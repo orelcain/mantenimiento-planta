@@ -11,7 +11,11 @@ import {
   horaCalzaEnTurno,
   terminoAhora,
   TOPE_TERMINO_AHORA_MIN,
+  horaMasMinutos,
+  horaInicioNuevoEvento,
+  turnoEnCurso,
 } from '../turnoMantencion'
+import { DURACIONES_SUGERIDAS_MIN } from '../../../config/bitacora'
 import { fuePendiente, minutosParadaDe, ordenarEventos, resumirBitacora } from '../resumenBitacora'
 import { minutosDesdeInicioTurno } from '../turnoMantencion'
 import { bandaDeCelda, nombreCorto, normalizarFechaCalendario, tecnicosDelCalendario, tecnicosDeTurno } from '../tecnicosDeTurno'
@@ -279,8 +283,9 @@ describe('correo de la bitácora', () => {
       ...base,
       eventos: [ev({ fotos: [{ url: 'https://x/a.jpg', path: 'p', etiqueta: 'despues', ancho: 1600, alto: 1200 }, { url: 'https://x/b.jpg', path: 'p', etiqueta: 'antes', ancho: 1200, alto: 1600 }] })],
     })
-    expect(html).toContain('width="260" height="195"')
-    expect(html).toContain('width="260" height="347"')
+    // 156 px: dos por fila caben en un teléfono (ver ANCHO_FOTO).
+    expect(html).toContain('width="156" height="117"')
+    expect(html).toContain('width="156" height="208"')
     // "Antes" sale primero aunque se haya cargado después.
     expect(html.indexOf('b.jpg')).toBeLessThan(html.indexOf('a.jpg'))
   })
@@ -316,7 +321,7 @@ describe('correo de la bitácora', () => {
   it('incluye la observación general escapada y con saltos de línea', () => {
     const html = bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: 'Planta sin agua caliente <2 h>\nSe avisó a jefatura' })
     // Título de sección y el texto en recuadro, escapado y con saltos (correo 17-09).
-    expect(html).toContain('Observaciones del turno</div>')
+    expect(html).toContain('Observaciones del turno</b></small></div>')
     expect(html).toContain('Planta sin agua caliente &lt;2 h&gt;<br>Se avisó a jefatura</div>')
     expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: '   ' })).not.toContain('Observaciones del turno')
     expect(bitacoraATextoPlano({ ...base, eventos: [ev({})], observacion: 'Sin novedad' })).toContain('Observaciones del turno: Sin novedad')
@@ -419,9 +424,47 @@ describe('«Terminó ahora» solo cuando es verdad (18-09-2026)', () => {
     expect(terminoAhora('2026-09-17_noche', '23:55', a(17, 0, 10))).toEqual({ disponible: true, hora: '00:10', minutos: 15 })
   })
 
+  it('«¿Cuánto duró?» pone el término desde el inicio, también cruzando medianoche', () => {
+    expect(horaMasMinutos('11:00', 20)).toBe('11:20')
+    expect(horaMasMinutos('23:50', 20)).toBe('00:10')
+    expect(horaMasMinutos('9:05', 60)).toBe('10:05')
+    expect(horaMasMinutos('', 5)).toBeNull()
+    // Invariante del chip marcado: la duración que se lee de vuelta es la elegida.
+    for (const inicio of ['10:00', '23:55', '00:00']) {
+      for (const n of DURACIONES_SUGERIDAS_MIN) expect(minutosEntre(inicio, horaMasMinutos(inicio, n))).toBe(n)
+    }
+  })
+
   it('sin inicio, turno futuro o id inválido: no se ofrece', () => {
     expect(terminoAhora('2026-09-17_tarde', '', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'sin-inicio' })
     expect(terminoAhora('2026-09-18_dia', '09:00', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'otro-turno' })
     expect(terminoAhora('basura', '09:00', a(17, 22, 0))).toEqual({ disponible: false, motivo: 'otro-turno' })
+  })
+})
+
+describe('la hora de Inicio de un evento NUEVO no se rellena con un dato falso (19-09-2026)', () => {
+  const dia17 = turnoDesdeId('2026-09-17_dia')!
+  const a = (dia: number, h: number, m: number) => new Date(2026, 8, dia, h, m, 0, 0)
+
+  it('turnoEnCurso: dentro de la ventana, ni antes ni después', () => {
+    expect(turnoEnCurso(dia17, a(17, 8, 0))).toBe(true)
+    expect(turnoEnCurso(dia17, a(17, 15, 59))).toBe(true)
+    expect(turnoEnCurso(dia17, a(17, 16, 0))).toBe(false)
+    expect(turnoEnCurso(dia17, a(17, 7, 59))).toBe(false)
+  })
+
+  it('turno en curso: se sugiere la hora de ahora, igual que antes', () => {
+    expect(horaInicioNuevoEvento(dia17, a(17, 11, 0))).toBe('11:00')
+  })
+
+  it('turno YA CERRADO: queda vacío, no el inicio del turno (antes daba «08:00»)', () => {
+    // Caso real: TOLVA GENERAL RILES, cargada a las 18:55 con el turno de día
+    // (08:00-16:00) ya terminado. Antes del fix, esto habría calculado una
+    // parada de 3 h 20 min en vez de los 20 min reales.
+    expect(horaInicioNuevoEvento(dia17, a(17, 18, 55))).toBe('')
+  })
+
+  it('turno todavía no empieza: también vacío (no adelanta su propio inicio)', () => {
+    expect(horaInicioNuevoEvento(dia17, a(17, 6, 0))).toBe('')
   })
 })

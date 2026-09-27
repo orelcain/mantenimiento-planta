@@ -19,8 +19,10 @@ import {
   collection,
   collectionGroup,
   doc,
+  getDoc,
   getDocs,
   setDoc,
+  writeBatch,
   addDoc,
   updateDoc,
   query,
@@ -38,6 +40,7 @@ import { useAuthStore } from '@/store'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import type { MaterialClase } from '@/types/repuestos'
+import { conTotalesPorSap, diferencia, type PlanAjuste } from '@/utils/repuestos/inventarioTabla'
 
 // ══════════════════════════════════════════════
 //  TIPOS
@@ -85,6 +88,8 @@ export interface BodegaMergedItem {
   nombresComunes?: string[]
   /** Slugs de máquina para las que este repuesto es "común" (marca compartida). */
   comunEn?: string[]
+  /** Cuántas lleva la máquina (BOM de SAP PM). Informa al solicitar; no manda la cantidad. */
+  cantidadPorMaquina?: number
   tipo?: string
   /** Clase del material (maestro unificado): repuesto·insumo·herramienta·… */
   clase?: MaterialClase
@@ -181,6 +186,64 @@ export interface InventarioSesion {
   conDiferencia: number
   createdAt: Date
   closedAt?: Date
+  /** 'maquina' = conteo físico de la bodega de UNA máquina, cargado desde el
+   *  cuaderno: cada línea lleva ubicación y código de fabricante, y puede no
+   *  tener SAP todavía. Sin tipo = inventario periódico clásico (por SAP). */
+  tipo?: 'periodico' | 'maquina'
+  maquina?: string
+  /** Líneas que aún esperan confirmación (código, cantidad o SAP). */
+  dudosos?: number
+  /** Unidades contadas en total. */
+  unidades?: number
+  /** Ya se llevó (al menos una vez) el stock de bodega a lo contado. */
+  ajustado?: boolean
+}
+
+/** Por qué una línea del inventario por máquina quedó en "Dudosos". */
+export type MotivoDuda = 'codigo' | 'cantidad' | 'sap' | 'sin_sap'
+
+/**
+ * Una línea del inventario por máquina (subcolección `conteos`, id propio:
+ * el mismo SAP puede aparecer en dos ubicaciones y una línea puede no tener SAP).
+ */
+export interface InventarioLinea {
+  id: string
+  ubicacion: string
+  /** Código de fabricante vigente (el corregido, si se validó otro). */
+  codigoFabricante: string
+  /** Lo que decía el cuaderno, tal cual: nunca se pisa. */
+  codigoCuaderno: string
+  codigoSAP: string
+  textoBreve: string
+  descripcion: string
+  nombreComun: string
+  cantidad: number | null
+  stockSistema: number | null
+  notaCuaderno: string
+  estado: 'validado' | 'dudoso'
+  motivo?: MotivoDuda
+  detalleDuda?: string
+  sugerencia?: string
+  validadoPorNombre?: string
+  validadoAt?: Date
+  /** Cantidad que ya se llevó al stock de bodega (null/undefined = pendiente).
+   *  Si se recuenta y cambia, la línea vuelve a quedar pendiente. */
+  aplicadoCantidad?: number | null
+  /** Stock que decía el sistema ANTES del ajuste: la evidencia de cuánto no cuadraba. */
+  stockSistemaAntes?: number | null
+  aplicadoAt?: Date
+  /** El nombre es PROVISIONAL (del despiece/catálogo): falta confirmarlo con SAP. */
+  nombrePendiente?: boolean
+  /** Ficha del maestro donde vive el nombre (por si su ID no es el SAP). */
+  fichaId?: string
+  /** false = esa ficha todavía no tiene el SAP escrito: al confirmar se completa. */
+  sapEnFicha?: boolean
+  /** Derivado (no se guarda): si el mismo SAP está en varias líneas, lo
+   *  contado entre TODAS. El stock del sistema es por SAP, así que la
+   *  diferencia se mide contra este total, no contra la línea sola. */
+  contadoSap?: number
+  /** Derivado: en cuántas líneas está ese SAP (solo si son más de una). */
+  lineasSap?: number
 }
 
 export interface InventarioConteo {
@@ -378,6 +441,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         alias: rep.alias,
         nombresComunes: Array.isArray(rep.nombresComunes) ? rep.nombresComunes : undefined,
         comunEn: Array.isArray(rep.comunEn) ? rep.comunEn : undefined,
+        cantidadPorMaquina: typeof rep.cantidadPorMaquina === 'number' && rep.cantidadPorMaquina > 0 ? rep.cantidadPorMaquina : undefined,
         tipo: rep.tipo,
         clase: rep.clase,
         tieneSap: rep.tieneSap ?? !!sap,
@@ -682,6 +746,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         totalItems: data.totalItems ?? 0, contados: data.contados ?? 0,
         conDiferencia: data.conDiferencia ?? 0,
         createdAt: tsToDate(data.createdAt), closedAt: data.closedAt ? tsToDate(data.closedAt) : undefined,
+        tipo: data.tipo === 'maquina' ? 'maquina' : 'periodico',
+        maquina: data.maquina, dudosos: data.dudosos, unidades: data.unidades, ajustado: !!data.ultimoAjuste,
       }
     })
   }, [])
@@ -731,6 +797,200 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     const conDiferencia = allConteos.filter(c => c.stockFisico !== null && c.diferencia !== 0).length
     await updateDoc(doc(db, INVENTARIO_COL, inventarioId), { contados, conDiferencia })
   }, [loadConteos])
+
+  // ── Inventario por máquina ──
+
+  const loadLineas = useCallback(async (inventarioId: string): Promise<InventarioLinea[]> => {
+    const snap = await getDocs(collection(db, INVENTARIO_COL, inventarioId, 'conteos'))
+    return snap.docs.map(d => {
+      const x = d.data()
+      return {
+        id: d.id,
+        ubicacion: x.ubicacion || '',
+        codigoFabricante: x.codigoFabricante || '',
+        codigoCuaderno: x.codigoCuaderno || x.codigoFabricante || '',
+        codigoSAP: x.codigoSAP || '',
+        textoBreve: x.textoBreve || '',
+        descripcion: x.descripcion || '',
+        nombreComun: x.nombreComun || '',
+        cantidad: typeof x.cantidad === 'number' ? x.cantidad : null,
+        stockSistema: typeof x.stockSistema === 'number' ? x.stockSistema : null,
+        notaCuaderno: x.notaCuaderno || '',
+        estado: x.estado === 'dudoso' ? 'dudoso' : 'validado',
+        motivo: x.motivo,
+        detalleDuda: x.detalleDuda,
+        sugerencia: x.sugerencia,
+        validadoPorNombre: x.validadoPorNombre,
+        validadoAt: x.validadoAt ? tsToDate(x.validadoAt) : undefined,
+        aplicadoCantidad: typeof x.aplicadoCantidad === 'number' ? x.aplicadoCantidad : null,
+        stockSistemaAntes: typeof x.stockSistemaAntes === 'number' ? x.stockSistemaAntes : x.stockSistemaAntes === null ? null : undefined,
+        aplicadoAt: x.aplicadoAt ? tsToDate(x.aplicadoAt) : undefined,
+        nombrePendiente: !!x.nombrePendiente,
+        fichaId: x.fichaId || undefined,
+        sapEnFicha: x.sapEnFicha === false ? false : undefined,
+      }
+    })
+  }, [])
+
+  /**
+   * Confirma una línea (o corrige una ya validada): queda validada con el
+   * código, cantidad y SAP que se indiquen. El código del cuaderno no se toca:
+   * así siempre se ve qué decía el papel y qué se confirmó.
+   */
+  const validarLinea = useCallback(async (
+    inventarioId: string,
+    lineaId: string,
+    datos: { codigoFabricante: string; cantidad: number; codigoSAP: string; textoBreve: string; descripcion?: string; stockSistema: number | null },
+    userId: string,
+    userName: string,
+  ) => {
+    await updateDoc(doc(db, INVENTARIO_COL, inventarioId, 'conteos', lineaId), {
+      codigoFabricante: datos.codigoFabricante.trim(),
+      cantidad: datos.cantidad,
+      stockFisico: datos.cantidad,
+      codigoSAP: datos.codigoSAP.trim(),
+      textoBreve: datos.textoBreve,
+      ...(datos.descripcion !== undefined ? { descripcion: datos.descripcion } : {}),
+      stockSistema: datos.stockSistema,
+      diferencia: datos.stockSistema != null ? datos.cantidad - datos.stockSistema : 0,
+      estado: 'validado',
+      validadoPor: userId,
+      validadoPorNombre: userName,
+      validadoAt: serverTimestamp(),
+    })
+    // Los totales de la sesión se recalculan de las líneas (son ~150: barato).
+    const lineas = await loadLineas(inventarioId)
+    await updateDoc(doc(db, INVENTARIO_COL, inventarioId), {
+      dudosos: lineas.filter(l => l.estado === 'dudoso').length,
+      unidades: lineas.reduce((a, l) => a + (l.cantidad ?? 0), 0),
+      contados: lineas.filter(l => l.cantidad != null).length,
+      // Mismo criterio que la tabla: un SAP en varias líneas se compara por su total.
+      conDiferencia: conTotalesPorSap(lineas).filter(l => { const d = diferencia(l); return d != null && d !== 0 }).length,
+    })
+  }, [loadLineas])
+
+  /**
+   * Lleva el stock de bodega a lo contado en un inventario por máquina.
+   * Por cada SAP que cambia: actualiza `bodega/{sap}.stockActual` (o crea la
+   * ficha con la ubicación del inventario si no existía) y deja un movimiento
+   * de AJUSTE con "sistema X → contado Y" para poder auditarlo. Las líneas
+   * quedan marcadas como aplicadas y guardan cuánto decía el sistema ANTES:
+   * esa es la evidencia de cuánto no cuadraba. Se puede volver a correr: el
+   * plan (planDeAjuste) solo trae lo pendiente.
+   */
+  const aplicarAjusteInventario = useCallback(async (
+    sesion: InventarioSesion,
+    lineas: InventarioLinea[],
+    plan: PlanAjuste,
+    userId: string,
+    userName: string,
+    onProgreso?: (hechos: number, total: number) => void,
+  ): Promise<{ actualizados: number; creados: number; cuadran: number }> => {
+    let actualizados = 0, creados = 0, hechos = 0
+    const total = plan.cambian.length
+    for (const a of plan.cambian) {
+      const existing = bodegaOverlays.get(a.codigoSAP)
+      const donde = `${sesion.maquina ?? 'Bodega'} · ${a.ubicaciones.join(', ')}`
+      if (existing) {
+        await updateDoc(doc(db, BODEGA_COL, existing.id), {
+          stockActual: a.contado, updatedAt: serverTimestamp(), ultimoConteoAt: serverTimestamp(),
+        })
+        actualizados++
+      } else {
+        await setDoc(doc(db, BODEGA_COL, a.codigoSAP), {
+          codigoSAP: a.codigoSAP, stockActual: a.contado, stockMinimo: 0,
+          ubicacionBodega: donde, unidad: 'pzas', ...denormNombre(a.codigoSAP),
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ultimoConteoAt: serverTimestamp(),
+        })
+        creados++
+      }
+      const bid = existing?.id || a.codigoSAP
+      await addDoc(collection(db, BODEGA_COL, bid, 'movimientos'), {
+        bodegaItemId: bid, tipo: 'ajuste', cantidad: a.contado, stockResultante: a.contado,
+        motivo: `Inventario «${sesion.nombre}» (${donde}): sistema ${a.sistema ?? 'sin ficha'} → contado ${a.contado}`,
+        realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
+      })
+      onProgreso?.(++hechos, total)
+    }
+
+    // Marcar las líneas: aplicadas, con el stock de ANTES (solo la primera vez:
+    // un reconteo no debe borrar la evidencia original).
+    const porId = new Map(lineas.map(l => [l.id, l]))
+    const batch = writeBatch(db)
+    for (const a of [...plan.cambian, ...plan.cuadran]) {
+      for (const id of a.lineaIds) {
+        const l = porId.get(id)
+        if (!l) continue
+        batch.update(doc(db, INVENTARIO_COL, sesion.id, 'conteos', id), {
+          aplicadoCantidad: l.cantidad,
+          ...(l.stockSistemaAntes === undefined ? { stockSistemaAntes: a.sistema } : {}),
+          stockSistema: a.contado,
+          diferencia: 0,
+          aplicadoAt: serverTimestamp(),
+          aplicadoPor: userId,
+          aplicadoPorNombre: userName,
+        })
+      }
+    }
+    // La precisión de ANTES se guarda una sola vez (el primer ajuste): es el
+    // número que dice cuánto cuadraba el sistema antes del inventario.
+    const sesionRef = doc(db, INVENTARIO_COL, sesion.id)
+    const previa = (await getDoc(sesionRef)).data()
+    // Lo aplicado queda cuadrado (sistema = total contado del SAP): la diferencia
+    // que queda en la sesión es solo la de lo no aplicado.
+    const nuevoSistema = new Map([...plan.cambian, ...plan.cuadran].flatMap(a => a.lineaIds.map(id => [id, a.contado] as const)))
+    const tras = lineas.map(l => (nuevoSistema.has(l.id) ? { ...l, stockSistema: nuevoSistema.get(l.id)! } : l))
+    batch.update(sesionRef, {
+      conDiferencia: conTotalesPorSap(tras).filter(l => { const d = diferencia(l); return d != null && d !== 0 }).length,
+      ultimoAjuste: { actualizados, creados, cuadran: plan.cuadran.length, por: userName, at: serverTimestamp() },
+      ...(previa?.precisionAntes ? {} : {
+        precisionAntes: { conFicha: plan.conFicha, cuadraban: plan.cuadrabanConFicha, sinFicha: creados },
+      }),
+    })
+    await batch.commit()
+    await reloadBodega(true)
+    return { actualizados, creados, cuadran: plan.cuadran.length }
+  }, [bodegaOverlays, denormNombre, reloadBodega])
+
+  /**
+   * Confirma (o corrige) el nombre de SAP de un repuesto desde el inventario:
+   * lo escribe en su ficha del maestro, en la copia de bodega y en TODAS las
+   * líneas del inventario con ese SAP. Si la ficha todavía no tenía el SAP
+   * escrito (sapEnFicha === false), se completa en el mismo paso: quien
+   * confirma el nombre lo está leyendo en SAP con ese código.
+   */
+  const confirmarNombreRepuesto = useCallback(async (
+    inventarioId: string,
+    linea: InventarioLinea,
+    lineas: InventarioLinea[],
+    nombre: string,
+    userId: string,
+    userName: string,
+  ) => {
+    const n = nombre.trim()
+    if (!n) throw new Error('Escribe el nombre.')
+    const sap = linea.codigoSAP.trim()
+    if (!sap) throw new Error('Esta línea no tiene SAP.')
+    const batch = writeBatch(db)
+    batch.update(doc(db, 'repuestos', linea.fichaId || sap), {
+      textoBreve: n,
+      nombreProvisional: false,
+      nombreConfirmadoPor: userName,
+      nombreConfirmadoAt: serverTimestamp(),
+      ...(linea.sapEnFicha === false ? { codigoSAP: sap, tieneSap: true } : {}),
+      updatedAt: serverTimestamp(),
+    })
+    const enBodega = bodegaOverlays.get(sap)
+    if (enBodega) batch.update(doc(db, BODEGA_COL, enBodega.id), { textoBreve: n, updatedAt: serverTimestamp() })
+    for (const l of lineas.filter(x => x.codigoSAP === sap)) {
+      batch.update(doc(db, INVENTARIO_COL, inventarioId, 'conteos', l.id), {
+        textoBreve: n, nombrePendiente: false, sapEnFicha: true,
+        nombreConfirmadoPor: userId, nombreConfirmadoPorNombre: userName,
+      })
+    }
+    await batch.commit()
+    logger.info('Nombre de repuesto confirmado desde inventario', { sap, userId })
+  }, [bodegaOverlays])
 
   // Finalizar inventario — ajustar stock según conteo físico
   const finalizarInventario = useCallback(async (
@@ -916,5 +1176,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     loadConteos,
     registrarConteo,
     finalizarInventario,
+    loadLineas,
+    validarLinea,
+    aplicarAjusteInventario,
+    confirmarNombreRepuesto,
   }
 }

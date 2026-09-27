@@ -22,7 +22,8 @@ import { useAuthStore } from '@/store'
 import { toast } from '@/hooks/useToast'
 import { useAjustesTecnicos, useOpcionesEquipo } from '@/hooks/useListasBitacora'
 import { BITACORA_COLECCION, BITACORA_PLANTA, BITACORA_TURNOS_COLECCION, MAX_FOTOS_EVENTO, MAX_TIPO_OTRO, MAX_TITULO_EVENTO } from '@/config/bitacora'
-import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import type { FavoritosRepuestos, FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { normalizarRepuestos, resolverTipo } from '@/services/bitacora/presentacionEvento'
 import type { EventoBitacora, EventoBitacoraDatos, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import { ordenarEventos } from '@/services/bitacora/resumenBitacora'
@@ -32,9 +33,28 @@ import { borrarFotoOEncolar, type subirFotoBitacora } from '@/services/bitacora/
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
 import { usePresenciaBitacora } from '@/hooks/usePresenciaBitacora'
+import { logger } from '@/lib/logger'
 
 /** Cuánto dura la marca «Nuevo» de un evento que entró solo, si nadie lo abre. */
 const MARCA_NUEVO_MS = 90_000
+
+/**
+ * WEB_PWA_APPLE (Safari borra los datos del sitio menos usado cuando falta espacio):
+ * sin `persist()`, los cambios pendientes que quedan en IndexedDB con mala señal en
+ * planta pueden desaparecer antes de sincronizar. Se pide una sola vez por sesión;
+ * el navegador decide solo (no hay diálogo que el técnico deba contestar).
+ */
+let pedidoPersistencia = false
+function pedirAlmacenamientoPersistente() {
+  if (pedidoPersistencia || typeof navigator === 'undefined' || !navigator.storage?.persist) return
+  pedidoPersistencia = true
+  void navigator.storage
+    .persist()
+    .then((concedido) => {
+      if (!concedido) logger.warn('Almacenamiento persistente no concedido: los cambios sin sincronizar podrían borrarse con poco espacio')
+    })
+    .catch(() => {})
+}
 
 /**
  * Cierra el pendiente que un evento nuevo acaba de resolver.
@@ -170,6 +190,10 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
   const turnoId = turno.id
 
   useEffect(() => {
+    pedirAlmacenamientoPersistente()
+  }, [])
+
+  useEffect(() => {
     setCargando(true)
     setCrudos([])
     setNovedad(null)
@@ -303,6 +327,8 @@ export function useBitacoraTurno(turno: TurnoMantencion) {
         fotos,
         participantes: [...new Set(datos.participantes.map((p) => p.trim()).filter(Boolean))].slice(0, 12),
         equipoId: datos.equipoId || null,
+        // De qué inspección de planta y de qué punto de su pauta salió esta desviación.
+        inspeccion: datos.inspeccion ? { id: datos.inspeccion.id, criterioId: datos.inspeccion.criterioId } : null,
         estado,
         dispositivo: dispositivoActual(),
       }
@@ -723,6 +749,15 @@ export interface FuenteBitacora {
   subirFoto?: typeof subirFotoBitacora
   /** Reemplaza las lecturas del maestro de repuestos. */
   repuestos?: FuenteRepuestos
+  /** Los favoritos de repuestos del usuario (la estrella del buscador). */
+  useFavoritosRepuestos: () => FavoritosRepuestos
+}
+
+/** Los mismos «Mis favoritos» de Repuestos y del Centro Técnico: marcar aquí se ve allá. */
+function useFavoritosRepuestosFirestore(): FavoritosRepuestos {
+  const uid = useAuthStore((s) => s.user?.id)
+  const { favKeys, toggleFav } = useRepuestoFavoritos(uid)
+  return useMemo(() => ({ claves: favKeys, alternar: toggleFav }), [favKeys, toggleFav])
 }
 
 export const FUENTE_FIRESTORE: FuenteBitacora = {
@@ -734,4 +769,5 @@ export const FUENTE_FIRESTORE: FuenteBitacora = {
   useOpcionesEquipo,
   usePresencia: usePresenciaBitacora,
   useBorradoresAnteriores,
+  useFavoritosRepuestos: useFavoritosRepuestosFirestore,
 }

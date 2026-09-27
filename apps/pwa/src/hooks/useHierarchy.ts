@@ -80,8 +80,15 @@ async function getNodeCached(id: string): Promise<HierarchyNode | null> {
  * Hook principal: obtener árbol completo jerárquico
  * Con sincronización automática cada 30 segundos
  */
-export function useHierarchyTree(options?: { includeInactive?: boolean }) {
+/**
+ * Árbol de equipos. `vigilarCambios` prende el sondeo que avisa «hay datos nuevos»: solo lo
+ * pide la página de Jerarquía. Antes corría cada 30 s en TODAS las pantallas que usan el
+ * árbol (editor de líneas, CTD, repuestos…), gastando lecturas que nadie miraba — y además
+ * fallaba siempre: la consulta pedía un índice compuesto que no existe (19-09-2026).
+ */
+export function useHierarchyTree(options?: { includeInactive?: boolean; vigilarCambios?: boolean }) {
   const includeInactive = options?.includeInactive ?? false
+  const vigilarCambios = options?.vigilarCambios ?? false
   const [tree, setTree] = useState<HierarchyNodeWithChildren[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
@@ -170,20 +177,12 @@ export function useHierarchyTree(options?: { includeInactive?: boolean }) {
     if (!treeCache?.lastUpdate) return
     
     try {
+      // Un solo campo con rango y `limit(1)`: basta saber SI hay algo nuevo, y así usa el
+      // índice automático de Firestore (el filtro por `activo` exigía uno compuesto) y cuesta
+      // una lectura como mucho.
       const hierarchyRef = collection(db, 'hierarchy')
-      const q = includeInactive
-        ? query(
-            hierarchyRef,
-            where('actualizadoEn', '>', treeCache.lastUpdate),
-            orderBy('actualizadoEn', 'desc')
-          )
-        : query(
-            hierarchyRef,
-            where('activo', '==', true),
-            where('actualizadoEn', '>', treeCache.lastUpdate),
-            orderBy('actualizadoEn', 'desc')
-          )
-      
+      const q = query(hierarchyRef, where('actualizadoEn', '>', treeCache.lastUpdate), limit(1))
+
       const snapshot = await getDocs(q)
       if (snapshot.size > 0) {
         setHasUpdates(true)
@@ -202,14 +201,15 @@ export function useHierarchyTree(options?: { includeInactive?: boolean }) {
 
   useEffect(() => {
     loadTreeRef.current()
+    if (!vigilarCambios) return
 
-    // Polling cada 30 segundos para detectar cambios
+    // Cada 2 minutos: el árbol de equipos cambia de tanto en tanto, no cada medio minuto.
     const interval = setInterval(() => {
-      checkForUpdatesRef.current()
-    }, 30000)
+      void checkForUpdatesRef.current()
+    }, 120000)
 
     return () => clearInterval(interval)
-  }, [includeInactive])
+  }, [includeInactive, vigilarCambios])
 
   const refresh = () => {
     invalidateHierarchyCaches()

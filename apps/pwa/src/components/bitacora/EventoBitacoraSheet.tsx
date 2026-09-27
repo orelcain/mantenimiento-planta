@@ -1,11 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
-import { AlertTriangle, Check, Clock3, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Clock3, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { ActionSheet, Button, Sheet } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import {
   AUTOGUARDADO_MS,
   ETIQUETA_FOTO,
   CONTINGENCIAS_SUGERIDAS,
+  DURACIONES_SUGERIDAS_MIN,
   IMPACTOS,
   MAX_FOTOS_EVENTO,
   MAX_TIPO_OTRO,
@@ -50,19 +51,22 @@ import {
   formatoMinutos,
   horaCalzaEnTurno,
   horaDe,
+  horaInicioNuevoEvento,
+  horaMasMinutos,
   horarioTurno,
   horaSugeridaParaEvento,
   minutosEntre,
   terminoAhora,
   TOPE_TERMINO_AHORA_MIN,
+  turnoEnCurso as estaEnCurso,
   turnoDesdeId,
   turnoMantencionEn,
   turnosElegibles,
 } from '@/services/bitacora/turnoMantencion'
-import { etiquetaCodigoEquipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
+import { etiquetaCodigoEquipo, etiquetaTipo, limpiarTipo, normalizarRepuestos, normalizarTipo } from '@/services/bitacora/presentacionEvento'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { RepuestosUsados } from './RepuestosUsados'
-import type { FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
+import type { FavoritosRepuestos, FuenteRepuestos } from '@/services/bitacora/repuestosBitacora'
 import { fuenteRepuestosFirestore } from '@/services/bitacora/repuestosFirestore'
 
 interface Subida {
@@ -84,8 +88,15 @@ export interface EventoBitacoraSheetProps {
   sugerenciasTipo?: string[]
   /** Teléfono con pase de bitácora: registra siempre su técnico, sin elegir. */
   autorFijo?: string | null
+  /**
+   * Texto con el que nace la descripción de un evento NUEVO. Lo usa la inspección de planta
+   * al pasar una observación a la bitácora: lo ya escrito no se reescribe.
+   */
+  descripcionInicial?: string
   /** De dónde salen los repuestos (la vitrina usa uno de ejemplo). */
   fuenteRepuestos?: FuenteRepuestos
+  /** Estrella de favoritos en el buscador de repuestos; `null` la oculta (el pase). */
+  favoritosRepuestos?: FavoritosRepuestos | null
   /** El pase de bitácora no escribe en el maestro de repuestos (nombre común). */
   puedeEditarMaestro?: boolean
   /** `deTurno` = presentes del turno (botones rápidos); `todos` = lista de técnicos completa. */
@@ -192,7 +203,7 @@ function FilaInterruptor({
 // Estilo de control iOS: relleno suave, sin borde. 16 px en inputs para que
 // iOS no haga zoom al enfocar.
 const CAMPO =
-  'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+  'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
 const ETIQUETA_CAMPO = 'mb-1.5 block text-footnote text-muted-foreground'
 
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
@@ -202,7 +213,8 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={activo}
       className={[
-        'min-h-[44px] shrink-0 rounded-full px-4 text-footnote font-semibold transition-colors duration-150 motion-reduce:transition-none',
+        // min-w: un chip de un dígito («5») quedaba bajo los 44 px de ancho.
+        'min-h-[44px] min-w-[44px] shrink-0 rounded-full px-4 text-footnote font-semibold transition-colors duration-150 motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         activo ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/10 text-foreground hover:bg-muted-foreground/15',
       ].join(' ')}
@@ -220,7 +232,9 @@ export function EventoBitacoraSheet({
   sugerenciasEquipo,
   sugerenciasTipo = [],
   autorFijo = null,
+  descripcionInicial = '',
   fuenteRepuestos = fuenteRepuestosFirestore,
+  favoritosRepuestos = null,
   puedeEditarMaestro = true,
   tecnicos,
   opcionesEquipo,
@@ -242,7 +256,8 @@ export function EventoBitacoraSheet({
   const [turnoDestino, setTurnoDestino] = useState('')
   const campoId = useId()
   /** Al editar, «quién edita» va plegado en una línea; «Cambiar» muestra los chips (17-09). */
-  const [cambiarQuien, setCambiarQuien] = useState(false)
+  /** Fila abierta de la tarjeta de «quién»: lo que falta viene abierto al abrir la hoja. */
+  const [abierta, setAbierta] = useState<'tecnico' | 'participantes' | null>(null)
   /** Quién lo registró, editable en un evento ya publicado (se eligió mal o lo cargó otro). */
   const [registrador, setRegistrador] = useState('')
   const [participantes, setParticipantes] = useState<string[]>([])
@@ -289,6 +304,8 @@ export function EventoBitacoraSheet({
   const [subidas, setSubidas] = useState<Subida[]>([])
   const [guardando, setGuardando] = useState(false)
   const [confirmarSinFotos, setConfirmarSinFotos] = useState(false)
+  /** Foto(s) encima del bloque de Fotos, listas para soltar (HIG «Drag and drop»). */
+  const [arrastrandoFoto, setArrastrandoFoto] = useState(false)
   /** Cerrar un evento PUBLICADO con cambios sin guardar pide confirmación (HIG «Sheets»). */
   const [confirmarDescarte, setConfirmarDescarte] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -377,7 +394,8 @@ export function EventoBitacoraSheet({
     const quienInicial = autorFijo ?? (lista.length === 0 || lista.includes(recordado) ? recordado : '')
     setQuien(quienInicial)
     setTurnoDestino(evento?.turnoId ?? turno.id)
-    setCambiarQuien(false)
+    // El técnico que falta viene abierto (nuevo o borrador sin nombre); al editar uno publicado, cerrado.
+    setAbierta(!autorFijo && lista.length > 0 && !quienInicial && (!evento || evento.estado === 'borrador') ? 'tecnico' : null)
     setRegistrador(evento?.registradoPor ?? '')
     setParticipantes(evento?.participantes ?? [])
     // «Resolver pendiente»: el equipo, su vínculo y el tipo vienen del pendiente original.
@@ -388,11 +406,14 @@ export function EventoBitacoraSheet({
     setTipoOtro(evento?.tipoOtro ?? pendienteOrigen?.tipoOtro ?? '')
     setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? '')
     setTitulo(evento?.titulo ?? '')
-    setDescripcion(evento?.descripcion ?? '')
+    setDescripcion(evento?.descripcion ?? (evento ? '' : descripcionInicial))
     setSinHora(evento ? evento.horaInicio === '' : false)
     setPosicion(evento && evento.horaInicio === '' && typeof evento.posicionMin === 'number' ? String(evento.posicionMin) : '')
     // Un evento sin hora deja lista la hora sugerida por si se apaga «Sin hora».
-    setHoraInicio(evento?.horaInicio || horaSugeridaParaEvento(turno))
+    // `!evento` en vez de `esNuevo` (aunque sean lo mismo): así el linter de
+    // hooks ve la dependencia real (`evento`, ya en el arreglo) y no pide una
+    // extra por un valor derivado.
+    setHoraInicio(evento?.horaInicio || (!evento ? horaInicioNuevoEvento(turno) : horaSugeridaParaEvento(turno)))
     setHoraTermino(evento?.horaTermino ?? '')
     // Un evento que ya existe conserva lo suyo; uno nuevo nace sin responder.
     setImpacto(evento?.impacto ?? null)
@@ -420,7 +441,7 @@ export function EventoBitacoraSheet({
           repuestos: '[]',
           descripcion: '',
           contingencia: '',
-          horaInicio: horaSugeridaParaEvento(turno),
+          horaInicio: horaInicioNuevoEvento(turno),
           horaTermino: '',
           posicion: '',
           impacto: 'no-aplica',
@@ -445,12 +466,18 @@ export function EventoBitacoraSheet({
     setPorGuardar(false)
     setConflictos([])
     setEliminadoAfuera(false)
-  }, [open, evento, turno, pendienteOrigen, autorFijo])
+  }, [open, evento, turno, pendienteOrigen, autorFijo, descripcionInicial])
 
   const duracion = sinHora ? null : minutosEntre(horaInicio, horaTermino || null)
   /** «Terminó ahora» solo mientras corre el turno del evento y sin pasar de 2 h (18-09-2026). */
   const terminoSugerido = terminoAhora(turnoDestino || turno.id, horaInicio, ahora)
+  /** Se está cargando tarde: en vez de «Terminó ahora», «¿Cuánto duró?». */
+  const cargaTardia =
+    !terminoSugerido.disponible && (terminoSugerido.motivo === 'turno-terminado' || terminoSugerido.motivo === 'pasa-el-tope')
   const horaFaltante = !sinHora && !HORA_VALIDA.test(horaInicio)
+  // Mismo turno que decide «Terminó ahora» / «¿Cuánto duró?»: el elegido en el
+  // selector, y si no hay ninguno, el que se está mirando.
+  const turnoInicioCerrado = !estaEnCurso(turnoDesdeId(turnoDestino) ?? turno, ahora)
 
   // Lo que se guarda: el texto de «Otro» solo con ese tipo, y sin horas si es «Sin hora».
   const formularioActual = (): CamposFormulario => ({
@@ -524,7 +551,7 @@ export function EventoBitacoraSheet({
       fotos,
       fotosAntes: fotosServidor.current,
       cierreAntes: (eventoVivo ?? evento)?.cierre ?? null,
-      quien,
+      quien: autorEditable ? quien.trim() || registrador.trim() || registradoEnServidor : quien,
       resuelvePendiente: pendienteOrigen ? copiaDeOrigen(pendienteOrigen) : null,
       // Quien registra no se repite como participante (pudo quedar marcado antes de elegirlo).
       participantes: participantes.filter((p) => p.trim().toLowerCase() !== quienRegistro.trim().toLowerCase()),
@@ -762,7 +789,21 @@ export function EventoBitacoraSheet({
     inputRef.current?.click()
   }
 
-  const alElegir = (lista: FileList | null) => {
+  /**
+   * Fotos sueltas o pegadas (HIG «Drag and drop» / «Entering data», 19-09-2026):
+   * en el PC, arrastrar desde el explorador o pegar del portapapeles es más
+   * rápido que ir a elegir archivo. Van con etiqueta «Foto» (la genérica): el
+   * técnico la cambia después si corresponde («Antes»/«Después» solo tienen
+   * sentido al elegirlas a propósito).
+   */
+  const alSoltarOPegar = (archivos: readonly File[]) => {
+    const imagenes = archivos.filter((a) => a.type.startsWith('image/'))
+    if (!imagenes.length) return
+    etiquetaPendiente.current = 'foto'
+    alElegir(imagenes)
+  }
+
+  const alElegir = (lista: FileList | readonly File[] | null) => {
     if (!lista?.length) return
     const libres = MAX_FOTOS_EVENTO - fotos.length - subidas.length
     const archivos = Array.from(lista).slice(0, Math.max(0, libres))
@@ -786,6 +827,24 @@ export function EventoBitacoraSheet({
     void subirEnTanda(nuevas)
     if (inputRef.current) inputRef.current.value = ''
   }
+
+  // Ctrl+V con una imagen, desde CUALQUIER lugar de la hoja abierta: el evento
+  // `paste` llega al elemento con foco (un campo, o la hoja misma), casi nunca al
+  // bloque de Fotos, así que se escucha en el documento. Solo actúa si el
+  // portapapeles trae imágenes: pegar texto en un campo sigue igual.
+  const alSoltarOPegarRef = useRef(alSoltarOPegar)
+  alSoltarOPegarRef.current = alSoltarOPegar
+  useEffect(() => {
+    if (!open) return
+    const alPegar = (e: ClipboardEvent) => {
+      const archivos = Array.from(e.clipboardData?.files ?? [])
+      if (!archivos.some((a) => a.type.startsWith('image/'))) return
+      e.preventDefault()
+      alSoltarOPegarRef.current(archivos)
+    }
+    document.addEventListener('paste', alPegar)
+    return () => document.removeEventListener('paste', alPegar)
+  }, [open])
 
   /**
    * Saca de la hoja una foto que todavía sube o que no va a subir nunca. Si
@@ -883,8 +942,9 @@ export function EventoBitacoraSheet({
     setError(null)
     // Con la cuenta compartida, sin esto no se sabría quién registró. Si el
     // calendario no cargó (sin lista), se guarda con el nombre de la cuenta.
-    if (tecnicos.todos.length > 0 && !quien.trim()) {
-      setError(esNuevo ? 'Elige quién registra el evento.' : 'Elige quién está editando.')
+    if (tecnicos.todos.length > 0 && !autorEditable && !quien.trim()) {
+      setError('Elige el técnico.')
+      setAbierta('tecnico')
       return
     }
     if (tipo === 'otro' && !limpiarTipo(tipoOtro)) {
@@ -997,19 +1057,53 @@ export function EventoBitacoraSheet({
   const rotuloSubiendo = enCola > 1 ? `Subiendo ${fotos.length + 1} de ${totalLote}…` : 'Subiendo la foto…' 
   // HIG «Entering data»: el botón se habilita recién con lo obligatorio (quién,
   // tipo, hora o «Sin hora», qué pasó). Lo mismo que valida `guardar`.
-  const faltaObligatorio =
-    (tecnicos.todos.length > 0 && !quien.trim()) ||
-    tipo == null ||
-    (tipo === 'otro' && !limpiarTipo(tipoOtro)) ||
-    horaFaltante ||
-    !descripcion.trim() ||
+  // Un botón desactivado no dice POR QUÉ: con guantes se lee como que la app se
+  // colgó. `faltantes` nombra cada campo y se muestra junto a Guardar, sin
+  // esperar a que se intente tocar el botón (19-09-2026).
+  // «Técnico»: en uno publicado es el autor (se corrige aquí); en uno nuevo o en un
+  // borrador, quien lo escribe. El «editado por» de uno publicado sale del nombre
+  // recordado en este teléfono, sin otra pregunta (19-09-2026).
+  const valorTecnico = autorEditable ? registrador || registradoEnServidor : quien
+  const filaQuien = (cual: 'tecnico' | 'participantes', rotulo: string, valor: string, falta: boolean) => (
+    <button
+      type="button"
+      aria-expanded={abierta === cual}
+      onClick={() => setAbierta(abierta === cual ? null : cual)}
+      className="relative flex min-h-[44px] w-full items-center gap-3 pl-3 pr-2 text-left before:absolute before:left-3 before:right-0 before:top-0 before:h-px before:bg-muted-foreground/25 before:content-[''] first:before:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+    >
+      <span className="flex-1 text-body">{rotulo}</span>
+      <span className={`min-w-0 max-w-[62%] truncate text-right text-body ${falta ? 'font-semibold text-ink-warn' : 'text-muted-foreground'}`}>
+        {falta ? 'Elige quién' : valor}
+      </span>
+      <ChevronRight
+        className={`size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none ${abierta === cual ? 'rotate-90' : ''}`}
+        aria-hidden
+      />
+    </button>
+  )
+  const faltantes = [
+    tecnicos.todos.length > 0 && !autorEditable && !quien.trim() ? 'Técnico' : null,
+    tipo == null ? 'Qué se hizo' : tipo === 'otro' && !limpiarTipo(tipoOtro) ? 'el tipo «Otro»' : null,
+    horaFaltante ? 'Inicio' : null,
+    !descripcion.trim() ? 'Qué pasó' : null,
     // Sin esta respuesta el turno no puede demostrar nada: el evento sale con
     // 0 min de parada y el MTTR queda en «—» (18-09-2026).
-    impacto == null
+    impacto == null ? 'Impacto' : null,
+  ].filter((x): x is string => x != null)
+  const faltaObligatorio = faltantes.length > 0
   // HIG «Buttons»: en una hoja, Return activa el botón primario. Solo en los
   // campos simples (hora, minutos): el buscador y los chips usan Enter para elegir.
   const enterGuarda = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !guardando && !faltaObligatorio) {
+      e.preventDefault()
+      void guardar()
+    }
+  }
+  // HIG «Keyboards»: en el PC, Cmd/Ctrl+Enter guarda desde CUALQUIER campo (incluido
+  // el textarea, donde Enter solo es normal para bajar de línea). Quien carga la
+  // bitácora al cierre del turno suele encadenar varios eventos seguidos desde ahí.
+  const cmdEnterGuarda = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !guardando && !faltaObligatorio) {
       e.preventDefault()
       void guardar()
     }
@@ -1030,6 +1124,7 @@ export function EventoBitacoraSheet({
     <Sheet
       open={open}
       onClose={cerrarHoja}
+      onKeyDown={cmdEnterGuarda}
       size="wide"
       title={
         pendienteOrigen && esNuevo
@@ -1041,21 +1136,26 @@ export function EventoBitacoraSheet({
               : 'Editar evento'
       }
       actions={
-        <>
-          <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
-            {modoBorrador ? 'Cerrar' : 'Cancelar'}
-          </Button>
-          <Button onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
-            {guardando ? <Loader2 className="animate-spin" /> : null}
-            {guardando
-              ? 'Guardando…'
-              : subiendo
-              ? rotuloSubiendo
-              : modoBorrador
-                ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
-                : 'Guardar'}
-          </Button>
-        </>
+        <div className="flex w-full flex-col gap-2.5">
+          {faltaObligatorio && !guardando && (
+            <p className="text-footnote font-semibold text-ink-warn">Falta completar: {faltantes.join(', ')}</p>
+          )}
+          <div className="flex gap-2.5 [&>*]:flex-1">
+            <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
+              {modoBorrador ? 'Cerrar' : 'Cancelar'}
+            </Button>
+            <Button onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
+              {guardando ? <Loader2 className="animate-spin" /> : null}
+              {guardando
+                ? 'Guardando…'
+                : subiendo
+                ? rotuloSubiendo
+                : modoBorrador
+                  ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
+                  : 'Guardar'}
+            </Button>
+          </div>
+        </div>
       }
     >
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
@@ -1166,100 +1266,94 @@ export function EventoBitacoraSheet({
 
         <div className="grid gap-5 md:grid-cols-2 md:gap-x-7">
         <div className="flex min-w-0 flex-col gap-5">
-        {/* Quién: con la cuenta compartida de Mantención es el único dato de autoría.
-            Con pase de bitácora es el dueño del pase, sin elegir. */}
-        {autorFijo && (
-          <p className="text-footnote text-muted-foreground">
-            {esNuevo ? 'Registra' : 'Edita'}: <span className="font-semibold text-foreground">{autorFijo}</span>
-            {!esNuevo && !autorEditable && evento && autorVisible(evento) !== autorFijo ? ` · lo empezó ${autorVisible(evento)}` : ''}
-          </p>
-        )}
-        {tecnicos.todos.length > 0 && !autorFijo && (
-          <div>
-            {/* Al editar, el nombre recordado casi nunca cambia: una línea en vez
-                de tres chips. Al crear, elegir quién registra es lo primero. */}
-            {!esNuevo && quien && tecnicos.todos.includes(quien) && !cambiarQuien ? (
-              <p className="flex min-h-[44px] flex-wrap items-center gap-x-1 text-footnote text-muted-foreground">
-                {modoBorrador ? 'Continúas como' : 'Editas como'} <span className="font-semibold text-foreground">{quien}</span> ·
-                <button
-                  type="button"
-                  className="min-h-[44px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  onClick={() => setCambiarQuien(true)}
-                >
-                  Cambiar
-                </button>
-              </p>
-            ) : (
-              <SelectorTecnico
-                etiqueta={esNuevo ? 'Quién registra' : modoBorrador ? 'Quién continúa' : 'Quién edita'}
-                deTurno={tecnicos.deTurno}
-                todos={tecnicos.todos}
-                valor={quien}
-                onChange={setQuien}
-              />
-            )}
-            {!esNuevo && !autorEditable && evento && (
-              <p className="mt-1.5 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
+        {/* Quién y dónde, en UNA tarjeta de filas (mockup aprobado 19-09-2026, como el
+            editor de eventos del Calendario de iOS): cada fila dice su valor y se abre
+            en su lugar; lo que falta viene abierto. «Quién edita» y «Quién lo registró»
+            eran dos preguntas para el mismo técnico (Orel): queda una, «Técnico» — el
+            autor. Si corrige otro, el «editado por» se toma del nombre que recuerda
+            este teléfono, sin preguntar. */}
+        <div className="flex flex-col gap-1.5">
+          <div className="overflow-hidden rounded-ctl bg-muted-foreground/10">
+            {autorFijo ? (
+              <div className="flex min-h-[44px] items-center gap-3 px-3">
+                <span className="flex-1 text-body">Técnico</span>
+                <span className="text-body text-muted-foreground">{autorFijo}</span>
+              </div>
+            ) : tecnicos.todos.length > 0 ? (
+              <>
+                {filaQuien('tecnico', 'Técnico', valorTecnico || (esNuevo || modoBorrador ? '' : autorVisible(evento!)), !valorTecnico && (esNuevo || modoBorrador))}
+                {abierta === 'tecnico' && (
+                  <div className="px-3 pb-3">
+                    <SelectorTecnico
+                      etiqueta="Técnico"
+                      sinEtiqueta
+                      deTurno={tecnicos.deTurno}
+                      todos={tecnicos.todos}
+                      valor={valorTecnico}
+                      onChange={(n) => {
+                        if (autorEditable) setRegistrador(n)
+                        else setQuien(n)
+                        setAbierta(null)
+                      }}
+                      recordar={!autorEditable}
+                      vacio="Elige al técnico"
+                    />
+                  </div>
+                )}
+              </>
+            ) : null}
+            <label
+              htmlFor={`${campoId}-turno`}
+              className="relative flex min-h-[44px] items-center justify-between gap-3 pl-3 pr-1 before:absolute before:left-3 before:right-0 before:top-0 before:h-px before:bg-muted-foreground/25 before:content-[''] first:before:hidden"
+            >
+              <span className="text-body">Turno</span>
+              <select
+                id={`${campoId}-turno`}
+                value={turnoDestino}
+                onChange={(e) => setTurnoDestino(e.target.value)}
+                className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {opcionesTurno.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {nombreTurnoCorto(t.id)}
+                    {t.id === turnoEnCurso.id ? ' · en curso' : ''}
+                    {t.id === origenPendienteId ? ' · del pendiente' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {tecnicos.todos.length > 0 && (
+              <>
+                {filaQuien('participantes', 'Participaron', participantes.length ? participantes.join(', ') : 'Nadie', false)}
+                {abierta === 'participantes' && (
+                  <div className="px-3 pb-3">
+                    <SelectorParticipantes
+                      sinEtiqueta
+                      presentes={tecnicos.deTurno}
+                      todos={tecnicos.todos}
+                      excluir={quienRegistro}
+                      valor={participantes}
+                      onChange={setParticipantes}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
-        )}
-        {/* Turno donde queda el evento: se corrige si se registró en otro
-            (p. ej. «Resolver» tocado al día siguiente). Últimos 7 días, nunca
-            uno futuro ni anterior al pendiente que cierra (17-09). */}
-        <div>
-          <label htmlFor={`${campoId}-turno`} className="flex min-h-[44px] items-center justify-between gap-3 rounded-ctl bg-muted-foreground/10 pl-3 pr-1">
-            <span className="text-body">Turno</span>
-            <select
-              id={`${campoId}-turno`}
-              value={turnoDestino}
-              onChange={(e) => setTurnoDestino(e.target.value)}
-              className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-[16px] font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {opcionesTurno.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {nombreTurnoCorto(t.id)}
-                  {t.id === turnoEnCurso.id ? ' · en curso' : ''}
-                  {t.id === origenPendienteId ? ' · del pendiente' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          {modoBorrador && evento && autorVisible(evento) !== quien && (
+            <p className="px-3 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
+          )}
+          {autorEditable && evento && registrador && registrador !== registradoEnServidor && (
+            <p className="px-3 text-footnote text-muted-foreground">Hoy figura: {autorVisible(evento)}. Al guardar queda {registrador}.</p>
+          )}
           {turnoDestino !== turno.id && (
-            <p className="mt-1.5 text-footnote text-muted-foreground">
+            <p className="px-3 text-footnote text-muted-foreground">
               Al {modoBorrador || esNuevo ? 'publicar' : 'guardar'}, el evento pasa al {etiquetaCortaTurno(turnoDestino).toLowerCase()}
               {turnoDesdeId(turnoDestino) ? ` (${horarioTurno(turnoDesdeId(turnoDestino)!)})` : ''}
               {origenPendienteId ? ' y el pendiente queda resuelto ahí' : ''}.
             </p>
           )}
         </div>
-
-        {/* Publicado: quién lo registró se corrige aquí (también desde el pase);
-            quien corrige queda como «editado por». No se recuerda como «mi nombre». */}
-        {autorEditable && tecnicos.todos.length > 0 && (
-          <div>
-            <SelectorTecnico
-              etiqueta="Quién lo registró"
-              deTurno={tecnicos.deTurno}
-              todos={tecnicos.todos}
-              valor={registrador}
-              onChange={setRegistrador}
-              recordar={false}
-              vacio="Elige al técnico"
-            />
-            {evento && registrador && !tecnicos.todos.includes(registrador) && (
-              <p className="mt-1.5 text-footnote text-muted-foreground">Hoy figura: {autorVisible(evento)}</p>
-            )}
-          </div>
-        )}
-        {tecnicos.todos.length > 0 && (
-          <SelectorParticipantes
-            presentes={tecnicos.deTurno}
-            todos={tecnicos.todos}
-            excluir={quienRegistro}
-            valor={participantes}
-            onChange={setParticipantes}
-          />
-        )}
 
         {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de
             arriba. Los 8 a la vista (en filas): deslizando, «Novedad» no se veía. */}
@@ -1277,6 +1371,14 @@ export function EventoBitacoraSheet({
                 {t.id === 'otro' ? 'Otro…' : t.label}
               </Chip>
             ))}
+            {/* Un evento guardado con un tipo que ya no se ofrece («Falla», antes del
+                18-09) se abría sin ningún chip marcado: parecía faltar el dato. Se
+                muestra marcado; tocar otro lo cambia (pasada visual 19-09-2026). */}
+            {tipo != null && !TIPOS_EVENTO.some((t) => t.id === tipo) && (
+              <Chip activo onClick={() => undefined}>
+                {etiquetaTipo({ tipo, tipoOtro: null })} (anterior)
+              </Chip>
+            )}
           </div>
           {tipo === 'otro' && (
             <div className="mt-3 flex flex-col gap-2">
@@ -1356,7 +1458,10 @@ export function EventoBitacoraSheet({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>Inicio</label>
+                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>
+                    Inicio
+                    {horaFaltante && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+                  </label>
                   {/* HIG «Pickers»: minutos de 5 en 5, que con guantes se acierta. */}
                   <input id="bitacora-inicio" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} onKeyDown={enterGuarda} />
                 </div>
@@ -1365,6 +1470,12 @@ export function EventoBitacoraSheet({
                   <input id="bitacora-termino" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} onBlur={validarTermino} onKeyDown={enterGuarda} />
                 </div>
               </div>
+              {/* El «08:00» de un turno cerrado se leía como un dato real y nadie lo
+                  revisaba (medido 19-09-2026: 27% de los eventos se carga así). Ahora
+                  el campo nace vacío y esto explica por qué. */}
+              {horaFaltante && turnoInicioCerrado && (
+                <p className="-mt-1 text-footnote text-muted-foreground">Ese turno ya terminó: escribe la hora en que empezó de verdad.</p>
+              )}
               {/* Sin término no hay minutos de parada: 17 de 22 eventos reales se
                   guardaron sin él (18-09-2026). Un toque lo cierra con la hora
                   de ahora, que es la que corresponde al salir de la máquina —
@@ -1383,12 +1494,30 @@ export function EventoBitacoraSheet({
                   </span>
                 </button>
               )}
-              {!horaTermino && !terminoSugerido.disponible && (terminoSugerido.motivo === 'turno-terminado' || terminoSugerido.motivo === 'pasa-el-tope') && (
-                <p className="-mt-1 text-footnote text-muted-foreground">
-                  {terminoSugerido.motivo === 'turno-terminado'
-                    ? 'Ese turno ya terminó: escribe la hora en que terminó.'
-                    : `Empezó hace más de ${TOPE_TERMINO_AHORA_MIN / 60} horas: escribe la hora en que terminó.`}
-                </p>
+              {/* Cargando tarde, «ahora» ya no es el término: un toque en la
+                  duración lo calcula desde el inicio. Sigue a la vista con el
+                  término puesto, para poder corregir la elección. */}
+              {cargaTardia && (
+                <div className="-mt-1">
+                  <p id="bitacora-cuanto-duro" className={ETIQUETA_CAMPO}>
+                    ¿Cuánto duró?
+                    <span className="sr-only">
+                      {terminoSugerido.motivo === 'turno-terminado'
+                        ? ' Ese turno ya terminó.'
+                        : ` Empezó hace más de ${TOPE_TERMINO_AHORA_MIN / 60} horas.`}
+                    </span>
+                  </p>
+                  <div role="group" aria-labelledby="bitacora-cuanto-duro" className="flex flex-wrap gap-2">
+                    {DURACIONES_SUGERIDAS_MIN.map((n, i) => (
+                      <Chip key={n} activo={duracion === n} onClick={() => setHoraTermino(horaMasMinutos(horaInicio, n) ?? '')}>
+                        <span className="tabular-nums">
+                          {n}
+                          {i === DURACIONES_SUGERIDAS_MIN.length - 1 ? ' min' : <span className="sr-only"> minutos</span>}
+                        </span>
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
               )}
               {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
             </>
@@ -1397,11 +1526,14 @@ export function EventoBitacoraSheet({
 
         {/* Qué pasó */}
         <div>
-          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>Observaciones · qué pasó y qué se hizo</label>
+          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>
+            Observaciones · qué pasó y qué se hizo
+            {!descripcion.trim() && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+          </label>
           <textarea
             id="bitacora-descripcion"
             maxLength={3000}
-            className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             placeholder="Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío."
@@ -1410,7 +1542,7 @@ export function EventoBitacoraSheet({
 
         </div>
         <div className="flex min-w-0 flex-col gap-5">
-        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} />
+        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} favoritos={favoritosRepuestos} />
 
         {/* Impacto en producción */}
         <div>
@@ -1513,8 +1645,26 @@ export function EventoBitacoraSheet({
         </div>
 
         {/* Fotos */}
-        <div>
+        <div
+          onDragOver={(e) => {
+            // Sin preventDefault el navegador no deja soltar (HIG «Drag and drop»).
+            e.preventDefault()
+            setArrastrandoFoto(true)
+          }}
+          onDragLeave={(e) => {
+            // `dragleave` también salta al pasar sobre un hijo del bloque: sin
+            // este filtro el borde punteado parpadea mientras se arrastra.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastrandoFoto(false)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setArrastrandoFoto(false)
+            alSoltarOPegar(Array.from(e.dataTransfer.files))
+          }}
+          className={arrastrandoFoto ? 'rounded-ctl border-2 border-dashed border-primary/60' : 'border-2 border-dashed border-transparent'}
+        >
           <span className={ETIQUETA_CAMPO}>Fotos</span>
+          {arrastrandoFoto && <p className="mb-1.5 text-footnote text-muted-foreground">Suelta las fotos aquí</p>}
           <input
             ref={inputRef}
             type="file"
@@ -1527,7 +1677,14 @@ export function EventoBitacoraSheet({
             <div className="mb-3 grid grid-cols-3 gap-2">
               {fotos.map((f) => (
                 <figure key={f.path} className="relative m-0">
-                  <img src={f.url} alt={ETIQUETA_FOTO[f.etiqueta]} className="aspect-square w-full rounded-ctl bg-muted-foreground/10 object-cover" />
+                  {/* Ronda 47: la miniatura de 320 px, no la original de 1.600 px — este
+                      grid ya la pinta a ~110 px, y bajar la foto entera se paga en la red
+                      de planta por cada foto del editor, otra vez. */}
+                  <img
+                    src={f.thumbUrl ?? f.url}
+                    alt={ETIQUETA_FOTO[f.etiqueta]}
+                    className="aspect-square w-full rounded-ctl bg-muted-foreground/10 object-cover"
+                  />
                   <figcaption className="pt-1 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
                   <button
                     type="button"
@@ -1547,14 +1704,16 @@ export function EventoBitacoraSheet({
                     <>
                       <AlertTriangle className="size-5 text-ink-warn" aria-hidden />
                       <span className="text-caption text-muted-foreground">{s.error}</span>
-                      <span className="flex items-center gap-2">
-                        <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-primary">
+                      {/* min-h-44: piso táctil del HIG (accessibility); con guantes, «Reintentar»
+                          es el botón que más se toca justo cuando la red de planta ya falló. */}
+                      <span className="flex items-center gap-3">
+                        <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-primary">
                           <RotateCw className="size-3.5" /> Reintentar
                         </button>
                         {/* Sin esto, una foto que nunca va a subir (un HEIC, por
                             ejemplo) obligaba a cancelar el evento entero para
                             sacarla y se perdía todo lo escrito (revisión 15-09). */}
-                        <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                        <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
                           <X className="size-3.5" /> Quitar
                         </button>
                       </span>
@@ -1563,7 +1722,7 @@ export function EventoBitacoraSheet({
                     <>
                       <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
                       <span className="text-caption text-muted-foreground">Subiendo {ETIQUETA_FOTO[s.etiqueta].toLowerCase()}…</span>
-                      <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[32px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                      <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
                         <X className="size-3.5" /> Quitar
                       </button>
                     </>

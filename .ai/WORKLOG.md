@@ -11,6 +11,41 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-09-23 · Claude · Correo de bitácora: dos bloques y eventos en tabla (ronda 5)
+- Hecho: la bitácora abre con su propia banda azul («Bitácora de Mantención · Planta»), la misma de la planilla, y entre los dos bloques va aire + raya de tinta. Cada evento es una tabla propia con cabecera celeste (número · equipo · hora a la derecha) y el desglose debajo (tipo y N° de equipo, impacto, texto, repuestos, técnicos, fotos). Opción A del mockup elegida por Orel.
+- Archivos: services/bitacora/bitacoraCorreo.ts + 3 tests (estandar, repuestosEvento, whatsappYEvento).
+- Verificación: vitest 306/306, tsc, eslint; render Playwright a 760 px normal, «aplanado» simulado y 375 px (el desglose mide 350 px con dos fotos: cabe en el teléfono).
+- Estado: EN REVISIÓN (PR)
+- Sigue: test 5 de Orel desde el PC del trabajo.
+
+## 2026-09-23 · Claude · Correo de bitácora: pulido de estructura (ronda 4)
+- Hecho: cinco ajustes para que cada elemento quede separado y legible en cualquier compositor. Planilla MTTR: «Falla» se corta en palabra completa y «Observaciones» dice solo qué se hizo y si quedó pendiente (los repuestos con SAP y el impacto se leen en el detalle). Rótulo de foto solo cuando es Antes/Después. Evento sin equipo ni título ya no repite el tipo («Mejora / Mejora»). Filete sobre el rótulo de cada sección (aguanta el pegado que aplana). Línea «MTTR x · MTBF y» en negrita antes de la explicación.
+- Archivos: services/bitacora/{documentoCorreo,bitacoraCorreo,recoleccionMttr}.ts + recoleccionMttr.test.ts.
+- Verificación: vitest 306/306, tsc, eslint; render normal y «aplanado» simulado lado a lado.
+- Estado: EN REVISIÓN (PR)
+- Sigue: test 5 de Orel desde el PC del trabajo. Descartado: 3 fotos por fila en PC (3×156 supera los 351 px del teléfono).
+
+## 2026-09-23 · Claude · Correo de bitácora: jerarquía que sobrevive al pegado que aplana
+- Hecho: el Outlook nuevo con «Combinar formato» (predeterminado en cualquier PC ajeno) borra todo font-size/color al pegar; solo respeta <b>, <i>, <small> y fondos de celda (medido en Outlook web). Ahora cada nivel lleva doble señal: título en <b>, secundarios en <small>, cifras en <b> + <small>; cabecera de la planilla celeste con texto tinta (blanco sobre azul quedaba negro sobre azul). Texto de ayuda del panel Correo actualizado.
+- Archivos: services/bitacora/{documentoCorreo,bitacoraCorreo,recoleccionMttr}.ts, pages/BitacoraTurnoPage.tsx + 5 tests.
+- Verificación: vitest 306/306, tsc, eslint; render normal y «aplanado» simulado lado a lado.
+- Estado: EN REVISIÓN (PR)
+- Sigue: test 5 de Orel desde el PC del trabajo (Outlook nuevo con «Combinar formato»).
+
+## 2026-09-23 · Claude · Correo de bitácora: sobrevivir al pegado desde el iPhone
+- Hecho: el compositor de Outlook iOS reescribe el HTML al pegar (estilos calculados, sin atributos, sin imágenes remotas). Tablas sin `width:100%` (las fijaba a 680 px), colores de la planilla por tres vías (`background-color`, `bgcolor`, `<font color>`) porque borraba el blanco de los títulos y las bandas celestes.
+- Archivos: services/bitacora/{bitacoraCorreo,recoleccionMttr}.ts + test.
+- Verificación: vitest 306/306, tsc, eslint; render 390/900. Pendiente: pegar de nuevo desde iPhone (normal e «incrustadas») y desde PC.
+- Estado: EN REVISIÓN (PR)
+- Sigue: si el iPhone sigue botando las fotos, el camino es que la app MANDE el correo (Graph) o adjunte el PDF.
+
+## 2026-09-23 · Claude · Correo de bitácora que quepa en el celular
+- Hecho: fotos de a dos de 156 px, evento en dos celdas con la hora en la línea de datos, cifras de a tres, planilla MTTR de un día sin columna Fecha (la fecha va en la banda). Causa: el teléfono encoge el correo al elemento más ancho (≈650 px fijos contra 351 útiles) y Word borra `vertical-align` (sobrevive `valign`).
+- Archivos: services/bitacora/{bitacoraCorreo,documentoCorreo,recoleccionMttr}.ts + 4 tests.
+- Verificación: vitest 306/306, tsc, eslint; render a 390/680 px con Playwright. Falta la prueba real: correo del turno abierto en el teléfono.
+- Estado: EN REVISIÓN (PR)
+- Sigue: si en el teléfono sigue apretada la planilla, evaluar quitarla del cuerpo (va adjunta en .xlsx).
+
 > **Compactado el 2026-09-17** (tercera vez; las anteriores fueron el 2026-07-30 y el 2026-08-18).
 > - **Enteras, arriba y la más nueva primero:** las entradas del 2026-09-15 en adelante.
 > - **Resumidas por tema** (gotchas, causas raíz, decisiones con su porqué, cifras y pendientes):
@@ -20,6 +55,350 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 >
 > **Regla:** cada entrada nueva va ARRIBA, justo bajo esta nota (no al final). Si el archivo pasa de
 > ~150 KB, compactar lo más viejo del mismo modo.
+
+## 2026-09-22 · Monitor · los mismos accesos en el Inicio de PC
+
+- El Inicio de PC (`DashboardPage`, desde md) no tiene lista de líneas: va una tarjeta «Monitores de
+  línea» al lado de la bitácora (grilla de 2 columnas desde lg), solo para supervisor/admin.
+- `MonitorCell` salió de `MobileHomeGrid` a `components/home/MonitorCell.tsx` con `anidada`
+  (celular: bajo su línea, subhead y sangría; PC: lista propia, body sin sangría). Misma lógica de
+  token y estado que #1160.
+
+## 2026-09-22 · Monitor · acceso directo desde Inicio y cambio de línea en un toque
+
+- Pedido de Orel: llegar al monitor costaba ~4 toques (Análisis de Turno → compartir → abrir).
+  Ahora en Inicio, bajo «Principal · Eviscerado» y «Principal · Filete», va «Monitor <área>» con
+  la píldora «En turno / Sin turno». Dentro del monitor, con sesión de supervisor/admin, arriba:
+  «‹ Inicio» + selector `Eviscerado | Filete`. Solo Principal (Yal no, decisión de Orel).
+  Mockup aprobado: artifact F9Km5XRrWmVencXoVCzSCk (opción A).
+- `services/shoplogix/monitorDeLinea.ts`: el token sale de `createPublicShiftMonitor` modo línea
+  (backend `ensureLineMonitor`: reusa el link fijo, NO crea otro — verificado: devolvió
+  27b0e71c… chonchi y 10e3596b… filete, los mismos de Telegram). Se recuerda en localStorage
+  (`monitor-linea:{slug}`) hasta 1 día antes de vencer → el 2º toque no llama a la función.
+- Estado «En turno»: `turnoEnCurso.ts` (+6 tests) sobre los docs padre de ayer y hoy
+  (~6 docs/planta, ~45 KB las dos): turno con nombre, arrancado, SIN `endBriefSentAt` y con
+  `lastSyncAt` < 20 min. ⚠ No sirve solo `lastSyncAt`: el re-sync horario toca los turnos de
+  ayer (medido: sync hace 7 min en turnos cerrados). No usa `scheduledEnd` (se deriva del último
+  intervalo). Cache en memoria 2 min.
+- El monitor se monta con `key={token}` (`PublicShiftMonitorPage` → `MonitorDelToken`): cambiar de
+  línea por la misma ruta arrastraba estado local (vista, peso, cuota) de la otra línea.
+- Sin sesión (TV, QR de Producción) no cambia nada: verificado que el selector no aparece.
+- ⚠ A 375 px con sangría completa y título en body, «Monitor Eviscerado» se partía en 2 renglones
+  → subhead + sangría corta. `h-11` mide 37 px en móvil: el link «Inicio» va con `min-h-[44px]`.
+
+## 2026-09-19 · Historial · de «máquina detenida» a «línea perdida»
+
+- Para esto se construyó el editor de líneas: una parada de 30 min en una de las tres BAADER no le
+  cuesta 30 min a Eviscerado, le cuesta su cuota (≈10 min). Bloque nuevo en el Historial de la
+  bitácora: «¿Cuánto de eso le costó a la línea?», con dos barras por equipo (gris = máquina
+  detenida, azul = línea perdida) y el reparto por línea.
+- `services/bitacora/pesoDeLinea.ts` (+5 tests): cruza `resumen.equiposTodos` con
+  `pesosPorLinea(leerLineas(planta))`. La llave es `EventoBitacora.equipoId` (id de `hierarchy`),
+  que es la misma que usa `NodoGrafo.id` en el editor.
+- NO INVENTA (regla de datos): lo que no se puede convertir se informa aparte con su motivo —
+  `sin-ubicar` (no está en el editor, o el evento se escribió a mano sin elegirlo del buscador),
+  `fuera-de-linea` (está puesto pero no le llega el flujo) y `en-circulo`. Si nunca se guardaron
+  las líneas, el bloque no aparece.
+- `EquipoDelPeriodo` gana `equipoId`, y `ResumenPeriodo` gana `equiposTodos` (sin el recorte a 5).
+- ⚠ Redondear ANTES de restar: «5 min = 3 min, absorbió 3 min» sumaba más que el total.
+- Verificado en el navegador con datos reales (DESPLAZADOR AUTOMATICO 1, 50 % de Empaque: 5 → 3 min;
+  PLANTA RILES avisada como no ubicada) y a 375 px sin desborde.
+
+## 2026-09-19 · Jerarquía · el aviso «hay datos nuevos» nunca funcionó (y gastaba en todas las pantallas)
+
+- `useHierarchyTree` sondeaba cada 30 s en TODA pantalla que usa el árbol (editor de líneas, CTD,
+  repuestos…), aunque solo `HierarchyPage` lee `hasUpdates`. Y la consulta fallaba siempre:
+  `where('activo','==',true)` + rango en `actualizadoEn` + `orderBy` exige un índice compuesto que
+  no está en `firestore.indexes.json` → `failed-precondition` cada 30 s desde que existe.
+- Arreglo sin índice nuevo (regla de costos): la consulta queda con UN solo campo de rango y
+  `limit(1)` —basta saber si hay algo nuevo—, el sondeo se prende con `vigilarCambios: true` (solo
+  la página de Jerarquía) y pasa a 2 minutos.
+- Verificado en el navegador: tras dos ciclos completos no vuelve a aparecer el error.
+
+## 2026-09-19 · Admin · Editor de líneas: flechas que se acomodan «como cuerdas»
+
+- Idea de Orel (Inkscape/draw.io): arrastrar la línea la dobla por donde uno la lleve. `CurvaFlecha`
+  (a, b, puntos) se guarda con las líneas; `caminoSuave()` (Catmull-Rom → Bézier) pasa por los
+  puntos SIN ángulos rectos. Doble clic en un punto lo quita.
+- ⚠⚠ Dos trampas que costaron una hora:
+  1. **Caché de Vite podrida**: tras `preview_stop`/`preview_start` el lienzo dejó de dibujar TODAS
+     las aristas (0 en el DOM, 43 en estado) con el código de main, sin ningún error en consola.
+     Se arregla con `rm -rf apps/pwa/node_modules/.vite` y reiniciar. Antes de culpar al código:
+     comprobar contra main.
+  2. **`selected` NO llega por props** a un componente de arista propio en @xyflow/react 12: se lee
+     con `useStore((st) => !!st.edgeLookup.get(id)?.selected)`.
+- Y un error propio: al crear un punto y arrastrarlo en el mismo gesto, el cierre tenía la lista
+  ANTERIOR y el punto nuevo se borraba al primer movimiento → el arrastre recibe la lista vigente.
+
+## 2026-09-19 · Admin · Editor de líneas: leyenda al día y servicios que se pueden esconder
+
+- La leyenda y el minimapa todavía codificaban el peso con los colores de estado: ahora muestran
+  MUESTRAS DE LÍNEA (gruesa = 100 %, fina = 1/N), el borde punteado para «fuera de la línea» y la
+  píldora del grupo en paralelo. El minimapa tiñe por flujo con `--brand`.
+- Botón «Servicios»: esconde las tarjetas y las punteadas de apoyo (y su contenedor, que quedaba
+  vacío) para mirar la línea en limpio. Es solo visual: los pesos no cambian. 62→54 nodos,
+  43→40 flechas en los datos guardados.
+- Textos de los botones acortados: con seis, la barra envolvía el título.
+- Verificado en tema oscuro Y claro.
+
+## 2026-09-19 · Admin · Editor de líneas: grupos en paralelo a mano
+
+- Orel: «el elemento paralelo debe poder editarse y crearse manualmente, por si hay más elementos
+  en paralelo en otras áreas». `GrafoLineas.grupos: GrupoParalelo[]` (id, miembros, nombre) se
+  guarda en `lineasProceso/{planta}`; la regla no valida campos extra, no hubo que tocarla.
+- Modo «Agrupar en paralelo» en la barra (mismo patrón que «Unir equipos»): se tocan los equipos,
+  el aviso del lienzo lleva el botón «Agrupar». ⚠ NO depender de Ctrl/Mayús + clic: la
+  multiselección de React Flow no se disparó ni con `shift` ni con `ctrl` desde el panel, y además
+  no es descubrible.
+- El encuadre manual es de línea sólida (el deducido, punteado); se edita tocando SU PÍLDORA:
+  nombre, sacar miembros y deshacer el grupo. ⚠ El encuadre vive bajo las tarjetas (`zIndex -1`) y
+  un clic en el medio no le llega — por eso el asa es la píldora, con `pointerEvents:'all'`.
+- Los grupos deducidos se omiten cuando sus miembros ya están en un grupo hecho a mano.
+
+## 2026-09-19 · Admin · Editor de líneas: piel de diagrama (opción 1 del mockup, con curvas)
+
+- Mockup previo (agente directora-creativa): https://claude.ai/artifact/UEaHRAFsQRUkpY3bVFNkos. Orel
+  eligió la opción 1 «barra de reparto», pero RECHAZÓ el ruteo ortogonal: «debe verse fluido» → se
+  mantienen las curvas bezier (`type: 'default'`), no `smoothstep`.
+- Tarjeta 188×68, `rounded-ctl`, borde 1px (punteado si está fuera de línea), chip de cuota tabular
+  en tinte de marca y BARRA de cuota de 3 px al pie: la cuota se lee por largo. Se retira el borde
+  verde/ámbar/rojo por peso (esos colores significan estado en el resto de la app: una BAADER sana
+  al 33,3 % parecía en falla). Subtexto «1 de 3 · Eviscerado».
+- Flechas: el GROSOR es el flujo (2,5 / 1,8 / 1,4 px según 100 % / 50 % / 33 %), punta 7×6 (era
+  20×20, pesaba más que la línea).
+- Grupos en paralelo derivados del grafo (no se guardan): barra de reparto (P&ID, cabezal común) y
+  encuadre punteado con píldora «Paralelo · N ramas · X % c/u». Zonas bajan a `zIndex -2`.
+
+## 2026-09-19 · Admin · Editor de líneas: un círculo de flechas dejaba todo en 0 % sin decirlo
+
+- En las líneas GUARDADAS de Chonchi, Acopio entero marcaba 0 %: hay una flecha de vuelta
+  (`BOMBA VACIO ANILLO LIQUIDO N2 → DUCTO SUCCION PECES SISTEMA N1`) que arma un círculo, y
+  `pesosPorLinea` (Kahn) deja sin flujo a los nodos atrapados — correcto, pero mudo.
+- `PesoEnLinea.ciclo`: la tarjeta dice «en círculo · hay una flecha de vuelta» en vez de un 0 %
+  sin explicación, y el inspector nombra la flecha sobrante para quitarla. Test nuevo del caso.
+
+## 2026-09-19 · Admin · ⚠ LAS FLECHAS DEL EDITOR NUNCA SE VIERON: `--primary` no existe
+
+- Orel: «pero las flechas no se ven». Causa REAL: el color era `rgb(var(--primary))` y en esta app
+  la variable se llama **`--brand`** (`--primary` no está definida). Valor inválido → el navegador
+  calcula `stroke: none` → la flecha existe, se puede seleccionar y borrar, pero es invisible. Solo
+  se veían las de servicios (`--cat-6-ink`) y las de «entre líneas» (`--muted-foreground`).
+  Mismo error en `MantencionTurnoTab.tsx` (contorno del día de hoy), corregido también.
+- `vector-effect: non-scaling-stroke` en las flechas: a 32 % de zoom una línea de 2,5 px se veía de
+  0,8 px. Punta de flecha 16 → 20.
+- Aviso cuando la unión se rechaza (`onConnectEnd`) y en el modo unir: «X e Y ya estaban unidos» /
+  «Ya hay una flecha al revés». Rechazar en silencio se siente como que el editor no funciona.
+  En modo unir, los equipos ya unidos al origen se atenúan.
+- ⚠ Para verificar un color de token: leer `getComputedStyle` del elemento, no el atributo `style`.
+  El atributo decía `stroke: rgb(var(--primary))` y parecía correcto.
+
+## 2026-09-19 · Admin · Editor de líneas: modo «Unir equipos»
+
+- Orel: «sigo sin entender cómo poner las líneas de un elemento a otro». El problema real no era
+  el acierto sino la VISIBILIDAD: a 33 % de zoom el punto visible medía 4 px.
+- Botón «Unir equipos» en la barra: se toca el equipo de origen (queda con anillo), después el que
+  sigue, y la flecha se crea; el destino pasa a ser el origen del siguiente tramo (encadenar).
+  Aviso fijo en el lienzo con el paso actual, Esc suelta el origen o sale, clic en vacío suelta.
+  Con el modo activo las tarjetas no se arrastran (`nodesDraggable=false`), así el toque no mueve.
+- El punto VISIBLE también se escala con el zoom (12-30 unidades), no solo el área de agarre.
+- ⚠ El aviso va a `top-center` con `mt-[76px]`: arriba está la leyenda y lo tapaba.
+
+## 2026-09-19 · Admin · Editor de líneas: uniones con dos clics y punto de llegada real
+
+- Orel: «lo intento y no hacen nada». Causas: (1) #1122 dejó el punto izquierdo como adorno y la
+  tarjeta solo recibía la flecha mientras se ARRASTRA → unir con dos clics (clic en el punto de
+  salida, clic en el destino) quedó muerto; (2) el agarre de `28/zoom` llegaba a 88 unidades a
+  zoom bajo, tapaba media tarjeta y a las vecinas.
+- Ahora: el punto izquierdo vuelve a ser un punto de llegada real (el de las flechas guardadas);
+  la tarjeta entera recibe también durante la unión con clics (`connectionClickStartHandle`); el
+  agarre tiene tope de 36 unidades; `onConnect` guarda la flecha sin ids de punto.
+- Verificado con movimiento de mano (15 pasos): arrastrar al punto y dos clics crean la flecha; la
+  tarjeta se sigue arrastrando. ⚠ El arrastre del panel del navegador manda casi sin pasos
+  intermedios y no sirve para probar uniones: simular con `MouseEvent` y pausas.
+
+## 2026-09-19 · Admin · Editor de líneas: mover un contenedor entero por su título
+
+- La franja del título (48 px, la misma del margen superior) es el asa: arrastrarla mueve el
+  contenedor y TODO lo que le pertenece, a pasos de la grilla. El resto de la caja sigue
+  desplazando el lienzo.
+- La esquina de cada contenedor vive ahora en su nodo del lienzo (`alGrafo` la lee de ahí) → mover
+  la caja entra en deshacer de una vez; al guardar, los nodos de contenedor quedan en la esquina
+  guardada.
+- ⚠ Trampas pagadas: (1) un nodo arrastrable recibe la clase `nopan` → la caja entera habría
+  bloqueado el desplazamiento; por eso el asa es manual (eventos de puntero), no `draggable`.
+  (2) React Flow deja `pointer-events: none` a los nodos no seleccionables → la franja necesita
+  `pointerEvents: 'all'` o el clic cae al lienzo.
+- Verificado: Acopio, su entrada y el tablero se mueven el mismo delta; Eviscerado no; Ctrl+Z vuelve
+  exacto al estado guardado.
+
+## 2026-09-19 · Admin · Editor de líneas: uniones fáciles de acertar
+
+- Causa medida: a 37 % de zoom (el encuadre inicial) cada punto de unión medía **4 px** en pantalla
+  y había que soltar la flecha justo sobre el punto de llegada.
+- `PuntosUnion`: el punto de salida tiene área de agarre ≥ 28 px en pantalla a cualquier zoom
+  (`28 / zoom`, punto visible igual de chico); mientras se arrastra una flecha, TODA la tarjeta es
+  el punto de llegada (handle `target` a tamaño completo, `pointer-events` solo con
+  `useConnection().inProgress`, así no bloquea arrastrar la tarjeta). React Flow prioriza el handle
+  bajo el cursor (`elementFromPoint`), por eso funciona.
+- Verificado: soltar en el centro de una tarjeta crea la flecha (43→44) y la tarjeta se sigue
+  arrastrando.
+
+## 2026-09-19 · Admin · Editor de líneas: contenedores que crecen, árbol completo y elementos manuales
+
+- **Contenedores**: la pertenencia a una zona es explícita (`NodoGrafo.zona`; `''` = sin contenedor;
+  sin campo = por posición, para guardados viejos). `limitesDeZonas` amplía cada caja hacia
+  cualquier lado para que quepan sus equipos. Entrar, salir o cambiar de contenedor SIEMPRE se
+  confirma (hoja «¿Mover X de A a B?»; Cancelar devuelve el arrastre con deshacer). Al guardar,
+  las zonas quedan con el tamaño al que crecieron.
+- **Lista = árbol completo** desde `aq-in-cho` (`indiceArbol`), desplegable, con áreas y nodos sin
+  código; el buscador encuentra también áreas y muestra la ruta. Ahí aparece «Estanque de
+  transferencia AM» (Patio y servicios exteriores).
+- **Elementos manuales** (`manual:<id>`, con `nombre` en el doc): hoja con nombre + contenedor; el
+  inspector los marca «no está en el árbol». El inspector trae además el selector de contenedor.
+- ⚠ Trampa pagada: los nodos que entrega React Flow en `onNodeDragStop` traen los `data` de la
+  VISTA, no los del estado → la pertenencia se lee siempre del estado (`contenedorDeNodo`).
+- Verificado en `/dev/lineas-proceso` (sin guardar): agregar con confirmación, crecer hacia arriba
+  sin preguntar, mover Eviscerado→Acopio confirmado y cancelado, sacar, crear manual.
+
+## 2026-09-19 · Admin · Editor de líneas: pantalla completa y lista plegable
+- Orel: «¿cómo hacer el espacio de trabajo más amplio? ¿pantalla completa?». Botón «Pantalla completa»: el editor pasa a una capa `fixed inset-0` (tapa la barra lateral de la app) y pide `requestFullscreen` del DOCUMENTO — ⚠ NO del contenedor: los avisos con «Deshacer» viven en un portal del body y quedarían ocultos. Esc sale (`fullscreenchange` sincroniza). Botón para ocultar/mostrar la lista de equipos. Al ampliar, reencuadra.
+- Propuesta: zonas de Acopio/Eviscerado a 720 de alto y servicios más abajo — el «TABLERO CONTROL SISTEMA N1» quedaba encima del título de «Servicios de apoyo» (visto en la captura de Orel).
+- Verificado: sin solape (tablero termina en y=598, servicios empiezan en 620); capa fija activa; con la lista oculta el lienzo pasa de 1.073 a 1.353 px. (El panel de navegador de pruebas bloquea la pantalla completa real; en Chrome funciona.)
+- Estado: HECHO.
+
+## 2026-09-19 · Admin · Editor de líneas: Acopio por componentes, servicios de apoyo y HIG
+- Mockup aprobado: https://claude.ai/artifact/Xe7TNVjgcX3zHcjTz7hYYe. Datos de Orel: «Acopio tiene equipos individuales en línea»; «Sistema 1 es de Chonchi, Sistema 2 de Yal»; caseta agua mar, estanques y RILES «influyen indirectamente, hay que tenerlos».
+- ⚠ **El Sistema de bombeo N2 NO se movió en el árbol**: ACOPIO (`aq-in-cho-acop`) cuelga del SITIO, al lado de PLANTA CHONCHI y PLANTA YAL (compartido), y su ubicación técnica es la de SAP. Se marca en el editor (`DE_OTRA_PLANTA`: «de Yal», no cuenta en Chonchi; fuera de la propuesta).
+- **Acopio por componentes**: la propuesta despliega el Sistema N1 (ducto succión → bombas vacío N1/N2 en paralelo → ducto descarga; el resto de sus componentes a mano, sin unir). Inspector → «Desplegar componentes» para cualquier equipo con hijos. `indiceEquipos` nombra también a los componentes.
+- **Servicios de apoyo**: zona `tipo: 'apoyo'` (violeta `--cat-6-ink`, punteada) con secciones del árbol (Almacenamiento aguas, Estanque de transferencia AM, Pozos profundos, Planta RILES, Sala de máquinas, Caldera, Freón, Subestación) + Caseta agua mar. Flechas «abastece» (servicio → línea) / «recibe» (línea → servicio; las bombas de vacío de la tolva de vísceras están en RILES). `pesosPorLinea` IGNORA esas flechas (no reparten flujo: el efecto no es proporcional); `relacionesDeServicios` dice qué líneas toca cada uno.
+- **HIG**: inspector de la selección (peso, «si se detiene 30 min = N min de línea», componentes, acciones; flechas explicadas), deshacer/rehacer (Ctrl+Z / Ctrl+Mayús+Z, botones, aviso «Se quitó… · Deshacer»), aviso al salir con cambios, grilla de 16 px, zona de destino resaltada solo mientras se arrastra encima, `ariaLabel` en nodos y flechas.
+- Verificado con la sesión real (sin guardar): 57 nodos / 44 flechas; ducto 100 %, bombas de vacío 50 %; estanque «abastece a Eviscerado», RILES «recibe de Eviscerado»; N2 «de Yal»; inspector; Supr → N1 sube a 100 % + aviso con Deshacer; Ctrl+Z restaura (44 flechas, 50 %); desplegar agrega el componente.
+- 11 tests del modelo (3 nuevos de servicios). tsc 0 · eslint 30 · vitest 2.873 · auditorías OK · build OK (chunk 70,5 KB gz).
+- Estado: HECHO.
+
+## 2026-09-19 · Admin · Editor de líneas de proceso (grafo)
+- Idea de Orel: «tiempo reloj no es tiempo máquina» (1 de 3 Baader = 33 % de Eviscerado) → establecer qué máquinas forman cada línea y cómo influyen; «como esos programas donde arrastras y unes con líneas». Prototipos: columnas (DuwE9Y9tRKiBsf5ZyQp692) → grafo (https://claude.ai/artifact/G4KbK1RAYafiJXabWQGFNf), aprobado para el panel admin.
+- Nueva herramienta `/admin/lineas-proceso` (AdminRoute + RequireReAuth, fila «Líneas de proceso» en el panel). React Flow (`@xyflow/react` 12.11, MIT; agregado con **pnpm** — ⚠ `npm install` falla en este repo por el `prepare` de react-zoom-pan-pinch) en un chunk perezoso (66 KB gz).
+- Modelo `services/lineasProceso/modeloLineas.ts`: nodos = equipos de `hierarchy` + «Entrada» por línea; flechas = flujo. `pesosPorLinea`: el flujo entra al 100 % y se reparte en partes iguales en cada bifurcación (3 Baader → 33,3 %; al juntarse vuelve a 100 %); lo no conectado = fuera (0 %); la entrada de otra línea corta el cálculo; un ciclo no inventa flujo. 8 tests.
+- `propuestaChonchi.ts`: propuesta deducida del árbol (Acopio → Eviscerado → Emparrillado → Empaque; Filete como rama), buscada por NOMBRE; las dudas (Sellado, Cintas/Línea manual HG…) quedan fuera para que Orel decida. `seccionesDeProceso`: primer nivel de Acopio y de cada sección de Proceso (conjuntos de nivel 5 incluidos); ⚠ Knuro cuelga de su Baader en el árbol → «+N comp.».
+- Firestore `lineasProceso/{plantId}` (flechas como `{a,b}`: Firestore no guarda arreglos de arreglos). Regla: lectura `isActiveUser() || paseBitacoraActivo()`, escritura `isAdmin()` con version 1 y topes (20 líneas, 400 nodos, 800 flechas). `probar-reglas-bitacora.cjs --local`: 117/117 (6 casos nuevos).
+- Editor: lista de equipos por sección con búsqueda (arrastrar o tocar), nodos con peso en color (rojo 100 %, ámbar rama, punteado fuera), zonas por línea, flechas entre líneas punteadas, minimapa, «Planta completa», resumen por línea, «Cambios sin guardar» / Guardar / Volver a la propuesta. Teléfono (o `pointer: coarse`): SOLO LECTURA. Si la lectura falla, muestra la propuesta con aviso (antes: lienzo vacío).
+- ⚠ React Flow oculta los nodos hasta medirlos: en una pestaña de fondo del panel de navegador no aparecen (`visibility:hidden`) — traer la pestaña al frente para verificar.
+- Ruta de desarrollo `/dev/lineas-proceso` (solo DEV) para verificar sin el paso de contraseña. Verificado con la sesión real: 39 nodos, 34 flechas, Baader 33,3 %, bombeo 50 %; agregar (clic), unir (arrastre real del mouse → 4 ramas = 25 %), quitar (Supr) y solo lectura a 375 px. Nada se guardó.
+- tsc 0 · eslint 30 · vitest 2.870 · auditorías OK · build OK.
+- Siguiente: Orel arma las líneas y guarda → conectar el historial (paradas × peso de su línea) y la base de tiempo de Shoplogix por línea.
+- Estado: HECHO.
+
+## 2026-09-19 · Bitacora ronda 65 · Historial: un gráfico por PREGUNTA
+- Orel: «el gráfico no explica nada; hay que establecer qué preguntas son importantes para que los gráficos las respondan a simple vista». Catálogo aprobado (sin la 6, pendientes viejos): https://claude.ai/artifact/M3eDjf8oHto5U3wp7j3tTa
+- Se va el gráfico de barras por turno (respondía «¿cuántos minutos paró cada turno?», nadie lo pregunta; 30 barras = «reja», antipatrón de las guías) y la sección «Equipos que más pararon» (la reemplaza el Pareto). Entran 5 paneles: pregunta en gris · RESPUESTA como título (calculada con los mismos datos que se dibujan) · referencia dibujada:
+  1. ¿La línea está parando más o menos? → línea del % del tiempo de producción parado por día (≤14 días) o semana, promedio punteado; «Parando menos: de X a Y» solo si el cambio entre mitades ≥10 % y hay ≥4 puntos. ⚠ El día con el turno EN CURSO se dibuja hueco («hoy, en curso») y NO cuenta para promedio ni tendencia (se leía como caída falsa).
+  2. ¿Dónde se concentra la parada? → Pareto: barras ordenadas con % ACUMULADO; en rojo los que juntos llegan al 70 %; «Otros» nunca es prioridad.
+  3. ¿Mantención interviene sin detener la línea? → barras apiladas, «sin detener» abajo (base común).
+  4. ¿Cuánto tardamos en reparar? → un punto por falla + mediana («la mitad en X o menos; 8 de cada 10 en Y o menos»); con <5 fallas las nombra una por una. El promedio se dice en la referencia (lo suben las largas).
+  5. ¿Qué falla se está repitiendo? → lista de equipos con 2+ fallas (va PRIMERO: pide acción).
+- Lógica pura en `services/bitacora/preguntasHistorial.ts` (14 tests en `preguntasHistorial.test.ts`); gráficos SVG en `components/bitacora/GraficosHistorial.tsx` con tokens `rgb(var(--ink-crit))` etc.
+- Verificado con Playwright (`bitacora-historial.mjs`, teléfono y PC, claro y oscuro).
+- tsc 0 · eslint 30 · vitest 2.862 · auditorías piel/voseo/decimales/graficos OK · build OK.
+- Siguiente (lote aparte): base del % desde los turnos PROGRAMADOS de Shoplogix (informe del agente: `shoplogix/{chonchi|filete}/shifts`, reparto por solape con los turnos de Mantención, horas guardadas como UTC, excluir `Unscheduled`; decidir turnos con 0 ciclos y si se suma Filete).
+- Estado: HECHO.
+
+## 2026-09-19 · Bitacora ronda 64 · Historial: referencias en cada cifra y preguntas claras
+- Pasada visual del Historial con capturas reales (https://claude.ai/artifact/2tFtM99z5QCR9HPQimSfV6) — antes solo se había mirado el título del gráfico.
+- **Reglas de Orel (memoria `feedback_reglas_analisis_datos`):** «30 h de detención sin referencia no dice nada» → toda cifra dice contra qué se compara y si es bueno o malo; «los datos responden preguntas claras y precisas».
+- Cifras en dos preguntas: **¿Cuánto paró la línea?** (parada con `% del tiempo de producción`, fallas, MTTR «tiempo medio en reparar», MTBF «tiempo medio entre fallas») y **¿Cómo trabajó Mantención?** (eventos, sin detener con %, pendientes abiertos·cerrados, repuestos·unidades). Entran las FALLAS (base del MTTR); se va la casilla huérfana.
+- **¿Mejoramos?** `useHistorialBitacora` lee el período elegido y el ANTERIOR del mismo largo en la MISMA consulta (desde 2×días); `compararPeriodos` da «▲/▼ antes X» verde/rojo según sea MEJOR o PEOR para la planta. ⚠ Solo si el anterior tiene ≥60 % de los turnos del actual (la bitácora parte el 15-09): si no, lo dice en texto. Parada y fallas se comparan como TASA (por tiempo / por turno); <5 % = «igual».
+- **¿Es normal?** Línea punteada del promedio por turno en el gráfico; «máx» pasa al subtítulo (partía el título en el teléfono).
+- Teléfono: equipos → repuestos → quién → turnos (con `contents` en la columna derecha y `order-*`; el PC sigue en dos columnas). Turnos: 6 + «Ver los N turnos». Nombres de equipo completos (se perdía el «N3»). Repuestos «20 un.». Secciones con preguntas: «¿Qué equipos pararon más?», «¿Qué repuestos salieron de bodega?», «¿Quién está registrando?», «¿Cómo fue cada turno?».
+- Correo y PDF del historial llevan el mismo % del tiempo de producción. `porcentajeFino` usa `dec1` (audit-decimales).
+- Verificado con Playwright (`bitacora-historial.mjs`, teléfono y PC, claro y oscuro); vitrina ampliada a 90 turnos para que el período anterior esté completo y se vea la comparación.
+- tsc 0 · eslint 30 · vitest 2.848 (9 nuevos: `referenciasHistorial.test.ts`) · auditorías piel/voseo/decimales/graficos OK · build OK.
+- Pendiente (guías): banda de rango normal fijada A PRIORI cuando haya ~12 períodos estables.
+- Estado: HECHO.
+
+## 2026-09-19 · Bitacora ronda 63 · Los «quién» del editor en una tarjeta; «Técnico» único
+- Mockup interactivo aprobado (https://claude.ai/artifact/CCdca8MYyE3uTx6nCmoMZm). Antes de «¿Qué se hizo?» había 4 bloques (quién edita, turno, quién lo registró, participaron) → UNA tarjeta de filas de 44 px (Técnico › · Turno ⌄ · Participaron ›), como el editor del Calendario de iOS. Tocar una fila abre sus chips EN SU LUGAR (sin hoja sobre hoja); lo que falta viene abierto al abrir la hoja y elegir lo cierra.
+- **Orel: «el que edita y el que registra deberían ser el mismo técnico».** En datos eran dos (`registradoPor` = autor; `actualizadoPorNombre` = «editado por»). Queda UNA pregunta, «Técnico»: nuevo/borrador = quien lo escribe (`quien`); publicado = el AUTOR (se corrige ahí → `registradoPor`). El «editado por» de un publicado se toma SIN PREGUNTAR del nombre recordado del teléfono (o el autor si no hay) — se conserva la traza. Ya no es obligatorio elegir «quién edita» para guardar una corrección.
+- `SelectorTecnico` y `SelectorParticipantes` ganan `sinEtiqueta` (rótulo solo para lector de pantalla dentro de la fila). Separadores `bg-muted-foreground/25`: `bg-border` no se veía sobre el relleno en oscuro.
+- Verificado con Playwright (`bitacora-editor-quien.mjs`, claro y oscuro): publicado → «Técnico: Jose Chodil» cerrado y nada falta; nuevo → «Técnico: Elige quién» abierto, «Falta completar: Técnico, …»; al elegir Jose Chodil la fila se cierra y sale del aviso.
+- tsc 0 · eslint 30 · vitest 2.839 · auditorías OK · build OK.
+- Estado: HECHO.
+
+## 2026-09-19 · Bitacora ronda 62 · Pasada visual con capturas reales (Playwright)
+- Recorrido completo con `C:\Users\orelc\dev\capturas\bitacora-recorrido.mjs` (teléfono 375 y PC 1.440, claro y oscuro, hojas Compartir/editor, Inicio, Historial). Informe con capturas y propuesta simulada sobre la página real: https://claude.ai/artifact/ENcag4myAbpNgUa2oaGQjb — aprobado.
+- **Error (mío, lote 2):** «Falta completar: Quién lo registró» salía con ese campo LLENO; lo vacío era «Quién edita». El aviso usa ahora la misma etiqueta que el campo (`etiquetaQuien`: registra / continúa / edita).
+- **Orden en el teléfono:** pendientes anteriores → EVENTOS → contexto (antes los eventos quedaban a 3 pantallas, detrás de técnicos + resumen + observación + planilla). Solo cambian las clases `order-*`; el PC va por `grid-area` y no cambia (verificado en captura).
+- **Resumen compacto en el teléfono:** grilla de 3 (`<dl>`, cifra arriba, rótulo con punto abajo) en vez de 7 filas altas; la explicación del MTTR/MTBF queda una sola vez (bajo la planilla MTTR). En el PC sigue la lista (`ListGroup className="hidden md:flex"`).
+- **Tipo anterior:** un evento guardado con un tipo que ya no se ofrece («Falla», antes del 18-09) se abría sin chip marcado → ahora «Falla (anterior)» marcado; tocar otro lo cambia.
+- «El calendario decía: …» solo cuando difiere de los presentes; iniciales de los conectados sin taparse (superposición 8 → 4 px); «Tamaño de letra» al final de la columna de contexto (quedaba entre eventos y técnicos).
+- Verificado en capturas nuevas (teléfono y PC, ambos temas) + `bitacora-letra-real.mjs` al 135 % (sin desborde). tsc 0 · eslint 30 · vitest 2.839 · auditorías OK · build OK.
+- Queda como idea (con mockup propio): resumir en una fila los 4 bloques de «quién» del editor.
+- Estado: HECHO.
+
+## 2026-09-19 · Bitacora ronda 61 · Zoom y tamaño de letra (#12 del HIG, cierra el informe)
+- Mockup con CAPTURAS REALES al 100/124/135 % (https://claude.ai/artifact/4WKVax3ncz8BuVwzhEkdpA), aprobado.
+- **Zoom con dos dedos en toda la app**: el viewport tenía `maximum-scale=1, user-scalable=no` desde el release inicial (nadie lo decidió). Los campos miden ≥16 px, así que iOS no hace zoom solo al tocarlos.
+- **Letra que sigue al teléfono, solo en la bitácora**: la escala de tailwind (`fontSize`) ahora es `px × var(--escala-texto, 1)` — con 1 la app mide EXACTAMENTE lo mismo (medido: título 17 px). `useTamanoLetraBitacora` pone la variable en `<html>` (las hojas son portales) mientras la bitácora está abierta y la QUITA al salir (medido). iPhone: «Como el iPhone» lee `font: -apple-system-body` (Dynamic Type para web). Android/PC: selector propio «Tamaño de letra · Normal / Grande (118 %) / Muy grande (135 %)» al final de la lista, en `localStorage`. Tope 135 % = lo revisado con capturas; más allá, el zoom.
+- `text-[16px]` de los campos de la bitácora → `text-campo` (16 px × escala). `Button` y el título/descripción de `Sheet` (piel) pasan a `calc(rem × escala)`: con 1, idénticos en los ~10 usos.
+- Buscador de repuestos: pestañas a todo el ancho («Este equipo»), estrella junto al buscador, ayuda «Código o nombre» — al 135 % se cortaban «En este eq…» y «…código o nomb».
+- **Playwright instalado** (`playwright-core` 1.63 en `C:\Users\orelc\dev\capturas`, usa el Edge del sistema, sin descargar navegadores). Scripts: `bitacora-letra.mjs` (simula por CSS), `bitacora-letra-real.mjs` (usa el selector real, mide y captura). ⚠ `waitUntil: 'networkidle'` nunca llega con Vite (HMR): esperar un texto de la página.
+- Verificado con Playwright a 375 px, claro y oscuro, en los 3 tamaños: título 17 → 20,06 → 22,95 px; ancho de página 375 (sin desborde); variable ausente fuera de la bitácora.
+- tsc 0 · eslint 30 · vitest 2.839 (6 nuevos: `tamanoLetra.test.ts`) · auditorías OK · build OK.
+- Estado: HECHO. Informe de 12 hallazgos de la ronda 56 CERRADO.
+
+## 2026-09-19 · Bitacora ronda 60 · Estrella de favoritos en el buscador de repuestos
+- Idea de Orel, mockup aprobado (https://claude.ai/artifact/Te53eSjF2PLXmgidb4Q4oE, con sus favoritos reales: 3 de sus 8 están en la lista de materiales de KNURO N1, 159 repuestos).
+- Estrella de 44 px junto a «En este equipo / Todos» (sin equipo, junto al buscador): «Solo mis favoritos» se COMBINA con el alcance → favoritos de este equipo o todos, visibles SIN escribir; el buscador filtra dentro. Línea «3 de tus 8 favoritos están en este equipo» / «Tus 8 favoritos, de todos los equipos». Con la estrella apagada, los favoritos van primero (`buscarRepuestos(…, primero)`, ANTES de cortar en 8) y cada resultado tiene su estrella para marcar/desmarcar.
+- Son los MISMOS «Mis favoritos» de Repuestos y del Centro Técnico (`useRepuestoFavoritos`, `user_preferences.repuestoFavs`, clave = código SAP): cero datos nuevos. Entra por la fuente de la bitácora (`FuenteBitacora.useFavoritosRepuestos`), así la vitrina usa favoritos en memoria y NO toca los reales. El pase de bitácora no ve la estrella (es de la planta, no de una persona).
+- Descartado: «Favoritos» como tercera pestaña (pierde «mis favoritos de ESTE equipo»; HIG: un segmentado = opciones de una misma clase).
+- Desvío del mockup: en «Todos» no se dice en qué equipos está cada favorito — el índice liviano del maestro no trae `equipos`; costaría una lectura por favorito.
+- Verificado en `/dev/bitacora-real` (375 px, oscuro y claro): estrella encendida en «Todos» lista los 3 favoritos de ejemplo sin escribir; desmarcar uno lo saca y el conteo baja a 2; buscar «an» con la estrella apagada lo encuentra con su estrella vacía; equipo sin materiales → «Ninguno de tus 3 favoritos está en este equipo. Prueba en «Todos».» (sin una segunda lista vacía debajo, se quitó). Tokens: estrella `--ink-warn` (#985800 claro / #FF9F0A oscuro).
+- Tests: `favoritosRepuestos.test.ts` (6, con los materiales reales de KNURO N1). tsc 0 · eslint 30 · vitest 2.833 · auditorías OK · build OK.
+- Estado: HECHO.
+
+## 2026-09-19 · Bitacora ronda 59 · Lote 3 del HIG (PR #1111, `339e16e`)
+- Cierra #5/#6/#7/#10/#11 del informe de la ronda 56: fotos por arrastrar o Ctrl+V (listener en `document`, porque el pegado va al campo con foco; solo actúa si trae imágenes); «×» de 44 px en los buscadores de equipo/repuestos/técnicos + `enterKeyHint`; cantidad de repuesto escribible 1–999 (vacío o 0 vuelve al valor anterior); `Sheet` se cierra deslizando desde la agarradera (>120 px o 25%; pasa por `onClose`, pide confirmar igual); el gráfico del historial dice su resultado en el título y las barras son `<button aria-pressed>`.
+- ⚠ La animación `.piel-sheet-in` (fill `both`) le gana al `transform` en línea: el panel no seguía al dedo hasta apagarla al empezar el arrastre.
+- ⚠ Dos campos del editor comparten el aria-label «Borrar búsqueda» (equipo y repuestos): al probar por script, elegir el correcto.
+- Queda del informe solo #12 (zoom/Dynamic Type, decisión de Orel). Esta entrada se commitea con la ronda 60.
+
+## 2026-09-19 · Bitacora ronda 58 · Lote 2 del HIG: la hora y Guardar dicen la verdad
+- Mockup aprobado por Orel (https://claude.ai/artifact/BWv4YtX3oTPL4pWhKdFqdP, opciones A + B juntas). Aplica los dos hallazgos que más importan para la calidad del dato del MTTR, del informe de 12 de la ronda 56.
+- **#1 — la hora de Inicio ya no se rellena sola cuando el turno ya cerró.** `horaSugeridaParaEvento` seguía devolviendo el INICIO DEL TURNO (p. ej. 08:00) para un evento nuevo cuyo turno ya terminó — un valor con forma de hora real que nadie escribió y que nunca se marcaba «obligatorio» porque nunca quedaba vacío. Nueva `horaInicioNuevoEvento()` (junto a `turnoEnCurso()`, ambas en `turnoMantencion.ts`): vacío si el turno no está corriendo, «ahora» si sí. Solo afecta la semilla de un evento NUEVO (`!evento`); un evento existente conserva lo que tenga guardado. El campo se marca «obligatorio» (mismo patrón que Tipo e Impacto) y debajo aparece «Ese turno ya terminó: escribe la hora en que empezó de verdad.», calculado sobre el turno ELEGIDO en el selector (`turnoDestino`), igual que ya hacen «Terminó ahora»/«¿Cuánto duró?».
+- **#2 — Guardar dice qué falta.** «Quién lo registró» (`SelectorTecnico` gana la prop `obligatorio`) y «Observaciones» se marcan igual que Tipo e Impacto; y una línea fija arriba de los botones, «Falta completar: X, Y, Z», nombra TODO lo que falta a la vez — no hace falta tocar el botón desactivado para enterarse. `faltaObligatorio` ahora se DERIVA de la lista `faltantes` (antes eran 6 condiciones sueltas), para que no se puedan desincronizar.
+- ⚠ Colisión de nombres: ya existía un `const turnoEnCurso` local (el turno del reloj de AHORA) — la función importada se renombra `estaEnCurso` en el import para no pisarlo.
+- Verificado en `/dev/bitacora-real` con un turno real reexportado (2026-09-17_dia, ya cerrado) y clics reales: «Nuevo evento» ahí sale con Inicio vacío + obligatorio + el mensaje, y «Falta completar: Qué se hizo, Inicio, Qué pasó, Impacto» arriba de «Listo». Al cambiar el turno del selector a uno EN CURSO, el mensaje desaparece (el campo no se reescribe solo: eso queda fuera de alcance, no estaba en el mockup). Claro y oscuro (`--ink-warn` real en ambos); sin desborde horizontal.
+- Tests: `turnoEnCurso` y 4 casos de `horaInicioNuevoEvento` sobre el turno real (08:00-16:00 del 17-09) — dentro, en el borde, cerrado y antes de empezar; mutación comprobada (volver al valor viejo hace fallar 2 tests).
+- tsc 0; eslint 30 (una colisión de nombres agregó un warning de `exhaustive-deps`, resuelto usando `!evento` en vez de `esNuevo` en el array de dependencias); vitest 2.825; auditorías OK; build OK.
+- Estado: HECHO. Cierra el informe de 12 hallazgos de la ronda 56 en lo que más importaba; quedan #5/#6/#7/#10/#11 (cambian lo visible, menor impacto) y #12 (decisión de Orel).
+
+## 2026-09-19 · Bitacora ronda 57 · Lote 1 del HIG: sin cambio visible
+- Regla nueva de Orel: cada cambio en la PWA se revisa contra el HIG local (`[[feedback_revisar_hig_cada_cambio]]`). Primera revisión completa de la bitácora (agente, 12 hallazgos, ronda 56 en memoria) — este PR aplica los 5 que no cambian lo que se ve.
+- `navigator.storage.persist()` al abrir la bitácora, una vez por sesión (`useBitacoraTurno.ts`): sin esto, Safari puede borrar los cambios pendientes de IndexedDB con poca señal en planta.
+- Cmd/Ctrl+Enter guarda desde CUALQUIER campo del editor, incluido el textarea de Observaciones (antes solo funcionaba en los campos de hora). `Sheet` (piel) gana un `onKeyDown` opcional que no afecta a los otros 9 usos porque no lo pasan.
+- PDF y Excel MTTR: en el celular abren `navigator.share` (Outlook, WhatsApp) en vez de descargar directo — la planilla MTTR es el entregable que prueba el aporte de Mantención y quedaba en Descargas. Nuevo `services/bitacora/compartirArchivo.ts` (mismo patrón que `compartirWhatsapp.ts`); cae a la descarga de siempre en PC o si el navegador no admite compartir archivos.
+- «Reintentar»/«Quitar» de una foto que no subió: 32 px → 44 px (piso táctil del HIG y de DESIGN.md §3).
+- El editor pinta la MINIATURA de la foto (320 px), no la original de 1.600 px: se le había escapado a la ronda 47, que sí corrigió la lista.
+- Verificado: Ctrl+Enter llega al handler con `key: "Enter"` y `ctrlKey: true` (probado con un listener directo en el diálogo); la miniatura del editor mide 320×427 en vez de la original. tsc 0; eslint 30 (bajó de 31 con `logger.warn` en vez de `console.warn`); vitest 2.821; auditorías OK; build OK.
+- Estado: HECHO. Quedan del informe de 12: #1 (hora de inicio), #2 (Guardar sin decir qué falta) — mockup antes; #5, #6, #7, #10, #11 — sin mockup pero cambian lo que se ve; #12 (zoom/Dynamic Type) — decisión de Orel.
+
+## 2026-09-19 · Bitacora ronda 56 · Medición turno a turno lista para el primer turno real
+- Estado medido: la bitácora sigue con los mismos 22 eventos; el 18-09 **no hubo producción** (Fiestas Patrias: los tres turnos de Shoplogix de ese día tienen `effectiveStart: null`, igual que el noche del 17). La falta de eventos es esperable, no una falla. La prueba de Orel con un turno real queda para cuando vuelva la producción.
+- `scripts/medir-bitacora.cjs [desde] [hasta]` (solo lectura): por turno, eventos y borradores, término cargado sobre eventos con hora, mediana del desfase inicio→creación, cuántos se registraron >2 h después, cuántos con el turno ya cerrado y paradas con minutos; más la distribución de impacto y tipo. Hora de Chile con su desfase real por fecha (Intl, America/Santiago), no un -3 fijo.
+- Validado contra la medición a mano del 18-09 sobre 16→17-09: 5/15 con término, 6 registrados >2 h después, 6 con el turno cerrado, mediana 31 min. Coincide cifra por cifra.
+- ⚠ Para listar los turnos de `shoplogix/chonchi/shifts` sin índice: `listDocuments()` + `getAll()`. Un `orderBy(documentId(), 'desc')` pide un índice compuesto de collectionGroup en producción: no crearlo solo para mirar.
+- Estado: HECHO. Sigue: correrlo después del primer turno real (lunes 21-09 si hay producción) y comparar contra la línea base de arriba.
+
+## 2026-09-19 · Bitacora ronda 55 · «¿Cuánto duró?» para lo que se carga tarde
+- Orel confirmó la opción C del canvas: la carga a fin de turno es la norma (ronda 54: 6 de 15 eventos con hora se registraron más de 2 h después), así que se diseña para ella.
+- Hecho: cuando «Terminó ahora» no aplica porque el turno del evento ya terminó o empezó hace más de 2 h (`terminoAhora` → `turno-terminado` / `pasa-el-tope`), el editor muestra «¿Cuánto duró?» con 5 · 10 · 15 · 20 · 30 · 45 · 60 min (`DURACIONES_SUGERIDAS_MIN` en `config/bitacora.ts`). Un toque pone el término = inicio + N (`horaMasMinutos`, cruza medianoche). Reemplaza la línea «escribe la hora en que terminó» de la ronda 54.
+- Los chips SIGUEN a la vista con el término puesto y marcan el que coincide con la duración, para poder corregir la elección (y un evento viejo ya completo muestra el suyo marcado, o ninguno si duró 23 min).
+- `Chip` gana `min-w-[44px]`: un chip de un dígito («5») medía menos de 44 px de ancho. Los demás chips del editor ya eran más anchos, no cambian.
+- Accesible: grupo con `aria-labelledby` al rótulo; el motivo («Ese turno ya terminó.») y la unidad («5 minutos») van en `sr-only`.
+- Verificado en `/dev/bitacora-real` a 375 px con clic real: evento del 16-09 → 7 chips de 44 px (6 + «60 min» en la segunda fila, como el mockup), sin botón; toque en «20» → término 22:16, chip marcado, «Duración: 20 min»; el mismo evento movido al turno en curso → vuelve «Terminó ahora · 22:33 · 37 min» y los chips desaparecen. Claro y oscuro; sin desborde.
+- Test: `horaMasMinutos` (11:00+20, 23:50+20→00:10, hora inválida) y la invariante del chip marcado: `minutosEntre(inicio, horaMasMinutos(inicio, n)) === n` para todas las duraciones, también desde 23:55.
+- tsc 0; eslint 30; vitest 2.821; auditorías OK; build OK.
+- Estado: HECHO.
 
 ## 2026-09-19 · Bitacora ronda 54 · «Terminó ahora» solo cuando es verdad
 - Medido antes de tocar (22 eventos reales): 20 los cargó una sola persona; de 15 con hora de inicio, 7 se registraron dentro de la media hora y **6 más de 2 h después**; 6 se crearon con su turno ya terminado (el día 17-09 entero a las 18:55; en la tarde 17-09, 6 eventos entre las 23:17 y las 23:35). El botón de la ronda 48 salía SIEMPRE que faltaba el término, y con esa forma de cargar «ahora» es la hora de carga, no el término: la TOLVA GENERAL RILES (11:00, parada real de 20 min, cargada 18:55) habría quedado en 7 h 55 min y el MTTR del turno pasaba de 12,5 min a 4 h. Todavía no se había usado: 0 eventos nuevos desde el deploy.

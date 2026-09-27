@@ -55,7 +55,13 @@ const normalizar = (s: string) =>
  * nombre común. Primero lo que EMPIEZA con lo escrito (nombre común, nombre o
  * código); a igualdad, por nombre.
  */
-export function buscarRepuestos(lista: readonly RepuestoDelCatalogo[], texto: string, max = 8): RepuestoDelCatalogo[] {
+export function buscarRepuestos(
+  lista: readonly RepuestoDelCatalogo[],
+  texto: string,
+  max = 8,
+  /** Códigos que van primero (los favoritos del usuario), antes de cortar en `max`. */
+  primero?: ReadonlySet<string>,
+): RepuestoDelCatalogo[] {
   const q = normalizar(texto)
   if (q.length < 2) return []
   const palabras = q.split(' ')
@@ -68,12 +74,37 @@ export function buscarRepuestos(lista: readonly RepuestoDelCatalogo[], texto: st
     }))
     .filter((x) => palabras.every((p) => x.indice.includes(p)))
     .sort((a, b) => {
+      const fa = primero?.has(a.r.codigoSAP) ? 0 : 1
+      const fb = primero?.has(b.r.codigoSAP) ? 0 : 1
+      if (fa !== fb) return fa - fb
       const pa = a.comun.startsWith(q) || a.nombre.startsWith(q) || a.r.codigoSAP.startsWith(q) ? 0 : 1
       const pb = b.comun.startsWith(q) || b.nombre.startsWith(q) || b.r.codigoSAP.startsWith(q) ? 0 : 1
       return pa - pb || (a.comun || a.nombre).localeCompare(b.comun || b.nombre, 'es')
     })
     .slice(0, max)
     .map((x) => x.r)
+}
+
+/**
+ * «Solo mis favoritos»: los favoritos que están en `lista` (la del equipo o la
+ * de todos). Sin texto (o con menos de 2 letras), todos por nombre, para verlos
+ * sin escribir; con texto, se busca dentro de ellos.
+ */
+export function favoritosDeLista(
+  lista: readonly RepuestoDelCatalogo[],
+  favoritos: ReadonlySet<string>,
+  texto: string,
+): RepuestoDelCatalogo[] {
+  const favs = lista.filter((r) => favoritos.has(r.codigoSAP))
+  if (normalizar(texto).length >= 2) return buscarRepuestos(favs, texto, favs.length)
+  return [...favs].sort((a, b) => (a.nombreComun || a.nombre).localeCompare(b.nombreComun || b.nombre, 'es'))
+}
+
+/** Los favoritos de repuestos del usuario (la misma lista de Repuestos y el Centro Técnico). */
+export interface FavoritosRepuestos {
+  /** Claves marcadas: el código SAP (o `fab:…` para piezas sin SAP, que aquí no aparecen). */
+  claves: ReadonlySet<string>
+  alternar: (codigoSAP: string) => void
 }
 
 /** Las entradas del índice `repuestosIndice/sap` (`m: {sap: [nombre, comun]}`) como lista. */

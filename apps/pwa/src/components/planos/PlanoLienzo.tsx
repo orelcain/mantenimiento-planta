@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { geometriaGiro, type Giro } from '@/utils/giroPlano'
 import type { Caja, PlanoBorne, PlanoBorneLibre, PlanoHoja, PlanoHojaMeta, PlanoRotulo } from '@/hooks/usePlano'
+
+export type { Giro }
 
 export type Foco =
   | { tipo: 'caja'; b: Caja }
@@ -21,6 +24,10 @@ type Props = {
   onAparato: (tag: string) => void
   onRotulo: (r: PlanoRotulo) => void
   onFondo: () => void
+  /** Giro de la hoja en grados (0/90/180/270). Hay láminas escaneadas
+   *  acostadas dentro de una página vertical: sin girarlas no se leen. */
+  giro?: Giro
+  onGirar?: () => void
 }
 
 /** La letra del plano es de ~6 pt sobre un A3 de 1131: por debajo de 2 no se lee. */
@@ -37,6 +44,7 @@ const ESCALA_COLUMNA = 1.7
  */
 export function PlanoLienzo({
   hoja, meta, mostrarEs, notasDe, foco, resaltarTag, onSalto, onBorne, onBorneLibre, onAparato, onRotulo, onFondo,
+  giro = 0, onGirar,
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -49,6 +57,9 @@ export function PlanoLienzo({
   const pinza = useRef<{ dist: number } | null>(null)
   const [pulso, setPulso] = useState<number | null>(null)
   const [W, H] = meta.vb
+  // memo: `punto` entra en las deps del foco; recrearlo en cada render
+  // re-encuadraba la vista con cada re-render y anulaba el paneo.
+  const { VW, VH, css: cssGiro, punto } = useMemo(() => geometriaGiro(giro, W, H), [giro, W, H])
 
   const aplicar = useCallback(() => {
     const c = canvasRef.current
@@ -60,24 +71,34 @@ export function PlanoLienzo({
   const ajustar = useCallback(() => {
     const r = stageRef.current?.getBoundingClientRect()
     if (!r) return
-    const s = Math.min(r.width / W, r.height / H) * 0.94
-    vista.current = { s, x: (r.width - W * s) / 2, y: (r.height - H * s) / 2 }
+    const s = Math.min(r.width / VW, r.height / VH) * 0.94
+    vista.current = { s, x: (r.width - VW * s) / 2, y: (r.height - VH * s) / 2 }
     aplicar()
-  }, [W, H, aplicar])
+  }, [VW, VH, aplicar])
 
   const acercarA = useCallback(
-    (cx: number, cy: number, escala: number) => {
+    (px: number, py: number, escala: number, tam?: readonly [number, number]) => {
       const r = stageRef.current?.getBoundingClientRect()
       if (!r) return
+      // (px, py) es un punto del DIBUJO: con la hoja girada cae en otro lado.
+      const [cx, cy] = punto(px, py)
       const chico = Math.min(r.width, r.height) < 520 // en teléfono hace falta más aumento
-      const s = Math.max(escala * (chico ? 1.35 : 1), 1.5)
+      let s = Math.max(escala * (chico ? 1.35 : 1), 1.5)
+      // Hay ubicaciones sin la posición anclada: su caja es la FIGURA entera
+      // (~300×420). Con el aumento fijo quedaba en pantalla solo papel en
+      // blanco; ahora la caja entra completa en la zona visible.
+      if (tam) {
+        const [tw, th] = giro === 90 || giro === 270 ? [tam[1], tam[0]] : tam
+        const altoVisible = chico ? r.height * 0.45 : r.height * 0.85
+        s = Math.min(s, (r.width * 0.85) / Math.max(tw, 1), altoVisible / Math.max(th, 1))
+      }
       // en movil el panel es una hoja inferior que tapa el 55% de abajo: el
       // foco va al tercio superior para que el elemento marcado quede visible
       const focoY = chico ? r.height * 0.28 : r.height / 2
       vista.current = { s, x: r.width / 2 - cx * s, y: focoY - cy * s }
       aplicar()
     },
-    [aplicar],
+    [aplicar, punto, giro],
   )
 
   const zoom = useCallback(
@@ -100,7 +121,7 @@ export function PlanoLienzo({
     if (!foco) return
     if (foco.tipo === 'caja') {
       const [x, y, w, h] = foco.b
-      acercarA(x + w / 2, y + h / 2, ESCALA_APARATO)
+      acercarA(x + w / 2, y + h / 2, ESCALA_APARATO, [w, h])
     } else {
       const x = meta.cols[String(foco.c)]
       if (x == null) return
@@ -207,9 +228,14 @@ export function PlanoLienzo({
       <div
         ref={canvasRef}
         className="absolute left-0 top-0 origin-top-left shadow-2xl"
-        style={{ width: W, height: H, background: '#FCFBF8' }}
+        style={{ width: VW, height: VH, background: '#FCFBF8' }}
         onClick={(e) => { if (e.target === e.currentTarget) onFondo() }}
       >
+       {/* La hoja girada: dibujo y zonas clicables giran JUNTOS, así los
+           toques siguen cayendo sobre la posición correcta. */}
+       <div className="absolute left-0 top-0 origin-top-left"
+            style={{ width: W, height: H, transform: cssGiro || undefined }}
+            onClick={(e) => { if (e.target === e.currentTarget) onFondo() }}>
         <div className="absolute inset-0 [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
              dangerouslySetInnerHTML={{ __html: hoja.svg }} />
 
@@ -275,14 +301,16 @@ export function PlanoLienzo({
                   rx={2} fill="none" stroke="var(--lc-aqua-bright)" strokeWidth={1.6} />
           )}
         </svg>
+       </div>
       </div>
 
-      <div data-controles className="absolute bottom-24 right-3 flex flex-col overflow-hidden rounded-card border shadow-lg md:bottom-3"
+      <div data-controles className="absolute right-3 top-3 flex flex-col overflow-hidden rounded-card border shadow-lg md:bottom-3 md:top-auto"
            style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
         {[
           ['+', 'Acercar', () => { const r = stageRef.current!.getBoundingClientRect(); zoom(1.4, r.width / 2, r.height / 2) }],
           ['−', 'Alejar', () => { const r = stageRef.current!.getBoundingClientRect(); zoom(1 / 1.4, r.width / 2, r.height / 2) }],
           ['fit', 'Ajustar hoja', ajustar],
+          ...(onGirar ? [['↻', 'Girar la hoja 90°', onGirar]] : []),
         ].map(([txt, titulo, fn]) => (
           <button key={txt as string} type="button" title={titulo as string} onClick={fn as () => void}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center border-b font-mono text-sm last:border-b-0 hover:opacity-80"

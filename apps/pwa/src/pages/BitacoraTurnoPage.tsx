@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Images, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
@@ -21,14 +21,21 @@ import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
 import { SelectorTecnico } from '@/components/bitacora/SelectorTecnico'
 import { ListaTecnicosSheet, TecnicosDelTurnoSheet } from '@/components/bitacora/TecnicosTurnoSheets'
 import { construirListaTecnicos, sugeridosPorCalendario, tecnicosPresentes } from '@/services/bitacora/listaTecnicos'
+import { OPCIONES_TAMANO, esTamanoLetra } from '@/services/bitacora/tamanoLetra'
+import { useTamanoLetraBitacora } from '@/hooks/useTamanoLetraBitacora'
 import { etiquetaCortaTurno, origenDePendiente } from '@/services/bitacora/entregaTurno'
 import { tecnicoRecordado } from '@/components/bitacora/tecnicoRecordado'
 import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
+import { PanelInspeccion } from '@/components/bitacora/PanelInspeccion'
+import { useInspeccion } from '@/hooks/useInspeccion'
+import { anotarCriterio, fijarHoraCriterio, iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
+import { TEXTO_AVISO as TEXTO_AVISO_INSPECCION, TEXTO_LIBERACION, avisoDeInspeccion, frasePorLiberacion } from '@/services/inspecciones/modeloInspeccion'
+import { inspeccionAHtmlCorreo, inspeccionATextoPlano, tituloCorreoInspeccion } from '@/services/inspecciones/inspeccionCorreo'
 import { encabezadoEvento, etiquetaTipo, posicionAlMover, posicionEnIndice, tieneHora, tiposPropiosUsados, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { copiarHtml, copiarTexto } from '@/lib/clipboard'
-import type { EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
+import type { EnlaceInspeccion, EventoBitacora, FotoEvento, TurnoMantencion } from '@/services/bitacora/bitacora.types'
 import type { User } from '@/types'
 import { bitacoraAHtmlCorreo, bitacoraATextoPlano, tituloCorreo } from '@/services/bitacora/bitacoraCorreo'
 import { cargarFotoComoJpeg, purgarFotosPendientes } from '@/services/bitacora/fotosBitacora'
@@ -46,8 +53,10 @@ import {
   fechaTurnoLarga,
   formatoMinutos,
   horarioTurno,
+  minutosDesdeInicioTurno,
   turnoAdyacente,
   turnoDesdeId,
+  turnoEnCurso,
 } from '@/services/bitacora/turnoMantencion'
 
 /**
@@ -80,7 +89,9 @@ export function BitacoraTurnoVista({
   const navigate = useNavigate()
   const turnoActual = useTurnoMantencionActual()
   const turnoParam = params.get('turno')
-  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null } | null>(null)
+  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null; desdeInspeccion?: EnlaceInspeccion; descripcionInicial?: string } | null>(null)
+  // Pestaña: el turno o la inspección de planta (Orel, 20-09-2026).
+  const [vista, setVista] = useState<'turno' | 'inspeccion'>(() => (params.get('vista') === 'inspeccion' ? 'inspeccion' : 'turno'))
   // La jerarquía (702 nodos) se carga recién al abrir el editor, y queda en caché.
   const { opciones: opcionesEquipo, cargando: cargandoEquipos } = fuente.useOpcionesEquipo(Boolean(editor))
   const turnoNavegado = useMemo(() => turnoDesdeId(turnoParam) ?? turnoActual, [turnoParam, turnoActual])
@@ -114,6 +125,8 @@ export function BitacoraTurnoVista({
   const calendario = fuente.useTecnicos(turno)
   const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
   const { ajustes, guardarAjustes } = fuente.useAjustes()
+  const favoritosRepuestos = fuente.useFavoritosRepuestos()
+  const letra = useTamanoLetraBitacora()
   // Lista de técnicos = planilla del calendario + ajustes; presentes = ajuste del
   // turno o, si nadie lo tocó, lo que dice el calendario.
   const listaTecnicos = useMemo(() => construirListaTecnicos(calendario.todos, ajustes), [calendario.todos, ajustes])
@@ -228,6 +241,144 @@ export function BitacoraTurnoVista({
   const [quienNoAplica, setQuienNoAplica] = useState('')
 
   const abrirNuevo = useCallback(() => setEditor({ evento: null, idNuevo: nuevoId(), turno }), [nuevoId, turno])
+
+  // ── Inspección de planta post-aseo ──
+  const { pauta, cambioLaPauta, inspeccion, desviaciones, resumen: resumenInsp } = useInspeccion(BITACORA_PLANTA.id, turno.id, eventos)
+  const avisoInsp = useMemo(() => avisoDeInspeccion(turno.fecha, inspeccion, resumenInsp), [turno.fecha, inspeccion, resumenInsp])
+  /**
+   * Lo que CIERRA una inspección es la entrega, no el borde del turno.
+   *
+   * Estaba atada a `esActual` y el recorrido empieza a las 04:00 con el turno cerrando a las
+   * 08:00: al día siguiente el aviso decía «quedó a medias» y no dejaba terminarla — invitaba
+   * a algo imposible (Orel, 21-09-2026). Los eventos del mismo turno tampoco se bloquean al
+   * cerrarse, así que la inspección era MÁS estricta que la bitácora donde vive.
+   *
+   * Una vez liberada queda fija: ahí el panel solo ofrece deshacer la entrega.
+   */
+  const puedeEditarInspeccion = true
+  const [inspTrabajando, setInspTrabajando] = useState(false)
+  /** El correo de la inspección se arma igual que el del turno: mismos bloques, mismo estilo. */
+  const datosCorreoInsp = useMemo(
+    () =>
+      inspeccion
+        ? { inspeccion, pauta, resumen: resumenInsp, desviaciones, turno, planta: BITACORA_PLANTA.nombre }
+        : null,
+    [inspeccion, pauta, resumenInsp, desviaciones, turno],
+  )
+  const htmlCorreoInsp = useMemo(() => (datosCorreoInsp ? inspeccionAHtmlCorreo(datosCorreoInsp) : ''), [datosCorreoInsp])
+  const fotosInsp = useMemo(() => desviaciones.reduce((n, e) => n + (e.fotos?.length ?? 0), 0), [desviaciones])
+  /** El nombre con que se firma: el mismo que la bitácora usa para el autor. */
+  const firmante = autorFijo || [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ').trim() || usuario?.email || 'Mantención'
+
+  const conAviso = useCallback(
+    async (hacer: () => Promise<void>) => {
+      setInspTrabajando(true)
+      try {
+        await hacer()
+      } catch (e) {
+        // «Revisa la conexión» manda por el camino equivocado cuando en realidad faltan permisos.
+        const sinPermiso = (e as { code?: string })?.code === 'permission-denied'
+        toast({
+          title: 'No se pudo guardar la inspección',
+          description: sinPermiso ? 'Tu cuenta no puede escribir la inspección de este turno.' : 'Revisa la conexión e inténtalo de nuevo.',
+          variant: 'destructive',
+        })
+      } finally {
+        setInspTrabajando(false)
+      }
+    },
+    [toast],
+  )
+
+  /**
+   * §9 del procedimiento: «Informar al supervisor». No se inventa un canal — es el mismo
+   * `navigator.share` con que ya sale la bitácora, y el texto se arma con lo que quedó
+   * registrado, no con lo que alguien recuerde.
+   */
+  const avisarDeLaLiberacion = useCallback(async () => {
+    const l = inspeccion?.liberacion
+    if (!l) return
+    const lineas = [
+      `*${pauta.nombre}*`,
+      `${BITACORA_PLANTA.nombre} · ${etiquetaCortaTurno(turno.id)} · ${turno.fecha}`,
+      '',
+      `*${TEXTO_LIBERACION[l.estado].titulo}* — ${frasePorLiberacion(l.estado, resumenInsp)}`,
+      `${resumenInsp.revisados} de ${resumenInsp.total} puntos revisados${resumenInsp.minutosDeRecorrido != null ? ` en ${resumenInsp.minutosDeRecorrido} min` : ''}.`,
+    ]
+    if (resumenInsp.pendientesCriticos > 0) {
+      const n = resumenInsp.pendientesCriticos
+      // Sin emoji: la piel nueva usa Lucide, no signos (`audit-piel`).
+      lineas.push(`*Atención:* ${n} ${n === 1 ? 'desviación abierta detiene' : 'desviaciones abiertas detienen'} una línea.`)
+    }
+    const abiertas = desviaciones.filter((d) => d.pendiente && !d.cierre)
+    if (abiertas.length) {
+      lineas.push('', '*Queda abierto:*', ...abiertas.map((d) => `• ${d.equipo || 'Sin equipo'} — ${d.descripcion}`))
+    }
+    lineas.push('', `Liberada ${new Date(l.en).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })} · ${l.porNombre}`)
+    try {
+      await compartirMensaje(lineas.join('\n'))
+    } catch {
+      toast({ title: 'No se pudo compartir', description: 'Copia el texto a mano desde la pantalla.', variant: 'destructive' })
+    }
+  }, [inspeccion?.liberacion, pauta.nombre, turno, resumenInsp, desviaciones, toast])
+
+  const copiarInspeccionParaCorreo = useCallback(async () => {
+    if (!datosCorreoInsp) return
+    try {
+      await copiarHtml(htmlCorreoInsp, inspeccionATextoPlano(datosCorreoInsp))
+      toast({ title: 'Copiado', description: 'Pégalo en el correo con Ctrl+V.', variant: 'success' })
+    } catch {
+      toast({ title: 'No se pudo copiar', description: 'El navegador bloqueó el portapapeles. Prueba de nuevo.', variant: 'destructive' })
+    }
+  }, [datosCorreoInsp, htmlCorreoInsp, toast])
+
+  /**
+   * Igual que en el turno: para Outlook nuevo/web las fotos van DENTRO del HTML (JPEG a
+   * 600 px). Outlook clásico trunca las base64, por eso no es la opción por defecto.
+   */
+  const copiarInspeccionConFotos = useCallback(async () => {
+    if (!datosCorreoInsp) return
+    setInspTrabajando(true)
+    try {
+      const urls = [...new Set(desviaciones.flatMap((e) => (e.fotos ?? []).map((f) => f.url)))]
+      const mapa = new Map<string, string>()
+      await Promise.all(
+        urls.map(async (u) => {
+          try {
+            mapa.set(u, (await cargarFotoComoJpeg(u, 600, 0.78)).dataUrl)
+          } catch {
+            /* esa foto queda por URL */
+          }
+        }),
+      )
+      await copiarHtml(
+        inspeccionAHtmlCorreo({ ...datosCorreoInsp, fuenteFoto: (f) => mapa.get(f.url) ?? f.url }),
+        inspeccionATextoPlano(datosCorreoInsp),
+      )
+      toast({ title: 'Copiado con fotos incrustadas', description: 'Pensado para Outlook nuevo o web.', variant: 'success' })
+    } catch {
+      toast({ title: 'No se pudo copiar', variant: 'destructive' })
+    } finally {
+      setInspTrabajando(false)
+    }
+  }, [datosCorreoInsp, desviaciones, toast])
+
+  const iniciarLaInspeccion = useCallback(
+    () =>
+      void conAviso(() =>
+        iniciarInspeccion({
+          plantId: BITACORA_PLANTA.id,
+          turnoId: turno.id,
+          fechaTurno: turno.fecha,
+          banda: turno.banda,
+          pautaId: pauta.id,
+          pautaVersion: pauta.version,
+          iniciadaEn: new Date().toISOString(),
+          iniciadaPorNombre: firmante,
+        }),
+      ),
+    [conAviso, turno, pauta, firmante],
+  )
 
   // ── Borrar con «Deshacer» (mockup iOS 27, 17-09) ──
   // El evento se esconde y el borrado de verdad (fotos incluidas) ocurre al
@@ -492,9 +643,10 @@ export function BitacoraTurnoVista({
     setTrabajando('pdf')
     try {
       const { generarPdfBitacora } = await import('@/services/bitacora/bitacoraPdf')
-      const { fotosFallidas } = await generarPdfBitacora(datosCorreo)
+      const { fotosFallidas, via } = await generarPdfBitacora(datosCorreo)
+      if (via === 'cancelado') return
       toast({
-        title: 'PDF descargado',
+        title: via === 'compartido' ? 'PDF listo para enviar' : 'PDF descargado',
         description: fotosFallidas ? `${fotosFallidas} foto(s) no se pudieron incluir.` : undefined,
         variant: fotosFallidas ? 'default' : 'success',
       })
@@ -508,8 +660,15 @@ export function BitacoraTurnoVista({
   const bajarExcel = async () => {
     setTrabajando('excel')
     try {
-      await generarExcelRecoleccion(filasMttr, nombreExcelRecoleccion(turno))
-      toast({ title: 'Excel descargado', description: 'La planilla «Recoleccion MTTR» con los eventos del turno.', variant: 'success' })
+      // HIG «Activity views»: en el celular abre la hoja de compartir (Outlook,
+      // WhatsApp), no una descarga que hay que ir a buscar a la carpeta Descargas.
+      const via = await generarExcelRecoleccion(filasMttr, nombreExcelRecoleccion(turno))
+      if (via === 'cancelado') return
+      toast({
+        title: via === 'compartido' ? 'Excel listo para enviar' : 'Excel descargado',
+        description: 'La planilla «Recoleccion MTTR» con los eventos del turno.',
+        variant: 'success',
+      })
     } catch {
       toast({ title: 'No se pudo generar el Excel', variant: 'destructive' })
     } finally {
@@ -782,6 +941,157 @@ export function BitacoraTurnoVista({
         </div>
       </header>
 
+      {/* Dos pestañas: lo que pasó en el turno y la pauta de inspección de planta. El nombre
+          completo del procedimiento no cabe en una cápsula de 375 px, así que va de título
+          adentro (Orel pidió que dijera «inspección post aseo / detención prolongada»). */}
+      <SegmentedControl
+        className="px-1"
+        ariaLabel="Qué se está viendo de este turno"
+        value={vista}
+        onChange={(v) => {
+          setVista(v)
+          setParams(
+            (p) => {
+              const n = new URLSearchParams(p)
+              if (v === 'inspeccion') n.set('vista', 'inspeccion')
+              else n.delete('vista')
+              return n
+            },
+            { replace: true },
+          )
+        }}
+        segments={[
+          { value: 'turno', label: 'Turno' },
+          {
+            value: 'inspeccion',
+            label: (
+              <span className="flex items-center gap-1.5">
+                Inspección post-aseo
+                {/* Un punto, no un número: lo que hay que saber es que falta mirarla. */}
+                {avisoInsp && <span aria-label={TEXTO_AVISO_INSPECCION[avisoInsp]} className="size-1.5 rounded-full bg-ink-warn" />}
+              </span>
+            ),
+          },
+        ]}
+      />
+
+      {vista === 'turno' && avisoInsp && avisoInsp !== 'toca' && (
+        <button
+          type="button"
+          onClick={() => setVista('inspeccion')}
+          className="mx-1 flex min-h-[44px] items-center gap-2 rounded-ctl border border-ink-warn/30 bg-ink-warn/10 px-3 text-left text-footnote text-ink-warn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&>svg]:size-4 [&>svg]:shrink-0"
+        >
+          <AlertTriangle aria-hidden />
+          <span className="min-w-0 flex-1">{TEXTO_AVISO_INSPECCION[avisoInsp]}</span>
+          <ChevronRight aria-hidden />
+        </button>
+      )}
+
+      {vista === 'inspeccion' ? (
+        <div className="px-1">
+          <PanelInspeccion
+            pauta={pauta}
+            inspeccion={inspeccion}
+            desviaciones={desviaciones}
+            resumen={resumenInsp}
+            editable={puedeEditarInspeccion}
+            cambioLaPauta={cambioLaPauta}
+            tocaHoy={avisoInsp === 'toca'}
+            trabajando={inspTrabajando}
+            onIniciar={iniciarLaInspeccion}
+            onMarcar={(criterioId, resultado) =>
+              // La hora solo se sella si el turno está CORRIENDO. Completar el domingo el lunes
+              // a las 18:09 dejaba siete marcas a las 18:09 y un recorrido inventado; mismo
+              // criterio que ya rige en los eventos (Orel, 21-09-2026).
+              void conAviso(() =>
+                marcarCriterio(
+                  BITACORA_PLANTA.id,
+                  turno.id,
+                  criterioId,
+                  resultado,
+                  turnoEnCurso(turno) ? new Date().toISOString() : null,
+                ),
+              )
+            }
+            onFijarHora={(criterioId, hhmm) =>
+              void conAviso(() => fijarHoraCriterio(BITACORA_PLANTA.id, turno.id, criterioId, isoEnTurno(turno, hhmm)))
+            }
+            onAnotar={(criterioId, nota) => void conAviso(() => anotarCriterio(BITACORA_PLANTA.id, turno.id, criterioId, nota))}
+            onNuevaDesviacion={(criterioId, nota) =>
+              inspeccion &&
+              setEditor({
+                evento: null,
+                idNuevo: nuevoId(),
+                turno,
+                desdeInspeccion: { id: inspeccion.id, criterioId },
+                descripcionInicial: nota,
+              })
+            }
+            onAbrirEvento={(e) => setEditor({ evento: e, idNuevo: '', turno })}
+            onLiberar={(estado) =>
+              void conAviso(() =>
+                liberarPlanta(BITACORA_PLANTA.id, turno.id, {
+                  estado,
+                  en: new Date().toISOString(),
+                  porNombre: firmante,
+                  // La foto del momento: el informe de entrega no puede decir otra cosa
+                  // mañana porque alguien cerró un pendiente.
+                  resumen: resumenInsp,
+                }),
+              )
+            }
+            onDeshacerLiberacion={() => void conAviso(() => liberarPlanta(BITACORA_PLANTA.id, turno.id, null))}
+          />
+
+          {/* Enviar: la misma mecánica del turno — copiar para pegar en Outlook, o WhatsApp.
+              §9 del procedimiento: «Informar al supervisor». */}
+          {datosCorreoInsp && (
+            <section className="mt-5 flex flex-col gap-3 rounded-card border border-border bg-card p-4">
+              <h3 className="text-subhead font-semibold">Enviar la inspección</h3>
+              <p className="text-caption text-muted-foreground">
+                Lleva el criterio de liberación, el registro de desviaciones y el resultado final, como pide el procedimiento.
+              </p>
+              {/* El correo salía diciendo «La planta todavía no se ha liberado» cuando en
+                  terreno ya se había entregado: faltaba marcar la entrega y nadie lo veía
+                  hasta leer la vista previa (Orel, 21-09-2026). */}
+              {!inspeccion?.liberacion && (
+                <p className="flex items-start gap-2 rounded-ctl bg-ink-warn/10 p-2.5 text-caption leading-snug text-ink-warn [&>svg]:mt-px [&>svg]:size-4 [&>svg]:shrink-0">
+                  <AlertTriangle aria-hidden /> Todavía no marcaste la entrega y el correo lo va a decir. Márcala
+                  arriba, en «Liberación de planta».
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void copiarInspeccionParaCorreo()}>
+                  <Copy /> Copiar para correo
+                </Button>
+                <Button
+                  variant="tinted"
+                  onClick={() => void copiarTexto(tituloCorreoInspeccion({ turno, planta: BITACORA_PLANTA.nombre }))}
+                >
+                  Copiar asunto
+                </Button>
+                {fotosInsp > 0 && (
+                  <Button variant="tinted" onClick={() => void copiarInspeccionConFotos()} disabled={inspTrabajando}>
+                    {inspTrabajando ? <Loader2 className="animate-spin" /> : <Images />} Copiar con fotos incrustadas
+                  </Button>
+                )}
+                {inspeccion?.liberacion && (
+                  <Button variant="tinted" onClick={() => void avisarDeLaLiberacion()}>
+                    <Share /> Por WhatsApp
+                  </Button>
+                )}
+              </div>
+              <p className="text-caption text-muted-foreground">
+                Así se va a ver al pegarlo{fotosInsp > 0 ? ` · ${fotosInsp} ${fotosInsp === 1 ? 'foto' : 'fotos'}` : ''}.
+              </p>
+              {/* La vista previa va TAMBIÉN en el teléfono: la inspección se hace desde ahí y
+                  hay que poder mirar el correo antes de copiarlo. */}
+              <VistaPreviaCorreo html={htmlCorreoInsp} ancho={720} />
+            </section>
+          )}
+        </div>
+      ) : (
+      <>
       {/* Escritorio de turno (mockup A, 18-09-2026; HIG «Split views»): en PC, tres
           columnas — contexto (300 px) · eventos · vista previa del correo (380 px,
           fija); entre 768 y 1280 px, dos (contexto y eventos apilados, correo a la
@@ -909,7 +1219,10 @@ export function BitacoraTurnoVista({
       </div>
 
       {/* Contexto del turno: técnicos, resumen, observación (y en el teléfono, la planilla). */}
-      <div className="order-2 flex flex-col gap-5 md:order-none md:[grid-area:contexto]">
+      {/* Teléfono: pendientes anteriores (1) → eventos (2) → este contexto (3). Los eventos
+          quedaban a tres pantallas (pasada visual 19-09-2026, HIG «Layout»: lo importante
+          arriba). El PC no cambia: va en columnas por `grid-area`. */}
+      <div className="order-3 flex flex-col gap-5 md:order-none md:[grid-area:contexto]">
       {/* Técnicos del turno: quién está de verdad (mockup aprobado, pieza 1). */}
       {/* Columna de contexto como listas agrupadas (mockup A aprobado 18-09-2026;
           HIG «Lists and tables»): encabezado secundario, filas rótulo · valor
@@ -932,7 +1245,8 @@ export function BitacoraTurnoVista({
         }
         footer={
           // El calendario no siempre refleja el turno real: solo sugiere, no marca.
-          deTurnoCalendario.length > 0 ? (
+          // Si dice lo mismo que los presentes, la línea sobra (pasada visual 19-09).
+          deTurnoCalendario.length > 0 && [...deTurnoCalendario].sort().join('|') !== [...presentes.nombres].sort().join('|') ? (
             <span className="italic">
               {presentes.ajustado ? 'El calendario decía' : 'El calendario sugiere'}: {deTurnoCalendario.join(', ')}
             </span>
@@ -972,8 +1286,43 @@ export function BitacoraTurnoVista({
         const fallas = `${r.fallas} ${r.fallas === 1 ? 'falla' : 'fallas'}`
         const operando = minutosOperando(minutosDelTurno(turno), r.minutosParada)
         const mtbf = mtbfDelTurno(turno, r)
+        // Teléfono: las cifras en grilla de 3 (como la tarjeta de Inicio). La lista de 7
+        // filas altas ocupaba una pantalla entera y explicaba el MTTR tres veces; la
+        // explicación queda una sola vez, bajo la planilla MTTR (pasada visual 19-09).
+        const celdas: { id: string; rotulo: string; valor: string; punto?: 'ok' | 'warn' | 'crit' }[] = [
+          { id: 'eventos', rotulo: 'eventos', valor: String(r.eventos) },
+          { id: 'parada', rotulo: r.conParada > 0 ? `de parada · ${paradas}` : 'de parada', valor: formatoMinutos(r.minutosParada), punto: r.minutosParada > 0 ? 'crit' : undefined },
+          ...(r.fallas > 0 ? [{ id: 'fallas', rotulo: r.fallas === 1 ? 'falla' : 'fallas', valor: String(r.fallas), punto: 'crit' as const }] : []),
+          ...(r.afectados > 0 ? [{ id: 'afectados', rotulo: 'siguió gracias a Mantención', valor: String(r.afectados), punto: 'warn' as const }] : []),
+          { id: 'ventana', rotulo: 'sin detener producción', valor: String(r.enVentana), punto: r.enVentana > 0 ? 'ok' : undefined },
+          {
+            id: 'pendientes',
+            rotulo: r.pendientesCerrados > 0 ? `pendientes · ${r.pendientesCerrados} ${r.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}` : 'pendientes',
+            valor: String(r.pendientesDelTurno),
+            punto: r.pendientes > 0 ? 'warn' : r.pendientesCerrados > 0 ? 'ok' : undefined,
+          },
+          { id: 'mttr', rotulo: 'MTTR', valor: r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin) },
+          { id: 'mtbf', rotulo: 'MTBF', valor: mtbf == null ? '—' : formatoMinutos(mtbf) },
+        ]
         return (
+          <>
+          <section aria-label="Resumen del turno" className="flex flex-col md:hidden">
+            <h3 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">Resumen del turno</h3>
+            <dl className="grid grid-cols-3 gap-x-3 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+              {celdas.map((c) => (
+                <div key={c.id} className="flex min-w-0 flex-col-reverse gap-0.5">
+                  <dt className="flex items-start gap-1.5 text-footnote leading-tight text-muted-foreground">
+                    {c.punto && <span className={`mt-[0.3em] size-2 shrink-0 rounded-full ${PUNTO[c.punto]}`} aria-hidden />}
+                    <span className="min-w-0">{c.rotulo}</span>
+                  </dt>
+                  <dd className="text-headline tabular-nums">{c.valor}</dd>
+                </div>
+              ))}
+            </dl>
+            {r.fallas === 0 && <p className="px-4 pt-2 text-footnote text-muted-foreground">Sin fallas en el turno: MTTR y MTBF no aplican.</p>}
+          </section>
           <ListGroup
+            className="hidden md:flex"
             aria-label="Resumen del turno"
             title="Resumen del turno"
             footer={
@@ -1034,6 +1383,7 @@ export function BitacoraTurnoVista({
               value={cifra(mtbf == null ? '—' : formatoMinutos(mtbf))}
             />
           </ListGroup>
+          </>
         )
       })()}
 
@@ -1081,10 +1431,36 @@ export function BitacoraTurnoVista({
         </section>
       )}
 
+      {/* HIG «Typography»: la letra sigue el tamaño del teléfono. En iPhone lo lee
+          solo; en Android se elige aquí (19-09-2026, capturas al 100/124/135 %). */}
+      <div className="flex flex-col gap-1.5">
+        <label className="flex min-h-[44px] flex-wrap items-center justify-between gap-x-3 rounded-card bg-card pl-4 pr-2 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+          <span className="text-body">Tamaño de letra</span>
+          <select
+            value={letra.tamano}
+            onChange={(e) => {
+              if (esTamanoLetra(e.target.value)) letra.cambiar(e.target.value)
+            }}
+            className="ml-auto min-h-[44px] cursor-pointer rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {OPCIONES_TAMANO.filter((o) => o.value !== 'telefono' || letra.hayTelefono).map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="px-4 text-footnote text-muted-foreground">
+          {letra.tamano === 'telefono'
+            ? 'Sigue el tamaño del texto de Ajustes del iPhone.'
+            : 'Solo en este teléfono. También se puede ampliar con dos dedos.'}
+        </p>
+      </div>
+
       </div>
 
         {/* Línea de tiempo */}
-        <section aria-label="Eventos del turno" className="order-3 flex flex-col gap-5 md:order-none md:[grid-area:centro]">
+        <section aria-label="Eventos del turno" className="order-2 flex flex-col gap-5 md:order-none md:[grid-area:centro]">
           {cargando ? (
             <div className="flex flex-col gap-2 rounded-card bg-card p-4">
               {[0, 1, 2].map((i) => (
@@ -1181,12 +1557,14 @@ export function BitacoraTurnoVista({
           </div>
           <VistaPreviaCorreo html={htmlCorreo} />
           <p className="px-4 pt-2 text-footnote text-muted-foreground">
-            Outlook clásico: usa «Copiar para correo». Si en Outlook nuevo o web las fotos no aparecen, usa «Copiar con fotos incrustadas».
+            Outlook clásico: usa «Copiar para correo». En Outlook nuevo, web o celular usa «Copiar con fotos incrustadas»; si la letra sale toda igual, pega con «Mantener formato de origen».
           </p>
           </>
           )}
         </section>
       </div>
+      </>
+      )}
 
       <EventoBitacoraSheet
         open={!!editor}
@@ -1197,14 +1575,19 @@ export function BitacoraTurnoVista({
         sugerenciasEquipo={sugerenciasEquipo}
         sugerenciasTipo={sugerenciasTipo}
         autorFijo={autorFijo}
+        descripcionInicial={editor?.descripcionInicial ?? ''}
         puedeEditarMaestro={!autorFijo}
         tecnicos={tecnicos}
         opcionesEquipo={opcionesEquipo}
         cargandoEquipos={cargandoEquipos}
         subirFoto={fuente.subirFoto}
         fuenteRepuestos={fuente.repuestos}
+        // El pase es de la planta, no de una persona: «Mis favoritos» no aplica.
+        favoritosRepuestos={autorFijo ? null : favoritosRepuestos}
         onGuardar={async (id, datos, nuevo) => {
-          await guardar(id, datos, nuevo)
+          // La desviación es un evento normal; lo único que la distingue es de qué punto de
+          // la pauta salió. Se inyecta acá para no tocar el formulario de eventos.
+          await guardar(id, editor?.desdeInspeccion ? { ...datos, inspeccion: editor.desdeInspeccion } : datos, nuevo)
           // Quedó en otro turno (se registró en el equivocado): se dice dónde, con «Ver».
           const destino = datos.turnoId
           if (destino && editor && destino !== editor.turno.id && datos.estado !== 'borrador') {
@@ -1361,7 +1744,7 @@ export function BitacoraTurnoVista({
           onChange={(e) => setTextoObs(e.target.value)}
           maxLength={3000}
           placeholder="Planta operando normal. Queda pendiente el motor de tensado de la enzunchadora…"
-          className="min-h-[160px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+          className="min-h-[160px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
         />
       </Sheet>
 
@@ -1414,7 +1797,7 @@ export function BitacoraTurnoVista({
               onChange={(e) => setMotivoNoAplica(e.target.value)}
               maxLength={300}
               placeholder="Se resolvió solo, estaba duplicado, se cambió el equipo…"
-              className="min-h-[88px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-[16px] leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+              className="min-h-[88px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
             />
           </div>
         </div>
@@ -1523,10 +1906,15 @@ function AccionesCabecera({
  */
 const ANCHO_CORREO = 1000
 
-function VistaPreviaCorreo({ html }: { html: string }) {
+/**
+ * `ancho`: el lienzo sobre el que se dibuja el correo antes de escalarlo. El del turno usa
+ * los 1000 px de siempre; el de la inspección mide 680, y darle el lienzo ancho lo dejaba al
+ * 31 % en un teléfono — ilegible por 320 px de papel en blanco.
+ */
+function VistaPreviaCorreo({ html, ancho = ANCHO_CORREO }: { html: string; ancho?: number }) {
   const ref = useRef<HTMLIFrameElement>(null)
   const [alto, setAlto] = useState(480)
-  const doc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff;}body{padding:20px;width:${ANCHO_CORREO - 40}px;}</style></head><body>${html}</body></html>`
+  const doc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#fff;}body{padding:20px;width:${ancho - 40}px;}</style></head><body>${html}</body></html>`
 
   /**
    * El correo se dibuja a SU ancho real y se escala para caber en la columna.
@@ -1537,10 +1925,10 @@ function VistaPreviaCorreo({ html }: { html: string }) {
     const iframe = ref.current
     const d = iframe?.contentDocument
     if (!iframe || !d?.body) return
-    const escala = Math.min(1, iframe.clientWidth / ANCHO_CORREO)
+    const escala = Math.min(1, iframe.clientWidth / ancho)
     d.documentElement.style.zoom = String(escala)
     setAlto(Math.max(240, Math.ceil(d.body.scrollHeight * escala) + 4))
-  }, [])
+  }, [ancho])
 
   useEffect(() => {
     const iframe = ref.current
@@ -1566,4 +1954,17 @@ function VistaPreviaCorreo({ html }: { html: string }) {
       className="w-full rounded-card border-0 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
     />
   )
+}
+
+/**
+ * `HH:mm` → el instante ISO que le corresponde DENTRO del turno. No se puede armar con la
+ * fecha del turno a secas: el turno noche va de 00:00 a 08:00 pero el nocturno de otras bandas
+ * cruza la medianoche, y ahí la fecha del día siguiente es la correcta. `minutosDesdeInicioTurno`
+ * ya resuelve esa cuenta, así que se apoya en ella desde el inicio real del turno.
+ */
+function isoEnTurno(turno: TurnoMantencion, hhmm: string | null): string | null {
+  if (!hhmm) return null
+  const min = minutosDesdeInicioTurno(turno, hhmm)
+  if (!Number.isFinite(min) || min === Number.MAX_SAFE_INTEGER) return null
+  return new Date(turno.inicio.getTime() + min * 60_000).toISOString()
 }

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   attributeUnscheduledCycles,
   applyUnscheduledAttribution,
+  colasDelTurno,
   esColaDeEsteTurno,
   type CycleInterval,
 } from '../graderUnscheduledAttribution'
@@ -282,6 +283,18 @@ describe('esColaDeEsteTurno — la cola es del turno que siguió de largo', () =
     expect(esColaDeEsteTurno(lejos, v('2026-08-10T07:45:00', '2026-08-10T15:30:00'), [])).toBe(false)
   })
 
+  it('un turno EXTRAORDINARIO sin configurar NO es cola aunque arranque a una hora (Chonchi 26-sep)', () => {
+    // Turno 2 cerró 15:00 (última pieza 15:15); a las 16:15 arrancó otro turno de
+    // HG hasta las 22:55. Con la continuidad sola (60 min ≤ 90) se colgaba entero.
+    const extraordinario = tramo('2026-09-26T16:15:00', '2026-09-26T22:50:00')
+    expect(esColaDeEsteTurno(extraordinario, v('2026-09-26T07:15:00', '2026-09-26T15:00:00'), [])).toBe(false)
+  })
+
+  it('con hueco, una cola CORTA sigue contando (Filete 15:40→16:30, Yal 14:05→15:15)', () => {
+    expect(esColaDeEsteTurno(tramo('2026-08-10T15:40:00', '2026-08-10T16:25:00'), v('2026-08-10T07:45:00', '2026-08-10T15:30:00'), [])).toBe(true)
+    expect(esColaDeEsteTurno(tramo('2026-07-10T14:05:00', '2026-07-10T15:10:00'), v('2026-07-10T15:15:00', '2026-07-10T23:54:00'), [])).toBe(true)
+  })
+
   it('pegado al cierre es cola aunque el bloque dure horas', () => {
     const largo = tramo('2026-08-10T15:40:00', '2026-08-10T18:35:00')
     expect(esColaDeEsteTurno(largo, v('2026-08-10T07:45:00', '2026-08-10T15:30:00'), [])).toBe(true)
@@ -304,5 +317,45 @@ describe('esColaDeEsteTurno — la cola es del turno que siguió de largo', () =
   it('lo que cae DENTRO de otro turno es de ese turno', () => {
     const dentro = tramo('2026-08-10T10:00:00', '2026-08-10T10:25:00')
     expect(esColaDeEsteTurno(dentro, v('2026-08-10T07:45:00', '2026-08-10T09:30:00'), [DIA])).toBe(false)
+  })
+})
+
+describe('caso real Chonchi 26-sep: turno extraordinario sin configurar en Shoplogix', () => {
+  // Turno 2 07:15→15:00. El Unscheduled del día trae el arranque anticipado
+  // (06:00→07:10, es del Turno 2) y el turno extraordinario (16:15→22:55, NO).
+  const turno2 = shift({ dateKey: '2026-09-26', shiftId: 'Turno 2', cycles: 13215,
+                         start: wall('2026-09-26T07:15:00'), end: wall('2026-09-26T15:00:00') })
+  const antes = ['06:00', '06:20', '06:40', '07:00'].map(h => iv(h, 100, '2026-09-26'))
+  const extra: CycleInterval[] = []
+  for (let m = 16 * 60 + 15; m <= 22 * 60 + 50; m += 5) {
+    if (m >= 19 * 60 && m < 19 * 60 + 45) continue   // la pausa de 19:00→19:45
+    const hh = String(Math.floor(m / 60)).padStart(2, '0')
+    const mm = String(m % 60).padStart(2, '0')
+    extra.push(iv(hh + ':' + mm, 70, '2026-09-26'))
+  }
+
+  it('el Turno 2 se queda con el arranque anticipado y NADA del extraordinario', () => {
+    const r = attributeUnscheduledCycles([...antes, ...extra], [turno2])
+    expect(r.byShiftKey.get('2026-09-26__Turno 2')).toBe(400)
+    expect(r.unattributed).toBe(extra.length * 70)
+    expect(r.total).toBe(400 + extra.length * 70)
+  })
+
+  it('el extraordinario queda visible como bloque sin turno, no desaparece', () => {
+    const uns = shift({ dateKey: '2026-09-26', shiftId: 'Unscheduled', cycles: 400 + extra.length * 70, unscheduled: true,
+                        start: wall('2026-09-26T06:00:00'), end: wall('2026-09-26T23:37:00') })
+    const out = applyUnscheduledAttribution([turno2, uns], new Map([['2026-09-26__Unscheduled', [...antes, ...extra]]]))
+    expect(out.find(s => s.unscheduled)?.cycles).toBe(extra.length * 70)
+    expect(out.find(s => s.shiftId === 'Turno 2')?.cycles).toBe(13215 + 400)
+  })
+
+  it('colasDelTurno (la vista de turno) decide igual que la matriz', () => {
+    const tramos = [
+      { start: wall('2026-09-26T06:00:00').getTime(), end: wall('2026-09-26T07:00:00').getTime(), pieces: 400 },
+      { start: wall('2026-09-26T16:15:00').getTime(), end: wall('2026-09-26T18:55:00').getTime(), pieces: 2000 },
+      { start: wall('2026-09-26T19:45:00').getTime(), end: wall('2026-09-26T22:50:00').getTime(), pieces: 2500 },
+    ]
+    const ventana = { start: wall('2026-09-26T07:15:00'), end: wall('2026-09-26T15:00:00') }
+    expect(colasDelTurno(tramos, ventana, []).map(t => t.pieces)).toEqual([400])
   })
 })

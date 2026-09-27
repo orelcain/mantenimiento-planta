@@ -13,6 +13,10 @@ import { fechaLocal } from '@/services/bitacora/turnoMantencion'
  * exigiría índice compuesto): la planta se filtra en el teléfono. Es una lectura
  * puntual por período elegido, no un listener: el historial se mira, no se vigila.
  *
+ * Lee el período elegido Y el anterior del mismo largo en la MISMA consulta
+ * (desde `2 × días`): el anterior es la referencia «¿mejoramos?» de las cifras
+ * (19-09-2026). La bitácora trae pocos eventos, así que el costo es el mismo orden.
+ *
  * El rango va acotado por los DOS lados y con tope de documentos: sin el `<=`,
  * un teléfono con el reloj adelantado metía su evento «de mañana» en todos los
  * períodos; sin el tope, una temporada cargada se leía entera de una sentada
@@ -21,10 +25,11 @@ import { fechaLocal } from '@/services/bitacora/turnoMantencion'
 const TOPE_EVENTOS = 1500
 
 export function useHistorialBitacora(dias: number) {
-  const [eventos, setEventos] = useState<EventoBitacora[]>([])
+  const [todos, setTodos] = useState<EventoBitacora[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const desde = useMemo(() => fechaDesde(dias), [dias])
+  const desdeAnterior = useMemo(() => fechaDesde(dias * 2), [dias])
   const hasta = useMemo(() => fechaLocal(new Date()), [dias])
 
   useEffect(() => {
@@ -34,7 +39,7 @@ export function useHistorialBitacora(dias: number) {
     getDocs(
       query(
         collection(db, BITACORA_COLECCION),
-        where('fechaTurno', '>=', desde),
+        where('fechaTurno', '>=', desdeAnterior),
         where('fechaTurno', '<=', hasta),
         // Descendente: si el período supera el tope, lo que se pierde es lo más
         // viejo, no lo de ayer.
@@ -44,7 +49,7 @@ export function useHistorialBitacora(dias: number) {
     )
       .then((snap) => {
         if (!vivo) return
-        setEventos(
+        setTodos(
           snap.docs
             .map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora)
             .filter((e) => e.plantId === BITACORA_PLANTA.id),
@@ -68,10 +73,17 @@ export function useHistorialBitacora(dias: number) {
     return () => {
       vivo = false
     }
-  }, [desde, hasta])
+  }, [desdeAnterior, hasta])
 
-  const filas = useMemo(() => filasPorTurno(eventos), [eventos])
-  const resumen = useMemo(() => resumirPeriodo(eventos, desde, hasta), [eventos, desde, hasta])
+  // El período elegido y el anterior salen de la misma lectura.
+  const actuales = useMemo(() => todos.filter((e) => e.fechaTurno >= desde), [todos, desde])
+  const anteriores = useMemo(() => todos.filter((e) => e.fechaTurno < desde), [todos, desde])
+  const filas = useMemo(() => filasPorTurno(actuales), [actuales])
+  const resumen = useMemo(() => resumirPeriodo(actuales, desde, hasta), [actuales, desde, hasta])
+  const resumenAnterior = useMemo(
+    () => (anteriores.length ? resumirPeriodo(anteriores, desdeAnterior, anteriores[0]!.fechaTurno) : null),
+    [anteriores, desdeAnterior],
+  )
 
-  return { eventos, filas, resumen, cargando, error }
+  return { eventos: actuales, filas, resumen, resumenAnterior, cargando, error }
 }

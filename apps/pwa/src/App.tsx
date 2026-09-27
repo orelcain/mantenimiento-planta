@@ -36,6 +36,8 @@ const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuert
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
 const BitacoraRealDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraRealDevPage })))
 const PaseBitacoraDevPage = lazyWithReload(() => import('@/pages/dev/PaseBitacoraDevPage').then((mod) => ({ default: mod.PaseBitacoraDevPage })))
+const PendientesDevPage = lazyWithReload(() => import('@/pages/dev/PendientesDevPage').then((mod) => ({ default: mod.PendientesDevPage })))
+const InspeccionDevPage = lazyWithReload(() => import('@/pages/dev/InspeccionDevPage').then((mod) => ({ default: mod.InspeccionDevPage })))
 const PaseBitacoraPage = lazyWithReload(() => import('@/pages/PaseBitacoraPage').then((mod) => ({ default: mod.PaseBitacoraPage })))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
@@ -74,6 +76,7 @@ const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPa
 const ShoplogixCredentialsPage = lazyWithReload(() => import('@/pages/admin/ShoplogixCredentialsPage').then((mod) => ({ default: mod.ShoplogixCredentialsPage })))
 const AdminPanelPage = lazyWithReload(() => import('@/pages/admin/AdminPanelPage').then((mod) => ({ default: mod.AdminPanelPage })))
 const MachineCapacityPage = lazyWithReload(() => import('@/pages/admin/MachineCapacityPage').then((mod) => ({ default: mod.MachineCapacityPage })))
+const EditorLineasProcesoPage = lazyWithReload(() => import('@/pages/admin/EditorLineasProcesoPage'))
 const ShoplogixNotificationsConfigPage = lazyWithReload(() => import('@/pages/admin/ShoplogixNotificationsConfigPage').then((mod) => ({ default: mod.ShoplogixNotificationsConfigPage })))
 const TelegramSyncPage = lazyWithReload(() => import('@/pages/admin/TelegramSyncPage').then((mod) => ({ default: mod.TelegramSyncPage })))
 const PowerBIExportPage = lazyWithReload(() => import('@/pages/admin/PowerBIExportPage').then((mod) => ({ default: mod.PowerBIExportPage })))
@@ -345,6 +348,45 @@ export function App() {
                     <Suspense fallback={<LoadingScreen />}>
                       <BitacoraDevPage />
                     </Suspense>
+                  }
+                />
+              )}
+              {/* Solo desarrollo: la bandeja «Nombrados a mano en la bitácora» del editor de
+                  líneas con datos de ejemplo, sin Firestore. */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/pendientes"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <PendientesDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {/* Solo desarrollo: el panel de inspección post-aseo con datos de ejemplo, sin
+                  Firestore, para mirarlo contra el HIG sin sesión. */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/inspeccion"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <InspeccionDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {/* Solo desarrollo: el editor de líneas sin el paso de contraseña del panel
+                  admin, para verificarlo en local (lee Firestore con la sesión abierta). */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/lineas-proceso"
+                  element={
+                    // Fuera de MainLayout nadie le da altura al lienzo: se la damos acá.
+                    <div className="h-dvh">
+                      <Suspense fallback={<LoadingScreen />}>
+                        <EditorLineasProcesoPage />
+                      </Suspense>
+                    </div>
                   }
                 />
               )}
@@ -829,6 +871,15 @@ export function App() {
                 <RequireReAuth reason="antes de configurar la velocidad nameplate de las Baaders">
                   <Suspense fallback={<LoadingScreen />}>
                     <MachineCapacityPage />
+                  </Suspense>
+                </RequireReAuth>
+              </AdminRoute>
+            } />
+            <Route path="admin/lineas-proceso" element={
+              <AdminRoute>
+                <RequireReAuth reason="antes de editar las líneas de proceso">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <EditorLineasProcesoPage />
                   </Suspense>
                 </RequireReAuth>
               </AdminRoute>

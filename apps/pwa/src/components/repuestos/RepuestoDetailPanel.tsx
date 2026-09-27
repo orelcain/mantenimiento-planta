@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
-import { X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
+import { X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Shapes, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { findMachineBySlug } from '@/data/learningMachines'
 import { machinesForCommonSap } from '@/data/commonPartsByMachine'
@@ -56,6 +56,8 @@ interface RepuestoDetailPanelProps {
   onPhotos?: () => void
   /** Ver vínculos al manual. */
   onManual?: () => void
+  /** Figura del despiece donde va la pieza (por código de fabricante); null = no está en un despiece. */
+  dibujo?: { fig: string; abrir: () => void } | null
   /** ¿el repuesto está en favoritos? */
   isFavorite?: boolean
   /** Alternar favorito. */
@@ -157,7 +159,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -408,8 +410,8 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
         )}
 
         {/* Acciones de consulta (todos los usuarios) */}
-        {(onSpecs || onPhotos || onManual) && (
-          <div className="mb-3 grid grid-cols-3 gap-1.5">
+        {(onSpecs || onPhotos || onManual || dibujo) && (
+          <div className={['mb-3 grid gap-1.5', dibujo ? 'grid-cols-2' : 'grid-cols-3'].join(' ')}>
             {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} contenido={!!item.tieneFicha} />}
             {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={(item.fotos?.length ?? 0) + (item.fotosCatalogo?.length ?? 0)} />}
             {/*
@@ -418,6 +420,9 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
               habría dejado en gris un botón que abre el manual del KNURO. Mientras carga no se
               afirma nada (`undefined` = sin señal), para no decir «vacío» antes de saberlo.
             */}
+            {dibujo && (
+              <ActionBtn icon={Shapes} label={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />
+            )}
             {onManual && (
               <ActionBtn
                 icon={BookOpen}

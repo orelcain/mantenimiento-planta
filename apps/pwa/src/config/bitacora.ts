@@ -106,6 +106,15 @@ export const CONTINGENCIAS_SUGERIDAS = [
 ]
 
 /**
+ * «¿Cuánto duró?», cuando el evento se carga tarde (su turno ya terminó, o
+ * empezó hace más de 2 h) y «Terminó ahora» ya no sirve. Medido el 18-09-2026:
+ * las reparaciones reales con hora duraron de 5 a 23 min, y las cargadas tarde
+ * se anotaron con hora redonda (10:00–10:05, 11:00–11:20): a esa altura ya se
+ * está estimando, y elegir una duración es más honesto que inventar un término.
+ */
+export const DURACIONES_SUGERIDAS_MIN = [5, 10, 15, 20, 30, 45, 60] as const
+
+/**
  * Momentos típicos en que Mantención interviene sin parar producción.
  * Son sugerencias: el campo acepta cualquier texto.
  */

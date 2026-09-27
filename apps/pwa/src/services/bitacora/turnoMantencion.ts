@@ -160,6 +160,23 @@ export function horaSugeridaParaEvento(turno: TurnoMantencion, ahora: Date = new
   return horaDe(turno.inicio)
 }
 
+/** ¿El turno está corriendo ahora? (ni futuro ni ya cerrado). */
+export function turnoEnCurso(turno: Pick<TurnoMantencion, 'inicio' | 'fin'>, ahora: Date = new Date()): boolean {
+  return ahora >= turno.inicio && ahora < turno.fin
+}
+
+/**
+ * Semilla de «Inicio» para un evento NUEVO: «ahora» solo si el turno elegido
+ * está corriendo. Con el turno ya cerrado, `horaSugeridaParaEvento` rellenaba
+ * con el INICIO DEL TURNO (p. ej. 08:00) — un valor con forma de hora real que
+ * nadie escribió y que nadie revisaba: medido el 19-09-2026, el 27% de los
+ * eventos se carga con su turno ya terminado. Mejor vacío y obligatorio, igual
+ * que ya funciona con «Qué se hizo» e «Impacto».
+ */
+export function horaInicioNuevoEvento(turno: TurnoMantencion, ahora: Date = new Date()): string {
+  return turnoEnCurso(turno, ahora) ? horaDe(ahora) : ''
+}
+
 /** Minutos desde el inicio del turno hasta `HH:mm` (para ordenar eventos). */
 export function minutosDesdeInicioTurno(turno: Pick<TurnoMantencion, 'banda'>, hhmm: string): number {
   const m = hhmm.match(/^(\d{1,2}):(\d{2})$/)
@@ -186,6 +203,14 @@ export function minutosEntre(inicio: string, termino: string | null | undefined)
   const ma = Number(a[1]) * 60 + Number(a[2])
   const mb = Number(b[1]) * 60 + Number(b[2])
   return (mb - ma + 1440) % 1440
+}
+
+/** `HH:mm` más `minutos`, dando la vuelta por medianoche (23:50 + 20 = 00:10). Null si la hora no es válida. */
+export function horaMasMinutos(hhmm: string, minutos: number): string | null {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return null
+  const total = (((Number(m[1]) * 60 + Number(m[2]) + Math.round(minutos)) % 1440) + 1440) % 1440
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`
 }
 
 /** "35 min", "1 h 05 min", "2 h". */
