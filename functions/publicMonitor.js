@@ -335,6 +335,24 @@ function distanciaA(t, ventana) {
 const MAX_CONTINUIDAD_MS = 90 * 60 * 1000
 
 /**
+ * Una cola larga tiene que estar PEGADA al turno. Con un hueco real de sensor
+ * antes y horas de duración, no es la jornada que siguió de largo: es OTRO turno
+ * que Shoplogix no tiene configurado.
+ *
+ * Chonchi 26-sep-2026: el Turno 2 cerró 15:00 (última pieza 15:15) y a las 16:15
+ * arrancó un turno EXTRAORDINARIO hasta las 22:55, 9.553 piezas. Con la
+ * continuidad sola (60 min ≤ 90) se colgó entero del Turno 2 y el brief anunció
+ * 22.768 pz y "meta cumplida" para un turno que hizo 13.215 de 15.000.
+ *
+ * Dos medidas, las mismas que `graderUnscheduledAttribution.ts`:
+ *   · hasta 2 h un bloque puede ser cola aunque haya hueco (Filete 15:40→16:30,
+ *     Yal 14:05→15:15 anticipado);
+ *   · pegado al cierre (≤ 15 min, el corte de tramo) dura lo que dure.
+ */
+const MAX_DURACION_COLA_SUELTA_MS = 2 * 60 * 60 * 1000
+const HUECO_PEGADO_MS = 15 * 60 * 1000
+
+/**
  * Minutos entre un TRAMO [ini, fin] y una ventana; 0 si se solapan.
  *
  * Se mide de borde a borde, no desde el inicio del tramo: un bloque que corre
@@ -367,6 +385,9 @@ function distanciaTramo(tramo, ventana) {
 function esColaDeEsteTurno(tramo, ventanaTurno, otrasVentanas) {
   const propia = distanciaTramo(tramo, ventanaTurno)
   if (propia > MAX_CONTINUIDAD_MS) return false
+  // Con hueco de sensor, solo una cola corta. Larga y suelta = otro turno.
+  // (Acá `end` ya es el FIN del último intervalo, ver agruparTramos.)
+  if (propia > HUECO_PEGADO_MS && tramo.end - tramo.start > MAX_DURACION_COLA_SUELTA_MS) return false
   const yaCerro = (v) => Boolean(v?.end) && tramo.start >= v.end.getTime()
   return otrasVentanas.every((v) => {
     const otra = distanciaTramo(tramo, v)

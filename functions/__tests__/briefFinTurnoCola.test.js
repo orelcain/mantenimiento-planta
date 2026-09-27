@@ -288,3 +288,22 @@ test('entre dos turnos a la misma distancia gana el que ya cerró, y solo uno', 
   assert.strictEqual(desdeElQueCerro.pieces + desdeElQueAbre.pieces, 240, 'las piezas se cuentan UNA vez')
   assert.strictEqual(desdeElQueCerro.pieces, 240, 'la cola es del turno que venía trabajando')
 })
+
+test('un turno EXTRAORDINARIO sin configurar NO se cuelga como cola (Chonchi 26-sep)', async () => {
+  // Turno 2 07:15→15:00. A las 16:15 arrancó otro turno hasta las 22:55: con la
+  // continuidad sola (60 min ≤ 90) el brief anunció 22.768 pz y "meta cumplida"
+  // para un turno que hizo 13.215 de 15.000.
+  const S = (h, min) => Date.UTC(2026, 8, 26, h, min, 0)
+  const parent = { scheduledStart: iso(S(7, 15)), scheduledEnd: iso(S(15, 0)) }
+  const machines = [{ id: 'm1', totalCycles: 13215, intervals: intervals(S(7, 15), 96, 138), states: [] }]
+  const extraordinario = [...intervals(S(16, 15), 33, 70), ...intervals(S(19, 45), 38, 70)] // 16:15→19:00, 19:45→22:55
+  const out = await sumarColaAMaquinas(
+    fakeDb({
+      shiftDocId: '2026-09-26_Turno 2',
+      otros: { '2026-09-26_Unscheduled': { shiftId: 'Unscheduled', machines: { m1: { intervals: [...intervals(S(6, 0), 12, 30), ...extraordinario], states: [] } } } },
+    }),
+    'chonchi', '2026-09-26_Turno 2', parent, machines,
+  )
+  assert.strictEqual(out.pieces, 360, 'solo el arranque anticipado 06:00→07:00 es del Turno 2')
+  assert.strictEqual(machines[0].totalCycles, 13215 + 360)
+})
