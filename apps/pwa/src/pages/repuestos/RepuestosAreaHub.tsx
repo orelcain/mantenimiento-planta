@@ -22,6 +22,8 @@ import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
+import { SolicitarVariosSheet } from '@/components/repuestos/SolicitarVariosSheet'
+import type { PiezaSolicitable } from '@/utils/repuestos/solicitudMultiple'
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
 /** Lo que el formulario de solicitud muestra de bodega. Sin `bodegaId` el stock no se conoce. */
@@ -29,7 +31,7 @@ function stockDeSolicitud(r: { bodegaId?: string | null; stockActual: number; un
   return { configurado: !!r.bodegaId, stockActual: r.stockActual, unidad: r.unidad, ubicacionBodega: r.ubicacionBodega }
 }
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
-import { useSolicitudes, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
+import { useSolicitudes, type NuevaSolicitud, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
@@ -317,6 +319,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const { solicitudes, loading: solicitudesLoading, pendientesCount, crearSolicitud, avanzarEstado } = useSolicitudes()
   const [solicitarOpen, setSolicitarOpen] = useState(false)
   const [solicitarRepuesto, setSolicitarRepuesto] = useState<RepuestoLite | null>(null)
+  // «Solicitar repuestos» de la máquina enfocada: varios de una vez.
+  const [solicitarVariosOpen, setSolicitarVariosOpen] = useState(false)
   const [solicitudesOpen, setSolicitudesOpen] = useState(false)
   useEffect(() => {
     if (!abrirSolicitudes) return
@@ -611,6 +615,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSolicitarOpen(true)
   }, [])
 
+  const handleCrearVarias = useCallback(async (lineas: NuevaSolicitud[]) => {
+    for (const l of lineas) await crearSolicitud(l, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+    setSolicitarVariosOpen(false)
+    const unidades = lineas.reduce((a, l) => a + l.cantidad, 0)
+    toast({
+      title: `${lineas.length} ${lineas.length === 1 ? 'solicitud creada' : 'solicitudes creadas'}`,
+      description: `${unidades} unidades para ${selectedEquipName}. Quedan en «Solicitudes» y se avisa al grupo de Mantención en Telegram.`,
+      variant: 'success',
+    })
+  }, [crearSolicitud, user, toast, selectedEquipName])
+
   const handleCrearSolicitud = useCallback(
     async (data: Parameters<typeof crearSolicitud>[0]) => {
       await crearSolicitud(data, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
@@ -750,6 +765,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     // Por PLANTA + nombre: «KNURO N1» de Chonchi y el de Yal son dos equipos.
     return areaRepuestos.filter((r) => r.equipos.some((e) => claveDeEquipo(e.machineName || '', plantaDe(e.machineId)) === repEquipoFilter))
   }, [areaRepuestos, selectedEquipKey, selectedEquipMachineId, repEquipoFilter, plantaDe])
+
+  // Piezas de la máquina enfocada, como las ve «Solicitar repuestos»: comunes, stock y BOM.
+  const piezasDeLaMaquina = useMemo<PiezaSolicitable[]>(() => scopedRepuestos.map((r) => ({
+    clave: r.rowKey, codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, codigoFabricante: r.codigoFabricante || undefined,
+    comun: esComun(r), cantidadPorMaquina: r.cantidadPorMaquina, stock: stockDeSolicitud(r),
+  })), [scopedRepuestos])
+
 
   const stockKpis = useMemo(() => {
     let ok = 0, low = 0, out = 0
@@ -1644,9 +1666,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <Badge variant="secondary" className="ml-0.5 tabular-nums">{pendientesCount}</Badge>
             )}
           </Button>
-          <Button size="sm" className="h-11 gap-1.5" onClick={() => openSolicitar(null)}>
-            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
-          </Button>
+          {selectedEquipKey ? (
+            <Button size="sm" className="h-11 gap-1.5" onClick={() => setSolicitarVariosOpen(true)} title={`Solicitar uno o varios repuestos de ${selectedEquipName}`}>
+              <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuestos</span><span className="sm:hidden">Solicitar</span>
+            </Button>
+          ) : (
+            <Button size="sm" className="h-11 gap-1.5" onClick={() => openSolicitar(null)}>
+              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
+            </Button>
+          )}
           {/* Herramientas admin: toolbar en desktop (≥sm) */}
           {isAdmin && (
             <div className="hidden items-center gap-1 border-l border-border pl-2 sm:flex">
@@ -2338,6 +2366,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         repuesto={solicitarRepuesto}
         options={solicitarOptions}
         onSubmit={handleCrearSolicitud}
+      />
+      <SolicitarVariosSheet
+        open={solicitarVariosOpen}
+        onClose={() => setSolicitarVariosOpen(false)}
+        maquina={selectedEquipName}
+        piezas={piezasDeLaMaquina}
+        onSubmit={handleCrearVarias}
       />
       <SolicitudesPanel
         open={solicitudesOpen}
