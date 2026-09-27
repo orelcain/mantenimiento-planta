@@ -967,23 +967,37 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
   }
 }
 
-async function buildMonitorLive(db, plantSlug, shiftDocId, index = null) {
-  const parentRef = db.doc(`shoplogix/${plantSlug}/shifts/${shiftDocId}`)
-  // El doc padre ya viene en el índice (se cargó en la misma invocación, tras
-  // el write que disparó el trigger): releerlo sería pagar la misma lectura.
-  const enIndice = index?.byId.get(shiftDocId)
-  const [parentSnap, machinesSnap] = await Promise.all([
-    enIndice ? Promise.resolve(null) : parentRef.get(),
-    parentRef.collection('machines').get(),
-  ])
+/**
+ * @param {{parent: object, machines: Array}|null} fuente — un turno que NO existe
+ *   como doc en Firestore: el bloque que marcó el sensor dentro de `Unscheduled`
+ *   (ver `turnosDelSensor`). Trae su padre sintético y sus máquinas ya recortadas
+ *   al bloque, así que no se lee nada ni se rescata cola: el bloque ES la jornada.
+ */
+async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente = null) {
+  let parent
+  let machines
+  if (fuente) {
+    parent = fuente.parent
+    machines = [...fuente.machines]
+    if (machines.length === 0) return null
+  } else {
+    const parentRef = db.doc(`shoplogix/${plantSlug}/shifts/${shiftDocId}`)
+    // El doc padre ya viene en el índice (se cargó en la misma invocación, tras
+    // el write que disparó el trigger): releerlo sería pagar la misma lectura.
+    const enIndice = index?.byId.get(shiftDocId)
+    const [parentSnap, machinesSnap] = await Promise.all([
+      enIndice ? Promise.resolve(null) : parentRef.get(),
+      parentRef.collection('machines').get(),
+    ])
 
-  if (machinesSnap.empty) return null
+    if (machinesSnap.empty) return null
 
-  const parent = enIndice ? enIndice.data : (parentSnap.exists ? parentSnap.data() : {})
+    parent = enIndice ? enIndice.data : (parentSnap.exists ? parentSnap.data() : {})
 
-  const machines = machinesSnap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => String(a.machineName || '').localeCompare(String(b.machineName || '')))
+    machines = machinesSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+  }
+  machines.sort((a, b) => String(a.machineName || '').localeCompare(String(b.machineName || '')))
 
   // Piezas que la línea hizo fuera del horario del turno (ver
   // `loadOutsideShiftProduction`). Se fusionan en los intervals/states de cada
@@ -1002,11 +1016,13 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null) {
   )
 
   let extras = new Map()
-  try {
-    extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados, index)
-  } catch (err) {
-    // Nunca dejar al monitor sin datos por no poder rescatar la cola.
-    extras = new Map()
+  if (!fuente) {
+    try {
+      extras = await loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurno, yaContados, index)
+    } catch (err) {
+      // Nunca dejar al monitor sin datos por no poder rescatar la cola.
+      extras = new Map()
+    }
   }
 
   for (const m of machines) {
@@ -1809,6 +1825,130 @@ const HISTORY_LOOKBACK_DAYS = 12
 const HISTORY_MIN_PIECES = 50
 
 /**
+ * Un bloque sin turno tiene que durar MÁS que la cola más larga admisible para
+ * ser un turno del sensor: la misma vara que lo rechazó como cola (2 h).
+ */
+const SENSOR_SHIFT_MIN_MS = MAX_DURACION_COLA_SUELTA_MS
+
+/**
+ * Los bloques de producción de un `Unscheduled` que NINGÚN turno con nombre
+ * reclama y que tienen tamaño de turno: el turno que marcó el sensor.
+ *
+ * Chonchi 26-sep-2026: hubo un turno extraordinario 16:15→22:55 (9.553 pz) que
+ * nadie declaró en Shoplogix. Ya no se cuelga del Turno 2 como cola (ver
+ * `esColaDeEsteTurno`), pero tampoco puede desaparecer del monitor: es
+ * producción real de la línea, con sus paros y su cadencia, y Producción la va
+ * a buscar en el link. Las horas salen del sensor —primera y última pieza—,
+ * no de un horario que no existe.
+ *
+ * Qué NO entra: colas (las que sí son de un turno), ruido, y bloques cortos.
+ * Un rato suelto de madrugada (293 ciclos un domingo) no es un turno y
+ * mostrarlo como tal inventaría uno.
+ *
+ * @param {Array} machines — docs de `machines` del `Unscheduled`
+ * @param {Array<{start: Date, end: Date}>} ventanasConNombre — turnos del día y adyacentes
+ * @returns {Array<{start: number, end: number, pieces: number}>}
+ */
+function bloquesDelSensor(machines, ventanasConNombre) {
+  const sueltos = []
+  for (const m of machines) {
+    for (const iv of m.intervals || []) {
+      if ((iv.cycles || 0) <= 0) continue
+      const s = toDate(iv.startAt)
+      if (!s) continue
+      // Dentro de un turno con nombre ya lo cuenta ese turno.
+      if (ventanasConNombre.some(v => distanciaA(s.getTime(), v) === 0)) continue
+      sueltos.push(iv)
+    }
+  }
+  const utiles = agruparTramos(sueltos).filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
+  const cadenas = []
+  for (const t of [...utiles].sort((a, b) => a.start - b.start)) {
+    const ult = cadenas[cadenas.length - 1]
+    if (ult && t.start - ult.end <= MAX_CONTINUIDAD_MS) {
+      ult.end = Math.max(ult.end, t.end)
+      ult.pieces += t.pieces
+    } else {
+      cadenas.push({ start: t.start, end: t.end, pieces: t.pieces })
+    }
+  }
+  return cadenas.filter(c =>
+    c.end - c.start > SENSOR_SHIFT_MIN_MS
+    && c.pieces >= HISTORY_MIN_PIECES
+    // Si algún turno con nombre lo reclama como cola, es de ese turno.
+    && !ventanasConNombre.some(v => esColaDeEsteTurno(c, v, ventanasConNombre.filter(o => o !== v))))
+}
+
+/** `HH:MM` wall-clock de un ms derivado de intervals (ya viene como wall-clock-as-UTC). */
+function hhmmWall(ms) {
+  const d = new Date(ms)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * Recorta las máquinas del `Unscheduled` a UN bloque y les da el resumen que
+ * `buildMonitorLive` espera de un turno: totales del bloque, tiempos sumados
+ * de sus propios states (el `shiftRuntimeBreakdown` del doc es de las 24 h) y
+ * `expectedTotalCycles` en 0 — un turno que Shoplogix no configuró no tiene
+ * meta, y heredarle la de las 24 h lo pondría «bajo meta» siempre.
+ */
+function maquinasDelBloque(machines, bloque) {
+  const HOLGURA = 15 * 60_000
+  return machines.map(m => {
+    const intervals = (m.intervals || []).filter(iv => {
+      const s = toDate(iv.startAt)
+      return s && s.getTime() >= bloque.start && s.getTime() < bloque.end
+    })
+    const states = (m.states || []).filter(st => {
+      const s = toDate(st.startAt)
+      return s && s.getTime() >= bloque.start - HOLGURA && s.getTime() <= bloque.end + HOLGURA
+    })
+    const seg = (tipo) => states
+      .filter(st => st.type === tipo && !esPlannedDowntime(st))
+      .reduce((a, st) => a + (st.durationSec || 0), 0)
+    return {
+      ...m,
+      intervals,
+      states,
+      totalCycles: intervals.reduce((a, iv) => a + (iv.cycles || 0), 0),
+      expectedTotalCycles: 0,
+      shiftRuntimeBreakdown: { uptimeSec: seg('uptime'), downtimeSec: seg('downtime'), breakSec: seg('break') },
+      scheduledStart: new Date(bloque.start),
+      scheduledEnd: new Date(bloque.end),
+    }
+  }).filter(m => m.totalCycles > 0)
+}
+
+/**
+ * Los turnos del sensor de un `Unscheduled`, listos para `buildMonitorLive`.
+ *
+ * El id es `${dateKey}_Unscheduled@HH:MM` (hora de arranque real): conserva
+ * «Unscheduled» para que la PWA sepa que no tiene horario configurado, y la
+ * hora lo hace único y estable entre refrescos, que es lo que permite reusar
+ * el live ya publicado igual que con cualquier turno cerrado.
+ *
+ * @returns {Promise<Array<{id: string, start: Date, end: Date, pieces: number, fuenteDocId: string, fuente: {parent: object, machines: Array}}>>}
+ */
+async function turnosDelSensor(db, plantSlug, unschId, unschParent, ventanasConNombre) {
+  const snap = await db.collection(`shoplogix/${plantSlug}/shifts/${unschId}/machines`).get()
+  if (snap.empty) return []
+  const machines = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  const dateKey = unschId.slice(0, 10)
+  return bloquesDelSensor(machines, ventanasConNombre).map(b => {
+    const id = `${dateKey}_Unscheduled@${hhmmWall(b.start)}`
+    const parent = {
+      shiftId: id.slice(11),
+      scheduledStart: new Date(b.start),
+      scheduledEnd: new Date(b.end),
+      effectiveStart: new Date(b.start),
+      effectiveEnd: new Date(b.end),
+      lastSyncAt: unschParent?.lastSyncAt ?? null,
+    }
+    return { id, start: new Date(b.start), end: new Date(b.end), pieces: b.pieces, fuenteDocId: unschId, fuente: { parent, machines: maquinasDelBloque(machines, b) } }
+  })
+}
+
+/**
  * Turnos anteriores de la línea, para poder deslizar hacia atrás desde el link.
  *
  * Reusa lo ya publicado (`prevHistory`) en vez de recomponer los seis en cada
@@ -1817,16 +1957,21 @@ const HISTORY_MIN_PIECES = 50
  * recompone solo el más reciente del historial, que todavía puede moverse por
  * el re-sync móvil (reescribe ayer cada hora y hace 2-3 días una vez al día).
  *
- * @returns {Promise<Array<{shiftDocId: string, dateKey: string, shiftId: string, live: object}>>}
+ * @returns {Promise<Array<{shiftDocId: string, dateKey: string, shiftId: string, live: object, extraordinario?: object}>>}
+ *
+ * @param {{prev: object, next: object}|null} sinTurno — memoria de qué
+ *   `Unscheduled` ya se revisaron buscando turnos del sensor, por `lastSyncAt`
+ *   del padre. Con el mismo sello, se reusan las entradas ya publicadas y no se
+ *   lee su subcolección: en régimen el costo extra de esto es cero.
  */
-async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory = [], index = null) {
+async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory = [], index = null, sinTurno = null) {
   const nowWall = shoplogixPolling.toChileWall(new Date())
   const desde = shiftDateKey(nowWall, -HISTORY_LOOKBACK_DAYS)
 
+  const esUnscheduled = (id) => /unscheduled/i.test(id)
   const esCandidato = (id) =>
     id !== currentShiftDocId &&
-    id.slice(0, 10) >= desde &&
-    !/unscheduled/i.test(id)
+    id.slice(0, 10) >= desde
 
   let snaps
   if (index) {
@@ -1840,29 +1985,81 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
     snaps = await db.getAll(...candidatos)
   }
   const turnos = []
+  const conNombre = []   // {dateKey, ventana}: contra qué se mide lo suelto
+  const unscheduled = []
   for (const snap of snaps) {
     if (!snap.exists) continue
     const d = snap.data() || {}
+    if (esUnscheduled(snap.id)) { unscheduled.push({ id: snap.id, data: d }); continue }
     const start = toDate(d.scheduledStart)
+    const end = toDate(d.scheduledEnd)
+    if (start && end) conNombre.push({ dateKey: snap.id.slice(0, 10), ventana: { start, end } })
     const pieces = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
     // Ordenar por el horario REAL y no por el id: "Turno 1" de Chonchi arranca
     // 21:30 y "Turno 2" a las 09:00, así que alfabéticamente quedan al revés.
     if (start && pieces >= HISTORY_MIN_PIECES) turnos.push({ id: snap.id, start, pieces })
   }
-  turnos.sort((a, b) => b.start.getTime() - a.start.getTime())
+  // El turno vigente también compite por lo suelto de su día (no está en `snaps`).
+  const vigente = index?.byId.get(currentShiftDocId)?.data
+  if (vigente && !esUnscheduled(currentShiftDocId)) {
+    const start = toDate(vigente.scheduledStart)
+    const end = toDate(vigente.scheduledEnd)
+    if (start && end) conNombre.push({ dateKey: currentShiftDocId.slice(0, 10), ventana: { start, end } })
+  }
 
   const previos = new Map((prevHistory || []).map(h => [h.shiftDocId, h]))
+
+  // Los turnos que marcó el sensor (ver `turnosDelSensor`).
+  for (const u of unscheduled) {
+    const sello = iso(toDate(u.data.lastSyncAt))
+    const yaVisto = sello && sinTurno?.prev?.[u.id] === sello
+    if (sinTurno && sello) sinTurno.next[u.id] = sello
+    if (yaVisto) {
+      // Mismo sello que la última vez: lo publicado sigue valiendo, sin leer.
+      for (const h of previos.values()) {
+        if (h.extraordinario?.fuenteDocId === u.id && h.live) {
+          turnos.push({ id: h.shiftDocId, start: new Date(h.extraordinario.desde), pieces: h.live.totalPieces || 0, cacheado: h })
+        }
+      }
+      continue
+    }
+    const dia = Date.parse(`${u.id.slice(0, 10)}T00:00:00Z`)
+    const ventanas = conNombre
+      .filter(c => Math.abs(Date.parse(`${c.dateKey}T00:00:00Z`) - dia) <= 86_400_000)
+      .map(c => c.ventana)
+    try {
+      for (const t of await turnosDelSensor(db, plantSlug, u.id, u.data, ventanas)) turnos.push(t)
+    } catch {
+      // Sin turnos del sensor este refresco; el historial normal sigue igual.
+      if (sinTurno) delete sinTurno.next[u.id]
+    }
+  }
+  turnos.sort((a, b) => b.start.getTime() - a.start.getTime())
+
   const out = []
   for (let i = 0; i < turnos.length && out.length < HISTORY_MAX; i++) {
-    const { id } = turnos[i]
+    const t = turnos[i]
+    const { id } = t
+    // Un turno del sensor con sello vigente: se reusa tal cual, esté donde esté.
+    if (t.cacheado) { out.push(t.cacheado); continue }
     const cacheado = previos.get(id)
     // i === 0 es el turno inmediatamente anterior: puede seguir moviéndose.
     // Y solo se reusa un live medido con la rejilla vigente: uno viejo dejaría
     // «Anterior» mostrando el desglose recortado para siempre.
     if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === 2) { out.push(cacheado); continue }
     try {
-      const live = await buildMonitorLive(db, plantSlug, id, index)
-      if (live) out.push({ shiftDocId: id, dateKey: id.slice(0, 10), shiftId: id.slice(11), live })
+      const live = await buildMonitorLive(db, plantSlug, id, index, t.fuente ?? null)
+      if (!live) continue
+      const entrada = { shiftDocId: id, dateKey: id.slice(0, 10), shiftId: id.slice(11), live }
+      if (t.fuente) {
+        /*
+         * Lo que la PWA necesita para decirlo bien: que este turno lo marcó el
+         * sensor y no Shoplogix, con sus horas reales. `fuenteDocId` es lo que
+         * permite reusarlo mientras el `Unscheduled` no cambie.
+         */
+        entrada.extraordinario = { desde: iso(t.start), hasta: iso(t.end), fuenteDocId: t.fuenteDocId }
+      }
+      out.push(entrada)
     } catch {
       if (cacheado?.live) out.push(cacheado)
     }
@@ -2274,7 +2471,8 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     // igual los turnos anteriores para poder deslizar.
     const live = await buildMonitorLive(db, plantSlug, monitor.shiftDocId, index)
     if (!live) return null
-    const history = await buildMonitorHistory(db, plantSlug, monitor.shiftDocId, monitor.history, index)
+    const sinTurno = { prev: monitor.sinTurnoRevisados || {}, next: {} }
+    const history = await buildMonitorHistory(db, plantSlug, monitor.shiftDocId, monitor.history, index, sinTurno)
     const fh = await buildForecastHistory(
       db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11),
       monitor.forecastHistory, history, index, forecastSkip,
@@ -2282,6 +2480,7 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     return {
       live,
       history,
+      sinTurnoRevisados: sinTurno.next,
       forecastHistory: fh,
       /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
          un turno contra el otro. Ver `buildShiftStats`. */
@@ -2305,7 +2504,8 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   const live = await buildMonitorLive(db, plantSlug, shiftDocId, index)
   if (!live) return null
 
-  const history = await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history, index)
+  const sinTurno = { prev: monitor.sinTurnoRevisados || {}, next: {} }
+  const history = await buildMonitorHistory(db, plantSlug, shiftDocId, monitor.history, index, sinTurno)
   const fhLinea = await buildForecastHistory(
     db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.forecastHistory, history, index, forecastSkip,
   )
@@ -2317,6 +2517,7 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
   return {
     live,
     history,
+    sinTurnoRevisados: sinTurno.next,
     ...(seriesMinuto ? { seriesMinuto } : {}),
     /* Turnos del mismo nombre: es lo que hace posible pronosticar en las
        líneas con varios turnos por día. */
@@ -2385,7 +2586,8 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
   const live = shiftDocId ? await buildMonitorLive(db, plantSlug, shiftDocId, index) : null
   // Con historial desde el minuto uno: un link recién creado ya se puede
   // deslizar hacia atrás, sin esperar al primer refresco del trigger.
-  const history = shiftDocId ? await buildMonitorHistory(db, plantSlug, shiftDocId, [], index) : []
+  const sinTurno = { prev: {}, next: {} }
+  const history = shiftDocId ? await buildMonitorHistory(db, plantSlug, shiftDocId, [], index, sinTurno) : []
 
   const token = require('crypto').randomUUID()
   await db.collection(COLLECTION).doc(token).set({
@@ -2408,6 +2610,7 @@ async function ensureLineMonitor(db, plantSlug, { ttlDays = 30, meta = {} } = {}
     ttlHours: ttlDays * 24,
     live,
     history,
+    sinTurnoRevisados: sinTurno.next,
   })
   return { token, created: true }
 }
@@ -2529,6 +2732,7 @@ module.exports = {
   loadShiftIndex,
   parentSinCambioReal,
   // exportados para tests
+  bloquesDelSensor,
   currentStateOf,
   statusOf,
   modelLabel,
