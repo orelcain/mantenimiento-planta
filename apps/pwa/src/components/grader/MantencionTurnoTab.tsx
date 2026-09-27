@@ -222,7 +222,7 @@ function TendenciaMantencion({ plantSlug, shiftId, hastaDateKey }: {
                         style={{
                           height: `${Math.max(falla > 0 ? 8 : 2, (falla / maxFalla) * 100)}%`,
                           background: falla > 0 ? FILL.falla : FILL.planificado,
-                          outline: esHoy ? '2px solid rgb(var(--primary) / .5)' : undefined,
+                          outline: esHoy ? '2px solid rgb(var(--brand) / .5)' : undefined,
                         }}
                       />
                     </div>

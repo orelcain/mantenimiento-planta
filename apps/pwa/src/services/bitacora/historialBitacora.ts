@@ -1,8 +1,9 @@
-import { minutosDelTurno, mtbf } from './mtbf'
+import { dec1 } from '@/utils/formatoNumeros'
+import { MINUTOS_SIN_PRODUCCION_POR_TURNO, minutosDelTurno, mtbf } from './mtbf'
 import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { autorVisible } from './bitacora.types'
 import { esFalla, minutosParadaDe, resumirBitacora, type ResumenBitacora } from './resumenBitacora'
-import { fechaLocal, turnoDesdeId } from './turnoMantencion'
+import { fechaLocal, formatoMinutos, turnoDesdeId } from './turnoMantencion'
 import { soloListos } from './borradores'
 import { equipoConCodigo, nombreConComun, nombreRepuesto, normalizarRepuestos } from './presentacionEvento'
 
@@ -30,6 +31,12 @@ export interface FilaTurno {
 
 export interface EquipoDelPeriodo {
   equipo: string
+  /**
+   * Nodo de `hierarchy` cuando el técnico lo eligió del buscador. Es la llave para cruzar
+   * con el editor de líneas y pasar de minutos de máquina a minutos de LÍNEA (19-09-2026).
+   * Los eventos escritos a mano no lo traen: esos equipos quedan sin cuota, y se dice.
+   */
+  equipoId: string | null
   minutos: number
   paradas: number
   /** De esas paradas, cuántas fueron una falla (ver `esFalla`): es el divisor del MTBF. */
@@ -86,13 +93,15 @@ export interface ResumenPeriodo {
   pendientesAbiertos: number
   turnosSinParada: number
   equipos: EquipoDelPeriodo[]
+  /** Los mismos equipos sin recortar a cinco (para el peso por línea). */
+  equiposTodos: EquipoDelPeriodo[]
   porTecnico: Array<{ nombre: string; eventos: number }>
   /** Todos los repuestos del período, de más a menos unidades. */
   repuestos: RepuestoDelPeriodo[]
   unidadesRepuestos: number
 }
 
-const normalizarEquipo = (s: string) =>
+export const normalizarEquipo = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ')
 
 /** `YYYY-MM-DD` de hace `dias` días (incluye hoy). */
@@ -128,12 +137,14 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
   const validos = soloListos(eventos).filter((e) => e.turnoId && turnoDesdeId(e.turnoId))
   const total = resumirBitacora(validos)
 
-  const porEquipo = new Map<string, { equipo: string; minutos: number; paradas: number; fallas: number }>()
+  const porEquipo = new Map<string, { equipo: string; equipoId: string | null; minutos: number; paradas: number; fallas: number }>()
   for (const e of validos) {
     const parada = minutosParadaDe(e)
     if (parada == null || !e.equipo?.trim()) continue
     const k = normalizarEquipo(e.equipo)
-    const actual = porEquipo.get(k) ?? { equipo: e.equipo.trim(), minutos: 0, paradas: 0, fallas: 0 }
+    const actual = porEquipo.get(k) ?? { equipo: e.equipo.trim(), equipoId: null, minutos: 0, paradas: 0, fallas: 0 }
+    // Basta que UNA vez se haya elegido del buscador para poder ubicarlo en la línea.
+    if (!actual.equipoId && e.equipoId) actual.equipoId = e.equipoId
     actual.minutos += parada
     actual.paradas += 1
     if (esFalla(e)) actual.fallas += 1
@@ -209,6 +220,8 @@ export function resumirPeriodo(eventos: readonly EventoBitacora[], desde: string
     pendientesAbiertos: validos.filter((e) => e.pendiente && !e.cierre).length,
     turnosSinParada: filas.filter((f) => f.resumen.conParada === 0).length,
     equipos: equipos.slice(0, 5),
+    // Sin recortar: pesar las paradas por línea necesita todos, no solo los cinco mayores.
+    equiposTodos: equipos,
     porTecnico: [...porTecnico.entries()]
       .map(([nombre, n]) => ({ nombre, eventos: n }))
       .sort((a, b) => b.eventos - a.eventos)
@@ -259,4 +272,99 @@ export function tesisDelPeriodo(r: ResumenPeriodo): string {
 
 export function porcentaje(parte: number): string {
   return `${Math.round(parte * 100)}%`
+}
+
+/** Como `porcentaje`, con un decimal bajo 10 %: una parada de 0,4 % no puede leerse «0 %». */
+export function porcentajeFino(parte: number): string {
+  const p = parte * 100
+  return p > 0 && p < 10 ? `${dec1(p)} %` : `${Math.round(p)} %`
+}
+
+/*
+ * ── Referencias (reglas de análisis de datos, Orel 19-09-2026) ──────────────
+ * «30 horas de parada» solo no dice nada: todo número grande lleva CONTRA QUÉ se
+ * compara (_GUIAS/_DESTILADO_VISUALIZACION: «número gigante sin referencia es un
+ * adorno»). La referencia se elige por la pregunta:
+ *   ¿es mucho?      → % del tiempo de producción de los turnos registrados
+ *   ¿mejoramos?     → el período anterior del mismo largo (si está completo)
+ *   ¿esto es normal? → el promedio propio (línea del gráfico)
+ */
+
+/** Minutos en que la línea debía producir: turnos registrados − lo que no se produce (colación, reunión, ejercicios). */
+export function minutosProduccion(r: Pick<ResumenPeriodo, 'minutosTurnos' | 'turnos'>): number {
+  return Math.max(0, r.minutosTurnos - MINUTOS_SIN_PRODUCCION_POR_TURNO * r.turnos)
+}
+
+/** Parte del tiempo de producción que la línea estuvo parada (0–1), o null sin base. */
+export function parteParada(r: Pick<ResumenPeriodo, 'minutosTurnos' | 'turnos' | 'minutosParada'>): number | null {
+  const base = minutosProduccion(r)
+  return base > 0 ? Math.min(1, r.minutosParada / base) : null
+}
+
+/** El período anterior sirve para comparar solo si tiene al menos esta parte de los turnos del actual. */
+export const COBERTURA_MINIMA_ANTERIOR = 0.6
+
+export interface Tendencia {
+  /** Hacia dónde se movió el número. */
+  sentido: 'sube' | 'baja' | 'igual'
+  /** ¿Es bueno para la planta? null = sin cambio que importe. */
+  mejora: boolean | null
+  /** El valor del período anterior, ya formateado: la referencia a la vista. */
+  antes: string
+}
+
+export interface ComparacionPeriodos {
+  parada: Tendencia | null
+  fallas: Tendencia | null
+  mttr: Tendencia | null
+  mtbf: Tendencia | null
+}
+
+/** Cambio menor a esto (relativo) se lee «igual»: no se pinta de verde ni de rojo por ruido. */
+const UMBRAL_CAMBIO = 0.05
+
+function tendencia(actual: number, antes: number, menorEsMejor: boolean, formato: string): Tendencia {
+  const base = Math.max(Math.abs(antes), 1e-9)
+  const cambio = (actual - antes) / base
+  if (Math.abs(cambio) < UMBRAL_CAMBIO || actual === antes) return { sentido: 'igual', mejora: null, antes: formato }
+  const sube = actual > antes
+  return { sentido: sube ? 'sube' : 'baja', mejora: menorEsMejor ? !sube : sube, antes: formato }
+}
+
+/**
+ * ¿Mejoramos? Compara con el período anterior del mismo largo. Devuelve null si el
+ * anterior no está completo (la bitácora se usa desde el 15-09-2026): comparar
+ * contra un período casi vacío fabricaría una mejora o un empeoramiento falsos.
+ * Parada y fallas se comparan POR TIEMPO / POR TURNO, no en bruto: si el anterior
+ * tuvo menos turnos registrados, el total bruto engañaría.
+ */
+export function compararPeriodos(actual: ResumenPeriodo, anterior: ResumenPeriodo | null): ComparacionPeriodos | null {
+  if (!anterior || actual.turnos === 0 || anterior.turnos < actual.turnos * COBERTURA_MINIMA_ANTERIOR) return null
+  const pA = parteParada(actual)
+  const pB = parteParada(anterior)
+  return {
+    parada: pA != null && pB != null ? tendencia(pA, pB, true, porcentajeFino(pB)) : null,
+    fallas: tendencia(actual.fallas / actual.turnos, anterior.fallas / anterior.turnos, true, String(anterior.fallas)),
+    mttr: actual.mttrMin != null && anterior.mttrMin != null ? tendencia(actual.mttrMin, anterior.mttrMin, true, formatoMinutos(anterior.mttrMin)) : null,
+    mtbf: actual.mtbfMin != null && anterior.mtbfMin != null ? tendencia(actual.mtbfMin, anterior.mtbfMin, false, formatoMinutos(anterior.mtbfMin)) : null,
+  }
+}
+
+/** Promedio de minutos de parada por turno (incluye los turnos sin parada): la línea «¿esto es normal?» del gráfico. */
+export function promedioParadaPorTurno(filas: readonly Pick<FilaTurno, 'resumen'>[]): number {
+  if (!filas.length) return 0
+  return filas.reduce((n, f) => n + f.resumen.minutosParada, 0) / filas.length
+}
+
+/**
+ * El título del gráfico de paradas dice el hallazgo, no la etiqueta del eje
+ * (HIG «Charts», 19-09-2026): "3 de 12 turnos con parada · 45 min en total",
+ * o "Sin paradas en los 12 turnos" cuando ninguno tuvo.
+ */
+export function resumenGraficoParadas(filas: readonly Pick<FilaTurno, 'resumen'>[]): { titulo: string; total: number } {
+  const total = filas.length
+  const conParada = filas.filter((f) => f.resumen.conParada > 0).length
+  const minutos = filas.reduce((acc, f) => acc + f.resumen.minutosParada, 0)
+  const titulo = conParada > 0 ? `${conParada} de ${total} ${total === 1 ? 'turno' : 'turnos'} con parada · ${formatoMinutos(minutos)} en total` : `Sin paradas en ${total === 1 ? 'el turno' : `los ${total} turnos`}`
+  return { titulo, total }
 }

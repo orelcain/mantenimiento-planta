@@ -129,6 +129,17 @@ export function encabezadoEvento(
 }
 
 /**
+ * Entero entre 1 y `MAX_CANTIDAD_REPUESTO`, para «−»/«+», el input escribible
+ * de cantidad y el guardado. Vacío, 0 o algo no numérico → `respaldo` (el
+ * campo NUNCA borra el repuesto: HIG «Steppers», 19-09-2026).
+ */
+export function clampCantidadRepuesto(valor: unknown, respaldo = 1): number {
+  const n = Math.round(Number(valor))
+  if (!Number.isFinite(n) || n < 1) return respaldo
+  return Math.min(MAX_CANTIDAD_REPUESTO, n)
+}
+
+/**
  * Repuestos válidos y sin repetir (el mismo código suma cantidades), en el
  * orden en que se agregaron. Lo usa el guardado y la comparación entre equipos.
  */
@@ -137,7 +148,7 @@ export function normalizarRepuestos(lista: readonly Partial<RepuestoUsado>[] | n
   for (const r of lista ?? []) {
     const codigoSAP = String(r?.codigoSAP ?? '').trim()
     if (!/^[0-9A-Za-z-]{3,20}$/.test(codigoSAP)) continue
-    const cantidad = Math.min(MAX_CANTIDAD_REPUESTO, Math.max(1, Math.round(Number(r?.cantidad) || 1)))
+    const cantidad = clampCantidadRepuesto(r?.cantidad)
     const previo = porCodigo.get(codigoSAP)
     if (previo) previo.cantidad = Math.min(MAX_CANTIDAD_REPUESTO, previo.cantidad + cantidad)
     else {

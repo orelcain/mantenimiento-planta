@@ -18,6 +18,8 @@ export function SelectorTecnico({
   onChange,
   recordar = true,
   vacio = 'Elige tu nombre',
+  obligatorio,
+  sinEtiqueta = false,
 }: {
   etiqueta: string
   deTurno: string[]
@@ -28,6 +30,10 @@ export function SelectorTecnico({
   recordar?: boolean
   /** Texto de la opción vacía de la lista. */
   vacio?: string
+  /** Marca «obligatorio» junto al rótulo (mismo patrón que Tipo e Impacto) mientras no hay elección. */
+  obligatorio?: boolean
+  /** Dentro de una fila que ya dice el rótulo: se deja solo para lectores de pantalla. */
+  sinEtiqueta?: boolean
 }) {
   const id = useId()
   const resto = todos.filter((n) => !deTurno.includes(n))
@@ -50,8 +56,9 @@ export function SelectorTecnico({
 
   return (
     <div>
-      <span id={`${id}-label`} className="mb-1.5 block text-footnote text-muted-foreground">
+      <span id={`${id}-label`} className={sinEtiqueta ? 'sr-only' : 'mb-1.5 block text-footnote text-muted-foreground'}>
         {etiqueta}
+        {obligatorio && !valor && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
       </span>
       <div role="group" aria-labelledby={`${id}-label`} className="flex flex-wrap gap-2">
         {deTurno.map((n) => (
@@ -70,7 +77,7 @@ export function SelectorTecnico({
           aria-label="Técnico"
           value={todos.includes(valor) ? valor : ''}
           onChange={(e) => elegir(e.target.value)}
-          className="mt-2 h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="mt-2 h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <option value="" disabled>
             {vacio}

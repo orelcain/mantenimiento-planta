@@ -1,4 +1,5 @@
 import { ETIQUETA_FOTO } from '@/config/bitacora'
+import { compartirOBajarArchivo } from './compartirArchivo'
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
 import { tecnicosDelEvento, type EventoBitacora, type FotoEvento, type TurnoMantencion } from './bitacora.types'
 import { etiquetaParada, etiquetaPendientes, lineaPendienteAnterior, partesImpacto, repuestosDistintos } from './bitacoraCorreo'
@@ -43,7 +44,14 @@ export interface DatosPdfBitacora {
   pendientesAnteriores?: readonly EventoBitacora[]
 }
 
-export async function generarPdfBitacora({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [] }: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number }> {
+export async function generarPdfBitacora({
+  turno,
+  eventos: todos,
+  tecnicos,
+  planta,
+  observacion,
+  pendientesAnteriores = [],
+}: DatosPdfBitacora): Promise<{ archivo: string; fotosFallidas: number; via: 'compartido' | 'descargado' | 'cancelado' }> {
   const eventos = soloListos(todos)
   const { jsPDF } = await import('jspdf')
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -472,6 +480,6 @@ export async function generarPdfBitacora({ turno, eventos: todos, tecnicos, plan
   }
 
   const archivo = `bitacora-${turno.fecha}-${turno.banda}.pdf`
-  pdf.save(archivo)
-  return { archivo, fotosFallidas }
+  const via = await compartirOBajarArchivo(pdf.output('blob') as Blob, archivo, 'application/pdf')
+  return { archivo, fotosFallidas, via }
 }

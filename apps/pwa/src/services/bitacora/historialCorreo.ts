@@ -4,7 +4,7 @@ import { explicacionMtbfMttrPeriodo } from './mtbf'
 import { escaparHtml } from './bitacoraCorreo'
 import { etiquetaCortaTurno } from './entregaTurno'
 import { formatoMinutos } from './turnoMantencion'
-import { lineaRepuestoDelPeriodo, porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
+import { lineaRepuestoDelPeriodo, parteParada, porcentaje, porcentajeFino, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
 
 /**
  * Resumen del período para pegar en el correo (informe semanal a jefatura).
@@ -60,7 +60,7 @@ export function historialAHtmlCorreo(r: ResumenPeriodo, filas: readonly FilaTurn
   const kpis =
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:8px 0 4px;"><tr>` +
     kpi(String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos') +
-    kpi(formatoMinutos(r.minutosParada), `de parada (${r.conParada})`, r.minutosParada > 0 ? C.parada : C.tinta) +
+    kpi(formatoMinutos(r.minutosParada), `de parada (${r.conParada})${parteParada(r) != null ? ` · ${porcentajeFino(parteParada(r)!)} del tiempo de producción` : ''}`, r.minutosParada > 0 ? C.parada : C.tinta) +
     kpi(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin), 'MTTR') +
     kpi(r.mtbfMin == null ? '—' : formatoMinutos(r.mtbfMin), 'MTBF') +
     kpi(
@@ -122,7 +122,7 @@ export function historialATextoPlano(r: ResumenPeriodo, filas: readonly FilaTurn
   return [
     `${tituloHistorial(r)}\n${r.turnos} turnos registrados · ${planta}`,
     tesisDelPeriodo(r),
-    `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada (${r.conParada}) · MTTR ${
+    `${r.eventos} eventos · ${formatoMinutos(r.minutosParada)} de parada (${r.conParada}${parteParada(r) != null ? `, ${porcentajeFino(parteParada(r)!)} del tiempo de producción` : ''}) · MTTR ${
       r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)
     } · MTBF ${r.mtbfMin == null ? '—' : formatoMinutos(r.mtbfMin)} · ${r.sinDetener} sin detener${r.conImpacto > 0 ? ` (${porcentaje(r.parteSinDetener)})` : ''} · ${r.pendientesCerrados} pendientes cerrados · ${r.pendientesAbiertos} abiertos · ${
       r.repuestos.length

@@ -12,6 +12,7 @@ export function SelectorParticipantes({
   excluir,
   valor,
   onChange,
+  sinEtiqueta = false,
 }: {
   presentes: string[]
   todos: string[]
@@ -19,6 +20,8 @@ export function SelectorParticipantes({
   excluir: string
   valor: string[]
   onChange: (nombres: string[]) => void
+  /** Dentro de una fila que ya dice el rótulo: se deja solo para lectores de pantalla. */
+  sinEtiqueta?: boolean
 }) {
   const id = useId()
   const [agregando, setAgregando] = useState(false)
@@ -40,7 +43,7 @@ export function SelectorParticipantes({
 
   return (
     <div>
-      <span id={`${id}-label`} className="mb-1.5 block text-footnote text-muted-foreground">
+      <span id={`${id}-label`} className={sinEtiqueta ? 'sr-only' : 'mb-1.5 block text-footnote text-muted-foreground'}>
         También participaron
       </span>
       <div role="group" aria-labelledby={`${id}-label`} className="flex flex-wrap gap-2">
@@ -70,7 +73,7 @@ export function SelectorParticipantes({
             setAgregando(false)
           }}
           onBlur={() => setAgregando(false)}
-          className="mt-2 h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-[16px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="mt-2 h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <option value="" disabled>
             Elige quién participó

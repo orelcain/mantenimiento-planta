@@ -1,5 +1,5 @@
 import { textoSeguroPdf } from '@/utils/pdf/textoSeguroPdf'
-import { lineaRepuestoDelPeriodo, porcentaje, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
+import { lineaRepuestoDelPeriodo, parteParada, porcentaje, porcentajeFino, tesisDelPeriodo, type FilaTurno, type ResumenPeriodo } from './historialBitacora'
 import { formatoMinutos } from './turnoMantencion'
 import { etiquetaFilaTurno, tituloHistorial } from './historialCorreo'
 import type { EventoBitacora } from './bitacora.types'
@@ -57,7 +57,7 @@ export async function generarPdfHistorial(r: ResumenPeriodo, filas: readonly Fil
   // PDF tiene que señalar lo mismo (revisión 15-09).
   const kpis: Array<[string, string, RGB]> = [
     [String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos', TINTA],
-    [formatoMinutos(r.minutosParada), `de parada (${r.conParada})`, r.minutosParada > 0 ? PARADA : TINTA],
+    [formatoMinutos(r.minutosParada), `de parada · ${parteParada(r) != null ? `${porcentajeFino(parteParada(r)!)} del t. prod.` : `(${r.conParada})`}`, r.minutosParada > 0 ? PARADA : TINTA],
     [r.mttrMin == null ? '-' : formatoMinutos(r.mttrMin), 'MTTR', TINTA],
     [r.mtbfMin == null ? '-' : formatoMinutos(r.mtbfMin), 'MTBF', TINTA],
     [

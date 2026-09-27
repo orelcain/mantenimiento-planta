@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 import { loadDayShiftWindows, loadUnscheduledIntervals } from '@/services/grader/graderUnscheduledLoad'
 import {
   agruparTramos,
-  esColaDeEsteTurno,
+  colasDelTurno,
   intervalKey,
   OUTSIDE_MIN_PIECES,
 } from '@/services/grader/graderUnscheduledAttribution'
@@ -85,11 +85,12 @@ export function useShiftOutsidePieces(
         return !otras.some(v => t >= v.start.getTime() && t < v.end.getTime())
       })
 
-      const tramos = agruparTramos(candidatos)
-        .filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
-        // La pertenencia se decide sobre el TRAMO completo: es la cola de este
-        // turno o no lo es, entero (ver `esColaDeEsteTurno`).
-        .filter(t => !propia || esColaDeEsteTurno(t, propia, otras))
+      const utiles = agruparTramos(candidatos).filter(t => t.pieces >= OUTSIDE_MIN_PIECES)
+      // La pertenencia se decide sobre el BLOQUE encadenado, igual que la matriz
+      // y el monitor: es la cola de este turno o no lo es, entero. Un turno
+      // extraordinario sin configurar en Shoplogix (Chonchi 26-sep) no es cola
+      // aunque arranque a una hora del cierre (ver `esColaDeEsteTurno`).
+      const tramos = propia ? colasDelTurno(utiles, propia, otras) : utiles
       setOut({
         pieces: tramos.reduce((a, t) => a + t.pieces, 0),
         ranges: tramos.map(t => {

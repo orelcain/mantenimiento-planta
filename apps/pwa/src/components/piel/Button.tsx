@@ -38,10 +38,11 @@ const buttonVariants = cva(
         // `md` usa el píxel literal (no `h-11`): el root global va al 87.5%
         // (85% en móvil, ver index.css), así que h-11 (2.75rem) rinde ~37-38px
         // y no los 44 que este comentario promete.
-        sm: 'h-9 px-4 text-[0.8rem]',
-        md: 'h-[44px] px-5 text-sm',
-        lg: 'h-[3.25rem] px-6 text-[0.95rem] rounded-panel',
-        block: 'h-[3.25rem] w-full px-6 text-[0.95rem] rounded-panel',
+        // El texto × `--escala-texto` (tamaño de letra de la bitácora); con 1 mide lo mismo que antes.
+        sm: 'h-9 px-4 text-[length:calc(0.8rem*var(--escala-texto,1))]',
+        md: 'h-[44px] px-5 text-[length:calc(0.875rem*var(--escala-texto,1))] leading-5',
+        lg: 'h-[3.25rem] px-6 text-[length:calc(0.95rem*var(--escala-texto,1))] rounded-panel',
+        block: 'h-[3.25rem] w-full px-6 text-[length:calc(0.95rem*var(--escala-texto,1))] rounded-panel',
       },
     },
     defaultVariants: { variant: 'filled', size: 'md' },

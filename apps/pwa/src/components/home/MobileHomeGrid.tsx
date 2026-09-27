@@ -15,7 +15,9 @@ import { useAuthStore, useAppStore } from '@/store'
 import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
 import { LEARNING_MACHINES } from '@/data/learningMachines'
-import { PLANT_LINES, PLANTS } from '@/config/plantLines'
+import { PLANT_LINES, PLANTS, type PlantLineId } from '@/config/plantLines'
+import { lineaConMonitor } from '@/services/shoplogix/monitorDeLinea'
+import { MonitorCell } from './MonitorCell'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +39,12 @@ interface Tile {
    * pidió. Se dibujan con `ListCell variant="child"`.
    */
   children?: Tile[]
+  /**
+   * La línea tiene acceso directo a su monitor: bajo la celda va «Monitor
+   * <área>», que lo abre en UN toque (antes eran ~4 pasando por Análisis de
+   * Turno). Ver `LINEAS_CON_MONITOR`.
+   */
+  monitorDe?: PlantLineId
 }
 
 /*
@@ -59,6 +67,7 @@ const LINEAS_ANALISIS: Tile[] = PLANT_LINES
     icon: BarChart3,
     href: `/analisis-grader?linea=${l.id}`,
     color: 'blue' as TileColor,
+    monitorDe: lineaConMonitor(l.id)?.id,
   }))
 
 interface TileGroup {
@@ -147,6 +156,17 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
   ],
 
   admin: [
+    // Análisis y monitoreo arriba de Operaciones (Orel, 22-09): es lo que más
+    // se abre en el día y el monitor queda a un toque sin desplazar.
+    {
+      label: 'Análisis y monitoreo',
+      tiles: [
+        { id: 'grader',   label: 'Análisis de turno', sublabel: '',                icon: BarChart3, href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
+        { id: 'sensores', label: 'Sensores',       sublabel: 'Tiempo real',        icon: Activity,  href: '/sensors/monitor', color: 'green',  wip: true },
+        { id: 'mapa',     label: 'Mapa de planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
+        { id: 'clima',    label: 'Clima del puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
+      ],
+    },
     {
       label: 'Operaciones',
       tiles: [
@@ -162,15 +182,6 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
         { id: 'inspecc',   label: 'Inspecciones',  sublabel: 'Rondas',           icon: ClipboardList, href: '/inspections', color: 'amber',  wip: true },
         { id: 'prevntv',   label: 'Preventivo',    sublabel: 'Plan mantención',  icon: CalendarClock, href: '/preventive',  color: 'amber',  wip: true },
         { id: 'gantt',     label: 'Gantt',         sublabel: 'Planificador',     icon: TrendingUp,    href: '/gantt',       color: 'orange', wip: true },
-      ],
-    },
-    {
-      label: 'Análisis y monitoreo',
-      tiles: [
-        { id: 'grader',   label: 'Análisis de turno', sublabel: '',                icon: BarChart3, href: '/analisis-grader', color: 'blue', children: LINEAS_ANALISIS },
-        { id: 'sensores', label: 'Sensores',       sublabel: 'Tiempo real',        icon: Activity,  href: '/sensors/monitor', color: 'green',  wip: true },
-        { id: 'mapa',     label: 'Mapa de planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
-        { id: 'clima',    label: 'Clima del puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
       ],
     },
     {
@@ -430,14 +441,17 @@ export function MobileHomeGrid() {
                     /* Los hijos van en la MISMA tarjeta que el padre: una card
                        aparte los volvería un grupo hermano y se perdería de
                        quién dependen (§7). */
-                    ...(tile.children ?? []).map((hijo) => (
+                    ...(tile.children ?? []).flatMap((hijo) => [
                       <ListCell
                         key={hijo.id}
                         variant="child"
                         title={hijo.label}
                         onClick={() => navigate(hijo.href)}
-                      />
-                    )),
+                      />,
+                      ...(hijo.monitorDe && (role === 'admin' || role === 'supervisor')
+                        ? [<MonitorCell key={`monitor-${hijo.monitorDe}`} lineId={hijo.monitorDe} />]
+                        : []),
+                    ]),
                   ]
                 })}
               </ListGroup>

@@ -1,0 +1,728 @@
+/**
+ * Líneas de proceso de la planta como GRAFO (idea de Orel, 19-09-2026; prototipo
+ * https://claude.ai/artifact/G4KbK1RAYafiJXabWQGFNf).
+ *
+ * «Tiempo reloj no es lo mismo que tiempo máquina»: si para 1 de las 3 Baader 142,
+ * Eviscerado pierde el 33,3 % de su capacidad, no el 100 %. Cada línea tiene una
+ * ENTRADA; las flechas son el flujo del producto. El peso de cada máquina en su
+ * línea SE CALCULA: el flujo entra al 100 % y se reparte en partes iguales en cada
+ * bifurcación (3 ramas → 33,3 %; al juntarse vuelve a 100 %). Lo que no queda
+ * conectado desde la entrada está fuera de la línea (0 %). Una flecha hacia la
+ * entrada de OTRA línea marca la cadena entre líneas y ahí se corta el cálculo.
+ *
+ * Supuesto declarado: las ramas en paralelo tienen la misma capacidad.
+ *
+ * SERVICIOS DE APOYO (Orel, 19-09-2026): Caseta agua mar, estanques de agua, Planta
+ * RILES, sala de máquinas… no detienen la línea directo pero influyen. Viven en una
+ * zona de tipo `apoyo`; sus flechas son «abastece a» (servicio → línea) o «recibe de»
+ * (línea → servicio) y NO entran al cálculo de pesos: si RILES falla, la línea sigue
+ * un rato y el efecto no es proporcional (mezclarlo falsearía los pesos).
+ */
+
+export interface LineaProceso {
+  id: string
+  nombre: string
+  /** `apoyo` = zona de servicios que influyen indirectamente (sin entrada ni pesos). */
+  tipo?: 'linea' | 'apoyo'
+  /** Zona del lienzo (px del lienzo): solo dibujo. */
+  zona: { x: number; y: number; w: number; h: number }
+}
+
+export interface NodoGrafo {
+  /** Id del equipo en `hierarchy`, o `in:<lineaId>` para la entrada de una línea. */
+  id: string
+  x: number
+  y: number
+  /**
+   * Contenedor (zona) al que PERTENECE — explícito, no por dónde está dibujado (Orel,
+   * 19-09-2026: el contenedor crece con sus equipos; entrar o salir se confirma).
+   * Sin el campo (guardados antiguos) se deduce por la posición; `''` = sin contenedor.
+   */
+  zona?: string
+  /** Solo los elementos MANUALES (`manual:…`, creados en el editor, que no están en el árbol). */
+  nombre?: string
+}
+
+export const PREFIJO_MANUAL = 'manual:'
+export const esManual = (id: string) => id.startsWith(PREFIJO_MANUAL)
+
+export interface GrafoLineas {
+  version: 1
+  lineas: LineaProceso[]
+  nodos: NodoGrafo[]
+  /** [origen, destino]. */
+  aristas: [string, string][]
+  /** Grupos en paralelo marcados a mano (los evidentes se deducen del grafo). */
+  grupos?: GrupoParalelo[]
+  /** Puntos por los que se hace pasar una flecha, para acomodarla a mano. */
+  curvas?: CurvaFlecha[]
+  /**
+   * Nombres escritos a mano en la bitácora que el admin marcó «no es un equipo» (claves
+   * normalizadas, ver `pendientesDeUbicar`): un área, una sala, un error. Es lo único que se
+   * persiste de la bandeja de pendientes; la bandeja misma se deduce de los eventos.
+   */
+  descartados?: string[]
+  /**
+   * «Gracias a X funciona Y» (Orel, 19-09-2026): [habilitador, habilitado]. No pasa
+   * producto —las bombas de vacío no reciben peces— pero si el habilitador para, el
+   * habilitado pierde capacidad. Es el punto medio que faltaba entre una flecha de flujo
+   * (el producto pasa) y un servicio de apoyo (influye, sin peso).
+   */
+  habilitan?: [string, string][]
+  /**
+   * Cuánto se lleva cada rama en su bifurcación (Orel, 20-09-2026). Sin esto el flujo se parte
+   * en partes IGUALES, y eso es falso apenas las ramas rinden distinto: de la cinta azul salen
+   * las 3 Baader 142 (~5.500 piezas por turno cada una) y la línea manual HG (~2.750), o sea
+   * 28,6 % · 28,6 % · 28,6 % · 14 %, no 25 % cada una.
+   *
+   * `parte` es un peso RELATIVO, no un porcentaje: se puede escribir directamente las piezas
+   * por turno y el reparto sale solo. Las ramas sin cuota valen 1.
+   */
+  cuotas?: CuotaRama[]
+}
+
+/** Lo que se lleva una rama de su bifurcación, en peso relativo. */
+export interface CuotaRama {
+  a: string
+  b: string
+  parte: number
+}
+
+/**
+ * Una flecha acomodada a mano: pasa por estos puntos, en orden, con curva suave
+ * (Orel, 19-09-2026: «ordenar las líneas como si fueran cuerdas»).
+ */
+export interface CurvaFlecha {
+  a: string
+  b: string
+  puntos: { x: number; y: number }[]
+}
+
+/**
+ * Camino suave que pasa por todos los puntos (Catmull-Rom convertido a Bézier): curvas
+ * redondas, nunca ángulos rectos, que es lo que Orel pidió del diagrama.
+ */
+export function caminoSuave(puntos: readonly { x: number; y: number }[]): string {
+  if (puntos.length < 2) return ''
+  const p = puntos
+  let d = `M${p[0]!.x},${p[0]!.y}`
+  for (let i = 0; i < p.length - 1; i++) {
+    const p0 = p[i - 1] ?? p[i]!
+    const p1 = p[i]!
+    const p2 = p[i + 1]!
+    const p3 = p[i + 2] ?? p2
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 }
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 }
+    d += ` C${c1.x},${c1.y} ${c2.x},${c2.y} ${p2.x},${p2.y}`
+  }
+  return d
+}
+
+/**
+ * Un grupo en paralelo hecho a mano: sirve donde el reparto no se deduce solo (ramas con
+ * cuotas distintas, equipos que no cuelgan del mismo padre) o donde Orel quiere dejarlo
+ * dicho explícitamente en otra área (19-09-2026).
+ */
+export interface GrupoParalelo {
+  id: string
+  miembros: string[]
+  /** Nombre propio; si falta, se rotula «Grupo · N ramas». */
+  nombre?: string
+  /**
+   * Cómo se reparte lo que le llega al grupo:
+   * - `reparte` (el de siempre): cada miembro se lleva 1/N. Si para uno, se pierde esa parte.
+   * - `todas`: se necesitan TODAS para que funcione, así que cada una vale lo mismo que el
+   *   grupo entero. Orel, 19-09-2026, sobre las dos bombas de vacío de anillo: «succiona
+   *   pero con tan poco vacío que termina deteniendo la succión, así que en la práctica
+   *   deben estar las 2 operando». Estar al lado no es estar en paralelo.
+   */
+  modo?: 'reparte' | 'todas'
+}
+
+export const PREFIJO_GRUPO = 'grupo:'
+export const esGrupo = (id: string) => id.startsWith(PREFIJO_GRUPO)
+
+/**
+ * Id de un contenedor nuevo a partir de su nombre, sin chocar con los que ya existen
+ * (el id viaja en `NodoGrafo.zona` y en `in:<id>`: cambiarlo después rompería lo guardado).
+ */
+export function idDeContenedor(nombre: string, usados: readonly string[]): string {
+  const base =
+    nombre
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'linea'
+  let id = base
+  for (let i = 2; usados.includes(id); i++) id = `${base}-${i}`
+  return id
+}
+
+/** Caja de un contenedor nuevo: a la derecha de todo, que es como fluye la planta. */
+export function cajaNueva(cajas: Iterable<LineaProceso['zona']>, w = 560, h = 360): LineaProceso['zona'] {
+  const todas = [...cajas]
+  return {
+    x: todas.length ? Math.round(Math.max(...todas.map((z) => z.x + z.w)) + 80) : 0,
+    y: todas.length ? Math.round(Math.min(...todas.map((z) => z.y))) : 0,
+    w,
+    h,
+  }
+}
+
+/**
+ * ¿Una flecha `a → b` cerraría un círculo? (`b` ya llega hasta `a`). El reparto del flujo
+ * necesita que el grafo no tenga vueltas: en un círculo no se puede repartir y los equipos
+ * quedan sin porcentaje (`PesoEnLinea.ciclo`). Mejor no dejar armarlo que avisar después.
+ */
+export function cierraCiclo(aristas: readonly (readonly [string, string])[], a: string, b: string): boolean {
+  if (a === b) return true
+  const salidas = new Map<string, string[]>()
+  for (const [x, y] of aristas) salidas.set(x, [...(salidas.get(x) ?? []), y])
+  const visto = new Set<string>()
+  const pila = [b]
+  while (pila.length) {
+    const n = pila.pop()!
+    if (n === a) return true
+    if (visto.has(n)) continue
+    visto.add(n)
+    for (const s of salidas.get(n) ?? []) pila.push(s)
+  }
+  return false
+}
+
+/**
+ * Flechas que hay que agregar al sacar equipos del medio para que el flujo no quede cortado:
+ * en `A → B → C`, si se va B, queda `A → C` (patrón «Delete Middle Node» de React Flow).
+ * Cruza varios seguidos, no repite lo que ya existe y no arma círculos.
+ */
+export function puentesAlQuitar(aristas: readonly (readonly [string, string])[], quitados: readonly string[]): [string, string][] {
+  const fuera = new Set(quitados)
+  const salidas = new Map<string, string[]>()
+  for (const [x, y] of aristas) salidas.set(x, [...(salidas.get(x) ?? []), y])
+  const existe = new Set(aristas.map(([x, y]) => `${x}->${y}`))
+  const quedan = aristas.filter(([x, y]) => !fuera.has(x) && !fuera.has(y)) as [string, string][]
+  const out: [string, string][] = []
+  const puesto = new Set<string>()
+  for (const [a, b] of aristas) {
+    if (fuera.has(a) || !fuera.has(b)) continue
+    const visto = new Set<string>()
+    const pila = [b]
+    while (pila.length) {
+      const n = pila.pop()!
+      if (visto.has(n)) continue
+      visto.add(n)
+      for (const s of salidas.get(n) ?? []) {
+        if (fuera.has(s)) {
+          pila.push(s)
+          continue
+        }
+        const llave = `${a}->${s}`
+        if (s === a || existe.has(llave) || puesto.has(llave)) continue
+        if (cierraCiclo([...quedan, ...out], a, s)) continue
+        puesto.add(llave)
+        out.push([a, s])
+      }
+    }
+  }
+  return out
+}
+
+/** Dónde queda cada equipo después de acomodar. */
+export interface Acomodo {
+  id: string
+  x: number
+  y: number
+}
+
+/** Aire entre capas y entre ramas al acomodar. */
+export const ACOMODO = { entreCapas: 72, entreRamas: 28, sueltos: 56 }
+
+/**
+ * Acomoda los equipos de un contenedor de izquierda a derecha siguiendo el flujo.
+ *
+ * Tres reglas, en este orden:
+ *  1. El camino del producto va en capas: cada equipo una capa más a la derecha que el que
+ *     lo alimenta, con la capa medida por el camino MÁS LARGO, así nada queda a la izquierda
+ *     de quien lo alimenta. Las ramas de una capa se apilan respetando el orden que ya tenían.
+ *  2. Un GRUPO cuenta como un solo casillero: sus miembros se apilan en la misma capa.
+ *  3. Los HABILITADORES van DEBAJO de lo que habilitan, alineados con su columna (convención
+ *     IDEF0: lo que entra por abajo de una caja es lo que la hace posible). Si dos habilitan
+ *     lo mismo, se apilan uno bajo el otro.
+ *
+ * Lo que no cuelga de nada queda en filas al final. No toca contenedores ni flechas.
+ */
+export function acomodarEnCapas(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan'>>,
+  lineaId: string,
+  medidas: { nodo: typeof NODO; entrada: typeof ENTRADA; margen: typeof MARGEN_ZONA } = { nodo: NODO, entrada: ENTRADA, margen: MARGEN_ZONA },
+): Acomodo[] {
+  const linea = g.lineas.find((l) => l.id === lineaId)
+  if (!linea) return []
+  const dentro = g.nodos.filter((n) => zonaDeNodo(g.lineas, n) === lineaId)
+  if (!dentro.length) return []
+  const suyos = new Set(dentro.map((n) => n.id))
+
+  // Cada equipo pertenece a lo sumo a un grupo; el grupo es la UNIDAD que se acomoda.
+  const grupoDe = new Map<string, GrupoParalelo>()
+  for (const gr of g.grupos ?? []) for (const id of gr.miembros) if (suyos.has(id)) grupoDe.set(id, gr)
+  const unidadDe = (id: string) => {
+    const gr = grupoDe.get(id)
+    return gr ? PREFIJO_GRUPO + gr.id : id
+  }
+  const miembrosDe = (u: string): NodoGrafo[] =>
+    esGrupo(u) ? dentro.filter((n) => grupoDe.get(n.id) && PREFIJO_GRUPO + grupoDe.get(n.id)!.id === u) : dentro.filter((n) => n.id === u)
+
+  const unidades = [...new Set(dentro.map((n) => unidadDe(n.id)))]
+  const enUnidad = new Set(unidades)
+  const salidas = new Map<string, string[]>()
+  const entran = new Map<string, number>()
+  for (const [a, b] of g.aristas) {
+    const ua = enUnidad.has(a) ? a : unidadDe(a)
+    const ub = enUnidad.has(b) ? b : unidadDe(b)
+    if (!enUnidad.has(ua) || !enUnidad.has(ub) || ua === ub) continue
+    const lista = salidas.get(ua) ?? []
+    if (lista.includes(ub)) continue
+    lista.push(ub)
+    salidas.set(ua, lista)
+    entran.set(ub, (entran.get(ub) ?? 0) + 1)
+  }
+
+  // Capa por camino más largo (Kahn). Lo atascado está en un círculo y queda fuera de la cadena.
+  const capa = new Map<string, number>()
+  const pendientes = new Map(unidades.map((u) => [u, entran.get(u) ?? 0]))
+  const cola = unidades.filter((u) => !(entran.get(u) ?? 0))
+  for (const u of cola) capa.set(u, 0)
+  while (cola.length) {
+    const n = cola.shift()!
+    for (const s of salidas.get(n) ?? []) {
+      capa.set(s, Math.max(capa.get(s) ?? 0, (capa.get(n) ?? 0) + 1))
+      const p = (pendientes.get(s) ?? 1) - 1
+      pendientes.set(s, p)
+      if (p === 0) cola.push(s)
+    }
+  }
+  const enCadena = unidades.filter((u) => capa.has(u) && (salidas.has(u) || (entran.get(u) ?? 0) > 0))
+  const orden = new Map(unidades.map((u) => [u, Math.min(...miembrosDe(u).map((n) => n.y))]))
+
+  const x0 = linea.zona.x + medidas.margen.lado
+  const y0 = linea.zona.y + medidas.margen.arriba
+  const paso = medidas.nodo.ancho + ACOMODO.entreCapas
+  const alto = medidas.nodo.alto + ACOMODO.entreRamas
+  const out: Acomodo[] = []
+  const columna = new Map<string, number>()
+  let pieDeLaCadena = y0
+
+  const poner = (u: string, cx: number, cy: number) => {
+    columna.set(u, cx)
+    miembrosDe(u)
+      .sort((a, b) => a.y - b.y)
+      .forEach((n, i) => {
+        const t = esEntrada(n.id) ? medidas.entrada : medidas.nodo
+        out.push({
+          id: n.id,
+          x: Math.round(cx + (medidas.nodo.ancho - t.ancho) / 2),
+          y: Math.round(cy + i * alto + (medidas.nodo.alto - t.alto) / 2),
+        })
+      })
+    return cy + miembrosDe(u).length * alto
+  }
+
+  const porCapa = new Map<number, string[]>()
+  for (const u of enCadena) {
+    const c = capa.get(u) ?? 0
+    porCapa.set(c, [...(porCapa.get(c) ?? []), u])
+  }
+  for (const [c, lista] of [...porCapa.entries()].sort((a, b) => a[0] - b[0])) {
+    let cy = y0
+    for (const u of [...lista].sort((a, b) => (orden.get(a) ?? 0) - (orden.get(b) ?? 0))) cy = poner(u, x0 + c * paso, cy)
+    pieDeLaCadena = Math.max(pieDeLaCadena, cy)
+  }
+
+  // Habilitadores: bajo la columna de lo que habilitan. Si uno habilita a varios, va bajo
+  // el primero; si varios habilitan lo mismo, se apilan.
+  const colocadas = new Set(enCadena)
+  const usadas = new Map<number, number>()
+  for (const [h, t] of g.habilitan ?? []) {
+    const uh = enUnidad.has(h) ? h : unidadDe(h)
+    const ut = enUnidad.has(t) ? t : unidadDe(t)
+    if (!enUnidad.has(uh) || colocadas.has(uh)) continue
+    const cx = columna.get(ut)
+    if (cx === undefined) continue
+    const nivel = usadas.get(cx) ?? 0
+    const cy = pieDeLaCadena + ACOMODO.sueltos + nivel * alto
+    poner(uh, cx, cy)
+    usadas.set(cx, nivel + miembrosDe(uh).length)
+    colocadas.add(uh)
+  }
+
+  // Lo que no cuelga de nada: filas al final, sin mezclarse con la cadena.
+  const piso = pieDeLaCadena + ACOMODO.sueltos + (usadas.size ? Math.max(...usadas.values()) * alto + ACOMODO.sueltos : 0)
+  let i = 0
+  for (const u of unidades) {
+    if (colocadas.has(u)) continue
+    poner(u, x0 + (i % 5) * (medidas.nodo.ancho + ACOMODO.entreRamas), piso + Math.floor(i / 5) * alto)
+    i++
+  }
+  return out
+}
+
+/** Aire entre un contenedor y el siguiente al acomodar toda la planta. */
+export const ENTRE_CONTENEDORES = 140
+
+/**
+ * Acomoda TODA la planta: primero el contenido de cada contenedor y después los contenedores
+ * mismos, en fila de izquierda a derecha y del tamaño justo de lo que tienen adentro, para que
+ * dejen de pisarse (Orel, 20-09-2026: «reacomoda los contenedores para que no se solapen»).
+ *
+ * Se respeta el orden que ya tenían (por su x actual): acomodar no debe barajar la planta.
+ * Las zonas de apoyo van debajo de todo, que es donde se leen sin cruzar la línea.
+ */
+export function acomodarPlanta(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan'>>,
+  medidas: { nodo: typeof NODO; entrada: typeof ENTRADA; margen: typeof MARGEN_ZONA } = { nodo: NODO, entrada: ENTRADA, margen: MARGEN_ZONA },
+): { nodos: Acomodo[]; zonas: { id: string; zona: LineaProceso['zona'] }[] } {
+  const nodos: Acomodo[] = []
+  const zonas: { id: string; zona: LineaProceso['zona'] }[] = []
+  const porX = (a: LineaProceso, b: LineaProceso) => a.zona.x - b.zona.x || a.zona.y - b.zona.y
+
+  const medir = (l: LineaProceso) => {
+    // Se acomoda con el contenedor en el origen para medir cuánto ocupa de verdad.
+    const enOrigen = { ...g, lineas: g.lineas.map((x) => (x.id === l.id ? { ...x, zona: { ...x.zona, x: 0, y: 0 } } : x)) }
+    const piezas = acomodarEnCapas(enOrigen, l.id, medidas)
+    const w = piezas.length ? Math.max(...piezas.map((p) => p.x + medidas.nodo.ancho)) + medidas.margen.lado : l.zona.w
+    const h = piezas.length ? Math.max(...piezas.map((p) => p.y + medidas.nodo.alto)) + medidas.margen.abajo : l.zona.h
+    return { piezas, w: Math.max(w, 280), h: Math.max(h, 180) }
+  }
+
+  let x = 0
+  let alto = 0
+  for (const l of g.lineas.filter((z) => z.tipo !== 'apoyo').sort(porX)) {
+    const { piezas, w, h } = medir(l)
+    for (const p of piezas) nodos.push({ id: p.id, x: p.x + x, y: p.y })
+    zonas.push({ id: l.id, zona: { x, y: 0, w, h } })
+    alto = Math.max(alto, h)
+    x += w + ENTRE_CONTENEDORES
+  }
+
+  let y = alto + ENTRE_CONTENEDORES
+  for (const l of g.lineas.filter((z) => z.tipo === 'apoyo').sort(porX)) {
+    const { piezas, w, h } = medir(l)
+    for (const p of piezas) nodos.push({ id: p.id, x: p.x, y: p.y + y })
+    zonas.push({ id: l.id, zona: { x: 0, y, w, h } })
+    y += h + ENTRE_CONTENEDORES
+  }
+  return { nodos, zonas }
+}
+
+/** Tamaño de la tarjeta de un equipo en el lienzo (px): para saber en qué zona cae su centro. */
+export const NODO = { ancho: 188, alto: 68 }
+/** Tamaño de la píldora «Entrada …». */
+export const ENTRADA = { ancho: 124, alto: 44 }
+/** Aire entre el contenedor y sus equipos (arriba deja lugar para el título). */
+export const MARGEN_ZONA = { lado: 24, arriba: 48, abajo: 24 }
+
+export const PREFIJO_ENTRADA = 'in:'
+export const esEntrada = (id: string) => id.startsWith(PREFIJO_ENTRADA)
+export const lineaDeEntrada = (id: string) => id.slice(PREFIJO_ENTRADA.length)
+
+export interface PesoEnLinea {
+  lineaId: string
+  /** Parte del flujo de su línea que pasa por la máquina (0–1). */
+  peso: number
+  /**
+   * La máquina está dentro de un CÍRCULO de flechas (A → B → A): el flujo no se puede
+   * repartir y queda en 0. Hay que decirlo, si no el 0 % parece un error del editor
+   * (Orel, 19-09-2026: Acopio entero marcaba 0 % por una flecha de vuelta).
+   */
+  ciclo?: boolean
+  /** No pasa producto por ella: su cuota viene de lo que HABILITA. */
+  habilita?: boolean
+}
+
+/**
+ * Peso de cada máquina en su línea. Una máquina alcanzable desde dos entradas
+ * queda en la primera línea que la alcanza (orden de `lineas`).
+ */
+/**
+ * Peso de cada máquina en su línea. Una máquina alcanzable desde dos entradas
+ * queda en la primera línea que la alcanza (orden de `lineas`).
+ *
+ * Tres cosas reparten cuota, en este orden: las FLECHAS de flujo (1/N en cada bifurcación),
+ * los GRUPOS —lo que le llega al grupo se reparte entre sus miembros, o se copia entero si
+ * se necesitan todas— y los HABILITADORES, que no reciben flujo pero se llevan la cuota de
+ * lo que hacen posible.
+ */
+/** El peso relativo de una rama; 1 si no se le puso ninguno (o si el número no sirve). */
+export function parteDe(cuotas: readonly CuotaRama[] | undefined, a: string, b: string): number {
+  const c = cuotas?.find((x) => x.a === a && x.b === b)
+  return c && Number.isFinite(c.parte) && c.parte > 0 ? c.parte : 1
+}
+
+/** ¿Esta bifurcación reparte disparejo? Sirve para rotular solo donde importa. */
+export function repartoDisparejo(cuotas: readonly CuotaRama[] | undefined, a: string, hijos: readonly string[]): boolean {
+  if (!cuotas?.length || hijos.length < 2) return false
+  const partes = hijos.map((h) => parteDe(cuotas, a, h))
+  return Math.max(...partes) - Math.min(...partes) > 1e-6
+}
+
+export function pesosPorLinea(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'> & Partial<Pick<GrafoLineas, 'grupos' | 'habilitan' | 'cuotas'>>,
+): Map<string, PesoEnLinea> {
+  const grupos = g.grupos ?? []
+  const porId = new Map(grupos.map((x) => [PREFIJO_GRUPO + x.id, x]))
+  // Un grupo es un nodo más del grafo: se le puede llegar con una sola flecha.
+  const existe = new Set<string>([...g.nodos.map((n) => n.id), ...porId.keys()])
+  const servicios = serviciosDe(g)
+  const salidas = new Map<string, string[]>()
+  for (const [a, b] of g.aristas) {
+    // Las flechas de los servicios de apoyo son indirectas: no reparten flujo.
+    if (!existe.has(a) || !existe.has(b) || a === b || servicios.has(a) || servicios.has(b)) continue
+    const lista = salidas.get(a) ?? []
+    if (!lista.includes(b)) lista.push(b)
+    salidas.set(a, lista)
+  }
+  const res = new Map<string, PesoEnLinea>()
+  for (const l of g.lineas) {
+    if (l.tipo === 'apoyo') continue
+    const ini = PREFIJO_ENTRADA + l.id
+    if (!existe.has(ini)) continue
+    // Lo alcanzable desde la entrada, sin cruzar a la entrada de otra línea.
+    const alcanzables = new Set<string>()
+    const pila = [ini]
+    while (pila.length) {
+      const n = pila.pop()!
+      if (alcanzables.has(n)) continue
+      alcanzables.add(n)
+      for (const s of salidas.get(n) ?? []) if (!esEntrada(s)) pila.push(s)
+    }
+    // Flujo en orden topológico (Kahn). Un ciclo deja a sus nodos sin flujo: no se inventa.
+    const pendientes = new Map<string, number>()
+    for (const n of alcanzables) for (const s of salidas.get(n) ?? []) if (alcanzables.has(s)) pendientes.set(s, (pendientes.get(s) ?? 0) + 1)
+    const flujo = new Map<string, number>([[ini, 1]])
+    const cola = [ini]
+    while (cola.length) {
+      const n = cola.shift()!
+      const hijos = (salidas.get(n) ?? []).filter((s) => alcanzables.has(s))
+      // Reparto por cuota: sin cuotas todas valen 1 y queda el 1/N de siempre.
+      const partes = hijos.map((h) => parteDe(g.cuotas, n, h))
+      const suma = partes.reduce((a, b) => a + b, 0) || hijos.length
+      for (const [i, h] of hijos.entries()) {
+        flujo.set(h, (flujo.get(h) ?? 0) + ((flujo.get(n) ?? 0) * (partes[i] ?? 1)) / suma)
+        const p = (pendientes.get(h) ?? 1) - 1
+        pendientes.set(h, p)
+        if (p === 0) cola.push(h)
+      }
+    }
+    for (const n of alcanzables) {
+      if (n === ini || res.has(n)) continue
+      const atascado = !!pendientes.get(n)
+      res.set(n, { lineaId: l.id, peso: atascado ? 0 : Math.min(1, flujo.get(n) ?? 0), ...(atascado ? { ciclo: true } : {}) })
+    }
+  }
+  // Lo que le llegó a un grupo baja a sus miembros: 1/N, o entero si se necesitan todas.
+  const repartirGrupo = (gr: GrupoParalelo, p: PesoEnLinea, extra: Partial<PesoEnLinea> = {}) => {
+    const cuota = gr.modo === 'todas' ? p.peso : p.peso / Math.max(1, gr.miembros.length)
+    for (const miembro of gr.miembros) {
+      if (res.has(miembro)) continue
+      res.set(miembro, { lineaId: p.lineaId, peso: cuota, ...(p.ciclo ? { ciclo: true } : {}), ...extra })
+    }
+  }
+  for (const [gid, gr] of porId) {
+    const p = res.get(gid)
+    if (p) repartirGrupo(gr, p)
+  }
+  // Habilitadores: no reciben flujo, se llevan la cuota de lo que hacen posible. Si uno
+  // habilita a VARIOS, se lleva la SUMA: si para, se detienen todos (el compresor de aire
+  // del Acopio habilita a los dos estanques, asi que su parada cuesta el 100 %, no el 50 %).
+  // En cadena (X habilita a Y que habilita a Z) hacen falta varias vueltas.
+  const porFlujo = new Set(res.keys())
+  const porHabilitador = new Map<string, string[]>()
+  for (const [h, t] of g.habilitan ?? []) porHabilitador.set(h, [...(porHabilitador.get(h) ?? []), t])
+  for (let vuelta = 0; vuelta < 4 && porHabilitador.size; vuelta++) {
+    let cambio = false
+    for (const [h, destinos] of porHabilitador) {
+      // Si por el habilitador SI pasa producto, manda su cuota de flujo.
+      if (porFlujo.has(h)) continue
+      const cuotas = destinos.map((t) => res.get(t)).filter((p): p is PesoEnLinea => !!p)
+      if (!cuotas.length) continue
+      const suma = Math.min(1, cuotas.reduce((a, p) => a + p.peso, 0))
+      if (res.get(h)?.peso === suma) continue
+      res.set(h, { lineaId: cuotas[0]!.lineaId, peso: suma, habilita: true, ...(cuotas.every((p) => p.ciclo) ? { ciclo: true } : {}) })
+      cambio = true
+    }
+    if (!cambio) break
+  }
+  // Y recien ahi baja a los miembros del grupo que habilita.
+  for (const [gid, gr] of porId) {
+    const p = res.get(gid)
+    if (p?.habilita) repartirGrupo(gr, p, { habilita: true })
+  }
+  return res
+}
+
+/** «33,3 %», «100 %», «0 %». */
+export function formatoPeso(p: number): string {
+  const v = Math.round(p * 1000) / 10
+  return `${Number.isInteger(v) ? v : v.toLocaleString('es-CL')} %`
+}
+
+/** El contenedor al que pertenece un nodo: el explícito, el de su entrada, o el que tiene debajo. */
+export function zonaDeNodo(lineas: readonly LineaProceso[], n: NodoGrafo): string | undefined {
+  if (esEntrada(n.id)) return lineaDeEntrada(n.id)
+  if (n.zona === '') return undefined
+  if (n.zona && lineas.some((l) => l.id === n.zona)) return n.zona
+  return lineaEnPunto(lineas, n.x + NODO.ancho / 2, n.y + NODO.alto / 2)?.id
+}
+
+/**
+ * Límites de cada contenedor: su tamaño guardado AMPLIADO para que entren todos sus
+ * equipos, hacia cualquier lado (si un equipo se empuja arriba o a la izquierda, el
+ * contenedor lo sigue).
+ */
+export function limitesDeZonas(g: Pick<GrafoLineas, 'lineas' | 'nodos'>): Map<string, LineaProceso['zona']> {
+  const out = new Map<string, LineaProceso['zona']>()
+  for (const l of g.lineas) {
+    let x1 = l.zona.x
+    let y1 = l.zona.y
+    let x2 = l.zona.x + l.zona.w
+    let y2 = l.zona.y + l.zona.h
+    for (const n of g.nodos) {
+      if (zonaDeNodo(g.lineas, n) !== l.id) continue
+      const t = esEntrada(n.id) ? ENTRADA : NODO
+      x1 = Math.min(x1, n.x - MARGEN_ZONA.lado)
+      y1 = Math.min(y1, n.y - MARGEN_ZONA.arriba)
+      x2 = Math.max(x2, n.x + t.ancho + MARGEN_ZONA.lado)
+      y2 = Math.max(y2, n.y + t.alto + MARGEN_ZONA.abajo)
+    }
+    out.set(l.id, { x: x1, y: y1, w: x2 - x1, h: y2 - y1 })
+  }
+  return out
+}
+
+/** Caja que envuelve a un conjunto de equipos del lienzo, con aire alrededor. */
+export function limitesDeGrupo(nodos: readonly NodoGrafo[], miembros: readonly string[], aire = 14): { x: number; y: number; w: number; h: number } | undefined {
+  const cajas = nodos.filter((n) => miembros.includes(n.id))
+  if (cajas.length < 2) return undefined
+  const t = (n: NodoGrafo) => (esEntrada(n.id) ? ENTRADA : NODO)
+  const x1 = Math.min(...cajas.map((c) => c.x))
+  const y1 = Math.min(...cajas.map((c) => c.y))
+  const x2 = Math.max(...cajas.map((c) => c.x + t(c).ancho))
+  const y2 = Math.max(...cajas.map((c) => c.y + t(c).alto))
+  return { x: x1 - aire, y: y1 - aire, w: x2 - x1 + aire * 2, h: y2 - y1 + aire * 2 }
+}
+
+/** Los equipos que PERTENECEN a una zona de servicios de apoyo. */
+export function serviciosDe(g: Pick<GrafoLineas, 'lineas' | 'nodos'>): Set<string> {
+  const apoyo = new Set(g.lineas.filter((l) => l.tipo === 'apoyo').map((l) => l.id))
+  const out = new Set<string>()
+  if (!apoyo.size) return out
+  for (const n of g.nodos) {
+    if (esEntrada(n.id)) continue
+    const z = zonaDeNodo(g.lineas, n)
+    if (z && apoyo.has(z)) out.add(n.id)
+  }
+  return out
+}
+
+export interface RelacionServicio {
+  /** Líneas a las que abastece (flecha servicio → línea). */
+  abastece: string[]
+  /** Líneas de las que recibe (flecha línea → servicio), p. ej. RILES recibe vísceras de Eviscerado. */
+  recibe: string[]
+}
+
+/** Qué líneas toca cada servicio de apoyo, según sus flechas (lineaId, sin repetir). */
+export function relacionesDeServicios(g: Pick<GrafoLineas, 'lineas' | 'nodos' | 'aristas'>, pesos: Map<string, PesoEnLinea>): Map<string, RelacionServicio> {
+  const servicios = serviciosDe(g)
+  const lineaDe = (id: string) => (esEntrada(id) ? lineaDeEntrada(id) : pesos.get(id)?.lineaId)
+  const out = new Map<string, RelacionServicio>()
+  const de = (id: string) => {
+    const r = out.get(id) ?? { abastece: [], recibe: [] }
+    out.set(id, r)
+    return r
+  }
+  for (const s of servicios) de(s)
+  for (const [a, b] of g.aristas) {
+    if (servicios.has(a) && !servicios.has(b)) {
+      const l = lineaDe(b)
+      if (l && !de(a).abastece.includes(l)) de(a).abastece.push(l)
+    } else if (servicios.has(b) && !servicios.has(a)) {
+      const l = lineaDe(a)
+      if (l && !de(b).recibe.includes(l)) de(b).recibe.push(l)
+    }
+  }
+  return out
+}
+
+/** La línea en cuya zona cae un punto (para decir «fuera de la línea · Eviscerado»). */
+export function lineaEnPunto(lineas: readonly LineaProceso[], x: number, y: number): LineaProceso | undefined {
+  return lineas.find((l) => x >= l.zona.x && x < l.zona.x + l.zona.w && y >= l.zona.y && y < l.zona.y + l.zona.h)
+}
+
+/** Un equipo que el diagrama no va a poder cobrarle a ninguna línea. */
+export interface HallazgoRevision {
+  id: string
+  lineaId: string
+  /** Parte de la línea que pasa por él (0–1): ordena por lo que cuesta, no por nombre. */
+  peso: number
+}
+
+/**
+ * Qué le falta al diagrama, desde la única pregunta que importa: **¿qué falla de la bitácora
+ * no vamos a poder cobrarle a una línea?** (Orel, 20-09-2026).
+ *
+ * Son los tres motivos que `perdidaDeLinea` ya usa para dejar tiempo sin convertir, vistos
+ * desde el editor y ANTES de que ocurra la falla:
+ *
+ * - `fueraDeLinea` — está dibujado pero no le llega el flujo desde ninguna entrada: su parada
+ *   vale 0 minutos de línea.
+ * - `enCirculo` — un círculo de flechas deja sin cuota a todo lo de aguas abajo.
+ * - `sinSap` — elementos `manual:`, que existen solo acá. La bitácora liga por código de
+ *   equipo, así que una falla en ellos no se puede anotar contra nada.
+ *
+ * ⚠ Los servicios de apoyo NO son hallazgos: por diseño no reparten flujo (ver la cabecera de
+ * este archivo). Marcarlos «fuera de la línea» sería un falso positivo en cada revisión.
+ * ⚠ Tampoco se listan los equipos del árbol que no están en el lienzo: la enorme mayoría son
+ * componentes ya contados dentro de su padre («CHILLER · +5 comp.») y la lista sería ruido.
+ */
+export function revisionDeLineas(
+  g: Pick<GrafoLineas, 'lineas' | 'nodos'>,
+  pesos: ReadonlyMap<string, PesoEnLinea>,
+): {
+  fueraDeLinea: HallazgoRevision[]
+  enCirculo: HallazgoRevision[]
+  sinSap: HallazgoRevision[]
+  equipos: number
+  conFlujo: number
+} {
+  const apoyo = new Set(g.lineas.filter((l) => l.tipo === 'apoyo').map((l) => l.id))
+  const fueraDeLinea: HallazgoRevision[] = []
+  const enCirculo: HallazgoRevision[] = []
+  const sinSap: HallazgoRevision[] = []
+  let equipos = 0
+  let conFlujo = 0
+
+  for (const n of g.nodos) {
+    if (esEntrada(n.id)) continue
+    const zona = zonaDeNodo(g.lineas, n)
+    if (zona && apoyo.has(zona)) continue
+    equipos += 1
+    const p = pesos.get(n.id)
+    const h: HallazgoRevision = { id: n.id, lineaId: p?.lineaId ?? zona ?? '', peso: p?.peso ?? 0 }
+    if (p && !p.ciclo && p.peso > 0) conFlujo += 1
+    if (p?.ciclo) enCirculo.push(h)
+    else if (!p || p.peso <= 0) fueraDeLinea.push(h)
+    // Un elemento manual puede tener flujo perfecto y seguir siendo un pendiente con SAP.
+    if (esManual(n.id)) sinSap.push(h)
+  }
+
+  const porPeso = (a: HallazgoRevision, b: HallazgoRevision) => b.peso - a.peso || a.id.localeCompare(b.id)
+  return {
+    fueraDeLinea: fueraDeLinea.sort(porPeso),
+    enCirculo: enCirculo.sort(porPeso),
+    sinSap: sinSap.sort(porPeso),
+    equipos,
+    conFlujo,
+  }
+}

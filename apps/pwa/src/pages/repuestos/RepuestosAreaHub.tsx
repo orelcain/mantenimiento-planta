@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
@@ -22,6 +22,8 @@ import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
+import { SolicitarVariosSheet } from '@/components/repuestos/SolicitarVariosSheet'
+import type { PiezaSolicitable } from '@/utils/repuestos/solicitudMultiple'
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
 /** Lo que el formulario de solicitud muestra de bodega. Sin `bodegaId` el stock no se conoce. */
@@ -29,7 +31,7 @@ function stockDeSolicitud(r: { bodegaId?: string | null; stockActual: number; un
   return { configurado: !!r.bodegaId, stockActual: r.stockActual, unidad: r.unidad, ubicacionBodega: r.ubicacionBodega }
 }
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
-import { useSolicitudes, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
+import { useSolicitudes, type NuevaSolicitud, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
@@ -37,7 +39,8 @@ import { getTrashCount } from '@/services/auditLog'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { dibujoDe, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, useFigurasDespiece } from './enlacesPieza'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
@@ -264,8 +267,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // machineId/nodeId del equipo enfocado → acotar repuestos por IDENTIDAD (no por nombre).
   const [selectedEquipMachineId, setSelectedEquipMachineId] = useState<string | null>(null)
 
+  // Si venimos de «atrás» desde el dibujo, reponer búsqueda y panel (se consume una vez).
+  const [vueltaDelDibujo] = useState(() => leerVueltaDelDibujo())
+
   // Filtros + paginación de la tabla de repuestos
-  const [repQuery, setRepQuery] = useState('')
+  const [repQuery, setRepQuery] = useState(() => vueltaDelDibujo?.q ?? '')
   // Al empezar a buscar, llevar la lista a la vista: el aterrizaje del área
   // deja al usuario scrolleado en el dashboard y los resultados aparecían
   // "abajo", fuera de pantalla (se notaba sobre todo en móvil).
@@ -290,7 +296,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Repuesto seleccionado → panel lateral de detalle
   // Selección por rowKey estable (NO codigoSAP: vacío en repuestos sin SAP → colisiona).
-  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null)
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(() => vueltaDelDibujo?.rowKey ?? null)
 
 
   // Lightbox de fotos desde la miniatura de la fila (sin pasar por el detalle)
@@ -313,6 +319,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const { solicitudes, loading: solicitudesLoading, pendientesCount, crearSolicitud, avanzarEstado } = useSolicitudes()
   const [solicitarOpen, setSolicitarOpen] = useState(false)
   const [solicitarRepuesto, setSolicitarRepuesto] = useState<RepuestoLite | null>(null)
+  // «Solicitar repuestos» de la máquina enfocada: varios de una vez.
+  const [solicitarVariosOpen, setSolicitarVariosOpen] = useState(false)
   const [solicitudesOpen, setSolicitudesOpen] = useState(false)
   useEffect(() => {
     if (!abrirSolicitudes) return
@@ -607,6 +615,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSolicitarOpen(true)
   }, [])
 
+  const handleCrearVarias = useCallback(async (lineas: NuevaSolicitud[]) => {
+    for (const l of lineas) await crearSolicitud(l, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+    setSolicitarVariosOpen(false)
+    const unidades = lineas.reduce((a, l) => a + l.cantidad, 0)
+    toast({
+      title: `${lineas.length} ${lineas.length === 1 ? 'solicitud creada' : 'solicitudes creadas'}`,
+      description: `${unidades} unidades para ${selectedEquipName}. Quedan en «Solicitudes» y se avisa al grupo de Mantención en Telegram.`,
+      variant: 'success',
+    })
+  }, [crearSolicitud, user, toast, selectedEquipName])
+
   const handleCrearSolicitud = useCallback(
     async (data: Parameters<typeof crearSolicitud>[0]) => {
       await crearSolicitud(data, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
@@ -746,6 +765,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     // Por PLANTA + nombre: «KNURO N1» de Chonchi y el de Yal son dos equipos.
     return areaRepuestos.filter((r) => r.equipos.some((e) => claveDeEquipo(e.machineName || '', plantaDe(e.machineId)) === repEquipoFilter))
   }, [areaRepuestos, selectedEquipKey, selectedEquipMachineId, repEquipoFilter, plantaDe])
+
+  // Piezas de la máquina enfocada, como las ve «Solicitar repuestos»: comunes, stock y BOM.
+  const piezasDeLaMaquina = useMemo<PiezaSolicitable[]>(() => scopedRepuestos.map((r) => ({
+    clave: r.rowKey, codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, codigoFabricante: r.codigoFabricante || undefined,
+    comun: esComun(r), cantidadPorMaquina: r.cantidadPorMaquina, stock: stockDeSolicitud(r),
+  })), [scopedRepuestos])
+
 
   const stockKpis = useMemo(() => {
     let ok = 0, low = 0, out = 0
@@ -1054,6 +1080,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     } catch { /* noop */ }
   }, [prefsKey, repPageSize, repStockFilter, repFavOnly, repSortColumn, repSortDir])
 
+  // Código de fabricante → figura del despiece (BAADER 142 y 200), para el acceso al dibujo.
+  const figurasDespiece = useFigurasDespiece()
+  const navigate = useNavigate()
+  const irAlDibujo = useCallback((ruta: string, rowKey: string) => {
+    recordarVueltaDelDibujo({ q: repQuery, rowKey })
+    navigate(ruta)
+  }, [navigate, repQuery])
   const selectedRep = useMemo(
     () => areaRepuestos.find((r) => r.rowKey === selectedRowKey) ?? null,
     [areaRepuestos, selectedRowKey],
@@ -1633,9 +1666,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <Badge variant="secondary" className="ml-0.5 tabular-nums">{pendientesCount}</Badge>
             )}
           </Button>
-          <Button size="sm" className="h-11 gap-1.5" onClick={() => openSolicitar(null)}>
-            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
-          </Button>
+          {selectedEquipKey ? (
+            <Button size="sm" className="h-11 gap-1.5" onClick={() => setSolicitarVariosOpen(true)} title={`Solicitar uno o varios repuestos de ${selectedEquipName}`}>
+              <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuestos</span><span className="sm:hidden">Solicitar</span>
+            </Button>
+          ) : (
+            <Button size="sm" className="h-11 gap-1.5" onClick={() => openSolicitar(null)}>
+              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
+            </Button>
+          )}
           {/* Herramientas admin: toolbar en desktop (≥sm) */}
           {isAdmin && (
             <div className="hidden items-center gap-1 border-l border-border pl-2 sm:flex">
@@ -2026,6 +2065,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
                         {renderSortTh('stock', 'Stock', 'hidden md:table-cell')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
+                        <th className="hidden w-16 px-2 py-2 text-center font-semibold md:table-cell">Dibujo</th>
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -2035,6 +2075,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         // El equipo del filtro/foco primero; el marcador «Sin equipo» de un doc duplicado no cuenta.
                         const { nombre: equipo, mas } = equipoParaMostrar(r.equipos, preferirEquipo)
                         const extra = mas > 0 ? ` +${mas}` : ''
+                        const dibujo = dibujoDe(figurasDespiece, r.codigoFabricante, maquinaDeDespiece(equipo))
                         const isSel = selectedRowKey === r.rowKey
                         // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
                         const fotos = [...(r.fotos ?? []), ...(r.fotosCatalogo ?? [])]
@@ -2044,7 +2085,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           <Fragment key={r.rowKey}>
                           {showDespieceDivider && (
                             <tr className="bg-muted">
-                              <td colSpan={9} className="px-3 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground">
+                              <td colSpan={10} className="px-3 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground">
                                 Piezas de despiece · sin código SAP
                               </td>
                             </tr>
@@ -2150,6 +2191,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 )}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
                                 {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground">Fab {r.codigoFabricante}</span></span>}
+                                {dibujo && (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); irAlDibujo(dibujo.ruta, r.rowKey) }}
+                                          className={`${AREA_TACTIL_EN_TARJETA} ml-1.5 inline-flex items-center gap-1 rounded-ctl bg-primary/10 px-1.5 text-primary`}
+                                          aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
+                                    <Shapes className="h-3 w-3" /> Dibujo
+                                  </button>
+                                )}
                               </div>
                             </td>
                             <td className="hidden px-3 py-2 text-xs lg:table-cell" onClick={(e) => e.stopPropagation()}>
@@ -2194,6 +2242,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             </td>
                             <td className="hidden px-3 py-2 md:table-cell">
                               <span className="inline-block rounded-ctl bg-muted px-1.5 py-0.5 text-caption text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
+                            </td>
+                            <td className="hidden px-2 py-2 text-center md:table-cell">
+                              {dibujo ? (
+                                <button type="button" onClick={(e) => { e.stopPropagation(); irAlDibujo(dibujo.ruta, r.rowKey) }}
+                                        className={[AREA_TACTIL_COMPACTA, 'inline-flex items-center justify-center rounded-ctl text-primary hover:bg-primary/10'].join(' ')}
+                                        title={`Ver en el dibujo · fig. ${dibujo.fig}`} aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
+                                  <Shapes className="h-4 w-4" />
+                                </button>
+                              ) : <span className="text-muted-foreground/40">—</span>}
                             </td>
                             <td className="px-3 py-2">
                               <button
@@ -2287,6 +2344,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onSpecs={() => startAction('specs')}
           onPhotos={() => startAction('photos')}
           onManual={() => startAction('manual')}
+          dibujo={(() => {
+            const d = dibujoDe(figurasDespiece, selectedRep.codigoFabricante, maquinaDeDespiece(equipoParaMostrar(selectedRep.equipos, preferirEquipo).nombre))
+            return d ? { fig: d.fig, abrir: () => irAlDibujo(d.ruta, selectedRep.rowKey) } : null
+          })()}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
@@ -2305,6 +2366,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         repuesto={solicitarRepuesto}
         options={solicitarOptions}
         onSubmit={handleCrearSolicitud}
+      />
+      <SolicitarVariosSheet
+        open={solicitarVariosOpen}
+        onClose={() => setSolicitarVariosOpen(false)}
+        maquina={selectedEquipName}
+        piezas={piezasDeLaMaquina}
+        onSubmit={handleCrearVarias}
       />
       <SolicitudesPanel
         open={solicitudesOpen}

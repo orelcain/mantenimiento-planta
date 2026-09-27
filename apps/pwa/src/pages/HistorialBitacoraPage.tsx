@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, ClipboardCopy, FileDown, Loader2 } from 'lucide-react'
 import { Button, Pill } from '@/components/piel'
@@ -7,7 +7,42 @@ import { useHistorialBitacora } from '@/hooks/useHistorialBitacora'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { copiarHtml } from '@/lib/clipboard'
 import { historialAHtmlCorreo, historialATextoPlano } from '@/services/bitacora/historialCorreo'
-import { detalleRepuesto, porcentaje, tesisDelPeriodo, tituloRepuesto, type FilaTurno, type ResumenPeriodo } from '@/services/bitacora/historialBitacora'
+import {
+  compararPeriodos,
+  detalleRepuesto,
+  parteParada,
+  porcentaje,
+  porcentajeFino,
+  tesisDelPeriodo,
+  tituloRepuesto,
+  type ResumenPeriodo,
+  type Tendencia,
+} from '@/services/bitacora/historialBitacora'
+import { MINUTOS_SIN_PRODUCCION_POR_TURNO } from '@/services/bitacora/mtbf'
+import {
+  agrupacionPara,
+  duracionesFallas,
+  fallasRepetidas,
+  paretoEquipos,
+  respuestaIntervenciones,
+  respuestaReparacion,
+  respuestaRepetidas,
+  respuestaTendencia,
+  serieIntervenciones,
+  serieParada,
+} from '@/services/bitacora/preguntasHistorial'
+import {
+  GraficoIntervenciones,
+  GraficoPareto,
+  GraficoPerdidaLinea,
+  GraficoReparacion,
+  GraficoTendencia,
+  ListaRepetidas,
+  PanelPregunta,
+} from '@/components/bitacora/GraficosHistorial'
+import { perdidaDeLinea, respuestaPerdida } from '@/services/bitacora/pesoDeLinea'
+import { leerLineas } from '@/services/lineasProceso/lineasProceso.service'
+import type { GrafoLineas } from '@/services/lineasProceso/modeloLineas'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 
@@ -22,6 +57,8 @@ import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 const PERIODOS = [7, 14, 30] as const
 /** Repuestos a la vista antes de «Ver todos». */
 const MAX_REPUESTOS = 8
+/** Turnos a la vista antes de «Ver los N turnos»: con 14 días eran 30 filas antes de los equipos. */
+const MAX_TURNOS = 6
 
 export interface FuenteHistorial {
   useHistorial: (dias: number) => ReturnType<typeof useHistorialBitacora>
@@ -37,9 +74,44 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
   const { toast } = useToast()
   const navigate = useNavigate()
   const [dias, setDias] = useState<number>(14)
-  const { eventos, filas, resumen, cargando, error } = fuente.useHistorial(dias)
+  const { eventos, filas, resumen, resumenAnterior, cargando, error } = fuente.useHistorial(dias)
   const [trabajando, setTrabajando] = useState<null | 'copiar' | 'pdf'>(null)
   const [verTodosRepuestos, setVerTodosRepuestos] = useState(false)
+  const [verTodosTurnos, setVerTodosTurnos] = useState(false)
+  // Reglas de análisis de datos (Orel, 19-09-2026): cada cifra responde una pregunta y
+  // lleva contra qué se compara — ¿es mucho? (% del tiempo de producción) y ¿mejoramos?
+  // (el período anterior, solo si está completo).
+  const comparacion = useMemo(() => compararPeriodos(resumen, resumenAnterior ?? null), [resumen, resumenAnterior])
+  const pParada = parteParada(resumen)
+  const horasProduccionTurno = formatoMinutos(480 - MINUTOS_SIN_PRODUCCION_POR_TURNO)
+  // Las cinco preguntas del Historial (mockup aprobado 19-09-2026): cada gráfico
+  // tiene su respuesta calculada con los mismos datos que dibuja.
+  const agrupar = agrupacionPara(dias)
+  const porParada = useMemo(() => serieParada(filas, agrupar), [filas, agrupar])
+  const tendencia = useMemo(() => respuestaTendencia(porParada), [porParada])
+  const pareto = useMemo(() => paretoEquipos(resumen), [resumen])
+  const porIntervencion = useMemo(() => serieIntervenciones(filas, agrupar), [filas, agrupar])
+  const intervenciones = useMemo(() => respuestaIntervenciones(porIntervencion), [porIntervencion])
+  const duraciones = useMemo(() => duracionesFallas(eventos), [eventos])
+  const reparacion = useMemo(() => respuestaReparacion(duraciones), [duraciones])
+  const repetidas = useMemo(() => fallasRepetidas(eventos), [eventos])
+  /**
+   * Las líneas de proceso, para pasar de «máquina detenida» a «línea perdida». Se lee una
+   * vez: es un solo documento. Si todavía no existe, el bloque lo dice en vez de inventar.
+   */
+  const [lineas, setLineas] = useState<GrafoLineas | null>(null)
+  useEffect(() => {
+    let vivo = true
+    leerLineas(BITACORA_PLANTA.id)
+      .then((g) => vivo && setLineas(g))
+      .catch(() => undefined)
+    return () => {
+      vivo = false
+    }
+  }, [])
+  const perdida = useMemo(() => perdidaDeLinea(resumen.equiposTodos, lineas), [resumen, lineas])
+  const respPerdida = useMemo(() => respuestaPerdida(perdida, (m) => formatoMinutos(Math.round(m))), [perdida])
+  const unidadSerie = agrupar === 'dia' ? 'día' : 'semana'
   const abrirTurno = alAbrirTurno ?? ((turnoId: string) => navigate(`/bitacora?turno=${turnoId}`))
 
   const copiar = async () => {
@@ -133,18 +205,51 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         )}
       </section>
 
-      <section aria-label="Resumen del período" className="grid grid-cols-2 gap-x-4 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none sm:grid-cols-4">
-        {/* Los mismos ocho del correo y del PDF: comparar la pantalla con lo
-            pegado en el correo no puede dar de menos (revisión 15-09). */}
-        <Kpi valor={String(resumen.eventos)} etiqueta={resumen.eventos === 1 ? 'evento' : 'eventos'} />
-        <Kpi valor={formatoMinutos(resumen.minutosParada)} etiqueta={`de parada (${resumen.conParada})`} punto={resumen.minutosParada > 0 ? 'crit' : undefined} />
-        <Kpi valor={resumen.mttrMin == null ? '—' : formatoMinutos(resumen.mttrMin)} etiqueta="MTTR" />
-        <Kpi valor={resumen.mtbfMin == null ? '—' : formatoMinutos(resumen.mtbfMin)} etiqueta="MTBF" />
-        <Kpi valor={String(resumen.sinDetener)} etiqueta="sin detener" punto={resumen.sinDetener > 0 ? 'ok' : undefined} />
-        <Kpi valor={String(resumen.pendientesCerrados)} etiqueta="pendientes cerrados" punto={resumen.pendientesCerrados > 0 ? 'ok' : undefined} />
-        <Kpi valor={String(resumen.pendientesAbiertos)} etiqueta="pendientes abiertos" punto={resumen.pendientesAbiertos > 0 ? 'warn' : undefined} />
-        <Kpi valor={String(resumen.repuestos.length)} etiqueta={resumen.repuestos.length === 1 ? 'repuesto usado' : 'repuestos usados'} />
-        <Kpi valor={String(resumen.unidadesRepuestos)} etiqueta="unidades" />
+      <section aria-label="Resumen del período" className="flex flex-col gap-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+        {/* Los mismos números del correo y del PDF, agrupados por la pregunta que
+            responden (Orel, 19-09-2026: «los datos responden preguntas claras»). */}
+        <div>
+          <h2 className="pb-3 text-subhead font-semibold">¿Cuánto paró la línea?</h2>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+            <Kpi
+              valor={formatoMinutos(resumen.minutosParada)}
+              etiqueta={pParada != null ? `de parada · ${porcentajeFino(pParada)} del tiempo de producción` : 'de parada'}
+              punto={resumen.minutosParada > 0 ? 'crit' : undefined}
+              tendencia={comparacion?.parada}
+            />
+            <Kpi valor={String(resumen.fallas)} etiqueta={resumen.fallas === 1 ? 'falla' : 'fallas'} tendencia={comparacion?.fallas} />
+            <Kpi valor={resumen.mttrMin == null ? '—' : formatoMinutos(resumen.mttrMin)} etiqueta="MTTR · tiempo medio en reparar" tendencia={comparacion?.mttr} />
+            <Kpi valor={resumen.mtbfMin == null ? '—' : formatoMinutos(resumen.mtbfMin)} etiqueta="MTBF · tiempo medio entre fallas" tendencia={comparacion?.mtbf} />
+          </div>
+        </div>
+        <div className="border-t border-muted-foreground/20 pt-4">
+          <h2 className="pb-3 text-subhead font-semibold">¿Cómo trabajó Mantención?</h2>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+            <Kpi valor={String(resumen.eventos)} etiqueta={resumen.eventos === 1 ? 'evento registrado' : 'eventos registrados'} />
+            <Kpi
+              valor={String(resumen.sinDetener)}
+              etiqueta={resumen.conImpacto > 0 ? `sin detener la línea · ${porcentaje(resumen.parteSinDetener)} de las intervenciones` : 'sin detener la línea'}
+              punto={resumen.sinDetener > 0 ? 'ok' : undefined}
+            />
+            <Kpi
+              valor={String(resumen.pendientesAbiertos)}
+              etiqueta={`${resumen.pendientesAbiertos === 1 ? 'pendiente abierto' : 'pendientes abiertos'} · ${resumen.pendientesCerrados} ${resumen.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}`}
+              punto={resumen.pendientesAbiertos > 0 ? 'warn' : resumen.pendientesCerrados > 0 ? 'ok' : undefined}
+            />
+            <Kpi
+              valor={String(resumen.repuestos.length)}
+              etiqueta={`${resumen.repuestos.length === 1 ? 'repuesto' : 'repuestos'} · ${resumen.unidadesRepuestos} ${resumen.unidadesRepuestos === 1 ? 'unidad' : 'unidades'}`}
+            />
+          </div>
+        </div>
+        {!cargando && resumen.turnos > 0 && (
+          <p className="text-caption text-muted-foreground">
+            {comparacion
+              ? `▲▼ contra los ${dias} días anteriores (${resumenAnterior?.turnos ?? 0} turnos): verde es mejor, rojo es peor. `
+              : `Todavía no hay ${dias} días anteriores completos para comparar: la bitácora se usa desde el 15-09-2026. `}
+            Tiempo de producción: {resumen.turnos} {resumen.turnos === 1 ? 'turno' : 'turnos'} × {horasProduccionTurno} (8 h menos {formatoMinutos(MINUTOS_SIN_PRODUCCION_POR_TURNO)} sin producción).
+          </p>
+        )}
       </section>
 
       {/* Acciones de móvil (en PC van en el encabezado). */}
@@ -157,21 +262,87 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
         </Button>
       </div>
 
-      <GraficoParadas filas={filas} />
+      {!cargando && resumen.eventos > 0 && (
+        <>
+          {/* 5 va primero: es la que pide acción (alerta temprana). */}
+          <PanelPregunta
+            pregunta="¿Qué falla se está repitiendo?"
+            respuesta={respuestaRepetidas(repetidas, dias)}
+            referencia="Equipos con 2 o más fallas en el período, el más repetido primero: actuar antes de la próxima."
+          >
+            <ListaRepetidas lista={repetidas} dias={dias} />
+          </PanelPregunta>
+          <div className="grid items-start gap-5 md:grid-cols-2">
+            <PanelPregunta
+              pregunta="¿La línea está parando más o menos?"
+              respuesta={tendencia.titulo}
+              referencia={`% del tiempo de producción parado, por ${unidadSerie} · línea punteada: promedio del período (${porcentajeFino(tendencia.promedio)}). Bajo la línea, mejor que lo habitual.`}
+            >
+              <GraficoTendencia serie={porParada} promedio={tendencia.promedio} />
+            </PanelPregunta>
+            <PanelPregunta
+              pregunta="¿Dónde se concentra la parada?"
+              respuesta={pareto.titulo}
+              referencia="Parada por equipo, de mayor a menor · el % es ACUMULADO: en rojo, los que juntos suman el 70 %, donde conviene atacar primero."
+            >
+              <GraficoPareto barras={pareto.barras} />
+            </PanelPregunta>
+            {respPerdida && (
+              <PanelPregunta
+                pregunta="¿Cuánto de eso le costó a la línea?"
+                respuesta={respPerdida.titulo}
+                referencia={
+                  <>
+                    {respPerdida.detalle} La cuota de cada máquina sale del editor de líneas de proceso: una de tres máquinas en paralelo pesa un tercio; una en serie,
+                    toda la línea. <span className="text-muted-foreground/80">Barra gris: máquina detenida · barra azul: línea perdida.</span>
+                  </>
+                }
+              >
+                <GraficoPerdidaLinea perdida={perdida} />
+              </PanelPregunta>
+            )}
+            <PanelPregunta
+              pregunta="¿Mantención interviene sin detener la línea?"
+              respuesta={intervenciones.titulo}
+              referencia={
+                <>
+                  Intervenciones por {unidadSerie} · <span className="font-semibold text-ink-ok">verde: sin detener</span> (abajo) ·{' '}
+                  <span className="font-semibold text-ink-crit">rojo: con parada</span>
+                </>
+              }
+            >
+              <GraficoIntervenciones serie={porIntervencion} />
+            </PanelPregunta>
+            <PanelPregunta
+              pregunta="¿Cuánto tardamos en reparar?"
+              respuesta={reparacion.titulo}
+              referencia={
+                duraciones.length >= 5 && reparacion.promedio != null
+                  ? `Cada punto es una falla · la raya: la mitad de las fallas a cada lado (mediana). El promedio da ${formatoMinutos(Math.round(reparacion.promedio))}: lo suben las fallas largas de la derecha, que son las que hay que mirar.`
+                  : 'Cada punto es una falla con su duración.'
+              }
+            >
+              {duraciones.length > 0 && <GraficoReparacion duraciones={duraciones} mediana={reparacion.mediana} p80={reparacion.p80} />}
+            </PanelPregunta>
+          </div>
+        </>
+      )}
 
+      {/* Teléfono: equipos → repuestos → turnos → quién (lo que dice DÓNDE actuar,
+          arriba; antes estaba detrás de 30 turnos). PC: dos columnas como antes. */}
       <div className="grid items-start gap-5 md:grid-cols-2">
         {/* min-w-0: un hijo de grilla mide `min-width:auto` y el contenido más
             ancho de la lista estiraba la columna a 396 px, dejando la página
             con scroll horizontal a 375 px (medido 15-09). */}
-        <section aria-label="Turnos del período" className="flex min-w-0 flex-col">
-          <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Turnos</h2>
+        <section aria-label="Turnos del período" className="order-3 flex min-w-0 flex-col md:order-none">
+          <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">¿Cómo fue cada turno?</h2>
           {filas.length === 0 && !cargando ? (
             <p className="rounded-card bg-card px-6 py-8 text-center text-footnote text-muted-foreground">
               Sin turnos registrados en este período.
             </p>
           ) : (
             <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-              {filas.map((f) => (
+              {(verTodosTurnos ? filas : filas.slice(0, MAX_TURNOS)).map((f) => (
                 <button
                   key={f.turnoId}
                   type="button"
@@ -196,40 +367,25 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
                 </button>
               ))}
+              {filas.length > MAX_TURNOS && (
+                <button
+                  type="button"
+                  onClick={() => setVerTodosTurnos((v) => !v)}
+                  className='relative flex min-h-[44px] w-full items-center px-4 text-left text-footnote font-semibold text-primary before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary'
+                >
+                  {verTodosTurnos ? 'Ver menos' : `Ver los ${filas.length} turnos`}
+                </button>
+              )}
             </div>
           )}
         </section>
 
-        <div className="flex min-w-0 flex-col gap-5">
-          <section aria-label="Equipos que más pararon" className="flex min-w-0 flex-col">
-            <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Equipos que más pararon</h2>
-            <div className="flex flex-col gap-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-              {resumen.equipos.length === 0 ? (
-                <p className="text-footnote text-muted-foreground">Ninguna parada registrada en el período.</p>
-              ) : (
-                resumen.equipos.map((e) => (
-                  <div key={e.equipo} className="flex flex-col gap-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate text-body font-semibold">{e.equipo}</span>
-                      <span className="shrink-0 text-footnote font-semibold tabular-nums text-ink-crit">{formatoMinutos(e.minutos)}</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15">
-                      <div className="h-full rounded-full bg-ink-crit" style={{ width: `${Math.max(3, Math.round(e.parte * 100))}%` }} />
-                    </div>
-                    <span className="text-caption text-muted-foreground">
-                      {e.paradas} {e.paradas === 1 ? 'parada' : 'paradas'} · {porcentaje(e.parte)} del total
-                      {e.mtbfMin == null ? '' : ` · MTBF ${formatoMinutos(e.mtbfMin)}`}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+        <div className="contents md:flex md:min-w-0 md:flex-col md:gap-5">
 
           {/* Repuestos usados (mockup aprobado 17-09): lista por repuesto, de más
               a menos unidades; el equipo va en la misma fila. */}
-          <section aria-label="Repuestos usados" className="flex min-w-0 flex-col">
-            <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Repuestos usados</h2>
+          <section aria-label="Repuestos usados" className="order-2 flex min-w-0 flex-col md:order-none">
+            <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">¿Qué repuestos salieron de bodega?</h2>
             <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
               {resumen.repuestos.length === 0 ? (
                 <p className="p-4 text-footnote text-muted-foreground">Ningún repuesto registrado en el período.</p>
@@ -241,7 +397,7 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
                   >
                     <span className="min-w-0 truncate text-body font-semibold">{tituloRepuesto(r)}</span>
                     <span className="text-right text-body font-semibold tabular-nums">
-                      {r.unidades}
+                      {r.unidades} <span className="text-footnote font-normal">un.</span>
                       <span className="block text-caption font-normal text-muted-foreground">
                         {r.eventos} {r.eventos === 1 ? 'evento' : 'eventos'}
                       </span>
@@ -267,8 +423,8 @@ export function HistorialBitacoraVista({ fuente, alAbrirTurno }: { fuente: Fuent
           </section>
 
           {resumen.porTecnico.length > 0 && (
-            <section aria-label="Quién registró" className="flex flex-col">
-              <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">Quién registró</h2>
+            <section aria-label="Quién registró" className="order-4 flex flex-col md:order-none">
+              <h2 className="px-4 pb-2 text-caption font-semibold text-muted-foreground">¿Quién está registrando?</h2>
               <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
                 {resumen.porTecnico.map((t) => (
                   <div
@@ -305,55 +461,10 @@ function TesisConResalte({ resumen }: { resumen: ResumenPeriodo }) {
   )
 }
 
-/**
- * Minutos de parada por turno, del más antiguo al más nuevo. Barras en CSS: son
- * pocas y el dato es una comparación simple; los turnos SIN paradas van en verde
- * porque un turno limpio también es resultado.
- */
-function GraficoParadas({ filas }: { filas: readonly FilaTurno[] }) {
-  const datos = useMemo(() => [...filas].reverse(), [filas])
-  // El máximo REAL para el rótulo; el 1 es solo para no dividir por cero. Antes
-  // el mismo número se mostraba, y una semana sin ninguna parada anunciaba
-  // «máx 1 min», un dato que no existía (revisión 15-09).
-  const maxReal = Math.max(0, ...datos.map((f) => f.resumen.minutosParada))
-  const max = Math.max(1, maxReal)
-  if (!datos.length) return null
-  return (
-    <section aria-label="Minutos de parada por turno" className="rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-footnote text-muted-foreground">Minutos de parada por turno</h2>
-        <span className="text-caption tabular-nums text-muted-foreground">
-          {maxReal > 0 ? `máx ${formatoMinutos(maxReal)}` : 'sin paradas en el período'}
-        </span>
-      </div>
-      {/* min-w por barra + scroll: con 30 días (hasta 90 turnos) las barras
-          quedaban en menos de 1 px y el gráfico se veía vacío. */}
-      <div className="mt-2 flex h-24 items-end gap-[3px] overflow-x-auto">
-        {datos.map((f) => {
-          const alto = f.resumen.minutosParada > 0 ? Math.max(4, Math.round((f.resumen.minutosParada / max) * 100)) : 3
-          return (
-            <div
-              key={f.turnoId}
-              className={`min-h-[2px] min-w-[5px] flex-1 rounded-t-[3px] ${f.resumen.minutosParada > 0 ? 'bg-ink-crit' : 'bg-ink-ok'}`}
-              style={{ height: `${alto}%` }}
-              title={`${etiquetaCortaTurno(f.turnoId)}: ${f.resumen.conParada ? formatoMinutos(f.resumen.minutosParada) : 'sin paradas'}`}
-            />
-          )
-        })}
-      </div>
-      <div className="flex items-baseline justify-between pt-1 text-caption text-muted-foreground">
-        <span>{datos[0] ? etiquetaCortaTurno(datos[0].turnoId).replace('Turno ', '') : ''}</span>
-        <span>verde: turno sin paradas</span>
-        <span>{datos[datos.length - 1] ? etiquetaCortaTurno(datos[datos.length - 1]!.turnoId).replace('Turno ', '') : ''}</span>
-      </div>
-    </section>
-  )
-}
-
 const PUNTO = { ok: 'bg-ink-ok', warn: 'bg-ink-warn', crit: 'bg-ink-crit' } as const
 
 /** Cifra en tinta normal; el estado, en un punto junto al rótulo (DESIGN.md §10). */
-function Kpi({ valor, etiqueta, punto }: { valor: string; etiqueta: string; punto?: keyof typeof PUNTO }) {
+function Kpi({ valor, etiqueta, punto, tendencia }: { valor: string; etiqueta: string; punto?: keyof typeof PUNTO; tendencia?: Tendencia | null }) {
   return (
     <div className="min-w-0">
       <span className="block text-title2 tabular-nums leading-tight">{valor}</span>
@@ -361,6 +472,15 @@ function Kpi({ valor, etiqueta, punto }: { valor: string; etiqueta: string; punt
         {punto && <span className={`mr-1.5 inline-block size-2 rounded-full align-middle ${PUNTO[punto]}`} aria-hidden />}
         {etiqueta}
       </span>
+      {/* ¿Mejoramos? El valor del período anterior, con flecha: verde mejor, rojo peor. */}
+      {tendencia && (
+        <span
+          className={`block text-caption font-semibold tabular-nums ${tendencia.mejora == null ? 'text-muted-foreground' : tendencia.mejora ? 'text-ink-ok' : 'text-ink-crit'}`}
+        >
+          {tendencia.sentido === 'sube' ? '▲' : tendencia.sentido === 'baja' ? '▼' : '='} antes {tendencia.antes}
+          <span className="sr-only">{tendencia.mejora == null ? ', sin cambio' : tendencia.mejora ? ', mejoró' : ', empeoró'}</span>
+        </span>
+      )}
     </div>
   )
 }

@@ -2580,8 +2580,9 @@ function editarNota(key,id,pos){
   selTipo.value=n.tipo||'nota';
   txt.value=n.texto||'';
   try{ autor.value=n.autor||localStorage.getItem('p5autor')||''; }catch(e){ autor.value=n.autor||''; }
-  let fotoData=n.foto||null;
-  if(fotoData)prev.innerHTML='<img class="thumb" src="'+fotoData+'">';
+  // Misma barrera que la vista: una foto guardada no válida se descarta y no se vuelve a guardar.
+  let fotoData=safeFotoSrc(n.foto)||null;
+  if(fotoData)prev.innerHTML='<img class="thumb" src="'+escapeHtml(fotoData)+'">';
 
   file.onchange=()=>{
     const f=file.files&&file.files[0];

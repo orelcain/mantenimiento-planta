@@ -1,7 +1,8 @@
 import type { EventoBitacora, TurnoMantencion } from './bitacora.types'
 import { soloListos } from './borradores'
+import { compartirOBajarArchivo } from './compartirArchivo'
 import { LOGO_RECOLECCION_DATA_URI } from './logoRecoleccion'
-import { etiquetaTipo, nombreConComun, normalizarRepuestos, tituloDe } from './presentacionEvento'
+import { etiquetaTipo, tituloDe } from './presentacionEvento'
 import { gruposDelTurno, minutosParadaDe } from './resumenBitacora'
 import { etiquetaTurno, turnoDesdeId } from './turnoMantencion'
 
@@ -51,7 +52,15 @@ function fallaDe(e: EventoBitacora): string {
   if (titulo) return titulo
   // La planilla lleva la falla en pocas palabras.
   const { frase } = primeraFrase(e.descripcion ?? '')
-  return frase ? (frase.length > 70 ? `${frase.slice(0, 67).trimEnd()}…` : frase) : etiquetaTipo(e)
+  return frase ? recortarEnPalabra(frase, 70) : etiquetaTipo(e)
+}
+
+/** Corta en la última palabra completa que cabe; «…que indica que se…» a mitad de palabra se veía descuidado. */
+export function recortarEnPalabra(texto: string, largo: number): string {
+  const t = texto.trim().replace(/\s+/g, ' ')
+  if (t.length <= largo) return t
+  const corte = t.lastIndexOf(' ', largo - 1)
+  return `${t.slice(0, corte > largo / 2 ? corte : largo - 1).trimEnd()}…`
 }
 
 function observacionesDe(e: EventoBitacora): string {
@@ -64,13 +73,10 @@ function observacionesDe(e: EventoBitacora): string {
       ? ''
       : descripcion
     : primeraFrase(e.descripcion ?? '').resto
-  const partes = [texto]
-  const repuestos = normalizarRepuestos(e.repuestos)
-  if (repuestos.length) partes.push(`Repuestos: ${repuestos.map((r) => `${r.codigoSAP} ${nombreConComun(r)} ×${r.cantidad}`.replace(/\s+×/, ' ×')).join('; ')}.`)
-  if (e.impacto === 'afecta-sin-detener') {
-    partes.push(e.contingencia?.trim() ? `Afectó sin detener: ${e.contingencia.trim()}.` : 'Afectó sin detener la producción.')
-  }
-  if (e.impacto === 'en-ventana') partes.push(e.ventana?.trim() ? `Sin detener: ${e.ventana.trim()}.` : 'Sin detener producción.')
+  // Observaciones dice QUÉ SE HIZO y si quedó pendiente. Los repuestos con código SAP y el
+  // impacto iban también aquí y la celda se volvía un párrafo (correo del 23-09-2026); viven
+  // en el detalle de abajo, que es donde se leen bien. Tope de 220 caracteres en palabra completa.
+  const partes = [texto ? recortarEnPalabra(texto, 220) : '']
   if (e.pendiente) partes.push('Queda pendiente para el turno siguiente.')
   return partes.filter(Boolean).join(' ')
 }
@@ -125,35 +131,62 @@ export function filasRecoleccionPeriodo(eventos: readonly EventoBitacora[]): Fil
 const CAL = "Calibri,'Segoe UI',sans-serif"
 const AZUL = '#00557F'
 const BANDA = '#D9E1F2'
+// Cabecera de columnas: celeste con texto tinta, y no azul con texto blanco. El pegado que
+// aplana (Outlook nuevo con «Combinar formato», el predeterminado en cualquier PC ajeno)
+// vuelve NEGRO todo el texto y respeta el fondo: blanco sobre azul se leía negro sobre azul
+// (correos del 23-09-2026). Negro sobre celeste se lee en los dos casos.
+const CABECERA = '#BDD7EE'
+const TINTA = '#1F1F1F'
 const GRIS = '#F2F2F2'
-// En proporción y no en píxeles: en el celular el correo se adapta al ancho de la
-// pantalla y los anchos fijos dejaban a Observaciones sin espacio (revisión 17-09).
-// En PC (≈960 px) dan 115/154/211/96/384 px, cerca de la planilla.
-const ANCHOS = { fecha: 14, maquina: 16, falla: 21, duracion: 9 }
 
 export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones: { logo?: string } = {}): string {
   const logo = opciones.logo ?? LOGO_RECOLECCION_DATA_URI
-  const th = (t: string, ancho?: number) =>
-    `<th${ancho ? ` width="${ancho}%"` : ''} style="${ancho ? `width:${ancho}%;` : ''}background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:10pt;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 4px;">${t}</th>`
+  // 9 pt y no 10: en Outlook la planilla se leía «como letra 30» al lado del cuerpo del correo
+  // (Orel, 21-09-2026). Sigue siendo la copia del Excel —banda azul, filas alternadas, logo—,
+  // pero al tamaño del documento que la sigue, no al de una hoja de cálculo a pantalla completa.
+  // Colores por TRES vías (`background-color` en longhand, atributo `bgcolor` y `<font color>`):
+  // el compositor de Outlook en el iPhone reescribe el HTML al pegar y borraba el blanco del
+  // texto y el celeste de las bandas (quedaba negro sobre azul; prueba de Orel, 23-09-2026).
+  // Y sin anchos: los porcentajes los convertía en píxeles fijos.
+  const th = (t: string) =>
+    `<th bgcolor="${CABECERA}" style="background-color:${CABECERA};color:${TINTA};font-family:${CAL};font-size:9pt;line-height:1.25;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 5px;"><b>${t}</b></th>`
   const td = (t: string, i: number, izq = false, nowrap = false) =>
     // TableStyleMedium2 pinta la PRIMERA fila de datos y luego alterna.
-    // `overflow-wrap:anywhere`: en el celular una palabra larga («EMPACADORA») se
-    // montaba sobre la columna vecina en vez de partirse.
-    `<td style="background:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:10pt;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 4px;overflow-wrap:anywhere;word-break:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
+    // `overflow-wrap:break-word`: una palabra larga («EMPACADORA») se parte solo si ella sola
+    // no cabe en la celda. Iba `anywhere` + `word-break`, y en el teléfono «SELLADORA» salía
+    // como «SELLADO / RA» aunque hubiera espacio (correo del 23-09-2026).
+    `<td bgcolor="${i % 2 ? '#FFFFFF' : BANDA}" style="background-color:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:9pt;line-height:1.3;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 5px;overflow-wrap:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
+  // Un solo día (el correo del turno): la fecha va en la banda azul y la columna Fecha se
+  // omite. En el teléfono esa columna se llevaba un cuarto de los 351 px para una sola celda
+  // con dato, y «Máquina» quedaba partiendo palabras por letras (correo del 23-09-2026). El
+  // historial abarca varios días y conserva la columna. El Excel adjunto no cambia.
+  const fechas = filas.map((f) => f.fecha).filter(Boolean)
+  const unDia = fechas.length <= 1
+  const fila = (f: FilaRecoleccion, i: number) =>
+    `<tr>${unDia ? '' : td(f.fecha, i, false, true)}${td(f.maquina, i)}${td(f.falla, i)}${td(f.duracion, i, false, true)}${td(f.observaciones, i, true)}</tr>`
   const cuerpo = filas.length
-    ? filas
-        .map((f, i) => `<tr>${td(f.fecha, i)}${td(f.maquina, i)}${td(f.falla, i)}${td(f.duracion, i, false, true)}${td(f.observaciones, i, true)}</tr>`)
-        .join('')
-    : `<tr>${td('', 0, false, true)}${td('', 0)}${td('', 0)}${td('', 0)}${td('', 0, true)}</tr>`
+    ? filas.map(fila).join('')
+    : `<tr>${unDia ? '' : td('', 0, false, true)}${td('', 0)}${td('', 0)}${td('', 0, false, true)}${td('', 0, true)}</tr>`
+  const encabezado = unDia
+    ? `${th('Máquina')}${th('Falla')}${th('Duración Falla (Min)')}${th('Observaciones')}`
+    : `${th('Fecha')}${th('Máquina')}${th('Falla')}${th('Duración Falla (Min)')}${th('Observaciones')}`
+  const titulo = unDia && fechas[0] ? `MTBF - MTTR<span style="font-weight:normal;font-size:9pt;">&nbsp;&nbsp;·&nbsp;&nbsp;${escaparHtml(fechas[0])}</span>` : 'MTBF - MTTR'
   return (
     // La banda va en su propia tabla: con `table-layout:fixed` la primera fila fija
     // los anchos, y la celda del logo (146 px) no debe mandar sobre la columna Fecha.
-    `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;font-family:${CAL};">` +
-    `<tr><td width="146" style="width:146px;height:56px;background:${GRIS};padding:0 0 0 13px;vertical-align:middle;">` +
+    `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${CAL};">` +
+    // La banda baja de 56 a 40 px y el título de 16 a 12 pt. El logo NO se escala (se recortó
+    // el PNG a propósito): 120×28 entra en 40 px con 6 px de aire arriba y abajo.
+    `<tr><td width="134" bgcolor="${GRIS}" style="width:134px;height:40px;background-color:${GRIS};padding:0 0 0 12px;vertical-align:middle;">` +
     `<img src="${logo}" width="120" height="28" alt="" style="display:block;width:120px;height:28px;"></td>` +
-    `<td style="background:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:16pt;font-weight:bold;height:56px;padding:0 8px;vertical-align:middle;">MTBF - MTTR</td></tr></table>` +
-    `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;table-layout:fixed;width:100%;font-family:${CAL};">` +
-    `<tr>${th('Fecha', ANCHOS.fecha)}${th('Máquina', ANCHOS.maquina)}${th('Falla', ANCHOS.falla)}${th('Duración Falla (Min)', ANCHOS.duracion)}${th('Observaciones')}</tr>` +
+    // La banda del título sigue azul con blanco (es la identidad del Excel); si el pegado la
+    // vuelve negra, el título se pierde pero la tabla de abajo sigue legible.
+    `<td bgcolor="${AZUL}" style="background-color:${AZUL};color:#FFFFFF;font-family:${CAL};font-size:12pt;font-weight:bold;height:40px;padding:0 8px;vertical-align:middle;white-space:nowrap;"><font color="#FFFFFF"><b>${titulo}</b></font></td></tr></table>` +
+    // Sin `table-layout:fixed`: con él, la fecha en una línea se montaba sobre Máquina en el
+    // teléfono. En reparto automático los porcentajes siguen mandando cuando hay ancho (PC) y
+    // la columna cede lo justo cuando no lo hay.
+    `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${CAL};">` +
+    `<tr>${encabezado}</tr>` +
     cuerpo +
     `</table>`
   )
@@ -205,7 +238,7 @@ export function filasAXml(filas: readonly FilaRecoleccion[]): string {
     .join('')
 }
 
-export async function generarExcelRecoleccion(filas: readonly FilaRecoleccion[], nombre: string): Promise<void> {
+export async function generarExcelRecoleccion(filas: readonly FilaRecoleccion[], nombre: string): Promise<'compartido' | 'descargado' | 'cancelado'> {
   const { unzipSync, zipSync, strFromU8, strToU8 } = await import('fflate')
   const respuesta = await fetch(`${import.meta.env.BASE_URL}plantillas/recoleccion-mttr.xlsx`)
   if (!respuesta.ok) throw new Error('No se pudo cargar la plantilla del Excel')
@@ -220,13 +253,9 @@ export async function generarExcelRecoleccion(filas: readonly FilaRecoleccion[],
     .replace(/<dimension ref="[^"]*"/, `<dimension ref="A1:E${ultima}"`)
   const tabla = strFromU8(tablaOriginal).replace(/ref="A3:E\d+"/g, `ref="A3:E${ultima}"`)
   const salida = zipSync({ ...archivos, 'xl/worksheets/sheet1.xml': strToU8(hoja), 'xl/tables/table1.xml': strToU8(tabla) })
-  const blob = new Blob([salida as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nombre
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  const tipo = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  const blob = new Blob([salida as BlobPart], { type: tipo })
+  return compartirOBajarArchivo(blob, nombre, tipo)
 }
 
 /** «Recoleccion MTTR Turno dia 17-09-2026.xlsx», con el nombre que usan ellos. */

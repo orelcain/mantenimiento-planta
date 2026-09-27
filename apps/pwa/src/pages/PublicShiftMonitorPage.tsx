@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import {
@@ -82,8 +82,12 @@ import {
 } from './monitor/aporteHistorico'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
-import { Pill } from '@/components/piel'
-import { useIsAdmin } from '@/store'
+import { Pill, SegmentedControl } from '@/components/piel'
+import { useIsAdmin, useIsSupervisor } from '@/store'
+import { toast } from '@/hooks/useToast'
+import {
+  LINEAS_CON_MONITOR, lineaConMonitor, lineaDelMonitor, rutaMonitor, tokenMonitorDeLinea,
+} from '@/services/shoplogix/monitorDeLinea'
 import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
@@ -4384,7 +4388,70 @@ function StatusPill({ live, sinDatosHaceMin }: {
 
 // ── Página ──────────────────────────────────────────────────────────────────
 
+/**
+ * Cambiar de línea navega a OTRO token por la misma ruta: la clave por token
+ * hace que el monitor nazca limpio (vista, zoom, peso y cuota locales) en vez
+ * de arrastrar el estado de la línea anterior.
+ */
 export function PublicShiftMonitorPage() {
+  const { token } = useParams<{ token: string }>()
+  return <MonitorDelToken key={token} />
+}
+
+/**
+ * Volver a Inicio y saltar al monitor de la otra línea de Principal, en un
+ * toque. Solo con sesión de supervisor/admin: el link público (TV, QR de
+ * Producción) sigue mostrando una sola línea, y generar el token de la otra
+ * exige ese rol en el backend.
+ */
+function CambioDeLinea({ plantLineId, plantSlug, className }: {
+  plantLineId: string | null | undefined
+  plantSlug: string | null | undefined
+  className?: string
+}) {
+  const navigate = useNavigate()
+  const esSupervisor = useIsSupervisor()
+  const [cambiando, setCambiando] = useState(false)
+  const actual = lineaDelMonitor(plantLineId, plantSlug)
+  if (!esSupervisor || !actual) return null
+
+  const cambiar = async (id: string) => {
+    const destino = lineaConMonitor(id)
+    if (!destino || destino.id === actual.id || cambiando) return
+    setCambiando(true)
+    try {
+      navigate(rutaMonitor(await tokenMonitorDeLinea(destino)))
+    } catch (err) {
+      toast({
+        title: 'No se pudo abrir el monitor',
+        description: err instanceof Error ? err.message : 'Inténtalo de nuevo en un momento.',
+        variant: 'destructive',
+      })
+      setCambiando(false)
+    }
+  }
+
+  return (
+    <nav aria-label="Cambiar de monitor" className={`flex items-center gap-2 ${className ?? ''}`}>
+      <Link
+        to="/"
+        className="flex min-h-[44px] shrink-0 items-center gap-0.5 rounded-full pl-1 pr-2 text-subhead font-medium text-primary transition-opacity hover:opacity-80"
+      >
+        <ChevronLeft className="size-5" aria-hidden />
+        Inicio
+      </Link>
+      <SegmentedControl
+        className={cambiando ? 'min-w-0 flex-1 opacity-60' : 'min-w-0 flex-1'}
+        ariaLabel="Línea del monitor"
+        value={actual.id}
+        segments={LINEAS_CON_MONITOR.map((id) => ({ value: id, label: lineaConMonitor(id)?.areaLabel ?? id }))}
+        onChange={(id) => { void cambiar(id) }}
+      />
+    </nav>
+  )
+}
+
+function MonitorDelToken() {
   const { token } = useParams<{ token: string }>()
   const { isDark, toggleTheme } = useTheme()
   const [data, setData] = useState<PublicShiftMonitorDoc | null>(null)
@@ -4554,7 +4621,11 @@ export function PublicShiftMonitorPage() {
   const vistas = useMemo(() => {
     if (!data?.live) return []
     return [
-      { shiftDocId: data.shiftDocId, dateKey: data.dateKey, shiftId: data.shiftId, live: data.live },
+      {
+        shiftDocId: data.shiftDocId, dateKey: data.dateKey, shiftId: data.shiftId, live: data.live,
+        // El actual también puede ser el turno que marcó el sensor.
+        ...(data.extraordinario ? { extraordinario: data.extraordinario } : {}),
+      },
       ...(data.history ?? []),
     ]
   }, [data])
@@ -4587,6 +4658,13 @@ export function PublicShiftMonitorPage() {
 
   const vista = vistas[idx] ?? null
   const live = vista?.live ?? null
+  /**
+   * La meta del link NO aplica a un turno que marcó el sensor: es una jornada
+   * que Shoplogix no configuró y nadie le puso cuota. Heredarle los 15.000 de
+   * la línea lo dejaría «bajo meta» siempre — el mismo error del 26-sep, al
+   * revés.
+   */
+  const metaLink = vista?.extraordinario ? null : (data?.targetPieces ?? null)
 
   /*
    * ── El eje arranca donde la línea arrancó ──────────────────────────────
@@ -4724,7 +4802,7 @@ export function PublicShiftMonitorPage() {
    * módulo — que es donde escribe el editor de cuota. Con solo `targetPieces`,
    * una cuota puesta desde el monitor no movía la barra.
    */
-  const metaHero = data?.targetPieces ?? live?.quotaPieces ?? cuotaLocal ?? null
+  const metaHero = metaLink ?? live?.quotaPieces ?? cuotaLocal ?? null
   /* Con el MISMO contador del héroe, no con los tramos cerrados: a las 09:00
      el héroe decía 3.097 (pulso) y el chip 14% (2.800 de buckets, 8 min
      atrás) — 15,5% real. El mismo descuadre de «dos totales» que #819 cerró
@@ -5277,7 +5355,7 @@ export function PublicShiftMonitorPage() {
       : desdeMin
     return computePaceToTarget({
       // La cuota del link primero; si no, la de la config del turno.
-      targetPieces: data?.targetPieces ?? live.quotaPieces,
+      targetPieces: metaLink ?? live.quotaPieces,
       /* Sin cuota puesta por una persona, NO hay meta que perseguir (regla de
          Orel, 30-08): el «objetivo del sensor» dejó de ser respaldo y toda la
          tarjeta de ritmo necesario / hora extra se calla en vez de pedir
@@ -5318,7 +5396,7 @@ export function PublicShiftMonitorPage() {
       shiftClosed: live.shiftClosed,
       pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, data?.pulse, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
+  }, [live, metaLink, data?.pulse, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -5339,7 +5417,7 @@ export function PublicShiftMonitorPage() {
      * el objetivo del sensor como «cuota» le asignaba a Yal una meta que
      * nadie puso (regla de Orel, 30-08).
      */
-    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
+    const meta = metaLink ?? live?.quotaPieces ?? null
     const tb = live?.timeBreakdown
 
     // Las mismas del ritmo necesario y del fondo de los gráficos: `breaksTurno`.
@@ -5439,7 +5517,7 @@ export function PublicShiftMonitorPage() {
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, esActual, data?.pulse])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, metaLink, breaksTurno, esActual, data?.pulse])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -5453,7 +5531,7 @@ export function PublicShiftMonitorPage() {
   const pronostico = useMemo(() => {
     /* Sin cuota humana no hay meta (regla de Orel, 30-08): el pronóstico
        proyecta el cierre igual, solo que sin veredicto de «llega/no llega». */
-    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? null
+    const metaFc = metaLink ?? live?.quotaPieces ?? null
     /*
      * `forecastHistory` trae hasta 10 turnos del MISMO nombre; el filtro sobre
      * `history` queda de respaldo para los docs anteriores a ese campo (y para
@@ -5485,7 +5563,7 @@ export function PublicShiftMonitorPage() {
         porDelanteMin: pace?.pendingBreakMin ?? 0,
       },
     })
-  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
+  }, [live, data?.history, data?.forecastHistory, metaLink, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -5531,7 +5609,7 @@ export function PublicShiftMonitorPage() {
     if (ahoraT == null) return null
     /* La META en toneladas, con el peso VIGENTE: «≈ 16,4 t de ≈ 24 t» es la
        misma gramática que la meta en piezas (rediseño 26-08). */
-    const metaPz = data?.targetPieces ?? live.quotaPieces ?? cuotaLocal ?? null
+    const metaPz = metaLink ?? live.quotaPieces ?? cuotaLocal ?? null
     const metaT = metaPz != null ? toneladasDePiezas(metaPz, pesoKg) : null
     return {
       ahora: ahoraT,
@@ -5540,7 +5618,7 @@ export function PublicShiftMonitorPage() {
       /* El desglose solo cuenta historia con 2+ pesos distintos. */
       tramos: porTramos && porTramos.tramos.length >= 2 ? porTramos.tramos : null,
     }
-  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, data?.targetPieces, pesoLocal, cuotaLocal, pesosEliminados])
+  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, metaLink, pesoLocal, cuotaLocal, pesosEliminados])
 
   const onGuardarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
     ? async (pesoKg: number | null) => {
@@ -5764,6 +5842,7 @@ export function PublicShiftMonitorPage() {
   if (!live) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="w-full max-w-sm pb-6" />
         <Hourglass className="h-11 w-11 text-primary" />
         <p className="text-lg font-semibold text-foreground">Esperando el próximo turno</p>
         <p className="max-w-xs text-sm text-muted-foreground">
@@ -5908,7 +5987,14 @@ export function PublicShiftMonitorPage() {
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-muted-foreground">
             {areaTitle && <span>{areaTitle}</span>}
             {areaTitle && <span className="text-muted-foreground/50">·</span>}
-            <span className="font-medium text-foreground/80">{vista?.shiftId || data.shiftId}</span>
+            <span className="font-medium text-foreground/80">
+              {vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId)}
+            </span>
+            {/* Lo marcó el sensor, no Shoplogix: se dice, para que nadie lo
+                busque en el whiteboard ni le exija una meta que no tiene. */}
+            {vista?.extraordinario && (
+              <Pill tone="warning">sin configurar en Shoplogix · lo marcó el sensor</Pill>
+            )}
             <span className="text-muted-foreground/50">·</span>
             {/* first-letter, no `capitalize`: ese capitaliza CADA palabra y
                 dejaba "Lunes, 10 De Agosto". */}
@@ -5994,6 +6080,9 @@ export function PublicShiftMonitorPage() {
           </div>
 
           {/* El resto de la banda, solo en PC. */}
+          {!modoPantalla && (
+            <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="hidden w-80 shrink-0 lg:flex" />
+          )}
           {navegacionTurnos && <div className="hidden lg:block">{navegacionTurnos}</div>}
           {selectorPestana && <div className="hidden lg:block">{selectorPestana}</div>}
           {/* Los controles del modo TV, discretos: en la sala nadie los toca,
@@ -6036,6 +6125,9 @@ export function PublicShiftMonitorPage() {
           fuera de lo sticky: pegadas arriba se comerían media pantalla de
           scroll. El análisis dejó de compartir scroll con lo vivo — quien
           entra por el QR viene a ver cómo va el turno. */}
+      {!modoPantalla && (
+        <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="mx-auto max-w-3xl px-4 pt-3 lg:hidden" />
+      )}
       {navegacionTurnos && (
         <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{navegacionTurnos}</div>
       )}

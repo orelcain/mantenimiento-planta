@@ -345,7 +345,25 @@ export interface PublicShiftMonitorDoc {
    * deslizar hacia atrás sin sesión. Los compone el backend con el mismo
    * formato que `live`. Ausente en docs creados antes de esta función.
    */
-  history?: Array<{ shiftDocId: string; dateKey: string; shiftId: string; live: PublicMonitorLive }>
+  /**
+   * Presente cuando el turno ACTUAL publicado es uno que marcó el sensor (vino
+   * después del último turno con nombre, ya cerrado). Mismo formato que en
+   * `history`. `null` cuando el actual es un turno con nombre.
+   */
+  extraordinario?: { desde: string; hasta: string; fuenteDocId?: string } | null
+  history?: Array<{
+    shiftDocId: string
+    dateKey: string
+    shiftId: string
+    live: PublicMonitorLive
+    /**
+     * Presente cuando el turno lo marcó el SENSOR y no Shoplogix: un bloque
+     * de producción sin turno configurado, con tamaño de turno (Chonchi
+     * 26-sep-2026: extraordinario 16:15→22:55). Sus horas son la primera y la
+     * última pieza. No tiene meta: nadie la puso.
+     */
+    extraordinario?: { desde: string; hasta: string; fuenteDocId?: string }
+  }>
   /**
    * Las series minuto a minuto ARCHIVADAS de los últimos turnos (mismo formato
    * que `pulse.serieMinuto`, más el turno dueño): Shoplogix solo entrega los
