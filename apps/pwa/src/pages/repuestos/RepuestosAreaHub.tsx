@@ -37,8 +37,8 @@ import { getTrashCount } from '@/services/auditLog'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
-import { Link } from 'react-router-dom'
-import { dibujoDe, maquinaDeDespiece, useFigurasDespiece } from './enlacesPieza'
+import { Link, useNavigate } from 'react-router-dom'
+import { dibujoDe, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, useFigurasDespiece } from './enlacesPieza'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
@@ -265,8 +265,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // machineId/nodeId del equipo enfocado → acotar repuestos por IDENTIDAD (no por nombre).
   const [selectedEquipMachineId, setSelectedEquipMachineId] = useState<string | null>(null)
 
+  // Si venimos de «atrás» desde el dibujo, reponer búsqueda y panel (se consume una vez).
+  const [vueltaDelDibujo] = useState(() => leerVueltaDelDibujo())
+
   // Filtros + paginación de la tabla de repuestos
-  const [repQuery, setRepQuery] = useState('')
+  const [repQuery, setRepQuery] = useState(() => vueltaDelDibujo?.q ?? '')
   // Al empezar a buscar, llevar la lista a la vista: el aterrizaje del área
   // deja al usuario scrolleado en el dashboard y los resultados aparecían
   // "abajo", fuera de pantalla (se notaba sobre todo en móvil).
@@ -291,7 +294,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Repuesto seleccionado → panel lateral de detalle
   // Selección por rowKey estable (NO codigoSAP: vacío en repuestos sin SAP → colisiona).
-  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null)
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(() => vueltaDelDibujo?.rowKey ?? null)
 
 
   // Lightbox de fotos desde la miniatura de la fila (sin pasar por el detalle)
@@ -1057,6 +1060,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Código de fabricante → figura del despiece (BAADER 142 y 200), para el acceso al dibujo.
   const figurasDespiece = useFigurasDespiece()
+  const navigate = useNavigate()
+  const irAlDibujo = useCallback((ruta: string, rowKey: string) => {
+    recordarVueltaDelDibujo({ q: repQuery, rowKey })
+    navigate(ruta)
+  }, [navigate, repQuery])
   const selectedRep = useMemo(
     () => areaRepuestos.find((r) => r.rowKey === selectedRowKey) ?? null,
     [areaRepuestos, selectedRowKey],
@@ -2202,11 +2210,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             </td>
                             <td className="hidden px-2 py-2 text-center md:table-cell">
                               {dibujo ? (
-                                <Link to={dibujo.ruta} onClick={(e) => e.stopPropagation()}
-                                      className={[AREA_TACTIL_COMPACTA, 'inline-flex items-center justify-center rounded-ctl text-primary hover:bg-primary/10'].join(' ')}
-                                      title={`Ver en el dibujo · fig. ${dibujo.fig}`} aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
+                                <button type="button" onClick={(e) => { e.stopPropagation(); irAlDibujo(dibujo.ruta, r.rowKey) }}
+                                        className={[AREA_TACTIL_COMPACTA, 'inline-flex items-center justify-center rounded-ctl text-primary hover:bg-primary/10'].join(' ')}
+                                        title={`Ver en el dibujo · fig. ${dibujo.fig}`} aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
                                   <Shapes className="h-4 w-4" />
-                                </Link>
+                                </button>
                               ) : <span className="text-muted-foreground/40">—</span>}
                             </td>
                             <td className="px-3 py-2">
@@ -2301,7 +2309,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onSpecs={() => startAction('specs')}
           onPhotos={() => startAction('photos')}
           onManual={() => startAction('manual')}
-          dibujo={dibujoDe(figurasDespiece, selectedRep.codigoFabricante, maquinaDeDespiece(equipoParaMostrar(selectedRep.equipos, preferirEquipo).nombre))}
+          dibujo={(() => {
+            const d = dibujoDe(figurasDespiece, selectedRep.codigoFabricante, maquinaDeDespiece(equipoParaMostrar(selectedRep.equipos, preferirEquipo).nombre))
+            return d ? { fig: d.fig, abrir: () => irAlDibujo(d.ruta, selectedRep.rowKey) } : null
+          })()}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}

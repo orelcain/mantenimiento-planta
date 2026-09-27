@@ -79,6 +79,28 @@ export function dibujoDe(
 }
 
 /**
+ * Lo que Áreas tenía abierto al saltar al dibujo (búsqueda escrita + repuesto
+ * del panel), para reponerlo al volver con «atrás»: el hub se monta de cero y
+ * lo perdía. Vive en sessionStorage y se consume UNA vez.
+ */
+export const CLAVE_VOLVER_DEL_DIBUJO = 'repuestos:volverDelDibujo'
+export type VueltaDelDibujo = { q: string; rowKey: string | null }
+
+export function recordarVueltaDelDibujo(v: VueltaDelDibujo) {
+  try { sessionStorage.setItem(CLAVE_VOLVER_DEL_DIBUJO, JSON.stringify(v)) } catch { /* sin storage */ }
+}
+
+export function leerVueltaDelDibujo(): VueltaDelDibujo | null {
+  try {
+    const raw = sessionStorage.getItem(CLAVE_VOLVER_DEL_DIBUJO)
+    if (!raw) return null
+    sessionStorage.removeItem(CLAVE_VOLVER_DEL_DIBUJO)
+    const v = JSON.parse(raw) as Partial<VueltaDelDibujo>
+    return { q: typeof v.q === 'string' ? v.q : '', rowKey: typeof v.rowKey === 'string' ? v.rowKey : null }
+  } catch { return null }
+}
+
+/**
  * De un nombre de equipo («EVISCERADORA BAADER 142 N1», «BAADER 200») a la
  * máquina del despiece, para elegir el dibujo correcto si el código va en las dos.
  */
