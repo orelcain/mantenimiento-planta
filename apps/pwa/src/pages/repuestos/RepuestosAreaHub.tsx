@@ -2163,6 +2163,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 )}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
                                 {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground">Fab {r.codigoFabricante}</span></span>}
+                                {dibujo && (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); irAlDibujo(dibujo.ruta, r.rowKey) }}
+                                          className={`${AREA_TACTIL_EN_TARJETA} ml-1.5 inline-flex items-center gap-1 rounded-ctl bg-primary/10 px-1.5 text-primary`}
+                                          aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
+                                    <Shapes className="h-3 w-3" /> Dibujo
+                                  </button>
+                                )}
                               </div>
                             </td>
                             <td className="hidden px-3 py-2 text-xs lg:table-cell" onClick={(e) => e.stopPropagation()}>
