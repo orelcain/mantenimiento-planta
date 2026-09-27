@@ -11,7 +11,7 @@ import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay, Zap, Search, Lock, Gauge,
+  MonitorPlay, Zap, Search, Lock, Gauge, Ruler,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -446,6 +446,17 @@ export function MachineLearningPage() {
           )}
         </div>
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
+        {/* Acceso a la referencia de terreno (cifra primero + página del PDF), solo B200. */}
+        {machine.slug === 'baader-200' && activeTab === 'manual' && (
+          <button
+            type="button"
+            className="dp-hmi"
+            style={{ marginTop: -16, marginBottom: 24, minHeight: 44 }}
+            onClick={() => navigate('/aprendizaje/baader-200/terreno')}
+          >
+            <Ruler className="h-4 w-4" /> Referencia de terreno
+          </button>
+        )}
 
         {activeTab === 'quickref' && quickRefGroups ? (
           <QuickRefView groups={quickRefGroups} showSensitive={isAuthenticated} />

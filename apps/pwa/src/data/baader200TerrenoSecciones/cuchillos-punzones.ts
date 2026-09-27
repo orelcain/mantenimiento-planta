@@ -1,0 +1,103 @@
+import { FUENTES, PLANTA, V4, type SeccionTerreno } from '../baader200TerrenoTipos'
+
+// Sección «cuchillos-punzones» · V4 §7 (págs. 25-31) + planta págs. 13-14.
+// Convención de `pos`: 'dibujo.posición' de la V4 (p. ej. '35.2' = dib. 35, pos. 2),
+// porque la sección usa varios dibujos y los números de posición se repiten entre ellos.
+export const seccion: SeccionTerreno = {
+  id: 'cuchillos-punzones',
+  orden: 10,
+  titulo: 'Cuchillos punzones',
+  zona: 'Cuchillos de punta',
+  medidaPrincipal: {
+    clave: 'separacion',
+    nombre: 'Distancia entre las dos cuchillas de punta',
+    unidad: 'mm',
+    porEspecie: [
+      { especie: 'salmon', etiqueta: 'Todas las especies', valor: '8' },
+    ],
+    valorPlanta: { valor: '8', fuente: PLANTA(13) },
+    pos: ['38.8'],
+    ajusteCon: 'tornillos',
+    fuente: V4(28),
+  },
+  medidas: [
+    { clave: 'altura-guia-sup', nombre: 'Cuchillas sobre el canto inferior de la guía de espinas superior (rodillo en la parte trasera de la leva)', valores: ['5'], unidad: 'mm', pos: ['35.1', '35.7'], con: 'biela de mando pos. 2 del dibujo 35', fuente: V4(26) },
+    { clave: 'penetracion', nombre: 'Penetración en la guía de espinas inferior', valores: ['6-7'], unidad: 'mm', pos: ['36.3'], fuente: V4(26) },
+    { clave: 'fondo', nombre: 'Distancia al fondo del ahuecado de la guía inferior', valores: ['1'], unidad: 'mm', pos: ['37.4'], con: 'tornillo de tope inferior', fuente: V4(26) },
+    { clave: 'fondo-planta', nombre: 'Altura mínima sobre la ranura de la guía de espinas inferior (planta)', valores: ['1'], unidad: 'mm', con: 'tope del rodillo de la leva, en el cárter de levas', fuente: PLANTA(13) },
+    { clave: 'topes-sup', nombre: 'Tornillos de tope superiores al tope', valores: ['0,3'], unidad: 'mm', pos: ['38.5', '38.6'], fuente: V4(27) },
+    { clave: 'topes-planta', nombre: 'Pernos topes de seguridad (planta)', valores: ['0,5'], unidad: 'mm', fuente: PLANTA(13) },
+    { clave: 'talon', nombre: 'Cuchilla al talón de la silleta o al flanco del primer diente', valores: ['1-1,5'], unidad: 'mm', pos: ['39.1', '39.2'], fuente: V4(28) },
+    { clave: 'otros-dientes', nombre: 'Cuchilla a los demás dientes de la silleta', valores: ['0,5-1'], unidad: 'mm', pos: ['39.1', '39.2'], fuente: V4(28) },
+    { clave: 'punta-diente-planta', nombre: 'Punta del diente a la cuchilla, con la silleta pasando (planta)', valores: ['3-4'], unidad: 'mm', con: 'biela de mando de cada cuchillo', fuente: PLANTA(13) },
+    { clave: 'caida-planta', nombre: 'Caída del cuchillo antes de la llegada de la silleta (planta)', valores: ['7'], unidad: 'mm', con: 'segmento de la leva (fig. D, pos. 3)', fuente: PLANTA(13) },
+    { clave: 'silleta-50', nombre: 'Posición de la silleta para ajustar el segmento de leva', valores: ['50'], unidad: 'mm', fuente: V4(29) },
+    { clave: 'segmento', nombre: 'Segmento de leva (salmón coho, salmón salar y salmón trucha)', valores: ['15', '17'], unidad: 'mm', pos: ['42.3'], con: 'pernos del segmento', fuente: V4(30) },
+  ],
+  pasos: [
+    { texto: 'Desplazar las silletas hasta que el rodillo (dib. 34, pos. 1) quede sobre la parte trasera de la leva (pos. 2). Con la biela de mando (dib. 35, pos. 2), dejar las cuchillas de punta (pos. 1) 5 mm por encima del canto inferior de la guía de espinas superior (pos. 7).', pos: ['34.1', '34.2', '35.1', '35.2', '35.7'], medida: 'altura-guia-sup', fuente: V4(26) },
+    { texto: 'Avanzar las silletas hasta que las cuchillas entren 6-7 mm en la guía de espinas inferior (dib. 36, pos. 3). Dejar 1 mm al fondo del ahuecado con el tornillo de tope inferior (dib. 37, pos. 4).', pos: ['36.3', '37.4'], medida: 'fondo', fuente: V4(26) },
+    { texto: 'Ajustar los tornillos de tope superiores (dib. 38, pos. 5) a 0,3 mm del tope (pos. 6).', pos: ['38.5', '38.6'], medida: 'topes-sup', fuente: V4(27) },
+    { texto: 'Ajustar la distancia entre las dos cuchillas de punta a 8 mm con los tornillos (dib. 38, pos. 8).', pos: ['38.8'], medida: 'separacion', fuente: V4(28) },
+    { texto: 'Con una silleta a unos 50 mm (dib. 41), soltar la leva (dib. 42, pos. 1) y girarla en el sentido de trabajo hasta que el rodillo (pos. 2) salga de la vía de leva. Soltar los pernos (pos. 3) y dejar el segmento de leva en unos 15 o 17 mm.', pos: ['42.1', '42.2', '42.3'], medida: 'segmento', fuente: V4(30) },
+    { texto: 'Verificar que las cuchillas de punta (dib. 44, pos. 1) queden por encima del contradiente de la silleta (pos. 2) cuando el rodillo (dib. 45, pos. 3) está en lo más alto de la vía de leva (pos. 4).', pos: ['44.1', '44.2', '45.3', '45.4'], fuente: V4(31) },
+    { texto: 'Método de planta: con la silleta entre las cuchillas, regular la altura con la biela de mando (fig. A, pos. 2) hasta 3-4 mm entre la punta del diente y la cuchilla. Si una cuchilla queda más alta que la otra, corregir con la biela de cada una. Fijar los topes de seguridad a 0,5 mm y reapretar.', medida: 'punta-diente-planta', fuente: PLANTA(13) },
+  ],
+  advertencias: [
+    { texto: 'Si las cuchillas quedan más altas de lo normal, aparece gaping a lo largo del filete, en la línea del esquelón.', tipo: 'atencion', fuente: PLANTA(13) },
+    { texto: 'Si quedan más bajas, cortan la espina del flanco completa y los cuchillos rascadores dejan de cumplir su función.', tipo: 'atencion', fuente: PLANTA(13) },
+  ],
+  dibujos: [
+    { id: 'v4-dib35', url: FUENTES.v4.urlPagina(26), titulo: 'Dibujo 35 · cuchillas de punta (pos. 1), biela de mando (pos. 2) y guía superior (pos. 7)', recorte: { x: 5, y: 11, w: 79, h: 36 }, hotspots: [], fuente: V4(26) },
+    { id: 'v4-dib38', url: FUENTES.v4.urlPagina(27), titulo: 'Dibujo 38 · topes superiores (pos. 5·6) y tornillo de los 8 mm (pos. 8)', recorte: { x: 17, y: 61, w: 67, h: 28 }, hotspots: [], fuente: V4(27) },
+    { id: 'planta-p13', url: FUENTES.planta.urlPagina(13), titulo: 'Esquema de planta · figuras A a D del cuchillo punzón', recorte: { x: 6, y: 20, w: 41, h: 68 }, hotspots: [], fuente: PLANTA(13) },
+  ],
+  leyenda: [
+    { pos: ['35.1', '39.2', '44.1'], nombre: 'Cuchilla de punta izquierda', codigoBaader: ['2001400010'], confianza: 'alta', revisar: 'En la figura 107-4 del catálogo es 2005002010. Depende de la versión de la máquina.' },
+    { pos: ['35.1', '39.2', '44.1'], nombre: 'Cuchilla de punta derecha', codigoBaader: ['2001400009'], confianza: 'alta', revisar: 'En la figura 107-4 del catálogo es 2005002009. Depende de la versión de la máquina.' },
+    { pos: [], nombre: 'Soporte de cuchilla de punta', codigoBaader: ['2001400003'], confianza: 'alta' },
+    { pos: [], nombre: 'Horquilla porta-cuchilla (par)', codigoBaader: ['513057', '513047'], confianza: 'media', revisar: 'El catálogo no dice el lado de cada una.' },
+    { pos: ['35.2'], nombre: 'Biela de mando (varilla roscada)', codigoBaader: ['2000900007'], confianza: 'media', revisar: 'Alternativa: bielas diagonales 2001400008.' },
+    { pos: ['35.2'], nombre: 'Cabeza articulada de la biela (superior e inferior)', codigoBaader: ['94000005', '94000006'], sap: ['3300035291', '3300035292'], confianza: 'media' },
+    { pos: ['35.7'], nombre: 'Chapa guía delantera de la guía de espinas superior', codigoBaader: ['2001202002', '2001202004'], sap: ['3300017418', '3300017417'], confianza: 'alta', revisar: 'Referencia de altura; se ajusta en la sección de guías de espinas superiores.' },
+    { pos: ['36.3'], nombre: 'Chapa guía inferior (guía de espinas inferior)', codigoBaader: ['2000600004', '2000600005'], confianza: 'media', revisar: 'Referencia; se ajusta en la sección de guías de espinas.' },
+    { pos: ['34.1', '42.2', '45.3'], nombre: 'Rodillo (seguidor de leva)', codigoBaader: ['95060121'], sap: ['3300012369'], confianza: 'alta' },
+    { pos: [], nombre: 'Palanca de mando (brazo plano)', codigoBaader: ['518357'], confianza: 'alta' },
+    { pos: ['34.2', '42.1', '45.4'], nombre: 'Leva del cuchillo punzón', codigoBaader: ['2004132001'], confianza: 'media', revisar: 'Versión salmón. Otras especies: 2005102006, 516627 o 2005702017.' },
+    { pos: [], nombre: 'Segmento de la leva (15/17 mm)', codigoBaader: ['2005702018'], confianza: 'media', revisar: 'En las figuras 107-3 y 107-10 del catálogo es 519377. Depende de la versión.' },
+    { pos: ['42.3'], nombre: 'Pernos del segmento de leva', codigoBaader: ['30810820'], sap: ['3300038757'], confianza: 'alta', tornilleria: true },
+    { pos: ['38.8'], nombre: 'Tornillo de ajuste de los 8 mm', codigoBaader: ['30810830'], sap: ['3300045135'], confianza: 'media', tornilleria: true },
+    { pos: ['38.5'], nombre: 'Tornillos de tope superiores (0,3 mm)', codigoBaader: [], confianza: 'media', tornilleria: true, revisar: 'No identificados en el catálogo (revisadas las figuras 14-1, 14-2 y 9-x).' },
+    { pos: ['38.6'], nombre: 'Tope', codigoBaader: [], confianza: 'media', revisar: 'Candidato 520457 (ángulo), confianza baja. Confirmar en la máquina.' },
+    { pos: ['37.4'], nombre: 'Tornillo de tope inferior', codigoBaader: [], confianza: 'media', tornilleria: true, revisar: 'Candidato 1891910001 (tornillo amortiguador, SAP 3300012375), confianza baja.' },
+    { pos: ['39.1', '44.2'], nombre: 'Silleta salmón, dentado alto (contradiente)', codigoBaader: ['2004166001'], confianza: 'media', revisar: 'Referencia; no se ajusta en esta sección.' },
+  ],
+  diagnostico: [
+    {
+      falla: 'Gaping en la mitad del filete, a lo largo',
+      seccionApp: 'ts-gay-ping-filete',
+      chequeos: [
+        { texto: 'Filo del cuchillo de punta' },
+        { texto: 'Altura de trabajo del cuchillo de punta' },
+        { texto: 'Nivelación del cuchillo de punta, si el defecto sale de un solo lado' },
+        { texto: 'Altura de trabajo del cuchillo rascador' },
+        { texto: 'Abertura de los cuchillos rascadores' },
+      ],
+      fuente: PLANTA(25),
+    },
+    {
+      falla: 'Colgajo en la línea del esquelón',
+      seccionApp: 'ts-colgajo-esquelon',
+      chequeos: [
+        { texto: 'Filo y abertura de los cuchillos de punta' },
+        { texto: 'Abertura de los desviadores en los cuchillos de cola' },
+        { texto: 'Abertura y filo de los cuchillos de cola' },
+      ],
+      fuente: PLANTA(31),
+    },
+  ],
+  didactico: {
+    porQue: { texto: 'Los cuchillos punzones cortan junto a la silleta antes de que pasen los rascadores. Si quedan altos, el filete sale con gaping en la línea del esquelón; si quedan bajos, cortan la espina del flanco completa y los rascadores ya no tienen qué hacer.', dibujoId: 'planta-p14', fuente: PLANTA(13) },
+    notaAuditoria: 'Topes de seguridad: el texto de planta pide 0,5 mm (pág. 13), pero su propia figura A y la V4 (pág. 27) marcan 0,3 mm. Altura respecto a la silleta: planta pide 3-4 mm entre la punta del diente y la cuchilla; la V4 da 1-1,5 mm al talón o al primer diente y 0,5-1 mm a los demás. Miden desde puntos distintos y no se pueden convertir entre sí; hay que confirmar cuál rige. Los 8 mm entre cuchillas y el 1 mm sobre la guía inferior coinciden en ambos manuales. El segmento de leva de 15 o 17 mm la V4 lo asocia a salmón coho, salmón salar y salmón trucha, sin decir qué valor corresponde a cada uno; la V4 no trae tabla por especie para este cuchillo.',
+  },
+}

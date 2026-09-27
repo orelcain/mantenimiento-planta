@@ -137,6 +137,7 @@ const PlanosElectricosPage = lazyWithReload(() => import('@/pages/PlanosElectric
 const VariadoresPage = lazyWithReload(() => import('@/pages/VariadoresPage').then((mod) => ({ default: mod.VariadoresPage })))
 const Perilla5Page = lazyWithReload(() => import('@/pages/Perilla5Page').then((mod) => ({ default: mod.Perilla5Page })))
 const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
+const Baader200TerrenoPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader200TerrenoPage').then((mod) => ({ default: mod.Baader200TerrenoPage })))
 const LearningAdminPage = lazyWithReload(() => import('@/pages/LearningAdminPage').then((mod) => ({ default: mod.LearningAdminPage })))
 const LearningAdminMachinePage = lazyWithReload(() => import('@/pages/LearningAdminMachinePage').then((mod) => ({ default: mod.LearningAdminMachinePage })))
 
@@ -549,6 +550,24 @@ export function App() {
             {/* La vista inmersiva del Baader 200 (iframe con tema propio) se unificó
                 en la ficha estándar para no tener 2 formatos distintos en el Centro.
                 El share standalone por QR (/baader-200/learn) se conserva aparte. */}
+            {/* Referencia de terreno del manual de ajustes (cifra primero, dibujo con leyenda,
+                página del PDF a un toque). Rutas estáticas: ganan a `:sectionId` de abajo. */}
+            <Route
+              path="/aprendizaje/baader-200/terreno"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader200TerrenoPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/baader-200/terreno/:seccionId"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader200TerrenoPage />
+                </Suspense>
+              }
+            />
             <Route path="/aprendizaje/baader-200/:sectionId" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
             <Route path="/aprendizaje/baader-200" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
             <Route
