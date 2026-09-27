@@ -6,7 +6,7 @@
  * de 44). En el PC, donde el dibujo mide ~500 px, los números del dibujo también se tocan.
  * La fila elegida se despliega con el stock en vivo y el salto a Repuestos.
  */
-import { forwardRef, type ReactNode } from 'react'
+import { forwardRef, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Maximize2 } from 'lucide-react'
 import { FUENTES, type Dibujo, type PiezaLeyenda, type SeccionTerreno } from '@/data/baader200Terreno'
@@ -58,12 +58,16 @@ export const DibujoConLeyenda = forwardRef<HTMLDivElement, Props>(function Dibuj
     <ListGroup title="Dibujo y piezas" id={ANCLAS.dibujo} className="scroll-mt-4">
       {seccion.dibujos.length > 1 && (
         <div className="px-3 pt-3">
-          <SegmentedControl
-            ariaLabel="Dibujo"
-            value={dibujo.id}
-            onChange={onDibujo}
-            segments={seccion.dibujos.map(d => ({ value: d.id, label: etiquetaDibujo(d) }))}
-          />
+          {seccion.dibujos.length <= 4 ? (
+            <SegmentedControl
+              ariaLabel="Dibujo"
+              value={dibujo.id}
+              onChange={onDibujo}
+              segments={seccion.dibujos.map(d => ({ value: d.id, label: etiquetaDibujo(d) }))}
+            />
+          ) : (
+            <TiraDibujos dibujos={seccion.dibujos} activo={dibujo.id} onChange={onDibujo} />
+          )}
         </div>
       )}
 
@@ -129,6 +133,46 @@ export const DibujoConLeyenda = forwardRef<HTMLDivElement, Props>(function Dibuj
     </ListGroup>
   )
 })
+
+/**
+ * Con más de 4 dibujos (cola y contrabancadas trae 19) el segmentado se aplasta: tira de
+ * chips desplazable, con el activo centrado también cuando cambia desde la leyenda.
+ */
+function TiraDibujos({ dibujos, activo, onChange }: { dibujos: Dibujo[]; activo: string; onChange: (id: string) => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
+  }, [activo])
+  return (
+    <div
+      ref={ref}
+      role="tablist"
+      aria-label="Dibujo"
+      className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {dibujos.map(d => {
+        const esActivo = d.id === activo
+        return (
+          <button
+            key={d.id}
+            type="button"
+            role="tab"
+            aria-selected={esActivo}
+            onClick={() => onChange(d.id)}
+            className={cn(
+              'min-h-[44px] shrink-0 whitespace-nowrap rounded-full px-4 text-subhead font-medium',
+              'transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+              esActivo ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent',
+            )}
+          >
+            {etiquetaDibujo(d)}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function FilaLeyenda({ pieza, activa, onToggle, stock }: {
   pieza: PiezaLeyenda

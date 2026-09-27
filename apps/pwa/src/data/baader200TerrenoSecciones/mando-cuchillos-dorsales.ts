@@ -38,9 +38,9 @@ export const seccion: SeccionTerreno = {
     { texto: 'Los cuerpos de cojinete de las dorsales (dib. 17, pos. 6·7) descansan sobre los tornillos (dib. 17, pos. 4·5): el mando levanta las dorsales desde ese apoyo.', pos: ['6', '7', '4', '5'], tipo: 'atencion', fuente: V4(16) },
   ],
   dibujos: [
-    { id: 'v4-dib23', url: FUENTES.v4.urlPagina(17), titulo: 'Dibujo 23 · trinquete (pos. 12), fiador (pos. 13), tornillos (pos. 11·14), palanca (pos. 15) y tope (pos. 10)', recorte: { x: 15, y: 15, w: 67, h: 68 }, hotspots: [], fuente: V4(17) },
-    { id: 'v4-dib25', url: FUENTES.v4.urlPagina(18), titulo: 'Dibujo 25 · trinquete en la 4.ª entalla del fiador', recorte: { x: 20, y: 50, w: 60, h: 37 }, hotspots: [], fuente: V4(18) },
-    { id: 'planta-p11', url: FUENTES.planta.urlPagina(11), titulo: 'Esquema de planta · mando dorsal con cotas 12 y 28 mm', recorte: { x: 5, y: 29, w: 42, h: 50 }, hotspots: [], fuente: PLANTA(11) },
+    { id: 'v4-dib23', url: FUENTES.v4.urlPagina(17), titulo: 'Dibujo 23 · trinquete (pos. 12), fiador (pos. 13), tornillos (pos. 11·14), palanca (pos. 15) y tope (pos. 10)', recorte: { x: 15, y: 15, w: 67, h: 68 }, hotspots: [{ pos: '13', x: 35.4, y: 28.6 }, { pos: '12', x: 32.8, y: 32.7 }, { pos: '11', x: 33.0, y: 49.3 }, { pos: '14', x: 35.4, y: 70.6 }, { pos: '15', x: 55.5, y: 73.6 }, { pos: '10', x: 27.0, y: 84.9 }], fuente: V4(17) },
+    { id: 'v4-dib25', url: FUENTES.v4.urlPagina(18), titulo: 'Dibujo 25 · trinquete en la 4.ª entalla del fiador', recorte: { x: 20, y: 50, w: 60, h: 37 }, hotspots: [{ pos: '13', x: 71.9, y: 18.6 }, { pos: '12', x: 61.4, y: 62.8 }], fuente: V4(18) },
+    { id: 'planta-p11', url: FUENTES.planta.urlPagina(11), titulo: 'Esquema de planta · mando dorsal con cotas 12 y 28 mm', recorte: { x: 5, y: 29, w: 42, h: 50 }, hotspots: [{ pos: '12', x: 19.7, y: 41.8 }, { pos: '13', x: 23.6, y: 44.0 }, { pos: '11', x: 21.8, y: 53.8 }, { pos: '14', x: 27.0, y: 56.1 }, { pos: '15', x: 33.4, y: 54.0 }, { pos: '17', x: 29.2, y: 60.4 }, { pos: '9', x: 50.5, y: 58.0 }, { pos: '16', x: 96.2, y: 55.2 }, { pos: '9', x: 77.6, y: 58.6 }, { pos: '8', x: 79.4, y: 74.6 }, { pos: '8', x: 48.8, y: 86.2 }, { pos: '10', x: 31.6, y: 90.9 }], fuente: PLANTA(11) },
   ],
   leyenda: [
     { pos: ['8'], nombre: 'Rodillo', codigoBaader: ['95060123'], sap: ['3300012368'], confianza: 'media' },

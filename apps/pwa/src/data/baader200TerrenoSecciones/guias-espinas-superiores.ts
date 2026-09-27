@@ -50,8 +50,8 @@ export const seccion: SeccionTerreno = {
     { texto: 'Al montar dorsales nuevos, rehacer el ajuste con las guías frontales y, si hace falta, con la guía superior.', tipo: 'atencion', fuente: PLANTA(36) },
   ],
   dibujos: [
-    { id: 'v4-dib30', url: FUENTES.v4.urlPagina(22), titulo: 'Dibujo 30 · unidad delantera (pos. 4), tornillos (pos. 5·6·7·10), protección (pos. 8), placa (pos. 14); 3 mm y muelles 55 mm', recorte: { x: 6, y: 25, w: 88, h: 43 }, hotspots: [], fuente: V4(22) },
-    { id: 'v4-dib28-29', url: FUENTES.v4.urlPagina(21), titulo: 'Dibujos 28 y 29 · tuercas (pos. 9·11), chapa trasera (pos. 3), 2 mm al diente y medida «d»', recorte: { x: 5, y: 23, w: 92, h: 67 }, hotspots: [], fuente: V4(21) },
+    { id: 'v4-dib30', url: FUENTES.v4.urlPagina(22), titulo: 'Dibujo 30 · unidad delantera (pos. 4), tornillos (pos. 5·6·7·10), protección (pos. 8), placa (pos. 14); 3 mm y muelles 55 mm', recorte: { x: 6, y: 25, w: 88, h: 43 }, hotspots: [{ pos: '5', x: 43.3, y: 14.7 }, { pos: '6', x: 46.7, y: 16.0 }, { pos: '8', x: 60.2, y: 13.6 }, { pos: '7', x: 66.7, y: 11.6 }, { pos: '14', x: 11.2, y: 37.5 }, { pos: '10', x: 25.0, y: 44.5 }, { pos: '1', x: 74.1, y: 68.7 }, { pos: '4', x: 71.7, y: 71.8 }], fuente: V4(22) },
+    { id: 'v4-dib28-29', url: FUENTES.v4.urlPagina(21), titulo: 'Dibujos 28 y 29 · tuercas (pos. 9·11), chapa trasera (pos. 3), 2 mm al diente y medida «d»', recorte: { x: 5, y: 23, w: 92, h: 67 }, hotspots: [{ pos: '11', x: 24.5, y: 2.1 }, { pos: '9', x: 63.3, y: 1.8 }, { pos: '2', x: 86.9, y: 25.6 }, { pos: '3', x: 14.3, y: 83.2 }], fuente: V4(21) },
     { id: 'v4-dib32', url: FUENTES.v4.urlPagina(24), titulo: 'Dibujo 32 · abertura «e» entre chapas guía', recorte: { x: 20, y: 8, w: 60, h: 36 }, hotspots: [], fuente: V4(24) },
   ],
   leyenda: [
