@@ -534,11 +534,40 @@ const MAX_SHIFT_MS = 16 * 3600_000
  * es creíble. Sin oficial, o con un oficial igual de malo, se respeta el
  * derivado — el comportamiento de siempre.
  */
-function resolveShiftWindow({ scheduledStart, scheduledEnd, officialStart, officialEnd }) {
+function resolveShiftWindow({ scheduledStart, scheduledEnd, officialStart, officialEnd, nowWall = null }) {
   const sinCambio = { start: scheduledStart, end: scheduledEnd, corregida: false }
 
   const durDerivada = scheduledEnd.getTime() - scheduledStart.getTime()
-  if (durDerivada > 0 && durDerivada <= MAX_SHIFT_MS) return sinCambio   // derivado creíble
+  if (durDerivada > 0 && durDerivada <= MAX_SHIFT_MS) {
+    /*
+     * Derivado creíble, pero el turno está EN CURSO: el último interval es el
+     * minuto actual, así que el «cierre» derivado avanza con el reloj y la app
+     * decía «00:00→04:31» para un turno que Shoplogix programa hasta las 07:15
+     * (Chonchi, Turno 1 Lunes, 28-sep-2026 — lo vio Orel a las 04:40). Mientras
+     * el turno corre, el cierre lo dice el horario oficial. Pasado ese cierre se
+     * vuelve al derivado (la línea puede seguir de largo), que es lo de siempre.
+     *
+     * Conservador: solo se ALARGA hacia el oficial, nunca se acorta, y solo con
+     * un oficial que describa ESTE turno (mismo arranque, duración creíble).
+     */
+    const enCurso = nowWall instanceof Date && !isNaN(nowWall.getTime())
+    if (enCurso
+      && officialEnd instanceof Date && !isNaN(officialEnd.getTime())
+      && officialStart instanceof Date && !isNaN(officialStart.getTime())
+      && nowWall.getTime() < officialEnd.getTime()
+      && officialEnd.getTime() > scheduledEnd.getTime()
+      && officialEnd.getTime() - officialStart.getTime() > 0
+      && officialEnd.getTime() - officialStart.getTime() <= MAX_SHIFT_MS
+      && Math.abs(officialStart.getTime() - scheduledStart.getTime()) <= 12 * 3600_000) {
+      return {
+        start: scheduledStart,
+        end: officialEnd,
+        corregida: true,
+        motivo: 'turno en curso: el cierre lo da el horario oficial, no el último interval',
+      }
+    }
+    return sinCambio
+  }
 
   if (!(officialStart instanceof Date) || isNaN(officialStart.getTime())) return sinCambio
   if (!(officialEnd instanceof Date) || isNaN(officialEnd.getTime())) return sinCambio
@@ -805,9 +834,12 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       scheduledEnd:   group.scheduledEnd,
       officialStart:  oficialDeEsteTurno?.officialStart,
       officialEnd:    oficialDeEsteTurno?.officialEnd,
+      // Wall-clock-as-UTC, la misma escala que `group.scheduled*` (ver nota en el freeze-check).
+      nowWall:        toChileWall(syncedAt),
     })
     if (ventana.corregida) {
-      logger.warn(
+      // El caso «en curso» pasa en cada sync del turno vivo: info, no warn.
+      ;(ventana.motivo.startsWith('turno en curso') ? logger.info : logger.warn).call(logger,
         `[syncDay][${plantSlug}] ${group.shiftId}: ${ventana.motivo} `
         + `(${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)} ⇒ `
         + `${toShoplogixTime(ventana.start)}→${toShoplogixTime(ventana.end)})`,
