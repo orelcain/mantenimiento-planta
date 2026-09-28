@@ -104,11 +104,12 @@ export interface PublicMonitorLive {
    */
   plannedEnd?: string | null
   /**
-   * De dónde salió `plannedEnd`. `historial` es el caso normal: la mediana de
-   * los turnos anteriores con el mismo nombre. `config` solo cuando el turno es
-   * nuevo y todavía no tiene historia.
+   * De dónde salió `plannedEnd`. `shoplogix` es el caso normal desde el
+   * 28-09-2026: el horario oficial del turno manda. El resto solo cuando
+   * Shoplogix no dice nada: `historial` (mediana de los turnos anteriores con
+   * el mismo nombre), `config`, `duracion`, o `fijado` a mano.
    */
-  plannedEndSource?: 'fijado' | 'historial' | 'config' | 'duracion' | null
+  plannedEndSource?: 'shoplogix' | 'fijado' | 'historial' | 'config' | 'duracion' | null
   /**
    * Set point operacional de la máquina, editado por un supervisor en la PWA.
    * `medidoEl`/`metodo`/`por` viajan porque la fuente es parte del dato.
