@@ -81,6 +81,10 @@ describe('vecinas', () => {
 })
 
 describe('buscar', () => {
+  it('«calibre» lleva al segmento de leva del punzón (manual rev 2)', () => {
+    const r = buscar(indice, 'calibre')
+    expect(r.pasos.some(p => p.seccionId === 'cuchillos-punzones')).toBe(true)
+  })
   it('«trucha» responde con el valor de trucha primero', () => {
     const r = buscar(indice, 'trucha')
     expect(r.medidas[0]!.valor).toBe('4 mm')
