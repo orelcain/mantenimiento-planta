@@ -6222,6 +6222,7 @@ exports.setupMantApp = onRequest({ region: 'us-central1' }, async (req, res) => 
 // ═══════════════════════════════════════════════════════════════════════════
 
 const shoplogixSyncMod  = require('./shoplogix/sync')
+const guardiaTurnosMod  = require('./shoplogix/guardiaTurnos')
 const turnoBriefMod     = require('./shoplogix/turnoBrief')
 const shoplogixPolling  = require('./shoplogix/polling')
 const shoplogixTokenStore = require('./shoplogix/tokenStore')
@@ -6560,6 +6561,8 @@ exports.shoplogixSyncWakeup = onSchedule(
     logger.info(`[shoplogixSyncWakeup] modo auth: ${auth.mode}`)
 
     let authExpired = false
+    /** Hallazgos de la guardia de horario de todos los syncDay de este ciclo. */
+    const hallazgosGuardia = []
     // `forceAll` reescribe también los turnos ya congelados. Los re-sync de días
     // pasados existen precisamente para traer las correcciones retroactivas de
     // etiquetado de Shoplogix, y ahí TODOS los turnos están cerrados: sin forzar,
@@ -6584,6 +6587,7 @@ exports.shoplogixSyncWakeup = onSchedule(
       for (const outcome of settled) {
         if (outcome.status === 'fulfilled') {
           logger.info('[shoplogixSyncWakeup] OK', { result: outcome.value, authMode: auth.mode })
+          hallazgosGuardia.push(...(outcome.value?.guardia || []))
         } else {
           const err = outcome.reason
           if (err?.code === 'AUTH_EXPIRED') {
@@ -6599,6 +6603,16 @@ exports.shoplogixSyncWakeup = onSchedule(
     for (const dk of extraDateKeys) {
       if (authExpired) break
       await runDay(dk, true)   // día pasado → forzar, es el canal de corrección retroactiva
+    }
+
+    // Guardia del horario (ver shoplogix/guardiaTurnos.js): sin hallazgos no toca nada.
+    try {
+      const n = await guardiaTurnosMod.avisarHallazgos({
+        db, hallazgos: hallazgosGuardia, enviar: (t) => sendTelegramMessage(t),
+      })
+      if (n) logger.warn(`[shoplogixSyncWakeup] guardia de horario: ${n} aviso(s) enviados`)
+    } catch (e) {
+      logger.warn('[shoplogixSyncWakeup] guardia de horario falló:', e.message)
     }
 
     if (authExpired) {
@@ -8958,16 +8972,29 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     const indexByPlant = new Map()
     let refrescados = 0
 
+    const hallazgosMonitor = []
     for (const d of activos) {
       try {
         const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant)
         if (!patch) continue
         await d.ref.set(patch, { merge: true })
         refrescados++
+        // Guardia regla 2: solo cuando el write que disparó esto es el del turno
+        // que el monitor muestra (así el padre ya está en memoria, sin leer).
+        const sid = patch.shiftDocId ?? d.data().shiftDocId
+        if (sid === `${shiftDoc}` && after) {
+          hallazgosMonitor.push(...guardiaTurnosMod.revisarMonitor({ plantSlug: plant, shiftDocId: sid, live: patch.live, parent: after }))
+        }
       } catch (err) {
         // Un monitor roto no puede tumbar el refresco de los demás.
         logger.error('[publicShiftMonitor] no se pudo refrescar', { token: d.id, error: err.message })
       }
+    }
+
+    try {
+      await guardiaTurnosMod.avisarHallazgos({ db, hallazgos: hallazgosMonitor, enviar: (t) => sendTelegramMessage(t) })
+    } catch (e) {
+      logger.warn('[publicShiftMonitor] guardia de horario falló:', e.message)
     }
 
     if (refrescados > 0) {

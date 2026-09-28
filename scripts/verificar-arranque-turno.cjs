@@ -17,6 +17,11 @@
  *                   (bug del freeze, julio 2026).
  *   4. COHERENCIA   suma de machines[] del doc padre == suma de la subcoleccion.
  *   5. CALIDAD      dataQualityIssues vacio.
+ *   6. CIERRE       turno en curso => scheduledEnd == officialSchedule.end.
+ *                   Regla de Orel: el horario lo manda Shoplogix. El 28-09-2026
+ *                   el Turno 1 Lunes (00:00->07:15) se guardaba "hasta 04:31"
+ *                   porque el cierre salia del ultimo interval. Segunda red de
+ *                   la guardia en la nube (functions/shoplogix/guardiaTurnos.js).
  *
  * Uso:
  *   node scripts/verificar-arranque-turno.cjs [YYYY-MM-DD]
@@ -377,6 +382,22 @@ async function main() {
       // 5. CALIDAD
       if (Array.isArray(v.dataQualityIssues) && v.dataQualityIssues.length) {
         problema(`${plant} ${shiftId}: dataQualityIssues -> ${JSON.stringify(v.dataQualityIssues).slice(0, 200)}`)
+      }
+
+      // 6. CIERRE — con el turno en curso, el cierre guardado es el oficial.
+      // Pasado el cierre oficial no se opina: la linea puede seguir de largo y
+      // eso es hora extra real, no un descuadre. `offsetChileHoras` por la
+      // misma razon que en FRESCURA (wall-clock-as-UTC vs UTC real).
+      const finOficial = aFecha(v.officialSchedule?.end)
+      if (finOficial && shiftId !== 'Unscheduled') {
+        const oficialEnCurso = Date.now() < finOficial.getTime() + offsetChileHoras() * 3600e3
+        if (!oficialEnCurso) {
+          ok(`cierre: el turno ya paso su cierre oficial (${hhmm(finOficial)})`)
+        } else if (fin.getTime() !== finOficial.getTime()) {
+          problema(`${plant} ${shiftId}: en curso, Shoplogix lo cierra ${hhmm(finOficial)} y el doc dice ${hhmm(fin)}`)
+        } else {
+          ok(`cierre en curso coincide con Shoplogix (${hhmm(finOficial)})`)
+        }
       }
     }
   }
