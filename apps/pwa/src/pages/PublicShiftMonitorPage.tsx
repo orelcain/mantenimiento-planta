@@ -1811,7 +1811,9 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
   if (!cierre) return null
 
-  const puedeEditar = isAdmin && Boolean(plantSlug) && Boolean(shiftName)
+  /* Con horario de Shoplogix no hay nada que fijar: ese horario manda (regla
+     de Orel, 28-09). El botón solo tiene sentido cuando Shoplogix calla. */
+  const puedeEditar = isAdmin && Boolean(plantSlug) && Boolean(shiftName) && fuente !== 'shoplogix'
 
   const guardar = async () => {
     const m = /^(\d{1,2}):(\d{2})$/.exec(valor.trim())
@@ -1833,7 +1835,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
     <div className="mt-0.5 text-[11px] text-muted-foreground/80">
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
-          Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
+          {fuente === 'shoplogix' ? 'Cierre' : 'Cierre estimado'} <span className="tabular-nums">{fmtWallTime(cierre)}</span>
           {/*
             * `duracion` se dice distinto a propósito: no es «a qué hora
             * cerraron» sino «cuánto duraron». Es el caso de un turno sin
@@ -1841,7 +1843,9 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
             * estable es la duración — quien lee tiene que saber de dónde sale
             * el número para poder desconfiar de él con criterio.
             */}
-          {fuente === 'fijado'
+          {fuente === 'shoplogix'
+            ? ', según el horario de Shoplogix'
+            : fuente === 'fijado'
             ? ', fijado a mano'
             : fuente === 'duracion'
             ? `, estimado sumando lo que duran los turnos de esta línea (${muestras ?? 0} turnos)`
@@ -6033,7 +6037,7 @@ function MonitorDelToken() {
             {!live.shiftClosed && live.plannedEnd ? (
               <span className="tabular-nums">
                 {fmtWallTime(inicioReal)}&nbsp;&#8594;&nbsp;{fmtWallTime(live.plannedEnd)}
-                {live.plannedEndSource !== 'fijado' && (
+                {live.plannedEndSource !== 'fijado' && live.plannedEndSource !== 'shoplogix' && (
                   <span className="ml-1 rounded bg-muted px-1 py-px text-caption text-muted-foreground">
                     est.
                   </span>

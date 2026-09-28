@@ -973,6 +973,23 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
  *   (ver `turnosDelSensor`). Trae su padre sintético y sus máquinas ya recortadas
  *   al bloque, así que no se lee nada ni se rescata cola: el bloque ES la jornada.
  */
+/**
+ * El cierre del horario oficial de Shoplogix para ESTE turno, o null.
+ *
+ * Coherente = fin posterior al inicio, duración de turno creíble (≤ 16 h) y
+ * arranque a menos de 12 h del del doc — las mismas vallas que el sync usa para
+ * no guardar la plantilla de otro día (`isOfficialScheduleSane`).
+ */
+function cierreOficialCoherente(parent, scheduledStart) {
+  const ini = toDate(parent?.officialSchedule?.start)
+  const fin = toDate(parent?.officialSchedule?.end)
+  if (!ini || !fin) return null
+  const dur = fin.getTime() - ini.getTime()
+  if (!(dur > 0 && dur <= 16 * 3600_000)) return null
+  if (scheduledStart && Math.abs(ini.getTime() - scheduledStart.getTime()) > 12 * 3600_000) return null
+  return fin
+}
+
 async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente = null) {
   let parent
   let machines
@@ -1665,7 +1682,22 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
    */
   const inferido = await inferShiftEndFromHistory(db, plantSlug, shiftIdActual, scheduledStart, shiftDocId, index)
 
-  if (cfg.plannedEnd && cfg.endPinned) {
+  /*
+   * 0. SHOPLOGIX — si el turno tiene horario oficial, ese es el cierre y punto.
+   *    Regla de Orel (28-09-2026): «Shoplogix manda con el horario». Caso que lo
+   *    fijó: el Turno 2 de Chonchi del 28-09 estaba programado 09:15→17:00 y el
+   *    monitor estimaba 14:44 por los turnos anteriores, con la línea todavía
+   *    produciendo a las 16:09 — el «ritmo para llegar» se calculaba contra un
+   *    cierre que ya había pasado. Lo de abajo (fijado, historial, config,
+   *    duración) queda para cuando Shoplogix no dice nada: un `Unscheduled`, un
+   *    turno nuevo sin plantilla.
+   */
+  const oficialFin = cierreOficialCoherente(parent, scheduledStart)
+
+  if (oficialFin) {
+    plannedEnd = oficialFin
+    plannedEndSource = 'shoplogix'
+  } else if (cfg.plannedEnd && cfg.endPinned) {
     plannedEnd = cfg.plannedEnd
     plannedEndSource = 'fijado'
   } else {
@@ -1726,7 +1758,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
      * ritmo necesario para llegar. null cuando el turno no está en la config.
      */
     plannedEnd: iso(plannedEnd),
-    /** 'fijado' | 'historial' | 'config' | null — para poder decirlo en pantalla. */
+    /** 'shoplogix' | 'fijado' | 'historial' | 'config' | 'duracion' | null — para poder decirlo en pantalla. */
     plannedEndSource,
     /**
      * Set point operacional de la máquina, editado por un supervisor en la PWA
@@ -2779,6 +2811,7 @@ module.exports = {
   loadShiftIndex,
   parentSinCambioReal,
   // exportados para tests
+  cierreOficialCoherente,
   bloquesDelSensor,
   ordenarSensorComoActual,
   currentStateOf,

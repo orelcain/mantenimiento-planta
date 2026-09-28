@@ -1294,3 +1294,19 @@ test('el turno del sensor posterior a un turno cerrado pasa a ser el ACTUAL; el 
   const antes = { ...sensor, extraordinario: { ...sensor.extraordinario, desde: '2026-09-26T03:00:00.000Z' } }
   assert.equal(ordenarSensorComoActual('2026-09-26_Turno 2', t2, [antes]).shiftDocId, '2026-09-26_Turno 2')
 })
+
+const { cierreOficialCoherente } = require('../publicMonitor')
+
+test('el cierre lo da el horario de Shoplogix cuando existe (Chonchi Turno 2, 28-09)', () => {
+  const S = (h, m = 0) => new Date(Date.UTC(2026, 8, 28, h, m))
+  const parent = { officialSchedule: { start: S(9, 15), end: S(17, 0) } }
+  assert.equal(cierreOficialCoherente(parent, S(9, 15)).toISOString(), S(17, 0).toISOString())
+  // Sin horario oficial: no hay cierre de Shoplogix, se cae a la estimación.
+  assert.equal(cierreOficialCoherente({}, S(9, 15)), null)
+  // Plantilla de OTRO día (arranca 24 h después): no se usa.
+  const otroDia = { officialSchedule: { start: new Date(Date.UTC(2026, 8, 29, 9, 15)), end: new Date(Date.UTC(2026, 8, 29, 17, 0)) } }
+  assert.equal(cierreOficialCoherente(otroDia, S(9, 15)), null)
+  // Invertido o absurdo: no se usa.
+  assert.equal(cierreOficialCoherente({ officialSchedule: { start: S(17), end: S(9) } }, S(9, 15)), null)
+  assert.equal(cierreOficialCoherente({ officialSchedule: { start: S(0), end: new Date(Date.UTC(2026, 8, 29, 20)) } }, S(0)), null)
+})
