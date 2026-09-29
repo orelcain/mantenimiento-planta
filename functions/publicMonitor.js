@@ -2114,7 +2114,12 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
   // Los turnos que marcó el sensor (ver `turnosDelSensor`).
   for (const u of unscheduled) {
     const sello = iso(toDate(u.data.lastSyncAt))
-    const yaVisto = sello && sinTurno?.prev?.[u.id] === sello
+    // Además del sello, el live reusado tiene que estar medido con la vara
+    // vigente: sin esto el turno del sensor se quedaba con el desglose tbv 2
+    // después del cambio a minutos de máquina (28-09).
+    const conVaraVigente = [...previos.values()].every(h =>
+      h.extraordinario?.fuenteDocId !== u.id || h.live?.timeBreakdown?.tbv === TBV)
+    const yaVisto = sello && sinTurno?.prev?.[u.id] === sello && conVaraVigente
     if (sinTurno && sello) sinTurno.next[u.id] = sello
     if (yaVisto) {
       // Mismo sello que la última vez: lo publicado sigue valiendo, sin leer.

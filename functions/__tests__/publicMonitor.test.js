@@ -1247,6 +1247,11 @@ test('un extraordinario sin configurar entra al historial como turno del sensor,
   const otra = { prev: sinTurno.next, next: {} }
   const hist2 = await buildMonitorHistory(dbSinMaquinas, 'chonchi', actual, hist, null, otra)
   assert.ok(hist2.find(h => h.shiftDocId === sensor.shiftDocId), 'el turno del sensor sigue publicado sin releer su subcolección')
+
+  // Con un desglose de la vara vieja NO se reusa aunque el sello coincida: se recompone.
+  const viejo = hist.map(h => h.extraordinario ? { ...h, live: { ...h.live, timeBreakdown: { ...h.live.timeBreakdown, tbv: 2 } } } : h)
+  const hist3 = await buildMonitorHistory(db, 'chonchi', actual, viejo, null, { prev: sinTurno.next, next: {} })
+  assert.equal(hist3.find(h => h.extraordinario).live.timeBreakdown.tbv, 3, 'recompuesto con la vara vigente')
 })
 
 test('bloquesDelSensor: una cola, ruido o un rato corto NO son un turno', () => {
