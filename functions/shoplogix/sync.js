@@ -24,6 +24,7 @@ const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
 const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours, ahoraEnPlanta } = require('./polling')
+const { revisarTurnosDelSync } = require('./guardiaTurnos')
 const { canonicalShiftName } = require('./canonicalShift')
 
 /** Plantas activas — usada en wakeup scheduler. */
@@ -852,6 +853,8 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   )
 
   const allShiftResults = []
+  /** Lo que se escribió, para que la guardia revise el horario (ver guardiaTurnos). */
+  const turnosEscritos = []
   const frozenSkipped = []
   const truncatedSkipped = []
   const windowEnd = parseShoplogixTime(window.end)
@@ -1178,6 +1181,14 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     }
 
     await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set(parentDoc, { merge: true })
+    turnosEscritos.push({
+      docId: `${parentShiftDateKey}_${group.shiftId}`,
+      shiftId: group.shiftId,
+      scheduledStart: parentDoc.scheduledStart,
+      scheduledEnd: parentDoc.scheduledEnd,
+      effectiveEnd: parentDoc.effectiveEnd,
+      officialSchedule: parentDoc.officialSchedule ?? null,
+    })
 
     allShiftResults.push({ shiftId: group.shiftId, machines: shiftMachineResults })
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${parentShiftDateKey} ${group.shiftId} OK (window dateKey=${dateKey})`, { machines: shiftMachineResults })
@@ -1190,12 +1201,27 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${truncatedSkipped.length} cola(s) cortadas en el borde de la ventana, sin pisar el turno completo: ${truncatedSkipped.join(', ')}`)
   }
 
+  /*
+   * Guardia del horario: solo sobre la ventana VIVA (la única que trae el
+   * rollup oficial). Pura, sin lecturas: el wakeup decide si avisa.
+   */
+  const guardia = dateKey === currentDateKey(syncedAt)
+    ? revisarTurnosDelSync({
+      plantSlug,
+      turnos: turnosEscritos,
+      rollup: officialRollup ? { shiftLabel: officialRollup.shiftLabel } : null,
+      nowWall: toChileWall(syncedAt),
+    })
+    : []
+  if (guardia.length) logger.warn(`[shoplogix-syncDay][${plantSlug}] guardia de horario`, { guardia })
+
   return {
     plantSlug, dateKey,
     shiftGroups: shiftGroups.map(g => g.shiftId),
     results: allShiftResults,
     frozenSkipped: frozenSkipped.length,
     truncatedSkipped: truncatedSkipped.length,
+    guardia,
   }
 }
 
