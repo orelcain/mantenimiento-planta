@@ -1,4 +1,4 @@
-import { FUENTES, PLANTA, V4, type SeccionTerreno } from '../baader200TerrenoTipos'
+import { FUENTES, PLANTA, REV2, V4, type SeccionTerreno } from '../baader200TerrenoTipos'
 
 // Sección «cuchillos-punzones» · V4 §7 (págs. 25-31) + planta págs. 13-14.
 // Convención de `pos`: 'dibujo.posición' de la V4 (p. ej. '35.2' = dib. 35, pos. 2),
@@ -33,6 +33,8 @@ export const seccion: SeccionTerreno = {
     { clave: 'caida-planta', nombre: 'Caída del cuchillo antes de la llegada de la silleta (planta)', valores: ['7'], unidad: 'mm', con: 'segmento de la leva (fig. D, pos. 3)', fuente: PLANTA(13) },
     { clave: 'silleta-50', nombre: 'Posición de la silleta para ajustar el segmento de leva', valores: ['50'], unidad: 'mm', fuente: V4(29) },
     { clave: 'segmento', nombre: 'Segmento de leva (salmón coho, salmón salar y salmón trucha)', valores: ['15', '17'], unidad: 'mm', pos: ['42.3'], con: 'pernos del segmento', fuente: V4(30) },
+    { clave: 'silleta-rev2-leva', nombre: 'Posición de la silleta para soltar y girar la leva (rev 2)', valores: ['405'], unidad: 'mm', con: 'leva, hasta que el rodillo toque la vía', fuente: REV2(29) },
+    { clave: 'silleta-rev2-segmento', nombre: 'Posición de la silleta para ubicar el segmento según el pescado (rev 2)', valores: ['485'], unidad: 'mm', con: 'pernos del segmento de leva', fuente: REV2(30) },
   ],
   pasos: [
     { texto: 'Desplazar las silletas hasta que el rodillo (dib. 34, pos. 1) quede sobre la parte trasera de la leva (pos. 2). Con la biela de mando (dib. 35, pos. 2), dejar las cuchillas de punta (pos. 1) 5 mm por encima del canto inferior de la guía de espinas superior (pos. 7).', pos: ['34.1', '34.2', '35.1', '35.2', '35.7'], medida: 'altura-guia-sup', fuente: V4(26) },
@@ -40,6 +42,7 @@ export const seccion: SeccionTerreno = {
     { texto: 'Ajustar los tornillos de tope superiores (dib. 38, pos. 5) a 0,3 mm del tope (pos. 6).', pos: ['38.5', '38.6'], medida: 'topes-sup', fuente: V4(27) },
     { texto: 'Ajustar la distancia entre las dos cuchillas de punta a 8 mm con los tornillos (dib. 38, pos. 8).', pos: ['38.8'], medida: 'separacion', fuente: V4(28) },
     { texto: 'Con una silleta a unos 50 mm (dib. 41), soltar la leva (dib. 42, pos. 1) y girarla en el sentido de trabajo hasta que el rodillo (pos. 2) salga de la vía de leva. Soltar los pernos (pos. 3) y dejar el segmento de leva en unos 15 o 17 mm.', pos: ['42.1', '42.2', '42.3'], medida: 'segmento', fuente: V4(30) },
+    { texto: 'Cambio de calibre o de especie: el segmento de la leva se ubica «de acuerdo con el pescado a tratar», porque decide el momento en que baja la punta (manual rev 2). Rev 2: silleta a 405 mm para soltar la leva y girarla hasta que el rodillo toque la vía; silleta a unos 485 mm para ubicar el segmento. Anotar cuánto se movió y para qué calibre: ningún manual trae la tabla.', medida: 'silleta-rev2-segmento', fuente: REV2(30) },
     { texto: 'Verificar que las cuchillas de punta (dib. 44, pos. 1) queden por encima del contradiente de la silleta (pos. 2) cuando el rodillo (dib. 45, pos. 3) está en lo más alto de la vía de leva (pos. 4).', pos: ['44.1', '44.2', '45.3', '45.4'], fuente: V4(31) },
     { texto: 'Método de planta: con la silleta entre las cuchillas, regular la altura con la biela de mando (fig. A, pos. 2) hasta 3-4 mm entre la punta del diente y la cuchilla. Si una cuchilla queda más alta que la otra, corregir con la biela de cada una. Fijar los topes de seguridad a 0,5 mm y reapretar.', medida: 'punta-diente-planta', fuente: PLANTA(13) },
   ],
@@ -57,6 +60,7 @@ export const seccion: SeccionTerreno = {
     { id: 'v4-dib42', url: FUENTES.v4.urlPagina(30), titulo: 'Dibujo 42 · leva (pos. 1), rodillo (pos. 2) y pernos del segmento (pos. 3)', recorte: { x: 7, y: 28, w: 45.5, h: 51 }, hotspots: [{ pos: '42.1', x: 18.2, y: 48.0 }, { pos: '42.2', x: 33.4, y: 81.4 }, { pos: '42.3', x: 64.2, y: 60.0 }], fuente: V4(30) },
     { id: 'v4-dib44', url: FUENTES.v4.urlPagina(31), titulo: 'Dibujo 44 · cuchillas de punta (pos. 1) sobre el contradiente de la silleta (pos. 2)', recorte: { x: 17, y: 17.5, w: 66, h: 31.5 }, hotspots: [{ pos: '44.1', x: 52.6, y: 42.2 }, { pos: '44.2', x: 32.6, y: 59.4 }], fuente: V4(31) },
     { id: 'v4-dib45', url: FUENTES.v4.urlPagina(31), titulo: 'Dibujo 45 · rodillo (pos. 3) en lo más alto de la vía de leva (pos. 4)', recorte: { x: 17, y: 51.8, w: 65.5, h: 35.8 }, hotspots: [{ pos: '45.4', x: 53.0, y: 51.7 }, { pos: '45.3', x: 45.3, y: 80.7 }], fuente: V4(31) },
+    { id: 'rev2-dib43', url: FUENTES.rev2.urlPagina(30), titulo: 'Dibujo 43 (rev 2) · silleta a unos 485 mm para ubicar el segmento de leva', recorte: { x: 17, y: 16.5, w: 66, h: 29.5 }, hotspots: [], fuente: REV2(30) },
     { id: 'planta-p13', url: FUENTES.planta.urlPagina(13), titulo: 'Esquema de planta · figuras A a D del cuchillo punzón', recorte: { x: 6, y: 20, w: 41, h: 68 }, hotspots: [], fuente: PLANTA(13) },
   ],
   leyenda: [
@@ -105,6 +109,6 @@ export const seccion: SeccionTerreno = {
   ],
   didactico: {
     porQue: { texto: 'Los cuchillos punzones cortan junto a la silleta antes de que pasen los rascadores. Si quedan altos, el filete sale con gaping en la línea del esquelón; si quedan bajos, cortan la espina del flanco completa y los rascadores ya no tienen qué hacer.', dibujoId: 'planta-p14', fuente: PLANTA(13) },
-    notaAuditoria: 'Topes de seguridad: el texto de planta pide 0,5 mm (pág. 13), pero su propia figura A y la V4 (pág. 27) marcan 0,3 mm. Altura respecto a la silleta: planta pide 3-4 mm entre la punta del diente y la cuchilla; la V4 da 1-1,5 mm al talón o al primer diente y 0,5-1 mm a los demás. Miden desde puntos distintos y no se pueden convertir entre sí; hay que confirmar cuál rige. Los 8 mm entre cuchillas y el 1 mm sobre la guía inferior coinciden en ambos manuales. El segmento de leva de 15 o 17 mm la V4 lo asocia a salmón coho, salmón salar y salmón trucha, sin decir qué valor corresponde a cada uno; la V4 no trae tabla por especie para este cuchillo.',
+    notaAuditoria: 'Topes de seguridad: el texto de planta pide 0,5 mm (pág. 13), pero su propia figura A y la V4 (pág. 27) marcan 0,3 mm. Altura respecto a la silleta: planta pide 3-4 mm entre la punta del diente y la cuchilla; la V4 da 1-1,5 mm al talón o al primer diente y 0,5-1 mm a los demás. Miden desde puntos distintos y no se pueden convertir entre sí; hay que confirmar cuál rige. Los 8 mm entre cuchillas y el 1 mm sobre la guía inferior coinciden en ambos manuales. El segmento de leva de 15 o 17 mm la V4 lo asocia a salmón coho, salmón salar y salmón trucha, sin decir qué valor corresponde a cada uno; la V4 no trae tabla por especie para este cuchillo. La rev 2 (2022, anterior a la V4) no da milímetros para el segmento: dice que se ubica según el pescado y usa otras posiciones de silleta (405 mm y 485 mm, contra los 50 mm de la V4). Ningún manual trae una tabla por calibre; la medida por calibre la tiene que fijar la planta. Informe de planta del 28-09-2026: se ajustó el segmento para que la cuchilla caiga antes, el corte sea más largo y no se monte sobre la cola del filete.',
   },
 }

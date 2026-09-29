@@ -40,7 +40,8 @@ interface Props {
 function etiquetaDibujo(d: Dibujo): string {
   // Con 4 pestañas en 343 px caben ~9 caracteres: «Dib. 69·70», «Planta», «Pág. 24».
   const m = d.titulo.match(/^Dibujos? (\d+)(?: y (\d+))?/)
-  if (m) return `Dib. ${m[1]}`
+  // La rev 2 numera sus dibujos distinto que la V4: «Dib. 43» a secas se confunde.
+  if (m) return d.fuente.id === 'rev2' ? `Rev2 · ${m[1]}` : `Dib. ${m[1]}`
   return d.fuente.id === 'planta' ? 'Planta' : `Pág. ${d.fuente.pagina}`
 }
 

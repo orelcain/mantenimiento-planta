@@ -599,6 +599,38 @@ function isOfficialScheduleSane({ officialStart, officialEnd, scheduledStart, sc
       && Math.abs(officialEnd.getTime()   - scheduledEnd.getTime())   <= MAX_DRIFT_MS
 }
 
+/**
+ * Los intervals de UNA máquina que pertenecen a este turno.
+ *
+ * Cada tramo de 5 min va a un solo turno. Un turno con nombre se arma por
+ * VENTANA (`scheduledStart`/`scheduledEnd`, derivados de la primera máquina con
+ * datos) y no por etiqueta, porque Shoplogix etiqueta mal a veces una máquina
+ * dentro del turno. Pero en los bordes la ventana sola no alcanza: con turnos
+ * pegados, el tramo del borde lo reclaman los dos. Ahí decide la etiqueta.
+ * `Unscheduled` se filtra solo por etiqueta (sus bordes abrazan el día entero).
+ */
+function intervalsDelTurno(machineProduction, group) {
+  const TOLERANCE_MS = 5 * 60 * 1000
+  const ini = group.scheduledStart.getTime()
+  const fin = group.scheduledEnd.getTime()
+  const etiquetas = new Set(group.rawShiftIds || [group.rawShiftId || group.shiftId])
+  return (machineProduction || []).filter(iv => {
+    if (!iv.start) return false
+    if (group.shiftId === 'Unscheduled') return iv.shift === 'Unscheduled'
+    const t = parseShoplogixTime(iv.start).getTime()
+    // Adentro de la ventana manda la HORA: Shoplogix a veces etiqueta mal una
+    // máquina a mitad de turno (caso 2026-04-29, ver syncDay).
+    if (t >= ini && t < fin) return true
+    // En los 5 min de cada borde manda la ETIQUETA. El tramo que arranca justo
+    // en el cierre, o 5 min antes del inicio, es del turno vecino salvo que diga
+    // lo contrario — con la tolerancia a secas quedaba en los dos turnos
+    // (Yal 28-09-2026: 14:55 del Turno 1 también en el Turno 2; 15:00 y 15:05
+    // del Turno 2 también en el Turno 1).
+    const enBorde = (t >= ini - TOLERANCE_MS && t < ini) || (t >= fin && t <= fin + TOLERANCE_MS)
+    return enBorde && etiquetas.has(iv.shift)
+  })
+}
+
 function deriveShiftGroups(machineProductionResponses, plantSlug) {
   // Usar la primera máquina que tenga intervalos (todas deberían tener los mismos shifts)
   const firstWithIntervals = machineProductionResponses.find(r => r?.machineProduction?.length > 0)
@@ -645,8 +677,9 @@ function deriveShiftGroups(machineProductionResponses, plantSlug) {
       const canon = canonicalShiftName(plantSlug, scheduledStart, rawShiftId)
       const key = `${canon}__${shiftDateKeyFromStart(scheduledStart)}`
       if (!byCanon[key]) {
-        byCanon[key] = { shiftId: canon, first: g.first, last: g.last, rawShiftId }
+        byCanon[key] = { shiftId: canon, first: g.first, last: g.last, rawShiftId, rawShiftIds: new Set([rawShiftId]) }
       } else {
+        byCanon[key].rawShiftIds.add(rawShiftId)
         if (parseShoplogixTime(g.first.start).getTime() < parseShoplogixTime(byCanon[key].first.start).getTime()) byCanon[key].first = g.first
         if (parseShoplogixTime(g.last.end).getTime()   > parseShoplogixTime(byCanon[key].last.end).getTime())   byCanon[key].last  = g.last
       }
@@ -654,10 +687,14 @@ function deriveShiftGroups(machineProductionResponses, plantSlug) {
   }
 
   return Object.values(byCanon)
-    .map(({ shiftId, first, last, rawShiftId }) => ({
+    .map(({ shiftId, first, last, rawShiftId, rawShiftIds }) => ({
       shiftId,
       // rawShiftId != shiftId solo cuando se corrigió una anomalía de Shoplogix.
       rawShiftId,
+      // Todas las etiquetas crudas que forman el turno (dos tramos pueden
+      // canonizar al mismo nombre). Deciden los tramos del borde: ver
+      // `intervalsDelTurno`.
+      rawShiftIds: [...rawShiftIds].sort(),
       scheduledStart: parseShoplogixTime(first.start),
       scheduledEnd:   parseShoplogixTime(last.end),
     }))
@@ -936,7 +973,8 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         const groupStartMs = group.scheduledStart.getTime() - TOLERANCE_MS
         const groupEndMs   = group.scheduledEnd.getTime()   + TOLERANCE_MS
 
-        // EXCEPCIÓN — grupo "Unscheduled": filtrar por ETIQUETA, no por ventana.
+        // EXCEPCIÓN — grupo "Unscheduled": filtrar por ETIQUETA, no por ventana
+        // (vive en `intervalsDelTurno`, junto con la regla de los bordes).
         //
         // El grupo Unscheduled abarca del primer al último interval sin turno
         // del día; cuando la planta está ociosa al inicio Y al final de la
@@ -948,16 +986,9 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         // Turno 2 de 8.169). Para turnos NOMBRADOS el filtro temporal sigue
         // siendo necesario (etiquetado inconsistente entre máquinas, ver
         // arriba); para Unscheduled la etiqueta es exacta por definición.
-        const isUnscheduledGroup = group.shiftId === 'Unscheduled'
         const filteredProd = {
           ...rawProd,
-          machineProduction: (rawProd.machineProduction || [])
-            .filter(iv => {
-              if (!iv.start) return false
-              if (isUnscheduledGroup) return iv.shift === 'Unscheduled'
-              const ivStartMs = parseShoplogixTime(iv.start).getTime()
-              return ivStartMs >= groupStartMs && ivStartMs <= groupEndMs
-            }),
+          machineProduction: intervalsDelTurno(rawProd.machineProduction, group),
           comments: filterCommentsToWindow(rawProd.comments, groupStartMs, groupEndMs),
         }
 
@@ -1301,6 +1332,7 @@ async function syncShift({ db, accessToken, cookie, plantSlug = 'chonchi', dateK
 }
 
 module.exports = {
+  intervalsDelTurno,
   ACTIVE_PLANTS,
   CLOSED_SHIFT_GRACE_MS,
   PARENT_SCHEMA_VERSION,

@@ -1,17 +1,21 @@
 /**
  * Manual de ajustes BAADER 200 · «referencia de terreno».
  *
- * Unifica las DOS fuentes que usa la planta, sin mezclarlas:
+ * Unifica las TRES fuentes que usa la planta, sin mezclarlas:
  *  - `v4`     = «Nuevo manual de ajuste Baader 200 V4» (Boanerges Service, Ing. E. Aravena; 56 págs.).
  *               Imágenes en /baader200-manual/v4/pNN.jpg (render de la página NN).
  *  - `planta` = «Introducción Baader 200 para técnicos y operadores» (Marine Harvest Chamiza, oct. 2007; 38 págs.).
  *               Imágenes en /baader200-manual/page-NN.jpg.
+ *  - `rev2`   = «Nuevo manual de ajuste, Boanerges Service (rev 2)» (feb. 2022; 55 págs.). Es la versión
+ *               ANTERIOR a la V4 (nov. 2024). Se cita solo donde dice algo que la V4 ya no dice (p. ej. que el
+ *               segmento de leva del punzón se ajusta según el pescado). Imágenes en /baader200-manual/rev2/pNN.jpg.
+ *               ⚠ Sus números de posición no siempre coinciden con los de la V4 (dib. 42: rodillo y leva cambiados).
  * Cada valor lleva su fuente y página para poder discutirlo con el PDF en la mano.
  * La leyenda de los dibujos sale del cruce manual V4 → catálogo Baader → maestro SAP
  * (Excel «Cruce manual de ajuste V4 x repuestos · 2026-09-27», carpeta DOCUMENTOS de la máquina).
  */
 
-export type FuenteId = 'v4' | 'planta'
+export type FuenteId = 'v4' | 'planta' | 'rev2'
 
 export interface Fuente {
   id: FuenteId
@@ -159,6 +163,14 @@ export const FUENTES: Record<FuenteId, FuenteInfo> = {
     alto: 1496,
     urlPagina: n => `${BASE}baader200-manual/page-${String(n).padStart(2, '0')}.jpg`,
   },
+  rev2: {
+    titulo: 'Nuevo manual de ajuste Baader 200, rev 2 (Boanerges Service, 2022)',
+    corto: 'Manual rev 2',
+    paginas: 55,
+    ancho: 935,
+    alto: 1210,
+    urlPagina: n => `${BASE}baader200-manual/rev2/p${String(n).padStart(2, '0')}.jpg`,
+  },
 }
 
 export const ESPECIES: { id: EspecieId; etiqueta: string; corta: string }[] = [
@@ -169,6 +181,7 @@ export const ESPECIES: { id: EspecieId; etiqueta: string; corta: string }[] = [
 
 export const V4 = (pagina: number): Fuente => ({ id: 'v4', pagina })
 export const PLANTA = (pagina: number): Fuente => ({ id: 'planta', pagina })
+export const REV2 = (pagina: number): Fuente => ({ id: 'rev2', pagina })
 
 export const SALMON_INCLUYE = ['trucha asalmonada', 'salmón japonés', 'bacalao japonés', 'perca (Barsch)', 'yellowtail']
 export const BLANCO_INCLUYE = ['abadejo de Alaska', 'bacalao del Pacífico', 'colín', 'añón']
