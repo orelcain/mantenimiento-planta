@@ -358,6 +358,22 @@ export function TiempoDelTurno({
   const excedente = superada ? Math.max(0, Math.round(hechas! - referencia!)) : 0
   const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
   const porRitmo = (hayBrecha || superada) && perdidas != null ? Math.max(0, (brecha ?? 0) - perdidas) : null
+  /**
+   * Lo que las paradas costaron DE VERDAD, sin topar a la brecha.
+   *
+   * `perdidas` está topada porque la BARRA reparte la meta y no puede dibujar
+   * más de lo que faltó. Pero el número que se LEE tiene que ser el real: desde
+   * que cada máquina detenida cuenta su parte (tbv 3, #1195) las paradas pueden
+   * explicar más que la brecha —Chonchi 28-09: 1.245 pz contra 780 faltantes— y
+   * la fila decía 780 arriba de un detalle cuyos grupos sumaban 1.245. Para
+   * Mantención el excedente ES el argumento: sin esas paradas el turno cerraba
+   * SOBRE la meta.
+   */
+  const perdidasReales = crudas == null ? null : Math.round(crudas)
+  /** Cuánto se pasaba de la meta si esas paradas no hubieran ocurrido. */
+  const paradasSobreBrecha = hayBrecha && perdidasReales != null && brecha != null
+    ? Math.max(0, perdidasReales - brecha)
+    : 0
   /** Lo que la cuota todavía no pide: va HUECO en la barra, no es pérdida. */
   const porJugar = cuotaOk != null && metaOk != null ? Math.max(0, metaOk - cuotaOk) : 0
   /** El peso de cada parte sobre la meta: el «% del 100%» que pidió Orel. */
@@ -458,7 +474,11 @@ export function TiempoDelTurno({
           <div className="mt-2 overflow-hidden rounded-[10px] bg-muted">
             {([
               { p: 'hechas' as const, nombre: 'Hechas', valor: `${fmtInt(hechas)} pz`, pct: pctMeta(hechas), tick: 'bg-muted-foreground/[0.5]' },
-              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidas)} pz`, pct: pctMeta(perdidas), tick: 'bg-red-600 dark:bg-red-500' },
+              /* El VALOR es el costo real —lo mismo que suman los grupos de
+                 adentro—; el segmento de la barra sigue topado a la brecha,
+                 porque la barra reparte la meta. La frase de abajo lo dice
+                 cuando los dos números se separan. */
+              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidasReales ?? perdidas)} pz`, pct: pctMeta(perdidasReales ?? perdidas), tick: 'bg-red-600 dark:bg-red-500' },
               { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, pct: pctMeta(porRitmo), tick: 'bg-amber-600 dark:bg-amber-500' },
               ...(porJugarBarra > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugarBarra)} pz`, pct: pctMeta(porJugarBarra), tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
               /*
@@ -686,10 +706,29 @@ export function TiempoDelTurno({
                 {perdidas != null && perdidas > 0 && (
                   <>
                     {' '}Las paradas igual costaron ~
-                    <span className="tabular-nums font-semibold">{fmtInt(perdidas)} pz</span> — sin
+                    <span className="tabular-nums font-semibold">{fmtInt(perdidasReales ?? perdidas)} pz</span> — sin
                     ellas {cerrado ? 'el cierre quedaba' : 'iríamos'} más arriba.
                   </>
                 )}
+              </p>
+            )
+            : cerrado && paradasSobreBrecha > 0
+            ? (
+              /* Las paradas explican TODA la brecha y sobran: decir «780 de 780
+                 son paradas» esconde el argumento. El excedente es lo que el
+                 turno habría cerrado POR ENCIMA de la meta sin esas paradas. */
+              <p className="mt-2 text-[13.5px] leading-snug text-foreground">
+                Las paradas costaron{' '}
+                <span className="tabular-nums font-semibold text-ink-crit">
+                  {fmtInt(perdidasReales!)} pz
+                </span>
+                {minMaquinaTotal != null && <> ({fmtDurMin(minMaquinaTotal)} de máquina)</>} — más
+                que las <span className="tabular-nums font-semibold">{fmtInt(brecha!)} pz</span> que
+                faltaron: sin ellas el turno cerraba{' '}
+                <span className="tabular-nums font-semibold text-ink-ok">
+                  ~{fmtInt(paradasSobreBrecha)} pz
+                </span>{' '}
+                sobre la meta.
               </p>
             )
             : cerrado

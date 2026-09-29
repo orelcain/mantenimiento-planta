@@ -640,3 +640,37 @@ describe('TiempoDelTurno · minutos de máquina (tbv 3, 28-09-2026)', () => {
     expect(t).toMatch(/de máquina/)
   })
 })
+
+describe('TiempoDelTurno · las paradas pueden costar MÁS que la brecha (28-09-2026)', () => {
+  /* El turno real: 14.220 de 15.000 (faltaron 780) y las cuatro causas suman
+     ~1.235 pz con las partes de máquina. La fila decía 780 arriba de un detalle
+     que sumaba 1.235. */
+  const TB = {
+    tbv: 3, nMaquinas: 3, windowMin: 470, producingMin: 400, plannedMin: 56, recoverableMin: 9,
+    planned: [],
+    recoverable: [
+      { reason: 'Micro Detencion', min: 40, count: 74, lineMin: 2, machineMin: 44.8, equivMin: 14.9 },
+      { reason: 'ACUMULACION RECHAZO', min: 17, count: 6, lineMin: 5, machineMin: 23, equivMin: 7.7 },
+      { reason: 'CINTAS (MECANICA)', min: 19, count: 6, lineMin: 4, machineMin: 19.3, equivMin: 6.4 },
+      { reason: 'PUNTO CERO', min: 11, count: 1, lineMin: 0, machineMin: 10.5, equivMin: 3.5 },
+    ],
+  } as unknown as Parameters<typeof TiempoDelTurno>[0]['tb']
+
+  const t = () => render(
+    <TiempoDelTurno tb={TB} cerrado meta={15000} hechas={14220} cpmAndando={38}
+      grupos={agruparEventos({ tb: TB, cpmGlobal: 38 })} />,
+  ).container.textContent ?? ''
+
+  it('la fila «Paradas» muestra el costo REAL, no la brecha', () => {
+    // 32,5 min equivalentes × 38 pz/min = 1.235, no las 780 que faltaron.
+    expect(t()).toMatch(/Paradas1\.235 pz/)
+  })
+
+  it('y la frase dice cuánto se pasaba de la meta sin esas paradas', () => {
+    const texto = t()
+    expect(texto).toMatch(/más que las 780 pz que faltaron/)
+    expect(texto).toMatch(/~455 pz sobre la meta/)
+    // Ya no tiene sentido hablar de «ritmo por debajo»: las paradas lo explican todo.
+    expect(texto).not.toMatch(/ritmo por debajo del necesario/)
+  })
+})
