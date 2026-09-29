@@ -70,6 +70,9 @@ async function loadShiftIndex(db, plantSlug, nowWall = shoplogixPolling.toChileW
 
 const COLLECTION = 'publicShiftMonitors'
 
+/** Versión vigente del desglose de tiempos (`timeBreakdown.tbv`). Ver buildMonitorLive. */
+const TBV = 3
+
 /** Intervalo de producción de Shoplogix: 5 minutos fijos. */
 const INTERVAL_MIN = 5
 /**
@@ -1281,11 +1284,31 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
    * ritmo andando daba 13,5 con ~11,8 reales (las piezas de la cola contaban,
    * sus minutos produciendo no).
    */
-  const spanMin = effectiveStart && effectiveEnd && effectiveEnd > effectiveStart
-    ? Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / 60_000)
+  /*
+   * La rejilla arranca en la primera pieza… salvo que el turno haya empezado
+   * con una parada de CONVENIO (la reunión de inicio). Chonchi 28-09: reunión
+   * 09:15→09:24 en las tres máquinas y primera pieza 09:20 — la rejilla cortaba
+   * la reunión en 5 min y «Programado» mentía. Solo se retrocede hasta el
+   * arranque programado, y solo por una parada de convenio: un arranque
+   * anticipado o una falla antes de la primera pieza no mueven nada.
+   */
+  let inicioRejilla = effectiveStart
+  if (effectiveStart && scheduledStart && scheduledStart < effectiveStart) {
+    for (const m of machines) {
+      for (const st of m.states || []) {
+        if (st.type === 'uptime' || esPlannedDowntime(st)) continue
+        const d = toDate(st.startAt)
+        const reason = (st.reason || st.name || '').trim()
+        if (!d || !esParoPlanificado(reason)) continue
+        if (d >= scheduledStart && d < inicioRejilla) inicioRejilla = d
+      }
+    }
+  }
+  const spanMin = inicioRejilla && effectiveEnd && effectiveEnd > inicioRejilla
+    ? Math.round((effectiveEnd.getTime() - inicioRejilla.getTime()) / 60_000)
     : Math.max(0, Math.round(windowHours * 60))
   const minVentana = spanMin
-  const t0Ventana = effectiveStart ? effectiveStart.getTime() : null
+  const t0Ventana = inicioRejilla ? inicioRejilla.getTime() : null
 
   /*
    * La rejilla va de 10 en 10 segundos, no de minuto en minuto: una micro
@@ -1354,6 +1377,49 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
     }
   }
 
+  /*
+   * Minutos de MÁQUINA por causa: cuánto estuvo detenida cada máquina, sumado.
+   *
+   * `min` (la causa activa en alguna máquina) y `lineMin` (la línea entera
+   * parada) no dicen cuánto costó que UNA Baader se parara mientras las otras
+   * seguían: Chonchi 28-09, PUNTO CERO dejó la Ev 1 once minutos detenida
+   * (09:43→09:54) y el bloque decía «0 min · 0 pz». Regla de Orel (28-09): cada
+   * máquina es su peso en la línea —en Chonchi, cada Baader 1/3— así que
+   * `equivMin` = minutos de máquina × 1/N es lo que la línea dejó de producir.
+   * Nunca pasa de lo que la línea puede dar: tres máquinas paradas a la vez 5
+   * min son 15 de máquina y 5 equivalentes, igual que `lineMin`.
+   *
+   * Cada máquina se resuelve en su propia rejilla: los states repetidos entre
+   * el doc del turno y la cola `Unscheduled` se pisan en vez de sumarse.
+   */
+  const nMaquinas = Math.max(1, machines.length)
+  const celdasMaquina = new Map()
+  if (t0Ventana != null) {
+    for (const m of machines) {
+      const propias = new Map()
+      for (const st of m.states || []) {
+        if (st.type === 'uptime' || esPlannedDowntime(st)) continue
+        const d = toDate(st.startAt)
+        const sec = st.durationSec || 0
+        if (!d || sec <= 0) continue
+        const reason = (st.reason || st.name || 'Sin razón').trim()
+        let g = propias.get(reason)
+        if (!g) { g = new Uint8Array(celdas); propias.set(reason, g) }
+        marcar(g, d.getTime(), d.getTime() + sec * 1000, 1)
+      }
+      for (const [reason, g] of propias) {
+        let n = 0
+        for (let i = 0; i < g.length; i++) if (g[i]) n++
+        celdasMaquina.set(reason, (celdasMaquina.get(reason) || 0) + n)
+      }
+    }
+  }
+  const minutosDeMaquina = (reason) => {
+    const n = celdasMaquina.get(reason) || 0
+    const machineMin = Math.round(((n * PASO_SEG) / 60) * 10) / 10
+    return { machineMin, equivMin: Math.round((machineMin / nMaquinas) * 10) / 10 }
+  }
+
   /**
    * Minutos y tramos contiguos de una causa. "2x" son dos paradas reales, no
    * dos máquinas parando por lo mismo.
@@ -1383,7 +1449,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
     const r = resumir(g)
     if (r.min <= 0) continue
     ;(esParoPlanificado(reason) ? planificados : recuperables)
-      .push({ reason, min: r.min, count: r.count, lineMin: r.lineMin })
+      .push({ reason, min: r.min, count: r.count, lineMin: r.lineMin, ...minutosDeMaquina(reason) })
   }
   planificados.sort((a, b) => b.min - a.min)
   recuperables.sort((a, b) => b.min - a.min)
@@ -1833,7 +1899,11 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
        * acá, un live viejo se re-sellaba como nuevo y los récords mezclaban
        * turnos medidos con dos varas.
        */
-      tbv: 2,
+      /* v3 (28-09-2026): `machineMin`/`equivMin` por causa y la reunión de
+         inicio completa. Sube la vara: los lives cacheados con v2 se recomponen. */
+      tbv: TBV,
+      /** Máquinas de la línea: el N del peso 1/N de `equivMin`. */
+      nMaquinas,
       windowMin: minVentana,
       producingMin,
       plannedMin,
@@ -2078,7 +2148,7 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
     // i === 0 es el turno inmediatamente anterior: puede seguir moviéndose.
     // Y solo se reusa un live medido con la rejilla vigente: uno viejo dejaría
     // «Anterior» mostrando el desglose recortado para siempre.
-    if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === 2) { out.push(cacheado); continue }
+    if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === TBV) { out.push(cacheado); continue }
     try {
       const live = await buildMonitorLive(db, plantSlug, id, index, t.fuente ?? null)
       if (!live) continue
@@ -2235,7 +2305,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
   const previos = new Map((prev || []).map(h => [h.shiftDocId, h]))
   // Lives que este mismo refresco ya construyó: se aprovechan gratis.
   const yaConstruidos = new Map([
-    ...(history || []).filter(h => h.live?.timeBreakdown?.tbv === 2).map(h => [h.shiftDocId, h.live]),
+    ...(history || []).filter(h => h.live?.timeBreakdown?.tbv === TBV).map(h => [h.shiftDocId, h.live]),
   ])
   const conCurva = new Set((forecast || []).map(f => f.shiftDocId))
 
@@ -2249,7 +2319,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === 2 && cacheado.porMaquina !== undefined) {
+    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined) {
       out.push(cacheado); continue
     }
     /*
@@ -2371,7 +2441,7 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
   // Solo lives de la rejilla vigente: uno viejo acá se resumiría y quedaría
   // sellado como nuevo con números de la vara vieja — cache poisoning silencioso.
   const yaConstruidos = new Map((history || [])
-    .filter(h => h.live?.timeBreakdown?.tbv === 2)
+    .filter(h => h.live?.timeBreakdown?.tbv === TBV)
     .map(h => [h.shiftDocId, h.live]))
   const ids = candidatos.map(r => r.id).sort().reverse().slice(0, FORECAST_MAX)
 
@@ -2388,7 +2458,7 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
     // una semana en poblarse sola. Se compara contra `undefined` a proposito:
     // un turno donde el sensor no espero nada guarda `null` y NO se rearma.
     const cacheado = previos.get(id)
-    const completo = cacheado && cacheado.windowMin != null && cacheado.tbv === 2
+    const completo = cacheado && cacheado.windowMin != null && cacheado.tbv === TBV
       && cacheado.expected !== undefined
     if (completo && i > 0) { out.push(cacheado); continue }
     // Descartado conocido (prueba de 180 pz, arranque abortado): no se

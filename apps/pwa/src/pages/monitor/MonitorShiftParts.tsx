@@ -124,6 +124,13 @@ function nombreDeConvenio(reason: string): string {
   return `La parada de convenio «${bajo}»`
 }
 
+/** Cuántas máquinas tiene la línea: viaja en el desglose (tbv 3); si no, se deduce de equivMin = machineMin / N. */
+function nMaquinasDe(tb: NonNullable<PublicMonitorLive['timeBreakdown']>): number {
+  if (tb.nMaquinas && tb.nMaquinas > 0) return tb.nMaquinas
+  const x = tb.recoverable.find((c) => (c.equivMin ?? 0) > 0 && (c.machineMin ?? 0) > 0)
+  return x ? Math.max(1, Math.round(x.machineMin! / x.equivMin!)) : 1
+}
+
 function fmtDurMin(min: number): string {
   if (!Number.isFinite(min) || min <= 0) return '—'
   const h = Math.floor(min / 60)
@@ -236,6 +243,9 @@ export function TiempoDelTurno({
   const [parte, setParte] = useState<'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado' | null>('paradas')
   const alternarParte = (p: 'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado') =>
     setParte((v) => (v === p ? null : p))
+  /* Con el turno cerrado no hay próxima parada: decía «entra a las ~17:14»
+     con el turno terminado a las 17:05 (Chonchi 28-09). */
+  const proxima = cerrado ? null : proximaParada
   if (!tb || tb.windowMin <= 0) return null
 
   const pct = (m: number) => Math.max(0, (m / tb.windowMin) * 100)
@@ -308,10 +318,21 @@ export function TiempoDelTurno({
   const sumaLinea = tb.recoverable.reduce((a, x) => a + minDeLinea(x), 0)
   const escala = sumaLinea > tb.recoverableMin && sumaLinea > 0 ? tb.recoverableMin / sumaLinea : 1
   const restoMin = Math.max(0, tb.recoverableMin - sumaLinea)
+  /*
+   * Desde tbv 3 (28-09-2026) se valorizan los minutos EQUIVALENTES de línea:
+   * cada máquina detenida por su peso (1/N). Con los de línea entera, una
+   * Baader parada 11 min mientras las otras dos seguían costaba 0 pz. Los
+   * payloads viejos siguen con `lineMin` escalado.
+   */
+  const conEquiv = tb.recoverable.length > 0 && tb.recoverable.every((x) => x.equivMin != null)
+  const minParaPiezas = (x: (typeof tb.recoverable)[number]) =>
+    conEquiv ? Math.max(0, x.equivMin ?? 0) : minDeLinea(x) * escala
+  /** Minutos de máquina de las paradas evitables: los que se leen en cada fila. */
+  const minMaquinaTotal = conEquiv ? tb.recoverable.reduce((a, x) => a + Math.max(0, x.machineMin ?? 0), 0) : null
   const crudas =
     cpm == null
       ? null
-      : tb.recoverable.reduce((a, x) => a + piezasDe(x.reason, minDeLinea(x) * escala), 0) + restoMin * cpm
+      : tb.recoverable.reduce((a, x) => a + piezasDe(x.reason, minParaPiezas(x)), 0) + restoMin * cpm
   /*
    * La vara de la resta. Cerrado: la meta completa. En vivo: la cuota A ESTA
    * ALTURA (la misma curva del comparador, aplanada en colación) — contra la
@@ -550,6 +571,12 @@ export function TiempoDelTurno({
                           {costo
                             ? (
                               <>
+                                {conEquiv && (
+                                  <>
+                                    Minutos de máquina; cada una detenida cuenta como su parte de la
+                                    línea (1 de {nMaquinasDe(tb)}).{' '}
+                                  </>
+                                )}
                                 Cada parada valorizada al ritmo que la línea traía justo antes
                                 {rango && (
                                   <>
@@ -673,7 +700,11 @@ export function TiempoDelTurno({
                 <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
                   {fmtInt(perdidas)}
                 </span>{' '}
-                son <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b> y{' '}
+                son{' '}
+                {minMaquinaTotal != null
+                  ? <b>paradas evitables ({fmtDurMin(minMaquinaTotal)} de máquina)</b>
+                  : <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b>}{' '}
+                y{' '}
                 <span className="tabular-nums font-semibold">{fmtInt(porRitmo)}</span>, ritmo por
                 debajo del necesario.
               </p>
@@ -741,7 +772,7 @@ export function TiempoDelTurno({
                 onVentana={onVentana}
                 onTramo={onTramo}
                 notas={notas}
-                proximaParada={g.dueno === 'programado' ? proximaParada : null}
+                proximaParada={g.dueno === 'programado' ? proxima : null}
                 plannedMin={tb.plannedMin}
               />
               {/* ⚠ La frase que Mantención necesita poder decir. Va pegada al
@@ -770,12 +801,12 @@ export function TiempoDelTurno({
           «Programado» esté abierta — con ella cerrada, este renglón es el
           único que lo dice; con ella abierta lo dice el grupo y esto se
           calla para no repetirlo. */}
-      {proximaParada && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
+      {proxima && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
         <p className="mt-1.5 text-[11px] text-muted-foreground/80">
           {tb.plannedMin === 0 ? 'Todavía sin paradas de convenio: ' : ''}
-          {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
+          {nombreDeConvenio(proxima.reason)} entra a las{' '}
           {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
-          <span className="tabular-nums">~{proximaParada.hora}</span>.
+          <span className="tabular-nums">~{proxima.hora}</span>.
         </p>
       )}
 
