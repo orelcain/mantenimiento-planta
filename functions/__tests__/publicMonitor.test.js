@@ -776,8 +776,8 @@ test('el historial reusa lo ya publicado salvo el turno inmediatamente anterior'
   // cual; si se recompusiera, saldría 1000. Desde #564 solo se reusa un live
   // medido con la rejilla vigente (`timeBreakdown.tbv === 2`).
   const prev = [
-    { shiftDocId: ayer, dateKey: d1, shiftId: 'Turno Dia', live: { totalPieces: 999999, timeBreakdown: { tbv: 2 } } },
-    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888, timeBreakdown: { tbv: 2 } } },
+    { shiftDocId: ayer, dateKey: d1, shiftId: 'Turno Dia', live: { totalPieces: 999999, timeBreakdown: { tbv: 3 } } },
+    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888, timeBreakdown: { tbv: 3 } } },
   ]
 
   const hist = await buildMonitorHistory(db, 'filete', actual, prev)
@@ -916,7 +916,7 @@ test('shiftStats reusa lo cacheado y no reconstruye turnos viejos', async () => 
   })
 
   // Valor imposible: si se reusa sale tal cual; si se recompone, saldría 1000.
-  const prev = [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', total: 777777, windowMin: 480, tbv: 2 }]
+  const prev = [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', total: 777777, windowMin: 480, tbv: 3 }]
   const out = await buildShiftStats(db, 'filete', actual, prev, [], [])
   const viejo = out.find(o => o.shiftDocId === anteayer)
   assert.equal(viejo?.total, 777777, 'un turno cerrado no cambia: se reusa')
@@ -1309,4 +1309,41 @@ test('el cierre lo da el horario de Shoplogix cuando existe (Chonchi Turno 2, 28
   // Invertido o absurdo: no se usa.
   assert.equal(cierreOficialCoherente({ officialSchedule: { start: S(17), end: S(9) } }, S(9, 15)), null)
   assert.equal(cierreOficialCoherente({ officialSchedule: { start: S(0), end: new Date(Date.UTC(2026, 8, 29, 20)) } }, S(0)), null)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Camino a la meta (28-09-2026): minutos de MÁQUINA por causa y su equivalente
+// de línea por peso (1/N), y la reunión de inicio completa aunque la primera
+// pieza llegue después.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('una Baader parada con las otras dos andando: 11 min de máquina, 3,7 equivalentes, 0 de línea', async () => {
+  const S = (h, m = 0) => Date.UTC(2026, 8, 28, h, m)
+  const st = (a, b, type, reason = '') => ({ startAt: new Date(a), endAt: new Date(b), durationSec: (b - a) / 1000, type, reason, name: reason ? 'Detencion' : 'Produccion' })
+  const maq = (id, states) => ({
+    machineid: id, machineName: id, machineType: 'baader_142', totalCycles: 600,
+    shiftRuntimeBreakdown: { uptimeSec: 3000, downtimeSec: 660, breakSec: 540 },
+    intervals: intervals(S(9, 20), 12, 50), states,
+  })
+  const reunion = (id) => st(S(9, 15), S(9, 24), 'break', 'REUNION INICIO TURNO')
+  const machines = [
+    maq('ev1', [reunion('ev1'), st(S(9, 24), S(9, 43), 'uptime'), st(S(9, 43), S(9, 54), 'downtime', 'PUNTO CERO'), st(S(9, 54), S(10, 20), 'uptime')]),
+    maq('ev2', [reunion('ev2'), st(S(9, 24), S(10, 20), 'uptime')]),
+    maq('ev3', [reunion('ev3'), st(S(9, 24), S(10, 20), 'uptime')]),
+  ]
+  const id = '2026-09-28_Turno 2'
+  const db = fakeShiftsDb(
+    { [id]: { shiftId: 'Turno 2', scheduledStart: new Date(S(9, 15)), scheduledEnd: new Date(S(17)), machines: [{ totalCycles: 1800 }] } },
+    { [id]: machines },
+  )
+  const live = await buildMonitorLive(db, 'chonchi', id)
+  const tb = live.timeBreakdown
+  assert.equal(tb.tbv, 3)
+  assert.equal(tb.nMaquinas, 3)
+  const pc = tb.recoverable.find(c => c.reason === 'PUNTO CERO')
+  assert.equal(pc.machineMin, 11, 'la Ev 1 estuvo 11 min detenida')
+  assert.equal(pc.equivMin, 3.7, '11 min de una de tres máquinas')
+  assert.equal(pc.lineMin, 0, 'la línea entera nunca paró')
+  const re = tb.planned.find(c => c.reason === 'REUNION INICIO TURNO')
+  assert.equal(re.min, 9, 'la reunión completa 09:15→09:24, no recortada en la primera pieza (09:20)')
 })

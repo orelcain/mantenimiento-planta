@@ -81,18 +81,34 @@ const textoVivo = (args: {
     />,
   ).container.textContent ?? ''
 
+/** El aviso de la próxima parada solo tiene sentido con el turno EN VIVO. */
+const textoAviso = (
+  tb: Parameters<typeof TiempoDelTurno>[0]['tb'],
+  proximaParada: { hora: string; reason: string } | null,
+  cerrado = false,
+) =>
+  render(
+    <TiempoDelTurno tb={tb} proximaParada={proximaParada} cerrado={cerrado} grupos={agruparEventos({ tb })} />,
+  ).container.textContent ?? ''
+
 describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
   it('⚠ avisa cuándo entra la colación AUNQUE ya hubo paradas planificadas', () => {
     // Y la nombra: «la próxima entra a las 12:55» obligaba a adivinar cuál.
-    const t = texto(ANTES_DE_LA_COLACION, { hora: '12:55', reason: 'COLACION' })
+    const t = textoAviso(ANTES_DE_LA_COLACION, { hora: '12:55', reason: 'COLACION' })
     expect(t).toMatch(/La colación entra a las/i)
     expect(t).toContain('~12:55')
   })
 
   it('con el turno todavía sin ninguna parada de convenio, lo dice así', () => {
-    const t = texto({ ...ANTES_DE_LA_COLACION, plannedMin: 0, planned: [] }, { hora: '12:55', reason: 'COLACION' })
+    const t = textoAviso({ ...ANTES_DE_LA_COLACION, plannedMin: 0, planned: [] }, { hora: '12:55', reason: 'COLACION' })
     expect(t).toMatch(/Todavía sin paradas de convenio/i)
     expect(t).toContain('~12:55')
+  })
+
+  it('con el turno CERRADO no anuncia la próxima parada (Chonchi 28-09: «~17:14» tras cerrar 17:05)', () => {
+    const t = textoAviso(ANTES_DE_LA_COLACION, { hora: '17:14', reason: 'DETENCION PROGRAMADA' }, true)
+    expect(t).not.toMatch(/entra a las/i)
+    expect(t).not.toContain('~17:14')
   })
 
   it('sin próxima parada conocida no inventa una línea', () => {
@@ -598,5 +614,29 @@ describe('TiempoDelTurno · la parada tocada se marca SOLA en el gráfico', () =
     // «08:11→08:12 · 1,5 min» era el reloj contradiciendo a la duración.
     expect(t).toMatch(/08:11:20→08:12:50/)
     expect(t).toMatch(/1,5 min/)
+  })
+})
+
+describe('TiempoDelTurno · minutos de máquina (tbv 3, 28-09-2026)', () => {
+  // PUNTO CERO dejó la Ev 1 detenida 11 min con las otras dos andando: la fila
+  // decía «0 pz · 0 min». Ahora muestra los minutos de máquina y cuesta su tercio.
+  const TB3 = {
+    tbv: 3, nMaquinas: 3, windowMin: 470, producingMin: 400, plannedMin: 60, recoverableMin: 2,
+    planned: [],
+    recoverable: [
+      { reason: 'PUNTO CERO', min: 11, count: 1, lineMin: 0, machineMin: 11, equivMin: 3.7 },
+      { reason: 'Micro Detencion', min: 40, count: 74, lineMin: 2, machineMin: 47, equivMin: 15.7 },
+    ],
+  } as unknown as Parameters<typeof TiempoDelTurno>[0]['tb']
+
+  it('cada causa muestra sus minutos de máquina y cuesta su parte de la línea', () => {
+    const t = render(
+      <TiempoDelTurno tb={TB3} cerrado meta={15000} hechas={14220} cpmAndando={36}
+        grupos={agruparEventos({ tb: TB3, cpmGlobal: 36 })} />,
+    ).container.textContent ?? ''
+    expect(t).toMatch(/PUNTO CERO/)
+    expect(t).toMatch(/133 pz · 11 min · 1×/)     // 3,7 × 36 — antes «0 pz · 0 min»
+    expect(t).toMatch(/565 pz · 47 min · 74×/)    // 15,7 × 36
+    expect(t).toMatch(/de máquina/)
   })
 })
