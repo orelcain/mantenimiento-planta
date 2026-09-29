@@ -198,7 +198,15 @@ export interface PublicMonitorLive {
      * llevó 98 min de UNA Baader y solo 4 detuvieron la línea.
      */
     planned: Array<{ reason: string; min: number; count: number; lineMin?: number }>
-    recoverable: Array<{ reason: string; min: number; count: number; lineMin?: number }>
+    /**
+     * `machineMin`: minutos que cada máquina estuvo detenida por la causa,
+     * sumados. `equivMin`: su equivalente de línea por el peso de cada máquina
+     * (1/N) — lo que se traduce a piezas desde el 28-09-2026. Ausentes en
+     * payloads viejos (tbv < 3): ahí se cae a `lineMin`.
+     */
+    recoverable: Array<{ reason: string; min: number; count: number; lineMin?: number; machineMin?: number; equivMin?: number }>
+    /** Máquinas de la línea (el N de `equivMin`). Ausente en tbv < 3. */
+    nMaquinas?: number
   } | null
   /**
    * KPIs de Mantención del turno, calculados por el backend desde los states
