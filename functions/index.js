@@ -7474,6 +7474,24 @@ async function getShoplogixEligibleUsers(plant) {
   return ids
 }
 
+// Umbrales aprendidos por causa (shoplogixUmbralesParos/{planta}), con cache de
+// 1 h por instancia: el trigger de máquina corre en cada sync y no puede leer
+// el doc cada vez. Costo: ≤ 1 lectura por planta por hora por instancia.
+const _umbralesParosCache = new Map()
+async function getUmbralesParos(plant) {
+  const hit = _umbralesParosCache.get(plant)
+  if (hit && Date.now() - hit.at < 3600_000) return hit.causas
+  let causas = null
+  try {
+    const snap = await db.doc(`shoplogixUmbralesParos/${plant}`).get()
+    causas = snap.exists ? (snap.data().causas || null) : null
+  } catch (e) {
+    logger.warn('[getUmbralesParos] no se pudo leer, se usa el umbral de respaldo:', e.message)
+  }
+  _umbralesParosCache.set(plant, { at: Date.now(), causas })
+  return causas
+}
+
 // Destino Telegram de las notifs Shoplogix, configurable por planta desde
 // Panel Admin (channels.telegramDest): 'bot' = DM del admin con
 // @antarfood_mant_bot (default, para rodaje sin ensuciar el grupo),
@@ -7539,6 +7557,13 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
     // Salida rápida: solo dataQualityIssues cambió, nada relevante para notifs
     if (cyclesBefore === cyclesAfter && (before.states || []).length === statesAfter.length) return
 
+    // Unscheduled repite los estados del turno con nombre (el mismo paro salía
+    // dos veces) y un re-sync/backfill de días viejos disparaba avisos de
+    // agosto (30-09-2026). Se sale ANTES de leer config y usuarios.
+    const avisosParos = require('./shoplogix/avisosParos')
+    const nowWallMs = shoplogixPolling.toChileWall(new Date()).getTime()
+    if (!avisosParos.esTurnoAvisable(shiftDoc, nowWallMs)) return
+
     const machineName = after.machineName || machineId
     const plantLabel  = SHOPLOGIX_PLANT_LABEL[plant] || plant
     const shiftId     = after.shiftId || shiftDoc.split('_').slice(1).join('_')
@@ -7552,6 +7577,14 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
       getShoplogixEligibleUsers(plant),
     ])
     if (eligibleIds.length === 0) return
+    // Umbral aprendido por causa (shoplogix/avisosParos.js). `umbralAprendido:
+    // false` en notificationConfig vuelve a la regla fija de stoppageMinMinutes.
+    const usarAprendido = config.events.umbralAprendido !== false
+    const tablaUmbrales = usarAprendido ? await getUmbralesParos(plant) : null
+    const evalParos = (yaNotificadas) => avisosParos.parosParaAvisar({
+      states: statesAfter, tabla: tablaUmbrales, usarAprendido,
+      minFijoMin: config.events.stoppageMinMinutes ?? 3, nowWallMs, yaNotificadas,
+    })
 
     // ── Idempotencia via transacción Firestore ────────────────────────────────
     // syncDay escribe 2 veces por máquina (doc + dataQualityIssues) y Eventarc
@@ -7564,19 +7597,10 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
     const notifications = await db.runTransaction(async (tx) => {
       const snap = await tx.get(stateRef)
 
-      // Clave estable por evento de detención: startAt (Timestamp) si existe;
-      // fallback a nombre+posición. Permite deduplicar por EVENTO en vez de por
-      // conteo — necesario con el umbral de minutos: una detención "en curso"
-      // (durationSec creciendo) que cruza el umbral en un sync posterior debe
-      // alertar UNA vez, cosa que el conteo posicional no podía expresar.
-      const stopKeyOf = (stop, idx) => {
-        const ts = stop.startAt?.toMillis?.() ?? (stop.startAt instanceof Date ? stop.startAt.getTime() : null)
-        return ts != null ? `t${ts}` : `${stop.name || 's'}|${stop.reason || ''}|${idx}`
-      }
-      const minSec = Math.max(0, (config.events.stoppageMinMinutes ?? 3)) * 60
-      const relevantes = downtimes
-        .map((stop, idx) => ({ stop, key: stopKeyOf(stop, idx) }))
-        .filter(({ stop }) => (stop.durationSec || 0) >= minSec)
+      // Paros que ya pasaron SU umbral (aprendido por causa, o el fijo si el
+      // toggle está apagado). Clave estable por startAt: un paro en curso que
+      // cruza el umbral en un sync posterior avisa UNA vez.
+      const { relevantes } = evalParos(new Set())
 
       // Primera vez que vemos esta máquina/turno: inicializar baseline sin notificar.
       // Evita "catch-up" de historial al hacer un deploy mid-shift.
@@ -7632,14 +7656,14 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
         // deploy no tiene notifiedStopKeys → baseline con lo existente para no
         // re-alertar el historial del turno en curso.
         const esPrimeraConKeys = !('notifiedStopKeys' in st)
-        const nuevas = esPrimeraConKeys ? [] : relevantes.filter(({ key }) => !yaNotificadas.has(key))
-        for (const { stop } of nuevas) {
+        const nuevas = esPrimeraConKeys ? [] : evalParos(yaNotificadas).nuevas
+        for (const { stop, umbral } of nuevas) {
           const dMin   = Math.round((stop.durationSec || 0) / 60)
           const reason = stop.reason || stop.name || 'Detención'
+          const iniMs  = stop.startAt?.toMillis?.() ?? (stop.startAt instanceof Date ? stop.startAt.getTime() : null)
           toSend.push({
-            title: `⛔ Detención ${dMin} min · ${machineName}`,
-            body:  `${reason} · ${plantLabel}`,
-            tg:    `⛔ <b>Detención de ${dMin} min</b> — ${plantLabel}\n${machineName} · ${reason}`,
+            ...avisosParos.textoAvisoParo({ dMin, reason, machineName, plantLabel, umbral: usarAprendido ? umbral : null }),
+            paro: { causa: reason, iniMs },
           })
         }
         if (esPrimeraConKeys || nuevas.length > 0) {
@@ -7671,13 +7695,64 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
 
     if (notifications.length === 0) return
 
-    for (const n of notifications) {
+    // Evento de LÍNEA: la misma causa arrancando en varias máquinas a ±3 min
+    // es un solo aviso (en Chonchi un paro de línea mandaba 3 mensajes).
+    let aEnviar = notifications
+    const paros = notifications.filter((n) => n.paro)
+    const { PLANT_MACHINES } = require('./shoplogix/machines')
+    if (paros.length > 0 && (PLANT_MACHINES[plant]?.length || 0) > 1) {
+      try {
+        const lineaRef = db.doc(`shoplogixNotifState/${plant}_${shiftDoc}__linea`)
+        const repetidos = await db.runTransaction(async (tx) => {
+          const snap = await tx.get(lineaRef)
+          let recientes = snap.exists ? (snap.data().recientes || []) : []
+          const rep = new Set()
+          for (const n of paros) {
+            const r = avisosParos.agruparEnLinea(recientes, n.paro)
+            if (r.repetido) rep.add(n)
+            recientes = r.recientes
+          }
+          tx.set(lineaRef, { recientes, updatedAt: new Date() }, { merge: true })
+          return rep
+        })
+        aEnviar = notifications.filter((n) => !repetidos.has(n))
+      } catch (e) {
+        logger.warn('[onShoplogixMachineUpdated] agrupación de línea falló (se avisa igual):', e.message)
+      }
+    }
+    if (aEnviar.length === 0) return
+
+    for (const n of aEnviar) {
       await dispatchShoplogixNotif(config, eligibleIds, n.title, n.body, { plant, shiftDoc, machineId }, n.tg)
     }
 
     logger.info('[onShoplogixMachineUpdated] dispatched', {
-      plant, shiftDoc, machineId, count: notifications.length,
+      plant, shiftDoc, machineId, count: aEnviar.length, agrupados: notifications.length - aEnviar.length,
     })
+  },
+)
+
+// ── recalcularUmbralesParos ─────────────────────────────────────────────────
+// Lunes 05:30: recalcula por causa cuánto dura un paro «normal» (p90 de los
+// últimos 30 días de turnos con nombre y producción real) para que el aviso
+// de detención solo salte con lo que se sale de lo normal. Lee por RANGO de
+// documentId; ~300 lecturas por planta por semana. Solo las líneas que se
+// miran (Yal quedó fuera de Telegram el 30-09-2026).
+const PLANTAS_UMBRALES_PAROS = ['chonchi', 'filete']
+exports.recalcularUmbralesParos = onSchedule(
+  { schedule: 'every monday 05:30', timeZone: 'America/Santiago', region: 'us-central1', memory: '256MiB', timeoutSeconds: 300 },
+  async () => {
+    const avisosParos = require('./shoplogix/avisosParos')
+    const hoyDateKey = shoplogixPolling.toChileWall(new Date()).toISOString().slice(0, 10)
+    for (const plantSlug of PLANTAS_UMBRALES_PAROS) {
+      try {
+        const r = await avisosParos.calcularUmbralesPlanta({ db, plantSlug, hoyDateKey, FieldPath })
+        await db.doc(`shoplogixUmbralesParos/${plantSlug}`).set({ ...r, calculadoEl: new Date() })
+        logger.info(`[recalcularUmbralesParos] ${plantSlug}: ${r.turnos} turnos, ${r.paros} paros, ${r.causas.length} causas`)
+      } catch (e) {
+        logger.error(`[recalcularUmbralesParos] ${plantSlug} falló:`, e.message)
+      }
+    }
   },
 )
 
