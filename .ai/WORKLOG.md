@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-09-30 · Claude · Repuestos: cuadre del maestro y la bodega con el stock SAP del 29-09
+- Hecho: el planificador de Mantención mandó «REPUESTOS CHONCHI 29-09.xlsx» (export SAP, centro AI04, almacén M001, 7 hojas por marca, 1.317 SAP). Script `scripts/cuadrar-sap-29-09.js` (dry-run + `--write`, ya corrido en prod con snapshots previos `_snapshots/repuestos__2026-09-30T22-49*` y `bodega__2026-09-30T22-49*`): 398 fichas actualizadas (338 renombradas al nombre SAP, el viejo pasa a `alias` solo si no nombraba otra pieza; 175 códigos de fabricante, 203 valores y 480 unidades completados), 247 SAP enlazados a fichas de despiece por código de fabricante (29 de ellas piezas repetidas en 142 y 200, fusionadas en una ficha con los equipos de ambas), 285 fichas nuevas (id = SAP, sin equipo, `origen.de: ['sap-export']`), 529 stocks de bodega puestos al valor SAP con movimiento `ajuste` trazable (`realizadoPor: script:cuadrar-sap-29-09`), 153 docs de bodega nuevos. Copia del Excel con tildes reparadas en `OneDrive\ANTARFOOD\INVENTARIO\`.
+- Archivos: scripts/cuadrar-sap-29-09.js, _snapshots/cuadrar-sap-29-09__plan.json (plan completo con antes/después).
+- Verificación: lectura posterior de fichas nuevas, renombradas (historial `textoBreve`), enlace, fusión y bodega con movimiento; `99-stats-maestro`: 7.952 docs, 4.392 con SAP, 2.408 SAP con stock. Los SAP de la BAADER 200 inventariados el 25-09 cuadraban exactos con SAP antes de escribir.
+- Estado: HECHO (datos en prod)
+- Sigue: 24 SAP cuyo código de fabricante ya tenía OTRO SAP en el maestro quedaron como ficha aparte (ver `plan.conflictos`); 1.069 SAP con stock en la app que el export no trae (pedir export completo del almacén M001); 3.195 SAP sin equipo asignado.
+
 ## 2026-09-23 · Claude · Correo de bitácora: dos bloques y eventos en tabla (ronda 5)
 - Hecho: la bitácora abre con su propia banda azul («Bitácora de Mantención · Planta»), la misma de la planilla, y entre los dos bloques va aire + raya de tinta. Cada evento es una tabla propia con cabecera celeste (número · equipo · hora a la derecha) y el desglose debajo (tipo y N° de equipo, impacto, texto, repuestos, técnicos, fotos). Opción A del mockup elegida por Orel.
 - Archivos: services/bitacora/bitacoraCorreo.ts + 3 tests (estandar, repuestosEvento, whatsappYEvento).
