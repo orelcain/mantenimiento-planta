@@ -2114,12 +2114,21 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
   // Los turnos que marcó el sensor (ver `turnosDelSensor`).
   for (const u of unscheduled) {
     const sello = iso(toDate(u.data.lastSyncAt))
+    /*
+     * El sello dice «este Unscheduled ya se revisó», y eso solo vale mientras
+     * siga publicado el historial que se construyó con él. Si el historial
+     * viene vacío —se reconstruye de cero, o alguien lo reseteó— el sello haría
+     * saltar la revisión sin nada que reusar y el turno del sensor se perdería
+     * para siempre: pasó el 29-09 al recomponer los monitores tras el re-sync,
+     * y el extraordinario del 26-09 desapareció del link de Chonchi.
+     */
+    const hayHistorialPrevio = (prevHistory || []).length > 0
     // Además del sello, el live reusado tiene que estar medido con la vara
     // vigente: sin esto el turno del sensor se quedaba con el desglose tbv 2
     // después del cambio a minutos de máquina (28-09).
     const conVaraVigente = [...previos.values()].every(h =>
       h.extraordinario?.fuenteDocId !== u.id || h.live?.timeBreakdown?.tbv === TBV)
-    const yaVisto = sello && sinTurno?.prev?.[u.id] === sello && conVaraVigente
+    const yaVisto = hayHistorialPrevio && sello && sinTurno?.prev?.[u.id] === sello && conVaraVigente
     if (sinTurno && sello) sinTurno.next[u.id] = sello
     if (yaVisto) {
       // Mismo sello que la última vez: lo publicado sigue valiendo, sin leer.
