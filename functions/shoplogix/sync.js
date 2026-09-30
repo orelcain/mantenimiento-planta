@@ -343,6 +343,28 @@ async function isTruncatedHeadOfPrevWindow({ db, plantSlug, parentShiftDateKey, 
  * Ante cualquier duda (doc ausente, sin `scheduledEnd`, error de lectura)
  * devuelve false → se escribe. Nunca deja de guardar un turno por precaución.
  */
+/**
+ * Cierre con el que el guard de «cola cortada» decide si el turno quedó cortado
+ * por el borde de la ventana: el MÁS TEMPRANO entre el observado (último
+ * interval) y el que quedó tras `resolveShiftWindow`.
+ *
+ * Con el turno EN CURSO, `resolveShiftWindow` alarga el cierre hasta el horario
+ * oficial (#1191). Ese cierre es una promesa, no algo que se vio: pasárselo al
+ * guard hacía que un turno que arranca antes de las 08:00 (ancla de la ventana)
+ * pareciera una cola cortada durante toda su primera parte — Chonchi, Turno 2,
+ * 29-sep-2026: arrancó 07:15, oficial 15:00, ventana de ayer hasta 08:00 → el
+ * doc quedó congelado en el primer interval y el monitor dijo «detenido» hasta
+ * las 08:03. El guard existe para no pisar un turno completo con un fragmento
+ * visto en el borde; eso se juzga con lo observado. Cuando la corrección ACORTA
+ * (ventana imposible por re-etiquetado, caso 3-ago), manda la corregida, igual
+ * que antes.
+ */
+function cierreParaGuardCola(cierreObservado, cierreCorregido) {
+  if (!(cierreObservado instanceof Date) || Number.isNaN(cierreObservado.getTime())) return cierreCorregido
+  if (!(cierreCorregido instanceof Date) || Number.isNaN(cierreCorregido.getTime())) return cierreObservado
+  return cierreObservado.getTime() <= cierreCorregido.getTime() ? cierreObservado : cierreCorregido
+}
+
 async function isTruncatedTailOfNextWindow({ db, plantSlug, parentShiftDateKey, shiftId, scheduledEnd, windowEnd, logger }) {
   if (scheduledEnd.getTime() < windowEnd.getTime()) return false
 
@@ -866,6 +888,9 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     // oficial (ver resolveShiftWindow). Va PRIMERO: el freeze-check, los filtros
     // de intervals, los aggregates y el doc leen todos `group.scheduled*`, así
     // que corregir acá arregla el turno completo en vez de parchar cada uso.
+    // El cierre OBSERVADO (último interval), antes de que la corrección lo mueva:
+    // lo necesita el guard de cola cortada (ver `cierreParaGuardCola`).
+    const cierreObservado = group.scheduledEnd
     const oficialDeEsteTurno = officialRollup && officialRollup.shiftLabel === group.shiftId
       ? officialRollup
       : null
@@ -908,7 +933,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
 
     if (await isTruncatedTailOfNextWindow({
       db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
-      scheduledEnd: group.scheduledEnd, windowEnd, logger,
+      scheduledEnd: cierreParaGuardCola(cierreObservado, group.scheduledEnd), windowEnd, logger,
     })) {
       truncatedSkipped.push(`${parentShiftDateKey} ${group.shiftId}`)
       allShiftResults.push({ shiftId: group.shiftId, skipped: 'truncated-tail' })
@@ -1332,6 +1357,7 @@ async function syncShift({ db, accessToken, cookie, plantSlug = 'chonchi', dateK
 }
 
 module.exports = {
+  cierreParaGuardCola,
   intervalsDelTurno,
   ACTIVE_PLANTS,
   CLOSED_SHIFT_GRACE_MS,
