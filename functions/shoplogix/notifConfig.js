@@ -38,7 +38,10 @@ const DEFAULTS = Object.freeze({
   pieceInterval: { enabled: false, every: 1000 },
   // stoppageMinMinutes: umbral para alertar detenciones (≥N min). Bajo eso es
   // ruido operacional (y las "Micro Detencion" tienen su propio toggle aparte).
-  events:        { stoppage: true, stoppageMinMinutes: 3, microStoppage: false },
+  // umbralAprendido (30-09-2026): el aviso de paro salta cuando dura más que el
+  // p90 de SU causa en 30 días (shoplogix/avisosParos.js), no con 3 min fijos.
+  // En false vuelve la regla vieja de stoppageMinMinutes.
+  events:        { stoppage: true, stoppageMinMinutes: 3, microStoppage: false, umbralAprendido: true },
   /**
    * Link del monitor público al arrancar el turno (el que se le reenvía a
    * Control de Producción). Va por su PROPIO flag y no por `channels.telegram`:
