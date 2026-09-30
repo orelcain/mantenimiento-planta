@@ -1248,6 +1248,11 @@ test('un extraordinario sin configurar entra al historial como turno del sensor,
   const hist2 = await buildMonitorHistory(dbSinMaquinas, 'chonchi', actual, hist, null, otra)
   assert.ok(hist2.find(h => h.shiftDocId === sensor.shiftDocId), 'el turno del sensor sigue publicado sin releer su subcolección')
 
+  // Sin historial previo el sello NO alcanza: se recompone (si no, el turno del
+  // sensor se perdía al reconstruir el historial desde cero — 29-09, tras el re-sync).
+  const hist2b = await buildMonitorHistory(db, 'chonchi', actual, [], null, { prev: sinTurno.next, next: {} })
+  assert.ok(hist2b.find(h => h.extraordinario), 'el turno del sensor vuelve a salir aunque el sello ya estuviera')
+
   // Con un desglose de la vara vieja NO se reusa aunque el sello coincida: se recompone.
   const viejo = hist.map(h => h.extraordinario ? { ...h, live: { ...h.live, timeBreakdown: { ...h.live.timeBreakdown, tbv: 2 } } } : h)
   const hist3 = await buildMonitorHistory(db, 'chonchi', actual, viejo, null, { prev: sinTurno.next, next: {} })
