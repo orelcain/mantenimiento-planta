@@ -6471,6 +6471,16 @@ exports.shoplogixPulseWakeup = onSchedule(
             pulsoCpm: pulsoPrimero?.cpm ?? null,
             porMaquina: pulsoPrimero?.porMaquina ?? null,
             lecturaFallo: !lectura,
+            /* Sello del último sync del turno que MUESTRA el monitor (ISO, UTC
+               real) — ya viene en el doc que se leyó arriba: cero lecturas
+               extra. Con el pulso andando y este sello viejo, la pantalla está
+               congelada (señal «Monitor desactualizado»). */
+            lastSyncAtMs: (() => {
+              const v = live.lastSyncAt
+              const ms = typeof v?.toMillis === 'function' ? v.toMillis() : Date.parse(v ?? '')
+              return Number.isFinite(ms) ? ms : null
+            })(),
+            ahoraMs: Date.now(),
           },
           /* Con el LINK al monitor: un aviso de «línea detenida» sin dónde
              mirarla obliga a buscar el QR (mejora natural, 29-08). El id del

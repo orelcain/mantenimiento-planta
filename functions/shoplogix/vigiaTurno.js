@@ -15,6 +15,10 @@
  *   · una parada pactada que se alarga más de lo pactado
  *   · el contador vivo sin responder
  *   · el ritmo desplomado de forma sostenida
+ *   · el MONITOR desactualizado: el contador vivo ve la línea produciendo
+ *     pero el turno guardado no avanza (29-09-2026: la línea arrancó 07:15 y
+ *     el monitor dijo «detenido» hasta las 08:03 — nadie se enteró hasta que
+ *     Producción mandó una foto)
  *
  * Cada señal abre un CICLO que después se cierra («volvió a producir») — una
  * alerta sin cierre deja al que la lee esperando para siempre. Y cada señal
@@ -46,6 +50,20 @@ const UMBRALES = Object.freeze({
   cpmRecuperado: 18,
   /** Un pulso por máquina bajo esto cuenta como «en cero». */
   cpmMaquinaCero: 0.2,
+  /**
+   * Monitor desactualizado. Con la línea produciendo cada sync (5 min + jitter)
+   * trae piezas nuevas y reconstruye el espejo, así que un espejo sano nunca
+   * pasa de ~10 min. Sin producción el espejo NO se rehace (solo cambia el
+   * sello, ver `parentSinCambioReal`), por eso la señal exige que el pulso vea
+   * la línea andando.
+   */
+  syncViejoMin: 20,
+  /** Lecturas seguidas «viejo + produciendo» antes de avisar. */
+  syncViejoConfirmaMin: 3,
+  /** Bajo esta edad el monitor está al día de nuevo (histéresis). */
+  syncAlDiaMin: 12,
+  /** Sobre esto el pulso de línea cuenta como «produciendo». */
+  cpmPulsoProduce: 3,
 })
 
 function esPactada(reason) {
@@ -66,6 +84,9 @@ function esPactada(reason) {
  *   @param {number|null} lectura.pulsoCpm   cpm del pulso de línea
  *   @param {Array<{id:string,cpm:number}>|null} lectura.porMaquina
  *   @param {boolean} lectura.lecturaFallo   leerPulso devolvió null
+ *   @param {number|null} [lectura.lastSyncAtMs] sello del último sync del turno
+ *                          que muestra el monitor (`live.lastSyncAt`, UTC real)
+ *   @param {number|null} [lectura.ahoraMs]      reloj de la corrida (UTC real)
  * @param {object} st  estado previo (plano, Firestore-safe)
  * @param {Map<string,string>} nombres  machineid → nombre corto
  * @returns {{eventos: string[], estado: object}}
@@ -107,8 +128,41 @@ function evaluarVigia(lectura, st, nombres) {
 
   const pz = Math.round(lectura.totalPieces || 0)
 
+  // ── Monitor desactualizado ───────────────────────────────────────────────
+  //    El contador vivo (pulso) ve la línea produciendo y el turno guardado
+  //    no avanza: lo que mira Producción está congelado, sea cual sea la causa
+  //    (sync que saltea el turno, espejo que no se escribe, cookie caída...).
+  const edadSyncMin = (lectura.ahoraMs != null && lectura.lastSyncAtMs != null)
+    ? (lectura.ahoraMs - lectura.lastSyncAtMs) / 60_000
+    : null
+  const pulsoProduce = lectura.pulsoCpm != null && lectura.pulsoCpm >= UMBRALES.cpmPulsoProduce
+  const monitorViejo = edadSyncMin != null && edadSyncMin >= UMBRALES.syncViejoMin
+  if (edadSyncMin != null) {
+    if (monitorViejo && pulsoProduce) {
+      st.syncViejoN = (st.syncViejoN || 0) + 1
+      if (st.syncViejoN === UMBRALES.syncViejoConfirmaMin) {
+        ev.push(`🧊 <b>Monitor desactualizado</b>: Shoplogix ve la línea produciendo (${lectura.pulsoCpm.toFixed(1)} pz/min, ${pz.toLocaleString()} pz) pero el turno no se guarda hace ~${Math.round(edadSyncMin)} min. La pantalla muestra datos viejos: revisar el sync.`)
+        st.syncViejoAvisado = true
+      }
+    } else {
+      st.syncViejoN = 0
+      if (edadSyncMin < UMBRALES.syncAlDiaMin && st.syncViejoAvisado) {
+        ev.push(`✅ <b>Monitor al día de nuevo</b>: el turno se volvió a guardar (${pz.toLocaleString()} pz).`)
+        st.syncViejoAvisado = false
+      }
+    }
+  }
+
   // ── Paro de línea ────────────────────────────────────────────────────────
-  if (lectura.status !== 'produciendo') {
+  //    El `status` sale del turno GUARDADO (hasta 5 min de atraso, o mucho más
+  //    si el sync falla); el pulso es el contador vivo. Si el pulso ve la línea
+  //    produciendo, el «detenida» está atrasado: sin opinión. El 29-09 el vigía
+  //    habría avisado «Línea detenida» a las 07:25 con la línea andando desde
+  //    las 07:20. Costo: en un paro real el aviso sale cuando el pulso ya cayó
+  //    (~5 lecturas), unos minutos más tarde que antes.
+  if (lectura.status !== 'produciendo' && pulsoProduce) {
+    // sin opinión: ni suma ni cierra el ciclo de paro
+  } else if (lectura.status !== 'produciendo') {
     st.paroN = (st.paroN || 0) + 1
     const pactada = esPactada(lectura.reason)
     const umbral = pactada ? UMBRALES.paroPactadoMin : UMBRALES.paroNoPactadoMin
