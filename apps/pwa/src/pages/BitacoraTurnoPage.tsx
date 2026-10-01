@@ -29,6 +29,9 @@ import { useToast } from '@/hooks/useToast'
 import { FUENTE_FIRESTORE, useTurnoMantencionActual, type FuenteBitacora } from '@/hooks/useBitacoraTurno'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { PanelInspeccion } from '@/components/bitacora/PanelInspeccion'
+import { PanelRutas } from '@/components/bitacora/PanelRutas'
+import { useRutasInspeccion } from '@/hooks/useRutasInspeccion'
+import { anotarEquipo, cerrarRecorrido, iniciarRecorrido, marcarEquipo } from '@/services/inspecciones/rutas.service'
 import { useInspeccion } from '@/hooks/useInspeccion'
 import { anotarCriterio, fijarHoraCriterio, iniciarInspeccion, liberarPlanta, marcarCriterio } from '@/services/inspecciones/inspecciones.service'
 import { TEXTO_AVISO as TEXTO_AVISO_INSPECCION, TEXTO_LIBERACION, avisoDeInspeccion, frasePorLiberacion } from '@/services/inspecciones/modeloInspeccion'
@@ -89,9 +92,12 @@ export function BitacoraTurnoVista({
   const navigate = useNavigate()
   const turnoActual = useTurnoMantencionActual()
   const turnoParam = params.get('turno')
-  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null; desdeInspeccion?: EnlaceInspeccion; descripcionInicial?: string } | null>(null)
+  const [editor, setEditor] = useState<{ evento: EventoBitacora | null; idNuevo: string; turno: TurnoMantencion; pendienteOrigen?: EventoBitacora | null; desdeInspeccion?: EnlaceInspeccion; descripcionInicial?: string; equipoInicial?: string } | null>(null)
   // Pestaña: el turno o la inspección de planta (Orel, 20-09-2026).
-  const [vista, setVista] = useState<'turno' | 'inspeccion'>(() => (params.get('vista') === 'inspeccion' ? 'inspeccion' : 'turno'))
+  const [vista, setVista] = useState<'turno' | 'inspeccion' | 'rutas'>(() => {
+    const v = params.get('vista')
+    return v === 'inspeccion' || v === 'rutas' ? v : 'turno'
+  })
   // La jerarquía (702 nodos) se carga recién al abrir el editor, y queda en caché.
   const { opciones: opcionesEquipo, cargando: cargandoEquipos } = fuente.useOpcionesEquipo(Boolean(editor))
   const turnoNavegado = useMemo(() => turnoDesdeId(turnoParam) ?? turnoActual, [turnoParam, turnoActual])
@@ -257,6 +263,7 @@ export function BitacoraTurnoVista({
    */
   const puedeEditarInspeccion = true
   const [inspTrabajando, setInspTrabajando] = useState(false)
+  const { rutas, recorridos, deEsteTurno, porAtencion } = useRutasInspeccion(BITACORA_PLANTA.id, turno.id)
   /** El correo de la inspección se arma igual que el del turno: mismos bloques, mismo estilo. */
   const datosCorreoInsp = useMemo(
     () =>
@@ -271,7 +278,7 @@ export function BitacoraTurnoVista({
   const firmante = autorFijo || [usuario?.nombre, usuario?.apellido].filter(Boolean).join(' ').trim() || usuario?.email || 'Mantención'
 
   const conAviso = useCallback(
-    async (hacer: () => Promise<void>) => {
+    async (hacer: () => Promise<void>, que = 'la inspección') => {
       setInspTrabajando(true)
       try {
         await hacer()
@@ -279,8 +286,8 @@ export function BitacoraTurnoVista({
         // «Revisa la conexión» manda por el camino equivocado cuando en realidad faltan permisos.
         const sinPermiso = (e as { code?: string })?.code === 'permission-denied'
         toast({
-          title: 'No se pudo guardar la inspección',
-          description: sinPermiso ? 'Tu cuenta no puede escribir la inspección de este turno.' : 'Revisa la conexión e inténtalo de nuevo.',
+          title: `No se pudo guardar ${que}`,
+          description: sinPermiso ? `Tu cuenta no puede escribir ${que} de este turno.` : 'Revisa la conexión e inténtalo de nuevo.',
           variant: 'destructive',
         })
       } finally {
@@ -953,8 +960,8 @@ export function BitacoraTurnoVista({
           setParams(
             (p) => {
               const n = new URLSearchParams(p)
-              if (v === 'inspeccion') n.set('vista', 'inspeccion')
-              else n.delete('vista')
+              if (v === 'turno') n.delete('vista')
+              else n.set('vista', v)
               return n
             },
             { replace: true },
@@ -962,11 +969,12 @@ export function BitacoraTurnoVista({
         }}
         segments={[
           { value: 'turno', label: 'Turno' },
+          { value: 'rutas', label: 'Rutas' },
           {
             value: 'inspeccion',
             label: (
               <span className="flex items-center gap-1.5">
-                Inspección post-aseo
+                Post-aseo
                 {/* Un punto, no un número: lo que hay que saber es que falta mirarla. */}
                 {avisoInsp && <span aria-label={TEXTO_AVISO_INSPECCION[avisoInsp]} className="size-1.5 rounded-full bg-ink-warn" />}
               </span>
@@ -987,7 +995,49 @@ export function BitacoraTurnoVista({
         </button>
       )}
 
-      {vista === 'inspeccion' ? (
+      {vista === 'rutas' ? (
+        <div className="px-1">
+          <PanelRutas
+            rutas={rutas}
+            porAtencion={porAtencion}
+            deEsteTurno={deEsteTurno}
+            recorridos={recorridos}
+            editable
+            trabajando={inspTrabajando}
+            onIniciar={(rutaId) =>
+              void conAviso(() =>
+                iniciarRecorrido({
+                  plantId: BITACORA_PLANTA.id,
+                  rutaId,
+                  turnoId: turno.id,
+                  fechaTurno: turno.fecha,
+                  iniciadoEn: new Date().toISOString(),
+                  iniciadoPorNombre: firmante,
+                }),
+                'el recorrido',
+              )
+            }
+            onMarcar={(rutaId, equipoId, resultado) =>
+              void conAviso(() => marcarEquipo(BITACORA_PLANTA.id, turno.id, rutaId, equipoId, resultado), 'el recorrido')
+            }
+            onAnotar={(rutaId, equipoId, nota) =>
+              void conAviso(() => anotarEquipo(BITACORA_PLANTA.id, turno.id, rutaId, equipoId, nota), 'el recorrido')
+            }
+            onCerrar={(rutaId, cerrado) => void conAviso(() => cerrarRecorrido(BITACORA_PLANTA.id, turno.id, rutaId, cerrado), 'el recorrido')}
+            onHallazgo={(ruta, equipo, nota) =>
+              // El hallazgo es un evento del turno como cualquier otro: el equipo y lo escrito
+              // van prellenados para no redactar dos veces.
+              setEditor({
+                evento: null,
+                idNuevo: nuevoId(),
+                turno,
+                equipoInicial: equipo.nombre,
+                descripcionInicial: nota ? `${ruta.nombre} · ${nota}` : `${ruta.nombre} · ${equipo.nombre}`,
+              })
+            }
+          />
+        </div>
+      ) : vista === 'inspeccion' ? (
         <div className="px-1">
           <PanelInspeccion
             pauta={pauta}
@@ -1576,6 +1626,7 @@ export function BitacoraTurnoVista({
         sugerenciasTipo={sugerenciasTipo}
         autorFijo={autorFijo}
         descripcionInicial={editor?.descripcionInicial ?? ''}
+        equipoInicial={editor?.equipoInicial ?? ''}
         puedeEditarMaestro={!autorFijo}
         tecnicos={tecnicos}
         opcionesEquipo={opcionesEquipo}
