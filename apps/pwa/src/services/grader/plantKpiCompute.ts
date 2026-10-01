@@ -275,6 +275,85 @@ const SLX_TO_GRADER: Record<string, string> = {
   'Turno día': 'Turno día',
 }
 
+/** Lo que hace falta de cada máquina para consolidar la planta. */
+export type PlantRatioInput = {
+  breakdown: Pick<Breakdown, 'uptimeSec' | 'downtimeSec' | 'setupSec'>
+  intervals: Pick<Interval, 'cycles' | 'expectedCycles'>[]
+  macroSec: number
+  macroCount: number
+}
+
+/**
+ * Consolida las razones de varias máquinas en las de la LÍNEA/PLANTA.
+ *
+ * Suma numeradores y denominadores y divide UNA vez. No promedia las razones de
+ * cada máquina: A, P, MTTR y MTBF son divisiones, y un promedio simple le da el
+ * mismo voto a la máquina que corrió 20 minutos que a la que corrió el turno
+ * entero. Es la misma regla que ya se aplica al juntar las instancias de una
+ * máquina a lo largo de varios turnos, aplicada ahora sobre el eje máquina.
+ *
+ * Vive acá, exportada, porque el board del turno en curso (`usePlantKPIs`) y la
+ * agregación de período (`aggregateShifts`) consolidaban por separado y la
+ * corrección tiene que valer para los dos.
+ */
+export function aggregatePlantRatios(inputs: PlantRatioInput[]): {
+  availability: number
+  performance: number
+  mttrMin: number
+  mtbfHours: number
+  breakdown: { uptimeSec: number; downtimeSec: number; setupSec: number }
+  macroCount: number
+} {
+  const breakdown = inputs.reduce(
+    (a, x) => ({
+      uptimeSec:   a.uptimeSec   + x.breakdown.uptimeSec,
+      downtimeSec: a.downtimeSec + x.breakdown.downtimeSec,
+      setupSec:    a.setupSec    + x.breakdown.setupSec,
+    }),
+    { uptimeSec: 0, downtimeSec: 0, setupSec: 0 },
+  )
+  const macroSec   = inputs.reduce((a, x) => a + x.macroSec, 0)
+  const macroCount = inputs.reduce((a, x) => a + x.macroCount, 0)
+  return {
+    availability: availabilityISO(breakdown),
+    performance:  performanceISO(inputs.flatMap(x => x.intervals)),
+    mttrMin:      macroCount > 0 ? macroSec / macroCount / 60 : 0,
+    mtbfHours:    macroCount > 0 ? breakdown.uptimeSec / macroCount / 3600 : breakdown.uptimeSec / 3600,
+    breakdown,
+    macroCount,
+  }
+}
+
+/**
+ * Calidad ponderada por volumen: piezas buenas sobre piezas totales.
+ *
+ * No promedia los P0% de cada turno — eso le daría el mismo peso a un turno de
+ * 300 piezas que a uno de 30.000.
+ *
+ * Respaldo: los resúmenes viejos pueden traer `pointZeroPct` sin las piezas. Si
+ * NINGUNO tiene piezas se promedian los porcentajes, que es lo que se hacía
+ * antes; peor que ponderar, pero mejor que perder la calidad en silencio y
+ * dejar el OEE en null. Si al menos uno tiene piezas, manda el ponderado y los
+ * incompletos quedan fuera.
+ */
+export function aggregateQuality(
+  summaries: Pick<GraderDailySummary, 'totalPieces' | 'pointZeroPieces' | 'pointZeroPct'>[],
+): number | null {
+  const conPiezas = summaries.filter(
+    g => typeof g.totalPieces === 'number' && g.totalPieces > 0
+      && typeof g.pointZeroPieces === 'number',
+  )
+  if (conPiezas.length > 0) {
+    const total = conPiezas.reduce((a, g) => a + g.totalPieces, 0)
+    const p0    = conPiezas.reduce((a, g) => a + g.pointZeroPieces, 0)
+    return Math.max(0, Math.min(1, (total - p0) / total))
+  }
+  const pcts = summaries
+    .filter(g => typeof g.pointZeroPct === 'number')
+    .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
+  return pcts.length > 0 ? avg(pcts) : null
+}
+
 function prevDay(dk: string): string {
   const d = new Date(`${dk}T12:00:00`)
   d.setDate(d.getDate() - 1)
@@ -365,15 +444,20 @@ export function aggregateShifts(
     }
   })
 
-  const availability = avg(machineKPIs.map(m => m.availability))
-  const performance = avg(machineKPIs.map(m => m.performance))
+  // Paso 3: la misma regla del paso 2, ahora sobre el eje MÁQUINA.
+  const plant = aggregatePlantRatios(acc.map(a => ({
+    breakdown:  a.breakdown,
+    intervals:  a.intervals,
+    macroSec:   a.maintenance.macroSec,
+    macroCount: a.maintenance.macroCount,
+  })))
+  const { availability, performance } = plant
 
-  // Calidad: promedio de (1 − P0%) de los turnos con Grader data
-  const qualityValues = shifts
-    .map(s => findGraderSummary(s, graderSummaries))
-    .filter((g): g is GraderDailySummary => g !== undefined && typeof g.pointZeroPct === 'number')
-    .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
-  const quality = qualityValues.length > 0 ? avg(qualityValues) : null
+  const quality = aggregateQuality(
+    shifts
+      .map(s => findGraderSummary(s, graderSummaries))
+      .filter((g): g is GraderDailySummary => g !== undefined),
+  )
   const oee = quality !== null ? availability * performance * quality : null
 
   const first = shifts[0]!
@@ -386,8 +470,8 @@ export function aggregateShifts(
     performance,
     quality,
     oee,
-    mttrMin: avg(machineKPIs.map(m => m.mttrMin)),
-    mtbfHours: avg(machineKPIs.map(m => m.mtbfHours)),
+    mttrMin: plant.mttrMin,
+    mtbfHours: plant.mtbfHours,
     failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
     microCount: machineKPIs.reduce((a, m) => a + m.microCount, 0),
     microMin: machineKPIs.reduce((a, m) => a + m.microMin, 0),
