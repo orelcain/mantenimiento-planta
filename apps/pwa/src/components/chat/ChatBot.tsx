@@ -12,7 +12,7 @@ import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
 import { loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
 import { logger } from '@/lib/logger'
-import { usePantallaCompletaMovil } from '@/lib/pantallaCompletaMovil'
+import { useBurbujaChatOculta, registrarAbrirAria } from '@/lib/pantallaCompletaMovil'
 import { AriaAvatar } from './AriaAvatar'
 
 // ─── Formateador de markdown básico + #9 tablas ────────────────────
@@ -939,7 +939,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
 // ─── Componente principal ───────────────────────────────────────────
 export function ChatBot() {
   const navigate = useNavigate()
-  const pantallaCompletaMovil = usePantallaCompletaMovil()
+  const pantallaCompletaMovil = useBurbujaChatOculta()
   const {
     messages,
     isLoading,
@@ -965,6 +965,10 @@ export function ChatBot() {
   } = useChatBot()
 
   const [input, setInput] = useState('')
+  // Abrir ARIA desde fuera (menú ⋯ de Repuestos): solo abre, no cierra si ya estaba abierto.
+  const abrirDesdeFuera = useRef<(c?: string) => void>(() => {})
+  abrirDesdeFuera.current = (c) => { if (!isOpen) toggle(); if (c) setInput(c) }
+  useEffect(() => registrarAbrirAria((c) => abrirDesdeFuera.current(c)), [])
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [showAgentSelector, setShowAgentSelector] = useState(false)

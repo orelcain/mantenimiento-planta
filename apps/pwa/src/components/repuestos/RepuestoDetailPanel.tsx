@@ -22,7 +22,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button as PielButton, ListGroup, ListCell } from '@/components/piel'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
-import { levantarPantallaCompletaMovil } from '@/lib/pantallaCompletaMovil'
+import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
 import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 
@@ -294,7 +294,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   }, [])
   useEffect(() => {
     if (!bajoMd || !hayItem) return
-    return levantarPantallaCompletaMovil()
+    return ocultarBurbujaChat()
   }, [bajoMd, hayItem])
 
   const copySap = useCallback(() => {
