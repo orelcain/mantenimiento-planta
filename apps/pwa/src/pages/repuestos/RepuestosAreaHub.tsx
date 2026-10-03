@@ -2019,7 +2019,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <Button
                 variant={repConFotos ? 'default' : 'outline'}
                 size="sm"
-                className="gap-1.5 md:hidden"
+                className={['min-h-[44px] gap-1.5', repConFotos ? '' : 'md:hidden'].join(' ')}
                 onClick={() => setRepConFotos((v) => !v)}
                 aria-pressed={repConFotos}
               >

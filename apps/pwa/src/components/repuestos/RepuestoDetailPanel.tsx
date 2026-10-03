@@ -778,7 +778,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   return (
     <aside
       style={isDesktop ? { width } : undefined}
-      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:relative sm:z-auto sm:w-auto sm:shrink-0"
+      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:static sm:z-auto sm:w-auto sm:shrink-0 relative"
     >
       {/* Asa de arrastre para ajustar el ancho (solo desktop) */}
       <div
