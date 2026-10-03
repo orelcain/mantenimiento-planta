@@ -616,7 +616,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
     const tonoStock = item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'
     return (
       <aside className="fixed inset-0 z-50 flex h-full w-full flex-col bg-background pt-[env(safe-area-inset-top)]">
-        {/* Barra superior: ‹ volver + cápsula de vidrio con ★ y ⋯ (una sola cápsula, no un vidrio por botón) */}
+        {/* Barra superior: ‹ volver + cápsula de vidrio con favorito y ⋯ (una sola cápsula, no un vidrio por botón) */}
         <div className="flex shrink-0 items-center justify-between px-2">
           <button onClick={onClose} className="inline-flex min-h-[44px] items-center gap-0.5 pl-0.5 pr-2 text-body text-primary" aria-label={`Volver a ${volverA || areaName || 'Repuestos'}`}>
             <ChevronLeft className="size-6" aria-hidden />
@@ -693,7 +693,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
           <p className="flex items-center gap-1.5 px-4 pb-4 text-subhead text-muted-foreground">
             {item.bodegaId ? (
               <>
-                <span className={['size-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-red-500' : item.stockStatus === 'low' ? 'bg-amber-500' : 'bg-emerald-500'].join(' ')} aria-hidden />
+                <span className={['size-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-ink-crit' : item.stockStatus === 'low' ? 'bg-ink-warn' : 'bg-ink-ok'].join(' ')} aria-hidden />
                 <span>
                   <b className={['font-semibold tabular-nums', tonoStock].join(' ')}>{item.stockActual} {item.unidad || 'pzas'}</b>
                   {item.stockStatus === 'out' ? ' · sin stock' : item.stockStatus === 'low' ? ' · bajo mínimo' : ' disponibles'} · {bodega}
