@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
@@ -64,6 +64,13 @@ import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type Repu
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
+import { RepuestosEntrada, type AreaFila, type ListaFavoritos } from '@/components/repuestos/RepuestosEntrada'
+import {
+  leerRecientesRepuestos, limpiarRecientesRepuestos, registrarRecienteEquipo, registrarRecienteRepuesto,
+  type RecienteRepuesto,
+} from '@/utils/repuestos/recientesRepuestos'
+import { abrirAria, ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
 
 // Fase 4 normalización (2026-06): el hub lee/escribe la colección plana `repuestos`
 // (equipos:[nodeIds]). Quedan para Fase 5: reubicar/importar/duplicados/manuales de
@@ -75,6 +82,9 @@ type StockFilter = 'all' | StockStatus
 const PAGE_SIZES = [8, 25, 50]
 
 const STORAGE_KEY = 'repuestos-nav-node' // compartido con EquipmentNavigator
+/** Mismo corte que el resto del módulo: bajo `sm` (640 px) es teléfono; desde ahí aparece el árbol fijo. */
+const CORTE_TELEFONO = '(max-width: 639px)'
+const esTelefono = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(CORTE_TELEFONO).matches
 
 /** Etiqueta de tipo de repuesto (texto libre del catálogo); vacío → "Sin clasificar". */
 const tipoLabelOf = (tipo?: string): string => (tipo || '').trim() || 'Sin clasificar'
@@ -229,6 +239,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   )
 
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(() => {
+    // En el teléfono se entra por «Buscador primero» (recientes, favoritos, áreas): no se restaura el
+    // último área, que escondía la entrada para siempre. El área guardada sigue valiendo en PC.
+    if (esTelefono()) return null
     try { return localStorage.getItem(STORAGE_KEY) } catch { return null }
   })
   const [showingAll, setShowingAll] = useState(false)
@@ -475,9 +488,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [equipFavLists, setEquipFavLists] = useState<FavList[]>([])
   const [favBarClosed, setFavBarClosed] = useState<Record<string, boolean>>({})
   const [favBarOpen, setFavBarOpen] = useState(false) // barra de favoritos colapsada por defecto (UX)
+  const [favCargando, setFavCargando] = useState(true)
   useEffect(() => {
-    if (!user?.id) return
-    getUserPreferences(user.id).then((p) => setEquipFavLists(p.favoriteLists || [])).catch(() => {})
+    if (!user?.id) { setFavCargando(false); return }
+    getUserPreferences(user.id).then((p) => setEquipFavLists(p.favoriteLists || [])).catch(() => {}).finally(() => setFavCargando(false))
   }, [user?.id])
 
   // ── Gestión de favoritos de EQUIPOS (G2, Wave 2) ──
@@ -581,6 +595,26 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     }
   }, [areaFavOnly, favoriteAreaIds, equipFavKeys, getNodePath, areaTree])
 
+  // ── Entrada del teléfono: recientes, menú ⋯ y búsqueda ──
+  const [recientes, setRecientes] = useState<RecienteRepuesto[]>(() => leerRecientesRepuestos())
+  const [menuMasOpen, setMenuMasOpen] = useState(false)
+  /** `showingAll` lo levantó el buscador (no el usuario): al borrar el texto se devuelve. */
+  const autoTodasRef = useRef(false)
+  // La burbuja de ARIA tapaba estrellas y filas en todo Repuestos: en el teléfono se esconde
+  // (ARIA queda en el menú ⋯ y como última fila de una búsqueda).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia(CORTE_TELEFONO)
+    let baja: (() => void) | null = null
+    const sync = () => {
+      if (mq.matches && !baja) baja = ocultarBurbujaChat()
+      else if (!mq.matches && baja) { baja(); baja = null }
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    return () => { mq.removeEventListener('change', sync); baja?.() }
+  }, [])
+
   // Clic en chip de equipo → ir a su área + filtrar la tabla a ese equipo + revelar equipos.
   const handleFavEquipClick = useCallback((favKey: string, displayName?: string, areaIdHint?: string | null) => {
     const eq = getGlobalEquipmentCache() || []
@@ -609,9 +643,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     // Identidad del equipo en el modelo plano = nodeId (clave de r.equipos[].machineId).
     // favKey puede ser un linkedMachineId legacy (favoritos viejos) → traducir al nodo.
     setSelectedEquipMachineId(e?.id ?? favKey)
-    setSelectedEquipName(displayName || (e as { alias?: string } | undefined)?.alias || e?.nombre || (m ? m.nombre : favKey))
+    const nombreEquipo = displayName || (e as { alias?: string } | undefined)?.alias || e?.nombre || (m ? m.nombre : favKey)
+    setSelectedEquipName(nombreEquipo)
     setSelectedRowKey(null)
     setSidebarMobileOpen(false)
+    registrarRecienteEquipo(e?.id ?? favKey, nombreEquipo)
+    setRecientes(leerRecientesRepuestos())
   }, [machines, getNodePath, padreDeEquipo])
   useEffect(() => {
     if (isAdmin) getTrashCount().then(setTrashCount).catch(() => {})
@@ -1100,6 +1137,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     () => areaRepuestos.find((r) => r.rowKey === selectedRowKey) ?? null,
     [areaRepuestos, selectedRowKey],
   )
+  // Al abrir el detalle de un repuesto con SAP, queda en «Recientes» de la entrada.
+  const repAbierto = selectedRep?.codigoSAP?.trim() ?? ''
+  const repAbiertoNombre = selectedRep?.textoBreve ?? ''
+  useEffect(() => {
+    if (!repAbierto) return
+    registrarRecienteRepuesto(repAbierto, repAbiertoNombre || repAbierto)
+    setRecientes(leerRecientesRepuestos())
+  }, [repAbierto, repAbiertoNombre])
 
   // Guardar ubicación estructurada (preserva el resto del stock del item).
   // Firestore no admite `undefined` (sin ignoreUndefinedProperties) → se stripean.
@@ -1602,6 +1647,54 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   const equipFavTotal = equipFavLists.reduce((n, l) => n + l.machineIds.length, 0)
 
+  // ── Entrada del teléfono ──
+  // Sin área, equipo ni búsqueda: en vez de «Selecciona un área» y ceros, las tres listas.
+  const entradaMovil = !selectedAreaId && !showingAll && !selectedEquipKey && !repQuery.trim()
+  const listasFavoritos: ListaFavoritos[] = equipFavLists.map((l) => ({
+    nombre: l.name,
+    items: l.machineIds.map((id) => ({ id, nombre: l.machineNames?.[id] || equipNameMap.get(id) || id })),
+  }))
+  const areasEntrada: AreaFila[] = ((areaTree.length === 1 && areaTree[0]!.children.length > 0) ? areaTree[0]!.children : areaTree)
+    .map((n) => ({
+      id: n.id,
+      nombre: n.nombre,
+      equipos: (function c(x: AreaTreeNode): number { let t = x.equipmentCount; x.children.forEach((y) => { t += c(y) }); return t })(n),
+    }))
+  const buscarMovil = (v: string) => {
+    setRepQuery(v)
+    // Misma regla que en PC: al teclear se miran todas las áreas. Al borrar, se devuelve.
+    if (v.trim() && !showingAll) { setShowingAll(true); autoTodasRef.current = true }
+    else if (!v.trim() && autoTodasRef.current) { setShowingAll(false); autoTodasRef.current = false }
+  }
+  const volverAEntrada = () => {
+    autoTodasRef.current = false
+    setRepQuery('')
+    setShowingAll(false)
+    setSelectedAreaId(null)
+    setRepEquipoFilter('all')
+    setSelectedEquipKey(null)
+    setSelectedEquipMachineId(null)
+    setSelectedEquipName('')
+    setSelectedRowKey(null)
+  }
+  const abrirRecienteEntrada = (r: RecienteRepuesto) => {
+    if (r.tipo === 'equipo') { handleFavEquipClick(r.id, r.nombre); return }
+    // Un repuesto reciente puede ser de cualquier área: se busca por su SAP en todas.
+    setRepQuery(r.id)
+    setShowingAll(true)
+    autoTodasRef.current = true
+  }
+  const abrirAreaEntrada = (id: string) => {
+    setOpenNodes((prev) => {
+      const next = { ...prev }
+      getNodePath(id).forEach((n) => { next[n.id] = true })
+      return next
+    })
+    expandNode(id)
+    setSidebarMobileOpen(true)
+  }
+  const celdaMenu = 'min-h-[52px]'
+
   return (
     <div className="relative flex h-full bg-background">
       <AreaSidebar
@@ -1647,7 +1740,85 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         {/* Header del módulo: búsqueda global + acciones */}
         {/* gap/min-w reducidos en móvil: la fila completa (menú+buscador+acciones+⋮)
             debe caber en 375px — si no, el "⋮" salta a una segunda fila entera. */}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-2.5 py-2.5 sm:gap-2 sm:px-4">
+        {/* Teléfono: el buscador ocupa la fila; al lado solo Solicitudes y ⋯ (el resto vive en el menú). */}
+        <div className="flex items-center gap-2 px-4 py-2.5 sm:hidden">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <input
+              type="search"
+              enterKeyHint="search"
+              value={repQuery}
+              onChange={(e) => buscarMovil(e.target.value)}
+              placeholder="SAP, repuesto o equipo"
+              aria-label="Buscar repuestos"
+              className="h-[44px] w-full rounded-[22px] border-0 bg-muted pl-10 pr-11 text-body placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {repQuery && (
+              <button
+                type="button"
+                onClick={() => buscarMovil('')}
+                aria-label="Borrar búsqueda"
+                className="absolute right-0 top-0 flex size-11 items-center justify-center rounded-full text-muted-foreground"
+              >
+                <X className="size-[18px]" aria-hidden />
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSolicitudesOpen(true)}
+            aria-label={pendientesCount > 0 ? `Solicitudes, ${pendientesCount} pendientes` : 'Solicitudes'}
+            className="relative flex size-11 shrink-0 items-center justify-center rounded-full text-brand-ink hover:bg-muted"
+          >
+            <ClipboardList className="size-5" aria-hidden />
+            {pendientesCount > 0 && (
+              <span className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink-crit/[0.15] px-1 text-caption font-semibold text-ink-crit tabular-nums">{pendientesCount}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenuMasOpen(true)}
+            aria-label="Más acciones"
+            className="relative flex size-11 shrink-0 items-center justify-center rounded-full text-brand-ink hover:bg-muted"
+          >
+            <MoreHorizontal className="size-5" aria-hidden />
+            {isAdmin && trashCount > 0 && (
+              <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-ink-crit" aria-hidden />
+            )}
+          </button>
+        </div>
+        <PSheet open={menuMasOpen} onClose={() => setMenuMasOpen(false)} title="Más acciones">
+          <ListGroup>
+            {!selectedEquipKey && (
+              <ListCell
+                leading={<CellIcon tone="neutral"><Plus aria-hidden /></CellIcon>}
+                title="Solicitar un repuesto"
+                onClick={() => { setMenuMasOpen(false); openSolicitar(null) }}
+                className={celdaMenu}
+              />
+            )}
+            <ListCell
+              leading={<CellIcon tone="neutral"><MessageCircle aria-hidden /></CellIcon>}
+              title="Preguntar a ARIA"
+              onClick={() => { setMenuMasOpen(false); abrirAria(repQuery.trim() || undefined) }}
+              className={celdaMenu}
+            />
+            {adminTools.map((t) => {
+              const Icon = t.icon
+              return (
+                <ListCell
+                  key={t.key}
+                  leading={<CellIcon tone="neutral"><Icon aria-hidden /></CellIcon>}
+                  title={t.label}
+                  value={t.badge ? t.badge : undefined}
+                  onClick={() => { setMenuMasOpen(false); t.onClick() }}
+                  className={celdaMenu}
+                />
+              )
+            })}
+          </ListGroup>
+        </PSheet>
+        <div className="hidden flex-wrap items-center gap-1.5 border-b border-border px-2.5 py-2.5 sm:flex sm:gap-2 sm:px-4">
           <button
             onClick={() => setSidebarMobileOpen(true)}
             className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
@@ -1737,9 +1908,33 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Teléfono: entrada por listas, o «‹ Repuestos» para volver a ella desde un área, equipo o búsqueda. */}
+          {entradaMovil ? (
+            <div className="sm:hidden">
+              <RepuestosEntrada
+                recientes={recientes}
+                onAbrirReciente={abrirRecienteEntrada}
+                onLimpiarRecientes={() => { limpiarRecientesRepuestos(); setRecientes([]) }}
+                listasFavoritos={listasFavoritos}
+                favoritosCargando={favCargando}
+                onAbrirEquipo={(id, nombre) => handleFavEquipClick(id, nombre)}
+                onQuitarFavorito={isAdmin ? removeEquipFromList : undefined}
+                areas={areasEntrada}
+                onAbrirArea={abrirAreaEntrada}
+              />
+            </div>
+          ) : (
+            <div className="-mt-2 mb-1 sm:hidden">
+              <PButton variant="plain" className="-ml-3 gap-1 pl-2 pr-4" onClick={volverAEntrada}>
+                <ChevronLeft aria-hidden /> Repuestos
+              </PButton>
+            </div>
+          )}
+          {/* Lo de abajo es la vista de siempre: en PC no cambia; en el teléfono se oculta mientras manda la entrada. */}
+          <div className={entradaMovil ? 'hidden sm:contents' : 'contents'}>
           {/* Favoritos de equipos (listas con nombre) — colapsada por defecto + gestionable por admin (G2) */}
           {(equipFavLists.length > 0 || isAdmin) && (
-            <div className="mb-5 rounded-card border border-border bg-muted p-3">
+            <div className="mb-5 rounded-card border border-border bg-muted p-3 max-sm:hidden">
               <button
                 onClick={() => setFavBarOpen((v) => !v)}
                 className="flex min-h-[44px] w-full items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
@@ -1829,9 +2024,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             <div className="min-w-0">
               {/* Breadcrumb: con equipo seleccionado incluye el área; si no, la deja para el título. */}
               {(selectedEquipKey ? breadcrumb.length > 0 : breadcrumb.length > 1) && (
-                <div className="mb-0.5 truncate text-caption text-muted-foreground">
-                  {(selectedEquipKey ? breadcrumb : breadcrumb.slice(0, -1)).join(' › ')}
-                </div>
+                <>
+                  {/* Teléfono: la ruta abre el árbol de áreas (reemplaza al botón de menú). */}
+                  <button
+                    type="button"
+                    onClick={() => setSidebarMobileOpen(true)}
+                    aria-label="Abrir áreas"
+                    className="mb-0.5 flex min-h-[44px] max-w-full items-center text-left text-caption text-muted-foreground sm:hidden"
+                  >
+                    <span className="truncate">{(selectedEquipKey ? breadcrumb : breadcrumb.slice(0, -1)).join(' › ')}</span>
+                  </button>
+                  <div className="mb-0.5 hidden truncate text-caption text-muted-foreground sm:block">
+                    {(selectedEquipKey ? breadcrumb : breadcrumb.slice(0, -1)).join(' › ')}
+                  </div>
+                </>
               )}
               <div className="flex items-center gap-2">
                 {selectedEquipKey && <Cog className="h-5 w-5 shrink-0 text-cat-7-ink" />}
@@ -1849,7 +2055,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <button
                     onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground max-sm:min-h-[44px] max-sm:px-4"
                     title="Volver a ver todos los repuestos del área"
                   >
                     <ChevronLeft className="h-3 w-3 shrink-0" /> Volver a <span className="truncate font-semibold">{selectedNode?.nombre ?? 'el área'}</span>
@@ -1863,7 +2069,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   {selectedEquipMachineId && (
                     <Link
                       to={rutaExpedienteEquipo(selectedEquipMachineId)}
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground max-sm:min-h-[44px] max-sm:border-transparent max-sm:bg-primary/[0.13] max-sm:px-4 max-sm:text-brand-ink"
                       title="Abrir el expediente de este equipo: lista de materiales, manuales y ficha"
                     >
                       <ClipboardList className="h-3 w-3 shrink-0" /> Ver expediente
@@ -1888,6 +2094,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               )}
             </div>
           </div>
+
+          {/* Teléfono, con un equipo abierto: «Solicitar repuestos» es el único botón relleno de la vista. */}
+          {selectedEquipKey && (
+            <div className="-mt-1 mb-4 sm:hidden">
+              <PButton variant="filled" size="block" onClick={() => setSolicitarVariosOpen(true)}>
+                <ClipboardList aria-hidden /> Solicitar repuestos
+              </PButton>
+            </div>
+          )}
 
           {/* KPIs — en móvil el grid de 4 cards + stats empujaba la lista ~2
               pantallas abajo: se reemplaza por un strip de una línea (mismos
@@ -2360,6 +2575,21 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 ahora viven en el maestro `repuestos` y aparecen en la tabla
                 principal con su badge de clase. Evita resultados duplicados. */}
           </section>
+
+          {/* Teléfono: sin la burbuja, ARIA queda como última fila de una búsqueda. */}
+          {repQuery.trim() && (
+            <div className="mt-4 sm:hidden">
+              <ListGroup>
+                <ListCell
+                  leading={<CellIcon tone="neutral"><MessageCircle aria-hidden /></CellIcon>}
+                  title={<span className="text-primary">Preguntar a ARIA por «{repQuery.trim()}»</span>}
+                  onClick={() => abrirAria(repQuery.trim())}
+                  className={celdaMenu}
+                />
+              </ListGroup>
+            </div>
+          )}
+          </div>
         </div>
       </div>
 
