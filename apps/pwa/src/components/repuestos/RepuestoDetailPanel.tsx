@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
-import { X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Shapes, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
+import { ChevronLeft, MoreHorizontal, X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Shapes, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { findMachineBySlug } from '@/data/learningMachines'
 import { machinesForCommonSap } from '@/data/commonPartsByMachine'
@@ -18,7 +18,11 @@ import { CLASE_LABEL } from '@/types/repuestos'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
 import { AREA_TACTIL, AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { Button as PielButton, ListGroup, ListCell } from '@/components/piel'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { levantarPantallaCompletaMovil } from '@/lib/pantallaCompletaMovil'
 import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 
@@ -32,6 +36,8 @@ interface RepuestoDetailPanelProps {
    */
   plantaDe?: (nodeId: string) => string | undefined
   areaName: string
+  /** Texto del «‹ volver» en el teléfono (la cinta/equipo desde donde se llegó). Por defecto, el área. */
+  volverA?: string
   onClose: () => void
   loadMovimientos: (bodegaDocId: string, max?: number) => Promise<MovimientoBodega[]>
   onSaveLocation: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
@@ -159,7 +165,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -171,7 +177,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
    * seguía diciendo "Sin movimientos registrados" hasta reabrir el panel.
    */
   const [movsRefresh, setMovsRefresh] = useState(0)
-  const [lightbox, setLightbox] = useState<string[] | null>(null)
+  const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null)
   const [editLoc, setEditLoc] = useState(false)
   const [locForm, setLocForm] = useState<UbicacionEstructurada>({})
   const [savingLoc, setSavingLoc] = useState(false)
@@ -273,6 +279,24 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
     return () => { alive = false }
   }, [bodegaDocId, loadMovimientos, movsRefresh])
 
+  const navigate = useNavigate()
+  const hayItem = !!item
+  // Bajo md (<768 px) la lista usa la fila móvil: la burbuja del chat se esconde mientras el detalle esté abierto.
+  // En <640 el detalle es pantalla completa; entre 640 y 767 es el panel lateral y la burbuja tapaba su «Ver».
+  const [bajoMd, setBajoMd] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 767px)')
+    const alCambiar = () => setBajoMd(mq.matches)
+    alCambiar()
+    mq.addEventListener('change', alCambiar)
+    return () => mq.removeEventListener('change', alCambiar)
+  }, [])
+  useEffect(() => {
+    if (!bajoMd || !hayItem) return
+    return levantarPantallaCompletaMovil()
+  }, [bajoMd, hayItem])
+
   const copySap = useCallback(() => {
     if (!sap) return
     navigator.clipboard?.writeText(sap).then(() => {
@@ -289,227 +313,10 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
   const ultimo = movs && movs.length > 0 ? movs[0] : null
   const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
 
-  return (
-    <aside
-      style={isDesktop ? { width } : undefined}
-      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:static sm:z-auto sm:w-auto sm:shrink-0 relative"
-    >
-      {/* Asa de arrastre para ajustar el ancho (solo desktop) */}
-      <div
-        onMouseDown={startResize}
-        className="absolute left-0 top-0 z-10 hidden h-full w-1.5 cursor-col-resize bg-transparent transition-colors hover:bg-primary/40 sm:block"
-        title="Arrastra para ajustar el ancho"
-        aria-label="Ajustar ancho del panel"
-      />
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <span className="text-caption font-bold tracking-wider text-muted-foreground">Detalle del repuesto</span>
-        <div className="flex items-center gap-1">
-          {onToggleFavorite && (
-            <button
-              onClick={onToggleFavorite}
-              /* 44x44 REALES, sin margen negativo: entre este botón y «Cerrar» solo hay 4 px
-                 medidos, así que invadir hacia los lados haría que tocar uno active el otro. */
-              className={[AREA_TACTIL, 'rounded-ctl transition', isFavorite ? 'text-ink-warn' : 'text-muted-foreground hover:text-ink-warn'].join(' ')}
-              title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-              aria-label="Favorito"
-            >
-              <Star className={['h-4 w-4', isFavorite ? 'fill-current' : ''].join(' ')} />
-            </button>
-          )}
-          <button onClick={onClose} className={`${AREA_TACTIL} rounded-ctl text-muted-foreground hover:bg-muted hover:text-foreground`} aria-label="Cerrar">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Foto — solo cuando HAY foto. El placeholder gastaba media pantalla
-            de móvil en un ícono (solo ~64 de 7.700 repuestos tienen foto) y
-            empujaba stock/ubicación fuera de la vista. */}
-        {photo && (
-          <div className="mb-3 flex justify-center">
-            <button
-              onClick={() => setLightbox(allPhotos.length ? allPhotos : null)}
-              className="overflow-hidden rounded-card border border-border transition hover:ring-2 hover:ring-primary"
-            >
-              <img src={photo} alt={item.textoBreve} className="h-32 w-full max-w-[280px] object-cover" />
-            </button>
-          </div>
-        )}
-
-        {/* Nombre + SAP */}
-        {isAdmin && onRename ? (
-          <InlineEditName
-            value={item.textoBreve || ''}
-            onSave={onRename}
-            canEdit
-            placeholder="(sin nombre)"
-            textClassName="text-base font-bold leading-tight text-foreground"
-            inputClassName="text-base font-bold leading-tight"
-          />
-        ) : (
-          <h2 className="text-base font-bold leading-tight text-foreground">{item.textoBreve || '(sin nombre)'}</h2>
-        )}
-        <div className="mb-3 mt-1.5 flex flex-wrap items-center gap-2">
-          {item.clase && (
-            <span className="rounded-ctl bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">{CLASE_LABEL[item.clase]}</span>
-          )}
-          {sap ? (
-            <span className="inline-flex items-center gap-1">
-              <span className="text-caption tracking-wide text-muted-foreground">SAP</span>
-              <span className="font-mono text-sm text-foreground">{sap}</span>
-              {/* Era 18×18: el target más chico de la pantalla y la acción que más se usa en
-                  planta. Crece hacia afuera — medidos 61 px libres arriba y 13 abajo. */}
-              <button onClick={copySap} className={`${AREA_TACTIL_COMPACTA} rounded-ctl text-muted-foreground hover:text-primary`} title="Copiar SAP" aria-label="Copiar código SAP">
-                {copied ? <Check className="h-3.5 w-3.5 text-ink-ok" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
-            </span>
-          ) : (
-            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-caption font-medium text-ink-warn">sin SAP · pieza de despiece</span>
-          )}
-        </div>
-
-        {/* Stock + ubicación PRIMERO — es lo que el técnico vino a buscar.
-            Antes vivían 2 scrolls abajo (tarjeta de stock + fila BODEGA),
-            detrás de secciones administrativas. La tarjeta detallada
-            (mín/máx/conteo) sigue abajo; esto es el resumen de un vistazo. */}
-        {item.bodegaId && (
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-card border border-border bg-muted px-3 py-2">
-            <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
-              <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-red-500' : item.stockStatus === 'low' ? 'bg-amber-500' : 'bg-emerald-500'].join(' ')} />
-              <span className={item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'}>
-                {item.stockActual} {item.unidad || 'pzas'}
-              </span>
-              {item.stockStatus === 'out' && <span className="text-caption font-normal text-muted-foreground">sin stock</span>}
-              {item.stockStatus === 'low' && <span className="text-caption font-normal text-muted-foreground">bajo mínimo</span>}
-            </span>
-            <span className="inline-flex min-w-0 items-center gap-1 text-sm text-foreground">
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate font-medium">{bodega}</span>
-            </span>
-          </div>
-        )}
-
-        {/* Acción: solicitar repuesto — solo con SAP (lo ordenable). Sin SAP no se puede pedir. */}
-        {sap ? (
-          onSolicitar && (
-            <Button size="sm" className="mb-3 w-full gap-1.5" onClick={() => onSolicitar(item)}>
-              <Plus className="h-4 w-4" /> Solicitar repuesto
-            </Button>
-          )
-        ) : (
-          <div className="mb-3 rounded-card border border-dashed border-transparent bg-amber-500/[0.15] px-3 py-2">
-            <p className="text-caption text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
-            {onAssignSap && (
-              <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
-                <Plus className="h-4 w-4" /> Asignar código SAP
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Acciones de consulta (todos los usuarios) */}
-        {(onSpecs || onPhotos || onManual || dibujo) && (
-          <div className={['mb-3 grid gap-1.5', dibujo ? 'grid-cols-2' : 'grid-cols-3'].join(' ')}>
-            {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} contenido={!!item.tieneFicha} />}
-            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={(item.fotos?.length ?? 0) + (item.fotosCatalogo?.length ?? 0)} />}
-            {/*
-              El modal de manual muestra los vínculos PROPIOS del repuesto Y los HEREDADOS de
-              sus equipos, así que la señal tiene que sumar los dos: contar solo los propios
-              habría dejado en gris un botón que abre el manual del KNURO. Mientras carga no se
-              afirma nada (`undefined` = sin señal), para no decir «vacío» antes de saberlo.
-            */}
-            {dibujo && (
-              <ActionBtn icon={Shapes} label={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />
-            )}
-            {onManual && (
-              <ActionBtn
-                icon={BookOpen}
-                label="Manual"
-                onClick={onManual}
-                contenido={manualesLoading ? undefined : (item.manuales ?? 0) + manualesHeredados.length}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Agregar a lista de favoritos con nombre */}
-        {onAddToList && (
-          <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onAddToList}>
-            <ListPlus className="h-4 w-4" /> Agregar a lista
-          </Button>
-        )}
-
-        {/* Acciones de edición (solo admin) */}
-        {isAdmin && (onEditRepuesto || onDeleteRepuesto) && (
-          <div className="mb-3 grid grid-cols-2 gap-1.5">
-            {onEditRepuesto && <ActionBtn icon={SquarePen} label="Editar" onClick={onEditRepuesto} />}
-            {onDeleteRepuesto && <ActionBtn icon={Trash2} label="Eliminar" onClick={onDeleteRepuesto} danger />}
-          </div>
-        )}
-
-        {/* Dónde se usa — N:M (todos los equipos donde sirve el material) */}
-        <div className="border-y border-border/60 py-2">
-          <div className="mb-1.5 flex items-center gap-1.5 text-caption tracking-wide text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5" />
-            {equiposReales.length > 0 ? `Dónde se usa · ${totalEquiposUnicos} ${totalEquiposUnicos === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
-          </div>
-          {equiposReales.length > 0 ? (
-            <div className="space-y-1">
-              {familiasEquipos.slice(0, 6).map((f) => (
-                <div
-                  key={`${f.planta ?? ''}|${f.familia}`}
-                  className="flex items-center gap-1.5 rounded-ctl bg-muted px-2 py-1 text-footnote text-foreground"
-                >
-                  <span className="min-w-0 truncate">
-                    {f.familia}
-                    {f.planta && <span className="text-muted-foreground"> · {plantaCorta(f.planta)}</span>}
-                  </span>
-                  {/*
-                    Cada unidad abre el expediente de ESE equipo, en la lista de materiales y ya
-                    filtrada por el código de esta pieza. Por eso la agrupación tenía que saber la
-                    planta: «N1» a secas habría llevado a Chonchi o a Yal según el orden de llegada.
-                  */}
-                  <span className="ml-auto flex shrink-0 items-center gap-1">
-                    {f.unidades.map((u) => (
-                      <Link
-                        key={u.nodeId}
-                        to={rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente })}
-                        title={`Abrir el expediente de ${u.nombre}${f.planta ? ` (${plantaCorta(f.planta)})` : ''}`}
-                        /* Tamaño REAL y no un área ampliada: N1, N2 y N3 quedan a 4 px entre sí y un pseudo-
-                           elemento de 44 px se solaparía con el vecino — tocar N1 abriría N2. */
-                        className="inline-flex min-h-[32px] min-w-[38px] items-center justify-center rounded-ctl bg-background px-2 font-mono text-caption text-primary hover:underline"
-                      >
-                        {u.unidad || 'Ver'}
-                      </Link>
-                    ))}
-                  </span>
-                </div>
-              ))}
-              {familiasEquipos.length > 6 && (
-                <div className="px-2 text-caption text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
-              )}
-              {onAssignEquipo && (
-                /* 15 px de alto. Sube a 44 sin estirar la lista: medidos 65 px libres arriba
-                   y 86 abajo, así que el área crece hacia afuera sin pisar nada. */
-                <button onClick={onAssignEquipo} className={`${AREA_TACTIL_COMPACTA} mt-0.5 inline-flex items-center gap-1 px-1 text-caption text-primary hover:underline`}>
-                  <Plus className="h-3 w-3" /> Agregar equipo
-                </button>
-              )}
-            </div>
-          ) : (
-            <div>
-              <p className="text-footnote text-muted-foreground">Insumo/herramienta sin equipo fijo — disponible para toda la planta.</p>
-              {onAssignEquipo && (
-                <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignEquipo}>
-                  <Plus className="h-4 w-4" /> Asignar a un equipo
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-
+  // Secciones de abajo (común, manuales, descripción, campos, stock, conteo, ubicación,
+  // movimientos): idénticas en teléfono y escritorio, por eso se definen una sola vez.
+  const resto = (
+    <>
         {/* Repuesto común / más usado — lista COMPARTIDA de planta. Fusiona los
             SEMBRADOS de la lista base (commonPartsByMachine, por SAP, no editables
             desde acá) + los MARCADOS a mano (comunEn, con ✕). Se refleja en la
@@ -800,9 +607,409 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, onClose, loadMov
             })}
           </div>
         )}
+    </>
+  )
+
+  if (!isDesktop) {
+    const nombreFmt = formatNombreSAP(item.textoBreve).nombre || item.textoBreve || '(sin nombre)'
+    const hayMenu = !!onAddToList || (isAdmin && (!!onEditRepuesto || !!onDeleteRepuesto))
+    const tonoStock = item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'
+    return (
+      <aside className="fixed inset-0 z-50 flex h-full w-full flex-col bg-background pt-[env(safe-area-inset-top)]">
+        {/* Barra superior: ‹ volver + cápsula de vidrio con favorito y ⋯ (una sola cápsula, no un vidrio por botón) */}
+        <div className="flex shrink-0 items-center justify-between px-2">
+          <button onClick={onClose} className="inline-flex min-h-[44px] items-center gap-0.5 pl-0.5 pr-2 text-body text-primary" aria-label={`Volver a ${volverA || areaName || 'Repuestos'}`}>
+            <ChevronLeft className="size-6" aria-hidden />
+            <span className="max-w-[60vw] truncate">{volverA || areaName || 'Repuestos'}</span>
+          </button>
+          <div className="glass-nav flex items-center rounded-full px-0.5">
+            {onToggleFavorite && (
+              <button onClick={onToggleFavorite} className={[AREA_TACTIL, 'rounded-full', isFavorite ? 'text-ink-warn' : 'text-foreground'].join(' ')} aria-label={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'} aria-pressed={!!isFavorite}>
+                <Star className={['size-[22px]', isFavorite ? 'fill-current' : ''].join(' ')} />
+              </button>
+            )}
+            {hayMenu && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className={[AREA_TACTIL, 'rounded-full text-foreground'].join(' ')} aria-label="Más acciones">
+                    <MoreHorizontal className="size-[22px]" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[13rem]">
+                  {onAddToList && (
+                    <DropdownMenuItem className="min-h-[44px] gap-2 text-body" onSelect={onAddToList}>
+                      <ListPlus className="size-4" /> Agregar a lista
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && onEditRepuesto && (
+                    <DropdownMenuItem className="min-h-[44px] gap-2 text-body" onSelect={onEditRepuesto}>
+                      <SquarePen className="size-4" /> Editar
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && onDeleteRepuesto && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="min-h-[44px] gap-2 text-body text-ink-crit focus:text-ink-crit" onSelect={onDeleteRepuesto}>
+                        <Trash2 className="size-4" /> Eliminar
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto pb-[calc(104px+env(safe-area-inset-bottom))]">
+          {/* Nombre */}
+          <div className="px-4 pt-1">
+            {isAdmin && onRename ? (
+              <InlineEditName
+                value={item.textoBreve || ''}
+                onSave={onRename}
+                canEdit
+                placeholder="(sin nombre)"
+                textClassName="text-title2 font-bold"
+                inputClassName="text-title2 font-bold"
+              />
+            ) : (
+              <h2 className="text-title2 font-bold text-foreground">{nombreFmt}</h2>
+            )}
+          </div>
+          {/* SAP + copiar (44×44: a la derecha hay espacio) */}
+          <div className="flex items-center justify-between pl-4 pr-1">
+            {sap ? (
+              <>
+                <span className="text-subhead text-muted-foreground">SAP <span className="ml-1 font-mono text-body text-foreground">{sap}</span></span>
+                <button onClick={copySap} className={`${AREA_TACTIL} rounded-full text-primary`} aria-label="Copiar código SAP">
+                  {copied ? <Check className="size-5 text-ink-ok" /> : <Copy className="size-5" />}
+                </button>
+              </>
+            ) : (
+              <span className="py-2 text-subhead text-ink-warn">Sin SAP · pieza de despiece</span>
+            )}
+          </div>
+          {/* Stock en una línea, sin tarjeta */}
+          <p className="flex items-center gap-1.5 px-4 pb-4 text-subhead text-muted-foreground">
+            {item.bodegaId ? (
+              <>
+                <span className={['size-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-ink-crit' : item.stockStatus === 'low' ? 'bg-ink-warn' : 'bg-ink-ok'].join(' ')} aria-hidden />
+                <span>
+                  <b className={['font-semibold tabular-nums', tonoStock].join(' ')}>{item.stockActual} {item.unidad || 'pzas'}</b>
+                  {item.stockStatus === 'out' ? ' · sin stock' : item.stockStatus === 'low' ? ' · bajo mínimo' : ' disponibles'} · {bodega}
+                </span>
+              </>
+            ) : (
+              <span>Sin stock configurado</span>
+            )}
+          </p>
+
+          {/* Carrusel de fotos: solo si hay */}
+          {allPhotos.length > 0 && (
+            <div className="mb-5 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label="Fotos del repuesto">
+              {allPhotos.map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setLightbox({ photos: allPhotos, index: i })}
+                  className="aspect-video w-[248px] shrink-0 snap-center overflow-hidden rounded-[16px] ring-1 ring-inset ring-border"
+                  aria-label={`Ver foto ${i + 1} de ${allPhotos.length}`}
+                >
+                  <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Dónde se usa: la fila ENTERA es tocable (antes el «Ver» medía 38×32) */}
+          <div className="pb-5">
+            <ListGroup
+              className="px-4"
+              title={equiposReales.length > 0 ? `Dónde se usa · ${totalEquiposUnicos} ${totalEquiposUnicos === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
+            >
+              {equiposReales.length > 0 ? (
+                familiasEquipos.flatMap((f) =>
+                  f.unidades.map((u) => (
+                    <ListCell
+                      key={u.nodeId}
+                      className="min-h-[52px]"
+                      title={`${f.familia}${u.unidad ? ` ${u.unidad}` : ''}`}
+                      subtitle={f.planta ? plantaCorta(f.planta) : undefined}
+                      onClick={() => navigate(rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente }))}
+                    />
+                  )),
+                )
+              ) : (
+                <ListCell className="min-h-[52px]" title="Disponible para toda la planta" subtitle="Insumo o herramienta sin equipo fijo" />
+              )}
+              {onAssignEquipo && (
+                <ListCell className="min-h-[52px] text-primary" title={equiposReales.length > 0 ? 'Agregar equipo' : 'Asignar a un equipo'} onClick={onAssignEquipo} />
+              )}
+            </ListGroup>
+          </div>
+
+          {/* Documentos */}
+          {(onSpecs || onManual || dibujo || onPhotos) && (
+            <div className="pb-5">
+              <ListGroup className="px-4" title="Documentos">
+                {onSpecs && <ListCell className="min-h-[52px]" leading={<FileText className="size-5 text-primary" />} title="Ficha técnica" value={item.tieneFicha ? undefined : 'Sin cargar'} onClick={onSpecs} />}
+                {onManual && <ListCell className="min-h-[52px]" leading={<BookOpen className="size-5 text-primary" />} title="Manual" value={manualesLoading ? undefined : ((item.manuales ?? 0) + manualesHeredados.length) || 'Sin cargar'} onClick={onManual} />}
+                {dibujo && <ListCell className="min-h-[52px]" leading={<Shapes className="size-5 text-primary" />} title={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />}
+                {onPhotos && <ListCell className="min-h-[52px]" leading={<ImageIcon className="size-5 text-primary" />} title="Fotos" value={allPhotos.length || 'Sin cargar'} onClick={onPhotos} />}
+              </ListGroup>
+            </div>
+          )}
+
+          <div className="px-4">{resto}</div>
+        </div>
+
+        {/* Barra inferior de vidrio: único botón filled de la vista */}
+        <div className="glass-nav absolute inset-x-0 bottom-0 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          {sap ? (
+            onSolicitar && (
+              <PielButton size="lg" className="w-full" onClick={() => onSolicitar(item)}>
+                <Plus /> Solicitar repuesto
+              </PielButton>
+            )
+          ) : (
+            onAssignSap && (
+              <PielButton size="lg" variant="tinted" className="w-full" onClick={onAssignSap}>
+                <Plus /> Asignar código SAP
+              </PielButton>
+            )
+          )}
+        </div>
+
+        {lightbox && <ImageLightbox photos={lightbox.photos} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />}
+      </aside>
+    )
+  }
+
+  return (
+    <aside
+      style={isDesktop ? { width } : undefined}
+      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:static sm:z-auto sm:w-auto sm:shrink-0 relative"
+    >
+      {/* Asa de arrastre para ajustar el ancho (solo desktop) */}
+      <div
+        onMouseDown={startResize}
+        className="absolute left-0 top-0 z-10 hidden h-full w-1.5 cursor-col-resize bg-transparent transition-colors hover:bg-primary/40 sm:block"
+        title="Arrastra para ajustar el ancho"
+        aria-label="Ajustar ancho del panel"
+      />
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <span className="text-caption font-bold tracking-wider text-muted-foreground">Detalle del repuesto</span>
+        <div className="flex items-center gap-1">
+          {onToggleFavorite && (
+            <button
+              onClick={onToggleFavorite}
+              /* 44x44 REALES, sin margen negativo: entre este botón y «Cerrar» solo hay 4 px
+                 medidos, así que invadir hacia los lados haría que tocar uno active el otro. */
+              className={[AREA_TACTIL, 'rounded-ctl transition', isFavorite ? 'text-ink-warn' : 'text-muted-foreground hover:text-ink-warn'].join(' ')}
+              title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+              aria-label="Favorito"
+            >
+              <Star className={['h-4 w-4', isFavorite ? 'fill-current' : ''].join(' ')} />
+            </button>
+          )}
+          <button onClick={onClose} className={`${AREA_TACTIL} rounded-ctl text-muted-foreground hover:bg-muted hover:text-foreground`} aria-label="Cerrar">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {lightbox && <ImageLightbox photos={lightbox} onClose={() => setLightbox(null)} />}
+      <div className="flex-1 overflow-y-auto p-4">
+        {/* Foto — solo cuando HAY foto. El placeholder gastaba media pantalla
+            de móvil en un ícono (solo ~64 de 7.700 repuestos tienen foto) y
+            empujaba stock/ubicación fuera de la vista. */}
+        {photo && (
+          <div className="mb-3 flex justify-center">
+            <button
+              onClick={() => setLightbox(allPhotos.length ? { photos: allPhotos, index: 0 } : null)}
+              className="overflow-hidden rounded-card border border-border transition hover:ring-2 hover:ring-primary"
+            >
+              <img src={photo} alt={item.textoBreve} className="h-32 w-full max-w-[280px] object-cover" />
+            </button>
+          </div>
+        )}
+
+        {/* Nombre + SAP */}
+        {isAdmin && onRename ? (
+          <InlineEditName
+            value={item.textoBreve || ''}
+            onSave={onRename}
+            canEdit
+            placeholder="(sin nombre)"
+            textClassName="text-base font-bold leading-tight text-foreground"
+            inputClassName="text-base font-bold leading-tight"
+          />
+        ) : (
+          <h2 className="text-base font-bold leading-tight text-foreground">{item.textoBreve || '(sin nombre)'}</h2>
+        )}
+        <div className="mb-3 mt-1.5 flex flex-wrap items-center gap-2">
+          {item.clase && (
+            <span className="rounded-ctl bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">{CLASE_LABEL[item.clase]}</span>
+          )}
+          {sap ? (
+            <span className="inline-flex items-center gap-1">
+              <span className="text-caption tracking-wide text-muted-foreground">SAP</span>
+              <span className="font-mono text-sm text-foreground">{sap}</span>
+              {/* Era 18×18: el target más chico de la pantalla y la acción que más se usa en
+                  planta. Crece hacia afuera — medidos 61 px libres arriba y 13 abajo. */}
+              <button onClick={copySap} className={`${AREA_TACTIL_COMPACTA} rounded-ctl text-muted-foreground hover:text-primary`} title="Copiar SAP" aria-label="Copiar código SAP">
+                {copied ? <Check className="h-3.5 w-3.5 text-ink-ok" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </span>
+          ) : (
+            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-caption font-medium text-ink-warn">sin SAP · pieza de despiece</span>
+          )}
+        </div>
+
+        {/* Stock + ubicación PRIMERO — es lo que el técnico vino a buscar.
+            Antes vivían 2 scrolls abajo (tarjeta de stock + fila BODEGA),
+            detrás de secciones administrativas. La tarjeta detallada
+            (mín/máx/conteo) sigue abajo; esto es el resumen de un vistazo. */}
+        {item.bodegaId && (
+          <div className="mb-3 flex items-center justify-between gap-2 rounded-card border border-border bg-muted px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
+              <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-red-500' : item.stockStatus === 'low' ? 'bg-amber-500' : 'bg-emerald-500'].join(' ')} />
+              <span className={item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'}>
+                {item.stockActual} {item.unidad || 'pzas'}
+              </span>
+              {item.stockStatus === 'out' && <span className="text-caption font-normal text-muted-foreground">sin stock</span>}
+              {item.stockStatus === 'low' && <span className="text-caption font-normal text-muted-foreground">bajo mínimo</span>}
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1 text-sm text-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate font-medium">{bodega}</span>
+            </span>
+          </div>
+        )}
+
+        {/* Acción: solicitar repuesto — solo con SAP (lo ordenable). Sin SAP no se puede pedir. */}
+        {sap ? (
+          onSolicitar && (
+            <Button size="sm" className="mb-3 w-full gap-1.5" onClick={() => onSolicitar(item)}>
+              <Plus className="h-4 w-4" /> Solicitar repuesto
+            </Button>
+          )
+        ) : (
+          <div className="mb-3 rounded-card border border-dashed border-transparent bg-amber-500/[0.15] px-3 py-2">
+            <p className="text-caption text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
+            {onAssignSap && (
+              <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
+                <Plus className="h-4 w-4" /> Asignar código SAP
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Acciones de consulta (todos los usuarios) */}
+        {(onSpecs || onPhotos || onManual || dibujo) && (
+          <div className={['mb-3 grid gap-1.5', dibujo ? 'grid-cols-2' : 'grid-cols-3'].join(' ')}>
+            {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} contenido={!!item.tieneFicha} />}
+            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={(item.fotos?.length ?? 0) + (item.fotosCatalogo?.length ?? 0)} />}
+            {/*
+              El modal de manual muestra los vínculos PROPIOS del repuesto Y los HEREDADOS de
+              sus equipos, así que la señal tiene que sumar los dos: contar solo los propios
+              habría dejado en gris un botón que abre el manual del KNURO. Mientras carga no se
+              afirma nada (`undefined` = sin señal), para no decir «vacío» antes de saberlo.
+            */}
+            {dibujo && (
+              <ActionBtn icon={Shapes} label={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />
+            )}
+            {onManual && (
+              <ActionBtn
+                icon={BookOpen}
+                label="Manual"
+                onClick={onManual}
+                contenido={manualesLoading ? undefined : (item.manuales ?? 0) + manualesHeredados.length}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Agregar a lista de favoritos con nombre */}
+        {onAddToList && (
+          <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onAddToList}>
+            <ListPlus className="h-4 w-4" /> Agregar a lista
+          </Button>
+        )}
+
+        {/* Acciones de edición (solo admin) */}
+        {isAdmin && (onEditRepuesto || onDeleteRepuesto) && (
+          <div className="mb-3 grid grid-cols-2 gap-1.5">
+            {onEditRepuesto && <ActionBtn icon={SquarePen} label="Editar" onClick={onEditRepuesto} />}
+            {onDeleteRepuesto && <ActionBtn icon={Trash2} label="Eliminar" onClick={onDeleteRepuesto} danger />}
+          </div>
+        )}
+
+        {/* Dónde se usa — N:M (todos los equipos donde sirve el material) */}
+        <div className="border-y border-border/60 py-2">
+          <div className="mb-1.5 flex items-center gap-1.5 text-caption tracking-wide text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" />
+            {equiposReales.length > 0 ? `Dónde se usa · ${totalEquiposUnicos} ${totalEquiposUnicos === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
+          </div>
+          {equiposReales.length > 0 ? (
+            <div className="space-y-1">
+              {familiasEquipos.slice(0, 6).map((f) => (
+                <div
+                  key={`${f.planta ?? ''}|${f.familia}`}
+                  className="flex items-center gap-1.5 rounded-ctl bg-muted px-2 py-1 text-footnote text-foreground"
+                >
+                  <span className="min-w-0 truncate">
+                    {f.familia}
+                    {f.planta && <span className="text-muted-foreground"> · {plantaCorta(f.planta)}</span>}
+                  </span>
+                  {/*
+                    Cada unidad abre el expediente de ESE equipo, en la lista de materiales y ya
+                    filtrada por el código de esta pieza. Por eso la agrupación tenía que saber la
+                    planta: «N1» a secas habría llevado a Chonchi o a Yal según el orden de llegada.
+                  */}
+                  <span className="ml-auto flex shrink-0 items-center gap-1">
+                    {f.unidades.map((u) => (
+                      <Link
+                        key={u.nodeId}
+                        to={rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente })}
+                        title={`Abrir el expediente de ${u.nombre}${f.planta ? ` (${plantaCorta(f.planta)})` : ''}`}
+                        /* Tamaño REAL y no un área ampliada: N1, N2 y N3 quedan a 4 px entre sí y un pseudo-
+                           elemento de 44 px se solaparía con el vecino — tocar N1 abriría N2. */
+                        className="inline-flex min-h-[32px] min-w-[38px] items-center justify-center rounded-ctl bg-background px-2 font-mono text-caption text-primary hover:underline"
+                      >
+                        {u.unidad || 'Ver'}
+                      </Link>
+                    ))}
+                  </span>
+                </div>
+              ))}
+              {familiasEquipos.length > 6 && (
+                <div className="px-2 text-caption text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
+              )}
+              {onAssignEquipo && (
+                /* 15 px de alto. Sube a 44 sin estirar la lista: medidos 65 px libres arriba
+                   y 86 abajo, así que el área crece hacia afuera sin pisar nada. */
+                <button onClick={onAssignEquipo} className={`${AREA_TACTIL_COMPACTA} mt-0.5 inline-flex items-center gap-1 px-1 text-caption text-primary hover:underline`}>
+                  <Plus className="h-3 w-3" /> Agregar equipo
+                </button>
+              )}
+            </div>
+          ) : (
+            <div>
+              <p className="text-footnote text-muted-foreground">Insumo/herramienta sin equipo fijo — disponible para toda la planta.</p>
+              {onAssignEquipo && (
+                <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignEquipo}>
+                  <Plus className="h-4 w-4" /> Asignar a un equipo
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {resto}
+      </div>
+
+      {lightbox && <ImageLightbox photos={lightbox.photos} initialIndex={lightbox.index} onClose={() => setLightbox(null)} />}
     </aside>
   )
 }

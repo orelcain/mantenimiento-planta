@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
@@ -87,6 +87,11 @@ const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string
 }
 
 type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
+
+/** Fotos de una fila: las de bodega (reales del físico) primero, luego las del catálogo. */
+function fotosDeFila(r: { fotos?: string[]; fotosCatalogo?: string[] }): string[] {
+  return [...(r.fotos ?? []), ...(r.fotosCatalogo ?? [])].filter(Boolean)
+}
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
   primary: { text: 'text-brand-ink',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
@@ -300,7 +305,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
 
   // Lightbox de fotos desde la miniatura de la fila (sin pasar por el detalle)
-  const [rowLightbox, setRowLightbox] = useState<string[] | null>(null)
+  const [rowLightbox, setRowLightbox] = useState<{ photos: string[]; index: number } | null>(null)
   // rowKey cuyo SAP se acaba de copiar (feedback ✓ en la fila)
   const [copiedSapKey, setCopiedSapKey] = useState<string | null>(null)
   const copySapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -425,6 +430,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // Los favoritos salen del hook compartido: la misma lista que usan el expediente y Bodega.
   const { favKeys, toggleFav } = useRepuestoFavoritos(user?.id)
   const [repFavOnly, setRepFavOnly] = useState(false)
+  // Móvil: «Con fotos» — la tira de miniaturas solo existe en filas con foto (4 % de las filas).
+  const [repConFotos, setRepConFotos] = useState(false)
   // Filtro "Comunes": repuestos de la lista curada COMPARTIDA (commonPartsByMachine
   // estática + marca `comunEn` del doc), la misma que se ve en la pestaña "Repuestos
   // comunes" del Aprendizaje. Distinto de los favoritos (personales por usuario).
@@ -883,6 +890,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     let res = scopedRepuestos
     if (repFavOnly) res = res.filter(esFavoritoDe(favKeys))
     if (repComunOnly) res = res.filter(esComun)
+    if (repConFotos) res = res.filter((r) => fotosDeFila(r).length > 0)
     if (listFilter !== 'all') {
       const l = favLists.find((x) => x.name === listFilter)
       const ids = new Set(l?.repuestoIds ?? [])
@@ -914,7 +922,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       })
     }
     return res
-  }, [scopedRepuestos, repFavOnly, repComunOnly, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
+  }, [scopedRepuestos, repFavOnly, repComunOnly, repConFotos, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
 
   // Cuántos favoritos tuyos hay EN ESTE alcance (equipo o área), no en toda la planta: el
   // filtro ya trabajaba sobre el alcance, pero el contador mostraba el total global — decía
@@ -953,10 +961,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     (!repSoloSap ? 1 : 0) +
     (repFavOnly ? 1 : 0) +
     (repComunOnly ? 1 : 0) +
+    (repConFotos ? 1 : 0) +
     (listFilter !== 'all' ? 1 : 0)
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repComunOnly, listFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repComunOnly, repConFotos, listFilter, repPageSize])
 
   // Si la búsqueda/filtros dejan fuera al repuesto seleccionado, cerrar el panel
   // de detalle: evita que quede "pegado" mostrando un repuesto que ya no está
@@ -2007,6 +2016,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   <span className="tabular-nums opacity-70">({comunesEnScope})</span>
                 </Button>
               )}
+              <Button
+                variant={repConFotos ? 'default' : 'outline'}
+                size="sm"
+                className={['min-h-[44px] gap-1.5', repConFotos ? '' : 'md:hidden'].join(' ')}
+                onClick={() => setRepConFotos((v) => !v)}
+                aria-pressed={repConFotos}
+              >
+                <ImageIcon className="h-4 w-4" /> Con fotos
+              </Button>
               {favLists.length > 0 && (
                 <Select value={listFilter} onValueChange={setListFilter}>
                   <SelectTrigger className="w-[170px]"><SelectValue placeholder="Lista" /></SelectTrigger>
@@ -2078,7 +2096,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         const dibujo = dibujoDe(figurasDespiece, r.codigoFabricante, maquinaDeDespiece(equipo))
                         const isSel = selectedRowKey === r.rowKey
                         // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
-                        const fotos = [...(r.fotos ?? []), ...(r.fotosCatalogo ?? [])]
+                        const fotos = fotosDeFila(r)
                         // Divisor de tier: primera fila sin SAP (despiece) tras las con-SAP.
                         const showDespieceDivider = !r.codigoSAP && (idx === 0 || !!pagedRep[idx - 1]?.codigoSAP)
                         return (
@@ -2100,7 +2118,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             <td className="hidden px-2 py-1.5 md:table-cell">
                               {fotos.length > 0 && fotos[0] ? (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); setRowLightbox(fotos) }}
+                                  onClick={(e) => { e.stopPropagation(); setRowLightbox({ photos: fotos, index: 0 }) }}
                                   className="group relative block h-9 w-9 overflow-hidden rounded-ctl ring-1 ring-border transition hover:ring-primary/60"
                                   title="Ver fotos"
                                   aria-label="Ver fotos del repuesto"
@@ -2199,6 +2217,26 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   </button>
                                 )}
                               </div>
+                              {/* Móvil: tira de hasta 3 miniaturas SOLO si la fila tiene fotos (el 96 %
+                                  no tiene: sin cajón vacío). Cada una abre el visor en ESA foto. */}
+                              {fotos.length > 0 && (
+                                <div className="mt-2.5 grid grid-cols-3 gap-2 md:hidden">
+                                  {fotos.slice(0, 3).map((src, i) => (
+                                    <button
+                                      key={src}
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); setRowLightbox({ photos: fotos, index: i }) }}
+                                      className="relative aspect-[16/10] overflow-hidden rounded-ctl ring-1 ring-inset ring-border"
+                                      aria-label={`Ver foto ${i + 1} de ${fotos.length} de ${r.textoBreve || 'el repuesto'}`}
+                                    >
+                                      <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+                                      {i === 2 && fotos.length > 3 && (
+                                        <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-subhead font-semibold text-white">+{fotos.length - 3}</span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td className="hidden px-3 py-2 text-xs lg:table-cell" onClick={(e) => e.stopPropagation()}>
                               {editApodosKey === r.rowKey ? (
@@ -2331,6 +2369,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           item={selectedRep}
           plantaDe={plantaDe}
           areaName={showingAll ? 'Todas las áreas' : (formatNombreSAP(selectedNode?.nombre).nombre || selectedNode?.nombre || '')}
+          volverA={formatNombreSAP(selectedEquipName).nombre || selectedEquipName || undefined}
           onClose={() => setSelectedRowKey(null)}
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}
@@ -2794,7 +2833,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       </Dialog>
 
       {/* Lightbox de fotos abierto desde la miniatura de una fila */}
-      {rowLightbox && <ImageLightbox photos={rowLightbox} onClose={() => setRowLightbox(null)} />}
+      {rowLightbox && <ImageLightbox photos={rowLightbox.photos} initialIndex={rowLightbox.index} onClose={() => setRowLightbox(null)} />}
 
     </div>
   )
