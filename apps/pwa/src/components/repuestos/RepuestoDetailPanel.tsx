@@ -281,11 +281,21 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
 
   const navigate = useNavigate()
   const hayItem = !!item
-  // Teléfono: el detalle es pantalla completa → la burbuja del chat se esconde (tapaba la barra inferior).
+  // Bajo md (<768 px) la lista usa la fila móvil: la burbuja del chat se esconde mientras el detalle esté abierto.
+  // En <640 el detalle es pantalla completa; entre 640 y 767 es el panel lateral y la burbuja tapaba su «Ver».
+  const [bajoMd, setBajoMd] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches)
   useEffect(() => {
-    if (isDesktop || !hayItem) return
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 767px)')
+    const alCambiar = () => setBajoMd(mq.matches)
+    alCambiar()
+    mq.addEventListener('change', alCambiar)
+    return () => mq.removeEventListener('change', alCambiar)
+  }, [])
+  useEffect(() => {
+    if (!bajoMd || !hayItem) return
     return levantarPantallaCompletaMovil()
-  }, [isDesktop, hayItem])
+  }, [bajoMd, hayItem])
 
   const copySap = useCallback(() => {
     if (!sap) return
