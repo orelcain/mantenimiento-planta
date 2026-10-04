@@ -58,6 +58,8 @@ export interface ListCellProps extends Omit<React.HTMLAttributes<HTMLDivElement>
   valueSub?: React.ReactNode
   /** Slot libre a la derecha (Pill, Switch…). Va antes del chevron. */
   trailing?: React.ReactNode
+  /** Renglón gris opcional entre título y subtítulo (p. ej. el nombre SAP bajo un nombre común). */
+  detail?: React.ReactNode
   /** Muestra el chevron de navegación. Se activa solo si hay onClick. */
   chevron?: boolean
   /**
@@ -73,6 +75,7 @@ export function ListCell({
   leading,
   title,
   subtitle,
+  detail,
   value,
   valueSub,
   trailing,
@@ -134,6 +137,9 @@ export function ListCell({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className={cn('line-clamp-2 text-body leading-tight sm:truncate',
           esHijo ? 'font-normal' : 'font-semibold')}>{title}</div>
+        {detail && (
+          <div className="line-clamp-1 text-footnote leading-tight text-muted-foreground">{detail}</div>
+        )}
         {subtitle && (
           <div className="line-clamp-1 text-footnote leading-tight text-muted-foreground">{subtitle}</div>
         )}

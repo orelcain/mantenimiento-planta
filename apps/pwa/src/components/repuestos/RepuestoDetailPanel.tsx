@@ -21,7 +21,7 @@ import { AREA_TACTIL, AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button as PielButton, ListGroup, ListCell } from '@/components/piel'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
 import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
@@ -312,6 +312,11 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   const photo = allPhotos[0]
   const ultimo = movs && movs.length > 0 ? movs[0] : null
   const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
+  // Nombre común primero: el título es el 1er nombre común y el nombre SAP queda en su propio renglón gris.
+  const nv = nombreVisible(item)
+  const etiquetasNombre = nv.etiquetas.map((et) => (
+    <span key={et} className="mr-1.5 inline-block rounded-ctl bg-muted px-1.5 py-0.5 align-middle text-caption font-medium text-muted-foreground">{et}</span>
+  ))
 
   // Secciones de abajo (común, manuales, descripción, campos, stock, conteo, ubicación,
   // movimientos): idénticas en teléfono y escritorio, por eso se definen una sola vez.
@@ -436,7 +441,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               {!editApodos && (
                 <span className="flex min-w-0 items-center gap-1.5 text-right text-footnote font-medium text-foreground">
                   <span className="min-w-0 truncate" title={(item.nombresComunes ?? []).join(', ')}>
-                    {(item.nombresComunes && item.nombresComunes.length) ? item.nombresComunes.join(', ') : '—'}
+                    {nv.esComun ? nv.titulo : '—'}
                   </span>
                   {onSaveApodos && (
                     <button onClick={startEditApodos} className="shrink-0 rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Editar nombres comunes" aria-label="Editar nombres comunes">
@@ -446,6 +451,9 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                 </span>
               )}
             </div>
+            {!editApodos && nv.otros.length > 0 && (
+              <p className="mt-0.5 break-words text-footnote text-muted-foreground">También se busca como: {nv.otros.join(', ')}</p>
+            )}
             {editApodos && (
               <div className="mt-2 space-y-2">
                 <Input
@@ -456,7 +464,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                     if (e.key === 'Enter') saveApodos()
                     else if (e.key === 'Escape') setEditApodos(false)
                   }}
-                  placeholder="apodos, separados por coma"
+                  placeholder="nombres comunes, separados por coma (el primero se muestra como título)"
                   className="h-8 text-xs"
                   disabled={savingApodos}
                 />
@@ -611,7 +619,6 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   )
 
   if (!isDesktop) {
-    const nombreFmt = formatNombreSAP(item.textoBreve).nombre || item.textoBreve || '(sin nombre)'
     const hayMenu = !!onAddToList || (isAdmin && (!!onEditRepuesto || !!onDeleteRepuesto))
     const tonoStock = item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'
     return (
@@ -663,17 +670,37 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         <div className="flex-1 overflow-y-auto pb-[calc(104px+env(safe-area-inset-bottom))]">
           {/* Nombre */}
           <div className="px-4 pt-1">
-            {isAdmin && onRename ? (
-              <InlineEditName
-                value={item.textoBreve || ''}
-                onSave={onRename}
-                canEdit
-                placeholder="(sin nombre)"
-                textClassName="text-title2 font-bold"
-                inputClassName="text-title2 font-bold"
-              />
+            {nv.esComun ? (
+              <>
+                <h2 className="text-title2 font-bold text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+                {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
+                  <InlineEditName
+                    value={item.textoBreve || ''}
+                    display={nv.oficial ?? `Nombre SAP: ${nv.titulo}`}
+                    onSave={onRename}
+                    canEdit
+                    textClassName="break-words text-subhead text-muted-foreground"
+                    inputClassName="text-subhead"
+                  />
+                ) : (
+                  <p className="break-words text-subhead text-muted-foreground">{nv.oficial}</p>
+                ))}
+              </>
+            ) : isAdmin && onRename ? (
+              <h2 className="text-title2 font-bold text-foreground">
+                {etiquetasNombre}
+                <InlineEditName
+                  value={item.textoBreve || ''}
+                  display={nv.titulo}
+                  onSave={onRename}
+                  canEdit
+                  placeholder="(sin nombre)"
+                  textClassName="text-title2 font-bold"
+                  inputClassName="text-title2 font-bold"
+                />
+              </h2>
             ) : (
-              <h2 className="text-title2 font-bold text-foreground">{nombreFmt}</h2>
+              <h2 className="text-title2 font-bold text-foreground">{etiquetasNombre}{nv.titulo}</h2>
             )}
           </div>
           {/* SAP + copiar (44×44: a la derecha hay espacio) */}
@@ -829,23 +856,44 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               onClick={() => setLightbox(allPhotos.length ? { photos: allPhotos, index: 0 } : null)}
               className="overflow-hidden rounded-card border border-border transition hover:ring-2 hover:ring-primary"
             >
-              <img src={photo} alt={item.textoBreve} className="h-32 w-full max-w-[280px] object-cover" />
+              <img src={photo} alt={nv.titulo} className="h-32 w-full max-w-[280px] object-cover" />
             </button>
           </div>
         )}
 
         {/* Nombre + SAP */}
-        {isAdmin && onRename ? (
-          <InlineEditName
-            value={item.textoBreve || ''}
-            onSave={onRename}
-            canEdit
-            placeholder="(sin nombre)"
-            textClassName="text-base font-bold leading-tight text-foreground"
-            inputClassName="text-base font-bold leading-tight"
-          />
+        {nv.esComun ? (
+          <>
+            <h2 className="text-base font-bold leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+            {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
+              <InlineEditName
+                value={item.textoBreve || ''}
+                display={nv.oficial ?? `Nombre SAP: ${nv.titulo}`}
+                onSave={onRename}
+                canEdit
+                className="mt-0.5"
+                textClassName="break-words text-footnote text-muted-foreground"
+                inputClassName="text-footnote"
+              />
+            ) : (
+              <p className="mt-0.5 break-words text-footnote text-muted-foreground">{nv.oficial}</p>
+            ))}
+          </>
+        ) : isAdmin && onRename ? (
+          <h2 className="text-base font-bold leading-tight text-foreground">
+            {etiquetasNombre}
+            <InlineEditName
+              value={item.textoBreve || ''}
+              display={nv.titulo}
+              onSave={onRename}
+              canEdit
+              placeholder="(sin nombre)"
+              textClassName="text-base font-bold leading-tight text-foreground"
+              inputClassName="text-base font-bold leading-tight"
+            />
+          </h2>
         ) : (
-          <h2 className="text-base font-bold leading-tight text-foreground">{item.textoBreve || '(sin nombre)'}</h2>
+          <h2 className="text-base font-bold leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
         )}
         <div className="mb-3 mt-1.5 flex flex-wrap items-center gap-2">
           {item.clase && (

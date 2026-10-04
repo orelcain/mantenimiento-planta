@@ -35,6 +35,7 @@ import { useBodega } from '@/hooks/repuestos/useBodega'
 import { Tag as CatTag, type TagTone, ListGroup, ListCell, SwipeRow } from '@/components/piel'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { cn } from '@/lib/utils'
 import { CargaRapidaModal } from '@/components/repuestos/CargaRapidaModal'
 import type {
@@ -335,7 +336,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     if (searchQuery.trim()) {
       const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
       result = result.filter(i => {
-        const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
+        const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${(i.nombresComunes ?? []).join(' ')} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
         return haystackMatchesAll(h, terms)
       })
     }
@@ -522,11 +523,14 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
               onClick={() => setAlertasAbiertas(v => !v)}
               aria-expanded={alertasAbiertas}
             />
-            {alertasAbiertas && stats.alertas.slice(0, 10).map(item => (
+            {alertasAbiertas && stats.alertas.slice(0, 10).map(item => {
+              const nv = nombreVisible(item)
+              return (
               <ListCell
                 key={item.codigoSAP}
                 variant="child"
-                title={<span className="font-normal">{formatNombreSAP(item.textoBreve).nombre || item.codigoSAP}</span>}
+                title={<span className="font-normal">{nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : item.codigoSAP}</span>}
+                detail={nv.oficial}
                 subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(' · ')}
                 trailing={
                   <span className="flex flex-col items-end">
@@ -536,7 +540,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
                 }
                 onClick={() => setDrawerItem(item)}
               />
-            ))}
+              )
+            })}
             {alertasAbiertas && stats.alertas.length > 10 && (
               <ListCell variant="child" title={<span className="font-medium text-brand-ink">Ver todas las alertas</span>} onClick={() => setStockFilter('bajo')} />
             )}
@@ -1685,7 +1690,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
   // Foto propia de bodega o, en su defecto, del catálogo (fotosReales/manual).
   const foto = item.fotos?.[0] || item.fotosCatalogo?.[0]
   // Presentación: formato oración con siglas protegidas; el dato SAP no se toca.
-  const { nombre, etiquetas } = formatNombreSAP(item.textoBreve)
+  const nv = nombreVisible(item)
 
   // DESIGN.md §10: la cifra va en tinta de etiqueta; el ESTADO es el rótulo de
   // 13 px debajo. Nada de canto de color, fondo teñido ni barra en la lista.
@@ -1726,11 +1731,12 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
         }
         title={
           <span className="font-normal">
-            {etiquetas.map(e => <CatTag key={e} tone="neutral" className="mr-1.5 align-[2px]">{e}</CatTag>)}
+            {nv.etiquetas.map(e => <CatTag key={e} tone="neutral" className="mr-1.5 align-[2px]">{e}</CatTag>)}
             {item.isWatched && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
-            {nombre || <span className="italic text-muted-foreground">Sin nombre · SAP {item.codigoSAP}</span>}
+            {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre · SAP {item.codigoSAP}</span>}
           </span>
         }
+        detail={nv.oficial}
         subtitle={meta}
         trailing={
           <span className="flex flex-col items-end">
