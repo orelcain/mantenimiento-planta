@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { unicosPorId, idsDelAlcance } from '../alcanceDeExportacion'
+import { unicosPorId, idsDelAlcance, hayAlgoQueExportar } from '../alcanceDeExportacion'
+
+describe('hayAlgoQueExportar', () => {
+  it.each([
+    { caso: 'sin selección ni búsqueda', areaId: null, mostrandoTodo: false, equipoKey: null, busqueda: '', esperado: false },
+    { caso: 'con búsqueda de solo espacios', areaId: null, mostrandoTodo: false, equipoKey: null, busqueda: '   ', esperado: false },
+    { caso: 'con búsqueda', areaId: null, mostrandoTodo: false, equipoKey: null, busqueda: ' rodamiento ', esperado: true },
+    { caso: 'con equipo', areaId: null, mostrandoTodo: false, equipoKey: 'equipo-1', busqueda: '', esperado: true },
+    { caso: 'con área', areaId: 'area-1', mostrandoTodo: false, equipoKey: null, busqueda: '', esperado: true },
+    { caso: 'con todas las áreas', areaId: null, mostrandoTodo: true, equipoKey: null, busqueda: '', esperado: true },
+  ])('$caso devuelve $esperado', ({ esperado, areaId, mostrandoTodo, equipoKey, busqueda }) => {
+    expect(hayAlgoQueExportar({ areaId, mostrandoTodo, equipoKey, busqueda })).toBe(esperado)
+  })
+})
 
 /** El catálogo real: una fila por cada equipo donde sirve la pieza. */
 const catalogoConRepeticiones = [

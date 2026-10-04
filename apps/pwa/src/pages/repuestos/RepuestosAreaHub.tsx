@@ -65,6 +65,8 @@ import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
+import { cn } from '@/lib/utils'
+import { hayAlgoQueExportar } from '@/utils/repuestos/alcanceDeExportacion'
 import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
 import { RepuestosEntrada, type AreaFila, type ListaFavoritos, type RecienteVisible } from '@/components/repuestos/RepuestosEntrada'
 import { restoreEquipToList, type FavoritoQuitado } from '@/utils/repuestos/favoritosListas'
@@ -1669,9 +1671,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // Herramientas admin de catálogo — compartidas entre toolbar desktop y overflow móvil.
   // (Fase 4) Importar / duplicados / gestor de máquinas quedaron fuera: eran
   // machine-bound; se reimplementan sobre la colección plana en Fase 5.
-  const adminTools = isAdmin
+  // Sin área, equipo ni búsqueda no hay nada que exportar: el teléfono lo dice en vez de abrir el
+  // Centro de Reportes vacío («0 ítems»). La barra del PC no cambia.
+  const puedeExportar = hayAlgoQueExportar({ areaId: selectedAreaId, mostrandoTodo: showingAll, equipoKey: selectedEquipKey, busqueda: repQuery })
+  const adminTools: Array<{ key: string; icon: typeof Download; label: string; onClick: () => void; badge?: number; deshabilitada?: boolean; motivo?: string }> = isAdmin
     ? [
-        { key: 'export', icon: Download, label: 'Exportar reporte', onClick: () => setExportOpen(true) },
+        { key: 'export', icon: Download, label: 'Exportar reporte', onClick: () => setExportOpen(true), deshabilitada: !puedeExportar, motivo: 'Elige un equipo o un área primero' },
         { key: 'audit', icon: History, label: 'Historial de cambios', onClick: () => setAuditLogOpen(true) },
         { key: 'trash', icon: Trash2, label: 'Papelera', onClick: () => setTrashOpen(true), badge: trashCount },
       ]
@@ -1845,9 +1850,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   key={t.key}
                   leading={<CellIcon tone="neutral"><Icon aria-hidden /></CellIcon>}
                   title={t.label}
+                  subtitle={t.deshabilitada ? t.motivo : undefined}
                   value={t.badge ? t.badge : undefined}
-                  onClick={() => { setMenuMasOpen(false); t.onClick() }}
-                  className={celdaMenu}
+                  onClick={t.deshabilitada ? undefined : () => { setMenuMasOpen(false); t.onClick() }}
+                  aria-disabled={t.deshabilitada || undefined}
+                  className={cn(celdaMenu, t.deshabilitada && 'opacity-50')}
                 />
               )
             })}
@@ -1925,7 +1932,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         <button
                           key={t.key}
                           onClick={() => { t.onClick(); setAdminMenuOpen(false) }}
-                          className="flex w-full items-center gap-2.5 rounded-ctl px-2.5 py-2.5 text-left text-sm text-foreground hover:bg-muted/50"
+                          disabled={t.deshabilitada}
+                          title={t.deshabilitada ? t.motivo : undefined}
+                          className="flex w-full items-center gap-2.5 rounded-ctl px-2.5 py-2.5 text-left text-sm text-foreground hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50"
                         >
                           <Icon className="h-4 w-4 text-muted-foreground" />
                           <span className="flex-1">{t.label}</span>
