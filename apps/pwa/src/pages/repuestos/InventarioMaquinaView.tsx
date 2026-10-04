@@ -7,6 +7,7 @@ import {
   type ColumnaOrden, type FiltroDif, type FiltroEstado, type FiltrosTabla,
 } from '@/utils/repuestos/inventarioTabla'
 import { rutaDibujo, useFigurasDespiece, useManualesPieza } from './enlacesPieza'
+import { nombreParaTexto } from '@/utils/repuestos/nombrePorSap'
 import type { useBodega, InventarioLinea, InventarioSesion, MotivoDuda, BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
 /**
@@ -38,6 +39,22 @@ function buscarEnMaestro(items: BodegaMergedItem[], codigo: string): BodegaMerge
 }
 
 type Guardar = (l: InventarioLinea, d: Parameters<ReturnType<typeof useBodega>['validarLinea']>[2]) => Promise<void>
+
+/**
+ * Nombre común primero: si la línea trae nombre común ese es el título y el nombre SAP va
+ * debajo en gris. Sin nombre común queda el texto SAP tal cual llega del cuaderno (esta vista
+ * se cuadra contra el papel, así que no se reformatea). No toca el dato.
+ */
+const claveNombre = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, '')
+const tituloDe = (l: InventarioLinea): string => {
+  const comun = l.nombreComun?.trim()
+  return comun ? comun.charAt(0).toUpperCase() + comun.slice(1) : nombreDe(l)
+}
+const subtituloDe = (l: InventarioLinea): string => {
+  const comun = l.nombreComun?.trim()
+  const sap = nombreDe(l)
+  return comun && sap && claveNombre(sap) !== claveNombre(comun) ? sap : ''
+}
 
 /**
  * Al ir del inventario al dibujo en el teléfono (misma pestaña), al volver
@@ -469,8 +486,8 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
                       {l.codigoCuaderno !== l.codigoFabricante && <span className="block text-caption text-muted-foreground">cuaderno: {l.codigoCuaderno}</span>}
                     </td>
                     <td className="border-b border-border/40 px-2 py-2">
-                      {nombreDe(l) || <span className="text-muted-foreground/60">—</span>}
-                      {l.nombreComun && <span className="text-muted-foreground"> · {l.nombreComun}</span>}
+                      {tituloDe(l) || <span className="text-muted-foreground/60">—</span>}
+                      {subtituloDe(l) && <span className="block text-footnote text-muted-foreground">{subtituloDe(l)}</span>}
                     </td>
                     <td className="border-b border-border/40 px-2 py-2 font-mono">{l.codigoSAP || <span className="text-muted-foreground/60">sin SAP</span>}</td>
                     <td className="border-b border-border/40 px-2 py-2 text-right font-semibold tabular-nums">
@@ -664,14 +681,14 @@ function FilaValidada({ linea: l, items, onGuardar }: {
         <div className="min-w-0 flex-1">
           <p className="truncate text-body font-medium text-foreground">
             {item?.isWatched && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
-            {l.textoBreve || l.descripcion || 'Sin nombre'}
+            {tituloDe(l) || 'Sin nombre'}
           </p>
+          {subtituloDe(l) && <p className="truncate text-footnote text-muted-foreground">{subtituloDe(l)}</p>}
           <p className="text-footnote text-muted-foreground">
             <span className="font-mono tabular-nums">{l.codigoFabricante}</span>
             {' · '}
             {l.codigoSAP ? <span className="font-mono tabular-nums">SAP {l.codigoSAP}</span> : <span className="text-ink-warn">sin SAP</span>}
             {l.codigoCuaderno && l.codigoCuaderno !== l.codigoFabricante && <> · cuaderno: <span className="font-mono">{l.codigoCuaderno}</span></>}
-            {l.nombreComun && <> · {l.nombreComun}</>}
           </p>
           {l.nombrePendiente && <Tag tone={5} className="mt-1">Confirmar nombre</Tag>}
         </div>
@@ -691,7 +708,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
       </button>
 
       <Sheet open={acciones} onClose={() => setAcciones(false)}
-             title={l.textoBreve || l.descripcion || l.codigoFabricante}
+             title={tituloDe(l) || l.codigoFabricante}
              description={<span className="font-mono tabular-nums">{l.codigoFabricante}{l.codigoSAP ? ` · SAP ${l.codigoSAP}` : ''} · {l.ubicacion}</span>}>
         <ListGroup>
           {l.nombrePendiente && (
@@ -877,7 +894,7 @@ function FormularioLinea({ linea: l, items, textoBoton, onGuardar, onCancelar }:
       )}
       <p className="text-footnote text-muted-foreground">
         {enMaestro
-          ? <>En el maestro: <b className="text-foreground">{enMaestro.textoBreve}</b> · SAP <span className="font-mono">{enMaestro.codigoSAP}</span>{enMaestro.bodegaId ? ` · stock sistema ${enMaestro.stockActual}` : ' · sin stock configurado en bodega'}</>
+          ? <>En el maestro: <b className="text-foreground">{nombreParaTexto(enMaestro)}</b> · SAP <span className="font-mono">{enMaestro.codigoSAP}</span>{enMaestro.bodegaId ? ` · stock sistema ${enMaestro.stockActual}` : ' · sin stock configurado en bodega'}</>
           : codigo.trim().length >= 4 ? 'Ese código no tiene SAP en el maestro: se puede validar igual y asignar el SAP a mano.' : ''}
       </p>
       <label className="flex flex-col gap-1">
@@ -887,7 +904,7 @@ function FormularioLinea({ linea: l, items, textoBoton, onGuardar, onCancelar }:
                className={`${campo} font-mono tabular-nums`} />
       </label>
       {sap.trim() && !itemSap && <p className="text-footnote text-ink-warn">Ese SAP no está en la bodega de la app.</p>}
-      {itemSap && sapTocado && <p className="text-footnote text-muted-foreground">SAP {itemSap.codigoSAP}: {itemSap.textoBreve}</p>}
+      {itemSap && sapTocado && <p className="text-footnote text-muted-foreground">SAP {itemSap.codigoSAP}: {nombreParaTexto(itemSap)}</p>}
       {err && <p className="text-footnote text-ink-crit">{err}</p>}
       <div className="flex gap-2">
         <Button variant="filled" onClick={enviar} disabled={!valido || guardando}>

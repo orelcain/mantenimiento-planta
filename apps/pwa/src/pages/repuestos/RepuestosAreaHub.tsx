@@ -65,6 +65,7 @@ import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
+import { indicePorSap, nombreVisiblePorSap, tituloOCodigo } from '@/utils/repuestos/nombrePorSap'
 import { cn } from '@/lib/utils'
 import { hayAlgoQueExportar } from '@/utils/repuestos/alcanceDeExportacion'
 import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
@@ -235,6 +236,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const { allRepuestos, loadAll, loadArea, loaded: repuestosLoaded, loading: repuestosLoading, catalogoCompleto, areasCargadas } = useGlobalSearch(machines)
   // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
   const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock, registrarSalidaDeSolicitud, overlayDeSap, registrarConteoRapido } = useBodega(allRepuestos)
+  // SAP -> repuesto del catálogo cargado: resuelve el nombre común de lo que solo guarda `textoBreve`.
+  const indiceNombresPorSap = useMemo(() => indicePorSap(bodegaItems), [bodegaItems])
 
   // membership repuesto(machineId) → área: vía equipment cache, con fallback a ancestría directa
   const machineInArea = useCallback(
@@ -394,7 +397,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               user.id,
               user.nombre,
             )
-            const nombre = sol.textoBreve || sol.codigoSAP
+            const nombre = nombreVisiblePorSap(indiceNombresPorSap, sol.codigoSAP, sol.textoBreve).titulo
             if (plan.accion === 'sin-bodega') {
               toast({ title: 'Entregada sin descontar stock', description: `${nombre} no tiene registro en bodega.` })
             } else if (plan.faltante > 0) {
@@ -414,7 +417,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       }
       await avanzarEstado(id, next, user?.id ?? '', user?.nombre ?? '')
     },
-    [solicitudes, user, registrarSalidaDeSolicitud, avanzarEstado, toast],
+    [solicitudes, user, registrarSalidaDeSolicitud, avanzarEstado, toast, indiceNombresPorSap],
   )
   const [actionTarget, setActionTarget] = useState<{ kind: RepAction; source: GlobalSearchResult } | null>(null)
   const [equipoPicker, setEquipoPicker] = useState<{ kind: RepAction; sources: GlobalSearchResult[] } | null>(null)
@@ -701,11 +704,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       // Antes el formulario solo se cerraba: nada decía que la solicitud había salido ni dónde verla.
       toast({
         title: 'Solicitud creada',
-        description: `${data.textoBreve || data.codigoSAP} ×${data.cantidad}. Queda en «Solicitudes» y se avisa al grupo de Mantención en Telegram.`,
+        description: `${nombreVisiblePorSap(indiceNombresPorSap, data.codigoSAP, data.textoBreve).titulo} ×${data.cantidad}. Queda en «Solicitudes» y se avisa al grupo de Mantención en Telegram.`,
         variant: 'success',
       })
     },
-    [crearSolicitud, user, toast],
+    [crearSolicitud, user, toast, indiceNombresPorSap],
   )
 
   // Persistir selección
@@ -837,7 +840,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Piezas de la máquina enfocada, como las ve «Solicitar repuestos»: comunes, stock y BOM.
   const piezasDeLaMaquina = useMemo<PiezaSolicitable[]>(() => scopedRepuestos.map((r) => ({
-    clave: r.rowKey, codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, codigoFabricante: r.codigoFabricante || undefined,
+    clave: r.rowKey, codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, codigoFabricante: r.codigoFabricante || undefined,
     comun: esComun(r), cantidadPorMaquina: r.cantidadPorMaquina, stock: stockDeSolicitud(r),
   })), [scopedRepuestos])
 
@@ -941,7 +944,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Opciones para el selector del modal de solicitud (repuestos del área con SAP)
   const solicitarOptions = useMemo<RepuestoLite[]>(
-    () => areaRepuestos.map((r) => ({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, stock: stockDeSolicitud(r) })),
+    () => areaRepuestos.map((r) => ({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, stock: stockDeSolicitud(r) })),
     [areaRepuestos],
   )
 
@@ -1488,11 +1491,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Índice para detectar duplicados al crear (por SAP exacto o nombre normalizado).
   const dupIndex = useMemo(() => {
-    const bySap = new Map<string, { id: string; textoBreve: string; codigoSAP: string }>()
-    const byName = new Map<string, { id: string; textoBreve: string; codigoSAP: string }>()
+    type Dup = { id: string; textoBreve: string; codigoSAP: string; nombresComunes?: string[] }
+    const bySap = new Map<string, Dup>()
+    const byName = new Map<string, Dup>()
     for (const r of allRepuestos) {
       const sap = (r.repuesto.codigoSAP || '').trim()
-      const entry = { id: r.repuesto.id, textoBreve: r.repuesto.textoBreve, codigoSAP: sap }
+      const entry = { id: r.repuesto.id, textoBreve: r.repuesto.textoBreve, codigoSAP: sap, nombresComunes: r.repuesto.nombresComunes }
       if (sap && !bySap.has(sap)) bySap.set(sap, entry)
       const nm = normalizeForSearch(r.repuesto.textoBreve)
       if (nm && !byName.has(nm)) byName.set(nm, entry)
@@ -2662,7 +2666,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onClose={() => setSelectedRowKey(null)}
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}
-          onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, stock: stockDeSolicitud(r) })}
+          onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, stock: stockDeSolicitud(r) })}
           onAssignSap={!selectedRep.codigoSAP ? () => { setAsignarSapValue(''); setAsignarSapOpen(true) } : undefined}
           onAssignEquipo={() => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
           isAdmin={isAdmin}
@@ -2708,6 +2712,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         solicitudes={solicitudes}
         loading={solicitudesLoading}
         onAvanzar={handleAvanzarSolicitud}
+        nombreDe={(sap, texto) => nombreVisiblePorSap(indiceNombresPorSap, sap, texto)}
         stockDe={(sap) => {
           const o = overlayDeSap(sap)
           return o ? { configurado: true, stockActual: o.stockActual, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega } : { configurado: false }
@@ -2956,7 +2961,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             <DialogContent className="max-w-sm">
               <DialogHeader>
                 <DialogTitle className="text-base">Agregar a lista</DialogTitle>
-                <DialogDescription className="truncate">{row?.textoBreve || row?.codigoSAP || 'Repuesto'}</DialogDescription>
+                <DialogDescription className="truncate">{row ? tituloOCodigo(row) : 'Repuesto'}</DialogDescription>
               </DialogHeader>
               <div className="space-y-1.5">
                 {favLists.length === 0 && <p className="text-xs text-muted-foreground">Aún no tienes listas. Crea una abajo.</p>}
@@ -3050,7 +3055,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           fotosReales={actionRep.fotosReales || []}
           imagenesManual={actionRep.imagenesManual || []}
           gallery={actionRep.gallery || []}
-          repuestoName={actionRep.textoBreve || actionRep.codigoSAP || 'Repuesto'}
+          repuestoName={tituloOCodigo(actionRep)}
           isAdmin={isAdmin}
           machineId={actionMachineId}
           repuestoId={actionRep.id}
@@ -3076,7 +3081,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           <DialogHeader>
             <DialogTitle className="text-base">Eliminar repuesto</DialogTitle>
             <DialogDescription>
-              Se moverá a la papelera (recuperable). {actionRep ? `"${actionRep.textoBreve || actionRep.codigoSAP}"` : ''}
+              Se moverá a la papelera (recuperable). {actionRep ? `"${tituloOCodigo(actionRep)}"` : ''}
               {actionMachine ? ` — equipo ${actionMachine.nombre}` : ''}
             </DialogDescription>
           </DialogHeader>

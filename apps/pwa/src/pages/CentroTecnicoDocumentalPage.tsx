@@ -1529,6 +1529,7 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
   const { toast } = useToast()
   const piezasSolicitables = useMemo<PiezaSolicitable[]>(() => repuestos.map((r) => ({
     clave: r.id, codigoSAP: r.codigoSAP, textoBreve: r.nombre, codigoFabricante: r.codigoFabricante,
+    nombresComunes: (r.doc as { nombresComunes?: string[] }).nombresComunes,
     comun: esComun({ rowKey: r.id, codigoSAP: r.codigoSAP, comunEn: (r.doc as { comunEn?: unknown[] }).comunEn }),
     cantidadPorMaquina: r.cantidadPorMaquina,
   })), [repuestos])
