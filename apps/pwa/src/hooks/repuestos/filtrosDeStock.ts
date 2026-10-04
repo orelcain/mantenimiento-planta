@@ -1,4 +1,4 @@
-import { stockStatusOf, type ItemConStock } from './estadoDeStock'
+import { esAlertaDeStock, stockStatusOf, type ItemConStock } from './estadoDeStock'
 
 /**
  * Un filtro de stock = UN predicado. El contador y la lista salen del mismo.
@@ -19,7 +19,7 @@ import { stockStatusOf, type ItemConStock } from './estadoDeStock'
  * volver a divergir. Si mañana se agrega un filtro, se agrega aquí y el contador viene gratis.
  */
 
-export type StockFilterKey = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
+export type StockFilterKey = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos' | 'alertas'
 
 /** Lo mínimo que necesita un ítem para poder clasificarse. */
 export interface ItemFiltrable extends ItemConStock {
@@ -33,6 +33,7 @@ export const FILTROS_DE_STOCK: Record<StockFilterKey, (item: ItemFiltrable) => b
   sin: (i) => stockStatusOf(i) === 'out',
   sinConfig: (i) => !i.bodegaId,
   favoritos: (i) => !!i.isWatched,
+  alertas: esAlertaDeStock,
 }
 
 /** Aplica el filtro. Es la ÚNICA forma en que la lista debe filtrarse. */

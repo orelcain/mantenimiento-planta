@@ -29,7 +29,7 @@ import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
-import { aplicarFiltroDeStock, contarParaFiltro } from '@/hooks/repuestos/filtrosDeStock'
+import { aplicarFiltroDeStock, contarParaFiltro, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 // `Tag` colisiona con el ícono homónimo de lucide ya usado acá.
 import { Tag as CatTag, type TagTone, ListGroup, ListCell, SwipeRow } from '@/components/piel'
@@ -49,10 +49,10 @@ import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
 import { StockTablaPC } from './StockTablaPC'
 import { useEsPC } from '@/hooks/useEsPC'
-import { Pill, SegmentedControl } from '@/components/piel'
+import { Pill, SegmentedControl, Button as PielButton } from '@/components/piel'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
-type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
+type StockFilter = StockFilterKey
 
 const INPUT = 'w-full px-3 py-2 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
 
@@ -186,10 +186,11 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
     { id: 'movimientos', label: 'Movimientos', icon: History },
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
   ]
+  const unicoEnCurso = enCurso.length === 1 ? enCurso[0] : undefined
   const subTabActual = SUB_TABS.find(t => t.id === subTab) ?? { id: 'stock' as BodegaTab, label: 'Stock', icon: Package }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-3 sm:p-6 lg:max-w-[1680px]">
+    <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:p-6 lg:max-w-[1680px]">
       {/* PC: las cuatro vistas a la vista, con cuántos inventarios hay en curso. */}
       <div className="hidden max-w-2xl lg:block">
         <SegmentedControl<BodegaTab>
@@ -202,8 +203,10 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           }))} />
       </div>
       {/* Teléfono: la sub-vista se elige desde el título (patrón Salud / Fitness):
-          evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos. */}
-      <div className="lg:hidden">
+          evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos.
+          El inventario en curso va en la misma fila, a la derecha: un toque y sin gastar
+          una tarjeta de alto encima de la lista. */}
+      <div className="flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -230,10 +233,24 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           })}
         </DropdownMenuContent>
       </DropdownMenu>
+      {subTab === 'stock' && enCurso.length > 0 && (
+        <PielButton
+          variant="tinted"
+          size="md"
+          className="min-w-0 shrink gap-2 px-4 sm:hidden"
+          onClick={() => (unicoEnCurso ? verInventario(unicoEnCurso.id) : setSubTab('inventarios'))}
+          aria-label={unicoEnCurso ? `Inventario en curso: ${unicoEnCurso.nombre}. Abrir` : `${enCurso.length} inventarios en curso. Abrir`}
+        >
+          <span className="size-2 shrink-0 rounded-full bg-ink-warn" aria-hidden />
+          <span className="truncate">{enCurso.length === 1 ? 'Inventario en curso' : `${enCurso.length} en curso`}</span>
+          <ChevronRight className="shrink-0" />
+        </PielButton>
+      )}
       </div>
 
+      {/* Desde sm: el aviso completo, como siempre. Solo en el celular (<sm) lo reemplaza el botón del título. */}
       {subTab === 'stock' && enCurso.map(s => (
-        <div key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+        <div key={s.id} className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
           <ClipboardList className="size-5 shrink-0 text-ink-warn" />
           <div className="min-w-0 flex-1">
             <p className="text-subhead font-semibold text-foreground">{s.nombre}</p>
@@ -346,6 +363,18 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     return result
   }, [items, stockFilter, searchQuery, sortField, sortDir])
 
+  // Desglose de las alertas para el encabezado del filtro «Alertas». La alerta solo vigila
+  // los ítems con mínimo definido; los en cero sin mínimo se aclaran al pie para que el
+  // «Sin stock» de otro chip no parezca contradecirla.
+  const desgloseAlertas = useMemo(() => {
+    const sinStock = stats.alertas.filter(a => a.stockActual === 0).length
+    return {
+      sinStock,
+      bajoMinimo: stats.alertas.length - sinStock,
+      enCeroSinMinimo: Math.max(0, stats.sinStock - sinStock),
+    }
+  }, [stats.alertas, stats.sinStock])
+
   // Las cuatro acciones de la vista (lote, carga rápida, configurar, CSV) viven
   // en un menú «⋯», no como botones de color junto al buscador (DESIGN.md §10).
   const menuAcciones = (
@@ -391,6 +420,19 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     )
   }
 
+  // Con «Alertas» el encabezado dice qué hay dentro (sin stock / bajo mínimo); con una
+  // búsqueda encima, cuántas de las alertas calzan. Los demás filtros: orden · N de total.
+  const ordenadoPor = ({ nombre: 'nombre', sap: 'código SAP', stock: 'stock', valor: 'valor', equipos: 'equipos' } as Record<SortField, string>)[sortField]
+  const enAlertas = stockFilter === 'alertas'
+  const tituloLista = enAlertas
+    ? (searchQuery.trim()
+        ? `Alertas · ${filtered.length} de ${stats.alertas.length}`
+        : ['Alertas', desgloseAlertas.sinStock > 0 && `${desgloseAlertas.sinStock} sin stock`, desgloseAlertas.bajoMinimo > 0 && `${desgloseAlertas.bajoMinimo} bajo mínimo`].filter(Boolean).join(' · '))
+    : `Por ${ordenadoPor} · ${filtered.length} de ${items.length}`
+  const pieLista = enAlertas && !searchQuery.trim() && desgloseAlertas.enCeroSinMinimo > 0
+    ? `${desgloseAlertas.enCeroSinMinimo} más en cero sin mínimo: no alertan porque no tienen mínimo.`
+    : undefined
+
   return (
     <>
       {/* ── Buscar + menú de acciones ── */}
@@ -416,15 +458,19 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {/* ── Filtros como chips (Fotos / App Store) ──
           El elegido va en tinte de marca; el estado es un punto de 8 px, nunca un
           relleno verde/ámbar/rojo. Cuentan con el MISMO predicado que filtra. */}
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
         {([
+          // Primero: es lo que hay que mirar. Filtra con el MISMO predicado que la cifra.
+          ...(stats.alertas.length > 0 || stockFilter === 'alertas'
+            ? [{ key: 'alertas' as StockFilter, label: 'Alertas', dot: 'bg-ink-crit', soloMovil: true }]
+            : []),
           { key: 'configurados', label: 'Configurados' },
           { key: 'todos', label: 'Con SAP' },
           { key: 'bajo', label: 'Bajo stock', dot: 'bg-amber-500' },
           { key: 'sin', label: 'Sin stock', dot: 'bg-red-500' },
           { key: 'sinConfig', label: 'Sin configurar' },
           { key: 'favoritos', label: 'Favoritos', icon: Star },
-        ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star }[]).map(f => {
+        ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star; soloMovil?: boolean }[]).map(f => {
           const on = stockFilter === f.key
           const Icon = f.icon
           return (
@@ -435,6 +481,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
               onClick={e => { setStockFilter(f.key); e.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }) }}
               className={cn(
                 'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-subhead font-medium transition-colors',
+                f.soloMovil && 'sm:hidden',
                 on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]',
               )}
             >
@@ -449,6 +496,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         })}
       </div>
 
+      {/* Desde sm: la tarjeta de alertas de siempre. En el celular (<sm) la reemplaza el chip «Alertas». */}
+      <div className="hidden sm:block">
       {/* ── Alertas: una celda con tile rojo y badge numérico (patrón Ajustes ›
           Actualización de software). Se despliega en el mismo grupo. ── */}
       {stats.alertas.length > 0 && (stockFilter === 'todos' || stockFilter === 'configurados') && !searchQuery && (() => {
@@ -494,17 +543,19 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           </ListGroup>
         )
       })()}
+      </div>
 
       {/* ── Lista agrupada: un solo scroll de página (antes 60 vh anidados) ── */}
       {filtered.length === 0 ? (
         <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
       ) : (
         <ListGroup
-          title={`Por ${({ nombre: 'nombre', sap: 'código SAP', stock: 'stock', valor: 'valor', equipos: 'equipos' } as Record<SortField, string>)[sortField]} · ${filtered.length} de ${items.length}`}
+          title={tituloLista}
+          footer={pieLista}
           action={
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3 text-footnote font-medium text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <button type="button" className="relative inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3 after:absolute after:inset-x-0 after:-inset-y-[6px] after:content-[''] sm:after:content-none text-footnote font-medium text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                   <ArrowUpDown className="size-3.5" />Ordenar
                 </button>
               </DropdownMenuTrigger>
@@ -967,7 +1018,7 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
   return (
     <div className="space-y-3">
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
         {([
           { f: 'todos' as MovFilter, label: 'Total', count: movimientos.length },
           { f: 'entrada' as MovFilter, label: 'Entradas', count: entradas },
