@@ -36,6 +36,7 @@ import { Tag as CatTag, type TagTone, ListGroup, ListCell, SwipeRow } from '@/co
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
+import { indicePorSap, nombreVisiblePorSap } from '@/utils/repuestos/nombrePorSap'
 import { cn } from '@/lib/utils'
 import { CargaRapidaModal } from '@/components/repuestos/CargaRapidaModal'
 import type {
@@ -770,7 +771,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           </div>
         </div>
 
-        <ConteoList conteos={conteos} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={handleConteo} />
+        <ConteoList conteos={conteos} catalogo={bodega.items} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={handleConteo} />
       </div>
     )
   }
@@ -838,8 +839,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
 
 // ── Lista de conteos (con escaneo rápido) ──
 
-function ConteoList({ conteos, isFinalizado, onConteo }: {
-  conteos: InventarioConteo[]; isFinalizado: boolean
+function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
+  conteos: InventarioConteo[]; catalogo: BodegaMergedItem[]; isFinalizado: boolean
   onConteo: (sap: string, stockFisico: number, obs?: string) => Promise<void>
 }) {
   const [tab, setTab] = useState<'pendientes' | 'contados' | 'diferencias'>('pendientes')
@@ -848,6 +849,9 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
   const [editObs, setEditObs] = useState('')
   const [conteoSearch, setConteoSearch] = useState('')
   const [quickScan, setQuickScan] = useState(false)
+  // El conteo persiste solo `textoBreve`: el nombre común se resuelve por SAP al mostrar.
+  const indiceNombres = useMemo(() => indicePorSap(catalogo), [catalogo])
+  const nombreDe = (c: InventarioConteo) => nombreVisiblePorSap(indiceNombres, c.codigoSAP, c.textoBreve)
 
   const pendientes = conteos.filter(c => c.stockFisico === null)
   const contados = conteos.filter(c => c.stockFisico !== null)
@@ -858,10 +862,11 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
     if (!conteoSearch.trim()) return baseList
     const terms = normalizeForSearch(conteoSearch).split(/\s+/).filter(Boolean)
     return baseList.filter(c => {
-      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve}`)
+      const cat = indiceNombres.get(c.codigoSAP.trim())
+      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve} ${(cat?.nombresComunes ?? []).join(' ')}`)
       return haystackMatchesAll(h, terms)
     })
-  }, [baseList, conteoSearch])
+  }, [baseList, conteoSearch, indiceNombres])
 
   const handleSave = async (sap: string) => {
     await onConteo(sap, editValue, editObs)
@@ -916,7 +921,8 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
             <div key={c.codigoSAP} className="px-4 py-2.5 hover:bg-muted transition-colors">
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{c.textoBreve}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{nombreDe(c).titulo}</p>
+                  {nombreDe(c).oficial && <p className="text-footnote text-muted-foreground truncate">{nombreDe(c).oficial}</p>}
                   <span className="text-caption font-mono text-primary">{c.codigoSAP}</span>
                 </div>
                 <div className="text-center shrink-0 w-16">

@@ -36,4 +36,9 @@ describe('resumenDeSolicitudes', () => {
     expect(r.indexOf('CILINDRO')).toBeLessThan(r.indexOf('Últimas entregadas'))
     expect(r).toContain('aprobada por Orel el 15-09')
   })
+
+  it('con nombre común del catálogo: común primero y el SAP entre paréntesis', () => {
+    const r = resumenDeSolicitudes([{ ...mayo, estado: 'pendiente', textoBreve: 'Cuchillo 94011760', nombresComunes: ['cuchillo circular baader 200'] }])
+    expect(r).toContain('Cuchillo circular baader 200 (SAP: Cuchillo 94011760) ×2')
+  })
 })

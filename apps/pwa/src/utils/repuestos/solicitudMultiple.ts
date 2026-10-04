@@ -8,6 +8,7 @@
  * `components/repuestos/SolicitarVariosSheet.tsx`.
  */
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { avisoDeStock, CANTIDAD_MAXIMA, type StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 import type { NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
 
@@ -16,6 +17,8 @@ export interface PiezaSolicitable {
   clave: string
   codigoSAP: string
   textoBreve: string
+  /** Nombres comunes: el primero es el título que se muestra. No se persiste en la solicitud. */
+  nombresComunes?: string[]
   codigoFabricante?: string
   /** Común de la máquina (lista curada o marcado a mano). */
   comun?: boolean
@@ -50,12 +53,12 @@ export function agruparParaSolicitar(
 ): { grupo: GrupoSolicitable; piezas: PiezaSolicitable[] }[] {
   const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean)
   const visibles = terms.length
-    ? piezas.filter((p) => haystackMatchesAll(normalizeForSearch(`${p.textoBreve} ${p.codigoSAP} ${p.codigoFabricante ?? ''}`), terms))
+    ? piezas.filter((p) => haystackMatchesAll(normalizeForSearch(`${p.textoBreve} ${(p.nombresComunes ?? []).join(' ')} ${p.codigoSAP} ${p.codigoFabricante ?? ''}`), terms))
     : piezas
   const orden: GrupoSolicitable[] = ['comunes', 'unaUnidad', 'resto', 'sinSap']
   const porGrupo = new Map<GrupoSolicitable, PiezaSolicitable[]>(orden.map((g) => [g, []]))
   for (const p of visibles) porGrupo.get(grupoDe(p))!.push(p)
-  for (const lista of porGrupo.values()) lista.sort((a, b) => a.textoBreve.localeCompare(b.textoBreve, 'es'))
+  for (const lista of porGrupo.values()) lista.sort((a, b) => nombreVisible(a).titulo.localeCompare(nombreVisible(b).titulo, 'es'))
   return orden.map((grupo) => ({ grupo, piezas: porGrupo.get(grupo)! })).filter((g) => g.piezas.length > 0)
 }
 

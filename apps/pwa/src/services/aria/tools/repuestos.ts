@@ -17,6 +17,7 @@ import { db } from '@/services/firebase'
 import { registerTool } from './registry'
 import { getGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { resumenDeSolicitudes, type SolicitudParaAria } from './resumenSolicitudes'
+import { nombreParaTexto, textoBuscableRepuesto, tieneComun } from '@/utils/repuestos/nombrePorSap'
 
 const normalizeText = (s: string) =>
   s
@@ -30,7 +31,7 @@ const normalizeText = (s: string) =>
 function summarizeRepuesto(r: GlobalSearchResult): string {
   const rep = r.repuesto
   const parts: string[] = []
-  const name = rep.textoBreve || rep.descripcion || '(sin nombre)'
+  const name = nombreParaTexto(rep)
   const sap = rep.codigoSAP ? ` · SAP ${rep.codigoSAP}` : ''
   const fab = rep.codigoFabricante ? ` · cód.fab ${rep.codigoFabricante}` : ''
   parts.push(`• ${name}${sap}${fab}`)
@@ -80,7 +81,7 @@ registerTool({
     }
     const matches = cache.filter((r) => {
       const hay = normalizeText(
-        `${r.repuesto.textoBreve || ''} ${r.repuesto.descripcion || ''} ${r.repuesto.codigoSAP || ''} ${r.repuesto.codigoFabricante || ''} ${r.machineName}`,
+        textoBuscableRepuesto(r.repuesto, r.machineName),
       )
       return hay.includes(needle)
     })
@@ -122,11 +123,20 @@ registerTool({
     const snap = await getDocs(query(collection(db, 'solicitudes_repuestos'), orderBy('createdAt', 'desc'), limit(30)))
     const aFecha = (v: unknown): Date | undefined =>
       v && typeof (v as { toDate?: () => Date }).toDate === 'function' ? (v as { toDate: () => Date }).toDate() : undefined
+    // La solicitud guarda solo `textoBreve`: el nombre común se resuelve contra el catálogo
+    // cacheado por SAP (si el cache está frío queda el texto guardado).
+    const comunPorSap = new Map<string, string[]>()
+    for (const r of getGlobalRepuestosCache() ?? []) {
+      const sap = (r.repuesto.codigoSAP || '').trim()
+      const comunes = r.repuesto.nombresComunes
+      if (sap && comunes && tieneComun(r.repuesto) && !comunPorSap.has(sap)) comunPorSap.set(sap, comunes)
+    }
     const solicitudes: SolicitudParaAria[] = snap.docs.map((d) => {
       const x = d.data() as Record<string, unknown>
       return {
         codigoSAP: String(x.codigoSAP ?? ''),
         textoBreve: String(x.textoBreve ?? ''),
+        nombresComunes: comunPorSap.get(String(x.codigoSAP ?? '').trim()),
         cantidad: typeof x.cantidad === 'number' ? x.cantidad : 1,
         estado: String(x.estado ?? 'pendiente'),
         solicitadoPorNombre: String(x.solicitadoPorNombre ?? ''),

@@ -105,3 +105,12 @@ describe('SAP repartido en varias líneas', () => {
     expect(a!.contadoSap).toBeUndefined()
   })
 })
+
+describe('orden por Nombre', () => {
+  it('ordena por el título que se ve (el nombre común si hay), sin cambiar los datos', () => {
+    // b se ve «Bocina» aunque su texto SAP sea RODILLO; c no tiene nombre y va al final.
+    expect(ids(ordenarLineas(L, 'nombre', 1))).toBe('bdac')
+    expect(ids(ordenarLineas(L, 'nombre', -1))).toBe('adbc')
+    expect(L[1]!.textoBreve).toBe('RODILLO 92152025')
+  })
+})

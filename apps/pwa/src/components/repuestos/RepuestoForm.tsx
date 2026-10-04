@@ -1,3 +1,4 @@
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { ScanLine, Boxes, AlertTriangle } from 'lucide-react'
 import type { Repuesto, RepuestoFormData, MaterialClase } from '@/types/repuestos'
@@ -49,7 +50,7 @@ interface RepuestoFormModalProps {
   /** Tipos que ya existen en el catálogo, para sugerir sin cerrar la lista. */
   tiposConocidos?: string[]
   /** Detecta si ya existe un material con el SAP o nombre tecleado (aviso de duplicado). */
-  onCheckDuplicate?: (args: { codigoSAP: string; textoBreve: string }) => { id: string; textoBreve: string; codigoSAP: string } | null
+  onCheckDuplicate?: (args: { codigoSAP: string; textoBreve: string }) => { id: string; textoBreve: string; codigoSAP: string; nombresComunes?: string[] } | null
   /** Cambiar el equipo/destino (reabre el picker). Muestra el enlace "Cambiar". */
   onChangeTarget?: () => void
   loading?: boolean
@@ -231,7 +232,8 @@ export function RepuestoFormModal({
             <div className="flex items-start gap-2 rounded-card border border-transparent bg-amber-500/[0.15] px-3 py-2 text-xs text-ink-warn">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                Ya existe un material parecido: <span className="font-semibold">{duplicate.textoBreve}</span>
+                Ya existe un material parecido: <span className="font-semibold">{nombreVisible(duplicate).titulo}</span>
+                {nombreVisible(duplicate).oficial ? <> ({nombreVisible(duplicate).oficial})</> : null}
                 {duplicate.codigoSAP ? <> (SAP {duplicate.codigoSAP})</> : null}. Revísalo antes de crear un duplicado.
               </span>
             </div>
