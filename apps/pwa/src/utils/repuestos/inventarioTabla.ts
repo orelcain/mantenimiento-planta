@@ -53,6 +53,12 @@ export function nombreDe(l: InventarioLinea): string {
   return l.textoBreve || l.descripcion || ''
 }
 
+/** Título que se ve en pantalla: el nombre común (con mayúscula inicial) si hay, si no el texto SAP. */
+export function tituloVisible(l: InventarioLinea): string {
+  const comun = l.nombreComun?.trim()
+  return comun ? comun.charAt(0).toUpperCase() + comun.slice(1) : nombreDe(l)
+}
+
 export function pasaFiltros(l: InventarioLinea, f: FiltrosTabla, busca = ''): boolean {
   const q = norm(busca.trim())
   if (q) {
@@ -88,7 +94,7 @@ function valor(l: InventarioLinea, c: ColumnaOrden): string | number | null {
   switch (c) {
     case 'ubicacion': return l.ubicacion
     case 'codigo': return l.codigoFabricante
-    case 'nombre': return nombreDe(l) || null
+    case 'nombre': return tituloVisible(l) || null
     case 'sap': return l.codigoSAP || null
     case 'cantidad': return l.cantidad
     case 'sistema': return l.stockSistema

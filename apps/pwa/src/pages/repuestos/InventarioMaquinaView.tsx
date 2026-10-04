@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, BookOpen, BadgeCheck, Check, Package, Star, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
 import { Button, ListCell, ListGroup, SegmentedControl, Sheet, Tag, type TagTone } from '@/components/piel'
 import {
-  FILTROS_VACIOS, conTotalesPorSap, diferencia, filtrosActivos, nombreDe, ordenarLineas, pasaFiltros, planDeAjuste,
+  FILTROS_VACIOS, conTotalesPorSap, diferencia, filtrosActivos, nombreDe, ordenarLineas, tituloVisible, pasaFiltros, planDeAjuste,
   type ColumnaOrden, type FiltroDif, type FiltroEstado, type FiltrosTabla,
 } from '@/utils/repuestos/inventarioTabla'
 import { rutaDibujo, useFigurasDespiece, useManualesPieza } from './enlacesPieza'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreParaTexto } from '@/utils/repuestos/nombrePorSap'
 import type { useBodega, InventarioLinea, InventarioSesion, MotivoDuda, BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
@@ -46,13 +47,10 @@ type Guardar = (l: InventarioLinea, d: Parameters<ReturnType<typeof useBodega>['
  * se cuadra contra el papel, así que no se reformatea). No toca el dato.
  */
 const claveNombre = (t: string) => t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, '')
-const tituloDe = (l: InventarioLinea): string => {
-  const comun = l.nombreComun?.trim()
-  return comun ? comun.charAt(0).toUpperCase() + comun.slice(1) : nombreDe(l)
-}
+const tituloDe = tituloVisible
 const subtituloDe = (l: InventarioLinea): string => {
   const comun = l.nombreComun?.trim()
-  const sap = nombreDe(l)
+  const sap = formatNombreSAP(nombreDe(l)).nombre
   return comun && sap && claveNombre(sap) !== claveNombre(comun) ? sap : ''
 }
 
