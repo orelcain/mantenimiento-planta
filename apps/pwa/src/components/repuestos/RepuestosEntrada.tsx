@@ -141,7 +141,7 @@ export function RepuestosEntrada({
       )}
 
       <Sheet open={verTodosFav} onClose={() => setVerTodosFav(false)} title={`Favoritos · ${totalFavoritos}`}>
-        <div className="flex flex-col gap-5">
+        <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto overscroll-contain">
           {listasFavoritos.filter((l) => l.items.length > 0).map((l) => (
             <ListGroup key={l.nombre} title={l.nombre}>
               {l.items.map((f) => (
@@ -155,6 +155,7 @@ export function RepuestosEntrada({
                       type="button"
                       aria-label={`Quitar ${nombreBonito(f.nombre)} de ${l.nombre}`}
                       onClick={(e) => { e.stopPropagation(); onQuitarFavorito(l.nombre, f.id) }}
+                      onKeyDown={(e) => e.stopPropagation()}
                       className="-mr-2 flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
                     >
                       <X className="size-[18px]" aria-hidden />

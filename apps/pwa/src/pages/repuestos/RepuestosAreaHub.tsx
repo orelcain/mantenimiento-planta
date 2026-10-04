@@ -1595,6 +1595,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // ── Handlers ──
   const handleSelectArea = useCallback((node: AreaTreeNode) => {
+    autoTodasRef.current = false
     setSelectedAreaId(node.id)
     setShowingAll(false)
     // Seleccionar el área (no un equipo) limpia el filtro de equipo → muestra todo el área.
@@ -1620,6 +1621,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   }, [expandNode])
 
   const handleShowAll = useCallback(() => {
+    autoTodasRef.current = false
     setShowingAll(true)
     setSelectedAreaId(null)
     setRepEquipoFilter('all')
@@ -1676,6 +1678,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSelectedEquipMachineId(null)
     setSelectedEquipName('')
     setSelectedRowKey(null)
+    // Filtros que ya no se ven desde la entrada: si quedaran puestos, un SAP reciente podría dar cero resultados.
+    setRepStockFilter('all'); setRepClaseFilter('all'); setRepFavOnly(false); setRepComunOnly(false)
+    setRepConFotos(false); setListFilter('all'); setRepSoloSap(true)
   }
   const abrirRecienteEntrada = (r: RecienteRepuesto) => {
     if (r.tipo === 'equipo') { handleFavEquipClick(r.id, r.nombre); return }
