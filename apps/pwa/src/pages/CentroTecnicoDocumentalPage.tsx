@@ -1880,10 +1880,12 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                         {nv.oficial && <span className="block truncate text-footnote text-muted-foreground">{nv.oficial}</span>}
                       </div>
                       <span className="hidden w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground sm:block">{r.codigoSAP}</span>
-                      <span className="hidden min-w-0 flex-1 truncate sm:block">
-                        {nv.esComun ? nv.titulo : r.nombre}
-                        {nv.oficial && <span className="text-muted-foreground"> · {nv.oficial}</span>}
-                        {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
+                      <span className="hidden min-w-0 flex-1 sm:block">
+                        <span className="block truncate">
+                          {nv.esComun ? nv.titulo : r.nombre}
+                          {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
+                        </span>
+                        {nv.oficial && <span className="block truncate text-caption text-muted-foreground" title={nv.oficial}>{nv.oficial}</span>}
                       </span>
                       {cantidadDePosicion(r.cantidadPorMaquina).real ? (
                         <span

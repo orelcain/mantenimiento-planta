@@ -17,7 +17,7 @@ import type { RecienteRepuesto } from '@/utils/repuestos/recientesRepuestos'
  */
 
 /** Reciente ya resuelto contra el catálogo: `nombre` es el título a mostrar y `oficial` el nombre SAP (solo si hay nombre común). */
-export type RecienteVisible = RecienteRepuesto & { oficial?: string | null }
+export type RecienteVisible = RecienteRepuesto & { oficial?: string | null; resuelto?: boolean }
 export interface FavoritoEquipo { id: string; nombre: string }
 export interface ListaFavoritos { nombre: string; items: FavoritoEquipo[] }
 export interface AreaFila { id: string; nombre: string; equipos: number }
@@ -204,7 +204,7 @@ export function RepuestosEntrada({
                   {r.tipo === 'equipo' ? <Cog aria-hidden /> : <Package aria-hidden />}
                 </CellIcon>
               }
-              title={nombreBonito(r.nombre)}
+              title={r.resuelto ? r.nombre : nombreBonito(r.nombre)}
               subtitle={r.tipo === 'equipo'
                 ? 'Equipo'
                 : <>{r.oficial ? `${r.oficial} · ` : ''}<span className="font-mono tabular-nums">{r.id}</span></>}

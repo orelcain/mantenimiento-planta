@@ -617,7 +617,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       const it = r.tipo === 'repuesto' ? porSap.get(r.id) : undefined
       if (!it) return r
       const v = nombreVisible(it)
-      return { ...r, nombre: v.titulo, oficial: v.oficial }
+      return { ...r, nombre: v.titulo, oficial: v.oficial, resuelto: true }
     })
   }, [recientes, bodegaItems])
   const [menuMasOpen, setMenuMasOpen] = useState(false)

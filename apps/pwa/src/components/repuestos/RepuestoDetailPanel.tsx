@@ -673,10 +673,10 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
             {nv.esComun ? (
               <>
                 <h2 className="text-title2 font-bold text-foreground">{etiquetasNombre}{nv.titulo}</h2>
-                {nv.oficial && (isAdmin && onRename ? (
+                {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
                   <InlineEditName
                     value={item.textoBreve || ''}
-                    display={nv.oficial}
+                    display={nv.oficial ?? `Nombre SAP: ${nv.titulo}`}
                     onSave={onRename}
                     canEdit
                     textClassName="break-words text-subhead text-muted-foreground"
@@ -865,10 +865,10 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         {nv.esComun ? (
           <>
             <h2 className="text-base font-bold leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
-            {nv.oficial && (isAdmin && onRename ? (
+            {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
               <InlineEditName
                 value={item.textoBreve || ''}
-                display={nv.oficial}
+                display={nv.oficial ?? `Nombre SAP: ${nv.titulo}`}
                 onSave={onRename}
                 canEdit
                 className="mt-0.5"
