@@ -320,7 +320,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         Formato de Reporte
                     </h3>
                     <Tabs value={reportType} onValueChange={(v) => setReportType(v as ReportType)} className="w-full">
-                        <TabsList className="grid w-full grid-cols-1 h-auto gap-3 bg-transparent p-0">
+                        <TabsList className="grid w-full grid-cols-1 h-auto gap-3 bg-transparent p-0 !rounded-none !overflow-visible">
                             <TabsTrigger
                                 value="catalog"
                                 className="w-full h-auto items-start sm:h-11 sm:items-center justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm !rounded-card"
