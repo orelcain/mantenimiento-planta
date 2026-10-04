@@ -862,8 +862,8 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
     if (!conteoSearch.trim()) return baseList
     const terms = normalizeForSearch(conteoSearch).split(/\s+/).filter(Boolean)
     return baseList.filter(c => {
-      const nv = nombreVisiblePorSap(indiceNombres, c.codigoSAP, c.textoBreve)
-      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve} ${nv.titulo}`)
+      const cat = indiceNombres.get(c.codigoSAP.trim())
+      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve} ${(cat?.nombresComunes ?? []).join(' ')}`)
       return haystackMatchesAll(h, terms)
     })
   }, [baseList, conteoSearch, indiceNombres])
