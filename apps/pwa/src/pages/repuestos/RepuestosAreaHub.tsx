@@ -66,6 +66,7 @@ import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
 import { RepuestosEntrada, type AreaFila, type ListaFavoritos } from '@/components/repuestos/RepuestosEntrada'
+import { restoreEquipToList, type FavoritoQuitado } from '@/utils/repuestos/favoritosListas'
 import {
   leerRecientesRepuestos, limpiarRecientesRepuestos, registrarRecienteEquipo, registrarRecienteRepuesto,
   type RecienteRepuesto,
@@ -541,6 +542,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   }, [equipFavLists, persistEquipLists])
   const removeEquipFromList = useCallback((listName: string, machineId: string) => {
     persistEquipLists(equipFavLists.map((l) => l.name === listName ? { ...l, machineIds: l.machineIds.filter((id) => id !== machineId) } : l).filter((l) => l.machineIds.length > 0))
+  }, [equipFavLists, persistEquipLists])
+  // Deshacer un «quitar» de la hoja de favoritos del celular: devuelve el equipo a su posición
+  // y recrea la lista si quedó vacía (quitar el último equipo borra la lista).
+  const restaurarEquipoEnLista = useCallback((q: FavoritoQuitado) => {
+    persistEquipLists(restoreEquipToList(equipFavLists, q))
   }, [equipFavLists, persistEquipLists])
   // Reordenar por drag-and-drop: mueve el item de `from` a la posición `to`.
   const reorderEquipInList = useCallback((listName: string, from: number, to: number) => {
@@ -1924,6 +1930,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 favoritosCargando={favCargando}
                 onAbrirEquipo={(id, nombre) => handleFavEquipClick(id, nombre)}
                 onQuitarFavorito={isAdmin ? removeEquipFromList : undefined}
+                onRestaurarFavorito={isAdmin ? restaurarEquipoEnLista : undefined}
+                onBuscarTodo={buscarMovil}
                 areas={areasEntrada}
                 onAbrirArea={abrirAreaEntrada}
               />

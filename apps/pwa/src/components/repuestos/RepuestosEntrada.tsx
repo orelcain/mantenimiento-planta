@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react'
-import { Cog, MapPin, Package, X } from 'lucide-react'
-import { CellIcon, ListCell, ListGroup, Sheet } from '@/components/piel'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { Cog, MapPin, Package, Search, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button, CellIcon, Disclosure, ListCell, ListGroup, Sheet } from '@/components/piel'
+import { normalizeForSearch } from '@/utils/repuestos/searchNormalize'
+import type { FavoritoQuitado } from '@/utils/repuestos/favoritosListas'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import type { RecienteRepuesto } from '@/utils/repuestos/recientesRepuestos'
 
@@ -24,8 +27,12 @@ interface Props {
   listasFavoritos: ListaFavoritos[]
   favoritosCargando: boolean
   onAbrirEquipo: (id: string, nombre: string) => void
-  /** Solo admin: quitar un equipo de su lista desde la hoja «Ver todos». */
+  /** Solo admin: quitar un equipo de su lista desde la hoja «Ver todos» (modo Editar). */
   onQuitarFavorito?: (lista: string, id: string) => void
+  /** Solo admin: deshacer un quitar; devuelve el equipo a su posición y recrea la lista si quedó vacía. */
+  onRestaurarFavorito?: (quitado: FavoritoQuitado) => void
+  /** «Buscar en todos los repuestos»: pasa el texto al buscador principal. */
+  onBuscarTodo?: (texto: string) => void
   areas: AreaFila[]
   onAbrirArea: (id: string) => void
 }
@@ -39,14 +46,30 @@ function nombreBonito(n: string): string {
   return formatNombreSAP(n).nombre || n
 }
 
+/** Primeros nombres de la lista para la cabecera plegada: «Marel hg, Baader 142 y 9 más». */
+function resumenLista(l: ListaFavoritos): string {
+  const nombres = l.items.slice(0, 2).map((f) => nombreBonito(f.nombre))
+  const resto = l.items.length - nombres.length
+  return resto > 0 ? `${nombres.join(', ')} y ${resto} más` : nombres.join(', ')
+}
+
 const accionHeader = '-my-3 flex min-h-[44px] items-center px-2 text-subhead font-medium text-primary'
 
 export function RepuestosEntrada({
   recientes, onAbrirReciente, onLimpiarRecientes,
-  listasFavoritos, favoritosCargando, onAbrirEquipo, onQuitarFavorito,
+  listasFavoritos, favoritosCargando, onAbrirEquipo, onQuitarFavorito, onRestaurarFavorito, onBuscarTodo,
   areas, onAbrirArea,
 }: Props) {
   const [verTodosFav, setVerTodosFav] = useState(false)
+  const [consulta, setConsulta] = useState('')
+  const [editando, setEditando] = useState(false)
+  /** Fila con el signo menos tocado: muestra «Quitar» (clave `lista` + NUL + `id`). */
+  const [porQuitar, setPorQuitar] = useState<string | null>(null)
+  const [quitados, setQuitados] = useState<FavoritoQuitado[]>([])
+  const cuerpoRef = useRef<HTMLDivElement>(null)
+  /** Alto del cuerpo congelado al enfocar el buscador, para que la hoja no salte al filtrar. */
+  const [altoCongelado, setAltoCongelado] = useState<number | undefined>(undefined)
+  const puedeEditar = Boolean(onQuitarFavorito && onRestaurarFavorito)
 
   const totalFavoritos = useMemo(() => listasFavoritos.reduce((n, l) => n + l.items.length, 0), [listasFavoritos])
 
@@ -67,6 +90,99 @@ export function RepuestosEntrada({
     const resto = planos.filter((f) => !recientesEquipo.includes(f))
     return [...recientesEquipo, ...resto].slice(0, VISIBLES_FAVORITOS)
   }, [listasFavoritos, recientes])
+
+  const busqueda = normalizeForSearch(consulta)
+  const listasVisibles = useMemo(() => listasFavoritos.filter((l) => l.items.length > 0), [listasFavoritos])
+  const coincidencias = useMemo(() => {
+    if (!busqueda) return []
+    return listasVisibles
+      .map((lista) => ({ lista, items: lista.items.filter((f) => normalizeForSearch(nombreBonito(f.nombre)).includes(busqueda)) }))
+      .filter((c) => c.items.length > 0)
+  }, [listasVisibles, busqueda])
+
+  const cerrarHoja = () => {
+    setVerTodosFav(false)
+    setConsulta('')
+    setEditando(false)
+    setPorQuitar(null)
+    setQuitados([])
+    setAltoCongelado(undefined)
+  }
+
+  /** Nombre con subrayado en lo que coincide con la búsqueda (sin cambiar el color del texto). */
+  const resaltar = (nombre: string): ReactNode => {
+    if (!busqueda) return nombre
+    const plano = nombre.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    const i = plano.indexOf(busqueda)
+    if (i < 0 || plano.length !== nombre.length) return nombre
+    return (
+      <>
+        {nombre.slice(0, i)}
+        <mark className="bg-transparent text-inherit underline decoration-primary decoration-2 underline-offset-[3px]">{nombre.slice(i, i + busqueda.length)}</mark>
+        {nombre.slice(i + busqueda.length)}
+      </>
+    )
+  }
+
+  const nombreQuitado = (q: FavoritoQuitado) => nombreBonito(q.machineName || q.machineId)
+
+  const quitar = (lista: string, f: FavoritoEquipo) => {
+    if (!onQuitarFavorito) return
+    const listIndex = listasFavoritos.findIndex((l) => l.nombre === lista)
+    const index = listasFavoritos[listIndex]?.items.findIndex((x) => x.id === f.id) ?? -1
+    if (listIndex < 0 || index < 0) return
+    setQuitados((q) => [...q, { listName: lista, machineId: f.id, machineName: f.nombre, index, listIndex }])
+    setPorQuitar(null)
+    onQuitarFavorito(lista, f.id)
+  }
+
+  const filaFavorito = (lista: string, f: FavoritoEquipo) => {
+    const nombre = nombreBonito(f.nombre)
+    const clave = `${lista}\u0000${f.id}`
+    if (!editando) {
+      return (
+        <ListCell
+          key={f.id}
+          leading={<CellIcon tone="neutral"><Cog aria-hidden /></CellIcon>}
+          title={resaltar(nombre)}
+          onClick={() => { cerrarHoja(); onAbrirEquipo(f.id, f.nombre) }}
+          className="min-h-[52px]"
+        />
+      )
+    }
+    return (
+      <ListCell
+        key={f.id}
+        leading={
+          <div className="-ml-3 flex items-center gap-1">
+            <button
+              type="button"
+              aria-label={`Quitar ${nombre} de ${lista}`}
+              aria-expanded={porQuitar === clave}
+              onClick={() => setPorQuitar(porQuitar === clave ? null : clave)}
+              className="flex size-11 items-center justify-center"
+            >
+              <span className="relative block size-[22px] rounded-full bg-destructive" aria-hidden>
+                <span className="absolute inset-x-[5px] top-[10px] h-[2px] rounded-full bg-destructive-foreground" />
+              </span>
+            </button>
+            <CellIcon tone="neutral"><Cog aria-hidden /></CellIcon>
+          </div>
+        }
+        title={resaltar(nombre)}
+        trailing={porQuitar === clave ? (
+          <button
+            type="button"
+            onClick={() => quitar(lista, f)}
+            className="flex min-h-[44px] items-center rounded-full bg-destructive px-4 text-subhead font-semibold text-destructive-foreground"
+          >
+            Quitar
+          </button>
+        ) : undefined}
+        className="min-h-[52px] before:left-[4.6rem]"
+      />
+    )
+  }
 
   const hayRecientes = recientes.length > 0
   const hayFavoritos = totalFavoritos > 0
@@ -140,32 +256,114 @@ export function RepuestosEntrada({
         </ListGroup>
       )}
 
-      <Sheet open={verTodosFav} onClose={() => setVerTodosFav(false)} title={`Favoritos · ${totalFavoritos}`}>
-        <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto overscroll-contain">
-          {listasFavoritos.filter((l) => l.items.length > 0).map((l) => (
-            <ListGroup key={l.nombre} title={l.nombre}>
-              {l.items.map((f) => (
-                <ListCell
-                  key={f.id}
-                  leading={<CellIcon tone="neutral"><Cog aria-hidden /></CellIcon>}
-                  title={nombreBonito(f.nombre)}
-                  onClick={() => { setVerTodosFav(false); onAbrirEquipo(f.id, f.nombre) }}
-                  trailing={onQuitarFavorito ? (
-                    <button
-                      type="button"
-                      aria-label={`Quitar ${nombreBonito(f.nombre)} de ${l.nombre}`}
-                      onClick={(e) => { e.stopPropagation(); onQuitarFavorito(l.nombre, f.id) }}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      className="-mr-2 flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
-                    >
-                      <X className="size-[18px]" aria-hidden />
-                    </button>
-                  ) : undefined}
-                  className="min-h-[52px]"
-                />
-              ))}
-            </ListGroup>
-          ))}
+      <Sheet
+        open={verTodosFav}
+        onClose={cerrarHoja}
+        title="Favoritos"
+        surface="grouped"
+        headerAction={puedeEditar ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (editando) { setEditando(false); setPorQuitar(null); setQuitados([]) } else { setEditando(true) }
+            }}
+            className={cn('flex min-h-[44px] items-center px-2 text-body text-primary', editando && 'font-semibold')}
+          >
+            {editando ? 'Listo' : 'Editar'}
+          </button>
+        ) : undefined}
+        toolbar={
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <input
+              type="search"
+              enterKeyHint="search"
+              value={consulta}
+              onChange={(e) => setConsulta(e.target.value)}
+              onFocus={() => setAltoCongelado(cuerpoRef.current?.offsetHeight)}
+              onBlur={() => { if (!consulta) setAltoCongelado(undefined) }}
+              placeholder={`Buscar en ${totalFavoritos} favoritos`}
+              aria-label="Buscar en favoritos"
+              className="h-[44px] w-full rounded-[22px] border-0 bg-muted pl-10 pr-11 text-body placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {consulta && (
+              <button
+                type="button"
+                onClick={() => { setConsulta(''); setAltoCongelado(undefined) }}
+                aria-label="Borrar búsqueda"
+                className="absolute right-0 top-0 flex size-11 items-center justify-center rounded-full text-muted-foreground"
+              >
+                <X className="size-[18px]" aria-hidden />
+              </button>
+            )}
+          </div>
+        }
+      >
+        <div ref={cuerpoRef} style={altoCongelado ? { minHeight: altoCongelado } : undefined} className="flex flex-col gap-4">
+          {busqueda ? (
+            coincidencias.length === 0 ? (
+              <div className="px-1 text-subhead text-muted-foreground">
+                <p>Ningún favorito coincide con «{consulta.trim()}».</p>
+                {onBuscarTodo && (
+                  <Button
+                    variant="plain"
+                    className="-ml-3 mt-1 h-auto min-h-[44px] whitespace-normal text-left"
+                    onClick={() => { const t = consulta.trim(); cerrarHoja(); onBuscarTodo(t) }}
+                  >
+                    Buscar «{consulta.trim()}» en todos los repuestos
+                  </Button>
+                )}
+              </div>
+            ) : coincidencias.map((c) => (
+              <ListGroup
+                key={c.lista.nombre}
+                title={<>{c.lista.nombre} <span className="font-normal tabular-nums">· {c.items.length} de {c.lista.items.length}</span></>}
+              >
+                {c.items.map((f) => filaFavorito(c.lista.nombre, f))}
+              </ListGroup>
+            ))
+          ) : (
+            listasVisibles.map((l) => (
+              <Disclosure
+                key={l.nombre}
+                flush
+                storageKey={`repuestos-fav-abierta:${l.nombre}`}
+                defaultOpen={listasVisibles.length === 1}
+                title={
+                  <span className="flex items-center gap-2">
+                    <span className="block min-w-0 flex-1">
+                      <span className="block truncate">{l.nombre}</span>
+                      <span className="block truncate text-footnote font-normal text-muted-foreground">{resumenLista(l)}</span>
+                    </span>
+                    <span className="shrink-0 text-subhead font-normal tabular-nums text-muted-foreground">{l.items.length}</span>
+                  </span>
+                }
+              >
+                {l.items.map((f) => filaFavorito(l.nombre, f))}
+              </Disclosure>
+            ))
+          )}
+          {quitados.length > 0 && onRestaurarFavorito && (
+            <div
+              role="status"
+              className="sticky bottom-0 flex min-h-[52px] items-center gap-2 rounded-card bg-card py-1 pl-4 pr-2 shadow-[0_2px_12px_rgba(0,0,0,0.10)] dark:shadow-none"
+            >
+              <span className="min-w-0 flex-1 text-subhead leading-snug">
+                {nombreQuitado(quitados[quitados.length - 1]!)} quitado de {quitados[quitados.length - 1]!.listName}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const ultimo = quitados[quitados.length - 1]!
+                  onRestaurarFavorito(ultimo)
+                  setQuitados((q) => q.slice(0, -1))
+                }}
+                className="flex min-h-[44px] items-center px-3 text-body font-semibold text-primary"
+              >
+                Deshacer
+              </button>
+            </div>
+          )}
         </div>
       </Sheet>
     </div>
