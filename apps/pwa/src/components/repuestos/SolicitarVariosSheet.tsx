@@ -11,6 +11,7 @@ import { AlertTriangle, Loader2, Minus, Plus, Search, Send } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
+import { AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import type { NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
@@ -113,10 +114,10 @@ export function SolicitarVariosSheet({ open, onClose, maquina, piezas, cargarSto
                 const st = p.stock
                 const nv = nombreVisible(p)
                 return (
-                  <li key={p.clave} className={cn('flex items-center gap-3 px-3 py-2', marcada && 'bg-primary/[0.06]', !pedible && 'opacity-60')}>
+                  <li key={p.clave} className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2', marcada && 'bg-primary/[0.06]', !pedible && 'opacity-60')}>
                     <Checkbox checked={marcada} disabled={!pedible} onCheckedChange={(v) => alternar(p, v === true)}
-                              aria-label={`Marcar ${nv.titulo}`} className="h-5 w-5" />
-                    <button type="button" disabled={!pedible} onClick={() => alternar(p, !marcada)} className="min-w-0 flex-1 text-left">
+                              aria-label={`Marcar ${nv.titulo}`} className={cn('h-5 w-5', AREA_TACTIL_COMPACTA)} />
+                    <button type="button" disabled={!pedible} onClick={() => alternar(p, !marcada)} className="min-w-[120px] flex-1 text-left">
                       <div className="truncate text-body font-medium text-foreground">{p.textoBreve || nv.esComun ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre</span>}</div>
                       {nv.oficial && <div className="truncate text-footnote text-muted-foreground">{nv.oficial}</div>}
                       <div className="text-caption text-muted-foreground">
@@ -134,13 +135,13 @@ export function SolicitarVariosSheet({ open, onClose, maquina, piezas, cargarSto
                     {pedible && (
                       <div className={cn('flex shrink-0 items-center overflow-hidden rounded-ctl border border-border', !marcada && 'opacity-40')}>
                         <button type="button" aria-label="Menos" disabled={!marcada} onClick={() => fijar(p.clave, (cant ?? 1) - 1)}
-                                className="flex h-9 w-9 items-center justify-center hover:bg-muted disabled:cursor-default"><Minus className="h-3.5 w-3.5" /></button>
+                                className="flex h-[44px] w-[44px] items-center justify-center hover:bg-muted disabled:cursor-default"><Minus className="h-3.5 w-3.5" /></button>
                         <input type="number" inputMode="numeric" min={1} aria-label={`Cantidad de ${nv.titulo}`}
                                value={cant ?? 1} disabled={!marcada}
                                onChange={(e) => fijar(p.clave, Number(e.target.value))}
-                               className="h-9 w-12 bg-muted text-center text-body tabular-nums text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
+                               className="h-[44px] w-[44px] bg-muted text-center text-body tabular-nums text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
                         <button type="button" aria-label="Más" disabled={!marcada} onClick={() => fijar(p.clave, (cant ?? 1) + 1)}
-                                className="flex h-9 w-9 items-center justify-center hover:bg-muted disabled:cursor-default"><Plus className="h-3.5 w-3.5" /></button>
+                                className="flex h-[44px] w-[44px] items-center justify-center hover:bg-muted disabled:cursor-default"><Plus className="h-3.5 w-3.5" /></button>
                       </div>
                     )}
                   </li>
