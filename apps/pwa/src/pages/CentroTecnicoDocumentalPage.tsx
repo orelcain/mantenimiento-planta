@@ -1656,16 +1656,76 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
     }
   }
 
+  // Encabezado del teléfono: la acción principal es Solicitar; sin piezas con SAP pasa a ser
+  // Vincular (si hay permiso); sin ninguna de las dos no hay fila. Lo demás va al menú «⋯».
+  const tieneSap = repuestos.some((r) => r.codigoSAP.trim())
+  const puedeVincular = canEdit && !!nodeId && !adding
+  const accionPrincipal: 'solicitar' | 'vincular' | null = tieneSap ? 'solicitar' : puedeVincular ? 'vincular' : null
+  const vincularEnMenu = puedeVincular && accionPrincipal === 'solicitar'
+  const hayMenuAcciones = vincularEnMenu || puedeExportarBom
+
   return (
     <Card>
       <CardContent className="p-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">
+        {/*
+          Teléfono (<sm): título solo en su línea; «Solicitar repuestos» a todo el ancho (la acción
+          que deja rastro) y Vincular / Exportar en el menú «⋯». Solo el botón se estira, así que el
+          encabezado no desborda con ningún ancho. ≥sm: los botones de siempre, sin cambios.
+        */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+          <div className="text-headline font-semibold sm:text-sm">
             Repuestos del equipo{' '}
-            {repuestos.length > 0 && <span className="text-xs font-normal text-muted-foreground">({repuestos.length})</span>}
+            {repuestos.length > 0 && (
+              <>
+                <span className="text-subhead font-normal tabular-nums text-muted-foreground sm:hidden">{repuestos.length}</span>
+                <span className="hidden text-xs font-normal text-muted-foreground sm:inline">({repuestos.length})</span>
+              </>
+            )}
           </div>
-          <div className="flex items-center gap-1.5">
-            {repuestos.some((r) => r.codigoSAP.trim()) && (
+          {accionPrincipal && (
+            <div className="flex gap-2 sm:hidden">
+              {accionPrincipal === 'solicitar' ? (
+                <PielButton variant="tinted" size="md" className="min-w-0 flex-1 gap-2" disabled={busy} onClick={() => setSolicitarOpen(true)}>
+                  <ClipboardList /> Solicitar repuestos
+                </PielButton>
+              ) : (
+                <PielButton variant="tinted" size="md" className="min-w-0 flex-1 gap-2" disabled={busy} onClick={openAdd}>
+                  <Plus /> Vincular repuesto
+                </PielButton>
+              )}
+              {hayMenuAcciones && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Más acciones de repuestos"
+                      className="flex size-[44px] shrink-0 items-center justify-center rounded-full bg-muted text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    >
+                      <MoreHorizontal className="size-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[13rem]">
+                    {vincularEnMenu && (
+                      <DropdownMenuItem className="gap-2 py-2" disabled={busy} onClick={openAdd}>
+                        <Plus className="size-4 text-muted-foreground" />Vincular repuesto
+                      </DropdownMenuItem>
+                    )}
+                    {puedeExportarBom && (
+                      <DropdownMenuItem
+                        className="gap-2 py-2"
+                        onClick={exportarBom}
+                        title={`Descargar la lista de materiales de ${opcionesBom?.equipoCodigo} para cargar en SAP (IB01), centro ${opcionesBom?.centro || 'sin determinar'}`}
+                      >
+                        <Download className="size-4 text-muted-foreground" />Exportar para SAP (IB01)
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
+          <div className="hidden items-center gap-1.5 sm:flex">
+            {tieneSap && (
               <Button variant="outline" size="sm" onClick={() => setSolicitarOpen(true)}>
                 <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> Solicitar repuestos
               </Button>
@@ -1727,12 +1787,12 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
         */}
         {repuestos.length > 0 && (
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-2 sm:h-3.5 sm:w-3.5" />
             <Input
               value={filtro}
               onChange={(ev) => setFiltro(ev.target.value)}
               placeholder="Buscar por código SAP, nombre o tipo…"
-              className="h-8 pl-7 text-sm"
+              className="h-11 rounded-full border-0 bg-muted pl-10 text-body sm:h-8 sm:rounded-ctl sm:border sm:border-input sm:bg-background sm:pl-7 sm:text-sm"
               aria-label="Buscar en los materiales del equipo"
             />
           </div>
@@ -1757,11 +1817,14 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
             {particion.bom.length > 0 && (
               <>
                 <div className="flex flex-wrap items-baseline gap-x-2 pt-1">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-ok">
+                  <span className="text-subhead font-semibold text-muted-foreground sm:text-xs sm:uppercase sm:tracking-wide sm:text-ink-ok">
                     Lista de materiales SAP · {particion.bom.length}
                     {filtrando && ` de ${particionTotal.bom.length}`}
                   </span>
-                  <span className="text-caption text-muted-foreground">
+                  <span className="text-footnote text-muted-foreground sm:hidden">
+                    Con código y cantidad. Es la que se carga en IB01.
+                  </span>
+                  <span className="hidden text-caption text-muted-foreground sm:inline">
                     con código y cantidad — es la que se carga en IB01
                   </span>
                   {bomSinCantidad > 0 && (
@@ -1777,7 +1840,7 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                       variant="outline"
                       size="sm"
                       onClick={exportarBom}
-                      className="ml-auto h-6 px-2 text-caption"
+                      className="ml-auto hidden h-6 px-2 text-caption sm:inline-flex"
                       title={`Descargar la lista de materiales de ${opcionesBom?.equipoCodigo} para cargar en SAP (IB01), centro ${opcionesBom?.centro || 'sin determinar'}`}
                     >
                       <Download className="mr-1 h-3 w-3" /> Exportar para SAP
@@ -1786,26 +1849,37 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                 </div>
                 <div className="divide-y">
                   {particion.bom.map((r) => (
-                    <div key={r.id} className="flex items-center gap-3 py-2 text-sm">
+                    <div key={r.id} className={cn('flex min-h-[52px] items-center gap-1 text-sm sm:min-h-0 sm:gap-3 sm:py-2', userId && '-mx-2 sm:mx-0')}>
                       {userId && (
                         <button
                           onClick={() => toggleFav(r)}
-                          className={['shrink-0 rounded-ctl p-0.5 transition', favs.has(rowKeyDeRepuesto(r)) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-ink-warn'].join(' ')}
+                          className={['flex size-[44px] shrink-0 items-center justify-center rounded-full transition sm:size-auto sm:rounded-ctl sm:p-0.5', favs.has(rowKeyDeRepuesto(r)) ? 'text-ink-warn' : 'text-muted-foreground hover:text-ink-warn sm:text-muted-foreground/30'].join(' ')}
                           title={favs.has(rowKeyDeRepuesto(r)) ? 'Quitar de mis favoritos' : 'Marcar como favorito (los mismos de Repuestos)'}
                           aria-label="Favorito"
                           aria-pressed={favs.has(rowKeyDeRepuesto(r))}
                         >
-                          <Star className={['h-3.5 w-3.5', favs.has(rowKeyDeRepuesto(r)) ? 'fill-current' : ''].join(' ')} />
+                          <Star className={['h-4 w-4 sm:h-3.5 sm:w-3.5', favs.has(rowKeyDeRepuesto(r)) ? 'fill-current' : ''].join(' ')} />
                         </button>
                       )}
-                      <span className="w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{r.codigoSAP}</span>
-                      <span className="min-w-0 flex-1 truncate">
+                      {/* Teléfono: código arriba y nombre debajo (hasta 2 líneas), sin la columna fija de 112 px. */}
+                      <div className="min-w-0 flex-1 sm:hidden">
+                        <span className="block font-mono text-footnote tabular-nums text-muted-foreground">
+                          {r.codigoSAP}
+                          {typeof r.stockFisico === 'number' ? ` · stock ${r.stockFisico}` : ''}
+                        </span>
+                        <span className="line-clamp-2 text-body">
+                          {formatNombreSAP(r.nombre).nombre || r.nombre}
+                          {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
+                        </span>
+                      </div>
+                      <span className="hidden w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground sm:block">{r.codigoSAP}</span>
+                      <span className="hidden min-w-0 flex-1 truncate sm:block">
                         {r.nombre}
                         {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
                       </span>
                       {cantidadDePosicion(r.cantidadPorMaquina).real ? (
                         <span
-                          className="shrink-0 rounded-ctl bg-muted px-1.5 font-mono text-xs tabular-nums text-ink-ok"
+                          className="shrink-0 text-subhead font-semibold tabular-nums text-foreground sm:rounded-ctl sm:bg-muted sm:px-1.5 sm:font-mono sm:text-xs sm:font-normal sm:text-ink-ok"
                           title="Cantidad que lleva la máquina"
                         >
                           ×{r.cantidadPorMaquina}
@@ -1819,17 +1893,17 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                         </span>
                       )}
                       {typeof r.stockFisico === 'number' && (
-                        <span className="shrink-0 text-xs text-muted-foreground">stock {r.stockFisico}</span>
+                        <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">stock {r.stockFisico}</span>
                       )}
                       {canEdit && nodeId && (
                         <button
                           disabled={busy}
                           onClick={() => desvincular(r.id)}
-                          className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                          className="flex size-[44px] shrink-0 items-center justify-center text-muted-foreground hover:text-destructive sm:size-auto sm:p-1"
                           title="Quitar del equipo"
                           aria-label="Quitar repuesto"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                         </button>
                       )}
                     </div>
