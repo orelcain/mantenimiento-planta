@@ -64,8 +64,9 @@ import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type Repu
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
-import { RepuestosEntrada, type AreaFila, type ListaFavoritos } from '@/components/repuestos/RepuestosEntrada'
+import { RepuestosEntrada, type AreaFila, type ListaFavoritos, type RecienteVisible } from '@/components/repuestos/RepuestosEntrada'
 import { restoreEquipToList, type FavoritoQuitado } from '@/utils/repuestos/favoritosListas'
 import {
   leerRecientesRepuestos, limpiarRecientesRepuestos, registrarRecienteEquipo, registrarRecienteRepuesto,
@@ -603,6 +604,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // ── Entrada del teléfono: recientes, menú ⋯ y búsqueda ──
   const [recientes, setRecientes] = useState<RecienteRepuesto[]>(() => leerRecientesRepuestos())
+  // El nombre guardado en «Recientes» es solo respaldo: se resuelve contra el catálogo ya cargado para
+  // que un nombre común agregado después aparezca. `oficial` = nombre SAP bajo el nombre común.
+  const recientesVisibles = useMemo<RecienteVisible[]>(() => {
+    if (!recientes.some((r) => r.tipo === 'repuesto')) return recientes
+    const porSap = new Map<string, (typeof bodegaItems)[number]>()
+    for (const it of bodegaItems) {
+      const sap = it.codigoSAP?.trim()
+      if (sap && !porSap.has(sap)) porSap.set(sap, it)
+    }
+    return recientes.map((r) => {
+      const it = r.tipo === 'repuesto' ? porSap.get(r.id) : undefined
+      if (!it) return r
+      const v = nombreVisible(it)
+      return { ...r, nombre: v.titulo, oficial: v.oficial }
+    })
+  }, [recientes, bodegaItems])
   const [menuMasOpen, setMenuMasOpen] = useState(false)
   /** `showingAll` lo levantó el buscador (no el usuario): al borrar el texto se devuelve. */
   const autoTodasRef = useRef(false)
@@ -1080,11 +1097,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       }))
     }
     const dir = repSortDir === 'asc' ? 1 : -1
+    // «Repuesto» se ordena por lo que se ve (nombre común o nombre SAP formateado). Se calcula una vez por fila.
+    const tituloPorFila = new Map<AreaRepuestoRow, string>()
+    const tituloDe = (r: AreaRepuestoRow): string => {
+      let t = tituloPorFila.get(r)
+      if (t === undefined) { t = nombreVisible(r).titulo; tituloPorFila.set(r, t) }
+      return t
+    }
     const val = (r: AreaRepuestoRow): string | number => {
       switch (repSortColumn) {
         case 'codigoSAP': return r.codigoSAP || ''
         case 'codigoFabricante': return r.codigoFabricante || ''
-        case 'textoBreve': return r.textoBreve || r.alias || ''
+        case 'textoBreve': return tituloDe(r)
         case 'equipo': return equipoParaMostrar(r.equipos).nombre
         case 'stock': return r.bodegaId ? r.stockActual : -1
         case 'tipo': return tipoLabelOf(r.tipo)
@@ -1145,7 +1169,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   )
   // Al abrir el detalle de un repuesto con SAP, queda en «Recientes» de la entrada.
   const repAbierto = selectedRep?.codigoSAP?.trim() ?? ''
-  const repAbiertoNombre = selectedRep?.textoBreve ?? ''
+  const repAbiertoNombre = selectedRep ? nombreVisible(selectedRep).titulo : ''
   useEffect(() => {
     if (!repAbierto) return
     registrarRecienteRepuesto(repAbierto, repAbiertoNombre || repAbierto)
@@ -1923,7 +1947,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           {entradaMovil ? (
             <div className="sm:hidden">
               <RepuestosEntrada
-                recientes={recientes}
+                recientes={recientesVisibles}
                 onAbrirReciente={abrirRecienteEntrada}
                 onLimpiarRecientes={() => { limpiarRecientesRepuestos(); setRecientes([]) }}
                 listasFavoritos={listasFavoritos}
@@ -2307,7 +2331,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         {renderSortTh('codigoSAP', 'SAP', 'hidden md:table-cell')}
                         {renderSortTh('codigoFabricante', 'Cód. Fabricante', 'hidden md:table-cell')}
                         {renderSortTh('textoBreve', 'Repuesto')}
-                        <th className="hidden px-3 py-2 font-semibold lg:table-cell">Nombre común</th>
+                        {/* Solo administración: el título ya es el primer nombre común; aquí van los demás y «+ agregar». */}
+                        {isAdmin && <th className="hidden px-3 py-2 font-semibold lg:table-cell">Otros nombres</th>}
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
                         {renderSortTh('stock', 'Stock', 'hidden md:table-cell')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
@@ -2323,6 +2348,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         const extra = mas > 0 ? ` +${mas}` : ''
                         const dibujo = dibujoDe(figurasDespiece, r.codigoFabricante, maquinaDeDespiece(equipo))
                         const isSel = selectedRowKey === r.rowKey
+                        const nv = nombreVisible(r)
                         // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
                         const fotos = fotosDeFila(r)
                         // Divisor de tier: primera fila sin SAP (despiece) tras las con-SAP.
@@ -2398,7 +2424,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                     {CLASE_LABEL[r.clase]}
                                   </span>
                                 )}
-                                <span className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</span>
+                                {nv.etiquetas.map((et) => (
+                                  <span key={et} className="shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">{et}</span>
+                                ))}
+                                <span className="line-clamp-2 min-w-0 font-medium text-foreground">{nv.titulo}</span>
                                 {(isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
                                     className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-caption font-semibold text-ink-ok"
@@ -2408,6 +2437,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   </span>
                                 )}
                               </div>
+                              {nv.oficial && (
+                                <span className="block max-w-[18rem] truncate text-footnote text-muted-foreground md:max-w-[300px] md:text-caption" title={nv.oficial}>
+                                  {nv.oficial}
+                                </span>
+                              )}
                               {/* En móvil, stock + ubicación como chip propio (la columna
                                   Stock está oculta: desbordaba el ancho y quedaba cortada) */}
                               <div className="mt-1 flex items-center gap-1.5 text-caption md:hidden">
@@ -2466,6 +2500,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 </div>
                               )}
                             </td>
+                            {isAdmin && (
                             <td className="hidden px-3 py-2 text-xs lg:table-cell" onClick={(e) => e.stopPropagation()}>
                               {editApodosKey === r.rowKey ? (
                                 <input
@@ -2478,26 +2513,28 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   }}
                                   onBlur={() => saveApodos(r)}
                                   disabled={savingApodos}
-                                  placeholder="apodos, separados por coma"
+                                  placeholder="nombres comunes, separados por coma (el primero se muestra como título)"
+                                  aria-label="Nombres comunes"
                                   className="w-full rounded-ctl border border-primary/50 bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
                                 />
                               ) : (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (!isAdmin) return
+                                    // El editor recibe la LISTA COMPLETA: si se mostraran solo los «otros», guardar borraría el título.
                                     setEditApodosVal((r.nombresComunes ?? []).join(', '))
                                     setEditApodosKey(r.rowKey)
                                   }}
                                   className="block w-full max-w-[220px] truncate text-left text-muted-foreground transition hover:text-foreground"
-                                  title={isAdmin ? 'Editar nombres comunes' : ((r.nombresComunes ?? []).join(', '))}
+                                  title={(r.nombresComunes ?? []).join(', ') || 'Agregar nombre común'}
                                 >
-                                  {(r.nombresComunes && r.nombresComunes.length)
-                                    ? r.nombresComunes.join(', ')
-                                    : (isAdmin ? <span className="italic text-muted-foreground/40">+ agregar apodos</span> : '—')}
+                                  {nv.otros.length
+                                    ? nv.otros.join(', ')
+                                    : <span className="italic text-muted-foreground/40">{nv.esComun ? '+ otro nombre' : '+ nombre común'}</span>}
                                 </button>
                               )}
                             </td>
+                            )}
                             <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">{equipo}<span className="text-muted-foreground/60">{extra}</span></td>
                             <td className="hidden px-3 py-2 md:table-cell">
                               <div className="flex items-center gap-1.5">

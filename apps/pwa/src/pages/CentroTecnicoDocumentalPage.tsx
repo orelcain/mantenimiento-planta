@@ -52,6 +52,7 @@ import { generarReporteEquipo } from '@/services/equipmentReportPdf'
 import { qrComoPng } from '@/utils/pdf/qrDataUrl'
 import { useAuthStore } from '@/store'
 import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { useEquipmentFavorites } from '@/hooks/useEquipmentFavorites'
 import { useEquipmentNotes } from '@/hooks/useEquipmentNotes'
@@ -1848,7 +1849,9 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                   )}
                 </div>
                 <div className="divide-y">
-                  {particion.bom.map((r) => (
+                  {particion.bom.map((r) => {
+                    const nv = nombreVisible(r.doc)
+                    return (
                     <div key={r.id} className={cn('flex min-h-[52px] items-center gap-1 text-sm sm:min-h-0 sm:gap-3 sm:py-2', userId && '-mx-2 sm:mx-0')}>
                       {userId && (
                         <button
@@ -1868,13 +1871,18 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                           {typeof r.stockFisico === 'number' ? ` · stock ${r.stockFisico}` : ''}
                         </span>
                         <span className="line-clamp-2 text-body">
-                          {formatNombreSAP(r.nombre).nombre || r.nombre}
+                          {nv.esComun && nv.etiquetas.map((et) => (
+                            <span key={et} className="mr-1.5 inline-block rounded-ctl bg-muted px-1.5 align-middle text-caption font-medium text-muted-foreground">{et}</span>
+                          ))}
+                          {nv.esComun ? nv.titulo : formatNombreSAP(r.nombre).nombre || r.nombre}
                           {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
                         </span>
+                        {nv.oficial && <span className="block truncate text-footnote text-muted-foreground">{nv.oficial}</span>}
                       </div>
                       <span className="hidden w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground sm:block">{r.codigoSAP}</span>
                       <span className="hidden min-w-0 flex-1 truncate sm:block">
-                        {r.nombre}
+                        {nv.esComun ? nv.titulo : r.nombre}
+                        {nv.oficial && <span className="text-muted-foreground"> · {nv.oficial}</span>}
                         {r.tipo ? <span className="text-caption text-muted-foreground"> · {r.tipo}</span> : null}
                       </span>
                       {cantidadDePosicion(r.cantidadPorMaquina).real ? (
@@ -1907,7 +1915,8 @@ function RecursosRepuestos({ equipment, canEdit, buscarInicial }: { equipment: E
                         </button>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </>
             )}

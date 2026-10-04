@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Button, Pill, Tag, type PillTone } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { stockStatusOf, type StockStatus } from '@/hooks/repuestos/estadoDeStock'
 import { contarParaFiltro, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
 import type { BodegaMergedItem } from '@/hooks/repuestos/useBodega'
@@ -40,7 +41,8 @@ const ORDEN_ESTADO: Record<StockStatus, number> = { out: 0, low: 1, ok: 2, unset
 
 function clave(i: BodegaMergedItem, c: Col): string | number | null {
   switch (c) {
-    case 'nombre': return formatNombreSAP(i.textoBreve).nombre || null
+    // Se ordena por lo que se ve: el nombre común si lo hay, si no el nombre SAP formateado.
+    case 'nombre': { const v = nombreVisible(i); return v.esComun || v.titulo !== '(sin nombre)' ? v.titulo : null }
     case 'sap': return i.codigoSAP
     case 'fab': return i.codigoFabricante || null
     case 'ubicacion': return i.bodegaId ? (i.ubicacionBodega || null) : null
@@ -223,7 +225,7 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                   <tr><td colSpan={COLS.length + 3} className="py-12 text-center text-muted-foreground">Ningún repuesto cumple los filtros.</td></tr>
                 )}
                 {visibles.slice(0, limite).map(i => {
-                  const { nombre, etiquetas } = formatNombreSAP(i.textoBreve)
+                  const nv = nombreVisible(i)
                   const est = stockStatusOf(i)
                   const ms = maquinas(i)
                   const v = valorTotal(i)
@@ -238,8 +240,9 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                         </button>
                       </td>
                       <td className="max-w-[26rem] border-b border-border/40 px-2 py-2">
-                        {etiquetas.map(e => <Tag key={e} tone="neutral" className="mr-1.5 align-[1px]">{e}</Tag>)}
-                        {nombre || <span className="italic text-muted-foreground">Sin nombre</span>}
+                        {nv.etiquetas.map(e => <Tag key={e} tone="neutral" className="mr-1.5 align-[1px]">{e}</Tag>)}
+                        {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre</span>}
+                        {nv.oficial && <span className="block max-w-[300px] truncate text-caption text-muted-foreground" title={nv.oficial}>{nv.oficial}</span>}
                       </td>
                       <td className="border-b border-border/40 px-2 py-2 font-mono">{i.codigoSAP}</td>
                       <td className="border-b border-border/40 px-2 py-2 font-mono">{i.codigoFabricante || <span className="text-muted-foreground/50">—</span>}</td>

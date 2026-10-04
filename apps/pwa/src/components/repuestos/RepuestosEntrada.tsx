@@ -16,12 +16,14 @@ import type { RecienteRepuesto } from '@/utils/repuestos/recientesRepuestos'
  * dibuja, así nunca aparece un 0 que se lea como «no hay stock».
  */
 
+/** Reciente ya resuelto contra el catálogo: `nombre` es el título a mostrar y `oficial` el nombre SAP (solo si hay nombre común). */
+export type RecienteVisible = RecienteRepuesto & { oficial?: string | null }
 export interface FavoritoEquipo { id: string; nombre: string }
 export interface ListaFavoritos { nombre: string; items: FavoritoEquipo[] }
 export interface AreaFila { id: string; nombre: string; equipos: number }
 
 interface Props {
-  recientes: RecienteRepuesto[]
+  recientes: RecienteVisible[]
   onAbrirReciente: (r: RecienteRepuesto) => void
   onLimpiarRecientes: () => void
   listasFavoritos: ListaFavoritos[]
@@ -203,7 +205,9 @@ export function RepuestosEntrada({
                 </CellIcon>
               }
               title={nombreBonito(r.nombre)}
-              subtitle={r.tipo === 'equipo' ? 'Equipo' : <span className="font-mono tabular-nums">{r.id}</span>}
+              subtitle={r.tipo === 'equipo'
+                ? 'Equipo'
+                : <>{r.oficial ? `${r.oficial} · ` : ''}<span className="font-mono tabular-nums">{r.id}</span></>}
               onClick={() => onAbrirReciente(r)}
               className="min-h-[52px]"
             />
