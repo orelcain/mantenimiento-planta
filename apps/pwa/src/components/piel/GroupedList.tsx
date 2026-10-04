@@ -156,18 +156,28 @@ export function ListCell({
   )
 }
 
-/** Ícono cuadrado de celda: la inicial del equipo sobre color de estado. */
+/**
+ * Ícono cuadrado de celda.
+ * - `status` (por defecto): la inicial del equipo sobre color de estado.
+ * - `neutral`: glifo sobre relleno neutro; el color queda para el estado, no para el ícono
+ *   (DESIGN.md §3). 30 px de caja y glifo de 18.
+ */
 export function CellIcon({
   className,
   children,
+  tone = 'status',
 }: {
   className?: string
   children: React.ReactNode
+  tone?: 'status' | 'neutral'
 }) {
   return (
     <span
       className={cn(
-        'flex size-7 items-center justify-center rounded-ctl text-[0.62rem] font-bold text-white',
+        'flex items-center justify-center',
+        tone === 'neutral'
+          ? 'size-[30px] rounded-[8px] bg-muted text-muted-foreground [&_svg]:size-[18px]'
+          : 'size-7 rounded-ctl text-[0.62rem] font-bold text-white',
         className,
       )}
     >
