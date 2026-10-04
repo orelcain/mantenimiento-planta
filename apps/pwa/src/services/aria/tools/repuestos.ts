@@ -17,7 +17,7 @@ import { db } from '@/services/firebase'
 import { registerTool } from './registry'
 import { getGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { resumenDeSolicitudes, type SolicitudParaAria } from './resumenSolicitudes'
-import { nombreParaTexto } from '@/utils/repuestos/nombrePorSap'
+import { nombreParaTexto, textoBuscableRepuesto, tieneComun } from '@/utils/repuestos/nombrePorSap'
 
 const normalizeText = (s: string) =>
   s
@@ -81,7 +81,7 @@ registerTool({
     }
     const matches = cache.filter((r) => {
       const hay = normalizeText(
-        `${r.repuesto.textoBreve || ''} ${r.repuesto.descripcion || ''} ${r.repuesto.codigoSAP || ''} ${r.repuesto.codigoFabricante || ''} ${r.machineName}`,
+        textoBuscableRepuesto(r.repuesto, r.machineName),
       )
       return hay.includes(needle)
     })
@@ -129,7 +129,7 @@ registerTool({
     for (const r of getGlobalRepuestosCache() ?? []) {
       const sap = (r.repuesto.codigoSAP || '').trim()
       const comunes = r.repuesto.nombresComunes
-      if (sap && comunes?.length && !comunPorSap.has(sap)) comunPorSap.set(sap, comunes)
+      if (sap && comunes && tieneComun(r.repuesto) && !comunPorSap.has(sap)) comunPorSap.set(sap, comunes)
     }
     const solicitudes: SolicitudParaAria[] = snap.docs.map((d) => {
       const x = d.data() as Record<string, unknown>

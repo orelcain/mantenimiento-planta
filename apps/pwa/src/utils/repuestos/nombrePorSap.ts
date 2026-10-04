@@ -8,6 +8,10 @@ type FuenteNombre = {
   descripcion?: string | null
 }
 
+/** Hay al menos un nombre común con texto (un `['   ']` no cuenta). */
+export const tieneComun = (r: { nombresComunes?: readonly string[] | null }): boolean =>
+  !!r.nombresComunes?.some((n) => n.trim())
+
 const claveSap = (sap?: string | null): string => (sap ?? '').trim()
 
 /**
@@ -20,7 +24,7 @@ export function indicePorSap<T extends FuenteNombre>(items: readonly T[]): Map<s
     const sap = claveSap(it.codigoSAP)
     if (!sap) continue
     const previo = mapa.get(sap)
-    if (!previo || (!previo.nombresComunes?.length && it.nombresComunes?.length)) mapa.set(sap, it)
+    if (!previo || (!tieneComun(previo) && tieneComun(it))) mapa.set(sap, it)
   }
   return mapa
 }
@@ -59,4 +63,11 @@ export function nombreParaTexto(r: FuenteNombre): string {
   const nv = nombreVisible(r)
   if (!nv.esComun) return r.textoBreve?.trim() || r.descripcion?.trim() || '(sin nombre)'
   return nv.oficial ? `${nv.titulo} (SAP: ${nv.oficial})` : nv.titulo
+}
+
+/** Texto buscable de un repuesto para ARIA: nombre SAP, descripción, TODOS los nombres comunes, SAP y fabricante. */
+export function textoBuscableRepuesto(r: FuenteNombre & { codigoFabricante?: string | null }, extra = ''): string {
+  return [r.textoBreve, r.descripcion, ...(r.nombresComunes ?? []), r.codigoSAP, r.codigoFabricante, extra]
+    .map((t) => t || '')
+    .join(' ')
 }

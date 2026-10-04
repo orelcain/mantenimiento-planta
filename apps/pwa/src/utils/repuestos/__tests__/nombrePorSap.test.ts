@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { indicePorSap, nombreParaTexto, nombreVisiblePorSap } from '../nombrePorSap'
+import { indicePorSap, nombreParaTexto, nombreVisiblePorSap, textoBuscableRepuesto } from '../nombrePorSap'
 
 describe('nombreVisiblePorSap', () => {
   const indice = indicePorSap([
@@ -34,5 +34,33 @@ describe('nombreParaTexto (ARIA)', () => {
   it('sin común: el texto SAP tal cual; vacío no revienta', () => {
     expect(nombreParaTexto({ textoBreve: 'AMORTIGUADOR 1421003000', nombresComunes: [] })).toBe('AMORTIGUADOR 1421003000')
     expect(nombreParaTexto({ textoBreve: '', nombresComunes: null })).toBe('(sin nombre)')
+  })
+})
+
+describe('índice y búsqueda', () => {
+  it('un duplicado con nombre común vacío no bloquea al que sí tiene', () => {
+    const i = indicePorSap([
+      { codigoSAP: '7', textoBreve: 'A', nombresComunes: ['   '] },
+      { codigoSAP: '7', textoBreve: 'A', nombresComunes: ['apodo'] },
+    ])
+    expect(nombreVisiblePorSap(i, '7', 'A').titulo).toBe('Apodo')
+    const j = indicePorSap([
+      { codigoSAP: '7', textoBreve: 'A', nombresComunes: ['apodo'] },
+      { codigoSAP: '7', textoBreve: 'A', nombresComunes: [' '] },
+    ])
+    expect(nombreVisiblePorSap(j, '7', 'A').titulo).toBe('Apodo')
+  })
+
+  it('SAP con espacios resuelve; con ceros iniciales es otro SAP (no se coacciona)', () => {
+    const i = indicePorSap([{ codigoSAP: ' 94011760 ', textoBreve: 'X', nombresComunes: ['cuchillo'] }])
+    expect(nombreVisiblePorSap(i, '94011760', 'Y').titulo).toBe('Cuchillo')
+    expect(nombreVisiblePorSap(i, '094011760', 'Y').titulo).toBe('Y')
+  })
+
+  it('el texto buscable incluye TODOS los nombres comunes (buscar solo por apodo encuentra)', () => {
+    const t = textoBuscableRepuesto({ textoBreve: 'Cuchillo 1', nombresComunes: ['cuchillo circular', 'disco de corte'], codigoSAP: '9' }, 'BAADER 200').toLowerCase()
+    expect(t).toContain('cuchillo circular')
+    expect(t).toContain('disco de corte')
+    expect(t).toContain('baader 200')
   })
 })
