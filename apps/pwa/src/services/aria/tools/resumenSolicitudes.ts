@@ -12,9 +12,13 @@
  * Telegram sí (`ariaDataSolicitudes`).
  */
 
+import { nombreParaTexto } from '@/utils/repuestos/nombrePorSap'
+
 export interface SolicitudParaAria {
   codigoSAP: string
   textoBreve: string
+  /** Nombres comunes del catálogo (resueltos por SAP); la solicitud guardada no los trae. */
+  nombresComunes?: readonly string[]
   cantidad: number
   estado: 'pendiente' | 'aprobada' | 'entregada' | string
   solicitadoPorNombre: string
@@ -35,7 +39,7 @@ function fecha(d?: Date): string {
 }
 
 function linea(s: SolicitudParaAria): string {
-  const partes = [`- [${s.estado}] ${s.textoBreve || '(sin nombre)'} ×${s.cantidad} · SAP ${s.codigoSAP || '—'}`, `pedida por ${s.solicitadoPorNombre || '?'} el ${fecha(s.createdAt)}`]
+  const partes = [`- [${s.estado}] ${nombreParaTexto({ textoBreve: s.textoBreve, nombresComunes: s.nombresComunes })} ×${s.cantidad} · SAP ${s.codigoSAP || '—'}`, `pedida por ${s.solicitadoPorNombre || '?'} el ${fecha(s.createdAt)}`]
   if (s.aprobadaPor) partes.push(`aprobada por ${s.aprobadaPor} el ${fecha(s.aprobadaAt)}`)
   if (s.entregadaPor) partes.push(`entregada por ${s.entregadaPor} el ${fecha(s.entregadaAt)}`)
   if (s.observaciones) partes.push(`obs: ${s.observaciones}`)
