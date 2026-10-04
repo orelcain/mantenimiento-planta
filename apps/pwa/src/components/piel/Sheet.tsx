@@ -31,9 +31,21 @@ export interface SheetProps {
    * para guardar sin soltar el teclado). No afecta a un Sheet que no lo pase.
    */
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void
+  /**
+   * `grouped` = hoja de lista agrupada (HIG «Lists»): el panel va en `bg-background` para que los
+   * grupos `bg-card` se vean como tarjetas, márgenes de 16 px, altura según el contenido con tope
+   * de 85 dvh y el cuerpo con su propio scroll. Sin esto el Sheet se comporta como siempre.
+   */
+  surface?: 'card' | 'grouped'
+  /** Acción a la derecha del título (por ejemplo «Editar»). Debe medir ≥44 px de alto. */
+  headerAction?: React.ReactNode
+  /** Zona fija bajo el título, fuera del scroll (por ejemplo un buscador). */
+  toolbar?: React.ReactNode
 }
 
-export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown }: SheetProps) {
+export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown, surface = 'card', headerAction, toolbar }: SheetProps) {
+  /** Con `grouped` o `toolbar` el panel es una columna: encabezado fijo y cuerpo que desplaza. */
+  const estructurado = surface === 'grouped' || toolbar != null
   const panelRef = React.useRef<HTMLDivElement>(null)
   const returnFocusRef = React.useRef<HTMLElement | null>(null)
   /** Arrastre hacia abajo para cerrar (HIG «Sheets», 19-09-2026): posición inicial del dedo y alto del panel. */
@@ -124,7 +136,9 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
         tabIndex={-1}
         onKeyDown={onKeyDown}
         className={cn(
-          'relative w-full rounded-t-panel bg-card px-6 pb-8 pt-2.5',
+          'relative w-full rounded-t-panel pt-2.5',
+          surface === 'grouped' ? 'bg-background' : 'bg-card',
+          estructurado ? 'flex max-h-[85dvh] flex-col px-4' : 'px-6 pb-8',
           size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
           'shadow-[0_-10px_50px_rgba(0,0,0,0.3)] outline-none',
           'piel-sheet-in',
@@ -143,11 +157,24 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
         />
         {/* Agarradera: señal de "esto se arrastra/cierra", no decoración. */}
         <div className="mx-auto mb-3.5 h-[5px] w-9 rounded-full bg-muted-foreground/40" aria-hidden />
-        {title && <h2 className="text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]">{title}</h2>}
+        {estructurado || headerAction ? (
+          <div className="flex min-h-[44px] flex-none items-center gap-2">
+            {title && <h2 className="min-w-0 flex-1 text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]">{title}</h2>}
+            {/* Por encima de la zona de arrastre (absolute, 44 px de alto), que si no se comería el toque. */}
+            {headerAction && <div className="relative z-10 flex-none">{headerAction}</div>}
+          </div>
+        ) : (
+          title && <h2 className="text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]">{title}</h2>
+        )}
         {description && (
           <p className="mt-1 text-[length:calc(0.83rem*var(--escala-texto,1))] leading-snug text-muted-foreground">{description}</p>
         )}
-        {children && <div className="mt-4">{children}</div>}
+        {toolbar && <div className="mt-2 flex-none">{toolbar}</div>}
+        {children && (estructurado ? (
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(12px,env(safe-area-inset-bottom))]">{children}</div>
+        ) : (
+          <div className="mt-4">{children}</div>
+        ))}
         {actions && <div className="mt-5 flex gap-2.5 [&>*]:flex-1">{actions}</div>}
       </div>
     </div>,
