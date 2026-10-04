@@ -206,7 +206,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos.
           El inventario en curso va en la misma fila, a la derecha: un toque y sin gastar
           una tarjeta de alto encima de la lista. */}
-      <div className="flex min-h-[44px] items-center justify-between gap-2 lg:hidden">
+      <div className="flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -237,7 +237,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
         <PielButton
           variant="tinted"
           size="md"
-          className="min-w-0 shrink gap-2 px-4"
+          className="min-w-0 shrink gap-2 px-4 sm:hidden"
           onClick={() => (unicoEnCurso ? verInventario(unicoEnCurso.id) : setSubTab('inventarios'))}
           aria-label={unicoEnCurso ? `Inventario en curso: ${unicoEnCurso.nombre}. Abrir` : `${enCurso.length} inventarios en curso. Abrir`}
         >
@@ -248,9 +248,9 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
       )}
       </div>
 
-      {/* PC: el aviso completo sobre la tabla. En el teléfono lo reemplaza el botón del título. */}
+      {/* Desde sm: el aviso completo, como siempre. Solo en el celular (<sm) lo reemplaza el botón del título. */}
       {subTab === 'stock' && enCurso.map(s => (
-        <div key={s.id} className="hidden lg:flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+        <div key={s.id} className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
           <ClipboardList className="size-5 shrink-0 text-ink-warn" />
           <div className="min-w-0 flex-1">
             <p className="text-subhead font-semibold text-foreground">{s.nombre}</p>
@@ -318,6 +318,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const [drawerItem, setDrawerItem] = useState<BodegaMergedItem | null>(null)
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [alertasAbiertas, setAlertasAbiertas] = useState(false)
 
   const esPC = useEsPC()
 
@@ -461,7 +462,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         {([
           // Primero: es lo que hay que mirar. Filtra con el MISMO predicado que la cifra.
           ...(stats.alertas.length > 0 || stockFilter === 'alertas'
-            ? [{ key: 'alertas' as StockFilter, label: 'Alertas', dot: 'bg-red-500' }]
+            ? [{ key: 'alertas' as StockFilter, label: 'Alertas', dot: 'bg-ink-crit', soloMovil: true }]
             : []),
           { key: 'configurados', label: 'Configurados' },
           { key: 'todos', label: 'Con SAP' },
@@ -469,7 +470,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           { key: 'sin', label: 'Sin stock', dot: 'bg-red-500' },
           { key: 'sinConfig', label: 'Sin configurar' },
           { key: 'favoritos', label: 'Favoritos', icon: Star },
-        ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star }[]).map(f => {
+        ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star; soloMovil?: boolean }[]).map(f => {
           const on = stockFilter === f.key
           const Icon = f.icon
           return (
@@ -480,6 +481,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
               onClick={e => { setStockFilter(f.key); e.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }) }}
               className={cn(
                 'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-subhead font-medium transition-colors',
+                f.soloMovil && 'sm:hidden',
                 on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]',
               )}
             >
@@ -494,6 +496,55 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         })}
       </div>
 
+      {/* Desde sm: la tarjeta de alertas de siempre. En el celular (<sm) la reemplaza el chip «Alertas». */}
+      <div className="hidden sm:block">
+      {/* ── Alertas: una celda con tile rojo y badge numérico (patrón Ajustes ›
+          Actualización de software). Se despliega en el mismo grupo. ── */}
+      {stats.alertas.length > 0 && (stockFilter === 'todos' || stockFilter === 'configurados') && !searchQuery && (() => {
+        const sinStock = stats.alertas.filter(a => a.stockActual === 0)
+        const bajoStock = stats.alertas.filter(a => a.stockActual > 0)
+        const enCeroSinMinimo = stats.sinStock - sinStock.length
+        const partes = [
+          sinStock.length > 0 && `${sinStock.length} sin stock`,
+          bajoStock.length > 0 && `${bajoStock.length} bajo mínimo`,
+          // La alerta solo vigila los ítems con mínimo definido. Sin esta parte,
+          // «21 sin stock» convivía con el chip que dice 545 y nadie entendía la diferencia.
+          enCeroSinMinimo > 0 && `+${enCeroSinMinimo} en cero sin mínimo`,
+        ].filter(Boolean).join(' · ')
+        return (
+          <ListGroup>
+            <ListCell
+              leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-red-500 text-white"><AlertTriangle className="size-5" /></span>}
+              title={<span className="font-normal">Alertas de stock</span>}
+              subtitle={partes}
+              trailing={<span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-red-500 px-2 text-footnote font-semibold tabular-nums text-white">{stats.alertas.length}</span>}
+              chevron={false}
+              onClick={() => setAlertasAbiertas(v => !v)}
+              aria-expanded={alertasAbiertas}
+            />
+            {alertasAbiertas && stats.alertas.slice(0, 10).map(item => (
+              <ListCell
+                key={item.codigoSAP}
+                variant="child"
+                title={<span className="font-normal">{formatNombreSAP(item.textoBreve).nombre || item.codigoSAP}</span>}
+                subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(' · ')}
+                trailing={
+                  <span className="flex flex-col items-end">
+                    <span className="text-headline tabular-nums text-foreground">{item.stockActual}<span className="ml-1 text-footnote font-normal text-muted-foreground">{item.unidad}</span></span>
+                    <span className={cn('text-footnote font-medium', item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn')}>{item.stockActual === 0 ? 'Sin stock' : `Bajo mín · ${item.stockMinimo}`}</span>
+                  </span>
+                }
+                onClick={() => setDrawerItem(item)}
+              />
+            ))}
+            {alertasAbiertas && stats.alertas.length > 10 && (
+              <ListCell variant="child" title={<span className="font-medium text-brand-ink">Ver todas las alertas</span>} onClick={() => setStockFilter('bajo')} />
+            )}
+          </ListGroup>
+        )
+      })()}
+      </div>
+
       {/* ── Lista agrupada: un solo scroll de página (antes 60 vh anidados) ── */}
       {filtered.length === 0 ? (
         <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
@@ -504,7 +555,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           action={
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="relative inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3 after:absolute after:inset-x-0 after:-inset-y-[9px] after:content-[''] text-footnote font-medium text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <button type="button" className="relative inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3 after:absolute after:inset-x-0 after:-inset-y-[6px] after:content-[''] sm:after:content-none text-footnote font-medium text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                   <ArrowUpDown className="size-3.5" />Ordenar
                 </button>
               </DropdownMenuTrigger>
