@@ -323,7 +323,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         <TabsList className="grid w-full grid-cols-1 h-auto gap-3 bg-transparent p-0 !rounded-none !overflow-visible">
                             <TabsTrigger
                                 value="catalog"
-                                className="w-full h-auto items-start sm:h-11 sm:items-center justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm !rounded-card"
+                                className="w-full h-auto items-start justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm !rounded-card"
                             >
                                 <div className="flex items-start gap-3 sm:gap-4">
                                     <div className="p-2.5 bg-cat-4-tint/[0.15] text-cat-4-ink rounded-card shrink-0 mt-0.5">
@@ -340,7 +340,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             {sapDisponible && (
                             <TabsTrigger
                                 value="sap_bom"
-                                className="w-full h-auto items-start sm:h-11 sm:items-center justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm !rounded-card"
+                                className="w-full h-auto items-start justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm !rounded-card"
                             >
                                 <div className="flex items-start gap-3 sm:gap-4">
                                     <div className="p-2.5 bg-cat-8-tint/[0.15] text-cat-8-ink rounded-card shrink-0 mt-0.5">
@@ -360,7 +360,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             {(favKeys?.size ?? 0) > 0 && (
                             <TabsTrigger
                                 value="technical_sheet"
-                                className="w-full h-auto items-start sm:h-11 sm:items-center justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm !rounded-card"
+                                className="w-full h-auto items-start justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm !rounded-card"
                             >
                                 <div className="flex items-start gap-3 sm:gap-4">
                                     <div className="p-2.5 bg-brand-ink/[0.15] text-brand-ink rounded-card shrink-0 mt-0.5">
