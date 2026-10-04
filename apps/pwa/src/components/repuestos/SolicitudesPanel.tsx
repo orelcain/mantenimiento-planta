@@ -20,6 +20,7 @@ import {
 } from '@/hooks/repuestos/useSolicitudes'
 import { duracionLegible } from '@/hooks/repuestos/trazaDeSolicitud'
 import { avisoDeStock, type StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
+import { nombreVisible, type NombreVisible } from '@/utils/repuestos/nombreVisible'
 
 interface Props {
   open: boolean
@@ -29,6 +30,11 @@ interface Props {
   onAvanzar: (id: string, estado: SolicitudEstado) => Promise<void>
   /** Stock de bodega por SAP: quien aprueba o entrega tiene que ver si hay antes de apretar. */
   stockDe?: (codigoSAP: string) => StockDeSolicitud | undefined
+  /**
+   * Título para MOSTRAR: la solicitud solo guarda `textoBreve`; el nombre común se resuelve
+   * contra el catálogo por SAP. Sin esto se muestra el texto guardado.
+   */
+  nombreDe?: (codigoSAP: string, textoBreve: string) => NombreVisible
 }
 
 const ESTADO_META: Record<SolicitudEstado, { label: string; cls: string }> = {
@@ -73,7 +79,9 @@ function LineaDeStock({ s, stockDe, className = '' }: { s: SolicitudRepuesto; st
 
 type Filtro = 'all' | SolicitudEstado
 
-export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onAvanzar, stockDe }: Props) {
+export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onAvanzar, stockDe, nombreDe }: Props) {
+  const nv = (s: SolicitudRepuesto): NombreVisible =>
+    nombreDe ? nombreDe(s.codigoSAP, s.textoBreve) : nombreVisible({ textoBreve: s.textoBreve })
   const [busyId, setBusyId] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<Filtro>('all')
 
@@ -159,7 +167,8 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                   <li key={s.id} className="space-y-1.5 px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">{s.textoBreve || '(sin nombre)'}</div>
+                        <div className="font-medium text-foreground">{nv(s).titulo}</div>
+                        {nv(s).oficial && <div className="text-footnote text-muted-foreground">{nv(s).oficial}</div>}
                         <div className="font-mono text-caption text-muted-foreground">SAP {s.codigoSAP} · {fmtDate(s.createdAt)}</div>
                       </div>
                       <span className="shrink-0 text-base font-semibold tabular-nums text-foreground" aria-label={`Cantidad ${s.cantidad}`}>×{s.cantidad}</span>
@@ -201,7 +210,8 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                     return (
                       <tr key={s.id} className="align-top">
                         <td className="px-3 py-2">
-                          <div className="font-medium text-foreground">{s.textoBreve || '(sin nombre)'}</div>
+                          <div className="font-medium text-foreground">{nv(s).titulo}</div>
+                          {nv(s).oficial && <div className="text-footnote text-muted-foreground">{nv(s).oficial}</div>}
                           <div className="font-mono text-caption text-muted-foreground">SAP {s.codigoSAP} · {fmtDate(s.createdAt)}</div>
                           {s.observaciones && <div className="mt-0.5 text-caption italic text-muted-foreground">{s.observaciones}</div>}
                           {next && <LineaDeStock s={s} stockDe={stockDe} className="mt-0.5" />}
