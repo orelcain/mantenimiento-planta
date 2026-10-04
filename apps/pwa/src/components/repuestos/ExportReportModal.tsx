@@ -219,9 +219,9 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 overflow-hidden gap-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:overflow-hidden max-sm:rounded-none max-sm:pb-0">
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 overflow-hidden gap-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:overflow-hidden max-sm:rounded-t-none max-sm:pb-0">
         {/* pr-[56px]: libre para la X de 44 px del diálogo, que se comía la esquina de «Vista Actual». */}
-        <div className="pl-4 pr-4 sm:pr-[56px] py-3 sm:pl-6 sm:py-4 border-b flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center bg-muted shrink-0">
+        <div className="pl-4 pr-4 sm:pr-[56px] py-3 sm:pl-6 sm:py-4 border-b flex flex-col max-sm:gap-3 sm:flex-row sm:justify-between sm:items-center bg-muted shrink-0">
             <div className="min-w-0 max-sm:pr-11">
                  <DialogTitle className="text-lg sm:text-xl flex items-center gap-2 whitespace-nowrap">
                     <FileText className="w-5 h-5"/> Centro de Reportes
@@ -234,7 +234,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                     variant={filterMode === 'all' ? 'secondary' : 'ghost'} 
                     size="sm" 
                     onClick={() => { setFilterMode('all'); setSelectedIds(new Set(repuestos.map(r => r.id))) }}
-                    className="text-xs h-11 sm:h-8 flex-1 sm:flex-none px-2 sm:px-3 whitespace-normal leading-tight"
+                    className="text-xs h-11 sm:h-8 flex-1 sm:flex-none px-2 sm:px-3 whitespace-normal sm:whitespace-nowrap"
                 >
                     Catálogo Completo ({catalogoUnico.length})
                 </Button>
@@ -243,7 +243,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         variant={filterMode === 'filtered' ? 'secondary' : 'ghost'} 
                         size="sm" 
                         onClick={() => { setFilterMode('filtered'); setSelectedIds(new Set(filteredRepuestos!.map(r => r.id))) }}
-                        className="text-xs h-11 sm:h-8 flex-1 sm:flex-none px-2 sm:px-3 whitespace-normal leading-tight"
+                        className="text-xs h-11 sm:h-8 flex-1 sm:flex-none px-2 sm:px-3 whitespace-normal sm:whitespace-nowrap"
                     >
                         Vista Actual ({vistaUnica.length})
                     </Button>
@@ -263,8 +263,8 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                 <div className="px-3 py-1 sm:p-3 border-b bg-muted font-medium text-xs tracking-wider text-muted-foreground flex justify-between items-center">
                     <span>Ítems</span>
                     <div className="flex items-center gap-1 sm:block sm:space-x-1 sm:gap-0">
-                        <Button variant="ghost" className="h-11 sm:h-6 px-3 sm:px-2 text-xs" onClick={() => setSelectedIds(new Set())}>Ninguno</Button>
-                        <Button variant="ghost" className="h-11 sm:h-6 px-3 sm:px-2 text-xs" onClick={() => {
+                        <Button variant="ghost" className="h-11 sm:h-6 px-3 sm:px-4 text-xs" onClick={() => setSelectedIds(new Set())}>Ninguno</Button>
+                        <Button variant="ghost" className="h-11 sm:h-6 px-3 sm:px-4 text-xs" onClick={() => {
                              const modeList = filterMode === 'filtered' && filteredRepuestos ? filteredRepuestos : repuestos
                              setSelectedIds(new Set(modeList.map(r => r.id)))
                         }}>Todos</Button>
@@ -323,7 +323,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         <TabsList className="grid w-full grid-cols-1 h-auto gap-3 bg-transparent p-0">
                             <TabsTrigger
                                 value="catalog"
-                                className="w-full h-auto items-start justify-start whitespace-normal text-left px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                                className="w-full h-auto items-start sm:h-11 sm:items-center justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-3 sm:gap-4">
                                     <div className="p-2.5 bg-cat-4-tint/[0.15] text-cat-4-ink rounded-card shrink-0 mt-0.5">
@@ -340,7 +340,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             {sapDisponible && (
                             <TabsTrigger
                                 value="sap_bom"
-                                className="w-full h-auto items-start justify-start whitespace-normal text-left px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                                className="w-full h-auto items-start sm:h-11 sm:items-center justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-3 sm:gap-4">
                                     <div className="p-2.5 bg-cat-8-tint/[0.15] text-cat-8-ink rounded-card shrink-0 mt-0.5">
@@ -360,7 +360,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             {(favKeys?.size ?? 0) > 0 && (
                             <TabsTrigger
                                 value="technical_sheet"
-                                className="w-full h-auto items-start justify-start whitespace-normal text-left px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
+                                className="w-full h-auto items-start sm:h-11 sm:items-center justify-start whitespace-normal px-4 py-3 border bg-background hover:bg-muted/50 data-[state=active]:border-primary data-[state=active]:ring-1 data-[state=active]:ring-primary/20 transition-all shadow-sm rounded-card"
                             >
                                 <div className="flex items-start gap-3 sm:gap-4">
                                     <div className="p-2.5 bg-brand-ink/[0.15] text-brand-ink rounded-card shrink-0 mt-0.5">
