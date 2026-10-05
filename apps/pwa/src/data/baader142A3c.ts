@@ -36,9 +36,18 @@ export interface Elemento {
   senal_a3c: string
   /** Todos los bornes asociados, incluidos pares encoder y bits; [] si ninguno. */
   borne: number[]
-  led_texto: string
+  /** Solo las frases genéricas de la tarjeta (entrada / salida); null si no se sabe. */
+  led_texto: string | null
   modulo: string | null
-  certeza: 'alta' | 'media' | 'baja'
+  certeza: 'alta' | 'baja'
+  /** Fuentes en forma corta, p. ej. «Manual 2005, p. 66»; obligatorias en certeza alta. */
+  fuentes?: string[]
+  /** Aviso breve cuando las hojas del plano se contradicen. */
+  nota?: string
+  /** Tipo de sensor declarado por la lista eléctrica del manual. */
+  tipo_sensor?: string
+  /** Solo en certeza baja: qué confirmar en terreno. */
+  pregunta_terreno?: string
   /** [] cuando no hay ubicación en la hoja 22. */
   hoja22_hotspots: Rect[]
 }

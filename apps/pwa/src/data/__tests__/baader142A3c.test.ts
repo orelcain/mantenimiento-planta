@@ -30,6 +30,88 @@ describe('integridad del paquete A3C real', () => {
     }
   })
 
+  it('solo afirma lo respaldado: 103 en certeza alta con fuentes y 42 en baja sin descripción', () => {
+    const todos = Object.entries(datos.elementos)
+    for (const [k, e] of todos) expect(['alta', 'baja'], k).toContain(e.certeza)
+    const altos = todos.filter(([, e]) => e.certeza === 'alta')
+    const bajos = todos.filter(([, e]) => e.certeza === 'baja').map(([k]) => k)
+    expect(altos).toHaveLength(103)
+    expect(bajos.sort()).toEqual([
+      'A3C.Entregen', 'A3C.R_L_SM', 'A3C.Reset', 'A3C.Step_SM', 'A5', 'B30', 'B40', 'B41', 'B50', 'H10',
+      'J10', 'J11', 'J6', 'J7', 'J8', 'J9', 'Q0', 'TP', 'TP_5VV', 'TP_GNDDC',
+      'X1', 'X10', 'X12', 'X13', 'X14', 'X15', 'X17', 'X2', 'X20', 'X5', 'X6', 'X7',
+      'Y3', 'Y31', 'Y32', 'Y33', 'Y34', 'Y35', 'Y36', 'Y51', 'Y52', 'Y6',
+    ])
+    for (const [k, e] of altos) {
+      expect(e.que_hace.startsWith('Sin descripción'), `${k}: sin descripción pese a certeza alta`).toBe(false)
+      expect(e.fuentes?.length, `${k}: certeza alta sin fuentes`).toBeGreaterThan(0)
+      expect(e.pregunta_terreno, `${k}: certeza alta con pregunta de terreno`).toBeUndefined()
+      // Nada por analogía ni por posición: el texto no puede dudar de lo que afirma.
+      expect(e.que_hace, k).not.toMatch(/probablemente|sería|podría|por contexto|según variante|por analogía/i)
+    }
+    for (const k of bajos) {
+      const e = datos.elementos[k]!
+      expect(e.que_hace, k).toBe('Sin descripción en el plano ni el manual.')
+      expect(e.fuentes, k).toBeUndefined()
+      expect(e.pregunta_terreno, k).toBeTruthy()
+    }
+    expect(datos.elementos.Y4!.certeza).toBe('alta')
+    expect(datos.elementos.Y3!.certeza).toBe('baja')
+  })
+
+  it('marca como inductivos solo los sensores que el manual lista así', () => {
+    const inductivos = Object.entries(datos.elementos).filter(([, e]) => e.tipo_sensor).map(([k]) => k)
+    expect(inductivos.sort()).toEqual(['B1', 'B10', 'B11', 'B12', 'B14', 'B15', 'B16', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9'])
+    for (const k of inductivos) expect(datos.elementos[k]!.tipo_sensor).toMatch(/^Interruptor de aproximación inductivo \(manual 2005, p\. 6[67]\)$/)
+  })
+
+  it('el texto de LED de cada elemento es solo una de las frases genéricas de la tarjeta, o null', () => {
+    const permitidos = new Set<string | null>([
+      null,
+      'Se enciende cuando la A3C recibe la señal del elemento.',
+      'Se enciende cuando la A3C activa la salida.',
+      'Se enciende cuando la A3C recibe la señal del elemento; hay un LED por bit (Bit 0 a Bit 9).',
+    ])
+    for (const [k, e] of Object.entries(datos.elementos)) expect(permitidos.has(e.led_texto), k).toBe(true)
+  })
+
+  it('los nombres y las preguntas no afirman lo que ninguna fuente dice', () => {
+    expect(datos.elementos.Q0!.es).toBe('Sin nombre en el plano')
+    for (const k of ['F27', 'F28', 'F29']) expect(datos.elementos[k]!.es, k).toBe('Sobrecarga de motores (Überlast Motore)')
+    const prohibidos = /protección térmica|interruptor principal|de seguridad|presostato|sin corriente|sentido de giro|parpade|a mano|acercas|metal|relé de|conector o bornera/i
+    const textos = [
+      ...Object.entries(datos.elementos).map(([k, e]) => [k, e.es] as const),
+      ...datos.ledsEstado.map(l => [l.id, l.es] as const),
+      ...datos.quiz.flatMap((p, i) => [[`quiz ${i + 1}`, `${p.q} ${p.why} ${p.ops.map(o => o[1]).join(' ')}`] as const]),
+    ]
+    for (const [k, t] of textos) expect(t, k).not.toMatch(prohibidos)
+  })
+
+  it('módulo: nulo en certeza baja; en alta solo donde el nombre o la hoja 22 lo rotulan', () => {
+    for (const [k, e] of Object.entries(datos.elementos)) {
+      if (e.certeza === 'baja') expect(e.modulo, k).toBeNull()
+      if (e.certeza === 'baja') expect(e.led_texto, k).toBeNull()
+    }
+    const conModulo = Object.entries(datos.elementos).filter(([, e]) => e.modulo !== null).map(([k]) => k)
+    expect(conModulo.sort()).toEqual(['A3C.X4', 'A3C.X5', 'B1', 'B2', 'B21', 'B22', 'B23', 'B24', 'B25', 'B3', 'B4', 'B5', 'B6', 'F1', 'F2', 'SM1', 'SM2', 'SM3', 'SM4', 'SM5'])
+    for (const k of ['F27', 'F28', 'F29', 'Q0', 'B30', 'B40', 'B41', 'B42']) expect(datos.elementos[k]!.modulo, k).toBeNull()
+  })
+
+  it('los bornes 112 a 115 rotulan el contacto de la hoja 23, sin «peso»', () => {
+    for (const [n, c] of [[112, '2'], [113, '4'], [114, '8'], [115, '16']] as const) {
+      expect(datos.bornes.find(b => b.borne === n)!.senal_es).toBe(`Contacto ${c} (grupo S20–S24)`)
+    }
+  })
+
+  it('ningún texto del paquete llama «peso» a un contacto', () => {
+    const textos = [
+      ...datos.bornes.map(b => b.senal_es),
+      ...Object.values(datos.elementos).flatMap(e => [e.es, e.que_hace, e.led_texto ?? '', e.nota ?? '']),
+      ...datos.quiz.map(p => `${p.q} ${p.why} ${p.ops.map(o => o[1]).join(' ')}`),
+    ]
+    for (const t of textos) expect(t).not.toMatch(/(^|[^a-záéíóúñ])pesos?([^a-záéíóúñ]|$)/i)
+  })
+
   it('incluye doce preguntas válidas, repartidas entre PC y teléfono', () => {
     expect(datos.quiz).toHaveLength(12)
     expect(datos.quiz.filter(p => p.contexto === 'pc')).toHaveLength(6)

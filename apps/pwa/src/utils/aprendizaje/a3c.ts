@@ -27,7 +27,7 @@ export interface Regleta {
 /** Las 7 regletas X5, con el título de su módulo tal como lo rotula el plano (no hay 135). */
 export const REGLETAS: Regleta[] = [
   { desde: 1, hasta: 29, preset: 'r1', original: 'SM3 Sauger', es: 'SM3 aspirador' },
-  { desde: 30, hasta: 54, preset: 'r30', original: 'SM2 Schlitzmesser', es: 'SM2 cuchillo de corte' },
+  { desde: 30, hasta: 54, preset: 'r30', original: 'SM2 Schlitzmesser', es: 'SM2 cuchilla hendedora' },
   { desde: 55, hasta: 65, preset: 'r55', original: 'SM1 Zentrierung · RS232', es: 'SM1 centrado · RS232' },
   { desde: 66, hasta: 94, preset: 'r66', original: 'SM4 Kratzer A', es: 'SM4 raspador A' },
   { desde: 95, hasta: 123, preset: 'r95', original: 'SM5 Kratzer B', es: 'SM5 raspador B' },
@@ -66,6 +66,15 @@ export function limpiarSenal(s: string): string {
   return s.replace(/^\d\)\s*/, '').trim()
 }
 
+/**
+ * Rótulo del borne para mostrarlo. `senal_original` de los bornes 112–115 trae «Peso N»,
+ * palabra que la hoja 23 no dibuja (solo los números 2, 4, 8, 16 del grupo S20–S24), y alimenta
+ * `codigoCorto`; a la vista va el rótulo literal de `senal_es`.
+ */
+export function rotuloBorne(b: Borne): string {
+  return limpiarSenal(/^\s*(\d\)\s*)?Peso(?!\w)/.test(b.senal_original) ? b.senal_es : b.senal_original)
+}
+
 /** Clave canónica al tocar un borne: su elemento si lo tiene; si no, el borne suelto. */
 export function claveDeBorne(m: ModeloA3c, n: number): ClaveSel {
   const b = m.bornes.get(n)
@@ -98,6 +107,11 @@ export interface ItemA3c {
   /** Con «Original», el nombre en español va debajo como apoyo. */
   nombreApoyo: string | null
   tipo: TipoItem
+  /**
+   * La píldora de tipo solo se muestra si el manual o el catálogo lo respaldan para ESTE
+   * elemento (ver `tipoRespaldado`). Un elemento de certeza baja nunca la muestra.
+   */
+  mostrarTipo: boolean
   bornes: number[]
   /** Bornes de este ítem que tienen su LED dibujado en el plano. */
   leds: number[]
@@ -109,9 +123,28 @@ export interface ItemA3c {
   /** Texto tal cual en el plano (alemán o código), para la ficha. */
   enPlano: string
   modulo: string | null
+  fuentes: string[]
+  nota: string | null
+  tipoSensor: string | null
+  preguntaTerreno: string | null
+}
+
+/**
+ * ¿El tipo del elemento está respaldado por una fuente propia de ESE elemento? Certeza alta,
+ * citado en el manual o el catálogo, y coherente con el sentido que dice la tarjeta (un
+ * pulsador que no llega a la A3C no es «Sensor · entrada»). Lo deducido por cercanía en el
+ * dibujo o por la letra del código no cuenta.
+ */
+export function tipoRespaldado(e: Elemento): boolean {
+  if (e.certeza !== 'alta') return false
+  if (!(e.fuentes ?? []).some(f => /^(Manual|Catálogo)/.test(f))) return false
+  if (e.tipo === 'sensor' || e.tipo === 'encoder') return e.senal_a3c === 'entrada'
+  if (e.tipo === 'salida') return e.senal_a3c === 'salida'
+  return /^motor/.test(e.tipo)
 }
 
 function tipoDeElemento(e: Elemento): TipoItem {
+  if (e.certeza === 'baja') return 'otro'
   if (/^motor/.test(e.tipo)) return 'motor'
   if (e.senal_a3c === 'salida' || e.tipo === 'salida') return 'salida'
   if (e.tipo === 'sensor') return 'sensor'
@@ -176,15 +209,20 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       nombre,
       nombreApoyo: idioma === 'or' && nombre !== e.es ? e.es : null,
       tipo,
+      mostrarTipo: tipoRespaldado(e),
       bornes,
       leds: bornes.filter(n => m.bornes.get(n)?.led),
       ledsEstado: ledsEstadoDe(m, id),
       hotspots: e.hoja22_hotspots,
       queHace: { texto: conDatos ? e.que_hace : SIN_DESCRIPCION, conDatos },
       cuandoLed: e.led_texto ? textoLed(e.led_texto) : '',
-      senal: SENAL[e.senal_a3c] ?? SENAL_NO_INDICADO,
+      senal: e.certeza === 'baja' ? SENAL_NO_INDICADO : (SENAL[e.senal_a3c] ?? SENAL_NO_INDICADO),
       enPlano: e.original,
       modulo: e.modulo,
+      fuentes: conDatos ? (e.fuentes ?? []) : [],
+      nota: e.nota ?? null,
+      tipoSensor: e.tipo_sensor ?? null,
+      preguntaTerreno: e.certeza === 'baja' ? (e.pregunta_terreno ?? null) : null,
     }
   }
   if (k === 'b') {
@@ -192,7 +230,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
     const b = m.bornes.get(n)
     if (!b) return null
     const tipo = tipoDeBorne(b)
-    const original = limpiarSenal(b.senal_original)
+    const original = rotuloBorne(b)
     const es = tipo === 'sin' ? 'Sin etiqueta en el plano' : limpiarSenal(b.senal_es) || original
     const nombre = idioma === 'or' && original ? original : es
     let queHace: ItemA3c['queHace'] = { texto: SIN_DESCRIPCION, conDatos: false }
@@ -205,6 +243,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       nombre,
       nombreApoyo: idioma === 'or' && nombre !== es ? es : null,
       tipo,
+      mostrarTipo: true,
       bornes: [n],
       leds: b.led ? [n] : [],
       ledsEstado: [],
@@ -214,6 +253,10 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       senal: SENAL[b.sentido] ?? SENAL_NO_INDICADO,
       enPlano: original,
       modulo: null,
+      fuentes: [],
+      nota: null,
+      tipoSensor: null,
+      preguntaTerreno: null,
     }
   }
   if (k === 'l') {
@@ -226,15 +269,20 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       nombre,
       nombreApoyo: idioma === 'or' && nombre !== l.es ? l.es : null,
       tipo: 'led',
+      mostrarTipo: true,
       bornes: [],
       leds: [],
       ledsEstado: [l],
       hotspots: [],
-      queHace: { texto: `Indicador propio de la tarjeta: ${l.es.charAt(0).toLowerCase()}${l.es.slice(1)}.`, conDatos: true },
+      queHace: { texto: `LED de la tarjeta rotulado «${l.original}»${l.es !== l.original ? ` (${l.es})` : ''}.`, conDatos: true },
       cuandoLed: '',
       senal: 'Indicador interno de la tarjeta',
       enPlano: l.original,
       modulo: 'Tarjeta A3C',
+      fuentes: [],
+      nota: null,
+      tipoSensor: null,
+      preguntaTerreno: null,
     }
   }
   return null
@@ -275,10 +323,10 @@ export function lineaLed(item: ItemA3c): LineaLed {
   }
   const r = regletaDe(n0)
   const cuando =
-    item.codigo === 'B13' ? 'patrón según el ángulo del eje'
-      : item.tipo === 'encoder' && item.leds.length === 2 ? 'parpadean al girar'
-        : item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
-          : 'prende con la señal del elemento'
+    item.codigo === 'B13' ? 'un LED por bit (Bit 0 a Bit 9)'
+      : item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
+        : item.tipo === 'sensor' || item.tipo === 'encoder' ? 'prende con la señal del elemento'
+          : 'el plano no indica el sentido de esta señal'
   return {
     grande: `LED ${rango(item.leds)}`,
     texto: `${r ? `Regleta ${r.desde}–${r.hasta} · ` : ''}${cuando}`,
@@ -373,7 +421,7 @@ export function buscar(m: ModeloA3c, consulta: string, idioma: Idioma): GrupoLis
     .filter(it => {
       if (!q) return true
       const otro = describir(m, it.clave, idioma === 'es' ? 'or' : 'es')
-      const heno = norm([it.codigo, it.nombre, otro?.nombre ?? '', it.enPlano, it.bornes.join(' '), ETIQUETA_TIPO[it.tipo]].join(' '))
+      const heno = norm([it.codigo, it.nombre, otro?.nombre ?? '', it.enPlano, it.bornes.join(' '), it.mostrarTipo ? ETIQUETA_TIPO[it.tipo] : ''].join(' '))
       if (/^\d+$/.test(q)) return it.bornes.includes(Number(q)) || norm(it.codigo).includes(q)
       return heno.includes(q)
     })

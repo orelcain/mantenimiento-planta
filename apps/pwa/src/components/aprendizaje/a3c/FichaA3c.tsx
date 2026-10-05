@@ -28,14 +28,19 @@ export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
         <span className={cn('text-headline', item.tipo === 'sin' && 'text-muted-foreground')}>{item.nombre}</span>
       </div>
       {item.nombreApoyo && <p className="text-footnote text-muted-foreground">{item.nombreApoyo}</p>}
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <Pill tone={item.tipo === 'salida' ? 'info' : 'neutral'}>{ETIQUETA_TIPO[item.tipo]}</Pill>
-        {item.modulo && <Pill>{item.modulo}</Pill>}
-      </div>
+      {(item.mostrarTipo || item.modulo) && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {item.mostrarTipo && <Pill tone={item.tipo === 'salida' ? 'info' : 'neutral'}>{ETIQUETA_TIPO[item.tipo]}</Pill>}
+          {item.modulo && <Pill>{item.modulo}</Pill>}
+        </div>
+      )}
 
       <section className="mt-4">
         <h4 className="text-footnote font-semibold text-muted-foreground">Qué hace</h4>
         <p className={cn('text-subhead leading-snug', !item.queHace.conDatos && 'text-muted-foreground')}>{item.queHace.texto}</p>
+        {item.preguntaTerreno && (
+          <p className="mt-1.5 text-subhead leading-snug">Pendiente de confirmar en terreno: {item.preguntaTerreno}</p>
+        )}
       </section>
       {item.cuandoLed && (
         <section className="mt-4">
@@ -45,6 +50,12 @@ export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
       )}
 
       <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-subhead">
+        {item.tipoSensor && (
+          <>
+            <dt className="pt-0.5 text-footnote text-muted-foreground">Tipo</dt>
+            <dd>{item.tipoSensor}</dd>
+          </>
+        )}
         <dt className="pt-0.5 text-footnote text-muted-foreground">Señal</dt>
         <dd>{item.senal}</dd>
         {item.bornes.length > 0 && (
@@ -63,11 +74,15 @@ export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
         {item.enPlano && (
           <>
             <dt className="pt-0.5 text-footnote text-muted-foreground">En el plano</dt>
-            <dd className="font-mono text-footnote">{item.enPlano}</dd>
+            <dd>
+              <span className="font-mono text-footnote">{item.enPlano}</span>
+              {item.nota && <span className="mt-0.5 block text-footnote text-muted-foreground">{item.nota}</span>}
+            </dd>
           </>
         )}
       </dl>
-      <p className="mt-4 font-mono text-caption text-muted-foreground">
+      {item.fuentes.length > 0 && <p className="mt-4 text-caption text-muted-foreground">Fuente: {item.fuentes.join('; ')}</p>}
+      <p className={cn('font-mono text-caption text-muted-foreground', item.fuentes.length ? 'mt-1' : 'mt-4')}>
         Plano 142.71.00.888, hoja 23/45{item.hotspots.length ? ' y 22/45' : ''}
       </p>
     </div>

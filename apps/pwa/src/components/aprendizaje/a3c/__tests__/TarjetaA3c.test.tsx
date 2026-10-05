@@ -33,6 +33,28 @@ describe('Tarjeta A3C', () => {
     expect(within(screen.getByTestId('ficha-a3c')).getByText('B4')).toBeTruthy()
   })
 
+  it('B11 muestra qué hace, el tipo inductivo y la fuente', () => {
+    montar(true)
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 116,/ }))
+    const ficha = within(screen.getByTestId('ficha-a3c'))
+    expect(ficha.getByText('B11')).toBeTruthy()
+    expect(ficha.getAllByText(/palpador/).length).toBeGreaterThan(0)
+    expect(ficha.getByText('Interruptor de aproximación inductivo (manual 2005, p. 66)')).toBeTruthy()
+    expect(ficha.getByText(/Fuente: Manual 2005, p\. 66/)).toBeTruthy()
+  })
+
+  it('un elemento sin respaldo (B30, Y3) dice que no hay descripción y pide confirmar en terreno', () => {
+    montar(true)
+    for (const codigo of ['B30', 'Y3']) {
+      fireEvent.change(screen.getByLabelText('Buscar elemento, borne o LED'), { target: { value: codigo } })
+      fireEvent.click(screen.getAllByRole('button', { name: new RegExp(codigo) })[0]!)
+      const ficha = within(screen.getByTestId('ficha-a3c'))
+      expect(ficha.getByText('Sin descripción en el plano ni el manual.')).toBeTruthy()
+      expect(ficha.getByText(/Pendiente de confirmar en terreno/)).toBeTruthy()
+      expect(ficha.queryByText('Deducido del plano')).toBeNull()
+    }
+  })
+
   it('elegir el borne 68 enciende el LED de Y8 y muestra su ficha como salida', () => {
     montar(true)
     fireEvent.click(screen.getByRole('button', { name: /^Borne 68,/ }))
