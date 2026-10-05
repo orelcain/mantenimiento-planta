@@ -27,7 +27,7 @@ export interface Regleta {
 /** Las 7 regletas X5, con el título de su módulo tal como lo rotula el plano (no hay 135). */
 export const REGLETAS: Regleta[] = [
   { desde: 1, hasta: 29, preset: 'r1', original: 'SM3 Sauger', es: 'SM3 aspirador' },
-  { desde: 30, hasta: 54, preset: 'r30', original: 'SM2 Schlitzmesser', es: 'SM2 cuchillo de corte' },
+  { desde: 30, hasta: 54, preset: 'r30', original: 'SM2 Schlitzmesser', es: 'SM2 cuchilla hendedora' },
   { desde: 55, hasta: 65, preset: 'r55', original: 'SM1 Zentrierung · RS232', es: 'SM1 centrado · RS232' },
   { desde: 66, hasta: 94, preset: 'r66', original: 'SM4 Kratzer A', es: 'SM4 raspador A' },
   { desde: 95, hasta: 123, preset: 'r95', original: 'SM5 Kratzer B', es: 'SM5 raspador B' },
@@ -242,7 +242,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       leds: [],
       ledsEstado: [l],
       hotspots: [],
-      queHace: { texto: `Indicador propio de la tarjeta: ${l.es.charAt(0).toLowerCase()}${l.es.slice(1)}.`, conDatos: true },
+      queHace: { texto: `LED de la tarjeta rotulado «${l.original}»${l.es !== l.original ? ` (${l.es})` : ''}.`, conDatos: true },
       cuandoLed: '',
       senal: 'Indicador interno de la tarjeta',
       enPlano: l.original,
@@ -291,10 +291,10 @@ export function lineaLed(item: ItemA3c): LineaLed {
   }
   const r = regletaDe(n0)
   const cuando =
-    item.codigo === 'B13' ? 'patrón según el ángulo del eje'
-      : item.tipo === 'encoder' && item.leds.length === 2 ? 'parpadean al girar'
-        : item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
-          : 'prende con la señal del elemento'
+    item.codigo === 'B13' ? 'un LED por bit (Bit 0 a Bit 9)'
+      : item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
+        : item.tipo === 'sensor' || item.tipo === 'encoder' ? 'prende con la señal del elemento'
+          : 'el plano no indica el sentido de esta señal'
   return {
     grande: `LED ${rango(item.leds)}`,
     texto: `${r ? `Regleta ${r.desde}–${r.hasta} · ` : ''}${cuando}`,

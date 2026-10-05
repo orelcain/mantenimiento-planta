@@ -36,7 +36,7 @@ describe('selección y descripción con datos reales', () => {
     expect(lineaLed(item('e:B13')).grande).toBe('LED 32–41')
     expect(item('e:B21').tipo).toBe('encoder')
     expect(item('e:B21').leds).toHaveLength(2)
-    expect(lineaLed(item('e:B21')).texto).toContain('parpadean al girar')
+    expect(lineaLed(item('e:B21')).texto).toContain('prende con la señal del elemento')
   })
 
   it('asocia STEP2 al motor SM2 aunque no tenga bornes', () => {

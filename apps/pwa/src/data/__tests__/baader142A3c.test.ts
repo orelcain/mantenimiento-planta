@@ -65,6 +65,28 @@ describe('integridad del paquete A3C real', () => {
     for (const k of inductivos) expect(datos.elementos[k]!.tipo_sensor).toMatch(/^Interruptor de aproximación inductivo \(manual 2005, p\. 6[67]\)$/)
   })
 
+  it('el texto de LED de cada elemento es solo una de las frases genéricas de la tarjeta, o null', () => {
+    const permitidos = new Set<string | null>([
+      null,
+      'Se enciende cuando la A3C recibe la señal del elemento.',
+      'Se enciende cuando la A3C activa la salida.',
+      'Se enciende cuando la A3C recibe la señal del elemento; hay un LED por bit (Bit 0 a Bit 9).',
+    ])
+    for (const [k, e] of Object.entries(datos.elementos)) expect(permitidos.has(e.led_texto), k).toBe(true)
+  })
+
+  it('los nombres y las preguntas no afirman lo que ninguna fuente dice', () => {
+    expect(datos.elementos.Q0!.es).toBe('Sin nombre en el plano')
+    for (const k of ['F27', 'F28', 'F29']) expect(datos.elementos[k]!.es, k).toBe('Sobrecarga de motores (Überlast Motore)')
+    const prohibidos = /protección térmica|interruptor principal|de seguridad|presostato|sin corriente|sentido de giro|parpade|a mano|acercas|metal|relé de|conector o bornera/i
+    const textos = [
+      ...Object.entries(datos.elementos).map(([k, e]) => [k, e.es] as const),
+      ...datos.ledsEstado.map(l => [l.id, l.es] as const),
+      ...datos.quiz.flatMap((p, i) => [[`quiz ${i + 1}`, `${p.q} ${p.why} ${p.ops.map(o => o[1]).join(' ')}`] as const]),
+    ]
+    for (const [k, t] of textos) expect(t, k).not.toMatch(prohibidos)
+  })
+
   it('incluye doce preguntas válidas, repartidas entre PC y teléfono', () => {
     expect(datos.quiz).toHaveLength(12)
     expect(datos.quiz.filter(p => p.contexto === 'pc')).toHaveLength(6)
