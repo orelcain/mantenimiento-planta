@@ -1,0 +1,72 @@
+/*
+ * Tarjeta A3C · BAADER 142 — estilos del dibujo vectorial del plano y sus capas.
+ *
+ * Todo sale de tokens del tema (--foreground, --card, --brand, --tw-red-500, --tw-green-500),
+ * así que claro y oscuro cambian solos. El grosor del trazo se calcula con la escala de la
+ * cámara (--escala = px por unidad del plano): grosor del plano con un piso en pantalla,
+ * para que las líneas no desaparezcan al alejar ni engorden al acercar.
+ */
+
+/* ─── Dibujo del plano ─────────────────────────────────────────────── */
+.a3c-dibujo { color: rgb(var(--foreground)); }
+.dark .a3c-dibujo { color: rgb(var(--foreground) / 0.78); }
+.a3c-tinta { fill: none; stroke: currentColor; stroke-width: max(.37px, calc(.75px / var(--escala, 1))); }
+.a3c-tinta.a3c-s2 { stroke-width: max(.71px, calc(1.1px / var(--escala, 1))); }
+.a3c-tinta.a3c-s0 { stroke-width: max(.06px, calc(.4px / var(--escala, 1))); }
+.a3c-textos text { font-family: Tahoma, Verdana, "DejaVu Sans", sans-serif; fill: currentColor; }
+
+.a3c-lienzo { display: block; width: 100%; height: 100%; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+.a3c-lienzo.a3c-arrastrando { cursor: grabbing; }
+.a3c-cam { transform-origin: 0 0; transition: transform .32s cubic-bezier(.22,.9,.24,1); }
+
+/* ─── Capas interactivas ───────────────────────────────────────────── */
+.a3c-zona { fill: transparent; stroke: rgb(var(--brand)); stroke-opacity: .45; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.a3c-zona.a3c-hover { stroke-opacity: 1; fill: rgb(var(--brand) / .14); }
+.a3c-elegida { fill: rgb(var(--brand) / .14); stroke: rgb(var(--brand)); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.a3c-celda-hover { fill: none; stroke: rgb(var(--brand)); stroke-width: 1.5; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
+
+/* Anillo de llegada al saltar a un punto (800 ms, solo transform + opacity). */
+.a3c-llegada { fill: none; stroke: rgb(var(--brand)); stroke-width: 2; vector-effect: non-scaling-stroke; --k: calc(24 / var(--escala, 1)); transform: scale(var(--k)); transform-box: fill-box; transform-origin: center; opacity: 0; }
+.a3c-llegada.a3c-pulso { animation: a3c-llegada .8s ease-out; }
+@keyframes a3c-llegada { from { opacity: 1; transform: scale(calc(var(--k, 1) * .4)) } to { opacity: 0; transform: scale(calc(var(--k, 1) * 1.2)) } }
+
+/* Los círculos se agrandan con `transform: scale(--k)` y no con la propiedad CSS `r` (Safari iOS
+   no la aplica de forma fiable): el `r` del SVG es el radio base y --k lo lleva al mínimo en pantalla. */
+/* ─── LED encendido ────────────────────────────────────────────────────
+   Rojo del LED real (systemRed del tema); verde en 95–111. Dos anillos que se expanden y
+   se desvanecen 3 veces y luego un halo fijo. Con movimiento reducido: rojo fijo, halo quieto. */
+.a3c-led { --led: var(--tw-red-500); }
+.a3c-led.a3c-verde { --led: var(--tw-green-500); }
+.a3c-led .a3c-nucleo { --k: max(1, calc(1.852 / var(--escala, 1))); transform: scale(var(--k)); transform-box: fill-box; transform-origin: center; fill: rgb(var(--led)); animation: a3c-fade .22s ease-out both; }
+.a3c-led .a3c-halo { --k: max(1, calc(2.333 / var(--escala, 1))); transform: scale(var(--k)); fill: rgb(var(--led) / .28); transform-box: fill-box; transform-origin: center; animation: a3c-halo .4s ease-out both; }
+.a3c-led .a3c-anillo { --k: max(1, calc(2 / var(--escala, 1))); transform: scale(var(--k)); fill: none; stroke: rgb(var(--led)); stroke-width: 2; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; opacity: 0; animation: a3c-anillo 1.1s cubic-bezier(.2,.7,.3,1) 3; }
+.a3c-led .a3c-anillo.a3c-segundo { animation-delay: .55s; }
+.a3c-led.a3c-en-plano .a3c-nucleo { fill: none; }
+.a3c-led.a3c-en-plano .a3c-halo { display: none; }
+.a3c-led.a3c-en-plano .a3c-anillo { stroke: rgb(var(--brand)); --k: calc(1.75 / var(--escala, 1)); }
+.a3c-led.a3c-quiz .a3c-anillo { animation-iteration-count: infinite; animation-duration: 1.6s; }
+@keyframes a3c-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes a3c-halo { from { opacity: 0; transform: scale(calc(var(--k, 1) * .4)) } to { opacity: 1; transform: scale(var(--k, 1)) } }
+@keyframes a3c-anillo { 0% { opacity: .85; transform: scale(var(--k, 1)) } 100% { opacity: 0; transform: scale(calc(var(--k, 1) * 2.8)) } }
+
+/* ─── Foco del LED en la franja y punto de la regleta ─────────────────── */
+.a3c-foco { width: 18px; height: 18px; border-radius: 9999px; flex: none; background: radial-gradient(circle, rgb(var(--tw-red-500)) 0 40%, rgb(var(--tw-red-500) / .35) 62%, transparent 72%); }
+.a3c-foco.a3c-verde { background: radial-gradient(circle, rgb(var(--tw-green-500)) 0 40%, rgb(var(--tw-green-500) / .35) 62%, transparent 72%); }
+.a3c-foco.a3c-apagado { background: transparent; box-shadow: inset 0 0 0 1.5px rgb(var(--muted-foreground) / .6); }
+
+.a3c-punto { position: relative; width: 10px; height: 10px; border-radius: 9999px; background: rgb(var(--tw-red-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-red-500) / .5); }
+.a3c-punto.a3c-verde { background: rgb(var(--tw-green-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-green-500) / .55); }
+.a3c-punto.a3c-sin-led { background: transparent; box-shadow: none; }
+.a3c-punto.a3c-encendido { background: rgb(var(--tw-red-500)); box-shadow: 0 0 8px rgb(var(--tw-red-500) / .8); }
+.a3c-punto.a3c-verde.a3c-encendido { background: rgb(var(--tw-green-500)); box-shadow: 0 0 8px rgb(var(--tw-green-500) / .8); }
+.a3c-punto.a3c-encendido::after { content: ""; position: absolute; inset: -3px; border-radius: 9999px; border: 2px solid rgb(var(--tw-red-500)); opacity: 0; animation: a3c-anillo 1.1s cubic-bezier(.2,.7,.3,1) 3; }
+.a3c-punto.a3c-verde.a3c-encendido::after { border-color: rgb(var(--tw-green-500)); }
+
+.a3c-regleta { scrollbar-width: none; scroll-padding-inline: 40%; }
+.a3c-regleta::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .a3c-cam { transition: none; }
+  .a3c-led .a3c-anillo, .a3c-punto.a3c-encendido::after, .a3c-llegada { display: none; }
+  .a3c-led .a3c-nucleo, .a3c-led .a3c-halo { animation: none; }
+}

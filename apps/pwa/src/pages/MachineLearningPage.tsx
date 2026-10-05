@@ -11,7 +11,7 @@ import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay, Zap, Search, Lock, Gauge, Ruler,
+  MonitorPlay, Zap, Search, Lock, Gauge, Ruler, CircuitBoard,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -403,6 +403,12 @@ export function MachineLearningPage() {
           {!isCourse && machine.hmiRoute && (
             <button className="dp-hmi" onClick={() => navigate(machine.hmiRoute!)}>
               <MonitorPlay className="h-4 w-4" /> Practicar en el simulador · {machine.hmiLabel}
+            </button>
+          )}
+          {/* Tarjeta A3C interactiva (plano 888 h. 22-23), solo BAADER 142. */}
+          {machine.slug === 'baader-142' && (
+            <button className="dp-hmi" style={{ minHeight: 44 }} onClick={() => navigate('/aprendizaje/baader-142/tarjeta-a3c')}>
+              <CircuitBoard className="h-4 w-4" /> Tarjeta A3C · qué LED prende
             </button>
           )}
 

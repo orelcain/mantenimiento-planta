@@ -138,6 +138,7 @@ const VariadoresPage = lazyWithReload(() => import('@/pages/VariadoresPage').the
 const Perilla5Page = lazyWithReload(() => import('@/pages/Perilla5Page').then((mod) => ({ default: mod.Perilla5Page })))
 const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
 const Baader200TerrenoPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader200TerrenoPage').then((mod) => ({ default: mod.Baader200TerrenoPage })))
+const Baader142A3cPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader142A3cPage').then((mod) => ({ default: mod.Baader142A3cPage })))
 const LearningAdminPage = lazyWithReload(() => import('@/pages/LearningAdminPage').then((mod) => ({ default: mod.LearningAdminPage })))
 const LearningAdminMachinePage = lazyWithReload(() => import('@/pages/LearningAdminMachinePage').then((mod) => ({ default: mod.LearningAdminMachinePage })))
 
@@ -631,6 +632,15 @@ export function App() {
               element={
                 <Suspense fallback={<LoadingScreen />}>
                   <Perilla5Page />
+                </Suspense>
+              }
+            />
+            {/* Tarjeta A3C de la BAADER 142: plano 888 hojas 22 y 23, interactivo. */}
+            <Route
+              path="/aprendizaje/baader-142/tarjeta-a3c"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader142A3cPage />
                 </Suspense>
               }
             />

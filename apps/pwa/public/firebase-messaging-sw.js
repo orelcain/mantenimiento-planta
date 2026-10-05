@@ -45,7 +45,9 @@ const baseUrl = getBaseUrl()
 
 // Cache for heavy assets (models, images)
 const CACHE_NAME = 'assets-cache-v1'
-const HEAVY_ASSET_RE = /\.(glb|gltf|bin|jpg|jpeg|png|webp|svg)$/i
+// Incluye el JSON de la Tarjeta A3C (solo esa carpeta: no todos los .json de la app) para que
+// la herramienta abra sin señal junto a sus dos SVG.
+const HEAVY_ASSET_RE = /(\.(glb|gltf|bin|jpg|jpeg|png|webp|svg)|\/learning-assets\/baader-142\/a3c\/[^/]+\.json)$/i
 
 // ─── App Shell para el bot Mini App (mant.html) ────────────────────
 // Permite que el bot ABRA sin red. Sin esto, el WebView de Telegram falla
