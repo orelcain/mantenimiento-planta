@@ -37,7 +37,7 @@ describe('selección y descripción con datos reales', () => {
     const l = lineaLed(b13)
     expect(l).toMatchObject({ grande: 'LED 32–41', color: null, grupo: true, encendible: true })
     expect(l.texto).toContain('32, 35 y 37 a 40')
-    expect(l.texto).toContain('No se encienden todos a la vez')
+    expect(l.texto).toContain('En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40')
     expect(b13.cuandoLed).toContain('32, 35 y 37 a 40')
     expect(b13.cuandoLed).not.toMatch(/se enciende cuando/i)
     expect(item('e:B1').grupoBits).toBe(false)

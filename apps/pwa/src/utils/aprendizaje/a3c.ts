@@ -209,7 +209,7 @@ function textoLed(t: string): string {
 
 /** LED de estado de un elemento: los que el paquete le asigna + Step SMn para el motor SMn. */
 const TEXTO_GRUPO_BITS =
-  'Un LED por bit (Bit 0 a Bit 9). No se encienden todos a la vez: en la foto de la N2, con la máquina detenida, estaban encendidos 32, 35 y 37 a 40.'
+  'Un LED por bit (Bit 0 a Bit 9). En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40.'
 
 /** ¿Todos los bornes del elemento son bits de un código («Bit 0», «Bit 1»…)? */
 function esGrupoBits(m: ModeloA3c, bornes: number[]): boolean {
@@ -360,7 +360,7 @@ export function lineaLed(item: ItemA3c): LineaLed {
   if (item.grupoBits) {
     return {
       grande: `LED ${rango(item.leds)}`,
-      texto: 'Uno por bit (Bit 0 a Bit 9). No se encienden todos a la vez: en la foto de la N2, con la máquina detenida, estaban encendidos 32, 35 y 37 a 40.',
+      texto: 'Uno por bit (Bit 0 a Bit 9). En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40.',
       color: null,
       encendible: true,
       grupo: true,
