@@ -152,6 +152,20 @@ describe('Tarjeta A3C · LED de estado «60V DC» en la placa', () => {
     expect(within(screen.getByTestId('franja-led')).getByRole('button', { name: 'Ver LED 139 en la tarjeta' })).toBeTruthy()
   })
 
+  it('X5:136 (sin LED) tampoco está en la placa: la franja lo dice y «Ver en el plano» lleva a su celda', () => {
+    localStorage.setItem('a3c-vista-tarjeta', 'placa')
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 136,/ }))
+    const franja = within(screen.getByTestId('franja-led'))
+    expect(franja.getByText('Sin LED')).toBeTruthy()
+    expect(franja.getByText(/No está dibujado en la placa/)).toBeTruthy()
+    fireEvent.click(franja.getByRole('button', { name: 'Ver el borne 136 en el plano' }))
+    expect(host()).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Plano' }).getAttribute('aria-selected')).toBe('true')
+    // En el plano vuelve a ser «Sin LED», sin botón.
+    expect(within(screen.getByTestId('franja-led')).queryByRole('button')).toBeNull()
+  })
+
   it('el borne 103 enciende led-X5-103 (un LED por fila en el plano; lo dudoso era solo el estado de la foto)', () => {
     localStorage.setItem('a3c-vista-tarjeta', 'placa')
     montar()

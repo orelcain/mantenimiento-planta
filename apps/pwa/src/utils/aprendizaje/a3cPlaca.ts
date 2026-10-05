@@ -252,8 +252,17 @@ export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
  * si en la placa no hay nada que mostrar se dice, y «Ver» lleva al plano en vez de no hacer nada.
  */
 export function lineaEnPlaca(linea: LineaLed, geo: GeoPlaca, item: ItemA3c): LineaLed & { soloPlano: boolean } {
-  if (!linea.encendible || ledsPlaca(geo, item).length) return { ...linea, soloPlano: false }
-  if (!focoPlaca(geo, item)) return { ...linea, texto: 'No está dibujado en la placa', soloPlano: true }
+  const foco = focoPlaca(geo, item)
+  if (!linea.encendible) {
+    // Un borne sin LED que la placa no dibuja (136–145): igual se puede ver dónde está en el plano.
+    if (item.bornes.length && !foco) {
+      const nombreVer = `el borne ${item.bornes.join(', ')}`
+      return { ...linea, texto: 'Sin LED en el plano · No está dibujado en la placa', encendible: true, nombreVer, soloPlano: true }
+    }
+    return { ...linea, soloPlano: false }
+  }
+  if (ledsPlaca(geo, item).length) return { ...linea, soloPlano: false }
+  if (!foco) return { ...linea, texto: 'No está dibujado en la placa', soloPlano: true }
   return { ...linea, texto: `${linea.texto} · Sin LED identificado en la placa`, soloPlano: false }
 }
 

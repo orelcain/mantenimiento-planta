@@ -311,6 +311,8 @@ export interface LineaLed {
   color: ColorLed | null
   /** Hay algo que encender en la tarjeta (habilita «Ver»). */
   encendible: boolean
+  /** Qué nombra «Ver» cuando no es un LED (p. ej. «el borne 136»); si falta, `grande`. */
+  nombreVer?: string
 }
 
 function rango(ns: number[]): string {
