@@ -425,7 +425,7 @@ export function lineasDeTexto(t: Texto, idioma: Idioma): LineaTexto[] {
     const ls = partirPalabras(texto, 70, L.size)
     const fs = L.size * 0.9
     const y0 = (L.cy ?? t.y) - (ls.length - 1) * fs * 0.55 + fs * 0.35
-    return ls.map((s, i) => ({ x: L.x, y: +(y0 + i * fs * 1.1).toFixed(2), size: +fs.toFixed(2), texto: s, anchor: L.a }))
+    return ls.map((s, i) => ({ x: L.x, y: +(y0 + i * fs * 1.1).toFixed(2), size: +fs.toFixed(2), texto: s, anchor: L.a })) // decimal-tecnico: coordenadas y tamano de texto de un atributo SVG, no una cifra que alguien lea
   }
   const transform = L.g ?? undefined
   if (idioma === 'or' || !L.lines?.length) {
