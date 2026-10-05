@@ -87,6 +87,31 @@ describe('integridad del paquete A3C real', () => {
     for (const [k, t] of textos) expect(t, k).not.toMatch(prohibidos)
   })
 
+  it('módulo: nulo en certeza baja; en alta solo donde el nombre o la hoja 22 lo rotulan', () => {
+    for (const [k, e] of Object.entries(datos.elementos)) {
+      if (e.certeza === 'baja') expect(e.modulo, k).toBeNull()
+      if (e.certeza === 'baja') expect(e.led_texto, k).toBeNull()
+    }
+    const conModulo = Object.entries(datos.elementos).filter(([, e]) => e.modulo !== null).map(([k]) => k)
+    expect(conModulo.sort()).toEqual(['A3C.X4', 'A3C.X5', 'B1', 'B2', 'B21', 'B22', 'B23', 'B24', 'B25', 'B3', 'B4', 'B5', 'B6', 'F1', 'F2', 'SM1', 'SM2', 'SM3', 'SM4', 'SM5'])
+    for (const k of ['F27', 'F28', 'F29', 'Q0', 'B30', 'B40', 'B41', 'B42']) expect(datos.elementos[k]!.modulo, k).toBeNull()
+  })
+
+  it('los bornes 112 a 115 rotulan el contacto de la hoja 23, sin «peso»', () => {
+    for (const [n, c] of [[112, '2'], [113, '4'], [114, '8'], [115, '16']] as const) {
+      expect(datos.bornes.find(b => b.borne === n)!.senal_es).toBe(`Contacto ${c} (grupo S20–S24)`)
+    }
+  })
+
+  it('ningún texto del paquete llama «peso» a un contacto', () => {
+    const textos = [
+      ...datos.bornes.map(b => b.senal_es),
+      ...Object.values(datos.elementos).flatMap(e => [e.es, e.que_hace, e.led_texto ?? '', e.nota ?? '']),
+      ...datos.quiz.map(p => `${p.q} ${p.why} ${p.ops.map(o => o[1]).join(' ')}`),
+    ]
+    for (const t of textos) expect(t).not.toMatch(/(^|[^a-záéíóúñ])pesos?([^a-záéíóúñ]|$)/i)
+  })
+
   it('incluye doce preguntas válidas, repartidas entre PC y teléfono', () => {
     expect(datos.quiz).toHaveLength(12)
     expect(datos.quiz.filter(p => p.contexto === 'pc')).toHaveLength(6)

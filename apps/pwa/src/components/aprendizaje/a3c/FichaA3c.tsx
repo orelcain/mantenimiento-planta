@@ -28,10 +28,12 @@ export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
         <span className={cn('text-headline', item.tipo === 'sin' && 'text-muted-foreground')}>{item.nombre}</span>
       </div>
       {item.nombreApoyo && <p className="text-footnote text-muted-foreground">{item.nombreApoyo}</p>}
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <Pill tone={item.tipo === 'salida' ? 'info' : 'neutral'}>{ETIQUETA_TIPO[item.tipo]}</Pill>
-        {item.modulo && <Pill>{item.modulo}</Pill>}
-      </div>
+      {(item.mostrarTipo || item.modulo) && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {item.mostrarTipo && <Pill tone={item.tipo === 'salida' ? 'info' : 'neutral'}>{ETIQUETA_TIPO[item.tipo]}</Pill>}
+          {item.modulo && <Pill>{item.modulo}</Pill>}
+        </div>
+      )}
 
       <section className="mt-4">
         <h4 className="text-footnote font-semibold text-muted-foreground">Qué hace</h4>

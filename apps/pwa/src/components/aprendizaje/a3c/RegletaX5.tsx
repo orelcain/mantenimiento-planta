@@ -6,7 +6,7 @@
 import { forwardRef, memo, useMemo } from 'react'
 import type { Borne } from '@/data/baader142A3c'
 import { cn } from '@/lib/utils'
-import { REGLETAS, codigoCorto, colorLed, limpiarSenal, type Idioma } from '@/utils/aprendizaje/a3c'
+import { REGLETAS, codigoCorto, colorLed, rotuloBorne, type Idioma } from '@/utils/aprendizaje/a3c'
 
 export interface RegletaX5Props {
   bornes: Map<number, Borne>
@@ -45,7 +45,7 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
               type="button"
               data-n={n}
               aria-pressed={elegidos.has(n)}
-              aria-label={`Borne ${n}, ${sin ? 'sin etiqueta' : limpiarSenal(b.senal_original)}${b.led ? '' : ', sin LED'}`}
+              aria-label={`Borne ${n}, ${sin ? 'sin etiqueta' : rotuloBorne(b)}${b.led ? '' : ', sin LED'}`}
               onClick={() => onElegir(n)}
               className={cn(
                 'flex flex-none snap-center flex-col items-center justify-between rounded-ctl bg-card px-0.5 pb-1.5 pt-1.5',

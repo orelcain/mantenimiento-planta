@@ -7,7 +7,7 @@ import {
   describir, elegirEn, guardarIdioma, guardarRacha, leerIdioma, leerRacha,
   limitarCamara, lineaLed, lineasDeTexto, matrizCamara, nuevoQuiz, objetivosHoja23,
   pantallaAUnidades, puntosLed, recorteRegleta, regletaDe, reiniciar, responder,
-  siguiente, SIN_DESCRIPCION, zoomCamara, type LimitesCamara,
+  siguiente, SIN_DESCRIPCION, tipoRespaldado, zoomCamara, type LimitesCamara,
 } from '../a3c'
 
 const datos = JSON.parse(readFileSync(resolve(__dirname, '../../../../public/learning-assets/baader-142/a3c/a3c-datos.json'), 'utf8')) as A3CDatos
@@ -60,6 +60,38 @@ describe('selección y descripción con datos reales', () => {
     for (const [clave] of bajos) expect(item(`e:${clave}`).queHace).toEqual({ texto: SIN_DESCRIPCION, conDatos: false })
   })
 
+  it('la píldora de tipo y el módulo solo salen donde una fuente propia los respalda', () => {
+    // F27, Q0, B30: sin tipo ni módulo; el tipo de un baja no se usa ni para el LED ni para la señal.
+    for (const k of ['F27', 'Q0', 'B30', 'B40', 'B41']) {
+      expect(item(`e:${k}`), k).toMatchObject({ mostrarTipo: false, modulo: null })
+    }
+    expect(item('e:B30').tipo).toBe('otro')
+    expect(item('e:Y3')).toMatchObject({ mostrarTipo: false, tipo: 'otro', cuandoLed: '', senal: 'El plano no indica el sentido' })
+    expect(lineaLed(item('e:Y3')).texto).not.toContain('activa la salida')
+    // B42 es alta, pero solo del plano: sin píldora de tipo (el nombre ya lo dice).
+    expect(item('e:B42')).toMatchObject({ mostrarTipo: false, modulo: null })
+    // B11: el manual lo lista como interruptor de aproximación; su módulo era cercanía en el dibujo.
+    expect(item('e:B11')).toMatchObject({ mostrarTipo: true, tipo: 'sensor', modulo: null })
+    // B1 y SM2: tipo del manual y módulo rotulado.
+    expect(item('e:B1')).toMatchObject({ mostrarTipo: true, modulo: 'SM1: centrado' })
+    expect(item('e:SM2')).toMatchObject({ mostrarTipo: true, modulo: 'SM2: cuchilla hendedora' })
+    // Un pulsador que no llega a la A3C no es «Sensor · entrada».
+    expect(item('e:S1').mostrarTipo).toBe(false)
+    expect(tipoRespaldado(datos.elementos.S1!)).toBe(false)
+    expect(tipoRespaldado(datos.elementos.Y8!)).toBe(true)
+  })
+
+  it('los bornes 112–115 se muestran como «Contacto N», también en «Original», y ya no dicen peso', () => {
+    for (const [n, c] of [[112, '2'], [113, '4'], [114, '8'], [115, '16']] as const) {
+      for (const idioma of ['es', 'or'] as const) {
+        const it = describir(m, `b:${n}`, idioma)!
+        expect(it.nombre).toBe(`Contacto ${c} (grupo S20–S24)`)
+        expect(it.enPlano).toBe(`Contacto ${c} (grupo S20–S24)`)
+        expect(JSON.stringify(it)).not.toMatch(/peso/i)
+      }
+    }
+  })
+
   it('muestra el nombre original con apoyo en español solo cuando corresponde', () => {
     expect(describir(m, 'e:Y8', 'or')).toMatchObject({ nombre: datos.elementos.Y8!.original, nombreApoyo: datos.elementos.Y8!.es })
     expect(item('e:Y8').nombreApoyo).toBeNull()
@@ -73,7 +105,7 @@ describe('selección y descripción con datos reales', () => {
     expect(regletaDe(135)).toBeUndefined()
   })
 
-  it.each([[1, 'B21A'], [33, 'bit1'], [11, '—'], [101, 'OK']] as const)('abrevia la señal del borne %i', (n, codigo) => {
+  it.each([[1, 'B21A'], [33, 'bit1'], [11, '—'], [101, 'OK'], [112, 'S·2'], [115, 'S·16']] as const)('abrevia la señal del borne %i', (n, codigo) => {
     expect(codigoCorto(m.bornes.get(n)!)).toBe(codigo)
   })
 })
