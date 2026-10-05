@@ -306,3 +306,26 @@ describe('rueda', () => {
     expect(deltaRuedaPx(1, 2)).toBe(100)
   })
 })
+
+describe('LED «60V DC» de cada bloque SM (hoja 23)', () => {
+  it('cada SMk tiene su LED 60V DC y la franja nombra los dos LED con «y»', () => {
+    for (let k = 1; k <= 6; k++) expect(item(`e:SM${k}`).ledsEstado.map(l => l.id)).toEqual([`V60_${k}`, `STEP${k}`])
+    expect(lineaLed(item('e:SM2')).grande).toBe('LED 60V DC SM2 y Step SM2')
+  })
+
+  it('cada LED 60V DC queda junto a su rótulo «60V DC» y en el bloque de su SM (mismo lado, rótulo SM más cercano)', () => {
+    const textos = datos.textos.hoja23
+    const rotulos = textos.filter(t => t.original === '60V DC')
+    expect(rotulos).toHaveLength(6)
+    const sms = textos.filter(t => /^SM\d \S/.test(t.original))
+    for (let k = 1; k <= 6; k++) {
+      const l = datos.ledsEstado.find(e => e.id === `V60_${k}`)!
+      expect(l.elemento).toBe(`SM${k}`)
+      // A la izquierda el rótulo va bajo el LED; a la derecha, sobre el conector de 2 bornes.
+      expect(Math.min(...rotulos.map(t => Math.hypot(t.x - l.led.x, t.y - l.led.y)))).toBeLessThan(60)
+      const lado = sms.filter(t => (t.x < 400) === (l.led.x < 400))
+      const cerca = lado.sort((a, b) => Math.abs(a.y - l.led.y) - Math.abs(b.y - l.led.y))[0]!
+      expect(cerca.original.startsWith(`SM${k} `)).toBe(true)
+    }
+  })
+})

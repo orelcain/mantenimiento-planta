@@ -186,7 +186,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   const ledsP = useMemo(() => (placa ? ledsPlaca(placa.geo, item) : []), [placa, item])
 
   // En la placa, el LED y el borne elegidos se marcan también en el propio dibujo (atributos
-  // sobre sus grupos `led-X5-n` / `borne-X5-n`): el CSS los resalta y queda verificable. Corre
+  // sobre sus grupos `led-X5-n` o `led-estado-k` / `borne-X5-n`): el CSS los resalta y queda verificable. Corre
   // en cada render porque el lienzo puede montarse de nuevo (cambio de diseño o de lámina).
   useEffect(() => {
     const host = placaHost.current
@@ -195,7 +195,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       e.removeAttribute('data-encendido')
       e.removeAttribute('data-elegido')
     })
-    for (const l of ledsP) host.querySelector(`#led-X5-${l.n}`)?.setAttribute('data-encendido', '')
+    for (const l of ledsP) host.querySelector(`#${l.svgId}`)?.setAttribute('data-encendido', '')
     for (const n of elegidos) host.querySelector(`#borne-X5-${n}`)?.setAttribute('data-elegido', '')
   })
 

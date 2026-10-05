@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { interiorPlaca, interiorSvg, type A3CDatos, type PaqueteA3c, type PaquetePlaca } from '@/data/baader142A3c'
 import { camaraDePreset, colorLed, LEDS_VERDES_FOTO, limitarCamara, matrizCamara } from '@/utils/aprendizaje/a3c'
-import { geometriaPlaca, limitesPlaca, presetsPlaca, ZONAS_PLACA } from '@/utils/aprendizaje/a3cPlaca'
+import { geometriaPlaca, leerTransform, limitesPlaca, presetsPlaca, ZONAS_PLACA } from '@/utils/aprendizaje/a3cPlaca'
 import { TarjetaA3c } from '../TarjetaA3c'
 
 const assets = resolve(__dirname, '../../../../../public/learning-assets/baader-142/a3c')
@@ -102,11 +102,78 @@ describe('Tarjeta A3C · vista Placa', () => {
   })
 })
 
+/** Toca (mouse) un punto del dibujo de la placa con la cámara en «Todo» (lienzo de 343 × 340 en happy-dom). */
+function tocarPlaca(x: number, y: number) {
+  fireEvent.click(within(host()!).getByRole('button', { name: 'Todo' }))
+  const cam = limitarCamara(camaraDePreset(presetsPlaca(placa.geo).todo!, 343, 340), limitesPlaca(placa.geo))
+  const mz = matrizCamara(cam, 343, 340)
+  const svg = host()!.querySelector('svg')!
+  const e = { pointerId: 1, pointerType: 'mouse', button: 0, clientX: x * mz.s + mz.tx, clientY: y * mz.s + mz.ty }
+  fireEvent.pointerDown(svg, e)
+  fireEvent.pointerUp(svg, e)
+}
+
+describe('Tarjeta A3C · LED de estado «60V DC» en la placa', () => {
+  it('tocar led-estado-4 elige el LED 60V DC SM4 y lo enciende (en la placa y en el plano)', () => {
+    localStorage.setItem('a3c-vista-tarjeta', 'placa')
+    montar()
+    const l = placa.geo.ledsEstado.get('V60_4')!
+    tocarPlaca(l.x, l.y)
+    expect(within(screen.getByTestId('franja-led')).getByText('LED 60V DC SM4')).toBeTruthy()
+    expect(encendidos()).toEqual(['led-estado-4'])
+    fireEvent.click(screen.getByRole('tab', { name: 'Plano' }))
+    const plano = [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
+    expect(plano).toEqual(['l:V60_4:V60_4'])
+  })
+
+  it('elegir el motor SM1 enciende led-estado-1 (su LED «60V DC»); «Ver» queda en la placa', () => {
+    localStorage.setItem('a3c-vista-tarjeta', 'placa')
+    montar()
+    fireEvent.change(screen.getByLabelText('Buscar elemento, borne o LED'), { target: { value: 'SM1' } })
+    fireEvent.click(screen.getAllByRole('button', { name: /^SM1 / })[0]!)
+    expect(ficha().getByText('SM1')).toBeTruthy()
+    expect(encendidos()).toEqual(['led-estado-1'])
+    expect(within(screen.getByTestId('franja-led')).getByText('LED 60V DC SM1 y Step SM1')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver LED 60V DC SM1 y Step SM1 en la tarjeta' })).toBeTruthy()
+  })
+
+})
+
 describe('placa-n2.svg · integridad y seguridad', () => {
+  it('cada led-estado-k asignado es un LED «60V DC» del plano, en su bloque X4 y en la misma posición relativa', () => {
+    // Cajas de los conectores X4 de la placa (primer <rect> de cada grupo, con su transform).
+    const x4 = new Map<string, { x0: number; x1: number; y0: number; y1: number }>()
+    for (const g of svgPlaca.matchAll(/<g id="conector-X4-\d+"[^>]*transform="([^"]+)"[^>]*data-bornes="(\d+-\d+)"[^>]*>[\s\S]*?<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)) {
+      const [a, , , d, e, f] = leerTransform(g[1]!)
+      const [x, y, w, h] = [g[3], g[4], g[5], g[6]].map(Number) as [number, number, number, number]
+      x4.set(g[2]!, { x0: a * x + e, x1: a * (x + w) + e, y0: d * y + f, y1: d * (y + h) + f })
+    }
+    // Plano (hoja 23): a la izquierda el LED va entre el conector de 4 y el de 2 (sobre este);
+    // a la derecha, justo bajo el de 2 y antes del de 4. Igual en la placa.
+    const bloques: [string, string, string, 'izq' | 'der'][] = [
+      ['V60_1', '15-18', '13-14', 'izq'], ['V60_2', '9-12', '7-8', 'izq'], ['V60_3', '3-6', '1-2', 'izq'],
+      ['V60_4', '19-20', '21-24', 'der'], ['V60_5', '25-26', '27-30', 'der'], ['V60_6', '31-32', '33-36', 'der'],
+    ]
+    expect([...placa.geo.ledsEstado.keys()].sort()).toEqual(bloques.map(b => b[0]))
+    for (const [id, arriba, abajo, lado] of bloques) {
+      const l = placa.geo.ledsEstado.get(id)!
+      const [a, b] = [x4.get(arriba)!, x4.get(abajo)!]
+      expect(l.y > a.y1 && l.y < b.y0).toBe(true)
+      // Pegado al de 2 bornes (≤ 1/4 del tramo entre conectores).
+      const dos = lado === 'izq' ? b.y0 - l.y : l.y - a.y1
+      expect(dos).toBeLessThan((b.y0 - a.y1) / 4)
+      expect(l.x > Math.min(a.x0, b.x0) - 5 && l.x < Math.max(a.x1, b.x1) + 5).toBe(true)
+      expect(lado === 'izq' ? l.x < 500 : l.x > 700).toBe(true)
+      expect(datos.ledsEstado.some(e => e.id === id && e.original === '60V DC')).toBe(true)
+    }
+  })
+
   it('cada led-X5-n de la placa es un borne de a3c-datos.json, y cada borne X5 1–134 está dibujado', () => {
     const bornes = new Set(datos.bornes.map(b => b.borne))
     const leds = [...svgPlaca.matchAll(/id="led-X5-(\d+)"/g)].map(m => Number(m[1]))
     expect(leds.length).toBe(placa.geo.leds.size)
+    // 136–145 (alimentación) no tienen numeración asignada en la placa: no hay borne-X5 de ellos.
+    for (let n = 136; n <= 145; n++) expect(placa.geo.bornes.has(n)).toBe(false)
     for (const n of leds) expect(bornes.has(n)).toBe(true)
     for (let n = 1; n <= 134; n++) expect(placa.geo.bornes.has(n)).toBe(true)
   })

@@ -327,7 +327,7 @@ export function lineaLed(item: ItemA3c): LineaLed {
   if (!item.leds.length && l0) {
     const ls = item.ledsEstado
     const ln = ls[ls.length - 1] ?? l0
-    const grande = ls.length > 1 ? `LED ${l0.etiqueta} a ${ln.etiqueta}` : `LED ${l0.etiqueta}`
+    const grande = ls.length > 2 ? `LED ${l0.etiqueta} a ${ln.etiqueta}` : ls.length === 2 ? `LED ${l0.etiqueta} y ${ln.etiqueta}` : `LED ${l0.etiqueta}`
     return { grande, texto: 'LED de estado de la tarjeta, sin borne X5', color: 'r', encendible: true }
   }
   if (!item.bornes.length) {
