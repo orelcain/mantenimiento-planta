@@ -2207,6 +2207,22 @@ service cloud.firestore {
       allow create, update: if isSupervisor() && isValidDocSize();
       allow delete: if isAdmin();
     }
+    // Rutas de inspección (R-MAN-CH-004, 26-09-2026): la pauta la edita un supervisor; el
+    // recorrido lo llena quien está de turno, igual que la bitácora.
+    // ⚠ Sin este `match` la colección cae en el deny por defecto y NO escribe nada — es lo que
+    // pasó con los eventos de Diego: la app escribe sin esperar al servidor, así que el rechazo
+    // no se ve y el dato se pierde en la caché local.
+    match /rutasInspeccion/{rutaId} {
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+    match /recorridos/{recorridoId} {
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if (isActiveUser() || paseBitacoraActivo()) && isValidDocSize();
+      allow delete: if isSupervisor();
+    }
+
     match /inspecciones/{inspeccionId} {
       allow read: if isActiveUser() || paseBitacoraActivo();
       // Se escribe con `merge`, así que create y update son el mismo gesto. No se
