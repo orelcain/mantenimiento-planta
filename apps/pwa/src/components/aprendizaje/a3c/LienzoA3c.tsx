@@ -35,7 +35,8 @@ export interface LienzoA3cHandle {
 }
 
 export interface LienzoA3cProps {
-  hoja: Hoja
+  /** Hoja del plano o «placa» (dibujo de la placa real, sin textos de la app). */
+  hoja: Hoja | 'placa'
   dibujo: string
   textos: Texto[]
   idioma: Idioma

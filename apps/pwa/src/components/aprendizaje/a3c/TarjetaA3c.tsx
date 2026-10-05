@@ -11,8 +11,20 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, Minus, Plus, Search } from 'lucide-react'
-import { ListCell, ListGroup, SegmentedControl, Sheet } from '@/components/piel'
-import type { Hoja, PaqueteA3c } from '@/data/baader142A3c'
+import { Button, ListCell, ListGroup, SegmentedControl, Sheet } from '@/components/piel'
+import { cargarPlacaA3c, type Hoja, type PaqueteA3c, type PaquetePlaca, type Texto } from '@/data/baader142A3c'
+import {
+  altoBornePlaca,
+  focoPlaca,
+  guardarVistaTarjeta,
+  leerVistaTarjeta,
+  ledsPlaca,
+  limitesPlaca,
+  objetivosPlaca,
+  presetsPlaca,
+  zonaPlaca,
+  type VistaTarjeta,
+} from '@/utils/aprendizaje/a3cPlaca'
 import { cn } from '@/lib/utils'
 import {
   buscar,
@@ -43,8 +55,13 @@ import './a3c.css'
 const LIM22: LimitesCamara = { minW: 70, maxW: 2200, bounds: [40, 45, 1080, 675] }
 const LIM23: LimitesCamara = { minW: 50, maxW: 2000, bounds: [-60, 0, 780, 1131] }
 const FUENTE = 'Plano 142.71.00.888, hojas 22 y 23 · máquinas N2 y N3'
+const FUENTE_PLACA = 'Placa de la N2 (Línea 2), dibujada desde foto; mismo plano 142.71.00.888 que la N3'
+/** La placa no lleva textos de la app: sus rótulos vienen dibujados en el SVG. */
+const SIN_TEXTOS: Texto[] = []
 
 type Modo = 'explorar' | 'practicar'
+/** Lo que se dibuja en un lienzo: una hoja del plano o la placa. */
+type Lamina = Hoja | 'placa'
 
 /**
  * Hacia dónde quedan los textos de una regleta respecto de su LED: en las de arriba del
@@ -52,10 +69,12 @@ type Modo = 'explorar' | 'practicar'
  * revés. La cámara se corre hacia el texto para que el LED y su rótulo entren juntos.
  */
 const ladoTextos = (x: number) => (x > 360 ? -1 : 1)
-type Origen = Hoja | 'regleta' | 'lista' | null
+type Origen = Lamina | 'regleta' | 'lista' | null
 
 export interface TarjetaA3cProps {
   paquete: PaqueteA3c
+  /** Dibujo de la placa ya cargado (pruebas). Sin esto se pide al elegir «Placa». */
+  placa?: PaquetePlaca
   onVolver: () => void
   etiquetaVolver: string
   /** Fuerza el diseño (pruebas). Sin esto se mide el ancho real del contenedor. */
@@ -79,7 +98,7 @@ function usePunteroGrueso(): boolean {
   return grueso
 }
 
-export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: forzado, tactil }: TarjetaA3cProps) {
+export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver, dosColumnas: forzado, tactil }: TarjetaA3cProps) {
   const { datos, dibujo } = paquete
   const m = useMemo(() => construirModelo(datos), [datos])
   const obj22 = useMemo(() => objetivosHoja22(m), [m])
@@ -122,8 +141,36 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
   /** Elementos que comparten sitio en el plano: la persona elige cuál quería (toque ambiguo). */
   const [ambiguos, setAmbiguos] = useState<ClaveSel[] | null>(null)
 
+  // ─── Vista de la tarjeta: Plano (hoja 23) | Placa (dibujo desde foto, se pide al elegirla) ───
+  const [vista, setVistaEstado] = useState<VistaTarjeta>(leerVistaTarjeta)
+  const [placaCargada, setPlacaCargada] = useState<PaquetePlaca | null>(null)
+  const [errorPlaca, setErrorPlaca] = useState(false)
+  const [intentoPlaca, setIntentoPlaca] = useState(0)
+  const [presetP, setPresetP] = useState<string | null>(null)
+  const placa = placaDada ?? placaCargada
+  const verPlaca = vista === 'placa'
+  useEffect(() => {
+    if (!verPlaca || placa) return
+    let vivo = true
+    setErrorPlaca(false)
+    cargarPlacaA3c().then(
+      p => vivo && setPlacaCargada(p),
+      () => vivo && setErrorPlaca(true),
+    )
+    return () => {
+      vivo = false
+    }
+  }, [verPlaca, placa, intentoPlaca])
+  const presetsP = useMemo(() => (placa ? presetsPlaca(placa.geo) : null), [placa])
+  const limP = useMemo(() => (placa ? limitesPlaca(placa.geo) : null), [placa])
+  const objP = useMemo(() => (placa ? objetivosPlaca(m, placa.geo) : []), [m, placa])
+  const altoP = useMemo(() => (placa ? altoBornePlaca(placa.geo) : 10), [placa])
+
   const v22 = useRef<LienzoA3cHandle>(null)
   const v23 = useRef<LienzoA3cHandle>(null)
+  const vP = useRef<LienzoA3cHandle>(null)
+  const tipP = useRef<HTMLDivElement>(null)
+  const placaHost = useRef<HTMLDivElement>(null)
   const regletaRef = useRef<HTMLDivElement>(null)
   const tip22 = useRef<HTMLDivElement>(null)
   const tip23 = useRef<HTMLDivElement>(null)
@@ -136,11 +183,42 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
   const elegidos = useMemo(() => new Set([...item.bornes, ...(selN != null ? [selN] : [])]), [item, selN])
   const encendidos = useMemo(() => new Set(item.leds), [item])
   const grupos = useMemo(() => buscar(m, consulta, idioma), [m, consulta, idioma])
+  const ledsP = useMemo(() => (placa ? ledsPlaca(placa.geo, item) : []), [placa, item])
+
+  // En la placa, el LED y el borne elegidos se marcan también en el propio dibujo (atributos
+  // sobre sus grupos `led-X5-n` / `borne-X5-n`): el CSS los resalta y queda verificable. Corre
+  // en cada render porque el lienzo puede montarse de nuevo (cambio de diseño o de lámina).
+  useEffect(() => {
+    const host = placaHost.current
+    if (!host) return
+    host.querySelectorAll('[data-encendido],[data-elegido]').forEach(e => {
+      e.removeAttribute('data-encendido')
+      e.removeAttribute('data-elegido')
+    })
+    for (const l of ledsP) host.querySelector(`#led-X5-${l.n}`)?.setAttribute('data-encendido', '')
+    for (const n of elegidos) host.querySelector(`#borne-X5-${n}`)?.setAttribute('data-elegido', '')
+  })
+
+  /** Encuadre de la placa: entre el LED y su borne (quedan lado a lado), con pulso en el LED. */
+  const enfocarPlaca = useCallback((clave: ClaveSel, origen: Origen) => {
+    const c = vP.current
+    const it = describir(m, clave, 'es')
+    if (!c || !placa || !it) return
+    const foco = focoPlaca(placa.geo, it)
+    if (!foco) return
+    if (origen !== 'placa') {
+      const b = it.bornes.map(n => placa.geo.bornes.get(n)).find(Boolean)
+      const cx = b ? (foco[0] + b.x + b.w / 2) / 2 : foco[0]
+      c.enfocar(cx, foco[1], Math.min(c.camara().w, pc ? 260 : 170))
+    }
+    c.pulso(foco[0], foco[1])
+  }, [m, placa, pc])
 
   /** Lleva las cámaras a lo elegido (la que originó el toque no se mueve). */
   const enfocar = useCallback((clave: ClaveSel, origen: Origen) => {
     const it = describir(m, clave, 'es')
     if (!it) return
+    enfocarPlaca(clave, origen)
     const xy = puntoFoco(m, it)
     const c23 = v23.current
     if (c23 && xy) {
@@ -158,7 +236,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
       if (origen !== '22') c22.enfocar(cx, cy, Math.min(c22.camara().w, pc ? 300 : 200))
       c22.pulso(cx, cy)
     }
-  }, [m, pc])
+  }, [m, pc, enfocarPlaca])
 
   const seleccionar = useCallback((clave: ClaveSel, origen: Origen, n?: number) => {
     const it = describir(m, clave, 'es')
@@ -190,7 +268,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     const f = pendiente.current
     pendiente.current = null
     f?.()
-  }, [hoja, modo, pc])
+  }, [hoja, modo, pc, vista, placa])
 
   // Al volver de «Practicar» (los lienzos se montan de nuevo) o al cambiar de diseño, la cámara
   // vuelve a lo elegido. Antes de la primera elección se respeta el encuadre inicial.
@@ -204,6 +282,14 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
 
   const verLed = () => {
     const ir = () => {
+      if (verPlaca) {
+        const c = vP.current
+        const xy = placa && focoPlaca(placa.geo, item)
+        if (!c || !xy) return
+        c.enfocar(xy[0], xy[1], pc ? 220 : 150)
+        c.pulso(xy[0], xy[1])
+        return
+      }
       const xy = puntoFoco(m, item)
       const c = v23.current
       if (!c || !xy) return
@@ -221,6 +307,18 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     if (h === hoja) return
     pendiente.current = () => enfocar(sel, null)
     setHoja(h)
+  }
+
+  /** Plano | Placa: solo cambia el dibujo de la tarjeta; la selección es la misma. */
+  const cambiarVista = (v: VistaTarjeta) => {
+    if (v === vista) return
+    setVistaEstado(v)
+    guardarVistaTarjeta(v)
+    // Al volver al plano (o si la placa ya está cargada) el nuevo lienzo se lleva a lo elegido;
+    // si la placa aún no llega, arranca en la zona del borne elegido (`inicio`).
+    if (ultimoOrigen.current !== null && (v === 'plano' || placa)) {
+      pendiente.current = () => (v === 'placa' ? enfocarPlaca(sel, null) : enfocar(sel, '22'))
+    }
   }
 
   // ─── Toques y hover en los dibujos ───
@@ -290,6 +388,29 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     setHov(h => (h?.clave === nuevo?.clave && h?.n === undefined ? h : nuevo))
     mostrarTip(tip22.current, nuevo ? 'si' : null, ev)
   }
+  // Placa: mismo criterio que la hoja 23 (borne o su LED → el elemento de ese borne).
+  const toquePlaca = (u: [number, number]) => {
+    const c = vP.current
+    if (!c) return
+    const ppu = c.pxPorUnidad()
+    const el = elegirEn(objP, u, (grueso ? 22 : 6) / ppu)
+    const primero = el.cerca[0]
+    if (!primero) return
+    // Táctil: si en el dedo caben dos bornes, acerca hasta que cada borne mida ~44 px.
+    if (grueso && el.distintos > 1 && altoP * ppu < 30) {
+      c.enfocar(u[0], u[1], (c.anchoPx() * altoP) / 44)
+      return
+    }
+    if (primero.o.n != null) elegirBorne(primero.o.n, 'placa')
+    else seleccionar(primero.o.clave, 'placa')
+  }
+  const hoverPlaca = (u: [number, number] | null, ev?: { x: number; y: number }) => {
+    const c = vP.current
+    const o = u && c ? elegirEn(objP, u, 6 / c.pxPorUnidad()).cerca[0]?.o : undefined
+    const nuevo = o ? { clave: o.clave, n: o.n } : null
+    setHov(h => (h?.clave === nuevo?.clave && h?.n === nuevo?.n ? h : nuevo))
+    mostrarTip(tipP.current, nuevo ? 'si' : null, ev)
+  }
   const itemHov = hov ? describir(m, hov.clave, idioma) : null
 
   const elegirDeLista = (c: ClaveSel) => {
@@ -353,6 +474,34 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     </>
   )
 
+  // Placa: los LED del dibujo están todos APAGADOS (el estado de la foto no es en vivo); aquí
+  // se enciende solo el del elemento elegido, con el mismo LED animado que en el plano.
+  const capaPlaca = placa && (
+    <>
+      <g>
+        {[...elegidos].map(n => {
+          const r = placa.geo.bornes.get(n)
+          if (!r) return null
+          return <rect key={n} className="a3c-elegida" x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx={1} />
+        })}
+      </g>
+      <g data-testid="leds-placa">
+        {ledsP.map(p => (
+          <g key={p.k} className={cn('a3c-led a3c-en-placa', p.color === 'g' && 'a3c-verde')} data-led={p.k}>
+            <circle className="a3c-halo" cx={p.x} cy={p.y} r={p.r * 2.1} />
+            <circle className="a3c-anillo" cx={p.x} cy={p.y} r={p.r * 1.4} />
+            <circle className="a3c-anillo a3c-segundo" cx={p.x} cy={p.y} r={p.r * 1.4} />
+            <circle className="a3c-nucleo" cx={p.x} cy={p.y} r={p.r * 1.05} />
+          </g>
+        ))}
+      </g>
+      {hov?.n != null && placa.geo.bornes.get(hov.n) && (() => {
+        const r = placa.geo.bornes.get(hov.n!)!
+        return <rect className="a3c-celda-hover" x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} />
+      })()}
+    </>
+  )
+
   const elegirAmbiguo = (c: ClaveSel) => {
     setAmbiguos(null)
     seleccionar(c, '22')
@@ -403,9 +552,21 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     />
   )
 
-  const atajos = (h: Hoja, activo: string | null) => {
-    const ps = datos.presets_v5[h === '22' ? 'hoja22' : 'hoja23']
-    const lienzo = h === '22' ? v22 : v23
+  const selectorVista = (clase: string) => (
+    <SegmentedControl<VistaTarjeta>
+      ariaLabel="Vista de la tarjeta"
+      value={vista}
+      onChange={cambiarVista}
+      segments={[{ value: 'plano', label: 'Plano' }, { value: 'placa', label: 'Placa' }]}
+      className={clase}
+    />
+  )
+
+  const refDe = (l: Lamina) => (l === '22' ? v22 : l === '23' ? v23 : vP)
+
+  const atajos = (l: Lamina, activo: string | null) => {
+    const ps = l === 'placa' ? presetsP ?? {} : datos.presets_v5[l === '22' ? 'hoja22' : 'hoja23']
+    const lienzo = refDe(l)
     return (
       <div role="group" aria-label="Atajos de zoom" className="flex flex-none gap-0.5 rounded-full bg-muted p-0.5">
         {Object.entries(ps).map(([k, p]) => (
@@ -427,8 +588,8 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     )
   }
 
-  const botonesZoom = (h: Hoja) => {
-    const lienzo = h === '22' ? v22 : v23
+  const botonesZoom = (l: Lamina) => {
+    const lienzo = refDe(l)
     const clase = cn(
       'grid place-items-center rounded-full bg-muted text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
       grueso ? 'size-[44px]' : 'size-[32px]',
@@ -451,7 +612,77 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     </div>
   )
 
+  /** Teléfono: Máquina | Tarjeta y, en «Tarjeta», Plano | Placa (arriba, sin tapar los atajos). */
+  const selectoresTel = !pc && (
+    <div className="pointer-events-none absolute inset-x-2 top-2 z-[2] flex items-start justify-between gap-1.5">
+      <SegmentedControl<Hoja>
+        ariaLabel="Dibujo"
+        value={hoja}
+        onChange={cambiarHoja}
+        segments={[{ value: '22', label: 'Máquina' }, { value: '23', label: 'Tarjeta' }]}
+        className="pointer-events-auto w-[190px] flex-none"
+      />
+      {hoja === '23' && selectorVista('pointer-events-auto w-[132px] flex-none')}
+    </div>
+  )
+
+  const contenidoTip = (l: Lamina) =>
+    itemHov && (
+      <>
+        {hov?.n != null && <b className="font-mono">X5:{hov.n} · </b>}
+        <b className="font-mono">{itemHov.codigo}</b> {itemHov.nombre}
+        {l === '22' && <><br />{lineaLed(itemHov).grande}</>}
+        {l === '23' && hov?.n != null && !m.bornes.get(hov.n)?.led && <><br />Sin LED en el plano</>}
+        {l === 'placa' && hov?.n != null && !placa?.geo.leds.has(hov.n) && <><br />Sin LED en la placa</>}
+      </>
+    )
+
+  const lienzoPlaca = (clase: string) => {
+    const nInicio = selN ?? item.bornes[0]
+    return (
+      <div ref={placaHost} className={cn('a3c-placa relative overflow-hidden rounded-card bg-card', clase)} data-lienzo="placa">
+        {placa && presetsP && limP ? (
+          <LienzoA3c
+            key={`placa-${pc ? 'pc' : 'tel'}`}
+            ref={vP}
+            hoja="placa"
+            dibujo={placa.dibujo}
+            textos={SIN_TEXTOS}
+            idioma={idioma}
+            presets={presetsP}
+            inicio={pc ? 'todo' : (nInicio != null && zonaPlaca(nInicio)) || 'todo'}
+            limites={limP}
+            etiqueta="Placa A3C de la N2 (Línea 2), dibujada desde foto; los LED no muestran estado en vivo"
+            onToque={toquePlaca}
+            onHover={pc ? hoverPlaca : undefined}
+            onPresetActivo={setPresetP}
+          >
+            {capaPlaca}
+          </LienzoA3c>
+        ) : errorPlaca ? (
+          <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
+            <p className="text-subhead">No se pudo cargar el dibujo de la placa. Revisa la conexión e inténtalo de nuevo.</p>
+            <Button onClick={() => setIntentoPlaca(i => i + 1)}>Reintentar</Button>
+          </div>
+        ) : (
+          <div role="status" aria-label="Cargando la placa" className="h-full animate-pulse bg-muted motion-reduce:animate-none" />
+        )}
+        {selectoresTel}
+        {placa && (
+          <>
+            <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', grueso ? 'right-[60px]' : 'right-12', 'a3c-regleta')}>
+              {atajos('placa', presetP)}
+            </div>
+            {botonesZoom('placa')}
+          </>
+        )}
+        {pc && tip(tipP, contenidoTip('placa'))}
+      </div>
+    )
+  }
+
   const lienzo = (h: Hoja, clase: string) => {
+    if (h === '23' && verPlaca) return lienzoPlaca(clase)
     const es22 = h === '22'
     return (
       <div className={cn('relative overflow-hidden rounded-card bg-card', clase)} data-lienzo={h}>
@@ -472,29 +703,12 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
         >
           {es22 ? capa22 : capa23}
         </LienzoA3c>
-        {!pc && (
-          <div className="absolute left-2 top-2 z-[2]">
-            <SegmentedControl<Hoja>
-              ariaLabel="Dibujo"
-              value={hoja}
-              onChange={cambiarHoja}
-              segments={[{ value: '22', label: 'Máquina' }, { value: '23', label: 'Tarjeta' }]}
-              className="w-[200px]"
-            />
-          </div>
-        )}
+        {selectoresTel}
         <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', grueso ? 'right-[60px]' : 'right-12', 'a3c-regleta')}>
           {atajos(h, es22 ? preset22 : preset23)}
         </div>
         {botonesZoom(h)}
-        {pc && tip(es22 ? tip22 : tip23, itemHov && (
-          <>
-            {hov?.n != null && <b className="font-mono">X5:{hov.n} · </b>}
-            <b className="font-mono">{itemHov.codigo}</b> {itemHov.nombre}
-            {es22 && <><br />{lineaLed(itemHov).grande}</>}
-            {!es22 && hov?.n != null && !m.bornes.get(hov.n)?.led && <><br />Sin LED en el plano</>}
-          </>
-        ))}
+        {pc && tip(es22 ? tip22 : tip23, contenidoTip(h))}
       </div>
     )
   }
@@ -582,6 +796,10 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
           {modo === 'practicar' ? quiz : (
             <div className="grid h-[max(640px,calc(100dvh-190px))] grid-cols-[minmax(0,520px)_minmax(0,1fr)] gap-5">
               <div className="flex min-h-0 flex-col">
+                <div className="flex items-center gap-3 pb-2">
+                  {selectorVista('w-[200px] flex-none')}
+                  {verPlaca && <p className="min-w-0 text-caption leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
+                </div>
                 {lienzo('23', 'min-h-0 flex-1')}
                 {regleta}
               </div>
@@ -613,6 +831,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
         {modo === 'practicar' ? quiz : (
           <>
             {lienzo(hoja, 'mt-3 h-[clamp(280px,calc(100dvh-440px),460px)] touch-none')}
+            {hoja === '23' && verPlaca && <p className="mt-1.5 text-caption leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
             <FranjaLed linea={linea} onVer={verLed} className="mt-3" />
             {regleta}
             <button
