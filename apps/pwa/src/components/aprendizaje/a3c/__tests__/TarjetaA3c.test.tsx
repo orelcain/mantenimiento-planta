@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { interiorSvg, type A3CDatos, type PaqueteA3c } from '@/data/baader142A3c'
 import { TarjetaA3c } from '../TarjetaA3c'
@@ -16,8 +16,8 @@ const paquete: PaqueteA3c = {
   },
 }
 
-const montar = (dosColumnas: boolean) =>
-  render(<TarjetaA3c paquete={paquete} onVolver={() => {}} etiquetaVolver="Baader 142" dosColumnas={dosColumnas} />)
+const montar = (dosColumnas: boolean, tactil?: boolean, p: PaqueteA3c = paquete) =>
+  render(<TarjetaA3c paquete={p} onVolver={() => {}} etiquetaVolver="Baader 142" dosColumnas={dosColumnas} tactil={tactil} />)
 
 const ledsEncendidos = () => [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
 
@@ -102,5 +102,35 @@ describe('Tarjeta A3C', () => {
     expect(screen.getByText('Correcto.')).toBeTruthy()
     expect(screen.getByTestId('racha').textContent).toBe('Racha 1 · mejor 1')
     expect(JSON.parse(localStorage.getItem('a3c-racha')!)).toEqual({ racha: 1, mejor: 1 })
+  })
+
+  it('tablet de 2 columnas con puntero táctil: atajos, zoom y regleta de 44 px', () => {
+    montar(true, true)
+    expect(screen.getAllByRole('button', { name: 'Acercar' })[0]!.className).toContain('size-[44px]')
+    expect(within(screen.getAllByRole('group', { name: 'Atajos de zoom' })[0]!).getAllByRole('button')[0]!.className).toContain('h-[44px]')
+    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('w-[44px]')
+  })
+
+  it('PC con mouse conserva los controles compactos', () => {
+    montar(true, false)
+    expect(screen.getAllByRole('button', { name: 'Acercar' })[0]!.className).toContain('size-[32px]')
+    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('w-[30px]')
+  })
+
+  it('alternar ES/Original no mueve la regleta', () => {
+    montar(true, false)
+    const regleta = screen.getByRole('group', { name: /Regleta X5/ })
+    const mover = vi.fn()
+    regleta.scrollTo = mover as unknown as typeof regleta.scrollTo
+    fireEvent.click(screen.getByRole('tab', { name: 'Original' }))
+    expect(mover).not.toHaveBeenCalled()
+  })
+
+  it('Practicar sin preguntas muestra un estado vacío con salida', () => {
+    montar(false, undefined, { ...paquete, datos: { ...paquete.datos, quiz: [] } })
+    fireEvent.click(screen.getByRole('tab', { name: 'Practicar' }))
+    expect(screen.getByText(/No hay preguntas de práctica/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a explorar' }))
+    expect(screen.getByRole('tab', { name: 'Explorar' }).getAttribute('aria-selected')).toBe('true')
   })
 })

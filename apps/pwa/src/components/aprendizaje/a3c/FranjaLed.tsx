@@ -10,14 +10,13 @@ export function FranjaLed({ linea, onVer, className }: { linea: LineaLed; onVer?
   return (
     <div
       className={cn('flex min-h-[60px] items-center gap-3 rounded-card bg-card py-2 pl-4 pr-2', className)}
-      aria-live="polite"
       data-testid="franja-led"
     >
       <span
         aria-hidden
         className={cn('a3c-foco', !linea.color && 'a3c-apagado', linea.color === 'g' && 'a3c-verde')}
       />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" aria-live="polite">
         <p className="font-mono text-title3 font-semibold leading-tight tabular-nums">{linea.grande}</p>
         <p className="text-footnote leading-snug text-muted-foreground">{linea.texto}</p>
       </div>

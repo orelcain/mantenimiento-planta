@@ -11,6 +11,7 @@ import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useR
 import type { Hoja, PresetV5, Texto } from '@/data/baader142A3c'
 import {
   camaraDePreset,
+  deltaRuedaPx,
   limitarCamara,
   lineasDeTexto,
   matrizCamara,
@@ -190,6 +191,8 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
     const pts = new Map<number, { x: number; y: number }>()
     let inicioGesto: { n: number; cam: Camara; p?: { x: number; y: number }; d: number; m?: { x: number; y: number } } | null = null
     let movido = false
+    // Un gesto que tuvo dos dedos nunca es un toque (al levantarlos sin mover no debe elegir nada).
+    let hubo2 = false
     const caja = () => svg.getBoundingClientRect()
     const aU = (cx: number, cy: number): [number, number] => {
       const r = caja()
@@ -208,12 +211,15 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
       }
     }
     const down = (e: PointerEvent) => {
+      // Mouse: solo el botón principal (clic derecho / ctrl+clic abren menú y no deben arrastrar).
+      if (e.pointerType === 'mouse' && e.button !== 0) return
       try {
         svg.setPointerCapture?.(e.pointerId)
       } catch {
         /* puntero ya liberado (o sintético): el gesto sigue sin captura */
       }
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (pts.size >= 2) hubo2 = true
       inicioGesto = foto()
       movido = false
     }
@@ -253,18 +259,31 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
       }
     }
     const up = (e: PointerEvent) => {
-      const eraToque = !movido && pts.size === 1 && e.type === 'pointerup'
+      const eraToque = !movido && !hubo2 && pts.size === 1 && pts.has(e.pointerId) && e.type === 'pointerup'
       pts.delete(e.pointerId)
       svg.classList.remove('a3c-arrastrando')
       if (eraToque) cb.current.onToque?.(aU(e.clientX, e.clientY))
       inicioGesto = foto()
-      if (!pts.size) movido = false
+      if (!pts.size) {
+        movido = false
+        hubo2 = false
+      }
+    }
+    // El navegador quitó la captura (cambio de pestaña, gesto del sistema): sin restos en `pts`.
+    const perdida = (e: PointerEvent) => {
+      if (!pts.delete(e.pointerId)) return
+      svg.classList.remove('a3c-arrastrando')
+      inicioGesto = foto()
+      if (!pts.size) {
+        movido = false
+        hubo2 = false
+      }
     }
     const leave = () => cb.current.onHover?.(null)
     const wheel = (e: WheelEvent) => {
       e.preventDefault()
       const u = aU(e.clientX, e.clientY)
-      cam.current = zoomCamara(cam.current, Math.exp(e.deltaY * 0.0015), cb.current.limites, u[0], u[1])
+      cam.current = zoomCamara(cam.current, Math.exp(deltaRuedaPx(e.deltaY, e.deltaMode) * 0.0015), cb.current.limites, u[0], u[1])
       marcarPreset(null)
       aplicar(false)
     }
@@ -272,6 +291,7 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
     svg.addEventListener('pointermove', move)
     svg.addEventListener('pointerup', up)
     svg.addEventListener('pointercancel', up)
+    svg.addEventListener('lostpointercapture', perdida)
     svg.addEventListener('pointerleave', leave)
     svg.addEventListener('wheel', wheel, { passive: false })
     return () => {
@@ -279,6 +299,7 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
       svg.removeEventListener('pointermove', move)
       svg.removeEventListener('pointerup', up)
       svg.removeEventListener('pointercancel', up)
+      svg.removeEventListener('lostpointercapture', perdida)
       svg.removeEventListener('pointerleave', leave)
       svg.removeEventListener('wheel', wheel)
       clearTimeout(timerEscala.current)
@@ -301,7 +322,7 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
             <CapaTextos textos={textos} idioma={idioma} soloNumeros={soloNumeros} />
           </g>
           {children}
-          <circle ref={anilloRef} className="a3c-llegada" cx={0} cy={0} r={0} />
+          <circle ref={anilloRef} className="a3c-llegada" cx={0} cy={0} r={1} />
         </g>
       </svg>
     </div>

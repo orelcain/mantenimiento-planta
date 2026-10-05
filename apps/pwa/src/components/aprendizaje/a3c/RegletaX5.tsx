@@ -3,7 +3,7 @@
  * con el LED (si el plano lo dibuja), el número y un código corto. En el teléfono cada
  * celda mide 44 px de ancho (se recorre con el pulgar); en PC, 30 px (mouse).
  */
-import { forwardRef, memo } from 'react'
+import { forwardRef, memo, useMemo } from 'react'
 import type { Borne } from '@/data/baader142A3c'
 import { cn } from '@/lib/utils'
 import { REGLETAS, codigoCorto, colorLed, limpiarSenal, type Idioma } from '@/utils/aprendizaje/a3c'
@@ -22,6 +22,8 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
   { bornes, elegidos, encendidos, idioma, compacta, onElegir },
   ref,
 ) {
+  // El código corto solo depende de los bornes: no se recalcula en cada hover del padre.
+  const codigos = useMemo(() => new Map([...bornes].map(([n, b]) => [n, codigoCorto(b)])), [bornes])
   return (
     <div
       ref={ref}
@@ -60,7 +62,7 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
                   sin ? 'text-muted-foreground/70' : salida ? 'text-brand-ink' : 'text-muted-foreground',
                 )}
               >
-                {salida ? '→' : ''}{codigoCorto(b)}
+                {salida ? '→' : ''}{codigos.get(n)}
               </span>
             </button>,
           )

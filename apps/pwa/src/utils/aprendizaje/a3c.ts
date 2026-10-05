@@ -531,6 +531,49 @@ export function elegirEn(objs: Objetivo[], u: [number, number], radio: number): 
 
 export const centroRect = (r: Rect): [number, number] => [r.x + r.w / 2, r.y + r.h / 2]
 
+export type ToqueAmbiguo =
+  | { tipo: 'elegir'; clave: ClaveSel }
+  | { tipo: 'acercar' }
+  | { tipo: 'lista'; claves: ClaveSel[] }
+
+/**
+ * Qué hacer con un toque en el plano de ubicación (hoja 22). `cerca` viene de `elegirEn`
+ * (del más cercano al más lejano). Si el elemento más cercano tiene otro a menos de `minPx`
+ * en pantalla (centro a centro), el dedo no puede distinguirlos: se acerca la cámara si aún
+ * se puede; si ya no, se elige el más cercano al punto tocado y, si siguen empatados (los
+ * que están en el mismo sitio, como S20..S25), se devuelve la lista para que la persona elija.
+ */
+export function resolverToqueAmbiguo(
+  cerca: { o: Objetivo; d: number }[],
+  ppu: number,
+  puedeAcercar: boolean,
+  minPx = 44,
+): ToqueAmbiguo | null {
+  const vistos = new Set<ClaveSel>()
+  const porClave = cerca.filter(x => (vistos.has(x.o.clave) ? false : (vistos.add(x.o.clave), true)))
+  const primero = porClave[0]
+  if (!primero) return null
+  const [ax, ay] = centroRect(primero.o.r)
+  const grupo = [
+    primero,
+    ...porClave.slice(1).filter(x => {
+      const [bx, by] = centroRect(x.o.r)
+      return Math.hypot(ax - bx, ay - by) * ppu < minPx
+    }),
+  ]
+  if (grupo.length === 1) return { tipo: 'elegir', clave: primero.o.clave }
+  if (puedeAcercar) return { tipo: 'acercar' }
+  const EPS = 1e-6
+  const empatados = grupo.filter(x => x.d - primero.d <= EPS)
+  if (empatados.length === 1) return { tipo: 'elegir', clave: primero.o.clave }
+  return { tipo: 'lista', claves: empatados.map(x => x.o.clave) }
+}
+
+/** `deltaY` de la rueda en píxeles, sea cual sea la unidad que reporte el navegador. */
+export function deltaRuedaPx(deltaY: number, deltaMode: number): number {
+  return deltaMode === 1 ? deltaY * 16 : deltaMode === 2 ? deltaY * 100 : deltaY
+}
+
 // ─── Práctica ─────────────────────────────────────────────────────────────
 
 export interface EstadoQuiz {

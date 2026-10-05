@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, Minus, Plus, Search } from 'lucide-react'
-import { SegmentedControl, Sheet } from '@/components/piel'
+import { ListCell, ListGroup, SegmentedControl, Sheet } from '@/components/piel'
 import type { Hoja, PaqueteA3c } from '@/data/baader142A3c'
 import { cn } from '@/lib/utils'
 import {
@@ -28,6 +28,7 @@ import {
   objetivosHoja23,
   puntoFoco,
   puntosLed,
+  resolverToqueAmbiguo,
   type ClaveSel,
   type Idioma,
   type LimitesCamara,
@@ -59,9 +60,26 @@ export interface TarjetaA3cProps {
   etiquetaVolver: string
   /** Fuerza el diseño (pruebas). Sin esto se mide el ancho real del contenedor. */
   dosColumnas?: boolean
+  /** Fuerza el modo táctil en el diseño de PC (pruebas). Sin esto se lee `(pointer: coarse)`. */
+  tactil?: boolean
 }
 
-export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: forzado }: TarjetaA3cProps) {
+/** ¿El puntero principal es táctil? Sigue los cambios (tablet con teclado, convertibles). */
+function usePunteroGrueso(): boolean {
+  const consulta = () => (typeof window !== 'undefined' ? window.matchMedia?.('(pointer: coarse)') : undefined)
+  const [grueso, setGrueso] = useState(() => !!consulta()?.matches)
+  useEffect(() => {
+    const mq = consulta()
+    if (!mq) return
+    const f = () => setGrueso(mq.matches)
+    f()
+    mq.addEventListener?.('change', f)
+    return () => mq.removeEventListener?.('change', f)
+  }, [])
+  return grueso
+}
+
+export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: forzado, tactil }: TarjetaA3cProps) {
   const { datos, dibujo } = paquete
   const m = useMemo(() => construirModelo(datos), [datos])
   const obj22 = useMemo(() => objetivosHoja22(m), [m])
@@ -81,6 +99,10 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     return () => ro.disconnect()
   }, [forzado])
   const pc = forzado ?? medido
+  const punteroGrueso = usePunteroGrueso()
+  // Táctil = teléfono (una columna) o cualquier pantalla con puntero grueso, aunque quepan dos columnas:
+  // radios de toque, atajos y zoom de 44 px y desambiguación por zoom/lista.
+  const grueso = !pc || (tactil ?? punteroGrueso)
 
   const [modo, setModo] = useState<Modo>('explorar')
   const [idioma, setIdiomaEstado] = useState<Idioma>(leerIdioma)
@@ -97,6 +119,8 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
   const [consulta, setConsulta] = useState('')
   const [hojaAbierta, setHojaAbierta] = useState(false)
   const [resultadosPc, setResultadosPc] = useState(false)
+  /** Elementos que comparten sitio en el plano: la persona elige cuál quería (toque ambiguo). */
+  const [ambiguos, setAmbiguos] = useState<ClaveSel[] | null>(null)
 
   const v22 = useRef<LienzoA3cHandle>(null)
   const v23 = useRef<LienzoA3cHandle>(null)
@@ -146,18 +170,20 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
 
   const elegirBorne = useCallback((n: number, origen: Origen) => seleccionar(claveDeBorne(m, n), origen, n), [m, seleccionar])
 
-  // La regleta sigue a la selección (salvo si el toque vino de ella).
+  // La regleta sigue a la selección (salvo si el toque vino de ella). Depende del BORNE, no del
+  // texto: alternar ES/Original no debe mover la regleta.
+  const nRegleta = selN ?? item.bornes[0] ?? null
   useEffect(() => {
     const cont = regletaRef.current
     if (!cont || ultimoOrigen.current === 'regleta') return
-    const n = selN ?? item.bornes[0]
+    const n = nRegleta
     const celda = n != null ? cont.querySelector<HTMLElement>(`[data-n="${n}"]`) : null
     if (!celda || typeof cont.scrollTo !== 'function') return
     const rc = cont.getBoundingClientRect()
     const rt = celda.getBoundingClientRect()
     const suave = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     cont.scrollTo({ left: cont.scrollLeft + rt.left - rc.left - rc.width / 2 + rt.width / 2, behavior: suave ? 'smooth' : 'auto' })
-  }, [sel, selN, item, modo, pc])
+  }, [nRegleta, modo, grueso])
 
   // Acciones pendientes tras cambiar de lienzo en el teléfono (el nuevo se monta primero).
   useEffect(() => {
@@ -165,6 +191,16 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     pendiente.current = null
     f?.()
   }, [hoja, modo, pc])
+
+  // Al volver de «Practicar» (los lienzos se montan de nuevo) o al cambiar de diseño, la cámara
+  // vuelve a lo elegido. Antes de la primera elección se respeta el encuadre inicial.
+  const previo = useRef({ modo, pc })
+  useEffect(() => {
+    const p = previo.current
+    if (p.modo === modo && p.pc === pc) return
+    previo.current = { modo, pc }
+    if (modo === 'explorar' && ultimoOrigen.current !== null) enfocar(sel, null)
+  }, [modo, pc, sel, enfocar])
 
   const verLed = () => {
     const ir = () => {
@@ -192,11 +228,11 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     const c = v23.current
     if (!c) return
     const ppu = c.pxPorUnidad()
-    const el = elegirEn(obj23, u, (pc ? 6 : 22) / ppu)
+    const el = elegirEn(obj23, u, (grueso ? 22 : 6) / ppu)
     const primero = el.cerca[0]
     if (!primero) return
-    // Teléfono: si en el dedo caben dos bornes (celdas de 8,5 u a < 30 px), acerca en vez de adivinar.
-    if (!pc && el.distintos > 1 && 8.5 * ppu < 30) {
+    // Táctil: si en el dedo caben dos bornes (celdas de 8,5 u a < 30 px), acerca en vez de adivinar.
+    if (grueso && el.distintos > 1 && 8.5 * ppu < 30) {
       c.enfocar(u[0], u[1], c.anchoPx() / 5.2)
       return
     }
@@ -207,23 +243,24 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     const c = v22.current
     if (!c) return
     const ppu = c.pxPorUnidad()
-    const el = elegirEn(obj22, u, (pc ? 6 : 22) / ppu)
-    const primero = el.cerca[0]
-    if (!primero) {
-      // Vista completa en el teléfono: un toque en una zona acerca a esa zona.
-      if (!pc && ppu < 0.7) c.preset(u[1] < 400 ? 'modulos' : u[0] < 300 ? 'ciclon' : 'gabinete')
+    const el = elegirEn(obj22, u, (grueso ? 22 : 6) / ppu)
+    if (!el.cerca[0]) {
+      // Vista completa en táctil: un toque en una zona acerca a esa zona.
+      if (grueso && ppu < 0.7) c.preset(u[1] < 400 ? 'modulos' : u[0] < 300 ? 'ciclon' : 'gabinete')
       return
     }
-    const otro = el.cerca.find(x => x.o.clave !== primero.o.clave)
-    if (!pc && otro) {
-      const [ax, ay] = centroRect(primero.o.r)
-      const [bx, by] = centroRect(otro.o.r)
-      if (Math.hypot(ax - bx, ay - by) * ppu < 44) {
-        c.enfocar(u[0], u[1], Math.min(c.camara().w * 0.5, 200))
-        return
-      }
+    if (!grueso) {
+      seleccionar(el.cerca[0].o.clave, '22')
+      return
     }
-    seleccionar(primero.o.clave, '22')
+    // Táctil: si varios elementos caben bajo el dedo, acerca; en el límite del zoom elige el más
+    // cercano y, si siguen empatados (S20..S25 están en el mismo sitio), pregunta cuál.
+    const w = c.camara().w
+    const r = resolverToqueAmbiguo(el.cerca, ppu, w > LIM22.minW * 1.02)
+    if (!r) return
+    if (r.tipo === 'acercar') c.enfocar(u[0], u[1], Math.max(LIM22.minW, Math.min(w * 0.5, 200)))
+    else if (r.tipo === 'lista') setAmbiguos(r.claves)
+    else seleccionar(r.clave, '22')
   }
 
   const mostrarTip = (tip: HTMLDivElement | null, texto: ReactNode | null, ev?: { x: number; y: number }) => {
@@ -235,7 +272,8 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     }
     const r = host.getBoundingClientRect()
     tip.hidden = false
-    tip.style.left = `${Math.min(ev.x - r.left + 14, r.width - 250)}px`
+    const ancho = tip.offsetWidth || 240
+    tip.style.left = `${Math.max(4, Math.min(ev.x - r.left + 14, r.width - ancho - 4))}px`
     tip.style.top = `${ev.y - r.top + 16}px`
   }
   const hover23 = (u: [number, number] | null, ev?: { x: number; y: number }) => {
@@ -315,6 +353,36 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     </>
   )
 
+  const elegirAmbiguo = (c: ClaveSel) => {
+    setAmbiguos(null)
+    seleccionar(c, '22')
+  }
+  const hojaAmbigua = (
+    <Sheet
+      open={ambiguos !== null}
+      onClose={() => setAmbiguos(null)}
+      title="¿Cuál?"
+      description="Estos elementos están en el mismo lugar del plano."
+      surface="grouped"
+    >
+      <ListGroup>
+        {(ambiguos ?? []).map(c => {
+          const it = describir(m, c, idioma)
+          if (!it) return null
+          return (
+            <ListCell
+              key={c}
+              onClick={() => elegirAmbiguo(c)}
+              title={<span><span className="mr-2 font-mono font-semibold">{it.codigo}</span>{it.nombre}</span>}
+              subtitle={lineaLed(it).grande}
+              chevron={false}
+            />
+          )
+        })}
+      </ListGroup>
+    </Sheet>
+  )
+
   // ─── Piezas de interfaz ───
   const selectorIdioma = (
     <SegmentedControl<Idioma>
@@ -348,7 +416,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
             onClick={() => lienzo.current?.preset(k)}
             className={cn(
               'whitespace-nowrap rounded-full px-3 text-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-              pc ? 'h-[30px]' : 'h-[40px]',
+              grueso ? 'h-[44px]' : 'h-[30px]',
               activo === k ? 'bg-card text-brand-ink' : 'text-foreground',
             )}
           >
@@ -363,7 +431,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     const lienzo = h === '22' ? v22 : v23
     const clase = cn(
       'grid place-items-center rounded-full bg-muted text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-      pc ? 'size-[32px]' : 'size-[44px]',
+      grueso ? 'size-[44px]' : 'size-[32px]',
     )
     return (
       <div className="absolute bottom-2 right-2 z-[2] flex flex-col gap-1.5">
@@ -415,7 +483,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
             />
           </div>
         )}
-        <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', pc ? 'right-12' : 'right-[60px]', 'a3c-regleta')}>
+        <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', grueso ? 'right-[60px]' : 'right-12', 'a3c-regleta')}>
           {atajos(h, es22 ? preset22 : preset23)}
         </div>
         {botonesZoom(h)}
@@ -431,6 +499,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
     )
   }
 
+  const alElegirRegleta = useCallback((n: number) => elegirBorne(n, 'regleta'), [elegirBorne])
   const regleta = (
     <RegletaX5
       ref={regletaRef}
@@ -438,8 +507,8 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
       elegidos={elegidos}
       encendidos={encendidos}
       idioma={idioma}
-      compacta={pc}
-      onElegir={n => elegirBorne(n, 'regleta')}
+      compacta={!grueso}
+      onElegir={alElegirRegleta}
     />
   )
 
@@ -451,6 +520,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
       textos={datos.textos.hoja23}
       preguntas={datos.quiz.filter(q => q.contexto === (pc ? 'pc' : 'telefono'))}
       dosColumnas={pc}
+      onVolver={() => setModo('explorar')}
     />
   )
 
@@ -500,7 +570,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
                 <div className="relative w-[300px]">
                   {campoBusqueda(false)}
                   {resultadosPc && consulta.trim() && (
-                    <div className="absolute left-0 right-0 top-[52px] z-20 max-h-[420px] overflow-y-auto rounded-card bg-background p-3 shadow-[0_8px_28px_rgba(0,0,0,0.18)]">
+                    <div className="absolute left-0 right-0 top-[52px] z-20 max-h-[420px] overflow-y-auto rounded-card bg-background p-3 shadow-xl">
                       <ListaA3c grupos={grupos} elegido={sel} consulta={consulta} onElegir={elegirDeLista} />
                     </div>
                   )}
@@ -525,6 +595,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
             </div>
           )}
         </div>
+        {hojaAmbigua}
       </div>
     )
   }
@@ -586,6 +657,7 @@ export function TarjetaA3c({ paquete, onVolver, etiquetaVolver, dosColumnas: for
           </>
         )}
       </Sheet>
+      {hojaAmbigua}
     </div>
   )
 }

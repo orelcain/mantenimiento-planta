@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { A3CDatos } from '@/data/baader142A3c'
 import {
-  buscar, camaraDePreset, claveDeBorne, codigoCorto, colorLed, construirModelo,
+  buscar, camaraDePreset, centroRect, deltaRuedaPx, objetivosHoja22, resolverToqueAmbiguo, claveDeBorne, codigoCorto, colorLed, construirModelo,
   describir, elegirEn, guardarIdioma, guardarRacha, leerIdioma, leerRacha,
   limitarCamara, lineaLed, lineasDeTexto, matrizCamara, nuevoQuiz, objetivosHoja23,
   pantallaAUnidades, puntosLed, recorteRegleta, regletaDe, reiniciar, responder,
@@ -219,5 +219,48 @@ describe('persistencia local', () => {
   it('descarta una racha almacenada con JSON corrupto', () => {
     localStorage.setItem('a3c-racha', '{corrupto')
     expect(leerRacha()).toEqual({ racha: 0, mejor: 0 })
+  })
+})
+
+describe('toque ambiguo en el plano de ubicación (hoja 22)', () => {
+  const obj22 = objetivosHoja22(m)
+  const grupoS = ['S20', 'S21', 'S22', 'S23', 'S24', 'S25'].map(k => `e:${k}`)
+  const sobre = (clave: string) => centroRect(obj22.find(o => o.clave === clave)!.r)
+
+  it('S20..S25 comparten posición: con el zoom al límite ofrece la lista con los seis', () => {
+    const u = sobre('e:S20')
+    const r = resolverToqueAmbiguo(elegirEn(obj22, u, 22 / 4.9).cerca, 4.9, false)
+    expect(r?.tipo).toBe('lista')
+    if (r?.tipo === 'lista') expect(grupoS.every(c => r.claves.includes(c))).toBe(true)
+  })
+
+  it('si aún se puede acercar, acerca en vez de adivinar', () => {
+    const u = sobre('e:S20')
+    expect(resolverToqueAmbiguo(elegirEn(obj22, u, 22 / 4.9).cerca, 4.9, true)).toEqual({ tipo: 'acercar' })
+  })
+
+  it('sin empate elige el más cercano al punto tocado', () => {
+    const cerca = [
+      { o: { clave: 'e:A', r: { x: 0, y: 0, w: 2, h: 2 } }, d: 0 },
+      { o: { clave: 'e:B', r: { x: 3, y: 0, w: 2, h: 2 } }, d: 1.5 },
+    ]
+    expect(resolverToqueAmbiguo(cerca, 5, false)).toEqual({ tipo: 'elegir', clave: 'e:A' })
+  })
+
+  it('un vecino lejos en pantalla no es ambiguo y un toque vacío devuelve null', () => {
+    const cerca = [
+      { o: { clave: 'e:A', r: { x: 0, y: 0, w: 2, h: 2 } }, d: 0 },
+      { o: { clave: 'e:B', r: { x: 30, y: 0, w: 2, h: 2 } }, d: 1 },
+    ]
+    expect(resolverToqueAmbiguo(cerca, 5, false)).toEqual({ tipo: 'elegir', clave: 'e:A' })
+    expect(resolverToqueAmbiguo([], 5, false)).toBeNull()
+  })
+})
+
+describe('rueda', () => {
+  it('normaliza líneas y páginas a píxeles', () => {
+    expect(deltaRuedaPx(100, 0)).toBe(100)
+    expect(deltaRuedaPx(3, 1)).toBe(48)
+    expect(deltaRuedaPx(1, 2)).toBe(100)
   })
 })

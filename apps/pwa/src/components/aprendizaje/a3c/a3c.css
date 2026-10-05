@@ -26,26 +26,28 @@
 .a3c-celda-hover { fill: none; stroke: rgb(var(--brand)); stroke-width: 1.5; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
 
 /* Anillo de llegada al saltar a un punto (800 ms, solo transform + opacity). */
-.a3c-llegada { fill: none; stroke: rgb(var(--brand)); stroke-width: 2; vector-effect: non-scaling-stroke; r: calc(24px / var(--escala, 1)); transform-box: fill-box; transform-origin: center; opacity: 0; }
+.a3c-llegada { fill: none; stroke: rgb(var(--brand)); stroke-width: 2; vector-effect: non-scaling-stroke; --k: calc(24 / var(--escala, 1)); transform: scale(var(--k)); transform-box: fill-box; transform-origin: center; opacity: 0; }
 .a3c-llegada.a3c-pulso { animation: a3c-llegada .8s ease-out; }
-@keyframes a3c-llegada { from { opacity: 1; transform: scale(.4) } to { opacity: 0; transform: scale(1.2) } }
+@keyframes a3c-llegada { from { opacity: 1; transform: scale(calc(var(--k, 1) * .4)) } to { opacity: 0; transform: scale(calc(var(--k, 1) * 1.2)) } }
 
+/* Los círculos se agrandan con `transform: scale(--k)` y no con la propiedad CSS `r` (Safari iOS
+   no la aplica de forma fiable): el `r` del SVG es el radio base y --k lo lleva al mínimo en pantalla. */
 /* ─── LED encendido ────────────────────────────────────────────────────
    Rojo del LED real (systemRed del tema); verde en 95–111. Dos anillos que se expanden y
    se desvanecen 3 veces y luego un halo fijo. Con movimiento reducido: rojo fijo, halo quieto. */
 .a3c-led { --led: var(--tw-red-500); }
 .a3c-led.a3c-verde { --led: var(--tw-green-500); }
-.a3c-led .a3c-nucleo { r: max(2.7px, calc(5px / var(--escala, 1))); fill: rgb(var(--led)); animation: a3c-fade .22s ease-out both; }
-.a3c-led .a3c-halo { r: max(6px, calc(14px / var(--escala, 1))); fill: rgb(var(--led) / .28); transform-box: fill-box; transform-origin: center; animation: a3c-halo .4s ease-out both; }
-.a3c-led .a3c-anillo { r: max(4px, calc(8px / var(--escala, 1))); fill: none; stroke: rgb(var(--led)); stroke-width: 2; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; opacity: 0; animation: a3c-anillo 1.1s cubic-bezier(.2,.7,.3,1) 3; }
+.a3c-led .a3c-nucleo { --k: max(1, calc(1.852 / var(--escala, 1))); transform: scale(var(--k)); transform-box: fill-box; transform-origin: center; fill: rgb(var(--led)); animation: a3c-fade .22s ease-out both; }
+.a3c-led .a3c-halo { --k: max(1, calc(2.333 / var(--escala, 1))); transform: scale(var(--k)); fill: rgb(var(--led) / .28); transform-box: fill-box; transform-origin: center; animation: a3c-halo .4s ease-out both; }
+.a3c-led .a3c-anillo { --k: max(1, calc(2 / var(--escala, 1))); transform: scale(var(--k)); fill: none; stroke: rgb(var(--led)); stroke-width: 2; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; opacity: 0; animation: a3c-anillo 1.1s cubic-bezier(.2,.7,.3,1) 3; }
 .a3c-led .a3c-anillo.a3c-segundo { animation-delay: .55s; }
 .a3c-led.a3c-en-plano .a3c-nucleo { fill: none; }
 .a3c-led.a3c-en-plano .a3c-halo { display: none; }
-.a3c-led.a3c-en-plano .a3c-anillo { stroke: rgb(var(--brand)); r: calc(14px / var(--escala, 1)); }
+.a3c-led.a3c-en-plano .a3c-anillo { stroke: rgb(var(--brand)); --k: calc(1.75 / var(--escala, 1)); }
 .a3c-led.a3c-quiz .a3c-anillo { animation-iteration-count: infinite; animation-duration: 1.6s; }
 @keyframes a3c-fade { from { opacity: 0 } to { opacity: 1 } }
-@keyframes a3c-halo { from { opacity: 0; transform: scale(.4) } to { opacity: 1; transform: scale(1) } }
-@keyframes a3c-anillo { 0% { opacity: .85; transform: scale(1) } 100% { opacity: 0; transform: scale(2.8) } }
+@keyframes a3c-halo { from { opacity: 0; transform: scale(calc(var(--k, 1) * .4)) } to { opacity: 1; transform: scale(var(--k, 1)) } }
+@keyframes a3c-anillo { 0% { opacity: .85; transform: scale(var(--k, 1)) } 100% { opacity: 0; transform: scale(calc(var(--k, 1) * 2.8)) } }
 
 /* ─── Foco del LED en la franja y punto de la regleta ─────────────────── */
 .a3c-foco { width: 18px; height: 18px; border-radius: 9999px; flex: none; background: radial-gradient(circle, rgb(var(--tw-red-500)) 0 40%, rgb(var(--tw-red-500) / .35) 62%, transparent 72%); }

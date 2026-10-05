@@ -66,9 +66,11 @@ export interface QuizA3cProps {
   textos: Texto[]
   preguntas: Pregunta[]
   dosColumnas: boolean
+  /** Vuelve al modo Explorar (estado vacío). */
+  onVolver?: () => void
 }
 
-export function QuizA3c({ modelo, dibujo, textos, preguntas, dosColumnas }: QuizA3cProps) {
+export function QuizA3c({ modelo, dibujo, textos, preguntas, dosColumnas, onVolver }: QuizA3cProps) {
   const [s, setS] = useState(() => {
     const r = leerRacha()
     return nuevoQuiz(preguntas.length, r.racha, r.mejor)
@@ -143,7 +145,18 @@ export function QuizA3c({ modelo, dibujo, textos, preguntas, dosColumnas }: Quiz
       </div>
     )
   }
-  if (!q) return null
+  if (!q) {
+    return (
+      <div className="mt-4 rounded-card bg-card p-4" role="status">
+        <p className="text-subhead">No hay preguntas de práctica disponibles para este diseño.</p>
+        {onVolver && (
+          <Button className="mt-3" variant="tinted" onClick={onVolver}>
+            Volver a explorar
+          </Button>
+        )}
+      </div>
+    )
+  }
 
   const ledsVisibles = respondida && q.after ? q.after : q.lit
   const ref = q.lit.length ? q.lit : q.after ?? []
