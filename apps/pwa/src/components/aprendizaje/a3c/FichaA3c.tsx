@@ -31,7 +31,6 @@ export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
       <div className="mt-2 flex flex-wrap gap-1.5">
         <Pill tone={item.tipo === 'salida' ? 'info' : 'neutral'}>{ETIQUETA_TIPO[item.tipo]}</Pill>
         {item.modulo && <Pill>{item.modulo}</Pill>}
-        {item.deducido && <Pill tone="warning">Deducido del plano</Pill>}
       </div>
 
       <section className="mt-4">

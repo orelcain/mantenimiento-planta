@@ -30,19 +30,33 @@ describe('integridad del paquete A3C real', () => {
     }
   })
 
-  it('documenta cada elemento de certeza alta o media y deja 13 en baja', () => {
+  it('solo afirma lo respaldado: 103 en certeza alta con fuentes y 42 en baja sin descripción', () => {
     const todos = Object.entries(datos.elementos)
+    for (const [k, e] of todos) expect(['alta', 'baja'], k).toContain(e.certeza)
+    const altos = todos.filter(([, e]) => e.certeza === 'alta')
     const bajos = todos.filter(([, e]) => e.certeza === 'baja').map(([k]) => k)
-    expect(bajos.sort()).toEqual(['A5', 'B30', 'B40', 'B41', 'B50', 'H10', 'X13', 'Y31', 'Y32', 'Y33', 'Y34', 'Y35', 'Y36'])
-    expect(datos.elementos.Y4!.certeza).toBe('media')
-    for (const [k, e] of todos.filter(([, x]) => x.certeza !== 'baja')) {
-      if (e.que_hace.startsWith('Sin descripción')) throw new Error(`${k}: sin descripción pese a certeza ${e.certeza}`)
+    expect(altos).toHaveLength(103)
+    expect(bajos.sort()).toEqual([
+      'A3C.Entregen', 'A3C.R_L_SM', 'A3C.Reset', 'A3C.Step_SM', 'A5', 'B30', 'B40', 'B41', 'B50', 'H10',
+      'J10', 'J11', 'J6', 'J7', 'J8', 'J9', 'Q0', 'TP', 'TP_5VV', 'TP_GNDDC',
+      'X1', 'X10', 'X12', 'X13', 'X14', 'X15', 'X17', 'X2', 'X20', 'X5', 'X6', 'X7',
+      'Y3', 'Y31', 'Y32', 'Y33', 'Y34', 'Y35', 'Y36', 'Y51', 'Y52', 'Y6',
+    ])
+    for (const [k, e] of altos) {
+      expect(e.que_hace.startsWith('Sin descripción'), `${k}: sin descripción pese a certeza alta`).toBe(false)
+      expect(e.fuentes?.length, `${k}: certeza alta sin fuentes`).toBeGreaterThan(0)
+      expect(e.pregunta_terreno, `${k}: certeza alta con pregunta de terreno`).toBeUndefined()
+      // Nada por analogía ni por posición: el texto no puede dudar de lo que afirma.
+      expect(e.que_hace, k).not.toMatch(/probablemente|sería|podría|por contexto|según variante|por analogía/i)
     }
-    // Los 33 elementos investigados en esta ronda traen fuentes; el resto aún no tiene el campo.
-    const investigados = ['A3C.Entregen', 'A3C.R_L_SM', 'A3C.Reset', 'A4', 'B6', 'B11', 'B15', 'B18', 'B19', 'C1', 'C2', 'J6', 'J7', 'J8', 'J9', 'J10', 'J11', 'R1', 'R2', 'S25', 'SM6', 'SM6-1', 'T1', 'T2', 'V1', 'V2', 'X6', 'X17', 'Y3', 'Y4', 'Y6', 'Y15', 'Y52']
-    for (const k of investigados) expect(datos.elementos[k]!.fuentes?.length, k).toBeGreaterThan(0)
-    expect(todos.filter(([, e]) => e.fuentes).map(([k]) => k).sort()).toEqual([...investigados].sort())
-    for (const k of bajos) expect(datos.elementos[k]!.pregunta_terreno).toBeTruthy()
+    for (const k of bajos) {
+      const e = datos.elementos[k]!
+      expect(e.que_hace, k).toBe('Sin descripción en el plano ni el manual.')
+      expect(e.fuentes, k).toBeUndefined()
+      expect(e.pregunta_terreno, k).toBeTruthy()
+    }
+    expect(datos.elementos.Y4!.certeza).toBe('alta')
+    expect(datos.elementos.Y3!.certeza).toBe('baja')
   })
 
   it('marca como inductivos solo los sensores que el manual lista así', () => {

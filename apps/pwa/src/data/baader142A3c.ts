@@ -38,8 +38,8 @@ export interface Elemento {
   borne: number[]
   led_texto: string
   modulo: string | null
-  certeza: 'alta' | 'media' | 'baja'
-  /** Fuentes en forma corta, p. ej. «Manual 2005, p. 66»; solo en certeza alta o media. */
+  certeza: 'alta' | 'baja'
+  /** Fuentes en forma corta, p. ej. «Manual 2005, p. 66»; obligatorias en certeza alta. */
   fuentes?: string[]
   /** Aviso breve cuando las hojas del plano se contradicen. */
   nota?: string

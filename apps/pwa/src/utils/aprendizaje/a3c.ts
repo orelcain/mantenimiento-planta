@@ -110,8 +110,6 @@ export interface ItemA3c {
   enPlano: string
   modulo: string | null
   fuentes: string[]
-  /** «media»: la función se dedujo del plano, no está rotulada. */
-  deducido: boolean
   nota: string | null
   tipoSensor: string | null
   preguntaTerreno: string | null
@@ -192,7 +190,6 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       enPlano: e.original,
       modulo: e.modulo,
       fuentes: conDatos ? (e.fuentes ?? []) : [],
-      deducido: conDatos && e.certeza === 'media',
       nota: e.nota ?? null,
       tipoSensor: e.tipo_sensor ?? null,
       preguntaTerreno: e.certeza === 'baja' ? (e.pregunta_terreno ?? null) : null,
@@ -226,7 +223,6 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       enPlano: original,
       modulo: null,
       fuentes: [],
-      deducido: false,
       nota: null,
       tipoSensor: null,
       preguntaTerreno: null,
@@ -252,7 +248,6 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       enPlano: l.original,
       modulo: 'Tarjeta A3C',
       fuentes: [],
-      deducido: false,
       nota: null,
       tipoSensor: null,
       preguntaTerreno: null,
