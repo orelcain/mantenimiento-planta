@@ -55,6 +55,19 @@ describe('Tarjeta A3C · vista Placa', () => {
     expect(capa).toEqual(['e:B11:116'])
   })
 
+  it('elegir B13 no enciende ningún LED de la placa y marca los 10 como grupo', () => {
+    localStorage.setItem('a3c-vista-tarjeta', 'placa')
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 32,/ }))
+    expect(ficha().getByText('B13')).toBeTruthy()
+    expect(encendidos()).toEqual([])
+    expect(document.querySelectorAll('[data-testid="leds-placa"] [data-led]')).toHaveLength(0)
+    const grupo = [...host()!.querySelectorAll('[data-grupo]')].map(e => e.id).sort()
+    expect(grupo).toEqual(Array.from({ length: 10 }, (_, i) => `led-X5-${32 + i}`).sort())
+    expect(document.querySelectorAll('[data-testid="leds-placa-grupo"] circle')).toHaveLength(10)
+    expect(screen.getByTestId('franja-led').textContent).toContain('estaban encendidos 32, 35 y 37 a 40')
+  })
+
   it('sin un elemento con LED, ningún LED de la placa está encendido (el estado de la foto no se muestra)', () => {
     localStorage.setItem('a3c-vista-tarjeta', 'placa')
     montar()

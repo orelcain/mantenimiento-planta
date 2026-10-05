@@ -234,7 +234,7 @@ export type LedEncendidoPlaca = PuntoLed & { r: number; /** Grupo del LED en el 
  */
 export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
   const out: LedEncendidoPlaca[] = []
-  for (const n of item.leds) {
+  for (const n of item.grupoBits ? [] : item.leds) {
     const l = geo.leds.get(n)
     // Mismo color que en el plano (tabla de la foto en `colorLed`): una sola fuente.
     if (l) out.push({ k: `${item.clave}:${n}`, n, svgId: `led-X5-${n}`, x: l.x, y: l.y, r: l.r, color: colorLed(n) })
@@ -243,6 +243,17 @@ export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
     const l = geo.ledsEstado.get(e.id)
     // Rojo, como el mismo LED de estado en el plano (`puntosLed`).
     if (l) out.push({ k: `${item.clave}:${e.id}`, svgId: l.svgId, x: l.x, y: l.y, r: l.r, color: 'r' })
+  }
+  return out
+}
+
+/** Los LED de la placa que se marcan como grupo del ítem (bits de un código): contorno, no encendido. */
+export function ledsGrupoPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
+  if (!item.grupoBits) return []
+  const out: LedEncendidoPlaca[] = []
+  for (const n of item.leds) {
+    const l = geo.leds.get(n)
+    if (l) out.push({ k: `${item.clave}:${n}`, n, svgId: `led-X5-${n}`, x: l.x, y: l.y, r: l.r, color: colorLed(n) })
   }
   return out
 }
@@ -261,14 +272,14 @@ export function lineaEnPlaca(linea: LineaLed, geo: GeoPlaca, item: ItemA3c): Lin
     }
     return { ...linea, soloPlano: false }
   }
-  if (ledsPlaca(geo, item).length) return { ...linea, soloPlano: false }
+  if (ledsPlaca(geo, item).length || ledsGrupoPlaca(geo, item).length) return { ...linea, soloPlano: false }
   if (!foco) return { ...linea, texto: 'No está dibujado en la placa', soloPlano: true }
   return { ...linea, texto: `${linea.texto} · Sin LED identificado en la placa`, soloPlano: false }
 }
 
 /** Punto al que ir en la placa: el primer LED encendible o, si no hay, el centro del primer borne. */
 export function focoPlaca(geo: GeoPlaca, item: ItemA3c): [number, number] | null {
-  const l = ledsPlaca(geo, item)[0]
+  const l = ledsPlaca(geo, item)[0] ?? ledsGrupoPlaca(geo, item)[0]
   if (l) return [l.x, l.y]
   for (const n of item.bornes) {
     const b = geo.bornes.get(n)

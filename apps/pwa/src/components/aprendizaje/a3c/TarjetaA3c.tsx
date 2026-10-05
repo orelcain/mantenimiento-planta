@@ -19,6 +19,7 @@ import {
   focoPlaca,
   guardarVistaTarjeta,
   leerVistaTarjeta,
+  ledsGrupoPlaca,
   ledsPlaca,
   lineaEnPlaca,
   limitesPlaca,
@@ -41,6 +42,7 @@ import {
   objetivosHoja22,
   objetivosHoja23,
   puntoFoco,
+  puntosGrupo,
   puntosLed,
   resolverToqueAmbiguo,
   type ClaveSel,
@@ -258,10 +260,13 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   const item = useMemo(() => describir(m, sel, idioma) ?? describir(m, 'e:B4', idioma)!, [m, sel, idioma])
   const linea = useMemo(() => lineaLed(item), [item])
   const leds = useMemo(() => puntosLed(m, item), [m, item])
+  const grupo = useMemo(() => puntosGrupo(m, item), [m, item])
   const elegidos = useMemo(() => new Set([...item.bornes, ...(selN != null ? [selN] : [])]), [item, selN])
-  const encendidos = useMemo(() => new Set(item.leds), [item])
+  const encendidos = useMemo(() => new Set(item.grupoBits ? [] : item.leds), [item])
+  const enGrupo = useMemo(() => new Set(item.grupoBits ? item.leds : []), [item])
   const grupos = useMemo(() => buscar(m, consulta, idioma), [m, consulta, idioma])
   const ledsP = useMemo(() => (placa ? ledsPlaca(placa.geo, item) : []), [placa, item])
+  const grupoP = useMemo(() => (placa ? ledsGrupoPlaca(placa.geo, item) : []), [placa, item])
   // En «Placa» la franja dice si lo elegido no está en el dibujo; entonces «Ver» lleva al plano.
   const lineaVista = useMemo(
     () => (verPlaca && placa ? lineaEnPlaca(linea, placa.geo, item) : { ...linea, soloPlano: false }),
@@ -274,11 +279,13 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   useEffect(() => {
     const host = placaHost.current
     if (!host) return
-    host.querySelectorAll('[data-encendido],[data-elegido]').forEach(e => {
+    host.querySelectorAll('[data-encendido],[data-grupo],[data-elegido]').forEach(e => {
       e.removeAttribute('data-encendido')
+      e.removeAttribute('data-grupo')
       e.removeAttribute('data-elegido')
     })
     for (const l of ledsP) host.querySelector(`#${l.svgId}`)?.setAttribute('data-encendido', '')
+    for (const l of grupoP) host.querySelector(`#${l.svgId}`)?.setAttribute('data-grupo', '')
     for (const n of elegidos) host.querySelector(`#borne-X5-${n}`)?.setAttribute('data-elegido', '')
   })
 
@@ -539,6 +546,11 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
           return <rect key={n} className="a3c-elegida" x={r.x} y={r.y} width={r.w} height={r.h} />
         })}
       </g>
+      <g data-testid="leds-grupo">
+        {grupo.map(p => (
+          <circle key={p.k} className="a3c-contorno" data-grupo={p.k} cx={p.x} cy={p.y} r={4} />
+        ))}
+      </g>
       <g data-testid="leds-encendidos">
         {leds.map(p => (
           <g key={p.k} className={cn('a3c-led', p.color === 'g' && 'a3c-verde')} data-led={p.k}>
@@ -592,6 +604,11 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
           if (!r) return null
           return <rect key={n} className="a3c-elegida" x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx={1} />
         })}
+      </g>
+      <g data-testid="leds-placa-grupo">
+        {grupoP.map(p => (
+          <circle key={p.k} className="a3c-contorno a3c-en-placa" data-grupo={p.k} cx={p.x} cy={p.y} r={p.r * 1.4} />
+        ))}
       </g>
       <g data-testid="leds-placa">
         {ledsP.map(p => (
@@ -834,6 +851,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       bornes={m.bornes}
       elegidos={elegidos}
       encendidos={encendidos}
+      grupo={enGrupo}
       idioma={idioma}
       compacta={!grueso}
       vertical={pc}

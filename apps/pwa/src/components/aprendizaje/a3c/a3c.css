@@ -44,6 +44,8 @@
 .a3c-led.a3c-en-plano .a3c-nucleo { fill: none; }
 .a3c-led.a3c-en-plano .a3c-halo { display: none; }
 .a3c-led.a3c-en-plano .a3c-anillo { stroke: rgb(var(--brand)); --k: calc(1.75 / var(--escala, 1)); }
+.a3c-contorno { --k: max(1, calc(2 / var(--escala, 1))); transform: scale(var(--k)); transform-box: fill-box; transform-origin: center; fill: none; stroke: rgb(var(--brand)); stroke-width: 1.5; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.a3c-contorno.a3c-en-placa { --k: max(1, calc(1.03 / var(--escala, 1))); }
 .a3c-led.a3c-quiz .a3c-anillo { animation-iteration-count: infinite; animation-duration: 1.6s; }
 @keyframes a3c-fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes a3c-halo { from { opacity: 0; transform: scale(calc(var(--k, 1) * .4)) } to { opacity: 1; transform: scale(var(--k, 1)) } }
@@ -71,6 +73,7 @@
 
 .a3c-punto { position: relative; width: 10px; height: 10px; border-radius: 9999px; background: rgb(var(--tw-red-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-red-500) / .5); }
 .a3c-punto.a3c-verde { background: rgb(var(--tw-green-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-green-500) / .55); }
+.a3c-punto.a3c-grupo { background: transparent; box-shadow: none; border: 1.5px dashed rgb(var(--brand)); }
 .a3c-punto.a3c-sin-led { background: transparent; box-shadow: none; }
 .a3c-punto.a3c-encendido { background: rgb(var(--tw-red-500)); box-shadow: 0 0 8px rgb(var(--tw-red-500) / .8); }
 .a3c-punto.a3c-verde.a3c-encendido { background: rgb(var(--tw-green-500)); box-shadow: 0 0 8px rgb(var(--tw-green-500) / .8); }
