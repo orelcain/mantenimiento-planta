@@ -270,7 +270,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       enPlano: original,
       modulo: null,
       fuentes: [],
-      nota: null,
+      nota: b.nota ?? null,
       tipoSensor: null,
       preguntaTerreno: null,
     }

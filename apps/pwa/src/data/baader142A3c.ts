@@ -27,6 +27,8 @@ export interface Borne {
   sentido: Sentido
   led: Led | null
   celda: Rect
+  /** De dónde sale el elemento cuando no es el rótulo de la hoja 23, o por qué no se asigna. */
+  nota?: string
 }
 export interface Elemento {
   etiqueta: string

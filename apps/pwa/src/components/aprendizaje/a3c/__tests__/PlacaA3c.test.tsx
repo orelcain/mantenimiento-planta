@@ -174,6 +174,40 @@ describe('Tarjeta A3C · LED de estado «60V DC» en la placa', () => {
   })
 })
 
+describe('Tarjeta A3C · B50 y B42 (hojas 11 y 21)', () => {
+  const buscarYElegir = (q: string) => {
+    fireEvent.change(screen.getByLabelText('Buscar elemento, borne o LED'), { target: { value: q } })
+    fireEvent.click(screen.getAllByRole('button', { name: new RegExp(`^${q} `) })[0]!)
+  }
+  const plano = () => [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
+
+  it('elegir B50 enciende el LED 126 en el plano y led-X5-126 en la placa', () => {
+    montar()
+    buscarYElegir('B50')
+    expect(ficha().getByText('B50')).toBeTruthy()
+    expect(plano()).toEqual(['e:B50:126'])
+    fireEvent.click(screen.getByRole('tab', { name: 'Placa' }))
+    expect(encendidos()).toEqual(['led-X5-126'])
+  })
+
+  it('B42 se alcanza desde el buscador y desde su borne 127', () => {
+    montar()
+    buscarYElegir('B42')
+    expect(plano()).toEqual(['e:B42:127'])
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 45,/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 127,/ }))
+    expect(ficha().getByText('B42')).toBeTruthy()
+  })
+
+  it('el borne 128 queda suelto, con su rótulo de la hoja 23 y la nota de la hoja 11', () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 128,/ }))
+    expect(ficha().getAllByText('X5:128').length).toBeGreaterThan(0)
+    expect(ficha().getByText(/La hoja 23 rotula aquí B50; la hoja 11 lo cablea al borne 126/)).toBeTruthy()
+    expect(plano()).toEqual(['b:128:128'])
+  })
+})
+
 describe('placa-n2.svg · integridad y seguridad', () => {
   it('cada led-estado-k asignado es un LED «60V DC» del plano, en su bloque X4 y en la misma posición relativa', () => {
     // Cajas de los conectores X4 de la placa (primer <rect> de cada grupo, con su transform).

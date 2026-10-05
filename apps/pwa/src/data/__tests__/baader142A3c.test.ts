@@ -20,6 +20,22 @@ describe('integridad del paquete A3C real', () => {
     expect(new Set(datos.ledsEstado.map(l => l.id)).size).toBe(22)
   })
 
+  it('126 → B50 (hoja 11) y 127 → B42 (hoja 21); 128 conserva el rótulo de la hoja 23 sin elemento', () => {
+    const b = (n: number) => datos.bornes.find(x => x.borne === n)!
+    expect(b(126).elemento).toBe('B50')
+    expect(b(126).nota).toMatch(/hoja 11/)
+    expect(b(127).elemento).toBe('B42')
+    expect(b(127).nota).toMatch(/hoja 21/)
+    expect(b(128).elemento).toBeNull()
+    expect(b(128).senal_original).toBe('8) B50 Position Kratzer C')
+    expect(b(128).nota).toBe('La hoja 23 rotula aquí B50; la hoja 11 lo cablea al borne 126.')
+    expect(datos.elementos.B50!.borne).toEqual([126])
+    expect(datos.elementos.B42!.borne).toEqual([127])
+    // Geometría y LED intactos.
+    expect(b(126).led).toEqual({ x: 562.68, y: 814.25, r: 2.9 })
+    expect(b(128).led).toEqual({ x: 562.68, y: 831.26, r: 2.9 })
+  })
+
   it('mantiene válidas las referencias entre los 145 elementos y sus bornes', () => {
     expect(Object.keys(datos.elementos)).toHaveLength(145)
     const numeros = new Set(datos.bornes.map(b => b.borne))
