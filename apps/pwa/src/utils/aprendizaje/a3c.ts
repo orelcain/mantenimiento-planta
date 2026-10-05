@@ -550,6 +550,27 @@ export function zoomCamara(c: Camara, f: number, lim: LimitesCamara, ux?: number
   return limitarCamara({ w, cx: ux + (c.cx - ux) * k, cy: uy + (c.cy - uy) * k }, lim)
 }
 
+/**
+ * Cámara durante un pellizco: el ancho sigue a la distancia entre los dedos y el punto del
+ * dibujo que estaba bajo su punto medio al empezar queda bajo el punto medio actual (el zoom
+ * se ancla entre los dedos, como la rueda bajo el puntero). `m0`/`m1` en px del lienzo.
+ */
+export function camaraPellizco(
+  c0: Camara,
+  d0: number,
+  m0: [number, number],
+  d1: number,
+  m1: [number, number],
+  vw: number,
+  vh: number,
+  lim: LimitesCamara,
+): Camara {
+  const w = Math.max(lim.minW, Math.min(lim.maxW, (c0.w * d0) / Math.max(d1, 1)))
+  const [ux, uy] = pantallaAUnidades(c0, vw, vh, m0[0], m0[1])
+  const s = vw / w
+  return { w, cx: ux + w / 2 - m1[0] / s, cy: uy + vh / s / 2 - m1[1] / s }
+}
+
 // ─── Toque / clic en el dibujo ────────────────────────────────────────────
 
 export interface Objetivo { clave: ClaveSel; n?: number; r: Rect }

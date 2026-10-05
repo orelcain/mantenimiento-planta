@@ -137,6 +137,27 @@ describe('Tarjeta A3C · LED de estado «60V DC» en la placa', () => {
     expect(screen.getByRole('button', { name: 'Ver LED 60V DC SM1 y Step SM1 en la tarjeta' })).toBeTruthy()
   })
 
+  it('X5:139 no está dibujado en la placa: la franja lo dice y «Ver en el plano» cambia a Plano con el LED 139', () => {
+    localStorage.setItem('a3c-vista-tarjeta', 'placa')
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 139,/ }))
+    expect(encendidos()).toEqual([])
+    const franja = within(screen.getByTestId('franja-led'))
+    expect(franja.getByText(/No está dibujado en la placa/)).toBeTruthy()
+    fireEvent.click(franja.getByRole('button', { name: 'Ver LED 139 en el plano' }))
+    expect(host()).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Plano' }).getAttribute('aria-selected')).toBe('true')
+    const plano = [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
+    expect(plano).toEqual(['b:139:139'])
+    expect(within(screen.getByTestId('franja-led')).getByRole('button', { name: 'Ver LED 139 en la tarjeta' })).toBeTruthy()
+  })
+
+  it('el borne 103 enciende led-X5-103 (un LED por fila en el plano; lo dudoso era solo el estado de la foto)', () => {
+    localStorage.setItem('a3c-vista-tarjeta', 'placa')
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 103,/ }))
+    expect(encendidos()).toEqual(['led-X5-103'])
+  })
 })
 
 describe('placa-n2.svg · integridad y seguridad', () => {
@@ -167,6 +188,15 @@ describe('placa-n2.svg · integridad y seguridad', () => {
       expect(datos.ledsEstado.some(e => e.id === id && e.original === '60V DC')).toBe(true)
     }
   })
+
+  it('un LED con asociación ambigua no se toma como LED de su borne', () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><g id="led-X5-7" data-asociacion="ambigua"><circle cx="1" cy="1" r="1"/></g><g id="led-X5-8"><circle cx="3" cy="1" r="1"/></g><g id="led-estado-1"><circle cx="5" cy="5" r="1"/></g></svg>'
+    const g = geometriaPlaca(svg)
+    expect([...g.leds.keys()]).toEqual([8])
+    expect(g.ledsEstado.size).toBe(0)
+    expect(svgPlaca).not.toMatch(/data-asociacion="ambigua"/)
+  })
+
 
   it('cada led-X5-n de la placa es un borne de a3c-datos.json, y cada borne X5 1–134 está dibujado', () => {
     const bornes = new Set(datos.bornes.map(b => b.borne))

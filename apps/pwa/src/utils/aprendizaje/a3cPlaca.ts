@@ -11,7 +11,7 @@
  * los dibuja todos apagados y enciende únicamente el del elemento elegido.
  */
 import type { PresetV5, Rect, ViewBox } from '@/data/baader142A3c'
-import { claveDeBorne, colorLed, type ColorLed, type ItemA3c, type LimitesCamara, type ModeloA3c, type Objetivo, type PuntoLed } from './a3c'
+import { claveDeBorne, colorLed, type ColorLed, type ItemA3c, type LimitesCamara, type LineaLed, type ModeloA3c, type Objetivo, type PuntoLed } from './a3c'
 
 export interface LedPlaca { x: number; y: number; r: number; color: ColorLed }
 /** LED de estado de la placa (`led-estado-k`) ya asociado a un LED de estado del plano. */
@@ -140,7 +140,8 @@ export function geometriaPlaca(svg: string): GeoPlaca {
       const c = cajaDe(el, m)
       if (c) geo.bornes.set(Number(k[1]), c)
     } else if ((k = /^led-X5-(\d+)$/.exec(id))) {
-      const c = circuloDe(el, m)
+      // Solo lo cierto: un LED cuya asociación al borne es dudosa no se enciende como si fuera suyo.
+      const c = el.getAttribute('data-asociacion') === 'ambigua' ? null : circuloDe(el, m)
       if (c) {
         const color: ColorLed = (el.getAttribute('data-estado') ?? '').startsWith('verde') ? 'g' : 'r'
         geo.leds.set(Number(k[1]), { ...c, color })
@@ -246,6 +247,15 @@ export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
   return out
 }
 
+/**
+ * La franja «qué LED prende» vista desde la placa. El plano manda (mismo número de LED), pero
+ * si en la placa no hay nada que mostrar se dice, y «Ver» lleva al plano en vez de no hacer nada.
+ */
+export function lineaEnPlaca(linea: LineaLed, geo: GeoPlaca, item: ItemA3c): LineaLed & { soloPlano: boolean } {
+  if (!linea.encendible || ledsPlaca(geo, item).length) return { ...linea, soloPlano: false }
+  if (!focoPlaca(geo, item)) return { ...linea, texto: 'No está dibujado en la placa', soloPlano: true }
+  return { ...linea, texto: `${linea.texto} · Sin LED identificado en la placa`, soloPlano: false }
+}
 
 /** Punto al que ir en la placa: el primer LED encendible o, si no hay, el centro del primer borne. */
 export function focoPlaca(geo: GeoPlaca, item: ItemA3c): [number, number] | null {

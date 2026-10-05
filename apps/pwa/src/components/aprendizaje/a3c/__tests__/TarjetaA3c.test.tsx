@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { interiorSvg, type A3CDatos, type PaqueteA3c } from '@/data/baader142A3c'
+import { camaraDePreset, limitarCamara, matrizCamara } from '@/utils/aprendizaje/a3c'
 import { TarjetaA3c } from '../TarjetaA3c'
 
 // Paquete real (el mismo que sirve la app desde public/), sin red.
@@ -94,6 +95,29 @@ describe('Tarjeta A3C', () => {
 
     montar(true)
     expect(screen.getByRole('tab', { name: 'Original' }).getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('con mouse, un clic sobre S20..S25 (misma zona del plano) pregunta cuál en vez de elegir S20', () => {
+    montar(true, false)
+    const cam = limitarCamara(camaraDePreset(paquete.datos.presets_v5.hoja22.todo!, 343, 340), { minW: 70, maxW: 2200, bounds: [40, 45, 1080, 675] })
+    const mz = matrizCamara(cam, 343, 340)
+    const h = paquete.datos.elementos.S20!.hoja22_hotspots[0]!
+    const svg = document.querySelector('svg[data-hoja="22"]')!
+    const e = { pointerId: 1, pointerType: 'mouse', button: 0, clientX: (h.x + h.w / 2) * mz.s + mz.tx, clientY: (h.y + h.h / 2) * mz.s + mz.ty }
+    fireEvent.pointerDown(svg, e)
+    fireEvent.pointerUp(svg, e)
+    const hoja = screen.getByRole('dialog')
+    expect(within(hoja).getByText('¿Cuál?')).toBeTruthy()
+    for (const k of ['S20', 'S21', 'S22', 'S23', 'S24', 'S25']) expect(within(hoja).getByText(k)).toBeTruthy()
+  })
+
+  it('los selectores Idioma, Modo y Plano | Placa miden 44 px en PC', () => {
+    montar(true)
+    for (const n of ['Idioma de los textos del plano', 'Modo', 'Vista de la tarjeta']) {
+      const t = screen.getByRole('tablist', { name: n })
+      expect(t.className).toContain('h-[44px]')
+      expect(t.className).toContain('[&>button]:h-[44px]')
+    }
   })
 
   it('el buscador encuentra por número de borne y elegir el resultado cambia la selección', () => {

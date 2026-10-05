@@ -11,6 +11,7 @@ import { forwardRef, memo, useEffect, useImperativeHandle, useLayoutEffect, useR
 import type { Hoja, PresetV5, Texto } from '@/data/baader142A3c'
 import {
   camaraDePreset,
+  camaraPellizco,
   deltaRuedaPx,
   limitarCamara,
   lineasDeTexto,
@@ -236,10 +237,12 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
         const [a, b] = [...pts.values()]
         if (!a || !b) return
         const d = Math.hypot(a.x - b.x, a.y - b.y)
-        const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-        const w = Math.max(cb.current.limites.minW, Math.min(cb.current.limites.maxW, (g.cam.w * g.d) / Math.max(d, 1)))
-        const p2 = (tam.current.vw / w) * ((caja().width || tam.current.vw) / tam.current.vw)
-        cam.current = { w, cx: g.cam.cx - (m.x - g.m.x) / p2, cy: g.cam.cy - (m.y - g.m.y) / p2 }
+        // Puntos medios (el de inicio y el actual) en px del lienzo: el zoom se ancla entre los dedos.
+        const r = caja()
+        const k = tam.current.vw / (r.width || tam.current.vw)
+        const enLienzo = (p: { x: number; y: number }): [number, number] => [(p.x - r.left) * k, (p.y - r.top) * k]
+        const m1 = enLienzo({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+        cam.current = camaraPellizco(g.cam, g.d, enLienzo(g.m), d, m1, tam.current.vw, tam.current.vh, cb.current.limites)
         movido = true
         marcarPreset(null)
         aplicar(false)

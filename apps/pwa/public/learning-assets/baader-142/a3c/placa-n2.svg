@@ -1448,7 +1448,7 @@
 <rect x="555.8" y="632.56" width="2.2" height="4.120000000000001" rx="0" fill="#794a21" stroke="none" />
 <text x="578" y="636.82" font-family="Arial,sans-serif" font-size="6.1" fill="#31462f" text-anchor="middle">103</text>
 </g>
-<g id="led-X5-103" data-source="photo" data-state-source="photograph-approximation" data-live="false" data-estado="verde-encendido" data-asociacion="ambigua" data-nota="LED entre las filas 103 y 104; se asigna 103 por el desfase constante LED-rótulo de la regleta" data-id-v6="LED-X5-103" class="led"><title>LED representado según fotografía; asociación al borne por proximidad visual, no continuidad eléctrica verificada.</title>
+<g id="led-X5-103" data-source="photo" data-state-source="photograph-approximation" data-live="false" data-estado="verde-encendido" data-asociacion="fila-del-plano" data-nota="LED de la fila 103: en el plano 888 los bornes 99–111 llevan un LED cada uno, uno por fila. Lo dudoso era solo cuál de las filas 103 y 104 estaba encendida en la foto (data-estado)" data-id-v6="LED-X5-103" class="led"><title>LED representado según fotografía; asociación al borne por proximidad visual, no continuidad eléctrica verificada.</title>
 <circle cx="595" cy="634.62" r="4.2" fill="#b9ed19" stroke="#70834f" />
 </g>
 <g id="borne-X5-104" data-source="photo-plan" data-connector="X5" data-terminal="104" data-numero-en-foto="legible" data-id-v6="X5-104" class="borne"><title>A3C.X5:104; referencia del plano, posición en la regleta según fotografía</title>
