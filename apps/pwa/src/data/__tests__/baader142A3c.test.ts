@@ -30,6 +30,27 @@ describe('integridad del paquete A3C real', () => {
     }
   })
 
+  it('documenta cada elemento de certeza alta o media y deja 13 en baja', () => {
+    const todos = Object.entries(datos.elementos)
+    const bajos = todos.filter(([, e]) => e.certeza === 'baja').map(([k]) => k)
+    expect(bajos.sort()).toEqual(['A5', 'B30', 'B40', 'B41', 'B50', 'H10', 'X13', 'Y31', 'Y32', 'Y33', 'Y34', 'Y35', 'Y36'])
+    expect(datos.elementos.Y4!.certeza).toBe('media')
+    for (const [k, e] of todos.filter(([, x]) => x.certeza !== 'baja')) {
+      if (e.que_hace.startsWith('Sin descripción')) throw new Error(`${k}: sin descripción pese a certeza ${e.certeza}`)
+    }
+    // Los 33 elementos investigados en esta ronda traen fuentes; el resto aún no tiene el campo.
+    const investigados = ['A3C.Entregen', 'A3C.R_L_SM', 'A3C.Reset', 'A4', 'B6', 'B11', 'B15', 'B18', 'B19', 'C1', 'C2', 'J6', 'J7', 'J8', 'J9', 'J10', 'J11', 'R1', 'R2', 'S25', 'SM6', 'SM6-1', 'T1', 'T2', 'V1', 'V2', 'X6', 'X17', 'Y3', 'Y4', 'Y6', 'Y15', 'Y52']
+    for (const k of investigados) expect(datos.elementos[k]!.fuentes?.length, k).toBeGreaterThan(0)
+    expect(todos.filter(([, e]) => e.fuentes).map(([k]) => k).sort()).toEqual([...investigados].sort())
+    for (const k of bajos) expect(datos.elementos[k]!.pregunta_terreno).toBeTruthy()
+  })
+
+  it('marca como inductivos solo los sensores que el manual lista así', () => {
+    const inductivos = Object.entries(datos.elementos).filter(([, e]) => e.tipo_sensor).map(([k]) => k)
+    expect(inductivos.sort()).toEqual(['B1', 'B10', 'B11', 'B12', 'B14', 'B15', 'B16', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9'])
+    for (const k of inductivos) expect(datos.elementos[k]!.tipo_sensor).toMatch(/^Interruptor de aproximación inductivo \(manual 2005, p\. 6[67]\)$/)
+  })
+
   it('incluye doce preguntas válidas, repartidas entre PC y teléfono', () => {
     expect(datos.quiz).toHaveLength(12)
     expect(datos.quiz.filter(p => p.contexto === 'pc')).toHaveLength(6)

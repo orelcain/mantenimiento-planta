@@ -39,6 +39,14 @@ export interface Elemento {
   led_texto: string
   modulo: string | null
   certeza: 'alta' | 'media' | 'baja'
+  /** Fuentes en forma corta, p. ej. «Manual 2005, p. 66»; solo en certeza alta o media. */
+  fuentes?: string[]
+  /** Aviso breve cuando las hojas del plano se contradicen. */
+  nota?: string
+  /** Tipo de sensor declarado por la lista eléctrica del manual. */
+  tipo_sensor?: string
+  /** Solo en certeza baja: qué confirmar en terreno. */
+  pregunta_terreno?: string
   /** [] cuando no hay ubicación en la hoja 22. */
   hoja22_hotspots: Rect[]
 }

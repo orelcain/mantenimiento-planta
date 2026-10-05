@@ -109,6 +109,12 @@ export interface ItemA3c {
   /** Texto tal cual en el plano (alemán o código), para la ficha. */
   enPlano: string
   modulo: string | null
+  fuentes: string[]
+  /** «media»: la función se dedujo del plano, no está rotulada. */
+  deducido: boolean
+  nota: string | null
+  tipoSensor: string | null
+  preguntaTerreno: string | null
 }
 
 function tipoDeElemento(e: Elemento): TipoItem {
@@ -185,6 +191,11 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       senal: SENAL[e.senal_a3c] ?? SENAL_NO_INDICADO,
       enPlano: e.original,
       modulo: e.modulo,
+      fuentes: conDatos ? (e.fuentes ?? []) : [],
+      deducido: conDatos && e.certeza === 'media',
+      nota: e.nota ?? null,
+      tipoSensor: e.tipo_sensor ?? null,
+      preguntaTerreno: e.certeza === 'baja' ? (e.pregunta_terreno ?? null) : null,
     }
   }
   if (k === 'b') {
@@ -214,6 +225,11 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       senal: SENAL[b.sentido] ?? SENAL_NO_INDICADO,
       enPlano: original,
       modulo: null,
+      fuentes: [],
+      deducido: false,
+      nota: null,
+      tipoSensor: null,
+      preguntaTerreno: null,
     }
   }
   if (k === 'l') {
@@ -235,6 +251,11 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       senal: 'Indicador interno de la tarjeta',
       enPlano: l.original,
       modulo: 'Tarjeta A3C',
+      fuentes: [],
+      deducido: false,
+      nota: null,
+      tipoSensor: null,
+      preguntaTerreno: null,
     }
   }
   return null
