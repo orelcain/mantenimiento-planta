@@ -10,8 +10,9 @@
  * hoja 23 ya girada (x' = y, y' = 1131,73 − x), dibujos sin texto (los textos los pone la
  * app desde `textos`).
  */
+import { geometriaPlaca, type GeoPlaca } from '@/utils/aprendizaje/a3cPlaca'
 
-export type ViewBox = [x: number, y: number, w: number, h: number]
+export type ViewBox =[x: number, y: number, w: number, h: number]
 export interface Rect { x: number; y: number; w: number; h: number }
 /** r = 2.9: radio del área interactiva de un LED. */
 export interface Led { x: number; y: number; r: number }
@@ -132,13 +133,51 @@ export const RUTA_ASSETS_A3C = `${BASE}learning-assets/baader-142/a3c/`
  * archivo es global si se inserta en la página, y `.tinta` / `.s2` son nombres demasiado
  * genéricos. Las reglas equivalentes viven en `components/aprendizaje/a3c/a3c.css`.
  */
-export function interiorSvg(svg: string): string {
+export function interiorSvg(svg: string, prefijo = 'a3c-'): string {
   const ini = svg.indexOf('>', svg.indexOf('<svg'))
   const fin = svg.lastIndexOf('</svg>')
   const cuerpo = ini >= 0 && fin > ini ? svg.slice(ini + 1, fin) : svg
   return cuerpo
     .replace(/<style[\s\S]*?<\/style>/g, '')
-    .replace(/class="([^"]*)"/g, (_m, c: string) => `class="${c.split(/\s+/).filter(Boolean).map(x => `a3c-${x}`).join(' ')}"`)
+    .replace(/class="([^"]*)"/g, (_m, c: string) => `class="${c.split(/\s+/).filter(Boolean).map(x => `${prefijo}${x}`).join(' ')}"`)
+}
+
+/**
+ * Interior del dibujo de la placa (`placa-n2.svg`): mismo saneamiento que las hojas, con
+ * prefijo propio `a3cp-` (sus clases `led` / `borne` chocarían con las de la herramienta) y
+ * sin `<title>`, `<desc>` ni `<metadata>`: son notas del dibujante; dentro de la página darían
+ * tooltips nativos encima del de la app y un `id="title"` global.
+ */
+export function interiorPlaca(svg: string): string {
+  return interiorSvg(svg, 'a3cp-')
+    .replace(/<title[\s\S]*?<\/title>/g, '')
+    .replace(/<desc[\s\S]*?<\/desc>/g, '')
+    .replace(/<metadata[\s\S]*?<\/metadata>/g, '')
+}
+
+/** Vista «Placa»: dibujo de la placa real de la N2 (desde foto) y su geometría ya leída. */
+export interface PaquetePlaca {
+  dibujo: string
+  geo: GeoPlaca
+}
+
+let cachePlaca: Promise<PaquetePlaca> | null = null
+
+/** Pide `placa-n2.svg` (~240 KB) solo cuando alguien elige «Placa»; una vez por sesión. */
+export function cargarPlacaA3c(): Promise<PaquetePlaca> {
+  if (!cachePlaca) {
+    cachePlaca = fetch(`${RUTA_ASSETS_A3C}placa-n2.svg`)
+      .then(r => {
+        if (!r.ok) throw new Error(`No se pudo cargar placa-n2.svg (${r.status})`)
+        return r.text()
+      })
+      .then(svg => ({ dibujo: interiorPlaca(svg), geo: geometriaPlaca(svg) }))
+      .catch(err => {
+        cachePlaca = null
+        throw err
+      })
+  }
+  return cachePlaca
 }
 
 let cache: Promise<PaqueteA3c> | null = null

@@ -97,8 +97,18 @@ describe('selección y descripción con datos reales', () => {
     expect(item('e:Y8').nombreApoyo).toBeNull()
   })
 
-  it.each([[95, 'g'], [111, 'g'], [94, 'r'], [112, 'r']] as const)('asigna el color del borne %i', (n, color) => {
-    expect(colorLed(n)).toBe(color)
+  // Color según la foto de la N2: verdes también en 1–28 (pares desde 14) y 66–94, no solo 95–111.
+  it.each([[42, 'r'], [5, 'g'], [72, 'g'], [116, 'r'], [95, 'g'], [111, 'g'], [94, 'g'], [112, 'r'], [11, 'r'], [140, 'r']] as const)(
+    'asigna el color del borne %i',
+    (n, color) => {
+      expect(colorLed(n)).toBe(color)
+    },
+  )
+
+  it('la franja de B1 (borne 42) es roja y la de un borne verde de la foto es verde', () => {
+    expect(lineaLed(item('e:B1'))).toMatchObject({ grande: 'LED 42', color: 'r' })
+    expect(lineaLed(item(claveDeBorne(m, 72))).color).toBe('g')
+    expect(lineaLed(item(claveDeBorne(m, 5))).color).toBe('g')
   })
 
   it('no asigna regleta al borne inexistente 135', () => {

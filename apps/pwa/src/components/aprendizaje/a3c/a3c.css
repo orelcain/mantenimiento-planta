@@ -49,6 +49,21 @@
 @keyframes a3c-halo { from { opacity: 0; transform: scale(calc(var(--k, 1) * .4)) } to { opacity: 1; transform: scale(var(--k, 1)) } }
 @keyframes a3c-anillo { 0% { opacity: .85; transform: scale(var(--k, 1)) } 100% { opacity: 0; transform: scale(calc(var(--k, 1) * 2.8)) } }
 
+/* ─── Vista «Placa» (placa-n2.svg, dibujada desde foto) ────────────────
+   El verde de PCB y sus piezas son colores del propio dibujo (es una foto dibujada) y no
+   cambian con el tema. Sus LED traen el estado que tenían EN LA FOTO (`data-estado`): eso no es
+   estado en vivo, así que aquí se pintan TODOS apagados según su color; los dos tonos rojo y
+   verde apagado son los del mismo SVG (#821c1c, #477646); el ámbar apagado no existe en el
+   dibujo y se fija aquí oscureciendo su ámbar. Solo el LED elegido se enciende (capa de la app). */
+.a3c-placa { --a3cp-off-rojo: #821c1c; --a3cp-off-verde: #477646; --a3cp-off-ambar: #6e5a1c; }
+.a3c-placa .a3cp-led circle { fill: var(--a3cp-off-rojo); }
+.a3c-placa .a3cp-led[data-estado^="verde"] circle { fill: var(--a3cp-off-verde); }
+.a3c-placa .a3cp-led:is([data-estado^="amarillo"], [data-estado^="ambar"]) circle { fill: var(--a3cp-off-ambar); }
+/* Los círculos encendidos de la placa son ~2 veces los del plano: el mismo mínimo en pantalla. */
+.a3c-led.a3c-en-placa .a3c-nucleo { --k: max(1, calc(.85 / var(--escala, 1))); }
+.a3c-led.a3c-en-placa .a3c-halo { --k: max(1, calc(1.19 / var(--escala, 1))); }
+.a3c-led.a3c-en-placa .a3c-anillo { --k: max(1, calc(1.03 / var(--escala, 1))); }
+
 /* ─── Foco del LED en la franja y punto de la regleta ─────────────────── */
 .a3c-foco { width: 18px; height: 18px; border-radius: 9999px; flex: none; background: radial-gradient(circle, rgb(var(--tw-red-500)) 0 40%, rgb(var(--tw-red-500) / .35) 62%, transparent 72%); }
 .a3c-foco.a3c-verde { background: radial-gradient(circle, rgb(var(--tw-green-500)) 0 40%, rgb(var(--tw-green-500) / .35) 62%, transparent 72%); }
