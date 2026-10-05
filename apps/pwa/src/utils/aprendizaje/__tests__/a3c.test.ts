@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { A3CDatos } from '@/data/baader142A3c'
 import {
-  buscar, camaraDePreset, centroRect, deltaRuedaPx, objetivosHoja22, resolverToqueAmbiguo, claveDeBorne, codigoCorto, colorLed, construirModelo,
+  buscar, camaraDePreset, camaraPellizco, centroRect, deltaRuedaPx, objetivosHoja22, resolverToqueAmbiguo, claveDeBorne, codigoCorto, colorLed, construirModelo,
   describir, elegirEn, guardarIdioma, guardarRacha, leerIdioma, leerRacha,
   limitarCamara, lineaLed, lineasDeTexto, matrizCamara, nuevoQuiz, objetivosHoja23,
   pantallaAUnidades, puntosLed, recorteRegleta, regletaDe, reiniciar, responder,
@@ -304,5 +304,52 @@ describe('rueda', () => {
     expect(deltaRuedaPx(100, 0)).toBe(100)
     expect(deltaRuedaPx(3, 1)).toBe(48)
     expect(deltaRuedaPx(1, 2)).toBe(100)
+  })
+})
+
+describe('pellizco anclado al punto medio de los dedos', () => {
+  const lim: LimitesCamara = { minW: 50, maxW: 2000, bounds: [-60, 0, 780, 1131] }
+  const c0 = { cx: 400, cy: 500, w: 300 }
+
+  it('el punto del dibujo bajo el punto medio inicial queda bajo el punto medio actual', () => {
+    const m0: [number, number] = [80, 220]
+    const u0 = pantallaAUnidades(c0, 343, 340, m0[0], m0[1])
+    // Abre los dedos al doble y los corre 30 px a la derecha.
+    const c1 = camaraPellizco(c0, 100, m0, 200, [110, 220], 343, 340, lim)
+    expect(c1.w).toBeCloseTo(150)
+    const u1 = pantallaAUnidades(c1, 343, 340, 110, 220)
+    expect(u1[0]).toBeCloseTo(u0[0])
+    expect(u1[1]).toBeCloseTo(u0[1])
+  })
+
+  it('sin cambiar la distancia ni el punto medio, la cámara no se mueve; el ancho respeta los límites', () => {
+    const c1 = camaraPellizco(c0, 120, [50, 60], 120, [50, 60], 343, 340, lim)
+    expect(c1.cx).toBeCloseTo(c0.cx)
+    expect(c1.cy).toBeCloseTo(c0.cy)
+    expect(c1.w).toBeCloseTo(c0.w)
+    expect(camaraPellizco(c0, 10, [0, 0], 1000, [0, 0], 343, 340, lim).w).toBe(50)
+  })
+})
+
+describe('LED «60V DC» de cada bloque SM (hoja 23)', () => {
+  it('cada SMk tiene su LED 60V DC y la franja nombra los dos LED con «y»', () => {
+    for (let k = 1; k <= 6; k++) expect(item(`e:SM${k}`).ledsEstado.map(l => l.id)).toEqual([`V60_${k}`, `STEP${k}`])
+    expect(lineaLed(item('e:SM2')).grande).toBe('LED 60V DC SM2 y Step SM2')
+  })
+
+  it('cada LED 60V DC queda junto a su rótulo «60V DC» y en el bloque de su SM (mismo lado, rótulo SM más cercano)', () => {
+    const textos = datos.textos.hoja23
+    const rotulos = textos.filter(t => t.original === '60V DC')
+    expect(rotulos).toHaveLength(6)
+    const sms = textos.filter(t => /^SM\d \S/.test(t.original))
+    for (let k = 1; k <= 6; k++) {
+      const l = datos.ledsEstado.find(e => e.id === `V60_${k}`)!
+      expect(l.elemento).toBe(`SM${k}`)
+      // A la izquierda el rótulo va bajo el LED; a la derecha, sobre el conector de 2 bornes.
+      expect(Math.min(...rotulos.map(t => Math.hypot(t.x - l.led.x, t.y - l.led.y)))).toBeLessThan(60)
+      const lado = sms.filter(t => (t.x < 400) === (l.led.x < 400))
+      const cerca = lado.sort((a, b) => Math.abs(a.y - l.led.y) - Math.abs(b.y - l.led.y))[0]!
+      expect(cerca.original.startsWith(`SM${k} `)).toBe(true)
+    }
   })
 })

@@ -270,7 +270,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       enPlano: original,
       modulo: null,
       fuentes: [],
-      nota: null,
+      nota: b.nota ?? null,
       tipoSensor: null,
       preguntaTerreno: null,
     }
@@ -311,6 +311,8 @@ export interface LineaLed {
   color: ColorLed | null
   /** Hay algo que encender en la tarjeta (habilita «Ver»). */
   encendible: boolean
+  /** Qué nombra «Ver» cuando no es un LED (p. ej. «el borne 136»); si falta, `grande`. */
+  nombreVer?: string
 }
 
 function rango(ns: number[]): string {
@@ -327,7 +329,7 @@ export function lineaLed(item: ItemA3c): LineaLed {
   if (!item.leds.length && l0) {
     const ls = item.ledsEstado
     const ln = ls[ls.length - 1] ?? l0
-    const grande = ls.length > 1 ? `LED ${l0.etiqueta} a ${ln.etiqueta}` : `LED ${l0.etiqueta}`
+    const grande = ls.length > 2 ? `LED ${l0.etiqueta} a ${ln.etiqueta}` : ls.length === 2 ? `LED ${l0.etiqueta} y ${ln.etiqueta}` : `LED ${l0.etiqueta}`
     return { grande, texto: 'LED de estado de la tarjeta, sin borne X5', color: 'r', encendible: true }
   }
   if (!item.bornes.length) {
@@ -548,6 +550,27 @@ export function zoomCamara(c: Camara, f: number, lim: LimitesCamara, ux?: number
   if (ux == null || uy == null) return limitarCamara({ ...c, w }, lim)
   const k = w / c.w
   return limitarCamara({ w, cx: ux + (c.cx - ux) * k, cy: uy + (c.cy - uy) * k }, lim)
+}
+
+/**
+ * Cámara durante un pellizco: el ancho sigue a la distancia entre los dedos y el punto del
+ * dibujo que estaba bajo su punto medio al empezar queda bajo el punto medio actual (el zoom
+ * se ancla entre los dedos, como la rueda bajo el puntero). `m0`/`m1` en px del lienzo.
+ */
+export function camaraPellizco(
+  c0: Camara,
+  d0: number,
+  m0: [number, number],
+  d1: number,
+  m1: [number, number],
+  vw: number,
+  vh: number,
+  lim: LimitesCamara,
+): Camara {
+  const w = Math.max(lim.minW, Math.min(lim.maxW, (c0.w * d0) / Math.max(d1, 1)))
+  const [ux, uy] = pantallaAUnidades(c0, vw, vh, m0[0], m0[1])
+  const s = vw / w
+  return { w, cx: ux + w / 2 - m1[0] / s, cy: uy + vh / s / 2 - m1[1] / s }
 }
 
 // ─── Toque / clic en el dibujo ────────────────────────────────────────────

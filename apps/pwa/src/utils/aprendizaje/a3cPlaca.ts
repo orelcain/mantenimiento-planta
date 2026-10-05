@@ -11,14 +11,18 @@
  * los dibuja todos apagados y enciende únicamente el del elemento elegido.
  */
 import type { PresetV5, Rect, ViewBox } from '@/data/baader142A3c'
-import { claveDeBorne, colorLed, type ColorLed, type ItemA3c, type LimitesCamara, type ModeloA3c, type Objetivo, type PuntoLed } from './a3c'
+import { claveDeBorne, colorLed, type ColorLed, type ItemA3c, type LimitesCamara, type LineaLed, type ModeloA3c, type Objetivo, type PuntoLed } from './a3c'
 
 export interface LedPlaca { x: number; y: number; r: number; color: ColorLed }
+/** LED de estado de la placa (`led-estado-k`) ya asociado a un LED de estado del plano. */
+export interface LedEstadoPlaca extends LedPlaca { svgId: string }
 export interface RegletaPlaca { desde: number; hasta: number; r: Rect }
 export interface GeoPlaca {
   viewBox: ViewBox
   bornes: Map<number, Rect>
   leds: Map<number, LedPlaca>
+  /** Por id del LED de estado del plano (`data-led-plano`, p. ej. «V60_1»). */
+  ledsEstado: Map<string, LedEstadoPlaca>
   regletas: RegletaPlaca[]
 }
 
@@ -116,7 +120,17 @@ export function geometriaPlaca(svg: string): GeoPlaca {
     viewBox: vb.length === 4 && vb.every(Number.isFinite) ? (vb as ViewBox) : [0, 0, 1000, 1000],
     bornes: new Map(),
     leds: new Map(),
+    ledsEstado: new Map(),
     regletas: [],
+  }
+  /** Centro y radio (coordenadas raíz) del círculo de un LED. */
+  const circuloDe = (el: Element, m: Matriz) => {
+    const c = el.querySelector('circle')
+    if (!c) return null
+    // El círculo puede tener su propio transform (hoy no lo tiene).
+    const mc = multiplicar(m, leerTransform(c.getAttribute('transform')))
+    const [x, y] = aplicar(mc, num(c, 'cx'), num(c, 'cy'))
+    return { x, y, r: num(c, 'r') * Math.sqrt(Math.abs(mc[0] * mc[3] - mc[1] * mc[2])) }
   }
   const visitar = (el: Element, m0: Matriz) => {
     const m = multiplicar(m0, leerTransform(el.getAttribute('transform')))
@@ -126,15 +140,17 @@ export function geometriaPlaca(svg: string): GeoPlaca {
       const c = cajaDe(el, m)
       if (c) geo.bornes.set(Number(k[1]), c)
     } else if ((k = /^led-X5-(\d+)$/.exec(id))) {
-      const c = el.querySelector('circle')
+      // Solo lo cierto: un LED cuya asociación al borne es dudosa no se enciende como si fuera suyo.
+      const c = el.getAttribute('data-asociacion') === 'ambigua' ? null : circuloDe(el, m)
       if (c) {
-        // El círculo puede tener su propio transform (hoy no lo tiene).
-        const mc = multiplicar(m, leerTransform(c.getAttribute('transform')))
-        const [x, y] = aplicar(mc, num(c, 'cx'), num(c, 'cy'))
-        const r = num(c, 'r') * Math.sqrt(Math.abs(mc[0] * mc[3] - mc[1] * mc[2]))
         const color: ColorLed = (el.getAttribute('data-estado') ?? '').startsWith('verde') ? 'g' : 'r'
-        geo.leds.set(Number(k[1]), { x, y, r, color })
+        geo.leds.set(Number(k[1]), { ...c, color })
       }
+    } else if (/^led-estado-\d+$/.test(id)) {
+      // Solo los que ya tienen su LED del plano asignado (`data-led-plano`).
+      const plano = el.getAttribute('data-led-plano')
+      const c = plano ? circuloDe(el, m) : null
+      if (plano && c) geo.ledsEstado.set(plano, { ...c, color: 'r', svgId: id })
     } else if ((k = /^regleta-X5-(\d+)-(\d+)$/.exec(id))) {
       // El cuerpo es el primer <rect> (en las regletas izquierdas va dentro de un <g> extra).
       const cuerpo = el.querySelector('rect')
@@ -196,10 +212,11 @@ export function limitesPlaca(geo: GeoPlaca): LimitesCamara {
 /** Bornes y LED tocables: los dos llevan al mismo elemento (mismo mapeo que el plano). */
 export function objetivosPlaca(m: ModeloA3c, geo: GeoPlaca): Objetivo[] {
   const out: Objetivo[] = []
+  const caja = (l: LedPlaca): Rect => ({ x: l.x - l.r, y: l.y - l.r, w: 2 * l.r, h: 2 * l.r })
   for (const [n, r] of geo.bornes) if (m.bornes.has(n)) out.push({ clave: claveDeBorne(m, n), n, r })
-  for (const [n, l] of geo.leds) {
-    if (m.bornes.has(n)) out.push({ clave: claveDeBorne(m, n), n, r: { x: l.x - l.r, y: l.y - l.r, w: 2 * l.r, h: 2 * l.r } })
-  }
+  for (const [n, l] of geo.leds) if (m.bornes.has(n)) out.push({ clave: claveDeBorne(m, n), n, r: caja(l) })
+  // LED de estado: llevan a su LED del plano (como tocar ese LED en la hoja 23).
+  for (const [id, l] of geo.ledsEstado) if (m.ledsEstado.has(id)) out.push({ clave: `l:${id}`, r: caja(l) })
   return out
 }
 
@@ -209,15 +226,44 @@ export function altoBornePlaca(geo: GeoPlaca): number {
   return hs[Math.floor(hs.length / 2)] ?? 10
 }
 
-/** Los LED de la placa que se encienden para un ítem: los de sus bornes con LED en el plano. */
-export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): (PuntoLed & { n: number; r: number })[] {
-  const out: (PuntoLed & { n: number; r: number })[] = []
+export type LedEncendidoPlaca = PuntoLed & { r: number; /** Grupo del LED en el SVG de la placa. */ svgId: string; n?: number }
+
+/**
+ * Los LED de la placa que se encienden para un ítem: los de sus bornes con LED en el plano y
+ * sus LED de estado que la placa tiene asignados (`data-led-plano`).
+ */
+export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
+  const out: LedEncendidoPlaca[] = []
   for (const n of item.leds) {
     const l = geo.leds.get(n)
     // Mismo color que en el plano (tabla de la foto en `colorLed`): una sola fuente.
-    if (l) out.push({ k: `${item.clave}:${n}`, n, x: l.x, y: l.y, r: l.r, color: colorLed(n) })
+    if (l) out.push({ k: `${item.clave}:${n}`, n, svgId: `led-X5-${n}`, x: l.x, y: l.y, r: l.r, color: colorLed(n) })
+  }
+  for (const e of item.ledsEstado) {
+    const l = geo.ledsEstado.get(e.id)
+    // Rojo, como el mismo LED de estado en el plano (`puntosLed`).
+    if (l) out.push({ k: `${item.clave}:${e.id}`, svgId: l.svgId, x: l.x, y: l.y, r: l.r, color: 'r' })
   }
   return out
+}
+
+/**
+ * La franja «qué LED prende» vista desde la placa. El plano manda (mismo número de LED), pero
+ * si en la placa no hay nada que mostrar se dice, y «Ver» lleva al plano en vez de no hacer nada.
+ */
+export function lineaEnPlaca(linea: LineaLed, geo: GeoPlaca, item: ItemA3c): LineaLed & { soloPlano: boolean } {
+  const foco = focoPlaca(geo, item)
+  if (!linea.encendible) {
+    // Un borne sin LED que la placa no dibuja (136–145): igual se puede ver dónde está en el plano.
+    if (item.bornes.length && !foco) {
+      const nombreVer = `el borne ${item.bornes.join(', ')}`
+      return { ...linea, texto: 'Sin LED en el plano · No está dibujado en la placa', encendible: true, nombreVer, soloPlano: true }
+    }
+    return { ...linea, soloPlano: false }
+  }
+  if (ledsPlaca(geo, item).length) return { ...linea, soloPlano: false }
+  if (!foco) return { ...linea, texto: 'No está dibujado en la placa', soloPlano: true }
+  return { ...linea, texto: `${linea.texto} · Sin LED identificado en la placa`, soloPlano: false }
 }
 
 /** Punto al que ir en la placa: el primer LED encendible o, si no hay, el centro del primer borne. */
