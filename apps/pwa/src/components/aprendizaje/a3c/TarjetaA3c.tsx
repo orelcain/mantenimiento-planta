@@ -309,6 +309,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     setHoja(h)
   }
 
+  const enfocarAlCargar = useRef(false)
   /** Plano | Placa: solo cambia el dibujo de la tarjeta; la selección es la misma. */
   const cambiarVista = (v: VistaTarjeta) => {
     if (v === vista) return
@@ -316,10 +317,17 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     guardarVistaTarjeta(v)
     // Al volver al plano (o si la placa ya está cargada) el nuevo lienzo se lleva a lo elegido;
     // si la placa aún no llega, arranca en la zona del borne elegido (`inicio`).
-    if (ultimoOrigen.current !== null && (v === 'plano' || placa)) {
-      pendiente.current = () => (v === 'placa' ? enfocarPlaca(sel, null) : enfocar(sel, '22'))
-    }
+    if (ultimoOrigen.current === null) return
+    if (v === 'plano' || placa) pendiente.current = () => (v === 'placa' ? enfocarPlaca(sel, null) : enfocar(sel, '22'))
+    else enfocarAlCargar.current = true
   }
+  // Primera vez en «Placa» con algo ya elegido: al llegar el dibujo (su lienzo se monta en el
+  // mismo commit) se encuadra lo elegido, no el atajo inicial.
+  useEffect(() => {
+    if (!placa || !enfocarAlCargar.current) return
+    enfocarAlCargar.current = false
+    enfocarPlaca(sel, null)
+  }, [placa, sel, enfocarPlaca])
 
   // ─── Toques y hover en los dibujos ───
   const toque23 = (u: [number, number]) => {
@@ -397,8 +405,9 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     const primero = el.cerca[0]
     if (!primero) return
     // Táctil: si en el dedo caben dos bornes, acerca hasta que cada borne mida ~44 px.
-    if (grueso && el.distintos > 1 && altoP * ppu < 30) {
-      c.enfocar(u[0], u[1], (c.anchoPx() * altoP) / 44)
+    const alto = (primero.o.n != null && placa?.geo.bornes.get(primero.o.n)?.h) || altoP
+    if (grueso && el.distintos > 1 && alto * ppu < 30) {
+      c.enfocar(u[0], u[1], (c.anchoPx() * alto) / 44)
       return
     }
     if (primero.o.n != null) elegirBorne(primero.o.n, 'placa')
@@ -558,7 +567,8 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       value={vista}
       onChange={cambiarVista}
       segments={[{ value: 'plano', label: 'Plano' }, { value: 'placa', label: 'Placa' }]}
-      className={clase}
+      // 44 px en px, no en rem: en PC la raíz es de 14 px y `h-11` quedaría en 38,5 px.
+      className={cn('h-[44px] [&>button]:h-[44px]', clase)}
     />
   )
 
@@ -620,9 +630,10 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
         value={hoja}
         onChange={cambiarHoja}
         segments={[{ value: '22', label: 'Máquina' }, { value: '23', label: 'Tarjeta' }]}
-        className="pointer-events-auto w-[190px] flex-none"
+        className="pointer-events-auto min-w-0 max-w-[190px] flex-[1_1_190px]"
       />
-      {hoja === '23' && selectorVista('pointer-events-auto w-[132px] flex-none')}
+      {/* En teléfonos angostos (≤ 360 px) los dos se encogen en vez de recortarse. */}
+      {hoja === '23' && selectorVista('pointer-events-auto min-w-0 max-w-[132px] flex-[0_1_132px]')}
     </div>
   )
 
