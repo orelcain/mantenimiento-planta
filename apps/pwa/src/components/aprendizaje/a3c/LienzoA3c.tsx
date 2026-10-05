@@ -51,6 +51,8 @@ export interface LienzoA3cProps {
   onHover?: (u: [number, number] | null, ev?: { x: number; y: number }) => void
   /** Avisa qué atajo está activo (null = la cámara se movió a mano). */
   onPresetActivo?: (k: string | null) => void
+  /** Área del dibujo dentro del contenedor (PC: deja libre la franja de atajos de abajo). */
+  area?: string
   children?: ReactNode
 }
 
@@ -84,7 +86,7 @@ const ANCHO_DEF = 343
 const ALTO_DEF = 340
 
 export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function LienzoA3c(
-  { hoja, dibujo, textos, idioma, soloNumeros, presets, inicio, limites, etiqueta, onToque, onHover, onPresetActivo, children },
+  { hoja, dibujo, textos, idioma, soloNumeros, presets, inicio, limites, etiqueta, onToque, onHover, onPresetActivo, area = 'inset-0', children },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -311,7 +313,7 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
   }, [])
 
   return (
-    <div ref={hostRef} className="absolute inset-0">
+    <div ref={hostRef} className={`absolute ${area}`}>
       <svg
         ref={svgRef}
         className="a3c-lienzo"

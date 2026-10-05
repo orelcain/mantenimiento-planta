@@ -4,12 +4,13 @@
  * Teléfono (una mano): lienzo Máquina | Tarjeta con pellizco, arrastre, atajos y + / − de
  * 44 px; debajo, «qué LED prende» siempre visible, la regleta X5 recorrible y la ficha en
  * una hoja inferior con buscador. Un toque ambiguo acerca en vez de adivinar.
- * PC: tarjeta completa (vertical, como en la placa) + plano de ubicación + ficha a la vez;
- * el mouse muestra la señal y un clic en un dibujo mueve el otro.
+ * PC: tarjeta completa (vertical, como en la placa) + plano de ubicación + ficha a la vez,
+ * a todo el ancho y alto útil de la ventana (ver `distribuirPc`); el mouse muestra la señal y
+ * un clic en un dibujo mueve el otro.
  *
  * Recibe el paquete ya cargado (la página lo pide); así se prueba sin red.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ChevronLeft, Minus, Plus, Search } from 'lucide-react'
 import { Button, ListCell, ListGroup, SegmentedControl, Sheet } from '@/components/piel'
 import { cargarPlacaA3c, type Hoja, type PaqueteA3c, type PaquetePlaca, type Texto } from '@/data/baader142A3c'
@@ -47,6 +48,15 @@ import {
   type LimitesCamara,
 } from '@/utils/aprendizaje/a3c'
 import { LienzoA3c, type LienzoA3cHandle } from './LienzoA3c'
+import {
+  ALTO_DIVISOR,
+  ALTO_MIN_PC,
+  ANCHO_REGLETA_PC,
+  MARGEN_INF_PC,
+  SOLAPE_DIVISOR,
+  UBICACION_MIN,
+  distribuirPc,
+} from './distribucionPc'
 import { FranjaLed } from './FranjaLed'
 import { RegletaX5 } from './RegletaX5'
 import { FichaA3c, ListaA3c } from './FichaA3c'
@@ -61,6 +71,36 @@ const FUENTE_PLACA = 'Placa de la N2 (Línea 2), dibujada desde foto; mismo plan
 const ALTO_44 = 'h-[44px] [&>button]:h-[44px]'
 /** La placa no lleva textos de la app: sus rótulos vienen dibujados en el SVG. */
 const SIN_TEXTOS: Texto[] = []
+
+const CLAVE_DIVISION = 'a3c-pc-ubicacion'
+
+/**
+ * Distancia del borde superior de `el` al tope de la página SIN scroll: su posición en pantalla
+ * más todo lo desplazado por la ventana y por sus contenedores. No depende del alto de ningún
+ * contenedor (un `main` de alto automático mediría el propio contenido y realimentaría la medida).
+ */
+function topeSinScroll(el: HTMLElement): number {
+  let top = el.getBoundingClientRect().top + window.scrollY
+  for (let p = el.parentElement; p; p = p.parentElement) top += p.scrollTop
+  return top
+}
+
+/** Fracción del alto útil que la persona dejó para el plano de ubicación (null = por defecto). */
+function leerDivision(): number | null {
+  try {
+    const v = Number(localStorage.getItem(CLAVE_DIVISION))
+    return v > 0 && v < 1 ? v : null
+  } catch {
+    return null
+  }
+}
+function guardarDivision(f: number) {
+  try {
+    localStorage.setItem(CLAVE_DIVISION, f.toFixed(3))
+  } catch {
+    /* sin almacenamiento: vale para esta sesión */
+  }
+}
 
 type Modo = 'explorar' | 'practicar'
 /** Lo que se dibuja en un lienzo: una hoja del plano o la placa. */
@@ -127,6 +167,41 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   const grueso = !pc || (tactil ?? punteroGrueso)
 
   const [modo, setModo] = useState<Modo>('explorar')
+
+  // PC: alto útil MEDIDO (alto de la ventana menos lo que hay sobre la grilla) y ancho real.
+  const grillaRef = useRef<HTMLDivElement>(null)
+  const [area, setArea] = useState<{ ancho: number; alto: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = grillaRef.current
+    if (!pc || modo !== 'explorar' || !el) return
+    const medir = () => {
+      const alto = Math.round(window.innerHeight - topeSinScroll(el) - MARGEN_INF_PC)
+      const nuevo = { ancho: Math.round(el.clientWidth), alto: Math.max(ALTO_MIN_PC, alto) }
+      setArea(a => (a && a.ancho === nuevo.ancho && a.alto === nuevo.alto ? a : nuevo))
+    }
+    medir()
+    window.addEventListener('resize', medir)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medir) : null
+    ro?.observe(el)
+    return () => {
+      window.removeEventListener('resize', medir)
+      ro?.disconnect()
+    }
+  }, [pc, modo])
+  const dist = area && area.ancho > 0 ? distribuirPc(area.ancho, area.alto) : null
+  // División plano de ubicación | ficha, ajustable y recordada como fracción del alto útil.
+  const [division, setDivision] = useState<number | null>(leerDivision)
+  const altoUbic = dist && area
+    ? Math.round(Math.min(dist.maxUbicacion, Math.max(UBICACION_MIN, division != null ? division * area.alto : dist.altoUbicacion)))
+    : 340
+  const fijarUbicacion = (px: number) => {
+    if (!area || !dist) return
+    const v = Math.min(dist.maxUbicacion, Math.max(UBICACION_MIN, px))
+    const f = v / area.alto
+    setDivision(f)
+    guardarDivision(f)
+  }
+  const arrastreDivisor = useRef<{ id: number; y: number; alto: number } | null>(null)
   const [idioma, setIdiomaEstado] = useState<Idioma>(leerIdioma)
   const setIdioma = (i: Idioma) => {
     setIdiomaEstado(i)
@@ -268,8 +343,10 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     const rc = cont.getBoundingClientRect()
     const rt = celda.getBoundingClientRect()
     const suave = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    cont.scrollTo({ left: cont.scrollLeft + rt.left - rc.left - rc.width / 2 + rt.width / 2, behavior: suave ? 'smooth' : 'auto' })
-  }, [nRegleta, modo, grueso])
+    // PC: columna vertical; teléfono: tira horizontal.
+    if (pc) cont.scrollTo({ top: cont.scrollTop + rt.top - rc.top - rc.height / 2 + rt.height / 2, behavior: suave ? 'smooth' : 'auto' })
+    else cont.scrollTo({ left: cont.scrollLeft + rt.left - rc.left - rc.width / 2 + rt.width / 2, behavior: suave ? 'smooth' : 'auto' })
+  }, [nRegleta, modo, grueso, pc])
 
   // Acciones pendientes tras cambiar de lienzo en el teléfono (el nuevo se monta primero).
   useEffect(() => {
@@ -669,6 +746,9 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       </>
     )
 
+  // PC: el dibujo termina sobre la franja de atajos (no queda tapado por ella) y «Todo» se ve entero.
+  const areaPc = pc ? (grueso ? 'inset-x-0 top-0 bottom-[56px]' : 'inset-x-0 top-0 bottom-[42px]') : undefined
+
   const lienzoPlaca = (clase: string) => {
     const nInicio = selN ?? item.bornes[0]
     return (
@@ -688,6 +768,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
             onToque={toquePlaca}
             onHover={pc ? hoverPlaca : undefined}
             onPresetActivo={setPresetP}
+            area={areaPc}
           >
             {capaPlaca}
           </LienzoA3c>
@@ -713,11 +794,11 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     )
   }
 
-  const lienzo = (h: Hoja, clase: string) => {
+  const lienzo = (h: Hoja, clase: string, estilo?: CSSProperties) => {
     if (h === '23' && verPlaca) return lienzoPlaca(clase)
     const es22 = h === '22'
     return (
-      <div className={cn('relative overflow-hidden rounded-card bg-card', clase)} data-lienzo={h}>
+      <div className={cn('relative overflow-hidden rounded-card bg-card', clase)} style={estilo} data-lienzo={h}>
         <LienzoA3c
           key={`${h}-${pc ? 'pc' : 'tel'}`}
           ref={es22 ? v22 : v23}
@@ -732,6 +813,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
           onToque={es22 ? toque22 : toque23}
           onHover={pc ? (es22 ? hover22 : hover23) : undefined}
           onPresetActivo={es22 ? setPreset22 : setPreset23}
+          area={areaPc}
         >
           {es22 ? capa22 : capa23}
         </LienzoA3c>
@@ -754,6 +836,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       encendidos={encendidos}
       idioma={idioma}
       compacta={!grueso}
+      vertical={pc}
       onElegir={alElegirRegleta}
     />
   )
@@ -800,12 +883,78 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     </label>
   )
 
+  // Divisor plano de ubicación | ficha (PC): arrastre, flechas (Mayús = paso largo), Inicio/Fin;
+  // doble clic vuelve al reparto por defecto. Objetivo de 44 px; su mitad baja pisa el relleno de la ficha.
+  /** Termina el arrastre del puntero que lo empezó (otro dedo no lo corta ni lo mueve). */
+  const soltarDivisor = (e: React.PointerEvent) => {
+    if (arrastreDivisor.current?.id === e.pointerId) arrastreDivisor.current = null
+  }
+  const divisor = dist && area && (
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Tamaño del plano de ubicación y de la ficha"
+      aria-valuemin={UBICACION_MIN}
+      aria-valuemax={dist.maxUbicacion}
+      aria-valuenow={altoUbic}
+      aria-valuetext={`Plano de ubicación de ${altoUbic} px de alto`}
+      tabIndex={0}
+      data-testid="divisor-pc"
+      className="group relative z-[3] flex flex-none cursor-row-resize touch-none items-center justify-center focus-visible:outline-none"
+      style={{ height: ALTO_DIVISOR, marginBottom: -SOLAPE_DIVISOR }}
+      onPointerDown={e => {
+        if ((e.pointerType === 'mouse' && e.button !== 0) || arrastreDivisor.current) return
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId)
+        } catch {
+          // Sin captura, soltar fuera del divisor no avisaría: no se arrastra.
+          return
+        }
+        arrastreDivisor.current = { id: e.pointerId, y: e.clientY, alto: altoUbic }
+      }}
+      onPointerMove={e => {
+        const a = arrastreDivisor.current
+        if (a && a.id === e.pointerId) fijarUbicacion(a.alto + e.clientY - a.y)
+      }}
+      onPointerUp={soltarDivisor}
+      onPointerCancel={soltarDivisor}
+      onLostPointerCapture={soltarDivisor}
+      onDoubleClick={() => {
+        setDivision(null)
+        try {
+          localStorage.removeItem(CLAVE_DIVISION)
+        } catch {
+          /* sin almacenamiento */
+        }
+      }}
+      onKeyDown={e => {
+        const paso = e.shiftKey ? 80 : 24
+        const v =
+          e.key === 'ArrowUp' ? altoUbic - paso
+          : e.key === 'ArrowDown' ? altoUbic + paso
+          : e.key === 'Home' ? UBICACION_MIN
+          : e.key === 'End' ? dist.maxUbicacion
+          : null
+        if (v == null) return
+        e.preventDefault()
+        fijarUbicacion(v)
+      }}
+    >
+      <span
+        aria-hidden
+        className="h-[5px] w-10 rounded-full bg-muted-foreground/40 group-hover:bg-muted-foreground/70 group-focus-visible:bg-primary"
+        style={{ marginBottom: SOLAPE_DIVISOR }}
+      />
+    </div>
+  )
+
   if (pc) {
     return (
-      <div ref={raizRef} className="min-h-full w-full bg-background pb-10 text-foreground">
-        <div className="mx-auto w-full max-w-[1400px] px-5">
+      <div ref={raizRef} className="min-h-full w-full bg-background pb-4 text-foreground">
+        {/* Sin `max-width`: la herramienta usa todo el ancho útil de la ventana (HIG, layout). */}
+        <div className="w-full px-5">
           <div className="flex h-[52px] items-center">{volver}</div>
-          <header className="flex flex-wrap items-end justify-between gap-4 pb-4">
+          <header className="flex flex-wrap items-end justify-between gap-4 pb-3">
             <div className="min-w-0">
               <h1 className="text-title1 font-bold">Tarjeta A3C · BAADER 142</h1>
               <p className="mt-0.5 font-mono text-caption text-muted-foreground">{FUENTE}</p>
@@ -826,20 +975,33 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
             </div>
           </header>
           {modo === 'practicar' ? quiz : (
-            <div className="grid h-[max(640px,calc(100dvh-190px))] grid-cols-[minmax(0,520px)_minmax(0,1fr)] gap-5">
-              <div className="flex min-h-0 flex-col">
-                <div className="flex items-center gap-3 pb-2">
+            <div
+              ref={grillaRef}
+              data-testid="grilla-pc"
+              className="grid h-[max(560px,calc(100dvh-180px))] grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5"
+              style={dist && area ? { height: area.alto, gridTemplateColumns: `${dist.anchoTarjeta}px minmax(0,1fr)` } : undefined}
+            >
+              {/* Izquierda: la tarjeta, protagonista (≥ 50 % del ancho, todo el alto), con la regleta X5
+                  como índice vertical: los 144 bornes legibles y elegibles con teclado, sin tira horizontal. */}
+              <div className="flex min-h-0 min-w-0 flex-col">
+                <div className="flex min-h-[52px] items-center gap-3 pb-2">
                   {selectorVista('w-[200px] flex-none')}
                   {verPlaca && <p className="min-w-0 text-caption leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
                 </div>
-                {lienzo('23', 'min-h-0 flex-1')}
-                {regleta}
+                <div className="grid min-h-0 flex-1 gap-2" style={{ gridTemplateColumns: `${ANCHO_REGLETA_PC}px minmax(0,1fr)` }}>
+                  <div className="min-h-0">{regleta}</div>
+                  {lienzo('23', 'h-full min-h-0')}
+                </div>
               </div>
-              <div className="flex min-h-0 flex-col gap-3">
-                {lienzo('22', 'h-[300px] flex-none')}
+              {/* Derecha: plano de ubicación grande arriba; ficha compacta abajo; divisor ajustable. */}
+              <div className="flex min-h-0 min-w-0 flex-col">
+                {lienzo('22', 'flex-none', { height: altoUbic })}
+                {divisor}
                 <div className="min-h-0 flex-1 overflow-y-auto rounded-card bg-card p-4">
                   <FranjaLed linea={lineaVista} onVer={verLed} destino={lineaVista.soloPlano ? 'plano' : 'tarjeta'} className="bg-background" />
-                  <div className="mt-4"><FichaA3c item={item} idioma={idioma} /></div>
+                  <div className={cn('mt-3', dist?.fichaAncha && 'columns-2 gap-8 [&_dl]:break-inside-avoid [&_section]:break-inside-avoid')}>
+                    <FichaA3c item={item} idioma={idioma} compacta />
+                  </div>
                 </div>
               </div>
             </div>

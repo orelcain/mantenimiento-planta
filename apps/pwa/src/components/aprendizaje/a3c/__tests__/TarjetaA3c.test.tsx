@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { interiorSvg, type A3CDatos, type PaqueteA3c } from '@/data/baader142A3c'
 import { camaraDePreset, limitarCamara, matrizCamara } from '@/utils/aprendizaje/a3c'
 import { TarjetaA3c } from '../TarjetaA3c'
+import { ALTO_DIVISOR, FICHA_MIN, SOLAPE_DIVISOR, UBICACION_MIN, distribuirPc } from '../distribucionPc'
 
 // Paquete real (el mismo que sirve la app desde public/), sin red.
 const assets = resolve(__dirname, '../../../../../public/learning-assets/baader-142/a3c')
@@ -154,13 +155,60 @@ describe('Tarjeta A3C', () => {
     montar(true, true)
     expect(screen.getAllByRole('button', { name: 'Acercar' })[0]!.className).toContain('size-[44px]')
     expect(within(screen.getAllByRole('group', { name: 'Atajos de zoom' })[0]!).getAllByRole('button')[0]!.className).toContain('h-[44px]')
-    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('w-[44px]')
+    // En PC la regleta es una columna vertical: filas de 44 px con puntero táctil.
+    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('h-[44px]')
   })
 
   it('PC con mouse conserva los controles compactos', () => {
     montar(true, false)
     expect(screen.getAllByRole('button', { name: 'Acercar' })[0]!.className).toContain('size-[32px]')
-    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('w-[30px]')
+    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('h-[30px]')
+  })
+
+  it('la regleta X5 es vertical en PC y horizontal en el teléfono', () => {
+    montar(true, false)
+    expect(screen.getByRole('group', { name: /Regleta X5/ }).getAttribute('data-orientacion')).toBe('vertical')
+    cleanup()
+    montar(false)
+    expect(screen.getByRole('group', { name: /Regleta X5/ }).getAttribute('data-orientacion')).toBe('horizontal')
+  })
+
+  it('reparto de PC: la tarjeta ocupa al menos la mitad del ancho y el plano de ubicación es grande', () => {
+    for (const [ancho, alto] of [[1000, 640], [1180, 740], [1660, 930], [2300, 1300]] as const) {
+      const d = distribuirPc(ancho, alto)
+      expect(d.anchoTarjeta).toBeGreaterThanOrEqual(ancho * 0.5 - 1)
+      expect(d.anchoTarjeta).toBeLessThanOrEqual(ancho * 0.62 + 1)
+      expect(d.altoUbicacion).toBeGreaterThanOrEqual(Math.max(UBICACION_MIN, Math.min(alto * 0.58, d.maxUbicacion)) - 1)
+      expect(alto - d.maxUbicacion - (ALTO_DIVISOR - SOLAPE_DIVISOR)).toBeGreaterThanOrEqual(FICHA_MIN)
+    }
+  })
+
+  it('PC medido: grilla al alto de la ventana y divisor con teclado que se recuerda', () => {
+    const d = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.dataset.testid === 'grilla-pc' ? 1400 : 0
+      },
+    })
+    try {
+      montar(true, false)
+      const grilla = screen.getByTestId('grilla-pc')
+      const alto = Math.max(560, window.innerHeight - 16)
+      expect(grilla.style.height).toBe(`${alto}px`)
+      expect(grilla.style.gridTemplateColumns).toBe(`${distribuirPc(1400, alto).anchoTarjeta}px minmax(0,1fr)`)
+      const sep = screen.getByRole('separator', { name: /plano de ubicación y de la ficha/ })
+      const antes = Number(sep.getAttribute('aria-valuenow'))
+      fireEvent.keyDown(sep, { key: 'ArrowUp' })
+      expect(Number(sep.getAttribute('aria-valuenow'))).toBe(antes - 24)
+      expect(Number(localStorage.getItem('a3c-pc-ubicacion'))).toBeCloseTo((antes - 24) / alto, 2)
+      fireEvent.keyDown(sep, { key: 'Home' })
+      expect(Number(sep.getAttribute('aria-valuenow'))).toBe(UBICACION_MIN)
+      fireEvent.keyDown(sep, { key: 'End' })
+      expect(Number(sep.getAttribute('aria-valuenow'))).toBe(distribuirPc(1400, alto).maxUbicacion)
+    } finally {
+      if (d) Object.defineProperty(HTMLElement.prototype, 'clientWidth', d)
+    }
   })
 
   it('alternar ES/Original no mueve la regleta', () => {
