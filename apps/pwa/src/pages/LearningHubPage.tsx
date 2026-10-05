@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Cpu, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X,
-  Lock, Activity, Waypoints, MoreHorizontal,
+  Lock, Activity, Waypoints, MoreHorizontal, CircuitBoard,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -76,6 +76,12 @@ const SPECIAL_MODULES: SpecialModule[] = [
     description: 'Las 10 posiciones del selector 5, el protocolo del Upgrade Kit y los 46 códigos E con solución paso a paso. Con registro de lecturas y tendencia por herramienta.',
     icon: Activity, href: '/aprendizaje/perilla-5',
     stats: '14 secciones · 46 códigos · 46 figuras anotables',
+  },
+  {
+    id: 'tarjeta-a3c', title: 'Tarjeta A3C · Baader 142', subtitle: 'Qué LED prende y qué hace cada señal',
+    description: 'El plano 888 de la tarjeta y la máquina, interactivo: toca un sensor, borne o LED y ve qué LED prende, dónde está y qué hace. En español o con los textos originales, con práctica.',
+    icon: CircuitBoard, href: '/aprendizaje/baader-142/tarjeta-a3c',
+    stats: '144 bornes · 111 LED · práctica',
   },
   {
     id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',
