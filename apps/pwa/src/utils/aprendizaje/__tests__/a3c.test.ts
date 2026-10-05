@@ -6,7 +6,7 @@ import {
   buscar, camaraDePreset, camaraPellizco, centroRect, deltaRuedaPx, objetivosHoja22, resolverToqueAmbiguo, claveDeBorne, codigoCorto, colorLed, construirModelo,
   describir, elegirEn, guardarIdioma, guardarRacha, leerIdioma, leerRacha,
   limitarCamara, lineaLed, lineasDeTexto, matrizCamara, nuevoQuiz, objetivosHoja23,
-  pantallaAUnidades, puntosLed, recorteRegleta, regletaDe, reiniciar, responder,
+  pantallaAUnidades, puntosGrupo, puntosLed, recorteRegleta, regletaDe, reiniciar, responder,
   siguiente, SIN_DESCRIPCION, tipoRespaldado, zoomCamara, type LimitesCamara,
 } from '../a3c'
 
@@ -27,6 +27,25 @@ describe('selección y descripción con datos reales', () => {
     const b4 = item('e:B4')
     expect(b4).toMatchObject({ tipo: 'sensor', bornes: [45], leds: [45] })
     expect(lineaLed(b4)).toMatchObject({ grande: 'LED 45', color: 'r', encendible: true })
+  })
+
+  it('B13: los 10 LED son un grupo de bits, no se encienden; B1 sí se enciende', () => {
+    const b13 = item('e:B13')
+    expect(b13.grupoBits).toBe(true)
+    expect(puntosLed(m, b13)).toEqual([])
+    expect(puntosGrupo(m, b13)).toHaveLength(10)
+    const l = lineaLed(b13)
+    expect(l).toMatchObject({ grande: 'LED 32–41', color: null, grupo: true, encendible: true })
+    expect(l.texto).toContain('32, 35 y 37 a 40')
+    expect(l.texto).toContain('En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40')
+    expect(b13.cuandoLed).toContain('32, 35 y 37 a 40')
+    expect(b13.cuandoLed).not.toMatch(/se enciende cuando/i)
+    expect(item('e:B1').grupoBits).toBe(false)
+    expect(puntosGrupo(m, item('e:B1'))).toEqual([])
+    expect(puntosLed(m, item('e:B1'))).toHaveLength(1)
+    // Ningún otro elemento tiene bornes que sean bits de un código.
+    const otros = Object.keys(datos.elementos).filter(k => item(`e:${k}`).grupoBits)
+    expect(otros).toEqual(['B13'])
   })
 
   it('explica la salida Y8, el rango B13 y el par de LED del encoder B21', () => {

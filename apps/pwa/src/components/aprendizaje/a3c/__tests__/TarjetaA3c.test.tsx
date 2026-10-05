@@ -45,6 +45,18 @@ describe('Tarjeta A3C', () => {
     expect(ficha.getByText(/Fuente: Manual 2005, p\. 66/)).toBeTruthy()
   })
 
+  it('B13 en el plano: ningún LED encendido y los 10 marcados como grupo; B1 sí enciende su LED', () => {
+    montar(true)
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 32,/ }))
+    expect(document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')).toHaveLength(0)
+    expect(document.querySelectorAll('[data-testid="leds-grupo"] circle')).toHaveLength(10)
+    expect(document.querySelectorAll('.a3c-punto.a3c-encendido')).toHaveLength(0)
+    expect(document.querySelectorAll('.a3c-punto.a3c-grupo')).toHaveLength(10)
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 42,/ }))
+    expect(document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-testid="leds-grupo"] circle')).toHaveLength(0)
+  })
+
   it('un elemento sin respaldo (B30, Y3) dice que no hay descripción y pide confirmar en terreno', () => {
     montar(true)
     for (const codigo of ['B30', 'Y3']) {

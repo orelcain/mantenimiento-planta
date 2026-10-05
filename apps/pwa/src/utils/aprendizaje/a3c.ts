@@ -135,6 +135,11 @@ export interface ItemA3c {
   hotspots: Rect[]
   queHace: { texto: string; conDatos: boolean }
   cuandoLed: string
+  /**
+   * Los bornes son los bits de un código (Bit 0 a Bit n, como el codificador de ángulo B13): sus
+   * LED se marcan como grupo del elemento y NO se encienden todos, porque en la foto no lo estaban.
+   */
+  grupoBits: boolean
   senal: string
   /** Texto tal cual en el plano (alemán o código), para la ficha. */
   enPlano: string
@@ -203,6 +208,14 @@ function textoLed(t: string): string {
 }
 
 /** LED de estado de un elemento: los que el paquete le asigna + Step SMn para el motor SMn. */
+const TEXTO_GRUPO_BITS =
+  'Un LED por bit (Bit 0 a Bit 9). En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40.'
+
+/** ¿Todos los bornes del elemento son bits de un código («Bit 0», «Bit 1»…)? */
+function esGrupoBits(m: ModeloA3c, bornes: number[]): boolean {
+  return bornes.length >= 4 && bornes.every(n => /^Bit *[0-9]/.test(limpiarSenal(m.bornes.get(n)?.senal_original ?? '')))
+}
+
 function ledsEstadoDe(m: ModeloA3c, clave: string): LedEstado[] {
   const propios = m.datos.ledsEstado.filter(l => l.elemento === clave)
   const sm = /^SM(\d)$/.exec(clave)
@@ -231,7 +244,8 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       ledsEstado: ledsEstadoDe(m, id),
       hotspots: e.hoja22_hotspots,
       queHace: { texto: conDatos ? e.que_hace : SIN_DESCRIPCION, conDatos },
-      cuandoLed: e.led_texto ? textoLed(e.led_texto) : '',
+      cuandoLed: esGrupoBits(m, bornes) ? TEXTO_GRUPO_BITS : e.led_texto ? textoLed(e.led_texto) : '',
+      grupoBits: esGrupoBits(m, bornes),
       senal: e.certeza === 'baja' ? SENAL_NO_INDICADO : (SENAL[e.senal_a3c] ?? SENAL_NO_INDICADO),
       enPlano: e.original,
       modulo: e.modulo,
@@ -266,6 +280,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       hotspots: [],
       queHace,
       cuandoLed: '',
+      grupoBits: false,
       senal: SENAL[b.sentido] ?? SENAL_NO_INDICADO,
       enPlano: original,
       modulo: null,
@@ -292,6 +307,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       hotspots: [],
       queHace: { texto: `LED de la tarjeta rotulado «${l.original}»${l.es !== l.original ? ` (${l.es})` : ''}.`, conDatos: true },
       cuandoLed: '',
+      grupoBits: false,
       senal: 'Indicador interno de la tarjeta',
       enPlano: l.original,
       modulo: 'Tarjeta A3C',
@@ -313,6 +329,8 @@ export interface LineaLed {
   encendible: boolean
   /** Qué nombra «Ver» cuando no es un LED (p. ej. «el borne 136»); si falta, `grande`. */
   nombreVer?: string
+  /** Los LED son un grupo (bits de un código): se marcan con contorno, no se encienden. */
+  grupo?: boolean
 }
 
 function rango(ns: number[]): string {
@@ -339,10 +357,18 @@ export function lineaLed(item: ItemA3c): LineaLed {
   if (n0 == null) {
     return { grande: 'Sin LED', texto: `Borne ${rango(item.bornes)}: el plano no le dibuja LED`, color: null, encendible: false }
   }
+  if (item.grupoBits) {
+    return {
+      grande: `LED ${rango(item.leds)}`,
+      texto: 'Uno por bit (Bit 0 a Bit 9). En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40.',
+      color: null,
+      encendible: true,
+      grupo: true,
+    }
+  }
   const r = regletaDe(n0)
   const cuando =
-    item.codigo === 'B13' ? 'un LED por bit (Bit 0 a Bit 9)'
-      : item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
+    item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
         : item.tipo === 'sensor' || item.tipo === 'encoder' ? 'prende con la señal del elemento'
           : 'el plano no indica el sentido de esta señal'
   return {
@@ -358,7 +384,7 @@ export interface PuntoLed { k: string; x: number; y: number; color: ColorLed }
 /** Los LED que se encienden en la hoja 23 para un ítem. */
 export function puntosLed(m: ModeloA3c, item: ItemA3c): PuntoLed[] {
   const out: PuntoLed[] = []
-  for (const n of item.leds) {
+  for (const n of item.grupoBits ? [] : item.leds) {
     const l = m.bornes.get(n)?.led
     if (l) out.push({ k: `${item.clave}:${n}`, x: l.x, y: l.y, color: colorLed(n) })
   }
@@ -366,9 +392,20 @@ export function puntosLed(m: ModeloA3c, item: ItemA3c): PuntoLed[] {
   return out
 }
 
+/** Los LED que se marcan como GRUPO del elemento (contorno fijo, sin encender): solo los bits de un código. */
+export function puntosGrupo(m: ModeloA3c, item: ItemA3c): PuntoLed[] {
+  if (!item.grupoBits) return []
+  const out: PuntoLed[] = []
+  for (const n of item.leds) {
+    const l = m.bornes.get(n)?.led
+    if (l) out.push({ k: `${item.clave}:${n}`, x: l.x, y: l.y, color: colorLed(n) })
+  }
+  return out
+}
+
 /** Punto al que ir en la tarjeta: el primer LED o, si no hay, el centro del primer borne. */
 export function puntoFoco(m: ModeloA3c, item: ItemA3c): [number, number] | null {
-  const p = puntosLed(m, item)[0]
+  const p = puntosLed(m, item)[0] ?? puntosGrupo(m, item)[0]
   if (p) return [p.x, p.y]
   const b = item.bornes[0] != null ? m.bornes.get(item.bornes[0]) : undefined
   return b ? [b.celda.x + b.celda.w / 2, b.celda.y + b.celda.h / 2] : null
