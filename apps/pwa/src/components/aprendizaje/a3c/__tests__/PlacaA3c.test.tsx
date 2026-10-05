@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { interiorPlaca, interiorSvg, type A3CDatos, type PaqueteA3c, type PaquetePlaca } from '@/data/baader142A3c'
-import { camaraDePreset, limitarCamara, matrizCamara } from '@/utils/aprendizaje/a3c'
+import { camaraDePreset, colorLed, LEDS_VERDES_FOTO, limitarCamara, matrizCamara } from '@/utils/aprendizaje/a3c'
 import { geometriaPlaca, limitesPlaca, presetsPlaca, ZONAS_PLACA } from '@/utils/aprendizaje/a3cPlaca'
 import { TarjetaA3c } from '../TarjetaA3c'
 
@@ -67,6 +67,20 @@ describe('Tarjeta A3C · vista Placa', () => {
     expect(host()!.querySelectorAll('[data-estado$="-encendido"]').length).toBeGreaterThan(0)
   })
 
+  it('un LED verde de la foto (borne 72) sale verde en el plano, en la placa y en la franja', () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 72,/ }))
+    const verde = (sel: string) => document.querySelector(sel)!.classList.contains('a3c-verde')
+    expect(verde('[data-testid="leds-encendidos"] [data-led]')).toBe(true)
+    expect(verde('[data-testid="franja-led"] .a3c-foco')).toBe(true)
+    fireEvent.click(screen.getByRole('tab', { name: 'Placa' }))
+    expect(encendidos()).toEqual(['led-X5-72'])
+    expect(verde('[data-testid="leds-placa"] [data-led]')).toBe(true)
+    // Y un rojo de la foto (B11, borne 116) no.
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 116,/ }))
+    expect(verde('[data-testid="leds-placa"] [data-led]')).toBe(false)
+  })
+
   it('un clic en borne-X5-45 de la placa elige B4', () => {
     localStorage.setItem('a3c-vista-tarjeta', 'placa')
     montar()
@@ -95,6 +109,12 @@ describe('placa-n2.svg · integridad y seguridad', () => {
     expect(leds.length).toBe(placa.geo.leds.size)
     for (const n of leds) expect(bornes.has(n)).toBe(true)
     for (let n = 1; n <= 134; n++) expect(placa.geo.bornes.has(n)).toBe(true)
+  })
+
+  it('la tabla de LED verdes de la app es exactamente la de la foto (data-estado verde-*)', () => {
+    const verdes = [...svgPlaca.matchAll(/id="led-X5-(\d+)"[^>]*data-estado="verde/g)].map(m => Number(m[1])).sort((a, b) => a - b)
+    expect([...LEDS_VERDES_FOTO].sort((a, b) => a - b)).toEqual(verdes)
+    for (const [n, l] of placa.geo.leds) expect(l.color).toBe(colorLed(n))
   })
 
   it('geometría y atajos salen de las regletas reales', () => {

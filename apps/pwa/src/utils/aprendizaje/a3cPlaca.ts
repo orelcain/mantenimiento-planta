@@ -11,7 +11,7 @@
  * los dibuja todos apagados y enciende únicamente el del elemento elegido.
  */
 import type { PresetV5, Rect, ViewBox } from '@/data/baader142A3c'
-import { claveDeBorne, type ColorLed, type ItemA3c, type LimitesCamara, type ModeloA3c, type Objetivo, type PuntoLed } from './a3c'
+import { claveDeBorne, colorLed, type ColorLed, type ItemA3c, type LimitesCamara, type ModeloA3c, type Objetivo, type PuntoLed } from './a3c'
 
 export interface LedPlaca { x: number; y: number; r: number; color: ColorLed }
 export interface RegletaPlaca { desde: number; hasta: number; r: Rect }
@@ -214,7 +214,8 @@ export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): (PuntoLed & { n: number
   const out: (PuntoLed & { n: number; r: number })[] = []
   for (const n of item.leds) {
     const l = geo.leds.get(n)
-    if (l) out.push({ k: `${item.clave}:${n}`, n, x: l.x, y: l.y, r: l.r, color: l.color })
+    // Mismo color que en el plano (tabla de la foto en `colorLed`): una sola fuente.
+    if (l) out.push({ k: `${item.clave}:${n}`, n, x: l.x, y: l.y, r: l.r, color: colorLed(n) })
   }
   return out
 }

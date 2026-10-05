@@ -39,10 +39,26 @@ export function regletaDe(n: number): Regleta | undefined {
   return REGLETAS.find(r => n >= r.desde && n <= r.hasta)
 }
 
-/** Verde en 95–111 (fotos de la N2, 04-10-2026); rojo en el resto y en los LED de estado. */
+/**
+ * Bornes X5 cuyo LED es VERDE, según la foto de la placa de la N2 (prefijo `verde-` del
+ * `data-estado` de cada `led-X5-n` en `placa-n2.svg`; el test de integridad lo compara). La foto
+ * es lo único que respalda el color: el plano no lo dice. Tabla estática para no tener que
+ * cargar la placa en la vista «Plano».
+ */
+export const LEDS_VERDES_FOTO: ReadonlySet<number> = new Set([
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 16, 18, 20, 22, 24, 26, 28,
+  66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 92, 93, 94,
+  95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
+])
+
+/**
+ * Color del LED de un borne X5: verde si la foto de la N2 lo muestra verde; rojo en el resto
+ * y en los LED de estado. Los LED que la foto no muestra (139–145, zona de potencia) quedan en
+ * rojo solo como dibujo: ningún texto de la herramienta afirma su color.
+ */
 export type ColorLed = 'r' | 'g'
 export function colorLed(n: number): ColorLed {
-  return n >= 95 && n <= 111 ? 'g' : 'r'
+  return LEDS_VERDES_FOTO.has(n) ? 'g' : 'r'
 }
 
 // ─── Modelo ───────────────────────────────────────────────────────────────
