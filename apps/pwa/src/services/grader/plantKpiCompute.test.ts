@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO, targetCpmFromIntervals, computeLostPieces, cadenceCpm, lineCadenceCpm, computeOfficialCompliance } from './plantKpiCompute'
+import { aggregateShifts, computeMachineKPI, availabilityISO, performanceISO, targetCpmFromIntervals, computeLostPieces, cadenceCpm, lineCadenceCpm, computeOfficialCompliance, aggregatePlantRatios, aggregateQuality } from './plantKpiCompute'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from './types'
 
@@ -252,5 +252,105 @@ describe('computeOfficialCompliance', () => {
     const r = computeOfficialCompliance([{ machineid: 'a', totalCycles: 1200 }], { a: 1000 })
     expect(r!.pct).toBeCloseTo(1.2, 3)
     expect(r!.level).toBe('ok')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consolidación sobre el eje MÁQUINA.
+//
+// Arriba ya se fija que juntar varios TURNOS suma segundos y ciclos en vez de
+// promediar ratios. Lo que faltaba es la misma regla sobre el otro eje: juntar
+// varias MÁQUINAS en el número de la línea. Se promediaban sus razones, que le
+// da el mismo voto a la que corrió 20 minutos y a la que corrió el turno
+// entero. Cada test comprueba además que el resultado NO coincide con el
+// promedio simple: si alguien vuelve a promediar, fallan.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const sinCiclos: { cycles: number; expectedCycles: number }[] = []
+
+describe('aggregatePlantRatios', () => {
+  it('pondera la disponibilidad por segundos, no por máquina', () => {
+    // Una máquina corrió el turno entero; la otra casi no arrancó.
+    const plant = aggregatePlantRatios([
+      { breakdown: { uptimeSec: 3600, downtimeSec: 0, setupSec: 0 }, intervals: sinCiclos, macroSec: 0, macroCount: 0 },
+      { breakdown: { uptimeSec: 60, downtimeSec: 540, setupSec: 0 }, intervals: sinCiclos, macroSec: 0, macroCount: 0 },
+    ])
+    expect(plant.availability).toBeCloseTo(3660 / 4200, 6) // 0.871
+    expect(plant.availability).not.toBeCloseTo(0.55, 2)    // el promedio simple
+  })
+
+  it('calcula el MTTR sobre el total de fallas, no promediando el MTTR de cada máquina', () => {
+    // Máquina A: 1 falla de 60 min. Máquina B: 10 fallas de 6 min.
+    const plant = aggregatePlantRatios([
+      { breakdown: { uptimeSec: 3600, downtimeSec: 3600, setupSec: 0 }, intervals: sinCiclos, macroSec: 3600, macroCount: 1 },
+      { breakdown: { uptimeSec: 3600, downtimeSec: 3600, setupSec: 0 }, intervals: sinCiclos, macroSec: 3600, macroCount: 10 },
+    ])
+    expect(plant.mttrMin).toBeCloseTo(7200 / 11 / 60, 6) // 10.9 min
+    expect(plant.mttrMin).toBeLessThan(15)               // promediar daba 33: el triple
+  })
+
+  it('calcula el MTBF con el uptime total sobre el total de fallas', () => {
+    const plant = aggregatePlantRatios([
+      { breakdown: { uptimeSec: 7200, downtimeSec: 0, setupSec: 0 }, intervals: sinCiclos, macroSec: 600, macroCount: 2 },
+      { breakdown: { uptimeSec: 3600, downtimeSec: 0, setupSec: 0 }, intervals: sinCiclos, macroSec: 300, macroCount: 1 },
+    ])
+    expect(plant.mtbfHours).toBeCloseTo(10800 / 3 / 3600, 6)
+  })
+
+  it('pondera el rendimiento juntando los intervalos de todas las máquinas', () => {
+    const plant = aggregatePlantRatios([
+      { breakdown: { uptimeSec: 3600, downtimeSec: 0, setupSec: 0 }, intervals: [{ cycles: 100, expectedCycles: 100 }], macroSec: 0, macroCount: 0 },
+      { breakdown: { uptimeSec: 60, downtimeSec: 0, setupSec: 0 }, intervals: [{ cycles: 1, expectedCycles: 100 }], macroSec: 0, macroCount: 0 },
+    ])
+    expect(plant.performance).toBeCloseTo(101 / 200, 6) // promediar daba 0.505
+  })
+
+  it('sin fallas no divide por cero: MTTR 0 y MTBF = el uptime entero', () => {
+    const plant = aggregatePlantRatios([
+      { breakdown: { uptimeSec: 3600, downtimeSec: 0, setupSec: 0 }, intervals: sinCiclos, macroSec: 0, macroCount: 0 },
+    ])
+    expect(plant.mttrMin).toBe(0)
+    expect(plant.mtbfHours).toBeCloseTo(1, 6)
+  })
+
+  it('sin máquinas devuelve ceros, no NaN', () => {
+    const plant = aggregatePlantRatios([])
+    expect(Number.isNaN(plant.availability)).toBe(false)
+    expect(Number.isNaN(plant.mttrMin)).toBe(false)
+    expect(plant.macroCount).toBe(0)
+  })
+})
+
+describe('aggregateQuality', () => {
+  it('pondera por piezas y no por turno', () => {
+    // Un turno chico y malísimo junto a uno grande y bueno.
+    const q = aggregateQuality([
+      { totalPieces: 300, pointZeroPieces: 150, pointZeroPct: 50 },
+      { totalPieces: 30_000, pointZeroPieces: 300, pointZeroPct: 1 },
+    ])
+    expect(q).toBeCloseTo((30_300 - 450) / 30_300, 6) // 0.985
+    expect(q).toBeGreaterThan(0.95)                   // promediar daba 0.745
+  })
+
+  it('sin piezas cae al promedio de porcentajes en vez de perder la calidad', () => {
+    // Resúmenes viejos: traen pointZeroPct pero no las piezas.
+    const q = aggregateQuality([{ pointZeroPct: 2 } as never])
+    expect(q).toBeCloseTo(0.98, 6)
+  })
+
+  it('con piezas en al menos uno, los incompletos no arrastran el número', () => {
+    const q = aggregateQuality([
+      { totalPieces: 1000, pointZeroPieces: 10, pointZeroPct: 1 },
+      { pointZeroPct: 90 } as never, // sin piezas: fuera
+    ])
+    expect(q).toBeCloseTo(0.99, 6)
+  })
+
+  it('sin nada devuelve null', () => {
+    expect(aggregateQuality([])).toBeNull()
+  })
+
+  it('acota entre 0 y 1 aunque los datos vengan sucios', () => {
+    expect(aggregateQuality([{ totalPieces: 100, pointZeroPieces: 500, pointZeroPct: 500 }])).toBe(0)
   })
 })
