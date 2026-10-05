@@ -21,7 +21,7 @@ import {
 } from '@/utils/aprendizaje/a3c'
 import { CapaTextos } from './LienzoA3c'
 
-function Recorte({ modelo, dibujo, textos, leds, mostrar }: { modelo: ModeloA3c; dibujo: string; textos: Texto[]; leds: number[]; mostrar: boolean }) {
+function Recorte({ modelo, dibujo, textos, leds, mostrar, alto }: { modelo: ModeloA3c; dibujo: string; textos: Texto[]; leds: number[]; mostrar: boolean; alto?: string }) {
   const rc = recorteRegleta(modelo, leds[0] ?? 0)
   if (!rc) return null
   const [x, y, w, h] = rc.viewBox
@@ -30,7 +30,7 @@ function Recorte({ modelo, dibujo, textos, leds, mostrar }: { modelo: ModeloA3c;
       <div className="rounded-card bg-card p-2">
         <svg
           viewBox={`${x} ${y} ${w} ${h}`}
-          className="block h-auto max-h-[430px] w-full"
+          className={cn('block h-auto w-full', alto ?? 'max-h-[430px]')}
           style={{ ['--escala' as string]: 2 }}
           role="img"
           aria-label={`Regleta ${rc.regleta.desde}–${rc.regleta.hasta} del plano${mostrar && leds.length ? `, LED ${leds.join(', ')} encendido` : ''}`}
@@ -160,7 +160,17 @@ export function QuizA3c({ modelo, dibujo, textos, preguntas, dosColumnas, onVolv
 
   const ledsVisibles = respondida && q.after ? q.after : q.lit
   const ref = q.lit.length ? q.lit : q.after ?? []
-  const tablero = <Recorte modelo={modelo} dibujo={dibujo} textos={textos} leds={ledsVisibles.length ? ledsVisibles : ref} mostrar={ledsVisibles.length > 0} />
+  // En PC el recorte crece con el alto de la ventana (descontada la cabecera); en el teléfono, 430 px como siempre.
+  const tablero = (
+    <Recorte
+      modelo={modelo}
+      dibujo={dibujo}
+      textos={textos}
+      leds={ledsVisibles.length ? ledsVisibles : ref}
+      mostrar={ledsVisibles.length > 0}
+      alto={dosColumnas ? 'max-h-[max(430px,calc(100dvh-260px))]' : undefined}
+    />
+  )
   const opciones = (
     <div className="flex flex-col gap-2" role="group" aria-label="Respuestas">
       {q.ops.map(([cod, desc], i) => {

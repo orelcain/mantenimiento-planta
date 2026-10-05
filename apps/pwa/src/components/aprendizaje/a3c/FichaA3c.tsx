@@ -19,8 +19,29 @@ function listaBornes(ns: number[]): string {
   return ns.length > 3 ? `${ns[0]}–${ns[ns.length - 1]}` : ns.join(', ')
 }
 
-export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
+/**
+ * `compacta` (PC): lo esencial primero —código, nombre, tipo, señal y borne— y debajo «Qué hace»,
+ * «Cuándo prende» y la fuente, para que la ficha se lea en poco alto sin quitarle sitio a los dibujos.
+ */
+export function FichaA3c({ item, idioma, compacta = false }: { item: ItemA3c; idioma: Idioma; compacta?: boolean }) {
   const r = item.bornes[0] != null ? regletaDe(item.bornes[0]) : undefined
+  const textos = (
+    <>
+      <section className={compacta ? 'mt-3' : 'mt-4'}>
+        <h4 className="text-footnote font-semibold text-muted-foreground">Qué hace</h4>
+        <p className={cn('text-subhead leading-snug', !item.queHace.conDatos && 'text-muted-foreground')}>{item.queHace.texto}</p>
+        {item.preguntaTerreno && (
+          <p className="mt-1.5 text-subhead leading-snug">Pendiente de confirmar en terreno: {item.preguntaTerreno}</p>
+        )}
+      </section>
+      {item.cuandoLed && (
+        <section className={compacta ? 'mt-3' : 'mt-4'}>
+          <h4 className="text-footnote font-semibold text-muted-foreground">Cuándo prende el LED</h4>
+          <p className="text-subhead leading-snug">{item.cuandoLed}</p>
+        </section>
+      )}
+    </>
+  )
   return (
     <div data-testid="ficha-a3c">
       <div className="flex flex-wrap items-baseline gap-x-2">
@@ -35,19 +56,7 @@ export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
         </div>
       )}
 
-      <section className="mt-4">
-        <h4 className="text-footnote font-semibold text-muted-foreground">Qué hace</h4>
-        <p className={cn('text-subhead leading-snug', !item.queHace.conDatos && 'text-muted-foreground')}>{item.queHace.texto}</p>
-        {item.preguntaTerreno && (
-          <p className="mt-1.5 text-subhead leading-snug">Pendiente de confirmar en terreno: {item.preguntaTerreno}</p>
-        )}
-      </section>
-      {item.cuandoLed && (
-        <section className="mt-4">
-          <h4 className="text-footnote font-semibold text-muted-foreground">Cuándo prende el LED</h4>
-          <p className="text-subhead leading-snug">{item.cuandoLed}</p>
-        </section>
-      )}
+      {!compacta && textos}
 
       <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-subhead">
         {item.tipoSensor && (
@@ -81,6 +90,7 @@ export function FichaA3c({ item, idioma }: { item: ItemA3c; idioma: Idioma }) {
           </>
         )}
       </dl>
+      {compacta && textos}
       {item.fuentes.length > 0 && <p className="mt-4 text-caption text-muted-foreground">Fuente: {item.fuentes.join('; ')}</p>}
       <p className={cn('font-mono text-caption text-muted-foreground', item.fuentes.length ? 'mt-1' : 'mt-4')}>
         Plano 142.71.00.888, hoja 23/45{item.hotspots.length ? ' y 22/45' : ''}
