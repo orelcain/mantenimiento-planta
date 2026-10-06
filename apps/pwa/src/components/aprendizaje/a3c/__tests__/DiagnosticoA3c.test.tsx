@@ -1,0 +1,134 @@
+// @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { interiorSvg, type A3CDatos, type PaqueteA3c } from '@/data/baader142A3c'
+import { TarjetaA3c } from '../TarjetaA3c'
+
+const assets = resolve(__dirname, '../../../../../public/learning-assets/baader-142/a3c')
+const paquete: PaqueteA3c = {
+  datos: JSON.parse(readFileSync(resolve(assets, 'a3c-datos.json'), 'utf8')) as A3CDatos,
+  dibujo: {
+    '22': interiorSvg(readFileSync(resolve(assets, 'hoja22.svg'), 'utf8')),
+    '23': interiorSvg(readFileSync(resolve(assets, 'hoja23.svg'), 'utf8')),
+  },
+}
+
+const montar = (dosColumnas = false) =>
+  render(<TarjetaA3c paquete={paquete} onVolver={() => {}} etiquetaVolver="Baader 142" dosColumnas={dosColumnas} />)
+
+/** Abre el modo Diagnóstico (su UI es un chunk perezoso). */
+async function abrir(dosColumnas = false) {
+  montar(dosColumnas)
+  fireEvent.click(screen.getByRole('tab', { name: 'Diagnóstico' }))
+  await screen.findByTestId('diagnostico-a3c')
+}
+const teclado = () => within(screen.getByRole('group', { name: 'Teclado del código' }))
+const escribir = (codigo: string) => [...codigo].forEach(c => fireEvent.click(teclado().getByRole('button', { name: c })))
+const visor = () => screen.getByTestId('visor-codigo').textContent?.replace(/\s+/g, ' ').trim()
+
+beforeEach(() => localStorage.clear())
+afterEach(cleanup)
+
+describe('Tarjeta A3C · Diagnóstico', () => {
+  it('el teclado arma el código, borra y avisa si el manual no lo tiene', async () => {
+    await abrir()
+    expect(visor()).toBe('E 8__')
+    escribir('803')
+    expect(visor()).toBe('E 803')
+    fireEvent.click(teclado().getByRole('button', { name: 'Borrar' }))
+    expect(visor()).toBe('E 80')
+    escribir('6')
+    expect(screen.getByText(/El manual no tiene ese código/)).toBeTruthy()
+  })
+
+  it('E 803: paso B3 con LED 44, X5.44 y «Manual 2005, p. 42»', async () => {
+    await abrir()
+    escribir('803')
+    const paso = screen.getAllByTestId('paso-diagnostico')[0]!
+    const p = within(paso)
+    expect(p.getByText(/B3 · sensor de posición cero SM3/)).toBeTruthy()
+    expect(p.getByText(/^44 · foto N2: apagado$/)).toBeTruthy()
+    expect(p.getByText('X5.44')).toBeTruthy()
+    expect(p.getByText('Manual 2005, p. 42')).toBeTruthy()
+  })
+
+  it('«Descartado / Sospechoso» exige antes confirmar «Máquina parada y asegurada»', async () => {
+    await abrir()
+    escribir('803')
+    const paso = within(screen.getAllByTestId('paso-diagnostico')[0]!)
+    const descartado = paso.getByRole('button', { name: 'Descartado' })
+    expect((descartado as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(descartado)
+    expect(descartado.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByText(/Prohibido rociar con spray/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Máquina parada y asegurada' }))
+    fireEvent.click(descartado)
+    expect(descartado.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: /Cerrar diagnóstico · 1 de 2 revisados/ })).toBeTruthy()
+  })
+
+  it('cerrar suma al contador local y lo guarda en el equipo', async () => {
+    await abrir()
+    expect(screen.getByTestId('contador-diagnosticos').textContent).toMatch(/^0 diagnósticos cerrados en este equipo · solo local$/)
+    escribir('803')
+    fireEvent.click(screen.getByRole('button', { name: 'Máquina parada y asegurada' }))
+    fireEvent.click(screen.getByRole('button', { name: /Cerrar diagnóstico/ }))
+    expect(screen.getByTestId('contador-diagnosticos').textContent).toMatch(/^1 diagnóstico cerrado/)
+    expect(JSON.parse(localStorage.getItem('a3c-diagnostico-v1')!).cerrados).toBe(1)
+    // Al cerrar, la confirmación de seguridad se pide de nuevo.
+    expect(screen.getByRole('button', { name: 'Máquina parada y asegurada' })).toBeTruthy()
+  })
+
+  it('«Ver B3 en la tarjeta» vuelve a Explorar con B3 elegido y su LED 44 encendido', async () => {
+    await abrir()
+    escribir('803')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver B3 en la tarjeta' }))
+    expect(screen.getByRole('tab', { name: 'Explorar' }).getAttribute('aria-selected')).toBe('true')
+    expect(within(screen.getByTestId('franja-led')).getByText('LED 44')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Borne 44,/ }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('E 827 muestra su aviso y la pregunta para terreno', async () => {
+    await abrir()
+    escribir('827')
+    expect(screen.getByRole('note').textContent).toMatch(/verificar en terreno/)
+    expect(screen.getByText(/¿B15, B14 o los dos\?/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver B15 en la tarjeta' })).toBeTruthy()
+  })
+
+  it('pestaña Módulo: Centraje avisa la duda de dígitos; un código lleva a su resultado', async () => {
+    await abrir()
+    fireEvent.click(screen.getByRole('tab', { name: 'Módulo' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Centraje/ }))
+    const det = within(screen.getByTestId('detalle-modulo'))
+    expect(det.getByRole('note').textContent).toMatch(/verificar en terreno/)
+    expect(det.getByRole('button', { name: /^B1,/ })).toBeTruthy()
+    fireEvent.click(det.getByRole('button', { name: 'E 801' }))
+    expect(visor()).toBe('E 801')
+  })
+
+  it('pestaña LED: el 134 es B15 y lleva a E 827', async () => {
+    await abrir()
+    fireEvent.click(screen.getByRole('tab', { name: 'LED' }))
+    const t = within(screen.getByRole('group', { name: 'Teclado del LED' }))
+    ;['1', '3', '4'].forEach(c => fireEvent.click(t.getByRole('button', { name: c })))
+    const det = within(screen.getByTestId('detalle-led'))
+    expect(det.getByText(/Borne X5\.134/)).toBeTruthy()
+    expect(det.getByText('B15')).toBeTruthy()
+    expect(det.getByText(/Lo ves encendido, igual que en la foto de la N2/)).toBeTruthy()
+    fireEvent.click(det.getByRole('button', { name: 'E 827' }))
+    expect(visor()).toBe('E 827')
+  })
+
+  it('PC: tres columnas y la regleta del paso elegido con su LED como señal', async () => {
+    await abrir(true)
+    escribir('803')
+    const panel = within(screen.getByTestId('panel-regleta'))
+    expect(panel.getByText(/Regleta X5 · 30–54/)).toBeTruthy()
+    expect(panel.getByRole('button', { name: /^Borne 44,/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('panel-regleta').querySelectorAll('[role="group"] .a3c-punto.a3c-encendido')).toHaveLength(1)
+    expect(panel.getByRole('button', { name: 'Plano · hoja 23' })).toBeTruthy()
+  })
+})
