@@ -278,7 +278,11 @@ export function lineaEnPlaca(linea: LineaLed, geo: GeoPlaca, item: ItemA3c): Lin
     // Un borne sin LED que la placa no dibuja (136–145): igual se puede ver dónde está en el plano.
     if (item.bornes.length && !foco) {
       const nombreVer = `el borne ${item.bornes.join(', ')}`
-      return { ...linea, texto: 'Sin LED en el plano · No está dibujado en la placa', encendible: true, nombreVer, soloPlano: true }
+      // Un borne que otra hoja sí dibuja con LED (31) no dice «Sin LED en el plano».
+      const texto = item.sinLed
+        ? `${item.sinLed.texto.replace(/[.\s]+$/, '')} · No está dibujado en la placa`
+        : 'Sin LED en el plano · No está dibujado en la placa'
+      return { ...linea, texto, encendible: true, nombreVer, soloPlano: true }
     }
     return { ...linea, soloPlano: false }
   }

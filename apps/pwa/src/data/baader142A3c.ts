@@ -29,13 +29,21 @@ export interface Borne {
   celda: Rect
   /** De dónde sale el elemento cuando no es el rótulo de la hoja 23, o por qué no se asigna. */
   nota?: string
-  /** «contorno»: su LED se marca sin encenderse (el plano no lo liga con certeza a esta señal). */
+  /**
+   * «contorno»: su LED se marca sin encenderse (el plano no lo liga con certeza a esta señal).
+   * «senal»: se enciende aunque la hoja 23 no lo rotule, porque otra hoja dibuja el LED de su entrada (127 · B42).
+   */
   led_modo?: ModoLedDato
   /** Texto de la franja «qué LED prende» cuando el genérico no aplica. */
   franja_texto?: string
+  /** Borne sin ⊗ en la hoja 23 que otra hoja sí dibuja con LED (31): qué dice el plano. */
+  sin_led_grande?: string
+  sin_led_texto?: string
+  /** Qué confirmar en terreno sobre el LED de este borne. */
+  pregunta_terreno?: string
 }
 /** Cómo se muestra el LED de un ítem cuando el genérico no aplica. */
-export type ModoLedDato = 'contorno' | 'neutro'
+export type ModoLedDato = 'senal' | 'contorno' | 'neutro'
 export interface Elemento {
   etiqueta: string
   original: string

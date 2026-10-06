@@ -43,9 +43,10 @@ describe('selección y descripción con datos reales', () => {
     expect(item('e:B1').modoLed).toBe('senal')
     expect(puntosGrupo(m, item('e:B1'))).toEqual([])
     expect(puntosLed(m, item('e:B1'))).toHaveLength(1)
-    // Los únicos elementos con LED X5 marcados como grupo: B13, los pares A/B, B11 (en reposo) y B50 (dudoso).
+    // Los únicos elementos con LED X5 marcados como grupo: B13, los pares A/B, el encoder de pulsos B27,
+    // B11 (en reposo) e Y51/Y52 (las hojas 21 y 23 se contradicen).
     const otros = Object.keys(datos.elementos).filter(k => item(`e:${k}`).modoLed === 'contorno' && item(`e:${k}`).leds.length)
-    expect(otros.sort()).toEqual(['B11', 'B13', 'B21', 'B22', 'B23', 'B24', 'B25', 'B50'])
+    expect(otros.sort()).toEqual(['B11', 'B13', 'B21', 'B22', 'B23', 'B24', 'B25', 'B27', 'Y51', 'Y52'])
   })
 
   it('explica la salida Y8, el rango B13 y el par de LED del encoder B21', () => {
@@ -406,8 +407,9 @@ describe('principio rector: solo se enciende el LED que es señal del elemento',
         expect(n, `${c}: LED de alimentación encendido`).toBeLessThan(136)
       }
       // Lista independiente de `modoLed`: LED que NUNCA se encienden, se elija lo que se elija
-      // (canales A/B 1–10, bits 32–41, B11 116, B50 126/128, sin rótulo, alimentación 136–145).
-      const prohibidos = new Set([...Array.from({ length: 10 }, (_, i) => i + 1), ...Array.from({ length: 10 }, (_, i) => i + 32), 116, 126, 128, 28, 50, 76, 93, 94, 95, 96, 97, 98, 99, 100, 106, 129, 130, 131, 132])
+      // (canales A/B 1–10, bits 32–41, B27 53, B11 116, 128 (K7 u B50), Y51/Y52 105/107, 92, codificación
+      // sin LED en el esquema, sin rótulo, alimentación 136–145).
+      const prohibidos = new Set([...Array.from({ length: 10 }, (_, i) => i + 1), ...Array.from({ length: 10 }, (_, i) => i + 32), 53, 116, 128, 105, 107, 92, 118, 122, 133, 28, 50, 76, 93, 94, 95, 96, 97, 98, 99, 100, 106, 129, 130, 131, 132])
       for (const p of on) expect(prohibidos.has(Number(p.k.split(':').pop())), `${c}: enciende ${p.k}`).toBe(false)
       // Los tres modos se excluyen: lo que se enciende no se marca también como grupo o neutro.
       const marcas = [on.length, puntosGrupo(m, it).length, puntosNeutros(m, it).length].filter(Boolean)
@@ -437,7 +439,8 @@ describe('principio rector: solo se enciende el LED que es señal del elemento',
     expect(b11.modoLed).toBe('contorno')
     expect(puntosLed(m, b11)).toEqual([])
     expect(puntosGrupo(m, b11).map(p => p.k)).toEqual(['e:B11:116'])
-    expect(b11.cuandoLed).toContain('Según el manual (p. 66 y p. 18), con las puntas juntas (reposo) el diodo está encendido')
+    expect(b11.cuandoLed).toContain('Manual p. 28 (impresa 26): con las puntas juntas se enciende el diodo del interruptor')
+    expect(b11.cuandoLed).toContain('El LED 116 es su entrada en la A3C (hoja 12)')
     expect(b11.cuandoLed).toContain('En la foto de la N2, 116 encendido')
     expect(b11.cuandoLed).toContain('se espera que se apague')
     expect(lineaLed(b11).texto).not.toContain('prende con la señal')
@@ -481,28 +484,39 @@ describe('principio rector: solo se enciende el LED que es señal del elemento',
     expect(item('b:31').queHace.texto).toBe('Borne de alimentación.')
   })
 
-  it('B50: el plano se contradice (126 u 128); buscar «B50» trae los dos con el aviso', () => {
-    expect(lineaLed(item('e:B50'))).toMatchObject({ grande: 'LED 126 o 128', grupo: true })
-    expect(puntosGrupo(m, item('e:B50')).map(p => p.k)).toEqual(['e:B50:126', 'e:B50:128'])
-    expect(lineaLed(item('b:128')).texto).not.toContain('prende con la señal')
+  it('B50 enciende el 126 (hojas 9, 11 y 21); el 128 queda con contorno y buscar «B50» avisa en los dos', () => {
+    expect(puntosLed(m, item('e:B50')).map(p => p.k)).toEqual(['e:B50:126'])
+    expect(puntosGrupo(m, item('e:B50'))).toEqual([])
+    expect(lineaLed(item('e:B50'))).toMatchObject({ grande: 'LED 126', color: 'r', encendible: true })
+    expect(item('b:128').modoLed).toBe('contorno')
+    expect(puntosLed(m, item('b:128'))).toEqual([])
+    expect(lineaLed(item('b:128')).texto).toContain(
+      'La hoja 23 rotula B50 aquí, pero las hojas 9 y 21 llevan al 128 la señal A3C_128 del contacto K7 (relé), y la hoja 11 cablea B50 al 126',
+    )
     const items = buscar(m, 'B50', 'es').flatMap(g => g.items)
     expect(items.map(i => i.clave).sort()).toEqual(['b:128', 'e:B50'])
-    for (const i of items) expect(lineaLed(i).texto, i.clave).toMatch(/se contradice/)
+    // Ninguno de los dos queda sin aviso: cada uno nombra el otro borne.
+    expect(lineaLed(item('e:B50')).texto + item('e:B50').cuandoLed).toMatch(/128/)
+    expect(lineaLed(item('b:128')).texto).toMatch(/126/)
+    expect(item('e:B50').nota).toMatch(/hojas 9 y 21 llevan al 128 la señal A3C_128 del contacto K7/)
   })
 
-  it('textos aprobados: S25, S20, Y14, Y55, SM6-1, A3C, B16, B27, B42 y salidas Y3/Y6/Y51/Y52', () => {
+  it('textos aprobados: S25, S20, Y14, Y55, SM6-1, A3C, B16, B27, B42 y salidas Y3/Y6', () => {
     expect(lineaLed(item('e:S25'))).toMatchObject({ grande: 'Sin LED', texto: 'Hoja 19: común en X5:91 (la hoja 23 no rotula ese borne ni le dibuja LED)' })
     expect(lineaLed(item('e:S20')).texto).toBe('Común X5:86; contactos 2/4/8/16 compartidos en X5:112–115 (sin LED)')
-    expect(lineaLed(item('e:Y14')).texto).toBe('Sin borne X5 propio. Hoja 8: se alimenta por un contacto de K23 (X5:12, sin LED)')
+    expect(lineaLed(item('e:Y14')).texto).toBe('Sin borne X5 propio. Hoja 8: se alimenta por un contacto de K23 (X5:12)')
     expect(item('e:Y14').senal).not.toContain('la A3C activa el elemento')
     expect(item('e:Y55')).toMatchObject({ senal: 'El plano no indica por dónde llega a la A3C' })
     expect(item('e:Y55').preguntaTerreno).toBeTruthy()
     expect(lineaLed(item('e:SM6-1')).texto).toBe('Sin borne X5. Sale por A3C.X4.31–36 (hoja 17). Las hojas no aclaran si sus LED son los de SM6.')
     expect(lineaLed(item('e:A3C'))).toMatchObject({ texto: 'Es la tarjeta: elige un borne o un LED.', encendible: false })
     expect(item('e:B16').tipoSensorNota).toContain('Revisa qué sensor está montado antes de probar con metal.')
-    expect(item('e:B27').cuandoLed).toBe('Encoder de pulsos (hoja 13), no un sensor que se active con metal. En la foto de la N2: apagado.')
+    expect(item('e:B27').cuandoLed).toBe(
+      'Encoder de pulsos (hoja 13): LED en la entrada X5:53, pero ningún documento dice cómo se ve con pulsos. En la foto de la N2: apagado.',
+    )
+    expect(item('e:B27').modoLed).toBe('contorno')
     expect(item('e:B42').nota).toBe('El borne 127 sale de la hoja 21 (la hoja 23 no lo rotula).')
-    for (const k of ['Y3', 'Y6', 'Y51', 'Y52']) {
+    for (const k of ['Y3', 'Y6']) {
       expect(lineaLed(item(`e:${k}`)).texto, k).toContain('prende cuando la A3C activa la salida')
       expect(item(`e:${k}`).preguntaTerreno, k).toBeTruthy()
     }
@@ -515,5 +529,150 @@ describe('principio rector: solo se enciende el LED que es señal del elemento',
     for (const k of ['Y3', 'Y6', 'Y51', 'Y52']) expect(de('Salidas'), k).toContain(`e:${k}`)
     expect(de('Motores')).toContain('e:SM6')
     expect(de('Sensores')).toContain('e:B1')
+  })
+})
+
+// ─── Auditoría de evidencia de LED (plano 888, hojas 9–15, 20, 21 y 23; manual 2005) ───────────
+// Un LED solo se ENCIENDE si el plano respalda que es señal de ESE elemento; lo disputado va con contorno.
+describe('auditoría de evidencia de LED', () => {
+  const todas = [
+    ...Object.keys(datos.elementos).map(k => `e:${k}`),
+    ...datos.bornes.map(b => `b:${b.borne}`),
+    ...datos.ledsEstado.map(l => `l:${l.id}`),
+  ]
+  const encendidosPor = (c: string) => puntosLed(m, item(c)).map(p => Number(p.k.split(':').pop())).filter(Number.isInteger)
+  /** Todo lo que la herramienta escribe de un ítem (franja, ficha y búsqueda). */
+  const textos = (c: string) => {
+    const it = item(c)
+    const l = lineaLed(it)
+    return [l.grande, l.texto, it.cuandoLed, it.nota ?? '', it.senal, it.preguntaTerreno ?? '', it.queHace.texto, it.tipoSensor ?? '', it.tipoSensorNota ?? '', ...it.fuentes].join(' · ')
+  }
+  // Clasificación de `evidencia_led.json`.
+  const SIN_RESPALDO = [28, 76, 93, 95, 96, 97, 98, 99, 130, 139, 140]
+  const PARCIAL = [50, 92, 94, 100, 104, 105, 106, 107, 108, 118, 122, 128, 129, 133, 145]
+  /** Bornes que las hojas 9–15 y 21 dibujan con símbolo de LED de entrada o de salida. */
+  const CON_SIMBOLO = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 16, 18, 20, 22, 24, 26, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54,
+    66, 68, 70, 72, 74, 78, 80, 82, 84, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 116, 117, 119, 120, 121, 123, 124, 125, 126, 127,
+    128, 131, 132, 134, 142, 143,
+  ]
+
+  it('los 11 LED SIN RESPALDO nunca se encienden, se elija lo que se elija', () => {
+    for (const c of todas) for (const n of encendidosPor(c)) expect(SIN_RESPALDO, `${c} enciende ${n}`).not.toContain(n)
+  })
+
+  it('de los 15 PARCIAL solo se encienden 104 y 108 (salidas a K53/K54, hoja 21)', () => {
+    const on = new Set(todas.flatMap(encendidosPor).filter(n => PARCIAL.includes(n)))
+    expect([...on].sort((a, b) => a - b)).toEqual([104, 108])
+  })
+
+  it('B50 enciende el 126; el 128 no se enciende desde ningún ítem', () => {
+    expect(encendidosPor('e:B50')).toEqual([126])
+    expect(claveDeBorne(m, 126)).toBe('e:B50')
+    for (const c of todas) expect(encendidosPor(c), c).not.toContain(128)
+    expect(lineaLed(item('b:128')).texto).toContain(
+      'La hoja 23 rotula B50 aquí, pero las hojas 9 y 21 llevan al 128 la señal A3C_128 del contacto K7 (relé), y la hoja 11 cablea B50 al 126',
+    )
+  })
+
+  it('Y51 (107) e Y52 (105): contorno, con las dos hojas y la pregunta de terreno', () => {
+    for (const [k, n] of [['Y51', 107], ['Y52', 105]] as const) {
+      const it = item(`e:${k}`)
+      expect(it.modoLed, k).toBe('contorno')
+      expect(puntosLed(m, it), k).toEqual([])
+      expect(puntosGrupo(m, it).map(p => p.k), k).toEqual([`e:${k}:${n}`])
+      expect(it.preguntaTerreno, k).toMatch(new RegExp(`LED ${n}`))
+      expect(encendidosPor(`b:${n}`), String(n)).toEqual([])
+    }
+    expect(lineaLed(item('e:Y52')).texto).toContain('LED de la salida X5:105. La hoja 21 lo lleva a K51 → Y51 (Schieber); la hoja 23 rotula Y52. Confirma en terreno')
+    expect(lineaLed(item('e:Y51')).texto).toContain('LED de la salida X5:107. La hoja 21 lo lleva a K52 → Y52 (Kugelhahn auf/zu); la hoja 23 rotula Y51. Confirma en terreno')
+  })
+
+  it('bornes 12, 13 (K23, K25) y 31: no se encienden, dicen qué hoja dibuja el LED y piden confirmarlo en la placa', () => {
+    for (const [n, hoja] of [[12, 9], [13, 9], [31, 13]] as const) {
+      const c = claveDeBorne(m, n)
+      const it = item(c)
+      expect(puntosLed(m, it), c).toEqual([])
+      expect(lineaLed(it), c).toMatchObject({
+        grande: 'Sin LED en la hoja 23',
+        texto: `La hoja ${hoja} dibuja LED en este borne, pero la hoja 23 no le pone círculo. Confirma en la placa si tiene LED`,
+        encendible: false,
+      })
+      expect(it.preguntaTerreno, c).toContain(`X5:${n}`)
+    }
+  })
+
+  it('«al acercar metal» solo en B1–B10, B12, B14 y B15 (manual p. 66: inductivos; plano: contacto de cierre)', () => {
+    const inductivos = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B12', 'B14', 'B15']
+    const con = todas.filter(c => /al acercar metal/.test(textos(c))).map(c => c.slice(2))
+    expect(con.sort()).toEqual([...inductivos].sort())
+    // Hoja del esquema que dibuja el LED de entrada de cada sensor (evidencia_led.json, cadena 3).
+    const HOJA: Record<string, number> = { B1: 10, B2: 10, B3: 10, B4: 10, B5: 11, B6: 11, B7: 11, B8: 11, B9: 11, B10: 11, B12: 12, B14: 12, B15: 12 }
+    for (const k of inductivos) {
+      const n = datos.elementos[k]!.borne[0]
+      const h = HOJA[k]
+      expect(item(`e:${k}`).cuandoLed, k).toMatch(new RegExp(`^El plano \\(hoja ${h}\\) dibuja este sensor con contacto de cierre y un LED en la entrada X5:${n}\\.`))
+      expect(lineaLed(item(`e:${k}`)).texto, k).toContain(`Plano 888, hoja ${h}: LED en la entrada X5:${n}`)
+      expect(item(`e:${k}`).fuentes, k).toContain(`Plano 888, hoja ${h}`)
+    }
+    for (const k of ['B16', 'B18', 'B19', 'B42']) {
+      expect(textos(`e:${k}`), k).toContain('prende cuando llega la señal')
+      expect(textos(`e:${k}`), k).not.toMatch(/acercar metal/)
+    }
+  })
+
+  it('B11: cita el manual p. 28 (impresa 26), diodo del interruptor; ningún texto dice «p. 66 y 18»', () => {
+    for (const c of todas) expect(textos(c), c).not.toMatch(/p\. 66 y (p\. )?18/)
+    const b11 = item('e:B11')
+    expect(b11.cuandoLed).toMatch(/^Manual p\. 28 \(impresa 26\): con las puntas juntas se enciende el diodo del interruptor\./)
+    expect(b11.cuandoLed).not.toMatch(/p\. 66|p\. 18/)
+    expect(b11.fuentes).toContain('Manual 2005, p. 28 (impresa 26)')
+    expect(b11.modoLed).toBe('contorno')
+  })
+
+  it('ningún borne con símbolo de LED de entrada o salida dice «el plano no indica el sentido»', () => {
+    for (const n of CON_SIMBOLO) {
+      for (const c of new Set([claveDeBorne(m, n), `b:${n}`])) expect(textos(c), `${c} (X5:${n})`).not.toMatch(/no indica el sentido/i)
+    }
+  })
+
+  it('textos aprobados de la sección F (relés, SPS, Start, Y53/Y54, codificación, 92, B42, B27)', () => {
+    const franja = (c: string) => lineaLed(item(c)).texto
+    expect(franja('e:K20')).toContain('Salida de la A3C al relé K20 (hoja 9): prende cuando la A3C activa la salida')
+    expect(franja('e:K22')).toContain('Salida de la A3C al relé K22 (hoja 9): prende cuando la A3C activa la salida')
+    expect(franja('b:66')).toContain('Salida de la A3C al relé K26 (hoja 9)')
+    for (const n of [101, 102, 109, 110, 111]) expect(franja(`b:${n}`), String(n)).toContain('Salida de la A3C hacia la SPS (hojas 20 y 21)')
+    expect(franja('b:51')).toContain('Entrada de la A3C (hoja 9, contacto K24): prende con la orden de arranque')
+    expect(encendidosPor('b:51')).toEqual([51])
+    expect(encendidosPor('e:K20')).toEqual([26])
+    for (const [k, rele] of [['Y53', 'K53'], ['Y54', 'K54']] as const) {
+      expect(franja(`e:${k}`), k).toContain(`la A3C activa el relé. La válvula ${k} la acciona la SPS (hojas 20 y 21)`)
+      expect(franja(`e:${k}`), k).toContain(`relé ${rele}`)
+    }
+    for (const n of [118, 122, 133]) {
+      expect(item(`b:${n}`).modoLed, String(n)).toBe('contorno')
+      expect(franja(`b:${n}`), String(n)).toContain('Entrada de codificación de la versión (hoja 1, tabla «Codierung»); el esquema no le dibuja LED')
+    }
+    expect(encendidosPor('b:117')).toEqual([117])
+    expect(franja('b:117')).toContain('Entrada de codificación (hoja 11)')
+    expect(item('b:92').modoLed).toBe('contorno')
+    expect(franja('b:92')).toContain('La hoja 23 dibuja su LED; el esquema (hoja 9) no lo detalla: el plano no dice cuándo prende')
+    const t42 = 'El plano dibuja un LED en la entrada X5:127 (hoja 21) para B42; prende cuando llega la señal de B42'
+    for (const c of ['e:B42', 'b:127']) {
+      expect(item(c).modoLed, c).toBe('senal')
+      expect(encendidosPor(c), c).toEqual([127])
+      expect(franja(c), c).toContain(t42)
+    }
+    expect(item('e:B27').modoLed).toBe('contorno')
+    expect(encendidosPor('e:B27')).toEqual([])
+  })
+
+  it('el color solo se afirma como «según la foto de la N2»', () => {
+    for (const c of todas) {
+      const t = textos(c)
+      for (const x of t.matchAll(/\b(verde|rojo|roja|verdes|rojos|ámbar|amarillo)\b/gi)) {
+        expect(t.slice(Math.max(0, x.index - 80), x.index + 20), c).toMatch(/foto de la N2/)
+      }
+    }
   })
 })

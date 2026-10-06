@@ -203,16 +203,18 @@ describe('Tarjeta A3C · B50 y B42 (hojas 11 y 21)', () => {
   }
   const plano = () => [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
 
-  it('elegir B50 marca los LED 126 y 128 con contorno (el plano se contradice), sin encender ninguno', () => {
+  it('elegir B50 enciende el LED 126 (hoja 11) y la ficha avisa de la hoja 23 en el 128', () => {
     montar()
     buscarYElegir('B50')
     expect(ficha().getByText('B50')).toBeTruthy()
-    expect(plano()).toEqual([])
-    expect([...document.querySelectorAll('[data-testid="leds-grupo"] [data-grupo]')].map(g => g.getAttribute('data-grupo'))).toEqual(['e:B50:126', 'e:B50:128'])
-    expect(screen.getByTestId('franja-led').textContent).toContain('LED 126 o 128')
+    expect(plano()).toEqual(['e:B50:126'])
+    expect(document.querySelectorAll('[data-testid="leds-grupo"] [data-grupo]')).toHaveLength(0)
+    expect(screen.getByTestId('franja-led').textContent).toContain('LED 126')
+    expect(screen.getByTestId('franja-led').textContent).toContain('Plano 888, hoja 11: LED en la entrada X5:126')
+    expect(ficha().getByText(/La hoja 23 rotula B50 en el 128, pero las hojas 9 y 21 llevan al 128 la señal A3C_128 del contacto K7/)).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: 'Placa' }))
-    expect(encendidos()).toEqual([])
-    expect([...host()!.querySelectorAll('[id^="led-"][data-grupo]')].map(e => e.id).sort()).toEqual(['led-X5-126', 'led-X5-128'])
+    expect(encendidos()).toEqual(['led-X5-126'])
+    expect(host()!.querySelectorAll('[id^="led-"][data-grupo]')).toHaveLength(0)
   })
 
   it('B42 se alcanza desde el buscador y desde su borne 127', () => {
@@ -224,14 +226,15 @@ describe('Tarjeta A3C · B50 y B42 (hojas 11 y 21)', () => {
     expect(ficha().getByText('B42')).toBeTruthy()
   })
 
-  it('el borne 128 queda suelto, con su rótulo de la hoja 23 y la nota de la hoja 11', () => {
+  it('el borne 128 queda suelto, con contorno, el rótulo de la hoja 23 y la señal de K7 (hojas 9 y 21)', () => {
     montar()
     fireEvent.click(screen.getByRole('button', { name: /^Borne 128,/ }))
     expect(ficha().getAllByText('X5:128').length).toBeGreaterThan(0)
-    expect(ficha().getByText(/La hoja 23 rotula aquí B50; la hoja 11 lo cablea al borne 126/)).toBeTruthy()
-    // No dice «prende con la señal»: remite a B50 y solo marca el LED con contorno.
+    expect(ficha().getByText(/las hojas 9 y 21 le llevan la señal A3C_128 del contacto K7/)).toBeTruthy()
+    // No se enciende como sensor B50: solo contorno, y la franja dice por qué.
     expect(plano()).toEqual([])
-    expect(screen.getByTestId('franja-led').textContent).toContain('ve la ficha de B50')
+    expect(document.querySelectorAll('[data-testid="leds-grupo"] [data-grupo]')).toHaveLength(1)
+    expect(screen.getByTestId('franja-led').textContent).toContain('la señal A3C_128 del contacto K7 (relé), y la hoja 11 cablea B50 al 126')
     expect(screen.getByTestId('franja-led').textContent).not.toContain('prende con la señal')
   })
 })
