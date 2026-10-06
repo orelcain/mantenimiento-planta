@@ -20,6 +20,7 @@ import {
   guardarVistaTarjeta,
   leerVistaTarjeta,
   ledsGrupoPlaca,
+  ledsNeutrosPlaca,
   ledsPlaca,
   lineaEnPlaca,
   limitesPlaca,
@@ -44,6 +45,7 @@ import {
   puntoFoco,
   puntosGrupo,
   puntosLed,
+  puntosNeutros,
   resolverToqueAmbiguo,
   type ClaveSel,
   type Idioma,
@@ -262,11 +264,15 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   const leds = useMemo(() => puntosLed(m, item), [m, item])
   const grupo = useMemo(() => puntosGrupo(m, item), [m, item])
   const elegidos = useMemo(() => new Set([...item.bornes, ...(selN != null ? [selN] : [])]), [item, selN])
-  const encendidos = useMemo(() => new Set(item.grupoBits ? [] : item.leds), [item])
-  const enGrupo = useMemo(() => new Set(item.grupoBits ? item.leds : []), [item])
+  const neutros = useMemo(() => puntosNeutros(m, item), [m, item])
+  // Regleta: solo se enciende el LED que es señal del elemento; el resto, contorno o punto neutro.
+  const encendidos = useMemo(() => new Set(item.modoLed === 'senal' ? item.leds : []), [item])
+  const enGrupo = useMemo(() => new Set(item.modoLed === 'contorno' ? item.leds : []), [item])
+  const enNeutro = useMemo(() => new Set(item.modoLed === 'neutro' ? item.leds : []), [item])
   const grupos = useMemo(() => buscar(m, consulta, idioma), [m, consulta, idioma])
   const ledsP = useMemo(() => (placa ? ledsPlaca(placa.geo, item) : []), [placa, item])
   const grupoP = useMemo(() => (placa ? ledsGrupoPlaca(placa.geo, item) : []), [placa, item])
+  const neutrosP = useMemo(() => (placa ? ledsNeutrosPlaca(placa.geo, item) : []), [placa, item])
   // En «Placa» la franja dice si lo elegido no está en el dibujo; entonces «Ver» lleva al plano.
   const lineaVista = useMemo(
     () => (verPlaca && placa ? lineaEnPlaca(linea, placa.geo, item) : { ...linea, soloPlano: false }),
@@ -279,13 +285,16 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   useEffect(() => {
     const host = placaHost.current
     if (!host) return
-    host.querySelectorAll('[data-encendido],[data-grupo],[data-elegido]').forEach(e => {
+    // Solo los grupos del dibujo (con id): las capas de la app también llevan data-grupo / data-neutro.
+    host.querySelectorAll(':is([id^="led-"],[id^="borne-"]):is([data-encendido],[data-grupo],[data-neutro],[data-elegido])').forEach(e => {
       e.removeAttribute('data-encendido')
       e.removeAttribute('data-grupo')
+      e.removeAttribute('data-neutro')
       e.removeAttribute('data-elegido')
     })
     for (const l of ledsP) host.querySelector(`#${l.svgId}`)?.setAttribute('data-encendido', '')
     for (const l of grupoP) host.querySelector(`#${l.svgId}`)?.setAttribute('data-grupo', '')
+    for (const l of neutrosP) host.querySelector(`#${l.svgId}`)?.setAttribute('data-neutro', '')
     for (const n of elegidos) host.querySelector(`#borne-X5-${n}`)?.setAttribute('data-elegido', '')
   })
 
@@ -551,6 +560,11 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
           <circle key={p.k} className="a3c-contorno" data-grupo={p.k} cx={p.x} cy={p.y} r={4} />
         ))}
       </g>
+      <g data-testid="leds-neutros">
+        {neutros.map(p => (
+          <circle key={p.k} className={cn('a3c-led-neutro', p.tono !== 'gris' && `a3c-${p.tono}`)} data-neutro={p.k} cx={p.x} cy={p.y} r={2.7} />
+        ))}
+      </g>
       <g data-testid="leds-encendidos">
         {leds.map(p => (
           <g key={p.k} className={cn('a3c-led', p.color === 'g' && 'a3c-verde')} data-led={p.k}>
@@ -608,6 +622,11 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       <g data-testid="leds-placa-grupo">
         {grupoP.map(p => (
           <circle key={p.k} className="a3c-contorno a3c-en-placa" data-grupo={p.k} cx={p.x} cy={p.y} r={p.r * 1.4} />
+        ))}
+      </g>
+      <g data-testid="leds-placa-neutros">
+        {neutrosP.map(p => (
+          <circle key={p.k} className={cn('a3c-led-neutro a3c-en-placa', p.tono !== 'gris' && `a3c-${p.tono}`)} data-neutro={p.k} cx={p.x} cy={p.y} r={p.r * 1.05} />
         ))}
       </g>
       <g data-testid="leds-placa">
@@ -852,6 +871,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       elegidos={elegidos}
       encendidos={encendidos}
       grupo={enGrupo}
+      neutros={enNeutro}
       idioma={idioma}
       compacta={!grueso}
       vertical={pc}

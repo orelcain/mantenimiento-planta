@@ -29,7 +29,13 @@ export interface Borne {
   celda: Rect
   /** De dónde sale el elemento cuando no es el rótulo de la hoja 23, o por qué no se asigna. */
   nota?: string
+  /** «contorno»: su LED se marca sin encenderse (el plano no lo liga con certeza a esta señal). */
+  led_modo?: ModoLedDato
+  /** Texto de la franja «qué LED prende» cuando el genérico no aplica. */
+  franja_texto?: string
 }
+/** Cómo se muestra el LED de un ítem cuando el genérico no aplica. */
+export type ModoLedDato = 'contorno' | 'neutro'
 export interface Elemento {
   etiqueta: string
   original: string
@@ -51,6 +57,24 @@ export interface Elemento {
   tipo_sensor?: string
   /** Solo en certeza baja: qué confirmar en terreno. */
   pregunta_terreno?: string
+  /** Lo que falta confirmar en terreno sobre su LED o su borne (también en certeza alta). */
+  pregunta_terreno_led?: string
+  /** Nota que va junto al «Tipo» de sensor (p. ej. el plano admite otro tipo). */
+  tipo_sensor_nota?: string
+  /** «Cuándo prende el LED» propio de este elemento (manual, foto o contradicción del plano); manda sobre `led_texto`. */
+  cuando_texto?: string
+  /** «contorno»: su LED se marca sin encenderse (en reposo ya está encendido, o el plano se contradice). */
+  led_modo?: ModoLedDato
+  /** LED X5 que el plano le atribuye cuando no es el de su borne (hojas que se contradicen). */
+  leds_posibles?: number[]
+  /** Textos propios de la franja «qué LED prende» cuando el genérico no aplica. */
+  franja_grande?: string
+  franja_texto?: string
+  /** Franja de un elemento sin LED: por qué no lo tiene (sin el genérico «No tiene borne X5»). */
+  sin_led_grande?: string
+  sin_led_texto?: string
+  /** «Señal» propia cuando el genérico promete algo que el plano no dice. */
+  senal_texto?: string
   /** [] cuando no hay ubicación en la hoja 22. */
   hoja22_hotspots: Rect[]
 }

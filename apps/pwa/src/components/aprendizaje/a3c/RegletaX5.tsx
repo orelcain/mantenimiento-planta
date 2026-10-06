@@ -15,8 +15,10 @@ export interface RegletaX5Props {
   /** Bornes resaltados (los del elemento elegido + el borne tocado). */
   elegidos: Set<number>
   encendidos: Set<number>
-  /** Bornes cuyo LED forma un grupo (bits de un código): contorno fijo, sin encender. */
+  /** Bornes cuyo LED se marca con contorno fijo, sin encender (grupo, en reposo o asignación dudosa). */
   grupo?: Set<number>
+  /** Bornes cuyo LED se marca con un punto gris fijo (alimentación: el plano no dice cuándo prende). */
+  neutros?: Set<number>
   idioma: Idioma
   compacta: boolean
   /** Columna vertical (PC) en vez de tira horizontal (teléfono). */
@@ -25,7 +27,7 @@ export interface RegletaX5Props {
 }
 
 export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(function RegletaX5(
-  { bornes, elegidos, encendidos, grupo, idioma, compacta, vertical = false, onElegir },
+  { bornes, elegidos, encendidos, grupo, neutros, idioma, compacta, vertical = false, onElegir },
   ref,
 ) {
   // El código corto solo depende de los bornes: no se recalcula en cada hover del padre.
@@ -66,7 +68,7 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
                 elegidos.has(n) && 'bg-primary/[0.13] ring-2 ring-inset ring-primary',
               )}
             >
-              <span aria-hidden className={cn('a3c-punto', !b.led && 'a3c-sin-led', b.led && colorLed(n) === 'g' && 'a3c-verde', b.led && on && 'a3c-encendido', b.led && grupo?.has(n) && 'a3c-grupo')} />
+              <span aria-hidden className={cn('a3c-punto', !b.led && 'a3c-sin-led', b.led && colorLed(n) === 'g' && 'a3c-verde', b.led && on && 'a3c-encendido', b.led && grupo?.has(n) && 'a3c-grupo', b.led && neutros?.has(n) && 'a3c-neutro')} />
               <span className={cn('font-mono text-footnote font-semibold leading-none tabular-nums', vertical && 'w-[3ch] flex-none text-right', sin && 'text-muted-foreground/70')}>{n}</span>
               <span
                 className={cn(

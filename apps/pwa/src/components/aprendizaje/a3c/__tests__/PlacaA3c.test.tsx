@@ -4,8 +4,8 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { interiorPlaca, interiorSvg, type A3CDatos, type PaqueteA3c, type PaquetePlaca } from '@/data/baader142A3c'
-import { camaraDePreset, colorLed, LEDS_VERDES_FOTO, limitarCamara, matrizCamara } from '@/utils/aprendizaje/a3c'
-import { geometriaPlaca, leerTransform, limitesPlaca, presetsPlaca, ZONAS_PLACA } from '@/utils/aprendizaje/a3cPlaca'
+import { camaraDePreset, colorLed, construirModelo, describir, LEDS_VERDES_FOTO, limitarCamara, matrizCamara } from '@/utils/aprendizaje/a3c'
+import { geometriaPlaca, leerTransform, ledsGrupoPlaca, ledsNeutrosPlaca, ledsPlaca, limitesPlaca, presetsPlaca, ZONAS_PLACA } from '@/utils/aprendizaje/a3cPlaca'
 import { TarjetaA3c } from '../TarjetaA3c'
 
 const assets = resolve(__dirname, '../../../../../public/learning-assets/baader-142/a3c')
@@ -43,16 +43,18 @@ describe('Tarjeta A3C · vista Placa', () => {
     expect(host()).toBeNull()
   })
 
-  it('elegir B11 enciende solo led-X5-116 en la placa y resalta borne-X5-116', () => {
+  it('elegir B11 marca led-X5-116 con contorno (en reposo ya está encendido), sin encenderlo, y resalta borne-X5-116', () => {
     localStorage.setItem('a3c-vista-tarjeta', 'placa')
     montar()
     fireEvent.click(screen.getByRole('button', { name: /^Borne 116,/ }))
     expect(ficha().getByText('B11')).toBeTruthy()
-    expect(encendidos()).toEqual(['led-X5-116'])
+    expect(encendidos()).toEqual([])
+    expect([...host()!.querySelectorAll('[id^="led-"][data-grupo]')].map(e => e.id)).toEqual(['led-X5-116'])
     expect(host()!.querySelector('#borne-X5-116')!.hasAttribute('data-elegido')).toBe(true)
     expect(host()!.querySelector('#borne-X5-45')!.hasAttribute('data-elegido')).toBe(false)
-    const capa = [...document.querySelectorAll('[data-testid="leds-placa"] [data-led]')].map(g => g.getAttribute('data-led'))
-    expect(capa).toEqual(['e:B11:116'])
+    expect(document.querySelectorAll('[data-testid="leds-placa"] [data-led]')).toHaveLength(0)
+    expect(screen.getByTestId('franja-led').textContent).toContain('se espera que se apague')
+    expect(screen.getByTestId('franja-led').textContent).toContain('En la foto de la N2: encendido')
   })
 
   it('elegir B13 no enciende ningún LED de la placa y marca los 10 como grupo', () => {
@@ -62,7 +64,7 @@ describe('Tarjeta A3C · vista Placa', () => {
     expect(ficha().getByText('B13')).toBeTruthy()
     expect(encendidos()).toEqual([])
     expect(document.querySelectorAll('[data-testid="leds-placa"] [data-led]')).toHaveLength(0)
-    const grupo = [...host()!.querySelectorAll('[data-grupo]')].map(e => e.id).sort()
+    const grupo = [...host()!.querySelectorAll('[id^="led-"][data-grupo]')].map(e => e.id).sort()
     expect(grupo).toEqual(Array.from({ length: 10 }, (_, i) => `led-X5-${32 + i}`).sort())
     expect(document.querySelectorAll('[data-testid="leds-placa-grupo"] circle')).toHaveLength(10)
     expect(screen.getByTestId('franja-led').textContent).toContain('estaban encendidos 32, 35 y 37 a 40')
@@ -89,8 +91,8 @@ describe('Tarjeta A3C · vista Placa', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Placa' }))
     expect(encendidos()).toEqual(['led-X5-72'])
     expect(verde('[data-testid="leds-placa"] [data-led]')).toBe(true)
-    // Y un rojo de la foto (B11, borne 116) no.
-    fireEvent.click(screen.getByRole('button', { name: /^Borne 116,/ }))
+    // Y un rojo de la foto (B1, borne 42) no.
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 42,/ }))
     expect(verde('[data-testid="leds-placa"] [data-led]')).toBe(false)
   })
 
@@ -127,30 +129,36 @@ function tocarPlaca(x: number, y: number) {
 }
 
 describe('Tarjeta A3C · LED de estado «60V DC» en la placa', () => {
-  it('tocar led-estado-4 elige el LED 60V DC SM4 y lo enciende (en la placa y en el plano)', () => {
+  it('tocar led-estado-4 elige el LED 60V DC SM4: punto ámbar fijo (color de la foto), sin encenderlo', () => {
     localStorage.setItem('a3c-vista-tarjeta', 'placa')
     montar()
     const l = placa.geo.ledsEstado.get('V60_4')!
     tocarPlaca(l.x, l.y)
     expect(within(screen.getByTestId('franja-led')).getByText('LED 60V DC SM4')).toBeTruthy()
-    expect(encendidos()).toEqual(['led-estado-4'])
+    expect(screen.getByTestId('franja-led').textContent).toContain('En la foto de la N2: encendido (ámbar)')
+    expect(encendidos()).toEqual([])
+    expect([...host()!.querySelectorAll('[id^="led-"][data-neutro]')].map(e => e.id)).toEqual(['led-estado-4'])
+    expect(document.querySelector('[data-testid="leds-placa-neutros"] circle')!.classList.contains('a3c-ambar')).toBe(true)
     fireEvent.click(screen.getByRole('tab', { name: 'Plano' }))
-    const plano = [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
+    expect(document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')).toHaveLength(0)
+    const plano = [...document.querySelectorAll('[data-testid="leds-neutros"] [data-neutro]')].map(g => g.getAttribute('data-neutro'))
     expect(plano).toEqual(['l:V60_4:V60_4'])
   })
 
-  it('elegir el motor SM1 enciende led-estado-1 (su LED «60V DC»); «Ver» queda en la placa', () => {
+  it('elegir el motor SM1 marca led-estado-1 (su LED «60V DC») con contorno, sin encenderlo; «Ver» queda en la placa', () => {
     localStorage.setItem('a3c-vista-tarjeta', 'placa')
     montar()
     fireEvent.change(screen.getByLabelText('Buscar elemento, borne o LED'), { target: { value: 'SM1' } })
     fireEvent.click(screen.getAllByRole('button', { name: /^SM1 / })[0]!)
     expect(ficha().getByText('SM1')).toBeTruthy()
-    expect(encendidos()).toEqual(['led-estado-1'])
+    expect(encendidos()).toEqual([])
+    expect([...host()!.querySelectorAll('[id^="led-"][data-grupo]')].map(e => e.id)).toEqual(['led-estado-1'])
+    expect(screen.getByTestId('franja-led').textContent).toContain('El plano no dice cuándo prende cada uno')
     expect(within(screen.getByTestId('franja-led')).getByText('LED 60V DC SM1 y Step SM1')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ver LED 60V DC SM1 y Step SM1 en la tarjeta' })).toBeTruthy()
   })
 
-  it('X5:139 no está dibujado en la placa: la franja lo dice y «Ver en el plano» cambia a Plano con el LED 139', () => {
+  it('X5:139 no está dibujado en la placa: la franja lo dice y «Ver en el plano» cambia a Plano con el LED 139 en gris', () => {
     localStorage.setItem('a3c-vista-tarjeta', 'placa')
     montar()
     fireEvent.click(screen.getByRole('button', { name: /^Borne 139,/ }))
@@ -160,7 +168,8 @@ describe('Tarjeta A3C · LED de estado «60V DC» en la placa', () => {
     fireEvent.click(franja.getByRole('button', { name: 'Ver LED 139 en el plano' }))
     expect(host()).toBeNull()
     expect(screen.getByRole('tab', { name: 'Plano' }).getAttribute('aria-selected')).toBe('true')
-    const plano = [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
+    expect(document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')).toHaveLength(0)
+    const plano = [...document.querySelectorAll('[data-testid="leds-neutros"] [data-neutro]')].map(g => g.getAttribute('data-neutro'))
     expect(plano).toEqual(['b:139:139'])
     expect(within(screen.getByTestId('franja-led')).getByRole('button', { name: 'Ver LED 139 en la tarjeta' })).toBeTruthy()
   })
@@ -194,13 +203,16 @@ describe('Tarjeta A3C · B50 y B42 (hojas 11 y 21)', () => {
   }
   const plano = () => [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
 
-  it('elegir B50 enciende el LED 126 en el plano y led-X5-126 en la placa', () => {
+  it('elegir B50 marca los LED 126 y 128 con contorno (el plano se contradice), sin encender ninguno', () => {
     montar()
     buscarYElegir('B50')
     expect(ficha().getByText('B50')).toBeTruthy()
-    expect(plano()).toEqual(['e:B50:126'])
+    expect(plano()).toEqual([])
+    expect([...document.querySelectorAll('[data-testid="leds-grupo"] [data-grupo]')].map(g => g.getAttribute('data-grupo'))).toEqual(['e:B50:126', 'e:B50:128'])
+    expect(screen.getByTestId('franja-led').textContent).toContain('LED 126 o 128')
     fireEvent.click(screen.getByRole('tab', { name: 'Placa' }))
-    expect(encendidos()).toEqual(['led-X5-126'])
+    expect(encendidos()).toEqual([])
+    expect([...host()!.querySelectorAll('[id^="led-"][data-grupo]')].map(e => e.id).sort()).toEqual(['led-X5-126', 'led-X5-128'])
   })
 
   it('B42 se alcanza desde el buscador y desde su borne 127', () => {
@@ -217,11 +229,38 @@ describe('Tarjeta A3C · B50 y B42 (hojas 11 y 21)', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Borne 128,/ }))
     expect(ficha().getAllByText('X5:128').length).toBeGreaterThan(0)
     expect(ficha().getByText(/La hoja 23 rotula aquí B50; la hoja 11 lo cablea al borne 126/)).toBeTruthy()
-    expect(plano()).toEqual(['b:128:128'])
+    // No dice «prende con la señal»: remite a B50 y solo marca el LED con contorno.
+    expect(plano()).toEqual([])
+    expect(screen.getByTestId('franja-led').textContent).toContain('ve la ficha de B50')
+    expect(screen.getByTestId('franja-led').textContent).not.toContain('prende con la señal')
   })
 })
 
 describe('placa-n2.svg · integridad y seguridad', () => {
+  it('principio rector en la placa: solo se encienden LED de ítems en modo «señal»; ningún LED de estado se enciende', () => {
+    const m = construirModelo(datos)
+    const claves = [
+      ...Object.keys(datos.elementos).map(k => `e:${k}`),
+      ...datos.bornes.map(b => `b:${b.borne}`),
+      ...datos.ledsEstado.map(l => `l:${l.id}`),
+    ]
+    for (const c of claves) {
+      const it = describir(m, c, 'es')!
+      const on = ledsPlaca(placa.geo, it)
+      if (it.modoLed !== 'senal') expect(on, c).toEqual([])
+      for (const l of on) expect(l.svgId, c).toMatch(/^led-X5-\d+$/)
+      if (it.modoLed !== 'contorno') expect(ledsGrupoPlaca(placa.geo, it), c).toEqual([])
+      if (it.modoLed !== 'neutro') expect(ledsNeutrosPlaca(placa.geo, it), c).toEqual([])
+    }
+    expect(ledsPlaca(placa.geo, describir(m, 'e:B1', 'es')!).map(l => l.svgId)).toEqual(['led-X5-42'])
+    expect(ledsPlaca(placa.geo, describir(m, 'e:Y8', 'es')!).map(l => l.svgId)).toEqual(['led-X5-68'])
+    for (const k of ['B13', 'B21', 'B22', 'B23', 'B24', 'B25', 'SM1', 'SM2', 'SM3', 'SM4', 'SM5', 'SM6']) {
+      const it = describir(m, `e:${k}`, 'es')!
+      expect(ledsPlaca(placa.geo, it), k).toEqual([])
+      expect(ledsGrupoPlaca(placa.geo, it).length, k).toBeGreaterThan(0)
+    }
+  })
+
   it('cada led-estado-k asignado es un LED «60V DC» del plano, en su bloque X4 y en la misma posición relativa', () => {
     // Cajas de los conectores X4 de la placa (primer <rect> de cada grupo, con su transform).
     const x4 = new Map<string, { x0: number; x1: number; y0: number; y1: number }>()

@@ -46,6 +46,13 @@
 .a3c-led.a3c-en-plano .a3c-anillo { stroke: rgb(var(--brand)); --k: calc(1.75 / var(--escala, 1)); }
 .a3c-contorno { --k: max(1, calc(2 / var(--escala, 1))); transform: scale(var(--k)); transform-box: fill-box; transform-origin: center; fill: none; stroke: rgb(var(--brand)); stroke-width: 1.5; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .a3c-contorno.a3c-en-placa { --k: max(1, calc(1.03 / var(--escala, 1))); }
+/* LED marcado sin encender (modo «neutro»): punto fijo gris, o del color que tenía en la foto
+   (60V DC). Sin halo ni anillos: no es la señal del elemento. No hay token amarillo en el tema:
+   el amarillo de la foto (60V DC SM1–SM2) sale de mezclar el ámbar con un poco de verde. */
+.a3c-led-neutro { --tono: rgb(var(--muted-foreground)); --k: max(1, calc(1.852 / var(--escala, 1))); transform: scale(var(--k)); transform-box: fill-box; transform-origin: center; fill: var(--tono); stroke: rgb(var(--card)); stroke-width: 1; vector-effect: non-scaling-stroke; pointer-events: none; }
+.a3c-led-neutro.a3c-en-placa { --k: max(1, calc(.85 / var(--escala, 1))); }
+.a3c-led-neutro.a3c-ambar, .a3c-foco.a3c-neutro.a3c-ambar { --tono: rgb(var(--tw-amber-500)); }
+.a3c-led-neutro.a3c-amarillo, .a3c-foco.a3c-neutro.a3c-amarillo { --tono: color-mix(in srgb, rgb(var(--tw-amber-500)) 72%, rgb(var(--tw-green-500))); }
 .a3c-led.a3c-quiz .a3c-anillo { animation-iteration-count: infinite; animation-duration: 1.6s; }
 @keyframes a3c-fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes a3c-halo { from { opacity: 0; transform: scale(calc(var(--k, 1) * .4)) } to { opacity: 1; transform: scale(var(--k, 1)) } }
@@ -70,11 +77,14 @@
 .a3c-foco { width: 18px; height: 18px; border-radius: 9999px; flex: none; background: radial-gradient(circle, rgb(var(--tw-red-500)) 0 40%, rgb(var(--tw-red-500) / .35) 62%, transparent 72%); }
 .a3c-foco.a3c-verde { background: radial-gradient(circle, rgb(var(--tw-green-500)) 0 40%, rgb(var(--tw-green-500) / .35) 62%, transparent 72%); }
 .a3c-foco.a3c-apagado { background: transparent; box-shadow: inset 0 0 0 1.5px rgb(var(--muted-foreground) / .6); }
+.a3c-foco.a3c-grupo { background: transparent; border: 1.5px dashed rgb(var(--brand)); }
+.a3c-foco.a3c-neutro { --tono: rgb(var(--muted-foreground)); background: radial-gradient(circle, var(--tono) 0 40%, transparent 46%); box-shadow: inset 0 0 0 1.5px rgb(var(--muted-foreground) / .45); }
 
 .a3c-punto { position: relative; width: 10px; height: 10px; border-radius: 9999px; background: rgb(var(--tw-red-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-red-500) / .5); }
 .a3c-punto.a3c-verde { background: rgb(var(--tw-green-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-green-500) / .55); }
 .a3c-punto.a3c-grupo { background: transparent; box-shadow: none; border: 1.5px dashed rgb(var(--brand)); }
 .a3c-punto.a3c-sin-led { background: transparent; box-shadow: none; }
+.a3c-punto.a3c-neutro { background: rgb(var(--muted-foreground) / .75); box-shadow: none; }
 .a3c-punto.a3c-encendido { background: rgb(var(--tw-red-500)); box-shadow: 0 0 8px rgb(var(--tw-red-500) / .8); }
 .a3c-punto.a3c-verde.a3c-encendido { background: rgb(var(--tw-green-500)); box-shadow: 0 0 8px rgb(var(--tw-green-500) / .8); }
 .a3c-punto.a3c-encendido::after { content: ""; position: absolute; inset: -3px; border-radius: 9999px; border: 2px solid rgb(var(--tw-red-500)); opacity: 0; animation: a3c-anillo 1.1s cubic-bezier(.2,.7,.3,1) 3; }

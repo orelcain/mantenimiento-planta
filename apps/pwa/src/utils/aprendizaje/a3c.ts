@@ -61,6 +61,55 @@ export function colorLed(n: number): ColorLed {
   return LEDS_VERDES_FOTO.has(n) ? 'g' : 'r'
 }
 
+/**
+ * LED X5 que la foto de la N2 muestra (los `led-X5-n` de `placa-n2.svg`) y, de ellos, los que
+ * estaban ENCENDIDOS (`data-estado` «…-encendido»). Es una foto sin proceso, no un estado en vivo:
+ * solo respalda la línea «En la foto de la N2: …». El test de integridad la compara con el SVG.
+ */
+export const LEDS_FOTO: ReadonlySet<number> = new Set([
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 16, 18, 20, 22, 24, 26, 28,
+  32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+  66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 92, 93, 94,
+  95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111,
+  116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134,
+])
+export const LEDS_ENCENDIDOS_FOTO: ReadonlySet<number> = new Set([
+  4, 6, 9, 10, 32, 35, 37, 38, 39, 40, 48, 49, 72, 78, 80, 82, 98, 101, 103, 109, 110, 111,
+  116, 117, 122, 124, 125, 132, 134,
+])
+
+/** Tono de un LED que se marca sin encenderse: gris neutro, o el color que tenía en la foto. */
+export type TonoNeutro = 'gris' | 'ambar' | 'amarillo'
+
+/** LED de estado que la foto muestra, con su color (`led-estado-k` · `data-led-plano`); todos encendidos. */
+export const LEDS_ESTADO_FOTO: Readonly<Record<string, Exclude<TonoNeutro, 'gris'>>> = {
+  V60_1: 'amarillo',
+  V60_2: 'amarillo',
+  V60_3: 'ambar',
+  V60_4: 'ambar',
+  V60_5: 'ambar',
+  V60_6: 'ambar',
+}
+const NOMBRE_TONO: Record<TonoNeutro, string> = { gris: 'gris', ambar: 'ámbar', amarillo: 'amarillo' }
+
+const estadoFoto = (n: number) => (LEDS_ENCENDIDOS_FOTO.has(n) ? 'encendido' : 'apagado')
+
+/**
+ * «En la foto de la N2: …» para los LED X5 de un ítem, o null si la foto no muestra ninguno.
+ * Un LED: solo su estado; varios: «1 y 2 apagados» o «3 apagado, 4 encendido».
+ */
+export function textoFoto(ns: number[]): string | null {
+  const vs = ns.filter(n => LEDS_FOTO.has(n))
+  const v0 = vs[0]
+  if (v0 == null) return null
+  if (ns.length === 1) return `En la foto de la N2: ${estadoFoto(v0)}.`
+  if (vs.length === 1) return `En la foto de la N2: ${v0} ${estadoFoto(v0)}.`
+  if (vs.every(n => estadoFoto(n) === estadoFoto(v0))) {
+    return `En la foto de la N2: ${vs.slice(0, -1).join(', ')}${vs.length > 1 ? ` y ${vs[vs.length - 1]}` : ''} ${estadoFoto(v0)}${vs.length > 1 ? 's' : ''}.`
+  }
+  return `En la foto de la N2: ${vs.map(n => `${n} ${estadoFoto(n)}`).join(', ')}.`
+}
+
 // ─── Modelo ───────────────────────────────────────────────────────────────
 
 export interface ModeloA3c {
@@ -136,10 +185,24 @@ export interface ItemA3c {
   queHace: { texto: string; conDatos: boolean }
   cuandoLed: string
   /**
-   * Los bornes son los bits de un código (Bit 0 a Bit n, como el codificador de ángulo B13): sus
-   * LED se marcan como grupo del elemento y NO se encienden todos, porque en la foto no lo estaban.
+   * Cómo se muestran sus LED (`leds` y `ledsEstado`). Principio: solo se ENCIENDE el LED que el
+   * plano, el manual o la foto respaldan como señal de ESTE elemento al activarse.
+   *   `senal`    se encienden (núcleo, halo y anillos).
+   *   `contorno` se marcan con contorno punteado fijo, sin encender: bits de un código (B13), canales
+   *              A/B de un encoder, los LED de estado de un motor SM, un LED que ya está encendido en
+   *              reposo (B11) o uno que el plano se contradice en asignar (B50).
+   *   `neutro`   punto fijo gris (o del color que tenía en la foto), sin animación: un LED de estado
+   *              o de alimentación elegido por sí mismo, del que el plano no dice cuándo prende.
    */
-  grupoBits: boolean
+  modoLed: ModoLed
+  /** Tono del punto en modo `neutro`. */
+  tono: TonoNeutro | null
+  /** Franja propia (cuando el texto genérico no aplica). `texto` sin la línea de la foto. */
+  franja: { grande: string | null; texto: string | null }
+  /** Franja de un ítem sin LED, cuando el plano dice por qué. */
+  sinLed: { grande: string | null; texto: string } | null
+  /** «En la foto de la N2: …» de sus LED X5, o null si la foto no los muestra. */
+  foto: string | null
   senal: string
   /** Texto tal cual en el plano (alemán o código), para la ficha. */
   enPlano: string
@@ -147,8 +210,12 @@ export interface ItemA3c {
   fuentes: string[]
   nota: string | null
   tipoSensor: string | null
+  /** Aviso junto al tipo de sensor (el plano admite otro tipo). */
+  tipoSensorNota: string | null
   preguntaTerreno: string | null
 }
+
+export type ModoLed = 'senal' | 'contorno' | 'neutro'
 
 /**
  * ¿El tipo del elemento está respaldado por una fuente propia de ESE elemento? Certeza alta,
@@ -164,10 +231,20 @@ export function tipoRespaldado(e: Elemento): boolean {
   return /^motor/.test(e.tipo)
 }
 
-function tipoDeElemento(e: Elemento): TipoItem {
-  if (e.certeza === 'baja') return 'otro'
+/**
+ * Salida de certeza baja cuyos bornes la hoja 23 marca como salidas de la A3C (Y3, Y6, Y51, Y52):
+ * lo dudoso es el nombre o el uso, no el sentido; eso queda en «Pendiente de confirmar».
+ */
+function salidaPorBorne(m: ModeloA3c, e: Elemento): boolean {
+  return e.senal_a3c === 'salida' && e.borne.length > 0 && e.borne.every(n => m.bornes.get(n)?.sentido === 'salida')
+}
+
+function tipoDeElemento(m: ModeloA3c, e: Elemento): TipoItem {
+  if (e.certeza === 'baja') return salidaPorBorne(m, e) ? 'salida' : 'otro'
   if (/^motor/.test(e.tipo)) return 'motor'
   if (e.senal_a3c === 'salida' || e.tipo === 'salida') return 'salida'
+  // Un pulsador que no llega a la A3C (S1, S3…) no va con los sensores de la tarjeta.
+  if (e.senal_a3c === 'no_llega_a_la_A3C') return 'otro'
   if (e.tipo === 'sensor') return 'sensor'
   if (e.tipo === 'encoder') return 'encoder'
   if (e.senal_a3c === 'alimentacion') return 'alimentacion'
@@ -207,7 +284,6 @@ function textoLed(t: string): string {
     .trim()
 }
 
-/** LED de estado de un elemento: los que el paquete le asigna + Step SMn para el motor SMn. */
 const TEXTO_GRUPO_BITS =
   'Un LED por bit (Bit 0 a Bit 9). En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40.'
 
@@ -216,6 +292,32 @@ function esGrupoBits(m: ModeloA3c, bornes: number[]): boolean {
   return bornes.length >= 4 && bornes.every(n => /^Bit *[0-9]/.test(limpiarSenal(m.bornes.get(n)?.senal_original ?? '')))
 }
 
+/** ¿Los dos bornes son los canales A y B de un encoder («… A», «… B»), como B21–B25? */
+function esParAB(m: ModeloA3c, bornes: number[]): boolean {
+  const [a, b] = bornes.map(n => limpiarSenal(m.bornes.get(n)?.senal_original ?? ''))
+  return bornes.length === 2 && !!a && !!b && / A$/.test(a) && / B$/.test(b) && a.slice(0, -1) === b.slice(0, -1)
+}
+
+/** Texto de un par A/B: qué LED es cada canal y cómo estaban en la foto (no se encienden). */
+function textoParAB(a: number, b: number): string {
+  return `Canal A = LED ${a}, canal B = LED ${b}.${textoFoto([a, b]) ? ` ${textoFoto([a, b])}` : ''}`
+}
+
+/** Los LED de estado de un motor SM (60V DC y Step): qué son y cómo estaba el 60V DC en la foto. */
+function textoLedsMotor(sm: string, ls: LedEstado[]): string {
+  const v60 = ls.find(l => l.original === '60V DC')
+  const tono = v60 ? LEDS_ESTADO_FOTO[v60.id] : undefined
+  const foto = tono ? ` En la foto de la N2, 60V DC estaba encendido (${NOMBRE_TONO[tono]}).` : ''
+  return `LED rotulados 60V DC y Step ${sm} del bloque ${sm}. El plano no dice cuándo prende cada uno.${foto}`
+}
+
+/** Une un texto y la línea de la foto (si la hay y el texto no la trae ya). */
+function conFoto(texto: string, foto: string | null): string {
+  if (!foto || texto.includes('En la foto de la N2')) return texto
+  return texto ? `${texto.replace(/[.\s]+$/, '')}. ${foto}` : foto
+}
+
+/** LED de estado de un elemento: los que el paquete le asigna + Step SMn para el motor SMn. */
 function ledsEstadoDe(m: ModeloA3c, clave: string): LedEstado[] {
   const propios = m.datos.ledsEstado.filter(l => l.elemento === clave)
   const sm = /^SM(\d)$/.exec(clave)
@@ -228,10 +330,24 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
   if (k === 'e') {
     const e = m.datos.elementos[id]
     if (!e) return null
-    const tipo = tipoDeElemento(e)
+    const tipo = tipoDeElemento(m, e)
     const bornes = [...e.borne].sort((a, b) => a - b)
     const nombre = idioma === 'or' && e.original ? e.original : e.es
     const conDatos = e.certeza !== 'baja' && !!e.que_hace && e.que_hace !== SIN_DESCRIPCION
+    const ledsEstado = ledsEstadoDe(m, id)
+    const leds = e.leds_posibles ?? bornes.filter(n => m.bornes.get(n)?.led)
+    const bits = esGrupoBits(m, bornes)
+    const [a, b] = leds
+    const parAB = !bits && a != null && b != null && leds.length === 2 && esParAB(m, bornes)
+    // Solo LED de estado (motores SM, y los grupos A3C.R_L_SM… que no se eligen): ninguno es la señal del elemento.
+    const soloEstado = !leds.length && ledsEstado.length > 0
+    const foto = textoFoto(leds)
+    // Texto propio de un grupo (no se enciende): el mismo en la franja y en «Cuándo prende».
+    const textoGrupo = bits ? TEXTO_GRUPO_BITS
+      : parAB ? textoParAB(a, b)
+        : soloEstado && /^motor/.test(e.tipo) ? textoLedsMotor(id, ledsEstado)
+          : soloEstado ? `LED de estado de la tarjeta (${ledsEstado.map(l => l.etiqueta).join(', ')}). El plano no dice cuándo prende cada uno.`
+            : null
     return {
       clave,
       codigo: e.etiqueta,
@@ -240,19 +356,29 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       tipo,
       mostrarTipo: tipoRespaldado(e),
       bornes,
-      leds: bornes.filter(n => m.bornes.get(n)?.led),
-      ledsEstado: ledsEstadoDe(m, id),
+      leds,
+      ledsEstado,
       hotspots: e.hoja22_hotspots,
       queHace: { texto: conDatos ? e.que_hace : SIN_DESCRIPCION, conDatos },
-      cuandoLed: esGrupoBits(m, bornes) ? TEXTO_GRUPO_BITS : e.led_texto ? textoLed(e.led_texto) : '',
-      grupoBits: esGrupoBits(m, bornes),
-      senal: e.certeza === 'baja' ? SENAL_NO_INDICADO : (SENAL[e.senal_a3c] ?? SENAL_NO_INDICADO),
+      cuandoLed: textoGrupo ?? (e.cuando_texto ? conFoto(e.cuando_texto, foto) : e.led_texto ? conFoto(textoLed(e.led_texto), foto) : ''),
+      modoLed: textoGrupo ? 'contorno' : (e.led_modo ?? 'senal'),
+      tono: null,
+      franja: {
+        grande: e.franja_grande ?? null,
+        texto: bits ? 'Uno por bit (Bit 0 a Bit 9). En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40.' : (textoGrupo ?? e.franja_texto ?? null),
+      },
+      sinLed: e.sin_led_texto ? { grande: e.sin_led_grande ?? null, texto: e.sin_led_texto } : null,
+      foto,
+      senal:
+        e.senal_texto ??
+        (e.certeza === 'baja' ? (salidaPorBorne(m, e) ? SENAL.salida! : SENAL_NO_INDICADO) : (SENAL[e.senal_a3c] ?? SENAL_NO_INDICADO)),
       enPlano: e.original,
       modulo: e.modulo,
       fuentes: conDatos ? (e.fuentes ?? []) : [],
       nota: e.nota ?? null,
       tipoSensor: e.tipo_sensor ?? null,
-      preguntaTerreno: e.certeza === 'baja' ? (e.pregunta_terreno ?? null) : null,
+      tipoSensorNota: e.tipo_sensor_nota ?? null,
+      preguntaTerreno: (e.certeza === 'baja' ? e.pregunta_terreno : e.pregunta_terreno_led) ?? null,
     }
   }
   if (k === 'b') {
@@ -264,9 +390,23 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
     const es = tipo === 'sin' ? 'Sin etiqueta en el plano' : limpiarSenal(b.senal_es) || original
     const nombre = idioma === 'or' && original ? original : es
     let queHace: ItemA3c['queHace'] = { texto: SIN_DESCRIPCION, conDatos: false }
-    if (tipo === 'alimentacion') queHace = { texto: 'Alimentación de la tarjeta. No es una señal.', conDatos: true }
+    if (tipo === 'alimentacion') queHace = { texto: 'Borne de alimentación.', conDatos: true }
     else if (tipo === 'comunicacion') queHace = { texto: 'Línea de comunicación serie. No corresponde a un sensor.', conDatos: true }
     else if (tipo === 'sin') queHace = { texto: 'El plano no le pone etiqueta a este borne.', conDatos: false }
+    // Regleta de alimentación (136–145): su LED no es la señal de ningún elemento; punto gris.
+    const alimentacion = !!b.led && regletaDe(n)?.desde === 136
+    // Un borne de un elemento hereda su restricción (B13, B21–B25, B11, B50): la UI abre el
+    // elemento (`claveDeBorne`), pero `b:N` tampoco debe encender lo que el elemento no enciende.
+    const delElemento = b.elemento && m.datos.elementos[b.elemento] ? describir(m, `e:${b.elemento}`, idioma)?.modoLed : undefined
+    const modoLed: ModoLed = !b.led ? 'senal'
+      : alimentacion ? 'neutro'
+        : (b.led_modo ?? (tipo === 'sin' || (delElemento && delElemento !== 'senal') ? 'contorno' : 'senal'))
+    let franja: string | null = b.franja_texto ?? null
+    if (!franja && alimentacion) {
+      franja = `${tipo === 'sin' ? 'Borne sin rótulo de la regleta de alimentación' : `Borne de alimentación «${original}»`}. El plano no dice cuándo prende.`
+    } else if (!franja && modoLed === 'contorno') {
+      franja = tipo === 'sin' && !delElemento ? 'Borne sin rótulo: el plano no dice de qué señal es este LED' : `LED del elemento ${b.elemento}: ve su ficha`
+    }
     return {
       clave,
       codigo: `X5:${n}`,
@@ -280,13 +420,18 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       hotspots: [],
       queHace,
       cuandoLed: '',
-      grupoBits: false,
+      modoLed,
+      tono: modoLed === 'neutro' ? 'gris' : null,
+      franja: { grande: null, texto: franja },
+      sinLed: null,
+      foto: b.led ? textoFoto([n]) : null,
       senal: SENAL[b.sentido] ?? SENAL_NO_INDICADO,
       enPlano: original,
       modulo: null,
       fuentes: [],
       nota: b.nota ?? null,
       tipoSensor: null,
+      tipoSensorNota: null,
       preguntaTerreno: null,
     }
   }
@@ -294,6 +439,9 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
     const l = m.ledsEstado.get(id)
     if (!l) return null
     const nombre = idioma === 'or' ? l.original : l.es
+    // LED de estado elegido por sí mismo: el plano no dice cuándo prende; punto fijo, gris o del color de la foto.
+    const tono: TonoNeutro = LEDS_ESTADO_FOTO[l.id] ?? 'gris'
+    const bloque = l.original === '60V DC' && l.elemento ? ` del bloque ${l.elemento}` : ''
     return {
       clave,
       codigo: l.etiqueta,
@@ -307,13 +455,18 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       hotspots: [],
       queHace: { texto: `LED de la tarjeta rotulado «${l.original}»${l.es !== l.original ? ` (${l.es})` : ''}.`, conDatos: true },
       cuandoLed: '',
-      grupoBits: false,
+      modoLed: 'neutro',
+      tono,
+      franja: { grande: null, texto: `LED rotulado «${l.original}»${bloque}. El plano no dice cuándo prende.` },
+      sinLed: null,
+      foto: tono === 'gris' ? null : `En la foto de la N2: encendido (${NOMBRE_TONO[tono]}).`,
       senal: 'Indicador interno de la tarjeta',
       enPlano: l.original,
       modulo: 'Tarjeta A3C',
       fuentes: [],
       nota: null,
       tipoSensor: null,
+      tipoSensorNota: null,
       preguntaTerreno: null,
     }
   }
@@ -324,13 +477,16 @@ export interface LineaLed {
   /** «LED 45», «LED 32–41», «Sin LED»… */
   grande: string
   texto: string
+  /** Color del LED que se ENCIENDE (solo en modo `senal`); null si nada se enciende. */
   color: ColorLed | null
-  /** Hay algo que encender en la tarjeta (habilita «Ver»). */
+  /** Hay algo que mostrar en la tarjeta (habilita «Ver»). */
   encendible: boolean
   /** Qué nombra «Ver» cuando no es un LED (p. ej. «el borne 136»); si falta, `grande`. */
   nombreVer?: string
-  /** Los LED son un grupo (bits de un código): se marcan con contorno, no se encienden. */
+  /** Los LED se marcan con contorno, sin encenderse (grupo, en reposo o asignación dudosa). */
   grupo?: boolean
+  /** El LED se marca con un punto fijo de este tono, sin encenderse. */
+  tono?: TonoNeutro
 }
 
 function rango(ns: number[]): string {
@@ -340,51 +496,52 @@ function rango(ns: number[]): string {
 
 /** La franja «qué LED prende». */
 export function lineaLed(item: ItemA3c): LineaLed {
-  if (item.tipo === 'led') {
-    return { grande: `LED ${item.codigo}`, texto: 'LED propio de la tarjeta, sin borne X5', color: 'r', encendible: true }
-  }
   const l0 = item.ledsEstado[0]
   if (!item.leds.length && l0) {
     const ls = item.ledsEstado
     const ln = ls[ls.length - 1] ?? l0
     const grande = ls.length > 2 ? `LED ${l0.etiqueta} a ${ln.etiqueta}` : ls.length === 2 ? `LED ${l0.etiqueta} y ${ln.etiqueta}` : `LED ${l0.etiqueta}`
-    return { grande, texto: 'LED de estado de la tarjeta, sin borne X5', color: 'r', encendible: true }
+    const texto = conFoto(item.franja.texto ?? 'LED de estado de la tarjeta, sin borne X5', item.foto)
+    if (item.modoLed === 'neutro') return { grande, texto, color: null, encendible: true, tono: item.tono ?? 'gris' }
+    return { grande, texto, color: null, encendible: true, grupo: true }
   }
   if (!item.bornes.length) {
+    if (item.sinLed) return { grande: item.sinLed.grande ?? 'Sin LED', texto: item.sinLed.texto, color: null, encendible: false }
     return { grande: 'Sin LED en la A3C', texto: 'No tiene borne X5 en la tarjeta', color: null, encendible: false }
   }
   const n0 = item.leds[0]
   if (n0 == null) {
-    return { grande: 'Sin LED', texto: `Borne ${rango(item.bornes)}: el plano no le dibuja LED`, color: null, encendible: false }
+    return { grande: 'Sin LED', texto: item.sinLed?.texto ?? `Borne ${rango(item.bornes)}: el plano no le dibuja LED`, color: null, encendible: false }
   }
-  if (item.grupoBits) {
-    return {
-      grande: `LED ${rango(item.leds)}`,
-      texto: 'Uno por bit (Bit 0 a Bit 9). En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40.',
-      color: null,
-      encendible: true,
-      grupo: true,
-    }
+  const grande = item.franja.grande ?? `LED ${rango(item.leds)}`
+  if (item.modoLed === 'contorno') {
+    return { grande, texto: conFoto(item.franja.texto ?? '', item.foto), color: null, encendible: true, grupo: true }
+  }
+  if (item.modoLed === 'neutro') {
+    return { grande, texto: conFoto(item.franja.texto ?? '', item.foto), color: null, encendible: true, tono: item.tono ?? 'gris' }
   }
   const r = regletaDe(n0)
   const cuando =
-    item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
-        : item.tipo === 'sensor' || item.tipo === 'encoder' ? 'prende con la señal del elemento'
-          : 'el plano no indica el sentido de esta señal'
+    item.franja.texto ??
+    (item.tipo === 'salida' ? 'prende cuando la A3C activa la salida'
+      : item.tipo === 'sensor' || item.tipo === 'encoder' ? 'prende con la señal del elemento'
+        : 'el plano no indica el sentido de esta señal')
   return {
-    grande: `LED ${rango(item.leds)}`,
-    texto: `${r ? `Regleta ${r.desde}–${r.hasta} · ` : ''}${cuando}`,
+    grande,
+    texto: conFoto(`${r ? `Regleta ${r.desde}–${r.hasta} · ` : ''}${cuando}`, item.foto),
     color: colorLed(n0),
     encendible: true,
   }
 }
 
 export interface PuntoLed { k: string; x: number; y: number; color: ColorLed }
+export interface PuntoNeutro { k: string; x: number; y: number; tono: TonoNeutro }
 
-/** Los LED que se encienden en la hoja 23 para un ítem. */
+/** Los LED que se ENCIENDEN en la hoja 23 para un ítem: solo en modo `senal`. */
 export function puntosLed(m: ModeloA3c, item: ItemA3c): PuntoLed[] {
+  if (item.modoLed !== 'senal') return []
   const out: PuntoLed[] = []
-  for (const n of item.grupoBits ? [] : item.leds) {
+  for (const n of item.leds) {
     const l = m.bornes.get(n)?.led
     if (l) out.push({ k: `${item.clave}:${n}`, x: l.x, y: l.y, color: colorLed(n) })
   }
@@ -392,20 +549,34 @@ export function puntosLed(m: ModeloA3c, item: ItemA3c): PuntoLed[] {
   return out
 }
 
-/** Los LED que se marcan como GRUPO del elemento (contorno fijo, sin encender): solo los bits de un código. */
+/** Los LED que se marcan con CONTORNO (fijo, sin encender): modo `contorno`, X5 y de estado. */
 export function puntosGrupo(m: ModeloA3c, item: ItemA3c): PuntoLed[] {
-  if (!item.grupoBits) return []
+  if (item.modoLed !== 'contorno') return []
   const out: PuntoLed[] = []
   for (const n of item.leds) {
     const l = m.bornes.get(n)?.led
     if (l) out.push({ k: `${item.clave}:${n}`, x: l.x, y: l.y, color: colorLed(n) })
   }
+  for (const l of item.ledsEstado) out.push({ k: `${item.clave}:${l.id}`, x: l.led.x, y: l.led.y, color: 'r' })
+  return out
+}
+
+/** Los LED que se marcan con un PUNTO FIJO neutro (gris o color de la foto): modo `neutro`. */
+export function puntosNeutros(m: ModeloA3c, item: ItemA3c): PuntoNeutro[] {
+  if (item.modoLed !== 'neutro') return []
+  const tono = item.tono ?? 'gris'
+  const out: PuntoNeutro[] = []
+  for (const n of item.leds) {
+    const l = m.bornes.get(n)?.led
+    if (l) out.push({ k: `${item.clave}:${n}`, x: l.x, y: l.y, tono })
+  }
+  for (const l of item.ledsEstado) out.push({ k: `${item.clave}:${l.id}`, x: l.led.x, y: l.led.y, tono })
   return out
 }
 
 /** Punto al que ir en la tarjeta: el primer LED o, si no hay, el centro del primer borne. */
 export function puntoFoco(m: ModeloA3c, item: ItemA3c): [number, number] | null {
-  const p = puntosLed(m, item)[0] ?? puntosGrupo(m, item)[0]
+  const p = puntosLed(m, item)[0] ?? puntosGrupo(m, item)[0] ?? puntosNeutros(m, item)[0]
   if (p) return [p.x, p.y]
   const b = item.bornes[0] != null ? m.bornes.get(item.bornes[0]) : undefined
   return b ? [b.celda.x + b.celda.w / 2, b.celda.y + b.celda.h / 2] : null
@@ -447,11 +618,15 @@ function norm(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
 
-/** Todo lo que se puede elegir en la lista (sin buscar): lo que tiene borne o ubicación. */
+/**
+ * Todo lo que se puede elegir en la lista (sin buscar): lo que tiene borne o ubicación, y los
+ * motores con LED de estado en la tarjeta aunque no tengan ninguna de las dos (SM6).
+ */
 export function clavesListables(m: ModeloA3c): ClaveSel[] {
   const out: ClaveSel[] = []
   for (const [k, e] of Object.entries(m.datos.elementos)) {
-    if (e.borne.length || e.hoja22_hotspots.length) out.push(`e:${k}`)
+    const motorConLed = /^motor/.test(e.tipo) && ledsEstadoDe(m, k).length > 0
+    if (e.borne.length || e.hoja22_hotspots.length || motorConLed) out.push(`e:${k}`)
   }
   for (const b of m.datos.bornes) {
     if (!b.elemento && (b.sentido === 'entrada' || b.sentido === 'salida' || b.sentido === 'no_indicado')) out.push(`b:${b.borne}`)

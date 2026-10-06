@@ -240,3 +240,54 @@ describe('Tarjeta A3C', () => {
     expect(screen.getByRole('tab', { name: 'Explorar' }).getAttribute('aria-selected')).toBe('true')
   })
 })
+
+describe('Tarjeta A3C · solo se enciende la señal del elemento', () => {
+  const grupoPlano = () => [...document.querySelectorAll('[data-testid="leds-grupo"] [data-grupo]')].map(g => g.getAttribute('data-grupo'))
+  const elegirDeLista = (codigo: string) => {
+    fireEvent.change(screen.getByLabelText('Buscar elemento, borne o LED'), { target: { value: codigo } })
+    fireEvent.click(screen.getAllByRole('button', { name: new RegExp(`^${codigo} `) })[0]!)
+  }
+
+  it('B21 (encoder A/B): los LED 1 y 2 con contorno, ninguno encendido, y el estado de la foto', () => {
+    montar(true)
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 1,/ }))
+    expect(ledsEncendidos()).toEqual([])
+    expect(grupoPlano()).toEqual(['e:B21:1', 'e:B21:2'])
+    expect(document.querySelectorAll('.a3c-punto.a3c-encendido')).toHaveLength(0)
+    expect(document.querySelectorAll('.a3c-punto.a3c-grupo')).toHaveLength(2)
+    expect(screen.getByTestId('franja-led').textContent).toContain('Canal A = LED 1, canal B = LED 2. En la foto de la N2: 1 y 2 apagados.')
+  })
+
+  it('B11: sin anillos de encendido; contorno y el texto del manual', () => {
+    montar(true)
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 116,/ }))
+    expect(ledsEncendidos()).toEqual([])
+    // (Los anillos del plano de ubicación, hoja 22, marcan dónde está el sensor, no un LED.)
+    expect(document.querySelectorAll('[data-testid="leds-encendidos"] .a3c-anillo')).toHaveLength(0)
+    expect(grupoPlano()).toEqual(['e:B11:116'])
+    expect(within(screen.getByTestId('ficha-a3c')).getByText(/con las puntas juntas \(reposo\) el diodo está encendido/)).toBeTruthy()
+  })
+
+  it('SM3 elegido por la lista: 60V DC y Step con contorno, ninguno encendido; SM6 también se puede elegir', () => {
+    montar(true)
+    elegirDeLista('SM3')
+    expect(ledsEncendidos()).toEqual([])
+    expect(grupoPlano()).toEqual(['e:SM3:V60_3', 'e:SM3:STEP3'])
+    expect(screen.getByTestId('franja-led').textContent).toContain('En la foto de la N2, 60V DC estaba encendido (ámbar)')
+    elegirDeLista('SM6')
+    expect(within(screen.getByTestId('ficha-a3c')).getByText('SM6')).toBeTruthy()
+    expect(grupoPlano()).toEqual(['e:SM6:V60_6', 'e:SM6:STEP6'])
+  })
+
+  it('Y8 enciende su LED 68 con anillos; el borne 139 (alimentación) queda como punto gris', () => {
+    montar(true)
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 68,/ }))
+    expect(ledsEncendidos()).toEqual(['e:Y8:68'])
+    expect(document.querySelectorAll('[data-testid="leds-encendidos"] .a3c-anillo')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: /^Borne 139,/ }))
+    expect(ledsEncendidos()).toEqual([])
+    expect([...document.querySelectorAll('[data-testid="leds-neutros"] [data-neutro]')].map(g => g.getAttribute('data-neutro'))).toEqual(['b:139:139'])
+    expect(document.querySelectorAll('.a3c-punto.a3c-neutro')).toHaveLength(1)
+    expect(document.querySelector('[data-testid="franja-led"] .a3c-foco')!.classList.contains('a3c-neutro')).toBe(true)
+  })
+})

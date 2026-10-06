@@ -6,8 +6,8 @@ import {
   buscar, camaraDePreset, camaraPellizco, centroRect, deltaRuedaPx, objetivosHoja22, resolverToqueAmbiguo, claveDeBorne, codigoCorto, colorLed, construirModelo,
   describir, elegirEn, guardarIdioma, guardarRacha, leerIdioma, leerRacha,
   limitarCamara, lineaLed, lineasDeTexto, matrizCamara, nuevoQuiz, objetivosHoja23,
-  pantallaAUnidades, puntosGrupo, puntosLed, recorteRegleta, regletaDe, reiniciar, responder,
-  siguiente, SIN_DESCRIPCION, tipoRespaldado, zoomCamara, type LimitesCamara,
+  pantallaAUnidades, puntosGrupo, puntosLed, puntosNeutros, recorteRegleta, regletaDe, reiniciar, responder,
+  siguiente, SIN_DESCRIPCION, tipoRespaldado, zoomCamara, LEDS_ENCENDIDOS_FOTO, LEDS_ESTADO_FOTO, LEDS_FOTO, type LimitesCamara,
 } from '../a3c'
 
 const datos = JSON.parse(readFileSync(resolve(__dirname, '../../../../public/learning-assets/baader-142/a3c/a3c-datos.json'), 'utf8')) as A3CDatos
@@ -31,7 +31,7 @@ describe('selección y descripción con datos reales', () => {
 
   it('B13: los 10 LED son un grupo de bits, no se encienden; B1 sí se enciende', () => {
     const b13 = item('e:B13')
-    expect(b13.grupoBits).toBe(true)
+    expect(b13.modoLed).toBe('contorno')
     expect(puntosLed(m, b13)).toEqual([])
     expect(puntosGrupo(m, b13)).toHaveLength(10)
     const l = lineaLed(b13)
@@ -40,12 +40,12 @@ describe('selección y descripción con datos reales', () => {
     expect(l.texto).toContain('En la foto de la N2 solo estaban encendidos 32, 35 y 37 a 40')
     expect(b13.cuandoLed).toContain('32, 35 y 37 a 40')
     expect(b13.cuandoLed).not.toMatch(/se enciende cuando/i)
-    expect(item('e:B1').grupoBits).toBe(false)
+    expect(item('e:B1').modoLed).toBe('senal')
     expect(puntosGrupo(m, item('e:B1'))).toEqual([])
     expect(puntosLed(m, item('e:B1'))).toHaveLength(1)
-    // Ningún otro elemento tiene bornes que sean bits de un código.
-    const otros = Object.keys(datos.elementos).filter(k => item(`e:${k}`).grupoBits)
-    expect(otros).toEqual(['B13'])
+    // Los únicos elementos con LED X5 marcados como grupo: B13, los pares A/B, B11 (en reposo) y B50 (dudoso).
+    const otros = Object.keys(datos.elementos).filter(k => item(`e:${k}`).modoLed === 'contorno' && item(`e:${k}`).leds.length)
+    expect(otros.sort()).toEqual(['B11', 'B13', 'B21', 'B22', 'B23', 'B24', 'B25', 'B50'])
   })
 
   it('explica la salida Y8, el rango B13 y el par de LED del encoder B21', () => {
@@ -55,7 +55,7 @@ describe('selección y descripción con datos reales', () => {
     expect(lineaLed(item('e:B13')).grande).toBe('LED 32–41')
     expect(item('e:B21').tipo).toBe('encoder')
     expect(item('e:B21').leds).toHaveLength(2)
-    expect(lineaLed(item('e:B21')).texto).toContain('prende con la señal del elemento')
+    expect(lineaLed(item('e:B21')).texto).toBe('Canal A = LED 1, canal B = LED 2. En la foto de la N2: 1 y 2 apagados.')
   })
 
   it('asocia STEP2 al motor SM2 aunque no tenga bornes', () => {
@@ -70,7 +70,9 @@ describe('selección y descripción con datos reales', () => {
     expect(item('b:11')).toMatchObject({ tipo: 'sin', nombre: 'Sin etiqueta en el plano' })
     expect(lineaLed(item('b:11')).grande).toBe('Sin LED')
     expect(item('l:RL1').tipo).toBe('led')
-    expect(puntosLed(m, item('l:RL1'))).toHaveLength(1)
+    // Un LED de estado elegido por sí mismo no se enciende: punto gris fijo.
+    expect(puntosLed(m, item('l:RL1'))).toHaveLength(0)
+    expect(puntosNeutros(m, item('l:RL1'))).toEqual([expect.objectContaining({ tono: 'gris' })])
   })
 
   it('no presenta como documentados los elementos de certeza baja', () => {
@@ -85,8 +87,10 @@ describe('selección y descripción con datos reales', () => {
       expect(item(`e:${k}`), k).toMatchObject({ mostrarTipo: false, modulo: null })
     }
     expect(item('e:B30').tipo).toBe('otro')
-    expect(item('e:Y3')).toMatchObject({ mostrarTipo: false, tipo: 'otro', cuandoLed: '', senal: 'El plano no indica el sentido' })
-    expect(lineaLed(item('e:Y3')).texto).not.toContain('activa la salida')
+    // Y3: certeza baja en el nombre, pero la hoja 23 marca su borne como salida: texto de salida y la duda aparte.
+    expect(item('e:Y3')).toMatchObject({ mostrarTipo: false, tipo: 'salida', cuandoLed: '', senal: 'Salida: la A3C activa el elemento' })
+    expect(lineaLed(item('e:Y3')).texto).toContain('prende cuando la A3C activa la salida')
+    expect(item('e:Y3').preguntaTerreno).toBeTruthy()
     // B42 es alta, pero solo del plano: sin píldora de tipo (el nombre ya lo dice).
     expect(item('e:B42')).toMatchObject({ mostrarTipo: false, modulo: null })
     // B11: el manual lo lista como interruptor de aproximación; su módulo era cercanía en el dibujo.
@@ -127,7 +131,9 @@ describe('selección y descripción con datos reales', () => {
   it('la franja de B1 (borne 42) es roja y la de un borne verde de la foto es verde', () => {
     expect(lineaLed(item('e:B1'))).toMatchObject({ grande: 'LED 42', color: 'r' })
     expect(lineaLed(item(claveDeBorne(m, 72))).color).toBe('g')
-    expect(lineaLed(item(claveDeBorne(m, 5))).color).toBe('g')
+    expect(lineaLed(item(claveDeBorne(m, 68))).color).toBe('g')
+    // Borne 5 = canal A de B23: grupo, no se enciende (sin color de encendido).
+    expect(lineaLed(item(claveDeBorne(m, 5)))).toMatchObject({ color: null, grupo: true })
   })
 
   it('no asigna regleta al borne inexistente 135', () => {
@@ -354,6 +360,9 @@ describe('LED «60V DC» de cada bloque SM (hoja 23)', () => {
   it('cada SMk tiene su LED 60V DC y la franja nombra los dos LED con «y»', () => {
     for (let k = 1; k <= 6; k++) expect(item(`e:SM${k}`).ledsEstado.map(l => l.id)).toEqual([`V60_${k}`, `STEP${k}`])
     expect(lineaLed(item('e:SM2')).grande).toBe('LED 60V DC SM2 y Step SM2')
+    expect(lineaLed(item('e:SM2'))).toMatchObject({ color: null, grupo: true })
+    expect(lineaLed(item('e:SM2')).texto).toBe('LED rotulados 60V DC y Step SM2 del bloque SM2. El plano no dice cuándo prende cada uno. En la foto de la N2, 60V DC estaba encendido (amarillo).')
+    expect(lineaLed(item('e:SM4')).texto).toContain('encendido (ámbar)')
   })
 
   it('cada LED 60V DC queda junto a su rótulo «60V DC» y en el bloque de su SM (mismo lado, rótulo SM más cercano)', () => {
@@ -370,5 +379,141 @@ describe('LED «60V DC» de cada bloque SM (hoja 23)', () => {
       const cerca = lado.sort((a, b) => Math.abs(a.y - l.led.y) - Math.abs(b.y - l.led.y))[0]!
       expect(cerca.original.startsWith(`SM${k} `)).toBe(true)
     }
+  })
+})
+
+// ─── Principio rector ─────────────────────────────────────────────────────
+// Solo se ENCIENDE (núcleo, halo y anillos) el LED que el plano, el manual o la foto respaldan como
+// señal de ESE elemento al activarse. Grupos de bits, canales A/B, LED de estado y de alimentación
+// se marcan (contorno o punto neutro) y la franja dice qué son y cómo estaban en la foto de la N2.
+describe('principio rector: solo se enciende el LED que es señal del elemento', () => {
+  const todas = [
+    ...Object.keys(datos.elementos).map(k => `e:${k}`),
+    ...datos.bornes.map(b => `b:${b.borne}`),
+    ...datos.ledsEstado.map(l => `l:${l.id}`),
+  ]
+  const svg = readFileSync(resolve(__dirname, '../../../../public/learning-assets/baader-142/a3c/placa-n2.svg'), 'utf8')
+  const estados = [...svg.matchAll(/id="led-X5-(\d+)"[^>]*?data-estado="([^"]+)"/g)].map(x => [Number(x[1]), x[2]!] as const)
+
+  it('ningún LED de grupo, de estado o de alimentación queda encendido, en ningún elemento ni borne', () => {
+    for (const c of todas) {
+      const it = item(c)
+      const on = puntosLed(m, it)
+      if (it.modoLed !== 'senal') expect(on, c).toEqual([])
+      for (const p of on) {
+        const n = Number(p.k.split(':').pop())
+        expect(Number.isInteger(n), `${c}: LED de estado encendido (${p.k})`).toBe(true)
+        expect(n, `${c}: LED de alimentación encendido`).toBeLessThan(136)
+      }
+      // Lista independiente de `modoLed`: LED que NUNCA se encienden, se elija lo que se elija
+      // (canales A/B 1–10, bits 32–41, B11 116, B50 126/128, sin rótulo, alimentación 136–145).
+      const prohibidos = new Set([...Array.from({ length: 10 }, (_, i) => i + 1), ...Array.from({ length: 10 }, (_, i) => i + 32), 116, 126, 128, 28, 50, 76, 93, 94, 95, 96, 97, 98, 99, 100, 106, 129, 130, 131, 132])
+      for (const p of on) expect(prohibidos.has(Number(p.k.split(':').pop())), `${c}: enciende ${p.k}`).toBe(false)
+      // Los tres modos se excluyen: lo que se enciende no se marca también como grupo o neutro.
+      const marcas = [on.length, puntosGrupo(m, it).length, puntosNeutros(m, it).length].filter(Boolean)
+      expect(marcas.length, c).toBeLessThanOrEqual(1)
+      if (it.modoLed !== 'senal') expect(lineaLed(it).color, c).toBeNull()
+    }
+  })
+
+  it.each([['B13', 10], ['B21', 2], ['B22', 2], ['B23', 2], ['B24', 2], ['B25', 2], ['SM1', 2], ['SM2', 2], ['SM3', 2], ['SM4', 2], ['SM5', 2], ['SM6', 2]] as const)(
+    '%s: 0 LED encendidos y %i marcados como grupo',
+    (k, n) => {
+      const it = item(`e:${k}`)
+      expect(puntosLed(m, it)).toEqual([])
+      expect(puntosGrupo(m, it)).toHaveLength(n)
+      expect(lineaLed(it)).toMatchObject({ grupo: true, color: null, encendible: true })
+    },
+  )
+
+  it('un sensor (B1 → 42) y una salida (Y8 → 68) encienden exactamente su LED', () => {
+    expect(puntosLed(m, item('e:B1')).map(p => p.k)).toEqual(['e:B1:42'])
+    expect(puntosLed(m, item('e:Y8')).map(p => p.k)).toEqual(['e:Y8:68'])
+    expect(lineaLed(item('e:Y8')).texto).toContain('prende cuando la A3C activa la salida')
+  })
+
+  it('B11 no usa el encendido por señal: en reposo ya está encendido y al probarlo se espera que se apague', () => {
+    const b11 = item('e:B11')
+    expect(b11.modoLed).toBe('contorno')
+    expect(puntosLed(m, b11)).toEqual([])
+    expect(puntosGrupo(m, b11).map(p => p.k)).toEqual(['e:B11:116'])
+    expect(b11.cuandoLed).toContain('Según el manual (p. 66 y p. 18), con las puntas juntas (reposo) el diodo está encendido')
+    expect(b11.cuandoLed).toContain('En la foto de la N2, 116 encendido')
+    expect(b11.cuandoLed).toContain('se espera que se apague')
+    expect(lineaLed(b11).texto).not.toContain('prende con la señal')
+  })
+
+  it('todo texto de LED con foto trae «En la foto de la N2» y coincide con el estado de la foto', () => {
+    for (const c of todas) {
+      const it = item(c)
+      if (!it.leds.some(n => LEDS_FOTO.has(n))) continue
+      expect(lineaLed(it).texto, c).toContain('En la foto de la N2')
+      if (it.cuandoLed) expect(it.cuandoLed, c).toContain('En la foto de la N2')
+      const n0 = it.leds[0]!
+      if (it.leds.length === 1 && it.modoLed !== 'contorno') {
+        expect(lineaLed(it).texto, c).toContain(`En la foto de la N2: ${LEDS_ENCENDIDOS_FOTO.has(n0) ? 'encendido' : 'apagado'}.`)
+      }
+    }
+    for (const k of ['V60_1', 'V60_6']) expect(lineaLed(item(`l:${k}`)).texto, k).toContain('En la foto de la N2: encendido')
+  })
+
+  it('las tablas de la foto (LED presentes, encendidos y 60V DC) coinciden con placa-n2.svg', () => {
+    expect(estados).toHaveLength(90)
+    const orden = (xs: number[]) => [...xs].sort((a, b) => a - b)
+    expect(orden([...LEDS_FOTO])).toEqual(orden(estados.map(e => e[0])))
+    expect(orden([...LEDS_ENCENDIDOS_FOTO])).toEqual(orden(estados.filter(e => e[1].endsWith('-encendido')).map(e => e[0])))
+    const v60 = [...svg.matchAll(/data-estado="([a-z]+)-encendido"[^>]*?data-led-plano="(V60_\d)"/g)].map(x => [x[2], x[1]])
+    expect(Object.fromEntries(v60)).toEqual(LEDS_ESTADO_FOTO)
+  })
+
+  it('LED de estado y de alimentación elegidos solos: punto neutro, con lo que dice el rótulo', () => {
+    expect(lineaLed(item('l:V60_4'))).toMatchObject({ grande: 'LED 60V DC SM4', tono: 'ambar', color: null })
+    expect(lineaLed(item('l:V60_1')).tono).toBe('amarillo')
+    expect(lineaLed(item('l:RESET'))).toMatchObject({ tono: 'gris', texto: 'LED rotulado «Reset SM1-6». El plano no dice cuándo prende.' })
+    for (const n of [139, 140, 142, 143, 145]) {
+      const it = item(`b:${n}`)
+      expect(it.modoLed, String(n)).toBe('neutro')
+      expect(puntosNeutros(m, it), String(n)).toHaveLength(1)
+      expect(lineaLed(it).texto, String(n)).toContain('El plano no dice cuándo prende')
+    }
+    expect(lineaLed(item('b:139')).texto).toBe('Borne de alimentación «24V Drehwertgeber». El plano no dice cuándo prende.')
+    expect(lineaLed(item('b:145')).texto).toContain('alimentación de B13, no uno de sus bits')
+    expect(item('b:31').queHace.texto).toBe('Borne de alimentación.')
+  })
+
+  it('B50: el plano se contradice (126 u 128); buscar «B50» trae los dos con el aviso', () => {
+    expect(lineaLed(item('e:B50'))).toMatchObject({ grande: 'LED 126 o 128', grupo: true })
+    expect(puntosGrupo(m, item('e:B50')).map(p => p.k)).toEqual(['e:B50:126', 'e:B50:128'])
+    expect(lineaLed(item('b:128')).texto).not.toContain('prende con la señal')
+    const items = buscar(m, 'B50', 'es').flatMap(g => g.items)
+    expect(items.map(i => i.clave).sort()).toEqual(['b:128', 'e:B50'])
+    for (const i of items) expect(lineaLed(i).texto, i.clave).toMatch(/se contradice/)
+  })
+
+  it('textos aprobados: S25, S20, Y14, Y55, SM6-1, A3C, B16, B27, B42 y salidas Y3/Y6/Y51/Y52', () => {
+    expect(lineaLed(item('e:S25'))).toMatchObject({ grande: 'Sin LED', texto: 'Hoja 19: común en X5:91 (la hoja 23 no rotula ese borne ni le dibuja LED)' })
+    expect(lineaLed(item('e:S20')).texto).toBe('Común X5:86; contactos 2/4/8/16 compartidos en X5:112–115 (sin LED)')
+    expect(lineaLed(item('e:Y14')).texto).toBe('Sin borne X5 propio. Hoja 8: se alimenta por un contacto de K23 (X5:12, sin LED)')
+    expect(item('e:Y14').senal).not.toContain('la A3C activa el elemento')
+    expect(item('e:Y55')).toMatchObject({ senal: 'El plano no indica por dónde llega a la A3C' })
+    expect(item('e:Y55').preguntaTerreno).toBeTruthy()
+    expect(lineaLed(item('e:SM6-1')).texto).toBe('Sin borne X5. Sale por A3C.X4.31–36 (hoja 17). Las hojas no aclaran si sus LED son los de SM6.')
+    expect(lineaLed(item('e:A3C'))).toMatchObject({ texto: 'Es la tarjeta: elige un borne o un LED.', encendible: false })
+    expect(item('e:B16').tipoSensorNota).toContain('Revisa qué sensor está montado antes de probar con metal.')
+    expect(item('e:B27').cuandoLed).toBe('Encoder de pulsos (hoja 13), no un sensor que se active con metal. En la foto de la N2: apagado.')
+    expect(item('e:B42').nota).toBe('El borne 127 sale de la hoja 21 (la hoja 23 no lo rotula).')
+    for (const k of ['Y3', 'Y6', 'Y51', 'Y52']) {
+      expect(lineaLed(item(`e:${k}`)).texto, k).toContain('prende cuando la A3C activa la salida')
+      expect(item(`e:${k}`).preguntaTerreno, k).toBeTruthy()
+    }
+  })
+
+  it('lista: pulsadores fuera de «Sensores», Y3/Y6/Y51/Y52 en «Salidas» y SM6 elegible', () => {
+    const grupos = buscar(m, '', 'es')
+    const de = (t: string) => grupos.find(g => g.titulo === t)?.items.map(i => i.clave) ?? []
+    for (const k of ['S1', 'S3', 'S4', 'S5', 'S6', 'S9']) expect(de('Sensores'), k).not.toContain(`e:${k}`)
+    for (const k of ['Y3', 'Y6', 'Y51', 'Y52']) expect(de('Salidas'), k).toContain(`e:${k}`)
+    expect(de('Motores')).toContain('e:SM6')
+    expect(de('Sensores')).toContain('e:B1')
   })
 })
