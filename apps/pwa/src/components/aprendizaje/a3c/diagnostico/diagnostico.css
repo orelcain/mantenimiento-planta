@@ -1,0 +1,25 @@
+/* Diagnóstico · Tarjeta A3C. Tintes por tinta adaptativa (--ink-*), como las Pill de la piel:
+   el color acompaña, el texto dice el estado. Nada de colores crudos. */
+
+.a3cd-aviso { background: rgb(var(--ink-warn) / .15); }
+.a3cd-aviso .a3cd-ic { color: rgb(var(--ink-warn)); }
+.a3cd-seguridad { background: rgb(var(--ink-crit) / .12); }
+.dark .a3cd-seguridad { background: rgb(var(--ink-crit) / .18); }
+.a3cd-seguridad .a3cd-ic { color: rgb(var(--ink-crit)); }
+.a3cd-asegurada { background: rgb(var(--ink-ok) / .15); }
+.a3cd-asegurada .a3cd-ic { color: rgb(var(--ink-ok)); }
+
+/* Descartado / Sospechoso: tinte al estar elegido; el texto dice cuál. */
+.a3cd-marca[aria-pressed="true"][data-marca="descartado"] { background: rgb(var(--ink-ok) / .15); color: rgb(var(--ink-ok)); box-shadow: inset 0 0 0 2px rgb(var(--ink-ok)); }
+.a3cd-marca[aria-pressed="true"][data-marca="sospechoso"] { background: rgb(var(--ink-crit) / .12); color: rgb(var(--ink-crit)); box-shadow: inset 0 0 0 2px rgb(var(--ink-crit)); }
+
+/* LED de un paso, tal como estaba en la foto de la N2. Fijo: solo pulsa el de la regleta (PC). */
+.a3cd-led { display: inline-block; vertical-align: middle; flex: none; width: 14px; height: 14px; border-radius: 9999px; background: rgb(var(--muted)); box-shadow: inset 0 0 0 1.5px rgb(var(--muted-foreground) / .6); }
+.a3cd-led[data-estado="encendido"] { background: rgb(var(--tw-red-500)); box-shadow: 0 0 6px rgb(var(--tw-red-500) / .7); }
+.a3cd-led[data-estado="encendido"][data-color="g"] { background: rgb(var(--tw-green-500)); box-shadow: 0 0 6px rgb(var(--tw-green-500) / .7); }
+/* Grupo o canal (bits de B13, A/B de un encoder) y LED de estado: contorno, nunca encendido. */
+.a3cd-led[data-estado="contorno"] { background: transparent; box-shadow: none; border: 2px dashed rgb(var(--muted-foreground)); }
+/* La leyenda no pulsa: solo pulsa el LED del paso elegido en la regleta. */
+.a3cd-leyenda .a3c-punto::after { display: none; }
+/* Regleta del panel (PC): solo trae los bornes de UNA regleta; los títulos de las otras quedan vacíos y se ocultan. */
+.a3cd-regleta [data-orientacion] > div:is(:has(+ div), :last-child) { display: none; }

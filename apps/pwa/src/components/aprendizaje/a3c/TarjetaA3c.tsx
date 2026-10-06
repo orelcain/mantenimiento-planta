@@ -10,7 +10,7 @@
  *
  * Recibe el paquete ya cargado (la página lo pide); así se prueba sin red.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ChevronLeft, Minus, Plus, Search } from 'lucide-react'
 import { Button, ListCell, ListGroup, SegmentedControl, Sheet } from '@/components/piel'
 import { cargarPlacaA3c, type Hoja, type PaqueteA3c, type PaquetePlaca, type Texto } from '@/data/baader142A3c'
@@ -67,6 +67,9 @@ import { FichaA3c, ListaA3c } from './FichaA3c'
 import { QuizA3c } from './QuizA3c'
 import './a3c.css'
 
+/** Modo «Diagnóstico»: sus datos y su UI se piden solo al elegirlo (chunk aparte). */
+const DiagnosticoA3c = lazy(() => import('./diagnostico/DiagnosticoA3c'))
+
 const LIM22: LimitesCamara = { minW: 70, maxW: 2200, bounds: [40, 45, 1080, 675] }
 const LIM23: LimitesCamara = { minW: 50, maxW: 2000, bounds: [-60, 0, 780, 1131] }
 const FUENTE = 'Plano 142.71.00.888, hojas 22 y 23 · máquinas N2 y N3'
@@ -106,7 +109,7 @@ function guardarDivision(f: number) {
   }
 }
 
-type Modo = 'explorar' | 'practicar'
+type Modo = 'explorar' | 'practicar' | 'diagnostico'
 /** Lo que se dibuja en un lienzo: una hoja del plano o la placa. */
 type Lamina = Hoja | 'placa'
 
@@ -171,6 +174,11 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   const grueso = !pc || (tactil ?? punteroGrueso)
 
   const [modo, setModo] = useState<Modo>('explorar')
+  /** El diagnóstico queda montado (oculto) tras abrirlo: al volver de «Ver en la tarjeta» sigue igual. */
+  const [diagAbierto, setDiagAbierto] = useState(false)
+  useEffect(() => {
+    if (modo === 'diagnostico') setDiagAbierto(true)
+  }, [modo])
 
   // PC: alto útil MEDIDO (alto de la ventana menos lo que hay sobre la grilla) y ancho real.
   const grillaRef = useRef<HTMLDivElement>(null)
@@ -441,6 +449,24 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     enfocarPlaca(sel, null)
   }, [placa, sel, enfocarPlaca])
 
+  /**
+   * «Ver X en la tarjeta» desde el diagnóstico: vuelve a «Explorar» con X elegido (misma selección
+   * y animación que un toque en la lista) y, si se pide, en el Plano o la Placa. En el teléfono
+   * muestra la tarjeta (no el plano de ubicación) para que se vea el LED.
+   */
+  const verEnTarjeta = useCallback((clave: ClaveSel, v?: VistaTarjeta) => {
+    if (v && v !== vista) {
+      setVistaEstado(v)
+      guardarVistaTarjeta(v)
+      if (v === 'placa' && !placa) enfocarAlCargar.current = true
+    }
+    if (!pc) setHoja('23')
+    seleccionar(clave, 'lista')
+    setModo('explorar')
+    const raiz = raizRef.current
+    if (raiz && typeof raiz.scrollIntoView === 'function') raiz.scrollIntoView({ block: 'start' })
+  }, [vista, placa, pc, seleccionar])
+
   // ─── Toques y hover en los dibujos ───
   const toque23 = (u: [number, number]) => {
     const c = v23.current
@@ -691,8 +717,8 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
       ariaLabel="Modo"
       value={modo}
       onChange={setModo}
-      segments={[{ value: 'explorar', label: 'Explorar' }, { value: 'practicar', label: 'Practicar' }]}
-      className={cn(ALTO_44, pc ? 'w-[260px] flex-none' : 'mt-3')}
+      segments={[{ value: 'explorar', label: 'Explorar' }, { value: 'practicar', label: 'Practicar' }, { value: 'diagnostico', label: 'Diagnóstico' }]}
+      className={cn(ALTO_44, pc ? 'w-[390px] flex-none' : 'mt-3')}
     />
   )
 
@@ -986,6 +1012,14 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     </div>
   )
 
+  const diagnostico = (diagAbierto || modo === 'diagnostico') && (
+    <div hidden={modo !== 'diagnostico'}>
+      <Suspense fallback={<div role="status" aria-label="Cargando el diagnóstico" className="mt-3 h-[320px] animate-pulse rounded-card bg-card motion-reduce:animate-none" />}>
+        <DiagnosticoA3c modelo={m} pc={pc} idioma={idioma} onVerEnTarjeta={verEnTarjeta} />
+      </Suspense>
+    </div>
+  )
+
   if (pc) {
     return (
       <div ref={raizRef} className="min-h-full w-full bg-background pb-4 text-foreground">
@@ -1012,7 +1046,8 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
               {selectorModo}
             </div>
           </header>
-          {modo === 'practicar' ? quiz : (
+          {diagnostico}
+          {modo === 'practicar' ? quiz : modo === 'diagnostico' ? null : (
             <div
               ref={grillaRef}
               data-testid="grilla-pc"
@@ -1060,7 +1095,8 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
         <h1 className="text-title1 font-bold">Tarjeta A3C</h1>
         <p className="mt-0.5 font-mono text-caption text-muted-foreground">{FUENTE}</p>
         {selectorModo}
-        {modo === 'practicar' ? quiz : (
+        {diagnostico}
+        {modo === 'practicar' ? quiz : modo === 'diagnostico' ? null : (
           <>
             {lienzo(hoja, 'mt-3 h-[clamp(280px,calc(100dvh-440px),460px)] touch-none')}
             {hoja === '23' && verPlaca && <p className="mt-1.5 text-caption leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
