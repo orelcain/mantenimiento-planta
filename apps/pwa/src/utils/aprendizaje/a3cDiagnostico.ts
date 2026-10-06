@@ -140,13 +140,13 @@ export function diagnosticar(n: number): Diagnostico | null {
     d.pasos.push({
       tipo: 'ajuste',
       titulo: 'Posición del extractor (Upgrade Kit, §22.4.3)',
-      porque: 'Unos 2 mm entre la abrazadera de colas abierta y la chapaleta derecha, con ambas cabezas articuladas ajustadas de forma igual. La chapaleta izquierda, al cerrarse, no toca la chapaleta derecha. El manual no lo liga a E 827 por nombre.',
+      porque: 'Unos 2 mm entre la abrazadera de colas abierta y la chapaleta derecha, con ambas cabezas articuladas ajustadas de forma igual. La chapaleta izquierda, al cerrarse, no toca la chapaleta derecha, ni la cubierta al abrirse. El manual no lo liga a E 827 por nombre.',
       fuente: 'Manual 2005, p. 86',
     })
     d.pasos.push({
       tipo: 'elemento',
       titulo: 'B14 · carro delante del extractor',
-      porque: 'El manual no liga B14 a E 827; el runbook de planta lo revisa junto a B15.',
+      porque: 'Interruptor de aproximación inductivo (carro delante extractor), según la lista de elementos eléctricos del manual. El manual no lo liga a E 827.',
       fuente: 'Manual 2005, p. 66',
       elemento: 'B14',
       verificar: true,

@@ -219,16 +219,15 @@ export function ResultadoCodigo({ d, modelo, local, asegurada, elegido, onConfir
       ))}
       {d.noIndica.map(x => <NoIndicaCaja key={x.texto} x={x} />)}
       {relacionados && <p className="px-1 text-footnote leading-snug text-muted-foreground">Relacionado, no se enciende: {relacionados}.</p>}
-      {total > 0 && (
-        <button
-          type="button"
-          onClick={onCerrar}
-          disabled={!asegurada}
-          className="h-[48px] w-full rounded-full bg-muted text-subhead font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
-        >
-          Cerrar diagnóstico · {hechos} de {total} revisados
-        </button>
-      )}
+      {/* Se cierra también un código sin pasos que marcar (E 821, E 9xx…): el contador cuenta diagnósticos. */}
+      <button
+        type="button"
+        onClick={onCerrar}
+        disabled={!asegurada}
+        className="h-[48px] w-full rounded-full bg-muted text-subhead font-semibold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40"
+      >
+        {total > 0 ? `Cerrar diagnóstico · ${hechos} de ${total} revisados` : 'Cerrar diagnóstico'}
+      </button>
     </div>
   )
 }

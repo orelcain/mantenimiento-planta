@@ -157,7 +157,6 @@ export function DetalleLed({
                 ? `Lo ves ${visto}, igual que en la foto de la N2.`
                 : `Lo ves ${visto}; en la foto de la N2 estaba ${foto}.`}
           </p>
-          <p className="mt-1 text-footnote text-muted-foreground">La foto de la N2 es una foto sin proceso, no el estado normal.</p>
         </div>
       )}
       <NoIndicaCaja x={{ texto: 'El manual no da el estado normal de cada LED en reposo ni en marcha.', pregunta: PREGUNTAS_TERRENO[6]! }} />

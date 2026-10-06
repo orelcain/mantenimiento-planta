@@ -80,7 +80,7 @@ export const SEGURIDAD: { texto: string; fuente: Fuente }[] = [
 export const AJUSTE_TOPES = {
   cero: 'Ajustar la distancia de 0,8 mm entre el interruptor de aproximación y la polea de correa dentada.',
   min: 'Con el SM en MIN: ajustar 0,5–1 mm entre el tornillo de tope de enfrente y el tope.',
-  max: 'Con el SM en MAX: apretar el tornillo de tope contra el tope; 2 mm entre el tornillo de tope y la tuerca hexagonal (unos 17 mm entre la palanca de sujeción y el tornillo de tope).',
+  max: 'Soltar los tornillos que sujetan la polea de correa dentada y ajustar 2 mm entre el tornillo de tope y la tuerca hexagonal (unos 17 mm entre la palanca de sujeción y el tornillo de tope). Con el selector 5 en posición 5, el pulsador I lleva el SM a CERO y, otra vez, a MAX: apretar el tornillo de tope contra el tope y fijar los tornillos de la polea.',
   todo: 'Repetir el ajuste completo de topes: 0,8 mm al interruptor de aproximación, y CERO, MAX y MIN con el selector 5 en posición 5 y el pulsador I. Orden: SM3, SM2, SM1, SM4, SM5.',
   fuente: 'Manual 2005, p. 32',
 } as const

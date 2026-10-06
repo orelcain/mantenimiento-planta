@@ -69,6 +69,17 @@ describe('Tarjeta A3C · Diagnóstico', () => {
     expect(screen.getByRole('button', { name: /Cerrar diagnóstico · 1 de 2 revisados/ })).toBeTruthy()
   })
 
+  it('cambiar de código pide confirmar la seguridad otra vez; E 821 también se cierra', async () => {
+    await abrir()
+    escribir('803')
+    fireEvent.click(screen.getByRole('button', { name: 'Máquina parada y asegurada' }))
+    escribir('821')
+    expect(screen.getByText(/Pulsar el pulsador I/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Cerrar diagnóstico' }) as HTMLButtonElement).disabled).toBe(true)
+    escribir('803')
+    expect((within(screen.getAllByTestId('paso-diagnostico')[0]!).getByRole('button', { name: 'Descartado' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('cerrar suma al contador local y lo guarda en el equipo', async () => {
     await abrir()
     expect(screen.getByTestId('contador-diagnosticos').textContent).toMatch(/^0 diagnósticos cerrados en este equipo · solo local$/)

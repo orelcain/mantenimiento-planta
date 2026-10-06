@@ -8,7 +8,7 @@
  * Teléfono: una columna, una mano. PC: entrada | pasos | regleta X5 con el LED del paso elegido.
  * Lo marcado y el contador de diagnósticos cerrados quedan solo en este equipo (localStorage).
  */
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button, ListCell, ListGroup, SegmentedControl } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { GRUPOS_CODIGOS, MODULOS } from '@/data/baader142Diagnostico'
@@ -16,6 +16,7 @@ import type { Borne } from '@/data/baader142A3c'
 import type { VistaTarjeta } from '@/utils/aprendizaje/a3cPlaca'
 import { claveDeBorne, describir, regletaDe, type ClaveSel, type Idioma, type ModeloA3c } from '@/utils/aprendizaje/a3c'
 import {
+  CLAVE_LOCAL,
   cerrar,
   claveMarca,
   diagnosticar,
@@ -40,8 +41,6 @@ export interface DiagnosticoA3cProps {
   modelo: ModeloA3c
   /** Tres columnas (PC) o una (teléfono). */
   pc: boolean
-  /** Puntero grueso: filas de la regleta de 44 px. */
-  tactil: boolean
   idioma: Idioma
   /** Cambia a «Explorar» con el elemento elegido (y, si se da, en el Plano o la Placa). */
   onVerEnTarjeta: (clave: ClaveSel, vista?: VistaTarjeta) => void
@@ -49,12 +48,15 @@ export interface DiagnosticoA3cProps {
 
 const textoCerrados = (n: number) => `${n} ${n === 1 ? 'diagnóstico cerrado' : 'diagnósticos cerrados'} en este equipo · solo local`
 
-export default function DiagnosticoA3c({ modelo, pc, tactil, idioma, onVerEnTarjeta }: DiagnosticoA3cProps) {
+export default function DiagnosticoA3c({ modelo, pc, idioma, onVerEnTarjeta }: DiagnosticoA3cProps) {
   const [pestana, setPestana] = useState<Pestana>('codigo')
   const [codigo, setCodigo] = useState('')
   const [local, setLocalEstado] = useState<EstadoLocal>(leerLocal)
-  /** Confirmación «Máquina parada y asegurada» por código: solo en esta sesión, nunca guardada. */
-  const [asegurados, setAsegurados] = useState<ReadonlySet<string>>(new Set())
+  /**
+   * Código con «Máquina parada y asegurada» confirmado: uno solo, solo en esta sesión y nunca
+   * guardado. Cambiar de código (p. ej. a E 821, que manda arrancar) obliga a confirmar de nuevo.
+   */
+  const [asegurado, setAsegurado] = useState<string | null>(null)
   const [elegido, setElegido] = useState<number | null>(null)
   const [moduloId, setModuloId] = useState<string | null>(null)
   const [focoModulo, setFocoModulo] = useState<string | null>(null)
@@ -63,10 +65,19 @@ export default function DiagnosticoA3c({ modelo, pc, tactil, idioma, onVerEnTarj
   const [aviso, setAviso] = useState('')
   const resultadoRef = useRef<HTMLDivElement>(null)
 
-  const setLocal = (e: EstadoLocal) => {
-    setLocalEstado(e)
-    guardarLocal(e)
+  /** Escribe sobre lo último guardado (otra pestaña pudo cerrar o marcar entretanto). */
+  const actualizarLocal = (f: (e: EstadoLocal) => EstadoLocal) => {
+    const nuevo = f(leerLocal())
+    guardarLocal(nuevo)
+    setLocalEstado(nuevo)
   }
+  useEffect(() => {
+    const alCambiar = (ev: StorageEvent) => {
+      if (ev.key === null || ev.key === CLAVE_LOCAL) setLocalEstado(leerLocal())
+    }
+    window.addEventListener('storage', alCambiar)
+    return () => window.removeEventListener('storage', alCambiar)
+  }, [])
 
   const d = useMemo(() => (codigo.length === 3 ? diagnosticar(Number(codigo)) : null), [codigo])
   const mod = MODULOS.find(x => x.id === moduloId) ?? null
@@ -74,12 +85,14 @@ export default function DiagnosticoA3c({ modelo, pc, tactil, idioma, onVerEnTarj
 
   const irACodigo = (n: number) => {
     setCodigo(String(n))
+    setAsegurado(null)
     setElegido(null)
     setPestana('codigo')
     setAviso('')
   }
   const alTeclear = (t: Tecla) => {
     setCodigo(c => teclear(c, t))
+    setAsegurado(null)
     setElegido(null)
     setAviso('')
   }
@@ -172,7 +185,6 @@ export default function DiagnosticoA3c({ modelo, pc, tactil, idioma, onVerEnTarj
     )
 
   // ─── Detalle ───
-  const confirmar = (etiqueta: string) => setAsegurados(s => new Set(s).add(etiqueta))
   let detalle: ReactNode = null
   if (pestana === 'codigo') {
     if (d) {
@@ -181,17 +193,13 @@ export default function DiagnosticoA3c({ modelo, pc, tactil, idioma, onVerEnTarj
           d={d}
           modelo={modelo}
           local={local}
-          asegurada={asegurados.has(d.etiqueta)}
+          asegurada={asegurado === d.etiqueta}
           elegido={pc ? elegidoEfectivo : null}
-          onConfirmar={() => confirmar(d.etiqueta)}
-          onMarcar={(i, m: Marca) => setLocal(marcar(local, claveMarca(d, i), m))}
+          onConfirmar={() => setAsegurado(d.etiqueta)}
+          onMarcar={(i, m: Marca) => actualizarLocal(e => marcar(e, claveMarca(d, i), m))}
           onCerrar={() => {
-            setLocal(cerrar(local, d))
-            setAsegurados(s => {
-              const n = new Set(s)
-              n.delete(d.etiqueta)
-              return n
-            })
+            actualizarLocal(e => cerrar(e, d))
+            setAsegurado(null)
             setAviso(`Diagnóstico de ${d.etiqueta} cerrado.`)
           }}
           onVer={verElemento}
@@ -264,7 +272,6 @@ export default function DiagnosticoA3c({ modelo, pc, tactil, idioma, onVerEnTarj
         modelo={modelo}
         clave={claveFoco}
         idioma={idioma}
-        tactil={tactil}
         onBorne={n => {
           setLed(String(n))
           setPestana('led')
@@ -281,14 +288,12 @@ function PanelRegleta({
   modelo,
   clave,
   idioma,
-  tactil,
   onBorne,
   onVer,
 }: {
   modelo: ModeloA3c
   clave: ClaveSel | null
   idioma: Idioma
-  tactil: boolean
   onBorne: (n: number) => void
   onVer: (clave: ClaveSel, vista?: VistaTarjeta) => void
 }) {
@@ -303,6 +308,14 @@ function PanelRegleta({
   const encendidos = useMemo(() => new Set(item?.modoLed === 'senal' ? item.leds : []), [item])
   const grupo = useMemo(() => new Set(item?.modoLed === 'contorno' ? item.leds : []), [item])
   const senal = item?.modoLed === 'senal' && item.leds.length > 0
+  // Filas de 44 px: la regleta no cabe entera; se recorre hasta el borne del elemento.
+  const cajaRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const cont = cajaRef.current?.querySelector<HTMLElement>('[data-orientacion="vertical"]')
+    const celda = n0 != null ? cont?.querySelector<HTMLElement>(`[data-n="${n0}"]`) : null
+    if (!cont || !celda) return
+    cont.scrollTop += celda.getBoundingClientRect().top - cont.getBoundingClientRect().top - cont.clientHeight / 2 + celda.offsetHeight / 2
+  }, [n0, clave])
   return (
     <aside className="sticky top-4 flex min-w-0 flex-col gap-3" aria-label="Regleta X5 del paso elegido" data-testid="panel-regleta">
       <div className="rounded-card bg-card p-4">
@@ -317,14 +330,14 @@ function PanelRegleta({
                 : `${item.codigo} · LED ${item.leds.join(' y ')} con contorno: no se enciende.${item.foto ? ` ${item.foto}` : ''}`}
         </p>
         {r && (
-          <div className="mt-3 h-[min(52vh,520px)]">
+          <div ref={cajaRef} className="a3cd-regleta mt-3 h-[min(52vh,520px)]">
             <RegletaX5
               bornes={bornes}
               elegidos={elegidos}
               encendidos={encendidos}
               grupo={grupo}
               idioma={idioma}
-              compacta={!tactil}
+              compacta={false}
               vertical
               onElegir={onBorne}
             />

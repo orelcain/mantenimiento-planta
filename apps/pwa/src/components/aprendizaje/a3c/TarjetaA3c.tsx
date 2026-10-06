@@ -1015,7 +1015,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   const diagnostico = (diagAbierto || modo === 'diagnostico') && (
     <div hidden={modo !== 'diagnostico'}>
       <Suspense fallback={<div role="status" aria-label="Cargando el diagnóstico" className="mt-3 h-[320px] animate-pulse rounded-card bg-card motion-reduce:animate-none" />}>
-        <DiagnosticoA3c modelo={m} pc={pc} tactil={grueso} idioma={idioma} onVerEnTarjeta={verEnTarjeta} />
+        <DiagnosticoA3c modelo={m} pc={pc} idioma={idioma} onVerEnTarjeta={verEnTarjeta} />
       </Suspense>
     </div>
   )
