@@ -226,6 +226,16 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
       if (pts.size >= 2) hubo2 = true
       inicioGesto = foto()
       movido = false
+      // El globo de hover está en px de pantalla y el dibujo se mueve debajo: durante el gesto
+      // quedaría pegado en su sitio nombrando un borne que ya no está bajo el puntero.
+      cb.current.onHover?.(null)
+    }
+    /** Con el mouse quieto tras soltar o girar la rueda, el globo vuelve a nombrar lo que hay bajo el puntero. */
+    const rehover = (e: PointerEvent | WheelEvent) => {
+      if (pts.size) return
+      const r = caja()
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return
+      cb.current.onHover?.(aU(e.clientX, e.clientY), { x: e.clientX, y: e.clientY })
     }
     const move = (e: PointerEvent) => {
       if (!pts.has(e.pointerId)) {
@@ -274,6 +284,7 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
         movido = false
         hubo2 = false
       }
+      if (e.pointerType === 'mouse' && e.type === 'pointerup') rehover(e)
     }
     // El navegador quitó la captura (cambio de pestaña, gesto del sistema): sin restos en `pts`.
     const perdida = (e: PointerEvent) => {
@@ -292,6 +303,7 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
       cam.current = zoomCamara(cam.current, Math.exp(deltaRuedaPx(e.deltaY, e.deltaMode) * 0.0015), cb.current.limites, u[0], u[1])
       marcarPreset(null)
       aplicar(false)
+      rehover(e)
     }
     svg.addEventListener('pointerdown', down)
     svg.addEventListener('pointermove', move)

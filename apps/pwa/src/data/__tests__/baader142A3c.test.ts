@@ -14,7 +14,7 @@ describe('integridad del paquete A3C real', () => {
     expect(new Set(numeros).size).toBe(144)
     expect(numeros).not.toContain(135)
     expect(datos.bornes.filter(b => b.led)).toHaveLength(95)
-    expect(datos.bornes.filter(b => b.sentido === 'sin_etiqueta')).toHaveLength(41)
+    expect(datos.bornes.filter(b => b.sentido === 'sin_etiqueta')).toHaveLength(40) // 41 sin rótulo en la hoja 23; el 132 ya tiene sentido (entrada, hojas 1 y 10)
     // 16 de la zona central + un «60V DC» por bloque SM1..SM6 junto a su conector X4.
     expect(datos.ledsEstado).toHaveLength(22)
     expect(new Set(datos.ledsEstado.map(l => l.id)).size).toBe(22)
@@ -36,8 +36,8 @@ describe('integridad del paquete A3C real', () => {
     expect(b(128).led).toEqual({ x: 562.68, y: 831.26, r: 2.9 })
   })
 
-  it('mantiene válidas las referencias entre los 145 elementos y sus bornes', () => {
-    expect(Object.keys(datos.elementos)).toHaveLength(145)
+  it('mantiene válidas las referencias entre los 146 elementos y sus bornes', () => {
+    expect(Object.keys(datos.elementos)).toHaveLength(146)
     const numeros = new Set(datos.bornes.map(b => b.borne))
     for (const b of datos.bornes) {
       if (b.elemento !== null) expect(b.elemento in datos.elementos).toBe(true)
@@ -47,12 +47,12 @@ describe('integridad del paquete A3C real', () => {
     }
   })
 
-  it('solo afirma lo respaldado: 103 en certeza alta con fuentes y 42 en baja sin descripción', () => {
+  it('solo afirma lo respaldado: 104 en certeza alta con fuentes y 42 en baja sin descripción', () => {
     const todos = Object.entries(datos.elementos)
     for (const [k, e] of todos) expect(['alta', 'baja'], k).toContain(e.certeza)
     const altos = todos.filter(([, e]) => e.certeza === 'alta')
     const bajos = todos.filter(([, e]) => e.certeza === 'baja').map(([k]) => k)
-    expect(altos).toHaveLength(103)
+    expect(altos).toHaveLength(104)
     expect(bajos.sort()).toEqual([
       'A3C.Entregen', 'A3C.R_L_SM', 'A3C.Reset', 'A3C.Step_SM', 'A5', 'B30', 'B40', 'B41', 'B50', 'H10',
       'J10', 'J11', 'J6', 'J7', 'J8', 'J9', 'Q0', 'TP', 'TP_5VV', 'TP_GNDDC',
