@@ -82,6 +82,8 @@
 
 .a3c-punto { position: relative; width: 10px; height: 10px; border-radius: 9999px; background: rgb(var(--tw-red-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-red-500) / .5); }
 .a3c-punto.a3c-verde { background: rgb(var(--tw-green-500) / .22); box-shadow: inset 0 0 0 1px rgb(var(--tw-green-500) / .55); }
+/* LED que la foto de la N2 no muestra (139–145): ningún documento dice su color; gris en reposo. */
+.a3c-punto.a3c-sin-foto { background: rgb(var(--muted-foreground) / .22); box-shadow: inset 0 0 0 1px rgb(var(--muted-foreground) / .5); }
 .a3c-punto.a3c-grupo { background: transparent; box-shadow: none; border: 1.5px dashed rgb(var(--brand)); }
 .a3c-punto.a3c-sin-led { background: transparent; box-shadow: none; }
 .a3c-punto.a3c-neutro { background: rgb(var(--muted-foreground) / .75); box-shadow: none; }

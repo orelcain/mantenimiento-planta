@@ -8,7 +8,7 @@
 import { forwardRef, memo, useMemo } from 'react'
 import type { Borne } from '@/data/baader142A3c'
 import { cn } from '@/lib/utils'
-import { REGLETAS, codigoCorto, colorLed, rotuloBorne, type Idioma } from '@/utils/aprendizaje/a3c'
+import { LEDS_FOTO, REGLETAS, codigoCorto, colorLed, rotuloBorne, type Idioma } from '@/utils/aprendizaje/a3c'
 
 export interface RegletaX5Props {
   bornes: Map<number, Borne>
@@ -68,7 +68,7 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
                 elegidos.has(n) && 'bg-primary/[0.13] ring-2 ring-inset ring-primary',
               )}
             >
-              <span aria-hidden className={cn('a3c-punto', !b.led && 'a3c-sin-led', b.led && colorLed(n) === 'g' && 'a3c-verde', b.led && on && 'a3c-encendido', b.led && grupo?.has(n) && 'a3c-grupo', b.led && neutros?.has(n) && 'a3c-neutro')} />
+              <span aria-hidden className={cn('a3c-punto', !b.led && 'a3c-sin-led', b.led && colorLed(n) === 'g' && 'a3c-verde', b.led && !LEDS_FOTO.has(n) && 'a3c-sin-foto', b.led && on && 'a3c-encendido', b.led && grupo?.has(n) && 'a3c-grupo', b.led && neutros?.has(n) && 'a3c-neutro')} />
               <span className={cn('font-mono text-footnote font-semibold leading-none tabular-nums', vertical && 'w-[3ch] flex-none text-right', sin && 'text-muted-foreground/70')}>{n}</span>
               <span
                 className={cn(

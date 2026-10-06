@@ -28,7 +28,7 @@ describe('integridad del paquete A3C real', () => {
     expect(b(127).nota).toMatch(/hoja 21/)
     expect(b(128).elemento).toBeNull()
     expect(b(128).senal_original).toBe('8) B50 Position Kratzer C')
-    expect(b(128).nota).toBe('La hoja 23 rotula aquí B50; la hoja 11 lo cablea al borne 126.')
+    expect(b(128).nota).toBe('La hoja 23 rotula aquí B50; las hojas 9 y 21 le llevan la señal A3C_128 del contacto K7 y la hoja 11 cablea B50 al 126.')
     expect(datos.elementos.B50!.borne).toEqual([126])
     expect(datos.elementos.B42!.borne).toEqual([127])
     // Geometría y LED intactos.

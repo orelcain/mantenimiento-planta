@@ -265,7 +265,7 @@ describe('Tarjeta A3C · solo se enciende la señal del elemento', () => {
     // (Los anillos del plano de ubicación, hoja 22, marcan dónde está el sensor, no un LED.)
     expect(document.querySelectorAll('[data-testid="leds-encendidos"] .a3c-anillo')).toHaveLength(0)
     expect(grupoPlano()).toEqual(['e:B11:116'])
-    expect(within(screen.getByTestId('ficha-a3c')).getByText(/con las puntas juntas \(reposo\) el diodo está encendido/)).toBeTruthy()
+    expect(within(screen.getByTestId('ficha-a3c')).getByText(/Manual p\. 28 \(impresa 26\): con las puntas juntas se enciende el diodo del interruptor/)).toBeTruthy()
   })
 
   it('SM3 elegido por la lista: 60V DC y Step con contorno, ninguno encendido; SM6 también se puede elegir', () => {
