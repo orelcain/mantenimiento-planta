@@ -9,8 +9,12 @@
  * segmento visual queda a 40 y sigue concéntrico (cápsula dentro de cápsula).
  * Nunca lleva contadores ni íconos de color: el estado va en la celda que
  * corresponda, no en el selector de vistas.
+ *
+ * Teclado (WAI-ARIA APG «Tabs», activación automática): un solo tope de Tab
+ * (el segmento elegido), flechas ←/→ con vuelta circular, Inicio/Fin. Al mover
+ * se llama a `onChange` y el foco acompaña al segmento nuevo.
  */
-import type { ReactNode } from 'react'
+import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface Segment<T extends string> {
@@ -29,23 +33,47 @@ export interface SegmentedControlProps<T extends string> {
 }
 
 export function SegmentedControl<T extends string>({ value, onChange, segments, ariaLabel, className }: SegmentedControlProps<T>) {
+  const botones = useRef<(HTMLButtonElement | null)[]>([])
+  // Tabulable: el elegido; si ningún valor coincide, el primero.
+  const tabulable = Math.max(0, segments.findIndex(s => s.value === value))
+
+  const alTeclear = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return
+    const n = segments.length
+    const destino =
+      e.key === 'ArrowRight' ? (i + 1) % n
+      : e.key === 'ArrowLeft' ? (i - 1 + n) % n
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? n - 1
+      : null
+    if (destino == null) return
+    e.preventDefault()
+    const seg = segments[destino]
+    if (!seg) return
+    onChange(seg.value)
+    botones.current[destino]?.focus()
+  }
+
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
       className={cn('flex h-11 w-full rounded-full bg-muted', className)}
     >
-      {segments.map(s => {
+      {segments.map((s, i) => {
         const on = s.value === value
         return (
           // El <button> mide los 44 px completos (área táctil); la pastilla
           // visual es el <span> interior de 40, concéntrica con la pista.
           <button
             key={s.value}
+            ref={el => { botones.current[i] = el }}
             type="button"
             role="tab"
             aria-selected={on}
+            tabIndex={i === tabulable ? 0 : -1}
             onClick={() => onChange(s.value)}
+            onKeyDown={e => alTeclear(e, i)}
             className="flex h-11 min-w-0 flex-1 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
           >
             <span
