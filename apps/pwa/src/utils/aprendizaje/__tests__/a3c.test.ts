@@ -408,8 +408,8 @@ describe('principio rector: solo se enciende el LED que es señal del elemento',
       }
       // Lista independiente de `modoLed`: LED que NUNCA se encienden, se elija lo que se elija
       // (canales A/B 1–10, bits 32–41, B27 53, B11 116, 128 (K7 u B50), Y51/Y52 105/107, 92, codificación
-      // sin LED en el esquema, sin rótulo, alimentación 136–145).
-      const prohibidos = new Set([...Array.from({ length: 10 }, (_, i) => i + 1), ...Array.from({ length: 10 }, (_, i) => i + 32), 53, 116, 128, 105, 107, 92, 118, 122, 133, 28, 50, 76, 93, 94, 95, 96, 97, 98, 99, 100, 106, 129, 130, 131, 132])
+      // sin LED en el esquema, 132 (codificación PCS), sin rótulo, alimentación 136–145). El 131 sí: B44 (hoja 14).
+      const prohibidos = new Set([...Array.from({ length: 10 }, (_, i) => i + 1), ...Array.from({ length: 10 }, (_, i) => i + 32), 53, 116, 128, 105, 107, 92, 118, 122, 133, 28, 50, 76, 93, 94, 95, 96, 97, 98, 99, 100, 106, 129, 130, 132])
       for (const p of on) expect(prohibidos.has(Number(p.k.split(':').pop())), `${c}: enciende ${p.k}`).toBe(false)
       // Los tres modos se excluyen: lo que se enciende no se marca también como grupo o neutro.
       const marcas = [on.length, puntosGrupo(m, it).length, puntosNeutros(m, it).length].filter(Boolean)
@@ -665,6 +665,24 @@ describe('auditoría de evidencia de LED', () => {
     }
     expect(item('e:B27').modoLed).toBe('contorno')
     expect(encendidosPor('e:B27')).toEqual([])
+  })
+
+  it('131 es B44 (hoja 14, LED de entrada) y 132 es codificación PCS con contorno (hoja 1)', () => {
+    const franja = (c: string) => lineaLed(item(c)).texto
+    expect(claveDeBorne(m, 131)).toBe('e:B44')
+    const t44 = 'Plano 888, hoja 14: LED en la entrada X5:131 para B44; prende cuando llega la señal de B44'
+    for (const c of ['e:B44', 'b:131']) {
+      expect(item(c).modoLed, c).toBe('senal')
+      expect(encendidosPor(c), c).toEqual([131])
+      expect(franja(c), c).toContain(t44)
+    }
+    expect(item('e:B44').enPlano).toBe('Rutsche weggeschwenkt')
+    expect(item('e:B44').fuentes).toEqual(['Plano 888, hoja 14', 'Plano 888, hoja 1 (nota 15)'])
+    expect(item('e:B44').tipoSensor ?? null).toBeNull()
+    expect(item('b:132').modoLed).toBe('contorno')
+    expect(encendidosPor('b:132')).toEqual([])
+    expect(franja('b:132')).toContain('Entrada de codificación de la versión (hoja 1, tabla «Codierung»: PCS, desde X14:9); la hoja 10 le dibuja LED de entrada')
+    for (const n of [131, 132]) expect(franja(claveDeBorne(m, n)), String(n)).not.toMatch(/no dice de qué señal/)
   })
 
   it('el color solo se afirma como «según la foto de la N2»', () => {
