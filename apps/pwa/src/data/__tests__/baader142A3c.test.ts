@@ -14,7 +14,7 @@ describe('integridad del paquete A3C real', () => {
     expect(new Set(numeros).size).toBe(144)
     expect(numeros).not.toContain(135)
     expect(datos.bornes.filter(b => b.led)).toHaveLength(95)
-    expect(datos.bornes.filter(b => b.sentido === 'sin_etiqueta')).toHaveLength(41)
+    expect(datos.bornes.filter(b => b.sentido === 'sin_etiqueta')).toHaveLength(40) // 41 sin rótulo en la hoja 23; el 132 ya tiene sentido (entrada, hojas 1 y 10)
     // 16 de la zona central + un «60V DC» por bloque SM1..SM6 junto a su conector X4.
     expect(datos.ledsEstado).toHaveLength(22)
     expect(new Set(datos.ledsEstado.map(l => l.id)).size).toBe(22)
