@@ -189,8 +189,9 @@ export interface ItemA3c {
    * plano, el manual o la foto respaldan como señal de ESTE elemento al activarse.
    *   `senal`    se encienden (núcleo, halo y anillos).
    *   `contorno` se marcan con contorno punteado fijo, sin encender: bits de un código (B13), canales
-   *              A/B de un encoder, los LED de estado de un motor SM, un LED que ya está encendido en
-   *              reposo (B11) o uno que el plano se contradice en asignar (B50).
+   *              A/B de un encoder o de pulsos (B27), los LED de estado de un motor SM, un LED que ya
+   *              está encendido en reposo (B11), uno que las hojas se contradicen en asignar (Y51/Y52,
+   *              128) o uno que solo la hoja 23 dibuja, sin decir cuándo prende (92, codificación).
    *   `neutro`   punto fijo gris (o del color que tenía en la foto), sin animación: un LED de estado
    *              o de alimentación elegido por sí mismo, del que el plano no dice cuándo prende.
    */
@@ -423,7 +424,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       modoLed,
       tono: modoLed === 'neutro' ? 'gris' : null,
       franja: { grande: null, texto: franja },
-      sinLed: null,
+      sinLed: !b.led && b.sin_led_texto ? { grande: b.sin_led_grande ?? null, texto: b.sin_led_texto } : null,
       foto: b.led ? textoFoto([n]) : null,
       senal: SENAL[b.sentido] ?? SENAL_NO_INDICADO,
       enPlano: original,
@@ -432,7 +433,7 @@ export function describir(m: ModeloA3c, clave: ClaveSel, idioma: Idioma): ItemA3
       nota: b.nota ?? null,
       tipoSensor: null,
       tipoSensorNota: null,
-      preguntaTerreno: null,
+      preguntaTerreno: b.pregunta_terreno ?? null,
     }
   }
   if (k === 'l') {
@@ -511,7 +512,7 @@ export function lineaLed(item: ItemA3c): LineaLed {
   }
   const n0 = item.leds[0]
   if (n0 == null) {
-    return { grande: 'Sin LED', texto: item.sinLed?.texto ?? `Borne ${rango(item.bornes)}: el plano no le dibuja LED`, color: null, encendible: false }
+    return { grande: item.sinLed?.grande ?? 'Sin LED', texto: item.sinLed?.texto ?? `Borne ${rango(item.bornes)}: el plano no le dibuja LED`, color: null, encendible: false }
   }
   const grande = item.franja.grande ?? `LED ${rango(item.leds)}`
   if (item.modoLed === 'contorno') {
