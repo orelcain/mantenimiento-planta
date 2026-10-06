@@ -7,11 +7,13 @@
  * raíz) para tocar, encender y encuadrar sin depender de `getBBox` (que no existe en pruebas).
  *
  * HONESTIDAD: `data-estado` de cada LED es el estado que tenía en la FOTO, no un estado en
- * vivo. Solo se usa para saber de qué color es el LED (rojo / verde / ámbar); la herramienta
- * los dibuja todos apagados y enciende únicamente el del elemento elegido.
+ * vivo. Da el color del LED (rojo / verde / ámbar) y la línea «En la foto de la N2: …» (tablas
+ * `LEDS_*_FOTO` de `a3c.ts`, comparadas con este SVG en las pruebas). La herramienta los dibuja
+ * todos apagados y enciende solo el LED que es señal del elemento elegido (modo `senal`); el resto
+ * se marca con contorno o con un punto neutro (`ItemA3c.modoLed`).
  */
 import type { PresetV5, Rect, ViewBox } from '@/data/baader142A3c'
-import { claveDeBorne, colorLed, type ColorLed, type ItemA3c, type LimitesCamara, type LineaLed, type ModeloA3c, type Objetivo, type PuntoLed } from './a3c'
+import { claveDeBorne, colorLed, type ColorLed, type ItemA3c, type LimitesCamara, type LineaLed, type ModeloA3c, type Objetivo, type PuntoLed, type PuntoNeutro } from './a3c'
 
 export interface LedPlaca { x: number; y: number; r: number; color: ColorLed }
 /** LED de estado de la placa (`led-estado-k`) ya asociado a un LED de estado del plano. */
@@ -227,35 +229,43 @@ export function altoBornePlaca(geo: GeoPlaca): number {
 }
 
 export type LedEncendidoPlaca = PuntoLed & { r: number; /** Grupo del LED en el SVG de la placa. */ svgId: string; n?: number }
+export type LedNeutroPlaca = PuntoNeutro & { r: number; svgId: string; n?: number }
 
-/**
- * Los LED de la placa que se encienden para un ítem: los de sus bornes con LED en el plano y
- * sus LED de estado que la placa tiene asignados (`data-led-plano`).
- */
-export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
-  const out: LedEncendidoPlaca[] = []
-  for (const n of item.grupoBits ? [] : item.leds) {
+/** LED X5 y de estado de la placa que tocan a un ítem (los que la placa dibuja), con su id en el SVG. */
+function ledsDeItem(geo: GeoPlaca, item: ItemA3c): { k: string; n?: number; svgId: string; l: LedPlaca }[] {
+  const out: { k: string; n?: number; svgId: string; l: LedPlaca }[] = []
+  for (const n of item.leds) {
     const l = geo.leds.get(n)
-    // Mismo color que en el plano (tabla de la foto en `colorLed`): una sola fuente.
-    if (l) out.push({ k: `${item.clave}:${n}`, n, svgId: `led-X5-${n}`, x: l.x, y: l.y, r: l.r, color: colorLed(n) })
+    if (l) out.push({ k: `${item.clave}:${n}`, n, svgId: `led-X5-${n}`, l })
   }
   for (const e of item.ledsEstado) {
     const l = geo.ledsEstado.get(e.id)
-    // Rojo, como el mismo LED de estado en el plano (`puntosLed`).
-    if (l) out.push({ k: `${item.clave}:${e.id}`, svgId: l.svgId, x: l.x, y: l.y, r: l.r, color: 'r' })
+    if (l) out.push({ k: `${item.clave}:${e.id}`, svgId: l.svgId, l })
   }
   return out
 }
 
-/** Los LED de la placa que se marcan como grupo del ítem (bits de un código): contorno, no encendido. */
+/**
+ * Los LED de la placa que se ENCIENDEN para un ítem (solo en modo `senal`): los de sus bornes con
+ * LED en el plano y sus LED de estado que la placa tiene asignados (`data-led-plano`).
+ */
+export function ledsPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
+  if (item.modoLed !== 'senal') return []
+  // Mismo color que en el plano (tabla de la foto en `colorLed`; rojo para los de estado): una sola fuente.
+  return ledsDeItem(geo, item).map(({ k, n, svgId, l }) => ({ k, n, svgId, x: l.x, y: l.y, r: l.r, color: n != null ? colorLed(n) : 'r' }))
+}
+
+/** Los LED de la placa que se marcan con contorno (modo `contorno`): fijo, sin encender. */
 export function ledsGrupoPlaca(geo: GeoPlaca, item: ItemA3c): LedEncendidoPlaca[] {
-  if (!item.grupoBits) return []
-  const out: LedEncendidoPlaca[] = []
-  for (const n of item.leds) {
-    const l = geo.leds.get(n)
-    if (l) out.push({ k: `${item.clave}:${n}`, n, svgId: `led-X5-${n}`, x: l.x, y: l.y, r: l.r, color: colorLed(n) })
-  }
-  return out
+  if (item.modoLed !== 'contorno') return []
+  return ledsDeItem(geo, item).map(({ k, n, svgId, l }) => ({ k, n, svgId, x: l.x, y: l.y, r: l.r, color: n != null ? colorLed(n) : 'r' }))
+}
+
+/** Los LED de la placa que se marcan con un punto fijo neutro (modo `neutro`). */
+export function ledsNeutrosPlaca(geo: GeoPlaca, item: ItemA3c): LedNeutroPlaca[] {
+  if (item.modoLed !== 'neutro') return []
+  const tono = item.tono ?? 'gris'
+  return ledsDeItem(geo, item).map(({ k, n, svgId, l }) => ({ k, n, svgId, x: l.x, y: l.y, r: l.r, tono }))
 }
 
 /**
@@ -272,15 +282,16 @@ export function lineaEnPlaca(linea: LineaLed, geo: GeoPlaca, item: ItemA3c): Lin
     }
     return { ...linea, soloPlano: false }
   }
-  if (ledsPlaca(geo, item).length || ledsGrupoPlaca(geo, item).length) return { ...linea, soloPlano: false }
-  if (!foco) return { ...linea, texto: 'No está dibujado en la placa', soloPlano: true }
-  return { ...linea, texto: `${linea.texto} · Sin LED identificado en la placa`, soloPlano: false }
+  if (ledsDeItem(geo, item).length) return { ...linea, soloPlano: false }
+  const base = linea.texto.replace(/[.\s]+$/, '')
+  if (!foco) return { ...linea, texto: `${base} · No está dibujado en la placa`, soloPlano: true }
+  return { ...linea, texto: `${base} · Sin LED identificado en la placa`, soloPlano: false }
 }
 
-/** Punto al que ir en la placa: el primer LED encendible o, si no hay, el centro del primer borne. */
+/** Punto al que ir en la placa: el primer LED del ítem que la placa dibuja o, si no hay, el centro del primer borne. */
 export function focoPlaca(geo: GeoPlaca, item: ItemA3c): [number, number] | null {
-  const l = ledsPlaca(geo, item)[0] ?? ledsGrupoPlaca(geo, item)[0]
-  if (l) return [l.x, l.y]
+  const l = ledsDeItem(geo, item)[0]
+  if (l) return [l.l.x, l.l.y]
   for (const n of item.bornes) {
     const b = geo.bornes.get(n)
     if (b) return [b.x + b.w / 2, b.y + b.h / 2]

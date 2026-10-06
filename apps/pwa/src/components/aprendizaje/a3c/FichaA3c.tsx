@@ -62,7 +62,10 @@ export function FichaA3c({ item, idioma, compacta = false }: { item: ItemA3c; id
         {item.tipoSensor && (
           <>
             <dt className="pt-0.5 text-footnote text-muted-foreground">Tipo</dt>
-            <dd>{item.tipoSensor}</dd>
+            <dd>
+              {item.tipoSensor}
+              {item.tipoSensorNota && <span className="mt-0.5 block text-footnote text-muted-foreground">{item.tipoSensorNota}</span>}
+            </dd>
           </>
         )}
         <dt className="pt-0.5 text-footnote text-muted-foreground">Señal</dt>

@@ -27,7 +27,12 @@ export function FranjaLed({
     >
       <span
         aria-hidden
-        className={cn('a3c-foco', !linea.color && 'a3c-apagado', linea.color === 'g' && 'a3c-verde')}
+        className={cn(
+          'a3c-foco',
+          // Solo un LED que se enciende lleva el foco de color; contorno y punto neutro, como en la tarjeta.
+          linea.grupo ? 'a3c-grupo' : linea.tono ? cn('a3c-neutro', linea.tono !== 'gris' && `a3c-${linea.tono}`) : !linea.color && 'a3c-apagado',
+          linea.color === 'g' && 'a3c-verde',
+        )}
       />
       <div className="min-w-0 flex-1" aria-live="polite">
         <p className="font-mono text-title3 font-semibold leading-tight tabular-nums">{linea.grande}</p>
