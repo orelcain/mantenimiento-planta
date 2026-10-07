@@ -50,6 +50,21 @@ SAP_CANDIDATO = {
 }
 
 
+def normalizar_fig(fig):
+    """«121 (2014) / 70-4 (2006)» -> «70-4»; «118 / 123 (2014)» -> «118 (2014)».
+    Una sola figura por entrada: la del 2006 si existe (tiene hoja en el visor de
+    despiece), si no la primera del 2014. La cita completa queda en `fuentes`."""
+    if not fig:
+        return None
+    partes = [x.strip() for x in str(fig).split("/") if x.strip()]
+    es_2014 = "2014" in str(fig) and "2006" not in str(fig)
+    for x in partes:
+        if "2006" in x:
+            return x.replace("(2006)", "").strip()
+    base = partes[0].replace("(2014)", "").strip()
+    return f"{base} (2014)" if es_2014 or "2014" in partes[0] else base
+
+
 def hoja_despiece(figuras, nr, fig):
     """Hoja del visor de despiece (catalogo 2006). Las figuras del 2014 no estan
     en el visor: sin hoja no hay boton «Ver dibujo», y eso es lo honesto."""
@@ -61,6 +76,7 @@ def hoja_despiece(figuras, nr, fig):
 
 def entrada(fila, nr, es, de, fig, pos, confianza, sap=None, sap_nombre=None, ubic=None,
             razon=None, fuentes=None, generacion=None, figuras=None):
+    fig = normalizar_fig(fig)
     e = {
         "nr": nr,
         "es": es or "",
