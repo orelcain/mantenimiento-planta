@@ -5,6 +5,7 @@
  */
 import { ListCell, ListGroup, Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
+import { RepuestoA3c } from './RepuestoA3c'
 import {
   ETIQUETA_TIPO,
   lineaLed,
@@ -93,6 +94,7 @@ export function FichaA3c({ item, idioma, compacta = false }: { item: ItemA3c; id
           </>
         )}
       </dl>
+      <RepuestoA3c codigo={item.codigo} compacta={compacta} />
       {compacta && textos}
       {item.fuentes.length > 0 && <p className="mt-4 text-caption text-muted-foreground">Fuente: {item.fuentes.join('; ')}</p>}
       <p className={cn('font-mono text-caption text-muted-foreground', item.fuentes.length ? 'mt-1' : 'mt-4')}>

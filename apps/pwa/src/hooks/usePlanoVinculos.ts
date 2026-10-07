@@ -98,12 +98,15 @@ export function usePlanoVinculos(planoSlug: string | undefined) {
       const u = auth.currentUser
       if (!u || !planoSlug) throw new Error('Hay que iniciar sesión para confirmar en terreno.')
       const id = `${planoSlug}__${datos.aparato}`
+      // Esta app NO activa `ignoreUndefinedProperties`: un `nota: undefined` hace fallar el setDoc
+      // antes de llegar a la regla. Así «Sí, es esta» y «No existe» nunca se guardaban.
+      const definidos = Object.fromEntries(Object.entries(datos).filter(([, v]) => v !== undefined))
       await setDoc(
         doc(db, COL, id),
         {
           plantId: 'chonchi',
           planoSlug,
-          ...datos,
+          ...definidos,
           confirmadoPor: u.uid,
           confirmadoPorNombre: u.displayName ?? u.email ?? '',
           actualizado: serverTimestamp(),

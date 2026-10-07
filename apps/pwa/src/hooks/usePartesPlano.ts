@@ -7,8 +7,10 @@ export type ParteFisica = {
   nr: string
   es: string
   de: string
-  fig: string
-  hoja: number
+  /** Figura del catálogo («70-8» = 2006; «120 (2014)» = catálogo de las nuevas). */
+  fig: string | null
+  /** Hoja del visor de despiece (solo catálogo 2006). null = sin dibujo navegable. */
+  hoja: number | null
   pos: string
   /** 'catalogo' = el cruce sale del catálogo BAADER 2006, sin verificar en
    *  terreno. Cualquier otro valor se trata como propuesto, nunca confirmado. */
@@ -18,6 +20,16 @@ export type ParteFisica = {
   sap?: string
   sapNombre?: string
   sapUbicacion?: string
+  /** 'conjunto' = el código es del conjunto (p. ej. la isla de válvulas), no de la pieza sola. */
+  nivel?: 'pieza' | 'conjunto'
+  /** Por qué se propone (cuando confianza ≠ 'catalogo'). */
+  razon?: string
+  /** Citas: catálogo + página/figura/posición. */
+  fuentes?: string[]
+  /** Generación de máquina a la que corresponde el dato («N1 (catálogo 2006)»). */
+  generacion?: string
+  /** Qué falta para tener certeza (lo resuelve terreno). */
+  pendiente?: string
 }
 
 /** Una familia de aparatos por letra IEC 81346 (K, Q, F, S, Y, M, SM, B...):
