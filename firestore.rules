@@ -15,8 +15,14 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.get('pase_bitacora', false) == true;
     }
 
+    // Sesión de la Mini App AnimeTracker (función animeAuth, claim anime_tg):
+    // solo sirve para su propio doc de animelists, nada más de la app.
+    function tieneSesionAnime() {
+      return request.auth != null && request.auth.token.get('anime_tg', null) != null;
+    }
+
     function isAuthenticated() {
-      return request.auth != null && !tienePaseBitacora();
+      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime();
     }
 
     // El teléfono del pase sigue habilitado (un supervisor no lo quitó ni
@@ -2117,12 +2123,15 @@ service cloud.firestore {
       allow write: if isSupervisor() && isValidDocSize();
     }
 
-    // ── AnimeTracker Mini App (bot personal, sin auth) ──────────────────────
-    // Lectura pública (mini-app sin login). Escritura pública pero acotada a
-    // <1MB por doc para limitar abuso/costos. Endurecido 2026-07-05.
+    // ── AnimeTracker Mini App (bot personal) ─────────────────────────────────
+    // Solo la sesión que emite animeAuth (firma de Telegram del bot de anime +
+    // ID permitido) y solo su propio doc. Antes era read/write público.
+    // Cerrado 2026-10-07.
     match /animelists/{userId} {
-      allow read: if true;
-      allow write: if isValidDocSize();
+      allow read: if tieneSesionAnime() && request.auth.token.anime_tg == userId;
+      allow create, update: if tieneSesionAnime()
+        && request.auth.token.anime_tg == userId
+        && isValidDocSize();
     }
 
     // ── Telegram Mini App — whitelist de chats autorizados ───────────────────
