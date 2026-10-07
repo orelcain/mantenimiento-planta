@@ -8712,6 +8712,69 @@ exports.animeEstrenosManual = onRequest(
   }
 );
 
+// ── animeAuth — sesión de la Mini App AnimeTracker ──────────────────────────────
+// La Mini App leía y escribía `animelists/{id}` con una regla abierta (`if true`):
+// cualquiera con la API key pública podía leer, sobrescribir o borrar las listas.
+// Ahora la Mini App manda el initData de Telegram, se valida la firma con el
+// token del bot de anime y solo los IDs de ANIME_USUARIOS_PERMITIDOS reciben un
+// custom token (uid `anime_<id>`, claim `anime_tg`). La regla exige ese claim.
+// Ese uid no tiene doc en `users`, así que no pasa ninguna guardia de la PWA.
+const ANIME_USUARIOS_PERMITIDOS = new Set([ANIME_CHAT_ID]);
+const ANIME_ORIGENES = [
+  'https://mantenimiento-planta-771a3.web.app',
+  'https://mantenimiento-planta-771a3.firebaseapp.com',
+];
+
+exports.animeAuth = onRequest(
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'], maxInstances: 2, cors: ANIME_ORIGENES },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    const botToken = process.env.ANIME_BOT_TOKEN;
+    if (!botToken) { res.status(500).json({ error: 'Bot no configurado' }); return; }
+
+    const initData = String(req.body?.initData || '');
+    if (!initData || initData.length > 4096) { res.status(400).json({ error: 'Abre la app desde Telegram' }); return; }
+
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash') || '';
+    params.delete('hash');
+    const checkString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+    const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const expected = Buffer.from(createHmac('sha256', secretKey).update(checkString).digest('hex'), 'utf8');
+    const got = Buffer.from(hash, 'utf8');
+    if (expected.length !== got.length || !timingSafeEqual(expected, got)) {
+      res.status(401).json({ error: 'Firma de Telegram inválida' });
+      return;
+    }
+
+    const authDate = parseInt(params.get('auth_date') || '0', 10);
+    if (Math.floor(Date.now() / 1000) - authDate > 86400) {
+      res.status(401).json({ error: 'Sesión expirada, vuelve a abrir la app' });
+      return;
+    }
+
+    let tgId = '';
+    try { tgId = String(JSON.parse(params.get('user') || '{}').id || ''); } catch { /* vacío */ }
+    if (!ANIME_USUARIOS_PERMITIDOS.has(tgId)) {
+      logger.warn('[animeAuth] usuario no permitido', { tgId });
+      res.status(403).json({ error: 'Esta app es privada' });
+      return;
+    }
+
+    const uid = `anime_${tgId}`;
+    const claims = { anime_tg: tgId };
+    // La cuenta se crea con Admin SDK: el auto-registro de Auth está deshabilitado.
+    await getAuth().getUser(uid).catch(() => getAuth().createUser({ uid, displayName: 'AnimeTracker' }));
+    await getAuth().setCustomUserClaims(uid, claims);
+    const token = await getAuth().createCustomToken(uid, claims);
+    res.json({ token, tgId });
+  }
+);
+
 // ═══════════════════════════════════════════════════════════════════
 // STOCK BAJO MÍNIMO — Notificación al registrar conteo
 // ═══════════════════════════════════════════════════════════════════

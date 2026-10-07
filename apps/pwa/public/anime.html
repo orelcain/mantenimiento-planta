@@ -2,10 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org https://www.gstatic.com; connect-src 'self' https://graphql.anilist.co https://api.mymemory.translated.net https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AnimeTracker</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -584,9 +586,45 @@ const db = firebase.firestore();
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
+// ── Sesión ───────────────────────────────────────────────────────────────────
+// Las listas solo se leen/escriben con la sesión que emite animeAuth (firma de
+// Telegram validada en el servidor + ID permitido). Fuera de Telegram no hay datos.
+const ANIME_AUTH_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/animeAuth';
+let authTgId = null;
+
+async function ensureAnimeAuth() {
+  const auth = firebase.auth();
+  await new Promise(resolve => { const off = auth.onAuthStateChanged(() => { off(); resolve(); }); });
+  const tgUserId = tg?.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : null;
+  if (auth.currentUser) {
+    const tok = await auth.currentUser.getIdTokenResult().catch(() => null);
+    const claimId = tok?.claims?.anime_tg;
+    if (claimId && (!tgUserId || claimId === tgUserId)) { authTgId = claimId; return; }
+    await auth.signOut();
+  }
+  if (!tg?.initData) throw new Error('Abre AnimeTracker desde Telegram.');
+  const r = await fetch(ANIME_AUTH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: tg.initData }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || !data.token) throw new Error(data.error || ('Error de acceso (' + r.status + ')'));
+  await auth.signInWithCustomToken(data.token);
+  authTgId = String(data.tgId);
+}
+
+function showAuthError(msg) {
+  const box = document.createElement('div');
+  box.setAttribute('role', 'alert');
+  box.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--tg-theme-bg-color,#111);color:var(--tg-theme-text-color,#eee);font:15px/1.5 system-ui,sans-serif;text-align:center;z-index:9999';
+  box.textContent = '🔒 ' + msg;
+  document.body.appendChild(box);
+}
+
 function getUserId() {
-  const uid = tg?.initDataUnsafe?.user?.id;
-  return uid ? String(uid) : 'default';
+  if (!authTgId) throw new Error('Sin sesión');
+  return authTgId;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -636,11 +674,85 @@ function toast(msg, ms=2200) {
   setTimeout(() => el.classList.remove('show'), ms);
 }
 function haptic(t) { if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(t||'light'); }
-function safe(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function safe(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function safeUrl(u) {
+  try {
+    const url = new URL(String(u ?? ''));
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+  } catch { return ''; }
+}
+// Arguments are data only: entity decoding cannot turn them into JavaScript.
+function actionAttrs(action, args, stop=false, type='click') {
+  return `data-${type}="${safe(action)}" data-${type}-args="${safe(JSON.stringify(args))}"${stop ? ` data-${type}-stop="1"` : ''}`;
+}
+const htmlActions = {
+  _pickFilter,
+  _rdEp,
+  _sagaQuickAdd,
+  _toggleGenre,
+  _toggleTag,
+  addFromDetail: (id, list, r, el) => addFromDetail(id, list, el, r),
+  changeEp,
+  changeEpFromSearch,
+  deleteAnime,
+  editCustomList,
+  moveToList,
+  navToDateKey,
+  openAnimeDetail,
+  openAnimeLink,
+  openEpModal,
+  openExternal,
+  openImgViewer,
+  openLinkModal,
+  openNickModal,
+  openNotesModal,
+  openResultDetail,
+  openSagaEntryDetail,
+  openSagaPanel,
+  openSite,
+  quickAdd,
+  quickAddEstreno,
+  removeFilter,
+  runRecentSearch,
+  setRating,
+  setTab,
+  toggleMovie,
+  toggleSynopsis,
+  translateSynopsis,
+  _listFilterChange: (list, el) => _listFilterChange(list, el.value),
+  _listSortChange: (list, el) => _listSortChange(list, el.value),
+};
+for (const type of ['click', 'input', 'change']) {
+  document.addEventListener(type, event => {
+    // Walk a snapshot: a handler may replace its own card while handling a click.
+    for (const el of event.composedPath()) {
+      if (!(el instanceof Element)) continue;
+      const action = el.getAttribute(`data-${type}`);
+      const stop = el.hasAttribute(`data-${type}-stop`);
+      if (stop) event.stopPropagation();
+      if (action && Object.hasOwn(htmlActions, action)) {
+        const args = JSON.parse(el.getAttribute(`data-${type}-args`) || '[]');
+        if (Array.isArray(args)) htmlActions[action](...args, el);
+      }
+      if (stop) break;
+    }
+  });
+}
+function openSite(url) {
+  url = safeUrl(url);
+  if (url) window.open(url, '_blank', 'noopener');
+}
 function pct(w,t) { return t ? Math.min(100,Math.round(w/t*100)) : 0; }
 function imgTag(src, fb='🎌') {
-  if (!src) return fb;
-  return `<img src="${safe(src)}" loading="lazy" onerror="this.parentElement.innerHTML='${fb}'">`;
+  src = safeUrl(src);
+  if (!src) return safe(fb);
+  return `<img src="${safe(src)}" loading="lazy" data-fallback="${safe(fb)}" onerror="this.parentElement.textContent=this.dataset.fallback">`;
+}
+function showGridImageFallback(img) {
+  const fallback = document.createElement('div');
+  fallback.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;font-size:36px';
+  fallback.textContent = '🎌';
+  img.parentElement.replaceChildren(fallback);
 }
 function statusLabel(s) {
   return {RELEASING:'📺 En emisión',FINISHED:'✅ Terminado',NOT_YET_RELEASED:'🔜 Próximo',CANCELLED:'🚫 Cancelado',HIATUS:'⏸ Pausa'}[s]||s||'';
@@ -1256,22 +1368,22 @@ function estrenoGridCard(e, isTracked) {
   const a = isTracked ? getAnime(e.id) : null;
   const w = a?.watchedEps || 0;
   const t = a?.totalEps || null;
-  const trackedBadge = isTracked ? `<div class="egc-track-badge">${trackEmoji} ${e.tracking}</div>` : '';
+  const trackedBadge = isTracked ? `<div class="egc-track-badge">${trackEmoji} ${safe(e.tracking)}</div>` : '';
   const progressPill = (isTracked && e.format !== 'MOVIE' && e.tracking !== 'completado' && t)
-    ? `<div class="egc-progress-pill">${w}/${t}</div>` : '';
-  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" onclick="openResultDetail(${JSON.stringify({...e, episodes: t || null}).replace(/"/g,'&quot;')})">
+    ? `<div class="egc-progress-pill">${safe(w)}/${safe(t)}</div>` : '';
+  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" ${actionAttrs('openResultDetail', [{...e, episodes: t || null}])}>
     <div class="egc-poster">
-      ${e.cover?`<img src="${safe(e.cover)}" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:36px\\'>🎌</div>'">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px">🎌</div>'}
+      ${safeUrl(e.cover)?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="showGridImageFallback(this)">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px">🎌</div>'}
       ${trackedBadge}
       ${progressPill}
       <div class="egc-format-icon">${fmtIcon}</div>
       <div class="egc-overlay">
         <span class="egc-time">${time}</span>
-        <span class="egc-ep">Ep ${e.episode}</span>
+        <span class="egc-ep">Ep ${safe(e.episode)}</span>
       </div>
     </div>
     <div class="egc-title">${safe(e.title)}</div>
-    <div class="egc-meta">${e.score?`⭐ ${e.score}`:''}${e.genres?.length?` · ${e.genres[0]}`:''}</div>
+    <div class="egc-meta">${e.score?`⭐ ${safe(e.score)}`:''}${e.genres?.length?` · ${safe(e.genres[0])}`:''}</div>
   </div>`;
 }
 
@@ -1279,28 +1391,28 @@ function estrenoCard(e, isTracked) {
   const time = new Date(e.airingAt*1000).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
   const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
   const trackEmoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[e.tracking]||'';
-  const trackedChip = isTracked ? `<div class="tracked-chip">${trackEmoji} ${e.tracking}</div>` : '';
+  const trackedChip = isTracked ? `<div class="tracked-chip">${trackEmoji} ${safe(e.tracking)}</div>` : '';
   const addBtns = isTracked
-    ? `<div class="estreno-ep-counter" onclick="event.stopPropagation()">
-        <button class="ep-btn" onclick="changeEp(${e.id},-1,'${e.tracking}')">−</button>
-        <span class="ep-count editable" onclick="openEpModal(${e.id})" title="Tap para editar">${(getAnime(e.id)?.watchedEps||0)} ep</span>
-        <button class="ep-btn" onclick="changeEp(${e.id},1,'${e.tracking}')">+</button>
+    ? `<div class="estreno-ep-counter" data-click-stop="1">
+        <button class="ep-btn" ${actionAttrs('changeEp', [e.id,-1,e.tracking])}>−</button>
+        <span class="ep-count editable" ${actionAttrs('openEpModal', [e.id])} title="Tap para editar">${safe((getAnime(e.id)?.watchedEps||0))} ep</span>
+        <button class="ep-btn" ${actionAttrs('changeEp', [e.id,1,e.tracking])}>+</button>
        </div>`
-    : `<div class="qadd-row">${LIST_OPTS.map(l=>`<button class="qadd-btn" onclick="event.stopPropagation();quickAddEstreno(${JSON.stringify(e).replace(/"/g,'&quot;')},'${l.key}',this)">${l.emoji} ${l.label}</button>`).join('')}</div>`;
-  return `<div class="estreno-card${isTracked?' is-tracked':''}" onclick="openResultDetail(${JSON.stringify({...e, score: e.score, episodes: null}).replace(/"/g,'&quot;')})">
+    : `<div class="qadd-row">${LIST_OPTS.map(l=>`<button class="qadd-btn" ${actionAttrs('quickAddEstreno', [e,l.key], true)}>${l.emoji} ${l.label}</button>`).join('')}</div>`;
+  return `<div class="estreno-card${isTracked?' is-tracked':''}" ${actionAttrs('openResultDetail', [{...e, score: e.score, episodes: null}])}>
     <div class="estreno-poster">
-      ${e.cover?`<img src="${safe(e.cover)}" loading="lazy" onerror="this.parentElement.innerHTML='🎌'">`:'🎌'}
+      ${e.cover?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="this.parentElement.innerHTML='🎌'">`:'🎌'}
       <div class="estreno-time-badge">${time}</div>
     </div>
     <div class="estreno-body">
       ${trackedChip}
       <div class="estreno-title">${safe(e.title)}</div>
       <div class="estreno-meta">
-        <span>Ep. ${e.episode}</span>
-        ${e.score?`<span>⭐ ${e.score}</span>`:''}
-        <span>${fmtIcon} ${e.format==='TV'?'TV':e.format==='MOVIE'?'Película':e.format}</span>
+        <span>Ep. ${safe(e.episode)}</span>
+        ${e.score?`<span>⭐ ${safe(e.score)}</span>`:''}
+        <span>${fmtIcon} ${safe(e.format==='TV'?'TV':e.format==='MOVIE'?'Película':e.format)}</span>
       </div>
-      ${e.genres.length?`<div class="estreno-genres">${e.genres.join(' · ')}</div>`:''}
+      ${e.genres.length?`<div class="estreno-genres">${safe(e.genres.join(' · '))}</div>`:''}
       ${addBtns}
     </div>
   </div>`;
@@ -1356,7 +1468,7 @@ function renderActiveFiltersBar() {
   const chips = getActiveFilterChips();
   if (!chips.length) return '';
   const chipHtml = chips.map(c =>
-    `<span class="active-filter-chip">${safe(c.label)} <button onclick="removeFilter('${c.key}')" aria-label="Quitar">×</button></span>`
+    `<span class="active-filter-chip">${safe(c.label)} <button ${actionAttrs('removeFilter', [c.key])} aria-label="Quitar">×</button></span>`
   ).join('');
   return `<div class="active-filters">${chipHtml}<button class="clear-all-btn" onclick="clearAllFilters(true)">Limpiar todo</button></div>`;
 }
@@ -1365,10 +1477,10 @@ function renderRecentHtml() {
   const recent = getRecent();
   if (!recent.length) return '<div class="empty"><div class="big">🎌</div><p>Escribe el nombre de un anime<br>para buscar en AniList</p></div>';
   const items = recent.map(r=>`
-    <div class="recent-item" onclick="runRecentSearch('${safe(r.q)}')">
-      <div class="recent-thumb">${r.cover?`<img src="${safe(r.cover)}" loading="lazy" onerror="this.style.display='none'">`:'<span style="font-size:18px">🎌</span>'}</div>
+    <div class="recent-item" ${actionAttrs('runRecentSearch', [r.q])}>
+      <div class="recent-thumb">${r.cover?`<img src="${safe(safeUrl(r.cover))}" loading="lazy" onerror="this.style.display='none'">`:'<span style="font-size:18px">🎌</span>'}</div>
       <div class="recent-label">${safe(r.q)}</div>
-      <div class="recent-count">${r.count}</div>
+      <div class="recent-count">${safe(r.count)}</div>
     </div>`).join('');
   return `<div class="recent-header">
     <span class="section-title" style="padding:12px 14px 6px;display:block">Búsquedas recientes</span>
@@ -1406,15 +1518,15 @@ function gridCard(r) {
   if (tracked) {
     const t = a?.totalEps || r.episodes;
     if (a && r.format !== 'MOVIE' && tracked !== 'completado' && t) {
-      badge = `<div class="tracked-badge with-eps">${emoji} ${a.watchedEps||0}/${t}</div>`;
+      badge = `<div class="tracked-badge with-eps">${emoji} ${safe(a.watchedEps||0)}/${safe(t)}</div>`;
     } else {
       badge = `<div class="tracked-badge">${emoji}</div>`;
     }
   }
-  return `<div class="grid-card" onclick="openResultDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+  return `<div class="grid-card" ${actionAttrs('openResultDetail', [r])}>
     <div class="grid-poster">${imgTag(r.cover,'🎌')}${badge}</div>
     <div class="grid-title">${safe(r.title)}</div>
-    <div class="grid-meta">${r.score?'⭐'+r.score+' · ':''}${r.format||'TV'}</div>
+    <div class="grid-meta">${safe(r.score?'⭐'+r.score+' · ':'')}${safe(r.format||'TV')}</div>
   </div>`;
 }
 
@@ -1422,14 +1534,14 @@ function listCard(r) {
   const tracked = getAnimeList(r.id)||r.tracking;
   const a = tracked ? getAnime(r.id) : null;
   const meta = [
-    r.score?`<span>⭐ ${r.score}</span>`:'',
-    r.format?`<span>📺 ${r.format==='TV'?'Serie':r.format==='MOVIE'?'Película':r.format}</span>`:'',
-    r.episodes?`<span>🎞 ${r.episodes} ep</span>`:'',
-    r.startDate?`<span>📅 ${r.startDate.substring(0,7)}</span>`:'',
+    r.score?`<span>⭐ ${safe(r.score)}</span>`:'',
+    r.format?`<span>📺 ${safe(r.format==='TV'?'Serie':r.format==='MOVIE'?'Película':r.format)}</span>`:'',
+    r.episodes?`<span>🎞 ${safe(r.episodes)} ep</span>`:'',
+    r.startDate?`<span>📅 ${safe(r.startDate.substring(0,7))}</span>`:'',
   ].filter(Boolean).join('');
-  const trackedHtml = tracked?`<div class="tracked-chip">${{viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[tracked]||'✓'} ${tracked}</div>`:'';
-  const nextHtml = r.nextEp?`<div class="result-next">📡 Ep ${r.nextEp.ep} → ${r.nextEp.airingAt}</div>`:'';
-  const genresHtml = r.genres?.length?`<div class="result-genres">${r.genres.join(' · ')}</div>`:'';
+  const trackedHtml = tracked?`<div class="tracked-chip">${{viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[tracked]||'✓'} ${safe(tracked)}</div>`:'';
+  const nextHtml = r.nextEp?`<div class="result-next">📡 Ep ${safe(r.nextEp.ep)} → ${safe(r.nextEp.airingAt)}</div>`:'';
+  const genresHtml = r.genres?.length?`<div class="result-genres">${safe(r.genres.join(' · '))}</div>`:'';
 
   // NEW: ep counter when tracked (non-movie, non-completado)
   let progressHtml = '';
@@ -1438,10 +1550,10 @@ function listCard(r) {
     const t = a.totalEps || r.episodes || 0;
     const p = t ? Math.round(w/t*100) : 0;
     progressHtml = `<div class="result-progress-wrap">
-      <div class="estreno-ep-counter" onclick="event.stopPropagation()">
-        <button class="ep-btn" onclick="changeEpFromSearch(${r.id},-1)">−</button>
-        <span class="ep-count editable" data-search-ep="${r.id}" onclick="event.stopPropagation();openEpModal(${r.id})" title="Tap para editar">${w}${t?` / ${t}`:''}</span>
-        <button class="ep-btn" onclick="changeEpFromSearch(${r.id},1)">+</button>
+      <div class="estreno-ep-counter" data-click-stop="1">
+        <button class="ep-btn" ${actionAttrs('changeEpFromSearch', [r.id,-1])}>−</button>
+        <span class="ep-count editable" data-search-ep="${safe(r.id)}" ${actionAttrs('openEpModal', [r.id], true)} title="Tap para editar">${safe(w)}${t?` / ${safe(t)}`:''}</span>
+        <button class="ep-btn" ${actionAttrs('changeEpFromSearch', [r.id,1])}>+</button>
       </div>
       ${t?`<div class="result-progress-bar"><div class="result-progress-bar-fill" style="width:${p}%"></div></div>`:''}
     </div>`;
@@ -1452,19 +1564,19 @@ function listCard(r) {
   if (a) {
     const links = _getLinks(a);
     const linkBtns = links.map((url, i) =>
-      `<button class="link-mini-btn" onclick="event.stopPropagation();openAnimeLink(${r.id},${i})" title="${safe(url)}">▶️ ${safe(_extractDomain(url))}</button>`
+      `<button class="link-mini-btn" ${actionAttrs('openAnimeLink', [r.id,i], true)} title="${safe(url)}">▶️ ${safe(_extractDomain(url))}</button>`
     ).join('');
     const addLink = links.length < MAX_LINKS_PER_ANIME
-      ? `<button class="link-mini-btn" style="border-style:dashed;background:none" onclick="event.stopPropagation();openLinkModal(${r.id})">🔗 + link</button>`
+      ? `<button class="link-mini-btn" style="border-style:dashed;background:none" ${actionAttrs('openLinkModal', [r.id], true)}>🔗 + link</button>`
       : '';
     if (linkBtns || addLink) linksHtml = `<div class="result-links">${linkBtns}${addLink}</div>`;
   }
 
   const addBtns = LIST_OPTS.map(l=>
-    `<button class="qadd-btn${tracked===l.key?' active':''}" onclick="event.stopPropagation();quickAdd(${r.id},'${l.key}',this)">${l.emoji} ${l.label}</button>`
+    `<button class="qadd-btn${tracked===l.key?' active':''}" ${actionAttrs('quickAdd', [r.id,l.key], true)}>${l.emoji} ${l.label}</button>`
   ).join('');
   const nickHtml = a?.nickname ? `<div class="result-genres" style="opacity:1;color:var(--accent);font-weight:600">🏷️ ${safe(a.nickname)}</div>` : '';
-  return `<div class="result-card" onclick="openResultDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+  return `<div class="result-card" ${actionAttrs('openResultDetail', [r])}>
     <div class="result-poster">${imgTag(r.cover,'🎌')}</div>
     <div class="result-body">
       ${trackedHtml}
@@ -1512,7 +1624,7 @@ async function quickAdd(id, list, btn) {
     const chip = card.querySelector('.tracked-chip');
     const emoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[list]||'✓';
     if (chip) chip.textContent=`${emoji} ${list}`;
-    else card.querySelector('.result-body').insertAdjacentHTML('afterbegin',`<div class="tracked-chip">${emoji} ${list}</div>`);
+    else card.querySelector('.result-body').insertAdjacentHTML('afterbegin',`<div class="tracked-chip">${emoji} ${safe(list)}</div>`);
   }
   toast(`✓ "${(r.title||'').substring(0,20)}" → ${list}`);
 }
@@ -1524,15 +1636,15 @@ function openResultDetail(r) {
   const a = tracked ? getAnime(r.id) : null;
   document.getElementById('detail-title').textContent = r.title;
   const badges = [
-    r.status?`<span class="detail-badge">${statusLabel(r.status)}</span>`:'',
-    r.format?`<span class="detail-badge">${r.format==='MOVIE'?'🎬 Película':r.format}</span>`:'',
-    r.episodes?`<span class="detail-badge">🎞 ${r.episodes} eps</span>`:'',
-    r.startDate?`<span class="detail-badge">📅 ${r.startDate.substring(0,7)}</span>`:'',
-    r.season?`<span class="detail-badge">🗓 ${r.season}</span>`:'',
+    r.status?`<span class="detail-badge">${safe(statusLabel(r.status))}</span>`:'',
+    r.format?`<span class="detail-badge">${safe(r.format==='MOVIE'?'🎬 Película':r.format)}</span>`:'',
+    r.episodes?`<span class="detail-badge">🎞 ${safe(r.episodes)} eps</span>`:'',
+    r.startDate?`<span class="detail-badge">📅 ${safe(r.startDate.substring(0,7))}</span>`:'',
+    r.season?`<span class="detail-badge">🗓 ${safe(r.season)}</span>`:'',
   ].join('');
   const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
   const addBtns = allOpts.map(l=>
-    `<div class="list-opt${tracked===l.key?' active':''}" onclick="addFromDetail(${r.id},'${l.key}',this,${JSON.stringify(r).replace(/"/g,'&quot;')})">${safe(l.emoji)} ${safe(l.label)}</div>`
+    `<div class="list-opt${tracked===l.key?' active':''}" ${actionAttrs('addFromDetail', [r.id,l.key,r])}>${safe(l.emoji)} ${safe(l.label)}</div>`
   ).join('') + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
 
   // Episode counter section — shown when anime is tracked and not a movie/completado
@@ -1544,9 +1656,9 @@ function openResultDetail(r) {
     epSection = `<div class="detail-section">
       <div class="detail-section-title">Progreso</div>
       <div class="ep-big" id="epbig-rd">
-        <button class="ep-btn" onclick="_rdEp(${r.id},-1)">−</button>
-        <span class="ep-count editable" id="epc-rd" onclick="openEpModal(${r.id})" title="Tap para escribir">${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span></span>
-        <button class="ep-btn" onclick="_rdEp(${r.id},1)">+</button>
+        <button class="ep-btn" ${actionAttrs('_rdEp', [r.id,-1])}>−</button>
+        <span class="ep-count editable" id="epc-rd" ${actionAttrs('openEpModal', [r.id])} title="Tap para escribir">${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span></span>
+        <button class="ep-btn" ${actionAttrs('_rdEp', [r.id,1])}>+</button>
       </div>
       ${t?`<div class="progress-bar" style="margin-top:9px"><div class="progress-fill" id="epfill-rd" style="width:${p}%"></div></div>
       <div style="text-align:center;font-size:11px;color:var(--hint);margin-top:4px" id="epct-rd">${p}%</div>`:''}
@@ -1561,35 +1673,35 @@ function openResultDetail(r) {
 
   document.getElementById('detail-body').innerHTML = `
     <div class="detail-hero">
-      <div class="detail-hero-img" onclick="openImgViewer('${safe(r.cover||r.coverImage||'')}')">${imgTag(r.cover||r.coverImage,'🎌')}</div>
+      <div class="detail-hero-img" ${actionAttrs('openImgViewer', [r.cover||r.coverImage||''])}>${imgTag(r.cover||r.coverImage,'🎌')}</div>
       <div class="detail-info">
         <div class="detail-name">${safe(r.title)}</div>
         <div class="detail-badges">${badges}</div>
-        ${r.score?`<div class="detail-score">⭐ ${r.score}<span style="font-size:12px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
-        ${r.genres?.length?`<div style="font-size:11px;color:var(--hint);margin-top:8px">${r.genres.join(' · ')}</div>`:''}
+        ${r.score?`<div class="detail-score">⭐ ${safe(r.score)}<span style="font-size:12px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
+        ${r.genres?.length?`<div style="font-size:11px;color:var(--hint);margin-top:8px">${safe(r.genres.join(' · '))}</div>`:''}
         ${_durationHtml({duration:r.duration||a?.duration, totalEps:r.episodes||a?.totalEps}, a?.watchedEps||0)}
       </div>
     </div>
     ${r.description||a?.description ? `<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(r.description||a?.description, 'rd'+r.id)}</div>` : ''}
     <div class="detail-section">
       <div class="detail-section-title">Saga / Franquicia</div>
-      <button class="saga-entry-btn" onclick="openSagaPanel(${r.id})">
+      <button class="saga-entry-btn" ${actionAttrs('openSagaPanel', [r.id])}>
         <span>🔗 Ver obras relacionadas</span>
         <span class="saga-arrow">›</span>
       </button>
     </div>
-    <div class="detail-section" id="wtw-section-${r.id}">
+    <div class="detail-section" id="wtw-section-${safe(r.id)}">
       <div class="detail-section-title">📺 ¿Dónde ver?</div>
-      <div id="wtw-body-${r.id}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
+      <div id="wtw-body-${safe(r.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
-    ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${r.nextEp.ep}: ${r.nextEp.airingAt}</div></div>`:''}
+    ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${safe(r.nextEp.ep)}: ${safe(r.nextEp.airingAt)}</div></div>`:''}
     ${epSection}
     ${ratingSection}
     <div class="detail-section">
       <div class="detail-section-title">Agregar a lista</div>
       <div class="list-selector">${addBtns}</div>
     </div>
-    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" onclick="window.open('${safe(r.siteUrl)}','_blank')">🔗 Ver en AniList</button></div>`:''}`;
+    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" ${actionAttrs('openSite', [r.siteUrl])}>🔗 Ver en AniList</button></div>`:''}`;
   openDetail();
   loadWhereToWatch(r.id);
 }
@@ -1607,7 +1719,7 @@ async function _rdEp(id, delta) {
   const ec = document.getElementById('epc-rd');
   const ef = document.getElementById('epfill-rd');
   const et = document.getElementById('epct-rd');
-  if (ec) ec.innerHTML = `${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span>`;
+  if (ec) ec.innerHTML = `${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span>`;
   if (ef) ef.style.width = p + '%';
   if (et) et.textContent = p + '%';
   _checkAutoComplete(a);
@@ -1638,9 +1750,9 @@ function renderOverview() {
     const ip = key === 'viendo' ? arr.filter(a => (a.watchedEps||0) < (a.totalEps||Infinity)).length : 0;
     const bar = total ? Math.round(n/total*100) : 0;
     const color = colors[key] || '#7c3aed';
-    html += `<div class="overview-card" onclick="setTab('${key}')">
+    html += `<div class="overview-card" ${actionAttrs('setTab', [key])}>
       <div class="ov-row">
-        <div class="ov-left"><div class="ov-icon">${meta.emoji}</div>
+        <div class="ov-left"><div class="ov-icon">${safe(meta.emoji)}</div>
           <div><div class="ov-label">${safe(meta.name)}</div>${ip?`<div class="ov-sub">${ip} en progreso</div>`:''}</div>
         </div>
         <div class="ov-count">${n}</div>
@@ -1656,13 +1768,13 @@ function renderOverview() {
       const meta = getListMeta(key);
       const n = (allLists[key]||[]).length;
       const bar = total ? Math.round(n/total*100) : 0;
-      html += `<div class="overview-card" onclick="setTab('${key}')">
+      html += `<div class="overview-card" ${actionAttrs('setTab', [key])}>
         <div class="ov-row">
-          <div class="ov-left"><div class="ov-icon">${meta.emoji}</div>
+          <div class="ov-left"><div class="ov-icon">${safe(meta.emoji)}</div>
             <div><div class="ov-label">${safe(meta.name)}</div><div class="ov-sub">Lista personalizada</div></div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <button class="link-edit-btn" style="width:34px;height:34px" onclick="event.stopPropagation();editCustomList('${key}')" title="Editar">✏️</button>
+            <button class="link-edit-btn" style="width:34px;height:34px" ${actionAttrs('editCustomList', [key], true)} title="Editar">✏️</button>
             <div class="ov-count">${n}</div>
           </div>
         </div>
@@ -1682,7 +1794,7 @@ function renderList(listName) {
   const c   = document.getElementById('content');
   const meta = getListMeta(listName);
   if (!raw.length) {
-    c.innerHTML = `<div class="empty"><div class="big">${meta.emoji}</div><p><b>${safe(meta.name)}</b> está vacía.<br>Busca anime para agregar.</p></div>`;
+    c.innerHTML = `<div class="empty"><div class="big">${safe(meta.emoji)}</div><p><b>${safe(meta.name)}</b> está vacía.<br>Busca anime para agregar.</p></div>`;
     return;
   }
   const sortMode    = _listSort[listName]   || 'addedAt';
@@ -1706,11 +1818,11 @@ function renderList(listName) {
   const toolsRow = `<div class="list-tools-row">
     <div class="list-search-wrap">
       <span class="si">🔍</span>
-      <input class="list-search-mini" id="lsf-${listName}" type="search" placeholder="Filtrar…" autocomplete="off" value="${safe(filterText)}"
-        oninput="_listFilterChange('${listName}',this.value)">
+      <input class="list-search-mini" id="lsf-${safe(listName)}" type="search" placeholder="Filtrar…" autocomplete="off" value="${safe(filterText)}"
+        ${actionAttrs('_listFilterChange', [listName], false, 'input')}>
     </div>
-    <select class="list-sort-select" onchange="_listSortChange('${listName}',this.value)">
-      ${sortOpts.map(o=>`<option value="${o.v}"${sortMode===o.v?' selected':''}>${o.l}</option>`).join('')}
+    <select class="list-sort-select" ${actionAttrs('_listSortChange', [listName], false, 'change')}>
+      ${sortOpts.map(o=>`<option value="${safe(o.v)}"${sortMode===o.v?' selected':''}>${safe(o.l)}</option>`).join('')}
     </select>
   </div>`;
 
@@ -1753,31 +1865,31 @@ function animeCard(a,listName){
       if (behind > 0) status = `<span class="behind">${behind} pendiente${behind>1?'s':''}</span>`;
       else if (behind === 0) status = `<span class="uptodate">al día ✓</span>`;
       else status = `<span class="ahead">+${-behind} de adelanto</span>`;
-      airedHtml = `<div class="progress-aired">📡 ${aired} emitido${aired===1?'':'s'}${a.nextEp?.airingAt?` · próx ${a.nextEp.airingAt}`:''} · ${status}</div>`;
+      airedHtml = `<div class="progress-aired">📡 ${safe(aired)} emitido${aired===1?'':'s'}${a.nextEp?.airingAt?` · próx ${safe(a.nextEp.airingAt)}`:''} · ${status}</div>`;
     }
     progressHtml = `<div class="progress-wrap">
-      <div class="progress-label"><span>${w} / ${t||'?'} eps</span><span>${t?p+'%':''}</span></div>
+      <div class="progress-label"><span>${safe(w)} / ${safe(t||'?')} eps</span><span>${t?p+'%':''}</span></div>
       ${t?`<div class="progress-bar"><div class="progress-fill" style="width:${p}%"></div></div>`:''}
       ${airedHtml}
     </div>`;
   }
   const counter=listName!=='completado'&&!isMovie?`
-    <div class="ep-counter" onclick="event.stopPropagation()">
-      <button class="ep-btn" onclick="changeEp(${a.id},-1,'${listName}')">−</button>
-      <span class="ep-count editable" onclick="openEpModal(${a.id})" title="Tap para editar">${w}${t?' / '+t:' ep'}</span>
-      <button class="ep-btn" onclick="changeEp(${a.id},1,'${listName}')">+</button>
+    <div class="ep-counter" data-click-stop="1">
+      <button class="ep-btn" ${actionAttrs('changeEp', [a.id,-1,listName])}>−</button>
+      <span class="ep-count editable" ${actionAttrs('openEpModal', [a.id])} title="Tap para editar">${safe(w)}${safe(t?' / '+t:' ep')}</span>
+      <button class="ep-btn" ${actionAttrs('changeEp', [a.id,1,listName])}>+</button>
     </div>`:'';
   const miniStars = a.userRating ? `<div class="card-rating">${[1,2,3,4,5].map(n=>`<span class="card-star${a.userRating>=n?' filled':''}">★</span>`).join('')}</div>` : '';
   const airedN = getAiredEp(a);
   const behind = airedN != null ? airedN - w : 0;
-  return `<div class="card${behind >= 3 ? ' is-behind' : ''}" data-swipe-id="${a.id}" onclick="openAnimeDetail(${a.id})">
+  return `<div class="card${behind >= 3 ? ' is-behind' : ''}" data-swipe-id="${safe(a.id)}" ${actionAttrs('openAnimeDetail', [a.id])}>
     <div class="card-poster">${imgTag(a.coverImage,'🎌')}</div>
     <div class="card-body">
       <div class="card-title">${safe(a.title)}</div>
       <div class="card-meta">
-        ${a.status?`<span class="badge-s">${statusLabel(a.status)}</span>`:''}
-        ${a.format&&a.format!=='TV'?`<span class="badge-s">${a.format}</span>`:''}
-        ${a.averageScore?`<span class="badge-s">⭐${a.averageScore}</span>`:''}
+        ${a.status?`<span class="badge-s">${safe(statusLabel(a.status))}</span>`:''}
+        ${a.format&&a.format!=='TV'?`<span class="badge-s">${safe(a.format)}</span>`:''}
+        ${a.averageScore?`<span class="badge-s">⭐${safe(a.averageScore)}</span>`:''}
       </div>
       ${progressHtml}${counter}${miniStars}
     </div>
@@ -1832,7 +1944,7 @@ async function loadWhereToWatch(id){
       const emoji = WATCH_SITE_EMOJI[l.site] || '📺';
       const lang = l.language ? ` · ${safe(l.language)}` : '';
       return `<div class="link-row">
-        <button class="link-open-btn" onclick="openExternal('${safe(l.url)}')">
+        <button class="link-open-btn" ${actionAttrs('openExternal', [l.url])}>
           <span style="font-size:15px">${emoji}</span>
           <span class="link-domain">${safe(l.site)}${lang}</span>
           <span class="link-arrow">→</span>
@@ -1846,6 +1958,8 @@ async function loadWhereToWatch(id){
 }
 // Abre un link externo desde la Mini App (Telegram WebApp o navegador)
 function openExternal(url){
+  url = safeUrl(url);
+  if (!url) return;
   haptic('medium');
   if (tg?.openLink) tg.openLink(url);
   else window.open(url, '_blank', 'noopener');
@@ -1855,35 +1969,35 @@ function renderDetailBody(a,listName){
   const w=a.watchedEps||0,t=a.totalEps||0,p=t?pct(w,t):0,isMovie=a.format==='MOVIE';
   document.getElementById('detail-title').textContent=a.title;
   const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
-  const listOpts = allOpts.map(l=>`<div class="list-opt${listName===l.key?' active':''}" onclick="moveToList(${a.id},'${l.key}')">${safe(l.emoji)} ${safe(l.label)}</div>`).join('')
+  const listOpts = allOpts.map(l=>`<div class="list-opt${listName===l.key?' active':''}" ${actionAttrs('moveToList', [a.id,l.key])}>${safe(l.emoji)} ${safe(l.label)}</div>`).join('')
     + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
   const epSection=isMovie
-    ?`<div class="ep-big"><button class="ep-btn" style="width:100%;font-size:14px;font-weight:600" onclick="toggleMovie(${a.id},'${listName}')">${w>0?'⬜ Marcar no vista':'✅ Marcar vista'}</button></div>`
+    ?`<div class="ep-big"><button class="ep-btn" style="width:100%;font-size:14px;font-weight:600" ${actionAttrs('toggleMovie', [a.id,listName])}>${w>0?'⬜ Marcar no vista':'✅ Marcar vista'}</button></div>`
     :`<div class="ep-big" id="epbig">
         <button class="ep-btn" onclick="detailEp(-1)">−</button>
-        <span class="ep-count editable" id="epc" onclick="openEpModal(${a.id})" title="Tap para escribir el episodio">${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span></span>
+        <span class="ep-count editable" id="epc" ${actionAttrs('openEpModal', [a.id])} title="Tap para escribir el episodio">${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span></span>
         <button class="ep-btn" onclick="detailEp(1)">+</button>
       </div>
       ${t?`<div class="progress-bar" style="margin-top:9px"><div class="progress-fill" id="epfill" style="width:${p}%"></div></div>
       <div style="text-align:center;font-size:11px;color:var(--hint);margin-top:4px" id="epct">${p}%</div>`:''}`;
   document.getElementById('detail-body').innerHTML=`
     <div class="detail-hero">
-      <div class="detail-hero-img" onclick="openImgViewer('${safe(a.coverImage||'')}')">${imgTag(a.coverImage,'🎌')}</div>
+      <div class="detail-hero-img" ${actionAttrs('openImgViewer', [a.coverImage||''])}>${imgTag(a.coverImage,'🎌')}</div>
       <div class="detail-info">
         <div class="detail-name">${safe(a.title)}</div>
         <div class="detail-badges">
-          ${a.status?`<span class="detail-badge">${statusLabel(a.status)}</span>`:''}
-          ${a.format?`<span class="detail-badge">${a.format}</span>`:''}
-          ${t?`<span class="detail-badge">${t} eps</span>`:''}
+          ${a.status?`<span class="detail-badge">${safe(statusLabel(a.status))}</span>`:''}
+          ${a.format?`<span class="detail-badge">${safe(a.format)}</span>`:''}
+          ${t?`<span class="detail-badge">${safe(t)} eps</span>`:''}
         </div>
-        ${a.averageScore?`<div class="detail-score">⭐ ${a.averageScore}<span style="font-size:11px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
+        ${a.averageScore?`<div class="detail-score">⭐ ${safe(a.averageScore)}<span style="font-size:11px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
         ${_durationHtml(a, w)}
       </div>
     </div>
     ${a.description?`<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(a.description, 'da'+a.id)}</div>`:''}
     <div class="detail-section">
       <div class="detail-section-title">Saga / Franquicia</div>
-      <button class="saga-entry-btn" onclick="openSagaPanel(${a.id})">
+      <button class="saga-entry-btn" ${actionAttrs('openSagaPanel', [a.id])}>
         <span>🔗 Ver obras relacionadas</span>
         <span class="saga-arrow">›</span>
       </button>
@@ -1898,13 +2012,13 @@ function renderDetailBody(a,listName){
       ${a.userNote
         ? `<div class="link-row">
             <div class="notes-display" style="flex:1">${safe(a.userNote)}</div>
-            <button class="link-edit-btn" onclick="openNotesModal(${a.id})" title="Editar">✏️</button>
+            <button class="link-edit-btn" ${actionAttrs('openNotesModal', [a.id])} title="Editar">✏️</button>
            </div>`
-        : `<button class="link-add-btn" onclick="openNotesModal(${a.id})">📝 Agregar nota personal</button>`}
+        : `<button class="link-add-btn" ${actionAttrs('openNotesModal', [a.id])}>📝 Agregar nota personal</button>`}
     </div>
-    <div class="detail-section" id="wtw-section-${a.id}">
+    <div class="detail-section" id="wtw-section-${safe(a.id)}">
       <div class="detail-section-title">📺 ¿Dónde ver?</div>
-      <div id="wtw-body-${a.id}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
+      <div id="wtw-body-${safe(a.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
     <div class="detail-section">
       <div class="detail-section-title">Mis links${_getLinks(a).length?` · ${_getLinks(a).length}/${MAX_LINKS_PER_ANIME}`:''}</div>
@@ -1912,38 +2026,38 @@ function renderDetailBody(a,listName){
         ? `<div class="link-list">
             ${_getLinks(a).map((url, i) => `
               <div class="link-row">
-                <button class="link-open-btn" onclick="openAnimeLink(${a.id},${i})">
+                <button class="link-open-btn" ${actionAttrs('openAnimeLink', [a.id,i])}>
                   <span style="font-size:15px">▶️</span>
                   <span class="link-domain">${safe(_extractDomain(url))}</span>
                   <span class="link-arrow">→</span>
                 </button>
-                <button class="link-edit-btn" onclick="openLinkModal(${a.id},${i})" title="Editar">✏️</button>
+                <button class="link-edit-btn" ${actionAttrs('openLinkModal', [a.id,i])} title="Editar">✏️</button>
               </div>
             `).join('')}
             ${_getLinks(a).length < MAX_LINKS_PER_ANIME
-              ? `<button class="link-add-btn" onclick="openLinkModal(${a.id})">+ Agregar otro link</button>`
+              ? `<button class="link-add-btn" ${actionAttrs('openLinkModal', [a.id])}>+ Agregar otro link</button>`
               : ''}
           </div>`
-        : `<button class="link-add-btn" onclick="openLinkModal(${a.id})">🔗 Agregar link (Crunchyroll, etc)</button>`
+        : `<button class="link-add-btn" ${actionAttrs('openLinkModal', [a.id])}>🔗 Agregar link (Crunchyroll, etc)</button>`
       }
     </div>
     <div class="detail-section">
       <div class="detail-section-title">Apodo</div>
       ${a.nickname
         ? `<div class="link-row">
-            <button class="link-open-btn" style="cursor:default" onclick="event.stopPropagation()">
+            <button class="link-open-btn" style="cursor:default" data-click-stop="1">
               <span style="font-size:14px">🏷️</span>
               <span class="link-domain">${safe(a.nickname)}</span>
             </button>
-            <button class="link-edit-btn" onclick="openNickModal(${a.id})" title="Editar">✏️</button>
+            <button class="link-edit-btn" ${actionAttrs('openNickModal', [a.id])} title="Editar">✏️</button>
           </div>`
-        : `<button class="link-add-btn" onclick="openNickModal(${a.id})">🏷️ Agregar apodo (busca más rápido)</button>`
+        : `<button class="link-add-btn" ${actionAttrs('openNickModal', [a.id])}>🏷️ Agregar apodo (busca más rápido)</button>`
       }
     </div>
     <div class="detail-section"><div class="detail-section-title">Lista</div><div class="list-selector">${listOpts}</div></div>
     <div class="detail-section">
-      ${a.siteUrl?`<button class="action-btn action-ghost" onclick="window.open('${safe(a.siteUrl)}','_blank')">🔗 Ver en AniList</button>`:''}
-      <button class="action-btn action-danger" onclick="deleteAnime(${a.id})">❌ Quitar de mis listas</button>
+      ${a.siteUrl?`<button class="action-btn action-ghost" ${actionAttrs('openSite', [a.siteUrl])}>🔗 Ver en AniList</button>`:''}
+      <button class="action-btn action-danger" ${actionAttrs('deleteAnime', [a.id])}>❌ Quitar de mis listas</button>
     </div>`;
 }
 
@@ -1954,7 +2068,7 @@ async function detailEp(delta){
   a.watchedEps=w;
   const t=a.totalEps||0,p=t?pct(w,t):0;
   const ec=document.getElementById('epc'),ef=document.getElementById('epfill'),et=document.getElementById('epct');
-  if(ec) ec.innerHTML=`${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span>`;
+  if(ec) ec.innerHTML=`${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span>`;
   if(ef) ef.style.width=p+'%';
   if(et) et.textContent=p+'%';
   await updateEpInList(a.id,w);
@@ -2075,6 +2189,7 @@ function _ivReset() {
   _ivApply();
 }
 function openImgViewer(src) {
+  src = safeUrl(src);
   if (!src) return;
   haptic('light');
   // Try upgrading URL to higher-res (medium → large)
@@ -2256,7 +2371,7 @@ async function saveLinkFromModal() {
   if (_linkModalAnimeId == null) return;
   const url = document.getElementById('link-input').value.trim();
   if (!url) { closeLinkModal(); return; } // empty = no-op
-  if (!/^https?:\/\//i.test(url)) {
+  if (!safeUrl(url)) {
     toast('⚠️ Link debe empezar con http:// o https://');
     return;
   }
@@ -2297,7 +2412,7 @@ async function removeLinkFromModal() {
 function openAnimeLink(id, idx) {
   const a = getAnime(Number(id)) || detailAnime;
   const links = _getLinks(a);
-  const url = links[idx || 0];
+  const url = safeUrl(links[idx || 0]);
   if (!url) return;
   haptic('medium');
   if (tg?.openLink) tg.openLink(url);
@@ -2396,9 +2511,9 @@ async function saveEpFromModal() {
 function _buildFilterChips(containerId, options, key, current) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  let html = `<button class="filter-chip${!current?' active':''}" data-val="" onclick="_pickFilter('${key}','')">Cualquiera</button>`;
+  let html = `<button class="filter-chip${!current?' active':''}" data-val="" ${actionAttrs('_pickFilter', [key,''])}>Cualquiera</button>`;
   html += options.map(o =>
-    `<button class="filter-chip${current===o.v?' active':''}" data-val="${safe(o.v)}" onclick="_pickFilter('${key}','${safe(o.v)}')">${o.label}</button>`
+    `<button class="filter-chip${current===o.v?' active':''}" data-val="${safe(o.v)}" ${actionAttrs('_pickFilter', [key,o.v])}>${safe(o.label)}</button>`
   ).join('');
   el.innerHTML = html;
 }
@@ -2406,14 +2521,14 @@ function _buildGenreChips(current) {
   const el = document.getElementById('filter-genres');
   if (!el) return;
   el.innerHTML = GENRE_OPTS.map(g =>
-    `<button class="filter-chip multi${(current||[]).includes(g)?' active':''}" data-val="${safe(g)}" onclick="_toggleGenre('${safe(g)}')">${g}</button>`
+    `<button class="filter-chip multi${(current||[]).includes(g)?' active':''}" data-val="${safe(g)}" ${actionAttrs('_toggleGenre', [g])}>${safe(g)}</button>`
   ).join('');
 }
 function _buildTagChips(current) {
   const el = document.getElementById('filter-tags');
   if (!el) return;
   el.innerHTML = TAG_OPTS.map(t =>
-    `<button class="filter-chip multi${(current||[]).includes(t)?' active':''}" data-val="${safe(t)}" onclick="_toggleTag('${safe(t)}')">${t}</button>`
+    `<button class="filter-chip multi${(current||[]).includes(t)?' active':''}" data-val="${safe(t)}" ${actionAttrs('_toggleTag', [t])}>${safe(t)}</button>`
   ).join('');
 }
 function _toggleTag(t) {
@@ -2501,11 +2616,11 @@ function removeFilter(key) {
 // ── Personal rating (1–5 stars) ───────────────────────────────────────────────
 function _starsHtml(id, rating, containerId) {
   const stars = [1,2,3,4,5].map(n =>
-    `<button class="star-btn${(rating||0) >= n ? ' filled' : ''}" onclick="setRating(${id},${n},'${containerId}')" aria-label="${n} estrellas">★</button>`
+    `<button class="star-btn${(rating||0) >= n ? ' filled' : ''}" ${actionAttrs('setRating', [id,n,containerId])} aria-label="${n} estrellas">★</button>`
   ).join('');
   const label = rating ? `${rating}/5` : 'Sin calificar';
-  const clear  = rating ? `<button class="rating-clear" onclick="setRating(${id},0,'${containerId}')">✕</button>` : '';
-  return `<div class="star-row" id="${containerId}">${stars}<span class="rating-label">${label}</span>${clear}</div>`;
+  const clear  = rating ? `<button class="rating-clear" ${actionAttrs('setRating', [id,0,containerId])}>✕</button>` : '';
+  return `<div class="star-row" id="${safe(containerId)}">${stars}<span class="rating-label">${safe(label)}</span>${clear}</div>`;
 }
 
 async function setRating(id, rating, containerId) {
@@ -2699,9 +2814,9 @@ function _synopsisHtml(desc, id) {
   const display = cached || desc;
   const short   = !cached && display.length > 200;
   return `<div class="synopsis-wrap">
-    <p class="synopsis-text${short?' clamped':''}" id="syn-${id}">${safe(display)}</p>
-    ${short?`<button class="synopsis-toggle" id="syn-btn-${id}" onclick="toggleSynopsis('${id}')">Leer más ▾</button>`:''}
-    ${!cached?`<button class="translate-btn" id="trans-btn-${id}" onclick="translateSynopsis('${id}',this)">🌐 Español</button>`:'<span style="font-size:10px;color:var(--hint);display:inline-block;margin-top:4px">✓ Traducido</span>'}
+    <p class="synopsis-text${short?' clamped':''}" id="syn-${safe(id)}">${safe(display)}</p>
+    ${short?`<button class="synopsis-toggle" id="syn-btn-${safe(id)}" ${actionAttrs('toggleSynopsis', [id])}>Leer más ▾</button>`:''}
+    ${!cached?`<button class="translate-btn" id="trans-btn-${safe(id)}" ${actionAttrs('translateSynopsis', [id])}>🌐 Español</button>`:'<span style="font-size:10px;color:var(--hint);display:inline-block;margin-top:4px">✓ Traducido</span>'}
   </div>`;
 }
 function _durationHtml(a, watchedEps) {
@@ -2709,11 +2824,11 @@ function _durationHtml(a, watchedEps) {
   const dur = a.duration;
   const pending = a.totalEps ? Math.max(0, a.totalEps - (watchedEps||0)) : null;
   const parts = [];
-  parts.push(`<span>⏱ ${dur} min/ep</span>`);
+  parts.push(`<span>⏱ ${safe(dur)} min/ep</span>`);
   if (pending !== null && pending > 0) {
     const mins = pending * dur;
     const label = mins >= 60 ? `~${Math.round(mins/60)}h restantes` : `~${mins}min restantes`;
-    parts.push(`<span>${label}</span>`);
+    parts.push(`<span>${safe(label)}</span>`);
   }
   return `<div class="duration-line">${parts.join('')}</div>`;
 }
@@ -2816,27 +2931,26 @@ async function openSagaPanel(animeId) {
     const tracked = getAnimeList(e.id);
     const a       = tracked ? getAnime(e.id) : null;
     const watchedBadge = tracked
-      ? `<div class="relation-watched-badge">${tracked==='completado'?'✅':tracked==='viendo'?'▶️':getListMeta(tracked).emoji}</div>`
+      ? `<div class="relation-watched-badge">${safe(tracked==='completado'?'✅':tracked==='viendo'?'▶️':getListMeta(tracked).emoji)}</div>`
       : '';
     const progressTxt = a && a.totalEps
-      ? `<span style="color:var(--accent);font-weight:600">${a.watchedEps||0}/${a.totalEps}</span>` : '';
-    const rData = JSON.stringify(e).replace(/"/g, '&quot;');
+      ? `<span style="color:var(--accent);font-weight:600">${safe(a.watchedEps||0)}/${safe(a.totalEps)}</span>` : '';
     const addBtns = allOpts.map(l =>
-      `<button class="qadd-btn${tracked===l.key?' active':''}" onclick="event.stopPropagation();_sagaQuickAdd(${e.id},'${l.key}',${rData},this)">${safe(l.emoji)} ${safe(l.label)}</button>`
+      `<button class="qadd-btn${tracked===l.key?' active':''}" ${actionAttrs('_sagaQuickAdd', [e.id,l.key,e], true)}>${safe(l.emoji)} ${safe(l.label)}</button>`
     ).join('');
-    return `<div class="relation-card" onclick="openSagaEntryDetail(${e.id},${rData})">
+    return `<div class="relation-card" ${actionAttrs('openSagaEntryDetail', [e.id,e])}>
       <div class="relation-num">${i+1}</div>
       <div class="relation-poster">${imgTag(e.cover,'🎌')}${watchedBadge}</div>
       <div class="relation-body">
         <div class="relation-title">${safe(e.title)}</div>
         <div class="relation-meta">
-          ${e.startYear!==9999?`<span>📅 ${e.startYear}</span>`:''}
-          <span>${e.format==='MOVIE'?'🎬 Película':e.format||'TV'}</span>
-          ${e.episodes?`<span>🎞 ${e.episodes} eps</span>`:''}
-          ${e.score?`<span>⭐${e.score}</span>`:''}
+          ${e.startYear!==9999?`<span>📅 ${safe(e.startYear)}</span>`:''}
+          <span>${safe(e.format==='MOVIE'?'🎬 Película':e.format||'TV')}</span>
+          ${e.episodes?`<span>🎞 ${safe(e.episodes)} eps</span>`:''}
+          ${e.score?`<span>⭐${safe(e.score)}</span>`:''}
           ${progressTxt}
         </div>
-        <span class="relation-type-badge">${RELATION_LABEL[e.relationType]||e.relationType}</span>
+        <span class="relation-type-badge">${safe(RELATION_LABEL[e.relationType]||e.relationType)}</span>
         <div class="qadd-row" style="margin-top:5px">${addBtns}</div>
       </div>
     </div>`;
@@ -2876,7 +2990,7 @@ async function _sagaQuickAdd(id, list, r, btnEl) {
   if (badge) { badge.textContent = getListMeta(list).emoji; badge.style.display = 'flex'; }
   else {
     const poster = btnEl.closest('.relation-card')?.querySelector('.relation-poster');
-    if (poster) poster.insertAdjacentHTML('beforeend', `<div class="relation-watched-badge">${getListMeta(list).emoji}</div>`);
+    if (poster) poster.insertAdjacentHTML('beforeend', `<div class="relation-watched-badge">${safe(getListMeta(list).emoji)}</div>`);
   }
   toast(`✓ "${(r.title||'').substring(0,20)}" → ${list}`);
 }
@@ -2919,7 +3033,7 @@ function renderStats() {
     <div class="section-title" style="padding:0 0 10px">📊 Estadísticas</div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-big">${totalAnime}</div><div class="stat-label">Anime</div></div>
-      <div class="stat-card"><div class="stat-big">${totalEps.toLocaleString()}</div><div class="stat-label">Eps vistos</div></div>
+      <div class="stat-card"><div class="stat-big">${safe(totalEps.toLocaleString())}</div><div class="stat-label">Eps vistos</div></div>
       <div class="stat-card"><div class="stat-big">${totalHours >= 1000 ? (totalHours/1000).toFixed(1)+'k' : totalHours}h</div><div class="stat-label">Tiempo visto</div></div>
       <div class="stat-card"><div class="stat-big">${avgRating ? avgRating+'★' : '—'}</div><div class="stat-label">Rating medio</div></div>
     </div>
@@ -2951,7 +3065,7 @@ function renderWeekStrip() {
     const cached    = loadDayCache(d);
     const total     = cached !== null ? cached.length : null;
     const mine      = cached !== null ? cached.filter(e => getAnimeList(e.id)).length : null;
-    html += `<div class="wdc${isToday?' wdc-today':''}${isCurrent?' wdc-current':''}" onclick="navToDateKey('${dk}')">
+    html += `<div class="wdc${isToday?' wdc-today':''}${isCurrent?' wdc-current':''}" ${actionAttrs('navToDateKey', [dk])}>
       <div class="wdc-name">${DAY_ABBR_ES[d.getDay()]}</div>
       <div class="wdc-date">${d.getDate()}</div>
       <div class="wdc-eps">${total !== null ? total : '·'}</div>
@@ -3054,6 +3168,12 @@ function _attachSwipe(listName) {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async()=>{
   const startTab = window.location.hash === '#estrenos' ? 'estrenos' : 'buscar';
+  try {
+    await ensureAnimeAuth();
+  } catch (e) {
+    showAuthError(e.message || 'No se pudo iniciar sesión.');
+    return;
+  }
   setTab(startTab);
   await loadLists();
   updateDots();

@@ -9,8 +9,12 @@ service firebase.storage {
     function tienePaseBitacora() {
       return request.auth != null && request.auth.token.get('pase_bitacora', false) == true;
     }
+    // Sesión de la Mini App AnimeTracker (claim anime_tg): no toca Storage.
+    function tieneSesionAnime() {
+      return request.auth != null && request.auth.token.get('anime_tg', null) != null;
+    }
     function sesionApp() {
-      return request.auth != null && !tienePaseBitacora();
+      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime();
     }
     // Rol del usuario (cross-service: lee el doc de Firestore del caller).
     // Solo se usa donde el path es explícitamente admin-only (ver /maps/).
