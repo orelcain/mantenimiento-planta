@@ -13,6 +13,8 @@ import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE, type ParteEncontrada } from '@/hooks/useCodigosParte'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
+import { fechaCortaVinculo, guardarVinculoTerreno, mensajeErrorTerreno } from '@/utils/aprendizaje/vinculoTerreno'
+import { esModoCandidatos } from '@/utils/aprendizaje/repuestosA3c'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { type Giro } from '@/utils/giroPlano'
 import { usePlanoGiros } from '@/hooks/usePlanoGiros'
@@ -38,12 +40,7 @@ const normalizarPos = (t: string) =>
  *  de piezas pueden traer "&"/"<" sueltos del OCR del catálogo). */
 const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/** dd-MM: la fecha corta que va junto a quién confirmó en terreno. */
-const formatearFechaCorta = (t?: VinculoTerreno['actualizado']) => {
-  if (!t) return ''
-  const d = t.toDate()
-  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+const formatearFechaCorta = fechaCortaVinculo
 
 /** Etiqueta de un grupo del índice lateral / select de hojas. Los planos
  *  eléctricos usan 2 claves fijas; el despiece manda su propia etiqueta de
@@ -2115,7 +2112,13 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
   slug: string
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
 }) {
-  const pieza = partes?.aparatos[sel.tag]?.[0]
+  const entradas = partes?.aparatos[sel.tag] ?? []
+  // Con candidatos (B1 en las N2/N3: 42303109 o 42303107), la pieza que vale es la que se
+  // confirmó en terreno por su código; la primera solo es el fallback de vínculos sin código.
+  const v = vinculosTerreno.vinculos.get(sel.tag)
+  const elegida = v?.estado === 'confirmado' && v.codigo ? entradas.find((e) => e.nr === v.codigo) : undefined
+  const pieza = elegida ?? entradas[0]
+  const candidatos = !elegida && esModoCandidatos(entradas) ? entradas : null
   if (!partes) return null
   if (!pieza) return <ZonaSugerida tag={sel.tag} partes={partes} slug={slug} />
 
@@ -2123,7 +2126,7 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
   // de "es otro modelo" sale de los datos, no de un texto fijo.
   const otras = Object.entries(partes.aparatos)
     .flatMap(([tag, entradas]) => entradas.map((e) => ({ tag, ...e })))
-    .filter((e) => e.fig === pieza.fig && e.nr !== pieza.nr && e.tag !== sel.tag)
+    .filter((e) => !!pieza.fig && e.fig === pieza.fig && e.nr !== pieza.nr && e.tag !== sel.tag)
   const nrOtras = otras[0]?.nr
   // Compactar respetando HUECOS (compactarTramos, con tests): "B1–B12"
   // escondería que B10 usa el mismo modelo que B14.
@@ -2136,18 +2139,24 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
     <div className="mb-3 rounded-card border p-3" style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
       <Titulo>Pieza física</Titulo>
       <PiezaTerreno tag={sel.tag} pieza={pieza} vinculosTerreno={vinculosTerreno} />
+      {candidatos && (
+        <p className="m-0 mt-2 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+          Candidatos: <span className="font-mono">{candidatos.map((c) => c.nr).join(' / ')}</span>. El
+          catálogo no dice cuál va aquí; la etiqueta decide (se marca en la Tarjeta A3C).
+        </p>
+      )}
       {aviso && (
         <p className="m-0 mt-2 rounded-ctl border-l-2 py-1 pl-2 text-footnote leading-relaxed"
            style={{ borderColor: 'var(--lc-prep)', background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
           {aviso}
         </p>
       )}
-      <Link to={`/aprendizaje/planos/${partes.despiece}?hoja=${pieza.hoja}&ap=${encodeURIComponent(pieza.pos)}`}
+      {pieza.hoja != null && <Link to={`/aprendizaje/planos/${partes.despiece}?hoja=${pieza.hoja}&ap=${encodeURIComponent(pieza.pos)}`}
             onClick={(e) => { e.stopPropagation(); void registrarUso(slug, 'salto-a-despiece', sel.tag) }}
             className="mt-2 flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
             style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
         Ver en el despiece
-      </Link>
+      </Link>}
     </div>
   )
 }
@@ -2160,7 +2169,7 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
  */
 function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
   tag: string
-  pieza: { es: string; de?: string; nr: string; sap?: string; sapUbicacion?: string; confianza: string }
+  pieza: { es: string; de?: string; nr: string; sap?: string; sapUbicacion?: string; confianza: string; fig?: string | null }
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
 }) {
   const v = vinculosTerreno.vinculos.get(tag)
@@ -2185,28 +2194,18 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
     setGuardando(true)
     setErrorLocal(null)
     try {
-      // La foto va primero: si falla la subida, no se guarda un vínculo que
-      // dice tener evidencia y no la tiene.
-      const urlFoto = foto ? await vinculosTerreno.subirFoto(foto) : undefined
-      await vinculosTerreno.confirmar({
+      await guardarVinculoTerreno(vinculosTerreno, {
         aparato: tag,
         estado: opcion,
-        codigo: opcion === 'confirmado' ? pieza.nr : opcion === 'corregido' ? codigoLeido.trim() : undefined,
-        nota: nota.trim() || undefined,
-        foto: urlFoto,
+        codigoCatalogo: pieza.nr,
+        codigoLeido,
+        nota,
+        foto,
       })
       setAbierto(false)
       setFoto(null)
     } catch (e) {
-      // Firestore contesta "Missing or insufficient permissions" tanto si se
-      // cayo la sesion como si el dato no pasa la regla. Frente a la maquina
-      // ese texto no ayuda: se traduce a algo que se pueda hacer.
-      const msg = e instanceof Error ? e.message : ''
-      setErrorLocal(
-        /permission|insufficient/i.test(msg)
-          ? 'No se pudo guardar: revisa que tu sesión siga abierta y que el código no sea muy largo.'
-          : msg || 'No se pudo guardar.',
-      )
+      setErrorLocal(mensajeErrorTerreno(e))
     } finally {
       setGuardando(false)
     }
@@ -2239,7 +2238,7 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
             ) : (
               <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
                     style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
-                {pieza.confianza === 'catalogo' ? 'según catálogo BAADER 2006' : 'propuesto'}
+                {pieza.confianza === 'catalogo' ? `según catálogo BAADER ${pieza.fig?.includes('2014') ? '2014' : '2006'}` : 'propuesto'}
               </span>
             )}
           </div>
@@ -2257,10 +2256,10 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
             </>
           ) : (
             <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
-              {pieza.nr}
+              {v?.estado === 'confirmado' && v.codigo ? v.codigo : pieza.nr}
             </p>
           )}
-          {pieza.sap && (
+          {pieza.sap && (v?.estado !== 'confirmado' || !v.codigo || v.codigo === pieza.nr) && (
             <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-caption"
                   style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
               SAP {pieza.sap}{pieza.sapUbicacion ? ` · ${pieza.sapUbicacion}` : ''}

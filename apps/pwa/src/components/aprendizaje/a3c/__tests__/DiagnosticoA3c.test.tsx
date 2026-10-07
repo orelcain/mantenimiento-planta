@@ -1,10 +1,15 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { interiorSvg, type A3CDatos, type PaqueteA3c } from '@/data/baader142A3c'
 import { TarjetaA3c } from '../TarjetaA3c'
+
+// La ficha monta la sección «Repuesto» y la cabecera el indicador: sin red ni Firestore en estos tests.
+vi.mock('@/hooks/usePartesPlano', () => ({ usePartesPlano: () => null }))
+vi.mock('@/hooks/usePlanoVinculos', () => ({ usePlanoVinculos: () => ({ vinculos: new Map(), confirmar: async () => {}, subirFoto: async () => '', resumen: { confirmados: 0, corregidos: 0, total: 0 }, error: null }) }))
+vi.mock('@/hooks/repuestos/useRepuestosByCodigos', () => ({ useRepuestosByCodigos: () => ({ bySap: new Map(), loading: false }) }))
 
 const assets = resolve(__dirname, '../../../../../public/learning-assets/baader-142/a3c')
 const paquete: PaqueteA3c = {

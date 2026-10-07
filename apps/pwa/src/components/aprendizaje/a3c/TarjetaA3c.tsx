@@ -64,6 +64,7 @@ import {
 import { FranjaLed } from './FranjaLed'
 import { RegletaX5 } from './RegletaX5'
 import { FichaA3c, ListaA3c } from './FichaA3c'
+import { IndicadorRepuestosA3c } from './IndicadorRepuestosA3c'
 import { QuizA3c } from './QuizA3c'
 import './a3c.css'
 
@@ -151,6 +152,7 @@ function usePunteroGrueso(): boolean {
 export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver, dosColumnas: forzado, tactil }: TarjetaA3cProps) {
   const { datos, dibujo } = paquete
   const m = useMemo(() => construirModelo(datos), [datos])
+  const codigosElementos = useMemo(() => Object.keys(datos.elementos), [datos])
   const obj22 = useMemo(() => objetivosHoja22(m), [m])
   const obj23 = useMemo(() => objetivosHoja23(m), [m])
 
@@ -1030,6 +1032,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
             <div className="min-w-0">
               <h1 className="text-title1 font-bold">Tarjeta A3C · BAADER 142</h1>
               <p className="mt-0.5 font-mono text-caption text-muted-foreground">{FUENTE}</p>
+              <IndicadorRepuestosA3c codigos={codigosElementos} />
             </div>
             <div className="flex items-center gap-3">
               {selectorIdioma}
@@ -1094,6 +1097,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
         </div>
         <h1 className="text-title1 font-bold">Tarjeta A3C</h1>
         <p className="mt-0.5 font-mono text-caption text-muted-foreground">{FUENTE}</p>
+        <IndicadorRepuestosA3c codigos={codigosElementos} />
         {selectorModo}
         {diagnostico}
         {modo === 'practicar' ? quiz : modo === 'diagnostico' ? null : (

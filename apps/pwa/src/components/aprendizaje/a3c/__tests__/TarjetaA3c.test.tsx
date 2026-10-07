@@ -8,6 +8,11 @@ import { camaraDePreset, limitarCamara, matrizCamara } from '@/utils/aprendizaje
 import { TarjetaA3c } from '../TarjetaA3c'
 import { ALTO_DIVISOR, FICHA_MIN, SOLAPE_DIVISOR, UBICACION_MIN, distribuirPc } from '../distribucionPc'
 
+// La ficha monta la sección «Repuesto» y la cabecera el indicador: sin red ni Firestore en estos tests.
+vi.mock('@/hooks/usePartesPlano', () => ({ usePartesPlano: () => null }))
+vi.mock('@/hooks/usePlanoVinculos', () => ({ usePlanoVinculos: () => ({ vinculos: new Map(), confirmar: async () => {}, subirFoto: async () => '', resumen: { confirmados: 0, corregidos: 0, total: 0 }, error: null }) }))
+vi.mock('@/hooks/repuestos/useRepuestosByCodigos', () => ({ useRepuestosByCodigos: () => ({ bySap: new Map(), loading: false }) }))
+
 // Paquete real (el mismo que sirve la app desde public/), sin red.
 const assets = resolve(__dirname, '../../../../../public/learning-assets/baader-142/a3c')
 const paquete: PaqueteA3c = {
