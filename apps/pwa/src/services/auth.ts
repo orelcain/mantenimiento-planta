@@ -19,7 +19,6 @@ import {
   collection,
   getDocs,
   serverTimestamp,
-  increment,
 } from '@/services/firestoreTracked'
 import { auth, db } from './firebase'
 import { logger } from '@/lib/logger'
@@ -154,7 +153,9 @@ async function signInWithGoogleToken(idToken: string): Promise<User> {
   return newUser
 }
 
-// Registrar con código de invitación
+// Registrar con código de invitación — todo en el servidor (registrarConInvitacion).
+// El auto-registro de Firebase Auth está deshabilitado: crear la cuenta desde el
+// navegador ya no es posible, y el rol lo fija el código, no el cliente.
 export async function signUpWithInviteCode(
   email: string,
   password: string,
@@ -162,45 +163,20 @@ export async function signUpWithInviteCode(
   apellido: string,
   inviteCode: string
 ): Promise<User> {
-  // Verificar código de invitación
-  const invite = await validateInviteCode(inviteCode)
-  if (!invite) {
-    throw new Error('Código de invitación inválido o expirado')
+  const { httpsCallable, getFunctions } = await import('firebase/functions')
+  const { default: app } = await import('./firebase')
+  const registrar = httpsCallable(getFunctions(app), 'registrarConInvitacion')
+  try {
+    await registrar({ email, password, nombre, apellido, code: inviteCode.toUpperCase() })
+  } catch (e) {
+    const msg = (e as { message?: string })?.message
+    throw new Error(msg || 'No se pudo crear la cuenta')
   }
 
-  // Crear usuario en Firebase Auth
-  const credential = await createUserWithEmailAndPassword(auth, email, password)
-  
-  // Actualizar perfil
-  await updateProfile(credential.user, {
-    displayName: `${nombre} ${apellido}`,
-  })
-
-  // Crear documento de usuario
-  const userData: User = {
-    id: credential.user.uid,
-    email,
-    nombre,
-    apellido,
-    rol: invite.rol,
-    activo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-
-  await setDoc(doc(db, 'users', credential.user.uid), {
-    ...userData,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    notificationPrefs: { processStarted: { chonchi: true, yal: true } },
-  })
-
-  // Incrementar usos del código
-  await updateDoc(doc(db, 'inviteCodes', invite.id), {
-    usosActuales: increment(1),
-  })
-
-  return userData
+  const credential = await signInWithEmailAndPassword(auth, email, password)
+  const user = await getUserByIdConTokenFresco(credential.user)
+  if (!user) throw new Error('La cuenta se creó, pero no se encontró el perfil. Contacta al administrador.')
+  return user
 }
 
 // Crear usuario directamente (solo admin)

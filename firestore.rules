@@ -453,7 +453,10 @@ service cloud.firestore {
           (
             isOwner(userId)
             && request.resource.data.email == request.auth.token.email
-            && request.resource.data.rol in ['tecnico', 'usuario']
+            // Solo 'usuario' (primer login con Google). El alta con rol la hace
+            // registrarConInvitacion con Admin SDK; antes cualquiera se creaba
+            // 'tecnico' llamando a la API REST de Auth (cerrado 2026-10-07).
+            && request.resource.data.rol == 'usuario'
             && request.resource.data.activo == true
           )
         );
@@ -1931,11 +1934,10 @@ service cloud.firestore {
       // cerrarse a admin-only sin romper nada.
       allow read: if isAdmin();
       allow create: if isAdmin() && isValidInviteCode();
-      // Solo admin edita libremente; registro solo puede incrementar usosActuales (+1) y/o desactivar el código
-      allow update: if isAdmin()
-        || (isAuthenticated()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usosActuales', 'activo'])
-          && request.resource.data.usosActuales == resource.data.usosActuales + 1);
+      // Solo admin edita.
+      // El uso lo descuenta registrarConInvitacion (Admin SDK). Antes cualquier
+      // sesión podía sumar +1 y agotar los códigos de otros.
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 

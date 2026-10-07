@@ -8,7 +8,7 @@ const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestor
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 const { getStorage } = require('firebase-admin/storage')
-const { randomUUID, createHmac, timingSafeEqual } = require('crypto')
+const { randomUUID, createHmac, createHash, timingSafeEqual } = require('crypto')
 const { getAuth } = require('firebase-admin/auth')
 
 initializeApp()
@@ -50,6 +50,73 @@ function requireAdminKey(req, res) {
     return false
   }
   return true
+}
+
+// ── Guardia de los proxies de IA pagados (Groq, Gemini, DeepSeek, Whisper, TTS) ──
+// Antes bastaba `request.auth`, y cualquier cuenta (incluido un auto-registro por
+// la API REST de Auth) gastaba crédito sin tope. Ahora: solo personal de
+// mantención activo (o un teléfono con pase, si la función lo permite) y un
+// tope diario por usuario contado en Firestore (1 lectura + 1 escritura por
+// llamada). La colección `aiCuotaDiaria` no tiene regla → el cliente no la ve.
+const AI_LIMITE_DIARIO = { admin: 2000, supervisor: 600, tecnico: 600, usuario: 60, pase: 120 }
+
+// permitirUsuario: el rol básico 'usuario' solo dicta por voz al reportar (Whisper).
+async function _assertAiCaller(request, servicio, { permitirPase = false, permitirUsuario = false } = {}) {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Se requiere autenticación para usar la IA')
+
+  let perfil
+  if (request.auth.token?.pase_bitacora === true) {
+    if (!permitirPase) throw new HttpsError('permission-denied', 'Función no disponible con pase de bitácora')
+    // El claim sobrevive hasta 1 h tras revocar el teléfono: mirar el dispositivo.
+    const disp = await db.collection('bitacoraDispositivos').doc(uid).get()
+    if (!disp.exists || disp.data()?.activo !== true) {
+      throw new HttpsError('permission-denied', 'Este teléfono ya no tiene pase activo')
+    }
+    perfil = 'pase'
+  } else {
+    const snap = await db.collection('users').doc(uid).get()
+    const u = snap.exists ? snap.data() : null
+    const rolesPermitidos = permitirUsuario ? ['admin', 'supervisor', 'tecnico', 'usuario'] : ['admin', 'supervisor', 'tecnico']
+    if (!u || u.activo === false || !rolesPermitidos.includes(u.rol)) {
+      throw new HttpsError('permission-denied', 'La IA es solo para personal de mantención')
+    }
+    perfil = u.rol
+  }
+
+  const limite = AI_LIMITE_DIARIO[perfil]
+  const dia = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
+  const ref = db.collection('aiCuotaDiaria').doc(`${uid}_${dia}`)
+  await db.runTransaction(async (tx) => {
+    const s = await tx.get(ref)
+    const total = s.exists ? (s.data().total || 0) : 0
+    if (total >= limite) {
+      throw new HttpsError('resource-exhausted', `Llegaste al límite diario de IA (${limite} consultas). Se renueva a medianoche.`)
+    }
+    tx.set(ref, {
+      uid,
+      dia,
+      perfil,
+      total: total + 1,
+      por: { [servicio]: FieldValue.increment(1) },
+      actualizado: FieldValue.serverTimestamp(),
+    }, { merge: true })
+  })
+}
+
+// Freno anti fuerza bruta para endpoints sin login (registro con invitación):
+// N intentos por hora por IP. La IP se guarda como hash, no en claro.
+async function _frenoPorIp(request, accion, maxPorHora) {
+  const ip = String(request.rawRequest?.ip || request.rawRequest?.headers?.['x-forwarded-for'] || 'sin-ip').split(',')[0].trim()
+  const hora = new Date().toISOString().slice(0, 13)
+  const ipHash = createHash('sha256').update(ip).digest('hex').slice(0, 24)
+  const ref = db.collection('frenoIp').doc(`${accion}_${ipHash}_${hora}`)
+  await db.runTransaction(async (tx) => {
+    const s = await tx.get(ref)
+    const n = s.exists ? (s.data().n || 0) : 0
+    if (n >= maxPorHora) throw new HttpsError('resource-exhausted', 'Demasiados intentos. Prueba de nuevo en una hora.')
+    tx.set(ref, { n: n + 1, accion, hora }, { merge: true })
+  })
 }
 
 // RTDB se inicializa lazy (getDatabase() requiere FIREBASE_CONFIG, solo disponible en Cloud Functions runtime)
@@ -351,10 +418,8 @@ async function sendNotification(tokens, title, body, data = {}) {
 }
 
 exports.sendGanttAlert = onCall({ region: 'us-central1' }, async (request) => {
-  const callerId = request.auth?.uid
-  if (!callerId) {
-    throw new Error('User not authenticated')
-  }
+  // Antes bastaba una sesión cualquiera para mandar push a todos los admins/supervisores.
+  const { uid: callerId } = await _assertTechnicianCaller(request)
 
   const {
     taskId,
@@ -1015,9 +1080,7 @@ exports.groqProxy = onCall(
   },
   async (request) => {
     // Verificar autenticación
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'groq')
 
     const { messages, model, temperature, max_tokens } = request.data
 
@@ -1089,9 +1152,7 @@ exports.whisperProxy = onCall(
     timeoutSeconds: 120,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para transcribir audio')
-    }
+    await _assertAiCaller(request, 'whisper', { permitirPase: true, permitirUsuario: true })
 
     const { audioBase64, mimeType, language, prompt, model } = request.data || {}
     if (!audioBase64 || typeof audioBase64 !== 'string') {
@@ -1158,9 +1219,7 @@ exports.geminiProxy = onCall(
     maxInstances: 10,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'gemini')
 
     const { messages, model, temperature, max_tokens, systemInstruction, thinkingBudget } = request.data
 
@@ -1265,9 +1324,7 @@ exports.geminiVisionProxy = onCall(
     timeoutSeconds: 60,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'geminiVision')
 
     const { imageParts, prompt, model, temperature, max_tokens, thinkingBudget } = request.data
 
@@ -1346,9 +1403,7 @@ exports.deepseekProxy = onCall(
     maxInstances: 5,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'deepseek')
 
     const { messages, model, temperature, max_tokens } = request.data
 
@@ -3178,9 +3233,7 @@ const TTS_ALLOWED_VOICES = new Set(['es-US-Chirp-HD-F', 'es-US-Neural2-A'])
 exports.googleTtsProxy = onCall(
   { enforceAppCheck: false, maxInstances: 10, timeoutSeconds: 30 },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la voz de ARIA')
-    }
+    await _assertAiCaller(request, 'tts')
     const { action } = request.data || {}
     const token = await ariaGetGcpToken()
 
@@ -6105,17 +6158,21 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   let authorized = false
   let role = 'usuario'
 
+  // Abierta desde el menú del bot, initData NO trae `chat` → cae al chat del
+  // .env, que está en la whitelist. Antes eso bastaba para autorizar a
+  // CUALQUIER usuario de Telegram. Ahora hay que ser miembro real del grupo.
   if (chatId) {
     const chatDoc = await db.collection('telegramAuthorizedChats').doc(String(chatId)).get()
     if (chatDoc.exists && chatDoc.data().activo !== false) {
-      authorized = true
-      // Verificar rol del usuario en el grupo
       const memberResult = await callTelegramApi('getChatMember', {
         chat_id: chatId,
         user_id: tgUser.id,
       })
-      if (memberResult?.ok) {
-        const status = memberResult.result?.status
+      const status = memberResult?.ok ? memberResult.result?.status : null
+      const esMiembro = ['creator', 'administrator', 'member'].includes(status)
+        || (status === 'restricted' && memberResult.result?.is_member === true)
+      if (esMiembro) {
+        authorized = true
         role = (status === 'creator' || status === 'administrator') ? 'tecnico' : 'usuario'
       }
     }
@@ -6131,10 +6188,12 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   try {
     const linkSnap = await db.collection('users')
       .where('telegramId', '==', tgIdStr)
-      .limit(1)
+      .limit(5)
       .get()
-    if (!linkSnap.empty) {
-      const linkedDoc = linkSnap.docs[0]
+    // Solo cuentas PWA reales: el perfil virtual tg_<id> también tiene telegramId,
+    // y tomarlo como vínculo dejaba entrar a alguien ya expulsado del grupo.
+    const linkedDoc = linkSnap.docs.find((d) => !d.id.startsWith('tg_') && d.data().isTelegramUser !== true)
+    if (linkedDoc) {
       const linkedData = linkedDoc.data()
       // Solo linkear si el usuario PWA está activo
       if (linkedData.activo !== false) {
@@ -6146,6 +6205,8 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
         if (pwaRol && ['admin', 'supervisor', 'tecnico'].includes(pwaRol)) {
           role = pwaRol
         }
+        // Cuenta PWA activa vinculada a este Telegram: ya fue dada de alta por un admin.
+        authorized = true
         // Refrescar lastSeenAt + telegramUsername (no tocamos rol/activo)
         await linkedDoc.ref.set({
           telegramUsername: tgUser.username || null,
@@ -6157,6 +6218,14 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   } catch (err) {
     // Si la query falla, seguir con el flujo virtual
     logger.warn('mintTelegramAuthToken: link lookup error', { err: String(err) })
+  }
+
+  // Sin grupo ni cuenta vinculada no se emite sesión: un token "no autorizado"
+  // igual valía como request.auth para las reglas y funciones que solo piden login.
+  if (!authorized) {
+    logger.warn('mintTelegramAuthToken: rechazado (no es miembro ni está vinculado)', { tgId: tgIdStr, chatId })
+    res.status(403).json({ error: 'Tu cuenta de Telegram no está autorizada. Pide acceso al administrador.' })
+    return
   }
 
   // 7. Si no está linkeado, asegurar que existe el doc virtual `tg_<id>`
@@ -6721,7 +6790,7 @@ async function _assertTechnicianCaller(request) {
   const uid = request.auth?.uid
   if (!uid) throw new HttpsError('unauthenticated', 'Login requerido')
   const snap = await db.collection('users').doc(uid).get()
-  const rol = snap.exists ? snap.data()?.rol : null
+  const rol = snap.exists && snap.data()?.activo !== false ? snap.data()?.rol : null
   if (!['admin', 'supervisor', 'tecnico'].includes(rol)) {
     throw new HttpsError('permission-denied', 'Solo personal de mantención')
   }
@@ -6768,6 +6837,7 @@ exports.shoplogixCredsDelete = onCall({ region: 'us-central1' }, async (request)
 exports.validateInviteCodeProxy = onCall({ region: 'us-central1' }, async (request) => {
   const code = String(request.data?.code ?? '').trim().toUpperCase()
   if (!code || code.length > 40) return { valid: false }
+  await _frenoPorIp(request, 'invitacion', 30)
 
   const snap = await db.collection('inviteCodes')
     .where('code', '==', code)
@@ -6796,6 +6866,100 @@ exports.validateInviteCodeProxy = onCall({ region: 'us-central1' }, async (reque
     createdAt: d.createdAt && typeof d.createdAt.toDate === 'function' ? d.createdAt.toDate().toISOString() : null,
     expiresAt: expiresAt ? expiresAt.toISOString() : null,
   }
+})
+
+// ── Registro con código de invitación, 100 % en el servidor ───────────────────
+// Antes el código se validaba en el navegador y la cuenta se creaba con
+// createUserWithEmailAndPassword: cualquiera podía saltarse la pantalla, llamar
+// a la API REST de Auth y crearse su doc `users` con rol 'tecnico'. Ahora el
+// auto-registro de Auth queda DESHABILITADO en la consola y la única puerta es
+// esta función: valida el código en transacción, crea la cuenta con Admin SDK
+// (que ignora ese bloqueo) y escribe el perfil con el rol del código.
+exports.registrarConInvitacion = onCall({ region: 'us-central1', maxInstances: 3 }, async (request) => {
+  const d = request.data || {}
+  const email = String(d.email ?? '').trim().toLowerCase()
+  const password = String(d.password ?? '')
+  const nombre = String(d.nombre ?? '').trim()
+  const apellido = String(d.apellido ?? '').trim()
+  const code = String(d.code ?? '').trim().toUpperCase()
+
+  if (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError('invalid-argument', 'Correo inválido')
+  }
+  if (password.length < 6 || password.length > 128) {
+    throw new HttpsError('invalid-argument', 'La contraseña debe tener entre 6 y 128 caracteres')
+  }
+  if (nombre.length < 2 || nombre.length > 50 || apellido.length < 2 || apellido.length > 50) {
+    throw new HttpsError('invalid-argument', 'Nombre y apellido deben tener entre 2 y 50 caracteres')
+  }
+  if (!code || code.length > 40) throw new HttpsError('permission-denied', 'Código de invitación inválido o expirado')
+
+  await _frenoPorIp(request, 'registro', 10)
+
+  const snap = await db.collection('inviteCodes')
+    .where('code', '==', code)
+    .where('activo', '==', true)
+    .limit(1)
+    .get()
+  if (snap.empty) throw new HttpsError('permission-denied', 'Código de invitación inválido o expirado')
+  const inviteRef = snap.docs[0].ref
+
+  // Reserva el uso en transacción (dos registros simultáneos no pasan el tope).
+  let rol
+  await db.runTransaction(async (tx) => {
+    const s = await tx.get(inviteRef)
+    const v = s.data() || {}
+    const expiresAt = v.expiresAt && typeof v.expiresAt.toDate === 'function' ? v.expiresAt.toDate() : null
+    const agotado = typeof v.usosMaximos === 'number' && (v.usosActuales || 0) >= v.usosMaximos
+    if (v.activo !== true || (expiresAt && expiresAt < new Date()) || agotado) {
+      throw new HttpsError('permission-denied', 'Código de invitación inválido o expirado')
+    }
+    // Mismo criterio que tenía la regla de auto-creación: admin y supervisor
+    // los eleva un admin a mano, nunca un código.
+    if (!['tecnico', 'usuario'].includes(v.rol)) {
+      throw new HttpsError('permission-denied', 'Este código requiere alta manual por un administrador')
+    }
+    rol = v.rol
+    tx.update(inviteRef, { usosActuales: FieldValue.increment(1) })
+  })
+
+  let userRecord
+  try {
+    userRecord = await getAuth().createUser({ email, password, displayName: `${nombre} ${apellido}` })
+  } catch (e) {
+    await inviteRef.update({ usosActuales: FieldValue.increment(-1) }).catch(() => undefined)
+    if (e.code === 'auth/email-already-exists') throw new HttpsError('already-exists', 'Ese correo ya tiene una cuenta')
+    if (e.code === 'auth/invalid-password' || e.code === 'auth/invalid-email') {
+      throw new HttpsError('invalid-argument', 'Correo o contraseña inválidos')
+    }
+    logger.error('registrarConInvitacion: createUser falló', { code: e.code })
+    throw new HttpsError('internal', 'No se pudo crear la cuenta')
+  }
+
+  try {
+    await db.collection('users').doc(userRecord.uid).set({
+      id: userRecord.uid,
+      email,
+      nombre,
+      apellido,
+      rol,
+      activo: true,
+      invitacionId: inviteRef.id,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      notificationPrefs: { processStarted: { chonchi: true, yal: true } },
+    })
+  } catch (e) {
+    // Sin perfil la cuenta no sirve y bloquearía el reintento con «ya existe»:
+    // se deshace todo para que la persona pueda volver a intentar.
+    logger.error('registrarConInvitacion: perfil falló, revirtiendo', { uid: userRecord.uid, err: String(e) })
+    await getAuth().deleteUser(userRecord.uid).catch(() => undefined)
+    await inviteRef.update({ usosActuales: FieldValue.increment(-1) }).catch(() => undefined)
+    throw new HttpsError('internal', 'No se pudo crear la cuenta. Intenta de nuevo.')
+  }
+
+  logger.info('registrarConInvitacion: cuenta creada', { uid: userRecord.uid, rol, invite: inviteRef.id })
+  return { ok: true }
 })
 
 // Password de OTA (ArduinoOTA) de los ESP32 de sensores — antes vivía en
