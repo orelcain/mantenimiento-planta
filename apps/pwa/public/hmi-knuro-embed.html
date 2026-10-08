@@ -270,6 +270,120 @@ body.readonly .psp{display:none!important;}
 body.readonly input.fe,body.readonly input.fe1,body.readonly select{pointer-events:none;opacity:0.65;user-select:none;}
 body.readonly #tip-vis-btn{display:none!important;}
 body.readonly .tip-i{cursor:default;}
+/* ── Ícono de ayuda (nativo del HMI, se escala con él). Neutro para todos; el único color
+   es ámbar relleno cuando el valor actual difiere del predeterminado (span.fr). El origen
+   (manual / deducido) ya no se codifica aquí: se lee al abrir la ayuda.
+   .b1 conserva el borde de 1 px que tenían los íconos «manual» para que la caja del ícono,
+   y con ella la etiqueta del HMI alineada a la derecha, no se mueva ni un píxel. ── */
+.tip-i.has-text{background:#fff;border:1.5px solid #8E8E93;}
+.tip-i.has-text::after{color:#636366;}
+.tip-i.has-text.b1{border-width:1px;}
+.tip-i.o-sindato{background:transparent;border-style:dotted;border-color:#AEAEB2;}
+.tip-i.o-sindato::after{color:#AEAEB2;}
+.tip-i.v-chg{background:#C98A1E;border-color:#C98A1E;border-style:solid;}
+.tip-i.v-chg::after{color:#fff;}
+.sc .pt .plb,.sc td:has(> input[id]){cursor:pointer;}
+body.readonly .sc td:has(> input[id]){cursor:pointer;}
+/* Campo marcado por la ayuda */
+.sc input.kn-ring{outline:3px solid #2E75B6;outline-offset:3px;box-shadow:0 0 0 9px rgba(46,117,182,.22);position:relative;z-index:1;opacity:1!important;}
+.sc tr.kn-ring-row>td{background:rgba(46,117,182,.10);}
+
+/* ══ AYUDA v3 · piel PWA (DESIGN.md §3). Se dibuja en <body>, fuera de #hs,
+   para no heredar el scale() del HMI. Tema: el del padre (clase .dark en su <html>)
+   o, sin padre, prefers-color-scheme. ══ */
+:root{
+  --kh-bg:#F2F2F7;--kh-card:#FFFFFF;--kh-card2:#F2F2F7;
+  --kh-label:#1C1C1E;--kh-label2:#6E6E71;--kh-label3:rgba(60,60,67,.30);
+  --kh-sep:rgba(60,60,67,.29);--kh-fill:rgba(120,120,128,.12);
+  --kh-accent:#2E75B6;--kh-accent-tint:rgba(46,117,182,.10);
+  --kh-warn-ink:#7A5A1E;--kh-warn-tint:rgba(255,149,0,.12);--kh-warn-line:#C98A1E;
+  --kh-pop-shadow:0 8px 28px rgba(0,0,0,.14);
+  --kh-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --kh-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --kh-e-out:cubic-bezier(.22,.9,.24,1);
+}
+:root[data-kn-theme="dark"]{
+  --kh-bg:#1C1C1E;--kh-card:#2C2C2E;--kh-card2:#3A3A3C;
+  --kh-label:#FFFFFF;--kh-label2:rgba(235,235,245,.60);--kh-label3:rgba(235,235,245,.30);
+  --kh-sep:rgba(84,84,88,.65);--kh-fill:rgba(120,120,128,.24);
+  --kh-accent:#5AA0DC;--kh-accent-tint:rgba(90,160,220,.16);
+  --kh-warn-ink:#FF9F0A;--kh-warn-tint:rgba(255,159,10,.14);--kh-warn-line:#FF9F0A;
+  --kh-pop-shadow:none;
+}
+.kh{font-family:var(--kh-ui);color:var(--kh-label);-webkit-font-smoothing:antialiased;color-scheme:light;}
+:root[data-kn-theme="dark"] .kh{color-scheme:dark;}
+.kh p{margin:0;}
+.kh b{font-weight:600;}
+.kh svg{flex-shrink:0;}
+.kh :focus-visible{outline:2px solid var(--kh-accent);outline-offset:2px;}
+/* Globo (PC) */
+.kh-pop{position:fixed;z-index:10000;width:360px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;overscroll-behavior:contain;background:var(--kh-card);border-radius:26px;padding:16px 16px 18px;display:flex;flex-direction:column;gap:12px;font-size:15px;line-height:20px;outline:1px solid var(--kh-sep);outline-offset:-1px;box-shadow:var(--kh-pop-shadow);}
+.kh p{margin:0;}
+.kh svg{flex-shrink:0;}
+.kh-top{display:grid;grid-template-columns:minmax(0,1fr) 30px;gap:8px;align-items:start;}
+.kh-title{font-size:20px;line-height:25px;font-weight:600;overflow-wrap:anywhere;text-wrap:balance;}
+/* Cierre discreto: 30 px visibles, 44 px de área táctil con el pseudo-elemento */
+.kh-x{width:30px;height:30px;border-radius:999px;border:0;background:var(--kh-fill);color:var(--kh-label2);display:grid;place-items:center;margin:0;cursor:pointer;padding:0;position:relative;}
+.kh-x::after{content:"";position:absolute;inset:-7px;}
+.kh-x svg{width:12px;height:12px;}
+/* Línea de origen: gris, una sola vez, con glifo propio */
+.kh-org{display:flex;align-items:flex-start;gap:6px;margin-top:-6px;font-size:13px;line-height:18px;color:var(--kh-label2);}
+.kh-org svg{width:15px;height:15px;margin-top:1.5px;}
+.kh-org b{font-weight:600;color:var(--kh-label);}
+/* Línea de valor: número grande + unidad corta + estado (ámbar solo si cambió) */
+.kh-val{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;}
+.kh-val .n{font:500 28px/34px var(--kh-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.kh-val .u{font-size:15px;color:var(--kh-label2);margin-left:-4px;}
+.kh-val .st{margin-left:auto;font-size:13px;line-height:18px;color:var(--kh-label2);font-variant-numeric:tabular-nums;}
+.kh-val.chg .n,.kh-val.chg .st{color:var(--kh-warn-ink);}
+.kh-val.chg .st{font-weight:600;}
+.kh-blk{display:flex;flex-direction:column;gap:2px;}
+.kh-blk .h{font-size:13px;line-height:18px;font-weight:600;color:var(--kh-label2);}
+/* «Si queda muy bajo o muy alto»: plegado en el globo, abierto en la hoja */
+.kh-more{border-top:1px solid var(--kh-sep);padding-top:4px;}
+.kh-more summary{list-style:none;cursor:pointer;color:var(--kh-accent);min-height:44px;display:flex;align-items:center;gap:6px;}
+.kh-more summary::-webkit-details-marker{display:none;}
+.kh-more summary .chev{width:8px;height:13px;transition:transform .2s;}
+.kh-more[open] summary .chev{transform:rotate(90deg);}
+.kh-lohi{display:flex;flex-direction:column;gap:8px;padding-bottom:2px;}
+.kh-lohi>div{display:grid;grid-template-columns:18px minmax(0,1fr);gap:2px 6px;}
+.kh-lohi svg{width:14px;height:14px;color:var(--kh-label2);margin-top:3px;}
+.kh-lohi .h{font-size:13px;line-height:18px;font-weight:600;color:var(--kh-label2);}
+.kh-lohi p{grid-column:2;}
+.kh-btn-tint{min-height:44px;border-radius:999px;border:0;background:var(--kh-accent-tint);color:var(--kh-accent);font:600 15px var(--kh-ui);padding:0 18px;align-self:flex-start;cursor:pointer;}
+/* Hoja inferior (celular) */
+.kh-sheet{position:fixed;left:0;right:0;bottom:0;z-index:10000;height:58vh;height:58dvh;background:var(--kh-card);border-radius:32px 32px 0 0;box-shadow:0 -1px 0 var(--kh-sep);display:flex;flex-direction:column;font-size:17px;line-height:22px;transform:translateY(0);transition:transform 350ms var(--kh-e-out),height 350ms var(--kh-e-out);}
+.kh-sheet.kh-full{height:92vh;height:92dvh;}
+.kh-sheet.kh-enter,.kh-sheet.kh-leave{transform:translateY(100%);}
+.kh-sheet-head{padding:8px 16px 8px;touch-action:none;flex-shrink:0;}
+.kh-grab{width:36px;height:5px;border-radius:3px;background:var(--kh-label3);margin:0 auto 8px;}
+.kh-sheet .kh-title{font-size:22px;line-height:28px;}
+.kh-sheet-body{flex:1;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:4px 16px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;}
+.kh-sheet .kh-org{font-size:15px;line-height:20px;}
+.kh-sheet .kh-org svg{margin-top:2.5px;}
+.kh-sheet .kh-blk .h,.kh-sheet .kh-lohi .h{font-size:15px;line-height:20px;}
+.kh-sheet .kh-lohi svg{margin-top:4px;}
+.kh-sheet .kh-more summary{font-size:17px;}
+body.kh-sheet-open #hp{padding-bottom:58vh;padding-bottom:58dvh;}
+/* Lista de campos (celular) */
+#kn-help-list{width:100%;flex-shrink:0;background:var(--kh-bg);padding:16px 16px 24px;margin-top:8px;}
+#kn-help-list[hidden]{display:none;}
+/* Encabezado de grupo: el origen aparece una vez por grupo, no en cada fila */
+.kh-gh{font-size:13px;line-height:18px;color:var(--kh-label2);padding:12px 4px 6px;margin:0;display:flex;align-items:flex-start;gap:6px;font-weight:400;}
+.kh-gh svg{width:14px;height:14px;margin-top:2px;}
+.kh-gh b{font-weight:600;color:var(--kh-label);}
+.kh-glist{background:var(--kh-card);border-radius:26px;overflow:hidden;}
+.kn-row{display:grid;grid-template-columns:minmax(0,1fr) auto 8px;gap:2px 12px;align-items:center;width:100%;min-height:56px;padding:8px 16px;position:relative;background:transparent;border:0;text-align:left;color:var(--kh-label);font:inherit;cursor:pointer;}
+.kn-row+.kn-row::before{content:"";position:absolute;left:16px;right:0;top:0;height:1px;background:var(--kh-sep);}
+.kn-row .l{font-size:17px;line-height:22px;grid-column:1;overflow-wrap:anywhere;}
+.kn-row .val{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.kn-row .cur{font-family:var(--kh-mono);font-variant-numeric:tabular-nums;font-size:17px;line-height:22px;}
+.kn-row.chg .cur,.kn-row.chg .def{color:var(--kh-warn-ink);}
+.kn-row .def{font-size:13px;line-height:18px;color:var(--kh-label2);font-variant-numeric:tabular-nums;}
+.kn-row .chev{grid-column:3;grid-row:1 / span 2;width:8px;height:13px;color:var(--kh-label3);}
+.kn-row.sel{background:var(--kh-accent-tint);}
+@media (min-width:768px){#kn-help-list{display:none!important;}}
+@media (prefers-reduced-motion:reduce){.kh-sheet{transition:none;}}
 </style>
 </head>
 <body>
@@ -1344,6 +1458,7 @@ function nav(id){
   if(window.innerWidth<=860)closePanel();
 }
 function show(id,name){
+  closeHelp(true);
   document.querySelector('.sc.active')?.classList.remove('active');
   document.getElementById(id).classList.add('active');
   ['ts','bs'].forEach(x=>{const e=document.getElementById(x);if(e)e.textContent=name;});
@@ -1463,6 +1578,8 @@ async function loadFromStorage(){
 /* ── Listener postMessage desde HmiKnuroPage (sólo en iframe) ── */
 if(IN_IFRAME){
   window.addEventListener('message',e=>{
+    // Solo el padre same-origin (HmiKnuroPage / HmiKnuroPublicPage) puede hablarle al HMI.
+    if(e.origin!==location.origin||e.source!==window.parent) return;
     if(!e.data||typeof e.data.type!=='string') return;
     if(e.data.type==='hmi:load-preset'){loadPreset(e.data.name);return;}
     if(e.data.type!=='hmi:init') return;
@@ -1484,10 +1601,12 @@ if(IN_IFRAME){
       const pn=document.getElementById('pn');
       if(pn) pn.value=cur;
     }
-    // Modo readonly, tooltips y clave desde la página pública/admin
-    if(e.data.readonly) READ_ONLY=true;
+    // Modo readonly y tooltips desde la página pública/admin.
+    // La clave de edición YA NO viaja por hmi:init: la página admin (tras AdminRoute,
+    // y Firestore exige isSupervisor para escribir) concede la edición con canEdit.
+    if(e.data.readonly){READ_ONLY=true;_TIP_CAN_EDIT=false;_tipAuth=false;}
+    else if(e.data.canEdit===true){_TIP_CAN_EDIT=true;_tipAuth=true;}
     if(e.data.tooltips) Object.assign(PARAM_TOOLTIPS,e.data.tooltips);
-    if(e.data.pwd) localStorage.setItem('knuro-admin-pwd',e.data.pwd);
     renderPresets(); populateCmpSelects();
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
     if(toLoad){setAllInputs(presets[toLoad],toLoad);updateActivePreset(toLoad);}
@@ -1504,7 +1623,7 @@ async function persistPresets(changedName,previousData){
       name:changedName||null,
       data:changedName?presets[changedName]:null,
       previousData:previousData||null
-    },'*');
+    },location.origin);
     return;
   }
   try{
@@ -1531,7 +1650,7 @@ function persistRefs(){
     refs[fr.dataset.frid]=fr.textContent.trim();
   });
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:save-refs',refs},'*');
+    window.parent.postMessage({type:'hmi:save-refs',refs},location.origin);
     return;
   }
   localStorage.setItem('knuro-refs',JSON.stringify(refs));
@@ -1573,12 +1692,18 @@ let pescRows=[..._PESC_N2];
 function applyPescRows(d){
   const rows=(d&&d['pesc-rows'])?d['pesc-rows'].split(','):[..._PESC_N2];
   pescRows=rows;
+  // Reemplaza solo en los nodos de texto: un textContent sobre .plb borraba los íconos ⓘ.
   document.querySelectorAll('.plb').forEach(el=>{
-    let t=el.textContent;
-    // normalizar a N2 primero (por si venía de N1), luego aplicar destino
-    _PESC_N1.forEach((nr,i)=>{t=t.replaceAll(nr,_PESC_N2[i]);});
-    _PESC_N2.forEach((nr,i)=>{t=t.replaceAll(nr,rows[i]);});
-    el.textContent=t;
+    const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+    let n;
+    while((n=w.nextNode())){
+      if(n.parentElement&&n.parentElement.closest('.tip-i')) continue;
+      let t=n.nodeValue;
+      // normalizar a N2 primero (por si venía de N1), luego aplicar destino
+      _PESC_N1.forEach((nr,i)=>{t=t.replaceAll(nr,_PESC_N2[i]);});
+      _PESC_N2.forEach((nr,i)=>{t=t.replaceAll(nr,rows[i]);});
+      if(t!==n.nodeValue) n.nodeValue=t;
+    }
   });
 }
 function setAllInputs(d,presetName){
@@ -1595,7 +1720,7 @@ function updateActivePreset(name){
   if(t) t.textContent=name?name+' — HMI':'Knuro B2 — HMI Simulator';
   document.getElementById('pn').value=name||'';
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:set-current',name:name||''},'*');
+    window.parent.postMessage({type:'hmi:set-current',name:name||''},location.origin);
   } else {
     localStorage.setItem('knuro-current',name||'');
   }
@@ -1616,13 +1741,14 @@ function loadPreset(n){
   if(presets[n]){
     setAllInputs(presets[n],n);
     updateActivePreset(n);
+    renderTooltipIcons(); // etiquetas y valores cambiaron: refrescar íconos, lista y globo
   }
 }
 
 function deletePreset(n){
   if(!confirm('¿Eliminar preset "'+n+'"?')) return;
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:delete-preset',name:n},'*');
+    window.parent.postMessage({type:'hmi:delete-preset',name:n},location.origin);
   }
   delete presets[n];
   if(!IN_IFRAME) persistPresets();
@@ -1666,7 +1792,7 @@ function reorderPreset(n,dir){
   const tmp=base[idx];base[idx]=base[swap];base[swap]=tmp;
   presetOrder=base;
   renderPresets();
-  if(IN_IFRAME) window.parent.postMessage({type:'hmi:reorder-preset',order:base},'*');
+  if(IN_IFRAME) window.parent.postMessage({type:'hmi:reorder-preset',order:base},location.origin);
 }
 
 /* ── Export JSON (download) ── */
@@ -2648,7 +2774,13 @@ function _addTipIcon(container,tipId){
 
   const icon=document.createElement('span');
   const _hasText=_getTipText(tipId);
-  icon.className='tip-i'+(_hasText?' has-text':'')+(_isHidden?' reveal-hidden':'');
+  // Origen solo para la geometría (b1 = borde de 1 px que ya tenían los íconos «manual») y
+  // para «sin dato» (punteado). El color lo pone _khIconState: ámbar si el valor cambió.
+  const _org=_hasText?parseTip(_hasText).origin:'';
+  icon.className='tip-i'+(_hasText?' has-text'+(_org==='manual'?' b1':'')+(_org==='sindato'?' o-sindato':''):'')+(_isHidden?' reveal-hidden':'');
+  _khIconState(icon,tipId);
+  icon.setAttribute('role','button');
+  icon.setAttribute('aria-label','Ayuda: '+_getTipLabel(tipId));
   icon.dataset.pid=tipId;
 
   let _clickTimer=null;
@@ -2670,13 +2802,15 @@ function _addTipIcon(container,tipId){
 
 /* ── Renderizar iconos de tooltip ── */
 function renderTooltipIcons(){
-  // 1) Parámetros: icono en la celda del label (.plb)
-  document.querySelectorAll('.pt .plb').forEach(td=>{
-    const nextTd=td.nextElementSibling;
-    if(!nextTd) return;
-    const inp=nextTd.querySelector('input.fe,input.fe1');
-    if(!inp||!inp.id) return;
-    _addTipIcon(td,inp.id);
+  // 1) Parámetros: TODOS los campos numéricos. Si la celda vecina es la etiqueta (.plb)
+  //    el ícono va ahí; si no (2ª columna de tablas de 2 columnas, h2pr-8/9, tabla de
+  //    Vacío Baader sin .pt/.plb) va en la propia celda del campo, después del valor.
+  document.querySelectorAll('.sc input.fe[id],.sc input.fe1[id]').forEach(inp=>{
+    const td=inp.closest('td');
+    if(!td) return;
+    const prev=td.previousElementSibling;
+    if(prev&&prev.classList.contains('plb')) _addTipIcon(prev,inp.id);
+    else _addTipIcon(td,inp.id);
   });
 
   // 2) Menús de navegación: icono en el span del .idxr
@@ -2702,6 +2836,8 @@ function renderTooltipIcons(){
     btn.style.position='relative';
     _addTipIcon(btn,tipId);
   });
+  renderHelpList();
+  _khRefreshOpen();
 }
 
 /* ── Init ── */
@@ -2735,7 +2871,7 @@ window.addEventListener('load',async()=>{
     // En mobile el CSS lo convierte en panel deslizable; en desktop queda inline.
     // Notificar al padre (HmiKnuroPage) que estamos listos para recibir datos
     // Incluir tooltips locales para sincronización automática a Firestore
-    window.parent.postMessage({type:'hmi:ready',tooltips:PARAM_TOOLTIPS},'*');
+    window.parent.postMessage({type:'hmi:ready',tooltips:PARAM_TOOLTIPS},location.origin);
     // Los presets/refs llegarán via hmi:init → ver listener arriba
   } else {
     // Modo standalone: cargar desde localStorage como siempre
@@ -2788,6 +2924,7 @@ window.addEventListener('load',async()=>{
 /* ── TOOLTIP SYSTEM v2 ── */
 let PARAM_TOOLTIPS={};
 let _tipAuth=false; // sesión autenticada para edición
+let _TIP_CAN_EDIT=false; // iframe: edición concedida por la página admin (hmi:init canEdit)
 
 function initTooltipSystem(){
   // En iframe: esperar a hmi:init de Firestore. No cargar localStorage.
@@ -2816,9 +2953,15 @@ function initTooltipSystem(){
       saveTooltips();
     }
   }
-  if(!localStorage.getItem('knuro-admin-pwd')){
-    localStorage.setItem('knuro-admin-pwd','admin');
-  }
+  // Clave de edición: ya no se siembra 'admin'.
+  // · En iframe la edición la concede el padre (canEdit); se borra cualquier copia de la
+  //   clave real que versiones anteriores dejaron aquí al recibirla por hmi:init.
+  // · Standalone (archivo abierto directo, guarda solo en localStorage): la primera vez se
+  //   pide definir una clave; la 'admin' sembrada antes se descarta.
+  try{
+    if(IN_IFRAME) localStorage.removeItem('knuro-admin-pwd');
+    else if(localStorage.getItem('knuro-admin-pwd')==='admin') localStorage.removeItem('knuro-admin-pwd');
+  }catch(e){}
   _updateVisBtnState();
   setTimeout(_moveTipVisBtn,100); // esperar a que el DOM esté listo
 }
@@ -2826,7 +2969,7 @@ function initTooltipSystem(){
 function saveTooltips(){
   localStorage.setItem('knuro-tooltips',JSON.stringify(PARAM_TOOLTIPS));
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:save-tooltip',tooltips:PARAM_TOOLTIPS},'*');
+    window.parent.postMessage({type:'hmi:save-tooltip',tooltips:PARAM_TOOLTIPS},location.origin);
   }
 }
 
@@ -2848,8 +2991,8 @@ function _getTipLabel(id){
     const btn=Array.from(document.querySelectorAll('button.hb.pill')).find(b=>(b.getAttribute('onclick')||'').includes("'"+navId+"'"));
     if(btn)return btn.textContent.replace(/\s+/g,' ').trim();
   } else {
-    const inp=document.getElementById(id);
-    if(inp){const td=inp.closest('td');if(td){const plb=td.previousElementSibling;if(plb&&plb.classList.contains('plb'))return plb.textContent.replace(/\s+/g,' ').trim();}}
+    const info=_fieldInfo(id);
+    if(info) return info.name;
   }
   return id;
 }
@@ -3063,38 +3206,12 @@ function _positionTipBox(box,iconEl,pos,paramId){
   else{box.style.top='100%';box.style.bottom='auto';box.style.marginTop='4px';}
 }
 
-/* Click: fijar/cerrar tooltip */
+/* Click en ⓘ: abre/cierra la ayuda (globo anclado en PC, hoja en celular). */
 function toggleTipBox(paramId,iconEl){
-  const existing=document.querySelector('.tip-box[data-pid="'+paramId+'"]');
-  if(existing){existing.remove();return;}
+  if(_khOpen&&_khOpen.id===paramId){closeHelp();return;}
   // Si está oculto y no estamos en modo "ver ocultos", no mostrar
   if(_getTipHidden(paramId)&&!_tipRevealHidden) return;
-  closeTipBox();
-
-  const text=_getTipText(paramId);
-  const pos=_getTipPos(paramId);
-  const box=document.createElement('div');
-  box.className='tip-box';
-  box.dataset.pid=paramId;
-
-  if(text){
-    box.innerHTML='<span class="tip-close">&times;</span>'+text;
-  } else {
-    box.innerHTML='<span class="tip-close">&times;</span><span style="color:#999;font-style:italic;">Sin descripción. Doble-click en <b>ⓘ</b> para agregar.</span>';
-  }
-  box.querySelector('.tip-close').onclick=()=>box.remove();
-  _positionTipBox(box,iconEl,pos,paramId);
-
-  // Cerrar al hacer click fuera
-  setTimeout(()=>{
-    const handler=(e)=>{
-      if(!box.contains(e.target)&&e.target!==iconEl){
-        box.remove();
-        document.removeEventListener('click',handler);
-      }
-    };
-    document.addEventListener('click',handler);
-  },10);
+  openHelp(paramId,iconEl);
 }
 
 /* Pedir clave inline (sin prompt nativo) */
@@ -3135,10 +3252,17 @@ function _askPwd(iconEl,onSuccess){
 
 /* Doble-click: modo edición con clave */
 function openTipEdit(paramId,iconEl){
-  if(!_tipAuth){
+  if(READ_ONLY) return;
+  if(IN_IFRAME){
+    // En iframe solo edita quien la página admin habilitó (canEdit en hmi:init).
+    if(!_TIP_CAN_EDIT) return;
+  } else if(!_tipAuth){
+    let has=false;try{has=!!localStorage.getItem('knuro-admin-pwd');}catch(e){}
+    if(!has){setAdminPassword();return;}
     _askPwd(iconEl,()=>openTipEdit(paramId,iconEl));
     return;
   }
+  closeHelp(true);
   closeTipBox();
 
   const text=_getTipText(paramId);
@@ -3159,8 +3283,8 @@ function openTipEdit(paramId,iconEl){
   const label=_getTipLabel(paramId);
   box.innerHTML=
     '<span class="tip-close">&times;</span>'+
-    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">✏️ '+label+'</div>'+
-    '<textarea placeholder="Escribe la explicación...">'+text.replace(/</g,'&lt;')+'</textarea>'+
+    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">✏️ '+_escHTML(label)+'</div>'+
+    '<textarea placeholder="Escribe la explicación...">'+_escHTML(text)+'</textarea>'+
     '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">'+
     '<button class="tip-save">Guardar</button>'+
     '<span style="font-size:9px;color:#666;">Pos:'+selectHTML+'</span>'+
@@ -3168,7 +3292,7 @@ function openTipEdit(paramId,iconEl){
     '<div style="margin-top:5px;display:flex;align-items:center;justify-content:space-between;gap:6px;">'+
     '<label class="tip-lbl"><input type="checkbox" class="tip-chk"'+(curHidden?' checked':'')+'>'+
     ' Ocultar tooltip</label>'+
-    '<span onclick="setAdminPassword()" style="font-size:9px;color:#aaa;cursor:pointer;text-decoration:underline;">⚙ cambiar clave</span>'+
+    (IN_IFRAME?'':'<span onclick="setAdminPassword()" style="font-size:9px;color:#aaa;cursor:pointer;text-decoration:underline;">⚙ cambiar clave</span>')+
     '</div>';
 
   box.querySelector('.tip-close').onclick=()=>{box.remove();};
@@ -3198,13 +3322,15 @@ function saveTipEdit(paramId,el){
 }
 
 function setAdminPassword(){
+  // Solo standalone: en la PWA la edición la concede la página admin, sin clave.
+  if(IN_IFRAME) return;
   closeTipBox();
   const box=document.createElement('div');
   box.className='tip-box editing';
   box.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);min-width:220px;z-index:99999;';
   box.innerHTML=
     '<span class="tip-close">&times;</span>'+
-    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔑 Cambiar contraseña</div>'+
+    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔑 '+(localStorage.getItem('knuro-admin-pwd')?'Cambiar contraseña':'Define una clave de edición')+'</div>'+
     '<input type="password" id="_pwd1" placeholder="Nueva contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;margin-bottom:4px;">'+
     '<input type="password" id="_pwd2" placeholder="Confirmar contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;">'+
     '<div style="margin-top:5px;display:flex;gap:4px;align-items:center;">'+
@@ -3218,7 +3344,6 @@ function setAdminPassword(){
     if(!v1){msg.textContent='Ingresa una contraseña';msg.style.display='inline';return;}
     if(v1!==v2){msg.textContent='No coinciden';msg.style.display='inline';return;}
     localStorage.setItem('knuro-admin-pwd',v1);
-    if(IN_IFRAME) window.parent.postMessage({type:'hmi:save-pwd',pwd:v1},'*');
     _tipAuth=false;
     box.remove();
   };
@@ -3226,11 +3351,530 @@ function setAdminPassword(){
   setTimeout(()=>box.querySelector('#_pwd1').focus(),50);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   AYUDA v3 · opción B «Lista + hoja»
+   - PC (≥768 px): globo anclado al costado del campo, sin taparlo, en <body>.
+   - Celular (<768 px): lista de campos bajo el HMI + hoja inferior.
+   Todo texto de ayuda pasa por sanitizeTipHTML (solo <b>, <i>, <br>).
+   ══════════════════════════════════════════════════════════════════════ */
+function _escHTML(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+/* Lista blanca: <b>, </b>, <i>, </i>, <br> sin atributos. Todo lo demás queda escapado. */
+function sanitizeTipHTML(s){
+  return _escHTML(s)
+    .replace(/&lt;(\/?)(b|i)&gt;/gi,(m,c,t)=>'<'+c+t.toLowerCase()+'>')
+    .replace(/&lt;br\s*\/?&gt;/gi,'<br>');
+}
+function _khNorm(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();}
+
+const KH_I={
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>',
+  ded:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" stroke-dasharray="2.5 2.5"/></svg>',
+  dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M8 12h8"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  chev:'<svg class="chev" viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'
+};
+
+/* Parsea el texto de ayuda (ya saneado) en secciones + pie «Fuente: … pág. N · Origen: X».
+   Sin pie → Deducido. Vacío → 'none' (sin ayuda). */
+function parseTip(raw){
+  const r={origin:'none',page:'',fuente:'',que:'',unit:'',por:'',lo:'',hi:'',extra:[]};
+  if(raw==null||!String(raw).trim()) return r;
+  const html=sanitizeTipHTML(raw);
+  const KEYS={'que hace':'que','unidad':'unit','por que importa':'por','si es muy bajo':'lo','si es muy alto':'hi'};
+  let org='';
+  html.split('<br>').forEach(line=>{
+    const t=line.trim();
+    if(!t) return;
+    const f=t.match(/^<i>\s*Fuente:\s*([\s\S]*?)\s*<\/i>$/i);
+    if(f){
+      const om=f[1].match(/Origen:\s*([\s\S]+?)\s*$/i);
+      if(om) org=_khNorm(om[1]);
+      r.fuente=f[1].replace(/\s*·?\s*Origen:[\s\S]*$/i,'').trim();
+      const pm=r.fuente.match(/p[áa]g\.?\s*(\d+)/i);
+      if(pm) r.page=pm[1];
+      return;
+    }
+    const m=t.match(/^<b>([^<]*?)\s*:?\s*<\/b>\s*:?\s*([\s\S]*)$/);
+    if(m){
+      const k=KEYS[_khNorm(m[1]).replace(/:$/,'')];
+      if(k&&m[2]){r[k]=m[2];return;}
+    }
+    r.extra.push(t);
+  });
+  if(org.startsWith('manual')) r.origin='manual';
+  else if(org.startsWith('deducido')) r.origin='deducido';
+  else if(org.startsWith('sin dato')) r.origin='sindato';
+  else if(/^<b>\s*sin dato/i.test(html.trim())) r.origin='sindato';
+  else r.origin='deducido';
+  return r;
+}
+
+/* Texto efectivo (respeta «ocultos» salvo en modo «Ver ocultos») */
+function _khText(id){
+  if(_getTipHidden(id)&&!_tipRevealHidden) return '';
+  const t=_getTipText(id);
+  return typeof t==='string'?t:String(t||'');
+}
+
+/* ── Nombre legible de un campo: [Salmón/Coho ·] etiqueta [· columna] ── */
+function _khCellText(el){
+  let t='';
+  el.childNodes.forEach(n=>{
+    if(n.nodeType===3) t+=n.nodeValue;
+    else if(n.nodeType===1&&n.tagName==='BR') t+=' ';
+    else if(n.nodeType===1&&!n.classList.contains('tip-i')&&!/^(INPUT|BUTTON|SELECT)$/.test(n.tagName)) t+=n.textContent;
+  });
+  return t.replace(/\s+/g,' ').trim();
+}
+function _khColHeader(td){
+  const table=td.closest('table');
+  const head=table&&table.tHead;
+  if(!head||!head.rows.length) return '';
+  let idx=0;
+  for(const c of td.parentElement.cells){if(c===td) break; idx+=c.colSpan||1;}
+  let pos=0;
+  for(const th of head.rows[head.rows.length-1].cells){
+    const span=th.colSpan||1;
+    if(idx>=pos&&idx<pos+span) return th.textContent.replace(/\s+/g,' ').trim();
+    pos+=span;
+  }
+  return '';
+}
+function _khTablePrefix(table){
+  // Título de bloque de texto puro justo antes de la tabla (p.ej. «Salmón» / «Coho» en Ímpetu)
+  const prev=table.previousElementSibling;
+  if(prev&&prev.tagName==='DIV'&&!prev.children.length){
+    const t=prev.textContent.replace(/\s+/g,' ').trim();
+    if(t&&t.length<=24) return t;
+  }
+  return '';
+}
+function _fieldInfo(id){
+  const inp=document.getElementById(id);
+  if(!inp||!inp.matches||!inp.matches('input.fe,input.fe1')) return null;
+  const td=inp.closest('td');
+  const tr=td?td.parentElement:null;
+  let label='',labelEl=null;
+  if(tr){
+    labelEl=tr.querySelector('td.plb');
+    if(!labelEl){const c0=tr.cells[0];if(c0&&c0!==td&&!c0.querySelector('input')) labelEl=c0;}
+    if(labelEl) label=_khCellText(labelEl);
+  }
+  const col=td?_khColHeader(td):'';
+  const table=td?td.closest('table'):null;
+  const prefix=table?_khTablePrefix(table):'';
+  let name=label||id;
+  if(col) name+=' · '+col;
+  if(prefix) name=prefix+' · '+name;
+  const sc=inp.closest('.sc');
+  const st=sc?sc.querySelector('.st'):null;
+  const fr=(inp.nextElementSibling&&inp.nextElementSibling.classList.contains('fr'))?inp.nextElementSibling:null;
+  return {id,inp,td,tr,labelEl,name,screenTitle:st?st.textContent.replace(/\s+/g,' ').trim():'',fr};
+}
+
+/* ── Valores: Predeterminado (span.fr) → Actual (input) ── */
+function _khNum(s){
+  const t=String(s==null?'':s).trim().split(/\s+/)[0].replace(',','.');
+  return /^[-−]?\d+(\.\d+)?$/.test(t)?parseFloat(t.replace('−','-')):null;
+}
+/* Solo para mostrar: coma decimal como el panel («0.50» → «0,50»). No toca lo guardado. */
+function _khFmt(s){return String(s==null?'':s).trim().replace(/^([-−]?\d+)\.(\d+)(?=\s|$)/,'$1,$2');}
+function _khDec(s){const m=String(s||'').trim().split(/\s+/)[0].match(/[.,](\d+)$/);return m?m[1].length:0;}
+function _khValues(info){
+  const act=String(info.inp.value||'').trim();
+  const def=info.fr?info.fr.textContent.trim():'';
+  let state='nodef',delta='';
+  if(def){
+    const a=_khNum(act),d=_khNum(def);
+    if(a!=null&&d!=null){
+      if(Math.abs(a-d)<1e-9) state='same';
+      else{
+        state='diff';
+        const v=a-d,dec=Math.max(_khDec(act),_khDec(def));
+        delta=(v>0?'+':'−')+Math.abs(v).toFixed(dec).replace('.',',');
+      }
+    } else state=(act===def)?'same':'diff';
+  }
+  return {act,def,state,delta};
+}
+
+/* ⓘ del HMI: ámbar relleno solo si el valor actual difiere del predeterminado (span.fr).
+   Sin predeterminado, o íconos de menú/botón: neutro. */
+function _khIconState(icon,id){
+  const info=_fieldInfo(id);
+  icon.classList.toggle('v-chg',!!(info&&info.fr&&_khValues(info).state==='diff'));
+}
+function _khRefreshIcons(){
+  document.querySelectorAll('.sc .tip-i[data-pid]').forEach(ic=>_khIconState(ic,ic.dataset.pid));
+}
+
+/* Unidad corta: «bar (convención general del manual, pág. 104)» → «bar»; lo de dentro queda como nota */
+function _khUnit(u){
+  const t=String(u||'').trim();
+  const i=t.indexOf(' (');
+  if(i<0) return {short:t,note:''};
+  return {short:t.slice(0,i).trim(),note:t.slice(i+2).replace(/\)\s*$/,'').trim()};
+}
+/* Línea de origen (una sola, gris). Texto ya saneado/escapado. */
+function _khOriginTexts(p){
+  if(p.origin==='manual') return {ic:KH_I.book,html:'<b>Manual</b>'+(p.page?' · pág. '+_escHTML(p.page):'')};
+  if(p.origin==='deducido') return {ic:KH_I.ded,html:'<b>Deducido</b>'+(p.page?' de pág. '+_escHTML(p.page):', sin página de respaldo')+' · confírmalo en terreno'};
+  if(p.origin==='sindato') return {ic:KH_I.dash,html:'<b>Sin dato</b> en el manual · consulta a Mantención'};
+  return {ic:KH_I.dash,html:'<b>Sin ayuda</b> todavía'};
+}
+function _khOriginLine(p,unitNote){
+  const o=_khOriginTexts(p);
+  return '<div class="kh-org">'+o.ic+'<span>'+o.html+(unitNote?' · unidad: '+unitNote:'')+'</span></div>';
+}
+function _khCanEdit(){return !READ_ONLY&&(IN_IFRAME?_TIP_CAN_EDIT:true);}
+
+/* Contenido común del globo y de la hoja. Devuelve {top, body, origin}. */
+function _khContent(id,sheet){
+  const info=_fieldInfo(id);
+  const p=parseTip(_khText(id));
+  // Una sección sin texto no se dibuja: el origen («Sin dato», «Sin ayuda») ya lo dice.
+  const blk=(h,c)=>c?'<div class="kh-blk">'+(h?'<span class="h">'+h+'</span>':'')+'<p>'+c+'</p></div>':'';
+  const title=info?info.name:_getTipLabel(id);
+  const top='<div class="kh-top">'+
+    '<div class="kh-title" id="kh-title-'+(sheet?'s':'p')+'">'+_escHTML(title)+'</div>'+
+    '<button type="button" class="kh-x" aria-label="Cerrar ayuda">'+KH_I.x+'</button></div>';
+  const u=_khUnit(p.unit);
+  // La nota de la unidad («convención general, pág. 104») solo suma si el campo no tiene otra página.
+  let b=_khOriginLine(p,(!p.page&&u.note)?u.note:'');
+  if(info){
+    const v=_khValues(info);
+    const st=v.state==='diff'?'predeterminado '+_escHTML(_khFmt(v.def))+(v.delta?' · '+_escHTML(v.delta):'')
+      :v.state==='same'?'= predeterminado':'sin predeterminado cargado';
+    b+='<div class="kh-val'+(v.state==='diff'?' chg':'')+'"><span class="n">'+(_escHTML(_khFmt(v.act))||'—')+'</span>'+
+      (u.short?'<span class="u">'+u.short+'</span>':'')+'<span class="st">'+st+'</span></div>';
+  }
+  // «Sin dato en el manual. No modificar sin consultar a Mantención.» ya lo dice la línea de origen.
+  const extra=p.origin==='sindato'
+    ?p.extra.filter(t=>!/^<b>\s*sin dato en el manual\.?\s*<\/b>\s*(no modificar sin consultar a mantenci[oó]n\.?)?\s*$/i.test(t))
+    :p.extra;
+  if(extra.length) b+=blk('',extra.join('<br>'));
+  if(info){
+    b+=blk('Qué hace',p.que);
+    b+=blk('Por qué importa',p.por);
+    if(p.lo||p.hi){
+      b+='<details class="kh-more"'+(sheet?' open':'')+'><summary>'+KH_I.chev+'Si queda muy bajo o muy alto</summary><div class="kh-lohi">'+
+        (p.lo?'<div>'+KH_I.down+'<span class="h">Muy bajo</span><p>'+p.lo+'</p></div>':'')+
+        (p.hi?'<div>'+KH_I.up+'<span class="h">Muy alto</span><p>'+p.hi+'</p></div>':'')+'</div></details>';
+    }
+  } else {
+    // Menús y botones de navegación: texto libre saneado
+    b+=blk('',[p.que,p.por].filter(Boolean).join('<br>'));
+  }
+  if(_khCanEdit()) b+='<button type="button" class="kh-btn-tint" data-act="edit">'+(p.origin==='none'?'Escribir ayuda':'Editar ayuda')+'</button>';
+  return {top,body:b,origin:p.origin,info};
+}
+
+/* ── Estado ── */
+let _khOpen=null; // {id, el, kind:'pop'|'sheet', anchor, info}
+function _khIsNarrow(){return window.innerWidth<768;}
+function _khRing(info,on){
+  if(!info) return;
+  info.inp.classList.toggle('kn-ring',on);
+  if(info.tr) info.tr.classList.toggle('kn-ring-row',on);
+}
+function closeHelp(instant){
+  if(!_khOpen) return;
+  const o=_khOpen;
+  _khOpen=null;
+  _khRing(o.info,false);
+  document.querySelectorAll('#kn-help-list .kn-row.sel').forEach(r=>r.classList.remove('sel'));
+  if(o.kind==='sheet'){
+    document.body.classList.remove('kh-sheet-open');
+    const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(instant||reduce){o.el.remove();}
+    else{o.el.classList.add('kh-leave');setTimeout(()=>o.el.remove(),360);}
+  } else o.el.remove();
+}
+function openHelp(id,anchor){
+  if(_khIsNarrow()) _khOpenSheet(id);
+  else _khOpenPop(id,anchor);
+}
+function _khWire(el,id){
+  el.querySelector('.kh-x').addEventListener('click',e=>{e.stopPropagation();closeHelp();});
+  // Al desplegar «Si queda muy bajo o muy alto» el globo crece: recolocarlo para que quepa.
+  const more=el.querySelector('.kh-more');
+  if(more) more.addEventListener('toggle',()=>{if(_khOpen&&_khOpen.el===el&&_khOpen.kind==='pop') _khPlace();});
+  const ed=el.querySelector('[data-act="edit"]');
+  if(ed) ed.addEventListener('click',e=>{
+    e.stopPropagation();
+    const info=_fieldInfo(id);
+    const a=(info&&info.inp)||document.querySelector('.tip-i[data-pid="'+CSS.escape(id)+'"]')||ed;
+    closeHelp(true);
+    openTipEdit(id,a);
+  });
+}
+function _khOpenPop(id,anchor){
+  closeHelp(true);
+  closeTipBox();
+  const c=_khContent(id,false);
+  const el=document.createElement('div');
+  el.className='kh kh-pop';
+  el.setAttribute('role','dialog');
+  el.setAttribute('aria-labelledby','kh-title-p');
+  el.dataset.pid=id;
+  el.dataset.origin=c.origin;
+  el.innerHTML=c.top+c.body;
+  document.body.appendChild(el);
+  _khWire(el,id);
+  _khRing(c.info,true);
+  _khOpen={id,el,kind:'pop',anchor:anchor||null,info:c.info};
+  _khPlace();
+}
+/* Rectángulo del contenido visible de la tabla del campo (las celdas se estiran a lo ancho
+   del HMI, así que se mide lo que hay dentro de ellas, no la celda). */
+function _khTableRect(table){
+  let l=Infinity,r=-Infinity,t=Infinity,b=-Infinity;
+  table.querySelectorAll('td,th').forEach(c=>{
+    const rg=document.createRange();
+    rg.selectNodeContents(c);
+    const q=rg.getBoundingClientRect();
+    if(!q.width&&!q.height) return;
+    l=Math.min(l,q.left);r=Math.max(r,q.right);t=Math.min(t,q.top);b=Math.max(b,q.bottom);
+  });
+  if(l===Infinity){const q=table.getBoundingClientRect();return {left:q.left,right:q.right,top:q.top,bottom:q.bottom};}
+  return {left:l,right:r,top:t,bottom:b};
+}
+/* Globo fuera de la tabla del HMI, nunca sobre la fila del campo ni sobre su tabla:
+   (1) a la derecha del marco del HMI (#hs) → (2) pegado al borde derecho de la ventana, si
+   queda a la derecha de la tabla (puede tapar el mapa de navegación) → (3) bajo la tabla →
+   (4) sobre la tabla → (5) al costado del campo / debajo / encima, como antes. */
+function _khPlace(){
+  if(!_khOpen||_khOpen.kind!=='pop') return;
+  const {el,info,anchor}=_khOpen;
+  const ref=(info&&info.inp)||anchor;
+  if(!ref||!ref.isConnected){closeHelp(true);return;}
+  const vw=window.innerWidth,vh=window.innerHeight,M=8,G=12;
+  const w=Math.min(360,vw-2*M);
+  el.style.width=w+'px';
+  const h=Math.min(el.scrollHeight,vh-2*M);
+  const fR=ref.getBoundingClientRect();
+  const rR=(info&&info.tr)?info.tr.getBoundingClientRect():fR;
+  const table=info&&info.td?info.td.closest('table'):null;
+  const tR=table?_khTableRect(table):{left:rR.left,right:rR.right,top:rR.top,bottom:rR.bottom};
+  const hs=document.getElementById('hs');
+  const hR=hs?hs.getBoundingClientRect():null;
+  const yBeside=Math.max(M,Math.min(fR.top-16,vh-h-M));
+  const hitsRow=(x,y)=>x<rR.right&&x+w>rR.left&&y<rR.bottom&&y+h>rR.top;
+  // Al costado (fuera de la tabla), a la altura del campo; si así pisa la banda de la fila
+  // marcada, justo debajo de la fila, o justo encima.
+  const yOut=xx=>!hitsRow(xx,yBeside)?yBeside
+    :(rR.bottom+G+h<=vh-M)?rR.bottom+G
+    :(rR.top-G-h>=M)?rR.top-G-h:yBeside;
+  let x=null,y=null;
+  if(hR&&hR.right+G+w<=vw-M){x=hR.right+G;y=yOut(x);}
+  else if(vw-M-w>=tR.right+G){x=vw-M-w;y=yOut(x);}
+  else{
+    const xt=Math.max(M,Math.min(tR.left,vw-w-M));
+    if(tR.bottom+G+h<=vh-M&&!hitsRow(xt,tR.bottom+G)){x=xt;y=tR.bottom+G;}
+    else if(tR.top-G-h>=M&&!hitsRow(xt,tR.top-G-h)){x=xt;y=tR.top-G-h;}
+  }
+  if(x==null){
+    const lR=(info&&info.labelEl)?info.labelEl.getBoundingClientRect():fR;
+    const cands=[rR.right+G, rR.left-G-w, fR.right+G, Math.min(lR.left,fR.left)-G-w];
+    for(const cx of cands){if(cx>=M&&cx+w<=vw-M){x=cx;break;}}
+    if(x!=null) y=yBeside;
+    else{
+      x=Math.max(M,Math.min(fR.left,vw-w-M));
+      if(fR.bottom+G+h<=vh-M) y=fR.bottom+G;
+      else if(fR.top-G-h>=M) y=fR.top-G-h;
+      else y=Math.max(M,vh-h-M);
+    }
+  }
+  el.style.left=Math.round(x)+'px';
+  el.style.top=Math.round(y)+'px';
+}
+function _khOpenSheet(id){
+  const wasSheet=_khOpen&&_khOpen.kind==='sheet';
+  closeHelp(true);
+  closeTipBox();
+  const c=_khContent(id,true);
+  const el=document.createElement('div');
+  el.className='kh kh-sheet'+(wasSheet?'':' kh-enter');
+  el.setAttribute('role','dialog');
+  el.setAttribute('aria-labelledby','kh-title-s');
+  el.dataset.pid=id;
+  el.dataset.origin=c.origin;
+  el.innerHTML='<div class="kh-sheet-head"><div class="kh-grab" aria-hidden="true"></div>'+c.top+'</div><div class="kh-sheet-body">'+c.body+'</div>';
+  document.body.appendChild(el);
+  document.body.classList.add('kh-sheet-open');
+  _khWire(el,id);
+  _khRing(c.info,true);
+  _khOpen={id,el,kind:'sheet',anchor:null,info:c.info};
+  document.querySelectorAll('#kn-help-list .kn-row').forEach(r=>r.classList.toggle('sel',r.dataset.pid===id));
+  if(!wasSheet) requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('kh-enter')));
+  // Mantener el HMI (con el campo marcado) visible arriba de la hoja
+  const hp=document.getElementById('hp');
+  if(hp&&hp.scrollTop>0) hp.scrollTo({top:0,behavior:'smooth'});
+  // Arrastre: abajo cierra (>120 px o 25 %), arriba expande a 92 %
+  const head=el.querySelector('.kh-sheet-head');
+  let sy=0,dy=0,dragging=false;
+  head.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;dy=0;dragging=true;el.style.transition='none';},{passive:true});
+  head.addEventListener('touchmove',e=>{if(!dragging)return;dy=e.touches[0].clientY-sy;if(dy>0)el.style.transform='translateY('+dy+'px)';},{passive:true});
+  head.addEventListener('touchend',()=>{
+    if(!dragging) return;
+    dragging=false;
+    el.style.transition='';el.style.transform='';
+    if(dy>Math.min(120,el.offsetHeight*.25)) closeHelp();
+    else if(dy<-40) el.classList.add('kh-full');
+  });
+}
+/* Re-render del globo/hoja abiertos (valores o textos cambiaron) */
+function _khRefreshOpen(){
+  if(!_khOpen) return;
+  const {id,kind,el}=_khOpen;
+  if(!document.body.contains(el)){_khOpen=null;return;}
+  const info=_fieldInfo(id);
+  if(info&&!info.inp.closest('.sc.active')){closeHelp(true);return;}
+  const c=_khContent(id,kind==='sheet');
+  el.dataset.origin=c.origin;
+  if(kind==='sheet'){
+    const body=el.querySelector('.kh-sheet-body'),st=body.scrollTop;
+    el.querySelector('.kh-top').outerHTML=c.top;
+    body.innerHTML=c.body;body.scrollTop=st;
+  } else el.innerHTML=c.top+c.body;
+  _khRing(_khOpen.info,false);
+  _khOpen.info=c.info;
+  _khRing(c.info,true);
+  _khWire(el,id);
+  if(kind==='pop') _khPlace();
+}
+
+/* ── Lista de campos de la pantalla actual (celular) ── */
+function renderHelpList(){
+  const hp=document.getElementById('hp');
+  if(!hp) return;
+  let wrap=document.getElementById('kn-help-list');
+  if(!wrap){
+    wrap=document.createElement('section');
+    wrap.id='kn-help-list';
+    wrap.className='kh';
+    wrap.setAttribute('aria-label','Campos de esta pantalla');
+    hp.appendChild(wrap);
+    wrap.addEventListener('click',e=>{
+      const b=e.target.closest('.kn-row');
+      if(b) openHelp(b.dataset.pid,null);
+    });
+  }
+  const sc=document.querySelector('.sc.active');
+  const inputs=sc?[...sc.querySelectorAll('input.fe[id],input.fe1[id]')]:[];
+  if(!inputs.length){wrap.hidden=true;wrap.innerHTML='';return;}
+  wrap.hidden=false;
+  const sel=_khOpen?_khOpen.id:null;
+  // Agrupar por origen (+ página): el origen va una vez en el encabezado del grupo.
+  const RANK={deducido:0,manual:1,sindato:2,none:3};
+  const groups=new Map();
+  inputs.forEach(inp=>{
+    const info=_fieldInfo(inp.id);
+    const p=parseTip(_khText(inp.id));
+    const key=p.origin+'|'+p.page;
+    if(!groups.has(key)) groups.set(key,{p,rows:[]});
+    const v=_khValues(info);
+    const chg=v.state==='diff';
+    const cur='<span class="cur">'+(_escHTML(_khFmt(v.act))||'—')+'</span>';
+    const def=chg&&v.def?'<span class="def">pred. '+_escHTML(_khFmt(v.def))+'</span>':'';
+    groups.get(key).rows.push('<button type="button" class="kn-row'+(chg?' chg':'')+(inp.id===sel?' sel':'')+'" data-pid="'+_escHTML(inp.id)+'">'+
+      '<span class="l">'+_escHTML(info.name)+'</span><span class="val">'+cur+def+'</span>'+KH_I.chev+'</button>');
+  });
+  const gl=p=>p.origin==='manual'?'<b>Manual</b>'+(p.page?' · pág. '+_escHTML(p.page):'')
+    :p.origin==='deducido'?'<b>Deducido</b>'+(p.page?' de pág. '+_escHTML(p.page):', sin página de respaldo')
+    :p.origin==='sindato'?'<b>Sin dato</b> en el manual':'<b>Sin ayuda</b> todavía';
+  const html=[...groups.values()].sort((a,b)=>RANK[a.p.origin]-RANK[b.p.origin]).map(g=>{
+    const ic=_khOriginTexts(g.p).ic;
+    const n=g.rows.length;
+    return '<h2 class="kh-gh">'+ic+'<span>'+gl(g.p)+' · '+n+(n===1?' campo':' campos')+'</span></h2><div class="kh-glist">'+g.rows.join('')+'</div>';
+  });
+  wrap.innerHTML=html.join('');
+}
+
+/* ── Tema: el del padre (clase .dark en su <html>); sin padre, el del sistema ── */
+function _khApplyTheme(){
+  let t=null;
+  try{
+    if(IN_IFRAME&&window.parent&&window.parent.document){
+      const h=window.parent.document.documentElement;
+      t=h.classList.contains('dark')?'dark':'light';
+    }
+  }catch(e){}
+  if(!t) t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  document.documentElement.dataset.knTheme=t;
+}
+_khApplyTheme();
+try{
+  if(IN_IFRAME&&window.parent&&window.parent.document)
+    new MutationObserver(_khApplyTheme).observe(window.parent.document.documentElement,{attributes:true,attributeFilter:['class']});
+}catch(e){}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',_khApplyTheme);}catch(e){}
+
+/* ── Eventos globales ── */
+window.addEventListener('load',()=>{
+  const hs=document.getElementById('hs');
+  if(!hs) return;
+  // La fila completa abre la ayuda (etiqueta, celda, ícono). El input sigue editable.
+  hs.addEventListener('click',e=>{
+    if(e.target.closest('.tip-i,button,input,select,textarea,[contenteditable="true"]')) return;
+    const td=e.target.closest('td');
+    if(!td||!td.closest('.sc.active')) return;
+    const tr=td.parentElement;
+    let inp=td.querySelector('input.fe[id],input.fe1[id]');
+    if(!inp&&td.classList.contains('plb')){
+      const nx=td.nextElementSibling;
+      inp=(nx&&nx.querySelector('input.fe[id],input.fe1[id]'))||tr.querySelector('input.fe[id],input.fe1[id]');
+    }
+    if(!inp&&!tr.querySelector('td.plb')){
+      const c0=tr.cells[0];
+      if(c0===td) inp=tr.querySelector('input.fe[id],input.fe1[id]');
+    }
+    if(!inp) return;
+    if(_getTipHidden(inp.id)&&!_tipRevealHidden&&!_khIsNarrow()) return;
+    if(_khOpen&&_khOpen.id===inp.id&&_khOpen.kind==='pop'){closeHelp();return;}
+    openHelp(inp.id,inp);
+  });
+});
+document.addEventListener('pointerdown',e=>{
+  // Globo (PC): se cierra con clic afuera. La hoja (celular) solo con ×, arrastre o Esc,
+  // para que desplazar la página con el dedo no la cierre.
+  if(!_khOpen||_khOpen.kind!=='pop') return;
+  const t=e.target;
+  if(_khOpen.el.contains(t)||!t.closest) return;
+  if(t.closest('.tip-i')) return; // el clic del ícono alterna
+  if(t.closest('#hs td')&&!t.closest('input,button,select,textarea')) return; // el clic de fila decide
+  closeHelp();
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&_khOpen){closeHelp();}});
+let _khInputT=null;
+document.addEventListener('input',e=>{
+  if(!e.target.matches||!e.target.matches('input.fe,input.fe1')) return;
+  clearTimeout(_khInputT);
+  _khInputT=setTimeout(()=>{_khRefreshIcons();renderHelpList();_khRefreshOpen();},150);
+});
+let _khResizeT=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(_khResizeT);
+  _khResizeT=setTimeout(()=>{
+    if(_khOpen){
+      const narrow=_khIsNarrow();
+      if(narrow&&_khOpen.kind==='pop'){const id=_khOpen.id;closeHelp(true);_khOpenSheet(id);}
+      else if(!narrow&&_khOpen.kind==='sheet'){const o=_khOpen;closeHelp(true);_khOpenPop(o.id,o.info&&o.info.inp);}
+      else _khPlace();
+    }
+  },120);
+});
+document.addEventListener('scroll',()=>{if(_khOpen&&_khOpen.kind==='pop') _khPlace();},true);
+
 initTooltipSystem();
 
 // Ctrl+Shift+T: cambiar contraseña
 document.addEventListener('keydown',e=>{
-  if(e.ctrlKey&&e.shiftKey&&e.key==='T'){
+  if(!IN_IFRAME&&e.ctrlKey&&e.shiftKey&&e.key==='T'){
     e.preventDefault();
     setAdminPassword();
   }
