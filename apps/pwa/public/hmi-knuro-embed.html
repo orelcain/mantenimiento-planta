@@ -4532,6 +4532,17 @@ function _knPlain(html){
     .replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&')
     .replace(/\s+/g,' ').trim();
 }
+/* Texto de ayuda para buscar: sin el pie «Fuente: … · Origen: …» ni las frases fijas de los
+   globos sin dato, que ponían «sin», «dato», «manual» o «consultar» en casi todos los textos. */
+function _knHelpBusq(plain){
+  return String(plain||'')
+    .replace(/Fuente:[^]*$/i,' ')
+    .replace(/Sin dato en el manual\.?/gi,' ')
+    .replace(/No modificar sin consultar a Mantenci[oó]n\.?/gi,' ')
+    .replace(/\s+/g,' ').trim();
+}
+/* Palabras vacías: no deciden una coincidencia dentro del texto de ayuda */
+const KN_VACIAS=new Set(['de','del','la','las','el','los','y','o','en','a','al','con','por','para','un','una','que','se','su']);
 /* Índice: se arma en cada búsqueda (≈180 campos + 58 pantallas), así siempre refleja
    los valores y textos actuales sin enganchar eventos. */
 function _knIndex(){
@@ -4542,13 +4553,13 @@ function _knIndex(){
     const path=_knPath(sid);
     const help=_knPlain(_khText('scr:'+sid));
     const inps=[...sc.querySelectorAll('input.fe[id],input.fe1[id]')];
-    screens.push({kind:'screen',sid,title,path,help,n:inps.length,nName:_khNorm(title+' '+alias),nHelp:_khNorm(help)});
+    screens.push({kind:'screen',sid,title,path,help,n:inps.length,nName:_khNorm(title+' '+alias),nHelp:_khNorm(_knHelpBusq(help))});
     inps.forEach(inp=>{
       const info=_fieldInfo(inp.id);
       if(!info) return;
       const fh=_knPlain(_khText(inp.id));
       fields.push({kind:'field',id:inp.id,sid,name:info.name,title,path,help:fh,info,
-        nName:_khNorm(info.name),nScr:_khNorm(title+' '+alias+' '+path),nHelp:_khNorm(fh)});
+        nName:_khNorm(info.name),nScr:_khNorm(title+' '+alias+' '+path),nHelp:_khNorm(_knHelpBusq(fh))});
     });
   });
   return {fields,screens};
@@ -4599,16 +4610,21 @@ function _knSearch(q){
   const toks=_khNorm(q).split(/\s+/).filter(Boolean);
   if(!toks.length) return null;
   const has=s=>toks.every(t=>_knAt(s,t,0)>=0);
+  // En el texto de ayuda: todas las palabras con contenido deben estar, y al menos una
+  // tiene que aparecer en la propia ayuda (si todas calzan solo en el nombre, ya salió arriba).
+  const llenas=toks.filter(t=>!KN_VACIAS.has(t));
+  const tH=llenas.length?llenas:toks;
+  const hasH=(nombre,ayuda)=>tH.every(t=>_knAt(nombre,t,0)>=0||_knAt(ayuda,t,0)>=0)&&tH.some(t=>_knAt(ayuda,t,0)>=0);
   const {fields,screens}=_knIndex();
   const F=[],H=[],S=[];
   fields.forEach(f=>{
     if(has(f.nName)) F.push({f,l:1});
     else if(has(f.nName+' '+f.nScr)) F.push({f,l:2});
-    else if(has(f.nName+' '+f.nScr+' '+f.nHelp)) H.push({f,l:3});
+    else if(hasH(f.nName+' '+f.nScr,f.nHelp)) H.push({f,l:3});
   });
   screens.forEach(s=>{
     if(has(s.nName)) S.push({f:s,l:1});
-    else if(has(s.nName+' '+s.nHelp)) H.push({f:s,l:3});
+    else if(hasH(s.nName,s.nHelp)) H.push({f:s,l:3});
   });
   F.sort((a,b)=>a.l-b.l);
   // Pantallas antes que campos si la pantalla calza por nombre y ningún campo por el suyo («evacuador»)
