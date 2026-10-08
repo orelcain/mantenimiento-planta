@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck, QrCode, Minimize } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { History, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck, QrCode, Minimize, ArrowLeft } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
 import { logger } from '@/lib/logger'
@@ -22,9 +23,11 @@ import {
   saveDefaultSnapshot,
 } from '@/services/hmiKnuro'
 import type { HmiHistoryEntry } from '@/services/hmiKnuro'
-import { Button } from '@/components/ui'
 import { useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
 import { AvisoGirarTelefono } from '@/components/hmiKnuro/AvisoGirarTelefono'
+import { KnuroPresetPicker } from '@/components/hmiKnuro/KnuroPresetPicker'
+import { frasePreset, partirPreset } from '@/components/hmiKnuro/knuroPresets'
+import '@/components/hmiKnuro/knuroConsola.css'
 
 /**
  * HmiKnuroPage — Módulo HMI Knuro B2
@@ -41,13 +44,26 @@ import { AvisoGirarTelefono } from '@/components/hmiKnuro/AvisoGirarTelefono'
  * `fixed inset-0` por encima de la barra inferior de la app, sin la barra admin, y el iframe
  * recibe `hmi:land` (riel Buscar/Lista/«?»/Salir). Las acciones admin (presets, Historial…)
  * quedan fuera de ese modo: «Salir» las devuelve. En vertical, aviso «Gira el teléfono».
+ *
+ * Marco «Consola» (knuroConsola.css), igual que la página pública: estilo FIJO, no sigue el tema.
+ * Cabecera: Simulador (volver) · presets en segmentados Planta/Máquina · menú «Presets» (orden,
+ * renombrar, clonar, QR, restaurar/guardar defaults) · Historial · Recargar. Lo que vive DENTRO del
+ * iframe (guardar valores como preset, comparar, exportar PDF, editar refs) sigue en el panel
+ * «Pantallas» del simulador, sección «Edición de presets» (solo fuera de modo lectura).
  */
+/** «Planta Principal - BAA142 - N1» → «Principal · N°1» (el nombre completo queda en el title). */
+function etiquetaCorta(name: string): string {
+  const p = partirPreset(name)
+  return p ? `${p.planta} · N°${p.maquina}` : name
+}
+
 export function HmiKnuroPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const presetsDropdownRef = useRef<HTMLDivElement>(null)
   /** Flag: el iframe ya envió hmi:ready pero user no estaba disponible aún */
   const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
+  const navigate = useNavigate()
   const containerRef = useRef<HTMLDivElement>(null)
   const { compact, immersive, isFullscreen, visualFs, enterFullscreen, exitImmersive, mostrarAviso, ocultarAviso } =
     useHmiKnuroMovil(containerRef, iframeRef)
@@ -236,6 +252,11 @@ export function HmiKnuroPage() {
     setPresetsOpen(false)
   }, [])
 
+  // Volver al simulador público, en el preset que se está editando
+  const volverAlSimulador = () => {
+    navigate(currentPresetName ? `/aprendizaje/hmi-knuro/${encodeURIComponent(currentPresetName)}` : '/aprendizaje/hmi-knuro')
+  }
+
   // ── Historial ──────────────────────────────────────────────────────────
   const openHistory = async () => {
     setHistoryOpen(true)
@@ -350,188 +371,124 @@ export function HmiKnuroPage() {
     setEditingPreset(null)
   }, [user, editingPreset, presets, presetKeys, currentPresetName])
 
+  // Menú «Presets»: orden, renombrar, clonar, QR, restaurar y guardar defaults (antes la barra
+  // admin y el desplegable). La elección del preset activo va en los segmentados.
+  const presetMenu = (
+    <div className="knc-popw" ref={presetsDropdownRef}>
+      <button
+        type="button"
+        className="knc-ib knc-pc"
+        aria-haspopup="menu"
+        aria-expanded={presetsOpen}
+        onClick={() => setPresetsOpen(p => !p)}
+        title="Gestionar presets"
+      >
+        <Sliders aria-hidden="true" /><span className="knc-t2">Presets</span><ChevronDown aria-hidden="true" />
+      </button>
+      <button type="button" className="knc-ib m sq knc-m" aria-haspopup="menu" aria-expanded={presetsOpen} onClick={() => setPresetsOpen(p => !p)} aria-label="Gestionar presets">
+        <Sliders aria-hidden="true" />
+      </button>
+      {presetsOpen && (
+        <div className="knc-pop r" role="menu" style={{ width: 340 }}>
+          <div className="knc-pop-h">Presets · orden, nombre, copia y QR</div>
+          {presetKeys.length === 0 && <div className="knc-pop-h" style={{ textTransform: 'none' }}>Cargando presets…</div>}
+          {presetKeys.map((name, idx) => {
+            const isEditing = editingPreset?.name === name
+            const on = name === currentPresetName
+            return (
+              <div key={name} className={cn('knc-pop-row', on && 'on')}>
+                {isEditing ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={editingPreset.value}
+                      onChange={e => setEditingPreset({ name, value: e.target.value })}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') confirmRename()
+                        if (e.key === 'Escape') { e.stopPropagation(); setEditingPreset(null) }
+                      }}
+                      className="knc-input"
+                      aria-label={`Nuevo nombre para ${name}`}
+                    />
+                    <button type="button" className="knc-tool" onClick={confirmRename} title="Confirmar" aria-label="Confirmar"><Check /></button>
+                    <button type="button" className="knc-tool" onClick={() => setEditingPreset(null)} title="Cancelar" aria-label="Cancelar"><X /></button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="knc-tool" onClick={() => movePreset(name, 'up')} disabled={idx === 0} title="Mover arriba" aria-label={`Mover ${name} arriba`}><ArrowUp /></button>
+                    <button type="button" className="knc-tool" onClick={() => movePreset(name, 'down')} disabled={idx === presetKeys.length - 1} title="Mover abajo" aria-label={`Mover ${name} abajo`}><ArrowDown /></button>
+                    <button type="button" role="menuitemradio" aria-checked={on} className="knc-pop-i" style={{ flex: 1, minWidth: 0 }} onClick={() => loadPresetFromReact(name)}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{etiquetaCorta(name)}</span>
+                    </button>
+                    <button type="button" className="knc-tool" onClick={() => setEditingPreset({ name, value: name })} title="Renombrar" aria-label={`Renombrar ${name}`}><Pencil /></button>
+                    <button type="button" className="knc-tool" onClick={() => clonePreset(name)} title={`Clonar «${name}»`} aria-label={`Clonar ${name}`}><Copy /></button>
+                    <button type="button" className="knc-tool" onClick={() => { setPresetsOpen(false); setQrPreset(name) }} title={`Compartir «${name}» (QR)`} aria-label={`QR de ${name}`}><QrCode /></button>
+                  </>
+                )}
+              </div>
+            )
+          })}
+          <div className="knc-pop-h">Valores por defecto</div>
+          <button type="button" className="knc-pop-i" onClick={() => { setPresetsOpen(false); resetToDefaults() }}>
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />Restaurar los presets por defecto
+          </button>
+          <button type="button" className="knc-pop-i" onClick={() => { setPresetsOpen(false); saveAsDefaults() }}>
+            <BookmarkCheck className="h-4 w-4" aria-hidden="true" />Guardar los actuales como defaults
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div
       ref={containerRef}
-      className={immersive ? 'fixed inset-0 z-[70] flex flex-col bg-[#1a1c22]' : 'flex flex-col h-full w-full relative'}
+      className={immersive ? 'knc fixed inset-0 z-[70] flex flex-col' : 'knc flex flex-col h-full w-full relative'}
       style={immersive
         ? { height: '100dvh', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }
         : undefined}
     >
 
-      {/* ── Toolbar (fuera en pantalla completa / celular horizontal) ─── */}
-      <div className={cn('flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2', immersive && 'hidden')}>
-        <div className="flex items-center gap-2 min-w-0">
-          <Cpu className="h-4 w-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold truncate">HMI Knuro</span>
-          <span className="text-xs text-muted-foreground hidden md:inline">
-            Simulador de parámetros — Baader
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 flex-shrink-0">
-
-          {/* Selector de presets */}
-          <div className="relative" ref={presetsDropdownRef}>
-            <Button
-              variant={presetsOpen ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setPresetsOpen(p => !p)}
-              className="h-7 gap-1 text-xs"
-              title="Seleccionar preset"
-            >
-              <Sliders className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline max-w-[90px] truncate">
-                {currentPresetName ?? 'Presets'}
-              </span>
-              <ChevronDown className={cn('h-3 w-3 transition-transform', presetsOpen && 'rotate-180')} />
-            </Button>
-
-            {presetsOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl w-56 max-h-72 overflow-y-auto">
-                {presetKeys.length === 0 ? (
-                  <div className="text-xs text-muted-foreground px-3 py-3 text-center leading-relaxed">
-                    Cargando presets…
-                  </div>
-                ) : (
-                  presetKeys.map((name, idx) => {
-                    const isEditing = editingPreset?.name === name
-                    return (
-                      <div
-                        key={name}
-                        className={cn(
-                          'flex items-center text-xs hover:bg-muted transition-colors group',
-                          name === currentPresetName && 'bg-primary/10'
-                        )}
-                      >
-                        {/* Mover arriba / abajo */}
-                        {!isEditing && (
-                          <div className="flex flex-col opacity-0 group-hover:opacity-50 flex-shrink-0 pl-1">
-                            <button
-                              onClick={e => { e.stopPropagation(); movePreset(name, 'up') }}
-                              disabled={idx === 0}
-                              className="hover:opacity-100 disabled:opacity-20 p-0.5"
-                              title="Mover arriba"
-                            >
-                              <ArrowUp className="h-2.5 w-2.5" />
-                            </button>
-                            <button
-                              onClick={e => { e.stopPropagation(); movePreset(name, 'down') }}
-                              disabled={idx === presetKeys.length - 1}
-                              className="hover:opacity-100 disabled:opacity-20 p-0.5"
-                              title="Mover abajo"
-                            >
-                              <ArrowDown className="h-2.5 w-2.5" />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Nombre o input de edición */}
-                        {isEditing ? (
-                          <input
-                            autoFocus
-                            value={editingPreset.value}
-                            onChange={e => setEditingPreset({ name, value: e.target.value })}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') confirmRename()
-                              if (e.key === 'Escape') setEditingPreset(null)
-                            }}
-                            onClick={e => e.stopPropagation()}
-                            className="flex-1 mx-1 px-1.5 py-1 bg-background border border-primary rounded text-xs outline-none min-w-0"
-                          />
-                        ) : (
-                          <button
-                            onClick={() => loadPresetFromReact(name)}
-                            className={cn(
-                              'flex-1 text-left px-2 py-2 flex items-center gap-1.5 min-w-0',
-                              name === currentPresetName && 'text-primary font-semibold'
-                            )}
-                          >
-                            <span className="flex-1 truncate">{name}</span>
-                            {name === currentPresetName && (
-                              <span className="text-[10px] opacity-60 flex-shrink-0">activo</span>
-                            )}
-                          </button>
-                        )}
-
-                        {/* Acciones: confirmar/cancelar o editar/clonar */}
-                        <div className="flex items-center flex-shrink-0 pr-1">
-                          {isEditing ? (
-                            <>
-                              <button
-                                onClick={e => { e.stopPropagation(); confirmRename() }}
-                                className="p-1.5 text-emerald-400 hover:text-emerald-300"
-                                title="Confirmar"
-                              >
-                                <Check className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={e => { e.stopPropagation(); setEditingPreset(null) }}
-                                className="p-1.5 text-muted-foreground hover:text-foreground"
-                                title="Cancelar"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={e => { e.stopPropagation(); setEditingPreset({ name, value: name }) }}
-                                className="p-1.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
-                                title="Renombrar"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={e => { e.stopPropagation(); clonePreset(name) }}
-                                className="p-1.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
-                                title={`Clonar "${name}"`}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={e => { e.stopPropagation(); setPresetsOpen(false); setQrPreset(name) }}
-                                className="p-1.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
-                                title={`Compartir "${name}" (QR)`}
-                              >
-                                <QrCode className="h-3 w-3" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            )}
+      {/* ── Cabecera «Consola» (fuera en pantalla completa / celular horizontal) ─── */}
+      {!immersive && (
+        <header className="knc-hdr">
+          <button type="button" onClick={volverAlSimulador} className="knc-ib knc-pc" aria-label="Volver al simulador" title="Volver al simulador">
+            <ArrowLeft aria-hidden="true" /><span className="knc-t2">Simulador</span>
+          </button>
+          <button type="button" onClick={volverAlSimulador} className="knc-ib m sq bare knc-m" aria-label="Volver al simulador">
+            <ArrowLeft aria-hidden="true" />
+          </button>
+          <div className="knc-ttl">
+            <b>HMI Knuro</b>
+            <span className="knc-lab">Editor de presets y ayudas</span>
           </div>
+          <span className="knc-div knc-pc" aria-hidden="true" />
+          <div className="knc-pc" style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+            <KnuroPresetPicker names={presetKeys} selected={currentPresetName} onSelect={loadPresetFromReact} variant="pc" />
+          </div>
+          <span className="knc-sp" />
+          {presetMenu}
+          <button type="button" className="knc-ib knc-pc" aria-pressed={historyOpen} onClick={historyOpen ? () => setHistoryOpen(false) : openHistory} title="Historial de cambios">
+            <History aria-hidden="true" /><span className="knc-t1">Historial</span>
+          </button>
+          <button type="button" className="knc-ib m sq knc-m" aria-pressed={historyOpen} onClick={historyOpen ? () => setHistoryOpen(false) : openHistory} aria-label="Historial de cambios">
+            <History aria-hidden="true" />
+          </button>
+          <button type="button" className="knc-ib knc-pc" onClick={refreshIframe} title="Recargar el simulador">
+            <RefreshCw aria-hidden="true" /><span className="knc-t1">Recargar</span>
+          </button>
+          <button type="button" className="knc-ib m sq knc-m" onClick={refreshIframe} aria-label="Recargar el simulador">
+            <RefreshCw aria-hidden="true" />
+          </button>
+        </header>
+      )}
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={historyOpen ? () => setHistoryOpen(false) : openHistory}
-            className="h-7 gap-1 text-xs"
-          >
-            <History className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Historial</span>
-          </Button>
-
-          <Button variant="ghost" size="sm" onClick={refreshIframe} className="h-7 gap-1 text-xs">
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Recargar</span>
-          </Button>
-
-          <Button variant="ghost" size="sm" onClick={resetToDefaults} className="h-7 gap-1 text-xs" title="Restaurar presets a valores por defecto">
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Restaurar</span>
-          </Button>
-          <Button variant="ghost" size="sm" onClick={saveAsDefaults} className="h-7 gap-1 text-xs" title="Guardar presets actuales como defaults (Restaurar usará estos valores)">
-            <BookmarkCheck className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Guardar Defaults</span>
-          </Button>
+      {/* ── Celular: presets en fila propia ─────────────────────────── */}
+      {!immersive && (
+        <div className="knc-m">
+          <KnuroPresetPicker names={presetKeys} selected={currentPresetName} onSelect={loadPresetFromReact} variant="m" />
         </div>
-      </div>
+      )}
 
       {/* ── Celular vertical: aviso para girar ───────────────────────── */}
       {mostrarAviso && <AvisoGirarTelefono onPantallaCompleta={enterFullscreen} onCerrar={ocultarAviso} />}
@@ -550,51 +507,32 @@ export function HmiKnuroPage() {
 
       {/* Salir de pantalla completa fuera del modo horizontal (en horizontal se sale desde el riel del HMI) */}
       {(isFullscreen || visualFs) && !compact && (
-        <button
-          onClick={exitImmersive}
-          aria-label="Salir de pantalla completa"
-          className="fixed top-2 right-2 z-[80] flex items-center justify-center rounded-lg text-blue-200"
-          style={{ width: 44, height: 44, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)' }}
-        >
-          <Minimize className="h-4 w-4" />
+        <button type="button" onClick={exitImmersive} aria-label="Salir de pantalla completa" className="knc-fsx">
+          <Minimize className="h-4 w-4" aria-hidden="true" />
         </button>
       )}
 
-      {/* ── QR Dialog ────────────────────────────────────────────────── */}
+      {/* ── QR ───────────────────────────────────────────────────────── */}
       {qrPreset && (() => {
         const base = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
         const learnUrl = `${base}/aprendizaje/hmi-knuro/${encodeURIComponent(qrPreset)}`
+        const partes = partirPreset(qrPreset)
         return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-            onClick={() => setQrPreset(null)}
-          >
-            <div
-              className="bg-card border border-border rounded-xl p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5">
-                  <QrCode className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold">Compartir preset</span>
-                </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setQrPreset(null)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+          <div className="knc-scrim" onClick={() => setQrPreset(null)}>
+            <div className="knc-dlg" role="dialog" aria-modal="true" aria-label="Compartir preset" onClick={e => e.stopPropagation()}>
+              <div className="knc-dlg-h">
+                <span>Compartir preset</span>
+                <button type="button" className="knc-ib sq bare" onClick={() => setQrPreset(null)} aria-label="Cerrar"><X aria-hidden="true" /></button>
               </div>
-              <p className="text-xs text-muted-foreground text-center">{qrPreset}</p>
-              <div className="bg-white p-3 rounded-lg">
+              <p>{partes ? frasePreset(partes) : qrPreset}</p>
+              <div className="knc-qr">
                 <QRCodeSVG value={learnUrl} size={180} level="M" includeMargin={false} />
               </div>
-              <div className="flex items-center gap-2 w-full">
-                <input
-                  readOnly
-                  value={learnUrl}
-                  className="flex-1 text-[10px] bg-muted border border-border rounded px-2 py-1.5 text-foreground outline-none min-w-0"
-                />
-                <Button
-                  size="sm"
-                  className="h-7 gap-1 text-xs flex-shrink-0"
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input readOnly value={learnUrl} className="knc-input knc-mono" style={{ fontSize: 11 }} aria-label="Enlace" />
+                <button
+                  type="button"
+                  className="knc-ib"
                   onClick={() => {
                     navigator.clipboard.writeText(learnUrl).then(() => {
                       setQrCopied(true)
@@ -602,13 +540,11 @@ export function HmiKnuroPage() {
                     })
                   }}
                 >
-                  {qrCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {qrCopied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                   {qrCopied ? 'Copiado' : 'Copiar'}
-                </Button>
+                </button>
               </div>
-              <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-                Este link abre el HMI en modo lectura.<br/>No requiere login.
-              </p>
+              <p>Abre el simulador en modo lectura. No requiere sesión.</p>
             </div>
           </div>
         )
@@ -617,39 +553,39 @@ export function HmiKnuroPage() {
       {/* ── Panel historial (drawer lateral) ────────────────────────── */}
       {historyOpen && (
         <div
-          className="absolute inset-y-0 right-0 flex flex-col bg-card border-l border-border shadow-2xl z-50"
+          className="knc-drawer absolute inset-y-0 right-0 flex flex-col z-50"
           style={{ width: 'min(320px, 90vw)' }}
         >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border flex-shrink-0">
+          <div className="flex items-center justify-between px-3 py-2 knc-drawer-h flex-shrink-0">
             <span className="text-sm font-semibold flex items-center gap-1.5">
-              <History className="h-4 w-4 text-primary" />
+              <History className="h-4 w-4" aria-hidden="true" />
               Historial de cambios
             </span>
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
+              <button
+                type="button"
+                className="knc-ib sq bare"
                 onClick={() => setHistoryExpanded(p => !p)}
-                title={historyExpanded ? 'Colapsar diffs' : 'Ver diffs'}
+                title={historyExpanded ? 'Ocultar cambios' : 'Ver cambios'}
+                aria-label={historyExpanded ? 'Ocultar cambios' : 'Ver cambios'}
               >
                 {historyExpanded
                   ? <ChevronDown className="h-3.5 w-3.5" />
                   : <ChevronUp className="h-3.5 w-3.5" />
                 }
-              </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setHistoryOpen(false)}>
+              </button>
+              <button type="button" className="knc-ib sq bare" onClick={() => setHistoryOpen(false)} aria-label="Cerrar historial">
                 <X className="h-3.5 w-3.5" />
-              </Button>
+              </button>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {loadingHistory && (
-              <div className="text-xs text-muted-foreground text-center py-8">Cargando historial…</div>
+              <div className="text-xs knc-ink2 text-center py-8">Cargando historial…</div>
             )}
             {!loadingHistory && history.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center py-8">Sin cambios registrados</div>
+              <div className="text-xs knc-ink2 text-center py-8">Sin cambios registrados</div>
             )}
             {history.map((entry, i) => {
               const diffs = entry.data && entry.previousData
@@ -658,28 +594,28 @@ export function HmiKnuroPage() {
               return (
                 <div
                   key={entry.id ?? i}
-                  className="text-xs rounded-lg border border-border p-2 space-y-0.5 hover:bg-muted/40 transition-colors"
+                  className="text-xs knc-drawer-i p-2 space-y-0.5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className={cn('font-semibold truncate', entry.action === 'delete' ? 'text-red-400' : 'text-emerald-400')}>
-                      {entry.action === 'save' ? '💾' : '🗑'} {entry.presetName}
+                    <span className={cn('font-semibold truncate', entry.action === 'delete' ? 'knc-bad' : 'knc-ok')}>
+                      {entry.action === 'save' ? 'Guardado' : 'Borrado'} · {entry.presetName}
                     </span>
-                    <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                    <span className="text-[11px] knc-ink2 flex-shrink-0">
                       {entry.timestamp.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
                     </span>
                   </div>
-                  <div className="text-muted-foreground truncate">{entry.userName}</div>
+                  <div className="knc-ink2 truncate">{entry.userName}</div>
                   {historyExpanded && diffs.length > 0 && (
-                    <div className="mt-1 pt-1 border-t border-border space-y-0.5">
+                    <div className="mt-1 pt-1 knc-drawer-sep space-y-0.5">
                       {diffs.slice(0, 5).map(([k, v]) => (
-                        <div key={k} className="flex gap-1 font-mono text-[10px]">
-                          <span className="text-muted-foreground truncate max-w-[80px]">{k}</span>
-                          <span className="text-red-400 line-through">{entry.previousData?.[k]}</span>
-                          <span className="text-emerald-400">{v}</span>
+                        <div key={k} className="flex gap-1 font-mono text-[11px]">
+                          <span className="knc-ink2 truncate max-w-[80px]">{k}</span>
+                          <span className="knc-bad line-through">{entry.previousData?.[k]}</span>
+                          <span className="knc-ok">{v}</span>
                         </div>
                       ))}
                       {diffs.length > 5 && (
-                        <div className="text-muted-foreground text-[10px]">+{diffs.length - 5} más…</div>
+                        <div className="knc-ink2 text-[11px]">+{diffs.length - 5} más…</div>
                       )}
                     </div>
                   )}
