@@ -54,26 +54,51 @@
     <!-- Script inline para aplicar tema antes de que React cargue (evita flash) -->
     <script>
       (function() {
-        const theme = localStorage.getItem('app-theme') || 'dark';
-        if (theme === 'dark') {
-          document.documentElement.classList.add('dark');
-        }
         // PIEL APPLE PREDETERMINADA desde 2026-09-16 (DESIGN.md, vara iOS 27).
         // `?skin=default` (queda recordado en localStorage `app-skin`) vuelve a la
         // piel anterior para comparar; `?skin=apple` la restablece.
-        var qs = new URLSearchParams(location.search).get('skin');
-        if (qs) localStorage.setItem('app-skin', qs);
-        var skin = localStorage.getItem('app-skin') || 'apple';
+        // `?skin=pizarra` = piel Apple + paleta Pizarra (`data-paleta="pizarra"`),
+        // detrás de interruptor: sin ese valor guardado, nada de esto corre.
+        // Misma regla en src/lib/intensidad.ts (el test ejecuta este script).
+        // Cada acceso a localStorage va protegido por separado (modo privado,
+        // cuota llena): el tema inicial se aplica SIEMPRE y las escrituras van al final.
+        var get = function(k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+        var qs = null;
+        try { qs = new URLSearchParams(location.search).get('skin'); } catch (e) {}
+        var skin = qs || get('app-skin') || 'apple';
+        var theme = get('app-theme') || 'dark';
+        var pizarra = skin === 'pizarra';
+        if (pizarra) {
+          // Intensidad: app-intensidad > app-theme guardado > dispositivo
+          // (celular: día · PC: automático = prefers-color-scheme).
+          var mq = function(q) { return typeof window.matchMedia === 'function' && window.matchMedia(q).matches; };
+          var guardada = get('app-intensidad');
+          var tema = get('app-theme');
+          var inten = (guardada === 'dia' || guardada === 'penumbra' || guardada === 'auto') ? guardada
+            : tema === 'dark' ? 'penumbra'
+            : tema === 'light' ? 'dia'
+            : (mq('(max-width: 767px)') || mq('(pointer: coarse)')) ? 'dia' : 'auto';
+          var oscuro = inten === 'penumbra' || (inten === 'auto' && mq('(prefers-color-scheme: dark)'));
+          theme = oscuro ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-paleta', 'pizarra');
+        }
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
         if (skin !== 'default') {
-          document.documentElement.setAttribute('data-skin', skin);
+          document.documentElement.setAttribute('data-skin', pizarra ? 'apple' : skin);
         }
         // theme-color del chrome móvil acorde al tema, antes de que cargue React
         var tc = document.querySelector('meta[name="theme-color"]');
         if (tc) {
-          tc.setAttribute('content', skin === 'apple'
+          tc.setAttribute('content', pizarra
+            ? (theme === 'dark' ? '#171614' : '#F2F1EC')
+            : skin === 'apple'
             ? (theme === 'dark' ? '#1c1c1e' : '#f2f2f7')
             : (theme === 'dark' ? '#0d1722' : '#d7e5f2'));
         }
+        // Recordar la piel elegida por ?skin= (recién ahora: si falla, ya se pintó bien)
+        if (qs) { try { localStorage.setItem('app-skin', qs); } catch (e) {} }
       })();
     </script>
   </head>
