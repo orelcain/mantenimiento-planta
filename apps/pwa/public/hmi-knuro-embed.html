@@ -3472,6 +3472,8 @@ function _khNum(s){
   const t=String(s==null?'':s).trim().split(/\s+/)[0].replace(',','.');
   return /^[-−]?\d+(\.\d+)?$/.test(t)?parseFloat(t.replace('−','-')):null;
 }
+/* Solo para mostrar: coma decimal como el panel («0.50» → «0,50»). No toca lo guardado. */
+function _khFmt(s){return String(s==null?'':s).trim().replace(/^([-−]?\d+)\.(\d+)(?=\s|$)/,'$1,$2');}
 function _khDec(s){const m=String(s||'').trim().split(/\s+/)[0].match(/[.,](\d+)$/);return m?m[1].length:0;}
 function _khValues(info){
   const act=String(info.inp.value||'').trim();
@@ -3493,7 +3495,7 @@ function _khValues(info){
 
 function _khOriginChip(p){
   if(p.origin==='manual') return '<span class="kh-origin o-manual">'+KH_I.book+(p.page?'Manual · pág. '+_escHTML(p.page):'Manual')+'</span>';
-  if(p.origin==='deducido') return '<span class="kh-origin o-deducido">'+KH_I.warn+'Deducido</span>';
+  if(p.origin==='deducido') return '<span class="kh-origin o-deducido">'+KH_I.warn+(p.page?'Deducido · pág. '+_escHTML(p.page):'Deducido')+'</span>';
   if(p.origin==='sindato') return '<span class="kh-origin o-sindato">'+KH_I.dash+'Sin dato</span>';
   return '<span class="kh-origin o-sindato">'+KH_I.dash+'Sin ayuda</span>';
 }
@@ -3512,12 +3514,16 @@ function _khContent(id,sheet){
     '<div class="kh-title" id="kh-title-'+(sheet?'s':'p')+'">'+_escHTML(title)+'</div></div>'+
     '<button type="button" class="kh-x" aria-label="Cerrar ayuda">'+KH_I.x+'</button></div>';
   let b=_khOriginChip(p);
-  if(p.origin==='deducido') b+='<div class="kh-warnbox">No está en el manual. Confírmalo en terreno antes de cambiar el valor.</div>';
+  // Lo deducido casi siempre sale de una página del manual: lo interpretado es su aplicación a
+  // esta fila/columna o el «muy bajo / muy alto». Sin página no hay respaldo directo.
+  if(p.origin==='deducido') b+='<div class="kh-warnbox">'+(p.page
+    ?'Interpretado del manual, no dicho textual. Confírmalo en terreno antes de cambiar el valor.'
+    :'Sin respaldo directo en el manual. Confírmalo en terreno antes de cambiar el valor.')+'</div>';
   if(info){
     const v=_khValues(info);
     b+='<div class="kh-cmp'+(v.state==='diff'?' diff':'')+'">';
-    if(v.def) b+='<div class="kh-cv"><span class="k">Predeterminado</span><span class="v dim">'+_escHTML(v.def)+'</span></div><span class="kh-arrow" aria-hidden="true">→</span>';
-    b+='<div class="kh-cv"><span class="k">Actual</span><span class="v act">'+(_escHTML(v.act)||'—')+'</span></div>';
+    if(v.def) b+='<div class="kh-cv"><span class="k">Predeterminado</span><span class="v dim">'+_escHTML(_khFmt(v.def))+'</span></div><span class="kh-arrow" aria-hidden="true">→</span>';
+    b+='<div class="kh-cv"><span class="k">Actual</span><span class="v act">'+(_escHTML(_khFmt(v.act))||'—')+'</span></div>';
     b+=v.state==='diff'?'<span class="kh-delta diff">'+(v.delta?_escHTML(v.delta):'Distinto')+'</span>'
       :v.state==='same'?'<span class="kh-delta same">Igual al predeterminado</span>'
       :'<span class="kh-delta same">Sin predeterminado cargado</span>';
@@ -3706,11 +3712,11 @@ function renderHelpList(){
     const p=parseTip(_khText(inp.id));
     const v=_khValues(info);
     const s=p.origin==='manual'?'<span class="s o-manual">'+KH_I.book+(p.page?'Manual · pág. '+_escHTML(p.page):'Manual')+'</span>'
-      :p.origin==='deducido'?'<span class="s o-deducido">'+KH_I.warn+'Deducido</span>'
+      :p.origin==='deducido'?'<span class="s o-deducido">'+KH_I.warn+(p.page?'Deducido · pág. '+_escHTML(p.page):'Deducido')+'</span>'
       :p.origin==='sindato'?'<span class="s">'+KH_I.dash+'Sin dato</span>'
       :'<span class="s">'+KH_I.dash+'Sin ayuda</span>';
-    const cur='<span class="cur'+(v.state==='diff'?' diff':'')+'">'+(v.state==='diff'&&v.delta?'<span class="kh-delta diff">'+_escHTML(v.delta)+'</span>':'')+(_escHTML(v.act)||'—')+'</span>';
-    const def=v.def?'<span class="def">Pred. '+_escHTML(v.def)+'</span>':'';
+    const cur='<span class="cur'+(v.state==='diff'?' diff':'')+'">'+(v.state==='diff'&&v.delta?'<span class="kh-delta diff">'+_escHTML(v.delta)+'</span>':'')+(_escHTML(_khFmt(v.act))||'—')+'</span>';
+    const def=v.def?'<span class="def">Pred. '+_escHTML(_khFmt(v.def))+'</span>':'';
     return '<button type="button" class="kn-row'+(inp.id===sel?' sel':'')+'" data-pid="'+_escHTML(inp.id)+'">'+
       '<span class="l">'+_escHTML(info.name)+'</span>'+s+'<span class="val">'+cur+def+'</span>'+KH_I.chev+'</button>';
   });
