@@ -287,16 +287,6 @@ export function HmiKnuroPublicPage() {
         />
       </div>
 
-      {/* Footer branding */}
-      {!immersive && (
-        <div
-          className="flex-shrink-0 text-center"
-          style={{ padding: '3px 0', background: '#0d1f3c', borderTop: '1px solid #12243a' }}
-        >
-          <p className="text-[9px] text-[#2a4a6a] uppercase tracking-wider">Mantenimiento Industrial — Solo lectura</p>
-        </div>
-      )}
-
       {/* Salir de pantalla completa fuera del modo horizontal (en horizontal se sale desde el riel del HMI) */}
       {(isFullscreen || visualFs) && !compact && (
         <button
