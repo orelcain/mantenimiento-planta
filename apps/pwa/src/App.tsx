@@ -139,6 +139,7 @@ const Perilla5Page = lazyWithReload(() => import('@/pages/Perilla5Page').then((m
 const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
 const Baader200TerrenoPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader200TerrenoPage').then((mod) => ({ default: mod.Baader200TerrenoPage })))
 const Baader142A3cPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader142A3cPage').then((mod) => ({ default: mod.Baader142A3cPage })))
+const Baader142A3cPorConfirmarPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader142A3cPorConfirmarPage').then((mod) => ({ default: mod.Baader142A3cPorConfirmarPage })))
 const LearningAdminPage = lazyWithReload(() => import('@/pages/LearningAdminPage').then((mod) => ({ default: mod.LearningAdminPage })))
 const LearningAdminMachinePage = lazyWithReload(() => import('@/pages/LearningAdminMachinePage').then((mod) => ({ default: mod.LearningAdminMachinePage })))
 
@@ -641,6 +642,15 @@ export function App() {
               element={
                 <Suspense fallback={<LoadingScreen />}>
                   <Baader142A3cPage />
+                </Suspense>
+              }
+            />
+            {/* Por confirmar en terreno: elementos del plano 888 por prioridad de fallas. */}
+            <Route
+              path="/aprendizaje/baader-142/tarjeta-a3c/por-confirmar"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader142A3cPorConfirmarPage />
                 </Suspense>
               }
             />

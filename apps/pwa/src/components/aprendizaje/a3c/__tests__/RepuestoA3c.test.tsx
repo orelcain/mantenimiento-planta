@@ -228,15 +228,18 @@ describe('RepuestoA3c', () => {
 describe('IndicadorRepuestosA3c', () => {
   it('muestra N/M y confirmados, sin contar pseudo-elementos', () => {
     mocks.vinculos = new Map<string, Partial<VinculoTerreno>>([['B1', { estado: 'confirmado' }]])
-    render(<IndicadorRepuestosA3c codigos={['A3C.P1', 'X5', 'B1', 'B10', 'Y3']} />)
+    render(<MemoryRouter><IndicadorRepuestosA3c codigos={['A3C.P1', 'X5', 'B1', 'B10', 'Y3']} /></MemoryRouter>)
     const t = screen.getByTestId('indicador-repuestos').textContent ?? ''
     expect(t).toContain('2/3')
     expect(t).toContain('1 confirmado en terreno')
+    const enlace = screen.getByTestId('indicador-repuestos')
+    expect(enlace.tagName).toBe('A')
+    expect(enlace.getAttribute('href')).toBe('/aprendizaje/baader-142/tarjeta-a3c/por-confirmar')
   })
 
   it('sin sesión no afirma confirmaciones', () => {
     useAuthStore.setState({ isAuthenticated: false })
-    render(<IndicadorRepuestosA3c codigos={['B1', 'B10']} />)
+    render(<MemoryRouter><IndicadorRepuestosA3c codigos={['B1', 'B10']} /></MemoryRouter>)
     const t = screen.getByTestId('indicador-repuestos').textContent ?? ''
     expect(t).toContain('2/2')
     expect(t).toContain('inicia sesión')
@@ -244,7 +247,7 @@ describe('IndicadorRepuestosA3c', () => {
 
   it('no se muestra mientras el plano no cargó', () => {
     mocks.partes = null
-    render(<IndicadorRepuestosA3c codigos={['B1']} />)
+    render(<MemoryRouter><IndicadorRepuestosA3c codigos={['B1']} /></MemoryRouter>)
     expect(screen.queryByTestId('indicador-repuestos')).toBeNull()
   })
 })
