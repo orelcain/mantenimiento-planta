@@ -2050,9 +2050,14 @@ service cloud.firestore {
     }
 
     match /baader200-config/{configId} {
-      // Lectura pública para section-order (Modo Aprendizaje)
-      allow read: if true;
-      allow write: if isSupervisor();
+      // Solo 'section-order' es público: lo lee Baader200LearningPublicPage
+      // (Modo Aprendizaje vía QR, sin login). Cualquier otro doc pide login no
+      // anónimo. 'edit-pwd' guardaba una clave en claro con lectura pública;
+      // ya nada la usa (editar = rol supervisor/admin, igual que
+      // baader200-sections): queda cerrado para todos, también para escribir.
+      allow read: if configId == 'section-order'
+        || (configId != 'edit-pwd' && isNotAnonymous());
+      allow write: if configId != 'edit-pwd' && isSupervisor();
     }
 
     // ============================================

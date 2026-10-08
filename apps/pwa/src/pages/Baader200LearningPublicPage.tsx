@@ -101,7 +101,7 @@ export function Baader200LearningPublicPage() {
       currentId: selId,
       order: sectionOrder,
       readonly: true,
-    }, '*')
+    }, window.location.origin)
   }, [sections, sectionOrder])
 
   useEffect(() => {
@@ -123,7 +123,7 @@ export function Baader200LearningPublicPage() {
     const basePath = window.location.pathname.includes('/aprendizaje/') ? '/aprendizaje/baader-200' : '/baader-200/learn'
     navigate(`${basePath}/${encodeURIComponent(id)}`, { replace: true })
     if (iframeReadyRef.current) {
-      iframeRef.current?.contentWindow?.postMessage({ type: 'b200:select-section', id }, '*')
+      iframeRef.current?.contentWindow?.postMessage({ type: 'b200:select-section', id }, window.location.origin)
     }
   }
 
