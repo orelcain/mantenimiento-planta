@@ -35,7 +35,7 @@ function buildItems(currentSlug?: string): StripItem[] {
   const specialItems: StripItem[] = [
     {
       key: 'hmi-knuro',
-      label: 'HMI Knuro B2',
+      label: 'HMI Knuro',
       href: '/aprendizaje/hmi-knuro',
       icon: Cpu,
       color: '#44ddaa',

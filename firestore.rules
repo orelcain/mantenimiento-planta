@@ -2057,18 +2057,21 @@ service cloud.firestore {
     }
 
     // ============================================
-    // HMI KNURO B2 — Presets, historial y config
+    // HMI KNURO — Presets, historial y config
     // ============================================
+    // Escritura SOLO admin: el editor (/hmi-knuro) es AdminRoute y es lo único que
+    // escribe aquí. Todos los demás usan el simulador de solo lectura
+    // (/aprendizaje/hmi-knuro), que lee presets, tooltips y preset-order sin login.
     match /hmi-knuro-presets/{presetId} {
       // Lectura pública (Modo Aprendizaje vía QR, sin login)
       allow read: if true;
-      allow create, update: if isSupervisor() && isValidDocSize();
-      allow delete: if isSupervisor();
+      allow create, update: if isAdmin() && isValidDocSize();
+      allow delete: if isAdmin();
     }
 
     match /hmi-knuro-history/{entryId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidDocSize();
+      allow create: if isAdmin() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
@@ -2080,13 +2083,13 @@ service cloud.firestore {
       // queda cerrado para todos, también para escribir.
       allow read: if configId == 'preset-order'
         || (configId != 'tooltip-pwd' && isNotAnonymous());
-      allow write: if configId != 'tooltip-pwd' && isSupervisor();
+      allow write: if configId != 'tooltip-pwd' && isAdmin();
     }
 
-    // Tooltips de parámetros — lectura pública, escritura solo supervisor
+    // Tooltips de parámetros — lectura pública, escritura solo admin
     match /hmi-knuro-tooltips/{docId} {
       allow read: if true;
-      allow write: if isSupervisor() && isValidDocSize();
+      allow write: if isAdmin() && isValidDocSize();
     }
 
     // ============================================

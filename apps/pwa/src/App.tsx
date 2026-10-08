@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams, useParams } from 'react-router-dom'
 import { onAuthChange, getUserByIdConTokenFresco, signOut as signOutService } from '@/services/auth'
 import { paseDeSesion, usuarioDePase } from '@/services/bitacora/paseBitacora'
 import { PaseBitacoraLayout } from '@/components/layout/PaseBitacoraLayout'
@@ -167,6 +167,12 @@ function PublicOrPrivateLayout() {
   if (isLoading) return <LoadingScreen />
   if (isAuthenticated) return <MainLayout />
   return <Outlet />
+}
+
+/** /hmi/learn/:presetId → /aprendizaje/hmi-knuro/:presetId (QR impresos antes de unificar la entrada). */
+function RedirigirHmiLearn() {
+  const { presetId } = useParams<{ presetId: string }>()
+  return <Navigate to={`/aprendizaje/hmi-knuro/${encodeURIComponent(presetId ?? '')}`} replace />
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -513,23 +519,10 @@ export function App() {
             }
           />
 
-          {/* Public HMI learning mode (no auth required) */}
-          <Route
-            path="/hmi/learn/:presetId"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <HmiKnuroPublicPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/hmi/learn"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <HmiKnuroPublicPage />
-              </Suspense>
-            }
-          />
+          {/* Rutas antiguas del Modo Aprendizaje HMI Knuro: los QR ya impresos apuntan aquí.
+              Se redirigen a la única puerta, /aprendizaje/hmi-knuro[/:presetId]. */}
+          <Route path="/hmi/learn/:presetId" element={<RedirigirHmiLearn />} />
+          <Route path="/hmi/learn" element={<Navigate to="/aprendizaje/hmi-knuro" replace />} />
 
           {/* Learning Hub — Centro de Aprendizaje (publico, con sidebar si el usuario esta autenticado) */}
           <Route element={<PublicOrPrivateLayout />}>

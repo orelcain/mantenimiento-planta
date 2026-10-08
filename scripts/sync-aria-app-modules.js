@@ -35,7 +35,7 @@ const DESCRIPCIONES = {
   '/analisis-grader': 'Análisis de Turno del Grader: piezas, compuertas, P0, microdetenciones y Lente de Mantención',
   '/clima-puerto': 'Estado del puerto/bahía con pronóstico y alertas automáticas',
   '/planos-aguas': 'Planos de aguas de la planta',
-  '/hmi-knuro': 'HMI del sistema Knuro con presets e histórico',
+  '/aprendizaje/hmi-knuro': 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR)',
   '/baader-200': 'Guía técnica interactiva de la Baader 200 por secciones',
   '/aprendizaje': 'Centro de Aprendizaje: cursos de electricidad (NFPA 70E, Rescate/SVB, NFPA 70B) con lecciones y exámenes',
   '/centro-tecnico-documental': 'Portada del Centro Técnico Documental: KPIs documentales de equipos y export a Excel',

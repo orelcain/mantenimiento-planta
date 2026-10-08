@@ -188,7 +188,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       label: 'Herramientas',
       tiles: [
         { id: 'visor3d',    label: 'Visor 3D',    sublabel: 'Modelos 3D',  icon: Box,     href: '/visor-3d',              color: 'slate' },
-        { id: 'hmi',        label: 'HMI Knuro',   sublabel: 'Simulador',   icon: Cpu,     href: '/hmi-knuro',             color: 'slate' },
+        { id: 'hmi',        label: 'HMI Knuro',   sublabel: 'Simulador',   icon: Cpu,     href: '/aprendizaje/hmi-knuro', color: 'slate' },
         { id: 'hmi-grader', label: 'HMI Grader',  sublabel: 'Simulador',   icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
         // Baader 200 NO aparece aquí — ya está en Formación via MACHINE_TILES
       ],

@@ -111,7 +111,9 @@ const navGroups: NavGroup[] = [
       { name: 'Análisis de turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
       { name: 'Clima del puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
       { name: 'Planos de aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
-      { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
+      // Una sola puerta para todos: el simulador en el Centro de Aprendizaje. El editor
+      // (/hmi-knuro, solo admin) se abre desde ahí con «Editar presets y ayudas».
+      { name: 'HMI Knuro', href: '/aprendizaje/hmi-knuro', icon: Cpu },
       { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
     ],
   },
@@ -208,7 +210,9 @@ export function MainLayout() {
   const { setZones, setEquipment, setIncidents } = useAppStore()
   const isGanttRoute = location.pathname.startsWith('/gantt')
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
-  const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro')
+  // Editor (/hmi-knuro) y simulador público con sesión (/aprendizaje/hmi-knuro): ambos son
+  // un iframe a pantalla útil, sin el pb-24 de Aprendizaje que dejaba un segundo scroll.
+  const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro') || location.pathname.startsWith('/aprendizaje/hmi-knuro')
   const isBaader200Route = location.pathname.startsWith('/baader-200')
   const isPlanosAguasRoute = location.pathname.startsWith('/planos-aguas')
   const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')

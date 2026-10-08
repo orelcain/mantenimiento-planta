@@ -49,7 +49,8 @@ export const APP_MODULES: readonly AppModule[] = [
   { ruta: '/analisis-grader', nombre: 'Análisis de turno', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Análisis de turno del Grader: piezas, compuertas, P0, microdetenciones y Lente de Mantención', puedesPreguntar: 'producción del turno/día, piezas por Baader, P0%, MTTR/MTBF, disponibilidad, por qué está detenida, causas de paro, en vivo' },
   { ruta: '/clima-puerto', nombre: 'Clima del puerto', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Estado del puerto/bahía con pronóstico y alertas automáticas', puedesPreguntar: 'estado del puerto, pronóstico, alertas de bahía' },
   { ruta: '/planos-aguas', nombre: 'Planos de aguas', grupo: 'Herramientas', estado: 'desarrollo', descripcion: 'Planos de aguas de la planta' },
-  { ruta: '/hmi-knuro', nombre: 'HMI Knuro', grupo: 'Herramientas', estado: 'produccion', descripcion: 'HMI del sistema Knuro con presets e histórico' },
+  { ruta: '/aprendizaje/hmi-knuro', nombre: 'HMI Knuro', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR)' },
+  { ruta: '/hmi-knuro', nombre: 'Editor HMI Knuro', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Editor de presets, ayudas e histórico del HMI Knuro (se abre desde el simulador con «Editar presets y ayudas»)', adminOnly: true },
   { ruta: '/baader-200', nombre: 'Baader 200', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Guía técnica interactiva de la Baader 200 por secciones' },
   // ── Aprendizaje ──
   { ruta: '/aprendizaje', nombre: 'Centro de aprendizaje', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Centro de aprendizaje: cursos de electricidad (NFPA 70E, Rescate/SVB, NFPA 70B) con lecciones y exámenes' },
