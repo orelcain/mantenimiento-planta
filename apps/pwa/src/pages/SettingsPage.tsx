@@ -17,8 +17,6 @@ import {
   Wrench,
   Moon,
   Sun,
-  Eye,
-  EyeOff,
 } from 'lucide-react'
 import {
   Card,
@@ -66,7 +64,6 @@ import { leerAjustesGenerales, AJUSTES_GENERALES_POR_DEFECTO, type AjustesGenera
 import type { User, InviteCode, UserRole } from '@/types'
 import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
-import { getHmiTooltipPwd, saveHmiTooltipPwd } from '@/services/hmiKnuro'
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
 import { ProcessNotificationsPanel } from '@/components/settings/ProcessNotificationsPanel'
 import { PermissionsPage } from '@/pages/admin/PermissionsPage'
@@ -960,118 +957,7 @@ function SystemSettings() {
           <FixPCBOButton />
         </CardContent>
       </Card>
-
-      {/* Card clave edición tooltips HMI Knuro */}
-      <HmiTooltipPwdCard />
     </div>
-  )
-}
-
-// Componente para clave de edición de tooltips HMI Knuro
-function HmiTooltipPwdCard() {
-  const [currentPwd, setCurrentPwd] = useState('')
-  const [showCurrentPwd, setShowCurrentPwd] = useState(false)
-  const [newPwd, setNewPwd] = useState('')
-  const [confirmPwd, setConfirmPwd] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    getHmiTooltipPwd().then(pwd => {
-      setCurrentPwd(pwd)
-      setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [])
-
-  const handleSave = async () => {
-    if (!newPwd.trim()) { setError('La clave no puede estar vacía'); return }
-    if (newPwd !== confirmPwd) { setError('Las claves no coinciden'); return }
-    setSaving(true)
-    setError(null)
-    try {
-      await saveHmiTooltipPwd(newPwd.trim())
-      setCurrentPwd(newPwd.trim())
-      setNewPwd('')
-      setConfirmPwd('')
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al guardar')
-    }
-    setSaving(false)
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Key className="h-5 w-5" />
-          Clave de edición
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Clave de edición para acciones sensibles (eliminar equipos, editar tooltips HMI, etc.). Se guarda en Firestore y aplica en todos los dispositivos.
-        </p>
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner size="sm" /> Cargando...
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between p-3 rounded-card bg-muted/50 text-sm">
-              <span>Clave actual: <span className="font-mono font-semibold">{showCurrentPwd ? currentPwd : '•'.repeat(Math.max(currentPwd.length, 6))}</span></span>
-              <button
-                onClick={() => setShowCurrentPwd(v => !v)}
-                className="ml-2 text-muted-foreground hover:text-foreground"
-                title={showCurrentPwd ? 'Ocultar clave' : 'Mostrar clave'}
-                type="button"
-              >
-                {showCurrentPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="hmi-new-pwd">Nueva clave</Label>
-                <Input
-                  id="hmi-new-pwd"
-                  type="password"
-                  value={newPwd}
-                  onChange={e => setNewPwd(e.target.value)}
-                  placeholder="Nueva clave"
-                  autoComplete="new-password"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="hmi-confirm-pwd">Confirmar clave</Label>
-                <Input
-                  id="hmi-confirm-pwd"
-                  type="password"
-                  value={confirmPwd}
-                  onChange={e => setConfirmPwd(e.target.value)}
-                  placeholder="Repetir clave"
-                  autoComplete="new-password"
-                />
-              </div>
-              {error && (
-                <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">{error}</div>
-              )}
-              {success && (
-                <div className="p-3 rounded-card bg-green-500/[0.15] text-ink-ok flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4" /> Clave guardada en Firestore
-                </div>
-              )}
-              <Button onClick={handleSave} disabled={saving} className="gap-2">
-                {saving ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
-                {saving ? 'Guardando...' : 'Guardar clave'}
-              </Button>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
   )
 }
 

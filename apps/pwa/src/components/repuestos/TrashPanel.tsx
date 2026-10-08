@@ -2,7 +2,11 @@
  * TrashPanel — Papelera restaurable
  *
  * Modal Dialog que muestra los items eliminados en los últimos 30 días.
- * Permite restaurar (con clave de edición) o eliminar permanentemente.
+ * Permite restaurar o eliminar permanentemente. Ambas acciones son solo de
+ * administrador: lo exige firestore.rules (`trash`: update/delete → isAdmin) y
+ * la UI lo refleja con el rol del usuario. Antes pedía una «clave de edición»
+ * que se leía en claro desde Firestore (hmi-knuro-config/tooltip-pwd, lectura
+ * pública); se quitó.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,11 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button, Input } from '@/components/ui'
+import { Button } from '@/components/ui'
 import { getTrashItems, restoreFromTrash, permanentDeleteFromTrash } from '@/services/auditLog'
-import { getHmiTooltipPwd } from '@/services/hmiKnuro'
 import { useToast } from '@/hooks/useToast'
-import { useAuthStore } from '@/store/authStore'
+import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import type { TrashItem } from '@/types/audit'
 
 interface Props {
@@ -63,12 +66,11 @@ function collectionLabel(col: string): string {
 export function TrashPanel({ open, onOpenChange }: Props) {
   const { toast } = useToast()
   const user = useAuthStore(s => s.user)
+  const isAdmin = useIsAdmin()
   const [items, setItems] = useState<TrashItem[]>([])
   const [loading, setLoading] = useState(false)
   const [restoreTarget, setRestoreTarget] = useState<TrashItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<TrashItem | null>(null)
-  const [clave, setClave] = useState('')
-  const [claveError, setClaveError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const loadItems = useCallback(async () => {
@@ -84,17 +86,9 @@ export function TrashPanel({ open, onOpenChange }: Props) {
 
   // ── Restaurar ──
   const handleRestore = useCallback(async () => {
-    if (!restoreTarget || !clave.trim()) return
+    if (!restoreTarget || !isAdmin) return
     setBusy(true)
-    setClaveError('')
     try {
-      const correctPwd = await getHmiTooltipPwd()
-      if (clave.trim() !== correctPwd) {
-        setClaveError('Clave incorrecta')
-        setBusy(false)
-        return
-      }
-
       const result = await restoreFromTrash(
         restoreTarget.id,
         user?.id || '',
@@ -112,22 +106,13 @@ export function TrashPanel({ open, onOpenChange }: Props) {
     }
     setBusy(false)
     setRestoreTarget(null)
-    setClave('')
-  }, [restoreTarget, clave, user, toast])
+  }, [restoreTarget, isAdmin, user, toast])
 
   // ── Eliminar permanente ──
   const handlePermanentDelete = useCallback(async () => {
-    if (!deleteTarget || !clave.trim()) return
+    if (!deleteTarget || !isAdmin) return
     setBusy(true)
-    setClaveError('')
     try {
-      const correctPwd = await getHmiTooltipPwd()
-      if (clave.trim() !== correctPwd) {
-        setClaveError('Clave incorrecta')
-        setBusy(false)
-        return
-      }
-
       const ok = await permanentDeleteFromTrash(deleteTarget.id)
       if (ok) {
         toast({ title: 'Eliminado', description: 'Se eliminó permanentemente.', variant: 'success' })
@@ -140,8 +125,7 @@ export function TrashPanel({ open, onOpenChange }: Props) {
     }
     setBusy(false)
     setDeleteTarget(null)
-    setClave('')
-  }, [deleteTarget, clave, toast])
+  }, [deleteTarget, isAdmin, toast])
 
   const activeAction = restoreTarget || deleteTarget
 
@@ -200,14 +184,14 @@ export function TrashPanel({ open, onOpenChange }: Props) {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
-                      onClick={() => { setRestoreTarget(item); setDeleteTarget(null); setClave(''); setClaveError('') }}
+                      onClick={() => { setRestoreTarget(item); setDeleteTarget(null) }}
                       className="p-1.5 rounded-ctl hover:bg-primary/10 text-brand-ink transition-colors"
                       title="Restaurar"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => { setDeleteTarget(item); setRestoreTarget(null); setClave(''); setClaveError('') }}
+                      onClick={() => { setDeleteTarget(item); setRestoreTarget(null) }}
                       className="p-1.5 rounded-ctl hover:bg-destructive/10 text-destructive transition-colors"
                       title="Eliminar permanente"
                     >
@@ -220,7 +204,7 @@ export function TrashPanel({ open, onOpenChange }: Props) {
           )}
         </div>
 
-        {/* ── Confirmación con clave ── */}
+        {/* ── Confirmación (solo administrador) ── */}
         {activeAction && (
           <div className="border-t border-border pt-3 space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -236,24 +220,11 @@ export function TrashPanel({ open, onOpenChange }: Props) {
                 </>
               )}
             </div>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                placeholder="Clave de edición"
-                value={clave}
-                onChange={e => { setClave(e.target.value); setClaveError('') }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    if (restoreTarget) handleRestore()
-                    else handlePermanentDelete()
-                  }
-                }}
-                className="flex-1 h-8 text-xs"
-              />
+            <div className="flex justify-end gap-2">
               <Button
                 size="sm"
                 variant={restoreTarget ? 'default' : 'destructive'}
-                disabled={busy || !clave.trim()}
+                disabled={busy || !isAdmin}
                 onClick={restoreTarget ? handleRestore : handlePermanentDelete}
                 className="h-8 text-xs"
               >
@@ -262,13 +233,13 @@ export function TrashPanel({ open, onOpenChange }: Props) {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => { setRestoreTarget(null); setDeleteTarget(null); setClave(''); setClaveError('') }}
+                onClick={() => { setRestoreTarget(null); setDeleteTarget(null) }}
                 className="h-8 text-xs"
               >
                 Cancelar
               </Button>
             </div>
-            {claveError && <p className="text-xs text-destructive">{claveError}</p>}
+            {!isAdmin && <p className="text-xs text-destructive">Solo un administrador puede restaurar o eliminar desde la papelera.</p>}
           </div>
         )}
       </DialogContent>
