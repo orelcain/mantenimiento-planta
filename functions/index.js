@@ -8798,6 +8798,240 @@ exports.animeAuth = onRequest(
   }
 );
 
+// ── mediaApi — películas y series para AnimeTracker (TMDB) ─────────────────────
+// Proxy de solo lectura hacia TMDB con el secreto TMDB_READ_TOKEN (nunca va al
+// cliente). Solo responde a la sesión de AnimeTracker (claim anime_tg de un ID
+// permitido). Caché en memoria por instancia para no repetir consultas.
+// Datos de "dónde ver" = JustWatch vía TMDB (hay que mostrar el crédito).
+const TMDB_BASE = 'https://api.themoviedb.org/3';
+const MEDIA_LANG = 'es-MX';
+const _mediaCache = new Map();
+const MEDIA_CACHE_MAX = 400;
+const MEDIA_H = 3600 * 1000;
+
+function _mediaCacheGet(key) {
+  const hit = _mediaCache.get(key);
+  if (!hit) return null;
+  if (hit.exp < Date.now()) { _mediaCache.delete(key); return null; }
+  return hit.val;
+}
+function _mediaCacheSet(key, val, ttlMs) {
+  if (_mediaCache.size >= MEDIA_CACHE_MAX) _mediaCache.delete(_mediaCache.keys().next().value);
+  _mediaCache.set(key, { val, exp: Date.now() + ttlMs });
+}
+
+async function _tmdb(path, params, ttlMs) {
+  const qs = new URLSearchParams({ language: MEDIA_LANG, ...params }).toString();
+  const key = `${path}?${qs}`;
+  const cached = _mediaCacheGet(key);
+  if (cached) return cached;
+  const r = await fetch(`${TMDB_BASE}${path}?${qs}`, {
+    headers: { Authorization: `Bearer ${process.env.TMDB_READ_TOKEN}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!r.ok) {
+    logger.warn('[mediaApi] TMDB', { path, status: r.status });
+    const err = new Error(`TMDB ${r.status}`);
+    err.status = r.status === 404 ? 404 : 502;
+    throw err;
+  }
+  const data = await r.json();
+  _mediaCacheSet(key, data, ttlMs);
+  return data;
+}
+
+function _mediaInt(v, def, min, max) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+}
+function _mediaIds(v) {
+  return String(v || '').split(/[|,]/).map((s) => s.trim()).filter((s) => /^\d{1,7}$/.test(s)).slice(0, 30);
+}
+function _mediaTipo(v) { return v === 'tv' ? 'tv' : 'movie'; }
+function _mediaRegion(v) { return /^[A-Z]{2}$/.test(v || '') ? v : 'CL'; }
+
+// Resumen liviano de un título para las tarjetas.
+function _mediaItem(x, tipoForzado) {
+  const tipo = tipoForzado || x.media_type;
+  if (tipo !== 'movie' && tipo !== 'tv') return null;
+  return {
+    id: x.id,
+    tipo,
+    titulo: x.title || x.name || '',
+    original: x.original_title || x.original_name || '',
+    fecha: x.release_date || x.first_air_date || '',
+    poster: x.poster_path || null,
+    fondo: x.backdrop_path || null,
+    nota: typeof x.vote_average === 'number' ? Math.round(x.vote_average * 10) / 10 : null,
+    votos: x.vote_count || 0,
+    idioma: x.original_language || '',
+    generos: x.genre_ids || [],
+  };
+}
+function _mediaLista(data, tipo) {
+  return {
+    pagina: data.page || 1,
+    paginas: Math.min(data.total_pages || 1, 50),
+    items: (data.results || []).map((x) => _mediaItem(x, tipo)).filter(Boolean),
+  };
+}
+function _mediaProveedores(bloque) {
+  if (!bloque) return null;
+  const map = (arr) => (arr || []).map((p) => ({ id: p.provider_id, nombre: p.provider_name, logo: p.logo_path }));
+  return {
+    link: bloque.link || null,
+    suscripcion: map(bloque.flatrate),
+    gratis: map([...(bloque.free || []), ...(bloque.ads || [])]),
+    arriendo: map(bloque.rent),
+    compra: map(bloque.buy),
+  };
+}
+
+const _mediaOps = {
+  // Plataformas disponibles en un país (películas + series, sin duplicar).
+  async plataformas(q) {
+    const region = _mediaRegion(q.region);
+    const [m, t] = await Promise.all([
+      _tmdb('/watch/providers/movie', { watch_region: region }, 24 * MEDIA_H),
+      _tmdb('/watch/providers/tv', { watch_region: region }, 24 * MEDIA_H),
+    ]);
+    const vistos = new Map();
+    for (const p of [...(m.results || []), ...(t.results || [])]) {
+      if (vistos.has(p.provider_id)) continue;
+      vistos.set(p.provider_id, {
+        id: p.provider_id,
+        nombre: p.provider_name,
+        logo: p.logo_path,
+        prioridad: (p.display_priorities && p.display_priorities[region]) ?? p.display_priority ?? 999,
+      });
+    }
+    return { region, items: [...vistos.values()].sort((a, b) => a.prioridad - b.prioridad) };
+  },
+
+  async buscar(q) {
+    const texto = String(q.q || '').trim().slice(0, 100);
+    if (!texto) return { pagina: 1, paginas: 1, items: [] };
+    const data = await _tmdb('/search/multi', { query: texto, include_adult: 'false', page: _mediaInt(q.page, 1, 1, 20) }, MEDIA_H);
+    return _mediaLista(data);
+  },
+
+  async tendencias(q) {
+    const tipo = ['movie', 'tv'].includes(q.tipo) ? q.tipo : 'all';
+    const data = await _tmdb(`/trending/${tipo}/week`, { page: _mediaInt(q.page, 1, 1, 10) }, 3 * MEDIA_H);
+    return _mediaLista(data, tipo === 'all' ? undefined : tipo);
+  },
+
+  async proximos(q) {
+    const data = await _tmdb('/movie/upcoming', { region: 'CL', page: _mediaInt(q.page, 1, 1, 10) }, 6 * MEDIA_H);
+    return _mediaLista(data, 'movie');
+  },
+
+  // Lo que está HOY en las plataformas dadas (por país), lo más reciente primero.
+  async descubrir(q) {
+    const tipo = _mediaTipo(q.tipo);
+    const region = _mediaRegion(q.region);
+    const hoy = new Date().toISOString().slice(0, 10);
+    const params = {
+      watch_region: region,
+      page: _mediaInt(q.page, 1, 1, 20),
+      include_adult: 'false',
+      'vote_count.gte': String(_mediaInt(q.minVotos, 20, 0, 5000)),
+    };
+    const prov = _mediaIds(q.plataformas);
+    if (prov.length) {
+      params.with_watch_providers = prov.join('|');
+      params.with_watch_monetization_types = /^[a-z|]{1,40}$/.test(q.como || '') ? q.como : 'flatrate|free|ads';
+    }
+    const generos = _mediaIds(q.generos);
+    if (generos.length) params.with_genres = generos.join(q.todos === '1' ? ',' : '|');
+    const estudios = _mediaIds(q.estudios);
+    if (estudios.length) params.with_companies = estudios.join('|');
+    if (/^[a-z]{2}$/.test(q.idiomaOriginal || '')) params.with_original_language = q.idiomaOriginal;
+    const campoFecha = tipo === 'movie' ? 'primary_release_date' : 'first_air_date';
+    if (q.orden === 'populares') {
+      params.sort_by = 'popularity.desc';
+    } else {
+      params.sort_by = `${campoFecha}.desc`;
+      params[`${campoFecha}.lte`] = hoy;
+    }
+    const data = await _tmdb(`/discover/${tipo}`, params, 3 * MEDIA_H);
+    return _mediaLista(data, tipo);
+  },
+
+  async generos(q) {
+    const tipo = _mediaTipo(q.tipo);
+    const data = await _tmdb(`/genre/${tipo}/list`, {}, 24 * 7 * MEDIA_H);
+    return { items: (data.genres || []).map((g) => ({ id: g.id, nombre: g.name })) };
+  },
+
+  // Resuelve un estudio o franquicia por nombre (Marvel Studios, Lucasfilm…).
+  async estudio(q) {
+    const texto = String(q.q || '').trim().slice(0, 60);
+    if (!texto) return { items: [] };
+    const data = await _tmdb('/search/company', { query: texto }, 24 * 7 * MEDIA_H);
+    return { items: (data.results || []).slice(0, 5).map((c) => ({ id: c.id, nombre: c.name, pais: c.origin_country || '' })) };
+  },
+
+  // Ficha completa + dónde ver en TODOS los países (el cliente pone Chile primero).
+  async titulo(q) {
+    const tipo = _mediaTipo(q.tipo);
+    const id = _mediaInt(q.id, 0, 1, 99999999);
+    if (!id) { const e = new Error('id inválido'); e.status = 400; throw e; }
+    const d = await _tmdb(`/${tipo}/${id}`, { append_to_response: 'watch/providers,external_ids' }, 12 * MEDIA_H);
+    const porPais = {};
+    const wp = (d['watch/providers'] && d['watch/providers'].results) || {};
+    for (const [pais, bloque] of Object.entries(wp)) porPais[pais] = _mediaProveedores(bloque);
+    return {
+      id: d.id,
+      tipo,
+      titulo: d.title || d.name || '',
+      original: d.original_title || d.original_name || '',
+      fecha: d.release_date || d.first_air_date || '',
+      duracion: d.runtime || (Array.isArray(d.episode_run_time) ? d.episode_run_time[0] : null) || null,
+      temporadas: d.number_of_seasons || null,
+      episodios: d.number_of_episodes || null,
+      sinopsis: d.overview || '',
+      poster: d.poster_path || null,
+      fondo: d.backdrop_path || null,
+      nota: typeof d.vote_average === 'number' ? Math.round(d.vote_average * 10) / 10 : null,
+      generos: (d.genres || []).map((g) => g.name),
+      coleccion: d.belongs_to_collection ? { id: d.belongs_to_collection.id, nombre: d.belongs_to_collection.name } : null,
+      estudios: (d.production_companies || []).slice(0, 4).map((c) => c.name),
+      imdb: (d.external_ids && d.external_ids.imdb_id) || null,
+      dondeVer: porPais,
+    };
+  },
+};
+
+exports.mediaApi = onRequest(
+  { region: 'us-central1', secrets: ['TMDB_READ_TOKEN'], maxInstances: 2, timeoutSeconds: 20, cors: ANIME_ORIGENES },
+  async (req, res) => {
+    if (req.method !== 'GET') { res.status(405).json({ error: 'GET only' }); return; }
+    const authz = String(req.get('authorization') || '');
+    const idToken = authz.startsWith('Bearer ') ? authz.slice(7) : '';
+    let claim = null;
+    try {
+      const dec = idToken ? await getAuth().verifyIdToken(idToken) : null;
+      claim = dec && dec.anime_tg ? String(dec.anime_tg) : null;
+    } catch { claim = null; }
+    if (!claim || !ANIME_USUARIOS_PERMITIDOS.has(claim)) {
+      res.status(401).json({ error: 'Sesión de AnimeTracker requerida' });
+      return;
+    }
+    const op = String(req.query.op || '');
+    const fn = Object.prototype.hasOwnProperty.call(_mediaOps, op) ? _mediaOps[op] : null;
+    if (!fn) { res.status(400).json({ error: 'Operación desconocida' }); return; }
+    if (!process.env.TMDB_READ_TOKEN) { res.status(500).json({ error: 'TMDB no configurado' }); return; }
+    try {
+      const data = await fn(req.query);
+      res.set('Cache-Control', 'private, max-age=300');
+      res.json(data);
+    } catch (e) {
+      res.status(e.status || 500).json({ error: e.status === 404 ? 'No encontrado' : 'Error consultando TMDB' });
+    }
+  }
+);
+
 // ═══════════════════════════════════════════════════════════════════
 // STOCK BAJO MÍNIMO — Notificación al registrar conteo
 // ═══════════════════════════════════════════════════════════════════
