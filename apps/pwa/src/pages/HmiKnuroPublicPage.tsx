@@ -10,16 +10,21 @@
  *   MainLayout): el HMI toma el alto completo y el iframe muestra su riel (Buscar, Lista,
  *   «?», Salir). Se activa con «Pantalla completa» o con solo girar el teléfono.
  * - Celular vertical: aviso descartable «Gira el teléfono…» con botón «Pantalla completa».
- * - Ruta: /hmi/learn  y  /hmi/learn/:presetId
+ * - Ruta: /aprendizaje/hmi-knuro  y  /aprendizaje/hmi-knuro/:presetId (única puerta para todos).
+ *   /hmi/learn[/:presetId] (QR antiguos) redirige aquí desde App.tsx.
+ * - Con sesión va dentro de MainLayout (main de alto fijo, ver isHmiKnuroRoute): ocupa h-full.
+ *   Sin sesión no hay layout: ocupa 100dvh.
+ * - Admin: botón «Editar presets y ayudas» → /hmi-knuro (editor, AdminRoute).
  */
 
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Loader2, AlertCircle, BookOpen, QrCode, X, Copy, Check, Maximize, Minimize } from 'lucide-react'
+import { Loader2, AlertCircle, BookOpen, QrCode, X, Copy, Check, Maximize, Minimize, ArrowLeft, Pencil } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnuro'
 import { useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
 import { AvisoGirarTelefono } from '@/components/hmiKnuro/AvisoGirarTelefono'
+import { useAuthStore, useIsAdmin } from '@/store'
 
 export function HmiKnuroPublicPage() {
   const { presetId } = useParams<{ presetId?: string }>()
@@ -27,6 +32,8 @@ export function HmiKnuroPublicPage() {
   const location = useLocation()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeReadyRef = useRef(false)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const isAdmin = useIsAdmin()
 
   const [presets, setPresets] = useState<Record<string, Record<string, string>>>({})
   const [tooltips, setTooltips] = useState<Record<string, unknown>>({})
@@ -52,7 +59,7 @@ export function HmiKnuroPublicPage() {
 
   const learnUrl = useMemo(() => {
     const base = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
-    return selected ? `${base}/hmi/learn/${encodeURIComponent(selected)}` : `${base}/hmi/learn`
+    return selected ? `${base}/aprendizaje/hmi-knuro/${encodeURIComponent(selected)}` : `${base}/aprendizaje/hmi-knuro`
   }, [selected])
 
   // Cargar datos desde Firestore (sin auth)
@@ -123,8 +130,8 @@ export function HmiKnuroPublicPage() {
     }
   }
 
-  // Ruta base de la página actual (sin el :presetId). Sirve para /hmi/learn y
-  // /aprendizaje/hmi-knuro: la navegación relativa ('../learn/x') solo servía en la primera
+  // Ruta base de la página actual (sin el :presetId), hoy siempre /aprendizaje/hmi-knuro
+  // (antes también /hmi/learn): la navegación relativa ('../learn/x') solo servía en la primera
   // y mandaba a /aprendizaje/learn/x (inexistente -> login) en la segunda.
   const basePath = useMemo(() => {
     let path = location.pathname.replace(/\/+$/, '')
@@ -148,6 +155,14 @@ export function HmiKnuroPublicPage() {
     if (presetId in presets) applyPreset(presetId)
   }, [presetId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Volver: con sesión, atrás en el historial si se llegó navegando dentro de la app; si no
+  // (QR, enlace directo o sin sesión), al Centro de Aprendizaje.
+  const volver = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (isAuthenticated && idx > 0) navigate(-1)
+    else navigate('/aprendizaje')
+  }
+
   const copyLink = () => {
     navigator.clipboard.writeText(learnUrl).then(() => {
       setCopied(true)
@@ -158,7 +173,7 @@ export function HmiKnuroPublicPage() {
   // Loading
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen w-screen bg-[#0a1628]">
+      <div className={`flex items-center justify-center bg-[#0a1628] ${isAuthenticated ? 'h-full w-full' : 'h-screen w-screen'}`}>
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
           <p className="text-blue-300 text-sm">Cargando HMI…</p>
@@ -170,7 +185,7 @@ export function HmiKnuroPublicPage() {
   // Error
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen w-screen bg-[#0a1628]">
+      <div className={`flex items-center justify-center bg-[#0a1628] ${isAuthenticated ? 'h-full w-full' : 'h-screen w-screen'}`}>
         <div className="flex flex-col items-center gap-3 max-w-sm px-4">
           <AlertCircle className="h-10 w-10 text-red-400" />
           <p className="text-red-300 text-sm text-center">{error}</p>
@@ -182,10 +197,12 @@ export function HmiKnuroPublicPage() {
   return (
     <div
       ref={containerRef}
-      className={immersive ? 'fixed inset-0 z-[70] flex flex-col bg-[#1a1c22]' : 'flex flex-col w-screen bg-[#0a1628]'}
+      className={immersive
+        ? 'fixed inset-0 z-[70] flex flex-col bg-[#1a1c22]'
+        : isAuthenticated ? 'flex flex-col h-full w-full bg-[#0a1628]' : 'flex flex-col w-screen bg-[#0a1628]'}
       style={immersive
         ? { height: '100dvh', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }
-        : { height: '100dvh' }}
+        : isAuthenticated ? undefined : { height: '100dvh' }}
     >
 
       {/* Header */}
@@ -193,10 +210,29 @@ export function HmiKnuroPublicPage() {
         className="flex items-center gap-2 px-3 flex-shrink-0 border-b border-[#1e3a5f]"
         style={{ height: immersive ? '0' : '40px', overflow: 'hidden', background: '#0d1f3c', borderBottomWidth: immersive ? 0 : undefined, transition: 'height .2s' }}
       >
+        <button
+          onClick={volver}
+          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 -ml-1 rounded"
+          title="Volver"
+          aria-label="Volver"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Volver</span>
+        </button>
         <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
         <span className="text-blue-300 text-xs font-semibold tracking-wide uppercase">Modo Aprendizaje</span>
         <span className="text-[#3a5a7a] text-xs hidden sm:inline">— HMI Knuro</span>
         <div className="flex-1" />
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/hmi-knuro')}
+            className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
+            title="Editar presets y ayudas"
+          >
+            <Pencil className="h-3 w-3" />
+            <span className="hidden sm:inline">Editar presets y ayudas</span>
+          </button>
+        )}
         <button
           onClick={toggleFullscreen}
           className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"

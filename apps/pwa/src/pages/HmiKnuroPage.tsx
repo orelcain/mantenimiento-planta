@@ -104,7 +104,7 @@ export function HmiKnuroPage() {
       setCurrentPresetName(current)
       setPresetOrder(order)
       // La clave de edición ya NO viaja al iframe: esta página está tras AdminRoute y
-      // Firestore exige isSupervisor para escribir hmi-knuro-tooltips, así que la
+      // Firestore exige isAdmin para escribir hmi-knuro-tooltips, así que la
       // edición de globos se concede con canEdit (ver hmi-knuro-embed.html).
       iframe.contentWindow?.postMessage(
         { type: 'hmi:init', presets: presetsData, current, refs, order, tooltips, canEdit: true },
@@ -563,7 +563,7 @@ export function HmiKnuroPage() {
       {/* ── QR Dialog ────────────────────────────────────────────────── */}
       {qrPreset && (() => {
         const base = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
-        const learnUrl = `${base}/hmi/learn/${encodeURIComponent(qrPreset)}`
+        const learnUrl = `${base}/aprendizaje/hmi-knuro/${encodeURIComponent(qrPreset)}`
         return (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"

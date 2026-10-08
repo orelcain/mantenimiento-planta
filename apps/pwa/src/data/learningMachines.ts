@@ -75,7 +75,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     icon: Scissors,
     color: '#a5745f',
     hmiRoute: '/aprendizaje/hmi-knuro',
-    hmiLabel: 'HMI Knuro B2',
+    hmiLabel: 'HMI Knuro',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
@@ -96,8 +96,6 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Fileteadora Baader 200 — manual técnico completo con ajustes, medidas y calibración.',
     icon: BookOpen,
     color: '#6b8299',
-    hmiRoute: '/aprendizaje/hmi-knuro',
-    hmiLabel: 'HMI Knuro B2',
     sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {

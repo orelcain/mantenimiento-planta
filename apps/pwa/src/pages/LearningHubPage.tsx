@@ -56,9 +56,9 @@ interface SpecialModule {
 
 const SPECIAL_MODULES: SpecialModule[] = [
   {
-    id: 'hmi-knuro', title: 'HMI Knuro B2', subtitle: 'Simulador de parámetros',
-    description: 'Panel HMI Knuro para máquinas Baader. Presets de planta y modo de práctica.',
-    icon: Cpu, href: '/aprendizaje/hmi-knuro', stats: '6 presets · práctica',
+    id: 'hmi-knuro', title: 'HMI Knuro', subtitle: 'Simulador de parámetros',
+    description: 'Panel HMI Knuro de la Baader 142. Presets de planta y modo de práctica.',
+    icon: Cpu, href: '/aprendizaje/hmi-knuro', stats: 'Presets de planta · práctica',
   },
   {
     id: 'hmi-grader', title: 'HMI Grader', subtitle: 'StaticGrader Marelec Z2',
