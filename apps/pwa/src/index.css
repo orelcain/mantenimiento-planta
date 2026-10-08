@@ -380,7 +380,10 @@
   --ink-ok: 31 118 53;
   --ink-info: 40 101 158;
 
-  --card-edge: 255 255 255;         /* = --card: la tarjeta flota, sin contorno */
+  /* Borde de 1 px que separa tarjeta y fondo (1,52:1 sobre la tarjeta). Antes decía
+     255 255 255 («flota sin contorno») y además lo pisaba un 44 44 46 duplicado más
+     abajo, que dejaba TODA <Card> clara con un borde casi negro. */
+  --card-edge: 209 209 214;         /* #D1D1D6 */
 
   /* Radios de iOS 26/27 (DESIGN.md §4, ADELANTA 3). Apple documenta que las
      secciones "tienen un radio aumentado para coincidir con la curvatura de
@@ -393,7 +396,6 @@
   --r-ctl: 10px;
   --r-card: 26px;
   --r-panel: 32px;
-  --card-edge: 44 44 46;            /* = --card oscuro */
 }
 
 :root[data-skin="apple"].dark {
@@ -406,6 +408,8 @@
      rechazó #000 por dureza. La elevación se comunica por TONO, no por sombra. */
   --background: 28 28 30;           /* #1C1C1E */
   --card: 44 44 46;                 /* #2C2C2E */
+  --card-edge: 60 60 66;            /* #3C3C42: borde de 1 px, 1,47:1 sobre la tarjeta; con
+                                       reflejo de planta el tono solo no separa */
   --foreground: 255 255 255;        /* label */
   --muted-foreground: 159 159 165;  /* #9F9FA5 = secondaryLabel .60 aplanado, 5.9:1 ✓ */
   --secondary: 72 72 74;            /* #48484A systemGray dark 3 */
