@@ -6,6 +6,7 @@ import { db, auth, storage } from '@/services/firebase'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 import { generateId } from '@/lib/utils'
 import { logger } from '@/lib/logger'
+import { useAuthStore } from '@/store/authStore'
 
 const COL = 'planoVinculos'
 
@@ -40,9 +41,15 @@ export type VinculoTerreno = {
 export function usePlanoVinculos(planoSlug: string | undefined) {
   const [vinculos, setVinculos] = useState<Map<string, VinculoTerreno>>(new Map())
   const [error, setError] = useState<string | null>(null)
+  const sesion = useAuthStore((s) => s.isAuthenticated)
 
   useEffect(() => {
-    if (!planoSlug) return
+    // Sin sesión la regla no deja leer (isActiveUser): suscribirse solo producía un
+    // permission-denied por cada pantalla abierta desde un QR o un enlace compartido.
+    if (!planoSlug || !sesion) {
+      setVinculos(new Map())
+      return
+    }
     const q = query(collection(db, COL), where('planoSlug', '==', planoSlug))
     const off = onSnapshot(
       q,
@@ -63,7 +70,7 @@ export function usePlanoVinculos(planoSlug: string | undefined) {
       },
     )
     return off
-  }, [planoSlug])
+  }, [planoSlug, sesion])
 
   /**
    * Sube la foto de la etiqueta y devuelve su URL. La evidencia visual es lo

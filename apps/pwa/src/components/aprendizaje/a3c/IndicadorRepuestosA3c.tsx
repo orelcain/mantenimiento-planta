@@ -1,9 +1,11 @@
 /**
  * Indicador de cobertura bajo la línea de fuente de la tarjeta:
  * «Repuestos identificados N/M · X confirmados en terreno», con barra (identificados en acento,
- * confirmados encima en verde). Cuenta solo piezas físicas (ver `esPiezaFisica`).
+ * confirmados encima en verde). Es un enlace a «Por confirmar en terreno». Cuenta solo piezas físicas (ver `esPiezaFisica`).
  */
 import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { usePlanoVinculos } from '@/hooks/usePlanoVinculos'
 import { useAuthStore } from '@/store/authStore'
@@ -18,9 +20,10 @@ export function IndicadorRepuestosA3c({ codigos }: { codigos: readonly string[] 
   if (!partes || c.total === 0) return null
   const pct = (n: number) => `${(n / c.total) * 100}%`
   return (
-    <div
+    <Link
+      to="/aprendizaje/baader-142/tarjeta-a3c/por-confirmar"
       data-testid="indicador-repuestos"
-      className="mt-2 inline-flex min-h-[32px] items-center gap-2 text-footnote text-muted-foreground tabular-nums"
+      className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-ctl text-footnote text-muted-foreground tabular-nums hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       <span className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-muted" aria-hidden>
         <span className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: pct(c.identificados) }} />
@@ -37,6 +40,7 @@ export function IndicadorRepuestosA3c({ codigos }: { codigos: readonly string[] 
           ' · inicia sesión para ver las confirmaciones'
         )}
       </span>
-    </div>
+      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/55" aria-hidden />
+    </Link>
   )
 }
