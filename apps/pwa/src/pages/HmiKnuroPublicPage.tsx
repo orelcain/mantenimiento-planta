@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Loader2, AlertCircle, BookOpen, QrCode, X, Copy, Check, Maximize, Minimize } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnuro'
@@ -18,6 +18,7 @@ import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnu
 export function HmiKnuroPublicPage() {
   const { presetId } = useParams<{ presetId?: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeReadyRef = useRef(false)
 
@@ -139,16 +140,40 @@ export function HmiKnuroPublicPage() {
     return () => window.removeEventListener('message', handler)
   }, [presets, tooltips, presetOrder, selected]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cambiar preset
-  const switchPreset = (name: string) => {
+  // Aplicar un preset a la UI y al iframe (sin tocar la URL)
+  const applyPreset = (name: string) => {
     setSelected(name)
-    navigate(`../learn/${encodeURIComponent(name)}`, { relative: 'route', replace: true })
     if (iframeReadyRef.current) {
       iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:load-preset', name }, window.location.origin)
       // Also re-send full init to ensure tooltips are loaded
       setTimeout(() => sendInitData(name), 100)
     }
   }
+
+  // Ruta base de la página actual (sin el :presetId). Sirve para /hmi/learn y
+  // /aprendizaje/hmi-knuro: la navegación relativa ('../learn/x') solo servía en la primera
+  // y mandaba a /aprendizaje/learn/x (inexistente -> login) en la segunda.
+  const basePath = useMemo(() => {
+    let path = location.pathname.replace(/\/+$/, '')
+    if (presetId) {
+      const suffix = '/' + encodeURIComponent(presetId)
+      if (path.endsWith(suffix)) path = path.slice(0, -suffix.length)
+      else path = path.slice(0, path.lastIndexOf('/'))
+    }
+    return path
+  }, [location.pathname, presetId])
+
+  // Cambiar preset: actualiza la URL (conserva la ruta pública actual); el efecto de abajo aplica el cambio
+  const switchPreset = (name: string) => {
+    if (name === presetId) return
+    navigate(`${basePath}/${encodeURIComponent(name)}`)
+  }
+
+  // La URL manda: atrás/adelante del navegador o enlace directo cambian el preset
+  useEffect(() => {
+    if (loading || !presetId || presetId === selected) return
+    if (presetId in presets) applyPreset(presetId)
+  }, [presetId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const copyLink = () => {
     navigator.clipboard.writeText(learnUrl).then(() => {
