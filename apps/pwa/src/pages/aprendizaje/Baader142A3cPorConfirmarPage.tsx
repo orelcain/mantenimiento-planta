@@ -11,7 +11,7 @@
  */
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Check, ChevronLeft, Cog, Disc3, Droplet, ScanLine, Workflow } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Cog, Disc3, Droplet, FilePlus, ScanLine, Workflow } from 'lucide-react'
 import { Button, CellIcon, Disclosure, ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import { RepuestoA3c } from '@/components/aprendizaje/a3c/RepuestoA3c'
 import { SelectorMaquinaPlano } from '@/components/aprendizaje/SelectorMaquinaPlano'
@@ -21,6 +21,9 @@ import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { usePlanoVinculos } from '@/hooks/usePlanoVinculos'
 import { useMaquinaPlano } from '@/hooks/useMaquinaPlano'
 import { useAuthStore } from '@/store/authStore'
+import { useAltasDeCodigo } from '@/hooks/repuestos/useAltasDeCodigo'
+import { cuantosElementos, resumenElementos } from '@/utils/aprendizaje/altaCodigoA3c'
+import { kpiAltas, type CodigoSinSap, type KpiAltas } from '@/utils/aprendizaje/kpiAltasA3c'
 import { cn } from '@/lib/utils'
 import { armarPorConfirmar, estaEnLista, primeraSeleccion, type Conteo, type FilaPorConfirmar } from '@/utils/aprendizaje/porConfirmarA3c'
 import type { MaquinaBaader } from '@/services/baader142/perilla5Protocolo'
@@ -202,6 +205,83 @@ function KpiRonda({ maquina, maquinas, prioritarios }: { maquina: MaquinaBaader 
 
 const prioridadPct = (n: number, total: number) => (total ? (n / total) * 100 : 0)
 
+/**
+ * Fila «Sin SAP · 16 códigos» bajo el indicador de confirmación: de los códigos de fabricante del plano que
+ * el maestro no tiene, cuántos ya se dieron de alta, cuántos están pedidos y cuántos faltan por pedir (las
+ * tres cifras son excluyentes y suman el total). Al tocarla se abre la lista, ordenada por cuántos
+ * elementos cubre cada código.
+ */
+function FilaSinSap({ kpi, onAbrir }: { kpi: KpiAltas; onAbrir: () => void }) {
+  const pct = (n: number) => `${prioridadPct(n, kpi.total)}%`
+  return (
+    <div className="mt-3" data-testid="kpi-sin-sap">
+      <ListGroup footer={`Cubren ${cuantosElementos(kpi.elementosCubiertos)} del plano.`}>
+        <button
+          type="button"
+          onClick={onAbrir}
+          className="relative flex min-h-[76px] w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none"
+        >
+          <CellIcon tone="neutral" className="mt-0.5 bg-warning/[0.15] text-ink-warn"><FilePlus aria-hidden /></CellIcon>
+          <span className="min-w-0 flex-1">
+            <span className="block text-body">Sin SAP · <b className="font-semibold tabular-nums">{kpi.total}</b> {kpi.total === 1 ? 'código' : 'códigos'}</span>
+            <span className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+              <i className="block h-full bg-success" style={{ width: pct(kpi.dadasDeAlta) }} />
+              <i className="block h-full bg-primary" style={{ width: pct(kpi.enBodega) }} />
+            </span>
+            <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-footnote tabular-nums text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-success" aria-hidden />{kpi.dadasDeAlta} {kpi.dadasDeAlta === 1 ? 'dado' : 'dados'} de alta</span>
+              <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-primary" aria-hidden />{kpi.enBodega} en bodega</span>
+              <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-muted ring-1 ring-inset ring-border" aria-hidden />{kpi.sinPedir} sin pedir</span>
+            </span>
+          </span>
+          <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground/60" aria-hidden />
+        </button>
+      </ListGroup>
+    </div>
+  )
+}
+
+const GRUPOS_SIN_SAP: { estado: CodigoSinSap['estado']; titulo: string }[] = [
+  { estado: 'sin_pedir', titulo: 'Sin pedir' },
+  { estado: 'en_bodega', titulo: 'En bodega' },
+  { estado: 'dada_de_alta', titulo: 'Dados de alta' },
+]
+
+/** Los códigos sin SAP en tres grupos; tocar uno abre la ficha de su primer elemento. */
+function ListaSinSap({ kpi, onElegir }: { kpi: KpiAltas; onElegir: (elemento: string) => void }) {
+  return (
+    <div className="flex flex-col gap-5" data-testid="lista-sin-sap">
+      <p className="px-4 text-footnote text-muted-foreground">
+        {kpi.total} códigos de fabricante del plano 888 que bodega no tiene. Ordenados por cuántos elementos cubren.
+      </p>
+      {GRUPOS_SIN_SAP.map(g => {
+        const items = kpi.codigos.filter(c => c.estado === g.estado)
+        if (!items.length) return null
+        return (
+          <ListGroup key={g.estado} title={`${g.titulo} · ${items.length}`}>
+            {items.map(c => (
+              <ListCell
+                key={c.codigo}
+                data-testid={`sin-sap-${c.codigo}`}
+                title={<span className="font-mono tabular-nums">{c.codigo}</span>}
+                detail={<span className="text-subhead text-foreground">{c.nombre}</span>}
+                subtitle={`${resumenElementos(c.elementos)} · ${[c.nivel === 'conjunto' ? 'conjunto' : '', c.confianza === 'catalogo' ? 'según catálogo' : 'propuesto'].filter(Boolean).join(' · ')}`}
+                trailing={
+                  c.estado === 'dada_de_alta' ? <Pill tone="ok">SAP {c.sapCreado}</Pill>
+                    : c.estado === 'en_bodega' ? <Pill tone="warning">Pendiente</Pill>
+                      : undefined
+                }
+                chevron
+                onClick={() => c.elementos[0] && onElegir(c.elementos[0])}
+              />
+            ))}
+          </ListGroup>
+        )
+      })}
+    </div>
+  )
+}
+
 export function Baader142A3cPorConfirmarPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -212,6 +292,9 @@ export function Baader142A3cPorConfirmarPage() {
   const { porAparato } = usePlanoVinculos(SLUG_PLANO_A3C)
   const sesion = useAuthStore(s => s.isAuthenticated)
   const esPc = useEsPc()
+  const { altas } = useAltasDeCodigo()
+  const kpiSinSap = useMemo(() => (partes ? kpiAltas(partes, altas) : null), [partes, altas])
+  const [sinSapAbierto, setSinSapAbierto] = useState(false)
 
   const cargar = useCallback(() => {
     setError(null)
@@ -273,6 +356,7 @@ export function Baader142A3cPorConfirmarPage() {
         )}
         <Pill tone="neutral" className="mt-3">Plano 888 · N2 y N3</Pill>
       </section>
+      {sesion && kpiSinSap && kpiSinSap.total > 0 && <FilaSinSap kpi={kpiSinSap} onAbrir={() => setSinSapAbierto(true)} />}
 
       <div className="mt-6 flex flex-col gap-6">
         {datos.grupos.map(g => (
@@ -350,6 +434,11 @@ export function Baader142A3cPorConfirmarPage() {
           )}
         </div>
       </div>
+      {kpiSinSap && (
+        <Sheet open={sinSapAbierto} onClose={() => setSinSapAbierto(false)} surface="grouped" title="Sin SAP" headerAction={<Button variant="plain" onClick={() => setSinSapAbierto(false)}>Listo</Button>}>
+          <ListaSinSap kpi={kpiSinSap} onElegir={el => { setSinSapAbierto(false); elegir(el) }} />
+        </Sheet>
+      )}
       {!esPc && (
         <Sheet
           open={!!elValido}
