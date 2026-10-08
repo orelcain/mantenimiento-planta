@@ -53,6 +53,7 @@ import { useUploadQueueStore } from '@/store/uploadQueueStore'
 import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/services/permissions'
 import { loadSidebarConfig } from '@/services/sidebarConfig'
 import { useTheme } from '@/hooks/useTheme'
+import { ControlIntensidad } from '@/components/piel/ControlIntensidad'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
 import { useContadorVistas } from '@/hooks/useContadorVistas'
 
@@ -679,6 +680,7 @@ export function MainLayout() {
               {/* User dropdown */}
               {userMenuOpen && (
                 <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                  <ControlIntensidad />
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -810,6 +812,7 @@ export function MainLayout() {
 
                   {userMenuOpen && (
                     <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                      <ControlIntensidad />
                       <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"

@@ -207,9 +207,9 @@ export default {
         // HIG doc cuando el verde accesible de Apple (#248A3D) daba 4.40:1 y se
         // bajó a #217E38. Medido: critical 6.55 · warning 6.35 · ok 6.36.
         fill: {
-          critical: '#8C4B45',
-          warning: '#7A5A1E',
-          ok: '#2F6B41',
+          critical: 'rgb(var(--fill-critical) / <alpha-value>)',
+          warning: 'rgb(var(--fill-warning) / <alpha-value>)',
+          ok: 'rgb(var(--fill-ok) / <alpha-value>)',
         },
       },
       textColor: {

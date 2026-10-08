@@ -192,6 +192,13 @@
      contorno" y "tarjeta que flota", que es lo que define el look de Apple. */
   --card-edge: 88 94 100;           /* = --border en la piel actual */
 
+  /* Rellenos opacos de estado (bg-fill-*). Antes eran hex fijos en tailwind.config.js:
+     #8C4B45 / #7A5A1E / #2F6B41. Mismos valores, ahora var-izados para que la paleta
+     Pizarra pueda cambiarlos; sin ella, el color resultante es idéntico. */
+  --fill-critical: 140 75 69;
+  --fill-warning: 122 90 30;
+  --fill-ok: 47 107 65;
+
   --r-ctl: 0.5rem;                  /* controles: botón, input, chip cuadrado */
   --r-card: 0.75rem;                /* tarjeta / grupo de lista */
   --r-panel: 1rem;                  /* contenedor grande, sheet, modal */
@@ -437,6 +444,107 @@
   --ink-warn: 255 159 10;
   --ink-ok: 48 209 88;
   --ink-info: 113 173 225;
+}
+
+/* ============================================================================
+   PALETA PIZARRA — detrás de interruptor (`?skin=pizarra`)
+   Decisión del jurado (08-10): docs en scratchpad/ronda-estilo-propio/6_jurado_final.md.
+   ---------------------------------------------------------------------------
+   Mecanismo: NO es una piel nueva. index.html mantiene data-skin="apple" (radios,
+   primitivos, geometría) y AGREGA data-paleta="pizarra". Estos bloques solo
+   sobrescriben tokens de COLOR. Sin el atributo ningún selector de abajo casa,
+   así que el CSS resultante de quien no la activa es el mismo de siempre.
+   Vuelta atrás: `?skin=apple` (borra la paleta) o `?skin=default`.
+
+   Especificidad: el Día usa :not(.dark) para no filtrarse a Penumbra (empata en
+   0,3,0 con `[data-skin="apple"].dark` y, al ir después, lo pisaría); Penumbra
+   (0,4,0) gana sobre los dos bloques Apple sin depender del orden.
+
+   Decisiones que el spec no fijaba (medidas en scripts/check-contrast-pizarra.mjs):
+   · --muted-foreground = texto 2; el texto 3 queda reservado en --foreground-3.
+   · --accent = superficie 2 = fondo; --secondary = borde. --muted (riel de segmentados,
+     buscadores, chips) es la SUPERFICIE 3 de la tabla del jurado: si valiera lo mismo que
+     el fondo, todo `bg-muted` sobre la página desaparecería. Día #E2E1DB / Penumbra
+     #2E2D2B, ≥1,15:1 contra fondo y tarjeta (check-contrast-pizarra.mjs). Es el único
+     color agregado a Pizarra.
+   · «Normal sin color» (ISA-101): --ink-ok y --fill-ok son NEUTROS (texto 2).
+     Va ícono de visto + palabra, no verde. Los -emerald/-green de Tailwind NO se
+     tocan acá: son series/chips que se barren por oleada.
+   · Texto de aviso/falla/info en Día se oscureció sobre lo sugerido (#8A5A00,
+     #C21F2E, #2A6BA6) hasta dar ≥4,5:1 también sobre su propio tinte al 15%
+     apoyado en el fondo (el peor caso, mismo criterio que el resto del archivo).
+   Series de gráficos (--cat-*, --shift-ramp-*, --mon-*) no se tocan: la regla
+   de 9 colores no aplica a las series.
+   ============================================================================ */
+:root[data-skin="apple"][data-paleta="pizarra"]:not(.dark) {
+  --background: 242 241 236;        /* #F2F1EC */
+  --card: 255 255 255;              /* #FFFFFF */
+  --foreground: 29 29 28;           /* #1D1D1C texto 1 */
+  --muted-foreground: 78 77 74;     /* #4E4D4A texto 2 */
+  --foreground-3: 106 105 102;      /* #6A6966 texto 3 (reservado, sin consumidor aún) */
+  --secondary: 212 211 207;         /* = borde */
+  --muted: 226 225 219;             /* #E2E1DB superficie 3 */
+  --accent: 242 241 236;
+  --border: 212 211 207;            /* #D4D3CF */
+  --card-edge: 212 211 207;
+  --sidebar-active: rgba(42, 107, 166, 0.12);
+  --sidebar-active-foreground: #27639a;
+  --sidebar-surface: #f2f1ec;
+  --panel-surface: #f2f1ec;
+
+  --brand: 42 107 166;              /* #2A6BA6 acento */
+  --brand-foreground: 255 255 255;
+  --brand-ink: 39 99 154;           /* #27639A: acento oscurecido para texto sobre tinte */
+
+  --ink-crit: 177 39 45;            /* #B1272D = relleno de falla */
+  --ink-warn: 132 86 0;             /* #845600 (ámbar solo como relleno; como texto, este) */
+  --ink-ok: 78 77 74;               /* normal sin color: texto 2 */
+  --ink-info: 39 99 154;            /* = acento (versión de texto) */
+
+  --tw-red-400: 177 39 45;   --tw-red-500: 177 39 45;   --tw-red-600: 177 39 45;
+  --destructive-tint: 245 227 228;  /* #B1272D al 13% sobre la tarjeta, opaco */
+  --tw-amber-400: 242 180 0; --tw-amber-500: 242 180 0; --tw-amber-600: 132 86 0;
+  --tw-blue-400: 42 107 166; --tw-blue-500: 42 107 166;
+
+  --fill-critical: 177 39 45;       /* relleno + texto #FFFFFF (6,57:1) */
+  --fill-warning: 242 180 0;        /* relleno #F2B400 + texto #1D1D1C (9,08:1), NUNCA blanco */
+  --fill-ok: 78 77 74;
+}
+
+:root[data-skin="apple"][data-paleta="pizarra"].dark {
+  --background: 23 22 20;           /* #171614 */
+  --card: 34 33 32;                 /* #222120 */
+  --foreground: 232 226 215;        /* #E8E2D7 texto 1 */
+  --muted-foreground: 189 182 170;  /* #BDB6AA texto 2 */
+  --foreground-3: 168 161 149;      /* #A8A195 texto 3 (reservado) */
+  --secondary: 62 61 58;
+  --muted: 46 45 43;                /* #2E2D2B superficie 3 */
+  --accent: 23 22 20;
+  --border: 62 61 58;               /* #3E3D3A */
+  --card-edge: 62 61 58;
+  --sidebar-active: rgba(125, 180, 238, 0.18);
+  --sidebar-active-foreground: #7db4ee;
+  --sidebar-surface: #171614;
+  --panel-surface: #171614;
+
+  --brand: 125 180 238;             /* #7DB4EE */
+  --brand-foreground: 23 22 20;     /* texto oscuro sobre el acento */
+  --brand-ink: 125 180 238;
+
+  --ink-crit: 255 154 144;          /* #FF9A90 */
+  --ink-warn: 242 193 78;           /* #F2C14E */
+  --ink-ok: 189 182 170;            /* normal sin color: texto 2 */
+  --ink-info: 125 180 238;
+
+  /* Tinta/ícono legibles sobre la tarjeta oscura; el relleno de falla va en --fill-critical. */
+  --tw-red-400: 255 154 144; --tw-red-500: 255 154 144; --tw-red-600: 255 154 144;
+  --destructive-tint: 63 49 47;     /* #FF9A90 al 13% sobre la tarjeta, opaco */
+  --tw-amber-400: 242 180 0; --tw-amber-500: 242 180 0; --tw-amber-600: 242 193 78;
+  --tw-blue-400: 125 180 238; --tw-blue-500: 125 180 238;
+
+  --fill-critical: 177 39 45;       /* relleno + texto #E8E2D7 (5,09:1) */
+  --fill-warning: 242 180 0;        /* relleno + texto #171614 (9,73:1) */
+  --fill-ok: 189 182 170;
 }
 
 /* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que

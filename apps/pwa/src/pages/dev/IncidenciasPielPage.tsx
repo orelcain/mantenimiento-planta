@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { IncidentsPage } from '@/pages/IncidentsPage'
 import { useAppStore } from '@/store'
 import type { Incident } from '@/types'
+import { aplicarPielAlDocumento } from '@/lib/intensidad'
 
 /**
  * Vitrina de la PANTALLA REAL de Incidencias ya convertida al diseño Apple:
@@ -42,8 +43,7 @@ export default function IncidenciasPielPage() {
   useEffect(() => { setIncidents(DEMO) }, [setIncidents])
   useEffect(() => {
     localStorage.setItem('app-skin', skin)
-    if (skin === 'default') document.documentElement.removeAttribute('data-skin')
-    else document.documentElement.setAttribute('data-skin', skin)
+    aplicarPielAlDocumento(skin) // 'pizarra' = data-skin="apple" + data-paleta="pizarra"
   }, [skin])
   useEffect(() => {
     localStorage.setItem('app-theme', theme)

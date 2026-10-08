@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LayoutGrid, Plus, Settings2, GraduationCap, MoreHorizontal } from 'lucide-react'
 import { Button, Pill, Tag, ListGroup, ListCell, CellIcon, Sheet, TabBar } from '@/components/piel'
+import { aplicarPielAlDocumento } from '@/lib/intensidad'
 
 /**
  * Vitrina VIVA de la nueva piel: `/dev/piel`.
@@ -20,10 +21,8 @@ function useToggle(key: string, initial: string) {
     localStorage.setItem(key, v)
     if (key === 'app-theme') {
       document.documentElement.classList.toggle('dark', v === 'dark')
-    } else if (v === 'default') {
-      document.documentElement.removeAttribute('data-skin')
     } else {
-      document.documentElement.setAttribute('data-skin', v)
+      aplicarPielAlDocumento(v) // 'pizarra' = data-skin="apple" + data-paleta="pizarra"
     }
   }, [key, v])
   return [v, setV] as const

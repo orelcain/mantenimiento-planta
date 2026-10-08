@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LossCascadeCard } from '@/components/grader/LossCascadeCard'
 import { fixtureShift } from './piloto/fixture'
+import { aplicarPielAlDocumento } from '@/lib/intensidad'
 
 /**
  * Vitrina del MÓDULO GRADER barrido: `/dev/grader-piel`.
@@ -21,8 +22,7 @@ export default function GraderPielPage() {
 
   useEffect(() => {
     localStorage.setItem('app-skin', skin)
-    if (skin === 'default') document.documentElement.removeAttribute('data-skin')
-    else document.documentElement.setAttribute('data-skin', skin)
+    aplicarPielAlDocumento(skin) // 'pizarra' = data-skin="apple" + data-paleta="pizarra"
   }, [skin])
 
   useEffect(() => {
