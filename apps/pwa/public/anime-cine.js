@@ -3,6 +3,7 @@
    animelists/{tgId}/cine/datos — doc aparte porque saveLists() de anime
    reescribe el doc principal completo.
    Depende de globals de anime.html: firebase, db, tg, getUserId, toast, haptic. */
+/* global db, tg, getUserId, toast, haptic */
 (function () {
   'use strict';
 
@@ -41,7 +42,7 @@
 
   // ── Utilidades ──────────────────────────────────────────────────────────
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ruta = (p) => (typeof p === 'string' && /^\/[A-Za-z0-9_.\-]+$/.test(p) ? p : null);
+  const ruta = (p) => (typeof p === 'string' && /^\/[A-Za-z0-9_.-]+$/.test(p) ? p : null);
   const img = (p, tam) => { const r = ruta(p); return r ? `${IMG}${tam}${r}` : ''; };
   const anio = (f) => (/^\d{4}/.test(f || '') ? f.slice(0, 4) : '');
   const tipoTxt = (t) => (t === 'tv' ? 'Serie' : 'Película');
