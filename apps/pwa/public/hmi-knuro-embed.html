@@ -270,6 +270,114 @@ body.readonly .psp{display:none!important;}
 body.readonly input.fe,body.readonly input.fe1,body.readonly select{pointer-events:none;opacity:0.65;user-select:none;}
 body.readonly #tip-vis-btn{display:none!important;}
 body.readonly .tip-i{cursor:default;}
+/* ── Ícono de ayuda según origen (nativo del HMI, se escala con él) ── */
+.tip-i.o-manual{background:#2E75B6;border:1px solid #2E75B6;}
+.tip-i.o-manual::after{color:#fff;}
+.tip-i.o-deducido{background:#fff6e5;border:1.5px dashed #b07a12;}
+.tip-i.o-deducido::after{color:#7A5A1E;}
+.tip-i.o-sindato{background:#ececec;border:1.5px dotted #777;}
+.tip-i.o-sindato::after{color:#555;}
+.sc .pt .plb,.sc td:has(> input[id]){cursor:pointer;}
+body.readonly .sc td:has(> input[id]){cursor:pointer;}
+/* Campo marcado por la ayuda */
+.sc input.kn-ring{outline:3px solid #2E75B6;outline-offset:3px;box-shadow:0 0 0 9px rgba(46,117,182,.22);position:relative;z-index:1;opacity:1!important;}
+.sc tr.kn-ring-row>td{background:rgba(46,117,182,.10);}
+
+/* ══ AYUDA v3 · piel PWA (DESIGN.md §3). Se dibuja en <body>, fuera de #hs,
+   para no heredar el scale() del HMI. Tema: el del padre (clase .dark en su <html>)
+   o, sin padre, prefers-color-scheme. ══ */
+:root{
+  --kh-bg:#F2F2F7;--kh-card:#FFFFFF;--kh-card2:#F2F2F7;
+  --kh-label:#1C1C1E;--kh-label2:#6E6E71;--kh-label3:rgba(60,60,67,.30);
+  --kh-sep:rgba(60,60,67,.29);--kh-fill:rgba(120,120,128,.12);
+  --kh-accent:#2E75B6;--kh-accent-tint:rgba(46,117,182,.10);
+  --kh-warn-ink:#7A5A1E;--kh-warn-tint:rgba(255,149,0,.12);--kh-warn-line:#C98A1E;
+  --kh-pop-shadow:0 8px 28px rgba(0,0,0,.14);
+  --kh-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --kh-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --kh-e-out:cubic-bezier(.22,.9,.24,1);
+}
+:root[data-kn-theme="dark"]{
+  --kh-bg:#1C1C1E;--kh-card:#2C2C2E;--kh-card2:#3A3A3C;
+  --kh-label:#FFFFFF;--kh-label2:rgba(235,235,245,.60);--kh-label3:rgba(235,235,245,.30);
+  --kh-sep:rgba(84,84,88,.65);--kh-fill:rgba(120,120,128,.24);
+  --kh-accent:#5AA0DC;--kh-accent-tint:rgba(90,160,220,.16);
+  --kh-warn-ink:#FF9F0A;--kh-warn-tint:rgba(255,159,10,.14);--kh-warn-line:#FF9F0A;
+  --kh-pop-shadow:none;
+}
+.kh{font-family:var(--kh-ui);color:var(--kh-label);-webkit-font-smoothing:antialiased;color-scheme:light;}
+:root[data-kn-theme="dark"] .kh{color-scheme:dark;}
+.kh p{margin:0;}
+.kh b{font-weight:600;}
+.kh svg{flex-shrink:0;}
+.kh :focus-visible{outline:2px solid var(--kh-accent);outline-offset:2px;}
+/* Globo (PC) */
+.kh-pop{position:fixed;z-index:10000;width:380px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;overscroll-behavior:contain;background:var(--kh-card);border-radius:26px;padding:16px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:20px;outline:1px solid var(--kh-sep);outline-offset:-1px;box-shadow:var(--kh-pop-shadow);}
+.kh-pop[data-origin="deducido"],.kh-sheet[data-origin="deducido"]{outline:1.5px dashed var(--kh-warn-line);outline-offset:-1.5px;}
+.kh-top{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:start;}
+.kh-crumb{font-size:13px;line-height:18px;color:var(--kh-label2);}
+.kh-title{font-size:17px;line-height:22px;font-weight:600;overflow-wrap:anywhere;}
+.kh-x{width:44px;height:44px;border-radius:999px;border:0;background:var(--kh-fill);color:var(--kh-label2);display:grid;place-items:center;margin:-6px -6px 0 0;cursor:pointer;padding:0;}
+.kh-x svg{width:16px;height:16px;}
+.kh-origin{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 11px 5px 9px;font-size:13px;line-height:18px;font-weight:600;align-self:flex-start;}
+.kh-origin svg{width:15px;height:15px;}
+.kh-origin.o-manual{background:var(--kh-accent-tint);color:var(--kh-accent);}
+.kh-origin.o-deducido{background:var(--kh-warn-tint);color:var(--kh-warn-ink);outline:1px dashed var(--kh-warn-line);outline-offset:-1px;}
+.kh-origin.o-sindato{background:var(--kh-fill);color:var(--kh-label2);outline:1px dotted var(--kh-label3);outline-offset:-1px;}
+.kh-warnbox{font-size:13px;line-height:18px;color:var(--kh-warn-ink);background:var(--kh-warn-tint);border-radius:14px;padding:10px 12px;}
+.kh-cmp{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;background:var(--kh-card2);border-radius:16px;padding:12px 14px;}
+.kh-cv{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.kh-cmp .k{font-size:13px;line-height:18px;color:var(--kh-label2);}
+.kh-cmp .v{font-family:var(--kh-mono);font-variant-numeric:tabular-nums;font-size:24px;line-height:28px;font-weight:500;overflow-wrap:anywhere;}
+.kh-cmp .v.dim{color:var(--kh-label2);}
+.kh-cmp.diff .v.act{color:var(--kh-warn-ink);}
+.kh-arrow{color:var(--kh-label2);font-size:17px;line-height:28px;}
+.kh-cmp .kh-delta{margin-left:auto;margin-bottom:3px;}
+.kh-delta{display:inline-block;border-radius:999px;padding:5px 10px;font-size:13px;line-height:18px;font-weight:600;font-family:var(--kh-mono);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.kh-delta.diff{background:var(--kh-warn-tint);color:var(--kh-warn-ink);}
+.kh-delta.same{background:var(--kh-fill);color:var(--kh-label2);font-family:var(--kh-ui);}
+.kh-blk{display:flex;flex-direction:column;gap:4px;}
+.kh-blk .h{font-size:13px;line-height:18px;font-weight:600;color:var(--kh-label2);}
+.kh-empty{color:var(--kh-label3);}
+.kh-lohi{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.kh-lohi>div{background:var(--kh-card2);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0;}
+.kh-lohi .h{display:flex;align-items:center;gap:6px;font-size:13px;line-height:18px;font-weight:600;color:var(--kh-label);}
+.kh-lohi svg{width:14px;height:14px;color:var(--kh-label2);}
+.kh-src{display:flex;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--kh-sep);font-size:13px;line-height:18px;color:var(--kh-label2);}
+.kh-src svg{width:16px;height:16px;}
+.kh-btn-tint{min-height:44px;border-radius:999px;border:0;background:var(--kh-accent-tint);color:var(--kh-accent);font:600 15px var(--kh-ui);padding:0 18px;align-self:flex-start;cursor:pointer;}
+/* Hoja inferior (celular) */
+.kh-sheet{position:fixed;left:0;right:0;bottom:0;z-index:10000;height:58vh;height:58dvh;background:var(--kh-card);border-radius:32px 32px 0 0;box-shadow:0 -1px 0 var(--kh-sep);display:flex;flex-direction:column;font-size:17px;line-height:22px;transform:translateY(0);transition:transform 350ms var(--kh-e-out),height 350ms var(--kh-e-out);}
+.kh-sheet.kh-full{height:92vh;height:92dvh;}
+.kh-sheet.kh-enter,.kh-sheet.kh-leave{transform:translateY(100%);}
+.kh-sheet-head{padding:8px 16px 8px;touch-action:none;flex-shrink:0;}
+.kh-grab{width:36px;height:5px;border-radius:3px;background:var(--kh-label3);margin:0 auto 8px;}
+.kh-sheet .kh-title{font-size:20px;line-height:25px;}
+.kh-sheet-body{flex:1;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:4px 16px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;}
+.kh-sheet .kh-warnbox{font-size:15px;line-height:20px;}
+.kh-sheet .kh-blk .h{font-size:15px;line-height:20px;}
+body.kh-sheet-open #hp{padding-bottom:58vh;padding-bottom:58dvh;}
+/* Lista de campos (celular) */
+#kn-help-list{width:100%;flex-shrink:0;background:var(--kh-bg);padding:16px 16px 24px;margin-top:8px;}
+#kn-help-list[hidden]{display:none;}
+.kh-list-h{font-size:15px;line-height:20px;font-weight:600;color:var(--kh-label2);padding:0 4px 6px;margin:0;}
+.kh-glist{background:var(--kh-card);border-radius:26px;overflow:hidden;}
+.kn-row{display:grid;grid-template-columns:minmax(0,1fr) auto 8px;gap:2px 12px;align-items:center;width:100%;min-height:56px;padding:8px 16px;position:relative;background:transparent;border:0;text-align:left;color:var(--kh-label);font:inherit;cursor:pointer;}
+.kn-row+.kn-row::before{content:"";position:absolute;left:16px;right:0;top:0;height:1px;background:var(--kh-sep);}
+.kn-row .l{font-size:17px;line-height:22px;grid-column:1;overflow-wrap:anywhere;}
+.kn-row .s{font-size:13px;line-height:18px;color:var(--kh-label2);display:flex;align-items:center;gap:5px;grid-column:1;}
+.kn-row .s svg{width:13px;height:13px;}
+.kn-row .s.o-manual{color:var(--kh-accent);}
+.kn-row .s.o-deducido{color:var(--kh-warn-ink);}
+.kn-row .val{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.kn-row .cur{font-family:var(--kh-mono);font-variant-numeric:tabular-nums;font-size:17px;line-height:22px;display:flex;align-items:center;gap:8px;}
+.kn-row .cur.diff{color:var(--kh-warn-ink);}
+.kn-row .def{font-size:13px;line-height:18px;color:var(--kh-label2);font-variant-numeric:tabular-nums;}
+.kn-row .kh-delta{font-size:12px;padding:3px 8px;line-height:16px;}
+.kn-row .chev{grid-column:3;grid-row:1 / span 2;width:8px;height:13px;color:var(--kh-label3);}
+.kn-row.sel{background:var(--kh-accent-tint);}
+@media (min-width:768px){#kn-help-list{display:none!important;}}
+@media (prefers-reduced-motion:reduce){.kh-sheet{transition:none;}}
 </style>
 </head>
 <body>
@@ -1344,6 +1452,7 @@ function nav(id){
   if(window.innerWidth<=860)closePanel();
 }
 function show(id,name){
+  closeHelp(true);
   document.querySelector('.sc.active')?.classList.remove('active');
   document.getElementById(id).classList.add('active');
   ['ts','bs'].forEach(x=>{const e=document.getElementById(x);if(e)e.textContent=name;});
@@ -1463,6 +1572,8 @@ async function loadFromStorage(){
 /* ── Listener postMessage desde HmiKnuroPage (sólo en iframe) ── */
 if(IN_IFRAME){
   window.addEventListener('message',e=>{
+    // Solo el padre same-origin (HmiKnuroPage / HmiKnuroPublicPage) puede hablarle al HMI.
+    if(e.origin!==location.origin||e.source!==window.parent) return;
     if(!e.data||typeof e.data.type!=='string') return;
     if(e.data.type==='hmi:load-preset'){loadPreset(e.data.name);return;}
     if(e.data.type!=='hmi:init') return;
@@ -1484,10 +1595,12 @@ if(IN_IFRAME){
       const pn=document.getElementById('pn');
       if(pn) pn.value=cur;
     }
-    // Modo readonly, tooltips y clave desde la página pública/admin
-    if(e.data.readonly) READ_ONLY=true;
+    // Modo readonly y tooltips desde la página pública/admin.
+    // La clave de edición YA NO viaja por hmi:init: la página admin (tras AdminRoute,
+    // y Firestore exige isSupervisor para escribir) concede la edición con canEdit.
+    if(e.data.readonly){READ_ONLY=true;_TIP_CAN_EDIT=false;_tipAuth=false;}
+    else if(e.data.canEdit===true){_TIP_CAN_EDIT=true;_tipAuth=true;}
     if(e.data.tooltips) Object.assign(PARAM_TOOLTIPS,e.data.tooltips);
-    if(e.data.pwd) localStorage.setItem('knuro-admin-pwd',e.data.pwd);
     renderPresets(); populateCmpSelects();
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
     if(toLoad){setAllInputs(presets[toLoad],toLoad);updateActivePreset(toLoad);}
@@ -1504,7 +1617,7 @@ async function persistPresets(changedName,previousData){
       name:changedName||null,
       data:changedName?presets[changedName]:null,
       previousData:previousData||null
-    },'*');
+    },location.origin);
     return;
   }
   try{
@@ -1531,7 +1644,7 @@ function persistRefs(){
     refs[fr.dataset.frid]=fr.textContent.trim();
   });
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:save-refs',refs},'*');
+    window.parent.postMessage({type:'hmi:save-refs',refs},location.origin);
     return;
   }
   localStorage.setItem('knuro-refs',JSON.stringify(refs));
@@ -1573,12 +1686,18 @@ let pescRows=[..._PESC_N2];
 function applyPescRows(d){
   const rows=(d&&d['pesc-rows'])?d['pesc-rows'].split(','):[..._PESC_N2];
   pescRows=rows;
+  // Reemplaza solo en los nodos de texto: un textContent sobre .plb borraba los íconos ⓘ.
   document.querySelectorAll('.plb').forEach(el=>{
-    let t=el.textContent;
-    // normalizar a N2 primero (por si venía de N1), luego aplicar destino
-    _PESC_N1.forEach((nr,i)=>{t=t.replaceAll(nr,_PESC_N2[i]);});
-    _PESC_N2.forEach((nr,i)=>{t=t.replaceAll(nr,rows[i]);});
-    el.textContent=t;
+    const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+    let n;
+    while((n=w.nextNode())){
+      if(n.parentElement&&n.parentElement.closest('.tip-i')) continue;
+      let t=n.nodeValue;
+      // normalizar a N2 primero (por si venía de N1), luego aplicar destino
+      _PESC_N1.forEach((nr,i)=>{t=t.replaceAll(nr,_PESC_N2[i]);});
+      _PESC_N2.forEach((nr,i)=>{t=t.replaceAll(nr,rows[i]);});
+      if(t!==n.nodeValue) n.nodeValue=t;
+    }
   });
 }
 function setAllInputs(d,presetName){
@@ -1595,7 +1714,7 @@ function updateActivePreset(name){
   if(t) t.textContent=name?name+' — HMI':'Knuro B2 — HMI Simulator';
   document.getElementById('pn').value=name||'';
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:set-current',name:name||''},'*');
+    window.parent.postMessage({type:'hmi:set-current',name:name||''},location.origin);
   } else {
     localStorage.setItem('knuro-current',name||'');
   }
@@ -1616,13 +1735,14 @@ function loadPreset(n){
   if(presets[n]){
     setAllInputs(presets[n],n);
     updateActivePreset(n);
+    renderTooltipIcons(); // etiquetas y valores cambiaron: refrescar íconos, lista y globo
   }
 }
 
 function deletePreset(n){
   if(!confirm('¿Eliminar preset "'+n+'"?')) return;
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:delete-preset',name:n},'*');
+    window.parent.postMessage({type:'hmi:delete-preset',name:n},location.origin);
   }
   delete presets[n];
   if(!IN_IFRAME) persistPresets();
@@ -1666,7 +1786,7 @@ function reorderPreset(n,dir){
   const tmp=base[idx];base[idx]=base[swap];base[swap]=tmp;
   presetOrder=base;
   renderPresets();
-  if(IN_IFRAME) window.parent.postMessage({type:'hmi:reorder-preset',order:base},'*');
+  if(IN_IFRAME) window.parent.postMessage({type:'hmi:reorder-preset',order:base},location.origin);
 }
 
 /* ── Export JSON (download) ── */
@@ -2648,7 +2768,9 @@ function _addTipIcon(container,tipId){
 
   const icon=document.createElement('span');
   const _hasText=_getTipText(tipId);
-  icon.className='tip-i'+(_hasText?' has-text':'')+(_isHidden?' reveal-hidden':'');
+  icon.className='tip-i'+(_hasText?' has-text o-'+parseTip(_hasText).origin:'')+(_isHidden?' reveal-hidden':'');
+  icon.setAttribute('role','button');
+  icon.setAttribute('aria-label','Ayuda: '+_getTipLabel(tipId));
   icon.dataset.pid=tipId;
 
   let _clickTimer=null;
@@ -2670,13 +2792,15 @@ function _addTipIcon(container,tipId){
 
 /* ── Renderizar iconos de tooltip ── */
 function renderTooltipIcons(){
-  // 1) Parámetros: icono en la celda del label (.plb)
-  document.querySelectorAll('.pt .plb').forEach(td=>{
-    const nextTd=td.nextElementSibling;
-    if(!nextTd) return;
-    const inp=nextTd.querySelector('input.fe,input.fe1');
-    if(!inp||!inp.id) return;
-    _addTipIcon(td,inp.id);
+  // 1) Parámetros: TODOS los campos numéricos. Si la celda vecina es la etiqueta (.plb)
+  //    el ícono va ahí; si no (2ª columna de tablas de 2 columnas, h2pr-8/9, tabla de
+  //    Vacío Baader sin .pt/.plb) va en la propia celda del campo, después del valor.
+  document.querySelectorAll('.sc input.fe[id],.sc input.fe1[id]').forEach(inp=>{
+    const td=inp.closest('td');
+    if(!td) return;
+    const prev=td.previousElementSibling;
+    if(prev&&prev.classList.contains('plb')) _addTipIcon(prev,inp.id);
+    else _addTipIcon(td,inp.id);
   });
 
   // 2) Menús de navegación: icono en el span del .idxr
@@ -2702,6 +2826,8 @@ function renderTooltipIcons(){
     btn.style.position='relative';
     _addTipIcon(btn,tipId);
   });
+  renderHelpList();
+  _khRefreshOpen();
 }
 
 /* ── Init ── */
@@ -2735,7 +2861,7 @@ window.addEventListener('load',async()=>{
     // En mobile el CSS lo convierte en panel deslizable; en desktop queda inline.
     // Notificar al padre (HmiKnuroPage) que estamos listos para recibir datos
     // Incluir tooltips locales para sincronización automática a Firestore
-    window.parent.postMessage({type:'hmi:ready',tooltips:PARAM_TOOLTIPS},'*');
+    window.parent.postMessage({type:'hmi:ready',tooltips:PARAM_TOOLTIPS},location.origin);
     // Los presets/refs llegarán via hmi:init → ver listener arriba
   } else {
     // Modo standalone: cargar desde localStorage como siempre
@@ -2788,6 +2914,7 @@ window.addEventListener('load',async()=>{
 /* ── TOOLTIP SYSTEM v2 ── */
 let PARAM_TOOLTIPS={};
 let _tipAuth=false; // sesión autenticada para edición
+let _TIP_CAN_EDIT=false; // iframe: edición concedida por la página admin (hmi:init canEdit)
 
 function initTooltipSystem(){
   // En iframe: esperar a hmi:init de Firestore. No cargar localStorage.
@@ -2816,9 +2943,15 @@ function initTooltipSystem(){
       saveTooltips();
     }
   }
-  if(!localStorage.getItem('knuro-admin-pwd')){
-    localStorage.setItem('knuro-admin-pwd','admin');
-  }
+  // Clave de edición: ya no se siembra 'admin'.
+  // · En iframe la edición la concede el padre (canEdit); se borra cualquier copia de la
+  //   clave real que versiones anteriores dejaron aquí al recibirla por hmi:init.
+  // · Standalone (archivo abierto directo, guarda solo en localStorage): la primera vez se
+  //   pide definir una clave; la 'admin' sembrada antes se descarta.
+  try{
+    if(IN_IFRAME) localStorage.removeItem('knuro-admin-pwd');
+    else if(localStorage.getItem('knuro-admin-pwd')==='admin') localStorage.removeItem('knuro-admin-pwd');
+  }catch(e){}
   _updateVisBtnState();
   setTimeout(_moveTipVisBtn,100); // esperar a que el DOM esté listo
 }
@@ -2826,7 +2959,7 @@ function initTooltipSystem(){
 function saveTooltips(){
   localStorage.setItem('knuro-tooltips',JSON.stringify(PARAM_TOOLTIPS));
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:save-tooltip',tooltips:PARAM_TOOLTIPS},'*');
+    window.parent.postMessage({type:'hmi:save-tooltip',tooltips:PARAM_TOOLTIPS},location.origin);
   }
 }
 
@@ -2848,8 +2981,8 @@ function _getTipLabel(id){
     const btn=Array.from(document.querySelectorAll('button.hb.pill')).find(b=>(b.getAttribute('onclick')||'').includes("'"+navId+"'"));
     if(btn)return btn.textContent.replace(/\s+/g,' ').trim();
   } else {
-    const inp=document.getElementById(id);
-    if(inp){const td=inp.closest('td');if(td){const plb=td.previousElementSibling;if(plb&&plb.classList.contains('plb'))return plb.textContent.replace(/\s+/g,' ').trim();}}
+    const info=_fieldInfo(id);
+    if(info) return info.name;
   }
   return id;
 }
@@ -3063,38 +3196,12 @@ function _positionTipBox(box,iconEl,pos,paramId){
   else{box.style.top='100%';box.style.bottom='auto';box.style.marginTop='4px';}
 }
 
-/* Click: fijar/cerrar tooltip */
+/* Click en ⓘ: abre/cierra la ayuda (globo anclado en PC, hoja en celular). */
 function toggleTipBox(paramId,iconEl){
-  const existing=document.querySelector('.tip-box[data-pid="'+paramId+'"]');
-  if(existing){existing.remove();return;}
+  if(_khOpen&&_khOpen.id===paramId){closeHelp();return;}
   // Si está oculto y no estamos en modo "ver ocultos", no mostrar
   if(_getTipHidden(paramId)&&!_tipRevealHidden) return;
-  closeTipBox();
-
-  const text=_getTipText(paramId);
-  const pos=_getTipPos(paramId);
-  const box=document.createElement('div');
-  box.className='tip-box';
-  box.dataset.pid=paramId;
-
-  if(text){
-    box.innerHTML='<span class="tip-close">&times;</span>'+text;
-  } else {
-    box.innerHTML='<span class="tip-close">&times;</span><span style="color:#999;font-style:italic;">Sin descripción. Doble-click en <b>ⓘ</b> para agregar.</span>';
-  }
-  box.querySelector('.tip-close').onclick=()=>box.remove();
-  _positionTipBox(box,iconEl,pos,paramId);
-
-  // Cerrar al hacer click fuera
-  setTimeout(()=>{
-    const handler=(e)=>{
-      if(!box.contains(e.target)&&e.target!==iconEl){
-        box.remove();
-        document.removeEventListener('click',handler);
-      }
-    };
-    document.addEventListener('click',handler);
-  },10);
+  openHelp(paramId,iconEl);
 }
 
 /* Pedir clave inline (sin prompt nativo) */
@@ -3135,10 +3242,17 @@ function _askPwd(iconEl,onSuccess){
 
 /* Doble-click: modo edición con clave */
 function openTipEdit(paramId,iconEl){
-  if(!_tipAuth){
+  if(READ_ONLY) return;
+  if(IN_IFRAME){
+    // En iframe solo edita quien la página admin habilitó (canEdit en hmi:init).
+    if(!_TIP_CAN_EDIT) return;
+  } else if(!_tipAuth){
+    let has=false;try{has=!!localStorage.getItem('knuro-admin-pwd');}catch(e){}
+    if(!has){setAdminPassword();return;}
     _askPwd(iconEl,()=>openTipEdit(paramId,iconEl));
     return;
   }
+  closeHelp(true);
   closeTipBox();
 
   const text=_getTipText(paramId);
@@ -3159,8 +3273,8 @@ function openTipEdit(paramId,iconEl){
   const label=_getTipLabel(paramId);
   box.innerHTML=
     '<span class="tip-close">&times;</span>'+
-    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">✏️ '+label+'</div>'+
-    '<textarea placeholder="Escribe la explicación...">'+text.replace(/</g,'&lt;')+'</textarea>'+
+    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">✏️ '+_escHTML(label)+'</div>'+
+    '<textarea placeholder="Escribe la explicación...">'+_escHTML(text)+'</textarea>'+
     '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">'+
     '<button class="tip-save">Guardar</button>'+
     '<span style="font-size:9px;color:#666;">Pos:'+selectHTML+'</span>'+
@@ -3168,7 +3282,7 @@ function openTipEdit(paramId,iconEl){
     '<div style="margin-top:5px;display:flex;align-items:center;justify-content:space-between;gap:6px;">'+
     '<label class="tip-lbl"><input type="checkbox" class="tip-chk"'+(curHidden?' checked':'')+'>'+
     ' Ocultar tooltip</label>'+
-    '<span onclick="setAdminPassword()" style="font-size:9px;color:#aaa;cursor:pointer;text-decoration:underline;">⚙ cambiar clave</span>'+
+    (IN_IFRAME?'':'<span onclick="setAdminPassword()" style="font-size:9px;color:#aaa;cursor:pointer;text-decoration:underline;">⚙ cambiar clave</span>')+
     '</div>';
 
   box.querySelector('.tip-close').onclick=()=>{box.remove();};
@@ -3198,13 +3312,15 @@ function saveTipEdit(paramId,el){
 }
 
 function setAdminPassword(){
+  // Solo standalone: en la PWA la edición la concede la página admin, sin clave.
+  if(IN_IFRAME) return;
   closeTipBox();
   const box=document.createElement('div');
   box.className='tip-box editing';
   box.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);min-width:220px;z-index:99999;';
   box.innerHTML=
     '<span class="tip-close">&times;</span>'+
-    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔑 Cambiar contraseña</div>'+
+    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔑 '+(localStorage.getItem('knuro-admin-pwd')?'Cambiar contraseña':'Define una clave de edición')+'</div>'+
     '<input type="password" id="_pwd1" placeholder="Nueva contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;margin-bottom:4px;">'+
     '<input type="password" id="_pwd2" placeholder="Confirmar contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;">'+
     '<div style="margin-top:5px;display:flex;gap:4px;align-items:center;">'+
@@ -3218,7 +3334,6 @@ function setAdminPassword(){
     if(!v1){msg.textContent='Ingresa una contraseña';msg.style.display='inline';return;}
     if(v1!==v2){msg.textContent='No coinciden';msg.style.display='inline';return;}
     localStorage.setItem('knuro-admin-pwd',v1);
-    if(IN_IFRAME) window.parent.postMessage({type:'hmi:save-pwd',pwd:v1},'*');
     _tipAuth=false;
     box.remove();
   };
@@ -3226,11 +3341,462 @@ function setAdminPassword(){
   setTimeout(()=>box.querySelector('#_pwd1').focus(),50);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   AYUDA v3 · opción B «Lista + hoja»
+   - PC (≥768 px): globo anclado al costado del campo, sin taparlo, en <body>.
+   - Celular (<768 px): lista de campos bajo el HMI + hoja inferior.
+   Todo texto de ayuda pasa por sanitizeTipHTML (solo <b>, <i>, <br>).
+   ══════════════════════════════════════════════════════════════════════ */
+function _escHTML(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+/* Lista blanca: <b>, </b>, <i>, </i>, <br> sin atributos. Todo lo demás queda escapado. */
+function sanitizeTipHTML(s){
+  return _escHTML(s)
+    .replace(/&lt;(\/?)(b|i)&gt;/gi,(m,c,t)=>'<'+c+t.toLowerCase()+'>')
+    .replace(/&lt;br\s*\/?&gt;/gi,'<br>');
+}
+function _khNorm(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();}
+
+const KH_I={
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M8 12h8"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  chev:'<svg class="chev" viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'
+};
+
+/* Parsea el texto de ayuda (ya saneado) en secciones + pie «Fuente: … pág. N · Origen: X».
+   Sin pie → Deducido. Vacío → 'none' (sin ayuda). */
+function parseTip(raw){
+  const r={origin:'none',page:'',fuente:'',que:'',unit:'',por:'',lo:'',hi:'',extra:[]};
+  if(raw==null||!String(raw).trim()) return r;
+  const html=sanitizeTipHTML(raw);
+  const KEYS={'que hace':'que','unidad':'unit','por que importa':'por','si es muy bajo':'lo','si es muy alto':'hi'};
+  let org='';
+  html.split('<br>').forEach(line=>{
+    const t=line.trim();
+    if(!t) return;
+    const f=t.match(/^<i>\s*Fuente:\s*([\s\S]*?)\s*<\/i>$/i);
+    if(f){
+      const om=f[1].match(/Origen:\s*([\s\S]+?)\s*$/i);
+      if(om) org=_khNorm(om[1]);
+      r.fuente=f[1].replace(/\s*·?\s*Origen:[\s\S]*$/i,'').trim();
+      const pm=r.fuente.match(/p[áa]g\.?\s*(\d+)/i);
+      if(pm) r.page=pm[1];
+      return;
+    }
+    const m=t.match(/^<b>([^<]*?)\s*:?\s*<\/b>\s*:?\s*([\s\S]*)$/);
+    if(m){
+      const k=KEYS[_khNorm(m[1]).replace(/:$/,'')];
+      if(k&&m[2]){r[k]=m[2];return;}
+    }
+    r.extra.push(t);
+  });
+  if(org.startsWith('manual')) r.origin='manual';
+  else if(org.startsWith('deducido')) r.origin='deducido';
+  else if(org.startsWith('sin dato')) r.origin='sindato';
+  else if(/^<b>\s*sin dato/i.test(html.trim())) r.origin='sindato';
+  else r.origin='deducido';
+  return r;
+}
+
+/* Texto efectivo (respeta «ocultos» salvo en modo «Ver ocultos») */
+function _khText(id){
+  if(_getTipHidden(id)&&!_tipRevealHidden) return '';
+  const t=_getTipText(id);
+  return typeof t==='string'?t:String(t||'');
+}
+
+/* ── Nombre legible de un campo: [Salmón/Coho ·] etiqueta [· columna] ── */
+function _khCellText(el){
+  let t='';
+  el.childNodes.forEach(n=>{
+    if(n.nodeType===3) t+=n.nodeValue;
+    else if(n.nodeType===1&&n.tagName==='BR') t+=' ';
+    else if(n.nodeType===1&&!n.classList.contains('tip-i')&&!/^(INPUT|BUTTON|SELECT)$/.test(n.tagName)) t+=n.textContent;
+  });
+  return t.replace(/\s+/g,' ').trim();
+}
+function _khColHeader(td){
+  const table=td.closest('table');
+  const head=table&&table.tHead;
+  if(!head||!head.rows.length) return '';
+  let idx=0;
+  for(const c of td.parentElement.cells){if(c===td) break; idx+=c.colSpan||1;}
+  let pos=0;
+  for(const th of head.rows[head.rows.length-1].cells){
+    const span=th.colSpan||1;
+    if(idx>=pos&&idx<pos+span) return th.textContent.replace(/\s+/g,' ').trim();
+    pos+=span;
+  }
+  return '';
+}
+function _khTablePrefix(table){
+  // Título de bloque de texto puro justo antes de la tabla (p.ej. «Salmón» / «Coho» en Ímpetu)
+  const prev=table.previousElementSibling;
+  if(prev&&prev.tagName==='DIV'&&!prev.children.length){
+    const t=prev.textContent.replace(/\s+/g,' ').trim();
+    if(t&&t.length<=24) return t;
+  }
+  return '';
+}
+function _fieldInfo(id){
+  const inp=document.getElementById(id);
+  if(!inp||!inp.matches||!inp.matches('input.fe,input.fe1')) return null;
+  const td=inp.closest('td');
+  const tr=td?td.parentElement:null;
+  let label='',labelEl=null;
+  if(tr){
+    labelEl=tr.querySelector('td.plb');
+    if(!labelEl){const c0=tr.cells[0];if(c0&&c0!==td&&!c0.querySelector('input')) labelEl=c0;}
+    if(labelEl) label=_khCellText(labelEl);
+  }
+  const col=td?_khColHeader(td):'';
+  const table=td?td.closest('table'):null;
+  const prefix=table?_khTablePrefix(table):'';
+  let name=label||id;
+  if(col) name+=' · '+col;
+  if(prefix) name=prefix+' · '+name;
+  const sc=inp.closest('.sc');
+  const st=sc?sc.querySelector('.st'):null;
+  const fr=(inp.nextElementSibling&&inp.nextElementSibling.classList.contains('fr'))?inp.nextElementSibling:null;
+  return {id,inp,td,tr,labelEl,name,screenTitle:st?st.textContent.replace(/\s+/g,' ').trim():'',fr};
+}
+function _khCrumb(title){return String(title||'').split(/\s+[-.]\s+/).map(s=>s.trim()).filter(Boolean).join(' › ');}
+
+/* ── Valores: Predeterminado (span.fr) → Actual (input) ── */
+function _khNum(s){
+  const t=String(s==null?'':s).trim().split(/\s+/)[0].replace(',','.');
+  return /^[-−]?\d+(\.\d+)?$/.test(t)?parseFloat(t.replace('−','-')):null;
+}
+function _khDec(s){const m=String(s||'').trim().split(/\s+/)[0].match(/[.,](\d+)$/);return m?m[1].length:0;}
+function _khValues(info){
+  const act=String(info.inp.value||'').trim();
+  const def=info.fr?info.fr.textContent.trim():'';
+  let state='nodef',delta='';
+  if(def){
+    const a=_khNum(act),d=_khNum(def);
+    if(a!=null&&d!=null){
+      if(Math.abs(a-d)<1e-9) state='same';
+      else{
+        state='diff';
+        const v=a-d,dec=Math.max(_khDec(act),_khDec(def));
+        delta=(v>0?'+':'−')+Math.abs(v).toFixed(dec).replace('.',',');
+      }
+    } else state=(act===def)?'same':'diff';
+  }
+  return {act,def,state,delta};
+}
+
+function _khOriginChip(p){
+  if(p.origin==='manual') return '<span class="kh-origin o-manual">'+KH_I.book+(p.page?'Manual · pág. '+_escHTML(p.page):'Manual')+'</span>';
+  if(p.origin==='deducido') return '<span class="kh-origin o-deducido">'+KH_I.warn+'Deducido</span>';
+  if(p.origin==='sindato') return '<span class="kh-origin o-sindato">'+KH_I.dash+'Sin dato</span>';
+  return '<span class="kh-origin o-sindato">'+KH_I.dash+'Sin ayuda</span>';
+}
+function _khCanEdit(){return !READ_ONLY&&(IN_IFRAME?_TIP_CAN_EDIT:true);}
+
+/* Contenido común del globo y de la hoja. Devuelve {top, body, origin}. */
+function _khContent(id,sheet){
+  const info=_fieldInfo(id);
+  const p=parseTip(_khText(id));
+  const E='<span class="kh-empty">Sin dato</span>';
+  const blk=(h,c)=>'<div class="kh-blk"><span class="h">'+h+'</span><p>'+c+'</p></div>';
+  const active=document.querySelector('.sc.active .st');
+  const crumb=_khCrumb(info?info.screenTitle:(active?active.textContent:''));
+  const title=info?info.name:_getTipLabel(id);
+  const top='<div class="kh-top"><div><div class="kh-crumb">'+_escHTML(crumb)+'</div>'+
+    '<div class="kh-title" id="kh-title-'+(sheet?'s':'p')+'">'+_escHTML(title)+'</div></div>'+
+    '<button type="button" class="kh-x" aria-label="Cerrar ayuda">'+KH_I.x+'</button></div>';
+  let b=_khOriginChip(p);
+  if(p.origin==='deducido') b+='<div class="kh-warnbox">No está en el manual. Confírmalo en terreno antes de cambiar el valor.</div>';
+  if(info){
+    const v=_khValues(info);
+    b+='<div class="kh-cmp'+(v.state==='diff'?' diff':'')+'">';
+    if(v.def) b+='<div class="kh-cv"><span class="k">Predeterminado</span><span class="v dim">'+_escHTML(v.def)+'</span></div><span class="kh-arrow" aria-hidden="true">→</span>';
+    b+='<div class="kh-cv"><span class="k">Actual</span><span class="v act">'+(_escHTML(v.act)||'—')+'</span></div>';
+    b+=v.state==='diff'?'<span class="kh-delta diff">'+(v.delta?_escHTML(v.delta):'Distinto')+'</span>'
+      :v.state==='same'?'<span class="kh-delta same">Igual al predeterminado</span>'
+      :'<span class="kh-delta same">Sin predeterminado cargado</span>';
+    b+='</div>';
+    if(p.extra.length) b+='<div class="kh-blk"><p>'+p.extra.join('<br>')+'</p></div>';
+    b+=blk('Qué hace',p.que||E);
+    if(p.unit) b+=blk('Unidad',p.unit);
+    b+=blk('Por qué importa',p.por||E);
+    b+='<div class="kh-lohi"><div><span class="h">'+KH_I.down+'Muy bajo</span><p>'+(p.lo||E)+'</p></div>'+
+       '<div><span class="h">'+KH_I.up+'Muy alto</span><p>'+(p.hi||E)+'</p></div></div>';
+  } else {
+    // Menús y botones de navegación: texto libre saneado
+    const parts=[];
+    if(p.que) parts.push(p.que);
+    if(p.por) parts.push(p.por);
+    parts.push(...p.extra);
+    b+='<div class="kh-blk"><p>'+(parts.join('<br>')||E)+'</p></div>';
+  }
+  if(_khCanEdit()) b+='<button type="button" class="kh-btn-tint" data-act="edit">'+(p.origin==='none'?'Escribir ayuda':'Editar ayuda')+'</button>';
+  const srcIc=p.origin==='manual'?KH_I.book:p.origin==='deducido'?KH_I.warn:KH_I.dash;
+  const srcTxt=p.fuente||(p.origin==='none'?'Nadie ha escrito esta ayuda todavía':'Sin página del manual');
+  b+='<div class="kh-src">'+srcIc+'<span>'+srcTxt+'</span></div>';
+  return {top,body:b,origin:p.origin,info};
+}
+
+/* ── Estado ── */
+let _khOpen=null; // {id, el, kind:'pop'|'sheet', anchor, info}
+function _khIsNarrow(){return window.innerWidth<768;}
+function _khRing(info,on){
+  if(!info) return;
+  info.inp.classList.toggle('kn-ring',on);
+  if(info.tr) info.tr.classList.toggle('kn-ring-row',on);
+}
+function closeHelp(instant){
+  if(!_khOpen) return;
+  const o=_khOpen;
+  _khOpen=null;
+  _khRing(o.info,false);
+  document.querySelectorAll('#kn-help-list .kn-row.sel').forEach(r=>r.classList.remove('sel'));
+  if(o.kind==='sheet'){
+    document.body.classList.remove('kh-sheet-open');
+    const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(instant||reduce){o.el.remove();}
+    else{o.el.classList.add('kh-leave');setTimeout(()=>o.el.remove(),360);}
+  } else o.el.remove();
+}
+function openHelp(id,anchor){
+  if(_khIsNarrow()) _khOpenSheet(id);
+  else _khOpenPop(id,anchor);
+}
+function _khWire(el,id){
+  el.querySelector('.kh-x').addEventListener('click',e=>{e.stopPropagation();closeHelp();});
+  const ed=el.querySelector('[data-act="edit"]');
+  if(ed) ed.addEventListener('click',e=>{
+    e.stopPropagation();
+    const info=_fieldInfo(id);
+    const a=(info&&info.inp)||document.querySelector('.tip-i[data-pid="'+CSS.escape(id)+'"]')||ed;
+    closeHelp(true);
+    openTipEdit(id,a);
+  });
+}
+function _khOpenPop(id,anchor){
+  closeHelp(true);
+  closeTipBox();
+  const c=_khContent(id,false);
+  const el=document.createElement('div');
+  el.className='kh kh-pop';
+  el.setAttribute('role','dialog');
+  el.setAttribute('aria-labelledby','kh-title-p');
+  el.dataset.pid=id;
+  el.dataset.origin=c.origin;
+  el.innerHTML=c.top+c.body;
+  document.body.appendChild(el);
+  _khWire(el,id);
+  _khRing(c.info,true);
+  _khOpen={id,el,kind:'pop',anchor:anchor||null,info:c.info};
+  _khPlace();
+}
+/* Al costado del campo, sin taparlo: derecha de la fila → izquierda de la fila →
+   derecha del campo → izquierda de la etiqueta → debajo/encima. */
+function _khPlace(){
+  if(!_khOpen||_khOpen.kind!=='pop') return;
+  const {el,info,anchor}=_khOpen;
+  const ref=(info&&info.inp)||anchor;
+  if(!ref||!ref.isConnected){closeHelp(true);return;}
+  const vw=window.innerWidth,vh=window.innerHeight,M=8,G=12;
+  const w=Math.min(380,vw-2*M);
+  el.style.width=w+'px';
+  const h=Math.min(el.scrollHeight,vh-2*M);
+  const fR=ref.getBoundingClientRect();
+  const rR=(info&&info.tr)?info.tr.getBoundingClientRect():fR;
+  const lR=(info&&info.labelEl)?info.labelEl.getBoundingClientRect():fR;
+  const cands=[rR.right+G, rR.left-G-w, fR.right+G, Math.min(lR.left,fR.left)-G-w];
+  let x=null,y;
+  for(const cx of cands){if(cx>=M&&cx+w<=vw-M){x=cx;break;}}
+  if(x!=null){
+    y=Math.max(M,Math.min(fR.top-16,vh-h-M));
+  } else {
+    x=Math.max(M,Math.min(fR.left,vw-w-M));
+    if(fR.bottom+G+h<=vh-M) y=fR.bottom+G;
+    else if(fR.top-G-h>=M) y=fR.top-G-h;
+    else y=Math.max(M,vh-h-M);
+  }
+  el.style.left=Math.round(x)+'px';
+  el.style.top=Math.round(y)+'px';
+}
+function _khOpenSheet(id){
+  const wasSheet=_khOpen&&_khOpen.kind==='sheet';
+  closeHelp(true);
+  closeTipBox();
+  const c=_khContent(id,true);
+  const el=document.createElement('div');
+  el.className='kh kh-sheet'+(wasSheet?'':' kh-enter');
+  el.setAttribute('role','dialog');
+  el.setAttribute('aria-labelledby','kh-title-s');
+  el.dataset.pid=id;
+  el.dataset.origin=c.origin;
+  el.innerHTML='<div class="kh-sheet-head"><div class="kh-grab" aria-hidden="true"></div>'+c.top+'</div><div class="kh-sheet-body">'+c.body+'</div>';
+  document.body.appendChild(el);
+  document.body.classList.add('kh-sheet-open');
+  _khWire(el,id);
+  _khRing(c.info,true);
+  _khOpen={id,el,kind:'sheet',anchor:null,info:c.info};
+  document.querySelectorAll('#kn-help-list .kn-row').forEach(r=>r.classList.toggle('sel',r.dataset.pid===id));
+  if(!wasSheet) requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('kh-enter')));
+  // Mantener el HMI (con el campo marcado) visible arriba de la hoja
+  const hp=document.getElementById('hp');
+  if(hp&&hp.scrollTop>0) hp.scrollTo({top:0,behavior:'smooth'});
+  // Arrastre: abajo cierra (>120 px o 25 %), arriba expande a 92 %
+  const head=el.querySelector('.kh-sheet-head');
+  let sy=0,dy=0,dragging=false;
+  head.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;dy=0;dragging=true;el.style.transition='none';},{passive:true});
+  head.addEventListener('touchmove',e=>{if(!dragging)return;dy=e.touches[0].clientY-sy;if(dy>0)el.style.transform='translateY('+dy+'px)';},{passive:true});
+  head.addEventListener('touchend',()=>{
+    if(!dragging) return;
+    dragging=false;
+    el.style.transition='';el.style.transform='';
+    if(dy>Math.min(120,el.offsetHeight*.25)) closeHelp();
+    else if(dy<-40) el.classList.add('kh-full');
+  });
+}
+/* Re-render del globo/hoja abiertos (valores o textos cambiaron) */
+function _khRefreshOpen(){
+  if(!_khOpen) return;
+  const {id,kind,el}=_khOpen;
+  if(!document.body.contains(el)){_khOpen=null;return;}
+  const info=_fieldInfo(id);
+  if(info&&!info.inp.closest('.sc.active')){closeHelp(true);return;}
+  const c=_khContent(id,kind==='sheet');
+  el.dataset.origin=c.origin;
+  if(kind==='sheet'){
+    const body=el.querySelector('.kh-sheet-body'),st=body.scrollTop;
+    el.querySelector('.kh-top').outerHTML=c.top;
+    body.innerHTML=c.body;body.scrollTop=st;
+  } else el.innerHTML=c.top+c.body;
+  _khRing(_khOpen.info,false);
+  _khOpen.info=c.info;
+  _khRing(c.info,true);
+  _khWire(el,id);
+  if(kind==='pop') _khPlace();
+}
+
+/* ── Lista de campos de la pantalla actual (celular) ── */
+function renderHelpList(){
+  const hp=document.getElementById('hp');
+  if(!hp) return;
+  let wrap=document.getElementById('kn-help-list');
+  if(!wrap){
+    wrap=document.createElement('section');
+    wrap.id='kn-help-list';
+    wrap.className='kh';
+    wrap.setAttribute('aria-label','Campos de esta pantalla');
+    hp.appendChild(wrap);
+    wrap.addEventListener('click',e=>{
+      const b=e.target.closest('.kn-row');
+      if(b) openHelp(b.dataset.pid,null);
+    });
+  }
+  const sc=document.querySelector('.sc.active');
+  const inputs=sc?[...sc.querySelectorAll('input.fe[id],input.fe1[id]')]:[];
+  if(!inputs.length){wrap.hidden=true;wrap.innerHTML='';return;}
+  wrap.hidden=false;
+  const sel=_khOpen?_khOpen.id:null;
+  const rows=inputs.map(inp=>{
+    const info=_fieldInfo(inp.id);
+    const p=parseTip(_khText(inp.id));
+    const v=_khValues(info);
+    const s=p.origin==='manual'?'<span class="s o-manual">'+KH_I.book+(p.page?'Manual · pág. '+_escHTML(p.page):'Manual')+'</span>'
+      :p.origin==='deducido'?'<span class="s o-deducido">'+KH_I.warn+'Deducido</span>'
+      :p.origin==='sindato'?'<span class="s">'+KH_I.dash+'Sin dato</span>'
+      :'<span class="s">'+KH_I.dash+'Sin ayuda</span>';
+    const cur='<span class="cur'+(v.state==='diff'?' diff':'')+'">'+(v.state==='diff'&&v.delta?'<span class="kh-delta diff">'+_escHTML(v.delta)+'</span>':'')+(_escHTML(v.act)||'—')+'</span>';
+    const def=v.def?'<span class="def">Pred. '+_escHTML(v.def)+'</span>':'';
+    return '<button type="button" class="kn-row'+(inp.id===sel?' sel':'')+'" data-pid="'+_escHTML(inp.id)+'">'+
+      '<span class="l">'+_escHTML(info.name)+'</span>'+s+'<span class="val">'+cur+def+'</span>'+KH_I.chev+'</button>';
+  });
+  wrap.innerHTML='<h2 class="kh-list-h">Campos de esta pantalla</h2><div class="kh-glist">'+rows.join('')+'</div>';
+}
+
+/* ── Tema: el del padre (clase .dark en su <html>); sin padre, el del sistema ── */
+function _khApplyTheme(){
+  let t=null;
+  try{
+    if(IN_IFRAME&&window.parent&&window.parent.document){
+      const h=window.parent.document.documentElement;
+      t=h.classList.contains('dark')?'dark':'light';
+    }
+  }catch(e){}
+  if(!t) t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  document.documentElement.dataset.knTheme=t;
+}
+_khApplyTheme();
+try{
+  if(IN_IFRAME&&window.parent&&window.parent.document)
+    new MutationObserver(_khApplyTheme).observe(window.parent.document.documentElement,{attributes:true,attributeFilter:['class']});
+}catch(e){}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',_khApplyTheme);}catch(e){}
+
+/* ── Eventos globales ── */
+window.addEventListener('load',()=>{
+  const hs=document.getElementById('hs');
+  if(!hs) return;
+  // La fila completa abre la ayuda (etiqueta, celda, ícono). El input sigue editable.
+  hs.addEventListener('click',e=>{
+    if(e.target.closest('.tip-i,button,input,select,textarea,[contenteditable="true"]')) return;
+    const td=e.target.closest('td');
+    if(!td||!td.closest('.sc.active')) return;
+    const tr=td.parentElement;
+    let inp=td.querySelector('input.fe[id],input.fe1[id]');
+    if(!inp&&td.classList.contains('plb')){
+      const nx=td.nextElementSibling;
+      inp=(nx&&nx.querySelector('input.fe[id],input.fe1[id]'))||tr.querySelector('input.fe[id],input.fe1[id]');
+    }
+    if(!inp&&!tr.querySelector('td.plb')){
+      const c0=tr.cells[0];
+      if(c0===td) inp=tr.querySelector('input.fe[id],input.fe1[id]');
+    }
+    if(!inp) return;
+    if(_getTipHidden(inp.id)&&!_tipRevealHidden&&!_khIsNarrow()) return;
+    if(_khOpen&&_khOpen.id===inp.id&&_khOpen.kind==='pop'){closeHelp();return;}
+    openHelp(inp.id,inp);
+  });
+});
+document.addEventListener('pointerdown',e=>{
+  // Globo (PC): se cierra con clic afuera. La hoja (celular) solo con ×, arrastre o Esc,
+  // para que desplazar la página con el dedo no la cierre.
+  if(!_khOpen||_khOpen.kind!=='pop') return;
+  const t=e.target;
+  if(_khOpen.el.contains(t)||!t.closest) return;
+  if(t.closest('.tip-i')) return; // el clic del ícono alterna
+  if(t.closest('#hs td')&&!t.closest('input,button,select,textarea')) return; // el clic de fila decide
+  closeHelp();
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&_khOpen){closeHelp();}});
+let _khInputT=null;
+document.addEventListener('input',e=>{
+  if(!e.target.matches||!e.target.matches('input.fe,input.fe1')) return;
+  clearTimeout(_khInputT);
+  _khInputT=setTimeout(()=>{renderHelpList();_khRefreshOpen();},150);
+});
+let _khResizeT=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(_khResizeT);
+  _khResizeT=setTimeout(()=>{
+    if(_khOpen){
+      const narrow=_khIsNarrow();
+      if(narrow&&_khOpen.kind==='pop'){const id=_khOpen.id;closeHelp(true);_khOpenSheet(id);}
+      else if(!narrow&&_khOpen.kind==='sheet'){const o=_khOpen;closeHelp(true);_khOpenPop(o.id,o.info&&o.info.inp);}
+      else _khPlace();
+    }
+  },120);
+});
+document.addEventListener('scroll',()=>{if(_khOpen&&_khOpen.kind==='pop') _khPlace();},true);
+
 initTooltipSystem();
 
 // Ctrl+Shift+T: cambiar contraseña
 document.addEventListener('keydown',e=>{
-  if(e.ctrlKey&&e.shiftKey&&e.key==='T'){
+  if(!IN_IFRAME&&e.ctrlKey&&e.shiftKey&&e.key==='T'){
     e.preventDefault();
     setAdminPassword();
   }
