@@ -2,7 +2,9 @@
  * Sección «Repuesto» de la ficha A3C (opción «Pieza al frente»): qué pieza es el elemento, si hay en
  * bodega y dónde, cómo se ve y con qué certeza, y la pregunta «¿Es la pieza instalada en esta
  * máquina?» a un toque. Comparte las confirmaciones con el visor del plano eléctrico: mismo plano
- * (`baader-142-888`) y mismo doc `planoVinculos/<slug>__<aparato>`.
+ * (`baader-142-888`) y mismo doc `planoVinculos/<slug>__<aparato>__<maquina>`: el plano sirve a N2 y
+ * N3 y una misma designación puede llevar piezas distintas en cada una. La máquina se elige una vez
+ * (`useMaquinaPlano`: ?maquina= o la última usada); la ficha no la repite, solo la nombra.
  *
  * Fuentes: `partes.json` (catálogos BAADER 2006 y 2014 cruzados con el maestro SAP; ver
  * scripts/planos/aplicar_cruce_a3c_888.py), `repuestos`/`bodega`
@@ -14,12 +16,18 @@ import { Camera, Cog, ImageOff, Layers, Package, FilePlus } from 'lucide-react'
 import { Button, Pill, Sheet } from '@/components/piel'
 import { usePartesPlano, type ParteFisica } from '@/hooks/usePartesPlano'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
+import { useMaquinaPlano } from '@/hooks/useMaquinaPlano'
+import { SelectorMaquinaPlano } from '@/components/aprendizaje/SelectorMaquinaPlano'
+import { EnTerrenoA3c } from './EnTerrenoA3c'
+import type { MaquinaBaader } from '@/services/baader142/perilla5Protocolo'
 import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
 import { certezaDe, clasificarRepuesto, esModoCandidatos, origenPieza, SLUG_PLANO_A3C } from '@/utils/aprendizaje/repuestosA3c'
 import {
   MAX_CODIGO_ETIQUETA,
+  estadoPorMaquina,
+  etiquetaMaquina,
   fechaCortaVinculo,
   guardarVinculoTerreno,
   mensajeErrorTerreno,
@@ -28,11 +36,20 @@ import {
 
 type Vinculos = ReturnType<typeof usePlanoVinculos>
 
+/** La máquina activa y lo que hay guardado de este aparato en cada una. */
+interface TerrenoProps {
+  maquina: MaquinaBaader | null
+  maquinas: readonly MaquinaBaader[]
+  setMaquina: (m: MaquinaBaader) => void
+  entrada?: Vinculos['porAparato'] extends Map<string, infer E> ? E : never
+}
+
 const mayuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; compacta?: boolean }) {
   const partes = usePartesPlano(SLUG_PLANO_A3C)
-  const vinculosHook = usePlanoVinculos(SLUG_PLANO_A3C)
+  const { maquina, setMaquina, maquinas } = useMaquinaPlano(SLUG_PLANO_A3C)
+  const vinculosHook = usePlanoVinculos(SLUG_PLANO_A3C, maquina)
   const sesion = useAuthStore(s => s.isAuthenticated)
   const clase = useMemo(() => clasificarRepuesto(codigo, partes), [codigo, partes])
   const saps = useMemo(() => clase.piezas.map(p => p.sap).filter((s): s is string => !!s), [clase])
@@ -42,6 +59,9 @@ export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; comp
   if (!partes || clase.estado === 'D') return null
   const candidatos = esModoCandidatos(clase.piezas)
   const size = compacta ? 'sm' : 'md'
+  const entrada = vinculosHook.porAparato.get(codigo)
+  const distintas = sesion && estadoPorMaquina(entrada, maquinas).distintas
+  const terreno: TerrenoProps = { maquina, maquinas, setMaquina, entrada }
 
   return (
     <section className="mt-5 break-inside-avoid" data-testid="repuesto-a3c" data-estado={clase.estado}>
@@ -49,10 +69,13 @@ export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; comp
         <SoloFamilia familia={clase.familia} despiece={partes.despiece} compacta={compacta} />
       ) : (
         <>
+        {distintas && (
+          <Pill tone="info" className="mb-3">Distinta por máquina</Pill>
+        )}
         {candidatos && (
           <p className="mb-3 text-footnote text-muted-foreground" data-testid="repuesto-candidatos">
             El catálogo no dice cuál de estos {clase.piezas.length} códigos va en {codigo}. La etiqueta del
-            equipo decide: márcala abajo y queda registrada para todos.
+            equipo decide: márcala abajo y queda registrada para esa máquina.
           </p>
         )}
         {clase.piezas.map((p, i) => (
@@ -71,6 +94,7 @@ export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; comp
             compacta={compacta}
             candidatos={candidatos}
             nrPrimera={clase.piezas[0]?.nr ?? p.nr}
+            terreno={terreno}
           />
         ))}
         {candidatos && clase.piezas[0] && (
@@ -82,6 +106,7 @@ export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; comp
             vinculos={vinculosHook}
             sesion={sesion}
             size={size}
+            terreno={terreno}
           />
         )}
         </>
@@ -148,9 +173,10 @@ interface PiezaBloqueProps {
   /** Varias piezas candidatas: la pregunta va una sola vez, al final de la sección. */
   candidatos: boolean
   nrPrimera: string
+  terreno: TerrenoProps
 }
 
-function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vinculos, sesion, repuesto, cargando, compacta, candidatos, nrPrimera }: PiezaBloqueProps) {
+function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vinculos, sesion, repuesto, cargando, compacta, candidatos, nrPrimera, terreno }: PiezaBloqueProps) {
   const navigate = useNavigate()
   const size = compacta ? 'sm' : 'md'
   // El vínculo es por aparato, no por pieza: solo la primera lo lleva (igual que el visor eléctrico),
@@ -262,7 +288,7 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
         )}
       </div>
 
-      {indice === 0 && !candidatos && <PreguntaTerreno codigo={codigo} pieza={pieza} vinculo={v} vinculos={vinculos} sesion={sesion} size={size} />}
+      {indice === 0 && !candidatos && <PreguntaTerreno codigo={codigo} pieza={pieza} vinculo={v} vinculos={vinculos} sesion={sesion} size={size} terreno={terreno} />}
 
       <Sheet open={foto} onClose={() => setFoto(false)} title={pieza.nr} description={nombreSap ?? pieza.es}>
         {repuesto?.fotoUrl && <img src={repuesto.fotoUrl} alt={`Foto de ${pieza.nr}`} className="mx-auto max-h-[60dvh] w-full rounded-ctl object-contain" />}
@@ -280,7 +306,7 @@ function Stock({ repuesto, cargando }: { repuesto?: RepuestoResuelto; cargando: 
 }
 
 function PreguntaTerreno({
-  codigo, pieza, candidatos, vinculo, vinculos, sesion, size,
+  codigo, pieza, candidatos, vinculo, vinculos, sesion, size, terreno,
 }: {
   codigo: string
   pieza: ParteFisica
@@ -290,7 +316,10 @@ function PreguntaTerreno({
   vinculos: Vinculos
   sesion: boolean
   size: 'sm' | 'md'
+  terreno: TerrenoProps
 }) {
+  const { maquina, maquinas, setMaquina, entrada } = terreno
+  const mm = maquina ? etiquetaMaquina(maquina) : null
   const [corrigiendo, setCorrigiendo] = useState(false)
   const [otra, setOtra] = useState(false)
   const [etiqueta, setEtiqueta] = useState('')
@@ -300,7 +329,7 @@ function PreguntaTerreno({
   const [error, setError] = useState<string | null>(null)
 
   const guardar = async (estado: VinculoTerreno['estado'], nrElegido: string = pieza.nr) => {
-    if (!puedeGuardarTerreno(estado, etiqueta)) return
+    if (!maquina || !puedeGuardarTerreno(estado, etiqueta)) return
     setGuardando(true)
     setError(null)
     try {
@@ -334,46 +363,62 @@ function PreguntaTerreno({
     )
   }
 
+  const enTerreno = <EnTerrenoA3c entrada={entrada} maquinas={maquinas} maquina={maquina} />
+
   if (vinculo && !corrigiendo) {
     const quien = `${vinculo.confirmadoPorNombre || 'alguien'}${vinculo.actualizado ? ` · ${fechaCortaVinculo(vinculo.actualizado)}` : ''}`
     const texto =
       vinculo.estado === 'confirmado'
-        ? `Confirmada en esta máquina${candidatos && vinculo.codigo ? ` (${vinculo.codigo})` : ''} por ${quien}.`
+        ? `Confirmada en ${mm}${candidatos && vinculo.codigo ? ` (${vinculo.codigo})` : ''} por ${quien}.`
         : vinculo.estado === 'corregido'
-          ? `En terreno se anotó otra pieza, por ${quien}.`
-          : `Marcado en terreno: el elemento no tiene esta pieza en la máquina, por ${quien}.`
+          ? `En ${mm} se anotó otra pieza, por ${quien}.`
+          : `Marcado en terreno: el elemento no tiene esta pieza en ${mm}, por ${quien}.`
     // El hook no permite borrar un vínculo, así que no hay «Deshacer»: solo volver a responder.
     return (
-      <div className={separador}>
-        <p className="text-footnote text-muted-foreground">{texto}</p>
-        <Button variant="plain" size={size} className="-ml-2.5" onClick={() => setCorrigiendo(true)}>
-          Corregir respuesta
-        </Button>
-      </div>
+      <>
+        {enTerreno}
+        <div className={separador}>
+          <p className="text-footnote text-muted-foreground">{texto}</p>
+          <Button variant="plain" size={size} className="-ml-2.5" onClick={() => setCorrigiendo(true)}>
+            Corregir respuesta de {mm}
+          </Button>
+        </div>
+      </>
     )
   }
 
+  const sinMaquina = !maquina
   return (
+    <>
+    {enTerreno}
     <div className={separador}>
+      {sinMaquina && (
+        // Sin máquina elegida no se responde: un default silencioso guardaría en la equivocada.
+        <div className="mb-3" data-testid="elige-maquina">
+          <p className="mb-2 text-subhead font-semibold">¿En cuál máquina estás?</p>
+          <SelectorMaquinaPlano maquina={maquina} maquinas={maquinas} onChange={setMaquina} />
+        </div>
+      )}
       <p className="mb-2 text-subhead font-semibold">
-        {candidatos ? '¿Qué código dice la etiqueta?' : '¿Es la pieza instalada en esta máquina?'}
+        {candidatos ? '¿Qué código dice la etiqueta' : '¿Es la pieza instalada'}
+        {mm ? ` en ${mm}` : ''}?
       </p>
       <div className="flex flex-wrap gap-1.5">
         {candidatos ? (
           candidatos.map(c => (
-            <Button key={c.nr} variant="tinted" size={size} disabled={guardando} onClick={() => void guardar('confirmado', c.nr)}>
+            <Button key={c.nr} variant="tinted" size={size} disabled={guardando || sinMaquina} onClick={() => void guardar('confirmado', c.nr)}>
               Es {c.nr}
             </Button>
           ))
         ) : (
-          <Button variant="tinted" size={size} disabled={guardando} onClick={() => void guardar('confirmado')}>
+          <Button variant="tinted" size={size} disabled={guardando || sinMaquina} onClick={() => void guardar('confirmado')}>
             Sí, es esta
           </Button>
         )}
-        <Button variant="plain" size={size} disabled={guardando} onClick={() => setOtra(true)}>
+        <Button variant="plain" size={size} disabled={guardando || sinMaquina} onClick={() => setOtra(true)}>
           {candidatos ? 'Otro código' : 'Es otra'}
         </Button>
-        <Button variant="plain" size={size} disabled={guardando} onClick={() => void guardar('no_aplica')}>
+        <Button variant="plain" size={size} disabled={guardando || sinMaquina} onClick={() => void guardar('no_aplica')}>
           No existe aquí
         </Button>
       </div>
@@ -424,5 +469,6 @@ function PreguntaTerreno({
         </div>
       </Sheet>
     </div>
+    </>
   )
 }

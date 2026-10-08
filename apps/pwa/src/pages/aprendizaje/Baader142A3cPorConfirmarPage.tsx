@@ -3,23 +3,29 @@
  * `/aprendizaje/baader-142/tarjeta-a3c/por-confirmar`). Lista, por módulo y en orden de fallas, los
  * elementos del plano 888 cuya pieza hay que confirmar mirando el equipo. La ficha de cada uno es
  * `RepuestoA3c` (la misma de la Tarjeta): teléfono = Sheet; PC = lista a la izquierda y ficha a la
- * derecha. El elemento elegido va en `?el=` para compartir el enlace.
+ * derecha. El elemento elegido va en `?el=` y la máquina en `?maquina=n2` para compartir el enlace.
+ * El plano 888 sirve a N2 y N3 y una misma designación puede llevar piezas distintas en cada una:
+ * la máquina se elige UNA vez (selector bajo el título), la lista, el KPI y la pregunta de cada
+ * ficha hablan de ella, y cada fila dice en una línea gris qué pasa en la otra.
  * Prioridad: `data/baader142A3cPrioridad.ts` (curada a mano). Candidatos: `partes.json` en vivo.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Check, ChevronLeft, Cog, Disc3, Droplet, ScanLine, Workflow } from 'lucide-react'
 import { Button, CellIcon, Disclosure, ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import { RepuestoA3c } from '@/components/aprendizaje/a3c/RepuestoA3c'
+import { SelectorMaquinaPlano } from '@/components/aprendizaje/SelectorMaquinaPlano'
 import { cargarA3c, type PaqueteA3c } from '@/data/baader142A3c'
-import { PRIORIDAD_A3C, TOTAL_PRIORITARIOS, type TipoElementoPrioritario } from '@/data/baader142A3cPrioridad'
+import { PRIORIDAD_A3C, type TipoElementoPrioritario } from '@/data/baader142A3cPrioridad'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { usePlanoVinculos } from '@/hooks/usePlanoVinculos'
+import { useMaquinaPlano } from '@/hooks/useMaquinaPlano'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
-import { armarPorConfirmar, estaEnLista, primeraSeleccion, type FilaPorConfirmar } from '@/utils/aprendizaje/porConfirmarA3c'
+import { armarPorConfirmar, estaEnLista, primeraSeleccion, type Conteo, type FilaPorConfirmar } from '@/utils/aprendizaje/porConfirmarA3c'
+import type { MaquinaBaader } from '@/services/baader142/perilla5Protocolo'
 import { clasificarRepuesto, letraFamilia, SLUG_PLANO_A3C } from '@/utils/aprendizaje/repuestosA3c'
-import { fechaCortaVinculo } from '@/utils/aprendizaje/vinculoTerreno'
+import { etiquetaMaquina, fechaCortaVinculo } from '@/utils/aprendizaje/vinculoTerreno'
 
 const RUTA_TARJETA = '/aprendizaje/baader-142/tarjeta-a3c'
 
@@ -79,6 +85,30 @@ function Fila({ fila, sesion, seleccionada, onAbrir }: { fila: FilaPorConfirmar;
     linea2 = <>Leído: {mono(v?.codigo ?? '—')}</>
   }
 
+  // Línea gris: qué pasa en la otra máquina (en azul si lleva una pieza distinta).
+  const linea3 = sesion
+    ? fila.otras.map(o => {
+        const mm = etiquetaMaquina(o.maquina)
+        const distinta = o.relacion === 'distinta'
+        const texto =
+          o.estado === 'pendiente'
+            ? 'pendiente'
+            : o.estado === 'no_aplica'
+              ? 'no existe'
+              : o.codigo
+                ? <>{mono(o.codigo)}{o.relacion ? `, ${o.relacion}` : ''}</>
+                : o.estado === 'corregido'
+                  ? 'otra pieza'
+                  : 'confirmado'
+        return (
+          <span key={o.maquina} className={cn(distinta && 'text-brand-ink')} data-testid={`otra-${fila.codigo}-${mm}`}>
+            {mm}: {texto}
+          </span>
+        )
+      })
+    : []
+  const previo = sesion && estado === 'pendiente' && fila.anteriorSinMaquina ? <span key="previo">antes sin indicar máquina</span> : null
+
   let pill: React.ReactNode = null
   if (estado === 'confirmado') pill = <Pill tone="ok"><Check aria-hidden className="size-3" /> Confirmado</Pill>
   else if (estado === 'corregido') pill = <Pill tone="warning">Otra pieza</Pill>
@@ -98,7 +128,16 @@ function Fila({ fila, sesion, seleccionada, onAbrir }: { fila: FilaPorConfirmar;
         </>
       }
       detail={fila.lectura ? <span className="text-subhead text-foreground">{fila.lectura}</span> : undefined}
-      subtitle={linea2}
+      subtitle={
+        <>
+          {linea2}
+          {(linea3.length > 0 || previo) && (
+            <span className="block">
+              {[...linea3, previo].filter(Boolean).flatMap((x, i) => (i === 0 ? [x] : [' · ', x]))}
+            </span>
+          )}
+        </>
+      }
       trailing={pill}
       chevron
       onClick={onAbrir}
@@ -118,13 +157,59 @@ function Ficha({ codigo, nombre }: { codigo: string; nombre?: string }) {
   )
 }
 
+/** KPI de la ronda: barra grande de la máquina elegida y dos chicas (la otra máquina, «En ambas»). */
+function KpiRonda({ maquina, maquinas, prioritarios }: { maquina: MaquinaBaader | null; maquinas: readonly MaquinaBaader[]; prioritarios: Conteo }) {
+  const pct = (n: number) => `${prioridadPct(n, prioritarios.total)}%`
+  const grande = maquina ? (prioritarios.porMaquina[maquina] ?? 0) : prioritarios.enTodas
+  const chicas: { clave: string; etiqueta: string; n: number; tenue: boolean }[] = [
+    ...maquinas.filter(m => m !== maquina).map(m => ({ clave: m, etiqueta: etiquetaMaquina(m), n: prioritarios.porMaquina[m] ?? 0, tenue: true })),
+    ...(maquina ? [{ clave: 'ambas', etiqueta: 'En ambas', n: prioritarios.enTodas, tenue: false }] : []),
+  ]
+  return (
+    <>
+      <p className="tabular-nums">
+        <span className="text-display font-bold">{grande}</span>{' '}
+        <span className="text-body text-muted-foreground">
+          de {prioritarios.total} prioritarios resueltos {maquina ? `en ${etiquetaMaquina(maquina)}` : 'en ambas'}
+        </span>
+      </p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+        <div
+          className="h-full rounded-full bg-success transition-[width] duration-300 motion-reduce:transition-none"
+          style={{ width: pct(grande) }}
+        />
+      </div>
+      {chicas.length > 0 && (
+        <div className="mt-3 grid grid-cols-[auto_1fr_auto] items-center gap-x-2.5 gap-y-2 text-footnote tabular-nums" data-testid="kpi-otras">
+          {chicas.map(c => (
+            <Fragment key={c.clave}>
+              <span className="text-muted-foreground">{c.etiqueta}</span>
+              <div className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+                <div
+                  className={cn('h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none', c.tenue ? 'bg-muted-foreground/55' : 'bg-success')}
+                  style={{ width: pct(c.n) }}
+                />
+              </div>
+              <span>{c.n}/{prioritarios.total}</span>
+            </Fragment>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-footnote text-muted-foreground">La tarjeta cuenta lo resuelto en ambas máquinas.</p>
+    </>
+  )
+}
+
+const prioridadPct = (n: number, total: number) => (total ? (n / total) * 100 : 0)
+
 export function Baader142A3cPorConfirmarPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [paquete, setPaquete] = useState<PaqueteA3c | null>(null)
   const [error, setError] = useState<string | null>(null)
   const partes = usePartesPlano(SLUG_PLANO_A3C)
-  const { vinculos } = usePlanoVinculos(SLUG_PLANO_A3C)
+  const { maquina, setMaquina, maquinas } = useMaquinaPlano(SLUG_PLANO_A3C)
+  const { porAparato } = usePlanoVinculos(SLUG_PLANO_A3C)
   const sesion = useAuthStore(s => s.isAuthenticated)
   const esPc = useEsPc()
 
@@ -141,11 +226,13 @@ export function Baader142A3cPorConfirmarPage() {
             prioridad: PRIORIDAD_A3C,
             aparatos: partes?.aparatos,
             // Sin sesión no se afirma nada confirmado.
-            vinculos: sesion ? vinculos : null,
+            porAparato: sesion ? porAparato : null,
+            maquina,
+            maquinas,
             elementos: paquete.datos.elementos,
           })
         : null,
-    [paquete, partes, vinculos, sesion],
+    [paquete, partes, porAparato, sesion, maquina, maquinas],
   )
 
   const el = params.get('el')
@@ -153,8 +240,11 @@ export function Baader142A3cPorConfirmarPage() {
   // de familia por coincidencia ni bloquea la selección automática de la primera pendiente.
   const elValido = datos && estaEnLista(datos, el) ? el : null
   const seleccion = elValido ?? (esPc && datos ? primeraSeleccion(datos) : null)
-  const elegir = (codigo: string) => setParams({ el: codigo }, { replace: true })
-  const cerrar = () => setParams({}, { replace: true })
+  // Conservan el resto de la query (?maquina=…): `setParams({ el })` la borraba.
+  const elegir = (codigo: string) =>
+    setParams(prev => { const n = new URLSearchParams(prev); n.set('el', codigo); return n }, { replace: true })
+  const cerrar = () =>
+    setParams(prev => { const n = new URLSearchParams(prev); n.delete('el'); return n }, { replace: true })
   const nombreDe = (c: string) => paquete?.datos.elementos[c]?.es
 
   const volver = (
@@ -173,18 +263,9 @@ export function Baader142A3cPorConfirmarPage() {
       <section className="mt-4 rounded-card bg-card p-4" data-testid="kpi-por-confirmar">
         {sesion ? (
           <>
-            <p className="tabular-nums">
-              <span className="text-display font-bold">{datos.prioritarios.confirmados}</span>{' '}
-              <span className="text-body text-muted-foreground">de {TOTAL_PRIORITARIOS} prioritarios confirmados</span>
-            </p>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
-              <div
-                className="h-full rounded-full bg-success transition-[width] duration-300 motion-reduce:transition-none"
-                style={{ width: `${(datos.prioritarios.confirmados / TOTAL_PRIORITARIOS) * 100}%` }}
-              />
-            </div>
+            <KpiRonda maquina={maquina} maquinas={maquinas} prioritarios={datos.prioritarios} />
             <p className="mt-2 text-footnote text-muted-foreground tabular-nums">
-              {datos.plano.confirmados} de {datos.plano.total} en todo el plano
+              {maquina ? etiquetaMaquina(maquina) : 'En ambas'}: {maquina ? datos.plano.porMaquina[maquina] ?? 0 : datos.plano.enTodas} de {datos.plano.total} en todo el plano
             </p>
           </>
         ) : (
@@ -200,7 +281,7 @@ export function Baader142A3cPorConfirmarPage() {
             title={<span className="text-headline text-foreground">{g.numero} · {g.modulo.nombre}</span>}
             action={
               <span className="text-footnote tabular-nums text-muted-foreground">
-                {g.modulo.episodios} episodios{sesion ? ` · ${g.confirmados}/${g.total}` : ''}
+                {g.modulo.episodios} episodios{sesion && maquina ? ` · ${g.resueltos}/${g.total} en ${etiquetaMaquina(maquina)}` : ''}
               </span>
             }
             footer={g.modulo.resumen}
@@ -214,7 +295,7 @@ export function Baader142A3cPorConfirmarPage() {
         <div>
           <Disclosure
             title="Resto"
-            summary={`${datos.resto.total} elementos${sesion ? ` · ${datos.resto.confirmados} confirmados` : ''}`}
+            summary={`${datos.resto.total} elementos${sesion && maquina ? ` · ${datos.resto.resueltos} resueltos en ${etiquetaMaquina(maquina)}` : ''}`}
             defaultOpen={false}
             storageKey="a3c-por-confirmar-resto"
             flush
@@ -246,7 +327,18 @@ export function Baader142A3cPorConfirmarPage() {
         <h1 className="text-display font-bold">Por confirmar en terreno</h1>
         <p className="mt-0.5 text-footnote text-muted-foreground">Ordenado por fallas en la bitácora desde el 16-09</p>
         <div className="lg:grid lg:grid-cols-[420px_1fr] lg:items-start lg:gap-6">
-          <div className="min-w-0">{cuerpo}</div>
+          <div className="min-w-0">
+            {sesion && (
+              // Cromo de navegación (translúcido): es la única superficie translúcida y no es contenido.
+              <div className="sticky top-0 z-10 -mx-4 bg-background/80 px-4 pb-2.5 pt-2 backdrop-blur-xl lg:mx-0 lg:px-0" data-testid="selector-maquina">
+                <SelectorMaquinaPlano maquina={maquina} maquinas={maquinas} onChange={setMaquina} />
+                <p className="mt-1.5 text-footnote text-muted-foreground tabular-nums">
+                  {maquina ? `Respondes por ${etiquetaMaquina(maquina)} · plano 888` : '¿En cuál máquina estás? Elígela para responder.'}
+                </p>
+              </div>
+            )}
+            {cuerpo}
+          </div>
           {esPc && seleccion && (
             <aside className="sticky top-4 mt-4 max-h-[calc(100dvh-32px)] overflow-y-auto rounded-card bg-card p-5" data-testid="panel-ficha">
               <h2 className="text-headline font-semibold">
