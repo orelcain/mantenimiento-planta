@@ -14,8 +14,6 @@ import {
   saveHmiRefs,
   saveHmiTooltips,
   getHmiTooltips,
-  getHmiTooltipPwd,
-  saveHmiTooltipPwd,
   addHmiHistory,
   getHmiHistory,
   seedDefaultPresets,
@@ -72,12 +70,11 @@ export function HmiKnuroPage() {
   // No depende de user para leer; solo lo necesita para sembrar presets si vacío.
   const sendInitData = useCallback(async (iframe: HTMLIFrameElement) => {
     try {
-      let [presetsData, current, refs, order, pwd, tooltips] = await Promise.all([
+      let [presetsData, current, refs, order, tooltips] = await Promise.all([
         getHmiPresets(),
         getCurrentPreset(),
         getHmiRefs(),
         getPresetOrder(),
-        getHmiTooltipPwd(),
         getHmiTooltips(),
       ])
       // Si Firestore está vacío, sembrar los 6 presets por defecto automáticamente
@@ -96,7 +93,13 @@ export function HmiKnuroPage() {
       setPresets(presetsData)
       setCurrentPresetName(current)
       setPresetOrder(order)
-      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order, pwd, tooltips }, '*')
+      // La clave de edición ya NO viaja al iframe: esta página está tras AdminRoute y
+      // Firestore exige isSupervisor para escribir hmi-knuro-tooltips, así que la
+      // edición de globos se concede con canEdit (ver hmi-knuro-embed.html).
+      iframe.contentWindow?.postMessage(
+        { type: 'hmi:init', presets: presetsData, current, refs, order, tooltips, canEdit: true },
+        window.location.origin,
+      )
     } catch (err) {
       logger.error('HMI: Error cargando Firestore', err instanceof Error ? err : new Error(String(err)))
     }
@@ -156,14 +159,7 @@ export function HmiKnuroPage() {
         return
       }
 
-      if (type === 'hmi:save-pwd') {
-        if (typeof event.data.pwd === 'string' && event.data.pwd) {
-          await saveHmiTooltipPwd(event.data.pwd).catch(err =>
-            logger.error('HMI: Error guardando clave en Firestore', err instanceof Error ? err : new Error(String(err)))
-          )
-        }
-        return
-      }
+      // 'hmi:save-pwd' ya no existe: el iframe no maneja la clave (se cambia en Ajustes).
 
       // El resto de mensajes requieren user autenticado
       if (!user) return
@@ -225,7 +221,7 @@ export function HmiKnuroPage() {
 
   // ── Cargar preset desde la toolbar React (útil en mobile) ──────────────
   const loadPresetFromReact = useCallback((name: string) => {
-    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:load-preset', name }, '*')
+    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:load-preset', name }, window.location.origin)
     setCurrentPresetName(name)
     setPresetsOpen(false)
   }, [])
@@ -276,7 +272,7 @@ export function HmiKnuroPage() {
     // Cargar el clon en el iframe
     iframeRef.current?.contentWindow?.postMessage(
       { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {}, order: cloneOrder },
-      '*'
+      window.location.origin
     )
     await setCurrentPreset(trimmed)
     setCurrentPresetName(trimmed)
@@ -290,7 +286,7 @@ export function HmiKnuroPage() {
     const [presetsData, current, refs] = await Promise.all([getHmiPresets(), getCurrentPreset(), getHmiRefs()])
     setPresets(presetsData)
     setCurrentPresetName(current)
-    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order: presetOrder }, '*')
+    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order: presetOrder }, window.location.origin)
   }, [user, presetOrder])
 
   const saveAsDefaults = useCallback(async () => {
@@ -338,7 +334,7 @@ export function HmiKnuroPage() {
       await setCurrentPreset(trimmed)
       setCurrentPresetName(trimmed)
       iframeRef.current?.contentWindow?.postMessage(
-        { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {}, order: newOrder }, '*'
+        { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {}, order: newOrder }, window.location.origin
       )
     }
     setEditingPreset(null)

@@ -124,7 +124,7 @@ export function HmiKnuroPublicPage() {
         readonly: true,
         tooltips,
       },
-      '*'
+      window.location.origin
     )
   }
 
@@ -144,7 +144,7 @@ export function HmiKnuroPublicPage() {
     setSelected(name)
     navigate(`../learn/${encodeURIComponent(name)}`, { relative: 'route', replace: true })
     if (iframeReadyRef.current) {
-      iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:load-preset', name }, '*')
+      iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:load-preset', name }, window.location.origin)
       // Also re-send full init to ensure tooltips are loaded
       setTimeout(() => sendInitData(name), 100)
     }
