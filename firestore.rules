@@ -2320,6 +2320,16 @@ service cloud.firestore {
       allow create, update: if tieneSesionAnime()
         && request.auth.token.anime_tg == userId
         && isValidDocSize();
+
+      // Películas, series y plataformas (modo Cine). Doc aparte: saveLists()
+      // reescribe el doc de anime completo y borraría estos campos.
+      match /cine/{docId} {
+        allow read: if tieneSesionAnime() && request.auth.token.anime_tg == userId;
+        allow create, update: if tieneSesionAnime()
+          && request.auth.token.anime_tg == userId
+          && docId == 'datos'
+          && isValidDocSize();
+      }
     }
 
     // ── Telegram Mini App — whitelist de chats autorizados ───────────────────
