@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import type { PartesPlano, ParteFisica } from '@/hooks/usePartesPlano'
-import type { VinculoTerreno } from '@/hooks/usePlanoVinculos'
 import type { RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
 import { useAuthStore } from '@/store/authStore'
 import { RepuestoA3c } from '../RepuestoA3c'
@@ -11,22 +10,39 @@ import { IndicadorRepuestosA3c } from '../IndicadorRepuestosA3c'
 
 const mocks = vi.hoisted(() => ({
   partes: null as unknown,
-  vinculos: new Map<string, unknown>(),
+  /** docs de planoVinculos tal como los lee el hook (con `maquina` o sin ella, los viejos). */
+  docs: [] as Record<string, unknown>[],
+  /** la máquina con que RepuestoA3c pidió el hook. */
+  maquinaPedida: null as unknown,
   bySap: new Map<string, unknown>(),
   confirmar: vi.fn(async () => {}),
   subirFoto: vi.fn(async () => 'https://foto'),
 }))
 
 vi.mock('@/hooks/usePartesPlano', () => ({ usePartesPlano: () => mocks.partes }))
-vi.mock('@/hooks/usePlanoVinculos', () => ({
-  usePlanoVinculos: () => ({
-    vinculos: mocks.vinculos,
-    confirmar: mocks.confirmar,
-    subirFoto: mocks.subirFoto,
-    resumen: { confirmados: 0, corregidos: 0, total: 0 },
-    error: null,
-  }),
-}))
+// El hook real agrupa y filtra con las funciones puras de vinculoTerreno: se reusan acá.
+vi.mock('@/hooks/usePlanoVinculos', async () => {
+  const u = await vi.importActual<typeof import('@/utils/aprendizaje/vinculoTerreno')>('@/utils/aprendizaje/vinculoTerreno')
+  return {
+    usePlanoVinculos: (slug: string, maquina?: 'baader-n1' | 'baader-n2' | 'baader-n3' | null) => {
+      mocks.maquinaPedida = maquina ?? null
+      const porAparato = u.agruparVinculos(slug, mocks.docs as { aparato: string; maquina?: 'baader-n2' }[])
+      const vinculos = new Map<string, unknown>()
+      porAparato.forEach((e, aparato) => {
+        const v = u.vinculoActivo(slug, e, maquina)
+        if (v) vinculos.set(aparato, v)
+      })
+      return {
+        vinculos,
+        porAparato,
+        confirmar: mocks.confirmar,
+        subirFoto: mocks.subirFoto,
+        resumen: { confirmados: 0, corregidos: 0, total: 0 },
+        error: null,
+      }
+    },
+  }
+})
 vi.mock('@/hooks/repuestos/useRepuestosByCodigos', () => ({
   useRepuestosByCodigos: () => ({ bySap: mocks.bySap, loading: false }),
 }))
@@ -47,9 +63,18 @@ function Ruta() {
   const l = useLocation()
   return <output data-testid="ruta">{l.pathname + l.search}</output>
 }
-const montar = (codigo: string, compacta = false) =>
+/** Un doc de `planoVinculos` del 888. Sin `maquina` (null) = confirmación vieja. */
+const doc = (aparato: string, extra: Record<string, unknown> = {}, maquina: string | null = 'baader-n2') => ({
+  id: `baader-142-888__${aparato}${maquina ? `__${maquina}` : ''}`,
+  planoSlug: 'baader-142-888',
+  aparato,
+  ...(maquina ? { maquina } : {}),
+  confirmadoPor: 'u1',
+  ...extra,
+})
+const montar = (codigo: string, compacta = false, ruta = '/?maquina=n2') =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[ruta]}>
       <RepuestoA3c codigo={codigo} compacta={compacta} />
       <Ruta />
     </MemoryRouter>,
@@ -57,7 +82,9 @@ const montar = (codigo: string, compacta = false) =>
 
 beforeEach(() => {
   mocks.partes = partesBase()
-  mocks.vinculos = new Map()
+  mocks.docs = []
+  mocks.maquinaPedida = null
+  localStorage.clear()
   mocks.bySap = new Map()
   mocks.confirmar.mockClear()
   mocks.subirFoto.mockClear()
@@ -101,7 +128,7 @@ describe('RepuestoA3c', () => {
     montar('SM6-1')
     expect(screen.getByText('Solo familia')).toBeTruthy()
     expect(screen.getByText(/Lee la etiqueta en terreno/)).toBeTruthy()
-    expect(screen.queryByText('¿Es la pieza instalada en esta máquina?')).toBeNull()
+    expect(screen.queryByText('¿Es la pieza instalada en N2?')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Fig\. 2-6/ }))
     expect(screen.getByTestId('ruta').textContent).toBe('/aprendizaje/planos/baader-142-despiece?hoja=9')
   })
@@ -123,7 +150,7 @@ describe('RepuestoA3c', () => {
     montar('B1')
     expect(screen.getAllByTestId('repuesto-pieza')).toHaveLength(2)
     expect(screen.getByText('99990001')).toBeTruthy()
-    expect(screen.getAllByText('¿Es la pieza instalada en esta máquina?')).toHaveLength(1)
+    expect(screen.getAllByText('¿Es la pieza instalada en N2?')).toHaveLength(1)
   })
 
   it('sin sesión: pide iniciar sesión y no ofrece botones que fallen', () => {
@@ -160,13 +187,94 @@ describe('RepuestoA3c', () => {
   })
 
   it('un vínculo confirmado cambia la Pill y reemplaza la pregunta por la línea de respuesta', () => {
-    mocks.vinculos = new Map<string, Partial<VinculoTerreno>>([['B1', { estado: 'confirmado', confirmadoPorNombre: 'Ana' }]])
+    mocks.docs = [doc('B1', { estado: 'confirmado', confirmadoPorNombre: 'Ana' })]
     montar('B1')
     expect(screen.getByText('Confirmada en terreno')).toBeTruthy()
-    expect(screen.queryByText('¿Es la pieza instalada en esta máquina?')).toBeNull()
-    expect(screen.getByText(/Confirmada en esta máquina por Ana/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Corregir respuesta' }))
-    expect(screen.getByText('¿Es la pieza instalada en esta máquina?')).toBeTruthy()
+    expect(screen.queryByText('¿Es la pieza instalada en N2?')).toBeNull()
+    expect(screen.getByText(/Confirmada en N2 por Ana/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Corregir respuesta de N2' }))
+    expect(screen.getByText('¿Es la pieza instalada en N2?')).toBeTruthy()
+  })
+
+  describe('máquina (el 888 sirve a N2 y N3)', () => {
+    it('sin máquina elegida: pregunta en cuál estás, botones desactivados y nada se guarda', () => {
+      montar('B1', false, '/')
+      expect(screen.getByTestId('elige-maquina')).toBeTruthy()
+      expect(screen.getByText('¿En cuál máquina estás?')).toBeTruthy()
+      for (const n of ['Sí, es esta', 'Es otra', 'No existe aquí']) {
+        expect((screen.getByRole('button', { name: n }) as HTMLButtonElement).disabled, n).toBe(true)
+      }
+      expect(mocks.maquinaPedida).toBeNull()
+    })
+
+    it('elegir N3 en el selector la deja en la URL (conservando el resto) y habilita la pregunta', () => {
+      montar('B1', false, '/?el=B1')
+      fireEvent.click(screen.getByRole('tab', { name: 'N3' }))
+      expect(screen.getByTestId('ruta').textContent).toBe('/?el=B1&maquina=n3')
+      expect(screen.getByText('¿Es la pieza instalada en N3?')).toBeTruthy()
+      expect((screen.getByRole('button', { name: 'Sí, es esta' }) as HTMLButtonElement).disabled).toBe(false)
+      expect(screen.queryByTestId('elige-maquina')).toBeNull()
+      expect(localStorage.getItem('plano-maquina:baader-142-888')).toBe('n3')
+      expect(mocks.maquinaPedida).toBe('baader-n3')
+    })
+
+    it('la máquina sale de ?maquina= y, si falta, de la última elegida en el teléfono', () => {
+      montar('B1', false, '/?maquina=n3')
+      expect(mocks.maquinaPedida).toBe('baader-n3')
+      expect(screen.getByText('¿Es la pieza instalada en N3?')).toBeTruthy()
+      cleanup()
+      localStorage.setItem('plano-maquina:baader-142-888', 'n2')
+      montar('B1', false, '/')
+      expect(mocks.maquinaPedida).toBe('baader-n2')
+    })
+
+    it('«En terreno»: una fila por máquina, la activa marcada «Aquí»', () => {
+      mocks.docs = [doc('B1', { estado: 'confirmado', codigo: '42303109', confirmadoPorNombre: 'Ana' }, 'baader-n2')]
+      montar('B1', false, '/?maquina=n3')
+      const n2 = screen.getByTestId('en-terreno-N2').textContent ?? ''
+      const n3 = screen.getByTestId('en-terreno-N3').textContent ?? ''
+      expect(n2).toContain('Confirmado')
+      expect(n2).toContain('42303109')
+      expect(n2).toContain('Ana')
+      expect(n2).not.toContain('Aquí')
+      expect(n3).toContain('Pendiente')
+      expect(n3).toContain('Aquí')
+      // lo de N2 no responde la pregunta de N3
+      expect(screen.getByText('¿Es la pieza instalada en N3?')).toBeTruthy()
+      expect(screen.getByText('Según catálogo')).toBeTruthy()
+    })
+
+    it('piezas distintas por máquina: fila informativa y Pill azul, no «Es otra pieza»', () => {
+      mocks.docs = [
+        doc('B1', { estado: 'confirmado', codigo: '42303107' }, 'baader-n2'),
+        doc('B1', { estado: 'confirmado', codigo: '42303109' }, 'baader-n3'),
+      ]
+      montar('B1')
+      const f = screen.getByTestId('piezas-distintas').textContent ?? ''
+      expect(f).toContain('Piezas distintas por máquina')
+      expect(f).toContain('N2 lleva 42303107 y N3 lleva 42303109')
+      expect(f).toContain('Pide el repuesto según la máquina')
+      expect(screen.getByText('Distinta por máquina')).toBeTruthy()
+      expect(screen.queryByText('Es otra pieza')).toBeNull()
+    })
+
+    it('misma pieza en ambas: sin aviso de piezas distintas', () => {
+      mocks.docs = [
+        doc('B1', { estado: 'confirmado', codigo: '42303109' }, 'baader-n2'),
+        doc('B1', { estado: 'confirmado', codigo: '42303109' }, 'baader-n3'),
+      ]
+      montar('B1')
+      expect(screen.queryByTestId('piezas-distintas')).toBeNull()
+      expect(screen.queryByText('Distinta por máquina')).toBeNull()
+    })
+
+    it('la confirmación vieja sin máquina se muestra como pista y no confirma nada', () => {
+      mocks.docs = [doc('B1', { estado: 'confirmado', confirmadoPorNombre: 'Ana' }, null)]
+      montar('B1')
+      expect(screen.getByTestId('en-terreno-previo').textContent).toContain('Confirmación anterior (sin máquina)')
+      expect(screen.getByText('Según catálogo')).toBeTruthy()
+      expect(screen.getByText('¿Es la pieza instalada en N2?')).toBeTruthy()
+    })
   })
 
   describe('candidatos (ninguno según catálogo: la etiqueta decide)', () => {
@@ -185,7 +293,7 @@ describe('RepuestoA3c', () => {
       montar('B1')
       expect(screen.getByTestId('repuesto-candidatos').textContent).toMatch(/2 códigos va en B1/)
       expect(screen.getAllByText('Propuesto')).toHaveLength(2)
-      expect(screen.getByText('¿Qué código dice la etiqueta?')).toBeTruthy()
+      expect(screen.getByText('¿Qué código dice la etiqueta en N2?')).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Es 42303109' })).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Es 42303107' })).toBeTruthy()
       expect(screen.queryByRole('button', { name: 'Sí, es esta' })).toBeNull()
@@ -209,16 +317,16 @@ describe('RepuestoA3c', () => {
 
     it('confirmado uno, el otro queda descartado', () => {
       mocks.partes = candidatosB1()
-      mocks.vinculos = new Map<string, Partial<VinculoTerreno>>([['B1', { estado: 'confirmado', codigo: '42303107', confirmadoPorNombre: 'Ana' }]])
+      mocks.docs = [doc('B1', { estado: 'confirmado', codigo: '42303107', confirmadoPorNombre: 'Ana' })]
       montar('B1')
       expect(screen.getByText('Confirmada en terreno')).toBeTruthy()
       expect(screen.getByText('Descartada en terreno')).toBeTruthy()
-      expect(screen.getByText(/Confirmada en esta máquina \(42303107\) por Ana/)).toBeTruthy()
+      expect(screen.getByText(/Confirmada en N2 \(42303107\) por Ana/)).toBeTruthy()
     })
   })
 
   it('un vínculo corregido muestra «Es otra pieza» y la etiqueta leída', () => {
-    mocks.vinculos = new Map<string, Partial<VinculoTerreno>>([['B1', { estado: 'corregido', codigo: '77770001' }]])
+    mocks.docs = [doc('B1', { estado: 'corregido', codigo: '77770001' })]
     montar('B1')
     expect(screen.getAllByText('Es otra pieza').length).toBeGreaterThan(0)
     expect(screen.getByText('77770001')).toBeTruthy()
@@ -226,15 +334,29 @@ describe('RepuestoA3c', () => {
 })
 
 describe('IndicadorRepuestosA3c', () => {
-  it('muestra N/M y confirmados, sin contar pseudo-elementos', () => {
-    mocks.vinculos = new Map<string, Partial<VinculoTerreno>>([['B1', { estado: 'confirmado' }]])
+  it('muestra N/M y los resueltos en AMBAS máquinas, sin contar pseudo-elementos', () => {
+    mocks.docs = [doc('B1', { estado: 'confirmado' }, 'baader-n2'), doc('B1', { estado: 'corregido', codigo: '77770001' }, 'baader-n3')]
     render(<MemoryRouter><IndicadorRepuestosA3c codigos={['A3C.P1', 'X5', 'B1', 'B10', 'Y3']} /></MemoryRouter>)
     const t = screen.getByTestId('indicador-repuestos').textContent ?? ''
     expect(t).toContain('2/3')
-    expect(t).toContain('1 confirmado en terreno')
+    expect(t).toContain('1 resuelto en ambas')
+    expect(screen.getByTestId('indicador-por-maquina').textContent).toBe('N2 1 · N3 1')
     const enlace = screen.getByTestId('indicador-repuestos')
     expect(enlace.tagName).toBe('A')
     expect(enlace.getAttribute('href')).toBe('/aprendizaje/baader-142/tarjeta-a3c/por-confirmar')
+  })
+
+  it('resuelto solo en N2 no suma en ambas; la línea dice cuánto lleva cada una', () => {
+    mocks.docs = [doc('B1', { estado: 'confirmado' }, 'baader-n2'), doc('B10', { estado: 'confirmado' }, 'baader-n2')]
+    render(<MemoryRouter><IndicadorRepuestosA3c codigos={['B1', 'B10', 'Y3']} /></MemoryRouter>)
+    expect(screen.getByTestId('indicador-repuestos').textContent).toContain('0 resueltos en ambas')
+    expect(screen.getByTestId('indicador-por-maquina').textContent).toBe('N2 2 · N3 0')
+  })
+
+  it('la confirmación vieja sin máquina no cuenta', () => {
+    mocks.docs = [doc('B1', { estado: 'confirmado' }, null)]
+    render(<MemoryRouter><IndicadorRepuestosA3c codigos={['B1', 'B10']} /></MemoryRouter>)
+    expect(screen.getByTestId('indicador-por-maquina').textContent).toBe('N2 0 · N3 0')
   })
 
   it('sin sesión no afirma confirmaciones', () => {

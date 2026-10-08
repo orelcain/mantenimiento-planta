@@ -9,6 +9,8 @@
  * se cargan de a una y NO se meten en el bundle.
  */
 
+import type { MaquinaBaader } from '@/services/baader142/perilla5Protocolo'
+
 /** Los planos pesados viven en Firebase Storage (lectura publica via
  *  storage.rules `planos/`), no en el repo: la GEA sola son ~400 MB de SVG. */
 const STORAGE_BASE =
@@ -68,6 +70,11 @@ export type PlanoCatalogo = {
   /** 'es' = el plano ya viene en espanol: se oculta el toggle DE/ES. */
   idioma?: 'es'
 
+  /** Máquinas (N1/N2/N3) a las que sirve el plano. Con más de una, la confirmación en terreno
+   *  de un aparato es POR MÁQUINA (`planoVinculos/<slug>__<aparato>__<maquina>`). Sin dato = el
+   *  plano no distingue máquina (200, GEA). */
+  maquinas?: MaquinaBaader[]
+
   /** La máquina física a la que pertenece. El catálogo se agrupa por esto. */
   equipo: EquipoId
   tipo: TipoPlano
@@ -100,6 +107,7 @@ export const PLANOS: PlanoCatalogo[] = [
     descripcion:
       'Esquema de circuitos y plano de bornes de la evisceradora. Confirmado contra la placa: ' +
       'el campo Wiring Diagr. dice 1427100888.',
+    maquinas: ['baader-n2', 'baader-n3'],
     equipo: 'baader-142',
     tipo: 'electrico',
     variante: 'las nuevas',
@@ -172,6 +180,7 @@ export const PLANOS: PlanoCatalogo[] = [
       'El plano de la generacion anterior (protecciones F1-F5, sin PLC). Ojo: hay 3 ' +
       'candidatos para las viejas (851/860/866); este es el que la curaduria del equipo ' +
       'rotulo como "Baader 142 antigua". Confirmar en terreno con la placa.',
+    maquinas: ['baader-n1'],
     equipo: 'baader-142',
     tipo: 'electrico',
     variante: 'las antiguas',
@@ -291,6 +300,11 @@ export function planosPorEquipo(): { equipo: Equipo; planos: PlanoCatalogo[] }[]
 
 export function planoPorSlug(slug: string | undefined) {
   return PLANOS.find((p) => p.slug === slug)
+}
+
+/** Máquinas a las que sirve el plano (`[]` si no distingue máquina). */
+export function maquinasDePlano(slug: string | undefined): MaquinaBaader[] {
+  return planoPorSlug(slug)?.maquinas ?? []
 }
 
 /** Ruta pública de un asset del plano (índice, hoja SVG o sus zonas). */

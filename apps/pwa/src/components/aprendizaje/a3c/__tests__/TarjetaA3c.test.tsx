@@ -10,7 +10,9 @@ import { ALTO_DIVISOR, FICHA_MIN, SOLAPE_DIVISOR, UBICACION_MIN, distribuirPc } 
 
 // La ficha monta la sección «Repuesto» y la cabecera el indicador: sin red ni Firestore en estos tests.
 vi.mock('@/hooks/usePartesPlano', () => ({ usePartesPlano: () => null }))
-vi.mock('@/hooks/usePlanoVinculos', () => ({ usePlanoVinculos: () => ({ vinculos: new Map(), confirmar: async () => {}, subirFoto: async () => '', resumen: { confirmados: 0, corregidos: 0, total: 0 }, error: null }) }))
+vi.mock('@/hooks/usePlanoVinculos', () => ({ usePlanoVinculos: () => ({ vinculos: new Map(), porAparato: new Map(), confirmar: async () => {}, subirFoto: async () => '', resumen: { confirmados: 0, corregidos: 0, total: 0 }, error: null }) }))
+// RepuestoA3c lee la máquina de la URL/localStorage: acá no hay Router, se fija N2.
+vi.mock('@/hooks/useMaquinaPlano', () => ({ useMaquinaPlano: () => ({ maquina: 'baader-n2', setMaquina: () => {}, maquinas: ['baader-n2', 'baader-n3'] }) }))
 vi.mock('@/hooks/repuestos/useRepuestosByCodigos', () => ({ useRepuestosByCodigos: () => ({ bySap: new Map(), loading: false }) }))
 
 // Paquete real (el mismo que sirve la app desde public/), sin red.
