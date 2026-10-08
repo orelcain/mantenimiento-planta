@@ -49,11 +49,13 @@ export const APP_MODULES: readonly AppModule[] = [
   { ruta: '/analisis-grader', nombre: 'Análisis de turno', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Análisis de turno del Grader: piezas, compuertas, P0, microdetenciones y Lente de Mantención', puedesPreguntar: 'producción del turno/día, piezas por Baader, P0%, MTTR/MTBF, disponibilidad, por qué está detenida, causas de paro, en vivo' },
   { ruta: '/clima-puerto', nombre: 'Clima del puerto', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Estado del puerto/bahía con pronóstico y alertas automáticas', puedesPreguntar: 'estado del puerto, pronóstico, alertas de bahía' },
   { ruta: '/planos-aguas', nombre: 'Planos de aguas', grupo: 'Herramientas', estado: 'desarrollo', descripcion: 'Planos de aguas de la planta' },
-  { ruta: '/aprendizaje/hmi-knuro', nombre: 'HMI Knuro', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR)' },
-  { ruta: '/hmi-knuro', nombre: 'Editor HMI Knuro', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Editor de presets, ayudas e histórico del HMI Knuro (se abre desde el simulador con «Editar presets y ayudas»)', adminOnly: true },
   { ruta: '/baader-200', nombre: 'Baader 200', grupo: 'Herramientas', estado: 'produccion', descripcion: 'Guía técnica interactiva de la Baader 200 por secciones' },
   // ── Aprendizaje ──
   { ruta: '/aprendizaje', nombre: 'Centro de aprendizaje', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Centro de aprendizaje: cursos de electricidad (NFPA 70E, Rescate/SVB, NFPA 70B) con lecciones y exámenes' },
+  // HMI: se entra SOLO desde el Centro de Aprendizaje. Los editores (/hmi-knuro, /hmi-grader)
+  // no se ofrecen como entrada: el admin los abre con el botón de edición dentro del simulador.
+  { ruta: '/aprendizaje/hmi-knuro', nombre: 'HMI Knuro', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR). El admin edita presets y ayudas con el botón «Editar presets y ayudas» de esa misma pantalla' },
+  { ruta: '/aprendizaje/hmi-grader', nombre: 'HMI Grader', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI del Grader (StaticGrader Marelec Z2) para practicar; abre sin sesión. El admin edita el estado con «Editar estado» de esa misma pantalla' },
   { ruta: '/centro-tecnico-documental', nombre: 'Centro técnico documental', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Portada del Centro técnico documental: KPIs documentales de equipos y export a Excel' },
   // ── Administración ──
   { ruta: '/admin', nombre: 'Panel de administración', grupo: 'Administración', estado: 'produccion', descripcion: 'Panel de administración (solo administradores)', adminOnly: true },

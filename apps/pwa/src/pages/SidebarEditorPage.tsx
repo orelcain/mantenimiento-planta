@@ -72,7 +72,6 @@ const DEFAULT_GROUPS: Group[] = [
       { id: 'visor3d', name: 'Visor 3D', href: '/visor-3d', groupId: 'herramientas' },
       { id: 'grader', name: 'Análisis de turno', href: '/analisis-grader', groupId: 'herramientas' },
       { id: 'clima', name: 'Clima del puerto', href: '/clima-puerto', groupId: 'herramientas' },
-      { id: 'hmi', name: 'HMI Knuro', href: '/aprendizaje/hmi-knuro', groupId: 'herramientas' },
       { id: 'baader', name: 'Baader 200', href: '/baader-200', groupId: 'herramientas' },
     ],
   },

@@ -91,25 +91,16 @@ const MACHINE_TILES: Tile[] = LEARNING_MACHINES.map((m) => ({
   wip:      !Object.values(m.sections).some(Boolean),
 }))
 
-// HMI tiles para roles NO admin (admin los tiene en Herramientas sin duplicar)
+// HMI: se entra solo desde Aprendizaje (rutas /aprendizaje/hmi-*), para todos los roles.
+// Los editores de admin (/hmi-knuro, /hmi-grader) se abren desde dentro de cada simulador.
 const HMI_TILES_BASE: Tile[] = [
   { id: 'hmi-knuro',  label: 'HMI Knuro',  sublabel: '', icon: Cpu,     href: '/aprendizaje/hmi-knuro',  color: 'slate' },
   { id: 'hmi-grader', label: 'HMI Grader', sublabel: '', icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
 ]
 
-// Para admin: sin HMI en Formación — ambos HMI están en Herramientas
-const HMI_TILES_ADMIN: Tile[] = []
-
 const FORMACION_TILES: Tile[] = [
   ...MACHINE_TILES,
   ...HMI_TILES_BASE,
-  { id: 'hub', label: 'Ver hub →', sublabel: '', icon: GraduationCap, href: '/aprendizaje', color: 'purple' },
-]
-
-// Admin: Baader 200 ya está en MACHINE_TILES via formación — no duplicar en Herramientas
-const FORMACION_TILES_ADMIN: Tile[] = [
-  ...MACHINE_TILES,
-  ...HMI_TILES_ADMIN,
   { id: 'hub', label: 'Ver hub →', sublabel: '', icon: GraduationCap, href: '/aprendizaje', color: 'purple' },
 ]
 
@@ -188,13 +179,11 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       label: 'Herramientas',
       tiles: [
         { id: 'visor3d',    label: 'Visor 3D',    sublabel: 'Modelos 3D',  icon: Box,     href: '/visor-3d',              color: 'slate' },
-        { id: 'hmi',        label: 'HMI Knuro',   sublabel: 'Simulador',   icon: Cpu,     href: '/aprendizaje/hmi-knuro', color: 'slate' },
-        { id: 'hmi-grader', label: 'HMI Grader',  sublabel: 'Simulador',   icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
         // Baader 200 NO aparece aquí — ya está en Formación via MACHINE_TILES
       ],
     },
-    // Formación admin: sin HMI Knuro (está en Herramientas arriba)
-    { label: 'Formación', tiles: FORMACION_TILES_ADMIN },
+    // Formación admin: con los HMI (única entrada, vía Aprendizaje)
+    { label: 'Formación', tiles: FORMACION_TILES },
     {
       label: 'Administración',
       tiles: [

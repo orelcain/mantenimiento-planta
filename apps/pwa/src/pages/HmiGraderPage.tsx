@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, BookOpen, Scale, RefreshCw, RotateCcw, Save } from 'lucide-react'
-import { useAuthStore } from '@/store'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, BookOpen, Scale, RefreshCw, RotateCcw, Save, Pencil } from 'lucide-react'
+import { useAuthStore, useIsAdmin } from '@/store'
 import { GRADER_HMI_TARGETS } from '@/services/grader/graderHmiPractice'
 import { logger } from '@/lib/logger'
 import {
@@ -23,6 +23,13 @@ import { Button } from '@/components/ui'
  * está preparado para la iter siguiente cuando se agregue el bridge al HTML.
  *
  * Patrón idéntico a HmiKnuroPage pero sin presets (el Grader no los usa).
+ *
+ * Dos rutas, un componente:
+ * - /aprendizaje/hmi-grader (pública, única entrada para todos): práctica de solo lectura. Lee el
+ *   estado guardado pero NO escribe nada en Firestore (ni el auto-guardado del iframe, ni historial).
+ *   Al admin le muestra «Editar estado» → /hmi-grader.
+ * - /hmi-grader (AdminRoute, sin ítem de menú): modo edición; Guardar / Restaurar y persistencia.
+ *   firestore.rules: escritura de hmi-grader-config / -history solo admin.
  */
 export function HmiGraderPage() {
   const navigate = useNavigate()
@@ -30,6 +37,10 @@ export function HmiGraderPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
+  const isAdmin = useIsAdmin()
+  const location = useLocation()
+  // Modo edición: solo en /hmi-grader y solo admin (la ruta ya es AdminRoute; se repite por defensa).
+  const modoEdicion = isAdmin && location.pathname.replace(/\/+$/, '') === '/hmi-grader'
 
   // Modo práctica: ?practica=<runbookId> → al cargar, el simulador navega solo
   // hasta la pantalla del procedimiento (ver graderHmiPractice.ts).
@@ -102,6 +113,7 @@ export function HmiGraderPage() {
 
       // Guardar estado (disparado cuando el HMI cambia indicadores o log)
       if (type === 'hmi:save-state' && event.data.state) {
+        if (!modoEdicion) return // práctica: lo que se toca no pisa el estado compartido
         try {
           await saveGraderState(event.data.state, user?.id)
           setGraderState(event.data.state)
@@ -112,7 +124,7 @@ export function HmiGraderPage() {
       }
 
       // Log de eventos (futuro: persistir pocket clicks, fkey press, etc)
-      if (type === 'hmi:log-event' && user) {
+      if (type === 'hmi:log-event' && user && modoEdicion) {
         try {
           await addGraderHistory({
             action: event.data.action ?? 'state-save',
@@ -128,7 +140,7 @@ export function HmiGraderPage() {
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [user, sendInitData, practiceTarget])
+  }, [user, sendInitData, practiceTarget, modoEdicion])
 
   const refreshIframe = useCallback(() => {
     if (!iframeRef.current) return
@@ -201,6 +213,31 @@ export function HmiGraderPage() {
             <span className="hidden sm:inline">Expediente</span>
           </Button>
 
+          {isAdmin && !modoEdicion && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/hmi-grader')}
+              className="h-7 gap-1 text-xs"
+              title="Editar estado del simulador"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Editar estado</span>
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={refreshIframe}
+            className="h-7 gap-1 text-xs"
+            title="Recargar simulador"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Recargar</span>
+          </Button>
+
+          {modoEdicion && (<>
           <Button
             variant="ghost"
             size="sm"
@@ -216,17 +253,6 @@ export function HmiGraderPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={refreshIframe}
-            className="h-7 gap-1 text-xs"
-            title="Recargar simulador"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Recargar</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
             onClick={handleResetState}
             className="h-7 gap-1 text-xs"
             title="Restaurar a estado inicial"
@@ -234,6 +260,7 @@ export function HmiGraderPage() {
             <RotateCcw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Restaurar</span>
           </Button>
+          </>)}
         </div>
       </div>
 

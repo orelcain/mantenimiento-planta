@@ -1,5 +1,5 @@
 // Prueba las reglas de Firestore del HMI Knuro (hmi-knuro-config, -presets, -history,
-// -tooltips) con la API projects:test. Escritura: solo admin. Lectura pública: presets,
+// -tooltips, -defaults) y del HMI Grader (hmi-grader-config, -history) con la API projects:test. Escritura: solo admin. Lectura pública: presets,
 // tooltips y config/preset-order (los lee /aprendizaje/hmi-knuro sin sesión).
 // (mismo patrón que probar-reglas-bitacora.cjs). NO escribe datos.
 // Uso (desde la raíz del repo):
@@ -18,7 +18,8 @@ const usuario = (rol) => [
   { function: 'get', args: [{ anyValue: {} }], result: { value: { data: { activo: true, rol } } } },
 ]
 // id simple → hmi-knuro-config/<id>; 'coleccion/doc' → hmi-knuro-<coleccion>/<doc>
-const ruta = (id) => `/databases/(default)/documents/${id.includes('/') ? 'hmi-knuro-' + id : 'hmi-knuro-config/' + id}`
+// 'grader:coleccion/doc' → hmi-grader-<coleccion>/<doc>
+const ruta = (id) => `/databases/(default)/documents/${id.startsWith('grader:') ? 'hmi-grader-' + id.slice(7) : id.includes('/') ? 'hmi-knuro-' + id : 'hmi-knuro-config/' + id}`
 const docId = (id) => id.split('/').pop()
 const auth = (uid, provider = 'google.com') => (uid ? { uid, token: { firebase: { sign_in_provider: provider } } } : null)
 
@@ -56,6 +57,20 @@ const casos = [
   ['Técnico CREA historial', 'DENY', { method: 'create', uid: 't1', id: 'history/h2', data: { action: 'x' } }, usuario('tecnico')],
   ['Supervisor CREA historial', 'DENY', { method: 'create', uid: 's1', id: 'history/h2', data: { action: 'x' } }, usuario('supervisor')],
   ['Admin CREA historial', 'ALLOW', { method: 'create', uid: 'a1', id: 'history/h2', data: { action: 'x' } }, usuario('admin')],
+  // hmi-knuro-defaults («Guardar Defaults» del editor)
+  ['Admin ESCRIBE defaults', 'ALLOW', { method: 'create', uid: 'a1', id: 'defaults/P1', data: { data: {} } }, usuario('admin')],
+  ['Admin LEE defaults', 'ALLOW', { method: 'get', uid: 'a1', id: 'defaults/P1' }, usuario('admin')],
+  ['Supervisor ESCRIBE defaults', 'DENY', { method: 'create', uid: 's1', id: 'defaults/P1', data: { data: {} } }, usuario('supervisor')],
+  ['Técnico LEE defaults', 'DENY', { method: 'get', uid: 't1', id: 'defaults/P1' }, usuario('tecnico')],
+  ['Sin login LEE defaults', 'DENY', { method: 'get', id: 'defaults/P1' }, []],
+  // HMI Grader
+  ['Sin login LEE grader state', 'ALLOW', { method: 'get', id: 'grader:config/state' }, []],
+  ['Técnico ESCRIBE grader state', 'DENY', { method: 'update', uid: 't1', id: 'grader:config/state', data: { indicators: {} } }, usuario('tecnico')],
+  ['Supervisor ESCRIBE grader state', 'DENY', { method: 'update', uid: 's1', id: 'grader:config/state', data: { indicators: {} } }, usuario('supervisor')],
+  ['Admin ESCRIBE grader state', 'ALLOW', { method: 'update', uid: 'a1', id: 'grader:config/state', data: { indicators: {} } }, usuario('admin')],
+  ['Técnico LEE grader historial', 'ALLOW', { method: 'get', uid: 't1', id: 'grader:history/h1' }, usuario('tecnico')],
+  ['Técnico CREA grader historial', 'DENY', { method: 'create', uid: 't1', id: 'grader:history/h2', data: { action: 'x' } }, usuario('tecnico')],
+  ['Admin CREA grader historial', 'ALLOW', { method: 'create', uid: 'a1', id: 'grader:history/h2', data: { action: 'x' } }, usuario('admin')],
 ]
 
 ;(async () => {

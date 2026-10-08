@@ -35,12 +35,16 @@ const DESCRIPCIONES = {
   '/analisis-grader': 'Análisis de Turno del Grader: piezas, compuertas, P0, microdetenciones y Lente de Mantención',
   '/clima-puerto': 'Estado del puerto/bahía con pronóstico y alertas automáticas',
   '/planos-aguas': 'Planos de aguas de la planta',
-  '/aprendizaje/hmi-knuro': 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR)',
   '/baader-200': 'Guía técnica interactiva de la Baader 200 por secciones',
   '/aprendizaje': 'Centro de Aprendizaje: cursos de electricidad (NFPA 70E, Rescate/SVB, NFPA 70B) con lecciones y exámenes',
   '/centro-tecnico-documental': 'Portada del Centro Técnico Documental: KPIs documentales de equipos y export a Excel',
   '/admin': 'Panel de administración (solo administradores)',
 }
+
+const MODULOS_FUERA_DEL_MENU = [
+  { nombre: 'HMI Knuro', ruta: '/aprendizaje/hmi-knuro', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR). Se entra desde el Centro de Aprendizaje' },
+  { nombre: 'HMI Grader', ruta: '/aprendizaje/hmi-grader', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI del Grader (StaticGrader Marelec Z2) para practicar. Se entra desde el Centro de Aprendizaje' },
+]
 
 function parseNavItems(src) {
   const modulos = []
@@ -68,6 +72,9 @@ function parseNavItems(src) {
   // Solo el bloque navGroups (antes de ALL_NAV_ITEMS) para no capturar el bottom-nav
   const bloque = src.split('ALL_NAV_ITEMS')[0]
   const modulos = parseNavItems(bloque)
+  // Módulos que no están en el menú lateral pero sí son entrada válida (desde el Centro de
+  // Aprendizaje). Los editores /hmi-knuro y /hmi-grader NO se listan: no son una entrada.
+  for (const extra of MODULOS_FUERA_DEL_MENU) if (!modulos.some((m) => m.ruta === extra.ruta)) modulos.push(extra)
   if (modulos.length < 10) throw new Error(`parse sospechoso: solo ${modulos.length} módulos`)
 
   const sinDesc = modulos.filter((m) => !m.descripcion)

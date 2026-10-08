@@ -2092,6 +2092,13 @@ service cloud.firestore {
       allow write: if isAdmin() && isValidDocSize();
     }
 
+    // Snapshot de defaults («Guardar Defaults» del editor). No tenía regla: el botón
+    // fallaba con permission-denied incluso para admin. Solo el editor (admin) la usa.
+    match /hmi-knuro-defaults/{presetId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() && isValidDocSize();
+    }
+
     // ============================================
     // HMI GRADER — Estado del simulador e historial
     // ============================================
@@ -2102,14 +2109,15 @@ service cloud.firestore {
     // registrados, el último el 24-08-2026.
     match /hmi-grader-config/{configId} {
       // Lectura pública: /aprendizaje/hmi-grader se abre sin login, igual que
-      // el HMI Knuro.
+      // el HMI Knuro. Escritura solo admin: la práctica pública no persiste nada;
+      // se guarda solo en el modo edición (/hmi-grader, AdminRoute).
       allow read: if true;
-      allow write: if isSupervisor() && isValidDocSize();
+      allow write: if isAdmin() && isValidDocSize();
     }
 
     match /hmi-grader-history/{entryId} {
       allow read: if isNotAnonymous();
-      allow create: if isNotAnonymous() && isValidDocSize();
+      allow create: if isAdmin() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 

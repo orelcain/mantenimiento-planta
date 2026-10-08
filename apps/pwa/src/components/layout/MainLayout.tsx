@@ -111,9 +111,9 @@ const navGroups: NavGroup[] = [
       { name: 'Análisis de turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
       { name: 'Clima del puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
       { name: 'Planos de aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
-      // Una sola puerta para todos: el simulador en el Centro de Aprendizaje. El editor
-      // (/hmi-knuro, solo admin) se abre desde ahí con «Editar presets y ayudas».
-      { name: 'HMI Knuro', href: '/aprendizaje/hmi-knuro', icon: Cpu },
+      // HMI Knuro y HMI Grader NO van en el menú: se entra solo desde el Centro de
+      // Aprendizaje (/aprendizaje/hmi-*). Los editores (/hmi-knuro, /hmi-grader, solo admin)
+      // se abren con el botón de edición dentro de cada simulador.
       { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
     ],
   },
