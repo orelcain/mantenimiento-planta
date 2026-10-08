@@ -390,6 +390,12 @@ propia de la app modulando una variable de opacidad.
   una sección. El Grader tenía un tercer modo (un toggle sol/luna que arrancaba siempre en
   oscuro, ignorando el tema de la app); desde 2026-09-16 hereda el tema en vivo y el toggle
   se retiró. `useIsDark()` en `hooks/useTheme.ts` es la forma de preguntar por el tema.
+- **Excepción explícita: el simulador HMI Knuro (2026-10-08).** Su marco completo (cabecera,
+  presets, barra de pantalla, panel «Pantallas», riel horizontal, aviso de giro) usa el estilo
+  fijo «Consola», igual en tema claro y oscuro, como un visor de video o de fotos de iOS. No es
+  un interruptor de tema del módulo (eso sigue prohibido): es un visor de equipo que se ve
+  siempre igual. Detalle y tokens en §5f. La regla general no cambia: cualquier otra pantalla
+  sigue el tema del sistema, y la excepción no se extiende por analogía sin anotarla aquí.
 - **Los grises son neutros.** Sesgo de hue ≤ 5 (diferencia máx. entre canales RGB). La
   escala *slate* de Tailwind tiene sesgo 27–34 y hace que un módulo se lea como de otra app
   aunque cada color cumpla contraste. Los grises de iOS: `#1C1C1E` (2), `#6E6E71` (3),
@@ -590,6 +596,17 @@ con un script Node local (`writeFileSync` en `utf8`).
    `HmiKnuroPublicPage`) y las experiencias interactivas sobre el modelo 3D (sopladoras Baader
    142, plataforma pontón) conservan su tipografía: es fidelidad al equipo, no interfaz. Lo que
    sí les aplica es el marco alrededor (botones, encabezados de la app).
+   **Ampliación HMI Knuro (2026-10-08):** en `HmiKnuroPublicPage` (/aprendizaje/hmi-knuro) y en
+   el editor `HmiKnuroPage` (/hmi-knuro) el MARCO completo del simulador también es excepción:
+   estilo fijo «Consola» que NO sigue el tema (excepción explícita a §6b). Gris acero neutro
+   (sesgo ≤ 3) sin azul: `--k-case #1c1d1f`, `--k-panel #26272a`, `--k-raised #313236`,
+   `--k-line #3d3f43`, `--k-ink #e6e6e6`, `--k-ink2 #a6a7a9`; la selección es una tecla
+   encendida (`--k-key #d9dadb`, texto `#141516`, borde inferior 2 px `#8f9093`, la familia de
+   los globos) y el único color es el navy `#1e3f7a` del «?». IBM Plex Sans/Mono, foco 2 px
+   `#e6e6e6`. Tokens en `components/hmiKnuro/knuroConsola.css` (React) y en el bloque
+   «CONSOLA» de `public/hmi-knuro-embed.html` (iframe). Dentro de la app con sesión el bloque
+   del simulador se ve con este estilo, como un visor. NO cambian el panel X2 (`.dev`/`#hs`) ni
+   los globos, la hoja y la lista de campos (familia «Ventana del panel», siempre clara).
    Hallazgo del medidor en PC: con la raíz al 87,5 % `text-xs` (0.75rem) rendía 10,5 px en
    TODO el escritorio (chips de fecha, pie de la barra lateral, tarjetas del visor 3D). Se
    resolvió en la escala, no pantalla por pantalla: `xs = max(0.75rem, 11px)` en

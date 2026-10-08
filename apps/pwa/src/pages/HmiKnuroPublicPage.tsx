@@ -4,7 +4,8 @@
  * - NO requiere autenticación
  * - Carga presets y tooltips desde Firestore (lectura pública)
  * - Embebe el HMI en modo readonly (sin edición de parámetros ni tooltips)
- * - Selector de preset (pills horizontales scrollables)
+ * - Marco «Consola» (knuroConsola.css): estilo FIJO, no sigue el tema de la app (DESIGN.md §5f).
+ * - Presets en dos segmentados, Planta y Máquina (KnuroPresetPicker); la línea es texto fijo.
  * - Layout adaptado a móvil horizontal
  * - Celular horizontal: pantalla completa del simulador SIN barras de la página (ni las de
  *   MainLayout): el HMI toma el alto completo y el iframe muestra su riel (Buscar, Lista,
@@ -19,11 +20,14 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Loader2, AlertCircle, BookOpen, QrCode, X, Copy, Check, Maximize, Minimize, ArrowLeft, Pencil } from 'lucide-react'
+import { Loader2, AlertCircle, QrCode, X, Copy, Check, Maximize, Minimize, ArrowLeft, Pencil } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnuro'
 import { useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
 import { AvisoGirarTelefono } from '@/components/hmiKnuro/AvisoGirarTelefono'
+import { KnuroPresetPicker } from '@/components/hmiKnuro/KnuroPresetPicker'
+import { frasePreset, partirPreset } from '@/components/hmiKnuro/knuroPresets'
+import '@/components/hmiKnuro/knuroConsola.css'
 import { useAuthStore, useIsAdmin } from '@/store'
 
 export function HmiKnuroPublicPage() {
@@ -170,26 +174,22 @@ export function HmiKnuroPublicPage() {
     })
   }
 
-  // Loading
-  if (loading) {
-    return (
-      <div className={`flex items-center justify-center bg-[#0a1628] ${isAuthenticated ? 'h-full w-full' : 'h-screen w-screen'}`}>
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-          <p className="text-blue-300 text-sm">Cargando HMI…</p>
-        </div>
-      </div>
-    )
-  }
+  const fsOn = isFullscreen || visualFs
+  const fsLabel = fsOn ? 'Salir de pantalla completa' : 'Pantalla completa'
+  const selPartes = selected ? partirPreset(selected) : null
+  const fraseSel = selPartes ? frasePreset(selPartes) : selected
 
-  // Error
-  if (error) {
+  const presetPicker = (variant: 'pc' | 'm') => (
+    <KnuroPresetPicker names={presetKeys} selected={selected || null} onSelect={switchPreset} variant={variant} />
+  )
+
+  // Carga / error: mismo marco fijo «Consola»
+  if (loading || error) {
     return (
-      <div className={`flex items-center justify-center bg-[#0a1628] ${isAuthenticated ? 'h-full w-full' : 'h-screen w-screen'}`}>
-        <div className="flex flex-col items-center gap-3 max-w-sm px-4">
-          <AlertCircle className="h-10 w-10 text-red-400" />
-          <p className="text-red-300 text-sm text-center">{error}</p>
-        </div>
+      <div className={`knc knc-estado ${isAuthenticated ? 'h-full w-full' : 'h-screen w-screen'}`}>
+        {loading
+          ? <><Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" /><p>Cargando HMI…</p></>
+          : <><AlertCircle className="h-8 w-8 bad" aria-hidden="true" /><p className="bad" style={{ maxWidth: 320, textAlign: 'center' }}>{error}</p></>}
       </div>
     )
   }
@@ -198,79 +198,58 @@ export function HmiKnuroPublicPage() {
     <div
       ref={containerRef}
       className={immersive
-        ? 'fixed inset-0 z-[70] flex flex-col bg-[#1a1c22]'
-        : isAuthenticated ? 'flex flex-col h-full w-full bg-[#0a1628]' : 'flex flex-col w-screen bg-[#0a1628]'}
+        ? 'knc fixed inset-0 z-[70] flex flex-col'
+        : isAuthenticated ? 'knc flex flex-col h-full w-full' : 'knc flex flex-col w-screen'}
       style={immersive
         ? { height: '100dvh', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }
         : isAuthenticated ? undefined : { height: '100dvh' }}
     >
 
-      {/* Header */}
-      <div
-        className="flex items-center gap-2 px-3 flex-shrink-0 border-b border-[#1e3a5f]"
-        style={{ height: immersive ? '0' : '40px', overflow: 'hidden', background: '#0d1f3c', borderBottomWidth: immersive ? 0 : undefined, transition: 'height .2s' }}
-      >
-        <button
-          onClick={volver}
-          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 -ml-1 rounded"
-          title="Volver"
-          aria-label="Volver"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Volver</span>
-        </button>
-        <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
-        <span className="text-blue-300 text-xs font-semibold tracking-wide uppercase">Modo Aprendizaje</span>
-        <span className="text-[#3a5a7a] text-xs hidden sm:inline">— HMI Knuro</span>
-        <div className="flex-1" />
-        {isAdmin && (
-          <button
-            onClick={() => navigate('/hmi-knuro')}
-            className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
-            title="Editar presets y ayudas"
-          >
-            <Pencil className="h-3 w-3" />
-            <span className="hidden sm:inline">Editar presets y ayudas</span>
+      {/* Cabecera (fuera en pantalla completa / celular horizontal) */}
+      {!immersive && (
+        <header className="knc-hdr">
+          <button type="button" onClick={volver} className="knc-ib knc-pc" aria-label="Volver">
+            <ArrowLeft aria-hidden="true" /><span className="knc-t2">Volver</span>
           </button>
-        )}
-        <button
-          onClick={toggleFullscreen}
-          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
-          title={(isFullscreen || visualFs) ? 'Salir de pantalla completa' : 'Pantalla completa'}
-        >
-          {(isFullscreen || visualFs) ? <Minimize className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
-        </button>
-        <button
-          onClick={() => setQrOpen(true)}
-          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
-          title="Compartir QR"
-        >
-          <QrCode className="h-3 w-3" />
-          <span className="hidden sm:inline">Compartir</span>
-        </button>
-      </div>
+          <button type="button" onClick={volver} className="knc-ib m sq bare knc-m" aria-label="Volver">
+            <ArrowLeft aria-hidden="true" />
+          </button>
+          <div className="knc-ttl">
+            <b>HMI Knuro</b>
+            <span className="knc-lab knc-pc">Modo aprendizaje</span>
+            <span className="knc-lab knc-m">Modo aprendizaje · solo lectura</span>
+          </div>
+          <span className="knc-ro knc-pc">Solo lectura</span>
+          <span className="knc-div knc-pc" aria-hidden="true" />
+          <div className="knc-pc" style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>{presetPicker('pc')}</div>
+          <span className="knc-sp" />
+          {isAdmin && (
+            <>
+              <button type="button" onClick={() => navigate('/hmi-knuro')} className="knc-ib knc-pc" title="Editar presets y ayudas" aria-label="Editar presets y ayudas">
+                <Pencil aria-hidden="true" /><span className="knc-t2">Editar presets y ayudas</span>
+              </button>
+              <button type="button" onClick={() => navigate('/hmi-knuro')} className="knc-ib m sq knc-m" aria-label="Editar presets y ayudas">
+                <Pencil aria-hidden="true" />
+              </button>
+            </>
+          )}
+          <button type="button" onClick={toggleFullscreen} className="knc-ib knc-pc" aria-label={fsLabel} title={fsLabel}>
+            {fsOn ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}<span className="knc-t1">{fsLabel}</span>
+          </button>
+          <button type="button" onClick={toggleFullscreen} className="knc-ib m sq knc-m" aria-label={fsLabel}>
+            {fsOn ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}
+          </button>
+          <button type="button" onClick={() => setQrOpen(true)} className="knc-ib knc-pc" aria-label="Compartir (QR)" title="Compartir (QR)">
+            <QrCode aria-hidden="true" /><span className="knc-t1">Compartir</span>
+          </button>
+          <button type="button" onClick={() => setQrOpen(true)} className="knc-ib m sq knc-m" aria-label="Compartir (QR)">
+            <QrCode aria-hidden="true" />
+          </button>
+        </header>
+      )}
 
-      {/* Preset selector */}
-      <div
-        className="flex items-center gap-2 px-3 flex-shrink-0 overflow-x-auto"
-        style={{ height: immersive ? '0' : '36px', overflow: immersive ? 'hidden' : 'auto', background: '#0a1628', borderBottom: immersive ? '0' : '1px solid #12243a', transition: 'height .2s' }}
-      >
-        <span className="text-[10px] text-[#3a5a7a] flex-shrink-0 uppercase tracking-wide">Preset:</span>
-        {presetKeys.map(name => (
-          <button
-            key={name}
-            onClick={() => switchPreset(name)}
-            className="flex-shrink-0 px-2.5 py-0.5 rounded-full text-[10px] transition-all whitespace-nowrap"
-            style={
-              name === selected
-                ? { background: '#1a4a8a', color: '#7ec8ff', border: '1px solid #2a6abf', fontWeight: 600 }
-                : { background: '#0d1f3c', color: '#4a7aaa', border: '1px solid #1e3a5f' }
-            }
-          >
-            {name}
-          </button>
-        ))}
-      </div>
+      {/* Celular: presets en fila propia, sin scroll horizontal */}
+      {!immersive && <div className="knc-m">{presetPicker('m')}</div>}
 
       {/* Celular vertical: aviso para girar */}
       {mostrarAviso && <AvisoGirarTelefono onPantallaCompleta={enterFullscreen} onCerrar={ocultarAviso} />}
@@ -288,57 +267,34 @@ export function HmiKnuroPublicPage() {
       </div>
 
       {/* Salir de pantalla completa fuera del modo horizontal (en horizontal se sale desde el riel del HMI) */}
-      {(isFullscreen || visualFs) && !compact && (
-        <button
-          onClick={exitImmersive}
-          aria-label="Salir de pantalla completa"
-          className="fixed top-2 right-2 z-[80] flex items-center justify-center rounded-lg text-blue-200"
-          style={{ width: 44, height: 44, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)' }}
-        >
-          <Minimize className="h-4 w-4" />
+      {fsOn && !compact && (
+        <button type="button" onClick={exitImmersive} aria-label="Salir de pantalla completa" className="knc-fsx">
+          <Minimize className="h-4 w-4" aria-hidden="true" />
         </button>
       )}
 
-      {/* QR Dialog */}
+      {/* QR */}
       {qrOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.7)' }}
-          onClick={() => setQrOpen(false)}
-        >
-          <div
-            className="bg-[#0d1f3c] border border-[#1e3a5f] rounded-xl p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-blue-300 text-sm font-semibold">Compartir preset</span>
-              <button onClick={() => setQrOpen(false)} className="text-[#3a5a7a] hover:text-blue-300">
-                <X className="h-4 w-4" />
+        <div className="knc-scrim" onClick={() => setQrOpen(false)}>
+          <div className="knc-dlg" role="dialog" aria-modal="true" aria-label="Compartir preset" onClick={e => e.stopPropagation()}>
+            <div className="knc-dlg-h">
+              <span>Compartir preset</span>
+              <button type="button" onClick={() => setQrOpen(false)} className="knc-ib sq bare" aria-label="Cerrar">
+                <X aria-hidden="true" />
               </button>
             </div>
-
-            {selected && (
-              <p className="text-[11px] text-blue-400 text-center">{selected}</p>
-            )}
-
-            <div className="bg-white p-3 rounded-lg">
+            {fraseSel && <p>{fraseSel}</p>}
+            <div className="knc-qr">
               <QRCodeSVG value={learnUrl} size={180} level="M" includeMargin={false} />
             </div>
-
-            <div className="flex items-center gap-2 w-full">
-              <input
-                readOnly
-                value={learnUrl}
-                className="flex-1 text-[10px] bg-[#0a1628] border border-[#1e3a5f] rounded px-2 py-1.5 text-blue-300 outline-none min-w-0"
-              />
-              <button
-                onClick={copyLink}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-[#1a4a8a] text-blue-200 text-[10px] hover:bg-[#2a5a9a] transition-colors flex-shrink-0"
-              >
-                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input readOnly value={learnUrl} className="knc-input knc-mono" style={{ fontSize: 11 }} aria-label="Enlace" />
+              <button type="button" onClick={copyLink} className="knc-ib">
+                {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                 {copied ? 'Copiado' : 'Copiar'}
               </button>
             </div>
+            <p>Abre el simulador en modo lectura. No requiere sesión.</p>
           </div>
         </div>
       )}

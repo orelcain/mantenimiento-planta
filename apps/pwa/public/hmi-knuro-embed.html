@@ -495,6 +495,178 @@ body.kn-land .kh-list-h{position:sticky;top:0;z-index:1;}
 body.kn-land .kh-list-h .kh-x{display:grid;}
 /* Área táctil de la ⓘ de los campos: 44 px reales, invisible (el ícono no cambia) */
 body.kn-land .sc td .tip-i::before{content:"";position:absolute;left:50%;top:50%;width:calc(44px / var(--kn-sc,1));height:calc(44px / var(--kn-sc,1));transform:translate(-50%,-50%);border-radius:50%;}
+
+/* ══ MARCO «CONSOLA» (ronda 4, alternativa A) ════════════════════════════════════════════
+   Todo lo que rodea al panel: barra de pantalla (miga + «?»), panel «Pantallas» (buscador +
+   árbol), riel horizontal y fondo. Estilo FIJO: no sigue el tema de la app (DESIGN.md §5f).
+   Gris acero neutro, sin azul; selección = tecla encendida (--k-key + borde inferior 2 px,
+   como los globos). Único color: navy del «?». Mismos tokens que knuroConsola.css (React).
+   NO toca .dev/#hs (el X2 y su pantalla), ni globos/hoja/lista (familia «Ventana del panel»). */
+:root{
+  --k-case:#1c1d1f;--k-panel:#26272a;--k-raised:#313236;--k-line:#3d3f43;
+  --k-ink:#e6e6e6;--k-ink2:#a6a7a9;--k-key:#d9dadb;--k-keyink:#141516;--k-keyedge:#8f9093;
+  --k-help:#1e3f7a;--k-helpedge:#102a55;--k-helpon:#16305e;--k-hover:#2d2e31;--k-warn:#ac966e;--k-bad:#b2807f;
+  --k-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --k-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --bg:var(--k-case);--pb:var(--k-panel);--bdr:var(--k-line);--ac2:var(--k-ink2);
+}
+html,body{background:var(--k-case);}
+#tb{display:none!important;}               /* la barra «Knuro · pantalla · ⚙» repetía la miga; el ⚙ pasa a «Pantallas» */
+.hml{display:none!important;}              /* título grande que repetía el preset */
+#hp{justify-content:flex-start;padding:0 24px 24px;}
+/* Barra de pantalla: miga + código + «? Esta pantalla» (+ «Pantallas» en celular) */
+#kn-bar{height:48px;margin:0;gap:12px;font-family:var(--k-ui);color:var(--k-ink);}
+.kn-crumb{display:flex;align-items:baseline;gap:6px;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;}
+.kn-crumb .p{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:var(--k-ink2);}
+.kn-crumb .p.last{display:none;}
+.kn-crumb .c{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:16px;font-weight:600;color:var(--k-ink);}
+.kn-crumb .code{flex:none;font:400 12px/1.35 var(--k-mono);font-variant-numeric:tabular-nums;color:var(--k-ink2);border:1px solid var(--k-line);border-radius:3px;padding:0 5px;}
+.kn-tools{flex:none;margin-left:auto;gap:8px;}
+#kn-scr-btn{height:32px;background:var(--k-help);border:1px solid var(--k-help);border-bottom:2px solid var(--k-helpedge);border-radius:4px;color:#fff;font:600 13px/1 var(--k-ui);gap:6px;padding:0 10px 0 6px;}
+#kn-scr-btn .q{width:20px;height:20px;background:transparent;color:#fff;font:700 15px/1 var(--k-ui);border-radius:0;}
+#kn-scr-btn:active{background:var(--k-helpon);}
+#kn-scr-btn[aria-expanded="true"]{background:var(--k-helpon);border-color:var(--k-helpon);color:#fff;}
+#kn-scr-btn[aria-expanded="true"] .q{background:transparent;color:#fff;}
+#kn-scr-btn.empty{background:transparent;border:1px dashed var(--k-line);color:var(--k-ink2);}
+#kn-scr-btn.empty .q{background:transparent;color:var(--k-ink2);}
+#kn-scr-btn:focus-visible,.kn-pan:focus-visible,#rp button:focus-visible,#rp [role="button"]:focus-visible,.kn-rb:focus-visible{outline:2px solid #e6e6e6;outline-offset:2px;}
+.kn-pan{display:none;align-items:center;gap:6px;height:44px;padding:0 12px;background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);font:500 15px/1 var(--k-ui);cursor:pointer;white-space:nowrap;}
+.kn-pan svg{width:18px;height:18px;}
+.kn-pan[aria-expanded="true"]{background:var(--k-key);border-color:var(--k-key);border-bottom:2px solid var(--k-keyedge);color:var(--k-keyink);}
+/* Panel «Pantallas»: buscador arriba, árbol (o resultados) abajo */
+#rp{background:var(--k-panel);border-left:1px solid var(--k-line);color:var(--k-ink);font-family:var(--k-ui);}
+.kp-grab{display:none;flex:none;width:36px;height:5px;border-radius:3px;background:var(--k-line);margin:6px auto 0;}
+.kp-head{display:flex;align-items:center;gap:8px;flex:none;padding:12px 10px 0 14px;}
+.kp-head b{flex:1;min-width:0;font:600 13px/1.2 var(--k-ui);color:var(--k-ink);}
+.kp-fold{width:26px;height:26px;display:grid;place-items:center;padding:0;background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);cursor:pointer;}
+.kp-fold svg{width:16px;height:16px;}
+.kp-fold:hover,.rp-mini:hover{background:var(--k-hover);}
+.kp-done{display:none;height:44px;padding:0 4px;background:none;border:0;color:var(--k-ink);font:600 17px/1 var(--k-ui);cursor:pointer;}
+#kp-search{flex:none;padding:10px 10px 8px;}
+#kp-search .kn-search{height:36px;background:var(--k-raised);border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink2);padding:0 6px 0 10px;}
+#kp-search .kn-search input{font:400 13px/20px var(--k-ui);color:var(--k-ink);}
+#kp-search .kn-search input::placeholder{color:var(--k-ink2);}
+#kp-search .kn-search:focus-within{border-color:var(--k-keyedge);background:var(--k-raised);box-shadow:none;outline:2px solid #e6e6e6;outline-offset:2px;}
+#kp-search .kn-kbd{font:400 11px/16px var(--k-mono);color:var(--k-ink2);border:1px solid var(--k-line);border-radius:3px;background:transparent;padding:0 5px;}
+.kn-clr{flex:none;width:24px;height:24px;display:grid;place-items:center;padding:0;background:none;border:0;border-radius:3px;color:var(--k-ink2);cursor:pointer;}
+.kn-clr svg{width:14px;height:14px;}
+.kn-clr[hidden]{display:none;}
+.rp-sec-hdr{display:none!important;}
+.rp-mini{padding:12px 0;background:none;border:0;color:var(--k-ink);width:100%;}
+.rp-mini svg{width:18px;height:18px;}
+#rp.collapsed .kp-head,#rp.collapsed #kp-search,#rp.collapsed .kn-res-in{display:none!important;}
+/* Árbol: sin emojis, triángulo de despliegue en los grupos, códigos en mono a la derecha */
+#rp .rp-tree{padding:0 6px 12px;}
+#rp .tn{margin:0;}
+#rp .tnc{margin-left:16px;border-left:0;padding-left:0;}
+#rp .tnh,#rp .tna{display:flex;align-items:center;gap:6px;min-height:30px;padding:0 10px 0 6px!important;border-radius:3px;border-left:0;color:var(--k-ink);font:400 13px/1.2 var(--k-ui);cursor:pointer;}
+#rp .tna,#rp .tnh:not(.kn-kids){padding-left:26px!important;}
+#rp .tnh.kn-kids .tnl{font-weight:600;}
+#rp .tnl{flex:1;min-width:0;font-size:inherit;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#rp .tni,#rp .sym{display:none;}
+#rp .tnbg,#rp .to{flex:none;margin-left:auto;background:none;border:0;padding:0;font:400 11px/1 var(--k-mono);font-variant-numeric:tabular-nums;color:var(--k-ink2);}
+#rp .tnh:hover,#rp .tna:hover{background:var(--k-hover);color:var(--k-ink);}
+#rp .tnh.act{background:transparent;border-left:0;}
+#rp .tnh.act .tnl{color:inherit;}
+#rp .tnh.kn-cur,#rp .tna.kn-cur{background:var(--k-key);color:var(--k-keyink);box-shadow:inset 0 -2px 0 var(--k-keyedge);}
+#rp .kn-cur .tnbg,#rp .kn-cur .to,#rp .kn-cur .kn-chev{color:var(--k-keyink);}
+#rp .tdv{height:1px;background:var(--k-line);margin:6px 0;}
+.kn-chev{position:relative;flex:none;width:14px;height:14px;display:grid;place-items:center;padding:0;background:none;border:0;color:var(--k-ink2);cursor:pointer;}
+.kn-chev::after{content:"";position:absolute;inset:-8px;}
+.kn-chev svg{width:12px;height:12px;transition:transform .15s;}
+.tn.kn-closed>.tnh .kn-chev svg{transform:rotate(-90deg);}
+.tn.kn-closed>.tnc{display:none;}
+/* Resultados de búsqueda dentro del panel (reemplazan al árbol mientras haya texto) */
+#rp.kn-searching .rp-sec{display:none;}
+#rp .kn-res.kn-res-in{position:static;flex:1 1 auto;min-height:0;max-height:none;width:auto!important;overflow:auto;background:transparent;border:0;border-radius:0;box-shadow:none;padding:0 10px 12px;color:var(--k-ink);font-family:var(--k-ui);}
+#rp .kn-res-in .kh-gh{font:400 11px/1.3 var(--k-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--k-ink2);padding:12px 2px 4px;}
+#rp .kn-res-in .kh-gh b{font-weight:600;color:inherit;}
+#rp .kn-res-in .kh-glist{background:transparent;border-top:0;}
+#rp .kn-res-in .kn-row{min-height:44px;padding:8px 4px;color:var(--k-ink);border-bottom:1px solid var(--k-line);font:14px/1.3 var(--k-ui);border-radius:0;}
+#rp .kn-res-in .kn-row .l{font-size:14px;}
+#rp .kn-res-in .kn-row .s{font-size:12px;color:var(--k-ink2);}
+#rp .kn-res-in .kn-row .cur{font:500 12px/1.2 var(--k-mono);color:var(--k-ink);}
+#rp .kn-res-in .kn-row.chg .cur{color:var(--k-warn);}
+#rp .kn-res-in .kn-row .chev{color:var(--k-ink2);}
+#rp .kn-res-in .kn-row:hover,#rp .kn-res-in .kn-row.sel{background:var(--k-hover);}
+#rp .kn-res-in mark{background:transparent;color:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;padding:0;}
+#rp .kn-res-in .more,#rp .kn-res-in .kn-empty{color:var(--k-ink2);padding:10px 2px;font-size:13px;}
+/* Edición de presets (solo editor admin; en modo lectura .psp no existe) */
+#rp .psp{border-top:1px solid var(--k-line);}
+#rp .psp-hdr{border-bottom-color:var(--k-line);}
+#rp .psp-hdr span{font:600 11px/1.3 var(--k-ui);letter-spacing:.06em;color:var(--k-ink2);}
+#rp .psp-hdr .arr{color:var(--k-ink2);}
+#rp .ptab{background:transparent;border-color:var(--k-line);color:var(--k-ink2);font:500 11px/1.2 var(--k-ui);padding:6px 2px;}
+#rp .ptab.active{background:var(--k-key);border-color:var(--k-key);color:var(--k-keyink);font-weight:600;}
+#rp .ps-curr{background:var(--k-raised);border-color:var(--k-line);}
+#rp .ps-curr-lbl,#rp .ps-list-hdr{font-size:11px;letter-spacing:.04em;color:var(--k-ink2);}
+#rp .ps-curr-name{color:var(--k-ink);}
+#rp .ps-list-hdr,#rp .ps-new{border-color:var(--k-line);}
+#rp .psave input,#rp .cmp-row-sel select{background:var(--k-raised);border-color:var(--k-line);color:var(--k-ink);font-size:12px;}
+#rp .pbtn{background:var(--k-raised);color:var(--k-ink);border-color:var(--k-line);font-size:11px!important;}
+#rp .pbtn:hover{background:var(--k-hover);}
+#rp .pbtn.del,#rp .cmp-row-sel .cmp-rem{color:var(--k-bad);background:var(--k-raised);border-color:var(--k-line);}
+#rp .pbtn.refs-btn.active{background:var(--k-key);color:var(--k-keyink);border-color:var(--k-key);}
+#rp .pi{background:var(--k-case);border-color:var(--k-line);}
+#rp .pi span{color:var(--k-ink);font-size:12px;}
+#rp .pi-active{border-color:var(--k-keyedge);box-shadow:inset 0 -2px 0 var(--k-keyedge);}
+#rp .cmp-tbl th{background:var(--k-raised);color:var(--k-ink);border-color:var(--k-line);}
+#rp .cmp-tbl td{border-color:var(--k-line);color:var(--k-ink);}
+#rp .cmp-tbl tr:nth-child(even) td{background:var(--k-case);}
+#rp .cmp-sec-hdr td{background:var(--k-case)!important;color:var(--k-ink2)!important;border-top-color:var(--k-line)!important;}
+#rp .cmp-diff{color:var(--k-warn)!important;}
+#rp .cmp-summary b{color:var(--k-warn);}
+/* Riel del celular horizontal */
+#kn-rail{background:var(--k-panel);border-left:1px solid var(--k-line);}
+.kn-rb{background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);font:700 18px/1 var(--k-ui);}
+.kn-rb:active{background:var(--k-hover);}
+.kn-rb[aria-pressed="true"]{background:var(--k-key);border-color:var(--k-key);border-bottom:2px solid var(--k-keyedge);color:var(--k-keyink);}
+.kn-rb[data-act="scr"]{background:var(--k-help);border-color:var(--k-help);border-bottom:2px solid var(--k-helpedge);color:#fff;}
+.kn-rb[data-act="scr"][aria-pressed="true"]{background:var(--k-helpon);border-color:var(--k-helpon);color:#fff;}
+@media(max-width:1100px){#rp{width:300px;}#rp.collapsed{width:36px;}}
+@media(max-width:860px){
+  #hp{padding:0 16px 16px;}
+  #kn-bar{height:52px;margin:0;gap:8px;}
+  .kn-crumb .p.full{display:none;}
+  .kn-crumb .p.last{display:block;}
+  .kn-crumb .c{font-size:17px;}
+  .kn-crumb .code{font-size:13px;}
+  .kn-pan{display:inline-flex;}
+  /* «Pantallas» = hoja a alto completo desde abajo (el ⚙ desaparece) */
+  #rp,#rp.collapsed{position:fixed;left:0;right:0;top:8px;bottom:0;width:auto;border-left:0;border-top:1px solid var(--k-line);border-radius:12px 12px 0 0;transform:translateY(105%);transition:transform .3s cubic-bezier(.22,.9,.24,1);z-index:100;}
+  #rp.open{transform:none;}
+  #rp.collapsed .rp-sec,#rp.collapsed .psp{display:flex;}
+  #rp.collapsed .kp-head,#rp.collapsed #kp-search{display:flex!important;}
+  #rp.collapsed #kp-search{display:block!important;}
+  #rp .rp-mini,#rp.collapsed .rp-mini{display:none!important;}
+  .kp-grab{display:block;}
+  .kp-fold{display:none;}
+  .kp-done{display:inline-flex;align-items:center;}
+  .kp-head{height:48px;padding:0 12px 0 16px;}
+  .kp-head b{font-size:17px;}
+  #kp-search{padding:4px 16px 8px;}
+  #kp-search .kn-search{height:44px;}
+  #kp-search .kn-search input{font-size:16px;line-height:22px;}
+  #rp .rp-tree{padding:0 10px calc(24px + env(safe-area-inset-bottom));}
+  #rp .tnh,#rp .tna{min-height:44px;font-size:15px;}
+  #rp .tnbg,#rp .to{font-size:13px;}
+  #rp .tnc{margin-left:16px;}
+  #rp .kn-res.kn-res-in{padding:0 16px calc(24px + env(safe-area-inset-bottom));}
+  #rp .kn-res-in .kn-row .l{font-size:15px;}
+  #rp .kn-res-in .kn-row .s{font-size:13px;}
+  #ov.show{background:rgba(0,0,0,.55);}
+}
+@media(max-width:767px){
+  .kn-tools{flex:none;}
+  #kn-scr-btn{width:44px;height:44px;padding:0;justify-content:center;}
+  #kn-scr-btn .q{width:auto;height:auto;font-size:19px;}
+}
+/* Horizontal (riel): «Pantallas» se abre como panel lateral junto al riel */
+body.kn-land #rp,body.kn-land #rp.collapsed{top:0;bottom:0;left:auto;right:calc(60px + env(safe-area-inset-right));width:min(380px,62vw);border-radius:0;border-top:0;border-left:1px solid var(--k-line);transform:translateX(calc(100% + 80px));}
+body.kn-land #rp.open{transform:none;}
+body.kn-land .kp-grab{display:none;}
+@media (prefers-reduced-motion:reduce){#rp{transition:none!important;}.kn-chev svg{transition:none;}}
+@media (pointer:coarse){#kp-search .kn-kbd{display:none;}}
 </style>
 </head>
 <body>
@@ -1239,12 +1411,15 @@ body.kn-land .sc td .tip-i::before{content:"";position:absolute;left:50%;top:50%
 </div><!-- /hp -->
 
 <!-- ══ RIGHT PANEL ══ -->
-<div id="rp">
-  <div class="rp-toggle" onclick="toggleRightPanel()" title="Colapsar/expandir panel">◀</div>
-  <div class="rp-mini" onclick="toggleRightPanel()">
-    <span title="Mapa de Navegación">🌐</span>
-    <span title="Presets">💾</span>
+<div id="rp" role="region" aria-label="Pantallas">
+  <div class="kp-grab" aria-hidden="true"></div>
+  <div class="kp-head">
+    <b>Pantallas</b>
+    <button type="button" class="kp-fold" onclick="toggleRightPanel()" aria-label="Plegar el panel Pantallas" title="Plegar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    <button type="button" class="kp-done" onclick="closePanel()">Listo</button>
   </div>
+  <button type="button" class="rp-mini" onclick="toggleRightPanel()" aria-label="Mostrar el panel Pantallas" title="Pantallas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 5h6M8 12h8M8 19h8M5 5v14h3M5 12h3"/></svg></button>
+  <div id="kp-search"></div>
 
   <!-- Tree section -->
   <div class="rp-sec">
@@ -1366,7 +1541,7 @@ body.kn-land .sc td .tip-i::before{content:"";position:absolute;left:50%;top:50%
 
   <!-- Preset section -->
   <div class="psp">
-    <div class="psp-hdr open" id="presets-hdr" onclick="togglePresets()"><span>💾 Presets de máquina</span><span class="arr">▶</span></div>
+    <div class="psp-hdr open" id="presets-hdr" onclick="togglePresets()"><span>Edición de presets</span><span class="arr">▶</span></div>
     <div class="psp-body" id="presets-body">
     <div class="ptabs">
       <button class="ptab active" id="tab-save" onclick="switchTab('save')">Guardar / Cargar</button>
@@ -1387,15 +1562,15 @@ body.kn-land .sc td .tip-i::before{content:"";position:absolute;left:50%;top:50%
         <!-- Guardar con nombre -->
         <div class="ps-new">
           <input id="pn" placeholder="Nombre de máquina…">
-          <button class="pbtn" onclick="savePreset()" title="Guarda los valores actuales del HMI con este nombre">💾 Guardar preset</button>
+          <button class="pbtn" onclick="savePreset()" title="Guarda los valores actuales del HMI con este nombre">Guardar preset</button>
         </div>
         <!-- Importar / Exportar -->
         <div class="ps-acts">
-          <button class="pbtn pdf" onclick="showExportDialog()">📤 Exportar PDF</button>
+          <button class="pbtn pdf" onclick="showExportDialog()">Exportar PDF</button>
         </div>
         <!-- Editar valores de referencia -->
         <div class="ps-acts" style="margin-top:4px;">
-          <button id="refs-edit-btn" class="pbtn refs-btn" onclick="toggleRefsEdit(this)" title="Activa la edición manual de los valores de referencia (fábrica) mostrados junto a cada parámetro">✏ Editar Refs</button>
+          <button id="refs-edit-btn" class="pbtn refs-btn" onclick="toggleRefsEdit(this)" title="Activa la edición manual de los valores de referencia (fábrica) mostrados junto a cada parámetro">Editar refs</button>
         </div>
         <div id="refs-hint" style="display:none;font-size:8.5px;color:#aa8800;margin-top:3px;padding:3px 4px;background:#2a2200;border-radius:3px;border:1px solid #554400;">Haz clic en cualquier valor gris junto a un parámetro para editarlo. Enter o clic fuera para confirmar.</div>
       </div>
@@ -1412,7 +1587,7 @@ body.kn-land .sc td .tip-i::before{content:"";position:absolute;left:50%;top:50%
           <button id="cmp-add-btn" onclick="addCmpPreset()" class="pbtn" style="font-size:9px;padding:2px 8px;flex:none;">+ Agregar</button>
           <button onclick="renderCompare()" class="pbtn" style="font-size:9px;padding:2px 8px;">↻ Comparar</button>
         </div>
-        <div style="font-size:9px;color:#555;margin-bottom:4px;">🟡 = valores diferentes entre máquinas</div>
+        <div style="font-size:11px;color:var(--k-ink2);margin-bottom:4px;">Resaltado = valores diferentes entre máquinas</div>
         <div id="cmp-out"></div>
       </div>
     </div>
@@ -1519,14 +1694,15 @@ function scaleHMI(){
   // Fallback: window.innerWidth menos el panel si estamos en modo standalone.
   const cs=getComputedStyle(p);
   const padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
-  const availW=p.clientWidth>10?p.clientWidth-(document.body.classList.contains('kn-land')?padX:0):(window.innerWidth-(IN_IFRAME?0:300));
-  let availH=p.clientHeight>10?p.clientHeight:window.innerHeight;
-  // PC: la barra del simulador (buscador) ocupa más alto que el título que reemplaza.
+  const availW=p.clientWidth>10?p.clientWidth-padX:(window.innerWidth-(IN_IFRAME?0:300));
+  const padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  let availH=p.clientHeight>10?p.clientHeight-padY:window.innerHeight;
+  // Marco «Consola»: la barra de pantalla va arriba del panel; el bisel del X2 (.dev) suma ~42×66 px.
   const knBar=document.getElementById('kn-bar');
-  if(knBar&&window.innerWidth>860) availH-=Math.max(0,knBar.offsetHeight+10-24);
-  if(availW<10||availH<10) return;
   const land=document.body&&document.body.classList.contains('kn-land');
-  let sc=land?Math.min(availW/800,availH/480):Math.min((availW-40)/800,(availH-40)/480,1.35);
+  if(knBar&&!land) availH-=knBar.offsetHeight;
+  if(availW<10||availH<10) return;
+  let sc=land?Math.min(availW/800,availH/480):Math.min((availW-42)/800,(availH-66)/480,1.35);
   sc=Math.max(sc,.28);
   document.documentElement.style.setProperty('--kn-sc',sc.toFixed(4));
   s.style.transform=`scale(${sc})`;s.style.width='800px';s.style.height='480px';
@@ -1583,23 +1759,88 @@ function show(id,name){
   document.querySelectorAll('.tnh.act').forEach(e=>e.classList.remove('act'));
   const tk=TREE[id]||'tr-s4';
   const te=document.getElementById(tk);
-  te?.classList.add('act');te?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  te?.classList.add('act');
+  _knTreeMark(id,te);
   renderTooltipIcons();  // Actualizar iconos de tooltip en la pantalla
   _updateVisBtnState();  // Actualizar visibilidad del botón
   _moveTipVisBtn();      // Mover botón al header activo
 }
 
 /* ── Panel toggle (mobile) ── */
-function togglePanel(){
-  const p=document.getElementById('rp'),o=document.getElementById('ov'),b=document.getElementById('ttbtn');
-  const open=p.classList.contains('open');
-  p.classList.toggle('open',!open);o.classList.toggle('show',!open);b.classList.toggle('open',!open);
-  b.textContent=open?'⚙':'✕';
+function _knPanSet(on){
+  const p=document.getElementById('rp'),o=document.getElementById('ov');
+  if(!p) return;
+  const was=p.classList.contains('open');
+  p.classList.toggle('open',on);o?.classList.toggle('show',on);
+  const pb=document.getElementById('kn-pan-btn');if(pb) pb.setAttribute('aria-expanded',String(on));
+  if(on&&!was){
+    if(typeof closeHelp==='function') closeHelp(true);
+    _knTreeMark(_knCurScreen());
+    const cur=p.querySelector('.kn-cur');
+    if(cur) requestAnimationFrame(()=>cur.scrollIntoView({block:'center'}));
+  }
+  if(!on&&was){const q=document.getElementById('kn-q');if(q&&document.activeElement===q) q.blur();}
+  if(typeof _knRailSync==='function') _knRailSync();
 }
-function closePanel(){
-  document.getElementById('rp').classList.remove('open');
-  document.getElementById('ov').classList.remove('show');
-  const b=document.getElementById('ttbtn');b.classList.remove('open');b.textContent='⚙';
+function togglePanel(){
+  const p=document.getElementById('rp');
+  if(p) _knPanSet(!p.classList.contains('open'));
+}
+function closePanel(){_knPanSet(false);}
+
+/* ── Árbol «Pantallas»: triángulo de despliegue en los grupos, solo abierta la rama actual,
+   fila de la pantalla actual marcada (tecla encendida). Reusa el árbol y nav() de siempre. ── */
+const KN_I_CHEV='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 9l6 7 6-7z"/></svg>';
+function _knTreeInit(){
+  const tree=document.querySelector('#rp .rp-tree');
+  if(!tree||tree.dataset.kn) return;
+  tree.dataset.kn='1';
+  tree.setAttribute('role','tree');tree.setAttribute('aria-label','Mapa de pantallas del HMI');
+  tree.querySelectorAll('.tnh,.tna').forEach(r=>{r.tabIndex=0;r.setAttribute('role','treeitem');});
+  tree.querySelectorAll('.tn').forEach(tn=>{
+    const h=tn.querySelector(':scope > .tnh'),c=tn.querySelector(':scope > .tnc');
+    if(!h||!c) return;
+    h.classList.add('kn-kids');
+    tn.classList.add('kn-closed');
+    h.setAttribute('aria-expanded','false');
+    const b=document.createElement('button');
+    b.type='button';b.className='kn-chev';b.tabIndex=-1;b.innerHTML=KN_I_CHEV;
+    b.setAttribute('aria-label','Desplegar '+((h.querySelector('.tnl')||h).textContent||'').trim());
+    b.addEventListener('click',e=>{e.stopPropagation();_knTreeOpen(tn,tn.classList.contains('kn-closed'));});
+    h.insertBefore(b,h.firstChild);
+  });
+  tree.addEventListener('keydown',e=>{
+    const r=e.target.closest&&e.target.closest('.tnh,.tna');
+    if(!r) return;
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();r.click();}
+    else if((e.key==='ArrowRight'||e.key==='ArrowLeft')&&r.classList.contains('kn-kids')){e.preventDefault();_knTreeOpen(r.parentElement,e.key==='ArrowRight');}
+  });
+}
+function _knTreeOpen(tn,open){
+  tn.classList.toggle('kn-closed',!open);
+  const h=tn.querySelector(':scope > .tnh');if(h) h.setAttribute('aria-expanded',String(open));
+}
+/* La fila de la pantalla actual: la que navega a ella (grupo antes que hoja); si no hay, la del grupo (TREE). */
+function _knTreeRow(id){
+  const rows=[...document.querySelectorAll('#rp .rp-tree .tnh[onclick],#rp .rp-tree .tna[onclick]')].filter(r=>r.getAttribute('onclick')==="nav('"+id+"')");
+  return rows.find(r=>r.classList.contains('tnh'))||rows[0]||null;
+}
+function _knTreeMark(id,fallback){
+  _knTreeInit();
+  document.querySelectorAll('#rp .kn-cur').forEach(e=>{e.classList.remove('kn-cur');e.removeAttribute('aria-current');});
+  const row=(id&&_knTreeRow(id))||fallback||null;
+  if(!row) return;
+  row.classList.add('kn-cur');row.setAttribute('aria-current','page');
+  let tn=row.closest('.tn');
+  while(tn){_knTreeOpen(tn,true);tn=tn.parentElement&&tn.parentElement.closest('.tn');}
+  const rp=document.getElementById('rp');
+  if(rp&&getComputedStyle(rp).visibility!=='hidden'&&!rp.classList.contains('kn-searching')) row.scrollIntoView({block:'nearest'});
+}
+/* Código de la pantalla en el árbol (S01, 3-1…) para la miga */
+function _knCode(id){
+  const r=_knTreeRow(id);
+  const c=r&&r.querySelector('.tnbg,.to');
+  return c?c.textContent.trim():'';
 }
 
 /* ── Collapsible tree section ── */
@@ -1612,13 +1853,12 @@ function toggleSec(hdrId,bodyId){
 }
 function toggleRightPanel(){
   const rp=document.getElementById('rp');
-  const btn=rp.querySelector('.rp-toggle');
   const collapsed=rp.classList.toggle('collapsed');
-  btn.textContent=collapsed?'▶':'◀';
   try{localStorage.setItem('hmi-rp-collapsed',collapsed?'1':'');}catch(e){}
+  requestAnimationFrame(scaleHMI);
 }
-// Restaurar estado del panel
-try{if(localStorage.getItem('hmi-rp-collapsed')==='1'){document.getElementById('rp').classList.add('collapsed');document.querySelector('.rp-toggle').textContent='▶';}}catch(e){}
+// Restaurar estado del panel (plegado a 36 px en PC)
+try{if(localStorage.getItem('hmi-rp-collapsed')==='1'){document.getElementById('rp').classList.add('collapsed');}}catch(e){}
 
 function togglePresets(){
   const hdr=document.getElementById('presets-hdr');
@@ -4293,30 +4533,44 @@ function _knBuildBar(){
   if(!hp) return;
   const bar=document.createElement('div');
   bar.id='kn-bar';
-  const hml=hp.querySelector(':scope > .hml');
   hp.insertBefore(bar,hp.firstChild);
-  if(hml) bar.appendChild(hml);
+  // Miga (Menú Técnico › Carro 2 › Tiempo 3-1): dice dónde se está; la llena _knScrRefresh
+  const crumb=document.createElement('div');
+  crumb.className='kn-crumb';
+  crumb.id='kn-crumb';
+  bar.appendChild(crumb);
   const tools=document.createElement('div');
   tools.className='kn-tools kh';
   tools.innerHTML=
     '<button type="button" id="kn-scr-btn" hidden aria-expanded="false" aria-haspopup="dialog" title="Para qué sirve esta pantalla">'+
       '<span class="q" aria-hidden="true">?</span><span class="lbl">Esta pantalla</span></button>'+
-    '<label class="kn-search">'+KN_I_SEARCH+
+    '<button type="button" id="kn-pan-btn" class="kn-pan" aria-expanded="false" aria-controls="rp">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 5h6M8 12h8M8 19h8M5 5v14h3M5 12h3"/></svg>Pantallas</button>';
+  bar.appendChild(tools);
+  // Buscador arriba del árbol, en el panel «Pantallas» (PC: lateral; celular: hoja)
+  const panS=document.getElementById('kp-search');
+  const lbl=document.createElement('label');
+  lbl.className='kn-search kh';
+  lbl.innerHTML=KN_I_SEARCH+
       '<input id="kn-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="kn-res" '+
       'autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="Buscar parámetro o pantalla" aria-label="Buscar parámetro o pantalla del HMI">'+
-      '<span class="kn-kbd" aria-hidden="true">/</span></label>';
-  bar.appendChild(tools);
+      '<span class="kn-kbd" aria-hidden="true">/</span>'+
+      '<button type="button" class="kn-clr" hidden aria-label="Borrar búsqueda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+  (panS||tools).appendChild(lbl);
   const res=document.createElement('div');
   res.id='kn-res';
-  res.className='kn-res kh';
+  res.className='kn-res kh'+(panS?' kn-res-in':'');
   res.setAttribute('role','listbox');
   res.setAttribute('aria-label','Resultados de la búsqueda');
   res.hidden=true;
-  document.body.appendChild(res);
+  if(panS) panS.after(res); else document.body.appendChild(res);
 
   const q=document.getElementById('kn-q');
+  const clr=lbl.querySelector('.kn-clr');
   document.getElementById('kn-scr-btn').addEventListener('click',e=>{e.stopPropagation();_knOpenScr();});
-  q.addEventListener('input',_knRender);
+  document.getElementById('kn-pan-btn').addEventListener('click',e=>{e.stopPropagation();togglePanel();});
+  clr.addEventListener('click',e=>{e.preventDefault();q.value='';clr.hidden=true;_knCloseRes();q.focus();});
+  q.addEventListener('input',()=>{clr.hidden=!q.value;_knRender();});
   q.addEventListener('focus',()=>{
     if(_khIsNarrow()){
       if(_khOpen) closeHelp(true);
@@ -4336,9 +4590,9 @@ function _knBuildBar(){
       if(!res.hidden&&_knHits.length) _knGo(_knHits[_knAct<0?0:_knAct]);
     } else if(e.key==='Escape'){
       e.preventDefault();e.stopPropagation();
-      if(!res.hidden){_knCloseRes();}
-      else if(q.value){q.value='';}
-      else{q.blur();if(_knIsLand()) _knLandPanel(null);}
+      if(q.value){q.value='';clr.hidden=true;_knCloseRes();}
+      else if(!res.hidden){_knCloseRes();}
+      else{q.blur();if(window.innerWidth<=860) closePanel();if(_knIsLand()) _knLandPanel(null);}
     }
   });
   res.addEventListener('mousedown',e=>{if(!_khIsNarrow()) e.preventDefault();}); // PC: no perder el foco del campo
@@ -4347,7 +4601,7 @@ function _knBuildBar(){
     if(b) _knGo(_knHits[+b.dataset.i]);
   });
   document.addEventListener('pointerdown',e=>{
-    if(res.hidden) return;
+    if(res.hidden||res.classList.contains('kn-res-in')) return; // en el panel, los resultados quedan mientras haya texto
     if(e.target.closest&&(e.target.closest('#kn-res')||e.target.closest('#kn-bar')||e.target.closest('#kn-rail'))) return;
     _knCloseRes();
   },true);
@@ -4355,8 +4609,15 @@ function _knBuildBar(){
   document.addEventListener('keydown',e=>{
     const t=e.target;
     const typing=t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-    if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey){e.preventDefault();q.focus();q.select();return;}
-    if(e.key==='/'&&!typing&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();q.focus();q.select();}
+    const go=()=>{
+      e.preventDefault();
+      const rp=document.getElementById('rp');
+      if(rp&&rp.classList.contains('collapsed')&&window.innerWidth>860) toggleRightPanel();
+      if(window.innerWidth<=860) _knPanSet(true);
+      q.focus();q.select();
+    };
+    if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey){go();return;}
+    if(e.key==='/'&&!typing&&!e.ctrlKey&&!e.metaKey&&!e.altKey) go();
   });
   window.addEventListener('resize',()=>{if(!res.hidden) _knPlaceRes();});
   _knScrRefresh();
@@ -4365,7 +4626,7 @@ function _knBuildBar(){
 function _knPlaceRes(){
   const res=document.getElementById('kn-res');
   const box=document.querySelector('#kn-bar .kn-search');
-  if(!res||!box) return;
+  if(!res||!box||res.classList.contains('kn-res-in')) return;
   const r=box.getBoundingClientRect();
   if(_khIsNarrow()){
     res.style.top=Math.round(r.bottom+8)+'px';
@@ -4381,6 +4642,7 @@ function _knCloseRes(){
   const res=document.getElementById('kn-res');
   const q=document.getElementById('kn-q');
   if(res){res.hidden=true;res.innerHTML='';}
+  document.getElementById('rp')?.classList.remove('kn-searching');
   if(q){q.setAttribute('aria-expanded','false');q.removeAttribute('aria-activedescendant');}
   _knHits=[];_knAct=-1;
 }
@@ -4430,6 +4692,7 @@ function _knRender(){
   if(!_knHits.length) html='<div class="kn-empty">Nada con «'+_escHTML(q.value.trim())+'». Prueba con el nombre que aparece en el panel.</div>';
   res.innerHTML=html;
   res.hidden=false;
+  if(res.classList.contains('kn-res-in')) document.getElementById('rp')?.classList.add('kn-searching');
   q.setAttribute('aria-expanded','true');
   _knPlaceRes();
   res.scrollTop=0;
@@ -4445,8 +4708,11 @@ function _knPulse(el){
 function _knGo(hit){
   if(!hit) return;
   const q=document.getElementById('kn-q');
-  _knCloseRes();
+  const res=document.getElementById('kn-res');
+  // En el panel «Pantallas» los resultados quedan a la vista (PC); en celular se cierra la hoja
+  if(!(res&&res.classList.contains('kn-res-in'))) _knCloseRes();
   if(_khIsNarrow()&&q) q.blur(); // baja el teclado para ver el HMI y la hoja
+  if(window.innerWidth<=860){if(q) q.blur();closePanel();}
   if(_knIsLand()){if(q) q.blur();_knLandPanel(null);}
   if(_knCurScreen()!==hit.sid) nav(hit.sid);
   requestAnimationFrame(()=>{
@@ -4470,7 +4736,25 @@ function _knOpenScr(forceOpen){
   const b=document.getElementById('kn-scr-btn');
   if(b) b.setAttribute('aria-expanded','true');
 }
+/* Miga de la barra de pantalla: ruta del HMI (sin repetir lo que ya dice el título) + código */
+function _knCrumbRefresh(){
+  const el=document.getElementById('kn-crumb');
+  if(!el) return;
+  const sid=_knCurScreen();
+  if(!sid){el.innerHTML='';return;}
+  let title=sid==='ph'?(document.getElementById('ph-t')?.textContent||''):_knScreenTitle(sid);
+  const parts=sid==='ph'?[]:(_knPath(sid)?_knPath(sid).split(' › '):[]);
+  while(parts.length&&_khNorm(title).startsWith(_khNorm(parts[parts.length-1]))) parts.pop();
+  // «Carro 2 - Tiempo» → miga «… › Carro 2 ›» y pantalla «Tiempo»
+  const tt=title.split(/\s+-\s+/).filter(Boolean);
+  if(tt.length>1){title=tt.pop();parts.push(...tt);}
+  const code=sid==='ph'?'':_knCode(sid);
+  el.innerHTML=(parts.length?'<span class="p full">'+_escHTML(parts.join(' › '))+' ›</span><span class="p last">'+_escHTML(parts[parts.length-1])+' ›</span>':'')+
+    '<span class="c">'+_escHTML(title)+'</span>'+(code?'<span class="code">'+_escHTML(code)+'</span>':'');
+  el.title=parts.concat(title).join(' › ');
+}
 function _knScrRefresh(){
+  _knCrumbRefresh();
   const b=document.getElementById('kn-scr-btn');
   if(!b) return;
   setTimeout(_knRailSync,0);
@@ -4544,6 +4828,7 @@ function _knApplyLand(){
   if(document.body.classList.contains('kn-land')===on) return;
   closeHelp(true);
   if(typeof _knCloseRes==='function') _knCloseRes();
+  closePanel();
   document.body.classList.remove('kn-land-search','kn-land-list');
   document.body.classList.toggle('kn-land',on);
   _knRailSync();
@@ -4558,6 +4843,7 @@ function _knLandPanel(which){
   if(was==='search'){_knCloseRes();const q=document.getElementById('kn-q');if(q) q.blur();}
   if(which&&which!==was){
     closeHelp(true);
+    closePanel();
     if(which==='search'){
       b.classList.add('kn-land-search');
       const q=document.getElementById('kn-q');
@@ -4579,7 +4865,7 @@ function _knBuildRail(){
   r.setAttribute('aria-label','Herramientas del simulador');
   const I=(d,sw)=>'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="'+(sw||2)+'" stroke-linecap="round" aria-hidden="true">'+d+'</svg>';
   r.innerHTML=
-    '<button type="button" class="kn-rb" data-act="search" aria-pressed="false" aria-label="Buscar parámetro o pantalla" title="Buscar">'+I('<circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4.5 4.5"/>')+'</button>'+
+    '<button type="button" class="kn-rb" data-act="pan" aria-pressed="false" aria-label="Pantallas: buscar o elegir pantalla" title="Pantallas">'+I('<path d="M3 4h5M7 10h7M7 16h7M4 4v12h3M4 10h3"/>')+'</button>'+
     '<button type="button" class="kn-rb" data-act="list" aria-pressed="false" aria-label="Lista de campos de esta pantalla" title="Lista de campos">'+I('<path d="M3 5h14M3 10h14M3 15h14"/>')+'</button>'+
     '<button type="button" class="kn-rb" data-act="scr" aria-pressed="false" aria-label="Para qué sirve esta pantalla" title="Ayuda de pantalla">?</button>'+
     '<button type="button" class="kn-rb" data-act="exit" aria-label="Salir de pantalla completa" title="Salir de pantalla completa">'+I('<path d="M8 3v5H3M12 3v5h5M17 12h-5v5M3 12h5v5"/>',1.8)+'</button>';
@@ -4589,8 +4875,9 @@ function _knBuildRail(){
     if(!b||b.disabled) return;
     e.stopPropagation();
     const act=b.dataset.act;
+    if(act==='pan'){_knLandPanel(null);togglePanel();return;}
     if(act==='search'||act==='list'){_knLandPanel(act);return;}
-    if(act==='scr'){_knLandPanel(null);_knOpenScr();_knRailSync();return;}
+    if(act==='scr'){_knLandPanel(null);closePanel();_knOpenScr();_knRailSync();return;}
     if(act==='exit'){
       _knLandPanel(null);
       closeHelp(true);
@@ -4605,6 +4892,7 @@ function _knRailSync(){
   const b=document.body;
   const set=(act,on)=>{const x=r.querySelector('[data-act="'+act+'"]');if(x) x.setAttribute('aria-pressed',String(on));};
   set('search',b.classList.contains('kn-land-search'));
+  set('pan',!!document.getElementById('rp')?.classList.contains('open'));
   set('list',b.classList.contains('kn-land-list'));
   const sid=_knCurScreen();
   set('scr',!!(_khOpen&&_khOpen.id==='scr:'+sid));
@@ -4619,7 +4907,7 @@ window.addEventListener('load',()=>{
   _knApplyLand();
   if(!IN_IFRAME){try{matchMedia(KN_LAND_MQ).addEventListener('change',_knApplyLand);}catch(e){}}
 });
-window.addEventListener('load',_knBuildBar);
+window.addEventListener('load',()=>{_knBuildBar();_knTreeMark(_knCurScreen());_knCrumbRefresh();});
 
 initTooltipSystem();
 
