@@ -1996,9 +1996,14 @@ service cloud.firestore {
     }
 
     match /hmi-knuro-config/{configId} {
-      // Lectura pública para preset-order (Modo Aprendizaje)
-      allow read: if true;
-      allow write: if isSupervisor();
+      // Solo 'preset-order' es público: lo lee HmiKnuroPublicPage (Modo
+      // Aprendizaje vía QR, sin login). 'current' y 'refs' los lee HmiKnuroPage,
+      // que está tras login. 'tooltip-pwd' guardaba una clave en claro con
+      // lectura pública; ya nada la usa (papelera = rol admin, HMI = #1228):
+      // queda cerrado para todos, también para escribir.
+      allow read: if configId == 'preset-order'
+        || (configId != 'tooltip-pwd' && isNotAnonymous());
+      allow write: if configId != 'tooltip-pwd' && isSupervisor();
     }
 
     // Tooltips de parámetros — lectura pública, escritura solo supervisor
