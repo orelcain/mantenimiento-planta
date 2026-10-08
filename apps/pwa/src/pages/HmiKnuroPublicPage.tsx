@@ -10,7 +10,9 @@
  * - Celular horizontal: pantalla completa del simulador SIN barras de la página (ni las de
  *   MainLayout): el HMI toma el alto completo y el iframe muestra su riel (Buscar, Lista,
  *   «?», Salir). Se activa con «Pantalla completa» o con solo girar el teléfono.
- * - Celular vertical: aviso descartable «Gira el teléfono…» con botón «Pantalla completa».
+ * - Celular vertical: pista de giro de primera visita DENTRO del iframe (línea bajo el panel, no
+ *   flota sobre nada; mensaje hmi:giro). Se marca vista al mostrarse (una sola vez). La frase de
+ *   planta y máquina va en el encabezado en lugar del subtítulo.
  * - Ruta: /aprendizaje/hmi-knuro  y  /aprendizaje/hmi-knuro/:presetId (única puerta para todos).
  *   /hmi/learn[/:presetId] (QR antiguos) redirige aquí desde App.tsx.
  * - Con sesión va dentro de MainLayout (main de alto fijo, ver isHmiKnuroRoute): ocupa h-full.
@@ -23,8 +25,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Loader2, AlertCircle, QrCode, X, Copy, Check, Maximize, Minimize, ArrowLeft, Pencil } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnuro'
-import { useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
-import { AvisoGirarTelefono } from '@/components/hmiKnuro/AvisoGirarTelefono'
+import { AVISO_KEY, useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
 import { KnuroPresetPicker } from '@/components/hmiKnuro/KnuroPresetPicker'
 import { frasePreset, partirPreset } from '@/components/hmiKnuro/knuroPresets'
 import '@/components/hmiKnuro/knuroConsola.css'
@@ -54,6 +55,27 @@ export function HmiKnuroPublicPage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const { compact, immersive, isFullscreen, visualFs, enterFullscreen, exitImmersive, toggleFullscreen, mostrarAviso, ocultarAviso } =
     useHmiKnuroMovil(containerRef, iframeRef)
+
+  // Pista de giro → iframe. Al mostrarse queda marcada como vista (localStorage): sale una vez.
+  const [iframeListo, setIframeListo] = useState(false)
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== iframeRef.current?.contentWindow) return
+      const t = (e.data as { type?: unknown } | null)?.type
+      if (t === 'hmi:ready') setIframeListo(true)
+      else if (t === 'hmi:giro-off') ocultarAviso()
+      else if (t === 'hmi:giro-fs') { ocultarAviso(); enterFullscreen() }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [ocultarAviso, enterFullscreen])
+  useEffect(() => {
+    if (!iframeListo) return
+    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:giro', on: mostrarAviso }, window.location.origin)
+    if (mostrarAviso) {
+      try { window.localStorage.setItem(AVISO_KEY, '1') } catch { /* modo privado */ }
+    }
+  }, [iframeListo, mostrarAviso])
 
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
@@ -180,7 +202,7 @@ export function HmiKnuroPublicPage() {
   const fraseSel = selPartes ? frasePreset(selPartes) : selected
 
   const presetPicker = (variant: 'pc' | 'm') => (
-    <KnuroPresetPicker names={presetKeys} selected={selected || null} onSelect={switchPreset} variant={variant} />
+    <KnuroPresetPicker names={presetKeys} selected={selected || null} onSelect={switchPreset} variant={variant} frase={false} />
   )
 
   // Carga / error: mismo marco fijo «Consola»
@@ -217,7 +239,7 @@ export function HmiKnuroPublicPage() {
           <div className="knc-ttl">
             <b>HMI Knuro</b>
             <span className="knc-lab knc-pc">Modo aprendizaje</span>
-            <span className="knc-lab knc-m">Modo aprendizaje · solo lectura</span>
+            <span className="knc-lab knc-m">{fraseSel || 'Modo aprendizaje'}</span>
           </div>
           <span className="knc-ro knc-pc">Solo lectura</span>
           <span className="knc-div knc-pc" aria-hidden="true" />
@@ -250,9 +272,6 @@ export function HmiKnuroPublicPage() {
 
       {/* Celular: presets en fila propia, sin scroll horizontal */}
       {!immersive && <div className="knc-m">{presetPicker('m')}</div>}
-
-      {/* Celular vertical: aviso para girar */}
-      {mostrarAviso && <AvisoGirarTelefono onPantallaCompleta={enterFullscreen} onCerrar={ocultarAviso} />}
 
       {/* iframe */}
       <div className="flex-1 min-h-0 relative">

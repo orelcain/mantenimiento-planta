@@ -65,6 +65,8 @@
 .knc-prow { flex-shrink: 0; background: var(--k-panel); border-bottom: 1px solid var(--k-line); padding: 6px 16px 10px; }
 .knc-prow .knc-segs { display: flex; gap: 12px; }
 .knc-frase { font-size: 12px; color: var(--k-ink2); margin-top: 6px; }
+/* Sin frase (pública: la frase va en el encabezado): una sola fila de 44 px */
+.knc-prow.sola { height: 44px; padding: 0 16px; }
 
 /* Menú emergente (respaldo de presets y gestión admin) */
 .knc-popw { position: relative; flex: none; }
@@ -116,7 +118,7 @@
 @container knc (min-width: 721px) { .knc-m { display: none !important; } }
 @container knc (max-width: 720px) {
   .knc-pc { display: none !important; }
-  .knc-hdr { height: 52px; gap: 6px; padding: 0 8px; }
+  .knc-hdr { height: 48px; gap: 4px; padding: 0 8px 0 4px; }
   .knc-ttl b { font-size: 17px; }
   .knc-lab { font-size: 12px; letter-spacing: 0; }
 }

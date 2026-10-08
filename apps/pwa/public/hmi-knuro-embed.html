@@ -667,6 +667,54 @@ body.kn-land #rp.open{transform:none;}
 body.kn-land .kp-grab{display:none;}
 @media (prefers-reduced-motion:reduce){#rp{transition:none!important;}.kn-chev svg{transition:none;}}
 @media (pointer:coarse){#kp-search .kn-kbd{display:none;}}
+
+/* ══ CELULAR VERTICAL · pulido r8, variante (a) «bisel fino» ═══════════════════════════════
+   Solo ≤767 px y fuera del modo horizontal (body.kn-land): PC y horizontal no cambian.
+   Margen de página 8 px; el X2 pasa a un bisel de 4 px (arriba y a los lados) con la franja
+   «X2 pro / Beijer» de 14 px abajo, sin degradado ni sombra grande (la sombra del .dev de PC
+   era el «degradado» que oscurecía el encabezado de la lista). Escala en scaleHMI().
+   La barra queda con miga + «Pantallas»: el «?» sobra porque la ayuda de pantalla vive en la
+   lista (abierta si no hay campos, plegada como primera fila si los hay). */
+@media (max-width:767px){
+  body:not(.kn-land) #hp{padding-left:8px;padding-right:8px;}
+  body:not(.kn-land) #kn-bar{height:44px;padding:0 0 0 8px;}
+  body:not(.kn-land) #kn-scr-btn{display:none!important;}
+  body:not(.kn-land) .kn-pan{height:36px;font-size:14px;}
+  body:not(.kn-land) .dev{padding:4px 4px 0;border-radius:6px;background:#101011;box-shadow:inset 0 1px 0 rgba(255,255,255,.07);}
+  body:not(.kn-land) .led{display:none;}
+  body:not(.kn-land) .sw{border:0;box-shadow:none;}
+  body:not(.kn-land) .brd{height:14px;padding:0 4px;}
+  body:not(.kn-land) .brd .mn{font-size:9px;color:#9a9aa0;letter-spacing:0;}
+  body:not(.kn-land) .brd .bj{font-size:9px;color:#8a8a8f;letter-spacing:0;}
+  body:not(.kn-land) #kn-help-list{margin-top:12px;padding-bottom:16px;}
+  /* «Pantallas» (árbol + buscador) se abre BAJO la barra: el título y el botón quedan a la vista */
+  body:not(.kn-land) #rp,body:not(.kn-land) #rp.collapsed{top:44px;}
+  body:not(.kn-land) #ov{top:44px;}
+}
+/* Lista del celular vertical (renderHelpList, modo «v»): familia «Ventana del panel» */
+.kn-lh{display:flex;align-items:baseline;gap:8px;padding:12px 16px 10px;border-bottom:1px solid #dcdcdc;background:#f4f4f4;font:700 13px/1.2 Arial,Helvetica,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#4a4a4a;}
+.kn-lh .n{font:500 13px/1.2 var(--k-mono);font-variant-numeric:tabular-nums;letter-spacing:0;color:#5c5c5c;}
+.kn-sh{padding:12px 16px 14px;border-bottom:1px solid #dcdcdc;color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;}
+.kn-sh .ey{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#4a4a4a;margin-bottom:6px;}
+.kn-sh p{font-size:15px;line-height:1.45;margin:0 0 8px;color:#1a1a1a;}
+.kn-sh p .h{font-weight:700;}
+.kn-sh .kn-org{display:flex;align-items:flex-start;gap:6px;font-size:13px;line-height:1.35;color:#5c5c5c;}
+.kn-sh .kn-org svg{width:15px;height:15px;margin-top:1px;}
+.kn-sh .kn-org b{color:#1a1a1a;}
+.kn-sh .kh-btn-tint{margin-top:10px;}
+.kn-row.kn-row-acc .chev{transform:rotate(90deg);transition:transform .15s;}
+.kn-row.kn-row-acc[aria-expanded="true"] .chev{transform:rotate(-90deg);}
+.kn-row.kn-row-acc[aria-expanded="true"]{border-bottom-color:transparent;}
+.kn-acc .kn-sh{padding:2px 14px 14px;}
+/* Pista de giro (primera visita): línea inline bajo el panel, no flota sobre nada */
+#kn-giro{display:none;align-self:stretch;align-items:center;gap:8px;min-height:44px;margin:8px 0 0;padding:0 0 0 12px;background:var(--k-panel);border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink2);font:400 13px/1.3 var(--k-ui);}
+#kn-giro svg.rot{width:20px;height:20px;flex:none;}
+#kn-giro span{flex:1;min-width:0;}
+#kn-giro button{flex:none;height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;background:transparent;border:0;color:var(--k-ink);font:600 13px/1 var(--k-ui);cursor:pointer;}
+#kn-giro button.x{width:44px;padding:0;color:var(--k-ink2);}
+#kn-giro button svg{width:16px;height:16px;}
+@media (max-width:767px){body.kn-giro:not(.kn-land) #kn-giro{display:flex;}}
+@media (prefers-reduced-motion:reduce){.kn-row.kn-row-acc .chev{transition:none;}}
 </style>
 </head>
 <body>
@@ -1702,7 +1750,11 @@ function scaleHMI(){
   const land=document.body&&document.body.classList.contains('kn-land');
   if(knBar&&!land) availH-=knBar.offsetHeight;
   if(availW<10||availH<10) return;
-  let sc=land?Math.min(availW/800,availH/480):Math.min((availW-42)/800,(availH-66)/480,1.35);
+  // Celular vertical (≤767, sin kn-land): bisel fino de 4 px por lado y 4+14 px en alto.
+  const thin=!land&&window.innerWidth<768;
+  let sc=land?Math.min(availW/800,availH/480)
+    :thin?Math.min((availW-8)/800,(availH-18)/480)
+    :Math.min((availW-42)/800,(availH-66)/480,1.35);
   sc=Math.max(sc,.28);
   document.documentElement.style.setProperty('--kn-sc',sc.toFixed(4));
   s.style.transform=`scale(${sc})`;s.style.width='800px';s.style.height='480px';
@@ -1775,6 +1827,8 @@ function _knPanSet(on){
   const pb=document.getElementById('kn-pan-btn');if(pb) pb.setAttribute('aria-expanded',String(on));
   if(on&&!was){
     if(typeof closeHelp==='function') closeHelp(true);
+    // Celular vertical: la hoja arranca bajo la barra de pantalla; la barra tiene que estar arriba.
+    if(typeof _khIsNarrow==='function'&&_khIsNarrow()){const hp=document.getElementById('hp');if(hp&&hp.scrollTop>0) hp.scrollTop=0;}
     _knTreeMark(_knCurScreen());
     const cur=p.querySelector('.kn-cur');
     if(cur) requestAnimationFrame(()=>cur.scrollIntoView({block:'center'}));
@@ -1941,6 +1995,7 @@ if(IN_IFRAME){
     if(!e.data||typeof e.data.type!=='string') return;
     if(e.data.type==='hmi:load-preset'){loadPreset(e.data.name);return;}
     if(e.data.type==='hmi:land'){_knLandMsg=!!e.data.on;_knApplyLand();return;}
+    if(e.data.type==='hmi:giro'){_knGiro(!!e.data.on);return;}
     if(e.data.type!=='hmi:init') return;
     presets=e.data.presets||{};
     presetOrder=e.data.order||[];
@@ -4277,7 +4332,27 @@ function _khRefreshOpen(){
 }
 
 /* ── Lista de campos de la pantalla actual (celular) ── */
+/* Celular vertical («v»): sin encabezado «Esta pantalla». Sin campos, la ayuda de pantalla va
+   ABIERTA con su línea de origen; con campos, encabezado plano «Campos · N» y la ayuda plegada
+   como primera fila (se abre en el lugar). Horizontal (lista lateral) y PC: sin cambios. */
+let _knScrExp=null,_knListMode=null;
+function _knListV(){return _khIsNarrow();}
+function _knScrHelpHTML(scrId,withEyebrow){
+  const p=parseTip(_khText(scrId));
+  const o=_khOriginTexts(p);
+  let h=withEyebrow?'<div class="ey">Para qué sirve esta pantalla</div>':'';
+  sanitizeTipHTML(_khText(scrId)).split('<br>').forEach(line=>{
+    const t=line.trim();
+    if(!t||/^<i>\s*Fuente:/i.test(t)) return;
+    const m=t.match(/^<b>([^<]{1,40}?)\s*:?\s*<\/b>\s*:?\s*([\s\S]+)$/);
+    h+=m?'<p><span class="h">'+m[1]+':</span> '+m[2]+'</p>':'<p>'+t+'</p>';
+  });
+  h+='<div class="kn-org">'+o.ic+'<span>'+o.html+'</span></div>';
+  if(_khCanEdit()) h+='<button type="button" class="kh-btn-tint" data-act="scr-edit">'+(p.origin==='none'?'Escribir para qué sirve':'Editar ayuda de pantalla')+'</button>';
+  return h;
+}
 function renderHelpList(){
+  _knListMode=_knListV()?'v':'o';
   const hp=document.getElementById('hp');
   if(!hp) return;
   let wrap=document.getElementById('kn-help-list');
@@ -4289,8 +4364,12 @@ function renderHelpList(){
     hp.appendChild(wrap);
     wrap.addEventListener('click',e=>{
       if(e.target.closest('.kh-list-h .kh-x')){_knLandPanel(null);return;}
+      const ed=e.target.closest('[data-act="scr-edit"]');
+      if(ed){const sc0=document.querySelector('.sc.active');if(sc0) openTipEdit('scr:'+sc0.id,ed);return;}
       const b=e.target.closest('.kn-row');
       if(!b) return;
+      // Celular vertical: la ayuda de pantalla se abre en el mismo lugar (acordeón), no en hoja.
+      if(b.classList.contains('kn-row-acc')){_knScrExp=_knScrExp===b.dataset.pid?null:b.dataset.pid;renderHelpList();return;}
       // En horizontal la lista tapa el panel: se cierra y el globo sale junto a la fila.
       if(_knIsLand()) _knLandPanel(null);
       openHelp(b.dataset.pid,null);
@@ -4305,8 +4384,18 @@ function renderHelpList(){
   if(!inputs.length&&!showScr){wrap.hidden=true;wrap.innerHTML='';if(typeof _knRailSync==='function') _knRailSync();return;}
   wrap.hidden=false;
   const sel=_khOpen?_khOpen.id:null;
+  const vMode=_knListMode==='v';
+  if(_knScrExp&&_knScrExp!==scrId) _knScrExp=null; // otra pantalla: la ayuda vuelve plegada
   let scrRow='';
-  if(showScr){
+  if(showScr&&vMode&&!inputs.length){
+    scrRow='<div class="kn-sh" role="region" aria-label="Para qué sirve esta pantalla">'+_knScrHelpHTML(scrId,true)+'</div>';
+  } else if(showScr&&vMode){
+    const so=_khOriginTexts(parseTip(_khText(scrId)));
+    const ex=_knScrExp===scrId;
+    scrRow='<div class="kh-glist kn-scr-g kn-acc"><button type="button" class="kn-row kn-row-scr kn-row-acc" aria-expanded="'+ex+'" aria-controls="kn-scr-acc" data-pid="'+_escHTML(scrId)+'">'+
+      '<span class="l">Para qué sirve esta pantalla</span><span class="s">'+so.ic+'<span>'+so.html+'</span></span>'+KH_I.chev+'</button>'+
+      '<div class="kn-sh" id="kn-scr-acc"'+(ex?'':' hidden')+'>'+(ex?_knScrHelpHTML(scrId,false):'')+'</div></div>';
+  } else if(showScr){
     const sp=parseTip(_khText(scrId));
     const so=_khOriginTexts(sp);
     scrRow='<div class="kh-glist kn-scr-g"><button type="button" class="kn-row kn-row-scr'+(scrId===sel?' sel':'')+'" data-pid="'+_escHTML(scrId)+'">'+
@@ -4337,7 +4426,8 @@ function renderHelpList(){
   });
   // Sin campos (p. ej. Principal) no se muestra «· 0»: solo queda la fila de la pantalla.
   const headTxt=inputs.length?'Campos de esta pantalla · '+inputs.length:'Esta pantalla';
-  const head='<div class="kh-list-h"><span>'+headTxt+'</span>'+
+  const head=vMode?(inputs.length?'<div class="kn-lh">Campos <span class="n">· '+inputs.length+'</span></div>':''):
+    '<div class="kh-list-h"><span>'+headTxt+'</span>'+
     '<button type="button" class="kh-x" aria-label="Cerrar lista de campos">'+KH_I.x+'</button></div>';
   wrap.innerHTML=head+scrRow+html.join('');
   if(typeof _knRailSync==='function') _knRailSync();
@@ -4391,6 +4481,7 @@ let _khResizeT=null;
 window.addEventListener('resize',()=>{
   clearTimeout(_khResizeT);
   _khResizeT=setTimeout(()=>{
+    if(_knListMode&&_knListMode!==(_knListV()?'v':'o')) renderHelpList();
     if(_khOpen){
       const narrow=_khIsNarrow();
       if(narrow&&_khOpen.kind==='pop'){const id=_khOpen.id;closeHelp(true);_khOpenSheet(id);}
@@ -4831,6 +4922,7 @@ function _knApplyLand(){
   closePanel();
   document.body.classList.remove('kn-land-search','kn-land-list');
   document.body.classList.toggle('kn-land',on);
+  renderHelpList(); // la lista cambia de forma entre vertical y la lateral del modo horizontal
   _knRailSync();
   scaleHMI();
   requestAnimationFrame(scaleHMI);
@@ -4856,6 +4948,32 @@ function _knLandPanel(which){
     }
   }
   _knRailSync();
+}
+/* Pista de giro (celular vertical, primera visita): la decide el padre (mensaje hmi:giro, misma
+   clave de localStorage que antes). Es una línea DENTRO del flujo, bajo el panel: no flota sobre
+   presets, título, «Pantallas», el HMI ni la lista. «Pantalla completa» y × avisan al padre. */
+function _knGiro(on){
+  let g=document.getElementById('kn-giro');
+  if(on&&!g){
+    const dev=document.querySelector('#hp .dev');
+    if(!dev) return;
+    g=document.createElement('div');
+    g.id='kn-giro';
+    g.setAttribute('role','note');
+    g.innerHTML='<svg class="rot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="10" width="15" height="10" rx="2"/><path d="M14 4a6 6 0 0 1 6 6M20 10l-2-2M20 10l2-2"/></svg>'+
+      '<span>Gira el teléfono para agrandar el panel</span>'+
+      '<button type="button" data-act="fs">Pantalla completa</button>'+
+      '<button type="button" class="x" data-act="x" aria-label="Cerrar aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+    dev.after(g);
+    g.addEventListener('click',e=>{
+      const b=e.target.closest('button');
+      if(!b) return;
+      e.stopPropagation();
+      _knGiro(false);
+      if(IN_IFRAME) window.parent.postMessage({type:b.dataset.act==='fs'?'hmi:giro-fs':'hmi:giro-off'},location.origin);
+    });
+  }
+  document.body.classList.toggle('kn-giro',on);
 }
 function _knBuildRail(){
   if(document.getElementById('kn-rail')) return;

@@ -17,9 +17,11 @@ interface Props {
   onSelect: (name: string) => void
   /** 'pc': dentro de la cabecera, con rótulos. 'm': fila propia del celular, con la frase debajo. */
   variant: 'pc' | 'm'
+  /** 'm': frase de planta y máquina bajo los segmentos (la pública la lleva en el encabezado). */
+  frase?: boolean
 }
 
-export function KnuroPresetPicker({ names, selected, onSelect, variant }: Props) {
+export function KnuroPresetPicker({ names, selected, onSelect, variant, frase = true }: Props) {
   const modelo = useMemo(() => modeloPresets(names), [names])
   const actual = selected ? partirPreset(selected) : null
   const m = variant === 'm'
@@ -70,9 +72,9 @@ export function KnuroPresetPicker({ names, selected, onSelect, variant }: Props)
 
   if (m) {
     return (
-      <div className="knc-prow">
+      <div className={`knc-prow${frase ? '' : ' sola'}`}>
         <div className="knc-segs">{segPlanta}{segMaquina}</div>
-        <div className="knc-frase" aria-live="polite">{actual ? frasePreset(actual) : 'Elige planta y máquina'}</div>
+        {frase && <div className="knc-frase" aria-live="polite">{actual ? frasePreset(actual) : 'Elige planta y máquina'}</div>}
       </div>
     )
   }
