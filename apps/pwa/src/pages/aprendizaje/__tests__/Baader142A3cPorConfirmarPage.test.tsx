@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import type { PartesPlano, ParteFisica } from '@/hooks/usePartesPlano'
 import { useAuthStore } from '@/store/authStore'
@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   partes: null as unknown,
   /** docs de planoVinculos tal como los lee el hook (con `maquina`, o sin ella los viejos). */
   docs: [] as Record<string, unknown>[],
+  /** altas de código tal como las entrega el listener compartido. */
+  altas: [] as unknown[],
 }))
 
 vi.mock('@/hooks/usePartesPlano', () => ({ usePartesPlano: () => mocks.partes }))
@@ -35,6 +37,9 @@ vi.mock('@/hooks/usePlanoVinculos', async () => {
     },
   }
 })
+vi.mock('@/hooks/repuestos/useAltasDeCodigo', () => ({
+  useAltasDeCodigo: () => ({ altas: mocks.altas, porCodigo: new Map(), loading: false }),
+}))
 vi.mock('@/hooks/repuestos/useRepuestosByCodigos', () => ({
   useRepuestosByCodigos: () => ({ bySap: new Map(), loading: false }),
 }))
@@ -97,6 +102,7 @@ const fijarMedia = (pc: boolean) => {
 beforeEach(() => {
   mocks.partes = partesBase()
   mocks.docs = []
+  mocks.altas = []
   localStorage.clear()
   useAuthStore.setState({ isAuthenticated: true })
   fijarMedia(false)
@@ -270,5 +276,87 @@ describe('Baader142A3cPorConfirmarPage', () => {
       expect(screen.getByTestId('fila-SM5').textContent).toContain('N3: pendiente')
       expect(screen.getByTestId('kpi-por-confirmar').textContent).toContain('prioritarios resueltos en ambas')
     })
+  })
+})
+
+describe('Baader142A3cPorConfirmarPage · indicador «Sin SAP»', () => {
+  /** SM5 y B1 sin SAP; B2 y B3 comparten el código 42303200 (sin SAP, conjunto); B4 sí tiene SAP. */
+  const conSinSap = (): PartesPlano => ({
+    despiece: 'baader-142-despiece',
+    aparatos: {
+      SM5: [pieza()],
+      B1: [pieza({ nr: '42303109', pos: 'B1' })],
+      B2: [pieza({ nr: '42303200', pos: 'B2', nivel: 'conjunto', confianza: 'propuesto', es: 'Isla' })],
+      B3: [pieza({ nr: '42303200', pos: 'B3', nivel: 'conjunto', confianza: 'propuesto', es: 'Isla' })],
+      B4: [pieza({ nr: '42303300', pos: 'B4', sap: '3300000001' })],
+    },
+    familias: {},
+  })
+  const alta = (codigoFabricante: string, estado: string, extra: Record<string, unknown> = {}) => ({ codigoFabricante, estado, ...extra })
+
+  it('una fila con el total de códigos sin SAP y la barra que suma: dados de alta · en bodega · sin pedir', async () => {
+    mocks.partes = conSinSap()
+    mocks.altas = [alta('41702013', 'creada', { sapCreado: '3300112345' }), alta('42303200', 'pendiente'), alta('42303109', 'rechazada')]
+    montar()
+    const kpi = (await screen.findByTestId('kpi-sin-sap')).textContent ?? ''
+    expect(kpi).toContain('Sin SAP · 3 códigos')
+    expect(kpi).toContain('1 dado de alta')
+    expect(kpi).toContain('1 en bodega')
+    // la rechazada vuelve a «sin pedir»
+    expect(kpi).toContain('1 sin pedir')
+    expect(kpi).toContain('Cubren 4 elementos del plano.')
+  })
+
+  it('sin altas todo está sin pedir; sin sesión la fila no aparece', async () => {
+    mocks.partes = conSinSap()
+    montar()
+    expect((await screen.findByTestId('kpi-sin-sap')).textContent).toContain('3 sin pedir')
+    cleanup()
+    useAuthStore.setState({ isAuthenticated: false })
+    montar()
+    await screen.findByText('Por confirmar en terreno')
+    expect(screen.queryByTestId('kpi-sin-sap')).toBeNull()
+  })
+
+  it('si ningún código está sin SAP, no hay fila', async () => {
+    mocks.partes = { ...conSinSap(), aparatos: { B4: [pieza({ nr: '42303300', pos: 'B4', sap: '3300000001' })] } }
+    montar()
+    await screen.findByText('Por confirmar en terreno')
+    expect(screen.queryByTestId('kpi-sin-sap')).toBeNull()
+  })
+
+  it('al tocarla abre la lista en tres grupos, ordenada por cuántos elementos cubre cada código', async () => {
+    mocks.partes = conSinSap()
+    mocks.altas = [alta('41702013', 'creada', { sapCreado: '3300112345' }), alta('42303109', 'pendiente')]
+    montar()
+    fireEvent.click(within(await screen.findByTestId('kpi-sin-sap')).getByRole('button'))
+    const lista = await screen.findByTestId('lista-sin-sap')
+    const t = lista.textContent ?? ''
+    expect(t).toContain('3 códigos de fabricante del plano 888 que bodega no tiene')
+    expect(t).toContain('Sin pedir · 1')
+    expect(t).toContain('En bodega · 1')
+    expect(t).toContain('Dados de alta · 1')
+    expect(within(lista).getByTestId('sin-sap-42303200').textContent).toContain('B2, B3 · 2 elementos · conjunto · propuesto')
+    expect(within(lista).getByTestId('sin-sap-41702013').textContent).toContain('SAP 3300112345')
+    // el de 2 elementos va antes que los de 1 dentro de su orden global
+    expect(t.indexOf('42303200')).toBeLessThan(t.indexOf('42303109'))
+  })
+
+  it('tocar un código de la lista abre la ficha de su primer elemento', async () => {
+    mocks.partes = conSinSap()
+    montar()
+    fireEvent.click(within(await screen.findByTestId('kpi-sin-sap')).getByRole('button'))
+    fireEvent.click(within(await screen.findByTestId('lista-sin-sap')).getByTestId('sin-sap-41702013'))
+    await waitFor(() => expect(screen.getByTestId('ruta').textContent).toContain('el=SM5'))
+    expect(screen.queryByTestId('lista-sin-sap')).toBeNull()
+  })
+
+  it('la lista «Sin SAP» trae «Listo» para cerrar (el Sheet no tiene otro botón)', async () => {
+    mocks.partes = conSinSap()
+    montar()
+    fireEvent.click(within(await screen.findByTestId('kpi-sin-sap')).getByRole('button'))
+    await screen.findByTestId('lista-sin-sap')
+    fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
+    await waitFor(() => expect(screen.queryByTestId('lista-sin-sap')).toBeNull())
   })
 })

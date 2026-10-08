@@ -948,16 +948,18 @@ exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{s
   if (!sol) return
 
   // El mensaje vive en solicitudRepuesto.js (probado): stock al pedir + enlace al panel.
-  const { mensajeTelegram, esc, RUTA_SOLICITUDES } = require('./solicitudRepuesto')
+  const { mensajeTelegram, mensajeAltaTelegram, esAltaCodigo, esc, RUTA_SOLICITUDES } = require('./solicitudRepuesto')
   const nombre = esc(sol.textoBreve) || '(sin nombre)'
   const cantidad = sol.cantidad ?? 1
   const solicitante = esc(sol.solicitadoPorNombre) || 'Desconocido'
+  // Alta de código (ficha A3C): MISMA función y mismo canal, pero sin SAP ni stock que leer.
+  const esAlta = esAltaCodigo(sol)
 
   // Stock al momento de pedir: UNA lectura por solicitud (hubo 1 en 3,5 meses → costo nulo).
-  // Si falla, el aviso sale igual y dice que no hay registro.
+  // Si falla, el aviso sale igual y dice que no hay registro. Una alta no tiene SAP: no lee bodega.
   let bodega = null
   try {
-    const sapLimpio = String(sol.codigoSAP || '').trim()
+    const sapLimpio = esAlta ? '' : String(sol.codigoSAP || '').trim()
     if (sapLimpio) {
       const b = await db.collection('bodega').doc(sapLimpio).get()
       bodega = b.exists ? b.data() : null
@@ -967,15 +969,15 @@ exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{s
   }
 
   // Telegram → topic de Repuestos (cae a General si no está configurado)
-  await sendTelegramMessage(mensajeTelegram(sol, bodega), undefined, { topicId: getTopicId('repuestos') })
+  await sendTelegramMessage(esAlta ? mensajeAltaTelegram(sol) : mensajeTelegram(sol, bodega), undefined, { topicId: getTopicId('repuestos') })
 
   // Push FCM a supervisores/admins
   try {
     const supervisors = await getSupervisorsAndAdmins()
     const tokens = dedupeTokens(await getTokensForUsers(supervisors))
     if (tokens.length > 0) {
-      await sendNotification(tokens, '📦 Nueva solicitud de repuesto', `${nombre} ×${cantidad} — ${solicitante}`, {
-        type: 'SOLICITUD_REPUESTO_CREATED',
+      await sendNotification(tokens, esAlta ? '🆕 Solicitud de alta de código' : '📦 Nueva solicitud de repuesto', `${nombre} ×${cantidad} — ${solicitante}`, {
+        type: esAlta ? 'ALTA_CODIGO_CREATED' : 'SOLICITUD_REPUESTO_CREATED',
         solicitudId,
         codigoSAP: sol.codigoSAP || '',
         url: RUTA_SOLICITUDES,
@@ -4559,9 +4561,30 @@ async function ariaDataStockBajo() {
 }
 
 async function ariaDataSolicitudes() {
-  const snap = await db.collection('solicitudes_repuestos').orderBy('createdAt', 'desc').limit(10).get()
+  // Dos consultas, sin índice compuesto nuevo:
+  //  1. ALTAS DE CÓDIGO (tipo 'alta_codigo': pedir a bodega que cree un SAP): `where('tipo','==',...)` solo, sin
+  //     orderBy (ordenarlas exigiría un índice compuesto). Hay a lo más UNA por código de fabricante (id fijo
+  //     alta_<código>): ~16 en el plano 888, así que 50 es holgado; se ordenan en memoria.
+  //  2. PEDIDOS: los viejos NO tienen el campo `tipo` y Firestore no filtra por «campo ausente» (`!=` los excluye),
+  //     así que se trae `orderBy('createdAt','desc')` con límite 10 + (altas encontradas) y se descartan las altas en
+  //     memoria: como mucho `altas.size` de esos documentos son altas, siempre sobran 10 pedidos si existen.
+  // LÍMITE: con más de 50 altas recientes el resumen de pedidos puede quedar corto (hoy hay ~16, una por código).
+  const altasSnap = await db.collection('solicitudes_repuestos').where('tipo', '==', 'alta_codigo').limit(50).get()
+  const altasDocs = altasSnap.docs.sort((a, b) => (b.data().createdAt?.toMillis?.() ?? 0) - (a.data().createdAt?.toMillis?.() ?? 0))
+  const snap = await db.collection('solicitudes_repuestos').orderBy('createdAt', 'desc').limit(10 + altasDocs.length).get()
   if (snap.empty) return 'No hay solicitudes de repuestos registradas.'
-  const lines = snap.docs.map((d) => {
+  const pedidos = snap.docs.filter((d) => d.data().tipo !== 'alta_codigo').slice(0, 10)
+  const bloqueAltas = altasDocs.length
+    ? `\nALTAS DE CÓDIGO (aparte de los pedidos: Mantención pide a bodega crear el SAP de un código de fabricante; no se aprueban ni se entregan): ` +
+      `pendientes ${altasDocs.filter((d) => d.data().estado === 'pendiente').length}, creadas ${altasDocs.filter((d) => d.data().estado === 'creada').length}, rechazadas ${altasDocs.filter((d) => d.data().estado === 'rechazada').length}.\n` +
+      altasDocs.slice(0, 8).map((d) => {
+        const x = d.data()
+        const res = x.estado === 'creada' ? ` · SAP ${x.sapCreado || '?'}` : x.estado === 'rechazada' ? ` · motivo: ${x.motivoRechazo || '?'}` : ''
+        return `- ${ariaFmtFecha(x.createdAt)} [${x.estado || '?'}] código ${x.codigoFabricante || '?'} ${x.textoBreve || ''} (${(x.elementos || []).join(', ') || x.elemento || '?'}) x${x.cantidad || 1} — ${x.solicitadoPorNombre || '?'}${res}`
+      }).join('\n')
+    : ''
+  if (!pedidos.length) return `No hay pedidos de repuestos registrados.${bloqueAltas}`
+  const lines = pedidos.map((d) => {
     const x = d.data()
     // Traza (#1017): quién aprobó y quién entregó; las viejas no la tienen y no se inventa.
     const traza = [
@@ -4570,9 +4593,9 @@ async function ariaDataSolicitudes() {
     ].filter(Boolean).join(' · ')
     return `- ${ariaFmtFecha(x.createdAt)} [${x.estado || '?'}] ${x.textoBreve || x.codigoSAP || '?'} x${x.cantidad || 1} — ${x.solicitadoPorNombre || '?'}${traza ? ` · ${traza}` : ''}`
   })
-  const cuenta = (e) => snap.docs.filter((d) => d.data().estado === e).length
-  return `Solicitudes de repuestos (últimas ${snap.size}): pendientes de aprobar ${cuenta('pendiente')}, aprobadas por entregar ${cuenta('aprobada')}, entregadas ${cuenta('entregada')}.\n${lines.join('\n')}\n` +
-    '(Esta es la fuente de solicitudes. Un repuesto del catálogo con fabricante «pendiente» NO es una solicitud.)'
+  const cuenta = (e) => pedidos.filter((d) => d.data().estado === e).length
+  return `Solicitudes de repuestos (últimas ${pedidos.length}): pendientes de aprobar ${cuenta('pendiente')}, aprobadas por entregar ${cuenta('aprobada')}, entregadas ${cuenta('entregada')}.\n${lines.join('\n')}\n` +
+    '(Esta es la fuente de solicitudes. Un repuesto del catálogo con fabricante «pendiente» NO es una solicitud.)' + bloqueAltas
 }
 
 async function ariaDataPreventivos() {

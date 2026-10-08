@@ -1134,14 +1134,91 @@ service cloud.firestore {
 
     // Solicitudes de repuesto (área-first F6) — cualquier usuario autenticado solicita;
     // técnicos+ avanzan el estado (pendiente→aprobada→entregada); admin elimina.
+    //
+    // ALTA DE CÓDIGO (`tipo == 'alta_codigo'`, ficha A3C): pide a bodega crear el SAP de un código
+    // de fabricante. Tiene su propio ciclo (pendiente → creada | rechazada) y un id fijo
+    // `alta_<CODIGO>` (un código = una alta; el cliente la crea en transacción). Las solicitudes SIN
+    // `tipo` (pedidos normales) se rigen por las mismas reglas de siempre.
     match /solicitudes_repuestos/{solicitudId} {
+      function esAltaCodigo(d) {
+        return d.get('tipo', '') == 'alta_codigo';
+      }
+      // Campos de un alta al crearla. Los de resolución (sapCreado, origenSap, creadaPor…, motivoRechazo,
+      // rechazadaPor…) NO están: solo bodega los escribe después, con las reglas de abajo.
+      function altaCamposDeCreacion() {
+        return ['tipo', 'codigoFabricante', 'codigoNorm', 'codigoSAP', 'textoBreve', 'descripcionDe', 'fig', 'pos', 'fuentes',
+                'nivel', 'confianza', 'planoSlug', 'maquina', 'elemento', 'elementos', 'cantidad', 'observaciones', 'fotoUrl',
+                'estado', 'solicitadoPor', 'solicitadoPorNombre', 'createdAt'];
+      }
+      // El id queda atado al código: `alta_<codigoNorm>`, y codigoNorm se COMPARA con el fabricante normalizado
+      // (`upper()` + quitar todo lo que no sea A-Z0-9), igual que normCodigo del cliente. Así `alta_ABC` y `alta_XYZ` no pueden ser del
+      // mismo fabricante «ABC».
+      function altaValida() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(altaCamposDeCreacion())
+          && d.codigoNorm is string && d.codigoNorm.matches('^[A-Z0-9]{1,30}$')
+          && solicitudId == 'alta_' + d.codigoNorm
+          && d.codigoFabricante is string
+          && d.codigoFabricante.size() >= 1 && d.codigoFabricante.size() <= 30
+          // codigoNorm tiene que SER la normalización del fabricante (igual que normCodigo del cliente).
+          && d.codigoNorm == d.codigoFabricante.upper().replace('[^A-Z0-9]', '')
+          && d.codigoSAP == ''
+          && d.cantidad is int && d.cantidad >= 1 && d.cantidad <= 999;
+      }
+      // Bodega (técnico+) registra el SAP creado: 10 dígitos, el SAP queda también en codigoSAP, y la autoría es de
+      // quien escribe (no se puede firmar por otro).
+      function altaCreada() {
+        let d = request.resource.data;
+        return isTechnician()
+          && resource.data.estado == 'pendiente'
+          && d.estado == 'creada'
+          && d.sapCreado is string && d.sapCreado.matches('[0-9]{10}')
+          && d.codigoSAP == d.sapCreado
+          && d.origenSap in ['nuevo', 'ya_existia']
+          && d.creadaPor == request.auth.uid
+          && d.creadaPorNombre is string
+          && d.diff(resource.data).affectedKeys().hasOnly(
+            ['estado', 'sapCreado', 'codigoSAP', 'origenSap', 'creadaPor', 'creadaPorNombre', 'creadaAt']);
+      }
+      // Bodega (técnico+) rechaza con motivo obligatorio (1–300), firmando con su propio uid.
+      function altaRechazada() {
+        let d = request.resource.data;
+        return isTechnician()
+          && resource.data.estado == 'pendiente'
+          && d.estado == 'rechazada'
+          && d.motivoRechazo is string
+          && d.motivoRechazo.size() >= 1 && d.motivoRechazo.size() <= 300
+          && d.rechazadaPor == request.auth.uid
+          && d.rechazadaPorNombre is string
+          && d.diff(resource.data).affectedKeys().hasOnly(
+            ['estado', 'motivoRechazo', 'rechazadaPor', 'rechazadaPorNombre', 'rechazadaAt']);
+      }
+      // «Volver a solicitar»: cualquier usuario activo reabre una alta rechazada; pasa a ser su solicitante y el
+      // rechazo anterior se BORRA (no puede quedar un motivo en una alta pendiente).
+      function altaReabierta() {
+        let d = request.resource.data;
+        return isAuthenticated() && isActiveUser()
+          && resource.data.estado == 'rechazada'
+          && d.estado == 'pendiente'
+          && d.solicitadoPor == request.auth.uid
+          && d.codigoSAP == ''
+          && d.cantidad is int && d.cantidad >= 1 && d.cantidad <= 999
+          && !('motivoRechazo' in d) && !('rechazadaPor' in d) && !('rechazadaPorNombre' in d) && !('rechazadaAt' in d)
+          && d.diff(resource.data).affectedKeys().hasOnly(
+            ['estado', 'solicitadoPor', 'solicitadoPorNombre', 'cantidad', 'observaciones', 'fotoUrl', 'createdAt',
+             'motivoRechazo', 'rechazadaPor', 'rechazadaPorNombre', 'rechazadaAt']);
+      }
+
       allow read: if isNotAnonymous();
       allow create: if isAuthenticated()
         && request.resource.data.solicitadoPor == request.auth.uid
         && request.resource.data.estado == 'pendiente'
         && request.resource.data.codigoSAP is string
-        && request.resource.data.cantidad is number;
-      allow update: if isTechnician();
+        && request.resource.data.cantidad is number
+        && (!esAltaCodigo(request.resource.data) || altaValida());
+      allow update: if (isTechnician() && !esAltaCodigo(resource.data) && !esAltaCodigo(request.resource.data))
+        || (esAltaCodigo(resource.data) && esAltaCodigo(request.resource.data)
+            && (altaCreada() || altaRechazada() || altaReabierta()));
       allow delete: if isAdmin();
     }
 

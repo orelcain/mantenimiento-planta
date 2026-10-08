@@ -12,7 +12,7 @@
  * Una futura iteración puede sumar carga lazy desde la tool si el caso de
  * uso lo justifica (refactor de useGlobalSearch para extraer loader puro).
  */
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { registerTool } from './registry'
 import { getGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
@@ -120,7 +120,18 @@ registerTool({
     /\bpor\s+entregar\b/i,
   ],
   execute: async () => {
-    const snap = await getDocs(query(collection(db, 'solicitudes_repuestos'), orderBy('createdAt', 'desc'), limit(30)))
+    // Dos consultas, sin índice compuesto: las altas de código (a lo más una por código de fabricante) por `tipo` y
+    // los pedidos por fecha con 30 + (altas) documentos, descartando las altas en memoria (los pedidos viejos no
+    // tienen `tipo`, y Firestore no filtra por «campo ausente»): así las altas no desplazan a los pedidos.
+    // (`resumenDeSolicitudes` ordena las altas por createdAt desc antes de mostrar las 8 más recientes.)
+    const altasSnap = await getDocs(query(collection(db, 'solicitudes_repuestos'), where('tipo', '==', 'alta_codigo'), limit(50)))
+    const pedidosSnap = await getDocs(query(collection(db, 'solicitudes_repuestos'), orderBy('createdAt', 'desc'), limit(30 + altasSnap.size)))
+    const snap = {
+      docs: [
+        ...pedidosSnap.docs.filter((d) => (d.data() as { tipo?: unknown }).tipo !== 'alta_codigo').slice(0, 30),
+        ...altasSnap.docs,
+      ],
+    }
     const aFecha = (v: unknown): Date | undefined =>
       v && typeof (v as { toDate?: () => Date }).toDate === 'function' ? (v as { toDate: () => Date }).toDate() : undefined
     // La solicitud guarda solo `textoBreve`: el nombre común se resuelve contra el catálogo
@@ -134,6 +145,7 @@ registerTool({
     const solicitudes: SolicitudParaAria[] = snap.docs.map((d) => {
       const x = d.data() as Record<string, unknown>
       return {
+        tipo: typeof x.tipo === 'string' ? x.tipo : undefined,
         codigoSAP: String(x.codigoSAP ?? ''),
         textoBreve: String(x.textoBreve ?? ''),
         nombresComunes: comunPorSap.get(String(x.codigoSAP ?? '').trim()),
@@ -146,6 +158,10 @@ registerTool({
         aprobadaAt: aFecha(x.aprobadaAt),
         entregadaPor: typeof x.entregadaPor === 'string' ? x.entregadaPor : undefined,
         entregadaAt: aFecha(x.entregadaAt),
+        codigoFabricante: typeof x.codigoFabricante === 'string' ? x.codigoFabricante : undefined,
+        elementos: Array.isArray(x.elementos) ? x.elementos.filter((e): e is string => typeof e === 'string') : undefined,
+        sapCreado: typeof x.sapCreado === 'string' ? x.sapCreado : undefined,
+        motivoRechazo: typeof x.motivoRechazo === 'string' ? x.motivoRechazo : undefined,
       }
     })
     return {

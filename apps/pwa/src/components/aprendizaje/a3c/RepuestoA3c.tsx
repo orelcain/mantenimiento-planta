@@ -12,7 +12,7 @@
  */
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, Cog, ImageOff, Layers, Package, FilePlus } from 'lucide-react'
+import { Camera, CheckCircle2, Cog, ImageOff, Layers, Package, FilePlus, RotateCcw } from 'lucide-react'
 import { Button, Pill, Sheet } from '@/components/piel'
 import { usePartesPlano, type ParteFisica } from '@/hooks/usePartesPlano'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
@@ -21,8 +21,13 @@ import { SelectorMaquinaPlano } from '@/components/aprendizaje/SelectorMaquinaPl
 import { EnTerrenoA3c } from './EnTerrenoA3c'
 import type { MaquinaBaader } from '@/services/baader142/perilla5Protocolo'
 import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
+import { useAltasDeCodigo } from '@/hooks/repuestos/useAltasDeCodigo'
+import { crearAltaCodigo, reabrirAlta, type AltaCodigo } from '@/hooks/repuestos/useSolicitudes'
+import { SolicitarAltaSheet, type DatosEnvioAlta } from './SolicitarAltaSheet'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
+import { armarAltaCodigo, codigoParaAlta, elementosConCodigo, fechaCortaAlta, listaEnFrase, sapEfectivo } from '@/utils/aprendizaje/altaCodigoA3c'
+import { normCodigo } from '@/utils/repuestos/normCodigo'
 import { certezaDe, clasificarRepuesto, esModoCandidatos, origenPieza, SLUG_PLANO_A3C } from '@/utils/aprendizaje/repuestosA3c'
 import {
   MAX_CODIGO_ETIQUETA,
@@ -52,12 +57,25 @@ export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; comp
   const vinculosHook = usePlanoVinculos(SLUG_PLANO_A3C, maquina)
   const sesion = useAuthStore(s => s.isAuthenticated)
   const clase = useMemo(() => clasificarRepuesto(codigo, partes), [codigo, partes])
-  const saps = useMemo(() => clase.piezas.map(p => p.sap).filter((s): s is string => !!s), [clase])
+  const candidatos = esModoCandidatos(clase.piezas)
+  // Altas de código ya pedidas a bodega: UN listener compartido para toda la pantalla.
+  const { porCodigo: altasPorCodigo } = useAltasDeCodigo()
+  const vinculoDelAparato = vinculosHook.vinculos.get(codigo)
+  const codigosAlta = useMemo(
+    () => clase.piezas.map((p, i) => codigoParaAlta(p, candidatos || i === 0 ? vinculoDelAparato : undefined)),
+    [clase, candidatos, vinculoDelAparato],
+  )
+  const altas = useMemo(
+    () => clase.piezas.map((p, i) => (p.sap ? undefined : altasPorCodigo.get(normCodigo(codigosAlta[i] ?? p.nr)))),
+    [clase, codigosAlta, altasPorCodigo],
+  )
+  // El SAP vale lo que dice el plano o, si no hay, el que bodega creó para el alta (aparecen foto y stock solos).
+  const sapsEfectivos = useMemo(() => clase.piezas.map((p, i) => sapEfectivo(p.sap, altas[i])), [clase, altas])
+  const saps = useMemo(() => sapsEfectivos.filter((s): s is string => !!s), [sapsEfectivos])
   const { bySap, loading } = useRepuestosByCodigos(saps)
 
   // D: nada que mostrar (o el plano aún no cargó). Sin sección, sin ruido.
   if (!partes || clase.estado === 'D') return null
-  const candidatos = esModoCandidatos(clase.piezas)
   const size = compacta ? 'sm' : 'md'
   const entrada = vinculosHook.porAparato.get(codigo)
   const distintas = sesion && estadoPorMaquina(entrada, maquinas).distintas
@@ -89,7 +107,11 @@ export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; comp
             despiece={partes.despiece}
             vinculos={vinculosHook}
             sesion={sesion}
-            repuesto={p.sap ? bySap.get(p.sap) : undefined}
+            repuesto={sapsEfectivos[i] ? bySap.get(sapsEfectivos[i]!) : undefined}
+            sapEf={sapsEfectivos[i]}
+            alta={altas[i]}
+            codigoAlta={codigosAlta[i] ?? p.nr}
+            aparatos={partes.aparatos}
             cargando={loading}
             compacta={compacta}
             candidatos={candidatos}
@@ -174,18 +196,50 @@ interface PiezaBloqueProps {
   candidatos: boolean
   nrPrimera: string
   terreno: TerrenoProps
+  /** SAP que vale: el del plano o el que bodega creó para el alta de código. */
+  sapEf?: string
+  /** Alta de código pedida para el código de esta pieza (cualquier estado), si existe. */
+  alta?: AltaCodigo
+  /** Código de fabricante que se pediría: el de la etiqueta leída en terreno o el del catálogo. */
+  codigoAlta: string
+  aparatos: Record<string, ParteFisica[]>
 }
 
-function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vinculos, sesion, repuesto, cargando, compacta, candidatos, nrPrimera, terreno }: PiezaBloqueProps) {
+function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vinculos, sesion, repuesto, cargando, compacta, candidatos, nrPrimera, terreno, sapEf, alta, codigoAlta, aparatos }: PiezaBloqueProps) {
   const navigate = useNavigate()
+  const usuario = useAuthStore(s => s.user)
+  const [altaAbierta, setAltaAbierta] = useState(false)
   const size = compacta ? 'sm' : 'md'
   // El vínculo es por aparato, no por pieza: solo la primera lo lleva (igual que el visor eléctrico),
   // salvo con candidatos, donde el código guardado dice cuál quedó y cuáles se descartan.
   const v = candidatos || indice === 0 ? vinculos.vinculos.get(codigo) : undefined
   const cert = certezaDe(pieza.confianza, v, pieza.nr, nrPrimera)
   const [foto, setFoto] = useState(false)
-  const nombreSap = repuesto?.nombre ?? pieza.sapNombre
-  const ubicacion = repuesto?.ubicacion ?? pieza.sapUbicacion
+  // El nombre y la ubicación del cruce (`partes.json`) hablan del SAP del plano; para el de un alta creada, el maestro.
+  const nombreSap = pieza.sap ? (repuesto?.nombre ?? pieza.sapNombre) : (repuesto?.nombre ?? alta?.textoBreve)
+  const ubicacion = pieza.sap ? (repuesto?.ubicacion ?? pieza.sapUbicacion) : repuesto?.ubicacion
+  const elementosAlta = useMemo(() => elementosConCodigo(aparatos, codigoAlta), [aparatos, codigoAlta])
+  const codigoLeido = normCodigo(codigoAlta) !== normCodigo(pieza.nr)
+
+  const enviarAlta = async ({ cantidad, observaciones, archivo }: DatosEnvioAlta) => {
+    if (!usuario) throw new Error('Hay que iniciar sesión.')
+    const fotoUrl = archivo ? await vinculos.subirFoto(archivo) : undefined
+    if (alta?.estado === 'rechazada') {
+      await reabrirAlta(alta.id, { cantidad, observaciones, fotoUrl }, usuario.id, usuario.nombre)
+    } else {
+      const { id, data } = armarAltaCodigo({ codigo: codigoAlta, pieza, elemento: codigo, maquina: terreno.maquina, aparatos, planoSlug: SLUG_PLANO_A3C, observaciones, fotoUrl })
+      await crearAltaCodigo(id, data, cantidad, usuario.id, usuario.nombre)
+    }
+    setAltaAbierta(false)
+  }
+  /** «Confirmar en terreno primero»: cierra el formulario y deja la pregunta de la ficha a la vista. */
+  const irAPregunta = () => {
+    setAltaAbierta(false)
+    requestAnimationFrame(() => {
+      const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      document.querySelector('[data-testid="pregunta-terreno"]')?.scrollIntoView?.({ block: 'center', behavior: reducido ? 'auto' : 'smooth' })
+    })
+  }
   const origen = `${origenPieza(pieza)}${pieza.generacion ? ` · ${pieza.generacion}` : ''}`
 
   return (
@@ -239,21 +293,21 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
 
       <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-subhead">
         <dt className="pt-0.5 text-footnote text-muted-foreground">SAP</dt>
-        {pieza.sap ? (
+        {sapEf ? (
           <dd>
-            <span className="font-mono tabular-nums">{pieza.sap}</span>
+            <span className="font-mono tabular-nums">{sapEf}</span>
             {nombreSap && <span className="block text-footnote text-muted-foreground">{nombreSap}</span>}
           </dd>
         ) : (
           <dd className="font-semibold text-ink-warn">Sin código SAP en el maestro</dd>
         )}
-        {pieza.sap && ubicacion && (
+        {sapEf && ubicacion && (
           <>
             <dt className="pt-0.5 text-footnote text-muted-foreground">Bodega</dt>
             <dd>{ubicacion}</dd>
           </>
         )}
-        {pieza.sap && (
+        {sapEf && (
           <>
             <dt className="pt-0.5 text-footnote text-muted-foreground">Stock</dt>
             <dd>
@@ -263,20 +317,31 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
         )}
       </dl>
 
+      {!sapEf && <EstadoAlta alta={alta} elemento={codigo} elementos={elementosAlta} sesion={sesion} />}
+      {sapEf && alta?.estado === 'creada' && !pieza.sap && (
+        <p className="mt-2.5 flex items-start gap-1.5 text-footnote text-ink-ok" data-testid="alta-gracias">
+          <CheckCircle2 className="mt-px size-4 shrink-0" aria-hidden />
+          <span>Alta gracias a Mantención · pedida {fechaCortaAlta(alta.createdAt)}{alta.creadaAt ? `, creada ${fechaCortaAlta(alta.creadaAt)}` : ''}</span>
+        </p>
+      )}
+
       <div className="mt-3 flex flex-wrap gap-2">
-        {pieza.sap ? (
-          <Button variant="tinted" size={size} onClick={() => navigate(`/repuestos?q=${encodeURIComponent(pieza.sap ?? '')}`)}>
+        {sapEf ? (
+          <Button variant="tinted" size={size} onClick={() => navigate(`/repuestos?q=${encodeURIComponent(sapEf)}`)}>
             <Package aria-hidden />
             Ver en Repuestos
           </Button>
-        ) : (
-          // TODO: no existe un flujo de «solicitar alta de código». Por ahora lleva al buscador de
-          // Repuestos con el código de fabricante, para comprobar que de verdad no está en el maestro.
-          <Button variant="tinted" size={size} onClick={() => navigate(`/repuestos?q=${encodeURIComponent(pieza.nr)}`)}>
+        ) : sesion && alta?.estado === 'rechazada' ? (
+          <Button variant="tinted" size={size} onClick={() => setAltaAbierta(true)}>
+            <RotateCcw aria-hidden />
+            Volver a solicitar
+          </Button>
+        ) : sesion && !alta ? (
+          <Button variant="tinted" size={size} onClick={() => setAltaAbierta(true)}>
             <FilePlus aria-hidden />
             Solicitar alta de código
           </Button>
-        )}
+        ) : null}
         {pieza.hoja != null && (
           <Button
             variant="plain"
@@ -290,11 +355,65 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
 
       {indice === 0 && !candidatos && <PreguntaTerreno codigo={codigo} pieza={pieza} vinculo={v} vinculos={vinculos} sesion={sesion} size={size} terreno={terreno} />}
 
+      {!sapEf && sesion && (!alta || alta.estado === 'rechazada') && (
+        <SolicitarAltaSheet
+          open={altaAbierta}
+          onClose={() => setAltaAbierta(false)}
+          codigo={codigoAlta}
+          codigoLeido={codigoLeido}
+          pieza={pieza}
+          elemento={codigo}
+          maquina={terreno.maquina}
+          elementos={elementosAlta.includes(codigo) ? elementosAlta : [...elementosAlta, codigo]}
+          inicial={alta?.estado === 'rechazada' ? { cantidad: alta.cantidad, observaciones: alta.observaciones } : undefined}
+          onEnviar={enviarAlta}
+          onConfirmarEnTerreno={irAPregunta}
+        />
+      )}
+
       <Sheet open={foto} onClose={() => setFoto(false)} title={pieza.nr} description={nombreSap ?? pieza.es}>
         {repuesto?.fotoUrl && <img src={repuesto.fotoUrl} alt={`Foto de ${pieza.nr}`} className="mx-auto max-h-[60dvh] w-full rounded-ctl object-contain" />}
       </Sheet>
     </div>
   )
+}
+
+/** Bajo la fila SAP, mientras no hay SAP: qué pasó con la solicitud de alta de ese código (o cómo pedirla). */
+function EstadoAlta({ alta, elemento, elementos, sesion }: { alta?: AltaCodigo; elemento: string; elementos: readonly string[]; sesion: boolean }) {
+  if (!alta) {
+    const otros = elementos.filter(e => e !== elemento)
+    return (
+      <>
+        {otros.length > 0 && (
+          <p className="mt-2 text-footnote text-muted-foreground">Un solo pedido sirve para {listaEnFrase([...otros, elemento])}.</p>
+        )}
+        {!sesion && <p className="mt-2 text-footnote text-muted-foreground">Inicia sesión para solicitar el alta.</p>}
+      </>
+    )
+  }
+  const desde = alta.elemento && alta.elemento !== elemento ? ` · desde ${alta.elemento}` : ''
+  if (alta.estado === 'pendiente') {
+    return (
+      <div className="mt-2.5 flex flex-col items-start gap-1.5" data-testid="alta-estado" data-alta="pendiente">
+        <Pill tone="warning">Alta solicitada · pendiente</Pill>
+        <p className="text-footnote text-muted-foreground">
+          por {alta.solicitadoPorNombre || 'alguien'} · {fechaCortaAlta(alta.createdAt)} · {alta.cantidad} {alta.cantidad === 1 ? 'unidad' : 'unidades'}{desde}
+        </p>
+      </div>
+    )
+  }
+  if (alta.estado === 'rechazada') {
+    return (
+      <div className="mt-2.5 flex flex-col items-start gap-1.5" data-testid="alta-estado" data-alta="rechazada">
+        <Pill tone="neutral">Alta rechazada</Pill>
+        {alta.motivoRechazo && <p className="text-subhead">«{alta.motivoRechazo}»</p>}
+        <p className="text-footnote text-muted-foreground">
+          {alta.rechazadaPorNombre || 'bodega'}{alta.rechazadaAt ? ` · ${fechaCortaAlta(alta.rechazadaAt)}` : ''}
+        </p>
+      </div>
+    )
+  }
+  return null
 }
 
 function Stock({ repuesto, cargando }: { repuesto?: RepuestoResuelto; cargando: boolean }) {
@@ -391,7 +510,7 @@ function PreguntaTerreno({
   return (
     <>
     {enTerreno}
-    <div className={separador}>
+    <div className={separador} data-testid="pregunta-terreno">
       {sinMaquina && (
         // Sin máquina elegida no se responde: un default silencioso guardaría en la equivocada.
         <div className="mb-3" data-testid="elige-maquina">
