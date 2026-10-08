@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck, QrCode } from 'lucide-react'
+import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck, QrCode, Minimize } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
 import { logger } from '@/lib/logger'
@@ -23,6 +23,8 @@ import {
 } from '@/services/hmiKnuro'
 import type { HmiHistoryEntry } from '@/services/hmiKnuro'
 import { Button } from '@/components/ui'
+import { useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
+import { AvisoGirarTelefono } from '@/components/hmiKnuro/AvisoGirarTelefono'
 
 /**
  * HmiKnuroPage — Módulo HMI Knuro B2
@@ -34,6 +36,11 @@ import { Button } from '@/components/ui'
  * NOTA de timing: el iframe puede enviar 'hmi:ready' ANTES de que Firebase Auth
  * restaure la sesión. Usamos iframeReadyRef para reintentar sendInitData cuando
  * user se vuelve disponible.
+ *
+ * Celular (useHmiKnuroMovil, igual que la página pública): en horizontal el simulador pasa a
+ * `fixed inset-0` por encima de la barra inferior de la app, sin la barra admin, y el iframe
+ * recibe `hmi:land` (riel Buscar/Lista/«?»/Salir). Las acciones admin (presets, Historial…)
+ * quedan fuera de ese modo: «Salir» las devuelve. En vertical, aviso «Gira el teléfono».
  */
 export function HmiKnuroPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -41,6 +48,9 @@ export function HmiKnuroPage() {
   /** Flag: el iframe ya envió hmi:ready pero user no estaba disponible aún */
   const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { compact, immersive, isFullscreen, visualFs, enterFullscreen, exitImmersive, mostrarAviso, ocultarAviso } =
+    useHmiKnuroMovil(containerRef, iframeRef)
 
   // ── Estado presets ──────────────────────────────────────────────────────
   const [presets, setPresets] = useState<Record<string, Record<string, string>>>({})
@@ -341,10 +351,16 @@ export function HmiKnuroPage() {
   }, [user, editingPreset, presets, presetKeys, currentPresetName])
 
   return (
-    <div className="flex flex-col h-full w-full relative">
+    <div
+      ref={containerRef}
+      className={immersive ? 'fixed inset-0 z-[70] flex flex-col bg-[#1a1c22]' : 'flex flex-col h-full w-full relative'}
+      style={immersive
+        ? { height: '100dvh', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }
+        : undefined}
+    >
 
-      {/* ── Toolbar ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2">
+      {/* ── Toolbar (fuera en pantalla completa / celular horizontal) ─── */}
+      <div className={cn('flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2', immersive && 'hidden')}>
         <div className="flex items-center gap-2 min-w-0">
           <Cpu className="h-4 w-4 text-primary flex-shrink-0" />
           <span className="text-sm font-semibold truncate">HMI Knuro</span>
@@ -517,6 +533,9 @@ export function HmiKnuroPage() {
         </div>
       </div>
 
+      {/* ── Celular vertical: aviso para girar ───────────────────────── */}
+      {mostrarAviso && <AvisoGirarTelefono onPantallaCompleta={enterFullscreen} onCerrar={ocultarAviso} />}
+
       {/* ── iframe ───────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 relative overflow-hidden">
         <iframe
@@ -528,6 +547,18 @@ export function HmiKnuroPage() {
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
         />
       </div>
+
+      {/* Salir de pantalla completa fuera del modo horizontal (en horizontal se sale desde el riel del HMI) */}
+      {(isFullscreen || visualFs) && !compact && (
+        <button
+          onClick={exitImmersive}
+          aria-label="Salir de pantalla completa"
+          className="fixed top-2 right-2 z-[80] flex items-center justify-center rounded-lg text-blue-200"
+          style={{ width: 44, height: 44, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)' }}
+        >
+          <Minimize className="h-4 w-4" />
+        </button>
+      )}
 
       {/* ── QR Dialog ────────────────────────────────────────────────── */}
       {qrPreset && (() => {
