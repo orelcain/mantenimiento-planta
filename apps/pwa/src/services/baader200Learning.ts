@@ -142,16 +142,10 @@ export async function addB200History(
   })
 }
 
-/** Obtiene la clave de edición de Baader 200 desde Firestore */
-export async function getB200EditPwd(): Promise<string> {
-  const snap = await getDoc(doc(db, CONFIG_COL, 'edit-pwd'))
-  return snap.exists() ? (snap.data().pwd as string) || 'admin' : 'admin'
-}
-
-/** Guarda la clave de edición de Baader 200 en Firestore */
-export async function saveB200EditPwd(pwd: string): Promise<void> {
-  await setDoc(doc(db, CONFIG_COL, 'edit-pwd'), { pwd, updatedAt: serverTimestamp() })
-}
+// La «clave de edición» (baader200-config/edit-pwd) se quitó: vivía en claro con
+// lectura pública y caía a 'admin' si faltaba el doc. Hoy edita quien tiene rol
+// supervisor/admin (lo mismo que exige firestore.rules para escribir
+// baader200-sections), y el doc quedó cerrado en las reglas.
 
 export async function getB200History(limitCount = 50): Promise<B200HistoryEntry[]> {
   const q = query(
