@@ -763,7 +763,21 @@ service cloud.firestore {
             || isNonEmptyString(request.resource.data.nota, 1, 500))
         && (!('foto' in request.resource.data)
             || request.resource.data.foto is string)
-        && request.resource.data.confirmadoPor == request.auth.uid;
+        && request.resource.data.confirmadoPor == request.auth.uid
+        // Id del doc según el plano (se usa (A && B) || (!A && C), no el ternario):
+        // · 888 (sirve a N2 y N3): `maquina` obligatoria (N2 o N3) e id `<slug>__<aparato>__<maquina>`.
+        //   Un cliente viejo, sin `maquina`, rebota aquí y la app muestra «actualiza la app».
+        // · Cualquier otro plano (860, 200, GEA): SIN `maquina` e id `<slug>__<aparato>`. Aceptar una
+        //   máquina ahí dejaba docs que el visor nunca muestra o que pisaban al válido del 860.
+        && (
+          (request.resource.data.planoSlug == 'baader-142-888'
+            && 'maquina' in request.resource.data
+            && request.resource.data.maquina in ['baader-n2', 'baader-n3']
+            && vinculoId == request.resource.data.planoSlug + '__' + request.resource.data.aparato + '__' + request.resource.data.maquina)
+          || (request.resource.data.planoSlug != 'baader-142-888'
+            && !('maquina' in request.resource.data)
+            && vinculoId == request.resource.data.planoSlug + '__' + request.resource.data.aparato)
+        );
 
       // Nadie borra evidencia de terreno: si estaba mal, se corrige con un
       // update (que deja el estado 'corregido' y la nota del por que).

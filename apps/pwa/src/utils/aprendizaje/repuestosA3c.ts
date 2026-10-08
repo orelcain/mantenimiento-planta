@@ -5,6 +5,8 @@
  */
 import type { ParteFamilia, ParteFisica, PartesPlano } from '@/hooks/usePartesPlano'
 import type { VinculoTerreno } from '@/hooks/usePlanoVinculos'
+import type { MaquinaBaader } from '@/services/baader142/perilla5Protocolo'
+import { estadoPorMaquina, type EntradaVinculos } from '@/utils/aprendizaje/vinculoTerreno'
 
 export const SLUG_PLANO_A3C = 'baader-142-888'
 
@@ -49,23 +51,32 @@ export interface CoberturaRepuestos {
   total: number
   /** N: con al menos una pieza exacta. */
   identificados: number
-  /** X: con vínculo confirmado en terreno. */
+  /**
+   * X: resueltos en TODAS las máquinas del plano (cualquier respuesta: confirmado, corregido o
+   * no_aplica; piezas distintas entre máquinas también es resuelto). Es la cifra de la tarjeta.
+   */
   confirmados: number
+  /** Resueltos en cada máquina por separado (N2: a, N3: b). */
+  porMaquina: Partial<Record<MaquinaBaader, number>>
 }
 
 export function coberturaRepuestos(
   codigos: readonly string[],
   aparatos: Record<string, readonly unknown[]> | null | undefined,
-  vinculos: ReadonlyMap<string, Pick<VinculoTerreno, 'estado'>> | null | undefined,
+  porAparato: ReadonlyMap<string, EntradaVinculos<Pick<VinculoTerreno, 'estado' | 'codigo'>>> | null | undefined,
+  maquinas: readonly MaquinaBaader[],
 ): CoberturaRepuestos {
   const fisicos = [...new Set(codigos)].filter(esPiezaFisica)
   let identificados = 0
   let confirmados = 0
+  const porMaquina: Partial<Record<MaquinaBaader, number>> = Object.fromEntries(maquinas.map(m => [m, 0]))
   for (const c of fisicos) {
     if ((aparatos?.[c]?.length ?? 0) > 0) identificados++
-    if (vinculos?.get(c)?.estado === 'confirmado') confirmados++
+    const e = estadoPorMaquina(porAparato?.get(c), maquinas)
+    if (e.enTodas) confirmados++
+    for (const m of e.resueltas) porMaquina[m] = (porMaquina[m] ?? 0) + 1
   }
-  return { total: fisicos.length, identificados, confirmados }
+  return { total: fisicos.length, identificados, confirmados, porMaquina }
 }
 
 export type Certeza = { tono: 'info' | 'neutral' | 'ok' | 'warning'; texto: string }
@@ -80,7 +91,7 @@ export function esModoCandidatos(piezas: readonly Pick<ParteFisica, 'confianza'>
 
 /**
  * Pill de certeza de UNA pieza: la confirmación en terreno manda sobre lo que dice el catálogo.
- * El vínculo es por aparato y guarda el código elegido; con candidatos, solo la pieza con ese
+ * `vinculo` es el de la máquina activa. Guarda el código elegido; con candidatos, solo la pieza con ese
  * código queda confirmada y las demás se descartan. Un vínculo viejo sin código vale para `nrPrimera`.
  */
 export function certezaDe(

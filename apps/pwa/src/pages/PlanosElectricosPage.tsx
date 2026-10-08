@@ -13,7 +13,9 @@ import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE, type ParteEncontrada } from '@/hooks/useCodigosParte'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
-import { fechaCortaVinculo, guardarVinculoTerreno, mensajeErrorTerreno } from '@/utils/aprendizaje/vinculoTerreno'
+import { useMaquinaPlano } from '@/hooks/useMaquinaPlano'
+import { SelectorMaquinaPlano } from '@/components/aprendizaje/SelectorMaquinaPlano'
+import { etiquetaMaquina, fechaCortaVinculo, guardarVinculoTerreno, mensajeErrorTerreno } from '@/utils/aprendizaje/vinculoTerreno'
 import { esModoCandidatos } from '@/utils/aprendizaje/repuestosA3c'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { type Giro } from '@/utils/giroPlano'
@@ -400,7 +402,10 @@ function Visor({ slug }: { slug: string }) {
   const partes = usePartesPlano(slug)
   // Confirmacion EN TERRENO de ese puente: quien esta frente a la maquina
   // dice si el catalogo acerto, se equivoco o el aparato ni existe ahi.
-  const vinculosTerreno = usePlanoVinculos(slug)
+  // Planos que sirven a varias máquinas (888: N2 y N3): la confirmación es POR MÁQUINA. En los
+  // demás (860, 200, GEA) `maquinas.length <= 1` y nada cambia.
+  const maquinaPlano = useMaquinaPlano(slug)
+  const vinculosTerreno = usePlanoVinculos(slug, maquinaPlano.maquina)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
   // ES por defecto: el equipo lee castellano; el aleman queda a un toque para
@@ -1365,7 +1370,7 @@ function Visor({ slug }: { slug: string }) {
                      onIrFigura={irAFigura} onVerEnDibujo={(caja) => setFoco({ tipo: 'caja', b: caja })}
                      anclaDeAparato={anclaDeAparato}
                      partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo}
-                     vinculosTerreno={vinculosTerreno} />}
+                     vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano} />}
           </>}
         </aside>
       </div>
@@ -1378,7 +1383,7 @@ function Visor({ slug }: { slug: string }) {
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, codigoEnRecorrido, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, onVerEnDibujo, anclaDeAparato, partes, slug,
-  sapPorCodigo, vinculosTerreno,
+  sapPorCodigo, vinculosTerreno, maquinaPlano,
 }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
@@ -1411,6 +1416,7 @@ function Panel({
   /** códigos que el catálogo marca como piezas de desgaste */
   desgaste?: string[]
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
+  maquinaPlano: ReturnType<typeof useMaquinaPlano>
 }) {
   const [copiadoLista, setCopiadoLista] = useState(false)
   // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
@@ -1498,6 +1504,17 @@ function Panel({
         {partes?.cobertura && (
           <>
             <Titulo>Puente al catálogo de piezas</Titulo>
+            {/* Solo en planos con más de una máquina: las confirmaciones de abajo son de la elegida. */}
+            {maquinaPlano.maquinas.length > 1 && (
+              <div className="mb-2" data-testid="selector-maquina-visor">
+                <SelectorMaquinaPlano maquina={maquinaPlano.maquina} maquinas={maquinaPlano.maquinas} onChange={maquinaPlano.setMaquina} />
+                {!maquinaPlano.maquina && (
+                  <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-prep)' }}>
+                    ¿En cuál máquina estás? Elígela para ver y hacer confirmaciones.
+                  </p>
+                )}
+              </div>
+            )}
             <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
               <b style={{ color: 'var(--lc-ink)' }}>
                 {partes.cobertura.exacta + partes.cobertura.zona} de {partes.cobertura.total}
@@ -1515,7 +1532,7 @@ function Panel({
             {vinculosTerreno.resumen.confirmados + vinculosTerreno.resumen.corregidos > 0 && (
               <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-nuevo)' }}>
                 <b>{vinculosTerreno.resumen.confirmados + vinculosTerreno.resumen.corregidos}</b>{' '}
-                confirmados en terreno
+                confirmados en terreno{maquinaPlano.maquinas.length > 1 && maquinaPlano.maquina ? ` en ${etiquetaMaquina(maquinaPlano.maquina)}` : ''}
               </p>
             )}
             {/* La ruta de trabajo, viva: los que tienen pieza propuesta y
@@ -1676,7 +1693,7 @@ function Panel({
         ))}
       </div>
 
-      <PiezaFisica sel={sel} partes={partes} slug={slug} vinculosTerreno={vinculosTerreno} />
+      <PiezaFisica sel={sel} partes={partes} slug={slug} vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano} />
 
       <FichasSap notas={notas.notasDe('aparato', anclaDeAparato(sel.tag))} />
 
@@ -2106,11 +2123,12 @@ function FichaPieza({
  * Vive aparte del cruce SAP (`FichasSap`, debajo): son fuentes distintas —
  * esta sale del catálogo de fábrica, esa de lo que la gente anotó a mano.
  */
-function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
+function PiezaFisica({ sel, partes, slug, vinculosTerreno, maquinaPlano }: {
   sel: { tipo: 'aparato'; tag: string }
   partes: ReturnType<typeof usePartesPlano>
   slug: string
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
+  maquinaPlano: ReturnType<typeof useMaquinaPlano>
 }) {
   const entradas = partes?.aparatos[sel.tag] ?? []
   // Con candidatos (B1 en las N2/N3: 42303109 o 42303107), la pieza que vale es la que se
@@ -2138,7 +2156,7 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
   return (
     <div className="mb-3 rounded-card border p-3" style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
       <Titulo>Pieza física</Titulo>
-      <PiezaTerreno tag={sel.tag} pieza={pieza} vinculosTerreno={vinculosTerreno} />
+      <PiezaTerreno tag={sel.tag} pieza={pieza} vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano} />
       {candidatos && (
         <p className="m-0 mt-2 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
           Candidatos: <span className="font-mono">{candidatos.map((c) => c.nr).join(' / ')}</span>. El
@@ -2167,12 +2185,16 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
  * está frente a la máquina es la que convierte esa propuesta en certeza —
  * o la corrige, o dice que ese aparato ni existe ahí.
  */
-function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
+function PiezaTerreno({ tag, pieza, vinculosTerreno, maquinaPlano }: {
   tag: string
   pieza: { es: string; de?: string; nr: string; sap?: string; sapUbicacion?: string; confianza: string; fig?: string | null }
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
+  maquinaPlano: ReturnType<typeof useMaquinaPlano>
 }) {
   const v = vinculosTerreno.vinculos.get(tag)
+  // Plano de varias máquinas sin ninguna elegida: no se confirma (se guardaría en la equivocada).
+  const faltaMaquina = maquinaPlano.maquinas.length > 1 && !maquinaPlano.maquina
+  const enMaquina = maquinaPlano.maquinas.length > 1 && maquinaPlano.maquina ? ` en ${etiquetaMaquina(maquinaPlano.maquina)}` : ''
   const [abierto, setAbierto] = useState(false)
   const [opcion, setOpcion] = useState<VinculoTerreno['estado'] | null>(null)
   const [codigoLeido, setCodigoLeido] = useState('')
@@ -2228,12 +2250,12 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
             {v?.estado === 'confirmado' ? (
               <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
                     style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
-                Confirmado en terreno
+                Confirmado en terreno{enMaquina}
               </span>
             ) : v?.estado === 'corregido' ? (
               <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
                     style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
-                Corregido en terreno
+                Corregido en terreno{enMaquina}
               </span>
             ) : (
               <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
@@ -2281,6 +2303,15 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
         <p className="m-0 mt-2 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
           Inicia sesión para ver y hacer confirmaciones en terreno
         </p>
+      ) : faltaMaquina ? (
+        // El selector va AQUÍ y no solo en «Puente al catálogo»: con ?ap=B5 (enlace directo) ese
+        // bloque no se muestra y no había dónde elegir la máquina para confirmar.
+        <div className="mt-2" data-testid="selector-maquina-ficha">
+          <p className="m-0 mb-1 text-caption" style={{ color: 'var(--lc-prep)' }}>
+            ¿En cuál máquina estás? Elígela para confirmar en terreno.
+          </p>
+          <SelectorMaquinaPlano maquina={maquinaPlano.maquina} maquinas={maquinaPlano.maquinas} onChange={maquinaPlano.setMaquina} />
+        </div>
       ) : abierto ? (
         <FormularioTerreno
           opcion={opcion} onOpcion={setOpcion}
