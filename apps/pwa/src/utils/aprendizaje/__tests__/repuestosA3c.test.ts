@@ -45,15 +45,27 @@ describe('esPiezaFisica', () => {
 })
 
 describe('coberturaRepuestos', () => {
-  const vin = new Map<string, { estado: 'confirmado' | 'corregido' | 'no_aplica' }>([
-    ['B1', { estado: 'confirmado' }], ['B10', { estado: 'corregido' }], ['X5', { estado: 'confirmado' }],
+  type V = { estado: 'confirmado' | 'corregido' | 'no_aplica'; codigo?: string }
+  const e = (n2?: V, n3?: V) => ({ porMaquina: { ...(n2 ? { 'baader-n2': n2 } : {}), ...(n3 ? { 'baader-n3': n3 } : {}) } })
+  const MQ = ['baader-n2', 'baader-n3'] as const
+  const por = new Map<string, { porMaquina: Partial<Record<'baader-n2' | 'baader-n3', V>>; sinMaquina?: V }>([
+    ['B1', e({ estado: 'confirmado' }, { estado: 'corregido', codigo: 'X9' })], // resuelto en ambas (aunque distinta)
+    ['B10', e({ estado: 'confirmado' })], // solo N2
+    ['X5', e({ estado: 'confirmado' }, { estado: 'confirmado' })], // regleta: no es pieza
+    ['Y3', { porMaquina: {}, sinMaquina: { estado: 'confirmado' as const } }], // vieja sin máquina: no cuenta
   ])
-  it('cuenta M, N y X sin contar pseudo-elementos, regletas ni TP', () => {
-    const r = coberturaRepuestos(['A3C.P1', 'X5', 'TP', 'B1', 'B10', 'B1', 'Y3'], partes.aparatos, vin)
-    expect(r).toEqual({ total: 3, identificados: 2, confirmados: 1 })
+  it('cuenta M, N y X (resueltos en ambas) sin contar pseudo-elementos, regletas ni TP', () => {
+    const r = coberturaRepuestos(['A3C.P1', 'X5', 'TP', 'B1', 'B10', 'B1', 'Y3'], partes.aparatos, por, MQ)
+    expect(r).toEqual({ total: 3, identificados: 2, confirmados: 1, porMaquina: { 'baader-n2': 2, 'baader-n3': 1 } })
   })
   it('sin datos: todo en cero salvo el total', () => {
-    expect(coberturaRepuestos(['B1', 'B2'], null, null)).toEqual({ total: 2, identificados: 0, confirmados: 0 })
+    expect(coberturaRepuestos(['B1', 'B2'], null, null, MQ)).toEqual({
+      total: 2, identificados: 0, confirmados: 0, porMaquina: { 'baader-n2': 0, 'baader-n3': 0 },
+    })
+  })
+  it('cualquier respuesta resuelve: no_aplica en una y confirmado en la otra suma en ambas', () => {
+    const r = coberturaRepuestos(['B1'], null, new Map([['B1', e({ estado: 'no_aplica' }, { estado: 'confirmado' })]]), MQ)
+    expect(r.confirmados).toBe(1)
   })
 })
 

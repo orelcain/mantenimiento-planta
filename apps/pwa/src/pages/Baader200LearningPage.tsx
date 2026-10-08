@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { History, BookOpen, RefreshCw, X, ChevronDown, ChevronUp, QrCode, Copy, Check, Trash2, Sparkles, Save } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
+import { useIsSupervisor } from '@/store/authStore'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import { storage } from '@/services/firebase'
@@ -14,7 +15,6 @@ import {
   addB200History,
   getB200History,
   seedB200Sections,
-  getB200EditPwd,
 } from '@/services/baader200Learning'
 import type { B200Section, B200HistoryEntry } from '@/services/baader200Learning'
 import { Button } from '@/components/ui'
@@ -24,6 +24,13 @@ export function Baader200LearningPage() {
   const iframeReadyRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const user = useAuthStore(state => state.user)
+  // Quién puede editar: lo mismo que exige firestore.rules para escribir
+  // baader200-sections (isSupervisor = supervisor o admin). La página además
+  // está tras AdminRoute. Antes se pedía una «clave de edición» guardada en
+  // claro en baader200-config/edit-pwd (lectura pública, default 'admin').
+  const canEdit = useIsSupervisor()
+  // Los mensajes al iframe van solo a nuestro propio origen (nunca '*').
+  const ORIGEN = window.location.origin
 
   const [sections, setSections] = useState<B200Section[]>([])
   const [, setSectionOrder] = useState<string[]>([])
@@ -63,13 +70,14 @@ export function Baader200LearningPage() {
         currentId: sectionsData[0]?.id ?? null,
         order,
         readonly: false,
-      }, '*')
+        canEdit,
+      }, ORIGEN)
       setErrorCarga(null)
     } catch (err) {
       logger.error('B200: Error cargando datos', err instanceof Error ? err : new Error(String(err)))
       setErrorCarga(err instanceof Error ? err.message : String(err))
     }
-  }, [user])
+  }, [user, canEdit, ORIGEN])
 
   useEffect(() => {
     if (user && iframeReadyRef.current && iframeRef.current) {
@@ -141,21 +149,14 @@ export function Baader200LearningPage() {
       }
 
       if (type === 'b200:request-unlock') {
-        const pwd = prompt('Ingrese clave de administrador:')
-        if (!pwd) {
-          iframeRef.current?.contentWindow?.postMessage({ type: 'b200:lock-fail', message: 'Operación cancelada' }, '*')
-          return
-        }
-        try {
-          const correctPwd = await getB200EditPwd()
-          if (pwd === correctPwd) {
-            iframeRef.current?.contentWindow?.postMessage({ type: 'b200:unlock' }, '*')
-          } else {
-            iframeRef.current?.contentWindow?.postMessage({ type: 'b200:lock-fail', message: 'Clave incorrecta' }, '*')
-          }
-        } catch {
-          iframeRef.current?.contentWindow?.postMessage({ type: 'b200:lock-fail', message: 'Error verificando clave' }, '*')
-        }
+        // El candado del iframe queda como protección contra ediciones
+        // accidentales; desbloquear depende del rol, no de una clave.
+        iframeRef.current?.contentWindow?.postMessage(
+          canEdit
+            ? { type: 'b200:unlock' }
+            : { type: 'b200:lock-fail', message: 'Solo un supervisor o administrador puede editar el manual.' },
+          ORIGEN,
+        )
         return
       }
 
@@ -166,7 +167,7 @@ export function Baader200LearningPage() {
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [user, sections, sendInitData])
+  }, [user, sections, sendInitData, canEdit, ORIGEN])
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -188,23 +189,23 @@ export function Baader200LearningPage() {
         task.on('state_changed',
           (snap) => {
             const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100)
-            iframe.postMessage({ type: 'b200:upload-progress', percent: pct, current: i + 1, total: files.length }, '*')
+            iframe.postMessage({ type: 'b200:upload-progress', percent: pct, current: i + 1, total: files.length }, ORIGEN)
           },
           (err) => {
-            iframe.postMessage({ type: 'b200:upload-error', error: err.message }, '*')
+            iframe.postMessage({ type: 'b200:upload-error', error: err.message }, ORIGEN)
             reject(err)
           },
           async () => {
             const url = await getDownloadURL(task.snapshot.ref)
-            iframe.postMessage({ type: 'b200:upload-result', url, caption: caption || defaultName }, '*')
+            iframe.postMessage({ type: 'b200:upload-result', url, caption: caption || defaultName }, ORIGEN)
             resolve()
           }
         )
       }).catch(() => {})
     }
-    iframe.postMessage({ type: 'b200:upload-done' }, '*')
+    iframe.postMessage({ type: 'b200:upload-done' }, ORIGEN)
     e.target.value = ''
-  }, [])
+  }, [ORIGEN])
 
   const refreshIframe = () => {
     if (!iframeRef.current) return

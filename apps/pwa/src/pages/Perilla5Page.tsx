@@ -68,6 +68,7 @@ import {
 } from '@/services/baader142/perilla5Notas'
 
 import zoomPlugin from 'chartjs-plugin-zoom'
+import { parsearMaquina } from '@/utils/aprendizaje/vinculoTerreno'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, zoomPlugin)
 
@@ -531,10 +532,7 @@ function VistaProtocolo() {
 
   // El aviso de Telegram trae ?maquina=n2: el operador cae directo en SU maquina
   // en vez de aterrizar en N1 y tener que darse cuenta. Acepta n2 o baader-n2.
-  const [maquina, setMaquina] = useState<MaquinaBaader>(() => {
-    const q = (searchParams.get('maquina') ?? '').toLowerCase().replace('baader-', '')
-    return q === 'n2' ? 'baader-n2' : q === 'n3' ? 'baader-n3' : 'baader-n1'
-  })
+  const [maquina, setMaquina] = useState<MaquinaBaader>(() => parsearMaquina(searchParams.get('maquina')) ?? 'baader-n1')
   // Fecha LOCAL (no toISOString/UTC): la lectura semanal se hace al fin del turno
   // de la tarde, justo la ventana en que la fecha UTC ya saltó al día siguiente.
   const [fecha, setFecha] = useState(() => {

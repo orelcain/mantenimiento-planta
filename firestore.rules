@@ -763,7 +763,21 @@ service cloud.firestore {
             || isNonEmptyString(request.resource.data.nota, 1, 500))
         && (!('foto' in request.resource.data)
             || request.resource.data.foto is string)
-        && request.resource.data.confirmadoPor == request.auth.uid;
+        && request.resource.data.confirmadoPor == request.auth.uid
+        // Id del doc según el plano (se usa (A && B) || (!A && C), no el ternario):
+        // · 888 (sirve a N2 y N3): `maquina` obligatoria (N2 o N3) e id `<slug>__<aparato>__<maquina>`.
+        //   Un cliente viejo, sin `maquina`, rebota aquí y la app muestra «actualiza la app».
+        // · Cualquier otro plano (860, 200, GEA): SIN `maquina` e id `<slug>__<aparato>`. Aceptar una
+        //   máquina ahí dejaba docs que el visor nunca muestra o que pisaban al válido del 860.
+        && (
+          (request.resource.data.planoSlug == 'baader-142-888'
+            && 'maquina' in request.resource.data
+            && request.resource.data.maquina in ['baader-n2', 'baader-n3']
+            && vinculoId == request.resource.data.planoSlug + '__' + request.resource.data.aparato + '__' + request.resource.data.maquina)
+          || (request.resource.data.planoSlug != 'baader-142-888'
+            && !('maquina' in request.resource.data)
+            && vinculoId == request.resource.data.planoSlug + '__' + request.resource.data.aparato)
+        );
 
       // Nadie borra evidencia de terreno: si estaba mal, se corrige con un
       // update (que deja el estado 'corregido' y la nota del por que).
@@ -1982,9 +1996,14 @@ service cloud.firestore {
     }
 
     match /hmi-knuro-config/{configId} {
-      // Lectura pública para preset-order (Modo Aprendizaje)
-      allow read: if true;
-      allow write: if isSupervisor();
+      // Solo 'preset-order' es público: lo lee HmiKnuroPublicPage (Modo
+      // Aprendizaje vía QR, sin login). 'current' y 'refs' los lee HmiKnuroPage,
+      // que está tras login. 'tooltip-pwd' guardaba una clave en claro con
+      // lectura pública; ya nada la usa (papelera = rol admin, HMI = #1228):
+      // queda cerrado para todos, también para escribir.
+      allow read: if configId == 'preset-order'
+        || (configId != 'tooltip-pwd' && isNotAnonymous());
+      allow write: if configId != 'tooltip-pwd' && isSupervisor();
     }
 
     // Tooltips de parámetros — lectura pública, escritura solo supervisor
@@ -2031,9 +2050,14 @@ service cloud.firestore {
     }
 
     match /baader200-config/{configId} {
-      // Lectura pública para section-order (Modo Aprendizaje)
-      allow read: if true;
-      allow write: if isSupervisor();
+      // Solo 'section-order' es público: lo lee Baader200LearningPublicPage
+      // (Modo Aprendizaje vía QR, sin login). Cualquier otro doc pide login no
+      // anónimo. 'edit-pwd' guardaba una clave en claro con lectura pública;
+      // ya nada la usa (editar = rol supervisor/admin, igual que
+      // baader200-sections): queda cerrado para todos, también para escribir.
+      allow read: if configId == 'section-order'
+        || (configId != 'edit-pwd' && isNotAnonymous());
+      allow write: if configId != 'edit-pwd' && isSupervisor();
     }
 
     // ============================================
