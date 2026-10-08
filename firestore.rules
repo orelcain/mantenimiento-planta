@@ -1955,6 +1955,82 @@ service cloud.firestore {
       allow write: if isSupervisor();
     }
 
+    // Contador de vistas por módulo: UN doc por día (hora de Chile), id YYYY-MM-DD.
+    //   { ultimo: '<modulo>', '<modulo>': { vistas, claro|oscuro, cel|pc, u: { '<hash12 del uid>': true } } }
+    // Una «vista» es un USUARIO-DÍA por módulo: el dedupe lo garantiza la regla, no el cliente.
+    // Cada escritura toca UN módulo, suma 1 a `vistas`, a una intensidad y a un dispositivo, y
+    // agrega EXACTAMENTE el hash del que escribe (sha256 del uid, 12 primeros hex) a `u`, que no
+    // podía estar antes. Resultado: máximo 1 vista por usuario, módulo y día; `u` no se puede
+    // vaciar ni quitar (hasAll del mapa anterior); el doc no se puede inflar ni borrar.
+    // La lista de módulos debe coincidir con MODULOS_VISTAS (moduloDeRuta.ts); un test lo comprueba.
+    // Lectura solo supervisor/admin: es telemetría de uso, no un dato de planta.
+    function moduloVistasClaves() {
+      return ['inicio', 'incidencias', 'bitacora', 'repuestos', 'bodega', 'analisis-turno',
+        'monitor', 'aprendizaje', 'aprendizaje-hmi-knuro', 'aprendizaje-hmi-grader',
+        'aprendizaje-hmi-bombeo-s2', 'aprendizaje-perilla-5', 'aprendizaje-tarjeta-a3c',
+        'aprendizaje-variadores', 'aprendizaje-planos', 'aprendizaje-maquina',
+        'aprendizaje-baader-200', 'inspecciones', 'equipos', 'aria', 'admin', 'otro'];
+    }
+
+    function miHashVistas() {
+      return hashing.sha256(request.auth.uid.toUtf8()).toHexString().lower()[0:12];
+    }
+
+    // n = módulo tras la escritura, v = módulo antes ({} si no existía).
+    function moduloVistasOk(n, v) {
+      return n is map
+        && n.keys().hasOnly(['vistas', 'claro', 'oscuro', 'cel', 'pc', 'u'])
+        && n.get('vistas', null) is int
+        && n.vistas == v.get('vistas', 0) + 1
+        && n.get('claro', 0) - v.get('claro', 0) in [0, 1]
+        && n.get('oscuro', 0) - v.get('oscuro', 0) in [0, 1]
+        && (n.get('claro', 0) - v.get('claro', 0)) + (n.get('oscuro', 0) - v.get('oscuro', 0)) == 1
+        && n.get('cel', 0) - v.get('cel', 0) in [0, 1]
+        && n.get('pc', 0) - v.get('pc', 0) in [0, 1]
+        && (n.get('cel', 0) - v.get('cel', 0)) + (n.get('pc', 0) - v.get('pc', 0)) == 1
+        // `u` obligatorio: se conserva completo y se agrega SOLO mi hash, que no estaba.
+        && n.get('u', null) is map
+        && n.u.keys().hasAll(v.get('u', {}).keys())
+        && n.u.diff(v.get('u', {})).affectedKeys().hasOnly([miHashVistas()])
+        && n.u.diff(v.get('u', {})).affectedKeys().hasAll([miHashVistas()])
+        && !(miHashVistas() in v.get('u', {}))
+        && n.u[miHashVistas()] == true;
+    }
+
+    // El id del doc (día de Chile) debe estar cerca de request.time: no se siembran días
+    // lejanos. La fecha se toma a 00:00 UTC; Chile va 3-4 h detrás de UTC, así que se acepta
+    // request.time entre (fecha - 1 día) y (fecha + 2 días).
+    function diaVistasCercano(dia) {
+      return dia.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.time > timestamp.date(int(dia[0:4]), int(dia[5:7]), int(dia[8:10])) - duration.value(1, 'd')
+        && request.time < timestamp.date(int(dia[0:4]), int(dia[5:7]), int(dia[8:10])) + duration.value(2, 'd');
+    }
+
+    // `ultimo` = módulo que toca ESTA escritura. Las reglas no pueden sacar un elemento de un
+    // Set (affectedKeys), así que el cliente lo declara y las reglas exigen que sea el único
+    // módulo que cambia (junto con `ultimo`).
+    match /moduloVistas/{dia} {
+      allow read: if isSupervisor();
+
+      allow create: if isActiveUser()
+        && diaVistasCercano(dia)
+        && request.resource.data.ultimo in moduloVistasClaves()
+        && request.resource.data.keys().hasOnly([request.resource.data.ultimo, 'ultimo'])
+        && request.resource.data.keys().hasAll([request.resource.data.ultimo, 'ultimo'])
+        && moduloVistasOk(request.resource.data[request.resource.data.ultimo], {});
+
+      allow update: if isActiveUser()
+        && diaVistasCercano(dia)
+        && request.resource.data.ultimo in moduloVistasClaves()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([request.resource.data.ultimo, 'ultimo'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasAny([request.resource.data.ultimo])
+        && moduloVistasOk(
+             request.resource.data[request.resource.data.ultimo],
+             resource.data.get(request.resource.data.ultimo, {}));
+
+      allow delete: if false;
+    }
+
     // ANÁLISIS GRADER - Capturas de timing de flipper desde HMI Marelec Z2
     match /flipperZ2Captures/{captureId} {
       allow read: if isNotAnonymous();
