@@ -213,7 +213,14 @@ self.addEventListener('fetch', (event) => {
   // Con red siempre gana la red (el HTML nunca queda viejo). Sin red se
   // devuelve el index.html cacheado y el router resuelve la ruta en el
   // cliente, así cualquier vista ya visitada abre igual.
-  if (request.mode === 'navigate' && url.origin === self.location.origin && !url.pathname.endsWith('/mant.html')) {
+  // Solo la app: las páginas estáticas de public/ (embeds *.html de los HMI,
+  // /prueba-terreno/…) y los iframes NO pasan por aquí. Antes se guardaban como
+  // './index.html', pisaban la copia de la app y, sin red, abría el embed o la
+  // prueba en vez de la app (y al revés).
+  const esPaginaEstatica = (url.pathname.endsWith('.html') && !url.pathname.endsWith('/index.html'))
+    || /\/prueba-terreno(\/|$)/.test(url.pathname)
+  if (request.mode === 'navigate' && request.destination !== 'iframe'
+      && url.origin === self.location.origin && !esPaginaEstatica) {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(request)
