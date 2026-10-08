@@ -15,6 +15,8 @@
 import { nombreParaTexto } from '@/utils/repuestos/nombrePorSap'
 
 export interface SolicitudParaAria {
+  /** `'alta_codigo'` = pedido a bodega de crear el SAP de un código de fabricante (NO es un pedido de repuesto). */
+  tipo?: string
   codigoSAP: string
   textoBreve: string
   /** Nombres comunes del catálogo (resueltos por SAP); la solicitud guardada no los trae. */
@@ -28,6 +30,11 @@ export interface SolicitudParaAria {
   aprobadaAt?: Date
   entregadaPor?: string
   entregadaAt?: Date
+  /** Solo en las altas de código. */
+  codigoFabricante?: string
+  elementos?: readonly string[]
+  sapCreado?: string
+  motivoRechazo?: string
 }
 
 /** «31-05», en hora de Chile. A mano: `toLocaleDateString` cambia de forma según el ICU del entorno. */
@@ -46,7 +53,34 @@ function linea(s: SolicitudParaAria): string {
   return partes.join(' · ')
 }
 
-export function resumenDeSolicitudes(solicitudes: readonly SolicitudParaAria[]): string {
+/**
+ * LÍMITE DE ARIA: la tool trae a lo más 50 altas y los pedidos con límite `30 + altas`; con más de 50 altas el
+ * resumen de pedidos puede quedar corto (hoy hay a lo más una alta por código del plano, ~16).
+ * Las altas de código van aparte: otro ciclo (pendiente → creada | rechazada) y no se entregan ni descuentan stock. */
+function bloqueAltas(todas: readonly SolicitudParaAria[]): string {
+  // Las más recientes primero (la consulta de altas no ordena: ordenar exigiría un índice compuesto).
+  const altas = [...todas].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
+  const por = (e: string) => altas.filter((s) => s.estado === e)
+  const lineaAlta = (s: SolicitudParaAria) => {
+    const donde = s.elementos?.length ? ` (elementos ${s.elementos.join(', ')})` : ''
+    const resultado = s.estado === 'creada' ? ` · SAP ${s.sapCreado || '?'}` : s.estado === 'rechazada' ? ` · motivo: ${s.motivoRechazo || '?'}` : ''
+    return `- [${s.estado}] código de fabricante ${s.codigoFabricante || '?'} ${s.textoBreve || ''}${donde} ×${s.cantidad} · pedida por ${s.solicitadoPorNombre || '?'} el ${fecha(s.createdAt)}${resultado}`.replace(/\s+/g, ' ')
+  }
+  return (
+    `ALTAS DE CÓDIGO (aparte de los pedidos: Mantención pide a bodega que cree el SAP de un código de fabricante; no se aprueban ni se entregan). ` +
+    `Registradas: ${altas.length} — pendientes en bodega: ${por('pendiente').length}, creadas: ${por('creada').length}, rechazadas: ${por('rechazada').length}.\n` +
+    altas.slice(0, 8).map(lineaAlta).join('\n')
+  )
+}
+
+export function resumenDeSolicitudes(todas: readonly SolicitudParaAria[]): string {
+  const altas = todas.filter((s) => s.tipo === 'alta_codigo')
+  const solicitudes = todas.filter((s) => s.tipo !== 'alta_codigo')
+  const base = resumenDePedidos(solicitudes)
+  return altas.length ? `${base}\n${bloqueAltas(altas)}` : base
+}
+
+function resumenDePedidos(solicitudes: readonly SolicitudParaAria[]): string {
   const pendientes = solicitudes.filter((s) => s.estado === 'pendiente')
   const aprobadas = solicitudes.filter((s) => s.estado === 'aprobada')
   const entregadas = solicitudes.filter((s) => s.estado === 'entregada')

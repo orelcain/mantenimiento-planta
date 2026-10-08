@@ -31,11 +31,12 @@ function stockDeSolicitud(r: { bodegaId?: string | null; stockActual: number; un
   return { configurado: !!r.bodegaId, stockActual: r.stockActual, unidad: r.unidad, ubicacionBodega: r.ubicacionBodega }
 }
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
-import { useSolicitudes, type NuevaSolicitud, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
+import { esAlta, useSolicitudes, type AltaCodigo, type NuevaSolicitud, type OrigenSap, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
 import { getTrashCount } from '@/services/auditLog'
+import { buscarDestinoDeFusion, buscarRepuestoPorSap } from '@/services/repuestos/asignarSapMaestro'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
@@ -341,7 +342,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // ── Solicitudes de repuesto (Fase 6) ──
   const user = useAuthStore((s) => s.user)
-  const { solicitudes, loading: solicitudesLoading, pendientesCount, crearSolicitud, avanzarEstado } = useSolicitudes()
+  const { solicitudes, loading: solicitudesLoading, pendientesCount, crearSolicitud, avanzarEstado, registrarAltaCreada, rechazarAlta } = useSolicitudes()
   const [solicitarOpen, setSolicitarOpen] = useState(false)
   const [solicitarRepuesto, setSolicitarRepuesto] = useState<RepuestoLite | null>(null)
   // «Solicitar repuestos» de la máquina enfocada: varios de una vez.
@@ -386,8 +387,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // el catálogo va por área y una solicitud de otra área se entregaba sin descontar nada.
   const handleAvanzarSolicitud = useCallback(
     async (id: string, next: SolicitudEstado) => {
+      // Las altas de código tienen su propio ciclo (registrar SAP / rechazar): nunca avanzan ni descuentan stock.
+      const pedida = solicitudes.find((s) => s.id === id)
+      if (pedida && esAlta(pedida)) return
       if (next === 'entregada' && user) {
-        const sol = solicitudes.find((s) => s.id === id)
+        const sol = pedida
         if (sol) {
           try {
             const plan = await registrarSalidaDeSolicitud(
@@ -419,6 +423,46 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     },
     [solicitudes, user, registrarSalidaDeSolicitud, avanzarEstado, toast, indiceNombresPorSap],
   )
+  // Alta de código (ficha A3C): bodega registra el SAP que creó, o rechaza con motivo. El panel pinta los
+  // bloques y valida; acá se escribe en el maestro (asigna / completa / crea `repuestos/{SAP}`) y en la solicitud.
+  const handleRegistrarSapAlta = useCallback(
+    async (alta: AltaCodigo, sap: string, origen: OrigenSap) => {
+      if (!user) throw new Error('Hay que iniciar sesión.')
+      try {
+        await registrarAltaCreada(alta, sap, origen, user.id, user.nombre)
+      } catch (e) {
+        toast({
+          variant: 'destructive',
+          title: 'No se pudo registrar el SAP',
+          // Los errores de negocio (SAP de otro repuesto, alta ya cerrada por otro operador) traen su texto.
+          description: e instanceof Error && e.name === 'ErrorAltaSap' ? e.message : 'La alta sigue pendiente: reintenta.',
+        })
+        throw e
+      }
+      invalidateGlobalRepuestosCache()
+      toast({ title: 'Alta registrada', description: `${alta.codigoFabricante} ahora es SAP ${sap}.`, variant: 'success' })
+    },
+    [user, registrarAltaCreada, toast],
+  )
+  const handleRechazarAlta = useCallback(
+    async (alta: AltaCodigo, motivo: string) => {
+      if (!user) throw new Error('Hay que iniciar sesión.')
+      try {
+        await rechazarAlta(alta.id, motivo, user.id, user.nombre)
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'No se pudo rechazar', description: 'Reintenta en un momento.' })
+        throw e
+      }
+      toast({ title: 'Alta rechazada', description: `${alta.codigoFabricante}: quien la pidió verá el motivo.` })
+    },
+    [user, rechazarAlta, toast],
+  )
+  // Registrar o rechazar un alta es de bodega: técnico, supervisor o admin (igual que firestore.rules).
+  const puedeResolverAltas = user?.rol === 'tecnico' || user?.rol === 'supervisor' || user?.rol === 'admin'
+  const buscarSapEnMaestro = useCallback(async (sap: string) => {
+    const r = await buscarRepuestoPorSap(sap)
+    return r ? { nombre: r.textoBreve || r.codigoFabricante || 'Repuesto', codigoFabricante: r.codigoFabricante || '' } : null
+  }, [])
   const [actionTarget, setActionTarget] = useState<{ kind: RepAction; source: GlobalSearchResult } | null>(null)
   const [equipoPicker, setEquipoPicker] = useState<{ kind: RepAction; sources: GlobalSearchResult[] } | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -1354,7 +1398,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       setAsignarSapSaving(true)
       try {
         const despiece = src.repuesto
-        const target = allRepuestos.find((r) => (r.repuesto.codigoSAP || '').trim() === sap && r.repuesto.id !== despiece.id)?.repuesto
+        const target = buscarDestinoDeFusion(sap, despiece.id, allRepuestos.map((r) => r.repuesto))
         if (target) {
           const equipos = [...new Set([...(target.equipos || []), ...(despiece.equipos || [])])]
           const equiposCodigos = [...new Set([...(target.equiposCodigos || []), ...(despiece.equiposCodigos || [])])]
@@ -2712,6 +2756,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         solicitudes={solicitudes}
         loading={solicitudesLoading}
         onAvanzar={handleAvanzarSolicitud}
+        onRegistrarSap={puedeResolverAltas ? handleRegistrarSapAlta : undefined}
+        onRechazarAlta={puedeResolverAltas ? handleRechazarAlta : undefined}
+        buscarSap={buscarSapEnMaestro}
         nombreDe={(sap, texto) => nombreVisiblePorSap(indiceNombresPorSap, sap, texto)}
         stockDe={(sap) => {
           const o = overlayDeSap(sap)
