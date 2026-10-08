@@ -301,6 +301,7 @@ body.readonly .sc td:has(> input[id]){cursor:pointer;}
   --kh-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
   --kh-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
   --kh-e-out:cubic-bezier(.22,.9,.24,1);
+  --kh-on-accent:#FFFFFF;--kh-on-accent-fill:rgba(255,255,255,.22);--kh-pulse:rgba(46,117,182,.06);
 }
 :root[data-kn-theme="dark"]{
   --kh-bg:#1C1C1E;--kh-card:#2C2C2E;--kh-card2:#3A3A3C;
@@ -384,6 +385,61 @@ body.kh-sheet-open #hp{padding-bottom:58vh;padding-bottom:58dvh;}
 .kn-row.sel{background:var(--kh-accent-tint);}
 @media (min-width:768px){#kn-help-list{display:none!important;}}
 @media (prefers-reduced-motion:reduce){.kh-sheet{transition:none;}}
+
+/* ══ BARRA DEL SIMULADOR: buscador + «?» de pantalla. Vive FUERA del panel (.dev):
+   el HMI conserva su aspecto. Mismos tokens que el globo y la hoja. ══ */
+#kn-bar{align-self:stretch;display:flex;align-items:center;gap:16px;margin:0 24px 10px;flex-shrink:0;min-width:0;}
+#kn-bar .hml{margin:0;align-self:center;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kn-tools{display:flex;align-items:center;gap:8px;margin-left:auto;flex:0 1 460px;min-width:0;}
+.kn-search{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:36px;border-radius:999px;background:var(--kh-card);padding:0 12px;color:var(--kh-label2);box-shadow:0 0 0 1px var(--kh-sep);cursor:text;}
+.kn-search svg{width:16px;height:16px;}
+.kn-search input{all:unset;flex:1;min-width:0;height:100%;font:400 15px/20px var(--kh-ui);color:var(--kh-label);}
+.kn-search input::placeholder{color:var(--kh-label2);opacity:1;}
+.kn-search:focus-within{box-shadow:0 0 0 2px var(--kh-accent);}
+.kn-search input:focus,.kn-search input:focus-visible{outline:none;box-shadow:none;}
+.kn-kbd{font:500 12px/16px var(--kh-mono);color:var(--kh-label2);border:1px solid var(--kh-sep);border-radius:6px;padding:1px 6px;}
+.kn-search:focus-within .kn-kbd{display:none;}
+#kn-scr-btn{flex-shrink:0;height:36px;border-radius:999px;border:0;background:var(--kh-accent);color:var(--kh-on-accent);font:600 15px/20px var(--kh-ui);display:inline-flex;align-items:center;gap:8px;padding:0 14px 0 6px;cursor:pointer;white-space:nowrap;}
+#kn-scr-btn .q{width:24px;height:24px;border-radius:999px;background:var(--kh-on-accent-fill);display:grid;place-items:center;font-weight:700;font-size:15px;line-height:1;}
+#kn-scr-btn[hidden]{display:none;}
+#kn-scr-btn.empty{background:transparent;color:var(--kh-label2);box-shadow:inset 0 0 0 1.5px var(--kh-label3);}
+#kn-scr-btn.empty .q{background:var(--kh-fill);}
+#kn-scr-btn[aria-expanded="true"]{box-shadow:0 0 0 2px var(--kh-bg),0 0 0 4px var(--kh-accent);}
+#kn-scr-btn:focus-visible{outline:2px solid var(--kh-accent);outline-offset:3px;}
+.kh-eyebrow{display:block;font-size:13px;line-height:18px;font-weight:600;color:var(--kh-label2);margin-bottom:2px;}
+.kh-sheet .kh-eyebrow{font-size:15px;line-height:20px;}
+/* Resultados: solo posición y superficie. Filas = .kn-row, grupos = .kh-gh + .kh-glist
+   (las mismas clases de la lista de campos), así heredan cualquier cambio de la piel. */
+.kn-res{position:fixed;z-index:10001;background:var(--kh-card);border-radius:26px;box-shadow:var(--kh-pop-shadow),0 0 0 1px var(--kh-sep);overflow:auto;overscroll-behavior:contain;padding:4px 12px 12px;max-height:min(62vh,540px);}
+.kn-res[hidden]{display:none;}
+.kn-res mark{background:var(--kh-accent-tint);color:var(--kh-accent);border-radius:4px;padding:0 1px;font-weight:600;}
+.kn-res .kn-row:hover{background:var(--kh-accent-tint);}
+.kn-res .more,.kn-empty{padding:10px 4px;font-size:13px;line-height:18px;color:var(--kh-label2);}
+.kn-empty{font-size:15px;line-height:20px;}
+/* Fila «Para qué sirve esta pantalla» de la lista del celular */
+.kn-row .s{grid-column:1;font-size:13px;line-height:18px;color:var(--kh-label2);display:flex;align-items:flex-start;gap:6px;}
+.kn-row .s svg{width:14px;height:14px;margin-top:2px;}
+.kn-scr-g{margin-bottom:8px;}
+/* Marca del campo elegido desde el buscador: late dos veces */
+@keyframes knPulse{50%{box-shadow:0 0 0 16px var(--kh-pulse);}}
+.sc input.kn-ring.kn-pulse{animation:knPulse .6s ease-in-out 2;}
+@media (max-width:860px){
+  #kn-bar{margin:4px 16px 10px;}
+}
+@media (max-width:767px){
+  .kn-tools{flex:1 1 auto;}
+  .kn-search{height:44px;padding:0 14px;}
+  .kn-search input{font-size:17px;line-height:22px;}
+  .kn-kbd{display:none;}
+  #kn-scr-btn{width:44px;height:44px;padding:0;justify-content:center;}
+  #kn-scr-btn .lbl{display:none;}
+  #kn-scr-btn .q{width:auto;height:auto;background:none;font-size:20px;}
+  #kn-scr-btn.empty .q{background:none;}
+  .kn-res{left:0!important;right:0;width:auto!important;bottom:0;max-height:none;border-radius:0;background:var(--kh-bg);box-shadow:none;padding:8px 16px 24px;}
+  .kn-res .kn-row:hover{background:transparent;}
+  .kn-res .kn-row.sel{background:var(--kh-accent-tint);}
+}
+@media (prefers-reduced-motion:reduce){.sc input.kn-ring.kn-pulse{animation:none;}}
 </style>
 </head>
 <body>
@@ -1407,7 +1463,10 @@ function scaleHMI(){
   // Si #hp tiene dimensiones reales usarlas directamente (ya excluye #rp).
   // Fallback: window.innerWidth menos el panel si estamos en modo standalone.
   const availW=p.clientWidth>10?p.clientWidth:(window.innerWidth-(IN_IFRAME?0:300));
-  const availH=p.clientHeight>10?p.clientHeight:window.innerHeight;
+  let availH=p.clientHeight>10?p.clientHeight:window.innerHeight;
+  // PC: la barra del simulador (buscador) ocupa más alto que el título que reemplaza.
+  const knBar=document.getElementById('kn-bar');
+  if(knBar&&window.innerWidth>860) availH-=Math.max(0,knBar.offsetHeight+10-24);
   if(availW<10||availH<10) return;
   let sc=Math.min((availW-40)/800,(availH-40)/480,1.35);
   sc=Math.max(sc,.28);
@@ -2838,6 +2897,7 @@ function renderTooltipIcons(){
   });
   renderHelpList();
   _khRefreshOpen();
+  _knScrRefresh();
 }
 
 /* ── Init ── */
@@ -2986,6 +3046,8 @@ function _getTipLabel(id){
       return btn&&(btn.getAttribute('onclick')||'').includes("'"+navId+"'");
     });
     if(row){const sp=row.querySelector('span');if(sp)return sp.textContent.trim();}
+  } else if(id.startsWith('scr:')){
+    return 'Pantalla: '+_knScreenTitle(id.slice(4));
   } else if(id.startsWith('btn:')){
     const navId=id.slice(4);
     const btn=Array.from(document.querySelectorAll('button.hb.pill')).find(b=>(b.getAttribute('onclick')||'').includes("'"+navId+"'"));
@@ -3534,6 +3596,7 @@ function _khCanEdit(){return !READ_ONLY&&(IN_IFRAME?_TIP_CAN_EDIT:true);}
 
 /* Contenido común del globo y de la hoja. Devuelve {top, body, origin}. */
 function _khContent(id,sheet){
+  if(String(id).startsWith('scr:')) return _knScrContent(id,sheet);
   const info=_fieldInfo(id);
   const p=parseTip(_khText(id));
   // Una sección sin texto no se dibuja: el origen («Sin dato», «Sin ayuda») ya lo dice.
@@ -3586,6 +3649,8 @@ function closeHelp(instant){
   const o=_khOpen;
   _khOpen=null;
   _khRing(o.info,false);
+  const sb=document.getElementById('kn-scr-btn');
+  if(sb) sb.setAttribute('aria-expanded','false');
   document.querySelectorAll('#kn-help-list .kn-row.sel').forEach(r=>r.classList.remove('sel'));
   if(o.kind==='sheet'){
     document.body.classList.remove('kh-sheet-open');
@@ -3607,7 +3672,8 @@ function _khWire(el,id){
   if(ed) ed.addEventListener('click',e=>{
     e.stopPropagation();
     const info=_fieldInfo(id);
-    const a=(info&&info.inp)||document.querySelector('.tip-i[data-pid="'+CSS.escape(id)+'"]')||ed;
+    const a=(info&&info.inp)||document.querySelector('.tip-i[data-pid="'+CSS.escape(id)+'"]')||
+      (String(id).startsWith('scr:')&&document.getElementById('kn-scr-btn'))||ed;
     closeHelp(true);
     openTipEdit(id,a);
   });
@@ -3766,9 +3832,20 @@ function renderHelpList(){
   }
   const sc=document.querySelector('.sc.active');
   const inputs=sc?[...sc.querySelectorAll('input.fe[id],input.fe1[id]')]:[];
-  if(!inputs.length){wrap.hidden=true;wrap.innerHTML='';return;}
+  // Primera fila: «Para qué sirve esta pantalla» (si hay texto; vacía y editable para admin).
+  const scrId=sc?'scr:'+sc.id:'';
+  const scrHas=!!(sc&&_khText(scrId));
+  const showScr=!!(sc&&sc.id!=='ph'&&(scrHas||_khCanEdit()));
+  if(!inputs.length&&!showScr){wrap.hidden=true;wrap.innerHTML='';return;}
   wrap.hidden=false;
   const sel=_khOpen?_khOpen.id:null;
+  let scrRow='';
+  if(showScr){
+    const sp=parseTip(_khText(scrId));
+    const so=_khOriginTexts(sp);
+    scrRow='<div class="kh-glist kn-scr-g"><button type="button" class="kn-row kn-row-scr'+(scrId===sel?' sel':'')+'" data-pid="'+_escHTML(scrId)+'">'+
+      '<span class="l">Para qué sirve esta pantalla</span><span class="s">'+so.ic+'<span>'+so.html+'</span></span>'+KH_I.chev+'</button></div>';
+  }
   // Agrupar por origen (+ página): el origen va una vez en el encabezado del grupo.
   const RANK={deducido:0,manual:1,sindato:2,none:3};
   const groups=new Map();
@@ -3792,7 +3869,7 @@ function renderHelpList(){
     const n=g.rows.length;
     return '<h2 class="kh-gh">'+ic+'<span>'+gl(g.p)+' · '+n+(n===1?' campo':' campos')+'</span></h2><div class="kh-glist">'+g.rows.join('')+'</div>';
   });
-  wrap.innerHTML=html.join('');
+  wrap.innerHTML=scrRow+html.join('');
 }
 
 /* ── Tema: el del padre (clase .dark en su <html>); sin padre, el del sistema ── */
@@ -3845,7 +3922,7 @@ document.addEventListener('pointerdown',e=>{
   if(!_khOpen||_khOpen.kind!=='pop') return;
   const t=e.target;
   if(_khOpen.el.contains(t)||!t.closest) return;
-  if(t.closest('.tip-i')) return; // el clic del ícono alterna
+  if(t.closest('.tip-i,#kn-scr-btn')) return; // el clic del ícono (o del «?») alterna
   if(t.closest('#hs td')&&!t.closest('input,button,select,textarea')) return; // el clic de fila decide
   closeHelp();
 },true);
@@ -3869,6 +3946,348 @@ window.addEventListener('resize',()=>{
   },120);
 });
 document.addEventListener('scroll',()=>{if(_khOpen&&_khOpen.kind==='pop') _khPlace();},true);
+
+/* ══════════════════════════════════════════════════════════════════════
+   BUSCADOR de parámetros + «?» de AYUDA DE PANTALLA
+   Ambos viven en la barra del simulador (#kn-bar), FUERA del panel (.dev):
+   el HMI no cambia. El «?» lee PARAM_TOOLTIPS['scr:<idPantalla>'] (mismo doc
+   hmi-knuro-tooltips/default, mismo formato saneado). Todo texto que sale de
+   PARAM_TOOLTIPS pasa por sanitizeTipHTML o _escHTML antes de entrar al DOM.
+   ══════════════════════════════════════════════════════════════════════ */
+const KN_I_SEARCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+function _knCurScreen(){const sc=document.querySelector('#hs .sc.active');return sc?sc.id:'';}
+/* Nombre de la pantalla tal como lo dice su barra de título, sin el «Principal - Menú Técnico -» repetido */
+function _knScreenTitle(sid){
+  const sc=document.getElementById(sid);
+  const st=sc?sc.querySelector(':scope > .sh .st'):null;
+  let t=st?st.textContent.replace(/\s+/g,' ').trim():'';
+  t=t.replace(/^…\s*-\s*/,'').replace(/^Principal\s*[-.]\s*/i,'').replace(/^(Men[uú]\s+T[eé]cnico|Technical\s+Menu)\s*-\s*/i,'');
+  if(!t||t==='—') t=(typeof NAMES!=='undefined'&&NAMES[sid])||sid;
+  return t;
+}
+/* Ruta del HMI hasta la pantalla (por data-back), p.ej. «Menú Técnico › Vacío».
+   En las cadenas «SIGUIENTE» (sensores, configuración) data-back es la página anterior,
+   no el menú: se salta mientras la anterior apunte a esta con data-next. */
+function _knPath(sid){
+  const out=[];const seen=new Set();
+  let cur=sid;
+  let sc=document.getElementById(cur);
+  let b=sc&&sc.dataset.back;
+  while(b&&!seen.has(b)&&out.length<6){
+    seen.add(b);
+    const p=document.getElementById(b);
+    if(!p) break;
+    if(!(p.dataset.sennav&&p.dataset.next===cur)) out.unshift(_knScreenTitle(b));
+    cur=b;b=p.dataset.back;
+  }
+  return out.join(' › ');
+}
+function _knPlain(html){
+  return String(html||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]*>/g,' ')
+    .replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&')
+    .replace(/\s+/g,' ').trim();
+}
+/* Índice: se arma en cada búsqueda (≈180 campos + 58 pantallas), así siempre refleja
+   los valores y textos actuales sin enganchar eventos. */
+function _knIndex(){
+  const fields=[],screens=[];
+  document.querySelectorAll('#hs .sc').forEach(sc=>{
+    if(sc.id==='ph') return;
+    const sid=sc.id,title=_knScreenTitle(sid),alias=(typeof NAMES!=='undefined'&&NAMES[sid])||'';
+    const path=_knPath(sid);
+    const help=_knPlain(_khText('scr:'+sid));
+    const inps=[...sc.querySelectorAll('input.fe[id],input.fe1[id]')];
+    screens.push({kind:'screen',sid,title,path,help,n:inps.length,nName:_khNorm(title+' '+alias),nHelp:_khNorm(help)});
+    inps.forEach(inp=>{
+      const info=_fieldInfo(inp.id);
+      if(!info) return;
+      const fh=_knPlain(_khText(inp.id));
+      fields.push({kind:'field',id:inp.id,sid,name:info.name,title,path,help:fh,info,
+        nName:_khNorm(info.name),nScr:_khNorm(title+' '+alias+' '+path),nHelp:_khNorm(fh)});
+    });
+  });
+  return {fields,screens};
+}
+/* Coincidencia al inicio de palabra («vacio» no calza dentro de «activacion»). norm ya normalizado. */
+function _knAt(norm,t,from){
+  let p=from||0;
+  while(t&&(p=norm.indexOf(t,p))>=0){
+    if(p===0||!/[a-z0-9]/.test(norm[p-1])) return p;
+    p++;
+  }
+  return -1;
+}
+/* Resaltado sin tildes ni mayúsculas, sobre el texto original escapado */
+function _knHL(text,toks){
+  const s=String(text==null?'':text);
+  let norm='';const map=[];
+  for(let i=0;i<s.length;i++){
+    const n=s[i].normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    for(let k=0;k<n.length;k++){norm+=n[k];map.push(i);}
+  }
+  const mk=new Array(s.length).fill(false);
+  toks.forEach(t=>{let p=0;while(t&&(p=_knAt(norm,t,p))>=0){for(let k=p;k<p+t.length;k++)mk[map[k]]=true;p+=t.length;}});
+  let out='',open=false;
+  for(let i=0;i<s.length;i++){
+    if(mk[i]&&!open){out+='<mark>';open=true;}
+    if(!mk[i]&&open){out+='</mark>';open=false;}
+    out+=_escHTML(s[i]);
+  }
+  return out+(open?'</mark>':'');
+}
+/* Fragmento del texto de ayuda alrededor de la primera coincidencia */
+function _knSnippet(text,toks){
+  const s=String(text||'');
+  const n=_khNorm(s);
+  let at=-1;
+  toks.forEach(t=>{const p=_knAt(n,t,0);if(p>=0&&(at<0||p<at))at=p;});
+  if(at<0) return _knHL(s.slice(0,110),toks);
+  // _khNorm puede acortar (tildes combinadas); la posición es aproximada y basta para recortar
+  const a=Math.max(0,at-45),b=Math.min(s.length,at+75);
+  let frag=s.slice(a,b);
+  if(a>0) frag=frag.replace(/^\S*\s+/,'');          // sin palabras cortadas
+  if(b<s.length) frag=frag.replace(/\s+\S*$/,'');
+  return '«'+(a>0?'…':'')+_knHL(frag.trim(),toks)+(b<s.length?'…':'')+'»';
+}
+const KN_MAX_FIELDS=30;
+function _knSearch(q){
+  const toks=_khNorm(q).split(/\s+/).filter(Boolean);
+  if(!toks.length) return null;
+  const has=s=>toks.every(t=>_knAt(s,t,0)>=0);
+  const {fields,screens}=_knIndex();
+  const F=[],H=[],S=[];
+  fields.forEach(f=>{
+    if(has(f.nName)) F.push({f,l:1});
+    else if(has(f.nName+' '+f.nScr)) F.push({f,l:2});
+    else if(has(f.nName+' '+f.nScr+' '+f.nHelp)) H.push({f,l:3});
+  });
+  screens.forEach(s=>{
+    if(has(s.nName)) S.push({f:s,l:1});
+    else if(has(s.nName+' '+s.nHelp)) H.push({f:s,l:3});
+  });
+  F.sort((a,b)=>a.l-b.l);
+  // Pantallas antes que campos si la pantalla calza por nombre y ningún campo por el suyo («evacuador»)
+  const screensFirst=S.length>0&&!F.some(x=>x.l===1);
+  return {toks,F,S,H,screensFirst};
+}
+
+/* ── UI ── */
+let _knHits=[],_knAct=-1;
+function _knBuildBar(){
+  if(document.getElementById('kn-bar')) return;
+  const hp=document.getElementById('hp');
+  if(!hp) return;
+  const bar=document.createElement('div');
+  bar.id='kn-bar';
+  const hml=hp.querySelector(':scope > .hml');
+  hp.insertBefore(bar,hp.firstChild);
+  if(hml) bar.appendChild(hml);
+  const tools=document.createElement('div');
+  tools.className='kn-tools kh';
+  tools.innerHTML=
+    '<button type="button" id="kn-scr-btn" hidden aria-expanded="false" aria-haspopup="dialog" title="Para qué sirve esta pantalla">'+
+      '<span class="q" aria-hidden="true">?</span><span class="lbl">Esta pantalla</span></button>'+
+    '<label class="kn-search">'+KN_I_SEARCH+
+      '<input id="kn-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="kn-res" '+
+      'autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="Buscar parámetro o pantalla" aria-label="Buscar parámetro o pantalla del HMI">'+
+      '<span class="kn-kbd" aria-hidden="true">/</span></label>';
+  bar.appendChild(tools);
+  const res=document.createElement('div');
+  res.id='kn-res';
+  res.className='kn-res kh';
+  res.setAttribute('role','listbox');
+  res.setAttribute('aria-label','Resultados de la búsqueda');
+  res.hidden=true;
+  document.body.appendChild(res);
+
+  const q=document.getElementById('kn-q');
+  document.getElementById('kn-scr-btn').addEventListener('click',e=>{e.stopPropagation();_knOpenScr();});
+  q.addEventListener('input',_knRender);
+  q.addEventListener('focus',()=>{
+    if(_khIsNarrow()){
+      if(_khOpen) closeHelp(true);
+      const hpEl=document.getElementById('hp');
+      if(hpEl&&hpEl.scrollTop>0) hpEl.scrollTop=0;
+    }
+    if(q.value.trim()) _knRender();
+  });
+  q.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      e.preventDefault();
+      if(res.hidden){_knRender();return;}
+      if(!_knHits.length) return;
+      _knSetAct(_knAct<0?(e.key==='ArrowDown'?0:_knHits.length-1):(_knAct+(e.key==='ArrowDown'?1:-1)+_knHits.length)%_knHits.length);
+    } else if(e.key==='Enter'){
+      e.preventDefault();
+      if(!res.hidden&&_knHits.length) _knGo(_knHits[_knAct<0?0:_knAct]);
+    } else if(e.key==='Escape'){
+      e.preventDefault();e.stopPropagation();
+      if(!res.hidden){_knCloseRes();}
+      else if(q.value){q.value='';}
+      else q.blur();
+    }
+  });
+  res.addEventListener('mousedown',e=>{if(!_khIsNarrow()) e.preventDefault();}); // PC: no perder el foco del campo
+  res.addEventListener('click',e=>{
+    const b=e.target.closest('.kn-hit');
+    if(b) _knGo(_knHits[+b.dataset.i]);
+  });
+  document.addEventListener('pointerdown',e=>{
+    if(res.hidden) return;
+    if(e.target.closest&&(e.target.closest('#kn-res')||e.target.closest('#kn-bar'))) return;
+    _knCloseRes();
+  },true);
+  // «/» o Ctrl+K enfocan el buscador (si no se está escribiendo en otro campo)
+  document.addEventListener('keydown',e=>{
+    const t=e.target;
+    const typing=t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey){e.preventDefault();q.focus();q.select();return;}
+    if(e.key==='/'&&!typing&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();q.focus();q.select();}
+  });
+  window.addEventListener('resize',()=>{if(!res.hidden) _knPlaceRes();});
+  _knScrRefresh();
+  scaleHMI();
+}
+function _knPlaceRes(){
+  const res=document.getElementById('kn-res');
+  const box=document.querySelector('#kn-bar .kn-search');
+  if(!res||!box) return;
+  const r=box.getBoundingClientRect();
+  if(_khIsNarrow()){
+    res.style.top=Math.round(r.bottom+8)+'px';
+    res.style.left='';res.style.width='';
+  } else {
+    const w=Math.min(Math.max(r.width,420),window.innerWidth-16);
+    res.style.width=w+'px';
+    res.style.left=Math.round(Math.max(8,Math.min(r.right-w,window.innerWidth-w-8)))+'px';
+    res.style.top=Math.round(r.bottom+8)+'px';
+  }
+}
+function _knCloseRes(){
+  const res=document.getElementById('kn-res');
+  const q=document.getElementById('kn-q');
+  if(res){res.hidden=true;res.innerHTML='';}
+  if(q){q.setAttribute('aria-expanded','false');q.removeAttribute('aria-activedescendant');}
+  _knHits=[];_knAct=-1;
+}
+function _knSetAct(i){
+  _knAct=i;
+  const q=document.getElementById('kn-q');
+  document.querySelectorAll('#kn-res .kn-hit').forEach(b=>{
+    const on=+b.dataset.i===i;
+    b.classList.toggle('sel',on);
+    b.setAttribute('aria-selected',on?'true':'false');
+    if(on){q.setAttribute('aria-activedescendant',b.id);b.scrollIntoView({block:'nearest'});}
+  });
+}
+function _knRender(){
+  const q=document.getElementById('kn-q');
+  const res=document.getElementById('kn-res');
+  if(!q||!res) return;
+  const r=_knSearch(q.value);
+  if(!r){_knCloseRes();return;}
+  _knHits=[];_knAct=-1;
+  const toks=r.toks;
+  const row=(hit,l,c,v,chg)=>{
+    const i=_knHits.push(hit)-1;
+    return '<button type="button" role="option" aria-selected="false" id="kn-hit-'+i+'" class="kn-row kn-hit'+(chg?' chg':'')+'" data-i="'+i+'">'+
+      '<span class="l">'+l+'</span>'+(c?'<span class="s"><span>'+c+'</span></span>':'')+'<span class="val">'+(v?'<span class="cur">'+v+'</span>':'')+'</span>'+KH_I.chev+'</button>';
+  };
+  const fieldVal=f=>{const v=_khValues(f.info);return {txt:_escHTML(_khFmt(v.act))||'—',chg:v.state==='diff'};};
+  // Ruta sin repetir: el título ya trae el menú padre («Vacío - Monitorear Vacío»)
+  const where=f=>{
+    const parts=f.path?f.path.split(' › '):[];
+    while(parts.length&&_khNorm(f.title).startsWith(_khNorm(parts[parts.length-1]))) parts.pop();
+    return _knHL(parts.concat(f.title).join(' › '),toks);
+  };
+  const grp=(title,n,rows)=>rows?'<h2 class="kh-gh"><span><b>'+title+'</b> · '+n+'</span></h2><div class="kh-glist" role="group" aria-label="'+_escHTML(title)+'">'+rows+'</div>':'';
+  let gF='',gS='',gH='';
+  r.F.slice(0,KN_MAX_FIELDS).forEach(({f})=>{const v=fieldVal(f);gF+=row(f,_knHL(f.name,toks),where(f),v.txt,v.chg);});
+  r.S.forEach(({f:s})=>{gS+=row({kind:'screen',sid:s.sid,viaHelp:false},_knHL(s.title,toks),_knHL(s.path,toks),s.n?s.n+(s.n===1?' campo':' campos'):'',false);});
+  r.H.slice(0,KN_MAX_FIELDS).forEach(({f})=>{
+    if(f.kind==='field'){const v=fieldVal(f);gH+=row(f,_knHL(f.name,toks),_knHL(f.title,toks)+' · '+_knSnippet(f.help,toks),v.txt,v.chg);}
+    else gH+=row({kind:'screen',sid:f.sid,viaHelp:true},'Pantalla '+_knHL(f.title,toks),_knSnippet(f.help,toks),'',false);
+  });
+  const more=(n,shown)=>n>shown?'<div class="more">y '+(n-shown)+' más · agrega otra palabra para acotar</div>':'';
+  const blockF=grp('Campos',r.F.length,gF)+more(r.F.length,KN_MAX_FIELDS);
+  const blockS=grp('Pantallas',r.S.length,gS);
+  const blockH=grp('En el texto de la ayuda',r.H.length,gH)+more(r.H.length,KN_MAX_FIELDS);
+  let html=(r.screensFirst?blockS+blockF:blockF+blockS)+blockH;
+  if(!_knHits.length) html='<div class="kn-empty">Nada con «'+_escHTML(q.value.trim())+'». Prueba con el nombre que aparece en el panel.</div>';
+  res.innerHTML=html;
+  res.hidden=false;
+  q.setAttribute('aria-expanded','true');
+  _knPlaceRes();
+  res.scrollTop=0;
+  if(!_khIsNarrow()&&_knHits.length) _knSetAct(0);
+}
+function _knPulse(el){
+  if(!el) return;
+  el.classList.remove('kn-pulse');
+  void el.offsetWidth;
+  el.classList.add('kn-pulse');
+  setTimeout(()=>el.classList.remove('kn-pulse'),1300);
+}
+function _knGo(hit){
+  if(!hit) return;
+  const q=document.getElementById('kn-q');
+  _knCloseRes();
+  if(_khIsNarrow()&&q) q.blur(); // baja el teclado para ver el HMI y la hoja
+  if(_knCurScreen()!==hit.sid) nav(hit.sid);
+  requestAnimationFrame(()=>{
+    if(hit.kind==='field'){
+      const el=document.getElementById(hit.id);
+      if(!el) return;
+      openHelp(hit.id,el);
+      _knPulse(el);
+    } else if(hit.viaHelp){
+      _knOpenScr(true);
+    }
+  });
+}
+/* «?» de pantalla */
+function _knOpenScr(forceOpen){
+  const sid=_knCurScreen();
+  if(!sid||sid==='ph') return;
+  const id='scr:'+sid;
+  if(_khOpen&&_khOpen.id===id&&!forceOpen){closeHelp();return;}
+  openHelp(id,document.getElementById('kn-scr-btn'));
+  const b=document.getElementById('kn-scr-btn');
+  if(b) b.setAttribute('aria-expanded','true');
+}
+function _knScrRefresh(){
+  const b=document.getElementById('kn-scr-btn');
+  if(!b) return;
+  const sid=_knCurScreen();
+  const has=!!(sid&&_khText('scr:'+sid));
+  b.hidden=!(sid&&sid!=='ph'&&(has||_khCanEdit()));
+  b.classList.toggle('empty',!has);
+  const t=sid?_knScreenTitle(sid):'';
+  b.setAttribute('aria-label',(has?'Para qué sirve esta pantalla: ':'Escribir para qué sirve esta pantalla: ')+t);
+  b.title=has?'Para qué sirve esta pantalla':'Sin texto todavía · escribir para qué sirve';
+  b.setAttribute('aria-expanded',String(!!(_khOpen&&_khOpen.id==='scr:'+sid)));
+}
+/* Contenido del globo/hoja de pantalla: mismo formato que el de un campo
+   (texto saneado + línea de origen). Cada línea «<b>Etiqueta:</b> texto» es un bloque. */
+function _knScrContent(id,sheet){
+  const sid=String(id).slice(4);
+  const p=parseTip(_khText(id));
+  const blk=(h,c)=>c?'<div class="kh-blk">'+(h?'<span class="h">'+h+'</span>':'')+'<p>'+c+'</p></div>':'';
+  const top='<div class="kh-top">'+
+    '<div class="kh-title" id="kh-title-'+(sheet?'s':'p')+'"><span class="kh-eyebrow">Para qué sirve esta pantalla</span>'+_escHTML(_knScreenTitle(sid))+'</div>'+
+    '<button type="button" class="kh-x" aria-label="Cerrar ayuda">'+KH_I.x+'</button></div>';
+  let b=_khOriginLine(p,'');
+  // Bloques en el orden en que vienen escritos (texto saneado; el pie «Fuente…» ya va en la línea de origen).
+  sanitizeTipHTML(_khText(id)).split('<br>').forEach(line=>{
+    const t=line.trim();
+    if(!t||/^<i>\s*Fuente:/i.test(t)) return;
+    const m=t.match(/^<b>([^<]{1,40}?)\s*:?\s*<\/b>\s*:?\s*([\s\S]+)$/);
+    b+=m?blk(m[1],m[2]):blk('',t);
+  });
+  if(_khCanEdit()) b+='<button type="button" class="kh-btn-tint" data-act="edit">'+(p.origin==='none'?'Escribir para qué sirve':'Editar ayuda de pantalla')+'</button>';
+  return {top,body:b,origin:p.origin,info:null};
+}
+window.addEventListener('load',_knBuildBar);
 
 initTooltipSystem();
 
