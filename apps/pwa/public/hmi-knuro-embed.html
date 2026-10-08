@@ -366,7 +366,7 @@ body.readonly .sc td:has(> input[id]){cursor:pointer;}
 .kh-side .kh-x{width:44px;height:35px;border:0;border-left:1px solid #c0c0c0;border-radius:0;background:transparent;}
 .kh-side .kh-x::after{display:none;}
 .kh-side .kh-x svg{width:14px;height:14px;}
-.kh-side .kh-bd{padding:8px 10px 10px;gap:6px;min-height:0;}
+.kh-side .kh-bd{padding:8px 10px 10px;gap:6px;min-height:0;overflow:auto;}
 .kh-side .kh-org,.kh-side .kh-val .u,.kh-side .kh-val .st,.kh-side .kh-blk .h,.kh-side .kh-lohi .h,.kh-side .kh-lbl,.kh-side .kh-eyebrow{font-size:14px;}
 .kh-side .kh-org svg{width:14px;height:14px;}
 .kh-side .kh-val .n{font-size:20px;}
@@ -3883,42 +3883,88 @@ function _khPlaceIn(r){
   pk.hidden=px<8*k||px>w-18*k;
   pk.style.left=Math.round(Math.max(8*k,Math.min(px,w-18*k)))+'px';
 }
-/* Celular horizontal · al costado de la fila, en px reales: empieza 8 px después del valor de
-   referencia (o termina 8 px antes del rótulo si la fila está en la mitad derecha), centrado
-   en la fila, con el pico apuntando a ella. No tapa su campo ni su ⓘ. */
+/* Celular horizontal · en px reales, fuera de #hs. REGLA DURA: nunca tapa lo propio del campo
+   (input, valor de referencia gris, ⓘ, rótulo; en filas de navegación, la fila entera). Con
+   ~342 px de alto el orden es: (a) arriba de la fila, (b) abajo, (c) al costado, en el hueco
+   horizontal más ancho que deje libre lo propio (en tablas de 2 columnas puede tapar la otra
+   columna), (d) si nada cabe completo, el que más deje ver, con scroll interno. El «?» de
+   pantalla (sin campo) va a la izquierda del riel, como antes. */
 function _khPlaceSide(r){
   const el=_khOpen.el;
-  const vw=window.innerWidth,vh=window.innerHeight,M=8,G=8,PK=7;
+  const vw=window.innerWidth,vh=window.innerHeight,M=8,G=6,PK=7;
   const rail=document.getElementById('kn-rail');
   const xMax=(rail&&rail.offsetWidth?rail.getBoundingClientRect().left:vw)-M;
   const hp=document.getElementById('hp');
   const xMin=Math.max(M,(hp?parseFloat(getComputedStyle(hp).paddingLeft)||0:0)+M);
   const R=e=>e.getBoundingClientRect();
+  const pk=el.querySelector('.kh-pk'),bd=el.querySelector('.kh-bd');
   const p=R(r.pin);
-  const rowR=r.rowEl?R(r.rowEl):p;
-  const cy=(rowR.top+rowR.bottom)/2;
-  // Lado derecho: después de lo propio (ⓘ, campo, valor de referencia); izquierdo: antes del rótulo/ⓘ
-  const rightX=Math.max(p.right,...[r.fld,r.fr,r.ic].filter(e=>e&&e.isConnected).map(e=>R(e).right))+G+PK;
-  const leftX=Math.min(p.left,...[r.label,r.ic,r.fld].filter(e=>e&&e.isConnected).map(e=>R(e).left))-G-PK;
-  const roomR=xMax-rightX,roomL=leftX-xMin;
-  const hsR=document.getElementById('hs').getBoundingClientRect();
-  let onRight=(p.left+p.right)/2<(hsR.left+hsR.right)/2;
-  if(onRight&&roomR<240&&roomL>roomR) onRight=false;
-  if(!onRight&&roomL<240&&roomR>roomL) onRight=true;
-  const w=Math.max(220,Math.min(380,onRight?roomR:roomL));
-  let left=onRight?rightX:leftX-w;
-  left=Math.max(xMin,Math.min(left,xMax-w));
-  el.style.width=w+'px';
+  bd.style.maxHeight='';
   el.style.maxHeight=(vh-2*M)+'px';
-  const h=el.offsetHeight;
-  const top=Math.max(M,Math.min(cy-h/2,vh-M-h));
-  el.style.left=Math.round(left)+'px';
-  el.style.top=Math.round(top)+'px';
-  const pk=el.querySelector('.kh-pk');
-  pk.className='kh-pk '+(onRight?'izq':'der');
-  pk.hidden=false;
-  pk.style.left=onRight?'':'auto';
-  pk.style.top=Math.round(Math.max(10,Math.min(cy-top-5,h-20)))+'px';
+  const measure=w=>{el.style.width=w+'px';return el.offsetHeight;};
+  const put=(left,top,dir,pkPos)=>{
+    el.style.left=Math.round(left)+'px';el.style.top=Math.round(top)+'px';
+    pk.className='kh-pk '+dir;pk.hidden=false;
+    if(dir==='izq'||dir==='der'){pk.style.left=dir==='izq'?'':'auto';pk.style.top=Math.round(Math.max(10,Math.min(pkPos-top-5,el.offsetHeight-20)))+'px';}
+    else{pk.style.top='';const w=el.offsetWidth,px=pkPos-left-5;pk.hidden=px<8||px>w-18;pk.style.left=Math.round(Math.max(8,Math.min(px,w-18)))+'px';}
+  };
+  // Lo propio del campo: no se tapa nunca
+  const own=[r.label,r.ic,r.fld,r.fr,r.fld?null:r.rowEl,r.fld||r.ic?null:r.pin]
+    .filter(e=>e&&e.isConnected).map(R).filter(q=>q.width>0||q.height>0);
+  if(!r.fld&&!r.ic){
+    // «?» de pantalla: a la izquierda del riel, centrado en el botón
+    const w=Math.min(380,xMax-xMin-PK);
+    const h=measure(w);
+    const cy=(p.top+p.bottom)/2;
+    put(Math.max(xMin,p.left-G-PK-w),Math.max(M,Math.min(cy-h/2,vh-M-h)),'der',cy);
+    return;
+  }
+  const oT=Math.min(...own.map(q=>q.top)),oB=Math.max(...own.map(q=>q.bottom));
+  const pkX=(p.left+p.right)/2,cy=(oT+oB)/2;
+  const fullW=Math.min(440,xMax-xMin);
+  const hFull=measure(fullW);
+  const up=oT-G-PK-M, dn=vh-M-(oB+G+PK);
+  const hzLeft=()=>Math.max(xMin,Math.min(pkX-fullW/2,xMax-fullW));
+  // (a) arriba · (b) abajo, completos
+  if(hFull<=up){measure(fullW);put(hzLeft(),oT-G-PK-hFull,'abajo',pkX);return;}
+  if(hFull<=dn){measure(fullW);put(hzLeft(),oB+G+PK,'arriba',pkX);return;}
+  // (c) costado: huecos horizontales libres de lo propio
+  const xs=own.map(q=>[q.left-G-PK,q.right+G+PK]).sort((x,y)=>x[0]-y[0]);
+  const gaps=[];let cur=xMin;
+  xs.forEach(([l,rr])=>{if(l>cur) gaps.push([cur,l]);cur=Math.max(cur,rr);});
+  if(xMax>cur) gaps.push([cur,xMax]);
+  gaps.sort((x,y)=>(y[1]-y[0])-(x[1]-x[0]));
+  const g=gaps[0];
+  const gw=g?g[1]-g[0]:0;
+  const sideH=gw>=200?measure(Math.min(380,gw)):Infinity;
+  const sidePut=()=>{
+    const w=Math.min(380,gw);measure(w);
+    // Hueco a la derecha de la ⓘ/campo → se pega a su borde izquierdo y el pico mira a la izquierda
+    const onRight=(g[0]+g[1])/2>pkX;
+    const left=onRight?g[0]:g[1]-w;
+    const h=el.offsetHeight;
+    put(left,Math.max(M,Math.min(cy-h/2,vh-M-h)),onRight?'izq':'der',cy);
+  };
+  if(sideH<=vh-2*M){sidePut();return;}
+  // (d) nada cabe completo: arriba/abajo con scroll si dejan ≥ 90 px; si no, costado con scroll
+  const best=Math.max(up,dn);
+  if(best>=90||gw<140){
+    measure(fullW);
+    const avail=Math.max(60,best);
+    // Ajuste iterativo del cuerpo (scroll interno) hasta que la caja quepa en el hueco
+    let mh=bd.getBoundingClientRect().height-(el.offsetHeight-avail);
+    for(let i=0;i<4;i++){
+      bd.style.maxHeight=Math.max(24,Math.floor(mh))+'px';
+      const over=el.offsetHeight-avail;
+      if(over<=0||mh<=24) break;
+      mh-=over;
+    }
+    const h=el.offsetHeight;
+    if(up>=dn) put(hzLeft(),oT-G-PK-h,'abajo',pkX);
+    else put(hzLeft(),oB+G+PK,'arriba',pkX);
+    return;
+  }
+  sidePut();
 }
 function _khOpenSheet(id){
   const wasSheet=_khOpen&&_khOpen.kind==='sheet';
@@ -4468,6 +4514,30 @@ function _knLandWanted(){
   if(IN_IFRAME) return _knLandMsg===true;
   try{return matchMedia(KN_LAND_MQ).matches;}catch(e){return false;}
 }
+/* Las áreas táctiles de 44 px de ⓘ vecinas se solapan (filas a ~22 px reales): sin esto, tocar
+   la ⓘ de una fila abría la de la fila de abajo (la última en el DOM gana). En horizontal, el
+   toque se resuelve a la ⓘ cuyo centro está más cerca del dedo. Si el toque empieza en el área
+   de una ⓘ y termina en la de otra, el click llega al ancestro común (la tabla): también se
+   resuelve, siempre que caiga dentro del área táctil (22 px del centro) y no en un control. */
+document.addEventListener('click',e=>{
+  if(!document.body.classList.contains('kn-land')||e.__knIcon) return;
+  const tg=e.target&&e.target.closest?e.target:null;
+  if(!tg||typeof e.clientX!=='number'||!tg.closest('#hs .sc.active')) return;
+  const t=tg.closest('.tip-i');
+  if(!t&&tg.closest('input,button,select,textarea,a,[onclick]')) return;
+  let best=t,bd=t?Infinity:22;
+  document.querySelectorAll('#hs .sc.active .tip-i').forEach(ic=>{
+    const q=ic.getBoundingClientRect();
+    if(!q.width) return;
+    const d=Math.hypot(e.clientX-(q.left+q.width/2),e.clientY-(q.top+q.height/2));
+    if(d<bd){bd=d;best=ic;}
+  });
+  if(!best||best===t) return;
+  e.stopPropagation();e.preventDefault();
+  const ev=new MouseEvent('click',{bubbles:true,cancelable:true,clientX:e.clientX,clientY:e.clientY});
+  ev.__knIcon=true;
+  best.dispatchEvent(ev);
+},true);
 function _knApplyLand(){
   const on=_knLandWanted();
   if(on) _knBuildRail();
