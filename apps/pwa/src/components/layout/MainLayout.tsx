@@ -54,6 +54,7 @@ import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/servi
 import { loadSidebarConfig } from '@/services/sidebarConfig'
 import { useTheme } from '@/hooks/useTheme'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
+import { useContadorVistas } from '@/hooks/useContadorVistas'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
@@ -173,6 +174,7 @@ export const ALL_NAV_ITEMS: ReadonlyArray<NavItemMeta> = navGroups.flatMap((g) =
 export function MainLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  useContadorVistas()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = useIsAdmin()
