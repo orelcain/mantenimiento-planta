@@ -23,8 +23,7 @@ import {
   saveDefaultSnapshot,
 } from '@/services/hmiKnuro'
 import type { HmiHistoryEntry } from '@/services/hmiKnuro'
-import { useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
-import { AvisoGirarTelefono } from '@/components/hmiKnuro/AvisoGirarTelefono'
+import { AVISO_KEY, useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
 import { KnuroPresetPicker } from '@/components/hmiKnuro/KnuroPresetPicker'
 import { frasePreset, partirPreset } from '@/components/hmiKnuro/knuroPresets'
 import '@/components/hmiKnuro/knuroConsola.css'
@@ -67,6 +66,28 @@ export function HmiKnuroPage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const { compact, immersive, isFullscreen, visualFs, enterFullscreen, exitImmersive, mostrarAviso, ocultarAviso } =
     useHmiKnuroMovil(containerRef, iframeRef)
+
+  // Pista de giro → iframe (la misma línea en el flujo que usa la página pública, bajo el panel).
+  // Al mostrarse queda marcada como vista (localStorage): sale una vez.
+  const [iframeListo, setIframeListo] = useState(false)
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== iframeRef.current?.contentWindow) return
+      const t = (e.data as { type?: unknown } | null)?.type
+      if (t === 'hmi:ready') setIframeListo(true)
+      else if (t === 'hmi:giro-off') ocultarAviso()
+      else if (t === 'hmi:giro-fs') { ocultarAviso(); enterFullscreen() }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [ocultarAviso, enterFullscreen])
+  useEffect(() => {
+    if (!iframeListo) return
+    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:giro', on: mostrarAviso }, window.location.origin)
+    if (mostrarAviso) {
+      try { window.localStorage.setItem(AVISO_KEY, '1') } catch { /* modo privado */ }
+    }
+  }, [iframeListo, mostrarAviso])
 
   // ── Estado presets ──────────────────────────────────────────────────────
   const [presets, setPresets] = useState<Record<string, Record<string, string>>>({})
@@ -489,9 +510,6 @@ export function HmiKnuroPage() {
           <KnuroPresetPicker names={presetKeys} selected={currentPresetName} onSelect={loadPresetFromReact} variant="m" />
         </div>
       )}
-
-      {/* ── Celular vertical: aviso para girar ───────────────────────── */}
-      {mostrarAviso && <AvisoGirarTelefono onPantallaCompleta={enterFullscreen} onCerrar={ocultarAviso} />}
 
       {/* ── iframe ───────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 relative overflow-hidden">
