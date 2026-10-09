@@ -69,15 +69,17 @@
         var theme = get('app-theme') || 'dark';
         var pizarra = skin === 'pizarra';
         if (pizarra) {
-          // Intensidad: app-intensidad > app-theme guardado > dispositivo
-          // (celular: día · PC: automático = prefers-color-scheme).
+          // Intensidad: app-intensidad (elegida a propósito) > celular = día (ignora
+          // app-theme, que useTheme escribía solo) > PC: app-theme > automático.
+          // No se escribe app-intensidad al resolver.
           var mq = function(q) { return typeof window.matchMedia === 'function' && window.matchMedia(q).matches; };
           var guardada = get('app-intensidad');
           var tema = get('app-theme');
           var inten = (guardada === 'dia' || guardada === 'penumbra' || guardada === 'auto') ? guardada
+            : (mq('(max-width: 767px)') || mq('(pointer: coarse)')) ? 'dia'
             : tema === 'dark' ? 'penumbra'
             : tema === 'light' ? 'dia'
-            : (mq('(max-width: 767px)') || mq('(pointer: coarse)')) ? 'dia' : 'auto';
+            : 'auto';
           var oscuro = inten === 'penumbra' || (inten === 'auto' && mq('(prefers-color-scheme: dark)'));
           theme = oscuro ? 'dark' : 'light';
           document.documentElement.setAttribute('data-paleta', 'pizarra');
