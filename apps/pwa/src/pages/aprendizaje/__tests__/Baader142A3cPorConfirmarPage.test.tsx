@@ -204,9 +204,13 @@ describe('Baader142A3cPorConfirmarPage', () => {
 
     it('cerrar la ficha quita ?el= pero deja ?maquina=', async () => {
       montar(`${RUTA}?maquina=n2&el=SM5`)
-      await screen.findByRole('dialog')
+      const dialogo = await screen.findByRole('dialog')
+      // El Sheet registra Escape en un useEffect que corre DESPUÉS de que el diálogo ya está en el DOM.
+      // `findByRole` puede volver en ese hueco y, con la suite cargada, la tecla llegaba sin listener y
+      // se perdía (ningún timeout lo arreglaba). El mismo efecto enfoca el panel: esperar el foco = listo.
+      await waitFor(() => expect(document.activeElement).toBe(dialogo))
       fireEvent.keyDown(document, { key: 'Escape' })
-      await waitFor(() => expect(screen.getByTestId('ruta').textContent).not.toContain('el=SM5'), { timeout: 4000 })
+      await waitFor(() => expect(screen.getByTestId('ruta').textContent).not.toContain('el=SM5'))
       expect(screen.getByTestId('ruta').textContent).toContain('maquina=n2')
     })
 

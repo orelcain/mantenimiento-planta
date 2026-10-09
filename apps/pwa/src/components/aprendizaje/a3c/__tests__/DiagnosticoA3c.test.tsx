@@ -2,7 +2,7 @@
 import { MemoryRouter } from 'react-router-dom'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { interiorSvg, type A3CDatos, type PaqueteA3c } from '@/data/baader142A3c'
 import { TarjetaA3c } from '../TarjetaA3c'
@@ -36,6 +36,10 @@ const teclado = () => within(screen.getByRole('group', { name: 'Teclado del cód
 const escribir = (codigo: string) => [...codigo].forEach(c => fireEvent.click(teclado().getByRole('button', { name: c })))
 const visor = () => screen.getByTestId('visor-codigo').textContent?.replace(/\s+/g, ' ').trim()
 
+// El chunk perezoso se importa aquí, fuera del test: en la suite completa transformarlo y cargarlo
+// tomaba 0,2–0,5 s en local y pasaba de 1 s en el CI, y el primer `findByTestId` (1 s por defecto)
+// fallaba solo en el primer test. Con el módulo ya en caché, el `lazy()` de la tarjeta resuelve al tiro.
+beforeAll(() => import('../diagnostico/DiagnosticoA3c'))
 beforeEach(() => localStorage.clear())
 afterEach(cleanup)
 
