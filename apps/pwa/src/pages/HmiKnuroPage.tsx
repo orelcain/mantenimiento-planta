@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { History, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck, QrCode, Minimize, ArrowLeft } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
+import { useTemaEmbed } from '@/hooks/useTemaEmbed'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import {
@@ -44,7 +45,7 @@ import '@/components/hmiKnuro/knuroConsola.css'
  * recibe `hmi:land` (riel Buscar/Lista/«?»/Salir). Las acciones admin (presets, Historial…)
  * quedan fuera de ese modo: «Salir» las devuelve. En vertical, aviso «Gira el teléfono».
  *
- * Marco «Consola» (knuroConsola.css), igual que la página pública: estilo FIJO, no sigue el tema.
+ * Marco (knuroConsola.css): sigue el tema de la app (paleta Pizarra); ya no hay estilo fijo «Consola».
  * Cabecera: Simulador (volver) · presets en segmentados Planta/Máquina · menú «Presets» (orden,
  * renombrar, clonar, QR, restaurar/guardar defaults) · Historial · Recargar. Lo que vive DENTRO del
  * iframe (guardar valores como preset, comparar, exportar PDF, editar refs) sigue en el panel
@@ -58,6 +59,7 @@ function etiquetaCorta(name: string): string {
 
 export function HmiKnuroPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const enviarTema = useTemaEmbed(iframeRef)
   const presetsDropdownRef = useRef<HTMLDivElement>(null)
   /** Flag: el iframe ya envió hmi:ready pero user no estaba disponible aún */
   const iframeReadyRef = useRef(false)
@@ -470,7 +472,7 @@ export function HmiKnuroPage() {
         : undefined}
     >
 
-      {/* ── Cabecera «Consola» (fuera en pantalla completa / celular horizontal) ─── */}
+      {/* ── Cabecera del editor (fuera en pantalla completa / celular horizontal) ─── */}
       {!immersive && (
         <header className="knc-hdr">
           <button type="button" onClick={volverAlSimulador} className="knc-ib knc-pc" aria-label="Volver al simulador" title="Volver al simulador">
@@ -519,6 +521,7 @@ export function HmiKnuroPage() {
           title="HMI Knuro Simulator"
           className="w-full h-full border-0"
           allow="fullscreen"
+          onLoad={enviarTema}
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
         />
       </div>

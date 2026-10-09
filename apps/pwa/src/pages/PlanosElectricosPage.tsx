@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, Clock, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, Loader2, LayoutPanelTop, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { EncabezadoHerramienta } from '@/components/piel'
 import { EQUIPOS, PLANOS, assetPlano, planoPorSlug, planosPorEquipo, type PlanoCatalogo, type TipoPlano } from '@/data/planos'
 import {
   usePlano, guardarPlanoOffline,
@@ -208,12 +209,20 @@ function Catalogo() {
   const buscando = q.trim().length > 0
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 p-5" style={{ color: 'var(--lc-ink)' }}>
+    <div style={{ color: 'var(--lc-ink)' }}>
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver="Aprendizaje"
+        volverA="/aprendizaje"
+        titulo="Planos"
+        subtitulo={`${PLANOS.length} documentos de ${EQUIPOS.length} máquinas`}
+        contextoAria="Estoy en el catálogo de planos del Centro de aprendizaje. "
+      />
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 p-5">
       <header>
-        <h1 className="m-0 text-title3">Planos</h1>
-        <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
           Los planos del fabricante, navegables: los saltos entre hojas se siguen tocando
-          y los rótulos se leen en castellano. {PLANOS.length} documentos de {EQUIPOS.length} máquinas.
+          y los rótulos se leen en castellano.
         </p>
         <div className="relative mt-3">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2"
@@ -295,6 +304,7 @@ function Catalogo() {
           ))}
         </div>
       )}
+    </div>
     </div>
   )
 }
@@ -922,26 +932,19 @@ function Visor({ slug }: { slug: string }) {
     // 2.250 px del índice de 44 hojas y el dibujo quedaba centrado fuera de la
     // pantalla. dvh además descuenta la barra del navegador en el teléfono.
     <div ref={raizRef} className="flex flex-col" style={{ height: altoPagina, background: 'var(--lc-bg)', color: 'var(--lc-ink)' }}>
-      {/* riel superior */}
+      {/* Encabezado único del marco de herramientas. Antes la vuelta al catálogo era un enlace
+          «‹ BAADER 142 / plano · rev» dentro del riel; ahora el título dice la máquina y el
+          subtítulo el plano y su revisión. Las migas internas (hojas, panel) se conservan. */}
+      <EncabezadoHerramienta
+        etiquetaVolver="Planos"
+        volverA="/aprendizaje/planos"
+        titulo={cat?.maquina ?? indice.maquina}
+        subtitulo={`${indice.plano} · ${indice.rev}`}
+        contextoAria={`Estoy en el plano ${indice.plano} de ${cat?.maquina ?? indice.maquina}, hoja ${hoja.blatt}. `}
+      />
+      {/* riel de búsqueda y hojas */}
       <header className="sticky top-0 z-40 flex flex-wrap items-center gap-3 border-b px-3 py-2"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
-        {/* La vuelta al catálogo estaba SOLO en el título, sin nada que lo
-            indicara: nadie adivina que tocando "BAADER 142" se sale del plano
-            (lo reportó Orel usándolo). La flecha lo dice, y entra en el mismo
-            área tocable de 44 px. */}
-        <Link to="/aprendizaje/planos"
-              title="Volver a todos los planos"
-              className="-ml-1 flex min-h-[44px] items-center gap-1.5 rounded-ctl pl-1 pr-2 no-underline"
-              style={{ color: 'inherit' }}>
-          <ChevronLeft size={18} style={{ color: 'var(--lc-aqua-bright)' }} />
-          <span className="flex flex-col leading-tight">
-            <span className="text-footnote font-semibold">{cat?.maquina ?? indice.maquina}</span>
-            <span className="font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
-              {indice.plano} · {indice.rev}
-            </span>
-          </span>
-        </Link>
-
         <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca}

@@ -4,8 +4,11 @@
  * - NO requiere autenticación
  * - Carga presets y tooltips desde Firestore (lectura pública)
  * - Embebe el HMI en modo readonly (sin edición de parámetros ni tooltips)
- * - Marco «Consola» (knuroConsola.css): estilo FIJO, no sigue el tema de la app (DESIGN.md §5f).
- * - Presets en dos segmentados, Planta y Máquina (KnuroPresetPicker); la línea es texto fijo.
+ * - Marco único de herramienta (2026-10-09): EncabezadoHerramienta (volver · título · ARIA · Más) y,
+ *   debajo, el único control: los presets (ControlPresetsKnuro: Máquina N1-N3 segmentada + Planta).
+ *   El marco sigue el tema (paleta Pizarra); ya no hay estilo fijo «Consola» (DESIGN.md §5f/§6b).
+ *   Pantalla completa y Compartir (QR) viven en «Más». El iframe lleva `embed=1`: sin su franja
+ *   «Modo Aprendizaje — Solo lectura».
  * - Layout adaptado a móvil horizontal
  * - Celular horizontal: pantalla completa del simulador SIN barras de la página (ni las de
  *   MainLayout): el HMI toma el alto completo y el iframe muestra su riel (Buscar, Lista,
@@ -15,21 +18,23 @@
  *   planta y máquina va en el encabezado en lugar del subtítulo.
  * - Ruta: /aprendizaje/hmi-knuro  y  /aprendizaje/hmi-knuro/:presetId (única puerta para todos).
  *   /hmi/learn[/:presetId] (QR antiguos) redirige aquí desde App.tsx.
- * - Con sesión va dentro de MainLayout (main de alto fijo, ver isHmiKnuroRoute): ocupa h-full.
+ * - Con sesión va dentro de MainLayout (main de alto fijo: modo «lienzo» de lib/rutasHerramienta.ts): ocupa h-full.
  *   Sin sesión no hay layout: ocupa 100dvh.
  * - Admin: botón «Editar presets y ayudas» → /hmi-knuro (editor, AdminRoute).
  */
 
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Loader2, AlertCircle, QrCode, X, Copy, Check, Maximize, Minimize, ArrowLeft, Pencil } from 'lucide-react'
+import { Loader2, AlertCircle, QrCode, X, Copy, Check, Maximize, Minimize, Pencil } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnuro'
 import { AVISO_KEY, useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
-import { KnuroPresetPicker } from '@/components/hmiKnuro/KnuroPresetPicker'
+import { ControlPresetsKnuro } from '@/components/hmiKnuro/ControlPresetsKnuro'
+import { EncabezadoHerramienta } from '@/components/piel'
 import { frasePreset, partirPreset } from '@/components/hmiKnuro/knuroPresets'
 import '@/components/hmiKnuro/knuroConsola.css'
 import { useAuthStore, useIsAdmin } from '@/store'
+import { useTemaEmbed } from '@/hooks/useTemaEmbed'
 
 export function HmiKnuroPublicPage() {
   const { presetId } = useParams<{ presetId?: string }>()
@@ -37,6 +42,7 @@ export function HmiKnuroPublicPage() {
   const location = useLocation()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeReadyRef = useRef(false)
+  const enviarTema = useTemaEmbed(iframeRef)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const isAdmin = useIsAdmin()
 
@@ -80,7 +86,7 @@ export function HmiKnuroPublicPage() {
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
     const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
-    return basePath + 'hmi-knuro-embed.html?v=' + v + '&mode=readonly'
+    return basePath + 'hmi-knuro-embed.html?v=' + v + '&mode=readonly&embed=1'
   }, [])
 
   const learnUrl = useMemo(() => {
@@ -181,14 +187,6 @@ export function HmiKnuroPublicPage() {
     if (presetId in presets) applyPreset(presetId)
   }, [presetId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Volver: con sesión, atrás en el historial si se llegó navegando dentro de la app; si no
-  // (QR, enlace directo o sin sesión), al Centro de Aprendizaje.
-  const volver = () => {
-    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
-    if (isAuthenticated && idx > 0) navigate(-1)
-    else navigate('/aprendizaje')
-  }
-
   const copyLink = () => {
     navigator.clipboard.writeText(learnUrl).then(() => {
       setCopied(true)
@@ -201,11 +199,7 @@ export function HmiKnuroPublicPage() {
   const selPartes = selected ? partirPreset(selected) : null
   const fraseSel = selPartes ? frasePreset(selPartes) : selected
 
-  const presetPicker = (variant: 'pc' | 'm') => (
-    <KnuroPresetPicker names={presetKeys} selected={selected || null} onSelect={switchPreset} variant={variant} frase={false} />
-  )
-
-  // Carga / error: mismo marco fijo «Consola»
+  // Carga / error: mismo marco (sigue el tema)
   if (loading || error) {
     return (
       <div className={`knc knc-estado ${isAuthenticated ? 'h-full w-full' : 'h-screen w-screen'}`}>
@@ -227,51 +221,23 @@ export function HmiKnuroPublicPage() {
         : isAuthenticated ? undefined : { height: '100dvh' }}
     >
 
-      {/* Cabecera (fuera en pantalla completa / celular horizontal) */}
+      {/* Encabezado único del marco (fuera en pantalla completa / celular horizontal). El único
+          control, los presets, va debajo en el celular y dentro de la fila en PC. */}
       {!immersive && (
-        <header className="knc-hdr">
-          <button type="button" onClick={volver} className="knc-ib knc-pc" aria-label="Volver">
-            <ArrowLeft aria-hidden="true" /><span className="knc-t2">Volver</span>
-          </button>
-          <button type="button" onClick={volver} className="knc-ib m sq bare knc-m" aria-label="Volver">
-            <ArrowLeft aria-hidden="true" />
-          </button>
-          <div className="knc-ttl">
-            <b>HMI Knuro</b>
-            <span className="knc-lab knc-pc">Modo aprendizaje</span>
-            <span className="knc-lab knc-m">{fraseSel || 'Modo aprendizaje'}</span>
-          </div>
-          <span className="knc-ro knc-pc">Solo lectura</span>
-          <span className="knc-div knc-pc" aria-hidden="true" />
-          <div className="knc-pc" style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>{presetPicker('pc')}</div>
-          <span className="knc-sp" />
-          {isAdmin && (
-            <>
-              <button type="button" onClick={() => navigate('/hmi-knuro')} className="knc-ib knc-pc" title="Editar presets y ayudas" aria-label="Editar presets y ayudas">
-                <Pencil aria-hidden="true" /><span className="knc-t2">Editar presets y ayudas</span>
-              </button>
-              <button type="button" onClick={() => navigate('/hmi-knuro')} className="knc-ib m sq knc-m" aria-label="Editar presets y ayudas">
-                <Pencil aria-hidden="true" />
-              </button>
-            </>
-          )}
-          <button type="button" onClick={toggleFullscreen} className="knc-ib knc-pc" aria-label={fsLabel} title={fsLabel}>
-            {fsOn ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}<span className="knc-t1">{fsLabel}</span>
-          </button>
-          <button type="button" onClick={toggleFullscreen} className="knc-ib m sq knc-m" aria-label={fsLabel}>
-            {fsOn ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}
-          </button>
-          <button type="button" onClick={() => setQrOpen(true)} className="knc-ib knc-pc" aria-label="Compartir (QR)" title="Compartir (QR)">
-            <QrCode aria-hidden="true" /><span className="knc-t1">Compartir</span>
-          </button>
-          <button type="button" onClick={() => setQrOpen(true)} className="knc-ib m sq knc-m" aria-label="Compartir (QR)">
-            <QrCode aria-hidden="true" />
-          </button>
-        </header>
+        <EncabezadoHerramienta
+          etiquetaVolver="Aprendizaje"
+          volverA="/aprendizaje"
+          titulo="HMI Knuro"
+          subtitulo={fraseSel || undefined}
+          contextoAria={`Estoy en el simulador HMI Knuro${fraseSel ? `, ${fraseSel}` : ''}. `}
+          control={<ControlPresetsKnuro names={presetKeys} selected={selected || null} onSelect={switchPreset} />}
+          itemsMas={[
+            { key: 'fs', label: fsLabel, icon: fsOn ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />, onClick: toggleFullscreen },
+            { key: 'qr', label: 'Compartir (QR)', icon: <QrCode aria-hidden="true" />, onClick: () => setQrOpen(true) },
+            ...(isAdmin ? [{ key: 'edit', label: 'Editar presets y ayudas', icon: <Pencil aria-hidden="true" />, onClick: () => navigate('/hmi-knuro') }] : []),
+          ]}
+        />
       )}
-
-      {/* Celular: presets en fila propia, sin scroll horizontal */}
-      {!immersive && <div className="knc-m">{presetPicker('m')}</div>}
 
       {/* iframe */}
       <div className="flex-1 min-h-0 relative">
@@ -281,6 +247,7 @@ export function HmiKnuroPublicPage() {
           title="HMI Knuro — Modo Aprendizaje"
           className="w-full h-full border-0"
           allow="fullscreen"
+          onLoad={enviarTema}
           sandbox="allow-scripts allow-same-origin allow-forms"
         />
       </div>

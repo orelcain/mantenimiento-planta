@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, BookOpen, Scale, RefreshCw, RotateCcw, Save, Pencil } from 'lucide-react'
+import { BookOpen, RefreshCw, RotateCcw, Save, Pencil } from 'lucide-react'
 import { useAuthStore, useIsAdmin } from '@/store'
 import { GRADER_HMI_TARGETS } from '@/services/grader/graderHmiPractice'
 import { logger } from '@/lib/logger'
@@ -11,7 +11,8 @@ import {
   addGraderHistory,
   type GraderState,
 } from '@/services/hmiGrader'
-import { Button } from '@/components/ui'
+import { EncabezadoHerramienta } from '@/components/piel'
+import { useTemaEmbed } from '@/hooks/useTemaEmbed'
 
 /**
  * HmiGraderPage — Módulo HMI Grader (Marelec StaticGrader Z2)
@@ -35,6 +36,7 @@ export function HmiGraderPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const enviarTema = useTemaEmbed(iframeRef)
   const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
   const isAdmin = useIsAdmin()
@@ -48,13 +50,6 @@ export function HmiGraderPage() {
     const id = searchParams.get('practica')
     return id ? GRADER_HMI_TARGETS[id] ?? null : null
   }, [searchParams])
-
-  // Volver: go-back real si hay historial de navegación in-app; si se entró
-  // por link directo (sin historial), cae al Centro de Aprendizaje.
-  const handleBack = useCallback(() => {
-    if (window.history.length > 1) navigate(-1)
-    else navigate('/aprendizaje')
-  }, [navigate])
 
   const [graderState, setGraderState] = useState<GraderState | null>(null)
   const [savingState, setSavingState] = useState(false)
@@ -181,97 +176,33 @@ export function HmiGraderPage() {
   return (
     <div className="flex flex-col h-full w-full relative">
 
-      {/* ── Toolbar ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="h-7 gap-1 text-xs flex-shrink-0"
-            title="Volver al Centro de aprendizaje"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Volver</span>
-          </Button>
-          <Scale className="h-4 w-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold truncate">HMI Grader</span>
-          <span className="text-xs text-muted-foreground hidden md:inline">
-            Simulador StaticGrader — Marelec Z2
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/aprendizaje/maquina/grader')}
-            className="h-7 gap-1 text-xs"
-            title="Ver el expediente del Grader (manual, procedimientos, diagnóstico)"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Expediente</span>
-          </Button>
-
-          {isAdmin && !modoEdicion && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/hmi-grader')}
-              className="h-7 gap-1 text-xs"
-              title="Editar estado del simulador"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Editar estado</span>
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refreshIframe}
-            className="h-7 gap-1 text-xs"
-            title="Recargar simulador"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Recargar</span>
-          </Button>
-
-          {modoEdicion && (<>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSaveState}
-            disabled={savingState}
-            className="h-7 gap-1 text-xs"
-            title="Guardar estado actual en Firestore"
-          >
-            <Save className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Guardar</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleResetState}
-            className="h-7 gap-1 text-xs"
-            title="Restaurar a estado inicial"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Restaurar</span>
-          </Button>
-          </>)}
-        </div>
-      </div>
+      {/* ── Encabezado único del marco de herramientas ──────────────────
+          Volver usa useVolver (history.state.idx): antes `history.length > 1` podía sacar al
+          usuario de la app al entrar por un enlace con historial previo. Todo lo que eran
+          botones sueltos (Expediente, Editar estado, Recargar, Guardar, Restaurar) va en «Más». */}
+      <EncabezadoHerramienta
+        etiquetaVolver={modoEdicion ? 'Simulador' : 'Aprendizaje'}
+        volverA={modoEdicion ? '/aprendizaje/hmi-grader' : '/aprendizaje'}
+        titulo="HMI Grader"
+        subtitulo={modoEdicion ? 'Edición del estado · StaticGrader Marelec Z2' : 'Simulador StaticGrader · Marelec Z2'}
+        contextoAria="Estoy en el simulador HMI Grader (StaticGrader Marelec Z2). "
+        itemsMas={[
+          { key: 'exp', label: 'Expediente del Grader', subtitle: 'Manual, procedimientos y diagnóstico', icon: <BookOpen aria-hidden="true" />, onClick: () => navigate('/aprendizaje/maquina/grader') },
+          ...(isAdmin && !modoEdicion ? [{ key: 'edit', label: 'Editar estado', icon: <Pencil aria-hidden="true" />, onClick: () => navigate('/hmi-grader') }] : []),
+          { key: 'reload', label: 'Recargar simulador', icon: <RefreshCw aria-hidden="true" />, onClick: refreshIframe },
+          ...(modoEdicion ? [
+            { key: 'save', label: 'Guardar estado', subtitle: 'Escribe el estado actual en Firestore', icon: <Save aria-hidden="true" />, onClick: handleSaveState, disabled: savingState },
+            { key: 'reset', label: 'Restaurar estado inicial', icon: <RotateCcw aria-hidden="true" />, onClick: handleResetState },
+          ] : []),
+        ]}
+      />
 
       {/* ── iframe ─────────────────────────────────────────────────────
-          min-height: 880px porque el HMI + teclados necesitan ~854px y no
-          queremos depender solo del flex-1 del MainLayout (que puede colapsar
-          si el layout padre no tiene altura fija) */}
-      <div
-        className="flex-1 min-h-0 relative overflow-auto bg-[#2C3E50]"
-        style={{ minHeight: 880 }}
-      >
+          El HMI + teclados necesitan ~854 px. Ese mínimo vive SOLO en el iframe: el contenedor
+          es `flex-1 min-h-0 overflow-auto`, así que toma el alto que deja el encabezado y se
+          desplaza. Con el mínimo en el contenedor (antes) la página medía 880 + encabezado, el
+          ancestro `overflow-hidden` del modo lienzo la recortaba y lo de abajo no se alcanzaba. */}
+      <div className="flex-1 min-h-0 relative overflow-auto bg-background">
         <iframe
           ref={iframeRef}
           src={iframeSrc}
@@ -279,6 +210,7 @@ export function HmiGraderPage() {
           className="w-full border-0 block"
           style={{ height: '100%', minHeight: 880 }}
           allow="fullscreen"
+          onLoad={enviarTema}
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
         />
       </div>

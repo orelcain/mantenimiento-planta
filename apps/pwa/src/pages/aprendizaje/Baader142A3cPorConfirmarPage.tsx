@@ -10,9 +10,9 @@
  * Prioridad: `data/baader142A3cPrioridad.ts` (curada a mano). Candidatos: `partes.json` en vivo.
  */
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Check, ChevronLeft, ChevronRight, Cog, Disc3, Droplet, FilePlus, ScanLine, Workflow } from 'lucide-react'
-import { Button, CellIcon, Disclosure, ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
+import { useSearchParams } from 'react-router-dom'
+import { Check, ChevronRight, Cog, Disc3, Droplet, FilePlus, ScanLine, Workflow } from 'lucide-react'
+import { Button, CellIcon, Disclosure, EncabezadoHerramienta, ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import { RepuestoA3c } from '@/components/aprendizaje/a3c/RepuestoA3c'
 import { SelectorMaquinaPlano } from '@/components/aprendizaje/SelectorMaquinaPlano'
 import { cargarA3c, type PaqueteA3c } from '@/data/baader142A3c'
@@ -283,7 +283,6 @@ function ListaSinSap({ kpi, onElegir }: { kpi: KpiAltas; onElegir: (elemento: st
 }
 
 export function Baader142A3cPorConfirmarPage() {
-  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [paquete, setPaquete] = useState<PaqueteA3c | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -329,17 +328,6 @@ export function Baader142A3cPorConfirmarPage() {
   const cerrar = () =>
     setParams(prev => { const n = new URLSearchParams(prev); n.delete('el'); return n }, { replace: true })
   const nombreDe = (c: string) => paquete?.datos.elementos[c]?.es
-
-  const volver = (
-    <button
-      type="button"
-      onClick={() => navigate(RUTA_TARJETA)}
-      className="-ml-2 inline-flex min-h-[44px] items-center gap-0.5 rounded-full px-2 text-body text-primary hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-    >
-      <ChevronLeft aria-hidden className="size-6" />
-      Tarjeta A3C
-    </button>
-  )
 
   const cuerpo = datos ? (
     <>
@@ -406,15 +394,20 @@ export function Baader142A3cPorConfirmarPage() {
 
   return (
     <div className="min-h-full w-full bg-background pb-[calc(env(safe-area-inset-bottom,0px)+24px)] text-foreground">
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver="Tarjeta A3C"
+        volverA={RUTA_TARJETA}
+        titulo="Por confirmar en terreno"
+        subtitulo="Ordenado por fallas en la bitácora desde el 16-09"
+        contextoAria="Estoy en «Por confirmar en terreno» de la Tarjeta A3C de la Baader 142. "
+      />
       <div className="mx-auto w-full max-w-[640px] px-4 lg:max-w-[1120px]">
-        <div className="flex h-[52px] items-center">{volver}</div>
-        <h1 className="text-display font-bold">Por confirmar en terreno</h1>
-        <p className="mt-0.5 text-footnote text-muted-foreground">Ordenado por fallas en la bitácora desde el 16-09</p>
         <div className="lg:grid lg:grid-cols-[420px_1fr] lg:items-start lg:gap-6">
           <div className="min-w-0">
             {sesion && (
               // Cromo de navegación (translúcido): es la única superficie translúcida y no es contenido.
-              <div className="sticky top-0 z-10 -mx-4 bg-background/80 px-4 pb-2.5 pt-2 backdrop-blur-xl lg:mx-0 lg:px-0" data-testid="selector-maquina">
+              <div className="sticky top-[calc(env(safe-area-inset-top)+56px)] z-10 -mx-4 bg-background/80 lg:top-[120px] px-4 pb-2.5 pt-2 backdrop-blur-xl lg:mx-0 lg:px-0" data-testid="selector-maquina">
                 <SelectorMaquinaPlano maquina={maquina} maquinas={maquinas} onChange={setMaquina} />
                 <p className="mt-1.5 text-footnote text-muted-foreground tabular-nums">
                   {maquina ? `Respondes por ${etiquetaMaquina(maquina)} · plano 888` : '¿En cuál máquina estás? Elígela para responder.'}
@@ -424,7 +417,7 @@ export function Baader142A3cPorConfirmarPage() {
             {cuerpo}
           </div>
           {esPc && seleccion && (
-            <aside className="sticky top-4 mt-4 max-h-[calc(100dvh-32px)] overflow-y-auto rounded-card bg-card p-5" data-testid="panel-ficha">
+            <aside className="sticky top-[136px] mt-4 max-h-[calc(100dvh-152px)] overflow-y-auto rounded-card bg-card p-5" data-testid="panel-ficha">
               <h2 className="text-headline font-semibold">
                 <span className="font-mono">{seleccion}</span>
                 {nombreDe(seleccion) ? <span className="font-normal text-muted-foreground"> · {nombreDe(seleccion)}</span> : null}

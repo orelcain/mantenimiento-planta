@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Knuro HMI">
 <meta name="theme-color" content="#1a1c22">
 <title>Knuro HMI — B2</title>
+<script src="embed-tema.js"></script>
 <script>
 const _m={name:"Knuro HMI",short_name:"Knuro HMI",display:"standalone",background_color:"#1a1c22",theme_color:"#1a1c22",orientation:"any",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%231a1c22'/><text x='50%' y='55%' font-size='80' text-anchor='middle' dominant-baseline='middle' fill='%234499ff'>K</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
 const _b=new Blob([JSON.stringify(_m)],{type:'application/json'});const _l=document.createElement('link');_l.rel='manifest';_l.href=URL.createObjectURL(_b);document.head.appendChild(_l);
@@ -715,6 +716,55 @@ body.kn-land .kp-grab{display:none;}
 #kn-giro button svg{width:16px;height:16px;}
 @media (max-width:767px){body.kn-giro:not(.kn-land) #kn-giro{display:flex;}}
 @media (prefers-reduced-motion:reduce){.kn-row.kn-row-acc .chev{transition:none;}}
+/* ══ TEMA DE LA APP (contrato app:tema · public/embed-tema.js) ═══════════════════════════
+   Con el mensaje del padre, TODO lo que rodea al panel sigue el tema Pizarra (Día y Noche):
+   fondo, barra de pantalla, panel «Pantallas» con su buscador, riel, aviso de giro y, en el
+   celular vertical, la lista de campos y «Para qué sirve esta pantalla». Sin mensaje (el embed
+   abierto suelto) se queda la «Consola» gris de arriba.
+   NO toca .dev / .sw / #hs / .led / .brd (el bisel del X2 y su pantalla conservan sus colores
+   reales: sus literales no pasan por --bg/--pb/--bdr/--ac2, que solo usan html/body y #rp) ni
+   la familia «Ventana del panel» (globos .kh-pop, hoja .kh-sheet y resultados flotantes .kn-res:
+   siempre claros, con la etiqueta AYUDA). */
+html.tema-app{
+  --k-case:var(--tema-fondo);--k-panel:var(--tema-superficie);
+  --k-ink:var(--tema-tinta);--k-ink2:var(--tema-tinta2);--k-line:var(--tema-linea);
+  --k-raised:color-mix(in srgb,var(--tema-superficie) 88%,var(--tema-tinta));
+  --k-hover:color-mix(in srgb,var(--tema-superficie) 92%,var(--tema-tinta));
+  --k-key:color-mix(in srgb,var(--tema-acento) 18%,var(--tema-superficie));
+  --k-keyink:var(--tema-tinta);--k-keyedge:var(--tema-acento);
+  --k-warn:#845600;--k-bad:#a3262b;
+}
+html.tema-app[data-tema="dark"]{--k-warn:#e0b45c;--k-bad:#e58a86;}
+html.tema-app,html.tema-app body{color:var(--k-ink);}
+html.tema-app #kn-scr-btn:focus-visible,html.tema-app .kn-pan:focus-visible,html.tema-app #rp button:focus-visible,
+html.tema-app #rp [role="button"]:focus-visible,html.tema-app .kn-rb:focus-visible,
+html.tema-app #kp-search .kn-search:focus-within{outline-color:var(--tema-acento);}
+html.tema-app .rp-toggle{background:var(--k-panel);border-color:var(--k-line);color:var(--k-ink2);}
+html.tema-app .rp-toggle:hover{background:var(--k-hover);color:var(--k-ink);}
+/* Lista de campos (celular vertical y horizontal) y su fila «Para qué sirve esta pantalla» */
+html.tema-app #kn-help-list{background:var(--k-panel);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kh-list-h{background:var(--k-raised);border-bottom-color:var(--k-line);color:var(--k-ink);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kh-list-h .kh-x{background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);}
+html.tema-app #kn-help-list .kn-lh{background:transparent;border-bottom-color:var(--k-line);color:var(--k-ink2);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kn-lh .n{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kh-gh{color:var(--k-ink2);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kh-gh b{color:var(--k-ink);}
+html.tema-app #kn-help-list .kh-glist{background:transparent;border-top-color:var(--k-line);}
+html.tema-app #kn-help-list .kn-row{color:var(--k-ink);border-bottom-color:var(--k-line);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kn-row.kn-row-acc[aria-expanded="true"]{border-bottom-color:transparent;}
+html.tema-app #kn-help-list .kn-row .def,html.tema-app #kn-help-list .kn-row .s{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-row .chev{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-row .cur{font-family:var(--k-mono);}
+html.tema-app #kn-help-list .kn-row.chg .cur,html.tema-app #kn-help-list .kn-row.chg .def{color:var(--k-warn);}
+html.tema-app #kn-help-list .kn-row.sel{background:var(--k-key);}
+html.tema-app #kn-help-list .kn-row:active{background:var(--k-hover);}
+html.tema-app #kn-help-list .kn-sh{border-bottom-color:var(--k-line);color:var(--k-ink);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kn-sh .ey{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-sh p{color:var(--k-ink);}
+html.tema-app #kn-help-list .kn-sh .kn-org{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-sh .kn-org b{color:var(--k-ink);}
+html.tema-app #kn-help-list .kh-btn-tint{background:var(--k-raised);border-color:var(--k-line);color:var(--k-ink);}
+html.tema-app body.kn-land.kn-land-list #kn-help-list{border-left-color:var(--k-line);}
 </style>
 </head>
 <body>
@@ -1946,9 +1996,12 @@ const IN_IFRAME=(()=>{try{return window.self!==window.top;}catch(e){return true;
 
 /* ── Modo Aprendizaje (readonly) ── */
 let READ_ONLY=new URLSearchParams(location.search).get('mode')==='readonly';
+/* ?embed=1: la app ya pone su propio encabezado (EncabezadoHerramienta) → sin la franja del embed. */
+const EMBED=new URLSearchParams(location.search).get('embed')==='1';
 function _applyReadOnly(){
   if(!READ_ONLY) return;
   document.body.classList.add('readonly');
+  if(EMBED) return;
   // Insertar banner en cada .sh al mostrar pantalla
   document.querySelectorAll('.sc .sh').forEach(sh=>{
     if(sh.querySelector('.readonly-banner')) return;

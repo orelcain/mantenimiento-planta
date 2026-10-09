@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#000000">
 <title>SIMATIC HMI — Bombeo Acopio S2 (YAL)</title>
+<script src="embed-tema.js"></script>
 <style>
   *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -32,6 +33,9 @@
     max-width: 100%;
     max-height: 100%;
   }
+  /* Contrato app:tema (embed-tema.js): SOLO el fondo alrededor del dibujo (las barras cuando no
+     calza la proporción); el HMI y sus colores no cambian. */
+  html.tema-app, html.tema-app body, html.tema-app #hmi-stage { background: var(--tema-fondo); }
   body.compare-mode #hmi-stage { padding: 0; background: #000; }
   html.in-iframe, html.in-iframe body { padding: 0; min-height: 0; }
   #hmi-stage svg [data-key^="valve."] { cursor: pointer; }
@@ -877,7 +881,8 @@
     document.body.classList.add('edit');
   }
   // Modo embedded: HMI dentro de HmiBombeoS2PublicPage (oculta cycle-panel — controles vienen del wrapper)
-  if (urlParams.get('embedded') === '1') {
+  // embed=1 es el nombre común de todos los embeds de la app; embedded=1 se conserva como alias.
+  if (urlParams.get('embed') === '1' || urlParams.get('embedded') === '1') {
     document.body.classList.add('embedded');
   }
 

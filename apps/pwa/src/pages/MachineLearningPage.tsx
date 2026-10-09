@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
+  BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
   MonitorPlay, Zap, Search, Lock, Gauge, Ruler, CircuitBoard,
@@ -47,6 +47,7 @@ import { QuickRefView } from '@/components/learning/QuickRefView'
 import { getQuickRef, hasQuickRef } from '@/data/learningQuickRef'
 import { posicionesDeMaquina, VARIADORES, type PosicionReceta } from '@/data/variadores'
 import { getQuizBest } from '@/utils/learningProgress'
+import { EncabezadoHerramienta } from '@/components/piel'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = CAPACITACION_AREA
@@ -377,10 +378,17 @@ export function MachineLearningPage() {
 
   return (
     <div className={`dossier ${heightClass} w-full`}>
-      <div className="dp-wrap" style={{ paddingBottom: '7rem' }}>
-        <button className="dp-back" onClick={() => navigate('/aprendizaje')}>
-          <ArrowLeft className="h-4 w-4" /> Centro de aprendizaje
-        </button>
+      {/* Encabezado único del marco de herramientas (antes «← Centro de aprendizaje» en mono). */}
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver="Aprendizaje"
+        volverA="/aprendizaje"
+        titulo={isCourse ? 'Curso' : 'Ficha técnica'}
+        subtitulo={machine.name}
+        contextoAria={`Estoy en ${isCourse ? 'el curso' : 'la ficha técnica de'} ${machine.name} del Centro de aprendizaje. `}
+      />
+      {/* Sin barra inferior en esta ruta (modo «lectura»): solo aire para el gesto de inicio. */}
+      <div className="dp-wrap" style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}>
 
         {/* Portada del documento */}
         <header style={{ paddingTop: 'clamp(10px, 3vw, 30px)' }}>
