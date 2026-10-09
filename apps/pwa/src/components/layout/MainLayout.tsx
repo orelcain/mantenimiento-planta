@@ -1254,7 +1254,7 @@ export function MainLayout() {
       {!canSee('aria') && isAdmin && (
         <button
           onClick={handleEnableAria}
-          className="fixed right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all hover:scale-105 bottom-24 lg:bottom-6"
+          className="fixed right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 pizarra:bg-none pizarra:bg-primary pizarra:text-primary-foreground transition-all hover:scale-105 bottom-24 lg:bottom-6"
           title="Activar el asistente ARIA"
         >
           <Bot className="h-5 w-5" />

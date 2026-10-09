@@ -48,7 +48,9 @@ interface QualityColorEntry {
 
 const QUALITY_COLORS: Record<QualityKey, QualityColorEntry> = {
   premium:    { hex: '#6366f1', textClass: 'text-indigo-400'  },
-  superior:   { hex: '#10b981', textClass: 'text-emerald-400' },
+  // Pizarra vuelve neutro el verde «ok» de Tailwind; la leyenda de la serie «superior» debe
+  // seguir calzando con su hex (#10b981), que no cambia. Sin la paleta, la clase `pizarra:` no casa.
+  superior:   { hex: '#10b981', textClass: 'text-emerald-400 pizarra:text-[#10b981]' },
   primera:    { hex: '#3b82f6', textClass: 'text-blue-400'    },
   segunda:    { hex: '#f59e0b', textClass: 'text-amber-400'   },
   tercera:    { hex: '#f97316', textClass: 'text-orange-400'  },

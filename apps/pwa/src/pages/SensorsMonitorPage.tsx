@@ -806,9 +806,9 @@ function TrendSparkline({
         ref={containerRef}
         className={`w-full rounded-card overflow-hidden relative select-none transition-colors duration-700 ${
           alertLevel === 'critical'
-            ? 'border-2 border-red-500/[0.25] bg-gradient-to-b from-red-950/40 via-muted/20 to-muted/5 shadow-[0_0_24px_rgba(239,68,68,0.15)]'
+            ? 'border-2 border-red-500/[0.25] bg-gradient-to-b from-red-950/40 via-muted/20 to-muted/5 shadow-[0_0_24px_rgba(239,68,68,0.15)] pizarra:shadow-none'
             : alertLevel === 'warning'
-            ? 'border-2 border-amber-500/[0.25] bg-gradient-to-b from-amber-950/30 via-muted/20 to-muted/5 shadow-[0_0_18px_rgba(245,158,11,0.10)]'
+            ? 'border-2 border-amber-500/[0.25] bg-gradient-to-b from-amber-950/30 via-muted/20 to-muted/5 shadow-[0_0_18px_rgba(245,158,11,0.10)] pizarra:shadow-none'
             : 'border border-border/20 bg-gradient-to-b from-muted/30 to-muted/5'
         }`}
         style={{ height: `${chartH}px`, transition: dragState.current.active ? 'none' : 'height 0.2s ease' }}

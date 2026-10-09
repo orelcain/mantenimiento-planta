@@ -40,7 +40,7 @@ describe('qualityColorHex', () => {
 describe('qualityColorTextClass', () => {
   it('matchea calidades canónicas con la clase tailwind correspondiente', () => {
     expect(qualityColorTextClass('premium')).toBe('text-indigo-400')
-    expect(qualityColorTextClass('superior')).toBe('text-emerald-400')
+    expect(qualityColorTextClass('superior')).toBe('text-emerald-400 pizarra:text-[#10b981]')
     expect(qualityColorTextClass('primera')).toBe('text-blue-400')
     expect(qualityColorTextClass('segunda')).toBe('text-amber-400')
     expect(qualityColorTextClass('tercera')).toBe('text-orange-400')

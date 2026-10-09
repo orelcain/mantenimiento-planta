@@ -330,7 +330,7 @@ export function summarizeCorrelations(correlations: PauseCorrelation[]): {
 
 /** Convierte confidence numérico (0..1) a label textual operacional. */
 export function confidenceLabel(confidence: number): { text: 'alta' | 'media' | 'baja'; color: string } {
-  if (confidence >= 0.7) return { text: 'alta',  color: 'text-rose-300' }
+  if (confidence >= 0.7) return { text: 'alta',  color: 'text-rose-300 pizarra:text-ink-crit' }
   if (confidence >= 0.4) return { text: 'media', color: 'text-amber-300' }
-  return { text: 'baja', color: 'text-slate-400' }
+  return { text: 'baja', color: 'text-slate-400 pizarra:text-muted-foreground' }
 }
