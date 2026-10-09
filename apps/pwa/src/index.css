@@ -454,14 +454,14 @@
 }
 
 /* ============================================================================
-   PALETA PIZARRA — detrás de interruptor (`?skin=pizarra`)
+   PALETA PIZARRA — PREDETERMINADA desde 2026-10-22 (index.html: sin `app-skin` guardado)
    Decisión del jurado (08-10): docs en scratchpad/ronda-estilo-propio/6_jurado_final.md.
    ---------------------------------------------------------------------------
    Mecanismo: NO es una piel nueva. index.html mantiene data-skin="apple" (radios,
    primitivos, geometría) y AGREGA data-paleta="pizarra". Estos bloques solo
    sobrescriben tokens de COLOR. Sin el atributo ningún selector de abajo casa,
    así que el CSS resultante de quien no la activa es el mismo de siempre.
-   Vuelta atrás: `?skin=apple` (borra la paleta) o `?skin=default`.
+   Vuelta atrás: `?skin=apple` (paleta anterior, queda guardada) o `?skin=default`.
 
    Especificidad: el Día usa :not(.dark) para no filtrarse a Penumbra (empata en
    0,3,0 con `[data-skin="apple"].dark` y, al ir después, lo pisaría); Penumbra
@@ -644,20 +644,35 @@
 
 /* ── Excepciones de Pizarra: el Monitor TV conserva TODOS sus colores de estado ──
    Decisión del usuario: el monitor de planta (`.monitor-tv`, App.tsx) sigue con el
-   semáforo de Apple —verde, rojo y ámbar— hasta la oleada 1. Se re-fijan las variables
+   semáforo de Apple —verde, rojo y ámbar— hasta la prueba a 3 m. Se re-fijan las variables
    en el propio contenedor: las heredan sus descendientes y ganan sobre el :root. Son
-   los valores del bloque `[data-skin="apple"]` / `.dark` de arriba. */
+   los valores EFECTIVOS de la piel Apple (cascada :root, .dark, apple, apple.dark), tanto
+   los --tw-* como los tokens de estado --ink-*, --fill-*, --success, --warning y
+   --destructive-tint. Las series --mon-* NO se tocan. El test
+   `src/lib/__tests__/monitorTvEstado.test.ts` compara estos bloques contra Apple. */
 :root[data-paleta="pizarra"]:not(.dark) .monitor-tv {
   --tw-emerald-400: 52 199 89;   --tw-emerald-500: 52 199 89;   --tw-emerald-600: 33 125 56;
   --tw-green-400: 52 199 89;     --tw-green-500: 52 199 89;     --tw-green-600: 33 125 56;
   --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 196 45 37;
   --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 158 92 0;
+  /* Tokens de estado (texto, rellenos, avisos): valores EXACTOS de la piel Apple, claro. */
+  --ink-ok: 31 118 53;           --ink-crit: 184 42 35;         --ink-warn: 152 88 0;          --ink-info: 40 101 158;
+  --fill-ok: 47 107 65;          --fill-critical: 140 75 69;    --fill-warning: 122 90 30;
+  --success: 108 152 108;        --success-foreground: 255 255 255;
+  --warning: 192 142 95;         --warning-foreground: 0 0 0;   --warning-ink: 192 142 95;
+  --destructive-tint: 255 230 228;
 }
 :root[data-paleta="pizarra"].dark .monitor-tv {
   --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 209 88;
   --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 209 88;
   --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 119 111;
   --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 159 10;
+  /* Tokens de estado (texto, rellenos, avisos): valores EXACTOS de la piel Apple, oscuro. */
+  --ink-ok: 48 209 88;           --ink-crit: 255 119 111;       --ink-warn: 255 159 10;        --ink-info: 113 173 225;
+  --fill-ok: 47 107 65;          --fill-critical: 140 75 69;    --fill-warning: 122 90 30;
+  --success: 108 152 108;        --success-foreground: 255 255 255;
+  --warning: 192 142 95;         --warning-foreground: 0 0 0;   --warning-ink: 192 142 95;
+  --destructive-tint: 71 47 48;
 }
 
 /* Trama diagonal para «contexto» en gráficos (externo, ritmo, colación, planificado): se

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1c1c1e" />
+    <meta name="theme-color" content="#F2F1EC" />
     <meta name="description" content="Sistema de gestión de mantenimiento industrial y levantamiento de incidencias" />
     <!-- CSP conservador: el sitio canónico es GitHub Pages, que NO soporta headers HTTP
          custom (los de firebase.json solo aplican al hosting secundario, casi sin uso —
@@ -54,18 +54,25 @@
     <!-- Script inline para aplicar tema antes de que React cargue (evita flash) -->
     <script>
       (function() {
-        // PIEL APPLE PREDETERMINADA desde 2026-09-16 (DESIGN.md, vara iOS 27).
-        // `?skin=default` (queda recordado en localStorage `app-skin`) vuelve a la
-        // piel anterior para comparar; `?skin=apple` la restablece.
-        // `?skin=pizarra` = piel Apple + paleta Pizarra (`data-paleta="pizarra"`),
-        // detrás de interruptor: sin ese valor guardado, nada de esto corre.
+        // PALETA PIZARRA PREDETERMINADA desde 2026-10-22 (antes: Apple sin paleta).
+        //   (sin nada guardado)  → Pizarra = data-skin="apple" + data-paleta="pizarra"
+        //   ?skin=apple          → paleta anterior (queda guardada como elección)  ← VÍA DE ESCAPE
+        //   ?skin=default        → piel antigua (queda guardada)
+        //   ?skin=pizarra        → vuelve a Pizarra (queda guardada)
+        // MIGRACIÓN: antes, un `app-skin='apple'` podía quedar guardado sin que nadie lo
+        // eligiera (las páginas /dev lo escribían al abrirse). Un `apple` guardado SIN la
+        // marca `app-skin-v=2` se trata como «sin elegir» y se borra una sola vez; las
+        // elecciones nuevas (?skin=…) escriben la marca y se respetan para siempre.
         // Misma regla en src/lib/intensidad.ts (el test ejecuta este script).
         // Cada acceso a localStorage va protegido por separado (modo privado,
         // cuota llena): el tema inicial se aplica SIEMPRE y las escrituras van al final.
         var get = function(k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
         var qs = null;
         try { qs = new URLSearchParams(location.search).get('skin'); } catch (e) {}
-        var skin = qs || get('app-skin') || 'apple';
+        var migrada = get('app-skin-v') === '2';
+        var guardada = get('app-skin');
+        if (guardada === 'apple' && !migrada) guardada = null;
+        var skin = qs || guardada || 'pizarra';
         var theme = get('app-theme') || 'dark';
         var pizarra = skin === 'pizarra';
         if (pizarra) {
@@ -73,9 +80,9 @@
           // app-theme, que useTheme escribía solo) > PC: app-theme > automático.
           // No se escribe app-intensidad al resolver.
           var mq = function(q) { return typeof window.matchMedia === 'function' && window.matchMedia(q).matches; };
-          var guardada = get('app-intensidad');
+          var elegida = get('app-intensidad');
           var tema = get('app-theme');
-          var inten = (guardada === 'dia' || guardada === 'penumbra' || guardada === 'auto') ? guardada
+          var inten = (elegida === 'dia' || elegida === 'penumbra' || elegida === 'auto') ? elegida
             : (mq('(max-width: 767px)') || mq('(pointer: coarse)')) ? 'dia'
             : tema === 'dark' ? 'penumbra'
             : tema === 'light' ? 'dia'
@@ -100,7 +107,14 @@
             : (theme === 'dark' ? '#0d1722' : '#d7e5f2'));
         }
         // Recordar la piel elegida por ?skin= (recién ahora: si falla, ya se pintó bien)
-        if (qs) { try { localStorage.setItem('app-skin', qs); } catch (e) {} }
+        // y marcar la migración. Sin ?skin=, la primera vez se borra el `apple` heredado.
+        try {
+          if (qs) { localStorage.setItem('app-skin', qs); localStorage.setItem('app-skin-v', '2'); }
+          else if (!migrada) {
+            if (localStorage.getItem('app-skin') === 'apple') localStorage.removeItem('app-skin');
+            localStorage.setItem('app-skin-v', '2');
+          }
+        } catch (e) {}
       })();
     </script>
   </head>

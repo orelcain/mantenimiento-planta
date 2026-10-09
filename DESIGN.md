@@ -617,6 +617,14 @@ con un script Node local (`writeFileSync` en `utf8`).
    de sesgo 6. El celeste `#d7e5f2` (sesgo 27) de la piel vieja queda hasta que la piel Apple
    sea la predeterminada. ✅ 2026-09-16: la piel Apple es la predeterminada (index.html);
    `?skin=default` vuelve a la anterior para comparar.
+   ✅ **2026-10-22: la paleta Pizarra es la predeterminada** (`apps/pwa/index.html`; misma
+   regla en `src/lib/intensidad.ts`). Sin `app-skin` guardado → `data-skin="apple"` +
+   `data-paleta="pizarra"`. **Vía de escape:** `?skin=apple` = paleta anterior (queda guardada
+   como elección), `?skin=default` = piel antigua, `?skin=pizarra` = volver. Un `app-skin=apple`
+   guardado SIN la marca `app-skin-v=2` es «sin elegir» (las páginas /dev lo escribían solo al
+   abrirse): se borra una vez y el dispositivo pasa a Pizarra; con la marca, es elección y se
+   respeta. Las páginas /dev ya no escriben `app-skin` al abrirse, solo al elegir. Intensidad:
+   celular parte en Día, PC sigue `app-theme` o el sistema (ver `resolverIntensidad`).
 7. ~~Los 228 `<button>` a mano~~ — **cerrado en teléfono 2026-09-16.** Se dirigió con el medidor
    pantalla por pantalla (Análisis de Turno y período, Bodega, Códigos, Áreas, Bitácora, Home,
    Aprendizaje, Configuración, identidad): selectores de vistas → `SegmentedControl`, acciones

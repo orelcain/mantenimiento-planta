@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { LayoutGrid, Plus, Settings2, GraduationCap, MoreHorizontal } from 'lucide-react'
 import { Button, Pill, Tag, ListGroup, ListCell, CellIcon, Sheet, TabBar } from '@/components/piel'
-import { aplicarPielAlDocumento } from '@/lib/intensidad'
+import { aplicarPielAlDocumento, pielGuardadaEfectiva, recordarPiel } from '@/lib/intensidad'
 
 /**
  * Vitrina VIVA de la nueva piel: `/dev/piel`.
@@ -16,15 +16,22 @@ import { aplicarPielAlDocumento } from '@/lib/intensidad'
  */
 
 function useToggle(key: string, initial: string) {
-  const [v, setV] = useState(() => localStorage.getItem(key) || initial)
+  // La piel NO se escribe al abrir la página (dejaba un `apple` que nadie eligió):
+  // solo al elegirla, con la marca de elección (`recordarPiel`).
+  const esPiel = key === 'app-skin'
+  const [v, setVEstado] = useState(() => (esPiel ? pielGuardadaEfectiva() : localStorage.getItem(key) || initial))
+  const setV = useCallback((nuevo: string) => {
+    if (esPiel) recordarPiel(nuevo)
+    setVEstado(nuevo)
+  }, [esPiel])
   useEffect(() => {
-    localStorage.setItem(key, v)
+    if (!esPiel) localStorage.setItem(key, v)
     if (key === 'app-theme') {
       document.documentElement.classList.toggle('dark', v === 'dark')
     } else {
       aplicarPielAlDocumento(v) // 'pizarra' = data-skin="apple" + data-paleta="pizarra"
     }
-  }, [key, v])
+  }, [key, v, esPiel])
   return [v, setV] as const
 }
 
@@ -70,7 +77,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 }
 
 export default function PielShowcasePage() {
-  const [skin, setSkin] = useToggle('app-skin', 'apple')
+  const [skin, setSkin] = useToggle('app-skin', 'pizarra')
   const [theme, setTheme] = useToggle('app-theme', 'dark')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [tab, setTab] = useState('turno')
@@ -87,6 +94,7 @@ export default function PielShowcasePage() {
             value={skin}
             onChange={setSkin}
             options={[
+              { value: 'pizarra', label: 'Pizarra' },
               { value: 'apple', label: 'Piel nueva' },
               { value: 'default', label: 'Piel actual' },
             ]}
