@@ -59,7 +59,7 @@ import { LossCascadeCard } from './LossCascadeCard'
 import { ImputacionParetoCard } from './ImputacionParetoCard'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
-import { slxStateColor, slxSuavizarAcento } from '@/services/shoplogix/shoplogixColors'
+import { slxStateColor, slxStateTrama, slxSuavizarAcento } from '@/services/shoplogix/shoplogixColors'
 import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { logger } from '@/lib/logger'
 import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
@@ -209,6 +209,8 @@ function computeCiclo(
 interface ReasonAggregate {
   reason: string
   color: string
+  /** Pizarra: colación y parada planificada («contexto») se dibujan con trama, igual que en el Gantt. */
+  trama: boolean
   durationSec: number
   count: number
 }
@@ -225,7 +227,7 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
       existing.durationSec += s.durationSec
       existing.count += 1
     } else {
-      map.set(key, { reason: key, color, durationSec: s.durationSec, count: 1 })
+      map.set(key, { reason: key, color, trama: slxStateTrama(s.type, s.reason), durationSec: s.durationSec, count: 1 })
     }
   }
   return Array.from(map.values()).sort((a, b) => b.durationSec - a.durationSec)
@@ -275,7 +277,7 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
           >
             {/* Color del state (viene de Shoplogix, #ff0000 crudo → −50% croma) */}
             <span
-              className="w-2 h-2 rounded-ctl shrink-0 ring-1 ring-foreground/60"
+              className={cn('w-2 h-2 rounded-ctl shrink-0 ring-1 ring-foreground/60', r.trama && 'pz-trama')}
               style={{ backgroundColor: slxSuavizarAcento(r.color) }}
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
@@ -287,7 +289,7 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
             <div className="flex-1 h-1.5 bg-muted/80 rounded-full overflow-hidden min-w-0">
               <div
                 data-pareto-bar=""
-                className="h-full rounded-full opacity-80"
+                className={cn('h-full rounded-full opacity-80', r.trama && 'pz-trama')}
                 style={{
                   width: `${Math.max(pct, 1)}%`,
                   backgroundColor: slxSuavizarAcento(r.color),
@@ -1015,7 +1017,7 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
                           <td className="px-2 py-1 text-right text-foreground whitespace-nowrap">{fmtDurationSec(s.durationSec)}</td>
                           <td className="px-2 py-1">
                             <span className="inline-flex items-center gap-1.5 min-w-0">
-                              <span className="w-2 h-2 rounded-ctl shrink-0" style={{ background: color }} />
+                              <span className={cn('w-2 h-2 rounded-ctl shrink-0', slxStateTrama(s.type, s.reason) && 'pz-trama')} style={{ backgroundColor: color }} />
                               <span className="text-foreground truncate">{motivo}</span>
                             </span>
                           </td>

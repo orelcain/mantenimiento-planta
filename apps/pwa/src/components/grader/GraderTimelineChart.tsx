@@ -26,32 +26,11 @@ import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.
 import type { TimelineBucket } from '@/services/grader/types'
 import { minDe, maxDe } from '@/services/grader/minMaxSeguro'
 import { dec1 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor, porPaleta } from '@/lib/coloresGrafico'
+import { getCalibreColor, getErrorColor, gateColor } from './graderTimelineColors'
 
 // ── Paleta ──────────────────────────────────────────────────────────────────
-
-const CALIBRE_COLORS: Record<string, string> = {
-  '0-2': '#94a3b8', '1-2': '#94a3b8',
-  '2-3': '#3b82f6', '2-4': '#3b82f6',
-  '3-4': '#10b981',
-  '4-5': '#f59e0b', '4-6': '#f59e0b',
-  '5-6': '#ef4444',
-  '6-8': '#ec4899',
-  '8-10': '#8b5cf6',
-  '10-12': '#14b8a6',
-  '12+': '#f97316',
-}
-const DEFAULT_CALIBRE_COLOR = '#6b7280'
-
-const ERROR_COLORS: Record<string, string> = {
-  'Fuera de rango': '#ef4444',
-  'Fuera de límites': '#f59e0b',
-  'No leído por fotocélula': '#8b5cf6',
-  'No leido por fotocelula': '#8b5cf6',
-  'Too close or too long': '#3b82f6',
-  'Puerta no preparada': '#10b981',
-  'Desconocido': '#6b7280',
-}
-const DEFAULT_ERROR_COLOR = '#6b7280'
 
 // Bandas de peso por calibre (lb→gramos) para markArea
 const CALIBRE_BANDS = [
@@ -60,20 +39,6 @@ const CALIBRE_BANDS = [
   { label: '6-8 lb', min: 2722, max: 3629, color: 'rgba(236,72,153,0.04)' },
   { label: '8-10 lb', min: 3629, max: 4536, color: 'rgba(139,92,246,0.04)' },
 ]
-
-function getCalibreColor(calibre: string): string {
-  for (const [key, color] of Object.entries(CALIBRE_COLORS)) {
-    if (calibre.includes(key)) return color
-  }
-  return DEFAULT_CALIBRE_COLOR
-}
-
-function getErrorColor(error: string): string {
-  for (const [key, color] of Object.entries(ERROR_COLORS)) {
-    if (error.toLowerCase().includes(key.toLowerCase())) return color
-  }
-  return DEFAULT_ERROR_COLOR
-}
 
 // ── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -430,7 +395,14 @@ const LAYER_COLORS: Record<LayerKey, string> = {
   gates: '#8b5cf6',
 }
 
-const GATE_PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#06b6d4','#e11d48']
+/** Pizarra: cada capa = una serie (1-5, orden fijo). Los botones de capa y su línea usan el mismo token. */
+const LAYER_TOKENS: Record<LayerKey, string> = {
+  weights: 'serie-1',
+  p0pct: 'serie-2',
+  errors: 'serie-3',
+  production: 'serie-4',
+  gates: 'serie-5',
+}
 
 // ── Moving average ─────────────────────────────────────────────────────────
 
@@ -451,6 +423,8 @@ function computeMovingAvg(data: Array<[number, number]>, windowSize: number): Ar
 // ── Componente ──────────────────────────────────────────────────────────────
 
 export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: Props) {
+  // Pizarra: `version` sube al cambiar Día/Penumbra o la paleta y obliga a recalcular los colores.
+  const colores = useColoresGrafico()
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     weights: true,
     p0pct: true,
@@ -542,10 +516,11 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
       })
 
       // Bandas de calibre (markArea) con labels al borde derecho
-      const markAreaData = CALIBRE_BANDS.map((b) => ([
+      const markAreaData = CALIBRE_BANDS.map((b, bi) => ([
         {
           yAxis: b.min,
-          itemStyle: { color: b.color },
+          // Pizarra: franjas alternas en neutro (el rótulo dice cuál es cuál; el color no lleva identidad).
+          itemStyle: { color: elegirColor(b.color, 'grafico-neutro-medio', bi % 2 === 0 ? 0.05 : 0.1) },
           label: {
             show: true,
             position: 'insideTopRight',
@@ -565,7 +540,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
         symbolSize: 2,
         data: weightSeries.map(([ts, w, cal]) => ({
           value: [ts, w],
-          itemStyle: { color: getCalibreColor(cal), opacity: 0.35 },
+          itemStyle: { color: getCalibreColor(cal), opacity: porPaleta(0.35, 0.55) },
         })),
         large: true, largeThreshold: 2000,
         emphasis: { itemStyle: { opacity: 1, borderColor: '#fff', borderWidth: 1 }, scale: 4 },
@@ -581,7 +556,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           xAxisIndex: 0, yAxisIndex: yIdx,
           data: weightMovingAvg,
           smooth: true,
-          lineStyle: { width: 6, color: 'rgba(0,0,0,0.5)' },
+          lineStyle: { width: 6, color: elegirColor('rgba(0,0,0,0.5)', 'card', 0.7) },
           itemStyle: { color: 'transparent' },
           showSymbol: false,
           z: 4,
@@ -595,8 +570,9 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           xAxisIndex: 0, yAxisIndex: yIdx,
           data: weightMovingAvg,
           smooth: true,
-          lineStyle: { width: 2.5, color: '#fbbf24', shadowColor: 'rgba(251,191,36,0.4)', shadowBlur: 6 },
-          itemStyle: { color: '#fbbf24' },
+          // Pizarra: el promedio es el foco del gráfico de pesos → serie 1.
+          lineStyle: { width: 2.5, color: elegirColor('#fbbf24', 'serie-1'), shadowColor: elegirColor('rgba(251,191,36,0.4)', 'serie-1', 0.4), shadowBlur: 6 },
+          itemStyle: { color: elegirColor('#fbbf24', 'serie-1') },
           showSymbol: false,
           z: 5,
         })
@@ -608,8 +584,8 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
     if (layers.p0pct && p0PctSeries.length > 0) {
       yAxes.push({
         type: 'value', name: 'P0%', position: 'right', gridIndex: 0,
-        axisLabel: { formatter: (v: number) => `${Math.round(v)}%`, fontSize: 10, color: '#ef4444' },
-        nameTextStyle: { fontSize: 10, color: '#ef4444' },
+        axisLabel: { formatter: (v: number) => `${Math.round(v)}%`, fontSize: 10, color: elegirColor('#ef4444', 'muted-foreground') },
+        nameTextStyle: { fontSize: 10, color: elegirColor('#ef4444', 'muted-foreground') },
         min: 0, max: (v: any) => Math.ceil(Math.max(v.max * 1.1, 5)),
         splitLine: { show: false },
       })
@@ -619,10 +595,10 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
         xAxisIndex: 0, yAxisIndex: yIdx,
         data: p0PctSeries,
         smooth: true,
-        lineStyle: { width: 2, color: '#ef4444' },
-        itemStyle: { color: '#ef4444' },
+        lineStyle: { width: 2, color: elegirColor('#ef4444', 'serie-2') },
+        itemStyle: { color: elegirColor('#ef4444', 'serie-2') },
         showSymbol: false,
-        areaStyle: { color: 'rgba(239,68,68,0.05)' },
+        areaStyle: { color: elegirColor('rgba(239,68,68,0.05)', 'serie-2', 0.08) },
       })
 
       // R21: P0% acumulado del turno (dashed, más suave)
@@ -633,8 +609,8 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           xAxisIndex: 0, yAxisIndex: yIdx,
           data: p0CumulativeSeries,
           smooth: true,
-          lineStyle: { width: 1.5, color: '#fb923c', type: 'dashed' as const },
-          itemStyle: { color: '#fb923c' },
+          lineStyle: { width: 1.5, color: elegirColor('#fb923c', 'grafico-neutro-fuerte'), type: 'dashed' as const },
+          itemStyle: { color: elegirColor('#fb923c', 'grafico-neutro-fuerte') },
           showSymbol: false,
         })
       }
@@ -645,7 +621,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
         type: 'line',
         xAxisIndex: 0, yAxisIndex: yIdx,
         data: p0PctSeries.length > 0 ? [[p0PctSeries[0]![0], 2], [p0PctSeries[p0PctSeries.length - 1]![0], 2]] : [],
-        lineStyle: { width: 1, color: 'rgba(16,185,129,0.4)', type: 'dotted' as const },
+        lineStyle: { width: 1, color: elegirColor('rgba(16,185,129,0.4)', 'grafico-meta', 0.8), type: 'dotted' as const },
         itemStyle: { color: 'transparent' },
         showSymbol: false,
         silent: true,
@@ -691,7 +667,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
         return [
           {
             xAxis: g.start,
-            itemStyle: { color: 'rgba(100,116,139,0.1)' },
+            itemStyle: { color: elegirColor('rgba(100,116,139,0.1)', 'grafico-neutro-medio', 0.1) },
             label: {
               show: true,
               position: 'insideTop',
@@ -711,7 +687,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
     // ── Grid inferior: Producción ──
     if (useDualGrid) {
       const lowerLabel = layers.gates ? 'Gates' : 'pz/min'
-      const lowerColor = layers.gates ? '#8b5cf6' : '#10b981'
+      const lowerColor = layers.gates ? elegirColor('#8b5cf6', 'serie-5') : elegirColor('#10b981', 'serie-4')
       grids.push({
         left: 55, right: 60,
         top: '66%', bottom: 61,
@@ -735,15 +711,15 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           xAxisIndex: 1, yAxisIndex: yIdx,
           data: productionSeries,
           smooth: 0.3,
-          lineStyle: { width: 1.5, color: '#10b981' },
-          itemStyle: { color: '#10b981' },
+          lineStyle: { width: 1.5, color: elegirColor('#10b981', 'serie-4') },
+          itemStyle: { color: elegirColor('#10b981', 'serie-4') },
           showSymbol: false,
           areaStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(16,185,129,0.5)' },
-                { offset: 1, color: 'rgba(16,185,129,0.05)' },
+                { offset: 0, color: elegirColor('rgba(16,185,129,0.5)', 'serie-4', 0.5) },
+                { offset: 1, color: elegirColor('rgba(16,185,129,0.05)', 'serie-4', 0.05) },
               ],
             },
           },
@@ -753,7 +729,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
       // R23: Gate distribution as stacked area
       if (layers.gates && gateTimeSeries.length > 0) {
         for (const gts of gateTimeSeries) {
-          const color = GATE_PALETTE[(gts.gate - 1) % GATE_PALETTE.length]!
+          const color = gateColor(gts.gate)
           series.push({
             name: `G${gts.gate}`,
             type: 'line',
@@ -794,16 +770,16 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
             return `<b style="color:${params.color}">● ${cal}</b><br/>${time}<br/>Peso <b>${w.toLocaleString('es-CL')}g</b> (${(w / 453.592).toFixed(1)} lb)`
           }
           if (sn.includes('promedio')) {
-            return `<b style="color:#fbbf24">━ Promedio móvil</b><br/>${time}<br/>Peso <b>${params.value[1].toLocaleString('es-CL')}g</b>`
+            return `<b style="color:${elegirColor('#fbbf24', 'serie-1')}">━ Promedio móvil</b><br/>${time}<br/>Peso <b>${params.value[1].toLocaleString('es-CL')}g</b>`
           }
           if (sn.includes('acum')) {
-            return `<b style="color:#fb923c">┅ P0% acumulado</b><br/>${time}<br/><b>${params.value[1]}%</b> del turno`
+            return `<b style="color:${elegirColor('#fb923c', 'grafico-neutro-fuerte')}">┅ P0% acumulado</b><br/>${time}<br/><b>${params.value[1]}%</b> del turno`
           }
           if (sn.includes('P0%')) {
-            return `<b style="color:#ef4444">● P0% instantáneo</b><br/>${time}<br/><b>${params.value[1]}%</b> (ventana 5 min)`
+            return `<b style="color:${elegirColor('#ef4444', 'serie-2')}">● P0% instantáneo</b><br/>${time}<br/><b>${params.value[1]}%</b> (ventana 5 min)`
           }
           if (sn.includes('Producción')) {
-            return `<b style="color:#10b981">▊ Producción</b><br/>${time}<br/><b>${params.value[1]}</b> pz/min`
+            return `<b style="color:${elegirColor('#10b981', 'serie-4')}">▊ Producción</b><br/>${time}<br/><b>${params.value[1]}</b> pz/min`
           }
           if (sn.startsWith('G')) {
             return `<b style="color:${params.color}">■ Gate ${sn.slice(1)}</b><br/>${time}<br/><b>${params.value[1]}</b> pz (5 min)`
@@ -827,16 +803,16 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
           start: zoomRange.start, end: zoomRange.end,
           height: 18, bottom: 22,
           borderColor: 'rgba(148,163,184,0.1)',
-          fillerColor: 'rgba(59,130,246,0.1)',
-          handleStyle: { color: '#3b82f6', borderColor: '#3b82f6' },
+          fillerColor: elegirColor('rgba(59,130,246,0.1)', 'serie-1', 0.1),
+          handleStyle: { color: elegirColor('#3b82f6', 'serie-1'), borderColor: elegirColor('#3b82f6', 'serie-1') },
           textStyle: { fontSize: 9, color: '#64748b' },
           dataBackground: {
-            lineStyle: { color: 'rgba(59,130,246,0.2)', width: 1 },
-            areaStyle: { color: 'rgba(59,130,246,0.03)' },
+            lineStyle: { color: elegirColor('rgba(59,130,246,0.2)', 'serie-1', 0.2), width: 1 },
+            areaStyle: { color: elegirColor('rgba(59,130,246,0.03)', 'serie-1', 0.03) },
           },
           selectedDataBackground: {
-            lineStyle: { color: '#3b82f6' },
-            areaStyle: { color: 'rgba(59,130,246,0.08)' },
+            lineStyle: { color: elegirColor('#3b82f6', 'serie-1') },
+            areaStyle: { color: elegirColor('rgba(59,130,246,0.08)', 'serie-1', 0.08) },
           },
         },
         { type: 'inside', xAxisIndex: useDualGrid ? [0, 1] : [0] },
@@ -851,7 +827,8 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
       },
       animation: false,
     }
-  }, [layers, weightSeries, weightMovingAvg, p0PctSeries, p0CumulativeSeries, errorSeries, productionSeries, gateTimeSeries, gaps, useDualGrid, zoomRange])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers, weightSeries, weightMovingAvg, p0PctSeries, p0CumulativeSeries, errorSeries, productionSeries, gateTimeSeries, gaps, useDualGrid, zoomRange, colores.version])
 
   if (stats.totalPieces === 0) return null
 
@@ -911,7 +888,12 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
                   ? 'border-transparent text-white'
                   : 'bg-background border-border text-muted-foreground hover:bg-muted/50',
               )}
-              style={layers[key] ? { backgroundColor: LAYER_COLORS[key] } : undefined}
+              style={layers[key]
+                ? colores.pizarra
+                  // Pizarra: tinte de la serie + borde + texto de tinta (blanco sobre oliva/ciruela no llega a 4,5:1).
+                  ? { backgroundColor: elegirColor(LAYER_COLORS[key], LAYER_TOKENS[key], 0.18), borderColor: elegirColor(LAYER_COLORS[key], LAYER_TOKENS[key]), color: 'rgb(var(--foreground))' }
+                  : { backgroundColor: LAYER_COLORS[key] }
+                : undefined}
             >
               {LAYER_LABELS[key]}
             </button>
@@ -937,7 +919,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
                   </span>
                 ))}
                 <span className="flex items-center gap-1 text-muted-foreground">
-                  <span className="w-6 h-[2px] rounded-ctl" style={{ backgroundColor: '#fbbf24' }} />prom (50)
+                  <span className="w-6 h-[2px] rounded-ctl" style={{ backgroundColor: elegirColor('#fbbf24', 'serie-1') }} />prom (50)
                 </span>
               </div>
             )}
@@ -955,9 +937,9 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
             {layers.p0pct && (
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
                 <span className="text-muted-foreground font-semibold">P0%:</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded-ctl" style={{ backgroundColor: '#ef4444' }} />instantáneo (5min)</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded-ctl border-b border-dashed" style={{ borderColor: '#fb923c' }} />acumulado turno</span>
-                <span className="flex items-center gap-1"><span className="w-4 h-[1px] rounded-ctl" style={{ backgroundColor: 'rgba(16,185,129,0.5)', borderTop: '1px dotted rgba(16,185,129,0.5)' }} />target 2%</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded-ctl" style={{ backgroundColor: elegirColor('#ef4444', 'serie-2') }} />instantáneo (5min)</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded-ctl border-b border-dashed" style={{ borderColor: elegirColor('#fb923c', 'grafico-neutro-fuerte') }} />acumulado turno</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[1px] rounded-ctl" style={{ backgroundColor: elegirColor('rgba(16,185,129,0.5)', 'grafico-meta', 0.8), borderTop: `1px dotted ${elegirColor('rgba(16,185,129,0.5)', 'grafico-meta', 0.8)}` }} />target 2%</span>
               </div>
             )}
             {layers.gates && stats.uniqueGates.length > 0 && (
@@ -965,7 +947,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
                 <span className="text-muted-foreground font-semibold">Gates:</span>
                 {stats.uniqueGates.map((g) => (
                   <span key={g} className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-ctl" style={{ backgroundColor: GATE_PALETTE[(g - 1) % GATE_PALETTE.length] }} />
+                    <span className="w-2 h-2 rounded-ctl" style={{ backgroundColor: gateColor(g) }} />
                     G{g}
                   </span>
                 ))}

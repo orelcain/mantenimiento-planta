@@ -31,7 +31,9 @@ import { MinuteDetailDialog } from './MinuteDetailDialog'
 import type { GateAssignment } from '@/services/grader/types'
 import {
   fmtTime,
-  CAUSE_HEX,
+  causaColor,
+  causaColorAlfa,
+  rielColor,
   computeProductionWindow,
   resolveAxisWindow,
   buildMarkLines,
@@ -45,7 +47,6 @@ import {
   tramosDeConfig,
   tramoDe,
   type TramoConfig,
-  RIEL_COLOR,
   RIEL_GLIFO,
   type TipoEventoTurno,
 
@@ -59,8 +60,10 @@ import {
   DEFAULT_P0_CRITICAL_PCT,
   P0_LINE_MIN_PIECES,
   p0StatusFromPct,
-  p0StatusHex,
+  p0StatusGrafico,
 } from '@/services/grader/graderP0Thresholds'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor, porPaleta } from '@/lib/coloresGrafico'
 import {
   computeSegmentVerdicts,
   verdictColor,
@@ -278,6 +281,8 @@ export function ShiftTimelineView({
 
   // ── Export PNG / CSV + selector de rango ─────────────────────────────────
   const echartsRef = useRef<any>(null)
+  // Pizarra: al cambiar Día/Penumbra (o la paleta) el gráfico se recalcula con los tokens nuevos.
+  const coloresGrafico = useColoresGrafico()
 
   // ── Sincronización cross-chart (Fase 1 del Synchronized Timeline) ────────
   const timelineSync = useTimelineSyncOptional()
@@ -290,7 +295,7 @@ export function ShiftTimelineView({
     chartImageRef.current = () => {
       const instance = echartsRef.current?.getEchartsInstance()
       if (!instance) return null
-      return instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#111827' }) as string
+      return instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: elegirColor('#111827', 'card') }) as string
     }
     return () => { chartImageRef.current = null }
   }, [chartImageRef])
@@ -617,10 +622,15 @@ export function ShiftTimelineView({
     })
   }, [checkpoints, checkpointsExpanded, tramos])
 
+  /* PNG/PDF: el gráfico vivo y la cabecera se componen con los colores de la paleta ACTIVA, y el
+     fondo y las tintas del PNG siguen a la tarjeta (--card / --foreground): con Pizarra en Día el
+     archivo sale claro, en Penumbra oscuro. Sin Pizarra, EXACTAMENTE los de siempre (fondo #111827).
+     Se decidió no forzar «la paleta de hoy» al exportar: obligaría a dibujar el gráfico una segunda
+     vez con otras opciones, y el archivo debe verse como la pantalla desde donde se sacó. */
   const downloadPNG = useCallback(() => {
     const instance = echartsRef.current?.getEchartsInstance()
     if (!instance) return
-    const chartUrl = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#111827' }) as string
+    const chartUrl = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: elegirColor('#111827', 'card') }) as string
 
     /* ── Metadata para la cabecera ─────────────────────────────────────────
      *
@@ -656,7 +666,7 @@ export function ShiftTimelineView({
     // (consistencia con el resto del módulo). Slate gris si no hay P0% aún.
     const p0Color = p0Pct == null
       ? '#94a3b8'
-      : p0StatusHex(p0StatusFromPct(p0Pct, { alert: alertThreshold, critical: criticalThreshold }))
+      : p0StatusGrafico(p0StatusFromPct(p0Pct, { alert: alertThreshold, critical: criticalThreshold }))
 
     /* ── Pie del PNG: los eventos con sus palabras ─────────────────────────
      *
@@ -677,7 +687,7 @@ export function ShiftTimelineView({
             : null,
           hora: fmtTime(cp.at),
           glifo: RIEL_GLIFO[cp.kind],
-          color: RIEL_COLOR[cp.kind],
+          color: rielColor(cp.kind),
           texto: [cp.label, cp.sub].filter(Boolean).join(' · '),
         })
       }
@@ -703,21 +713,21 @@ export function ShiftTimelineView({
       const ctx = canvas.getContext('2d')!
 
       // Fondo cabecera
-      ctx.fillStyle = '#0f172a'
+      ctx.fillStyle = elegirColor('#0f172a', 'card')
       ctx.fillRect(0, 0, W, HEADER_H)
       // Línea separadora amber
-      ctx.fillStyle = '#f59e0b'
+      ctx.fillStyle = elegirColor('#f59e0b', 'serie-1')
       ctx.fillRect(0, HEADER_H - 3, W, 3)
 
       const base = Math.round(W * 0.016)
 
       // Título principal
-      ctx.fillStyle = '#f8fafc'
+      ctx.fillStyle = elegirColor('#f8fafc', 'foreground')
       ctx.font = `bold ${Math.round(base * 1.15)}px system-ui,sans-serif`
       ctx.fillText(`GRADER Z2 · ${shiftLabel} · ${dateLabel}`, Math.round(W * 0.013), Math.round(HEADER_H * 0.42))
 
       // Rango visible
-      ctx.fillStyle = '#94a3b8'
+      ctx.fillStyle = elegirColor('#94a3b8', 'muted-foreground')
       ctx.font = `${base}px system-ui,sans-serif`
       ctx.fillText(`Rango: ${rangeLabel}`, Math.round(W * 0.013), Math.round(HEADER_H * 0.76))
 
@@ -737,20 +747,20 @@ export function ShiftTimelineView({
       if (FOOT_H > 0) {
         const x0 = Math.round(W * 0.013)
         let y = HEADER_H + img.height
-        ctx.fillStyle = '#111827'
+        ctx.fillStyle = elegirColor('#111827', 'card')
         ctx.fillRect(0, y, W, FOOT_H)
-        ctx.fillStyle = 'rgba(148,163,184,0.35)'
+        ctx.fillStyle = elegirColor('rgba(148,163,184,0.35)', 'muted-foreground', 0.35)
         ctx.fillRect(x0, y, W - x0 * 2, 1)
         y += Math.round(base0 * 1.9)
         if (constantesPng) {
-          ctx.fillStyle = '#94a3b8'
+          ctx.fillStyle = elegirColor('#94a3b8', 'muted-foreground')
           ctx.font = `${base0}px system-ui,sans-serif`
           ctx.fillText(constantesPng, x0, y)
           y += FILA_H
         }
         for (const f of filasPng) {
           if (f.tramo) {
-            ctx.fillStyle = '#cbd5e1'
+            ctx.fillStyle = elegirColor('#cbd5e1', 'foreground')
             ctx.font = `600 ${base0}px system-ui,sans-serif`
             ctx.fillText(f.tramo, x0, y)
             y += FILA_H
@@ -758,15 +768,15 @@ export function ShiftTimelineView({
           ctx.fillStyle = f.color
           ctx.font = `${Math.round(base0 * 1.1)}px system-ui,sans-serif`
           ctx.fillText(f.glifo, x0 + Math.round(base0 * 0.6), y)
-          ctx.fillStyle = '#94a3b8'
+          ctx.fillStyle = elegirColor('#94a3b8', 'muted-foreground')
           ctx.font = `${base0}px system-ui,sans-serif`
           ctx.fillText(f.hora, x0 + Math.round(base0 * 2.2), y)
-          ctx.fillStyle = '#e2e8f0'
+          ctx.fillStyle = elegirColor('#e2e8f0', 'foreground')
           ctx.fillText(f.texto, x0 + Math.round(base0 * 6), y)
           y += FILA_H
         }
         if (checkpoints.length > PNG_MAX_EVENTOS) {
-          ctx.fillStyle = '#64748b'
+          ctx.fillStyle = elegirColor('#64748b', 'muted-foreground')
           ctx.fillText(`+${checkpoints.length - PNG_MAX_EVENTOS} eventos más en la app`, x0, y)
         }
       }
@@ -1015,7 +1025,7 @@ export function ShiftTimelineView({
     // P0% del turno, se muestra rojo conservador.
     const lineColor = summaryP0Pct == null
       ? '#ef4444'
-      : p0StatusHex(p0StatusFromPct(summaryP0Pct, { alert: alertThreshold, critical: criticalThreshold }))
+      : p0StatusGrafico(p0StatusFromPct(summaryP0Pct, { alert: alertThreshold, critical: criticalThreshold }))
 
     // Mark lines y mark areas: helpers puros extraídos en M11.
     const { shiftMarkLines, thresholdLines } =
@@ -1215,7 +1225,8 @@ export function ShiftTimelineView({
           const total = productivas + p0Min
           if (total > 0) {
             const pctMin = dec1(((p0Min / total) * 100))
-            lines.push(`<span style="color:#10b981">▮</span> Este minuto: <b>${total}</b> pzs (<span style="color:#10b981">${productivas}</span> OK + <span style="color:#94a3b8">${p0Min}</span> P0 = <b>${pctMin}%</b>)`)
+            const cProd = elegirColor('#10b981', 'serie-1')
+            lines.push(`<span style="color:${cProd}">▮</span> Este minuto: <b>${total}</b> pzs (<span style="color:${cProd}">${productivas}</span> OK + <span style="color:${elegirColor('#94a3b8', 'grafico-neutro-medio')}">${p0Min}</span> P0 = <b>${pctMin}%</b>)`)
             // Desglose por causa para este minuto (sólo si hubo P0)
             if (p0Min > 0) {
               const breakdown = breakdownByMinute.get(time)
@@ -1223,7 +1234,7 @@ export function ShiftTimelineView({
                 const sortedCauses = [...breakdown.entries()].sort((a, b) => b[1] - a[1])
                 for (const [cause, count] of sortedCauses) {
                   const label = MATRIX_P0_CAUSES[cause]?.label ?? cause
-                  const color = CAUSE_HEX[cause] ?? '#94a3b8'
+                  const color = causaColor(cause, '#94a3b8')
                   lines.push(`&nbsp;&nbsp;<span style="color:${color}">●</span> ${label}: ${count}`)
                 }
               }
@@ -1330,8 +1341,9 @@ export function ShiftTimelineView({
           yAxisIndex: 1,
           stack: 'volumen',
           data: productivePiecesAligned,
-          itemStyle: { color: 'rgba(16, 185, 129, 0.28)' },  // emerald 28% opacity
-          emphasis: { itemStyle: { color: 'rgba(16, 185, 129, 0.55)' } },
+          // Pizarra: lo productivo es el foco (serie 1); un poco más de opacidad para que se lea sobre la tarjeta.
+          itemStyle: { color: elegirColor('rgba(16, 185, 129, 0.28)', 'serie-1', 0.35) },  // emerald 28% opacity
+          emphasis: { itemStyle: { color: elegirColor('rgba(16, 185, 129, 0.55)', 'serie-1', 0.65) } },
           // Ancho adaptativo al zoom: barMaxWidth 12 deja respirar al zoom
           // (antes 4 se veían hilos). barCategoryGap 10% mantiene contraste
           // mínimo entre barras vecinas.
@@ -1351,8 +1363,8 @@ export function ShiftTimelineView({
           yAxisIndex: 1,
           stack: 'volumen',
           data: p0PiecesAligned,
-          itemStyle: { color: 'rgba(148, 163, 184, 0.45)' },
-          emphasis: { itemStyle: { color: 'rgba(148, 163, 184, 0.75)' } },
+          itemStyle: { color: elegirColor('rgba(148, 163, 184, 0.45)', 'grafico-neutro-medio', 0.55) },
+          emphasis: { itemStyle: { color: elegirColor('rgba(148, 163, 184, 0.75)', 'grafico-neutro-medio', 0.8) } },
           barMaxWidth: 12,
           barCategoryGap: '10%',
           z: 2,
@@ -1402,7 +1414,7 @@ export function ShiftTimelineView({
         // Una serie scatter por cada causa seleccionada (multi-select)
         ...causesArr.map(cause => {
           const pts = piecesByCause.get(cause) ?? []
-          const color = CAUSE_HEX[cause] ?? '#ef4444'
+          const color = causaColor(cause)
           return {
             name: MATRIX_P0_CAUSES[cause].label,
             type: 'scatter' as const,
@@ -1412,7 +1424,7 @@ export function ShiftTimelineView({
             itemStyle: {
               color,
               opacity: 0.75,
-              borderColor: '#1f2937',
+              borderColor: elegirColor('#1f2937', 'card'),
               borderWidth: 0.5,
             },
             emphasis: { itemStyle: { opacity: 1, borderWidth: 2, borderColor: '#f9fafb' } },
@@ -1421,7 +1433,8 @@ export function ShiftTimelineView({
         }),
       ],
     }
-  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState, upstreamSnapshot, slxOuterBounds, marcadoresRiel])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState, upstreamSnapshot, slxOuterBounds, marcadoresRiel, coloresGrafico.version])
 
   // ── Cobertura del turno ────────────────────────────────────────────────
   // Mide cuánto del turno está "entendido" (operación + colación + micros
@@ -1582,14 +1595,14 @@ export function ShiftTimelineView({
           <div className="flex items-center gap-2 px-3 py-2 rounded-ctl border border-border bg-muted text-xs flex-wrap">
             <span className="text-muted-foreground shrink-0">Mostrando:</span>
             {causesArr.map(cause => {
-              const color = CAUSE_HEX[cause] ?? '#ef4444'
+              const color = causaColor(cause)
               const label = MATRIX_P0_CAUSES[cause].label
               const count = (piecesByCause.get(cause) ?? []).length
               return (
                 <span
                   key={cause}
                   className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-caption font-medium"
-                  style={{ borderColor: color + '60', backgroundColor: color + '15', color }}
+                  style={{ borderColor: causaColorAlfa(cause, '60', 0.38), backgroundColor: causaColorAlfa(cause, '15', 0.15), color: porPaleta(color, 'rgb(var(--foreground))') }}
                 >
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
                   {label}
@@ -1740,7 +1753,7 @@ export function ShiftTimelineView({
               >
                 <span
                   className="shrink-0 mt-0.5 w-4 text-center font-medium tabular-nums"
-                  style={{ color: RIEL_COLOR[cp.kind] }}
+                  style={{ color: rielColor(cp.kind) }}
                   aria-hidden
                 >
                   {RIEL_GLIFO[cp.kind]}

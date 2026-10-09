@@ -3,12 +3,17 @@ import { AlertTriangle } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
 import type { GraderAnalyticsResult } from '@/services/grader/types'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { hayPizarra } from '@/lib/coloresGrafico'
+import { heatColor } from '@/services/grader/graderHeatColor'
 
 interface Props {
   analytics: GraderAnalyticsResult
 }
 
 export function PuntoCeroFueraRangoCard({ analytics }: Props) {
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de canvas se leen de los tokens al pintar).
+  useColoresGrafico()
   const outOfRange = analytics.pointZeroClassification.outOfRangeByWeight
   if (outOfRange.length === 0) return null
 
@@ -35,6 +40,8 @@ export function PuntoCeroFueraRangoCard({ analytics }: Props) {
                     label: 'Piezas fuera de rango',
                     data: outOfRange.map((d) => d.pieces),
                     backgroundColor: outOfRange.map((_, i, arr) => {
+                      // Pizarra: los rangos de peso son un ORDEN → rampa secuencial (no rojo→ámbar).
+                      if (hayPizarra()) return heatColor(i, 0, arr.length - 1, 0.75)
                       const t = arr.length > 1 ? i / (arr.length - 1) : 0
                       const r = Math.round(239 + (245 - 239) * t)
                       const g = Math.round(68 + (158 - 68) * t)

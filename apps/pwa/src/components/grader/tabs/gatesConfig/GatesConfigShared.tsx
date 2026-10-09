@@ -3,6 +3,8 @@ import { Badge, Input, Label, Switch } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { CalibrationStatus } from '@/services/grader/types'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
 
 /**
  * Coeficientes alométricos Length-Weight Relationship (LWR): W(g) = a × L(cm)^b
@@ -54,6 +56,8 @@ export function BeltVisualizer({
   cadencePiecesPerMin: number
   overlapping: boolean
 }) {
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores se leen de los tokens al pintar).
+  useColoresGrafico()
   if (spacingM <= 0 || salmonLengthM <= 0) return null
   const gapM = Math.max(0, spacingM - salmonLengthM)
   const secondsBetweenFish = 60 / Math.max(cadencePiecesPerMin, 0.01)
@@ -79,8 +83,17 @@ export function BeltVisualizer({
   const fish2X = marginX + spacingPx
 
   // Colores de estado
-  const gapColor = overlapping ? '#ef4444' : gapM < salmonLengthM * 0.5 ? '#f59e0b' : '#10b981'
-  const gapBg = overlapping ? 'rgba(239,68,68,0.15)' : gapM < salmonLengthM * 0.5 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.12)'
+  // Pizarra: el hueco entre peces es un estado con banda fija (solapa / menos de medio pez / holgado):
+  // falla / aviso solo cuando sale de la banda; dentro de ella, serie 1. Texto con tinta (--ink-*).
+  const estadoGap = overlapping ? 'falla' : gapM < salmonLengthM * 0.5 ? 'aviso' : 'ok'
+  const gapColor = estadoGap === 'falla' ? elegirColor('#ef4444', 'grafico-falla') : estadoGap === 'aviso' ? elegirColor('#f59e0b', 'grafico-aviso') : elegirColor('#10b981', 'serie-1')
+  const gapInk = estadoGap === 'falla' ? elegirColor('#ef4444', 'ink-crit') : estadoGap === 'aviso' ? elegirColor('#f59e0b', 'ink-warn') : elegirColor('#10b981', 'ink-info')
+  const gapBg = estadoGap === 'falla' ? elegirColor('rgba(239,68,68,0.15)', 'grafico-falla', 0.15) : estadoGap === 'aviso' ? elegirColor('rgba(245,158,11,0.15)', 'grafico-aviso', 0.15) : elegirColor('rgba(16,185,129,0.12)', 'serie-1', 0.12)
+  // Cotas del paso, del pez y de la cinta: contexto (neutros) en vez de naranja/celeste.
+  const dimColor = elegirColor('#fb923c', 'grafico-neutro-fuerte')
+  const cintaColor = elegirColor('#38bdf8', 'grafico-meta')
+  const pezColor = elegirColor('#c2410c', 'grafico-neutro-fuerte')
+  const pezAvisoColor = elegirColor('#991b1b', 'grafico-falla')
 
   // Escala métrica: ticks cada 50 cm
   const maxCm = Math.ceil(totalMeters * 100 / 50) * 50
@@ -100,18 +113,18 @@ export function BeltVisualizer({
             <stop offset="100%" stopColor="#1e293b" />
           </linearGradient>
           <linearGradient id="bv-fish" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#fb923c" />
-            <stop offset="100%" stopColor="#c2410c" />
+            <stop offset="0%" stopColor={elegirColor('#fb923c', 'grafico-neutro-medio')} />
+            <stop offset="100%" stopColor={pezColor} />
           </linearGradient>
           <linearGradient id="bv-fish-warn" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#ef4444" />
-            <stop offset="100%" stopColor="#991b1b" />
+            <stop offset="0%" stopColor={elegirColor('#ef4444', 'grafico-falla', 0.75)} />
+            <stop offset="100%" stopColor={pezAvisoColor} />
           </linearGradient>
           <marker id="bv-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
           </marker>
           <marker id="bv-arrow-orange" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb923c" />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={dimColor} />
           </marker>
           <marker id="bv-arrow-gap" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
             <path d="M 0 0 L 10 5 L 0 10 z" fill={gapColor} />
@@ -157,7 +170,7 @@ export function BeltVisualizer({
           fill={overlapping ? 'url(#bv-fish-warn)' : 'url(#bv-fish)'}
         />
         <circle cx={fish1X + fishLenPx * 0.82} cy={fishCY - 2} r="1.8" fill="#1f2937" />
-        <path d={`M ${fish1X + 2} ${fishCY} Q ${fish1X - 6} ${fishCY - 5} ${fish1X - 8} ${fishCY} Q ${fish1X - 6} ${fishCY + 5} ${fish1X + 2} ${fishCY} Z`} fill={overlapping ? '#991b1b' : '#c2410c'} />
+        <path d={`M ${fish1X + 2} ${fishCY} Q ${fish1X - 6} ${fishCY - 5} ${fish1X - 8} ${fishCY} Q ${fish1X - 6} ${fishCY + 5} ${fish1X + 2} ${fishCY} Z`} fill={overlapping ? pezAvisoColor : pezColor} />
 
         {/* ═══ Pez 2 + ojito ═══ */}
         <ellipse
@@ -168,20 +181,20 @@ export function BeltVisualizer({
           fill={overlapping ? 'url(#bv-fish-warn)' : 'url(#bv-fish)'}
         />
         <circle cx={fish2X + fishLenPx * 0.82} cy={fishCY - 2} r="1.8" fill="#1f2937" />
-        <path d={`M ${fish2X + 2} ${fishCY} Q ${fish2X - 6} ${fishCY - 5} ${fish2X - 8} ${fishCY} Q ${fish2X - 6} ${fishCY + 5} ${fish2X + 2} ${fishCY} Z`} fill={overlapping ? '#991b1b' : '#c2410c'} />
+        <path d={`M ${fish2X + 2} ${fishCY} Q ${fish2X - 6} ${fishCY - 5} ${fish2X - 8} ${fishCY} Q ${fish2X - 6} ${fishCY + 5} ${fish2X + 2} ${fishCY} Z`} fill={overlapping ? pezAvisoColor : pezColor} />
 
         {/* Flecha de dirección de movimiento sobre la cinta */}
         <g transform={`translate(${svgW - 52}, ${beltY - 8})`}>
-          <line x1="0" y1="0" x2="35" y2="0" stroke="#38bdf8" strokeWidth="1.5" markerEnd="url(#bv-arrow)" />
-          <text x="40" y="3" fontSize="9" fill="#38bdf8">cinta</text>
+          <line x1="0" y1="0" x2="35" y2="0" stroke={cintaColor} strokeWidth="1.5" markerEnd="url(#bv-arrow)" />
+          <text x="40" y="3" fontSize="9" fill={cintaColor}>cinta</text>
         </g>
 
         {/* ═══ Cota inferior 1: largo pez (bajo el pez 1) ═══ */}
         <g>
-          <line x1={fish1X} y1={fishCY + fishRy + 2} x2={fish1X} y2={beltY + beltH + 18} stroke="#fb923c" strokeWidth="0.5" strokeDasharray="2 2" />
-          <line x1={fish1X + fishLenPx} y1={fishCY + fishRy + 2} x2={fish1X + fishLenPx} y2={beltY + beltH + 18} stroke="#fb923c" strokeWidth="0.5" strokeDasharray="2 2" />
-          <line x1={fish1X} y1={beltY + beltH + 18} x2={fish1X + fishLenPx} y2={beltY + beltH + 18} stroke="#fb923c" strokeWidth="1" markerStart="url(#bv-arrow-orange)" markerEnd="url(#bv-arrow-orange)" />
-          <text x={fish1X + fishLenPx / 2} y={beltY + beltH + 32} textAnchor="middle" fontSize="10" fill="#fb923c" fontWeight="600">
+          <line x1={fish1X} y1={fishCY + fishRy + 2} x2={fish1X} y2={beltY + beltH + 18} stroke={dimColor} strokeWidth="0.5" strokeDasharray="2 2" />
+          <line x1={fish1X + fishLenPx} y1={fishCY + fishRy + 2} x2={fish1X + fishLenPx} y2={beltY + beltH + 18} stroke={dimColor} strokeWidth="0.5" strokeDasharray="2 2" />
+          <line x1={fish1X} y1={beltY + beltH + 18} x2={fish1X + fishLenPx} y2={beltY + beltH + 18} stroke={dimColor} strokeWidth="1" markerStart="url(#bv-arrow-orange)" markerEnd="url(#bv-arrow-orange)" />
+          <text x={fish1X + fishLenPx / 2} y={beltY + beltH + 32} textAnchor="middle" fontSize="10" fill={dimColor} fontWeight="600">
             pez {(salmonLengthM * 100).toFixed(0)} cm
           </text>
         </g>
@@ -192,19 +205,19 @@ export function BeltVisualizer({
             <line x1={fish1X + fishLenPx} y1={fishCY + fishRy + 2} x2={fish1X + fishLenPx} y2={beltY + beltH + 42} stroke={gapColor} strokeWidth="0.5" strokeDasharray="2 2" />
             <line x1={fish2X} y1={fishCY + fishRy + 2} x2={fish2X} y2={beltY + beltH + 42} stroke={gapColor} strokeWidth="0.5" strokeDasharray="2 2" />
             <line x1={fish1X + fishLenPx} y1={beltY + beltH + 42} x2={fish2X} y2={beltY + beltH + 42} stroke={gapColor} strokeWidth="1.2" markerStart="url(#bv-arrow-gap)" markerEnd="url(#bv-arrow-gap)" />
-            <text x={fish1X + fishLenPx + gapPx / 2} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={gapColor} fontWeight="700">
+            <text x={fish1X + fishLenPx + gapPx / 2} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={gapInk} fontWeight="700">
               gap libre {(gapM * 100).toFixed(0)} cm
             </text>
           </g>
         )}
         {/* Cuando el gap es muy chico o negativo, mostrarlo como advertencia */}
         {gapPx <= 20 && gapPx > 0 && (
-          <text x={fish1X + fishLenPx + gapPx / 2} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={gapColor} fontWeight="700">
+          <text x={fish1X + fishLenPx + gapPx / 2} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={gapInk} fontWeight="700">
             gap {(gapM * 100).toFixed(0)} cm
           </text>
         )}
         {gapPx <= 0 && (
-          <text x={fish1X + fishLenPx} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill="#ef4444" fontWeight="700">
+          <text x={fish1X + fishLenPx} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={elegirColor('#ef4444', 'ink-crit')} fontWeight="700">
             solapamiento — peces se pisan
           </text>
         )}

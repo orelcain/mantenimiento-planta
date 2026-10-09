@@ -6,6 +6,9 @@ import { cn } from '@/lib/utils'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
 import { resolveCalibreLabel } from '@/services/grader/graderDashboardHelpers'
 import type { GraderAnalyticsResult } from '@/services/grader/types'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
+import { colorTipoError } from '../../graderTimelineColors'
 
 const causeColorMap: Record<string, string> = {
   fuera_de_limites: 'rgba(239,68,68,0.92)',
@@ -16,8 +19,9 @@ const causeColorMap: Record<string, string> = {
   otro: 'rgba(107,114,128,0.92)',
 }
 
+// Pizarra: tipos de error = series 1-5 en orden fijo y «Otros» (mismo mapa que el pivote y el timeline).
 const getCauseColor = (cause: string): string =>
-  causeColorMap[cause] ?? 'rgba(107,114,128,0.92)'
+  colorTipoError(cause, causeColorMap[cause] ?? 'rgba(107,114,128,0.92)', 0.92)
 
 interface Props {
   analytics: GraderAnalyticsResult
@@ -33,6 +37,8 @@ export function PuntoCeroClasificacionCard({
   onSelectedCauseLabelChange,
 }: Props) {
   const [expandedCause, setExpandedCause] = useState<string | null>(null)
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de canvas se leen de los tokens al pintar).
+  useColoresGrafico()
 
   const causes = analytics.pointZeroClassification.causes
   if (causes.length === 0) return null
@@ -43,7 +49,7 @@ export function PuntoCeroClasificacionCard({
       {
         data: causes.map((c) => c.pieces),
         backgroundColor: causes.map((c) => getCauseColor(c.cause)),
-        borderColor: 'rgba(255,255,255,0.92)',
+        borderColor: elegirColor('rgba(255,255,255,0.92)', 'card', 0.92),
         borderWidth: 2,
         hoverOffset: 8,
       },

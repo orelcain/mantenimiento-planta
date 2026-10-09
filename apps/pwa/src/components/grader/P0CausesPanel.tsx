@@ -29,6 +29,7 @@ import {
   MATRIX_CAUSE_ORDER_DERIVED,
 } from '@/services/grader/graderMatrixP0Causes'
 import { CauseTooltip } from './CauseTooltip'
+import { causaColorCss } from './shiftTimelineHelpers'
 import type { MatrixP0Cause, PointZeroClassification } from '@/services/grader/types'
 import type { LucideProps } from 'lucide-react'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
@@ -47,29 +48,24 @@ const CAUSE_ICONS: Record<MatrixP0Cause, IconComponent> = {
   otro: ({ className }) => <HelpCircle className={className} />,
 }
 
-/** Hex de cada causa para el ring del checkbox (consistente con scatter del timeline). */
-const CAUSE_HEX_BORDERS: Record<MatrixP0Cause, string> = {
-  fuera_de_limites:     '#ef4444',
-  no_leido_fotocelula:  '#f97316',
-  too_close_too_long:   '#a855f7',
-  puerta_no_preparada:  '#06b6d4',
-  fuera_de_calibre:     '#6366f1',
-  fuera_de_calidad:     '#10b981',
-  fuera_de_conservacion:'#f59e0b',
-  fuera_de_producto:    '#92400e',
-  otro:                 '#71717a',
-}
+/**
+ * Color de cada causa para el ring del checkbox: EL MISMO que el scatter del timeline
+ * (`causaColorCss` en shiftTimelineHelpers: hex de siempre sin Pizarra, serie 1-5 / Otros con ella).
+ */
 
 const FALLBACK_COLOR = { badge: 'bg-muted-foreground/[0.10] text-muted-foreground', bar: 'bg-muted-foreground' }
 const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
-  red:     { badge: 'bg-red-500/[0.15] text-ink-crit',       bar: 'bg-fill-critical'   },
-  orange:  { badge: 'bg-cat-4-tint/[0.15] text-cat-4-ink', bar: 'bg-cat-4-tint'},
-  purple:  { badge: 'bg-cat-6-tint/[0.15] text-cat-6-ink', bar: 'bg-cat-6-tint'},
-  cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cat-7-ink',     bar: 'bg-cat-7-tint'  },
-  emerald: { badge: 'bg-emerald-500/[0.15] text-ink-ok', bar: 'bg-fill-ok' },
-  amber:   { badge: 'bg-amber-500/[0.15] text-ink-warn',   bar: 'bg-fill-warning' },
-  brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn', bar: 'bg-fill-warning' },
-  blue:    { badge: 'bg-primary/[0.15] text-brand-ink',     bar: 'bg-primary'  },
+  // Variantes `pizarra:`: 5 causas = series 1-5 (acero, oliva, índigo/ciruela...) en el mismo orden que
+  // el scatter del timeline (CAUSA_TOKEN) y las 3 derivadas + «otra» = «Otros» (neutro medio). Ninguna
+  // causa usa falla/aviso: esas son de estado (fuera de banda), no de identidad.
+  red:     { badge: 'bg-red-500/[0.15] text-ink-crit pizarra:bg-cat-1-tint/[0.15] pizarra:text-cat-1-ink', bar: 'bg-fill-critical pizarra:bg-cat-1-tint' },
+  orange:  { badge: 'bg-cat-4-tint/[0.15] text-cat-4-ink pizarra:bg-cat-3-tint/[0.15] pizarra:text-cat-3-ink', bar: 'bg-cat-4-tint pizarra:bg-cat-3-tint' },
+  purple:  { badge: 'bg-cat-6-tint/[0.15] text-cat-6-ink pizarra:bg-cat-5-tint/[0.15] pizarra:text-cat-5-ink', bar: 'bg-cat-6-tint pizarra:bg-cat-5-tint' },
+  cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cat-7-ink pizarra:bg-cat-5-tint/[0.15] pizarra:text-cat-5-ink', bar: 'bg-cat-7-tint pizarra:bg-cat-5-tint' },
+  emerald: { badge: 'bg-emerald-500/[0.15] text-ink-ok pizarra:bg-cat-5-tint/[0.15] pizarra:text-cat-5-ink', bar: 'bg-fill-ok pizarra:bg-cat-5-tint' },
+  amber:   { badge: 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-cat-2-tint/[0.15] pizarra:text-cat-2-ink', bar: 'bg-fill-warning pizarra:bg-cat-2-tint' },
+  brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-cat-6-tint/[0.15] pizarra:text-cat-6-ink', bar: 'bg-fill-warning pizarra:bg-cat-6-tint' },
+  blue:    { badge: 'bg-primary/[0.15] text-brand-ink pizarra:bg-cat-7-tint/[0.15] pizarra:text-cat-7-ink', bar: 'bg-primary pizarra:bg-cat-7-tint' },
   zinc:    FALLBACK_COLOR,
 }
 
@@ -130,7 +126,7 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
         !hasPieces && 'opacity-40',
         selected && 'ring-2 ring-offset-1 ring-offset-background',
       )}
-      style={selected ? { '--tw-ring-color': CAUSE_HEX_BORDERS[cause] ?? '#ef4444' } as React.CSSProperties : undefined}
+      style={selected ? { '--tw-ring-color': causaColorCss(cause) } as React.CSSProperties : undefined}
     >
       <div className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/40 transition-colors">
         {hasPieces && (
@@ -235,7 +231,7 @@ function UmbrellaCauseRow({
         !hasPieces && 'opacity-40',
         selected && 'ring-2 ring-offset-1 ring-offset-background',
       )}
-      style={selected ? { '--tw-ring-color': CAUSE_HEX_BORDERS.fuera_de_limites } as React.CSSProperties : undefined}
+      style={selected ? { '--tw-ring-color': causaColorCss('fuera_de_limites') } as React.CSSProperties : undefined}
     >
       <div className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/40 transition-colors">
         {hasPieces && (
@@ -361,7 +357,7 @@ function SubCauseRow({
         hasPieces ? 'bg-background' : 'opacity-40',
         selected && 'ring-1 ring-offset-1 ring-offset-background',
       )}
-      style={selected ? { '--tw-ring-color': CAUSE_HEX_BORDERS[cause] ?? '#ef4444' } as React.CSSProperties : undefined}
+      style={selected ? { '--tw-ring-color': causaColorCss(cause) } as React.CSSProperties : undefined}
     >
       {hasPieces && onToggle && (
         <input

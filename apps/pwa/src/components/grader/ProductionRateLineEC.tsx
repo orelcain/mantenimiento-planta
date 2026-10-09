@@ -38,6 +38,7 @@ import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { useTheme } from '@/hooks/useTheme'
 import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { hayPizarra, tramaDiagonal } from '@/lib/coloresGrafico'
 import { dec1 } from '@/utils/formatoNumeros'
 
 // ── Colores por máquina (sky, violet, emerald) + ámbar para el promedio ──────
@@ -550,6 +551,9 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
     // La brecha se apila sobre la barra: en modo línea no tiene dónde apilarse.
     // La serie existe SIEMPRE en modo barras (ver `gapSeriesData`): con el toggle
     // apagado va con datos vacíos, no se saca del array.
+    const colorBrecha = hayPizarra()
+      ? tramaDiagonal(elegir(GAP_COLOR, 'grafico-neutro-medio', 0.6), elegir('#222120', 'card'))
+      : GAP_COLOR
     const gapSeries = mode === 'bar'
       ? series.map((s, i) => ({
           name:     i === 0 ? GAP_LABEL : `${GAP_LABEL} ${s.name}`,
@@ -557,8 +561,10 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
           stack:    `pz-${s.name}`,
           barWidth: barPx,
           data:     gapSeriesData(axis, regrouped.series[i] ?? [], regrouped.target, showGap),
-          itemStyle: { color: GAP_COLOR },
-          emphasis:  { itemStyle: { color: GAP_COLOR } },
+          // Pizarra: «lo que faltó» es una cantidad, no un estado → neutro medio CON TRAMA (hueco);
+          // el rojo queda para las paradas con objetivo (estado fuera de banda), abajo.
+          itemStyle: { color: colorBrecha },
+          emphasis:  { itemStyle: { color: colorBrecha } },
           tooltip:   { valueFormatter: (v: number) => `${v} pz/min sin producir` },
         }))
       : []
@@ -583,10 +589,11 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
       // vistazo que la pérdida fue por máquina parada, no por ritmo lento.
       markArea: stoppedWithTarget.length > 0 ? {
         silent: true,
+        // Pizarra: parada con objetivo corriendo = valor fuera de la banda esperada → falla (suave).
         itemStyle: {
-          color: 'rgba(176,112,109,0.16)',
+          color: elegir('rgba(176,112,109,0.16)', 'grafico-falla', 0.12),
           borderWidth: 1,
-          borderColor: 'rgba(176,112,109,0.45)',
+          borderColor: elegir('rgba(176,112,109,0.45)', 'grafico-falla', 0.6),
           borderType: 'dashed' as const,
         },
         /* Sin etiqueta. ECharts pinta el `name` de cada área arriba del tramo:
@@ -773,7 +780,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
         <p className="mt-1 flex items-center gap-1.5 text-caption text-muted-foreground">
           <span
             className="inline-block w-4 h-2.5 shrink-0 rounded-[2px] border border-dashed"
-            style={{ background: 'rgba(176,112,109,0.16)', borderColor: 'rgba(176,112,109,0.45)' }}
+            style={{ background: elegir('rgba(176,112,109,0.16)', 'grafico-falla', 0.12), borderColor: elegir('rgba(176,112,109,0.45)', 'grafico-falla', 0.6) }}
           />
           Tramos sombreados: la máquina estaba parada mientras el objetivo corría
           — pérdida por detención, no por ritmo lento.

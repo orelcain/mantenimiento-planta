@@ -14,6 +14,8 @@
  * Aplica el principio "consistencia entre elementos" del CLAUDE.md.
  */
 
+import { elegirColor } from '@/lib/coloresGrafico'
+
 // ── Conjunto canónico ────────────────────────────────────────────────────────
 
 /**
@@ -47,17 +49,18 @@ interface QualityColorEntry {
 }
 
 const QUALITY_COLORS: Record<QualityKey, QualityColorEntry> = {
-  premium:    { hex: '#6366f1', textClass: 'text-indigo-400'  },
-  // Pizarra vuelve neutro el verde «ok» de Tailwind; la leyenda de la serie «superior» debe
-  // seguir calzando con su hex (#10b981), que no cambia. Sin la paleta, la clase `pizarra:` no casa.
-  superior:   { hex: '#10b981', textClass: 'text-emerald-400 pizarra:text-[#10b981]' },
-  primera:    { hex: '#3b82f6', textClass: 'text-blue-400'    },
-  segunda:    { hex: '#f59e0b', textClass: 'text-amber-400'   },
-  tercera:    { hex: '#f97316', textClass: 'text-orange-400'  },
-  industrial: { hex: '#94a3b8', textClass: 'text-slate-400'   },
-  descarte:   { hex: '#ef4444', textClass: 'text-red-400'     },
-  grado:      { hex: '#06b6d4', textClass: 'text-cyan-400'    },
-  d:          { hex: '#71717a', textClass: 'text-zinc-400'    },
+  // Variantes `pizarra:` (solo casan con la paleta Pizarra; sin ella la clase es la de siempre).
+  // Texto: la rampa --calidad-4/5 no llega a 4,5:1 como tinta (Día 3,9 y 2,9:1), así que segunda y
+  // tercera usan la tinta del acero (--cat-1-ink); el resto sigue la correspondencia de QUALITY_TOKENS.
+  premium:    { hex: '#6366f1', textClass: 'text-indigo-400 pizarra:text-[var(--calidad-1)]'  },
+  superior:   { hex: '#10b981', textClass: 'text-emerald-400 pizarra:text-[var(--calidad-2)]' },
+  primera:    { hex: '#3b82f6', textClass: 'text-blue-400 pizarra:text-[var(--calidad-3)]'    },
+  segunda:    { hex: '#f59e0b', textClass: 'text-amber-400 pizarra:text-cat-1-ink'   },
+  tercera:    { hex: '#f97316', textClass: 'text-orange-400 pizarra:text-cat-1-ink'  },
+  industrial: { hex: '#94a3b8', textClass: 'text-slate-400 pizarra:text-cat-4-ink'   },
+  descarte:   { hex: '#ef4444', textClass: 'text-red-400 pizarra:text-cat-6-ink'     },
+  grado:      { hex: '#06b6d4', textClass: 'text-cyan-400 pizarra:text-cat-7-ink'    },
+  d:          { hex: '#71717a', textClass: 'text-zinc-400 pizarra:text-cat-5-ink'    },
 }
 
 /** Fallback cuando la calidad no matchea ninguna clave canónica. */
@@ -104,18 +107,28 @@ export function qualityColorHex(quality: string | undefined | null): string {
  * grado = serie 4; d = neutro medio. Solo se resuelve con la paleta Pizarra activa: `qualityColorHex`
  * NO cambia (hay tests que fijan sus hex y los usan PDF/exportaciones, que no leen CSS).
  */
-const QUALITY_VARS: Record<QualityKey, string> = {
-  premium:    'var(--calidad-1)',
-  superior:   'var(--calidad-2)',
-  primera:    'var(--calidad-3)',
-  segunda:    'var(--calidad-4)',
-  tercera:    'var(--calidad-5)',
-  industrial: 'rgb(var(--grafico-neutro-fuerte))',
-  descarte:   'rgb(var(--serie-3))',
-  grado:      'rgb(var(--serie-4))',
-  d:          'rgb(var(--grafico-neutro-medio))',
+const QUALITY_TOKENS: Record<QualityKey, string> = {
+  premium:    'calidad-1',
+  superior:   'calidad-2',
+  primera:    'calidad-3',
+  segunda:    'calidad-4',
+  tercera:    'calidad-5',
+  industrial: 'grafico-neutro-fuerte',
+  descarte:   'serie-3',
+  grado:      'serie-4',
+  d:          'grafico-neutro-medio',
 }
-const FALLBACK_VAR = 'rgb(var(--serie-otros))'
+const FALLBACK_TOKEN = 'serie-otros'
+
+/** `--calidad-N` guarda un color completo (hex); los demás tokens guardan canales «R G B». */
+function tokenAVar(token: string): string {
+  return token.startsWith('calidad-') ? `var(--${token})` : `rgb(var(--${token}))`
+}
+
+const QUALITY_VARS = Object.fromEntries(
+  QUALITY_KEYS.map((k) => [k, tokenAVar(QUALITY_TOKENS[k])]),
+) as Record<QualityKey, string>
+const FALLBACK_VAR = tokenAVar(FALLBACK_TOKEN)
 
 /** `var(--…)` de la calidad bajo Pizarra; sirve en `style` HTML/SVG (no en canvas). */
 export function qualityColorVar(quality: string | undefined | null): string {
@@ -125,6 +138,22 @@ export function qualityColorVar(quality: string | undefined | null): string {
     if (k.includes(key)) return QUALITY_VARS[key]
   }
   return FALLBACK_VAR
+}
+
+/**
+ * Color RESUELTO para canvas (Chart.js / ECharts, que no leen `var()`): `hoy` (el literal que el
+ * gráfico traía) sin Pizarra; con ella, el token de la calidad leído de los estilos (con `alfa`).
+ * Es la forma de pintar calidades en un canvas sin tocar `qualityColorHex`.
+ */
+export function qualityColorCanvas(quality: string | undefined | null, hoy: string, alfa = 1): string {
+  const k = (quality ?? '').toLowerCase().replace(/[^a-z]/g, '')
+  let token = FALLBACK_TOKEN
+  if (k) {
+    for (const key of QUALITY_KEYS) {
+      if (k.includes(key)) { token = QUALITY_TOKENS[key]; break }
+    }
+  }
+  return elegirColor(hoy, token, alfa)
 }
 
 /**

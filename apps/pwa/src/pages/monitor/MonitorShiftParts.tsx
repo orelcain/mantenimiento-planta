@@ -884,7 +884,7 @@ export function TiempoDelTurno({
         <div className="mt-2">
           <div className="flex h-6 overflow-hidden rounded-lg text-[11px] font-semibold text-white">
             <span
-              className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500"
+              className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500 pizarra:bg-[rgb(var(--grafico-neutro-fuerte))] pizarra:text-[rgb(var(--card))]"
               style={{ width: `${pct(tb.producingMin)}%` }}
               title={`Produciendo ${tb.producingMin} min`}
             >
@@ -895,7 +895,7 @@ export function TiempoDelTurno({
                 accesibilidad. */}
             {tb.plannedMin > 0 && (
               <span
-                className="flex items-center justify-center bg-slate-500"
+                className="flex items-center justify-center bg-slate-500 pizarra:bg-[rgb(var(--grafico-neutro-medio))] pizarra:text-foreground pz-trama"
                 style={{ width: `${pct(tb.plannedMin)}%` }}
                 title={`Planificado ${tb.plannedMin} min`}
               >
@@ -903,7 +903,7 @@ export function TiempoDelTurno({
               </span>
             )}
             <span
-              className="flex items-center justify-center bg-red-600 dark:bg-red-500"
+              className="flex items-center justify-center bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))] pizarra:text-[rgb(var(--card))]"
               style={{ width: `${pct(tb.recoverableMin)}%` }}
               title={`Recuperable ${tb.recoverableMin} min`}
             >
@@ -914,17 +914,17 @@ export function TiempoDelTurno({
 
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500" />
+              <i className="h-2.5 w-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500 pizarra:bg-[rgb(var(--grafico-neutro-fuerte))]" />
               Produciendo <span className="tabular-nums text-foreground/80">{tb.producingMin} min</span>
             </span>
             {tb.plannedMin > 0 && (
               <span className="flex items-center gap-1.5">
-                <i className="h-2.5 w-2.5 rounded-sm bg-slate-500" />
+                <i className="h-2.5 w-2.5 rounded-sm bg-slate-500 pizarra:bg-[rgb(var(--grafico-neutro-medio))] pz-trama" />
                 Planificado <span className="tabular-nums text-foreground/80">{tb.plannedMin} min</span>
               </span>
             )}
             <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-[4px] bg-red-600 dark:bg-red-500" />
+              <i className="h-2.5 w-2.5 rounded-[4px] bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]" />
               Recuperable <span className="tabular-nums text-foreground/80">{tb.recoverableMin} min</span>
             </span>
           </div>
