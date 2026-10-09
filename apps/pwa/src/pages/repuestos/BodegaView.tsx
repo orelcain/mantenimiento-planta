@@ -811,8 +811,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           {sesiones.map(s => (
             <button key={s.id} type="button" onClick={() => handleOpenSesion(s)}
               className="w-full min-h-[44px] flex items-center gap-4 p-4 bg-card border border-border rounded-card hover:bg-muted transition-colors text-left">
-              <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-emerald-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
-                {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-ink-ok" /> : <ClipboardList className="h-5 w-5 text-ink-warn" />}
+              <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-emerald-500/[0.15]' : 'bg-amber-500/[0.15] pizarra:bg-muted'}`}>
+                {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-ink-ok" /> : <ClipboardList className="h-5 w-5 text-ink-warn pizarra:text-muted-foreground" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">{s.nombre}</p>

@@ -256,7 +256,7 @@ export function useCtdEquipos(favorites: Set<string>) {
       ? { key: 'sinEvaluar' as const, label: 'Criticidad sin evaluar', n: kpis.sinEvaluar, cls: 'text-amber-600' }
       : { key: 'A' as const, label: 'Criticidad A', n: kpis.critA, cls: 'text-red-600' },
     { key: 'incompleta', label: 'Ficha incompleta', n: kpis.incompletas, cls: 'text-amber-600' },
-    { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600' },
+    { key: 'favoritos', label: '★ Favoritos', n: kpis.favs, cls: 'text-yellow-600 pizarra:text-muted-foreground' },
   ]
 
   const estadoChips: { key: EstadoFiltro; label: string }[] = [

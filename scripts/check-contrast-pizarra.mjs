@@ -143,6 +143,15 @@ for (const { nombre, sel, penumbra } of INTENSIDADES) {
     wcag(`ink-${k} sobre su tinte 15% (sobre fondo)`, ink, componer(bg, base[k], 0.15))
     wcag(`ink-${k} sobre su tinte 15% (sobre tarjeta)`, ink, componer(card, base[k], 0.15))
   }
+  // Tinte neutro: con Pizarra los verdes de Tailwind (--tw-emerald-500) valen texto 2, así que
+  // `bg-emerald-500/[0.15]` + `text-ink-ok` (chips «ok» sin migrar) debe seguir legible.
+  wcag('ink-ok sobre tinte neutro (tw-emerald-500 15% sobre fondo)', t['ink-ok'], componer(bg, t['tw-emerald-500'], 0.15))
+  wcag('ink-ok sobre tinte neutro (tw-emerald-500 15% sobre tarjeta)', t['ink-ok'], componer(card, t['tw-emerald-500'], 0.15))
+  wcag('ink-ok sobre tinte neutro (tw-green-500 15% sobre fondo)', t['ink-ok'], componer(bg, t['tw-green-500'], 0.15))
+  // success: relleno de botón/badge con su texto, y tinta de aviso sobre el relleno de aviso
+  wcag('texto sobre success (button/badge)', t['success-foreground'], t.success)
+  wcag('texto sobre warning (button/badge)', t['warning-foreground'], t.warning)
+  wcag('warning-ink (ink-warn) sobre su tinte 15% (sobre fondo)', t['ink-warn'], componer(bg, t.warning, 0.15))
   // Texto destructivo (rojo-600) y botón destructivo tinted
   wcag('text-destructive (tw-red-600) sobre tarjeta', t['tw-red-600'], card)
   wcag('text-destructive sobre botón tinted (destructive-tint)', t['tw-red-600'], t['destructive-tint'])

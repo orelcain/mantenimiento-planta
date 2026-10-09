@@ -149,6 +149,13 @@
   --tw-amber-400: 172 150 110;    --tw-amber-500: 168 140 100;   --tw-amber-600: 174 126 89;
   --tw-blue-400: 109 163 216;     --tw-blue-500: 74 134 200;
 
+  /* success / warning var-izados (tailwind.config.js). Defaults = los hex de siempre
+     (#6c986c, #ffffff, #c08e5f, #000000); la paleta Pizarra los reasigna más abajo.
+     --warning-ink es la TINTA de aviso (text-warning), separada del relleno (bg-warning). */
+  --success: 108 152 108;         --success-foreground: 255 255 255;
+  --warning: 192 142 95;          --warning-foreground: 0 0 0;
+  --warning-ink: 192 142 95;
+
   /* ── TINTA ADAPTATIVA (--ink-*) ───────────────────────────────────────────
      Nace de un ERROR: el barrido colapsó `text-X-700 dark:text-X-400` en un
      único `text-X-600`, y en la piel ACTUAL eso lavó los colores (el verde
@@ -505,6 +512,14 @@
   --destructive-tint: 245 227 228;  /* #B1272D al 13% sobre la tarjeta, opaco */
   --tw-amber-400: 242 180 0; --tw-amber-500: 242 180 0; --tw-amber-600: 132 86 0;
   --tw-blue-400: 42 107 166; --tw-blue-500: 42 107 166;
+  /* Verdes «ok» de Tailwind = texto 2 (igual que --ink-ok): normal sin color (ISA-101).
+     Las series de gráfico y el Monitor TV conservan su color (ver excepciones abajo). */
+  --tw-emerald-400: 78 77 74; --tw-emerald-500: 78 77 74; --tw-emerald-600: 78 77 74;
+  --tw-green-400: 78 77 74;   --tw-green-500: 78 77 74;   --tw-green-600: 78 77 74;
+  /* success = texto 2; warning = ámbar de relleno con texto oscuro; su tinta = --ink-warn. */
+  --success: 78 77 74;        --success-foreground: 255 255 255;
+  --warning: 242 180 0;       --warning-foreground: 29 29 28;
+  --warning-ink: var(--ink-warn);
 
   --fill-critical: 177 39 45;       /* relleno + texto #FFFFFF (6,57:1) */
   --fill-warning: 242 180 0;        /* relleno #F2B400 + texto #1D1D1C (9,08:1), NUNCA blanco */
@@ -541,10 +556,33 @@
   --destructive-tint: 63 49 47;     /* #FF9A90 al 13% sobre la tarjeta, opaco */
   --tw-amber-400: 242 180 0; --tw-amber-500: 242 180 0; --tw-amber-600: 242 193 78;
   --tw-blue-400: 125 180 238; --tw-blue-500: 125 180 238;
+  --tw-emerald-400: 189 182 170; --tw-emerald-500: 189 182 170; --tw-emerald-600: 189 182 170;
+  --tw-green-400: 189 182 170;   --tw-green-500: 189 182 170;   --tw-green-600: 189 182 170;
+  --success: 189 182 170;     --success-foreground: 23 22 20;
+  --warning: 242 180 0;       --warning-foreground: 29 29 28;
+  --warning-ink: var(--ink-warn);
 
   --fill-critical: 177 39 45;       /* relleno + texto #E8E2D7 (5,09:1) */
   --fill-warning: 242 180 0;        /* relleno + texto #171614 (9,73:1) */
   --fill-ok: 189 182 170;
+}
+
+/* ── Excepciones de Pizarra: el Monitor TV conserva TODOS sus colores de estado ──
+   Decisión del usuario: el monitor de planta (`.monitor-tv`, App.tsx) sigue con el
+   semáforo de Apple —verde, rojo y ámbar— hasta la oleada 1. Se re-fijan las variables
+   en el propio contenedor: las heredan sus descendientes y ganan sobre el :root. Son
+   los valores del bloque `[data-skin="apple"]` / `.dark` de arriba. */
+:root[data-paleta="pizarra"]:not(.dark) .monitor-tv {
+  --tw-emerald-400: 52 199 89;   --tw-emerald-500: 52 199 89;   --tw-emerald-600: 33 125 56;
+  --tw-green-400: 52 199 89;     --tw-green-500: 52 199 89;     --tw-green-600: 33 125 56;
+  --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 196 45 37;
+  --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 158 92 0;
+}
+:root[data-paleta="pizarra"].dark .monitor-tv {
+  --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 209 88;
+  --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 209 88;
+  --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 119 111;
+  --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 159 10;
 }
 
 /* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que
@@ -1252,6 +1290,15 @@
   .grader-light-mode::-webkit-scrollbar-thumb {
     background: #cbd5e1;
   }
+}
+
+/* Pizarra · contra-reglas del módulo Grader en modo Día. `.grader-light-mode` fuerza hex con
+   !important (verde #22c55e, badge #dcfce7/#166534); con Pizarra el «ok» es neutro. Solo se
+   monta con el tema claro, así que los tokens son los del Día. Especificidad mayor + !important. */
+:root[data-paleta="pizarra"] .grader-light-mode .text-green-500 { color: rgb(var(--ink-ok)) !important; }
+:root[data-paleta="pizarra"] .grader-light-mode [class*="bg-green-900"] {
+  background-color: rgb(var(--muted)) !important;
+  color: rgb(var(--ink-ok)) !important;
 }
 
 /* Perilla 5 · Protocolo — foco visible en todo interactivo (constitución §accesibilidad).

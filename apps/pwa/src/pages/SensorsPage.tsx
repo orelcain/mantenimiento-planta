@@ -1397,7 +1397,7 @@ export function SensorsPage() {
                   {/* WiFi Principal (Station Mode) */}
                   {selectedDevice.wifiSsid && (
                     <div className={`rounded-ctl border p-3 ${selectedDeviceIsFresh
-                      ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-emerald-500/[0.25]'
+                      ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-emerald-500/[0.25] pizarra:bg-none pizarra:bg-muted'
                       : 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-500/[0.25]'
                       }`}>
                       <div className={`text-xs font-semibold mb-2 flex items-center gap-1 ${selectedDeviceIsFresh
@@ -1587,7 +1587,7 @@ export function SensorsPage() {
 
                   {/* WiFi AP Local */}
                   {selectedDevice.apSsid && (
-                    <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-500/[0.25]">
+                    <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-500/[0.25] pizarra:bg-none pizarra:bg-muted">
                       <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                         <Wifi className="h-3 w-3" />
                         WiFi Local (Access Point)
@@ -2204,7 +2204,7 @@ export function SensorsPage() {
                 </div>
 
                 {selectedDevice.apSsid && (
-                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-500/[0.25]">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-500/[0.25] pizarra:bg-none pizarra:bg-muted">
                     <div className="text-xs font-semibold text-primary mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Configuración Actual del AP
@@ -2267,7 +2267,7 @@ export function SensorsPage() {
                 )}
 
                 {selectedDevice && (
-                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-500/[0.25]">
+                  <div className="rounded-ctl border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-500/[0.25] pizarra:bg-none pizarra:bg-muted">
                     <div className="text-xs font-semibold text-ink-ok mb-2 flex items-center gap-1">
                       <Wifi className="h-3 w-3" />
                       Información OTA (WiFi)

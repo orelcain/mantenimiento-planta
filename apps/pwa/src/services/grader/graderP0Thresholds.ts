@@ -67,7 +67,7 @@ export function p0StatusColor(status: P0Status): string {
   switch (status) {
     case 'ok':       return 'text-emerald-400'
     case 'alert':    return 'text-amber-400'
-    case 'critical': return 'text-rose-400'
+    case 'critical': return 'text-rose-400 pizarra:text-ink-crit'
   }
 }
 
@@ -94,7 +94,7 @@ export function p0StatusBgBorderClass(status: P0Status): string {
   switch (status) {
     case 'ok':       return 'border-emerald-500/30 bg-emerald-500/5'
     case 'alert':    return 'border-amber-500/30 bg-amber-500/5'
-    case 'critical': return 'border-rose-500/30 bg-rose-500/5'
+    case 'critical': return 'border-rose-500/30 bg-rose-500/5 pizarra:border-red-500/30 pizarra:bg-red-500/[0.15]'
   }
 }
 
@@ -103,6 +103,6 @@ export function p0StatusBorderClass(status: P0Status): string {
   switch (status) {
     case 'ok':       return 'border-emerald-500/30'
     case 'alert':    return 'border-amber-500/30'
-    case 'critical': return 'border-rose-500/30'
+    case 'critical': return 'border-rose-500/30 pizarra:border-red-500/30'
   }
 }
