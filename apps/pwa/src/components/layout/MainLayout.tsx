@@ -41,6 +41,8 @@ import { getEquipments } from '@/services/equipment'
 import { subscribeToIncidents } from '@/services/incidents'
 import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
+import { modoHerramienta } from '@/lib/rutasHerramienta'
+import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
 import { enBitacora, pedirNuevoEvento } from '@/services/bitacora/pedirNuevoEvento'
 import { RotuloNuevoEvento } from '@/components/bitacora/RotuloNuevoEvento'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
@@ -219,6 +221,12 @@ export function MainLayout() {
   const isBaader200Route = location.pathname.startsWith('/baader-200')
   const isPlanosAguasRoute = location.pathname.startsWith('/planos-aguas')
   const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
+  // Herramientas del Centro de Aprendizaje (HMI, Perilla, A3C, planos, fichas…): pantalla completa
+  // con su propio EncabezadoHerramienta. Sin barra inferior, sin botón flotante de ARIA y sin el
+  // botón «Activar ARIA»: el usuario vuelve con el encabezado, el atrás del sistema o «Más».
+  // El hub /aprendizaje devuelve null y conserva todo. Ver lib/rutasHerramienta.ts.
+  const modoHerr = modoHerramienta(location.pathname)
+  useEffect(() => (modoHerr ? ocultarBurbujaChat() : undefined), [modoHerr])
   const isMapRoute = location.pathname.startsWith('/map')
   // Repuestos: lente área-first con 3 paneles (sidebar/lista/detalle) que scrollean
   // independientes → necesita contenedor de altura acotada + overflow-hidden (como Clima/HMI).
@@ -1181,7 +1189,12 @@ export function MainLayout() {
         <main
           id="main-content"
           className={`${
-            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute || isLineasRoute
+            modoHerr === 'lienzo'
+              // Alto exacto del dispositivo: ya no hay barra inferior que descontar (antes -4rem).
+              ? 'h-[100dvh] lg:h-[calc(100dvh-3.5rem)] p-0 overflow-hidden pb-[env(safe-area-inset-bottom)] lg:pb-0'
+              : modoHerr === 'lectura'
+              ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-[env(safe-area-inset-bottom)] lg:pb-0'
+              : isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute || isLineasRoute
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-24 lg:pb-0'
@@ -1251,7 +1264,7 @@ export function MainLayout() {
       {canSee('aria') && <ChatBot />}
 
       {/* Botón para que admin active ARIA si no está habilitado */}
-      {!canSee('aria') && isAdmin && (
+      {!canSee('aria') && isAdmin && !modoHerr && (
         <button
           onClick={handleEnableAria}
           className="fixed right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 pizarra:bg-none pizarra:bg-primary pizarra:text-primary-foreground transition-all hover:scale-105 bottom-24 lg:bottom-6"
@@ -1273,7 +1286,7 @@ export function MainLayout() {
           // rectangular de borde a borde con border-t era iOS 15. Sin border-t:
           // el borde lo pone el inset de 0.5px del propio material.
           'lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav',
-          location.pathname === '/' && 'hidden',
+          (location.pathname === '/' || modoHerr) && 'hidden',
         )}
         // Flota 12px por encima de la safe area (el home indicator), no se apoya en ella.
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}

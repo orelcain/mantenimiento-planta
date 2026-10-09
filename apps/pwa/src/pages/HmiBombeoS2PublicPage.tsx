@@ -12,9 +12,12 @@
  */
 
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
-import { BookOpen, QrCode, X, Copy, Check, Maximize, Minimize, GitCompare, Play, Pause, SkipBack, SkipForward, Rewind, Paintbrush, Eraser, Camera, Download, Trash2 } from 'lucide-react'
+import { QrCode, X, Copy, Check, Maximize, Minimize, GitCompare, Play, Pause, SkipBack, SkipForward, Rewind, Paintbrush, Eraser, Camera, Download, Trash2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { dec2 } from '@/utils/formatoNumeros'
+import { EncabezadoHerramienta } from '@/components/piel'
+import { useAuthStore } from '@/store'
+import { useTemaEmbed } from '@/hooks/useTemaEmbed'
 
 const SNAPSHOTS_LS_KEY = 'hmi-yal-snapshots-v1'
 
@@ -188,8 +191,10 @@ function diffSnapshots(a: Snapshot, b: Snapshot): DiffEntry[] {
 
 export function HmiBombeoS2PublicPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const enviarTema = useTemaEmbed(iframeRef)
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
 
   const [qrOpen, setQrOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -346,8 +351,8 @@ export function HmiBombeoS2PublicPage() {
 
   const iframeSrc = useMemo(() => {
     const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
-    // embedded=1 → oculta el cycle-panel del HMI (los controles vienen del wrapper React)
-    return BASE_PATH + 'hmi-bombeo-s2-embed.html?v=' + v + '&embedded=1'
+    // embed=1 → oculta el cycle-panel del HMI (los controles vienen del wrapper React)
+    return BASE_PATH + 'hmi-bombeo-s2-embed.html?v=' + v + '&embed=1'
   }, [])
 
   const learnUrl = useMemo(() => {
@@ -488,17 +493,34 @@ export function HmiBombeoS2PublicPage() {
   const totalFrames = Math.round(videoDuration * VIDEO_FPS)
 
   return (
-    <div ref={containerRef} className="flex flex-col w-screen bg-[#0a1628]" style={{ height: '100dvh' }}>
+    <div
+      ref={containerRef}
+      className={`flex flex-col bg-[#0a1628] ${isAuthenticated ? 'h-full w-full' : 'w-screen'}`}
+      style={isAuthenticated ? undefined : { height: '100dvh' }}
+    >
 
-      {/* Header */}
+      {/* Encabezado único del marco (volver · título · ARIA · Más). Pantalla completa y Compartir
+          viven en «Más». Debajo, la barra de herramientas del validador, sin cambios de tamaño
+          (los toques de 48 px y el desborde de esta pantalla son de la tanda b). */}
+      {!visualFs && (
+        <EncabezadoHerramienta
+          className="bg-background"
+          etiquetaVolver="Aprendizaje"
+          volverA="/aprendizaje"
+          titulo="HMI Bombeo Acopio S2"
+          subtitulo="Planta Yal · validador con video real"
+          contextoAria="Estoy en el simulador HMI Bombeo Acopio S2 (Yal). "
+          itemsMas={[
+            { key: 'fs', label: (isFullscreen || visualFs) ? 'Salir de pantalla completa' : 'Pantalla completa', icon: (isFullscreen || visualFs) ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />, onClick: toggleFullscreen },
+            { key: 'qr', label: 'Compartir (QR)', icon: <QrCode aria-hidden="true" />, onClick: () => setQrOpen(true) },
+          ]}
+        />
+      )}
+
       <div
-        className="flex items-center gap-2 px-3 flex-shrink-0 border-b border-[#1e3a5f]"
+        className="flex items-center justify-end gap-2 px-3 flex-shrink-0 border-b border-[#1e3a5f]"
         style={{ height: visualFs ? '0' : '40px', overflow: 'hidden', background: '#0d1f3c', transition: 'height .2s' }}
       >
-        <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
-        <span className="text-blue-300 text-xs font-semibold tracking-wide uppercase">Modo Aprendizaje</span>
-        <span className="text-[#3a5a7a] text-xs hidden sm:inline">— HMI Bombeo Acopio S2 (YAL) · Validador con video real</span>
-        <div className="flex-1" />
         <button
           onClick={() => setPaintMode(v => !v)}
           className={`flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded border ${paintMode ? 'border-pink-400 text-pink-300 bg-pink-500/10' : 'border-[#1e3a5f] text-blue-400 hover:text-blue-200 hover:border-blue-400'}`}
@@ -541,21 +563,6 @@ export function HmiBombeoS2PublicPage() {
           <GitCompare className="h-3 w-3" />
           <span className="hidden sm:inline">{compareMode ? 'Video ON' : 'Video OFF'}</span>
         </button>
-        <button
-          onClick={toggleFullscreen}
-          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
-          title={(isFullscreen || visualFs) ? 'Salir de pantalla completa' : 'Pantalla completa'}
-        >
-          {(isFullscreen || visualFs) ? <Minimize className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
-        </button>
-        <button
-          onClick={() => setQrOpen(true)}
-          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
-          title="Compartir QR"
-        >
-          <QrCode className="h-3 w-3" />
-          <span className="hidden sm:inline">Compartir</span>
-        </button>
       </div>
 
       {/* Body: simulador | video player */}
@@ -567,6 +574,7 @@ export function HmiBombeoS2PublicPage() {
             title="HMI Bombeo Acopio S2 — Simulador"
             className="w-full h-full border-0"
             allow="fullscreen"
+            onLoad={enviarTema}
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           />
           <div className="absolute top-2 left-2 text-[10px] uppercase tracking-wider text-blue-300 bg-[#0d1f3c]/80 px-2 py-0.5 rounded border border-[#1e3a5f] pointer-events-none">

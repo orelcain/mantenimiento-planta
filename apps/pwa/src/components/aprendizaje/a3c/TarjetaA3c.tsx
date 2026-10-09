@@ -11,8 +11,8 @@
  * Recibe el paquete ya cargado (la página lo pide); así se prueba sin red.
  */
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ChevronLeft, Minus, Plus, Search } from 'lucide-react'
-import { Button, ListCell, ListGroup, SegmentedControl, Sheet } from '@/components/piel'
+import { Languages, Minus, Plus, Search } from 'lucide-react'
+import { Button, EncabezadoHerramienta, ListCell, ListGroup, SegmentedControl, Sheet } from '@/components/piel'
 import { cargarPlacaA3c, type Hoja, type PaqueteA3c, type PaquetePlaca, type Texto } from '@/data/baader142A3c'
 import {
   altoBornePlaca,
@@ -126,7 +126,8 @@ export interface TarjetaA3cProps {
   paquete: PaqueteA3c
   /** Dibujo de la placa ya cargado (pruebas). Sin esto se pide al elegir «Placa». */
   placa?: PaquetePlaca
-  onVolver: () => void
+  /** Ruta a la que vuelve el «‹» del encabezado si no hay historial interno (la ficha de la máquina). */
+  volverA: string
   etiquetaVolver: string
   /** Fuerza el diseño (pruebas). Sin esto se mide el ancho real del contenedor. */
   dosColumnas?: boolean
@@ -149,7 +150,7 @@ function usePunteroGrueso(): boolean {
   return grueso
 }
 
-export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver, dosColumnas: forzado, tactil }: TarjetaA3cProps) {
+export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver, dosColumnas: forzado, tactil }: TarjetaA3cProps) {
   const { datos, dibujo } = paquete
   const m = useMemo(() => construirModelo(datos), [datos])
   const codigosElementos = useMemo(() => Object.keys(datos.elementos), [datos])
@@ -705,22 +706,15 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
   )
 
   // ─── Piezas de interfaz ───
-  const selectorIdioma = (
-    <SegmentedControl<Idioma>
-      ariaLabel="Idioma de los textos del plano"
-      value={idioma}
-      onChange={setIdioma}
-      segments={[{ value: 'es', label: 'ES' }, { value: 'or', label: 'Original' }]}
-      className={cn(ALTO_44, 'w-[168px] flex-none')}
-    />
-  )
+  // Un solo control en el encabezado (marco único): el modo. «Español / Original» se cambia una vez
+  // por sesión y pasa al menú Más.
   const selectorModo = (
     <SegmentedControl<Modo>
+      tamano="herramienta"
       ariaLabel="Modo"
       value={modo}
       onChange={setModo}
       segments={[{ value: 'explorar', label: 'Explorar' }, { value: 'practicar', label: 'Practicar' }, { value: 'diagnostico', label: 'Diagnóstico' }]}
-      className={cn(ALTO_44, pc ? 'w-[390px] flex-none' : 'mt-3')}
     />
   )
 
@@ -919,15 +913,22 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
     />
   )
 
-  const volver = (
-    <button
-      type="button"
-      onClick={onVolver}
-      className="-ml-2 inline-flex min-h-[44px] items-center gap-0.5 rounded-full px-2 text-body text-primary hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-    >
-      <ChevronLeft aria-hidden className="size-6" />
-      {etiquetaVolver}
-    </button>
+  const encabezado = (
+    <EncabezadoHerramienta
+      etiquetaVolver={etiquetaVolver}
+      volverA={volverA}
+      titulo={pc ? 'Tarjeta A3C · BAADER 142' : 'Tarjeta A3C'}
+      subtitulo={pc ? undefined : 'BAADER 142'}
+      contextoAria={`Estoy en la Tarjeta A3C de la Baader 142, con ${item.codigo} elegido. `}
+      control={selectorModo}
+      itemsMas={[{
+        key: 'idioma',
+        icon: <Languages aria-hidden />,
+        label: idioma === 'es' ? 'Textos del plano en original' : 'Textos del plano en español',
+        subtitle: idioma === 'es' ? 'Ahora en español' : 'Ahora en el idioma original',
+        onClick: () => setIdioma(idioma === 'es' ? 'or' : 'es'),
+      }]}
+    />
   )
 
   const campoBusqueda = (autoFocus: boolean) => (
@@ -1024,18 +1025,17 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
 
   if (pc) {
     return (
-      <div ref={raizRef} className="min-h-full w-full bg-background pb-4 text-foreground">
+      <div ref={raizRef} className="flex h-full min-h-0 w-full flex-col bg-background text-foreground">
+        {encabezado}
+        <div className="min-h-0 flex-1 overflow-y-auto pb-4">
         {/* Sin `max-width`: la herramienta usa todo el ancho útil de la ventana (HIG, layout). */}
         <div className="w-full px-5">
-          <div className="flex h-[52px] items-center">{volver}</div>
-          <header className="flex flex-wrap items-end justify-between gap-4 pb-3">
+          <header className="flex flex-wrap items-end justify-between gap-4 py-3">
             <div className="min-w-0">
-              <h1 className="text-title1 font-bold">Tarjeta A3C · BAADER 142</h1>
-              <p className="mt-0.5 font-mono text-caption text-muted-foreground">{FUENTE}</p>
+              <p className="font-mono text-caption text-muted-foreground">{FUENTE}</p>
               <IndicadorRepuestosA3c codigos={codigosElementos} />
             </div>
             <div className="flex items-center gap-3">
-              {selectorIdioma}
               {modo === 'explorar' && (
                 <div className="relative w-[300px]">
                   {campoBusqueda(false)}
@@ -1046,7 +1046,6 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
                   )}
                 </div>
               )}
-              {selectorModo}
             </div>
           </header>
           {diagnostico}
@@ -1083,26 +1082,23 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
             </div>
           )}
         </div>
+        </div>
         {hojaAmbigua}
       </div>
     )
   }
 
   return (
-    <div ref={raizRef} className="min-h-full w-full bg-background pb-[calc(env(safe-area-inset-bottom,0px)+24px)] text-foreground">
+    <div ref={raizRef} className="flex h-full min-h-0 w-full flex-col bg-background text-foreground">
+      {encabezado}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom,0px)+24px)]">
       <div className="mx-auto w-full max-w-[640px] px-4">
-        <div className="flex h-[52px] items-center justify-between gap-2">
-          {volver}
-          {selectorIdioma}
-        </div>
-        <h1 className="text-title1 font-bold">Tarjeta A3C</h1>
-        <p className="mt-0.5 font-mono text-caption text-muted-foreground">{FUENTE}</p>
+        <p className="mt-3 font-mono text-caption text-muted-foreground">{FUENTE}</p>
         <IndicadorRepuestosA3c codigos={codigosElementos} />
-        {selectorModo}
         {diagnostico}
         {modo === 'practicar' ? quiz : modo === 'diagnostico' ? null : (
           <>
-            {lienzo(hoja, 'mt-3 h-[clamp(280px,calc(100dvh-440px),460px)] touch-none')}
+            {lienzo(hoja, 'mt-3 h-[clamp(280px,calc(100dvh-380px),460px)] touch-none')}
             {hoja === '23' && verPlaca && <p className="mt-1.5 text-caption leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
             <FranjaLed linea={lineaVista} onVer={verLed} destino={lineaVista.soloPlano ? 'plano' : 'tarjeta'} className="mt-3" />
             {regleta}
@@ -1124,6 +1120,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, onVolver, etiquetaVolver
             </button>
           </>
         )}
+      </div>
       </div>
       <Sheet
         open={hojaAbierta}

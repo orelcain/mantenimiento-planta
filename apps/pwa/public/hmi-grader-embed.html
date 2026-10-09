@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-title" content="Grader HMI">
 <meta name="theme-color" content="#1A5276">
 <title>RC 172.27.12.12</title>
+<script src="embed-tema.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -40,6 +41,9 @@ html, body {
   justify-content: center;
   overflow: auto;
 }
+/* Contrato app:tema (embed-tema.js): SOLO el fondo alrededor de la ventana RC sigue el tema de la
+   app; la ventana y todo su contenido conservan sus colores (réplica del equipo). */
+html.tema-app, html.tema-app body { background: var(--tema-fondo); }
 /* Cuando está embebido en iframe (HmiGraderPage del Learning Hub),
    alinear al top-left con padding para evitar recortes por centrado flex */
 html.in-iframe, html.in-iframe body {

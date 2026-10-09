@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { MemoryRouter } from 'react-router-dom'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +24,7 @@ const paquete: PaqueteA3c = {
 }
 
 const montar = (dosColumnas = false) =>
-  render(<TarjetaA3c paquete={paquete} onVolver={() => {}} etiquetaVolver="Baader 142" dosColumnas={dosColumnas} />)
+  render(<MemoryRouter><TarjetaA3c paquete={paquete} volverA="/aprendizaje/maquina/baader-142" etiquetaVolver="Baader 142" dosColumnas={dosColumnas} /></MemoryRouter>)
 
 /** Abre el modo Diagnóstico (su UI es un chunk perezoso). */
 async function abrir(dosColumnas = false) {

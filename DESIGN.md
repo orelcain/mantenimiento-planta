@@ -390,12 +390,10 @@ propia de la app modulando una variable de opacidad.
   una sección. El Grader tenía un tercer modo (un toggle sol/luna que arrancaba siempre en
   oscuro, ignorando el tema de la app); desde 2026-09-16 hereda el tema en vivo y el toggle
   se retiró. `useIsDark()` en `hooks/useTheme.ts` es la forma de preguntar por el tema.
-- **Excepción explícita: el simulador HMI Knuro (2026-10-08).** Su marco completo (cabecera,
-  presets, barra de pantalla, panel «Pantallas», riel horizontal, aviso de giro) usa el estilo
-  fijo «Consola», igual en tema claro y oscuro, como un visor de video o de fotos de iOS. No es
-  un interruptor de tema del módulo (eso sigue prohibido): es un visor de equipo que se ve
-  siempre igual. Detalle y tokens en §5f. La regla general no cambia: cualquier otra pantalla
-  sigue el tema del sistema, y la excepción no se extiende por analogía sin anotarla aquí.
+- **Sin excepciones de marco (2026-10-09).** El marco del simulador HMI Knuro tuvo un estilo fijo
+  «Consola» (2026-10-08); se retiró: ahora sigue el tema como cualquier otra pantalla (paleta
+  Pizarra, claro y oscuro) y usa el marco único de herramientas (§5f). Lo único que no sigue el
+  tema es lo que es fidelidad al equipo (ver §5f): el bisel del X2 y los globos «Ventana del panel».
 - **Los grises son neutros.** Sesgo de hue ≤ 5 (diferencia máx. entre canales RGB). La
   escala *slate* de Tailwind tiene sesgo 27–34 y hace que un módulo se lea como de otra app
   aunque cada color cumpla contraste. Los grises de iOS: `#1C1C1E` (2), `#6E6E71` (3),
@@ -596,17 +594,31 @@ con un script Node local (`writeFileSync` en `utf8`).
    `HmiKnuroPublicPage`) y las experiencias interactivas sobre el modelo 3D (sopladoras Baader
    142, plataforma pontón) conservan su tipografía: es fidelidad al equipo, no interfaz. Lo que
    sí les aplica es el marco alrededor (botones, encabezados de la app).
-   **Ampliación HMI Knuro (2026-10-08):** en `HmiKnuroPublicPage` (/aprendizaje/hmi-knuro) y en
-   el editor `HmiKnuroPage` (/hmi-knuro) el MARCO completo del simulador también es excepción:
-   estilo fijo «Consola» que NO sigue el tema (excepción explícita a §6b). Gris acero neutro
-   (sesgo ≤ 3) sin azul: `--k-case #1c1d1f`, `--k-panel #26272a`, `--k-raised #313236`,
-   `--k-line #3d3f43`, `--k-ink #e6e6e6`, `--k-ink2 #a6a7a9`; la selección es una tecla
-   encendida (`--k-key #d9dadb`, texto `#141516`, borde inferior 2 px `#8f9093`, la familia de
-   los globos) y el único color es el navy `#1e3f7a` del «?». IBM Plex Sans/Mono, foco 2 px
-   `#e6e6e6`. Tokens en `components/hmiKnuro/knuroConsola.css` (React) y en el bloque
-   «CONSOLA» de `public/hmi-knuro-embed.html` (iframe). Dentro de la app con sesión el bloque
-   del simulador se ve con este estilo, como un visor. NO cambian el panel X2 (`.dev`/`#hs`) ni
-   los globos, la hoja y la lista de campos (familia «Ventana del panel», siempre clara).
+   **HMI Knuro (2026-10-09, reemplaza la ampliación «Consola» del 08-10):** el MARCO del
+   simulador (`HmiKnuroPublicPage` y editor `HmiKnuroPage`) sigue el tema de la app. La página
+   pública usa `EncabezadoHerramienta` + presets como `SegmentedControl` (ver «Marco de
+   herramientas» abajo); `knuroConsola.css` ya no tiene colores propios: cada `--k-*` es un alias de
+   un token de la app (lo siguen usando el editor admin, el diálogo QR y los estados de carga). NO
+   cambian el panel X2 (`.dev`/`#hs`) ni los globos de ayuda y la hoja (familia «Ventana del
+   panel», siempre clara, etiqueta AYUDA). El bloque «CONSOLA» de `public/hmi-knuro-embed.html`
+   (fondo, barra, panel «Pantallas» y su buscador, riel, aviso de giro, **lista de campos** y
+   **«Para qué sirve esta pantalla»**) SIGUE EL TEMA: recibe los colores de la app por `postMessage`
+   (`public/embed-tema.js`, `lib/temaEmbed.ts`, `hooks/useTemaEmbed.ts`). Decisión del usuario
+   2026-10-09: la lista de campos y «Para qué sirve» siguen el tema (oscuras en Noche); solo los
+   globos de ayuda quedan siempre claros. Abierto suelto (sin padre), el embed conserva sus grises.
+
+   **Marco de herramientas (2026-10-09, Centro de Aprendizaje).** Las herramientas (HMI Knuro,
+   Grader y Bombeo, Perilla 5, Tarjeta A3C, planos, Variadores, fichas, terreno) ocupan toda la
+   pantalla y comparten un solo encabezado, `components/piel/EncabezadoHerramienta`: volver «‹»
+   (48 px; en PC con el rótulo del destino) + título/subtítulo + «Preguntar a ARIA» y «Más» (48 px),
+   56 px en celular y 64 en PC, y debajo el ÚNICO control de la herramienta (un `SegmentedControl`
+   con `tamano="herramienta"` = 48 px literales). Qué rutas son herramienta lo decide
+   `lib/rutasHerramienta.ts` (`lienzo` = alto fijo sin scroll de página; `lectura` = scroll normal);
+   en ambas `MainLayout` oculta la barra inferior, el botón flotante de ARIA y «Activar ARIA»; el
+   hub `/aprendizaje` conserva todo. Siempre se puede volver: con el «‹» (`hooks/useVolver.ts`:
+   atrás si `history.state.idx > 0`, si no a la ruta de respaldo; nunca `history.length`), con el
+   atrás del sistema y con «Más → Ir al inicio». Iframes: `?embed=1` quita el encabezado propio del
+   embed (Knuro: franja «Modo Aprendizaje»; Bombeo: alias de `embedded=1`).
    Hallazgo del medidor en PC: con la raíz al 87,5 % `text-xs` (0.75rem) rendía 10,5 px en
    TODO el escritorio (chips de fecha, pie de la barra lateral, tarjetas del visor 3D). Se
    resolvió en la escala, no pantalla por pantalla: `xs = max(0.75rem, 11px)` en

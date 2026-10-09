@@ -1,5 +1,5 @@
 /**
- * Selector de presets del marco «Consola»: dos controles segmentados (Planta y Máquina) con la
+ * Selector de presets del editor admin (la página pública usa ControlPresetsKnuro bajo el EncabezadoHerramienta): dos controles segmentados (Planta y Máquina) con la
  * línea como texto fijo. Si los nombres no calzan el patrón «Planta X - BAA142 - N1» (o hay
  * demasiadas plantas/máquinas) cae a un botón emergente con el menú agrupado por planta.
  * No navega ni habla con el iframe: solo llama `onSelect(nombre)`; cada página decide qué hace

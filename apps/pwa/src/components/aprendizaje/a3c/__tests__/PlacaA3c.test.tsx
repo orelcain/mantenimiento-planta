@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { MemoryRouter } from 'react-router-dom'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +24,7 @@ const svgPlaca = leer('placa-n2.svg')
 const placa: PaquetePlaca = { dibujo: interiorPlaca(svgPlaca), geo: geometriaPlaca(svgPlaca) }
 
 const montar = () =>
-  render(<TarjetaA3c paquete={paquete} placa={placa} onVolver={() => {}} etiquetaVolver="Baader 142" dosColumnas tactil={false} />)
+  render(<MemoryRouter><TarjetaA3c paquete={paquete} placa={placa} volverA="/aprendizaje/maquina/baader-142" etiquetaVolver="Baader 142" dosColumnas tactil={false} /></MemoryRouter>)
 const host = () => document.querySelector<HTMLElement>('[data-lienzo="placa"]')
 const encendidos = () => [...document.querySelectorAll('[data-lienzo="placa"] [data-encendido]')].map(e => e.id)
 const ficha = () => within(screen.getByTestId('ficha-a3c'))

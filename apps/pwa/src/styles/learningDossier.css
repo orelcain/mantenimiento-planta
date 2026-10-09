@@ -59,10 +59,6 @@
   .dossier .dp-wrap { max-width: 1200px; }
 }
 
-/* Volver */
-.dossier .dp-back { display: inline-flex; align-items: center; gap: 8px; font-family: var(--dp-mono); font-size: 12px; letter-spacing: .04em; color: var(--dp-ink-soft); background: none; border: 0; cursor: pointer; padding: 8px 0; }
-.dossier .dp-back:hover { color: var(--dp-accent); }
-
 /* Portada */
 .dossier .dp-eyebrow { font-family: var(--dp-mono); font-size: 11px; letter-spacing: .14em; color: var(--dp-ink-soft); }
 .dossier .dp-eyebrow b { color: var(--dp-accent); font-weight: 600; }

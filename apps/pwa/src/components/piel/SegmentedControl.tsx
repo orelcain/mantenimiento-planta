@@ -30,9 +30,16 @@ export interface SegmentedControlProps<T extends string> {
   /** Nombre accesible del grupo, p. ej. "Vista de Repuestos". */
   ariaLabel: string
   className?: string
+  /**
+   * `herramienta`: 48 px LITERALES (pista) y 44 de pastilla, para el único control bajo el
+   * encabezado de las herramientas del Centro de Aprendizaje. No usa `h-11` porque con la raíz al
+   * 85 % del celular rinde ~37 px. El tamaño por defecto (44) no cambia: lo usa Repuestos.
+   */
+  tamano?: 'normal' | 'herramienta'
 }
 
-export function SegmentedControl<T extends string>({ value, onChange, segments, ariaLabel, className }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({ value, onChange, segments, ariaLabel, className, tamano = 'normal' }: SegmentedControlProps<T>) {
+  const grande = tamano === 'herramienta'
   const botones = useRef<(HTMLButtonElement | null)[]>([])
   // Tabulable: el elegido; si ningún valor coincide, el primero.
   const tabulable = Math.max(0, segments.findIndex(s => s.value === value))
@@ -58,7 +65,7 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn('flex h-11 w-full rounded-full bg-muted', className)}
+      className={cn('flex w-full rounded-full bg-muted', grande ? 'h-[48px]' : 'h-11', className)}
     >
       {segments.map((s, i) => {
         const on = s.value === value
@@ -74,7 +81,7 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
             tabIndex={i === tabulable ? 0 : -1}
             onClick={() => onChange(s.value)}
             onKeyDown={e => alTeclear(e, i)}
-            className="flex h-11 min-w-0 flex-1 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+            className={cn('flex min-w-0 flex-1 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40', grande ? 'h-[48px]' : 'h-11')}
           >
             <span
               className={cn(

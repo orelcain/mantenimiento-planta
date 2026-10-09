@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { MemoryRouter } from 'react-router-dom'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -26,7 +27,13 @@ const paquete: PaqueteA3c = {
 }
 
 const montar = (dosColumnas: boolean, tactil?: boolean, p: PaqueteA3c = paquete) =>
-  render(<TarjetaA3c paquete={p} onVolver={() => {}} etiquetaVolver="Baader 142" dosColumnas={dosColumnas} tactil={tactil} />)
+  render(<MemoryRouter><TarjetaA3c paquete={p} volverA="/aprendizaje/maquina/baader-142" etiquetaVolver="Baader 142" dosColumnas={dosColumnas} tactil={tactil} /></MemoryRouter>)
+
+/** El idioma del plano se cambia desde el menú Más del encabezado (marco único de herramientas). */
+const pasarAOriginal = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Más' }))
+  fireEvent.click(screen.getByRole('button', { name: /Textos del plano en original/ }))
+}
 
 const ledsEncendidos = () => [...document.querySelectorAll('[data-testid="leds-encendidos"] [data-led]')].map(g => g.getAttribute('data-led'))
 
@@ -97,14 +104,14 @@ describe('Tarjeta A3C', () => {
     expect(within(screen.getByTestId('franja-led')).getByText('Sin LED')).toBeTruthy()
   })
 
-  it('ES | Original cambia los textos del dibujo y de la ficha, y se recuerda', () => {
+  it('Español / Original (en el menú Más) cambia los textos del dibujo y de la ficha, y se recuerda', () => {
     montar(true)
     const lienzo = document.querySelector('svg[data-hoja="23"]')!
     expect(lienzo.textContent).toContain('B21 encoder SM1 B')
     // En español el texto del plano solo aparece en «En el plano», no como nombre.
     expect(within(screen.getByTestId('ficha-a3c')).getAllByText(paquete.datos.elementos.B4!.original)).toHaveLength(1)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Original' }))
+    pasarAOriginal()
     expect(lienzo.textContent).toContain('B21 Drehwertgeber SM1 B')
     expect(lienzo.textContent).not.toContain('B21 encoder SM1 B')
     const ficha = within(screen.getByTestId('ficha-a3c'))
@@ -114,7 +121,8 @@ describe('Tarjeta A3C', () => {
     cleanup()
 
     montar(true)
-    expect(screen.getByRole('tab', { name: 'Original' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Más' }))
+    expect(screen.getByRole('button', { name: /Textos del plano en español/ })).toBeTruthy()
   })
 
   it('con mouse, un clic sobre S20..S25 (misma zona del plano) pregunta cuál en vez de elegir S20', () => {
@@ -131,13 +139,16 @@ describe('Tarjeta A3C', () => {
     for (const k of ['S20', 'S21', 'S22', 'S23', 'S24', 'S25']) expect(within(hoja).getByText(k)).toBeTruthy()
   })
 
-  it('los selectores Idioma, Modo y Plano | Placa miden 44 px en PC', () => {
+  it('el selector de modo (en el encabezado) mide 48 px y Plano | Placa 44 px en PC', () => {
     montar(true)
-    for (const n of ['Idioma de los textos del plano', 'Modo', 'Vista de la tarjeta']) {
-      const t = screen.getByRole('tablist', { name: n })
-      expect(t.className).toContain('h-[44px]')
-      expect(t.className).toContain('[&>button]:h-[44px]')
-    }
+    const modo = screen.getByRole('tablist', { name: 'Modo' })
+    expect(modo.className).toContain('h-[48px]')
+    expect(within(modo).getAllByRole('tab')[0]!.className).toContain('h-[48px]')
+    const vista = screen.getByRole('tablist', { name: 'Vista de la tarjeta' })
+    expect(vista.className).toContain('h-[44px]')
+    expect(vista.className).toContain('[&>button]:h-[44px]')
+    // El idioma ya no es un segundo control de pestañas: vive en «Más».
+    expect(screen.queryByRole('tablist', { name: 'Idioma de los textos del plano' })).toBeNull()
   })
 
   it('el buscador encuentra por número de borne y elegir el resultado cambia la selección', () => {
@@ -235,7 +246,7 @@ describe('Tarjeta A3C', () => {
     const regleta = screen.getByRole('group', { name: /Regleta X5/ })
     const mover = vi.fn()
     regleta.scrollTo = mover as unknown as typeof regleta.scrollTo
-    fireEvent.click(screen.getByRole('tab', { name: 'Original' }))
+    pasarAOriginal()
     expect(mover).not.toHaveBeenCalled()
   })
 

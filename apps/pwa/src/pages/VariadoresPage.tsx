@@ -22,7 +22,7 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp, Hourglass } from 'lucide-react'
+import { ArrowLeftRight, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp, Hourglass } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { crearAporte, aportesDePosicion, type AporteVariador } from '@/services/variadoresAportes'
 import { getIncidents, resolveIncident } from '@/services/incidents'
@@ -39,6 +39,7 @@ import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
 import { FOCO, tinte, chip as chipEstilo, panel as panelEstilo, aviso } from '@/data/variadoresUi'
 import { MetaText } from '@/components/learning/primitives'
+import { EncabezadoHerramienta } from '@/components/piel'
 import {
   VARIADORES,
   MOTORES_CINTAS,
@@ -1853,7 +1854,6 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
 
 // ── Página ────────────────────────────────────────────────────────────────────
 export function VariadoresPage() {
-  const navigate = useNavigate()
   // La ficha abierta va en la URL: así se puede compartir el enlace de un equipo
   // por Telegram y quien lo abra cae directo en su ficha.
   const [params, setParams] = useSearchParams()
@@ -1945,27 +1945,24 @@ export function VariadoresPage() {
 
   return (
     <div className="min-h-screen" style={{ background: C.bg }}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-20 pt-7">
-        {/* Cabecera */}
-        <header className="flex flex-col gap-3">
-          <button
-            onClick={() => navigate('/aprendizaje')}
-            className={`inline-flex w-fit items-center gap-2 rounded-ctl text-[14px] font-medium ${FOCO}`}
-            style={{ color: C.aquaBright }}
-          >
-            <ArrowLeft className="h-4 w-4" /> Centro de aprendizaje
-          </button>
-          <h1
-            className="m-0 text-[clamp(1.55rem,4vw,2.1rem)] font-semibold leading-tight tracking-[-0.021em]"
-            style={{ color: C.ink, textWrap: 'balance' }}
-          >
-            Variadores y partidores suaves
-          </h1>
+      {/* Encabezado único del marco de herramientas. En el catálogo vuelve al Centro de
+          aprendizaje; dentro de una ficha, al catálogo (antes «← Volver al catálogo»). */}
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver={ficha ? 'Variadores' : 'Aprendizaje'}
+        volverA="/aprendizaje"
+        onVolver={ficha ? () => abrirFicha(null) : undefined}
+        titulo="Variadores"
+        subtitulo={ficha ? ficha.nombre : 'Parámetros y fallas por modelo'}
+        contextoAria={ficha ? `Estoy en la ficha del variador ${ficha.nombre}. ` : 'Estoy en el catálogo de variadores y partidores suaves. '}
+      />
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-20 pt-5">
+        {!ficha && (
           <p className="m-0 max-w-[62ch] text-[15px] leading-relaxed" style={{ color: C.inkMid }}>
-            Qué parámetros espera cada modelo y en qué menú están. Para cuando hay que
-            reemplazar uno y configurarlo sin buscar el manual.
+            Variadores y partidores suaves: qué parámetros espera cada modelo y en qué menú están. Para
+            cuando hay que reemplazar uno y configurarlo sin buscar el manual.
           </p>
-        </header>
+        )}
 
         {fichaRota && (
           <div
@@ -2179,14 +2176,6 @@ export function VariadoresPage() {
           </>
         ) : (
           <>
-            <button
-              onClick={() => abrirFicha(null)}
-              className={`inline-flex w-fit items-center gap-2 rounded-ctl text-[14px] font-medium ${FOCO}`}
-              style={{ color: C.aquaBright }}
-            >
-              <ArrowLeft className="h-4 w-4" /> Volver al catálogo
-            </button>
-
             <div className="overflow-hidden rounded-card" style={panelEstilo}>
               <div
                 className="flex flex-wrap items-baseline justify-between gap-3 px-5 py-4"

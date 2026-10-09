@@ -24,7 +24,7 @@ import {
 } from '@/data/baader200Terreno'
 import { useAuthStore } from '@/store'
 import { useRepuestosByCodigos } from '@/hooks/repuestos/useRepuestosByCodigos'
-import { ListGroup } from '@/components/piel'
+import { EncabezadoHerramienta, ListGroup } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import {
   ANCLAS,
@@ -197,60 +197,39 @@ function Seccion({ seccion }: { seccion: SeccionTerreno }) {
       ref={raizRef}
       className={cn(
         'min-h-full w-full bg-background text-foreground',
-        // Aire para la barra flotante (y, con sesión, para la barra de la app debajo).
-        // Con sesión la app ya deja 96 px abajo (MainLayout); se suma lo de esta barra.
-        !dosColumnas && (isAuthenticated ? 'pb-[calc(env(safe-area-inset-bottom,0px)+72px)]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+96px)]'),
+        // Aire para la barra flotante de secciones. La ruta es de «lectura» (lib/rutasHerramienta.ts):
+        // ya no hay barra de la app debajo, con o sin sesión.
+        !dosColumnas && 'pb-[calc(env(safe-area-inset-bottom,0px)+96px)]',
         dosColumnas && 'pb-10',
       )}
     >
-      <div className={cn('mx-auto w-full', dosColumnas ? 'max-w-[1180px] px-5' : 'max-w-[640px] px-4')}>
-        {/* Navegación */}
-        <div className="flex h-[52px] items-center justify-between">
+      {/* Encabezado único del marco: antes «‹ Baader 200», el título y la lupa. El buscador pasa a
+          ser el control (campo de 48 px) bajo el encabezado en el celular y dentro de él en PC. */}
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver="Baader 200"
+        volverA={FICHA}
+        titulo={seccion.titulo}
+        subtitulo={dosColumnas ? `Manual de ajustes BAADER 200 · ${subtitulo.charAt(0).toLowerCase()}${subtitulo.slice(1)}` : subtitulo}
+        contextoAria={`Estoy en el manual de ajustes de la Baader 200, sección «${seccion.titulo}». `}
+        control={
           <button
             type="button"
-            onClick={() => navigate(FICHA)}
-            className="-ml-2 inline-flex min-h-[44px] items-center gap-0.5 rounded-full px-2 text-body text-primary hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="Buscar en el manual"
+            onClick={() => setBuscando(true)}
+            className="flex h-[48px] w-full items-center gap-2 rounded-full bg-muted px-4 text-left text-body text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <ChevronLeft aria-hidden className="size-6" />
-            Baader 200
+            <Search aria-hidden className="size-[18px] shrink-0" />
+            Medida, pos. o código
           </button>
-          {!dosColumnas && (
-            <button
-              type="button"
-              aria-label="Buscar en el manual"
-              onClick={() => setBuscando(true)}
-              className="-mr-2 grid size-[44px] place-items-center rounded-full text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <Search aria-hidden className="size-[22px]" />
-            </button>
-          )}
-        </div>
-
-        {/* Título */}
-        <header className={cn('pb-4', dosColumnas && 'flex items-end gap-4')}>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-title1 font-bold">{seccion.titulo}</h1>
-            <p className="mt-0.5 text-subhead text-muted-foreground">
-              {dosColumnas ? `Manual de ajustes BAADER 200 · ${subtitulo.charAt(0).toLowerCase()}${subtitulo.slice(1)}` : subtitulo}
-            </p>
-          </div>
-          {dosColumnas && (
-            <button
-              type="button"
-              onClick={() => setBuscando(true)}
-              className="flex h-[44px] w-[320px] shrink-0 items-center gap-2 rounded-[22px] bg-muted px-3.5 text-left text-body text-muted-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <Search aria-hidden className="size-[18px]" />
-              Medida, pos. o código
-            </button>
-          )}
-        </header>
-
+        }
+      />
+      <div className={cn('mx-auto w-full pt-4', dosColumnas ? 'max-w-[1180px] px-5' : 'max-w-[640px] px-4')}>
         {dosColumnas && <TiraSecciones actualId={seccion.id} onElegir={irASeccion} />}
 
         {dosColumnas ? (
           <div className="grid grid-cols-[minmax(0,540px)_minmax(0,1fr)] items-start gap-6">
-            <div className="sticky top-4 max-h-[calc(100dvh-6rem)] space-y-6 overflow-y-auto overscroll-contain pb-1">
+            <div className="sticky top-[136px] max-h-[calc(100dvh-152px)] space-y-6 overflow-y-auto overscroll-contain pb-1">
               {dibujo}
             </div>
             <div className="min-w-0 space-y-6">
@@ -277,7 +256,6 @@ function Seccion({ seccion }: { seccion: SeccionTerreno }) {
         <BarraSecciones
           anterior={v.anterior}
           siguiente={v.siguiente}
-          conBarraApp={isAuthenticated}
           onIr={irASeccion}
           onSecciones={() => setHoja(true)}
         />
@@ -340,10 +318,9 @@ function ParaAprender({ seccion, onFuente }: { seccion: SeccionTerreno; onFuente
 
 type Vecina = ReturnType<typeof vecinas>['anterior']
 
-function BarraSecciones({ anterior, siguiente, conBarraApp, onIr, onSecciones }: {
+function BarraSecciones({ anterior, siguiente, onIr, onSecciones }: {
   anterior: Vecina
   siguiente: Vecina
-  conBarraApp: boolean
   onIr: (id: string) => void
   onSecciones: () => void
 }) {
@@ -379,8 +356,8 @@ function BarraSecciones({ anterior, siguiente, conBarraApp, onIr, onSecciones }:
     <nav
       aria-label="Secciones del manual"
       className="glass-nav fixed inset-x-3 z-30 mx-auto grid h-[60px] max-w-[616px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 rounded-full px-1.5"
-      // Flota sobre la safe area; con sesión, además, sobre la barra de navegación de la app.
-      style={{ bottom: `calc(env(safe-area-inset-bottom, 0px) + ${conBarraApp ? 84 : 12}px)` }}
+      // Flota sobre la safe area (no hay barra de la app debajo en esta ruta).
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
     >
       {lado(anterior, 'ant')}
       <button

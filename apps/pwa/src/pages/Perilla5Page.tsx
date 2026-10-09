@@ -20,11 +20,11 @@
  * (claro/oscuro) para que no sea una isla clara dentro de la app en oscuro.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
-  PencilLine, Share2, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleGauge, Copy,
-  TrendingDown, TrendingUp, LineChart as LineChartIcon, Loader2, RotateCcw,
+  PencilLine, Share2, CheckCircle2, ChevronDown, ChevronRight, Copy,
+  TrendingDown, TrendingUp, Loader2, RotateCcw,
   Save, Video,
 } from 'lucide-react'
 import { Line, getElementAtEvent } from 'react-chartjs-2'
@@ -40,6 +40,7 @@ import {
   type TooltipItem,
 } from 'chart.js'
 import { useAuthStore } from '@/store'
+import { EncabezadoHerramienta, SegmentedControl } from '@/components/piel'
 import { useTheme } from '@/hooks/useTheme'
 import { LC } from '@/data/learningTheme'
 import {
@@ -294,7 +295,7 @@ export function Perilla5Page() {
   const vista: Vista = searchParams.get('vista') === 'protocolo' ? 'protocolo' : 'herramienta'
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const { isDark } = useTheme()
-  const { user } = useAuthStore()
+  const { user, isAuthenticated } = useAuthStore()
 
   /* ---------- PUENTE con la herramienta embebida ----------
    * El iframe no tiene sesión de Firebase, así que nos pide a nosotros cada
@@ -417,94 +418,58 @@ export function Perilla5Page() {
   }, [searchParams])
 
   return (
-    <div className="min-h-screen" style={{ background: LC.bg, color: LC.ink }}>
-      {/* La herramienta es una superficie de lectura densa (tablas, figuras,
-          buscador): encajonarla en max-w-5xl la hacía ver postiza en el monitor
-          del taller. La vista de protocolo sí se queda angosta, que es un
-          formulario. */}
-      <div
-        className={`mx-auto px-4 py-5 ${vista === 'herramienta' ? 'max-w-[1400px]' : 'max-w-5xl'}`}
-      >
-        <Link
-          to="/aprendizaje"
-          className="inline-flex items-center gap-1.5 text-sm"
-          style={{ color: LC.inkMid }}
-        >
-          <ArrowLeft className="h-4 w-4" /> Centro de aprendizaje
-        </Link>
+    // Herramienta de pantalla completa (modo «lienzo» de lib/rutasHerramienta.ts): el alto lo da
+    // el layout; el encabezado único queda arriba y el resto es el cuerpo. Sin sesión no hay
+    // layout y la página toma el alto del dispositivo.
+    <div
+      className={`flex flex-col ${isAuthenticated ? 'h-full' : 'h-[100dvh]'}`}
+      style={{ background: LC.bg, color: LC.ink }}
+    >
+      <EncabezadoHerramienta
+        etiquetaVolver="Aprendizaje"
+        volverA="/aprendizaje"
+        titulo="Perilla 5"
+        subtitulo="Diagnóstico Baader 142"
+        contextoAria="Estoy en la herramienta Perilla 5, diagnóstico de la Baader 142. "
+        control={
+          <SegmentedControl
+            tamano="herramienta"
+            ariaLabel="Vista de Perilla 5"
+            value={vista}
+            onChange={setVista}
+            segments={[
+              { value: 'herramienta', label: 'Herramienta' },
+              { value: 'protocolo', label: 'Protocolo' },
+            ]}
+          />
+        }
+      />
 
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold leading-tight sm:text-2xl">
-              Perilla 5 · Diagnóstico Baader 142
-            </h1>
-            {/* En el teléfono la herramienta necesita todo el alto posible: la
-                descripción larga solo aparece de tablet para arriba. */}
-            <p className="mt-1 hidden text-sm sm:block" style={{ color: LC.inkMid }}>
-              Todo lo que la máquina cuenta antes de fallar: las 10 posiciones del selector 5,
-              el protocolo del Upgrade Kit y los 46 códigos E con su solución. Validada en
-              terreno el 08-08-2026.
-            </p>
-          </div>
-
-          <div className="flex gap-2" role="tablist" aria-label="Vista">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={vista === 'herramienta'}
-              onClick={() => setVista('herramienta')}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl border px-3.5 text-sm font-medium"
-              style={
-                vista === 'herramienta'
-                  ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
-                  : { background: LC.surface, borderColor: LC.border, color: LC.inkMid }
-              }
-            >
-              <CircleGauge className="h-4 w-4" /> Herramienta
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={vista === 'protocolo'}
-              onClick={() => setVista('protocolo')}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl border px-3.5 text-sm font-medium"
-              style={
-                vista === 'protocolo'
-                  ? { background: LC.aqua, borderColor: LC.aqua, color: '#fff' }
-                  : { background: LC.surface, borderColor: LC.border, color: LC.inkMid }
-              }
-            >
-              <LineChartIcon className="h-4 w-4" /> Protocolo · registro y tendencia
-            </button>
+      {vista === 'herramienta' ? (
+        // El visor de figuras de la herramienta es position:fixed DENTRO del iframe, así que su
+        // «pantalla completa» es este alto: el iframe toma todo lo que deja el encabezado.
+        <div className="min-h-0 flex-1">
+          <iframe
+            ref={iframeRef}
+            src={iframeSrc}
+            title="Herramienta Perilla 5 · Diagnóstico BAADER 142"
+            className="block h-full w-full border-0"
+            style={{ background: isDark ? '#0D1722' : '#EFF1F3' }}
+            onLoad={() => {
+              iframeRef.current?.contentWindow?.postMessage(
+                { __p5: true, type: 'tema', dark: isDark },
+                window.location.origin,
+              )
+            }}
+          />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-5xl px-4 py-5">
+            <VistaProtocolo />
           </div>
         </div>
-
-        {vista === 'herramienta' ? (
-          <div
-            className="mt-4 overflow-hidden rounded-card border"
-            style={{ borderColor: LC.border }}
-          >
-            {/* El visor de figuras de la herramienta es position:fixed DENTRO del
-                iframe, así que su "pantalla completa" es este alto: en el teléfono
-                se le da todo lo que sobra para que el dibujo se vea grande. */}
-            <iframe
-              ref={iframeRef}
-              src={iframeSrc}
-              title="Herramienta Perilla 5 · Diagnóstico BAADER 142"
-              className="block h-[calc(100dvh-150px)] min-h-[520px] w-full sm:h-[calc(100dvh-200px)]"
-              style={{ background: isDark ? '#0D1722' : '#EFF1F3' }}
-              onLoad={() => {
-                iframeRef.current?.contentWindow?.postMessage(
-                  { __p5: true, type: 'tema', dark: isDark },
-                  window.location.origin,
-                )
-              }}
-            />
-          </div>
-        ) : (
-          <VistaProtocolo />
-        )}
-      </div>
+      )}
     </div>
   )
 }
