@@ -214,6 +214,7 @@
     b.className = 'btn-pantalla';
     const pintar = () => {
       const full = !!tg.isFullscreen;
+      document.body.classList.toggle('tg-fullscreen', full);
       b.innerHTML = full ? ICON_REDUCIR : ICON_AMPLIAR;
       b.setAttribute('aria-label', full ? 'Salir de pantalla completa' : 'Pantalla completa');
       b.title = b.getAttribute('aria-label');

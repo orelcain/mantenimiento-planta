@@ -51,6 +51,11 @@
 .btn-pantalla { width: 32px; height: 32px; border: 0; border-radius: 999px; background: rgba(118, 118, 128, .24); color: inherit; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; position: relative; margin-left: 8px; }
 .btn-pantalla::after { content: ''; position: absolute; inset: -6px; } /* área táctil 44 px */
 body.modo-cine #content, body.modo-cine .bottom-nav { display: none !important; }
+/* Pantalla completa: Telegram dibuja sus botones (⋮ ✕) sobre la esquina superior derecha. */
+body.tg-fullscreen header { padding-right: 120px !important; padding-top: var(--tg-content-safe-area-inset-top, 0px); }
+/* Foco visible discreto, sin el recuadro blanco del navegador. */
+#cine :focus { outline: none; }
+#cine :focus-visible, #cine-ficha :focus-visible, #cine-sheet :focus-visible, #cine-tabbar :focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
 @media (max-width: 430px) {
   header:has(.modo-switch) .logo span, header:has(.modo-switch) #hdr-badge { display: none !important; }
   .modo-switch button { min-width: 0; padding: 0 10px; font-size: 13px; }
@@ -68,11 +73,11 @@ body.modo-cine #cine { display: block; }
 .c-large { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; }
 .c-sub { margin: 4px 0 0; font-size: 15px; line-height: 20px; color: var(--c-text2); }
 
-.c-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: var(--c-fill); border-radius: 999px; padding: 3px; gap: 2px; margin: 8px 16px 0; }
+.c-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: var(--c-fill); border-radius: 999px; padding: 3px; gap: 2px; margin: 8px 16px 0; max-width: 560px; }
 .c-seg button { height: 34px; border: 0; border-radius: 999px; background: transparent; color: var(--c-text); font-size: 15px; font-weight: 400; }
 .c-seg button[aria-pressed='true'] { background: var(--c-thumb); font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .05); }
 
-.c-filtros-row { margin: 8px 16px 0; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: calc(100% - 32px); border: 0; background: transparent; padding: 0; text-align: left; color: inherit; }
+.c-filtros-row { margin: 8px 16px 0; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: calc(100% - 32px); max-width: 560px; border-radius: 12px; border: 0; background: transparent; padding: 0; text-align: left; color: inherit; }
 .c-filtros-row span:first-child { font-size: 15px; line-height: 20px; color: var(--c-text2); }
 .c-filtros-row span:last-child { font-size: 15px; font-weight: 600; color: var(--c-accent); flex-shrink: 0; }
 
@@ -87,12 +92,11 @@ body.modo-cine #cine { display: block; }
 .c-carrusel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 4px; scroll-snap-type: x mandatory; scrollbar-width: none; }
 .c-carrusel::-webkit-scrollbar { display: none; }
 /* Tamaño elegido con el botón de la cuadrícula (data-tam en #cine). */
-#cine { --cols: 3; --car-w: 118px; --card-t: 14px; --poster-r: 16px; }
-#cine[data-tam='c'] { --cols: 4; --car-w: 92px; --card-t: 13px; --poster-r: 12px; }
-#cine[data-tam='g'] { --cols: 2; --car-w: 150px; --card-t: 15px; --poster-r: 20px; }
-.c-grid { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: 12px; row-gap: 20px; padding: 0 16px; }
-@media (min-width: 600px) { .c-grid { grid-template-columns: repeat(calc(var(--cols) + 1), minmax(0, 1fr)); } }
-@media (min-width: 900px) { .c-grid { grid-template-columns: repeat(calc(var(--cols) + 3), minmax(0, 1fr)); } }
+/* Ancho mínimo por tarjeta: caben las que entren (panel angosto = 3, pantalla completa = muchas). */
+#cine { --card-min: 104px; --car-w: 118px; --card-t: 14px; --poster-r: 14px; }
+#cine[data-tam='c'] { --card-min: 88px; --car-w: 92px; --card-t: 13px; --poster-r: 12px; }
+#cine[data-tam='g'] { --card-min: 156px; --car-w: 156px; --card-t: 15px; --poster-r: 18px; }
+.c-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr)); column-gap: 12px; row-gap: 20px; padding: 0 16px; }
 #cine[data-tam='c'] .c-grid { column-gap: 8px; row-gap: 16px; }
 .c-card { display: flex; flex-direction: column; gap: 8px; border: 0; background: none; padding: 0; color: inherit; text-align: left; min-width: 0; }
 .c-carrusel .c-card { width: var(--car-w); flex-shrink: 0; scroll-snap-align: start; }
