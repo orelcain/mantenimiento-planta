@@ -58,13 +58,13 @@ const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
   // Variantes `pizarra:`: 5 causas = series 1-5 (acero, oliva, índigo/ciruela...) en el mismo orden que
   // el scatter del timeline (CAUSA_TOKEN) y las 3 derivadas + «otra» = «Otros» (neutro medio). Ninguna
   // causa usa falla/aviso: esas son de estado (fuera de banda), no de identidad.
-  red:     { badge: 'bg-red-500/[0.15] text-ink-crit pizarra:bg-cat-1-tint/[0.15] pizarra:text-cat-1-ink', bar: 'bg-fill-critical pizarra:bg-cat-1-tint' },
+  red:     { badge: 'bg-destructive/[0.15] text-ink-crit pizarra:bg-cat-1-tint/[0.15] pizarra:text-cat-1-ink', bar: 'bg-fill-critical pizarra:bg-cat-1-tint' },
   orange:  { badge: 'bg-cat-4-tint/[0.15] text-cat-4-ink pizarra:bg-cat-3-tint/[0.15] pizarra:text-cat-3-ink', bar: 'bg-cat-4-tint pizarra:bg-cat-3-tint' },
   purple:  { badge: 'bg-cat-6-tint/[0.15] text-cat-6-ink pizarra:bg-cat-5-tint/[0.15] pizarra:text-cat-5-ink', bar: 'bg-cat-6-tint pizarra:bg-cat-5-tint' },
   cyan:    { badge: 'bg-cat-7-tint/[0.15] text-cat-7-ink pizarra:bg-cat-5-tint/[0.15] pizarra:text-cat-5-ink', bar: 'bg-cat-7-tint pizarra:bg-cat-5-tint' },
-  emerald: { badge: 'bg-emerald-500/[0.15] text-ink-ok pizarra:bg-cat-5-tint/[0.15] pizarra:text-cat-5-ink', bar: 'bg-fill-ok pizarra:bg-cat-5-tint' },
-  amber:   { badge: 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-cat-2-tint/[0.15] pizarra:text-cat-2-ink', bar: 'bg-fill-warning pizarra:bg-cat-2-tint' },
-  brown:   { badge: 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-cat-6-tint/[0.15] pizarra:text-cat-6-ink', bar: 'bg-fill-warning pizarra:bg-cat-6-tint' },
+  emerald: { badge: 'bg-success/[0.15] text-ink-ok pizarra:bg-cat-5-tint/[0.15] pizarra:text-cat-5-ink', bar: 'bg-fill-ok pizarra:bg-cat-5-tint' },
+  amber:   { badge: 'bg-warning/[0.15] text-ink-warn pizarra:bg-cat-2-tint/[0.15] pizarra:text-cat-2-ink', bar: 'bg-fill-warning pizarra:bg-cat-2-tint' },
+  brown:   { badge: 'bg-warning/[0.15] text-ink-warn pizarra:bg-cat-6-tint/[0.15] pizarra:text-cat-6-ink', bar: 'bg-fill-warning pizarra:bg-cat-6-tint' },
   blue:    { badge: 'bg-primary/[0.15] text-brand-ink pizarra:bg-cat-7-tint/[0.15] pizarra:text-cat-7-ink', bar: 'bg-primary pizarra:bg-cat-7-tint' },
   zinc:    FALLBACK_COLOR,
 }

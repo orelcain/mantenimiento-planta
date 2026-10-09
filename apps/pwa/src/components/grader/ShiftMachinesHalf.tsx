@@ -28,9 +28,9 @@ const UMBRAL_UPTIME = { ok: 70, warn: 40 }
 const UMBRAL_RITMO = { ok: 85, warn: 50 }
 
 const VEREDICTO = {
-  ok:       { label: 'Bien',    text: 'text-ink-ok',   fill: 'bg-ink-ok',   chip: 'bg-emerald-500/[0.15] border-ink-ok/[0.45]' },
-  warn:     { label: 'Regular', text: 'text-ink-warn', fill: 'bg-ink-warn', chip: 'bg-amber-500/[0.15] border-ink-warn/[0.45]' },
-  critical: { label: 'Crítico', text: 'text-ink-crit', fill: 'bg-ink-crit', chip: 'bg-red-500/[0.15] border-ink-crit/[0.45]' },
+  ok:       { label: 'Bien',    text: 'text-ink-ok',   fill: 'bg-ink-ok',   chip: 'bg-success/[0.15] border-ink-ok/[0.45]' },
+  warn:     { label: 'Regular', text: 'text-ink-warn', fill: 'bg-ink-warn', chip: 'bg-warning/[0.15] border-ink-warn/[0.45]' },
+  critical: { label: 'Crítico', text: 'text-ink-crit', fill: 'bg-ink-crit', chip: 'bg-destructive/[0.15] border-ink-crit/[0.45]' },
 } as const
 
 type Veredicto = keyof typeof VEREDICTO

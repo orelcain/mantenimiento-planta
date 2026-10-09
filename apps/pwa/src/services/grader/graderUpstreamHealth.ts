@@ -39,9 +39,9 @@ export function reachedStatusFromPct(pct: number): ReachedStatus {
 /** Color tailwind para texto según status — alineado con la paleta del módulo. */
 export function reachedStatusColor(status: ReachedStatus): string {
   switch (status) {
-    case 'healthy':   return 'text-emerald-400'
-    case 'attention': return 'text-amber-400'
-    case 'critical':  return 'text-rose-400 pizarra:text-ink-crit'
+    case 'healthy':   return 'text-ink-ok'
+    case 'attention': return 'text-ink-warn'
+    case 'critical':  return 'text-ink-crit'
   }
 }
 
@@ -130,8 +130,8 @@ export function varianceLabel(direction: VarianceDirection): string {
 
 export function varianceColor(direction: VarianceDirection): string {
   switch (direction) {
-    case 'better':      return 'text-emerald-400'
-    case 'as_expected': return 'text-slate-400 pizarra:text-muted-foreground'
-    case 'worse':       return 'text-rose-400 pizarra:text-ink-crit'
+    case 'better':      return 'text-ink-ok'
+    case 'as_expected': return 'text-muted-foreground'
+    case 'worse':       return 'text-ink-crit'
   }
 }

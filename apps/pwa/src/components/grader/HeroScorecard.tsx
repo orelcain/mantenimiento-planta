@@ -44,9 +44,9 @@ function fmtSyncRelative(at: Date | null | undefined): string {
 /** Chip del P0: el estado va en el chip, NO en un fondo tintado de toda la
  *  tarjeta (regla del design system: el semántico nunca como bloque grande). */
 const P0_CHIP = {
-  ok:       { text: 'text-ink-ok',   dot: 'bg-ink-ok',   ring: 'bg-emerald-500/[0.15] border-ink-ok/[0.45]' },
-  warn:     { text: 'text-ink-warn', dot: 'bg-ink-warn', ring: 'bg-amber-500/[0.15] border-ink-warn/[0.45]' },
-  critical: { text: 'text-ink-crit', dot: 'bg-ink-crit', ring: 'bg-red-500/[0.15] border-ink-crit/[0.45]' },
+  ok:       { text: 'text-ink-ok',   dot: 'bg-ink-ok',   ring: 'bg-success/[0.15] border-ink-ok/[0.45]' },
+  warn:     { text: 'text-ink-warn', dot: 'bg-ink-warn', ring: 'bg-warning/[0.15] border-ink-warn/[0.45]' },
+  critical: { text: 'text-ink-crit', dot: 'bg-ink-crit', ring: 'bg-destructive/[0.15] border-ink-crit/[0.45]' },
 }
 
 interface HeroScorecardProps {

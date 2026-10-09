@@ -395,7 +395,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 </div>
                 <div className="h-1 bg-muted/50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-amber-500/[0.15] transition-all"
+                    className="h-full rounded-full bg-warning/[0.15] transition-all"
                     style={{ width: `${barPct.toFixed(1)}%` }}
                   />
                 </div>

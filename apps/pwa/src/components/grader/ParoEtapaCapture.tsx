@@ -200,13 +200,13 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
+          <div className="flex items-start gap-2 text-xs text-ink-crit bg-destructive/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /><span className="break-words">{error}</span>
           </div>
         )}
 
         <div className="flex items-center gap-3">
-          {/* Usaba `bg-red-500/[0.15] text-ink-crit`, que pisa el variant con clases
+          {/* Usaba `bg-destructive/[0.15] text-ink-crit`, que pisa el variant con clases
               crudas: en la piel Apple ese token es el systemRed vivo y daba
               2.59:1 con texto blanco. El variant `destructive` existe justo
               para esto (3.80:1). Ver DESIGN.md §3: el tinte vivo no va en

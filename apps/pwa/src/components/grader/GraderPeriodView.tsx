@@ -675,7 +675,7 @@ export function GraderPeriodView({ data }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {visibleStats.minP0Day && (
             <Card
-              className="border-transparent bg-emerald-500/[0.15] cursor-pointer hover:bg-emerald-500/[0.15] transition-colors"
+              className="border-transparent bg-success/[0.15] cursor-pointer hover:bg-success/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.minP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -694,7 +694,7 @@ export function GraderPeriodView({ data }: Props) {
           )}
           {visibleStats.maxP0Day && (
             <Card
-              className="border-transparent bg-red-500/[0.15] cursor-pointer hover:bg-red-500/[0.15] transition-colors"
+              className="border-transparent bg-destructive/[0.15] cursor-pointer hover:bg-destructive/[0.15] transition-colors"
               onClick={() => navigate(`/analisis-grader/turno/${visibleStats.maxP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
@@ -1059,7 +1059,7 @@ export function GraderPeriodView({ data }: Props) {
                         variant="outline"
                         className={cn(
                           'text-caption',
-                          s.shiftId === 'Turno día'   && 'border-amber-500/[0.25] text-ink-warn',
+                          s.shiftId === 'Turno día'   && 'border-warning/[0.25] text-ink-warn',
                           s.shiftId === 'Turno noche' && 'border-cat-3-tint/[0.25] text-cat-3-ink',
                         )}
                       >

@@ -400,7 +400,7 @@ export function PlantKPIBoard({
 
             {/* Diagnóstico: ¿qué Baader arrastra la línea? (piezas perdidas) */}
             {machineDiag && (
-              <div className="flex items-start gap-1.5 rounded-ctl bg-amber-500/[0.15] px-2.5 py-2 text-caption text-ink-warn">
+              <div className="flex items-start gap-1.5 rounded-ctl bg-warning/[0.15] px-2.5 py-2 text-caption text-ink-warn">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
                   title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad — una es el modelo antiguo (19 pz/min) y las otras dos el nuevo (16 pz/min), así que su % no es comparable.`}
@@ -441,7 +441,7 @@ export function PlantKPIBoard({
                   key={m.machineid}
                   className={cn(
                     'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-caption',
-                    isWorst && 'ring-1 ring-amber-500/40 bg-amber-500/[0.04]',
+                    isWorst && 'ring-1 ring-warning/40 bg-warning/[0.04]',
                   )}
                   title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\nLa que más piezas pierde del grupo' : ''}`}
                 >

@@ -2083,7 +2083,7 @@ export function AnalisisGraderTurnoPage() {
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-[1760px]">
       {/* M18 — Banner offline */}
       {!isOnline && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-amber-500/[0.15] border border-transparent text-ink-warn text-sm">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-ctl bg-warning/[0.15] border border-transparent text-ink-warn text-sm">
           <WifiOff className="w-4 h-4 shrink-0" />
           <span>
             Sin conexión — las anotaciones se guardarán localmente y se sincronizarán al reconectarse.
@@ -2164,7 +2164,7 @@ export function AnalisisGraderTurnoPage() {
                     variant="outline"
                     className={`text-caption px-1.5 py-0 shrink-0 ${
                       shiftWindow.status === 'live'
-                        ? 'border-red-500/[0.25] text-ink-crit'
+                        ? 'border-ink-crit/[0.25] text-ink-crit'
                         : shiftWindow.status === 'future'
                           ? 'bg-muted text-foreground border-transparent inline-flex items-center gap-1'
                           : 'border-muted-foreground/30 text-muted-foreground'
@@ -2193,7 +2193,7 @@ export function AnalisisGraderTurnoPage() {
               variant="outline"
               size="sm"
               onClick={() => setNextPauseOpen(true)}
-              className="gap-1.5 text-ink-warn border-transparent hover:bg-amber-500/[0.15]"
+              className="gap-1.5 text-ink-warn border-transparent hover:bg-warning/[0.15]"
               title={`${untaggedPauses.length} pausas sin clasificar en este turno`}
             >
               <Tag className="w-3.5 h-3.5" />
@@ -2457,7 +2457,7 @@ export function AnalisisGraderTurnoPage() {
             {/* Contador de tiempo desde último sync */}
             {slxBestSyncedAt && (
               <span className={`flex items-center gap-1 text-caption font-medium tabular-nums shrink-0 px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-destructive animate-pulse' : 'bg-current'}`} />
                 {slxSyncing ? 'sincronizando…' : syncAge.label}
               </span>
             )}
@@ -2602,7 +2602,7 @@ export function AnalisisGraderTurnoPage() {
             </p>
 
             {/* Shoplogix — automático */}
-            <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.15] border border-transparent dark:bg-cat-6-tint/[0.15] dark:border-transparent">
+            <div className="flex items-start gap-3 p-3 rounded-card bg-cat-6-tint/[0.15] border border-transparent">
               <Zap className="w-4 h-4 text-cat-6-ink mt-0.5 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-cat-6-ink">Shoplogix — {hasGraderData ? 'Evisceradoras Baader 142' : getMachineKind(plantLineCfg.id).long}</p>
@@ -2630,7 +2630,7 @@ export function AnalisisGraderTurnoPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-7 text-xs border-transparent text-ink-info hover:bg-blue-500/[0.15] shrink-0 mt-0.5"
+                  className="h-7 text-xs border-transparent text-ink-info hover:bg-primary/[0.15] shrink-0 mt-0.5"
                   onClick={() => navigate(wizardUrl)}
                 >
                   <Upload className="w-3 h-3 mr-1" />
@@ -2643,7 +2643,7 @@ export function AnalisisGraderTurnoPage() {
             {/* Marel HG (corta-cabeza) — solo Chonchi. Yal no tiene
                 corta-cabeza, los salmones salen evisecerados con cabeza. */}
             {isClassificationPlant && (
-              <div className="flex items-start gap-3 p-3 rounded-card bg-amber-500/[0.15] border border-transparent dark:bg-amber-500/[0.15] dark:border-transparent">
+              <div className="flex items-start gap-3 p-3 rounded-card bg-warning/[0.15] border border-transparent">
                 <Scale className="w-4 h-4 text-ink-warn mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink-warn">Marel HG — Corta-cabeza</p>
@@ -2651,7 +2651,7 @@ export function AnalisisGraderTurnoPage() {
                     Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
                   </p>
                 </div>
-                <Badge variant="outline" className="text-caption border-amber-500/[0.25] text-ink-warn shrink-0 mt-0.5">
+                <Badge variant="outline" className="text-caption border-warning/[0.25] text-ink-warn shrink-0 mt-0.5">
                   requiere Grader
                 </Badge>
               </div>
@@ -2960,7 +2960,7 @@ export function AnalisisGraderTurnoPage() {
               <div className="flex items-center gap-2">
                 {slxBestSyncedAt && (
                   <span className={`flex items-center gap-1 text-caption font-medium tabular-nums px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-destructive animate-pulse' : 'bg-current'}`} />
                     {slxSyncing ? 'sincronizando…' : syncAge.label}
                   </span>
                 )}
@@ -3136,7 +3136,7 @@ export function AnalisisGraderTurnoPage() {
                     </code>
                     <button
                       onClick={handleCopy}
-                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-amber-500/[0.15] hover:brightness-95 text-ink-warn text-caption px-2 py-1 transition-colors"
+                      className="shrink-0 flex items-center gap-1 rounded-ctl bg-warning/[0.15] hover:brightness-95 text-ink-warn text-caption px-2 py-1 transition-colors"
                       title="Copiar link"
                     >
                       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}

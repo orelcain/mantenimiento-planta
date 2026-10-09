@@ -238,7 +238,7 @@ export function ShiftQuotaCard({
           </span>
           {usingFallback && (
             <span
-              className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-transparent cursor-help"
+              className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-success/[0.15] text-ink-ok border border-transparent cursor-help"
               title="No hay Excel del Grader cargado aún. Se muestra avance estimado desde ciclos Baader (Shoplogix), que será reemplazado por la cifra real cuando se cargue el Excel."
             >
               <Radio className="w-2.5 h-2.5 animate-pulse" />
@@ -246,7 +246,7 @@ export function ShiftQuotaCard({
             </span>
           )}
           {cumplio && (
-            <span className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-emerald-500/[0.15] text-ink-ok border border-transparent">
+            <span className="flex items-center gap-1 text-caption px-1.5 py-0.5 rounded-ctl bg-success/[0.15] text-ink-ok border border-transparent">
               <CheckCircle2 className="w-2.5 h-2.5" />
               Cumplido
             </span>
@@ -326,7 +326,7 @@ export function ShiftQuotaCard({
                 un dato que está bien. */}
             {discrepancy && discrepancy.missing > 0 && (
               <div
-                className="flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-transparent px-2.5 py-1.5"
+                className="flex items-start gap-2 rounded-ctl bg-warning/[0.15] border border-transparent px-2.5 py-1.5"
                 title="Shoplogix reporta más ciclos en las Baader que piezas pesadas en el Grader. Como todas las piezas deberían pasar por el Grader, la diferencia puede ser: Excel parcial, fallas de registro del Marelec, o pérdidas físicas."
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-ink-warn shrink-0 mt-px" />

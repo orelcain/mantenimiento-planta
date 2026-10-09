@@ -71,9 +71,9 @@ describe('severityBadgeClass + severityLabel', () => {
     expect(severityLabel('adjustment')).toBe('ajuste')
     expect(severityLabel('reconfigure')).toBe('reconfigurar')
 
-    expect(severityBadgeClass('direct')).toContain('emerald')
-    expect(severityBadgeClass('adjustment')).toContain('amber')
-    expect(severityBadgeClass('reconfigure')).toContain('rose')
+    expect(severityBadgeClass('direct')).toContain('text-ink-ok')
+    expect(severityBadgeClass('adjustment')).toContain('text-ink-warn')
+    expect(severityBadgeClass('reconfigure')).toContain('text-ink-crit')
   })
 })
 

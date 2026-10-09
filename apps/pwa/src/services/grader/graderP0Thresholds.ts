@@ -67,9 +67,9 @@ export function p0StatusFromPct(
 /** Color tailwind para texto según status — alineado con paleta del módulo. */
 export function p0StatusColor(status: P0Status): string {
   switch (status) {
-    case 'ok':       return 'text-emerald-400'
-    case 'alert':    return 'text-amber-400'
-    case 'critical': return 'text-rose-400 pizarra:text-ink-crit'
+    case 'ok':       return 'text-ink-ok'
+    case 'alert':    return 'text-ink-warn'
+    case 'critical': return 'text-ink-crit'
   }
 }
 
@@ -107,17 +107,17 @@ export function p0StatusLabel(status: P0Status): string {
 /** Clase Tailwind de borde+fondo sutil — para cards y rows coloreados por status P0. */
 export function p0StatusBgBorderClass(status: P0Status): string {
   switch (status) {
-    case 'ok':       return 'border-emerald-500/30 bg-emerald-500/5'
-    case 'alert':    return 'border-amber-500/30 bg-amber-500/5'
-    case 'critical': return 'border-rose-500/30 bg-rose-500/5 pizarra:border-red-500/30 pizarra:bg-red-500/[0.15]'
+    case 'ok':       return 'border-success/30 bg-success/5'
+    case 'alert':    return 'border-warning/30 bg-warning/5'
+    case 'critical': return 'border-ink-crit/30 bg-destructive/5 pizarra:bg-destructive/[0.15]'
   }
 }
 
 /** Clase Tailwind solo de borde (sin fondo) — para badges y chips coloreados por status P0. */
 export function p0StatusBorderClass(status: P0Status): string {
   switch (status) {
-    case 'ok':       return 'border-emerald-500/30'
-    case 'alert':    return 'border-amber-500/30'
-    case 'critical': return 'border-rose-500/30 pizarra:border-red-500/30'
+    case 'ok':       return 'border-success/30'
+    case 'alert':    return 'border-warning/30'
+    case 'critical': return 'border-ink-crit/30'
   }
 }

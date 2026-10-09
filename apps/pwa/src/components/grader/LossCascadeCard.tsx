@@ -63,10 +63,10 @@ const PZ_BUCKET: Record<string, string> = {
 
 const BUCKET_COLOR: Record<string, string> = {
   'planificado':    'bg-muted-foreground/[0.10]',
-  'externo':        `bg-amber-500/[0.15] ${PZ_BUCKET['externo']}`,
-  'mantencion':     `bg-red-500/[0.15] ${PZ_BUCKET['mantencion']}`,
+  'externo':        `bg-warning/[0.15] ${PZ_BUCKET['externo']}`,
+  'mantencion':     `bg-destructive/[0.15] ${PZ_BUCKET['mantencion']}`,
   'sin-clasificar': `bg-cat-6-tint/[0.15] ${PZ_BUCKET['sin-clasificar']}`,
-  'produccion':     `bg-emerald-500/[0.15] ${PZ_BUCKET['produccion']}`,
+  'produccion':     `bg-success/[0.15] ${PZ_BUCKET['produccion']}`,
 }
 
 /** Persistido entre turnos: si el usuario colapsa la cascada, se queda así
@@ -262,8 +262,8 @@ export function LossCascadeCard({
       id: 'externo' as LossBucket, label: '− Externo', sec: totals.externoSec,
       pct: `${dec1(pctOfTurno(totals.externoSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.externoSec))}% del techo`,
-      bg: 'bg-amber-500/[0.15] pizarra:bg-[rgb(var(--serie-otros)/0.15)]', text: 'text-ink-warn pizarra:text-muted-foreground',
-      ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
+      bg: 'bg-warning/[0.15] pizarra:bg-[rgb(var(--serie-otros)/0.15)]', text: 'text-ink-warn pizarra:text-muted-foreground',
+      ringHover: 'hover:ring-warning/40', ringActive: 'ring-1 ring-warning/70',
       tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
     },
     {
@@ -278,8 +278,8 @@ export function LossCascadeCard({
       id: 'mantencion' as LossBucket, label: '− Mantención', sec: totals.mantencionSec,
       pct: `${dec1(pctOfTurno(totals.mantencionSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.mantencionSec))}% del techo`,
-      bg: 'bg-red-500/[0.15] pizarra:bg-[rgb(var(--serie-1)/0.15)]', text: 'text-ink-crit pizarra:text-brand-ink',
-      ringHover: 'hover:ring-red-500/40', ringActive: 'ring-1 ring-red-500/70',
+      bg: 'bg-destructive/[0.15] pizarra:bg-[rgb(var(--serie-1)/0.15)]', text: 'text-ink-crit pizarra:text-brand-ink',
+      ringHover: 'hover:ring-ink-crit/40', ringActive: 'ring-1 ring-ink-crit/70',
       tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
     },
     {
@@ -397,7 +397,7 @@ export function LossCascadeCard({
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.techoSec)}</div>
               <div className="text-caption text-muted-foreground/60 tabular-nums">{dec1(pctOfTurno(totals.techoSec))}% del turno · subtotal</div>
             </div>
-            <div className="rounded-ctl bg-emerald-500/[0.15] px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
+            <div className="rounded-ctl bg-success/[0.15] px-2 py-1.5" title="Tiempo efectivamente produciendo (uptime).">
               <div className="text-ink-ok text-caption uppercase">= Uso real</div>
               <div className="font-mono tabular-nums font-semibold">{fmtHm(totals.produccionSec)}</div>
               <div className="text-caption text-muted-foreground/60 tabular-nums">{dec1(pctOfTurno(totals.produccionSec))}% del turno</div>
@@ -493,8 +493,8 @@ export function LossCascadeCard({
           })()}
 
           {causeMachine ? (
-            <div className="flex items-center gap-2 text-caption rounded-ctl border border-transparent bg-amber-500/[0.15] px-2 py-1.5">
-              <span className="w-2 h-2 rounded-ctl shrink-0 bg-amber-400" />
+            <div className="flex items-center gap-2 text-caption rounded-ctl border border-transparent bg-warning/[0.15] px-2 py-1.5">
+              <span className="w-2 h-2 rounded-ctl shrink-0 bg-warning" />
               <span>
                 Resaltando: <b>{causeMachine.label}</b> en <b>{causeMachine.machine}</b>
                 <span className="text-muted-foreground"> · mira las bandas amarillas en la velocidad upstream</span>
@@ -585,8 +585,8 @@ export function LossCascadeCard({
                                   : { bucket: c.bucket, label: c.label, machine: mn },
                               )}
                               className={cn(
-                                'text-caption px-1 rounded-ctl bg-muted border transition-colors hover:border-amber-500/[0.25] hover:text-foreground',
-                                active ? 'border-transparent text-ink-warn bg-amber-500/[0.15]' : 'border-border/60 text-muted-foreground',
+                                'text-caption px-1 rounded-ctl bg-muted border transition-colors hover:border-warning/[0.25] hover:text-foreground',
+                                active ? 'border-transparent text-ink-warn bg-warning/[0.15]' : 'border-border/60 text-muted-foreground',
                               )}
                               title={`Ver solo los eventos de "${c.label}" en ${mn}`}
                             >
