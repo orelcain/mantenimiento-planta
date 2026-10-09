@@ -2,8 +2,9 @@
  * ControlIntensidad — «Día · Penumbra · Automático» de la paleta Pizarra.
  *
  * Vive en el menú de usuario (a dos toques desde cualquier pantalla), en una fila
- * propia a todo el ancho del menú. Solo se muestra con Pizarra activa: sin ella
- * devuelve null y el selector Sol/Luna de siempre queda como está. Se recuerda por
+ * propia a todo el ancho del menú. Se muestra siempre que Pizarra esté activa (es la
+ * predeterminada; sin ella, con `?skin=apple`, devuelve null y el selector Sol/Luna de
+ * siempre queda como está). Se recuerda por
  * dispositivo (`app-intensidad`).
  *
  * Etiquetas cortas (Día · Noche · Auto): el menú mide ~196 px y cada botón deja

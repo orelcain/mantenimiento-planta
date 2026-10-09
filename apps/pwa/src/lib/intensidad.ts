@@ -7,8 +7,10 @@
  * `intensidad.test.ts` EJECUTA ese script y lo compara contra estas funciones,
  * así que si una cambia sin la otra, falla.
  *
- * Solo aplica con la paleta Pizarra activa (`?skin=pizarra`). Con la paleta
- * normal nada de esto corre: `app-theme` sigue mandando igual que siempre.
+ * Solo aplica con la paleta Pizarra activa. Pizarra es la PREDETERMINADA (activación
+ * 2026-10-22): se desactiva con `?skin=apple` (paleta anterior) o `?skin=default`
+ * (piel antigua). Con la paleta anterior nada de esto corre: `app-theme` manda igual
+ * que siempre.
  */
 
 export type Intensidad = 'dia' | 'penumbra' | 'auto'
@@ -72,12 +74,41 @@ export interface PielResuelta {
   recordar: string | null
 }
 
+/** Clave de localStorage de la piel elegida (`pizarra` · `apple` · `default`). */
+export const CLAVE_PIEL = 'app-skin'
+
 /**
- * `?skin=pizarra` → app-skin='pizarra' → data-skin="apple" + data-paleta="pizarra".
- * Cualquier otro valor se comporta como hasta ahora (`default` = sin atributo).
+ * Clave de versión de la migración de `app-skin`. Vale `VERSION_PIEL` cuando el
+ * dispositivo ya pasó por la activación de Pizarra como predeterminada.
  */
-export function resolverPiel(qs: string | null, guardada: string | null): PielResuelta {
-  const skin = qs || guardada || 'apple'
+export const CLAVE_PIEL_VERSION = 'app-skin-v'
+export const VERSION_PIEL = '2'
+
+/** Piel que se usa si la persona nunca eligió una. */
+export const PIEL_PREDETERMINADA = 'pizarra'
+
+/**
+ * Qué piel queda efectiva. Orden: `?skin=` > `app-skin` guardado > Pizarra.
+ *
+ * MIGRACIÓN: antes de Pizarra, `apple` era el predeterminado y las páginas /dev
+ * escribían `app-skin='apple'` solo por abrirse (sin que nadie lo eligiera), además
+ * de los enlaces `?skin=apple` de las pruebas. Por eso un `apple` guardado SIN la
+ * marca `app-skin-v=2` es indistinguible de una elección: se trata como «sin elegir».
+ * Con la marca puesta, `apple` es una elección explícita y se respeta.
+ * (`default` y `pizarra` solo se guardaban al elegirlos a propósito: se respetan.)
+ */
+export function pielEfectiva(qs: string | null, guardada: string | null, migrada: boolean): string {
+  const g = guardada === 'apple' && !migrada ? null : guardada
+  return qs || g || PIEL_PREDETERMINADA
+}
+
+/**
+ * `pizarra` (predeterminada) → data-skin="apple" + data-paleta="pizarra".
+ * `apple` = paleta anterior; `default` = sin atributo (piel antigua).
+ * `migrada` solo importa para un `apple` guardado (ver `pielEfectiva`).
+ */
+export function resolverPiel(qs: string | null, guardada: string | null, migrada = true): PielResuelta {
+  const skin = pielEfectiva(qs, guardada, migrada)
   if (skin === 'pizarra') return { dataSkin: 'apple', paleta: 'pizarra', recordar: qs || null }
   return { dataSkin: skin === 'default' ? null : skin, paleta: null, recordar: qs || null }
 }
@@ -108,6 +139,17 @@ export function resolverIntensidadActual(): { intensidad: Intensidad; oscuro: bo
   })
 }
 
+/** Piel efectiva leída del almacenamiento real (páginas /dev, que no pasan por index.html). */
+export function pielGuardadaEfectiva(): string {
+  return pielEfectiva(null, leerAlmacen(CLAVE_PIEL), leerAlmacen(CLAVE_PIEL_VERSION) === VERSION_PIEL)
+}
+
+/** Guarda una piel ELEGIDA a propósito, con la marca que la distingue de un `apple` heredado. */
+export function recordarPiel(skin: string): void {
+  escribirAlmacen(CLAVE_PIEL, skin)
+  escribirAlmacen(CLAVE_PIEL_VERSION, VERSION_PIEL)
+}
+
 /** ¿El documento tiene la paleta Pizarra activa? */
 export function paletaPizarraActiva(): boolean {
   return document.documentElement.getAttribute('data-paleta') === 'pizarra'
@@ -115,7 +157,8 @@ export function paletaPizarraActiva(): boolean {
 
 /**
  * Aplica al <html> el valor de `app-skin` (páginas /dev que lo copian a mano):
- * `pizarra` = data-skin="apple" + data-paleta="pizarra"; `default` = sin atributos.
+ * `pizarra` = data-skin="apple" + data-paleta="pizarra"; `apple` = piel anterior;
+ * `default` = sin atributos.
  */
 export function aplicarPielAlDocumento(skin: string): void {
   const root = document.documentElement

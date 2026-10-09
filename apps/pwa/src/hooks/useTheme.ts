@@ -5,9 +5,10 @@
  * - Persistencia en localStorage
  * - Actualización automática del DOM
  * - Modo oscuro por defecto
- * - Con la paleta Pizarra activa (`data-paleta="pizarra"`, `?skin=pizarra`) el tema
- *   sale de la INTENSIDAD (Día · Penumbra · Automático, `app-intensidad`); sin
- *   Pizarra todo este archivo se comporta exactamente como antes.
+ * - Con la paleta Pizarra activa (`data-paleta="pizarra"`; predeterminada desde 2026-10-22,
+ *   se sale con `?skin=apple`) el tema
+ *   sale de la INTENSIDAD (Día · Penumbra · Automático, `app-intensidad`); con la
+ *   paleta anterior (`?skin=apple`) todo este archivo se comporta exactamente como antes.
  * - Pizarra en celular sin `app-intensidad`: parte en Día aunque `app-theme` diga dark
  *   (ver `resolverIntensidad`); no se escribe nada hasta que la persona elige con el control.
  */
