@@ -59,9 +59,9 @@ export function cautelaSeverity(
 /** Color tailwind para badge de severidad — alineado con paleta del módulo. */
 export function severityBadgeClass(sev: ReassignmentSeverity): string {
   switch (sev) {
-    case 'direct':       return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-    case 'adjustment':   return 'bg-amber-500/10   text-amber-400   border-amber-500/30'
-    case 'reconfigure':  return 'bg-rose-500/10    text-rose-400    border-rose-500/30'
+    case 'direct':       return 'bg-success/10 text-ink-ok border-success/30'
+    case 'adjustment':   return 'bg-warning/10   text-ink-warn   border-warning/30'
+    case 'reconfigure':  return 'bg-destructive/10    text-ink-crit    border-ink-crit/30'
   }
 }
 

@@ -32,9 +32,9 @@ export const SPECIES_ALLOMETRY = {
 /** Badge de estado de calibración para parámetros físicos */
 export function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   if (status === 'verified')
-    return <Badge className="text-caption bg-green-500/[0.15] text-ink-ok whitespace-nowrap gap-1"><Check className="h-3 w-3" />Verificado</Badge>
+    return <Badge className="text-caption bg-success/[0.15] text-ink-ok whitespace-nowrap gap-1"><Check className="h-3 w-3" />Verificado</Badge>
   if (status === 'estimated')
-    return <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap gap-1"><AlertTriangle className="h-3 w-3" />Estimado</Badge>
+    return <Badge className="text-caption bg-warning/[0.15] text-ink-warn whitespace-nowrap gap-1"><AlertTriangle className="h-3 w-3" />Estimado</Badge>
   return <Badge className="text-caption bg-muted-foreground/[0.10] text-muted-foreground whitespace-nowrap gap-1"><HelpCircle className="h-3 w-3" />Falta</Badge>
 }
 
@@ -337,7 +337,7 @@ export function AutoField({ label, value, onChange, auto, onAutoChange, suggeste
           className={cn('mt-1 font-mono', auto && hasData && 'opacity-60 pr-14')}
         />
         {auto && hasData && (
-          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-caption bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0 pointer-events-none">
+          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-caption bg-success/[0.15] text-ink-ok px-1.5 py-0 pointer-events-none">
             Auto
           </Badge>
         )}

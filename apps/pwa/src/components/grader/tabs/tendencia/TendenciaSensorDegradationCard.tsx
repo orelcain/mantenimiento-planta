@@ -18,7 +18,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
   if (!sensorDegradationView || sensorDegradationView.degradations.length === 0) return null
 
   return (
-    <Card className="border-transparent bg-amber-500/[0.15]">
+    <Card className="border-transparent bg-warning/[0.15]">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-ink-warn" />
@@ -38,7 +38,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                 key={deg.error}
                 className={cn(
                   'flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-ctl border',
-                  isCritical ? 'border-transparent bg-red-500/[0.15]' : 'border-transparent bg-amber-500/[0.15]',
+                  isCritical ? 'border-transparent bg-destructive/[0.15]' : 'border-transparent bg-warning/[0.15]',
                 )}
               >
                 <div className="min-w-0 flex-1">
@@ -48,8 +48,8 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                       className={cn(
                         'text-caption shrink-0',
                         isCritical
-                          ? 'border-red-500/[0.25] text-ink-crit'
-                          : 'border-amber-500/[0.25] text-ink-warn',
+                          ? 'border-ink-crit/[0.25] text-ink-crit'
+                          : 'border-warning/[0.25] text-ink-warn',
                       )}
                     >
                       {isCritical ? 'CRÍTICO' : 'ALERTA'}
@@ -71,7 +71,7 @@ export function TendenciaSensorDegradationCard({ sensorDegradationView }: Props)
                         <div
                           className={cn(
                             'w-4 rounded-ctl transition-all',
-                            isCritical ? 'bg-red-500/[0.15]' : 'bg-amber-500/[0.15]',
+                            isCritical ? 'bg-destructive/[0.15]' : 'bg-warning/[0.15]',
                           )}
                           style={{ height: `${Math.max(heightPct, 4)}%` }}
                         />

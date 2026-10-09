@@ -42,7 +42,7 @@ const CATEGORY_META: Record<SuggestedAction['category'], {
   color: string
   bg: string
 }> = {
-  terreno: { label: 'Terreno', icon: Wrench, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15] border-transparent' },
+  terreno: { label: 'Terreno', icon: Wrench, color: 'text-ink-warn', bg: 'bg-warning/[0.15] border-transparent' },
   oficina: { label: 'Oficina', icon: Monitor, color: 'text-brand-ink', bg: 'bg-primary/[0.15] border-transparent' },
   verificar: { label: 'Verificar', icon: Eye, color: 'text-cat-6-ink', bg: 'bg-cat-6-tint/[0.15] border-transparent' },
 }

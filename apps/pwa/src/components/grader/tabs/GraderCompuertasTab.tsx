@@ -26,6 +26,7 @@ import type {
 } from '@/services/grader/types'
 import type { TimingThresholdOverrides } from '@/services/grader/graderGateTiming'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 
 interface Props {
   analytics: GraderAnalyticsResult
@@ -38,6 +39,8 @@ interface Props {
 }
 
 export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThresholds, onThresholdsChange }: Props) {
+  // Series/estado de los gráficos: sin Pizarra el literal de siempre; con ella, los tokens.
+  const { elegir } = useColoresGrafico()
   // Umbrales de timing (del config o defaults)
   const thresholdOverrides: TimingThresholdOverrides = useMemo(() => ({
     marginOkSec: errorThresholds?.timingMarginOkSec,
@@ -100,9 +103,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   className={cn(
                     'p-3 rounded-card border flex items-start gap-3',
                     gb.severity === 'critical'
-                      ? 'border-transparent bg-red-500/[0.15]'
+                      ? 'border-transparent bg-destructive/[0.15]'
                       : gb.severity === 'warn'
-                      ? 'border-transparent bg-amber-500/[0.15]'
+                      ? 'border-transparent bg-warning/[0.15]'
                       : 'border-muted bg-muted',
                   )}
                 >
@@ -123,7 +126,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                         <Badge variant="destructive" className="text-caption">-{gb.gap} gate(s)</Badge>
                       )}
                       {gb.gap < 0 && (
-                        <Badge variant="outline" className="text-caption text-ink-ok border-emerald-500/[0.25]">
+                        <Badge variant="outline" className="text-caption text-ink-ok border-success/[0.25]">
                           +{-gb.gap} extra
                         </Badge>
                       )}
@@ -142,20 +145,20 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       {
                         label: 'Demanda (%)',
                         data: analytics.gateBalance.map((g) => g.demandPct),
-                        backgroundColor: 'rgba(59,130,246,0.7)',
+                        backgroundColor: elegir('rgba(59,130,246,0.7)', 'serie-1', 0.7),
                         yAxisID: 'y',
                       },
                       {
                         label: 'Gates Asignados',
                         data: analytics.gateBalance.map((g) => g.gatesAssigned),
-                        backgroundColor: 'rgba(16,185,129,0.7)',
+                        backgroundColor: elegir('rgba(16,185,129,0.7)', 'serie-2', 0.7),
                         yAxisID: 'y1',
                       },
                       {
                         label: 'Gates Ideal',
                         data: analytics.gateBalance.map((g) => g.idealGates),
-                        backgroundColor: 'rgba(168,85,247,0.4)',
-                        borderColor: 'rgba(168,85,247,0.8)',
+                        backgroundColor: elegir('rgba(168,85,247,0.4)', 'serie-3', 0.4),
+                        borderColor: elegir('rgba(168,85,247,0.8)', 'serie-3', 0.8),
                         borderWidth: 1,
                         yAxisID: 'y1',
                       },
@@ -247,8 +250,8 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                   {analytics.gateAdvancedStats.map((gs) => (
                     <tr key={gs.gateNumber} className={cn(
                       'border-b hover:bg-muted/30',
-                      gs.cv > 0.15 && 'bg-amber-500/[0.15]',
-                      gs.mismatchPct > 30 && 'bg-red-500/[0.15]',
+                      gs.cv > 0.15 && 'bg-warning/[0.15]',
+                      gs.mismatchPct > 30 && 'bg-destructive/[0.15]',
                     )}>
                       <td className="py-2 px-2 font-medium">Gate {gs.gateNumber}</td>
                       <td className="py-2 px-2 text-right">{gs.pieces.toLocaleString('es-CL')}</td>
@@ -294,9 +297,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                     label: 'CV (%)',
                     data: analytics.gateAdvancedStats.map(g => g.cv * 100),
                     backgroundColor: analytics.gateAdvancedStats.map(g =>
-                      g.cv > 0.2 ? 'rgba(239,68,68,0.7)' :
-                      g.cv > 0.15 ? 'rgba(245,158,11,0.7)' :
-                      'rgba(16,185,129,0.7)'
+                      g.cv > 0.2 ? elegir('rgba(239,68,68,0.7)', 'grafico-falla', 0.7) :
+                      g.cv > 0.15 ? elegir('rgba(245,158,11,0.7)', 'grafico-aviso', 0.7) :
+                      elegir('rgba(16,185,129,0.7)', 'grafico-neutro-medio', 0.7)
                     ),
                   }],
                 }}
@@ -446,9 +449,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       t.status === 'critical' ? 'text-ink-crit' :
                       'text-muted-foreground'
                     const bg =
-                      t.status === 'ok' ? 'bg-emerald-500/[0.15]' :
-                      t.status === 'warn' ? 'bg-amber-500/[0.15]' :
-                      t.status === 'critical' ? 'bg-red-500/[0.15]' :
+                      t.status === 'ok' ? 'bg-success/[0.15]' :
+                      t.status === 'warn' ? 'bg-warning/[0.15]' :
+                      t.status === 'critical' ? 'bg-destructive/[0.15]' :
                       ''
                     const label =
                       t.status === 'ok' ? 'OK' :
@@ -568,7 +571,7 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                             className={cn(
                               'text-caption',
                               o.isMatch
-                                ? 'border-emerald-500/[0.25] text-ink-ok'
+                                ? 'border-success/[0.25] text-ink-ok'
                                 : 'border-cat-6-tint/[0.25] text-cat-6-ink',
                             )}
                           >

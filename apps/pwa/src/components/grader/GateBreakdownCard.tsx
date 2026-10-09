@@ -310,8 +310,8 @@ export function GateBreakdownCard({
           <span
             className={cn(
               'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-caption font-medium cursor-default',
-              diagnosis.color === 'emerald' && 'border-transparent bg-emerald-500/[0.15] text-ink-ok',
-              diagnosis.color === 'amber'   && 'border-transparent bg-amber-500/[0.15] text-ink-warn',
+              diagnosis.color === 'emerald' && 'border-transparent bg-success/[0.15] text-ink-ok',
+              diagnosis.color === 'amber'   && 'border-transparent bg-warning/[0.15] text-ink-warn',
               diagnosis.color === 'blue'    && 'border-transparent bg-primary/[0.15] text-brand-ink',
               diagnosis.color === 'zinc'    && 'border-muted-foreground/[0.10] bg-muted-foreground/[0.10] text-muted-foreground',
             )}
@@ -335,20 +335,20 @@ export function GateBreakdownCard({
         {calibreGroups.length > 0 && (
           <div className="flex items-center gap-2 pb-1 flex-wrap">
             {kpi.saturado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/[0.15] border border-transparent text-caption font-medium text-ink-crit">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/[0.15] border border-transparent text-caption font-medium text-ink-crit">
+                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
                 {kpi.saturado} saturado{kpi.saturado > 1 ? 's' : ''}
               </span>
             )}
             {kpi.optimo > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/[0.15] border border-transparent text-caption font-medium text-ink-ok">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/[0.15] border border-transparent text-caption font-medium text-ink-ok">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
                 {kpi.optimo} óptimo{kpi.optimo > 1 ? 's' : ''}
               </span>
             )}
             {kpi.sobredimensionado > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/[0.15] border border-transparent text-caption font-medium text-ink-warn">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/[0.15] border border-transparent text-caption font-medium text-ink-warn">
+                <span className="w-1.5 h-1.5 rounded-full bg-warning" />
                 {kpi.sobredimensionado} sobredim.
               </span>
             )}
@@ -520,16 +520,16 @@ export function GateBreakdownCard({
                           className={cn(
                             'flex items-start gap-2.5 px-3 py-2.5 rounded-ctl border text-xs transition-colors',
                             isTop
-                              ? 'border-transparent bg-red-500/[0.15]'
-                              : 'border-transparent bg-amber-500/[0.15]',
+                              ? 'border-transparent bg-destructive/[0.15]'
+                              : 'border-transparent bg-warning/[0.15]',
                           )}
                         >
                           {/* Número de prioridad */}
                           <span className={cn(
                             'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-caption font-bold mt-0.5',
                             isTop
-                              ? 'bg-red-500/[0.15] text-ink-crit'
-                              : 'bg-amber-500/[0.15] text-ink-warn',
+                              ? 'bg-destructive/[0.15] text-ink-crit'
+                              : 'bg-warning/[0.15] text-ink-warn',
                           )}>
                             {i + 1}
                           </span>

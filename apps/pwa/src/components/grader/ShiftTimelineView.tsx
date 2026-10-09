@@ -1485,8 +1485,8 @@ export function ShiftTimelineView({
             <span
               className={cn(
                 'ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-caption font-medium',
-                coverage.pct >= 95 && 'border-transparent bg-emerald-500/[0.15] text-ink-ok',
-                coverage.pct < 95 && coverage.pct >= 85 && 'border-transparent bg-amber-500/[0.15] text-ink-warn',
+                coverage.pct >= 95 && 'border-transparent bg-success/[0.15] text-ink-ok',
+                coverage.pct < 95 && coverage.pct >= 85 && 'border-transparent bg-warning/[0.15] text-ink-warn',
                 coverage.pct < 85 && 'border-transparent bg-cat-4-tint/[0.15] text-cat-4-ink',
                 canAnnotate && coverage.unclassifiedMin > 0 && 'cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity',
               )}

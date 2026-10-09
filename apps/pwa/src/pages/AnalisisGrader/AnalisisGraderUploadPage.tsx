@@ -61,10 +61,10 @@ const KIND_LABELS: Record<MatrixFileKind, string> = {
 
 const KIND_COLORS: Record<MatrixFileKind, string> = {
   PIEZA_PIEZA: 'bg-primary/[0.15] text-brand-ink',
-  PUERTA_0: 'bg-red-500/[0.15] text-ink-crit',
-  PORC_CALIDAD: 'bg-green-500/[0.15] text-ink-ok',
+  PUERTA_0: 'bg-destructive/[0.15] text-ink-crit',
+  PORC_CALIDAD: 'bg-success/[0.15] text-ink-ok',
   TOTALES_PRODUCCION: 'bg-cat-6-tint/[0.15] text-cat-6-ink',
-  TOTAL_PIEZAS_POR_FOLIO: 'bg-amber-500/[0.15] text-ink-warn',
+  TOTAL_PIEZAS_POR_FOLIO: 'bg-warning/[0.15] text-ink-warn',
   UNKNOWN: 'bg-muted-foreground/[0.10] text-muted-foreground',
 }
 
@@ -523,7 +523,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               setError(null)
               if (inputRef.current) inputRef.current.value = ''
             }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-transparent text-ink-crit text-xs font-medium hover:bg-red-500/[0.15] transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-ctl border border-transparent text-ink-crit text-xs font-medium hover:bg-destructive/[0.15] transition-colors"
             title="Cancelar — limpia los archivos en cola"
           >
             <X className="h-3 w-3" />
@@ -560,7 +560,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           el único que monta esta página y siempre con `compact`. */}
       {/* Zona de carga */}
       <div>
-        <Card className="lg:border-l-4 lg:border-l-blue-500/40 lg:hover:shadow-md lg:transition-shadow">
+        <Card className="lg:border-l-4 lg:border-l-primary/40 lg:hover:shadow-md lg:transition-shadow">
         <CardContent className="pt-4 pb-4 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className={cn('text-xs', KIND_COLORS.PIEZA_PIEZA)}>Pieza-Pieza</Badge>
@@ -610,7 +610,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
           {/* Turno detectado */}
           {turnoRange && (
-            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/[0.15] border border-transparent rounded-ctl px-3 py-2">
+            <div className="flex items-center gap-3 flex-wrap text-xs bg-success/[0.15] border border-transparent rounded-ctl px-3 py-2">
               <CheckCircle className="h-3.5 w-3.5 text-ink-ok shrink-0" />
               <span className="font-medium">{turnoRange.date} · {turnoRange.start}–{turnoRange.end}</span>
               <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString('es-CL')} piezas</span>

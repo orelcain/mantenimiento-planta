@@ -51,8 +51,8 @@ export function ConfigDriftBanner({
     return (
       <div
         className={cn(
-          'flex items-center gap-2.5 rounded-card border border-transparent bg-amber-500/[0.15] px-3.5 py-3',
-          'dark:bg-amber-500/[0.15] dark:border-transparent',
+          'flex items-center gap-2.5 rounded-card border border-transparent bg-warning/[0.15] px-3.5 py-3',
+          'dark:bg-warning/[0.15] dark:border-transparent',
           className,
         )}
       >
@@ -74,7 +74,7 @@ export function ConfigDriftBanner({
   return (
     <div
       className={cn(
-        'rounded-card border border-transparent bg-amber-500/[0.15] dark:border-transparent',
+        'rounded-card border border-transparent bg-warning/[0.15]',
         className,
       )}
     >
@@ -99,10 +99,10 @@ export function ConfigDriftBanner({
       </button>
 
       {open && (
-        <div className="px-3.5 pb-3.5 pt-3 border-t border-amber-500/[0.25] dark:border-amber-500/[0.25]">
+        <div className="px-3.5 pb-3.5 pt-3 border-t border-warning/[0.25]">
           <table className="w-full text-footnote">
             <thead>
-              <tr className="text-caption text-ink-warn/80 dark:text-ink-warn/80">
+              <tr className="text-caption text-ink-warn/80">
                 <th className="text-left font-normal pb-1.5">Causa que depende de las gates</th>
                 <th className="text-right font-normal pb-1.5">guardado</th>
                 <th className="text-right font-normal pb-1.5 pl-3">config actual</th>

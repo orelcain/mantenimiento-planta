@@ -23,9 +23,9 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
       className={cn(
         'p-3 rounded-card border',
         insight.severity === 'critical'
-          ? 'border-transparent bg-red-500/[0.15]'
+          ? 'border-transparent bg-destructive/[0.15]'
           : insight.severity === 'warn'
-          ? 'border-transparent bg-amber-500/[0.15]'
+          ? 'border-transparent bg-warning/[0.15]'
           : 'border-transparent bg-primary/[0.15]',
       )}
     >
@@ -90,10 +90,10 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 className={cn(
                   'p-3 rounded-card border-l-4',
                   c.confidence === 'high'
-                    ? 'border-l-red-500 bg-red-500/[0.15]'
+                    ? 'border-l-ink-crit bg-destructive/[0.15]'
                     : c.confidence === 'medium'
-                    ? 'border-l-amber-500 bg-amber-500/[0.15]'
-                    : 'border-l-blue-400 bg-muted',
+                    ? 'border-l-warning bg-warning/[0.15]'
+                    : 'border-l-primary bg-muted',
                 )}
               >
                 <div className="flex items-center justify-between gap-2 mb-1">
@@ -102,8 +102,8 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                     variant="outline"
                     className={cn(
                       'text-caption shrink-0',
-                      c.confidence === 'high' && 'text-ink-crit border-red-500/[0.25]',
-                      c.confidence === 'medium' && 'text-ink-warn border-amber-500/[0.25]',
+                      c.confidence === 'high' && 'text-ink-crit border-ink-crit/[0.25]',
+                      c.confidence === 'medium' && 'text-ink-warn border-warning/[0.25]',
                     )}
                   >
                     {confidenceLabel[c.confidence] || c.confidence}
@@ -137,9 +137,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                 className={cn(
                   'flex items-start gap-3 p-2.5 rounded-card border',
                   a.priority === 'high'
-                    ? 'border-transparent bg-red-500/[0.15]'
+                    ? 'border-transparent bg-destructive/[0.15]'
                     : a.priority === 'medium'
-                    ? 'border-transparent bg-amber-500/[0.15]'
+                    ? 'border-transparent bg-warning/[0.15]'
                     : 'border-muted bg-muted',
                 )}
               >
@@ -147,9 +147,9 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
                   className={cn(
                     'flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-caption font-bold',
                     a.priority === 'high'
-                      ? 'bg-red-500/[0.15] text-ink-crit'
+                      ? 'bg-destructive/[0.15] text-ink-crit'
                       : a.priority === 'medium'
-                      ? 'bg-amber-500/[0.15] text-ink-warn'
+                      ? 'bg-warning/[0.15] text-ink-warn'
                       : 'bg-muted text-muted-foreground',
                   )}
                 >
@@ -172,7 +172,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
-        <div className="rounded-card border-2 border-transparent bg-emerald-500/[0.15] p-3">
+        <div className="rounded-card border-2 border-transparent bg-success/[0.15] p-3">
           <p className="text-caption font-semibold tracking-wider text-ink-ok mb-2">
             Qu&eacute; verificar ahora
           </p>
@@ -181,7 +181,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
               <label key={i} className="flex items-start gap-2.5 cursor-pointer group">
                 <input
                   type="checkbox"
-                  className="mt-1 h-4 w-4 rounded-ctl border-emerald-400 text-ink-ok focus:ring-emerald-500 shrink-0"
+                  className="mt-1 h-4 w-4 rounded-ctl border-success text-ink-ok focus:ring-success shrink-0"
                 />
                 <span className="text-sm group-hover:text-foreground transition-colors">{c}</span>
               </label>
@@ -192,7 +192,7 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
       {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
-        <div className="p-2.5 bg-amber-500/[0.15] rounded-card dark:border-transparent">
+        <div className="p-2.5 bg-warning/[0.15] rounded-card dark:border-transparent">
           <p className="text-caption font-semibold tracking-wider text-ink-warn mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-caption text-ink-warn">{d}</p>
@@ -213,12 +213,12 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
     add: 'Agregar',
   }
   const typeColors: Record<string, string> = {
-    correction: 'text-ink-warn border-amber-500/[0.25]',
+    correction: 'text-ink-warn border-warning/[0.25]',
     optimization: 'text-cat-6-ink border-cat-6-tint',
-    investigate: 'text-ink-info border-blue-500/[0.25]',
+    investigate: 'text-ink-info border-primary/[0.25]',
     swap: 'text-cat-6-ink border-cat-6-tint',
-    reassign: 'text-brand-ink border-blue-500/[0.25]',
-    add: 'text-ink-ok border-emerald-500/[0.25]',
+    reassign: 'text-brand-ink border-primary/[0.25]',
+    add: 'text-ink-ok border-success/[0.25]',
   }
   /** Ícono por tipo de sugerencia: componente, no emoji (§17). */
   const typeIcons: Record<string, LucideIcon> = {
@@ -235,8 +235,8 @@ export function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggest
   return (
     <div className={cn(
       'p-3 rounded-card border',
-      suggestion.impactScore >= 70 ? 'border-transparent bg-red-500/[0.15]' :
-      suggestion.impactScore >= 40 ? 'border-transparent bg-amber-500/[0.15]' :
+      suggestion.impactScore >= 70 ? 'border-transparent bg-destructive/[0.15]' :
+      suggestion.impactScore >= 40 ? 'border-transparent bg-warning/[0.15]' :
       'border-muted bg-muted',
     )}>
       <div className="flex items-center gap-2 flex-wrap">

@@ -128,12 +128,16 @@ export function slxKeyForVisualShift(visualDay: string, shiftId: string): string
 // `getShiftMeta(shiftId)` para evitar mezclas tipo "Turno día" + "T1" + iconos
 // distintos en distintas vistas.
 //
+// COLOR: el turno es identidad, no estado, así que NO lleva color propio (ISA-101: el color
+// se reserva para aviso/falla). Texto/fondo/borde son neutros del tema; lo que distingue el
+// turno es el ÍCONO y la etiqueta.
+//
 // Convención de períodos:
-//   - mañana      (06–12) → Sun (amber)
-//   - tarde       (12–19) → Sunset (orange)
-//   - noche       (19–07) → Moon (indigo)
-//   - dia         → Sun (amber) — Excel "Turno día" o T1+T2 sumados
-//   - noche-corta → Moon (indigo) — Excel "Turno noche" sin precisar T3
+//   - mañana      (06–12) → Sun
+//   - tarde       (12–19) → Sunset
+//   - noche       (19–07) → Moon
+//   - dia         → Sun — Excel "Turno día" o T1+T2 sumados
+//   - noche-corta → Moon — Excel "Turno noche" sin precisar T3
 //
 // Mapeo de shiftId → período + label + shortLabel:
 //   Turno 1     → mañana      | "Turno 1 — Mañana"  | "T1"
@@ -172,9 +176,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno 1 — Mañana',
     shortLabel: 'T1',
     period: 'mañana',
-    textColorClass: 'text-amber-600 dark:text-amber-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-amber-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-amber-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Sun',
     emoji: '☀',
     isDayLike: true,
@@ -184,9 +188,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno 2 — Tarde',
     shortLabel: 'T2',
     period: 'tarde',
-    textColorClass: 'text-orange-600 dark:text-orange-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-orange-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-orange-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Sunset',
     emoji: '🌅',
     isDayLike: true,
@@ -196,9 +200,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno 3 — Noche',
     shortLabel: 'T3',
     period: 'noche',
-    textColorClass: 'text-indigo-600 dark:text-indigo-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-indigo-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-indigo-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Moon',
     emoji: '🌙',
     isDayLike: false,
@@ -210,9 +214,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno 1 Lunes — Madrugada',
     shortLabel: 'T1L',
     period: 'noche',
-    textColorClass: 'text-indigo-600 dark:text-indigo-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-indigo-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-indigo-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Sunrise',
     emoji: '🌄',
     isDayLike: false,
@@ -226,9 +230,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Sin turno asignado',
     shortLabel: 'S/T',
     period: 'desconocido',
-    textColorClass: 'text-slate-600 dark:text-slate-300 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-slate-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-slate-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Clock',
     emoji: '⏱',
     isDayLike: false,
@@ -238,9 +242,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno día',
     shortLabel: 'Día',
     period: 'dia',
-    textColorClass: 'text-amber-600 dark:text-amber-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-amber-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-amber-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Sun',
     emoji: '☀',
     isDayLike: true,
@@ -253,9 +257,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno Día',
     shortLabel: 'Día',
     period: 'dia',
-    textColorClass: 'text-amber-600 dark:text-amber-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-amber-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-amber-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Sun',
     emoji: '☀',
     isDayLike: true,
@@ -271,9 +275,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno Noche Lunes',
     shortLabel: 'NocheL',
     period: 'noche',
-    textColorClass: 'text-indigo-600 dark:text-indigo-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-indigo-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-indigo-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Sunrise',
     emoji: '\u{1F304}',
     isDayLike: false,
@@ -296,9 +300,9 @@ const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
     label: 'Turno noche',
     shortLabel: 'Noche',
     period: 'noche-corta',
-    textColorClass: 'text-indigo-600 dark:text-indigo-400 pizarra:text-muted-foreground',
-    bgColorClass: 'bg-indigo-500/10 pizarra:bg-muted',
-    borderColorClass: 'border-indigo-500/30 pizarra:border-border',
+    textColorClass: 'text-muted-foreground',
+    bgColorClass: 'bg-muted',
+    borderColorClass: 'border-border',
     iconName: 'Moon',
     emoji: '🌙',
     isDayLike: false,
@@ -339,9 +343,9 @@ function periodFromStartHour(hour: number): 'mañana' | 'tarde' | 'noche' {
 /** Campos VISUALES por período (ícono/color/emoji) — misma paleta que SHIFT_META_TABLE. */
 const VISUAL_BY_PERIOD: Record<'mañana' | 'tarde' | 'noche',
   Pick<ShiftMeta, 'period' | 'textColorClass' | 'bgColorClass' | 'borderColorClass' | 'iconName' | 'emoji' | 'isDayLike'>> = {
-  'mañana': { period: 'mañana', textColorClass: 'text-amber-600 dark:text-amber-400 pizarra:text-muted-foreground',  bgColorClass: 'bg-amber-500/10 pizarra:bg-muted',  borderColorClass: 'border-amber-500/30 pizarra:border-border',  iconName: 'Sun',    emoji: '☀',  isDayLike: true  },
-  'tarde':  { period: 'tarde',  textColorClass: 'text-orange-600 dark:text-orange-400 pizarra:text-muted-foreground', bgColorClass: 'bg-orange-500/10 pizarra:bg-muted', borderColorClass: 'border-orange-500/30 pizarra:border-border', iconName: 'Sunset', emoji: '🌅', isDayLike: true  },
-  'noche':  { period: 'noche',  textColorClass: 'text-indigo-600 dark:text-indigo-400 pizarra:text-muted-foreground', bgColorClass: 'bg-indigo-500/10 pizarra:bg-muted', borderColorClass: 'border-indigo-500/30 pizarra:border-border', iconName: 'Moon',   emoji: '🌙', isDayLike: false },
+  'mañana': { period: 'mañana', textColorClass: 'text-muted-foreground',  bgColorClass: 'bg-muted',  borderColorClass: 'border-border',  iconName: 'Sun',    emoji: '☀',  isDayLike: true  },
+  'tarde':  { period: 'tarde',  textColorClass: 'text-muted-foreground', bgColorClass: 'bg-muted', borderColorClass: 'border-border', iconName: 'Sunset', emoji: '🌅', isDayLike: true  },
+  'noche':  { period: 'noche',  textColorClass: 'text-muted-foreground', bgColorClass: 'bg-muted', borderColorClass: 'border-border', iconName: 'Moon',   emoji: '🌙', isDayLike: false },
 }
 
 /**

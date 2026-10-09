@@ -350,7 +350,7 @@ export function UpstreamScatterCard({
         }
 
   return (
-    <Card className="border-border bg-card dark:border-border dark:bg-muted-foreground/[0.10]">
+    <Card className="border-border bg-card dark:bg-muted-foreground/[0.10]">
       <CardContent className="py-3 px-4">
         {/* Header: ícono + título + KPI accionable de zona crítica */}
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">

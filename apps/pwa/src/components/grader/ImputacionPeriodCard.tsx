@@ -50,9 +50,9 @@ export function tendenciaImputacion(porTurno: PeriodImputacion['porTurno']): Ten
  * estado: el texto va en neutro.
  */
 const nivel = (pct: number) =>
-  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-ink-warn pizarra:text-muted-foreground', bar: 'bg-amber-500/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Parcial' }
-  : { text: 'text-ink-crit', bar: 'bg-red-500/[0.15] pizarra:bg-[rgb(var(--grafico-falla))]', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-success/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-ink-warn pizarra:text-muted-foreground', bar: 'bg-warning/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Parcial' }
+  : { text: 'text-ink-crit', bar: 'bg-destructive/[0.15] pizarra:bg-[rgb(var(--grafico-falla))]', label: 'Sin imputar' }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
   if (!imputacion || imputacion.totalSec <= 0) return null

@@ -22,7 +22,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
   const p0Better = m.deltaP0 < 0
   const p0Worse = m.deltaP0 > 0
   const p0Color = p0Better ? 'text-ink-ok' : p0Worse ? 'text-ink-crit' : 'text-muted-foreground'
-  const p0BgClass = p0Better ? 'bg-emerald-500/[0.15] border-transparent' : p0Worse ? 'bg-red-500/[0.15] border-transparent' : 'bg-muted/20'
+  const p0BgClass = p0Better ? 'bg-success/[0.15] border-transparent' : p0Worse ? 'bg-destructive/[0.15] border-transparent' : 'bg-muted/20'
   const percentileLabel = m.percentileP0 >= 75 ? 'peor 25%' : m.percentileP0 >= 50 ? 'peor 50%' : m.percentileP0 >= 25 ? 'mejor 50%' : 'mejor 25%'
 
   return (
@@ -77,7 +77,7 @@ export function TendenciaMultiSessionCard({ multiSessionInsightsView }: Props) {
                     className={cn(
                       'flex items-center justify-between gap-2 p-1.5 rounded-ctl border text-xs',
                       isInCurrent
-                        ? 'border-transparent bg-amber-500/[0.15]'
+                        ? 'border-transparent bg-warning/[0.15]'
                         : 'border-border bg-muted/10',
                     )}
                   >

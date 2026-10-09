@@ -48,15 +48,15 @@ export function DistanciasTab({ physicalConfig, setPhysicalConfig, updateFlipper
               key={gateNum}
               className={cn(
                 'rounded-card border bg-muted dark:bg-muted-foreground/[0.10] p-3 space-y-2',
-                isCritical ? 'border-transparent bg-red-500/[0.15]' : 'border-border dark:border-muted-foreground/[0.10]',
+                isCritical ? 'border-transparent bg-destructive/[0.15]' : 'border-border dark:border-muted-foreground/[0.10]',
               )}
             >
               {/* Header */}
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">Gate {gateNum}</span>
                 <div className="flex items-center gap-1">
-                  {isCritical && <Badge className="text-caption px-1 py-0 bg-red-500/[0.15] text-ink-crit">Crítico</Badge>}
-                  {isWarning && <Badge className="text-caption px-1 py-0 bg-amber-500/[0.15] text-ink-warn">Ajustado</Badge>}
+                  {isCritical && <Badge className="text-caption px-1 py-0 bg-destructive/[0.15] text-ink-crit">Crítico</Badge>}
+                  {isWarning && <Badge className="text-caption px-1 py-0 bg-warning/[0.15] text-ink-warn">Ajustado</Badge>}
                   <Button
                     size="sm"
                     variant="ghost"

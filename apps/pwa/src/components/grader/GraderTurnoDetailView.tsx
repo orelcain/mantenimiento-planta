@@ -366,12 +366,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {(summary.hasPieceData === false || summary.hasGate0Data === false) && (
                 <div className="flex gap-1.5 mt-2">
                   {summary.hasPieceData === false && (
-                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-transparent">
+                    <Badge className="text-caption bg-destructive/[0.15] text-ink-crit border-transparent">
                       Falta PIEZA_PIEZA
                     </Badge>
                   )}
                   {summary.hasGate0Data === false && (
-                    <Badge className="text-caption bg-red-500/[0.15] text-ink-crit border-transparent">
+                    <Badge className="text-caption bg-destructive/[0.15] text-ink-crit border-transparent">
                       Falta PUERTA_0
                     </Badge>
                   )}
@@ -529,8 +529,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                         variant="outline"
                         className={cn(
                           'text-caption py-0',
-                          c.pct >= 50 ? 'border-red-500/[0.25] text-ink-crit' :
-                          c.pct >= 25 ? 'border-amber-500/[0.25] text-ink-warn' :
+                          c.pct >= 50 ? 'border-ink-crit/[0.25] text-ink-crit' :
+                          c.pct >= 25 ? 'border-warning/[0.25] text-ink-warn' :
                           'border-muted-foreground/30 text-muted-foreground'
                         )}
                       >
@@ -643,15 +643,15 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {/* Leyenda de colores P0 */}
               <div className="flex items-center gap-4 mt-2 text-caption text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 pizarra:bg-[rgb(var(--serie-1))]" />
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-success pizarra:bg-[rgb(var(--serie-1))]" />
                   P0% {'<'} 2% (OK)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 pizarra:bg-[rgb(var(--grafico-aviso))]" />
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-warning pizarra:bg-[rgb(var(--grafico-aviso))]" />
                   2-3.5% (Warn)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 pizarra:bg-[rgb(var(--grafico-falla))]" />
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-destructive pizarra:bg-[rgb(var(--grafico-falla))]" />
                   {'>'} 3.5% (Crítico)
                 </span>
                 <span className="text-muted-foreground/50 ml-auto">Detalle pieza a pieza disponible en "Abrir dashboard completo"</span>
@@ -677,8 +677,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {insights.map((ins) => {
               const sev = ins.severity
-              const borderCls = sev === 'critical' ? 'border-transparent bg-red-500/[0.15]'
-                : sev === 'warn' ? 'border-transparent bg-amber-500/[0.15]'
+              const borderCls = sev === 'critical' ? 'border-transparent bg-destructive/[0.15]'
+                : sev === 'warn' ? 'border-transparent bg-warning/[0.15]'
                 : 'border-transparent bg-primary/[0.15]'
               const icon = sev === 'critical' ? <AlertTriangle className="h-3.5 w-3.5 text-ink-crit shrink-0 mt-0.5" />
                 : sev === 'warn' ? <AlertTriangle className="h-3.5 w-3.5 text-ink-warn shrink-0 mt-0.5" />
@@ -923,7 +923,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             </p>
           )}
           {aiError && (
-            <div className="p-3 rounded-card bg-red-500/[0.15] border border-transparent text-sm">
+            <div className="p-3 rounded-card bg-destructive/[0.15] border border-transparent text-sm">
               <div className="flex items-center gap-2 text-ink-crit">
                 <XCircle className="h-4 w-4" />
                 <span className="font-medium">Error de análisis IA</span>

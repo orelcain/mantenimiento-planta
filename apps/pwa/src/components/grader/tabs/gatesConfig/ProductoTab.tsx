@@ -82,10 +82,10 @@ export function ProductoTab({
     : null
   const salmonPassTimeSec = salmonLengthM / speedMps
   const verdictColor = overlapping
-    ? 'bg-red-500/[0.15] text-ink-crit border-transparent'
+    ? 'bg-destructive/[0.15] text-ink-crit border-transparent'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
-      ? 'bg-amber-500/[0.15] text-ink-warn border-transparent'
-      : 'bg-emerald-500/[0.15] text-ink-ok border-transparent'
+      ? 'bg-warning/[0.15] text-ink-warn border-transparent'
+      : 'bg-success/[0.15] text-ink-ok border-transparent'
   const verdictText = overlapping
     ? 'Solapamiento — peces se pisan'
     : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
@@ -130,7 +130,7 @@ export function ProductoTab({
                 className={cn('h-8 text-xs w-28 font-mono', medianWeightG != null && 'opacity-70')}
               />
               {medianSource === 'excel' && (
-                <Badge className="text-caption bg-emerald-500/[0.15] text-ink-ok px-1.5 py-0">
+                <Badge className="text-caption bg-success/[0.15] text-ink-ok px-1.5 py-0">
                   Excel · {dec2((medianWeightG! / 1000))} kg
                 </Badge>
               )}
@@ -143,8 +143,8 @@ export function ProductoTab({
                 <Badge className={cn(
                   'text-caption px-1.5 py-0',
                   historicalMedianG.fromCalendar
-                    ? 'bg-emerald-500/[0.15] text-ink-ok'
-                    : 'bg-amber-500/[0.15] text-ink-warn',
+                    ? 'bg-success/[0.15] text-ink-ok'
+                    : 'bg-warning/[0.15] text-ink-warn',
                 )}>
                   {historicalMedianG.fromCalendar && <CalendarDays className='mr-1 inline h-3 w-3' />}{historicalMedianG.dateKey} {historicalMedianG.shiftId}
                 </Badge>
@@ -299,7 +299,7 @@ export function ProductoTab({
           <div className="rounded-card border border-border bg-muted dark:border-muted-foreground/[0.10] dark:bg-muted-foreground/[0.10] p-3 space-y-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-xs font-semibold text-ink-warn">Reset mecánico cilindro</p>
-              <span className="inline-flex items-center gap-1 rounded-ctl border px-1 py-0.5 text-caption bg-amber-500/[0.15] text-ink-warn whitespace-nowrap"><AlertTriangle className="h-3 w-3" />Estimado</span>
+              <span className="inline-flex items-center gap-1 rounded-ctl border px-1 py-0.5 text-caption bg-warning/[0.15] text-ink-warn whitespace-nowrap"><AlertTriangle className="h-3 w-3" />Estimado</span>
             </div>
             <div>
               <Label className="text-xs">Tiempo reset (s)</Label>

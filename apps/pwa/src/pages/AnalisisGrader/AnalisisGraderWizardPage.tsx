@@ -811,9 +811,9 @@ export function AnalisisGraderWizardPage() {
             <Badge
               variant="outline"
               className={
-                autosaveState === 'saved' ? 'text-ink-ok border-emerald-500/[0.25]' :
+                autosaveState === 'saved' ? 'text-ink-ok border-success/[0.25]' :
                 autosaveState === 'saving' ? 'text-ink-info border-primary/[0.25]' :
-                autosaveState === 'error' ? 'text-ink-warn border-amber-500/[0.25]' :
+                autosaveState === 'error' ? 'text-ink-warn border-warning/[0.25]' :
                 'text-muted-foreground border-muted'
               }
             >
@@ -901,7 +901,7 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
       {savedToCalendar && (
-        <Card className="border-transparent bg-emerald-500/[0.15]">
+        <Card className="border-transparent bg-success/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
             <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
             <p className="text-sm text-ink-ok font-medium flex-1 min-w-[16rem]">
@@ -929,7 +929,7 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
       {saveError && (
-        <Card className="border-transparent bg-red-500/[0.15]">
+        <Card className="border-transparent bg-destructive/[0.15]">
           <CardContent className="py-3 px-4 flex items-start gap-2">
             <AlertCircle className="h-4 w-4 text-ink-crit shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -942,7 +942,7 @@ export function AnalisisGraderWizardPage() {
             <Button
               size="sm"
               variant="ghost"
-              className="text-ink-crit hover:bg-red-500/[0.15] shrink-0"
+              className="text-ink-crit hover:bg-destructive/[0.15] shrink-0"
               onClick={() => setSaveError(null)}
             >
               Cerrar
@@ -999,7 +999,7 @@ export function AnalisisGraderWizardPage() {
                 )}
                 <ChevronDown
                   className={cn(
-                    'h-3.5 w-3.5 shrink-0 transition-transform text-ink-info/60 dark:text-ink-info/60',
+                    'h-3.5 w-3.5 shrink-0 transition-transform text-ink-info/60',
                     uploadPanelExpanded && 'rotate-180',
                   )}
                 />

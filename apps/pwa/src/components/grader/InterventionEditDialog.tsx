@@ -24,9 +24,9 @@ const TIPOS: { id: Tipo; label: string }[] = [
   { id: 'inspeccion', label: 'Inspección' },
 ]
 const SEVS: { id: Sev; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1', dot: 'bg-emerald-500', active: 'border-transparent bg-emerald-500/[0.15] text-ink-ok' },
-  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-amber-500', active: 'border-transparent bg-amber-500/[0.15] text-ink-warn' },
-  { id: 'rojo', label: 'Cond. 3', dot: 'bg-red-500', active: 'border-transparent bg-red-500/[0.15] text-ink-crit' },
+  { id: 'verde', label: 'Cond. 1', dot: 'bg-success', active: 'border-transparent bg-success/[0.15] text-ink-ok' },
+  { id: 'amarillo', label: 'Cond. 2', dot: 'bg-warning', active: 'border-transparent bg-warning/[0.15] text-ink-warn' },
+  { id: 'rojo', label: 'Cond. 3', dot: 'bg-destructive', active: 'border-transparent bg-destructive/[0.15] text-ink-crit' },
 ]
 
 function toLocalInput(d: Date): string {
@@ -184,13 +184,13 @@ export function InterventionEditDialog({
             </div>
           </div>
           {!sapOrden.trim() && (
-            <Badge variant="outline" className="text-caption text-ink-warn border-amber-500/[0.25]">
+            <Badge variant="outline" className="text-caption text-ink-warn border-warning/[0.25]">
               SAP pendiente · falta crear la OT
             </Badge>
           )}
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-ink-crit bg-destructive/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -200,7 +200,7 @@ export function InterventionEditDialog({
         <DialogFooter className="gap-2 sm:justify-between">
           {isAdmin ? (
             <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleting || saving}
-              className="text-ink-crit hover:text-ink-crit dark:hover:text-ink-crit hover:bg-red-500/[0.15]">
+              className="text-ink-crit hover:text-ink-crit dark:hover:text-ink-crit hover:bg-destructive/[0.15]">
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
               Eliminar
             </Button>

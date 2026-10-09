@@ -57,7 +57,7 @@ export function PuntoCeroClasificacionCard({
   }
 
   return (
-    <Card className="border-red-500/[0.25]">
+    <Card className="border-ink-crit/[0.25]">
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
           <Target className="h-4 w-4 text-ink-crit" />
