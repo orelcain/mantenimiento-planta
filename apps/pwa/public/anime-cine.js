@@ -42,7 +42,7 @@
       const host = x.hostname.replace(/^www\./, '');
       if (host === 't.me' || host === 'telegram.me') {
         const canal = x.pathname.split('/').filter(Boolean)[0];
-        return canal ? `Telegram · ${canal}` : 'Telegram';
+        return canal === 'c' ? 'Telegram · canal privado' : (canal ? `Telegram · ${canal}` : 'Telegram');
       }
       return host;
     } catch { return u; }
