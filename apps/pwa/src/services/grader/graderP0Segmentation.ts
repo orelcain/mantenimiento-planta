@@ -73,9 +73,9 @@ export type VerdictStatus = SegmentVerdict['status']
 export function verdictColor(status: VerdictStatus): string {
   switch (status) {
     case 'improved':          return 'text-emerald-400'
-    case 'worsened':          return 'text-rose-400'
-    case 'neutral':           return 'text-zinc-400'
-    case 'insufficient-data': return 'text-zinc-500'
+    case 'worsened':          return 'text-rose-400 pizarra:text-ink-crit'
+    case 'neutral':           return 'text-zinc-400 pizarra:text-muted-foreground'
+    case 'insufficient-data': return 'text-zinc-500 pizarra:text-muted-foreground'
   }
 }
 

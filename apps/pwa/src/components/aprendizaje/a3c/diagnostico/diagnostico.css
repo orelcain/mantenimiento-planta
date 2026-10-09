@@ -23,3 +23,7 @@
 .a3cd-leyenda .a3c-punto::after { display: none; }
 /* Regleta del panel (PC): solo trae los bornes de UNA regleta; los títulos de las otras quedan vacíos y se ocultan. */
 .a3cd-regleta [data-orientacion] > div:is(:has(+ div), :last-child) { display: none; }
+
+/* Pizarra · el LED verde de un paso conserva su verde (LED físico, no estado «ok»). */
+:root[data-paleta="pizarra"]:not(.dark) .a3cd-led[data-color="g"] { --tw-green-500: 52 199 89; }
+:root[data-paleta="pizarra"].dark .a3cd-led[data-color="g"] { --tw-green-500: 48 209 88; }

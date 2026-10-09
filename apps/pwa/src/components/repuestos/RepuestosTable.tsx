@@ -45,14 +45,14 @@ const formatNumber = (value: number) =>
 
 function tipoBadgeClass(tipo: string): string {
   const t = tipo.toUpperCase()
-  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-primary/[0.15] text-brand-ink'
-  if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-green-500/[0.15] text-ink-ok'
-  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/[0.15] text-ink-crit'
-  if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR', 'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t)) return 'bg-cat-6-tint/[0.15] text-cat-6-ink'
-  if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t)) return 'bg-muted-foreground/[0.10] text-muted-foreground'
-  if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-cat-4-tint/[0.15] text-cat-4-ink'
-  if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t)) return 'bg-cat-7-tint/[0.15] text-cat-7-ink'
-  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-amber-500/[0.15] text-ink-warn'
+  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-primary/[0.15] text-brand-ink pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-green-500/[0.15] text-ink-ok pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/[0.15] text-ink-crit pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR', 'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t)) return 'bg-cat-6-tint/[0.15] text-cat-6-ink pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t)) return 'bg-muted-foreground/[0.10] text-muted-foreground pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-cat-4-tint/[0.15] text-cat-4-ink pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t)) return 'bg-cat-7-tint/[0.15] text-cat-7-ink pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-muted pizarra:text-muted-foreground'
   return 'bg-muted text-muted-foreground'
 }
 
@@ -294,7 +294,7 @@ export function RepuestosTable({
               key={rep.id}
               id={`repuesto-${rep.id}`}
               onClick={() => onViewDetail?.(rep)}
-              className={`bg-card border rounded-card p-3 transition-all active:scale-[0.99] ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/[0.15]' : ''}`}
+              className={`bg-card border rounded-card p-3 transition-all active:scale-[0.99] ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/[0.15] pizarra:ring-primary' : ''}`}
             >
               <div className="flex gap-2.5 items-start">
                 {/* Thumbnail compacto */}
@@ -372,7 +372,7 @@ export function RepuestosTable({
                 <tr
                   key={rep.id}
                   id={`repuesto-${rep.id}`}
-                  className={`group hover:bg-primary/5 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'} ${highlightedRepuestoId === rep.id ? 'ring-2 ring-inset ring-emerald-500 bg-emerald-500/[0.15] animate-pulse' : ''}`}
+                  className={`group hover:bg-primary/5 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'} ${highlightedRepuestoId === rep.id ? 'ring-2 ring-inset ring-emerald-500 bg-emerald-500/[0.15] pizarra:ring-primary animate-pulse' : ''}`}
                 >
                   {/* Thumbnail */}
                   <td className="pl-4 pr-2 py-2.5">

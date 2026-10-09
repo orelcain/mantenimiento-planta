@@ -122,13 +122,15 @@ export default {
           DEFAULT: '#bf6c61',
           foreground: '#ffffff',
         },
+        // success / warning por VARIABLE (index.css): los defaults de `:root` son los
+        // mismos hex de siempre; la paleta Pizarra los reasigna.
         success: {
-          DEFAULT: '#6c986c',
-          foreground: '#ffffff',
+          DEFAULT: 'rgb(var(--success) / <alpha-value>)',
+          foreground: 'rgb(var(--success-foreground) / <alpha-value>)',
         },
         warning: {
-          DEFAULT: '#c08e5f',
-          foreground: '#000000',
+          DEFAULT: 'rgb(var(--warning) / <alpha-value>)',
+          foreground: 'rgb(var(--warning-foreground) / <alpha-value>)',
         },
         // Paleta CATEGÓRICA (index.css). Se consume por el primitivo <Tag>,
         // no a mano: `text-cat-3-ink` suelto vuelve a dispersar la decisión.
@@ -214,6 +216,14 @@ export default {
       },
       textColor: {
         destructive: 'rgb(var(--tw-red-600) / <alpha-value>)',
+        // La TINTA de aviso se separa del relleno `warning` (igual que destructive):
+        // con Pizarra el relleno es ámbar vivo y el texto necesita el ámbar oscuro.
+        // Default = el color de siempre.
+        // (objeto, no string: un string pisaría `warning.foreground` → `text-warning-foreground`.)
+        warning: {
+          DEFAULT: 'rgb(var(--warning-ink) / <alpha-value>)',
+          foreground: 'rgb(var(--warning-foreground) / <alpha-value>)',
+        },
       },
       fontSize: {
         // ×`--escala-texto` (19-09-2026): con 1 (por defecto) todo mide lo mismo que antes;
@@ -264,5 +274,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Variante `pizarra:` — solo aplica con la paleta Pizarra activa (`?skin=pizarra`).
+    // Sin `data-paleta="pizarra"` ninguna clase `pizarra:` casa, así que el resto de la
+    // app queda idéntico. Especificidad (0,3,0): gana sobre `dark:` (0,2,0) y la base.
+    function ({ addVariant }) {
+      addVariant('pizarra', ':root[data-paleta="pizarra"] &')
+    },
+  ],
 }

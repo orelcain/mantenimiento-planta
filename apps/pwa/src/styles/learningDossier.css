@@ -507,3 +507,22 @@
 .dossier .dp-match-status.is-done { color: var(--dp-ok); }
 
 .dossier a:focus-visible, .dossier button:focus-visible { outline: 2px solid var(--dp-accent); outline-offset: 3px; }
+
+/* Pizarra · el Dossier toma los tokens de la paleta (papel, tinta, regla, acento, ok, aviso).
+   Solo con data-paleta="pizarra": sin ella rigen los valores de arriba. Los tokens cambian
+   solos con Día / Penumbra (clase .dark en <html>), por eso un único bloque basta. Todas las
+   --dp-* de color están cubiertas (las tipográficas --dp-cond/mono/body no se tocan). */
+:root[data-paleta="pizarra"] .dossier {
+  --dp-paper:       rgb(var(--background));
+  --dp-ink:         rgb(var(--foreground));
+  --dp-ink-soft:    rgb(var(--muted-foreground));
+  --dp-ink-faint:   rgb(var(--foreground-3));
+  --dp-rule:        rgb(var(--border));
+  --dp-rule-hard:   rgb(var(--foreground-3) / .45);
+  --dp-accent:      rgb(var(--brand-ink));
+  --dp-warn:        rgb(var(--ink-warn));
+  --dp-ok:          rgb(var(--ink-ok));
+  --dp-accent-soft: rgb(var(--brand-ink) / .12);
+  --dp-warn-soft:   rgb(var(--ink-warn) / .12);
+  --dp-ok-soft:     rgb(var(--ink-ok) / .12);
+}

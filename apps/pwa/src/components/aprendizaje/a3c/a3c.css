@@ -100,3 +100,12 @@
   .a3c-led .a3c-anillo, .a3c-punto.a3c-encendido::after, .a3c-llegada { display: none; }
   .a3c-led .a3c-nucleo, .a3c-led .a3c-halo { animation: none; }
 }
+
+/* Pizarra · los LED físicos de la tarjeta conservan su color (el verde «ok» de Pizarra es neutro,
+   pero el LED real de la placa es verde). Se re-fija el token en el propio elemento: --led y los
+   fondos que leen var(--tw-green-500) lo toman de aquí. Valores = verde de Apple (claro / oscuro).
+   El amarillo neutro mezcla ámbar y verde, y el ámbar neutro es el LED ámbar de la foto: igual. */
+:root[data-paleta="pizarra"]:not(.dark) :is(.a3c-led.a3c-verde, .a3c-foco.a3c-verde, .a3c-punto.a3c-verde, .a3c-led-neutro.a3c-amarillo, .a3c-foco.a3c-neutro.a3c-amarillo) { --tw-green-500: 52 199 89; }
+:root[data-paleta="pizarra"].dark :is(.a3c-led.a3c-verde, .a3c-foco.a3c-verde, .a3c-punto.a3c-verde, .a3c-led-neutro.a3c-amarillo, .a3c-foco.a3c-neutro.a3c-amarillo) { --tw-green-500: 48 209 88; }
+:root[data-paleta="pizarra"]:not(.dark) :is(.a3c-led-neutro.a3c-ambar, .a3c-foco.a3c-neutro.a3c-ambar, .a3c-led-neutro.a3c-amarillo, .a3c-foco.a3c-neutro.a3c-amarillo) { --tw-amber-500: 255 149 0; }
+:root[data-paleta="pizarra"].dark :is(.a3c-led-neutro.a3c-ambar, .a3c-foco.a3c-neutro.a3c-ambar, .a3c-led-neutro.a3c-amarillo, .a3c-foco.a3c-neutro.a3c-amarillo) { --tw-amber-500: 255 159 10; }
