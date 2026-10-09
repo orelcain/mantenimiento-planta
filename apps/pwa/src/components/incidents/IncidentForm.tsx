@@ -40,9 +40,9 @@ interface IncidentFormProps {
 }
 
 const PRIORITY_OPTIONS = [
-  { value: 'critica', label: 'Crítica', desc: 'Detiene prod.', color: 'bg-red-500', border: 'border-red-500' },
+  { value: 'critica', label: 'Crítica', desc: 'Detiene prod.', color: 'bg-fill-critical', border: 'border-fill-critical' },
   { value: 'alta', label: 'Alta', desc: 'Afecta op.', color: 'bg-cat-4-tint', border: 'border-cat-4-tint/[0.25]' },
-  { value: 'media', label: 'Media', desc: 'Atención', color: 'bg-blue-500', border: 'border-blue-500' },
+  { value: 'media', label: 'Media', desc: 'Atención', color: 'bg-primary', border: 'border-primary' },
   { value: 'baja', label: 'Baja', desc: 'Puede esperar', color: 'bg-muted-foreground', border: 'border-border' },
 ]
 
@@ -478,7 +478,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                                 {/* Componente de visualización de ID o fetch del nombre */}
                                 {/* Dado que solo tenemos el ID aquí, mostraremos algo genérico o el ID 
                                     (Idealmente el HierarchySelector debería pasar el objeto seleccionado o nombre) */}
-                                <div className="h-2 w-2 rounded-full bg-green-500" />
+                                <div className="h-2 w-2 rounded-full bg-fill-ok" />
                                 <span className="truncate">Confirmada (Click para cambiar)</span>
                              </div>
                         </div>

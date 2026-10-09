@@ -150,6 +150,14 @@ export default {
         // por UNA clase que ya cambia con el tema. No usar los -600 para esto:
         // esos tienen dueño (la decisión de julio de bajar croma) y reutilizarlos
         // lavó los colores de producción.
+        // RELLENOS de estado (ver el comentario de `backgroundColor` más abajo). Viven en `colors`
+        // para servir en TODAS las utilidades: bg-, border-, ring-, from-/via-/to-, divide-, text-.
+        // Antes estaban solo en backgroundColor y `border-fill-*` / `ring-fill-*` no generaban CSS.
+        fill: {
+          critical: 'rgb(var(--fill-critical) / <alpha-value>)',
+          warning: 'rgb(var(--fill-warning) / <alpha-value>)',
+          ok: 'rgb(var(--fill-ok) / <alpha-value>)',
+        },
         'ink-crit': 'rgb(var(--ink-crit) / <alpha-value>)',
         'ink-warn': 'rgb(var(--ink-warn) / <alpha-value>)',
         'ink-ok': 'rgb(var(--ink-ok) / <alpha-value>)',
@@ -208,11 +216,6 @@ export default {
         // AA con blanco, no hexes libres: misma lógica que ya usaba el §1.4 del
         // HIG doc cuando el verde accesible de Apple (#248A3D) daba 4.40:1 y se
         // bajó a #217E38. Medido: critical 6.55 · warning 6.35 · ok 6.36.
-        fill: {
-          critical: 'rgb(var(--fill-critical) / <alpha-value>)',
-          warning: 'rgb(var(--fill-warning) / <alpha-value>)',
-          ok: 'rgb(var(--fill-ok) / <alpha-value>)',
-        },
       },
       textColor: {
         destructive: 'rgb(var(--tw-red-600) / <alpha-value>)',

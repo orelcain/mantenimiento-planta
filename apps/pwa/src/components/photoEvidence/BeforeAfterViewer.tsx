@@ -70,7 +70,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
             {/* Antes */}
             <div className="space-y-1">
               <span className="text-xs font-medium text-ink-crit flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                <span className="w-2 h-2 rounded-full bg-fill-critical"></span>
                 ANTES
               </span>
               {before ? (
@@ -102,7 +102,7 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
             {/* Después */}
             <div className="space-y-1">
               <span className="text-xs font-medium text-ink-ok flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                <span className="w-2 h-2 rounded-full bg-fill-ok"></span>
                 DESPUÉS
               </span>
               {after ? (
@@ -178,10 +178,10 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
             </div>
 
             {/* Labels */}
-            <div className="absolute top-2 left-2 px-2 py-1 bg-red-500/[0.15] text-ink-crit text-xs font-medium rounded-ctl">
+            <div className="absolute top-2 left-2 px-2 py-1 bg-fill-critical/[0.15] text-ink-crit text-xs font-medium rounded-ctl">
               ANTES
             </div>
-            <div className="absolute top-2 right-2 px-2 py-1 bg-green-500/[0.15] text-ink-ok text-xs font-medium rounded-ctl">
+            <div className="absolute top-2 right-2 px-2 py-1 bg-ink-ok/[0.15] text-ink-ok text-xs font-medium rounded-ctl">
               DESPUÉS
             </div>
           </div>
