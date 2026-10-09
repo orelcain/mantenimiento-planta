@@ -37,6 +37,7 @@ import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { useTheme } from '@/hooks/useTheme'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { dec1 } from '@/utils/formatoNumeros'
 
 // ── Colores por máquina (sky, violet, emerald) + ámbar para el promedio ──────
@@ -46,6 +47,8 @@ const MACHINE_COLORS = [
   { line: 'rgba(52,211,153,0.9)',  area: 'rgba(52,211,153,0.08)'  },  // emerald-400
   { line: 'rgba(251,191,36,0.9)',  area: 'rgba(251,191,36,0.06)'  },  // amber-400 (más)
 ]
+/** Pizarra: máquinas = series 1-4 (orden fijo); promedio = neutro fuerte; objetivo = meta punteada. */
+const MACHINE_TOKENS = ['serie-1', 'serie-2', 'serie-3', 'serie-4'] as const
 const AVG_COLOR  = { line: 'rgba(251,191,36,0.95)', area: 'rgba(251,191,36,0.12)' }  // amber
 /** Objetivo del sensor — violeta, el mismo tono que ya usaba la línea de meta. */
 const TARGET_COLOR = 'rgba(139,92,246,0.75)'
@@ -331,6 +334,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
   const wrapRef    = useRef<HTMLDivElement>(null)
   const [wrapWidth, setWrapWidth] = useState(0)
   const { isDark } = useTheme()
+  const { elegir } = useColoresGrafico()
   const ink = isDark ? CHART_INK.dark : CHART_INK.light
 
   // El alto de la leyenda depende del ancho REAL, no del breakpoint: el mismo
@@ -490,7 +494,12 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
     const axis = regrouped.timeAxis
 
     const machineSeries = series.map((s, i) => {
-      const col = MACHINE_COLORS[i % MACHINE_COLORS.length]!
+      const idxCol = i % MACHINE_COLORS.length
+      const base = MACHINE_COLORS[idxCol]!
+      const col = {
+        line: elegir(base.line, MACHINE_TOKENS[idxCol]!, 0.9),
+        area: elegir(base.area, MACHINE_TOKENS[idxCol]!, 0.08),
+      }
       const data = axis.map((ts, ti) => [ts, regrouped.series[i]?.[ti] ?? null] as [number, number | null])
       // Los tramos SIN dato quedan como hueco (null) en los dos modos: "no hubo
       // dato" y "produjo cero" son cosas distintas.
@@ -567,8 +576,8 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
       // los tramos aislados se dibujaban como rayitas flotantes sueltas.
       connectNulls: true,
       symbol:      'none',
-      lineStyle:   { color: TARGET_COLOR, width: 1.4, type: 'dashed' as const },
-      itemStyle:   { color: TARGET_COLOR },
+      lineStyle:   { color: elegir(TARGET_COLOR, 'grafico-meta', 0.75), width: 1.4, type: 'dashed' as const },
+      itemStyle:   { color: elegir(TARGET_COLOR, 'grafico-meta', 0.75) },
       z:           0,
       // Tramos con objetivo corriendo y producción 0: el sombreado dice de un
       // vistazo que la pérdida fue por máquina parada, no por ritmo lento.
@@ -605,8 +614,8 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
       connectNulls: false,
       symbol:      'diamond',
       symbolSize:  5,
-      lineStyle:   { color: AVG_COLOR.line, width: 2, type: 'dashed' as const },
-      itemStyle:   { color: AVG_COLOR.line },
+      lineStyle:   { color: elegir(AVG_COLOR.line, 'grafico-neutro-fuerte', 0.95), width: 2, type: 'dashed' as const },
+      itemStyle:   { color: elegir(AVG_COLOR.line, 'grafico-neutro-fuerte', 0.95) },
       z:           1,
       emphasis:    { lineStyle: { width: 3 } },
       // markLine objetivo
@@ -615,11 +624,11 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
         animation: false,
         data: [{
           yAxis: expectedRate,
-          lineStyle: { color: 'rgba(139,92,246,0.6)', type: 'dashed', width: 1 },
+          lineStyle: { color: elegir('rgba(139,92,246,0.6)', 'grafico-meta', 0.75), type: 'dashed', width: 1 },
           label: {
             show: true,
             formatter: `objetivo ${expectedRate.toFixed(0)} pz/m`,
-            color: 'rgba(139,92,246,0.9)',
+            color: elegir('rgba(139,92,246,0.9)', 'grafico-meta'),
             fontSize: 9,
             position: 'end',
           },
@@ -737,7 +746,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
         z: 10,
       }] : undefined,
     }
-  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, clippedCount, expectedRate, timelineSync, showAvg, highlightRanges, showGap, wrapWidth, legendLabelsForHeight, ink])
+  }, [series, avgSeries, targetSeries, stoppedWithTarget, timeAxis, rangeStart, rangeEnd, maxRate, clippedCount, expectedRate, timelineSync, showAvg, highlightRanges, showGap, wrapWidth, legendLabelsForHeight, ink, elegir])
 
   if (timeAxis.length < 2) return null
 

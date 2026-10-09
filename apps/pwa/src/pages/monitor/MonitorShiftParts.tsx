@@ -455,8 +455,8 @@ export function TiempoDelTurno({
           <div className="mt-1 flex h-6 gap-[2px]">
             {([
               { p: 'hechas' as const, v: hechas, cls: 'bg-muted-foreground/[0.35]', flex: true, rotulo: 'hechas' },
-              { p: 'paradas' as const, v: hayBrecha ? perdidas : 0, cls: 'bg-red-600 dark:bg-red-500', rotulo: 'perdidas en paradas' },
-              { p: 'ritmo' as const, v: hayBrecha ? porRitmo : 0, cls: 'bg-amber-600 dark:bg-amber-500', rotulo: 'por ritmo' },
+              { p: 'paradas' as const, v: hayBrecha ? perdidas : 0, cls: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]', rotulo: 'perdidas en paradas' },
+              { p: 'ritmo' as const, v: hayBrecha ? porRitmo : 0, cls: 'bg-amber-600 dark:bg-amber-500 pizarra:bg-[rgb(var(--serie-1))] pz-trama', rotulo: 'por ritmo' },
               { p: 'jugar' as const, v: porJugarBarra, cls: 'border border-dashed border-muted-foreground/[0.4]', rotulo: 'aún por jugar' },
             ]).filter((s) => s.flex || s.v > 0).map((s) => (
               <button
@@ -478,8 +478,8 @@ export function TiempoDelTurno({
                  adentro—; el segmento de la barra sigue topado a la brecha,
                  porque la barra reparte la meta. La frase de abajo lo dice
                  cuando los dos números se separan. */
-              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidasReales ?? perdidas)} pz`, pct: pctMeta(perdidasReales ?? perdidas), tick: 'bg-red-600 dark:bg-red-500' },
-              { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, pct: pctMeta(porRitmo), tick: 'bg-amber-600 dark:bg-amber-500' },
+              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidasReales ?? perdidas)} pz`, pct: pctMeta(perdidasReales ?? perdidas), tick: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]' },
+              { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, pct: pctMeta(porRitmo), tick: 'bg-amber-600 dark:bg-amber-500 pizarra:bg-[rgb(var(--serie-1))] pz-trama' },
               ...(porJugarBarra > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugarBarra)} pz`, pct: pctMeta(porJugarBarra), tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
               /*
                * El convenio NO tiene segmento en la barra: la barra cuenta

@@ -59,9 +59,9 @@ import { LossCascadeCard } from './LossCascadeCard'
 import { ImputacionParetoCard } from './ImputacionParetoCard'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
-import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
+import { slxStateColor, slxSuavizarAcento } from '@/services/shoplogix/shoplogixColors'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { logger } from '@/lib/logger'
-import { softenAccentHex } from '@/lib/softenColor'
 import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 
@@ -219,7 +219,7 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
     if (s.type === 'uptime') continue  // solo paros
     const key = s.reason || s.name     // si no tiene reason, usa name ("Micro Detencion")
     // Color semántico (mismo helper que StateTimelineEC → leyenda siempre consistente)
-    const color = slxStateColor(s.type, s.reason, s.color)
+    const color = slxStateColor(s.type, s.reason, s.color, s.name)
     const existing = map.get(key)
     if (existing) {
       existing.durationSec += s.durationSec
@@ -276,7 +276,7 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
             {/* Color del state (viene de Shoplogix, #ff0000 crudo → −50% croma) */}
             <span
               className="w-2 h-2 rounded-ctl shrink-0 ring-1 ring-foreground/60"
-              style={{ backgroundColor: softenAccentHex(r.color) }}
+              style={{ backgroundColor: slxSuavizarAcento(r.color) }}
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
                 Mobile: max 9rem + line-clamp-2 (puede ocupar 2 líneas). */}
@@ -290,7 +290,7 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
                 className="h-full rounded-full opacity-80"
                 style={{
                   width: `${Math.max(pct, 1)}%`,
-                  backgroundColor: softenAccentHex(r.color),
+                  backgroundColor: slxSuavizarAcento(r.color),
                   transformOrigin: 'left center',
                 }}
               />
@@ -617,7 +617,10 @@ function StateTimeline({
   const rangeStart = windowStart ?? shift.shiftStart
   const rangeEnd   = windowEnd   ?? shift.shiftEnd
   const totalMs = rangeEnd.getTime() - rangeStart.getTime()
-  const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
+  // Pizarra: al cambiar Día/Penumbra hay que recalcular los colores de las causas.
+  const { version: versionColores } = useColoresGrafico()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states, versionColores])
 
   if (totalMs <= 0 || shift.states.length === 0) {
     return <div className="h-5 rounded-ctl bg-muted/60" />
@@ -781,6 +784,8 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
   windowStart?: Date
   windowEnd?: Date
 }) {
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de estado se calculan en el render).
+  useColoresGrafico()
   // Estado seleccionado al clickear un segmento del Gantt (drill-down rico).
   // Click sobre el mismo state lo cierra (toggle).
   const [selectedState, setSelectedState] = useState<UpstreamMachineState | null>(null)
@@ -999,7 +1004,7 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
                   </thead>
                   <tbody>
                     {analisis.eventos.map((s, i) => {
-                      const color = slxStateColor(s.type, s.reason, s.color)
+                      const color = slxStateColor(s.type, s.reason, s.color, s.name)
                       const motivo = s.reason || s.name || s.type
                       const coms = analisis.byState.get(s) ?? []
                       const comentario = coms.map((c) => c.text).join(' · ')
