@@ -480,8 +480,8 @@
    · Texto de aviso/falla/info en Día se oscureció sobre lo sugerido (#8A5A00,
      #C21F2E, #2A6BA6) hasta dar ≥4,5:1 también sobre su propio tinte al 15%
      apoyado en el fondo (el peor caso, mismo criterio que el resto del archivo).
-   Series de gráficos (--cat-*, --shift-ramp-*, --mon-*) no se tocan: la regla
-   de 9 colores no aplica a las series.
+   Series de gráficos (--serie-*, --cat-*, --shift-ramp-*, --mon-*): ver los bloques
+   «GRÁFICOS» de cada intensidad (regla «foco, contexto, estado»).
    ============================================================================ */
 :root[data-skin="apple"][data-paleta="pizarra"]:not(.dark) {
   --background: 242 241 236;        /* #F2F1EC */
@@ -524,6 +524,48 @@
   --fill-critical: 177 39 45;       /* relleno + texto #FFFFFF (6,57:1) */
   --fill-warning: 242 180 0;        /* relleno #F2B400 + texto #1D1D1C (9,08:1), NUNCA blanco */
   --fill-ok: 78 77 74;
+
+  /* ── GRÁFICOS · «foco, contexto, estado» (spec paleta-graficos, aprobada 09-10) ──
+     Serie 1 = lo que el gráfico quiere que mires (acento); el resto va en neutros.
+     Aviso/falla (--fill-warning / --fill-critical) SOLO cuando un valor sale de una
+     banda fijada antes. Máximo 5 series; más de 5 → «Otros». Canales "R G B". */
+  --serie-1: 42 107 166;      /* Acero (acento) #2A6BA6 */
+  --serie-2: 113 145 70;      /* Oliva #719146 */
+  --serie-3: 165 120 190;     /* Ciruela gris #a578be */
+  --serie-4: 19 143 130;      /* Petróleo #138f82 */
+  --serie-5: 108 106 179;     /* Índigo apagado #6c6ab3 */
+  --serie-otros: 135 134 130; /* Gris cálido #878682 */
+  --grafico-neutro-fuerte: 78 77 74;   /* #4E4D4A */
+  --grafico-neutro-medio: 135 134 130; /* #878682 */
+  --grafico-meta: 106 105 102;         /* #6A6966 meta/cuota punteada */
+  /* Estado en MARCAS de gráfico: = --fill-critical / --fill-warning en Día; en Penumbra la falla
+     sube a --ink-crit (#FF9A90) porque #B1272D sobre la tarjeta oscura no llega a 3:1. */
+  --grafico-falla: 177 39 45;          /* #B1272D */
+  --grafico-aviso: 242 180 0;          /* #F2B400 */
+  /* Categóricos --cat-N: tinte (relleno) · tinta (texto) */
+  --cat-1-tint: 42 107 166;   --cat-1-ink: 57 98 138;    /* Acero #39628a */
+  --cat-2-tint: 113 145 70;   --cat-2-ink: 83 105 54;    /* Oliva #536936 */
+  --cat-3-tint: 108 106 179;  --cat-3-ink: 92 91 142;    /* Índigo apagado #5c5b8e */
+  --cat-4-tint: 78 77 74;     --cat-4-ink: 78 77 74;     /* Neutro fuerte #4E4D4A */
+  --cat-5-tint: 135 134 130;  --cat-5-ink: 100 99 96;    /* Neutro medio #646360 (spec #6A6966 daba 4,19:1 sobre su tinte) */
+  --cat-6-tint: 165 120 190;  --cat-6-ink: 115 85 132;   /* Ciruela gris #735584 */
+  --cat-7-tint: 19 143 130;   --cat-7-ink: 19 108 98;    /* Petróleo #136c62 */
+  --cat-8-tint: 135 134 130;  --cat-8-ink: 100 99 96;    /* = cat-5 (revisar pantallas con 8 chips) */
+  /* Rampa secuencial de 4 pasos (menos → más) */
+  --shift-ramp-1: #94acc5;  --shift-ramp-1-ink: #1D1D1C;
+  --shift-ramp-2: #698eb4;  --shift-ramp-2-ink: #1D1D1C;
+  --shift-ramp-3: #2a6ba6;  --shift-ramp-3-ink: #FFFFFF;
+  --shift-ramp-4: #254e75;  --shift-ramp-4-ink: #FFFFFF;
+  --shift-empty: rgba(29, 29, 28, 0.06);
+  /* Calidades Grader: rampa ORDINAL premium → tercera (5 pasos) */
+  --calidad-1: #274a6c; --calidad-2: #305d87; --calidad-3: #3f6f9e; --calidad-4: #5b83aa; --calidad-5: #7696b6;
+  /* Monitor público (series; los estados del .monitor-tv no cambian) */
+  --mon-hoy: #2A6BA6;
+  --mon-cuota: #6A6966;
+  --mon-ref: #878682;
+  --mon-maq-1: #2A6BA6; --mon-maq-2: #719146; --mon-maq-3: #a578be;
+  --mon-arriba-soft: rgba(42, 107, 166, 0.16);
+  --mon-abajo-soft: rgba(78, 77, 74, 0.14);
 }
 
 :root[data-skin="apple"][data-paleta="pizarra"].dark {
@@ -565,6 +607,39 @@
   --fill-critical: 177 39 45;       /* relleno + texto #E8E2D7 (5,09:1) */
   --fill-warning: 242 180 0;        /* relleno + texto #171614 (9,73:1) */
   --fill-ok: 189 182 170;
+
+  /* ── GRÁFICOS · «foco, contexto, estado» (ver bloque Día) ── */
+  --serie-1: 86 152 218;      /* Acero (acento) #5698da */
+  --serie-2: 125 151 74;      /* Oliva #7d974a */
+  --serie-3: 133 96 172;      /* Ciruela gris #8560ac */
+  --serie-4: 34 165 164;      /* Petróleo #22a5a4 */
+  --serie-5: 138 126 206;     /* Índigo apagado #8a7ece */
+  --serie-otros: 124 122 117; /* Gris cálido #7c7a75 */
+  --grafico-neutro-fuerte: 189 182 170; /* #BDB6AA */
+  --grafico-neutro-medio: 124 122 117;  /* #7c7a75 */
+  --grafico-meta: 168 161 149;          /* #A8A195 */
+  --grafico-falla: 255 154 144;         /* #FF9A90 */
+  --grafico-aviso: 242 180 0;           /* #F2B400 */
+  --cat-1-tint: 86 152 218;   --cat-1-ink: 132 175 220;  /* Acero #84afdc */
+  --cat-2-tint: 125 151 74;   --cat-2-ink: 159 180 124;  /* Oliva #9fb47c */
+  --cat-3-tint: 138 126 206;  --cat-3-ink: 169 163 219;  /* Índigo apagado #a9a3db */
+  --cat-4-tint: 189 182 170;  --cat-4-ink: 189 182 170;  /* Neutro fuerte #BDB6AA */
+  --cat-5-tint: 124 122 117;  --cat-5-ink: 168 161 149;  /* Neutro medio #A8A195 */
+  --cat-6-tint: 133 96 172;   --cat-6-ink: 183 158 212;  /* Ciruela gris #b79ed4 */
+  --cat-7-tint: 34 165 164;   --cat-7-ink: 106 187 186;  /* Petróleo #6abbba */
+  --cat-8-tint: 124 122 117;  --cat-8-ink: 168 161 149;  /* = cat-5 */
+  --shift-ramp-1: #405367;  --shift-ramp-1-ink: #E8E2D7;
+  --shift-ramp-2: #496684;  --shift-ramp-2-ink: #E8E2D7;
+  --shift-ramp-3: #5f8fbf;  --shift-ramp-3-ink: #171614;
+  --shift-ramp-4: #89b4e1;  --shift-ramp-4-ink: #171614;
+  --shift-empty: rgba(232, 226, 215, 0.06);
+  --calidad-1: #bbd4ee; --calidad-2: #9dc0e5; --calidad-3: #81acd9; --calidad-4: #6b98c6; --calidad-5: #5d84ac;
+  --mon-hoy: #7DB4EE;
+  --mon-cuota: #A8A195;
+  --mon-ref: #7c7a75;
+  --mon-maq-1: #5698da; --mon-maq-2: #7d974a; --mon-maq-3: #8560ac;
+  --mon-arriba-soft: rgba(86, 152, 218, 0.18);
+  --mon-abajo-soft: rgba(189, 182, 170, 0.14);
 }
 
 /* ── Excepciones de Pizarra: el Monitor TV conserva TODOS sus colores de estado ──
@@ -583,6 +658,13 @@
   --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 209 88;
   --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 119 111;
   --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 159 10;
+}
+
+/* Trama diagonal para «contexto» en gráficos (externo, ritmo, colación, planificado): se
+   dibuja con franjas del color de la tarjeta sobre el relleno, así funciona igual en Día y
+   Penumbra y no depende del color. SOLO existe con Pizarra: sin ella la clase no casa. */
+:root[data-paleta="pizarra"] .pz-trama {
+  background-image: repeating-linear-gradient(135deg, rgb(var(--card)) 0 2px, transparent 2px 6px);
 }
 
 /* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que

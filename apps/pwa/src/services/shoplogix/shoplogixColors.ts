@@ -20,6 +20,7 @@
  */
 
 import { softenAccentHex } from '@/lib/softenColor'
+import { elegirColor, hayPizarra } from '@/lib/coloresGrafico'
 
 /**
  * Retorna el color CSS (#rrggbb) para un estado de máquina, ya atenuado a
@@ -61,8 +62,62 @@ export function slxStateColor(
   type: string,
   reason: string,
   stored?: string,
+  name?: string,
 ): string {
+  // Pizarra: colores de la paleta de gráficos, SIN el −50% de croma (ya son apagados).
+  if (typeof document !== 'undefined' && hayPizarra()) return slxStateColorPizarra(type, reason, name)
   return softenAccentHex(slxStateColorRaw(type, reason, stored))
+}
+
+/** Quita el −50% de croma solo sin Pizarra; con Pizarra el color ya viene de la paleta. */
+export function slxSuavizarAcento(color: string): string {
+  return typeof document !== 'undefined' && hayPizarra() ? color : softenAccentHex(color)
+}
+
+/** ¿Este estado va con trama (contexto: colación, parada planificada)? Solo con Pizarra. */
+export function slxStateTrama(type: string, reason: string): boolean {
+  if (typeof document === 'undefined' || !hayPizarra() || type === 'uptime') return false
+  const r = reason.toUpperCase().trim()
+  return r.includes('COLAC') || r.includes('PLANNED DOWNTIME') || r.includes('POST-TURNO')
+}
+
+/**
+ * Mapa de la paleta de gráficos (spec «foco, contexto, estado»), en el MISMO orden de
+ * prioridad que `slxStateColorRaw`. Ajuste/mantención = serie 1 (el foco de la app);
+ * falta MMPP = 2; setup = 3; micro detención = 4; limpieza = 5; lo normal y lo planificado
+ * en neutro medio; otras causas con nombre en neutro fuerte (distinguible del uptime);
+ * parada SIN causa = falla (pide imputar). Corrige el defecto de la paleta anterior, donde
+ * micro detención y parada sin causa compartían el mismo rojo.
+ */
+function slxStateColorPizarra(type: string, reason: string, name?: string): string {
+  const medio = () => elegirColor('#878682', 'grafico-neutro-medio')
+  if (type === 'uptime') return medio()
+
+  const r = reason.toUpperCase().trim()
+
+  if (r.includes('MMPP') || r.includes('MATERIA PRIMA') || r.includes('FALTA MP') || r.includes('SIN MATERIA')) {
+    return elegirColor('#719146', 'serie-2')
+  }
+  if (r.includes('AJUSTE') || r.includes('MANTENIM') || r.includes('MANTENC') || r.includes('REPARAC')) {
+    return elegirColor('#2A6BA6', 'serie-1')
+  }
+  if (r.includes('COLAC')) return medio()
+  if (r.includes('REUNION') || r.includes('REUNI') || r.includes('INICIO TURNO') || r.includes('CAPACIT')) return medio()
+  if (r.includes('LIMPIEZA') || r.includes('SANITIZ')) return elegirColor('#6c6ab3', 'serie-5')
+  if (r.includes('PLANNED DOWNTIME') || r.includes('POST-TURNO')) return medio()
+
+  if (type === 'setup') return elegirColor('#a578be', 'serie-3')
+  if (type === 'break') return medio()
+
+  if (type === 'downtime') {
+    const esMicro = r.includes('MICRO') || (name ?? '').toUpperCase().includes('MICRO')
+    if (esMicro) return elegirColor('#138f82', 'serie-4')
+    // Con causa anotada pero sin color propio en la paleta: neutro fuerte (≠ uptime).
+    if (r) return elegirColor('#4E4D4A', 'grafico-neutro-fuerte')
+    return elegirColor('#B1272D', 'grafico-falla') // parada sin causa
+  }
+
+  return medio()
 }
 
 function slxStateColorRaw(

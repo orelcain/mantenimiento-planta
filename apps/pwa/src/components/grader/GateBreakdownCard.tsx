@@ -27,7 +27,7 @@ import {
   quantifyReassignable,
   type ReassignmentSeverity,
 } from '@/services/grader/graderGateAssignment'
-import { qualityColorHex } from '@/services/grader/graderQualityColors'
+import { qualityColorDisplay } from '@/services/grader/graderQualityColors'
 import { GateChangeTrigger } from './GateChangeTrigger'
 import { dec1 } from '@/utils/formatoNumeros'
 
@@ -385,7 +385,7 @@ export function GateBreakdownCard({
                 {cfg && (
                   <span
                     className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ backgroundColor: qualityColorHex(cfg.quality) }}
+                    style={{ backgroundColor: qualityColorDisplay(cfg.quality) }}
                   />
                 )}
                 {cfg ? `${cfg.calibre} · ${cfg.quality}` : '—'}
@@ -468,7 +468,7 @@ export function GateBreakdownCard({
                           <td className="px-2 py-1.5 font-medium">
                             <span
                               className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
-                              style={{ backgroundColor: qualityColorHex(g.quality) }}
+                              style={{ backgroundColor: qualityColorDisplay(g.quality) }}
                             />
                             {g.label}
                           </td>

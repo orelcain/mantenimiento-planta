@@ -48,12 +48,25 @@ function fmtHm(sec: number): string {
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
 
+/**
+ * Variante Pizarra de cada grupo («foco, contexto, estado»): producción = gris cálido de «Otros»,
+ * externo = el mismo gris CON TRAMA (contexto: no es de Mantención), mantención = serie 1 (el foco
+ * de la app), sin clasificar = HUECO (tiempo sin causa: no se pinta, se delimita). Las clases
+ * `pizarra:` y `.pz-trama` solo casan con `data-paleta="pizarra"`; sin ella nada cambia.
+ */
+const PZ_BUCKET: Record<string, string> = {
+  'produccion':     'pizarra:bg-[rgb(var(--serie-otros))]',
+  'externo':        'pizarra:bg-[rgb(var(--serie-otros))] pz-trama',
+  'mantencion':     'pizarra:bg-[rgb(var(--serie-1))]',
+  'sin-clasificar': 'pizarra:bg-transparent pizarra:shadow-[inset_0_0_0_1px_rgb(var(--grafico-neutro-medio))]',
+}
+
 const BUCKET_COLOR: Record<string, string> = {
   'planificado':    'bg-muted-foreground/[0.10]',
-  'externo':        'bg-amber-500/[0.15]',
-  'mantencion':     'bg-red-500/[0.15]',
-  'sin-clasificar': 'bg-cat-6-tint/[0.15]',
-  'produccion':     'bg-emerald-500/[0.15]',
+  'externo':        `bg-amber-500/[0.15] ${PZ_BUCKET['externo']}`,
+  'mantencion':     `bg-red-500/[0.15] ${PZ_BUCKET['mantencion']}`,
+  'sin-clasificar': `bg-cat-6-tint/[0.15] ${PZ_BUCKET['sin-clasificar']}`,
+  'produccion':     `bg-emerald-500/[0.15] ${PZ_BUCKET['produccion']}`,
 }
 
 /** Persistido entre turnos: si el usuario colapsa la cascada, se queda así
@@ -249,7 +262,7 @@ export function LossCascadeCard({
       id: 'externo' as LossBucket, label: '− Externo', sec: totals.externoSec,
       pct: `${dec1(pctOfTurno(totals.externoSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.externoSec))}% del techo`,
-      bg: 'bg-amber-500/[0.15]', text: 'text-ink-warn',
+      bg: 'bg-amber-500/[0.15] pizarra:bg-[rgb(var(--serie-otros)/0.15)]', text: 'text-ink-warn pizarra:text-muted-foreground',
       ringHover: 'hover:ring-amber-400/40', ringActive: 'ring-1 ring-amber-400/70',
       tip: 'Falta MMPP, cumplimiento de cuota, energía — la máquina disponible pero el proceso no la alimentó. NO es pérdida de Mantención. Click para ver sus eventos.',
     },
@@ -265,7 +278,7 @@ export function LossCascadeCard({
       id: 'mantencion' as LossBucket, label: '− Mantención', sec: totals.mantencionSec,
       pct: `${dec1(pctOfTurno(totals.mantencionSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.mantencionSec))}% del techo`,
-      bg: 'bg-red-500/[0.15]', text: 'text-ink-crit',
+      bg: 'bg-red-500/[0.15] pizarra:bg-[rgb(var(--serie-1)/0.15)]', text: 'text-ink-crit pizarra:text-brand-ink',
       ringHover: 'hover:ring-red-500/40', ringActive: 'ring-1 ring-red-500/70',
       tip: 'Averías, ajustes de mantenimiento, micro detenciones, cintas — el frente que Mantención debe reducir. Click para ver sus eventos.',
     },
@@ -273,7 +286,7 @@ export function LossCascadeCard({
       id: 'sin-clasificar' as LossBucket, label: '− Sin clasif.', sec: totals.sinClasificarSec,
       pct: `${dec1(pctOfTurno(totals.sinClasificarSec))}% del turno`,
       pct2: `${dec1(pctOfTecho(totals.sinClasificarSec))}% del techo`,
-      bg: 'bg-cat-6-tint/[0.15]', text: 'text-cat-6-ink',
+      bg: 'bg-cat-6-tint/[0.15] pizarra:bg-transparent pizarra:border pizarra:border-dashed pizarra:border-[rgb(var(--grafico-neutro-medio))]', text: 'text-cat-6-ink pizarra:text-muted-foreground',
       ringHover: 'hover:ring-cat-6-ink/40', ringActive: 'ring-1 ring-cat-6-ink/70',
       tip: 'Causal desconocida o sin anotar en Shoplogix (ej. LOGICA). Anotarla le asigna dueño. Click para ver sus eventos.',
     },
@@ -425,13 +438,13 @@ export function LossCascadeCard({
             }
             const groupTotalSec = perMachine.reduce((a, m) => a + bucketSecOf(m.cascade), 0)
             const theme = activeBucket == null
-              ? { bar: 'bg-emerald-500/[0.15]', text: 'text-ink-ok' }
+              ? { bar: BUCKET_COLOR['produccion'], text: 'text-ink-ok' }
               : activeBucket === 'externo'
-              ? { bar: 'bg-amber-500/[0.15]', text: 'text-ink-warn' }
+              ? { bar: BUCKET_COLOR['externo'], text: 'text-ink-warn pizarra:text-muted-foreground' }
               : activeBucket === 'mantencion'
-              ? { bar: 'bg-red-500/[0.15]', text: 'text-ink-crit' }
+              ? { bar: BUCKET_COLOR['mantencion'], text: 'text-ink-crit pizarra:text-brand-ink' }
               : activeBucket === 'sin-clasificar'
-              ? { bar: 'bg-cat-6-tint/[0.15]', text: 'text-cat-6-ink' }
+              ? { bar: BUCKET_COLOR['sin-clasificar'], text: 'text-cat-6-ink pizarra:text-muted-foreground' }
               : { bar: 'bg-muted-foreground/[0.10]', text: 'text-muted-foreground' }
             const groupLabel = activeBucket == null ? 'Uso real por máquina' : `${LOSS_BUCKET_META[activeBucket as keyof typeof LOSS_BUCKET_META]?.label ?? activeBucket} por máquina`
             return (

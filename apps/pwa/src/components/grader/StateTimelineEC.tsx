@@ -22,7 +22,9 @@ import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
-import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
+import { slxStateColor, slxStateTrama } from '@/services/shoplogix/shoplogixColors'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor, tramaDiagonal } from '@/lib/coloresGrafico'
 import { classifyLossState } from '@/services/shoplogix/lossBuckets'
 
 interface Props {
@@ -64,13 +66,16 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
   const highlightBucket = timelineSync?.highlightBucket ?? null
 
   // ── Datos de la serie ───────────────────────────────────────────────────────
+  // `colores.version` cambia al cambiar Día/Penumbra con Pizarra: hay que recalcular el color.
+  const colores = useColoresGrafico()
   const seriesData = useMemo(() => shift.states.map((st) => {
-    const color = slxStateColor(st.type, st.reason, st.color)
+    const color = slxStateColor(st.type, st.reason, st.color, st.name)
     return {
       value: [st.startAt.getTime(), st.endAt.getTime(), color],
       itemStyle: { color },
     }
-  }), [shift.states])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [shift.states, colores.version])
 
   // ── Lot projection ──────────────────────────────────────────────────────────
   const lotMarkLines = useMemo(() => {
@@ -241,7 +246,10 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
             type: 'rect' as const,
             shape: { x: start[0], y: yCenter - height / 2, width: widthPx, height },
             style: {
-              fill: api.value(2),
+              // Pizarra: colación y parada planificada = «contexto» → neutro con trama.
+              fill: stForHl && slxStateTrama(stForHl.type, stForHl.reason)
+                ? tramaDiagonal(api.value(2), elegirColor('#222120', 'card'))
+                : api.value(2),
               stroke: isHighlighted ? 'rgba(250,204,21,0.95)' : 'rgba(15,23,42,0.4)',
               lineWidth: isHighlighted ? 3 : 0.5,
               shadowBlur: isHighlighted ? 6 : 0,
@@ -327,7 +335,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
   // pointerEvents:none → el cursor sigue interactuando con el chart debajo, no flickea.
   const tooltipNode = hoverInfo ? (() => {
     const st        = hoverInfo.state
-    const color     = slxStateColor(st.type, st.reason, st.color)
+    const color     = slxStateColor(st.type, st.reason, st.color, st.name)
     const cause     = st.reason || st.name
     const typeLabel = st.type === 'uptime'  ? 'Produciendo'
       : st.type === 'break'  ? 'Paro programado'

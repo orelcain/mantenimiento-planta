@@ -11,6 +11,8 @@
  *    su tinte al 15% apoyado en el fondo = peor caso, igual que check-contrast.mjs).
  *  · APCA 0.0.98G: cuerpo |Lc| ≥ 75, secundario ≥ 60, terciario ≥ 45; en Penumbra el
  *    texto 1 no pasa de |Lc| 90.
+ *  · GRÁFICOS (paleta-graficos): series, neutros, --mon-*, calidades y rampa ≥ 3:1 como marca sobre
+ *    la tarjeta; tintas --cat-N-ink y tintas de la rampa ≥ 4,5:1.
  *  · Bordes y rellenos sobre tarjeta se informan, no cuentan (separador / forma+palabra).
  *
  * Uso: node scripts/check-contrast-pizarra.mjs   (o `pnpm check:contrast:pizarra`)
@@ -170,6 +172,56 @@ for (const { nombre, sel, penumbra } of INTENSIDADES) {
   lc('ink-crit sobre tarjeta', t['ink-crit'], card, 60)
   lc('ink-warn sobre tarjeta', t['ink-warn'], card, 60)
   lc('texto sobre relleno de falla', penumbra ? t.foreground : '#ffffff', t['fill-critical'], 60)
+
+  // ── GRÁFICOS (spec paleta-graficos «foco, contexto, estado») ────────────────
+  // Marcas (barras, líneas, puntos) ≥ 3:1 contra la tarjeta; tintas de texto ≥ 4,5:1.
+  console.log(`\n=== PIZARRA ${nombre} — series y neutros de gráfico (marcas ≥ 3:1 sobre la tarjeta) ===`)
+  for (const k of ['serie-1', 'serie-2', 'serie-3', 'serie-4', 'serie-5', 'serie-otros', 'grafico-neutro-fuerte', 'grafico-neutro-medio', 'grafico-meta', 'grafico-falla']) {
+    if (!t[k]) { console.log(`FAIL falta --${k}`); resultados.push({ etiqueta: `falta --${k} ${nombre}`, ok: false, valor: 0 }); continue }
+    wcag(`--${k} sobre la tarjeta`, t[k], card, 3)
+  }
+  // El aviso (#F2B400) sobre tarjeta clara no llega a 3:1: es un estado y va con forma + palabra.
+  info('--grafico-aviso sobre la tarjeta (estado: forma + palabra)', t['grafico-aviso'], card)
+  // Estado en marcas = el mismo valor del relleno (Día) o de la tinta (Penumbra), según la intensidad.
+  {
+    const ref = penumbra ? 'ink-crit' : 'fill-critical'
+    const ok = t['grafico-falla'] === t[ref]
+    console.log(`${ok ? 'OK  ' : 'FAIL'} --grafico-falla = --${ref} (${t['grafico-falla']} vs ${t[ref]})`)
+    resultados.push({ etiqueta: `--grafico-falla = --${ref} ${nombre}`, ok, valor: 0 })
+  }
+
+  console.log(`\n=== PIZARRA ${nombre} — mon-* (series del monitor, marcas ≥ 3:1 sobre la tarjeta) ===`)
+  for (const k of ['mon-hoy', 'mon-cuota', 'mon-ref', 'mon-maq-1', 'mon-maq-2', 'mon-maq-3']) {
+    if (!t[k]) { console.log(`FAIL falta --${k}`); resultados.push({ etiqueta: `falta --${k} ${nombre}`, ok: false, valor: 0 }); continue }
+    wcag(`--${k} sobre la tarjeta`, t[k], card, 3)
+  }
+
+  console.log(`\n=== PIZARRA ${nombre} — calidades Grader (rampa ordinal, marcas ≥ 3:1) ===`)
+  for (let i = 1; i <= 5; i++) wcag(`--calidad-${i} sobre la tarjeta`, t[`calidad-${i}`], card, 3)
+
+  console.log(`\n=== PIZARRA ${nombre} — rampa secuencial de turnos (tinta ≥ 4,5:1 sobre cada paso) ===`)
+  for (let i = 1; i <= 4; i++) wcag(`--shift-ramp-${i}-ink sobre su paso`, t[`shift-ramp-${i}-ink`], t[`shift-ramp-${i}`])
+  // Monotonía: la rampa se lee de menos a más (Día: más oscuro; Penumbra: más claro).
+  for (let i = 1; i < 4; i++) {
+    const a1 = lum(hexToRgb(t[`shift-ramp-${i}`])), a2 = lum(hexToRgb(t[`shift-ramp-${i + 1}`]))
+    const ok = penumbra ? a2 > a1 : a2 < a1
+    console.log(`${ok ? 'OK  ' : 'FAIL'} rampa monótona ${nombre}: paso ${i} → ${i + 1}`)
+    resultados.push({ etiqueta: `rampa monótona ${nombre} ${i}→${i + 1}`, ok, valor: 0 })
+  }
+  // Los pasos altos son marcas sobre la tarjeta: ≥ 3:1 (el 1-2 pueden ser claros: llevan tinta propia).
+  wcag('--shift-ramp-3 sobre la tarjeta', t['shift-ramp-3'], card, 3)
+  wcag('--shift-ramp-4 sobre la tarjeta', t['shift-ramp-4'], card, 3)
+  info('--shift-ramp-1 sobre la tarjeta (paso bajo; se lee por su tinta)', t['shift-ramp-1'], card)
+
+  console.log(`\n=== PIZARRA ${nombre} — categóricos --cat-N (tinta ≥ 4,5:1; tinte como marca ≥ 3:1) ===`)
+  for (let i = 1; i <= 8; i++) {
+    const ink = t[`cat-${i}-ink`], tint = t[`cat-${i}-tint`]
+    if (!ink || !tint) { console.log(`FAIL falta --cat-${i}`); resultados.push({ etiqueta: `falta --cat-${i} ${nombre}`, ok: false, valor: 0 }); continue }
+    wcag(`--cat-${i}-ink sobre la tarjeta`, ink, card)
+    wcag(`--cat-${i}-ink sobre su tinte 15% (sobre fondo)`, ink, componer(bg, tint, 0.15))
+    wcag(`--cat-${i}-ink sobre su tinte 15% (sobre tarjeta)`, ink, componer(card, tint, 0.15))
+    wcag(`--cat-${i}-tint (marca) sobre la tarjeta`, tint, card, 3)
+  }
 
   console.log(`\n=== PIZARRA ${nombre} — no textual (informativo) ===`)
   info('borde sobre tarjeta (separador, no control)', t.border, card)

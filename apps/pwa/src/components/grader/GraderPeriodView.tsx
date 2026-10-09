@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { Bar, Line } from 'react-chartjs-2'
@@ -100,6 +101,9 @@ const BAR_BLUE = 'rgba(59, 130, 246, 0.7)'
 const BAR_BLUE_BORDER = 'rgba(59, 130, 246, 1)'
 const BAR_AMBER = 'rgba(245, 158, 11, 0.7)'
 const BAR_AMBER_BORDER = 'rgba(245, 158, 11, 1)'
+const MEDIA_7D_LINE = 'rgba(156, 163, 175, 0.9)'
+const P0_HORA_LINE = 'rgba(168, 85, 247, 1)'
+const P0_HORA_FILL = 'rgba(168, 85, 247, 0.15)'
 
 // ── Componente ───────────────────────────────────────────────────────────────
 
@@ -113,6 +117,26 @@ interface Props {
 
 export function GraderPeriodView({ data }: Props) {
   const navigate = useNavigate()
+  // Colores: sin Pizarra son los literales de arriba (idénticos a siempre); con Pizarra, la
+  // paleta de series («foco, contexto, estado»): día = serie 1, noche = serie 2, P0% y barras = serie 1,
+  // umbrales = aviso / falla.
+  const { elegir, version: versionColores } = useColoresGrafico()
+  const col = useMemo(() => ({
+    diaLine: elegir(DIA_LINE_COLOR, 'serie-1'),
+    diaFill: elegir(DIA_FILL_COLOR, 'serie-1', 0.12),
+    nocheLine: elegir(NOCHE_LINE_COLOR, 'serie-2'),
+    nocheFill: elegir(NOCHE_FILL_COLOR, 'serie-2', 0.12),
+    warn: elegir(WARN_LINE, 'grafico-aviso'),
+    critical: elegir(CRITICAL_LINE, 'grafico-falla'),
+    barBlue: elegir(BAR_BLUE, 'serie-1', 0.7),
+    barBlueBorder: elegir(BAR_BLUE_BORDER, 'serie-1'),
+    barAmber: elegir(BAR_AMBER, 'serie-1', 0.7),
+    barAmberBorder: elegir(BAR_AMBER_BORDER, 'serie-1'),
+    media7d: elegir(MEDIA_7D_LINE, 'grafico-neutro-medio'),
+    p0Line: elegir(P0_HORA_LINE, 'serie-1'),
+    p0Fill: elegir(P0_HORA_FILL, 'serie-1', 0.15),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [elegir, versionColores])
   const [sortKey, setSortKey] = useState<SortKey>('dateKey')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [page, setPage] = useState(0)
@@ -196,8 +220,8 @@ export function GraderPeriodView({ data }: Props) {
         {
           label: 'Turno día',
           data: dailyP0Series.map((d) => d.dia ? d.dia.p0Pct : null),
-          borderColor: DIA_LINE_COLOR,
-          backgroundColor: DIA_FILL_COLOR,
+          borderColor: col.diaLine,
+          backgroundColor: col.diaFill,
           borderWidth: isMobile ? 1.5 : 2,
           fill: false,
           tension: 0.2,
@@ -209,8 +233,8 @@ export function GraderPeriodView({ data }: Props) {
         {
           label: 'Turno noche',
           data: dailyP0Series.map((d) => d.noche ? d.noche.p0Pct : null),
-          borderColor: NOCHE_LINE_COLOR,
-          backgroundColor: NOCHE_FILL_COLOR,
+          borderColor: col.nocheLine,
+          backgroundColor: col.nocheFill,
           borderWidth: isMobile ? 1.5 : 2,
           fill: false,
           tension: 0.2,
@@ -222,7 +246,7 @@ export function GraderPeriodView({ data }: Props) {
         ...(dailyP0Series.length > 14 ? [{
           label: 'Media 7d',
           data: rolling7,
-          borderColor: 'rgba(156, 163, 175, 0.9)',
+          borderColor: col.media7d,
           backgroundColor: 'transparent',
           borderWidth: 2,
           borderDash: [5, 3],
@@ -235,7 +259,7 @@ export function GraderPeriodView({ data }: Props) {
         }] : []),
       ],
     }
-  }, [dailyP0Series])
+  }, [dailyP0Series, col])
 
   const trendChartOptions = useMemo(() => ({
     responsive: true,
@@ -332,23 +356,23 @@ export function GraderPeriodView({ data }: Props) {
         {
           label: 'P0% por hora',
           data: hourlyFiltered.map((h) => h.p0Pct),
-          borderColor: 'rgba(168, 85, 247, 1)',
-          backgroundColor: 'rgba(168, 85, 247, 0.15)',
+          borderColor: col.p0Line,
+          backgroundColor: col.p0Fill,
           borderWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2,
           fill: true,
           tension: 0.25,
           pointRadius: typeof window !== 'undefined' && window.innerWidth < 768 ? 3 : 4,
           pointHoverRadius: 5,
           pointBackgroundColor: hourlyFiltered.map((h) =>
-            h.shiftId === 'Turno día' ? DIA_LINE_COLOR : NOCHE_LINE_COLOR,
+            h.shiftId === 'Turno día' ? col.diaLine : col.nocheLine,
           ),
           pointBorderColor: hourlyFiltered.map((h) =>
-            h.shiftId === 'Turno día' ? DIA_LINE_COLOR : NOCHE_LINE_COLOR,
+            h.shiftId === 'Turno día' ? col.diaLine : col.nocheLine,
           ),
         },
       ],
     }
-  }, [useHourlyView, hourlyFiltered])
+  }, [useHourlyView, hourlyFiltered, col])
 
   const hourlyChartOptions = useMemo(() => ({
     responsive: true,
@@ -415,12 +439,12 @@ export function GraderPeriodView({ data }: Props) {
       datasets: [{
         label: 'Piezas',
         data: top.map((d) => d.pieces),
-        backgroundColor: BAR_BLUE,
-        borderColor: BAR_BLUE_BORDER,
+        backgroundColor: col.barBlue,
+        borderColor: col.barBlueBorder,
         borderWidth: 1,
       }],
     }
-  }, [calibreDistribution])
+  }, [calibreDistribution, col])
 
   // ── Chart: top causas P0 ─────────────────────────────────────────────────
   const causesChartData = useMemo(() => {
@@ -430,12 +454,12 @@ export function GraderPeriodView({ data }: Props) {
       datasets: [{
         label: 'Piezas P0',
         data: topP0Causes.map((c) => c.pieces),
-        backgroundColor: BAR_AMBER,
-        borderColor: BAR_AMBER_BORDER,
+        backgroundColor: col.barAmber,
+        borderColor: col.barAmberBorder,
         borderWidth: 1,
       }],
     }
-  }, [topP0Causes])
+  }, [topP0Causes, col])
 
   // ── Tabla ordenable ──────────────────────────────────────────────────────
   const sortedShifts = useMemo(() => {
@@ -824,20 +848,20 @@ export function GraderPeriodView({ data }: Props) {
             {useHourlyView ? (
               <>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: DIA_LINE_COLOR }} /> Turno día
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: col.diaLine }} /> Turno día
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: NOCHE_LINE_COLOR }} /> Turno noche
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: col.nocheLine }} /> Turno noche
                 </span>
                 <span>{hourlyFiltered.length > 0 ? `${Math.round(hourlyFiltered.reduce((a, h) => a + h.totalPieces, 0) / 1000)}k piezas en rango` : ''}</span>
               </>
             ) : (
               <>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-0.5" style={{ background: WARN_LINE }} /> Warn ≥2%
+                  <span className="inline-block w-3 h-0.5" style={{ background: col.warn }} /> Warn ≥2%
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-0.5" style={{ background: CRITICAL_LINE }} /> Critical ≥3.5%
+                  <span className="inline-block w-3 h-0.5" style={{ background: col.critical }} /> Critical ≥3.5%
                 </span>
                 {hourlySeries.length > 0 && (
                   <span className="text-cat-6-ink">
