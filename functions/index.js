@@ -8578,10 +8578,11 @@ async function _queryAniList(query, variables) {
   return r.json();
 }
 
-async function _sendTelegram(botToken, chatId, text, replyMarkup) {
+async function _sendTelegram(botToken, chatId, text, replyMarkup, extra) {
   const { default: fetch } = await import('node-fetch');
-  const body = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
+  const body = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(extra || {}) };
   if (replyMarkup) body.reply_markup = replyMarkup;
+  for (const k of Object.keys(body)) if (body[k] == null) delete body[k];
   const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -8649,7 +8650,13 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
   }
   const visibles = schedules.filter((s) => s.media && !s.media.isAdult);
 
-  if (!visibles.length) {
+  // Cine/series de tus plataformas (no frena el resumen si TMDB falla).
+  let cine = null;
+  try { cine = await _cineParaResumen(dateKey); } catch (e) { logger.warn('[anime] cine en resumen falló:', e.message); }
+  const hayCine = !!(cine && (cine.nuevos.length || cine.cines.length));
+
+  if (!visibles.length && !hayCine) {
+    if (cine && !manual) { try { await cine.guardar(); } catch { /* */ } }
     logger.info('[anime] Sin estrenos hoy:', dateKey);
     return { enviado: false, motivo: 'sin estrenos' };
   }
@@ -8718,7 +8725,9 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
     text = `📺 <b>Estrenos del día — ${_tgHtml(dateCapitalized)}</b>`
       + seccion('⭐ <b>Tus series', tracked, tracTope)
       + seccion('🆕 <b>Estrenos nuevos · ep 1', premieres, premTope)
-      + seccion('📡 <b>Descubrimiento', discovery, 8);
+      + seccion('📡 <b>Descubrimiento', discovery, 8)
+      + (cine ? seccion('🎬 <b>Llegó a tus plataformas', cine.nuevos, 5) + seccion('🍿 <b>Estrenos en cines esta semana', cine.cines, 5) : '')
+      + (hayCine ? '\n\n<i>Cine y series: datos de JustWatch vía TMDB.</i>' : '');
     if (text.length <= 3900) break;
     tracTope = Math.max(8, tracTope - 5);
     premTope = Math.max(5, premTope - 4);
@@ -8745,10 +8754,172 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
     await db.collection('anime_notifications').doc(dateKey).set({
       sent: true, sentAt: FieldValue.serverTimestamp(),
       premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, total: visibles.length,
+      cine: cine ? cine.nuevos.length : 0, cines: cine ? cine.cines.length : 0,
     });
+    if (cine) { try { await cine.guardar(); } catch (e) { logger.warn('[anime] no se guardó cineVistos:', e.message); } }
   }
-  return { enviado: true, premieres: premieres.length, tracked: tracked.length, discovery: discovery.length };
+  return { enviado: true, premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, cine: cine ? cine.nuevos.length : 0, cines: cine ? cine.cines.length : 0 };
 }
+
+// ── Cine en el resumen diario ─────────────────────────────────────────────────
+// TMDB no publica cuándo entra un título a una plataforma: se comparan los
+// estrenos más recientes de cada plataforma que pagas contra todo lo ya visto
+// (anime_estado/cineVistos, acumulado). Lo nunca visto = «llegó».
+// La primera vez solo guarda la foto inicial (no avisa 80 títulos de golpe).
+async function _cineParaResumen(dateKey) {
+  if (!process.env.TMDB_READ_TOKEN) return null;
+  const snap = await db.collection('animelists').doc(ANIME_CHAT_ID).collection('cine').doc('datos').get();
+  const d = snap.exists ? (snap.data() || {}) : {};
+  const plats = (Array.isArray(d.plataformas) ? d.plataformas : []).filter((x) => Number.isInteger(x)).slice(0, 8);
+  const enLista = new Set((Array.isArray(d.lista) ? d.lista : []).map((x) => `${x.tipo}:${x.id}`));
+  const resultado = { nuevos: [], cines: [], guardar: async () => {} };
+
+  if (plats.length) {
+    const nombres = {};
+    try { (await _mediaOps.plataformas({ region: 'CL' })).items.forEach((p) => { nombres[p.id] = p.nombre; }); } catch { /* sin nombres */ }
+    const estadoRef = db.collection('anime_estado').doc('cineVistos');
+    const prev = await estadoRef.get();
+    const primeraVez = !prev.exists;
+    const vistos = new Set(prev.exists ? (prev.data().ids || []) : []);
+    const hoy = dateKey;
+    const porTitulo = new Map(); // tipo:id → { item, tipo, plataformas[] }
+    for (const pid of plats) {
+      for (const tipo of ['movie', 'tv']) {
+        const campo = tipo === 'movie' ? 'primary_release_date' : 'first_air_date';
+        let r;
+        try {
+          r = await _tmdb(`/discover/${tipo}`, {
+            watch_region: 'CL', with_watch_providers: String(pid), with_watch_monetization_types: 'flatrate|free|ads',
+            sort_by: `${campo}.desc`, [`${campo}.lte`]: hoy, include_adult: 'false', 'vote_count.gte': '5', page: '1',
+          }, 3 * MEDIA_H);
+        } catch (e) { logger.warn('[anime] cine discover', pid, tipo, e.message); continue; }
+        for (const x of (r.results || []).slice(0, 20)) {
+          const k = `${tipo}:${x.id}`;
+          const g = porTitulo.get(k) || { x, tipo, plataformas: [] };
+          if (!g.plataformas.includes(pid)) g.plataformas.push(pid);
+          porTitulo.set(k, g);
+        }
+      }
+    }
+    const nuevos = [];
+    for (const [k, g] of porTitulo) {
+      if (!primeraVez && !vistos.has(k) && !enLista.has(k)) nuevos.push(g);
+      vistos.add(k);
+    }
+    const unir = (arr) => (arr.length <= 1 ? arr.join('') : `${arr.slice(0, -1).join(', ')} y ${arr[arr.length - 1]}`);
+    resultado.nuevos = nuevos.map((g) => {
+      const titulo = _tgHtml(String(g.x.title || g.x.name || 'Sin título').substring(0, 45));
+      const anio = String(g.x.release_date || g.x.first_air_date || '').slice(0, 4);
+      const donde = unir(g.plataformas.map((p) => nombres[p] || `plataforma ${p}`));
+      return `${g.tipo === 'tv' ? '📺' : '🎬'} <b>${titulo}</b>${anio ? ` (${anio})` : ''} · en ${_tgHtml(donde)}`;
+    });
+    // Se guarda solo si el resumen sale bien (lo llama _runAnimeEstrenos).
+    resultado.guardar = async () => {
+      const ids = [...vistos];
+      await estadoRef.set({ ids: ids.slice(Math.max(0, ids.length - 3000)), actualizado: FieldValue.serverTimestamp() });
+    };
+  }
+
+  // Jueves: estrenos de la semana en cines de Chile.
+  const diaSemana = new Date(`${dateKey}T12:00:00Z`).getUTCDay();
+  if (diaSemana === 4) {
+    try {
+      const r = await _tmdb('/movie/now_playing', { region: 'CL', page: '1' }, 6 * MEDIA_H);
+      const desde = new Date(`${dateKey}T12:00:00Z`); desde.setUTCDate(desde.getUTCDate() - 7);
+      const desdeKey = desde.toISOString().slice(0, 10);
+      resultado.cines = (r.results || [])
+        .filter((x) => x.release_date && x.release_date >= desdeKey && x.release_date <= dateKey)
+        .map((x) => `🍿 <b>${_tgHtml(String(x.title || '').substring(0, 45))}</b>`);
+    } catch (e) { logger.warn('[anime] cines CL', e.message); }
+  }
+  return resultado;
+}
+
+// ── Aviso en tiempo real: episodio nuevo de algo en «viendo» ──────────────────
+// Cada 30 min revisa AniList solo para los anime de «viendo». Un aviso por
+// episodio (marca anime_notifications/ep_<id>_<ep>), agrupado en un mensaje.
+// Entre 01:00 y 08:00 (Chile) llega en silencio.
+async function _runAvisosEpisodios(botToken) {
+  const ahora = Math.floor(Date.now() / 1000);
+  const estadoRef = db.collection('anime_estado').doc('avisos');
+  const est = await estadoRef.get();
+  let desde = est.exists && Number.isFinite(est.data().ultimoCorte) ? est.data().ultimoCorte : ahora - 1800;
+  desde = Math.max(desde, ahora - 6 * 3600); // como máximo 6 h hacia atrás
+
+  const listsDoc = await db.collection('animelists').doc(ANIME_CHAT_ID).get();
+  const viendo = listsDoc.exists && Array.isArray(listsDoc.data().viendo) ? listsDoc.data().viendo : [];
+  const porId = new Map(viendo.filter((a) => a && Number.isInteger(Number(a.id))).map((a) => [Number(a.id), a]));
+  if (!porId.size) { await estadoRef.set({ ultimoCorte: ahora }, { merge: true }); return { avisos: 0 }; }
+
+  const ids = [...porId.keys()];
+  const GQL = 'query($ids:[Int],$f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
+  const schedules = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    for (let p = 1; p <= 3; p++) {
+      const json = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: ahora, p });
+      const page = json.data.Page || {};
+      schedules.push(...(page.airingSchedules || []));
+      if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+    }
+  }
+
+  const pendientes = [];
+  const yaVistos = new Set(); // una emisión puede venir repetida entre páginas/grupos
+  for (const s of schedules) {
+    const a = porId.get(Number(s.media && s.media.id));
+    if (!a || (Number(a.watchedEps) || 0) >= s.episode) continue;
+    const clave = `${s.media.id}_${s.episode}`;
+    if (yaVistos.has(clave)) continue;
+    yaVistos.add(clave);
+    const ref = db.collection('anime_notifications').doc(`ep_${s.media.id}_${s.episode}`);
+    if ((await ref.get()).exists) continue;
+    pendientes.push({ s, ref });
+  }
+
+  if (pendientes.length) {
+    const lineas = pendientes.map(({ s }) => {
+      const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || 'Sin título').substring(0, 45));
+      const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
+      return `▶️ <b>${t}</b> · ep ${s.episode} · ${h}`;
+    });
+    const titulo = pendientes.length === 1 ? '🔔 <b>Salió un episodio de lo que estás viendo</b>' : `🔔 <b>Salieron ${pendientes.length} episodios de lo que estás viendo</b>`;
+    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}`;
+    const hora = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
+    const silencio = hora >= 1 && hora < 8;
+    const replyMarkup = { inline_keyboard: [[{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
+    let result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup, { disable_notification: silencio });
+    if (!result || !result.ok) {
+      const plano = text.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      result = await _sendTelegram(botToken, ANIME_CHAT_ID, plano, replyMarkup, { disable_notification: silencio, parse_mode: null });
+    }
+    if (!result || !result.ok) throw new Error(`Telegram no aceptó el aviso: ${(result && result.description) || 'sin respuesta'}`);
+    await Promise.all(pendientes.map(({ s, ref }) => ref.set({ media: s.media.id, ep: s.episode, avisadoEn: FieldValue.serverTimestamp() })));
+  }
+  await estadoRef.set({ ultimoCorte: ahora, ultimaEjecucion: FieldValue.serverTimestamp() }, { merge: true });
+  return { avisos: pendientes.length };
+}
+
+exports.animeAvisosEpisodios = onSchedule(
+  {
+    schedule: 'every 30 minutes',
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 60,
+    memory: '256MiB',
+    retryCount: 0,
+    maxInstances: 1,
+    secrets: ['ANIME_BOT_TOKEN'],
+  },
+  async () => {
+    const token = process.env.ANIME_BOT_TOKEN;
+    if (!token) { logger.error('[anime] ANIME_BOT_TOKEN no configurado'); return; }
+    try {
+      const r = await _runAvisosEpisodios(token);
+      if (r.avisos) logger.info('[anime] avisos de episodio:', r.avisos);
+    } catch (e) {
+      logger.error('[anime] avisos de episodio falló:', e.message);
+    }
+  }
+);
 
 exports.animeEstrenosDiarios = onSchedule(
   {
@@ -8757,7 +8928,7 @@ exports.animeEstrenosDiarios = onSchedule(
     timeoutSeconds: 60,
     memory: '256MiB',
     retryCount: 0,
-    secrets: ['ANIME_BOT_TOKEN'],
+    secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'],
   },
   async () => {
     const token = process.env.ANIME_BOT_TOKEN;
@@ -8768,7 +8939,7 @@ exports.animeEstrenosDiarios = onSchedule(
 
 // Disparo manual del chequeo de estrenos — herramienta de admin, ningún cliente la llama.
 exports.animeEstrenosManual = onRequest(
-  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'], maxInstances: 1 },
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'], maxInstances: 1 },
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
     if (!requireAdminKey(req, res)) return;
