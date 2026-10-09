@@ -203,3 +203,7 @@ body.modo-cine #cine-tabbar { display: grid; }
   #cine-ficha, #cine-sheet, .s-panel, .c-switch::after { transition: none; }
   .c-cargando { animation-duration: 2s; }
 }
+
+.c-oculto { display: none !important; }
+:root[data-scheme='light'] .modo-switch button[aria-pressed='true'] { background: #FFFFFF; color: #1C1C1E; box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+:root[data-scheme='light'] .modo-switch, :root[data-scheme='light'] .btn-pantalla { background: rgba(120, 120, 128, .12); }
