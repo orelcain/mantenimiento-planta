@@ -4,6 +4,7 @@
    reescribe el doc principal completo.
    Depende de globals de anime.html: firebase, db, tg, getUserId, toast, haptic. */
 /* global db, tg, getUserId, toast, haptic */
+/* Usa de anime.html: window.atPrefs, window.confirmarTg, window.botonesNativos. */
 (function () {
   'use strict';
 
@@ -70,14 +71,15 @@
   // Tamaño de las tarjetas: c (chico, 4 col.), m (mediano, 3), g (grande, 2).
   const TAMANOS = [['m', 'Mediano'], ['c', 'Chico'], ['g', 'Grande']];
   let tamano = 'm';
-  try { tamano = localStorage.getItem('at_tamano') || 'm'; } catch { tamano = 'm'; }
+  const prefs = (window.atPrefs || { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* */ } } });
+  tamano = prefs.get('at_tamano', 'm');
   if (!TAMANOS.some(([k]) => k === tamano)) tamano = 'm';
   const ICON_TAM = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
   const btnTamano = () => { const n = (TAMANOS.find(([k]) => k === tamano) || TAMANOS[0])[1]; return `<button type="button" class="c-iconbtn" data-tam="1" aria-label="Tamaño de tarjetas: ${n}" title="Tamaño: ${n}">${ICON_TAM}</button>`; };
   function cambiarTamano() {
     const i = TAMANOS.findIndex(([k]) => k === tamano);
     tamano = TAMANOS[(i + 1) % TAMANOS.length][0];
-    try { localStorage.setItem('at_tamano', tamano); } catch { /* sin almacenamiento */ }
+    prefs.set('at_tamano', tamano);
     const cine = document.getElementById('cine');
     cine.dataset.tam = tamano;
     cine.querySelectorAll('[data-tam]').forEach((b) => { if (b.tagName === 'BUTTON') b.outerHTML = btnTamano(); });
@@ -231,7 +233,7 @@
     if (tg && typeof tg.onEvent === 'function') tg.onEvent('themeChanged', aplicarEsquema);
 
     let modo = 'anime';
-    try { modo = localStorage.getItem('at_modo') || 'anime'; } catch { modo = 'anime'; }
+    modo = prefs.get('at_modo', 'anime');
     if (modo === 'cine') cambiarModo('cine');
   }
 
@@ -260,7 +262,7 @@
         return;
       }
       const full = !!tg.isFullscreen;
-      try { localStorage.setItem('at_pantalla', full ? '0' : '1'); } catch { /* sin almacenamiento */ }
+      prefs.set('at_pantalla', full ? '0' : '1');
       try { if (full) tg.exitFullscreen(); else tg.requestFullscreen(); } catch { avisar('Tu Telegram no permite pantalla completa'); }
     });
     if (typeof tg.onEvent === 'function') {
@@ -270,9 +272,19 @@
     header.appendChild(b);
     pintar();
     let pref = '0';
-    try { pref = localStorage.getItem('at_pantalla') || '0'; } catch { pref = '0'; }
+    pref = prefs.get('at_pantalla', '0');
     if (soporta && pref === '1' && !tg.isFullscreen) { try { tg.requestFullscreen(); } catch { /* el usuario lo pide con el botón */ } }
   }
+
+  window.addEventListener('at-prefs', (e) => {
+    const c = (e && e.detail) || {};
+    if (c.at_tamano && TAMANOS.some(([k]) => k === c.at_tamano) && c.at_tamano !== tamano) {
+      tamano = c.at_tamano;
+      const cine = document.getElementById('cine');
+      if (cine) cine.dataset.tam = tamano;
+    }
+    if (c.at_modo && c.at_modo !== est.modo) cambiarModo(c.at_modo);
+  });
 
   function aplicarEsquema() {
     const claro = tg && tg.colorScheme === 'light';
@@ -300,7 +312,7 @@
     est.modo = modo === 'cine' ? 'cine' : 'anime';
     document.body.classList.toggle('modo-cine', est.modo === 'cine');
     document.querySelectorAll('.modo-switch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modo === est.modo)));
-    try { localStorage.setItem('at_modo', est.modo); } catch { /* sin almacenamiento */ }
+    prefs.set('at_modo', est.modo);
     if (est.modo === 'cine') {
       const badge = document.getElementById('hdr-badge');
       if (badge) badge.style.display = 'none';
@@ -615,6 +627,7 @@
         guardar();
       }
       ficha.innerHTML = htmlFicha(t);
+      botonesFicha(t);
       ficha.dataset.tipo = tipo;
       ficha.dataset.id = String(id);
       est.fichaActual = t;
@@ -625,6 +638,7 @@
   }
   function cerrarFicha() {
     fichaReq++;
+    if (window.botonesNativos) window.botonesNativos.ocultar();
     const ficha = document.getElementById('cine-ficha');
     ficha.classList.remove('abierta');
     est.fichaActual = null;
@@ -684,7 +698,7 @@
           ${t.nota ? `<span class="f-meta">TMDB ${esc(t.nota)}</span>` : ''}
         </div>
       </div>
-      <div class="c-btns">
+      <div class="c-btns${window.botonesNativos && window.botonesNativos.disponibles() && window.botonesNativos.secundarioDisponible() ? ' c-oculto' : ''}">
         <button type="button" class="c-btn ${guardado ? 'tinted' : 'filled'}" data-guardar="1">${guardado ? 'En tu lista' : 'Agregar'}</button>
         <button type="button" class="c-btn ${guardado && guardado.estado === 'visto' ? 'filled' : 'tinted'}" data-visto="1">${guardado && guardado.estado === 'visto' ? 'Visto' : 'Ya la vi'}</button>
       </div>
@@ -761,7 +775,17 @@
     if (tg && tg.openLink) tg.openLink(u); else window.open(u, '_blank', 'noopener');
   }
 
-  function guardarDesdeFicha(marcarVisto) {
+  function botonesFicha(t) {
+    const bn = window.botonesNativos;
+    if (!bn || !t) return;
+    const it = enLista(t.tipo, t.id);
+    bn.mostrar({
+      principal: { texto: it ? 'En tu lista ✓' : 'Agregar a Mi lista', accion: () => guardarDesdeFicha(false) },
+      secundario: { texto: it && it.estado === 'visto' ? 'Visto ✓' : 'Ya la vi', accion: () => guardarDesdeFicha(true) },
+    });
+  }
+
+  function guardarDesdeFicha(marcarVisto, confirmado) {
     const t = est.fichaActual;
     if (!t) return;
     let it = enLista(t.tipo, t.id);
@@ -773,7 +797,11 @@
       it.vistoEn = it.estado === 'visto' ? Date.now() : null;
       avisar(it.estado === 'visto' ? 'Marcado como visto' : 'Vuelve a «Por ver»');
     } else if (it) {
-      if (it.links && it.links.length && !window.confirm('Al quitarlo de tu lista también se borran tus links. ¿Seguir?')) return;
+      if (it.links && it.links.length && !confirmado) {
+        const preguntar = window.confirmarTg || ((m) => Promise.resolve(window.confirm(m)));
+        preguntar('Al quitarlo de tu lista también se borran tus links. ¿Seguir?').then((ok) => { if (ok) guardarDesdeFicha(false, true); });
+        return;
+      }
       est.datos.lista = est.datos.lista.filter((x) => x !== it);
       avisar('Quitado de tu lista');
     } else {
@@ -786,6 +814,7 @@
     const y = ficha.scrollTop;
     ficha.innerHTML = htmlFicha(t);
     ficha.scrollTop = y;
+    botonesFicha(t);
   }
 
   // ── Filtros (sheet) ────────────────────────────────────────────────────
