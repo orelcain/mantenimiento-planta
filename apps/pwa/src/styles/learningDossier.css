@@ -73,25 +73,6 @@
 .dossier .dp-hmi { margin-top: 20px; display: inline-flex; align-items: center; gap: 8px; font-family: var(--dp-body); font-size: 12.5px; color: var(--dp-accent); background: none; border: 0; border-bottom: 1px solid var(--dp-accent); cursor: pointer; padding: 2px 0; }
 .dossier .dp-hmi:hover { color: var(--dp-ink); border-color: var(--dp-ink); }
 
-/* Selector de secciones de la máquina/curso — una sola fila subrayada con scroll
-   horizontal, igual en desktop y móvil (nunca se envuelve a 2 filas). Estilo
-   "documentation portal": subrayado, no píldoras — ver memoria de diseño del
-   Centro de Aprendizaje para el porqué (setproduct.com/blog/tabs-ui-design). */
-.dossier .dp-scroll-tabs { position: relative; display: flex; align-items: center; margin-top: 22px; border-bottom: 1px solid var(--dp-rule); }
-.dossier .dp-scroll-track { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
-.dossier .dp-scroll-track::-webkit-scrollbar { display: none; }
-.dossier .dp-scroll-tab { display: inline-flex; align-items: center; gap: 6px; font-family: var(--dp-body); font-size: 12px; color: var(--dp-ink-faint); background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: color .15s ease, border-color .15s ease; }
-.dossier .dp-scroll-tab:hover { color: var(--dp-ink); }
-.dossier .dp-scroll-tab[aria-current="true"] { color: var(--dp-ink); border-bottom-color: var(--dp-accent); font-weight: 600; }
-.dossier .dp-scroll-tab-done { color: var(--dp-ok); font-weight: 700; }
-.dossier .dp-scroll-fade { position: absolute; top: 0; right: 26px; bottom: 1px; width: 30px; background: linear-gradient(to right, transparent, var(--dp-paper)); pointer-events: none; }
-.dossier .dp-scroll-arrow { flex-shrink: 0; display: none; align-items: center; justify-content: center; width: 26px; height: 34px; background: none; border: 0; color: var(--dp-ink-faint); cursor: pointer; }
-.dossier .dp-scroll-arrow:hover { color: var(--dp-ink); }
-@media (min-width: 700px) {
-  /* Las flechas ayudan a quien usa mouse sin gesto horizontal; en touch el deslizar alcanza. */
-  .dossier .dp-scroll-arrow { display: flex; }
-}
-
 /* Progreso del curso en la portada */
 .dossier .dp-progress { display: flex; align-items: center; gap: 12px; margin-top: 18px; max-width: 420px; }
 .dossier .dp-progress-track { position: relative; flex: 1; height: 6px; border-radius: 999px; background: var(--dp-accent-soft); overflow: hidden; }
@@ -526,7 +507,6 @@
 /* Toques de 48 px en celular y tableta (oleada 4, tanda c). En PC se mantiene la densidad. */
 @media (max-width: 1023px) {
   .dossier .dp-hmi,
-  .dossier .dp-scroll-tab,
   .dossier .dp-index button,
   .dossier .dp-nav button,
   .dossier .dp-practice,

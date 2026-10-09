@@ -43,9 +43,19 @@ export const usePantallaCompletaMovil = useBurbujaChatOculta
 
 /* ───────── Abrir ARIA desde fuera del chat ───────── */
 
-type AbrirAria = (consulta?: string) => void
+/**
+ * Opciones al abrir ARIA. `hoja` = abrirla como hoja a media pantalla (celular) o panel lateral (PC)
+ * con la herramienta visible detrás; `contexto` = rótulo corto de dónde está el usuario
+ * («HMI Knuro · N1 · Principal»), que la hoja muestra en su encabezado.
+ */
+export interface OpcionesAria {
+  hoja?: boolean
+  contexto?: string
+}
+
+type AbrirAria = (consulta?: string, opciones?: OpcionesAria) => void
 let abrirAriaFn: AbrirAria | null = null
-let consultaPendiente: { consulta?: string } | null = null
+let consultaPendiente: { consulta?: string; opciones?: OpcionesAria } | null = null
 
 /** El ChatBot registra aquí cómo se abre. Devuelve la baja. Si alguien pidió abrir antes, se atiende al registrar. */
 export function registrarAbrirAria(fn: AbrirAria): () => void {
@@ -53,13 +63,13 @@ export function registrarAbrirAria(fn: AbrirAria): () => void {
   if (consultaPendiente) {
     const p = consultaPendiente
     consultaPendiente = null
-    fn(p.consulta)
+    fn(p.consulta, p.opciones)
   }
   return () => { if (abrirAriaFn === fn) abrirAriaFn = null }
 }
 
 /** Abre el chat de ARIA; con `consulta`, la deja escrita en el campo (no la envía). */
-export function abrirAria(consulta?: string): void {
-  if (abrirAriaFn) abrirAriaFn(consulta)
-  else consultaPendiente = { consulta }
+export function abrirAria(consulta?: string, opciones?: OpcionesAria): void {
+  if (abrirAriaFn) abrirAriaFn(consulta, opciones)
+  else consultaPendiente = { consulta, opciones }
 }

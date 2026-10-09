@@ -63,7 +63,7 @@ describe('EncabezadoHerramienta', () => {
   it('Preguntar a ARIA abre el chat con el contexto de la herramienta', () => {
     montar({ contextoAria: 'Estoy en el HMI Grader. ' })
     fireEvent.click(screen.getByRole('button', { name: 'Preguntar a ARIA' }))
-    expect(abrirAria).toHaveBeenCalledWith('Estoy en el HMI Grader. ')
+    expect(abrirAria).toHaveBeenCalledWith('Estoy en el HMI Grader. ', { hoja: true, contexto: 'HMI Grader · Simulador' })
   })
 
   it('Más, Ir al inicio: sale de la herramienta aunque no haya barra inferior', () => {
