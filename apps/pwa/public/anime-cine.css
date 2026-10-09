@@ -85,11 +85,21 @@ body.modo-cine #cine { display: block; }
 .c-h2 h2 { margin: 0; font-size: 20px; line-height: 25px; font-weight: 600; }
 .c-h2 span, .c-h2 button { font-size: 15px; color: var(--c-text2); background: none; border: 0; padding: 0; }
 .c-h2 button { color: var(--c-accent); min-height: 44px; }
+.c-h2-plat { justify-content: flex-start; align-items: center; gap: 10px; }
+.c-plat-logo { width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; }
+.c-alcance { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 16px 0; max-width: 560px; }
+.c-alcance .c-seg { margin: 0; flex: 1; max-width: 340px; }
+.c-link { border: 0; background: none; color: var(--c-accent); font-size: 15px; font-weight: 600; min-height: 44px; padding: 0 4px; flex-shrink: 0; }
+.c-resumen { margin: 4px 32px 0 !important; }
+.c-addlink { display: flex; gap: 8px; margin: 12px 16px 0; }
+.c-addlink input { flex: 1; min-width: 0; height: 44px; border-radius: 22px; border: 0; background: var(--c-fill); color: var(--c-text); font-size: 17px; padding: 0 16px; outline: none; }
+.c-addlink input::placeholder { color: var(--c-text2); }
+.c-addlink .c-btn { height: 44px; font-size: 15px; }
 .c-hgroup { margin: 24px 32px 8px; font-size: 16px; line-height: 20px; font-weight: 600; }
 .c-foot { margin: 8px 32px 0; font-size: 13px; line-height: 18px; color: var(--c-text2); }
 
 /* ── Pósters ────────────────────────────────────────────────────────── */
-.c-carrusel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 4px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.c-carrusel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 4px; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; }
 .c-carrusel::-webkit-scrollbar { display: none; }
 /* Tamaño elegido con el botón de la cuadrícula (data-tam en #cine). */
 /* Ancho mínimo por tarjeta: caben las que entren (panel angosto = 3, pantalla completa = muchas). */

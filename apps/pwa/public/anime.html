@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<link rel="stylesheet" href="anime-cine.css?v=20261008d">
+<link rel="stylesheet" href="anime-cine.css?v=20261008f">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -741,7 +741,18 @@ for (const type of ['click', 'input', 'change']) {
 }
 function openSite(url) {
   url = safeUrl(url);
-  if (url) window.open(url, '_blank', 'noopener');
+  if (!url) return;
+  if (tg?.openLink) tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
+// Links t.me se abren dentro de Telegram; el resto, en el navegador externo.
+function openUrlTelegramAware(url) {
+  url = safeUrl(url);
+  if (!url) return;
+  haptic('medium');
+  if (/^https:\/\/(t|telegram)\.me\//i.test(url) && typeof tg?.openTelegramLink === 'function') { tg.openTelegramLink(url); return; }
+  if (tg?.openLink) tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
 }
 function pct(w,t) { return t ? Math.min(100,Math.round(w/t*100)) : 0; }
 function imgTag(src, fb='🎌') {
@@ -1631,6 +1642,9 @@ async function quickAdd(id, list, btn) {
 }
 
 function openResultDetail(r) {
+  // Si ya está en una de tus listas, abre la ficha completa (links, notas, apodo),
+  // la misma que en Viendo. Antes Estrenos/Buscar abrían una ficha reducida.
+  if (r && getAnime(r.id)) { openAnimeDetail(r.id); return; }
   haptic('light');
   if (lastSearchQuery && lastSearchResults.length) saveRecent(lastSearchQuery, lastSearchResults);
   const tracked = getAnimeList(r.id)||r.tracking;
@@ -2329,7 +2343,13 @@ let _linkModalEditIdx = null; // null = adding new, number = editing existing
 
 function _extractDomain(url) {
   try {
-    const host = new URL(url).hostname.replace(/^www\./, '');
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    // t.me/canal → «Telegram · canal» (antes salía solo «T»).
+    if (host === 't.me' || host === 'telegram.me') {
+      const canal = u.pathname.split('/').filter(Boolean)[0];
+      return canal ? `Telegram · ${canal}` : 'Telegram';
+    }
     const main = host.split('.')[0];
     return main.charAt(0).toUpperCase() + main.slice(1);
   } catch { return 'Link'; }
@@ -2413,11 +2433,7 @@ async function removeLinkFromModal() {
 function openAnimeLink(id, idx) {
   const a = getAnime(Number(id)) || detailAnime;
   const links = _getLinks(a);
-  const url = safeUrl(links[idx || 0]);
-  if (!url) return;
-  haptic('medium');
-  if (tg?.openLink) tg.openLink(url);
-  else window.open(url, '_blank', 'noopener');
+  openUrlTelegramAware(links[idx || 0]);
 }
 
 // ── Nickname (alias para búsqueda rápida) ─────────────────────────────────────
@@ -3168,7 +3184,8 @@ function _attachSwipe(listName) {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async()=>{
-  const startTab = window.location.hash === '#estrenos' ? 'estrenos' : 'buscar';
+  // Abre en Estrenos (lo que sale hoy); #buscar fuerza la búsqueda.
+  const startTab = window.location.hash === '#buscar' ? 'buscar' : 'estrenos';
   try {
     await ensureAnimeAuth();
   } catch (e) {
@@ -3183,6 +3200,6 @@ function _attachSwipe(listName) {
   if (startTab !== 'estrenos') fetchDay(currentDay, false);
 })();
 </script>
-<script src="anime-cine.js?v=20261008d"></script>
+<script src="anime-cine.js?v=20261008f"></script>
 </body>
 </html>
