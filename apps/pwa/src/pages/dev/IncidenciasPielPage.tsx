@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { IncidentsPage } from '@/pages/IncidentsPage'
 import { useAppStore } from '@/store'
 import type { Incident } from '@/types'
-import { aplicarPielAlDocumento } from '@/lib/intensidad'
+import { aplicarPielAlDocumento, pielGuardadaEfectiva, recordarPiel } from '@/lib/intensidad'
 
 /**
  * Vitrina de la PANTALLA REAL de Incidencias ya convertida al diseño Apple:
@@ -37,12 +37,11 @@ const DEMO: Incident[] = [
 
 export default function IncidenciasPielPage() {
   const setIncidents = useAppStore((s) => s.setIncidents)
-  const [skin, setSkin] = useState(() => localStorage.getItem('app-skin') || 'apple')
+  const [skin, setSkin] = useState(pielGuardadaEfectiva) // predeterminada: Pizarra
   const [theme, setTheme] = useState(() => localStorage.getItem('app-theme') || 'dark')
 
   useEffect(() => { setIncidents(DEMO) }, [setIncidents])
   useEffect(() => {
-    localStorage.setItem('app-skin', skin)
     aplicarPielAlDocumento(skin) // 'pizarra' = data-skin="apple" + data-paleta="pizarra"
   }, [skin])
   useEffect(() => {
@@ -74,7 +73,7 @@ export default function IncidenciasPielPage() {
           ANTARFOOD <span className="font-normal text-muted-foreground">· Incidencias rediseñada</span>
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Seg v={skin} set={setSkin} opts={[['apple', 'Piel nueva'], ['default', 'Piel actual']]} />
+          <Seg v={skin} set={(v) => { recordarPiel(v); setSkin(v) }} opts={[['pizarra', 'Pizarra'], ['apple', 'Piel nueva'], ['default', 'Piel actual']]} />
           <Seg v={theme} set={setTheme} opts={[['light', 'Claro'], ['dark', 'Oscuro']]} />
         </div>
       </header>
