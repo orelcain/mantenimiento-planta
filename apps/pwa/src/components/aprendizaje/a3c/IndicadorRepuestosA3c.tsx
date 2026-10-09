@@ -29,7 +29,7 @@ export function IndicadorRepuestosA3c({ codigos }: { codigos: readonly string[] 
     <Link
       to="/aprendizaje/baader-142/tarjeta-a3c/por-confirmar"
       data-testid="indicador-repuestos"
-      className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-ctl text-footnote text-muted-foreground tabular-nums hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="mt-2 inline-flex min-h-[48px] items-center gap-2 rounded-ctl text-footnote text-muted-foreground tabular-nums hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
       <span className="relative h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-muted" aria-hidden>
         <span className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: pct(c.identificados) }} />

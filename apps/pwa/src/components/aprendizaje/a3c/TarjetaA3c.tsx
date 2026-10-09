@@ -2,7 +2,7 @@
  * Tarjeta A3C · BAADER 142 — la herramienta completa (mockup v5 aprobado).
  *
  * Teléfono (una mano): lienzo Máquina | Tarjeta con pellizco, arrastre, atajos y + / − de
- * 44 px; debajo, «qué LED prende» siempre visible, la regleta X5 recorrible y la ficha en
+ * 48 px; debajo, «qué LED prende» siempre visible, la regleta X5 recorrible y la ficha en
  * una hoja inferior con buscador. Un toque ambiguo acerca en vez de adivinar.
  * PC: tarjeta completa (vertical, como en la placa) + plano de ubicación + ficha a la vez,
  * a todo el ancho y alto útil de la ventana (ver `distribuirPc`); el mouse muestra la señal y
@@ -75,8 +75,14 @@ const LIM22: LimitesCamara = { minW: 70, maxW: 2200, bounds: [40, 45, 1080, 675]
 const LIM23: LimitesCamara = { minW: 50, maxW: 2000, bounds: [-60, 0, 780, 1131] }
 const FUENTE = 'Plano 142.71.00.888, hojas 22 y 23 · máquinas N2 y N3'
 const FUENTE_PLACA = 'Placa de la N2 (Línea 2), dibujada desde foto; mismo plano 142.71.00.888 que la N3'
-/** 44 px en px, no en rem: en PC la raíz es de 14 px y el `h-11` del control quedaría en 38,5 px. */
-const ALTO_44 = 'h-[44px] [&>button]:h-[44px]'
+/** 48 px en px, no en rem: en PC la raíz es de 14 px y el `h-12` del control quedaría en 42 px. */
+const ALTO_48 = 'h-[48px] [&>button]:h-[48px]'
+/**
+ * Radio de toque del plano con puntero grueso: 24 px a cada lado del dedo = 48 px de diámetro.
+ * Es el «área de toque invisible» de los puntos del plano (bornes, LED, zonas): el dibujo no cambia,
+ * un toque cae en el objeto más cercano dentro de este radio.
+ */
+const RADIO_TOQUE_PX = 24
 /** La placa no lleva textos de la app: sus rótulos vienen dibujados en el SVG. */
 const SIN_TEXTOS: Texto[] = []
 
@@ -173,7 +179,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
   const pc = forzado ?? medido
   const punteroGrueso = usePunteroGrueso()
   // Táctil = teléfono (una columna) o cualquier pantalla con puntero grueso, aunque quepan dos columnas:
-  // radios de toque, atajos y zoom de 44 px y desambiguación por zoom/lista.
+  // radios de toque, atajos y zoom de 48 px y desambiguación por zoom/lista.
   const grueso = !pc || (tactil ?? punteroGrueso)
 
   const [modo, setModo] = useState<Modo>('explorar')
@@ -475,7 +481,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
     const c = v23.current
     if (!c) return
     const ppu = c.pxPorUnidad()
-    const el = elegirEn(obj23, u, (grueso ? 22 : 6) / ppu)
+    const el = elegirEn(obj23, u, (grueso ? RADIO_TOQUE_PX : 6) / ppu)
     const primero = el.cerca[0]
     if (!primero) return
     // Táctil: si en el dedo caben dos bornes (celdas de 8,5 u a < 30 px), acerca en vez de adivinar.
@@ -490,7 +496,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
     const c = v22.current
     if (!c) return
     const ppu = c.pxPorUnidad()
-    const el = elegirEn(obj22, u, (grueso ? 22 : 6) / ppu)
+    const el = elegirEn(obj22, u, (grueso ? RADIO_TOQUE_PX : 6) / ppu)
     if (!el.cerca[0]) {
       // Vista completa en táctil: un toque en una zona acerca a esa zona.
       if (grueso && ppu < 0.7) c.preset(u[1] < 400 ? 'modulos' : u[0] < 300 ? 'ciclon' : 'gabinete')
@@ -545,13 +551,13 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
     const c = vP.current
     if (!c) return
     const ppu = c.pxPorUnidad()
-    const el = elegirEn(objP, u, (grueso ? 22 : 6) / ppu)
+    const el = elegirEn(objP, u, (grueso ? RADIO_TOQUE_PX : 6) / ppu)
     const primero = el.cerca[0]
     if (!primero) return
-    // Táctil: si en el dedo caben dos bornes, acerca hasta que cada borne mida ~44 px.
+    // Táctil: si en el dedo caben dos bornes, acerca hasta que cada borne mida ~48 px.
     const alto = (primero.o.n != null && placa?.geo.bornes.get(primero.o.n)?.h) || altoP
     if (grueso && el.distintos > 1 && alto * ppu < 30) {
-      c.enfocar(u[0], u[1], (c.anchoPx() * alto) / 44)
+      c.enfocar(u[0], u[1], (c.anchoPx() * alto) / 48)
       return
     }
     if (primero.o.n != null) elegirBorne(primero.o.n, 'placa')
@@ -724,7 +730,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
       value={vista}
       onChange={cambiarVista}
       segments={[{ value: 'plano', label: 'Plano' }, { value: 'placa', label: 'Placa' }]}
-      className={cn(ALTO_44, clase)}
+      className={cn(ALTO_48, clase)}
     />
   )
 
@@ -734,7 +740,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
     const ps = l === 'placa' ? presetsP ?? {} : datos.presets_v5[l === '22' ? 'hoja22' : 'hoja23']
     const lienzo = refDe(l)
     return (
-      <div role="group" aria-label="Atajos de zoom" className="flex flex-none gap-0.5 rounded-full bg-muted p-0.5">
+      <div role="group" aria-label="Atajos de zoom" className={cn('flex flex-none rounded-full bg-muted', grueso ? 'gap-2 p-1' : 'gap-0.5 p-0.5')}>
         {Object.entries(ps).map(([k, p]) => (
           <button
             key={k}
@@ -743,7 +749,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
             onClick={() => lienzo.current?.preset(k)}
             className={cn(
               'whitespace-nowrap rounded-full px-3 text-footnote font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-              grueso ? 'h-[44px]' : 'h-[30px]',
+              grueso ? 'h-[48px]' : 'h-[30px]',
               activo === k ? 'bg-card text-brand-ink' : 'text-foreground',
             )}
           >
@@ -758,10 +764,10 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
     const lienzo = refDe(l)
     const clase = cn(
       'grid place-items-center rounded-full bg-muted text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-      grueso ? 'size-[44px]' : 'size-[32px]',
+      grueso ? 'size-[48px]' : 'size-[32px]',
     )
     return (
-      <div className="absolute bottom-2 right-2 z-[2] flex flex-col gap-1.5">
+      <div className={cn('absolute bottom-2 right-2 z-[2] flex flex-col', grueso ? 'gap-2' : 'gap-1.5')}>
         <button type="button" aria-label="Acercar" className={clase} onClick={() => lienzo.current?.zoom(0.66)}>
           <Plus aria-hidden className="size-5" />
         </button>
@@ -786,7 +792,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
         value={hoja}
         onChange={cambiarHoja}
         segments={[{ value: '22', label: 'Máquina' }, { value: '23', label: 'Tarjeta' }]}
-        className={cn(ALTO_44, 'pointer-events-auto min-w-0 max-w-[190px] flex-[1_1_190px]')}
+        className={cn(ALTO_48, 'pointer-events-auto min-w-0 max-w-[190px] flex-[1_1_190px]')}
       />
       {/* En teléfonos angostos (≤ 360 px) los dos se encogen en vez de recortarse. */}
       {hoja === '23' && selectorVista('pointer-events-auto min-w-0 max-w-[132px] flex-[0_1_132px]')}
@@ -805,7 +811,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
     )
 
   // PC: el dibujo termina sobre la franja de atajos (no queda tapado por ella) y «Todo» se ve entero.
-  const areaPc = pc ? (grueso ? 'inset-x-0 top-0 bottom-[56px]' : 'inset-x-0 top-0 bottom-[42px]') : undefined
+  const areaPc = pc ? (grueso ? 'inset-x-0 top-0 bottom-[72px]' : 'inset-x-0 top-0 bottom-[42px]') : undefined
 
   const lienzoPlaca = (clase: string) => {
     const nInicio = selN ?? item.bornes[0]
@@ -841,7 +847,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
         {selectoresTel}
         {placa && (
           <>
-            <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', grueso ? 'right-[60px]' : 'right-12', 'a3c-regleta')}>
+            <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', grueso ? 'right-[64px]' : 'right-12', 'a3c-regleta')}>
               {atajos('placa', presetP)}
             </div>
             {botonesZoom('placa')}
@@ -876,7 +882,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
           {es22 ? capa22 : capa23}
         </LienzoA3c>
         {selectoresTel}
-        <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', grueso ? 'right-[60px]' : 'right-12', 'a3c-regleta')}>
+        <div className={cn('absolute bottom-2 left-2 z-[2] overflow-x-auto', grueso ? 'right-[64px]' : 'right-12', 'a3c-regleta')}>
           {atajos(h, es22 ? preset22 : preset23)}
         </div>
         {botonesZoom(h)}
@@ -932,7 +938,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
   )
 
   const campoBusqueda = (autoFocus: boolean) => (
-    <label className="flex h-[44px] items-center gap-2 rounded-[22px] bg-muted px-3.5 text-muted-foreground">
+    <label className="flex h-[48px] items-center gap-2 rounded-[24px] bg-muted px-3.5 text-muted-foreground">
       <Search aria-hidden className="size-[18px] flex-none" />
       <input
         type="search"

@@ -17,6 +17,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { dec2 } from '@/utils/formatoNumeros'
 import { EncabezadoHerramienta } from '@/components/piel'
 import { useAuthStore } from '@/store'
+import { useEsPC } from '@/hooks/useEsPC'
 import { useTemaEmbed } from '@/hooks/useTemaEmbed'
 
 const SNAPSHOTS_LS_KEY = 'hmi-yal-snapshots-v1'
@@ -189,12 +190,17 @@ function diffSnapshots(a: Snapshot, b: Snapshot): DiffEntry[] {
   return out
 }
 
+/** Botón del reproductor: 48×48 en el celular (regla de toque), compacto en PC. */
+const BTN_VIDEO =
+  'flex-shrink-0 flex items-center justify-center size-12 lg:size-auto lg:p-1 rounded text-blue-400 hover:text-blue-200 hover:bg-[#1e3a5f]'
+
 export function HmiBombeoS2PublicPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const enviarTema = useTemaEmbed(iframeRef)
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const esPC = useEsPC()
 
   const [qrOpen, setQrOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -495,7 +501,7 @@ export function HmiBombeoS2PublicPage() {
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-[#0a1628] ${isAuthenticated ? 'h-full w-full' : 'w-screen'}`}
+      className={`flex flex-col overflow-hidden bg-[#0a1628] w-full max-w-full ${isAuthenticated ? 'h-full' : ''}`}
       style={isAuthenticated ? undefined : { height: '100dvh' }}
     >
 
@@ -513,17 +519,25 @@ export function HmiBombeoS2PublicPage() {
           itemsMas={[
             { key: 'fs', label: (isFullscreen || visualFs) ? 'Salir de pantalla completa' : 'Pantalla completa', icon: (isFullscreen || visualFs) ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />, onClick: toggleFullscreen },
             { key: 'qr', label: 'Compartir (QR)', icon: <QrCode aria-hidden="true" />, onClick: () => setQrOpen(true) },
+            // En el celular los controles secundarios de la barra viven aquí (los dos principales
+            // —Sync y Video— quedan a la vista a 48 px). En PC siguen en la barra.
+            ...(esPC ? [] : [
+              { key: 'editar', label: paintMode ? 'Editor de cañerías: desactivar' : 'Editor de cañerías: activar', subtitle: 'Toque en cañerías: automático, verde, rojo', icon: <Paintbrush aria-hidden="true" />, onClick: () => setPaintMode(v => !v) },
+              { key: 'capturar', label: 'Capturar estado', subtitle: 'Guarda el simulador con el tiempo del video', icon: <Camera aria-hidden="true" />, onClick: requestSnapshot },
+              ...(overridesCount > 0 ? [{ key: 'limpiar', label: 'Limpiar cañerías forzadas', icon: <Eraser aria-hidden="true" />, onClick: clearOverrides }] : []),
+            ]),
           ]}
         />
       )}
 
       <div
         className="flex items-center justify-end gap-2 px-3 flex-shrink-0 border-b border-[#1e3a5f]"
-        style={{ height: visualFs ? '0' : '40px', overflow: 'hidden', background: '#0d1f3c', transition: 'height .2s' }}
+        style={{ height: visualFs ? '0' : (esPC ? '40px' : '64px'), overflow: 'hidden', background: '#0d1f3c', transition: 'height .2s' }}
       >
+        {/* Secundarios: solo en PC. En el celular están en «Más» del encabezado. */}
         <button
           onClick={() => setPaintMode(v => !v)}
-          className={`flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded border ${paintMode ? 'border-pink-400 text-pink-300 bg-pink-500/10' : 'border-[#1e3a5f] text-blue-400 hover:text-blue-200 hover:border-blue-400'}`}
+          className={`hidden lg:flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded border ${paintMode ? 'border-pink-400 text-pink-300 bg-pink-500/10' : 'border-[#1e3a5f] text-blue-400 hover:text-blue-200 hover:border-blue-400'}`}
           title={paintMode ? 'Editor Manual ON: click en cañerías para forzar verde/rojo. Click válvulas/LEDs igual que siempre.' : 'Activar editor manual de cañerías (click ciclo: auto → verde → rojo → auto)'}
         >
           <Paintbrush className="h-3 w-3" />
@@ -532,7 +546,7 @@ export function HmiBombeoS2PublicPage() {
         {overridesCount > 0 && (
           <button
             onClick={clearOverrides}
-            className="flex items-center gap-1 text-[10px] text-pink-400 hover:text-pink-200 transition-colors px-2 py-1 rounded border border-pink-700 hover:border-pink-400"
+            className="hidden lg:flex items-center gap-1 text-[10px] text-pink-400 hover:text-pink-200 transition-colors px-2 py-1 rounded border border-pink-700 hover:border-pink-400"
             title="Limpiar todos los overrides manuales (vuelve a las reglas automáticas)"
           >
             <Eraser className="h-3 w-3" />
@@ -541,33 +555,34 @@ export function HmiBombeoS2PublicPage() {
         )}
         <button
           onClick={requestSnapshot}
-          className="flex items-center gap-1 text-[10px] text-cyan-300 hover:text-cyan-100 transition-colors px-2 py-1 rounded border border-cyan-700 hover:border-cyan-400"
+          className="hidden lg:flex items-center gap-1 text-[10px] text-cyan-300 hover:text-cyan-100 transition-colors px-2 py-1 rounded border border-cyan-700 hover:border-cyan-400"
           title="Capturar el estado actual del simulador con el timestamp del video"
         >
           <Camera className="h-3 w-3" />
           <span className="hidden sm:inline">Capturar</span>
         </button>
+        {/* Principales: 48 px en el celular, compactos en PC. */}
         <button
           onClick={() => setSyncMode(v => !v)}
-          className={`flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded border ${syncMode ? 'border-amber-400 text-amber-300 bg-amber-500/10' : 'border-[#1e3a5f] text-blue-400 hover:text-blue-200 hover:border-blue-400'}`}
+          className={`flex items-center justify-center gap-1.5 text-xs lg:text-[10px] transition-colors min-h-12 min-w-12 px-3 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1 rounded border ${syncMode ? 'border-amber-400 text-amber-300 bg-amber-500/10' : 'border-[#1e3a5f] text-blue-400 hover:text-blue-200 hover:border-blue-400'}`}
           title={syncMode ? 'Sync ON: el simulador refleja el estado del video automáticamente al cruzar cada bookmark' : 'Sync OFF: el simulador es independiente del video'}
         >
-          <span className="font-mono text-[10px]">⇄</span>
-          <span className="hidden sm:inline">Sync {syncMode ? 'ON' : 'OFF'}</span>
+          <span className="font-mono">⇄</span>
+          <span>Sync {syncMode ? 'ON' : 'OFF'}</span>
         </button>
         <button
           onClick={() => setCompareMode(v => !v)}
-          className={`flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded border ${compareMode ? 'border-green-400 text-green-300 bg-green-500/10' : 'border-[#1e3a5f] text-blue-400 hover:text-blue-200 hover:border-blue-400'}`}
+          className={`flex items-center justify-center gap-1.5 text-xs lg:text-[10px] transition-colors min-h-12 min-w-12 px-3 lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1 rounded border ${compareMode ? 'border-green-400 text-green-300 bg-green-500/10' : 'border-[#1e3a5f] text-blue-400 hover:text-blue-200 hover:border-blue-400'}`}
           title="Mostrar / ocultar video real al lado del simulador"
         >
-          <GitCompare className="h-3 w-3" />
-          <span className="hidden sm:inline">{compareMode ? 'Video ON' : 'Video OFF'}</span>
+          <GitCompare className="h-4 w-4 lg:h-3 lg:w-3" />
+          <span>{compareMode ? 'Video ON' : 'Video OFF'}</span>
         </button>
       </div>
 
       {/* Body: simulador | video player */}
-      <div className="flex-1 min-h-0 relative flex">
-        <div className={compareMode ? 'w-1/2 min-h-0 relative' : 'w-full min-h-0 relative'}>
+      <div className="flex-1 min-h-0 relative flex flex-col lg:flex-row">
+        <div className={compareMode ? 'w-full flex-1 lg:flex-none lg:w-1/2 min-h-0 relative' : 'w-full flex-1 min-h-0 relative'}>
           <iframe
             ref={iframeRef}
             src={iframeSrc}
@@ -582,7 +597,7 @@ export function HmiBombeoS2PublicPage() {
           </div>
         </div>
         {compareMode && (
-          <div className="w-1/2 min-h-0 relative bg-black flex flex-col border-l border-[#1e3a5f]">
+          <div className="w-full h-[42%] lg:h-auto lg:w-1/2 min-h-0 relative bg-black flex flex-col border-t lg:border-t-0 lg:border-l border-[#1e3a5f]">
             {/* Video element */}
             <div className="flex-1 min-h-0 relative flex items-center justify-center bg-black">
               <video
@@ -600,48 +615,54 @@ export function HmiBombeoS2PublicPage() {
               </div>
             </div>
 
-            {/* Custom video controls */}
-            <div className="flex-shrink-0 bg-[#0a1628] border-t border-[#1e3a5f] px-2 py-2">
-              <div className="flex items-center gap-1 mb-1">
+            {/* Custom video controls: 48 px en el celular, compactos en PC */}
+            <div className="flex-shrink-0 bg-[#0a1628] border-t border-[#1e3a5f] px-2 py-1 lg:py-2">
+              <div className="flex flex-wrap items-center gap-1 lg:mb-1">
                 <button
                   onClick={() => { const v = videoRef.current; if (v) { v.pause(); v.currentTime = 0 } }}
-                  className="flex-shrink-0 p-1 rounded text-blue-400 hover:text-blue-200 hover:bg-[#1e3a5f]"
+                  className={BTN_VIDEO}
                   title="Volver al inicio"
+                  aria-label="Volver al inicio del video"
                 >
-                  <Rewind className="h-3.5 w-3.5" />
+                  <Rewind className="h-5 w-5 lg:h-3.5 lg:w-3.5" />
                 </button>
                 <button
                   onClick={() => stepFrame(-10)}
-                  className="flex-shrink-0 p-1 rounded text-blue-400 hover:text-blue-200 hover:bg-[#1e3a5f] font-mono text-[9px]"
+                  className={`${BTN_VIDEO} font-mono text-xs lg:text-[9px]`}
                   title="-10 frames (Shift+←)"
+                  aria-label="Retroceder 10 frames"
                 >
                   ⏪10
                 </button>
                 <button
                   onClick={() => stepFrame(-1)}
-                  className="flex-shrink-0 p-1 rounded text-blue-400 hover:text-blue-200 hover:bg-[#1e3a5f]"
+                  className={BTN_VIDEO}
                   title="-1 frame (←)"
+                  aria-label="Retroceder 1 frame"
                 >
-                  <SkipBack className="h-3.5 w-3.5" />
+                  <SkipBack className="h-5 w-5 lg:h-3.5 lg:w-3.5" />
                 </button>
                 <button
                   onClick={togglePlayPause}
-                  className="flex-shrink-0 p-1 rounded text-green-400 hover:text-green-200 hover:bg-[#1e3a5f]"
+                  className={`${BTN_VIDEO} !text-green-400 hover:!text-green-200`}
                   title="Play/Pause (Space)"
+                  aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
                 >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {isPlaying ? <Pause className="h-6 w-6 lg:h-4 lg:w-4" /> : <Play className="h-6 w-6 lg:h-4 lg:w-4" />}
                 </button>
                 <button
                   onClick={() => stepFrame(1)}
-                  className="flex-shrink-0 p-1 rounded text-blue-400 hover:text-blue-200 hover:bg-[#1e3a5f]"
+                  className={BTN_VIDEO}
                   title="+1 frame (→)"
+                  aria-label="Avanzar 1 frame"
                 >
-                  <SkipForward className="h-3.5 w-3.5" />
+                  <SkipForward className="h-5 w-5 lg:h-3.5 lg:w-3.5" />
                 </button>
                 <button
                   onClick={() => stepFrame(10)}
-                  className="flex-shrink-0 p-1 rounded text-blue-400 hover:text-blue-200 hover:bg-[#1e3a5f] font-mono text-[9px]"
+                  className={`${BTN_VIDEO} font-mono text-xs lg:text-[9px]`}
                   title="+10 frames (Shift+→)"
+                  aria-label="Avanzar 10 frames"
                 >
                   10⏩
                 </button>
@@ -651,8 +672,8 @@ export function HmiBombeoS2PublicPage() {
                 <span className="text-[10px] font-mono text-[#5a8ab8] flex-shrink-0">
                   {formatTime(videoTime)} / {formatTime(videoDuration)}
                 </span>
-                <div className="flex-1" />
-                <span className="text-[9px] text-[#3a5a7a] uppercase tracking-wider">←/→ frame · Shift ±10 · Space</span>
+                <div className="flex-1 hidden lg:block" />
+                <span className="hidden lg:inline text-[9px] text-[#3a5a7a] uppercase tracking-wider">←/→ frame · Shift ±10 · Space</span>
               </div>
               <input
                 type="range"
@@ -661,7 +682,8 @@ export function HmiBombeoS2PublicPage() {
                 step={FRAME_DT}
                 value={videoTime}
                 onChange={(e) => { const v = videoRef.current; if (v) { v.pause(); v.currentTime = parseFloat(e.target.value) } }}
-                className="w-full h-1 bg-[#1e3a5f] rounded accent-green-500 cursor-pointer"
+                aria-label="Posición del video"
+                className="w-full h-12 lg:h-1 bg-transparent lg:bg-[#1e3a5f] rounded accent-green-500 cursor-pointer"
               />
             </div>
           </div>
@@ -671,7 +693,7 @@ export function HmiBombeoS2PublicPage() {
       {/* Footer: panel del ciclo (bookmarks rápidos) */}
       {!visualFs && (
         <div className="flex-shrink-0 border-t border-[#1e3a5f] bg-[#0d1f3c]">
-          <div className="flex items-center gap-1 px-2 py-2 overflow-x-auto">
+          <div className="flex items-center gap-2 lg:gap-1 px-2 py-2 overflow-x-auto">
             <span className="text-[#3a5a7a] text-[9px] uppercase tracking-wider flex-shrink-0 pr-1">Bookmarks ciclo:</span>
             {CYCLE_STATES.map((s, idx) => {
               const active = currentStateIdx === idx
@@ -680,7 +702,7 @@ export function HmiBombeoS2PublicPage() {
                 <button
                   key={s.id}
                   onClick={() => applyState(idx)}
-                  className="flex-shrink-0 px-2.5 py-1 rounded text-[11px] transition-all whitespace-nowrap font-mono"
+                  className="flex-shrink-0 flex items-center justify-center min-h-12 px-3 lg:min-h-0 lg:px-2.5 lg:py-1 rounded text-xs lg:text-[11px] transition-all whitespace-nowrap font-mono"
                   style={
                     active
                       ? { background: isTransition ? '#7a4a1a' : '#1a4a8a', color: '#fff', border: '1px solid ' + (isTransition ? '#bf6a2a' : '#2a6abf'), fontWeight: 700 }
@@ -689,7 +711,7 @@ export function HmiBombeoS2PublicPage() {
                   title={`${s.description}\n→ Aplica al simulador y salta a t=${s.videoTimestamp}s del video`}
                 >
                   {s.label}
-                  <span className="ml-1 text-[8px] opacity-60">{s.videoTimestamp}s</span>
+                  <span className="ml-1 text-xs lg:text-[8px] opacity-60">{s.videoTimestamp}s</span>
                 </button>
               )
             })}
@@ -714,7 +736,8 @@ export function HmiBombeoS2PublicPage() {
       {visualFs && (
         <button
           onClick={() => setVisualFs(false)}
-          className="fixed top-2 right-2 z-50 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-200"
+          className="fixed top-2 right-2 z-50 flex size-12 items-center justify-center gap-1 rounded-lg text-[10px] text-blue-200"
+          aria-label="Salir de pantalla completa"
           style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)' }}
         >
           <Minimize className="h-3 w-3" />
@@ -736,7 +759,7 @@ export function HmiBombeoS2PublicPage() {
               <span className="text-cyan-300 text-sm font-semibold flex items-center gap-2">
                 <Camera className="h-4 w-4" /> Capturar Estado
               </span>
-              <button onClick={() => setCaptureDialogOpen(false)} className="text-[#3a5a7a] hover:text-cyan-300">
+              <button onClick={() => setCaptureDialogOpen(false)} aria-label="Cerrar" className="flex size-12 lg:size-auto items-center justify-center text-[#3a5a7a] hover:text-cyan-300">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -756,7 +779,7 @@ export function HmiBombeoS2PublicPage() {
                 onChange={e => setCaptureName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') confirmSnapshot() }}
                 placeholder="ej: A.2_real, Venteo_max, Fase_A_inicio..."
-                className="bg-[#0a1628] border border-[#1e3a5f] rounded px-2 py-1.5 text-[12px] text-blue-200 outline-none focus:border-cyan-400"
+                className="bg-[#0a1628] border border-[#1e3a5f] rounded px-2 py-1.5 min-h-12 lg:min-h-0 text-[12px] text-blue-200 outline-none focus:border-cyan-400"
                 autoFocus
               />
             </label>
@@ -768,19 +791,19 @@ export function HmiBombeoS2PublicPage() {
                 onChange={e => setCaptureDescription(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') confirmSnapshot() }}
                 placeholder="ej: B_full ocurrió, venteo vacío activo"
-                className="bg-[#0a1628] border border-[#1e3a5f] rounded px-2 py-1.5 text-[12px] text-blue-200 outline-none focus:border-cyan-400"
+                className="bg-[#0a1628] border border-[#1e3a5f] rounded px-2 py-1.5 min-h-12 lg:min-h-0 text-[12px] text-blue-200 outline-none focus:border-cyan-400"
               />
             </label>
             <div className="flex items-center gap-2 mt-1">
               <button
                 onClick={confirmSnapshot}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[11px] font-semibold transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 min-h-12 lg:min-h-0 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[11px] font-semibold transition-colors"
               >
                 <Check className="h-3.5 w-3.5" /> Guardar snapshot
               </button>
               <button
                 onClick={() => setCaptureDialogOpen(false)}
-                className="px-3 py-2 rounded border border-[#1e3a5f] hover:border-blue-400 text-blue-300 text-[11px] transition-colors"
+                className="px-3 py-2 min-h-12 lg:min-h-0 rounded border border-[#1e3a5f] hover:border-blue-400 text-blue-300 text-[11px] transition-colors"
               >
                 Cancelar
               </button>
@@ -794,7 +817,7 @@ export function HmiBombeoS2PublicPage() {
         <div className="absolute top-[44px] left-0 z-30 max-w-[260px] max-h-[60vh] overflow-y-auto bg-[#0d1f3c]/95 border border-cyan-900 rounded-r-lg p-2 shadow-2xl">
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-cyan-300 text-[10px] font-semibold uppercase tracking-wide">Snapshots ({snapshots.length})</span>
-            <button onClick={exportSnapshotsJSON} title="Exportar todos como JSON" className="text-blue-400 hover:text-blue-200">
+            <button onClick={exportSnapshotsJSON} title="Exportar todos como JSON" aria-label="Exportar snapshots" className="flex size-12 lg:size-auto items-center justify-center text-blue-400 hover:text-blue-200">
               <Download className="h-3 w-3" />
             </button>
           </div>
@@ -802,7 +825,7 @@ export function HmiBombeoS2PublicPage() {
             <div className="bg-cyan-900/40 border border-cyan-700 rounded mb-2 p-1.5 text-cyan-200 text-[10px] flex items-center gap-1">
               <GitCompare className="h-3 w-3 flex-shrink-0" />
               <span className="flex-1 leading-tight">Click otro snap para comparar con <span className="font-mono text-cyan-100">{snapshots.find(s => s.id === diffFirstId)?.name}</span></span>
-              <button onClick={() => setDiffFirstId(null)} title="Cancelar diff" className="text-cyan-400 hover:text-cyan-100 flex-shrink-0">
+              <button onClick={() => setDiffFirstId(null)} title="Cancelar diff" aria-label="Cancelar comparación" className="flex size-12 lg:size-auto items-center justify-center text-cyan-400 hover:text-cyan-100 flex-shrink-0">
                 <X className="h-3 w-3" />
               </button>
             </div>
@@ -810,7 +833,7 @@ export function HmiBombeoS2PublicPage() {
           <div className="flex flex-col gap-1">
             {snapshots.map(s => (
               <div key={s.id} className={`bg-[#0a1628] border rounded p-1.5 flex items-start gap-1 group transition-colors ${diffFirstId === s.id ? 'border-cyan-400 ring-2 ring-cyan-400/40' : 'border-[#1e3a5f] hover:border-cyan-700'}`}>
-                <button onClick={() => applySnapshot(s)} className="flex-1 text-left" title={s.description || 'Aplicar al simulador y saltar al timestamp del video'}>
+                <button onClick={() => applySnapshot(s)} className="flex-1 text-left min-h-12 lg:min-h-0" title={s.description || 'Aplicar al simulador y saltar al timestamp del video'}>
                   <div className="text-[11px] text-cyan-200 font-mono leading-tight">{s.name}</div>
                   <div className="text-[9px] text-[#5a8ab8] font-mono">
                     {formatTime(s.videoTimestamp)} · f_{String(s.frameNumber).padStart(4, '0')}
@@ -820,12 +843,13 @@ export function HmiBombeoS2PublicPage() {
                 </button>
                 <button
                   onClick={() => handleDiffClick(s)}
-                  className={`flex-shrink-0 p-0.5 transition-opacity ${diffFirstId === s.id ? 'opacity-100 text-cyan-300' : 'opacity-0 group-hover:opacity-100 text-cyan-500 hover:text-cyan-300'}`}
+                  aria-label="Comparar snapshot"
+                  className={`flex-shrink-0 flex size-12 lg:size-auto items-center justify-center lg:p-0.5 transition-opacity ${diffFirstId === s.id ? 'opacity-100 text-cyan-300' : 'lg:opacity-0 group-hover:opacity-100 text-cyan-500 hover:text-cyan-300'}`}
                   title={diffFirstId === s.id ? 'Cancelar selección' : diffFirstId ? 'Comparar con seleccionado' : 'Iniciar diff'}
                 >
                   <GitCompare className="h-3 w-3" />
                 </button>
-                <button onClick={() => deleteSnapshot(s.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity flex-shrink-0 p-0.5" title="Eliminar snapshot">
+                <button onClick={() => deleteSnapshot(s.id)} aria-label="Eliminar snapshot" className="lg:opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity flex-shrink-0 flex size-12 lg:size-auto items-center justify-center lg:p-0.5" title="Eliminar snapshot">
                   <Trash2 className="h-3 w-3" />
                 </button>
               </div>
@@ -853,7 +877,7 @@ export function HmiBombeoS2PublicPage() {
                 <span className="text-cyan-500">→</span>
                 <span className="text-blue-200 font-mono">{diffPair[1].name}</span>
               </h2>
-              <button onClick={closeDiffModal} className="text-cyan-400 hover:text-cyan-200" title="Cerrar">
+              <button onClick={closeDiffModal} aria-label="Cerrar" className="flex size-12 lg:size-auto items-center justify-center text-cyan-400 hover:text-cyan-200" title="Cerrar">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -916,7 +940,7 @@ export function HmiBombeoS2PublicPage() {
           >
             <div className="flex items-center justify-between w-full">
               <span className="text-blue-300 text-sm font-semibold">Compartir HMI</span>
-              <button onClick={() => setQrOpen(false)} className="text-[#3a5a7a] hover:text-blue-300">
+              <button onClick={() => setQrOpen(false)} aria-label="Cerrar" className="flex size-12 lg:size-auto items-center justify-center text-[#3a5a7a] hover:text-blue-300">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -935,7 +959,7 @@ export function HmiBombeoS2PublicPage() {
               />
               <button
                 onClick={copyLink}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-[#1a4a8a] text-blue-200 text-[10px] hover:bg-[#2a5a9a] transition-colors flex-shrink-0"
+                className="flex items-center gap-1 px-2.5 py-1.5 min-h-12 lg:min-h-0 rounded bg-[#1a4a8a] text-blue-200 text-[10px] hover:bg-[#2a5a9a] transition-colors flex-shrink-0"
               >
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 {copied ? 'Copiado' : 'Copiar'}

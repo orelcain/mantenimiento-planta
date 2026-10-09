@@ -309,7 +309,7 @@ function NavegadorParametros({
                   setResaltado(null)
                 }}
                 aria-pressed={on}
-                className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
+                className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
                 style={{
                   background: on ? tinte.suave(C.aqua) : C.bgPanel,
                   border: `1px solid ${on ? C.aqua : C.border}`,
@@ -337,7 +337,7 @@ function NavegadorParametros({
             }}
             placeholder="Buscar: nCr, rampa, corriente…"
             aria-label="Buscar parámetro"
-            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
@@ -345,7 +345,7 @@ function NavegadorParametros({
           <button
             onClick={() => setSoloPlaca((v) => !v)}
             aria-pressed={soloPlaca}
-            className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
+            className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
             style={{
               background: soloPlaca ? tinte.suave(C.warn) : C.bgPanel,
               border: `1px solid ${soloPlaca ? C.warn : C.border}`,
@@ -440,7 +440,7 @@ function NavegadorParametros({
                   {equivalenciaDe(r.codigo) && (
                     <button
                       onClick={() => onComparar(r.codigo)}
-                      className={`ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium align-middle ${FOCO}`}
+                      className={`ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium align-middle ${FOCO} max-lg:min-h-[48px]`}
                       style={{
                         color: C.aquaBright,
                         background: tinte.suave(C.aqua),
@@ -531,7 +531,7 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Escribe el código que muestra el display: OLF, O-I, StF…"
           aria-label="Buscar código de falla"
-          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -616,7 +616,7 @@ function ChipSap({ codigo }: { codigo?: string }) {
           window.setTimeout(() => setCopiado(false), 1400)
         }}
         title="Copiar el código SAP"
-        className={`inline-flex items-center gap-1 px-2 py-1 font-mono text-footnote font-medium ${FOCO}`}
+        className={`inline-flex items-center gap-1 px-2 py-1 font-mono text-footnote font-medium ${FOCO} max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:justify-center`}
         style={{ color: C.aquaBright }}
       >
         {codigo}
@@ -627,7 +627,7 @@ function ChipSap({ codigo }: { codigo?: string }) {
           onClick={(e) => { e.stopPropagation(); navigate(`/repuestos?q=${encodeURIComponent(codigo)}`) }}
           title="Ver stock y ubicación en Repuestos"
           aria-label={`Ver ${codigo} en Repuestos`}
-          className={`px-2 py-1 ${FOCO}`}
+          className={`px-2 py-1 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
           style={{ color: C.aquaBright, borderLeft: `1px solid ${tinte.borde(C.aqua)}` }}
         >
           <PackageSearch className="h-3.5 w-3.5" />
@@ -784,7 +784,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
     return (
       <button
         onClick={abrir}
-        className={`mt-3 inline-flex w-fit items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-medium ${FOCO}`}
+        className={`mt-3 inline-flex w-fit items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-medium ${FOCO} max-lg:min-h-[48px]`}
         style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
       >
         <ClipboardCheck className="h-3.5 w-3.5" />
@@ -814,7 +814,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                 key={i.id}
                 onClick={() => setElegida(i.id)}
                 aria-pressed={elegida === i.id}
-                className={`rounded-ctl px-3 py-2 text-left text-footnote ${FOCO}`}
+                className={`rounded-ctl px-3 py-2 text-left text-footnote ${FOCO} max-lg:min-h-[48px]`}
                 style={{
                   background: elegida === i.id ? tinte.suave(C.aqua) : C.surface,
                   border: `1px solid ${elegida === i.id ? C.aqua : C.border}`,
@@ -843,7 +843,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                   key={m}
                   onClick={() => setModo(m)}
                   aria-pressed={modo === m}
-                  className={`rounded-ctl px-3 py-2 text-footnote ${FOCO}`}
+                  className={`rounded-ctl px-3 py-2 text-footnote ${FOCO} max-lg:min-h-[48px]`}
                   style={{
                     background: modo === m ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${modo === m ? C.aqua : C.border}`,
@@ -864,7 +864,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                   key={r.id}
                   onClick={() => setRango(r.id)}
                   aria-pressed={rango === r.id}
-                  className={`rounded-ctl px-3 py-2 font-mono text-footnote ${FOCO}`}
+                  className={`rounded-ctl px-3 py-2 font-mono text-footnote ${FOCO} max-lg:min-h-[48px]`}
                   style={{
                     background: rango === r.id ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${rango === r.id ? C.aqua : C.border}`,
@@ -885,7 +885,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
         <button
           onClick={guardar}
           disabled={!elegida || !modo || !rango || guardando}
-          className={`inline-flex items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-semibold disabled:opacity-45 ${FOCO}`}
+          className={`inline-flex items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-semibold disabled:opacity-45 ${FOCO} max-lg:min-h-[48px]`}
           style={{ color: C.ok, background: tinte.suave(C.ok) }}
         >
           {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
@@ -893,7 +893,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
         </button>
         <button
           onClick={() => setAbierto(false)}
-          className={`rounded-ctl px-3 py-2 text-footnote ${FOCO}`}
+          className={`rounded-ctl px-3 py-2 text-footnote ${FOCO} max-lg:min-h-[48px]`}
           style={{ color: C.inkMid }}
         >
           Cancelar
@@ -974,7 +974,7 @@ function AportarValor({
       {isAuthenticated && !abierto && (
         <button
           onClick={() => setAbierto(true)}
-          className={`mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-1 text-footnote ${FOCO}`}
+          className={`mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-1 text-footnote ${FOCO} max-lg:min-h-[48px]`}
           style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
         >
           <Plus className="h-3 w-3" />
@@ -991,13 +991,13 @@ function AportarValor({
             onKeyDown={(e) => { if (e.key === 'Enter') guardar(); if (e.key === 'Escape') setAbierto(false) }}
             placeholder={faltante ? 'Valor de la placa…' : 'Valor real…'}
             aria-label={`Valor de ${valor.codigo}`}
-            className={`rounded-ctl px-2 py-1 font-mono text-footnote ${FOCO}`}
+            className={`rounded-ctl px-2 py-1 font-mono text-footnote ${FOCO} max-lg:min-h-[48px]`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink, width: 130 }}
           />
           <button
             onClick={guardar}
             disabled={guardando || !texto.trim()}
-            className={`inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-footnote font-medium disabled:opacity-50 ${FOCO}`}
+            className={`inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-footnote font-medium disabled:opacity-50 ${FOCO} max-lg:min-h-[48px]`}
             style={{ color: C.ok, background: tinte.suave(C.ok) }}
           >
             {guardando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
@@ -1005,7 +1005,7 @@ function AportarValor({
           </button>
           <button
             onClick={() => { setAbierto(false); setError(null) }}
-            className={`rounded-ctl px-2 py-1 text-footnote ${FOCO}`}
+            className={`rounded-ctl px-2 py-1 text-footnote ${FOCO} max-lg:min-h-[48px]`}
             style={{ color: C.inkMid }}
           >
             Cancelar
@@ -1080,7 +1080,7 @@ function RecetasPorEquipo({
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar cinta, zona, motor o código SAP…"
             aria-label="Buscar posición"
-            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
@@ -1171,7 +1171,7 @@ function RecetasPorEquipo({
                       {fam ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); onAbrirFicha(fam.id) }}
-                          className={`rounded-ctl text-left font-medium hover:underline ${FOCO}`}
+                          className={`rounded-ctl text-left font-medium hover:underline ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                           style={{ color: C.aquaBright }}
                         >
                           {fam.nombre}
@@ -1314,7 +1314,7 @@ function ReemplazoOtraMarca({
               key={f.id}
               onClick={() => setDestinoId(on ? null : f.id)}
               aria-pressed={on}
-              className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
+              className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
               style={{
                 background: on ? tinte.suave(C.aqua) : C.bgPanel,
                 border: `1px solid ${on ? C.aqua : C.border}`,
@@ -1384,7 +1384,7 @@ function ReemplazoOtraMarca({
                               onClick={() =>
                                 onAbrirFicha(t.destino.id, 'parametros', { codigo: f.codigoDestino as string })
                               }
-                              className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                              className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                               style={{ color: C.aquaBright }}
                             >
                               {f.codigoDestino}
@@ -1433,7 +1433,7 @@ function ReemplazoOtraMarca({
                       <li key={x.codigo}>
                         <button
                           onClick={() => onAbrirFicha(t.destino.id, 'parametros', { codigo: x.codigo })}
-                          className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                          className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                           style={{ color: C.aquaBright }}
                         >
                           {x.codigo}
@@ -1539,7 +1539,7 @@ function BuscadorParametros({
           }}
           placeholder="nCr · P-08 · 1-24 · corriente · rampa · tensión…"
           aria-label="Buscar parámetro en todas las familias"
-          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -1592,7 +1592,7 @@ function BuscadorParametros({
                 {suEquiv && (
                   <button
                     onClick={() => setElegida(suEquiv)}
-                    className={`shrink-0 self-start rounded-ctl px-3 py-2 text-footnote font-medium sm:self-auto ${FOCO}`}
+                    className={`shrink-0 self-start rounded-ctl px-3 py-2 text-footnote font-medium sm:self-auto ${FOCO} max-lg:min-h-[48px]`}
                     style={{
                       color: C.aquaBright,
                       background: tinte.suave(C.aqua),
@@ -1745,7 +1745,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar por concepto o por código: corriente, nCr, P-08…"
           aria-label="Buscar equivalencia"
-          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -1832,7 +1832,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                             menu: c.ubicacion!.menu,
                           })
                         }
-                        className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                        className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                         style={{ color: C.aquaBright }}
                         title={`Ir a ${c.codigo} · ${c.ubicacion.fichaNombre}`}
                       >
@@ -1996,7 +1996,7 @@ export function VariadoresPage() {
                   key={v}
                   onClick={() => cambiarVista(v)}
                   aria-pressed={on}
-                  className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO}`}
+                  className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
                   style={{
                     background: on ? tinte.suave(C.aqua) : C.bgPanel,
                     border: `1px solid ${on ? C.aqua : C.border}`,
@@ -2028,7 +2028,7 @@ export function VariadoresPage() {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar marca, modelo o dónde se usa…"
                 aria-label="Buscar familia de variador"
-                className={`w-full rounded-card py-3 pl-10 pr-3 text-sm ${FOCO}`}
+                className={`w-full rounded-card py-3 pl-10 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
                 style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
               />
             </div>
@@ -2220,7 +2220,7 @@ export function VariadoresPage() {
                           key={s}
                           onClick={() => setSeccion(s)}
                           aria-pressed={on}
-                          className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO}`}
+                          className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
                           style={{
                             background: on ? tinte.suave(C.aqua) : C.bgPanel,
                             border: `1px solid ${on ? C.aqua : C.border}`,

@@ -40,6 +40,7 @@ export function HmiGraderPage() {
   const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
   const isAdmin = useIsAdmin()
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated)
   const location = useLocation()
   // Modo edición: solo en /hmi-grader y solo admin (la ruta ya es AdminRoute; se repite por defensa).
   const modoEdicion = isAdmin && location.pathname.replace(/\/+$/, '') === '/hmi-grader'
@@ -174,7 +175,11 @@ export function HmiGraderPage() {
   }, [graderState, user])
 
   return (
-    <div className="flex flex-col h-full w-full relative">
+    // Sin sesión no hay layout que acote el alto: se toma el del viewport (como el HMI Knuro).
+    <div
+      className="flex flex-col h-full w-full relative"
+      style={isAuthenticated ? undefined : { height: '100dvh' }}
+    >
 
       {/* ── Encabezado único del marco de herramientas ──────────────────
           Volver usa useVolver (history.state.idx): antes `history.length > 1` podía sacar al
@@ -198,17 +203,16 @@ export function HmiGraderPage() {
       />
 
       {/* ── iframe ─────────────────────────────────────────────────────
-          El HMI + teclados necesitan ~854 px. Ese mínimo vive SOLO en el iframe: el contenedor
-          es `flex-1 min-h-0 overflow-auto`, así que toma el alto que deja el encabezado y se
-          desplaza. Con el mínimo en el contenedor (antes) la página medía 880 + encabezado, el
-          ancestro `overflow-hidden` del modo lienzo la recortaba y lo de abajo no se alcanzaba. */}
+          El HMI + teclados necesitan ~854 px. En PC ese mínimo vive SOLO en el iframe: el
+          contenedor es `flex-1 min-h-0 overflow-auto`, toma el alto que deja el encabezado y se
+          desplaza. En el celular no hay mínimo: el embed escala el panel completo para que quepa
+          (teclados incluidos) y se amplía con pellizco / doble toque / «1×». */}
       <div className="flex-1 min-h-0 relative overflow-auto bg-background">
         <iframe
           ref={iframeRef}
           src={iframeSrc}
           title="HMI Grader Simulator"
-          className="w-full border-0 block"
-          style={{ height: '100%', minHeight: 880 }}
+          className="absolute inset-x-0 top-0 block h-full w-full border-0 lg:min-h-[880px]"
           allow="fullscreen"
           onLoad={enviarTema}
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"

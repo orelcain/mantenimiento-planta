@@ -39,7 +39,7 @@ export function FranjaLed({
         <p className="text-footnote leading-snug text-muted-foreground">{linea.texto}</p>
       </div>
       {linea.encendible && onVer && (
-        <Button variant="tinted" onClick={onVer} aria-label={`Ver ${linea.nombreVer ?? linea.grande} en ${enPlano ? 'el plano' : 'la tarjeta'}`}>
+        <Button variant="tinted" className="h-[48px]" onClick={onVer} aria-label={`Ver ${linea.nombreVer ?? linea.grande} en ${enPlano ? 'el plano' : 'la tarjeta'}`}>
           {enPlano ? 'Ver en el plano' : 'Ver'}
         </Button>
       )}

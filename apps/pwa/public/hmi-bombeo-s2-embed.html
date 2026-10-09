@@ -236,6 +236,8 @@
     stroke-width: 2;
     filter: drop-shadow(0 0 6px #ff66ff);
   }
+  /* Zoom táctil (public/embed-zoom.js): touch-action:none SOLO en el panel; la hoja de estilo del botón «1×» la inyecta el script. */
+  #hmi-stage { overflow: hidden; position: relative; }
 </style>
 </head>
 <body>
@@ -300,7 +302,7 @@
   <span id="cycle-info" style="color:#7ec8ff">Fase A · t=0s</span>
 </div>
 
-<div id="hmi-stage">
+<div id="hmi-stage" data-bisel>
   <!-- viewBox 1448x1086 matchea el PNG-en-SVG de fondo -->
   <svg xmlns="http://www.w3.org/2000/svg"
        xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -1861,6 +1863,24 @@
   } else {
     bootstrap();
   }
+})();
+</script>
+
+<script src="embed-zoom.js"></script>
+<script>
+/* Zoom táctil del panel: pellizco, doble toque y «1×» (embed-zoom.js). Se amplía el SVG entero. */
+(function(){
+  var svg = document.querySelector('#hmi-stage svg');
+  if (!svg || !window.EmbedZoom) return;
+  window.EmbedZoom.init({
+    layer: svg,
+    stage: document.getElementById('hmi-stage'),
+    // Válvulas y botones del equipo; con el editor de cañerías activo también cañerías, LED y lecturas.
+    esControl: function (t) {
+      var pintando = document.body.classList.contains('paint-mode');
+      return !!(t && t.closest && t.closest('[data-key^="valve."],[data-btn-action]' + (pintando ? ',[data-pipe],[data-key^="led."],[data-readout]' : '')));
+    }
+  });
 })();
 </script>
 

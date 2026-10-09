@@ -370,6 +370,7 @@ export function Baader142A3cPorConfirmarPage() {
             summary={`${datos.resto.total} elementos${sesion && maquina ? ` · ${datos.resto.resueltos} resueltos en ${etiquetaMaquina(maquina)}` : ''}`}
             defaultOpen={false}
             storageKey="a3c-por-confirmar-resto"
+            className="[&>button]:min-h-[48px]"
             flush
           >
             {datos.resto.filas.map(f => (
