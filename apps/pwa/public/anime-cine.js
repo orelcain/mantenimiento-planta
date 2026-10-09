@@ -39,6 +39,22 @@
     paisesTodos: false,
   };
   const cacheApi = new Map();
+  // Tamaño de las tarjetas: c (chico, 4 col.), m (mediano, 3), g (grande, 2).
+  const TAMANOS = [['m', 'Mediano'], ['c', 'Chico'], ['g', 'Grande']];
+  let tamano = 'm';
+  try { tamano = localStorage.getItem('at_tamano') || 'm'; } catch { tamano = 'm'; }
+  if (!TAMANOS.some(([k]) => k === tamano)) tamano = 'm';
+  const ICON_TAM = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
+  const btnTamano = () => { const n = (TAMANOS.find(([k]) => k === tamano) || TAMANOS[0])[1]; return `<button type="button" class="c-iconbtn" data-tam="1" aria-label="Tamaño de tarjetas: ${n}" title="Tamaño: ${n}">${ICON_TAM}</button>`; };
+  function cambiarTamano() {
+    const i = TAMANOS.findIndex(([k]) => k === tamano);
+    tamano = TAMANOS[(i + 1) % TAMANOS.length][0];
+    try { localStorage.setItem('at_tamano', tamano); } catch { /* sin almacenamiento */ }
+    const cine = document.getElementById('cine');
+    cine.dataset.tam = tamano;
+    cine.querySelectorAll('[data-tam]').forEach((b) => { if (b.tagName === 'BUTTON') b.outerHTML = btnTamano(); });
+    avisar(`Tarjetas: ${(TAMANOS.find(([k]) => k === tamano) || TAMANOS[0])[1].toLowerCase()}`);
+  }
 
   // ── Utilidades ──────────────────────────────────────────────────────────
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -147,6 +163,7 @@
 
     const cine = document.createElement('div');
     cine.id = 'cine';
+    cine.dataset.tam = tamano;
     const content = document.getElementById('content');
     content.insertAdjacentElement('afterend', cine);
 
@@ -191,7 +208,7 @@
   function montarPantallaCompleta(header) {
     const escritorio = tg && ['tdesktop', 'macos', 'web', 'weba', 'webk', 'unigram'].includes(tg.platform);
     const soporta = tg && typeof tg.requestFullscreen === 'function' && (typeof tg.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('8.0'));
-    if (!escritorio || !soporta) return;
+    if (!escritorio) return;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn-pantalla';
@@ -202,6 +219,10 @@
       b.title = b.getAttribute('aria-label');
     };
     b.addEventListener('click', () => {
+      if (!soporta) {
+        avisar(`Tu Telegram (${tg.platform}, versión ${tg.version || '?'}) no permite pantalla completa; necesita 8.0 o más. Actualízalo.`);
+        return;
+      }
       const full = !!tg.isFullscreen;
       try { localStorage.setItem('at_pantalla', full ? '0' : '1'); } catch { /* sin almacenamiento */ }
       try { if (full) tg.exitFullscreen(); else tg.requestFullscreen(); } catch { avisar('Tu Telegram no permite pantalla completa'); }
@@ -214,7 +235,7 @@
     pintar();
     let pref = '0';
     try { pref = localStorage.getItem('at_pantalla') || '0'; } catch { pref = '0'; }
-    if (pref === '1' && !tg.isFullscreen) { try { tg.requestFullscreen(); } catch { /* el usuario lo pide con el botón */ } }
+    if (soporta && pref === '1' && !tg.isFullscreen) { try { tg.requestFullscreen(); } catch { /* el usuario lo pide con el botón */ } }
   }
 
   function aplicarEsquema() {
@@ -304,7 +325,7 @@
     const sinPlat = !est.datos.plataformas.length;
     cine.innerHTML = `
       <div class="c-top"><div><div class="c-eyebrow">${esc(hoy.charAt(0).toUpperCase() + hoy.slice(1))}</div><h1 class="c-large">Hoy</h1></div>
-        <button type="button" class="c-iconbtn" data-ir="buscar" aria-label="Buscar">${ICON.lupa}</button></div>
+        <div style="display:flex;gap:8px">${btnTamano()}<button type="button" class="c-iconbtn" data-ir="buscar" aria-label="Buscar">${ICON.lupa}</button></div></div>
       <div class="c-seg" role="group" aria-label="Tipo">${segs.map(([k, t]) => `<button type="button" data-tipo="${k}" aria-pressed="${est.tipo === k}">${t}</button>`).join('')}</div>
       <button type="button" class="c-filtros-row" data-filtros="1"><span>${esc(resumenFiltros())}</span><span>Filtros</span></button>
       ${sinPlat ? `<div class="c-group" style="margin-top:16px"><button type="button" class="c-row" data-ir="plat"><div class="c-row-main"><span class="c-row-t">Elige las plataformas que pagas</span><span class="c-row-s">Así esta pantalla muestra lo nuevo en ellas</span></div>${ICON.chev}</button></div>` : ''}
@@ -364,7 +385,7 @@
   function renderBuscar() {
     const cine = document.getElementById('cine');
     cine.innerHTML = `
-      <div class="c-top"><div><h1 class="c-large">Buscar</h1></div></div>
+      <div class="c-top"><div><h1 class="c-large">Buscar</h1></div>${btnTamano()}</div>
       <div class="c-search">${ICON.lupa}<input type="search" id="c-q" placeholder="Películas y series" value="${esc(est.busqueda)}" autocomplete="off" enterkeyhint="search" aria-label="Buscar películas y series"></div>
       <div id="c-res"></div>`;
     if (est.busqueda) buscar(est.busqueda); else pintarSugerencias();
@@ -629,6 +650,7 @@
     if (d.abrir) { const [tipo, id] = d.abrir.split(':'); abrirFicha(tipo, Number(id)); return; }
     if (d.cerrar) { cerrarFicha(); return; }
     if (d.ir) { irA(d.ir); return; }
+    if (d.tam) { cambiarTamano(); return; }
     if (d.tipo) { est.tipo = d.tipo; vibrar(); renderHoy(); return; }
     if (d.vista) { est.listaVista = d.vista; renderLista(); return; }
     if (d.plat) {
