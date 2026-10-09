@@ -330,8 +330,10 @@
       <div class="c-seg" role="group" aria-label="Tipo">${segs.map(([k, t]) => `<button type="button" data-tipo="${k}" aria-pressed="${est.tipo === k}">${t}</button>`).join('')}</div>
       <button type="button" class="c-filtros-row" data-filtros="1"><span>${esc(resumenFiltros())}</span><span>Filtros</span></button>
       ${sinPlat ? `<div class="c-group" style="margin-top:16px"><button type="button" class="c-row" data-ir="plat"><div class="c-row-main"><span class="c-row-t">Elige las plataformas que pagas</span><span class="c-row-s">Así esta pantalla muestra lo nuevo en ellas</span></div>${ICON.chev}</button></div>` : ''}
-      <div class="c-h2"><h2>${sinPlat ? 'Lo más reciente en Chile' : 'Nuevo en tus plataformas'}</h2></div>
+      <div class="c-h2"><h2>${esc(tituloPrincipal().titulo)}</h2></div>
+      <p class="c-foot" style="margin:-6px 32px 12px">${esc(tituloPrincipal().nota)}</p>
       <div class="c-grid" id="c-nuevo">${esqueleto(4)}</div>
+      <div id="c-plats"></div>
       <div class="c-h2"><h2>Tendencias de la semana</h2></div>
       <div class="c-carrusel" id="c-tend">${esqueleto(3, true)}</div>
       ${est.tipo === 'todo' || est.tipo === 'movie' ? `<div class="c-h2"><h2>Próximamente en cines</h2></div><div class="c-carrusel" id="c-prox">${esqueleto(3, true)}</div>` : ''}
@@ -339,10 +341,30 @@
     cargarHoy();
   }
 
-  function paramsDescubrir(tipo) {
+  // Con filtros de franquicia o género no es "lo nuevo": es lo que hay de eso en tus
+  // plataformas. TMDB no sabe cuándo llegó cada título a cada plataforma.
+  const hayFiltroContenido = () => est.datos.filtros.generos.length > 0 || est.datos.filtros.estudios.length > 0;
+  function tituloPrincipal() {
+    const sinPlat = !est.datos.plataformas.length;
+    if (hayFiltroContenido()) {
+      const f = est.datos.filtros;
+      const partes = [...f.estudios.map((x) => x.nombre)];
+      if (f.generos.length && est.generos) partes.push(...f.generos.map((g) => (est.generos.find((x) => x.id === g) || {}).nombre).filter(Boolean));
+      else if (f.generos.length) partes.push(`${f.generos.length} género${f.generos.length === 1 ? '' : 's'}`);
+      return { titulo: sinPlat ? 'En Chile' : 'En tus plataformas', nota: `${partes.join(', ')} · lo más popular primero` };
+    }
+    return {
+      titulo: sinPlat ? 'Estrenos recientes en Chile' : 'Estrenos recientes en tus plataformas',
+      nota: 'Por fecha de estreno. La fecha en que llegó a cada plataforma llega con Streaming Availability.',
+    };
+  }
+
+  function paramsDescubrir(tipo, plataformas) {
     const f = est.datos.filtros;
     const p = { tipo, region: PAIS, como: f.como.join('|') || 'flatrate' };
-    if (est.datos.plataformas.length) p.plataformas = est.datos.plataformas.join('|');
+    const plats = plataformas || est.datos.plataformas;
+    if (plats.length) p.plataformas = plats.join('|');
+    if (hayFiltroContenido()) p.orden = 'populares';
     if (f.generos.length) p.generos = f.generos.join('|');
     if (f.estudios.length) p.estudios = f.estudios.map((x) => x.id).join('|');
     if (est.tipo === 'anime') { p.idiomaOriginal = 'ja'; p.generos = '16'; p.minVotos = '5'; }
@@ -350,15 +372,24 @@
   }
 
   async function cargarHoy() {
+    if (hayFiltroContenido() && !est.generos && est.datos.filtros.generos.length) {
+      Promise.all([api('generos', { tipo: 'movie' }), api('generos', { tipo: 'tv' })]).then(([m, t]) => {
+        const mapa = new Map();
+        [...m.items, ...t.items].forEach((g) => { if (!mapa.has(g.id)) mapa.set(g.id, g); });
+        est.generos = [...mapa.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      }).catch(() => {});
+    }
     const tipos = est.tipo === 'todo' || est.tipo === 'anime' ? ['movie', 'tv'] : [est.tipo];
     const pintar = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
     const sel = est.tipo;
     try {
       const res = await Promise.all(tipos.map((t) => api('descubrir', paramsDescubrir(t))));
       if (sel !== est.tipo || est.tab !== 'hoy') return;
-      const items = res.flatMap((r) => r.items).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).slice(0, 10);
+      const todos = res.flatMap((r) => r.items);
+      const items = (hayFiltroContenido() ? intercalar(res.map((r) => r.items)) : todos.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))).slice(0, 12);
       pintar('c-nuevo', items.length ? items.map((it) => tarjeta(it)).join('') : '<p class="c-vacio" style="grid-column:1/-1">No hay títulos con estos filtros.</p>');
     } catch (e) { pintar('c-nuevo', `<p class="c-vacio" style="grid-column:1/-1">${esc(e.message)}</p>`); }
+    cargarPorPlataforma(tipos, sel);
     try {
       const t = est.tipo === 'tv' || est.tipo === 'movie' ? est.tipo : 'all';
       const r = await api('tendencias', { tipo: t });
@@ -376,6 +407,44 @@
       } catch (e) { pintar('c-prox', `<p class="c-vacio">${esc(e.message)}</p>`); }
     }
   }
+  // Mezcla listas ya ordenadas (películas y series) alternando, sin perder el orden de cada una.
+  function intercalar(listas) {
+    const out = [];
+    const max = Math.max(0, ...listas.map((l) => l.length));
+    for (let i = 0; i < max; i++) listas.forEach((l) => { if (l[i]) out.push(l[i]); });
+    return out;
+  }
+
+  // Un carrusel por cada plataforma que pagas: lo más popular que tiene hoy en Chile.
+  async function cargarPorPlataforma(tipos, sel) {
+    const cont = document.getElementById('c-plats');
+    if (!cont || !est.datos.plataformas.length) return;
+    try {
+      if (!est.provCL) est.provCL = (await api('plataformas', { region: PAIS })).items;
+    } catch { est.provCL = est.provCL || []; }
+    if (sel !== est.tipo || est.tab !== 'hoy') return;
+    const orden = new Map((est.provCL || []).map((p, i) => [p.id, i]));
+    const mias = est.datos.plataformas
+      .map((id) => (est.provCL || []).find((p) => p.id === id) || { id, nombre: `Plataforma ${id}`, logo: null })
+      .sort((a, b) => (orden.get(a.id) ?? 999) - (orden.get(b.id) ?? 999));
+    cont.innerHTML = mias.map((p) => {
+      const logo = img(p.logo, 'w92');
+      return `<div class="c-h2 c-h2-plat">${logo ? `<img src="${esc(logo)}" alt="" class="c-plat-logo">` : ''}<h2>En ${esc(p.nombre)}</h2></div>
+        <div class="c-carrusel" id="c-plat-${p.id}">${esqueleto(3, true)}</div>`;
+    }).join('');
+    await Promise.all(mias.map(async (p) => {
+      const el = document.getElementById(`c-plat-${p.id}`);
+      try {
+        const res = await Promise.all(tipos.map((t) => api('descubrir', { ...paramsDescubrir(t, [p.id]), orden: 'populares' })));
+        if (sel !== est.tipo || est.tab !== 'hoy' || !el.isConnected) return;
+        const items = intercalar(res.map((r) => r.items)).slice(0, 15);
+        el.innerHTML = items.length ? items.map((it) => tarjeta(it)).join('') : '<p class="c-vacio">Nada con estos filtros aquí.</p>';
+      } catch (e) {
+        if (el.isConnected) el.innerHTML = `<p class="c-vacio">${esc(e.message)}</p>`;
+      }
+    }));
+  }
+
   const fechaCorta = (f) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f || '')) return '';
     const d = new Date(`${f}T12:00:00`);
