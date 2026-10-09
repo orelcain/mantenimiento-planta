@@ -46,7 +46,7 @@ export interface EncabezadoHerramientaProps {
   control?: ReactNode
   /** Entradas propias del menú «Más» (pantalla completa, compartir, expediente…). */
   itemsMas?: readonly ItemMasHerramienta[]
-  /** Texto con que se abre ARIA (queda escrito en el campo, no se envía): herramienta, preset, pantalla. */
+  /** Texto con que se abre ARIA (queda escrito en el campo, no se envía): herramienta, preset, pantalla. La hoja muestra además «título · subtítulo» como contexto. */
   contextoAria?: string
   /**
    * Páginas de LECTURA (scroll de la ventana, no de un contenedor): el encabezado se queda pegado
@@ -85,6 +85,9 @@ export function EncabezadoHerramienta({
   // ARIA vive dentro del layout con sesión: sin sesión (QR, enlace público) no hay chat al que abrir.
   const conAria = autenticado && canSee('aria')
   const cerrarYHacer = (fn: () => void) => () => { setMasAbierto(false); fn() }
+  // ARIA se abre como HOJA que ya sabe dónde está el usuario: «HMI Knuro · N1 · pantalla Principal».
+  const preguntarAria = () =>
+    abrirAria(contextoAria, { hoja: true, contexto: [titulo, subtitulo].filter(Boolean).join(' · ') })
 
   return (
     <header
@@ -124,7 +127,7 @@ export function EncabezadoHerramienta({
           {conAria && (
             <button
               type="button"
-              onClick={() => abrirAria(contextoAria)}
+              onClick={preguntarAria}
               aria-label="Preguntar a ARIA"
               className={BOTON_ICONO}
             >
@@ -160,7 +163,7 @@ export function EncabezadoHerramienta({
             <ListCell
               leading={<CellIcon tone="neutral"><MessageCircle aria-hidden /></CellIcon>}
               title="Preguntar a ARIA"
-              onClick={cerrarYHacer(() => abrirAria(contextoAria))}
+              onClick={cerrarYHacer(preguntarAria)}
               className="min-h-[52px]"
             />
           )}

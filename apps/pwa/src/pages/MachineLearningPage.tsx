@@ -47,7 +47,7 @@ import { QuickRefView } from '@/components/learning/QuickRefView'
 import { getQuickRef, hasQuickRef } from '@/data/learningQuickRef'
 import { posicionesDeMaquina, VARIADORES, type PosicionReceta } from '@/data/variadores'
 import { getQuizBest } from '@/utils/learningProgress'
-import { EncabezadoHerramienta } from '@/components/piel'
+import { EncabezadoHerramienta, SegmentedControl, SelectorSeccion } from '@/components/piel'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = CAPACITACION_AREA
@@ -195,57 +195,6 @@ const COURSE_TABS: TabDef[] = [
   },
 ]
 
-/**
- * ScrollTabs — selector de secciones de la máquina/curso: una sola fila subrayada
- * con scroll horizontal, igual en desktop y en móvil (nunca se envuelve a 2 filas).
- * Estilo "documentation portal" (subrayado) en vez de píldoras: son varias secciones
- * de consulta técnica, no un panel de ajustes con opciones excluyentes.
- */
-function ScrollTabs({
-  tabs,
-  activeTab,
-  onSelect,
-  quizPassed,
-}: {
-  tabs: TabDef[]
-  activeTab: TabId
-  onSelect: (id: TabId) => void
-  quizPassed: boolean
-}) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const scrollBy = (dx: number) => trackRef.current?.scrollBy({ left: dx, behavior: 'smooth' })
-
-  return (
-    <nav className="dp-scroll-tabs" aria-label="Secciones">
-      <button type="button" className="dp-scroll-arrow left" onClick={() => scrollBy(-160)} aria-label="Desplazar a la izquierda">
-        <ChevronLeft style={{ width: 15, height: 15 }} />
-      </button>
-      <div className="dp-scroll-track" ref={trackRef}>
-        {tabs.map(tab => {
-          const TabIcon = tab.icon
-          const evalDone = tab.id === 'quiz' && quizPassed
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              className="dp-scroll-tab"
-              onClick={() => onSelect(tab.id)}
-              aria-current={activeTab === tab.id ? 'true' : undefined}
-            >
-              {evalDone ? <span className="dp-scroll-tab-done">✓</span> : <TabIcon style={{ width: 13, height: 13 }} />}
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-      <div className="dp-scroll-fade" aria-hidden />
-      <button type="button" className="dp-scroll-arrow right" onClick={() => scrollBy(160)} aria-label="Desplazar a la derecha">
-        <ChevronRight style={{ width: 15, height: 15 }} />
-      </button>
-    </nav>
-  )
-}
-
 export function MachineLearningPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
@@ -385,6 +334,25 @@ export function MachineLearningPage() {
         volverA="/aprendizaje"
         titulo={isCourse ? 'Curso' : 'Ficha técnica'}
         subtitulo={machine.name}
+        // Una sola forma de pestañas: 2-4 secciones cortas = segmentado; más = «Sección ▾» (Sheet con lista).
+        control={tabs.length <= 4 ? (
+          <SegmentedControl
+            tamano="herramienta"
+            ariaLabel="Secciones"
+            value={activeTabData.id}
+            onChange={setActiveTab}
+            segments={tabs.map(t => ({ value: t.id, label: t.shortLabel }))}
+          />
+        ) : (
+          <SelectorSeccion
+            value={activeTabData.id}
+            onChange={setActiveTab}
+            opciones={tabs.map(t => {
+              const TabIcon = t.icon
+              return { value: t.id, label: t.label, icon: <TabIcon />, hecho: t.id === 'quiz' && quizPassed }
+            })}
+          />
+        )}
         contextoAria={`Estoy en ${isCourse ? 'el curso' : 'la ficha técnica de'} ${machine.name} del Centro de aprendizaje. `}
       />
       {/* Sin barra inferior en esta ruta (modo «lectura»): solo aire para el gesto de inicio. */}
@@ -433,12 +401,6 @@ export function MachineLearningPage() {
 
         <div className="dp-course">
           <div className="dp-main-col">
-            <ScrollTabs
-              tabs={tabs}
-              activeTab={activeTab}
-              onSelect={setActiveTab}
-              quizPassed={quizPassed}
-            />
 
         {/* Cabecera de sección activa */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginTop: 34 }}>

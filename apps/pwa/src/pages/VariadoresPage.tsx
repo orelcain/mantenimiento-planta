@@ -39,7 +39,7 @@ import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
 import { FOCO, tinte, chip as chipEstilo, panel as panelEstilo, aviso } from '@/data/variadoresUi'
 import { MetaText } from '@/components/learning/primitives'
-import { EncabezadoHerramienta } from '@/components/piel'
+import { EncabezadoHerramienta, SegmentedControl } from '@/components/piel'
 import {
   VARIADORES,
   MOTORES_CINTAS,
@@ -1954,6 +1954,21 @@ export function VariadoresPage() {
         onVolver={ficha ? () => abrirFicha(null) : undefined}
         titulo="Variadores"
         subtitulo={ficha ? ficha.nombre : 'Parámetros y fallas por modelo'}
+        // Cuatro vistas hermanas = un SegmentedControl de 48 px (antes chips con contorno que saltaban de línea).
+        control={ficha === null ? (
+          <SegmentedControl
+            tamano="herramienta"
+            ariaLabel="Vista"
+            value={vista}
+            onChange={cambiarVista}
+            segments={[
+              { value: 'catalogo', label: 'Modelo' },
+              { value: 'recetas', label: 'Equipo' },
+              { value: 'parametro', label: 'Parámetro' },
+              { value: 'equivalencias', label: 'Marcas' },
+            ]}
+          />
+        ) : undefined}
         contextoAria={ficha ? `Estoy en la ficha del variador ${ficha.nombre}. ` : 'Estoy en el catálogo de variadores y partidores suaves. '}
       />
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-20 pt-5">
@@ -1978,36 +1993,6 @@ export function VariadoresPage() {
               No existe la ficha «{abierta}» — puede ser un enlace viejo o un error de tipeo.
               Abajo está el catálogo completo.
             </span>
-          </div>
-        )}
-
-        {/* Selector de vista — solo en el catálogo, no dentro de una ficha */}
-        {ficha === null && (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Vista">
-            {([
-              ['catalogo', 'Por modelo'],
-              ['recetas', 'Por cinta / equipo'],
-              ['parametro', 'Buscar parámetro'],
-              ['equivalencias', 'Equivalencias entre marcas'],
-            ] as const).map(([v, rotulo]) => {
-              const on = vista === v
-              return (
-                <button
-                  key={v}
-                  onClick={() => cambiarVista(v)}
-                  aria-pressed={on}
-                  className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
-                  style={{
-                    background: on ? tinte.suave(C.aqua) : C.bgPanel,
-                    border: `1px solid ${on ? C.aqua : C.border}`,
-                    color: C.ink,
-                    fontWeight: on ? 600 : 400,
-                  }}
-                >
-                  {rotulo}
-                </button>
-              )
-            })}
           </div>
         )}
 

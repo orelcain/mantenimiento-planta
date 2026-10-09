@@ -12,7 +12,9 @@ import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
 import { loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
 import { logger } from '@/lib/logger'
-import { useBurbujaChatOculta, registrarAbrirAria } from '@/lib/pantallaCompletaMovil'
+import { useBurbujaChatOculta, registrarAbrirAria, type OpcionesAria } from '@/lib/pantallaCompletaMovil'
+import { ContextoHojaAria } from './ContextoHojaAria'
+import { useHojaAria } from './useHojaAria'
 import { AriaAvatar } from './AriaAvatar'
 
 // ─── Formateador de markdown básico + #9 tablas ────────────────────
@@ -966,9 +968,16 @@ export function ChatBot() {
 
   const [input, setInput] = useState('')
   // Abrir ARIA desde fuera (menú ⋯ de Repuestos): solo abre, no cierra si ya estaba abierto.
-  const abrirDesdeFuera = useRef<(c?: string) => void>(() => {})
-  abrirDesdeFuera.current = (c) => { if (!isOpen) toggle(); if (c) setInput(c) }
-  useEffect(() => registrarAbrirAria((c) => abrirDesdeFuera.current(c)), [])
+  // Desde una herramienta del Centro de aprendizaje se abre como HOJA (media pantalla en el celular,
+  // panel lateral en PC) con el contexto de la herramienta; es el MISMO chat, solo cambia el marco.
+  const [hoja, setHoja] = useHojaAria(isOpen)
+  const abrirDesdeFuera = useRef<(c?: string, o?: OpcionesAria) => void>(() => {})
+  abrirDesdeFuera.current = (c, o) => {
+    if (!isOpen) toggle()
+    setHoja(o?.hoja ? { contexto: o.contexto ?? '' } : null)
+    if (c) setInput(c)
+  }
+  useEffect(() => registrarAbrirAria((c, o) => abrirDesdeFuera.current(c, o)), [])
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [showAgentSelector, setShowAgentSelector] = useState(false)
@@ -1060,12 +1069,20 @@ export function ChatBot() {
     loadVoicePref()
   }, [])
 
-  // Focus input al abrir
+  // Esc cierra la hoja (la herramienta de atrás queda tal cual).
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen || !hoja) return
+    const alTeclear = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') toggle() }
+    document.addEventListener('keydown', alTeclear)
+    return () => document.removeEventListener('keydown', alTeclear)
+  }, [isOpen, hoja, toggle])
+
+  // Focus input al abrir (en la hoja no: el teclado taparía la mitad que ocupa)
+  useEffect(() => {
+    if (isOpen && !hoja) {
       setTimeout(() => inputRef.current?.focus(), 200)
     }
-  }, [isOpen])
+  }, [isOpen, hoja])
 
   // Llenar input cuando termina la transcripción de voz.
   // En modo conversación, en vez de llenar el input, ENVÍA directo.
@@ -1374,13 +1391,20 @@ export function ChatBot() {
   return (
     <>
       {/* Panel de chat */}
+      {isOpen && hoja && (
+        <div className="fixed inset-0 z-[39] bg-black/35 piel-fade-in lg:hidden" onClick={toggle} aria-hidden />
+      )}
       {isOpen && (
         <div
-          style={{ width: chatWidth }}
-          className="fixed bottom-[9rem] lg:bottom-20 right-4 z-40 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-secondary border-2 border-primary/40 rounded-card shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden"
+          style={hoja ? undefined : { width: chatWidth }}
+          role={hoja ? 'dialog' : undefined}
+          aria-label={hoja ? 'ARIA' : undefined}
+          className={hoja
+            ? 'fixed inset-x-0 bottom-0 z-40 flex h-[58dvh] max-h-[calc(100dvh-4rem)] flex-col overflow-hidden rounded-t-panel border-t border-border bg-secondary pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_50px_rgba(0,0,0,0.3)] piel-sheet-in lg:inset-x-auto lg:bottom-4 lg:right-4 lg:top-20 lg:h-auto lg:max-h-none lg:w-[28rem] lg:rounded-card lg:border'
+            : 'fixed bottom-[9rem] lg:bottom-20 right-4 z-40 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-secondary border-2 border-primary/40 rounded-card shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden'}
         >
           {/* Resize handle (left edge) */}
-          <div
+          {!hoja && <div
             onMouseDown={handleResizeStart}
             className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 group flex items-center"
             title="Arrastrar para redimensionar"
@@ -1388,7 +1412,7 @@ export function ChatBot() {
             <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-primary/20 rounded-r px-px py-6">
               <GripVertical className="w-3 h-3 text-primary/60" />
             </div>
-          </div>
+          </div>}
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted">
             <div className="flex items-center gap-2">
@@ -1530,10 +1554,12 @@ export function ChatBot() {
             </div>
           </div>
 
+          {hoja?.contexto && <ContextoHojaAria contexto={hoja.contexto} />}
+
           {/* Cuerpo: avatar al costado izquierdo + mensajes a la derecha */}
           <div className="flex flex-1 overflow-hidden">
           {/* Avatar de video de ARIA — riel izquierdo (idle ↔ habla, blob-load + lockstep) */}
-          {avatarShow && (
+          {avatarShow && !hoja && (
             <div className="shrink-0 w-80 border-r border-border bg-[var(--panel-surface)] flex flex-col items-stretch p-3">
               <AriaAvatar visible={avatarShow} />
             </div>
@@ -1791,7 +1817,7 @@ export function ChatBot() {
         onClick={toggle}
         className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
           // Detalle de repuesto a pantalla completa en el teléfono: la burbuja tapaba su barra inferior.
-          pantallaCompletaMovil && !isOpen ? 'hidden' : ''
+          (pantallaCompletaMovil && !isOpen) || hoja ? 'hidden' : ''
         } ${
           isOpen
             ? 'bg-muted text-muted-foreground hover:bg-muted/80'

@@ -1615,29 +1615,17 @@ function VistaProtocolo() {
                 </button>
               ) : null}
             </h2>
-            <div
-              className="inline-flex gap-1 rounded-ctl p-0.5"
-              role="tablist"
-              aria-label="Métrica"
-              style={{ background: LC.bgPanel }}
-            >
-              {(['correcciones', 'paradas'] as Metrica[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  role="tab"
-                  aria-selected={metrica === m}
-                  onClick={() => cambiarMetrica(m)}
-                  className="min-h-[44px] rounded-ctl px-3 text-footnote font-medium"
-                  style={
-                    metrica === m
-                      ? { background: LC.surface, color: LC.aqua, boxShadow: `inset 0 0 0 1.5px ${LC.aqua}`, fontWeight: 600 }
-                      : { color: LC.inkMid }
-                  }
-                >
-                  {m === 'paradas' ? 'Paradas' : 'Correcciones'}
-                </button>
-              ))}
+            <div className="w-full sm:w-64">
+              <SegmentedControl
+                tamano="herramienta"
+                ariaLabel="Métrica"
+                value={metrica}
+                onChange={cambiarMetrica}
+                segments={[
+                  { value: 'correcciones', label: 'Correcciones' },
+                  { value: 'paradas', label: 'Paradas' },
+                ]}
+              />
             </div>
           </div>
           {/* P48: qué significa la métrica elegida, en una línea — el «-C» del
