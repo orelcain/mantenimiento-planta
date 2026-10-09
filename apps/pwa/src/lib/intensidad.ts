@@ -47,15 +47,19 @@ export function oscuroDe(intensidad: Intensidad, sistemaOscuro: boolean): boolea
 /**
  * Orden de decisión:
  *  1. `app-intensidad` válida → se respeta.
- *  2. Si no, `app-theme` guardado: dark → Penumbra, light → Día.
- *  3. Si no hay nada: celular → Día; PC → Automático.
+ *  2. Si no, en celular → Día, IGNORANDO `app-theme` (casi todos los celulares
+ *     tienen 'dark' guardado porque `useTheme` lo escribía en la primera visita,
+ *     no porque la persona lo eligiera). No se escribe `app-intensidad`: si luego
+ *     elige otra cosa con el control, eso queda guardado y se respeta.
+ *  3. Si no, en PC: `app-theme` guardado (dark → Penumbra, light → Día); si no hay, Automático.
  */
 export function resolverIntensidad(e: EntradaIntensidad): { intensidad: Intensidad; oscuro: boolean } {
   let intensidad: Intensidad
   if (esIntensidad(e.guardada)) intensidad = e.guardada
+  else if (e.esCelular) intensidad = 'dia'
   else if (e.tema === 'dark') intensidad = 'penumbra'
   else if (e.tema === 'light') intensidad = 'dia'
-  else intensidad = e.esCelular ? 'dia' : 'auto'
+  else intensidad = 'auto'
   return { intensidad, oscuro: oscuroDe(intensidad, e.sistemaOscuro) }
 }
 

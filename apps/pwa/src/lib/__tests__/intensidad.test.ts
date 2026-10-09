@@ -21,9 +21,19 @@ describe('resolverIntensidad', () => {
     expect(resolverIntensidad({ ...base, guardada: 'penumbra', tema: 'light', esCelular: true })).toEqual({ intensidad: 'penumbra', oscuro: true })
   })
 
-  it('con un app-theme guardado y sin intensidad se respeta: dark → Penumbra, light → Día', () => {
-    expect(resolverIntensidad({ ...base, tema: 'dark', esCelular: true })).toEqual({ intensidad: 'penumbra', oscuro: true })
+  it('PC: con app-theme guardado y sin intensidad se respeta: dark → Penumbra, light → Día', () => {
+    expect(resolverIntensidad({ ...base, tema: 'dark' })).toEqual({ intensidad: 'penumbra', oscuro: true })
     expect(resolverIntensidad({ ...base, tema: 'light', sistemaOscuro: true })).toEqual({ intensidad: 'dia', oscuro: false })
+  })
+
+  it('celular + app-theme=dark sin app-intensidad → Día (ese dark lo escribió useTheme, no la persona)', () => {
+    expect(resolverIntensidad({ ...base, tema: 'dark', esCelular: true })).toEqual({ intensidad: 'dia', oscuro: false })
+    expect(resolverIntensidad({ ...base, tema: 'dark', esCelular: true, sistemaOscuro: true })).toEqual({ intensidad: 'dia', oscuro: false })
+  })
+
+  it('celular + app-intensidad elegida se respeta', () => {
+    expect(resolverIntensidad({ ...base, guardada: 'penumbra', tema: 'dark', esCelular: true })).toEqual({ intensidad: 'penumbra', oscuro: true })
+    expect(resolverIntensidad({ ...base, guardada: 'auto', esCelular: true, sistemaOscuro: true })).toEqual({ intensidad: 'auto', oscuro: true })
   })
 
   it('sin nada guardado: celular → Día; PC → Automático (sigue al sistema)', () => {
@@ -120,6 +130,24 @@ describe('script inline de index.html (anti-parpadeo)', () => {
   it('SIN Pizarra ignora app-intensidad (el interruptor manda)', () => {
     const r = correrScriptInicial({ store: { 'app-intensidad': 'dia' } })
     expect(r).toMatchObject({ oscuro: true, paleta: null })
+  })
+
+  it('casos puntuales del script con Pizarra: celular/PC y app-theme, sin escribir app-intensidad', () => {
+    const piz = { 'app-skin': 'pizarra' }
+    const a = correrScriptInicial({ store: { ...piz, 'app-theme': 'dark' }, celular: true })
+    expect(a).toMatchObject({ oscuro: false, themeColor: '#F2F1EC' })
+    expect(a.store['app-intensidad']).toBeUndefined()
+    const b = correrScriptInicial({ store: { ...piz, 'app-intensidad': 'penumbra' }, celular: true })
+    expect(b).toMatchObject({ oscuro: true, themeColor: '#171614' })
+    expect(correrScriptInicial({ store: { ...piz, 'app-theme': 'dark' } })).toMatchObject({ oscuro: true, themeColor: '#171614' })
+    expect(correrScriptInicial({ store: { ...piz }, sistemaOscuro: true })).toMatchObject({ oscuro: true })
+    expect(correrScriptInicial({ store: { ...piz }, sistemaOscuro: false })).toMatchObject({ oscuro: false })
+  })
+
+  it('SIN Pizarra el celular con app-theme=dark sigue oscuro y no se escribe nada nuevo', () => {
+    const r = correrScriptInicial({ store: { 'app-theme': 'dark' }, celular: true })
+    expect(r).toMatchObject({ oscuro: true, paleta: null, dataSkin: 'apple', themeColor: '#1c1c1e' })
+    expect(Object.keys(r.store)).toEqual(['app-theme'])
   })
 
   it('?skin=pizarra se recuerda y activa data-paleta con data-skin="apple"', () => {

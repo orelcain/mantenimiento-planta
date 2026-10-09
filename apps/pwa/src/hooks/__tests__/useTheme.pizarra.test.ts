@@ -72,9 +72,28 @@ describe('useTheme CON Pizarra', () => {
     expect(result.current.isDark).toBe(false)
   })
 
-  it('respeta un app-theme previo (dark → Penumbra)', () => {
-    simularSistema(false, true)
+  it('PC: respeta un app-theme previo (dark → Penumbra)', () => {
+    simularSistema(false, false)
     localStorage.setItem('app-theme', 'dark')
+    const { result } = renderHook(() => useTheme())
+    expect(result.current.intensidad).toBe('penumbra')
+    expect(result.current.isDark).toBe(true)
+  })
+
+  it('celular con app-theme=dark y sin app-intensidad: parte en Día y no escribe app-intensidad', () => {
+    simularSistema(true, true)
+    localStorage.setItem('app-theme', 'dark')
+    const { result } = renderHook(() => useTheme())
+    expect(result.current.intensidad).toBe('dia')
+    expect(result.current.isDark).toBe(false)
+    expect(root.classList.contains('dark')).toBe(false)
+    expect(localStorage.getItem('app-intensidad')).toBeNull()
+    expect(localStorage.getItem('app-theme')).toBe('dark') // intacto
+  })
+
+  it('celular con app-intensidad=penumbra elegida: se respeta', () => {
+    simularSistema(false, true)
+    localStorage.setItem('app-intensidad', 'penumbra')
     const { result } = renderHook(() => useTheme())
     expect(result.current.intensidad).toBe('penumbra')
     expect(result.current.isDark).toBe(true)
