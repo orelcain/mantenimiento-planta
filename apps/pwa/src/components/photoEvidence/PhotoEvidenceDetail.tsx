@@ -60,7 +60,7 @@ interface PhotoEvidenceDetailProps {
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
   pendiente: {
     label: 'Pendiente',
-    color: 'bg-amber-500/[0.15] text-ink-warn border-transparent',
+    color: 'bg-fill-warning/[0.15] text-ink-warn border-transparent',
     icon: Clock,
   },
   en_proceso: {
@@ -70,7 +70,7 @@ const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string;
   },
   corregida: {
     label: 'Corregida',
-    color: 'bg-green-500/[0.15] text-ink-ok border-transparent',
+    color: 'bg-ink-ok/[0.15] text-ink-ok border-transparent',
     icon: CheckCircle,
   },
   verificada: {
@@ -521,7 +521,7 @@ export function PhotoEvidenceDetail({
                   <div className="mt-3 p-3 rounded-card border border-border bg-muted space-y-3">
                     <div className="grid grid-cols-1 gap-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="p-3 rounded-card border border-transparent bg-red-500/[0.15]">
+                        <div className="p-3 rounded-card border border-transparent bg-fill-critical/[0.15]">
                           <PhotoUploader
                             photos={pairBeforePhoto}
                             onPhotosChange={(p) => {
@@ -547,7 +547,7 @@ export function PhotoEvidenceDetail({
                             </Button>
                           </div>
                         </div>
-                        <div className="p-3 rounded-card border border-transparent bg-green-500/[0.15]">
+                        <div className="p-3 rounded-card border border-transparent bg-ink-ok/[0.15]">
                           <PhotoUploader
                             photos={pairAfterPhoto}
                             onPhotosChange={(p) => {
@@ -749,7 +749,7 @@ export function PhotoEvidenceDetail({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-red-500 text-ink-crit hover:bg-red-500/[0.15]"
+                        className="border-fill-critical text-ink-crit hover:bg-fill-critical/[0.15]"
                         onClick={handleDeletePair}
                         disabled={isSaving}
                       >
@@ -879,7 +879,7 @@ export function PhotoEvidenceDetail({
 
                 <Button
                   variant="outline"
-                  className="text-ink-crit hover:bg-red-500/[0.15]"
+                  className="text-ink-crit hover:bg-fill-critical/[0.15]"
                   onClick={handleDelete}
                   disabled={isDeleting}
                 >

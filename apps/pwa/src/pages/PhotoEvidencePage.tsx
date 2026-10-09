@@ -228,11 +228,11 @@ export function PhotoEvidencePage() {
               <p className="text-2xl font-bold">{stats.total}</p>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
-            <div className="p-2 bg-amber-500/[0.15] rounded-card text-center">
+            <div className="p-2 bg-fill-warning/[0.15] rounded-card text-center">
               <p className="text-2xl font-bold text-foreground">{stats.pendientes}</p>
               <p className="text-xs text-muted-foreground">Pendientes</p>
             </div>
-            <div className="p-2 bg-green-500/[0.15] rounded-card text-center">
+            <div className="p-2 bg-ink-ok/[0.15] rounded-card text-center">
               <p className="text-2xl font-bold text-foreground">{stats.corregidas}</p>
               <p className="text-xs text-muted-foreground">Corregidas</p>
             </div>

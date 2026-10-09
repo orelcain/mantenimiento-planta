@@ -115,7 +115,7 @@ function ActionBtn({ icon: Icon, label, onClick, danger, contenido }: {
       className={[
         'relative flex flex-col items-center gap-1 rounded-card border bg-card px-2 py-2 text-caption font-medium transition',
         danger
-          ? 'border-border text-ink-crit hover:bg-red-500/[0.15] hover:border-transparent'
+          ? 'border-border text-ink-crit hover:bg-fill-critical/[0.15] hover:border-transparent'
           : senal && tiene
             ? 'border-primary/[0.35] text-foreground hover:bg-muted'
             : senal
@@ -347,7 +347,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                     return (
                       <span
                         key={slug}
-                        className="inline-flex items-center gap-1 rounded-ctl bg-emerald-500/[0.15] px-2 py-1 text-footnote font-medium text-ink-ok"
+                        className="inline-flex items-center gap-1 rounded-ctl bg-ink-ok/[0.15] px-2 py-1 text-footnote font-medium text-ink-ok"
                         title={seededOnly ? 'De la lista base (planilla de planta) — se edita en el código' : undefined}
                       >
                         {findMachineBySlug(slug)?.name ?? slug}
@@ -910,7 +910,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               </button>
             </span>
           ) : (
-            <span className="rounded-ctl bg-amber-500/[0.15] px-1.5 py-0.5 text-caption font-medium text-ink-warn">sin SAP · pieza de despiece</span>
+            <span className="rounded-ctl bg-fill-warning/[0.15] px-1.5 py-0.5 text-caption font-medium text-ink-warn">sin SAP · pieza de despiece</span>
           )}
         </div>
 
@@ -921,7 +921,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         {item.bodegaId && (
           <div className="mb-3 flex items-center justify-between gap-2 rounded-card border border-border bg-muted px-3 py-2">
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
-              <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-red-500' : item.stockStatus === 'low' ? 'bg-amber-500' : 'bg-emerald-500'].join(' ')} />
+              <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-fill-critical' : item.stockStatus === 'low' ? 'bg-fill-warning' : 'bg-fill-ok'].join(' ')} />
               <span className={item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'}>
                 {item.stockActual} {item.unidad || 'pzas'}
               </span>
@@ -943,7 +943,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
             </Button>
           )
         ) : (
-          <div className="mb-3 rounded-card border border-dashed border-transparent bg-amber-500/[0.15] px-3 py-2">
+          <div className="mb-3 rounded-card border border-dashed border-transparent bg-fill-warning/[0.15] px-3 py-2">
             <p className="text-caption text-muted-foreground">Pieza de despiece sin código SAP — asígnale un SAP para poder solicitarla a bodega.</p>
             {onAssignSap && (
               <Button size="sm" variant="outline" className="mt-2 w-full gap-1.5" onClick={onAssignSap}>
