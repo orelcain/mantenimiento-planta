@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<link rel="stylesheet" href="anime-cine.css?v=20261008i">
+<link rel="stylesheet" href="anime-cine.css?v=20261009a">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -437,6 +437,112 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 .nav-btn .dot { top: 8px; border-color: transparent; }
 #toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
 .c-oculto { display: none !important; }
+
+/* ══ Piel Apple E2–E4 (DESIGN.md): roles tipográficos, geometría y hojas ══ */
+/* Encabezados de sección: formato oración, sin mayúsculas ni línea. */
+.section-title, .estreno-section-title, .detail-section-title, .filter-section-title { text-transform: none; letter-spacing: 0; font-size: 16px; line-height: 20px; font-weight: 600; color: var(--text); }
+.section-title, .estreno-section-title { padding: 24px 16px 8px; }
+.estreno-section-title::after { display: none; }
+.detail-section-title, .filter-section-title { margin-bottom: 8px; }
+
+/* Filas y tarjetas: superficies con radio, separadas por espacio. */
+.card, .result-card, .estreno-card, .relation-card { background: var(--bg2); border: 0; border-radius: 20px; margin: 0 16px 8px; padding: 12px; }
+.estreno-card.is-tracked { border-left: 0; padding-left: 12px; box-shadow: inset 3px 0 0 var(--accent); }
+.list-results { padding: 8px 0; }
+.recent-item { border-radius: 14px; margin: 0 8px; }
+.overview-card { border: 0; border-radius: 26px; margin: 0 16px 8px; padding: 16px; }
+.card-title, .result-title, .estreno-title, .relation-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+.card-meta, .result-meta, .estreno-meta, .relation-meta, .result-genres, .estreno-genres, .result-next, .progress-label, .ov-sub { font-size: 13px; line-height: 18px; }
+.grid-title, .egc-title { font-size: 13px; line-height: 17px; font-weight: 600; }
+.grid-meta, .egc-meta { font-size: 12px; }
+.ov-label { font-size: 17px; }
+.recent-label { font-size: 17px; font-weight: 400; }
+.card-poster, .result-poster, .estreno-poster, .relation-poster, .card-poster img { border-radius: 12px; }
+.grid-poster, .egc-poster { border-radius: 14px; }
+.detail-hero-img { border-radius: 16px; }
+.recent-thumb { border-radius: 10px; }
+.progress-bar, .ov-bar { height: 6px; }
+
+/* Pills y badges: cápsula. */
+.badge-s, .detail-badge, .tracked-chip, .egc-ep, .egc-track-badge, .egc-progress-pill, .relation-type-badge, .recent-count, .grid-poster .tracked-badge { border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+
+/* Botones de acción: cápsula de 50 px, uno relleno por vista. */
+.action-btn { min-height: 50px; padding: 12px 20px; border-radius: 999px; font-size: 17px; font-weight: 600; margin-bottom: 12px; }
+.action-ghost { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.action-danger { border-radius: 999px; background: color-mix(in srgb, #FF453A 14%, transparent); color: #FF453A; }
+:root[data-scheme='light'] .action-danger { background: color-mix(in srgb, #FF3B30 12%, transparent); color: #D70015; }
+.modal-delete { border-radius: 999px; min-height: 44px; padding: 0 16px; font-size: 15px; }
+
+/* Botones rápidos y chips: cápsula sin borde, tinte al elegir. */
+.qadd-btn { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); font-size: 13px; padding: 6px 12px; position: relative; }
+.qadd-btn.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.chip, .filter-chip { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); font-size: 14px; padding: 7px 14px; }
+.chip.active, .filter-chip.active, .filter-chip.multi.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; border: 0; }
+.list-opt { border: 0; border-radius: 999px; min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: color-mix(in srgb, var(--text) 10%, transparent); }
+.list-opt.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; border: 0; }
+.link-mini-btn { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 12px; padding: 4px 10px; }
+
+/* Selectores segmentados: cápsula con pulgar. */
+.view-toggle, .day-view-toggle { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 12%, transparent); padding: 2px; gap: 2px; }
+.view-btn, .day-view-btn, .day-view-btn:first-child, .day-view-btn:last-child { width: 40px; height: 32px; border-radius: 999px; color: var(--text); position: relative; }
+.view-btn.active, .day-view-btn.active { background: #636366; color: #FFFFFF; }
+:root[data-scheme='light'] .view-btn.active, :root[data-scheme='light'] .day-view-btn.active { background: #FFFFFF; color: #1C1C1E; box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+
+/* Contadores de episodio: cápsula; el «+» y el «−» con 44 px de toque. */
+.ep-counter, .estreno-ep-counter { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); }
+.ep-btn { width: 36px; height: 36px; border-radius: 999px; }
+.ep-big { border: 0; border-radius: 26px; }
+.ep-big .ep-btn { width: 56px; height: 56px; }
+.ep-big .ep-count { font-size: 22px; }
+
+/* Botones de ícono: círculo de 44 px. */
+.back-btn, .estrenos-refresh, .iv-close { width: 44px; height: 44px; min-width: 44px; border: 0; border-radius: 999px; }
+.day-arrow { width: 44px; height: 44px; border-radius: 999px; }
+.day-center { border-radius: 22px; }
+.day-date { font-size: 15px; }
+.day-relative, .estreno-time-badge, .egc-time { font-size: 12px; }
+
+/* Campos de texto. */
+.search-top { border-bottom: 0; padding: 8px 16px; }
+.search-input { height: 44px; border: 0; border-radius: 22px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 17px; padding: 0 16px 0 40px; }
+.search-input:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); }
+.search-wrap .si { left: 14px; display: flex; color: var(--hint); }
+.modal-input { min-height: 44px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 17px; }
+#notes-textarea { border: 0; border-radius: 16px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 17px; line-height: 22px; }
+
+/* Links propios en la ficha. */
+.link-open-btn, .link-add-btn { min-height: 44px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 15px; }
+.link-add-btn { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.link-edit-btn { width: 44px; min-height: 44px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); display: flex; align-items: center; justify-content: center; }
+
+/* Ficha: encabezado sobre el mismo fondo y título grande. */
+.detail-header { background: var(--bg); border-bottom: 0; padding: 8px 16px; }
+.detail-title { font-size: 17px; font-weight: 600; }
+.detail-hero { padding: 8px 16px 16px; gap: 16px; }
+.detail-name { font-size: 22px; line-height: 28px; font-weight: 700; }
+.detail-section { padding: 0 16px 24px; }
+.synopsis-text { font-size: 17px; line-height: 22px; color: var(--hint); }
+.synopsis-toggle, .translate-btn { font-size: 15px; }
+
+/* Ventanas → hojas desde abajo (radio 32, tirador). */
+.modal-overlay { align-items: flex-end !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: rgba(0, 0, 0, .4) !important; }
+.modal-content { width: 100% !important; max-width: 640px; margin: 0 auto; border: 0 !important; border-radius: 32px 32px 0 0 !important; background: var(--bg) !important; padding: 20px 16px calc(24px + env(safe-area-inset-bottom)) !important; position: relative; max-height: 92vh; overflow-y: auto; }
+.modal-content::before { content: ''; position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 999px; background: color-mix(in srgb, var(--text) 30%, transparent); }
+.modal-title { font-size: 17px; font-weight: 600; text-align: center; }
+.modal-sub { font-size: 13px; text-align: center; }
+
+/* Semana y estadísticas: superficies sin borde. */
+.wdc { border: 0; border-radius: 12px; }
+.week-grid-strip, .stats-section, .saga-info-bar { border: 0; }
+.wdc-name { text-transform: none; letter-spacing: 0; }
+#toast { font-size: 15px; padding: 10px 18px; border: 0; }
+
+.week-toggle { width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.week-toggle.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border: 0; }
+textarea, input, select, button { font-family: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  #detail, #saga-panel, .modal-content, .card, .qadd-btn, .chip { transition: none !important; }
+}
 </style>
 </head>
 <body>
@@ -485,7 +591,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
       <button class="action-btn action-ghost" onclick="closeLinkModal()">Cancelar</button>
       <button class="action-btn action-primary" onclick="saveLinkFromModal()">Guardar</button>
     </div>
-    <button class="modal-delete" id="link-modal-delete" onclick="removeLinkFromModal()" style="display:none">🗑️ Eliminar este link</button>
+    <button class="modal-delete" id="link-modal-delete" onclick="removeLinkFromModal()" style="display:none">Eliminar este link</button>
   </div>
 </div>
 
@@ -523,7 +629,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
       <button class="action-btn action-ghost" onclick="closeCreateListModal()">Cancelar</button>
       <button class="action-btn action-primary" onclick="saveCreateListFromModal()">Guardar</button>
     </div>
-    <button class="modal-delete" id="list-modal-delete" onclick="deleteListFromModal()" style="display:none">🗑️ Eliminar lista</button>
+    <button class="modal-delete" id="list-modal-delete" onclick="deleteListFromModal()" style="display:none">Eliminar lista</button>
   </div>
 </div>
 
@@ -534,7 +640,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
     <div class="modal-sub" id="complete-modal-sub">—</div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="action-btn action-ghost" onclick="closeCompleteModal()">Seguir en Viendo</button>
-      <button class="action-btn action-primary" onclick="confirmComplete()">✅ Mover a Completado</button>
+      <button class="action-btn action-primary" onclick="confirmComplete()">Mover a Completado</button>
     </div>
   </div>
 </div>
@@ -549,7 +655,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
       <button class="action-btn action-ghost" onclick="closeNotesModal()">Cancelar</button>
       <button class="action-btn action-primary" onclick="saveNotesFromModal()">Guardar</button>
     </div>
-    <button class="modal-delete" id="notes-modal-delete" onclick="clearNote()" style="display:none">🗑️ Borrar nota</button>
+    <button class="modal-delete" id="notes-modal-delete" onclick="clearNote()" style="display:none">Borrar nota</button>
   </div>
 </div>
 
@@ -1387,7 +1493,7 @@ function renderEstrenos() {
           <button class="chip ${estrenosFilter==='movie'?'active':''}"   data-f="movie"   onclick="setEstrenosFilter('movie')">🎬 Películas</button>
           <button class="chip ${estrenosFilter==='ona'?'active':''}"     data-f="ona"     onclick="setEstrenosFilter('ona')">🖥️ ONA</button>
         </div>
-        <button class="week-toggle${weekStripVisible?' active':''}" id="week-toggle-btn" onclick="toggleWeekStrip()" title="Vista semanal">📅 Semana</button>
+        <button class="week-toggle${weekStripVisible?' active':''}" id="week-toggle-btn" onclick="toggleWeekStrip()" title="Vista semanal" aria-label="Vista semanal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/></svg></button>
         <div class="day-view-toggle">
           <button class="day-view-btn ${dayView==='list'?'active':''}" onclick="setDayView('list')" title="Lista">☰</button>
           <button class="day-view-btn ${dayView==='grid'?'active':''}" onclick="setDayView('grid')" title="Tarjetas">⊞</button>
@@ -1535,12 +1641,12 @@ function renderDayList() {
   const wrapOpen   = dayView === 'grid' ? '<div class="estreno-grid">' : '';
   const wrapClose  = dayView === 'grid' ? '</div>' : '';
   if (tracked.length) {
-    html += `<div class="estreno-section"><div class="estreno-section-title">⭐ Tus series — ${tracked.length}</div>`;
+    html += `<div class="estreno-section"><div class="estreno-section-title">Tus series · ${tracked.length}</div>`;
     html += wrapOpen + tracked.map(e => renderItem(e, true)).join('') + wrapClose;
     html += '</div>';
   }
   if (discovery.length) {
-    html += `<div class="estreno-section"><div class="estreno-section-title">📡 Descubrimiento — ${discovery.length}</div>`;
+    html += `<div class="estreno-section"><div class="estreno-section-title">Descubrimiento · ${discovery.length}</div>`;
     html += wrapOpen + discovery.map(e => renderItem(e, false)).join('') + wrapClose;
     html += '</div>';
   }
@@ -1623,7 +1729,7 @@ function renderSearch() {
   c.innerHTML = `
     <div class="search-top">
       <div class="search-wrap">
-        <span class="si">🔍</span>
+        <span class="si"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
         <input class="search-input" id="search-in" type="search" placeholder="Buscar anime en AniList..." autocomplete="off">
       </div>
       <div class="view-toggle">
@@ -1837,7 +1943,7 @@ function openResultDetail(r) {
   const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
   const addBtns = allOpts.map(l=>
     `<div class="list-opt${tracked===l.key?' active':''}" ${actionAttrs('addFromDetail', [r.id,l.key,r])}>${safe(l.emoji)} ${safe(l.label)}</div>`
-  ).join('') + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
+  ).join('') + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">+ Nueva</div>`;
 
   // Episode counter section — shown when anime is tracked and not a movie/completado
   let epSection = '';
@@ -1883,7 +1989,7 @@ function openResultDetail(r) {
       </button>
     </div>
     <div class="detail-section" id="wtw-section-${safe(r.id)}">
-      <div class="detail-section-title">📺 ¿Dónde ver?</div>
+      <div class="detail-section-title">¿Dónde ver?</div>
       <div id="wtw-body-${safe(r.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
     ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${safe(r.nextEp.ep)}: ${safe(r.nextEp.airingAt)}</div></div>`:''}
@@ -1893,7 +1999,7 @@ function openResultDetail(r) {
       <div class="detail-section-title">Agregar a lista</div>
       <div class="list-selector">${addBtns}</div>
     </div>
-    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" ${actionAttrs('openSite', [r.siteUrl])}>🔗 Ver en AniList</button></div>`:''}`;
+    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" ${actionAttrs('openSite', [r.siteUrl])}>Ver en AniList</button></div>`:''}`;
   openDetail();
   loadWhereToWatch(r.id);
 }
@@ -1968,7 +2074,7 @@ function renderOverview() {
             <div><div class="ov-label">${safe(meta.name)}</div><div class="ov-sub">Lista personalizada</div></div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <button class="link-edit-btn" style="width:34px;height:34px" ${actionAttrs('editCustomList', [key], true)} title="Editar">✏️</button>
+            <button class="link-edit-btn" style="width:34px;height:34px" ${actionAttrs('editCustomList', [key], true)} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
             <div class="ov-count">${n}</div>
           </div>
         </div>
@@ -1976,7 +2082,7 @@ function renderOverview() {
       </div>`;
     }
   }
-  html += `<div style="padding:14px"><button class="link-add-btn" onclick="openCreateListModal()">➕ Nueva lista personalizada</button></div>`;
+  html += `<div style="padding:14px"><button class="link-add-btn" onclick="openCreateListModal()">Nueva lista personalizada</button></div>`;
   html += renderStats();
   html += '</div>';
   document.getElementById('content').innerHTML = html;
@@ -2011,7 +2117,7 @@ function renderList(listName) {
 
   const toolsRow = `<div class="list-tools-row">
     <div class="list-search-wrap">
-      <span class="si">🔍</span>
+      <span class="si"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
       <input class="list-search-mini" id="lsf-${safe(listName)}" type="search" placeholder="Filtrar…" autocomplete="off" value="${safe(filterText)}"
         ${actionAttrs('_listFilterChange', [listName], false, 'input')}>
     </div>
@@ -2167,7 +2273,7 @@ function renderDetailBody(a,listName){
   document.getElementById('detail-title').textContent=a.title;
   const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
   const listOpts = allOpts.map(l=>`<div class="list-opt${listName===l.key?' active':''}" ${actionAttrs('moveToList', [a.id,l.key])}>${safe(l.emoji)} ${safe(l.label)}</div>`).join('')
-    + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
+    + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">+ Nueva</div>`;
   const epSection=isMovie
     ?`<div class="ep-big"><button class="ep-btn" style="width:100%;font-size:14px;font-weight:600" ${actionAttrs('toggleMovie', [a.id,listName])}>${w>0?'⬜ Marcar no vista':'✅ Marcar vista'}</button></div>`
     :`<div class="ep-big" id="epbig">
@@ -2209,12 +2315,12 @@ function renderDetailBody(a,listName){
       ${a.userNote
         ? `<div class="link-row">
             <div class="notes-display" style="flex:1">${safe(a.userNote)}</div>
-            <button class="link-edit-btn" ${actionAttrs('openNotesModal', [a.id])} title="Editar">✏️</button>
+            <button class="link-edit-btn" ${actionAttrs('openNotesModal', [a.id])} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
            </div>`
-        : `<button class="link-add-btn" ${actionAttrs('openNotesModal', [a.id])}>📝 Agregar nota personal</button>`}
+        : `<button class="link-add-btn" ${actionAttrs('openNotesModal', [a.id])}>Agregar nota personal</button>`}
     </div>
     <div class="detail-section" id="wtw-section-${safe(a.id)}">
-      <div class="detail-section-title">📺 ¿Dónde ver?</div>
+      <div class="detail-section-title">¿Dónde ver?</div>
       <div id="wtw-body-${safe(a.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
     <div class="detail-section">
@@ -2228,14 +2334,14 @@ function renderDetailBody(a,listName){
                   <span class="link-domain">${safe(_extractDomain(url))}</span>
                   <span class="link-arrow">→</span>
                 </button>
-                <button class="link-edit-btn" ${actionAttrs('openLinkModal', [a.id,i])} title="Editar">✏️</button>
+                <button class="link-edit-btn" ${actionAttrs('openLinkModal', [a.id,i])} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
               </div>
             `).join('')}
             ${_getLinks(a).length < MAX_LINKS_PER_ANIME
               ? `<button class="link-add-btn" ${actionAttrs('openLinkModal', [a.id])}>+ Agregar otro link</button>`
               : ''}
           </div>`
-        : `<button class="link-add-btn" ${actionAttrs('openLinkModal', [a.id])}>🔗 Agregar link (Crunchyroll, etc)</button>`
+        : `<button class="link-add-btn" ${actionAttrs('openLinkModal', [a.id])}>Agregar link (Crunchyroll, Telegram…)</button>`
       }
     </div>
     <div class="detail-section">
@@ -2246,15 +2352,15 @@ function renderDetailBody(a,listName){
               <span style="font-size:14px">🏷️</span>
               <span class="link-domain">${safe(a.nickname)}</span>
             </button>
-            <button class="link-edit-btn" ${actionAttrs('openNickModal', [a.id])} title="Editar">✏️</button>
+            <button class="link-edit-btn" ${actionAttrs('openNickModal', [a.id])} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
           </div>`
-        : `<button class="link-add-btn" ${actionAttrs('openNickModal', [a.id])}>🏷️ Agregar apodo (busca más rápido)</button>`
+        : `<button class="link-add-btn" ${actionAttrs('openNickModal', [a.id])}>Agregar apodo (busca más rápido)</button>`
       }
     </div>
     <div class="detail-section"><div class="detail-section-title">Lista</div><div class="list-selector">${listOpts}</div></div>
     <div class="detail-section">
-      ${a.siteUrl?`<button class="action-btn action-ghost" ${actionAttrs('openSite', [a.siteUrl])}>🔗 Ver en AniList</button>`:''}
-      <button class="action-btn action-danger" ${actionAttrs('deleteAnime', [a.id])}>❌ Quitar de mis listas</button>
+      ${a.siteUrl?`<button class="action-btn action-ghost" ${actionAttrs('openSite', [a.siteUrl])}>Ver en AniList</button>`:''}
+      <button class="action-btn action-danger" ${actionAttrs('deleteAnime', [a.id])}>Quitar de mis listas</button>
     </div>`;
 }
 
@@ -2546,7 +2652,7 @@ function _extractDomain(url) {
     // t.me/canal → «Telegram · canal» (antes salía solo «T»).
     if (host === 't.me' || host === 'telegram.me') {
       const canal = u.pathname.split('/').filter(Boolean)[0];
-      return canal ? `Telegram · ${canal}` : 'Telegram';
+      return canal === 'c' ? 'Telegram · canal privado' : (canal ? `Telegram · ${canal}` : 'Telegram');
     }
     const main = host.split('.')[0];
     return main.charAt(0).toUpperCase() + main.slice(1);
@@ -3042,7 +3148,7 @@ function _synopsisHtml(desc, id) {
   return `<div class="synopsis-wrap">
     <p class="synopsis-text${short?' clamped':''}" id="syn-${safe(id)}">${safe(display)}</p>
     ${short?`<button class="synopsis-toggle" id="syn-btn-${safe(id)}" ${actionAttrs('toggleSynopsis', [id])}>Leer más ▾</button>`:''}
-    ${!cached?`<button class="translate-btn" id="trans-btn-${safe(id)}" ${actionAttrs('translateSynopsis', [id])}>🌐 Español</button>`:'<span style="font-size:11px;color:var(--hint);display:inline-block;margin-top:4px">✓ Traducido</span>'}
+    ${!cached?`<button class="translate-btn" id="trans-btn-${safe(id)}" ${actionAttrs('translateSynopsis', [id])}>Traducir al español</button>`:'<span style="font-size:11px;color:var(--hint);display:inline-block;margin-top:4px">✓ Traducido</span>'}
   </div>`;
 }
 function _durationHtml(a, watchedEps) {
@@ -3081,7 +3187,7 @@ async function translateSynopsis(synId, btnEl) {
     _applyTranslation(synId, translated);
   } catch(_) {
     btnEl.classList.remove('loading');
-    btnEl.textContent = '🌐 Español';
+    btnEl.textContent = 'Traducir al español';
     toast('⚠️ Error al traducir. Intenta de nuevo.');
   }
 }
@@ -3189,7 +3295,7 @@ async function openSagaPanel(animeId) {
     ${cards}
     <div style="padding:14px">
       <button class="action-btn action-primary" onclick="saveSagaToList()">
-        ${alreadySaved ? '🔄 Actualizar saga en listas' : '💾 Guardar saga completa en mis listas'}
+        ${alreadySaved ? 'Actualizar saga en listas' : '💾 Guardar saga completa en mis listas'}
       </button>
     </div>`;
 }
@@ -3260,7 +3366,7 @@ function renderStats() {
   for (const k of allKeys) for (const a of (allLists[k]||[])) for (const g of (a.genres||[])) genreCount[g] = (genreCount[g]||0) + 1;
   const topGenres   = Object.entries(genreCount).sort((a,b) => b[1]-a[1]).slice(0,5);
   return `<div class="stats-section">
-    <div class="section-title" style="padding:0 0 10px">📊 Estadísticas</div>
+    <div class="section-title" style="padding:0 0 10px">Estadísticas</div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-big">${totalAnime}</div><div class="stat-label">Anime</div></div>
       <div class="stat-card"><div class="stat-big">${safe(totalEps.toLocaleString())}</div><div class="stat-label">Eps vistos</div></div>
@@ -3416,6 +3522,6 @@ function _attachSwipe(listName) {
   if (startTab !== 'estrenos') fetchDay(currentDay, false);
 })();
 </script>
-<script src="anime-cine.js?v=20261008i"></script>
+<script src="anime-cine.js?v=20261009a"></script>
 </body>
 </html>
