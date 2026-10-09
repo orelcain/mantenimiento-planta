@@ -408,6 +408,17 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 .saga-entry-btn { width: 100%; padding: 10px 14px; background: var(--bg2); border: 1.5px solid rgba(255,255,255,.08); border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .saga-entry-btn:active { background: rgba(255,255,255,.06); transform: scale(.98); }
 .saga-entry-btn .saga-arrow { font-size: 16px; color: var(--hint); }
+/* Expand touch targets without changing the visible button dimensions. */
+.ep-btn, .qadd-btn, .chip, .day-view-btn { position: relative; }
+.ep-btn::after, .qadd-btn::after, .chip::after, .day-view-btn::after { content: ''; position: absolute; inset: -6px; }
+.qadd-btn::after { inset: -10px -6px; }
+.chip::after { inset: -8px -6px; }
+.estreno-ep-counter .ep-btn::after { inset: -9px -8px; }
+.ep-big .ep-btn::after { inset: 0; }
+.ep-counter, .estreno-ep-counter, .day-view-toggle { overflow: visible; }
+.day-view-btn:first-child { border-radius: 7px 0 0 7px; }
+.day-view-btn:last-child { border-radius: 0 7px 7px 0; }
+.filter-chips { padding: 8px 6px 10px; margin: -8px -6px; }
 </style>
 </head>
 <body>
@@ -598,7 +609,9 @@ async function ensureAnimeAuth() {
   await new Promise(resolve => { const off = auth.onAuthStateChanged(() => { off(); resolve(); }); });
   const tgUserId = tg?.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : null;
   if (auth.currentUser) {
-    const tok = await auth.currentUser.getIdTokenResult().catch(() => null);
+    const tok = await auth.currentUser.getIdTokenResult().catch(() => {
+      throw new Error('Sin conexión. Vuelve a intentarlo.');
+    });
     const claimId = tok?.claims?.anime_tg;
     if (claimId && (!tgUserId || claimId === tgUserId)) { authTgId = claimId; return; }
     await auth.signOut();
@@ -608,6 +621,9 @@ async function ensureAnimeAuth() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: tg.initData }),
+  }).catch(e => {
+    if (e instanceof TypeError) throw new Error('Sin conexión. Vuelve a intentarlo.');
+    throw e;
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok || !data.token) throw new Error(data.error || ('Error de acceso (' + r.status + ')'));
@@ -638,6 +654,7 @@ const DEFAULT_LIST_META = {
   descartado:  { name: 'Descartado',  emoji: '❌' },
 };
 const EMPTY_LISTS = () => ({ viendo:[], interesante:[], pendiente:[], completado:[], descartado:[] });
+let listasCargadas = false;
 let allLists = EMPTY_LISTS();
 let listMeta = {};                  // metadata for custom lists: { customKey: {name, emoji} }
 function isCustomList(key) { return !DEFAULT_LIST_KEYS.includes(key); }
@@ -653,6 +670,7 @@ let lastSearchQuery = '';
 // Day view state (single day, navigable with arrows)
 let currentDay = new Date(); currentDay.setHours(0,0,0,0);
 let dayData = [];        // current day's episodes (already sorted by airingAt)
+let dayError = false;
 let dayLoading = false;  // true while fetching from AniList
 let dayFetchToken = 0;   // invalidates older fetches when navigating quickly
 let dayView = (function(){ try { return localStorage.getItem('at_day_view') || 'list'; } catch { return 'list'; } })(); // 'list' | 'grid'
@@ -777,9 +795,14 @@ const LIST_OPTS = [
 ];
 
 // ── Firestore: data layer ─────────────────────────────────────────────────────
-async function loadLists() {
+let listasLoading = null;
+function loadLists() {
+  if (!listasLoading) listasLoading = readAnimeLists().finally(() => { listasLoading = null; });
+  return listasLoading;
+}
+async function readAnimeLists() {
   try {
-    const snap = await db.collection('animelists').doc(getUserId()).get();
+    const snap = await db.collection('animelists').doc(getUserId()).get({ source: 'server' });
     if (snap.exists) {
       const d = snap.data();
       // Default lists
@@ -797,24 +820,40 @@ async function loadLists() {
           if ('userLink' in a) delete a.userLink;
         }
       }
+    } else {
+      allLists = EMPTY_LISTS();
+      listMeta = {};
     }
-  } catch(e) { console.error('loadLists:', e); }
+    listasCargadas = true;
+    if (currentTab === 'estrenos') renderDayList();
+  } catch(e) {
+    console.error('loadLists:', e);
+    // Si ya había listas cargadas (relectura al cambiar de pestaña), se siguen usando sin molestar.
+    if (!listasCargadas) toast('No se pudieron cargar tus listas. Cambia de pestaña para reintentar.');
+  }
   updateDots();
   return allLists;
 }
 
 async function saveLists() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   try {
     await db.collection('animelists').doc(getUserId()).set({
       ...allLists,
       listMeta,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-  } catch(e) { console.error('saveLists:', e); }
+    return true;
+  } catch(e) {
+    console.error('saveLists:', e);
+    toast('No se pudo guardar. Revisa tu conexión.');
+    return false;
+  }
 }
 
 // Custom list CRUD
 async function createCustomList(name, emoji) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   const key = 'custom_' + Date.now().toString(36);
   listMeta[key] = { name: (name||'').trim().slice(0, 30) || 'Sin nombre', emoji: emoji || '📂' };
   allLists[key] = [];
@@ -822,24 +861,27 @@ async function createCustomList(name, emoji) {
   return key;
 }
 async function renameCustomList(key, name, emoji) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (!isCustomList(key) || !listMeta[key]) return;
   listMeta[key] = { name: (name||'').trim().slice(0,30) || listMeta[key].name, emoji: emoji || listMeta[key].emoji };
   await saveLists();
 }
 async function deleteCustomList(key) {
-  if (!isCustomList(key) || !listMeta[key]) return;
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
+  if (!isCustomList(key) || !listMeta[key]) return false;
+  const pendingIds = new Set(allLists.pendiente.map(a => String(a.id)));
+  for (const anime of allLists[key] || []) {
+    if (pendingIds.has(String(anime.id))) continue;
+    allLists.pendiente.push(anime);
+    pendingIds.add(String(anime.id));
+  }
   delete listMeta[key];
   delete allLists[key];
-  try {
-    await db.collection('animelists').doc(getUserId()).update({
-      [key]: firebase.firestore.FieldValue.delete(),
-      listMeta: listMeta,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-  } catch(e) { console.error('deleteCustomList:', e); }
+  return await saveLists();
 }
 
 async function trackAnime(r, list) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   const id = Number(r.id);
   // Remove from all lists (defaults + customs)
   let existing = null;
@@ -873,6 +915,7 @@ async function trackAnime(r, list) {
 }
 
 async function updateEpInList(id, watchedEps, newList) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   id = Number(id);
   const allKeys = getAllListKeys();
   let anime = null;
@@ -889,10 +932,17 @@ async function updateEpInList(id, watchedEps, newList) {
     if (!allLists[newList]) allLists[newList] = [];
     allLists[newList].push(anime);
   }
-  await saveLists();
+  try {
+    return await saveLists();
+  } catch(e) {
+    console.error('updateEpInList:', e);
+    toast('No se pudo guardar. Revisa tu conexión.');
+    return false;
+  }
 }
 
 async function removeFromLists(id) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   id = Number(id);
   for (const l of getAllListKeys()) {
     allLists[l] = (allLists[l]||[]).filter(a => a.id !== id);
@@ -1084,6 +1134,7 @@ const _refreshing = new Set();
 const REFRESH_TTL_MS = 6 * 60 * 60 * 1000;
 
 async function refreshTrackedAiring(listName) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_refreshing.has(listName)) return;
   const list = allLists[listName] || [];
   if (!list.length) return;
@@ -1154,9 +1205,18 @@ function setTab(tab) {
   renderTab(tab);
 }
 async function renderTab(tab) {
+  if (!listasCargadas) {
+    document.getElementById('content').innerHTML = '<div class="spinner"></div>';
+    await loadLists();
+    if (currentTab !== tab) return;
+  } else if (tab !== 'buscar') {
+    // Relee al cambiar de pestaña para traer lo que marcaste en otro dispositivo
+    // (como antes). Si falla, se queda con lo ya cargado.
+    await loadLists();
+    if (currentTab !== tab) return;
+  }
   if (tab==='estrenos') { renderEstrenos(); return; }
   if (tab==='listas')   { renderOverview();  return; }
-  if (tab!=='buscar') { document.getElementById('content').innerHTML='<div class="spinner"></div>'; await loadLists(); }
   if (tab==='buscar') renderSearch();
   else renderList(tab);  // works for default and custom list keys
 }
@@ -1270,6 +1330,7 @@ function goToday() {
 
 async function fetchDay(d, force) {
   const myToken = ++dayFetchToken;
+  dayError = false;
   // Cache hit → render instantly, no network
   if (!force) {
     const cached = loadDayCache(d);
@@ -1298,7 +1359,9 @@ async function fetchDay(d, force) {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ query: DAY_GQL, variables: { from, to, page } }),
       });
+      if (!r.ok) throw new Error('AniList HTTP ' + r.status);
       const json = await r.json();
+      if (json.errors || !Array.isArray(json.data?.Page?.airingSchedules)) throw new Error('Respuesta inválida de AniList');
       const eps = (json.data?.Page?.airingSchedules || [])
         .filter(s => s?.media?.id)
         .map(s => {
@@ -1322,7 +1385,14 @@ async function fetchDay(d, force) {
     }
     allEps.sort((a, b) => a.airingAt - b.airingAt);
     saveDayCache(d, allEps);
-  } catch (e) { console.error('fetchDay:', e); }
+  } catch (e) {
+    console.error('fetchDay:', e);
+    if (myToken !== dayFetchToken) return;
+    dayError = true;
+    dayLoading = false;
+    renderDayList();
+    return;
+  }
 
   // Discard if a newer fetch superseded this one (user navigated away)
   if (myToken !== dayFetchToken) return;
@@ -1336,13 +1406,17 @@ function renderDayList() {
   const el = document.getElementById('estreno-content');
   if (!el) return;
 
+  if (dayError) {
+    el.innerHTML = '<div class="empty"><p>No se pudo cargar (sin conexión o AniList ocupado). Toca ↻ para reintentar.</p></div>';
+    return;
+  }
   if (dayLoading && !dayData.length) {
     el.innerHTML = '<div class="spinner"></div>';
     return;
   }
 
   let items = dayData.map(e => ({ ...e, tracking: getAnimeList(e.id) }));
-  if (estrenosFilter === 'tracked')      items = items.filter(e => e.tracking);
+  if (estrenosFilter === 'tracked')      items = items.filter(e => e.tracking && e.tracking !== 'descartado');
   else if (estrenosFilter === 'tv')      items = items.filter(e => ['TV','TV_SHORT'].includes(e.format));
   else if (estrenosFilter === 'movie')   items = items.filter(e => e.format === 'MOVIE');
   else if (estrenosFilter === 'ona')     items = items.filter(e => ['ONA','OVA','SPECIAL'].includes(e.format));
@@ -1355,8 +1429,8 @@ function renderDayList() {
     return;
   }
 
-  const tracked   = items.filter(e => e.tracking);
-  const discovery = items.filter(e => !e.tracking);
+  const tracked   = items.filter(e => e.tracking && e.tracking !== 'descartado');
+  const discovery = items.filter(e => !e.tracking || e.tracking === 'descartado');
   const renderItem = dayView === 'grid' ? estrenoGridCard : estrenoCard;
   const wrapOpen   = dayView === 'grid' ? '<div class="estreno-grid">' : '';
   const wrapClose  = dayView === 'grid' ? '</div>' : '';
@@ -1376,11 +1450,11 @@ function renderDayList() {
 function estrenoGridCard(e, isTracked) {
   const time = new Date(e.airingAt*1000).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
   const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
-  const trackEmoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[e.tracking]||'';
+  const trackMeta = getListMeta(e.tracking);
   const a = isTracked ? getAnime(e.id) : null;
   const w = a?.watchedEps || 0;
   const t = a?.totalEps || null;
-  const trackedBadge = isTracked ? `<div class="egc-track-badge">${trackEmoji} ${safe(e.tracking)}</div>` : '';
+  const trackedBadge = isTracked ? `<div class="egc-track-badge">${safe(trackMeta.emoji)} ${safe(trackMeta.name)}</div>` : '';
   const progressPill = (isTracked && e.format !== 'MOVIE' && e.tracking !== 'completado' && t)
     ? `<div class="egc-progress-pill">${safe(w)}/${safe(t)}</div>` : '';
   return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" ${actionAttrs('openResultDetail', [{...e, episodes: t || null}])}>
@@ -1402,8 +1476,8 @@ function estrenoGridCard(e, isTracked) {
 function estrenoCard(e, isTracked) {
   const time = new Date(e.airingAt*1000).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
   const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
-  const trackEmoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[e.tracking]||'';
-  const trackedChip = isTracked ? `<div class="tracked-chip">${trackEmoji} ${safe(e.tracking)}</div>` : '';
+  const trackMeta = getListMeta(e.tracking);
+  const trackedChip = isTracked ? `<div class="tracked-chip">${safe(trackMeta.emoji)} ${safe(trackMeta.name)}</div>` : '';
   const addBtns = isTracked
     ? `<div class="estreno-ep-counter" data-click-stop="1">
         <button class="ep-btn" ${actionAttrs('changeEp', [e.id,-1,e.tracking])}>−</button>
@@ -1431,6 +1505,7 @@ function estrenoCard(e, isTracked) {
 }
 
 async function quickAddEstreno(e, list, btn) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   saveRecent(e.title, [e]);
   await trackAnime(e, list);
@@ -1603,6 +1678,7 @@ function listCard(r) {
 }
 
 async function changeEpFromSearch(id, delta) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   id = Number(id);
   const a = getAnime(id);
@@ -1610,7 +1686,6 @@ async function changeEpFromSearch(id, delta) {
   const w = Math.max(0, (a.watchedEps || 0) + delta);
   if (a.totalEps && w > a.totalEps) return;
   a.watchedEps = w;
-  await updateEpInList(id, w);
   // Update count in place + progress bar fill
   const cnt = document.querySelector(`#search-results [data-search-ep="${id}"]`);
   if (cnt) cnt.textContent = `${w}${a.totalEps?` / ${a.totalEps}`:''}`;
@@ -1622,9 +1697,11 @@ async function changeEpFromSearch(id, delta) {
     if (bar) bar.style.width = p + '%';
   }
   _checkAutoComplete(a);
+  await updateEpInList(id, w);
 }
 
 async function quickAdd(id, list, btn) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   if (lastSearchQuery && lastSearchResults.length) saveRecent(lastSearchQuery, lastSearchResults);
   const r = lastSearchResults.find(x=>x.id===id);
@@ -1722,6 +1799,7 @@ function openResultDetail(r) {
 }
 
 async function _rdEp(id, delta) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   id = Number(id);
   const a = getAnime(id);
@@ -1729,7 +1807,6 @@ async function _rdEp(id, delta) {
   const w = Math.max(0, (a.watchedEps||0) + delta);
   if (a.totalEps && w > a.totalEps) return;
   a.watchedEps = w;
-  await updateEpInList(id, w);
   const t = a.totalEps || 0, p = t ? Math.round(w/t*100) : 0;
   const ec = document.getElementById('epc-rd');
   const ef = document.getElementById('epfill-rd');
@@ -1739,9 +1816,11 @@ async function _rdEp(id, delta) {
   if (et) et.textContent = p + '%';
   _checkAutoComplete(a);
   if (currentTab === 'estrenos') renderDayList();
+  await updateEpInList(id, w);
 }
 
 async function addFromDetail(id, list, el, r) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   if (r) await trackAnime(r, list);
   el.closest('.list-selector')?.querySelectorAll('.list-opt').forEach(o=>o.classList.remove('active'));
@@ -1912,14 +1991,16 @@ function animeCard(a,listName){
 }
 
 async function changeEp(id,delta,listName){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   const a=getAnime(id); if(!a) return;
   const w=Math.max(0,(a.watchedEps||0)+delta);
   if(a.totalEps&&w>a.totalEps) return;
   a.watchedEps=w;
-  await updateEpInList(id,w);
-  renderList(listName);
+  if (currentTab === 'estrenos') renderDayList();
+  else if (getAllListKeys().includes(currentTab)) renderList(currentTab);
   _checkAutoComplete(a);
+  await updateEpInList(id,w);
 }
 
 // ── Detail sheet (my anime) ───────────────────────────────────────────────────
@@ -2077,6 +2158,7 @@ function renderDetailBody(a,listName){
 }
 
 async function detailEp(delta){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if(!detailAnime) return; haptic('light');
   const a=detailAnime, w=Math.max(0,(a.watchedEps||0)+delta);
   if(a.totalEps&&w>a.totalEps) return;
@@ -2086,19 +2168,21 @@ async function detailEp(delta){
   if(ec) ec.innerHTML=`${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span>`;
   if(ef) ef.style.width=p+'%';
   if(et) et.textContent=p+'%';
-  await updateEpInList(a.id,w);
   _checkAutoComplete(a);
+  await updateEpInList(a.id,w);
 }
 
 async function toggleMovie(id,listName){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   const a=getAnime(id); if(!a) return;
   a.watchedEps=(a.watchedEps||0)>0?0:1;
-  await updateEpInList(id,a.watchedEps);
   renderDetailBody(a,listName||getAnimeList(id));
+  await updateEpInList(id,a.watchedEps);
 }
 
 async function moveToList(id,newList){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   const a=getAnime(id)||detailAnime; if(!a) return;
   await updateEpInList(id,a.watchedEps||0,newList);
@@ -2108,6 +2192,7 @@ async function moveToList(id,newList){
 }
 
 async function deleteAnime(id){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('heavy');
   const a=getAnime(id)||detailAnime, title=a?a.title.substring(0,22):'Anime';
   if(!confirm(`¿Quitar "${title}"?`)) return;
@@ -2132,6 +2217,7 @@ function closeDetail(){
   if(tg?.BackButton) tg.BackButton.hide();
 }
 if(tg?.BackButton) tg.BackButton.onClick(()=>{
+  if (document.getElementById('saga-panel')?.classList.contains('open')) { closeSagaPanel(); return; }
   const cm = document.getElementById('complete-modal');
   if (cm?.classList.contains('open')) { closeCompleteModal(); return; }
   const ntm = document.getElementById('notes-modal');
@@ -2389,6 +2475,7 @@ function closeLinkModal() {
 }
 
 async function saveLinkFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_linkModalAnimeId == null) return;
   const url = document.getElementById('link-input').value.trim();
   if (!url) { closeLinkModal(); return; } // empty = no-op
@@ -2416,6 +2503,7 @@ async function saveLinkFromModal() {
 }
 
 async function removeLinkFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_linkModalAnimeId == null || _linkModalEditIdx == null) return;
   const a = getAnime(_linkModalAnimeId);
   if (a && Array.isArray(a.userLinks)) {
@@ -2453,6 +2541,7 @@ function closeNickModal() {
   _nickModalAnimeId = null;
 }
 async function saveNickFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_nickModalAnimeId == null) return;
   const nick = document.getElementById('nick-input').value.trim().slice(0, 40);
   const a = getAnime(_nickModalAnimeId);
@@ -2491,6 +2580,7 @@ function closeEpModal() {
 }
 
 async function saveEpFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_epModalAnimeId == null) return;
   const a = getAnime(_epModalAnimeId);
   if (!a) return;
@@ -2501,7 +2591,6 @@ async function saveEpFromModal() {
     return;
   }
   a.watchedEps = v;
-  await updateEpInList(a.id, v);
 
   // Re-render whichever views are visible
   if (detailAnime?.id === a.id) {
@@ -2522,6 +2611,7 @@ async function saveEpFromModal() {
   if (a2) _checkAutoComplete(a2);
   toast(`✓ Ep ${v}`);
   closeEpModal();
+  await updateEpInList(a.id, v);
 }
 
 // ── Search filters modal ──────────────────────────────────────────────────────
@@ -2641,6 +2731,7 @@ function _starsHtml(id, rating, containerId) {
 }
 
 async function setRating(id, rating, containerId) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   id = Number(id);
   const a = getAnime(id) || detailAnime;
@@ -2682,6 +2773,7 @@ function closeCreateListModal() {
   _editingListKey = null;
 }
 async function saveCreateListFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   const name  = document.getElementById('list-name-input').value.trim();
   const emoji = document.getElementById('list-emoji-input').value.trim() || '📂';
   if (!name) { toast('⚠️ Ponle un nombre'); return; }
@@ -2699,14 +2791,15 @@ async function saveCreateListFromModal() {
   else if (detailAnime) renderDetailBody(getAnime(detailAnime.id) || detailAnime, getAnimeList(detailAnime.id));
 }
 async function deleteListFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (!_editingListKey) return;
   const meta = listMeta[_editingListKey];
   const items = allLists[_editingListKey] || [];
   const msg = items.length > 0
-    ? `"${meta.name}" tiene ${items.length} anime. Los animes NO se borran, solo se quitan de esta lista. ¿Seguro?`
+    ? `"${meta.name}" tiene ${items.length} anime. Los anime de esta lista pasan a Pendiente. ¿Seguro?`
     : `¿Eliminar "${meta.name}"?`;
   if (!confirm(msg)) return;
-  await deleteCustomList(_editingListKey);
+  if (!await deleteCustomList(_editingListKey)) return;
   closeCreateListModal();
   if (currentTab === 'listas') renderOverview();
   else if (currentTab === _editingListKey) setTab('listas');
@@ -2766,6 +2859,7 @@ function closeCompleteModal() {
   _pendingCompleteId = null;
 }
 async function confirmComplete() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_pendingCompleteId == null) return;
   const id = _pendingCompleteId;
   closeCompleteModal();
@@ -2795,23 +2889,26 @@ function closeNotesModal() {
   _notesModalId = null;
 }
 async function saveNotesFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_notesModalId == null) return;
   const note = document.getElementById('notes-textarea').value.trim().slice(0, 500);
   const a = getAnime(_notesModalId);
   if (a) {
     a.userNote = note || null;
-    await saveLists();
     if (detailAnime?.id === _notesModalId) { detailAnime.userNote = a.userNote; renderDetailBody(a, detailAnime.listName); }
-    toast(note ? '✓ Nota guardada' : '✓ Nota eliminada');
+    closeNotesModal();
+    if (await saveLists()) toast(note ? '✓ Nota guardada' : '✓ Nota eliminada');
+    return;
   }
   closeNotesModal();
 }
 async function clearNote() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_notesModalId == null) return;
   const a = getAnime(_notesModalId);
-  if (a) { a.userNote = null; await saveLists(); if (detailAnime?.id === _notesModalId) { detailAnime.userNote = null; renderDetailBody(a, detailAnime.listName); } }
+  if (a) { a.userNote = null; if (detailAnime?.id === _notesModalId) { detailAnime.userNote = null; renderDetailBody(a, detailAnime.listName); } }
   closeNotesModal();
-  toast('🗑️ Nota eliminada');
+  if (a && await saveLists()) toast('🗑️ Nota eliminada');
 }
 
 // ── Synopsis toggle (colapsar/expandir) ──────────────────────────────────────
@@ -2933,6 +3030,7 @@ async function openSagaPanel(animeId) {
   body.innerHTML = '<div class="spinner"></div>';
   title.textContent = 'Cargando…';
   panel.classList.add('open');
+  if (tg?.BackButton) tg.BackButton.show();
 
   const result = await fetchRelations(animeId);
   if (!result || !result.entries.length) {
@@ -2985,6 +3083,7 @@ async function openSagaPanel(animeId) {
 }
 
 function closeSagaPanel() {
+  if (tg?.BackButton && !document.getElementById('detail')?.classList.contains('open')) tg.BackButton.hide();
   const p = document.getElementById('saga-panel');
   p.classList.add('closing');
   setTimeout(() => p.classList.remove('open', 'closing'), 300);
@@ -2999,6 +3098,7 @@ function openSagaEntryDetail(id, r) {
 }
 
 async function _sagaQuickAdd(id, list, r, btnEl) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   await trackAnime({ ...r, id: Number(id) }, list);
   btnEl.closest('.qadd-row')?.querySelectorAll('.qadd-btn').forEach(b => b.classList.remove('active'));
@@ -3013,6 +3113,7 @@ async function _sagaQuickAdd(id, list, r, btnEl) {
 }
 
 async function saveSagaToList() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (!_sagaData) return;
   haptic('medium');
   const listKey  = 'saga_' + _sagaSourceId;
@@ -3192,8 +3293,8 @@ function _attachSwipe(listName) {
     showAuthError(e.message || 'No se pudo iniciar sesión.');
     return;
   }
-  setTab(startTab);
   await loadLists();
+  setTab(startTab);
   updateDots();
   checkConnection();
   // Pre-warm today's cache in background so Estrenos tab opens instantly

@@ -8598,112 +8598,156 @@ function _tzOffsetMin(date, timeZone) {
   return Math.round((tz.getTime() - utc.getTime()) / 60000);
 }
 
-async function _runAnimeEstrenos(botToken) {
-  // Día calendario en Santiago. FIX timezone (2026-05-20): antes dateKey usaba UTC
-  // vía toISOString(), desfasado del cron 23:00 Santiago (= 03:00 UTC día siguiente).
-  // Causaba: log decía día N+1, mensaje al usuario mostraba día N. Ahora todo es Santiago.
-  const now = new Date();
-  const dateKey = now.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }); // "YYYY-MM-DD" Santiago
+// Escapa texto para parse_mode HTML de Telegram (un "&" o "<" en un título
+// hacía que Telegram rechazara el mensaje completo).
+function _tgHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
-  // Check if already sent today
-  const sentDoc = await db.collection('anime_notifications').doc(dateKey).get();
-  if (sentDoc.exists && sentDoc.data().sent) {
-    logger.info('[anime] Notificación del día ya enviada:', dateKey);
-    return;
+// AniList con reintento: un 429 o caída devolvía data:null y se registraba
+// como "día sin estrenos".
+async function _queryAniListSeguro(query, variables) {
+  let ultimo = null;
+  for (let intento = 0; intento < 3; intento++) {
+    try {
+      const json = await _queryAniList(query, variables);
+      if (json && json.data && !json.errors) return json;
+      ultimo = new Error(`AniList: ${JSON.stringify(json && json.errors ? json.errors[0] : 'sin data').slice(0, 200)}`);
+    } catch (e) { ultimo = e; }
+    await new Promise((r) => setTimeout(r, 2000 * (intento + 1)));
+  }
+  throw ultimo || new Error('AniList no respondió');
+}
+
+// manual=true (herramienta de admin): no mira ni marca el "ya enviado", así un
+// disparo de prueba a media tarde no impide el resumen de las 23:00.
+async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
+  // Día calendario en Santiago (fix 2026-05-20: antes usaba UTC).
+  const now = new Date();
+  const dateKey = now.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }); // "YYYY-MM-DD"
+
+  if (!manual) {
+    const sentDoc = await db.collection('anime_notifications').doc(dateKey).get();
+    if (sentDoc.exists && sentDoc.data().sent) {
+      logger.info('[anime] Notificación del día ya enviada:', dateKey);
+      return { enviado: false, motivo: 'ya enviado' };
+    }
   }
 
-  // Query AniList: episodes aired today (medianoche Santiago → now + buffer)
+  // Episodios emitidos hoy (medianoche Santiago → ahora + 1 h), hasta 4 páginas.
   const [y, mo, d] = dateKey.split('-').map(Number);
   const offsetMin = _tzOffsetMin(now, 'America/Santiago'); // -240 (CLT) o -180 (CLST)
   const from = Math.floor((Date.UTC(y, mo - 1, d, 0, 0, 0) - offsetMin * 60000) / 1000);
-  const to   = Math.floor(Date.now() / 1000) + 3600;
-  const GQL = `query($f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$f,airingAt_lesser:$t){episode airingAt media{id title{romaji english}averageScore format}}}}`;
-  const json = await _queryAniList(GQL, { f: from, t: to });
-  const schedules = json.data?.Page?.airingSchedules || [];
+  const to = Math.floor(Date.now() / 1000) + 3600;
+  const GQL = `query($f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id isAdult title{romaji english}averageScore format}}}}`;
+  const schedules = [];
+  for (let p = 1; p <= 4; p++) {
+    const json = await _queryAniListSeguro(GQL, { f: from, t: to, p });
+    const page = json.data.Page || {};
+    schedules.push(...(page.airingSchedules || []));
+    if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+  }
+  const visibles = schedules.filter((s) => s.media && !s.media.isAdult);
 
-  if (!schedules.length) {
+  if (!visibles.length) {
     logger.info('[anime] Sin estrenos hoy:', dateKey);
-    return;
+    return { enviado: false, motivo: 'sin estrenos' };
   }
 
-  // Read user's tracked anime from Firestore
+  // Listas del usuario. "Tus series" = lo que sigues de verdad: viendo,
+  // interesante, pendiente y tus listas propias. Completado y descartado no
+  // cuentan como seguidas y tampoco aparecen en descubrimiento.
   const listsDoc = await db.collection('animelists').doc(ANIME_CHAT_ID).get();
   const lists = listsDoc.exists ? listsDoc.data() : {};
-  const trackedIds = new Set();
-  const trackedMap = {};
+  const meta = (lists && lists.listMeta) || {};
+  const NO_SEGUIDAS = new Set(['completado', 'descartado']);
+  const LIST_EMOJI = { viendo: '▶️', interesante: '⭐', pendiente: '📌' };
+  const seguidas = new Map(); // id → emoji de su lista
+  const ocultas = new Set();
   for (const [listName, animes] of Object.entries(lists)) {
     if (!Array.isArray(animes)) continue;
     for (const a of animes) {
-      trackedIds.add(String(a.id));
-      trackedMap[String(a.id)] = listName;
+      const id = String(a && a.id);
+      if (NO_SEGUIDAS.has(listName)) { ocultas.add(id); continue; }
+      const emoji = LIST_EMOJI[listName] || (meta[listName] && meta[listName].emoji) || '📂';
+      if (!seguidas.has(id) || listName === 'viendo') seguidas.set(id, emoji);
     }
   }
 
-  // Clasificar en 3 grupos: premieres (ep 1, sigas o no), tracked (ep>1 seguidos), discovery (ep>1 no seguidos)
-  const FMT = { MOVIE:'🎬', ONA:'🖥️', OVA:'📀', SPECIAL:'🌟', TV:'📺', TV_SHORT:'📺' };
-  const LIST_EMOJI = { viendo:'▶️', interesante:'⭐', pendiente:'📌', completado:'✅', descartado:'❌' };
+  // Agrupa episodios de la misma serie emitidos el mismo día (ep3–4).
+  const porSerie = new Map();
+  for (const s of visibles) {
+    const id = String(s.media.id);
+    const g = porSerie.get(id);
+    if (g) { g.eps.push(s.episode); g.airingAt = Math.min(g.airingAt, s.airingAt); } else porSerie.set(id, { media: s.media, eps: [s.episode], airingAt: s.airingAt });
+  }
 
-  const premieres = [];   // ep 1 — destacados arriba (lo verdaderamente nuevo)
-  const tracked   = [];   // ep>1 de series que sigues
-  const discovery = [];   // ep>1 de series que no sigues
-
-  for (const s of schedules) {
-    const m  = s.media;
-    const id = String(m.id);
-    const title = (m.title.english || m.title.romaji).substring(0, 36);
+  const FMT = { MOVIE: '🎬', ONA: '🖥️', OVA: '📀', SPECIAL: '🌟', TV: '📺', TV_SHORT: '📺' };
+  const premieres = [];
+  const tracked = [];
+  const discovery = [];
+  for (const [id, g] of porSerie) {
+    const m = g.media;
+    const eps = g.eps.sort((a, b) => a - b);
+    const epTxt = eps.length > 1 ? `ep${eps[0]}–${eps[eps.length - 1]}` : `ep${eps[0]}`;
+    const title = _tgHtml(String((m.title && (m.title.english || m.title.romaji)) || 'Sin título').substring(0, 40));
     const score = m.averageScore ? ` ⭐${m.averageScore}` : '';
-    const fmt   = FMT[m.format] || '🎞';
-    const ep    = s.episode;
-    const time  = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', timeZone:'America/Santiago' });
-    const line  = `${fmt} <b>${title}</b> ep${ep}${score} · ${time}`;
-    const isTracked = trackedIds.has(id);
-    const emoji = isTracked ? (LIST_EMOJI[trackedMap[id]] || '▶️') : '';
-
-    if (ep === 1) {
-      // Premiere: si la sigues muestra el emoji de tu lista; si no, solo la línea (el fmt ya trae 🎬/📺/etc)
-      premieres.push(emoji ? `${emoji} ${line}` : line);
-    } else if (isTracked) {
-      tracked.push(`${emoji} ${line}`);
-    } else {
-      discovery.push(line);
-    }
+    const fmt = FMT[m.format] || '🎞';
+    const time = new Date(g.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
+    const line = `${fmt} <b>${title}</b> ${epTxt}${score} · ${time}`;
+    const emoji = seguidas.get(id);
+    if (eps[0] === 1) premieres.push(emoji ? `${emoji} ${line}` : line);
+    else if (emoji) tracked.push(`${emoji} ${line}`);
+    else if (!ocultas.has(id)) discovery.push(line);
   }
 
-  // Build message — dateLabel derivado de dateKey (mediodía UTC → día calendario = dateKey) para coherencia con el dedup
-  const dateLabel = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', timeZone:'UTC' });
+  const dateLabel = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
   const dateCapitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-  let text = `📺 <b>Estrenos del día — ${dateCapitalized}</b>\n`;
 
-  if (premieres.length) {
-    text += `\n🆕 <b>Estrenos nuevos · ep 1 (${premieres.length}):</b>\n`;
-    text += premieres.join('\n');
-  }
-  if (tracked.length) {
-    text += `\n\n⭐ <b>Tus series (${tracked.length}):</b>\n`;
-    text += tracked.join('\n');
-  }
-  if (discovery.length) {
-    const show = discovery.slice(0, 8);
-    const rest = discovery.length - show.length;
-    text += `\n\n📡 <b>Descubrimiento (${discovery.length}):</b>\n`;
-    text += show.join('\n');
-    if (rest > 0) text += `\n<i>… y ${rest} más en la app</i>`;
-  }
-
-  const replyMarkup = {
-    inline_keyboard: [[
-      { text: '🎌 Ver todos en Mini App', web_app: { url: ANIME_APP_URL } }
-    ]]
+  // Telegram corta en 4096 caracteres: cada sección lleva tope y "… y N más".
+  const seccion = (titulo, lineas, tope) => {
+    if (!lineas.length) return '';
+    const show = lineas.slice(0, tope);
+    const rest = lineas.length - show.length;
+    return `\n\n${titulo} (${lineas.length}):</b>\n${show.join('\n')}${rest > 0 ? `\n<i>… y ${rest} más en la app</i>` : ''}`;
   };
+  let tracTope = 25;
+  let premTope = 15;
+  let text = '';
+  for (let i = 0; i < 6; i++) {
+    text = `📺 <b>Estrenos del día — ${_tgHtml(dateCapitalized)}</b>`
+      + seccion('⭐ <b>Tus series', tracked, tracTope)
+      + seccion('🆕 <b>Estrenos nuevos · ep 1', premieres, premTope)
+      + seccion('📡 <b>Descubrimiento', discovery, 8);
+    if (text.length <= 3900) break;
+    tracTope = Math.max(8, tracTope - 5);
+    premTope = Math.max(5, premTope - 4);
+  }
 
-  const result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup);
-  logger.info('[anime] Telegram result:', result.ok, result.description || '');
+  const replyMarkup = { inline_keyboard: [[{ text: '🎌 Ver todos en Mini App', web_app: { url: ANIME_APP_URL } }]] };
+  let result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup);
+  if (!result || !result.ok) {
+    // Plan B: el mismo texto sin formato, para que el día no quede sin resumen.
+    logger.warn('[anime] Telegram rechazó el HTML, reintento en texto plano:', result && result.description);
+    const plano = text.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    const { default: fetch } = await import('node-fetch');
+    const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: ANIME_CHAT_ID, text: plano.slice(0, 4000), disable_web_page_preview: true, reply_markup: replyMarkup }),
+    });
+    result = await r.json();
+  }
+  logger.info('[anime] Telegram result:', result && result.ok, (result && result.description) || '');
+  if (!result || !result.ok) throw new Error(`Telegram no aceptó el resumen: ${(result && result.description) || 'sin respuesta'}`);
 
-  // Mark as sent in Firestore
-  await db.collection('anime_notifications').doc(dateKey).set({
-    sent: true, sentAt: FieldValue.serverTimestamp(),
-    premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, total: schedules.length,
-  });
+  if (!manual) {
+    await db.collection('anime_notifications').doc(dateKey).set({
+      sent: true, sentAt: FieldValue.serverTimestamp(),
+      premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, total: visibles.length,
+    });
+  }
+  return { enviado: true, premieres: premieres.length, tracked: tracked.length, discovery: discovery.length };
 }
 
 exports.animeEstrenosDiarios = onSchedule(
@@ -8724,14 +8768,20 @@ exports.animeEstrenosDiarios = onSchedule(
 
 // Disparo manual del chequeo de estrenos — herramienta de admin, ningún cliente la llama.
 exports.animeEstrenosManual = onRequest(
-  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'] },
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'], maxInstances: 1 },
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
     if (!requireAdminKey(req, res)) return;
     const token = process.env.ANIME_BOT_TOKEN;
     if (!token) { res.status(500).json({ error: 'ANIME_BOT_TOKEN no configurado' }); return; }
-    await _runAnimeEstrenos(token);
-    res.json({ ok: true });
+    try {
+      // Manual = prueba: no marca el día, así el cron de las 23:00 igual envía.
+      const r = await _runAnimeEstrenos(token, { manual: true });
+      res.json({ ok: true, ...r });
+    } catch (e) {
+      logger.error('[anime] manual falló:', e.message);
+      res.status(502).json({ ok: false, error: e.message });
+    }
   }
 );
 
@@ -8775,7 +8825,7 @@ exports.animeAuth = onRequest(
     }
 
     const authDate = parseInt(params.get('auth_date') || '0', 10);
-    if (Math.floor(Date.now() / 1000) - authDate > 86400) {
+    if (Math.floor(Date.now() / 1000) - authDate > 3600) {
       res.status(401).json({ error: 'Sesión expirada, vuelve a abrir la app' });
       return;
     }
@@ -8791,8 +8841,14 @@ exports.animeAuth = onRequest(
     const uid = `anime_${tgId}`;
     const claims = { anime_tg: tgId };
     // La cuenta se crea con Admin SDK: el auto-registro de Auth está deshabilitado.
-    await getAuth().getUser(uid).catch(() => getAuth().createUser({ uid, displayName: 'AnimeTracker' }));
-    await getAuth().setCustomUserClaims(uid, claims);
+    try {
+      const u = await getAuth().getUser(uid);
+      if (!u.customClaims || u.customClaims.anime_tg !== tgId) await getAuth().setCustomUserClaims(uid, claims);
+    } catch (e) {
+      if (e.code !== 'auth/user-not-found') { logger.error('[animeAuth] getUser', e.code); res.status(503).json({ error: 'Intenta de nuevo' }); return; }
+      await getAuth().createUser({ uid, displayName: 'AnimeTracker' });
+      await getAuth().setCustomUserClaims(uid, claims);
+    }
     const token = await getAuth().createCustomToken(uid, claims);
     res.json({ token, tgId });
   }
@@ -8930,7 +8986,7 @@ const _mediaOps = {
   async descubrir(q) {
     const tipo = _mediaTipo(q.tipo);
     const region = _mediaRegion(q.region);
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
     const params = {
       watch_region: region,
       page: _mediaInt(q.page, 1, 1, 20),
