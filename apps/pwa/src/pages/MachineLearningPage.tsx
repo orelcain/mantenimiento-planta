@@ -393,7 +393,7 @@ export function MachineLearningPage() {
         {/* Portada del documento */}
         <header style={{ paddingTop: 'clamp(10px, 3vw, 30px)' }}>
           <div className="dp-eyebrow">
-            {isCourse ? (machine.modulo != null ? 'MÓDULO' : 'CURSO') : 'FICHA TÉCNICA'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area).toUpperCase() : 'REV 2026-07'}
+            {isCourse ? (machine.modulo != null ? 'Módulo' : 'Curso') : 'Ficha técnica'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area) : 'Rev. 2026-07'}
           </div>
           <h1 className="dp-title">{machine.name}</h1>
           <p className="dp-sub">{machine.description}</p>
@@ -415,7 +415,7 @@ export function MachineLearningPage() {
           )}
           {/* Tarjeta A3C interactiva (plano 888 h. 22-23), solo BAADER 142. */}
           {machine.slug === 'baader-142' && (
-            <button className="dp-hmi" style={{ minHeight: 44 }} onClick={() => navigate('/aprendizaje/baader-142/tarjeta-a3c')}>
+            <button className="dp-hmi" onClick={() => navigate('/aprendizaje/baader-142/tarjeta-a3c')}>
               <CircuitBoard className="h-4 w-4" /> Tarjeta A3C · qué LED prende
             </button>
           )}

@@ -88,7 +88,7 @@ export function RepuestoA3c({ codigo, compacta = false }: { codigo: string; comp
       ) : (
         <>
         {distintas && (
-          <Pill tone="info" className="mb-3">Distinta por máquina</Pill>
+          <Pill tone="info" className="mb-3 text-nota">Distinta por máquina</Pill>
         )}
         {candidatos && (
           <p className="mb-3 text-footnote text-muted-foreground" data-testid="repuesto-candidatos">
@@ -150,7 +150,7 @@ function SoloFamilia({ familia, despiece, compacta }: { familia: NonNullable<Ret
   const navigate = useNavigate()
   return (
     <>
-      <Encabezado pill={<Pill tone="neutral">Solo familia</Pill>} />
+      <Encabezado pill={<Pill tone="neutral" className="text-nota">Solo familia</Pill>} />
       <div className="flex items-start gap-3">
         <div className={cn('grid shrink-0 place-items-center rounded-ctl bg-muted text-muted-foreground', compacta ? 'size-[52px]' : 'size-16')}>
           <Cog className="size-[22px]" aria-hidden />
@@ -244,7 +244,7 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
 
   return (
     <div className={className} data-testid="repuesto-pieza">
-      <Encabezado sufijo={total > 1 ? ` ${indice + 1}/${total}` : ''} pill={<Pill tone={cert.tono}>{cert.texto}</Pill>} />
+      <Encabezado sufijo={total > 1 ? ` ${indice + 1}/${total}` : ''} pill={<Pill tone={cert.tono} className="text-nota">{cert.texto}</Pill>} />
       <div className="flex items-start gap-3">
         {repuesto?.fotoUrl ? (
           <button
@@ -270,7 +270,7 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
         <div className="min-w-0">
           <p className="break-all font-mono text-title3 font-semibold tabular-nums">{pieza.nr}</p>
           <p className="text-subhead leading-snug">{pieza.es}</p>
-          <p className="text-caption text-muted-foreground">{origen}</p>
+          <p className="text-nota text-muted-foreground">{origen}</p>
         </div>
       </div>
       {pieza.nivel === 'conjunto' && (
@@ -395,7 +395,7 @@ function EstadoAlta({ alta, elemento, elementos, sesion }: { alta?: AltaCodigo; 
   if (alta.estado === 'pendiente') {
     return (
       <div className="mt-2.5 flex flex-col items-start gap-1.5" data-testid="alta-estado" data-alta="pendiente">
-        <Pill tone="warning">Alta solicitada · pendiente</Pill>
+        <Pill tone="warning" className="text-nota">Alta solicitada · pendiente</Pill>
         <p className="text-footnote text-muted-foreground">
           por {alta.solicitadoPorNombre || 'alguien'} · {fechaCortaAlta(alta.createdAt)} · {alta.cantidad} {alta.cantidad === 1 ? 'unidad' : 'unidades'}{desde}
         </p>
@@ -405,7 +405,7 @@ function EstadoAlta({ alta, elemento, elementos, sesion }: { alta?: AltaCodigo; 
   if (alta.estado === 'rechazada') {
     return (
       <div className="mt-2.5 flex flex-col items-start gap-1.5" data-testid="alta-estado" data-alta="rechazada">
-        <Pill tone="neutral">Alta rechazada</Pill>
+        <Pill tone="neutral" className="text-nota">Alta rechazada</Pill>
         {alta.motivoRechazo && <p className="text-subhead">«{alta.motivoRechazo}»</p>}
         <p className="text-footnote text-muted-foreground">
           {alta.rechazadaPorNombre || 'bodega'}{alta.rechazadaAt ? ` · ${fechaCortaAlta(alta.rechazadaAt)}` : ''}

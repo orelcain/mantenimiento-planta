@@ -53,8 +53,8 @@ function Recorte({ modelo, dibujo, textos, leds, mostrar, alto }: { modelo: Mode
             })}
         </svg>
       </div>
-      <figcaption className="mt-1.5 font-mono text-caption text-muted-foreground">
-        X5 {rc.regleta.desde}–{rc.regleta.hasta} · hoja 23/45
+      <figcaption className="mt-1.5 text-nota text-muted-foreground">
+        <span className="font-mono">X5 {rc.regleta.desde}–{rc.regleta.hasta}</span> · hoja 23/45
       </figcaption>
     </figure>
   )

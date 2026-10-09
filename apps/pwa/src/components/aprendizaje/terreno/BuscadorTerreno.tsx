@@ -48,7 +48,7 @@ export function BuscadorTerreno({ abierto, onCerrar, onElegir, actualId }: {
   return (
     <div role="dialog" aria-modal="true" aria-label="Buscar en el manual" className="piel-fade-in fixed inset-0 z-[90] flex flex-col bg-background">
       <div className="mx-auto flex w-full max-w-[640px] items-center gap-2 px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))] lg:px-5">
-        <label className="flex h-[44px] min-w-0 flex-1 items-center gap-2 rounded-[22px] bg-muted px-3.5 text-muted-foreground">
+        <label className="flex h-[48px] min-w-0 flex-1 items-center gap-2 rounded-[22px] bg-muted px-3.5 text-muted-foreground">
           <Search aria-hidden className="size-[18px] shrink-0" />
           <input
             ref={inputRef}
@@ -66,7 +66,7 @@ export function BuscadorTerreno({ abierto, onCerrar, onElegir, actualId }: {
               type="button"
               aria-label="Borrar"
               onClick={() => { setQ(''); inputRef.current?.focus() }}
-              className="-mr-2.5 grid size-[44px] shrink-0 place-items-center rounded-full"
+              className="-mr-3 grid size-[48px] shrink-0 place-items-center rounded-full"
             >
               <X aria-hidden className="size-4" />
             </button>
@@ -85,7 +85,7 @@ export function BuscadorTerreno({ abierto, onCerrar, onElegir, actualId }: {
                     key={ej}
                     type="button"
                     onClick={() => setQ(ej)}
-                    className="min-h-[44px] rounded-full bg-card px-4 text-subhead shadow-[0_1px_4px_rgba(0,0,0,0.05)] hover:bg-accent dark:shadow-none"
+                    className="min-h-[48px] rounded-full bg-card px-4 text-subhead shadow-[0_1px_4px_rgba(0,0,0,0.05)] hover:bg-accent dark:shadow-none"
                   >
                     {ej}
                   </button>

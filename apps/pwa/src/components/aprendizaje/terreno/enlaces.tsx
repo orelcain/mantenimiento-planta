@@ -2,7 +2,7 @@
  * Piezas chicas compartidas por la referencia de terreno: el enlace a la página del
  * manual, el enlace a una posición del dibujo y el texto con las cifras destacadas.
  *
- * Los dos enlaces son texto en línea pero con 44 px de área táctil: el margen negativo
+ * Los dos enlaces son texto en línea pero con 48 px de área táctil: el margen negativo
  * vertical compensa la altura para que la línea no crezca (se usan con guantes).
  */
 import { Fragment, type ReactNode } from 'react'
@@ -15,7 +15,7 @@ export type AbrirFuente = (fuente: Fuente) => void
 export type VerPos = (pos: string[]) => void
 
 const ENLACE =
-  'inline-flex min-h-[44px] -my-[13px] items-center gap-1 rounded-ctl align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+  'inline-flex min-h-[48px] min-w-[48px] -my-[15px] items-center justify-center gap-1 rounded-ctl align-middle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 export function FuenteLink({ fuente, onAbrir, etiqueta, className }: {
   fuente: Fuente

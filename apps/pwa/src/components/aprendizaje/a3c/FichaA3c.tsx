@@ -52,8 +52,8 @@ export function FichaA3c({ item, idioma, compacta = false }: { item: ItemA3c; id
       {item.nombreApoyo && <p className="text-footnote text-muted-foreground">{item.nombreApoyo}</p>}
       {(item.mostrarTipo || item.modulo) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {item.mostrarTipo && <Pill tone={item.tipo === 'salida' ? 'info' : 'neutral'}>{ETIQUETA_TIPO[item.tipo]}</Pill>}
-          {item.modulo && <Pill>{item.modulo}</Pill>}
+          {item.mostrarTipo && <Pill tone={item.tipo === 'salida' ? 'info' : 'neutral'} className="text-nota">{ETIQUETA_TIPO[item.tipo]}</Pill>}
+          {item.modulo && <Pill className="text-nota">{item.modulo}</Pill>}
         </div>
       )}
 
@@ -96,9 +96,9 @@ export function FichaA3c({ item, idioma, compacta = false }: { item: ItemA3c; id
       </dl>
       <RepuestoA3c codigo={item.codigo} compacta={compacta} />
       {compacta && textos}
-      {item.fuentes.length > 0 && <p className="mt-4 text-caption text-muted-foreground">Fuente: {item.fuentes.join('; ')}</p>}
-      <p className={cn('font-mono text-caption text-muted-foreground', item.fuentes.length ? 'mt-1' : 'mt-4')}>
-        Plano 142.71.00.888, hoja 23/45{item.hotspots.length ? ' y 22/45' : ''}
+      {item.fuentes.length > 0 && <p className="mt-4 text-nota text-muted-foreground">Fuente: {item.fuentes.join('; ')}</p>}
+      <p className={cn('text-nota text-muted-foreground', item.fuentes.length ? 'mt-1' : 'mt-4')}>
+        Plano <span className="font-mono">142.71.00.888</span>, hoja 23/45{item.hotspots.length ? ' y 22/45' : ''}
       </p>
     </div>
   )

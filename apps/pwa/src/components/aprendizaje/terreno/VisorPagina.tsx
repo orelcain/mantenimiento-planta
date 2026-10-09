@@ -86,8 +86,8 @@ function Visor({ inicial, onCerrar }: { inicial: Fuente; onCerrar: () => void })
 
   const titulo = `${info.corto} · pág. ${pagina}`
   const foco = 'rounded-full text-white hover:bg-white/10 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white'
-  const boton = `grid size-[44px] shrink-0 place-items-center ${foco}`
-  const botonPagina = `inline-flex h-[44px] items-center gap-1 px-3 text-subhead ${foco}`
+  const boton = `grid size-[48px] shrink-0 place-items-center ${foco}`
+  const botonPagina = `inline-flex h-[48px] items-center gap-1 px-3 text-subhead ${foco}`
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`${info.titulo}, página ${pagina}`} className="piel-fade-in fixed inset-0 z-[110] flex select-none flex-col bg-black">
@@ -99,7 +99,7 @@ function Visor({ inicial, onCerrar }: { inicial: Fuente; onCerrar: () => void })
           <div className="truncate text-headline">{titulo}</div>
           <div className="truncate text-footnote text-white/60">{info.titulo}</div>
         </div>
-        <span className="size-[44px] shrink-0" aria-hidden />
+        <span className="size-[48px] shrink-0" aria-hidden />
       </div>
 
       <div

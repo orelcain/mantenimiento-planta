@@ -113,10 +113,10 @@ function Fila({ fila, sesion, seleccionada, onAbrir }: { fila: FilaPorConfirmar;
   const previo = sesion && estado === 'pendiente' && fila.anteriorSinMaquina ? <span key="previo">antes sin indicar máquina</span> : null
 
   let pill: React.ReactNode = null
-  if (estado === 'confirmado') pill = <Pill tone="ok"><Check aria-hidden className="size-3" /> Confirmado</Pill>
-  else if (estado === 'corregido') pill = <Pill tone="warning">Otra pieza</Pill>
-  else if (estado === 'no_aplica') pill = <Pill tone="neutral">No existe</Pill>
-  else if (fila.tipo || fila.candidatos.length) pill = <Pill tone="neutral">Pendiente</Pill>
+  if (estado === 'confirmado') pill = <Pill tone="ok" className="text-nota"><Check aria-hidden className="size-3" /> Confirmado</Pill>
+  else if (estado === 'corregido') pill = <Pill tone="warning" className="text-nota">Otra pieza</Pill>
+  else if (estado === 'no_aplica') pill = <Pill tone="neutral" className="text-nota">No existe</Pill>
+  else if (fila.tipo || fila.candidatos.length) pill = <Pill tone="neutral" className="text-nota">Pendiente</Pill>
 
   return (
     <ListCell
@@ -267,8 +267,8 @@ function ListaSinSap({ kpi, onElegir }: { kpi: KpiAltas; onElegir: (elemento: st
                 detail={<span className="text-subhead text-foreground">{c.nombre}</span>}
                 subtitle={`${resumenElementos(c.elementos)} · ${[c.nivel === 'conjunto' ? 'conjunto' : '', c.confianza === 'catalogo' ? 'según catálogo' : 'propuesto'].filter(Boolean).join(' · ')}`}
                 trailing={
-                  c.estado === 'dada_de_alta' ? <Pill tone="ok">SAP {c.sapCreado}</Pill>
-                    : c.estado === 'en_bodega' ? <Pill tone="warning">Pendiente</Pill>
+                  c.estado === 'dada_de_alta' ? <Pill tone="ok" className="text-nota">SAP {c.sapCreado}</Pill>
+                    : c.estado === 'en_bodega' ? <Pill tone="warning" className="text-nota">Pendiente</Pill>
                       : undefined
                 }
                 chevron
@@ -342,7 +342,7 @@ export function Baader142A3cPorConfirmarPage() {
         ) : (
           <p className="text-body text-muted-foreground">Inicia sesión para ver lo confirmado</p>
         )}
-        <Pill tone="neutral" className="mt-3">Plano 888 · N2 y N3</Pill>
+        <Pill tone="neutral" className="mt-3 text-nota">Plano 888 · N2 y N3</Pill>
       </section>
       {sesion && kpiSinSap && kpiSinSap.total > 0 && <FilaSinSap kpi={kpiSinSap} onAbrir={() => setSinSapAbierto(true)} />}
 
@@ -386,7 +386,7 @@ export function Baader142A3cPorConfirmarPage() {
   ) : error ? (
     <div className="mt-4 rounded-card bg-card p-4" role="alert">
       <p className="text-subhead">No se pudo cargar el plano. Revisa la conexión e inténtalo de nuevo.</p>
-      <p className="mt-1 font-mono text-caption text-muted-foreground">{error}</p>
+      <p className="mt-1 text-nota text-muted-foreground">{error}</p>
       <Button className="mt-3" onClick={cargar}>Reintentar</Button>
     </div>
   ) : (

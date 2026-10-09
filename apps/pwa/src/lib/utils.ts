@@ -11,7 +11,7 @@ import { logger } from '@/lib/logger'
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
-      'font-size': [{ text: ['xs', 'caption', 'footnote', 'subhead', 'callout', 'body', 'headline', 'title3', 'title2', 'title1', 'display'] }],
+      'font-size': [{ text: ['xs', 'caption', 'nota', 'footnote', 'subhead', 'callout', 'body', 'headline', 'title3', 'title2', 'title1', 'display'] }],
     },
   },
 })

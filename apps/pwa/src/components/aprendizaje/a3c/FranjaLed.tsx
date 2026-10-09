@@ -35,7 +35,7 @@ export function FranjaLed({
         )}
       />
       <div className="min-w-0 flex-1" aria-live="polite">
-        <p className="font-mono text-title3 font-semibold leading-tight tabular-nums">{linea.grande}</p>
+        <p className="text-title3 font-semibold leading-tight tabular-nums">{linea.grande}</p>
         <p className="text-footnote leading-snug text-muted-foreground">{linea.texto}</p>
       </div>
       {linea.encendible && onVer && (

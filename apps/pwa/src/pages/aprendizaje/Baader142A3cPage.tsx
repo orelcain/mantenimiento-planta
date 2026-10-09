@@ -33,7 +33,7 @@ export function Baader142A3cPage() {
         {error ? (
           <div className="mt-4 rounded-card bg-card p-4" role="alert">
             <p className="text-subhead">No se pudo cargar el plano de la tarjeta. Revisa la conexión e inténtalo de nuevo.</p>
-            <p className="mt-1 font-mono text-caption text-muted-foreground">{error}</p>
+            <p className="mt-1 text-nota text-muted-foreground">{error}</p>
             <Button className="mt-3" onClick={cargar}>Reintentar</Button>
           </div>
         ) : (

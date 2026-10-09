@@ -132,7 +132,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .rp-sec{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
 .rp-sec.collapsed{flex:none;}
 .rp-sec-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none;flex-shrink:0;}
-.rp-sec-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
+.rp-sec-hdr span{font-size:12px;font-weight:600;color:var(--ac2);flex:1;}
 .rp-sec-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
 .rp-sec-hdr.open .arr{transform:rotate(90deg);}
 .rp-body{overflow:hidden;transition:max-height .25s ease;flex:1;display:flex;flex-direction:column;min-height:0;}
@@ -156,7 +156,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .psp{flex:1;display:flex;flex-direction:column;overflow:hidden;border-top:1px solid var(--bdr);}
 .psp.collapsed{flex:none;margin-top:auto;}
 .psp-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;flex-shrink:0;cursor:pointer;user-select:none;border-bottom:1px solid var(--bdr);}
-.psp-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
+.psp-hdr span{font-size:12px;font-weight:600;color:var(--ac2);flex:1;}
 .psp-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
 .psp-hdr.open .arr{transform:rotate(90deg);}
 .psp-body{overflow:hidden;transition:max-height .3s ease;display:flex;flex-direction:column;flex:1;min-height:0;}
@@ -167,10 +167,10 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .ptab.active{background:#1a2844;color:#88aaff;border-color:var(--ac2);}
 /* preset activo */
 .ps-curr{background:#0d2244;border:1px solid #2255aa;border-radius:5px;padding:7px 10px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
-.ps-curr-lbl{font-size:8px;color:#5580bb;letter-spacing:1.5px;text-transform:uppercase;}
+.ps-curr-lbl{font-size:12px;font-weight:600;color:#5580bb;}
 .ps-curr-name{font-size:13px;font-weight:700;color:#aaccff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* lista */
-.ps-list-hdr{font-size:8px;color:#444;letter-spacing:1.5px;text-transform:uppercase;padding:4px 0 2px;border-bottom:1px solid #1e2028;flex-shrink:0;}
+.ps-list-hdr{font-size:12px;font-weight:600;color:#444;padding:4px 0 2px;border-bottom:1px solid #1e2028;flex-shrink:0;}
 #pl{flex:1;overflow-y:auto;min-height:0;}
 #pl::-webkit-scrollbar{width:3px;}
 #pl::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
@@ -211,7 +211,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .cmp-tbl tr:nth-child(even) td{background:#111318;}
 .cmp-diff{color:#ffbb44!important;font-weight:600;}
 .cmp-lbl{color:#aaa;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.2;font-size:9px;}
-.cmp-sec-hdr td{background:#0a1a30!important;color:#4a8ac4!important;font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 5px 2px;border-top:1px solid #1a3060!important;}
+.cmp-sec-hdr td{background:#0a1a30!important;color:#4a8ac4!important;font-size:12px;font-weight:700;padding:4px 5px 2px;border-top:1px solid #1a3060!important;}
 .cmp-summary{font-size:9px;color:#666;margin-bottom:5px;}
 .cmp-summary b{color:#ffbb44;}
 /* bottom bar */
@@ -265,9 +265,9 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box .tip-save{display:inline-block;margin-top:4px;padding:2px 10px;background:#2266aa;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:10px;}
 .tip-box .tip-save:hover{background:#1a5090;}
 .tip-chk{vertical-align:middle;margin-right:3px;cursor:pointer;}
-label.tip-lbl{font-size:9px;color:#885500;cursor:pointer;}
+label.tip-lbl{font-size:12px;color:#885500;cursor:pointer;}
 /* ── MODO APRENDIZAJE (readonly) ── */
-.readonly-banner{background:#1a3a6a;color:#7ec8ff;padding:3px 10px;font-size:10px;text-align:center;letter-spacing:0.5px;flex-shrink:0;border-bottom:1px solid #2a5a9a;}
+.readonly-banner{background:#1a3a6a;color:#7ec8ff;padding:3px 10px;font-size:12px;text-align:center;flex-shrink:0;border-bottom:1px solid #2a5a9a;}
 body.readonly .psp{display:none!important;}
 body.readonly input.fe,body.readonly input.fe1,body.readonly select{pointer-events:none;opacity:0.65;user-select:none;}
 body.readonly #tip-vis-btn{display:none!important;}
@@ -581,7 +581,7 @@ html,body{background:var(--k-case);}
 /* Resultados de búsqueda dentro del panel (reemplazan al árbol mientras haya texto) */
 #rp.kn-searching .rp-sec{display:none;}
 #rp .kn-res.kn-res-in{position:static;flex:1 1 auto;min-height:0;max-height:none;width:auto!important;overflow:auto;background:transparent;border:0;border-radius:0;box-shadow:none;padding:0 10px 12px;color:var(--k-ink);font-family:var(--k-ui);}
-#rp .kn-res-in .kh-gh{font:400 11px/1.3 var(--k-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--k-ink2);padding:12px 2px 4px;}
+#rp .kn-res-in .kh-gh{font:600 12px/1.3 var(--k-ui);color:var(--k-ink2);padding:12px 2px 4px;}
 #rp .kn-res-in .kh-gh b{font-weight:600;color:inherit;}
 #rp .kn-res-in .kh-glist{background:transparent;border-top:0;}
 #rp .kn-res-in .kn-row{min-height:44px;padding:8px 4px;color:var(--k-ink);border-bottom:1px solid var(--k-line);font:14px/1.3 var(--k-ui);border-radius:0;}
@@ -694,10 +694,10 @@ body.kn-land .kp-grab{display:none;}
   body:not(.kn-land) #ov{top:44px;}
 }
 /* Lista del celular vertical (renderHelpList, modo «v»): familia «Ventana del panel» */
-.kn-lh{display:flex;align-items:baseline;gap:8px;padding:12px 16px 10px;border-bottom:1px solid #dcdcdc;background:#f4f4f4;font:700 13px/1.2 Arial,Helvetica,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#4a4a4a;}
+.kn-lh{display:flex;align-items:baseline;gap:8px;padding:12px 16px 10px;border-bottom:1px solid #dcdcdc;background:#f4f4f4;font:700 13px/1.2 Arial,Helvetica,sans-serif;color:#4a4a4a;}
 .kn-lh .n{font:500 13px/1.2 var(--k-mono);font-variant-numeric:tabular-nums;letter-spacing:0;color:#5c5c5c;}
 .kn-sh{padding:12px 16px 14px;border-bottom:1px solid #dcdcdc;color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;}
-.kn-sh .ey{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#4a4a4a;margin-bottom:6px;}
+.kn-sh .ey{font-size:12px;font-weight:700;color:#4a4a4a;margin-bottom:6px;}
 .kn-sh p{font-size:15px;line-height:1.45;margin:0 0 8px;color:#1a1a1a;}
 .kn-sh p .h{font-weight:700;}
 .kn-sh .kn-org{display:flex;align-items:flex-start;gap:6px;font-size:13px;line-height:1.35;color:#5c5c5c;}
@@ -1709,14 +1709,14 @@ html.tema-app body.kn-land.kn-land-list #kn-help-list{border-left-color:var(--k-
     <div class="pt-panel" id="panel-cmp">
       <div class="pcmp">
         <div style="margin-bottom:5px;">
-          <span style="font-size:8.5px;color:#444;text-transform:uppercase;letter-spacing:1px;">Máquinas a comparar</span>
+          <span style="font-size:12px;font-weight:600;color:#444;">Máquinas a comparar</span>
         </div>
         <div id="cmp-sels"></div>
         <div style="display:flex;gap:3px;margin-bottom:6px;">
-          <button id="cmp-add-btn" onclick="addCmpPreset()" class="pbtn" style="font-size:9px;padding:2px 8px;flex:none;">+ Agregar</button>
-          <button onclick="renderCompare()" class="pbtn" style="font-size:9px;padding:2px 8px;">↻ Comparar</button>
+          <button id="cmp-add-btn" onclick="addCmpPreset()" class="pbtn" style="font-size:12px;padding:2px 8px;flex:none;">+ Agregar</button>
+          <button onclick="renderCompare()" class="pbtn" style="font-size:12px;padding:2px 8px;">↻ Comparar</button>
         </div>
-        <div style="font-size:11px;color:var(--k-ink2);margin-bottom:4px;">Resaltado = valores diferentes entre máquinas</div>
+        <div style="font-size:12px;color:var(--k-ink2);margin-bottom:4px;">Resaltado = valores diferentes entre máquinas</div>
         <div id="cmp-out"></div>
       </div>
     </div>
@@ -1740,30 +1740,30 @@ html.tema-app body.kn-land.kn-land-list #kn-help-list{border-left-color:var(--k-
 <!-- ══ EXPORT MODAL ══ -->
 <div id="exp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:#1a1c22;border:1px solid #2a2e3a;border-radius:10px;padding:22px 26px;width:min(500px,95vw);max-height:90vh;overflow-y:auto;font-family:'Segoe UI',Arial,sans-serif;">
-    <h2 style="color:#88aaff;font-size:14px;margin-bottom:16px;">📤 Exportar HMI</h2>
+    <h2 style="color:#88aaff;font-size:14px;margin-bottom:16px;">Exportar HMI</h2>
     <!-- Formato -->
     <div style="margin-bottom:14px;">
-      <div style="font-size:10px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Formato de exportación</div>
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px;">Formato de exportación</div>
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:7px;padding:9px 12px;border:1px solid #2a2e3a;border-radius:6px;background:#13151b;">
         <input type="radio" name="exp-type" value="table" checked onchange="expToggle()" style="margin-top:3px;accent-color:#4499ff;">
-        <div><div style="font-size:12px;color:#ccc;font-weight:600;">📋 Tabla de Parámetros</div><div style="font-size:10px;color:#555;margin-top:2px;">Nombres completos, ruta HMI, valor de referencia y comparación entre presets</div></div>
+        <div><div style="font-size:12px;color:#ccc;font-weight:600;">Tabla de parámetros</div><div style="font-size:12px;color:#555;margin-top:2px;">Nombres completos, ruta HMI, valor de referencia y comparación entre presets</div></div>
       </label>
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid #2a2e3a;border-radius:6px;background:#13151b;">
         <input type="radio" name="exp-type" value="visual" onchange="expToggle()" style="margin-top:3px;accent-color:#4499ff;">
-        <div><div style="font-size:12px;color:#ccc;font-weight:600;">🖥 Pantallas del HMI</div><div style="font-size:10px;color:#555;margin-top:2px;">Vista visual de cada pantalla con los valores actuales</div></div>
+        <div><div style="font-size:12px;color:#ccc;font-weight:600;">Pantallas del HMI</div><div style="font-size:12px;color:#555;margin-top:2px;">Vista visual de cada pantalla con los valores actuales</div></div>
       </label>
     </div>
     <!-- Sección tabla: presets -->
     <div id="exp-sect-table" style="margin-bottom:18px;">
-      <div style="font-size:10px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Presets a comparar</div>
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px;">Presets a comparar</div>
       <div id="exp-presets" style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto;padding-right:2px;"></div>
     </div>
     <!-- Sección visual: pantallas -->
     <div id="exp-sect-visual" style="display:none;margin-bottom:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;">Pantallas a exportar</div>
+        <div style="font-size:12px;font-weight:600;color:#555;">Pantallas a exportar</div>
         <div style="display:flex;gap:5px;">
-          <button onclick="expSelectAll(true)" style="background:#1e2028;color:#88aaff;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:10px;">Todas</button>
+          <button onclick="expSelectAll(true)" style="background:#1e2028;color:#88aaff;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:12px;">Todas</button>
           <button onclick="expSelectAll(false)" style="background:#1e2028;color:#666;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:10px;">Ninguna</button>
         </div>
       </div>
@@ -2038,7 +2038,7 @@ function _applyReadOnly(){
     if(sh.querySelector('.readonly-banner')) return;
     const b=document.createElement('div');
     b.className='readonly-banner';
-    b.textContent='📖 Modo Aprendizaje — Solo lectura';
+    b.textContent='Modo aprendizaje · solo lectura';
     sh.insertBefore(b,sh.firstChild);
   });
 }
