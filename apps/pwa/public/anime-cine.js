@@ -143,6 +143,7 @@
     const logo = header.querySelector('.logo');
     if (logo) logo.insertAdjacentElement('afterend', sw); else header.prepend(sw);
     sw.addEventListener('click', (e) => { const b = e.target.closest('button[data-modo]'); if (b) cambiarModo(b.dataset.modo); });
+    montarPantallaCompleta(header);
 
     const cine = document.createElement('div');
     cine.id = 'cine';
@@ -180,6 +181,40 @@
     let modo = 'anime';
     try { modo = localStorage.getItem('at_modo') || 'anime'; } catch { modo = 'anime'; }
     if (modo === 'cine') cambiarModo('cine');
+  }
+
+  // ── Pantalla completa (Telegram Desktop / Web, Bot API 8.0+) ───────────
+  // Telegram no muestra el botón por su cuenta: la Mini App lo pide con
+  // requestFullscreen(). Se recuerda la elección para abrir ampliada la próxima vez.
+  const ICON_AMPLIAR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
+  const ICON_REDUCIR = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>';
+  function montarPantallaCompleta(header) {
+    const escritorio = tg && ['tdesktop', 'macos', 'web', 'weba', 'webk', 'unigram'].includes(tg.platform);
+    const soporta = tg && typeof tg.requestFullscreen === 'function' && (typeof tg.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('8.0'));
+    if (!escritorio || !soporta) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-pantalla';
+    const pintar = () => {
+      const full = !!tg.isFullscreen;
+      b.innerHTML = full ? ICON_REDUCIR : ICON_AMPLIAR;
+      b.setAttribute('aria-label', full ? 'Salir de pantalla completa' : 'Pantalla completa');
+      b.title = b.getAttribute('aria-label');
+    };
+    b.addEventListener('click', () => {
+      const full = !!tg.isFullscreen;
+      try { localStorage.setItem('at_pantalla', full ? '0' : '1'); } catch { /* sin almacenamiento */ }
+      try { if (full) tg.exitFullscreen(); else tg.requestFullscreen(); } catch { avisar('Tu Telegram no permite pantalla completa'); }
+    });
+    if (typeof tg.onEvent === 'function') {
+      tg.onEvent('fullscreenChanged', pintar);
+      tg.onEvent('fullscreenFailed', () => avisar('Tu Telegram no permite pantalla completa; prueba actualizándolo'));
+    }
+    header.appendChild(b);
+    pintar();
+    let pref = '0';
+    try { pref = localStorage.getItem('at_pantalla') || '0'; } catch { pref = '0'; }
+    if (pref === '1' && !tg.isFullscreen) { try { tg.requestFullscreen(); } catch { /* el usuario lo pide con el botón */ } }
   }
 
   function aplicarEsquema() {

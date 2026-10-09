@@ -48,6 +48,8 @@
 .modo-switch button { min-width: 64px; height: 30px; border: 0; border-radius: 999px; background: transparent; color: inherit; font: 500 14px -apple-system, 'Segoe UI', system-ui, sans-serif; cursor: pointer; padding: 0 12px; position: relative; white-space: nowrap; }
 .modo-switch button::after { content: ''; position: absolute; inset: -7px 0; } /* área táctil 44 px */
 .modo-switch button[aria-pressed='true'] { background: #636366; color: #fff; font-weight: 600; }
+.btn-pantalla { width: 32px; height: 32px; border: 0; border-radius: 999px; background: rgba(118, 118, 128, .24); color: inherit; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; position: relative; margin-left: 8px; }
+.btn-pantalla::after { content: ''; position: absolute; inset: -6px; } /* área táctil 44 px */
 body.modo-cine #content, body.modo-cine .bottom-nav { display: none !important; }
 @media (max-width: 430px) {
   header:has(.modo-switch) .logo span, header:has(.modo-switch) #hdr-badge { display: none !important; }
