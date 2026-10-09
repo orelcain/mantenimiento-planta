@@ -20,6 +20,34 @@
     { nombre: 'Studio Ghibli', busca: 'Studio Ghibli' },
     { nombre: 'A24', busca: 'A24' },
   ];
+  // Búsqueda directa dentro de cada plataforma (id de proveedor de TMDB).
+  const BUSCAR_EN = {
+    8: (q) => `https://www.netflix.com/search?q=${q}`,
+    119: (q) => `https://www.primevideo.com/search?phrase=${q}`,
+    337: (q) => `https://www.disneyplus.com/search?q=${q}`,
+    1899: (q) => `https://play.max.com/search?q=${q}`,
+    384: (q) => `https://play.max.com/search?q=${q}`,
+    283: (q) => `https://www.crunchyroll.com/search?q=${q}`,
+    350: (q) => `https://tv.apple.com/search?term=${q}`,
+    2: (q) => `https://tv.apple.com/search?term=${q}`,
+    192: (q) => `https://www.youtube.com/results?search_query=${q}`,
+    3: (q) => `https://play.google.com/store/search?q=${q}&c=movies`,
+  };
+  const urlVer = (p, titulo, link) => (BUSCAR_EN[p.id] ? BUSCAR_EN[p.id](encodeURIComponent(titulo)) : link);
+  const LINK_OK = /^https:\/\/[^\s"'<>]{3,490}$/;
+  const dominio = (u) => {
+    try {
+      const x = new URL(u);
+      const host = x.hostname.replace(/^www\./, '');
+      if (host === 't.me' || host === 'telegram.me') {
+        const canal = x.pathname.split('/').filter(Boolean)[0];
+        return canal ? `Telegram · ${canal}` : 'Telegram';
+      }
+      return host;
+    } catch { return u; }
+  };
+  // Tiendas y canales que no son "una plataforma más" para los carruseles de «Todas».
+  const NO_CARRUSEL = /store|channel|google play|justwatch|amazon video|microsoft|rakuten|claro video/i;
   const COMO = [
     { id: 'flatrate', nombre: 'En suscripción' },
     { id: 'free|ads', nombre: 'Gratis o con anuncios' },
@@ -110,12 +138,14 @@
         est.datos.plataformas = Array.isArray(d.plataformas) ? d.plataformas.filter((x) => Number.isInteger(x)) : [];
         est.datos.lista = (Array.isArray(d.lista) ? d.lista : [])
           .filter((x) => clave(x))
-          .map((x) => ({ id: x.id, tipo: x.tipo, titulo: String(x.titulo || '').slice(0, 200), poster: ruta(x.poster), fecha: /^d{4}-d{2}-d{2}$/.test(x.fecha || '') ? x.fecha : '', estado: x.estado === 'visto' ? 'visto' : 'pendiente', agregado: Number(x.agregado) || 0, vistoEn: Number(x.vistoEn) || null }));
+          .map((x) => ({ id: x.id, tipo: x.tipo, titulo: String(x.titulo || '').slice(0, 200), poster: ruta(x.poster), fecha: /^d{4}-d{2}-d{2}$/.test(x.fecha || '') ? x.fecha : '', estado: x.estado === 'visto' ? 'visto' : 'pendiente', agregado: Number(x.agregado) || 0, vistoEn: Number(x.vistoEn) || null,
+            links: Array.isArray(x.links) ? x.links.filter((u) => typeof u === 'string' && LINK_OK.test(u)).slice(0, 10) : [] }));
         const f = d.filtros || {};
         est.datos.filtros = {
           generos: Array.isArray(f.generos) ? f.generos : [],
           estudios: Array.isArray(f.estudios) ? f.estudios : [],
           como: Array.isArray(f.como) && f.como.length ? f.como : ['flatrate', 'free|ads'],
+          alcance: f.alcance === 'todas' ? 'todas' : 'mias',
         };
       }
       est.cargado = true;
@@ -310,9 +340,10 @@
   const esqueleto = (n, carrusel) => Array.from({ length: n }, () => `<div class="c-card"${carrusel ? '' : ''}><div class="c-poster c-skel"></div></div>`).join('');
 
   // ── Hoy ────────────────────────────────────────────────────────────────
+  const alcance = () => (est.datos.plataformas.length && est.datos.filtros.alcance !== 'todas' ? 'mias' : 'todas');
   function resumenFiltros() {
     const n = est.datos.plataformas.length;
-    const partes = [n ? `${n} plataforma${n === 1 ? '' : 's'}` : 'Todas las plataformas', 'Chile'];
+    const partes = [alcance() === 'mias' ? `${n} plataforma${n === 1 ? '' : 's'}` : 'Todas las plataformas', 'Chile'];
     const f = est.datos.filtros;
     if (f.generos.length) partes.push(`${f.generos.length} género${f.generos.length === 1 ? '' : 's'}`);
     if (f.estudios.length) partes.push(f.estudios.map((x) => x.nombre).join(', '));
@@ -328,7 +359,14 @@
       <div class="c-top"><div><div class="c-eyebrow">${esc(hoy.charAt(0).toUpperCase() + hoy.slice(1))}</div><h1 class="c-large">Hoy</h1></div>
         <div style="display:flex;gap:8px">${btnTamano()}<button type="button" class="c-iconbtn" data-ir="buscar" aria-label="Buscar">${ICON.lupa}</button></div></div>
       <div class="c-seg" role="group" aria-label="Tipo">${segs.map(([k, t]) => `<button type="button" data-tipo="${k}" aria-pressed="${est.tipo === k}">${t}</button>`).join('')}</div>
-      <button type="button" class="c-filtros-row" data-filtros="1"><span>${esc(resumenFiltros())}</span><span>Filtros</span></button>
+      <div class="c-alcance">
+        <div class="c-seg" role="group" aria-label="Plataformas">
+          <button type="button" data-alcance="mias" aria-pressed="${alcance() === 'mias'}">Mis plataformas</button>
+          <button type="button" data-alcance="todas" aria-pressed="${alcance() === 'todas'}">Todas</button>
+        </div>
+        <button type="button" class="c-link" data-filtros="1">Filtros</button>
+      </div>
+      <p class="c-foot c-resumen">${esc(resumenFiltros())}</p>
       ${sinPlat ? `<div class="c-group" style="margin-top:16px"><button type="button" class="c-row" data-ir="plat"><div class="c-row-main"><span class="c-row-t">Elige las plataformas que pagas</span><span class="c-row-s">Así esta pantalla muestra lo nuevo en ellas</span></div>${ICON.chev}</button></div>` : ''}
       <div class="c-h2"><h2>${esc(tituloPrincipal().titulo)}</h2></div>
       <p class="c-foot" style="margin:-6px 32px 12px">${esc(tituloPrincipal().nota)}</p>
@@ -345,7 +383,7 @@
   // plataformas. TMDB no sabe cuándo llegó cada título a cada plataforma.
   const hayFiltroContenido = () => est.datos.filtros.generos.length > 0 || est.datos.filtros.estudios.length > 0;
   function tituloPrincipal() {
-    const sinPlat = !est.datos.plataformas.length;
+    const sinPlat = alcance() === 'todas';
     if (hayFiltroContenido()) {
       const f = est.datos.filtros;
       const partes = [...f.estudios.map((x) => x.nombre)];
@@ -362,7 +400,7 @@
   function paramsDescubrir(tipo, plataformas) {
     const f = est.datos.filtros;
     const p = { tipo, region: PAIS, como: f.como.join('|') || 'flatrate' };
-    const plats = plataformas || est.datos.plataformas;
+    const plats = plataformas || (alcance() === 'todas' ? [] : est.datos.plataformas);
     if (plats.length) p.plataformas = plats.join('|');
     if (hayFiltroContenido()) p.orden = 'populares';
     if (f.generos.length) p.generos = f.generos.join('|');
@@ -418,18 +456,24 @@
   // Un carrusel por cada plataforma que pagas: lo más popular que tiene hoy en Chile.
   async function cargarPorPlataforma(tipos, sel) {
     const cont = document.getElementById('c-plats');
-    if (!cont || !est.datos.plataformas.length) return;
+    if (!cont || (!est.datos.plataformas.length && alcance() !== 'todas')) return;
     try {
       if (!est.provCL) est.provCL = (await api('plataformas', { region: PAIS })).items;
     } catch { est.provCL = est.provCL || []; }
     if (sel !== est.tipo || est.tab !== 'hoy') return;
     const orden = new Map((est.provCL || []).map((p, i) => [p.id, i]));
-    const mias = est.datos.plataformas
+    const propias = est.datos.plataformas
       .map((id) => (est.provCL || []).find((p) => p.id === id) || { id, nombre: `Plataforma ${id}`, logo: null })
       .sort((a, b) => (orden.get(a.id) ?? 999) - (orden.get(b.id) ?? 999));
+    // Con «Todas», también las que no pagas (las más relevantes en Chile).
+    const otras = alcance() === 'todas'
+      ? (est.provCL || []).filter((p) => !est.datos.plataformas.includes(p.id) && !NO_CARRUSEL.test(p.nombre)).slice(0, 8)
+      : [];
+    const mias = [...propias, ...otras];
     cont.innerHTML = mias.map((p) => {
       const logo = img(p.logo, 'w92');
-      return `<div class="c-h2 c-h2-plat">${logo ? `<img src="${esc(logo)}" alt="" class="c-plat-logo">` : ''}<h2>En ${esc(p.nombre)}</h2></div>
+      const noPaga = !est.datos.plataformas.includes(p.id);
+      return `<div class="c-h2 c-h2-plat">${logo ? `<img src="${esc(logo)}" alt="" class="c-plat-logo">` : ''}<h2>En ${esc(p.nombre)}</h2>${noPaga ? '<span class="c-pill neutral">No la pagas</span>' : ''}</div>
         <div class="c-carrusel" id="c-plat-${p.id}">${esqueleto(3, true)}</div>`;
     }).join('');
     await Promise.all(mias.map(async (p) => {
@@ -573,15 +617,16 @@
     if (est.tab === 'lista') renderLista();
   }
 
-  function filasProveedor(lista, etiqueta, link) {
+  function filasProveedor(lista, etiqueta, link, titulo) {
     return lista.map((p) => {
+      const ver = urlVer(p, titulo || '', link);
       const tengo = est.datos.plataformas.includes(p.id);
       const logo = img(p.logo, 'w92');
       return `<div class="c-row" style="--sep-left:64px">
         <div class="c-logo">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : ''}</div>
         <div class="c-row-main"><span class="c-row-t">${esc(p.nombre)}</span><span class="c-row-s">${esc(etiqueta)}</span></div>
         ${tengo ? '<span class="c-pill">La tienes</span>' : ''}
-        ${link ? `<button type="button" class="c-trail accent" data-link="${esc(link)}" style="background:none;border:0;min-height:44px;padding:0 4px">Ver</button>` : ''}
+        ${ver ? `<button type="button" class="c-trail accent" data-link="${esc(ver)}" aria-label="Ver en ${esc(p.nombre)}" style="background:none;border:0;min-height:44px;padding:0 4px">Ver</button>` : ''}
       </div>`;
     }).join('');
   }
@@ -595,8 +640,8 @@
     const link = cl && cl.link && /^https:\/\/www\.themoviedb\.org\//.test(cl.link) ? cl.link : '';
     let chile = '';
     if (cl) {
-      chile = filasProveedor(cl.suscripcion, 'Suscripción', link) + filasProveedor(cl.gratis, 'Gratis o con anuncios', link)
-        + filasProveedor(cl.arriendo, 'Arriendo', link) + filasProveedor(cl.compra, 'Compra', link);
+      chile = filasProveedor(cl.suscripcion, 'Suscripción', link, t.titulo) + filasProveedor(cl.gratis, 'Gratis o con anuncios', link, t.titulo)
+        + filasProveedor(cl.arriendo, 'Arriendo', link, t.titulo) + filasProveedor(cl.compra, 'Compra', link, t.titulo);
     }
     const tengoAlguna = cl && cl.suscripcion.some((p) => est.datos.plataformas.includes(p.id));
 
@@ -630,13 +675,75 @@
       </div>
       <div class="c-hgroup" style="display:flex;align-items:center;gap:8px">Dónde ver en Chile ${tengoAlguna ? '<span class="c-pill">En tu plan</span>' : ''}</div>
       ${chile ? `<div class="c-group">${chile}</div>` : '<p class="c-foot" style="margin-top:0">No está en plataformas de Chile por ahora.</p>'}
-      <p class="c-foot">Audio latino y subtítulos: llegan cuando conectemos Streaming Availability.</p>
+      <p class="c-foot">«Ver» abre la búsqueda dentro de la plataforma. Audio latino y subtítulos: llegan cuando conectemos Streaming Availability.</p>
+      ${htmlMisLinks(t)}
       ${otros.length ? `<div class="c-hgroup" style="display:flex;justify-content:space-between">En otros países, con VPN <span style="font-weight:400;color:var(--c-text2)">${otros.length}</span></div>
         <div class="c-group">${filasOtros}</div>
         ${otros.length > 8 ? `<button type="button" class="c-filtros-row" data-paises="1" style="margin-left:32px"><span></span><span>${est.paisesTodos ? 'Ver menos' : `Ver los ${otros.length}`}</span></button>` : ''}` : ''}
       ${t.sinopsis ? `<h2 class="c-hgroup">Sinopsis</h2><p class="f-sinopsis">${esc(t.sinopsis)}</p>` : ''}
       ${t.coleccion ? `<p class="c-foot" style="margin-top:16px">Parte de: ${esc(t.coleccion.nombre)}</p>` : ''}
       <p class="f-credito">Dónde ver: datos de JustWatch vía TMDB. La disponibilidad cambia sin aviso.</p>`;
+  }
+
+  // «Mis links»: canales de Telegram u otros sitios donde la ves, como en anime.
+  function htmlMisLinks(t) {
+    const it = enLista(t.tipo, t.id);
+    const links = (it && it.links) || [];
+    const filas = links.map((u, i) => `<div class="c-row">
+        <button type="button" class="c-row-main" data-link="${esc(u)}" style="border:0;background:none;padding:0;text-align:left;color:inherit;min-height:44px;justify-content:center">
+          <span class="c-row-t" style="color:var(--c-accent)">${esc(dominio(u))}</span><span class="c-row-s" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u)}</span></button>
+        <button type="button" class="c-trail" data-qlink="${i}" aria-label="Quitar link" style="background:none;border:0;min-width:44px;min-height:44px">Quitar</button>
+      </div>`).join('');
+    return `<h2 class="c-hgroup">Mis links</h2>
+      ${links.length ? `<div class="c-group">${filas}</div>` : ''}
+      <div class="c-addlink">
+        <input type="url" id="c-link-in" placeholder="Pega un link (t.me/…, web…)" autocomplete="off" inputmode="url" aria-label="Nuevo link">
+        <button type="button" class="c-btn tinted" data-alink="1">Agregar</button>
+      </div>
+      <p class="c-foot">Los links de Telegram se abren dentro de Telegram.</p>`;
+  }
+  function itemDeFicha(t) {
+    let it = enLista(t.tipo, t.id);
+    if (!it) {
+      if (est.datos.lista.length >= LISTA_MAX) { avisar('Tu lista llegó al máximo de 1.500 títulos'); return null; }
+      it = { id: t.id, tipo: t.tipo, titulo: t.titulo, poster: t.poster, fecha: t.fecha, estado: 'pendiente', agregado: Date.now(), links: [] };
+      est.datos.lista.push(it);
+    }
+    if (!Array.isArray(it.links)) it.links = [];
+    return it;
+  }
+  function repintarFicha() {
+    const ficha = document.getElementById('cine-ficha');
+    const y = ficha.scrollTop;
+    ficha.innerHTML = htmlFicha(est.fichaActual);
+    ficha.scrollTop = y;
+  }
+  function agregarLink() {
+    const t = est.fichaActual;
+    const inp = document.getElementById('c-link-in');
+    if (!t || !inp) return;
+    if (!est.cargado) { avisar('Aún no cargan tus datos; intenta de nuevo'); return; }
+    let u = inp.value.trim();
+    if (/^t\.me\//i.test(u)) u = `https://${u}`;
+    if (!LINK_OK.test(u)) { avisar('El link debe empezar con https://'); return; }
+    const it = itemDeFicha(t);
+    if (!it) return;
+    if (it.links.includes(u)) { avisar('Ese link ya está'); return; }
+    if (it.links.length >= 10) { avisar('Máximo 10 links por título'); return; }
+    it.links.push(u);
+    vibrar(); guardar(); avisar('Link guardado'); repintarFicha();
+  }
+  function quitarLink(i) {
+    const t = est.fichaActual;
+    const it = t && enLista(t.tipo, t.id);
+    if (!it || !Array.isArray(it.links)) return;
+    it.links.splice(i, 1);
+    vibrar(); guardar(); repintarFicha();
+  }
+  function abrirLink(u) {
+    if (!LINK_OK.test(u)) return;
+    if (/^https:\/\/t\.me\//i.test(u) && tg && typeof tg.openTelegramLink === 'function') { tg.openTelegramLink(u); return; }
+    if (tg && tg.openLink) tg.openLink(u); else window.open(u, '_blank', 'noopener');
   }
 
   function guardarDesdeFicha(marcarVisto) {
@@ -651,10 +758,11 @@
       it.vistoEn = it.estado === 'visto' ? Date.now() : null;
       avisar(it.estado === 'visto' ? 'Marcado como visto' : 'Vuelve a «Por ver»');
     } else if (it) {
+      if (it.links && it.links.length && !window.confirm('Al quitarlo de tu lista también se borran tus links. ¿Seguir?')) return;
       est.datos.lista = est.datos.lista.filter((x) => x !== it);
       avisar('Quitado de tu lista');
     } else {
-      est.datos.lista.push({ id: t.id, tipo: t.tipo, titulo: t.titulo, poster: t.poster, fecha: t.fecha, estado: 'pendiente', agregado: Date.now() });
+      est.datos.lista.push({ id: t.id, tipo: t.tipo, titulo: t.titulo, poster: t.poster, fecha: t.fecha, estado: 'pendiente', agregado: Date.now(), links: [] });
       avisar('Agregado a Mi lista');
     }
     vibrar();
@@ -734,7 +842,13 @@
     if (d.guardar) { guardarDesdeFicha(false); return; }
     if (d.visto) { guardarDesdeFicha(true); return; }
     if (d.paises) { est.paisesTodos = !est.paisesTodos; if (est.fichaActual) { const f = document.getElementById('cine-ficha'); const y = f.scrollTop; f.innerHTML = htmlFicha(est.fichaActual); f.scrollTop = y; } return; }
-    if (d.link) { const u = d.link; if (/^https:\/\//.test(u)) { if (tg && tg.openLink) tg.openLink(u); else window.open(u, '_blank', 'noopener'); } return; }
+    if (d.link) { abrirLink(d.link); return; }
+    if (d.alink) { agregarLink(); return; }
+    if (d.qlink) { quitarLink(Number(d.qlink)); return; }
+    if (d.alcance) {
+      if (d.alcance === 'mias' && !est.datos.plataformas.length) { irA('plat'); return; }
+      est.datos.filtros.alcance = d.alcance; vibrar(); guardar(); renderHoy(); return;
+    }
     if (d.filtros) { abrirFiltros(); return; }
     if (d.fcomo) { const b = est.borrador; b.como = b.como.includes(d.fcomo) ? b.como.filter((x) => x !== d.fcomo) : [...b.como, d.fcomo]; if (!b.como.length) b.como = ['flatrate']; pintarFiltros(); return; }
     if (d.fgen) { const b = est.borrador; const g = Number(d.fgen); b.generos = b.generos.includes(g) ? b.generos.filter((x) => x !== g) : [...b.generos, g]; pintarFiltros(); return; }
