@@ -8886,7 +8886,11 @@ async function _runAvisosEpisodios(botToken) {
     const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}`;
     const hora = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
     const silencio = hora >= 1 && hora < 8;
-    const replyMarkup = { inline_keyboard: [[{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
+    const botones = pendientes.slice(0, 8).map(({ s }) => [{
+      text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`,
+      callback_data: `v:${s.media.id}:${s.episode}`,
+    }]);
+    const replyMarkup = { inline_keyboard: [...botones, [{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
     let result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup, { disable_notification: silencio });
     if (!result || !result.ok) {
       const plano = text.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
@@ -8912,12 +8916,233 @@ exports.animeAvisosEpisodios = onSchedule(
   async () => {
     const token = process.env.ANIME_BOT_TOKEN;
     if (!token) { logger.error('[anime] ANIME_BOT_TOKEN no configurado'); return; }
+    try { await _asegurarWebhookAnime(token); } catch (e) { logger.warn('[animeBot] registro de webhook:', e.message); }
     try {
       const r = await _runAvisosEpisodios(token);
       if (r.avisos) logger.info('[anime] avisos de episodio:', r.avisos);
     } catch (e) {
       logger.error('[anime] avisos de episodio falló:', e.message);
     }
+  }
+);
+
+// ── Bot interactivo de AnimeTracker (webhook propio) ──────────────────────────
+// Antes el bot de anime era pasivo. Ahora recibe: botones «✅ Visto ep N» de los
+// avisos, búsqueda inline (@anime_estreno_bot <título>) y /hoy, /buscar, /app.
+// Seguridad: Telegram firma cada update con secret_token (derivado del token del
+// bot, nunca sale del servidor) y solo se atiende a ANIME_USUARIOS_PERMITIDOS.
+// El webhook se registra solo desde animeAvisosEpisodios (_asegurarWebhookAnime).
+const ANIME_WEBHOOK_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/animeBotWebhook';
+const ANIME_WEBHOOK_VERSION = 1;
+
+function _secretoWebhookAnime(botToken) {
+  return createHmac('sha256', 'anime-webhook-v1').update(String(botToken)).digest('hex');
+}
+
+async function _tgApi(botToken, metodo, payload) {
+  const { default: fetch } = await import('node-fetch');
+  const r = await fetch(`https://api.telegram.org/bot${botToken}/${metodo}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}),
+  });
+  return r.json();
+}
+
+// Registra webhook y comandos una vez por versión (lo llama el cron de avisos).
+async function _asegurarWebhookAnime(botToken) {
+  const ref = db.collection('anime_estado').doc('webhook');
+  const est = await ref.get();
+  if (est.exists && est.data().version === ANIME_WEBHOOK_VERSION) return;
+  const w = await _tgApi(botToken, 'setWebhook', {
+    url: ANIME_WEBHOOK_URL,
+    secret_token: _secretoWebhookAnime(botToken),
+    allowed_updates: ['message', 'callback_query', 'inline_query'],
+    drop_pending_updates: true,
+    max_connections: 5,
+  });
+  if (!w || !w.ok) { logger.warn('[animeBot] setWebhook falló:', w && w.description); return; }
+  await _tgApi(botToken, 'setMyCommands', {
+    commands: [
+      { command: 'hoy', description: 'Episodios de hoy de lo que estás viendo' },
+      { command: 'buscar', description: 'Dónde ver una película o serie' },
+      { command: 'app', description: 'Abrir AnimeTracker' },
+    ],
+  });
+  await ref.set({ version: ANIME_WEBHOOK_VERSION, registradoEn: FieldValue.serverTimestamp() });
+  logger.info('[animeBot] webhook y comandos registrados');
+}
+
+// Marca un episodio como visto en la lista donde esté el anime (nunca resta).
+async function _marcarVistoAnime(mediaId, ep) {
+  const ref = db.collection('animelists').doc(ANIME_CHAT_ID);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const d = snap.data() || {};
+    for (const [lista, items] of Object.entries(d)) {
+      if (!Array.isArray(items)) continue;
+      const i = items.findIndex((a) => a && Number(a.id) === mediaId);
+      if (i < 0) continue;
+      const nuevo = items.slice();
+      const antes = Number(nuevo[i].watchedEps) || 0;
+      nuevo[i] = { ...nuevo[i], watchedEps: Math.max(antes, ep) };
+      tx.update(ref, { [lista]: nuevo, updatedAt: FieldValue.serverTimestamp() });
+      return { titulo: nuevo[i].title || '', antes, ahora: nuevo[i].watchedEps, lista };
+    }
+    return null;
+  });
+}
+
+// Dónde ver un título en Chile y, si no está, en qué país (VPN).
+function _resumenDondeVer(t) {
+  const cl = t.dondeVer && t.dondeVer.CL;
+  const nombres = (b) => [...(b.suscripcion || []), ...(b.gratis || [])].map((p) => p.nombre);
+  const enCl = cl ? nombres(cl) : [];
+  const otros = Object.entries(t.dondeVer || {})
+    .filter(([c, b]) => c !== 'CL' && b && nombres(b).length)
+    .sort(([a], [b]) => (['MX', 'AR', 'CO', 'ES', 'US'].indexOf(a) + 1 || 99) - (['MX', 'AR', 'CO', 'ES', 'US'].indexOf(b) + 1 || 99))
+    .slice(0, 3)
+    .map(([c, b]) => `${c}: ${nombres(b).slice(0, 2).join(', ')}`);
+  return { enCl, otros, arriendo: cl ? [...(cl.arriendo || []), ...(cl.compra || [])].map((p) => p.nombre) : [] };
+}
+
+function _mensajeDondeVer(t) {
+  const r = _resumenDondeVer(t);
+  const anio = String(t.fecha || '').slice(0, 4);
+  let txt = `${t.tipo === 'tv' ? '📺' : '🎬'} <b>${_tgHtml(t.titulo)}</b>${anio ? ` (${anio})` : ''}\n`;
+  txt += r.enCl.length ? `\n🇨🇱 <b>En Chile:</b> ${_tgHtml([...new Set(r.enCl)].join(', '))}` : '\n🇨🇱 No está en plataformas de Chile por ahora.';
+  if (r.arriendo.length) txt += `\n💳 Arriendo o compra: ${_tgHtml([...new Set(r.arriendo)].slice(0, 3).join(', '))}`;
+  if (r.otros.length) txt += `\n🌎 <b>Con VPN:</b> ${_tgHtml(r.otros.join(' · '))}`;
+  if (t.sinopsis) txt += `\n\n${_tgHtml(t.sinopsis.length > 280 ? `${t.sinopsis.slice(0, 277)}…` : t.sinopsis)}`;
+  txt += '\n\n<i>Dónde ver: JustWatch vía TMDB.</i>';
+  return txt;
+}
+
+async function _buscarDondeVer(q, max) {
+  const r = await _mediaOps.buscar({ q });
+  const items = (r.items || []).slice(0, max);
+  const fichas = await Promise.all(items.map((it) => _mediaOps.titulo({ tipo: it.tipo, id: String(it.id) }).catch(() => null)));
+  return fichas.filter(Boolean);
+}
+
+async function _episodiosDeHoy() {
+  const listsDoc = await db.collection('animelists').doc(ANIME_CHAT_ID).get();
+  const viendo = listsDoc.exists && Array.isArray(listsDoc.data().viendo) ? listsDoc.data().viendo : [];
+  const porId = new Map(viendo.filter((a) => a && Number.isInteger(Number(a.id))).map((a) => [Number(a.id), a]));
+  if (!porId.size) return [];
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+  const [y, mo, d] = hoy.split('-').map(Number);
+  const off = _tzOffsetMin(new Date(), 'America/Santiago');
+  const desde = Math.floor((Date.UTC(y, mo - 1, d) - off * 60000) / 1000);
+  const hasta = desde + 86400;
+  const GQL = 'query($ids:[Int],$f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
+  const ids = [...porId.keys()];
+  const out = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const j = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: hasta });
+    out.push(...((j.data.Page && j.data.Page.airingSchedules) || []));
+  }
+  return out.map((s) => ({ s, a: porId.get(Number(s.media.id)) }));
+}
+
+exports.animeBotWebhook = onRequest(
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'], maxInstances: 2, timeoutSeconds: 30 },
+  async (req, res) => {
+    const botToken = process.env.ANIME_BOT_TOKEN;
+    if (req.method !== 'POST' || !botToken) { res.status(405).send(''); return; }
+    // 1) Firma de Telegram, antes de leer nada más.
+    const esperado = Buffer.from(_secretoWebhookAnime(botToken));
+    const recibido = Buffer.from(String(req.get('X-Telegram-Bot-Api-Secret-Token') || ''));
+    if (esperado.length !== recibido.length || !timingSafeEqual(esperado, recibido)) { res.status(401).send(''); return; }
+    const u = req.body || {};
+    try {
+      // 2) Botón «✅ Visto ep N»
+      if (u.callback_query) {
+        const cq = u.callback_query;
+        if (!ANIME_USUARIOS_PERMITIDOS.has(String(cq.from && cq.from.id))) {
+          await _tgApi(botToken, 'answerCallbackQuery', { callback_query_id: cq.id, text: 'Bot privado' });
+        } else {
+          const m = /^v:(\d{1,9}):(\d{1,5})$/.exec(String(cq.data || ''));
+          if (!m) {
+            await _tgApi(botToken, 'answerCallbackQuery', { callback_query_id: cq.id });
+          } else {
+            const r = await _marcarVistoAnime(Number(m[1]), Number(m[2]));
+            await _tgApi(botToken, 'answerCallbackQuery', { callback_query_id: cq.id, text: r ? `✓ Ep ${r.ahora} visto` : 'Ya no está en tus listas' });
+            // Cambia ese botón por «✓» en el mensaje.
+            const kb = cq.message && cq.message.reply_markup && cq.message.reply_markup.inline_keyboard;
+            if (r && Array.isArray(kb)) {
+              const nuevo = kb.map((fila) => fila.map((b) => (b.callback_data === cq.data ? { text: `✓ Visto ep ${m[2]}`, callback_data: 'x' } : b)));
+              await _tgApi(botToken, 'editMessageReplyMarkup', { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: nuevo } });
+            }
+          }
+        }
+        res.status(200).send('');
+        return;
+      }
+
+      // 3) Búsqueda inline: @anime_estreno_bot <título>
+      if (u.inline_query) {
+        const iq = u.inline_query;
+        const q = String(iq.query || '').trim().slice(0, 80);
+        let results = [];
+        if (ANIME_USUARIOS_PERMITIDOS.has(String(iq.from && iq.from.id)) && q.length >= 2) {
+          let fichas = [];
+          try { fichas = await _buscarDondeVer(q, 6); } catch (e) { logger.warn('[animeBot] inline TMDB:', e.message); }
+          results = fichas.map((t) => {
+            const r = _resumenDondeVer(t);
+            const desc = r.enCl.length ? `Chile: ${[...new Set(r.enCl)].slice(0, 3).join(', ')}` : (r.otros.length ? `No en Chile · VPN ${r.otros[0]}` : 'Sin plataformas conocidas');
+            const thumb = t.poster && /^\/[A-Za-z0-9_.-]+$/.test(t.poster) ? `https://image.tmdb.org/t/p/w92${t.poster}` : undefined;
+            return {
+              type: 'article',
+              id: `${t.tipo}-${t.id}`.slice(0, 64),
+              title: `${t.titulo}${t.fecha ? ` (${String(t.fecha).slice(0, 4)})` : ''}`.slice(0, 120),
+              description: desc.slice(0, 200),
+              thumbnail_url: thumb,
+              input_message_content: { message_text: _mensajeDondeVer(t), parse_mode: 'HTML', link_preview_options: { is_disabled: true } },
+            };
+          });
+        }
+        await _tgApi(botToken, 'answerInlineQuery', { inline_query_id: iq.id, results, cache_time: 600, is_personal: true });
+        res.status(200).send('');
+        return;
+      }
+
+      // 4) Comandos en el chat privado
+      const msg = u.message;
+      if (msg && msg.text && ANIME_USUARIOS_PERMITIDOS.has(String(msg.from && msg.from.id))) {
+        const chat = msg.chat.id;
+        const texto = msg.text.trim();
+        const abrir = { inline_keyboard: [[{ text: '🎌 Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
+        if (/^\/(start|app)\b/.test(texto)) {
+          await _sendTelegram(botToken, chat, '🎌 <b>AnimeTracker</b>\n\n/hoy — episodios de hoy de lo que estás viendo\n/buscar &lt;título&gt; — dónde ver una película o serie\n\nEn cualquier chat: escribe <code>@anime_estreno_bot</code> y un título.', abrir);
+        } else if (/^\/hoy\b/.test(texto)) {
+          const eps = await _episodiosDeHoy();
+          if (!eps.length) {
+            await _sendTelegram(botToken, chat, 'Hoy no sale nada de lo que estás viendo.', abrir);
+          } else {
+            const lineas = eps.map(({ s, a }) => {
+              const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || '').substring(0, 45));
+              const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
+              const visto = (Number(a && a.watchedEps) || 0) >= s.episode;
+              return `${visto ? '✅' : '▶️'} <b>${t}</b> · ep ${s.episode} · ${h}`;
+            });
+            const botones = eps.filter(({ s, a }) => (Number(a && a.watchedEps) || 0) < s.episode && s.airingAt * 1000 <= Date.now()).slice(0, 8)
+              .map(({ s }) => [{ text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`, callback_data: `v:${s.media.id}:${s.episode}` }]);
+            await _sendTelegram(botToken, chat, `📅 <b>Hoy en lo que estás viendo</b>\n\n${lineas.join('\n')}`, { inline_keyboard: [...botones, ...abrir.inline_keyboard] });
+          }
+        } else {
+          const m = /^\/buscar(?:@\w+)?\s+(.{2,80})$/s.exec(texto);
+          if (m) {
+            const fichas = await _buscarDondeVer(m[1].trim(), 1);
+            await _sendTelegram(botToken, chat, fichas.length ? _mensajeDondeVer(fichas[0]) : 'No encontré ese título.', abrir);
+          } else if (/^\/buscar\b/.test(texto)) {
+            await _sendTelegram(botToken, chat, 'Escribe el título después del comando, por ejemplo: <code>/buscar dune</code>', abrir);
+          }
+        }
+      }
+    } catch (e) {
+      logger.error('[animeBot] update falló:', e.message);
+    }
+    res.status(200).send(''); // siempre 200: si no, Telegram reintenta en bucle
   }
 );
 
