@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Line } from 'react-chartjs-2'
 import type { GraderAnalyticsResult, GraderAnalysisConfig } from '@/services/grader/types'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
 
 interface Props {
   analytics: GraderAnalyticsResult
@@ -8,14 +10,17 @@ interface Props {
 }
 
 export function PuntoCeroSerieTemporalCard({ analytics, config }: Props) {
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de canvas se leen de los tokens al pintar).
+  useColoresGrafico()
   const timeSeriesData = {
     labels: analytics.timeSeriesPointZero.map((p) => p.bucketStart),
     datasets: [
       {
         label: 'Punto Cero (piezas)',
         data: analytics.timeSeriesPointZero.map((p) => p.pointZeroPieces),
-        borderColor: 'rgba(239,68,68,0.9)',
-        backgroundColor: 'rgba(239,68,68,0.1)',
+        // Pizarra: única serie del gráfico = foco (serie 1); el rojo queda para estados fuera de banda.
+        borderColor: elegirColor('rgba(239,68,68,0.9)', 'serie-1', 0.9),
+        backgroundColor: elegirColor('rgba(239,68,68,0.1)', 'serie-1', 0.1),
         fill: true,
         tension: 0.3,
       },

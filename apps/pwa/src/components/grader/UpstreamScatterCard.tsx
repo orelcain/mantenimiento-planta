@@ -24,6 +24,8 @@
 
 import { useMemo } from 'react'
 import { useTheme } from '@/hooks/useTheme'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
 import ReactECharts from 'echarts-for-react'
 import { Card, CardContent } from '@/components/ui'
 import { ScatterChart, AlertTriangle, TrendingDown, TrendingUp, Minus } from 'lucide-react'
@@ -105,6 +107,8 @@ export function UpstreamScatterCard({
   const criticalKpi  = useMemo(() => scatterCriticalZone(seriesData, criticalThreshold, baaderMedian), [seriesData, criticalThreshold, baaderMedian])
   const ejeY = useMemo(() => scatterYMax(seriesData, criticalThreshold), [seriesData, criticalThreshold])
   const { isDark } = useTheme()
+  // Pizarra: `version` sube al cambiar Día/Penumbra o la paleta → se recalculan los colores.
+  const colores = useColoresGrafico()
   const skin = isDark ? CHART_SKIN.dark : CHART_SKIN.light
   const MACHINE_COLORS = isDark ? MACHINE_COLORS_BY_THEME.dark : MACHINE_COLORS_BY_THEME.light
   const TREND_COLORS = isDark ? TREND_COLORS_BY_THEME.dark : TREND_COLORS_BY_THEME.light
@@ -126,7 +130,8 @@ export function UpstreamScatterCard({
         silent: true,
         markArea: {
           silent: true,
-          itemStyle: { color: 'rgba(220, 38, 38, 0.06)' },  // red-600 muy tenue
+          // Pizarra: la zona crítica sale de una banda fijada de antemano (umbral crítico de P0%) → falla.
+          itemStyle: { color: elegirColor('rgba(220, 38, 38, 0.06)', 'grafico-falla', 0.08) },  // red-600 muy tenue
           // Sin rótulo: iba pegado al borde superior del área y el grid lo
           // recortaba contra el techo del gráfico. Las dos líneas punteadas ya
           // dicen dónde empieza la zona, y la nota de abajo las nombra.
@@ -144,24 +149,24 @@ export function UpstreamScatterCard({
             // Horizontal: P0%=3.5 (umbral crítico) — rojo dashed
             {
               yAxis: criticalThreshold,
-              lineStyle: { color: 'rgba(220, 38, 38, 0.45)', type: 'dashed', width: 1 },
+              lineStyle: { color: elegirColor('rgba(220, 38, 38, 0.45)', 'grafico-falla', 0.6), type: 'dashed', width: 1 },
               label: {
                 show: true,
                 position: 'insideEndTop',
                 formatter: `Crítico ${criticalThreshold}%`,
-                color: 'rgba(220, 38, 38, 0.7)',
+                color: elegirColor('rgba(220, 38, 38, 0.7)', 'ink-crit'),
                 fontSize: 9,
               },
             },
             // Vertical: mediana del ritmo Baader — slate dotted
             {
               xAxis: baaderMedian,
-              lineStyle: { color: 'rgba(148, 163, 184, 0.45)', type: 'dotted', width: 1 },
+              lineStyle: { color: elegirColor('rgba(148, 163, 184, 0.45)', 'grafico-neutro-medio', 0.6), type: 'dotted', width: 1 },
               label: {
                 show: true,
                 position: 'insideEndBottom',
                 formatter: `Mediana ${Math.round(baaderMedian)}`,
-                color: 'rgba(148, 163, 184, 0.7)',
+                color: elegirColor('rgba(148, 163, 184, 0.7)', 'muted-foreground'),
                 fontSize: 9,
               },
             },
@@ -174,8 +179,10 @@ export function UpstreamScatterCard({
     }
 
     seriesData.forEach((s, idx) => {
-      const color = MACHINE_COLORS[idx % MACHINE_COLORS.length]!
-      const trendColor = TREND_COLORS[idx % TREND_COLORS.length]!
+      // Pizarra: las máquinas son series 1-3 en orden fijo (Evisceradora 1, 2, 3).
+      const tokenSerie = `serie-${(idx % MACHINE_COLORS.length) + 1}`
+      const color = elegirColor(MACHINE_COLORS[idx % MACHINE_COLORS.length]!, tokenSerie, 0.85)
+      const trendColor = elegirColor(TREND_COLORS[idx % TREND_COLORS.length]!, tokenSerie)
 
       // Solo los puntos usables: los buckets de menos de 5 piezas ya quedaban
       // fuera de la regresión, de la mediana y de la zona crítica, pero el
@@ -287,7 +294,8 @@ export function UpstreamScatterCard({
       },
       series,
     }
-  }, [seriesData, baaderMedian, criticalThreshold, skin, MACHINE_COLORS, TREND_COLORS, ejeY.max])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seriesData, baaderMedian, criticalThreshold, skin, MACHINE_COLORS, TREND_COLORS, ejeY.max, colores.version])
 
   // Pendiente con magnitud operacional ("cada -10 ciclos → ±N pts P0%")
   const slopeMagnitude = useMemo(() => scatterSlopeMagnitude(seriesData), [seriesData])

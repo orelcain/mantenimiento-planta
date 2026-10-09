@@ -16,6 +16,8 @@
  * Aplica el principio "consistencia entre elementos" del CLAUDE.md.
  */
 
+import { elegirColor } from '@/lib/coloresGrafico'
+
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
 /** Default: P0% bajo este valor → operación saludable (verde). */
@@ -77,6 +79,19 @@ export function p0StatusHex(status: P0Status): string {
     case 'ok':       return '#22c55e'  // emerald-500
     case 'alert':    return '#f59e0b'  // amber-500
     case 'critical': return '#ef4444'  // red-500
+  }
+}
+
+/**
+ * Color de MARCA de gráfico (canvas/ECharts/SVG) según el estado del P0%. Sin Pizarra es EXACTAMENTE
+ * `p0StatusHex`. Con ella, la regla «foco, contexto, estado»: dentro de banda (ok) = serie 1 (acento),
+ * y solo alerta/crítico —valores fuera de los umbrales fijados de antemano— llevan aviso/falla.
+ */
+export function p0StatusGrafico(status: P0Status): string {
+  switch (status) {
+    case 'ok':       return elegirColor(p0StatusHex('ok'), 'serie-1')
+    case 'alert':    return elegirColor(p0StatusHex('alert'), 'grafico-aviso')
+    case 'critical': return elegirColor(p0StatusHex('critical'), 'grafico-falla')
   }
 }
 

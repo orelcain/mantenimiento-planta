@@ -39,15 +39,28 @@ describe('qualityColorHex', () => {
 
 describe('qualityColorTextClass', () => {
   it('matchea calidades canónicas con la clase tailwind correspondiente', () => {
-    expect(qualityColorTextClass('premium')).toBe('text-indigo-400')
-    expect(qualityColorTextClass('superior')).toBe('text-emerald-400 pizarra:text-[#10b981]')
-    expect(qualityColorTextClass('primera')).toBe('text-blue-400')
-    expect(qualityColorTextClass('segunda')).toBe('text-amber-400')
-    expect(qualityColorTextClass('tercera')).toBe('text-orange-400')
-    expect(qualityColorTextClass('industrial')).toBe('text-slate-400')
-    expect(qualityColorTextClass('descarte')).toBe('text-red-400')
-    expect(qualityColorTextClass('grado')).toBe('text-cyan-400')
-    expect(qualityColorTextClass('d')).toBe('text-zinc-400')
+    // Sin las variantes `pizarra:` (solo casan con la paleta Pizarra) es la clase de siempre.
+    const sinPizarra = (q: string) => qualityColorTextClass(q).split(' ').filter((c) => !c.startsWith('pizarra:')).join(' ')
+    expect(sinPizarra('premium')).toBe('text-indigo-400')
+    expect(sinPizarra('superior')).toBe('text-emerald-400')
+    expect(sinPizarra('primera')).toBe('text-blue-400')
+    expect(sinPizarra('segunda')).toBe('text-amber-400')
+    expect(sinPizarra('tercera')).toBe('text-orange-400')
+    expect(sinPizarra('industrial')).toBe('text-slate-400')
+    expect(sinPizarra('descarte')).toBe('text-red-400')
+    expect(sinPizarra('grado')).toBe('text-cyan-400')
+    expect(sinPizarra('d')).toBe('text-zinc-400')
+    // Con Pizarra: la rampa ordinal en las tres primeras; segunda/tercera con la tinta del acero
+    // (--calidad-4/5 no llegan a 4,5:1 como texto); el resto, la tinta de su serie.
+    expect(qualityColorTextClass('premium')).toContain('pizarra:text-[var(--calidad-1)]')
+    expect(qualityColorTextClass('superior')).toContain('pizarra:text-[var(--calidad-2)]')
+    expect(qualityColorTextClass('primera')).toContain('pizarra:text-[var(--calidad-3)]')
+    expect(qualityColorTextClass('segunda')).toContain('pizarra:text-cat-1-ink')
+    expect(qualityColorTextClass('tercera')).toContain('pizarra:text-cat-1-ink')
+    expect(qualityColorTextClass('industrial')).toContain('pizarra:text-cat-4-ink')
+    expect(qualityColorTextClass('descarte')).toContain('pizarra:text-cat-6-ink')
+    expect(qualityColorTextClass('grado')).toContain('pizarra:text-cat-7-ink')
+    expect(qualityColorTextClass('d')).toContain('pizarra:text-cat-5-ink')
   })
 
   it('fallback a text-muted-foreground cuando no hay match', () => {

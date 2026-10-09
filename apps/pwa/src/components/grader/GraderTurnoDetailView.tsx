@@ -40,7 +40,11 @@ import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
 import { listPieceRecords, loadTimelineAggregates, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { GraderTimelineChart } from '@/components/grader/GraderTimelineChart'
-import { p0StatusFromPct, p0StatusColor, p0StatusBgBorderClass, p0StatusHex } from '@/services/grader/graderP0Thresholds'
+import { p0StatusFromPct, p0StatusColor, p0StatusBgBorderClass, p0StatusGrafico } from '@/services/grader/graderP0Thresholds'
+import { heatColor, heatBorder } from '@/services/grader/graderHeatColor'
+import { qualityColorCanvas } from '@/services/grader/graderQualityColors'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
 import { dec1 } from '@/utils/formatoNumeros'
 
 // Registrar los elementos de Chart.js necesarios (idempotente si ya están)
@@ -106,35 +110,6 @@ const DOUGHNUT_COLORS = [
   'rgba(107, 114, 128, 0.75)', // gray
 ]
 
-/**
- * Gradiente mapa de calor: AZUL (valor bajo) → VERDE (medio) → ROJO (valor alto)
- * t=0 → azul frío (59,130,246)
- * t=0.5 → verde (16,185,129)
- * t=1 → rojo caliente (239,68,68)
- */
-function heatColor(value: number, min: number, max: number, alpha = 0.78): string {
-  const t = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0.5
-  let r: number, g: number, b: number
-  if (t <= 0.5) {
-    // azul → verde
-    const s = t / 0.5
-    r = Math.round(59 * (1 - s) + 16 * s)
-    g = Math.round(130 * (1 - s) + 185 * s)
-    b = Math.round(246 * (1 - s) + 129 * s)
-  } else {
-    // verde → rojo
-    const s = (t - 0.5) / 0.5
-    r = Math.round(16 * (1 - s) + 239 * s)
-    g = Math.round(185 * (1 - s) + 68 * s)
-    b = Math.round(129 * (1 - s) + 68 * s)
-  }
-  return `rgba(${r},${g},${b},${alpha})`
-}
-
-function heatBorder(value: number, min: number, max: number): string {
-  return heatColor(value, min, max, 1)
-}
-
 // ── Componente ───────────────────────────────────────────────────────────────
 
 interface Props {
@@ -147,6 +122,8 @@ interface Props {
 
 export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButton }: Props) {
   const navigate = useNavigate()
+  // Pizarra: `version` sube al cambiar Día/Penumbra o la paleta → se recalculan los colores de los canvas.
+  const colores = useColoresGrafico()
 
   // ── Estado IA ────────────────────────────────────────────────────────────
   const [aiLoading, setAiLoading] = useState(false)
@@ -229,7 +206,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         borderWidth: 1,
       }],
     }
-  }, [summary.calibreDistribution])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary.calibreDistribution, colores.version])
 
   const qualityChartData = useMemo(() => {
     const dist = summary.qualityDistribution ?? []
@@ -240,11 +218,13 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
       datasets: [{
         label: 'Piezas',
         data: sorted.map((d) => d.pieces),
-        backgroundColor: sorted.map((_, i) => DOUGHNUT_COLORS[i % DOUGHNUT_COLORS.length]),
+        // Pizarra: cada calidad lleva el color de SU calidad (rampa ordinal), no el de su posición.
+        backgroundColor: sorted.map((d, i) => qualityColorCanvas(d.quality, DOUGHNUT_COLORS[i % DOUGHNUT_COLORS.length]!, 0.9)),
         borderWidth: 2,
       }],
     }
-  }, [summary.qualityDistribution])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary.qualityDistribution, colores.version])
 
   const gateChartData = useMemo(() => {
     const dist = summary.gateDistribution ?? []
@@ -259,16 +239,19 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
       datasets: [{
         label: 'Piezas',
         data: values,
+        // Pizarra: G0 (P0, piezas sin compuerta) = neutro fuerte, distinto de la rampa de cantidad;
+        // el rojo queda para estados fuera de banda.
         backgroundColor: sorted.map((d) =>
-          d.gate === 0 ? 'rgba(239, 68, 68, 0.7)' : heatColor(d.pieces, min, max),
+          d.gate === 0 ? elegirColor('rgba(239, 68, 68, 0.7)', 'grafico-neutro-fuerte', 0.8) : heatColor(d.pieces, min, max),
         ),
         borderColor: sorted.map((d) =>
-          d.gate === 0 ? 'rgba(239, 68, 68, 1)' : heatBorder(d.pieces, min, max),
+          d.gate === 0 ? elegirColor('rgba(239, 68, 68, 1)', 'grafico-neutro-fuerte') : heatBorder(d.pieces, min, max),
         ),
         borderWidth: 1,
       }],
     }
-  }, [summary.gateDistribution])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary.gateDistribution, colores.version])
 
   const displayMinutes = useMemo(() => safeMinutes(summary), [summary])
   const displayRate = useMemo(() => {
@@ -567,23 +550,23 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                       {
                         label: 'P0%',
                         data: p0PctData,
-                        borderColor: 'rgba(239, 68, 68, 1)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderColor: elegirColor('rgba(239, 68, 68, 1)', 'serie-1'),
+                        backgroundColor: elegirColor('rgba(239, 68, 68, 0.1)', 'serie-1', 0.1),
                         borderWidth: 2.5,
                         fill: true,
                         tension: 0.3,
                         pointRadius: 5,
                         pointHoverRadius: 7,
-                        pointBackgroundColor: p0PctData.map(v => p0StatusHex(p0StatusFromPct(v))),
-                        pointBorderColor: 'rgba(255,255,255,0.8)',
+                        pointBackgroundColor: p0PctData.map(v => p0StatusGrafico(p0StatusFromPct(v))),
+                        pointBorderColor: elegirColor('rgba(255,255,255,0.8)', 'card', 0.9),
                         pointBorderWidth: 2,
                         yAxisID: 'yP0',
                       },
                       {
                         label: 'Piezas/hora',
                         data: buckets.map(b => b.totalPieces),
-                        borderColor: 'rgba(59, 130, 246, 0.6)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                        borderColor: elegirColor('rgba(59, 130, 246, 0.6)', 'grafico-neutro-medio', 0.8),
+                        backgroundColor: elegirColor('rgba(59, 130, 246, 0.08)', 'grafico-neutro-medio', 0.1),
                         borderWidth: 1.5,
                         fill: true,
                         tension: 0.3,
@@ -594,7 +577,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                       {
                         label: 'Piezas P0',
                         data: buckets.map(b => b.p0Pieces),
-                        borderColor: 'rgba(239, 68, 68, 0.4)',
+                        borderColor: elegirColor('rgba(239, 68, 68, 0.4)', 'grafico-neutro-fuerte', 0.7),
                         backgroundColor: 'transparent',
                         borderWidth: 1,
                         borderDash: [4, 4],
@@ -640,7 +623,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                         suggestedMax: Math.max(5, Math.max(...p0PctData) + 1),
                         ticks: { callback: (v: any) => `${v}%`, font: { size: 10 } },
                         title: { display: true, text: 'P0%', font: { size: 10 } },
-                        grid: { color: 'rgba(239, 68, 68, 0.08)' },
+                        grid: { color: elegirColor('rgba(239, 68, 68, 0.08)', 'grafico-neutro-medio', 0.15) },
                       },
                       yProd: {
                         type: 'linear' as const,
@@ -660,15 +643,15 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {/* Leyenda de colores P0 */}
               <div className="flex items-center gap-4 mt-2 text-caption text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 pizarra:bg-[rgb(var(--serie-1))]" />
                   P0% {'<'} 2% (OK)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 pizarra:bg-[rgb(var(--grafico-aviso))]" />
                   2-3.5% (Warn)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 pizarra:bg-[rgb(var(--grafico-falla))]" />
                   {'>'} 3.5% (Crítico)
                 </span>
                 <span className="text-muted-foreground/50 ml-auto">Detalle pieza a pieza disponible en "Abrir dashboard completo"</span>
@@ -784,7 +767,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                     datasets: qualityChartData.datasets.map((ds: any) => ({
                       ...ds,
                       borderWidth: 2,
-                      borderColor: 'rgba(0,0,0,0.3)',
+                      borderColor: elegirColor('rgba(0,0,0,0.3)', 'card'),
                       hoverBorderWidth: 3,
                       hoverOffset: 8,
                     })),

@@ -17,6 +17,8 @@ import type {
 } from '@/services/grader/types'
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
 type CvSignal = { cls: string; label: string; bar: string }
@@ -44,6 +46,8 @@ export function TendenciaWeightCard({
   onSetWeightChartMode,
   getPointZeroSeverity,
 }: Props) {
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de canvas se leen de los tokens al pintar).
+  useColoresGrafico()
   return (
     <>
       <Card>
@@ -110,8 +114,9 @@ export function TendenciaWeightCard({
                 {
                   label: 'Peso observado (g)',
                   data: trendForecastView?.realAvgData ?? analytics.weightTrendSeries.map((b) => b.avgWeightGrams),
-                  borderColor: 'rgba(59,130,246,0.9)',
-                  backgroundColor: 'rgba(59,130,246,0.05)',
+                  // Pizarra: el peso observado es el foco (serie 1); su proyección es la misma serie punteada.
+                  borderColor: elegirColor('rgba(59,130,246,0.9)', 'serie-1', 0.9),
+                  backgroundColor: elegirColor('rgba(59,130,246,0.05)', 'serie-1', 0.05),
                   fill: false,
                   tension: 0.3,
                   pointRadius: 3,
@@ -120,7 +125,7 @@ export function TendenciaWeightCard({
                   ? [{
                       label: 'Peso proyectado (g)',
                       data: trendForecastView.projectedAvgData,
-                      borderColor: 'rgba(168,85,247,0.95)',
+                      borderColor: elegirColor('rgba(168,85,247,0.95)', 'serie-1', 0.8),
                       borderDash: [6, 4],
                       fill: false,
                       tension: 0.25,
@@ -131,7 +136,7 @@ export function TendenciaWeightCard({
                   {
                     label: 'Media Móvil 5',
                     data: trendForecastView?.realMovingAvgData ?? analytics.weightTrendSeries.map((b) => b.movingAvg5 ?? null),
-                    borderColor: 'rgba(139,92,246,0.8)',
+                    borderColor: elegirColor('rgba(139,92,246,0.8)', 'grafico-neutro-fuerte', 0.9),
                     borderDash: [6, 3],
                     fill: false,
                     tension: 0.4,
@@ -140,8 +145,8 @@ export function TendenciaWeightCard({
                   {
                     label: '+1σ',
                     data: trendForecastView?.realUpperBand ?? analytics.weightTrendSeries.map((b) => b.avgWeightGrams + b.stdDevWeightGrams),
-                    borderColor: 'rgba(16,185,129,0.3)',
-                    backgroundColor: 'rgba(16,185,129,0.05)',
+                    borderColor: elegirColor('rgba(16,185,129,0.3)', 'grafico-neutro-medio', 0.45),
+                    backgroundColor: elegirColor('rgba(16,185,129,0.05)', 'grafico-neutro-medio', 0.1),
                     fill: '+1' as const,
                     tension: 0.3,
                     pointRadius: 0,
@@ -150,7 +155,7 @@ export function TendenciaWeightCard({
                   {
                     label: '−1σ',
                     data: trendForecastView?.realLowerBand ?? analytics.weightTrendSeries.map((b) => Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)),
-                    borderColor: 'rgba(16,185,129,0.3)',
+                    borderColor: elegirColor('rgba(16,185,129,0.3)', 'grafico-neutro-medio', 0.45),
                     fill: false,
                     tension: 0.3,
                     pointRadius: 0,
@@ -234,8 +239,8 @@ export function TendenciaWeightCard({
                     {
                       label: 'Piezas observadas',
                       data: trendForecastView.realPiecesData,
-                      borderColor: 'rgba(37,99,235,0.95)',
-                      backgroundColor: 'rgba(37,99,235,0.12)',
+                      borderColor: elegirColor('rgba(37,99,235,0.95)', 'serie-1', 0.95),
+                      backgroundColor: elegirColor('rgba(37,99,235,0.12)', 'serie-1', 0.12),
                       fill: false,
                       tension: 0.25,
                       pointRadius: 2,
@@ -243,7 +248,7 @@ export function TendenciaWeightCard({
                     {
                       label: 'Piezas proyectadas',
                       data: trendForecastView.projectedPiecesData,
-                      borderColor: 'rgba(217,70,239,0.95)',
+                      borderColor: elegirColor('rgba(217,70,239,0.95)', 'serie-1', 0.8),
                       borderDash: [6, 4],
                       fill: false,
                       tension: 0.2,

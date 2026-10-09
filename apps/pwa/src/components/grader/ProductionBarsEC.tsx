@@ -22,6 +22,9 @@ import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { dec, dec1 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
+import { colorBarraProduccion } from './graderTimelineColors'
 
 interface Props {
   intervals: UpstreamProductionInterval[]
@@ -29,14 +32,6 @@ interface Props {
   windowStart?: Date
   windowEnd?: Date
 }
-
-const COLOR_MAP: Record<UpstreamProductionInterval['color'], string> = {
-  green:  'rgba(16, 185, 129, 0.9)',  // emerald-500
-  yellow: 'rgba(245, 158, 11, 0.9)',  // amber-500
-  red:    'rgba(244, 63, 94, 0.9)',   // rose-500
-  gray:   'rgba(51, 65, 85, 0.6)',    // slate-700
-}
-
 
 function fmtPct(x: number, decimals = 1): string {
   if (!isFinite(x)) return '—'
@@ -48,6 +43,8 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
   const myHoverId = useId()
   const timelineSync = useTimelineSyncOptional()
   const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
+  // Pizarra: `version` sube al cambiar Día/Penumbra o la paleta → se recalculan los colores.
+  const colores = useColoresGrafico()
 
   // ── Hover cross-chart (Fase 4b) — snap al minuto para evitar re-render
   // por pixel (idempotencia del setHover skip cuando ms === prev.ms).
@@ -117,7 +114,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
   // temporal del interval (alineado pixel-perfect con Gantt y Grader).
   const seriesData = useMemo(() => {
     return intervals.map((it) => ({
-      value: [it.startAt.getTime(), it.endAt.getTime(), it.cycles, COLOR_MAP[it.color]],
+      value: [it.startAt.getTime(), it.endAt.getTime(), it.cycles, colorBarraProduccion(it.color)],
       meta: {
         startAt: it.startAt,
         cycles: it.cycles,
@@ -125,7 +122,8 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         ratio: it.ratio,
       },
     }))
-  }, [intervals])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intervals, colores.version])
 
   // Valor máximo para escalar la altura (pixels) — usa el max de cycles
   // y expectedCycles para que la línea objetivo siempre quede dentro del rango
@@ -159,11 +157,12 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
       .filter((lc) => lc.ms >= rangeStart.getTime() && lc.ms <= rangeEnd.getTime())
       .map((lc) => ({
         xAxis: lc.ms,
-        lineStyle: { color: 'rgba(139,92,246,0.55)', type: 'dotted' as const, width: 1 },
+        lineStyle: { color: elegirColor('rgba(139,92,246,0.55)', 'grafico-meta', 0.55), type: 'dotted' as const, width: 1 },
         label: { show: false },
       }))
   // Misma razón que StateTimelineEC: dep = lotChanges, no timelineSync completo.
-  }, [timelineSync?.lotChanges, rangeStart, rangeEnd])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timelineSync?.lotChanges, rangeStart, rangeEnd, colores.version])
 
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
@@ -216,8 +215,8 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         if (!m) return ''
         return [
           `<b>${fmtTime(m.startAt)}</b>`,
-          `<span style="color:#10b981">▮</span> Producido: <b>${m.cycles}</b> pz`,
-          `<span style="color:#a78bfa">┄</span> Objetivo: ${Math.round(m.expectedCycles)} pz`,
+          `<span style="color:${elegirColor('#10b981', 'serie-1')}">▮</span> Producido: <b>${m.cycles}</b> pz`,
+          `<span style="color:${elegirColor('#a78bfa', 'grafico-meta')}">┄</span> Objetivo: ${Math.round(m.expectedCycles)} pz`,
           `<span style="color:#94a3b8">→</span> Cumplimiento: <b>${fmtPct(m.ratio, 0)}</b>`,
         ].join('<br/>')
       },
@@ -264,7 +263,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
           silent: true,
           symbol: 'none',
           lineStyle: {
-            color: 'rgba(167, 139, 250, 0.7)',
+            color: elegirColor('rgba(167, 139, 250, 0.7)', 'grafico-meta', 0.8),
             type: 'dashed' as const,
             width: 1,
           },
@@ -276,9 +275,9 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
                 show: true,
                 position: 'insideEndTop' as const,
                 formatter: `Objetivo ${Math.round(expected)} ± ${threshold}%`,
-                color: '#a78bfa',
+                color: elegirColor('#a78bfa', 'muted-foreground'),
                 fontSize: 9,
-                backgroundColor: 'rgba(15,23,42,0.9)',
+                backgroundColor: elegirColor('rgba(15,23,42,0.9)', 'card', 0.9),
                 padding: [2, 4, 2, 4] as [number, number, number, number],
                 borderRadius: 2,
               },
@@ -288,7 +287,8 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         } : undefined,
       },
     ],
-  }), [rangeStart, rangeEnd, seriesData, maxValue, expected, threshold, lotMarkLines])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [rangeStart, rangeEnd, seriesData, maxValue, expected, threshold, lotMarkLines, colores.version])
 
   if (intervals.length === 0) {
     return <div className="h-16 rounded-ctl bg-muted-foreground/[0.10]" />

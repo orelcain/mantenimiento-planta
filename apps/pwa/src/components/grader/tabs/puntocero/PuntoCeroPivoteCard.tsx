@@ -7,6 +7,8 @@ import { getTooltipProps } from '@/services/grader/graderTooltips'
 import { pctCalc } from '@/services/grader/graderDashboardHelpers'
 import type { GraderAnalyticsResult } from '@/services/grader/types'
 import { dec1 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { colorTipoError } from '../../graderTimelineColors'
 
 const errorColorMap: Record<string, string> = {
   'Fuera de rango': 'rgba(239,68,68,0.75)',
@@ -23,6 +25,8 @@ interface Props {
 
 export function PuntoCeroPivoteCard({ analytics }: Props) {
   const [p0ErrorFilter, setP0ErrorFilter] = useState<string | null>(null)
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de canvas se leen de los tokens al pintar).
+  useColoresGrafico()
 
   const allRows = analytics.pointZeroClassification.hierarchy
   if (allRows.length === 0) return null
@@ -45,8 +49,9 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
     return {
       label: errorLabel,
       data,
-      backgroundColor: errorColorMap[errorLabel] || 'rgba(107,114,128,0.6)',
-      borderColor: errorColorMap[errorLabel]?.replace('0.75', '1') || 'rgba(107,114,128,1)',
+      // Pizarra: tipo de error → serie 1-5 / Otros (mismo mapa que la clasificación y el timeline).
+      backgroundColor: colorTipoError(errorLabel, errorColorMap[errorLabel] || 'rgba(107,114,128,0.6)', 0.8),
+      borderColor: colorTipoError(errorLabel, errorColorMap[errorLabel]?.replace('0.75', '1') || 'rgba(107,114,128,1)'),
       borderWidth: 1,
     }
   })
