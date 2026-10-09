@@ -43,10 +43,16 @@ export function tendenciaImputacion(porTurno: PeriodImputacion['porTurno']): Ten
  * claro es la convención del repo, la misma que usan GateBreakdownCard y
  * ActionPlanPanel.
  */
+/**
+ * Pizarra («foco, contexto, estado»): la barra de cada turno va en serie 1, SÓLIDA — al 15 % de
+ * las clases de arriba quedaba en 1,1-1,3:1 contra la tarjeta y no se veía —, y solo los turnos
+ * bajo 60 % (decisión: imputar) pasan a falla. «Documentado» y «parcial» pierden el color de
+ * estado: el texto va en neutro.
+ */
 const nivel = (pct: number) =>
-  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
-  : { text: 'text-ink-crit', bar: 'bg-red-500/[0.15]', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-ink-warn pizarra:text-muted-foreground', bar: 'bg-amber-500/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Parcial' }
+  : { text: 'text-ink-crit', bar: 'bg-red-500/[0.15] pizarra:bg-[rgb(var(--grafico-falla))]', label: 'Sin imputar' }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
   if (!imputacion || imputacion.totalSec <= 0) return null

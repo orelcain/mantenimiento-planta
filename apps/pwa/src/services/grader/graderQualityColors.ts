@@ -95,6 +95,48 @@ export function qualityColorHex(quality: string | undefined | null): string {
   return resolveEntry(quality).hex
 }
 
+// ── Pizarra: rampa ORDINAL por token ─────────────────────────────────────────
+
+/**
+ * Color CSS por TOKEN (Pizarra, spec «foco, contexto, estado»). Las calidades son un orden,
+ * no categorías: premium → tercera = rampa azul de 5 pasos (`--calidad-1..5`, más oscuro =
+ * mejor en Día, más claro = mejor en Penumbra); industrial = neutro fuerte; descarte = serie 3;
+ * grado = serie 4; d = neutro medio. Solo se resuelve con la paleta Pizarra activa: `qualityColorHex`
+ * NO cambia (hay tests que fijan sus hex y los usan PDF/exportaciones, que no leen CSS).
+ */
+const QUALITY_VARS: Record<QualityKey, string> = {
+  premium:    'var(--calidad-1)',
+  superior:   'var(--calidad-2)',
+  primera:    'var(--calidad-3)',
+  segunda:    'var(--calidad-4)',
+  tercera:    'var(--calidad-5)',
+  industrial: 'rgb(var(--grafico-neutro-fuerte))',
+  descarte:   'rgb(var(--serie-3))',
+  grado:      'rgb(var(--serie-4))',
+  d:          'rgb(var(--grafico-neutro-medio))',
+}
+const FALLBACK_VAR = 'rgb(var(--serie-otros))'
+
+/** `var(--…)` de la calidad bajo Pizarra; sirve en `style` HTML/SVG (no en canvas). */
+export function qualityColorVar(quality: string | undefined | null): string {
+  const k = (quality ?? '').toLowerCase().replace(/[^a-z]/g, '')
+  if (!k) return FALLBACK_VAR
+  for (const key of QUALITY_KEYS) {
+    if (k.includes(key)) return QUALITY_VARS[key]
+  }
+  return FALLBACK_VAR
+}
+
+/**
+ * Lo que se pinta en pantalla: la variante por token con Pizarra, el hex de siempre sin ella.
+ * Para inline styles de HTML/SVG (puntos de leyenda). Canvas/ECharts siguen con `qualityColorHex`.
+ */
+export function qualityColorDisplay(quality: string | undefined | null): string {
+  return typeof document !== 'undefined' && document.documentElement.getAttribute('data-paleta') === 'pizarra'
+    ? qualityColorVar(quality)
+    : qualityColorHex(quality)
+}
+
 /**
  * Clase Tailwind de color de texto para una calidad — usar en className de
  * spans / labels. Devuelve `text-muted-foreground` cuando no hay match.

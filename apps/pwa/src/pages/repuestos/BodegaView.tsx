@@ -51,6 +51,7 @@ import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
 import { StockTablaPC } from './StockTablaPC'
 import { useEsPC } from '@/hooks/useEsPC'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { Pill, SegmentedControl, Button as PielButton } from '@/components/piel'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
@@ -1279,9 +1280,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         <div className="p-4">
           <div className="grid grid-cols-3 gap-3 mb-3">
             {[
-              { label: 'A — Crítico', data: abcData.A, color: 'text-ink-crit', bg: 'bg-red-500/[0.15]', desc: '80% del valor' },
-              { label: 'B — Importante', data: abcData.B, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15]', desc: '15% del valor' },
-              { label: 'C — Estándar', data: abcData.C, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]', desc: '5% del valor' },
+              { label: 'A — Crítico', data: abcData.A, color: 'text-ink-crit pizarra:text-brand-ink', bg: 'bg-red-500/[0.15] pizarra:bg-[rgb(var(--serie-1)/0.15)]', desc: '80% del valor' },
+              { label: 'B — Importante', data: abcData.B, color: 'text-ink-warn pizarra:text-muted-foreground', bg: 'bg-amber-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-fuerte)/0.15)]', desc: '15% del valor' },
+              { label: 'C — Estándar', data: abcData.C, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-medio)/0.15)]', desc: '5% del valor' },
             ].map(cat => (
               <div key={cat.label} className={`rounded-card border border-border p-3 ${cat.bg}`}>
                 <p className={`text-xs font-semibold ${cat.color}`}>{cat.label}</p>
@@ -1296,9 +1297,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           {/* Barra proporcional */}
           {abcData.totalValor > 0 && (
             <div className="h-4 rounded-full overflow-hidden flex bg-muted">
-              {abcData.A.length > 0 && <div className="bg-red-500/[0.15] h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
-              {abcData.B.length > 0 && <div className="bg-amber-500/[0.15] h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
-              {abcData.C.length > 0 && <div className="bg-emerald-500/[0.15] h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
+              {abcData.A.length > 0 && <div className="bg-red-500/[0.15] pizarra:bg-[rgb(var(--serie-1))] h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
+              {abcData.B.length > 0 && <div className="bg-amber-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-fuerte))] h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
+              {abcData.C.length > 0 && <div className="bg-emerald-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-medio))] h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
             </div>
           )}
         </div>
@@ -1648,7 +1649,10 @@ function EmptyState({ message }: { message: string }) {
   return (<div className="text-center py-12 text-muted-foreground"><Package className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm font-medium">{message}</p></div>)
 }
 
-function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data: number[]; width?: number; height?: number; color?: string }) {
+/** `token`: color de la paleta Pizarra (estado: falla / aviso; normal = serie 1). Sin Pizarra manda `color`. */
+function Sparkline({ data, width = 80, height = 24, color = '#3b82f6', token }: { data: number[]; width?: number; height?: number; color?: string; token?: string }) {
+  const { elegir } = useColoresGrafico()
+  const trazo = token ? elegir(color, token) : color
   if (data.length < 2) return <span className="text-caption text-muted-foreground">—</span>
   const min = Math.min(...data)
   const max = Math.max(...data)
@@ -1662,8 +1666,8 @@ function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data:
   const last = coords[coords.length - 1] ?? { x: 0, y: 0 }
   return (
     <svg width={width} height={height} className="shrink-0">
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={last.x} cy={last.y} r="2" fill={color} />
+      <polyline points={points} fill="none" stroke={trazo} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last.x} cy={last.y} r="2" fill={trazo} />
     </svg>
   )
 }
@@ -1849,7 +1853,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                 <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-mono">{item.codigoSAP}</span>
                 {item.codigoFabricante && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-cat-6-tint/[0.15] text-cat-6-ink font-mono">{item.codigoFabricante}</span>}
                 {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
-                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn' : 'bg-emerald-500/[0.15] text-ink-ok'}`}>ABC: {item.categoria}</span>}
+                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit pizarra:bg-[rgb(var(--serie-1)/0.15)] pizarra:text-brand-ink' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-[rgb(var(--grafico-neutro-fuerte)/0.15)] pizarra:text-muted-foreground' : 'bg-emerald-500/[0.15] text-ink-ok pizarra:bg-[rgb(var(--grafico-neutro-medio)/0.15)]'}`}>ABC: {item.categoria}</span>}
               </div>
             </div>
             <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
@@ -1916,7 +1920,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <div className="rounded-card border border-border p-3">
               <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1"><Activity className="h-3 w-3" /> Tendencia de stock</p>
               <div className="flex items-center justify-center">
-                <Sparkline data={sparkData} width={280} height={40} color={isSin ? '#ef4444' : isBajo ? '#f59e0b' : '#3b82f6'} />
+                <Sparkline data={sparkData} width={280} height={40} color={isSin ? '#ef4444' : isBajo ? '#f59e0b' : '#3b82f6'} token={isSin ? 'grafico-falla' : isBajo ? 'grafico-aviso' : 'serie-1'} />
               </div>
             </div>
           )}
