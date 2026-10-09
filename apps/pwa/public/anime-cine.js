@@ -129,8 +129,11 @@
 
   // ── Persistencia ────────────────────────────────────────────────────────
   const docRef = () => db.collection('animelists').doc(getUserId()).collection('cine').doc('datos');
+  let ultimaLectura = 0;
   async function cargarDatos() {
-    if (est.cargado) return;
+    // Relee al volver a Cine (cambios hechos en el teléfono/PC), salvo que haya
+    // un guardado pendiente en esta pantalla.
+    if (est.cargado && (guardarTimer || Date.now() - ultimaLectura < 30000)) return;
     try {
       const snap = await docRef().get();
       if (snap.exists) {
@@ -138,7 +141,7 @@
         est.datos.plataformas = Array.isArray(d.plataformas) ? d.plataformas.filter((x) => Number.isInteger(x)) : [];
         est.datos.lista = (Array.isArray(d.lista) ? d.lista : [])
           .filter((x) => clave(x))
-          .map((x) => ({ id: x.id, tipo: x.tipo, titulo: String(x.titulo || '').slice(0, 200), poster: ruta(x.poster), fecha: /^d{4}-d{2}-d{2}$/.test(x.fecha || '') ? x.fecha : '', estado: x.estado === 'visto' ? 'visto' : 'pendiente', agregado: Number(x.agregado) || 0, vistoEn: Number(x.vistoEn) || null,
+          .map((x) => ({ id: x.id, tipo: x.tipo, titulo: String(x.titulo || '').slice(0, 200), poster: ruta(x.poster), fecha: /^\d{4}-\d{2}-\d{2}$/.test(x.fecha || '') ? x.fecha : '', estado: x.estado === 'visto' ? 'visto' : 'pendiente', agregado: Number(x.agregado) || 0, vistoEn: Number(x.vistoEn) || null,
             links: Array.isArray(x.links) ? x.links.filter((u) => typeof u === 'string' && LINK_OK.test(u)).slice(0, 10) : [] }));
         const f = d.filtros || {};
         est.datos.filtros = {
@@ -149,6 +152,7 @@
         };
       }
       est.cargado = true;
+      ultimaLectura = Date.now();
     } catch (e) {
       console.error('cine cargarDatos', e);
       avisar('No se pudieron cargar tus datos de cine');
@@ -161,6 +165,7 @@
     clearTimeout(guardarTimer);
     guardarTimer = setTimeout(async () => {
       try {
+        guardarTimer = null;
         await docRef().set({
           plataformas: est.datos.plataformas,
           lista: est.datos.lista.slice(0, LISTA_MAX),
@@ -409,7 +414,10 @@
     return p;
   }
 
+  let hoyReq = 0;
   async function cargarHoy() {
+    const yo = ++hoyReq;
+    const vigente = () => yo === hoyReq && est.tab === 'hoy';
     if (hayFiltroContenido() && !est.generos && est.datos.filtros.generos.length) {
       Promise.all([api('generos', { tipo: 'movie' }), api('generos', { tipo: 'tv' })]).then(([m, t]) => {
         const mapa = new Map();
@@ -422,16 +430,16 @@
     const sel = est.tipo;
     try {
       const res = await Promise.all(tipos.map((t) => api('descubrir', paramsDescubrir(t))));
-      if (sel !== est.tipo || est.tab !== 'hoy') return;
+      if (!vigente()) return;
       const todos = res.flatMap((r) => r.items);
       const items = (hayFiltroContenido() ? intercalar(res.map((r) => r.items)) : todos.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))).slice(0, 12);
       pintar('c-nuevo', items.length ? items.map((it) => tarjeta(it)).join('') : '<p class="c-vacio" style="grid-column:1/-1">No hay títulos con estos filtros.</p>');
     } catch (e) { pintar('c-nuevo', `<p class="c-vacio" style="grid-column:1/-1">${esc(e.message)}</p>`); }
-    cargarPorPlataforma(tipos, sel);
+    cargarPorPlataforma(tipos, sel, vigente);
     try {
       const t = est.tipo === 'tv' || est.tipo === 'movie' ? est.tipo : 'all';
       const r = await api('tendencias', { tipo: t });
-      if (sel !== est.tipo || est.tab !== 'hoy') return;
+      if (!vigente()) return;
       let items = r.items;
       if (est.tipo === 'anime') items = items.filter((x) => x.idioma === 'ja');
       pintar('c-tend', items.length ? items.slice(0, 12).map((it) => tarjeta(it)).join('') : '<p class="c-vacio">Sin tendencias para este tipo.</p>');
@@ -454,13 +462,13 @@
   }
 
   // Un carrusel por cada plataforma que pagas: lo más popular que tiene hoy en Chile.
-  async function cargarPorPlataforma(tipos, sel) {
+  async function cargarPorPlataforma(tipos, sel, vigente) {
     const cont = document.getElementById('c-plats');
     if (!cont || (!est.datos.plataformas.length && alcance() !== 'todas')) return;
     try {
       if (!est.provCL) est.provCL = (await api('plataformas', { region: PAIS })).items;
     } catch { est.provCL = est.provCL || []; }
-    if (sel !== est.tipo || est.tab !== 'hoy') return;
+    if (!vigente()) return;
     const orden = new Map((est.provCL || []).map((p, i) => [p.id, i]));
     const propias = est.datos.plataformas
       .map((id) => (est.provCL || []).find((p) => p.id === id) || { id, nombre: `Plataforma ${id}`, logo: null })
@@ -480,7 +488,7 @@
       const el = document.getElementById(`c-plat-${p.id}`);
       try {
         const res = await Promise.all(tipos.map((t) => api('descubrir', { ...paramsDescubrir(t, [p.id]), orden: 'populares' })));
-        if (sel !== est.tipo || est.tab !== 'hoy' || !el.isConnected) return;
+        if (!vigente() || !el.isConnected) return;
         const items = intercalar(res.map((r) => r.items)).slice(0, 15);
         el.innerHTML = items.length ? items.map((it) => tarjeta(it)).join('') : '<p class="c-vacio">Nada con estos filtros aquí.</p>';
       } catch (e) {
@@ -599,6 +607,13 @@
     try {
       const t = await api('titulo', { tipo, id });
       if (yo !== fichaReq || !ficha.classList.contains('abierta')) return;
+      // Repara datos de la lista que un bug anterior dejó sin fecha o póster.
+      const guardado = enLista(t.tipo, t.id);
+      if (guardado && est.cargado && ((!guardado.fecha && t.fecha) || (!guardado.poster && t.poster))) {
+        guardado.fecha = guardado.fecha || t.fecha || '';
+        guardado.poster = guardado.poster || ruta(t.poster);
+        guardar();
+      }
       ficha.innerHTML = htmlFicha(t);
       ficha.dataset.tipo = tipo;
       ficha.dataset.id = String(id);
@@ -853,7 +868,7 @@
     if (d.fcomo) { const b = est.borrador; b.como = b.como.includes(d.fcomo) ? b.como.filter((x) => x !== d.fcomo) : [...b.como, d.fcomo]; if (!b.como.length) b.como = ['flatrate']; pintarFiltros(); return; }
     if (d.fgen) { const b = est.borrador; const g = Number(d.fgen); b.generos = b.generos.includes(g) ? b.generos.filter((x) => x !== g) : [...b.generos, g]; pintarFiltros(); return; }
     if (d.fest) { toggleEstudio(d.fest, d.fnom); return; }
-    if (d.flimpiar) { est.borrador = { generos: [], estudios: [], como: ['flatrate', 'free|ads'] }; pintarFiltros(); return; }
+    if (d.flimpiar) { est.borrador = { generos: [], estudios: [], como: ['flatrate', 'free|ads'], alcance: est.datos.filtros.alcance }; pintarFiltros(); return; }
     if (d.flisto) { est.datos.filtros = est.borrador; guardar(); cerrarFiltros(); if (est.tab === 'hoy') renderHoy(); }
   }
 

@@ -74,7 +74,8 @@ body.modo-cine #cine { display: block; }
 .c-sub { margin: 4px 0 0; font-size: 15px; line-height: 20px; color: var(--c-text2); }
 
 .c-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: var(--c-fill); border-radius: 999px; padding: 3px; gap: 2px; margin: 8px 16px 0; max-width: 560px; }
-.c-seg button { height: 34px; border: 0; border-radius: 999px; background: transparent; color: var(--c-text); font-size: 15px; font-weight: 400; }
+.c-seg button { height: 34px; border: 0; border-radius: 999px; background: transparent; color: var(--c-text); font-size: 15px; font-weight: 400; position: relative; }
+.c-seg button::after { content: ''; position: absolute; inset: -5px 0; }
 .c-seg button[aria-pressed='true'] { background: var(--c-thumb); font-weight: 600; box-shadow: 0 1px 4px rgba(0, 0, 0, .05); }
 
 .c-filtros-row { margin: 8px 16px 0; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: calc(100% - 32px); max-width: 560px; border-radius: 12px; border: 0; background: transparent; padding: 0; text-align: left; color: inherit; }
@@ -143,7 +144,8 @@ body.modo-cine #cine { display: block; }
 
 /* Chips de filtro */
 .c-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 16px; }
-.c-chip { height: 36px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--c-fill); color: var(--c-text); font-size: 15px; }
+.c-chip::after { content: ''; position: absolute; inset: -4px 0; }
+.c-chip { position: relative; height: 36px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--c-fill); color: var(--c-text); font-size: 15px; }
 .c-chip[aria-pressed='true'] { background: var(--c-accent-tint); color: var(--c-accent); font-weight: 600; }
 
 /* Botones */
