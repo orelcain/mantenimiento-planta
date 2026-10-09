@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#1a1c22">
 <title>Knuro HMI — B2</title>
 <script src="embed-tema.js"></script>
+<script src="embed-zoom.js"></script>
 <script>
 const _m={name:"Knuro HMI",short_name:"Knuro HMI",display:"standalone",background_color:"#1a1c22",theme_color:"#1a1c22",orientation:"any",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%231a1c22'/><text x='50%' y='55%' font-size='80' text-anchor='middle' dominant-baseline='middle' fill='%234499ff'>K</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
 const _b=new Blob([JSON.stringify(_m)],{type:'application/json'});const _l=document.createElement('link');_l.rel='manifest';_l.href=URL.createObjectURL(_b);document.head.appendChild(_l);
@@ -765,6 +766,36 @@ html.tema-app #kn-help-list .kn-sh .kn-org{color:var(--k-ink2);}
 html.tema-app #kn-help-list .kn-sh .kn-org b{color:var(--k-ink);}
 html.tema-app #kn-help-list .kh-btn-tint{background:var(--k-raised);border-color:var(--k-line);color:var(--k-ink);}
 html.tema-app body.kn-land.kn-land-list #kn-help-list{border-left-color:var(--k-line);}
+
+/* ══ TOQUES DE 48 PX Y ZOOM DEL PANEL (oleada 4 · tanda b) ═══════════════════════════════════
+   Regla del jurado: todo lo que NO es el panel del equipo (.dev, marcado data-bisel) mide ≥48 px y
+   deja 8 px entre objetivos. El panel conserva su tamaño y su fidelidad: se escala completo y se
+   amplía con pellizco (embed-zoom.js); nunca se encogen ni agrandan sus botones por separado. */
+#kn-dz{display:contents;}
+@media (max-width:767px){
+  body:not(.kn-land) #kn-dz{display:flex;justify-content:center;align-self:stretch;overflow:hidden;flex-shrink:0;position:relative;}
+  body:not(.kn-land) #kn-bar{height:56px;}
+  body:not(.kn-land) .kn-pan{height:48px;font-size:15px;}
+}
+@media (max-width:767px),(pointer:coarse){
+  .kn-pan{height:48px;min-width:48px;}
+  #kn-scr-btn{height:48px;min-width:48px;}
+  .kn-search,#kp-search .kn-search{height:50px;}
+  .kn-search input{min-height:48px;}
+  .kn-clr{width:48px;height:48px;margin-right:-6px;}
+  .kp-fold{width:48px;height:48px;}
+  .kp-done{height:48px;min-width:48px;padding:0 8px;}
+  .kp-head{gap:8px;padding-top:8px;}
+  #rp .tnh,#rp .tna{min-height:48px;}
+  .kn-chev{width:48px;height:48px;margin:0 -16px 0 -22px;}
+  .kn-chev::after{display:none;}
+  #rp .kn-res-in .kn-row{min-height:48px;}
+  .kn-row{min-height:48px;}
+  .kn-rb{width:48px;height:48px;}
+  #kn-giro{min-height:48px;gap:8px;}
+  #kn-giro button{height:48px;min-width:48px;}
+  #kn-giro button.x{width:48px;}
+}
 </style>
 </head>
 <body>
@@ -777,7 +808,7 @@ html.tema-app body.kn-land.kn-land-list #kn-help-list{border-left-color:var(--k-
 <div id="mn">
 <div id="hp">
   <div class="hml" id="hml-title">Knuro B2 — HMI Simulator</div>
-  <div class="dev">
+  <div class="dev" data-bisel>
     <div class="led"></div>
     <div class="sw"><div id="hs">
 
@@ -5033,7 +5064,7 @@ function _knGiro(on){
       '<span>Gira el teléfono para agrandar el panel</span>'+
       '<button type="button" data-act="fs">Pantalla completa</button>'+
       '<button type="button" class="x" data-act="x" aria-label="Cerrar aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
-    dev.after(g);
+    (dev.closest('#kn-dz')||dev).after(g);
     g.addEventListener('click',e=>{
       const b=e.target.closest('button');
       if(!b) return;
@@ -5106,5 +5137,37 @@ document.addEventListener('keydown',e=>{
   }
 });
 </script>
-<button id="tip-vis-btn" onclick="toggleTipVisibility()" style="display:none;">👁 Ver ocultos</button></body>
+<button id="tip-vis-btn" onclick="toggleTipVisibility()" style="display:none;">👁 Ver ocultos</button>
+<script>
+/* Zoom táctil del panel del X2 (pellizco, doble toque, «1×»). El panel se escala completo; en el
+   celular vertical un contenedor lo recorta para que la ampliación no tape la barra ni la lista. */
+(function(){
+  var dev = document.querySelector('#hp .dev');
+  var hp = document.getElementById('hp');
+  if (!dev || !hp || !window.EmbedZoom) return;
+  var dz = document.createElement('div');
+  dz.id = 'kn-dz';
+  dev.parentNode.insertBefore(dz, dev);
+  dz.appendChild(dev);
+  var zoom = window.EmbedZoom.init({
+    layer: dev,
+    stage: hp,
+    view: function () {
+      var el = getComputedStyle(dz).display === 'contents' ? hp : dz;
+      var r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
+    }
+  });
+  if (zoom && window.ResizeObserver) new ResizeObserver(function () { zoom.refit(); }).observe(hp);
+  // Al cambiar de pantalla (nav) o de preset, el panel vuelve a 1×: se ve la pantalla nueva completa.
+  if (zoom) {
+    var navOrig = window.nav;
+    if (typeof navOrig === 'function') window.nav = function () { zoom.reiniciar(); return navOrig.apply(this, arguments); };
+    window.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'hmi:load-preset') zoom.reiniciar();
+    });
+  }
+})();
+</script>
+</body>
 </html>

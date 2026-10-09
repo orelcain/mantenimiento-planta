@@ -54,7 +54,7 @@ export function RecorridoUbicaciones({
             segunda × apilada debajo confundía. */}
         {!compacto && (
           <button type="button" onClick={onCerrar} aria-label="Terminar el recorrido"
-                  className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full"
+                  className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] shrink-0 items-center justify-center rounded-full"
                   style={{ color: 'var(--lc-ink-mid)' }}>
             <X size={16} />
           </button>
@@ -63,7 +63,7 @@ export function RecorridoUbicaciones({
 
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={() => onIr((i - 1 + total) % total)} aria-label="Ubicación anterior"
-                className="flex h-[44px] w-[44px] items-center justify-center rounded-full"
+                className="flex h-[44px] w-[44px] max-md:h-[48px] max-md:w-[48px] items-center justify-center rounded-full"
                 style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
           <ChevronLeft size={20} />
         </button>
@@ -71,7 +71,7 @@ export function RecorridoUbicaciones({
           {i + 1} de {total}
         </span>
         <button type="button" onClick={() => onIr((i + 1) % total)} aria-label="Ubicación siguiente"
-                className="flex h-[44px] w-[44px] items-center justify-center rounded-full"
+                className="flex h-[44px] w-[44px] max-md:h-[48px] max-md:w-[48px] items-center justify-center rounded-full"
                 style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
           <ChevronRight size={20} />
         </button>
@@ -84,7 +84,7 @@ export function RecorridoUbicaciones({
             return (
               <button key={k} type="button" onClick={() => onIr(k)} aria-current={actual}
                       title={etiqueta(k)}
-                      className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 text-footnote"
+                      className="flex min-h-[44px] max-md:min-h-[48px] shrink-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 text-footnote"
                       style={{
                         background: actual ? 'var(--lc-aqua-bright)' : 'var(--lc-surface-hi)',
                         color: actual ? 'var(--lc-surface)' : 'var(--lc-ink)',
@@ -102,7 +102,7 @@ export function RecorridoUbicaciones({
             return (
               <li key={k}>
                 <button type="button" onClick={() => onIr(k)} aria-current={actual}
-                        className="flex min-h-[44px] w-full items-center gap-2.5 rounded-ctl px-1.5 py-1 text-left"
+                        className="flex min-h-[44px] max-md:min-h-[48px] w-full items-center gap-2.5 rounded-ctl px-1.5 py-1 text-left"
                         style={{ background: actual ? 'var(--lc-aqua-soft)' : 'transparent' }}>
                   <Numero n={k + 1} actual={actual} visto={vistos.has(k)} />
                   <span className="min-w-0 flex-1 text-footnote leading-snug" style={{ color: 'var(--lc-ink)' }}>

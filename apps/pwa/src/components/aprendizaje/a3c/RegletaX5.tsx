@@ -1,8 +1,8 @@
 /**
  * Regleta X5 recorrible: los 144 bornes en una tira horizontal, en el orden del plano,
  * con el LED (si el plano lo dibuja), el número y un código corto. En el teléfono cada
- * celda mide 44 px de ancho (se recorre con el pulgar); en PC, 30 px (mouse).
- * En PC va `vertical`: una columna junto a la tarjeta, con filas de 30 px (mouse) o 44 px
+ * celda mide 48 px de ancho (se recorre con el pulgar); en PC, 30 px (mouse).
+ * En PC va `vertical`: una columna junto a la tarjeta, con filas de 30 px (mouse) o 48 px
  * (táctil) y el rango de cada regleta fijo arriba mientras se recorre.
  */
 import { forwardRef, memo, useMemo } from 'react'
@@ -40,8 +40,8 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
       data-orientacion={vertical ? 'vertical' : 'horizontal'}
       className={
         vertical
-          ? cn('flex h-full flex-col overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]', compacta ? 'gap-[3px]' : 'gap-1')
-          : cn('a3c-regleta flex snap-x snap-proximity overflow-x-auto px-0.5 pb-1.5 pt-2', compacta ? 'gap-[3px]' : 'gap-1')
+          ? cn('flex h-full flex-col overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]', compacta ? 'gap-[3px]' : 'gap-2')
+          : cn('a3c-regleta flex snap-x snap-proximity overflow-x-auto px-0.5 pb-1.5 pt-2', compacta ? 'gap-[3px]' : 'gap-2')
       }
     >
       {REGLETAS.map(r => {
@@ -62,8 +62,8 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
               onClick={() => onElegir(n)}
               className={cn(
                 vertical
-                  ? cn('flex w-full flex-none items-center gap-2 rounded-ctl bg-card px-2 text-left', compacta ? 'h-[30px]' : 'h-[44px]')
-                  : cn('flex flex-none snap-center flex-col items-center justify-between rounded-ctl bg-card px-0.5 pb-1.5 pt-1.5', compacta ? 'h-[58px] w-[30px]' : 'h-[64px] w-[44px]'),
+                  ? cn('flex w-full flex-none items-center gap-2 rounded-ctl bg-card px-2 text-left', compacta ? 'h-[30px]' : 'h-[48px]')
+                  : cn('flex flex-none snap-center flex-col items-center justify-between rounded-ctl bg-card px-0.5 pb-1.5 pt-1.5', compacta ? 'h-[58px] w-[30px]' : 'h-[64px] w-[48px]'),
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                 elegidos.has(n) && 'bg-primary/[0.13] ring-2 ring-inset ring-primary',
               )}
@@ -72,7 +72,8 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
               <span className={cn('font-mono text-footnote font-semibold leading-none tabular-nums', vertical && 'w-[3ch] flex-none text-right', sin && 'text-muted-foreground/70')}>{n}</span>
               <span
                 className={cn(
-                  'max-w-full overflow-hidden whitespace-nowrap font-mono text-caption leading-none',
+                  'max-w-full overflow-hidden whitespace-nowrap font-mono leading-none',
+                  compacta ? 'text-caption' : 'text-xs',
                   vertical && 'min-w-0 flex-1 text-ellipsis',
                   sin ? 'text-muted-foreground/70' : salida ? 'text-brand-ink' : 'text-muted-foreground',
                 )}

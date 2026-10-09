@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#1A5276">
 <title>RC 172.27.12.12</title>
 <script src="embed-tema.js"></script>
+<script src="embed-zoom.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -47,6 +48,7 @@ html.tema-app, html.tema-app body { background: var(--tema-fondo); }
 /* Cuando está embebido en iframe (HmiGraderPage del Learning Hub),
    alinear al top-left con padding para evitar recortes por centrado flex */
 html.in-iframe, html.in-iframe body {
+  overflow: hidden; /* fitShell() hace caber el panel; al ampliar no aparecen barras */
   align-items: flex-start;
   justify-content: flex-start;
   padding: 12px;
@@ -739,7 +741,7 @@ html.in-iframe, html.in-iframe body {
 <body>
 
 <div id="shell-fit">
-<div id="marelec-shell">
+<div id="marelec-shell" data-bisel>
   <button id="toggle-keyboards" onclick="toggleKeyboards()">⌨ Ocultar teclados</button>
 
 <div id="rc-window">
@@ -2573,6 +2575,7 @@ if (window.parent !== window) {
    angosto se salía y recortaba. Escalamos con transform para preservar
    proporciones; el wrapper #shell-fit toma el tamaño escalado para que el
    body lo centre sin scroll. Recalcula al redimensionar y en toggleKeyboards. */
+var zoomGrader = null; // lo asigna el zoom táctil (más abajo); fitShell le avisa para recalcular límites
 function fitShell() {
   const shell = document.getElementById('marelec-shell');
   const fit = document.getElementById('shell-fit');
@@ -2581,16 +2584,32 @@ function fitShell() {
   fit.style.height = 'auto';
   shell.style.transform = 'none';
   const natW = shell.offsetWidth, natH = shell.offsetHeight;
-  const pad = 24;
-  const availW = document.documentElement.clientWidth - pad;
-  const availH = document.documentElement.clientHeight - pad;
+  // Relleno real: en el iframe lo llevan <html> Y <body> (12 + 12 por lado). Con un 24 fijo el
+  // teclado numérico quedaba cortado en el borde derecho del celular.
+  const px = (el, ...lados) => lados.reduce((t, l) => t + (parseFloat(getComputedStyle(el)[l]) || 0), 0);
+  const padX = px(document.documentElement, 'paddingLeft', 'paddingRight') + px(document.body, 'paddingLeft', 'paddingRight');
+  const padY = px(document.documentElement, 'paddingTop', 'paddingBottom') + px(document.body, 'paddingTop', 'paddingBottom');
+  const availW = document.documentElement.clientWidth - Math.max(24, padX);
+  const availH = document.documentElement.clientHeight - Math.max(24, padY);
   const s = Math.min(1, availW / natW, availH / natH);
   shell.style.transform = s < 1 ? 'scale(' + s + ')' : 'none';
   fit.style.width = (natW * s) + 'px';
   fit.style.height = (natH * s) + 'px';
+  if (zoomGrader) zoomGrader.refit();
 }
 window.addEventListener('resize', fitShell);
 fitShell();
+
+/* Zoom táctil del panel (embed-zoom.js): sobre el ajuste de arriba, el panel completo se amplía con
+   pellizco, doble toque alterna 1×/2× y «1×» vuelve al ajuste. Los botones del equipo no se tocan. */
+zoomGrader = window.EmbedZoom && window.EmbedZoom.init({
+  layer: document.getElementById('shell-fit'),
+  stage: document.documentElement,
+  view: () => ({ left: 0, top: 0, width: document.documentElement.clientWidth, height: document.documentElement.clientHeight }),
+  max: 4,
+  esControl: t => !!(t && t.closest && t.closest('.nk,.fkey,.gate,button,input,select,textarea,[onclick],[data-zoom-ignora]')) ||
+    (function () { for (var e = t; e && e.nodeType === 1; e = e.parentElement) { if (getComputedStyle(e).cursor === 'pointer') return true; } return false; })()
+});
 
 /* Notificar ready al wrapper */
 notifyReady();

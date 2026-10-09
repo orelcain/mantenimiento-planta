@@ -139,14 +139,14 @@ describe('Tarjeta A3C', () => {
     for (const k of ['S20', 'S21', 'S22', 'S23', 'S24', 'S25']) expect(within(hoja).getByText(k)).toBeTruthy()
   })
 
-  it('el selector de modo (en el encabezado) mide 48 px y Plano | Placa 44 px en PC', () => {
+  it('el selector de modo (en el encabezado) mide 48 px y Plano | Placa también 48 px', () => {
     montar(true)
     const modo = screen.getByRole('tablist', { name: 'Modo' })
     expect(modo.className).toContain('h-[48px]')
     expect(within(modo).getAllByRole('tab')[0]!.className).toContain('h-[48px]')
     const vista = screen.getByRole('tablist', { name: 'Vista de la tarjeta' })
-    expect(vista.className).toContain('h-[44px]')
-    expect(vista.className).toContain('[&>button]:h-[44px]')
+    expect(vista.className).toContain('h-[48px]')
+    expect(vista.className).toContain('[&>button]:h-[48px]')
     // El idioma ya no es un segundo control de pestañas: vive en «Más».
     expect(screen.queryByRole('tablist', { name: 'Idioma de los textos del plano' })).toBeNull()
   })
@@ -165,8 +165,8 @@ describe('Tarjeta A3C', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver LED 45 en la tarjeta' }))
     expect(document.querySelector('svg[data-hoja="23"]')).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Tarjeta' }).getAttribute('aria-selected')).toBe('true')
-    // celdas de la regleta de 44 px en el teléfono
-    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('w-[44px]')
+    // celdas de la regleta de 48 px en el teléfono
+    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('w-[48px]')
   })
 
   it('Practicar: responder bien sube la racha y queda guardada', () => {
@@ -181,12 +181,12 @@ describe('Tarjeta A3C', () => {
     expect(JSON.parse(localStorage.getItem('a3c-racha')!)).toEqual({ racha: 1, mejor: 1 })
   })
 
-  it('tablet de 2 columnas con puntero táctil: atajos, zoom y regleta de 44 px', () => {
+  it('tablet de 2 columnas con puntero táctil: atajos, zoom y regleta de 48 px', () => {
     montar(true, true)
-    expect(screen.getAllByRole('button', { name: 'Acercar' })[0]!.className).toContain('size-[44px]')
-    expect(within(screen.getAllByRole('group', { name: 'Atajos de zoom' })[0]!).getAllByRole('button')[0]!.className).toContain('h-[44px]')
-    // En PC la regleta es una columna vertical: filas de 44 px con puntero táctil.
-    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('h-[44px]')
+    expect(screen.getAllByRole('button', { name: 'Acercar' })[0]!.className).toContain('size-[48px]')
+    expect(within(screen.getAllByRole('group', { name: 'Atajos de zoom' })[0]!).getAllByRole('button')[0]!.className).toContain('h-[48px]')
+    // En PC la regleta es una columna vertical: filas de 48 px con puntero táctil.
+    expect(screen.getByRole('button', { name: /^Borne 45,/ }).className).toContain('h-[48px]')
   })
 
   it('PC con mouse conserva los controles compactos', () => {

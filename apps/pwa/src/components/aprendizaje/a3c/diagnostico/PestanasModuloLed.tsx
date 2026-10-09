@@ -11,7 +11,7 @@ import { FranjaLed } from '../FranjaLed'
 import { AvisoTerreno, NoIndicaCaja } from './ResultadoCodigo'
 import { estadoFoto, hechosDe } from './hechos'
 
-const chip = 'inline-flex h-[44px] items-center rounded-full bg-card px-4 text-subhead font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+const chip = 'inline-flex h-[48px] items-center rounded-full bg-card px-4 text-subhead font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
 function ChipsCodigos({ codigos, onCodigo }: { codigos: number[]; onCodigo: (n: number) => void }) {
   return (

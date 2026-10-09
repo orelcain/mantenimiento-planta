@@ -35,7 +35,7 @@ import { DetalleLed, DetalleModulo, ListaModulos, type Visto } from './PestanasM
 import './diagnostico.css'
 
 type Pestana = 'codigo' | 'modulo' | 'led'
-const ALTO_44 = 'h-[44px] [&>button]:h-[44px]'
+const ALTO_48 = 'h-[48px] [&>button]:h-[48px]'
 
 export interface DiagnosticoA3cProps {
   modelo: ModeloA3c
@@ -120,7 +120,7 @@ export default function DiagnosticoA3c({ modelo, pc, idioma, onVerEnTarjeta }: D
       value={pestana}
       onChange={setPestana}
       segments={[{ value: 'codigo', label: 'Código' }, { value: 'modulo', label: 'Módulo' }, { value: 'led', label: 'LED' }]}
-      className={cn(ALTO_44, 'w-full')}
+      className={cn(ALTO_48, 'w-full')}
     />
   )
 
@@ -145,7 +145,7 @@ export default function DiagnosticoA3c({ modelo, pc, idioma, onVerEnTarjeta }: D
             key={g.etiqueta}
             type="button"
             onClick={() => irACodigo(g.desde)}
-            className="inline-flex h-[44px] items-center rounded-full bg-card px-4 text-subhead font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="inline-flex h-[48px] items-center rounded-full bg-card px-4 text-subhead font-medium tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {g.etiqueta}
           </button>
@@ -178,7 +178,7 @@ export default function DiagnosticoA3c({ modelo, pc, idioma, onVerEnTarjeta }: D
           value={visto}
           onChange={setVisto}
           segments={[{ value: 'encendido', label: 'Lo veo encendido' }, { value: 'apagado', label: 'Lo veo apagado' }]}
-          className={cn(ALTO_44, 'w-full')}
+          className={cn(ALTO_48, 'w-full')}
         />
         <TecladoNumerico nombre="Teclado del LED" onTecla={t => setLed(c => teclear(c, t))} onVer={verResultado} etiquetaVer="Ver" />
       </>

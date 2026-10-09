@@ -325,7 +325,8 @@ export const LienzoA3c = forwardRef<LienzoA3cHandle, LienzoA3cProps>(function Li
   }, [])
 
   return (
-    <div ref={hostRef} className={`absolute ${area}`}>
+    // data-bisel: el plano es el equipo (conserva tamaño y fidelidad); los toques de 48 px miden fuera de él.
+    <div ref={hostRef} data-bisel className={`absolute ${area}`}>
       <svg
         ref={svgRef}
         className="a3c-lienzo"

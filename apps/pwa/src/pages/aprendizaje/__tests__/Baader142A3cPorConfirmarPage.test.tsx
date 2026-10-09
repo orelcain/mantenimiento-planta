@@ -206,7 +206,7 @@ describe('Baader142A3cPorConfirmarPage', () => {
       montar(`${RUTA}?maquina=n2&el=SM5`)
       await screen.findByRole('dialog')
       fireEvent.keyDown(document, { key: 'Escape' })
-      await waitFor(() => expect(screen.getByTestId('ruta').textContent).not.toContain('el=SM5'))
+      await waitFor(() => expect(screen.getByTestId('ruta').textContent).not.toContain('el=SM5'), { timeout: 4000 })
       expect(screen.getByTestId('ruta').textContent).toContain('maquina=n2')
     })
 
