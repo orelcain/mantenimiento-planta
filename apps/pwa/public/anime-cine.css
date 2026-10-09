@@ -86,17 +86,22 @@ body.modo-cine #cine { display: block; }
 /* ── Pósters ────────────────────────────────────────────────────────── */
 .c-carrusel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 4px; scroll-snap-type: x mandatory; scrollbar-width: none; }
 .c-carrusel::-webkit-scrollbar { display: none; }
-.c-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; row-gap: 20px; padding: 0 16px; }
-@media (min-width: 600px) { .c-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 900px) { .c-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* Tamaño elegido con el botón de la cuadrícula (data-tam en #cine). */
+#cine { --cols: 3; --car-w: 118px; --card-t: 14px; --poster-r: 16px; }
+#cine[data-tam='c'] { --cols: 4; --car-w: 92px; --card-t: 13px; --poster-r: 12px; }
+#cine[data-tam='g'] { --cols: 2; --car-w: 150px; --card-t: 15px; --poster-r: 20px; }
+.c-grid { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: 12px; row-gap: 20px; padding: 0 16px; }
+@media (min-width: 600px) { .c-grid { grid-template-columns: repeat(calc(var(--cols) + 1), minmax(0, 1fr)); } }
+@media (min-width: 900px) { .c-grid { grid-template-columns: repeat(calc(var(--cols) + 3), minmax(0, 1fr)); } }
+#cine[data-tam='c'] .c-grid { column-gap: 8px; row-gap: 16px; }
 .c-card { display: flex; flex-direction: column; gap: 8px; border: 0; background: none; padding: 0; color: inherit; text-align: left; min-width: 0; }
-.c-carrusel .c-card { width: 150px; flex-shrink: 0; scroll-snap-align: start; }
-.c-poster { width: 100%; aspect-ratio: 2 / 3; border-radius: 20px; background: var(--c-card2); overflow: hidden; position: relative; }
+.c-carrusel .c-card { width: var(--car-w); flex-shrink: 0; scroll-snap-align: start; }
+.c-poster { width: 100%; aspect-ratio: 2 / 3; border-radius: var(--poster-r, 20px); background: var(--c-card2); overflow: hidden; position: relative; }
 .c-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .c-poster .c-badge { position: absolute; left: 8px; bottom: 8px; height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; display: flex; align-items: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .c-poster .c-check { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; display: flex; align-items: center; justify-content: center; }
 .c-poster .c-noimg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px; text-align: center; font-size: 15px; color: var(--c-text2); }
-.c-card-t { font-size: 15px; line-height: 20px; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.c-card-t { font-size: var(--card-t, 15px); line-height: 1.3; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .c-card-s { font-size: 13px; line-height: 18px; color: var(--c-text2); margin-top: -6px; font-variant-numeric: tabular-nums; }
 
 /* ── Listas agrupadas ───────────────────────────────────────────────── */
