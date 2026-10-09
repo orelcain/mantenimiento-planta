@@ -102,7 +102,7 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
   return (
     <div
       className={`relative w-full aspect-[7/9] rounded-card overflow-hidden bg-black border transition-shadow duration-300 ${
-        isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgba(46,117,182,0.45)]' : 'border-border shadow'
+        isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgb(var(--brand)/0.45)]' : 'border-border shadow'
       }`}
     >
       <video
@@ -124,7 +124,7 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
       />
       <span
         className={`absolute bottom-1.5 right-1.5 w-2 h-2 rounded-full border border-black/40 ${
-          isSpeaking ? 'bg-primary animate-pulse' : 'bg-green-500'
+          isSpeaking ? 'bg-primary animate-pulse' : 'bg-fill-ok'
         }`}
         title={isSpeaking ? 'ARIA hablando' : 'ARIA en línea'}
       />

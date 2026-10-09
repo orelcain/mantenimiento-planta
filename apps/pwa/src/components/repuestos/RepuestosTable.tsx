@@ -45,14 +45,14 @@ const formatNumber = (value: number) =>
 
 function tipoBadgeClass(tipo: string): string {
   const t = tipo.toUpperCase()
-  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-primary/[0.15] text-brand-ink pizarra:bg-muted pizarra:text-muted-foreground'
-  if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-green-500/[0.15] text-ink-ok pizarra:bg-muted pizarra:text-muted-foreground'
-  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/[0.15] text-ink-crit pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-cat-1-tint/[0.15] text-cat-1-ink pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-cat-2-tint/[0.15] text-cat-2-ink pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-cat-5-tint/[0.15] text-cat-5-ink pizarra:bg-muted pizarra:text-muted-foreground'
   if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR', 'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t)) return 'bg-cat-6-tint/[0.15] text-cat-6-ink pizarra:bg-muted pizarra:text-muted-foreground'
   if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t)) return 'bg-muted-foreground/[0.10] text-muted-foreground pizarra:bg-muted pizarra:text-muted-foreground'
   if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-cat-4-tint/[0.15] text-cat-4-ink pizarra:bg-muted pizarra:text-muted-foreground'
   if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t)) return 'bg-cat-7-tint/[0.15] text-cat-7-ink pizarra:bg-muted pizarra:text-muted-foreground'
-  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-muted pizarra:text-muted-foreground'
+  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-cat-8-tint/[0.15] text-cat-8-ink pizarra:bg-muted pizarra:text-muted-foreground'
   return 'bg-muted text-muted-foreground'
 }
 
@@ -294,7 +294,7 @@ export function RepuestosTable({
               key={rep.id}
               id={`repuesto-${rep.id}`}
               onClick={() => onViewDetail?.(rep)}
-              className={`bg-card border rounded-card p-3 transition-all active:scale-[0.99] ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/[0.15] pizarra:ring-primary' : ''}`}
+              className={`bg-card border rounded-card p-3 transition-all active:scale-[0.99] ${highlightedRepuestoId === rep.id ? 'ring-2 ring-primary bg-primary/[0.15]' : ''}`}
             >
               <div className="flex gap-2.5 items-start">
                 {/* Thumbnail compacto */}
@@ -317,7 +317,7 @@ export function RepuestosTable({
                     {rep.codigoFabricante && <span className="text-caption font-mono text-cat-6-ink bg-cat-6-tint/[0.15] px-1 py-0 rounded-ctl">{rep.codigoFabricante}</span>}
                     {rep.tipo && <span className={`text-caption px-1 py-0 rounded-ctl font-semibold uppercase ${tipoBadgeClass(rep.tipo)}`}>{rep.tipo}</span>}
                     {(rep as EquipmentRepuesto).source && (
-                      <span className={`text-caption px-1 py-0 rounded-ctl font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-brand-ink'}`}>
+                      <span className={`text-caption px-1 py-0 rounded-ctl font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-ink-ok/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-brand-ink'}`}>
                         {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Comp.'}
                       </span>
                     )}
@@ -372,7 +372,7 @@ export function RepuestosTable({
                 <tr
                   key={rep.id}
                   id={`repuesto-${rep.id}`}
-                  className={`group hover:bg-primary/5 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'} ${highlightedRepuestoId === rep.id ? 'ring-2 ring-inset ring-emerald-500 bg-emerald-500/[0.15] pizarra:ring-primary animate-pulse' : ''}`}
+                  className={`group hover:bg-primary/5 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'} ${highlightedRepuestoId === rep.id ? 'ring-2 ring-inset ring-primary bg-primary/[0.15] animate-pulse' : ''}`}
                 >
                   {/* Thumbnail */}
                   <td className="pl-4 pr-2 py-2.5">
@@ -402,7 +402,7 @@ export function RepuestosTable({
                           </span>
                         )}
                         {(rep as EquipmentRepuesto).source && (
-                          <span className={`inline-block text-caption px-1 py-0 rounded-ctl font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-brand-ink'}`}>
+                          <span className={`inline-block text-caption px-1 py-0 rounded-ctl font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-ink-ok/[0.15] text-ink-ok' : 'bg-primary/[0.15] text-brand-ink'}`}>
                             {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Compartido'}
                           </span>
                         )}
@@ -411,7 +411,7 @@ export function RepuestosTable({
                         <ImageIcon className="h-3.5 w-3.5 text-primary/60 shrink-0" />
                       )}
                       {onToggleFavorite && (
-                        <button onClick={() => onToggleFavorite(rep.id)} className="shrink-0 p-0.5 rounded-ctl hover:bg-amber-500/[0.15] transition-colors">
+                        <button onClick={() => onToggleFavorite(rep.id)} className="shrink-0 p-0.5 rounded-ctl hover:bg-fill-warning/[0.15] transition-colors">
                           <Star className={`h-3 w-3 ${favoriteIds?.has(rep.id) ? 'text-ink-warn fill-current' : 'text-muted-foreground/20 group-hover:text-muted-foreground/40'}`} />
                         </button>
                       )}
@@ -491,7 +491,7 @@ export function RepuestosTable({
                       {onViewInManual && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Ver en Manual">
                           <button onClick={() => onViewInManual(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-ok/60 hover:text-ink-ok hover:bg-green-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-ok/60 hover:text-ink-ok hover:bg-ink-ok/[0.15] transition-colors">
                             <Eye className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
@@ -499,7 +499,7 @@ export function RepuestosTable({
                       {isAdmin && onEditAnnotation && (rep.vinculosManual?.length ?? 0) > 0 && (
                         <Tip label="Editar ubicación">
                           <button onClick={() => onEditAnnotation(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-ink-warn hover:bg-amber-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-ink-warn hover:bg-fill-warning/[0.15] transition-colors">
                             <Pencil className="h-3 w-3" />
                           </button>
                         </Tip>
@@ -522,7 +522,7 @@ export function RepuestosTable({
                       {onRelocate && (
                         <Tip label="Reubicar">
                           <button onClick={() => onRelocate(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-ink-warn hover:bg-amber-500/[0.15] transition-colors">
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-ctl text-ink-warn/60 hover:text-ink-warn hover:bg-fill-warning/[0.15] transition-colors">
                             <ArrowRightLeft className="h-3.5 w-3.5" />
                           </button>
                         </Tip>

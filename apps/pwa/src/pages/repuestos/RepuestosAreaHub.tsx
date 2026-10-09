@@ -96,9 +96,9 @@ const esTelefono = () => typeof window !== 'undefined' && !!window.matchMedia &&
 const tipoLabelOf = (tipo?: string): string => (tipo || '').trim() || 'Sin clasificar'
 
 const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string }> = {
-  ok: { label: 'Disponible', dot: 'bg-emerald-500', text: 'text-ink-ok' },
-  low: { label: 'Bajo', dot: 'bg-amber-500', text: 'text-ink-warn' },
-  out: { label: 'Sin stock', dot: 'bg-red-500', text: 'text-ink-crit' },
+  ok: { label: 'Disponible', dot: 'bg-fill-ok', text: 'text-ink-ok' },
+  low: { label: 'Bajo', dot: 'bg-fill-warning', text: 'text-ink-warn' },
+  out: { label: 'Sin stock', dot: 'bg-fill-critical', text: 'text-ink-crit' },
   unset: { label: 'Sin config', dot: 'bg-muted-foreground/40', text: 'text-muted-foreground' },
 }
 
@@ -111,9 +111,9 @@ function fotosDeFila(r: { fotos?: string[]; fotosCatalogo?: string[] }): string[
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
   primary: { text: 'text-brand-ink',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
-  emerald: { text: 'text-ink-ok',  chip: 'bg-emerald-500/[0.15]',  ring: 'ring-emerald-500/20',  glow: 'from-emerald-500/[0.07]' },
-  amber:   { text: 'text-ink-warn',    chip: 'bg-amber-500/[0.15]',    ring: 'ring-amber-500/20',    glow: 'from-amber-500/[0.07]' },
-  red:     { text: 'text-ink-crit',      chip: 'bg-red-500/[0.15]',      ring: 'ring-red-500/20',      glow: 'from-red-500/[0.07]' },
+  emerald: { text: 'text-ink-ok',  chip: 'bg-ink-ok/[0.15]',  ring: 'ring-ink-ok/20',  glow: 'from-ink-ok/[0.07]' },
+  amber:   { text: 'text-ink-warn',    chip: 'bg-fill-warning/[0.15]',    ring: 'ring-fill-warning/20',    glow: 'from-fill-warning/[0.07]' },
+  red:     { text: 'text-ink-crit',      chip: 'bg-fill-critical/[0.15]',      ring: 'ring-fill-critical/20',      glow: 'from-fill-critical/[0.07]' },
 }
 
 function KpiCard({ value, label, hint, icon: Icon, tone }: {
@@ -1954,7 +1954,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   <button key={t.key} onClick={t.onClick} title={t.label} className="relative rounded-ctl p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                     <Icon className="h-4 w-4" />
                     {t.badge ? (
-                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-fill-critical/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
                     ) : null}
                   </button>
                 )
@@ -1967,7 +1967,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground">
                 <MoreVertical className="h-5 w-5" />
                 {trashCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{trashCount}</span>
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-fill-critical/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{trashCount}</span>
                 )}
               </button>
               {adminMenuOpen && (
@@ -1987,7 +1987,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           <Icon className="h-4 w-4 text-muted-foreground" />
                           <span className="flex-1">{t.label}</span>
                           {t.badge ? (
-                            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
+                            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-fill-critical/[0.15] px-1 text-caption font-bold text-ink-crit tabular-nums">{t.badge}</span>
                           ) : null}
                         </button>
                       )
@@ -2033,7 +2033,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 onClick={() => setFavBarOpen((v) => !v)}
                 className="flex min-h-[44px] w-full items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
               >
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-ink-warn" /> Favoritos de equipos
+                <Star className="h-3.5 w-3.5 fill-current text-muted-foreground" /> Favoritos de equipos
                 {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
                 <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
               </button>
@@ -2204,9 +2204,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               toggle "KPIs y filtros". Desktop: sin cambios. */}
           <div className="mb-3 flex items-center justify-between gap-2 sm:hidden">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /><b>{repuestosBusy ? '…' : stockKpis.ok}</b></span>
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /><b>{repuestosBusy ? '…' : stockKpis.low}</b></span>
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" /><b>{repuestosBusy ? '…' : stockKpis.out}</b></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-fill-ok" /><b>{repuestosBusy ? '…' : stockKpis.ok}</b></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-fill-warning" /><b>{repuestosBusy ? '…' : stockKpis.low}</b></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-fill-critical" /><b>{repuestosBusy ? '…' : stockKpis.out}</b></span>
               <span className="text-muted-foreground"><b className="text-foreground">{repuestosBusy ? '…' : catalogStats.conSAP}</b> con SAP</span>
             </div>
             <Button
@@ -2487,7 +2487,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 <span className="line-clamp-2 min-w-0 font-medium text-foreground">{nv.titulo}</span>
                                 {(isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
-                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-emerald-500/[0.15] px-1.5 py-0.5 text-caption font-semibold text-ink-ok"
+                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-ink-ok/[0.15] px-1.5 py-0.5 text-caption font-semibold text-ink-ok"
                                     title={`Repuesto común / más usado de: ${[...new Set([...machinesForCommonSap(r.codigoSAP), ...(r.comunEn ?? [])])].map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
                                   >
                                     <Wrench className="h-3 w-3" /> común
@@ -3019,7 +3019,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                       key={l.name}
                       className={[
                         'flex items-center gap-2 rounded-card border px-3 py-2 text-xs font-medium transition',
-                        inList ? 'border-transparent bg-amber-500/[0.15] text-ink-warn' : 'border-border bg-card text-foreground',
+                        inList ? 'border-transparent bg-fill-warning/[0.15] text-ink-warn' : 'border-border bg-card text-foreground',
                       ].join(' ')}
                     >
                       <button onClick={() => toggleInList(l.name, rk)} className="flex flex-1 items-center gap-2 text-left">

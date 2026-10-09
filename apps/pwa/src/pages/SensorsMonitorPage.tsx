@@ -11,6 +11,7 @@ import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
 import { logger } from '@/lib/logger'
 import { dec1 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 
 function formatDateTime(timestamp?: number): string {
   if (!timestamp || !Number.isFinite(timestamp)) return '—'
@@ -289,6 +290,7 @@ function TrendSparkline({
     return () => window.removeEventListener('resize', onResize)
   }, [deviceId])
 
+  const { elegir } = useColoresGrafico()
   const normalizedReadings = useMemo(() => {
     return (readings ?? [])
       .filter(
@@ -365,11 +367,11 @@ function TrendSparkline({
   const markAreaTemp = showThresholds && chartMode === 'temperature' ? {
     silent: true,
     data: [
-      [{ yAxis: th.tempCritHigh, itemStyle: { color: 'rgba(239, 68, 68, 0.15)' } }, { yAxis: 'max' }],
-      [{ yAxis: th.tempWarnHigh, itemStyle: { color: 'rgba(245, 158, 11, 0.12)' } }, { yAxis: th.tempCritHigh }],
-      [{ yAxis: th.tempWarnLow, itemStyle: { color: 'rgba(34, 197, 94, 0.08)' } }, { yAxis: th.tempWarnHigh }],
-      [{ yAxis: th.tempCritLow, itemStyle: { color: 'rgba(245, 158, 11, 0.12)' } }, { yAxis: th.tempWarnLow }],
-      [{ yAxis: 'min', itemStyle: { color: 'rgba(239, 68, 68, 0.15)' } }, { yAxis: th.tempCritLow }]
+      [{ yAxis: th.tempCritHigh, itemStyle: { color: elegir('rgba(239, 68, 68, 0.15)', 'grafico-falla', 0.15) } }, { yAxis: 'max' }],
+      [{ yAxis: th.tempWarnHigh, itemStyle: { color: elegir('rgba(245, 158, 11, 0.12)', 'grafico-aviso', 0.14) } }, { yAxis: th.tempCritHigh }],
+      [{ yAxis: th.tempWarnLow, itemStyle: { color: elegir('rgba(34, 197, 94, 0.08)', 'grafico-neutro-medio', 0.1) } }, { yAxis: th.tempWarnHigh }],
+      [{ yAxis: th.tempCritLow, itemStyle: { color: elegir('rgba(245, 158, 11, 0.12)', 'grafico-aviso', 0.14) } }, { yAxis: th.tempWarnLow }],
+      [{ yAxis: 'min', itemStyle: { color: elegir('rgba(239, 68, 68, 0.15)', 'grafico-falla', 0.15) } }, { yAxis: th.tempCritLow }]
     ]
   } : undefined
 
@@ -378,21 +380,21 @@ function TrendSparkline({
     symbol: 'none',
     lineStyle: { type: 'dashed', width: 1 },
     data: [
-      { yAxis: th.tempCritHigh, lineStyle: { color: '#ef4444' }, label: { formatter: '{c}°', position: 'insideStartBottom', color: '#ef4444' } },
-      { yAxis: th.tempWarnHigh, lineStyle: { color: '#f59e0b' }, label: { formatter: '{c}°', position: 'insideStartBottom', color: '#f59e0b' } },
-      { yAxis: th.tempWarnLow, lineStyle: { color: '#f59e0b' }, label: { formatter: '{c}°', position: 'insideStartTop', color: '#f59e0b' } },
-      { yAxis: th.tempCritLow, lineStyle: { color: '#ef4444' }, label: { formatter: '{c}°', position: 'insideStartTop', color: '#ef4444' } }
+      { yAxis: th.tempCritHigh, lineStyle: { color: elegir('#ef4444', 'grafico-falla') }, label: { formatter: '{c}°', position: 'insideStartBottom', color: elegir('#ef4444', 'grafico-falla') } },
+      { yAxis: th.tempWarnHigh, lineStyle: { color: elegir('#f59e0b', 'grafico-aviso') }, label: { formatter: '{c}°', position: 'insideStartBottom', color: elegir('#f59e0b', 'grafico-aviso') } },
+      { yAxis: th.tempWarnLow, lineStyle: { color: elegir('#f59e0b', 'grafico-aviso') }, label: { formatter: '{c}°', position: 'insideStartTop', color: elegir('#f59e0b', 'grafico-aviso') } },
+      { yAxis: th.tempCritLow, lineStyle: { color: elegir('#ef4444', 'grafico-falla') }, label: { formatter: '{c}°', position: 'insideStartTop', color: elegir('#ef4444', 'grafico-falla') } }
     ]
   } : undefined
 
   const markAreaHum = showThresholds && chartMode === 'humidity' ? {
     silent: true,
     data: [
-      [{ yAxis: th.humCritHigh, itemStyle: { color: 'rgba(59, 130, 246, 0.15)' } }, { yAxis: 'max' }],
-      [{ yAxis: th.humWarnHigh, itemStyle: { color: 'rgba(6, 182, 212, 0.12)' } }, { yAxis: th.humCritHigh }],
-      [{ yAxis: th.humWarnLow, itemStyle: { color: 'rgba(34, 197, 94, 0.08)' } }, { yAxis: th.humWarnHigh }],
-      [{ yAxis: th.humCritLow, itemStyle: { color: 'rgba(6, 182, 212, 0.12)' } }, { yAxis: th.humWarnLow }],
-      [{ yAxis: 'min', itemStyle: { color: 'rgba(59, 130, 246, 0.15)' } }, { yAxis: th.humCritLow }]
+      [{ yAxis: th.humCritHigh, itemStyle: { color: elegir('rgba(59, 130, 246, 0.15)', 'grafico-falla', 0.15) } }, { yAxis: 'max' }],
+      [{ yAxis: th.humWarnHigh, itemStyle: { color: elegir('rgba(6, 182, 212, 0.12)', 'grafico-aviso', 0.14) } }, { yAxis: th.humCritHigh }],
+      [{ yAxis: th.humWarnLow, itemStyle: { color: elegir('rgba(34, 197, 94, 0.08)', 'grafico-neutro-medio', 0.1) } }, { yAxis: th.humWarnHigh }],
+      [{ yAxis: th.humCritLow, itemStyle: { color: elegir('rgba(6, 182, 212, 0.12)', 'grafico-aviso', 0.14) } }, { yAxis: th.humWarnLow }],
+      [{ yAxis: 'min', itemStyle: { color: elegir('rgba(59, 130, 246, 0.15)', 'grafico-falla', 0.15) } }, { yAxis: th.humCritLow }]
     ]
   } : undefined
 
@@ -401,10 +403,10 @@ function TrendSparkline({
     symbol: 'none',
     lineStyle: { type: 'dashed', width: 1 },
     data: [
-      { yAxis: th.humCritHigh, lineStyle: { color: '#3b82f6' }, label: { formatter: '{c}%', position: 'insideStartBottom', color: '#3b82f6' } },
-      { yAxis: th.humWarnHigh, lineStyle: { color: '#06b6d4' }, label: { formatter: '{c}%', position: 'insideStartBottom', color: '#06b6d4' } },
-      { yAxis: th.humWarnLow, lineStyle: { color: '#06b6d4' }, label: { formatter: '{c}%', position: 'insideStartTop', color: '#06b6d4' } },
-      { yAxis: th.humCritLow, lineStyle: { color: '#3b82f6' }, label: { formatter: '{c}%', position: 'insideStartTop', color: '#3b82f6' } }
+      { yAxis: th.humCritHigh, lineStyle: { color: elegir('#3b82f6', 'grafico-falla') }, label: { formatter: '{c}%', position: 'insideStartBottom', color: elegir('#3b82f6', 'grafico-falla') } },
+      { yAxis: th.humWarnHigh, lineStyle: { color: elegir('#06b6d4', 'grafico-aviso') }, label: { formatter: '{c}%', position: 'insideStartBottom', color: elegir('#06b6d4', 'grafico-aviso') } },
+      { yAxis: th.humWarnLow, lineStyle: { color: elegir('#06b6d4', 'grafico-aviso') }, label: { formatter: '{c}%', position: 'insideStartTop', color: elegir('#06b6d4', 'grafico-aviso') } },
+      { yAxis: th.humCritLow, lineStyle: { color: elegir('#3b82f6', 'grafico-falla') }, label: { formatter: '{c}%', position: 'insideStartTop', color: elegir('#3b82f6', 'grafico-falla') } }
     ]
   } : undefined
 
@@ -417,11 +419,11 @@ function TrendSparkline({
       seriesIndex: 0,
       dimension: 1,
       pieces: [
-        { lte: th.tempCritLow, color: '#ef4444' },
-        { gt: th.tempCritLow, lte: th.tempWarnLow, color: '#f59e0b' },
-        { gt: th.tempWarnLow, lte: th.tempWarnHigh, color: '#f97316' },
-        { gt: th.tempWarnHigh, lte: th.tempCritHigh, color: '#f59e0b' },
-        { gt: th.tempCritHigh, color: '#ef4444' },
+        { lte: th.tempCritLow, color: elegir('#ef4444', 'grafico-falla') },
+        { gt: th.tempCritLow, lte: th.tempWarnLow, color: elegir('#f59e0b', 'grafico-aviso') },
+        { gt: th.tempWarnLow, lte: th.tempWarnHigh, color: elegir('#f97316', 'serie-1') },
+        { gt: th.tempWarnHigh, lte: th.tempCritHigh, color: elegir('#f59e0b', 'grafico-aviso') },
+        { gt: th.tempCritHigh, color: elegir('#ef4444', 'grafico-falla') },
       ]
     }] : []),
     ...(showHum ? [{
@@ -430,11 +432,11 @@ function TrendSparkline({
       seriesIndex: showTemp ? 1 : 0,
       dimension: 1,
       pieces: [
-        { lte: th.humCritLow, color: '#7c3aed' },
-        { gt: th.humCritLow, lte: th.humWarnLow, color: '#3b82f6' },
-        { gt: th.humWarnLow, lte: th.humWarnHigh, color: '#06b6d4' },
-        { gt: th.humWarnHigh, lte: th.humCritHigh, color: '#3b82f6' },
-        { gt: th.humCritHigh, color: '#7c3aed' },
+        { lte: th.humCritLow, color: elegir('#7c3aed', 'grafico-falla') },
+        { gt: th.humCritLow, lte: th.humWarnLow, color: elegir('#3b82f6', 'grafico-aviso') },
+        { gt: th.humWarnLow, lte: th.humWarnHigh, color: elegir('#06b6d4', 'grafico-neutro-fuerte') },
+        { gt: th.humWarnHigh, lte: th.humCritHigh, color: elegir('#3b82f6', 'grafico-aviso') },
+        { gt: th.humCritHigh, color: elegir('#7c3aed', 'grafico-falla') },
       ]
     }] : [])
   ] : undefined
@@ -492,7 +494,7 @@ function TrendSparkline({
       splitLine: { show: false },
       axisTick: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } },
       axisLabel: {
-        color: '#64748b',
+        color: elegir('#64748b', 'grafico-meta'),
         fontSize: 10,
         hideOverlap: true,
         margin: 12
@@ -503,12 +505,12 @@ function TrendSparkline({
       {
         type: 'value',
         name: showTemp ? '°C' : '',
-        nameTextStyle: { color: '#f97316', fontSize: 10, align: 'right', padding: [0, 4, 0, 0] },
+        nameTextStyle: { color: elegir('#f97316', 'serie-1'), fontSize: 10, align: 'right', padding: [0, 4, 0, 0] },
         position: 'left',
         splitLine: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.04)', type: 'dashed' } },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(tempInterval && tempInterval < 1 ? 1 : 0) },
+        axisLabel: { color: elegir('#64748b', 'grafico-meta'), fontSize: 10, formatter: (v: number) => v.toFixed(tempInterval && tempInterval < 1 ? 1 : 0) },
         ...(tempInterval ? { interval: tempInterval } : {}),
         min: chartMode === 'temperature' && showThresholds ? (value: any) => Math.min(value.min, th.tempCritLow - 2) : 'dataMin',
         max: chartMode === 'temperature' && showThresholds ? (value: any) => Math.max(value.max, th.tempCritHigh + 2) : 'dataMax',
@@ -517,12 +519,12 @@ function TrendSparkline({
       {
         type: 'value',
         name: showHum ? '%' : '',
-        nameTextStyle: { color: '#06b6d4', fontSize: 10, align: 'left', padding: [0, 0, 0, 4] },
+        nameTextStyle: { color: elegir('#06b6d4', 'grafico-neutro-fuerte'), fontSize: 10, align: 'left', padding: [0, 0, 0, 4] },
         position: 'right',
         splitLine: { show: false },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(humInterval && humInterval < 1 ? 1 : 0) },
+        axisLabel: { color: elegir('#64748b', 'grafico-meta'), fontSize: 10, formatter: (v: number) => v.toFixed(humInterval && humInterval < 1 ? 1 : 0) },
         ...(humInterval ? { interval: humInterval } : {}),
         min: chartMode === 'humidity' && showThresholds ? (value: any) => Math.min(value.min, th.humCritLow - 2) : 'dataMin',
         max: chartMode === 'humidity' && showThresholds ? (value: any) => Math.max(value.max, th.humCritHigh + 2) : 'dataMax',
@@ -547,21 +549,21 @@ function TrendSparkline({
         bottom: 6,
         borderColor: 'transparent',
         backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        fillerColor: 'rgba(99, 102, 241, 0.12)',
+        fillerColor: elegir('rgba(99, 102, 241, 0.12)', 'serie-1', 0.12),
         handleSize: '80%',
         handleStyle: { color: '#475569', borderColor: '#64748b', borderWidth: 1 },
-        textStyle: { color: '#64748b', fontSize: 10 },
+        textStyle: { color: elegir('#64748b', 'grafico-meta'), fontSize: 10 },
         dataBackground: {
           lineStyle: { color: 'rgba(148, 163, 184, 0.25)', width: 1 },
           areaStyle: { color: 'rgba(148, 163, 184, 0.06)' }
         },
         selectedDataBackground: {
-          lineStyle: { color: 'rgba(99, 102, 241, 0.6)', width: 1 },
-          areaStyle: { color: 'rgba(99, 102, 241, 0.12)' }
+          lineStyle: { color: elegir('rgba(99, 102, 241, 0.6)', 'serie-1', 0.6), width: 1 },
+          areaStyle: { color: elegir('rgba(99, 102, 241, 0.12)', 'serie-1', 0.12) }
         },
         brushSelect: false,
         emphasis: {
-          handleStyle: { color: '#6366f1', borderColor: '#818cf8' }
+          handleStyle: { color: elegir('#6366f1', 'serie-1'), borderColor: elegir('#818cf8', 'serie-1') }
         }
       } as any
     ] as any,
@@ -576,20 +578,20 @@ function TrendSparkline({
         symbolSize: 4,
         smooth: 0.25,
         sampling: 'lttb',
-        itemStyle: { color: '#f97316' },
+        itemStyle: { color: elegir('#f97316', 'serie-1') },
         lineStyle: { width: 1.5 },
         emphasis: {
           focus: 'series',
           lineStyle: { width: 2.5 },
-          itemStyle: { borderWidth: 2, borderColor: '#f97316', color: '#fff' }
+          itemStyle: { borderWidth: 2, borderColor: elegir('#f97316', 'serie-1'), color: '#fff' }
         },
         areaStyle: useVisualMap ? { opacity: 0.10 } : {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(249, 115, 22, 0.20)' },
-              { offset: 0.6, color: 'rgba(249, 115, 22, 0.05)' },
-              { offset: 1, color: 'rgba(249, 115, 22, 0)' }
+              { offset: 0, color: elegir('rgba(249, 115, 22, 0.20)', 'serie-1', 0.2) },
+              { offset: 0.6, color: elegir('rgba(249, 115, 22, 0.05)', 'serie-1', 0.05) },
+              { offset: 1, color: elegir('rgba(249, 115, 22, 0)', 'serie-1', 0) }
             ]
           }
         },
@@ -606,20 +608,20 @@ function TrendSparkline({
         symbolSize: 4,
         smooth: 0.25,
         sampling: 'lttb',
-        itemStyle: { color: '#06b6d4' },
+        itemStyle: { color: elegir('#06b6d4', 'grafico-neutro-fuerte') },
         lineStyle: { width: 1.5 },
         emphasis: {
           focus: 'series',
           lineStyle: { width: 2.5 },
-          itemStyle: { borderWidth: 2, borderColor: '#06b6d4', color: '#fff' }
+          itemStyle: { borderWidth: 2, borderColor: elegir('#06b6d4', 'grafico-neutro-fuerte'), color: '#fff' }
         },
         areaStyle: useVisualMap ? { opacity: 0.10 } : {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(6, 182, 212, 0.15)' },
-              { offset: 0.6, color: 'rgba(6, 182, 212, 0.03)' },
-              { offset: 1, color: 'rgba(6, 182, 212, 0)' }
+              { offset: 0, color: elegir('rgba(6, 182, 212, 0.15)', 'grafico-neutro-fuerte', 0.15) },
+              { offset: 0.6, color: elegir('rgba(6, 182, 212, 0.03)', 'grafico-neutro-fuerte', 0.03) },
+              { offset: 1, color: elegir('rgba(6, 182, 212, 0)', 'grafico-neutro-fuerte', 0) }
             ]
           }
         },
@@ -641,8 +643,8 @@ function TrendSparkline({
           {alertLevel !== 'normal' && (
             <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-caption font-medium animate-pulse ${
               alertLevel === 'critical'
-                ? 'bg-red-500/[0.15] text-ink-crit ring-1 ring-red-500/30'
-                : 'bg-amber-500/[0.15] text-ink-warn ring-1 ring-amber-500/30'
+                ? 'bg-fill-critical/[0.15] text-ink-crit ring-1 ring-fill-critical/30'
+                : 'bg-fill-warning/[0.15] text-ink-warn ring-1 ring-fill-warning/30'
             }`}>
               <AlertTriangle className="h-2.5 w-2.5" />
               {alertLevel === 'critical' ? 'Crítico' : 'Advertencia'}
@@ -806,9 +808,9 @@ function TrendSparkline({
         ref={containerRef}
         className={`w-full rounded-card overflow-hidden relative select-none transition-colors duration-700 ${
           alertLevel === 'critical'
-            ? 'border-2 border-red-500/[0.25] bg-gradient-to-b from-red-950/40 via-muted/20 to-muted/5 shadow-[0_0_24px_rgba(239,68,68,0.15)] pizarra:shadow-none'
+            ? 'border-2 border-fill-critical/[0.25] bg-gradient-to-b from-fill-critical/[0.15] via-muted/20 to-muted/5 shadow-[0_0_24px_rgb(var(--fill-critical)/0.15)] pizarra:shadow-none'
             : alertLevel === 'warning'
-            ? 'border-2 border-amber-500/[0.25] bg-gradient-to-b from-amber-950/30 via-muted/20 to-muted/5 shadow-[0_0_18px_rgba(245,158,11,0.10)] pizarra:shadow-none'
+            ? 'border-2 border-fill-warning/[0.25] bg-gradient-to-b from-fill-warning/[0.15] via-muted/20 to-muted/5 shadow-[0_0_18px_rgb(var(--fill-warning)/0.10)] pizarra:shadow-none'
             : 'border border-border/20 bg-gradient-to-b from-muted/30 to-muted/5'
         }`}
         style={{ height: `${chartH}px`, transition: dragState.current.active ? 'none' : 'height 0.2s ease' }}
@@ -816,7 +818,7 @@ function TrendSparkline({
         {/* Barra superior de alerta */}
         {alertLevel !== 'normal' && (
           <div className={`absolute top-0 left-0 right-0 h-0.5 z-10 ${
-            alertLevel === 'critical' ? 'bg-red-500 animate-pulse' : 'bg-amber-500/[0.15]'
+            alertLevel === 'critical' ? 'bg-fill-critical animate-pulse' : 'bg-fill-warning/[0.15]'
           }`} />
         )}
         <ReactECharts
@@ -853,10 +855,10 @@ function TrendSparkline({
         {showThresholds && (
           <>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-ctl bg-amber-500/[0.15]" /> Advertencia
+              <span className="h-2 w-2 rounded-ctl bg-fill-warning/[0.15]" /> Advertencia
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-ctl bg-red-500/[0.15]" /> Peligro
+              <span className="h-2 w-2 rounded-ctl bg-fill-critical/[0.15]" /> Peligro
             </span>
           </>
         )}
@@ -919,24 +921,24 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
               {device.deviceId}
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium ${
                 isFresh
-                  ? 'bg-emerald-500/[0.15] text-ink-ok ring-1 ring-emerald-500/30'
+                  ? 'bg-ink-ok/[0.15] text-ink-ok ring-1 ring-ink-ok/30'
                   : 'bg-muted text-muted-foreground ring-1 ring-border'
               }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-fill-ok animate-pulse' : 'bg-muted-foreground'}`} />
                 {isFresh ? 'Online' : 'Offline'}
               </span>
               {alert === 'critical' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2 py-0.5 text-caption font-medium text-ink-crit ring-1 ring-red-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-fill-critical/[0.15] px-2 py-0.5 text-caption font-medium text-ink-crit ring-1 ring-fill-critical/30">
                   <AlertTriangle className="h-3 w-3" /> Crítico
                 </span>
               )}
               {alert === 'warning' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2 py-0.5 text-caption font-medium text-ink-warn ring-1 ring-amber-500/30">
+                <span className="inline-flex items-center gap-1 rounded-full bg-fill-warning/[0.15] px-2 py-0.5 text-caption font-medium text-ink-warn ring-1 ring-fill-warning/30">
                   <AlertTriangle className="h-3 w-3" /> Warning
                 </span>
               )}
               {backfillStatus?.active && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-caption font-medium text-ink-info ring-1 ring-blue-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2 py-0.5 text-caption font-medium text-ink-info ring-1 ring-primary/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                   <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
                 </span>
               )}
@@ -1069,19 +1071,19 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
               isFresh
-                ? 'bg-emerald-500/[0.15] text-ink-ok ring-1 ring-emerald-500/30'
+                ? 'bg-ink-ok/[0.15] text-ink-ok ring-1 ring-ink-ok/30'
                 : 'bg-muted text-muted-foreground ring-1 ring-border'
             }`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-fill-ok animate-pulse' : 'bg-muted-foreground'}`} />
               {isFresh ? 'Online' : 'Offline'}
             </span>
             {alert === 'critical' && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-crit ring-1 ring-red-500/30">
+              <span className="inline-flex items-center gap-1 rounded-full bg-fill-critical/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-crit ring-1 ring-fill-critical/30">
                 <AlertTriangle className="h-3 w-3" /> Crítico
               </span>
             )}
             {alert === 'warning' && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-warn ring-1 ring-amber-500/30">
+              <span className="inline-flex items-center gap-1 rounded-full bg-fill-warning/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-warn ring-1 ring-fill-warning/30">
                 <AlertTriangle className="h-3 w-3" /> Warning
               </span>
             )}
@@ -1091,7 +1093,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               </span>
             )}
             {backfillStatus?.active && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-info ring-1 ring-blue-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/[0.15] px-2.5 py-0.5 text-xs font-medium text-ink-info ring-1 ring-primary/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
                 <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
               </span>
             )}
@@ -1171,7 +1173,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
         )}
 
         {alert !== 'normal' && (
-          <div className="rounded-ctl border border-transparent bg-amber-500/[0.15] p-2 text-ink-warn flex items-center gap-2">
+          <div className="rounded-ctl border border-transparent bg-fill-warning/[0.15] p-2 text-ink-warn flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Revisar condición anómala y evaluar creación de incidencia.
           </div>
@@ -1465,7 +1467,7 @@ export function SensorsMonitorPage() {
                 <p className="text-xs text-muted-foreground mb-1">Online</p>
                 <p className="text-2xl font-bold text-ink-ok">{metrics.online}</p>
               </div>
-              <Activity className="h-8 w-8 text-emerald-500/[0.2]" />
+              <Activity className="h-8 w-8 text-ink-ok/[0.2]" />
             </div>
           </CardContent>
         </Card>
@@ -1476,7 +1478,7 @@ export function SensorsMonitorPage() {
                 <p className="text-xs text-muted-foreground mb-1">Warning</p>
                 <p className="text-2xl font-bold text-ink-warn">{metrics.warning}</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-amber-500/[0.2]" />
+              <AlertTriangle className="h-8 w-8 text-ink-warn/[0.2]" />
             </div>
           </CardContent>
         </Card>
@@ -1487,7 +1489,7 @@ export function SensorsMonitorPage() {
                 <p className="text-xs text-muted-foreground mb-1">Crítico</p>
                 <p className="text-2xl font-bold text-ink-crit">{metrics.critical}</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-500/[0.2]" />
+              <AlertTriangle className="h-8 w-8 text-ink-crit/[0.2]" />
             </div>
           </CardContent>
         </Card>
@@ -1527,7 +1529,7 @@ export function SensorsMonitorPage() {
       {loading && <Card><CardContent className="py-8 text-sm text-muted-foreground">Cargando panel...</CardContent></Card>}
 
       {error && (
-        <Card className="border-red-400">
+        <Card className="border-fill-critical">
           <CardContent className="py-4 text-sm text-ink-crit">Error de monitoreo: {error}</CardContent>
         </Card>
       )}

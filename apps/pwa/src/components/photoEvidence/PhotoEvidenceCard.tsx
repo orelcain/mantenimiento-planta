@@ -30,7 +30,7 @@ interface PhotoEvidenceCardProps {
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
   pendiente: {
     label: 'Pendiente',
-    color: 'bg-amber-500/[0.15] text-ink-warn border-transparent',
+    color: 'bg-fill-warning/[0.15] text-ink-warn border-transparent',
     icon: Clock,
   },
   en_proceso: {
@@ -40,7 +40,7 @@ const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string;
   },
   corregida: {
     label: 'Corregida',
-    color: 'bg-green-500/[0.15] text-ink-ok border-transparent',
+    color: 'bg-ink-ok/[0.15] text-ink-ok border-transparent',
     icon: CheckCircle,
   },
   verificada: {

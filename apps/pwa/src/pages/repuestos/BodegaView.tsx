@@ -469,8 +469,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
             : []),
           { key: 'configurados', label: 'Configurados' },
           { key: 'todos', label: 'Con SAP' },
-          { key: 'bajo', label: 'Bajo stock', dot: 'bg-amber-500' },
-          { key: 'sin', label: 'Sin stock', dot: 'bg-red-500' },
+          { key: 'bajo', label: 'Bajo stock', dot: 'bg-fill-warning' },
+          { key: 'sin', label: 'Sin stock', dot: 'bg-fill-critical' },
           { key: 'sinConfig', label: 'Sin configurar' },
           { key: 'favoritos', label: 'Favoritos', icon: Star },
         ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star; soloMovil?: boolean }[]).map(f => {
@@ -517,10 +517,10 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         return (
           <ListGroup>
             <ListCell
-              leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-red-500 text-white"><AlertTriangle className="size-5" /></span>}
+              leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-fill-critical text-white"><AlertTriangle className="size-5" /></span>}
               title={<span className="font-normal">Alertas de stock</span>}
               subtitle={partes}
-              trailing={<span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-red-500 px-2 text-footnote font-semibold tabular-nums text-white">{stats.alertas.length}</span>}
+              trailing={<span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-fill-critical px-2 text-footnote font-semibold tabular-nums text-white">{stats.alertas.length}</span>}
               chevron={false}
               onClick={() => setAlertasAbiertas(v => !v)}
               aria-expanded={alertasAbiertas}
@@ -679,7 +679,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
   if (resumenFinal) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <div className="h-16 w-16 rounded-panel bg-emerald-500/[0.15] flex items-center justify-center">
+        <div className="h-16 w-16 rounded-panel bg-ink-ok/[0.15] flex items-center justify-center">
           <CheckCircle2 className="h-8 w-8 text-ink-ok" />
         </div>
         <h3 className="text-lg font-bold text-foreground">Inventario finalizado</h3>
@@ -812,7 +812,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           {sesiones.map(s => (
             <button key={s.id} type="button" onClick={() => handleOpenSesion(s)}
               className="w-full min-h-[44px] flex items-center gap-4 p-4 bg-card border border-border rounded-card hover:bg-muted transition-colors text-left">
-              <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-emerald-500/[0.15]' : 'bg-amber-500/[0.15] pizarra:bg-muted'}`}>
+              <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-ink-ok/[0.15]' : 'bg-fill-warning/[0.15] pizarra:bg-muted'}`}>
                 {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-ink-ok" /> : <ClipboardList className="h-5 w-5 text-ink-warn pizarra:text-muted-foreground" />}
               </div>
               <div className="flex-1 min-w-0">
@@ -827,8 +827,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
                   <span>{s.createdAt.toLocaleDateString('es-CL')}</span>
                 </div>
               </div>
-              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn font-semibold shrink-0">En curso</span>}
-              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-emerald-500/[0.15] text-ink-ok font-semibold shrink-0">Finalizado</span>}
+              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-fill-warning/[0.15] text-ink-warn font-semibold shrink-0">En curso</span>}
+              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-ink-ok/[0.15] text-ink-ok font-semibold shrink-0">Finalizado</span>}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
           ))}
@@ -1087,8 +1087,8 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           <div className="divide-y divide-border/50 max-h-[55vh] overflow-y-auto">
             {filtered.map(m => {
               const tipoConfig = {
-                entrada: { label: 'Entrada', color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]', icon: ArrowDownCircle },
-                salida: { label: 'Salida', color: 'text-ink-crit', bg: 'bg-red-500/[0.15]', icon: ArrowUpCircle },
+                entrada: { label: 'Entrada', color: 'text-ink-ok', bg: 'bg-ink-ok/[0.15]', icon: ArrowDownCircle },
+                salida: { label: 'Salida', color: 'text-ink-crit', bg: 'bg-fill-critical/[0.15]', icon: ArrowUpCircle },
                 ajuste: { label: 'Ajuste', color: 'text-brand-ink', bg: 'bg-primary/[0.15]', icon: Settings2 },
               }[m.tipo]
               const TIcon = tipoConfig.icon
@@ -1230,9 +1230,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-3">Salud del inventario</p>
           <div className="flex items-center gap-3 mb-3">
             {[
-              { icon: ShieldCheck, label: 'OK', count: okCount, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]' },
-              { icon: ShieldAlert, label: 'Bajo', count: stats.bajoStock, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15]' },
-              { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-ink-crit', bg: 'bg-red-500/[0.15]' },
+              { icon: ShieldCheck, label: 'OK', count: okCount, color: 'text-ink-ok', bg: 'bg-ink-ok/[0.15]' },
+              { icon: ShieldAlert, label: 'Bajo', count: stats.bajoStock, color: 'text-ink-warn', bg: 'bg-fill-warning/[0.15]' },
+              { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-ink-crit', bg: 'bg-fill-critical/[0.15]' },
             ].map(s => (
               <div key={s.label} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-card border border-border bg-muted">
                 <s.icon className={`h-5 w-5 ${s.color}`} /><span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span><span className="text-caption text-muted-foreground">{s.label}</span>
@@ -1280,9 +1280,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         <div className="p-4">
           <div className="grid grid-cols-3 gap-3 mb-3">
             {[
-              { label: 'A — Crítico', data: abcData.A, color: 'text-ink-crit pizarra:text-brand-ink', bg: 'bg-red-500/[0.15] pizarra:bg-[rgb(var(--serie-1)/0.15)]', desc: '80% del valor' },
-              { label: 'B — Importante', data: abcData.B, color: 'text-ink-warn pizarra:text-muted-foreground', bg: 'bg-amber-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-fuerte)/0.15)]', desc: '15% del valor' },
-              { label: 'C — Estándar', data: abcData.C, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-medio)/0.15)]', desc: '5% del valor' },
+              { label: 'A — Crítico', data: abcData.A, color: 'text-cat-1-ink', bg: 'bg-cat-1-tint/[0.15]', desc: '80% del valor' },
+              { label: 'B — Importante', data: abcData.B, color: 'text-cat-4-ink', bg: 'bg-cat-4-tint/[0.15]', desc: '15% del valor' },
+              { label: 'C — Estándar', data: abcData.C, color: 'text-cat-5-ink', bg: 'bg-cat-5-tint/[0.15]', desc: '5% del valor' },
             ].map(cat => (
               <div key={cat.label} className={`rounded-card border border-border p-3 ${cat.bg}`}>
                 <p className={`text-xs font-semibold ${cat.color}`}>{cat.label}</p>
@@ -1297,9 +1297,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           {/* Barra proporcional */}
           {abcData.totalValor > 0 && (
             <div className="h-4 rounded-full overflow-hidden flex bg-muted">
-              {abcData.A.length > 0 && <div className="bg-red-500/[0.15] pizarra:bg-[rgb(var(--serie-1))] h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
-              {abcData.B.length > 0 && <div className="bg-amber-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-fuerte))] h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
-              {abcData.C.length > 0 && <div className="bg-emerald-500/[0.15] pizarra:bg-[rgb(var(--grafico-neutro-medio))] h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
+              {abcData.A.length > 0 && <div className="bg-cat-1-tint h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
+              {abcData.B.length > 0 && <div className="bg-cat-4-tint h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
+              {abcData.C.length > 0 && <div className="bg-cat-5-tint h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
             </div>
           )}
         </div>
@@ -1319,11 +1319,11 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           ) : (
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
-                <div className="flex-1 rounded-card border border-border bg-amber-500/[0.15] p-3 text-center">
+                <div className="flex-1 rounded-card border border-border bg-fill-warning/[0.15] p-3 text-center">
                   <p className="text-xl font-bold text-ink-warn tabular-nums">{deadStock.noMov90.length}</p>
                   <p className="text-caption text-muted-foreground">+90 días</p>
                 </div>
-                <div className="flex-1 rounded-card border border-border bg-red-500/[0.15] p-3 text-center">
+                <div className="flex-1 rounded-card border border-border bg-fill-critical/[0.15] p-3 text-center">
                   <p className="text-xl font-bold text-ink-crit tabular-nums">{deadStock.noMov180.length}</p>
                   <p className="text-caption text-muted-foreground">+180 días</p>
                 </div>
@@ -1381,14 +1381,14 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Alertas */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-red-500/[0.15]">
+          <div className="px-4 py-3 border-b border-border bg-fill-critical/[0.15]">
             <p className="text-xs font-semibold text-ink-crit tracking-wide flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Alertas ({stats.alertas.length})</p>
           </div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.alertas.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin alertas</p>
             : stats.alertas.map(item => (
               <div key={item.codigoSAP} className="px-4 py-2.5 flex items-center gap-3">
-                <div className={`h-8 w-8 rounded-card flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-red-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
+                <div className={`h-8 w-8 rounded-card flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-fill-critical/[0.15]' : 'bg-fill-warning/[0.15]'}`}>
                   {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-ink-crit" /> : <TrendingDown className="h-4 w-4 text-ink-warn" />}
                 </div>
                 <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-caption font-mono text-primary">{item.codigoSAP}</p></div>
@@ -1682,7 +1682,7 @@ function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; 
   return (
     <div className="relative h-1.5 w-full rounded-full bg-muted overflow-hidden">
       <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-      {minimo > 0 && <div className="absolute inset-y-0 w-px bg-amber-500/[0.15]" style={{ left: `${minimoPct}%` }} />}
+      {minimo > 0 && <div className="absolute inset-y-0 w-px bg-fill-warning/[0.15]" style={{ left: `${minimoPct}%` }} />}
     </div>
   )
 }
@@ -1853,13 +1853,13 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                 <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-mono">{item.codigoSAP}</span>
                 {item.codigoFabricante && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-cat-6-tint/[0.15] text-cat-6-ink font-mono">{item.codigoFabricante}</span>}
                 {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
-                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit pizarra:bg-[rgb(var(--serie-1)/0.15)] pizarra:text-brand-ink' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn pizarra:bg-[rgb(var(--grafico-neutro-fuerte)/0.15)] pizarra:text-muted-foreground' : 'bg-emerald-500/[0.15] text-ink-ok pizarra:bg-[rgb(var(--grafico-neutro-medio)/0.15)]'}`}>ABC: {item.categoria}</span>}
+                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-cat-1-tint/[0.15] text-cat-1-ink' : item.categoria === 'B' ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-cat-5-tint/[0.15] text-cat-5-ink'}`}>ABC: {item.categoria}</span>}
               </div>
             </div>
             <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/[0.15] border border-transparent rounded-card hover:bg-emerald-500/[0.15] text-ink-ok">
+            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-ink-ok/[0.15] border border-transparent rounded-card hover:bg-ink-ok/[0.15] text-ink-ok">
               <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
             </button>
             <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
@@ -1927,10 +1927,10 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 
           {/* Punto de reorden */}
           {reorder && (
-            <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-transparent bg-red-500/[0.15]' : 'border-border'}`}>
+            <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-transparent bg-fill-critical/[0.15]' : 'border-border'}`}>
               <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1">
                 <ShoppingCart className="h-3 w-3" /> Reposición
-                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">Pedir ahora</span>}
+                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-fill-critical/[0.15] text-ink-crit font-bold">Pedir ahora</span>}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
@@ -2219,8 +2219,8 @@ function MovimientoModal({ item, onSave, onClose }: {
   const handleTipoChange = (t: typeof tipo) => { setTipo(t); setMotivoKey('') }
 
   const OPTS = [
-    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-emerald-500/[0.15] border-transparent' },
-    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-red-500/[0.15] border-transparent' },
+    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-ink-ok/[0.15] border-transparent' },
+    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-fill-critical/[0.15] border-transparent' },
     { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-brand-ink bg-primary/[0.15] border-transparent' },
   ]
 
@@ -2284,8 +2284,8 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
           : movs.length === 0 ? <p className="text-center text-sm text-muted-foreground py-8">Sin movimientos</p>
           : <div className="space-y-2">{movs.map(m => {
-            const cfg = { entrada: { l: 'Entrada', c: 'text-ink-ok bg-emerald-500/[0.15]', i: ArrowDownCircle },
-              salida: { l: 'Salida', c: 'text-ink-crit bg-red-500/[0.15]', i: ArrowUpCircle },
+            const cfg = { entrada: { l: 'Entrada', c: 'text-ink-ok bg-ink-ok/[0.15]', i: ArrowDownCircle },
+              salida: { l: 'Salida', c: 'text-ink-crit bg-fill-critical/[0.15]', i: ArrowUpCircle },
               ajuste: { l: 'Ajuste', c: 'text-brand-ink bg-primary/[0.15]', i: Settings2 } }[m.tipo]
             const I = cfg.i
             return (
@@ -2387,11 +2387,11 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
             {/* Tipo */}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => { setTipo('entrada'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-ink-ok bg-emerald-500/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-ink-ok bg-ink-ok/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowDownCircle className="h-5 w-5" /> Entrada
               </button>
               <button type="button" onClick={() => { setTipo('salida'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-ink-crit bg-red-500/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-ink-crit bg-fill-critical/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowUpCircle className="h-5 w-5" /> Salida
               </button>
             </div>

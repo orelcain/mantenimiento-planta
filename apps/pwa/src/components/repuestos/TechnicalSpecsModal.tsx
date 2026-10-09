@@ -239,7 +239,7 @@ export function TechnicalSpecsModal({
           <div className="space-y-3 p-3 bg-primary/[0.15] rounded-card">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground">Datos Generales</h3>
               </div>
               <Badge variant="outline" className="text-caption px-1.5 py-0">
@@ -297,7 +297,7 @@ export function TechnicalSpecsModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-fill-warning" />
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground">Campos Adicionales</h3>
                 {filledCustom > 0 && (
                   <Badge variant="outline" className="text-caption px-1.5 py-0">{filledCustom}</Badge>
