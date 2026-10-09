@@ -85,11 +85,13 @@ body.modo-cine #cine { display: block; }
 .c-h2 h2 { margin: 0; font-size: 20px; line-height: 25px; font-weight: 600; }
 .c-h2 span, .c-h2 button { font-size: 15px; color: var(--c-text2); background: none; border: 0; padding: 0; }
 .c-h2 button { color: var(--c-accent); min-height: 44px; }
+.c-h2-plat { justify-content: flex-start; align-items: center; gap: 10px; }
+.c-plat-logo { width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; }
 .c-hgroup { margin: 24px 32px 8px; font-size: 16px; line-height: 20px; font-weight: 600; }
 .c-foot { margin: 8px 32px 0; font-size: 13px; line-height: 18px; color: var(--c-text2); }
 
 /* ── Pósters ────────────────────────────────────────────────────────── */
-.c-carrusel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 4px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.c-carrusel { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 4px; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; }
 .c-carrusel::-webkit-scrollbar { display: none; }
 /* Tamaño elegido con el botón de la cuadrícula (data-tam en #cine). */
 /* Ancho mínimo por tarjeta: caben las que entren (panel angosto = 3, pantalla completa = muchas). */
