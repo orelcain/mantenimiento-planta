@@ -41,7 +41,7 @@ export function IndicadorRepuestosA3c({ codigos }: { codigos: readonly string[] 
           <>
             {' · '}
             <b className="font-semibold text-foreground">{c.confirmados}</b> {c.confirmados === 1 ? 'resuelto' : 'resueltos'} en ambas
-            <span className="block text-caption" data-testid="indicador-por-maquina">
+            <span className="block text-nota" data-testid="indicador-por-maquina">
               {MAQUINAS.map(m => `${etiquetaMaquina(m)} ${c.porMaquina[m] ?? 0}`).join(' · ')}
             </span>
           </>

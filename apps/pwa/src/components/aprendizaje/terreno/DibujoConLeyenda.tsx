@@ -61,6 +61,7 @@ export const DibujoConLeyenda = forwardRef<HTMLDivElement, Props>(function Dibuj
         <div className="px-3 pt-3">
           {seccion.dibujos.length <= 4 ? (
             <SegmentedControl
+              tamano="herramienta"
               ariaLabel="Dibujo"
               value={dibujo.id}
               onChange={onDibujo}
@@ -111,7 +112,7 @@ export const DibujoConLeyenda = forwardRef<HTMLDivElement, Props>(function Dibuj
             {hotspotsTocables ? 'Haz clic en un número del dibujo o en una pieza' : 'Toca una pieza para verla en el dibujo'}
           </div>
         </div>
-        <Button variant="plain" onClick={() => onFuente(dibujo.fuente)} aria-label={`Ampliar ${dibujo.titulo}`}>
+        <Button variant="plain" className="h-[48px]" onClick={() => onFuente(dibujo.fuente)} aria-label={`Ampliar ${dibujo.titulo}`}>
           <Maximize2 aria-hidden />
           Ampliar
         </Button>
@@ -162,7 +163,7 @@ function TiraDibujos({ dibujos, activo, onChange }: { dibujos: Dibujo[]; activo:
             aria-selected={esActivo}
             onClick={() => onChange(d.id)}
             className={cn(
-              'min-h-[44px] shrink-0 whitespace-nowrap rounded-full px-4 text-subhead font-medium',
+              'min-h-[48px] shrink-0 whitespace-nowrap rounded-full px-4 text-subhead font-medium',
               'transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               esActivo ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-accent',
             )}
@@ -223,7 +224,7 @@ function FilaLeyenda({ pieza, activa, onToggle, stock }: {
             activa ? 'bg-primary text-primary-foreground' : 'bg-muted',
           )}
         >
-          {chip.dib && <span className="mb-0.5 text-[10px] font-medium opacity-70">dib. {chip.dib}</span>}
+          {chip.dib && <span className="mb-0.5 text-nota font-medium opacity-70">dib. {chip.dib}</span>}
           {chip.texto}
         </span>
         <span className="min-w-0 text-subhead leading-tight">

@@ -35,7 +35,7 @@ export function MedidaPrincipal({ medida, especie, onEspecie, onVerPos, onFuente
       className="scroll-mt-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none"
     >
       {segmentos.length > 1 && (
-        <SegmentedControl ariaLabel="Especie" value={actual.especie} onChange={onEspecie} segments={segmentos} />
+        <SegmentedControl tamano="herramienta" ariaLabel="Especie" value={actual.especie} onChange={onEspecie} segments={segmentos} />
       )}
 
       <p className={cn('flex items-baseline gap-2', segmentos.length > 1 ? 'mt-5' : 'mt-1')} aria-live="polite">

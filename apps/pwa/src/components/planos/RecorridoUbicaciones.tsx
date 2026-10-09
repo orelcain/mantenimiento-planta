@@ -43,8 +43,8 @@ export function RecorridoUbicaciones({
     <section aria-label={`Ubicaciones de ${codigo}`} className="mb-3 flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="m-0 font-mono text-caption tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>
-            {codigo} · {total} ubicaciones
+          <p className="m-0 text-nota tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>
+            <span className="font-mono">{codigo}</span> · {total} ubicaciones
           </p>
           {nombre && (
             <p className="m-0 truncate text-[17px] font-semibold leading-snug" style={{ color: 'var(--lc-ink)' }}>{nombre}</p>
@@ -118,7 +118,7 @@ export function RecorridoUbicaciones({
         </ol>
       )}
       {!compacto && (
-        <p className="m-0 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+        <p className="m-0 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
           Enter en el buscador: siguiente · Mayús + Enter: anterior
         </p>
       )}
@@ -128,7 +128,7 @@ export function RecorridoUbicaciones({
 
 function Numero({ n, actual, visto, enChip = false }: { n: number; actual: boolean; visto: boolean; enChip?: boolean }) {
   return (
-    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-caption font-bold tabular-nums"
+    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-nota font-bold tabular-nums"
           style={actual
             ? enChip
               ? { background: 'var(--lc-surface)', color: 'var(--lc-aqua-bright)' }

@@ -240,6 +240,9 @@ export default {
         // 10,5 px, medio punto bajo el mínimo del contrato. En móvil (raíz 16) sigue en 12.
         xs:        ['calc(max(0.75rem, 11px) * var(--escala-texto, 1))', { lineHeight: '1rem' }],
         caption:   ['calc(11px * var(--escala-texto, 1))', { lineHeight: '1.35' }],
+        // Piso de 12 px de las HERRAMIENTAS del Centro de Aprendizaje (oleada 4, tanda c): caption
+        // rinde 11 y no alcanza. El bisel (HMI, plano) conserva su tamaño y no usa este rol.
+        nota:      ['calc(12px * var(--escala-texto, 1))', { lineHeight: '1.35' }],
         footnote:  ['calc(13px * var(--escala-texto, 1))', { lineHeight: '1.4' }],
         // body 17 (Apple: 17/22). Estaba en 15, que es el SUBHEAD de Apple: toda la app
         // iba un escalon por debajo de iOS y eso alimentaba la densidad. subhead y

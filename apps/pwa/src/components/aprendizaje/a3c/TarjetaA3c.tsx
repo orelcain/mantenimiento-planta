@@ -73,7 +73,7 @@ const DiagnosticoA3c = lazy(() => import('./diagnostico/DiagnosticoA3c'))
 
 const LIM22: LimitesCamara = { minW: 70, maxW: 2200, bounds: [40, 45, 1080, 675] }
 const LIM23: LimitesCamara = { minW: 50, maxW: 2000, bounds: [-60, 0, 780, 1131] }
-const FUENTE = 'Plano 142.71.00.888, hojas 22 y 23 · máquinas N2 y N3'
+const FUENTE = <>Plano <span className="font-mono">142.71.00.888</span>, hojas 22 y 23 · máquinas N2 y N3</>
 const FUENTE_PLACA = 'Placa de la N2 (Línea 2), dibujada desde foto; mismo plano 142.71.00.888 que la N3'
 /** 48 px en px, no en rem: en PC la raíz es de 14 px y el `h-12` del control quedaría en 42 px. */
 const ALTO_48 = 'h-[48px] [&>button]:h-[48px]'
@@ -1038,7 +1038,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
         <div className="w-full px-5">
           <header className="flex flex-wrap items-end justify-between gap-4 py-3">
             <div className="min-w-0">
-              <p className="font-mono text-caption text-muted-foreground">{FUENTE}</p>
+              <p className="text-nota text-muted-foreground">{FUENTE}</p>
               <IndicadorRepuestosA3c codigos={codigosElementos} />
             </div>
             <div className="flex items-center gap-3">
@@ -1067,7 +1067,7 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
               <div className="flex min-h-0 min-w-0 flex-col">
                 <div className="flex min-h-[52px] items-center gap-3 pb-2">
                   {selectorVista('w-[200px] flex-none')}
-                  {verPlaca && <p className="min-w-0 text-caption leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
+                  {verPlaca && <p className="min-w-0 text-nota leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
                 </div>
                 <div className="grid min-h-0 flex-1 gap-2" style={{ gridTemplateColumns: `${ANCHO_REGLETA_PC}px minmax(0,1fr)` }}>
                   <div className="min-h-0">{regleta}</div>
@@ -1099,13 +1099,13 @@ export function TarjetaA3c({ paquete, placa: placaDada, volverA, etiquetaVolver,
       {encabezado}
       <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom,0px)+24px)]">
       <div className="mx-auto w-full max-w-[640px] px-4">
-        <p className="mt-3 font-mono text-caption text-muted-foreground">{FUENTE}</p>
+        <p className="mt-3 text-nota text-muted-foreground">{FUENTE}</p>
         <IndicadorRepuestosA3c codigos={codigosElementos} />
         {diagnostico}
         {modo === 'practicar' ? quiz : modo === 'diagnostico' ? null : (
           <>
             {lienzo(hoja, 'mt-3 h-[clamp(280px,calc(100dvh-380px),460px)] touch-none')}
-            {hoja === '23' && verPlaca && <p className="mt-1.5 text-caption leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
+            {hoja === '23' && verPlaca && <p className="mt-1.5 text-nota leading-snug text-muted-foreground">{FUENTE_PLACA}</p>}
             <FranjaLed linea={lineaVista} onVer={verLed} destino={lineaVista.soloPlano ? 'plano' : 'tarjeta'} className="mt-3" />
             {regleta}
             <button

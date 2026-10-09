@@ -85,7 +85,7 @@ function ResultadosNumeroParte({ partes }: { partes: ParteEncontrada[] }) {
   if (!partes.length) return null
   return (
     <div className="mt-3 flex flex-col gap-0.5">
-      <h2 className="m-0 mb-1 flex items-baseline gap-2 text-caption font-semibold tracking-wider"
+      <h2 className="m-0 mb-1 flex items-baseline gap-2 text-nota font-semibold"
           style={{ color: 'var(--lc-ink-ghost)' }}>
         Números de parte
         <span className="font-mono normal-case tracking-normal">{partes.length}</span>
@@ -102,7 +102,7 @@ function ResultadosNumeroParte({ partes }: { partes: ParteEncontrada[] }) {
               <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{pt.codigo}</span>
               {pt.nombre && <span className="ml-2 text-footnote">{pt.nombre}</span>}
             </span>
-            <span className="shrink-0 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+            <span className="shrink-0 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
               {pt.maquina}{pt.figura ? ` · fig. ${pt.figura}` : ' · en Repuestos'}
             </span>
           </Link>
@@ -250,7 +250,7 @@ function Catalogo() {
                     className="flex items-baseline justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80 max-md:min-h-[48px]"
                     style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
                 <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{h.clave}</span>
-                <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{h.maquina.slice(0, 30)} · {h.detalle}</span>
+                <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{h.maquina.slice(0, 30)} · {h.detalle}</span>
               </Link>
             ))}
           </div>
@@ -284,14 +284,14 @@ function Catalogo() {
                     {i > 0 && <div className="border-t" style={{ borderColor: 'var(--lc-border)' }} />}
                     <FilaPlano p={p} />
                     {p.verificacion?.estado === 'por_confirmar' && (
-                      <p className="m-0 flex items-start gap-2 px-3 pb-2.5 pt-2 text-caption leading-snug"
+                      <p className="m-0 flex items-start gap-2 px-3 pb-2.5 pt-2 text-nota leading-snug"
                          style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
                         <AlertTriangle size={14} className="mt-px shrink-0" />
                         <span>Sin confirmar. Antes de usarlo, {p.verificacion.nota}.</span>
                       </p>
                     )}
                     {p.verificacion?.estado === 'confirmado' && (
-                      <p className="m-0 -mt-1.5 flex items-start gap-2 py-1.5 pb-2 pl-14 pr-3 text-caption leading-snug"
+                      <p className="m-0 -mt-1.5 flex items-start gap-2 py-1.5 pb-2 pl-14 pr-3 text-nota leading-snug"
                          style={{ color: 'var(--lc-ink-lo)' }}>
                         <CheckCircle2 size={14} className="mt-px shrink-0" style={{ color: 'var(--lc-ok)' }} />
                         <span>Confirmado: {p.verificacion.nota}</span>
@@ -353,12 +353,12 @@ function FilaPlano({ p }: { p: PlanoCatalogo }) {
           {TIPO_LABEL[p.tipo]}
           {p.variante && <span className="font-normal" style={{ color: 'var(--lc-ink-mid)' }}> · {p.variante}</span>}
         </span>
-        <span className="truncate font-mono text-caption tabular-nums" style={{ color: 'var(--lc-ink-lo)' }}>
+        <span className="truncate text-nota tabular-nums" style={{ color: 'var(--lc-ink-lo)' }}>
           {/* El número se omite cuando no aporta: en los GEA repite el serial
               que ya está en la cabecera del grupo, y en el despiece de la 200
               es una frase larga que empujaba la línea a truncarse. */}
           {p.numero && p.numero !== '—' && !p.numero.includes(' ') && (
-            <><span className="font-medium" style={{ color: 'var(--lc-ink-mid)' }}>{p.numero}</span>{' · '}</>
+            <><span className="font-mono font-medium" style={{ color: 'var(--lc-ink-mid)' }}>{p.numero}</span>{' · '}</>
           )}
           {p.hojas} {p.unidad ?? 'hojas'}{p.detalle ? ` · ${p.detalle}` : ''}
         </span>
@@ -988,13 +988,13 @@ function Visor({ slug }: { slug: string }) {
                  className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-card border py-1 shadow-2xl"
                  style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
               <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
-                <span className="text-caption font-semibold" style={{ color: 'var(--lc-ink-mid)' }}>Recientes</span>
+                <span className="text-nota font-semibold" style={{ color: 'var(--lc-ink-mid)' }}>Recientes</span>
                 <button type="button"
                         onClick={() => {
                           setRecientes([])
                           try { localStorage.removeItem(`plano-recientes:${slug}`) } catch { /* sin storage */ }
                         }}
-                        className="min-h-[32px] text-caption max-md:min-h-[48px]" style={{ color: 'var(--lc-aqua-bright)' }}>
+                        className="min-h-[32px] text-nota max-md:min-h-[48px]" style={{ color: 'var(--lc-aqua-bright)' }}>
                   Borrar
                 </button>
               </div>
@@ -1008,7 +1008,7 @@ function Visor({ slug }: { slug: string }) {
                     <b className="shrink-0 font-mono text-footnote tabular-nums" style={{ color: 'var(--lc-ink)' }}>{r.c}</b>
                     <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>{r.n ?? ''}</span>
                     {n > 1 && (
-                      <span className="shrink-0 rounded-full px-2 py-0.5 text-caption font-semibold tabular-nums"
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-nota font-semibold tabular-nums"
                             style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
                         {n} lugares
                       </span>
@@ -1030,7 +1030,7 @@ function Visor({ slug }: { slug: string }) {
                       className="flex shrink-0 flex-col items-start rounded-card border px-2.5 py-1.5 text-left max-md:min-h-[48px]"
                       style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
                 <span className="text-footnote font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
-                <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
+                <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
               </button>
             ))}
           </div>
@@ -1144,8 +1144,8 @@ function Visor({ slug }: { slug: string }) {
                 <button key={i} type="button" onClick={() => void irA(d.hoja)}
                         className="flex flex-col items-start gap-0.5 rounded-ctl border px-2 py-1.5 text-left max-md:min-h-[48px]"
                         style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
-                  <span className="text-caption font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
-                  <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
+                  <span className="text-nota font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
+                  <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
                 </button>
               ))}
             </div>
@@ -1155,7 +1155,7 @@ function Visor({ slug }: { slug: string }) {
             if (!grupo.length) return null
             return (
               <section key={sec}>
-                <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-caption font-semibold tracking-wider"
+                <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-nota font-semibold"
                     style={{ background: 'var(--lc-surface)', color: 'var(--lc-ink-ghost)', borderColor: 'var(--lc-border)' }}>
                   {etiquetaSeccion(sec)}
                   <span className="font-mono normal-case tracking-normal">{grupo.length}</span>
@@ -1170,19 +1170,19 @@ function Visor({ slug }: { slug: string }) {
                               style={activa
                                 ? { background: 'var(--lc-aqua-soft)', boxShadow: 'inset 2px 0 0 var(--lc-aqua)' }
                                 : {}}>
-                        <span className="w-7 shrink-0 rounded-ctl py-0.5 text-center font-mono text-caption tabular-nums"
+                        <span className="w-7 shrink-0 rounded-ctl py-0.5 text-center font-mono text-nota tabular-nums"
                               style={activa
                                 ? { background: 'var(--lc-aqua)', color: '#fff' }
                                 : { background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
                           {h.blatt}
                         </span>
-                        <span className="line-clamp-2 min-w-0 flex-1 text-caption leading-snug"
+                        <span className="line-clamp-2 min-w-0 flex-1 text-nota leading-snug"
                               style={{ color: activa ? 'var(--lc-ink)' : 'var(--lc-ink-mid)' }}>
                           {limpiarTitulo(mostrarEs ? h.tituloEs : h.titulo)}
                         </span>
                         {(notasPorHoja.get(h.blatt) ?? 0) > 0 && (
                           <span title={`${notasPorHoja.get(h.blatt)} nota(s) de aparatos de esta hoja`}
-                                className="shrink-0 rounded-full px-1.5 font-mono text-[9.5px]"
+                                className="shrink-0 rounded-full px-1.5 font-mono text-nota"
                                 style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
                             {notasPorHoja.get(h.blatt)}
                           </span>
@@ -1213,7 +1213,7 @@ function Visor({ slug }: { slug: string }) {
           )}
           {cargando && (
             <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
-              <span className="rounded-full border px-3 py-1 text-caption shadow"
+              <span className="rounded-full border px-3 py-1 text-nota shadow"
                     style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
                 Cargando hoja…
               </span>
@@ -1471,12 +1471,12 @@ function Panel({
             <button key={`${f.pos}-${f.nr ?? ''}`} type="button" onClick={() => onSeleccionarFila(f)}
                     className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-2 text-left last:border-b-0"
                     style={{ borderColor: 'var(--lc-border)', minHeight: 44 }}>
-              <span className="w-9 shrink-0 font-mono text-caption tabular-nums"
+              <span className="w-9 shrink-0 font-mono text-nota tabular-nums"
                     style={{ color: 'var(--lc-aqua-bright)' }}>{f.pos}</span>
               <span className="min-w-0 flex-1 text-footnote leading-snug"
                     style={{ color: 'var(--lc-ink)' }}>{f.es || f.de}</span>
               {f.nr && (
-                <span className="shrink-0 font-mono text-caption tabular-nums"
+                <span className="shrink-0 font-mono text-nota tabular-nums"
                       style={{ color: 'var(--lc-ink-mid)' }}>{f.nr}</span>
               )}
             </button>
@@ -1548,7 +1548,7 @@ function Panel({
         )}
         {recientes.length > 0 && (
           <>
-            <h2 className="m-0 mb-2 mt-4 text-caption font-semibold tracking-wider"
+            <h2 className="m-0 mb-2 mt-4 text-nota font-semibold"
                 style={{ color: 'var(--lc-ink-ghost)' }}>
               Recientes
             </h2>
@@ -1611,7 +1611,7 @@ function Panel({
                     className="flex items-baseline justify-between rounded-ctl border px-2.5 py-1.5 text-left max-md:min-h-[48px]"
                     style={{ borderColor: 'var(--lc-border)' }}>
               <b className="font-mono text-footnote" style={{ color: 'var(--lc-nuevo)' }}>{o.k}</b>
-              <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>hoja {o.h}</span>
+              <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>hoja {o.h}</span>
             </button>
           ))}
         </div>
@@ -1868,11 +1868,11 @@ function Resultados({ items, total, onIr, partes = [], cargando = false }: {
                 onClick={() => onIr(r.blatt, r.col, r.caja, r.aparato)}
                 className="flex w-full items-baseline justify-between gap-2 rounded-ctl px-2 py-1.5 text-left hover:opacity-80 max-md:min-h-[48px]">
           <b className="font-mono text-footnote">{r.clave}</b>
-          <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
+          <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
         </button>
       ))}
       {truncado && (
-        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+        <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
           {items.length} de {total} — afina la búsqueda.
         </p>
       )}
@@ -1941,7 +1941,7 @@ function FichaPieza({
     <>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <Titulo>Pieza</Titulo>
-        <span className="rounded-ctl px-1.5 py-0.5 text-caption font-medium" style={{ background: badge.bg, color: badge.fg }}>
+        <span className="rounded-ctl px-1.5 py-0.5 text-nota font-medium" style={{ background: badge.bg, color: badge.fg }}>
           {badge.txt}
         </span>
       </div>
@@ -1954,13 +1954,13 @@ function FichaPieza({
       {/* Consumible: el técnico lo ve dentro de SU conjunto (un cojinete en
           la fig 13-1) sin tener que saber que también está en la figura 00. */}
       {fila.nr && desgaste?.includes(fila.nr) && (
-        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-caption font-semibold"
+        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-nota font-semibold"
            style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
           Pieza de desgaste — se cambia seguido
         </p>
       )}
       {fila.q != null && (
-        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-caption font-semibold"
+        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-nota font-semibold"
            style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
           Lleva {fila.q} unidades
         </p>
@@ -1982,7 +1982,7 @@ function FichaPieza({
       )}
 
       {fila.nr && usosPorCodigo?.[fila.nr] != null && (
-        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
           {umbralComun != null && usosPorCodigo[fila.nr]! > umbralComun
             ? `Pieza común: se usa en toda la máquina (${usosPorCodigo[fila.nr]} figuras)`
             : `Esta misma pieza va en otras ${usosPorCodigo[fila.nr]! - 1} figuras`}
@@ -2001,7 +2001,7 @@ function FichaPieza({
           42303077 es a la vez B10, B14 y B15. Saberlo evita pedir tres
           repuestos distintos creyendo que son piezas diferentes. */}
       {hermanas && hermanas.length > 1 && (
-        <p className="m-0 mt-1 flex flex-wrap items-baseline gap-1 text-caption"
+        <p className="m-0 mt-1 flex flex-wrap items-baseline gap-1 text-nota"
            style={{ color: 'var(--lc-ink-mid)' }}>
           <span>El mismo código es también</span>
           {hermanas.filter((h) => normalizarPos(h) !== selTag).map((h) => (
@@ -2051,7 +2051,7 @@ function FichaPieza({
         )}
         {fila.nr && !sap && (
           <Link to={`/repuestos?q=${encodeURIComponent(fila.nr)}`}
-                className="text-caption underline-offset-2 hover:underline"
+                className="text-nota underline-offset-2 hover:underline"
                 style={{ color: 'var(--lc-aqua-bright)' }}>
             Buscar {fila.nr} en repuestos
           </Link>
@@ -2063,7 +2063,7 @@ function FichaPieza({
           {/* El dato estatico del indice se ve SIEMPRE (el visor corre anonimo
               via QR y la coleccion repuestos exige sesion): SAP + nombre +
               ubicacion de bodega. FichasSap suma el stock vivo con sesion. */}
-          <p className="m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-caption"
+          <p className="m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-nota"
              style={{ color: 'var(--lc-ink-mid)' }}>
             <span className="rounded-ctl px-2 py-0.5 font-mono"
                   style={{ background: 'var(--lc-surface-hi)' }}>SAP {sap.s}</span>
@@ -2092,11 +2092,11 @@ function FichaPieza({
                     style={{ color: activa ? 'var(--lc-aqua-bright)' : 'var(--lc-ink-mid)' }}>
                 {f.pos}
               </span>
-              <span className="min-w-0 flex-1 truncate text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+              <span className="min-w-0 flex-1 truncate text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
                 {f.es || f.de || '—'}
               </span>
               {f.nr && (
-                <span className="shrink-0 font-mono text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{f.nr}</span>
+                <span className="shrink-0 font-mono text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{f.nr}</span>
               )}
             </button>
           )
@@ -2251,31 +2251,31 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno, maquinaPlano }: {
           <div className="flex flex-col items-start gap-1">
             <span className="text-footnote font-semibold leading-snug">{pieza.es}</span>
             {v?.estado === 'confirmado' ? (
-              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-nota"
                     style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
                 Confirmado en terreno{enMaquina}
               </span>
             ) : v?.estado === 'corregido' ? (
-              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-nota"
                     style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
                 Corregido en terreno{enMaquina}
               </span>
             ) : (
-              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-nota"
                     style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
                 {pieza.confianza === 'catalogo' ? `según catálogo BAADER ${pieza.fig?.includes('2014') ? '2014' : '2006'}` : 'propuesto'}
               </span>
             )}
           </div>
           {pieza.de && (
-            <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
+            <p className="m-0 mt-0.5 text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
           )}
           {v?.estado === 'corregido' ? (
             <>
               <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
                 {v.codigo}
               </p>
-              <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+              <p className="m-0 mt-0.5 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
                 el catálogo decía <span className="font-mono line-through">{pieza.nr}</span>
               </p>
             </>
@@ -2285,7 +2285,7 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno, maquinaPlano }: {
             </p>
           )}
           {pieza.sap && (v?.estado !== 'confirmado' || !v.codigo || v.codigo === pieza.nr) && (
-            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-caption"
+            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-nota"
                   style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
               SAP {pieza.sap}{pieza.sapUbicacion ? ` · ${pieza.sapUbicacion}` : ''}
             </span>
@@ -2293,7 +2293,7 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno, maquinaPlano }: {
         </>
       )}
       {v && (
-        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>
+        <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-lo)' }}>
           Por {v.confirmadoPorNombre || 'alguien'} · {formatearFechaCorta(v.actualizado)}
         </p>
       )}
@@ -2303,14 +2303,14 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno, maquinaPlano }: {
            el badge dice "segun catalogo" aunque alguien ya lo haya confirmado
            frente a la maquina. El texto tiene que decir que hay algo que no se
            esta viendo, no solo invitar a confirmar. */
-        <p className="m-0 mt-2 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+        <p className="m-0 mt-2 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
           Inicia sesión para ver y hacer confirmaciones en terreno
         </p>
       ) : faltaMaquina ? (
         // El selector va AQUÍ y no solo en «Puente al catálogo»: con ?ap=B5 (enlace directo) ese
         // bloque no se muestra y no había dónde elegir la máquina para confirmar.
         <div className="mt-2" data-testid="selector-maquina-ficha">
-          <p className="m-0 mb-1 text-caption" style={{ color: 'var(--lc-prep)' }}>
+          <p className="m-0 mb-1 text-nota" style={{ color: 'var(--lc-prep)' }}>
             ¿En cuál máquina estás? Elígela para confirmar en terreno.
           </p>
           <SelectorMaquinaPlano maquina={maquinaPlano.maquina} maquinas={maquinaPlano.maquinas} onChange={maquinaPlano.setMaquina} />
@@ -2456,7 +2456,7 @@ function PendientesTerreno({ partes, vinculos, onAbrir }: {
           </button>
         ))}
         {pendientes.length > 8 && (
-          <span className="self-center text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+          <span className="self-center text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
             +{pendientes.length - 8} más
           </span>
         )}
@@ -2489,7 +2489,7 @@ function ZonaSugerida({ tag, partes, slug }: {
           </Link>
         ))}
       </div>
-      <p className="m-0 mt-2 text-caption leading-relaxed" style={{ color: 'var(--lc-ink-lo)' }}>
+      <p className="m-0 mt-2 text-nota leading-relaxed" style={{ color: 'var(--lc-ink-lo)' }}>
         El catálogo no rotula la designación eléctrica: esto es el gabinete/conjunto
         donde está montado, no la pieza exacta.
       </p>
@@ -2531,23 +2531,26 @@ function FichasSap({ notas, saps: sapsDirectos }: {
               <span className="text-footnote font-semibold leading-snug">
                 {f.nombre ?? 'SAP sin catalogar'}
               </span>
-              <span className="shrink-0 font-mono text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
+              <span className="shrink-0 font-mono text-nota" style={{ color: 'var(--lc-aqua-bright)' }}>
                 {f.sap}
               </span>
             </div>
             {(f.marca || f.modeloTipo || f.codigoFabricante) && (
-              <p className="m-0 mt-1 font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
-                {[f.marca, f.modeloTipo, f.codigoFabricante].filter(Boolean).join(' · ')}
+              <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
+                {[f.marca, f.modeloTipo].filter(Boolean).join(' · ')}
+                {f.codigoFabricante && (
+                  <>{f.marca || f.modeloTipo ? ' · ' : ''}<span className="font-mono">{f.codigoFabricante}</span></>
+                )}
               </p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {f.stockActual == null ? (
-                <span className="rounded-ctl px-2 py-0.5 text-caption"
+                <span className="rounded-ctl px-2 py-0.5 text-nota"
                       style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
                   sin registro de bodega
                 </span>
               ) : (
-                <span className="rounded-ctl px-2 py-0.5 font-mono text-caption font-semibold"
+                <span className="rounded-ctl px-2 py-0.5 text-nota font-semibold tabular-nums"
                       style={sinStock
                         ? { background: 'var(--lc-danger-soft)', color: 'var(--lc-danger)' }
                         : bajo
@@ -2557,10 +2560,10 @@ function FichasSap({ notas, saps: sapsDirectos }: {
                 </span>
               )}
               {f.ubicacionBodega && (
-                <span className="text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{f.ubicacionBodega}</span>
+                <span className="text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{f.ubicacionBodega}</span>
               )}
               <Link to={`/repuestos?q=${encodeURIComponent(f.sap)}`}
-                    className="ml-auto text-caption underline-offset-2 hover:underline"
+                    className="ml-auto text-nota underline-offset-2 hover:underline"
                     style={{ color: 'var(--lc-aqua-bright)' }}>
                 Ver en Repuestos
               </Link>
@@ -2622,7 +2625,7 @@ function BotonOffline({ slug, indice }: { slug: string; indice: PlanoIndice | nu
     <button type="button"
             title={estado === 'si' ? 'Guardado para usar sin señal' : 'Guardar para usar sin señal'}
             onClick={() => { if (estado === 'no') void bajar() }}
-            className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center gap-1 rounded-ctl px-2 font-mono text-caption"
+            className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center gap-1 rounded-ctl px-2 font-mono text-nota"
             style={{ color: estado === 'si' ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
       {estado === 'bajando' ? <><Loader2 size={14} className="animate-spin" />{avance}%</>
         : estado === 'si' ? <><Check size={14} /><Download size={12} /></>
@@ -2651,7 +2654,7 @@ function etiquetaSel(s: NonNullable<Seleccion>): string {
 
 function Titulo({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="m-0 mb-2 text-caption font-semibold tracking-wider"
+    <h2 className="m-0 mb-2 text-nota font-semibold"
         style={{ color: 'var(--lc-ink-ghost)' }}>
       {children}
     </h2>

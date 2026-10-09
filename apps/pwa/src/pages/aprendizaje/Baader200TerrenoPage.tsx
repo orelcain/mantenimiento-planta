@@ -333,7 +333,7 @@ function BarraSecciones({ anterior, siguiente, onIr, onSecciones }: {
         onClick={() => e?.id && onIr(e.id)}
         aria-label={e ? `${dir === 'ant' ? 'Anterior' : 'Siguiente'}: ${e.titulo}${disponible ? '' : ' (pendiente)'}` : undefined}
         className={cn(
-          'flex min-h-[44px] min-w-0 items-center gap-1 rounded-full px-1.5 text-subhead leading-tight text-primary',
+          'flex min-h-[48px] min-w-0 items-center gap-1 rounded-full px-1.5 text-subhead leading-tight text-primary',
           'disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
           dir === 'sig' && 'justify-end text-right',
           !e && 'invisible',
@@ -342,7 +342,7 @@ function BarraSecciones({ anterior, siguiente, onIr, onSecciones }: {
         {dir === 'ant' && <ChevronLeft aria-hidden className="size-5 shrink-0" />}
         {e && (
           <span className="min-w-0">
-            <small className="block text-caption text-muted-foreground tabular-nums">
+            <small className="block text-nota text-muted-foreground tabular-nums">
               {e.numero}{disponible ? '' : ' · pendiente'}
             </small>
             <span className="block truncate">{e.titulo}</span>
@@ -363,7 +363,7 @@ function BarraSecciones({ anterior, siguiente, onIr, onSecciones }: {
       <button
         type="button"
         onClick={onSecciones}
-        className="min-h-[44px] rounded-full bg-muted px-4 text-subhead font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="min-h-[48px] rounded-full bg-muted px-4 text-subhead font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         Secciones
       </button>
@@ -387,7 +387,7 @@ function TiraSecciones({ actualId, onElegir }: { actualId: string; onElegir: (id
             title={disponible ? undefined : 'Pendiente de estructurar'}
             onClick={() => e.id && onElegir(e.id)}
             className={cn(
-              'min-h-[44px] shrink-0 whitespace-nowrap rounded-full px-3 text-subhead',
+              'min-h-[48px] shrink-0 whitespace-nowrap rounded-full px-3 text-subhead',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               actual ? 'bg-primary/[0.1] font-semibold text-brand-ink' : disponible ? 'text-foreground hover:bg-accent' : 'text-muted-foreground',
             )}

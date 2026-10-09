@@ -90,7 +90,7 @@ function EstadoChip({ estado }: { estado: EstadoFicha }) {
   const color = COLOR_ESTADO[estado]
   return (
     <span
-      className="inline-flex items-center gap-2 rounded-ctl px-2 py-1 text-caption font-medium whitespace-nowrap"
+      className="inline-flex items-center gap-2 rounded-ctl px-2 py-1 text-nota font-medium whitespace-nowrap"
       style={{ color, background: tinte.suave(color) }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
@@ -149,7 +149,7 @@ function SimuladorPSR() {
         <span className="font-mono text-footnote font-bold tracking-[0.22em]" style={{ color: '#e8422e' }}>
           ABB
         </span>
-        <span className="font-mono text-caption" style={{ color: '#6d7d8a' }}>
+        <span className="font-mono text-nota" style={{ color: '#6d7d8a' }}>
           PSR60-600-70 · Ue 208…600 V · Uc 100…240 V AC
         </span>
       </div>
@@ -158,10 +158,10 @@ function SimuladorPSR() {
         {POTENCIOMETROS_PSR.map((p) => (
           <div key={p.id} className="flex flex-col items-center gap-2 text-center">
             <Perilla valor={v(p.id)} min={p.min} max={p.max} />
-            <span className="font-mono text-caption uppercase tracking-[0.1em]" style={{ color: '#8b9aa6' }}>
+            <span className="text-nota font-semibold" style={{ color: '#8b9aa6' }}>
               {p.nombre}
             </span>
-            <span className="font-mono text-lg font-semibold tabular-nums" style={{ color: '#f0f4f7' }}>
+            <span className="text-lg font-semibold tabular-nums" style={{ color: '#f0f4f7' }}>
               {v(p.id)}{p.unidad}
             </span>
             <input
@@ -175,7 +175,7 @@ function SimuladorPSR() {
               style={{ accentColor: '#f5a623' }}
               onChange={(e) => setValores((v) => ({ ...v, [p.id]: Number(e.target.value) }))}
             />
-            <span className="font-mono text-caption" style={{ color: '#5d6b76' }}>{p.rango}</span>
+            <span className="text-nota tabular-nums" style={{ color: '#5d6b76' }}>{p.rango}</span>
           </div>
         ))}
       </div>
@@ -190,17 +190,17 @@ function SimuladorPSR() {
           ['Corriente nominal', '60 A'],
         ].map(([rotulo, valor]) => (
           <div key={rotulo} className="flex flex-col gap-1 px-3 py-3" style={{ background: '#131a20' }}>
-            <dt className="font-mono text-caption uppercase tracking-[0.09em]" style={{ color: '#6d7d8a' }}>
+            <dt className="text-nota font-semibold" style={{ color: '#6d7d8a' }}>
               {rotulo}
             </dt>
-            <dd className="m-0 font-mono text-[15px] font-semibold tabular-nums" style={{ color: '#e6ecf1' }}>
+            <dd className="m-0 text-[15px] font-semibold tabular-nums" style={{ color: '#e6ecf1' }}>
               {valor}
             </dd>
           </div>
         ))}
       </dl>
 
-      <p className="text-xs" style={{ color: '#8b9aa6', borderTop: '1px solid #232a30', paddingTop: 12 }}>
+      <p className="text-nota" style={{ color: '#8b9aa6', borderTop: '1px solid #232a30', paddingTop: 12 }}>
         Del catálogo ABB: <span className="font-mono">Uini 40…70 % da Uend 30…60 %</span>, y el escalón
         baja <span className="font-mono">2 %</span> por cada segundo de rampa de parada.
       </p>
@@ -317,7 +317,7 @@ function NavegadorParametros({
                   fontWeight: on ? 600 : 400,
                 }}
               >
-                <span className="mr-2 font-mono text-xs opacity-85">{codigo}</span>
+                <span className="mr-2 font-mono text-nota opacity-85">{codigo}</span>
                 {nombre}
               </button>
             )
@@ -355,7 +355,7 @@ function NavegadorParametros({
           >
             Solo datos de placa
           </button>
-          <MetaText mono>
+          <MetaText>
             {global
               ? `${visibles.length} de ${todas.length} en toda la ficha`
               : `${filas.length} parámetros`}
@@ -420,7 +420,7 @@ function NavegadorParametros({
                 >
                   {r.codigo}
                   {(global || marcado) && (
-                    <span className="mt-1 block font-sans text-caption font-normal" style={{ color: C.inkLo }}>
+                    <span className="mt-1 block font-sans text-nota font-normal" style={{ color: C.inkLo }}>
                       {r.menu.split(' ')[0]}
                     </span>
                   )}
@@ -429,7 +429,7 @@ function NavegadorParametros({
                   {r.descripcion}
                   {r.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium"
+                      className="ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-nota font-medium"
                       style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
@@ -440,7 +440,7 @@ function NavegadorParametros({
                   {equivalenciaDe(r.codigo) && (
                     <button
                       onClick={() => onComparar(r.codigo)}
-                      className={`ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium align-middle ${FOCO} max-lg:min-h-[48px]`}
+                      className={`ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-nota font-medium align-middle ${FOCO} max-lg:min-h-[48px]`}
                       style={{
                         color: C.aquaBright,
                         background: tinte.suave(C.aqua),
@@ -470,7 +470,7 @@ function NavegadorParametros({
                           <span style={{ color: C.ink }}>{o.que}</span>
                           {o.cuando && <span style={{ color: C.inkMid }}> — {o.cuando}</span>}
                           {o.requiere && (
-                            <span className="ml-2 whitespace-nowrap text-caption" style={{ color: C.inkLo }}>
+                            <span className="ml-2 whitespace-nowrap text-nota" style={{ color: C.inkLo }}>
                               ({o.requiere})
                             </span>
                           )}
@@ -494,7 +494,7 @@ function NavegadorParametros({
 
       <MetaText>
         <span
-          className="mr-2 inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
+          className="mr-2 inline-flex items-center rounded-ctl px-2 py-1 text-nota font-medium"
           style={{ color: C.warn, background: tinte.suave(C.warn) }}
         >
           Placa
@@ -669,8 +669,8 @@ function PanelEvidencia() {
         ].map(([rot, val, pie]) => (
           <div key={rot as string} className="flex flex-col gap-1 px-3 py-3" style={{ background: C.surface }}>
             <span className="text-footnote" style={{ color: C.inkMid }}>{rot}</span>
-            <span className="font-mono text-[22px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
-            {pie && <span className="text-caption" style={{ color: C.inkLo }}>{pie}</span>}
+            <span className="text-[22px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
+            {pie && <span className="text-nota" style={{ color: C.inkLo }}>{pie}</span>}
           </div>
         ))}
       </div>
@@ -1217,7 +1217,7 @@ function RecetasPorEquipo({
                                     {val.valor}
                                   </span>
                                   <span
-                                    className="rounded-ctl px-2 py-1 text-caption"
+                                    className="rounded-ctl px-2 py-1 text-nota"
                                     style={{
                                       color: COLOR_VALOR[val.estado],
                                       background: `color-mix(in srgb, ${COLOR_VALOR[val.estado]} 16%, transparent)`,
@@ -1404,7 +1404,7 @@ function ReemplazoOtraMarca({
                         >
                           {f.valor}
                           <span
-                            className="ml-2 rounded-ctl px-2 py-1 text-caption font-sans"
+                            className="ml-2 rounded-ctl px-2 py-1 text-nota font-sans"
                             style={{
                               color: COLOR_VALOR[f.estado],
                               background: tinte.suave(COLOR_VALOR[f.estado]),
@@ -1440,7 +1440,7 @@ function ReemplazoOtraMarca({
                         </button>{' '}
                         <span style={{ color: C.ink }}>{x.concepto}</span>
                         {x.menu && (
-                          <span className="ml-2 font-mono text-caption" style={{ color: C.inkLo }}>
+                          <span className="ml-2 font-mono text-nota" style={{ color: C.inkLo }}>
                             menú {x.menu.split(' ')[0]}
                             {x.rango && x.rango !== '—' ? ` · ${x.rango}` : ''}
                             {x.fabrica && x.fabrica !== '—' ? ` · fábrica ${x.fabrica}` : ''}
@@ -1575,7 +1575,7 @@ function BuscadorParametros({
                     </span>
                     <span className="text-[14px]" style={{ color: C.ink }}>{h.parametro.descripcion}</span>
                     {h.parametro.dePlaca && (
-                      <span className="rounded-ctl px-2 py-1 text-caption font-medium" style={chipEstilo(C.warn)}>Placa</span>
+                      <span className="rounded-ctl px-2 py-1 text-nota font-medium" style={chipEstilo(C.warn)}>Placa</span>
                     )}
                   </span>
                   <span className="text-footnote" style={{ color: C.inkMid }}>
@@ -1632,7 +1632,7 @@ function PanelComparacion({
       <span className="text-[15px] font-semibold" style={{ color: C.ink }}>
         {equiv.concepto}
         {equiv.dePlaca && (
-          <span className="ml-2 rounded-ctl px-2 py-1 text-caption font-medium" style={chipEstilo(C.warn)}>
+          <span className="ml-2 rounded-ctl px-2 py-1 text-nota font-medium" style={chipEstilo(C.warn)}>
             Dato de placa
           </span>
         )}
@@ -1802,7 +1802,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                   {e.concepto}
                   {e.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
+                      className="ml-2 inline-flex items-center rounded-ctl px-2 py-1 text-nota font-medium"
                       style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
@@ -2081,13 +2081,13 @@ export function VariadoresPage() {
                         <span className="block text-base font-semibold leading-tight tracking-[-0.014em]" style={{ color: C.ink }}>
                           {f.nombre}
                         </span>
-                        <span className="mt-1 block text-xs" style={{ color: C.inkMid }}>{f.tipo}</span>
+                        <span className="mt-1 block text-nota" style={{ color: C.inkMid }}>{f.tipo}</span>
                       </div>
                       <EstadoChip estado={f.estado} />
                     </div>
                     <span className="text-footnote leading-snug" style={{ color: C.inkMid }}>{f.donde}</span>
                     <span
-                      className="mt-1 pt-2 text-xs tabular-nums"
+                      className="mt-1 pt-2 text-nota tabular-nums"
                       style={{ color: C.inkMid, borderTop: `1px solid ${C.border}` }}
                     >
                       {f.menus
@@ -2134,8 +2134,8 @@ export function VariadoresPage() {
                         ['RPM salida', m.rpmSalida],
                       ].map(([rot, val]) => (
                         <div key={rot} className="flex flex-col gap-1 px-3 py-2" style={{ background: C.surface }}>
-                          <dt className="text-caption" style={{ color: C.inkMid }}>{rot}</dt>
-                          <dd className="m-0 font-mono text-[14px] font-semibold tabular-nums" style={{ color: C.ink }}>
+                          <dt className="text-nota" style={{ color: C.inkMid }}>{rot}</dt>
+                          <dd className="m-0 text-[14px] font-semibold tabular-nums" style={{ color: C.ink }}>
                             {val}
                           </dd>
                         </div>
@@ -2145,7 +2145,7 @@ export function VariadoresPage() {
                       {FALTAN_DE_PLACA.map((f) => (
                         <span
                           key={f}
-                          className="inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
+                          className="inline-flex items-center rounded-ctl px-2 py-1 text-nota font-medium"
                           style={{ color: C.warn, background: tinte.suave(C.warn) }}
                         >
                           {f}

@@ -51,7 +51,7 @@ export function EnTerrenoA3c({
               <CellIcon
                 tone="neutral"
                 className={cn(
-                  'font-mono text-caption font-bold',
+                  'font-mono text-nota font-bold',
                   v && 'bg-success/[0.15] text-ink-ok',
                   aqui && 'ring-2 ring-inset ring-primary',
                 )}

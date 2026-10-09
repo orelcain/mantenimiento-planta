@@ -73,7 +73,7 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
               <span
                 className={cn(
                   'max-w-full overflow-hidden whitespace-nowrap font-mono leading-none',
-                  compacta ? 'text-caption' : 'text-xs',
+                  compacta ? 'text-nota' : 'text-nota',
                   vertical && 'min-w-0 flex-1 text-ellipsis',
                   sin ? 'text-muted-foreground/70' : salida ? 'text-brand-ink' : 'text-muted-foreground',
                 )}
@@ -87,7 +87,7 @@ export const RegletaX5 = memo(forwardRef<HTMLDivElement, RegletaX5Props>(functio
           <div
             key={`sep-${r.desde}`}
             className={cn(
-              'flex flex-none flex-col justify-center font-mono text-caption font-semibold text-muted-foreground',
+              'flex flex-none flex-col justify-center font-mono text-nota font-semibold text-muted-foreground',
               vertical ? 'sticky top-0 z-[1] bg-background px-1 pb-1 pt-2 leading-tight' : 'whitespace-nowrap pl-2.5 pr-2',
             )}
           >
