@@ -59,6 +59,29 @@ export async function copiarHtml(html: string, textoPlano: string): Promise<void
 }
 
 /**
+ * Como `copiarHtml`, pero el HTML puede terminar de armarse DESPUÉS del toque (p. ej. midiendo
+ * fotos). `navigator.clipboard.write` se llama de inmediato, dentro del gesto, con el HTML
+ * como promesa: Safari y Firefox rechazan la escritura si se espera antes de llamarla.
+ * Si el panel no deja escribir, se espera el HTML y se usa el camino de `copiarHtml`.
+ */
+export async function copiarHtmlDiferido(html: Promise<string>, textoPlano: string): Promise<void> {
+  if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': html.then((h) => new Blob([h], { type: 'text/html' })),
+          'text/plain': new Blob([textoPlano], { type: 'text/plain' }),
+        }),
+      ])
+      return
+    } catch {
+      // permisos del panel embebido: fallback abajo
+    }
+  }
+  await copiarHtml(await html, textoPlano)
+}
+
+/**
  * Copia una IMAGEN (PNG) para pegarla con Ctrl+V, por ejemplo en WhatsApp Web.
  * Chrome solo acepta `image/png` en el portapapeles. Se puede pasar la promesa
  * del PNG: Safari exige que `write` se llame dentro del toque, aunque la imagen

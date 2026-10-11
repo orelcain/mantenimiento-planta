@@ -292,6 +292,16 @@ export function solicitudesDePedido(lineas: readonly LineaPedido[], notaPedido?:
     }))
 }
 
+/**
+ * Líneas que faltan por registrar como solicitud: con SAP y sin registrar todavía.
+ * Evita duplicar solicitudes (y avisos de Telegram) al tocar dos veces o al reintentar
+ * tras un fallo a mitad de camino.
+ */
+export function pendientesDeRegistrar(lineas: readonly LineaPedido[], registradas: readonly string[]): LineaPedido[] {
+  const hechas = new Set(registradas)
+  return lineas.filter((l) => l.codigoSAP && !hechas.has(l.clave))
+}
+
 /** Nombre de archivo sin caracteres raros. */
 export function nombreArchivoPedido(fecha: Date, ext: string): string {
   return `pedido-repuestos-${fechaCorta(fecha)}.${ext}`

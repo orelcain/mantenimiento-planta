@@ -776,16 +776,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     })
   }, [crearSolicitud, user, toast, selectedEquipName])
 
-  /** El pedido registrado como solicitudes (una por repuesto con SAP). El pedido no se vacía: falta enviarlo. */
-  const handleRegistrarPedido = useCallback(async (lineas: NuevaSolicitud[]) => {
-    for (const l of lineas) await crearSolicitud(l, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
-    const unidades = lineas.reduce((a, l) => a + l.cantidad, 0)
-    toast({
-      title: `${lineas.length} ${lineas.length === 1 ? 'solicitud registrada' : 'solicitudes registradas'}`,
-      description: `${unidades} unidades. Quedan en «Solicitudes» y se avisa al grupo de Mantención en Telegram.`,
-      variant: 'success',
-    })
-  }, [crearSolicitud, user, toast])
+  /** Una solicitud del pedido. La hoja las registra de a una, marca cada éxito y muestra el
+   *  resumen, así que un reintento no duplica. El pedido no se vacía: falta enviarlo. */
+  const handleRegistrarPedido = useCallback(async (s: NuevaSolicitud) => {
+    await crearSolicitud(s, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+  }, [crearSolicitud, user])
 
   const handleCrearSolicitud = useCallback(
     async (data: Parameters<typeof crearSolicitud>[0]) => {

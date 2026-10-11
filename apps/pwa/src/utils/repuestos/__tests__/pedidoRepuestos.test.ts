@@ -9,6 +9,7 @@ import {
   fijarCantidad,
   htmlPedido,
   nivelStock,
+  pendientesDeRegistrar,
   quitarLinea,
   resumenPedido,
   solicitudesDePedido,
@@ -145,5 +146,14 @@ describe('Excel y solicitudes', () => {
     expect(s.map((x) => x.codigoSAP)).toEqual(['3300012256', '3300074788'])
     expect(s[0]?.observaciones).toBe('urgente')
     expect(solicitudesDePedido([base])[0]).not.toHaveProperty('observaciones')
+  })
+})
+
+describe('pendientesDeRegistrar', () => {
+  it('salta las sin SAP y las ya registradas (no duplica al reintentar)', () => {
+    const lista = [base, sinSap, conStock]
+    expect(pendientesDeRegistrar(lista, []).map((l) => l.clave)).toEqual([base.clave, conStock.clave])
+    expect(pendientesDeRegistrar(lista, [base.clave]).map((l) => l.clave)).toEqual([conStock.clave])
+    expect(pendientesDeRegistrar(lista, [base.clave, conStock.clave])).toHaveLength(0)
   })
 })
