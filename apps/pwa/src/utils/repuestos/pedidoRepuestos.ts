@@ -361,6 +361,35 @@ export function pendientesDeRegistrar(lineas: readonly LineaPedido[], registrada
   return lineas.filter((l) => l.codigoSAP && !hechas.has(l.clave))
 }
 
+/** Lo que es de cada persona en el pedido (la preferencia de fotos es del dispositivo). */
+export interface PedidoDeUsuario {
+  lineas: LineaPedido[]
+  nota: string
+  registradas: string[]
+}
+
+export interface EstadoDuenos extends PedidoDeUsuario {
+  /** Usuario al que pertenece el pedido visible. `null` = guardado antes de existir dueño. */
+  dueno: string | null
+  /** Pedidos de otros usuarios en ESTE dispositivo (PC compartido de planta), apartados. */
+  otros: Record<string, PedidoDeUsuario>
+}
+
+/**
+ * Cambia el pedido visible al del usuario que entró. El de quien estaba se aparta (si tenía algo)
+ * y se recupera cuando vuelve. Un pedido sin dueño (anterior a esto) lo adopta el primero que entra.
+ */
+export function cambiarDuenoPedido(s: EstadoDuenos, id: string): EstadoDuenos {
+  if (!id || s.dueno === id) return s
+  if (s.dueno === null) return { ...s, dueno: id }
+  const otros = { ...s.otros }
+  if (s.lineas.length || s.nota.trim()) otros[s.dueno] = { lineas: s.lineas, nota: s.nota, registradas: s.registradas }
+  else delete otros[s.dueno]
+  const mio = otros[id]
+  delete otros[id]
+  return { dueno: id, otros, lineas: mio?.lineas ?? [], nota: mio?.nota ?? '', registradas: mio?.registradas ?? [] }
+}
+
 /** Nombre de archivo sin caracteres raros. */
 export function nombreArchivoPedido(fecha: Date, ext: string): string {
   return `pedido-repuestos-${fechaCorta(fecha)}.${ext}`

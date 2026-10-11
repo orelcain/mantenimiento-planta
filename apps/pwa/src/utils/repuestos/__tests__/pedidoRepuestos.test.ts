@@ -3,6 +3,7 @@ import {
   acotar,
   alternarLinea,
   asuntoPedido,
+  cambiarDuenoPedido,
   conSapAsignado,
   conStockVigente,
   etiquetaStock,
@@ -195,6 +196,31 @@ describe('correo sin fotos', () => {
     expect(html).not.toContain('<img')
     expect(html).not.toContain('Foto')
     expect(html).not.toContain('sin foto')
+  })
+})
+
+describe('pedido por usuario (PC compartido)', () => {
+  const vacio = { lineas: [], nota: '', registradas: [], otros: {} }
+  it('un pedido sin dueño (anterior) lo adopta el primero que entra, sin perderlo', () => {
+    const s = cambiarDuenoPedido({ ...vacio, dueno: null, lineas: [base] }, 'ana')
+    expect(s.dueno).toBe('ana')
+    expect(s.lineas).toEqual([base])
+  })
+  it('al entrar otro, aparta el de quien estaba y se lo devuelve cuando vuelve', () => {
+    const deAna = { ...vacio, dueno: 'ana', lineas: [base], nota: 'urgente', registradas: [base.clave] }
+    const deLuis = cambiarDuenoPedido(deAna, 'luis')
+    expect(deLuis.lineas).toEqual([])
+    expect(deLuis.nota).toBe('')
+    const conLuis = { ...deLuis, lineas: [conStock] }
+    const anaOtraVez = cambiarDuenoPedido(conLuis, 'ana')
+    expect(anaOtraVez).toMatchObject({ dueno: 'ana', lineas: [base], nota: 'urgente', registradas: [base.clave] })
+    expect(anaOtraVez.otros.luis?.lineas).toEqual([conStock])
+    expect(anaOtraVez.otros.ana).toBeUndefined()
+  })
+  it('no guarda pedidos vacíos de otros ni cambia nada si es el mismo usuario', () => {
+    const s = { ...vacio, dueno: 'ana' }
+    expect(cambiarDuenoPedido(s, 'ana')).toBe(s)
+    expect(cambiarDuenoPedido(s, 'luis').otros).toEqual({})
   })
 })
 

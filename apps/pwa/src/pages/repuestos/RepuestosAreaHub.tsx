@@ -382,6 +382,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const pedidoLineas = usePedidoStore((s) => s.lineas)
   const alternarEnPedido = usePedidoStore((s) => s.alternar)
   const reemplazarPedido = usePedidoStore((s) => s.reemplazar)
+  const usarDuenoPedido = usePedidoStore((s) => s.usarDueno)
+  // PC compartido de planta: cada usuario ve SU pedido; el de quien estaba queda apartado.
+  useEffect(() => {
+    if (user?.id) usarDuenoPedido(user.id)
+  }, [user?.id, usarDuenoPedido])
   // Marca la fila también si la línea se guardó con otra clave (p. ej. `fab:X` antes de tener SAP).
   const enPedido = useMemo(() => {
     const esta = indiceEnPedido(pedidoLineas)
