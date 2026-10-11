@@ -25,7 +25,7 @@ import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuesto
 import { SolicitarVariosSheet } from '@/components/repuestos/SolicitarVariosSheet'
 import { PedidoSheet } from '@/components/repuestos/PedidoSheet'
 import { usePedidoStore } from '@/store/pedidoStore'
-import type { LineaPedido } from '@/utils/repuestos/pedidoRepuestos'
+import { conSapAsignado, indiceEnPedido, type LineaPedido } from '@/utils/repuestos/pedidoRepuestos'
 import type { PiezaSolicitable } from '@/utils/repuestos/solicitudMultiple'
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
@@ -381,7 +381,38 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [pedidoOpen, setPedidoOpen] = useState(false)
   const pedidoLineas = usePedidoStore((s) => s.lineas)
   const alternarEnPedido = usePedidoStore((s) => s.alternar)
-  const enPedido = useMemo(() => new Set(pedidoLineas.map((l) => l.clave)), [pedidoLineas])
+  const reemplazarPedido = usePedidoStore((s) => s.reemplazar)
+  // Marca la fila también si la línea se guardó con otra clave (p. ej. `fab:X` antes de tener SAP).
+  const enPedido = useMemo(() => {
+    const esta = indiceEnPedido(pedidoLineas)
+    return (r: { rowKey: string; codigoSAP?: string; codigoFabricante?: string }) =>
+      esta({ clave: r.rowKey, codigoSAP: r.codigoSAP ?? '', codigoFabricante: r.codigoFabricante ?? '' })
+  }, [pedidoLineas])
+  // Líneas guardadas sin SAP cuya pieza ya lo tiene en el catálogo → pasan al SAP (se puede
+  // registrar como solicitud y no se duplica al tocarla de nuevo). Solo si el SAP es único.
+  useEffect(() => {
+    if (!pedidoLineas.some((l) => !l.codigoSAP && l.codigoFabricante) || !allRepuestos.length) return
+    const saps = new Map<string, Set<string>>()
+    for (const { repuesto } of allRepuestos) {
+      const fab = (repuesto.codigoFabricante || '').trim()
+      const sap = (repuesto.codigoSAP || '').trim()
+      if (!fab || !sap) continue
+      const s = saps.get(fab) ?? new Set<string>()
+      s.add(sap)
+      saps.set(fab, s)
+    }
+    const nuevas = conSapAsignado(pedidoLineas, (fab) => {
+      const s = saps.get(fab)
+      return s && s.size === 1 ? [...s][0] : undefined
+    })
+    if (nuevas !== pedidoLineas) reemplazarPedido(nuevas)
+  }, [pedidoLineas, allRepuestos, reemplazarPedido])
+  const stockDePedido = useCallback((sap: string) => {
+    const o = overlayDeSap(sap)
+    return o
+      ? { configurado: true, stockActual: o.stockActual, stockMinimo: o.stockMinimo, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega }
+      : { configurado: false }
+  }, [overlayDeSap])
   useEffect(() => {
     if (!abrirSolicitudes) return
     setSolicitudesOpen(true)
@@ -2666,12 +2697,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   tamaño táctil que la estrella; en el teléfono van uno sobre otro. */}
                               <button
                                 onClick={(e) => { e.stopPropagation(); alternarEnPedido(lineaDePedido(r, nv.titulo, equipo)) }}
-                                className={[CAJA_ACCION_FILA, 'rounded-ctl transition', enPedido.has(r.rowKey) ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary'].join(' ')}
-                                title={enPedido.has(r.rowKey) ? 'Quitar del pedido' : 'Agregar al pedido'}
-                                aria-label={enPedido.has(r.rowKey) ? `Quitar ${nv.titulo} del pedido` : `Agregar ${nv.titulo} al pedido`}
-                                aria-pressed={enPedido.has(r.rowKey)}
+                                className={[CAJA_ACCION_FILA, 'rounded-ctl transition', enPedido(r) ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary'].join(' ')}
+                                title={enPedido(r) ? 'Quitar del pedido' : 'Agregar al pedido'}
+                                aria-label={enPedido(r) ? `Quitar ${nv.titulo} del pedido` : `Agregar ${nv.titulo} al pedido`}
+                                aria-pressed={enPedido(r)}
                               >
-                                {enPedido.has(r.rowKey) ? <ListChecks className="h-4 w-4" /> : <ListPlus className="h-4 w-4" />}
+                                {enPedido(r) ? <ListChecks className="h-4 w-4" /> : <ListPlus className="h-4 w-4" />}
                               </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
@@ -2815,10 +2846,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         open={pedidoOpen}
         onClose={() => setPedidoOpen(false)}
         solicitante={user?.nombre}
-        stockDe={(sap) => {
-          const o = overlayDeSap(sap)
-          return o ? { configurado: true, stockActual: o.stockActual, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega } : { configurado: false }
-        }}
+        stockDe={stockDePedido}
         onRegistrar={handleRegistrarPedido}
       />
       <SolicitudesPanel

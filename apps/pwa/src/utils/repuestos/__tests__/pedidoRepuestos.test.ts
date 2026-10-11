@@ -3,11 +3,14 @@ import {
   acotar,
   alternarLinea,
   asuntoPedido,
+  conSapAsignado,
   conStockVigente,
   etiquetaStock,
   filasExcelPedido,
   fijarCantidad,
   htmlPedido,
+  indiceEnPedido,
+  mismoRepuesto,
   nivelStock,
   pendientesDeRegistrar,
   quitarLinea,
@@ -146,6 +149,52 @@ describe('Excel y solicitudes', () => {
     expect(s.map((x) => x.codigoSAP)).toEqual(['3300012256', '3300074788'])
     expect(s[0]?.observaciones).toBe('urgente')
     expect(solicitudesDePedido([base])[0]).not.toHaveProperty('observaciones')
+  })
+})
+
+describe('mismo repuesto con otra clave (fab: → SAP)', () => {
+  const despiece: LineaPedido = { ...base, clave: 'fab:1424101003', codigoSAP: '' }
+  it('reconoce la línea fab: como el repuesto que ahora tiene SAP', () => {
+    expect(mismoRepuesto(despiece, base)).toBe(true)
+    expect(indiceEnPedido([despiece])({ clave: base.clave, codigoSAP: base.codigoSAP, codigoFabricante: base.codigoFabricante })).toBe(true)
+  })
+  it('dos SAP distintos no son el mismo aunque compartan código de fabricante', () => {
+    expect(mismoRepuesto(base, { ...base, clave: '3300099999', codigoSAP: '3300099999' })).toBe(false)
+  })
+  it('tocar la fila con SAP quita la línea fab: en vez de duplicarla', () => {
+    expect(alternarLinea([despiece], base)).toHaveLength(0)
+  })
+  it('conSapAsignado pasa la línea al SAP y junta cantidades si ya estaba', () => {
+    const r = conSapAsignado([despiece], () => base.codigoSAP)
+    expect(r[0]).toMatchObject({ clave: base.codigoSAP, codigoSAP: base.codigoSAP })
+    const juntas = conSapAsignado([{ ...base, cantidad: 2 }, { ...despiece, cantidad: 3 }], () => base.codigoSAP)
+    expect(juntas).toHaveLength(1)
+    expect(juntas[0]?.cantidad).toBe(5)
+  })
+  it('conSapAsignado devuelve la misma lista si no hay nada que cambiar', () => {
+    const lista = [base, sinSap]
+    expect(conSapAsignado(lista, () => undefined)).toBe(lista)
+  })
+})
+
+describe('stock vigente con mínimo', () => {
+  const sinMinimo: LineaPedido = { ...base, stockActual: null, stockMinimo: null }
+  it('toma el mínimo configurado después de agregar la línea', () => {
+    const l = conStockVigente(sinMinimo, () => ({ configurado: true, stockActual: 1, stockMinimo: 3 }))
+    expect(l.stockMinimo).toBe(3)
+    expect(nivelStock(l)).toBe('bajo')
+  })
+  it('bodega configurada pero sin stock cargado = sin registro, no agotado', () => {
+    expect(nivelStock(conStockVigente(base, () => ({ configurado: true })))).toBe('sin-registro')
+  })
+})
+
+describe('correo sin fotos', () => {
+  it('quita la columna Foto entera', () => {
+    const html = htmlPedido({ lineas: [base], fecha, conFotos: false, foto: () => ({ src: 'https://x/f.jpg', w: 72, h: 72 }) })
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('Foto')
+    expect(html).not.toContain('sin foto')
   })
 })
 

@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ClipboardList, Copy, FileSpreadsheet, ImageOff, Minus, Plus, Share2, Trash2, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { Button, Sheet } from '@/components/piel'
+import { Button, SegmentedControl, Sheet } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { copiarHtmlDiferido, copiarTexto } from '@/lib/clipboard'
 import { useToast } from '@/hooks/useToast'
@@ -14,7 +14,6 @@ import { usePedidoStore } from '@/store/pedidoStore'
 import { compartirOBajarArchivo } from '@/services/bitacora/compartirArchivo'
 import { cargarFotoComoJpeg, cargarImagen } from '@/services/bitacora/fotosBitacora'
 import type { NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
-import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 import {
   asuntoPedido,
   conStockVigente,
@@ -29,6 +28,7 @@ import {
   textoPedido,
   type FotoCorreo,
   type NivelPedido,
+  type StockVigente,
 } from '@/utils/repuestos/pedidoRepuestos'
 
 interface Props {
@@ -36,7 +36,7 @@ interface Props {
   onClose: () => void
   solicitante?: string
   /** Stock vigente de bodega por SAP (el de la línea es el del momento en que se agregó). */
-  stockDe?: (sap: string) => StockDeSolicitud
+  stockDe?: (sap: string) => StockVigente
   /** Crea UNA solicitud en la app (las ve bodega y avisa por Telegram). La hoja registra de a una
    *  y marca cada éxito, así que un reintento tras un fallo no duplica las que ya salieron. */
   onRegistrar: (solicitud: NuevaSolicitud) => Promise<void>
@@ -89,7 +89,7 @@ function CampoCantidad({ cantidad, etiqueta, onFijar }: { cantidad: number; etiq
 }
 
 export function PedidoSheet({ open, onClose, solicitante, stockDe, onRegistrar }: Props) {
-  const { lineas: guardadas, nota, registradas, fijar, quitar, setNota, marcarRegistrada, vaciar } = usePedidoStore()
+  const { lineas: guardadas, nota, registradas, conFotos, setConFotos, fijar, quitar, setNota, marcarRegistrada, vaciar } = usePedidoStore()
   const { toast } = useToast()
   const [trabajo, setTrabajo] = useState<Trabajo>(null)
   const [confirmarVaciar, setConfirmarVaciar] = useState(false)
@@ -125,7 +125,9 @@ export function PedidoSheet({ open, onClose, solicitante, stockDe, onRegistrar }
         })
         .catch(() => { /* esa línea va sin foto */ })
     }
-    if (puedeCompartir) {
+    if (puedeCompartir && !conFotos) {
+      setArchivos([])
+    } else if (puedeCompartir) {
       setArchivos(null)
       Promise.all(
         lineas.map(async (l, i) => {
@@ -142,7 +144,7 @@ export function PedidoSheet({ open, onClose, solicitante, stockDe, onRegistrar }
     }
     return () => { vivo = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `firmaFotos` resume `lineas` (clave y foto)
-  }, [open, firmaFotos, puedeCompartir])
+  }, [open, firmaFotos, puedeCompartir, conFotos])
 
   /** Medidas de cada foto; las que aún no estaban, se esperan (ya dentro de la escritura diferida). */
   const medirFotos = async (): Promise<Map<string, FotoCorreo>> => {
@@ -170,6 +172,7 @@ export function PedidoSheet({ open, onClose, solicitante, stockDe, onRegistrar }
     setTrabajo(incrustadas ? 'copiar-incrustadas' : 'copiar')
     // El HTML se arma como promesa: la escritura al portapapeles parte ya, dentro del toque.
     const html = (async () => {
+      if (!conFotos) return htmlPedido({ ...datos, conFotos: false })
       const fotos = await medirFotos()
       if (incrustadas) {
         // Outlook nuevo / web: la foto viaja dentro del HTML. Outlook clásico trunca las base64.
@@ -212,11 +215,11 @@ export function PedidoSheet({ open, onClose, solicitante, stockDe, onRegistrar }
   /** Teléfono: hoja del sistema con el texto y las fotos (ya preparadas) como archivos. */
   const compartir = async () => {
     const base = { title: asuntoPedido(datos), text: textoPedido(datos) }
-    const fs = archivos ?? []
-    const conFotos = fs.length > 0 && typeof navigator.canShare === 'function' && navigator.canShare({ files: fs })
+    const fs = conFotos ? archivos ?? [] : []
+    const adjunta = fs.length > 0 && typeof navigator.canShare === 'function' && navigator.canShare({ files: fs })
     setTrabajo('compartir')
     try {
-      await navigator.share(conFotos ? { ...base, files: fs } : base)
+      await navigator.share(adjunta ? { ...base, files: fs } : base)
     } catch (e) {
       if ((e as { name?: string })?.name !== 'AbortError') {
         toast({ title: 'No se pudo compartir', description: 'Usa «Copiar para correo» o Excel.', variant: 'destructive' })
@@ -363,15 +366,30 @@ export function PedidoSheet({ open, onClose, solicitante, stockDe, onRegistrar }
               </p>
             )}
 
+            <div className="flex items-center justify-between gap-3">
+              <span className="shrink-0 text-footnote text-muted-foreground" title="En el correo y al compartir">Fotos</span>
+              <SegmentedControl
+                ariaLabel="Fotos en el pedido"
+                value={conFotos ? 'con' : 'sin'}
+                onChange={(v) => setConFotos(v === 'con')}
+                segments={[
+                  { value: 'con', label: 'Con fotos' },
+                  { value: 'sin', label: 'Sin fotos' },
+                ]}
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {puedeCompartir && (
                 <Button variant="tinted" onClick={compartir} disabled={ocupado || archivos === null}>
-                  <Share2 /> {archivos === null ? 'Preparando fotos…' : 'Compartir con fotos'}
+                  <Share2 /> {archivos === null ? 'Preparando fotos…' : conFotos ? 'Compartir con fotos' : 'Compartir'}
                 </Button>
               )}
-              <Button variant="tinted" onClick={() => copiar(true)} disabled={ocupado} title="Para Outlook nuevo o la web: las fotos van dentro del correo">
-                <Copy /> {trabajo === 'copiar-incrustadas' ? 'Copiando…' : 'Copiar con fotos incrustadas'}
-              </Button>
+              {conFotos && (
+                <Button variant="tinted" onClick={() => copiar(true)} disabled={ocupado} title="Para Outlook nuevo o la web: las fotos van dentro del correo">
+                  <Copy /> {trabajo === 'copiar-incrustadas' ? 'Copiando…' : 'Copiar con fotos incrustadas'}
+                </Button>
+              )}
               <Button variant="tinted" onClick={copiarAsunto} disabled={ocupado}>
                 <Copy /> Copiar asunto
               </Button>
@@ -400,8 +418,9 @@ export function PedidoSheet({ open, onClose, solicitante, stockDe, onRegistrar }
               )}
             </div>
             <p className="text-footnote text-muted-foreground">
-              «Copiar para correo» pega una tabla con foto, códigos, cantidad y stock en Outlook. En el teléfono, «Compartir con fotos» abre
-              Outlook, Gmail o WhatsApp con las fotos adjuntas.
+              {conFotos
+                ? '«Copiar para correo» pega una tabla con foto, códigos, cantidad y stock en Outlook. En el teléfono, «Compartir con fotos» abre Outlook, Gmail o WhatsApp con las fotos adjuntas.'
+                : '«Copiar para correo» pega la tabla sin fotos (códigos, cantidad y stock). Más liviana para enviar desde el teléfono.'}
             </p>
           </>
         )}

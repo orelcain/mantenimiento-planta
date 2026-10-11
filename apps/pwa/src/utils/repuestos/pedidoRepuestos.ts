@@ -59,11 +59,59 @@ export function acotar(n: number): number {
   return Math.min(CANTIDAD_MAXIMA, Math.max(1, Math.round(n)))
 }
 
+type Identidad = Pick<LineaPedido, 'clave' | 'codigoSAP' | 'codigoFabricante'>
+
+/**
+ * ¿Es el mismo repuesto? La clave (rowKey) cambia cuando una pieza de despiece recibe su SAP
+ * (`fab:X` → SAP), así que además se compara por SAP y, si a uno le falta el SAP, por código
+ * de fabricante. Dos SAP distintos nunca son el mismo, aunque compartan código de fabricante.
+ */
+export function mismoRepuesto(a: Identidad, b: Identidad): boolean {
+  if (a.clave === b.clave) return true
+  const sa = a.codigoSAP.trim()
+  const sb = b.codigoSAP.trim()
+  if (sa && sb) return sa === sb
+  const fa = a.codigoFabricante.trim()
+  return !!fa && fa === b.codigoFabricante.trim()
+}
+
 /** Agrega la línea o la quita si ya estaba (el botón de la fila es un interruptor). */
 export function alternarLinea(lista: readonly LineaPedido[], linea: LineaPedido): LineaPedido[] {
-  return lista.some((l) => l.clave === linea.clave)
-    ? lista.filter((l) => l.clave !== linea.clave)
+  return lista.some((l) => mismoRepuesto(l, linea))
+    ? lista.filter((l) => !mismoRepuesto(l, linea))
     : [...lista, { ...linea, cantidad: acotar(linea.cantidad) }]
+}
+
+/** Para marcar las filas del catálogo que ya están en el pedido (mismo criterio que `mismoRepuesto`). */
+export function indiceEnPedido(lista: readonly LineaPedido[]): (fila: Identidad) => boolean {
+  if (!lista.length) return () => false
+  return (fila) => lista.some((l) => mismoRepuesto(l, fila))
+}
+
+/**
+ * Las líneas guardadas sin SAP que hoy ya lo tienen en el catálogo pasan a usar el SAP (clave,
+ * código y registro como solicitud). Si el SAP ya estaba en el pedido, se juntan sumando la
+ * cantidad. `sapDeFabricante` debe devolver un SAP solo cuando es único para ese código.
+ * Devuelve la MISMA lista si no cambió nada (para no disparar guardados en bucle).
+ */
+export function conSapAsignado(lista: readonly LineaPedido[], sapDeFabricante: (fab: string) => string | undefined): readonly LineaPedido[] {
+  let cambio = false
+  const salida: LineaPedido[] = []
+  for (const l of lista) {
+    const fab = l.codigoFabricante.trim()
+    const sap = !l.codigoSAP && fab ? sapDeFabricante(fab)?.trim() : undefined
+    const nueva = sap ? { ...l, clave: sap, codigoSAP: sap } : l
+    if (nueva !== l) cambio = true
+    const previa = salida.findIndex((x) => mismoRepuesto(x, nueva))
+    if (previa >= 0) {
+      const x = salida[previa] as LineaPedido
+      salida[previa] = { ...x, cantidad: acotar(x.cantidad + nueva.cantidad) }
+      cambio = true
+    } else {
+      salida.push(nueva)
+    }
+  }
+  return cambio ? salida : lista
 }
 
 export function fijarCantidad(lista: readonly LineaPedido[], clave: string, n: number): LineaPedido[] {
@@ -74,14 +122,22 @@ export function quitarLinea(lista: readonly LineaPedido[], clave: string): Linea
   return lista.filter((l) => l.clave !== clave)
 }
 
-/** El stock vigente: el de bodega si se conoce ahora, si no el que tenía al agregarlo. */
-export function conStockVigente(l: LineaPedido, stockDe?: (sap: string) => StockDeSolicitud): LineaPedido {
+/** Lo que bodega sabe hoy de un SAP: lo de la solicitud más el mínimo (para avisar «bajo el mínimo»). */
+export type StockVigente = StockDeSolicitud & { stockMinimo?: number }
+
+/**
+ * El stock vigente: el de bodega si se conoce ahora, si no el que tenía al agregarlo.
+ * Igual que `avisoDeStock`: un documento de bodega sin stock cargado es «sin registro», no 0;
+ * y el mínimo también se toma del vigente (se pudo configurar después de agregar la línea).
+ */
+export function conStockVigente(l: LineaPedido, stockDe?: (sap: string) => StockVigente): LineaPedido {
   if (!stockDe || !l.codigoSAP) return l
   const s = stockDe(l.codigoSAP)
-  if (!s.configurado) return { ...l, stockActual: null }
+  if (!s.configurado || typeof s.stockActual !== 'number') return { ...l, stockActual: null }
   return {
     ...l,
-    stockActual: s.stockActual ?? 0,
+    stockActual: s.stockActual,
+    stockMinimo: typeof s.stockMinimo === 'number' ? s.stockMinimo : l.stockMinimo,
     unidad: s.unidad || l.unidad,
     ubicacionBodega: s.ubicacionBodega ?? l.ubicacionBodega,
   }
@@ -202,6 +258,8 @@ export interface FotoCorreo {
 
 export interface DatosCorreoPedido extends DatosPedido {
   foto?: (l: LineaPedido) => FotoCorreo | null
+  /** `false` = correo sin columna de fotos (más liviano, o para quien no las necesita). Por defecto, con fotos. */
+  conFotos?: boolean
 }
 
 /** El pedido como cuerpo de correo, con la forma de los demás correos de Mantención. */
@@ -220,9 +278,10 @@ export function htmlPedido(d: DatosCorreoPedido): string {
     ],
     1,
   )
+  const conFotos = d.conFotos !== false
   const filas = d.lineas
     .map((l) => {
-      const f = d.foto?.(l) ?? null
+      const f = conFotos ? d.foto?.(l) ?? null : null
       const foto = f
         ? `<img src="${escaparHtml(f.src)}" width="${f.w}" height="${f.h}" alt="" style="display:block;width:${f.w}px;height:${f.h}px;border:0;border-radius:4px;">`
         : `<span style="color:${C.sec};">${small('sin foto')}</span>`
@@ -233,8 +292,8 @@ export function htmlPedido(d: DatosCorreoPedido): string {
         (l.equipo ? `<div style="font-size:${SEC};color:${C.sec};">${small(escaparHtml(l.equipo))}</div>` : '')
       return (
         `<tr>` +
-        `<td valign="top" style="${CELDA}width:${track(2)};">${foto}</td>` +
-        celdaHtml(desc, track(6)) +
+        (conFotos ? `<td valign="top" style="${CELDA}width:${track(2)};">${foto}</td>` : '') +
+        celdaHtml(desc, track(conFotos ? 6 : 8)) +
         `<td valign="top" style="${CELDA}width:${track(1)};white-space:nowrap;font-variant-numeric:tabular-nums;">${negrita(`${l.cantidad}${unidad}`)}</td>` +
         `<td valign="top" style="${CELDA}width:${track(3)};">${estado(etiquetaStock(l), COLOR_NIVEL[nivelStock(l)])}</td>` +
         `</tr>`
@@ -243,7 +302,7 @@ export function htmlPedido(d: DatosCorreoPedido): string {
     .join('')
   const tabla =
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="${TABLA}margin-top:18px;">` +
-    encabezadoTabla(['Foto', 'Repuesto', 'Cant.', 'Stock']) +
+    encabezadoTabla(conFotos ? ['Foto', 'Repuesto', 'Cant.', 'Stock'] : ['Repuesto', 'Cant.', 'Stock']) +
     filas +
     `</table>`
   const obs = d.nota?.trim() ? nota(`${negrita('Observación.')} ${escaparHtml(d.nota.trim())}`) : ''
