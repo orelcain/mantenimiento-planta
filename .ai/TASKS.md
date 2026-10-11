@@ -6,6 +6,10 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 ## En curso
 
+- [ ] **Pedido de repuestos (carro multi-máquina)** — EN CURSO — claude (rama `feat/pedido-repuestos`).
+  Buscar y marcar repuestos de cualquier máquina en una lista persistente con cantidades; copiar para
+  correo (tabla con fotos), compartir con fotos, Excel, copiar asunto; registrar las líneas con SAP
+  como solicitudes a bodega.
 - [ ] **Bitácora de turno de Mantención (`/bitacora`)** — EN PROD, esperando uso real — claude (PR #1021-#1046; ver WORKLOG 2026-09-15).
   Eventos del turno con fotos antes/después, parada (MTTR) o ventana sin detener, pendientes que pasan
   solos al turno siguiente, técnicos del calendario, buscador de equipos; copiar al correo (Outlook
