@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { documentacionDe, fusionarDocumentacion, SIN_DOCUMENTACION } from '../documentacionDeRepuesto'
+import { documentacionDe, fotosParaEquipos, fusionarDocumentacion, SIN_DOCUMENTACION } from '../documentacionDeRepuesto'
 import type { Repuesto, TechnicalSpecs, ImagenRepuesto, MachineImage } from '@/types/repuestos'
 
 const rep = (p: Partial<Repuesto>): Repuesto => ({ id: 'r1', codigoSAP: '3300138386', textoBreve: 'X', ...p } as Repuesto)
@@ -84,5 +84,33 @@ describe('fusionarDocumentacion — dos documentos del mismo SAP', () => {
 
   it('fusionar dos vacíos sigue siendo vacío', () => {
     expect(fusionarDocumentacion(SIN_DOCUMENTACION, SIN_DOCUMENTACION)).toEqual(SIN_DOCUMENTACION)
+  })
+})
+
+describe('fotos según la máquina en foco', () => {
+  // Tornillo Baader usado en la 142 (equipos n1, n2) y en la 200 (b200): un dibujo de cada manual.
+  const de142 = { ...foto('u142'), tipo: 'manual' as const, equipos: ['n1', 'n2'] }
+  const de200 = { ...foto('u200'), tipo: 'manual' as const, equipos: ['b200'] }
+  const doc = documentacionDe(rep({ imagenesManual: [de142, de200], fotosReales: [foto('real')] }))
+
+  it('documentacionDe anota a qué equipos corresponde cada captura', () => {
+    expect(doc.equiposDeFoto).toEqual({ u142: ['n1', 'n2'], u200: ['b200'] })
+  })
+  it('mirando la 142 se ve su dibujo (y la foto real), no el de la 200', () => {
+    expect(fotosParaEquipos(doc.fotos, doc.equiposDeFoto, ['n2'])).toEqual(['real', 'u142'])
+    expect(fotosParaEquipos(doc.fotos, doc.equiposDeFoto, ['b200'])).toEqual(['real', 'u200'])
+  })
+  it('sin equipo en foco (búsqueda general) se ven todas', () => {
+    expect(fotosParaEquipos(doc.fotos, doc.equiposDeFoto, null)).toEqual(['real', 'u142', 'u200'])
+  })
+  it('si el filtro dejaría la fila sin fotos, se muestran todas', () => {
+    expect(fotosParaEquipos(['u200'], { u200: ['b200'] }, ['otro'])).toEqual(['u200'])
+  })
+  it('capturas antiguas sin equipos se ven siempre', () => {
+    expect(fotosParaEquipos(['vieja', 'u200'], { u200: ['b200'] }, ['n1'])).toEqual(['vieja'])
+  })
+  it('fusionar conserva el mapa de los dos documentos', () => {
+    const f = fusionarDocumentacion({ fotos: ['a'], tieneFicha: false, manuales: 0, equiposDeFoto: { a: ['x'] } }, { fotos: ['b'], tieneFicha: false, manuales: 0, equiposDeFoto: { b: ['y'] } })
+    expect(f.equiposDeFoto).toEqual({ a: ['x'], b: ['y'] })
   })
 })
