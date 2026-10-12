@@ -2719,6 +2719,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <RepuestoDetailPanel
           item={selectedRep}
           plantaDe={plantaDe}
+          equiposEnFoco={equiposEnFoco}
           areaName={showingAll ? 'Todas las áreas' : (formatNombreSAP(selectedNode?.nombre).nombre || selectedNode?.nombre || '')}
           volverA={formatNombreSAP(selectedEquipName).nombre || selectedEquipName || undefined}
           onClose={() => setSelectedRowKey(null)}

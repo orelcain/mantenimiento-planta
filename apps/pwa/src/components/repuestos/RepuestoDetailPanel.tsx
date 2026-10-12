@@ -25,6 +25,7 @@ import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
 import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
+import { fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
 
 export interface UbicacionEstructurada { pasillo?: string; estante?: string; nivel?: string }
 
@@ -35,6 +36,8 @@ interface RepuestoDetailPanelProps {
    * «KNURO N1» de Chonchi y de Yal se colapsan en uno: el panel decía 3 equipos para 6.
    */
   plantaDe?: (nodeId: string) => string | undefined
+  /** Equipo(s) en foco: oculta las capturas de manual de otra máquina (ver `fotosParaEquipos`). */
+  equiposEnFoco?: readonly string[] | null
   areaName: string
   /** Texto del «‹ volver» en el teléfono (la cinta/equipo desde donde se llegó). Por defecto, el área. */
   volverA?: string
@@ -165,7 +168,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -308,7 +311,9 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   if (!item) return null
 
   // Fotos de bodega (del físico) primero; si no hay, las del catálogo (manual/galería)
-  const allPhotos = [...(item.fotos ?? []), ...(item.fotosCatalogo ?? [])]
+  // Con un equipo en foco, sin el dibujo del manual de OTRA máquina (igual que la fila de la lista).
+  const fotosCatalogo = fotosParaEquipos(item.fotosCatalogo ?? [], item.equiposDeFoto, equiposEnFoco)
+  const allPhotos = [...(item.fotos ?? []), ...fotosCatalogo]
   const photo = allPhotos[0]
   const ultimo = movs && movs.length > 0 ? movs[0] : null
   const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
@@ -957,7 +962,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         {(onSpecs || onPhotos || onManual || dibujo) && (
           <div className={['mb-3 grid gap-1.5', dibujo ? 'grid-cols-2' : 'grid-cols-3'].join(' ')}>
             {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} contenido={!!item.tieneFicha} />}
-            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={(item.fotos?.length ?? 0) + (item.fotosCatalogo?.length ?? 0)} />}
+            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={allPhotos.length} />}
             {/*
               El modal de manual muestra los vínculos PROPIOS del repuesto Y los HEREDADOS de
               sus equipos, así que la señal tiene que sumar los dos: contar solo los propios
