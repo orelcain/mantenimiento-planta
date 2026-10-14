@@ -93,6 +93,8 @@ export interface EventoBitacoraSheetProps {
    * al pasar una observación a la bitácora: lo ya escrito no se reescribe.
    */
   descripcionInicial?: string
+  /** Nombre del equipo con que nace un evento NUEVO (la ruta ya sabe cuál es). */
+  equipoInicial?: string
   /** De dónde salen los repuestos (la vitrina usa uno de ejemplo). */
   fuenteRepuestos?: FuenteRepuestos
   /** Estrella de favoritos en el buscador de repuestos; `null` la oculta (el pase). */
@@ -233,6 +235,7 @@ export function EventoBitacoraSheet({
   sugerenciasTipo = [],
   autorFijo = null,
   descripcionInicial = '',
+  equipoInicial = '',
   fuenteRepuestos = fuenteRepuestosFirestore,
   favoritosRepuestos = null,
   puedeEditarMaestro = true,
@@ -404,7 +407,7 @@ export function EventoBitacoraSheet({
     setRepuestos(normalizarRepuestos(evento?.repuestos))
     setTipo(evento?.tipo ?? pendienteOrigen?.tipo ?? null)
     setTipoOtro(evento?.tipoOtro ?? pendienteOrigen?.tipoOtro ?? '')
-    setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? '')
+    setEquipo(evento?.equipo ?? pendienteOrigen?.equipo ?? (evento ? '' : equipoInicial))
     setTitulo(evento?.titulo ?? '')
     setDescripcion(evento?.descripcion ?? (evento ? '' : descripcionInicial))
     setSinHora(evento ? evento.horaInicio === '' : false)
@@ -466,7 +469,7 @@ export function EventoBitacoraSheet({
     setPorGuardar(false)
     setConflictos([])
     setEliminadoAfuera(false)
-  }, [open, evento, turno, pendienteOrigen, autorFijo, descripcionInicial])
+  }, [open, evento, turno, pendienteOrigen, autorFijo, descripcionInicial, equipoInicial])
 
   const duracion = sinHora ? null : minutosEntre(horaInicio, horaTermino || null)
   /** «Terminó ahora» solo mientras corre el turno del evento y sin pasar de 2 h (18-09-2026). */
