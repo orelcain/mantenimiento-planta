@@ -2,7 +2,7 @@
 /**
  * Carga imágenes de referencia del manual (imagenesManual, tipo 'manual') + vínculo a la página
  * (vinculosManual, polígono rojo) a repuestos, desde un manifest.json.
- *   node scripts/cargar-referencias-manual.cjs <carpeta-con-manifest> <machineId> [--dry-run]
+ *   node scripts/cargar-referencias-manual.cjs <carpeta-con-manifest> <machineId> [--dry-run] [--manual=<id de manuales>]
  * manifest: [{docId, pagina, puntos:[{x,y}], file, descripcion, code, nombre}]
  * No toca fotosReales. Idempotente: salta imágenes con la misma descripcion y vínculos a la misma página.
  */
@@ -24,14 +24,14 @@ const db = admin.firestore();
   let manualUrl = null;
   const all = await db.collection('repuestos').get();
   all.forEach((d) => { for (const v of d.get('vinculosManual') || []) if (!manualUrl && v.machineId === machineId) manualUrl = v.manualUrl; });
-  if (!manualUrl) {
-    // Máquina sin vínculos todavía: el manual principal está en `manuales/<machineId>__0`.
-    const m = await db.doc(`manuales/${machineId}__0`).get();
-    if (m.exists) manualUrl = m.get('url') || null;
-  }
-  if (!manualUrl) { console.log('No encontré manualUrl para', machineId); process.exit(2); }
+  // --manual=<id de manuales>: para máquinas con varios manuales (GEA: gea__mech-5550, …).
+  const manualId = (process.argv.find((x) => x.startsWith('--manual=')) || '').replace('--manual=', '') || `${machineId}__0`;
+  const docManual = await db.doc(`manuales/${manualId}`).get();
+  if (process.argv.some((x) => x.startsWith('--manual='))) manualUrl = docManual.get('url') || null;
+  else if (!manualUrl && docManual.exists) manualUrl = docManual.get('url') || null; // máquina sin vínculos todavía
+  if (!manualUrl) { console.log('No encontré manualUrl para', machineId, manualId); process.exit(2); }
   // Equipos del manual: van en cada captura para que la app muestre en cada máquina SU dibujo.
-  const equiposManual = (await db.doc(`manuales/${machineId}__0`).get()).get('equipos') || [];
+  const equiposManual = docManual.get('equipos') || [];
   // --parte=k/n: procesa solo esa fracción del manifest (para cargar en paralelo sin pisarse).
   const parte = (process.argv.find((x) => x.startsWith('--parte=')) || '').replace('--parte=', '');
   let lista = man;
@@ -69,7 +69,7 @@ const db = admin.firestore();
       }
     }
     if (e.posicion && !r.posicionManual) patch.posicionManual = e.posicion;
-    if (e.puntos && e.puntos.length && !vins.some((v) => v.machineId === machineId && v.pagina === e.pagina)) {
+    if (e.puntos && e.puntos.length && !vins.some((v) => v.machineId === machineId && v.pagina === e.pagina && (!v.manualUrl || v.manualUrl === manualUrl))) {
       patch.vinculosManual = [...vins, { id: `vinc_${Date.now()}_${e.pagina}`, pagina: e.pagina, machineId, manualUrl, puntos: e.puntos, forma: 'poligono',
         color: 'rgba(239, 68, 68, 0.3)', descripcion: `${e.code} — ${e.nombre}`, sinBorde: false }];
     }
