@@ -11,6 +11,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-10-14 · Claude · Cierre de merges: repuestos con dibujo propio (#1274) y rutas de inspección R-MAN-CH-004 (#1178)
+- Hecho: PR #1274 «feat(repuestos): cada máquina muestra su propio dibujo del manual», mergeado squash (commit c47a2fd2); build verde y deploy de la PWA completado OK. PR #1178 «Rutas de inspección: las 7 áreas del registro R-MAN-CH-004», rama actualizada contra main, build verde, mergeado squash (commit 70a47a7d); deploy de reglas Firestore (agrega `rutasInspeccion` y `recorridos`) y deploy de la PWA completados OK.
+- Verificación: prod sirve `version.json` 4.2.0 con build del 2026-10-14.
+- Estado: HECHO
+- Sigue (PRs abiertos): #1272 falta prueba en terreno (Outlook PC + compartir con fotos desde celular; comparte `RepuestosAreaHub.tsx`); #1273 falta prueba en iPhone real; #1134 listo pero mueve números ya mostrados, avisar a gerencia antes de mergear; #1159 draft, NO mergear sin rol IAM.
+
 ## 2026-10-07 · Claude · HMI Knuro: ayuda de campos opción B (globo PC + lista y hoja celular)
 - Hecho: globo anclado al campo en PC (≥768 px) y lista + hoja inferior en celular, con chip de origen (Manual · pág. N / Deducido / Sin dato) y Predeterminado → Actual. Íconos en los 178 campos (antes 30 sin ícono: 2ª columna de c1pr/c1p2/h2pr y vac-b-0..11). Fix: cambiar de preset ya no borra los íconos (applyPescRows tocaba textContent).
 - Seguridad: el texto de los globos se sanea a lista blanca `<b> <i> <br>` sin atributos antes de cualquier innerHTML (globo, hoja, lista), también en la página pública sin login. El iframe solo acepta mensajes del padre same-origin.
