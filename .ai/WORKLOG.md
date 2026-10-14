@@ -11,6 +11,22 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-10-07 · Claude · HMI Knuro: ayuda de campos opción B (globo PC + lista y hoja celular)
+- Hecho: globo anclado al campo en PC (≥768 px) y lista + hoja inferior en celular, con chip de origen (Manual · pág. N / Deducido / Sin dato) y Predeterminado → Actual. Íconos en los 178 campos (antes 30 sin ícono: 2ª columna de c1pr/c1p2/h2pr y vac-b-0..11). Fix: cambiar de preset ya no borra los íconos (applyPescRows tocaba textContent).
+- Seguridad: el texto de los globos se sanea a lista blanca `<b> <i> <br>` sin atributos antes de cualquier innerHTML (globo, hoja, lista), también en la página pública sin login. El iframe solo acepta mensajes del padre same-origin.
+- Decisión clave de edición: la clave vive en `hmi-knuro-config/tooltip-pwd`, que es de lectura pública, así que mandarla al iframe no protegía nada. Ahora HmiKnuroPage (tras AdminRoute; Firestore exige isSupervisor para escribir `hmi-knuro-tooltips`) manda `canEdit:true` en `hmi:init` y no la clave; se quitó `hmi:save-pwd`. La pública manda `readonly:true` y nunca recibió ni recibe clave. El iframe borra la copia que dejaban versiones anteriores en localStorage y ya no siembra `'admin'`. Standalone (abrir el .html directo, guarda solo en localStorage) pide definir una clave la primera vez.
+- Archivos: apps/pwa/public/hmi-knuro-embed.html, pages/HmiKnuroPage.tsx, pages/HmiKnuroPublicPage.tsx.
+- Verificación: tsc 0, eslint 0 en los .tsx, vite build OK, Playwright a 1280 y 375 px en claro y oscuro (globos de h2-2as-epv-0, c1pr-1, vac-b-4, ev-0 sin tapar el campo; lista con filas de 58 px; hoja al 58 % con el campo visible arriba), inyección `<img onerror>` mostrada escapada y sin alertas.
+- Estado: EN REVISIÓN (rama feat/hmi-knuro-globos-ayuda)
+- Sigue: probar la edición en la página admin con sesión de supervisor. Fuera de alcance: `tooltip-pwd` sigue legible por cualquiera (TrashPanel y Ajustes la usan como clave) y `getHmiTooltipPwd` devuelve `'admin'` si falta; en la pública, cambiar de preset navega a `/learn/…` y cae en login.
+
+## 2026-09-30 · Claude · Repuestos: cuadre del maestro y la bodega con el stock SAP del 29-09
+- Hecho: el planificador de Mantención mandó «REPUESTOS CHONCHI 29-09.xlsx» (export SAP, centro AI04, almacén M001, 7 hojas por marca, 1.317 SAP). Script `scripts/cuadrar-sap-29-09.js` (dry-run + `--write`, ya corrido en prod con snapshots previos `_snapshots/repuestos__2026-09-30T22-49*` y `bodega__2026-09-30T22-49*`): 398 fichas actualizadas (338 renombradas al nombre SAP, el viejo pasa a `alias` solo si no nombraba otra pieza; 175 códigos de fabricante, 203 valores y 480 unidades completados), 247 SAP enlazados a fichas de despiece por código de fabricante (29 de ellas piezas repetidas en 142 y 200, fusionadas en una ficha con los equipos de ambas), 285 fichas nuevas (id = SAP, sin equipo, `origen.de: ['sap-export']`), 529 stocks de bodega puestos al valor SAP con movimiento `ajuste` trazable (`realizadoPor: script:cuadrar-sap-29-09`), 153 docs de bodega nuevos. Copia del Excel con tildes reparadas en `OneDrive\ANTARFOOD\INVENTARIO\`.
+- Archivos: scripts/cuadrar-sap-29-09.js, _snapshots/cuadrar-sap-29-09__plan.json (plan completo con antes/después).
+- Verificación: lectura posterior de fichas nuevas, renombradas (historial `textoBreve`), enlace, fusión y bodega con movimiento; `99-stats-maestro`: 7.952 docs, 4.392 con SAP, 2.408 SAP con stock. Los SAP de la BAADER 200 inventariados el 25-09 cuadraban exactos con SAP antes de escribir.
+- Estado: HECHO (datos en prod)
+- Sigue: 24 SAP cuyo código de fabricante ya tenía OTRO SAP en el maestro quedaron como ficha aparte (ver `plan.conflictos`); 1.069 SAP con stock en la app que el export no trae (pedir export completo del almacén M001); 3.195 SAP sin equipo asignado.
+
 ## 2026-09-23 · Claude · Correo de bitácora: dos bloques y eventos en tabla (ronda 5)
 - Hecho: la bitácora abre con su propia banda azul («Bitácora de Mantención · Planta»), la misma de la planilla, y entre los dos bloques va aire + raya de tinta. Cada evento es una tabla propia con cabecera celeste (número · equipo · hora a la derecha) y el desglose debajo (tipo y N° de equipo, impacto, texto, repuestos, técnicos, fotos). Opción A del mockup elegida por Orel.
 - Archivos: services/bitacora/bitacoraCorreo.ts + 3 tests (estandar, repuestosEvento, whatsappYEvento).

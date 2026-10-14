@@ -12,11 +12,12 @@
  * Una futura iteración puede sumar carga lazy desde la tool si el caso de
  * uso lo justifica (refactor de useGlobalSearch para extraer loader puro).
  */
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { registerTool } from './registry'
 import { getGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { resumenDeSolicitudes, type SolicitudParaAria } from './resumenSolicitudes'
+import { nombreParaTexto, textoBuscableRepuesto, tieneComun } from '@/utils/repuestos/nombrePorSap'
 
 const normalizeText = (s: string) =>
   s
@@ -30,7 +31,7 @@ const normalizeText = (s: string) =>
 function summarizeRepuesto(r: GlobalSearchResult): string {
   const rep = r.repuesto
   const parts: string[] = []
-  const name = rep.textoBreve || rep.descripcion || '(sin nombre)'
+  const name = nombreParaTexto(rep)
   const sap = rep.codigoSAP ? ` · SAP ${rep.codigoSAP}` : ''
   const fab = rep.codigoFabricante ? ` · cód.fab ${rep.codigoFabricante}` : ''
   parts.push(`• ${name}${sap}${fab}`)
@@ -80,7 +81,7 @@ registerTool({
     }
     const matches = cache.filter((r) => {
       const hay = normalizeText(
-        `${r.repuesto.textoBreve || ''} ${r.repuesto.descripcion || ''} ${r.repuesto.codigoSAP || ''} ${r.repuesto.codigoFabricante || ''} ${r.machineName}`,
+        textoBuscableRepuesto(r.repuesto, r.machineName),
       )
       return hay.includes(needle)
     })
@@ -119,14 +120,35 @@ registerTool({
     /\bpor\s+entregar\b/i,
   ],
   execute: async () => {
-    const snap = await getDocs(query(collection(db, 'solicitudes_repuestos'), orderBy('createdAt', 'desc'), limit(30)))
+    // Dos consultas, sin índice compuesto: las altas de código (a lo más una por código de fabricante) por `tipo` y
+    // los pedidos por fecha con 30 + (altas) documentos, descartando las altas en memoria (los pedidos viejos no
+    // tienen `tipo`, y Firestore no filtra por «campo ausente»): así las altas no desplazan a los pedidos.
+    // (`resumenDeSolicitudes` ordena las altas por createdAt desc antes de mostrar las 8 más recientes.)
+    const altasSnap = await getDocs(query(collection(db, 'solicitudes_repuestos'), where('tipo', '==', 'alta_codigo'), limit(50)))
+    const pedidosSnap = await getDocs(query(collection(db, 'solicitudes_repuestos'), orderBy('createdAt', 'desc'), limit(30 + altasSnap.size)))
+    const snap = {
+      docs: [
+        ...pedidosSnap.docs.filter((d) => (d.data() as { tipo?: unknown }).tipo !== 'alta_codigo').slice(0, 30),
+        ...altasSnap.docs,
+      ],
+    }
     const aFecha = (v: unknown): Date | undefined =>
       v && typeof (v as { toDate?: () => Date }).toDate === 'function' ? (v as { toDate: () => Date }).toDate() : undefined
+    // La solicitud guarda solo `textoBreve`: el nombre común se resuelve contra el catálogo
+    // cacheado por SAP (si el cache está frío queda el texto guardado).
+    const comunPorSap = new Map<string, string[]>()
+    for (const r of getGlobalRepuestosCache() ?? []) {
+      const sap = (r.repuesto.codigoSAP || '').trim()
+      const comunes = r.repuesto.nombresComunes
+      if (sap && comunes && tieneComun(r.repuesto) && !comunPorSap.has(sap)) comunPorSap.set(sap, comunes)
+    }
     const solicitudes: SolicitudParaAria[] = snap.docs.map((d) => {
       const x = d.data() as Record<string, unknown>
       return {
+        tipo: typeof x.tipo === 'string' ? x.tipo : undefined,
         codigoSAP: String(x.codigoSAP ?? ''),
         textoBreve: String(x.textoBreve ?? ''),
+        nombresComunes: comunPorSap.get(String(x.codigoSAP ?? '').trim()),
         cantidad: typeof x.cantidad === 'number' ? x.cantidad : 1,
         estado: String(x.estado ?? 'pendiente'),
         solicitadoPorNombre: String(x.solicitadoPorNombre ?? ''),
@@ -136,6 +158,10 @@ registerTool({
         aprobadaAt: aFecha(x.aprobadaAt),
         entregadaPor: typeof x.entregadaPor === 'string' ? x.entregadaPor : undefined,
         entregadaAt: aFecha(x.entregadaAt),
+        codigoFabricante: typeof x.codigoFabricante === 'string' ? x.codigoFabricante : undefined,
+        elementos: Array.isArray(x.elementos) ? x.elementos.filter((e): e is string => typeof e === 'string') : undefined,
+        sapCreado: typeof x.sapCreado === 'string' ? x.sapCreado : undefined,
+        motivoRechazo: typeof x.motivoRechazo === 'string' ? x.motivoRechazo : undefined,
       }
     })
     return {

@@ -86,9 +86,9 @@ export function NotasAparato({ anclaId, notas, onCrear, onBorrar, onEditar }: Pr
           )}
 
           <footer className="mt-2 flex items-center justify-between gap-2">
-            <span className="font-mono text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+            <span className="text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
               {n.autorNombre ?? 'Anónimo'}
-              {n.codigoSAP ? ` · SAP ${n.codigoSAP}` : ''}
+              {n.codigoSAP ? <> · SAP <span className="font-mono">{n.codigoSAP}</span></> : ''}
             </span>
             {n.creadoPor === uid && (
               <span className="flex gap-0.5">
@@ -128,7 +128,7 @@ export function NotasAparato({ anclaId, notas, onCrear, onBorrar, onEditar }: Pr
           />
 
           {!!archivos.length && (
-            <p className="m-0 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+            <p className="m-0 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
               {archivos.length} foto{archivos.length !== 1 ? 's' : ''} lista
               {archivos.length !== 1 ? 's' : ''} para subir
               <button type="button" onClick={() => setArchivos([])} className="ml-2 align-middle">

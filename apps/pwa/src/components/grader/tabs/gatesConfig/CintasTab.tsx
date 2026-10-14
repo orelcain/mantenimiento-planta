@@ -45,8 +45,8 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
           // Responsabilidad por cinta
           const responsibility: Record<GraderBeltId, { icon: string; role: string; accent: string }> = {
             zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-primary/[0.15] border-transparent' },
-            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/[0.15] border-transparent' },
-            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/[0.15] border-transparent' },
+            accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-warning/[0.15] border-transparent' },
+            accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-warning/[0.15] border-transparent' },
             main:   { icon: '❹', role: 'Clasificadora principal',  accent: 'bg-primary/5 border-transparent' },
           }
           const resp = responsibility[beltId]
@@ -126,9 +126,9 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                       variant="outline"
                       className={cn(
                         'text-caption',
-                        ratio >= 2 ? 'border-green-500/[0.25] text-ink-ok' :
-                        ratio >= 1.2 ? 'border-amber-500/[0.25] text-ink-warn' :
-                        'border-red-500/[0.25] text-ink-crit',
+                        ratio >= 2 ? 'border-success/[0.25] text-ink-ok' :
+                        ratio >= 1.2 ? 'border-warning/[0.25] text-ink-warn' :
+                        'border-ink-crit/[0.25] text-ink-crit',
                       )}
                     >
                       ×{dec2(ratio)} vs {getBeltLabel(prevBeltId!)}
@@ -140,7 +140,7 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                 <div className="flex items-center justify-between gap-2 border-t pt-1.5">
                   {belt.vfd?.measuredAt ? (
                     <span className="inline-flex items-center gap-1 text-caption text-muted-foreground">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-success" />
                       Medido {new Date(belt.vfd.measuredAt).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })}
                       {belt.vfd.measuredBeltMps && (
                         <span className="font-mono ml-1">{belt.vfd.measuredBeltMps.toFixed(3)} m/s</span>

@@ -382,7 +382,7 @@ export function GateChangeModal({
                     onClick={() => setNewActive(v => !v)}
                     className={cn(
                       'text-xs px-2.5 py-1 rounded-ctl border transition-colors',
-                      newActive ? 'bg-green-500/[0.15] text-ink-ok border-transparent' : 'border-border text-muted-foreground hover:bg-muted',
+                      newActive ? 'bg-success/[0.15] text-ink-ok border-transparent' : 'border-border text-muted-foreground hover:bg-muted',
                     )}
                   >
                     {newActive ? '✓ Activar gate' : 'Mantener inactivo'}

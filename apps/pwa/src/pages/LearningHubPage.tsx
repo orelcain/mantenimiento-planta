@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Cpu, Scale, Wind, Gauge, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X,
-  Lock, Activity, Waypoints, MoreHorizontal,
+  Lock, Activity, Waypoints, MoreHorizontal, CircuitBoard,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -56,9 +56,9 @@ interface SpecialModule {
 
 const SPECIAL_MODULES: SpecialModule[] = [
   {
-    id: 'hmi-knuro', title: 'HMI Knuro B2', subtitle: 'Simulador de parámetros',
-    description: 'Panel HMI Knuro para máquinas Baader. Presets de planta y modo de práctica.',
-    icon: Cpu, href: '/aprendizaje/hmi-knuro', stats: '6 presets · práctica',
+    id: 'hmi-knuro', title: 'HMI Knuro', subtitle: 'Simulador de parámetros',
+    description: 'Panel HMI Knuro de la Baader 142. Presets de planta y modo de práctica.',
+    icon: Cpu, href: '/aprendizaje/hmi-knuro', stats: 'Presets de planta · práctica',
   },
   {
     id: 'hmi-grader', title: 'HMI Grader', subtitle: 'StaticGrader Marelec Z2',
@@ -76,6 +76,12 @@ const SPECIAL_MODULES: SpecialModule[] = [
     description: 'Las 10 posiciones del selector 5, el protocolo del Upgrade Kit y los 46 códigos E con solución paso a paso. Con registro de lecturas y tendencia por herramienta.',
     icon: Activity, href: '/aprendizaje/perilla-5',
     stats: '14 secciones · 46 códigos · 46 figuras anotables',
+  },
+  {
+    id: 'tarjeta-a3c', title: 'Tarjeta A3C · Baader 142', subtitle: 'Qué LED prende y qué hace cada señal',
+    description: 'El plano 888 de la tarjeta y la máquina, interactivo: toca un sensor, borne o LED y ve qué LED prende, dónde está y qué hace. En español o con los textos originales, con práctica.',
+    icon: CircuitBoard, href: '/aprendizaje/baader-142/tarjeta-a3c',
+    stats: '144 bornes · 111 LED · práctica',
   },
   {
     id: 'variadores', title: 'Variadores y partidores', subtitle: 'Catálogo de parámetros',

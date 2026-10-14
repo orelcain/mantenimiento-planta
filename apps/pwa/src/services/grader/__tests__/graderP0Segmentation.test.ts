@@ -368,10 +368,10 @@ describe('computeSegmentVerdicts — boundaries finos', () => {
 
 describe('verdictColor', () => {
   it('cubre los 4 status con paleta consistente', () => {
-    expect(verdictColor('improved')).toContain('emerald')
-    expect(verdictColor('worsened')).toContain('rose')
-    expect(verdictColor('neutral')).toContain('zinc')
-    expect(verdictColor('insufficient-data')).toContain('zinc')
+    expect(verdictColor('improved')).toContain('ink-ok')
+    expect(verdictColor('worsened')).toContain('ink-crit')
+    expect(verdictColor('neutral')).toContain('muted-foreground')
+    expect(verdictColor('insufficient-data')).toContain('muted-foreground')
   })
 })
 

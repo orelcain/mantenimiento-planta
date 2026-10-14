@@ -149,6 +149,13 @@
   --tw-amber-400: 172 150 110;    --tw-amber-500: 168 140 100;   --tw-amber-600: 174 126 89;
   --tw-blue-400: 109 163 216;     --tw-blue-500: 74 134 200;
 
+  /* success / warning var-izados (tailwind.config.js). Defaults = los hex de siempre
+     (#6c986c, #ffffff, #c08e5f, #000000); la paleta Pizarra los reasigna más abajo.
+     --warning-ink es la TINTA de aviso (text-warning), separada del relleno (bg-warning). */
+  --success: 108 152 108;         --success-foreground: 255 255 255;
+  --warning: 192 142 95;          --warning-foreground: 0 0 0;
+  --warning-ink: 192 142 95;
+
   /* ── TINTA ADAPTATIVA (--ink-*) ───────────────────────────────────────────
      Nace de un ERROR: el barrido colapsó `text-X-700 dark:text-X-400` en un
      único `text-X-600`, y en la piel ACTUAL eso lavó los colores (el verde
@@ -191,6 +198,13 @@
      propia tarjeta, o sea: invisible. Esa es la diferencia entre "tarjeta con
      contorno" y "tarjeta que flota", que es lo que define el look de Apple. */
   --card-edge: 88 94 100;           /* = --border en la piel actual */
+
+  /* Rellenos opacos de estado (bg-fill-*). Antes eran hex fijos en tailwind.config.js:
+     #8C4B45 / #7A5A1E / #2F6B41. Mismos valores, ahora var-izados para que la paleta
+     Pizarra pueda cambiarlos; sin ella, el color resultante es idéntico. */
+  --fill-critical: 140 75 69;
+  --fill-warning: 122 90 30;
+  --fill-ok: 47 107 65;
 
   --r-ctl: 0.5rem;                  /* controles: botón, input, chip cuadrado */
   --r-card: 0.75rem;                /* tarjeta / grupo de lista */
@@ -380,7 +394,10 @@
   --ink-ok: 31 118 53;
   --ink-info: 40 101 158;
 
-  --card-edge: 255 255 255;         /* = --card: la tarjeta flota, sin contorno */
+  /* Borde de 1 px que separa tarjeta y fondo (1,52:1 sobre la tarjeta). Antes decía
+     255 255 255 («flota sin contorno») y además lo pisaba un 44 44 46 duplicado más
+     abajo, que dejaba TODA <Card> clara con un borde casi negro. */
+  --card-edge: 209 209 214;         /* #D1D1D6 */
 
   /* Radios de iOS 26/27 (DESIGN.md §4, ADELANTA 3). Apple documenta que las
      secciones "tienen un radio aumentado para coincidir con la curvatura de
@@ -393,7 +410,6 @@
   --r-ctl: 10px;
   --r-card: 26px;
   --r-panel: 32px;
-  --card-edge: 44 44 46;            /* = --card oscuro */
 }
 
 :root[data-skin="apple"].dark {
@@ -406,6 +422,8 @@
      rechazó #000 por dureza. La elevación se comunica por TONO, no por sombra. */
   --background: 28 28 30;           /* #1C1C1E */
   --card: 44 44 46;                 /* #2C2C2E */
+  --card-edge: 60 60 66;            /* #3C3C42: borde de 1 px, 1,47:1 sobre la tarjeta; con
+                                       reflejo de planta el tono solo no separa */
   --foreground: 255 255 255;        /* label */
   --muted-foreground: 159 159 165;  /* #9F9FA5 = secondaryLabel .60 aplanado, 5.9:1 ✓ */
   --secondary: 72 72 74;            /* #48484A systemGray dark 3 */
@@ -433,6 +451,235 @@
   --ink-warn: 255 159 10;
   --ink-ok: 48 209 88;
   --ink-info: 113 173 225;
+}
+
+/* ============================================================================
+   PALETA PIZARRA — PREDETERMINADA desde 2026-10-22 (index.html: sin `app-skin` guardado)
+   Decisión del jurado (08-10): docs en scratchpad/ronda-estilo-propio/6_jurado_final.md.
+   ---------------------------------------------------------------------------
+   Mecanismo: NO es una piel nueva. index.html mantiene data-skin="apple" (radios,
+   primitivos, geometría) y AGREGA data-paleta="pizarra". Estos bloques solo
+   sobrescriben tokens de COLOR. Sin el atributo ningún selector de abajo casa,
+   así que el CSS resultante de quien no la activa es el mismo de siempre.
+   Vuelta atrás: `?skin=apple` (paleta anterior, queda guardada) o `?skin=default`.
+
+   Especificidad: el Día usa :not(.dark) para no filtrarse a Penumbra (empata en
+   0,3,0 con `[data-skin="apple"].dark` y, al ir después, lo pisaría); Penumbra
+   (0,4,0) gana sobre los dos bloques Apple sin depender del orden.
+
+   Decisiones que el spec no fijaba (medidas en scripts/check-contrast-pizarra.mjs):
+   · --muted-foreground = texto 2; el texto 3 queda reservado en --foreground-3.
+   · --accent = superficie 2 = fondo; --secondary = borde. --muted (riel de segmentados,
+     buscadores, chips) es la SUPERFICIE 3 de la tabla del jurado: si valiera lo mismo que
+     el fondo, todo `bg-muted` sobre la página desaparecería. Día #E2E1DB / Penumbra
+     #2E2D2B, ≥1,15:1 contra fondo y tarjeta (check-contrast-pizarra.mjs). Es el único
+     color agregado a Pizarra.
+   · «Normal sin color» (ISA-101): --ink-ok y --fill-ok son NEUTROS (texto 2).
+     Va ícono de visto + palabra, no verde. Los -emerald/-green de Tailwind NO se
+     tocan acá: son series/chips que se barren por oleada.
+   · Texto de aviso/falla/info en Día se oscureció sobre lo sugerido (#8A5A00,
+     #C21F2E, #2A6BA6) hasta dar ≥4,5:1 también sobre su propio tinte al 15%
+     apoyado en el fondo (el peor caso, mismo criterio que el resto del archivo).
+   Series de gráficos (--serie-*, --cat-*, --shift-ramp-*, --mon-*): ver los bloques
+   «GRÁFICOS» de cada intensidad (regla «foco, contexto, estado»).
+   ============================================================================ */
+:root[data-skin="apple"][data-paleta="pizarra"]:not(.dark) {
+  --background: 242 241 236;        /* #F2F1EC */
+  --card: 255 255 255;              /* #FFFFFF */
+  --foreground: 29 29 28;           /* #1D1D1C texto 1 */
+  --muted-foreground: 78 77 74;     /* #4E4D4A texto 2 */
+  --foreground-3: 106 105 102;      /* #6A6966 texto 3 (reservado, sin consumidor aún) */
+  --secondary: 212 211 207;         /* = borde */
+  --muted: 226 225 219;             /* #E2E1DB superficie 3 */
+  --accent: 242 241 236;
+  --border: 212 211 207;            /* #D4D3CF */
+  --card-edge: 212 211 207;
+  --sidebar-active: rgba(42, 107, 166, 0.12);
+  --sidebar-active-foreground: #27639a;
+  --sidebar-surface: #f2f1ec;
+  --panel-surface: #f2f1ec;
+
+  --brand: 42 107 166;              /* #2A6BA6 acento */
+  --brand-foreground: 255 255 255;
+  --brand-ink: 39 99 154;           /* #27639A: acento oscurecido para texto sobre tinte */
+
+  --ink-crit: 177 39 45;            /* #B1272D = relleno de falla */
+  --ink-warn: 132 86 0;             /* #845600 (ámbar solo como relleno; como texto, este) */
+  --ink-ok: 78 77 74;               /* normal sin color: texto 2 */
+  --ink-info: 39 99 154;            /* = acento (versión de texto) */
+
+  --tw-red-400: 177 39 45;   --tw-red-500: 177 39 45;   --tw-red-600: 177 39 45;
+  --destructive-tint: 245 227 228;  /* #B1272D al 13% sobre la tarjeta, opaco */
+  --tw-amber-400: 242 180 0; --tw-amber-500: 242 180 0; --tw-amber-600: 132 86 0;
+  --tw-blue-400: 42 107 166; --tw-blue-500: 42 107 166;
+  /* Verdes «ok» de Tailwind = texto 2 (igual que --ink-ok): normal sin color (ISA-101).
+     Las series de gráfico y el Monitor TV conservan su color (ver excepciones abajo). */
+  --tw-emerald-400: 78 77 74; --tw-emerald-500: 78 77 74; --tw-emerald-600: 78 77 74;
+  --tw-green-400: 78 77 74;   --tw-green-500: 78 77 74;   --tw-green-600: 78 77 74;
+  /* success = texto 2; warning = ámbar de relleno con texto oscuro; su tinta = --ink-warn. */
+  --success: 78 77 74;        --success-foreground: 255 255 255;
+  --warning: 242 180 0;       --warning-foreground: 29 29 28;
+  --warning-ink: var(--ink-warn);
+
+  --fill-critical: 177 39 45;       /* relleno + texto #FFFFFF (6,57:1) */
+  --fill-warning: 242 180 0;        /* relleno #F2B400 + texto #1D1D1C (9,08:1), NUNCA blanco */
+  --fill-ok: 78 77 74;
+
+  /* ── GRÁFICOS · «foco, contexto, estado» (spec paleta-graficos, aprobada 09-10) ──
+     Serie 1 = lo que el gráfico quiere que mires (acento); el resto va en neutros.
+     Aviso/falla (--fill-warning / --fill-critical) SOLO cuando un valor sale de una
+     banda fijada antes. Máximo 5 series; más de 5 → «Otros». Canales "R G B". */
+  --serie-1: 42 107 166;      /* Acero (acento) #2A6BA6 */
+  --serie-2: 113 145 70;      /* Oliva #719146 */
+  --serie-3: 165 120 190;     /* Ciruela gris #a578be */
+  --serie-4: 19 143 130;      /* Petróleo #138f82 */
+  --serie-5: 108 106 179;     /* Índigo apagado #6c6ab3 */
+  --serie-otros: 135 134 130; /* Gris cálido #878682 */
+  --grafico-neutro-fuerte: 78 77 74;   /* #4E4D4A */
+  --grafico-neutro-medio: 135 134 130; /* #878682 */
+  --grafico-meta: 106 105 102;         /* #6A6966 meta/cuota punteada */
+  /* Estado en MARCAS de gráfico: = --fill-critical / --fill-warning en Día; en Penumbra la falla
+     sube a --ink-crit (#FF9A90) porque #B1272D sobre la tarjeta oscura no llega a 3:1. */
+  --grafico-falla: 177 39 45;          /* #B1272D */
+  --grafico-aviso: 242 180 0;          /* #F2B400 */
+  /* Categóricos --cat-N: tinte (relleno) · tinta (texto) */
+  --cat-1-tint: 42 107 166;   --cat-1-ink: 57 98 138;    /* Acero #39628a */
+  --cat-2-tint: 113 145 70;   --cat-2-ink: 83 105 54;    /* Oliva #536936 */
+  --cat-3-tint: 108 106 179;  --cat-3-ink: 92 91 142;    /* Índigo apagado #5c5b8e */
+  --cat-4-tint: 78 77 74;     --cat-4-ink: 78 77 74;     /* Neutro fuerte #4E4D4A */
+  --cat-5-tint: 135 134 130;  --cat-5-ink: 100 99 96;    /* Neutro medio #646360 (spec #6A6966 daba 4,19:1 sobre su tinte) */
+  --cat-6-tint: 165 120 190;  --cat-6-ink: 115 85 132;   /* Ciruela gris #735584 */
+  --cat-7-tint: 19 143 130;   --cat-7-ink: 19 108 98;    /* Petróleo #136c62 */
+  --cat-8-tint: 135 134 130;  --cat-8-ink: 100 99 96;    /* = cat-5 (revisar pantallas con 8 chips) */
+  /* Rampa secuencial de 4 pasos (menos → más) */
+  --shift-ramp-1: #94acc5;  --shift-ramp-1-ink: #1D1D1C;
+  --shift-ramp-2: #698eb4;  --shift-ramp-2-ink: #1D1D1C;
+  --shift-ramp-3: #2a6ba6;  --shift-ramp-3-ink: #FFFFFF;
+  --shift-ramp-4: #254e75;  --shift-ramp-4-ink: #FFFFFF;
+  --shift-empty: rgba(29, 29, 28, 0.06);
+  /* Calidades Grader: rampa ORDINAL premium → tercera (5 pasos) */
+  --calidad-1: #274a6c; --calidad-2: #305d87; --calidad-3: #3f6f9e; --calidad-4: #5b83aa; --calidad-5: #7696b6;
+  /* Monitor público (series; los estados del .monitor-tv no cambian) */
+  --mon-hoy: #2A6BA6;
+  --mon-cuota: #6A6966;
+  --mon-ref: #878682;
+  --mon-maq-1: #2A6BA6; --mon-maq-2: #719146; --mon-maq-3: #a578be;
+  --mon-arriba-soft: rgba(42, 107, 166, 0.16);
+  --mon-abajo-soft: rgba(78, 77, 74, 0.14);
+}
+
+:root[data-skin="apple"][data-paleta="pizarra"].dark {
+  --background: 23 22 20;           /* #171614 */
+  --card: 34 33 32;                 /* #222120 */
+  --foreground: 232 226 215;        /* #E8E2D7 texto 1 */
+  --muted-foreground: 189 182 170;  /* #BDB6AA texto 2 */
+  --foreground-3: 168 161 149;      /* #A8A195 texto 3 (reservado) */
+  --secondary: 62 61 58;
+  --muted: 46 45 43;                /* #2E2D2B superficie 3 */
+  --accent: 23 22 20;
+  --border: 62 61 58;               /* #3E3D3A */
+  --card-edge: 62 61 58;
+  --sidebar-active: rgba(125, 180, 238, 0.18);
+  --sidebar-active-foreground: #7db4ee;
+  --sidebar-surface: #171614;
+  --panel-surface: #171614;
+
+  --brand: 125 180 238;             /* #7DB4EE */
+  --brand-foreground: 23 22 20;     /* texto oscuro sobre el acento */
+  --brand-ink: 125 180 238;
+
+  --ink-crit: 255 154 144;          /* #FF9A90 */
+  --ink-warn: 242 193 78;           /* #F2C14E */
+  --ink-ok: 189 182 170;            /* normal sin color: texto 2 */
+  --ink-info: 125 180 238;
+
+  /* Tinta/ícono legibles sobre la tarjeta oscura; el relleno de falla va en --fill-critical. */
+  --tw-red-400: 255 154 144; --tw-red-500: 255 154 144; --tw-red-600: 255 154 144;
+  --destructive-tint: 63 49 47;     /* #FF9A90 al 13% sobre la tarjeta, opaco */
+  --tw-amber-400: 242 180 0; --tw-amber-500: 242 180 0; --tw-amber-600: 242 193 78;
+  --tw-blue-400: 125 180 238; --tw-blue-500: 125 180 238;
+  --tw-emerald-400: 189 182 170; --tw-emerald-500: 189 182 170; --tw-emerald-600: 189 182 170;
+  --tw-green-400: 189 182 170;   --tw-green-500: 189 182 170;   --tw-green-600: 189 182 170;
+  --success: 189 182 170;     --success-foreground: 23 22 20;
+  --warning: 242 180 0;       --warning-foreground: 29 29 28;
+  --warning-ink: var(--ink-warn);
+
+  --fill-critical: 177 39 45;       /* relleno + texto #E8E2D7 (5,09:1) */
+  --fill-warning: 242 180 0;        /* relleno + texto #171614 (9,73:1) */
+  --fill-ok: 189 182 170;
+
+  /* ── GRÁFICOS · «foco, contexto, estado» (ver bloque Día) ── */
+  --serie-1: 86 152 218;      /* Acero (acento) #5698da */
+  --serie-2: 125 151 74;      /* Oliva #7d974a */
+  --serie-3: 133 96 172;      /* Ciruela gris #8560ac */
+  --serie-4: 34 165 164;      /* Petróleo #22a5a4 */
+  --serie-5: 138 126 206;     /* Índigo apagado #8a7ece */
+  --serie-otros: 124 122 117; /* Gris cálido #7c7a75 */
+  --grafico-neutro-fuerte: 189 182 170; /* #BDB6AA */
+  --grafico-neutro-medio: 124 122 117;  /* #7c7a75 */
+  --grafico-meta: 168 161 149;          /* #A8A195 */
+  --grafico-falla: 255 154 144;         /* #FF9A90 */
+  --grafico-aviso: 242 180 0;           /* #F2B400 */
+  --cat-1-tint: 86 152 218;   --cat-1-ink: 132 175 220;  /* Acero #84afdc */
+  --cat-2-tint: 125 151 74;   --cat-2-ink: 159 180 124;  /* Oliva #9fb47c */
+  --cat-3-tint: 138 126 206;  --cat-3-ink: 169 163 219;  /* Índigo apagado #a9a3db */
+  --cat-4-tint: 189 182 170;  --cat-4-ink: 189 182 170;  /* Neutro fuerte #BDB6AA */
+  --cat-5-tint: 124 122 117;  --cat-5-ink: 168 161 149;  /* Neutro medio #A8A195 */
+  --cat-6-tint: 133 96 172;   --cat-6-ink: 183 158 212;  /* Ciruela gris #b79ed4 */
+  --cat-7-tint: 34 165 164;   --cat-7-ink: 106 187 186;  /* Petróleo #6abbba */
+  --cat-8-tint: 124 122 117;  --cat-8-ink: 168 161 149;  /* = cat-5 */
+  --shift-ramp-1: #405367;  --shift-ramp-1-ink: #E8E2D7;
+  --shift-ramp-2: #496684;  --shift-ramp-2-ink: #E8E2D7;
+  --shift-ramp-3: #5f8fbf;  --shift-ramp-3-ink: #171614;
+  --shift-ramp-4: #89b4e1;  --shift-ramp-4-ink: #171614;
+  --shift-empty: rgba(232, 226, 215, 0.06);
+  --calidad-1: #bbd4ee; --calidad-2: #9dc0e5; --calidad-3: #81acd9; --calidad-4: #6b98c6; --calidad-5: #5d84ac;
+  --mon-hoy: #7DB4EE;
+  --mon-cuota: #A8A195;
+  --mon-ref: #7c7a75;
+  --mon-maq-1: #5698da; --mon-maq-2: #7d974a; --mon-maq-3: #8560ac;
+  --mon-arriba-soft: rgba(86, 152, 218, 0.18);
+  --mon-abajo-soft: rgba(189, 182, 170, 0.14);
+}
+
+/* ── Excepciones de Pizarra: el Monitor TV conserva TODOS sus colores de estado ──
+   Decisión del usuario: el monitor de planta (`.monitor-tv`, App.tsx) sigue con el
+   semáforo de Apple —verde, rojo y ámbar— hasta la prueba a 3 m. Se re-fijan las variables
+   en el propio contenedor: las heredan sus descendientes y ganan sobre el :root. Son
+   los valores EFECTIVOS de la piel Apple (cascada :root, .dark, apple, apple.dark), tanto
+   los --tw-* como los tokens de estado --ink-*, --fill-*, --success, --warning y
+   --destructive-tint. Las series --mon-* NO se tocan. El test
+   `src/lib/__tests__/monitorTvEstado.test.ts` compara estos bloques contra Apple. */
+:root[data-paleta="pizarra"]:not(.dark) .monitor-tv {
+  --tw-emerald-400: 52 199 89;   --tw-emerald-500: 52 199 89;   --tw-emerald-600: 33 125 56;
+  --tw-green-400: 52 199 89;     --tw-green-500: 52 199 89;     --tw-green-600: 33 125 56;
+  --tw-red-400: 255 59 48;       --tw-red-500: 255 59 48;       --tw-red-600: 196 45 37;
+  --tw-amber-400: 255 149 0;     --tw-amber-500: 255 149 0;     --tw-amber-600: 158 92 0;
+  /* Tokens de estado (texto, rellenos, avisos): valores EXACTOS de la piel Apple, claro. */
+  --ink-ok: 31 118 53;           --ink-crit: 184 42 35;         --ink-warn: 152 88 0;          --ink-info: 40 101 158;
+  --fill-ok: 47 107 65;          --fill-critical: 140 75 69;    --fill-warning: 122 90 30;
+  --success: 108 152 108;        --success-foreground: 255 255 255;
+  --warning: 192 142 95;         --warning-foreground: 0 0 0;   --warning-ink: 192 142 95;
+  --destructive-tint: 255 230 228;
+}
+:root[data-paleta="pizarra"].dark .monitor-tv {
+  --tw-emerald-400: 48 209 88;   --tw-emerald-500: 48 209 88;   --tw-emerald-600: 48 209 88;
+  --tw-green-400: 48 209 88;     --tw-green-500: 48 209 88;     --tw-green-600: 48 209 88;
+  --tw-red-400: 255 69 58;       --tw-red-500: 255 69 58;       --tw-red-600: 255 119 111;
+  --tw-amber-400: 255 159 10;    --tw-amber-500: 255 159 10;    --tw-amber-600: 255 159 10;
+  /* Tokens de estado (texto, rellenos, avisos): valores EXACTOS de la piel Apple, oscuro. */
+  --ink-ok: 48 209 88;           --ink-crit: 255 119 111;       --ink-warn: 255 159 10;        --ink-info: 113 173 225;
+  --fill-ok: 47 107 65;          --fill-critical: 140 75 69;    --fill-warning: 122 90 30;
+  --success: 108 152 108;        --success-foreground: 255 255 255;
+  --warning: 192 142 95;         --warning-foreground: 0 0 0;   --warning-ink: 192 142 95;
+  --destructive-tint: 71 47 48;
+}
+
+/* Trama diagonal para «contexto» en gráficos (externo, ritmo, colación, planificado): se
+   dibuja con franjas del color de la tarjeta sobre el relleno, así funciona igual en Día y
+   Penumbra y no depende del color. SOLO existe con Pizarra: sin ella la clase no casa. */
+:root[data-paleta="pizarra"] .pz-trama {
+  background-image: repeating-linear-gradient(135deg, rgb(var(--card)) 0 2px, transparent 2px 6px);
 }
 
 /* Motion de la NUEVA PIEL (docs §7). Solo `transform`/`opacity` — nada que
@@ -941,24 +1188,27 @@
     @apply bg-muted text-muted-foreground;
   }
 
-  /* ─── Modo Día para módulo Grader ──────────────── */
+  /* ─── Modo Día para módulo Grader ────────────────
+     Oleada 3 de Pizarra: los nueve valores ya no son hex propios (antes los systemGrouped de
+     iOS, a mano): LEEN LOS TOKENS del tema, así el Día de Análisis de turno es el mismo Día
+     de toda la app en cualquiera de las dos pieles (Pizarra: papel cálido; `?skin=apple`: los
+     grises de iOS, que son casi los hex de antes). Lo que sigue en este bloque es solo
+     ESTRUCTURA (contenedor, tarjetas, pestañas, tablas, botones outline); las reglas que
+     pintaban clases crudas de Tailwind (red-600, amber-600, green-500, bg-*-900, amber-50…)
+     se quitaron porque el módulo ya no usa ninguna: color de estado = tokens ink-*, fill-*,
+     success/warning/destructive. Tampoco se fuerzan `text-white`/`text-slate-*` a tinta
+     oscura: ese parche pintaba oscuro el texto blanco que va sobre relleno (barras de
+     pureza por puerta, capas del timeline). */
   .grader-light-mode {
-    /* Migrado a la paleta de iOS el 2026-09-16. Los nueve valores salian de la
-       escala SLATE de Tailwind, que tiene un sesgo azul fuerte: el texto daba
-       sesgo de hue 27 y el secundario 34, contra 2 y 3 de los grises de iOS.
-       Cada color cumplia contraste por separado, pero el modulo se leia como si
-       fuera de otra app. Ahora son los systemGrouped de iOS.
-       El secundario se aclara a proposito (7.58 -> 5.08): el hallazgo anti-fatiga
-       del HIG doc dice que Apple REDUCE la masa de contraste duro, no la sube. */
-    --grader-bg: #F2F2F7;        /* systemGroupedBackground */
-    --grader-fg: #1C1C1E;        /* label */
-    --grader-card: #FFFFFF;      /* secondarySystemGroupedBackground */
-    --grader-card-fg: #1C1C1E;
-    --grader-muted: #E5E5EA;     /* systemGray5 */
-    --grader-muted-fg: #6E6E71;  /* secondaryLabel */
-    --grader-border: #C6C6C8;    /* separator, aplanado */
-    --grader-popover: #FFFFFF;
-    --grader-popover-fg: #1C1C1E;
+    --grader-bg: rgb(var(--background));
+    --grader-fg: rgb(var(--foreground));
+    --grader-card: rgb(var(--card));
+    --grader-card-fg: rgb(var(--foreground));
+    --grader-muted: rgb(var(--muted));
+    --grader-muted-fg: rgb(var(--muted-foreground));
+    --grader-border: rgb(var(--border));
+    --grader-popover: rgb(var(--card));
+    --grader-popover-fg: rgb(var(--foreground));
   }
 
   .grader-light-mode {
@@ -993,25 +1243,6 @@
   .grader-light-mode [class*="text-muted-foreground/"] {
     color: var(--grader-muted-fg) !important;
     opacity: 1 !important;
-  }
-
-  /* Muchos componentes en modo oscuro usan colores de texto muy claros (blanco / slate-200).
-     En modo claro, forzarlos a texto legible. */
-  .grader-light-mode [class*="text-white"],
-  .grader-light-mode [class*="text-slate-100"],
-  .grader-light-mode [class*="text-slate-200"],
-  .grader-light-mode [class*="text-slate-300"],
-  .grader-light-mode [class*="text-slate-400"],
-  .grader-light-mode [class*="text-zinc-100"],
-  .grader-light-mode [class*="text-zinc-200"],
-  .grader-light-mode [class*="text-zinc-300"],
-  .grader-light-mode [class*="text-neutral-100"],
-  .grader-light-mode [class*="text-neutral-200"],
-  .grader-light-mode [class*="text-neutral-300"],
-  .grader-light-mode [class*="text-gray-100"],
-  .grader-light-mode [class*="text-gray-200"],
-  .grader-light-mode [class*="text-gray-300"] {
-    color: var(--grader-fg) !important;
   }
 
   /* Bg muted */
@@ -1051,7 +1282,7 @@
 
   /* Hover */
   .grader-light-mode tr:hover {
-    background-color: #f1f5f9 !important;
+    background-color: var(--grader-muted) !important;
   }
 
   /* Buttons */
@@ -1069,51 +1300,6 @@
   .grader-light-mode button:not([class*="outline"]) {
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   }
-
-  /* Badges */
-  .grader-light-mode [class*="bg-red-900"] {
-    background-color: #fee2e2 !important;
-    color: #991b1b !important;
-  }
-
-  .grader-light-mode [class*="bg-amber-900"] {
-    background-color: #fef3c7 !important;
-    color: #92400e !important;
-  }
-
-  .grader-light-mode [class*="bg-green-900"] {
-    background-color: #dcfce7 !important;
-    color: #166534 !important;
-  }
-
-  .grader-light-mode [class*="bg-blue-900"] {
-    background-color: #dbeafe !important;
-    color: #1e40af !important;
-  }
-
-  /* Note cards */
-  .grader-light-mode [class*="bg-amber-50"] {
-    background-color: #fffbeb !important;
-  }
-
-  .grader-light-mode [class*="border-amber-300"] {
-    border-color: #fcd34d !important;
-  }
-
-  .grader-light-mode [class*="border-red-200"] {
-    border-color: #fca5a5 !important;
-  }
-
-  .grader-light-mode [class*="border-red-300"] {
-    border-color: #fca5a5 !important;
-  }
-
-  /* Severity colors on value text */
-  .grader-light-mode .text-red-600 { color: #dc2626 !important; }
-  .grader-light-mode .text-amber-600 { color: #d97706 !important; }
-  .grader-light-mode .text-green-500 { color: #22c55e !important; }
-  .grader-light-mode .text-red-500 { color: #ef4444 !important; }
-  .grader-light-mode .text-blue-500 { color: #3b82f6 !important; }
 
   /* Tarjetas (primitivo Card). Hueco anterior al 2026-09-16: las reglas de este
      bloque cubrian el patron viejo `rounded-xl` + `border`, pero el primitivo
@@ -1138,7 +1324,7 @@
     background: var(--grader-bg);
   }
   .grader-light-mode::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: var(--grader-border);
   }
 }
 

@@ -53,9 +53,9 @@ describe('reachedStatusFromPct', () => {
 
 describe('reachedStatusColor + reachedStatusLabel', () => {
   it('cubre los 3 status', () => {
-    expect(reachedStatusColor('healthy')).toContain('emerald')
-    expect(reachedStatusColor('attention')).toContain('amber')
-    expect(reachedStatusColor('critical')).toContain('rose')
+    expect(reachedStatusColor('healthy')).toContain('ink-ok')
+    expect(reachedStatusColor('attention')).toContain('ink-warn')
+    expect(reachedStatusColor('critical')).toContain('ink-crit')
 
     expect(reachedStatusLabel('healthy')).toBe('saludable')
     expect(reachedStatusLabel('attention')).toBe('bajo objetivo')
@@ -158,8 +158,8 @@ describe('varianceDirection + label + color', () => {
     expect(varianceLabel('as_expected')).toBe('como esperado')
     expect(varianceLabel('worse')).toBe('peor que esperado')
 
-    expect(varianceColor('better')).toContain('emerald')
-    expect(varianceColor('as_expected')).toContain('slate')
-    expect(varianceColor('worse')).toContain('rose')
+    expect(varianceColor('better')).toContain('ink-ok')
+    expect(varianceColor('as_expected')).toContain('muted-foreground')
+    expect(varianceColor('worse')).toContain('ink-crit')
   })
 })

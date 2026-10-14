@@ -88,6 +88,8 @@ export interface BodegaMergedItem {
   nombresComunes?: string[]
   /** Slugs de máquina para las que este repuesto es "común" (marca compartida). */
   comunEn?: string[]
+  /** Cuántas lleva la máquina (BOM de SAP PM). Informa al solicitar; no manda la cantidad. */
+  cantidadPorMaquina?: number
   tipo?: string
   /** Clase del material (maestro unificado): repuesto·insumo·herramienta·… */
   clase?: MaterialClase
@@ -129,6 +131,8 @@ export interface BodegaMergedItem {
    *  Complementan `fotos` (overlay de bodega) para mostrar el repuesto aunque
    *  bodega no tenga foto propia. */
   fotosCatalogo?: string[]
+  /** URL de captura de manual → equipos a los que corresponde (ver `fotosParaEquipos`). */
+  equiposDeFoto?: Record<string, string[]>
   /** ¿Tiene ficha técnica CON CONTENIDO? Alimenta el badge del botón «Ficha». */
   tieneFicha?: boolean
   /** Cuántos manuales/documentos vinculados tiene. */
@@ -230,6 +234,12 @@ export interface InventarioLinea {
   /** Stock que decía el sistema ANTES del ajuste: la evidencia de cuánto no cuadraba. */
   stockSistemaAntes?: number | null
   aplicadoAt?: Date
+  /** El nombre es PROVISIONAL (del despiece/catálogo): falta confirmarlo con SAP. */
+  nombrePendiente?: boolean
+  /** Ficha del maestro donde vive el nombre (por si su ID no es el SAP). */
+  fichaId?: string
+  /** false = esa ficha todavía no tiene el SAP escrito: al confirmar se completa. */
+  sapEnFicha?: boolean
   /** Derivado (no se guarda): si el mismo SAP está en varias líneas, lo
    *  contado entre TODAS. El stock del sistema es por SAP, así que la
    *  diferencia se mide contra este total, no contra la línea sola. */
@@ -412,10 +422,11 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         // miraban las fotos: una ficha que viviera en el SEGUNDO documento del mismo SAP
         // se perdía por el orden de llegada (`3300138387` tiene dos documentos).
         const doc = fusionarDocumentacion(
-          { fotos: existing.fotosCatalogo ?? [], tieneFicha: !!existing.tieneFicha, manuales: existing.manuales ?? 0 },
+          { fotos: existing.fotosCatalogo ?? [], tieneFicha: !!existing.tieneFicha, manuales: existing.manuales ?? 0, equiposDeFoto: existing.equiposDeFoto },
           documentacionDe(rep),
         )
         existing.fotosCatalogo = doc.fotos.length ? doc.fotos : undefined
+        existing.equiposDeFoto = doc.equiposDeFoto
         existing.tieneFicha = doc.tieneFicha
         existing.manuales = doc.manuales
         continue
@@ -433,6 +444,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         alias: rep.alias,
         nombresComunes: Array.isArray(rep.nombresComunes) ? rep.nombresComunes : undefined,
         comunEn: Array.isArray(rep.comunEn) ? rep.comunEn : undefined,
+        cantidadPorMaquina: typeof rep.cantidadPorMaquina === 'number' && rep.cantidadPorMaquina > 0 ? rep.cantidadPorMaquina : undefined,
         tipo: rep.tipo,
         clase: rep.clase,
         tieneSap: rep.tieneSap ?? !!sap,
@@ -462,6 +474,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         ultimoConteoPor: overlay?.ultimoConteoPor,
         fotos: overlay?.fotos,
         fotosCatalogo: doc.fotos.length ? doc.fotos : undefined,
+        equiposDeFoto: doc.equiposDeFoto,
         tieneFicha: doc.tieneFicha,
         manuales: doc.manuales,
         isWatched: favKeys.has(key),
@@ -816,6 +829,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         aplicadoCantidad: typeof x.aplicadoCantidad === 'number' ? x.aplicadoCantidad : null,
         stockSistemaAntes: typeof x.stockSistemaAntes === 'number' ? x.stockSistemaAntes : x.stockSistemaAntes === null ? null : undefined,
         aplicadoAt: x.aplicadoAt ? tsToDate(x.aplicadoAt) : undefined,
+        nombrePendiente: !!x.nombrePendiente,
+        fichaId: x.fichaId || undefined,
+        sapEnFicha: x.sapEnFicha === false ? false : undefined,
       }
     })
   }, [])
@@ -924,7 +940,12 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     // número que dice cuánto cuadraba el sistema antes del inventario.
     const sesionRef = doc(db, INVENTARIO_COL, sesion.id)
     const previa = (await getDoc(sesionRef)).data()
+    // Lo aplicado queda cuadrado (sistema = total contado del SAP): la diferencia
+    // que queda en la sesión es solo la de lo no aplicado.
+    const nuevoSistema = new Map([...plan.cambian, ...plan.cuadran].flatMap(a => a.lineaIds.map(id => [id, a.contado] as const)))
+    const tras = lineas.map(l => (nuevoSistema.has(l.id) ? { ...l, stockSistema: nuevoSistema.get(l.id)! } : l))
     batch.update(sesionRef, {
+      conDiferencia: conTotalesPorSap(tras).filter(l => { const d = diferencia(l); return d != null && d !== 0 }).length,
       ultimoAjuste: { actualizados, creados, cuadran: plan.cuadran.length, por: userName, at: serverTimestamp() },
       ...(previa?.precisionAntes ? {} : {
         precisionAntes: { conFicha: plan.conFicha, cuadraban: plan.cuadrabanConFicha, sinFicha: creados },
@@ -934,6 +955,46 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     await reloadBodega(true)
     return { actualizados, creados, cuadran: plan.cuadran.length }
   }, [bodegaOverlays, denormNombre, reloadBodega])
+
+  /**
+   * Confirma (o corrige) el nombre de SAP de un repuesto desde el inventario:
+   * lo escribe en su ficha del maestro, en la copia de bodega y en TODAS las
+   * líneas del inventario con ese SAP. Si la ficha todavía no tenía el SAP
+   * escrito (sapEnFicha === false), se completa en el mismo paso: quien
+   * confirma el nombre lo está leyendo en SAP con ese código.
+   */
+  const confirmarNombreRepuesto = useCallback(async (
+    inventarioId: string,
+    linea: InventarioLinea,
+    lineas: InventarioLinea[],
+    nombre: string,
+    userId: string,
+    userName: string,
+  ) => {
+    const n = nombre.trim()
+    if (!n) throw new Error('Escribe el nombre.')
+    const sap = linea.codigoSAP.trim()
+    if (!sap) throw new Error('Esta línea no tiene SAP.')
+    const batch = writeBatch(db)
+    batch.update(doc(db, 'repuestos', linea.fichaId || sap), {
+      textoBreve: n,
+      nombreProvisional: false,
+      nombreConfirmadoPor: userName,
+      nombreConfirmadoAt: serverTimestamp(),
+      ...(linea.sapEnFicha === false ? { codigoSAP: sap, tieneSap: true } : {}),
+      updatedAt: serverTimestamp(),
+    })
+    const enBodega = bodegaOverlays.get(sap)
+    if (enBodega) batch.update(doc(db, BODEGA_COL, enBodega.id), { textoBreve: n, updatedAt: serverTimestamp() })
+    for (const l of lineas.filter(x => x.codigoSAP === sap)) {
+      batch.update(doc(db, INVENTARIO_COL, inventarioId, 'conteos', l.id), {
+        textoBreve: n, nombrePendiente: false, sapEnFicha: true,
+        nombreConfirmadoPor: userId, nombreConfirmadoPorNombre: userName,
+      })
+    }
+    await batch.commit()
+    logger.info('Nombre de repuesto confirmado desde inventario', { sap, userId })
+  }, [bodegaOverlays])
 
   // Finalizar inventario — ajustar stock según conteo físico
   const finalizarInventario = useCallback(async (
@@ -1122,5 +1183,6 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     loadLineas,
     validarLinea,
     aplicarAjusteInventario,
+    confirmarNombreRepuesto,
   }
 }

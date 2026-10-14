@@ -109,7 +109,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
           <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
           <span className="text-muted-foreground text-sm">· {dateKey}</span>
           {shiftWindow?.status === 'live' && (
-            <Badge className="bg-red-500/[0.15] text-ink-crit animate-pulse text-xs px-2 py-0">
+            <Badge className="bg-destructive/[0.15] text-ink-crit animate-pulse text-xs px-2 py-0">
               <Activity className="w-3 h-3 mr-1" />EN VIVO
             </Badge>
           )}
@@ -151,7 +151,7 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
                 {cyclesEnTurno.toLocaleString('es-CL')} en el turno
               </span>
               <span className="text-muted-foreground/40">+</span>
-              <span className="rounded-full border border-ink-warn/[0.45] bg-amber-500/[0.15] px-1.5 tabular-nums text-ink-warn">
+              <span className="rounded-full border border-ink-warn/[0.45] bg-warning/[0.15] px-1.5 tabular-nums text-ink-warn">
                 {outsidePieces.toLocaleString('es-CL')} fuera del horario
               </span>
               {(outside?.ranges ?? []).map(r => (

@@ -89,14 +89,14 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   if (status === 'saving') {
     return (
       <span className="inline-flex items-center gap-1 text-caption text-ink-warn font-medium">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+        <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
         Guardando…
       </span>
     )
   }
   return (
     <span className="inline-flex items-center gap-1 text-caption text-ink-ok font-medium">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      <span className="h-1.5 w-1.5 rounded-full bg-success" />
       Guardado
     </span>
   )
@@ -569,7 +569,7 @@ export function AnalisisGraderGatesConfigPage({
               className={cn(
                 'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
-                  ? 'border-emerald-500 text-ink-ok'
+                  ? 'border-success text-ink-ok'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/40',
               )}
             >
@@ -783,7 +783,7 @@ export function AnalisisGraderGatesConfigPage({
               ))}
             </div>
             {shiftGapMinutes > 0 && (
-              <div className="mt-3 flex items-start gap-2 rounded-ctl bg-amber-500/[0.15] border border-transparent px-3 py-2">
+              <div className="mt-3 flex items-start gap-2 rounded-ctl bg-warning/[0.15] border border-transparent px-3 py-2">
                 <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-ink-warn" />
                 <p className="text-xs text-ink-warn">
                   Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
@@ -845,7 +845,7 @@ export function AnalisisGraderGatesConfigPage({
                   <div>
                     <span className="text-sm font-medium">{t.name}</span>
                     {activeTemplateName === t.name && (
-                      <Badge className="ml-2 text-caption bg-green-500/[0.15] text-ink-ok">
+                      <Badge className="ml-2 text-caption bg-success/[0.15] text-ink-ok">
                         Activa
                       </Badge>
                     )}
@@ -1000,7 +1000,7 @@ export function AnalisisGraderGatesConfigPage({
               </Badge>
             )}
             {!hasShiftOverride && isCustomRanges && (
-              <Badge className="text-caption bg-amber-500/[0.15] text-ink-warn">
+              <Badge className="text-caption bg-warning/[0.15] text-ink-warn">
                 Global personalizado
               </Badge>
             )}

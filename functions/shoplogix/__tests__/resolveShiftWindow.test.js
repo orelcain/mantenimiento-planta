@@ -103,3 +103,59 @@ test('fechas inválidas en el oficial no rompen ni corrigen', () => {
   })
   assert.strictEqual(r.corregida, false)
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Turno EN CURSO: el cierre lo da el horario oficial, no el último interval.
+// Chonchi 28-sep-2026, "Turno 1 Lunes": Shoplogix programa 00:00→07:15; a las
+// 04:31 la app decía que el turno terminaba 04:31, porque ese era el último
+// interval sincronizado.
+// ─────────────────────────────────────────────────────────────────────────────
+const s = (h, m = 0) => new Date(Date.UTC(2026, 8, 28, h, m))
+
+test('turno en curso: el cierre se alarga hasta el oficial', () => {
+  const r = resolveShiftWindow({
+    scheduledStart: s(0, 0), scheduledEnd: s(4, 31),
+    officialStart: s(0, 0), officialEnd: s(7, 15),
+    nowWall: s(4, 34),
+  })
+  assert.strictEqual(r.corregida, true)
+  assert.strictEqual(r.start.toISOString(), s(0, 0).toISOString(), 'el arranque real se conserva')
+  assert.strictEqual(r.end.toISOString(), s(7, 15).toISOString())
+  assert.match(r.motivo, /en curso/)
+})
+
+test('pasado el cierre oficial vuelve a mandar el derivado (la línea puede seguir de largo)', () => {
+  const r = resolveShiftWindow({
+    scheduledStart: s(0, 0), scheduledEnd: s(7, 40),
+    officialStart: s(0, 0), officialEnd: s(7, 15),
+    nowWall: s(7, 45),
+  })
+  assert.strictEqual(r.corregida, false)
+  assert.strictEqual(r.end.toISOString(), s(7, 40).toISOString())
+})
+
+test('en curso pero el derivado ya pasó al oficial: no se acorta', () => {
+  const r = resolveShiftWindow({
+    scheduledStart: s(7, 15), scheduledEnd: s(15, 20),
+    officialStart: s(7, 15), officialEnd: s(15, 0),
+    nowWall: s(15, 20),
+  })
+  assert.strictEqual(r.corregida, false)
+})
+
+test('sin `nowWall` (llamadas viejas) el comportamiento no cambia', () => {
+  const r = resolveShiftWindow({
+    scheduledStart: s(0, 0), scheduledEnd: s(4, 31),
+    officialStart: s(0, 0), officialEnd: s(7, 15),
+  })
+  assert.strictEqual(r.corregida, false)
+})
+
+test('en curso con una plantilla oficial de OTRO turno (arranque a 24 h): no se adopta', () => {
+  const r = resolveShiftWindow({
+    scheduledStart: s(0, 0), scheduledEnd: s(4, 31),
+    officialStart: new Date(Date.UTC(2026, 8, 29, 0, 0)), officialEnd: new Date(Date.UTC(2026, 8, 29, 7, 15)),
+    nowWall: s(4, 34),
+  })
+  assert.strictEqual(r.corregida, false)
+})

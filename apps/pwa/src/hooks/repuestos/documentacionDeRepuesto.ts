@@ -28,6 +28,8 @@ export interface DocumentacionDeRepuesto {
   tieneFicha: boolean
   /** Cuántos manuales/documentos vinculados. */
   manuales: number
+  /** URL → equipos de las capturas de manual que dicen a qué equipos corresponden. */
+  equiposDeFoto?: Record<string, string[]>
 }
 
 export const SIN_DOCUMENTACION: DocumentacionDeRepuesto = { fotos: [], tieneFicha: false, manuales: 0 }
@@ -47,13 +49,42 @@ function fichaConContenido(rep: Repuesto): boolean {
 }
 
 export function documentacionDe(rep: Repuesto): DocumentacionDeRepuesto {
+  const equiposDeFoto: Record<string, string[]> = {}
+  for (const i of rep.imagenesManual || []) {
+    if (i.url && Array.isArray(i.equipos) && i.equipos.length) equiposDeFoto[i.url] = i.equipos
+  }
   return {
     fotos: [...(rep.fotosReales || []), ...(rep.imagenesManual || []), ...(rep.gallery || [])]
       .map((i) => i.url)
       .filter(Boolean),
     tieneFicha: fichaConContenido(rep),
     manuales: (rep.vinculosManual || []).length,
+    ...(Object.keys(equiposDeFoto).length ? { equiposDeFoto } : {}),
   }
+}
+
+/**
+ * Las fotos que corresponden a lo que se está mirando.
+ *
+ * Una pieza estándar (p. ej. un tornillo Baader) se usa en la 142 y en la 200 y tiene una
+ * captura de cada manual: mirando la 142 debe verse el dibujo de la 142, no el de la 200
+ * (Danilo, 11-10-2026: «la segunda foto no tiene ningún repuesto»). Reglas:
+ * - sin equipo en contexto (búsqueda general): todas;
+ * - fotos sin `equipos` (reales, galería, capturas antiguas): siempre;
+ * - si el filtro dejara la fila sin fotos, se muestran todas (mejor una foto de otra máquina
+ *   que ninguna).
+ */
+export function fotosParaEquipos(
+  fotos: readonly string[],
+  equiposDeFoto: Readonly<Record<string, readonly string[]>> | undefined,
+  contexto: readonly string[] | null | undefined,
+): string[] {
+  if (!contexto?.length || !equiposDeFoto) return [...fotos]
+  const visibles = fotos.filter((u) => {
+    const eq = equiposDeFoto[u]
+    return !eq || eq.some((id) => contexto.includes(id))
+  })
+  return visibles.length ? visibles : [...fotos]
 }
 
 /**
@@ -67,9 +98,11 @@ export function fusionarDocumentacion(
   a: DocumentacionDeRepuesto,
   b: DocumentacionDeRepuesto,
 ): DocumentacionDeRepuesto {
+  const equiposDeFoto = a.equiposDeFoto || b.equiposDeFoto ? { ...b.equiposDeFoto, ...a.equiposDeFoto } : undefined
   return {
     fotos: a.fotos.length ? a.fotos : b.fotos,
     tieneFicha: a.tieneFicha || b.tieneFicha,
     manuales: Math.max(a.manuales, b.manuales),
+    ...(equiposDeFoto ? { equiposDeFoto } : {}),
   }
 }

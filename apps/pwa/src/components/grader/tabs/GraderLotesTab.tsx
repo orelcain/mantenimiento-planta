@@ -7,6 +7,7 @@ import { Layers } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import { cn } from '@/lib/utils'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 
 type TooltipPropsLike = ReturnType<typeof getTooltipProps>
 
@@ -64,6 +65,7 @@ export function GraderLotesTab({
   onApplyGateAction,
   onApplyGateSuggestion,
 }: Props) {
+  const { elegir } = useColoresGrafico()
   if (lotAnalysisView.length === 0) {
     return (
       <Card>
@@ -99,13 +101,13 @@ export function GraderLotesTab({
                   {
                     label: 'Peso Promedio (g)',
                     data: lotAnalysisView.map(l => l.avgWeightGrams),
-                    backgroundColor: 'rgba(59,130,246,0.7)',
+                    backgroundColor: elegir('rgba(59,130,246,0.7)', 'serie-1', 0.7),
                     borderRadius: 6,
                   },
                   {
                     label: 'Mediana (g)',
                     data: lotAnalysisView.map(l => l.medianWeightGrams),
-                    backgroundColor: 'rgba(16,185,129,0.5)',
+                    backgroundColor: elegir('rgba(16,185,129,0.5)', 'grafico-neutro-medio', 0.7),
                     borderRadius: 6,
                   },
                 ],
@@ -380,7 +382,7 @@ export function GraderLotesTab({
                   <div key={action.gateNumber} className="flex items-start justify-between gap-2">
                     <p>• {action.text}</p>
                     {action.canApply && action.isApplied && (
-                      <Badge variant="outline" className="text-caption border-emerald-500/[0.25] text-ink-ok">
+                      <Badge variant="outline" className="text-caption border-success/[0.25] text-ink-ok">
                         Aplicada
                       </Badge>
                     )}

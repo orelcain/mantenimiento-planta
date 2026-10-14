@@ -31,6 +31,8 @@ export interface RepuestoParticionable {
   cantidadPorMaquina?: number
   /** El código del fabricante: lo único que distingue una pieza del despiece de otra. */
   codigoFabricante?: string
+  /** El documento, solo para buscar también por los nombres comunes (el título los muestra primero). */
+  doc?: { nombresComunes?: readonly string[] | null }
 }
 
 /** Un nombre del despiece y cuántas veces aparece en el equipo. */
@@ -146,6 +148,6 @@ export function filtrarRepuestosDeEquipo<T extends RepuestoParticionable>(
   if (!q) return [...repuestos]
   const terminos = q.split(' ').filter(Boolean)
   return repuestos.filter((r) =>
-    haystackMatchesAll(normalizeForSearch(`${r.codigoSAP} ${r.codigoFabricante ?? ''} ${r.nombre} ${r.tipo ?? ''}`), terminos),
+    haystackMatchesAll(normalizeForSearch(`${r.codigoSAP} ${r.codigoFabricante ?? ''} ${r.nombre} ${(r.doc?.nombresComunes ?? []).join(' ')} ${r.tipo ?? ''}`), terminos),
   )
 }

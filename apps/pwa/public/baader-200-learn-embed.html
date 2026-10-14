@@ -546,8 +546,38 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function byId(id){ return document.getElementById(id); }
 function isMobile(){ return window.innerWidth <= 700; }
 
+// Solo hablamos con la página que nos contiene, y solo si es nuestro mismo
+// origen (la PWA). Nunca '*': antes cualquier ventana podía escuchar o mandar.
+var ORIGEN = window.location.origin;
 function send(type, payload){
-  try{ parent.postMessage(Object.assign({type:type},payload||{}),'*'); }catch(e){}
+  if(window.parent === window) return;
+  try{ parent.postMessage(Object.assign({type:type},payload||{}),ORIGEN); }catch(e){}
+}
+function delPadre(e){
+  return window.parent !== window && e.source === window.parent && e.origin === ORIGEN;
+}
+// Número finito o el valor por defecto: los atributos numéricos (anotaciones,
+// recorte, posición) se pintan sin comillas escapadas, así que no se confía en
+// que lo guardado en Firestore sea un número.
+function num(v, def){ var n = Number(v); return isFinite(n) ? n : (def === undefined ? 0 : def); }
+// Deja como número cada campo numérico presente (los ausentes siguen ausentes,
+// porque el render distingue «sin posición» de «posición 0»).
+function numCampos(o, campos){
+  if(!o || typeof o !== 'object') return;
+  campos.forEach(function(k){ if(o[k] != null) o[k] = num(o[k]); });
+}
+function limpiarSeccion(sec){
+  if(!sec || typeof sec !== 'object') return sec;
+  (Array.isArray(sec.images) ? sec.images : []).forEach(function(im){
+    if(!im || typeof im !== 'object') return;
+    numCampos(im.crop, ['x','y','w','h']);
+    numCampos(im.layout, ['x','y','w','h']);
+    (Array.isArray(im.annotations) ? im.annotations : []).forEach(function(a){
+      numCampos(a, ['x','y','x2','y2','w','h','r','strokeW','opacity']);
+      if(a && Array.isArray(a.points)) a.points.forEach(function(p){ numCampos(p, ['x','y']); });
+    });
+  });
+  return sec;
 }
 
 // ── Nav toggle (mobile) ──
@@ -596,12 +626,15 @@ byId('lock-btn').addEventListener('click', function(){
 
 // ── postMessage ──
 window.addEventListener('message', function(e){
+  if(!delPadre(e)) return;
   var d = e.data;
   if(!d || typeof d.type !== 'string') return;
   if(d.type === 'b200:init'){
-    state.sections = Array.isArray(d.sections) ? d.sections : [];
+    state.sections = Array.isArray(d.sections) ? d.sections.map(limpiarSeccion) : [];
     state.currentId = d.currentId || null;
-    state.isAdminPage = d.readonly === false;
+    // Edita solo la página admin que además declara el rol (canEdit). La
+    // pública manda readonly:true y nada más: sin candado ni edición.
+    state.isAdminPage = d.readonly === false && d.canEdit === true;
     state.readonly = true;
     state.unlocked = false;
     updateLockBtn();
@@ -609,6 +642,7 @@ window.addEventListener('message', function(e){
     if(state.currentId) showSection(state.currentId);
     else if(state.sections.length) showSection(state.sections[0].id);
   } else if(d.type === 'b200:unlock'){
+    if(!state.isAdminPage) return;
     state.unlocked = true;
     state.readonly = false;
     updateLockBtn();
@@ -1918,6 +1952,7 @@ byId('f-upload-btn').addEventListener('click', function(){
 });
 
 window.addEventListener('message', function(e){
+  if(!delPadre(e)) return;
   var d = e.data;
   if(!d) return;
   if(d.type === 'b200:upload-result' && d.url){

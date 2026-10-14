@@ -18,8 +18,10 @@ import {
   BarChart3, Plus, ChevronRight, CheckCircle2, CircleDot,
   AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
-  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal,
+  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal, Shapes,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { dibujoDe, maquinaDeDespiece, useFigurasDespiece } from './enlacesPieza'
 import { QRCodeSVG } from 'qrcode.react'
 import { escapeHtml } from '@/lib/escapeHtml'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
@@ -27,12 +29,14 @@ import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
-import { aplicarFiltroDeStock, contarParaFiltro } from '@/hooks/repuestos/filtrosDeStock'
+import { aplicarFiltroDeStock, contarParaFiltro, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 // `Tag` colisiona con el ícono homónimo de lucide ya usado acá.
 import { Tag as CatTag, type TagTone, ListGroup, ListCell, SwipeRow } from '@/components/piel'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
+import { indicePorSap, nombreVisiblePorSap } from '@/utils/repuestos/nombrePorSap'
 import { cn } from '@/lib/utils'
 import { CargaRapidaModal } from '@/components/repuestos/CargaRapidaModal'
 import type {
@@ -47,10 +51,11 @@ import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
 import { StockTablaPC } from './StockTablaPC'
 import { useEsPC } from '@/hooks/useEsPC'
-import { Pill, SegmentedControl } from '@/components/piel'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { Pill, SegmentedControl, Button as PielButton } from '@/components/piel'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
-type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
+type StockFilter = StockFilterKey
 
 const INPUT = 'w-full px-3 py-2 text-sm bg-muted border border-border rounded-card focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
 
@@ -184,10 +189,11 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
     { id: 'movimientos', label: 'Movimientos', icon: History },
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
   ]
+  const unicoEnCurso = enCurso.length === 1 ? enCurso[0] : undefined
   const subTabActual = SUB_TABS.find(t => t.id === subTab) ?? { id: 'stock' as BodegaTab, label: 'Stock', icon: Package }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3 p-3 sm:p-6 lg:max-w-[1680px]">
+    <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:p-6 lg:max-w-[1680px]">
       {/* PC: las cuatro vistas a la vista, con cuántos inventarios hay en curso. */}
       <div className="hidden max-w-2xl lg:block">
         <SegmentedControl<BodegaTab>
@@ -200,8 +206,10 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           }))} />
       </div>
       {/* Teléfono: la sub-vista se elige desde el título (patrón Salud / Fitness):
-          evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos. */}
-      <div className="lg:hidden">
+          evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos.
+          El inventario en curso va en la misma fila, a la derecha: un toque y sin gastar
+          una tarjeta de alto encima de la lista. */}
+      <div className="flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -228,10 +236,24 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           })}
         </DropdownMenuContent>
       </DropdownMenu>
+      {subTab === 'stock' && enCurso.length > 0 && (
+        <PielButton
+          variant="tinted"
+          size="md"
+          className="min-w-0 shrink gap-2 px-4 sm:hidden"
+          onClick={() => (unicoEnCurso ? verInventario(unicoEnCurso.id) : setSubTab('inventarios'))}
+          aria-label={unicoEnCurso ? `Inventario en curso: ${unicoEnCurso.nombre}. Abrir` : `${enCurso.length} inventarios en curso. Abrir`}
+        >
+          <span className="size-2 shrink-0 rounded-full bg-ink-warn" aria-hidden />
+          <span className="truncate">{enCurso.length === 1 ? 'Inventario en curso' : `${enCurso.length} en curso`}</span>
+          <ChevronRight className="shrink-0" />
+        </PielButton>
+      )}
       </div>
 
+      {/* Desde sm: el aviso completo, como siempre. Solo en el celular (<sm) lo reemplaza el botón del título. */}
       {subTab === 'stock' && enCurso.map(s => (
-        <div key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+        <div key={s.id} className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
           <ClipboardList className="size-5 shrink-0 text-ink-warn" />
           <div className="min-w-0 flex-1">
             <p className="text-subhead font-semibold text-foreground">{s.nombre}</p>
@@ -282,6 +304,10 @@ function exportCsv(items: BodegaMergedItem[]) {
 function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
   const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
   const [searchQuery, setSearchQuery] = useState('')
+  // Código de fabricante → figura del despiece (BAADER 142/200): acceso al dibujo desde la tabla y el drawer.
+  const figurasDespiece = useFigurasDespiece()
+  const dibujoDeItem = useCallback((i: BodegaMergedItem) =>
+    dibujoDe(figurasDespiece, i.codigoFabricante, maquinaDeDespiece(i.equipos[0]?.machineName)), [figurasDespiece])
   // Default 'configurados': tras unificar el maestro (Fase 6) "Con SAP" pasó de
   // 759 a 3.778 ítems (mayoría sin stock). El gestor de bodega quiere ver primero
   // su inventario real (los que tienen registro de bodega); el resto, a un clic.
@@ -312,7 +338,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     if (searchQuery.trim()) {
       const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
       result = result.filter(i => {
-        const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
+        const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${(i.nombresComunes ?? []).join(' ')} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
         return haystackMatchesAll(h, terms)
       })
     }
@@ -339,6 +365,18 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     })
     return result
   }, [items, stockFilter, searchQuery, sortField, sortDir])
+
+  // Desglose de las alertas para el encabezado del filtro «Alertas». La alerta solo vigila
+  // los ítems con mínimo definido; los en cero sin mínimo se aclaran al pie para que el
+  // «Sin stock» de otro chip no parezca contradecirla.
+  const desgloseAlertas = useMemo(() => {
+    const sinStock = stats.alertas.filter(a => a.stockActual === 0).length
+    return {
+      sinStock,
+      bajoMinimo: stats.alertas.length - sinStock,
+      enCeroSinMinimo: Math.max(0, stats.sinStock - sinStock),
+    }
+  }, [stats.alertas, stats.sinStock])
 
   // Las cuatro acciones de la vista (lote, carga rápida, configurar, CSV) viven
   // en un menú «⋯», no como botones de color junto al buscador (DESIGN.md §10).
@@ -369,7 +407,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
+      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} dibujo={dibujoDeItem(drawerItem)} />}
     </>
   )
 
@@ -379,11 +417,24 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       <>
         <StockTablaPC items={items} acciones={menuAcciones}
                       onAbrir={setDrawerItem} onMovimiento={setMovimientoItem}
-                      onFavorito={i => toggleWatch(i.rowKey)} />
+                      onFavorito={i => toggleWatch(i.rowKey)} dibujoDe={dibujoDeItem} />
         {modales}
       </>
     )
   }
+
+  // Con «Alertas» el encabezado dice qué hay dentro (sin stock / bajo mínimo); con una
+  // búsqueda encima, cuántas de las alertas calzan. Los demás filtros: orden · N de total.
+  const ordenadoPor = ({ nombre: 'nombre', sap: 'código SAP', stock: 'stock', valor: 'valor', equipos: 'equipos' } as Record<SortField, string>)[sortField]
+  const enAlertas = stockFilter === 'alertas'
+  const tituloLista = enAlertas
+    ? (searchQuery.trim()
+        ? `Alertas · ${filtered.length} de ${stats.alertas.length}`
+        : ['Alertas', desgloseAlertas.sinStock > 0 && `${desgloseAlertas.sinStock} sin stock`, desgloseAlertas.bajoMinimo > 0 && `${desgloseAlertas.bajoMinimo} bajo mínimo`].filter(Boolean).join(' · '))
+    : `Por ${ordenadoPor} · ${filtered.length} de ${items.length}`
+  const pieLista = enAlertas && !searchQuery.trim() && desgloseAlertas.enCeroSinMinimo > 0
+    ? `${desgloseAlertas.enCeroSinMinimo} más en cero sin mínimo: no alertan porque no tienen mínimo.`
+    : undefined
 
   return (
     <>
@@ -410,15 +461,19 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {/* ── Filtros como chips (Fotos / App Store) ──
           El elegido va en tinte de marca; el estado es un punto de 8 px, nunca un
           relleno verde/ámbar/rojo. Cuentan con el MISMO predicado que filtra. */}
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
         {([
+          // Primero: es lo que hay que mirar. Filtra con el MISMO predicado que la cifra.
+          ...(stats.alertas.length > 0 || stockFilter === 'alertas'
+            ? [{ key: 'alertas' as StockFilter, label: 'Alertas', dot: 'bg-ink-crit', soloMovil: true }]
+            : []),
           { key: 'configurados', label: 'Configurados' },
           { key: 'todos', label: 'Con SAP' },
-          { key: 'bajo', label: 'Bajo stock', dot: 'bg-amber-500' },
-          { key: 'sin', label: 'Sin stock', dot: 'bg-red-500' },
+          { key: 'bajo', label: 'Bajo stock', dot: 'bg-fill-warning' },
+          { key: 'sin', label: 'Sin stock', dot: 'bg-fill-critical' },
           { key: 'sinConfig', label: 'Sin configurar' },
           { key: 'favoritos', label: 'Favoritos', icon: Star },
-        ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star }[]).map(f => {
+        ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star; soloMovil?: boolean }[]).map(f => {
           const on = stockFilter === f.key
           const Icon = f.icon
           return (
@@ -429,6 +484,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
               onClick={e => { setStockFilter(f.key); e.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }) }}
               className={cn(
                 'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-subhead font-medium transition-colors',
+                f.soloMovil && 'sm:hidden',
                 on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]',
               )}
             >
@@ -443,6 +499,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         })}
       </div>
 
+      {/* Desde sm: la tarjeta de alertas de siempre. En el celular (<sm) la reemplaza el chip «Alertas». */}
+      <div className="hidden sm:block">
       {/* ── Alertas: una celda con tile rojo y badge numérico (patrón Ajustes ›
           Actualización de software). Se despliega en el mismo grupo. ── */}
       {stats.alertas.length > 0 && (stockFilter === 'todos' || stockFilter === 'configurados') && !searchQuery && (() => {
@@ -459,19 +517,22 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         return (
           <ListGroup>
             <ListCell
-              leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-red-500 text-white"><AlertTriangle className="size-5" /></span>}
+              leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-fill-critical text-white"><AlertTriangle className="size-5" /></span>}
               title={<span className="font-normal">Alertas de stock</span>}
               subtitle={partes}
-              trailing={<span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-red-500 px-2 text-footnote font-semibold tabular-nums text-white">{stats.alertas.length}</span>}
+              trailing={<span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-fill-critical px-2 text-footnote font-semibold tabular-nums text-white">{stats.alertas.length}</span>}
               chevron={false}
               onClick={() => setAlertasAbiertas(v => !v)}
               aria-expanded={alertasAbiertas}
             />
-            {alertasAbiertas && stats.alertas.slice(0, 10).map(item => (
+            {alertasAbiertas && stats.alertas.slice(0, 10).map(item => {
+              const nv = nombreVisible(item)
+              return (
               <ListCell
                 key={item.codigoSAP}
                 variant="child"
-                title={<span className="font-normal">{formatNombreSAP(item.textoBreve).nombre || item.codigoSAP}</span>}
+                title={<span className="font-normal">{nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : item.codigoSAP}</span>}
+                detail={nv.oficial}
                 subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(' · ')}
                 trailing={
                   <span className="flex flex-col items-end">
@@ -481,24 +542,27 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
                 }
                 onClick={() => setDrawerItem(item)}
               />
-            ))}
+              )
+            })}
             {alertasAbiertas && stats.alertas.length > 10 && (
               <ListCell variant="child" title={<span className="font-medium text-brand-ink">Ver todas las alertas</span>} onClick={() => setStockFilter('bajo')} />
             )}
           </ListGroup>
         )
       })()}
+      </div>
 
       {/* ── Lista agrupada: un solo scroll de página (antes 60 vh anidados) ── */}
       {filtered.length === 0 ? (
         <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
       ) : (
         <ListGroup
-          title={`Por ${({ nombre: 'nombre', sap: 'código SAP', stock: 'stock', valor: 'valor', equipos: 'equipos' } as Record<SortField, string>)[sortField]} · ${filtered.length} de ${items.length}`}
+          title={tituloLista}
+          footer={pieLista}
           action={
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3 text-footnote font-medium text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+                <button type="button" className="relative inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3 after:absolute after:inset-x-0 after:-inset-y-[6px] after:content-[''] sm:after:content-none text-footnote font-medium text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
                   <ArrowUpDown className="size-3.5" />Ordenar
                 </button>
               </DropdownMenuTrigger>
@@ -615,7 +679,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
   if (resumenFinal) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-4">
-        <div className="h-16 w-16 rounded-panel bg-emerald-500/[0.15] flex items-center justify-center">
+        <div className="h-16 w-16 rounded-panel bg-ink-ok/[0.15] flex items-center justify-center">
           <CheckCircle2 className="h-8 w-8 text-ink-ok" />
         </div>
         <h3 className="text-lg font-bold text-foreground">Inventario finalizado</h3>
@@ -708,7 +772,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           </div>
         </div>
 
-        <ConteoList conteos={conteos} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={handleConteo} />
+        <ConteoList conteos={conteos} catalogo={bodega.items} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={handleConteo} />
       </div>
     )
   }
@@ -748,8 +812,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           {sesiones.map(s => (
             <button key={s.id} type="button" onClick={() => handleOpenSesion(s)}
               className="w-full min-h-[44px] flex items-center gap-4 p-4 bg-card border border-border rounded-card hover:bg-muted transition-colors text-left">
-              <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-emerald-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
-                {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-ink-ok" /> : <ClipboardList className="h-5 w-5 text-ink-warn" />}
+              <div className={`h-10 w-10 rounded-card flex items-center justify-center shrink-0 ${s.estado === 'finalizado' ? 'bg-ink-ok/[0.15]' : 'bg-fill-warning/[0.15] pizarra:bg-muted'}`}>
+                {s.estado === 'finalizado' ? <CheckCircle2 className="h-5 w-5 text-ink-ok" /> : <ClipboardList className="h-5 w-5 text-ink-warn pizarra:text-muted-foreground" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">{s.nombre}</p>
@@ -763,8 +827,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
                   <span>{s.createdAt.toLocaleDateString('es-CL')}</span>
                 </div>
               </div>
-              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-amber-500/[0.15] text-ink-warn font-semibold shrink-0">En curso</span>}
-              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-emerald-500/[0.15] text-ink-ok font-semibold shrink-0">Finalizado</span>}
+              {s.estado === 'en_curso' && <span className="text-caption px-2 py-0.5 rounded-full bg-fill-warning/[0.15] text-ink-warn font-semibold shrink-0">En curso</span>}
+              {s.estado === 'finalizado' && <span className="text-caption px-2 py-0.5 rounded-full bg-ink-ok/[0.15] text-ink-ok font-semibold shrink-0">Finalizado</span>}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
           ))}
@@ -776,8 +840,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
 
 // ── Lista de conteos (con escaneo rápido) ──
 
-function ConteoList({ conteos, isFinalizado, onConteo }: {
-  conteos: InventarioConteo[]; isFinalizado: boolean
+function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
+  conteos: InventarioConteo[]; catalogo: BodegaMergedItem[]; isFinalizado: boolean
   onConteo: (sap: string, stockFisico: number, obs?: string) => Promise<void>
 }) {
   const [tab, setTab] = useState<'pendientes' | 'contados' | 'diferencias'>('pendientes')
@@ -786,6 +850,9 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
   const [editObs, setEditObs] = useState('')
   const [conteoSearch, setConteoSearch] = useState('')
   const [quickScan, setQuickScan] = useState(false)
+  // El conteo persiste solo `textoBreve`: el nombre común se resuelve por SAP al mostrar.
+  const indiceNombres = useMemo(() => indicePorSap(catalogo), [catalogo])
+  const nombreDe = (c: InventarioConteo) => nombreVisiblePorSap(indiceNombres, c.codigoSAP, c.textoBreve)
 
   const pendientes = conteos.filter(c => c.stockFisico === null)
   const contados = conteos.filter(c => c.stockFisico !== null)
@@ -796,10 +863,11 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
     if (!conteoSearch.trim()) return baseList
     const terms = normalizeForSearch(conteoSearch).split(/\s+/).filter(Boolean)
     return baseList.filter(c => {
-      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve}`)
+      const cat = indiceNombres.get(c.codigoSAP.trim())
+      const h = normalizeForSearch(`${c.codigoSAP} ${c.textoBreve} ${(cat?.nombresComunes ?? []).join(' ')}`)
       return haystackMatchesAll(h, terms)
     })
-  }, [baseList, conteoSearch])
+  }, [baseList, conteoSearch, indiceNombres])
 
   const handleSave = async (sap: string) => {
     await onConteo(sap, editValue, editObs)
@@ -854,7 +922,8 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
             <div key={c.codigoSAP} className="px-4 py-2.5 hover:bg-muted transition-colors">
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{c.textoBreve}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{nombreDe(c).titulo}</p>
+                  {nombreDe(c).oficial && <p className="text-footnote text-muted-foreground truncate">{nombreDe(c).oficial}</p>}
                   <span className="text-caption font-mono text-primary">{c.codigoSAP}</span>
                 </div>
                 <div className="text-center shrink-0 w-16">
@@ -961,7 +1030,7 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
   return (
     <div className="space-y-3">
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
         {([
           { f: 'todos' as MovFilter, label: 'Total', count: movimientos.length },
           { f: 'entrada' as MovFilter, label: 'Entradas', count: entradas },
@@ -1018,8 +1087,8 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           <div className="divide-y divide-border/50 max-h-[55vh] overflow-y-auto">
             {filtered.map(m => {
               const tipoConfig = {
-                entrada: { label: 'Entrada', color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]', icon: ArrowDownCircle },
-                salida: { label: 'Salida', color: 'text-ink-crit', bg: 'bg-red-500/[0.15]', icon: ArrowUpCircle },
+                entrada: { label: 'Entrada', color: 'text-ink-ok', bg: 'bg-ink-ok/[0.15]', icon: ArrowDownCircle },
+                salida: { label: 'Salida', color: 'text-ink-crit', bg: 'bg-fill-critical/[0.15]', icon: ArrowUpCircle },
                 ajuste: { label: 'Ajuste', color: 'text-brand-ink', bg: 'bg-primary/[0.15]', icon: Settings2 },
               }[m.tipo]
               const TIcon = tipoConfig.icon
@@ -1161,9 +1230,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-3">Salud del inventario</p>
           <div className="flex items-center gap-3 mb-3">
             {[
-              { icon: ShieldCheck, label: 'OK', count: okCount, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]' },
-              { icon: ShieldAlert, label: 'Bajo', count: stats.bajoStock, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15]' },
-              { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-ink-crit', bg: 'bg-red-500/[0.15]' },
+              { icon: ShieldCheck, label: 'OK', count: okCount, color: 'text-ink-ok', bg: 'bg-ink-ok/[0.15]' },
+              { icon: ShieldAlert, label: 'Bajo', count: stats.bajoStock, color: 'text-ink-warn', bg: 'bg-fill-warning/[0.15]' },
+              { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-ink-crit', bg: 'bg-fill-critical/[0.15]' },
             ].map(s => (
               <div key={s.label} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-card border border-border bg-muted">
                 <s.icon className={`h-5 w-5 ${s.color}`} /><span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span><span className="text-caption text-muted-foreground">{s.label}</span>
@@ -1211,9 +1280,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         <div className="p-4">
           <div className="grid grid-cols-3 gap-3 mb-3">
             {[
-              { label: 'A — Crítico', data: abcData.A, color: 'text-ink-crit', bg: 'bg-red-500/[0.15]', desc: '80% del valor' },
-              { label: 'B — Importante', data: abcData.B, color: 'text-ink-warn', bg: 'bg-amber-500/[0.15]', desc: '15% del valor' },
-              { label: 'C — Estándar', data: abcData.C, color: 'text-ink-ok', bg: 'bg-emerald-500/[0.15]', desc: '5% del valor' },
+              { label: 'A — Crítico', data: abcData.A, color: 'text-cat-1-ink', bg: 'bg-cat-1-tint/[0.15]', desc: '80% del valor' },
+              { label: 'B — Importante', data: abcData.B, color: 'text-cat-4-ink', bg: 'bg-cat-4-tint/[0.15]', desc: '15% del valor' },
+              { label: 'C — Estándar', data: abcData.C, color: 'text-cat-5-ink', bg: 'bg-cat-5-tint/[0.15]', desc: '5% del valor' },
             ].map(cat => (
               <div key={cat.label} className={`rounded-card border border-border p-3 ${cat.bg}`}>
                 <p className={`text-xs font-semibold ${cat.color}`}>{cat.label}</p>
@@ -1228,9 +1297,9 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           {/* Barra proporcional */}
           {abcData.totalValor > 0 && (
             <div className="h-4 rounded-full overflow-hidden flex bg-muted">
-              {abcData.A.length > 0 && <div className="bg-red-500/[0.15] h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
-              {abcData.B.length > 0 && <div className="bg-amber-500/[0.15] h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
-              {abcData.C.length > 0 && <div className="bg-emerald-500/[0.15] h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
+              {abcData.A.length > 0 && <div className="bg-cat-1-tint h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
+              {abcData.B.length > 0 && <div className="bg-cat-4-tint h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
+              {abcData.C.length > 0 && <div className="bg-cat-5-tint h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
             </div>
           )}
         </div>
@@ -1250,11 +1319,11 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
           ) : (
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
-                <div className="flex-1 rounded-card border border-border bg-amber-500/[0.15] p-3 text-center">
+                <div className="flex-1 rounded-card border border-border bg-fill-warning/[0.15] p-3 text-center">
                   <p className="text-xl font-bold text-ink-warn tabular-nums">{deadStock.noMov90.length}</p>
                   <p className="text-caption text-muted-foreground">+90 días</p>
                 </div>
-                <div className="flex-1 rounded-card border border-border bg-red-500/[0.15] p-3 text-center">
+                <div className="flex-1 rounded-card border border-border bg-fill-critical/[0.15] p-3 text-center">
                   <p className="text-xl font-bold text-ink-crit tabular-nums">{deadStock.noMov180.length}</p>
                   <p className="text-caption text-muted-foreground">+180 días</p>
                 </div>
@@ -1312,14 +1381,14 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Alertas */}
         <div className="bg-card border border-border rounded-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-red-500/[0.15]">
+          <div className="px-4 py-3 border-b border-border bg-fill-critical/[0.15]">
             <p className="text-xs font-semibold text-ink-crit tracking-wide flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Alertas ({stats.alertas.length})</p>
           </div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.alertas.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin alertas</p>
             : stats.alertas.map(item => (
               <div key={item.codigoSAP} className="px-4 py-2.5 flex items-center gap-3">
-                <div className={`h-8 w-8 rounded-card flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-red-500/[0.15]' : 'bg-amber-500/[0.15]'}`}>
+                <div className={`h-8 w-8 rounded-card flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-fill-critical/[0.15]' : 'bg-fill-warning/[0.15]'}`}>
                   {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-ink-crit" /> : <TrendingDown className="h-4 w-4 text-ink-warn" />}
                 </div>
                 <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-caption font-mono text-primary">{item.codigoSAP}</p></div>
@@ -1580,7 +1649,10 @@ function EmptyState({ message }: { message: string }) {
   return (<div className="text-center py-12 text-muted-foreground"><Package className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm font-medium">{message}</p></div>)
 }
 
-function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data: number[]; width?: number; height?: number; color?: string }) {
+/** `token`: color de la paleta Pizarra (estado: falla / aviso; normal = serie 1). Sin Pizarra manda `color`. */
+function Sparkline({ data, width = 80, height = 24, color = '#3b82f6', token }: { data: number[]; width?: number; height?: number; color?: string; token?: string }) {
+  const { elegir } = useColoresGrafico()
+  const trazo = token ? elegir(color, token) : color
   if (data.length < 2) return <span className="text-caption text-muted-foreground">—</span>
   const min = Math.min(...data)
   const max = Math.max(...data)
@@ -1594,8 +1666,8 @@ function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data:
   const last = coords[coords.length - 1] ?? { x: 0, y: 0 }
   return (
     <svg width={width} height={height} className="shrink-0">
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={last.x} cy={last.y} r="2" fill={color} />
+      <polyline points={points} fill="none" stroke={trazo} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last.x} cy={last.y} r="2" fill={trazo} />
     </svg>
   )
 }
@@ -1610,7 +1682,7 @@ function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; 
   return (
     <div className="relative h-1.5 w-full rounded-full bg-muted overflow-hidden">
       <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-      {minimo > 0 && <div className="absolute inset-y-0 w-px bg-amber-500/[0.15]" style={{ left: `${minimoPct}%` }} />}
+      {minimo > 0 && <div className="absolute inset-y-0 w-px bg-fill-warning/[0.15]" style={{ left: `${minimoPct}%` }} />}
     </div>
   )
 }
@@ -1628,7 +1700,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
   // Foto propia de bodega o, en su defecto, del catálogo (fotosReales/manual).
   const foto = item.fotos?.[0] || item.fotosCatalogo?.[0]
   // Presentación: formato oración con siglas protegidas; el dato SAP no se toca.
-  const { nombre, etiquetas } = formatNombreSAP(item.textoBreve)
+  const nv = nombreVisible(item)
 
   // DESIGN.md §10: la cifra va en tinta de etiqueta; el ESTADO es el rótulo de
   // 13 px debajo. Nada de canto de color, fondo teñido ni barra en la lista.
@@ -1669,11 +1741,12 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
         }
         title={
           <span className="font-normal">
-            {etiquetas.map(e => <CatTag key={e} tone="neutral" className="mr-1.5 align-[2px]">{e}</CatTag>)}
+            {nv.etiquetas.map(e => <CatTag key={e} tone="neutral" className="mr-1.5 align-[2px]">{e}</CatTag>)}
             {item.isWatched && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
-            {nombre || <span className="italic text-muted-foreground">Sin nombre · SAP {item.codigoSAP}</span>}
+            {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre · SAP {item.codigoSAP}</span>}
           </span>
         }
+        detail={nv.oficial}
         subtitle={meta}
         trailing={
           <span className="flex flex-col items-end">
@@ -1693,7 +1766,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
 //  DRAWER LATERAL (vista rápida por ítem)
 // ══════════════════════════════════════════════
 
-function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData, onViewInEquipo, onSearchSimilar }: {
+function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData, onViewInEquipo, onSearchSimilar, dibujo }: {
   item: BodegaMergedItem; loadMovimientos: (id: string, max?: number) => Promise<MovimientoBodega[]>
   onClose: () => void; onEdit: () => void; onMovimiento: () => void
   addPhoto?: (sap: string, file: File) => Promise<string>
@@ -1701,7 +1774,10 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
   calcReorderData?: (item: BodegaMergedItem, movs: MovimientoBodega[]) => { consumoDiario: number; puntoReorden: number; diasRestantes: number; necesitaPedir: boolean } | null
   onViewInEquipo?: (machineId: string) => void
   onSearchSimilar?: (query: string) => void
+  /** Figura del despiece donde va la pieza; null = no está en un despiece. */
+  dibujo?: { ruta: string; fig: string } | null
 }) {
+  const navigate = useNavigate()
   const [movs, setMovs] = useState<MovimientoBodega[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -1777,13 +1853,13 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                 <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-mono">{item.codigoSAP}</span>
                 {item.codigoFabricante && <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-cat-6-tint/[0.15] text-cat-6-ink font-mono">{item.codigoFabricante}</span>}
                 {item.tipo && <CatTag tone={tipoTag(item.tipo)} className="uppercase">{item.tipo}</CatTag>}
-                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-red-500/[0.15] text-ink-crit' : item.categoria === 'B' ? 'bg-amber-500/[0.15] text-ink-warn' : 'bg-emerald-500/[0.15] text-ink-ok'}`}>ABC: {item.categoria}</span>}
+                {item.categoria && <span className={`text-caption px-1.5 py-0.5 rounded-ctl font-bold ${item.categoria === 'A' ? 'bg-cat-1-tint/[0.15] text-cat-1-ink' : item.categoria === 'B' ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-cat-5-tint/[0.15] text-cat-5-ink'}`}>ABC: {item.categoria}</span>}
               </div>
             </div>
             <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/[0.15] border border-transparent rounded-card hover:bg-emerald-500/[0.15] text-ink-ok">
+            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-ink-ok/[0.15] border border-transparent rounded-card hover:bg-ink-ok/[0.15] text-ink-ok">
               <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
             </button>
             <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
@@ -1795,6 +1871,12 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               </button>
             )}
           </div>
+          {dibujo && (
+            <button onClick={() => { onClose(); navigate(dibujo.ruta) }}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-card border border-transparent bg-primary/[0.15] px-3 py-2 text-xs font-medium text-brand-ink hover:bg-primary/[0.15]">
+              <Shapes className="h-3.5 w-3.5" /> Ver en el dibujo · fig. {dibujo.fig}
+            </button>
+          )}
         </div>
 
         <div className="px-5 py-4 space-y-4">
@@ -1838,17 +1920,17 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <div className="rounded-card border border-border p-3">
               <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1"><Activity className="h-3 w-3" /> Tendencia de stock</p>
               <div className="flex items-center justify-center">
-                <Sparkline data={sparkData} width={280} height={40} color={isSin ? '#ef4444' : isBajo ? '#f59e0b' : '#3b82f6'} />
+                <Sparkline data={sparkData} width={280} height={40} color={isSin ? '#ef4444' : isBajo ? '#f59e0b' : '#3b82f6'} token={isSin ? 'grafico-falla' : isBajo ? 'grafico-aviso' : 'serie-1'} />
               </div>
             </div>
           )}
 
           {/* Punto de reorden */}
           {reorder && (
-            <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-transparent bg-red-500/[0.15]' : 'border-border'}`}>
+            <div className={`rounded-card border p-3 ${reorder.necesitaPedir ? 'border-transparent bg-fill-critical/[0.15]' : 'border-border'}`}>
               <p className="text-caption text-muted-foreground tracking-wide mb-2 flex items-center gap-1">
                 <ShoppingCart className="h-3 w-3" /> Reposición
-                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-red-500/[0.15] text-ink-crit font-bold">Pedir ahora</span>}
+                {reorder.necesitaPedir && <span className="ml-auto text-caption px-1.5 py-0.5 rounded-ctl bg-fill-critical/[0.15] text-ink-crit font-bold">Pedir ahora</span>}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
@@ -2137,8 +2219,8 @@ function MovimientoModal({ item, onSave, onClose }: {
   const handleTipoChange = (t: typeof tipo) => { setTipo(t); setMotivoKey('') }
 
   const OPTS = [
-    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-emerald-500/[0.15] border-transparent' },
-    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-red-500/[0.15] border-transparent' },
+    { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-ink-ok bg-ink-ok/[0.15] border-transparent' },
+    { v: 'salida' as const, l: 'Salida', icon: ArrowUpCircle, c: 'text-ink-crit bg-fill-critical/[0.15] border-transparent' },
     { v: 'ajuste' as const, l: 'Ajuste', icon: Settings2, c: 'text-brand-ink bg-primary/[0.15] border-transparent' },
   ]
 
@@ -2202,8 +2284,8 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
         {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
           : movs.length === 0 ? <p className="text-center text-sm text-muted-foreground py-8">Sin movimientos</p>
           : <div className="space-y-2">{movs.map(m => {
-            const cfg = { entrada: { l: 'Entrada', c: 'text-ink-ok bg-emerald-500/[0.15]', i: ArrowDownCircle },
-              salida: { l: 'Salida', c: 'text-ink-crit bg-red-500/[0.15]', i: ArrowUpCircle },
+            const cfg = { entrada: { l: 'Entrada', c: 'text-ink-ok bg-ink-ok/[0.15]', i: ArrowDownCircle },
+              salida: { l: 'Salida', c: 'text-ink-crit bg-fill-critical/[0.15]', i: ArrowUpCircle },
               ajuste: { l: 'Ajuste', c: 'text-brand-ink bg-primary/[0.15]', i: Settings2 } }[m.tipo]
             const I = cfg.i
             return (
@@ -2305,11 +2387,11 @@ function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }
             {/* Tipo */}
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => { setTipo('entrada'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-ink-ok bg-emerald-500/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-ink-ok bg-ink-ok/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowDownCircle className="h-5 w-5" /> Entrada
               </button>
               <button type="button" onClick={() => { setTipo('salida'); setMotivoKey('') }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-ink-crit bg-red-500/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
+                className={`flex items-center justify-center gap-2 py-3 rounded-card border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-ink-crit bg-fill-critical/[0.15] border-transparent' : 'border-border bg-muted text-muted-foreground'}`}>
                 <ArrowUpCircle className="h-5 w-5" /> Salida
               </button>
             </div>

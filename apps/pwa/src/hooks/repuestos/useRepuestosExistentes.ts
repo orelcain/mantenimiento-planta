@@ -20,6 +20,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { getGlobalRepuestosCache } from '@/hooks/repuestos/useGlobalSearch'
 import { logger } from '@/lib/logger'
+import { normCodigo } from '@/utils/repuestos/normCodigo'
 
 export interface RepuestoExistente {
   id: string
@@ -27,8 +28,8 @@ export interface RepuestoExistente {
   textoBreve: string
 }
 
-/** Clave de match: sin separadores ni acentos, en mayúsculas. */
-export const normCodigo = (s: string) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+// Se re-exporta: vivía aquí y varias pantallas lo importan de este módulo.
+export { normCodigo }
 
 // Caché de módulo para la vía `in` (código normalizado → existente | null).
 const _porCodigo = new Map<string, RepuestoExistente | null>()

@@ -262,7 +262,7 @@ function PauseAnnotationPanel({
             <button
               onClick={() => void handleSave(item)}
               disabled={!selections[key] || isSaving}
-              className="shrink-0 px-2 h-6 rounded-ctl text-caption bg-amber-500/[0.15] text-ink-warn disabled:opacity-30 hover:brightness-95 transition-colors"
+              className="shrink-0 px-2 h-6 rounded-ctl text-caption bg-warning/[0.15] text-ink-warn disabled:opacity-30 hover:brightness-95 transition-colors"
             >
               {isSaving ? '…' : 'OK'}
             </button>
@@ -577,7 +577,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                   </span>
                   <div className="flex-1 h-3 bg-muted rounded-ctl overflow-hidden">
                     <div
-                      className="h-full rounded-ctl bg-amber-500/[0.15] transition-all duration-300"
+                      className="h-full rounded-ctl bg-warning/[0.15] transition-all duration-300"
                       style={{ width: `${d.pct}%` }}
                       title={fmtSec(d.sec)}
                     />
@@ -622,7 +622,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                 </p>
                 <div className="h-1 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-amber-500/[0.15] transition-all duration-150"
+                    className="h-full bg-warning/[0.15] transition-all duration-150"
                     style={{ width: `${(loadProgress.current / loadProgress.total) * 100}%` }}
                   />
                 </div>

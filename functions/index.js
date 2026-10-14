@@ -8,7 +8,7 @@ const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestor
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 const { getStorage } = require('firebase-admin/storage')
-const { randomUUID, createHmac, timingSafeEqual } = require('crypto')
+const { randomUUID, createHmac, createHash, timingSafeEqual } = require('crypto')
 const { getAuth } = require('firebase-admin/auth')
 
 initializeApp()
@@ -50,6 +50,73 @@ function requireAdminKey(req, res) {
     return false
   }
   return true
+}
+
+// ── Guardia de los proxies de IA pagados (Groq, Gemini, DeepSeek, Whisper, TTS) ──
+// Antes bastaba `request.auth`, y cualquier cuenta (incluido un auto-registro por
+// la API REST de Auth) gastaba crédito sin tope. Ahora: solo personal de
+// mantención activo (o un teléfono con pase, si la función lo permite) y un
+// tope diario por usuario contado en Firestore (1 lectura + 1 escritura por
+// llamada). La colección `aiCuotaDiaria` no tiene regla → el cliente no la ve.
+const AI_LIMITE_DIARIO = { admin: 2000, supervisor: 600, tecnico: 600, usuario: 60, pase: 120 }
+
+// permitirUsuario: el rol básico 'usuario' solo dicta por voz al reportar (Whisper).
+async function _assertAiCaller(request, servicio, { permitirPase = false, permitirUsuario = false } = {}) {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Se requiere autenticación para usar la IA')
+
+  let perfil
+  if (request.auth.token?.pase_bitacora === true) {
+    if (!permitirPase) throw new HttpsError('permission-denied', 'Función no disponible con pase de bitácora')
+    // El claim sobrevive hasta 1 h tras revocar el teléfono: mirar el dispositivo.
+    const disp = await db.collection('bitacoraDispositivos').doc(uid).get()
+    if (!disp.exists || disp.data()?.activo !== true) {
+      throw new HttpsError('permission-denied', 'Este teléfono ya no tiene pase activo')
+    }
+    perfil = 'pase'
+  } else {
+    const snap = await db.collection('users').doc(uid).get()
+    const u = snap.exists ? snap.data() : null
+    const rolesPermitidos = permitirUsuario ? ['admin', 'supervisor', 'tecnico', 'usuario'] : ['admin', 'supervisor', 'tecnico']
+    if (!u || u.activo === false || !rolesPermitidos.includes(u.rol)) {
+      throw new HttpsError('permission-denied', 'La IA es solo para personal de mantención')
+    }
+    perfil = u.rol
+  }
+
+  const limite = AI_LIMITE_DIARIO[perfil]
+  const dia = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
+  const ref = db.collection('aiCuotaDiaria').doc(`${uid}_${dia}`)
+  await db.runTransaction(async (tx) => {
+    const s = await tx.get(ref)
+    const total = s.exists ? (s.data().total || 0) : 0
+    if (total >= limite) {
+      throw new HttpsError('resource-exhausted', `Llegaste al límite diario de IA (${limite} consultas). Se renueva a medianoche.`)
+    }
+    tx.set(ref, {
+      uid,
+      dia,
+      perfil,
+      total: total + 1,
+      por: { [servicio]: FieldValue.increment(1) },
+      actualizado: FieldValue.serverTimestamp(),
+    }, { merge: true })
+  })
+}
+
+// Freno anti fuerza bruta para endpoints sin login (registro con invitación):
+// N intentos por hora por IP. La IP se guarda como hash, no en claro.
+async function _frenoPorIp(request, accion, maxPorHora) {
+  const ip = String(request.rawRequest?.ip || request.rawRequest?.headers?.['x-forwarded-for'] || 'sin-ip').split(',')[0].trim()
+  const hora = new Date().toISOString().slice(0, 13)
+  const ipHash = createHash('sha256').update(ip).digest('hex').slice(0, 24)
+  const ref = db.collection('frenoIp').doc(`${accion}_${ipHash}_${hora}`)
+  await db.runTransaction(async (tx) => {
+    const s = await tx.get(ref)
+    const n = s.exists ? (s.data().n || 0) : 0
+    if (n >= maxPorHora) throw new HttpsError('resource-exhausted', 'Demasiados intentos. Prueba de nuevo en una hora.')
+    tx.set(ref, { n: n + 1, accion, hora }, { merge: true })
+  })
 }
 
 // RTDB se inicializa lazy (getDatabase() requiere FIREBASE_CONFIG, solo disponible en Cloud Functions runtime)
@@ -351,10 +418,8 @@ async function sendNotification(tokens, title, body, data = {}) {
 }
 
 exports.sendGanttAlert = onCall({ region: 'us-central1' }, async (request) => {
-  const callerId = request.auth?.uid
-  if (!callerId) {
-    throw new Error('User not authenticated')
-  }
+  // Antes bastaba una sesión cualquiera para mandar push a todos los admins/supervisores.
+  const { uid: callerId } = await _assertTechnicianCaller(request)
 
   const {
     taskId,
@@ -883,16 +948,18 @@ exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{s
   if (!sol) return
 
   // El mensaje vive en solicitudRepuesto.js (probado): stock al pedir + enlace al panel.
-  const { mensajeTelegram, esc, RUTA_SOLICITUDES } = require('./solicitudRepuesto')
+  const { mensajeTelegram, mensajeAltaTelegram, esAltaCodigo, esc, RUTA_SOLICITUDES } = require('./solicitudRepuesto')
   const nombre = esc(sol.textoBreve) || '(sin nombre)'
   const cantidad = sol.cantidad ?? 1
   const solicitante = esc(sol.solicitadoPorNombre) || 'Desconocido'
+  // Alta de código (ficha A3C): MISMA función y mismo canal, pero sin SAP ni stock que leer.
+  const esAlta = esAltaCodigo(sol)
 
   // Stock al momento de pedir: UNA lectura por solicitud (hubo 1 en 3,5 meses → costo nulo).
-  // Si falla, el aviso sale igual y dice que no hay registro.
+  // Si falla, el aviso sale igual y dice que no hay registro. Una alta no tiene SAP: no lee bodega.
   let bodega = null
   try {
-    const sapLimpio = String(sol.codigoSAP || '').trim()
+    const sapLimpio = esAlta ? '' : String(sol.codigoSAP || '').trim()
     if (sapLimpio) {
       const b = await db.collection('bodega').doc(sapLimpio).get()
       bodega = b.exists ? b.data() : null
@@ -902,15 +969,15 @@ exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{s
   }
 
   // Telegram → topic de Repuestos (cae a General si no está configurado)
-  await sendTelegramMessage(mensajeTelegram(sol, bodega), undefined, { topicId: getTopicId('repuestos') })
+  await sendTelegramMessage(esAlta ? mensajeAltaTelegram(sol) : mensajeTelegram(sol, bodega), undefined, { topicId: getTopicId('repuestos') })
 
   // Push FCM a supervisores/admins
   try {
     const supervisors = await getSupervisorsAndAdmins()
     const tokens = dedupeTokens(await getTokensForUsers(supervisors))
     if (tokens.length > 0) {
-      await sendNotification(tokens, '📦 Nueva solicitud de repuesto', `${nombre} ×${cantidad} — ${solicitante}`, {
-        type: 'SOLICITUD_REPUESTO_CREATED',
+      await sendNotification(tokens, esAlta ? '🆕 Solicitud de alta de código' : '📦 Nueva solicitud de repuesto', `${nombre} ×${cantidad} — ${solicitante}`, {
+        type: esAlta ? 'ALTA_CODIGO_CREATED' : 'SOLICITUD_REPUESTO_CREATED',
         solicitudId,
         codigoSAP: sol.codigoSAP || '',
         url: RUTA_SOLICITUDES,
@@ -1015,9 +1082,7 @@ exports.groqProxy = onCall(
   },
   async (request) => {
     // Verificar autenticación
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'groq')
 
     const { messages, model, temperature, max_tokens } = request.data
 
@@ -1089,9 +1154,7 @@ exports.whisperProxy = onCall(
     timeoutSeconds: 120,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para transcribir audio')
-    }
+    await _assertAiCaller(request, 'whisper', { permitirPase: true, permitirUsuario: true })
 
     const { audioBase64, mimeType, language, prompt, model } = request.data || {}
     if (!audioBase64 || typeof audioBase64 !== 'string') {
@@ -1158,9 +1221,7 @@ exports.geminiProxy = onCall(
     maxInstances: 10,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'gemini')
 
     const { messages, model, temperature, max_tokens, systemInstruction, thinkingBudget } = request.data
 
@@ -1265,9 +1326,7 @@ exports.geminiVisionProxy = onCall(
     timeoutSeconds: 60,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'geminiVision')
 
     const { imageParts, prompt, model, temperature, max_tokens, thinkingBudget } = request.data
 
@@ -1346,9 +1405,7 @@ exports.deepseekProxy = onCall(
     maxInstances: 5,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la IA')
-    }
+    await _assertAiCaller(request, 'deepseek')
 
     const { messages, model, temperature, max_tokens } = request.data
 
@@ -3178,9 +3235,7 @@ const TTS_ALLOWED_VOICES = new Set(['es-US-Chirp-HD-F', 'es-US-Neural2-A'])
 exports.googleTtsProxy = onCall(
   { enforceAppCheck: false, maxInstances: 10, timeoutSeconds: 30 },
   async (request) => {
-    if (!request.auth) {
-      throw new Error('Se requiere autenticación para usar la voz de ARIA')
-    }
+    await _assertAiCaller(request, 'tts')
     const { action } = request.data || {}
     const token = await ariaGetGcpToken()
 
@@ -4506,9 +4561,30 @@ async function ariaDataStockBajo() {
 }
 
 async function ariaDataSolicitudes() {
-  const snap = await db.collection('solicitudes_repuestos').orderBy('createdAt', 'desc').limit(10).get()
+  // Dos consultas, sin índice compuesto nuevo:
+  //  1. ALTAS DE CÓDIGO (tipo 'alta_codigo': pedir a bodega que cree un SAP): `where('tipo','==',...)` solo, sin
+  //     orderBy (ordenarlas exigiría un índice compuesto). Hay a lo más UNA por código de fabricante (id fijo
+  //     alta_<código>): ~16 en el plano 888, así que 50 es holgado; se ordenan en memoria.
+  //  2. PEDIDOS: los viejos NO tienen el campo `tipo` y Firestore no filtra por «campo ausente» (`!=` los excluye),
+  //     así que se trae `orderBy('createdAt','desc')` con límite 10 + (altas encontradas) y se descartan las altas en
+  //     memoria: como mucho `altas.size` de esos documentos son altas, siempre sobran 10 pedidos si existen.
+  // LÍMITE: con más de 50 altas recientes el resumen de pedidos puede quedar corto (hoy hay ~16, una por código).
+  const altasSnap = await db.collection('solicitudes_repuestos').where('tipo', '==', 'alta_codigo').limit(50).get()
+  const altasDocs = altasSnap.docs.sort((a, b) => (b.data().createdAt?.toMillis?.() ?? 0) - (a.data().createdAt?.toMillis?.() ?? 0))
+  const snap = await db.collection('solicitudes_repuestos').orderBy('createdAt', 'desc').limit(10 + altasDocs.length).get()
   if (snap.empty) return 'No hay solicitudes de repuestos registradas.'
-  const lines = snap.docs.map((d) => {
+  const pedidos = snap.docs.filter((d) => d.data().tipo !== 'alta_codigo').slice(0, 10)
+  const bloqueAltas = altasDocs.length
+    ? `\nALTAS DE CÓDIGO (aparte de los pedidos: Mantención pide a bodega crear el SAP de un código de fabricante; no se aprueban ni se entregan): ` +
+      `pendientes ${altasDocs.filter((d) => d.data().estado === 'pendiente').length}, creadas ${altasDocs.filter((d) => d.data().estado === 'creada').length}, rechazadas ${altasDocs.filter((d) => d.data().estado === 'rechazada').length}.\n` +
+      altasDocs.slice(0, 8).map((d) => {
+        const x = d.data()
+        const res = x.estado === 'creada' ? ` · SAP ${x.sapCreado || '?'}` : x.estado === 'rechazada' ? ` · motivo: ${x.motivoRechazo || '?'}` : ''
+        return `- ${ariaFmtFecha(x.createdAt)} [${x.estado || '?'}] código ${x.codigoFabricante || '?'} ${x.textoBreve || ''} (${(x.elementos || []).join(', ') || x.elemento || '?'}) x${x.cantidad || 1} — ${x.solicitadoPorNombre || '?'}${res}`
+      }).join('\n')
+    : ''
+  if (!pedidos.length) return `No hay pedidos de repuestos registrados.${bloqueAltas}`
+  const lines = pedidos.map((d) => {
     const x = d.data()
     // Traza (#1017): quién aprobó y quién entregó; las viejas no la tienen y no se inventa.
     const traza = [
@@ -4517,9 +4593,9 @@ async function ariaDataSolicitudes() {
     ].filter(Boolean).join(' · ')
     return `- ${ariaFmtFecha(x.createdAt)} [${x.estado || '?'}] ${x.textoBreve || x.codigoSAP || '?'} x${x.cantidad || 1} — ${x.solicitadoPorNombre || '?'}${traza ? ` · ${traza}` : ''}`
   })
-  const cuenta = (e) => snap.docs.filter((d) => d.data().estado === e).length
-  return `Solicitudes de repuestos (últimas ${snap.size}): pendientes de aprobar ${cuenta('pendiente')}, aprobadas por entregar ${cuenta('aprobada')}, entregadas ${cuenta('entregada')}.\n${lines.join('\n')}\n` +
-    '(Esta es la fuente de solicitudes. Un repuesto del catálogo con fabricante «pendiente» NO es una solicitud.)'
+  const cuenta = (e) => pedidos.filter((d) => d.data().estado === e).length
+  return `Solicitudes de repuestos (últimas ${pedidos.length}): pendientes de aprobar ${cuenta('pendiente')}, aprobadas por entregar ${cuenta('aprobada')}, entregadas ${cuenta('entregada')}.\n${lines.join('\n')}\n` +
+    '(Esta es la fuente de solicitudes. Un repuesto del catálogo con fabricante «pendiente» NO es una solicitud.)' + bloqueAltas
 }
 
 async function ariaDataPreventivos() {
@@ -6105,17 +6181,21 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   let authorized = false
   let role = 'usuario'
 
+  // Abierta desde el menú del bot, initData NO trae `chat` → cae al chat del
+  // .env, que está en la whitelist. Antes eso bastaba para autorizar a
+  // CUALQUIER usuario de Telegram. Ahora hay que ser miembro real del grupo.
   if (chatId) {
     const chatDoc = await db.collection('telegramAuthorizedChats').doc(String(chatId)).get()
     if (chatDoc.exists && chatDoc.data().activo !== false) {
-      authorized = true
-      // Verificar rol del usuario en el grupo
       const memberResult = await callTelegramApi('getChatMember', {
         chat_id: chatId,
         user_id: tgUser.id,
       })
-      if (memberResult?.ok) {
-        const status = memberResult.result?.status
+      const status = memberResult?.ok ? memberResult.result?.status : null
+      const esMiembro = ['creator', 'administrator', 'member'].includes(status)
+        || (status === 'restricted' && memberResult.result?.is_member === true)
+      if (esMiembro) {
+        authorized = true
         role = (status === 'creator' || status === 'administrator') ? 'tecnico' : 'usuario'
       }
     }
@@ -6131,10 +6211,12 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   try {
     const linkSnap = await db.collection('users')
       .where('telegramId', '==', tgIdStr)
-      .limit(1)
+      .limit(5)
       .get()
-    if (!linkSnap.empty) {
-      const linkedDoc = linkSnap.docs[0]
+    // Solo cuentas PWA reales: el perfil virtual tg_<id> también tiene telegramId,
+    // y tomarlo como vínculo dejaba entrar a alguien ya expulsado del grupo.
+    const linkedDoc = linkSnap.docs.find((d) => !d.id.startsWith('tg_') && d.data().isTelegramUser !== true)
+    if (linkedDoc) {
       const linkedData = linkedDoc.data()
       // Solo linkear si el usuario PWA está activo
       if (linkedData.activo !== false) {
@@ -6146,6 +6228,8 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
         if (pwaRol && ['admin', 'supervisor', 'tecnico'].includes(pwaRol)) {
           role = pwaRol
         }
+        // Cuenta PWA activa vinculada a este Telegram: ya fue dada de alta por un admin.
+        authorized = true
         // Refrescar lastSeenAt + telegramUsername (no tocamos rol/activo)
         await linkedDoc.ref.set({
           telegramUsername: tgUser.username || null,
@@ -6157,6 +6241,14 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   } catch (err) {
     // Si la query falla, seguir con el flujo virtual
     logger.warn('mintTelegramAuthToken: link lookup error', { err: String(err) })
+  }
+
+  // Sin grupo ni cuenta vinculada no se emite sesión: un token "no autorizado"
+  // igual valía como request.auth para las reglas y funciones que solo piden login.
+  if (!authorized) {
+    logger.warn('mintTelegramAuthToken: rechazado (no es miembro ni está vinculado)', { tgId: tgIdStr, chatId })
+    res.status(403).json({ error: 'Tu cuenta de Telegram no está autorizada. Pide acceso al administrador.' })
+    return
   }
 
   // 7. Si no está linkeado, asegurar que existe el doc virtual `tg_<id>`
@@ -6222,6 +6314,7 @@ exports.setupMantApp = onRequest({ region: 'us-central1' }, async (req, res) => 
 // ═══════════════════════════════════════════════════════════════════════════
 
 const shoplogixSyncMod  = require('./shoplogix/sync')
+const guardiaTurnosMod  = require('./shoplogix/guardiaTurnos')
 const turnoBriefMod     = require('./shoplogix/turnoBrief')
 const shoplogixPolling  = require('./shoplogix/polling')
 const shoplogixTokenStore = require('./shoplogix/tokenStore')
@@ -6470,6 +6563,16 @@ exports.shoplogixPulseWakeup = onSchedule(
             pulsoCpm: pulsoPrimero?.cpm ?? null,
             porMaquina: pulsoPrimero?.porMaquina ?? null,
             lecturaFallo: !lectura,
+            /* Sello del último sync del turno que MUESTRA el monitor (ISO, UTC
+               real) — ya viene en el doc que se leyó arriba: cero lecturas
+               extra. Con el pulso andando y este sello viejo, la pantalla está
+               congelada (señal «Monitor desactualizado»). */
+            lastSyncAtMs: (() => {
+              const v = live.lastSyncAt
+              const ms = typeof v?.toMillis === 'function' ? v.toMillis() : Date.parse(v ?? '')
+              return Number.isFinite(ms) ? ms : null
+            })(),
+            ahoraMs: Date.now(),
           },
           /* Con el LINK al monitor: un aviso de «línea detenida» sin dónde
              mirarla obliga a buscar el QR (mejora natural, 29-08). El id del
@@ -6560,6 +6663,8 @@ exports.shoplogixSyncWakeup = onSchedule(
     logger.info(`[shoplogixSyncWakeup] modo auth: ${auth.mode}`)
 
     let authExpired = false
+    /** Hallazgos de la guardia de horario de todos los syncDay de este ciclo. */
+    const hallazgosGuardia = []
     // `forceAll` reescribe también los turnos ya congelados. Los re-sync de días
     // pasados existen precisamente para traer las correcciones retroactivas de
     // etiquetado de Shoplogix, y ahí TODOS los turnos están cerrados: sin forzar,
@@ -6584,6 +6689,7 @@ exports.shoplogixSyncWakeup = onSchedule(
       for (const outcome of settled) {
         if (outcome.status === 'fulfilled') {
           logger.info('[shoplogixSyncWakeup] OK', { result: outcome.value, authMode: auth.mode })
+          hallazgosGuardia.push(...(outcome.value?.guardia || []))
         } else {
           const err = outcome.reason
           if (err?.code === 'AUTH_EXPIRED') {
@@ -6599,6 +6705,16 @@ exports.shoplogixSyncWakeup = onSchedule(
     for (const dk of extraDateKeys) {
       if (authExpired) break
       await runDay(dk, true)   // día pasado → forzar, es el canal de corrección retroactiva
+    }
+
+    // Guardia del horario (ver shoplogix/guardiaTurnos.js): sin hallazgos no toca nada.
+    try {
+      const n = await guardiaTurnosMod.avisarHallazgos({
+        db, hallazgos: hallazgosGuardia, enviar: (t) => sendTelegramMessage(t),
+      })
+      if (n) logger.warn(`[shoplogixSyncWakeup] guardia de horario: ${n} aviso(s) enviados`)
+    } catch (e) {
+      logger.warn('[shoplogixSyncWakeup] guardia de horario falló:', e.message)
     }
 
     if (authExpired) {
@@ -6697,7 +6813,7 @@ async function _assertTechnicianCaller(request) {
   const uid = request.auth?.uid
   if (!uid) throw new HttpsError('unauthenticated', 'Login requerido')
   const snap = await db.collection('users').doc(uid).get()
-  const rol = snap.exists ? snap.data()?.rol : null
+  const rol = snap.exists && snap.data()?.activo !== false ? snap.data()?.rol : null
   if (!['admin', 'supervisor', 'tecnico'].includes(rol)) {
     throw new HttpsError('permission-denied', 'Solo personal de mantención')
   }
@@ -6744,6 +6860,7 @@ exports.shoplogixCredsDelete = onCall({ region: 'us-central1' }, async (request)
 exports.validateInviteCodeProxy = onCall({ region: 'us-central1' }, async (request) => {
   const code = String(request.data?.code ?? '').trim().toUpperCase()
   if (!code || code.length > 40) return { valid: false }
+  await _frenoPorIp(request, 'invitacion', 30)
 
   const snap = await db.collection('inviteCodes')
     .where('code', '==', code)
@@ -6772,6 +6889,100 @@ exports.validateInviteCodeProxy = onCall({ region: 'us-central1' }, async (reque
     createdAt: d.createdAt && typeof d.createdAt.toDate === 'function' ? d.createdAt.toDate().toISOString() : null,
     expiresAt: expiresAt ? expiresAt.toISOString() : null,
   }
+})
+
+// ── Registro con código de invitación, 100 % en el servidor ───────────────────
+// Antes el código se validaba en el navegador y la cuenta se creaba con
+// createUserWithEmailAndPassword: cualquiera podía saltarse la pantalla, llamar
+// a la API REST de Auth y crearse su doc `users` con rol 'tecnico'. Ahora el
+// auto-registro de Auth queda DESHABILITADO en la consola y la única puerta es
+// esta función: valida el código en transacción, crea la cuenta con Admin SDK
+// (que ignora ese bloqueo) y escribe el perfil con el rol del código.
+exports.registrarConInvitacion = onCall({ region: 'us-central1', maxInstances: 3 }, async (request) => {
+  const d = request.data || {}
+  const email = String(d.email ?? '').trim().toLowerCase()
+  const password = String(d.password ?? '')
+  const nombre = String(d.nombre ?? '').trim()
+  const apellido = String(d.apellido ?? '').trim()
+  const code = String(d.code ?? '').trim().toUpperCase()
+
+  if (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError('invalid-argument', 'Correo inválido')
+  }
+  if (password.length < 6 || password.length > 128) {
+    throw new HttpsError('invalid-argument', 'La contraseña debe tener entre 6 y 128 caracteres')
+  }
+  if (nombre.length < 2 || nombre.length > 50 || apellido.length < 2 || apellido.length > 50) {
+    throw new HttpsError('invalid-argument', 'Nombre y apellido deben tener entre 2 y 50 caracteres')
+  }
+  if (!code || code.length > 40) throw new HttpsError('permission-denied', 'Código de invitación inválido o expirado')
+
+  await _frenoPorIp(request, 'registro', 10)
+
+  const snap = await db.collection('inviteCodes')
+    .where('code', '==', code)
+    .where('activo', '==', true)
+    .limit(1)
+    .get()
+  if (snap.empty) throw new HttpsError('permission-denied', 'Código de invitación inválido o expirado')
+  const inviteRef = snap.docs[0].ref
+
+  // Reserva el uso en transacción (dos registros simultáneos no pasan el tope).
+  let rol
+  await db.runTransaction(async (tx) => {
+    const s = await tx.get(inviteRef)
+    const v = s.data() || {}
+    const expiresAt = v.expiresAt && typeof v.expiresAt.toDate === 'function' ? v.expiresAt.toDate() : null
+    const agotado = typeof v.usosMaximos === 'number' && (v.usosActuales || 0) >= v.usosMaximos
+    if (v.activo !== true || (expiresAt && expiresAt < new Date()) || agotado) {
+      throw new HttpsError('permission-denied', 'Código de invitación inválido o expirado')
+    }
+    // Mismo criterio que tenía la regla de auto-creación: admin y supervisor
+    // los eleva un admin a mano, nunca un código.
+    if (!['tecnico', 'usuario'].includes(v.rol)) {
+      throw new HttpsError('permission-denied', 'Este código requiere alta manual por un administrador')
+    }
+    rol = v.rol
+    tx.update(inviteRef, { usosActuales: FieldValue.increment(1) })
+  })
+
+  let userRecord
+  try {
+    userRecord = await getAuth().createUser({ email, password, displayName: `${nombre} ${apellido}` })
+  } catch (e) {
+    await inviteRef.update({ usosActuales: FieldValue.increment(-1) }).catch(() => undefined)
+    if (e.code === 'auth/email-already-exists') throw new HttpsError('already-exists', 'Ese correo ya tiene una cuenta')
+    if (e.code === 'auth/invalid-password' || e.code === 'auth/invalid-email') {
+      throw new HttpsError('invalid-argument', 'Correo o contraseña inválidos')
+    }
+    logger.error('registrarConInvitacion: createUser falló', { code: e.code })
+    throw new HttpsError('internal', 'No se pudo crear la cuenta')
+  }
+
+  try {
+    await db.collection('users').doc(userRecord.uid).set({
+      id: userRecord.uid,
+      email,
+      nombre,
+      apellido,
+      rol,
+      activo: true,
+      invitacionId: inviteRef.id,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      notificationPrefs: { processStarted: { chonchi: true, yal: true } },
+    })
+  } catch (e) {
+    // Sin perfil la cuenta no sirve y bloquearía el reintento con «ya existe»:
+    // se deshace todo para que la persona pueda volver a intentar.
+    logger.error('registrarConInvitacion: perfil falló, revirtiendo', { uid: userRecord.uid, err: String(e) })
+    await getAuth().deleteUser(userRecord.uid).catch(() => undefined)
+    await inviteRef.update({ usosActuales: FieldValue.increment(-1) }).catch(() => undefined)
+    throw new HttpsError('internal', 'No se pudo crear la cuenta. Intenta de nuevo.')
+  }
+
+  logger.info('registrarConInvitacion: cuenta creada', { uid: userRecord.uid, rol, invite: inviteRef.id })
+  return { ok: true }
 })
 
 // Password de OTA (ArduinoOTA) de los ESP32 de sensores — antes vivía en
@@ -7450,6 +7661,24 @@ async function getShoplogixEligibleUsers(plant) {
   return ids
 }
 
+// Umbrales aprendidos por causa (shoplogixUmbralesParos/{planta}), con cache de
+// 1 h por instancia: el trigger de máquina corre en cada sync y no puede leer
+// el doc cada vez. Costo: ≤ 1 lectura por planta por hora por instancia.
+const _umbralesParosCache = new Map()
+async function getUmbralesParos(plant) {
+  const hit = _umbralesParosCache.get(plant)
+  if (hit && Date.now() - hit.at < 3600_000) return hit.causas
+  let causas = null
+  try {
+    const snap = await db.doc(`shoplogixUmbralesParos/${plant}`).get()
+    causas = snap.exists ? (snap.data().causas || null) : null
+  } catch (e) {
+    logger.warn('[getUmbralesParos] no se pudo leer, se usa el umbral de respaldo:', e.message)
+  }
+  _umbralesParosCache.set(plant, { at: Date.now(), causas })
+  return causas
+}
+
 // Destino Telegram de las notifs Shoplogix, configurable por planta desde
 // Panel Admin (channels.telegramDest): 'bot' = DM del admin con
 // @antarfood_mant_bot (default, para rodaje sin ensuciar el grupo),
@@ -7515,6 +7744,13 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
     // Salida rápida: solo dataQualityIssues cambió, nada relevante para notifs
     if (cyclesBefore === cyclesAfter && (before.states || []).length === statesAfter.length) return
 
+    // Unscheduled repite los estados del turno con nombre (el mismo paro salía
+    // dos veces) y un re-sync/backfill de días viejos disparaba avisos de
+    // agosto (30-09-2026). Se sale ANTES de leer config y usuarios.
+    const avisosParos = require('./shoplogix/avisosParos')
+    const nowWallMs = shoplogixPolling.toChileWall(new Date()).getTime()
+    if (!avisosParos.esTurnoAvisable(shiftDoc, nowWallMs)) return
+
     const machineName = after.machineName || machineId
     const plantLabel  = SHOPLOGIX_PLANT_LABEL[plant] || plant
     const shiftId     = after.shiftId || shiftDoc.split('_').slice(1).join('_')
@@ -7528,6 +7764,14 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
       getShoplogixEligibleUsers(plant),
     ])
     if (eligibleIds.length === 0) return
+    // Umbral aprendido por causa (shoplogix/avisosParos.js). `umbralAprendido:
+    // false` en notificationConfig vuelve a la regla fija de stoppageMinMinutes.
+    const usarAprendido = config.events.umbralAprendido !== false
+    const tablaUmbrales = usarAprendido ? await getUmbralesParos(plant) : null
+    const evalParos = (yaNotificadas) => avisosParos.parosParaAvisar({
+      states: statesAfter, tabla: tablaUmbrales, usarAprendido,
+      minFijoMin: config.events.stoppageMinMinutes ?? 3, nowWallMs, yaNotificadas,
+    })
 
     // ── Idempotencia via transacción Firestore ────────────────────────────────
     // syncDay escribe 2 veces por máquina (doc + dataQualityIssues) y Eventarc
@@ -7540,19 +7784,10 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
     const notifications = await db.runTransaction(async (tx) => {
       const snap = await tx.get(stateRef)
 
-      // Clave estable por evento de detención: startAt (Timestamp) si existe;
-      // fallback a nombre+posición. Permite deduplicar por EVENTO en vez de por
-      // conteo — necesario con el umbral de minutos: una detención "en curso"
-      // (durationSec creciendo) que cruza el umbral en un sync posterior debe
-      // alertar UNA vez, cosa que el conteo posicional no podía expresar.
-      const stopKeyOf = (stop, idx) => {
-        const ts = stop.startAt?.toMillis?.() ?? (stop.startAt instanceof Date ? stop.startAt.getTime() : null)
-        return ts != null ? `t${ts}` : `${stop.name || 's'}|${stop.reason || ''}|${idx}`
-      }
-      const minSec = Math.max(0, (config.events.stoppageMinMinutes ?? 3)) * 60
-      const relevantes = downtimes
-        .map((stop, idx) => ({ stop, key: stopKeyOf(stop, idx) }))
-        .filter(({ stop }) => (stop.durationSec || 0) >= minSec)
+      // Paros que ya pasaron SU umbral (aprendido por causa, o el fijo si el
+      // toggle está apagado). Clave estable por startAt: un paro en curso que
+      // cruza el umbral en un sync posterior avisa UNA vez.
+      const { relevantes } = evalParos(new Set())
 
       // Primera vez que vemos esta máquina/turno: inicializar baseline sin notificar.
       // Evita "catch-up" de historial al hacer un deploy mid-shift.
@@ -7608,14 +7843,14 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
         // deploy no tiene notifiedStopKeys → baseline con lo existente para no
         // re-alertar el historial del turno en curso.
         const esPrimeraConKeys = !('notifiedStopKeys' in st)
-        const nuevas = esPrimeraConKeys ? [] : relevantes.filter(({ key }) => !yaNotificadas.has(key))
-        for (const { stop } of nuevas) {
+        const nuevas = esPrimeraConKeys ? [] : evalParos(yaNotificadas).nuevas
+        for (const { stop, umbral } of nuevas) {
           const dMin   = Math.round((stop.durationSec || 0) / 60)
           const reason = stop.reason || stop.name || 'Detención'
+          const iniMs  = stop.startAt?.toMillis?.() ?? (stop.startAt instanceof Date ? stop.startAt.getTime() : null)
           toSend.push({
-            title: `⛔ Detención ${dMin} min · ${machineName}`,
-            body:  `${reason} · ${plantLabel}`,
-            tg:    `⛔ <b>Detención de ${dMin} min</b> — ${plantLabel}\n${machineName} · ${reason}`,
+            ...avisosParos.textoAvisoParo({ dMin, reason, machineName, plantLabel, umbral: usarAprendido ? umbral : null }),
+            paro: { causa: reason, iniMs },
           })
         }
         if (esPrimeraConKeys || nuevas.length > 0) {
@@ -7647,13 +7882,64 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
 
     if (notifications.length === 0) return
 
-    for (const n of notifications) {
+    // Evento de LÍNEA: la misma causa arrancando en varias máquinas a ±3 min
+    // es un solo aviso (en Chonchi un paro de línea mandaba 3 mensajes).
+    let aEnviar = notifications
+    const paros = notifications.filter((n) => n.paro)
+    const { PLANT_MACHINES } = require('./shoplogix/machines')
+    if (paros.length > 0 && (PLANT_MACHINES[plant]?.length || 0) > 1) {
+      try {
+        const lineaRef = db.doc(`shoplogixNotifState/${plant}_${shiftDoc}__linea`)
+        const repetidos = await db.runTransaction(async (tx) => {
+          const snap = await tx.get(lineaRef)
+          let recientes = snap.exists ? (snap.data().recientes || []) : []
+          const rep = new Set()
+          for (const n of paros) {
+            const r = avisosParos.agruparEnLinea(recientes, n.paro)
+            if (r.repetido) rep.add(n)
+            recientes = r.recientes
+          }
+          tx.set(lineaRef, { recientes, updatedAt: new Date() }, { merge: true })
+          return rep
+        })
+        aEnviar = notifications.filter((n) => !repetidos.has(n))
+      } catch (e) {
+        logger.warn('[onShoplogixMachineUpdated] agrupación de línea falló (se avisa igual):', e.message)
+      }
+    }
+    if (aEnviar.length === 0) return
+
+    for (const n of aEnviar) {
       await dispatchShoplogixNotif(config, eligibleIds, n.title, n.body, { plant, shiftDoc, machineId }, n.tg)
     }
 
     logger.info('[onShoplogixMachineUpdated] dispatched', {
-      plant, shiftDoc, machineId, count: notifications.length,
+      plant, shiftDoc, machineId, count: aEnviar.length, agrupados: notifications.length - aEnviar.length,
     })
+  },
+)
+
+// ── recalcularUmbralesParos ─────────────────────────────────────────────────
+// Lunes 05:30: recalcula por causa cuánto dura un paro «normal» (p90 de los
+// últimos 30 días de turnos con nombre y producción real) para que el aviso
+// de detención solo salte con lo que se sale de lo normal. Lee por RANGO de
+// documentId; ~300 lecturas por planta por semana. Solo las líneas que se
+// miran (Yal quedó fuera de Telegram el 30-09-2026).
+const PLANTAS_UMBRALES_PAROS = ['chonchi', 'filete']
+exports.recalcularUmbralesParos = onSchedule(
+  { schedule: 'every monday 05:30', timeZone: 'America/Santiago', region: 'us-central1', memory: '256MiB', timeoutSeconds: 300 },
+  async () => {
+    const avisosParos = require('./shoplogix/avisosParos')
+    const hoyDateKey = shoplogixPolling.toChileWall(new Date()).toISOString().slice(0, 10)
+    for (const plantSlug of PLANTAS_UMBRALES_PAROS) {
+      try {
+        const r = await avisosParos.calcularUmbralesPlanta({ db, plantSlug, hoyDateKey, FieldPath })
+        await db.doc(`shoplogixUmbralesParos/${plantSlug}`).set({ ...r, calculadoEl: new Date() })
+        logger.info(`[recalcularUmbralesParos] ${plantSlug}: ${r.turnos} turnos, ${r.paros} paros, ${r.causas.length} causas`)
+      } catch (e) {
+        logger.error(`[recalcularUmbralesParos] ${plantSlug} falló:`, e.message)
+      }
+    }
   },
 )
 
@@ -8292,10 +8578,11 @@ async function _queryAniList(query, variables) {
   return r.json();
 }
 
-async function _sendTelegram(botToken, chatId, text, replyMarkup) {
+async function _sendTelegram(botToken, chatId, text, replyMarkup, extra) {
   const { default: fetch } = await import('node-fetch');
-  const body = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
+  const body = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(extra || {}) };
   if (replyMarkup) body.reply_markup = replyMarkup;
+  for (const k of Object.keys(body)) if (body[k] == null) delete body[k];
   const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -8312,113 +8599,552 @@ function _tzOffsetMin(date, timeZone) {
   return Math.round((tz.getTime() - utc.getTime()) / 60000);
 }
 
-async function _runAnimeEstrenos(botToken) {
-  // Día calendario en Santiago. FIX timezone (2026-05-20): antes dateKey usaba UTC
-  // vía toISOString(), desfasado del cron 23:00 Santiago (= 03:00 UTC día siguiente).
-  // Causaba: log decía día N+1, mensaje al usuario mostraba día N. Ahora todo es Santiago.
-  const now = new Date();
-  const dateKey = now.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }); // "YYYY-MM-DD" Santiago
+// Escapa texto para parse_mode HTML de Telegram (un "&" o "<" en un título
+// hacía que Telegram rechazara el mensaje completo).
+function _tgHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
-  // Check if already sent today
-  const sentDoc = await db.collection('anime_notifications').doc(dateKey).get();
-  if (sentDoc.exists && sentDoc.data().sent) {
-    logger.info('[anime] Notificación del día ya enviada:', dateKey);
-    return;
+// AniList con reintento: un 429 o caída devolvía data:null y se registraba
+// como "día sin estrenos".
+async function _queryAniListSeguro(query, variables) {
+  let ultimo = null;
+  for (let intento = 0; intento < 3; intento++) {
+    try {
+      const json = await _queryAniList(query, variables);
+      if (json && json.data && !json.errors) return json;
+      ultimo = new Error(`AniList: ${JSON.stringify(json && json.errors ? json.errors[0] : 'sin data').slice(0, 200)}`);
+    } catch (e) { ultimo = e; }
+    await new Promise((r) => setTimeout(r, 2000 * (intento + 1)));
+  }
+  throw ultimo || new Error('AniList no respondió');
+}
+
+// manual=true (herramienta de admin): no mira ni marca el "ya enviado", así un
+// disparo de prueba a media tarde no impide el resumen de las 23:00.
+async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
+  // Día calendario en Santiago (fix 2026-05-20: antes usaba UTC).
+  const now = new Date();
+  const dateKey = now.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }); // "YYYY-MM-DD"
+
+  if (!manual) {
+    const sentDoc = await db.collection('anime_notifications').doc(dateKey).get();
+    if (sentDoc.exists && sentDoc.data().sent) {
+      logger.info('[anime] Notificación del día ya enviada:', dateKey);
+      return { enviado: false, motivo: 'ya enviado' };
+    }
   }
 
-  // Query AniList: episodes aired today (medianoche Santiago → now + buffer)
+  // Episodios emitidos hoy (medianoche Santiago → ahora + 1 h), hasta 4 páginas.
   const [y, mo, d] = dateKey.split('-').map(Number);
   const offsetMin = _tzOffsetMin(now, 'America/Santiago'); // -240 (CLT) o -180 (CLST)
   const from = Math.floor((Date.UTC(y, mo - 1, d, 0, 0, 0) - offsetMin * 60000) / 1000);
-  const to   = Math.floor(Date.now() / 1000) + 3600;
-  const GQL = `query($f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$f,airingAt_lesser:$t){episode airingAt media{id title{romaji english}averageScore format}}}}`;
-  const json = await _queryAniList(GQL, { f: from, t: to });
-  const schedules = json.data?.Page?.airingSchedules || [];
+  const to = Math.floor(Date.now() / 1000) + 3600;
+  const GQL = `query($f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id isAdult title{romaji english}averageScore format}}}}`;
+  const schedules = [];
+  for (let p = 1; p <= 4; p++) {
+    const json = await _queryAniListSeguro(GQL, { f: from, t: to, p });
+    const page = json.data.Page || {};
+    schedules.push(...(page.airingSchedules || []));
+    if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+  }
+  const visibles = schedules.filter((s) => s.media && !s.media.isAdult);
 
-  if (!schedules.length) {
+  // Cine/series de tus plataformas (no frena el resumen si TMDB falla).
+  let cine = null;
+  try { cine = await _cineParaResumen(dateKey); } catch (e) { logger.warn('[anime] cine en resumen falló:', e.message); }
+  const hayCine = !!(cine && (cine.nuevos.length || cine.cines.length));
+
+  if (!visibles.length && !hayCine) {
+    if (cine && !manual) { try { await cine.guardar(); } catch { /* */ } }
     logger.info('[anime] Sin estrenos hoy:', dateKey);
-    return;
+    return { enviado: false, motivo: 'sin estrenos' };
   }
 
-  // Read user's tracked anime from Firestore
+  // Listas del usuario. "Tus series" = lo que sigues de verdad: viendo,
+  // interesante, pendiente y tus listas propias. Completado y descartado no
+  // cuentan como seguidas y tampoco aparecen en descubrimiento.
   const listsDoc = await db.collection('animelists').doc(ANIME_CHAT_ID).get();
   const lists = listsDoc.exists ? listsDoc.data() : {};
-  const trackedIds = new Set();
-  const trackedMap = {};
+  const meta = (lists && lists.listMeta) || {};
+  const NO_SEGUIDAS = new Set(['completado', 'descartado']);
+  const LIST_EMOJI = { viendo: '▶️', interesante: '⭐', pendiente: '📌' };
+  const seguidas = new Map(); // id → emoji de su lista
+  const ocultas = new Set();
   for (const [listName, animes] of Object.entries(lists)) {
     if (!Array.isArray(animes)) continue;
     for (const a of animes) {
-      trackedIds.add(String(a.id));
-      trackedMap[String(a.id)] = listName;
+      const id = String(a && a.id);
+      if (NO_SEGUIDAS.has(listName)) { ocultas.add(id); continue; }
+      const emoji = LIST_EMOJI[listName] || (meta[listName] && meta[listName].emoji) || '📂';
+      if (!seguidas.has(id) || listName === 'viendo') seguidas.set(id, emoji);
     }
   }
 
-  // Clasificar en 3 grupos: premieres (ep 1, sigas o no), tracked (ep>1 seguidos), discovery (ep>1 no seguidos)
-  const FMT = { MOVIE:'🎬', ONA:'🖥️', OVA:'📀', SPECIAL:'🌟', TV:'📺', TV_SHORT:'📺' };
-  const LIST_EMOJI = { viendo:'▶️', interesante:'⭐', pendiente:'📌', completado:'✅', descartado:'❌' };
+  // Agrupa episodios de la misma serie emitidos el mismo día (ep3–4).
+  const porSerie = new Map();
+  for (const s of visibles) {
+    const id = String(s.media.id);
+    const g = porSerie.get(id);
+    if (g) { g.eps.push(s.episode); g.airingAt = Math.min(g.airingAt, s.airingAt); } else porSerie.set(id, { media: s.media, eps: [s.episode], airingAt: s.airingAt });
+  }
 
-  const premieres = [];   // ep 1 — destacados arriba (lo verdaderamente nuevo)
-  const tracked   = [];   // ep>1 de series que sigues
-  const discovery = [];   // ep>1 de series que no sigues
-
-  for (const s of schedules) {
-    const m  = s.media;
-    const id = String(m.id);
-    const title = (m.title.english || m.title.romaji).substring(0, 36);
+  const FMT = { MOVIE: '🎬', ONA: '🖥️', OVA: '📀', SPECIAL: '🌟', TV: '📺', TV_SHORT: '📺' };
+  const premieres = [];
+  const tracked = [];
+  const discovery = [];
+  for (const [id, g] of porSerie) {
+    const m = g.media;
+    const eps = g.eps.sort((a, b) => a - b);
+    const epTxt = eps.length > 1 ? `ep${eps[0]}–${eps[eps.length - 1]}` : `ep${eps[0]}`;
+    const title = _tgHtml(String((m.title && (m.title.english || m.title.romaji)) || 'Sin título').substring(0, 40));
     const score = m.averageScore ? ` ⭐${m.averageScore}` : '';
-    const fmt   = FMT[m.format] || '🎞';
-    const ep    = s.episode;
-    const time  = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', timeZone:'America/Santiago' });
-    const line  = `${fmt} <b>${title}</b> ep${ep}${score} · ${time}`;
-    const isTracked = trackedIds.has(id);
-    const emoji = isTracked ? (LIST_EMOJI[trackedMap[id]] || '▶️') : '';
+    const fmt = FMT[m.format] || '🎞';
+    const time = new Date(g.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
+    const line = `${fmt} <b>${title}</b> ${epTxt}${score} · ${time}`;
+    const emoji = seguidas.get(id);
+    if (eps[0] === 1) premieres.push(emoji ? `${emoji} ${line}` : line);
+    else if (emoji) tracked.push(`${emoji} ${line}`);
+    else if (!ocultas.has(id)) discovery.push(line);
+  }
 
-    if (ep === 1) {
-      // Premiere: si la sigues muestra el emoji de tu lista; si no, solo la línea (el fmt ya trae 🎬/📺/etc)
-      premieres.push(emoji ? `${emoji} ${line}` : line);
-    } else if (isTracked) {
-      tracked.push(`${emoji} ${line}`);
-    } else {
-      discovery.push(line);
+  const dateLabel = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const dateCapitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+
+  // Telegram corta en 4096 caracteres: cada sección lleva tope y "… y N más".
+  const seccion = (titulo, lineas, tope) => {
+    if (!lineas.length) return '';
+    const show = lineas.slice(0, tope);
+    const rest = lineas.length - show.length;
+    return `\n\n${titulo} (${lineas.length}):</b>\n${show.join('\n')}${rest > 0 ? `\n<i>… y ${rest} más en la app</i>` : ''}`;
+  };
+  let tracTope = 25;
+  let premTope = 15;
+  let text = '';
+  for (let i = 0; i < 6; i++) {
+    text = `📺 <b>Estrenos del día — ${_tgHtml(dateCapitalized)}</b>`
+      + seccion('⭐ <b>Tus series', tracked, tracTope)
+      + seccion('🆕 <b>Estrenos nuevos · ep 1', premieres, premTope)
+      + seccion('📡 <b>Descubrimiento', discovery, 8)
+      + (cine ? seccion('🎬 <b>Llegó a tus plataformas', cine.nuevos, 5) + seccion('🍿 <b>Estrenos en cines esta semana', cine.cines, 5) : '')
+      + (hayCine ? '\n\n<i>Cine y series: datos de JustWatch vía TMDB.</i>' : '');
+    if (text.length <= 3900) break;
+    tracTope = Math.max(8, tracTope - 5);
+    premTope = Math.max(5, premTope - 4);
+  }
+
+  const replyMarkup = { inline_keyboard: [[{ text: '🎌 Ver todos en Mini App', web_app: { url: ANIME_APP_URL } }]] };
+  let result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup);
+  if (!result || !result.ok) {
+    // Plan B: el mismo texto sin formato, para que el día no quede sin resumen.
+    logger.warn('[anime] Telegram rechazó el HTML, reintento en texto plano:', result && result.description);
+    const plano = text.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    const { default: fetch } = await import('node-fetch');
+    const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: ANIME_CHAT_ID, text: plano.slice(0, 4000), disable_web_page_preview: true, reply_markup: replyMarkup }),
+    });
+    result = await r.json();
+  }
+  logger.info('[anime] Telegram result:', result && result.ok, (result && result.description) || '');
+  if (!result || !result.ok) throw new Error(`Telegram no aceptó el resumen: ${(result && result.description) || 'sin respuesta'}`);
+
+  if (!manual) {
+    await db.collection('anime_notifications').doc(dateKey).set({
+      sent: true, sentAt: FieldValue.serverTimestamp(),
+      premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, total: visibles.length,
+      cine: cine ? cine.nuevos.length : 0, cines: cine ? cine.cines.length : 0,
+    });
+    if (cine) { try { await cine.guardar(); } catch (e) { logger.warn('[anime] no se guardó cineVistos:', e.message); } }
+  }
+  return { enviado: true, premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, cine: cine ? cine.nuevos.length : 0, cines: cine ? cine.cines.length : 0 };
+}
+
+// ── Cine en el resumen diario ─────────────────────────────────────────────────
+// TMDB no publica cuándo entra un título a una plataforma: se comparan los
+// estrenos más recientes de cada plataforma que pagas contra todo lo ya visto
+// (anime_estado/cineVistos, acumulado). Lo nunca visto = «llegó».
+// La primera vez solo guarda la foto inicial (no avisa 80 títulos de golpe).
+async function _cineParaResumen(dateKey) {
+  if (!process.env.TMDB_READ_TOKEN) return null;
+  const snap = await db.collection('animelists').doc(ANIME_CHAT_ID).collection('cine').doc('datos').get();
+  const d = snap.exists ? (snap.data() || {}) : {};
+  const plats = (Array.isArray(d.plataformas) ? d.plataformas : []).filter((x) => Number.isInteger(x)).slice(0, 8);
+  const enLista = new Set((Array.isArray(d.lista) ? d.lista : []).map((x) => `${x.tipo}:${x.id}`));
+  const resultado = { nuevos: [], cines: [], guardar: async () => {} };
+
+  if (plats.length) {
+    const nombres = {};
+    try { (await _mediaOps.plataformas({ region: 'CL' })).items.forEach((p) => { nombres[p.id] = p.nombre; }); } catch { /* sin nombres */ }
+    const estadoRef = db.collection('anime_estado').doc('cineVistos');
+    const prev = await estadoRef.get();
+    const primeraVez = !prev.exists;
+    const vistos = new Set(prev.exists ? (prev.data().ids || []) : []);
+    const hoy = dateKey;
+    const porTitulo = new Map(); // tipo:id → { item, tipo, plataformas[] }
+    for (const pid of plats) {
+      for (const tipo of ['movie', 'tv']) {
+        const campo = tipo === 'movie' ? 'primary_release_date' : 'first_air_date';
+        let r;
+        try {
+          r = await _tmdb(`/discover/${tipo}`, {
+            watch_region: 'CL', with_watch_providers: String(pid), with_watch_monetization_types: 'flatrate|free|ads',
+            sort_by: `${campo}.desc`, [`${campo}.lte`]: hoy, include_adult: 'false', 'vote_count.gte': '5', page: '1',
+          }, 3 * MEDIA_H);
+        } catch (e) { logger.warn('[anime] cine discover', pid, tipo, e.message); continue; }
+        for (const x of (r.results || []).slice(0, 20)) {
+          const k = `${tipo}:${x.id}`;
+          const g = porTitulo.get(k) || { x, tipo, plataformas: [] };
+          if (!g.plataformas.includes(pid)) g.plataformas.push(pid);
+          porTitulo.set(k, g);
+        }
+      }
+    }
+    const nuevos = [];
+    for (const [k, g] of porTitulo) {
+      if (!primeraVez && !vistos.has(k) && !enLista.has(k)) nuevos.push(g);
+      vistos.add(k);
+    }
+    const unir = (arr) => (arr.length <= 1 ? arr.join('') : `${arr.slice(0, -1).join(', ')} y ${arr[arr.length - 1]}`);
+    resultado.nuevos = nuevos.map((g) => {
+      const titulo = _tgHtml(String(g.x.title || g.x.name || 'Sin título').substring(0, 45));
+      const anio = String(g.x.release_date || g.x.first_air_date || '').slice(0, 4);
+      const donde = unir(g.plataformas.map((p) => nombres[p] || `plataforma ${p}`));
+      return `${g.tipo === 'tv' ? '📺' : '🎬'} <b>${titulo}</b>${anio ? ` (${anio})` : ''} · en ${_tgHtml(donde)}`;
+    });
+    // Se guarda solo si el resumen sale bien (lo llama _runAnimeEstrenos).
+    resultado.guardar = async () => {
+      const ids = [...vistos];
+      await estadoRef.set({ ids: ids.slice(Math.max(0, ids.length - 3000)), actualizado: FieldValue.serverTimestamp() });
+    };
+  }
+
+  // Jueves: estrenos de la semana en cines de Chile.
+  const diaSemana = new Date(`${dateKey}T12:00:00Z`).getUTCDay();
+  if (diaSemana === 4) {
+    try {
+      const r = await _tmdb('/movie/now_playing', { region: 'CL', page: '1' }, 6 * MEDIA_H);
+      const desde = new Date(`${dateKey}T12:00:00Z`); desde.setUTCDate(desde.getUTCDate() - 7);
+      const desdeKey = desde.toISOString().slice(0, 10);
+      resultado.cines = (r.results || [])
+        .filter((x) => x.release_date && x.release_date >= desdeKey && x.release_date <= dateKey)
+        .map((x) => `🍿 <b>${_tgHtml(String(x.title || '').substring(0, 45))}</b>`);
+    } catch (e) { logger.warn('[anime] cines CL', e.message); }
+  }
+  return resultado;
+}
+
+// ── Aviso en tiempo real: episodio nuevo de algo en «viendo» ──────────────────
+// Cada 30 min revisa AniList solo para los anime de «viendo». Un aviso por
+// episodio (marca anime_notifications/ep_<id>_<ep>), agrupado en un mensaje.
+// Entre 01:00 y 08:00 (Chile) llega en silencio.
+async function _runAvisosEpisodios(botToken) {
+  const ahora = Math.floor(Date.now() / 1000);
+  const estadoRef = db.collection('anime_estado').doc('avisos');
+  const est = await estadoRef.get();
+  let desde = est.exists && Number.isFinite(est.data().ultimoCorte) ? est.data().ultimoCorte : ahora - 1800;
+  desde = Math.max(desde, ahora - 6 * 3600); // como máximo 6 h hacia atrás
+
+  const listsDoc = await db.collection('animelists').doc(ANIME_CHAT_ID).get();
+  const viendo = listsDoc.exists && Array.isArray(listsDoc.data().viendo) ? listsDoc.data().viendo : [];
+  const porId = new Map(viendo.filter((a) => a && Number.isInteger(Number(a.id))).map((a) => [Number(a.id), a]));
+  if (!porId.size) { await estadoRef.set({ ultimoCorte: ahora }, { merge: true }); return { avisos: 0 }; }
+
+  const ids = [...porId.keys()];
+  const GQL = 'query($ids:[Int],$f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
+  const schedules = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    for (let p = 1; p <= 3; p++) {
+      const json = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: ahora, p });
+      const page = json.data.Page || {};
+      schedules.push(...(page.airingSchedules || []));
+      if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
     }
   }
 
-  // Build message — dateLabel derivado de dateKey (mediodía UTC → día calendario = dateKey) para coherencia con el dedup
-  const dateLabel = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', timeZone:'UTC' });
-  const dateCapitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
-  let text = `📺 <b>Estrenos del día — ${dateCapitalized}</b>\n`;
-
-  if (premieres.length) {
-    text += `\n🆕 <b>Estrenos nuevos · ep 1 (${premieres.length}):</b>\n`;
-    text += premieres.join('\n');
-  }
-  if (tracked.length) {
-    text += `\n\n⭐ <b>Tus series (${tracked.length}):</b>\n`;
-    text += tracked.join('\n');
-  }
-  if (discovery.length) {
-    const show = discovery.slice(0, 8);
-    const rest = discovery.length - show.length;
-    text += `\n\n📡 <b>Descubrimiento (${discovery.length}):</b>\n`;
-    text += show.join('\n');
-    if (rest > 0) text += `\n<i>… y ${rest} más en la app</i>`;
+  const pendientes = [];
+  const yaVistos = new Set(); // una emisión puede venir repetida entre páginas/grupos
+  for (const s of schedules) {
+    const a = porId.get(Number(s.media && s.media.id));
+    if (!a || (Number(a.watchedEps) || 0) >= s.episode) continue;
+    const clave = `${s.media.id}_${s.episode}`;
+    if (yaVistos.has(clave)) continue;
+    yaVistos.add(clave);
+    const ref = db.collection('anime_notifications').doc(`ep_${s.media.id}_${s.episode}`);
+    if ((await ref.get()).exists) continue;
+    pendientes.push({ s, ref });
   }
 
-  const replyMarkup = {
-    inline_keyboard: [[
-      { text: '🎌 Ver todos en Mini App', web_app: { url: ANIME_APP_URL } }
-    ]]
-  };
+  if (pendientes.length) {
+    const lineas = pendientes.map(({ s }) => {
+      const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || 'Sin título').substring(0, 45));
+      const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
+      return `▶️ <b>${t}</b> · ep ${s.episode} · ${h}`;
+    });
+    const titulo = pendientes.length === 1 ? '🔔 <b>Salió un episodio de lo que estás viendo</b>' : `🔔 <b>Salieron ${pendientes.length} episodios de lo que estás viendo</b>`;
+    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}`;
+    const hora = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
+    const silencio = hora >= 1 && hora < 8;
+    const botones = pendientes.slice(0, 8).map(({ s }) => [{
+      text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`,
+      callback_data: `v:${s.media.id}:${s.episode}`,
+    }]);
+    const replyMarkup = { inline_keyboard: [...botones, [{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
+    let result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup, { disable_notification: silencio });
+    if (!result || !result.ok) {
+      const plano = text.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      result = await _sendTelegram(botToken, ANIME_CHAT_ID, plano, replyMarkup, { disable_notification: silencio, parse_mode: null });
+    }
+    if (!result || !result.ok) throw new Error(`Telegram no aceptó el aviso: ${(result && result.description) || 'sin respuesta'}`);
+    await Promise.all(pendientes.map(({ s, ref }) => ref.set({ media: s.media.id, ep: s.episode, avisadoEn: FieldValue.serverTimestamp() })));
+  }
+  await estadoRef.set({ ultimoCorte: ahora, ultimaEjecucion: FieldValue.serverTimestamp() }, { merge: true });
+  return { avisos: pendientes.length };
+}
 
-  const result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup);
-  logger.info('[anime] Telegram result:', result.ok, result.description || '');
+exports.animeAvisosEpisodios = onSchedule(
+  {
+    schedule: 'every 30 minutes',
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 60,
+    memory: '256MiB',
+    retryCount: 0,
+    maxInstances: 1,
+    secrets: ['ANIME_BOT_TOKEN'],
+  },
+  async () => {
+    const token = process.env.ANIME_BOT_TOKEN;
+    if (!token) { logger.error('[anime] ANIME_BOT_TOKEN no configurado'); return; }
+    try { await _asegurarWebhookAnime(token); } catch (e) { logger.warn('[animeBot] registro de webhook:', e.message); }
+    try {
+      const r = await _runAvisosEpisodios(token);
+      if (r.avisos) logger.info('[anime] avisos de episodio:', r.avisos);
+    } catch (e) {
+      logger.error('[anime] avisos de episodio falló:', e.message);
+    }
+  }
+);
 
-  // Mark as sent in Firestore
-  await db.collection('anime_notifications').doc(dateKey).set({
-    sent: true, sentAt: FieldValue.serverTimestamp(),
-    premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, total: schedules.length,
+// ── Bot interactivo de AnimeTracker (webhook propio) ──────────────────────────
+// Antes el bot de anime era pasivo. Ahora recibe: botones «✅ Visto ep N» de los
+// avisos, búsqueda inline (@anime_estreno_bot <título>) y /hoy, /buscar, /app.
+// Seguridad: Telegram firma cada update con secret_token (derivado del token del
+// bot, nunca sale del servidor) y solo se atiende a ANIME_USUARIOS_PERMITIDOS.
+// El webhook se registra solo desde animeAvisosEpisodios (_asegurarWebhookAnime).
+const ANIME_WEBHOOK_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/animeBotWebhook';
+const ANIME_WEBHOOK_VERSION = 1;
+
+function _secretoWebhookAnime(botToken) {
+  return createHmac('sha256', 'anime-webhook-v1').update(String(botToken)).digest('hex');
+}
+
+async function _tgApi(botToken, metodo, payload) {
+  const { default: fetch } = await import('node-fetch');
+  const r = await fetch(`https://api.telegram.org/bot${botToken}/${metodo}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}),
+  });
+  return r.json();
+}
+
+// Registra webhook y comandos una vez por versión (lo llama el cron de avisos).
+async function _asegurarWebhookAnime(botToken) {
+  const ref = db.collection('anime_estado').doc('webhook');
+  const est = await ref.get();
+  if (est.exists && est.data().version === ANIME_WEBHOOK_VERSION) return;
+  const w = await _tgApi(botToken, 'setWebhook', {
+    url: ANIME_WEBHOOK_URL,
+    secret_token: _secretoWebhookAnime(botToken),
+    allowed_updates: ['message', 'callback_query', 'inline_query'],
+    drop_pending_updates: true,
+    max_connections: 5,
+  });
+  if (!w || !w.ok) { logger.warn('[animeBot] setWebhook falló:', w && w.description); return; }
+  await _tgApi(botToken, 'setMyCommands', {
+    commands: [
+      { command: 'hoy', description: 'Episodios de hoy de lo que estás viendo' },
+      { command: 'buscar', description: 'Dónde ver una película o serie' },
+      { command: 'app', description: 'Abrir AnimeTracker' },
+    ],
+  });
+  await ref.set({ version: ANIME_WEBHOOK_VERSION, registradoEn: FieldValue.serverTimestamp() });
+  logger.info('[animeBot] webhook y comandos registrados');
+}
+
+// Marca un episodio como visto en la lista donde esté el anime (nunca resta).
+async function _marcarVistoAnime(mediaId, ep) {
+  const ref = db.collection('animelists').doc(ANIME_CHAT_ID);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const d = snap.data() || {};
+    for (const [lista, items] of Object.entries(d)) {
+      if (!Array.isArray(items)) continue;
+      const i = items.findIndex((a) => a && Number(a.id) === mediaId);
+      if (i < 0) continue;
+      const nuevo = items.slice();
+      const antes = Number(nuevo[i].watchedEps) || 0;
+      nuevo[i] = { ...nuevo[i], watchedEps: Math.max(antes, ep) };
+      tx.update(ref, { [lista]: nuevo, updatedAt: FieldValue.serverTimestamp() });
+      return { titulo: nuevo[i].title || '', antes, ahora: nuevo[i].watchedEps, lista };
+    }
+    return null;
   });
 }
+
+// Dónde ver un título en Chile y, si no está, en qué país (VPN).
+function _resumenDondeVer(t) {
+  const cl = t.dondeVer && t.dondeVer.CL;
+  const nombres = (b) => [...(b.suscripcion || []), ...(b.gratis || [])].map((p) => p.nombre);
+  const enCl = cl ? nombres(cl) : [];
+  const otros = Object.entries(t.dondeVer || {})
+    .filter(([c, b]) => c !== 'CL' && b && nombres(b).length)
+    .sort(([a], [b]) => (['MX', 'AR', 'CO', 'ES', 'US'].indexOf(a) + 1 || 99) - (['MX', 'AR', 'CO', 'ES', 'US'].indexOf(b) + 1 || 99))
+    .slice(0, 3)
+    .map(([c, b]) => `${c}: ${nombres(b).slice(0, 2).join(', ')}`);
+  return { enCl, otros, arriendo: cl ? [...(cl.arriendo || []), ...(cl.compra || [])].map((p) => p.nombre) : [] };
+}
+
+function _mensajeDondeVer(t) {
+  const r = _resumenDondeVer(t);
+  const anio = String(t.fecha || '').slice(0, 4);
+  let txt = `${t.tipo === 'tv' ? '📺' : '🎬'} <b>${_tgHtml(t.titulo)}</b>${anio ? ` (${anio})` : ''}\n`;
+  txt += r.enCl.length ? `\n🇨🇱 <b>En Chile:</b> ${_tgHtml([...new Set(r.enCl)].join(', '))}` : '\n🇨🇱 No está en plataformas de Chile por ahora.';
+  if (r.arriendo.length) txt += `\n💳 Arriendo o compra: ${_tgHtml([...new Set(r.arriendo)].slice(0, 3).join(', '))}`;
+  if (r.otros.length) txt += `\n🌎 <b>Con VPN:</b> ${_tgHtml(r.otros.join(' · '))}`;
+  if (t.sinopsis) txt += `\n\n${_tgHtml(t.sinopsis.length > 280 ? `${t.sinopsis.slice(0, 277)}…` : t.sinopsis)}`;
+  txt += '\n\n<i>Dónde ver: JustWatch vía TMDB.</i>';
+  return txt;
+}
+
+async function _buscarDondeVer(q, max) {
+  const r = await _mediaOps.buscar({ q });
+  const items = (r.items || []).slice(0, max);
+  const fichas = await Promise.all(items.map((it) => _mediaOps.titulo({ tipo: it.tipo, id: String(it.id) }).catch(() => null)));
+  return fichas.filter(Boolean);
+}
+
+async function _episodiosDeHoy() {
+  const listsDoc = await db.collection('animelists').doc(ANIME_CHAT_ID).get();
+  const viendo = listsDoc.exists && Array.isArray(listsDoc.data().viendo) ? listsDoc.data().viendo : [];
+  const porId = new Map(viendo.filter((a) => a && Number.isInteger(Number(a.id))).map((a) => [Number(a.id), a]));
+  if (!porId.size) return [];
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+  const [y, mo, d] = hoy.split('-').map(Number);
+  const off = _tzOffsetMin(new Date(), 'America/Santiago');
+  const desde = Math.floor((Date.UTC(y, mo - 1, d) - off * 60000) / 1000);
+  const hasta = desde + 86400;
+  const GQL = 'query($ids:[Int],$f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
+  const ids = [...porId.keys()];
+  const out = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const j = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: hasta });
+    out.push(...((j.data.Page && j.data.Page.airingSchedules) || []));
+  }
+  return out.map((s) => ({ s, a: porId.get(Number(s.media.id)) }));
+}
+
+exports.animeBotWebhook = onRequest(
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'], maxInstances: 2, timeoutSeconds: 30 },
+  async (req, res) => {
+    const botToken = process.env.ANIME_BOT_TOKEN;
+    if (req.method !== 'POST' || !botToken) { res.status(405).send(''); return; }
+    // 1) Firma de Telegram, antes de leer nada más.
+    const esperado = Buffer.from(_secretoWebhookAnime(botToken));
+    const recibido = Buffer.from(String(req.get('X-Telegram-Bot-Api-Secret-Token') || ''));
+    if (esperado.length !== recibido.length || !timingSafeEqual(esperado, recibido)) { res.status(401).send(''); return; }
+    const u = req.body || {};
+    try {
+      // 2) Botón «✅ Visto ep N»
+      if (u.callback_query) {
+        const cq = u.callback_query;
+        if (!ANIME_USUARIOS_PERMITIDOS.has(String(cq.from && cq.from.id))) {
+          await _tgApi(botToken, 'answerCallbackQuery', { callback_query_id: cq.id, text: 'Bot privado' });
+        } else {
+          const m = /^v:(\d{1,9}):(\d{1,5})$/.exec(String(cq.data || ''));
+          if (!m) {
+            await _tgApi(botToken, 'answerCallbackQuery', { callback_query_id: cq.id });
+          } else {
+            const r = await _marcarVistoAnime(Number(m[1]), Number(m[2]));
+            await _tgApi(botToken, 'answerCallbackQuery', { callback_query_id: cq.id, text: r ? `✓ Ep ${r.ahora} visto` : 'Ya no está en tus listas' });
+            // Cambia ese botón por «✓» en el mensaje.
+            const kb = cq.message && cq.message.reply_markup && cq.message.reply_markup.inline_keyboard;
+            if (r && Array.isArray(kb)) {
+              const nuevo = kb.map((fila) => fila.map((b) => (b.callback_data === cq.data ? { text: `✓ Visto ep ${m[2]}`, callback_data: 'x' } : b)));
+              await _tgApi(botToken, 'editMessageReplyMarkup', { chat_id: cq.message.chat.id, message_id: cq.message.message_id, reply_markup: { inline_keyboard: nuevo } });
+            }
+          }
+        }
+        res.status(200).send('');
+        return;
+      }
+
+      // 3) Búsqueda inline: @anime_estreno_bot <título>
+      if (u.inline_query) {
+        const iq = u.inline_query;
+        const q = String(iq.query || '').trim().slice(0, 80);
+        let results = [];
+        if (ANIME_USUARIOS_PERMITIDOS.has(String(iq.from && iq.from.id)) && q.length >= 2) {
+          let fichas = [];
+          try { fichas = await _buscarDondeVer(q, 6); } catch (e) { logger.warn('[animeBot] inline TMDB:', e.message); }
+          results = fichas.map((t) => {
+            const r = _resumenDondeVer(t);
+            const desc = r.enCl.length ? `Chile: ${[...new Set(r.enCl)].slice(0, 3).join(', ')}` : (r.otros.length ? `No en Chile · VPN ${r.otros[0]}` : 'Sin plataformas conocidas');
+            const thumb = t.poster && /^\/[A-Za-z0-9_.-]+$/.test(t.poster) ? `https://image.tmdb.org/t/p/w92${t.poster}` : undefined;
+            return {
+              type: 'article',
+              id: `${t.tipo}-${t.id}`.slice(0, 64),
+              title: `${t.titulo}${t.fecha ? ` (${String(t.fecha).slice(0, 4)})` : ''}`.slice(0, 120),
+              description: desc.slice(0, 200),
+              thumbnail_url: thumb,
+              input_message_content: { message_text: _mensajeDondeVer(t), parse_mode: 'HTML', link_preview_options: { is_disabled: true } },
+            };
+          });
+        }
+        await _tgApi(botToken, 'answerInlineQuery', { inline_query_id: iq.id, results, cache_time: 600, is_personal: true });
+        res.status(200).send('');
+        return;
+      }
+
+      // 4) Comandos en el chat privado
+      const msg = u.message;
+      if (msg && msg.text && ANIME_USUARIOS_PERMITIDOS.has(String(msg.from && msg.from.id))) {
+        const chat = msg.chat.id;
+        const texto = msg.text.trim();
+        const abrir = { inline_keyboard: [[{ text: '🎌 Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
+        if (/^\/(start|app)\b/.test(texto)) {
+          await _sendTelegram(botToken, chat, '🎌 <b>AnimeTracker</b>\n\n/hoy — episodios de hoy de lo que estás viendo\n/buscar &lt;título&gt; — dónde ver una película o serie\n\nEn cualquier chat: escribe <code>@anime_estreno_bot</code> y un título.', abrir);
+        } else if (/^\/hoy\b/.test(texto)) {
+          const eps = await _episodiosDeHoy();
+          if (!eps.length) {
+            await _sendTelegram(botToken, chat, 'Hoy no sale nada de lo que estás viendo.', abrir);
+          } else {
+            const lineas = eps.map(({ s, a }) => {
+              const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || '').substring(0, 45));
+              const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
+              const visto = (Number(a && a.watchedEps) || 0) >= s.episode;
+              return `${visto ? '✅' : '▶️'} <b>${t}</b> · ep ${s.episode} · ${h}`;
+            });
+            const botones = eps.filter(({ s, a }) => (Number(a && a.watchedEps) || 0) < s.episode && s.airingAt * 1000 <= Date.now()).slice(0, 8)
+              .map(({ s }) => [{ text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`, callback_data: `v:${s.media.id}:${s.episode}` }]);
+            await _sendTelegram(botToken, chat, `📅 <b>Hoy en lo que estás viendo</b>\n\n${lineas.join('\n')}`, { inline_keyboard: [...botones, ...abrir.inline_keyboard] });
+          }
+        } else {
+          const m = /^\/buscar(?:@\w+)?\s+(.{2,80})$/s.exec(texto);
+          if (m) {
+            const fichas = await _buscarDondeVer(m[1].trim(), 1);
+            await _sendTelegram(botToken, chat, fichas.length ? _mensajeDondeVer(fichas[0]) : 'No encontré ese título.', abrir);
+          } else if (/^\/buscar\b/.test(texto)) {
+            await _sendTelegram(botToken, chat, 'Escribe el título después del comando, por ejemplo: <code>/buscar dune</code>', abrir);
+          }
+        }
+      }
+    } catch (e) {
+      logger.error('[animeBot] update falló:', e.message);
+    }
+    res.status(200).send(''); // siempre 200: si no, Telegram reintenta en bucle
+  }
+);
 
 exports.animeEstrenosDiarios = onSchedule(
   {
@@ -8427,7 +9153,7 @@ exports.animeEstrenosDiarios = onSchedule(
     timeoutSeconds: 60,
     memory: '256MiB',
     retryCount: 0,
-    secrets: ['ANIME_BOT_TOKEN'],
+    secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'],
   },
   async () => {
     const token = process.env.ANIME_BOT_TOKEN;
@@ -8438,14 +9164,323 @@ exports.animeEstrenosDiarios = onSchedule(
 
 // Disparo manual del chequeo de estrenos — herramienta de admin, ningún cliente la llama.
 exports.animeEstrenosManual = onRequest(
-  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'] },
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'], maxInstances: 1 },
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
     if (!requireAdminKey(req, res)) return;
     const token = process.env.ANIME_BOT_TOKEN;
     if (!token) { res.status(500).json({ error: 'ANIME_BOT_TOKEN no configurado' }); return; }
-    await _runAnimeEstrenos(token);
-    res.json({ ok: true });
+    try {
+      // Manual = prueba: no marca el día, así el cron de las 23:00 igual envía.
+      const r = await _runAnimeEstrenos(token, { manual: true });
+      res.json({ ok: true, ...r });
+    } catch (e) {
+      logger.error('[anime] manual falló:', e.message);
+      res.status(502).json({ ok: false, error: e.message });
+    }
+  }
+);
+
+// ── animeAuth — sesión de la Mini App AnimeTracker ──────────────────────────────
+// La Mini App leía y escribía `animelists/{id}` con una regla abierta (`if true`):
+// cualquiera con la API key pública podía leer, sobrescribir o borrar las listas.
+// Ahora la Mini App manda el initData de Telegram, se valida la firma con el
+// token del bot de anime y solo los IDs de ANIME_USUARIOS_PERMITIDOS reciben un
+// custom token (uid `anime_<id>`, claim `anime_tg`). La regla exige ese claim.
+// Ese uid no tiene doc en `users`, así que no pasa ninguna guardia de la PWA.
+const ANIME_USUARIOS_PERMITIDOS = new Set([ANIME_CHAT_ID]);
+const ANIME_ORIGENES = [
+  'https://mantenimiento-planta-771a3.web.app',
+  'https://mantenimiento-planta-771a3.firebaseapp.com',
+];
+
+exports.animeAuth = onRequest(
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'], maxInstances: 2, cors: ANIME_ORIGENES },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+    const botToken = process.env.ANIME_BOT_TOKEN;
+    if (!botToken) { res.status(500).json({ error: 'Bot no configurado' }); return; }
+
+    const initData = String(req.body?.initData || '');
+    if (!initData || initData.length > 4096) { res.status(400).json({ error: 'Abre la app desde Telegram' }); return; }
+
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash') || '';
+    params.delete('hash');
+    const checkString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+    const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const expected = Buffer.from(createHmac('sha256', secretKey).update(checkString).digest('hex'), 'utf8');
+    const got = Buffer.from(hash, 'utf8');
+    if (expected.length !== got.length || !timingSafeEqual(expected, got)) {
+      res.status(401).json({ error: 'Firma de Telegram inválida' });
+      return;
+    }
+
+    const authDate = parseInt(params.get('auth_date') || '0', 10);
+    if (Math.floor(Date.now() / 1000) - authDate > 3600) {
+      res.status(401).json({ error: 'Sesión expirada, vuelve a abrir la app' });
+      return;
+    }
+
+    let tgId = '';
+    try { tgId = String(JSON.parse(params.get('user') || '{}').id || ''); } catch { /* vacío */ }
+    if (!ANIME_USUARIOS_PERMITIDOS.has(tgId)) {
+      logger.warn('[animeAuth] usuario no permitido', { tgId });
+      res.status(403).json({ error: 'Esta app es privada' });
+      return;
+    }
+
+    const uid = `anime_${tgId}`;
+    const claims = { anime_tg: tgId };
+    // La cuenta se crea con Admin SDK: el auto-registro de Auth está deshabilitado.
+    try {
+      const u = await getAuth().getUser(uid);
+      if (!u.customClaims || u.customClaims.anime_tg !== tgId) await getAuth().setCustomUserClaims(uid, claims);
+    } catch (e) {
+      if (e.code !== 'auth/user-not-found') { logger.error('[animeAuth] getUser', e.code); res.status(503).json({ error: 'Intenta de nuevo' }); return; }
+      await getAuth().createUser({ uid, displayName: 'AnimeTracker' });
+      await getAuth().setCustomUserClaims(uid, claims);
+    }
+    const token = await getAuth().createCustomToken(uid, claims);
+    res.json({ token, tgId });
+  }
+);
+
+// ── mediaApi — películas y series para AnimeTracker (TMDB) ─────────────────────
+// Proxy de solo lectura hacia TMDB con el secreto TMDB_READ_TOKEN (nunca va al
+// cliente). Solo responde a la sesión de AnimeTracker (claim anime_tg de un ID
+// permitido). Caché en memoria por instancia para no repetir consultas.
+// Datos de "dónde ver" = JustWatch vía TMDB (hay que mostrar el crédito).
+const TMDB_BASE = 'https://api.themoviedb.org/3';
+const MEDIA_LANG = 'es-MX';
+const _mediaCache = new Map();
+const MEDIA_CACHE_MAX = 400;
+const MEDIA_H = 3600 * 1000;
+
+function _mediaCacheGet(key) {
+  const hit = _mediaCache.get(key);
+  if (!hit) return null;
+  if (hit.exp < Date.now()) { _mediaCache.delete(key); return null; }
+  return hit.val;
+}
+function _mediaCacheSet(key, val, ttlMs) {
+  if (_mediaCache.size >= MEDIA_CACHE_MAX) _mediaCache.delete(_mediaCache.keys().next().value);
+  _mediaCache.set(key, { val, exp: Date.now() + ttlMs });
+}
+
+async function _tmdb(path, params, ttlMs) {
+  const qs = new URLSearchParams({ language: MEDIA_LANG, ...params }).toString();
+  const key = `${path}?${qs}`;
+  const cached = _mediaCacheGet(key);
+  if (cached) return cached;
+  const r = await fetch(`${TMDB_BASE}${path}?${qs}`, {
+    headers: { Authorization: `Bearer ${process.env.TMDB_READ_TOKEN}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!r.ok) {
+    logger.warn('[mediaApi] TMDB', { path, status: r.status });
+    const err = new Error(`TMDB ${r.status}`);
+    err.status = r.status === 404 ? 404 : 502;
+    throw err;
+  }
+  const data = await r.json();
+  _mediaCacheSet(key, data, ttlMs);
+  return data;
+}
+
+function _mediaInt(v, def, min, max) {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+}
+function _mediaIds(v) {
+  return String(v || '').split(/[|,]/).map((s) => s.trim()).filter((s) => /^\d{1,7}$/.test(s)).slice(0, 30);
+}
+function _mediaTipo(v) { return v === 'tv' ? 'tv' : 'movie'; }
+function _mediaRegion(v) { return /^[A-Z]{2}$/.test(v || '') ? v : 'CL'; }
+
+// Resumen liviano de un título para las tarjetas.
+function _mediaItem(x, tipoForzado) {
+  const tipo = tipoForzado || x.media_type;
+  if (tipo !== 'movie' && tipo !== 'tv') return null;
+  return {
+    id: x.id,
+    tipo,
+    titulo: x.title || x.name || '',
+    original: x.original_title || x.original_name || '',
+    fecha: x.release_date || x.first_air_date || '',
+    poster: x.poster_path || null,
+    fondo: x.backdrop_path || null,
+    nota: typeof x.vote_average === 'number' ? Math.round(x.vote_average * 10) / 10 : null,
+    votos: x.vote_count || 0,
+    idioma: x.original_language || '',
+    generos: x.genre_ids || [],
+  };
+}
+function _mediaLista(data, tipo) {
+  return {
+    pagina: data.page || 1,
+    paginas: Math.min(data.total_pages || 1, 50),
+    items: (data.results || []).map((x) => _mediaItem(x, tipo)).filter(Boolean),
+  };
+}
+function _mediaProveedores(bloque) {
+  if (!bloque) return null;
+  const map = (arr) => (arr || []).map((p) => ({ id: p.provider_id, nombre: p.provider_name, logo: p.logo_path }));
+  return {
+    link: bloque.link || null,
+    suscripcion: map(bloque.flatrate),
+    gratis: map([...(bloque.free || []), ...(bloque.ads || [])]),
+    arriendo: map(bloque.rent),
+    compra: map(bloque.buy),
+  };
+}
+
+const _mediaOps = {
+  // Plataformas disponibles en un país (películas + series, sin duplicar).
+  async plataformas(q) {
+    const region = _mediaRegion(q.region);
+    const [m, t] = await Promise.all([
+      _tmdb('/watch/providers/movie', { watch_region: region }, 24 * MEDIA_H),
+      _tmdb('/watch/providers/tv', { watch_region: region }, 24 * MEDIA_H),
+    ]);
+    const vistos = new Map();
+    for (const p of [...(m.results || []), ...(t.results || [])]) {
+      if (vistos.has(p.provider_id)) continue;
+      vistos.set(p.provider_id, {
+        id: p.provider_id,
+        nombre: p.provider_name,
+        logo: p.logo_path,
+        prioridad: (p.display_priorities && p.display_priorities[region]) ?? p.display_priority ?? 999,
+      });
+    }
+    return { region, items: [...vistos.values()].sort((a, b) => a.prioridad - b.prioridad) };
+  },
+
+  async buscar(q) {
+    const texto = String(q.q || '').trim().slice(0, 100);
+    if (!texto) return { pagina: 1, paginas: 1, items: [] };
+    const data = await _tmdb('/search/multi', { query: texto, include_adult: 'false', page: _mediaInt(q.page, 1, 1, 20) }, MEDIA_H);
+    return _mediaLista(data);
+  },
+
+  async tendencias(q) {
+    const tipo = ['movie', 'tv'].includes(q.tipo) ? q.tipo : 'all';
+    const data = await _tmdb(`/trending/${tipo}/week`, { page: _mediaInt(q.page, 1, 1, 10) }, 3 * MEDIA_H);
+    return _mediaLista(data, tipo === 'all' ? undefined : tipo);
+  },
+
+  async proximos(q) {
+    const data = await _tmdb('/movie/upcoming', { region: 'CL', page: _mediaInt(q.page, 1, 1, 10) }, 6 * MEDIA_H);
+    return _mediaLista(data, 'movie');
+  },
+
+  // Lo que está HOY en las plataformas dadas (por país), lo más reciente primero.
+  async descubrir(q) {
+    const tipo = _mediaTipo(q.tipo);
+    const region = _mediaRegion(q.region);
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+    const params = {
+      watch_region: region,
+      page: _mediaInt(q.page, 1, 1, 20),
+      include_adult: 'false',
+      'vote_count.gte': String(_mediaInt(q.minVotos, 20, 0, 5000)),
+    };
+    const prov = _mediaIds(q.plataformas);
+    if (prov.length) {
+      params.with_watch_providers = prov.join('|');
+      params.with_watch_monetization_types = /^[a-z|]{1,40}$/.test(q.como || '') ? q.como : 'flatrate|free|ads';
+    }
+    const generos = _mediaIds(q.generos);
+    if (generos.length) params.with_genres = generos.join(q.todos === '1' ? ',' : '|');
+    const estudios = _mediaIds(q.estudios);
+    if (estudios.length) params.with_companies = estudios.join('|');
+    if (/^[a-z]{2}$/.test(q.idiomaOriginal || '')) params.with_original_language = q.idiomaOriginal;
+    const campoFecha = tipo === 'movie' ? 'primary_release_date' : 'first_air_date';
+    if (q.orden === 'populares') {
+      params.sort_by = 'popularity.desc';
+    } else {
+      params.sort_by = `${campoFecha}.desc`;
+      params[`${campoFecha}.lte`] = hoy;
+    }
+    const data = await _tmdb(`/discover/${tipo}`, params, 3 * MEDIA_H);
+    return _mediaLista(data, tipo);
+  },
+
+  async generos(q) {
+    const tipo = _mediaTipo(q.tipo);
+    const data = await _tmdb(`/genre/${tipo}/list`, {}, 24 * 7 * MEDIA_H);
+    return { items: (data.genres || []).map((g) => ({ id: g.id, nombre: g.name })) };
+  },
+
+  // Resuelve un estudio o franquicia por nombre (Marvel Studios, Lucasfilm…).
+  async estudio(q) {
+    const texto = String(q.q || '').trim().slice(0, 60);
+    if (!texto) return { items: [] };
+    const data = await _tmdb('/search/company', { query: texto }, 24 * 7 * MEDIA_H);
+    return { items: (data.results || []).slice(0, 5).map((c) => ({ id: c.id, nombre: c.name, pais: c.origin_country || '' })) };
+  },
+
+  // Ficha completa + dónde ver en TODOS los países (el cliente pone Chile primero).
+  async titulo(q) {
+    const tipo = _mediaTipo(q.tipo);
+    const id = _mediaInt(q.id, 0, 1, 99999999);
+    if (!id) { const e = new Error('id inválido'); e.status = 400; throw e; }
+    const d = await _tmdb(`/${tipo}/${id}`, { append_to_response: 'watch/providers,external_ids' }, 12 * MEDIA_H);
+    const porPais = {};
+    const wp = (d['watch/providers'] && d['watch/providers'].results) || {};
+    for (const [pais, bloque] of Object.entries(wp)) porPais[pais] = _mediaProveedores(bloque);
+    return {
+      id: d.id,
+      tipo,
+      titulo: d.title || d.name || '',
+      original: d.original_title || d.original_name || '',
+      fecha: d.release_date || d.first_air_date || '',
+      duracion: d.runtime || (Array.isArray(d.episode_run_time) ? d.episode_run_time[0] : null) || null,
+      temporadas: d.number_of_seasons || null,
+      episodios: d.number_of_episodes || null,
+      sinopsis: d.overview || '',
+      poster: d.poster_path || null,
+      fondo: d.backdrop_path || null,
+      nota: typeof d.vote_average === 'number' ? Math.round(d.vote_average * 10) / 10 : null,
+      generos: (d.genres || []).map((g) => g.name),
+      coleccion: d.belongs_to_collection ? { id: d.belongs_to_collection.id, nombre: d.belongs_to_collection.name } : null,
+      estudios: (d.production_companies || []).slice(0, 4).map((c) => c.name),
+      imdb: (d.external_ids && d.external_ids.imdb_id) || null,
+      dondeVer: porPais,
+    };
+  },
+};
+
+exports.mediaApi = onRequest(
+  { region: 'us-central1', secrets: ['TMDB_READ_TOKEN'], maxInstances: 2, timeoutSeconds: 20, cors: ANIME_ORIGENES },
+  async (req, res) => {
+    if (req.method !== 'GET') { res.status(405).json({ error: 'GET only' }); return; }
+    const authz = String(req.get('authorization') || '');
+    const idToken = authz.startsWith('Bearer ') ? authz.slice(7) : '';
+    let claim = null;
+    try {
+      const dec = idToken ? await getAuth().verifyIdToken(idToken) : null;
+      claim = dec && dec.anime_tg ? String(dec.anime_tg) : null;
+    } catch { claim = null; }
+    if (!claim || !ANIME_USUARIOS_PERMITIDOS.has(claim)) {
+      res.status(401).json({ error: 'Sesión de AnimeTracker requerida' });
+      return;
+    }
+    const op = String(req.query.op || '');
+    const fn = Object.prototype.hasOwnProperty.call(_mediaOps, op) ? _mediaOps[op] : null;
+    if (!fn) { res.status(400).json({ error: 'Operación desconocida' }); return; }
+    if (!process.env.TMDB_READ_TOKEN) { res.status(500).json({ error: 'TMDB no configurado' }); return; }
+    try {
+      const data = await fn(req.query);
+      res.set('Cache-Control', 'private, max-age=300');
+      res.json(data);
+    } catch (e) {
+      res.status(e.status || 500).json({ error: e.status === 404 ? 'No encontrado' : 'Error consultando TMDB' });
+    }
   }
 );
 
@@ -8958,16 +9993,29 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     const indexByPlant = new Map()
     let refrescados = 0
 
+    const hallazgosMonitor = []
     for (const d of activos) {
       try {
         const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant)
         if (!patch) continue
         await d.ref.set(patch, { merge: true })
         refrescados++
+        // Guardia regla 2: solo cuando el write que disparó esto es el del turno
+        // que el monitor muestra (así el padre ya está en memoria, sin leer).
+        const sid = patch.shiftDocId ?? d.data().shiftDocId
+        if (sid === `${shiftDoc}` && after) {
+          hallazgosMonitor.push(...guardiaTurnosMod.revisarMonitor({ plantSlug: plant, shiftDocId: sid, live: patch.live, parent: after }))
+        }
       } catch (err) {
         // Un monitor roto no puede tumbar el refresco de los demás.
         logger.error('[publicShiftMonitor] no se pudo refrescar', { token: d.id, error: err.message })
       }
+    }
+
+    try {
+      await guardiaTurnosMod.avisarHallazgos({ db, hallazgos: hallazgosMonitor, enviar: (t) => sendTelegramMessage(t) })
+    } catch (e) {
+      logger.warn('[publicShiftMonitor] guardia de horario falló:', e.message)
     }
 
     if (refrescados > 0) {

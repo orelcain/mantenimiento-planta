@@ -14,6 +14,8 @@ interface InlineEditNameProps {
   inputClassName?: string
   /** Placeholder when empty */
   placeholder?: string
+  /** Texto a mostrar si debe diferir del valor que se edita (p. ej. el nombre SAP formateado). */
+  display?: string
 }
 
 /**
@@ -29,6 +31,7 @@ export function InlineEditName({
   textClassName = '',
   inputClassName = '',
   placeholder = '',
+  display,
 }: InlineEditNameProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -123,7 +126,7 @@ export function InlineEditName({
         onDoubleClick={startEdit}
         title={canEdit ? 'Doble-clic para editar' : undefined}
       >
-        {value || placeholder}
+        {display || value || placeholder}
       </span>
       {canEdit && (
         <Pencil

@@ -41,6 +41,8 @@ import { getEquipments } from '@/services/equipment'
 import { subscribeToIncidents } from '@/services/incidents'
 import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
+import { modoHerramienta } from '@/lib/rutasHerramienta'
+import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
 import { enBitacora, pedirNuevoEvento } from '@/services/bitacora/pedirNuevoEvento'
 import { RotuloNuevoEvento } from '@/components/bitacora/RotuloNuevoEvento'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
@@ -53,7 +55,9 @@ import { useUploadQueueStore } from '@/store/uploadQueueStore'
 import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/services/permissions'
 import { loadSidebarConfig } from '@/services/sidebarConfig'
 import { useTheme } from '@/hooks/useTheme'
+import { ControlIntensidad } from '@/components/piel/ControlIntensidad'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
+import { useContadorVistas } from '@/hooks/useContadorVistas'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
@@ -111,7 +115,9 @@ const navGroups: NavGroup[] = [
       { name: 'Análisis de turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
       { name: 'Clima del puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
       { name: 'Planos de aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
-      { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
+      // HMI Knuro y HMI Grader NO van en el menú: se entra solo desde el Centro de
+      // Aprendizaje (/aprendizaje/hmi-*). Los editores (/hmi-knuro, /hmi-grader, solo admin)
+      // se abren con el botón de edición dentro de cada simulador.
       { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
     ],
   },
@@ -171,6 +177,7 @@ export const ALL_NAV_ITEMS: ReadonlyArray<NavItemMeta> = navGroups.flatMap((g) =
 export function MainLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  useContadorVistas()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = useIsAdmin()
@@ -208,10 +215,18 @@ export function MainLayout() {
   const { setZones, setEquipment, setIncidents } = useAppStore()
   const isGanttRoute = location.pathname.startsWith('/gantt')
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
-  const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro')
+  // Editor (/hmi-knuro) y simulador público con sesión (/aprendizaje/hmi-knuro): ambos son
+  // un iframe a pantalla útil, sin el pb-24 de Aprendizaje que dejaba un segundo scroll.
+  const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro') || location.pathname.startsWith('/aprendizaje/hmi-knuro')
   const isBaader200Route = location.pathname.startsWith('/baader-200')
   const isPlanosAguasRoute = location.pathname.startsWith('/planos-aguas')
   const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
+  // Herramientas del Centro de Aprendizaje (HMI, Perilla, A3C, planos, fichas…): pantalla completa
+  // con su propio EncabezadoHerramienta. Sin barra inferior, sin botón flotante de ARIA y sin el
+  // botón «Activar ARIA»: el usuario vuelve con el encabezado, el atrás del sistema o «Más».
+  // El hub /aprendizaje devuelve null y conserva todo. Ver lib/rutasHerramienta.ts.
+  const modoHerr = modoHerramienta(location.pathname)
+  useEffect(() => (modoHerr ? ocultarBurbujaChat() : undefined), [modoHerr])
   const isMapRoute = location.pathname.startsWith('/map')
   // Repuestos: lente área-first con 3 paneles (sidebar/lista/detalle) que scrollean
   // independientes → necesita contenedor de altura acotada + overflow-hidden (como Clima/HMI).
@@ -673,6 +688,7 @@ export function MainLayout() {
               {/* User dropdown */}
               {userMenuOpen && (
                 <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                  <ControlIntensidad />
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -804,6 +820,7 @@ export function MainLayout() {
 
                   {userMenuOpen && (
                     <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                      <ControlIntensidad />
                       <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -1172,7 +1189,12 @@ export function MainLayout() {
         <main
           id="main-content"
           className={`${
-            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute || isLineasRoute
+            modoHerr === 'lienzo'
+              // Alto exacto del dispositivo: ya no hay barra inferior que descontar (antes -4rem).
+              ? 'h-[100dvh] lg:h-[calc(100dvh-3.5rem)] p-0 overflow-hidden pb-[env(safe-area-inset-bottom)] lg:pb-0'
+              : modoHerr === 'lectura'
+              ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-[env(safe-area-inset-bottom)] lg:pb-0'
+              : isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute || isLineasRoute
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-24 lg:pb-0'
@@ -1242,10 +1264,10 @@ export function MainLayout() {
       {canSee('aria') && <ChatBot />}
 
       {/* Botón para que admin active ARIA si no está habilitado */}
-      {!canSee('aria') && isAdmin && (
+      {!canSee('aria') && isAdmin && !modoHerr && (
         <button
           onClick={handleEnableAria}
-          className="fixed right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all hover:scale-105 bottom-24 lg:bottom-6"
+          className="fixed right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 pizarra:bg-none pizarra:bg-primary pizarra:text-primary-foreground transition-all hover:scale-105 bottom-24 lg:bottom-6"
           title="Activar el asistente ARIA"
         >
           <Bot className="h-5 w-5" />
@@ -1264,7 +1286,7 @@ export function MainLayout() {
           // rectangular de borde a borde con border-t era iOS 15. Sin border-t:
           // el borde lo pone el inset de 0.5px del propio material.
           'lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav',
-          location.pathname === '/' && 'hidden',
+          (location.pathname === '/' || modoHerr) && 'hidden',
         )}
         // Flota 12px por encima de la safe area (el home indicator), no se apoya en ella.
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}

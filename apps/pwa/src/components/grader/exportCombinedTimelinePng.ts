@@ -4,6 +4,13 @@
  * upstream), apilados en el orden DOM. Útil para compartir el timeline
  * completo del turno en un solo archivo (Slack, email, ticket).
  *
+ * Colores: sin la paleta Pizarra el archivo sale EXACTAMENTE como siempre (fondo slate-900, tintas
+ * claras). Con ella, el fondo, el encabezado y el separador siguen a la tarjeta y a las tintas del
+ * tema activo (Día = archivo claro, Penumbra = oscuro), igual que los gráficos que se capturan, que
+ * ya están dibujados con los tokens de ese tema. No se fuerza «la paleta de hoy» al exportar: habría
+ * que volver a dibujar cada gráfico con otras opciones, y el PNG debe verse como la pantalla de la
+ * que sale (se comparte tal cual por Slack, correo o ticket).
+ *
  * Implementación:
  *   1. Enumera DOM por `[_echarts_instance_]` filtrando por `inst.group`
  *   2. Por cada chart: getDataURL PNG con pixel ratio 2x
@@ -12,6 +19,7 @@
  */
 
 import * as echarts from 'echarts'
+import { elegirColor } from '@/lib/coloresGrafico'
 
 export interface CombinedExportMetadata {
   /** Encabezado principal (ej. "Análisis de Turno · 2026-02-26 · Turno día") */
@@ -64,7 +72,7 @@ export async function exportCombinedTimelinePng(
       url: inst.getDataURL({
         type: 'png',
         pixelRatio: 2,
-        backgroundColor: '#0f172a',  // slate-900 — consistente con header
+        backgroundColor: elegirColor('#0f172a', 'card'),  // slate-900 — consistente con header
       }) as string,
       cssWidth: Math.round(rect.width),
       cssHeight: Math.round(rect.height),
@@ -102,15 +110,15 @@ export async function exportCombinedTimelinePng(
   if (!ctx) throw new Error('Canvas 2D context no disponible')
 
   // 5. Pintar fondo + header
-  ctx.fillStyle = '#0f172a'  // slate-900
+  ctx.fillStyle = elegirColor('#0f172a', 'card')  // slate-900
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-  ctx.fillStyle = '#f8fafc'  // slate-50
+  ctx.fillStyle = elegirColor('#f8fafc', 'foreground')  // slate-50
   ctx.font = `${600 * (PIXEL_RATIO / 2)} ${15 * PIXEL_RATIO}px system-ui, -apple-system, sans-serif`
   ctx.textBaseline = 'top'
   ctx.fillText(meta.title, 16 * PIXEL_RATIO, 12 * PIXEL_RATIO)
   if (meta.subtitle) {
-    ctx.fillStyle = '#94a3b8'  // slate-400
+    ctx.fillStyle = elegirColor('#94a3b8', 'muted-foreground')  // slate-400
     ctx.font = `${11 * PIXEL_RATIO}px system-ui, -apple-system, sans-serif`
     ctx.fillText(meta.subtitle, 16 * PIXEL_RATIO, 33 * PIXEL_RATIO)
   }
@@ -122,9 +130,9 @@ export async function exportCombinedTimelinePng(
     const cap = captures[i]!
     // Sub-header antes del primer chart upstream (idx === 1)
     if (i === 1 && hasUpstream) {
-      ctx.fillStyle = '#1e293b'  // slate-800
+      ctx.fillStyle = elegirColor('#1e293b', 'muted')  // slate-800
       ctx.fillRect(0, yCss * PIXEL_RATIO, canvas.width, SEPARATOR_H_CSS * PIXEL_RATIO)
-      ctx.fillStyle = '#a78bfa'  // violet-400
+      ctx.fillStyle = elegirColor('#a78bfa', 'foreground')  // violet-400
       ctx.font = `${600 * (PIXEL_RATIO / 2)} ${12 * PIXEL_RATIO}px system-ui, -apple-system, sans-serif`
       ctx.fillText('⚡ Línea upstream — Evisceradoras Baader 142', 16 * PIXEL_RATIO, (yCss + 8) * PIXEL_RATIO)
       yCss += SEPARATOR_H_CSS

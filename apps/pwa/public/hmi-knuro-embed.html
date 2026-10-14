@@ -9,6 +9,8 @@
 <meta name="apple-mobile-web-app-title" content="Knuro HMI">
 <meta name="theme-color" content="#1a1c22">
 <title>Knuro HMI — B2</title>
+<script src="embed-tema.js"></script>
+<script src="embed-zoom.js"></script>
 <script>
 const _m={name:"Knuro HMI",short_name:"Knuro HMI",display:"standalone",background_color:"#1a1c22",theme_color:"#1a1c22",orientation:"any",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%231a1c22'/><text x='50%' y='55%' font-size='80' text-anchor='middle' dominant-baseline='middle' fill='%234499ff'>K</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
 const _b=new Blob([JSON.stringify(_m)],{type:'application/json'});const _l=document.createElement('link');_l.rel='manifest';_l.href=URL.createObjectURL(_b);document.head.appendChild(_l);
@@ -130,7 +132,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .rp-sec{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
 .rp-sec.collapsed{flex:none;}
 .rp-sec-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none;flex-shrink:0;}
-.rp-sec-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
+.rp-sec-hdr span{font-size:12px;font-weight:600;color:var(--ac2);flex:1;}
 .rp-sec-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
 .rp-sec-hdr.open .arr{transform:rotate(90deg);}
 .rp-body{overflow:hidden;transition:max-height .25s ease;flex:1;display:flex;flex-direction:column;min-height:0;}
@@ -154,7 +156,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .psp{flex:1;display:flex;flex-direction:column;overflow:hidden;border-top:1px solid var(--bdr);}
 .psp.collapsed{flex:none;margin-top:auto;}
 .psp-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;flex-shrink:0;cursor:pointer;user-select:none;border-bottom:1px solid var(--bdr);}
-.psp-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
+.psp-hdr span{font-size:12px;font-weight:600;color:var(--ac2);flex:1;}
 .psp-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
 .psp-hdr.open .arr{transform:rotate(90deg);}
 .psp-body{overflow:hidden;transition:max-height .3s ease;display:flex;flex-direction:column;flex:1;min-height:0;}
@@ -165,10 +167,10 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .ptab.active{background:#1a2844;color:#88aaff;border-color:var(--ac2);}
 /* preset activo */
 .ps-curr{background:#0d2244;border:1px solid #2255aa;border-radius:5px;padding:7px 10px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
-.ps-curr-lbl{font-size:8px;color:#5580bb;letter-spacing:1.5px;text-transform:uppercase;}
+.ps-curr-lbl{font-size:12px;font-weight:600;color:#5580bb;}
 .ps-curr-name{font-size:13px;font-weight:700;color:#aaccff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* lista */
-.ps-list-hdr{font-size:8px;color:#444;letter-spacing:1.5px;text-transform:uppercase;padding:4px 0 2px;border-bottom:1px solid #1e2028;flex-shrink:0;}
+.ps-list-hdr{font-size:12px;font-weight:600;color:#444;padding:4px 0 2px;border-bottom:1px solid #1e2028;flex-shrink:0;}
 #pl{flex:1;overflow-y:auto;min-height:0;}
 #pl::-webkit-scrollbar{width:3px;}
 #pl::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
@@ -209,7 +211,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .cmp-tbl tr:nth-child(even) td{background:#111318;}
 .cmp-diff{color:#ffbb44!important;font-weight:600;}
 .cmp-lbl{color:#aaa;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.2;font-size:9px;}
-.cmp-sec-hdr td{background:#0a1a30!important;color:#4a8ac4!important;font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 5px 2px;border-top:1px solid #1a3060!important;}
+.cmp-sec-hdr td{background:#0a1a30!important;color:#4a8ac4!important;font-size:12px;font-weight:700;padding:4px 5px 2px;border-top:1px solid #1a3060!important;}
 .cmp-summary{font-size:9px;color:#666;margin-bottom:5px;}
 .cmp-summary b{color:#ffbb44;}
 /* bottom bar */
@@ -218,7 +220,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 #ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;}
 @media(max-width:1100px){#rp{width:260px;}}
 @media(max-width:860px){
-  #tb,#bb{display:flex;}
+  #tb{display:flex;} /* #bb (🏠🔔🔧 + migas) se omite: repetía la cabecera y los botones Principal/Alarma/Menú Técnico del propio panel */
   .hml{display:none;}
   #hp{padding:8px 0;justify-content:flex-start;align-items:center;overflow:auto;}
   .dev{padding:10px 8px 8px;border-radius:10px;}
@@ -263,13 +265,537 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box .tip-save{display:inline-block;margin-top:4px;padding:2px 10px;background:#2266aa;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:10px;}
 .tip-box .tip-save:hover{background:#1a5090;}
 .tip-chk{vertical-align:middle;margin-right:3px;cursor:pointer;}
-label.tip-lbl{font-size:9px;color:#885500;cursor:pointer;}
+label.tip-lbl{font-size:12px;color:#885500;cursor:pointer;}
 /* ── MODO APRENDIZAJE (readonly) ── */
-.readonly-banner{background:#1a3a6a;color:#7ec8ff;padding:3px 10px;font-size:10px;text-align:center;letter-spacing:0.5px;flex-shrink:0;border-bottom:1px solid #2a5a9a;}
+.readonly-banner{background:#1a3a6a;color:#7ec8ff;padding:3px 10px;font-size:12px;text-align:center;flex-shrink:0;border-bottom:1px solid #2a5a9a;}
 body.readonly .psp{display:none!important;}
 body.readonly input.fe,body.readonly input.fe1,body.readonly select{pointer-events:none;opacity:0.65;user-select:none;}
 body.readonly #tip-vis-btn{display:none!important;}
 body.readonly .tip-i{cursor:default;}
+/* ── Ícono de ayuda (nativo del HMI, se escala con él). Neutro para todos; el único color
+   es ámbar relleno cuando el valor actual difiere del predeterminado (span.fr). El origen
+   (manual / deducido) ya no se codifica aquí: se lee al abrir la ayuda.
+   .b1 conserva el borde de 1 px que tenían los íconos «manual» para que la caja del ícono,
+   y con ella la etiqueta del HMI alineada a la derecha, no se mueva ni un píxel. ── */
+.tip-i.has-text{background:#fff;border:1.5px solid #8E8E93;}
+.tip-i.has-text::after{color:#636366;}
+.tip-i.has-text.b1{border-width:1px;}
+.tip-i.o-sindato{background:transparent;border-style:dotted;border-color:#AEAEB2;}
+.tip-i.o-sindato::after{color:#AEAEB2;}
+.tip-i.v-chg{background:#C98A1E;border-color:#C98A1E;border-style:solid;}
+.tip-i.v-chg::after{color:#fff;}
+.sc .pt .plb,.sc td:has(> input[id]){cursor:pointer;}
+body.readonly .sc td:has(> input[id]){cursor:pointer;}
+/* Campo marcado por la ayuda */
+.sc input.kn-ring{outline:3px solid #2E75B6;outline-offset:3px;box-shadow:0 0 0 9px rgba(46,117,182,.22);position:relative;z-index:1;opacity:1!important;}
+.sc tr.kn-ring-row>td{background:rgba(46,117,182,.10);}
+
+/* ══ AYUDA v4 · «Ventana del panel» (alternativa A). Grises, bisel de los botones .hb y barra
+   tipo .sh del propio X2; lo que la marca como ayuda (y no como pantalla) es la etiqueta azul
+   «AYUDA» y la sombra. SIEMPRE clara: el panel real es claro aunque la app esté en oscuro.
+   · Globo PC: vive DENTRO de #hs (escala con el panel); --k compensa la escala para que el
+     texto se lea ≥13 px reales. · Celular horizontal: globo al costado, en px reales, fuera
+     de #hs. · Hoja (celular vertical), lista, buscador y «?»: misma familia, en px reales. ══ */
+:root{
+  --kh-bg:#e8e8ee;--kh-card:#f4f4f4;
+  --kh-label:#111;--kh-label2:#555;--kh-label3:#9090a0;
+  --kh-sep:#d4d4dc;--kh-fill:#dcdce8;
+  --kh-accent:#1e3f7a;--kh-accent-tint:rgba(30,63,122,.10);
+  --kh-warn-ink:#8a5a00;
+  --kh-pop-shadow:0 3px 8px rgba(0,0,0,.28);
+  --kh-ui:Arial,Helvetica,sans-serif;
+  --kh-mono:"Courier New",monospace;
+  --kh-e-out:cubic-bezier(.22,.9,.24,1);
+  --kh-pulse:rgba(30,63,122,.10);
+}
+.kh{font-family:var(--kh-ui);color:var(--kh-label);color-scheme:light;}
+.kh p{margin:0;}
+.kh b{font-weight:bold;}
+.kh svg{flex-shrink:0;}
+.kh :focus-visible{outline:2px solid #4499ff;outline-offset:1px;}
+/* Barra de la ventana (= .sh del panel): etiqueta AYUDA + título + cerrar */
+.kh-bar{display:flex;align-items:center;gap:6px;background:#dcdcdc;border-bottom:1px solid #c0c0c0;}
+.kh-kind{flex:none;background:#1e3f7a;color:#fff;font:bold 9.5px/1 Arial,Helvetica,sans-serif;letter-spacing:.06em;padding:3px 5px;border-radius:2px;}
+.kh-ttl{flex:1;min-width:0;font:bold 13px/1.2 Arial,Helvetica,sans-serif;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kh-x{flex:none;position:relative;width:22px;height:20px;padding:0;margin:0;background:#dcdce8;border:1px solid #9090a0;border-bottom:2px solid #707080;border-radius:2px;color:#222;display:grid;place-items:center;cursor:pointer;}
+.kh-x::after{content:"";position:absolute;inset:-10px;}
+.kh-x svg{width:10px;height:10px;}
+.kh-x:active,.kh-mas:active,.kh-btn-tint:active{background:#c0c0cc;}
+/* Cuerpo */
+.kh-bd{display:flex;flex-direction:column;gap:5px;padding:6px 8px 8px;}
+.kh-eyebrow,.kh-lbl{display:block;font-size:12px;font-weight:bold;color:#555;}
+.kh-org{display:flex;align-items:flex-start;gap:5px;font-size:12px;line-height:1.35;color:#555;}
+.kh-org svg{width:12px;height:12px;margin-top:1px;}
+.kh-org b{color:#222;}
+.kh-val{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 6px;padding:3px 0;border-top:1px solid #d4d4dc;border-bottom:1px solid #d4d4dc;}
+.kh-val .n{font:bold 18px/1.15 "Courier New",monospace;color:#111;overflow-wrap:anywhere;}
+.kh-val .u{font-size:12px;color:#555;}
+.kh-val .st{margin-left:auto;font-size:12px;color:#555;}
+.kh-val.chg .n{color:#8a5a00;}
+.kh-val.chg .st{color:#8a5a00;font-weight:bold;}
+.kh-blk{display:flex;flex-direction:column;gap:1px;}
+.kh-blk .h{font-size:12px;font-weight:bold;color:#555;}
+.kh-blk p{font-size:13px;line-height:1.35;}
+/* «Más ▸»: botón del panel; despliega «Por qué importa» y «Si queda muy bajo o muy alto» */
+.kh-mas{align-self:flex-end;display:inline-flex;align-items:center;gap:6px;background:#dcdce8;border:1px solid #9090a0;border-bottom:2px solid #707080;border-radius:2px;font:12px Arial,Helvetica,sans-serif;color:#111;padding:3px 10px;cursor:pointer;}
+.kh-xtra{display:flex;flex-direction:column;gap:5px;}
+.kh-xtra[hidden]{display:none;}
+.kh-lohi{display:flex;flex-direction:column;gap:4px;}
+.kh-lohi>div{display:grid;grid-template-columns:14px minmax(0,1fr);gap:1px 5px;}
+.kh-lohi svg{width:12px;height:12px;color:#555;margin-top:2px;}
+.kh-lohi .h{font-size:12px;font-weight:bold;color:#555;}
+.kh-lohi p{grid-column:2;font-size:13px;line-height:1.35;}
+.kh-btn-tint{align-self:flex-start;background:#dcdce8;border:1px solid #9090a0;border-bottom:2px solid #707080;border-radius:2px;font:bold 12px Arial,Helvetica,sans-serif;color:#111;padding:4px 10px;cursor:pointer;}
+/* Globo PC: dentro de #hs, en px lógicos del HMI. .kh-z lleva el zoom que compensa la escala. */
+.kh-pop{position:absolute;z-index:50;--k:1;background:#f4f4f4;border:1px solid #9090a0;border-bottom:2px solid #707080;border-radius:3px;box-shadow:var(--kh-pop-shadow);}
+.kh-pop>.kh-z{zoom:var(--k);width:280px;}
+.kh-pop .kh-bar{height:26px;padding:0 3px 0 6px;border-radius:2px 2px 0 0;}
+.kh-pop .kh-bd{overflow:auto;overscroll-behavior:contain;}
+.kh-pop .kh-blk.q .h{display:none;}            /* compacto: el texto ya dice qué hace */
+.kh-pop.kh-more-open .kh-blk.q .h{display:block;}
+.kh-pk{position:absolute;width:calc(10px * var(--k));height:calc(10px * var(--k));transform:rotate(45deg);pointer-events:none;}
+.kh-pk.abajo{bottom:calc(-7px * var(--k));background:#f4f4f4;border-right:1px solid #9090a0;border-bottom:2px solid #707080;}
+.kh-pk.arriba{top:calc(-6px * var(--k));background:#dcdcdc;border-left:1px solid #9090a0;border-top:1px solid #9090a0;}
+.kh-pk.izq{left:-6px;background:#f4f4f4;border-left:1px solid #9090a0;border-bottom:1px solid #9090a0;}
+.kh-pk.der{right:-6px;background:#f4f4f4;border-right:1px solid #9090a0;border-top:1px solid #9090a0;}
+.kh-pk[hidden]{display:none;}
+/* Globo del celular horizontal: al costado de la fila, en px reales (fuera de #hs) */
+.kh-pop.kh-side{position:fixed;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.4);display:flex;flex-direction:column;}
+.kh-pop.kh-side>.kh-z{zoom:1;width:auto;display:flex;flex-direction:column;min-height:0;flex:1;}
+.kh-side .kh-bar{height:36px;padding:0 0 0 10px;gap:8px;flex:none;}
+.kh-side .kh-kind{font-size:11px;padding:4px 6px;}
+.kh-side .kh-ttl{font-size:15px;}
+.kh-side .kh-x{width:44px;height:35px;border:0;border-left:1px solid #c0c0c0;border-radius:0;background:transparent;}
+.kh-side .kh-x::after{display:none;}
+.kh-side .kh-x svg{width:14px;height:14px;}
+.kh-side .kh-bd{padding:8px 10px 10px;gap:6px;min-height:0;overflow:auto;}
+.kh-side .kh-org,.kh-side .kh-val .u,.kh-side .kh-val .st,.kh-side .kh-blk .h,.kh-side .kh-lohi .h,.kh-side .kh-lbl,.kh-side .kh-eyebrow{font-size:14px;}
+.kh-side .kh-org svg{width:14px;height:14px;}
+.kh-side .kh-val .n{font-size:20px;}
+.kh-side .kh-blk p,.kh-side .kh-lohi p{font-size:15px;line-height:1.4;}
+.kh-side .kh-mas{font-size:14px;padding:6px 12px;min-height:36px;}
+.kh-side .kh-btn-tint{font-size:14px;min-height:36px;}
+/* Hoja inferior (celular vertical): fuera de #hs, px reales */
+/* Alto según contenido: tope 58 % (92 % con «Más» o arrastrada arriba); el cuerpo hace scroll si excede */
+.kh-sheet{position:fixed;left:0;right:0;bottom:0;z-index:10000;max-height:58vh;max-height:58dvh;background:#f4f4f4;border-top:1px solid #9090a0;border-radius:6px 6px 0 0;box-shadow:0 -4px 14px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateY(0);transition:transform 350ms var(--kh-e-out),height 350ms var(--kh-e-out);}
+.kh-sheet.kh-more-open{max-height:92vh;max-height:92dvh;}
+.kh-sheet.kh-full{height:92vh;height:92dvh;max-height:92vh;max-height:92dvh;}
+.kh-sheet.kh-enter,.kh-sheet.kh-leave{transform:translateY(100%);}
+.kh-sheet .kh-bar{min-height:52px;padding:4px 4px 4px 12px;gap:8px;border-radius:6px 6px 0 0;touch-action:none;flex-shrink:0;}
+.kh-sheet .kh-kind{font-size:11px;padding:4px 6px;}
+.kh-sheet .kh-ttl{font-size:17px;white-space:normal;overflow-wrap:anywhere;}
+.kh-sheet .kh-x{width:44px;height:44px;}
+.kh-sheet .kh-x::after{display:none;}
+.kh-sheet .kh-x svg{width:16px;height:16px;}
+.kh-sheet-body{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:12px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;}
+.kh-sheet .kh-org,.kh-sheet .kh-blk .h,.kh-sheet .kh-lohi .h,.kh-sheet .kh-val .u,.kh-sheet .kh-val .st,.kh-sheet .kh-lbl,.kh-sheet .kh-eyebrow{font-size:15px;}
+.kh-sheet .kh-org svg{width:15px;height:15px;margin-top:2px;}
+.kh-sheet .kh-val{padding:6px 0;}
+.kh-sheet .kh-val .n{font-size:26px;}
+.kh-sheet .kh-blk p,.kh-sheet .kh-lohi p{font-size:16px;line-height:1.45;}
+.kh-sheet .kh-lohi>div{grid-template-columns:18px minmax(0,1fr);}
+.kh-sheet .kh-lohi svg{width:15px;height:15px;margin-top:3px;}
+.kh-sheet .kh-mas{align-self:stretch;min-height:44px;font-size:15px;justify-content:space-between;padding:0 12px;}
+.kh-sheet .kh-btn-tint{min-height:44px;font-size:15px;padding:0 14px;}
+body.kh-sheet-open #hp{padding-bottom:58vh;padding-bottom:var(--kh-sheet-h,58dvh);}
+/* Lista de campos (celular): encabezado tipo .sh, filas de 48 px */
+#kn-help-list{width:100%;flex-shrink:0;background:#f4f4f4;padding:0 0 16px;margin-top:8px;}
+#kn-help-list[hidden]{display:none;}
+.kh-list-h{display:flex;align-items:center;gap:8px;min-height:44px;background:#dcdcdc;border-bottom:1px solid #c0c0c0;padding:0 4px 0 14px;font:bold 14px Arial,Helvetica,sans-serif;color:#222;}
+.kh-list-h span{flex:1;min-width:0;}
+.kh-list-h .kh-x{display:none;width:44px;height:36px;}
+.kh-list-h .kh-x::after{display:none;}
+.kh-list-h .kh-x svg{width:14px;height:14px;}
+/* Encabezado de grupo: el origen aparece una vez por grupo, no en cada fila */
+.kh-gh{font-size:13px;line-height:1.35;color:#555;padding:10px 14px 4px;margin:0;display:flex;align-items:flex-start;gap:6px;font-weight:normal;}
+.kh-gh svg{width:14px;height:14px;margin-top:1px;}
+.kh-gh b{font-weight:bold;color:#222;}
+.kh-glist{background:#f4f4f4;border-top:1px solid #d4d4dc;}
+.kn-row{display:grid;grid-template-columns:minmax(0,1fr) auto 8px;gap:2px 10px;align-items:center;width:100%;min-height:48px;padding:6px 14px;position:relative;background:transparent;border:0;border-bottom:1px solid #d4d4dc;text-align:left;color:#111;font:16px/1.3 Arial,Helvetica,sans-serif;cursor:pointer;}
+.kn-row .l{font-size:16px;line-height:1.3;grid-column:1;overflow-wrap:anywhere;}
+.kn-row .val{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+.kn-row .cur{font:bold 16px/1.2 "Courier New",monospace;}
+.kn-row.chg .cur,.kn-row.chg .def{color:#8a5a00;}
+.kn-row .def{font-size:13px;color:#555;}
+.kn-row .chev{grid-column:3;grid-row:1 / span 2;width:8px;height:13px;color:#9090a0;}
+.kn-row.sel{background:var(--kh-accent-tint);}
+.kn-row:active{background:#dcdce8;}
+@media (min-width:768px){#kn-help-list{display:none!important;}}
+@media (prefers-reduced-motion:reduce){.kh-sheet{transition:none;}}
+
+/* ══ BARRA DEL SIMULADOR: buscador + «?» de pantalla. Vive FUERA del panel (.dev):
+   el HMI conserva su aspecto. Misma familia que el globo: campo = input.fe, botón = .hb. ══ */
+#kn-bar{align-self:stretch;display:flex;align-items:center;gap:16px;margin:0 24px 10px;flex-shrink:0;min-width:0;}
+#kn-bar .hml{margin:0;align-self:center;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kn-tools{display:flex;align-items:center;gap:8px;margin-left:auto;flex:0 1 460px;min-width:0;}
+.kn-search{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:36px;background:#fff;border:1px solid #888;border-radius:0;padding:0 10px;color:#555;cursor:text;}
+.kn-search svg{width:16px;height:16px;}
+.kn-search input{all:unset;flex:1;min-width:0;height:100%;font:15px/20px Arial,Helvetica,sans-serif;color:#111;}
+.kn-search input::placeholder{color:#666;opacity:1;}
+.kn-search:focus-within{border-color:#4499ff;background:#fffff8;box-shadow:0 0 0 1px #4499ff;}
+.kn-search input:focus,.kn-search input:focus-visible{outline:none;box-shadow:none;}
+.kn-kbd{font:12px/16px "Courier New",monospace;color:#555;border:1px solid #9090a0;border-bottom-width:2px;border-radius:2px;padding:0 5px;background:#f4f4f4;}
+.kn-search:focus-within .kn-kbd{display:none;}
+#kn-scr-btn{flex-shrink:0;height:36px;background:#dcdce8;border:1px solid #9090a0;border-bottom:2px solid #707080;border-radius:2px;color:#111;font:bold 14px/18px Arial,Helvetica,sans-serif;display:inline-flex;align-items:center;gap:8px;padding:0 12px 0 6px;cursor:pointer;white-space:nowrap;}
+#kn-scr-btn .q{width:22px;height:22px;border-radius:2px;background:#1e3f7a;color:#fff;display:grid;place-items:center;font-weight:bold;font-size:15px;line-height:1;}
+#kn-scr-btn[hidden]{display:none;}
+#kn-scr-btn:active{background:#c0c0cc;}
+#kn-scr-btn.empty{border-style:dashed;border-bottom-width:1px;color:#555;}
+#kn-scr-btn.empty .q{background:#9090a0;}
+#kn-scr-btn[aria-expanded="true"]{background:#1e3f7a;border-color:#1e3f7a;color:#fff;}
+#kn-scr-btn[aria-expanded="true"] .q{background:#fff;color:#1e3f7a;}
+#kn-scr-btn:focus-visible{outline:2px solid #4499ff;outline-offset:2px;}
+/* Resultados: misma ventana del panel. Filas = .kn-row, grupos = .kh-gh + .kh-glist */
+.kn-res{position:fixed;z-index:10001;background:#f4f4f4;border:1px solid #9090a0;border-bottom:2px solid #707080;border-radius:3px;box-shadow:var(--kh-pop-shadow);overflow:auto;overscroll-behavior:contain;padding:0 0 6px;max-height:min(62vh,540px);}
+.kn-res[hidden]{display:none;}
+.kn-res mark{background:#ffe9a8;color:#111;padding:0 1px;font-weight:bold;}
+.kn-res .kn-row:hover{background:var(--kh-accent-tint);}
+.kn-res .more,.kn-empty{padding:10px 14px;font-size:13px;line-height:1.35;color:#555;}
+.kn-empty{font-size:15px;}
+/* Fila «Para qué sirve esta pantalla» de la lista del celular */
+.kn-row .s{grid-column:1;font-size:13px;line-height:1.35;color:#555;display:flex;align-items:flex-start;gap:6px;}
+.kn-row .s svg{width:14px;height:14px;margin-top:1px;}
+.kn-scr-g{margin-bottom:4px;}
+/* Marca del campo elegido desde el buscador: late dos veces */
+@keyframes knPulse{50%{box-shadow:0 0 0 16px var(--kh-pulse);}}
+.sc input.kn-ring.kn-pulse{animation:knPulse .6s ease-in-out 2;}
+@media (max-width:860px){
+  #kn-bar{margin:4px 16px 10px;}
+}
+@media (max-width:767px){
+  .kn-tools{flex:1 1 auto;}
+  .kn-search{height:44px;padding:0 12px;}
+  .kn-search input{font-size:16px;line-height:22px;}
+  .kn-kbd{display:none;}
+  #kn-scr-btn{width:44px;height:44px;padding:0;justify-content:center;}
+  #kn-scr-btn .lbl{display:none;}
+  .kn-res{left:0!important;right:0;width:auto!important;bottom:0;max-height:none;border:0;border-top:1px solid #9090a0;border-radius:0;box-shadow:none;padding:0 0 24px;}
+  .kn-res .kn-row:hover{background:transparent;}
+  .kn-res .kn-row.sel{background:var(--kh-accent-tint);}
+}
+@media (prefers-reduced-motion:reduce){.sc input.kn-ring.kn-pulse{animation:none;}}
+
+/* ══ CELULAR · aviso para girar (vertical) y pantalla completa (horizontal) ══
+   body.kn-land: sin barras de la página ni del simulador; el HMI toma el alto completo y a la
+   derecha queda un riel de 60 px con Buscar, Lista, «?» y Salir. Respeta la muesca. */
+#kn-rail{display:none;position:fixed;z-index:10003;top:0;bottom:0;right:0;width:calc(60px + env(safe-area-inset-right));padding-right:env(safe-area-inset-right);background:#1c1c1e;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+.kn-rb{width:44px;height:44px;border-radius:4px;background:#dcdce8;border:1px solid #9090a0;border-bottom:2px solid #707080;display:flex;align-items:center;justify-content:center;font:bold 18px Arial,Helvetica,sans-serif;color:#222;padding:0;cursor:pointer;}
+.kn-rb svg{width:20px;height:20px;}
+.kn-rb:active{background:#c0c0cc;}
+.kn-rb[aria-pressed="true"]{background:#1e3f7a;border-color:#1e3f7a;color:#fff;}
+.kn-rb[disabled]{opacity:.4;cursor:default;}
+body.kn-land #kn-rail{display:flex;}
+body.kn-land #tb,body.kn-land #bb,body.kn-land .hml,body.kn-land .led,body.kn-land .brd,body.kn-land #fs-btn,body.kn-land #kn-bar,body.kn-land #kn-help-list{display:none!important;}
+body.kn-land #hp{padding:0 calc(60px + env(safe-area-inset-right)) 0 env(safe-area-inset-left);justify-content:center;align-items:center;overflow:hidden;}
+body.kn-land .dev{padding:0;border-radius:0;box-shadow:none;background:none;}
+body.kn-land .sw{border:0;box-shadow:none;}
+body.kn-land.kn-land-search #kn-bar{display:flex!important;position:fixed;z-index:10002;top:8px;left:calc(8px + env(safe-area-inset-left));right:calc(68px + env(safe-area-inset-right));margin:0;}
+body.kn-land.kn-land-search #kn-bar .kn-tools{flex:1 1 auto;}
+body.kn-land.kn-land-search #kn-scr-btn{display:none;}
+body.kn-land.kn-land-list #kn-help-list{display:block!important;position:fixed;z-index:10002;top:0;bottom:0;margin:0;right:calc(60px + env(safe-area-inset-right));width:min(440px,72vw);overflow:auto;overscroll-behavior:contain;box-shadow:-4px 0 14px rgba(0,0,0,.35);border-left:1px solid #9090a0;}
+body.kn-land .kh-list-h{position:sticky;top:0;z-index:1;}
+body.kn-land .kh-list-h .kh-x{display:grid;}
+/* Área táctil de la ⓘ de los campos: 44 px reales, invisible (el ícono no cambia) */
+body.kn-land .sc td .tip-i::before{content:"";position:absolute;left:50%;top:50%;width:calc(44px / var(--kn-sc,1));height:calc(44px / var(--kn-sc,1));transform:translate(-50%,-50%);border-radius:50%;}
+
+/* ══ MARCO «CONSOLA» (ronda 4, alternativa A) ════════════════════════════════════════════
+   Todo lo que rodea al panel: barra de pantalla (miga + «?»), panel «Pantallas» (buscador +
+   árbol), riel horizontal y fondo. Estilo FIJO: no sigue el tema de la app (DESIGN.md §5f).
+   Gris acero neutro, sin azul; selección = tecla encendida (--k-key + borde inferior 2 px,
+   como los globos). Único color: navy del «?». Mismos tokens que knuroConsola.css (React).
+   NO toca .dev/#hs (el X2 y su pantalla), ni globos/hoja/lista (familia «Ventana del panel»). */
+:root{
+  --k-case:#1c1d1f;--k-panel:#26272a;--k-raised:#313236;--k-line:#3d3f43;
+  --k-ink:#e6e6e6;--k-ink2:#a6a7a9;--k-key:#d9dadb;--k-keyink:#141516;--k-keyedge:#8f9093;
+  --k-help:#1e3f7a;--k-helpedge:#102a55;--k-helpon:#16305e;--k-hover:#2d2e31;--k-warn:#ac966e;--k-bad:#b2807f;
+  --k-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --k-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --bg:var(--k-case);--pb:var(--k-panel);--bdr:var(--k-line);--ac2:var(--k-ink2);
+}
+html,body{background:var(--k-case);}
+#tb{display:none!important;}               /* la barra «Knuro · pantalla · ⚙» repetía la miga; el ⚙ pasa a «Pantallas» */
+.hml{display:none!important;}              /* título grande que repetía el preset */
+#hp{justify-content:flex-start;padding:0 24px 24px;}
+/* Barra de pantalla: miga + código + «? Esta pantalla» (+ «Pantallas» en celular) */
+#kn-bar{height:48px;margin:0;gap:12px;font-family:var(--k-ui);color:var(--k-ink);}
+.kn-crumb{display:flex;align-items:baseline;gap:6px;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;}
+.kn-crumb .p{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:var(--k-ink2);}
+.kn-crumb .p.last{display:none;}
+.kn-crumb .c{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:16px;font-weight:600;color:var(--k-ink);}
+.kn-crumb .code{flex:none;font:400 12px/1.35 var(--k-mono);font-variant-numeric:tabular-nums;color:var(--k-ink2);border:1px solid var(--k-line);border-radius:3px;padding:0 5px;}
+.kn-tools{flex:none;margin-left:auto;gap:8px;}
+#kn-scr-btn{height:32px;background:var(--k-help);border:1px solid var(--k-help);border-bottom:2px solid var(--k-helpedge);border-radius:4px;color:#fff;font:600 13px/1 var(--k-ui);gap:6px;padding:0 10px 0 6px;}
+#kn-scr-btn .q{width:20px;height:20px;background:transparent;color:#fff;font:700 15px/1 var(--k-ui);border-radius:0;}
+#kn-scr-btn:active{background:var(--k-helpon);}
+#kn-scr-btn[aria-expanded="true"]{background:var(--k-helpon);border-color:var(--k-helpon);color:#fff;}
+#kn-scr-btn[aria-expanded="true"] .q{background:transparent;color:#fff;}
+#kn-scr-btn.empty{background:transparent;border:1px dashed var(--k-line);color:var(--k-ink2);}
+#kn-scr-btn.empty .q{background:transparent;color:var(--k-ink2);}
+#kn-scr-btn:focus-visible,.kn-pan:focus-visible,#rp button:focus-visible,#rp [role="button"]:focus-visible,.kn-rb:focus-visible{outline:2px solid #e6e6e6;outline-offset:2px;}
+.kn-pan{display:none;align-items:center;gap:6px;height:44px;padding:0 12px;background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);font:500 15px/1 var(--k-ui);cursor:pointer;white-space:nowrap;}
+.kn-pan svg{width:18px;height:18px;}
+.kn-pan[aria-expanded="true"]{background:var(--k-key);border-color:var(--k-key);border-bottom:2px solid var(--k-keyedge);color:var(--k-keyink);}
+/* Panel «Pantallas»: buscador arriba, árbol (o resultados) abajo */
+#rp{background:var(--k-panel);border-left:1px solid var(--k-line);color:var(--k-ink);font-family:var(--k-ui);}
+.kp-grab{display:none;flex:none;width:36px;height:5px;border-radius:3px;background:var(--k-line);margin:6px auto 0;}
+.kp-head{display:flex;align-items:center;gap:8px;flex:none;padding:12px 10px 0 14px;}
+.kp-head b{flex:1;min-width:0;font:600 13px/1.2 var(--k-ui);color:var(--k-ink);}
+.kp-fold{width:26px;height:26px;display:grid;place-items:center;padding:0;background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);cursor:pointer;}
+.kp-fold svg{width:16px;height:16px;}
+.kp-fold:hover,.rp-mini:hover{background:var(--k-hover);}
+.kp-done{display:none;height:44px;padding:0 4px;background:none;border:0;color:var(--k-ink);font:600 17px/1 var(--k-ui);cursor:pointer;}
+#kp-search{flex:none;padding:10px 10px 8px;}
+#kp-search .kn-search{height:36px;background:var(--k-raised);border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink2);padding:0 6px 0 10px;}
+#kp-search .kn-search input{font:400 13px/20px var(--k-ui);color:var(--k-ink);}
+#kp-search .kn-search input::placeholder{color:var(--k-ink2);}
+#kp-search .kn-search:focus-within{border-color:var(--k-keyedge);background:var(--k-raised);box-shadow:none;outline:2px solid #e6e6e6;outline-offset:2px;}
+#kp-search .kn-kbd{font:400 11px/16px var(--k-mono);color:var(--k-ink2);border:1px solid var(--k-line);border-radius:3px;background:transparent;padding:0 5px;}
+.kn-clr{flex:none;width:24px;height:24px;display:grid;place-items:center;padding:0;background:none;border:0;border-radius:3px;color:var(--k-ink2);cursor:pointer;}
+.kn-clr svg{width:14px;height:14px;}
+.kn-clr[hidden]{display:none;}
+.rp-sec-hdr{display:none!important;}
+.rp-mini{padding:12px 0;background:none;border:0;color:var(--k-ink);width:100%;}
+.rp-mini svg{width:18px;height:18px;}
+#rp.collapsed .kp-head,#rp.collapsed #kp-search,#rp.collapsed .kn-res-in{display:none!important;}
+/* Árbol: sin emojis, triángulo de despliegue en los grupos, códigos en mono a la derecha */
+#rp .rp-tree{padding:0 6px 12px;}
+#rp .tn{margin:0;}
+#rp .tnc{margin-left:16px;border-left:0;padding-left:0;}
+#rp .tnh,#rp .tna{display:flex;align-items:center;gap:6px;min-height:30px;padding:0 10px 0 6px!important;border-radius:3px;border-left:0;color:var(--k-ink);font:400 13px/1.2 var(--k-ui);cursor:pointer;}
+#rp .tna,#rp .tnh:not(.kn-kids){padding-left:26px!important;}
+#rp .tnh.kn-kids .tnl{font-weight:600;}
+#rp .tnl{flex:1;min-width:0;font-size:inherit;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#rp .tni,#rp .sym{display:none;}
+#rp .tnbg,#rp .to{flex:none;margin-left:auto;background:none;border:0;padding:0;font:400 11px/1 var(--k-mono);font-variant-numeric:tabular-nums;color:var(--k-ink2);}
+#rp .tnh:hover,#rp .tna:hover{background:var(--k-hover);color:var(--k-ink);}
+#rp .tnh.act{background:transparent;border-left:0;}
+#rp .tnh.act .tnl{color:inherit;}
+#rp .tnh.kn-cur,#rp .tna.kn-cur{background:var(--k-key);color:var(--k-keyink);box-shadow:inset 0 -2px 0 var(--k-keyedge);}
+#rp .kn-cur .tnbg,#rp .kn-cur .to,#rp .kn-cur .kn-chev{color:var(--k-keyink);}
+#rp .tdv{height:1px;background:var(--k-line);margin:6px 0;}
+.kn-chev{position:relative;flex:none;width:14px;height:14px;display:grid;place-items:center;padding:0;background:none;border:0;color:var(--k-ink2);cursor:pointer;}
+.kn-chev::after{content:"";position:absolute;inset:-8px;}
+.kn-chev svg{width:12px;height:12px;transition:transform .15s;}
+.tn.kn-closed>.tnh .kn-chev svg{transform:rotate(-90deg);}
+.tn.kn-closed>.tnc{display:none;}
+/* Resultados de búsqueda dentro del panel (reemplazan al árbol mientras haya texto) */
+#rp.kn-searching .rp-sec{display:none;}
+#rp .kn-res.kn-res-in{position:static;flex:1 1 auto;min-height:0;max-height:none;width:auto!important;overflow:auto;background:transparent;border:0;border-radius:0;box-shadow:none;padding:0 10px 12px;color:var(--k-ink);font-family:var(--k-ui);}
+#rp .kn-res-in .kh-gh{font:600 12px/1.3 var(--k-ui);color:var(--k-ink2);padding:12px 2px 4px;}
+#rp .kn-res-in .kh-gh b{font-weight:600;color:inherit;}
+#rp .kn-res-in .kh-glist{background:transparent;border-top:0;}
+#rp .kn-res-in .kn-row{min-height:44px;padding:8px 4px;color:var(--k-ink);border-bottom:1px solid var(--k-line);font:14px/1.3 var(--k-ui);border-radius:0;}
+#rp .kn-res-in .kn-row .l{font-size:14px;}
+#rp .kn-res-in .kn-row .s{font-size:12px;color:var(--k-ink2);}
+#rp .kn-res-in .kn-row .cur{font:500 12px/1.2 var(--k-mono);color:var(--k-ink);}
+#rp .kn-res-in .kn-row.chg .cur{color:var(--k-warn);}
+#rp .kn-res-in .kn-row .chev{color:var(--k-ink2);}
+#rp .kn-res-in .kn-row:hover,#rp .kn-res-in .kn-row.sel{background:var(--k-hover);}
+#rp .kn-res-in mark{background:transparent;color:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;padding:0;}
+#rp .kn-res-in .more,#rp .kn-res-in .kn-empty{color:var(--k-ink2);padding:10px 2px;font-size:13px;}
+/* Edición de presets (solo editor admin; en modo lectura .psp no existe) */
+#rp .psp{border-top:1px solid var(--k-line);}
+#rp .psp-hdr{border-bottom-color:var(--k-line);}
+#rp .psp-hdr span{font:600 11px/1.3 var(--k-ui);letter-spacing:.06em;color:var(--k-ink2);}
+#rp .psp-hdr .arr{color:var(--k-ink2);}
+#rp .ptab{background:transparent;border-color:var(--k-line);color:var(--k-ink2);font:500 11px/1.2 var(--k-ui);padding:6px 2px;}
+#rp .ptab.active{background:var(--k-key);border-color:var(--k-key);color:var(--k-keyink);font-weight:600;}
+#rp .ps-curr{background:var(--k-raised);border-color:var(--k-line);}
+#rp .ps-curr-lbl,#rp .ps-list-hdr{font-size:11px;letter-spacing:.04em;color:var(--k-ink2);}
+#rp .ps-curr-name{color:var(--k-ink);}
+#rp .ps-list-hdr,#rp .ps-new{border-color:var(--k-line);}
+#rp .psave input,#rp .cmp-row-sel select{background:var(--k-raised);border-color:var(--k-line);color:var(--k-ink);font-size:12px;}
+#rp .pbtn{background:var(--k-raised);color:var(--k-ink);border-color:var(--k-line);font-size:11px!important;}
+#rp .pbtn:hover{background:var(--k-hover);}
+#rp .pbtn.del,#rp .cmp-row-sel .cmp-rem{color:var(--k-bad);background:var(--k-raised);border-color:var(--k-line);}
+#rp .pbtn.refs-btn.active{background:var(--k-key);color:var(--k-keyink);border-color:var(--k-key);}
+#rp .pi{background:var(--k-case);border-color:var(--k-line);}
+#rp .pi span{color:var(--k-ink);font-size:12px;}
+#rp .pi-active{border-color:var(--k-keyedge);box-shadow:inset 0 -2px 0 var(--k-keyedge);}
+#rp .cmp-tbl th{background:var(--k-raised);color:var(--k-ink);border-color:var(--k-line);}
+#rp .cmp-tbl td{border-color:var(--k-line);color:var(--k-ink);}
+#rp .cmp-tbl tr:nth-child(even) td{background:var(--k-case);}
+#rp .cmp-sec-hdr td{background:var(--k-case)!important;color:var(--k-ink2)!important;border-top-color:var(--k-line)!important;}
+#rp .cmp-diff{color:var(--k-warn)!important;}
+#rp .cmp-summary b{color:var(--k-warn);}
+/* Riel del celular horizontal */
+#kn-rail{background:var(--k-panel);border-left:1px solid var(--k-line);}
+.kn-rb{background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);font:700 18px/1 var(--k-ui);}
+.kn-rb:active{background:var(--k-hover);}
+.kn-rb[aria-pressed="true"]{background:var(--k-key);border-color:var(--k-key);border-bottom:2px solid var(--k-keyedge);color:var(--k-keyink);}
+.kn-rb[data-act="scr"]{background:var(--k-help);border-color:var(--k-help);border-bottom:2px solid var(--k-helpedge);color:#fff;}
+.kn-rb[data-act="scr"][aria-pressed="true"]{background:var(--k-helpon);border-color:var(--k-helpon);color:#fff;}
+@media(max-width:1100px){#rp{width:300px;}#rp.collapsed{width:36px;}}
+@media(max-width:860px){
+  #hp{padding:0 16px 16px;}
+  #kn-bar{height:52px;margin:0;gap:8px;}
+  .kn-crumb .p.full{display:none;}
+  .kn-crumb .p.last{display:block;}
+  .kn-crumb .c{font-size:17px;}
+  .kn-crumb .code{font-size:13px;}
+  .kn-pan{display:inline-flex;}
+  /* «Pantallas» = hoja a alto completo desde abajo (el ⚙ desaparece) */
+  #rp,#rp.collapsed{position:fixed;left:0;right:0;top:8px;bottom:0;width:auto;border-left:0;border-top:1px solid var(--k-line);border-radius:12px 12px 0 0;transform:translateY(105%);transition:transform .3s cubic-bezier(.22,.9,.24,1);z-index:100;}
+  #rp.open{transform:none;}
+  #rp.collapsed .rp-sec,#rp.collapsed .psp{display:flex;}
+  #rp.collapsed .kp-head,#rp.collapsed #kp-search{display:flex!important;}
+  #rp.collapsed #kp-search{display:block!important;}
+  #rp .rp-mini,#rp.collapsed .rp-mini{display:none!important;}
+  .kp-grab{display:block;}
+  .kp-fold{display:none;}
+  .kp-done{display:inline-flex;align-items:center;}
+  .kp-head{height:48px;padding:0 12px 0 16px;}
+  .kp-head b{font-size:17px;}
+  #kp-search{padding:4px 16px 8px;}
+  #kp-search .kn-search{height:44px;}
+  #kp-search .kn-search input{font-size:16px;line-height:22px;}
+  #rp .rp-tree{padding:0 10px calc(24px + env(safe-area-inset-bottom));}
+  #rp .tnh,#rp .tna{min-height:44px;font-size:15px;}
+  #rp .tnbg,#rp .to{font-size:13px;}
+  #rp .tnc{margin-left:16px;}
+  #rp .kn-res.kn-res-in{padding:0 16px calc(24px + env(safe-area-inset-bottom));}
+  #rp .kn-res-in .kn-row .l{font-size:15px;}
+  #rp .kn-res-in .kn-row .s{font-size:13px;}
+  #ov.show{background:rgba(0,0,0,.55);}
+}
+@media(max-width:767px){
+  .kn-tools{flex:none;}
+  #kn-scr-btn{width:44px;height:44px;padding:0;justify-content:center;}
+  #kn-scr-btn .q{width:auto;height:auto;font-size:19px;}
+}
+/* Horizontal (riel): «Pantallas» se abre como panel lateral junto al riel */
+body.kn-land #rp,body.kn-land #rp.collapsed{top:0;bottom:0;left:auto;right:calc(60px + env(safe-area-inset-right));width:min(380px,62vw);border-radius:0;border-top:0;border-left:1px solid var(--k-line);transform:translateX(calc(100% + 80px));}
+body.kn-land #rp.open{transform:none;}
+body.kn-land .kp-grab{display:none;}
+@media (prefers-reduced-motion:reduce){#rp{transition:none!important;}.kn-chev svg{transition:none;}}
+@media (pointer:coarse){#kp-search .kn-kbd{display:none;}}
+
+/* ══ CELULAR VERTICAL · pulido r8, variante (a) «bisel fino» ═══════════════════════════════
+   Solo ≤767 px y fuera del modo horizontal (body.kn-land): PC y horizontal no cambian.
+   Margen de página 8 px; el X2 pasa a un bisel de 4 px (arriba y a los lados) con la franja
+   «X2 pro / Beijer» de 14 px abajo, sin degradado ni sombra grande (la sombra del .dev de PC
+   era el «degradado» que oscurecía el encabezado de la lista). Escala en scaleHMI().
+   La barra queda con miga + «Pantallas»: el «?» sobra porque la ayuda de pantalla vive en la
+   lista (abierta si no hay campos, plegada como primera fila si los hay). */
+@media (max-width:767px){
+  body:not(.kn-land) #hp{padding-left:8px;padding-right:8px;}
+  body:not(.kn-land) #kn-bar{height:44px;padding:0 0 0 8px;}
+  body:not(.kn-land) #kn-scr-btn{display:none!important;}
+  body:not(.kn-land) .kn-pan{height:36px;font-size:14px;}
+  body:not(.kn-land) .dev{padding:4px 4px 0;border-radius:6px;background:#101011;box-shadow:inset 0 1px 0 rgba(255,255,255,.07);}
+  body:not(.kn-land) .led{display:none;}
+  body:not(.kn-land) .sw{border:0;box-shadow:none;}
+  body:not(.kn-land) .brd{height:14px;padding:0 4px;}
+  body:not(.kn-land) .brd .mn{font-size:9px;color:#9a9aa0;letter-spacing:0;}
+  body:not(.kn-land) .brd .bj{font-size:9px;color:#8a8a8f;letter-spacing:0;}
+  body:not(.kn-land) #kn-help-list{margin-top:12px;padding-bottom:16px;}
+  /* «Pantallas» (árbol + buscador) se abre BAJO la barra: el título y el botón quedan a la vista */
+  body:not(.kn-land) #rp,body:not(.kn-land) #rp.collapsed{top:44px;}
+  body:not(.kn-land) #ov{top:44px;}
+}
+/* Lista del celular vertical (renderHelpList, modo «v»): familia «Ventana del panel» */
+.kn-lh{display:flex;align-items:baseline;gap:8px;padding:12px 16px 10px;border-bottom:1px solid #dcdcdc;background:#f4f4f4;font:700 13px/1.2 Arial,Helvetica,sans-serif;color:#4a4a4a;}
+.kn-lh .n{font:500 13px/1.2 var(--k-mono);font-variant-numeric:tabular-nums;letter-spacing:0;color:#5c5c5c;}
+.kn-sh{padding:12px 16px 14px;border-bottom:1px solid #dcdcdc;color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;}
+.kn-sh .ey{font-size:12px;font-weight:700;color:#4a4a4a;margin-bottom:6px;}
+.kn-sh p{font-size:15px;line-height:1.45;margin:0 0 8px;color:#1a1a1a;}
+.kn-sh p .h{font-weight:700;}
+.kn-sh .kn-org{display:flex;align-items:flex-start;gap:6px;font-size:13px;line-height:1.35;color:#5c5c5c;}
+.kn-sh .kn-org svg{width:15px;height:15px;margin-top:1px;}
+.kn-sh .kn-org b{color:#1a1a1a;}
+.kn-sh .kh-btn-tint{margin-top:10px;}
+.kn-row.kn-row-acc .chev{transform:rotate(90deg);transition:transform .15s;}
+.kn-row.kn-row-acc[aria-expanded="true"] .chev{transform:rotate(-90deg);}
+.kn-row.kn-row-acc[aria-expanded="true"]{border-bottom-color:transparent;}
+.kn-acc .kn-sh{padding:2px 14px 14px;}
+/* Pista de giro (primera visita): línea inline bajo el panel, no flota sobre nada */
+#kn-giro{display:none;align-self:stretch;align-items:center;gap:8px;min-height:44px;margin:8px 0 0;padding:0 0 0 12px;background:var(--k-panel);border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink2);font:400 13px/1.3 var(--k-ui);}
+#kn-giro svg.rot{width:20px;height:20px;flex:none;}
+#kn-giro span{flex:1;min-width:0;}
+#kn-giro button{flex:none;height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;background:transparent;border:0;color:var(--k-ink);font:600 13px/1 var(--k-ui);cursor:pointer;}
+#kn-giro button.x{width:44px;padding:0;color:var(--k-ink2);}
+#kn-giro button svg{width:16px;height:16px;}
+@media (max-width:767px){body.kn-giro:not(.kn-land) #kn-giro{display:flex;}}
+@media (prefers-reduced-motion:reduce){.kn-row.kn-row-acc .chev{transition:none;}}
+/* ══ TEMA DE LA APP (contrato app:tema · public/embed-tema.js) ═══════════════════════════
+   Con el mensaje del padre, TODO lo que rodea al panel sigue el tema Pizarra (Día y Noche):
+   fondo, barra de pantalla, panel «Pantallas» con su buscador, riel, aviso de giro y, en el
+   celular vertical, la lista de campos y «Para qué sirve esta pantalla». Sin mensaje (el embed
+   abierto suelto) se queda la «Consola» gris de arriba.
+   NO toca .dev / .sw / #hs / .led / .brd (el bisel del X2 y su pantalla conservan sus colores
+   reales: sus literales no pasan por --bg/--pb/--bdr/--ac2, que solo usan html/body y #rp) ni
+   la familia «Ventana del panel» (globos .kh-pop, hoja .kh-sheet y resultados flotantes .kn-res:
+   siempre claros, con la etiqueta AYUDA). */
+html.tema-app{
+  --k-case:var(--tema-fondo);--k-panel:var(--tema-superficie);
+  --k-ink:var(--tema-tinta);--k-ink2:var(--tema-tinta2);--k-line:var(--tema-linea);
+  --k-raised:color-mix(in srgb,var(--tema-superficie) 88%,var(--tema-tinta));
+  --k-hover:color-mix(in srgb,var(--tema-superficie) 92%,var(--tema-tinta));
+  --k-key:color-mix(in srgb,var(--tema-acento) 18%,var(--tema-superficie));
+  --k-keyink:var(--tema-tinta);--k-keyedge:var(--tema-acento);
+  --k-warn:#845600;--k-bad:#a3262b;
+}
+html.tema-app[data-tema="dark"]{--k-warn:#e0b45c;--k-bad:#e58a86;}
+html.tema-app,html.tema-app body{color:var(--k-ink);}
+html.tema-app #kn-scr-btn:focus-visible,html.tema-app .kn-pan:focus-visible,html.tema-app #rp button:focus-visible,
+html.tema-app #rp [role="button"]:focus-visible,html.tema-app .kn-rb:focus-visible,
+html.tema-app #kp-search .kn-search:focus-within{outline-color:var(--tema-acento);}
+html.tema-app .rp-toggle{background:var(--k-panel);border-color:var(--k-line);color:var(--k-ink2);}
+html.tema-app .rp-toggle:hover{background:var(--k-hover);color:var(--k-ink);}
+/* Lista de campos (celular vertical y horizontal) y su fila «Para qué sirve esta pantalla» */
+html.tema-app #kn-help-list{background:var(--k-panel);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kh-list-h{background:var(--k-raised);border-bottom-color:var(--k-line);color:var(--k-ink);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kh-list-h .kh-x{background:transparent;border:1px solid var(--k-line);border-radius:4px;color:var(--k-ink);}
+html.tema-app #kn-help-list .kn-lh{background:transparent;border-bottom-color:var(--k-line);color:var(--k-ink2);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kn-lh .n{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kh-gh{color:var(--k-ink2);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kh-gh b{color:var(--k-ink);}
+html.tema-app #kn-help-list .kh-glist{background:transparent;border-top-color:var(--k-line);}
+html.tema-app #kn-help-list .kn-row{color:var(--k-ink);border-bottom-color:var(--k-line);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kn-row.kn-row-acc[aria-expanded="true"]{border-bottom-color:transparent;}
+html.tema-app #kn-help-list .kn-row .def,html.tema-app #kn-help-list .kn-row .s{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-row .chev{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-row .cur{font-family:var(--k-mono);}
+html.tema-app #kn-help-list .kn-row.chg .cur,html.tema-app #kn-help-list .kn-row.chg .def{color:var(--k-warn);}
+html.tema-app #kn-help-list .kn-row.sel{background:var(--k-key);}
+html.tema-app #kn-help-list .kn-row:active{background:var(--k-hover);}
+html.tema-app #kn-help-list .kn-sh{border-bottom-color:var(--k-line);color:var(--k-ink);font-family:var(--k-ui);}
+html.tema-app #kn-help-list .kn-sh .ey{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-sh p{color:var(--k-ink);}
+html.tema-app #kn-help-list .kn-sh .kn-org{color:var(--k-ink2);}
+html.tema-app #kn-help-list .kn-sh .kn-org b{color:var(--k-ink);}
+html.tema-app #kn-help-list .kh-btn-tint{background:var(--k-raised);border-color:var(--k-line);color:var(--k-ink);}
+html.tema-app body.kn-land.kn-land-list #kn-help-list{border-left-color:var(--k-line);}
+
+/* ══ TOQUES DE 48 PX Y ZOOM DEL PANEL (oleada 4 · tanda b) ═══════════════════════════════════
+   Regla del jurado: todo lo que NO es el panel del equipo (.dev, marcado data-bisel) mide ≥48 px y
+   deja 8 px entre objetivos. El panel conserva su tamaño y su fidelidad: se escala completo y se
+   amplía con pellizco (embed-zoom.js); nunca se encogen ni agrandan sus botones por separado. */
+#kn-dz{display:contents;}
+@media (max-width:767px){
+  body:not(.kn-land) #kn-dz{display:flex;justify-content:center;align-self:stretch;overflow:hidden;flex-shrink:0;position:relative;}
+  body:not(.kn-land) #kn-bar{height:56px;}
+  body:not(.kn-land) .kn-pan{height:48px;font-size:15px;}
+}
+@media (max-width:767px),(pointer:coarse){
+  .kn-pan{height:48px;min-width:48px;}
+  #kn-scr-btn{height:48px;min-width:48px;}
+  .kn-search,#kp-search .kn-search{height:50px;}
+  .kn-search input{min-height:48px;}
+  .kn-clr{width:48px;height:48px;margin-right:-6px;}
+  .kp-fold{width:48px;height:48px;}
+  .kp-done{height:48px;min-width:48px;padding:0 8px;}
+  .kp-head{gap:8px;padding-top:8px;}
+  #rp .tnh,#rp .tna{min-height:48px;}
+  .kn-chev{width:48px;height:48px;margin:0 -16px 0 -22px;}
+  .kn-chev::after{display:none;}
+  #rp .kn-res-in .kn-row{min-height:48px;}
+  .kn-row{min-height:48px;}
+  .kn-rb{width:48px;height:48px;}
+  #kn-giro{min-height:48px;gap:8px;}
+  #kn-giro button{height:48px;min-width:48px;}
+  #kn-giro button.x{width:48px;}
+}
 </style>
 </head>
 <body>
@@ -282,7 +808,7 @@ body.readonly .tip-i{cursor:default;}
 <div id="mn">
 <div id="hp">
   <div class="hml" id="hml-title">Knuro B2 — HMI Simulator</div>
-  <div class="dev">
+  <div class="dev" data-bisel>
     <div class="led"></div>
     <div class="sw"><div id="hs">
 
@@ -1014,12 +1540,15 @@ body.readonly .tip-i{cursor:default;}
 </div><!-- /hp -->
 
 <!-- ══ RIGHT PANEL ══ -->
-<div id="rp">
-  <div class="rp-toggle" onclick="toggleRightPanel()" title="Colapsar/expandir panel">◀</div>
-  <div class="rp-mini" onclick="toggleRightPanel()">
-    <span title="Mapa de Navegación">🌐</span>
-    <span title="Presets">💾</span>
+<div id="rp" role="region" aria-label="Pantallas">
+  <div class="kp-grab" aria-hidden="true"></div>
+  <div class="kp-head">
+    <b>Pantallas</b>
+    <button type="button" class="kp-fold" onclick="toggleRightPanel()" aria-label="Plegar el panel Pantallas" title="Plegar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    <button type="button" class="kp-done" onclick="closePanel()">Listo</button>
   </div>
+  <button type="button" class="rp-mini" onclick="toggleRightPanel()" aria-label="Mostrar el panel Pantallas" title="Pantallas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 5h6M8 12h8M8 19h8M5 5v14h3M5 12h3"/></svg></button>
+  <div id="kp-search"></div>
 
   <!-- Tree section -->
   <div class="rp-sec">
@@ -1141,7 +1670,7 @@ body.readonly .tip-i{cursor:default;}
 
   <!-- Preset section -->
   <div class="psp">
-    <div class="psp-hdr open" id="presets-hdr" onclick="togglePresets()"><span>💾 Presets de máquina</span><span class="arr">▶</span></div>
+    <div class="psp-hdr open" id="presets-hdr" onclick="togglePresets()"><span>Edición de presets</span><span class="arr">▶</span></div>
     <div class="psp-body" id="presets-body">
     <div class="ptabs">
       <button class="ptab active" id="tab-save" onclick="switchTab('save')">Guardar / Cargar</button>
@@ -1162,15 +1691,15 @@ body.readonly .tip-i{cursor:default;}
         <!-- Guardar con nombre -->
         <div class="ps-new">
           <input id="pn" placeholder="Nombre de máquina…">
-          <button class="pbtn" onclick="savePreset()" title="Guarda los valores actuales del HMI con este nombre">💾 Guardar preset</button>
+          <button class="pbtn" onclick="savePreset()" title="Guarda los valores actuales del HMI con este nombre">Guardar preset</button>
         </div>
         <!-- Importar / Exportar -->
         <div class="ps-acts">
-          <button class="pbtn pdf" onclick="showExportDialog()">📤 Exportar PDF</button>
+          <button class="pbtn pdf" onclick="showExportDialog()">Exportar PDF</button>
         </div>
         <!-- Editar valores de referencia -->
         <div class="ps-acts" style="margin-top:4px;">
-          <button id="refs-edit-btn" class="pbtn refs-btn" onclick="toggleRefsEdit(this)" title="Activa la edición manual de los valores de referencia (fábrica) mostrados junto a cada parámetro">✏ Editar Refs</button>
+          <button id="refs-edit-btn" class="pbtn refs-btn" onclick="toggleRefsEdit(this)" title="Activa la edición manual de los valores de referencia (fábrica) mostrados junto a cada parámetro">Editar refs</button>
         </div>
         <div id="refs-hint" style="display:none;font-size:8.5px;color:#aa8800;margin-top:3px;padding:3px 4px;background:#2a2200;border-radius:3px;border:1px solid #554400;">Haz clic en cualquier valor gris junto a un parámetro para editarlo. Enter o clic fuera para confirmar.</div>
       </div>
@@ -1180,14 +1709,14 @@ body.readonly .tip-i{cursor:default;}
     <div class="pt-panel" id="panel-cmp">
       <div class="pcmp">
         <div style="margin-bottom:5px;">
-          <span style="font-size:8.5px;color:#444;text-transform:uppercase;letter-spacing:1px;">Máquinas a comparar</span>
+          <span style="font-size:12px;font-weight:600;color:#444;">Máquinas a comparar</span>
         </div>
         <div id="cmp-sels"></div>
         <div style="display:flex;gap:3px;margin-bottom:6px;">
-          <button id="cmp-add-btn" onclick="addCmpPreset()" class="pbtn" style="font-size:9px;padding:2px 8px;flex:none;">+ Agregar</button>
-          <button onclick="renderCompare()" class="pbtn" style="font-size:9px;padding:2px 8px;">↻ Comparar</button>
+          <button id="cmp-add-btn" onclick="addCmpPreset()" class="pbtn" style="font-size:12px;padding:2px 8px;flex:none;">+ Agregar</button>
+          <button onclick="renderCompare()" class="pbtn" style="font-size:12px;padding:2px 8px;">↻ Comparar</button>
         </div>
-        <div style="font-size:9px;color:#555;margin-bottom:4px;">🟡 = valores diferentes entre máquinas</div>
+        <div style="font-size:12px;color:var(--k-ink2);margin-bottom:4px;">Resaltado = valores diferentes entre máquinas</div>
         <div id="cmp-out"></div>
       </div>
     </div>
@@ -1211,30 +1740,30 @@ body.readonly .tip-i{cursor:default;}
 <!-- ══ EXPORT MODAL ══ -->
 <div id="exp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
   <div style="background:#1a1c22;border:1px solid #2a2e3a;border-radius:10px;padding:22px 26px;width:min(500px,95vw);max-height:90vh;overflow-y:auto;font-family:'Segoe UI',Arial,sans-serif;">
-    <h2 style="color:#88aaff;font-size:14px;margin-bottom:16px;">📤 Exportar HMI</h2>
+    <h2 style="color:#88aaff;font-size:14px;margin-bottom:16px;">Exportar HMI</h2>
     <!-- Formato -->
     <div style="margin-bottom:14px;">
-      <div style="font-size:10px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Formato de exportación</div>
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px;">Formato de exportación</div>
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:7px;padding:9px 12px;border:1px solid #2a2e3a;border-radius:6px;background:#13151b;">
         <input type="radio" name="exp-type" value="table" checked onchange="expToggle()" style="margin-top:3px;accent-color:#4499ff;">
-        <div><div style="font-size:12px;color:#ccc;font-weight:600;">📋 Tabla de Parámetros</div><div style="font-size:10px;color:#555;margin-top:2px;">Nombres completos, ruta HMI, valor de referencia y comparación entre presets</div></div>
+        <div><div style="font-size:12px;color:#ccc;font-weight:600;">Tabla de parámetros</div><div style="font-size:12px;color:#555;margin-top:2px;">Nombres completos, ruta HMI, valor de referencia y comparación entre presets</div></div>
       </label>
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid #2a2e3a;border-radius:6px;background:#13151b;">
         <input type="radio" name="exp-type" value="visual" onchange="expToggle()" style="margin-top:3px;accent-color:#4499ff;">
-        <div><div style="font-size:12px;color:#ccc;font-weight:600;">🖥 Pantallas del HMI</div><div style="font-size:10px;color:#555;margin-top:2px;">Vista visual de cada pantalla con los valores actuales</div></div>
+        <div><div style="font-size:12px;color:#ccc;font-weight:600;">Pantallas del HMI</div><div style="font-size:12px;color:#555;margin-top:2px;">Vista visual de cada pantalla con los valores actuales</div></div>
       </label>
     </div>
     <!-- Sección tabla: presets -->
     <div id="exp-sect-table" style="margin-bottom:18px;">
-      <div style="font-size:10px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Presets a comparar</div>
+      <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:8px;">Presets a comparar</div>
       <div id="exp-presets" style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto;padding-right:2px;"></div>
     </div>
     <!-- Sección visual: pantallas -->
     <div id="exp-sect-visual" style="display:none;margin-bottom:18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;">Pantallas a exportar</div>
+        <div style="font-size:12px;font-weight:600;color:#555;">Pantallas a exportar</div>
         <div style="display:flex;gap:5px;">
-          <button onclick="expSelectAll(true)" style="background:#1e2028;color:#88aaff;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:10px;">Todas</button>
+          <button onclick="expSelectAll(true)" style="background:#1e2028;color:#88aaff;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:12px;">Todas</button>
           <button onclick="expSelectAll(false)" style="background:#1e2028;color:#666;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:10px;">Ninguna</button>
         </div>
       </div>
@@ -1292,11 +1821,23 @@ function scaleHMI(){
   if(!p||!s) return;
   // Si #hp tiene dimensiones reales usarlas directamente (ya excluye #rp).
   // Fallback: window.innerWidth menos el panel si estamos en modo standalone.
-  const availW=p.clientWidth>10?p.clientWidth:(window.innerWidth-(IN_IFRAME?0:300));
-  const availH=p.clientHeight>10?p.clientHeight:window.innerHeight;
+  const cs=getComputedStyle(p);
+  const padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  const availW=p.clientWidth>10?p.clientWidth-padX:(window.innerWidth-(IN_IFRAME?0:300));
+  const padY=(parseFloat(cs.paddingTop)||0)+(parseFloat(cs.paddingBottom)||0);
+  let availH=p.clientHeight>10?p.clientHeight-padY:window.innerHeight;
+  // Marco «Consola»: la barra de pantalla va arriba del panel; el bisel del X2 (.dev) suma ~42×66 px.
+  const knBar=document.getElementById('kn-bar');
+  const land=document.body&&document.body.classList.contains('kn-land');
+  if(knBar&&!land) availH-=knBar.offsetHeight;
   if(availW<10||availH<10) return;
-  let sc=Math.min((availW-40)/800,(availH-40)/480,1.35);
+  // Celular vertical (≤767, sin kn-land): bisel fino de 4 px por lado y 4+14 px en alto.
+  const thin=!land&&window.innerWidth<768;
+  let sc=land?Math.min(availW/800,availH/480)
+    :thin?Math.min((availW-8)/800,(availH-18)/480)
+    :Math.min((availW-42)/800,(availH-66)/480,1.35);
   sc=Math.max(sc,.28);
+  document.documentElement.style.setProperty('--kn-sc',sc.toFixed(4));
   s.style.transform=`scale(${sc})`;s.style.width='800px';s.style.height='480px';
   s.parentElement.style.width=Math.round(800*sc)+'px';
   s.parentElement.style.height=Math.round(480*sc)+'px';
@@ -1344,29 +1885,97 @@ function nav(id){
   if(window.innerWidth<=860)closePanel();
 }
 function show(id,name){
+  closeHelp(true);
   document.querySelector('.sc.active')?.classList.remove('active');
   document.getElementById(id).classList.add('active');
   ['ts','bs'].forEach(x=>{const e=document.getElementById(x);if(e)e.textContent=name;});
   document.querySelectorAll('.tnh.act').forEach(e=>e.classList.remove('act'));
   const tk=TREE[id]||'tr-s4';
   const te=document.getElementById(tk);
-  te?.classList.add('act');te?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  te?.classList.add('act');
+  _knTreeMark(id,te);
   renderTooltipIcons();  // Actualizar iconos de tooltip en la pantalla
   _updateVisBtnState();  // Actualizar visibilidad del botón
   _moveTipVisBtn();      // Mover botón al header activo
 }
 
 /* ── Panel toggle (mobile) ── */
-function togglePanel(){
-  const p=document.getElementById('rp'),o=document.getElementById('ov'),b=document.getElementById('ttbtn');
-  const open=p.classList.contains('open');
-  p.classList.toggle('open',!open);o.classList.toggle('show',!open);b.classList.toggle('open',!open);
-  b.textContent=open?'⚙':'✕';
+function _knPanSet(on){
+  const p=document.getElementById('rp'),o=document.getElementById('ov');
+  if(!p) return;
+  const was=p.classList.contains('open');
+  p.classList.toggle('open',on);o?.classList.toggle('show',on);
+  const pb=document.getElementById('kn-pan-btn');if(pb) pb.setAttribute('aria-expanded',String(on));
+  if(on&&!was){
+    if(typeof closeHelp==='function') closeHelp(true);
+    // Celular vertical: la hoja arranca bajo la barra de pantalla; la barra tiene que estar arriba.
+    if(typeof _khIsNarrow==='function'&&_khIsNarrow()){const hp=document.getElementById('hp');if(hp&&hp.scrollTop>0) hp.scrollTop=0;}
+    _knTreeMark(_knCurScreen());
+    const cur=p.querySelector('.kn-cur');
+    if(cur) requestAnimationFrame(()=>cur.scrollIntoView({block:'center'}));
+  }
+  if(!on&&was){const q=document.getElementById('kn-q');if(q&&document.activeElement===q) q.blur();}
+  if(typeof _knRailSync==='function') _knRailSync();
 }
-function closePanel(){
-  document.getElementById('rp').classList.remove('open');
-  document.getElementById('ov').classList.remove('show');
-  const b=document.getElementById('ttbtn');b.classList.remove('open');b.textContent='⚙';
+function togglePanel(){
+  const p=document.getElementById('rp');
+  if(p) _knPanSet(!p.classList.contains('open'));
+}
+function closePanel(){_knPanSet(false);}
+
+/* ── Árbol «Pantallas»: triángulo de despliegue en los grupos, solo abierta la rama actual,
+   fila de la pantalla actual marcada (tecla encendida). Reusa el árbol y nav() de siempre. ── */
+const KN_I_CHEV='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 9l6 7 6-7z"/></svg>';
+function _knTreeInit(){
+  const tree=document.querySelector('#rp .rp-tree');
+  if(!tree||tree.dataset.kn) return;
+  tree.dataset.kn='1';
+  tree.setAttribute('role','tree');tree.setAttribute('aria-label','Mapa de pantallas del HMI');
+  tree.querySelectorAll('.tnh,.tna').forEach(r=>{r.tabIndex=0;r.setAttribute('role','treeitem');});
+  tree.querySelectorAll('.tn').forEach(tn=>{
+    const h=tn.querySelector(':scope > .tnh'),c=tn.querySelector(':scope > .tnc');
+    if(!h||!c) return;
+    h.classList.add('kn-kids');
+    tn.classList.add('kn-closed');
+    h.setAttribute('aria-expanded','false');
+    const b=document.createElement('button');
+    b.type='button';b.className='kn-chev';b.tabIndex=-1;b.innerHTML=KN_I_CHEV;
+    b.setAttribute('aria-label','Desplegar '+((h.querySelector('.tnl')||h).textContent||'').trim());
+    b.addEventListener('click',e=>{e.stopPropagation();_knTreeOpen(tn,tn.classList.contains('kn-closed'));});
+    h.insertBefore(b,h.firstChild);
+  });
+  tree.addEventListener('keydown',e=>{
+    const r=e.target.closest&&e.target.closest('.tnh,.tna');
+    if(!r) return;
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();r.click();}
+    else if((e.key==='ArrowRight'||e.key==='ArrowLeft')&&r.classList.contains('kn-kids')){e.preventDefault();_knTreeOpen(r.parentElement,e.key==='ArrowRight');}
+  });
+}
+function _knTreeOpen(tn,open){
+  tn.classList.toggle('kn-closed',!open);
+  const h=tn.querySelector(':scope > .tnh');if(h) h.setAttribute('aria-expanded',String(open));
+}
+/* La fila de la pantalla actual: la que navega a ella (grupo antes que hoja); si no hay, la del grupo (TREE). */
+function _knTreeRow(id){
+  const rows=[...document.querySelectorAll('#rp .rp-tree .tnh[onclick],#rp .rp-tree .tna[onclick]')].filter(r=>r.getAttribute('onclick')==="nav('"+id+"')");
+  return rows.find(r=>r.classList.contains('tnh'))||rows[0]||null;
+}
+function _knTreeMark(id,fallback){
+  _knTreeInit();
+  document.querySelectorAll('#rp .kn-cur').forEach(e=>{e.classList.remove('kn-cur');e.removeAttribute('aria-current');});
+  const row=(id&&_knTreeRow(id))||fallback||null;
+  if(!row) return;
+  row.classList.add('kn-cur');row.setAttribute('aria-current','page');
+  let tn=row.closest('.tn');
+  while(tn){_knTreeOpen(tn,true);tn=tn.parentElement&&tn.parentElement.closest('.tn');}
+  const rp=document.getElementById('rp');
+  if(rp&&getComputedStyle(rp).visibility!=='hidden'&&!rp.classList.contains('kn-searching')) row.scrollIntoView({block:'nearest'});
+}
+/* Código de la pantalla en el árbol (S01, 3-1…) para la miga */
+function _knCode(id){
+  const r=_knTreeRow(id);
+  const c=r&&r.querySelector('.tnbg,.to');
+  return c?c.textContent.trim():'';
 }
 
 /* ── Collapsible tree section ── */
@@ -1379,13 +1988,12 @@ function toggleSec(hdrId,bodyId){
 }
 function toggleRightPanel(){
   const rp=document.getElementById('rp');
-  const btn=rp.querySelector('.rp-toggle');
   const collapsed=rp.classList.toggle('collapsed');
-  btn.textContent=collapsed?'▶':'◀';
   try{localStorage.setItem('hmi-rp-collapsed',collapsed?'1':'');}catch(e){}
+  requestAnimationFrame(scaleHMI);
 }
-// Restaurar estado del panel
-try{if(localStorage.getItem('hmi-rp-collapsed')==='1'){document.getElementById('rp').classList.add('collapsed');document.querySelector('.rp-toggle').textContent='▶';}}catch(e){}
+// Restaurar estado del panel (plegado a 36 px en PC)
+try{if(localStorage.getItem('hmi-rp-collapsed')==='1'){document.getElementById('rp').classList.add('collapsed');}}catch(e){}
 
 function togglePresets(){
   const hdr=document.getElementById('presets-hdr');
@@ -1419,15 +2027,18 @@ const IN_IFRAME=(()=>{try{return window.self!==window.top;}catch(e){return true;
 
 /* ── Modo Aprendizaje (readonly) ── */
 let READ_ONLY=new URLSearchParams(location.search).get('mode')==='readonly';
+/* ?embed=1: la app ya pone su propio encabezado (EncabezadoHerramienta) → sin la franja del embed. */
+const EMBED=new URLSearchParams(location.search).get('embed')==='1';
 function _applyReadOnly(){
   if(!READ_ONLY) return;
   document.body.classList.add('readonly');
+  if(EMBED) return;
   // Insertar banner en cada .sh al mostrar pantalla
   document.querySelectorAll('.sc .sh').forEach(sh=>{
     if(sh.querySelector('.readonly-banner')) return;
     const b=document.createElement('div');
     b.className='readonly-banner';
-    b.textContent='📖 Modo Aprendizaje — Solo lectura';
+    b.textContent='Modo aprendizaje · solo lectura';
     sh.insertBefore(b,sh.firstChild);
   });
 }
@@ -1463,8 +2074,12 @@ async function loadFromStorage(){
 /* ── Listener postMessage desde HmiKnuroPage (sólo en iframe) ── */
 if(IN_IFRAME){
   window.addEventListener('message',e=>{
+    // Solo el padre same-origin (HmiKnuroPage / HmiKnuroPublicPage) puede hablarle al HMI.
+    if(e.origin!==location.origin||e.source!==window.parent) return;
     if(!e.data||typeof e.data.type!=='string') return;
     if(e.data.type==='hmi:load-preset'){loadPreset(e.data.name);return;}
+    if(e.data.type==='hmi:land'){_knLandMsg=!!e.data.on;_knApplyLand();return;}
+    if(e.data.type==='hmi:giro'){_knGiro(!!e.data.on);return;}
     if(e.data.type!=='hmi:init') return;
     presets=e.data.presets||{};
     presetOrder=e.data.order||[];
@@ -1484,10 +2099,12 @@ if(IN_IFRAME){
       const pn=document.getElementById('pn');
       if(pn) pn.value=cur;
     }
-    // Modo readonly, tooltips y clave desde la página pública/admin
-    if(e.data.readonly) READ_ONLY=true;
+    // Modo readonly y tooltips desde la página pública/admin.
+    // La clave de edición YA NO viaja por hmi:init: la página admin (tras AdminRoute,
+    // y Firestore exige isSupervisor para escribir) concede la edición con canEdit.
+    if(e.data.readonly){READ_ONLY=true;_TIP_CAN_EDIT=false;_tipAuth=false;}
+    else if(e.data.canEdit===true){_TIP_CAN_EDIT=true;_tipAuth=true;}
     if(e.data.tooltips) Object.assign(PARAM_TOOLTIPS,e.data.tooltips);
-    if(e.data.pwd) localStorage.setItem('knuro-admin-pwd',e.data.pwd);
     renderPresets(); populateCmpSelects();
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
     if(toLoad){setAllInputs(presets[toLoad],toLoad);updateActivePreset(toLoad);}
@@ -1504,7 +2121,7 @@ async function persistPresets(changedName,previousData){
       name:changedName||null,
       data:changedName?presets[changedName]:null,
       previousData:previousData||null
-    },'*');
+    },location.origin);
     return;
   }
   try{
@@ -1531,7 +2148,7 @@ function persistRefs(){
     refs[fr.dataset.frid]=fr.textContent.trim();
   });
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:save-refs',refs},'*');
+    window.parent.postMessage({type:'hmi:save-refs',refs},location.origin);
     return;
   }
   localStorage.setItem('knuro-refs',JSON.stringify(refs));
@@ -1573,12 +2190,18 @@ let pescRows=[..._PESC_N2];
 function applyPescRows(d){
   const rows=(d&&d['pesc-rows'])?d['pesc-rows'].split(','):[..._PESC_N2];
   pescRows=rows;
+  // Reemplaza solo en los nodos de texto: un textContent sobre .plb borraba los íconos ⓘ.
   document.querySelectorAll('.plb').forEach(el=>{
-    let t=el.textContent;
-    // normalizar a N2 primero (por si venía de N1), luego aplicar destino
-    _PESC_N1.forEach((nr,i)=>{t=t.replaceAll(nr,_PESC_N2[i]);});
-    _PESC_N2.forEach((nr,i)=>{t=t.replaceAll(nr,rows[i]);});
-    el.textContent=t;
+    const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+    let n;
+    while((n=w.nextNode())){
+      if(n.parentElement&&n.parentElement.closest('.tip-i')) continue;
+      let t=n.nodeValue;
+      // normalizar a N2 primero (por si venía de N1), luego aplicar destino
+      _PESC_N1.forEach((nr,i)=>{t=t.replaceAll(nr,_PESC_N2[i]);});
+      _PESC_N2.forEach((nr,i)=>{t=t.replaceAll(nr,rows[i]);});
+      if(t!==n.nodeValue) n.nodeValue=t;
+    }
   });
 }
 function setAllInputs(d,presetName){
@@ -1595,7 +2218,7 @@ function updateActivePreset(name){
   if(t) t.textContent=name?name+' — HMI':'Knuro B2 — HMI Simulator';
   document.getElementById('pn').value=name||'';
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:set-current',name:name||''},'*');
+    window.parent.postMessage({type:'hmi:set-current',name:name||''},location.origin);
   } else {
     localStorage.setItem('knuro-current',name||'');
   }
@@ -1616,13 +2239,14 @@ function loadPreset(n){
   if(presets[n]){
     setAllInputs(presets[n],n);
     updateActivePreset(n);
+    renderTooltipIcons(); // etiquetas y valores cambiaron: refrescar íconos, lista y globo
   }
 }
 
 function deletePreset(n){
   if(!confirm('¿Eliminar preset "'+n+'"?')) return;
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:delete-preset',name:n},'*');
+    window.parent.postMessage({type:'hmi:delete-preset',name:n},location.origin);
   }
   delete presets[n];
   if(!IN_IFRAME) persistPresets();
@@ -1666,7 +2290,7 @@ function reorderPreset(n,dir){
   const tmp=base[idx];base[idx]=base[swap];base[swap]=tmp;
   presetOrder=base;
   renderPresets();
-  if(IN_IFRAME) window.parent.postMessage({type:'hmi:reorder-preset',order:base},'*');
+  if(IN_IFRAME) window.parent.postMessage({type:'hmi:reorder-preset',order:base},location.origin);
 }
 
 /* ── Export JSON (download) ── */
@@ -2648,7 +3272,13 @@ function _addTipIcon(container,tipId){
 
   const icon=document.createElement('span');
   const _hasText=_getTipText(tipId);
-  icon.className='tip-i'+(_hasText?' has-text':'')+(_isHidden?' reveal-hidden':'');
+  // Origen solo para la geometría (b1 = borde de 1 px que ya tenían los íconos «manual») y
+  // para «sin dato» (punteado). El color lo pone _khIconState: ámbar si el valor cambió.
+  const _org=_hasText?parseTip(_hasText).origin:'';
+  icon.className='tip-i'+(_hasText?' has-text'+(_org==='manual'?' b1':'')+(_org==='sindato'?' o-sindato':''):'')+(_isHidden?' reveal-hidden':'');
+  _khIconState(icon,tipId);
+  icon.setAttribute('role','button');
+  icon.setAttribute('aria-label','Ayuda: '+_getTipLabel(tipId));
   icon.dataset.pid=tipId;
 
   let _clickTimer=null;
@@ -2670,13 +3300,15 @@ function _addTipIcon(container,tipId){
 
 /* ── Renderizar iconos de tooltip ── */
 function renderTooltipIcons(){
-  // 1) Parámetros: icono en la celda del label (.plb)
-  document.querySelectorAll('.pt .plb').forEach(td=>{
-    const nextTd=td.nextElementSibling;
-    if(!nextTd) return;
-    const inp=nextTd.querySelector('input.fe,input.fe1');
-    if(!inp||!inp.id) return;
-    _addTipIcon(td,inp.id);
+  // 1) Parámetros: TODOS los campos numéricos. Si la celda vecina es la etiqueta (.plb)
+  //    el ícono va ahí; si no (2ª columna de tablas de 2 columnas, h2pr-8/9, tabla de
+  //    Vacío Baader sin .pt/.plb) va en la propia celda del campo, después del valor.
+  document.querySelectorAll('.sc input.fe[id],.sc input.fe1[id]').forEach(inp=>{
+    const td=inp.closest('td');
+    if(!td) return;
+    const prev=td.previousElementSibling;
+    if(prev&&prev.classList.contains('plb')) _addTipIcon(prev,inp.id);
+    else _addTipIcon(td,inp.id);
   });
 
   // 2) Menús de navegación: icono en el span del .idxr
@@ -2702,15 +3334,20 @@ function renderTooltipIcons(){
     btn.style.position='relative';
     _addTipIcon(btn,tipId);
   });
+  renderHelpList();
+  _khRefreshOpen();
+  _knScrRefresh();
 }
 
 /* ── Init ── */
 window.addEventListener('load',async()=>{
   buildNavs();
   scaleHMI();
-  // Botón fullscreen flotante
+  // Botón fullscreen flotante. En Modo Aprendizaje (readonly) NO se crea: la página pública
+  // ya tiene «Pantalla completa» en su cabecera y el flotante tapaba el último botón
+  // («Información de alarma») de la botonera inferior del HMI.
   (()=>{
-    if(!document.fullscreenEnabled) return;
+    if(!document.fullscreenEnabled||READ_ONLY) return;
     const btn=document.createElement('button');
     btn.id='fs-btn'; btn.title='Pantalla completa';
     btn.innerHTML='⛶';
@@ -2735,7 +3372,7 @@ window.addEventListener('load',async()=>{
     // En mobile el CSS lo convierte en panel deslizable; en desktop queda inline.
     // Notificar al padre (HmiKnuroPage) que estamos listos para recibir datos
     // Incluir tooltips locales para sincronización automática a Firestore
-    window.parent.postMessage({type:'hmi:ready',tooltips:PARAM_TOOLTIPS},'*');
+    window.parent.postMessage({type:'hmi:ready',tooltips:PARAM_TOOLTIPS},location.origin);
     // Los presets/refs llegarán via hmi:init → ver listener arriba
   } else {
     // Modo standalone: cargar desde localStorage como siempre
@@ -2788,6 +3425,7 @@ window.addEventListener('load',async()=>{
 /* ── TOOLTIP SYSTEM v2 ── */
 let PARAM_TOOLTIPS={};
 let _tipAuth=false; // sesión autenticada para edición
+let _TIP_CAN_EDIT=false; // iframe: edición concedida por la página admin (hmi:init canEdit)
 
 function initTooltipSystem(){
   // En iframe: esperar a hmi:init de Firestore. No cargar localStorage.
@@ -2816,9 +3454,15 @@ function initTooltipSystem(){
       saveTooltips();
     }
   }
-  if(!localStorage.getItem('knuro-admin-pwd')){
-    localStorage.setItem('knuro-admin-pwd','admin');
-  }
+  // Clave de edición: ya no se siembra 'admin'.
+  // · En iframe la edición la concede el padre (canEdit); se borra cualquier copia de la
+  //   clave real que versiones anteriores dejaron aquí al recibirla por hmi:init.
+  // · Standalone (archivo abierto directo, guarda solo en localStorage): la primera vez se
+  //   pide definir una clave; la 'admin' sembrada antes se descarta.
+  try{
+    if(IN_IFRAME) localStorage.removeItem('knuro-admin-pwd');
+    else if(localStorage.getItem('knuro-admin-pwd')==='admin') localStorage.removeItem('knuro-admin-pwd');
+  }catch(e){}
   _updateVisBtnState();
   setTimeout(_moveTipVisBtn,100); // esperar a que el DOM esté listo
 }
@@ -2826,7 +3470,7 @@ function initTooltipSystem(){
 function saveTooltips(){
   localStorage.setItem('knuro-tooltips',JSON.stringify(PARAM_TOOLTIPS));
   if(IN_IFRAME){
-    window.parent.postMessage({type:'hmi:save-tooltip',tooltips:PARAM_TOOLTIPS},'*');
+    window.parent.postMessage({type:'hmi:save-tooltip',tooltips:PARAM_TOOLTIPS},location.origin);
   }
 }
 
@@ -2843,13 +3487,15 @@ function _getTipLabel(id){
       return btn&&(btn.getAttribute('onclick')||'').includes("'"+navId+"'");
     });
     if(row){const sp=row.querySelector('span');if(sp)return sp.textContent.trim();}
+  } else if(id.startsWith('scr:')){
+    return 'Pantalla: '+_knScreenTitle(id.slice(4));
   } else if(id.startsWith('btn:')){
     const navId=id.slice(4);
     const btn=Array.from(document.querySelectorAll('button.hb.pill')).find(b=>(b.getAttribute('onclick')||'').includes("'"+navId+"'"));
     if(btn)return btn.textContent.replace(/\s+/g,' ').trim();
   } else {
-    const inp=document.getElementById(id);
-    if(inp){const td=inp.closest('td');if(td){const plb=td.previousElementSibling;if(plb&&plb.classList.contains('plb'))return plb.textContent.replace(/\s+/g,' ').trim();}}
+    const info=_fieldInfo(id);
+    if(info) return info.name;
   }
   return id;
 }
@@ -3063,38 +3709,12 @@ function _positionTipBox(box,iconEl,pos,paramId){
   else{box.style.top='100%';box.style.bottom='auto';box.style.marginTop='4px';}
 }
 
-/* Click: fijar/cerrar tooltip */
+/* Click en ⓘ: abre/cierra la ayuda (globo anclado en PC, hoja en celular). */
 function toggleTipBox(paramId,iconEl){
-  const existing=document.querySelector('.tip-box[data-pid="'+paramId+'"]');
-  if(existing){existing.remove();return;}
+  if(_khOpen&&_khOpen.id===paramId){closeHelp();return;}
   // Si está oculto y no estamos en modo "ver ocultos", no mostrar
   if(_getTipHidden(paramId)&&!_tipRevealHidden) return;
-  closeTipBox();
-
-  const text=_getTipText(paramId);
-  const pos=_getTipPos(paramId);
-  const box=document.createElement('div');
-  box.className='tip-box';
-  box.dataset.pid=paramId;
-
-  if(text){
-    box.innerHTML='<span class="tip-close">&times;</span>'+text;
-  } else {
-    box.innerHTML='<span class="tip-close">&times;</span><span style="color:#999;font-style:italic;">Sin descripción. Doble-click en <b>ⓘ</b> para agregar.</span>';
-  }
-  box.querySelector('.tip-close').onclick=()=>box.remove();
-  _positionTipBox(box,iconEl,pos,paramId);
-
-  // Cerrar al hacer click fuera
-  setTimeout(()=>{
-    const handler=(e)=>{
-      if(!box.contains(e.target)&&e.target!==iconEl){
-        box.remove();
-        document.removeEventListener('click',handler);
-      }
-    };
-    document.addEventListener('click',handler);
-  },10);
+  openHelp(paramId,iconEl);
 }
 
 /* Pedir clave inline (sin prompt nativo) */
@@ -3135,10 +3755,17 @@ function _askPwd(iconEl,onSuccess){
 
 /* Doble-click: modo edición con clave */
 function openTipEdit(paramId,iconEl){
-  if(!_tipAuth){
+  if(READ_ONLY) return;
+  if(IN_IFRAME){
+    // En iframe solo edita quien la página admin habilitó (canEdit en hmi:init).
+    if(!_TIP_CAN_EDIT) return;
+  } else if(!_tipAuth){
+    let has=false;try{has=!!localStorage.getItem('knuro-admin-pwd');}catch(e){}
+    if(!has){setAdminPassword();return;}
     _askPwd(iconEl,()=>openTipEdit(paramId,iconEl));
     return;
   }
+  closeHelp(true);
   closeTipBox();
 
   const text=_getTipText(paramId);
@@ -3159,8 +3786,8 @@ function openTipEdit(paramId,iconEl){
   const label=_getTipLabel(paramId);
   box.innerHTML=
     '<span class="tip-close">&times;</span>'+
-    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">✏️ '+label+'</div>'+
-    '<textarea placeholder="Escribe la explicación...">'+text.replace(/</g,'&lt;')+'</textarea>'+
+    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">✏️ '+_escHTML(label)+'</div>'+
+    '<textarea placeholder="Escribe la explicación...">'+_escHTML(text)+'</textarea>'+
     '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">'+
     '<button class="tip-save">Guardar</button>'+
     '<span style="font-size:9px;color:#666;">Pos:'+selectHTML+'</span>'+
@@ -3168,7 +3795,7 @@ function openTipEdit(paramId,iconEl){
     '<div style="margin-top:5px;display:flex;align-items:center;justify-content:space-between;gap:6px;">'+
     '<label class="tip-lbl"><input type="checkbox" class="tip-chk"'+(curHidden?' checked':'')+'>'+
     ' Ocultar tooltip</label>'+
-    '<span onclick="setAdminPassword()" style="font-size:9px;color:#aaa;cursor:pointer;text-decoration:underline;">⚙ cambiar clave</span>'+
+    (IN_IFRAME?'':'<span onclick="setAdminPassword()" style="font-size:9px;color:#aaa;cursor:pointer;text-decoration:underline;">⚙ cambiar clave</span>')+
     '</div>';
 
   box.querySelector('.tip-close').onclick=()=>{box.remove();};
@@ -3198,13 +3825,15 @@ function saveTipEdit(paramId,el){
 }
 
 function setAdminPassword(){
+  // Solo standalone: en la PWA la edición la concede la página admin, sin clave.
+  if(IN_IFRAME) return;
   closeTipBox();
   const box=document.createElement('div');
   box.className='tip-box editing';
   box.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);min-width:220px;z-index:99999;';
   box.innerHTML=
     '<span class="tip-close">&times;</span>'+
-    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔑 Cambiar contraseña</div>'+
+    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔑 '+(localStorage.getItem('knuro-admin-pwd')?'Cambiar contraseña':'Define una clave de edición')+'</div>'+
     '<input type="password" id="_pwd1" placeholder="Nueva contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;margin-bottom:4px;">'+
     '<input type="password" id="_pwd2" placeholder="Confirmar contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;">'+
     '<div style="margin-top:5px;display:flex;gap:4px;align-items:center;">'+
@@ -3218,7 +3847,6 @@ function setAdminPassword(){
     if(!v1){msg.textContent='Ingresa una contraseña';msg.style.display='inline';return;}
     if(v1!==v2){msg.textContent='No coinciden';msg.style.display='inline';return;}
     localStorage.setItem('knuro-admin-pwd',v1);
-    if(IN_IFRAME) window.parent.postMessage({type:'hmi:save-pwd',pwd:v1},'*');
     _tipAuth=false;
     box.remove();
   };
@@ -3226,15 +3854,1320 @@ function setAdminPassword(){
   setTimeout(()=>box.querySelector('#_pwd1').focus(),50);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   AYUDA v3 · opción B «Lista + hoja»
+   - PC (≥768 px): globo anclado al costado del campo, sin taparlo, en <body>.
+   - Celular (<768 px): lista de campos bajo el HMI + hoja inferior.
+   Todo texto de ayuda pasa por sanitizeTipHTML (solo <b>, <i>, <br>).
+   ══════════════════════════════════════════════════════════════════════ */
+function _escHTML(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+/* Lista blanca: <b>, </b>, <i>, </i>, <br> sin atributos. Todo lo demás queda escapado. */
+function sanitizeTipHTML(s){
+  return _escHTML(s)
+    .replace(/&lt;(\/?)(b|i)&gt;/gi,(m,c,t)=>'<'+c+t.toLowerCase()+'>')
+    .replace(/&lt;br\s*\/?&gt;/gi,'<br>');
+}
+function _khNorm(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();}
+
+const KH_I={
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg>',
+  ded:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" stroke-dasharray="2.5 2.5"/></svg>',
+  dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M8 12h8"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  chev:'<svg class="chev" viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'
+};
+
+/* Parsea el texto de ayuda (ya saneado) en secciones + pie «Fuente: … pág. N · Origen: X».
+   Sin pie → Deducido. Vacío → 'none' (sin ayuda). */
+function parseTip(raw){
+  const r={origin:'none',page:'',fuente:'',que:'',unit:'',por:'',lo:'',hi:'',extra:[]};
+  if(raw==null||!String(raw).trim()) return r;
+  const html=sanitizeTipHTML(raw);
+  const KEYS={'que hace':'que','unidad':'unit','por que importa':'por','si es muy bajo':'lo','si es muy alto':'hi'};
+  let org='';
+  html.split('<br>').forEach(line=>{
+    const t=line.trim();
+    if(!t) return;
+    const f=t.match(/^<i>\s*Fuente:\s*([\s\S]*?)\s*<\/i>$/i);
+    if(f){
+      const om=f[1].match(/Origen:\s*([\s\S]+?)\s*$/i);
+      if(om) org=_khNorm(om[1]);
+      r.fuente=f[1].replace(/\s*·?\s*Origen:[\s\S]*$/i,'').trim();
+      const pm=r.fuente.match(/p[áa]g\.?\s*(\d+)/i);
+      if(pm) r.page=pm[1];
+      return;
+    }
+    const m=t.match(/^<b>([^<]*?)\s*:?\s*<\/b>\s*:?\s*([\s\S]*)$/);
+    if(m){
+      const k=KEYS[_khNorm(m[1]).replace(/:$/,'')];
+      if(k&&m[2]){r[k]=m[2];return;}
+    }
+    r.extra.push(t);
+  });
+  if(org.startsWith('manual')) r.origin='manual';
+  else if(org.startsWith('deducido')) r.origin='deducido';
+  else if(org.startsWith('sin dato')) r.origin='sindato';
+  else if(/^<b>\s*sin dato/i.test(html.trim())) r.origin='sindato';
+  else r.origin='deducido';
+  return r;
+}
+
+/* Texto efectivo (respeta «ocultos» salvo en modo «Ver ocultos») */
+function _khText(id){
+  if(_getTipHidden(id)&&!_tipRevealHidden) return '';
+  const t=_getTipText(id);
+  return typeof t==='string'?t:String(t||'');
+}
+
+/* ── Nombre legible de un campo: [Salmón/Coho ·] etiqueta [· columna] ── */
+function _khCellText(el){
+  let t='';
+  el.childNodes.forEach(n=>{
+    if(n.nodeType===3) t+=n.nodeValue;
+    else if(n.nodeType===1&&n.tagName==='BR') t+=' ';
+    else if(n.nodeType===1&&!n.classList.contains('tip-i')&&!/^(INPUT|BUTTON|SELECT)$/.test(n.tagName)) t+=n.textContent;
+  });
+  return t.replace(/\s+/g,' ').trim();
+}
+function _khColHeader(td){
+  const table=td.closest('table');
+  const head=table&&table.tHead;
+  if(!head||!head.rows.length) return '';
+  let idx=0;
+  for(const c of td.parentElement.cells){if(c===td) break; idx+=c.colSpan||1;}
+  let pos=0;
+  for(const th of head.rows[head.rows.length-1].cells){
+    const span=th.colSpan||1;
+    if(idx>=pos&&idx<pos+span) return th.textContent.replace(/\s+/g,' ').trim();
+    pos+=span;
+  }
+  return '';
+}
+function _khTablePrefix(table){
+  // Título de bloque de texto puro justo antes de la tabla (p.ej. «Salmón» / «Coho» en Ímpetu)
+  const prev=table.previousElementSibling;
+  if(prev&&prev.tagName==='DIV'&&!prev.children.length){
+    const t=prev.textContent.replace(/\s+/g,' ').trim();
+    if(t&&t.length<=24) return t;
+  }
+  return '';
+}
+function _fieldInfo(id){
+  const inp=document.getElementById(id);
+  if(!inp||!inp.matches||!inp.matches('input.fe,input.fe1')) return null;
+  const td=inp.closest('td');
+  const tr=td?td.parentElement:null;
+  let label='',labelEl=null;
+  if(tr){
+    labelEl=tr.querySelector('td.plb');
+    if(!labelEl){const c0=tr.cells[0];if(c0&&c0!==td&&!c0.querySelector('input')) labelEl=c0;}
+    if(labelEl) label=_khCellText(labelEl);
+  }
+  const col=td?_khColHeader(td):'';
+  const table=td?td.closest('table'):null;
+  const prefix=table?_khTablePrefix(table):'';
+  let name=label||id;
+  if(col) name+=' · '+col;
+  if(prefix) name=prefix+' · '+name;
+  const sc=inp.closest('.sc');
+  const st=sc?sc.querySelector('.st'):null;
+  const fr=(inp.nextElementSibling&&inp.nextElementSibling.classList.contains('fr'))?inp.nextElementSibling:null;
+  return {id,inp,td,tr,labelEl,name,screenTitle:st?st.textContent.replace(/\s+/g,' ').trim():'',fr};
+}
+
+/* ── Valores: Predeterminado (span.fr) → Actual (input) ── */
+function _khNum(s){
+  const t=String(s==null?'':s).trim().split(/\s+/)[0].replace(',','.');
+  return /^[-−]?\d+(\.\d+)?$/.test(t)?parseFloat(t.replace('−','-')):null;
+}
+/* Solo para mostrar: coma decimal como el panel («0.50» → «0,50»). No toca lo guardado. */
+function _khFmt(s){return String(s==null?'':s).trim().replace(/^([-−]?\d+)\.(\d+)(?=\s|$)/,'$1,$2');}
+function _khDec(s){const m=String(s||'').trim().split(/\s+/)[0].match(/[.,](\d+)$/);return m?m[1].length:0;}
+function _khValues(info){
+  const act=String(info.inp.value||'').trim();
+  const def=info.fr?info.fr.textContent.trim():'';
+  let state='nodef',delta='';
+  if(def){
+    const a=_khNum(act),d=_khNum(def);
+    if(a!=null&&d!=null){
+      if(Math.abs(a-d)<1e-9) state='same';
+      else{
+        state='diff';
+        const v=a-d,dec=Math.max(_khDec(act),_khDec(def));
+        delta=(v>0?'+':'−')+Math.abs(v).toFixed(dec).replace('.',',');
+      }
+    } else state=(act===def)?'same':'diff';
+  }
+  return {act,def,state,delta};
+}
+
+/* ⓘ del HMI: ámbar relleno solo si el valor actual difiere del predeterminado (span.fr).
+   Sin predeterminado, o íconos de menú/botón: neutro. */
+function _khIconState(icon,id){
+  const info=_fieldInfo(id);
+  icon.classList.toggle('v-chg',!!(info&&info.fr&&_khValues(info).state==='diff'));
+}
+function _khRefreshIcons(){
+  document.querySelectorAll('.sc .tip-i[data-pid]').forEach(ic=>_khIconState(ic,ic.dataset.pid));
+}
+
+/* Unidad corta: «bar (convención general del manual, pág. 104)» → «bar»; lo de dentro queda como nota */
+function _khUnit(u){
+  const t=String(u||'').trim();
+  const i=t.indexOf(' (');
+  if(i<0) return {short:t,note:''};
+  return {short:t.slice(0,i).trim(),note:t.slice(i+2).replace(/\)\s*$/,'').trim()};
+}
+/* Línea de origen (una sola, gris). Texto ya saneado/escapado. */
+function _khOriginTexts(p){
+  if(p.origin==='manual') return {ic:KH_I.book,html:'<b>Manual</b>'+(p.page?' · pág. '+_escHTML(p.page):'')};
+  if(p.origin==='deducido') return {ic:KH_I.ded,html:'<b>Deducido</b>'+(p.page?' de pág. '+_escHTML(p.page):', sin página de respaldo')+' · confírmalo en terreno'};
+  if(p.origin==='sindato') return {ic:KH_I.dash,html:'<b>Sin dato</b> en el manual · consulta a Mantención'};
+  return {ic:KH_I.dash,html:'<b>Sin ayuda</b> todavía'};
+}
+function _khOriginLine(p,unitNote){
+  const o=_khOriginTexts(p);
+  return '<div class="kh-org">'+o.ic+'<span>'+o.html+(unitNote?' · unidad: '+unitNote:'')+'</span></div>';
+}
+function _khCanEdit(){return !READ_ONLY&&(IN_IFRAME?_TIP_CAN_EDIT:true);}
+
+/* Barra de la ventana de ayuda (estilo .sh del panel): etiqueta AYUDA + título + cerrar. */
+function _khBar(title,sheet){
+  return '<div class="kh-bar"><span class="kh-kind">AYUDA</span>'+
+    '<span class="kh-ttl" id="kh-title-'+(sheet?'s':'p')+'" title="'+_escHTML(title)+'">'+_escHTML(title)+'</span>'+
+    '<button type="button" class="kh-x" aria-label="Cerrar ayuda">'+KH_I.x+'</button></div>';
+}
+/* «Más ▸»: lo secundario queda detrás de un botón del panel, dentro de la ventana. */
+function _khMore(inner,sheet){
+  if(!inner) return '';
+  return '<button type="button" class="kh-mas" data-act="more" aria-expanded="false">'+
+    '<span class="m-t">'+(sheet?'Por qué importa · muy bajo o muy alto':'Más')+'</span><span class="m-a" aria-hidden="true">▸</span></button>'+
+    '<div class="kh-xtra" hidden>'+inner+'</div>';
+}
+/* Contenido común del globo y de la hoja. Devuelve {top, body, origin, info}. */
+function _khContent(id,sheet){
+  if(String(id).startsWith('scr:')) return _knScrContent(id,sheet);
+  const info=_fieldInfo(id);
+  const p=parseTip(_khText(id));
+  // Una sección sin texto no se dibuja: el origen («Sin dato», «Sin ayuda») ya lo dice.
+  const blk=(h,c,cls)=>c?'<div class="kh-blk'+(cls?' '+cls:'')+'">'+(h?'<span class="h">'+h+'</span>':'')+'<p>'+c+'</p></div>':'';
+  const title=info?info.name:_getTipLabel(id);
+  const top=_khBar(title,sheet);
+  const u=_khUnit(p.unit);
+  // La nota de la unidad («convención general, pág. 104») solo suma si el campo no tiene otra página.
+  let b=_khOriginLine(p,(!p.page&&u.note)?u.note:'');
+  if(info){
+    const v=_khValues(info);
+    const st=v.state==='diff'?'predeterminado '+_escHTML(_khFmt(v.def))+(v.delta?' · '+_escHTML(v.delta):'')
+      :v.state==='same'?'= predeterminado':'sin predeterminado cargado';
+    b+='<div class="kh-val'+(v.state==='diff'?' chg':'')+'"><span class="n">'+(_escHTML(_khFmt(v.act))||'—')+'</span>'+
+      (u.short?'<span class="u">'+u.short+'</span>':'')+'<span class="st">'+st+'</span></div>';
+  }
+  // «Sin dato en el manual. No modificar sin consultar a Mantención.» ya lo dice la línea de origen.
+  const extra=p.origin==='sindato'
+    ?p.extra.filter(t=>!/^<b>\s*sin dato en el manual\.?\s*<\/b>\s*(no modificar sin consultar a mantenci[oó]n\.?)?\s*$/i.test(t))
+    :p.extra;
+  if(extra.length) b+=blk('',extra.join('<br>'));
+  if(info){
+    // Compacto: «Qué hace» a la vista (sin rótulo en el globo); el resto detrás de «Más ▸».
+    b+=blk('Qué hace',p.que,'q');
+    let more=blk('Por qué importa',p.por);
+    if(p.lo||p.hi){
+      more+='<div class="kh-blk"><span class="h">Si queda muy bajo o muy alto</span><div class="kh-lohi">'+
+        (p.lo?'<div>'+KH_I.down+'<span class="h">Muy bajo</span><p>'+p.lo+'</p></div>':'')+
+        (p.hi?'<div>'+KH_I.up+'<span class="h">Muy alto</span><p>'+p.hi+'</p></div>':'')+'</div></div>';
+    }
+    b+=_khMore(more,sheet);
+  } else {
+    // Menús y botones de navegación: texto libre saneado
+    b+=blk('',[p.que,p.por].filter(Boolean).join('<br>'));
+  }
+  if(_khCanEdit()) b+='<button type="button" class="kh-btn-tint" data-act="edit">'+(p.origin==='none'?'Escribir ayuda':'Editar ayuda')+'</button>';
+  return {top,body:b,origin:p.origin,info};
+}
+
+/* ── Estado ── */
+let _khOpen=null; // {id, el, kind:'pop'|'sheet', anchor, info}
+function _knIsLand(){return document.body.classList.contains('kn-land');}
+// Celular vertical → hoja. En el modo horizontal a pantalla completa nunca hay hoja.
+function _khIsNarrow(){return window.innerWidth<768&&!_knIsLand();}
+function _khRing(info,on){
+  if(!info) return;
+  info.inp.classList.toggle('kn-ring',on);
+  if(info.tr) info.tr.classList.toggle('kn-ring-row',on);
+}
+function closeHelp(instant){
+  if(!_khOpen) return;
+  const o=_khOpen;
+  _khOpen=null;
+  _khRing(o.info,false);
+  const sb=document.getElementById('kn-scr-btn');
+  if(sb) sb.setAttribute('aria-expanded','false');
+  document.querySelectorAll('#kn-help-list .kn-row.sel').forEach(r=>r.classList.remove('sel'));
+  if(typeof _knRailSync==='function') _knRailSync();
+  if(o.kind==='sheet'){
+    if(o.el._khRO){o.el._khRO.disconnect();o.el._khRO=null;}
+    document.body.classList.remove('kh-sheet-open');
+    const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(instant||reduce){o.el.remove();}
+    else{o.el.classList.add('kh-leave');setTimeout(()=>o.el.remove(),360);}
+  } else o.el.remove();
+}
+function openHelp(id,anchor){
+  if(_khIsNarrow()) _khOpenSheet(id);
+  else _khOpenPop(id,anchor);
+}
+function _khWire(el,id){
+  el.querySelector('.kh-x').addEventListener('click',e=>{e.stopPropagation();closeHelp();});
+  // «Más ▸» despliega lo secundario dentro de la misma ventana; el globo se recoloca.
+  const mas=el.querySelector('[data-act="more"]');
+  if(mas) mas.addEventListener('click',e=>{
+    e.stopPropagation();
+    _khSetMore(el,!el.classList.contains('kh-more-open'));
+    if(_khOpen&&_khOpen.el===el&&_khOpen.kind==='pop') _khPlace();
+  });
+  const ed=el.querySelector('[data-act="edit"]');
+  if(ed) ed.addEventListener('click',e=>{
+    e.stopPropagation();
+    const info=_fieldInfo(id);
+    const a=(info&&info.inp)||document.querySelector('.tip-i[data-pid="'+CSS.escape(id)+'"]')||
+      (String(id).startsWith('scr:')&&document.getElementById('kn-scr-btn'))||ed;
+    closeHelp(true);
+    openTipEdit(id,a);
+  });
+}
+function _khSetMore(el,on){
+  const mas=el.querySelector('[data-act="more"]');
+  const x=el.querySelector('.kh-xtra');
+  if(!mas||!x) return;
+  el.classList.toggle('kh-more-open',on);
+  x.hidden=!on;
+  mas.setAttribute('aria-expanded',String(on));
+  const sheet=el.classList.contains('kh-sheet');
+  mas.querySelector('.m-t').textContent=sheet?'Por qué importa · muy bajo o muy alto':(on?'Menos':'Más');
+  mas.querySelector('.m-a').textContent=on?'▴':'▸';
+}
+function _khPopHTML(c){
+  return '<div class="kh-z">'+c.top+'<div class="kh-bd">'+c.body+'</div></div><span class="kh-pk" aria-hidden="true"></span>';
+}
+function _khOpenPop(id,anchor){
+  closeHelp(true);
+  closeTipBox();
+  const c=_khContent(id,false);
+  const side=_knIsLand();
+  const el=document.createElement('div');
+  el.className='kh kh-pop'+(side?' kh-side':'');
+  el.setAttribute('role','dialog');
+  el.setAttribute('aria-labelledby','kh-title-p');
+  el.dataset.pid=id;
+  el.dataset.origin=c.origin;
+  el.innerHTML=_khPopHTML(c);
+  // PC: dentro del panel (#hs), así escala y se ancla con él. Horizontal: px reales, encima.
+  const hs=document.getElementById('hs');
+  (side||!hs?document.body:hs).appendChild(el);
+  _khWire(el,id);
+  _khRing(c.info,true);
+  _khOpen={id,el,kind:'pop',anchor:anchor||null,info:c.info};
+  if(typeof _knRailSync==='function') _knRailSync();
+  _khPlace();
+}
+/* ⓘ de un id en la pantalla activa */
+function _khIcon(id){
+  const sc=document.querySelector('#hs .sc.active');
+  return sc?sc.querySelector('.tip-i[data-pid="'+CSS.escape(id)+'"]'):null;
+}
+/* Rectángulos de referencia de la fila: fila completa, ⓘ, campo, valor de referencia, rótulo */
+function _khRefs(){
+  const {id,info,anchor}=_khOpen;
+  const ic=_khIcon(id);
+  const fld=info&&info.inp&&info.inp.isConnected?info.inp:null;
+  const a=anchor&&anchor.isConnected?anchor:null;
+  const pin=ic||fld||a;
+  const rowEl=(info&&info.tr)||(ic&&(ic.closest('.idxr')||ic.closest('button')||ic.closest('tr')))||null;
+  const els=[rowEl,ic,fld].filter(Boolean);
+  if(!els.length&&a) els.push(a);
+  return {pin,ic,fld,a,rowEl,els,fr:info&&info.fr,label:info&&info.labelEl};
+}
+function _khPlace(){
+  if(!_khOpen||_khOpen.kind!=='pop') return;
+  if(!_khOpen.el.isConnected){_khOpen=null;return;}
+  const r=_khRefs();
+  if(!r.pin){closeHelp(true);return;}
+  if(_khOpen.el.classList.contains('kh-side')) _khPlaceSide(r);
+  else _khPlaceIn(r);
+}
+/* PC · dentro de #hs, en px lógicos (800×480). Siempre ARRIBA de la fila si cabe, si no ABAJO:
+   nunca tapa su campo ni su ⓘ, ni la barra de título ni la botonera inferior. El pico cae
+   sobre la ⓘ; la caja se corre hacia el lado con más espacio. --k compensa la escala del panel
+   para que el texto de 12-13 px lógicos se lea ≥13 px reales. */
+function _khPlaceIn(r){
+  const el=_khOpen.el,hs=document.getElementById('hs');
+  const hR=hs.getBoundingClientRect();
+  const sc=hR.width/800||1;
+  const L=q=>({l:(q.left-hR.left)/sc,t:(q.top-hR.top)/sc,r:(q.right-hR.left)/sc,b:(q.bottom-hR.top)/sc});
+  const W=800,H=480,M=8,G=4;
+  const k=Math.max(1,Math.min(2.5,13/(12*sc)));
+  el.style.setProperty('--k',k.toFixed(3));
+  const z=el.querySelector('.kh-z'),bd=el.querySelector('.kh-bd'),pk=el.querySelector('.kh-pk');
+  z.style.width=Math.min(280,(W-2*M-2)/k)+'px';
+  bd.style.maxHeight='';
+  // Área útil: entre la barra de título (.sh) y la botonera (.nw) de la pantalla activa
+  const scr=hs.querySelector('.sc.active');
+  const shEl=scr&&scr.querySelector(':scope > .sh');
+  const nws=scr?scr.querySelectorAll('.nw'):[];
+  const nwEl=nws.length?nws[nws.length-1]:null;
+  const top0=shEl?L(shEl.getBoundingClientRect()).b+G:M;
+  const bot0=nwEl?L(nwEl.getBoundingClientRect()).t-G:H-M;
+  const PK=7*k;
+  let w=el.offsetWidth,h=el.offsetHeight;
+  const inHs=hs.contains(r.pin);
+  let dir,top,pkX=null;
+  if(inHs){
+    let rt=Infinity,rb=-Infinity;
+    r.els.forEach(e=>{const q=L(e.getBoundingClientRect());if(q.b-q.t<1&&q.r-q.l<1)return;rt=Math.min(rt,q.t);rb=Math.max(rb,q.b);});
+    const p=L(r.pin.getBoundingClientRect());
+    pkX=(p.l+p.r)/2;
+    const up=rt-G-PK-top0, dn=bot0-(rb+G+PK);
+    const fit=avail=>{ // si no cabe completo, el cuerpo hace scroll
+      if(h<=avail) return;
+      const bdH=bd.getBoundingClientRect().height/sc;
+      const want=Math.max(40,avail-(h-bdH));
+      bd.style.maxHeight=(want/k)+'px';
+      h=el.offsetHeight;
+    };
+    if(h<=up){dir='abajo';top=rt-G-PK-h;}
+    else if(h<=dn){dir='arriba';top=rb+G+PK;}
+    else if(up>=dn){fit(up);dir='abajo';top=rt-G-PK-h;}
+    else{fit(dn);dir='arriba';top=rb+G+PK;}
+    top=Math.max(top0,Math.min(top,bot0-h));
+  } else {
+    // «?» de pantalla (fuera del panel): arriba a la derecha, bajo la barra de título
+    dir='arriba';top=top0+PK;
+    const avail=bot0-top;
+    if(h>avail){const bdH=bd.getBoundingClientRect().height/sc;bd.style.maxHeight=(Math.max(40,avail-(h-bdH))/k)+'px';h=el.offsetHeight;}
+    const p=L(r.pin.getBoundingClientRect());
+    pkX=Math.max(0,Math.min(W,(p.l+p.r)/2));
+  }
+  w=el.offsetWidth;
+  let left=inHs?(pkX<W/2?pkX-24*k:pkX-w+24*k):W-M-w;
+  left=Math.max(M,Math.min(left,W-M-w));
+  el.style.left=Math.round(left)+'px';
+  el.style.top=Math.round(top)+'px';
+  pk.className='kh-pk '+dir;
+  const px=pkX-left-5*k;
+  pk.hidden=px<8*k||px>w-18*k;
+  pk.style.left=Math.round(Math.max(8*k,Math.min(px,w-18*k)))+'px';
+}
+/* Celular horizontal · en px reales, fuera de #hs. REGLA DURA: nunca tapa lo propio del campo
+   (input, valor de referencia gris, ⓘ, rótulo; en filas de navegación, la fila entera). Con
+   ~342 px de alto el orden es: (a) arriba de la fila, (b) abajo, (c) al costado, en el hueco
+   horizontal más ancho que deje libre lo propio (en tablas de 2 columnas puede tapar la otra
+   columna), (d) si nada cabe completo, el que más deje ver, con scroll interno. El «?» de
+   pantalla (sin campo) va a la izquierda del riel, como antes. */
+function _khPlaceSide(r){
+  const el=_khOpen.el;
+  const vw=window.innerWidth,vh=window.innerHeight,M=8,G=6,PK=7;
+  const rail=document.getElementById('kn-rail');
+  const xMax=(rail&&rail.offsetWidth?rail.getBoundingClientRect().left:vw)-M;
+  const hp=document.getElementById('hp');
+  const xMin=Math.max(M,(hp?parseFloat(getComputedStyle(hp).paddingLeft)||0:0)+M);
+  const R=e=>e.getBoundingClientRect();
+  const pk=el.querySelector('.kh-pk'),bd=el.querySelector('.kh-bd');
+  const p=R(r.pin);
+  bd.style.maxHeight='';
+  el.style.maxHeight=(vh-2*M)+'px';
+  const measure=w=>{el.style.width=w+'px';return el.offsetHeight;};
+  const put=(left,top,dir,pkPos)=>{
+    el.style.left=Math.round(left)+'px';el.style.top=Math.round(top)+'px';
+    pk.className='kh-pk '+dir;pk.hidden=false;
+    if(dir==='izq'||dir==='der'){pk.style.left=dir==='izq'?'':'auto';pk.style.top=Math.round(Math.max(10,Math.min(pkPos-top-5,el.offsetHeight-20)))+'px';}
+    else{pk.style.top='';const w=el.offsetWidth,px=pkPos-left-5;pk.hidden=px<8||px>w-18;pk.style.left=Math.round(Math.max(8,Math.min(px,w-18)))+'px';}
+  };
+  // Lo propio del campo: no se tapa nunca
+  const own=[r.label,r.ic,r.fld,r.fr,r.fld?null:r.rowEl,r.fld||r.ic?null:r.pin]
+    .filter(e=>e&&e.isConnected).map(R).filter(q=>q.width>0||q.height>0);
+  if(!r.fld&&!r.ic){
+    // «?» de pantalla: a la izquierda del riel, centrado en el botón
+    const w=Math.min(380,xMax-xMin-PK);
+    const h=measure(w);
+    const cy=(p.top+p.bottom)/2;
+    put(Math.max(xMin,p.left-G-PK-w),Math.max(M,Math.min(cy-h/2,vh-M-h)),'der',cy);
+    return;
+  }
+  const oT=Math.min(...own.map(q=>q.top)),oB=Math.max(...own.map(q=>q.bottom));
+  const pkX=(p.left+p.right)/2,cy=(oT+oB)/2;
+  const fullW=Math.min(440,xMax-xMin);
+  const hFull=measure(fullW);
+  const up=oT-G-PK-M, dn=vh-M-(oB+G+PK);
+  const hzLeft=()=>Math.max(xMin,Math.min(pkX-fullW/2,xMax-fullW));
+  // (a) arriba · (b) abajo, completos
+  if(hFull<=up){measure(fullW);put(hzLeft(),oT-G-PK-hFull,'abajo',pkX);return;}
+  if(hFull<=dn){measure(fullW);put(hzLeft(),oB+G+PK,'arriba',pkX);return;}
+  // (c) costado: huecos horizontales libres de lo propio
+  const xs=own.map(q=>[q.left-G-PK,q.right+G+PK]).sort((x,y)=>x[0]-y[0]);
+  const gaps=[];let cur=xMin;
+  xs.forEach(([l,rr])=>{if(l>cur) gaps.push([cur,l]);cur=Math.max(cur,rr);});
+  if(xMax>cur) gaps.push([cur,xMax]);
+  gaps.sort((x,y)=>(y[1]-y[0])-(x[1]-x[0]));
+  const g=gaps[0];
+  const gw=g?g[1]-g[0]:0;
+  const sideH=gw>=200?measure(Math.min(380,gw)):Infinity;
+  const sidePut=()=>{
+    const w=Math.min(380,gw);measure(w);
+    // Hueco a la derecha de la ⓘ/campo → se pega a su borde izquierdo y el pico mira a la izquierda
+    const onRight=(g[0]+g[1])/2>pkX;
+    const left=onRight?g[0]:g[1]-w;
+    const h=el.offsetHeight;
+    put(left,Math.max(M,Math.min(cy-h/2,vh-M-h)),onRight?'izq':'der',cy);
+  };
+  if(sideH<=vh-2*M){sidePut();return;}
+  // (d) nada cabe completo: arriba/abajo con scroll si dejan ≥ 90 px; si no, costado con scroll
+  const best=Math.max(up,dn);
+  if(best>=90||gw<140){
+    measure(fullW);
+    const avail=Math.max(60,best);
+    // Ajuste iterativo del cuerpo (scroll interno) hasta que la caja quepa en el hueco
+    let mh=bd.getBoundingClientRect().height-(el.offsetHeight-avail);
+    for(let i=0;i<4;i++){
+      bd.style.maxHeight=Math.max(24,Math.floor(mh))+'px';
+      const over=el.offsetHeight-avail;
+      if(over<=0||mh<=24) break;
+      mh-=over;
+    }
+    const h=el.offsetHeight;
+    if(up>=dn) put(hzLeft(),oT-G-PK-h,'abajo',pkX);
+    else put(hzLeft(),oB+G+PK,'arriba',pkX);
+    return;
+  }
+  sidePut();
+}
+function _khOpenSheet(id){
+  const wasSheet=_khOpen&&_khOpen.kind==='sheet';
+  closeHelp(true);
+  closeTipBox();
+  const c=_khContent(id,true);
+  const el=document.createElement('div');
+  el.className='kh kh-sheet'+(wasSheet?'':' kh-enter');
+  el.setAttribute('role','dialog');
+  el.setAttribute('aria-labelledby','kh-title-s');
+  el.dataset.pid=id;
+  el.dataset.origin=c.origin;
+  el.innerHTML=c.top+'<div class="kh-sheet-body">'+c.body+'</div>';
+  document.body.appendChild(el);
+  document.body.classList.add('kh-sheet-open');
+  _khSheetMeasure(el);
+  _khWire(el,id);
+  _khRing(c.info,true);
+  _khOpen={id,el,kind:'sheet',anchor:null,info:c.info};
+  document.querySelectorAll('#kn-help-list .kn-row').forEach(r=>r.classList.toggle('sel',r.dataset.pid===id));
+  if(!wasSheet) requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('kh-enter')));
+  // Mantener el HMI (con el campo marcado) visible arriba de la hoja
+  const hp=document.getElementById('hp');
+  if(hp&&hp.scrollTop>0) hp.scrollTo({top:0,behavior:'smooth'});
+  _khSheetDrag(el);
+}
+/* El hueco que deja #hp bajo el HMI sigue el alto REAL de la hoja (ya no es fijo en 58 %) */
+function _khSheetMeasure(el){
+  const set=()=>{if(el.isConnected) document.body.style.setProperty('--kh-sheet-h',el.offsetHeight+'px');};
+  set();
+  if(window.ResizeObserver){const ro=new ResizeObserver(set);ro.observe(el);el._khRO=ro;}
+}
+/* Arrastre sobre la barra de la hoja: abajo cierra (>120 px o 25 %), arriba expande a 92 % */
+function _khSheetDrag(el){
+  const head=el.querySelector('.kh-bar');
+  let sy=0,dy=0,dragging=false;
+  head.addEventListener('touchstart',e=>{if(e.target.closest('.kh-x'))return;sy=e.touches[0].clientY;dy=0;dragging=true;el.style.transition='none';},{passive:true});
+  head.addEventListener('touchmove',e=>{if(!dragging)return;dy=e.touches[0].clientY-sy;if(dy>0)el.style.transform='translateY('+dy+'px)';},{passive:true});
+  head.addEventListener('touchend',()=>{
+    if(!dragging) return;
+    dragging=false;
+    el.style.transition='';el.style.transform='';
+    if(dy>Math.min(120,el.offsetHeight*.25)) closeHelp();
+    else if(dy<-40) el.classList.add('kh-full');
+  });
+}
+/* Re-render del globo/hoja abiertos (valores o textos cambiaron) */
+function _khRefreshOpen(){
+  if(!_khOpen) return;
+  const {id,kind,el}=_khOpen;
+  if(!el.isConnected){_khOpen=null;return;}
+  const info=_fieldInfo(id);
+  if(info&&!info.inp.closest('.sc.active')){closeHelp(true);return;}
+  const c=_khContent(id,kind==='sheet');
+  const more=el.classList.contains('kh-more-open');
+  el.dataset.origin=c.origin;
+  if(kind==='sheet'){
+    const body=el.querySelector('.kh-sheet-body'),st=body.scrollTop;
+    el.querySelector('.kh-bar').outerHTML=c.top;
+    body.innerHTML=c.body;body.scrollTop=st;
+    _khSheetDrag(el);
+  } else el.innerHTML=_khPopHTML(c);
+  el.classList.remove('kh-more-open');
+  _khRing(_khOpen.info,false);
+  _khOpen.info=c.info;
+  _khRing(c.info,true);
+  _khWire(el,id);
+  if(more) _khSetMore(el,true);
+  if(kind==='pop') _khPlace();
+}
+
+/* ── Lista de campos de la pantalla actual (celular) ── */
+/* Celular vertical («v»): sin encabezado «Esta pantalla». Sin campos, la ayuda de pantalla va
+   ABIERTA con su línea de origen; con campos, encabezado plano «Campos · N» y la ayuda plegada
+   como primera fila (se abre en el lugar). Horizontal (lista lateral) y PC: sin cambios. */
+let _knScrExp=null,_knListMode=null;
+function _knListV(){return _khIsNarrow();}
+function _knScrHelpHTML(scrId,withEyebrow){
+  const p=parseTip(_khText(scrId));
+  const o=_khOriginTexts(p);
+  let h=withEyebrow?'<div class="ey">Para qué sirve esta pantalla</div>':'';
+  sanitizeTipHTML(_khText(scrId)).split('<br>').forEach(line=>{
+    const t=line.trim();
+    if(!t||/^<i>\s*Fuente:/i.test(t)) return;
+    const m=t.match(/^<b>([^<]{1,40}?)\s*:?\s*<\/b>\s*:?\s*([\s\S]+)$/);
+    h+=m?'<p><span class="h">'+m[1]+':</span> '+m[2]+'</p>':'<p>'+t+'</p>';
+  });
+  h+='<div class="kn-org">'+o.ic+'<span>'+o.html+'</span></div>';
+  if(_khCanEdit()) h+='<button type="button" class="kh-btn-tint" data-act="scr-edit">'+(p.origin==='none'?'Escribir para qué sirve':'Editar ayuda de pantalla')+'</button>';
+  return h;
+}
+function renderHelpList(){
+  _knListMode=_knListV()?'v':'o';
+  const hp=document.getElementById('hp');
+  if(!hp) return;
+  let wrap=document.getElementById('kn-help-list');
+  if(!wrap){
+    wrap=document.createElement('section');
+    wrap.id='kn-help-list';
+    wrap.className='kh';
+    wrap.setAttribute('aria-label','Campos de esta pantalla');
+    hp.appendChild(wrap);
+    wrap.addEventListener('click',e=>{
+      if(e.target.closest('.kh-list-h .kh-x')){_knLandPanel(null);return;}
+      const ed=e.target.closest('[data-act="scr-edit"]');
+      if(ed){const sc0=document.querySelector('.sc.active');if(sc0) openTipEdit('scr:'+sc0.id,ed);return;}
+      const b=e.target.closest('.kn-row');
+      if(!b) return;
+      // Celular vertical: la ayuda de pantalla se abre en el mismo lugar (acordeón), no en hoja.
+      if(b.classList.contains('kn-row-acc')){_knScrExp=_knScrExp===b.dataset.pid?null:b.dataset.pid;renderHelpList();return;}
+      // En horizontal la lista tapa el panel: se cierra y el globo sale junto a la fila.
+      if(_knIsLand()) _knLandPanel(null);
+      openHelp(b.dataset.pid,null);
+    });
+  }
+  const sc=document.querySelector('.sc.active');
+  const inputs=sc?[...sc.querySelectorAll('input.fe[id],input.fe1[id]')]:[];
+  // Primera fila: «Para qué sirve esta pantalla» (si hay texto; vacía y editable para admin).
+  const scrId=sc?'scr:'+sc.id:'';
+  const scrHas=!!(sc&&_khText(scrId));
+  const showScr=!!(sc&&sc.id!=='ph'&&(scrHas||_khCanEdit()));
+  if(!inputs.length&&!showScr){wrap.hidden=true;wrap.innerHTML='';if(typeof _knRailSync==='function') _knRailSync();return;}
+  wrap.hidden=false;
+  const sel=_khOpen?_khOpen.id:null;
+  const vMode=_knListMode==='v';
+  if(_knScrExp&&_knScrExp!==scrId) _knScrExp=null; // otra pantalla: la ayuda vuelve plegada
+  let scrRow='';
+  if(showScr&&vMode&&!inputs.length){
+    scrRow='<div class="kn-sh" role="region" aria-label="Para qué sirve esta pantalla">'+_knScrHelpHTML(scrId,true)+'</div>';
+  } else if(showScr&&vMode){
+    const so=_khOriginTexts(parseTip(_khText(scrId)));
+    const ex=_knScrExp===scrId;
+    scrRow='<div class="kh-glist kn-scr-g kn-acc"><button type="button" class="kn-row kn-row-scr kn-row-acc" aria-expanded="'+ex+'" aria-controls="kn-scr-acc" data-pid="'+_escHTML(scrId)+'">'+
+      '<span class="l">Para qué sirve esta pantalla</span><span class="s">'+so.ic+'<span>'+so.html+'</span></span>'+KH_I.chev+'</button>'+
+      '<div class="kn-sh" id="kn-scr-acc"'+(ex?'':' hidden')+'>'+(ex?_knScrHelpHTML(scrId,false):'')+'</div></div>';
+  } else if(showScr){
+    const sp=parseTip(_khText(scrId));
+    const so=_khOriginTexts(sp);
+    scrRow='<div class="kh-glist kn-scr-g"><button type="button" class="kn-row kn-row-scr'+(scrId===sel?' sel':'')+'" data-pid="'+_escHTML(scrId)+'">'+
+      '<span class="l">Para qué sirve esta pantalla</span><span class="s">'+so.ic+'<span>'+so.html+'</span></span>'+KH_I.chev+'</button></div>';
+  }
+  // Agrupar por origen (+ página): el origen va una vez en el encabezado del grupo.
+  const RANK={deducido:0,manual:1,sindato:2,none:3};
+  const groups=new Map();
+  inputs.forEach(inp=>{
+    const info=_fieldInfo(inp.id);
+    const p=parseTip(_khText(inp.id));
+    const key=p.origin+'|'+p.page;
+    if(!groups.has(key)) groups.set(key,{p,rows:[]});
+    const v=_khValues(info);
+    const chg=v.state==='diff';
+    const cur='<span class="cur">'+(_escHTML(_khFmt(v.act))||'—')+'</span>';
+    const def=chg&&v.def?'<span class="def">pred. '+_escHTML(_khFmt(v.def))+'</span>':'';
+    groups.get(key).rows.push('<button type="button" class="kn-row'+(chg?' chg':'')+(inp.id===sel?' sel':'')+'" data-pid="'+_escHTML(inp.id)+'">'+
+      '<span class="l">'+_escHTML(info.name)+'</span><span class="val">'+cur+def+'</span>'+KH_I.chev+'</button>');
+  });
+  const gl=p=>p.origin==='manual'?'<b>Manual</b>'+(p.page?' · pág. '+_escHTML(p.page):'')
+    :p.origin==='deducido'?'<b>Deducido</b>'+(p.page?' de pág. '+_escHTML(p.page):', sin página de respaldo')
+    :p.origin==='sindato'?'<b>Sin dato</b> en el manual':'<b>Sin ayuda</b> todavía';
+  const html=[...groups.values()].sort((a,b)=>RANK[a.p.origin]-RANK[b.p.origin]).map(g=>{
+    const ic=_khOriginTexts(g.p).ic;
+    const n=g.rows.length;
+    return '<h2 class="kh-gh">'+ic+'<span>'+gl(g.p)+' · '+n+(n===1?' campo':' campos')+'</span></h2><div class="kh-glist">'+g.rows.join('')+'</div>';
+  });
+  // Sin campos (p. ej. Principal) no se muestra «· 0»: solo queda la fila de la pantalla.
+  const headTxt=inputs.length?'Campos de esta pantalla · '+inputs.length:'Esta pantalla';
+  const head=vMode?(inputs.length?'<div class="kn-lh">Campos <span class="n">· '+inputs.length+'</span></div>':''):
+    '<div class="kh-list-h"><span>'+headTxt+'</span>'+
+    '<button type="button" class="kh-x" aria-label="Cerrar lista de campos">'+KH_I.x+'</button></div>';
+  wrap.innerHTML=head+scrRow+html.join('');
+  if(typeof _knRailSync==='function') _knRailSync();
+}
+
+/* ── Tema: la ayuda es SIEMPRE clara, como el panel real, aunque la app esté en oscuro ── */
+
+/* ── Eventos globales ── */
+window.addEventListener('load',()=>{
+  const hs=document.getElementById('hs');
+  if(!hs) return;
+  // La fila completa abre la ayuda (etiqueta, celda, ícono). El input sigue editable.
+  hs.addEventListener('click',e=>{
+    if(e.target.closest('.tip-i,button,input,select,textarea,[contenteditable="true"]')) return;
+    const td=e.target.closest('td');
+    if(!td||!td.closest('.sc.active')) return;
+    const tr=td.parentElement;
+    let inp=td.querySelector('input.fe[id],input.fe1[id]');
+    if(!inp&&td.classList.contains('plb')){
+      const nx=td.nextElementSibling;
+      inp=(nx&&nx.querySelector('input.fe[id],input.fe1[id]'))||tr.querySelector('input.fe[id],input.fe1[id]');
+    }
+    if(!inp&&!tr.querySelector('td.plb')){
+      const c0=tr.cells[0];
+      if(c0===td) inp=tr.querySelector('input.fe[id],input.fe1[id]');
+    }
+    if(!inp) return;
+    if(_getTipHidden(inp.id)&&!_tipRevealHidden&&!_khIsNarrow()) return;
+    if(_khOpen&&_khOpen.id===inp.id&&_khOpen.kind==='pop'){closeHelp();return;}
+    openHelp(inp.id,inp);
+  });
+});
+document.addEventListener('pointerdown',e=>{
+  // Globo (PC): se cierra con clic afuera. La hoja (celular) solo con ×, arrastre o Esc,
+  // para que desplazar la página con el dedo no la cierre.
+  if(!_khOpen||_khOpen.kind!=='pop') return;
+  const t=e.target;
+  if(_khOpen.el.contains(t)||!t.closest) return;
+  if(t.closest('.tip-i,#kn-scr-btn,#kn-rail')) return; // el clic del ícono (o del «?») alterna
+  if(t.closest('#hs td')&&!t.closest('input,button,select,textarea')) return; // el clic de fila decide
+  closeHelp();
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&_khOpen){closeHelp();}});
+let _khInputT=null;
+document.addEventListener('input',e=>{
+  if(!e.target.matches||!e.target.matches('input.fe,input.fe1')) return;
+  clearTimeout(_khInputT);
+  _khInputT=setTimeout(()=>{_khRefreshIcons();renderHelpList();_khRefreshOpen();},150);
+});
+let _khResizeT=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(_khResizeT);
+  _khResizeT=setTimeout(()=>{
+    if(_knListMode&&_knListMode!==(_knListV()?'v':'o')) renderHelpList();
+    if(_khOpen){
+      const narrow=_khIsNarrow();
+      if(narrow&&_khOpen.kind==='pop'){const id=_khOpen.id;closeHelp(true);_khOpenSheet(id);}
+      else if(!narrow&&_khOpen.kind==='sheet'){const o=_khOpen;closeHelp(true);_khOpenPop(o.id,o.info&&o.info.inp);}
+      else _khPlace();
+    }
+  },120);
+});
+document.addEventListener('scroll',()=>{if(_khOpen&&_khOpen.kind==='pop') _khPlace();},true);
+
+/* ══════════════════════════════════════════════════════════════════════
+   BUSCADOR de parámetros + «?» de AYUDA DE PANTALLA
+   Ambos viven en la barra del simulador (#kn-bar), FUERA del panel (.dev):
+   el HMI no cambia. El «?» lee PARAM_TOOLTIPS['scr:<idPantalla>'] (mismo doc
+   hmi-knuro-tooltips/default, mismo formato saneado). Todo texto que sale de
+   PARAM_TOOLTIPS pasa por sanitizeTipHTML o _escHTML antes de entrar al DOM.
+   ══════════════════════════════════════════════════════════════════════ */
+const KN_I_SEARCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+function _knCurScreen(){const sc=document.querySelector('#hs .sc.active');return sc?sc.id:'';}
+/* Nombre de la pantalla tal como lo dice su barra de título, sin el «Principal - Menú Técnico -» repetido */
+function _knScreenTitle(sid){
+  const sc=document.getElementById(sid);
+  const st=sc?sc.querySelector(':scope > .sh .st'):null;
+  let t=st?st.textContent.replace(/\s+/g,' ').trim():'';
+  t=t.replace(/^…\s*-\s*/,'').replace(/^Principal\s*[-.]\s*/i,'').replace(/^(Men[uú]\s+T[eé]cnico|Technical\s+Menu)\s*-\s*/i,'');
+  if(!t||t==='—') t=(typeof NAMES!=='undefined'&&NAMES[sid])||sid;
+  return t;
+}
+/* Ruta del HMI hasta la pantalla (por data-back), p.ej. «Menú Técnico › Vacío».
+   En las cadenas «SIGUIENTE» (sensores, configuración) data-back es la página anterior,
+   no el menú: se salta mientras la anterior apunte a esta con data-next. */
+function _knPath(sid){
+  const out=[];const seen=new Set();
+  let cur=sid;
+  let sc=document.getElementById(cur);
+  let b=sc&&sc.dataset.back;
+  while(b&&!seen.has(b)&&out.length<6){
+    seen.add(b);
+    const p=document.getElementById(b);
+    if(!p) break;
+    if(!(p.dataset.sennav&&p.dataset.next===cur)) out.unshift(_knScreenTitle(b));
+    cur=b;b=p.dataset.back;
+  }
+  return out.join(' › ');
+}
+function _knPlain(html){
+  return String(html||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]*>/g,' ')
+    .replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&')
+    .replace(/\s+/g,' ').trim();
+}
+/* Texto de ayuda para buscar: sin el pie «Fuente: … · Origen: …» ni las frases fijas de los
+   globos sin dato, que ponían «sin», «dato», «manual» o «consultar» en casi todos los textos. */
+function _knHelpBusq(plain){
+  return String(plain||'')
+    .replace(/Fuente:[^]*$/i,' ')
+    .replace(/Sin dato en el manual\.?/gi,' ')
+    .replace(/No modificar sin consultar a Mantenci[oó]n\.?/gi,' ')
+    .replace(/\s+/g,' ').trim();
+}
+/* Palabras vacías: no deciden una coincidencia dentro del texto de ayuda */
+const KN_VACIAS=new Set(['de','del','la','las','el','los','y','o','en','a','al','con','por','para','un','una','que','se','su']);
+/* Índice: se arma en cada búsqueda (≈180 campos + 58 pantallas), así siempre refleja
+   los valores y textos actuales sin enganchar eventos. */
+function _knIndex(){
+  const fields=[],screens=[];
+  document.querySelectorAll('#hs .sc').forEach(sc=>{
+    if(sc.id==='ph') return;
+    const sid=sc.id,title=_knScreenTitle(sid),alias=(typeof NAMES!=='undefined'&&NAMES[sid])||'';
+    const path=_knPath(sid);
+    const help=_knPlain(_khText('scr:'+sid));
+    const inps=[...sc.querySelectorAll('input.fe[id],input.fe1[id]')];
+    screens.push({kind:'screen',sid,title,path,help,n:inps.length,nName:_khNorm(title+' '+alias),nHelp:_khNorm(_knHelpBusq(help))});
+    inps.forEach(inp=>{
+      const info=_fieldInfo(inp.id);
+      if(!info) return;
+      const fh=_knPlain(_khText(inp.id));
+      fields.push({kind:'field',id:inp.id,sid,name:info.name,title,path,help:fh,info,
+        nName:_khNorm(info.name),nScr:_khNorm(title+' '+alias+' '+path),nHelp:_khNorm(_knHelpBusq(fh))});
+    });
+  });
+  return {fields,screens};
+}
+/* Coincidencia al inicio de palabra («vacio» no calza dentro de «activacion»). norm ya normalizado. */
+function _knAt(norm,t,from){
+  let p=from||0;
+  while(t&&(p=norm.indexOf(t,p))>=0){
+    if(p===0||!/[a-z0-9]/.test(norm[p-1])) return p;
+    p++;
+  }
+  return -1;
+}
+/* Resaltado sin tildes ni mayúsculas, sobre el texto original escapado */
+function _knHL(text,toks){
+  const s=String(text==null?'':text);
+  let norm='';const map=[];
+  for(let i=0;i<s.length;i++){
+    const n=s[i].normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    for(let k=0;k<n.length;k++){norm+=n[k];map.push(i);}
+  }
+  const mk=new Array(s.length).fill(false);
+  toks.forEach(t=>{let p=0;while(t&&(p=_knAt(norm,t,p))>=0){for(let k=p;k<p+t.length;k++)mk[map[k]]=true;p+=t.length;}});
+  let out='',open=false;
+  for(let i=0;i<s.length;i++){
+    if(mk[i]&&!open){out+='<mark>';open=true;}
+    if(!mk[i]&&open){out+='</mark>';open=false;}
+    out+=_escHTML(s[i]);
+  }
+  return out+(open?'</mark>':'');
+}
+/* Fragmento del texto de ayuda alrededor de la primera coincidencia */
+function _knSnippet(text,toks){
+  const s=String(text||'');
+  const n=_khNorm(s);
+  let at=-1;
+  toks.forEach(t=>{const p=_knAt(n,t,0);if(p>=0&&(at<0||p<at))at=p;});
+  if(at<0) return _knHL(s.slice(0,110),toks);
+  // _khNorm puede acortar (tildes combinadas); la posición es aproximada y basta para recortar
+  const a=Math.max(0,at-45),b=Math.min(s.length,at+75);
+  let frag=s.slice(a,b);
+  if(a>0) frag=frag.replace(/^\S*\s+/,'');          // sin palabras cortadas
+  if(b<s.length) frag=frag.replace(/\s+\S*$/,'');
+  return '«'+(a>0?'…':'')+_knHL(frag.trim(),toks)+(b<s.length?'…':'')+'»';
+}
+const KN_MAX_FIELDS=30;
+function _knSearch(q){
+  const toks=_khNorm(q).split(/\s+/).filter(Boolean);
+  if(!toks.length) return null;
+  const has=s=>toks.every(t=>_knAt(s,t,0)>=0);
+  // En el texto de ayuda: todas las palabras con contenido deben estar, y al menos una
+  // tiene que aparecer en la propia ayuda (si todas calzan solo en el nombre, ya salió arriba).
+  const llenas=toks.filter(t=>!KN_VACIAS.has(t));
+  const tH=llenas.length?llenas:toks;
+  const hasH=(nombre,ayuda)=>tH.every(t=>_knAt(nombre,t,0)>=0||_knAt(ayuda,t,0)>=0)&&tH.some(t=>_knAt(ayuda,t,0)>=0);
+  const {fields,screens}=_knIndex();
+  const F=[],H=[],S=[];
+  fields.forEach(f=>{
+    if(has(f.nName)) F.push({f,l:1});
+    else if(has(f.nName+' '+f.nScr)) F.push({f,l:2});
+    else if(hasH(f.nName+' '+f.nScr,f.nHelp)) H.push({f,l:3});
+  });
+  screens.forEach(s=>{
+    if(has(s.nName)) S.push({f:s,l:1});
+    else if(hasH(s.nName,s.nHelp)) H.push({f:s,l:3});
+  });
+  F.sort((a,b)=>a.l-b.l);
+  // Pantallas antes que campos si la pantalla calza por nombre y ningún campo por el suyo («evacuador»)
+  const screensFirst=S.length>0&&!F.some(x=>x.l===1);
+  return {toks,F,S,H,screensFirst};
+}
+
+/* ── UI ── */
+let _knHits=[],_knAct=-1;
+function _knBuildBar(){
+  if(document.getElementById('kn-bar')) return;
+  const hp=document.getElementById('hp');
+  if(!hp) return;
+  const bar=document.createElement('div');
+  bar.id='kn-bar';
+  hp.insertBefore(bar,hp.firstChild);
+  // Miga (Menú Técnico › Carro 2 › Tiempo 3-1): dice dónde se está; la llena _knScrRefresh
+  const crumb=document.createElement('div');
+  crumb.className='kn-crumb';
+  crumb.id='kn-crumb';
+  bar.appendChild(crumb);
+  const tools=document.createElement('div');
+  tools.className='kn-tools kh';
+  tools.innerHTML=
+    '<button type="button" id="kn-scr-btn" hidden aria-expanded="false" aria-haspopup="dialog" title="Para qué sirve esta pantalla">'+
+      '<span class="q" aria-hidden="true">?</span><span class="lbl">Esta pantalla</span></button>'+
+    '<button type="button" id="kn-pan-btn" class="kn-pan" aria-expanded="false" aria-controls="rp">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 5h6M8 12h8M8 19h8M5 5v14h3M5 12h3"/></svg>Pantallas</button>';
+  bar.appendChild(tools);
+  // Buscador arriba del árbol, en el panel «Pantallas» (PC: lateral; celular: hoja)
+  const panS=document.getElementById('kp-search');
+  const lbl=document.createElement('label');
+  lbl.className='kn-search kh';
+  lbl.innerHTML=KN_I_SEARCH+
+      '<input id="kn-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="kn-res" '+
+      'autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" placeholder="Buscar parámetro o pantalla" aria-label="Buscar parámetro o pantalla del HMI">'+
+      '<span class="kn-kbd" aria-hidden="true">/</span>'+
+      '<button type="button" class="kn-clr" hidden aria-label="Borrar búsqueda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+  (panS||tools).appendChild(lbl);
+  const res=document.createElement('div');
+  res.id='kn-res';
+  res.className='kn-res kh'+(panS?' kn-res-in':'');
+  res.setAttribute('role','listbox');
+  res.setAttribute('aria-label','Resultados de la búsqueda');
+  res.hidden=true;
+  if(panS) panS.after(res); else document.body.appendChild(res);
+
+  const q=document.getElementById('kn-q');
+  const clr=lbl.querySelector('.kn-clr');
+  document.getElementById('kn-scr-btn').addEventListener('click',e=>{e.stopPropagation();_knOpenScr();});
+  document.getElementById('kn-pan-btn').addEventListener('click',e=>{e.stopPropagation();togglePanel();});
+  clr.addEventListener('click',e=>{e.preventDefault();q.value='';clr.hidden=true;_knCloseRes();q.focus();});
+  q.addEventListener('input',()=>{clr.hidden=!q.value;_knRender();});
+  q.addEventListener('focus',()=>{
+    if(_khIsNarrow()){
+      if(_khOpen) closeHelp(true);
+      const hpEl=document.getElementById('hp');
+      if(hpEl&&hpEl.scrollTop>0) hpEl.scrollTop=0;
+    }
+    if(q.value.trim()) _knRender();
+  });
+  q.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      e.preventDefault();
+      if(res.hidden){_knRender();return;}
+      if(!_knHits.length) return;
+      _knSetAct(_knAct<0?(e.key==='ArrowDown'?0:_knHits.length-1):(_knAct+(e.key==='ArrowDown'?1:-1)+_knHits.length)%_knHits.length);
+    } else if(e.key==='Enter'){
+      e.preventDefault();
+      if(!res.hidden&&_knHits.length) _knGo(_knHits[_knAct<0?0:_knAct]);
+    } else if(e.key==='Escape'){
+      e.preventDefault();e.stopPropagation();
+      if(q.value){q.value='';clr.hidden=true;_knCloseRes();}
+      else if(!res.hidden){_knCloseRes();}
+      else{q.blur();if(window.innerWidth<=860) closePanel();if(_knIsLand()) _knLandPanel(null);}
+    }
+  });
+  res.addEventListener('mousedown',e=>{if(!_khIsNarrow()) e.preventDefault();}); // PC: no perder el foco del campo
+  res.addEventListener('click',e=>{
+    const b=e.target.closest('.kn-hit');
+    if(b) _knGo(_knHits[+b.dataset.i]);
+  });
+  document.addEventListener('pointerdown',e=>{
+    if(res.hidden||res.classList.contains('kn-res-in')) return; // en el panel, los resultados quedan mientras haya texto
+    if(e.target.closest&&(e.target.closest('#kn-res')||e.target.closest('#kn-bar')||e.target.closest('#kn-rail'))) return;
+    _knCloseRes();
+  },true);
+  // «/» o Ctrl+K enfocan el buscador (si no se está escribiendo en otro campo)
+  document.addEventListener('keydown',e=>{
+    const t=e.target;
+    const typing=t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    const go=()=>{
+      e.preventDefault();
+      const rp=document.getElementById('rp');
+      if(rp&&rp.classList.contains('collapsed')&&window.innerWidth>860) toggleRightPanel();
+      if(window.innerWidth<=860) _knPanSet(true);
+      q.focus();q.select();
+    };
+    if((e.key==='k'||e.key==='K')&&(e.ctrlKey||e.metaKey)&&!e.shiftKey&&!e.altKey){go();return;}
+    if(e.key==='/'&&!typing&&!e.ctrlKey&&!e.metaKey&&!e.altKey) go();
+  });
+  window.addEventListener('resize',()=>{if(!res.hidden) _knPlaceRes();});
+  _knScrRefresh();
+  scaleHMI();
+}
+function _knPlaceRes(){
+  const res=document.getElementById('kn-res');
+  const box=document.querySelector('#kn-bar .kn-search');
+  if(!res||!box||res.classList.contains('kn-res-in')) return;
+  const r=box.getBoundingClientRect();
+  if(_khIsNarrow()){
+    res.style.top=Math.round(r.bottom+8)+'px';
+    res.style.left='';res.style.width='';
+  } else {
+    const w=Math.min(Math.max(r.width,420),window.innerWidth-16);
+    res.style.width=w+'px';
+    res.style.left=Math.round(Math.max(8,Math.min(r.right-w,window.innerWidth-w-8)))+'px';
+    res.style.top=Math.round(r.bottom+8)+'px';
+  }
+}
+function _knCloseRes(){
+  const res=document.getElementById('kn-res');
+  const q=document.getElementById('kn-q');
+  if(res){res.hidden=true;res.innerHTML='';}
+  document.getElementById('rp')?.classList.remove('kn-searching');
+  if(q){q.setAttribute('aria-expanded','false');q.removeAttribute('aria-activedescendant');}
+  _knHits=[];_knAct=-1;
+}
+function _knSetAct(i){
+  _knAct=i;
+  const q=document.getElementById('kn-q');
+  document.querySelectorAll('#kn-res .kn-hit').forEach(b=>{
+    const on=+b.dataset.i===i;
+    b.classList.toggle('sel',on);
+    b.setAttribute('aria-selected',on?'true':'false');
+    if(on){q.setAttribute('aria-activedescendant',b.id);b.scrollIntoView({block:'nearest'});}
+  });
+}
+function _knRender(){
+  const q=document.getElementById('kn-q');
+  const res=document.getElementById('kn-res');
+  if(!q||!res) return;
+  const r=_knSearch(q.value);
+  if(!r){_knCloseRes();return;}
+  _knHits=[];_knAct=-1;
+  const toks=r.toks;
+  const row=(hit,l,c,v,chg)=>{
+    const i=_knHits.push(hit)-1;
+    return '<button type="button" role="option" aria-selected="false" id="kn-hit-'+i+'" class="kn-row kn-hit'+(chg?' chg':'')+'" data-i="'+i+'">'+
+      '<span class="l">'+l+'</span>'+(c?'<span class="s"><span>'+c+'</span></span>':'')+'<span class="val">'+(v?'<span class="cur">'+v+'</span>':'')+'</span>'+KH_I.chev+'</button>';
+  };
+  const fieldVal=f=>{const v=_khValues(f.info);return {txt:_escHTML(_khFmt(v.act))||'—',chg:v.state==='diff'};};
+  // Ruta sin repetir: el título ya trae el menú padre («Vacío - Monitorear Vacío»)
+  const where=f=>{
+    const parts=f.path?f.path.split(' › '):[];
+    while(parts.length&&_khNorm(f.title).startsWith(_khNorm(parts[parts.length-1]))) parts.pop();
+    return _knHL(parts.concat(f.title).join(' › '),toks);
+  };
+  const grp=(title,n,rows)=>rows?'<h2 class="kh-gh"><span><b>'+title+'</b> · '+n+'</span></h2><div class="kh-glist" role="group" aria-label="'+_escHTML(title)+'">'+rows+'</div>':'';
+  let gF='',gS='',gH='';
+  r.F.slice(0,KN_MAX_FIELDS).forEach(({f})=>{const v=fieldVal(f);gF+=row(f,_knHL(f.name,toks),where(f),v.txt,v.chg);});
+  r.S.forEach(({f:s})=>{gS+=row({kind:'screen',sid:s.sid,viaHelp:false},_knHL(s.title,toks),_knHL(s.path,toks),s.n?s.n+(s.n===1?' campo':' campos'):'',false);});
+  r.H.slice(0,KN_MAX_FIELDS).forEach(({f})=>{
+    if(f.kind==='field'){const v=fieldVal(f);gH+=row(f,_knHL(f.name,toks),_knHL(f.title,toks)+' · '+_knSnippet(f.help,toks),v.txt,v.chg);}
+    else gH+=row({kind:'screen',sid:f.sid,viaHelp:true},'Pantalla '+_knHL(f.title,toks),_knSnippet(f.help,toks),'',false);
+  });
+  const more=(n,shown)=>n>shown?'<div class="more">y '+(n-shown)+' más · agrega otra palabra para acotar</div>':'';
+  const blockF=grp('Campos',r.F.length,gF)+more(r.F.length,KN_MAX_FIELDS);
+  const blockS=grp('Pantallas',r.S.length,gS);
+  const blockH=grp('En el texto de la ayuda',r.H.length,gH)+more(r.H.length,KN_MAX_FIELDS);
+  let html=(r.screensFirst?blockS+blockF:blockF+blockS)+blockH;
+  if(!_knHits.length) html='<div class="kn-empty">Nada con «'+_escHTML(q.value.trim())+'». Prueba con el nombre que aparece en el panel.</div>';
+  res.innerHTML=html;
+  res.hidden=false;
+  if(res.classList.contains('kn-res-in')) document.getElementById('rp')?.classList.add('kn-searching');
+  q.setAttribute('aria-expanded','true');
+  _knPlaceRes();
+  res.scrollTop=0;
+  if(!_khIsNarrow()&&_knHits.length) _knSetAct(0);
+}
+function _knPulse(el){
+  if(!el) return;
+  el.classList.remove('kn-pulse');
+  void el.offsetWidth;
+  el.classList.add('kn-pulse');
+  setTimeout(()=>el.classList.remove('kn-pulse'),1300);
+}
+function _knGo(hit){
+  if(!hit) return;
+  const q=document.getElementById('kn-q');
+  const res=document.getElementById('kn-res');
+  // En el panel «Pantallas» los resultados quedan a la vista (PC); en celular se cierra la hoja
+  if(!(res&&res.classList.contains('kn-res-in'))) _knCloseRes();
+  if(_khIsNarrow()&&q) q.blur(); // baja el teclado para ver el HMI y la hoja
+  if(window.innerWidth<=860){if(q) q.blur();closePanel();}
+  if(_knIsLand()){if(q) q.blur();_knLandPanel(null);}
+  if(_knCurScreen()!==hit.sid) nav(hit.sid);
+  requestAnimationFrame(()=>{
+    if(hit.kind==='field'){
+      const el=document.getElementById(hit.id);
+      if(!el) return;
+      openHelp(hit.id,el);
+      _knPulse(el);
+    } else if(hit.viaHelp){
+      _knOpenScr(true);
+    }
+  });
+}
+/* «?» de pantalla */
+function _knOpenScr(forceOpen){
+  const sid=_knCurScreen();
+  if(!sid||sid==='ph') return;
+  const id='scr:'+sid;
+  if(_khOpen&&_khOpen.id===id&&!forceOpen){closeHelp();return;}
+  openHelp(id,_knIsLand()?document.querySelector('#kn-rail [data-act="scr"]'):document.getElementById('kn-scr-btn'));
+  const b=document.getElementById('kn-scr-btn');
+  if(b) b.setAttribute('aria-expanded','true');
+}
+/* Miga de la barra de pantalla: ruta del HMI (sin repetir lo que ya dice el título) + código */
+function _knCrumbRefresh(){
+  const el=document.getElementById('kn-crumb');
+  if(!el) return;
+  const sid=_knCurScreen();
+  if(!sid){el.innerHTML='';return;}
+  let title=sid==='ph'?(document.getElementById('ph-t')?.textContent||''):_knScreenTitle(sid);
+  const parts=sid==='ph'?[]:(_knPath(sid)?_knPath(sid).split(' › '):[]);
+  while(parts.length&&_khNorm(title).startsWith(_khNorm(parts[parts.length-1]))) parts.pop();
+  // «Carro 2 - Tiempo» → miga «… › Carro 2 ›» y pantalla «Tiempo»
+  const tt=title.split(/\s+-\s+/).filter(Boolean);
+  if(tt.length>1){title=tt.pop();parts.push(...tt);}
+  const code=sid==='ph'?'':_knCode(sid);
+  el.innerHTML=(parts.length?'<span class="p full">'+_escHTML(parts.join(' › '))+' ›</span><span class="p last">'+_escHTML(parts[parts.length-1])+' ›</span>':'')+
+    '<span class="c">'+_escHTML(title)+'</span>'+(code?'<span class="code">'+_escHTML(code)+'</span>':'');
+  el.title=parts.concat(title).join(' › ');
+}
+function _knScrRefresh(){
+  _knCrumbRefresh();
+  const b=document.getElementById('kn-scr-btn');
+  if(!b) return;
+  setTimeout(_knRailSync,0);
+  const sid=_knCurScreen();
+  const has=!!(sid&&_khText('scr:'+sid));
+  b.hidden=!(sid&&sid!=='ph'&&(has||_khCanEdit()));
+  b.classList.toggle('empty',!has);
+  const t=sid?_knScreenTitle(sid):'';
+  b.setAttribute('aria-label',(has?'Para qué sirve esta pantalla: ':'Escribir para qué sirve esta pantalla: ')+t);
+  b.title=has?'Para qué sirve esta pantalla':'Sin texto todavía · escribir para qué sirve';
+  b.setAttribute('aria-expanded',String(!!(_khOpen&&_khOpen.id==='scr:'+sid)));
+}
+/* Contenido del globo/hoja de pantalla: mismo formato que el de un campo
+   (texto saneado + línea de origen). Cada línea «<b>Etiqueta:</b> texto» es un bloque. */
+function _knScrContent(id,sheet){
+  const sid=String(id).slice(4);
+  const p=parseTip(_khText(id));
+  const blk=(h,c)=>c?'<div class="kh-blk">'+(h?'<span class="h">'+h+'</span>':'')+'<p>'+c+'</p></div>':'';
+  const top=_khBar(_knScreenTitle(sid),sheet);
+  let b='<span class="kh-eyebrow">Para qué sirve esta pantalla</span>'+_khOriginLine(p,'');
+  // Bloques en el orden en que vienen escritos (texto saneado; el pie «Fuente…» ya va en la línea de origen).
+  sanitizeTipHTML(_khText(id)).split('<br>').forEach(line=>{
+    const t=line.trim();
+    if(!t||/^<i>\s*Fuente:/i.test(t)) return;
+    const m=t.match(/^<b>([^<]{1,40}?)\s*:?\s*<\/b>\s*:?\s*([\s\S]+)$/);
+    b+=m?blk(m[1],m[2]):blk('',t);
+  });
+  if(_khCanEdit()) b+='<button type="button" class="kh-btn-tint" data-act="edit">'+(p.origin==='none'?'Escribir para qué sirve':'Editar ayuda de pantalla')+'</button>';
+  return {top,body:b,origin:p.origin,info:null};
+}
+/* ══════════════════════════════════════════════════════════════════════
+   CELULAR HORIZONTAL · pantalla completa del simulador (body.kn-land)
+   Sin barras: el HMI toma el alto completo y a la derecha queda un riel de 60 px con
+   Buscar, Lista de campos, «?» de pantalla y Salir. Dentro de la página pública lo decide
+   el padre (mensaje hmi:land), que además esconde SUS barras; abierto solo, lo decide la
+   media query (horizontal, ≤500 px de alto, pantalla táctil).
+   ══════════════════════════════════════════════════════════════════════ */
+const KN_LAND_MQ='(orientation: landscape) and (max-height: 500px) and (pointer: coarse)';
+let _knLandMsg=null;
+function _knLandWanted(){
+  if(IN_IFRAME) return _knLandMsg===true;
+  try{return matchMedia(KN_LAND_MQ).matches;}catch(e){return false;}
+}
+/* Las áreas táctiles de 44 px de ⓘ vecinas se solapan (filas a ~22 px reales): sin esto, tocar
+   la ⓘ de una fila abría la de la fila de abajo (la última en el DOM gana). En horizontal, el
+   toque se resuelve a la ⓘ cuyo centro está más cerca del dedo. Si el toque empieza en el área
+   de una ⓘ y termina en la de otra, el click llega al ancestro común (la tabla): también se
+   resuelve, siempre que caiga dentro del área táctil (22 px del centro) y no en un control. */
+document.addEventListener('click',e=>{
+  if(!document.body.classList.contains('kn-land')||e.__knIcon) return;
+  const tg=e.target&&e.target.closest?e.target:null;
+  if(!tg||typeof e.clientX!=='number'||!tg.closest('#hs .sc.active')) return;
+  const t=tg.closest('.tip-i');
+  if(!t&&tg.closest('input,button,select,textarea,a,[onclick]')) return;
+  let best=t,bd=t?Infinity:22;
+  document.querySelectorAll('#hs .sc.active .tip-i').forEach(ic=>{
+    const q=ic.getBoundingClientRect();
+    if(!q.width) return;
+    const d=Math.hypot(e.clientX-(q.left+q.width/2),e.clientY-(q.top+q.height/2));
+    if(d<bd){bd=d;best=ic;}
+  });
+  if(!best||best===t) return;
+  e.stopPropagation();e.preventDefault();
+  const ev=new MouseEvent('click',{bubbles:true,cancelable:true,clientX:e.clientX,clientY:e.clientY});
+  ev.__knIcon=true;
+  best.dispatchEvent(ev);
+},true);
+function _knApplyLand(){
+  const on=_knLandWanted();
+  if(on) _knBuildRail();
+  if(document.body.classList.contains('kn-land')===on) return;
+  closeHelp(true);
+  if(typeof _knCloseRes==='function') _knCloseRes();
+  closePanel();
+  document.body.classList.remove('kn-land-search','kn-land-list');
+  document.body.classList.toggle('kn-land',on);
+  renderHelpList(); // la lista cambia de forma entre vertical y la lateral del modo horizontal
+  _knRailSync();
+  scaleHMI();
+  requestAnimationFrame(scaleHMI);
+}
+/* Paneles superpuestos del modo horizontal: 'search' | 'list' | null */
+function _knLandPanel(which){
+  const b=document.body;
+  const was=b.classList.contains('kn-land-search')?'search':b.classList.contains('kn-land-list')?'list':null;
+  b.classList.remove('kn-land-search','kn-land-list');
+  if(was==='search'){_knCloseRes();const q=document.getElementById('kn-q');if(q) q.blur();}
+  if(which&&which!==was){
+    closeHelp(true);
+    closePanel();
+    if(which==='search'){
+      b.classList.add('kn-land-search');
+      const q=document.getElementById('kn-q');
+      if(q){q.focus();if(q.value.trim()) _knRender();}
+    } else {
+      renderHelpList();
+      b.classList.add('kn-land-list');
+      const l=document.getElementById('kn-help-list');
+      if(l) l.scrollTop=0;
+    }
+  }
+  _knRailSync();
+}
+/* Pista de giro (celular vertical, primera visita): la decide el padre (mensaje hmi:giro, misma
+   clave de localStorage que antes). Es una línea DENTRO del flujo, bajo el panel: no flota sobre
+   presets, título, «Pantallas», el HMI ni la lista. «Pantalla completa» y × avisan al padre. */
+function _knGiro(on){
+  let g=document.getElementById('kn-giro');
+  if(on&&!g){
+    const dev=document.querySelector('#hp .dev');
+    if(!dev) return;
+    g=document.createElement('div');
+    g.id='kn-giro';
+    g.setAttribute('role','note');
+    g.innerHTML='<svg class="rot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="10" width="15" height="10" rx="2"/><path d="M14 4a6 6 0 0 1 6 6M20 10l-2-2M20 10l2-2"/></svg>'+
+      '<span>Gira el teléfono para agrandar el panel</span>'+
+      '<button type="button" data-act="fs">Pantalla completa</button>'+
+      '<button type="button" class="x" data-act="x" aria-label="Cerrar aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+    (dev.closest('#kn-dz')||dev).after(g);
+    g.addEventListener('click',e=>{
+      const b=e.target.closest('button');
+      if(!b) return;
+      e.stopPropagation();
+      _knGiro(false);
+      if(IN_IFRAME) window.parent.postMessage({type:b.dataset.act==='fs'?'hmi:giro-fs':'hmi:giro-off'},location.origin);
+    });
+  }
+  document.body.classList.toggle('kn-giro',on);
+}
+function _knBuildRail(){
+  if(document.getElementById('kn-rail')) return;
+  const r=document.createElement('nav');
+  r.id='kn-rail';
+  r.className='kh';
+  r.setAttribute('aria-label','Herramientas del simulador');
+  const I=(d,sw)=>'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="'+(sw||2)+'" stroke-linecap="round" aria-hidden="true">'+d+'</svg>';
+  r.innerHTML=
+    '<button type="button" class="kn-rb" data-act="pan" aria-pressed="false" aria-label="Pantallas: buscar o elegir pantalla" title="Pantallas">'+I('<path d="M3 4h5M7 10h7M7 16h7M4 4v12h3M4 10h3"/>')+'</button>'+
+    '<button type="button" class="kn-rb" data-act="list" aria-pressed="false" aria-label="Lista de campos de esta pantalla" title="Lista de campos">'+I('<path d="M3 5h14M3 10h14M3 15h14"/>')+'</button>'+
+    '<button type="button" class="kn-rb" data-act="scr" aria-pressed="false" aria-label="Para qué sirve esta pantalla" title="Ayuda de pantalla">?</button>'+
+    '<button type="button" class="kn-rb" data-act="exit" aria-label="Salir de pantalla completa" title="Salir de pantalla completa">'+I('<path d="M8 3v5H3M12 3v5h5M17 12h-5v5M3 12h5v5"/>',1.8)+'</button>';
+  document.body.appendChild(r);
+  r.addEventListener('click',e=>{
+    const b=e.target.closest('.kn-rb');
+    if(!b||b.disabled) return;
+    e.stopPropagation();
+    const act=b.dataset.act;
+    if(act==='pan'){_knLandPanel(null);togglePanel();return;}
+    if(act==='search'||act==='list'){_knLandPanel(act);return;}
+    if(act==='scr'){_knLandPanel(null);closePanel();_knOpenScr();_knRailSync();return;}
+    if(act==='exit'){
+      _knLandPanel(null);
+      closeHelp(true);
+      try{if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});}catch(err){}
+      if(IN_IFRAME) window.parent.postMessage({type:'hmi:exit-fs'},location.origin);
+    }
+  });
+}
+function _knRailSync(){
+  const r=document.getElementById('kn-rail');
+  if(!r) return;
+  const b=document.body;
+  const set=(act,on)=>{const x=r.querySelector('[data-act="'+act+'"]');if(x) x.setAttribute('aria-pressed',String(on));};
+  set('search',b.classList.contains('kn-land-search'));
+  set('pan',!!document.getElementById('rp')?.classList.contains('open'));
+  set('list',b.classList.contains('kn-land-list'));
+  const sid=_knCurScreen();
+  set('scr',!!(_khOpen&&_khOpen.id==='scr:'+sid));
+  const scr=r.querySelector('[data-act="scr"]');
+  const sb=document.getElementById('kn-scr-btn');
+  if(scr) scr.disabled=!sb||sb.hidden;
+  const lst=r.querySelector('[data-act="list"]');
+  const l=document.getElementById('kn-help-list');
+  if(lst) lst.disabled=!l||l.hidden;
+}
+window.addEventListener('load',()=>{
+  _knApplyLand();
+  if(!IN_IFRAME){try{matchMedia(KN_LAND_MQ).addEventListener('change',_knApplyLand);}catch(e){}}
+});
+window.addEventListener('load',()=>{_knBuildBar();_knTreeMark(_knCurScreen());_knCrumbRefresh();});
+
 initTooltipSystem();
 
 // Ctrl+Shift+T: cambiar contraseña
 document.addEventListener('keydown',e=>{
-  if(e.ctrlKey&&e.shiftKey&&e.key==='T'){
+  if(!IN_IFRAME&&e.ctrlKey&&e.shiftKey&&e.key==='T'){
     e.preventDefault();
     setAdminPassword();
   }
 });
 </script>
-<button id="tip-vis-btn" onclick="toggleTipVisibility()" style="display:none;">👁 Ver ocultos</button></body>
+<button id="tip-vis-btn" onclick="toggleTipVisibility()" style="display:none;">👁 Ver ocultos</button>
+<script>
+/* Zoom táctil del panel del X2 (pellizco, doble toque, «1×»). El panel se escala completo; en el
+   celular vertical un contenedor lo recorta para que la ampliación no tape la barra ni la lista. */
+(function(){
+  var dev = document.querySelector('#hp .dev');
+  var hp = document.getElementById('hp');
+  if (!dev || !hp || !window.EmbedZoom) return;
+  var dz = document.createElement('div');
+  dz.id = 'kn-dz';
+  dev.parentNode.insertBefore(dz, dev);
+  dz.appendChild(dev);
+  var zoom = window.EmbedZoom.init({
+    layer: dev,
+    stage: hp,
+    view: function () {
+      var el = getComputedStyle(dz).display === 'contents' ? hp : dz;
+      var r = el.getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
+    }
+  });
+  if (zoom && window.ResizeObserver) new ResizeObserver(function () { zoom.refit(); }).observe(hp);
+  // Al cambiar de pantalla (nav) o de preset, el panel vuelve a 1×: se ve la pantalla nueva completa.
+  if (zoom) {
+    var navOrig = window.nav;
+    if (typeof navOrig === 'function') window.nav = function () { zoom.reiniciar(); return navOrig.apply(this, arguments); };
+    window.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'hmi:load-preset') zoom.reiniciar();
+    });
+  }
+})();
+</script>
+</body>
 </html>

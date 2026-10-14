@@ -153,10 +153,10 @@ export function InfoTooltip({
   }, [visible])
 
   const arrowClasses: Record<string, string> = {
-    top: 'top-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-b-transparent border-t-[#1e293b] dark:border-t-[#1e293b]',
-    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-t-transparent border-b-[#1e293b] dark:border-b-[#1e293b]',
-    left: 'left-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-r-transparent border-l-[#1e293b] dark:border-l-[#1e293b]',
-    right: 'right-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-l-transparent border-r-[#1e293b] dark:border-r-[#1e293b]',
+    top: 'top-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-b-transparent border-t-[#1e293b] dark:border-t-[#1e293b] pizarra:border-t-foreground',
+    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-t-transparent border-b-[#1e293b] dark:border-b-[#1e293b] pizarra:border-b-foreground',
+    left: 'left-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-r-transparent border-l-[#1e293b] dark:border-l-[#1e293b] pizarra:border-l-foreground',
+    right: 'right-full top-1/2 -translate-y-1/2 border-t-transparent border-b-transparent border-l-transparent border-r-[#1e293b] dark:border-r-[#1e293b] pizarra:border-r-foreground',
   }
 
   const Icon = variant === 'help' ? HelpCircle : Info
@@ -199,7 +199,7 @@ export function InfoTooltip({
           className={cn(
             'fixed z-[9999]',
             'rounded-card shadow-2xl',
-            'bg-slate-800 text-foreground',
+            'bg-slate-800 text-foreground pizarra:bg-foreground pizarra:text-background',
             'text-xs leading-relaxed',
             'transition-all duration-150 ease-out',
             visible

@@ -241,10 +241,19 @@ export function agruparEventos(args: {
   const escala = tb.recoverableMin > 0 && sumaLinea > tb.recoverableMin
     ? tb.recoverableMin / sumaLinea
     : 1
+  /*
+   * Desde el 28-09-2026 (tbv 3) cada causa trae `machineMin` y `equivMin`: se
+   * MUESTRAN los minutos de máquina —PUNTO CERO dejó la Ev 1 detenida 11 min y
+   * la fila decía «0 min»— y se VALORIZAN los equivalentes de línea (cada
+   * máquina por su peso, 1/N). Los equivalentes no se pisan entre causas (una
+   * máquina tiene un solo estado a la vez), así que no llevan escala.
+   */
+  const conEquiv = (tb.recoverable ?? []).length > 0 && (tb.recoverable ?? []).every((x) => x.equivMin != null)
 
   for (const x of tb.recoverable ?? []) {
     const { dueno, categoria, extension } = duenoDe(x.reason)
-    const minLinea = Math.max(0, x.lineMin ?? x.min ?? 0) * escala
+    const minLinea = conEquiv ? Math.max(0, x.equivMin ?? 0) : Math.max(0, x.lineMin ?? x.min ?? 0) * escala
+    const minVisible = conEquiv ? Math.max(0, x.machineMin ?? 0) : minLinea
     /*
      * El RITMO sigue siendo el local —el que la línea traía justo antes de esa
      * parada—; solo se corrigen los minutos. `costo` viene calculado sobre los
@@ -263,7 +272,7 @@ export function agruparEventos(args: {
     const piezas = cpmLocal ? minLinea * cpmLocal : null
     push(dueno, {
       reason: x.reason,
-      min: minLinea,
+      min: minVisible,
       count: x.count ?? 0,
       piezas,
       categoria,

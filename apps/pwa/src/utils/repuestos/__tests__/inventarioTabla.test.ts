@@ -29,6 +29,11 @@ describe('filtros de la tabla', () => {
     expect(ids(L.filter(l => pasaFiltros(l, f({ estado: 'codigo' }))))).toBe('c')
     expect(ids(L.filter(l => pasaFiltros(l, f({ estado: 'sap' }))))).toBe('')
   })
+  it('falta confirmar nombre: validada pero con nombre provisional', () => {
+    const conNombre = L.map(l => (l.id === 'd' ? { ...l, nombrePendiente: true } : l))
+    expect(ids(conNombre.filter(l => pasaFiltros(l, f({ estado: 'nombre' }))))).toBe('d')
+    expect(ids(conNombre.filter(l => pasaFiltros(l, f({ estado: 'validado' }))))).toBe('abd')
+  })
   it('nombre busca también el nombre común, sin acentos', () => expect(ids(L.filter(l => pasaFiltros(l, f({ nombre: 'bocína' }))))).toBe('b'))
   it('búsqueda global por palabras', () => expect(ids(L.filter(l => pasaFiltros(l, FILTROS_VACIOS, 'chapa 3300017418')))).toBe('a'))
   it('cuenta filtros activos', () => expect(filtrosActivos(f({ ubicacion: 'x', dif: 'con' }), 'q')).toBe(3))
@@ -98,5 +103,14 @@ describe('SAP repartido en varias líneas', () => {
     const d = { ...v('b', 'Ubicación 7', 2, 21), estado: 'dudoso' as const }
     const [a] = conTotalesPorSap([v('a', 'Ubicación 3', 19, 21), d])
     expect(a!.contadoSap).toBeUndefined()
+  })
+})
+
+describe('orden por Nombre', () => {
+  it('ordena por el título que se ve (el nombre común si hay), sin cambiar los datos', () => {
+    // b se ve «Bocina» aunque su texto SAP sea RODILLO; c no tiene nombre y va al final.
+    expect(ids(ordenarLineas(L, 'nombre', 1))).toBe('bdac')
+    expect(ids(ordenarLineas(L, 'nombre', -1))).toBe('adbc')
+    expect(L[1]!.textoBreve).toBe('RODILLO 92152025')
   })
 })

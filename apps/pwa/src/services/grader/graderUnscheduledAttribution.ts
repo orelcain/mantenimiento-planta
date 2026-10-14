@@ -130,6 +130,29 @@ export function agruparTramos(intervals: readonly CycleInterval[]): Array<{
  */
 export const MAX_CONTINUIDAD_MS = 90 * 60 * 1000
 
+/**
+ * Una cola larga tiene que estar PEGADA al turno. Si hay un hueco real de sensor
+ * entre el cierre y el bloque, y el bloque dura horas, no es la misma jornada que
+ * siguió de largo: es OTRO turno que Shoplogix no tiene configurado.
+ *
+ * Caso que lo fijó — Chonchi 26-sep-2026: el Turno 2 cerró 15:00 (última pieza
+ * 15:15) y a las 16:15 arrancó un turno EXTRAORDINARIO de HG hasta las 22:55,
+ * 9.553 piezas. Con la continuidad sola (60 min ≤ 90) el bloque entero se colgó
+ * del Turno 2 como "cola": la vista anunció 22.768 pz y "meta cumplida" para un
+ * turno que hizo 13.215 de 15.000 — no la cumplió — y el brief salió con eso.
+ *
+ * El corte entre turnos lo marca el sensor: una hora en blanco es el cambio de
+ * gente, no una pausa. Por eso hacen falta las dos medidas y no una:
+ *   · `MAX_DURACION_COLA_SUELTA_MS` (2 h): hasta acá un bloque puede ser cola
+ *     aunque haya hueco — cubre Filete 15:40→16:30 (50 min) y el arranque
+ *     anticipado de Yal 14:05→15:15 (70 min, 2.296 piezas).
+ *   · `HUECO_PEGADO_MS` (15 min, el mismo corte de tramo): pegado al cierre, la
+ *     cola puede durar lo que dure — es la línea que no paró.
+ * Un bloque de 6 h 40 con 60 min de silencio antes no pasa ninguna.
+ */
+export const MAX_DURACION_COLA_SUELTA_MS = 2 * 60 * 60 * 1000
+export const HUECO_PEGADO_MS = TRAMO_GAP_MS
+
 /** Ventana de un turno, para decidir de quién es un tramo. */
 export interface VentanaTurno { start: Date; end: Date }
 
@@ -188,12 +211,33 @@ export function esColaDeEsteTurno(
 ): boolean {
   const propia = distanciaTramo(tramo, ventana)
   if (propia > MAX_CONTINUIDAD_MS) return false
+  // Con hueco de sensor, solo una cola corta. Larga y suelta = otro turno.
+  const duracion = tramo.end + TRAMO_INTERVAL_MS - tramo.start
+  if (propia > HUECO_PEGADO_MS && duracion > MAX_DURACION_COLA_SUELTA_MS) return false
   const yaCerro = (v: VentanaTurno) => tramo.start >= v.end.getTime()
   return otras.every(v => {
     const otra = distanciaTramo(tramo, v)
     if (propia !== otra) return propia < otra
     return yaCerro(ventana) && !yaCerro(v)
   })
+}
+
+/**
+ * Los tramos sueltos que son cola de ESTE turno, decididos por BLOQUE encadenado
+ * (misma regla que `attributeUnscheduledCycles` y el monitor público). Devuelve
+ * los tramos originales, para que la vista pueda nombrarlos uno a uno.
+ */
+export function colasDelTurno<T extends { start: number; end: number; pieces: number }>(
+  tramos: readonly T[],
+  ventana: VentanaTurno,
+  otras: readonly VentanaTurno[],
+): T[] {
+  const out: T[] = []
+  for (const bloque of encadenarTramos(tramos)) {
+    if (!esColaDeEsteTurno(bloque, ventana, otras)) continue
+    for (const t of tramos) if (t.start >= bloque.start && t.end <= bloque.end) out.push(t)
+  }
+  return out.sort((a, b) => a.start - b.start)
 }
 
 export interface UnscheduledAttribution {

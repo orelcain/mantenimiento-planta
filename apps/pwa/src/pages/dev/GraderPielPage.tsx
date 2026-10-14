@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LossCascadeCard } from '@/components/grader/LossCascadeCard'
 import { fixtureShift } from './piloto/fixture'
+import { aplicarPielAlDocumento, pielGuardadaEfectiva, recordarPiel } from '@/lib/intensidad'
 
 /**
  * Vitrina del MÓDULO GRADER barrido: `/dev/grader-piel`.
@@ -15,14 +16,12 @@ import { fixtureShift } from './piloto/fixture'
  * Si un componente se ve mal acá, se ve mal en producción — es el mismo código.
  */
 export default function GraderPielPage() {
-  const [skin, setSkin] = useState(() => localStorage.getItem('app-skin') || 'apple')
+  const [skin, setSkin] = useState(pielGuardadaEfectiva) // predeterminada: Pizarra
   const [theme, setTheme] = useState(() => localStorage.getItem('app-theme') || 'dark')
   const shift = fixtureShift()
 
   useEffect(() => {
-    localStorage.setItem('app-skin', skin)
-    if (skin === 'default') document.documentElement.removeAttribute('data-skin')
-    else document.documentElement.setAttribute('data-skin', skin)
+    aplicarPielAlDocumento(skin) // 'pizarra' = data-skin="apple" + data-paleta="pizarra"
   }, [skin])
 
   useEffect(() => {
@@ -54,7 +53,7 @@ export default function GraderPielPage() {
           ANTARFOOD <span className="font-normal text-muted-foreground">· Grader con la piel nueva</span>
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Seg value={skin} set={setSkin} opts={[['apple', 'Piel nueva'], ['default', 'Piel actual']]} />
+          <Seg value={skin} set={(v) => { recordarPiel(v); setSkin(v) }} opts={[['pizarra', 'Pizarra'], ['apple', 'Piel nueva'], ['default', 'Piel actual']]} />
           <Seg value={theme} set={setTheme} opts={[['light', 'Claro'], ['dark', 'Oscuro']]} />
         </div>
       </header>

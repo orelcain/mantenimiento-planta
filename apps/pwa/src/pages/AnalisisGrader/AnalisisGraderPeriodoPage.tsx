@@ -236,7 +236,7 @@ export function AnalisisGraderPeriodoPage() {
           Aparece si todavía hay docs legacy en Firestore del iter 8 donde
           B (noche) se mapeaba incorrectamente a 'Turno tarde'. */}
       {legacyCount !== null && legacyCount > 0 && !migrationResult && (
-        <Card className="border-transparent bg-amber-500/[0.15]">
+        <Card className="border-transparent bg-warning/[0.15]">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-start gap-2 min-w-0">
               <AlertTriangle className="h-4 w-4 text-ink-warn shrink-0 mt-0.5" />
@@ -254,7 +254,7 @@ export function AnalisisGraderPeriodoPage() {
               size="sm"
               onClick={handleMigrate}
               disabled={migrating}
-              className="bg-amber-500/[0.15] hover:brightness-95 text-ink-warn shrink-0"
+              className="bg-warning/[0.15] hover:brightness-95 text-ink-warn shrink-0"
             >
               {migrating
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Migrando…</>
@@ -266,7 +266,7 @@ export function AnalisisGraderPeriodoPage() {
 
       {/* Confirmación post-migración */}
       {migrationResult && (
-        <Card className="border-transparent bg-emerald-500/[0.15]">
+        <Card className="border-transparent bg-success/[0.15]">
           <CardContent className="py-3 px-4 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-ink-ok shrink-0" />
             <p className="text-sm text-ink-ok">
@@ -387,7 +387,7 @@ export function AnalisisGraderPeriodoPage() {
       )}
 
       {!loading && error && (
-        <Card className="border-red-500/[0.25]">
+        <Card className="border-ink-crit/[0.25]">
           <CardContent className="pt-6 pb-6 text-center">
             <p className="text-sm text-destructive">{error}</p>
           </CardContent>

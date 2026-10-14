@@ -10,6 +10,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/shoplogix-tests.cjs\"",
+            "timeout": 120,
+            "statusMessage": "Tests del sync de Shoplogix…"
+          }
+        ]
+      }
     ]
   }
 }

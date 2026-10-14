@@ -104,11 +104,12 @@ export interface PublicMonitorLive {
    */
   plannedEnd?: string | null
   /**
-   * De dónde salió `plannedEnd`. `historial` es el caso normal: la mediana de
-   * los turnos anteriores con el mismo nombre. `config` solo cuando el turno es
-   * nuevo y todavía no tiene historia.
+   * De dónde salió `plannedEnd`. `shoplogix` es el caso normal desde el
+   * 28-09-2026: el horario oficial del turno manda. El resto solo cuando
+   * Shoplogix no dice nada: `historial` (mediana de los turnos anteriores con
+   * el mismo nombre), `config`, `duracion`, o `fijado` a mano.
    */
-  plannedEndSource?: 'fijado' | 'historial' | 'config' | 'duracion' | null
+  plannedEndSource?: 'shoplogix' | 'fijado' | 'historial' | 'config' | 'duracion' | null
   /**
    * Set point operacional de la máquina, editado por un supervisor en la PWA.
    * `medidoEl`/`metodo`/`por` viajan porque la fuente es parte del dato.
@@ -197,7 +198,15 @@ export interface PublicMonitorLive {
      * llevó 98 min de UNA Baader y solo 4 detuvieron la línea.
      */
     planned: Array<{ reason: string; min: number; count: number; lineMin?: number }>
-    recoverable: Array<{ reason: string; min: number; count: number; lineMin?: number }>
+    /**
+     * `machineMin`: minutos que cada máquina estuvo detenida por la causa,
+     * sumados. `equivMin`: su equivalente de línea por el peso de cada máquina
+     * (1/N) — lo que se traduce a piezas desde el 28-09-2026. Ausentes en
+     * payloads viejos (tbv < 3): ahí se cae a `lineMin`.
+     */
+    recoverable: Array<{ reason: string; min: number; count: number; lineMin?: number; machineMin?: number; equivMin?: number }>
+    /** Máquinas de la línea (el N de `equivMin`). Ausente en tbv < 3. */
+    nMaquinas?: number
   } | null
   /**
    * KPIs de Mantención del turno, calculados por el backend desde los states
@@ -345,7 +354,25 @@ export interface PublicShiftMonitorDoc {
    * deslizar hacia atrás sin sesión. Los compone el backend con el mismo
    * formato que `live`. Ausente en docs creados antes de esta función.
    */
-  history?: Array<{ shiftDocId: string; dateKey: string; shiftId: string; live: PublicMonitorLive }>
+  /**
+   * Presente cuando el turno ACTUAL publicado es uno que marcó el sensor (vino
+   * después del último turno con nombre, ya cerrado). Mismo formato que en
+   * `history`. `null` cuando el actual es un turno con nombre.
+   */
+  extraordinario?: { desde: string; hasta: string; fuenteDocId?: string } | null
+  history?: Array<{
+    shiftDocId: string
+    dateKey: string
+    shiftId: string
+    live: PublicMonitorLive
+    /**
+     * Presente cuando el turno lo marcó el SENSOR y no Shoplogix: un bloque
+     * de producción sin turno configurado, con tamaño de turno (Chonchi
+     * 26-sep-2026: extraordinario 16:15→22:55). Sus horas son la primera y la
+     * última pieza. No tiene meta: nadie la puso.
+     */
+    extraordinario?: { desde: string; hasta: string; fuenteDocId?: string }
+  }>
   /**
    * Las series minuto a minuto ARCHIVADAS de los últimos turnos (mismo formato
    * que `pulse.serieMinuto`, más el turno dueño): Shoplogix solo entrega los

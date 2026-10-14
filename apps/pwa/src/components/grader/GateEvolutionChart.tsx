@@ -12,16 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
+import { gateColor, inkOn } from './gateEvolutionColors'
 import { realIsoToWallClockMs } from '@/services/grader/graderGateObservations'
 import type { TimelineBucket } from '@/services/grader/types'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
-
-// Paleta para 12 gates (saturada, distinguible en dark mode)
-const GATE_COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
-  '#6366f1', '#84cc16', '#06b6d4', '#a855f7',
-]
 
 // Cromo del gráfico por tema (mismo patrón que ProductionRateLineEC): los
 // valores fijos de oscuro dejaban en claro una rejilla negra a rayas.
@@ -29,19 +25,6 @@ const CHART_INK = {
   dark:  { grid: '#1e293b', axis: '#94a3b8', axisName: '#64748b', axisLine: '#334155', pointer: '#475569', tipBg: '#1e293b', tipBorder: '#334155', tipText: '#e2e8f0' },
   light: { grid: '#c3d7e9', axis: '#41566a', axisName: '#41566a', axisLine: '#9aa6b1', pointer: '#7a8a99', tipBg: '#ffffff', tipBorder: '#c3d7e9', tipText: '#16242f' },
 } as const
-
-function gateColor(gateNumber: number): string {
-  return GATE_COLORS[(gateNumber - 1) % GATE_COLORS.length]!
-}
-
-/** Tinta legible sobre el color del gate (los claros —lima, ámbar, cian— piden tinta oscura). */
-function inkOn(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255
-  const g = parseInt(hex.slice(3, 5), 16) / 255
-  const b = parseInt(hex.slice(5, 7), 16) / 255
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-  return lum > 0.55 ? '#0d1722' : '#ffffff'
-}
 
 interface GateEvolutionChartProps {
   timelineBuckets: TimelineBucket[]
@@ -52,6 +35,8 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
   const [open, setOpen] = useState(false)
   const { isDark } = useTheme()
   const ink = isDark ? CHART_INK.dark : CHART_INK.light
+  // Pizarra: `version` sube al cambiar Día/Penumbra o la paleta → el gráfico se recalcula.
+  const colores = useColoresGrafico()
 
   // Gates activos en el último snapshot (para pre-selección)
   const activeGates = useMemo<Set<number>>(() => {
@@ -115,10 +100,11 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
         label: {
           formatter: label,
           fontSize: 9,
-          color: '#f59e0b',
+          // Pizarra: un cambio de configuración es un EVENTO, no un estado → neutro (no ámbar de aviso).
+          color: elegirColor('#f59e0b', 'muted-foreground'),
           position: 'insideStartBottom' as const,
         },
-        lineStyle: { type: 'dashed' as const, color: '#f59e0b88', width: 1.5 },
+        lineStyle: { type: 'dashed' as const, color: elegirColor('#f59e0b88', 'grafico-meta', 0.55), width: 1.5 },
       }
     })
 
@@ -210,7 +196,8 @@ export function GateEvolutionChart({ timelineBuckets, configSnapshots }: GateEvo
       },
       series,
     }
-  }, [timelineBuckets, selectedGates, configChanges, ink])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timelineBuckets, selectedGates, configChanges, ink, colores.version])
 
   if (!hasGateData) return null
 

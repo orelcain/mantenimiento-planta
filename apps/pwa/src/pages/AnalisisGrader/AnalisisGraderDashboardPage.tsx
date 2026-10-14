@@ -81,6 +81,7 @@ import type {
 } from '@/services/grader/types'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { useIsDark } from '@/hooks/useTheme'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, TimeScale, Filler)
 
@@ -171,6 +172,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   // DESIGN.md §6b: ningún módulo tiene tema propio. El Grader sigue al tema de la
   // app en vivo; para presentar en claro se cambia el tema en Configuración.
   const isDark = useIsDark()
+  // Barras de severidad (Chart.js): sin Pizarra el literal de siempre; con ella, los tokens de estado.
+  const { elegir: elegirGraf } = useColoresGrafico()
   const [selectedCauseLabel, setSelectedCauseLabel] = useState<string | null>(null)
   const [timeFilterFrom, setTimeFilterFrom] = useState<string>('')
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
@@ -256,10 +259,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
   const getPointZeroBarColor = useCallback((pct: number): string => {
     const severity = getPointZeroSeverity(pct)
-    if (severity === 'critical') return 'rgba(239,68,68,0.7)'
-    if (severity === 'warn') return 'rgba(245,158,11,0.7)'
-    return 'rgba(16,185,129,0.7)'
-  }, [getPointZeroSeverity])
+    if (severity === 'critical') return elegirGraf('rgba(239,68,68,0.7)', 'grafico-falla', 0.7)
+    if (severity === 'warn') return elegirGraf('rgba(245,158,11,0.7)', 'grafico-aviso', 0.7)
+    return elegirGraf('rgba(16,185,129,0.7)', 'grafico-neutro-medio', 0.7)
+  }, [getPointZeroSeverity, elegirGraf])
 
   // Compute analytics
   const computedAnalytics = useMemo<GraderAnalyticsResult>(
@@ -931,11 +934,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
    * El nivel ya se comunica con `label` (texto) y `cls`/`bar` (color).
    */
   const getCvSignal = useCallback((cv: number) => {
-    if (cv >= 20) return { label: 'alta', cls: 'text-ink-crit', bar: 'rgba(239,68,68,0.75)' }
-    if (cv >= 12) return { label: 'media-alta', cls: 'text-ink-warn', bar: 'rgba(245,158,11,0.75)' }
-    if (cv >= 8) return { label: 'media', cls: 'text-ink-warn', bar: 'rgba(234,179,8,0.75)' }
-    return { label: 'baja', cls: 'text-ink-ok', bar: 'rgba(16,185,129,0.75)' }
-  }, [])
+    if (cv >= 20) return { label: 'alta', cls: 'text-ink-crit', bar: elegirGraf('rgba(239,68,68,0.75)', 'grafico-falla', 0.75) }
+    if (cv >= 12) return { label: 'media-alta', cls: 'text-ink-warn', bar: elegirGraf('rgba(245,158,11,0.75)', 'grafico-aviso', 0.75) }
+    if (cv >= 8) return { label: 'media', cls: 'text-ink-warn', bar: elegirGraf('rgba(234,179,8,0.75)', 'grafico-aviso', 0.75) }
+    return { label: 'baja', cls: 'text-ink-ok', bar: elegirGraf('rgba(16,185,129,0.75)', 'grafico-neutro-medio', 0.75) }
+  }, [elegirGraf])
 
   const lotDispersionView = useMemo(() => {
     return lotAnalysisView.map((lot) => {
@@ -1210,7 +1213,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
       {/* Data notes */}
       {analytics.notes.length > 0 && (
-        <Card className="border-transparent bg-amber-500/[0.15]">
+        <Card className="border-transparent bg-warning/[0.15]">
           <CardContent className="pt-4">
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-ink-warn mt-0.5 shrink-0" />
@@ -1490,8 +1493,8 @@ function KPICard({
   return (
     <Card
       className={cn(
-        severity === 'critical' && 'border-red-500/[0.25]',
-        severity === 'warn' && 'border-amber-500/[0.25]',
+        severity === 'critical' && 'border-ink-crit/[0.25]',
+        severity === 'warn' && 'border-warning/[0.25]',
       )}
     >
       <CardContent className="pt-4">
@@ -1504,9 +1507,9 @@ function KPICard({
               variant="outline"
               className={cn(
                 'text-caption px-1.5 py-0 h-4 ml-auto',
-                statusBadge.severity === 'critical' && 'text-ink-crit border-red-500/[0.25]',
-                statusBadge.severity === 'warn' && 'text-ink-warn border-amber-500/[0.25]',
-                statusBadge.severity === 'ok' && 'text-ink-ok border-emerald-500/[0.25]',
+                statusBadge.severity === 'critical' && 'text-ink-crit border-ink-crit/[0.25]',
+                statusBadge.severity === 'warn' && 'text-ink-warn border-warning/[0.25]',
+                statusBadge.severity === 'ok' && 'text-ink-ok border-success/[0.25]',
               )}
             >
               {statusBadge.label}

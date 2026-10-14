@@ -1,3 +1,4 @@
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { ScanLine, Boxes, AlertTriangle } from 'lucide-react'
 import type { Repuesto, RepuestoFormData, MaterialClase } from '@/types/repuestos'
@@ -49,7 +50,7 @@ interface RepuestoFormModalProps {
   /** Tipos que ya existen en el catálogo, para sugerir sin cerrar la lista. */
   tiposConocidos?: string[]
   /** Detecta si ya existe un material con el SAP o nombre tecleado (aviso de duplicado). */
-  onCheckDuplicate?: (args: { codigoSAP: string; textoBreve: string }) => { id: string; textoBreve: string; codigoSAP: string } | null
+  onCheckDuplicate?: (args: { codigoSAP: string; textoBreve: string }) => { id: string; textoBreve: string; codigoSAP: string; nombresComunes?: string[] } | null
   /** Cambiar el equipo/destino (reabre el picker). Muestra el enlace "Cambiar". */
   onChangeTarget?: () => void
   loading?: boolean
@@ -228,10 +229,11 @@ export function RepuestoFormModal({
 
           {/* Aviso de duplicado (no bloquea: solo advierte) */}
           {duplicate && (
-            <div className="flex items-start gap-2 rounded-card border border-transparent bg-amber-500/[0.15] px-3 py-2 text-xs text-ink-warn">
+            <div className="flex items-start gap-2 rounded-card border border-transparent bg-fill-warning/[0.15] px-3 py-2 text-xs text-ink-warn">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                Ya existe un material parecido: <span className="font-semibold">{duplicate.textoBreve}</span>
+                Ya existe un material parecido: <span className="font-semibold">{nombreVisible(duplicate).titulo}</span>
+                {nombreVisible(duplicate).oficial ? <> ({nombreVisible(duplicate).oficial})</> : null}
                 {duplicate.codigoSAP ? <> (SAP {duplicate.codigoSAP})</> : null}. Revísalo antes de crear un duplicado.
               </span>
             </div>
@@ -379,7 +381,7 @@ export function RepuestoFormModal({
                   <Label className="text-xs text-muted-foreground">Destino</Label>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setTarget('own')}
-                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'own' ? 'border-transparent bg-emerald-500/[0.15] text-ink-ok' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                      className={`flex-1 px-3 py-2 rounded-card text-xs font-medium border transition-all ${target === 'own' ? 'border-transparent bg-ink-ok/[0.15] text-ink-ok' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
                       Propio de {equipmentName || 'este equipo'}
                     </button>
                     <button type="button" onClick={() => setTarget('shared')}

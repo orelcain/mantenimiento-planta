@@ -10,6 +10,8 @@ const { evaluarVigia, UMBRALES, esPactada } = require('../shoplogix/vigiaTurno')
 
 const NOMBRES = new Map([['id-ev1', 'Evisceradora 1'], ['id-ev2', 'Evisceradora 2']])
 
+// Una línea detenida se ve en 0 en el contador vivo: las lecturas «detenida»
+// llevan pulsoCpm 0 (con el pulso andando, el vigía no la da por detenida).
 const base = (extra = {}) => ({
   shiftDocId: '2026-08-27_Turno 1',
   shiftClosed: false,
@@ -40,7 +42,7 @@ test('vigia: N lecturas normales no dicen nada', () => {
 
 test('vigia: paro NO pactado avisa al umbral, UNA vez, y cierra con el reenganche', () => {
   const paradas = Array.from({ length: UMBRALES.paroNoPactadoMin + 5 }, () =>
-    base({ status: 'detenida', reason: 'Detencion' }))
+    base({ status: 'detenida', pulsoCpm: 0, reason: 'Detencion' }))
   const { eventos, st } = correr([base(), ...paradas, base({ totalPieces: 2099 })])
   const avisos = eventos.filter((e) => e.includes('Línea detenida'))
   assert.equal(avisos.length, 1)
@@ -57,7 +59,7 @@ test('vigia: «Planned Downtime» es PACTADA — la lección de la colación del
   assert.ok(!esPactada('Detencion'))
   // Con la pactada, a los 8 min NO dice nada; al umbral largo sí.
   const paradas = Array.from({ length: UMBRALES.paroPactadoMin }, () =>
-    base({ status: 'detenida', reason: 'Planned Downtime' }))
+    base({ status: 'detenida', pulsoCpm: 0, reason: 'Planned Downtime' }))
   const { eventos } = correr([base(), ...paradas])
   assert.equal(eventos.filter((e) => e.includes('Línea detenida')).length, 0)
   const largas = eventos.filter((e) => e.includes('pactada que se alarga'))
@@ -78,7 +80,7 @@ test('vigia: una máquina en cero con la línea andando — el caso Ev 1', () =>
 
 test('vigia: con la línea PARADA las máquinas en cero no cuentan (ya avisa el paro)', () => {
   const paradas = Array.from({ length: 30 }, () =>
-    base({ status: 'detenida', reason: 'Detencion', porMaquina: [{ id: 'id-ev1', cpm: 0 }, { id: 'id-ev2', cpm: 0 }] }))
+    base({ status: 'detenida', pulsoCpm: 0, reason: 'Detencion', porMaquina: [{ id: 'id-ev1', cpm: 0 }, { id: 'id-ev2', cpm: 0 }] }))
   const { eventos } = correr(paradas)
   assert.equal(eventos.filter((e) => e.includes('Evisceradora')).length, 0)
 })
@@ -100,16 +102,85 @@ test('vigia: ritmo desplomado sostenido, con histéresis para no parpadear', () 
 
 test('vigia: cambio de turno resetea todo sin avisar', () => {
   const paradas = Array.from({ length: UMBRALES.paroNoPactadoMin - 1 }, () =>
-    base({ status: 'detenida', reason: 'Detencion' }))
-  const { eventos } = correr([...paradas, base({ shiftDocId: '2026-08-28_Turno 2', status: 'detenida', reason: 'Detencion' })])
+    base({ status: 'detenida', pulsoCpm: 0, reason: 'Detencion' }))
+  const { eventos } = correr([...paradas, base({ shiftDocId: '2026-08-28_Turno 2', status: 'detenida', pulsoCpm: 0, reason: 'Detencion' })])
   // El contador del paro arrancó de nuevo con el turno nuevo: sin aviso.
   assert.deepEqual(eventos, [])
 })
 
 test('vigia: turno cerrado apaga los ciclos sin avisos de cierre', () => {
   const paradas = Array.from({ length: UMBRALES.paroNoPactadoMin }, () =>
-    base({ status: 'detenida', reason: 'Detencion' }))
-  const { eventos } = correr([...paradas, base({ shiftClosed: true, status: 'detenida' }), base({ shiftClosed: true, status: 'produciendo' })])
+    base({ status: 'detenida', pulsoCpm: 0, reason: 'Detencion' }))
+  const { eventos } = correr([...paradas, base({ shiftClosed: true, status: 'detenida', pulsoCpm: 0 }), base({ shiftClosed: true, status: 'produciendo' })])
   assert.equal(eventos.filter((e) => e.includes('Línea detenida')).length, 1)
   assert.equal(eventos.filter((e) => e.includes('Reenganche')).length, 0)
+})
+
+// ── Monitor desactualizado (caso real 29-09-2026, Chonchi Turno 2) ───────────
+// La línea arrancó 07:15; el turno guardado quedó con el sello de las 07:17 y
+// el monitor mostró «detenido» hasta las 08:03 con el contador vivo andando.
+const T0 = Date.parse('2026-09-29T10:17:32Z')           // lastSyncAt congelado (07:17 de planta)
+const minuto = (m) => T0 + m * 60_000
+const congelado = (m, extra = {}) => base({
+  shiftDocId: '2026-09-29_Turno 2',
+  status: 'detenida', reason: 'Detencion',              // lo que decía el espejo viejo
+  pulsoCpm: 38, lastSyncAtMs: T0, ahoraMs: minuto(m), ...extra,
+})
+
+test('vigia: monitor congelado con la línea produciendo avisa UNA vez y cierra al ponerse al día', () => {
+  const lecturas = []
+  for (let m = 1; m <= 45; m++) lecturas.push(congelado(m))
+  // 08:03: el sync vuelve a escribir el turno
+  lecturas.push(congelado(46, { status: 'produciendo', reason: '', lastSyncAtMs: minuto(46) }))
+  const { eventos, st } = correr(lecturas)
+  const avisos = eventos.filter((e) => e.includes('Monitor desactualizado'))
+  assert.equal(avisos.length, 1)
+  assert.ok(avisos[0].includes('38'), 'el aviso dice el ritmo que ve el contador')
+  assert.ok(eventos.some((e) => e.includes('Monitor al día')), 'el ciclo se cierra')
+  assert.equal(st.syncViejoAvisado, false)
+})
+
+test('vigia: con el monitor congelado NO avisa «línea detenida» (el estado es viejo)', () => {
+  const lecturas = []
+  for (let m = 1; m <= 45; m++) lecturas.push(congelado(m))
+  const { eventos } = correr(lecturas)
+  assert.equal(eventos.filter((e) => e.includes('Línea detenida')).length, 0)
+})
+
+test('vigia: sello viejo con la línea DETENIDA no es falla (el espejo no se rehace sin datos nuevos)', () => {
+  const lecturas = []
+  for (let m = 1; m <= 60; m++) lecturas.push(congelado(m, { pulsoCpm: 0 }))
+  const { eventos } = correr(lecturas)
+  assert.equal(eventos.filter((e) => e.includes('Monitor desactualizado')).length, 0)
+})
+
+test('vigia: un turno sano (sello refrescado cada ~5 min) nunca avisa', () => {
+  const lecturas = []
+  for (let m = 1; m <= 120; m++) {
+    const ultimoSync = minuto(m - (m % 5) - 3)            // sync cada 5 min + ~3 min de retardo
+    lecturas.push(base({ lastSyncAtMs: ultimoSync, ahoraMs: minuto(m) }))
+  }
+  const { eventos } = correr(lecturas)
+  assert.deepEqual(eventos, [])
+})
+
+test('vigia: sin sello en el espejo la señal no opina', () => {
+  const lecturas = []
+  for (let m = 1; m <= 45; m++) lecturas.push(congelado(m, { lastSyncAtMs: null, status: 'produciendo' }))
+  const { eventos } = correr(lecturas)
+  assert.deepEqual(eventos, [])
+})
+
+test('vigia: status «detenida» atrasado con el pulso andando NO es paro', () => {
+  const atrasadas = Array.from({ length: UMBRALES.paroNoPactadoMin + 5 }, () =>
+    base({ status: 'detenida', reason: 'Detencion', pulsoCpm: 30 }))
+  const { eventos } = correr(atrasadas)
+  assert.equal(eventos.filter((e) => e.includes('Línea detenida')).length, 0)
+})
+
+test('vigia: si el pulso no respondió, el paro se juzga por el status como siempre', () => {
+  const paradas = Array.from({ length: UMBRALES.paroNoPactadoMin }, () =>
+    base({ status: 'detenida', reason: 'Detencion', pulsoCpm: null, porMaquina: null }))
+  const { eventos } = correr(paradas)
+  assert.equal(eventos.filter((e) => e.includes('Línea detenida')).length, 1)
 })

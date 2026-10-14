@@ -4,8 +4,8 @@ import { ChevronDown, Fish, CalendarDays, BarChart3, Ruler, ClipboardList, Video
 import type { PointZeroSuggestion } from '@/services/grader/suggestions/types'
 
 const SEVERITY_STYLES = {
-  warning:     { border: 'border-transparent',    bg: 'bg-red-500/[0.15]',    badge: 'bg-red-500/[0.15] text-ink-crit',    dot: 'bg-red-400'    },
-  recommended: { border: 'border-transparent',  bg: 'bg-amber-500/[0.15]',  badge: 'bg-amber-500/[0.15] text-ink-warn', dot: 'bg-amber-400'  },
+  warning:     { border: 'border-transparent',    bg: 'bg-destructive/[0.15]',    badge: 'bg-destructive/[0.15] text-ink-crit',    dot: 'bg-destructive'    },
+  recommended: { border: 'border-transparent',  bg: 'bg-warning/[0.15]',  badge: 'bg-warning/[0.15] text-ink-warn', dot: 'bg-warning'  },
   info:        { border: 'border-transparent',     bg: 'bg-primary/[0.15]',     badge: 'bg-primary/[0.15] text-brand-ink',    dot: 'bg-ink-info'    },
 } as const
 
@@ -115,7 +115,7 @@ export function SuggestionCard({ suggestion: s }: Props) {
               <button
                 type="button"
                 onClick={s.applyFn}
-                className="px-3 py-1.5 rounded-ctl bg-emerald-500/[0.15] hover:brightness-95 text-ink-ok font-medium text-xs transition-colors"
+                className="px-3 py-1.5 rounded-ctl bg-success/[0.15] hover:brightness-95 text-ink-ok font-medium text-xs transition-colors"
               >
                 Aplicar
               </button>

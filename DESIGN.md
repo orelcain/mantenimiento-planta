@@ -390,6 +390,10 @@ propia de la app modulando una variable de opacidad.
   una sección. El Grader tenía un tercer modo (un toggle sol/luna que arrancaba siempre en
   oscuro, ignorando el tema de la app); desde 2026-09-16 hereda el tema en vivo y el toggle
   se retiró. `useIsDark()` en `hooks/useTheme.ts` es la forma de preguntar por el tema.
+- **Sin excepciones de marco (2026-10-09).** El marco del simulador HMI Knuro tuvo un estilo fijo
+  «Consola» (2026-10-08); se retiró: ahora sigue el tema como cualquier otra pantalla (paleta
+  Pizarra, claro y oscuro) y usa el marco único de herramientas (§5f). Lo único que no sigue el
+  tema es lo que es fidelidad al equipo (ver §5f): el bisel del X2 y los globos «Ventana del panel».
 - **Los grises son neutros.** Sesgo de hue ≤ 5 (diferencia máx. entre canales RGB). La
   escala *slate* de Tailwind tiene sesgo 27–34 y hace que un módulo se lea como de otra app
   aunque cada color cumpla contraste. Los grises de iOS: `#1C1C1E` (2), `#6E6E71` (3),
@@ -590,6 +594,31 @@ con un script Node local (`writeFileSync` en `utf8`).
    `HmiKnuroPublicPage`) y las experiencias interactivas sobre el modelo 3D (sopladoras Baader
    142, plataforma pontón) conservan su tipografía: es fidelidad al equipo, no interfaz. Lo que
    sí les aplica es el marco alrededor (botones, encabezados de la app).
+   **HMI Knuro (2026-10-09, reemplaza la ampliación «Consola» del 08-10):** el MARCO del
+   simulador (`HmiKnuroPublicPage` y editor `HmiKnuroPage`) sigue el tema de la app. La página
+   pública usa `EncabezadoHerramienta` + presets como `SegmentedControl` (ver «Marco de
+   herramientas» abajo); `knuroConsola.css` ya no tiene colores propios: cada `--k-*` es un alias de
+   un token de la app (lo siguen usando el editor admin, el diálogo QR y los estados de carga). NO
+   cambian el panel X2 (`.dev`/`#hs`) ni los globos de ayuda y la hoja (familia «Ventana del
+   panel», siempre clara, etiqueta AYUDA). El bloque «CONSOLA» de `public/hmi-knuro-embed.html`
+   (fondo, barra, panel «Pantallas» y su buscador, riel, aviso de giro, **lista de campos** y
+   **«Para qué sirve esta pantalla»**) SIGUE EL TEMA: recibe los colores de la app por `postMessage`
+   (`public/embed-tema.js`, `lib/temaEmbed.ts`, `hooks/useTemaEmbed.ts`). Decisión del usuario
+   2026-10-09: la lista de campos y «Para qué sirve» siguen el tema (oscuras en Noche); solo los
+   globos de ayuda quedan siempre claros. Abierto suelto (sin padre), el embed conserva sus grises.
+
+   **Marco de herramientas (2026-10-09, Centro de Aprendizaje).** Las herramientas (HMI Knuro,
+   Grader y Bombeo, Perilla 5, Tarjeta A3C, planos, Variadores, fichas, terreno) ocupan toda la
+   pantalla y comparten un solo encabezado, `components/piel/EncabezadoHerramienta`: volver «‹»
+   (48 px; en PC con el rótulo del destino) + título/subtítulo + «Preguntar a ARIA» y «Más» (48 px),
+   56 px en celular y 64 en PC, y debajo el ÚNICO control de la herramienta (un `SegmentedControl`
+   con `tamano="herramienta"` = 48 px literales). Qué rutas son herramienta lo decide
+   `lib/rutasHerramienta.ts` (`lienzo` = alto fijo sin scroll de página; `lectura` = scroll normal);
+   en ambas `MainLayout` oculta la barra inferior, el botón flotante de ARIA y «Activar ARIA»; el
+   hub `/aprendizaje` conserva todo. Siempre se puede volver: con el «‹» (`hooks/useVolver.ts`:
+   atrás si `history.state.idx > 0`, si no a la ruta de respaldo; nunca `history.length`), con el
+   atrás del sistema y con «Más → Ir al inicio». Iframes: `?embed=1` quita el encabezado propio del
+   embed (Knuro: franja «Modo Aprendizaje»; Bombeo: alias de `embedded=1`).
    Hallazgo del medidor en PC: con la raíz al 87,5 % `text-xs` (0.75rem) rendía 10,5 px en
    TODO el escritorio (chips de fecha, pie de la barra lateral, tarjetas del visor 3D). Se
    resolvió en la escala, no pantalla por pantalla: `xs = max(0.75rem, 11px)` en
@@ -600,6 +629,14 @@ con un script Node local (`writeFileSync` en `utf8`).
    de sesgo 6. El celeste `#d7e5f2` (sesgo 27) de la piel vieja queda hasta que la piel Apple
    sea la predeterminada. ✅ 2026-09-16: la piel Apple es la predeterminada (index.html);
    `?skin=default` vuelve a la anterior para comparar.
+   ✅ **2026-10-22: la paleta Pizarra es la predeterminada** (`apps/pwa/index.html`; misma
+   regla en `src/lib/intensidad.ts`). Sin `app-skin` guardado → `data-skin="apple"` +
+   `data-paleta="pizarra"`. **Vía de escape:** `?skin=apple` = paleta anterior (queda guardada
+   como elección), `?skin=default` = piel antigua, `?skin=pizarra` = volver. Un `app-skin=apple`
+   guardado SIN la marca `app-skin-v=2` es «sin elegir» (las páginas /dev lo escribían solo al
+   abrirse): se borra una vez y el dispositivo pasa a Pizarra; con la marca, es elección y se
+   respeta. Las páginas /dev ya no escriben `app-skin` al abrirse, solo al elegir. Intensidad:
+   celular parte en Día, PC sigue `app-theme` o el sistema (ver `resolverIntensidad`).
 7. ~~Los 228 `<button>` a mano~~ — **cerrado en teléfono 2026-09-16.** Se dirigió con el medidor
    pantalla por pantalla (Análisis de Turno y período, Bodega, Códigos, Áreas, Bitácora, Home,
    Aprendizaje, Configuración, identidad): selectores de vistas → `SegmentedControl`, acciones

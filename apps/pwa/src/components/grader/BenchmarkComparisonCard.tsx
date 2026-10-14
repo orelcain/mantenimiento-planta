@@ -30,19 +30,19 @@ const VERDICT_CONFIG = {
     label: 'Mejor que la temporada',
     Icon: TrendingDown,
     color: 'text-ink-ok',
-    bg: 'bg-emerald-500/[0.15] border-transparent',
+    bg: 'bg-success/[0.15] border-transparent',
   },
   similar: {
     label: 'Similar a la temporada',
     Icon: Minus,
     color: 'text-ink-warn',
-    bg: 'bg-amber-500/[0.15] border-transparent',
+    bg: 'bg-warning/[0.15] border-transparent',
   },
   worse: {
     label: 'Por encima del histórico',
     Icon: TrendingUp,
     color: 'text-ink-crit',
-    bg: 'bg-red-500/[0.15] border-transparent',
+    bg: 'bg-destructive/[0.15] border-transparent',
   },
 }
 

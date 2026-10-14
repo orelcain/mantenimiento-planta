@@ -24,6 +24,7 @@ const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
 const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours, ahoraEnPlanta } = require('./polling')
+const { revisarTurnosDelSync } = require('./guardiaTurnos')
 const { canonicalShiftName } = require('./canonicalShift')
 
 /** Plantas activas — usada en wakeup scheduler. */
@@ -342,6 +343,28 @@ async function isTruncatedHeadOfPrevWindow({ db, plantSlug, parentShiftDateKey, 
  * Ante cualquier duda (doc ausente, sin `scheduledEnd`, error de lectura)
  * devuelve false → se escribe. Nunca deja de guardar un turno por precaución.
  */
+/**
+ * Cierre con el que el guard de «cola cortada» decide si el turno quedó cortado
+ * por el borde de la ventana: el MÁS TEMPRANO entre el observado (último
+ * interval) y el que quedó tras `resolveShiftWindow`.
+ *
+ * Con el turno EN CURSO, `resolveShiftWindow` alarga el cierre hasta el horario
+ * oficial (#1191). Ese cierre es una promesa, no algo que se vio: pasárselo al
+ * guard hacía que un turno que arranca antes de las 08:00 (ancla de la ventana)
+ * pareciera una cola cortada durante toda su primera parte — Chonchi, Turno 2,
+ * 29-sep-2026: arrancó 07:15, oficial 15:00, ventana de ayer hasta 08:00 → el
+ * doc quedó congelado en el primer interval y el monitor dijo «detenido» hasta
+ * las 08:03. El guard existe para no pisar un turno completo con un fragmento
+ * visto en el borde; eso se juzga con lo observado. Cuando la corrección ACORTA
+ * (ventana imposible por re-etiquetado, caso 3-ago), manda la corregida, igual
+ * que antes.
+ */
+function cierreParaGuardCola(cierreObservado, cierreCorregido) {
+  if (!(cierreObservado instanceof Date) || Number.isNaN(cierreObservado.getTime())) return cierreCorregido
+  if (!(cierreCorregido instanceof Date) || Number.isNaN(cierreCorregido.getTime())) return cierreObservado
+  return cierreObservado.getTime() <= cierreCorregido.getTime() ? cierreObservado : cierreCorregido
+}
+
 async function isTruncatedTailOfNextWindow({ db, plantSlug, parentShiftDateKey, shiftId, scheduledEnd, windowEnd, logger }) {
   if (scheduledEnd.getTime() < windowEnd.getTime()) return false
 
@@ -534,11 +557,40 @@ const MAX_SHIFT_MS = 16 * 3600_000
  * es creíble. Sin oficial, o con un oficial igual de malo, se respeta el
  * derivado — el comportamiento de siempre.
  */
-function resolveShiftWindow({ scheduledStart, scheduledEnd, officialStart, officialEnd }) {
+function resolveShiftWindow({ scheduledStart, scheduledEnd, officialStart, officialEnd, nowWall = null }) {
   const sinCambio = { start: scheduledStart, end: scheduledEnd, corregida: false }
 
   const durDerivada = scheduledEnd.getTime() - scheduledStart.getTime()
-  if (durDerivada > 0 && durDerivada <= MAX_SHIFT_MS) return sinCambio   // derivado creíble
+  if (durDerivada > 0 && durDerivada <= MAX_SHIFT_MS) {
+    /*
+     * Derivado creíble, pero el turno está EN CURSO: el último interval es el
+     * minuto actual, así que el «cierre» derivado avanza con el reloj y la app
+     * decía «00:00→04:31» para un turno que Shoplogix programa hasta las 07:15
+     * (Chonchi, Turno 1 Lunes, 28-sep-2026 — lo vio Orel a las 04:40). Mientras
+     * el turno corre, el cierre lo dice el horario oficial. Pasado ese cierre se
+     * vuelve al derivado (la línea puede seguir de largo), que es lo de siempre.
+     *
+     * Conservador: solo se ALARGA hacia el oficial, nunca se acorta, y solo con
+     * un oficial que describa ESTE turno (mismo arranque, duración creíble).
+     */
+    const enCurso = nowWall instanceof Date && !isNaN(nowWall.getTime())
+    if (enCurso
+      && officialEnd instanceof Date && !isNaN(officialEnd.getTime())
+      && officialStart instanceof Date && !isNaN(officialStart.getTime())
+      && nowWall.getTime() < officialEnd.getTime()
+      && officialEnd.getTime() > scheduledEnd.getTime()
+      && officialEnd.getTime() - officialStart.getTime() > 0
+      && officialEnd.getTime() - officialStart.getTime() <= MAX_SHIFT_MS
+      && Math.abs(officialStart.getTime() - scheduledStart.getTime()) <= 12 * 3600_000) {
+      return {
+        start: scheduledStart,
+        end: officialEnd,
+        corregida: true,
+        motivo: 'turno en curso: el cierre lo da el horario oficial, no el último interval',
+      }
+    }
+    return sinCambio
+  }
 
   if (!(officialStart instanceof Date) || isNaN(officialStart.getTime())) return sinCambio
   if (!(officialEnd instanceof Date) || isNaN(officialEnd.getTime())) return sinCambio
@@ -567,6 +619,38 @@ function isOfficialScheduleSane({ officialStart, officialEnd, scheduledStart, sc
   if (officialEnd.getTime() <= officialStart.getTime()) return false
   return Math.abs(officialStart.getTime() - scheduledStart.getTime()) <= MAX_DRIFT_MS
       && Math.abs(officialEnd.getTime()   - scheduledEnd.getTime())   <= MAX_DRIFT_MS
+}
+
+/**
+ * Los intervals de UNA máquina que pertenecen a este turno.
+ *
+ * Cada tramo de 5 min va a un solo turno. Un turno con nombre se arma por
+ * VENTANA (`scheduledStart`/`scheduledEnd`, derivados de la primera máquina con
+ * datos) y no por etiqueta, porque Shoplogix etiqueta mal a veces una máquina
+ * dentro del turno. Pero en los bordes la ventana sola no alcanza: con turnos
+ * pegados, el tramo del borde lo reclaman los dos. Ahí decide la etiqueta.
+ * `Unscheduled` se filtra solo por etiqueta (sus bordes abrazan el día entero).
+ */
+function intervalsDelTurno(machineProduction, group) {
+  const TOLERANCE_MS = 5 * 60 * 1000
+  const ini = group.scheduledStart.getTime()
+  const fin = group.scheduledEnd.getTime()
+  const etiquetas = new Set(group.rawShiftIds || [group.rawShiftId || group.shiftId])
+  return (machineProduction || []).filter(iv => {
+    if (!iv.start) return false
+    if (group.shiftId === 'Unscheduled') return iv.shift === 'Unscheduled'
+    const t = parseShoplogixTime(iv.start).getTime()
+    // Adentro de la ventana manda la HORA: Shoplogix a veces etiqueta mal una
+    // máquina a mitad de turno (caso 2026-04-29, ver syncDay).
+    if (t >= ini && t < fin) return true
+    // En los 5 min de cada borde manda la ETIQUETA. El tramo que arranca justo
+    // en el cierre, o 5 min antes del inicio, es del turno vecino salvo que diga
+    // lo contrario — con la tolerancia a secas quedaba en los dos turnos
+    // (Yal 28-09-2026: 14:55 del Turno 1 también en el Turno 2; 15:00 y 15:05
+    // del Turno 2 también en el Turno 1).
+    const enBorde = (t >= ini - TOLERANCE_MS && t < ini) || (t >= fin && t <= fin + TOLERANCE_MS)
+    return enBorde && etiquetas.has(iv.shift)
+  })
 }
 
 function deriveShiftGroups(machineProductionResponses, plantSlug) {
@@ -615,8 +699,9 @@ function deriveShiftGroups(machineProductionResponses, plantSlug) {
       const canon = canonicalShiftName(plantSlug, scheduledStart, rawShiftId)
       const key = `${canon}__${shiftDateKeyFromStart(scheduledStart)}`
       if (!byCanon[key]) {
-        byCanon[key] = { shiftId: canon, first: g.first, last: g.last, rawShiftId }
+        byCanon[key] = { shiftId: canon, first: g.first, last: g.last, rawShiftId, rawShiftIds: new Set([rawShiftId]) }
       } else {
+        byCanon[key].rawShiftIds.add(rawShiftId)
         if (parseShoplogixTime(g.first.start).getTime() < parseShoplogixTime(byCanon[key].first.start).getTime()) byCanon[key].first = g.first
         if (parseShoplogixTime(g.last.end).getTime()   > parseShoplogixTime(byCanon[key].last.end).getTime())   byCanon[key].last  = g.last
       }
@@ -624,10 +709,14 @@ function deriveShiftGroups(machineProductionResponses, plantSlug) {
   }
 
   return Object.values(byCanon)
-    .map(({ shiftId, first, last, rawShiftId }) => ({
+    .map(({ shiftId, first, last, rawShiftId, rawShiftIds }) => ({
       shiftId,
       // rawShiftId != shiftId solo cuando se corrigió una anomalía de Shoplogix.
       rawShiftId,
+      // Todas las etiquetas crudas que forman el turno (dos tramos pueden
+      // canonizar al mismo nombre). Deciden los tramos del borde: ver
+      // `intervalsDelTurno`.
+      rawShiftIds: [...rawShiftIds].sort(),
       scheduledStart: parseShoplogixTime(first.start),
       scheduledEnd:   parseShoplogixTime(last.end),
     }))
@@ -786,6 +875,8 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   )
 
   const allShiftResults = []
+  /** Lo que se escribió, para que la guardia revise el horario (ver guardiaTurnos). */
+  const turnosEscritos = []
   const frozenSkipped = []
   const truncatedSkipped = []
   const windowEnd = parseShoplogixTime(window.end)
@@ -797,6 +888,9 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     // oficial (ver resolveShiftWindow). Va PRIMERO: el freeze-check, los filtros
     // de intervals, los aggregates y el doc leen todos `group.scheduled*`, así
     // que corregir acá arregla el turno completo en vez de parchar cada uso.
+    // El cierre OBSERVADO (último interval), antes de que la corrección lo mueva:
+    // lo necesita el guard de cola cortada (ver `cierreParaGuardCola`).
+    const cierreObservado = group.scheduledEnd
     const oficialDeEsteTurno = officialRollup && officialRollup.shiftLabel === group.shiftId
       ? officialRollup
       : null
@@ -805,9 +899,12 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       scheduledEnd:   group.scheduledEnd,
       officialStart:  oficialDeEsteTurno?.officialStart,
       officialEnd:    oficialDeEsteTurno?.officialEnd,
+      // Wall-clock-as-UTC, la misma escala que `group.scheduled*` (ver nota en el freeze-check).
+      nowWall:        toChileWall(syncedAt),
     })
     if (ventana.corregida) {
-      logger.warn(
+      // El caso «en curso» pasa en cada sync del turno vivo: info, no warn.
+      ;(ventana.motivo.startsWith('turno en curso') ? logger.info : logger.warn).call(logger,
         `[syncDay][${plantSlug}] ${group.shiftId}: ${ventana.motivo} `
         + `(${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)} ⇒ `
         + `${toShoplogixTime(ventana.start)}→${toShoplogixTime(ventana.end)})`,
@@ -836,7 +933,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
 
     if (await isTruncatedTailOfNextWindow({
       db, plantSlug, parentShiftDateKey, shiftId: group.shiftId,
-      scheduledEnd: group.scheduledEnd, windowEnd, logger,
+      scheduledEnd: cierreParaGuardCola(cierreObservado, group.scheduledEnd), windowEnd, logger,
     })) {
       truncatedSkipped.push(`${parentShiftDateKey} ${group.shiftId}`)
       allShiftResults.push({ shiftId: group.shiftId, skipped: 'truncated-tail' })
@@ -901,7 +998,8 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         const groupStartMs = group.scheduledStart.getTime() - TOLERANCE_MS
         const groupEndMs   = group.scheduledEnd.getTime()   + TOLERANCE_MS
 
-        // EXCEPCIÓN — grupo "Unscheduled": filtrar por ETIQUETA, no por ventana.
+        // EXCEPCIÓN — grupo "Unscheduled": filtrar por ETIQUETA, no por ventana
+        // (vive en `intervalsDelTurno`, junto con la regla de los bordes).
         //
         // El grupo Unscheduled abarca del primer al último interval sin turno
         // del día; cuando la planta está ociosa al inicio Y al final de la
@@ -913,16 +1011,9 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         // Turno 2 de 8.169). Para turnos NOMBRADOS el filtro temporal sigue
         // siendo necesario (etiquetado inconsistente entre máquinas, ver
         // arriba); para Unscheduled la etiqueta es exacta por definición.
-        const isUnscheduledGroup = group.shiftId === 'Unscheduled'
         const filteredProd = {
           ...rawProd,
-          machineProduction: (rawProd.machineProduction || [])
-            .filter(iv => {
-              if (!iv.start) return false
-              if (isUnscheduledGroup) return iv.shift === 'Unscheduled'
-              const ivStartMs = parseShoplogixTime(iv.start).getTime()
-              return ivStartMs >= groupStartMs && ivStartMs <= groupEndMs
-            }),
+          machineProduction: intervalsDelTurno(rawProd.machineProduction, group),
           comments: filterCommentsToWindow(rawProd.comments, groupStartMs, groupEndMs),
         }
 
@@ -1115,6 +1206,14 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     }
 
     await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set(parentDoc, { merge: true })
+    turnosEscritos.push({
+      docId: `${parentShiftDateKey}_${group.shiftId}`,
+      shiftId: group.shiftId,
+      scheduledStart: parentDoc.scheduledStart,
+      scheduledEnd: parentDoc.scheduledEnd,
+      effectiveEnd: parentDoc.effectiveEnd,
+      officialSchedule: parentDoc.officialSchedule ?? null,
+    })
 
     allShiftResults.push({ shiftId: group.shiftId, machines: shiftMachineResults })
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${parentShiftDateKey} ${group.shiftId} OK (window dateKey=${dateKey})`, { machines: shiftMachineResults })
@@ -1127,12 +1226,27 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     logger.info(`[shoplogix-syncDay][${plantSlug}] ${truncatedSkipped.length} cola(s) cortadas en el borde de la ventana, sin pisar el turno completo: ${truncatedSkipped.join(', ')}`)
   }
 
+  /*
+   * Guardia del horario: solo sobre la ventana VIVA (la única que trae el
+   * rollup oficial). Pura, sin lecturas: el wakeup decide si avisa.
+   */
+  const guardia = dateKey === currentDateKey(syncedAt)
+    ? revisarTurnosDelSync({
+      plantSlug,
+      turnos: turnosEscritos,
+      rollup: officialRollup ? { shiftLabel: officialRollup.shiftLabel } : null,
+      nowWall: toChileWall(syncedAt),
+    })
+    : []
+  if (guardia.length) logger.warn(`[shoplogix-syncDay][${plantSlug}] guardia de horario`, { guardia })
+
   return {
     plantSlug, dateKey,
     shiftGroups: shiftGroups.map(g => g.shiftId),
     results: allShiftResults,
     frozenSkipped: frozenSkipped.length,
     truncatedSkipped: truncatedSkipped.length,
+    guardia,
   }
 }
 
@@ -1243,6 +1357,8 @@ async function syncShift({ db, accessToken, cookie, plantSlug = 'chonchi', dateK
 }
 
 module.exports = {
+  cierreParaGuardCola,
+  intervalsDelTurno,
   ACTIVE_PLANTS,
   CLOSED_SHIFT_GRACE_MS,
   PARENT_SCHEMA_VERSION,

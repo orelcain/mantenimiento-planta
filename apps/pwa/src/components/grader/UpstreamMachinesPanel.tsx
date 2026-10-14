@@ -59,9 +59,9 @@ import { LossCascadeCard } from './LossCascadeCard'
 import { ImputacionParetoCard } from './ImputacionParetoCard'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
-import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
+import { slxStateColor, slxStateTrama, slxSuavizarAcento } from '@/services/shoplogix/shoplogixColors'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { logger } from '@/lib/logger'
-import { softenAccentHex } from '@/lib/softenColor'
 import { syncCubreElTurno } from '@/services/grader/frescuraDelSync'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 
@@ -209,6 +209,8 @@ function computeCiclo(
 interface ReasonAggregate {
   reason: string
   color: string
+  /** Pizarra: colación y parada planificada («contexto») se dibujan con trama, igual que en el Gantt. */
+  trama: boolean
   durationSec: number
   count: number
 }
@@ -219,13 +221,13 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
     if (s.type === 'uptime') continue  // solo paros
     const key = s.reason || s.name     // si no tiene reason, usa name ("Micro Detencion")
     // Color semántico (mismo helper que StateTimelineEC → leyenda siempre consistente)
-    const color = slxStateColor(s.type, s.reason, s.color)
+    const color = slxStateColor(s.type, s.reason, s.color, s.name)
     const existing = map.get(key)
     if (existing) {
       existing.durationSec += s.durationSec
       existing.count += 1
     } else {
-      map.set(key, { reason: key, color, durationSec: s.durationSec, count: 1 })
+      map.set(key, { reason: key, color, trama: slxStateTrama(s.type, s.reason), durationSec: s.durationSec, count: 1 })
     }
   }
   return Array.from(map.values()).sort((a, b) => b.durationSec - a.durationSec)
@@ -275,8 +277,8 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
           >
             {/* Color del state (viene de Shoplogix, #ff0000 crudo → −50% croma) */}
             <span
-              className="w-2 h-2 rounded-ctl shrink-0 ring-1 ring-foreground/60"
-              style={{ backgroundColor: softenAccentHex(r.color) }}
+              className={cn('w-2 h-2 rounded-ctl shrink-0 ring-1 ring-foreground/60', r.trama && 'pz-trama')}
+              style={{ backgroundColor: slxSuavizarAcento(r.color) }}
             />
             {/* Etiqueta — desktop: width fija 7.5rem + truncate.
                 Mobile: max 9rem + line-clamp-2 (puede ocupar 2 líneas). */}
@@ -287,10 +289,10 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
             <div className="flex-1 h-1.5 bg-muted/80 rounded-full overflow-hidden min-w-0">
               <div
                 data-pareto-bar=""
-                className="h-full rounded-full opacity-80"
+                className={cn('h-full rounded-full opacity-80', r.trama && 'pz-trama')}
                 style={{
                   width: `${Math.max(pct, 1)}%`,
-                  backgroundColor: softenAccentHex(r.color),
+                  backgroundColor: slxSuavizarAcento(r.color),
                   transformOrigin: 'left center',
                 }}
               />
@@ -358,9 +360,9 @@ function ShiftAvailabilityBar({
       <Timer className="w-3 h-3 shrink-0" />
       {/* Barra apilada — overflow-hidden recorta los divs al borde redondeado */}
       <div className="flex h-2 w-14 rounded-full overflow-hidden bg-muted/60 shrink-0">
-        {upPct    > 0 && <div className="h-full bg-emerald-500/[0.15]" style={{ width: `${upPct}%`    }} />}
-        {breakPct > 0 && <div className="h-full bg-amber-500/[0.15]"   style={{ width: `${breakPct}%` }} />}
-        {downPct  > 0 && <div className="h-full bg-red-500/[0.15]"    style={{ width: `${downPct}%`  }} />}
+        {upPct    > 0 && <div className="h-full bg-success/[0.15]" style={{ width: `${upPct}%`    }} />}
+        {breakPct > 0 && <div className="h-full bg-warning/[0.15]"   style={{ width: `${breakPct}%` }} />}
+        {downPct  > 0 && <div className="h-full bg-destructive/[0.15]"    style={{ width: `${downPct}%`  }} />}
         {setupPct > 0 && <div className="h-full bg-cat-6-tint/[0.15]"  style={{ width: `${setupPct}%` }} />}
       </div>
       <span className="tabular-nums">{fmtPct(shiftRuntime)}</span>
@@ -370,11 +372,13 @@ function ShiftAvailabilityBar({
 
 /**
  * Gráfico de tendencia histórica de una máquina — últimos N turnos del mismo tipo.
- * Dual-line: ritmo% (sky) + uptime% (emerald dashed). Altura 80px, sin zoom.
+ * Dual-line: ritmo% (serie-1) + uptime% (neutro, discontinua). Altura 80px, sin zoom.
  * Cargado lazy al expandir la MachineRow.
  */
 /** @public — importado en GraderHistoricalCalendar para la vista panorámica del home */
 export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] }) {
+  // Series: sin Pizarra el literal de siempre; con ella, serie-1 (foco) y neutro (contexto).
+  const { elegir } = useColoresGrafico()
   if (points.length < 2) {
     return (
       <p className="text-caption text-muted-foreground italic py-1">
@@ -428,9 +432,9 @@ export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] 
         smooth:      0.3,
         symbol:      'circle',
         symbolSize:  4,
-        lineStyle:   { color: 'rgba(56,189,248,0.9)',  width: 1.5 },
-        itemStyle:   { color: 'rgba(56,189,248,0.9)'  },
-        areaStyle:   { color: 'rgba(56,189,248,0.06)' },
+        lineStyle:   { color: elegir('rgba(56,189,248,0.9)', 'serie-1', 0.9),  width: 1.5 },
+        itemStyle:   { color: elegir('rgba(56,189,248,0.9)', 'serie-1', 0.9)  },
+        areaStyle:   { color: elegir('rgba(56,189,248,0.06)', 'serie-1', 0.06) },
       },
       {
         name:        'Uptime',
@@ -439,8 +443,8 @@ export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] 
         smooth:      0.3,
         symbol:      'diamond',
         symbolSize:  4,
-        lineStyle:   { color: 'rgba(52,211,153,0.9)', width: 1.5, type: 'dashed' as const },
-        itemStyle:   { color: 'rgba(52,211,153,0.9)' },
+        lineStyle:   { color: elegir('rgba(52,211,153,0.9)', 'grafico-neutro-medio', 0.9), width: 1.5, type: 'dashed' as const },
+        itemStyle:   { color: elegir('rgba(52,211,153,0.9)', 'grafico-neutro-medio', 0.9) },
       },
     ],
   }
@@ -617,7 +621,10 @@ function StateTimeline({
   const rangeStart = windowStart ?? shift.shiftStart
   const rangeEnd   = windowEnd   ?? shift.shiftEnd
   const totalMs = rangeEnd.getTime() - rangeStart.getTime()
-  const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
+  // Pizarra: al cambiar Día/Penumbra hay que recalcular los colores de las causas.
+  const { version: versionColores } = useColoresGrafico()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states, versionColores])
 
   if (totalMs <= 0 || shift.states.length === 0) {
     return <div className="h-5 rounded-ctl bg-muted/60" />
@@ -686,7 +693,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
     <div className="flex items-center gap-1.5 flex-wrap" title="Suma de tiempos de las 3 Baaders (horas-máquina, no tiempo de línea)">
       <Badge
         variant="outline"
-        className="bg-emerald-500/[0.15] border-transparent text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-success/[0.15] border-transparent text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
         title="Tiempo total procesando (suma de las 3 Baaders)"
       >
         ▲ {fmtDurationSec(totals.uptimeSec)}
@@ -694,7 +701,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.downtimeSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-red-500/[0.15] border-transparent text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
+          className="bg-destructive/[0.15] border-transparent text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Tiempo total de detención/paro (suma de las 3 Baaders)"
         >
           <PauseCircle className="h-3 w-3" />
@@ -704,7 +711,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
       {totals.breakSec > 0 && (
         <Badge
           variant="outline"
-          className="bg-amber-500/[0.15] border-transparent text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
+          className="bg-warning/[0.15] border-transparent text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
           title="Pausas programadas (colación/reunión), suma de las 3 Baaders"
         >
           <Coffee className="h-3 w-3" />
@@ -728,7 +735,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
     <div className="flex items-center gap-1.5 flex-wrap">
       <Badge
         variant="outline"
-        className="bg-muted border-border text-muted-foreground dark:bg-muted-foreground/[0.10] dark:border-border dark:text-muted-foreground tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-muted border-border text-muted-foreground dark:bg-muted-foreground/[0.10] tabular-nums text-caption px-2 py-0.5 h-5"
         title={
           `Tasa alcanzada: ${fmtPct(kpis.reachedPct, 0)} del esperado · ${reachedStatusLabel(reachedStatus)}.\n` +
           `Saludable ≥${REACHED_PCT_THRESHOLDS.healthyAbove * 100}% · Crítico <${REACHED_PCT_THRESHOLDS.criticalBelow * 100}%`
@@ -741,21 +748,21 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
       </Badge>
       <Badge
         variant="outline"
-        className="bg-emerald-500/[0.15] border-transparent text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-success/[0.15] border-transparent text-ink-ok tabular-nums text-caption px-2 py-0.5 h-5"
         title="Verde: piezas en intervalos donde el ritmo cumplió el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.greenCycles)} ({fmtPct(kpis.greenPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-amber-500/[0.15] border-transparent text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-warning/[0.15] border-transparent text-ink-warn tabular-nums text-caption px-2 py-0.5 h-5"
         title="Amarillo: piezas en intervalos con ritmo bajo el objetivo (dentro de tolerancia)"
       >
         {fmtInt(kpis.yellowCycles)} ({fmtPct(kpis.yellowPct, 0)})
       </Badge>
       <Badge
         variant="outline"
-        className="bg-red-500/[0.15] border-transparent text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5"
+        className="bg-destructive/[0.15] border-transparent text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5"
         title="Rojo: piezas en intervalos con ritmo MUY bajo el objetivo (fuera de tolerancia — atención)"
       >
         {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
@@ -781,6 +788,8 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
   windowStart?: Date
   windowEnd?: Date
 }) {
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de estado se calculan en el render).
+  useColoresGrafico()
   // Estado seleccionado al clickear un segmento del Gantt (drill-down rico).
   // Click sobre el mismo state lo cierra (toggle).
   const [selectedState, setSelectedState] = useState<UpstreamMachineState | null>(null)
@@ -999,7 +1008,7 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
                   </thead>
                   <tbody>
                     {analisis.eventos.map((s, i) => {
-                      const color = slxStateColor(s.type, s.reason, s.color)
+                      const color = slxStateColor(s.type, s.reason, s.color, s.name)
                       const motivo = s.reason || s.name || s.type
                       const coms = analisis.byState.get(s) ?? []
                       const comentario = coms.map((c) => c.text).join(' · ')
@@ -1010,7 +1019,7 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
                           <td className="px-2 py-1 text-right text-foreground whitespace-nowrap">{fmtDurationSec(s.durationSec)}</td>
                           <td className="px-2 py-1">
                             <span className="inline-flex items-center gap-1.5 min-w-0">
-                              <span className="w-2 h-2 rounded-ctl shrink-0" style={{ background: color }} />
+                              <span className={cn('w-2 h-2 rounded-ctl shrink-0', slxStateTrama(s.type, s.reason) && 'pz-trama')} style={{ backgroundColor: color }} />
                               <span className="text-foreground truncate">{motivo}</span>
                             </span>
                           </td>
@@ -1021,7 +1030,7 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
                                 <span>{comentario}</span>
                               </span>
                             ) : (
-                              <span className="text-muted-foreground dark:text-muted-foreground">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
                         </tr>
@@ -1243,7 +1252,7 @@ export function UpstreamMachinesPanel({
             {dataSource === 'demo' && (
               <Badge
                 variant="outline"
-                className="text-caption px-1.5 py-0 h-4 border-transparent text-ink-warn bg-amber-500/[0.15]"
+                className="text-caption px-1.5 py-0 h-4 border-transparent text-ink-warn bg-warning/[0.15]"
                 title="Datos sintéticos de demostración — no hay datos reales de Shoplogix para este turno en Firestore"
               >
                 DEMO
@@ -1330,7 +1339,7 @@ export function UpstreamMachinesPanel({
             {slxWindowMismatch && (
               <Badge
                 variant="outline"
-                className="bg-red-500/[0.15] border-transparent text-ink-crit text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
+                className="bg-destructive/[0.15] border-transparent text-ink-crit text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
                   `Datos SLX fuera de ventana: rango real ${fmtTime(slxWindowMismatch.actualStart.getTime())}–${fmtTime(slxWindowMismatch.actualEnd.getTime())} ` +
                   `no coincide con el turno actual. Probable causa: documento Firestore con datos de otro turno. ` +
@@ -1423,7 +1432,7 @@ export function UpstreamMachinesPanel({
                     className={cn(
                       'text-caption px-1.5 py-0.5 rounded-ctl border transition-colors',
                       showRateGap
-                        ? 'border-transparent bg-red-500/[0.15] text-ink-crit'
+                        ? 'border-transparent bg-destructive/[0.15] text-ink-crit'
                         : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >

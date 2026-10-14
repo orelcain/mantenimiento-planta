@@ -119,7 +119,7 @@ export function HierarchySelector({
     <div className="space-y-3">
       {/* Breadcrumb de selección actual */}
       {selections.some(s => s !== null) && (
-        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-card border border-blue-500/[0.25]">
+        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-card border border-blue-500/[0.25] pizarra:bg-none pizarra:bg-muted">
           <MapPin className="w-5 h-5 text-brand-ink flex-shrink-0" />
           <div className="flex-1 flex items-center gap-2 flex-wrap">
             {breadcrumbLoading ? (

@@ -145,7 +145,7 @@ Bot personal de tracking de anime con Mini App embebida en Telegram. Funcionalid
 │ Firestore mantenimiento-planta-771a3     │
 │                                          │
 │ Colección: animelists/{userId}          │
-│ Rule: allow read, write: if true        │
+│ Rule: solo sesión animeAuth (dueño)     │
 │ (sin auth — comentario explica que es   │
 │  "bot personal sin auth")               │
 └──────────────────────────────────────────┘
@@ -296,31 +296,20 @@ Las Cloud Functions del bot usan **Admin SDK**, no client SDK. Esto significa qu
 - `#list-modal` — crear/editar listas custom
 - Status dot online/offline en header — health check Firestore
 
-### Auth flow (VERIFICADO 2026-05-20 — corregido vs versión previa de este doc)
+### Auth flow (ACTUALIZADO 2026-10-07 — sesión propia, regla cerrada)
 
-**La Mini App NO autentica con Firebase Auth.** Verifiqué leyendo `anime.html`:
+Hasta el 07-10-2026 la Mini App no tenía sesión y la regla de `animelists` era `allow read: if true; allow write: if isValidDocSize()`: cualquiera con la API key pública leía, sobrescribía o borraba las listas. Ahora:
 
-```javascript
-// Líneas 576-581 de anime.html
-firebase.initializeApp({...})
-const db = firebase.firestore()
-// NO hay signInWithCustomToken, NO hay mintTelegramAuthToken, NO hay firebase.auth().signIn*
-```
+1. `anime.html` envía `Telegram.WebApp.initData` a la Cloud Function **`animeAuth`** (CORS solo para los dominios de Hosting).
+2. `animeAuth` valida la firma HMAC con **`ANIME_BOT_TOKEN`** (no con el bot de planta), exige `auth_date` ≤ 24 h y que el ID esté en `ANIME_USUARIOS_PERMITIDOS` (hoy solo `ANIME_CHAT_ID`).
+3. Emite un custom token uid `anime_<tgId>` con el claim `anime_tg`. La cuenta se crea con Admin SDK porque el auto-registro de Auth está deshabilitado.
+4. La Mini App hace `signInWithCustomToken`; la sesión persiste en el dispositivo.
+5. Reglas: `animelists/{userId}` solo con `tieneSesionAnime() && request.auth.token.anime_tg == userId`. El borrado del doc completo no está permitido.
+6. `tieneSesionAnime()` está excluida de `isAuthenticated()` (Firestore) y de `sesionApp()` (Storage), igual que el pase de bitácora: la sesión de anime no sirve para nada de la PWA. Tampoco pasa las guardias de las funciones (no tiene doc en `users`).
 
-Lo que hace en cambio:
-1. Telegram inyecta `initDataUnsafe.user.id` en `Telegram.WebApp` (cliente Telegram)
-2. Mini App lee este ID directamente para identificar al usuario y construir el doc path `animelists/{userId}`
-3. Firestore acepta lectura/escritura **porque la rule es `allow read, write: if true`** — sin auth requerida
-4. La API key Firebase (en `firebase.initializeApp`) es la única "credencial" — pero como la rule es permissive, cualquiera con la key puede acceder a cualquier `animelists/{cualquierID}`
+Fuera de Telegram la app muestra «Abre AnimeTracker desde Telegram» y no carga datos. Para sumar otro usuario: agregar su ID a `ANIME_USUARIOS_PERMITIDOS` en `functions/index.js`.
 
-⚠️ **Implicación crítica:** la rule de `animelists` **DEBE permanecer `if true`** mientras la Mini App no migre a `signInWithCustomToken`. Si endureces la rule sin actualizar la Mini App, el bot deja de funcionar.
-
-**Para endurecer la rule (refactor futuro):**
-1. Implementar en `anime.html`: `mintTelegramAuthToken` POST → `signInWithCustomToken(customToken)`
-2. Cambiar rule a: `allow read, write: if request.auth.uid == userId;`
-3. Test E2E porque puede haber side effects en flows de la Mini App que asumen lectura sin auth
-
-**¿Por qué la Mini App de planta (`mant.html`) sí autentica pero la de anime no?** La de planta accede a colecciones sensibles (incidents, equipment) que SÍ tienen rules estrictas. La de anime accede solo a `animelists` que es info personal sin sensibilidad de seguridad — se priorizó simplicidad.
+`anime.html` lleva además una CSP en `<meta>` (scripts solo de telegram.org y gstatic; conexiones solo a AniList, MyMemory, Firestore, Auth y Cloud Functions).
 
 ---
 
@@ -403,13 +392,16 @@ await db.collection('anime_notifications').doc(dateKey).set({
 
 ⚠️ **Esta colección NO está en `firestore.rules` con regla explícita.** Si se aplica una regla deny-all global y no se agrega excepción para `anime_notifications`, el bot empieza a enviar **notificaciones duplicadas** (no puede comprobar "ya envié hoy"). Verificar firestore.rules incluye también esta colección al endurecer reglas.
 
-### Rule actual de Firestore
+### Rule actual de Firestore (desde 2026-10-07)
 ```
 match /animelists/{userId} {
-  allow read, write: if true;
+  allow read: if tieneSesionAnime() && request.auth.token.anime_tg == userId;
+  allow create, update: if tieneSesionAnime()
+    && request.auth.token.anime_tg == userId
+    && isValidDocSize();
 }
 ```
-Sin auth requerida, sin match por userId. Pensado para bot personal — endurecer si se abre a más usuarios.
+Solo la sesión emitida por `animeAuth`, y solo su propio doc. Ver «Auth flow».
 
 ---
 
@@ -559,7 +551,7 @@ O migrar a librería de fechas con timezone explícito (date-fns-tz, luxon).
 ## 14. Mejoras pendientes / ideas
 
 ### Prioridad alta
-- [ ] **Auditar security rules** de `animelists` y endurecer si se quiere multi-usuario
+- [x] **Auditar security rules** de `animelists` — cerrado 2026-10-07 (sesión `animeAuth` + regla solo dueño)
 - [ ] **Documentar estructura real Firestore** (TypeScript types o JSON Schema)
 
 ### Prioridad media

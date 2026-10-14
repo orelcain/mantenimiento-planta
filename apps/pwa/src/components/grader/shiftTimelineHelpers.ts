@@ -14,6 +14,8 @@ import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.
 import type { SegmentVerdict, VerdictStatus } from '@/services/grader/graderP0Segmentation'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from '@/services/shoplogix/types'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
+import { elegirColor, hayPizarra, porPaleta } from '@/lib/coloresGrafico'
+import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 
 // ── Formato de hora ───────────────────────────────────────────────────────────
 
@@ -47,6 +49,47 @@ export const CAUSE_HEX: Record<MatrixP0Cause, string> = {
   fuera_de_conservacion: '#f59e0b', // amber-500
   fuera_de_producto:     '#92400e', // amber-800
   otro:                  '#71717a', // zinc-500
+}
+
+/**
+ * Pizarra: las 9 causas no caben en 5 series. Las 5 primeras llevan serie 1-5 (orden fijo, no por
+ * ranking del turno) y las derivadas del análisis («calidad», «conservación», «producto») y
+ * «otro» se agrupan en «Otros».
+ */
+const CAUSA_TOKEN: Record<MatrixP0Cause, string> = {
+  fuera_de_limites: 'serie-1',
+  no_leido_fotocelula: 'serie-2',
+  too_close_too_long: 'serie-3',
+  puerta_no_preparada: 'serie-4',
+  fuera_de_calibre: 'serie-5',
+  fuera_de_calidad: 'serie-otros',
+  fuera_de_conservacion: 'serie-otros',
+  fuera_de_producto: 'serie-otros',
+  otro: 'serie-otros',
+}
+
+/** Color de una causa P0: `CAUSE_HEX` (o `hoy` si la causa no existe) sin Pizarra; con ella, su serie. */
+export function causaColor(cause: MatrixP0Cause | string, hoy?: string, alfa = 1): string {
+  const base = (CAUSE_HEX as Record<string, string>)[cause] ?? hoy ?? '#ef4444'
+  return elegirColor(base, (CAUSA_TOKEN as Record<string, string>)[cause] ?? 'serie-otros', alfa)
+}
+
+/**
+ * Color de una causa como valor CSS vivo (`style`, `--tw-ring-color`): el hex de siempre sin Pizarra;
+ * con ella `rgb(var(--serie-N))`, que el navegador resuelve solo al cambiar Día/Penumbra (sin
+ * volver a leer tokens ni re-renderizar).
+ */
+export function causaColorCss(cause: MatrixP0Cause | string, hoy?: string): string {
+  const base = (CAUSE_HEX as Record<string, string>)[cause] ?? hoy ?? '#ef4444'
+  return porPaleta(base, `rgb(var(--${(CAUSA_TOKEN as Record<string, string>)[cause] ?? 'serie-otros'}))`)
+}
+
+/**
+ * Lo mismo con transparencia, para fondos y bordes de chips. Sin Pizarra reproduce el truco de
+ * siempre (hex + sufijo de 2 dígitos, p. ej. `'60'`); con ella usa la opacidad `alfa`.
+ */
+export function causaColorAlfa(cause: MatrixP0Cause | string, sufijoHex: string, alfa: number, hoy?: string): string {
+  return hayPizarra() ? causaColor(cause, hoy, alfa) : causaColor(cause, hoy) + sufijoHex
 }
 
 // ── Ventana de producción real ────────────────────────────────────────────────
@@ -359,6 +402,24 @@ export const RIEL_COLOR: Record<TipoEventoTurno, string> = {
 }
 
 /**
+ * Pizarra: la acción de Mantención es el foco (serie 1); carga, config y lote, series 2-4;
+ * la pausa es contexto (neutro medio). Los mismos tokens pintan las líneas verticales del
+ * gráfico para que riel y líneas calcen.
+ */
+const RIEL_TOKEN: Record<TipoEventoTurno, string> = {
+  accion: 'serie-1',
+  carga: 'serie-2',
+  config: 'serie-3',
+  lote: 'serie-4',
+  pausa: 'grafico-neutro-medio',
+}
+
+/** Color del tipo de evento: `RIEL_COLOR` sin Pizarra; con ella, su token. */
+export function rielColor(tipo: TipoEventoTurno): string {
+  return elegirColor(RIEL_COLOR[tipo], RIEL_TOKEN[tipo])
+}
+
+/**
  * Marcadores del riel como `markLine` verticales: la línea marca el instante
  * sobre el gráfico y la píldora de arriba lleva el glifo del tipo y, si el
  * marcador agrupa, cuántos eventos trae. Va dentro del canvas a propósito —
@@ -366,7 +427,7 @@ export const RIEL_COLOR: Record<TipoEventoTurno, string> = {
  */
 export function buildRielMarkLines(marcadores: readonly MarcadorRiel[]): object[] {
   return marcadores.map((m) => {
-    const color = RIEL_COLOR[m.tipo]
+    const color = rielColor(m.tipo)
     const n = m.eventos.length
     return {
       name: m.eventos.map((e) => e.titulo).join(' · '),
@@ -387,7 +448,7 @@ export function buildRielMarkLines(marcadores: readonly MarcadorRiel[]): object[
         fontSize: 11,
         padding: [2, 5, 2, 5],
         borderRadius: 4.5,
-        backgroundColor: 'rgba(15,23,42,0.92)',
+        backgroundColor: elegirColor('rgba(15,23,42,0.92)', 'card', 0.92),
         borderColor: color,
         borderWidth: 1,
       },
@@ -535,13 +596,13 @@ export function buildMarkLines(
     {
       name: `Inicio turno\n${fmtTime(startLabelTs)}`,
       xAxis: fmtTime(startLabelTs),
-      lineStyle: { color: '#10b981', type: 'solid' as const, width: 1 },
+      lineStyle: { color: elegirColor('#10b981', 'grafico-neutro-medio'), type: 'solid' as const, width: 1 },
       label: { show: false },
     },
     {
       name: `Fin turno\n${fmtTime(endLabelTs)}`,
       xAxis: fmtTime(endLabelTs),
-      lineStyle: { color: '#6b7280', type: 'solid' as const, width: 1 },
+      lineStyle: { color: elegirColor('#6b7280', 'grafico-neutro-medio'), type: 'solid' as const, width: 1 },
       label: { show: false },
     },
   ]
@@ -549,12 +610,12 @@ export function buildMarkLines(
   const thresholdLines = [
     {
       yAxis: alertThreshold,
-      lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1, opacity: 0.5 },
+      lineStyle: { color: elegirColor('#f59e0b', 'grafico-aviso'), type: 'dashed' as const, width: 1, opacity: 0.5 },
       label: { show: false },
     },
     {
       yAxis: criticalThreshold,
-      lineStyle: { color: '#ef4444', type: 'dashed' as const, width: 1, opacity: 0.5 },
+      lineStyle: { color: elegirColor('#ef4444', 'grafico-falla'), type: 'dashed' as const, width: 1, opacity: 0.5 },
       label: { show: false },
     },
   ]
@@ -562,21 +623,21 @@ export function buildMarkLines(
   const uploadLines = (shiftDoc?.uploads ?? []).map(u => ({
     name: `Upload\n${fmtTime(u.at)}`,
     xAxis: fmtTime(u.at),
-    lineStyle: { color: '#3b82f6', type: 'dashed' as const, width: 1.5 },
+    lineStyle: { color: elegirColor('#3b82f6', 'serie-2'), type: 'dashed' as const, width: 1.5 },
     label: { show: false },
   }))
 
   const actionLines = (shiftDoc?.actions ?? []).map(a => ({
     name: `Acción\n${fmtTime(a.at)}`,
     xAxis: fmtTime(a.at),
-    lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1.5 },
+    lineStyle: { color: elegirColor('#f59e0b', 'serie-1'), type: 'dashed' as const, width: 1.5 },
     label: { show: false },
   }))
 
   const configChangeLines = (configSnapshots ?? []).slice(1).map(s => ({
     name: `Config gates\n${fmtTime(s.at)}`,
     xAxis: fmtTime(s.at),
-    lineStyle: { color: '#06b6d4', type: 'dashed' as const, width: 1.5 },
+    lineStyle: { color: elegirColor('#06b6d4', 'serie-3'), type: 'dashed' as const, width: 1.5 },
     label: { show: false },
   }))
 
@@ -596,7 +657,7 @@ export function buildMarkLines(
       lotChangeLines.push({
         name: `Cambio a Lote ${curr.lot}`,
         xAxis: fmtTime(curr.tsMin),
-        lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
+        lineStyle: { color: elegirColor('#8b5cf6', 'serie-4'), type: 'dotted' as const, width: 1.5 },
         label: {
           show: false,
           // Los últimos 4 dígitos alcanzan para distinguir lotes dentro de un
@@ -606,12 +667,12 @@ export function buildMarkLines(
           // dos etiquetas caían una encima de la otra. El número completo sigue
           // en el nombre, que es lo que muestra el tooltip.
           formatter: `L ${String(curr.lot).slice(-4)}`,
-          color: '#a78bfa',
+          color: elegirColor('#a78bfa', 'serie-4'),
           fontSize: 11,
           fontWeight: 600 as const,
           position: 'insideEndBottom' as const,
-          backgroundColor: 'rgba(139,92,246,0.15)',
-          borderColor: 'rgba(139,92,246,0.4)',
+          backgroundColor: elegirColor('rgba(139,92,246,0.15)', 'serie-4', 0.15),
+          borderColor: elegirColor('rgba(139,92,246,0.4)', 'serie-4', 0.4),
           borderWidth: 1,
           borderRadius: 3,
           padding: [2, 4, 2, 4] as [number, number, number, number],
@@ -683,7 +744,7 @@ export function buildCadenceMarkLines(stats: CadenceStats): object[] {
     lines.push({
       name: 'Ritmo típico',
       yAxis: stats.typicalPzMin,
-      lineStyle: { color: '#38bdf8', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
+      lineStyle: { color: elegirColor('#38bdf8', 'grafico-neutro-fuerte'), type: 'dashed' as const, width: 1.5, opacity: 0.8 },
       label: { show: false },
       tooltip: { show: true, formatter: `Ritmo típico: mediana de pz/min en los minutos activos del turno (${v} pz/min).` },
     })
@@ -693,7 +754,7 @@ export function buildCadenceMarkLines(stats: CadenceStats): object[] {
     lines.push({
       name: 'Máx sostenida (10min)',
       yAxis: stats.bestSustained10MinPzMin,
-      lineStyle: { color: '#facc15', type: 'dashed' as const, width: 1.5, opacity: 0.8 },
+      lineStyle: { color: elegirColor('#facc15', 'grafico-meta'), type: 'dashed' as const, width: 1.5, opacity: 0.8 },
       label: { show: false },
       tooltip: { show: true, formatter: `Máx sostenida: mejor promedio móvil de 10 min activos del turno — capacidad demostrada (${v} pz/min).` },
     })
@@ -762,8 +823,8 @@ export function buildMarkAreas(
     } else {
       const baseOpacity = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06
       const opacity = isDominant ? baseOpacity * 0.4 : baseOpacity
-      areaColor = `rgba(148,163,184,${opacity.toFixed(3)})`
-      labelColor = '#94a3b8'
+      areaColor = elegirColor(`rgba(148,163,184,${opacity.toFixed(3)})`, 'grafico-neutro-medio', Number(opacity.toFixed(3)))
+      labelColor = elegirColor('#94a3b8', 'grafico-neutro-medio')
       labelText = `${durMin}min${rangeAdjusted ? ' *' : ''}`
     }
     return [
@@ -805,7 +866,7 @@ export function buildPauseBoundaryMarkLines(
     const effectiveTag = resolveEffectiveTag(p)
     const isDominant = durMin >= PAUSE_DOMINANT_THRESHOLD_MIN
     if (!isDominant) continue
-    const color = effectiveTag?.color ?? (p.tier === 'parada' ? '#94a3b8' : '#cbd5e1')
+    const color = effectiveTag?.color ?? elegirColor(p.tier === 'parada' ? '#94a3b8' : '#cbd5e1', 'grafico-neutro-medio')
     lines.push(
       /* Sin `label` explícito, ECharts dibuja el valor del eje sobre la línea:
          estos dos bordes eran los que escribían horas sueltas encima del
@@ -846,9 +907,11 @@ export function buildPauseBoundaryMarkLines(
  */
 export function verdictBandColor(status: VerdictStatus): string | null {
   switch (status) {
-    case 'improved':          return 'rgba(16, 185, 129, 0.07)'  // emerald-500 7%
-    case 'worsened':          return 'rgba(244, 63, 94, 0.07)'   // rose-500 7%
-    case 'neutral':           return 'rgba(148, 163, 184, 0.04)' // slate-400 4%
+    // Pizarra: mejoró = serie 1 (foco); empeoró = falla (el segmento salió de la banda del veredicto);
+    // neutro = neutro medio. Mismas opacidades.
+    case 'improved':          return elegirColor('rgba(16, 185, 129, 0.07)', 'serie-1', 0.07)  // emerald-500 7%
+    case 'worsened':          return elegirColor('rgba(244, 63, 94, 0.07)', 'grafico-falla', 0.07)   // rose-500 7%
+    case 'neutral':           return elegirColor('rgba(148, 163, 184, 0.04)', 'grafico-neutro-medio', 0.04) // slate-400 4%
     case 'insufficient-data': return null
   }
 }
@@ -999,7 +1062,10 @@ export function buildBaaderTimelineMarkers(
       if (tA === tB) continue
 
       // Color: usa el de Shoplogix como base, agrega transparencia para fill
-      const baseColor = state.color || '#94a3b8'
+      // Pizarra: el mismo color que el Gantt del panel upstream (slxStateColor); sin ella, el de Shoplogix.
+      const baseColor = hayPizarra()
+        ? slxStateColor(state.type, state.reason, state.color, state.name)
+        : state.color || '#94a3b8'
       const fill = colorWithAlpha(baseColor, 0.55)
       const stroke = colorWithAlpha(baseColor, 0.9)
       const durationMin = Math.max(1, Math.round(state.durationSec / 60))

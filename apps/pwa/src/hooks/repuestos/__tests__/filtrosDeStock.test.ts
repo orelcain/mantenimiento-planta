@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { contarAlertas, esAlertaDeStock } from '../estadoDeStock'
 import {
   FILTROS_DE_STOCK,
   aplicarFiltroDeStock,
@@ -24,7 +25,7 @@ const catalogoReal = [
 ]
 
 describe('el contador dice lo que el filtro muestra', () => {
-  const claves: StockFilterKey[] = ['todos', 'configurados', 'bajo', 'sin', 'sinConfig', 'favoritos']
+  const claves: StockFilterKey[] = ['todos', 'configurados', 'bajo', 'sin', 'sinConfig', 'favoritos', 'alertas']
 
   it.each(claves)('%s: contarParaFiltro coincide con aplicarFiltroDeStock', (key) => {
     expect(contarParaFiltro(catalogoReal, key)).toBe(aplicarFiltroDeStock(catalogoReal, key).length)
@@ -45,6 +46,34 @@ describe('"sin stock" incluye los que NO tienen mínimo definido', () => {
     const enCeroSinMinimo = item({ stockActual: 0, stockMinimo: 0 })
     expect(FILTROS_DE_STOCK.sin(enCeroSinMinimo)).toBe(true)
     expect(FILTROS_DE_STOCK.bajo(enCeroSinMinimo)).toBe(false)
+  })
+})
+
+describe('"alertas" usa el mismo criterio que las estadísticas', () => {
+  it('cuenta exactamente lo mismo que contarAlertas y esAlertaDeStock', () => {
+    expect(contarParaFiltro(catalogoReal, 'alertas')).toBe(61)
+    expect(contarParaFiltro(catalogoReal, 'alertas')).toBe(contarAlertas(catalogoReal))
+    expect(aplicarFiltroDeStock(catalogoReal, 'alertas')).toEqual(catalogoReal.filter(esAlertaDeStock))
+  })
+
+  it('incluye sin stock con mínimo, bajo mínimo e igual al mínimo', () => {
+    const lista = [
+      item({ stockActual: 0, stockMinimo: 3 }),
+      item({ stockActual: 2, stockMinimo: 3 }),
+      item({ stockActual: 3, stockMinimo: 3 }),
+    ]
+    expect(aplicarFiltroDeStock(lista, 'alertas')).toEqual(lista)
+    expect(contarParaFiltro(lista, 'alertas')).toBe(aplicarFiltroDeStock(lista, 'alertas').length)
+  })
+
+  it('excluye los en cero sin mínimo y los sin configurar con mínimo cero', () => {
+    const lista = [
+      item({ stockActual: 0, stockMinimo: 0 }),
+      item({ bodegaId: null, stockActual: 0, stockMinimo: 0 }),
+      item({ bodegaId: undefined, stockActual: 0, stockMinimo: 0 }),
+    ]
+    expect(aplicarFiltroDeStock(lista, 'alertas')).toEqual([])
+    expect(contarParaFiltro(lista, 'alertas')).toBe(0)
   })
 })
 

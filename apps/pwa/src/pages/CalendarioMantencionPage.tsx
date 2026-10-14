@@ -903,9 +903,9 @@ export function CalendarioMantencionPage() {
   }, [dayCols, syncCalendarToFirebase, buildLocalPayload])
 
   const syncIndicator = useMemo(() => {
-    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/[0.15] text-ink-warn border-transparent' }
-    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/[0.15] text-ink-ok border-transparent' }
-    if (syncState === 'error') return { label: `Sin subir${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/[0.15] text-ink-crit border-transparent' }
+    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-fill-warning/[0.15] text-ink-warn border-transparent' }
+    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-ink-ok/[0.15] text-ink-ok border-transparent' }
+    if (syncState === 'error') return { label: `Sin subir${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-fill-critical/[0.15] text-ink-crit border-transparent' }
     return { label: 'Sin cambios', className: 'bg-muted text-muted-foreground border-border' }
   }, [lastSyncAt, syncErrorText, syncState])
 
@@ -1572,7 +1572,7 @@ export function CalendarioMantencionPage() {
   function turnoBadgeClass(turno: string): string {
     const key = turno.trim().toUpperCase()
     if (key === 'A') return 'border-transparent bg-cat-7-tint/[0.15] text-cat-7-ink'
-    if (key === 'B') return 'border-transparent bg-amber-500/[0.15] text-ink-warn'
+    if (key === 'B') return 'border-transparent bg-fill-warning/[0.15] text-ink-warn'
     if (key === 'C') return 'border-transparent bg-cat-6-tint/[0.15] text-cat-6-ink'
     return 'border-border bg-muted text-foreground'
   }
@@ -2667,7 +2667,7 @@ export function CalendarioMantencionPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="inline-block h-2 w-2 rounded-full bg-primary" />
                   <label className="font-medium text-foreground">Semana</label>
                   <span className="text-caption text-muted-foreground">({weekDays.length} días)</span>
                 </div>
@@ -2702,8 +2702,8 @@ export function CalendarioMantencionPage() {
                     <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-muted px-2 md:px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 140 }}>
                       Técnico
                     </th>
-                    <th colSpan={hayAusencias ? 6 : 4} className="border-b border-l border-border/30 bg-primary/[0.15] dark:bg-gradient-to-r dark:from-blue-950/80 dark:to-blue-900/40 px-2 py-1.5 text-center text-caption font-bold tracking-wider text-brand-ink">
-                      <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Resumen Semanal</span>
+                    <th colSpan={hayAusencias ? 6 : 4} className="border-b border-l border-border/30 bg-primary/[0.15] px-2 py-1.5 text-center text-caption font-bold tracking-wider text-brand-ink">
+                      <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Resumen Semanal</span>
                     </th>
                     <th colSpan={hayAusencias ? 6 : 4} className="border-b border-l-2 border-border/30 bg-cat-3-tint/[0.15] px-2 py-1.5 text-center text-caption font-bold tracking-wider text-cat-3-ink">
                       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-cat-3-ink" />Resumen Mensual</span>
@@ -2753,7 +2753,7 @@ export function CalendarioMantencionPage() {
                     // y el rojo dejaba de significar nada.
                     const isRisk = wOver || mOver
                     const zebra = idx % 2 === 1 ? 'bg-muted' : ''
-                    const rowBg = isRisk ? 'bg-red-500/[0.15] hover:bg-red-500/[0.15] dark:hover:bg-red-500/[0.15]' : `${zebra} hover:bg-muted/50`
+                    const rowBg = isRisk ? 'bg-fill-critical/[0.15] hover:bg-fill-critical/[0.15] dark:hover:bg-fill-critical/[0.15]' : `${zebra} hover:bg-muted/50`
                     return (
                       <tr key={row.tech.r} className={`border-t border-border/20 transition-colors ${rowBg}`}>
                         <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-2 md:px-3 py-1.5" style={{ minWidth: 140, maxWidth: 200 }}>
@@ -2786,7 +2786,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${wOver ? 'bg-fill-critical' : row.deltaWeek > 0 ? 'bg-cat-4-tint' : 'bg-fill-ok'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-red-500/[0.15] text-ink-crit' : row.deltaWeek > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${wOver ? 'bg-fill-critical/[0.15] text-ink-crit' : row.deltaWeek > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
                               {formatDelta(row.deltaWeek)}
                             </span>
                           </div>
@@ -2802,7 +2802,7 @@ export function CalendarioMantencionPage() {
                         </td>)}
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.weekHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-transparent bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.weekHolidayPaidHours)}h pagadas`}>{row.weekHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-transparent bg-fill-warning/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.weekHolidayPaidHours)}h pagadas`}>{row.weekHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${dec1(row.monthWorkedHours)}h · Vac pagadas: ${dec1(row.monthVacationPaidHours)}h · Fer pagados: ${dec1(row.monthHolidayPaidHours)}h · Colación: ${dec1(row.monthBreakHours)}h`}>
@@ -2815,7 +2815,7 @@ export function CalendarioMantencionPage() {
                             <div className="flex-1 h-[5px] rounded-full bg-muted overflow-hidden">
                               <div className={`h-full rounded-full transition-all ${mOver ? 'bg-fill-critical' : row.deltaMonth > 0 ? 'bg-cat-4-tint' : 'bg-fill-ok'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-red-500/[0.15] text-ink-crit' : row.deltaMonth > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-ctl px-1 py-[1px] text-center text-caption tabular-nums font-bold ${mOver ? 'bg-fill-critical/[0.15] text-ink-crit' : row.deltaMonth > 0 ? 'bg-cat-4-tint/[0.15] text-cat-4-ink' : 'bg-muted text-muted-foreground'}`}>
                               {row.mesCompleto ? (
                                 formatDelta(row.deltaMonth)
                               ) : (
@@ -2837,7 +2837,7 @@ export function CalendarioMantencionPage() {
                         </td>)}
                         {hayAusencias && (<td className="px-1 py-1 text-center">
                           {row.monthHolidayDays > 0
-                            ? <span className="inline-block rounded-full border border-transparent bg-amber-500/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.monthHolidayPaidHours)}h pagadas`}>{row.monthHolidayDays}d</span>
+                            ? <span className="inline-block rounded-full border border-transparent bg-fill-warning/[0.15] px-1.5 py-[1px] text-caption font-bold tabular-nums text-ink-warn" title={`${dec1(row.monthHolidayPaidHours)}h pagadas`}>{row.monthHolidayDays}d</span>
                             : <span className="text-muted-foreground">–</span>}
                         </td>)}
                         <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">
@@ -2927,7 +2927,7 @@ export function CalendarioMantencionPage() {
                   ) : null}
                   <th
                     key={`day-${d.c}`}
-                    className={`sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25] shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
+                    className={`sticky top-0 z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-fill-warning/[0.25] shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2975,7 +2975,7 @@ export function CalendarioMantencionPage() {
                   ) : null}
                   <th
                     key={`date-${d.c}`}
-                    className={`sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-foreground ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-amber-500/[0.25] font-semibold text-ink-warn shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
+                    className={`sticky top-[30px] z-20 border border-border !bg-muted bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-foreground ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-fill-warning/[0.25] font-semibold text-ink-warn shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2993,7 +2993,7 @@ export function CalendarioMantencionPage() {
                 const isSelectedRow = selectedRow === tech.r
                 const metaValues = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name]
                 const dtk = tech.turno.trim().toUpperCase()
-                const dRowBg = dtk === 'A' ? 'bg-cat-7-tint/[0.15]' : dtk === 'B' ? 'bg-amber-500/[0.15]' : dtk === 'C' ? 'bg-cat-6-tint/[0.15]' : idx % 2 === 1 ? 'bg-muted' : ''
+                const dRowBg = dtk === 'A' ? 'bg-cat-7-tint/[0.15]' : dtk === 'B' ? 'bg-fill-warning/[0.15]' : dtk === 'C' ? 'bg-cat-6-tint/[0.15]' : idx % 2 === 1 ? 'bg-muted' : ''
                 return (
                   <tr key={tech.r} className={`border-b border-border/20 ${dRowBg} ${isSelectedRow ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''}`}>
                     {visibleMetaIndices.map((gi, vi) => (
@@ -3032,7 +3032,7 @@ export function CalendarioMantencionPage() {
                         ) : null}
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-muted-foreground/[0.10]' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-amber-500/[0.25]' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-muted-foreground/[0.10]' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-fill-warning/[0.25]' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
                           title={value || 'Sin turno'}
                           onClick={() => {

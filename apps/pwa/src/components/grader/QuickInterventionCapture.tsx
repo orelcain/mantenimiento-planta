@@ -59,22 +59,22 @@ const TIPOS: { id: InterventionTipo; label: string; icon: typeof Wrench }[] = [
 ]
 
 const SEVERIDADES: { id: InterventionSeveridad; label: string; dot: string; active: string }[] = [
-  { id: 'verde', label: 'Cond. 1 · OK', dot: 'bg-emerald-500', active: 'border-transparent bg-emerald-500/[0.15] text-ink-ok' },
-  { id: 'amarillo', label: 'Cond. 2 · Atención', dot: 'bg-amber-500', active: 'border-transparent bg-amber-500/[0.15] text-ink-warn' },
-  { id: 'rojo', label: 'Cond. 3 · Crítico', dot: 'bg-red-500', active: 'border-transparent bg-red-500/[0.15] text-ink-crit' },
+  { id: 'verde', label: 'Cond. 1 · OK', dot: 'bg-success', active: 'border-transparent bg-success/[0.15] text-ink-ok' },
+  { id: 'amarillo', label: 'Cond. 2 · Atención', dot: 'bg-warning', active: 'border-transparent bg-warning/[0.15] text-ink-warn' },
+  { id: 'rojo', label: 'Cond. 3 · Crítico', dot: 'bg-destructive', active: 'border-transparent bg-destructive/[0.15] text-ink-crit' },
 ]
 
 const TIPO_LABEL: Record<string, string> = {
   correctivo: 'Correctivo', preventivo: 'Preventivo', predictivo: 'Predictivo',
   inspeccion: 'Inspección', termografia: 'Termografía', medicion: 'Medición',
 }
-const SEV_DOT: Record<string, string> = { verde: 'bg-emerald-500', amarillo: 'bg-amber-500', rojo: 'bg-red-500' }
+const SEV_DOT: Record<string, string> = { verde: 'bg-success', amarillo: 'bg-warning', rojo: 'bg-destructive' }
 
 const RIESGO_STYLE: Record<AreaInsights['riesgo'], { label: string; cls: string }> = {
-  bajo: { label: 'Riesgo bajo', cls: 'border-transparent bg-emerald-500/[0.15] text-ink-ok' },
-  medio: { label: 'Riesgo medio', cls: 'border-transparent bg-amber-500/[0.15] text-ink-warn' },
+  bajo: { label: 'Riesgo bajo', cls: 'border-transparent bg-success/[0.15] text-ink-ok' },
+  medio: { label: 'Riesgo medio', cls: 'border-transparent bg-warning/[0.15] text-ink-warn' },
   alto: { label: 'Riesgo alto', cls: 'border-transparent bg-cat-4-tint/[0.15] text-cat-4-ink' },
-  critico: { label: 'Riesgo crítico', cls: 'border-transparent bg-red-500/[0.15] text-ink-crit' },
+  critico: { label: 'Riesgo crítico', cls: 'border-transparent bg-destructive/[0.15] text-ink-crit' },
 }
 
 /** Turno best-effort por hora local (las líneas manuales no tienen schedule Grader). */
@@ -427,7 +427,7 @@ export function QuickInterventionCapture({
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
+            <div className="flex items-start gap-2 text-xs text-ink-crit bg-destructive/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span className="break-words">{error}</span>
             </div>
@@ -514,7 +514,7 @@ export function QuickInterventionCapture({
                     <div className="flex flex-wrap items-center gap-1 mt-1">
                       {e.sapOrden
                         ? <Badge variant="outline" className="text-caption text-primary border-primary/[0.25]">OT {e.sapOrden}</Badge>
-                        : <Badge variant="outline" className="text-caption text-ink-warn border-amber-500/[0.25]">SAP pendiente</Badge>}
+                        : <Badge variant="outline" className="text-caption text-ink-warn border-warning/[0.25]">SAP pendiente</Badge>}
                       {e.sapAviso && <Badge variant="outline" className="text-caption text-muted-foreground border-border/50">Aviso {e.sapAviso}</Badge>}
                     </div>
                   </div>
@@ -565,7 +565,7 @@ export function QuickInterventionCapture({
               </Button>
 
               {insightsError && (
-                <div className="flex items-start gap-2 text-xs text-ink-crit bg-red-500/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
+                <div className="flex items-start gap-2 text-xs text-ink-crit bg-destructive/[0.15] border border-transparent rounded-ctl px-2.5 py-2">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span className="break-words">{insightsError}</span>
                 </div>
@@ -616,7 +616,7 @@ export function QuickInterventionCapture({
                       <p className="text-caption font-medium text-muted-foreground">Equipos / componentes a vigilar</p>
                       <div className="flex flex-wrap gap-1.5">
                         {insights.equiposAVigilar.map((eq, i) => (
-                          <Badge key={i} variant="outline" className="text-caption font-normal text-ink-warn border-amber-500/[0.25]">
+                          <Badge key={i} variant="outline" className="text-caption font-normal text-ink-warn border-warning/[0.25]">
                             {eq}
                           </Badge>
                         ))}

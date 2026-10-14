@@ -39,7 +39,7 @@ function fmtHm(sec: number): string {
 /** Mismo código de color por dueño que la cascada del turno. */
 const BUCKET_BG: Record<string, string> = {
   'planificado':    'bg-muted-foreground/[0.10]',
-  'externo':        'bg-amber-500/[0.15]',
+  'externo':        'bg-warning/[0.15]',
   'mantencion':     'bg-cat-5-tint/[0.15]',
   'sin-clasificar': 'bg-cat-6-tint/[0.15]',
 }
@@ -50,9 +50,9 @@ const BUCKET_BG: Record<string, string> = {
  * claro es la convención del repo.
  */
 const COVERAGE_THEME = (pct: number) =>
-  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-emerald-500/[0.15]', label: 'Documentado' }
-  : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-amber-500/[0.15]', label: 'Parcial' }
-  : { text: 'text-ink-crit', bar: 'bg-red-500/[0.15]', label: 'Sin imputar' }
+  pct >= 90 ? { text: 'text-ink-ok', bar: 'bg-success/[0.15]', label: 'Documentado' }
+  : pct >= 60 ? { text: 'text-ink-warn', bar: 'bg-warning/[0.15]', label: 'Parcial' }
+  : { text: 'text-ink-crit', bar: 'bg-destructive/[0.15]', label: 'Sin imputar' }
 
 export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineShift[] }) {
   const [expanded, setExpanded] = useState(true)
@@ -141,7 +141,7 @@ export function ImputacionParetoCard({ machines }: { machines: UpstreamMachineSh
                 <span className="truncate">{c.label}</span>
                 {c.ambigua && (
                   <span
-                    className="shrink-0 text-caption px-1 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-transparent"
+                    className="shrink-0 text-caption px-1 rounded-ctl bg-warning/[0.15] text-ink-warn border border-transparent"
                     title="Shoplogix manda la causal sin su categoría, y esta hoja existe en Falla Eléctrica y en Falla Mecánica. Para la cascada da igual (ambas son Mantención); para separar eléctrica de mecánica haría falta que la causal llegue prefijada desde Shoplogix."
                   >
                     ¿eléc. o mec.?

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowDownCircle, ChevronDown, ChevronUp, Download, Loader2, Search, Star, X } from 'lucide-react'
+import { ArrowDownCircle, ChevronDown, ChevronUp, Download, Loader2, Search, Shapes, Star, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Button, Pill, Tag, type PillTone } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { stockStatusOf, type StockStatus } from '@/hooks/repuestos/estadoDeStock'
 import { contarParaFiltro, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
 import type { BodegaMergedItem } from '@/hooks/repuestos/useBodega'
@@ -39,7 +41,8 @@ const ORDEN_ESTADO: Record<StockStatus, number> = { out: 0, low: 1, ok: 2, unset
 
 function clave(i: BodegaMergedItem, c: Col): string | number | null {
   switch (c) {
-    case 'nombre': return formatNombreSAP(i.textoBreve).nombre || null
+    // Se ordena por lo que se ve: el nombre común si lo hay, si no el nombre SAP formateado.
+    case 'nombre': { const v = nombreVisible(i); return v.esComun || v.titulo !== '(sin nombre)' ? v.titulo : null }
     case 'sap': return i.codigoSAP
     case 'fab': return i.codigoFabricante || null
     case 'ubicacion': return i.bodegaId ? (i.ubicacionBodega || null) : null
@@ -53,11 +56,13 @@ function clave(i: BodegaMergedItem, c: Col): string | number | null {
 
 const PASO = 200
 
-export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorito }: {
+export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorito, dibujoDe }: {
   items: BodegaMergedItem[]
   /** El menú «⋯» de siempre (lote, carga rápida, configurar, CSV). */
   acciones: ReactNode
   onAbrir: (i: BodegaMergedItem) => void
+  /** Figura del despiece de ese ítem (por código de fabricante); null = sin dibujo. */
+  dibujoDe?: (i: BodegaMergedItem) => { ruta: string; fig: string } | null
   onMovimiento: (i: BodegaMergedItem) => void
   onFavorito: (i: BodegaMergedItem) => void
 }) {
@@ -211,18 +216,20 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                       </button>
                     </th>
                   ))}
+                  <th className="w-14 border-b border-border px-1 py-2 text-center font-semibold text-muted-foreground">Dibujo</th>
                   <th className="w-11 border-b border-border" aria-label="Movimiento" />
                 </tr>
               </thead>
               <tbody>
                 {visibles.length === 0 && (
-                  <tr><td colSpan={COLS.length + 2} className="py-12 text-center text-muted-foreground">Ningún repuesto cumple los filtros.</td></tr>
+                  <tr><td colSpan={COLS.length + 3} className="py-12 text-center text-muted-foreground">Ningún repuesto cumple los filtros.</td></tr>
                 )}
                 {visibles.slice(0, limite).map(i => {
-                  const { nombre, etiquetas } = formatNombreSAP(i.textoBreve)
+                  const nv = nombreVisible(i)
                   const est = stockStatusOf(i)
                   const ms = maquinas(i)
                   const v = valorTotal(i)
+                  const dib = dibujoDe?.(i) ?? null
                   return (
                     <tr key={i.rowKey} onClick={() => onAbrir(i)} className="cursor-pointer hover:bg-muted/60">
                       <td className="border-b border-border/40 pl-1.5">
@@ -233,8 +240,9 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                         </button>
                       </td>
                       <td className="max-w-[26rem] border-b border-border/40 px-2 py-2">
-                        {etiquetas.map(e => <Tag key={e} tone="neutral" className="mr-1.5 align-[1px]">{e}</Tag>)}
-                        {nombre || <span className="italic text-muted-foreground">Sin nombre</span>}
+                        {nv.etiquetas.map(e => <Tag key={e} tone="neutral" className="mr-1.5 align-[1px]">{e}</Tag>)}
+                        {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre</span>}
+                        {nv.oficial && <span className="block max-w-[300px] truncate text-caption text-muted-foreground" title={nv.oficial}>{nv.oficial}</span>}
                       </td>
                       <td className="border-b border-border/40 px-2 py-2 font-mono">{i.codigoSAP}</td>
                       <td className="border-b border-border/40 px-2 py-2 font-mono">{i.codigoFabricante || <span className="text-muted-foreground/50">—</span>}</td>
@@ -247,6 +255,15 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                       <td className="border-b border-border/40 px-2 py-2 text-right tabular-nums">{i.bodegaId && i.stockMinimo > 0 ? i.stockMinimo : <span className="text-muted-foreground/50">—</span>}</td>
                       <td className="border-b border-border/40 px-2 py-2"><Pill tone={TONO_ESTADO[est]}>{ESTADO_TEXTO[est]}</Pill></td>
                       <td className="border-b border-border/40 px-2 py-2 text-right tabular-nums">{v ? `$${v.toLocaleString('es-CL', { maximumFractionDigits: 0 })}` : <span className="text-muted-foreground/50">—</span>}</td>
+                      <td className="border-b border-border/40 text-center">
+                        {dib ? (
+                          <Link to={dib.ruta} onClick={e => e.stopPropagation()} title={`Ver en el dibujo · fig. ${dib.fig}`}
+                                aria-label={`Ver ${i.codigoFabricante} en el dibujo`}
+                                className="inline-flex size-9 items-center justify-center rounded-full text-primary hover:bg-muted">
+                            <Shapes className="size-4" />
+                          </Link>
+                        ) : <span className="text-muted-foreground/40">—</span>}
+                      </td>
                       <td className="border-b border-border/40 pr-1.5">
                         <button type="button" aria-label="Registrar movimiento" title="Registrar movimiento"
                                 onClick={e => { e.stopPropagation(); onMovimiento(i) }}

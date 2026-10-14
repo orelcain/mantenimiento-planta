@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, Clock, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, Loader2, LayoutPanelTop, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { EncabezadoHerramienta } from '@/components/piel'
 import { EQUIPOS, PLANOS, assetPlano, planoPorSlug, planosPorEquipo, type PlanoCatalogo, type TipoPlano } from '@/data/planos'
 import {
   usePlano, guardarPlanoOffline,
@@ -13,6 +14,10 @@ import { usePlanoSap } from '@/hooks/usePlanoSap'
 import { usePartesPlano } from '@/hooks/usePartesPlano'
 import { useCodigosParte, useCargaSiEsNumero, PARECE_NUMERO_PARTE, type ParteEncontrada } from '@/hooks/useCodigosParte'
 import { usePlanoVinculos, type VinculoTerreno } from '@/hooks/usePlanoVinculos'
+import { useMaquinaPlano } from '@/hooks/useMaquinaPlano'
+import { SelectorMaquinaPlano } from '@/components/aprendizaje/SelectorMaquinaPlano'
+import { etiquetaMaquina, fechaCortaVinculo, guardarVinculoTerreno, mensajeErrorTerreno } from '@/utils/aprendizaje/vinculoTerreno'
+import { esModoCandidatos } from '@/utils/aprendizaje/repuestosA3c'
 import { PlanoLienzo, type Foco } from '@/components/planos/PlanoLienzo'
 import { type Giro } from '@/utils/giroPlano'
 import { usePlanoGiros } from '@/hooks/usePlanoGiros'
@@ -38,12 +43,7 @@ const normalizarPos = (t: string) =>
  *  de piezas pueden traer "&"/"<" sueltos del OCR del catálogo). */
 const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-/** dd-MM: la fecha corta que va junto a quién confirmó en terreno. */
-const formatearFechaCorta = (t?: VinculoTerreno['actualizado']) => {
-  if (!t) return ''
-  const d = t.toDate()
-  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+const formatearFechaCorta = fechaCortaVinculo
 
 /** Etiqueta de un grupo del índice lateral / select de hojas. Los planos
  *  eléctricos usan 2 claves fijas; el despiece manda su propia etiqueta de
@@ -85,7 +85,7 @@ function ResultadosNumeroParte({ partes }: { partes: ParteEncontrada[] }) {
   if (!partes.length) return null
   return (
     <div className="mt-3 flex flex-col gap-0.5">
-      <h2 className="m-0 mb-1 flex items-baseline gap-2 text-caption font-semibold tracking-wider"
+      <h2 className="m-0 mb-1 flex items-baseline gap-2 text-nota font-semibold"
           style={{ color: 'var(--lc-ink-ghost)' }}>
         Números de parte
         <span className="font-mono normal-case tracking-normal">{partes.length}</span>
@@ -96,13 +96,13 @@ function ResultadosNumeroParte({ partes }: { partes: ParteEncontrada[] }) {
           : `/repuestos?q=${encodeURIComponent(pt.codigo)}`
         return (
           <Link key={pt.codigo} to={destino}
-                className="flex min-h-[44px] items-center justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80"
+                className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80"
                 style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
             <span className="min-w-0 flex-1">
               <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{pt.codigo}</span>
               {pt.nombre && <span className="ml-2 text-footnote">{pt.nombre}</span>}
             </span>
-            <span className="shrink-0 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+            <span className="shrink-0 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
               {pt.maquina}{pt.figura ? ` · fig. ${pt.figura}` : ' · en Repuestos'}
             </span>
           </Link>
@@ -209,19 +209,27 @@ function Catalogo() {
   const buscando = q.trim().length > 0
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 p-5" style={{ color: 'var(--lc-ink)' }}>
+    <div style={{ color: 'var(--lc-ink)' }}>
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver="Aprendizaje"
+        volverA="/aprendizaje"
+        titulo="Planos"
+        subtitulo={`${PLANOS.length} documentos de ${EQUIPOS.length} máquinas`}
+        contextoAria="Estoy en el catálogo de planos del Centro de aprendizaje. "
+      />
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 p-5">
       <header>
-        <h1 className="m-0 text-title3">Planos</h1>
-        <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
           Los planos del fabricante, navegables: los saltos entre hojas se siguen tocando
-          y los rótulos se leen en castellano. {PLANOS.length} documentos de {EQUIPOS.length} máquinas.
+          y los rótulos se leen en castellano.
         </p>
         <div className="relative mt-3">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2"
                   style={{ color: 'var(--lc-ink-ghost)' }} />
           <input value={q} onChange={(e) => setQ(e.target.value)} type="search"
                  placeholder="Buscar en todos los planos: K7, RL33, sellado, excavador…"
-                 className="w-full rounded-card border bg-transparent py-2 pl-8 pr-2 font-mono text-footnote outline-none"
+                 className="min-h-[36px] w-full rounded-card border bg-transparent py-2 pl-8 pr-2 font-mono text-footnote outline-none max-md:min-h-[48px]"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
         </div>
         {/* NÚMEROS DE PARTE de toda la planta: incluye las máquinas sin
@@ -239,10 +247,10 @@ function Catalogo() {
             )}
             {hits.map((h, i) => (
               <Link key={i} to={h.href}
-                    className="flex items-baseline justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80"
+                    className="flex items-baseline justify-between gap-3 rounded-ctl px-2 py-1.5 no-underline hover:opacity-80 max-md:min-h-[48px]"
                     style={{ background: 'var(--lc-surface)', color: 'inherit' }}>
                 <span className="font-mono text-footnote" style={{ color: 'var(--lc-aqua-bright)' }}>{h.clave}</span>
-                <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{h.maquina.slice(0, 30)} · {h.detalle}</span>
+                <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{h.maquina.slice(0, 30)} · {h.detalle}</span>
               </Link>
             ))}
           </div>
@@ -276,14 +284,14 @@ function Catalogo() {
                     {i > 0 && <div className="border-t" style={{ borderColor: 'var(--lc-border)' }} />}
                     <FilaPlano p={p} />
                     {p.verificacion?.estado === 'por_confirmar' && (
-                      <p className="m-0 flex items-start gap-2 px-3 pb-2.5 pt-2 text-caption leading-snug"
+                      <p className="m-0 flex items-start gap-2 px-3 pb-2.5 pt-2 text-nota leading-snug"
                          style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
                         <AlertTriangle size={14} className="mt-px shrink-0" />
                         <span>Sin confirmar. Antes de usarlo, {p.verificacion.nota}.</span>
                       </p>
                     )}
                     {p.verificacion?.estado === 'confirmado' && (
-                      <p className="m-0 -mt-1.5 flex items-start gap-2 py-1.5 pb-2 pl-14 pr-3 text-caption leading-snug"
+                      <p className="m-0 -mt-1.5 flex items-start gap-2 py-1.5 pb-2 pl-14 pr-3 text-nota leading-snug"
                          style={{ color: 'var(--lc-ink-lo)' }}>
                         <CheckCircle2 size={14} className="mt-px shrink-0" style={{ color: 'var(--lc-ok)' }} />
                         <span>Confirmado: {p.verificacion.nota}</span>
@@ -296,6 +304,7 @@ function Catalogo() {
           ))}
         </div>
       )}
+    </div>
     </div>
   )
 }
@@ -344,12 +353,12 @@ function FilaPlano({ p }: { p: PlanoCatalogo }) {
           {TIPO_LABEL[p.tipo]}
           {p.variante && <span className="font-normal" style={{ color: 'var(--lc-ink-mid)' }}> · {p.variante}</span>}
         </span>
-        <span className="truncate font-mono text-caption tabular-nums" style={{ color: 'var(--lc-ink-lo)' }}>
+        <span className="truncate text-nota tabular-nums" style={{ color: 'var(--lc-ink-lo)' }}>
           {/* El número se omite cuando no aporta: en los GEA repite el serial
               que ya está en la cabecera del grupo, y en el despiece de la 200
               es una frase larga que empujaba la línea a truncarse. */}
           {p.numero && p.numero !== '—' && !p.numero.includes(' ') && (
-            <><span className="font-medium" style={{ color: 'var(--lc-ink-mid)' }}>{p.numero}</span>{' · '}</>
+            <><span className="font-mono font-medium" style={{ color: 'var(--lc-ink-mid)' }}>{p.numero}</span>{' · '}</>
           )}
           {p.hojas} {p.unidad ?? 'hojas'}{p.detalle ? ` · ${p.detalle}` : ''}
         </span>
@@ -403,7 +412,10 @@ function Visor({ slug }: { slug: string }) {
   const partes = usePartesPlano(slug)
   // Confirmacion EN TERRENO de ese puente: quien esta frente a la maquina
   // dice si el catalogo acerto, se equivoco o el aparato ni existe ahi.
-  const vinculosTerreno = usePlanoVinculos(slug)
+  // Planos que sirven a varias máquinas (888: N2 y N3): la confirmación es POR MÁQUINA. En los
+  // demás (860, 200, GEA) `maquinas.length <= 1` y nada cambia.
+  const maquinaPlano = useMaquinaPlano(slug)
+  const vinculosTerreno = usePlanoVinculos(slug, maquinaPlano.maquina)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
   // ES por defecto: el equipo lee castellano; el aleman queda a un toque para
@@ -920,26 +932,19 @@ function Visor({ slug }: { slug: string }) {
     // 2.250 px del índice de 44 hojas y el dibujo quedaba centrado fuera de la
     // pantalla. dvh además descuenta la barra del navegador en el teléfono.
     <div ref={raizRef} className="flex flex-col" style={{ height: altoPagina, background: 'var(--lc-bg)', color: 'var(--lc-ink)' }}>
-      {/* riel superior */}
+      {/* Encabezado único del marco de herramientas. Antes la vuelta al catálogo era un enlace
+          «‹ BAADER 142 / plano · rev» dentro del riel; ahora el título dice la máquina y el
+          subtítulo el plano y su revisión. Las migas internas (hojas, panel) se conservan. */}
+      <EncabezadoHerramienta
+        etiquetaVolver="Planos"
+        volverA="/aprendizaje/planos"
+        titulo={cat?.maquina ?? indice.maquina}
+        subtitulo={`${indice.plano} · ${indice.rev}`}
+        contextoAria={`Estoy en el plano ${indice.plano} de ${cat?.maquina ?? indice.maquina}, hoja ${hoja.blatt}. `}
+      />
+      {/* riel de búsqueda y hojas */}
       <header className="sticky top-0 z-40 flex flex-wrap items-center gap-3 border-b px-3 py-2"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
-        {/* La vuelta al catálogo estaba SOLO en el título, sin nada que lo
-            indicara: nadie adivina que tocando "BAADER 142" se sale del plano
-            (lo reportó Orel usándolo). La flecha lo dice, y entra en el mismo
-            área tocable de 44 px. */}
-        <Link to="/aprendizaje/planos"
-              title="Volver a todos los planos"
-              className="-ml-1 flex min-h-[44px] items-center gap-1.5 rounded-ctl pl-1 pr-2 no-underline"
-              style={{ color: 'inherit' }}>
-          <ChevronLeft size={18} style={{ color: 'var(--lc-aqua-bright)' }} />
-          <span className="flex flex-col leading-tight">
-            <span className="text-footnote font-semibold">{cat?.maquina ?? indice.maquina}</span>
-            <span className="font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
-              {indice.plano} · {indice.rev}
-            </span>
-          </span>
-        </Link>
-
         <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca}
@@ -971,7 +976,7 @@ function Visor({ slug }: { slug: string }) {
                  placeholder={esVisor ? 'Buscar hoja por título: sellado, vacío, freno…'
                               : esDespiece ? 'Buscar pieza: cuchilla, resorte, código…'
                               : 'Buscar K7, Q1, B12, Messer, cuchillo…'}
-                 className="min-h-[44px] w-full rounded-card border bg-transparent py-1.5 pl-8 pr-2 font-mono text-footnote outline-none"
+                 className="min-h-[44px] max-md:min-h-[48px] w-full rounded-card border bg-transparent py-1.5 pl-8 pr-2 font-mono text-footnote outline-none"
                  style={{ color: 'var(--lc-ink)', borderColor: 'var(--lc-border)' }} />
           {/* Historial de búsquedas: aparece al tocar el buscador. Cada fila
               dice cuántos lugares tiene el código, y abrirla deja el
@@ -983,13 +988,13 @@ function Visor({ slug }: { slug: string }) {
                  className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-card border py-1 shadow-2xl"
                  style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
               <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
-                <span className="text-caption font-semibold" style={{ color: 'var(--lc-ink-mid)' }}>Recientes</span>
+                <span className="text-nota font-semibold" style={{ color: 'var(--lc-ink-mid)' }}>Recientes</span>
                 <button type="button"
                         onClick={() => {
                           setRecientes([])
                           try { localStorage.removeItem(`plano-recientes:${slug}`) } catch { /* sin storage */ }
                         }}
-                        className="min-h-[32px] text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
+                        className="min-h-[32px] text-nota max-md:min-h-[48px]" style={{ color: 'var(--lc-aqua-bright)' }}>
                   Borrar
                 </button>
               </div>
@@ -998,12 +1003,12 @@ function Visor({ slug }: { slug: string }) {
                 return (
                   <button key={r.c} type="button" role="option" aria-selected={r.c === recorridoActivo?.codigo}
                           onClick={() => { abrirCodigo(r.c); buscaRef.current?.blur() }}
-                          className="flex min-h-[44px] w-full items-center gap-2.5 px-3 text-left hover:opacity-80">
+                          className="flex min-h-[44px] max-md:min-h-[48px] w-full items-center gap-2.5 px-3 text-left hover:opacity-80">
                     <Clock size={14} className="shrink-0" style={{ color: 'var(--lc-ink-ghost)' }} />
                     <b className="shrink-0 font-mono text-footnote tabular-nums" style={{ color: 'var(--lc-ink)' }}>{r.c}</b>
                     <span className="min-w-0 flex-1 truncate text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>{r.n ?? ''}</span>
                     {n > 1 && (
-                      <span className="shrink-0 rounded-full px-2 py-0.5 text-caption font-semibold tabular-nums"
+                      <span className="shrink-0 rounded-full px-2 py-0.5 text-nota font-semibold tabular-nums"
                             style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
                         {n} lugares
                       </span>
@@ -1022,10 +1027,10 @@ function Visor({ slug }: { slug: string }) {
           <div className="order-last flex basis-full gap-2 overflow-x-auto md:hidden">
             {indice.destacados.map((d, i) => (
               <button key={i} type="button" onClick={() => void irA(d.hoja)}
-                      className="flex shrink-0 flex-col items-start rounded-card border px-2.5 py-1.5 text-left"
+                      className="flex shrink-0 flex-col items-start rounded-card border px-2.5 py-1.5 text-left max-md:min-h-[48px]"
                       style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
                 <span className="text-footnote font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
-                <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
+                <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
               </button>
             ))}
           </div>
@@ -1036,7 +1041,7 @@ function Visor({ slug }: { slug: string }) {
             <button key={txt} type="button"
                     onClick={() => { setMostrarEs(v); localStorage.setItem('plano-idioma', v ? 'es' : 'de') }}
                     aria-pressed={mostrarEs === v}
-                    className="flex min-h-[44px] items-center px-3 text-footnote font-semibold"
+                    className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center px-3 text-footnote font-semibold"
                     style={mostrarEs === v
                       ? { background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }
                       : { color: 'var(--lc-ink-mid)' }}>
@@ -1046,7 +1051,7 @@ function Visor({ slug }: { slug: string }) {
         </div>
 
         <button type="button" title="Imprimir esta hoja" onClick={imprimirHoja}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <Printer size={15} />
         </button>
         <BotonOffline slug={slug} indice={indice} />
@@ -1062,23 +1067,23 @@ function Visor({ slug }: { slug: string }) {
                   }
                   void navigator.clipboard?.writeText(u.toString())
                 }}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <LinkIcon size={15} />
         </button>
         <button type="button" title="QR de este punto del plano" onClick={() => setMostrarQR(true)}
-                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
+                className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <QrCode size={15} />
         </button>
-        <div className="flex items-center gap-1 font-mono text-footnote">
+        <div className="flex items-center gap-1 max-md:gap-2 font-mono text-footnote">
           <button type="button" disabled={!anterior} onClick={() => anterior && void irA(anterior.blatt)}
-                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl disabled:opacity-30" title="Hoja anterior">
+                  className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl disabled:opacity-30" title="Hoja anterior">
             <ChevronLeft size={16} />
           </button>
           {/* Select nativo: en el teléfono el índice lateral no existe y sin
               esto la única forma de moverse era de a una hoja con las flechas. */}
           <select value={hoja.blatt} onChange={(e) => void irA(Number(e.target.value))}
                   aria-label="Ir a hoja"
-                  className="min-h-[44px] max-w-[7.5rem] cursor-pointer appearance-none truncate rounded-ctl border-0 bg-transparent pr-0.5 font-mono text-footnote tabular-nums outline-none sm:max-w-[18rem]"
+                  className="min-h-[44px] max-md:min-h-[48px] max-w-[7.5rem] cursor-pointer appearance-none truncate rounded-ctl border-0 bg-transparent pr-0.5 font-mono text-footnote tabular-nums outline-none sm:max-w-[18rem]"
                   style={{ color: 'var(--lc-ink)' }}>
             {secciones.map((sec) => (
               <optgroup key={sec} label={etiquetaSeccion(sec)}>
@@ -1103,7 +1108,7 @@ function Visor({ slug }: { slug: string }) {
           <span className="tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>/ {indice.hojasTotales}</span>
           <button type="button" disabled={!siguiente}
                   onClick={() => siguiente && void irA(siguiente.blatt)}
-                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl disabled:opacity-30" title="Hoja siguiente">
+                  className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl disabled:opacity-30" title="Hoja siguiente">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -1122,7 +1127,7 @@ function Visor({ slug }: { slug: string }) {
               {sel?.tipo === 'aparato' ? ` con la ficha de ${sel.tag}` : ''}. Imprímelo y pégalo en el tablero.
             </p>
             <button type="button" onClick={() => setMostrarQR(false)}
-                    className="rounded-ctl border px-3 py-1.5 text-footnote"
+                    className="rounded-ctl border px-3 py-1.5 text-footnote max-md:min-h-[48px]"
                     style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
               Cerrar
             </button>
@@ -1137,10 +1142,10 @@ function Visor({ slug }: { slug: string }) {
             <div className="flex flex-col gap-1.5 pb-2 pt-2">
               {indice.destacados.map((d, i) => (
                 <button key={i} type="button" onClick={() => void irA(d.hoja)}
-                        className="flex flex-col items-start gap-0.5 rounded-ctl border px-2 py-1.5 text-left"
+                        className="flex flex-col items-start gap-0.5 rounded-ctl border px-2 py-1.5 text-left max-md:min-h-[48px]"
                         style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)' }}>
-                  <span className="text-caption font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
-                  <span className="text-[10.5px]" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
+                  <span className="text-nota font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{d.etiqueta}</span>
+                  <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{d.detalle}</span>
                 </button>
               ))}
             </div>
@@ -1150,7 +1155,7 @@ function Visor({ slug }: { slug: string }) {
             if (!grupo.length) return null
             return (
               <section key={sec}>
-                <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-caption font-semibold tracking-wider"
+                <h2 className="sticky top-0 z-10 m-0 flex items-baseline justify-between border-b px-2 pb-1.5 pt-3 text-nota font-semibold"
                     style={{ background: 'var(--lc-surface)', color: 'var(--lc-ink-ghost)', borderColor: 'var(--lc-border)' }}>
                   {etiquetaSeccion(sec)}
                   <span className="font-mono normal-case tracking-normal">{grupo.length}</span>
@@ -1161,23 +1166,23 @@ function Visor({ slug }: { slug: string }) {
                     return (
                       <button key={h.blatt} type="button" onClick={() => void irA(h.blatt)}
                               aria-current={activa}
-                              className="mb-0.5 flex w-full items-center gap-2 rounded-ctl py-1.5 pl-1.5 pr-2 text-left"
+                              className="mb-0.5 flex w-full items-center gap-2 rounded-ctl py-1.5 pl-1.5 pr-2 text-left max-md:min-h-[48px]"
                               style={activa
                                 ? { background: 'var(--lc-aqua-soft)', boxShadow: 'inset 2px 0 0 var(--lc-aqua)' }
                                 : {}}>
-                        <span className="w-7 shrink-0 rounded-ctl py-0.5 text-center font-mono text-caption tabular-nums"
+                        <span className="w-7 shrink-0 rounded-ctl py-0.5 text-center font-mono text-nota tabular-nums"
                               style={activa
                                 ? { background: 'var(--lc-aqua)', color: '#fff' }
                                 : { background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
                           {h.blatt}
                         </span>
-                        <span className="line-clamp-2 min-w-0 flex-1 text-caption leading-snug"
+                        <span className="line-clamp-2 min-w-0 flex-1 text-nota leading-snug"
                               style={{ color: activa ? 'var(--lc-ink)' : 'var(--lc-ink-mid)' }}>
                           {limpiarTitulo(mostrarEs ? h.tituloEs : h.titulo)}
                         </span>
                         {(notasPorHoja.get(h.blatt) ?? 0) > 0 && (
                           <span title={`${notasPorHoja.get(h.blatt)} nota(s) de aparatos de esta hoja`}
-                                className="shrink-0 rounded-full px-1.5 font-mono text-[9.5px]"
+                                className="shrink-0 rounded-full px-1.5 font-mono text-nota"
                                 style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
                             {notasPorHoja.get(h.blatt)}
                           </span>
@@ -1194,13 +1199,13 @@ function Visor({ slug }: { slug: string }) {
         <main className="relative min-w-0 flex-1">
           <button type="button" aria-label="Cómo se usa"
                   onClick={() => setAyuda(true)}
-                  className="absolute bottom-24 left-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border shadow-lg md:hidden"
+                  className="absolute bottom-24 left-3 z-10 flex h-9 w-9 max-md:h-12 max-md:w-12 items-center justify-center rounded-full border shadow-lg md:hidden"
                   style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
             ?
           </button>
           {historial.length > 0 && (
             <button type="button" onClick={volver}
-                    className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-card border px-2.5 py-1.5 font-mono text-footnote shadow-lg"
+                    className="absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-card border px-2.5 py-1.5 font-mono text-footnote shadow-lg max-md:min-h-[48px]"
                     style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}
                     title="Deshacer el salto (Backspace)">
               <ChevronLeft size={13} /> Hoja {historial[historial.length - 1]}
@@ -1208,7 +1213,7 @@ function Visor({ slug }: { slug: string }) {
           )}
           {cargando && (
             <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
-              <span className="rounded-full border px-3 py-1 text-caption shadow"
+              <span className="rounded-full border px-3 py-1 text-nota shadow"
                     style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
                 Cargando hoja…
               </span>
@@ -1237,7 +1242,7 @@ function Visor({ slug }: { slug: string }) {
           }}>
           {/* agarradera (arrastra para ajustar la altura) + minimizar + cerrar */}
           <div
-            className="relative mb-2 -mt-1 cursor-ns-resize touch-none pt-1 md:hidden"
+            className="relative mb-2 -mt-1 cursor-ns-resize touch-none pt-1 md:hidden max-md:min-h-[48px]"
             onPointerDown={(e) => {
               ajuste.current = { y: e.clientY, alto: asideRef.current?.getBoundingClientRect().height ?? 300 }
               ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -1254,13 +1259,13 @@ function Visor({ slug }: { slug: string }) {
             <div className="mx-auto h-1 w-12 rounded-full" style={{ background: 'var(--lc-border)' }} />
             <button type="button" aria-label={minimizada ? 'Expandir panel' : 'Minimizar panel'}
                     onClick={() => { setMinimizada((m) => !m) }}
-                    className="absolute -top-1 right-8 rounded-ctl p-1.5"
+                    className="absolute -top-1 right-14 flex size-12 items-center justify-center rounded-ctl"
                     style={{ color: 'var(--lc-ink-mid)' }}>
               {minimizada ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             <button type="button" aria-label="Cerrar panel"
                     onClick={() => { setSel(null); terminarRecorrido(); setAyuda(false); setMinimizada(false); setAltoHoja(null) }}
-                    className="absolute -top-1 right-0 rounded-ctl p-1.5"
+                    className="absolute -top-1 right-0 flex size-12 items-center justify-center rounded-ctl"
                     style={{ color: 'var(--lc-ink-mid)' }}>
               <X size={16} />
             </button>
@@ -1276,14 +1281,14 @@ function Visor({ slug }: { slug: string }) {
               </button>
               <button type="button" aria-label="Ubicación anterior"
                       onClick={() => irAUbicacionActual(paso(recorridoActivo.i, puntosRecorrido.length, -1))}
-                      className="flex h-[36px] w-[44px] items-center justify-center rounded-full"
+                      className="flex h-[36px] w-[44px] max-md:h-[48px] max-md:w-[48px] items-center justify-center rounded-full"
                       style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
                 <ChevronLeft size={18} />
               </button>
               <span className="text-footnote font-semibold tabular-nums">{recorridoActivo.i + 1}/{puntosRecorrido.length}</span>
               <button type="button" aria-label="Ubicación siguiente"
                       onClick={() => irAUbicacionActual(paso(recorridoActivo.i, puntosRecorrido.length, 1))}
-                      className="flex h-[36px] w-[44px] items-center justify-center rounded-full"
+                      className="flex h-[36px] w-[44px] max-md:h-[48px] max-md:w-[48px] items-center justify-center rounded-full"
                       style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
                 <ChevronRight size={18} />
               </button>
@@ -1306,7 +1311,7 @@ function Visor({ slug }: { slug: string }) {
           )}
           {!mostrarResultados && !recorridoActivo && pilaSel.length > 0 && (
             <button type="button" onClick={volverSel}
-                    className="mb-2 flex w-full items-center gap-1.5 rounded-ctl border px-2 py-1.5 text-left text-footnote"
+                    className="mb-2 flex w-full items-center gap-1.5 rounded-ctl border px-2 py-1.5 text-left text-footnote max-md:min-h-[48px]"
                     style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
               <ChevronLeft size={13} /> Volver a {etiquetaSel(pilaSel[pilaSel.length - 1]!.s)}
             </button>
@@ -1353,7 +1358,7 @@ function Visor({ slug }: { slug: string }) {
             : esMovil && recorridoActivo && !fichaAbierta
             ? <button type="button"
                       onClick={() => { setFichaAbierta(true); setAltoHoja(Math.round(window.innerHeight * 0.7)) }}
-                      className="flex min-h-[44px] w-full items-center justify-between border-t pt-1 text-left text-footnote font-semibold"
+                      className="flex min-h-[44px] max-md:min-h-[48px] w-full items-center justify-between border-t pt-1 text-left text-footnote font-semibold"
                       style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
                 Ficha: SAP, bodega, cantidad
                 <ChevronUp size={16} />
@@ -1368,7 +1373,7 @@ function Visor({ slug }: { slug: string }) {
                      onIrFigura={irAFigura} onVerEnDibujo={(caja) => setFoco({ tipo: 'caja', b: caja })}
                      anclaDeAparato={anclaDeAparato}
                      partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo}
-                     vinculosTerreno={vinculosTerreno} />}
+                     vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano} />}
           </>}
         </aside>
       </div>
@@ -1381,7 +1386,7 @@ function Visor({ slug }: { slug: string }) {
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, codigoEnRecorrido, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, onVerEnDibujo, anclaDeAparato, partes, slug,
-  sapPorCodigo, vinculosTerreno,
+  sapPorCodigo, vinculosTerreno, maquinaPlano,
 }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
@@ -1414,6 +1419,7 @@ function Panel({
   /** códigos que el catálogo marca como piezas de desgaste */
   desgaste?: string[]
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
+  maquinaPlano: ReturnType<typeof useMaquinaPlano>
 }) {
   const [copiadoLista, setCopiadoLista] = useState(false)
   // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
@@ -1465,12 +1471,12 @@ function Panel({
             <button key={`${f.pos}-${f.nr ?? ''}`} type="button" onClick={() => onSeleccionarFila(f)}
                     className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-2 text-left last:border-b-0"
                     style={{ borderColor: 'var(--lc-border)', minHeight: 44 }}>
-              <span className="w-9 shrink-0 font-mono text-caption tabular-nums"
+              <span className="w-9 shrink-0 font-mono text-nota tabular-nums"
                     style={{ color: 'var(--lc-aqua-bright)' }}>{f.pos}</span>
               <span className="min-w-0 flex-1 text-footnote leading-snug"
                     style={{ color: 'var(--lc-ink)' }}>{f.es || f.de}</span>
               {f.nr && (
-                <span className="shrink-0 font-mono text-caption tabular-nums"
+                <span className="shrink-0 font-mono text-nota tabular-nums"
                       style={{ color: 'var(--lc-ink-mid)' }}>{f.nr}</span>
               )}
             </button>
@@ -1501,6 +1507,17 @@ function Panel({
         {partes?.cobertura && (
           <>
             <Titulo>Puente al catálogo de piezas</Titulo>
+            {/* Solo en planos con más de una máquina: las confirmaciones de abajo son de la elegida. */}
+            {maquinaPlano.maquinas.length > 1 && (
+              <div className="mb-2" data-testid="selector-maquina-visor">
+                <SelectorMaquinaPlano maquina={maquinaPlano.maquina} maquinas={maquinaPlano.maquinas} onChange={maquinaPlano.setMaquina} />
+                {!maquinaPlano.maquina && (
+                  <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-prep)' }}>
+                    ¿En cuál máquina estás? Elígela para ver y hacer confirmaciones.
+                  </p>
+                )}
+              </div>
+            )}
             <p className="m-0 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
               <b style={{ color: 'var(--lc-ink)' }}>
                 {partes.cobertura.exacta + partes.cobertura.zona} de {partes.cobertura.total}
@@ -1518,7 +1535,7 @@ function Panel({
             {vinculosTerreno.resumen.confirmados + vinculosTerreno.resumen.corregidos > 0 && (
               <p className="m-0 mt-1 text-footnote" style={{ color: 'var(--lc-nuevo)' }}>
                 <b>{vinculosTerreno.resumen.confirmados + vinculosTerreno.resumen.corregidos}</b>{' '}
-                confirmados en terreno
+                confirmados en terreno{maquinaPlano.maquinas.length > 1 && maquinaPlano.maquina ? ` en ${etiquetaMaquina(maquinaPlano.maquina)}` : ''}
               </p>
             )}
             {/* La ruta de trabajo, viva: los que tienen pieza propuesta y
@@ -1531,7 +1548,7 @@ function Panel({
         )}
         {recientes.length > 0 && (
           <>
-            <h2 className="m-0 mb-2 mt-4 text-caption font-semibold tracking-wider"
+            <h2 className="m-0 mb-2 mt-4 text-nota font-semibold"
                 style={{ color: 'var(--lc-ink-ghost)' }}>
               Recientes
             </h2>
@@ -1591,10 +1608,10 @@ function Panel({
         <div className="mt-2 flex flex-col gap-1.5">
           {sel.l.op.map((o) => (
             <button key={o.k} type="button" onClick={() => onIr(o.h, undefined, o.tb)}
-                    className="flex items-baseline justify-between rounded-ctl border px-2.5 py-1.5 text-left"
+                    className="flex items-baseline justify-between rounded-ctl border px-2.5 py-1.5 text-left max-md:min-h-[48px]"
                     style={{ borderColor: 'var(--lc-border)' }}>
               <b className="font-mono text-footnote" style={{ color: 'var(--lc-nuevo)' }}>{o.k}</b>
-              <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>hoja {o.h}</span>
+              <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>hoja {o.h}</span>
             </button>
           ))}
         </div>
@@ -1660,7 +1677,7 @@ function Panel({
       </p>
       {enEstaHoja > 1 && (
         <button type="button" onClick={onResaltar} aria-pressed={resaltar}
-                className="mt-2 w-full rounded-ctl border px-2 py-1.5 text-footnote font-medium"
+                className="mt-2 w-full rounded-ctl border px-2 py-1.5 text-footnote font-medium max-md:min-h-[48px]"
                 style={resaltar
                   ? { background: 'var(--lc-aqua)', borderColor: 'var(--lc-aqua)', color: '#fff' }
                   : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
@@ -1670,7 +1687,7 @@ function Panel({
       <div className="mb-4 mt-2 flex flex-wrap gap-1.5">
         {puntos.map((p) => (
           <button key={`${p.h}.${p.c}`} type="button" onClick={() => onIr(p.h, undefined, p.b)}
-                  className="flex min-h-[44px] items-center rounded-ctl border px-3 font-mono text-footnote tabular-nums"
+                  className="flex min-h-[44px] max-md:min-h-[48px] items-center rounded-ctl border px-3 font-mono text-footnote tabular-nums"
                   style={p.h === hojaActual
                     ? { borderColor: 'var(--lc-aqua)', color: 'var(--lc-aqua-bright)', background: 'var(--lc-aqua-soft)' }
                     : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
@@ -1679,7 +1696,7 @@ function Panel({
         ))}
       </div>
 
-      <PiezaFisica sel={sel} partes={partes} slug={slug} vinculosTerreno={vinculosTerreno} />
+      <PiezaFisica sel={sel} partes={partes} slug={slug} vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano} />
 
       <FichasSap notas={notas.notasDe('aparato', anclaDeAparato(sel.tag))} />
 
@@ -1849,13 +1866,13 @@ function Resultados({ items, total, onIr, partes = [], cargando = false }: {
       {items.map((r) => (
         <button key={`${r.clave}${r.detalle}`} type="button"
                 onClick={() => onIr(r.blatt, r.col, r.caja, r.aparato)}
-                className="flex w-full items-baseline justify-between gap-2 rounded-ctl px-2 py-1.5 text-left hover:opacity-80">
+                className="flex w-full items-baseline justify-between gap-2 rounded-ctl px-2 py-1.5 text-left hover:opacity-80 max-md:min-h-[48px]">
           <b className="font-mono text-footnote">{r.clave}</b>
-          <span className="text-caption" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
+          <span className="text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{r.detalle}</span>
         </button>
       ))}
       {truncado && (
-        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+        <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
           {items.length} de {total} — afina la búsqueda.
         </p>
       )}
@@ -1924,7 +1941,7 @@ function FichaPieza({
     <>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <Titulo>Pieza</Titulo>
-        <span className="rounded-ctl px-1.5 py-0.5 text-caption font-medium" style={{ background: badge.bg, color: badge.fg }}>
+        <span className="rounded-ctl px-1.5 py-0.5 text-nota font-medium" style={{ background: badge.bg, color: badge.fg }}>
           {badge.txt}
         </span>
       </div>
@@ -1937,13 +1954,13 @@ function FichaPieza({
       {/* Consumible: el técnico lo ve dentro de SU conjunto (un cojinete en
           la fig 13-1) sin tener que saber que también está en la figura 00. */}
       {fila.nr && desgaste?.includes(fila.nr) && (
-        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-caption font-semibold"
+        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-nota font-semibold"
            style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
           Pieza de desgaste — se cambia seguido
         </p>
       )}
       {fila.q != null && (
-        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-caption font-semibold"
+        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-nota font-semibold"
            style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
           Lleva {fila.q} unidades
         </p>
@@ -1965,7 +1982,7 @@ function FichaPieza({
       )}
 
       {fila.nr && usosPorCodigo?.[fila.nr] != null && (
-        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+        <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
           {umbralComun != null && usosPorCodigo[fila.nr]! > umbralComun
             ? `Pieza común: se usa en toda la máquina (${usosPorCodigo[fila.nr]} figuras)`
             : `Esta misma pieza va en otras ${usosPorCodigo[fila.nr]! - 1} figuras`}
@@ -1974,7 +1991,7 @@ function FichaPieza({
       {/* Antes solo lo decía: ahora se recorren, una por una, sin volver a buscar. */}
       {onRecorrer && ubicaciones > 1 && (
         <button type="button" onClick={onRecorrer}
-                className="mt-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full px-3 text-footnote font-semibold"
+                className="mt-2 flex min-h-[44px] max-md:min-h-[48px] w-full items-center justify-center gap-1.5 rounded-full px-3 text-footnote font-semibold"
                 style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
           Recorrer los {ubicaciones} lugares donde va <ChevronRight size={15} />
         </button>
@@ -1984,7 +2001,7 @@ function FichaPieza({
           42303077 es a la vez B10, B14 y B15. Saberlo evita pedir tres
           repuestos distintos creyendo que son piezas diferentes. */}
       {hermanas && hermanas.length > 1 && (
-        <p className="m-0 mt-1 flex flex-wrap items-baseline gap-1 text-caption"
+        <p className="m-0 mt-1 flex flex-wrap items-baseline gap-1 text-nota"
            style={{ color: 'var(--lc-ink-mid)' }}>
           <span>El mismo código es también</span>
           {hermanas.filter((h) => normalizarPos(h) !== selTag).map((h) => (
@@ -2007,7 +2024,7 @@ function FichaPieza({
           la ficha y no se entera de que el dibujo de atrás dice dónde va. */}
       {anclaEnDibujo && (
         <button type="button" onClick={() => onVerEnDibujo(anclaEnDibujo)}
-                className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-ctl border px-3 text-footnote font-medium"
+                className="mt-2 flex min-h-[44px] max-md:min-h-[48px] w-full items-center justify-center rounded-ctl border px-3 text-footnote font-medium"
                 style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
           Ver dónde va en el dibujo
         </button>
@@ -2020,21 +2037,21 @@ function FichaPieza({
       <div className="mt-2 flex flex-col gap-2">
         {fila.fig && (
           <button type="button" onClick={() => onIrFigura(fila.fig!)}
-                  className="flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
+                  className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
                   style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
             Ver figura {fila.fig}
           </button>
         )}
         {enPlanoElectrico && (
           <Link to={`/aprendizaje/planos/baader-142-888?ap=${encodeURIComponent(posN)}`}
-                className="flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
+                className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
                 style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
             Ver en plano eléctrico → {posN}
           </Link>
         )}
         {fila.nr && !sap && (
           <Link to={`/repuestos?q=${encodeURIComponent(fila.nr)}`}
-                className="text-caption underline-offset-2 hover:underline"
+                className="text-nota underline-offset-2 hover:underline"
                 style={{ color: 'var(--lc-aqua-bright)' }}>
             Buscar {fila.nr} en repuestos
           </Link>
@@ -2046,7 +2063,7 @@ function FichaPieza({
           {/* El dato estatico del indice se ve SIEMPRE (el visor corre anonimo
               via QR y la coleccion repuestos exige sesion): SAP + nombre +
               ubicacion de bodega. FichasSap suma el stock vivo con sesion. */}
-          <p className="m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-caption"
+          <p className="m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-nota"
              style={{ color: 'var(--lc-ink-mid)' }}>
             <span className="rounded-ctl px-2 py-0.5 font-mono"
                   style={{ background: 'var(--lc-surface-hi)' }}>SAP {sap.s}</span>
@@ -2065,7 +2082,7 @@ function FichaPieza({
           const anclada = tagsHoja.some((t) => t.t === fPosN)
           return (
             <button key={f.pos} type="button" onClick={() => onSeleccionarFila(f)}
-                    className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-1.5 text-left last:border-b-0"
+                    className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-1.5 text-left last:border-b-0 max-md:min-h-[48px]"
                     style={{
                       borderColor: 'var(--lc-border)',
                       background: activa ? 'var(--lc-aqua-soft)' : undefined,
@@ -2075,11 +2092,11 @@ function FichaPieza({
                     style={{ color: activa ? 'var(--lc-aqua-bright)' : 'var(--lc-ink-mid)' }}>
                 {f.pos}
               </span>
-              <span className="min-w-0 flex-1 truncate text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
+              <span className="min-w-0 flex-1 truncate text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
                 {f.es || f.de || '—'}
               </span>
               {f.nr && (
-                <span className="shrink-0 font-mono text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{f.nr}</span>
+                <span className="shrink-0 font-mono text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{f.nr}</span>
               )}
             </button>
           )
@@ -2109,13 +2126,20 @@ function FichaPieza({
  * Vive aparte del cruce SAP (`FichasSap`, debajo): son fuentes distintas —
  * esta sale del catálogo de fábrica, esa de lo que la gente anotó a mano.
  */
-function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
+function PiezaFisica({ sel, partes, slug, vinculosTerreno, maquinaPlano }: {
   sel: { tipo: 'aparato'; tag: string }
   partes: ReturnType<typeof usePartesPlano>
   slug: string
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
+  maquinaPlano: ReturnType<typeof useMaquinaPlano>
 }) {
-  const pieza = partes?.aparatos[sel.tag]?.[0]
+  const entradas = partes?.aparatos[sel.tag] ?? []
+  // Con candidatos (B1 en las N2/N3: 42303109 o 42303107), la pieza que vale es la que se
+  // confirmó en terreno por su código; la primera solo es el fallback de vínculos sin código.
+  const v = vinculosTerreno.vinculos.get(sel.tag)
+  const elegida = v?.estado === 'confirmado' && v.codigo ? entradas.find((e) => e.nr === v.codigo) : undefined
+  const pieza = elegida ?? entradas[0]
+  const candidatos = !elegida && esModoCandidatos(entradas) ? entradas : null
   if (!partes) return null
   if (!pieza) return <ZonaSugerida tag={sel.tag} partes={partes} slug={slug} />
 
@@ -2123,7 +2147,7 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
   // de "es otro modelo" sale de los datos, no de un texto fijo.
   const otras = Object.entries(partes.aparatos)
     .flatMap(([tag, entradas]) => entradas.map((e) => ({ tag, ...e })))
-    .filter((e) => e.fig === pieza.fig && e.nr !== pieza.nr && e.tag !== sel.tag)
+    .filter((e) => !!pieza.fig && e.fig === pieza.fig && e.nr !== pieza.nr && e.tag !== sel.tag)
   const nrOtras = otras[0]?.nr
   // Compactar respetando HUECOS (compactarTramos, con tests): "B1–B12"
   // escondería que B10 usa el mismo modelo que B14.
@@ -2135,19 +2159,25 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
   return (
     <div className="mb-3 rounded-card border p-3" style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
       <Titulo>Pieza física</Titulo>
-      <PiezaTerreno tag={sel.tag} pieza={pieza} vinculosTerreno={vinculosTerreno} />
+      <PiezaTerreno tag={sel.tag} pieza={pieza} vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano} />
+      {candidatos && (
+        <p className="m-0 mt-2 text-footnote leading-relaxed" style={{ color: 'var(--lc-ink-mid)' }}>
+          Candidatos: <span className="font-mono">{candidatos.map((c) => c.nr).join(' / ')}</span>. El
+          catálogo no dice cuál va aquí; la etiqueta decide (se marca en la Tarjeta A3C).
+        </p>
+      )}
       {aviso && (
         <p className="m-0 mt-2 rounded-ctl border-l-2 py-1 pl-2 text-footnote leading-relaxed"
            style={{ borderColor: 'var(--lc-prep)', background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
           {aviso}
         </p>
       )}
-      <Link to={`/aprendizaje/planos/${partes.despiece}?hoja=${pieza.hoja}&ap=${encodeURIComponent(pieza.pos)}`}
+      {pieza.hoja != null && <Link to={`/aprendizaje/planos/${partes.despiece}?hoja=${pieza.hoja}&ap=${encodeURIComponent(pieza.pos)}`}
             onClick={(e) => { e.stopPropagation(); void registrarUso(slug, 'salto-a-despiece', sel.tag) }}
-            className="mt-2 flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
+            className="mt-2 flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
             style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
         Ver en el despiece
-      </Link>
+      </Link>}
     </div>
   )
 }
@@ -2158,12 +2188,16 @@ function PiezaFisica({ sel, partes, slug, vinculosTerreno }: {
  * está frente a la máquina es la que convierte esa propuesta en certeza —
  * o la corrige, o dice que ese aparato ni existe ahí.
  */
-function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
+function PiezaTerreno({ tag, pieza, vinculosTerreno, maquinaPlano }: {
   tag: string
-  pieza: { es: string; de?: string; nr: string; sap?: string; sapUbicacion?: string; confianza: string }
+  pieza: { es: string; de?: string; nr: string; sap?: string; sapUbicacion?: string; confianza: string; fig?: string | null }
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
+  maquinaPlano: ReturnType<typeof useMaquinaPlano>
 }) {
   const v = vinculosTerreno.vinculos.get(tag)
+  // Plano de varias máquinas sin ninguna elegida: no se confirma (se guardaría en la equivocada).
+  const faltaMaquina = maquinaPlano.maquinas.length > 1 && !maquinaPlano.maquina
+  const enMaquina = maquinaPlano.maquinas.length > 1 && maquinaPlano.maquina ? ` en ${etiquetaMaquina(maquinaPlano.maquina)}` : ''
   const [abierto, setAbierto] = useState(false)
   const [opcion, setOpcion] = useState<VinculoTerreno['estado'] | null>(null)
   const [codigoLeido, setCodigoLeido] = useState('')
@@ -2185,28 +2219,18 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
     setGuardando(true)
     setErrorLocal(null)
     try {
-      // La foto va primero: si falla la subida, no se guarda un vínculo que
-      // dice tener evidencia y no la tiene.
-      const urlFoto = foto ? await vinculosTerreno.subirFoto(foto) : undefined
-      await vinculosTerreno.confirmar({
+      await guardarVinculoTerreno(vinculosTerreno, {
         aparato: tag,
         estado: opcion,
-        codigo: opcion === 'confirmado' ? pieza.nr : opcion === 'corregido' ? codigoLeido.trim() : undefined,
-        nota: nota.trim() || undefined,
-        foto: urlFoto,
+        codigoCatalogo: pieza.nr,
+        codigoLeido,
+        nota,
+        foto,
       })
       setAbierto(false)
       setFoto(null)
     } catch (e) {
-      // Firestore contesta "Missing or insufficient permissions" tanto si se
-      // cayo la sesion como si el dato no pasa la regla. Frente a la maquina
-      // ese texto no ayuda: se traduce a algo que se pueda hacer.
-      const msg = e instanceof Error ? e.message : ''
-      setErrorLocal(
-        /permission|insufficient/i.test(msg)
-          ? 'No se pudo guardar: revisa que tu sesión siga abierta y que el código no sea muy largo.'
-          : msg || 'No se pudo guardar.',
-      )
+      setErrorLocal(mensajeErrorTerreno(e))
     } finally {
       setGuardando(false)
     }
@@ -2227,41 +2251,41 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
           <div className="flex flex-col items-start gap-1">
             <span className="text-footnote font-semibold leading-snug">{pieza.es}</span>
             {v?.estado === 'confirmado' ? (
-              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-nota"
                     style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
-                Confirmado en terreno
+                Confirmado en terreno{enMaquina}
               </span>
             ) : v?.estado === 'corregido' ? (
-              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-nota"
                     style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-prep)' }}>
-                Corregido en terreno
+                Corregido en terreno{enMaquina}
               </span>
             ) : (
-              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-caption"
+              <span className="shrink-0 rounded-ctl px-2 py-0.5 text-nota"
                     style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
-                {pieza.confianza === 'catalogo' ? 'según catálogo BAADER 2006' : 'propuesto'}
+                {pieza.confianza === 'catalogo' ? `según catálogo BAADER ${pieza.fig?.includes('2014') ? '2014' : '2006'}` : 'propuesto'}
               </span>
             )}
           </div>
           {pieza.de && (
-            <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
+            <p className="m-0 mt-0.5 text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{pieza.de}</p>
           )}
           {v?.estado === 'corregido' ? (
             <>
               <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
                 {v.codigo}
               </p>
-              <p className="m-0 mt-0.5 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+              <p className="m-0 mt-0.5 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
                 el catálogo decía <span className="font-mono line-through">{pieza.nr}</span>
               </p>
             </>
           ) : (
             <p className="m-0 mt-1.5 font-mono text-[15px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>
-              {pieza.nr}
+              {v?.estado === 'confirmado' && v.codigo ? v.codigo : pieza.nr}
             </p>
           )}
-          {pieza.sap && (
-            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-caption"
+          {pieza.sap && (v?.estado !== 'confirmado' || !v.codigo || v.codigo === pieza.nr) && (
+            <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-0.5 text-nota"
                   style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
               SAP {pieza.sap}{pieza.sapUbicacion ? ` · ${pieza.sapUbicacion}` : ''}
             </span>
@@ -2269,7 +2293,7 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
         </>
       )}
       {v && (
-        <p className="m-0 mt-1 text-caption" style={{ color: 'var(--lc-ink-lo)' }}>
+        <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-lo)' }}>
           Por {v.confirmadoPorNombre || 'alguien'} · {formatearFechaCorta(v.actualizado)}
         </p>
       )}
@@ -2279,9 +2303,18 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
            el badge dice "segun catalogo" aunque alguien ya lo haya confirmado
            frente a la maquina. El texto tiene que decir que hay algo que no se
            esta viendo, no solo invitar a confirmar. */
-        <p className="m-0 mt-2 text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+        <p className="m-0 mt-2 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
           Inicia sesión para ver y hacer confirmaciones en terreno
         </p>
+      ) : faltaMaquina ? (
+        // El selector va AQUÍ y no solo en «Puente al catálogo»: con ?ap=B5 (enlace directo) ese
+        // bloque no se muestra y no había dónde elegir la máquina para confirmar.
+        <div className="mt-2" data-testid="selector-maquina-ficha">
+          <p className="m-0 mb-1 text-nota" style={{ color: 'var(--lc-prep)' }}>
+            ¿En cuál máquina estás? Elígela para confirmar en terreno.
+          </p>
+          <SelectorMaquinaPlano maquina={maquinaPlano.maquina} maquinas={maquinaPlano.maquinas} onChange={maquinaPlano.setMaquina} />
+        </div>
       ) : abierto ? (
         <FormularioTerreno
           opcion={opcion} onOpcion={setOpcion}
@@ -2293,7 +2326,7 @@ function PiezaTerreno({ tag, pieza, vinculosTerreno }: {
         />
       ) : (
         <button type="button" onClick={abrirFormulario}
-                className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
+                className="mt-2 flex min-h-[44px] max-md:min-h-[48px] w-full items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
                 style={v
                   ? { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }
                   : { borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
@@ -2332,7 +2365,7 @@ function FormularioTerreno({
     <div className="mt-2 flex flex-col gap-1.5 rounded-ctl border p-2" style={{ borderColor: 'var(--lc-border)' }}>
       {opciones.map((o) => (
         <button key={o.valor} type="button" onClick={() => onOpcion(o.valor)} aria-pressed={opcion === o.valor}
-                className="flex min-h-[44px] items-center rounded-ctl border px-3 text-left text-footnote font-medium"
+                className="flex min-h-[44px] max-md:min-h-[48px] items-center rounded-ctl border px-3 text-left text-footnote font-medium"
                 style={opcion === o.valor
                   ? { borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }
                   : { borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
@@ -2345,7 +2378,7 @@ function FormularioTerreno({
       {opcion === 'corregido' && (
         <input type="text" inputMode="numeric" maxLength={30} placeholder="código de la etiqueta" value={codigo}
                onChange={(e) => onCodigo(e.target.value)}
-               className="min-h-[44px] rounded-ctl border px-3 text-footnote"
+               className="min-h-[44px] max-md:min-h-[48px] rounded-ctl border px-3 text-footnote"
                style={{ borderColor: 'var(--lc-border)', background: 'var(--lc-surface)', color: 'var(--lc-ink)' }} />
       )}
       <textarea rows={2} maxLength={500} placeholder="Nota (opcional)" value={nota}
@@ -2355,7 +2388,7 @@ function FormularioTerreno({
       {/* La foto de la etiqueta es lo que vuelve irrefutable el vínculo: el
           que venga después no tiene que creer, ve la placa. Sin `capture`,
           el teléfono deja elegir cámara o galería. */}
-      <label className="flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-ctl border px-3 text-footnote font-medium"
+      <label className="flex min-h-[44px] max-md:min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-ctl border px-3 text-footnote font-medium"
              style={{ borderColor: 'var(--lc-border)', color: fotoNombre ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
         <Camera size={15} />
         {fotoNombre ? 'Foto lista ✓' : 'Foto de la etiqueta (opcional)'}
@@ -2369,12 +2402,12 @@ function FormularioTerreno({
       )}
       <div className="flex gap-1.5">
         <button type="button" onClick={onCancelar}
-                className="flex min-h-[44px] flex-1 items-center justify-center rounded-ctl border px-3 text-footnote font-medium"
+                className="flex min-h-[44px] max-md:min-h-[48px] flex-1 items-center justify-center rounded-ctl border px-3 text-footnote font-medium"
                 style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
           Cancelar
         </button>
         <button type="button" onClick={onGuardar} disabled={!puedeGuardar}
-                className="flex min-h-[44px] flex-1 items-center justify-center rounded-ctl border px-3 text-footnote font-medium disabled:opacity-50"
+                className="flex min-h-[44px] max-md:min-h-[48px] flex-1 items-center justify-center rounded-ctl border px-3 text-footnote font-medium disabled:opacity-50"
                 style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua)', color: '#fff' }}>
           {guardando ? 'Guardando…' : 'Guardar'}
         </button>
@@ -2423,7 +2456,7 @@ function PendientesTerreno({ partes, vinculos, onAbrir }: {
           </button>
         ))}
         {pendientes.length > 8 && (
-          <span className="self-center text-caption" style={{ color: 'var(--lc-ink-ghost)' }}>
+          <span className="self-center text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
             +{pendientes.length - 8} más
           </span>
         )}
@@ -2450,13 +2483,13 @@ function ZonaSugerida({ tag, partes, slug }: {
         {familia.figuras.slice(0, 3).map((f) => (
           <Link key={f.fig} to={`/aprendizaje/planos/${partes.despiece}?hoja=${f.hoja}`}
                 onClick={(e) => { e.stopPropagation(); void registrarUso(slug, 'salto-a-despiece', tag) }}
-                className="flex min-h-[44px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
+                className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
                 style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
             Fig {f.fig} · {f.titulo}
           </Link>
         ))}
       </div>
-      <p className="m-0 mt-2 text-caption leading-relaxed" style={{ color: 'var(--lc-ink-lo)' }}>
+      <p className="m-0 mt-2 text-nota leading-relaxed" style={{ color: 'var(--lc-ink-lo)' }}>
         El catálogo no rotula la designación eléctrica: esto es el gabinete/conjunto
         donde está montado, no la pieza exacta.
       </p>
@@ -2498,23 +2531,26 @@ function FichasSap({ notas, saps: sapsDirectos }: {
               <span className="text-footnote font-semibold leading-snug">
                 {f.nombre ?? 'SAP sin catalogar'}
               </span>
-              <span className="shrink-0 font-mono text-caption" style={{ color: 'var(--lc-aqua-bright)' }}>
+              <span className="shrink-0 font-mono text-nota" style={{ color: 'var(--lc-aqua-bright)' }}>
                 {f.sap}
               </span>
             </div>
             {(f.marca || f.modeloTipo || f.codigoFabricante) && (
-              <p className="m-0 mt-1 font-mono text-caption" style={{ color: 'var(--lc-ink-mid)' }}>
-                {[f.marca, f.modeloTipo, f.codigoFabricante].filter(Boolean).join(' · ')}
+              <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
+                {[f.marca, f.modeloTipo].filter(Boolean).join(' · ')}
+                {f.codigoFabricante && (
+                  <>{f.marca || f.modeloTipo ? ' · ' : ''}<span className="font-mono">{f.codigoFabricante}</span></>
+                )}
               </p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {f.stockActual == null ? (
-                <span className="rounded-ctl px-2 py-0.5 text-caption"
+                <span className="rounded-ctl px-2 py-0.5 text-nota"
                       style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
                   sin registro de bodega
                 </span>
               ) : (
-                <span className="rounded-ctl px-2 py-0.5 font-mono text-caption font-semibold"
+                <span className="rounded-ctl px-2 py-0.5 text-nota font-semibold tabular-nums"
                       style={sinStock
                         ? { background: 'var(--lc-danger-soft)', color: 'var(--lc-danger)' }
                         : bajo
@@ -2524,10 +2560,10 @@ function FichasSap({ notas, saps: sapsDirectos }: {
                 </span>
               )}
               {f.ubicacionBodega && (
-                <span className="text-caption" style={{ color: 'var(--lc-ink-lo)' }}>{f.ubicacionBodega}</span>
+                <span className="text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{f.ubicacionBodega}</span>
               )}
               <Link to={`/repuestos?q=${encodeURIComponent(f.sap)}`}
-                    className="ml-auto text-caption underline-offset-2 hover:underline"
+                    className="ml-auto text-nota underline-offset-2 hover:underline"
                     style={{ color: 'var(--lc-aqua-bright)' }}>
                 Ver en Repuestos
               </Link>
@@ -2589,7 +2625,7 @@ function BotonOffline({ slug, indice }: { slug: string; indice: PlanoIndice | nu
     <button type="button"
             title={estado === 'si' ? 'Guardado para usar sin señal' : 'Guardar para usar sin señal'}
             onClick={() => { if (estado === 'no') void bajar() }}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-ctl px-2 font-mono text-caption"
+            className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center gap-1 rounded-ctl px-2 font-mono text-nota"
             style={{ color: estado === 'si' ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
       {estado === 'bajando' ? <><Loader2 size={14} className="animate-spin" />{avance}%</>
         : estado === 'si' ? <><Check size={14} /><Download size={12} /></>
@@ -2618,7 +2654,7 @@ function etiquetaSel(s: NonNullable<Seleccion>): string {
 
 function Titulo({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="m-0 mb-2 text-caption font-semibold tracking-wider"
+    <h2 className="m-0 mb-2 text-nota font-semibold"
         style={{ color: 'var(--lc-ink-ghost)' }}>
       {children}
     </h2>
@@ -2634,7 +2670,7 @@ function Aviso({ texto, onReintentar }: { texto: string; onReintentar?: () => vo
           el único camino era recargar la página y perder la hoja abierta. */}
       {onReintentar && (
         <button type="button" onClick={onReintentar}
-                className="flex min-h-[44px] items-center rounded-ctl border px-4 font-medium"
+                className="flex min-h-[44px] max-md:min-h-[48px] items-center rounded-ctl border px-4 font-medium"
                 style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
           Reintentar
         </button>

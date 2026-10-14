@@ -38,6 +38,8 @@ export interface DisclosureProps {
   /** Recuerda abierto/cerrado entre visitas. */
   storageKey?: string
   className?: string
+  /** Sin relleno en el contenido: para filas que van de borde a borde (ListCell). */
+  flush?: boolean
   children: React.ReactNode
 }
 
@@ -48,6 +50,7 @@ export function Disclosure({
   defaultOpen = true,
   storageKey,
   className,
+  flush = false,
   children,
 }: DisclosureProps) {
   const inline = variant === 'inline'
@@ -103,7 +106,7 @@ export function Disclosure({
           <span className="shrink-0 text-footnote text-muted-foreground">{summary}</span>
         )}
       </button>
-      <div id={id} hidden={!open} className={cn(inline ? 'pt-1.5' : 'px-4 pb-4')}>
+      <div id={id} hidden={!open} className={cn(inline ? 'pt-1.5' : flush ? '' : 'px-4 pb-4')}>
         {children}
       </div>
     </section>

@@ -2,34 +2,44 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org https://www.gstatic.com; connect-src 'self' https://graphql.anilist.co https://api.mymemory.translated.net https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AnimeTracker</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<link rel="stylesheet" href="anime-cine.css?v=20261009a">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+/* Piel Apple (DESIGN.md): mismos tokens que «Cine y series», claro y oscuro
+   según el tema de Telegram (data-scheme en <html>). */
 :root {
-  --bg:      var(--tg-theme-bg-color, #0f0f1a);
-  --bg2:     var(--tg-theme-secondary-bg-color, #1a1a2e);
-  --text:    var(--tg-theme-text-color, #e8e8f0);
-  --hint:    var(--tg-theme-hint-color, #6b7280);
-  --accent:  var(--tg-theme-button-color, #7c3aed);
-  --acctxt:  var(--tg-theme-button-text-color, #ffffff);
-  --link:    var(--tg-theme-link-color, #8b5cf6);
+  --bg:      #1C1C1E;
+  --bg2:     #2C2C2E;
+  --text:    #FFFFFF;
+  --hint:    rgba(235, 235, 245, .6);
+  --accent:  #5AA0DC;
+  --acctxt:  #000000;
+  --link:    #5AA0DC;
+  color-scheme: dark;
   --nav-h:   60px;
   --hdr-h:   52px;
   --radius:  12px;
 }
 
+:root[data-scheme='light'] {
+  --bg: #F2F2F7; --bg2: #FFFFFF; --text: #1C1C1E; --hint: rgba(60, 60, 67, .6);
+  --accent: #2E75B6; --acctxt: #FFFFFF; --link: #2E75B6; color-scheme: light;
+}
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-header { height: var(--hdr-h); min-height: var(--hdr-h); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--bg2); border-bottom: 1px solid rgba(255,255,255,.06); font-weight: 700; font-size: 17px; }
+header { height: var(--hdr-h); min-height: var(--hdr-h); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--bg); border-bottom: 0; font-weight: 700; font-size: 17px; }
 header .logo { display: flex; align-items: center; gap: 8px; }
 header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background: var(--accent); color: var(--acctxt); border-radius: 99px; }
-.status-dot { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; }
+.status-dot { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 99px; }
 .status-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .status-online  { background: rgba(16,185,129,.15); color: #10b981; }
 .status-online::before  { background: #10b981; box-shadow: 0 0 5px #10b981; }
@@ -41,19 +51,19 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 
 #content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
 
-.bottom-nav { height: var(--nav-h); min-height: var(--nav-h); display: flex; background: var(--bg2); border-top: 1px solid rgba(255,255,255,.06); }
-.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: none; color: var(--hint); font-size: 10px; font-weight: 500; cursor: pointer; transition: color .15s; position: relative; }
+.bottom-nav { height: var(--nav-h); min-height: var(--nav-h); display: flex; background: var(--bg2); border-top: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: none; color: var(--hint); font-size: 11px; font-weight: 500; cursor: pointer; transition: color .15s; position: relative; }
 .nav-btn .icon { font-size: 20px; line-height: 1; }
 .nav-btn.active { color: var(--accent); }
 .nav-btn.active::after { content: ''; position: absolute; top: 0; left: 25%; right: 25%; height: 2px; background: var(--accent); border-radius: 99px; }
 .nav-btn .dot { position: absolute; top: 6px; right: calc(50% - 14px); width: 7px; height: 7px; border-radius: 50%; background: #ef4444; border: 2px solid var(--bg2); }
 
-.search-top { padding: 10px 12px; position: sticky; top: 0; background: var(--bg); z-index: 5; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid rgba(255,255,255,.04); }
+.search-top { padding: 10px 12px; position: sticky; top: 0; background: var(--bg); z-index: 5; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); }
 .search-wrap { position: relative; flex: 1; }
-.search-input { width: 100%; padding: 9px 12px 9px 36px; background: var(--bg2); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; color: var(--text); font-size: 15px; outline: none; transition: border-color .2s; }
+.search-input { width: 100%; padding: 9px 12px 9px 36px; background: var(--bg2); border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); border-radius: 10px; color: var(--text); font-size: 15px; outline: none; transition: border-color .2s; }
 .search-input:focus { border-color: var(--accent); }
 .search-wrap .si { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 15px; pointer-events: none; }
-.view-toggle { display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
+.view-toggle { display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); flex-shrink: 0; }
 .view-btn { width: 34px; height: 34px; border: none; background: none; color: var(--hint); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
 .view-btn.active { background: var(--accent); color: var(--acctxt); }
 
@@ -63,46 +73,46 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .grid-poster img { width: 100%; height: 100%; object-fit: cover; }
 .grid-poster .tracked-badge { position: absolute; top: 4px; right: 4px; font-size: 12px; background: rgba(0,0,0,.65); border-radius: 4px; padding: 1px 4px; }
 .grid-title { font-size: 11px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.grid-meta { font-size: 10px; color: var(--hint); margin-top: 2px; }
+.grid-meta { font-size: 11px; color: var(--hint); margin-top: 2px; }
 
 .list-results { padding: 6px 0; }
-.result-card { display: flex; gap: 11px; padding: 10px 13px; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; transition: background .12s; }
-.result-card:active { background: rgba(255,255,255,.03); }
+.result-card { display: flex; gap: 11px; padding: 10px 13px; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); cursor: pointer; transition: background .12s; }
+.result-card:active { background: color-mix(in srgb, var(--text) 3%, transparent); }
 .result-poster { width: 62px; min-width: 62px; height: 88px; border-radius: 7px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
 .result-poster img { width: 100%; height: 100%; object-fit: cover; }
 .result-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
 .result-title { font-weight: 600; font-size: 13.5px; line-height: 1.3; margin-bottom: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .result-meta { font-size: 11px; color: var(--hint); display: flex; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 5px; }
 .result-next { font-size: 11px; color: var(--link); margin-bottom: 5px; }
-.result-genres { font-size: 10px; color: var(--hint); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 6px; }
+.result-genres { font-size: 11px; color: var(--hint); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 6px; }
 
 .qadd-row { display: flex; gap: 5px; flex-wrap: wrap; }
-.qadd-btn { padding: 4px 9px; border-radius: 7px; border: 1.5px solid rgba(255,255,255,.12); background: none; color: var(--hint); font-size: 11px; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.qadd-btn { padding: 4px 9px; border-radius: 7px; border: 1.5px solid color-mix(in srgb, var(--text) 12%, transparent); background: none; color: var(--hint); font-size: 11px; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap; }
 .qadd-btn:active { transform: scale(.95); }
-.qadd-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(124,58,237,.12); }
+.qadd-btn.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
-.tracked-chip { display: inline-flex; align-self: flex-start; align-items: center; gap: 3px; font-size: 10px; padding: 2px 6px; border-radius: 5px; background: rgba(124,58,237,.18); color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+.tracked-chip { display: inline-flex; align-self: flex-start; align-items: center; gap: 3px; font-size: 11px; padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; margin-bottom: 4px; }
 
 .section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--hint); padding: 12px 14px 5px; }
 
-.card { display: flex; gap: 12px; padding: 11px 14px; align-items: flex-start; cursor: pointer; transition: background .15s; border-bottom: 1px solid rgba(255,255,255,.04); }
-.card:active { background: rgba(255,255,255,.04); }
+.card { display: flex; gap: 12px; padding: 11px 14px; align-items: flex-start; cursor: pointer; transition: background .15s; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); }
+.card:active { background: color-mix(in srgb, var(--text) 4%, transparent); }
 .card-poster { width: 72px; min-width: 72px; height: 102px; border-radius: 8px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 28px; }
 .card-poster img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
 .card-body { flex: 1; min-width: 0; }
 .card-title { font-weight: 600; font-size: 14px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
 .card-meta { font-size: 12px; color: var(--hint); margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
-.badge-s { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.08); }
+.badge-s { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 6px; border-radius: 6px; background: color-mix(in srgb, var(--text) 8%, transparent); }
 .progress-wrap { margin-bottom: 8px; }
 .progress-label { font-size: 11px; color: var(--hint); margin-bottom: 4px; display: flex; justify-content: space-between; }
-.progress-bar { height: 4px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+.progress-bar { height: 4px; background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: 99px; overflow: hidden; }
 .progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
-.ep-counter { display: inline-flex; align-items: center; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+.ep-counter { display: inline-flex; align-items: center; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
 .ep-btn { width: 32px; height: 32px; border: none; background: none; color: var(--accent); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .1s; }
-.ep-btn:active { background: rgba(124,58,237,.15); }
+.ep-btn:active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
 .ep-count { font-size: 13px; font-weight: 600; padding: 0 10px; color: var(--text); min-width: 52px; text-align: center; }
 
-.overview-card { margin: 7px 13px; padding: 14px; background: var(--bg2); border-radius: var(--radius); cursor: pointer; transition: transform .15s; border: 1px solid rgba(255,255,255,.06); }
+.overview-card { margin: 7px 13px; padding: 14px; background: var(--bg2); border-radius: var(--radius); cursor: pointer; transition: transform .15s; border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
 .overview-card:active { transform: scale(.98); }
 .ov-row { display: flex; align-items: center; justify-content: space-between; }
 .ov-left { display: flex; align-items: center; gap: 10px; }
@@ -110,14 +120,14 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .ov-label { font-weight: 600; font-size: 15px; }
 .ov-sub { font-size: 11px; color: var(--hint); margin-top: 2px; }
 .ov-count { font-size: 26px; font-weight: 700; color: var(--accent); }
-.ov-bar { height: 3px; background: rgba(255,255,255,.06); border-radius: 99px; margin-top: 10px; overflow: hidden; }
+.ov-bar { height: 3px; background: color-mix(in srgb, var(--text) 6%, transparent); border-radius: 99px; margin-top: 10px; overflow: hidden; }
 .ov-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; }
 
 #detail { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; background: var(--bg); transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1); }
 #detail.open { transform: translateY(0); }
 #detail.closing { transform: translateY(100%); }
-.detail-header { display: flex; align-items: center; gap: 12px; padding: 13px 14px; background: var(--bg2); border-bottom: 1px solid rgba(255,255,255,.06); }
-.back-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(255,255,255,.08); color: var(--text); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.detail-header { display: flex; align-items: center; gap: 12px; padding: 13px 14px; background: var(--bg2); border-bottom: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
+.back-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .detail-title { font-weight: 700; font-size: 15px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .detail-hero { display: flex; gap: 14px; padding: 14px; align-items: flex-start; }
@@ -126,16 +136,16 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .detail-info { flex: 1; }
 .detail-name { font-weight: 700; font-size: 15px; line-height: 1.3; margin-bottom: 6px; }
 .detail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
-.detail-badge { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.08); color: var(--hint); }
+.detail-badge { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--hint); }
 .detail-score { font-size: 18px; font-weight: 700; color: #fbbf24; }
 .detail-section { padding: 0 14px 14px; }
 .detail-section-title { font-size: 11px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-.ep-big { display: flex; align-items: center; justify-content: center; background: var(--bg2); border-radius: var(--radius); overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+.ep-big { display: flex; align-items: center; justify-content: center; background: var(--bg2); border-radius: var(--radius); overflow: hidden; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
 .ep-big .ep-btn { width: 52px; height: 52px; font-size: 22px; }
 .ep-big .ep-count { font-size: 18px; font-weight: 700; min-width: 80px; }
 .list-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .list-opt { padding: 9px 10px; border-radius: 9px; background: var(--bg2); border: 1.5px solid transparent; cursor: pointer; transition: all .15s; font-size: 12px; font-weight: 500; text-align: center; }
-.list-opt.active { border-color: var(--accent); color: var(--accent); background: rgba(124,58,237,.12); }
+.list-opt.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .list-opt:active { transform: scale(.97); }
 .action-btn { width: 100%; padding: 12px; border-radius: var(--radius); border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s; margin-bottom: 7px; }
 .action-btn:active { opacity: .7; }
@@ -148,7 +158,7 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .recent-clear:active { color: var(--text); }
 .recent-list { padding: 4px 0 8px; }
 .recent-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer; transition: background .12s; }
-.recent-item:active { background: rgba(255,255,255,.04); }
+.recent-item:active { background: color-mix(in srgb, var(--text) 4%, transparent); }
 .recent-thumb { width: 36px; height: 36px; border-radius: 6px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .recent-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .recent-label { flex: 1; font-size: 14px; font-weight: 500; }
@@ -158,13 +168,13 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .empty .big { font-size: 46px; margin-bottom: 10px; }
 .empty p { font-size: 14px; line-height: 1.5; }
 .spinner { display: flex; align-items: center; justify-content: center; padding: 44px; }
-.spinner::after { content: ''; width: 26px; height: 26px; border: 3px solid rgba(255,255,255,.1); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+.spinner::after { content: ''; width: 26px; height: 26px; border: 3px solid color-mix(in srgb, var(--text) 10%, transparent); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-#toast { position: fixed; bottom: calc(var(--nav-h) + 12px); left: 50%; transform: translateX(-50%) translateY(20px); background: #1e1e30; color: var(--text); padding: 9px 16px; border-radius: 99px; font-size: 13px; font-weight: 500; border: 1px solid rgba(255,255,255,.1); opacity: 0; transition: all .2s; pointer-events: none; z-index: 200; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+#toast { position: fixed; bottom: calc(var(--nav-h) + 12px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg2); color: var(--text); padding: 9px 16px; border-radius: 99px; font-size: 13px; font-weight: 500; border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); opacity: 0; transition: all .2s; pointer-events: none; z-index: 200; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.4); }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ── Estrenos tab ─────────────────────────────────────────────────────────── */
-.estrenos-header { padding: 12px 14px 8px; position: sticky; top: 0; background: var(--bg); z-index: 5; border-bottom: 1px solid rgba(255,255,255,.04); }
+.estrenos-header { padding: 12px 14px 8px; position: sticky; top: 0; background: var(--bg); z-index: 5; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); }
 .estrenos-date-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .estrenos-date { font-size: 15px; font-weight: 700; }
 .estrenos-refresh { width: 32px; height: 32px; border: none; background: var(--bg2); border-radius: 50%; color: var(--hint); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .2s; }
@@ -172,24 +182,24 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .estrenos-refresh.spinning { animation: spin .7s linear infinite; color: var(--accent); }
 .filter-chips { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
 .filter-chips::-webkit-scrollbar { display: none; }
-.chip { padding: 5px 13px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1.5px solid rgba(255,255,255,.1); background: none; color: var(--hint); cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
+.chip { padding: 5px 13px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1.5px solid color-mix(in srgb, var(--text) 10%, transparent); background: none; color: var(--hint); cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
 .chip.active { background: var(--accent); border-color: var(--accent); color: var(--acctxt); }
 
 .estreno-section { padding: 4px 0 2px; }
 .estreno-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--hint); padding: 10px 14px 6px; display: flex; align-items: center; gap: 6px; }
-.estreno-section-title::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.06); }
+.estreno-section-title::after { content: ''; flex: 1; height: 1px; background: color-mix(in srgb, var(--text) 6%, transparent); }
 
-.estreno-card { display: flex; gap: 11px; padding: 10px 13px; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; transition: background .12s; }
-.estreno-card:active { background: rgba(255,255,255,.03); }
-.estreno-card.is-tracked { background: rgba(124,58,237,.04); border-left: 3px solid var(--accent); padding-left: 10px; }
+.estreno-card { display: flex; gap: 11px; padding: 10px 13px; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); cursor: pointer; transition: background .12s; }
+.estreno-card:active { background: color-mix(in srgb, var(--text) 3%, transparent); }
+.estreno-card.is-tracked { background: color-mix(in srgb, var(--accent) 4%, transparent); border-left: 3px solid var(--accent); padding-left: 10px; }
 .estreno-poster { width: 58px; min-width: 58px; height: 84px; border-radius: 7px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; position: relative; }
 .estreno-poster img { width: 100%; height: 100%; object-fit: cover; }
-.estreno-time-badge { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); font-size: 9px; font-weight: 700; text-align: center; padding: 2px 0; color: #fff; letter-spacing: .3px; }
+.estreno-time-badge { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); font-size: 11px; font-weight: 700; text-align: center; padding: 2px 0; color: #fff; letter-spacing: .3px; }
 .estreno-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
 .estreno-title { font-weight: 600; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 3px; }
 .estreno-meta { font-size: 11px; color: var(--hint); display: flex; flex-wrap: wrap; gap: 4px 7px; margin-bottom: 4px; }
-.estreno-genres { font-size: 10px; color: var(--hint); opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
-.estreno-ep-counter { display: inline-flex; align-items: center; background: rgba(124,58,237,.12); border-radius: 7px; overflow: hidden; border: 1px solid rgba(124,58,237,.25); align-self: flex-start; }
+.estreno-genres { font-size: 11px; color: var(--hint); opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+.estreno-ep-counter { display: inline-flex; align-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 7px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); align-self: flex-start; }
 .estreno-ep-counter .ep-btn { width: 28px; height: 26px; font-size: 15px; }
 .estreno-ep-counter .ep-count { font-size: 11px; font-weight: 600; padding: 0 7px; min-width: 40px; }
 
@@ -199,18 +209,18 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .day-arrow:active { opacity: .6; transform: scale(.92); }
 .day-arrow:disabled { opacity: .3; cursor: default; }
 .day-center { flex: 1; text-align: center; cursor: pointer; padding: 4px 6px; border-radius: 10px; transition: background .12s; min-width: 0; }
-.day-center:active { background: rgba(255,255,255,.04); }
+.day-center:active { background: color-mix(in srgb, var(--text) 4%, transparent); }
 .day-center.is-today { cursor: default; }
 .day-date { font-size: 13.5px; font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .day-relative { font-size: 11px; color: var(--hint); margin-top: 2px; }
 .day-relative.is-today { color: var(--accent); font-weight: 600; }
 .day-actions-row { display: flex; gap: 8px; align-items: center; }
 .day-actions-row .filter-chips { flex: 1; min-width: 0; }
-.day-loading-bar { font-size: 10px; color: var(--hint); padding: 5px 14px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; background: rgba(124,58,237,.06); }
-.day-loading-bar::before { content: ''; width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,.15); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+.day-loading-bar { font-size: 11px; color: var(--hint); padding: 5px 14px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.day-loading-bar::before { content: ''; width: 10px; height: 10px; border: 1.5px solid color-mix(in srgb, var(--text) 15%, transparent); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
 
 /* ── Estrenos grid view (big posters) ──────────────────────────────────────── */
-.day-view-toggle { display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
+.day-view-toggle { display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); flex-shrink: 0; }
 .day-view-btn { width: 32px; height: 32px; border: none; background: none; color: var(--hint); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
 .day-view-btn.active { background: var(--accent); color: var(--acctxt); }
 .estreno-grid { display: grid; grid-template-columns: repeat(auto-fill, 160px); justify-content: center; gap: 10px; padding: 10px 12px; }
@@ -221,12 +231,12 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .egc-poster img { width: 100%; height: 100%; object-fit: cover; }
 .egc-overlay { position: absolute; inset: auto 0 0 0; background: linear-gradient(to top, rgba(0,0,0,.85) 30%, transparent); padding: 18px 8px 7px; display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; }
 .egc-time { font-size: 11px; font-weight: 700; color: white; letter-spacing: .3px; }
-.egc-ep { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.9); background: rgba(0,0,0,.45); padding: 2px 7px; border-radius: 4px; }
-.egc-track-badge { position: absolute; top: 6px; left: 6px; background: rgba(124,58,237,.92); color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; backdrop-filter: blur(4px); display: inline-flex; align-items: center; gap: 3px; }
-.egc-progress-pill { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.65); color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; backdrop-filter: blur(4px); }
+.egc-ep { font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--text) 90%, transparent); background: rgba(0,0,0,.45); padding: 2px 7px; border-radius: 4px; }
+.egc-track-badge { position: absolute; top: 6px; left: 6px; background: color-mix(in srgb, var(--accent) 92%, transparent); color: white; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; backdrop-filter: blur(4px); display: inline-flex; align-items: center; gap: 3px; }
+.egc-progress-pill { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.65); color: white; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; backdrop-filter: blur(4px); }
 .egc-format-icon { position: absolute; bottom: 38px; right: 6px; font-size: 14px; opacity: .9; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
 .egc-title { font-size: 12px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.egc-meta { font-size: 10.5px; color: var(--hint); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
+.egc-meta { font-size: 11px; color: var(--hint); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
 
 /* ── Image viewer (cover zoom + pan) ────────────────────────────────────────── */
 .detail-hero-img { cursor: zoom-in; }
@@ -237,29 +247,29 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .iv-canvas { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
 #iv-img { max-width: 100%; max-height: 100%; user-select: none; -webkit-user-drag: none; pointer-events: none; transform-origin: center center; will-change: transform; transition: transform .2s ease-out; }
 #iv-img.dragging { transition: none; }
-.iv-close { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,.55); color: white; border: 1.5px solid rgba(255,255,255,.18); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); line-height: 1; }
+.iv-close { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,.55); color: white; border: 1.5px solid color-mix(in srgb, var(--text) 18%, transparent); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); line-height: 1; }
 .iv-close:active { background: rgba(0,0,0,.85); transform: scale(.92); }
-.iv-hint { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.6); font-size: 11px; text-align: center; pointer-events: none; background: rgba(0,0,0,.5); padding: 6px 14px; border-radius: 99px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); white-space: nowrap; transition: opacity .4s; z-index: 10; }
+.iv-hint { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); color: color-mix(in srgb, var(--text) 60%, transparent); font-size: 11px; text-align: center; pointer-events: none; background: rgba(0,0,0,.5); padding: 6px 14px; border-radius: 99px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); white-space: nowrap; transition: opacity .4s; z-index: 10; }
 .iv-hint.fade { opacity: 0; }
 
 /* ── User link (per-anime streaming URL) ───────────────────────────────────── */
 .link-row { display: flex; gap: 7px; align-items: stretch; margin-bottom: 7px; }
-.link-open-btn { flex: 1; display: flex; align-items: center; gap: 9px; padding: 11px 14px; background: rgba(124,58,237,.14); color: var(--text); border: 1.5px solid rgba(124,58,237,.32); border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; min-width: 0; }
-.link-open-btn:active { background: rgba(124,58,237,.24); transform: scale(.98); }
+.link-open-btn { flex: 1; display: flex; align-items: center; gap: 9px; padding: 11px 14px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); border: 1.5px solid color-mix(in srgb, var(--accent) 32%, transparent); border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; min-width: 0; }
+.link-open-btn:active { background: color-mix(in srgb, var(--accent) 24%, transparent); transform: scale(.98); }
 .link-domain { flex: 1; text-align: left; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .link-arrow { color: var(--accent); font-size: 14px; flex-shrink: 0; }
-.link-edit-btn { width: 44px; background: var(--bg2); border: 1.5px solid rgba(255,255,255,.08); color: var(--hint); border-radius: 10px; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: all .15s; }
-.link-edit-btn:active { background: rgba(255,255,255,.06); transform: scale(.95); }
-.link-add-btn { width: 100%; padding: 11px 14px; background: var(--bg2); border: 1.5px dashed rgba(255,255,255,.15); color: var(--hint); border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
-.link-add-btn:active { background: rgba(124,58,237,.08); border-color: var(--accent); color: var(--accent); transform: scale(.99); }
+.link-edit-btn { width: 44px; background: var(--bg2); border: 1.5px solid color-mix(in srgb, var(--text) 8%, transparent); color: var(--hint); border-radius: 10px; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: all .15s; }
+.link-edit-btn:active { background: color-mix(in srgb, var(--text) 6%, transparent); transform: scale(.95); }
+.link-add-btn { width: 100%; padding: 11px 14px; background: var(--bg2); border: 1.5px dashed color-mix(in srgb, var(--text) 15%, transparent); color: var(--hint); border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
+.link-add-btn:active { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: var(--accent); color: var(--accent); transform: scale(.99); }
 
 /* ── Modal (link input) ─────────────────────────────────────────────────────── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); z-index: 250; display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
 .modal-overlay.open { display: flex; }
-.modal-content { background: var(--bg2); border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; border: 1px solid rgba(255,255,255,.06); }
+.modal-content { background: var(--bg2); border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
 .modal-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
 .modal-sub { font-size: 11px; color: var(--hint); margin-bottom: 12px; }
-.modal-input { width: 100%; padding: 11px 13px; background: var(--bg); border: 1.5px solid rgba(255,255,255,.1); border-radius: 9px; color: var(--text); font-size: 14px; outline: none; margin-bottom: 14px; transition: border-color .2s; }
+.modal-input { width: 100%; padding: 11px 13px; background: var(--bg); border: 1.5px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 9px; color: var(--text); font-size: 14px; outline: none; margin-bottom: 14px; transition: border-color .2s; }
 .modal-input:focus { border-color: var(--accent); }
 .modal-actions { display: flex; gap: 8px; }
 .modal-actions .action-btn { flex: 1; margin-bottom: 0; padding: 10px; }
@@ -270,38 +280,38 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 /* ── Search result enrichments (progress counter + links inline) ───────────── */
 .result-progress-wrap { margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .result-progress-wrap .estreno-ep-counter .ep-btn { width: 26px; height: 24px; font-size: 14px; }
-.result-progress-wrap .estreno-ep-counter .ep-count { font-size: 10.5px; padding: 0 7px; min-width: 56px; }
-.result-progress-bar { flex: 1; min-width: 60px; height: 3px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+.result-progress-wrap .estreno-ep-counter .ep-count { font-size: 11px; padding: 0 7px; min-width: 56px; }
+.result-progress-bar { flex: 1; min-width: 60px; height: 3px; background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: 99px; overflow: hidden; }
 .result-progress-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .25s; }
 .result-links { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
-.link-mini-btn { padding: 3px 9px; border-radius: 6px; border: 1px solid rgba(124,58,237,.3); background: rgba(124,58,237,.1); color: var(--accent); font-size: 10.5px; font-weight: 600; cursor: pointer; transition: all .12s; white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; }
-.link-mini-btn:active { background: rgba(124,58,237,.22); transform: scale(.95); }
-.tracked-badge.with-eps { font-size: 10px; padding: 2px 6px; }
+.link-mini-btn { padding: 3px 9px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); font-size: 11px; font-weight: 600; cursor: pointer; transition: all .12s; white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; }
+.link-mini-btn:active { background: color-mix(in srgb, var(--accent) 22%, transparent); transform: scale(.95); }
+.tracked-badge.with-eps { font-size: 11px; padding: 2px 6px; }
 .ep-count.editable { cursor: pointer; transition: background .12s, color .12s; border-radius: 4px; }
-.ep-count.editable:active { background: rgba(124,58,237,.2); color: var(--accent); }
-.ep-count.editable::after { content: '✎'; font-size: 9px; margin-left: 4px; opacity: .5; vertical-align: middle; }
+.ep-count.editable:active { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.ep-count.editable::after { content: '✎'; font-size: 11px; margin-left: 4px; opacity: .5; vertical-align: middle; }
 
 /* ── Search filters ────────────────────────────────────────────────────────── */
-.filter-btn { width: 34px; height: 34px; border: 1px solid rgba(255,255,255,.08); background: var(--bg2); border-radius: 8px; color: var(--hint); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; position: relative; }
+.filter-btn { width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); background: var(--bg2); border-radius: 8px; color: var(--hint); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; position: relative; }
 .filter-btn:active { transform: scale(.92); }
 .filter-btn.has-filters { background: var(--accent); color: var(--acctxt); border-color: var(--accent); }
-.filter-btn .filter-count { position: absolute; top: -3px; right: -3px; background: #ef4444; color: white; font-size: 9px; font-weight: 700; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); }
+.filter-btn .filter-count { position: absolute; top: -3px; right: -3px; background: #ef4444; color: white; font-size: 11px; font-weight: 700; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); }
 .active-filters { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 12px 8px; align-items: center; }
-.active-filter-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 4px 3px 9px; background: rgba(124,58,237,.15); border: 1px solid rgba(124,58,237,.3); border-radius: 99px; font-size: 11px; font-weight: 600; color: var(--accent); }
-.active-filter-chip button { background: rgba(124,58,237,.2); border: none; color: var(--accent); width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 11px; padding: 0; display: flex; align-items: center; justify-content: center; }
-.active-filter-chip button:active { background: rgba(124,58,237,.4); }
+.active-filter-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 4px 3px 9px; background: color-mix(in srgb, var(--accent) 15%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 99px; font-size: 11px; font-weight: 600; color: var(--accent); }
+.active-filter-chip button { background: color-mix(in srgb, var(--accent) 20%, transparent); border: none; color: var(--accent); width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 11px; padding: 0; display: flex; align-items: center; justify-content: center; }
+.active-filter-chip button:active { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 .active-filters .clear-all-btn { font-size: 11px; color: var(--hint); background: none; border: none; cursor: pointer; padding: 3px 6px; }
 .active-filters .clear-all-btn:active { color: var(--text); }
 .filter-modal-content { max-width: 420px; max-height: 88vh; overflow-y: auto; }
 .filter-section { margin-bottom: 14px; }
 .filter-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--hint); margin-bottom: 6px; }
 .filter-chips-row { display: flex; flex-wrap: wrap; gap: 5px; }
-.filter-chip { padding: 5px 10px; border-radius: 7px; border: 1.5px solid rgba(255,255,255,.1); background: var(--bg); color: var(--hint); font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .12s; white-space: nowrap; }
+.filter-chip { padding: 5px 10px; border-radius: 7px; border: 1.5px solid color-mix(in srgb, var(--text) 10%, transparent); background: var(--bg); color: var(--hint); font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .12s; white-space: nowrap; }
 .filter-chip:active { transform: scale(.96); }
 .filter-chip.active { background: var(--accent); color: var(--acctxt); border-color: var(--accent); }
-.filter-chip.multi.active { background: rgba(124,58,237,.18); color: var(--accent); border-color: rgba(124,58,237,.5); }
+.filter-chip.multi.active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 select.modal-input { background-image: linear-gradient(45deg, transparent 50%, var(--hint) 50%), linear-gradient(135deg, var(--hint) 50%, transparent 50%); background-position: calc(100% - 18px) center, calc(100% - 13px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; appearance: none; padding-right: 32px; }
-.progress-aired { font-size: 10.5px; color: var(--hint); margin-top: 3px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.progress-aired { font-size: 11px; color: var(--hint); margin-top: 3px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .progress-aired .behind { color: #fbbf24; font-weight: 600; }
 .progress-aired .uptodate { color: #10b981; font-weight: 600; }
 .progress-aired .ahead { color: var(--accent); font-weight: 600; }
@@ -312,26 +322,26 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 .star-btn.filled { opacity: 1; }
 .star-btn:active { transform: scale(.78); }
 .rating-label { font-size: 11px; color: var(--hint); margin-left: 5px; }
-.rating-clear { font-size: 10px; color: var(--hint); background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 5px; }
-.rating-clear:active { background: rgba(255,255,255,.06); color: var(--text); }
+.rating-clear { font-size: 11px; color: var(--hint); background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 5px; }
+.rating-clear:active { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
 .card-rating { display: flex; gap: 0; align-items: center; margin-top: 4px; }
 .card-star { font-size: 13px; color: #fbbf24; opacity: .22; }
 .card-star.filled { opacity: 1; }
 
 /* ── Stats cards ──────────────────────────────────────────────────────────── */
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 14px 12px; }
-.stat-card { background: var(--bg2); border-radius: 10px; padding: 14px 10px; text-align: center; border: 1px solid rgba(255,255,255,.06); }
+.stat-card { background: var(--bg2); border-radius: 10px; padding: 14px 10px; text-align: center; border: 1px solid color-mix(in srgb, var(--text) 6%, transparent); }
 .stat-big { font-size: 24px; font-weight: 700; color: var(--accent); line-height: 1; margin-bottom: 4px; }
 .stat-label { font-size: 11px; color: var(--hint); font-weight: 500; }
-.stats-section { padding: 12px 14px 16px; border-top: 1px solid rgba(255,255,255,.05); margin-top: 4px; }
+.stats-section { padding: 12px 14px 16px; border-top: 1px solid color-mix(in srgb, var(--text) 5%, transparent); margin-top: 4px; }
 
 /* ── List sort + filter row ──────────────────────────────────────────────── */
-.list-tools-row { display: flex; gap: 7px; align-items: center; padding: 8px 12px; position: sticky; top: 0; background: var(--bg); z-index: 4; border-bottom: 1px solid rgba(255,255,255,.04); }
-.list-search-mini { flex: 1; padding: 7px 11px 7px 30px; background: var(--bg2); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; transition: border-color .2s; min-width: 0; }
+.list-tools-row { display: flex; gap: 7px; align-items: center; padding: 8px 12px; position: sticky; top: 0; background: var(--bg); z-index: 4; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); }
+.list-search-mini { flex: 1; padding: 7px 11px 7px 30px; background: var(--bg2); border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; transition: border-color .2s; min-width: 0; }
 .list-search-mini:focus { border-color: var(--accent); }
 .list-search-wrap { position: relative; flex: 1; min-width: 0; }
 .list-search-wrap .si { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 13px; pointer-events: none; color: var(--hint); }
-.list-sort-select { background: var(--bg2); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: var(--hint); font-size: 11.5px; padding: 7px 8px; outline: none; flex-shrink: 0; cursor: pointer; }
+.list-sort-select { background: var(--bg2); border: 1px solid color-mix(in srgb, var(--text) 8%, transparent); border-radius: 8px; color: var(--hint); font-size: 11.5px; padding: 7px 8px; outline: none; flex-shrink: 0; cursor: pointer; }
 
 /* ── Behind highlight ────────────────────────────────────────────────────── */
 .card.is-behind { border-left: 3px solid rgba(239,68,68,.55); padding-left: 11px; background: rgba(239,68,68,.025); }
@@ -345,23 +355,23 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 .duration-line span { display: inline-flex; align-items: center; gap: 3px; }
 
 /* ── Week grid (Estrenos) ────────────────────────────────────────────────── */
-.week-toggle { padding: 4px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,.1); background: none; color: var(--hint); font-size: 11px; font-weight: 600; cursor: pointer; transition: all .15s; flex-shrink: 0; white-space: nowrap; }
-.week-toggle.active { background: rgba(124,58,237,.15); color: var(--accent); border-color: rgba(124,58,237,.4); }
-.week-grid-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; padding: 8px 12px 6px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.week-toggle { padding: 4px 10px; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); background: none; color: var(--hint); font-size: 11px; font-weight: 600; cursor: pointer; transition: all .15s; flex-shrink: 0; white-space: nowrap; }
+.week-toggle.active { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.week-grid-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; padding: 8px 12px 6px; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); }
 .wdc { background: var(--bg2); border-radius: 8px; padding: 7px 3px; text-align: center; cursor: pointer; transition: all .12s; border: 1.5px solid transparent; min-width: 0; }
 .wdc:active { opacity: .7; }
-.wdc.wdc-today { border-color: rgba(124,58,237,.4); }
-.wdc.wdc-current { background: rgba(124,58,237,.2); border-color: var(--accent); }
-.wdc-name { font-size: 9px; color: var(--hint); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.wdc.wdc-today { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.wdc.wdc-current { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
+.wdc-name { font-size: 11px; color: var(--hint); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
 .wdc-date { font-size: 12px; font-weight: 700; margin: 2px 0 1px; }
-.wdc-eps { font-size: 9px; color: var(--accent); font-weight: 700; min-height: 12px; }
-.wdc-mine { font-size: 8px; color: #10b981; font-weight: 700; }
+.wdc-eps { font-size: 11px; color: var(--accent); font-weight: 700; min-height: 12px; }
+.wdc-mine { font-size: 11px; color: #10b981; font-weight: 700; }
 
 /* ── Notes ───────────────────────────────────────────────────────────────── */
-.notes-display { font-size: 12.5px; line-height: 1.55; color: var(--text); background: var(--bg2); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; border: 1px solid rgba(255,255,255,.05); }
-#notes-textarea { width: 100%; padding: 11px 13px; background: var(--bg); border: 1.5px solid rgba(255,255,255,.1); border-radius: 9px; color: var(--text); font-size: 13px; line-height: 1.5; outline: none; min-height: 100px; resize: vertical; transition: border-color .2s; }
+.notes-display { font-size: 12.5px; line-height: 1.55; color: var(--text); background: var(--bg2); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; border: 1px solid color-mix(in srgb, var(--text) 5%, transparent); }
+#notes-textarea { width: 100%; padding: 11px 13px; background: var(--bg); border: 1.5px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 9px; color: var(--text); font-size: 13px; line-height: 1.5; outline: none; min-height: 100px; resize: vertical; transition: border-color .2s; }
 #notes-textarea:focus { border-color: var(--accent); }
-.notes-char-count { font-size: 10px; color: var(--hint); text-align: right; margin-top: 4px; }
+.notes-char-count { font-size: 11px; color: var(--hint); text-align: right; margin-top: 4px; }
 
 /* ── Auto-complete modal ─────────────────────────────────────────────────── */
 #complete-modal .modal-content { text-align: center; }
@@ -369,7 +379,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 
 /* ── Swipe-to-+1 in list cards ───────────────────────────────────────────── */
 .card-wrap { position: relative; overflow: hidden; }
-.card-swipe-bg { position: absolute; left: 0; top: 0; bottom: 0; width: 72px; background: var(--accent); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: white; font-size: 10px; font-weight: 700; opacity: 0; transition: opacity .1s; pointer-events: none; }
+.card-swipe-bg { position: absolute; left: 0; top: 0; bottom: 0; width: 72px; background: var(--accent); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: white; font-size: 11px; font-weight: 700; opacity: 0; transition: opacity .1s; pointer-events: none; }
 .card-swipe-bg .swipe-icon { font-size: 18px; line-height: 1; }
 .card { transition: transform .18s; will-change: transform; }
 .card.swiping { transition: none !important; }
@@ -377,17 +387,17 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 /* ── Season quick chip ───────────────────────────────────────────────────── */
 .season-quick-row { display: flex; gap: 6px; padding: 5px 12px 2px; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
 .season-quick-row::-webkit-scrollbar { display: none; }
-.season-chip-now { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 99px; background: rgba(124,58,237,.12); border: 1.5px solid rgba(124,58,237,.3); color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
-.season-chip-now:active { background: rgba(124,58,237,.22); transform: scale(.97); }
+.season-chip-now { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1.5px solid color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
+.season-chip-now:active { background: color-mix(in srgb, var(--accent) 22%, transparent); transform: scale(.97); }
 .season-chip-now.applied { background: var(--accent); color: var(--acctxt); border-color: var(--accent); }
 
 /* ── Saga / Relations panel ──────────────────────────────────────────────── */
 #saga-panel { position: fixed; inset: 0; z-index: 110; display: flex; flex-direction: column; background: var(--bg); transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1); }
 #saga-panel.open { transform: translateY(0); }
 #saga-panel.closing { transform: translateY(100%); }
-.saga-info-bar { padding: 8px 14px; font-size: 11.5px; color: var(--hint); background: rgba(124,58,237,.07); border-bottom: 1px solid rgba(255,255,255,.04); }
-.relation-card { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; transition: background .12s; align-items: flex-start; }
-.relation-card:active { background: rgba(255,255,255,.04); }
+.saga-info-bar { padding: 8px 14px; font-size: 11.5px; color: var(--hint); background: color-mix(in srgb, var(--accent) 7%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); }
+.relation-card { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent); cursor: pointer; transition: background .12s; align-items: flex-start; }
+.relation-card:active { background: color-mix(in srgb, var(--text) 4%, transparent); }
 .relation-num { width: 18px; min-width: 18px; font-size: 11px; font-weight: 700; color: var(--hint); text-align: center; padding-top: 3px; flex-shrink: 0; }
 .relation-poster { width: 54px; min-width: 54px; height: 76px; border-radius: 7px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; position: relative; }
 .relation-poster img { width: 100%; height: 100%; object-fit: cover; }
@@ -395,22 +405,150 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 .relation-body { flex: 1; min-width: 0; }
 .relation-title { font-weight: 600; font-size: 13px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
 .relation-meta { font-size: 11px; color: var(--hint); display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; align-items: center; }
-.relation-type-badge { font-size: 9.5px; padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.07); color: var(--hint); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; display: inline-block; margin-bottom: 4px; }
+.relation-type-badge { font-size: 11px; padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--hint); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; display: inline-block; margin-bottom: 4px; }
 /* ── Translate button ─────────────────────────────────────────────────────── */
-.translate-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--link); background: none; border: 1px solid rgba(124,58,237,.25); border-radius: 6px; cursor: pointer; padding: 3px 8px; margin-top: 6px; transition: all .15s; }
+.translate-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--link); background: none; border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); border-radius: 6px; cursor: pointer; padding: 3px 8px; margin-top: 6px; transition: all .15s; }
 .translate-btn:active { opacity: .6; }
 .translate-btn.loading { opacity: .5; pointer-events: none; }
-.translate-btn.done { color: var(--hint); border-color: rgba(255,255,255,.1); pointer-events: none; }
+.translate-btn.done { color: var(--hint); border-color: color-mix(in srgb, var(--text) 10%, transparent); pointer-events: none; }
 /* ── Saga entry button in detail ─────────────────────────────────────────── */
-.saga-entry-btn { width: 100%; padding: 10px 14px; background: var(--bg2); border: 1.5px solid rgba(255,255,255,.08); border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.saga-entry-btn:active { background: rgba(255,255,255,.06); transform: scale(.98); }
+.saga-entry-btn { width: 100%; padding: 10px 14px; background: var(--bg2); border: 1.5px solid color-mix(in srgb, var(--text) 8%, transparent); border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.saga-entry-btn:active { background: color-mix(in srgb, var(--text) 6%, transparent); transform: scale(.98); }
 .saga-entry-btn .saga-arrow { font-size: 16px; color: var(--hint); }
+/* Expand touch targets without changing the visible button dimensions. */
+.ep-btn, .qadd-btn, .chip, .day-view-btn { position: relative; }
+.ep-btn::after, .qadd-btn::after, .chip::after, .day-view-btn::after { content: ''; position: absolute; inset: -6px; }
+.qadd-btn::after { inset: -10px -6px; }
+.chip::after { inset: -8px -6px; }
+.estreno-ep-counter .ep-btn::after { inset: -9px -8px; }
+.ep-big .ep-btn::after { inset: 0; }
+.ep-counter, .estreno-ep-counter, .day-view-toggle { overflow: visible; }
+.day-view-btn:first-child { border-radius: 7px 0 0 7px; }
+.day-view-btn:last-child { border-radius: 0 7px 7px 0; }
+.filter-chips { padding: 8px 6px 10px; margin: -8px -6px; }
+
+/* Barra inferior flotante, igual a la de «Cine y series». */
+#content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.bottom-nav { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); height: 62px; min-height: 0; max-width: 560px; margin: 0 auto; padding: 4px; gap: 2px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--bg2) 72%, transparent); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); z-index: 50; }
+.nav-btn { border-radius: 999px; color: var(--text); font-size: 11px; line-height: 13px; gap: 2px; }
+.nav-btn .icon { display: flex; line-height: 0; }
+.nav-btn.active { background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--accent); font-weight: 600; }
+.nav-btn.active::after { display: none; }
+.nav-btn .dot { top: 8px; border-color: transparent; }
+#toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+.c-oculto { display: none !important; }
+
+/* ══ Piel Apple E2–E4 (DESIGN.md): roles tipográficos, geometría y hojas ══ */
+/* Encabezados de sección: formato oración, sin mayúsculas ni línea. */
+.section-title, .estreno-section-title, .detail-section-title, .filter-section-title { text-transform: none; letter-spacing: 0; font-size: 16px; line-height: 20px; font-weight: 600; color: var(--text); }
+.section-title, .estreno-section-title { padding: 24px 16px 8px; }
+.estreno-section-title::after { display: none; }
+.detail-section-title, .filter-section-title { margin-bottom: 8px; }
+
+/* Filas y tarjetas: superficies con radio, separadas por espacio. */
+.card, .result-card, .estreno-card, .relation-card { background: var(--bg2); border: 0; border-radius: 20px; margin: 0 16px 8px; padding: 12px; }
+.estreno-card.is-tracked { border-left: 0; padding-left: 12px; box-shadow: inset 3px 0 0 var(--accent); }
+.list-results { padding: 8px 0; }
+.recent-item { border-radius: 14px; margin: 0 8px; }
+.overview-card { border: 0; border-radius: 26px; margin: 0 16px 8px; padding: 16px; }
+.card-title, .result-title, .estreno-title, .relation-title { font-size: 17px; line-height: 22px; font-weight: 600; }
+.card-meta, .result-meta, .estreno-meta, .relation-meta, .result-genres, .estreno-genres, .result-next, .progress-label, .ov-sub { font-size: 13px; line-height: 18px; }
+.grid-title, .egc-title { font-size: 13px; line-height: 17px; font-weight: 600; }
+.grid-meta, .egc-meta { font-size: 12px; }
+.ov-label { font-size: 17px; }
+.recent-label { font-size: 17px; font-weight: 400; }
+.card-poster, .result-poster, .estreno-poster, .relation-poster, .card-poster img { border-radius: 12px; }
+.grid-poster, .egc-poster { border-radius: 14px; }
+.detail-hero-img { border-radius: 16px; }
+.recent-thumb { border-radius: 10px; }
+.progress-bar, .ov-bar { height: 6px; }
+
+/* Pills y badges: cápsula. */
+.badge-s, .detail-badge, .tracked-chip, .egc-ep, .egc-track-badge, .egc-progress-pill, .relation-type-badge, .recent-count, .grid-poster .tracked-badge { border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+
+/* Botones de acción: cápsula de 50 px, uno relleno por vista. */
+.action-btn { min-height: 50px; padding: 12px 20px; border-radius: 999px; font-size: 17px; font-weight: 600; margin-bottom: 12px; }
+.action-ghost { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.action-danger { border-radius: 999px; background: color-mix(in srgb, #FF453A 14%, transparent); color: #FF453A; }
+:root[data-scheme='light'] .action-danger { background: color-mix(in srgb, #FF3B30 12%, transparent); color: #D70015; }
+.modal-delete { border-radius: 999px; min-height: 44px; padding: 0 16px; font-size: 15px; }
+
+/* Botones rápidos y chips: cápsula sin borde, tinte al elegir. */
+.qadd-btn { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); font-size: 13px; padding: 6px 12px; position: relative; }
+.qadd-btn.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.chip, .filter-chip { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); font-size: 14px; padding: 7px 14px; }
+.chip.active, .filter-chip.active, .filter-chip.multi.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; border: 0; }
+.list-opt { border: 0; border-radius: 999px; min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: color-mix(in srgb, var(--text) 10%, transparent); }
+.list-opt.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; border: 0; }
+.link-mini-btn { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 12px; padding: 4px 10px; }
+
+/* Selectores segmentados: cápsula con pulgar. */
+.view-toggle, .day-view-toggle { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 12%, transparent); padding: 2px; gap: 2px; }
+.view-btn, .day-view-btn, .day-view-btn:first-child, .day-view-btn:last-child { width: 40px; height: 32px; border-radius: 999px; color: var(--text); position: relative; }
+.view-btn.active, .day-view-btn.active { background: #636366; color: #FFFFFF; }
+:root[data-scheme='light'] .view-btn.active, :root[data-scheme='light'] .day-view-btn.active { background: #FFFFFF; color: #1C1C1E; box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+
+/* Contadores de episodio: cápsula; el «+» y el «−» con 44 px de toque. */
+.ep-counter, .estreno-ep-counter { border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); }
+.ep-btn { width: 36px; height: 36px; border-radius: 999px; }
+.ep-big { border: 0; border-radius: 26px; }
+.ep-big .ep-btn { width: 56px; height: 56px; }
+.ep-big .ep-count { font-size: 22px; }
+
+/* Botones de ícono: círculo de 44 px. */
+.back-btn, .estrenos-refresh, .iv-close { width: 44px; height: 44px; min-width: 44px; border: 0; border-radius: 999px; }
+.day-arrow { width: 44px; height: 44px; border-radius: 999px; }
+.day-center { border-radius: 22px; }
+.day-date { font-size: 15px; }
+.day-relative, .estreno-time-badge, .egc-time { font-size: 12px; }
+
+/* Campos de texto. */
+.search-top { border-bottom: 0; padding: 8px 16px; }
+.search-input { height: 44px; border: 0; border-radius: 22px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 17px; padding: 0 16px 0 40px; }
+.search-input:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); }
+.search-wrap .si { left: 14px; display: flex; color: var(--hint); }
+.modal-input { min-height: 44px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 17px; }
+#notes-textarea { border: 0; border-radius: 16px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 17px; line-height: 22px; }
+
+/* Links propios en la ficha. */
+.link-open-btn, .link-add-btn { min-height: 44px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 15px; }
+.link-add-btn { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.link-edit-btn { width: 44px; min-height: 44px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); display: flex; align-items: center; justify-content: center; }
+
+/* Ficha: encabezado sobre el mismo fondo y título grande. */
+.detail-header { background: var(--bg); border-bottom: 0; padding: 8px 16px; }
+.detail-title { font-size: 17px; font-weight: 600; }
+.detail-hero { padding: 8px 16px 16px; gap: 16px; }
+.detail-name { font-size: 22px; line-height: 28px; font-weight: 700; }
+.detail-section { padding: 0 16px 24px; }
+.synopsis-text { font-size: 17px; line-height: 22px; color: var(--hint); }
+.synopsis-toggle, .translate-btn { font-size: 15px; }
+
+/* Ventanas → hojas desde abajo (radio 32, tirador). */
+.modal-overlay { align-items: flex-end !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: rgba(0, 0, 0, .4) !important; }
+.modal-content { width: 100% !important; max-width: 640px; margin: 0 auto; border: 0 !important; border-radius: 32px 32px 0 0 !important; background: var(--bg) !important; padding: 20px 16px calc(24px + env(safe-area-inset-bottom)) !important; position: relative; max-height: 92vh; overflow-y: auto; }
+.modal-content::before { content: ''; position: absolute; top: 8px; left: 50%; width: 36px; height: 5px; margin-left: -18px; border-radius: 999px; background: color-mix(in srgb, var(--text) 30%, transparent); }
+.modal-title { font-size: 17px; font-weight: 600; text-align: center; }
+.modal-sub { font-size: 13px; text-align: center; }
+
+/* Semana y estadísticas: superficies sin borde. */
+.wdc { border: 0; border-radius: 12px; }
+.week-grid-strip, .stats-section, .saga-info-bar { border: 0; }
+.wdc-name { text-transform: none; letter-spacing: 0; }
+#toast { font-size: 15px; padding: 10px 18px; border: 0; }
+
+.week-toggle { width: 44px; height: 36px; padding: 0; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.week-toggle.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border: 0; }
+textarea, input, select, button { font-family: inherit; }
+@media (prefers-reduced-motion: reduce) {
+  #detail, #saga-panel, .modal-content, .card, .qadd-btn, .chip { transition: none !important; }
+}
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="logo">🎌 <span>AnimeTracker</span></div>
+    <div class="logo"><span>AnimeTracker</span></div>
     <div style="display:flex;align-items:center;gap:7px">
       <span class="status-dot status-loading" id="conn-status" title="Verificando conexión…">…</span>
       <span class="badge" id="hdr-badge">Buscar</span>
@@ -418,11 +556,11 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
   </header>
   <div id="content"></div>
   <nav class="bottom-nav">
-    <button class="nav-btn" data-tab="estrenos" onclick="setTab('estrenos')"><span class="icon">📺</span><span>Estrenos</span></button>
-    <button class="nav-btn active" data-tab="buscar" onclick="setTab('buscar')"><span class="icon">🔍</span><span>Buscar</span></button>
-    <button class="nav-btn" data-tab="viendo" onclick="setTab('viendo')"><span class="icon">▶️</span><span>Viendo</span><span class="dot" id="dot-viendo" style="display:none"></span></button>
-    <button class="nav-btn" data-tab="pendiente" onclick="setTab('pendiente')"><span class="icon">📌</span><span>Pendiente</span></button>
-    <button class="nav-btn" data-tab="listas" onclick="setTab('listas')"><span class="icon">📂</span><span>Listas</span></button>
+    <button class="nav-btn" data-tab="estrenos" onclick="setTab('estrenos')"><span class="icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></span><span>Estrenos</span></button>
+    <button class="nav-btn active" data-tab="buscar" onclick="setTab('buscar')"><span class="icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span><span>Buscar</span></button>
+    <button class="nav-btn" data-tab="viendo" onclick="setTab('viendo')"><span class="icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/></svg></span><span>Viendo</span><span class="dot" id="dot-viendo" style="display:none"></span></button>
+    <button class="nav-btn" data-tab="pendiente" onclick="setTab('pendiente')"><span class="icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span><span>Pendiente</span></button>
+    <button class="nav-btn" data-tab="listas" onclick="setTab('listas')"><span class="icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span>Listas</span></button>
   </nav>
 </div>
 
@@ -453,7 +591,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
       <button class="action-btn action-ghost" onclick="closeLinkModal()">Cancelar</button>
       <button class="action-btn action-primary" onclick="saveLinkFromModal()">Guardar</button>
     </div>
-    <button class="modal-delete" id="link-modal-delete" onclick="removeLinkFromModal()" style="display:none">🗑️ Eliminar este link</button>
+    <button class="modal-delete" id="link-modal-delete" onclick="removeLinkFromModal()" style="display:none">Eliminar este link</button>
   </div>
 </div>
 
@@ -491,7 +629,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
       <button class="action-btn action-ghost" onclick="closeCreateListModal()">Cancelar</button>
       <button class="action-btn action-primary" onclick="saveCreateListFromModal()">Guardar</button>
     </div>
-    <button class="modal-delete" id="list-modal-delete" onclick="deleteListFromModal()" style="display:none">🗑️ Eliminar lista</button>
+    <button class="modal-delete" id="list-modal-delete" onclick="deleteListFromModal()" style="display:none">Eliminar lista</button>
   </div>
 </div>
 
@@ -502,7 +640,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
     <div class="modal-sub" id="complete-modal-sub">—</div>
     <div class="modal-actions" style="margin-top:16px">
       <button class="action-btn action-ghost" onclick="closeCompleteModal()">Seguir en Viendo</button>
-      <button class="action-btn action-primary" onclick="confirmComplete()">✅ Mover a Completado</button>
+      <button class="action-btn action-primary" onclick="confirmComplete()">Mover a Completado</button>
     </div>
   </div>
 </div>
@@ -517,7 +655,7 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
       <button class="action-btn action-ghost" onclick="closeNotesModal()">Cancelar</button>
       <button class="action-btn action-primary" onclick="saveNotesFromModal()">Guardar</button>
     </div>
-    <button class="modal-delete" id="notes-modal-delete" onclick="clearNote()" style="display:none">🗑️ Borrar nota</button>
+    <button class="modal-delete" id="notes-modal-delete" onclick="clearNote()" style="display:none">Borrar nota</button>
   </div>
 </div>
 
@@ -583,10 +721,133 @@ const db = firebase.firestore();
 // ── Telegram WebApp ───────────────────────────────────────────────────────────
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
+// Tema claro/oscuro de Telegram → tokens de la piel Apple.
+function aplicarTemaRaiz() { document.documentElement.dataset.scheme = tg && tg.colorScheme === 'light' ? 'light' : 'dark'; }
+aplicarTemaRaiz();
+if (tg && typeof tg.onEvent === 'function') tg.onEvent('themeChanged', aplicarTemaRaiz);
+
+// Preferencias: localStorage + CloudStorage de Telegram (Bot API 6.9), para
+// que modo, tamaño de tarjetas, vista y pantalla completa sean iguales en PC y teléfono.
+const atPrefs = (() => {
+  const CLAVES = ['at_modo', 'at_tamano', 'at_pantalla', 'at_day_view'];
+  const nube = () => !!(tg && tg.CloudStorage && (typeof tg.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('6.9')));
+  function get(k, def) { try { const v = localStorage.getItem(k); return v == null ? def : v; } catch { return def; } }
+  function set(k, v) {
+    try { localStorage.setItem(k, String(v)); } catch { /* sin almacenamiento */ }
+    if (nube()) { try { tg.CloudStorage.setItem(k, String(v), () => {}); } catch { /* sin nube */ } }
+  }
+  function sincronizar(ms) {
+    return new Promise((resolve) => {
+      if (!nube()) { resolve({}); return; }
+      let listo = false;
+      const fin = (r) => { if (!listo) { listo = true; resolve(r); } };
+      setTimeout(() => fin({}), ms || 1500);
+      try {
+        tg.CloudStorage.getItems(CLAVES, (err, vals) => {
+          if (err || !vals) { fin({}); return; }
+          const cambios = {};
+          for (const k of CLAVES) {
+            const nubeV = vals[k];
+            const local = get(k, null);
+            if (nubeV && nubeV !== local) { try { localStorage.setItem(k, nubeV); } catch { /* */ } cambios[k] = nubeV; }
+            else if (!nubeV && local != null) { try { tg.CloudStorage.setItem(k, local, () => {}); } catch { /* */ } }
+          }
+          fin(cambios);
+        });
+      } catch { fin({}); }
+    });
+  }
+  return { get, set, sincronizar };
+})();
+window.atPrefs = atPrefs;
+
+// Diálogo de confirmación nativo de Telegram (6.2+); en el navegador, confirm().
+function confirmarTg(msg) {
+  return new Promise((resolve) => {
+    if (tg && typeof tg.showConfirm === 'function' && (typeof tg.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('6.2'))) {
+      try { tg.showConfirm(String(msg).slice(0, 250), (ok) => resolve(!!ok)); return; } catch { /* sigue abajo */ }
+    }
+    resolve(window.confirm(msg));
+  });
+}
+window.confirmarTg = confirmarTg;
+
+// Botones nativos de Telegram abajo (MainButton 6.1+, SecondaryButton 7.10+).
+const botonesNativos = (() => {
+  let hP = null;
+  let hS = null;
+  const disponibles = () => !!(tg && tg.MainButton && typeof tg.MainButton.setParams === 'function');
+  const secOk = () => !!(tg && tg.SecondaryButton && typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('7.10'));
+  const claro = () => document.documentElement.dataset.scheme === 'light';
+  function ocultar() {
+    if (!disponibles()) return;
+    if (hP) { tg.MainButton.offClick(hP); hP = null; }
+    tg.MainButton.hide();
+    if (secOk()) { if (hS) { tg.SecondaryButton.offClick(hS); hS = null; } tg.SecondaryButton.hide(); }
+  }
+  function mostrar({ principal, secundario } = {}) {
+    if (!disponibles()) return false;
+    ocultar();
+    if (principal) {
+      tg.MainButton.setParams({ text: principal.texto, is_active: principal.activo !== false, is_visible: true, color: claro() ? '#2E75B6' : '#5AA0DC', text_color: claro() ? '#FFFFFF' : '#000000' });
+      hP = () => { haptic('light'); if (principal.activo !== false) principal.accion(); };
+      tg.MainButton.onClick(hP);
+    }
+    if (secundario && secOk()) {
+      tg.SecondaryButton.setParams({ text: secundario.texto, is_active: true, is_visible: true, position: 'left', color: claro() ? '#FFFFFF' : '#2C2C2E', text_color: claro() ? '#2E75B6' : '#5AA0DC' });
+      hS = () => { haptic('light'); secundario.accion(); };
+      tg.SecondaryButton.onClick(hS);
+    }
+    return true;
+  }
+  return { disponibles, secundarioDisponible: secOk, mostrar, ocultar };
+})();
+window.botonesNativos = botonesNativos;
+
+// ── Sesión ───────────────────────────────────────────────────────────────────
+// Las listas solo se leen/escriben con la sesión que emite animeAuth (firma de
+// Telegram validada en el servidor + ID permitido). Fuera de Telegram no hay datos.
+const ANIME_AUTH_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/animeAuth';
+let authTgId = null;
+
+async function ensureAnimeAuth() {
+  const auth = firebase.auth();
+  await new Promise(resolve => { const off = auth.onAuthStateChanged(() => { off(); resolve(); }); });
+  const tgUserId = tg?.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : null;
+  if (auth.currentUser) {
+    const tok = await auth.currentUser.getIdTokenResult().catch(() => {
+      throw new Error('Sin conexión. Vuelve a intentarlo.');
+    });
+    const claimId = tok?.claims?.anime_tg;
+    if (claimId && (!tgUserId || claimId === tgUserId)) { authTgId = claimId; return; }
+    await auth.signOut();
+  }
+  if (!tg?.initData) throw new Error('Abre AnimeTracker desde Telegram.');
+  const r = await fetch(ANIME_AUTH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: tg.initData }),
+  }).catch(e => {
+    if (e instanceof TypeError) throw new Error('Sin conexión. Vuelve a intentarlo.');
+    throw e;
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || !data.token) throw new Error(data.error || ('Error de acceso (' + r.status + ')'));
+  await auth.signInWithCustomToken(data.token);
+  authTgId = String(data.tgId);
+}
+
+function showAuthError(msg) {
+  const box = document.createElement('div');
+  box.setAttribute('role', 'alert');
+  box.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--tg-theme-bg-color,#111);color:var(--tg-theme-text-color,#eee);font:15px/1.5 system-ui,sans-serif;text-align:center;z-index:9999';
+  box.textContent = '🔒 ' + msg;
+  document.body.appendChild(box);
+}
 
 function getUserId() {
-  const uid = tg?.initDataUnsafe?.user?.id;
-  return uid ? String(uid) : 'default';
+  if (!authTgId) throw new Error('Sin sesión');
+  return authTgId;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -599,6 +860,7 @@ const DEFAULT_LIST_META = {
   descartado:  { name: 'Descartado',  emoji: '❌' },
 };
 const EMPTY_LISTS = () => ({ viendo:[], interesante:[], pendiente:[], completado:[], descartado:[] });
+let listasCargadas = false;
 let allLists = EMPTY_LISTS();
 let listMeta = {};                  // metadata for custom lists: { customKey: {name, emoji} }
 function isCustomList(key) { return !DEFAULT_LIST_KEYS.includes(key); }
@@ -614,9 +876,10 @@ let lastSearchQuery = '';
 // Day view state (single day, navigable with arrows)
 let currentDay = new Date(); currentDay.setHours(0,0,0,0);
 let dayData = [];        // current day's episodes (already sorted by airingAt)
+let dayError = false;
 let dayLoading = false;  // true while fetching from AniList
 let dayFetchToken = 0;   // invalidates older fetches when navigating quickly
-let dayView = (function(){ try { return localStorage.getItem('at_day_view') || 'list'; } catch { return 'list'; } })(); // 'list' | 'grid'
+let dayView = atPrefs.get('at_day_view', 'list'); // 'list' | 'grid'
 
 // ── Recent searches ───────────────────────────────────────────────────────────
 const LS_KEY = 'at_recent_searches';
@@ -636,11 +899,96 @@ function toast(msg, ms=2200) {
   setTimeout(() => el.classList.remove('show'), ms);
 }
 function haptic(t) { if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(t||'light'); }
-function safe(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function safe(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function safeUrl(u) {
+  try {
+    const url = new URL(String(u ?? ''));
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : '';
+  } catch { return ''; }
+}
+// Arguments are data only: entity decoding cannot turn them into JavaScript.
+function actionAttrs(action, args, stop=false, type='click') {
+  return `data-${type}="${safe(action)}" data-${type}-args="${safe(JSON.stringify(args))}"${stop ? ` data-${type}-stop="1"` : ''}`;
+}
+const htmlActions = {
+  _pickFilter,
+  _rdEp,
+  _sagaQuickAdd,
+  _toggleGenre,
+  _toggleTag,
+  addFromDetail: (id, list, r, el) => addFromDetail(id, list, el, r),
+  changeEp,
+  changeEpFromSearch,
+  deleteAnime,
+  editCustomList,
+  moveToList,
+  navToDateKey,
+  openAnimeDetail,
+  openAnimeLink,
+  openEpModal,
+  openExternal,
+  openImgViewer,
+  openLinkModal,
+  openNickModal,
+  openNotesModal,
+  openResultDetail,
+  openSagaEntryDetail,
+  openSagaPanel,
+  openSite,
+  quickAdd,
+  quickAddEstreno,
+  removeFilter,
+  runRecentSearch,
+  setRating,
+  setTab,
+  toggleMovie,
+  toggleSynopsis,
+  translateSynopsis,
+  _listFilterChange: (list, el) => _listFilterChange(list, el.value),
+  _listSortChange: (list, el) => _listSortChange(list, el.value),
+};
+for (const type of ['click', 'input', 'change']) {
+  document.addEventListener(type, event => {
+    // Walk a snapshot: a handler may replace its own card while handling a click.
+    for (const el of event.composedPath()) {
+      if (!(el instanceof Element)) continue;
+      const action = el.getAttribute(`data-${type}`);
+      const stop = el.hasAttribute(`data-${type}-stop`);
+      if (stop) event.stopPropagation();
+      if (action && Object.hasOwn(htmlActions, action)) {
+        const args = JSON.parse(el.getAttribute(`data-${type}-args`) || '[]');
+        if (Array.isArray(args)) htmlActions[action](...args, el);
+      }
+      if (stop) break;
+    }
+  });
+}
+function openSite(url) {
+  url = safeUrl(url);
+  if (!url) return;
+  if (tg?.openLink) tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
+// Links t.me se abren dentro de Telegram; el resto, en el navegador externo.
+function openUrlTelegramAware(url) {
+  url = safeUrl(url);
+  if (!url) return;
+  haptic('medium');
+  if (/^https:\/\/(t|telegram)\.me\//i.test(url) && typeof tg?.openTelegramLink === 'function') { tg.openTelegramLink(url); return; }
+  if (tg?.openLink) tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
 function pct(w,t) { return t ? Math.min(100,Math.round(w/t*100)) : 0; }
 function imgTag(src, fb='🎌') {
-  if (!src) return fb;
-  return `<img src="${safe(src)}" loading="lazy" onerror="this.parentElement.innerHTML='${fb}'">`;
+  src = safeUrl(src);
+  if (!src) return safe(fb);
+  return `<img src="${safe(src)}" loading="lazy" data-fallback="${safe(fb)}" onerror="this.parentElement.textContent=this.dataset.fallback">`;
+}
+function showGridImageFallback(img) {
+  const fallback = document.createElement('div');
+  fallback.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;font-size:36px';
+  fallback.textContent = '🎌';
+  img.parentElement.replaceChildren(fallback);
 }
 function statusLabel(s) {
   return {RELEASING:'📺 En emisión',FINISHED:'✅ Terminado',NOT_YET_RELEASED:'🔜 Próximo',CANCELLED:'🚫 Cancelado',HIATUS:'⏸ Pausa'}[s]||s||'';
@@ -653,9 +1001,14 @@ const LIST_OPTS = [
 ];
 
 // ── Firestore: data layer ─────────────────────────────────────────────────────
-async function loadLists() {
+let listasLoading = null;
+function loadLists() {
+  if (!listasLoading) listasLoading = readAnimeLists().finally(() => { listasLoading = null; });
+  return listasLoading;
+}
+async function readAnimeLists() {
   try {
-    const snap = await db.collection('animelists').doc(getUserId()).get();
+    const snap = await db.collection('animelists').doc(getUserId()).get({ source: 'server' });
     if (snap.exists) {
       const d = snap.data();
       // Default lists
@@ -673,24 +1026,40 @@ async function loadLists() {
           if ('userLink' in a) delete a.userLink;
         }
       }
+    } else {
+      allLists = EMPTY_LISTS();
+      listMeta = {};
     }
-  } catch(e) { console.error('loadLists:', e); }
+    listasCargadas = true;
+    if (currentTab === 'estrenos') renderDayList();
+  } catch(e) {
+    console.error('loadLists:', e);
+    // Si ya había listas cargadas (relectura al cambiar de pestaña), se siguen usando sin molestar.
+    if (!listasCargadas) toast('No se pudieron cargar tus listas. Cambia de pestaña para reintentar.');
+  }
   updateDots();
   return allLists;
 }
 
 async function saveLists() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   try {
     await db.collection('animelists').doc(getUserId()).set({
       ...allLists,
       listMeta,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-  } catch(e) { console.error('saveLists:', e); }
+    return true;
+  } catch(e) {
+    console.error('saveLists:', e);
+    toast('No se pudo guardar. Revisa tu conexión.');
+    return false;
+  }
 }
 
 // Custom list CRUD
 async function createCustomList(name, emoji) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   const key = 'custom_' + Date.now().toString(36);
   listMeta[key] = { name: (name||'').trim().slice(0, 30) || 'Sin nombre', emoji: emoji || '📂' };
   allLists[key] = [];
@@ -698,24 +1067,27 @@ async function createCustomList(name, emoji) {
   return key;
 }
 async function renameCustomList(key, name, emoji) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (!isCustomList(key) || !listMeta[key]) return;
   listMeta[key] = { name: (name||'').trim().slice(0,30) || listMeta[key].name, emoji: emoji || listMeta[key].emoji };
   await saveLists();
 }
 async function deleteCustomList(key) {
-  if (!isCustomList(key) || !listMeta[key]) return;
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
+  if (!isCustomList(key) || !listMeta[key]) return false;
+  const pendingIds = new Set(allLists.pendiente.map(a => String(a.id)));
+  for (const anime of allLists[key] || []) {
+    if (pendingIds.has(String(anime.id))) continue;
+    allLists.pendiente.push(anime);
+    pendingIds.add(String(anime.id));
+  }
   delete listMeta[key];
   delete allLists[key];
-  try {
-    await db.collection('animelists').doc(getUserId()).update({
-      [key]: firebase.firestore.FieldValue.delete(),
-      listMeta: listMeta,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-  } catch(e) { console.error('deleteCustomList:', e); }
+  return await saveLists();
 }
 
 async function trackAnime(r, list) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   const id = Number(r.id);
   // Remove from all lists (defaults + customs)
   let existing = null;
@@ -749,6 +1121,7 @@ async function trackAnime(r, list) {
 }
 
 async function updateEpInList(id, watchedEps, newList) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   id = Number(id);
   const allKeys = getAllListKeys();
   let anime = null;
@@ -765,10 +1138,17 @@ async function updateEpInList(id, watchedEps, newList) {
     if (!allLists[newList]) allLists[newList] = [];
     allLists[newList].push(anime);
   }
-  await saveLists();
+  try {
+    return await saveLists();
+  } catch(e) {
+    console.error('updateEpInList:', e);
+    toast('No se pudo guardar. Revisa tu conexión.');
+    return false;
+  }
 }
 
 async function removeFromLists(id) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   id = Number(id);
   for (const l of getAllListKeys()) {
     allLists[l] = (allLists[l]||[]).filter(a => a.id !== id);
@@ -960,6 +1340,7 @@ const _refreshing = new Set();
 const REFRESH_TTL_MS = 6 * 60 * 60 * 1000;
 
 async function refreshTrackedAiring(listName) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_refreshing.has(listName)) return;
   const list = allLists[listName] || [];
   if (!list.length) return;
@@ -1030,15 +1411,24 @@ function setTab(tab) {
   renderTab(tab);
 }
 async function renderTab(tab) {
+  if (!listasCargadas) {
+    document.getElementById('content').innerHTML = '<div class="spinner"></div>';
+    await loadLists();
+    if (currentTab !== tab) return;
+  } else if (tab !== 'buscar') {
+    // Relee al cambiar de pestaña para traer lo que marcaste en otro dispositivo
+    // (como antes). Si falla, se queda con lo ya cargado.
+    await loadLists();
+    if (currentTab !== tab) return;
+  }
   if (tab==='estrenos') { renderEstrenos(); return; }
   if (tab==='listas')   { renderOverview();  return; }
-  if (tab!=='buscar') { document.getElementById('content').innerHTML='<div class="spinner"></div>'; await loadLists(); }
   if (tab==='buscar') renderSearch();
   else renderList(tab);  // works for default and custom list keys
 }
 
 // ── Estrenos tab (single-day view, navigable with arrows) ────────────────────
-const DAY_GQL = `query($from:Int,$to:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$from,airingAt_lesser:$to){episode airingAt media{id title{romaji english}coverImage{large medium}averageScore format status genres siteUrl}}}}`;
+const DAY_GQL = `query($from:Int,$to:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$from,airingAt_lesser:$to){episode airingAt media{id isAdult title{romaji english}coverImage{large medium}averageScore format status genres siteUrl}}}}`;
 let estrenosFilter = 'todos';
 
 // Per-day persistence (localStorage)
@@ -1103,7 +1493,7 @@ function renderEstrenos() {
           <button class="chip ${estrenosFilter==='movie'?'active':''}"   data-f="movie"   onclick="setEstrenosFilter('movie')">🎬 Películas</button>
           <button class="chip ${estrenosFilter==='ona'?'active':''}"     data-f="ona"     onclick="setEstrenosFilter('ona')">🖥️ ONA</button>
         </div>
-        <button class="week-toggle${weekStripVisible?' active':''}" id="week-toggle-btn" onclick="toggleWeekStrip()" title="Vista semanal">📅 Semana</button>
+        <button class="week-toggle${weekStripVisible?' active':''}" id="week-toggle-btn" onclick="toggleWeekStrip()" title="Vista semanal" aria-label="Vista semanal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/></svg></button>
         <div class="day-view-toggle">
           <button class="day-view-btn ${dayView==='list'?'active':''}" onclick="setDayView('list')" title="Lista">☰</button>
           <button class="day-view-btn ${dayView==='grid'?'active':''}" onclick="setDayView('grid')" title="Tarjetas">⊞</button>
@@ -1124,7 +1514,7 @@ function setEstrenosFilter(f) {
 
 function setDayView(v) {
   dayView = v;
-  try { localStorage.setItem('at_day_view', v); } catch {}
+  atPrefs.set('at_day_view', v);
   document.querySelectorAll('.day-view-btn').forEach((b, i) => b.classList.toggle('active', (i===0?'list':'grid') === v));
   renderDayList();
 }
@@ -1146,6 +1536,7 @@ function goToday() {
 
 async function fetchDay(d, force) {
   const myToken = ++dayFetchToken;
+  dayError = false;
   // Cache hit → render instantly, no network
   if (!force) {
     const cached = loadDayCache(d);
@@ -1174,9 +1565,11 @@ async function fetchDay(d, force) {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ query: DAY_GQL, variables: { from, to, page } }),
       });
+      if (!r.ok) throw new Error('AniList HTTP ' + r.status);
       const json = await r.json();
+      if (json.errors || !Array.isArray(json.data?.Page?.airingSchedules)) throw new Error('Respuesta inválida de AniList');
       const eps = (json.data?.Page?.airingSchedules || [])
-        .filter(s => s?.media?.id)
+        .filter(s => s?.media?.id && !s.media.isAdult) // sin contenido adulto
         .map(s => {
           const m = s.media;
           return {
@@ -1198,7 +1591,14 @@ async function fetchDay(d, force) {
     }
     allEps.sort((a, b) => a.airingAt - b.airingAt);
     saveDayCache(d, allEps);
-  } catch (e) { console.error('fetchDay:', e); }
+  } catch (e) {
+    console.error('fetchDay:', e);
+    if (myToken !== dayFetchToken) return;
+    dayError = true;
+    dayLoading = false;
+    renderDayList();
+    return;
+  }
 
   // Discard if a newer fetch superseded this one (user navigated away)
   if (myToken !== dayFetchToken) return;
@@ -1212,13 +1612,17 @@ function renderDayList() {
   const el = document.getElementById('estreno-content');
   if (!el) return;
 
+  if (dayError) {
+    el.innerHTML = '<div class="empty"><p>No se pudo cargar (sin conexión o AniList ocupado). Toca ↻ para reintentar.</p></div>';
+    return;
+  }
   if (dayLoading && !dayData.length) {
     el.innerHTML = '<div class="spinner"></div>';
     return;
   }
 
   let items = dayData.map(e => ({ ...e, tracking: getAnimeList(e.id) }));
-  if (estrenosFilter === 'tracked')      items = items.filter(e => e.tracking);
+  if (estrenosFilter === 'tracked')      items = items.filter(e => e.tracking && e.tracking !== 'descartado');
   else if (estrenosFilter === 'tv')      items = items.filter(e => ['TV','TV_SHORT'].includes(e.format));
   else if (estrenosFilter === 'movie')   items = items.filter(e => e.format === 'MOVIE');
   else if (estrenosFilter === 'ona')     items = items.filter(e => ['ONA','OVA','SPECIAL'].includes(e.format));
@@ -1231,18 +1635,18 @@ function renderDayList() {
     return;
   }
 
-  const tracked   = items.filter(e => e.tracking);
-  const discovery = items.filter(e => !e.tracking);
+  const tracked   = items.filter(e => e.tracking && e.tracking !== 'descartado');
+  const discovery = items.filter(e => !e.tracking || e.tracking === 'descartado');
   const renderItem = dayView === 'grid' ? estrenoGridCard : estrenoCard;
   const wrapOpen   = dayView === 'grid' ? '<div class="estreno-grid">' : '';
   const wrapClose  = dayView === 'grid' ? '</div>' : '';
   if (tracked.length) {
-    html += `<div class="estreno-section"><div class="estreno-section-title">⭐ Tus series — ${tracked.length}</div>`;
+    html += `<div class="estreno-section"><div class="estreno-section-title">Tus series · ${tracked.length}</div>`;
     html += wrapOpen + tracked.map(e => renderItem(e, true)).join('') + wrapClose;
     html += '</div>';
   }
   if (discovery.length) {
-    html += `<div class="estreno-section"><div class="estreno-section-title">📡 Descubrimiento — ${discovery.length}</div>`;
+    html += `<div class="estreno-section"><div class="estreno-section-title">Descubrimiento · ${discovery.length}</div>`;
     html += wrapOpen + discovery.map(e => renderItem(e, false)).join('') + wrapClose;
     html += '</div>';
   }
@@ -1252,61 +1656,62 @@ function renderDayList() {
 function estrenoGridCard(e, isTracked) {
   const time = new Date(e.airingAt*1000).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
   const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
-  const trackEmoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[e.tracking]||'';
+  const trackMeta = getListMeta(e.tracking);
   const a = isTracked ? getAnime(e.id) : null;
   const w = a?.watchedEps || 0;
   const t = a?.totalEps || null;
-  const trackedBadge = isTracked ? `<div class="egc-track-badge">${trackEmoji} ${e.tracking}</div>` : '';
+  const trackedBadge = isTracked ? `<div class="egc-track-badge">${safe(trackMeta.emoji)} ${safe(trackMeta.name)}</div>` : '';
   const progressPill = (isTracked && e.format !== 'MOVIE' && e.tracking !== 'completado' && t)
-    ? `<div class="egc-progress-pill">${w}/${t}</div>` : '';
-  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" onclick="openResultDetail(${JSON.stringify({...e, episodes: t || null}).replace(/"/g,'&quot;')})">
+    ? `<div class="egc-progress-pill">${safe(w)}/${safe(t)}</div>` : '';
+  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" ${actionAttrs('openResultDetail', [{...e, episodes: t || null}])}>
     <div class="egc-poster">
-      ${e.cover?`<img src="${safe(e.cover)}" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:36px\\'>🎌</div>'">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px">🎌</div>'}
+      ${safeUrl(e.cover)?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="showGridImageFallback(this)">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px">🎌</div>'}
       ${trackedBadge}
       ${progressPill}
       <div class="egc-format-icon">${fmtIcon}</div>
       <div class="egc-overlay">
         <span class="egc-time">${time}</span>
-        <span class="egc-ep">Ep ${e.episode}</span>
+        <span class="egc-ep">Ep ${safe(e.episode)}</span>
       </div>
     </div>
     <div class="egc-title">${safe(e.title)}</div>
-    <div class="egc-meta">${e.score?`⭐ ${e.score}`:''}${e.genres?.length?` · ${e.genres[0]}`:''}</div>
+    <div class="egc-meta">${e.score?`⭐ ${safe(e.score)}`:''}${e.genres?.length?` · ${safe(e.genres[0])}`:''}</div>
   </div>`;
 }
 
 function estrenoCard(e, isTracked) {
   const time = new Date(e.airingAt*1000).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
   const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
-  const trackEmoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[e.tracking]||'';
-  const trackedChip = isTracked ? `<div class="tracked-chip">${trackEmoji} ${e.tracking}</div>` : '';
+  const trackMeta = getListMeta(e.tracking);
+  const trackedChip = isTracked ? `<div class="tracked-chip">${safe(trackMeta.emoji)} ${safe(trackMeta.name)}</div>` : '';
   const addBtns = isTracked
-    ? `<div class="estreno-ep-counter" onclick="event.stopPropagation()">
-        <button class="ep-btn" onclick="changeEp(${e.id},-1,'${e.tracking}')">−</button>
-        <span class="ep-count editable" onclick="openEpModal(${e.id})" title="Tap para editar">${(getAnime(e.id)?.watchedEps||0)} ep</span>
-        <button class="ep-btn" onclick="changeEp(${e.id},1,'${e.tracking}')">+</button>
+    ? `<div class="estreno-ep-counter" data-click-stop="1">
+        <button class="ep-btn" ${actionAttrs('changeEp', [e.id,-1,e.tracking])}>−</button>
+        <span class="ep-count editable" ${actionAttrs('openEpModal', [e.id])} title="Tap para editar">${safe((getAnime(e.id)?.watchedEps||0))} ep</span>
+        <button class="ep-btn" ${actionAttrs('changeEp', [e.id,1,e.tracking])}>+</button>
        </div>`
-    : `<div class="qadd-row">${LIST_OPTS.map(l=>`<button class="qadd-btn" onclick="event.stopPropagation();quickAddEstreno(${JSON.stringify(e).replace(/"/g,'&quot;')},'${l.key}',this)">${l.emoji} ${l.label}</button>`).join('')}</div>`;
-  return `<div class="estreno-card${isTracked?' is-tracked':''}" onclick="openResultDetail(${JSON.stringify({...e, score: e.score, episodes: null}).replace(/"/g,'&quot;')})">
+    : `<div class="qadd-row">${LIST_OPTS.map(l=>`<button class="qadd-btn" ${actionAttrs('quickAddEstreno', [e,l.key], true)}>${l.emoji} ${l.label}</button>`).join('')}</div>`;
+  return `<div class="estreno-card${isTracked?' is-tracked':''}" ${actionAttrs('openResultDetail', [{...e, score: e.score, episodes: null}])}>
     <div class="estreno-poster">
-      ${e.cover?`<img src="${safe(e.cover)}" loading="lazy" onerror="this.parentElement.innerHTML='🎌'">`:'🎌'}
+      ${e.cover?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="this.parentElement.innerHTML='🎌'">`:'🎌'}
       <div class="estreno-time-badge">${time}</div>
     </div>
     <div class="estreno-body">
       ${trackedChip}
       <div class="estreno-title">${safe(e.title)}</div>
       <div class="estreno-meta">
-        <span>Ep. ${e.episode}</span>
-        ${e.score?`<span>⭐ ${e.score}</span>`:''}
-        <span>${fmtIcon} ${e.format==='TV'?'TV':e.format==='MOVIE'?'Película':e.format}</span>
+        <span>Ep. ${safe(e.episode)}</span>
+        ${e.score?`<span>⭐ ${safe(e.score)}</span>`:''}
+        <span>${fmtIcon} ${safe(e.format==='TV'?'TV':e.format==='MOVIE'?'Película':e.format)}</span>
       </div>
-      ${e.genres.length?`<div class="estreno-genres">${e.genres.join(' · ')}</div>`:''}
+      ${e.genres.length?`<div class="estreno-genres">${safe(e.genres.join(' · '))}</div>`:''}
       ${addBtns}
     </div>
   </div>`;
 }
 
 async function quickAddEstreno(e, list, btn) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   saveRecent(e.title, [e]);
   await trackAnime(e, list);
@@ -1324,7 +1729,7 @@ function renderSearch() {
   c.innerHTML = `
     <div class="search-top">
       <div class="search-wrap">
-        <span class="si">🔍</span>
+        <span class="si"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
         <input class="search-input" id="search-in" type="search" placeholder="Buscar anime en AniList..." autocomplete="off">
       </div>
       <div class="view-toggle">
@@ -1356,7 +1761,7 @@ function renderActiveFiltersBar() {
   const chips = getActiveFilterChips();
   if (!chips.length) return '';
   const chipHtml = chips.map(c =>
-    `<span class="active-filter-chip">${safe(c.label)} <button onclick="removeFilter('${c.key}')" aria-label="Quitar">×</button></span>`
+    `<span class="active-filter-chip">${safe(c.label)} <button ${actionAttrs('removeFilter', [c.key])} aria-label="Quitar">×</button></span>`
   ).join('');
   return `<div class="active-filters">${chipHtml}<button class="clear-all-btn" onclick="clearAllFilters(true)">Limpiar todo</button></div>`;
 }
@@ -1365,10 +1770,10 @@ function renderRecentHtml() {
   const recent = getRecent();
   if (!recent.length) return '<div class="empty"><div class="big">🎌</div><p>Escribe el nombre de un anime<br>para buscar en AniList</p></div>';
   const items = recent.map(r=>`
-    <div class="recent-item" onclick="runRecentSearch('${safe(r.q)}')">
-      <div class="recent-thumb">${r.cover?`<img src="${safe(r.cover)}" loading="lazy" onerror="this.style.display='none'">`:'<span style="font-size:18px">🎌</span>'}</div>
+    <div class="recent-item" ${actionAttrs('runRecentSearch', [r.q])}>
+      <div class="recent-thumb">${r.cover?`<img src="${safe(safeUrl(r.cover))}" loading="lazy" onerror="this.style.display='none'">`:'<span style="font-size:18px">🎌</span>'}</div>
       <div class="recent-label">${safe(r.q)}</div>
-      <div class="recent-count">${r.count}</div>
+      <div class="recent-count">${safe(r.count)}</div>
     </div>`).join('');
   return `<div class="recent-header">
     <span class="section-title" style="padding:12px 14px 6px;display:block">Búsquedas recientes</span>
@@ -1406,15 +1811,15 @@ function gridCard(r) {
   if (tracked) {
     const t = a?.totalEps || r.episodes;
     if (a && r.format !== 'MOVIE' && tracked !== 'completado' && t) {
-      badge = `<div class="tracked-badge with-eps">${emoji} ${a.watchedEps||0}/${t}</div>`;
+      badge = `<div class="tracked-badge with-eps">${emoji} ${safe(a.watchedEps||0)}/${safe(t)}</div>`;
     } else {
       badge = `<div class="tracked-badge">${emoji}</div>`;
     }
   }
-  return `<div class="grid-card" onclick="openResultDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+  return `<div class="grid-card" ${actionAttrs('openResultDetail', [r])}>
     <div class="grid-poster">${imgTag(r.cover,'🎌')}${badge}</div>
     <div class="grid-title">${safe(r.title)}</div>
-    <div class="grid-meta">${r.score?'⭐'+r.score+' · ':''}${r.format||'TV'}</div>
+    <div class="grid-meta">${safe(r.score?'⭐'+r.score+' · ':'')}${safe(r.format||'TV')}</div>
   </div>`;
 }
 
@@ -1422,14 +1827,14 @@ function listCard(r) {
   const tracked = getAnimeList(r.id)||r.tracking;
   const a = tracked ? getAnime(r.id) : null;
   const meta = [
-    r.score?`<span>⭐ ${r.score}</span>`:'',
-    r.format?`<span>📺 ${r.format==='TV'?'Serie':r.format==='MOVIE'?'Película':r.format}</span>`:'',
-    r.episodes?`<span>🎞 ${r.episodes} ep</span>`:'',
-    r.startDate?`<span>📅 ${r.startDate.substring(0,7)}</span>`:'',
+    r.score?`<span>⭐ ${safe(r.score)}</span>`:'',
+    r.format?`<span>📺 ${safe(r.format==='TV'?'Serie':r.format==='MOVIE'?'Película':r.format)}</span>`:'',
+    r.episodes?`<span>🎞 ${safe(r.episodes)} ep</span>`:'',
+    r.startDate?`<span>📅 ${safe(r.startDate.substring(0,7))}</span>`:'',
   ].filter(Boolean).join('');
-  const trackedHtml = tracked?`<div class="tracked-chip">${{viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[tracked]||'✓'} ${tracked}</div>`:'';
-  const nextHtml = r.nextEp?`<div class="result-next">📡 Ep ${r.nextEp.ep} → ${r.nextEp.airingAt}</div>`:'';
-  const genresHtml = r.genres?.length?`<div class="result-genres">${r.genres.join(' · ')}</div>`:'';
+  const trackedHtml = tracked?`<div class="tracked-chip">${{viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[tracked]||'✓'} ${safe(tracked)}</div>`:'';
+  const nextHtml = r.nextEp?`<div class="result-next">📡 Ep ${safe(r.nextEp.ep)} → ${safe(r.nextEp.airingAt)}</div>`:'';
+  const genresHtml = r.genres?.length?`<div class="result-genres">${safe(r.genres.join(' · '))}</div>`:'';
 
   // NEW: ep counter when tracked (non-movie, non-completado)
   let progressHtml = '';
@@ -1438,10 +1843,10 @@ function listCard(r) {
     const t = a.totalEps || r.episodes || 0;
     const p = t ? Math.round(w/t*100) : 0;
     progressHtml = `<div class="result-progress-wrap">
-      <div class="estreno-ep-counter" onclick="event.stopPropagation()">
-        <button class="ep-btn" onclick="changeEpFromSearch(${r.id},-1)">−</button>
-        <span class="ep-count editable" data-search-ep="${r.id}" onclick="event.stopPropagation();openEpModal(${r.id})" title="Tap para editar">${w}${t?` / ${t}`:''}</span>
-        <button class="ep-btn" onclick="changeEpFromSearch(${r.id},1)">+</button>
+      <div class="estreno-ep-counter" data-click-stop="1">
+        <button class="ep-btn" ${actionAttrs('changeEpFromSearch', [r.id,-1])}>−</button>
+        <span class="ep-count editable" data-search-ep="${safe(r.id)}" ${actionAttrs('openEpModal', [r.id], true)} title="Tap para editar">${safe(w)}${t?` / ${safe(t)}`:''}</span>
+        <button class="ep-btn" ${actionAttrs('changeEpFromSearch', [r.id,1])}>+</button>
       </div>
       ${t?`<div class="result-progress-bar"><div class="result-progress-bar-fill" style="width:${p}%"></div></div>`:''}
     </div>`;
@@ -1452,19 +1857,19 @@ function listCard(r) {
   if (a) {
     const links = _getLinks(a);
     const linkBtns = links.map((url, i) =>
-      `<button class="link-mini-btn" onclick="event.stopPropagation();openAnimeLink(${r.id},${i})" title="${safe(url)}">▶️ ${safe(_extractDomain(url))}</button>`
+      `<button class="link-mini-btn" ${actionAttrs('openAnimeLink', [r.id,i], true)} title="${safe(url)}">▶️ ${safe(_extractDomain(url))}</button>`
     ).join('');
     const addLink = links.length < MAX_LINKS_PER_ANIME
-      ? `<button class="link-mini-btn" style="border-style:dashed;background:none" onclick="event.stopPropagation();openLinkModal(${r.id})">🔗 + link</button>`
+      ? `<button class="link-mini-btn" style="border-style:dashed;background:none" ${actionAttrs('openLinkModal', [r.id], true)}>🔗 + link</button>`
       : '';
     if (linkBtns || addLink) linksHtml = `<div class="result-links">${linkBtns}${addLink}</div>`;
   }
 
   const addBtns = LIST_OPTS.map(l=>
-    `<button class="qadd-btn${tracked===l.key?' active':''}" onclick="event.stopPropagation();quickAdd(${r.id},'${l.key}',this)">${l.emoji} ${l.label}</button>`
+    `<button class="qadd-btn${tracked===l.key?' active':''}" ${actionAttrs('quickAdd', [r.id,l.key], true)}>${l.emoji} ${l.label}</button>`
   ).join('');
   const nickHtml = a?.nickname ? `<div class="result-genres" style="opacity:1;color:var(--accent);font-weight:600">🏷️ ${safe(a.nickname)}</div>` : '';
-  return `<div class="result-card" onclick="openResultDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+  return `<div class="result-card" ${actionAttrs('openResultDetail', [r])}>
     <div class="result-poster">${imgTag(r.cover,'🎌')}</div>
     <div class="result-body">
       ${trackedHtml}
@@ -1479,6 +1884,7 @@ function listCard(r) {
 }
 
 async function changeEpFromSearch(id, delta) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   id = Number(id);
   const a = getAnime(id);
@@ -1486,7 +1892,6 @@ async function changeEpFromSearch(id, delta) {
   const w = Math.max(0, (a.watchedEps || 0) + delta);
   if (a.totalEps && w > a.totalEps) return;
   a.watchedEps = w;
-  await updateEpInList(id, w);
   // Update count in place + progress bar fill
   const cnt = document.querySelector(`#search-results [data-search-ep="${id}"]`);
   if (cnt) cnt.textContent = `${w}${a.totalEps?` / ${a.totalEps}`:''}`;
@@ -1498,9 +1903,11 @@ async function changeEpFromSearch(id, delta) {
     if (bar) bar.style.width = p + '%';
   }
   _checkAutoComplete(a);
+  await updateEpInList(id, w);
 }
 
 async function quickAdd(id, list, btn) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   if (lastSearchQuery && lastSearchResults.length) saveRecent(lastSearchQuery, lastSearchResults);
   const r = lastSearchResults.find(x=>x.id===id);
@@ -1512,28 +1919,31 @@ async function quickAdd(id, list, btn) {
     const chip = card.querySelector('.tracked-chip');
     const emoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[list]||'✓';
     if (chip) chip.textContent=`${emoji} ${list}`;
-    else card.querySelector('.result-body').insertAdjacentHTML('afterbegin',`<div class="tracked-chip">${emoji} ${list}</div>`);
+    else card.querySelector('.result-body').insertAdjacentHTML('afterbegin',`<div class="tracked-chip">${emoji} ${safe(list)}</div>`);
   }
   toast(`✓ "${(r.title||'').substring(0,20)}" → ${list}`);
 }
 
 function openResultDetail(r) {
+  // Si ya está en una de tus listas, abre la ficha completa (links, notas, apodo),
+  // la misma que en Viendo. Antes Estrenos/Buscar abrían una ficha reducida.
+  if (r && getAnime(r.id)) { openAnimeDetail(r.id); return; }
   haptic('light');
   if (lastSearchQuery && lastSearchResults.length) saveRecent(lastSearchQuery, lastSearchResults);
   const tracked = getAnimeList(r.id)||r.tracking;
   const a = tracked ? getAnime(r.id) : null;
   document.getElementById('detail-title').textContent = r.title;
   const badges = [
-    r.status?`<span class="detail-badge">${statusLabel(r.status)}</span>`:'',
-    r.format?`<span class="detail-badge">${r.format==='MOVIE'?'🎬 Película':r.format}</span>`:'',
-    r.episodes?`<span class="detail-badge">🎞 ${r.episodes} eps</span>`:'',
-    r.startDate?`<span class="detail-badge">📅 ${r.startDate.substring(0,7)}</span>`:'',
-    r.season?`<span class="detail-badge">🗓 ${r.season}</span>`:'',
+    r.status?`<span class="detail-badge">${safe(statusLabel(r.status))}</span>`:'',
+    r.format?`<span class="detail-badge">${safe(r.format==='MOVIE'?'🎬 Película':r.format)}</span>`:'',
+    r.episodes?`<span class="detail-badge">🎞 ${safe(r.episodes)} eps</span>`:'',
+    r.startDate?`<span class="detail-badge">📅 ${safe(r.startDate.substring(0,7))}</span>`:'',
+    r.season?`<span class="detail-badge">🗓 ${safe(r.season)}</span>`:'',
   ].join('');
   const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
   const addBtns = allOpts.map(l=>
-    `<div class="list-opt${tracked===l.key?' active':''}" onclick="addFromDetail(${r.id},'${l.key}',this,${JSON.stringify(r).replace(/"/g,'&quot;')})">${safe(l.emoji)} ${safe(l.label)}</div>`
-  ).join('') + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
+    `<div class="list-opt${tracked===l.key?' active':''}" ${actionAttrs('addFromDetail', [r.id,l.key,r])}>${safe(l.emoji)} ${safe(l.label)}</div>`
+  ).join('') + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">+ Nueva</div>`;
 
   // Episode counter section — shown when anime is tracked and not a movie/completado
   let epSection = '';
@@ -1544,9 +1954,9 @@ function openResultDetail(r) {
     epSection = `<div class="detail-section">
       <div class="detail-section-title">Progreso</div>
       <div class="ep-big" id="epbig-rd">
-        <button class="ep-btn" onclick="_rdEp(${r.id},-1)">−</button>
-        <span class="ep-count editable" id="epc-rd" onclick="openEpModal(${r.id})" title="Tap para escribir">${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span></span>
-        <button class="ep-btn" onclick="_rdEp(${r.id},1)">+</button>
+        <button class="ep-btn" ${actionAttrs('_rdEp', [r.id,-1])}>−</button>
+        <span class="ep-count editable" id="epc-rd" ${actionAttrs('openEpModal', [r.id])} title="Tap para escribir">${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span></span>
+        <button class="ep-btn" ${actionAttrs('_rdEp', [r.id,1])}>+</button>
       </div>
       ${t?`<div class="progress-bar" style="margin-top:9px"><div class="progress-fill" id="epfill-rd" style="width:${p}%"></div></div>
       <div style="text-align:center;font-size:11px;color:var(--hint);margin-top:4px" id="epct-rd">${p}%</div>`:''}
@@ -1561,40 +1971,41 @@ function openResultDetail(r) {
 
   document.getElementById('detail-body').innerHTML = `
     <div class="detail-hero">
-      <div class="detail-hero-img" onclick="openImgViewer('${safe(r.cover||r.coverImage||'')}')">${imgTag(r.cover||r.coverImage,'🎌')}</div>
+      <div class="detail-hero-img" ${actionAttrs('openImgViewer', [r.cover||r.coverImage||''])}>${imgTag(r.cover||r.coverImage,'🎌')}</div>
       <div class="detail-info">
         <div class="detail-name">${safe(r.title)}</div>
         <div class="detail-badges">${badges}</div>
-        ${r.score?`<div class="detail-score">⭐ ${r.score}<span style="font-size:12px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
-        ${r.genres?.length?`<div style="font-size:11px;color:var(--hint);margin-top:8px">${r.genres.join(' · ')}</div>`:''}
+        ${r.score?`<div class="detail-score">⭐ ${safe(r.score)}<span style="font-size:12px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
+        ${r.genres?.length?`<div style="font-size:11px;color:var(--hint);margin-top:8px">${safe(r.genres.join(' · '))}</div>`:''}
         ${_durationHtml({duration:r.duration||a?.duration, totalEps:r.episodes||a?.totalEps}, a?.watchedEps||0)}
       </div>
     </div>
     ${r.description||a?.description ? `<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(r.description||a?.description, 'rd'+r.id)}</div>` : ''}
     <div class="detail-section">
       <div class="detail-section-title">Saga / Franquicia</div>
-      <button class="saga-entry-btn" onclick="openSagaPanel(${r.id})">
+      <button class="saga-entry-btn" ${actionAttrs('openSagaPanel', [r.id])}>
         <span>🔗 Ver obras relacionadas</span>
         <span class="saga-arrow">›</span>
       </button>
     </div>
-    <div class="detail-section" id="wtw-section-${r.id}">
-      <div class="detail-section-title">📺 ¿Dónde ver?</div>
-      <div id="wtw-body-${r.id}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
+    <div class="detail-section" id="wtw-section-${safe(r.id)}">
+      <div class="detail-section-title">¿Dónde ver?</div>
+      <div id="wtw-body-${safe(r.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
-    ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${r.nextEp.ep}: ${r.nextEp.airingAt}</div></div>`:''}
+    ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${safe(r.nextEp.ep)}: ${safe(r.nextEp.airingAt)}</div></div>`:''}
     ${epSection}
     ${ratingSection}
     <div class="detail-section">
       <div class="detail-section-title">Agregar a lista</div>
       <div class="list-selector">${addBtns}</div>
     </div>
-    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" onclick="window.open('${safe(r.siteUrl)}','_blank')">🔗 Ver en AniList</button></div>`:''}`;
+    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" ${actionAttrs('openSite', [r.siteUrl])}>Ver en AniList</button></div>`:''}`;
   openDetail();
   loadWhereToWatch(r.id);
 }
 
 async function _rdEp(id, delta) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   id = Number(id);
   const a = getAnime(id);
@@ -1602,19 +2013,20 @@ async function _rdEp(id, delta) {
   const w = Math.max(0, (a.watchedEps||0) + delta);
   if (a.totalEps && w > a.totalEps) return;
   a.watchedEps = w;
-  await updateEpInList(id, w);
   const t = a.totalEps || 0, p = t ? Math.round(w/t*100) : 0;
   const ec = document.getElementById('epc-rd');
   const ef = document.getElementById('epfill-rd');
   const et = document.getElementById('epct-rd');
-  if (ec) ec.innerHTML = `${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span>`;
+  if (ec) ec.innerHTML = `${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span>`;
   if (ef) ef.style.width = p + '%';
   if (et) et.textContent = p + '%';
   _checkAutoComplete(a);
   if (currentTab === 'estrenos') renderDayList();
+  await updateEpInList(id, w);
 }
 
 async function addFromDetail(id, list, el, r) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   if (r) await trackAnime(r, list);
   el.closest('.list-selector')?.querySelectorAll('.list-opt').forEach(o=>o.classList.remove('active'));
@@ -1638,9 +2050,9 @@ function renderOverview() {
     const ip = key === 'viendo' ? arr.filter(a => (a.watchedEps||0) < (a.totalEps||Infinity)).length : 0;
     const bar = total ? Math.round(n/total*100) : 0;
     const color = colors[key] || '#7c3aed';
-    html += `<div class="overview-card" onclick="setTab('${key}')">
+    html += `<div class="overview-card" ${actionAttrs('setTab', [key])}>
       <div class="ov-row">
-        <div class="ov-left"><div class="ov-icon">${meta.emoji}</div>
+        <div class="ov-left"><div class="ov-icon">${safe(meta.emoji)}</div>
           <div><div class="ov-label">${safe(meta.name)}</div>${ip?`<div class="ov-sub">${ip} en progreso</div>`:''}</div>
         </div>
         <div class="ov-count">${n}</div>
@@ -1656,13 +2068,13 @@ function renderOverview() {
       const meta = getListMeta(key);
       const n = (allLists[key]||[]).length;
       const bar = total ? Math.round(n/total*100) : 0;
-      html += `<div class="overview-card" onclick="setTab('${key}')">
+      html += `<div class="overview-card" ${actionAttrs('setTab', [key])}>
         <div class="ov-row">
-          <div class="ov-left"><div class="ov-icon">${meta.emoji}</div>
+          <div class="ov-left"><div class="ov-icon">${safe(meta.emoji)}</div>
             <div><div class="ov-label">${safe(meta.name)}</div><div class="ov-sub">Lista personalizada</div></div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <button class="link-edit-btn" style="width:34px;height:34px" onclick="event.stopPropagation();editCustomList('${key}')" title="Editar">✏️</button>
+            <button class="link-edit-btn" style="width:34px;height:34px" ${actionAttrs('editCustomList', [key], true)} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
             <div class="ov-count">${n}</div>
           </div>
         </div>
@@ -1670,7 +2082,7 @@ function renderOverview() {
       </div>`;
     }
   }
-  html += `<div style="padding:14px"><button class="link-add-btn" onclick="openCreateListModal()">➕ Nueva lista personalizada</button></div>`;
+  html += `<div style="padding:14px"><button class="link-add-btn" onclick="openCreateListModal()">Nueva lista personalizada</button></div>`;
   html += renderStats();
   html += '</div>';
   document.getElementById('content').innerHTML = html;
@@ -1682,7 +2094,7 @@ function renderList(listName) {
   const c   = document.getElementById('content');
   const meta = getListMeta(listName);
   if (!raw.length) {
-    c.innerHTML = `<div class="empty"><div class="big">${meta.emoji}</div><p><b>${safe(meta.name)}</b> está vacía.<br>Busca anime para agregar.</p></div>`;
+    c.innerHTML = `<div class="empty"><div class="big">${safe(meta.emoji)}</div><p><b>${safe(meta.name)}</b> está vacía.<br>Busca anime para agregar.</p></div>`;
     return;
   }
   const sortMode    = _listSort[listName]   || 'addedAt';
@@ -1705,12 +2117,12 @@ function renderList(listName) {
 
   const toolsRow = `<div class="list-tools-row">
     <div class="list-search-wrap">
-      <span class="si">🔍</span>
-      <input class="list-search-mini" id="lsf-${listName}" type="search" placeholder="Filtrar…" autocomplete="off" value="${safe(filterText)}"
-        oninput="_listFilterChange('${listName}',this.value)">
+      <span class="si"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></span>
+      <input class="list-search-mini" id="lsf-${safe(listName)}" type="search" placeholder="Filtrar…" autocomplete="off" value="${safe(filterText)}"
+        ${actionAttrs('_listFilterChange', [listName], false, 'input')}>
     </div>
-    <select class="list-sort-select" onchange="_listSortChange('${listName}',this.value)">
-      ${sortOpts.map(o=>`<option value="${o.v}"${sortMode===o.v?' selected':''}>${o.l}</option>`).join('')}
+    <select class="list-sort-select" ${actionAttrs('_listSortChange', [listName], false, 'change')}>
+      ${sortOpts.map(o=>`<option value="${safe(o.v)}"${sortMode===o.v?' selected':''}>${safe(o.l)}</option>`).join('')}
     </select>
   </div>`;
 
@@ -1753,31 +2165,31 @@ function animeCard(a,listName){
       if (behind > 0) status = `<span class="behind">${behind} pendiente${behind>1?'s':''}</span>`;
       else if (behind === 0) status = `<span class="uptodate">al día ✓</span>`;
       else status = `<span class="ahead">+${-behind} de adelanto</span>`;
-      airedHtml = `<div class="progress-aired">📡 ${aired} emitido${aired===1?'':'s'}${a.nextEp?.airingAt?` · próx ${a.nextEp.airingAt}`:''} · ${status}</div>`;
+      airedHtml = `<div class="progress-aired">📡 ${safe(aired)} emitido${aired===1?'':'s'}${a.nextEp?.airingAt?` · próx ${safe(a.nextEp.airingAt)}`:''} · ${status}</div>`;
     }
     progressHtml = `<div class="progress-wrap">
-      <div class="progress-label"><span>${w} / ${t||'?'} eps</span><span>${t?p+'%':''}</span></div>
+      <div class="progress-label"><span>${safe(w)} / ${safe(t||'?')} eps</span><span>${t?p+'%':''}</span></div>
       ${t?`<div class="progress-bar"><div class="progress-fill" style="width:${p}%"></div></div>`:''}
       ${airedHtml}
     </div>`;
   }
   const counter=listName!=='completado'&&!isMovie?`
-    <div class="ep-counter" onclick="event.stopPropagation()">
-      <button class="ep-btn" onclick="changeEp(${a.id},-1,'${listName}')">−</button>
-      <span class="ep-count editable" onclick="openEpModal(${a.id})" title="Tap para editar">${w}${t?' / '+t:' ep'}</span>
-      <button class="ep-btn" onclick="changeEp(${a.id},1,'${listName}')">+</button>
+    <div class="ep-counter" data-click-stop="1">
+      <button class="ep-btn" ${actionAttrs('changeEp', [a.id,-1,listName])}>−</button>
+      <span class="ep-count editable" ${actionAttrs('openEpModal', [a.id])} title="Tap para editar">${safe(w)}${safe(t?' / '+t:' ep')}</span>
+      <button class="ep-btn" ${actionAttrs('changeEp', [a.id,1,listName])}>+</button>
     </div>`:'';
   const miniStars = a.userRating ? `<div class="card-rating">${[1,2,3,4,5].map(n=>`<span class="card-star${a.userRating>=n?' filled':''}">★</span>`).join('')}</div>` : '';
   const airedN = getAiredEp(a);
   const behind = airedN != null ? airedN - w : 0;
-  return `<div class="card${behind >= 3 ? ' is-behind' : ''}" data-swipe-id="${a.id}" onclick="openAnimeDetail(${a.id})">
+  return `<div class="card${behind >= 3 ? ' is-behind' : ''}" data-swipe-id="${safe(a.id)}" ${actionAttrs('openAnimeDetail', [a.id])}>
     <div class="card-poster">${imgTag(a.coverImage,'🎌')}</div>
     <div class="card-body">
       <div class="card-title">${safe(a.title)}</div>
       <div class="card-meta">
-        ${a.status?`<span class="badge-s">${statusLabel(a.status)}</span>`:''}
-        ${a.format&&a.format!=='TV'?`<span class="badge-s">${a.format}</span>`:''}
-        ${a.averageScore?`<span class="badge-s">⭐${a.averageScore}</span>`:''}
+        ${a.status?`<span class="badge-s">${safe(statusLabel(a.status))}</span>`:''}
+        ${a.format&&a.format!=='TV'?`<span class="badge-s">${safe(a.format)}</span>`:''}
+        ${a.averageScore?`<span class="badge-s">⭐${safe(a.averageScore)}</span>`:''}
       </div>
       ${progressHtml}${counter}${miniStars}
     </div>
@@ -1785,14 +2197,16 @@ function animeCard(a,listName){
 }
 
 async function changeEp(id,delta,listName){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   const a=getAnime(id); if(!a) return;
   const w=Math.max(0,(a.watchedEps||0)+delta);
   if(a.totalEps&&w>a.totalEps) return;
   a.watchedEps=w;
-  await updateEpInList(id,w);
-  renderList(listName);
+  if (currentTab === 'estrenos') renderDayList();
+  else if (getAllListKeys().includes(currentTab)) renderList(currentTab);
   _checkAutoComplete(a);
+  await updateEpInList(id,w);
 }
 
 // ── Detail sheet (my anime) ───────────────────────────────────────────────────
@@ -1803,6 +2217,7 @@ function openAnimeDetail(id){
   renderDetailBody(a,detailAnime.listName);
   openDetail();
   loadWhereToWatch(id);
+  botonVistoDetalle();
 }
 
 // "¿Dónde ver?" — consulta externalLinks oficiales de AniList y los muestra como botones.
@@ -1832,7 +2247,7 @@ async function loadWhereToWatch(id){
       const emoji = WATCH_SITE_EMOJI[l.site] || '📺';
       const lang = l.language ? ` · ${safe(l.language)}` : '';
       return `<div class="link-row">
-        <button class="link-open-btn" onclick="openExternal('${safe(l.url)}')">
+        <button class="link-open-btn" ${actionAttrs('openExternal', [l.url])}>
           <span style="font-size:15px">${emoji}</span>
           <span class="link-domain">${safe(l.site)}${lang}</span>
           <span class="link-arrow">→</span>
@@ -1846,6 +2261,8 @@ async function loadWhereToWatch(id){
 }
 // Abre un link externo desde la Mini App (Telegram WebApp o navegador)
 function openExternal(url){
+  url = safeUrl(url);
+  if (!url) return;
   haptic('medium');
   if (tg?.openLink) tg.openLink(url);
   else window.open(url, '_blank', 'noopener');
@@ -1855,35 +2272,35 @@ function renderDetailBody(a,listName){
   const w=a.watchedEps||0,t=a.totalEps||0,p=t?pct(w,t):0,isMovie=a.format==='MOVIE';
   document.getElementById('detail-title').textContent=a.title;
   const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
-  const listOpts = allOpts.map(l=>`<div class="list-opt${listName===l.key?' active':''}" onclick="moveToList(${a.id},'${l.key}')">${safe(l.emoji)} ${safe(l.label)}</div>`).join('')
-    + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
+  const listOpts = allOpts.map(l=>`<div class="list-opt${listName===l.key?' active':''}" ${actionAttrs('moveToList', [a.id,l.key])}>${safe(l.emoji)} ${safe(l.label)}</div>`).join('')
+    + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">+ Nueva</div>`;
   const epSection=isMovie
-    ?`<div class="ep-big"><button class="ep-btn" style="width:100%;font-size:14px;font-weight:600" onclick="toggleMovie(${a.id},'${listName}')">${w>0?'⬜ Marcar no vista':'✅ Marcar vista'}</button></div>`
+    ?`<div class="ep-big"><button class="ep-btn" style="width:100%;font-size:14px;font-weight:600" ${actionAttrs('toggleMovie', [a.id,listName])}>${w>0?'⬜ Marcar no vista':'✅ Marcar vista'}</button></div>`
     :`<div class="ep-big" id="epbig">
         <button class="ep-btn" onclick="detailEp(-1)">−</button>
-        <span class="ep-count editable" id="epc" onclick="openEpModal(${a.id})" title="Tap para escribir el episodio">${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span></span>
+        <span class="ep-count editable" id="epc" ${actionAttrs('openEpModal', [a.id])} title="Tap para escribir el episodio">${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span></span>
         <button class="ep-btn" onclick="detailEp(1)">+</button>
       </div>
       ${t?`<div class="progress-bar" style="margin-top:9px"><div class="progress-fill" id="epfill" style="width:${p}%"></div></div>
       <div style="text-align:center;font-size:11px;color:var(--hint);margin-top:4px" id="epct">${p}%</div>`:''}`;
   document.getElementById('detail-body').innerHTML=`
     <div class="detail-hero">
-      <div class="detail-hero-img" onclick="openImgViewer('${safe(a.coverImage||'')}')">${imgTag(a.coverImage,'🎌')}</div>
+      <div class="detail-hero-img" ${actionAttrs('openImgViewer', [a.coverImage||''])}>${imgTag(a.coverImage,'🎌')}</div>
       <div class="detail-info">
         <div class="detail-name">${safe(a.title)}</div>
         <div class="detail-badges">
-          ${a.status?`<span class="detail-badge">${statusLabel(a.status)}</span>`:''}
-          ${a.format?`<span class="detail-badge">${a.format}</span>`:''}
-          ${t?`<span class="detail-badge">${t} eps</span>`:''}
+          ${a.status?`<span class="detail-badge">${safe(statusLabel(a.status))}</span>`:''}
+          ${a.format?`<span class="detail-badge">${safe(a.format)}</span>`:''}
+          ${t?`<span class="detail-badge">${safe(t)} eps</span>`:''}
         </div>
-        ${a.averageScore?`<div class="detail-score">⭐ ${a.averageScore}<span style="font-size:11px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
+        ${a.averageScore?`<div class="detail-score">⭐ ${safe(a.averageScore)}<span style="font-size:11px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
         ${_durationHtml(a, w)}
       </div>
     </div>
     ${a.description?`<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(a.description, 'da'+a.id)}</div>`:''}
     <div class="detail-section">
       <div class="detail-section-title">Saga / Franquicia</div>
-      <button class="saga-entry-btn" onclick="openSagaPanel(${a.id})">
+      <button class="saga-entry-btn" ${actionAttrs('openSagaPanel', [a.id])}>
         <span>🔗 Ver obras relacionadas</span>
         <span class="saga-arrow">›</span>
       </button>
@@ -1898,13 +2315,13 @@ function renderDetailBody(a,listName){
       ${a.userNote
         ? `<div class="link-row">
             <div class="notes-display" style="flex:1">${safe(a.userNote)}</div>
-            <button class="link-edit-btn" onclick="openNotesModal(${a.id})" title="Editar">✏️</button>
+            <button class="link-edit-btn" ${actionAttrs('openNotesModal', [a.id])} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
            </div>`
-        : `<button class="link-add-btn" onclick="openNotesModal(${a.id})">📝 Agregar nota personal</button>`}
+        : `<button class="link-add-btn" ${actionAttrs('openNotesModal', [a.id])}>Agregar nota personal</button>`}
     </div>
-    <div class="detail-section" id="wtw-section-${a.id}">
-      <div class="detail-section-title">📺 ¿Dónde ver?</div>
-      <div id="wtw-body-${a.id}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
+    <div class="detail-section" id="wtw-section-${safe(a.id)}">
+      <div class="detail-section-title">¿Dónde ver?</div>
+      <div id="wtw-body-${safe(a.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
     <div class="detail-section">
       <div class="detail-section-title">Mis links${_getLinks(a).length?` · ${_getLinks(a).length}/${MAX_LINKS_PER_ANIME}`:''}</div>
@@ -1912,64 +2329,67 @@ function renderDetailBody(a,listName){
         ? `<div class="link-list">
             ${_getLinks(a).map((url, i) => `
               <div class="link-row">
-                <button class="link-open-btn" onclick="openAnimeLink(${a.id},${i})">
+                <button class="link-open-btn" ${actionAttrs('openAnimeLink', [a.id,i])}>
                   <span style="font-size:15px">▶️</span>
                   <span class="link-domain">${safe(_extractDomain(url))}</span>
                   <span class="link-arrow">→</span>
                 </button>
-                <button class="link-edit-btn" onclick="openLinkModal(${a.id},${i})" title="Editar">✏️</button>
+                <button class="link-edit-btn" ${actionAttrs('openLinkModal', [a.id,i])} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
               </div>
             `).join('')}
             ${_getLinks(a).length < MAX_LINKS_PER_ANIME
-              ? `<button class="link-add-btn" onclick="openLinkModal(${a.id})">+ Agregar otro link</button>`
+              ? `<button class="link-add-btn" ${actionAttrs('openLinkModal', [a.id])}>+ Agregar otro link</button>`
               : ''}
           </div>`
-        : `<button class="link-add-btn" onclick="openLinkModal(${a.id})">🔗 Agregar link (Crunchyroll, etc)</button>`
+        : `<button class="link-add-btn" ${actionAttrs('openLinkModal', [a.id])}>Agregar link (Crunchyroll, Telegram…)</button>`
       }
     </div>
     <div class="detail-section">
       <div class="detail-section-title">Apodo</div>
       ${a.nickname
         ? `<div class="link-row">
-            <button class="link-open-btn" style="cursor:default" onclick="event.stopPropagation()">
+            <button class="link-open-btn" style="cursor:default" data-click-stop="1">
               <span style="font-size:14px">🏷️</span>
               <span class="link-domain">${safe(a.nickname)}</span>
             </button>
-            <button class="link-edit-btn" onclick="openNickModal(${a.id})" title="Editar">✏️</button>
+            <button class="link-edit-btn" ${actionAttrs('openNickModal', [a.id])} title="Editar" aria-label="Editar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
           </div>`
-        : `<button class="link-add-btn" onclick="openNickModal(${a.id})">🏷️ Agregar apodo (busca más rápido)</button>`
+        : `<button class="link-add-btn" ${actionAttrs('openNickModal', [a.id])}>Agregar apodo (busca más rápido)</button>`
       }
     </div>
     <div class="detail-section"><div class="detail-section-title">Lista</div><div class="list-selector">${listOpts}</div></div>
     <div class="detail-section">
-      ${a.siteUrl?`<button class="action-btn action-ghost" onclick="window.open('${safe(a.siteUrl)}','_blank')">🔗 Ver en AniList</button>`:''}
-      <button class="action-btn action-danger" onclick="deleteAnime(${a.id})">❌ Quitar de mis listas</button>
+      ${a.siteUrl?`<button class="action-btn action-ghost" ${actionAttrs('openSite', [a.siteUrl])}>Ver en AniList</button>`:''}
+      <button class="action-btn action-danger" ${actionAttrs('deleteAnime', [a.id])}>Quitar de mis listas</button>
     </div>`;
 }
 
 async function detailEp(delta){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if(!detailAnime) return; haptic('light');
   const a=detailAnime, w=Math.max(0,(a.watchedEps||0)+delta);
   if(a.totalEps&&w>a.totalEps) return;
   a.watchedEps=w;
   const t=a.totalEps||0,p=t?pct(w,t):0;
   const ec=document.getElementById('epc'),ef=document.getElementById('epfill'),et=document.getElementById('epct');
-  if(ec) ec.innerHTML=`${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span>`;
+  if(ec) ec.innerHTML=`${safe(w)}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${safe(t||'?')}</span>`;
   if(ef) ef.style.width=p+'%';
   if(et) et.textContent=p+'%';
-  await updateEpInList(a.id,w);
   _checkAutoComplete(a);
+  await updateEpInList(a.id,w);
 }
 
 async function toggleMovie(id,listName){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   const a=getAnime(id); if(!a) return;
   a.watchedEps=(a.watchedEps||0)>0?0:1;
-  await updateEpInList(id,a.watchedEps);
   renderDetailBody(a,listName||getAnimeList(id));
+  await updateEpInList(id,a.watchedEps);
 }
 
 async function moveToList(id,newList){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('medium');
   const a=getAnime(id)||detailAnime; if(!a) return;
   await updateEpInList(id,a.watchedEps||0,newList);
@@ -1979,9 +2399,10 @@ async function moveToList(id,newList){
 }
 
 async function deleteAnime(id){
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('heavy');
   const a=getAnime(id)||detailAnime, title=a?a.title.substring(0,22):'Anime';
-  if(!confirm(`¿Quitar "${title}"?`)) return;
+  if(!(await confirmarTg(`¿Quitar "${title}"?`))) return;
   await removeFromLists(id);
   closeDetail();
   toast(`🗑️ "${title}" quitado`);
@@ -1996,13 +2417,25 @@ function openDetail(){
   requestAnimationFrame(()=>d.classList.add('open'));
   if(tg?.BackButton) tg.BackButton.show();
 }
+// Botón nativo de la ficha: suma el siguiente episodio sin buscar el «+».
+function botonVistoDetalle() {
+  if (!detailAnime || !getAnime(detailAnime.id)) { botonesNativos.ocultar(); return; }
+  const a = getAnime(detailAnime.id);
+  const w = a.watchedEps || 0;
+  const t = a.totalEps || a.episodes || 0;
+  const listName = getAnimeList(a.id);
+  if (t && w >= t) { botonesNativos.mostrar({ principal: { texto: 'Viste todos los episodios', activo: false, accion: () => {} } }); return; }
+  botonesNativos.mostrar({ principal: { texto: `✓ Visto ep ${w + 1}`, accion: async () => { await changeEp(a.id, 1, listName); botonVistoDetalle(); } } });
+}
 function closeDetail(){
+  botonesNativos.ocultar();
   const d=document.getElementById('detail');
   d.classList.add('closing'); d.classList.remove('open');
   detailAnime=null;
   if(tg?.BackButton) tg.BackButton.hide();
 }
 if(tg?.BackButton) tg.BackButton.onClick(()=>{
+  if (document.getElementById('saga-panel')?.classList.contains('open')) { closeSagaPanel(); return; }
   const cm = document.getElementById('complete-modal');
   if (cm?.classList.contains('open')) { closeCompleteModal(); return; }
   const ntm = document.getElementById('notes-modal');
@@ -2075,6 +2508,7 @@ function _ivReset() {
   _ivApply();
 }
 function openImgViewer(src) {
+  src = safeUrl(src);
   if (!src) return;
   haptic('light');
   // Try upgrading URL to higher-res (medium → large)
@@ -2213,7 +2647,13 @@ let _linkModalEditIdx = null; // null = adding new, number = editing existing
 
 function _extractDomain(url) {
   try {
-    const host = new URL(url).hostname.replace(/^www\./, '');
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    // t.me/canal → «Telegram · canal» (antes salía solo «T»).
+    if (host === 't.me' || host === 'telegram.me') {
+      const canal = u.pathname.split('/').filter(Boolean)[0];
+      return canal === 'c' ? 'Telegram · canal privado' : (canal ? `Telegram · ${canal}` : 'Telegram');
+    }
     const main = host.split('.')[0];
     return main.charAt(0).toUpperCase() + main.slice(1);
   } catch { return 'Link'; }
@@ -2253,10 +2693,11 @@ function closeLinkModal() {
 }
 
 async function saveLinkFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_linkModalAnimeId == null) return;
   const url = document.getElementById('link-input').value.trim();
   if (!url) { closeLinkModal(); return; } // empty = no-op
-  if (!/^https?:\/\//i.test(url)) {
+  if (!safeUrl(url)) {
     toast('⚠️ Link debe empezar con http:// o https://');
     return;
   }
@@ -2280,6 +2721,7 @@ async function saveLinkFromModal() {
 }
 
 async function removeLinkFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_linkModalAnimeId == null || _linkModalEditIdx == null) return;
   const a = getAnime(_linkModalAnimeId);
   if (a && Array.isArray(a.userLinks)) {
@@ -2297,11 +2739,7 @@ async function removeLinkFromModal() {
 function openAnimeLink(id, idx) {
   const a = getAnime(Number(id)) || detailAnime;
   const links = _getLinks(a);
-  const url = links[idx || 0];
-  if (!url) return;
-  haptic('medium');
-  if (tg?.openLink) tg.openLink(url);
-  else window.open(url, '_blank', 'noopener');
+  openUrlTelegramAware(links[idx || 0]);
 }
 
 // ── Nickname (alias para búsqueda rápida) ─────────────────────────────────────
@@ -2321,6 +2759,7 @@ function closeNickModal() {
   _nickModalAnimeId = null;
 }
 async function saveNickFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_nickModalAnimeId == null) return;
   const nick = document.getElementById('nick-input').value.trim().slice(0, 40);
   const a = getAnime(_nickModalAnimeId);
@@ -2359,6 +2798,7 @@ function closeEpModal() {
 }
 
 async function saveEpFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_epModalAnimeId == null) return;
   const a = getAnime(_epModalAnimeId);
   if (!a) return;
@@ -2369,7 +2809,6 @@ async function saveEpFromModal() {
     return;
   }
   a.watchedEps = v;
-  await updateEpInList(a.id, v);
 
   // Re-render whichever views are visible
   if (detailAnime?.id === a.id) {
@@ -2390,15 +2829,16 @@ async function saveEpFromModal() {
   if (a2) _checkAutoComplete(a2);
   toast(`✓ Ep ${v}`);
   closeEpModal();
+  await updateEpInList(a.id, v);
 }
 
 // ── Search filters modal ──────────────────────────────────────────────────────
 function _buildFilterChips(containerId, options, key, current) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  let html = `<button class="filter-chip${!current?' active':''}" data-val="" onclick="_pickFilter('${key}','')">Cualquiera</button>`;
+  let html = `<button class="filter-chip${!current?' active':''}" data-val="" ${actionAttrs('_pickFilter', [key,''])}>Cualquiera</button>`;
   html += options.map(o =>
-    `<button class="filter-chip${current===o.v?' active':''}" data-val="${safe(o.v)}" onclick="_pickFilter('${key}','${safe(o.v)}')">${o.label}</button>`
+    `<button class="filter-chip${current===o.v?' active':''}" data-val="${safe(o.v)}" ${actionAttrs('_pickFilter', [key,o.v])}>${safe(o.label)}</button>`
   ).join('');
   el.innerHTML = html;
 }
@@ -2406,14 +2846,14 @@ function _buildGenreChips(current) {
   const el = document.getElementById('filter-genres');
   if (!el) return;
   el.innerHTML = GENRE_OPTS.map(g =>
-    `<button class="filter-chip multi${(current||[]).includes(g)?' active':''}" data-val="${safe(g)}" onclick="_toggleGenre('${safe(g)}')">${g}</button>`
+    `<button class="filter-chip multi${(current||[]).includes(g)?' active':''}" data-val="${safe(g)}" ${actionAttrs('_toggleGenre', [g])}>${safe(g)}</button>`
   ).join('');
 }
 function _buildTagChips(current) {
   const el = document.getElementById('filter-tags');
   if (!el) return;
   el.innerHTML = TAG_OPTS.map(t =>
-    `<button class="filter-chip multi${(current||[]).includes(t)?' active':''}" data-val="${safe(t)}" onclick="_toggleTag('${safe(t)}')">${t}</button>`
+    `<button class="filter-chip multi${(current||[]).includes(t)?' active':''}" data-val="${safe(t)}" ${actionAttrs('_toggleTag', [t])}>${safe(t)}</button>`
   ).join('');
 }
 function _toggleTag(t) {
@@ -2501,14 +2941,15 @@ function removeFilter(key) {
 // ── Personal rating (1–5 stars) ───────────────────────────────────────────────
 function _starsHtml(id, rating, containerId) {
   const stars = [1,2,3,4,5].map(n =>
-    `<button class="star-btn${(rating||0) >= n ? ' filled' : ''}" onclick="setRating(${id},${n},'${containerId}')" aria-label="${n} estrellas">★</button>`
+    `<button class="star-btn${(rating||0) >= n ? ' filled' : ''}" ${actionAttrs('setRating', [id,n,containerId])} aria-label="${n} estrellas">★</button>`
   ).join('');
   const label = rating ? `${rating}/5` : 'Sin calificar';
-  const clear  = rating ? `<button class="rating-clear" onclick="setRating(${id},0,'${containerId}')">✕</button>` : '';
-  return `<div class="star-row" id="${containerId}">${stars}<span class="rating-label">${label}</span>${clear}</div>`;
+  const clear  = rating ? `<button class="rating-clear" ${actionAttrs('setRating', [id,0,containerId])}>✕</button>` : '';
+  return `<div class="star-row" id="${safe(containerId)}">${stars}<span class="rating-label">${safe(label)}</span>${clear}</div>`;
 }
 
 async function setRating(id, rating, containerId) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   id = Number(id);
   const a = getAnime(id) || detailAnime;
@@ -2550,6 +2991,7 @@ function closeCreateListModal() {
   _editingListKey = null;
 }
 async function saveCreateListFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   const name  = document.getElementById('list-name-input').value.trim();
   const emoji = document.getElementById('list-emoji-input').value.trim() || '📂';
   if (!name) { toast('⚠️ Ponle un nombre'); return; }
@@ -2567,14 +3009,15 @@ async function saveCreateListFromModal() {
   else if (detailAnime) renderDetailBody(getAnime(detailAnime.id) || detailAnime, getAnimeList(detailAnime.id));
 }
 async function deleteListFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (!_editingListKey) return;
   const meta = listMeta[_editingListKey];
   const items = allLists[_editingListKey] || [];
   const msg = items.length > 0
-    ? `"${meta.name}" tiene ${items.length} anime. Los animes NO se borran, solo se quitan de esta lista. ¿Seguro?`
+    ? `"${meta.name}" tiene ${items.length} anime. Los anime de esta lista pasan a Pendiente. ¿Seguro?`
     : `¿Eliminar "${meta.name}"?`;
-  if (!confirm(msg)) return;
-  await deleteCustomList(_editingListKey);
+  if (!(await confirmarTg(msg))) return;
+  if (!await deleteCustomList(_editingListKey)) return;
   closeCreateListModal();
   if (currentTab === 'listas') renderOverview();
   else if (currentTab === _editingListKey) setTab('listas');
@@ -2634,6 +3077,7 @@ function closeCompleteModal() {
   _pendingCompleteId = null;
 }
 async function confirmComplete() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_pendingCompleteId == null) return;
   const id = _pendingCompleteId;
   closeCompleteModal();
@@ -2663,23 +3107,26 @@ function closeNotesModal() {
   _notesModalId = null;
 }
 async function saveNotesFromModal() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_notesModalId == null) return;
   const note = document.getElementById('notes-textarea').value.trim().slice(0, 500);
   const a = getAnime(_notesModalId);
   if (a) {
     a.userNote = note || null;
-    await saveLists();
     if (detailAnime?.id === _notesModalId) { detailAnime.userNote = a.userNote; renderDetailBody(a, detailAnime.listName); }
-    toast(note ? '✓ Nota guardada' : '✓ Nota eliminada');
+    closeNotesModal();
+    if (await saveLists()) toast(note ? '✓ Nota guardada' : '✓ Nota eliminada');
+    return;
   }
   closeNotesModal();
 }
 async function clearNote() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (_notesModalId == null) return;
   const a = getAnime(_notesModalId);
-  if (a) { a.userNote = null; await saveLists(); if (detailAnime?.id === _notesModalId) { detailAnime.userNote = null; renderDetailBody(a, detailAnime.listName); } }
+  if (a) { a.userNote = null; if (detailAnime?.id === _notesModalId) { detailAnime.userNote = null; renderDetailBody(a, detailAnime.listName); } }
   closeNotesModal();
-  toast('🗑️ Nota eliminada');
+  if (a && await saveLists()) toast('🗑️ Nota eliminada');
 }
 
 // ── Synopsis toggle (colapsar/expandir) ──────────────────────────────────────
@@ -2699,9 +3146,9 @@ function _synopsisHtml(desc, id) {
   const display = cached || desc;
   const short   = !cached && display.length > 200;
   return `<div class="synopsis-wrap">
-    <p class="synopsis-text${short?' clamped':''}" id="syn-${id}">${safe(display)}</p>
-    ${short?`<button class="synopsis-toggle" id="syn-btn-${id}" onclick="toggleSynopsis('${id}')">Leer más ▾</button>`:''}
-    ${!cached?`<button class="translate-btn" id="trans-btn-${id}" onclick="translateSynopsis('${id}',this)">🌐 Español</button>`:'<span style="font-size:10px;color:var(--hint);display:inline-block;margin-top:4px">✓ Traducido</span>'}
+    <p class="synopsis-text${short?' clamped':''}" id="syn-${safe(id)}">${safe(display)}</p>
+    ${short?`<button class="synopsis-toggle" id="syn-btn-${safe(id)}" ${actionAttrs('toggleSynopsis', [id])}>Leer más ▾</button>`:''}
+    ${!cached?`<button class="translate-btn" id="trans-btn-${safe(id)}" ${actionAttrs('translateSynopsis', [id])}>Traducir al español</button>`:'<span style="font-size:11px;color:var(--hint);display:inline-block;margin-top:4px">✓ Traducido</span>'}
   </div>`;
 }
 function _durationHtml(a, watchedEps) {
@@ -2709,11 +3156,11 @@ function _durationHtml(a, watchedEps) {
   const dur = a.duration;
   const pending = a.totalEps ? Math.max(0, a.totalEps - (watchedEps||0)) : null;
   const parts = [];
-  parts.push(`<span>⏱ ${dur} min/ep</span>`);
+  parts.push(`<span>⏱ ${safe(dur)} min/ep</span>`);
   if (pending !== null && pending > 0) {
     const mins = pending * dur;
     const label = mins >= 60 ? `~${Math.round(mins/60)}h restantes` : `~${mins}min restantes`;
-    parts.push(`<span>${label}</span>`);
+    parts.push(`<span>${safe(label)}</span>`);
   }
   return `<div class="duration-line">${parts.join('')}</div>`;
 }
@@ -2740,7 +3187,7 @@ async function translateSynopsis(synId, btnEl) {
     _applyTranslation(synId, translated);
   } catch(_) {
     btnEl.classList.remove('loading');
-    btnEl.textContent = '🌐 Español';
+    btnEl.textContent = 'Traducir al español';
     toast('⚠️ Error al traducir. Intenta de nuevo.');
   }
 }
@@ -2801,6 +3248,7 @@ async function openSagaPanel(animeId) {
   body.innerHTML = '<div class="spinner"></div>';
   title.textContent = 'Cargando…';
   panel.classList.add('open');
+  if (tg?.BackButton) tg.BackButton.show();
 
   const result = await fetchRelations(animeId);
   if (!result || !result.entries.length) {
@@ -2816,27 +3264,26 @@ async function openSagaPanel(animeId) {
     const tracked = getAnimeList(e.id);
     const a       = tracked ? getAnime(e.id) : null;
     const watchedBadge = tracked
-      ? `<div class="relation-watched-badge">${tracked==='completado'?'✅':tracked==='viendo'?'▶️':getListMeta(tracked).emoji}</div>`
+      ? `<div class="relation-watched-badge">${safe(tracked==='completado'?'✅':tracked==='viendo'?'▶️':getListMeta(tracked).emoji)}</div>`
       : '';
     const progressTxt = a && a.totalEps
-      ? `<span style="color:var(--accent);font-weight:600">${a.watchedEps||0}/${a.totalEps}</span>` : '';
-    const rData = JSON.stringify(e).replace(/"/g, '&quot;');
+      ? `<span style="color:var(--accent);font-weight:600">${safe(a.watchedEps||0)}/${safe(a.totalEps)}</span>` : '';
     const addBtns = allOpts.map(l =>
-      `<button class="qadd-btn${tracked===l.key?' active':''}" onclick="event.stopPropagation();_sagaQuickAdd(${e.id},'${l.key}',${rData},this)">${safe(l.emoji)} ${safe(l.label)}</button>`
+      `<button class="qadd-btn${tracked===l.key?' active':''}" ${actionAttrs('_sagaQuickAdd', [e.id,l.key,e], true)}>${safe(l.emoji)} ${safe(l.label)}</button>`
     ).join('');
-    return `<div class="relation-card" onclick="openSagaEntryDetail(${e.id},${rData})">
+    return `<div class="relation-card" ${actionAttrs('openSagaEntryDetail', [e.id,e])}>
       <div class="relation-num">${i+1}</div>
       <div class="relation-poster">${imgTag(e.cover,'🎌')}${watchedBadge}</div>
       <div class="relation-body">
         <div class="relation-title">${safe(e.title)}</div>
         <div class="relation-meta">
-          ${e.startYear!==9999?`<span>📅 ${e.startYear}</span>`:''}
-          <span>${e.format==='MOVIE'?'🎬 Película':e.format||'TV'}</span>
-          ${e.episodes?`<span>🎞 ${e.episodes} eps</span>`:''}
-          ${e.score?`<span>⭐${e.score}</span>`:''}
+          ${e.startYear!==9999?`<span>📅 ${safe(e.startYear)}</span>`:''}
+          <span>${safe(e.format==='MOVIE'?'🎬 Película':e.format||'TV')}</span>
+          ${e.episodes?`<span>🎞 ${safe(e.episodes)} eps</span>`:''}
+          ${e.score?`<span>⭐${safe(e.score)}</span>`:''}
           ${progressTxt}
         </div>
-        <span class="relation-type-badge">${RELATION_LABEL[e.relationType]||e.relationType}</span>
+        <span class="relation-type-badge">${safe(RELATION_LABEL[e.relationType]||e.relationType)}</span>
         <div class="qadd-row" style="margin-top:5px">${addBtns}</div>
       </div>
     </div>`;
@@ -2848,12 +3295,13 @@ async function openSagaPanel(animeId) {
     ${cards}
     <div style="padding:14px">
       <button class="action-btn action-primary" onclick="saveSagaToList()">
-        ${alreadySaved ? '🔄 Actualizar saga en listas' : '💾 Guardar saga completa en mis listas'}
+        ${alreadySaved ? 'Actualizar saga en listas' : '💾 Guardar saga completa en mis listas'}
       </button>
     </div>`;
 }
 
 function closeSagaPanel() {
+  if (tg?.BackButton && !document.getElementById('detail')?.classList.contains('open')) tg.BackButton.hide();
   const p = document.getElementById('saga-panel');
   p.classList.add('closing');
   setTimeout(() => p.classList.remove('open', 'closing'), 300);
@@ -2868,6 +3316,7 @@ function openSagaEntryDetail(id, r) {
 }
 
 async function _sagaQuickAdd(id, list, r, btnEl) {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   haptic('light');
   await trackAnime({ ...r, id: Number(id) }, list);
   btnEl.closest('.qadd-row')?.querySelectorAll('.qadd-btn').forEach(b => b.classList.remove('active'));
@@ -2876,12 +3325,13 @@ async function _sagaQuickAdd(id, list, r, btnEl) {
   if (badge) { badge.textContent = getListMeta(list).emoji; badge.style.display = 'flex'; }
   else {
     const poster = btnEl.closest('.relation-card')?.querySelector('.relation-poster');
-    if (poster) poster.insertAdjacentHTML('beforeend', `<div class="relation-watched-badge">${getListMeta(list).emoji}</div>`);
+    if (poster) poster.insertAdjacentHTML('beforeend', `<div class="relation-watched-badge">${safe(getListMeta(list).emoji)}</div>`);
   }
   toast(`✓ "${(r.title||'').substring(0,20)}" → ${list}`);
 }
 
 async function saveSagaToList() {
+  if (!listasCargadas) { toast('Aún cargando tus listas…'); return false; }
   if (!_sagaData) return;
   haptic('medium');
   const listKey  = 'saga_' + _sagaSourceId;
@@ -2916,15 +3366,15 @@ function renderStats() {
   for (const k of allKeys) for (const a of (allLists[k]||[])) for (const g of (a.genres||[])) genreCount[g] = (genreCount[g]||0) + 1;
   const topGenres   = Object.entries(genreCount).sort((a,b) => b[1]-a[1]).slice(0,5);
   return `<div class="stats-section">
-    <div class="section-title" style="padding:0 0 10px">📊 Estadísticas</div>
+    <div class="section-title" style="padding:0 0 10px">Estadísticas</div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-big">${totalAnime}</div><div class="stat-label">Anime</div></div>
-      <div class="stat-card"><div class="stat-big">${totalEps.toLocaleString()}</div><div class="stat-label">Eps vistos</div></div>
+      <div class="stat-card"><div class="stat-big">${safe(totalEps.toLocaleString())}</div><div class="stat-label">Eps vistos</div></div>
       <div class="stat-card"><div class="stat-big">${totalHours >= 1000 ? (totalHours/1000).toFixed(1)+'k' : totalHours}h</div><div class="stat-label">Tiempo visto</div></div>
       <div class="stat-card"><div class="stat-big">${avgRating ? avgRating+'★' : '—'}</div><div class="stat-label">Rating medio</div></div>
     </div>
     ${topGenres.length ? `<div style="margin-top:10px">
-      <div class="section-title" style="padding:0 0 6px;font-size:10px">Géneros favoritos</div>
+      <div class="section-title" style="padding:0 0 6px;font-size:11px">Géneros favoritos</div>
       <div style="display:flex;flex-wrap:wrap;gap:5px">${topGenres.map(([g,n])=>`<span class="active-filter-chip" style="cursor:default">${safe(g)}<span style="opacity:.6;margin-left:3px">${n}</span></span>`).join('')}</div>
     </div>` : ''}
   </div>`;
@@ -2951,7 +3401,7 @@ function renderWeekStrip() {
     const cached    = loadDayCache(d);
     const total     = cached !== null ? cached.length : null;
     const mine      = cached !== null ? cached.filter(e => getAnimeList(e.id)).length : null;
-    html += `<div class="wdc${isToday?' wdc-today':''}${isCurrent?' wdc-current':''}" onclick="navToDateKey('${dk}')">
+    html += `<div class="wdc${isToday?' wdc-today':''}${isCurrent?' wdc-current':''}" ${actionAttrs('navToDateKey', [dk])}>
       <div class="wdc-name">${DAY_ABBR_ES[d.getDay()]}</div>
       <div class="wdc-date">${d.getDate()}</div>
       <div class="wdc-eps">${total !== null ? total : '·'}</div>
@@ -3053,14 +3503,25 @@ function _attachSwipe(listName) {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async()=>{
-  const startTab = window.location.hash === '#estrenos' ? 'estrenos' : 'buscar';
-  setTab(startTab);
+  // Abre en Estrenos (lo que sale hoy); #buscar fuerza la búsqueda.
+  const startTab = window.location.hash === '#buscar' ? 'buscar' : 'estrenos';
+  try {
+    await ensureAnimeAuth();
+  } catch (e) {
+    showAuthError(e.message || 'No se pudo iniciar sesión.');
+    return;
+  }
+  const cambiosPrefs = await atPrefs.sincronizar();
+  if (cambiosPrefs.at_day_view) dayView = cambiosPrefs.at_day_view;
+  window.dispatchEvent(new CustomEvent('at-prefs', { detail: cambiosPrefs }));
   await loadLists();
+  setTab(startTab);
   updateDots();
   checkConnection();
   // Pre-warm today's cache in background so Estrenos tab opens instantly
   if (startTab !== 'estrenos') fetchDay(currentDay, false);
 })();
 </script>
+<script src="anime-cine.js?v=20261009a"></script>
 </body>
 </html>

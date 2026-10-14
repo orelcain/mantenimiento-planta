@@ -11,12 +11,18 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PUB = join(__dirname, '..', '..', '..', 'public', 'planos')
+// La Tarjeta A3C lee el partes.json del 888 con las designaciones de SUS hojas (22/23): la propia
+// A3C, sus condensadores, resistencias y transformadores no están en el índice del visor.
+const A3C_DATOS = join(__dirname, '..', '..', '..', 'public', 'learning-assets', 'baader-142', 'a3c', 'a3c-datos.json')
+const elementosA3c = Object.keys(
+  (JSON.parse(readFileSync(A3C_DATOS, 'utf8')) as { elementos: Record<string, unknown> }).elementos,
+)
 
 type Entrada = {
   nr: string
   es: string
-  fig: string
-  hoja: number
+  fig: string | null
+  hoja: number | null
   pos: string
   confianza: string
   sap?: string
@@ -47,7 +53,8 @@ for (const slug of ['baader-142-888', 'baader-142-860']) {
 
     it('cada aparato mapeado EXISTE en el plano eléctrico', () => {
       for (const tag of Object.keys(partes.aparatos)) {
-        expect(indice.indice[tag], `${tag} no existe en el índice de ${slug}`).toBeDefined()
+        const enA3c = slug === 'baader-142-888' && elementosA3c.includes(tag)
+        expect(indice.indice[tag] ?? (enA3c || undefined), `${tag} no existe en el índice de ${slug}`).toBeDefined()
       }
     })
 
@@ -57,8 +64,18 @@ for (const slug of ['baader-142-888', 'baader-142-860']) {
         for (const e of entradas) {
           expect(e.nr, `${tag} sin nr`).toMatch(/^\d{6,10}$/)
           expect(e.es, `${tag} sin nombre ES`).toBeTruthy()
-          expect(e.fig, `${tag} sin figura`).toMatch(/^[\d-]+$/)
-          expect(e.hoja, `${tag} hoja inválida`).toBeGreaterThan(0)
+          // Figura del catálogo 2006 («70-8», con hoja en el visor de despiece) o del 2014
+          // («120 (2014)», sin hoja). Un candidato sin figura nunca puede decir «catálogo».
+          if (e.fig == null) {
+            expect(e.hoja, `${tag} candidato sin figura con hoja`).toBeNull()
+            expect(e.confianza, `${tag} sin figura no puede ser catálogo`).toBe('propuesto')
+          } else {
+            expect(e.fig, `${tag} figura inválida`).toMatch(/^[\d-]+( \(2014\))?$/)
+            if (e.fig.includes('2014')) expect(e.hoja, `${tag} figura 2014 sin visor`).toBeNull()
+            // Lo «según catálogo 2006» siempre aterriza en el visor; un propuesto puede no tener
+            // página (la ficha oculta «Ver dibujo» en vez de mandar a una hoja inexistente).
+            else if (e.hoja != null || e.confianza === 'catalogo') expect(e.hoja, `${tag} hoja inválida`).toBeGreaterThan(0)
+          }
           expect(['catalogo', 'propuesto', 'confirmado']).toContain(e.confianza)
           if (e.sap) expect(e.sap, `${tag} SAP inválido`).toMatch(/^\d{10}$/)
         }

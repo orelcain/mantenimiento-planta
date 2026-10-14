@@ -1811,7 +1811,9 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
 
   if (!cierre) return null
 
-  const puedeEditar = isAdmin && Boolean(plantSlug) && Boolean(shiftName)
+  /* Con horario de Shoplogix no hay nada que fijar: ese horario manda (regla
+     de Orel, 28-09). El botón solo tiene sentido cuando Shoplogix calla. */
+  const puedeEditar = isAdmin && Boolean(plantSlug) && Boolean(shiftName) && fuente !== 'shoplogix'
 
   const guardar = async () => {
     const m = /^(\d{1,2}):(\d{2})$/.exec(valor.trim())
@@ -1833,7 +1835,7 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
     <div className="mt-0.5 text-[11px] text-muted-foreground/80">
       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         <span>
-          Cierre estimado <span className="tabular-nums">{fmtWallTime(cierre)}</span>
+          {fuente === 'shoplogix' ? 'Cierre' : 'Cierre estimado'} <span className="tabular-nums">{fmtWallTime(cierre)}</span>
           {/*
             * `duracion` se dice distinto a propósito: no es «a qué hora
             * cerraron» sino «cuánto duraron». Es el caso de un turno sin
@@ -1841,7 +1843,9 @@ function CierreDelTurno({ cierre, muestras, fuente, plantSlug, shiftName, startA
             * estable es la duración — quien lee tiene que saber de dónde sale
             * el número para poder desconfiar de él con criterio.
             */}
-          {fuente === 'fijado'
+          {fuente === 'shoplogix'
+            ? ', según el horario de Shoplogix'
+            : fuente === 'fijado'
             ? ', fijado a mano'
             : fuente === 'duracion'
             ? `, estimado sumando lo que duran los turnos de esta línea (${muestras ?? 0} turnos)`
@@ -4621,7 +4625,11 @@ function MonitorDelToken() {
   const vistas = useMemo(() => {
     if (!data?.live) return []
     return [
-      { shiftDocId: data.shiftDocId, dateKey: data.dateKey, shiftId: data.shiftId, live: data.live },
+      {
+        shiftDocId: data.shiftDocId, dateKey: data.dateKey, shiftId: data.shiftId, live: data.live,
+        // El actual también puede ser el turno que marcó el sensor.
+        ...(data.extraordinario ? { extraordinario: data.extraordinario } : {}),
+      },
       ...(data.history ?? []),
     ]
   }, [data])
@@ -4654,6 +4662,13 @@ function MonitorDelToken() {
 
   const vista = vistas[idx] ?? null
   const live = vista?.live ?? null
+  /**
+   * La meta del link NO aplica a un turno que marcó el sensor: es una jornada
+   * que Shoplogix no configuró y nadie le puso cuota. Heredarle los 15.000 de
+   * la línea lo dejaría «bajo meta» siempre — el mismo error del 26-sep, al
+   * revés.
+   */
+  const metaLink = vista?.extraordinario ? null : (data?.targetPieces ?? null)
 
   /*
    * ── El eje arranca donde la línea arrancó ──────────────────────────────
@@ -4791,7 +4806,7 @@ function MonitorDelToken() {
    * módulo — que es donde escribe el editor de cuota. Con solo `targetPieces`,
    * una cuota puesta desde el monitor no movía la barra.
    */
-  const metaHero = data?.targetPieces ?? live?.quotaPieces ?? cuotaLocal ?? null
+  const metaHero = metaLink ?? live?.quotaPieces ?? cuotaLocal ?? null
   /* Con el MISMO contador del héroe, no con los tramos cerrados: a las 09:00
      el héroe decía 3.097 (pulso) y el chip 14% (2.800 de buckets, 8 min
      atrás) — 15,5% real. El mismo descuadre de «dos totales» que #819 cerró
@@ -5344,7 +5359,7 @@ function MonitorDelToken() {
       : desdeMin
     return computePaceToTarget({
       // La cuota del link primero; si no, la de la config del turno.
-      targetPieces: data?.targetPieces ?? live.quotaPieces,
+      targetPieces: metaLink ?? live.quotaPieces,
       /* Sin cuota puesta por una persona, NO hay meta que perseguir (regla de
          Orel, 30-08): el «objetivo del sensor» dejó de ser respaldo y toda la
          tarjeta de ritmo necesario / hora extra se calla en vez de pedir
@@ -5385,7 +5400,7 @@ function MonitorDelToken() {
       shiftClosed: live.shiftClosed,
       pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
     })
-  }, [live, data?.targetPieces, data?.pulse, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
+  }, [live, metaLink, data?.pulse, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -5406,7 +5421,7 @@ function MonitorDelToken() {
      * el objetivo del sensor como «cuota» le asignaba a Yal una meta que
      * nadie puso (regla de Orel, 30-08).
      */
-    const meta = data?.targetPieces ?? live?.quotaPieces ?? null
+    const meta = metaLink ?? live?.quotaPieces ?? null
     const tb = live?.timeBreakdown
 
     // Las mismas del ritmo necesario y del fondo de los gráficos: `breaksTurno`.
@@ -5506,7 +5521,7 @@ function MonitorDelToken() {
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, data?.targetPieces, breaksTurno, esActual, data?.pulse])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, metaLink, breaksTurno, esActual, data?.pulse])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -5520,7 +5535,7 @@ function MonitorDelToken() {
   const pronostico = useMemo(() => {
     /* Sin cuota humana no hay meta (regla de Orel, 30-08): el pronóstico
        proyecta el cierre igual, solo que sin veredicto de «llega/no llega». */
-    const metaFc = data?.targetPieces ?? live?.quotaPieces ?? null
+    const metaFc = metaLink ?? live?.quotaPieces ?? null
     /*
      * `forecastHistory` trae hasta 10 turnos del MISMO nombre; el filtro sobre
      * `history` queda de respaldo para los docs anteriores a ese campo (y para
@@ -5552,7 +5567,7 @@ function MonitorDelToken() {
         porDelanteMin: pace?.pendingBreakMin ?? 0,
       },
     })
-  }, [live, data?.history, data?.forecastHistory, data?.targetPieces, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
+  }, [live, data?.history, data?.forecastHistory, metaLink, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -5598,7 +5613,7 @@ function MonitorDelToken() {
     if (ahoraT == null) return null
     /* La META en toneladas, con el peso VIGENTE: «≈ 16,4 t de ≈ 24 t» es la
        misma gramática que la meta en piezas (rediseño 26-08). */
-    const metaPz = data?.targetPieces ?? live.quotaPieces ?? cuotaLocal ?? null
+    const metaPz = metaLink ?? live.quotaPieces ?? cuotaLocal ?? null
     const metaT = metaPz != null ? toneladasDePiezas(metaPz, pesoKg) : null
     return {
       ahora: ahoraT,
@@ -5607,7 +5622,7 @@ function MonitorDelToken() {
       /* El desglose solo cuenta historia con 2+ pesos distintos. */
       tramos: porTramos && porTramos.tramos.length >= 2 ? porTramos.tramos : null,
     }
-  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, data?.targetPieces, pesoLocal, cuotaLocal, pesosEliminados])
+  }, [live?.pesoPromedioKg, live?.totalPieces, live?.quotaPieces, live?.series, live?.pesoRegistros, metaLink, pesoLocal, cuotaLocal, pesosEliminados])
 
   const onGuardarPeso = esAdminMonitor && esActual && data?.plantSlug && live?.shiftName
     ? async (pesoKg: number | null) => {
@@ -5976,7 +5991,14 @@ function MonitorDelToken() {
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-muted-foreground">
             {areaTitle && <span>{areaTitle}</span>}
             {areaTitle && <span className="text-muted-foreground/50">·</span>}
-            <span className="font-medium text-foreground/80">{vista?.shiftId || data.shiftId}</span>
+            <span className="font-medium text-foreground/80">
+              {vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId)}
+            </span>
+            {/* Lo marcó el sensor, no Shoplogix: se dice, para que nadie lo
+                busque en el whiteboard ni le exija una meta que no tiene. */}
+            {vista?.extraordinario && (
+              <Pill tone="warning">sin configurar en Shoplogix · lo marcó el sensor</Pill>
+            )}
             <span className="text-muted-foreground/50">·</span>
             {/* first-letter, no `capitalize`: ese capitaliza CADA palabra y
                 dejaba "Lunes, 10 De Agosto". */}
@@ -6015,7 +6037,7 @@ function MonitorDelToken() {
             {!live.shiftClosed && live.plannedEnd ? (
               <span className="tabular-nums">
                 {fmtWallTime(inicioReal)}&nbsp;&#8594;&nbsp;{fmtWallTime(live.plannedEnd)}
-                {live.plannedEndSource !== 'fijado' && (
+                {live.plannedEndSource !== 'fijado' && live.plannedEndSource !== 'shoplogix' && (
                   <span className="ml-1 rounded bg-muted px-1 py-px text-caption text-muted-foreground">
                     est.
                   </span>

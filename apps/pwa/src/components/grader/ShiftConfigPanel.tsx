@@ -153,7 +153,7 @@ export function ShiftConfigPanel({
 
           {/* Cambios mid-turno */}
           {configChangesCount > 0 && (
-            <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-amber-500/[0.15] text-ink-warn border border-transparent">
+            <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-warning/[0.15] text-ink-warn border border-transparent">
               {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
             </span>
           )}

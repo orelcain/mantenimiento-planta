@@ -33,7 +33,7 @@ export function MetaText({ children, className = '', mono = false }: {
 }) {
   return (
     <span
-      className={`text-xs ${mono ? 'font-mono' : ''} ${className}`}
+      className={`text-nota ${mono ? 'font-mono' : ''} ${className}`}
       style={{ color: LC.inkLo }}
     >
       {children}
@@ -54,7 +54,7 @@ export function FilterChip({ active = false, onClick, children, accent = LC.aqua
       type="button"
       onClick={onClick}
       title={title}
-      className="inline-flex items-center gap-1.5 rounded-ctl px-2.5 py-1 text-xs font-medium transition-colors"
+      className="inline-flex items-center gap-1.5 rounded-ctl px-2.5 py-1 text-nota font-medium transition-colors"
       style={{
         color: active ? LC.ink : LC.inkMid,
         background: active ? tint(accent, 0.16) : 'transparent',

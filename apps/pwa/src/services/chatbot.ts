@@ -17,6 +17,7 @@ import { getTool } from './aria/tools'
 import { buildSituationalContextBlock } from './aria/situationalContext'
 import { buildAppKnowledgeBlock } from './aria/appKnowledge'
 import type { Incident } from '@/types'
+import { nombreParaTexto } from '@/utils/repuestos/nombrePorSap'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 export interface ChatMessage {
@@ -1417,6 +1418,8 @@ interface MaestroMat {
   fab: string
   alias: string
   nombresComunes: string
+  /** Primer nombre común (el que se muestra primero); '' si no tiene. */
+  nombreComun: string
   clase: string
   marca: string
   modeloTipo: string
@@ -1474,6 +1477,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
         fab: r.codigoFabricante || r.codigoBaader || '',
         alias: r.alias || '',
         nombresComunes: Array.isArray(r.nombresComunes) ? r.nombresComunes.join(' ') : (r.nombresComunes || ''),
+        nombreComun: String((Array.isArray(r.nombresComunes) ? r.nombresComunes[0] : r.nombresComunes) || '').trim(),
         clase: r.clase || 'repuesto',
         marca: r.marca || '',
         modeloTipo: r.modeloTipo || '',
@@ -1501,7 +1505,8 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
           : ` [${stockOf(m)} en stock]`
       const ubic = m.tieneSap && ubicBySap.get(m.sap) ? ` | Ubic: ${ubicBySap.get(m.sap)}` : ''
       const desc = m.descripcion && m.descripcion !== m.textoBreve ? ` | ${m.descripcion.slice(0, 50)}` : ''
-      return `${prefix} ${m.textoBreve}${desc} | SAP: ${m.sap || 'sin'} | Fab: ${m.fab || '—'} | Clase: ${m.clase} | Equipo: ${equiposLabel(m)}${stockNote}${ubic}`
+      const nombre = nombreParaTexto({ textoBreve: m.textoBreve, nombresComunes: m.nombreComun ? [m.nombreComun] : [] })
+      return `${prefix} ${nombre}${desc} | SAP: ${m.sap || 'sin'} | Fab: ${m.fab || '—'} | Clase: ${m.clase} | Equipo: ${equiposLabel(m)}${stockNote}${ubic}`
     }
     const haystackOf = (m: MaestroMat) =>
       normalizeText(

@@ -311,7 +311,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-500/[0.15] rounded-card">
+              <div className="p-2 bg-fill-critical/[0.15] rounded-card">
                 <AlertTriangle className="h-5 w-5 text-ink-crit" />
               </div>
               <div>
@@ -324,7 +324,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500/[0.15] rounded-card">
+              <div className="p-2 bg-fill-warning/[0.15] rounded-card">
                 <Clock className="h-5 w-5 text-ink-warn" />
               </div>
               <div>
@@ -337,7 +337,7 @@ export function PreventivePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-500/[0.15] rounded-card">
+              <div className="p-2 bg-ink-ok/[0.15] rounded-card">
                 <CheckCircle2 className="h-5 w-5 text-ink-ok" />
               </div>
               <div>
@@ -470,7 +470,7 @@ export function PreventivePage() {
                             className={cn(
                               'text-xs px-1 py-0.5 rounded-ctl truncate cursor-pointer transition-all hover:scale-105',
                               task.proximaEjecucion < new Date()
-                                ? 'bg-red-500/[0.15] text-ink-crit'
+                                ? 'bg-fill-critical/[0.15] text-ink-crit'
                                 : `${getColorForTechnician(task.asignadoA)}/20 text-white`
                             )}
                             onClick={(e) => {
@@ -537,7 +537,7 @@ export function PreventivePage() {
         <TabsContent value="list" className="space-y-4">
           {/* Overdue */}
           {overdueTasks.length > 0 && (
-            <Card className="border-red-500/[0.25]">
+            <Card className="border-fill-critical/[0.25]">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2 text-ink-crit">
                   <AlertTriangle className="h-5 w-5" />
@@ -655,7 +655,7 @@ export function PreventivePage() {
                         className="flex items-center justify-between p-3 bg-muted/50 rounded-card"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-green-500/[0.15] rounded-card">
+                          <div className="p-2 bg-ink-ok/[0.15] rounded-card">
                             <CheckCircle2 className="h-4 w-4 text-ink-ok" />
                           </div>
                           <div>
@@ -829,14 +829,14 @@ function TaskCard({
     <div
       className={cn(
         'flex items-center justify-between p-3 rounded-card border',
-        isOverdue ? 'border-transparent bg-red-500/[0.15]' : 'bg-muted'
+        isOverdue ? 'border-transparent bg-fill-critical/[0.15]' : 'bg-muted'
       )}
     >
       <div className="flex items-center gap-3">
         <div
           className={cn(
             'p-2 rounded-card',
-            isOverdue ? 'bg-red-500/[0.15]' : 'bg-primary/[0.15]'
+            isOverdue ? 'bg-fill-critical/[0.15]' : 'bg-primary/[0.15]'
           )}
         >
           <Wrench className={cn('h-4 w-4', isOverdue ? 'text-ink-crit' : 'text-brand-ink')} />
@@ -1021,7 +1021,7 @@ function TaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-transparent text-ink-crit px-4 py-3 rounded-ctl">
+          <div className="bg-fill-critical/[0.15] border border-transparent text-ink-crit px-4 py-3 rounded-ctl">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (
@@ -1322,7 +1322,7 @@ function ExecuteTaskDialog({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {Object.keys(errors).length > 0 && (
-          <div className="bg-red-500/[0.15] border border-transparent text-ink-crit px-4 py-3 rounded-ctl">
+          <div className="bg-fill-critical/[0.15] border border-transparent text-ink-crit px-4 py-3 rounded-ctl">
             <p className="font-medium">Por favor corrige los siguientes errores:</p>
             <ul className="mt-2 list-disc list-inside text-sm">
               {Object.values(errors).map((error, index) => (

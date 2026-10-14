@@ -58,9 +58,9 @@ describe('p0StatusFromPct', () => {
 
 describe('p0Status helpers (color/hex/label)', () => {
   it('color tailwind para los 3 status', () => {
-    expect(p0StatusColor('ok')).toContain('emerald')
-    expect(p0StatusColor('alert')).toContain('amber')
-    expect(p0StatusColor('critical')).toContain('rose')
+    expect(p0StatusColor('ok')).toContain('ink-ok')
+    expect(p0StatusColor('alert')).toContain('ink-warn')
+    expect(p0StatusColor('critical')).toContain('ink-crit')
   })
   it('hex para canvas/echarts', () => {
     expect(p0StatusHex('ok')).toMatch(/^#[0-9a-f]{6}$/i)

@@ -122,13 +122,15 @@ export default {
           DEFAULT: '#bf6c61',
           foreground: '#ffffff',
         },
+        // success / warning por VARIABLE (index.css): los defaults de `:root` son los
+        // mismos hex de siempre; la paleta Pizarra los reasigna.
         success: {
-          DEFAULT: '#6c986c',
-          foreground: '#ffffff',
+          DEFAULT: 'rgb(var(--success) / <alpha-value>)',
+          foreground: 'rgb(var(--success-foreground) / <alpha-value>)',
         },
         warning: {
-          DEFAULT: '#c08e5f',
-          foreground: '#000000',
+          DEFAULT: 'rgb(var(--warning) / <alpha-value>)',
+          foreground: 'rgb(var(--warning-foreground) / <alpha-value>)',
         },
         // Paleta CATEGÓRICA (index.css). Se consume por el primitivo <Tag>,
         // no a mano: `text-cat-3-ink` suelto vuelve a dispersar la decisión.
@@ -148,6 +150,14 @@ export default {
         // por UNA clase que ya cambia con el tema. No usar los -600 para esto:
         // esos tienen dueño (la decisión de julio de bajar croma) y reutilizarlos
         // lavó los colores de producción.
+        // RELLENOS de estado (ver el comentario de `backgroundColor` más abajo). Viven en `colors`
+        // para servir en TODAS las utilidades: bg-, border-, ring-, from-/via-/to-, divide-, text-.
+        // Antes estaban solo en backgroundColor y `border-fill-*` / `ring-fill-*` no generaban CSS.
+        fill: {
+          critical: 'rgb(var(--fill-critical) / <alpha-value>)',
+          warning: 'rgb(var(--fill-warning) / <alpha-value>)',
+          ok: 'rgb(var(--fill-ok) / <alpha-value>)',
+        },
         'ink-crit': 'rgb(var(--ink-crit) / <alpha-value>)',
         'ink-warn': 'rgb(var(--ink-warn) / <alpha-value>)',
         'ink-ok': 'rgb(var(--ink-ok) / <alpha-value>)',
@@ -206,14 +216,17 @@ export default {
         // AA con blanco, no hexes libres: misma lógica que ya usaba el §1.4 del
         // HIG doc cuando el verde accesible de Apple (#248A3D) daba 4.40:1 y se
         // bajó a #217E38. Medido: critical 6.55 · warning 6.35 · ok 6.36.
-        fill: {
-          critical: '#8C4B45',
-          warning: '#7A5A1E',
-          ok: '#2F6B41',
-        },
       },
       textColor: {
         destructive: 'rgb(var(--tw-red-600) / <alpha-value>)',
+        // La TINTA de aviso se separa del relleno `warning` (igual que destructive):
+        // con Pizarra el relleno es ámbar vivo y el texto necesita el ámbar oscuro.
+        // Default = el color de siempre.
+        // (objeto, no string: un string pisaría `warning.foreground` → `text-warning-foreground`.)
+        warning: {
+          DEFAULT: 'rgb(var(--warning-ink) / <alpha-value>)',
+          foreground: 'rgb(var(--warning-foreground) / <alpha-value>)',
+        },
       },
       fontSize: {
         // ×`--escala-texto` (19-09-2026): con 1 (por defecto) todo mide lo mismo que antes;
@@ -230,6 +243,9 @@ export default {
         // 10,5 px, medio punto bajo el mínimo del contrato. En móvil (raíz 16) sigue en 12.
         xs:        ['calc(max(0.75rem, 11px) * var(--escala-texto, 1))', { lineHeight: '1rem' }],
         caption:   ['calc(11px * var(--escala-texto, 1))', { lineHeight: '1.35' }],
+        // Piso de 12 px de las HERRAMIENTAS del Centro de Aprendizaje (oleada 4, tanda c): caption
+        // rinde 11 y no alcanza. El bisel (HMI, plano) conserva su tamaño y no usa este rol.
+        nota:      ['calc(12px * var(--escala-texto, 1))', { lineHeight: '1.35' }],
         footnote:  ['calc(13px * var(--escala-texto, 1))', { lineHeight: '1.4' }],
         // body 17 (Apple: 17/22). Estaba en 15, que es el SUBHEAD de Apple: toda la app
         // iba un escalon por debajo de iOS y eso alimentaba la densidad. subhead y
@@ -264,5 +280,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Variante `pizarra:` — solo aplica con la paleta Pizarra activa (`?skin=pizarra`).
+    // Sin `data-paleta="pizarra"` ninguna clase `pizarra:` casa, así que el resto de la
+    // app queda idéntico. Especificidad (0,3,0): gana sobre `dark:` (0,2,0) y la base.
+    function ({ addVariant }) {
+      addVariant('pizarra', ':root[data-paleta="pizarra"] &')
+    },
+  ],
 }

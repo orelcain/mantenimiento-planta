@@ -18,12 +18,15 @@ import {
   DialogFooter,
 } from '@/components/ui'
 import { normalizeForSearch, haystackMatchesAll } from '@/utils/repuestos'
+import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import type { NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
 import { avisoDeStock, cantidadDesdeTexto, CANTIDAD_MAXIMA, type StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
 export interface RepuestoLite {
   codigoSAP: string
   textoBreve: string
+  /** Nombres comunes del repuesto: el primero es el título que se muestra. */
+  nombresComunes?: string[]
   /** Stock de bodega al abrir el formulario (ver solicitudDeRepuesto). */
   stock?: StockDeSolicitud
 }
@@ -61,7 +64,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
   }, [open, repuesto])
 
   const optionsWithSap = useMemo(
-    () => options.filter((o) => o.codigoSAP?.trim()).sort((a, b) => a.textoBreve.localeCompare(b.textoBreve, 'es')),
+    () => options.filter((o) => o.codigoSAP?.trim()).sort((a, b) => nombreVisible(a).titulo.localeCompare(nombreVisible(b).titulo, 'es')),
     [options],
   )
 
@@ -78,7 +81,7 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
     const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean)
     if (!terms.length) return optionsWithSap.slice(0, MAX_RESULTADOS)
     return optionsWithSap
-      .filter((o) => haystackMatchesAll(normalizeForSearch(`${o.textoBreve} ${o.codigoSAP}`), terms))
+      .filter((o) => haystackMatchesAll(normalizeForSearch(`${o.textoBreve} ${(o.nombresComunes ?? []).join(' ')} ${o.codigoSAP}`), terms))
       .slice(0, MAX_RESULTADOS)
   }, [optionsWithSap, query])
 
@@ -117,7 +120,8 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
           {/* Repuesto: fijo (preseleccionado) o selector */}
           {repuesto ? (
             <div className="rounded-card border border-border bg-muted px-3 py-2">
-              <div className="text-sm font-medium text-foreground">{repuesto.textoBreve || '(sin nombre)'}</div>
+              <div className="text-sm font-medium text-foreground">{nombreVisible(repuesto).titulo}</div>
+              {nombreVisible(repuesto).oficial && <div className="text-footnote text-muted-foreground">{nombreVisible(repuesto).oficial}</div>}
               <div className="font-mono text-xs text-muted-foreground">SAP {repuesto.codigoSAP}</div>
             </div>
           ) : selected ? (
@@ -125,7 +129,8 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
               <label className="mb-1 block text-caption tracking-wide text-muted-foreground">Repuesto</label>
               <div className="flex items-start justify-between gap-2 rounded-card border border-transparent bg-primary/5 px-3 py-2">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">{selected.textoBreve || '(sin nombre)'}</div>
+                  <div className="truncate text-sm font-medium text-foreground">{nombreVisible(selected).titulo}</div>
+                  {nombreVisible(selected).oficial && <div className="truncate text-footnote text-muted-foreground">{nombreVisible(selected).oficial}</div>}
                   <div className="font-mono text-xs text-muted-foreground">SAP {selected.codigoSAP}</div>
                 </div>
                 <button
@@ -162,7 +167,10 @@ export function SolicitarRepuestoModal({ open, onOpenChange, repuesto, options =
                       onClick={() => setSap(o.codigoSAP)}
                       className="flex w-full items-baseline justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
                     >
-                      <span className="min-w-0 truncate text-sm text-foreground">{o.textoBreve || o.codigoSAP}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-foreground">{o.textoBreve || o.nombresComunes?.[0] ? nombreVisible(o).titulo : o.codigoSAP}</span>
+                        {nombreVisible(o).oficial && <span className="block truncate text-footnote text-muted-foreground">{nombreVisible(o).oficial}</span>}
+                      </span>
                       <span className="shrink-0 font-mono text-caption text-muted-foreground">{o.codigoSAP}</span>
                     </button>
                   ))

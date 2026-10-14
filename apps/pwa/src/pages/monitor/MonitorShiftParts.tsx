@@ -124,6 +124,13 @@ function nombreDeConvenio(reason: string): string {
   return `La parada de convenio «${bajo}»`
 }
 
+/** Cuántas máquinas tiene la línea: viaja en el desglose (tbv 3); si no, se deduce de equivMin = machineMin / N. */
+function nMaquinasDe(tb: NonNullable<PublicMonitorLive['timeBreakdown']>): number {
+  if (tb.nMaquinas && tb.nMaquinas > 0) return tb.nMaquinas
+  const x = tb.recoverable.find((c) => (c.equivMin ?? 0) > 0 && (c.machineMin ?? 0) > 0)
+  return x ? Math.max(1, Math.round(x.machineMin! / x.equivMin!)) : 1
+}
+
 function fmtDurMin(min: number): string {
   if (!Number.isFinite(min) || min <= 0) return '—'
   const h = Math.floor(min / 60)
@@ -236,6 +243,9 @@ export function TiempoDelTurno({
   const [parte, setParte] = useState<'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado' | null>('paradas')
   const alternarParte = (p: 'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado') =>
     setParte((v) => (v === p ? null : p))
+  /* Con el turno cerrado no hay próxima parada: decía «entra a las ~17:14»
+     con el turno terminado a las 17:05 (Chonchi 28-09). */
+  const proxima = cerrado ? null : proximaParada
   if (!tb || tb.windowMin <= 0) return null
 
   const pct = (m: number) => Math.max(0, (m / tb.windowMin) * 100)
@@ -308,10 +318,21 @@ export function TiempoDelTurno({
   const sumaLinea = tb.recoverable.reduce((a, x) => a + minDeLinea(x), 0)
   const escala = sumaLinea > tb.recoverableMin && sumaLinea > 0 ? tb.recoverableMin / sumaLinea : 1
   const restoMin = Math.max(0, tb.recoverableMin - sumaLinea)
+  /*
+   * Desde tbv 3 (28-09-2026) se valorizan los minutos EQUIVALENTES de línea:
+   * cada máquina detenida por su peso (1/N). Con los de línea entera, una
+   * Baader parada 11 min mientras las otras dos seguían costaba 0 pz. Los
+   * payloads viejos siguen con `lineMin` escalado.
+   */
+  const conEquiv = tb.recoverable.length > 0 && tb.recoverable.every((x) => x.equivMin != null)
+  const minParaPiezas = (x: (typeof tb.recoverable)[number]) =>
+    conEquiv ? Math.max(0, x.equivMin ?? 0) : minDeLinea(x) * escala
+  /** Minutos de máquina de las paradas evitables: los que se leen en cada fila. */
+  const minMaquinaTotal = conEquiv ? tb.recoverable.reduce((a, x) => a + Math.max(0, x.machineMin ?? 0), 0) : null
   const crudas =
     cpm == null
       ? null
-      : tb.recoverable.reduce((a, x) => a + piezasDe(x.reason, minDeLinea(x) * escala), 0) + restoMin * cpm
+      : tb.recoverable.reduce((a, x) => a + piezasDe(x.reason, minParaPiezas(x)), 0) + restoMin * cpm
   /*
    * La vara de la resta. Cerrado: la meta completa. En vivo: la cuota A ESTA
    * ALTURA (la misma curva del comparador, aplanada en colación) — contra la
@@ -337,6 +358,22 @@ export function TiempoDelTurno({
   const excedente = superada ? Math.max(0, Math.round(hechas! - referencia!)) : 0
   const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
   const porRitmo = (hayBrecha || superada) && perdidas != null ? Math.max(0, (brecha ?? 0) - perdidas) : null
+  /**
+   * Lo que las paradas costaron DE VERDAD, sin topar a la brecha.
+   *
+   * `perdidas` está topada porque la BARRA reparte la meta y no puede dibujar
+   * más de lo que faltó. Pero el número que se LEE tiene que ser el real: desde
+   * que cada máquina detenida cuenta su parte (tbv 3, #1195) las paradas pueden
+   * explicar más que la brecha —Chonchi 28-09: 1.245 pz contra 780 faltantes— y
+   * la fila decía 780 arriba de un detalle cuyos grupos sumaban 1.245. Para
+   * Mantención el excedente ES el argumento: sin esas paradas el turno cerraba
+   * SOBRE la meta.
+   */
+  const perdidasReales = crudas == null ? null : Math.round(crudas)
+  /** Cuánto se pasaba de la meta si esas paradas no hubieran ocurrido. */
+  const paradasSobreBrecha = hayBrecha && perdidasReales != null && brecha != null
+    ? Math.max(0, perdidasReales - brecha)
+    : 0
   /** Lo que la cuota todavía no pide: va HUECO en la barra, no es pérdida. */
   const porJugar = cuotaOk != null && metaOk != null ? Math.max(0, metaOk - cuotaOk) : 0
   /** El peso de cada parte sobre la meta: el «% del 100%» que pidió Orel. */
@@ -418,8 +455,8 @@ export function TiempoDelTurno({
           <div className="mt-1 flex h-6 gap-[2px]">
             {([
               { p: 'hechas' as const, v: hechas, cls: 'bg-muted-foreground/[0.35]', flex: true, rotulo: 'hechas' },
-              { p: 'paradas' as const, v: hayBrecha ? perdidas : 0, cls: 'bg-red-600 dark:bg-red-500', rotulo: 'perdidas en paradas' },
-              { p: 'ritmo' as const, v: hayBrecha ? porRitmo : 0, cls: 'bg-amber-600 dark:bg-amber-500', rotulo: 'por ritmo' },
+              { p: 'paradas' as const, v: hayBrecha ? perdidas : 0, cls: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]', rotulo: 'perdidas en paradas' },
+              { p: 'ritmo' as const, v: hayBrecha ? porRitmo : 0, cls: 'bg-amber-600 dark:bg-amber-500 pizarra:bg-[rgb(var(--serie-1))] pz-trama', rotulo: 'por ritmo' },
               { p: 'jugar' as const, v: porJugarBarra, cls: 'border border-dashed border-muted-foreground/[0.4]', rotulo: 'aún por jugar' },
             ]).filter((s) => s.flex || s.v > 0).map((s) => (
               <button
@@ -437,8 +474,12 @@ export function TiempoDelTurno({
           <div className="mt-2 overflow-hidden rounded-[10px] bg-muted">
             {([
               { p: 'hechas' as const, nombre: 'Hechas', valor: `${fmtInt(hechas)} pz`, pct: pctMeta(hechas), tick: 'bg-muted-foreground/[0.5]' },
-              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidas)} pz`, pct: pctMeta(perdidas), tick: 'bg-red-600 dark:bg-red-500' },
-              { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, pct: pctMeta(porRitmo), tick: 'bg-amber-600 dark:bg-amber-500' },
+              /* El VALOR es el costo real —lo mismo que suman los grupos de
+                 adentro—; el segmento de la barra sigue topado a la brecha,
+                 porque la barra reparte la meta. La frase de abajo lo dice
+                 cuando los dos números se separan. */
+              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidasReales ?? perdidas)} pz`, pct: pctMeta(perdidasReales ?? perdidas), tick: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]' },
+              { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, pct: pctMeta(porRitmo), tick: 'bg-amber-600 dark:bg-amber-500 pizarra:bg-[rgb(var(--serie-1))] pz-trama' },
               ...(porJugarBarra > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugarBarra)} pz`, pct: pctMeta(porJugarBarra), tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
               /*
                * El convenio NO tiene segmento en la barra: la barra cuenta
@@ -550,6 +591,12 @@ export function TiempoDelTurno({
                           {costo
                             ? (
                               <>
+                                {conEquiv && (
+                                  <>
+                                    Minutos de máquina; cada una detenida cuenta como su parte de la
+                                    línea (1 de {nMaquinasDe(tb)}).{' '}
+                                  </>
+                                )}
                                 Cada parada valorizada al ritmo que la línea traía justo antes
                                 {rango && (
                                   <>
@@ -659,10 +706,29 @@ export function TiempoDelTurno({
                 {perdidas != null && perdidas > 0 && (
                   <>
                     {' '}Las paradas igual costaron ~
-                    <span className="tabular-nums font-semibold">{fmtInt(perdidas)} pz</span> — sin
+                    <span className="tabular-nums font-semibold">{fmtInt(perdidasReales ?? perdidas)} pz</span> — sin
                     ellas {cerrado ? 'el cierre quedaba' : 'iríamos'} más arriba.
                   </>
                 )}
+              </p>
+            )
+            : cerrado && paradasSobreBrecha > 0
+            ? (
+              /* Las paradas explican TODA la brecha y sobran: decir «780 de 780
+                 son paradas» esconde el argumento. El excedente es lo que el
+                 turno habría cerrado POR ENCIMA de la meta sin esas paradas. */
+              <p className="mt-2 text-[13.5px] leading-snug text-foreground">
+                Las paradas costaron{' '}
+                <span className="tabular-nums font-semibold text-ink-crit">
+                  {fmtInt(perdidasReales!)} pz
+                </span>
+                {minMaquinaTotal != null && <> ({fmtDurMin(minMaquinaTotal)} de máquina)</>} — más
+                que las <span className="tabular-nums font-semibold">{fmtInt(brecha!)} pz</span> que
+                faltaron: sin ellas el turno cerraba{' '}
+                <span className="tabular-nums font-semibold text-ink-ok">
+                  ~{fmtInt(paradasSobreBrecha)} pz
+                </span>{' '}
+                sobre la meta.
               </p>
             )
             : cerrado
@@ -673,7 +739,11 @@ export function TiempoDelTurno({
                 <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
                   {fmtInt(perdidas)}
                 </span>{' '}
-                son <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b> y{' '}
+                son{' '}
+                {minMaquinaTotal != null
+                  ? <b>paradas evitables ({fmtDurMin(minMaquinaTotal)} de máquina)</b>
+                  : <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b>}{' '}
+                y{' '}
                 <span className="tabular-nums font-semibold">{fmtInt(porRitmo)}</span>, ritmo por
                 debajo del necesario.
               </p>
@@ -741,7 +811,7 @@ export function TiempoDelTurno({
                 onVentana={onVentana}
                 onTramo={onTramo}
                 notas={notas}
-                proximaParada={g.dueno === 'programado' ? proximaParada : null}
+                proximaParada={g.dueno === 'programado' ? proxima : null}
                 plannedMin={tb.plannedMin}
               />
               {/* ⚠ La frase que Mantención necesita poder decir. Va pegada al
@@ -770,12 +840,12 @@ export function TiempoDelTurno({
           «Programado» esté abierta — con ella cerrada, este renglón es el
           único que lo dice; con ella abierta lo dice el grupo y esto se
           calla para no repetirlo. */}
-      {proximaParada && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
+      {proxima && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
         <p className="mt-1.5 text-[11px] text-muted-foreground/80">
           {tb.plannedMin === 0 ? 'Todavía sin paradas de convenio: ' : ''}
-          {nombreDeConvenio(proximaParada.reason)} entra a las{' '}
+          {nombreDeConvenio(proxima.reason)} entra a las{' '}
           {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
-          <span className="tabular-nums">~{proximaParada.hora}</span>.
+          <span className="tabular-nums">~{proxima.hora}</span>.
         </p>
       )}
 
@@ -814,7 +884,7 @@ export function TiempoDelTurno({
         <div className="mt-2">
           <div className="flex h-6 overflow-hidden rounded-lg text-[11px] font-semibold text-white">
             <span
-              className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500"
+              className="flex items-center justify-center bg-emerald-600 dark:bg-emerald-500 pizarra:bg-[rgb(var(--grafico-neutro-fuerte))] pizarra:text-[rgb(var(--card))]"
               style={{ width: `${pct(tb.producingMin)}%` }}
               title={`Produciendo ${tb.producingMin} min`}
             >
@@ -825,7 +895,7 @@ export function TiempoDelTurno({
                 accesibilidad. */}
             {tb.plannedMin > 0 && (
               <span
-                className="flex items-center justify-center bg-slate-500"
+                className="flex items-center justify-center bg-slate-500 pizarra:bg-[rgb(var(--grafico-neutro-medio))] pizarra:text-foreground pz-trama"
                 style={{ width: `${pct(tb.plannedMin)}%` }}
                 title={`Planificado ${tb.plannedMin} min`}
               >
@@ -833,7 +903,7 @@ export function TiempoDelTurno({
               </span>
             )}
             <span
-              className="flex items-center justify-center bg-red-600 dark:bg-red-500"
+              className="flex items-center justify-center bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))] pizarra:text-[rgb(var(--card))]"
               style={{ width: `${pct(tb.recoverableMin)}%` }}
               title={`Recuperable ${tb.recoverableMin} min`}
             >
@@ -844,17 +914,17 @@ export function TiempoDelTurno({
 
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500" />
+              <i className="h-2.5 w-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500 pizarra:bg-[rgb(var(--grafico-neutro-fuerte))]" />
               Produciendo <span className="tabular-nums text-foreground/80">{tb.producingMin} min</span>
             </span>
             {tb.plannedMin > 0 && (
               <span className="flex items-center gap-1.5">
-                <i className="h-2.5 w-2.5 rounded-sm bg-slate-500" />
+                <i className="h-2.5 w-2.5 rounded-sm bg-slate-500 pizarra:bg-[rgb(var(--grafico-neutro-medio))] pz-trama" />
                 Planificado <span className="tabular-nums text-foreground/80">{tb.plannedMin} min</span>
               </span>
             )}
             <span className="flex items-center gap-1.5">
-              <i className="h-2.5 w-2.5 rounded-[4px] bg-red-600 dark:bg-red-500" />
+              <i className="h-2.5 w-2.5 rounded-[4px] bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]" />
               Recuperable <span className="tabular-nums text-foreground/80">{tb.recoverableMin} min</span>
             </span>
           </div>

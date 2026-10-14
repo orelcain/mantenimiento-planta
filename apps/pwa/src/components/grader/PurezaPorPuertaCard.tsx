@@ -37,6 +37,9 @@ import type { P0SinPuerta } from '@/services/grader/graderGate0Store'
 import { CAUSA_ORDER, normalizarCalibre, tramosDeCalibre, dimensionIntrusa, bloqueDe, parseWallClock, type CausaTipo, type GateCauses, type GateCauseGroup, type SeteoMaquina, type PesoPorPuerta, type SolapeDeRango, type CambioDePrograma, type MezclaPuerta, type MapaPeso, type DimensionMezcla, type GateObservations, type ComposicionCombo, type TramoCalibre } from '@/services/grader/graderGateObservations'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { dec1 } from '@/utils/formatoNumeros'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
+import { elegirColor } from '@/lib/coloresGrafico'
+import { colorCausaPureza } from './purezaColors'
 
 // ⚠ Nunca combinar estas clases de color con text-caption/text-title3 dentro
 // de cn(): tailwind-merge no conoce la escala tipográfica propia, toma
@@ -605,7 +608,7 @@ function buildApilado(mix: GateMix, causas: GateCauses, isDark: boolean): EChart
       },
     },
     series: series.map((s) => ({
-      type: 'bar', name: s.name, stack: 'pz', data: s.data, itemStyle: { color: colors[s.key] }, emphasis: { disabled: true }, barMaxWidth: 28,
+      type: 'bar', name: s.name, stack: 'pz', data: s.data, itemStyle: { color: colorCausaPureza(s.key, colors[s.key]) }, emphasis: { disabled: true }, barMaxWidth: 28,
     })),
   }
 }
@@ -663,6 +666,8 @@ function DetalleGate({ mix, entry, cfg, changeBuckets, causas, seteo, onAdoptar,
   piezas?: FirestorePieceRecord[]; piezasCargando?: boolean; onCargarPiezas?: (gate: number) => void; rangos?: CalibreWeightRange[]
 }) {
   const { isDark } = useTheme()
+  // Pizarra: re-render al cambiar Día/Penumbra (los colores de canvas se leen de los tokens al pintar).
+  useColoresGrafico()
   const nivel = nivelDePureza(mezclaPuerta?.pct ?? entry.purityPct)
   const cambios = new Set(changeBuckets ?? [])
   const purezaSinCambios = sinCambios(entry.purityByBucket, changeBuckets)
@@ -1031,12 +1036,15 @@ function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, foc
   onCargar?: () => void; rango?: { minGrams: number; maxGrams: number; calibre: string }; rangos?: CalibreWeightRange[]; focoMs?: number; isDark: boolean
 }) {
   const [soloIntrusas, setSoloIntrusas] = useState(false)
+  // Pizarra: `version` sube al cambiar Día/Penumbra o la paleta → el gráfico se recalcula.
+  const coloresGrafico = useColoresGrafico()
   const juzgadas = useMemo(() => (piezas && piezas.length ? juzgarPiezas(piezas, obs, m, rango, rangos) : []), [piezas, obs, m, rango, rangos])
   const option = useMemo<EChartsOption>(() => {
     const th = isDark ? 'dark' : 'light'
     const colores = CAUSA_COLOR[th]
     const texto = CHART_TEXT[th]
-    const warn = isDark ? '#ff9f0a' : '#974608'
+    // Pizarra: «fuera del rango por peso» es una banda fijada de antemano → aviso.
+    const warn = elegirColor(isDark ? '#ff9f0a' : '#974608', 'grafico-aviso')
     const visibles = soloIntrusas ? juzgadas.filter((p) => p.dim) : juzgadas
     const grupos = new Map<string, { name: string; symbol: string; color: string; fuera: boolean; data: Array<[number, number, string, string]> }>()
     for (const p of visibles) {
@@ -1044,7 +1052,8 @@ function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, foc
       const k = `${p.dim ?? 'ok'}|${p.fuera ? 1 : 0}`
       let g = grupos.get(k)
       if (!g) {
-        const color = p.dim ? colores[p.dim === 'calibre' ? 'calibre_lejano' : p.dim === 'calidad' ? 'calidad' : p.dim === 'conservacion' ? 'conservacion' : 'otros'] : texto.axis
+        const claveDim = p.dim === 'calibre' ? 'calibre_lejano' : p.dim === 'calidad' ? 'calidad' : p.dim === 'conservacion' ? 'conservacion' : 'otros'
+        const color = p.dim ? colorCausaPureza(claveDim, colores[claveDim]) : texto.axis
         g = { name: (p.dim ? `intrusa por ${DIM_LABEL[p.dim]}` : 'coincide') + (p.fuera ? ' · fuera de rango' : ''), symbol: p.dim ? 'diamond' : 'circle', color, fuera: p.fuera, data: [] }
         grupos.set(k, g)
       }
@@ -1073,7 +1082,7 @@ function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, foc
       series: [
         ...(rango ? [{
           type: 'line' as const, data: [], markArea: { silent: true, itemStyle: { color: texto.axis, opacity: 0.10 }, data: [[{ yAxis: rango.minGrams }, { yAxis: rango.maxGrams }]] as [[{ yAxis: number }, { yAxis: number }]] },
-          markLine: focoMs != null && focoMs !== juzgadas.find((p) => p.dim)?.x ? { silent: true, symbol: 'none', lineStyle: { color: isDark ? '#5aa0dc' : '#2e75b6', type: 'dashed' as const }, label: { show: false }, data: [{ xAxis: focoMs }] } : undefined,
+          markLine: focoMs != null && focoMs !== juzgadas.find((p) => p.dim)?.x ? { silent: true, symbol: 'none', lineStyle: { color: elegirColor(isDark ? '#5aa0dc' : '#2e75b6', 'serie-1'), type: 'dashed' as const }, label: { show: false }, data: [{ xAxis: focoMs }] } : undefined,
         }] : []),
         ...[...grupos.values()].map((g) => ({
           name: g.name, type: 'scatter' as const, data: g.data, symbol: g.symbol, symbolSize: g.symbol === 'diamond' ? 8 : 5,
@@ -1081,7 +1090,8 @@ function PiezasDePuerta({ obs, m, piezas, cargando, onCargar, rango, rangos, foc
         })),
       ],
     }
-  }, [juzgadas, soloIntrusas, isDark, rango, focoMs])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [juzgadas, soloIntrusas, isDark, rango, focoMs, coloresGrafico.version])
 
   const intrusas = juzgadas.filter((p) => p.dim).length
   const fuera = juzgadas.filter((p) => p.fuera).length

@@ -40,7 +40,9 @@ export function ListGroup({ title, action, footer, className, children, ...props
           {action && <div className="ml-auto text-[0.8rem] font-medium text-primary">{action}</div>}
         </header>
       )}
-      <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+      {/* Paleta Pizarra: borde de 1 px (--card-edge) y sin sombra, que con reflejo de planta no
+          separa; sin Pizarra las clases [[data-paleta=pizarra]_&]: no aplican y queda igual. */}
+      <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [[data-paleta=pizarra]_&]:border [[data-paleta=pizarra]_&]:border-card-edge [[data-paleta=pizarra]_&]:shadow-none">
         {children}
       </div>
       {footer && <p className="px-4 pt-2 text-[0.75rem] text-muted-foreground">{footer}</p>}
@@ -58,6 +60,8 @@ export interface ListCellProps extends Omit<React.HTMLAttributes<HTMLDivElement>
   valueSub?: React.ReactNode
   /** Slot libre a la derecha (Pill, Switch…). Va antes del chevron. */
   trailing?: React.ReactNode
+  /** Renglón gris opcional entre título y subtítulo (p. ej. el nombre SAP bajo un nombre común). */
+  detail?: React.ReactNode
   /** Muestra el chevron de navegación. Se activa solo si hay onClick. */
   chevron?: boolean
   /**
@@ -73,6 +77,7 @@ export function ListCell({
   leading,
   title,
   subtitle,
+  detail,
   value,
   valueSub,
   trailing,
@@ -134,6 +139,9 @@ export function ListCell({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className={cn('line-clamp-2 text-body leading-tight sm:truncate',
           esHijo ? 'font-normal' : 'font-semibold')}>{title}</div>
+        {detail && (
+          <div className="line-clamp-1 text-footnote leading-tight text-muted-foreground">{detail}</div>
+        )}
         {subtitle && (
           <div className="line-clamp-1 text-footnote leading-tight text-muted-foreground">{subtitle}</div>
         )}
@@ -156,18 +164,28 @@ export function ListCell({
   )
 }
 
-/** Ícono cuadrado de celda: la inicial del equipo sobre color de estado. */
+/**
+ * Ícono cuadrado de celda.
+ * - `status` (por defecto): la inicial del equipo sobre color de estado.
+ * - `neutral`: glifo sobre relleno neutro; el color queda para el estado, no para el ícono
+ *   (DESIGN.md §3). 30 px de caja y glifo de 18.
+ */
 export function CellIcon({
   className,
   children,
+  tone = 'status',
 }: {
   className?: string
   children: React.ReactNode
+  tone?: 'status' | 'neutral'
 }) {
   return (
     <span
       className={cn(
-        'flex size-7 items-center justify-center rounded-ctl text-[0.62rem] font-bold text-white',
+        'flex items-center justify-center',
+        tone === 'neutral'
+          ? 'size-[30px] rounded-[8px] bg-muted text-muted-foreground [&_svg]:size-[18px]'
+          : 'size-7 rounded-ctl text-[0.62rem] font-bold text-white',
         className,
       )}
     >

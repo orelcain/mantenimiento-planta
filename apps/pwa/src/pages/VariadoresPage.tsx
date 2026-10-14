@@ -22,7 +22,7 @@
  */
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp, Hourglass } from 'lucide-react'
+import { ArrowLeftRight, Search, AlertTriangle, BookOpen, ChevronRight, Copy, Check, PackageSearch, Plus, Loader2, ClipboardCheck, TrendingUp, Hourglass } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { crearAporte, aportesDePosicion, type AporteVariador } from '@/services/variadoresAportes'
 import { getIncidents, resolveIncident } from '@/services/incidents'
@@ -39,6 +39,7 @@ import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
 import { FOCO, tinte, chip as chipEstilo, panel as panelEstilo, aviso } from '@/data/variadoresUi'
 import { MetaText } from '@/components/learning/primitives'
+import { EncabezadoHerramienta, SegmentedControl } from '@/components/piel'
 import {
   VARIADORES,
   MOTORES_CINTAS,
@@ -89,7 +90,7 @@ function EstadoChip({ estado }: { estado: EstadoFicha }) {
   const color = COLOR_ESTADO[estado]
   return (
     <span
-      className="inline-flex items-center gap-2 rounded-ctl px-2 py-1 text-caption font-medium whitespace-nowrap"
+      className="inline-flex items-center gap-2 rounded-ctl px-2 py-1 text-nota font-medium whitespace-nowrap"
       style={{ color, background: tinte.suave(color) }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
@@ -148,7 +149,7 @@ function SimuladorPSR() {
         <span className="font-mono text-footnote font-bold tracking-[0.22em]" style={{ color: '#e8422e' }}>
           ABB
         </span>
-        <span className="font-mono text-caption" style={{ color: '#6d7d8a' }}>
+        <span className="font-mono text-nota" style={{ color: '#6d7d8a' }}>
           PSR60-600-70 · Ue 208…600 V · Uc 100…240 V AC
         </span>
       </div>
@@ -157,10 +158,10 @@ function SimuladorPSR() {
         {POTENCIOMETROS_PSR.map((p) => (
           <div key={p.id} className="flex flex-col items-center gap-2 text-center">
             <Perilla valor={v(p.id)} min={p.min} max={p.max} />
-            <span className="font-mono text-caption uppercase tracking-[0.1em]" style={{ color: '#8b9aa6' }}>
+            <span className="text-nota font-semibold" style={{ color: '#8b9aa6' }}>
               {p.nombre}
             </span>
-            <span className="font-mono text-lg font-semibold tabular-nums" style={{ color: '#f0f4f7' }}>
+            <span className="text-lg font-semibold tabular-nums" style={{ color: '#f0f4f7' }}>
               {v(p.id)}{p.unidad}
             </span>
             <input
@@ -174,7 +175,7 @@ function SimuladorPSR() {
               style={{ accentColor: '#f5a623' }}
               onChange={(e) => setValores((v) => ({ ...v, [p.id]: Number(e.target.value) }))}
             />
-            <span className="font-mono text-caption" style={{ color: '#5d6b76' }}>{p.rango}</span>
+            <span className="text-nota tabular-nums" style={{ color: '#5d6b76' }}>{p.rango}</span>
           </div>
         ))}
       </div>
@@ -189,17 +190,17 @@ function SimuladorPSR() {
           ['Corriente nominal', '60 A'],
         ].map(([rotulo, valor]) => (
           <div key={rotulo} className="flex flex-col gap-1 px-3 py-3" style={{ background: '#131a20' }}>
-            <dt className="font-mono text-caption uppercase tracking-[0.09em]" style={{ color: '#6d7d8a' }}>
+            <dt className="text-nota font-semibold" style={{ color: '#6d7d8a' }}>
               {rotulo}
             </dt>
-            <dd className="m-0 font-mono text-[15px] font-semibold tabular-nums" style={{ color: '#e6ecf1' }}>
+            <dd className="m-0 text-[15px] font-semibold tabular-nums" style={{ color: '#e6ecf1' }}>
               {valor}
             </dd>
           </div>
         ))}
       </dl>
 
-      <p className="text-xs" style={{ color: '#8b9aa6', borderTop: '1px solid #232a30', paddingTop: 12 }}>
+      <p className="text-nota" style={{ color: '#8b9aa6', borderTop: '1px solid #232a30', paddingTop: 12 }}>
         Del catálogo ABB: <span className="font-mono">Uini 40…70 % da Uend 30…60 %</span>, y el escalón
         baja <span className="font-mono">2 %</span> por cada segundo de rampa de parada.
       </p>
@@ -308,7 +309,7 @@ function NavegadorParametros({
                   setResaltado(null)
                 }}
                 aria-pressed={on}
-                className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
+                className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
                 style={{
                   background: on ? tinte.suave(C.aqua) : C.bgPanel,
                   border: `1px solid ${on ? C.aqua : C.border}`,
@@ -316,7 +317,7 @@ function NavegadorParametros({
                   fontWeight: on ? 600 : 400,
                 }}
               >
-                <span className="mr-2 font-mono text-xs opacity-85">{codigo}</span>
+                <span className="mr-2 font-mono text-nota opacity-85">{codigo}</span>
                 {nombre}
               </button>
             )
@@ -336,7 +337,7 @@ function NavegadorParametros({
             }}
             placeholder="Buscar: nCr, rampa, corriente…"
             aria-label="Buscar parámetro"
-            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
@@ -344,7 +345,7 @@ function NavegadorParametros({
           <button
             onClick={() => setSoloPlaca((v) => !v)}
             aria-pressed={soloPlaca}
-            className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
+            className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
             style={{
               background: soloPlaca ? tinte.suave(C.warn) : C.bgPanel,
               border: `1px solid ${soloPlaca ? C.warn : C.border}`,
@@ -354,7 +355,7 @@ function NavegadorParametros({
           >
             Solo datos de placa
           </button>
-          <MetaText mono>
+          <MetaText>
             {global
               ? `${visibles.length} de ${todas.length} en toda la ficha`
               : `${filas.length} parámetros`}
@@ -419,7 +420,7 @@ function NavegadorParametros({
                 >
                   {r.codigo}
                   {(global || marcado) && (
-                    <span className="mt-1 block font-sans text-caption font-normal" style={{ color: C.inkLo }}>
+                    <span className="mt-1 block font-sans text-nota font-normal" style={{ color: C.inkLo }}>
                       {r.menu.split(' ')[0]}
                     </span>
                   )}
@@ -428,7 +429,7 @@ function NavegadorParametros({
                   {r.descripcion}
                   {r.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium"
+                      className="ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-nota font-medium"
                       style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
@@ -439,7 +440,7 @@ function NavegadorParametros({
                   {equivalenciaDe(r.codigo) && (
                     <button
                       onClick={() => onComparar(r.codigo)}
-                      className={`ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-caption font-medium align-middle ${FOCO}`}
+                      className={`ml-2 inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-nota font-medium align-middle ${FOCO} max-lg:min-h-[48px]`}
                       style={{
                         color: C.aquaBright,
                         background: tinte.suave(C.aqua),
@@ -469,7 +470,7 @@ function NavegadorParametros({
                           <span style={{ color: C.ink }}>{o.que}</span>
                           {o.cuando && <span style={{ color: C.inkMid }}> — {o.cuando}</span>}
                           {o.requiere && (
-                            <span className="ml-2 whitespace-nowrap text-caption" style={{ color: C.inkLo }}>
+                            <span className="ml-2 whitespace-nowrap text-nota" style={{ color: C.inkLo }}>
                               ({o.requiere})
                             </span>
                           )}
@@ -493,7 +494,7 @@ function NavegadorParametros({
 
       <MetaText>
         <span
-          className="mr-2 inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
+          className="mr-2 inline-flex items-center rounded-ctl px-2 py-1 text-nota font-medium"
           style={{ color: C.warn, background: tinte.suave(C.warn) }}
         >
           Placa
@@ -530,7 +531,7 @@ function ListaFallas({ fallas }: { fallas: FallaVariador[] }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Escribe el código que muestra el display: OLF, O-I, StF…"
           aria-label="Buscar código de falla"
-          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -615,7 +616,7 @@ function ChipSap({ codigo }: { codigo?: string }) {
           window.setTimeout(() => setCopiado(false), 1400)
         }}
         title="Copiar el código SAP"
-        className={`inline-flex items-center gap-1 px-2 py-1 font-mono text-footnote font-medium ${FOCO}`}
+        className={`inline-flex items-center gap-1 px-2 py-1 font-mono text-footnote font-medium ${FOCO} max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:justify-center`}
         style={{ color: C.aquaBright }}
       >
         {codigo}
@@ -626,7 +627,7 @@ function ChipSap({ codigo }: { codigo?: string }) {
           onClick={(e) => { e.stopPropagation(); navigate(`/repuestos?q=${encodeURIComponent(codigo)}`) }}
           title="Ver stock y ubicación en Repuestos"
           aria-label={`Ver ${codigo} en Repuestos`}
-          className={`px-2 py-1 ${FOCO}`}
+          className={`px-2 py-1 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
           style={{ color: C.aquaBright, borderLeft: `1px solid ${tinte.borde(C.aqua)}` }}
         >
           <PackageSearch className="h-3.5 w-3.5" />
@@ -668,8 +669,8 @@ function PanelEvidencia() {
         ].map(([rot, val, pie]) => (
           <div key={rot as string} className="flex flex-col gap-1 px-3 py-3" style={{ background: C.surface }}>
             <span className="text-footnote" style={{ color: C.inkMid }}>{rot}</span>
-            <span className="font-mono text-[22px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
-            {pie && <span className="text-caption" style={{ color: C.inkLo }}>{pie}</span>}
+            <span className="text-[22px] font-semibold tabular-nums" style={{ color: C.ink }}>{val}</span>
+            {pie && <span className="text-nota" style={{ color: C.inkLo }}>{pie}</span>}
           </div>
         ))}
       </div>
@@ -783,7 +784,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
     return (
       <button
         onClick={abrir}
-        className={`mt-3 inline-flex w-fit items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-medium ${FOCO}`}
+        className={`mt-3 inline-flex w-fit items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-medium ${FOCO} max-lg:min-h-[48px]`}
         style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
       >
         <ClipboardCheck className="h-3.5 w-3.5" />
@@ -813,7 +814,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                 key={i.id}
                 onClick={() => setElegida(i.id)}
                 aria-pressed={elegida === i.id}
-                className={`rounded-ctl px-3 py-2 text-left text-footnote ${FOCO}`}
+                className={`rounded-ctl px-3 py-2 text-left text-footnote ${FOCO} max-lg:min-h-[48px]`}
                 style={{
                   background: elegida === i.id ? tinte.suave(C.aqua) : C.surface,
                   border: `1px solid ${elegida === i.id ? C.aqua : C.border}`,
@@ -842,7 +843,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                   key={m}
                   onClick={() => setModo(m)}
                   aria-pressed={modo === m}
-                  className={`rounded-ctl px-3 py-2 text-footnote ${FOCO}`}
+                  className={`rounded-ctl px-3 py-2 text-footnote ${FOCO} max-lg:min-h-[48px]`}
                   style={{
                     background: modo === m ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${modo === m ? C.aqua : C.border}`,
@@ -863,7 +864,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
                   key={r.id}
                   onClick={() => setRango(r.id)}
                   aria-pressed={rango === r.id}
-                  className={`rounded-ctl px-3 py-2 font-mono text-footnote ${FOCO}`}
+                  className={`rounded-ctl px-3 py-2 font-mono text-footnote ${FOCO} max-lg:min-h-[48px]`}
                   style={{
                     background: rango === r.id ? tinte.suave(C.aqua) : C.surface,
                     border: `1px solid ${rango === r.id ? C.aqua : C.border}`,
@@ -884,7 +885,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
         <button
           onClick={guardar}
           disabled={!elegida || !modo || !rango || guardando}
-          className={`inline-flex items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-semibold disabled:opacity-45 ${FOCO}`}
+          className={`inline-flex items-center gap-2 rounded-ctl px-3 py-2 text-footnote font-semibold disabled:opacity-45 ${FOCO} max-lg:min-h-[48px]`}
           style={{ color: C.ok, background: tinte.suave(C.ok) }}
         >
           {guardando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
@@ -892,7 +893,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
         </button>
         <button
           onClick={() => setAbierto(false)}
-          className={`rounded-ctl px-3 py-2 text-footnote ${FOCO}`}
+          className={`rounded-ctl px-3 py-2 text-footnote ${FOCO} max-lg:min-h-[48px]`}
           style={{ color: C.inkMid }}
         >
           Cancelar
@@ -973,7 +974,7 @@ function AportarValor({
       {isAuthenticated && !abierto && (
         <button
           onClick={() => setAbierto(true)}
-          className={`mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-1 text-footnote ${FOCO}`}
+          className={`mt-1 inline-flex w-fit items-center gap-1 rounded-ctl px-2 py-1 text-footnote ${FOCO} max-lg:min-h-[48px]`}
           style={{ color: C.aquaBright, background: tinte.suave(C.aqua) }}
         >
           <Plus className="h-3 w-3" />
@@ -990,13 +991,13 @@ function AportarValor({
             onKeyDown={(e) => { if (e.key === 'Enter') guardar(); if (e.key === 'Escape') setAbierto(false) }}
             placeholder={faltante ? 'Valor de la placa…' : 'Valor real…'}
             aria-label={`Valor de ${valor.codigo}`}
-            className={`rounded-ctl px-2 py-1 font-mono text-footnote ${FOCO}`}
+            className={`rounded-ctl px-2 py-1 font-mono text-footnote ${FOCO} max-lg:min-h-[48px]`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink, width: 130 }}
           />
           <button
             onClick={guardar}
             disabled={guardando || !texto.trim()}
-            className={`inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-footnote font-medium disabled:opacity-50 ${FOCO}`}
+            className={`inline-flex items-center gap-1 rounded-ctl px-2 py-1 text-footnote font-medium disabled:opacity-50 ${FOCO} max-lg:min-h-[48px]`}
             style={{ color: C.ok, background: tinte.suave(C.ok) }}
           >
             {guardando ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
@@ -1004,7 +1005,7 @@ function AportarValor({
           </button>
           <button
             onClick={() => { setAbierto(false); setError(null) }}
-            className={`rounded-ctl px-2 py-1 text-footnote ${FOCO}`}
+            className={`rounded-ctl px-2 py-1 text-footnote ${FOCO} max-lg:min-h-[48px]`}
             style={{ color: C.inkMid }}
           >
             Cancelar
@@ -1079,7 +1080,7 @@ function RecetasPorEquipo({
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar cinta, zona, motor o código SAP…"
             aria-label="Buscar posición"
-            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+            className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
             style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
           />
         </div>
@@ -1170,7 +1171,7 @@ function RecetasPorEquipo({
                       {fam ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); onAbrirFicha(fam.id) }}
-                          className={`rounded-ctl text-left font-medium hover:underline ${FOCO}`}
+                          className={`rounded-ctl text-left font-medium hover:underline ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                           style={{ color: C.aquaBright }}
                         >
                           {fam.nombre}
@@ -1216,7 +1217,7 @@ function RecetasPorEquipo({
                                     {val.valor}
                                   </span>
                                   <span
-                                    className="rounded-ctl px-2 py-1 text-caption"
+                                    className="rounded-ctl px-2 py-1 text-nota"
                                     style={{
                                       color: COLOR_VALOR[val.estado],
                                       background: `color-mix(in srgb, ${COLOR_VALOR[val.estado]} 16%, transparent)`,
@@ -1313,7 +1314,7 @@ function ReemplazoOtraMarca({
               key={f.id}
               onClick={() => setDestinoId(on ? null : f.id)}
               aria-pressed={on}
-              className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO}`}
+              className={`rounded-ctl px-3 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
               style={{
                 background: on ? tinte.suave(C.aqua) : C.bgPanel,
                 border: `1px solid ${on ? C.aqua : C.border}`,
@@ -1383,7 +1384,7 @@ function ReemplazoOtraMarca({
                               onClick={() =>
                                 onAbrirFicha(t.destino.id, 'parametros', { codigo: f.codigoDestino as string })
                               }
-                              className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                              className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                               style={{ color: C.aquaBright }}
                             >
                               {f.codigoDestino}
@@ -1403,7 +1404,7 @@ function ReemplazoOtraMarca({
                         >
                           {f.valor}
                           <span
-                            className="ml-2 rounded-ctl px-2 py-1 text-caption font-sans"
+                            className="ml-2 rounded-ctl px-2 py-1 text-nota font-sans"
                             style={{
                               color: COLOR_VALOR[f.estado],
                               background: tinte.suave(COLOR_VALOR[f.estado]),
@@ -1432,14 +1433,14 @@ function ReemplazoOtraMarca({
                       <li key={x.codigo}>
                         <button
                           onClick={() => onAbrirFicha(t.destino.id, 'parametros', { codigo: x.codigo })}
-                          className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                          className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                           style={{ color: C.aquaBright }}
                         >
                           {x.codigo}
                         </button>{' '}
                         <span style={{ color: C.ink }}>{x.concepto}</span>
                         {x.menu && (
-                          <span className="ml-2 font-mono text-caption" style={{ color: C.inkLo }}>
+                          <span className="ml-2 font-mono text-nota" style={{ color: C.inkLo }}>
                             menú {x.menu.split(' ')[0]}
                             {x.rango && x.rango !== '—' ? ` · ${x.rango}` : ''}
                             {x.fabrica && x.fabrica !== '—' ? ` · fábrica ${x.fabrica}` : ''}
@@ -1538,7 +1539,7 @@ function BuscadorParametros({
           }}
           placeholder="nCr · P-08 · 1-24 · corriente · rampa · tensión…"
           aria-label="Buscar parámetro en todas las familias"
-          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -1574,7 +1575,7 @@ function BuscadorParametros({
                     </span>
                     <span className="text-[14px]" style={{ color: C.ink }}>{h.parametro.descripcion}</span>
                     {h.parametro.dePlaca && (
-                      <span className="rounded-ctl px-2 py-1 text-caption font-medium" style={chipEstilo(C.warn)}>Placa</span>
+                      <span className="rounded-ctl px-2 py-1 text-nota font-medium" style={chipEstilo(C.warn)}>Placa</span>
                     )}
                   </span>
                   <span className="text-footnote" style={{ color: C.inkMid }}>
@@ -1591,7 +1592,7 @@ function BuscadorParametros({
                 {suEquiv && (
                   <button
                     onClick={() => setElegida(suEquiv)}
-                    className={`shrink-0 self-start rounded-ctl px-3 py-2 text-footnote font-medium sm:self-auto ${FOCO}`}
+                    className={`shrink-0 self-start rounded-ctl px-3 py-2 text-footnote font-medium sm:self-auto ${FOCO} max-lg:min-h-[48px]`}
                     style={{
                       color: C.aquaBright,
                       background: tinte.suave(C.aqua),
@@ -1631,7 +1632,7 @@ function PanelComparacion({
       <span className="text-[15px] font-semibold" style={{ color: C.ink }}>
         {equiv.concepto}
         {equiv.dePlaca && (
-          <span className="ml-2 rounded-ctl px-2 py-1 text-caption font-medium" style={chipEstilo(C.warn)}>
+          <span className="ml-2 rounded-ctl px-2 py-1 text-nota font-medium" style={chipEstilo(C.warn)}>
             Dato de placa
           </span>
         )}
@@ -1744,7 +1745,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar por concepto o por código: corriente, nCr, P-08…"
           aria-label="Buscar equivalencia"
-          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO}`}
+          className={`w-full rounded-ctl py-3 pl-9 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
           style={{ background: C.bgPanel, border: `1px solid ${C.border}`, color: C.ink }}
         />
       </div>
@@ -1801,7 +1802,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                   {e.concepto}
                   {e.dePlaca && (
                     <span
-                      className="ml-2 inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
+                      className="ml-2 inline-flex items-center rounded-ctl px-2 py-1 text-nota font-medium"
                       style={{ color: C.warn, background: tinte.suave(C.warn) }}
                     >
                       Placa
@@ -1831,7 +1832,7 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
                             menu: c.ubicacion!.menu,
                           })
                         }
-                        className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO}`}
+                        className={`rounded-ctl font-mono font-semibold underline decoration-dotted underline-offset-4 ${FOCO} max-lg:inline-flex max-lg:min-h-[48px] max-lg:min-w-[48px] max-lg:items-center max-lg:justify-center`}
                         style={{ color: C.aquaBright }}
                         title={`Ir a ${c.codigo} · ${c.ubicacion.fichaNombre}`}
                       >
@@ -1853,7 +1854,6 @@ function TablaEquivalencias({ onAbrirFicha }: { onAbrirFicha: AbrirFicha }) {
 
 // ── Página ────────────────────────────────────────────────────────────────────
 export function VariadoresPage() {
-  const navigate = useNavigate()
   // La ficha abierta va en la URL: así se puede compartir el enlace de un equipo
   // por Telegram y quien lo abra cae directo en su ficha.
   const [params, setParams] = useSearchParams()
@@ -1945,27 +1945,39 @@ export function VariadoresPage() {
 
   return (
     <div className="min-h-screen" style={{ background: C.bg }}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-20 pt-7">
-        {/* Cabecera */}
-        <header className="flex flex-col gap-3">
-          <button
-            onClick={() => navigate('/aprendizaje')}
-            className={`inline-flex w-fit items-center gap-2 rounded-ctl text-[14px] font-medium ${FOCO}`}
-            style={{ color: C.aquaBright }}
-          >
-            <ArrowLeft className="h-4 w-4" /> Centro de aprendizaje
-          </button>
-          <h1
-            className="m-0 text-[clamp(1.55rem,4vw,2.1rem)] font-semibold leading-tight tracking-[-0.021em]"
-            style={{ color: C.ink, textWrap: 'balance' }}
-          >
-            Variadores y partidores suaves
-          </h1>
+      {/* Encabezado único del marco de herramientas. En el catálogo vuelve al Centro de
+          aprendizaje; dentro de una ficha, al catálogo (antes «← Volver al catálogo»). */}
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver={ficha ? 'Variadores' : 'Aprendizaje'}
+        volverA="/aprendizaje"
+        onVolver={ficha ? () => abrirFicha(null) : undefined}
+        titulo="Variadores"
+        subtitulo={ficha ? ficha.nombre : 'Parámetros y fallas por modelo'}
+        // Cuatro vistas hermanas = un SegmentedControl de 48 px (antes chips con contorno que saltaban de línea).
+        control={ficha === null ? (
+          <SegmentedControl
+            tamano="herramienta"
+            ariaLabel="Vista"
+            value={vista}
+            onChange={cambiarVista}
+            segments={[
+              { value: 'catalogo', label: 'Modelo' },
+              { value: 'recetas', label: 'Equipo' },
+              { value: 'parametro', label: 'Parámetro' },
+              { value: 'equivalencias', label: 'Marcas' },
+            ]}
+          />
+        ) : undefined}
+        contextoAria={ficha ? `Estoy en la ficha del variador ${ficha.nombre}. ` : 'Estoy en el catálogo de variadores y partidores suaves. '}
+      />
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-5 pb-20 pt-5">
+        {!ficha && (
           <p className="m-0 max-w-[62ch] text-[15px] leading-relaxed" style={{ color: C.inkMid }}>
-            Qué parámetros espera cada modelo y en qué menú están. Para cuando hay que
-            reemplazar uno y configurarlo sin buscar el manual.
+            Variadores y partidores suaves: qué parámetros espera cada modelo y en qué menú están. Para
+            cuando hay que reemplazar uno y configurarlo sin buscar el manual.
           </p>
-        </header>
+        )}
 
         {fichaRota && (
           <div
@@ -1981,36 +1993,6 @@ export function VariadoresPage() {
               No existe la ficha «{abierta}» — puede ser un enlace viejo o un error de tipeo.
               Abajo está el catálogo completo.
             </span>
-          </div>
-        )}
-
-        {/* Selector de vista — solo en el catálogo, no dentro de una ficha */}
-        {ficha === null && (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Vista">
-            {([
-              ['catalogo', 'Por modelo'],
-              ['recetas', 'Por cinta / equipo'],
-              ['parametro', 'Buscar parámetro'],
-              ['equivalencias', 'Equivalencias entre marcas'],
-            ] as const).map(([v, rotulo]) => {
-              const on = vista === v
-              return (
-                <button
-                  key={v}
-                  onClick={() => cambiarVista(v)}
-                  aria-pressed={on}
-                  className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO}`}
-                  style={{
-                    background: on ? tinte.suave(C.aqua) : C.bgPanel,
-                    border: `1px solid ${on ? C.aqua : C.border}`,
-                    color: C.ink,
-                    fontWeight: on ? 600 : 400,
-                  }}
-                >
-                  {rotulo}
-                </button>
-              )
-            })}
           </div>
         )}
 
@@ -2031,7 +2013,7 @@ export function VariadoresPage() {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar marca, modelo o dónde se usa…"
                 aria-label="Buscar familia de variador"
-                className={`w-full rounded-card py-3 pl-10 pr-3 text-sm ${FOCO}`}
+                className={`w-full rounded-card py-3 pl-10 pr-3 text-sm ${FOCO} max-lg:min-h-[48px]`}
                 style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
               />
             </div>
@@ -2084,13 +2066,13 @@ export function VariadoresPage() {
                         <span className="block text-base font-semibold leading-tight tracking-[-0.014em]" style={{ color: C.ink }}>
                           {f.nombre}
                         </span>
-                        <span className="mt-1 block text-xs" style={{ color: C.inkMid }}>{f.tipo}</span>
+                        <span className="mt-1 block text-nota" style={{ color: C.inkMid }}>{f.tipo}</span>
                       </div>
                       <EstadoChip estado={f.estado} />
                     </div>
                     <span className="text-footnote leading-snug" style={{ color: C.inkMid }}>{f.donde}</span>
                     <span
-                      className="mt-1 pt-2 text-xs tabular-nums"
+                      className="mt-1 pt-2 text-nota tabular-nums"
                       style={{ color: C.inkMid, borderTop: `1px solid ${C.border}` }}
                     >
                       {f.menus
@@ -2137,8 +2119,8 @@ export function VariadoresPage() {
                         ['RPM salida', m.rpmSalida],
                       ].map(([rot, val]) => (
                         <div key={rot} className="flex flex-col gap-1 px-3 py-2" style={{ background: C.surface }}>
-                          <dt className="text-caption" style={{ color: C.inkMid }}>{rot}</dt>
-                          <dd className="m-0 font-mono text-[14px] font-semibold tabular-nums" style={{ color: C.ink }}>
+                          <dt className="text-nota" style={{ color: C.inkMid }}>{rot}</dt>
+                          <dd className="m-0 text-[14px] font-semibold tabular-nums" style={{ color: C.ink }}>
                             {val}
                           </dd>
                         </div>
@@ -2148,7 +2130,7 @@ export function VariadoresPage() {
                       {FALTAN_DE_PLACA.map((f) => (
                         <span
                           key={f}
-                          className="inline-flex items-center rounded-ctl px-2 py-1 text-caption font-medium"
+                          className="inline-flex items-center rounded-ctl px-2 py-1 text-nota font-medium"
                           style={{ color: C.warn, background: tinte.suave(C.warn) }}
                         >
                           {f}
@@ -2179,14 +2161,6 @@ export function VariadoresPage() {
           </>
         ) : (
           <>
-            <button
-              onClick={() => abrirFicha(null)}
-              className={`inline-flex w-fit items-center gap-2 rounded-ctl text-[14px] font-medium ${FOCO}`}
-              style={{ color: C.aquaBright }}
-            >
-              <ArrowLeft className="h-4 w-4" /> Volver al catálogo
-            </button>
-
             <div className="overflow-hidden rounded-card" style={panelEstilo}>
               <div
                 className="flex flex-wrap items-baseline justify-between gap-3 px-5 py-4"
@@ -2231,7 +2205,7 @@ export function VariadoresPage() {
                           key={s}
                           onClick={() => setSeccion(s)}
                           aria-pressed={on}
-                          className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO}`}
+                          className={`rounded-ctl px-4 py-2 text-footnote transition-colors ${FOCO} max-lg:min-h-[48px]`}
                           style={{
                             background: on ? tinte.suave(C.aqua) : C.bgPanel,
                             border: `1px solid ${on ? C.aqua : C.border}`,

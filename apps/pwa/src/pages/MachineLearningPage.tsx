@@ -8,10 +8,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
+  BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
   ChevronLeft, ChevronRight, Image as ImageIcon,
   ZoomIn, ZoomOut, RotateCcw, X, GraduationCap, BookMarked, Library,
-  MonitorPlay, Zap, Search, Lock, Gauge,
+  MonitorPlay, Zap, Search, Lock, Gauge, Ruler, CircuitBoard,
 } from 'lucide-react'
 import '@/styles/learningDossier.css'
 import { useAuthStore } from '@/store'
@@ -47,6 +47,7 @@ import { QuickRefView } from '@/components/learning/QuickRefView'
 import { getQuickRef, hasQuickRef } from '@/data/learningQuickRef'
 import { posicionesDeMaquina, VARIADORES, type PosicionReceta } from '@/data/variadores'
 import { getQuizBest } from '@/utils/learningProgress'
+import { EncabezadoHerramienta, SegmentedControl, SelectorSeccion } from '@/components/piel'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = CAPACITACION_AREA
@@ -194,57 +195,6 @@ const COURSE_TABS: TabDef[] = [
   },
 ]
 
-/**
- * ScrollTabs — selector de secciones de la máquina/curso: una sola fila subrayada
- * con scroll horizontal, igual en desktop y en móvil (nunca se envuelve a 2 filas).
- * Estilo "documentation portal" (subrayado) en vez de píldoras: son varias secciones
- * de consulta técnica, no un panel de ajustes con opciones excluyentes.
- */
-function ScrollTabs({
-  tabs,
-  activeTab,
-  onSelect,
-  quizPassed,
-}: {
-  tabs: TabDef[]
-  activeTab: TabId
-  onSelect: (id: TabId) => void
-  quizPassed: boolean
-}) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const scrollBy = (dx: number) => trackRef.current?.scrollBy({ left: dx, behavior: 'smooth' })
-
-  return (
-    <nav className="dp-scroll-tabs" aria-label="Secciones">
-      <button type="button" className="dp-scroll-arrow left" onClick={() => scrollBy(-160)} aria-label="Desplazar a la izquierda">
-        <ChevronLeft style={{ width: 15, height: 15 }} />
-      </button>
-      <div className="dp-scroll-track" ref={trackRef}>
-        {tabs.map(tab => {
-          const TabIcon = tab.icon
-          const evalDone = tab.id === 'quiz' && quizPassed
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              className="dp-scroll-tab"
-              onClick={() => onSelect(tab.id)}
-              aria-current={activeTab === tab.id ? 'true' : undefined}
-            >
-              {evalDone ? <span className="dp-scroll-tab-done">✓</span> : <TabIcon style={{ width: 13, height: 13 }} />}
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-      <div className="dp-scroll-fade" aria-hidden />
-      <button type="button" className="dp-scroll-arrow right" onClick={() => scrollBy(160)} aria-label="Desplazar a la derecha">
-        <ChevronRight style={{ width: 15, height: 15 }} />
-      </button>
-    </nav>
-  )
-}
-
 export function MachineLearningPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
@@ -377,15 +327,41 @@ export function MachineLearningPage() {
 
   return (
     <div className={`dossier ${heightClass} w-full`}>
-      <div className="dp-wrap" style={{ paddingBottom: '7rem' }}>
-        <button className="dp-back" onClick={() => navigate('/aprendizaje')}>
-          <ArrowLeft className="h-4 w-4" /> Centro de aprendizaje
-        </button>
+      {/* Encabezado único del marco de herramientas (antes «← Centro de aprendizaje» en mono). */}
+      <EncabezadoHerramienta
+        pegajoso
+        etiquetaVolver="Aprendizaje"
+        volverA="/aprendizaje"
+        titulo={isCourse ? 'Curso' : 'Ficha técnica'}
+        subtitulo={machine.name}
+        // Una sola forma de pestañas: 2-4 secciones cortas = segmentado; más = «Sección ▾» (Sheet con lista).
+        control={tabs.length <= 4 ? (
+          <SegmentedControl
+            tamano="herramienta"
+            ariaLabel="Secciones"
+            value={activeTabData.id}
+            onChange={setActiveTab}
+            segments={tabs.map(t => ({ value: t.id, label: t.shortLabel }))}
+          />
+        ) : (
+          <SelectorSeccion
+            value={activeTabData.id}
+            onChange={setActiveTab}
+            opciones={tabs.map(t => {
+              const TabIcon = t.icon
+              return { value: t.id, label: t.label, icon: <TabIcon />, hecho: t.id === 'quiz' && quizPassed }
+            })}
+          />
+        )}
+        contextoAria={`Estoy en ${isCourse ? 'el curso' : 'la ficha técnica de'} ${machine.name} del Centro de aprendizaje. `}
+      />
+      {/* Sin barra inferior en esta ruta (modo «lectura»): solo aire para el gesto de inicio. */}
+      <div className="dp-wrap" style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}>
 
         {/* Portada del documento */}
         <header style={{ paddingTop: 'clamp(10px, 3vw, 30px)' }}>
           <div className="dp-eyebrow">
-            {isCourse ? (machine.modulo != null ? 'MÓDULO' : 'CURSO') : 'FICHA TÉCNICA'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area).toUpperCase() : 'REV 2026-07'}
+            {isCourse ? (machine.modulo != null ? 'Módulo' : 'Curso') : 'Ficha técnica'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area) : 'Rev. 2026-07'}
           </div>
           <h1 className="dp-title">{machine.name}</h1>
           <p className="dp-sub">{machine.description}</p>
@@ -405,6 +381,12 @@ export function MachineLearningPage() {
               <MonitorPlay className="h-4 w-4" /> Practicar en el simulador · {machine.hmiLabel}
             </button>
           )}
+          {/* Tarjeta A3C interactiva (plano 888 h. 22-23), solo BAADER 142. */}
+          {machine.slug === 'baader-142' && (
+            <button className="dp-hmi" onClick={() => navigate('/aprendizaje/baader-142/tarjeta-a3c')}>
+              <CircuitBoard className="h-4 w-4" /> Tarjeta A3C · qué LED prende
+            </button>
+          )}
 
           {/* Estado de evaluación (único progreso que importa: esto es material
               de consulta periódica, no un curso lineal) */}
@@ -419,12 +401,6 @@ export function MachineLearningPage() {
 
         <div className="dp-course">
           <div className="dp-main-col">
-            <ScrollTabs
-              tabs={tabs}
-              activeTab={activeTab}
-              onSelect={setActiveTab}
-              quizPassed={quizPassed}
-            />
 
         {/* Cabecera de sección activa */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginTop: 34 }}>
@@ -446,6 +422,17 @@ export function MachineLearningPage() {
           )}
         </div>
         <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
+        {/* Acceso a la referencia de terreno (cifra primero + página del PDF), solo B200. */}
+        {machine.slug === 'baader-200' && activeTab === 'manual' && (
+          <button
+            type="button"
+            className="dp-hmi"
+            style={{ marginTop: -16, marginBottom: 24, minHeight: 44 }}
+            onClick={() => navigate('/aprendizaje/baader-200/terreno')}
+          >
+            <Ruler className="h-4 w-4" /> Referencia de terreno
+          </button>
+        )}
 
         {activeTab === 'quickref' && quickRefGroups ? (
           <QuickRefView groups={quickRefGroups} showSensitive={isAuthenticated} />

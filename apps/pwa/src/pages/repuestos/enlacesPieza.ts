@@ -62,10 +62,51 @@ export function rutaDibujo(
   codigo: string,
   maquina?: string,
 ): string | null {
-  const donde = figuras?.[codigo.trim()]
+  return dibujoDe(figuras, codigo, maquina)?.ruta ?? null
+}
+
+/** Como `rutaDibujo`, pero además dice la figura (para rotular «Dibujo · fig. 3-3»). */
+export function dibujoDe(
+  figuras: Record<string, EnDespiece[]> | null,
+  codigo: string | undefined | null,
+  maquina?: string,
+): { ruta: string; fig: string } | null {
+  const c = (codigo ?? '').trim()
+  const donde = c ? figuras?.[c] : undefined
   if (!donde?.length) return null
   const d = (maquina && donde.find((x) => x.maquina === maquina)) || donde[0]!
-  return `/aprendizaje/planos/${d.slug}?hoja=${d.hoja}&ap=${encodeURIComponent(codigo.trim())}`
+  return { ruta: `/aprendizaje/planos/${d.slug}?hoja=${d.hoja}&ap=${encodeURIComponent(c)}`, fig: d.fig }
+}
+
+/**
+ * Lo que Áreas tenía abierto al saltar al dibujo (búsqueda escrita + repuesto
+ * del panel), para reponerlo al volver con «atrás»: el hub se monta de cero y
+ * lo perdía. Vive en sessionStorage y se consume UNA vez.
+ */
+export const CLAVE_VOLVER_DEL_DIBUJO = 'repuestos:volverDelDibujo'
+export type VueltaDelDibujo = { q: string; rowKey: string | null }
+
+export function recordarVueltaDelDibujo(v: VueltaDelDibujo) {
+  try { sessionStorage.setItem(CLAVE_VOLVER_DEL_DIBUJO, JSON.stringify(v)) } catch { /* sin storage */ }
+}
+
+export function leerVueltaDelDibujo(): VueltaDelDibujo | null {
+  try {
+    const raw = sessionStorage.getItem(CLAVE_VOLVER_DEL_DIBUJO)
+    if (!raw) return null
+    sessionStorage.removeItem(CLAVE_VOLVER_DEL_DIBUJO)
+    const v = JSON.parse(raw) as Partial<VueltaDelDibujo>
+    return { q: typeof v.q === 'string' ? v.q : '', rowKey: typeof v.rowKey === 'string' ? v.rowKey : null }
+  } catch { return null }
+}
+
+/**
+ * De un nombre de equipo («EVISCERADORA BAADER 142 N1», «BAADER 200») a la
+ * máquina del despiece, para elegir el dibujo correcto si el código va en las dos.
+ */
+export function maquinaDeDespiece(nombreEquipo?: string | null): string | undefined {
+  const n = (nombreEquipo ?? '').toUpperCase()
+  return DESPIECES.find((d) => n.includes(d.maquina.replace('BAADER ', '')) && n.includes('BAADER'))?.maquina
 }
 
 /**

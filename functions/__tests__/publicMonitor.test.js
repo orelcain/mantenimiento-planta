@@ -776,8 +776,8 @@ test('el historial reusa lo ya publicado salvo el turno inmediatamente anterior'
   // cual; si se recompusiera, saldría 1000. Desde #564 solo se reusa un live
   // medido con la rejilla vigente (`timeBreakdown.tbv === 2`).
   const prev = [
-    { shiftDocId: ayer, dateKey: d1, shiftId: 'Turno Dia', live: { totalPieces: 999999, timeBreakdown: { tbv: 2 } } },
-    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888, timeBreakdown: { tbv: 2 } } },
+    { shiftDocId: ayer, dateKey: d1, shiftId: 'Turno Dia', live: { totalPieces: 999999, timeBreakdown: { tbv: 3 } } },
+    { shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888, timeBreakdown: { tbv: 3 } } },
   ]
 
   const hist = await buildMonitorHistory(db, 'filete', actual, prev)
@@ -916,7 +916,7 @@ test('shiftStats reusa lo cacheado y no reconstruye turnos viejos', async () => 
   })
 
   // Valor imposible: si se reusa sale tal cual; si se recompone, saldría 1000.
-  const prev = [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', total: 777777, windowMin: 480, tbv: 2 }]
+  const prev = [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', total: 777777, windowMin: 480, tbv: 3 }]
   const out = await buildShiftStats(db, 'filete', actual, prev, [], [])
   const viejo = out.find(o => o.shiftDocId === anteayer)
   assert.equal(viejo?.total, 777777, 'un turno cerrado no cambia: se reusa')
@@ -1181,4 +1181,179 @@ test('el índice de turnos evita el barrido: con índice, resolver no toca listD
   }
   const r = await resolveCurrentShiftDocId(dbProhibido, 'filete', w, index)
   assert.equal(r, vigenteId)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// El turno que marcó el sensor (Chonchi 26-sep-2026): un bloque sin turno con
+// tamaño de turno entra al historial con sus horas reales y sin meta.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { bloquesDelSensor } = require('../publicMonitor')
+
+test('un extraordinario sin configurar entra al historial como turno del sensor, sin meta', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno 2`
+  const t2Ayer = `${d1}_Turno 2`
+  const unsch = `${d1}_Unscheduled`
+  const hAyer = (h, m = 0) => new Date(Date.UTC(Number(d1.slice(0, 4)), Number(d1.slice(5, 7)) - 1, Number(d1.slice(8, 10)), h, m))
+  const maquina = (c, startMs, n) => ({
+    machineid: 'ev1', machineName: 'Evisceradora 1', machineType: 'baader_142',
+    totalCycles: c, shiftRuntime: 0.8,
+    shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 600, breakSec: 0 },
+    intervals: intervals(startMs, n, c / n), states: [],
+  })
+  // Turno 2 07:15→15:00 con 93 tramos; el Unscheduled trae el arranque anticipado
+  // (06:00→07:00, cola del Turno 2) y el extraordinario 16:15→22:55 (con pausa 19:00→19:45).
+  const extraordinario = [...intervals(hAyer(16, 15).getTime(), 33, 70), ...intervals(hAyer(19, 45).getTime(), 38, 70)]
+  const db = fakeShiftsDb(
+    {
+      [actual]: { shiftId: 'Turno 2', scheduledStart: hoy(7, 15), scheduledEnd: hoy(15), machines: [{ totalCycles: 3000 }] },
+      [t2Ayer]: { shiftId: 'Turno 2', scheduledStart: hAyer(7, 15), scheduledEnd: hAyer(15), machines: [{ totalCycles: 13215 }] },
+      [unsch]:  { shiftId: 'Unscheduled', scheduledStart: hAyer(6), scheduledEnd: hAyer(23, 37), lastSyncAt: hAyer(23, 40), machines: [{ totalCycles: 5330 }] },
+    },
+    {
+      [actual]: [maquina(3000, hoy(7, 15).getTime(), 6)],
+      [t2Ayer]: [maquina(13215, hAyer(7, 15).getTime(), 93)],
+      [unsch]:  [{ ...maquina(360, hAyer(6).getTime(), 12), intervals: [...intervals(hAyer(6).getTime(), 12, 30), ...extraordinario] }],
+    },
+  )
+
+  const sinTurno = { prev: {}, next: {} }
+  const hist = await buildMonitorHistory(db, 'chonchi', actual, [], null, sinTurno)
+
+  assert.equal(hist.length, 2, 'el Turno 2 de ayer y el turno del sensor')
+  const sensor = hist.find(h => h.extraordinario)
+  assert.ok(sensor, 'el extraordinario está en el historial')
+  assert.equal(sensor.shiftDocId, `${d1}_Unscheduled@16:15`)
+  assert.equal(sensor.live.totalPieces, 71 * 70, 'todas sus piezas, ninguna del arranque anticipado')
+  assert.equal(sensor.live.expectedPieces, 0, 'sin meta: Shoplogix no lo configuró')
+  assert.equal(fmtHHMM(sensor.extraordinario.desde), '16:15')
+  assert.equal(fmtHHMM(sensor.live.effectiveEnd), '22:55', 'las horas las marca el sensor')
+  assert.equal(hist[0].shiftDocId, sensor.shiftDocId, 'es el más reciente: va primero')
+  const t2 = hist.find(h => h.shiftDocId === t2Ayer)
+  assert.equal(t2.live.totalPieces, 13215 + 360, 'el Turno 2 se queda solo con su arranque anticipado')
+  assert.equal(sinTurno.next[unsch], hAyer(23, 40).toISOString(), 'queda el sello del Unscheduled revisado')
+
+  // Segundo refresco con el mismo sello: se reusa sin volver a leer.
+  const dbSinMaquinas = fakeShiftsDb(
+    {
+      [actual]: { shiftId: 'Turno 2', scheduledStart: hoy(7, 15), scheduledEnd: hoy(15), machines: [{ totalCycles: 3000 }] },
+      [t2Ayer]: { shiftId: 'Turno 2', scheduledStart: hAyer(7, 15), scheduledEnd: hAyer(15), machines: [{ totalCycles: 13215 }] },
+      [unsch]:  { shiftId: 'Unscheduled', scheduledStart: hAyer(6), scheduledEnd: hAyer(23, 37), lastSyncAt: hAyer(23, 40), machines: [{ totalCycles: 5330 }] },
+    },
+    { [t2Ayer]: [maquina(13215, hAyer(7, 15).getTime(), 93)] },
+  )
+  const otra = { prev: sinTurno.next, next: {} }
+  const hist2 = await buildMonitorHistory(dbSinMaquinas, 'chonchi', actual, hist, null, otra)
+  assert.ok(hist2.find(h => h.shiftDocId === sensor.shiftDocId), 'el turno del sensor sigue publicado sin releer su subcolección')
+
+  // Sin historial previo el sello NO alcanza: se recompone (si no, el turno del
+  // sensor se perdía al reconstruir el historial desde cero — 29-09, tras el re-sync).
+  const hist2b = await buildMonitorHistory(db, 'chonchi', actual, [], null, { prev: sinTurno.next, next: {} })
+  assert.ok(hist2b.find(h => h.extraordinario), 'el turno del sensor vuelve a salir aunque el sello ya estuviera')
+
+  // Con un desglose de la vara vieja NO se reusa aunque el sello coincida: se recompone.
+  const viejo = hist.map(h => h.extraordinario ? { ...h, live: { ...h.live, timeBreakdown: { ...h.live.timeBreakdown, tbv: 2 } } } : h)
+  const hist3 = await buildMonitorHistory(db, 'chonchi', actual, viejo, null, { prev: sinTurno.next, next: {} })
+  assert.equal(hist3.find(h => h.extraordinario).live.timeBreakdown.tbv, 3, 'recompuesto con la vara vigente')
+})
+
+test('bloquesDelSensor: una cola, ruido o un rato corto NO son un turno', () => {
+  const D = (h, m = 0) => Date.UTC(2026, 8, 25, h, m)
+  const turno2 = { start: new Date(D(7, 15)), end: new Date(D(15)) }
+  const maq = (ivs) => [{ intervals: ivs, states: [] }]
+  // Cola pegada al cierre (15:10→16:05): es del Turno 2.
+  assert.deepEqual(bloquesDelSensor(maq(intervals(D(15, 10), 11, 60)), [turno2]), [])
+  // 6 piezas sueltas: ruido.
+  assert.deepEqual(bloquesDelSensor(maq(intervals(D(3), 1, 6)), [turno2]), [])
+  // 50 min de madrugada con producción: corto, no es un turno.
+  assert.deepEqual(bloquesDelSensor(maq(intervals(D(2), 10, 40)), [turno2]), [])
+  // 16:15→22:55 con hueco de una hora antes: turno del sensor.
+  const b = bloquesDelSensor(maq([...intervals(D(16, 15), 33, 70), ...intervals(D(19, 45), 38, 70)]), [turno2])
+  assert.equal(b.length, 1)
+  assert.equal(b[0].pieces, 71 * 70)
+})
+
+const { ordenarSensorComoActual } = require('../publicMonitor')
+
+test('el turno del sensor posterior a un turno cerrado pasa a ser el ACTUAL; el de nombre baja a «1 atrás»', () => {
+  const t2 = { shiftClosed: true, scheduledStart: '2026-09-26T07:15:00.000Z', scheduledEnd: '2026-09-26T15:00:00.000Z', totalPieces: 13215 }
+  const sensor = {
+    shiftDocId: '2026-09-26_Unscheduled@16:15', dateKey: '2026-09-26', shiftId: 'Unscheduled@16:15',
+    live: { shiftClosed: true, totalPieces: 9553 },
+    extraordinario: { desde: '2026-09-26T16:15:00.000Z', hasta: '2026-09-26T22:55:00.000Z', fuenteDocId: '2026-09-26_Unscheduled' },
+  }
+  const t1Ayer = { shiftDocId: '2026-09-25_Turno 1', dateKey: '2026-09-25', shiftId: 'Turno 1', live: { totalPieces: 16346 } }
+
+  const out = ordenarSensorComoActual('2026-09-26_Turno 2', t2, [sensor, t1Ayer])
+  assert.equal(out.shiftDocId, sensor.shiftDocId, 'el último de la semana es el actual')
+  assert.equal(out.live.totalPieces, 9553)
+  assert.deepEqual(out.extraordinario, sensor.extraordinario)
+  assert.equal(out.history[0].shiftDocId, '2026-09-26_Turno 2', 'el Turno 2 queda un paso atrás')
+  assert.equal(out.history[0].live.totalPieces, 13215)
+  assert.equal(out.history[1].shiftDocId, '2026-09-25_Turno 1', 'y el resto conserva su orden')
+
+  // Con el turno con nombre EN CURSO, manda él: el sensor es historia.
+  const enCurso = { ...t2, shiftClosed: false }
+  const sigue = ordenarSensorComoActual('2026-09-26_Turno 2', enCurso, [sensor, t1Ayer])
+  assert.equal(sigue.shiftDocId, '2026-09-26_Turno 2')
+  assert.equal(sigue.extraordinario, null, 'se manda null para limpiar el campo con merge')
+
+  // Un sensor ANTERIOR al turno con nombre (arranque anticipado largo) tampoco lo desplaza.
+  const antes = { ...sensor, extraordinario: { ...sensor.extraordinario, desde: '2026-09-26T03:00:00.000Z' } }
+  assert.equal(ordenarSensorComoActual('2026-09-26_Turno 2', t2, [antes]).shiftDocId, '2026-09-26_Turno 2')
+})
+
+const { cierreOficialCoherente } = require('../publicMonitor')
+
+test('el cierre lo da el horario de Shoplogix cuando existe (Chonchi Turno 2, 28-09)', () => {
+  const S = (h, m = 0) => new Date(Date.UTC(2026, 8, 28, h, m))
+  const parent = { officialSchedule: { start: S(9, 15), end: S(17, 0) } }
+  assert.equal(cierreOficialCoherente(parent, S(9, 15)).toISOString(), S(17, 0).toISOString())
+  // Sin horario oficial: no hay cierre de Shoplogix, se cae a la estimación.
+  assert.equal(cierreOficialCoherente({}, S(9, 15)), null)
+  // Plantilla de OTRO día (arranca 24 h después): no se usa.
+  const otroDia = { officialSchedule: { start: new Date(Date.UTC(2026, 8, 29, 9, 15)), end: new Date(Date.UTC(2026, 8, 29, 17, 0)) } }
+  assert.equal(cierreOficialCoherente(otroDia, S(9, 15)), null)
+  // Invertido o absurdo: no se usa.
+  assert.equal(cierreOficialCoherente({ officialSchedule: { start: S(17), end: S(9) } }, S(9, 15)), null)
+  assert.equal(cierreOficialCoherente({ officialSchedule: { start: S(0), end: new Date(Date.UTC(2026, 8, 29, 20)) } }, S(0)), null)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Camino a la meta (28-09-2026): minutos de MÁQUINA por causa y su equivalente
+// de línea por peso (1/N), y la reunión de inicio completa aunque la primera
+// pieza llegue después.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('una Baader parada con las otras dos andando: 11 min de máquina, 3,7 equivalentes, 0 de línea', async () => {
+  const S = (h, m = 0) => Date.UTC(2026, 8, 28, h, m)
+  const st = (a, b, type, reason = '') => ({ startAt: new Date(a), endAt: new Date(b), durationSec: (b - a) / 1000, type, reason, name: reason ? 'Detencion' : 'Produccion' })
+  const maq = (id, states) => ({
+    machineid: id, machineName: id, machineType: 'baader_142', totalCycles: 600,
+    shiftRuntimeBreakdown: { uptimeSec: 3000, downtimeSec: 660, breakSec: 540 },
+    intervals: intervals(S(9, 20), 12, 50), states,
+  })
+  const reunion = (id) => st(S(9, 15), S(9, 24), 'break', 'REUNION INICIO TURNO')
+  const machines = [
+    maq('ev1', [reunion('ev1'), st(S(9, 24), S(9, 43), 'uptime'), st(S(9, 43), S(9, 54), 'downtime', 'PUNTO CERO'), st(S(9, 54), S(10, 20), 'uptime')]),
+    maq('ev2', [reunion('ev2'), st(S(9, 24), S(10, 20), 'uptime')]),
+    maq('ev3', [reunion('ev3'), st(S(9, 24), S(10, 20), 'uptime')]),
+  ]
+  const id = '2026-09-28_Turno 2'
+  const db = fakeShiftsDb(
+    { [id]: { shiftId: 'Turno 2', scheduledStart: new Date(S(9, 15)), scheduledEnd: new Date(S(17)), machines: [{ totalCycles: 1800 }] } },
+    { [id]: machines },
+  )
+  const live = await buildMonitorLive(db, 'chonchi', id)
+  const tb = live.timeBreakdown
+  assert.equal(tb.tbv, 3)
+  assert.equal(tb.nMaquinas, 3)
+  const pc = tb.recoverable.find(c => c.reason === 'PUNTO CERO')
+  assert.equal(pc.machineMin, 11, 'la Ev 1 estuvo 11 min detenida')
+  assert.equal(pc.equivMin, 3.7, '11 min de una de tres máquinas')
+  assert.equal(pc.lineMin, 0, 'la línea entera nunca paró')
+  const re = tb.planned.find(c => c.reason === 'REUNION INICIO TURNO')
+  assert.equal(re.min, 9, 'la reunión completa 09:15→09:24, no recortada en la primera pieza (09:20)')
 })

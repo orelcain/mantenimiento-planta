@@ -225,8 +225,11 @@ export function PlanoLienzo({
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onFondo() }}
     >
+      {/* data-bisel: la hoja del plano ES el equipo (conserva su tamaño); los toques de 48 px miden
+          fuera de ella: riel, controles de zoom y panel. */}
       <div
         ref={canvasRef}
+        data-bisel
         className="absolute left-0 top-0 origin-top-left shadow-2xl"
         style={{ width: VW, height: VH, background: '#FCFBF8' }}
         onClick={(e) => { if (e.target === e.currentTarget) onFondo() }}
@@ -313,7 +316,7 @@ export function PlanoLienzo({
           ...(onGirar ? [['↻', 'Girar la hoja 90°', onGirar]] : []),
         ].map(([txt, titulo, fn]) => (
           <button key={txt as string} type="button" title={titulo as string} onClick={fn as () => void}
-                  className="flex min-h-[44px] min-w-[44px] items-center justify-center border-b font-mono text-sm last:border-b-0 hover:opacity-80"
+                  className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center border-b font-mono text-sm last:border-b-0 hover:opacity-80"
                   style={{ color: 'var(--lc-ink-mid)', borderColor: 'var(--lc-border)' }}>
             {txt as string}
           </button>

@@ -151,7 +151,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
         {/* Shift headers */}
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 mb-1">
           <div className="text-right">
-            <Badge variant="outline" className="gap-1 text-ink-warn border-transparent bg-amber-500/[0.15]">
+            <Badge variant="outline" className="gap-1 text-ink-warn border-transparent bg-warning/[0.15]">
               <Sun className="h-3 w-3" /> {dia.shiftId}
             </Badge>
           </div>

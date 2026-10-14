@@ -22,7 +22,10 @@ import { Badge } from '@/components/ui'
 import { X, Clock, Activity, AlertCircle, Pause, Wrench, MessageSquare } from 'lucide-react'
 import type { UpstreamMachineShift, UpstreamMachineState, UpstreamShiftComment } from '@/services/shoplogix/types'
 import { fmtTimeWithSec, fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { softenAccentHex } from '@/lib/softenColor'
+import { hayPizarra } from '@/lib/coloresGrafico'
+import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { dec } from '@/utils/formatoNumeros'
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ interface Props {
 }
 
 export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
+  useColoresGrafico() // Pizarra: re-render al cambiar Día/Penumbra
   const shiftDurationMs = shift.shiftEnd.getTime() - shift.shiftStart.getTime()
   const shiftDurationSec = shiftDurationMs / 1000
 
@@ -94,7 +98,7 @@ export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
         <div className="flex items-center gap-2 min-w-0">
           <span
             className="w-3 h-3 rounded-ctl shrink-0 ring-1 ring-foreground/50"
-            style={{ backgroundColor: softenAccentHex(state.color) }}
+            style={{ backgroundColor: hayPizarra() ? slxStateColor(state.type, state.reason, state.color, state.name) : softenAccentHex(state.color) }}
           />
           <StateIcon type={state.type} />
           <div className="min-w-0">
@@ -104,7 +108,7 @@ export function StateDetailPanel({ state, shift, comments, onClose }: Props) {
                 {TYPE_LABEL[state.type] ?? state.type}
               </Badge>
               {state.isCurrent && (
-                <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-transparent bg-emerald-500/[0.15] text-ink-ok dark:border-transparent dark:bg-emerald-500/[0.15] dark:text-ink-ok">
+                <Badge variant="outline" className="text-caption px-1.5 py-0 h-4 border-transparent bg-success/[0.15] text-ink-ok">
                   En curso
                 </Badge>
               )}

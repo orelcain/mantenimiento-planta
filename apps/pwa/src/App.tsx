@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams, useParams } from 'react-router-dom'
 import { onAuthChange, getUserByIdConTokenFresco, signOut as signOutService } from '@/services/auth'
 import { paseDeSesion, usuarioDePase } from '@/services/bitacora/paseBitacora'
 import { PaseBitacoraLayout } from '@/components/layout/PaseBitacoraLayout'
@@ -137,6 +137,9 @@ const PlanosElectricosPage = lazyWithReload(() => import('@/pages/PlanosElectric
 const VariadoresPage = lazyWithReload(() => import('@/pages/VariadoresPage').then((mod) => ({ default: mod.VariadoresPage })))
 const Perilla5Page = lazyWithReload(() => import('@/pages/Perilla5Page').then((mod) => ({ default: mod.Perilla5Page })))
 const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
+const Baader200TerrenoPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader200TerrenoPage').then((mod) => ({ default: mod.Baader200TerrenoPage })))
+const Baader142A3cPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader142A3cPage').then((mod) => ({ default: mod.Baader142A3cPage })))
+const Baader142A3cPorConfirmarPage = lazyWithReload(() => import('@/pages/aprendizaje/Baader142A3cPorConfirmarPage').then((mod) => ({ default: mod.Baader142A3cPorConfirmarPage })))
 const LearningAdminPage = lazyWithReload(() => import('@/pages/LearningAdminPage').then((mod) => ({ default: mod.LearningAdminPage })))
 const LearningAdminMachinePage = lazyWithReload(() => import('@/pages/LearningAdminMachinePage').then((mod) => ({ default: mod.LearningAdminMachinePage })))
 
@@ -164,6 +167,12 @@ function PublicOrPrivateLayout() {
   if (isLoading) return <LoadingScreen />
   if (isAuthenticated) return <MainLayout />
   return <Outlet />
+}
+
+/** /hmi/learn/:presetId → /aprendizaje/hmi-knuro/:presetId (QR impresos antes de unificar la entrada). */
+function RedirigirHmiLearn() {
+  const { presetId } = useParams<{ presetId: string }>()
+  return <Navigate to={`/aprendizaje/hmi-knuro/${encodeURIComponent(presetId ?? '')}`} replace />
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -510,23 +519,10 @@ export function App() {
             }
           />
 
-          {/* Public HMI learning mode (no auth required) */}
-          <Route
-            path="/hmi/learn/:presetId"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <HmiKnuroPublicPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/hmi/learn"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <HmiKnuroPublicPage />
-              </Suspense>
-            }
-          />
+          {/* Rutas antiguas del Modo Aprendizaje HMI Knuro: los QR ya impresos apuntan aquí.
+              Se redirigen a la única puerta, /aprendizaje/hmi-knuro[/:presetId]. */}
+          <Route path="/hmi/learn/:presetId" element={<RedirigirHmiLearn />} />
+          <Route path="/hmi/learn" element={<Navigate to="/aprendizaje/hmi-knuro" replace />} />
 
           {/* Learning Hub — Centro de Aprendizaje (publico, con sidebar si el usuario esta autenticado) */}
           <Route element={<PublicOrPrivateLayout />}>
@@ -549,6 +545,24 @@ export function App() {
             {/* La vista inmersiva del Baader 200 (iframe con tema propio) se unificó
                 en la ficha estándar para no tener 2 formatos distintos en el Centro.
                 El share standalone por QR (/baader-200/learn) se conserva aparte. */}
+            {/* Referencia de terreno del manual de ajustes (cifra primero, dibujo con leyenda,
+                página del PDF a un toque). Rutas estáticas: ganan a `:sectionId` de abajo. */}
+            <Route
+              path="/aprendizaje/baader-200/terreno"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader200TerrenoPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/baader-200/terreno/:seccionId"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader200TerrenoPage />
+                </Suspense>
+              }
+            />
             <Route path="/aprendizaje/baader-200/:sectionId" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
             <Route path="/aprendizaje/baader-200" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
             <Route
@@ -612,6 +626,24 @@ export function App() {
               element={
                 <Suspense fallback={<LoadingScreen />}>
                   <Perilla5Page />
+                </Suspense>
+              }
+            />
+            {/* Tarjeta A3C de la BAADER 142: plano 888 hojas 22 y 23, interactivo. */}
+            <Route
+              path="/aprendizaje/baader-142/tarjeta-a3c"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader142A3cPage />
+                </Suspense>
+              }
+            />
+            {/* Por confirmar en terreno: elementos del plano 888 por prioridad de fallas. */}
+            <Route
+              path="/aprendizaje/baader-142/tarjeta-a3c/por-confirmar"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader142A3cPorConfirmarPage />
                 </Suspense>
               }
             />

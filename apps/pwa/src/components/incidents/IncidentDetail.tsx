@@ -554,7 +554,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     </div>
                   </div>
                   {iotData?.source === 'simulated' && (
-                    <Badge variant="outline" className="text-ink-warn border-transparent bg-amber-500/[0.15]">
+                    <Badge variant="outline" className="text-ink-warn border-transparent bg-fill-warning/[0.15]">
                       Dato simulado
                     </Badge>
                   )}

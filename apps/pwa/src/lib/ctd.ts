@@ -9,9 +9,9 @@ import type { Equipment, FichaTecnica, Incident, WorkOrder } from '@/types'
  */
 
 export const CRIT: Record<Equipment['criticidad'], { nivel: string; cls: string }> = {
-  alta: { nivel: 'A', cls: 'border-red-500 text-red-600' },
-  media: { nivel: 'B', cls: 'border-amber-500 text-amber-600' },
-  baja: { nivel: 'C', cls: 'border-emerald-500 text-emerald-600' },
+  alta: { nivel: 'A', cls: 'border-fill-critical text-ink-crit' },
+  media: { nivel: 'B', cls: 'border-fill-warning text-ink-warn' },
+  baja: { nivel: 'C', cls: 'border-fill-ok text-ink-ok' },
 }
 
 /**
@@ -31,9 +31,9 @@ export const CRIT_INFO: Record<Equipment['criticidad'], { label: string; desc: s
 }
 
 export const ESTADO: Record<Equipment['estado'], { label: string; cls: string }> = {
-  operativo: { label: 'Operativo', cls: 'border-emerald-500 text-emerald-600' },
-  en_mantenimiento: { label: 'En mantención', cls: 'border-amber-500 text-amber-600' },
-  fuera_servicio: { label: 'Fuera de servicio', cls: 'border-red-500 text-red-600' },
+  operativo: { label: 'Operativo', cls: 'border-fill-ok text-ink-ok' },
+  en_mantenimiento: { label: 'En mantención', cls: 'border-fill-warning text-ink-warn' },
+  fuera_servicio: { label: 'Fuera de servicio', cls: 'border-fill-critical text-ink-crit' },
 }
 
 /**
@@ -42,9 +42,9 @@ export const ESTADO: Record<Equipment['estado'], { label: string; cls: string }>
  * UI (`<CondDot>`) como los tooltips de ECharts, que son HTML plano.
  */
 export const COND_COLOR: Record<1 | 2 | 3, string> = {
-  1: 'rgb(16,185,129)',
-  2: 'rgb(234,179,8)',
-  3: 'rgb(239,68,68)',
+  1: 'rgb(var(--fill-ok))',
+  2: 'rgb(var(--fill-warning))',
+  3: 'rgb(var(--fill-critical))',
 }
 
 export const COND_LABEL: Record<1 | 2 | 3, string> = {
@@ -54,14 +54,14 @@ export const COND_LABEL: Record<1 | 2 | 3, string> = {
 }
 
 export const WO_ESTADO: Record<WorkOrder['estado'], { label: string; cls: string }> = {
-  abierta: { label: 'Abierta', cls: 'border-blue-500 text-blue-600' },
-  en_proceso: { label: 'En proceso', cls: 'border-amber-500 text-amber-600' },
-  cerrada: { label: 'Cerrada', cls: 'border-emerald-500 text-emerald-600' },
+  abierta: { label: 'Abierta', cls: 'border-primary text-ink-info' },
+  en_proceso: { label: 'En proceso', cls: 'border-fill-warning text-ink-warn' },
+  cerrada: { label: 'Cerrada', cls: 'border-fill-ok text-ink-ok' },
   cancelada: { label: 'Cancelada', cls: 'border-border text-muted-foreground' },
 }
 export const WO_PRIORIDAD: Record<WorkOrder['prioridad'], { label: string; cls: string }> = {
-  critica: { label: 'Crítica', cls: 'text-red-600' },
-  alta: { label: 'Alta', cls: 'text-amber-600' },
+  critica: { label: 'Crítica', cls: 'text-ink-crit' },
+  alta: { label: 'Alta', cls: 'text-ink-warn' },
   media: { label: 'Media', cls: 'text-muted-foreground' },
   baja: { label: 'Baja', cls: 'text-muted-foreground' },
 }

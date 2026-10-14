@@ -15,8 +15,14 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.get('pase_bitacora', false) == true;
     }
 
+    // Sesión de la Mini App AnimeTracker (función animeAuth, claim anime_tg):
+    // solo sirve para su propio doc de animelists, nada más de la app.
+    function tieneSesionAnime() {
+      return request.auth != null && request.auth.token.get('anime_tg', null) != null;
+    }
+
     function isAuthenticated() {
-      return request.auth != null && !tienePaseBitacora();
+      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime();
     }
 
     // El teléfono del pase sigue habilitado (un supervisor no lo quitó ni
@@ -453,7 +459,10 @@ service cloud.firestore {
           (
             isOwner(userId)
             && request.resource.data.email == request.auth.token.email
-            && request.resource.data.rol in ['tecnico', 'usuario']
+            // Solo 'usuario' (primer login con Google). El alta con rol la hace
+            // registrarConInvitacion con Admin SDK; antes cualquiera se creaba
+            // 'tecnico' llamando a la API REST de Auth (cerrado 2026-10-07).
+            && request.resource.data.rol == 'usuario'
             && request.resource.data.activo == true
           )
         );
@@ -754,7 +763,21 @@ service cloud.firestore {
             || isNonEmptyString(request.resource.data.nota, 1, 500))
         && (!('foto' in request.resource.data)
             || request.resource.data.foto is string)
-        && request.resource.data.confirmadoPor == request.auth.uid;
+        && request.resource.data.confirmadoPor == request.auth.uid
+        // Id del doc según el plano (se usa (A && B) || (!A && C), no el ternario):
+        // · 888 (sirve a N2 y N3): `maquina` obligatoria (N2 o N3) e id `<slug>__<aparato>__<maquina>`.
+        //   Un cliente viejo, sin `maquina`, rebota aquí y la app muestra «actualiza la app».
+        // · Cualquier otro plano (860, 200, GEA): SIN `maquina` e id `<slug>__<aparato>`. Aceptar una
+        //   máquina ahí dejaba docs que el visor nunca muestra o que pisaban al válido del 860.
+        && (
+          (request.resource.data.planoSlug == 'baader-142-888'
+            && 'maquina' in request.resource.data
+            && request.resource.data.maquina in ['baader-n2', 'baader-n3']
+            && vinculoId == request.resource.data.planoSlug + '__' + request.resource.data.aparato + '__' + request.resource.data.maquina)
+          || (request.resource.data.planoSlug != 'baader-142-888'
+            && !('maquina' in request.resource.data)
+            && vinculoId == request.resource.data.planoSlug + '__' + request.resource.data.aparato)
+        );
 
       // Nadie borra evidencia de terreno: si estaba mal, se corrige con un
       // update (que deja el estado 'corregido' y la nota del por que).
@@ -1111,14 +1134,91 @@ service cloud.firestore {
 
     // Solicitudes de repuesto (área-first F6) — cualquier usuario autenticado solicita;
     // técnicos+ avanzan el estado (pendiente→aprobada→entregada); admin elimina.
+    //
+    // ALTA DE CÓDIGO (`tipo == 'alta_codigo'`, ficha A3C): pide a bodega crear el SAP de un código
+    // de fabricante. Tiene su propio ciclo (pendiente → creada | rechazada) y un id fijo
+    // `alta_<CODIGO>` (un código = una alta; el cliente la crea en transacción). Las solicitudes SIN
+    // `tipo` (pedidos normales) se rigen por las mismas reglas de siempre.
     match /solicitudes_repuestos/{solicitudId} {
+      function esAltaCodigo(d) {
+        return d.get('tipo', '') == 'alta_codigo';
+      }
+      // Campos de un alta al crearla. Los de resolución (sapCreado, origenSap, creadaPor…, motivoRechazo,
+      // rechazadaPor…) NO están: solo bodega los escribe después, con las reglas de abajo.
+      function altaCamposDeCreacion() {
+        return ['tipo', 'codigoFabricante', 'codigoNorm', 'codigoSAP', 'textoBreve', 'descripcionDe', 'fig', 'pos', 'fuentes',
+                'nivel', 'confianza', 'planoSlug', 'maquina', 'elemento', 'elementos', 'cantidad', 'observaciones', 'fotoUrl',
+                'estado', 'solicitadoPor', 'solicitadoPorNombre', 'createdAt'];
+      }
+      // El id queda atado al código: `alta_<codigoNorm>`, y codigoNorm se COMPARA con el fabricante normalizado
+      // (`upper()` + quitar todo lo que no sea A-Z0-9), igual que normCodigo del cliente. Así `alta_ABC` y `alta_XYZ` no pueden ser del
+      // mismo fabricante «ABC».
+      function altaValida() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(altaCamposDeCreacion())
+          && d.codigoNorm is string && d.codigoNorm.matches('^[A-Z0-9]{1,30}$')
+          && solicitudId == 'alta_' + d.codigoNorm
+          && d.codigoFabricante is string
+          && d.codigoFabricante.size() >= 1 && d.codigoFabricante.size() <= 30
+          // codigoNorm tiene que SER la normalización del fabricante (igual que normCodigo del cliente).
+          && d.codigoNorm == d.codigoFabricante.upper().replace('[^A-Z0-9]', '')
+          && d.codigoSAP == ''
+          && d.cantidad is int && d.cantidad >= 1 && d.cantidad <= 999;
+      }
+      // Bodega (técnico+) registra el SAP creado: 10 dígitos, el SAP queda también en codigoSAP, y la autoría es de
+      // quien escribe (no se puede firmar por otro).
+      function altaCreada() {
+        let d = request.resource.data;
+        return isTechnician()
+          && resource.data.estado == 'pendiente'
+          && d.estado == 'creada'
+          && d.sapCreado is string && d.sapCreado.matches('[0-9]{10}')
+          && d.codigoSAP == d.sapCreado
+          && d.origenSap in ['nuevo', 'ya_existia']
+          && d.creadaPor == request.auth.uid
+          && d.creadaPorNombre is string
+          && d.diff(resource.data).affectedKeys().hasOnly(
+            ['estado', 'sapCreado', 'codigoSAP', 'origenSap', 'creadaPor', 'creadaPorNombre', 'creadaAt']);
+      }
+      // Bodega (técnico+) rechaza con motivo obligatorio (1–300), firmando con su propio uid.
+      function altaRechazada() {
+        let d = request.resource.data;
+        return isTechnician()
+          && resource.data.estado == 'pendiente'
+          && d.estado == 'rechazada'
+          && d.motivoRechazo is string
+          && d.motivoRechazo.size() >= 1 && d.motivoRechazo.size() <= 300
+          && d.rechazadaPor == request.auth.uid
+          && d.rechazadaPorNombre is string
+          && d.diff(resource.data).affectedKeys().hasOnly(
+            ['estado', 'motivoRechazo', 'rechazadaPor', 'rechazadaPorNombre', 'rechazadaAt']);
+      }
+      // «Volver a solicitar»: cualquier usuario activo reabre una alta rechazada; pasa a ser su solicitante y el
+      // rechazo anterior se BORRA (no puede quedar un motivo en una alta pendiente).
+      function altaReabierta() {
+        let d = request.resource.data;
+        return isAuthenticated() && isActiveUser()
+          && resource.data.estado == 'rechazada'
+          && d.estado == 'pendiente'
+          && d.solicitadoPor == request.auth.uid
+          && d.codigoSAP == ''
+          && d.cantidad is int && d.cantidad >= 1 && d.cantidad <= 999
+          && !('motivoRechazo' in d) && !('rechazadaPor' in d) && !('rechazadaPorNombre' in d) && !('rechazadaAt' in d)
+          && d.diff(resource.data).affectedKeys().hasOnly(
+            ['estado', 'solicitadoPor', 'solicitadoPorNombre', 'cantidad', 'observaciones', 'fotoUrl', 'createdAt',
+             'motivoRechazo', 'rechazadaPor', 'rechazadaPorNombre', 'rechazadaAt']);
+      }
+
       allow read: if isNotAnonymous();
       allow create: if isAuthenticated()
         && request.resource.data.solicitadoPor == request.auth.uid
         && request.resource.data.estado == 'pendiente'
         && request.resource.data.codigoSAP is string
-        && request.resource.data.cantidad is number;
-      allow update: if isTechnician();
+        && request.resource.data.cantidad is number
+        && (!esAltaCodigo(request.resource.data) || altaValida());
+      allow update: if (isTechnician() && !esAltaCodigo(resource.data) && !esAltaCodigo(request.resource.data))
+        || (esAltaCodigo(resource.data) && esAltaCodigo(request.resource.data)
+            && (altaCreada() || altaRechazada() || altaReabierta()));
       allow delete: if isAdmin();
     }
 
@@ -1855,6 +1955,82 @@ service cloud.firestore {
       allow write: if isSupervisor();
     }
 
+    // Contador de vistas por módulo: UN doc por día (hora de Chile), id YYYY-MM-DD.
+    //   { ultimo: '<modulo>', '<modulo>': { vistas, claro|oscuro, cel|pc, u: { '<hash12 del uid>': true } } }
+    // Una «vista» es un USUARIO-DÍA por módulo: el dedupe lo garantiza la regla, no el cliente.
+    // Cada escritura toca UN módulo, suma 1 a `vistas`, a una intensidad y a un dispositivo, y
+    // agrega EXACTAMENTE el hash del que escribe (sha256 del uid, 12 primeros hex) a `u`, que no
+    // podía estar antes. Resultado: máximo 1 vista por usuario, módulo y día; `u` no se puede
+    // vaciar ni quitar (hasAll del mapa anterior); el doc no se puede inflar ni borrar.
+    // La lista de módulos debe coincidir con MODULOS_VISTAS (moduloDeRuta.ts); un test lo comprueba.
+    // Lectura solo supervisor/admin: es telemetría de uso, no un dato de planta.
+    function moduloVistasClaves() {
+      return ['inicio', 'incidencias', 'bitacora', 'repuestos', 'bodega', 'analisis-turno',
+        'monitor', 'aprendizaje', 'aprendizaje-hmi-knuro', 'aprendizaje-hmi-grader',
+        'aprendizaje-hmi-bombeo-s2', 'aprendizaje-perilla-5', 'aprendizaje-tarjeta-a3c',
+        'aprendizaje-variadores', 'aprendizaje-planos', 'aprendizaje-maquina',
+        'aprendizaje-baader-200', 'inspecciones', 'equipos', 'aria', 'admin', 'otro'];
+    }
+
+    function miHashVistas() {
+      return hashing.sha256(request.auth.uid.toUtf8()).toHexString().lower()[0:12];
+    }
+
+    // n = módulo tras la escritura, v = módulo antes ({} si no existía).
+    function moduloVistasOk(n, v) {
+      return n is map
+        && n.keys().hasOnly(['vistas', 'claro', 'oscuro', 'cel', 'pc', 'u'])
+        && n.get('vistas', null) is int
+        && n.vistas == v.get('vistas', 0) + 1
+        && n.get('claro', 0) - v.get('claro', 0) in [0, 1]
+        && n.get('oscuro', 0) - v.get('oscuro', 0) in [0, 1]
+        && (n.get('claro', 0) - v.get('claro', 0)) + (n.get('oscuro', 0) - v.get('oscuro', 0)) == 1
+        && n.get('cel', 0) - v.get('cel', 0) in [0, 1]
+        && n.get('pc', 0) - v.get('pc', 0) in [0, 1]
+        && (n.get('cel', 0) - v.get('cel', 0)) + (n.get('pc', 0) - v.get('pc', 0)) == 1
+        // `u` obligatorio: se conserva completo y se agrega SOLO mi hash, que no estaba.
+        && n.get('u', null) is map
+        && n.u.keys().hasAll(v.get('u', {}).keys())
+        && n.u.diff(v.get('u', {})).affectedKeys().hasOnly([miHashVistas()])
+        && n.u.diff(v.get('u', {})).affectedKeys().hasAll([miHashVistas()])
+        && !(miHashVistas() in v.get('u', {}))
+        && n.u[miHashVistas()] == true;
+    }
+
+    // El id del doc (día de Chile) debe estar cerca de request.time: no se siembran días
+    // lejanos. La fecha se toma a 00:00 UTC; Chile va 3-4 h detrás de UTC, así que se acepta
+    // request.time entre (fecha - 1 día) y (fecha + 2 días).
+    function diaVistasCercano(dia) {
+      return dia.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.time > timestamp.date(int(dia[0:4]), int(dia[5:7]), int(dia[8:10])) - duration.value(1, 'd')
+        && request.time < timestamp.date(int(dia[0:4]), int(dia[5:7]), int(dia[8:10])) + duration.value(2, 'd');
+    }
+
+    // `ultimo` = módulo que toca ESTA escritura. Las reglas no pueden sacar un elemento de un
+    // Set (affectedKeys), así que el cliente lo declara y las reglas exigen que sea el único
+    // módulo que cambia (junto con `ultimo`).
+    match /moduloVistas/{dia} {
+      allow read: if isSupervisor();
+
+      allow create: if isActiveUser()
+        && diaVistasCercano(dia)
+        && request.resource.data.ultimo in moduloVistasClaves()
+        && request.resource.data.keys().hasOnly([request.resource.data.ultimo, 'ultimo'])
+        && request.resource.data.keys().hasAll([request.resource.data.ultimo, 'ultimo'])
+        && moduloVistasOk(request.resource.data[request.resource.data.ultimo], {});
+
+      allow update: if isActiveUser()
+        && diaVistasCercano(dia)
+        && request.resource.data.ultimo in moduloVistasClaves()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([request.resource.data.ultimo, 'ultimo'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasAny([request.resource.data.ultimo])
+        && moduloVistasOk(
+             request.resource.data[request.resource.data.ultimo],
+             resource.data.get(request.resource.data.ultimo, {}));
+
+      allow delete: if false;
+    }
+
     // ANÁLISIS GRADER - Capturas de timing de flipper desde HMI Marelec Z2
     match /flipperZ2Captures/{captureId} {
       allow read: if isNotAnonymous();
@@ -1931,11 +2107,10 @@ service cloud.firestore {
       // cerrarse a admin-only sin romper nada.
       allow read: if isAdmin();
       allow create: if isAdmin() && isValidInviteCode();
-      // Solo admin edita libremente; registro solo puede incrementar usosActuales (+1) y/o desactivar el código
-      allow update: if isAdmin()
-        || (isAuthenticated()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usosActuales', 'activo'])
-          && request.resource.data.usosActuales == resource.data.usosActuales + 1);
+      // Solo admin edita.
+      // El uso lo descuenta registrarConInvitacion (Admin SDK). Antes cualquier
+      // sesión podía sumar +1 y agotar los códigos de otros.
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -1958,31 +2133,46 @@ service cloud.firestore {
     }
 
     // ============================================
-    // HMI KNURO B2 — Presets, historial y config
+    // HMI KNURO — Presets, historial y config
     // ============================================
+    // Escritura SOLO admin: el editor (/hmi-knuro) es AdminRoute y es lo único que
+    // escribe aquí. Todos los demás usan el simulador de solo lectura
+    // (/aprendizaje/hmi-knuro), que lee presets, tooltips y preset-order sin login.
     match /hmi-knuro-presets/{presetId} {
       // Lectura pública (Modo Aprendizaje vía QR, sin login)
       allow read: if true;
-      allow create, update: if isSupervisor() && isValidDocSize();
-      allow delete: if isSupervisor();
+      allow create, update: if isAdmin() && isValidDocSize();
+      allow delete: if isAdmin();
     }
 
     match /hmi-knuro-history/{entryId} {
       allow read: if isNotAnonymous();
-      allow create: if isAuthenticated() && isValidDocSize();
+      allow create: if isAdmin() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
     match /hmi-knuro-config/{configId} {
-      // Lectura pública para preset-order (Modo Aprendizaje)
-      allow read: if true;
-      allow write: if isSupervisor();
+      // Solo 'preset-order' es público: lo lee HmiKnuroPublicPage (Modo
+      // Aprendizaje vía QR, sin login). 'current' y 'refs' los lee HmiKnuroPage,
+      // que está tras login. 'tooltip-pwd' guardaba una clave en claro con
+      // lectura pública; ya nada la usa (papelera = rol admin, HMI = #1228):
+      // queda cerrado para todos, también para escribir.
+      allow read: if configId == 'preset-order'
+        || (configId != 'tooltip-pwd' && isNotAnonymous());
+      allow write: if configId != 'tooltip-pwd' && isAdmin();
     }
 
-    // Tooltips de parámetros — lectura pública, escritura solo supervisor
+    // Tooltips de parámetros — lectura pública, escritura solo admin
     match /hmi-knuro-tooltips/{docId} {
       allow read: if true;
-      allow write: if isSupervisor() && isValidDocSize();
+      allow write: if isAdmin() && isValidDocSize();
+    }
+
+    // Snapshot de defaults («Guardar Defaults» del editor). No tenía regla: el botón
+    // fallaba con permission-denied incluso para admin. Solo el editor (admin) la usa.
+    match /hmi-knuro-defaults/{presetId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() && isValidDocSize();
     }
 
     // ============================================
@@ -1995,14 +2185,15 @@ service cloud.firestore {
     // registrados, el último el 24-08-2026.
     match /hmi-grader-config/{configId} {
       // Lectura pública: /aprendizaje/hmi-grader se abre sin login, igual que
-      // el HMI Knuro.
+      // el HMI Knuro. Escritura solo admin: la práctica pública no persiste nada;
+      // se guarda solo en el modo edición (/hmi-grader, AdminRoute).
       allow read: if true;
-      allow write: if isSupervisor() && isValidDocSize();
+      allow write: if isAdmin() && isValidDocSize();
     }
 
     match /hmi-grader-history/{entryId} {
       allow read: if isNotAnonymous();
-      allow create: if isNotAnonymous() && isValidDocSize();
+      allow create: if isAdmin() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
@@ -2023,9 +2214,14 @@ service cloud.firestore {
     }
 
     match /baader200-config/{configId} {
-      // Lectura pública para section-order (Modo Aprendizaje)
-      allow read: if true;
-      allow write: if isSupervisor();
+      // Solo 'section-order' es público: lo lee Baader200LearningPublicPage
+      // (Modo Aprendizaje vía QR, sin login). Cualquier otro doc pide login no
+      // anónimo. 'edit-pwd' guardaba una clave en claro con lectura pública;
+      // ya nada la usa (editar = rol supervisor/admin, igual que
+      // baader200-sections): queda cerrado para todos, también para escribir.
+      allow read: if configId == 'section-order'
+        || (configId != 'edit-pwd' && isNotAnonymous());
+      allow write: if configId != 'edit-pwd' && isSupervisor();
     }
 
     // ============================================
@@ -2115,12 +2311,25 @@ service cloud.firestore {
       allow write: if isSupervisor() && isValidDocSize();
     }
 
-    // ── AnimeTracker Mini App (bot personal, sin auth) ──────────────────────
-    // Lectura pública (mini-app sin login). Escritura pública pero acotada a
-    // <1MB por doc para limitar abuso/costos. Endurecido 2026-07-05.
+    // ── AnimeTracker Mini App (bot personal) ─────────────────────────────────
+    // Solo la sesión que emite animeAuth (firma de Telegram del bot de anime +
+    // ID permitido) y solo su propio doc. Antes era read/write público.
+    // Cerrado 2026-10-07.
     match /animelists/{userId} {
-      allow read: if true;
-      allow write: if isValidDocSize();
+      allow read: if tieneSesionAnime() && request.auth.token.anime_tg == userId;
+      allow create, update: if tieneSesionAnime()
+        && request.auth.token.anime_tg == userId
+        && isValidDocSize();
+
+      // Películas, series y plataformas (modo Cine). Doc aparte: saveLists()
+      // reescribe el doc de anime completo y borraría estos campos.
+      match /cine/{docId} {
+        allow read: if tieneSesionAnime() && request.auth.token.anime_tg == userId;
+        allow create, update: if tieneSesionAnime()
+          && request.auth.token.anime_tg == userId
+          && docId == 'datos'
+          && isValidDocSize();
+      }
     }
 
     // ── Telegram Mini App — whitelist de chats autorizados ───────────────────

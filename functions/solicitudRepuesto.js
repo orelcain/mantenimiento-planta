@@ -53,4 +53,41 @@ function mensajeTelegram(sol, bodega) {
   )
 }
 
-module.exports = { mensajeTelegram, lineaDeStock, RUTA_SOLICITUDES, esc }
+/** Tipo de las solicitudes que piden crear el SAP de un código de fabricante (ficha A3C). */
+const TIPO_ALTA_CODIGO = 'alta_codigo'
+const esAltaCodigo = (sol) => !!sol && sol.tipo === TIPO_ALTA_CODIGO
+
+/**
+ * «K20, K22»: los elementos del plano que usan el código. `elementos` viene calculado de partes.json; si no
+ * está (alta vieja), cae al elemento desde el que se pidió.
+ */
+function dondeSeUsa(sol) {
+  const els = Array.isArray(sol.elementos) && sol.elementos.length ? sol.elementos : sol.elemento ? [sol.elemento] : []
+  return els.map(esc).join(', ')
+}
+
+/**
+ * El aviso de un ALTA DE CÓDIGO nueva. No hay SAP todavía ni stock que leer: dice qué código de fabricante
+ * hay que dar de alta, para qué elemento(s) de qué máquina, cuántas unidades y quién lo pide. Si el código es
+ * del conjunto completo lo dice en mayúsculas, porque cambia lo que bodega tiene que crear.
+ */
+function mensajeAltaTelegram(sol) {
+  const codigo = esc(sol.codigoFabricante) || '—'
+  const desc = esc(sol.textoBreve) || '(sin descripción)'
+  const cantidad = sol.cantidad ?? 1
+  const solicitante = esc(sol.solicitadoPorNombre) || 'Desconocido'
+  const els = dondeSeUsa(sol)
+  const maquina = sol.maquina ? ` en ${esc(sol.maquina)}` : ''
+  const conjunto = sol.nivel === 'conjunto' ? `\n🧩 <b>CONJUNTO</b>: se pide el conjunto completo, no la pieza sola` : ''
+  const obs = sol.observaciones ? `\n📝 ${esc(sol.observaciones)}` : ''
+  return (
+    `🆕 <b>Solicitud de alta de código</b>\n\n` +
+    `🏷️ Código de fabricante <b>${codigo}</b>\n` +
+    `🔧 ${desc}${conjunto}\n` +
+    `📍 ${els ? `${els}${maquina}` : `Sin elemento${maquina}`}  ·  Cantidad: <b>${cantidad}</b>\n` +
+    `👤 ${solicitante}${obs}\n` +
+    `🔗 <a href="${URL_BASE}/repuestos?solicitudes=1">Ver solicitudes</a>`
+  )
+}
+
+module.exports = { mensajeTelegram, mensajeAltaTelegram, esAltaCodigo, TIPO_ALTA_CODIGO, lineaDeStock, RUTA_SOLICITUDES, esc }

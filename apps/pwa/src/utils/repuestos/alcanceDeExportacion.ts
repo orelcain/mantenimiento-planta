@@ -19,6 +19,16 @@ export interface ConId {
   id: string
 }
 
+/** Evita abrir el Centro de Reportes vacío desde el punto de entrada del teléfono. */
+export function hayAlgoQueExportar(alcance: {
+  areaId: string | null
+  mostrandoTodo: boolean
+  equipoKey: string | null
+  busqueda: string
+}): boolean {
+  return Boolean(alcance.areaId || alcance.mostrandoTodo || alcance.equipoKey || alcance.busqueda.trim())
+}
+
 /**
  * Los ítems únicos por id, en el orden en que aparecen la primera vez.
  *

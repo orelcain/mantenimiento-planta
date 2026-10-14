@@ -384,7 +384,7 @@ export function PDFViewer({
     return (
       <div className="flex items-center justify-center h-96 bg-muted rounded-card">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Cargando PDF...</p>
         </div>
       </div>
@@ -393,7 +393,7 @@ export function PDFViewer({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-96 bg-red-500/[0.15] rounded-card">
+      <div className="flex items-center justify-center h-96 bg-fill-critical/[0.15] rounded-card">
         <div className="text-center text-ink-crit">
           <p className="flex items-center justify-center gap-1.5 font-semibold"><AlertCircle className="h-4 w-4 shrink-0" />{error}</p>
           <p className="text-sm mt-2">Verifica que el archivo PDF sea accesible</p>
@@ -544,7 +544,7 @@ export function PDFViewer({
 
       {/* Info de marcadores */}
       {markersOnPage.length > 0 && (
-        <div className="p-2 bg-blue-500/[0.15] text-sm text-ink-info border-t">
+        <div className="p-2 bg-primary/[0.15] text-sm text-ink-info border-t">
           <MapPin className="inline h-3 w-3" /> {markersOnPage.length} marcador{markersOnPage.length > 1 ? 'es' : ''} en esta página
         </div>
       )}
