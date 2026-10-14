@@ -61,6 +61,7 @@ import { ExportReportModal, type SapEquipoContext } from '@/components/repuestos
 import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/repuestos'
 import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
+import { fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
@@ -104,9 +105,16 @@ const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string
 
 type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
 
-/** Fotos de una fila: las de bodega (reales del físico) primero, luego las del catálogo. */
-function fotosDeFila(r: { fotos?: string[]; fotosCatalogo?: string[] }): string[] {
-  return [...(r.fotos ?? []), ...(r.fotosCatalogo ?? [])].filter(Boolean)
+/**
+ * Fotos de una fila: las de bodega (reales del físico) primero, luego las del catálogo.
+ * Con un equipo en foco, las capturas de manual de OTRA máquina se ocultan (una pieza
+ * estándar tiene un dibujo del manual de la 142 y otro del de la 200: ver `fotosParaEquipos`).
+ */
+function fotosDeFila(
+  r: { fotos?: string[]; fotosCatalogo?: string[]; equiposDeFoto?: Record<string, string[]> },
+  equiposEnFoco?: readonly string[] | null,
+): string[] {
+  return [...(r.fotos ?? []), ...fotosParaEquipos(r.fotosCatalogo ?? [], r.equiposDeFoto, equiposEnFoco)].filter(Boolean)
 }
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
@@ -948,6 +956,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const valorSelectEquipo = selectedEquipMachineId
     ? (equipoOptions.find((o) => o.nodeIds.includes(selectedEquipMachineId))?.valor ?? 'all')
     : repEquipoFilter
+  // Equipo(s) en foco para elegir qué capturas de manual se ven (null = todas).
+  const equiposEnFoco = useMemo<string[] | null>(() => {
+    if (selectedEquipMachineId) return [selectedEquipMachineId]
+    if (repEquipoFilter !== 'all') return equipoOptions.find((o) => o.valor === repEquipoFilter)?.nodeIds ?? null
+    return null
+  }, [selectedEquipMachineId, repEquipoFilter, equipoOptions])
 
   // Opciones del filtro "Tipo" presentes en el alcance, ordenadas por frecuencia (con conteo)
   const tipoOptions = useMemo(() => {
@@ -2407,7 +2421,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         const isSel = selectedRowKey === r.rowKey
                         const nv = nombreVisible(r)
                         // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
-                        const fotos = fotosDeFila(r)
+                        const fotos = fotosDeFila(r, equiposEnFoco)
                         // Divisor de tier: primera fila sin SAP (despiece) tras las con-SAP.
                         const showDespieceDivider = !r.codigoSAP && (idx === 0 || !!pagedRep[idx - 1]?.codigoSAP)
                         return (
@@ -2705,6 +2719,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         <RepuestoDetailPanel
           item={selectedRep}
           plantaDe={plantaDe}
+          equiposEnFoco={equiposEnFoco}
           areaName={showingAll ? 'Todas las áreas' : (formatNombreSAP(selectedNode?.nombre).nombre || selectedNode?.nombre || '')}
           volverA={formatNombreSAP(selectedEquipName).nombre || selectedEquipName || undefined}
           onClose={() => setSelectedRowKey(null)}

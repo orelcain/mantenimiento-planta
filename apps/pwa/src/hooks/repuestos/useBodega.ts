@@ -131,6 +131,8 @@ export interface BodegaMergedItem {
    *  Complementan `fotos` (overlay de bodega) para mostrar el repuesto aunque
    *  bodega no tenga foto propia. */
   fotosCatalogo?: string[]
+  /** URL de captura de manual → equipos a los que corresponde (ver `fotosParaEquipos`). */
+  equiposDeFoto?: Record<string, string[]>
   /** ¿Tiene ficha técnica CON CONTENIDO? Alimenta el badge del botón «Ficha». */
   tieneFicha?: boolean
   /** Cuántos manuales/documentos vinculados tiene. */
@@ -420,10 +422,11 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         // miraban las fotos: una ficha que viviera en el SEGUNDO documento del mismo SAP
         // se perdía por el orden de llegada (`3300138387` tiene dos documentos).
         const doc = fusionarDocumentacion(
-          { fotos: existing.fotosCatalogo ?? [], tieneFicha: !!existing.tieneFicha, manuales: existing.manuales ?? 0 },
+          { fotos: existing.fotosCatalogo ?? [], tieneFicha: !!existing.tieneFicha, manuales: existing.manuales ?? 0, equiposDeFoto: existing.equiposDeFoto },
           documentacionDe(rep),
         )
         existing.fotosCatalogo = doc.fotos.length ? doc.fotos : undefined
+        existing.equiposDeFoto = doc.equiposDeFoto
         existing.tieneFicha = doc.tieneFicha
         existing.manuales = doc.manuales
         continue
@@ -471,6 +474,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         ultimoConteoPor: overlay?.ultimoConteoPor,
         fotos: overlay?.fotos,
         fotosCatalogo: doc.fotos.length ? doc.fotos : undefined,
+        equiposDeFoto: doc.equiposDeFoto,
         tieneFicha: doc.tieneFicha,
         manuales: doc.manuales,
         isWatched: favKeys.has(key),
