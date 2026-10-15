@@ -42,7 +42,7 @@ type Segmento = ClaseFotos
 function PuntoStock({ meta }: { meta: StockMetaGaleria | undefined }) {
   if (!meta) return null
   return (
-    <span className={`inline-flex items-center gap-1.5 text-footnote ${meta.text}`}>
+    <span className={`inline-flex items-center gap-1.5 text-caption ${meta.text}`}>
       <span aria-hidden className={`size-2 rounded-full ${meta.dot}`} />
       {meta.label}
     </span>
@@ -77,8 +77,8 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-card bg-card p-4">
-        <div className="text-title2 font-bold tabular-nums">{cob.pctReal} % con foto real</div>
+      <div className="rounded-card bg-card px-4 py-3">
+        <div className="text-title3 font-bold tabular-nums">{cob.pctReal} % con foto real</div>
         <div
           className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
           role="progressbar"
@@ -144,7 +144,7 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
           ))}
         </ListGroup>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] sm:gap-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-3">
           {mostrados.map(({ row, fotos }) => {
             const foto = portada(fotos) ?? ''
             const origen = origenDeFoto(foto)
@@ -183,10 +183,10 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
                 <button
                   type="button"
                   onClick={() => onAbrirFicha(row)}
-                  className="flex min-h-[44px] w-full flex-col gap-1 p-3 text-left"
+                  className="flex min-h-[44px] w-full flex-col gap-0.5 px-2.5 py-2 text-left"
                 >
-                  <span className="line-clamp-2 text-subhead font-semibold">{nombre(row)}</span>
-                  <span className="font-mono text-[13px] text-muted-foreground">{row.codigoSAP || '—'}</span>
+                  <span className="line-clamp-2 text-footnote font-semibold leading-snug">{nombre(row)}</span>
+                  <span className="font-mono text-caption text-muted-foreground">{row.codigoSAP || '—'}</span>
                   <PuntoStock meta={stockMeta[row.stockStatus]} />
                 </button>
               </div>

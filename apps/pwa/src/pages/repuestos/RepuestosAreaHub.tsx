@@ -2435,7 +2435,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           >
                             <td className="hidden px-2 py-1.5 md:table-cell">
                               {fotos.length > 0 && fotos[0] ? (
-                                <FotosHoverCard fotos={fotos} nombre={r.textoBreve} onAbrir={(i) => setRowLightbox({ photos: fotos, index: i })}>
+                                <FotosHoverCard fotos={fotos} nombre={r.textoBreve} codigo={r.codigoSAP} onAbrir={(i) => setRowLightbox({ photos: fotos, index: i })}>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setRowLightbox({ photos: fotos, index: 0 }) }}
                                   className="group relative block h-9 w-9 overflow-hidden rounded-ctl ring-1 ring-border transition hover:ring-primary/60"

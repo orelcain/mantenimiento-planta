@@ -1082,7 +1082,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                           aria-label={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)}`}
                           title={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)} de este repuesto`}
                           onClick={() => setQuitar({ nodeId: u.nodeId, etiqueta: etiquetaUnidad(f.familia, u.unidad, f.planta) })}
-                          className="-ml-1 inline-flex min-h-[32px] min-w-[26px] items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
+                          className="-ml-1.5 inline-flex min-h-[32px] min-w-[22px] items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
                         >
                           <X className="h-3 w-3" />
                         </button>
