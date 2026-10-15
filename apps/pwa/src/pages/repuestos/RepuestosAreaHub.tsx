@@ -72,6 +72,7 @@ import { hayAlgoQueExportar } from '@/utils/repuestos/alcanceDeExportacion'
 import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
 import { RepuestosEntrada, type AreaFila, type ListaFavoritos, type RecienteVisible } from '@/components/repuestos/RepuestosEntrada'
 import { EditarFavoritosSheet } from '@/components/repuestos/EditarFavoritosSheet'
+import { FotosHoverCard } from '@/components/repuestos/FotosHoverCard'
 import {
   leerRecientesRepuestos, limpiarRecientesRepuestos, registrarRecienteEquipo, registrarRecienteRepuesto,
   type RecienteRepuesto,
@@ -2368,6 +2369,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           >
                             <td className="hidden px-2 py-1.5 md:table-cell">
                               {fotos.length > 0 && fotos[0] ? (
+                                <FotosHoverCard fotos={fotos} nombre={r.textoBreve} onAbrir={(i) => setRowLightbox({ photos: fotos, index: i })}>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setRowLightbox({ photos: fotos, index: 0 }) }}
                                   className="group relative block h-9 w-9 overflow-hidden rounded-ctl ring-1 ring-border transition hover:ring-primary/60"
@@ -2379,6 +2381,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                     <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-0.5 text-caption font-bold text-white">+{fotos.length - 1}</span>
                                   )}
                                 </button>
+                                </FotosHoverCard>
                               ) : (
                                 <div className="flex h-9 w-9 items-center justify-center rounded-ctl border border-dashed border-border" title="Sin foto">
                                   <ImageOff className="h-3.5 w-3.5 text-muted-foreground/30" />
