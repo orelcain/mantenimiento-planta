@@ -21,13 +21,15 @@ interface Props {
   codigo?: string
   onAbrir: (index: number) => void
   children: ReactNode
+  /** Clases del envoltorio (en la galería ocupa toda la foto). */
+  className?: string
 }
 
 function esPC(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.(QUERY_PC).matches
 }
 
-export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children }: Props) {
+export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children, className }: Props) {
   const [pc] = useState(esPC)
   const [abierta, setAbierta] = useState(false)
   const [visible, setVisible] = useState(false)
@@ -98,7 +100,7 @@ export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children }: Pro
     <>
       <span
         ref={anclaRef}
-        className="inline-block"
+        className={className ?? 'inline-block'}
         onMouseEnter={programarAbrir}
         onMouseLeave={programarCerrar}
         onFocus={programarAbrir}

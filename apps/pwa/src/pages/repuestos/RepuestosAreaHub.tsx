@@ -1327,7 +1327,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     }
   }, [fotoPendienteKey, selectedRep, startAction])
   const fotosDeGaleria = useCallback((r: AreaRepuestoRow) => fotosDeFila(r, equiposEnFoco), [equiposEnFoco])
-  const nombreDeGaleria = useCallback((r: AreaRepuestoRow) => nombreVisible(r).titulo, [])
+  const nombreDeGaleria = useCallback((r: AreaRepuestoRow) => nombreVisible(r), [])
 
   // Renombrar (textoBreve): aplica a TODOS los equipos que comparten identidad.
   const handleRenameRep = useCallback(
