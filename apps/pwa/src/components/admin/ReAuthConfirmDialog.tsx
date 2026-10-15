@@ -147,7 +147,7 @@ export function ReAuthConfirmDialog({
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 autoFocus
-                placeholder="••••••••"
+                placeholder="Escribe tu contraseña"
               />
             </div>
           )}
