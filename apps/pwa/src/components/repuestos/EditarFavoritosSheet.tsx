@@ -106,7 +106,7 @@ function FilaEquipo({ lista, item, planta, onQuitar }: {
         </button>
       )}
       <div className="min-w-0 flex-1">
-        <p className={cn('truncate text-body', item.quitar && 'text-muted-foreground line-through')}>{item.nombre}</p>
+        <p className={cn('truncate text-subhead', item.quitar && 'text-muted-foreground line-through')}>{item.nombre}</p>
         {item.quitar && <p className="text-footnote text-muted-foreground">· se quitará</p>}
       </div>
       {!item.quitar && <Pastilla planta={planta} />}
@@ -466,7 +466,7 @@ export function EditarFavoritosSheet({
                             {(marcado || ya) && <Check className="size-3.5" />}
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-body">{r.nombre}</span>
+                            <span className="block truncate text-subhead">{r.nombre}</span>
                             {r.sub && <span className="block truncate text-footnote text-muted-foreground">{r.sub}</span>}
                           </span>
                           {ya && <span className="text-footnote text-muted-foreground">Ya está</span>}

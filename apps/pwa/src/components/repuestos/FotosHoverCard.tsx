@@ -17,6 +17,8 @@ const QUERY_PC = '(hover: hover) and (pointer: fine)'
 interface Props {
   fotos: string[]
   nombre: string
+  /** SAP (u otro código) bajo el nombre: la tarjeta tapa la fila, así que dice de qué repuesto son las fotos. */
+  codigo?: string
   onAbrir: (index: number) => void
   children: ReactNode
 }
@@ -25,7 +27,7 @@ function esPC(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.(QUERY_PC).matches
 }
 
-export function FotosHoverCard({ fotos, nombre, onAbrir, children }: Props) {
+export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children }: Props) {
   const [pc] = useState(esPC)
   const [abierta, setAbierta] = useState(false)
   const [visible, setVisible] = useState(false)
@@ -123,6 +125,10 @@ export function FotosHoverCard({ fotos, nombre, onAbrir, children }: Props) {
           }}
           className="z-50 rounded-[26px] border border-border bg-card p-3 shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-none"
         >
+          <div className="mb-2 px-1">
+            <p className="truncate text-footnote font-semibold text-foreground">{nombre}</p>
+            {codigo && <p className="font-mono text-caption text-muted-foreground">{codigo}</p>}
+          </div>
           <div className="relative mx-auto h-[260px] w-[356px]">
             <button
               type="button"
