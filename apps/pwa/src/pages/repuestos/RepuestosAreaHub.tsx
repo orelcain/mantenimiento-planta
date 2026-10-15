@@ -15,6 +15,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'rea
 import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
+import { quitarEquipoDeRepuesto } from '@/hooks/repuestos/quitarEquipo'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
@@ -1439,6 +1440,31 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     [selectedRep, resolveSources, crudUpdate, refreshCatalog, toast],
   )
 
+  // Quitar un equipo de la asignación N:M. Va por crudUpdate: recalcula areaIds y deja
+  // historial y auditoría (el «Quitar del equipo» del expediente no hace ninguna de las dos).
+  // Se aplica a TODOS los docs del SAP que tengan ese equipo: si queda en uno, el panel lo
+  // seguiría mostrando.
+  const handleQuitarEquipo = useCallback(
+    async (nodeId: string) => {
+      if (!selectedRep) return
+      const node = (getGlobalEquipmentCache() || []).find((e) => e.id === nodeId)
+      const nombre = node?.nombre || selectedRep.equipos.find((e) => e.machineId === nodeId)?.machineName || ''
+      const cambios = resolveSources(selectedRep)
+        .map((s) => ({ rep: s.repuesto, patch: quitarEquipoDeRepuesto(s.repuesto, { nodeId, codigo: node?.codigo, nombre }) }))
+        .filter((c) => c.patch)
+      if (!cambios.length) { toast({ title: 'Ese equipo ya no estaba asignado' }); return }
+      try {
+        for (const { rep, patch } of cambios) await crudUpdate('repuestos', rep.id, patch!, rep)
+        toast({ title: 'Equipo quitado', description: nombre, variant: 'success' })
+        await refreshCatalog()
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'No se pudo quitar el equipo', description: e instanceof Error ? e.message : '' })
+        throw e
+      }
+    },
+    [selectedRep, resolveSources, crudUpdate, refreshCatalog, toast],
+  )
+
   // Marcar / desmarcar el repuesto como "común" de una máquina (lista compartida).
   // Escribe `comunEn` en el/los doc(s) del SAP (con auditoría vía crudUpdate).
   const handleToggleComun = useCallback(
@@ -2697,6 +2723,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, stock: stockDeSolicitud(r) })}
           onAssignSap={!selectedRep.codigoSAP ? () => { setAsignarSapValue(''); setAsignarSapOpen(true) } : undefined}
           onAssignEquipo={() => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
+          onRemoveEquipo={isAdmin ? handleQuitarEquipo : undefined}
           isAdmin={isAdmin}
           onRename={isAdmin ? handleRenameRep : undefined}
           onEditRepuesto={isAdmin ? () => startAction('edit') : undefined}
