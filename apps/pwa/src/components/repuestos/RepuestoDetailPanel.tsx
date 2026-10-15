@@ -50,6 +50,8 @@ interface RepuestoDetailPanelProps {
   onAssignSap?: () => void
   /** Asignar/añadir un equipo donde se usa el material (N:M). */
   onAssignEquipo?: () => void
+  /** Quitar un equipo de la asignación N:M (pide confirmación en el panel). Solo admin. */
+  onRemoveEquipo?: (nodeId: string) => Promise<void>
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
   /** ¿el usuario es admin? Habilita editar/renombrar/reubicar/eliminar. */
   isAdmin?: boolean
@@ -168,7 +170,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -258,11 +260,38 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   const bodegaDocId = item?.bodegaId
   const sap = item?.codigoSAP ?? ''
 
+  // Equipo a quitar, a la espera de confirmación (nunca se quita con un solo toque).
+  const [quitar, setQuitar] = useState<{ nodeId: string; etiqueta: string } | null>(null)
+  const [quitando, setQuitando] = useState(false)
+  useEffect(() => { setQuitar(null) }, [item?.codigoSAP, item?.codigoFabricante])
+  const confirmarQuitar = useCallback(async () => {
+    if (!quitar || !onRemoveEquipo) return
+    setQuitando(true)
+    try { await onRemoveEquipo(quitar.nodeId); setQuitar(null) } catch { /* el hub ya avisó con un toast */ }
+    finally { setQuitando(false) }
+  }, [quitar, onRemoveEquipo])
+
   // Equipos N:M donde se usa el material (nodeIds) y manuales heredados de ellos.
   const equiposReales = (item?.equipos ?? []).filter((e) => e.machineId)
   // Agrupado por PLANTA y familia: los equipos se llaman igual en las dos plantas.
   const familiasEquipos = agruparDondeSeUsa(equiposReales, plantaDe)
   const totalEquiposUnicos = totalDondeSeUsa(familiasEquipos)
+  const etiquetaUnidad = (familia: string, unidad: string, planta?: string) =>
+    `${familia}${unidad ? ` ${unidad}` : ''}${planta ? ` · ${plantaCorta(planta)}` : ''}`
+  const confirmacionQuitar = quitar && onRemoveEquipo ? (
+    <div role="alertdialog" aria-label="Confirmar quitar equipo" className="mt-2 rounded-ctl border border-destructive/40 p-2.5 text-footnote text-foreground">
+      <p>
+        ¿Quitar <strong>{quitar.etiqueta}</strong> de este repuesto?
+        {equiposReales.length === 1 && ' Quedará como material transversal, sin equipo.'}
+      </p>
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" variant="destructive" className="gap-1.5" disabled={quitando} onClick={confirmarQuitar}>
+          {quitando && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Quitar
+        </Button>
+        <Button size="sm" variant="outline" disabled={quitando} onClick={() => setQuitar(null)}>Cancelar</Button>
+      </div>
+    </div>
+  ) : null
   // Con qué se llega filtrada la lista del expediente: el código de ESTA pieza.
   const buscarEnExpediente = (item?.codigoSAP || item?.codigoFabricante || '').trim()
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
@@ -768,6 +797,17 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                       title={`${f.familia}${u.unidad ? ` ${u.unidad}` : ''}`}
                       subtitle={f.planta ? plantaCorta(f.planta) : undefined}
                       onClick={() => navigate(rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente }))}
+                      trailing={onRemoveEquipo && (
+                        <button
+                          type="button"
+                          aria-label={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)}`}
+                          onClick={(e) => { e.stopPropagation(); setQuitar({ nodeId: u.nodeId, etiqueta: etiquetaUnidad(f.familia, u.unidad, f.planta) }) }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="-my-2 inline-flex size-11 items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      )}
                     />
                   )),
                 )
@@ -778,6 +818,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                 <ListCell className="min-h-[52px] text-primary" title={equiposReales.length > 0 ? 'Agregar equipo' : 'Asignar a un equipo'} onClick={onAssignEquipo} />
               )}
             </ListGroup>
+            {confirmacionQuitar && <div className="px-4">{confirmacionQuitar}</div>}
           </div>
 
           {/* Documentos */}
@@ -1022,8 +1063,8 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                   */}
                   <span className="ml-auto flex shrink-0 items-center gap-1">
                     {f.unidades.map((u) => (
+                      <span key={u.nodeId} className="inline-flex items-center rounded-ctl bg-background">
                       <Link
-                        key={u.nodeId}
                         to={rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente })}
                         title={`Abrir el expediente de ${u.nombre}${f.planta ? ` (${plantaCorta(f.planta)})` : ''}`}
                         /* Tamaño REAL y no un área ampliada: N1, N2 y N3 quedan a 4 px entre sí y un pseudo-
@@ -1032,6 +1073,18 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                       >
                         {u.unidad || 'Ver'}
                       </Link>
+                      {onRemoveEquipo && (
+                        <button
+                          type="button"
+                          aria-label={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)}`}
+                          title={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)} de este repuesto`}
+                          onClick={() => setQuitar({ nodeId: u.nodeId, etiqueta: etiquetaUnidad(f.familia, u.unidad, f.planta) })}
+                          className="-ml-1 inline-flex min-h-[32px] min-w-[26px] items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      </span>
                     ))}
                   </span>
                 </div>
@@ -1039,6 +1092,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               {familiasEquipos.length > 6 && (
                 <div className="px-2 text-caption text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
               )}
+              {confirmacionQuitar}
               {onAssignEquipo && (
                 /* 15 px de alto. Sube a 44 sin estirar la lista: medidos 65 px libres arriba
                    y 86 abajo, así que el área crece hacia afuera sin pisar nada. */
