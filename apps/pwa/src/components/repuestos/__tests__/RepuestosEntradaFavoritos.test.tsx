@@ -41,21 +41,12 @@ describe('Hoja de favoritos del celular', () => {
     expect(p.onBuscarTodo).toHaveBeenCalledWith('zzz')
   })
 
-  it('Editar: dos toques para quitar y la barra Deshacer devuelve el equipo', () => {
-    const onQuitarFavorito = vi.fn()
-    const onRestaurarFavorito = vi.fn()
-    montar({ onQuitarFavorito, onRestaurarFavorito })
-    // abre la lista de un solo equipo para poder verlo
-    fireEvent.click(screen.getByText('Cintas'))
+  it('Editar (solo admin) cierra la hoja y abre la edición; ya no hay quitar rápido', () => {
+    const onEditarFavoritos = vi.fn()
+    montar({ onEditarFavoritos })
+    expect(screen.queryByLabelText(/^Quitar /)).toBeNull()
     fireEvent.click(screen.getByText('Editar'))
-    fireEvent.click(screen.getByLabelText('Quitar Cinta aceleración 1 grader de Cintas'))
-    expect(onQuitarFavorito).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByText('Quitar'))
-    expect(onQuitarFavorito).toHaveBeenCalledWith('Cintas', 'c1')
-    expect(screen.getByRole('status').textContent).toContain('quitado de Cintas')
-    fireEvent.click(screen.getByText('Deshacer'))
-    expect(onRestaurarFavorito).toHaveBeenCalledWith(
-      { listName: 'Cintas', machineId: 'c1', machineName: 'Cinta aceleración 1 grader', index: 0, listIndex: 1 },
-    )
+    expect(onEditarFavoritos).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })

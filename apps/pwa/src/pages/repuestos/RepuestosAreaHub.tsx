@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
@@ -46,7 +46,7 @@ import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
-import { claveDeEquipo, equipoParaMostrar, opcionesDeEquipo } from '@/hooks/repuestos/dondeSeUsa'
+import { claveDeEquipo, equipoParaMostrar, opcionesDeEquipo, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
 import { areaContenedora, conteosConfiables } from '@/hooks/repuestos/alcanceDeAreas'
 import { apodosCambiaron, apodosDesdeTexto } from '@/hooks/repuestos/apodosDeRepuesto'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
@@ -60,7 +60,6 @@ import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ExportReportModal, type SapEquipoContext } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/repuestos'
 import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
-import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
 import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
@@ -72,7 +71,7 @@ import { cn } from '@/lib/utils'
 import { hayAlgoQueExportar } from '@/utils/repuestos/alcanceDeExportacion'
 import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
 import { RepuestosEntrada, type AreaFila, type ListaFavoritos, type RecienteVisible } from '@/components/repuestos/RepuestosEntrada'
-import { restoreEquipToList, type FavoritoQuitado } from '@/utils/repuestos/favoritosListas'
+import { EditarFavoritosSheet } from '@/components/repuestos/EditarFavoritosSheet'
 import {
   leerRecientesRepuestos, limpiarRecientesRepuestos, registrarRecienteEquipo, registrarRecienteRepuesto,
   type RecienteRepuesto,
@@ -563,62 +562,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const isEquipFav = useCallback((id: string) => equipFavLists.some((l) => l.machineIds.includes(id)), [equipFavLists])
   // Set plano de claves favoritas de equipos (machineIds de todas las listas) para el sidebar.
   const equipFavKeys = useMemo(() => new Set(equipFavLists.flatMap((l) => l.machineIds)), [equipFavLists])
-  const [favEquipPicker, setFavEquipPicker] = useState<{ machineId: string; displayName: string } | null>(null)
-  const [newEquipListName, setNewEquipListName] = useState('')
-  // Estrella: si ya está en alguna lista → quitar de todas; si no → abrir selector.
+  // Hoja de edición de favoritos de equipos. La estrella del árbol NUNCA quita: si el equipo ya es
+  // favorito avisa, y si no lo es abre la hoja con ese equipo preseleccionado. Quitar solo se hace
+  // desde la hoja, y pide la clave al guardar.
+  const [editarFav, setEditarFav] = useState<{ equipo?: { id: string; nombre: string } } | null>(null)
   const handleEquipStar = useCallback((machineId: string, _e: unknown, displayName?: string) => {
     if (isEquipFav(machineId)) {
-      persistEquipLists(equipFavLists.map((l) => ({ ...l, machineIds: l.machineIds.filter((id) => id !== machineId) })).filter((l) => l.machineIds.length > 0))
+      toast({ title: 'Ya está en favoritos', description: 'Para quitarlo, usa «Editar» en Favoritos de equipos.' })
     } else {
-      setFavEquipPicker({ machineId, displayName: displayName || machineId })
-      setNewEquipListName('')
+      setEditarFav({ equipo: { id: machineId, nombre: displayName || machineId } })
     }
-  }, [equipFavLists, isEquipFav, persistEquipLists])
-  const addEquipToList = useCallback((listName: string, machineId: string, displayName: string) => {
-    const clean = listName.trim()
-    if (!clean) return
-    const existing = equipFavLists.find((l) => l.name === clean)
-    let next: FavList[]
-    if (existing) {
-      if (existing.machineIds.includes(machineId)) { setFavEquipPicker(null); return }
-      next = equipFavLists.map((l) => l.name === clean ? { ...l, machineIds: [...l.machineIds, machineId], machineNames: { ...l.machineNames, [machineId]: displayName } } : l)
-    } else {
-      next = [...equipFavLists, { name: clean, machineIds: [machineId], machineNames: { [machineId]: displayName } }]
-    }
+  }, [isEquipFav, toast])
+  const guardarEquipFav = useCallback(async (next: FavList[]) => {
     persistEquipLists(next)
-    setFavEquipPicker(null)
-    setNewEquipListName('')
-  }, [equipFavLists, persistEquipLists])
-  const renameEquipList = useCallback((oldName: string, newName: string) => {
-    const clean = newName.trim()
-    if (!clean || (clean !== oldName && equipFavLists.some((l) => l.name === clean))) return
-    persistEquipLists(equipFavLists.map((l) => l.name === oldName ? { ...l, name: clean } : l))
-  }, [equipFavLists, persistEquipLists])
-  const deleteEquipList = useCallback((name: string) => {
-    if (!confirm(`¿Eliminar la lista "${name}"?`)) return
-    persistEquipLists(equipFavLists.filter((l) => l.name !== name))
-  }, [equipFavLists, persistEquipLists])
-  const removeEquipFromList = useCallback((listName: string, machineId: string) => {
-    persistEquipLists(equipFavLists.map((l) => l.name === listName ? { ...l, machineIds: l.machineIds.filter((id) => id !== machineId) } : l).filter((l) => l.machineIds.length > 0))
-  }, [equipFavLists, persistEquipLists])
-  // Deshacer un «quitar» de la hoja de favoritos del celular: devuelve el equipo a su posición
-  // y recrea la lista si quedó vacía (quitar el último equipo borra la lista).
-  const restaurarEquipoEnLista = useCallback((q: FavoritoQuitado) => {
-    persistEquipLists(restoreEquipToList(equipFavLists, q))
-  }, [equipFavLists, persistEquipLists])
-  // Reordenar por drag-and-drop: mueve el item de `from` a la posición `to`.
-  const reorderEquipInList = useCallback((listName: string, from: number, to: number) => {
-    if (from === to) return
-    persistEquipLists(equipFavLists.map((l) => {
-      if (l.name !== listName) return l
-      if (from < 0 || from >= l.machineIds.length || to < 0 || to >= l.machineIds.length) return l
-      const ids = [...l.machineIds]
-      const [moved] = ids.splice(from, 1)
-      ids.splice(to, 0, moved!)
-      return { ...l, machineIds: ids }
-    }))
-  }, [equipFavLists, persistEquipLists])
-  const [dragFav, setDragFav] = useState<{ list: string; idx: number } | null>(null)
+  }, [persistEquipLists])
 
   // Áreas favoritas (estrella en el árbol) — compartido con "Por equipo" (localStorage).
   const [favoriteAreaIds, setFavoriteAreaIds] = useState<Set<string>>(() => {
@@ -2024,8 +1981,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 listasFavoritos={listasFavoritos}
                 favoritosCargando={favCargando}
                 onAbrirEquipo={(id, nombre) => handleFavEquipClick(id, nombre)}
-                onQuitarFavorito={isAdmin ? removeEquipFromList : undefined}
-                onRestaurarFavorito={isAdmin ? restaurarEquipoEnLista : undefined}
+                onEditarFavoritos={isAdmin ? () => setEditarFav({}) : undefined}
                 onBuscarTodo={buscarMovil}
                 areas={areasEntrada}
                 onAbrirArea={abrirAreaEntrada}
@@ -2040,83 +1996,53 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           )}
           {/* Lo de abajo es la vista de siempre: en PC no cambia; en el teléfono se oculta mientras manda la entrada. */}
           <div className={entradaMovil ? 'hidden sm:contents' : 'contents'}>
-          {/* Favoritos de equipos (listas con nombre) — colapsada por defecto + gestionable por admin (G2) */}
+          {/* Favoritos de equipos (listas con nombre) — colapsada por defecto, SOLO LECTURA; se edita desde la hoja (admin). */}
           {(equipFavLists.length > 0 || isAdmin) && (
             <div className="mb-5 rounded-card border border-border bg-muted p-3 max-sm:hidden">
-              <button
-                onClick={() => setFavBarOpen((v) => !v)}
-                className="flex min-h-[44px] w-full items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
-              >
-                <Star className="h-3.5 w-3.5 fill-current text-muted-foreground" /> Favoritos de equipos
-                {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
-                <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setFavBarOpen((v) => !v)}
+                  className="flex min-h-[44px] flex-1 items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
+                >
+                  <Star className="h-3.5 w-3.5 fill-current text-muted-foreground" /> Favoritos de equipos
+                  {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
+                  <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
+                </button>
+                {isAdmin && (
+                  <PButton variant="plain" onClick={() => setEditarFav({})}>Editar</PButton>
+                )}
+              </div>
               {favBarOpen && (equipFavLists.length === 0 ? (
-                <p className="mt-2 pl-5 text-caption text-muted-foreground">Marca equipos con la estrella en «Estructura de equipos del área (admin)» para crear listas.</p>
+                <p className="mt-2 pl-5 text-caption text-muted-foreground">Marca equipos con la estrella en «Estructura de equipos del área (admin)» o con «Editar» para crear listas.</p>
               ) : (
                 <div className="mt-2 space-y-2">
                   {equipFavLists.map((list) => {
                     const closed = favBarClosed[list.name]
                     return (
                       <div key={list.name}>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setFavBarClosed((p) => ({ ...p, [list.name]: !p[list.name] }))}
-                            className="flex items-center gap-1.5 text-caption font-semibold text-foreground"
-                          >
-                            <ChevronDown className={['h-3.5 w-3.5 transition-transform', closed ? '-rotate-90' : ''].join(' ')} />
-                            {isAdmin ? (
-                              <InlineEditName value={list.name} onSave={async (n) => { renameEquipList(list.name, n) }} canEdit textClassName="text-caption font-semibold text-foreground" />
-                            ) : (
-                              <span>{list.name}</span>
-                            )}
-                            <span className="tabular-nums text-muted-foreground/60">({list.machineIds.length})</span>
-                          </button>
-                          {isAdmin && (
-                            <button onClick={() => deleteEquipList(list.name)} title="Eliminar lista" className="rounded-ctl p-0.5 text-muted-foreground/40 hover:text-ink-crit">
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
+                        <button
+                          onClick={() => setFavBarClosed((p) => ({ ...p, [list.name]: !p[list.name] }))}
+                          className="flex min-h-[44px] items-center gap-1.5 text-caption font-semibold text-foreground"
+                        >
+                          <ChevronDown className={['h-3.5 w-3.5 transition-transform', closed ? '-rotate-90' : ''].join(' ')} />
+                          <span>{list.name}</span>
+                          <span className="tabular-nums text-muted-foreground/60">({list.machineIds.length})</span>
+                        </button>
                         {!closed && (
-                          <div className="mt-1.5 flex flex-wrap gap-1.5 pl-5">
-                            {list.machineIds.map((id, idx) => {
-                              const dragging = dragFav?.list === list.name && dragFav.idx === idx
+                          <div className="flex flex-wrap gap-1.5 pl-5">
+                            {list.machineIds.map((id) => {
+                              const planta = plantaCorta(plantaDe(id))
                               return (
-                              <span
-                                key={id}
-                                draggable={isAdmin}
-                                onDragStart={(e) => { if (!isAdmin) return; e.dataTransfer.setData('text/plain', JSON.stringify({ list: list.name, idx })); e.dataTransfer.effectAllowed = 'move'; setDragFav({ list: list.name, idx }) }}
-                                onDragOver={(e) => { if (dragFav?.list === list.name) e.preventDefault() }}
-                                onDrop={(e) => {
-                                  e.preventDefault()
-                                  let from = dragFav?.list === list.name ? dragFav.idx : -1
-                                  try { const d = JSON.parse(e.dataTransfer.getData('text/plain')); if (d && d.list === list.name) from = d.idx } catch { /* noop */ }
-                                  if (from >= 0) reorderEquipInList(list.name, from, idx)
-                                  setDragFav(null)
-                                }}
-                                onDragEnd={() => setDragFav(null)}
-                                className={[
-                                  'group inline-flex items-center overflow-hidden rounded-full border border-border bg-background transition',
-                                  isAdmin ? 'cursor-grab active:cursor-grabbing' : '',
-                                  dragging ? 'opacity-40 ring-1 ring-primary' : '',
-                                ].join(' ')}
-                                title={isAdmin ? 'Arrastra para reordenar' : undefined}
-                              >
-                                {isAdmin && (
-                                  <GripVertical className="ml-1 h-3 w-3 shrink-0 text-muted-foreground/30 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100" />
-                                )}
                                 <button
+                                  key={id}
                                   onClick={() => handleFavEquipClick(id, list.machineNames?.[id] || equipNameMap.get(id))}
-                                  className="px-2.5 py-1 text-caption font-medium text-foreground transition hover:bg-primary/10 hover:text-brand-ink"
+                                  className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-caption font-medium text-foreground transition hover:bg-primary/10 hover:text-brand-ink"
                                 >
                                   {list.machineNames?.[id] || equipNameMap.get(id) || id}
+                                  {planta && <span className="font-normal text-muted-foreground">· {planta}</span>}
                                 </button>
-                                {isAdmin && (
-                                  <button onClick={() => removeEquipFromList(list.name, id)} title="Quitar de la lista" className="pl-0.5 pr-1.5 text-muted-foreground/40 transition hover:text-ink-crit [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"><X className="h-3 w-3" /></button>
-                                )}
-                              </span>
-                            )})}
+                              )
+                            })}
                           </div>
                         )}
                       </div>
@@ -3157,36 +3083,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       </Dialog>
 
 
-      {/* G2: selector de lista para favoritos de EQUIPOS (clic en la estrella de una tarjeta) */}
-      <Dialog open={!!favEquipPicker} onOpenChange={(o) => { if (!o) { setFavEquipPicker(null); setNewEquipListName('') } }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base">Agregar a lista de equipos</DialogTitle>
-            <DialogDescription className="truncate">{favEquipPicker?.displayName}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            {equipFavLists.length === 0 && <p className="text-xs text-muted-foreground">Aún no tienes listas. Crea una abajo.</p>}
-            {equipFavLists.map((l) => (
-              <button
-                key={l.name}
-                onClick={() => favEquipPicker && addEquipToList(l.name, favEquipPicker.machineId, favEquipPicker.displayName)}
-                className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-xs font-medium text-foreground transition hover:bg-muted hover:border-primary/40"
-              >
-                <Star className="h-3.5 w-3.5 shrink-0 text-ink-warn" />
-                <span className="flex-1 truncate">{l.name}</span>
-                <span className="text-caption text-muted-foreground tabular-nums">{l.machineIds.length}</span>
-              </button>
-            ))}
-          </div>
-          <form
-            onSubmit={(e) => { e.preventDefault(); if (favEquipPicker && newEquipListName.trim()) addEquipToList(newEquipListName, favEquipPicker.machineId, favEquipPicker.displayName) }}
-            className="mt-2 flex gap-2"
-          >
-            <Input value={newEquipListName} onChange={(e) => setNewEquipListName(e.target.value)} placeholder="Nueva lista…" className="h-8 text-xs" />
-            <Button type="submit" size="sm" disabled={!newEquipListName.trim()} className="h-8">Crear</Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Edición de favoritos de equipos: borrador + clave al guardar eliminaciones */}
+      <EditarFavoritosSheet
+        open={!!editarFav}
+        onOpenChange={(o) => { if (!o) setEditarFav(null) }}
+        listas={equipFavLists}
+        nombreDe={(id) => equipNameMap.get(id) || id}
+        plantaDe={plantaDe}
+        onGuardar={guardarEquipFav}
+        equipoInicial={editarFav?.equipo}
+      />
 
       {/* Lightbox de fotos abierto desde la miniatura de una fila */}
       {rowLightbox && <ImageLightbox photos={rowLightbox.photos} initialIndex={rowLightbox.index} onClose={() => setRowLightbox(null)} />}

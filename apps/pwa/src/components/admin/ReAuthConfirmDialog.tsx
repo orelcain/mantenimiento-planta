@@ -19,7 +19,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
-import { reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth'
+import { reauthenticateWithCredential, reauthenticateWithPopup, EmailAuthProvider, GoogleAuthProvider } from 'firebase/auth'
 import { auth } from '@/services/firebase'
 import {
   Dialog,
@@ -43,6 +43,8 @@ interface ReAuthConfirmDialogProps {
   reason?: string
   /** Se llama DESPUÉS de que reauthenticate tenga éxito. Puede ser async. */
   onConfirmed: () => void | Promise<void>
+  /** Para abrirlo encima de un <Sheet> de la piel nueva (z-100): sube el diálogo y su fondo por encima. */
+  elevado?: boolean
 }
 
 export function ReAuthConfirmDialog({
@@ -50,6 +52,7 @@ export function ReAuthConfirmDialog({
   onOpenChange,
   reason = 'para confirmar este cambio',
   onConfirmed,
+  elevado = false,
 }: ReAuthConfirmDialogProps) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -65,13 +68,17 @@ export function ReAuthConfirmDialog({
     }
   }, [open])
 
+  // Quien entró con Google no tiene contraseña en esta app: se re-autentica con la ventana de Google.
+  const esGoogle = auth.currentUser?.providerData[0]?.providerId === 'google.com'
+
   const handleConfirm = useCallback(async () => {
     const currentUser = auth.currentUser
     if (!currentUser?.email) {
       setError('No hay sesión activa. Vuelve a iniciar sesión.')
       return
     }
-    if (!password) {
+    const conGoogle = currentUser.providerData[0]?.providerId === 'google.com'
+    if (!conGoogle && !password) {
       setError('Introduce tu contraseña para continuar.')
       return
     }
@@ -79,8 +86,12 @@ export function ReAuthConfirmDialog({
     setLoading(true)
     setError(null)
     try {
-      const credential = EmailAuthProvider.credential(currentUser.email, password)
-      await reauthenticateWithCredential(currentUser, credential)
+      if (conGoogle) {
+        await reauthenticateWithPopup(currentUser, new GoogleAuthProvider())
+      } else {
+        const credential = EmailAuthProvider.credential(currentUser.email, password)
+        await reauthenticateWithCredential(currentUser, credential)
+      }
       // Re-auth OK → ejecutar acción protegida
       onOpenChange(false)
       await onConfirmed()
@@ -90,6 +101,8 @@ export function ReAuthConfirmDialog({
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         setError(`Contraseña incorrecta${newAttempts >= 3 ? ' — múltiples intentos fallidos' : ''}`)
+      } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setError('Cerraste la ventana de Google. Inténtalo de nuevo.')
       } else if (code === 'auth/too-many-requests') {
         setError('Demasiados intentos. Espera unos minutos.')
       } else {
@@ -105,14 +118,14 @@ export function ReAuthConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className={elevado ? 'z-[130] max-w-sm' : 'max-w-sm'} overlayClassName={elevado ? 'z-[130]' : undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <ShieldAlert className="w-4 h-4 text-ink-warn" />
             Confirma tu identidad
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {`Introduce tu contraseña ${reason}.`}
+            {esGoogle ? `Confirma con tu cuenta de Google ${reason}.` : `Introduce tu contraseña ${reason}.`}
             <span className="block mt-1 text-muted-foreground">
               Sesión activa: <span className="font-mono">{userEmail}</span>
             </span>
@@ -123,19 +136,21 @@ export function ReAuthConfirmDialog({
           onSubmit={(e) => { e.preventDefault(); handleConfirm() }}
           className="space-y-3"
         >
-          <div className="space-y-1.5">
-            <Label htmlFor="reauth-dialog-pwd">Contraseña</Label>
-            <Input
-              id="reauth-dialog-pwd"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              autoFocus
-              placeholder="••••••••"
-            />
-          </div>
+          {!esGoogle && (
+            <div className="space-y-1.5">
+              <Label htmlFor="reauth-dialog-pwd">Contraseña</Label>
+              <Input
+                id="reauth-dialog-pwd"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                autoFocus
+                placeholder="••••••••"
+              />
+            </div>
+          )}
           {error && <p className="text-xs text-cat-5-ink">{error}</p>}
 
           <DialogFooter className="gap-2 pt-1">
@@ -148,8 +163,8 @@ export function ReAuthConfirmDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" size="sm" disabled={loading || !password}>
-              {loading ? <Spinner /> : 'Confirmar y guardar'}
+            <Button type="submit" size="sm" disabled={loading || (!esGoogle && !password)}>
+              {loading ? <Spinner /> : esGoogle ? 'Confirmar con Google' : 'Confirmar y guardar'}
             </Button>
           </DialogFooter>
         </form>
