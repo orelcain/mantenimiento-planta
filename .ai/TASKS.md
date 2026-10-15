@@ -6,6 +6,9 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 ## En curso
 
+- [ ] **Visor de imágenes: zoom fluido en el celular** — EN REVISIÓN — claude (rama `fix/visor-zoom-movil`).
+  Reporte de Danilo: al hacer zoom/paneo en el teléfono la imagen parpadea y «se fuerza hacia
+  diferentes lados». Gestos reescritos en `ImageLightbox` + matemática probada en `lib/zoomVisor`.
 - [ ] **Bitácora de turno de Mantención (`/bitacora`)** — EN PROD, esperando uso real — claude (PR #1021-#1046; ver WORKLOG 2026-09-15).
   Eventos del turno con fotos antes/después, parada (MTTR) o ventana sin detener, pendientes que pasan
   solos al turno siguiente, técnicos del calendario, buscador de equipos; copiar al correo (Outlook
