@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, GripVertical, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle, ListPlus, ListChecks } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
@@ -23,6 +23,9 @@ import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
 import { SolicitarVariosSheet } from '@/components/repuestos/SolicitarVariosSheet'
+import { PedidoSheet } from '@/components/repuestos/PedidoSheet'
+import { usePedidoStore } from '@/store/pedidoStore'
+import { conSapAsignado, indiceEnPedido, type LineaPedido } from '@/utils/repuestos/pedidoRepuestos'
 import type { PiezaSolicitable } from '@/utils/repuestos/solicitudMultiple'
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
@@ -115,6 +118,32 @@ function fotosDeFila(
   equiposEnFoco?: readonly string[] | null,
 ): string[] {
   return [...(r.fotos ?? []), ...fotosParaEquipos(r.fotosCatalogo ?? [], r.equiposDeFoto, equiposEnFoco)].filter(Boolean)
+}
+
+/* Pedido y favorito van juntos en la última columna. Con el área táctil de 44 px
+   (pseudo-elemento) separados por 14 px, el área de la estrella tapaba la del pedido:
+   tocar «agregar al pedido» marcaba favorito. Cajas reales de 32 px, sin solaparse. */
+const CAJA_ACCION_FILA = 'inline-flex h-8 w-8 items-center justify-center'
+
+/** Una fila del catálogo como línea del pedido (foto, códigos y el stock del momento). */
+function lineaDePedido(
+  r: { rowKey: string; codigoSAP: string; codigoFabricante: string; textoBreve: string; unidad: string; stockActual: number; stockMinimo: number; ubicacionBodega: string; bodegaId?: string | null; fotos?: string[]; fotosCatalogo?: string[] },
+  textoVisible: string,
+  equipo: string,
+): LineaPedido {
+  return {
+    clave: r.rowKey,
+    codigoSAP: r.codigoSAP,
+    codigoFabricante: r.codigoFabricante,
+    textoBreve: textoVisible || r.textoBreve,
+    equipo,
+    cantidad: 1,
+    unidad: r.unidad || 'UN',
+    stockActual: r.bodegaId ? r.stockActual : null,
+    stockMinimo: r.bodegaId ? r.stockMinimo : null,
+    ubicacionBodega: r.ubicacionBodega || '',
+    foto: fotosDeFila(r)[0] ?? null,
+  }
 }
 
 const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
@@ -356,6 +385,47 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // «Solicitar repuestos» de la máquina enfocada: varios de una vez.
   const [solicitarVariosOpen, setSolicitarVariosOpen] = useState(false)
   const [solicitudesOpen, setSolicitudesOpen] = useState(false)
+  // «Pedido»: lista de repuestos de cualquier máquina para copiar al correo / Excel / solicitudes.
+  const [pedidoOpen, setPedidoOpen] = useState(false)
+  const pedidoLineas = usePedidoStore((s) => s.lineas)
+  const alternarEnPedido = usePedidoStore((s) => s.alternar)
+  const reemplazarPedido = usePedidoStore((s) => s.reemplazar)
+  const usarDuenoPedido = usePedidoStore((s) => s.usarDueno)
+  // PC compartido de planta: cada usuario ve SU pedido; el de quien estaba queda apartado.
+  useEffect(() => {
+    if (user?.id) usarDuenoPedido(user.id)
+  }, [user?.id, usarDuenoPedido])
+  // Marca la fila también si la línea se guardó con otra clave (p. ej. `fab:X` antes de tener SAP).
+  const enPedido = useMemo(() => {
+    const esta = indiceEnPedido(pedidoLineas)
+    return (r: { rowKey: string; codigoSAP?: string; codigoFabricante?: string }) =>
+      esta({ clave: r.rowKey, codigoSAP: r.codigoSAP ?? '', codigoFabricante: r.codigoFabricante ?? '' })
+  }, [pedidoLineas])
+  // Líneas guardadas sin SAP cuya pieza ya lo tiene en el catálogo → pasan al SAP (se puede
+  // registrar como solicitud y no se duplica al tocarla de nuevo). Solo si el SAP es único.
+  useEffect(() => {
+    if (!pedidoLineas.some((l) => !l.codigoSAP && l.codigoFabricante) || !allRepuestos.length) return
+    const saps = new Map<string, Set<string>>()
+    for (const { repuesto } of allRepuestos) {
+      const fab = (repuesto.codigoFabricante || '').trim()
+      const sap = (repuesto.codigoSAP || '').trim()
+      if (!fab || !sap) continue
+      const s = saps.get(fab) ?? new Set<string>()
+      s.add(sap)
+      saps.set(fab, s)
+    }
+    const nuevas = conSapAsignado(pedidoLineas, (fab) => {
+      const s = saps.get(fab)
+      return s && s.size === 1 ? [...s][0] : undefined
+    })
+    if (nuevas !== pedidoLineas) reemplazarPedido(nuevas)
+  }, [pedidoLineas, allRepuestos, reemplazarPedido])
+  const stockDePedido = useCallback((sap: string) => {
+    const o = overlayDeSap(sap)
+    return o
+      ? { configurado: true, stockActual: o.stockActual, stockMinimo: o.stockMinimo, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega }
+      : { configurado: false }
+  }, [overlayDeSap])
   useEffect(() => {
     if (!abrirSolicitudes) return
     setSolicitudesOpen(true)
@@ -749,6 +819,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       variant: 'success',
     })
   }, [crearSolicitud, user, toast, selectedEquipName])
+
+  /** Una solicitud del pedido. La hoja las registra de a una, marca cada éxito y muestra el
+   *  resumen, así que un reintento no duplica. El pedido no se vacía: falta enviarlo. */
+  const handleRegistrarPedido = useCallback(async (s: NuevaSolicitud) => {
+    await crearSolicitud(s, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+  }, [crearSolicitud, user])
 
   const handleCrearSolicitud = useCallback(
     async (data: Parameters<typeof crearSolicitud>[0]) => {
@@ -1944,6 +2020,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               className="h-11 pl-9"
             />
           </div>
+          <Button variant="outline" size="sm" className="h-11 min-w-11 justify-center gap-1.5 px-2 sm:px-3" onClick={() => setPedidoOpen(true)}
+                  title="Pedido: repuestos de cualquier máquina para copiar al correo, Excel o solicitudes"
+                  aria-label={`Pedido de repuestos${pedidoLineas.length ? `, ${pedidoLineas.length} en la lista` : ''}`}>
+            <ListChecks className="h-4 w-4" /> <span className="hidden sm:inline">Pedido</span>
+            {pedidoLineas.length > 0 && (
+              <Badge variant="secondary" className="ml-0.5 tabular-nums">{pedidoLineas.length}</Badge>
+            )}
+          </Button>
           <Button variant="outline" size="sm" className="h-11 w-11 justify-center gap-1.5 px-0 sm:w-auto sm:px-3" onClick={() => setSolicitudesOpen(true)}>
             <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitudes</span>
             {pendientesCount > 0 && (
@@ -2626,19 +2710,32 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 </button>
                               ) : <span className="text-muted-foreground/40">—</span>}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="px-1 py-2 md:px-2">
+                              <div className="flex flex-col items-center md:flex-row">
+                              {/* Agregar/quitar del pedido (lista para el correo a bodega). Mismo
+                                  tamaño táctil que la estrella; en el teléfono van uno sobre otro. */}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); alternarEnPedido(lineaDePedido(r, nv.titulo, equipo)) }}
+                                className={[CAJA_ACCION_FILA, 'rounded-ctl transition', enPedido(r) ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary'].join(' ')}
+                                title={enPedido(r) ? 'Quitar del pedido' : 'Agregar al pedido'}
+                                aria-label={enPedido(r) ? `Quitar ${nv.titulo} del pedido` : `Agregar ${nv.titulo} al pedido`}
+                                aria-pressed={enPedido(r)}
+                              >
+                                {enPedido(r) ? <ListChecks className="h-4 w-4" /> : <ListPlus className="h-4 w-4" />}
+                              </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
                                 /* Era 20×20. Holgura medida a su alrededor: 104 arriba, 32
                                    abajo, 47 a cada lado — el área de 44 crece sin tocar la
                                    fila vecina (marcar el favorito de otra pieza sin querer
                                    ya pasó una vez). */
-                                className={[AREA_TACTIL_COMPACTA, 'rounded-ctl transition', favKeys.has(r.rowKey) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-ink-warn'].join(' ')}
+                                className={[CAJA_ACCION_FILA, 'rounded-ctl transition', favKeys.has(r.rowKey) ? 'text-ink-warn' : 'text-muted-foreground/30 hover:text-ink-warn'].join(' ')}
                                 title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
                                 aria-label="Favorito"
                               >
                                 <Star className={['h-4 w-4', favKeys.has(r.rowKey) ? 'fill-current' : ''].join(' ')} />
                               </button>
+                              </div>
                             </td>
                           </tr>
                           </Fragment>
@@ -2764,6 +2861,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         maquina={selectedEquipName}
         piezas={piezasDeLaMaquina}
         onSubmit={handleCrearVarias}
+      />
+      <PedidoSheet
+        open={pedidoOpen}
+        onClose={() => setPedidoOpen(false)}
+        solicitante={user?.nombre}
+        stockDe={stockDePedido}
+        onRegistrar={handleRegistrarPedido}
       />
       <SolicitudesPanel
         open={solicitudesOpen}
