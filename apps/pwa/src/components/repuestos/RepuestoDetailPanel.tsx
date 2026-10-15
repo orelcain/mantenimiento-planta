@@ -6,7 +6,7 @@
  * tarjeta de stock (Disponible/Mínimo/Máximo) · Bodega · Ubicación ·
  * última actualización (último movimiento) · Ver movimientos.
  */
-import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import { ChevronLeft, MoreHorizontal, X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Shapes, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { findMachineBySlug } from '@/data/learningMachines'
@@ -264,6 +264,9 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   const [quitar, setQuitar] = useState<{ nodeId: string; etiqueta: string } | null>(null)
   const [quitando, setQuitando] = useState(false)
   useEffect(() => { setQuitar(null) }, [item?.codigoSAP, item?.codigoFabricante])
+  // En el teléfono la confirmación va bajo la lista: al tocar la x de arriba quedaba fuera de pantalla.
+  const confirmacionRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (quitar) confirmacionRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }) }, [quitar])
   const confirmarQuitar = useCallback(async () => {
     if (!quitar || !onRemoveEquipo) return
     setQuitando(true)
@@ -279,7 +282,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   const etiquetaUnidad = (familia: string, unidad: string, planta?: string) =>
     `${familia}${unidad ? ` ${unidad}` : ''}${planta ? ` · ${plantaCorta(planta)}` : ''}`
   const confirmacionQuitar = quitar && onRemoveEquipo ? (
-    <div role="alertdialog" aria-label="Confirmar quitar equipo" className="mt-2 rounded-ctl border border-destructive/40 p-2.5 text-footnote text-foreground">
+    <div ref={confirmacionRef} role="alertdialog" aria-label="Confirmar quitar equipo" className="mt-2 rounded-ctl border border-destructive/40 p-2.5 text-footnote text-foreground">
       <p>
         ¿Quitar <strong>{quitar.etiqueta}</strong> de este repuesto?
         {equiposReales.length === 1 && ' Quedará como material transversal, sin equipo.'}
