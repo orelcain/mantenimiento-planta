@@ -69,7 +69,8 @@ import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { indicePorSap, nombreVisiblePorSap, tituloOCodigo } from '@/utils/repuestos/nombrePorSap'
 import { cn } from '@/lib/utils'
 import { hayAlgoQueExportar } from '@/utils/repuestos/alcanceDeExportacion'
-import { Button as PButton, CellIcon, ListCell, ListGroup, Sheet as PSheet } from '@/components/piel'
+import { Button as PButton, CellIcon, ListCell, ListGroup, SegmentedControl, Sheet as PSheet } from '@/components/piel'
+import { GaleriaRepuestos } from '@/components/repuestos/GaleriaRepuestos'
 import { RepuestosEntrada, type AreaFila, type ListaFavoritos, type RecienteVisible } from '@/components/repuestos/RepuestosEntrada'
 import { EditarFavoritosSheet } from '@/components/repuestos/EditarFavoritosSheet'
 import { FotosHoverCard } from '@/components/repuestos/FotosHoverCard'
@@ -504,6 +505,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [repFavOnly, setRepFavOnly] = useState(false)
   // Móvil: «Con fotos» — la tira de miniaturas solo existe en filas con foto (4 % de las filas).
   const [repConFotos, setRepConFotos] = useState(false)
+  // Vista «Lista» (tabla de siempre) o «Galería» (fotos + avance). Se recuerda por navegador.
+  const [vistaRep, setVistaRep] = useState<'lista' | 'galeria'>(() => {
+    try { return localStorage.getItem('repuestos.vista') === 'galeria' ? 'galeria' : 'lista' } catch { return 'lista' }
+  })
+  const cambiarVistaRep = useCallback((v: 'lista' | 'galeria') => {
+    setVistaRep(v)
+    try { localStorage.setItem('repuestos.vista', v) } catch { /* sin almacenamiento: no se recuerda */ }
+  }, [])
+  // Repuesto cuya cámara se tocó en la galería: se abre su flujo de fotos cuando ya es el seleccionado.
+  const [fotoPendienteKey, setFotoPendienteKey] = useState<string | null>(null)
   // Filtro "Comunes": repuestos de la lista curada COMPARTIDA (commonPartsByMachine
   // estática + marca `comunEn` del doc), la misma que se ve en la pestaña "Repuestos
   // comunes" del Aprendizaje. Distinto de los favoritos (personales por usuario).
@@ -1306,6 +1317,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     },
     [selectedRep, resolveSources, toast],
   )
+
+  // Cámara de la galería «Sin foto»: selecciona la fila y, ya seleccionada, abre el flujo de fotos.
+  useEffect(() => {
+    if (fotoPendienteKey && selectedRep?.rowKey === fotoPendienteKey) {
+      setFotoPendienteKey(null)
+      startAction('photos')
+    }
+  }, [fotoPendienteKey, selectedRep, startAction])
+  const fotosDeGaleria = useCallback((r: AreaRepuestoRow) => fotosDeFila(r, equiposEnFoco), [equiposEnFoco])
+  const nombreDeGaleria = useCallback((r: AreaRepuestoRow) => nombreVisible(r).titulo, [])
 
   // Renombrar (textoBreve): aplica a TODOS los equipos que comparten identidad.
   const handleRenameRep = useCallback(
@@ -2194,6 +2215,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           <section ref={listSectionRef} className="scroll-mt-44 sm:scroll-mt-28">
             {/* Filtros (la búsqueda vive en la barra superior — global, sticky).
                 En móvil colapsados tras el botón "Filtros" del strip de KPIs. */}
+            <div className="mb-3 flex justify-end">
+              <SegmentedControl<'lista' | 'galeria'>
+                ariaLabel="Vista de repuestos"
+                value={vistaRep}
+                onChange={cambiarVistaRep}
+                className="sm:w-[220px]"
+                segments={[{ value: 'lista', label: 'Lista' }, { value: 'galeria', label: 'Galería' }]}
+              />
+            </div>
             <div className={[mobileExtrasOpen ? 'flex' : 'hidden', 'mb-3 flex-wrap items-center gap-2 sm:flex'].join(' ')}>
               {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
               <div className="grid grid-cols-2 gap-2 sm:contents">
@@ -2316,6 +2346,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   'Sin resultados para los filtros aplicados.'
                 )}
               </div>
+            ) : vistaRep === 'galeria' ? (
+              <GaleriaRepuestos
+                rows={filteredRep}
+                fotosDe={fotosDeGaleria}
+                nombreDe={nombreDeGaleria}
+                stockMeta={STOCK_META}
+                onAbrirFicha={(r) => setSelectedRowKey(r.rowKey)}
+                onAbrirFoto={(r, i) => setRowLightbox({ photos: fotosDeFila(r, equiposEnFoco), index: i })}
+                onAgregarFoto={(r) => { setSelectedRowKey(r.rowKey); setFotoPendienteKey(r.rowKey) }}
+              />
             ) : (
               <div className="overflow-hidden rounded-card border border-border">
                 <div className="overflow-x-auto">

@@ -21,4 +21,8 @@ describe('origenDeFoto', () => {
   it('no confunde un token con la ruta', () => {
     expect(origenDeFoto(`${BASE}x%2Fy.jpg?alt=media&token=%2Ffotos%2F`)).toBe('otra')
   })
+  it('fotos de Telegram y del modelo viejo /real/ son de bodega', () => {
+    expect(origenDeFoto(`${BASE}repuestos%2F3300138398%2Ftelegram_1783471407548_1.jpg?alt=media&token=x`)).toBe('bodega')
+    expect(origenDeFoto(`${BASE}machines%2Fabc%2Frepuestos%2F3300138378%2Freal%2F1783453706381_IMG_2240.jpg?alt=media`)).toBe('bodega')
+  })
 })
