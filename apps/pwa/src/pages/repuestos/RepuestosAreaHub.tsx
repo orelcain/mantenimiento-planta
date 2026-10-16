@@ -14,7 +14,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
 import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
-import { esComun, esDespiece, esFavoritoDe, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
+import { esComun, esDespiece, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { quitarEquipoDeRepuesto } from '@/hooks/repuestos/quitarEquipo'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
@@ -47,7 +47,12 @@ import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
-import { claveDeEquipo, equipoParaMostrar, opcionesDeEquipo, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
+import { equipoParaMostrar, plantaCorta, agruparDondeSeUsa } from '@/hooks/repuestos/dondeSeUsa'
+import { facetasDeEquipo, filtraPorFaceta, grupoEnFaceta, type Faceta } from '@/utils/repuestos/facetasEquipo'
+import { marcasDeFavorito, type MarcasFavorito } from '@/utils/repuestos/favoritosUnificado'
+import { ChipsEquipo } from '@/components/repuestos/ChipsEquipo'
+import { DondeSeUsaPills } from '@/components/repuestos/DondeSeUsaPills'
+import { FiltrosRepuestosSheet, type OpcionFiltro } from '@/components/repuestos/FiltrosRepuestosSheet'
 import { areaContenedora, conteosConfiables } from '@/hooks/repuestos/alcanceDeAreas'
 import { apodosCambiaron, apodosDesdeTexto } from '@/hooks/repuestos/apodosDeRepuesto'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
@@ -103,6 +108,22 @@ const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string
   low: { label: 'Bajo', dot: 'bg-fill-warning', text: 'text-ink-warn' },
   out: { label: 'Sin stock', dot: 'bg-fill-critical', text: 'text-ink-crit' },
   unset: { label: 'Sin config', dot: 'bg-muted-foreground/40', text: 'text-muted-foreground' },
+}
+
+/** Chip de la barra: 36 px visibles dentro de una zona táctil de 44. Activo = relleno de acento. */
+function ChipBarra({ activo, className, children, ...rest }: { activo: boolean; className?: string; children: React.ReactNode } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'>) {
+  return (
+    <button type="button" aria-pressed={activo} {...rest} className={cn('group inline-flex min-h-[44px] shrink-0 items-center disabled:opacity-40', className)}>
+      <span
+        className={cn(
+          'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-subhead font-medium transition-colors',
+          activo ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground group-hover:bg-muted',
+        )}
+      >
+        {children}
+      </span>
+    </button>
+  )
 }
 
 type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
@@ -316,7 +337,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     if (!repQuery.trim()) return
     listSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
   }, [repQuery])
-  const [repEquipoFilter, setRepEquipoFilter] = useState<string>('all')
+  // Faceta de equipo (chips sobre los resultados): reemplaza al desplegable «Todos los equipos».
+  const [facetaEquipo, setFacetaEquipo] = useState<Faceta | null>(null)
+  // «Bajo o sin stock»: chip de la barra (atajo de lo más pedido en planta).
+  const [repBajoOSin, setRepBajoOSin] = useState(false)
+  const [filtrosOpen, setFiltrosOpen] = useState(false)
   // Móvil: KPIs y filtros arrancan colapsados — entre el usuario y la primera
   // fila de repuestos había ~2 pantallas de dashboard. En desktop no aplica.
   const [mobileExtrasOpen, setMobileExtrasOpen] = useState(false)
@@ -516,10 +541,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   }, [])
   // Repuesto cuya cámara se tocó en la galería: se abre su flujo de fotos cuando ya es el seleccionado.
   const [fotoPendienteKey, setFotoPendienteKey] = useState<string | null>(null)
-  // Filtro "Comunes": repuestos de la lista curada COMPARTIDA (commonPartsByMachine
-  // estática + marca `comunEn` del doc), la misma que se ve en la pestaña "Repuestos
-  // comunes" del Aprendizaje. Distinto de los favoritos (personales por usuario).
-  const [repComunOnly, setRepComunOnly] = useState(false)
   // Picker "marcar como común de [máquina]" (abierto desde el panel de detalle).
   const [comunPickerOpen, setComunPickerOpen] = useState(false)
   const [comunQuery, setComunQuery] = useState('')
@@ -685,9 +706,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       setSelectedAreaId(null)
     }
     const m = machines.find((x) => x.id === (e?.id ?? favKey))
-    // El equipo enfocado manda sobre el filtro (ver scopedRepuestos) y el select lo refleja
-    // desde `valorSelectEquipo`: guardar acá el nombre dejaba un valor que no es opción.
-    setRepEquipoFilter('all')
+    // El equipo enfocado manda sobre la faceta (ver scopedRepuestos).
+    setFacetaEquipo(null)
     // Clave = id del NODO del equipo (para resaltarlo en el sidebar).
     setSelectedEquipKey(e?.id ?? favKey)
     // Identidad del equipo en el modelo plano = nodeId (clave de r.equipos[].machineId).
@@ -855,10 +875,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     if (selectedEquipKey) {
       return areaRepuestos.filter((r) => r.equipos.some((e) => e.machineId === selectedEquipMachineId))
     }
-    if (repEquipoFilter === 'all') return areaRepuestos
-    // Por PLANTA + nombre: «KNURO N1» de Chonchi y el de Yal son dos equipos.
-    return areaRepuestos.filter((r) => r.equipos.some((e) => claveDeEquipo(e.machineName || '', plantaDe(e.machineId)) === repEquipoFilter))
-  }, [areaRepuestos, selectedEquipKey, selectedEquipMachineId, repEquipoFilter, plantaDe])
+    return areaRepuestos
+  }, [areaRepuestos, selectedEquipKey, selectedEquipMachineId])
 
   // Piezas de la máquina enfocada, como las ve «Solicitar repuestos»: comunes, stock y BOM.
   const piezasDeLaMaquina = useMemo<PiezaSolicitable[]>(() => scopedRepuestos.map((r) => ({
@@ -908,42 +926,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     }
   }, [scopedRepuestos])
 
-  // Opciones del filtro "Equipo": TODOS los equipos de cada repuesto, no solo el primero
-  // (ver opcionesDeEquipo).
-  const equipoOptions = useMemo(
-    () => opcionesDeEquipo(areaRepuestos.flatMap((r) => r.equipos), plantaDe),
-    [areaRepuestos, plantaDe],
+  // Qué equipo nombra la columna «Equipo» cuando hay foco o faceta (ver equipoParaMostrar).
+  const equipoEnFaceta = useCallback(
+    (e: { machineId: string; machineName: string }, f: Faceta) =>
+      agruparDondeSeUsa([e], plantaDe).some((g) => grupoEnFaceta(g, f)),
+    [plantaDe],
   )
-  const etiquetaFiltroEquipo = equipoOptions.find((o) => o.valor === repEquipoFilter)?.etiqueta ?? repEquipoFilter
-  // Qué equipo nombra la columna «Equipo» cuando hay filtro o foco (ver equipoParaMostrar).
-  const preferirEquipo = useMemo(() => {
-    if (selectedEquipMachineId) return (e: { machineId: string }) => e.machineId === selectedEquipMachineId
-    if (repEquipoFilter !== 'all') {
-      return (e: { machineId: string; machineName: string }) => claveDeEquipo(e.machineName || '', plantaDe(e.machineId)) === repEquipoFilter
-    }
-    return undefined
-  }, [selectedEquipMachineId, repEquipoFilter, plantaDe])
-  const valorSelectEquipo = selectedEquipMachineId
-    ? (equipoOptions.find((o) => o.nodeIds.includes(selectedEquipMachineId))?.valor ?? 'all')
-    : repEquipoFilter
-  // Equipo(s) en foco para elegir qué capturas de manual se ven (null = todas).
-  const equiposEnFoco = useMemo<string[] | null>(() => {
-    if (selectedEquipMachineId) return [selectedEquipMachineId]
-    if (repEquipoFilter !== 'all') return equipoOptions.find((o) => o.valor === repEquipoFilter)?.nodeIds ?? null
-    return null
-  }, [selectedEquipMachineId, repEquipoFilter, equipoOptions])
-
-  // Opciones del filtro "Tipo" presentes en el alcance, ordenadas por frecuencia (con conteo)
-  const tipoOptions = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const r of scopedRepuestos) {
-      const t = tipoLabelOf(r.tipo)
-      counts.set(t, (counts.get(t) ?? 0) + 1)
-    }
-    return [...counts.entries()]
-      .map(([value, count]) => ({ value, count }))
-      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
-  }, [scopedRepuestos])
 
   /**
    * Tipos que ya existen, para sugerirlos al editar/crear un material.
@@ -958,81 +946,104 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     return [...s].sort((a, b) => a.localeCompare(b))
   }, [areaRepuestos])
 
-  // Opciones del filtro "Clase" (repuesto/insumo/herramienta/…) con conteo.
-  const claseOptions = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const r of scopedRepuestos) {
-      const c = r.clase || 'repuesto'
-      counts.set(c, (counts.get(c) ?? 0) + 1)
-    }
-    return [...counts.entries()]
-      .map(([value, count]) => ({ value, count }))
-      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
-  }, [scopedRepuestos])
-
   // Opciones para el selector del modal de solicitud (repuestos del área con SAP)
   const solicitarOptions = useMemo<RepuestoLite[]>(
     () => areaRepuestos.map((r) => ({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, stock: stockDeSolicitud(r) })),
     [areaRepuestos],
   )
 
-  // Filtrado (buscar + stock + tipo + fav) sobre el alcance ya reducido por equipo.
-  // NOTA: NO incluye el foco SAP — eso se aplica después, para poder contar el
-  // despiece oculto y mostrarlo en el interruptor.
-  const filteredBase = useMemo(() => {
-    let res = scopedRepuestos
-    if (repFavOnly) res = res.filter(esFavoritoDe(favKeys))
-    if (repComunOnly) res = res.filter(esComun)
-    if (repConFotos) res = res.filter((r) => fotosDeFila(r).length > 0)
-    if (listFilter !== 'all') {
-      const l = favLists.find((x) => x.name === listFilter)
-      const ids = new Set(l?.repuestoIds ?? [])
-      res = res.filter((r) => ids.has(r.rowKey))
-    }
-    if (repStockFilter !== 'all') res = res.filter((r) => r.stockStatus === repStockFilter)
-    if (repClaseFilter !== 'all') res = res.filter((r) => (r.clase || 'repuesto') === repClaseFilter)
-    if (repTipoFilter !== 'all') res = res.filter((r) => tipoLabelOf(r.tipo) === repTipoFilter)
-    // Multi-término con AND sobre el haystack unido: permite "máquina + pieza"
-    // ("baader casquillo", "gea sello") — el flujo natural del usuario en planta.
+  // ── Filtrado ──────────────────────────────────────────────────────────────────────────
+  // Orden: alcance (máquina del árbol) → búsqueda y filtros → foco SAP → [chips de equipo] →
+  // faceta → favoritos. Los chips de equipo se derivan de lo que queda ANTES de la faceta, para
+  // que sus conteos sean los de lo que se está mirando y no los del catálogo.
+  const nombreDeSlug = useCallback((slug: string) => findMachineBySlug(slug)?.name ?? slug, [])
+
+  // Multi-término con AND sobre el haystack unido: permite "máquina + pieza"
+  // ("baader casquillo", "gea sello") — el flujo natural del usuario en planta.
+  const coincideBusqueda = useMemo<Set<string> | null>(() => {
     const terms = normalizeForSearch(repQuery).split(/\s+/).filter(Boolean)
-    if (terms.length) {
-      res = res.filter((r) => {
-        const hay = normalizeForSearch(
-          [
-            r.codigoSAP,
-            r.textoBreve,
-            r.codigoFabricante,
-            r.alias ?? '',
-            (r.nombresComunes ?? []).join(' '),
-            r.marca ?? '',
-            r.modeloTipo ?? '',
-            r.descripcion ?? '',
-            tipoLabelOf(r.tipo),
-            ...r.equipos.map((e) => e.machineName),
-          ].join(' '),
-        )
-        return haystackMatchesAll(hay, terms)
-      })
+    if (!terms.length) return null
+    const ok = new Set<string>()
+    for (const r of scopedRepuestos) {
+      const hay = normalizeForSearch(
+        [
+          r.codigoSAP,
+          r.textoBreve,
+          r.codigoFabricante,
+          r.alias ?? '',
+          (r.nombresComunes ?? []).join(' '),
+          r.marca ?? '',
+          r.modeloTipo ?? '',
+          r.descripcion ?? '',
+          tipoLabelOf(r.tipo),
+          ...r.equipos.map((e) => e.machineName),
+        ].join(' '),
+      )
+      if (haystackMatchesAll(hay, terms)) ok.add(r.rowKey)
     }
-    return res
-  }, [scopedRepuestos, repFavOnly, repComunOnly, repConFotos, favKeys, listFilter, favLists, repStockFilter, repClaseFilter, repTipoFilter, repQuery])
+    return ok
+  }, [scopedRepuestos, repQuery])
 
-  // Cuántos favoritos tuyos hay EN ESTE alcance (equipo o área), no en toda la planta: el
-  // filtro ya trabajaba sobre el alcance, pero el contador mostraba el total global — decía
-  // "(7)" y al activarlo aparecía 1 sola fila.
-  const favoritosEnScope = useMemo(
-    () => contarCon(scopedRepuestos, esFavoritoDe(favKeys)),
-    [scopedRepuestos, favKeys],
+  const idsDeLista = useMemo(() => {
+    if (listFilter === 'all') return null
+    return new Set(favLists.find((x) => x.name === listFilter)?.repuestoIds ?? [])
+  }, [listFilter, favLists])
+
+  /** Filtros de la hoja y de la barra, salvo el que se omite (para contar sus opciones). */
+  const pasaFiltros = useCallback((r: AreaRepuestoRow, omitir?: 'clase' | 'tipo' | 'stock' | 'lista'): boolean => {
+    if (repConFotos && fotosDeFila(r).length === 0) return false
+    if (omitir !== 'lista' && idsDeLista && !idsDeLista.has(r.rowKey)) return false
+    if (omitir !== 'stock' && repStockFilter !== 'all' && r.stockStatus !== repStockFilter) return false
+    if (repBajoOSin && r.stockStatus !== 'low' && r.stockStatus !== 'out') return false
+    if (omitir !== 'clase' && repClaseFilter !== 'all' && (r.clase || 'repuesto') !== repClaseFilter) return false
+    if (omitir !== 'tipo' && repTipoFilter !== 'all' && tipoLabelOf(r.tipo) !== repTipoFilter) return false
+    return true
+  }, [repConFotos, idsDeLista, repStockFilter, repBajoOSin, repClaseFilter, repTipoFilter])
+
+  // Los equipos que definen el alcance de un repuesto: la máquina del árbol o la faceta de equipo.
+  const equiposDelAlcance = useCallback((r: AreaRepuestoRow, f: Faceta | null) => {
+    if (selectedEquipKey && selectedEquipMachineId) return r.equipos.filter((e) => e.machineId === selectedEquipMachineId)
+    if (f) return r.equipos.filter((e) => equipoEnFaceta(e, f))
+    return null
+  }, [selectedEquipKey, selectedEquipMachineId, equipoEnFaceta])
+
+  /** Marcas de la fila dentro del alcance: común del equipo y/o mía. */
+  const marcasDe = useCallback(
+    (r: AreaRepuestoRow, f: Faceta | null): MarcasFavorito => marcasDeFavorito(r, favKeys, equiposDelAlcance(r, f), nombreDeSlug),
+    [favKeys, equiposDelAlcance, nombreDeSlug],
+  )
+  /** «★ Favoritos» activo: comunes del alcance ∪ mis estrellas del alcance, sin repetir. */
+  const aplicaFavoritos = useCallback(
+    (rows: AreaRepuestoRow[], f: Faceta | null) => {
+      if (!repFavOnly) return rows
+      return rows.filter((r) => { const m = marcasDe(r, f); return m.comun || m.mia })
+    },
+    [repFavOnly, marcasDe],
   )
 
-  // Cuántos comunes hay en el alcance actual (lista estática por SAP + marca comunEn).
-  const comunesEnScope = useMemo(
-    () => contarCon(scopedRepuestos, esComun),
-    [scopedRepuestos],
+  const baseSinFav = useMemo(
+    () => scopedRepuestos.filter((r) => (!coincideBusqueda || coincideBusqueda.has(r.rowKey)) && pasaFiltros(r)),
+    [scopedRepuestos, coincideBusqueda, pasaFiltros],
   )
-
   // Foco SAP: oculta el despiece sin código SAP (default). El conteo de lo oculto
   // alimenta el interruptor "ver despiece".
+  const baseSap = useMemo(
+    () => (repSoloSap ? baseSinFav.filter((r) => !esDespiece(r)) : baseSinFav),
+    [baseSinFav, repSoloSap],
+  )
+  // Resultados sin la faceta de equipo: de acá salen los chips. Con una máquina elegida no hay chips
+  // (la máquina ya es el filtro).
+  const filasParaChips = useMemo(() => aplicaFavoritos(baseSap, null), [aplicaFavoritos, baseSap])
+  const facetaEfectiva = useMemo<Faceta | null>(() => {
+    if (!facetaEquipo || selectedEquipKey) return null
+    const f = facetasDeEquipo(filasParaChips, plantaDe)
+    return f.nivel === facetaEquipo.nivel && f.opciones.some((o) => o.clave === facetaEquipo.clave) ? facetaEquipo : null
+  }, [facetaEquipo, selectedEquipKey, filasParaChips, plantaDe])
+
+  const filteredBase = useMemo(() => {
+    const enFaceta = facetaEfectiva ? baseSinFav.filter((r) => filtraPorFaceta(r, facetaEfectiva, plantaDe)) : baseSinFav
+    return aplicaFavoritos(enFaceta, facetaEfectiva)
+  }, [baseSinFav, facetaEfectiva, plantaDe, aplicaFavoritos])
   const filteredRep = useMemo(
     () => (repSoloSap ? filteredBase.filter((r) => !esDespiece(r)) : filteredBase),
     [filteredBase, repSoloSap],
@@ -1042,23 +1053,99 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     [filteredBase, repSoloSap],
   )
 
-  // Filtros NO-default activos — badge del botón "Filtros" en móvil (los
-  // filtros arrancan colapsados; sin el conteo, un filtro activo escondido
-  // haría "desaparecer" repuestos sin explicación). `repSoloSap` no cuenta:
-  // true ES el default.
+  // Cuántas piezas tiene el chip «★ Favoritos»: comunes del alcance + mías del alcance, sin repetir.
+  // El alcance es la máquina del árbol o la faceta de equipo activa (sin ellas, todo el área).
+  // Sobre lo que deja la búsqueda y los filtros: el número del chip es lo que verá al tocarlo.
+  const favoritosEnScope = useMemo(() => {
+    const base = repSoloSap ? baseSinFav.filter((r) => !esDespiece(r)) : baseSinFav
+    const filas = facetaEfectiva ? base.filter((r) => filtraPorFaceta(r, facetaEfectiva, plantaDe)) : base
+    return contarCon(filas, (r) => { const m = marcasDe(r, facetaEfectiva); return m.comun || m.mia })
+  }, [baseSinFav, repSoloSap, facetaEfectiva, plantaDe, marcasDe])
+
+  // Qué equipo nombra la columna «Equipo» cuando hay foco o faceta (ver equipoParaMostrar).
+  const preferirEquipo = useMemo(() => {
+    if (selectedEquipMachineId) return (e: { machineId: string }) => e.machineId === selectedEquipMachineId
+    if (facetaEfectiva) return (e: { machineId: string; machineName: string }) => equipoEnFaceta(e, facetaEfectiva)
+    return undefined
+  }, [selectedEquipMachineId, facetaEfectiva, equipoEnFaceta])
+  // Equipo(s) en foco para elegir qué capturas de manual se ven (null = todas).
+  const equiposEnFoco = useMemo<string[] | null>(() => {
+    if (selectedEquipMachineId) return [selectedEquipMachineId]
+    if (facetaEfectiva) {
+      const ids = new Set<string>()
+      for (const r of areaRepuestos) for (const e of r.equipos) if (e.machineId && equipoEnFaceta(e, facetaEfectiva)) ids.add(e.machineId)
+      return ids.size ? [...ids] : null
+    }
+    return null
+  }, [selectedEquipMachineId, facetaEfectiva, areaRepuestos, equipoEnFaceta])
+
+  // Con «★ Favoritos» activo: qué es cada fila (común / mía) y de qué equipo hablan las cabeceras.
+  const marcasFav = useMemo(() => {
+    const m = new Map<string, MarcasFavorito>()
+    if (!repFavOnly) return m
+    for (const r of filteredRep) m.set(r.rowKey, marcasDe(r, facetaEfectiva))
+    return m
+  }, [repFavOnly, filteredRep, marcasDe, facetaEfectiva])
+  const etiquetaAlcance = useMemo(() => {
+    if (selectedEquipKey) return formatNombreSAP(selectedEquipName).nombre || selectedEquipName || ''
+    if (facetaEfectiva) return facetasDeEquipo(filasParaChips, plantaDe).opciones.find((o) => o.clave === facetaEfectiva.clave)?.etiqueta ?? ''
+    return ''
+  }, [selectedEquipKey, selectedEquipName, facetaEfectiva, filasParaChips, plantaDe])
+
+  // Opciones de la hoja de filtros, contadas con TODOS los demás filtros puestos (solo con la hoja abierta).
+  const opcionesHoja = useMemo(() => {
+    if (!filtrosOpen) return null
+    const filasSin = (omitir: 'clase' | 'tipo' | 'stock' | 'lista') => {
+      const base = scopedRepuestos.filter((r) => (!coincideBusqueda || coincideBusqueda.has(r.rowKey)) && pasaFiltros(r, omitir) && (!repSoloSap || !esDespiece(r)))
+      return aplicaFavoritos(facetaEfectiva ? base.filter((r) => filtraPorFaceta(r, facetaEfectiva, plantaDe)) : base, facetaEfectiva)
+    }
+    const contar = <T,>(filas: AreaRepuestoRow[], clave: (r: AreaRepuestoRow) => T): Map<T, number> => {
+      const m = new Map<T, number>()
+      for (const r of filas) { const k = clave(r); m.set(k, (m.get(k) ?? 0) + 1) }
+      return m
+    }
+    const clases: OpcionFiltro[] = [...contar(filasSin('clase'), (r) => r.clase || 'repuesto').entries()]
+      .map(([value, count]) => ({ value, count, label: CLASE_LABEL[value as keyof typeof CLASE_LABEL] ?? value }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'es'))
+    const tipos: OpcionFiltro[] = [...contar(filasSin('tipo'), (r) => tipoLabelOf(r.tipo)).entries()]
+      .map(([value, count]) => ({ value, count, label: value }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'es'))
+    const porStock = contar(filasSin('stock'), (r) => r.stockStatus)
+    const stocks: OpcionFiltro[] = [
+      { value: 'ok', label: 'Disponible', count: porStock.get('ok') ?? 0 },
+      { value: 'low', label: 'Bajo', count: porStock.get('low') ?? 0 },
+      { value: 'out', label: 'Sin stock', count: porStock.get('out') ?? 0 },
+    ]
+    const sinLista = filasSin('lista')
+    const listas: OpcionFiltro[] = favLists.map((l) => ({
+      value: l.name, label: l.name,
+      count: sinLista.filter((r) => l.repuestoIds.includes(r.rowKey)).length,
+    }))
+    // Despiece sin SAP que habría con los demás filtros (el interruptor lo suma o lo quita).
+    const despiece = aplicaFavoritos(
+      scopedRepuestos.filter((r) => esDespiece(r) && (!coincideBusqueda || coincideBusqueda.has(r.rowKey)) && pasaFiltros(r)
+        && (!facetaEfectiva || filtraPorFaceta(r, facetaEfectiva, plantaDe))),
+      facetaEfectiva,
+    ).length
+    return { clases, tipos, stocks, listas, despiece }
+  }, [filtrosOpen, scopedRepuestos, coincideBusqueda, pasaFiltros, repSoloSap, aplicaFavoritos, facetaEfectiva, plantaDe, favLists])
+
+  // Filtros de la HOJA activos (los de la barra —favoritos, bajo stock— se ven en la barra).
+  // `repSoloSap` cuenta cuando se apaga: true es el default.
   const filtrosActivos =
-    (repEquipoFilter !== 'all' || selectedEquipKey ? 1 : 0) +
     (repClaseFilter !== 'all' ? 1 : 0) +
     (repTipoFilter !== 'all' ? 1 : 0) +
     (repStockFilter !== 'all' ? 1 : 0) +
     (!repSoloSap ? 1 : 0) +
-    (repFavOnly ? 1 : 0) +
-    (repComunOnly ? 1 : 0) +
-    (repConFotos ? 1 : 0) +
     (listFilter !== 'all' ? 1 : 0)
+  const limpiarFiltrosHoja = () => {
+    setRepClaseFilter('all'); setRepTipoFilter('all'); setRepStockFilter('all'); setRepSoloSap(true); setListFilter('all')
+  }
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repComunOnly, repConFotos, listFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, facetaEfectiva, repStockFilter, repBajoOSin, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repConFotos, listFilter, repPageSize])
+  // La faceta de equipo es de ESTA búsqueda: al cambiar de área o de texto, se reinicia.
+  useEffect(() => { setFacetaEquipo(null) }, [selectedAreaId, showingAll, repQuery])
 
   // Si la búsqueda/filtros dejan fuera al repuesto seleccionado, cerrar el panel
   // de detalle: evita que quede "pegado" mostrando un repuesto que ya no está
@@ -1100,7 +1187,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     </th>
   )
 
-  const sortedRep = useMemo(() => {
+  const ordenadaRep = useMemo(() => {
     // Tiering SAP-first (modelo unificado): los materiales con código SAP
     // (ordenables, en bodega) van primero; las piezas de despiece sin SAP, después.
     // Partición estable → conserva el orden interno (relevancia/alfabético).
@@ -1153,6 +1240,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       return String(va).localeCompare(String(vb), 'es') * dir
     })
   }, [filteredRep, repSortColumn, repSortDir, repQuery])
+  // «★ Favoritos» activo: las comunes del equipo primero (incluye las que además son mías), luego solo las mías.
+  const sortedRep = useMemo(() => {
+    if (!repFavOnly) return ordenadaRep
+    const comunes: AreaRepuestoRow[] = []
+    const resto: AreaRepuestoRow[] = []
+    for (const r of ordenadaRep) (marcasFav.get(r.rowKey)?.comun ? comunes : resto).push(r)
+    return [...comunes, ...resto]
+  }, [ordenadaRep, repFavOnly, marcasFav])
 
   const totalPages = Math.max(1, Math.ceil(sortedRep.length / repPageSize))
   const page = Math.min(repPage, totalPages - 1)
@@ -1698,7 +1793,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSelectedAreaId(node.id)
     setShowingAll(false)
     // Seleccionar el área (no un equipo) limpia el filtro de equipo → muestra todo el área.
-    setRepEquipoFilter('all')
+    setFacetaEquipo(null)
     setSelectedEquipKey(null)
     setSelectedEquipMachineId(null)
     setSelectedEquipName('')
@@ -1723,7 +1818,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     autoTodasRef.current = false
     setShowingAll(true)
     setSelectedAreaId(null)
-    setRepEquipoFilter('all')
+    setFacetaEquipo(null)
+    setSelectedEquipKey(null)
+    setSelectedEquipMachineId(null)
+    setSelectedEquipName('')
+  }, [])
+
+  // Quita la máquina elegida en el árbol (la marca «en <máquina>» del buscador y «Volver a…»).
+  const quitarFocoMaquina = useCallback(() => {
+    setFacetaEquipo(null)
     setSelectedEquipKey(null)
     setSelectedEquipMachineId(null)
     setSelectedEquipName('')
@@ -1734,6 +1837,43 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const title = selectedEquipKey
     ? (selectedEquipName || 'Equipo')
     : (showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Selecciona un área'))
+
+  // Marca «en BAADER 142 N2 · Chonchi» junto al buscador: dice que la búsqueda está acotada a una máquina.
+  const nombreMaquinaFoco = formatNombreSAP(selectedEquipName).nombre || selectedEquipName
+  const plantaMaquinaFoco = selectedEquipMachineId ? plantaCorta(plantaDe(selectedEquipMachineId)) : ''
+  const marcaMaquina = selectedEquipKey && nombreMaquinaFoco ? (
+    <button
+      type="button"
+      onClick={quitarFocoMaquina}
+      aria-label={`Quitar el filtro de máquina: ${nombreMaquinaFoco}`}
+      className="inline-flex min-h-[44px] max-w-full shrink-0 items-center"
+    >
+      <span className="inline-flex min-h-[36px] max-w-full items-center gap-1.5 rounded-full bg-primary/[0.13] pl-3.5 pr-2.5 text-subhead font-medium text-brand-ink">
+        <span className="truncate">en {nombreMaquinaFoco}{plantaMaquinaFoco ? ` · ${plantaMaquinaFoco}` : ''}</span>
+        <X className="size-4 shrink-0" aria-hidden />
+      </span>
+    </button>
+  ) : null
+
+  // Línea que NOMBRA lo activo: «41 en Chonchi · Clase: Repuesto · Bajo o sin stock».
+  const lineaResultados = (() => {
+    const donde = selectedEquipKey && nombreMaquinaFoco
+      ? nombreMaquinaFoco
+      : etiquetaAlcance || (showingAll ? 'todas las áreas' : (formatNombreSAP(selectedNode?.nombre).nombre || selectedNode?.nombre || 'el área'))
+    const partes = [
+      `${filteredRep.length.toLocaleString('es-CL')} ${filteredRep.length === 1 ? 'repuesto' : 'repuestos'} en ${donde}`,
+      repQuery.trim() ? `«${repQuery.trim()}»` : '',
+      repClaseFilter !== 'all' ? `Clase: ${CLASE_LABEL[repClaseFilter as keyof typeof CLASE_LABEL] ?? repClaseFilter}` : '',
+      repTipoFilter !== 'all' ? `Tipo: ${repTipoFilter}` : '',
+      repStockFilter !== 'all' ? `Stock: ${({ ok: 'Disponible', low: 'Bajo', out: 'Sin stock', unset: 'Sin config.' } as Record<string, string>)[repStockFilter] ?? repStockFilter}` : '',
+      repBajoOSin ? 'Bajo o sin stock' : '',
+      repFavOnly ? 'Favoritos' : '',
+      repConFotos ? 'Con fotos' : '',
+      listFilter !== 'all' ? `Lista: ${listFilter}` : '',
+      !repSoloSap ? 'Con despiece sin SAP' : '',
+    ]
+    return partes.filter(Boolean).join(' · ')
+  })()
 
   // Herramientas admin de catálogo — compartidas entre toolbar desktop y overflow móvil.
   // (Fase 4) Importar / duplicados / gestor de máquinas quedaron fuera: eran
@@ -1775,13 +1915,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setRepQuery('')
     setShowingAll(false)
     setSelectedAreaId(null)
-    setRepEquipoFilter('all')
+    setFacetaEquipo(null)
     setSelectedEquipKey(null)
     setSelectedEquipMachineId(null)
     setSelectedEquipName('')
     setSelectedRowKey(null)
     // Filtros que ya no se ven desde la entrada: si quedaran puestos, un SAP reciente podría dar cero resultados.
-    setRepStockFilter('all'); setRepClaseFilter('all'); setRepFavOnly(false); setRepComunOnly(false)
+    setRepStockFilter('all'); setRepClaseFilter('all'); setRepFavOnly(false); setRepBajoOSin(false)
     setRepConFotos(false); setListFilter('all'); setRepSoloSap(true)
   }
   const abrirRecienteEntrada = (r: RecienteRepuesto) => {
@@ -1894,6 +2034,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             )}
           </button>
         </div>
+        {marcaMaquina && <div className="flex px-4 pb-1 sm:hidden">{marcaMaquina}</div>}
         <PSheet open={menuMasOpen} onClose={() => setMenuMasOpen(false)} title="Más acciones">
           <ListGroup>
             {!selectedEquipKey && (
@@ -1949,6 +2090,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               className="h-11 pl-9"
             />
           </div>
+          {marcaMaquina}
           <Button variant="outline" size="sm" className="h-11 w-11 justify-center gap-1.5 px-0 sm:w-auto sm:px-3" onClick={() => setSolicitudesOpen(true)}>
             <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitudes</span>
             {pendientesCount > 0 && (
@@ -2136,7 +2278,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               {selectedEquipKey ? (
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <button
-                    onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}
+                    onClick={quitarFocoMaquina}
                     className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground max-sm:min-h-[44px] max-sm:px-4"
                     title="Volver a ver todos los repuestos del área"
                   >
@@ -2158,14 +2300,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                     </Link>
                   )}
                 </div>
-              ) : repEquipoFilter !== 'all' ? (
-                <button
-                  onClick={() => { setRepEquipoFilter('all'); setSelectedEquipName('') }}
-                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-transparent bg-primary/10 px-2.5 py-1 text-caption font-medium text-brand-ink transition hover:bg-primary/20"
-                  title="Quitar filtro de equipo — ver todos los repuestos del área"
-                >
-                  <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{etiquetaFiltroEquipo}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
-                </button>
               ) : null}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -2203,8 +2337,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               className="h-11 shrink-0 gap-1.5"
               onClick={() => setMobileExtrasOpen((v) => !v)}
             >
-              <Settings2 className="h-4 w-4" /> Filtros
-              {filtrosActivos > 0 && <span className="tabular-nums opacity-80">({filtrosActivos})</span>}
+              <Settings2 className="h-4 w-4" /> KPIs
             </Button>
           </div>
 
@@ -2241,106 +2374,48 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           <section ref={listSectionRef} className="scroll-mt-44 sm:scroll-mt-28">
             {/* Filtros (la búsqueda vive en la barra superior — global, sticky).
                 En móvil colapsados tras el botón "Filtros" del strip de KPIs. */}
-            <div className="mb-3 flex justify-end">
+            {/* Barra: favoritos · bajo stock · filtros (hoja) · vista. Clase/Tipo/Stock/SAP/listas viven en la hoja. */}
+            <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <div className="-mx-4 flex min-w-0 items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+                <ChipBarra
+                  activo={repFavOnly}
+                  disabled={favoritosEnScope === 0 && !repFavOnly}
+                  onClick={() => setRepFavOnly((v) => !v)}
+                  title={favoritosEnScope === 0
+                    ? 'No hay favoritos en este alcance. Los comunes de la máquina los marca un administrador; tus estrellas se marcan en cada fila.'
+                    : 'Comunes de la máquina (lista compartida) y tus estrellas (personales), sin repetir.'}
+                >
+                  <Star className={['size-4', repFavOnly ? 'fill-current' : ''].join(' ')} aria-hidden /> Favoritos
+                  {(favoritosEnScope > 0 || repFavOnly) && <span className="text-footnote font-normal tabular-nums opacity-80">{favoritosEnScope}</span>}
+                </ChipBarra>
+                <ChipBarra activo={repBajoOSin} onClick={() => setRepBajoOSin((v) => !v)} title="Repuestos con stock bajo o agotado">
+                  Bajo o sin stock
+                </ChipBarra>
+                <ChipBarra activo={repConFotos} onClick={() => setRepConFotos((v) => !v)} className={repConFotos ? '' : 'md:hidden'}>
+                  <ImageIcon className="size-4" aria-hidden /> Con fotos
+                </ChipBarra>
+                <ChipBarra activo={false} onClick={() => setFiltrosOpen(true)} aria-haspopup="dialog">
+                  <Settings2 className="size-4" aria-hidden /> Filtros
+                  {filtrosActivos > 0 && (
+                    <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-footnote font-semibold tabular-nums text-primary-foreground">{filtrosActivos}</span>
+                  )}
+                </ChipBarra>
+              </div>
               <SegmentedControl<'lista' | 'galeria'>
                 ariaLabel="Vista de repuestos"
                 value={vistaRep}
                 onChange={cambiarVistaRep}
-                className="sm:w-[220px]"
+                className="sm:w-[220px] sm:shrink-0"
                 segments={[{ value: 'lista', label: 'Lista' }, { value: 'galeria', label: 'Galería' }]}
               />
             </div>
-            <div className={[mobileExtrasOpen ? 'flex' : 'hidden', 'mb-3 flex-wrap items-center gap-2 sm:flex'].join(' ')}>
-              {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
-              <div className="grid grid-cols-2 gap-2 sm:contents">
-              <Select value={valorSelectEquipo} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null); setSelectedEquipMachineId(null); setSelectedEquipName('') }}>
-                <SelectTrigger className="w-full sm:w-[190px]"><SelectValue placeholder="Todos los equipos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los equipos</SelectItem>
-                  {equipoOptions.map((e) => <SelectItem key={e.valor} value={e.valor}>{e.etiqueta}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={repClaseFilter} onValueChange={setRepClaseFilter}>
-                <SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder="Todas las clases" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las clases</SelectItem>
-                  {claseOptions.map((c) => <SelectItem key={c.value} value={c.value}>{CLASE_LABEL[c.value as keyof typeof CLASE_LABEL] ?? c.value} ({c.count})</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={repTipoFilter} onValueChange={setRepTipoFilter}>
-                <SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los tipos</SelectItem>
-                  {tipoOptions.map((t) => <SelectItem key={t.value} value={t.value}>{t.value} ({t.count})</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={repStockFilter} onValueChange={(v) => setRepStockFilter(v as StockFilter)}>
-                <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Stock: Todos</SelectItem>
-                  <SelectItem value="ok">Disponible</SelectItem>
-                  <SelectItem value="low">Bajo</SelectItem>
-                  <SelectItem value="out">Sin stock</SelectItem>
-                  <SelectItem value="unset">Sin config.</SelectItem>
-                </SelectContent>
-              </Select>
-              </div>
-              <Button
-                variant={repSoloSap ? 'default' : 'outline'}
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setRepSoloSap((v) => !v)}
-                title={repSoloSap
-                  ? 'Mostrando solo materiales con código SAP (los ordenables). Clic para incluir las piezas de despiece sin SAP.'
-                  : 'Incluyendo piezas de despiece sin SAP. Clic para enfocar solo en los que tienen SAP.'}
-              >
-                Solo con SAP
-                {repSoloSap && despieceOcultos > 0 && <span className="tabular-nums opacity-70">+{despieceOcultos} despiece</span>}
-              </Button>
-              <Button
-                variant={repFavOnly ? 'default' : 'outline'}
-                size="sm"
-                className="gap-1.5"
-                disabled={favoritosEnScope === 0 && !repFavOnly}
-                onClick={() => setRepFavOnly((v) => !v)}
-                title={favoritosEnScope === 0
-                  ? 'No marcaste ningún favorito en este equipo. Tus favoritos son atajos personales tuyos y se marcan con la estrella de cada fila.'
-                  : 'Mis favoritos: atajos personales tuyos (cada usuario tiene los suyos). Distinto de «Comunes», que es la lista compartida de la máquina.'}
-              >
-                <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Mis favoritos
-                {(favoritosEnScope > 0 || repFavOnly) && <span className="tabular-nums opacity-70">({favoritosEnScope})</span>}
-              </Button>
-              {comunesEnScope > 0 && (
-                <Button
-                  variant={repComunOnly ? 'default' : 'outline'}
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setRepComunOnly((v) => !v)}
-                  title="Mostrar solo los repuestos comunes / más usados de la máquina (lista curada compartida, la misma del Centro de aprendizaje)"
-                >
-                  <Wrench className="h-4 w-4" /> Comunes
-                  <span className="tabular-nums opacity-70">({comunesEnScope})</span>
-                </Button>
-              )}
-              <Button
-                variant={repConFotos ? 'default' : 'outline'}
-                size="sm"
-                className={['min-h-[44px] gap-1.5', repConFotos ? '' : 'md:hidden'].join(' ')}
-                onClick={() => setRepConFotos((v) => !v)}
-                aria-pressed={repConFotos}
-              >
-                <ImageIcon className="h-4 w-4" /> Con fotos
-              </Button>
-              {favLists.length > 0 && (
-                <Select value={listFilter} onValueChange={setListFilter}>
-                  <SelectTrigger className="w-[170px]"><SelectValue placeholder="Lista" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las listas</SelectItem>
-                    {favLists.map((l) => <SelectItem key={l.name} value={l.name}>{l.name} ({l.repuestoIds.length})</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+
+            {!repuestosBusy && (
+              <>
+                <ChipsEquipo rows={filasParaChips} plantaDe={plantaDe} faceta={facetaEfectiva} onChange={setFacetaEquipo} />
+                <p className="mb-2 px-1 text-footnote text-muted-foreground" aria-live="polite">{lineaResultados}</p>
+              </>
+            )}
 
             {repuestosBusy ? (
               <div className="overflow-hidden rounded-card border border-border">
@@ -2408,8 +2483,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                       {pagedRep.map((r, idx) => {
                         const meta = STOCK_META[r.stockStatus]
                         // El equipo del filtro/foco primero; el marcador «Sin equipo» de un doc duplicado no cuenta.
-                        const { nombre: equipo, mas } = equipoParaMostrar(r.equipos, preferirEquipo)
-                        const extra = mas > 0 ? ` +${mas}` : ''
+                        const { nombre: equipo } = equipoParaMostrar(r.equipos, preferirEquipo)
                         const dibujo = dibujoDe(figurasDespiece, r.codigoFabricante, maquinaDeDespiece(equipo))
                         const isSel = selectedRowKey === r.rowKey
                         const nv = nombreVisible(r)
@@ -2417,8 +2491,21 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         const fotos = fotosDeFila(r, equiposEnFoco)
                         // Divisor de tier: primera fila sin SAP (despiece) tras las con-SAP.
                         const showDespieceDivider = !r.codigoSAP && (idx === 0 || !!pagedRep[idx - 1]?.codigoSAP)
+                        // «★ Favoritos» activo: dos secciones, comunes del equipo y mis estrellas.
+                        const marcas = repFavOnly ? marcasFav.get(r.rowKey) : undefined
+                        const seccionFav = marcas ? (marcas.comun ? 'comun' : 'mia') : null
+                        const prevMarcas = repFavOnly && idx > 0 ? marcasFav.get(pagedRep[idx - 1]!.rowKey) : undefined
+                        const prevSeccion = prevMarcas ? (prevMarcas.comun ? 'comun' : 'mia') : null
+                        const showFavHeader = seccionFav !== null && seccionFav !== prevSeccion
                         return (
                           <Fragment key={r.rowKey}>
+                          {showFavHeader && (
+                            <tr className="bg-muted">
+                              <td colSpan={10} className="px-3 py-2 text-subhead font-semibold text-foreground">
+                                {seccionFav === 'comun' ? (etiquetaAlcance ? `Comunes de ${etiquetaAlcance}` : 'Comunes') : 'Mis estrellas'}
+                              </td>
+                            </tr>
+                          )}
                           {showDespieceDivider && (
                             <tr className="bg-muted">
                               <td colSpan={10} className="px-3 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground">
@@ -2494,7 +2581,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   <span key={et} className="shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">{et}</span>
                                 ))}
                                 <span className="line-clamp-2 min-w-0 font-medium text-foreground">{nv.titulo}</span>
-                                {(isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
+                                {marcas && (
+                                  <span className="inline-flex shrink-0 items-center gap-1">
+                                    {marcas.comun && (
+                                      <span className="inline-flex items-center rounded-full bg-ink-ok/[0.15] px-2 py-0.5 text-footnote font-semibold text-ink-ok">Común</span>
+                                    )}
+                                    {marcas.mia && (
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-footnote font-semibold text-muted-foreground">
+                                        <Star className="size-3 fill-current text-ink-warn" aria-hidden /> Mía
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                                {!marcas && (isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
                                     className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-ink-ok/[0.15] px-1.5 py-0.5 text-caption font-semibold text-ink-ok"
                                     title={`Repuesto común / más usado de: ${[...new Set([...machinesForCommonSap(r.codigoSAP), ...(r.comunEn ?? [])])].map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
@@ -2535,7 +2634,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                     <span> · </span>
                                   </button>
                                 )}
-                                {equipo}{extra} · {tipoLabelOf(r.tipo)}
+                                {tipoLabelOf(r.tipo)}
                                 {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground">Fab {r.codigoFabricante}</span></span>}
                                 {dibujo && (
                                   <button type="button" onClick={(e) => { e.stopPropagation(); irAlDibujo(dibujo.ruta, r.rowKey) }}
@@ -2545,6 +2644,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   </button>
                                 )}
                               </div>
+                              <DondeSeUsaPills equipos={r.equipos} plantaDe={plantaDe} enFocoId={selectedEquipMachineId} faceta={facetaEfectiva} className="mt-1.5 md:hidden" />
                               {/* Móvil: tira de hasta 3 miniaturas SOLO si la fila tiene fotos (el 96 %
                                   no tiene: sin cajón vacío). Cada una abre el visor en ESA foto. */}
                               {fotos.length > 0 && (
@@ -2601,7 +2701,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               )}
                             </td>
                             )}
-                            <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">{equipo}<span className="text-muted-foreground/60">{extra}</span></td>
+                            <td className="hidden px-3 py-2 md:table-cell">
+                              <DondeSeUsaPills equipos={r.equipos} plantaDe={plantaDe} enFocoId={selectedEquipMachineId} faceta={facetaEfectiva} />
+                            </td>
                             <td className="hidden px-3 py-2 md:table-cell">
                               <div className="flex items-center gap-1.5">
                                 <span className={['h-2 w-2 rounded-full', meta.dot].join(' ')} />
@@ -2708,6 +2810,29 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           </div>
         </div>
       </div>
+
+      <FiltrosRepuestosSheet
+        open={filtrosOpen}
+        onClose={() => setFiltrosOpen(false)}
+        clases={opcionesHoja?.clases ?? []}
+        clase={repClaseFilter}
+        onClase={setRepClaseFilter}
+        tipos={opcionesHoja?.tipos ?? []}
+        tipo={repTipoFilter}
+        onTipo={setRepTipoFilter}
+        stocks={opcionesHoja?.stocks ?? []}
+        stock={repStockFilter}
+        onStock={(v) => setRepStockFilter(v as StockFilter)}
+        despieceSinSap={opcionesHoja?.despiece ?? 0}
+        incluirSinSap={!repSoloSap}
+        onIncluirSinSap={(v) => setRepSoloSap(!v)}
+        listas={opcionesHoja?.listas ?? []}
+        lista={listFilter}
+        onLista={setListFilter}
+        activos={filtrosActivos}
+        onLimpiar={limpiarFiltrosHoja}
+        total={filteredRep.length}
+      />
 
       {/* Panel lateral de detalle del repuesto (columna fija, no modal) */}
       {selectedRep && (

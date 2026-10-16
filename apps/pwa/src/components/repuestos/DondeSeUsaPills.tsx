@@ -1,0 +1,89 @@
+/**
+ * «Dónde se usa» de una fila de Repuestos: familia + una pill por planta con sus unidades.
+ *
+ *   Evisceradora Baader 142  [ Chonchi  N1 N2 N3 ]  [ Yal  N1 ]  Knuro  [ Chonchi  N1 ]
+ *
+ * Reemplaza el texto «EVISCERADORA BAADER 142 N1 +5», que nombraba un equipo cualquiera y
+ * escondía los otros cinco. Datos de `agruparDondeSeUsa`: planta + nombre es la identidad.
+ *
+ *  - La unidad de la máquina en foco va en cápsula de acento.
+ *  - La planta que la faceta de equipo dejó fuera NO se oculta: queda al 55 %.
+ *  - Más de dos familias: se muestran dos y «+N familias».
+ */
+import { agruparDondeSeUsa, plantaCorta, type EquipoDelRepuesto, type GrupoDondeSeUsa } from '@/hooks/repuestos/dondeSeUsa'
+import { grupoEnFaceta, tituloFamilia, type Faceta } from '@/utils/repuestos/facetasEquipo'
+import { cn } from '@/lib/utils'
+
+export interface DondeSeUsaPillsProps {
+  equipos: readonly EquipoDelRepuesto[]
+  plantaDe: (nodeId: string) => string | undefined
+  /** nodeId de la máquina elegida en el árbol: su unidad se resalta. */
+  enFocoId?: string | null
+  /** Faceta de equipo activa: lo que quede fuera se atenúa. */
+  faceta?: Faceta | null
+  maxFamilias?: number
+  className?: string
+}
+
+interface Familia { clave: string; titulo: string; grupos: GrupoDondeSeUsa[]; enFoco: boolean }
+
+export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamilias = 2, className }: DondeSeUsaPillsProps) {
+  const grupos = agruparDondeSeUsa(equipos, plantaDe)
+  if (grupos.length === 0) {
+    return <span className={cn('text-footnote text-muted-foreground', className)}>Transversal</span>
+  }
+  const porFamilia = new Map<string, Familia>()
+  for (const g of grupos) {
+    const clave = g.familia.trim().toUpperCase()
+    const f = porFamilia.get(clave) ?? { clave, titulo: tituloFamilia(g.familia), grupos: [], enFoco: false }
+    f.grupos.push(g)
+    if (enFocoId && g.unidades.some((u) => u.nodeId === enFocoId)) f.enFoco = true
+    porFamilia.set(clave, f)
+  }
+  // La familia de la máquina en foco primero (sort estable: el resto conserva su orden).
+  const familias = [...porFamilia.values()].sort((a, b) => Number(b.enFoco) - Number(a.enFoco))
+  const visibles = familias.slice(0, maxFamilias)
+  const ocultas = familias.length - visibles.length
+
+  return (
+    <div className={cn('flex flex-col gap-1', className)} data-testid="donde-se-usa">
+      {visibles.map((f) => (
+        <div key={f.clave} className="flex flex-wrap items-center gap-1.5 text-footnote">
+          <span className="font-semibold text-foreground">{f.titulo}</span>
+          {f.grupos.map((g) => {
+            const fuera = !!faceta && !grupoEnFaceta(g, faceta)
+            const planta = plantaCorta(g.planta)
+            return (
+              <span
+                key={`${g.planta ?? ''}|${g.familia}`}
+                data-fuera={fuera ? 'true' : undefined}
+                className={cn('inline-flex items-center gap-0.5 rounded-full bg-muted py-0.5 pl-2 pr-1', fuera && 'opacity-55')}
+              >
+                {planta && <span className="mr-1 font-semibold text-muted-foreground">{planta}</span>}
+                {g.unidades.map((u) => {
+                  const enFoco = !!enFocoId && u.nodeId === enFocoId
+                  return (
+                    <span
+                      key={u.nodeId}
+                      title={u.nombre}
+                      data-en-foco={enFoco ? 'true' : undefined}
+                      className={cn(
+                        'inline-flex h-5 min-w-6 items-center justify-center rounded-full px-1 text-footnote font-semibold tabular-nums',
+                        enFoco ? 'bg-primary text-primary-foreground' : 'text-foreground',
+                      )}
+                    >
+                      {u.unidad || '·'}
+                    </span>
+                  )
+                })}
+              </span>
+            )
+          })}
+        </div>
+      ))}
+      {ocultas > 0 && (
+        <span className="text-footnote text-muted-foreground">+{ocultas} {ocultas === 1 ? 'familia' : 'familias'}</span>
+      )}
+    </div>
+  )
+}
