@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('@/services/firebase', () => ({ auth: { currentUser: { uid: 'u1' } }, db: {}, storage: {} }))
-vi.mock('firebase/storage', () => ({ ref: vi.fn(), uploadBytesResumable: vi.fn(), getDownloadURL: vi.fn() }))
+vi.mock('firebase/storage', () => ({ ref: vi.fn(), uploadBytesResumable: vi.fn(), getDownloadURL: vi.fn(), deleteObject: vi.fn() }))
 vi.mock('firebase/firestore', () => ({ addDoc: vi.fn(), collection: vi.fn(), serverTimestamp: vi.fn() }))
 vi.mock('@/hooks/repuestos/useManualesDeEquipos', () => ({ useManualesDeEquipos: () => ({ manuales: [], loading: false }) }))
 vi.mock('@/hooks/useGlobalEquipmentSearch', () => ({
