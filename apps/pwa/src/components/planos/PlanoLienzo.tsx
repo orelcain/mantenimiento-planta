@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { geometriaGiro, type Giro } from '@/utils/giroPlano'
+import { esCajaRespaldo } from '@/utils/recorridoPlano'
 import type { Caja, PlanoBorne, PlanoBorneLibre, PlanoHoja, PlanoHojaMeta, PlanoRotulo } from '@/hooks/usePlano'
 
 export type { Giro }
@@ -120,6 +121,8 @@ export function PlanoLienzo({
   useEffect(() => {
     if (!foco) return
     if (foco.tipo === 'caja') {
+      // Sin ubicación real: se ve la hoja entera, no un acercamiento al centro.
+      if (esCajaRespaldo(foco.b, meta.vb)) { ajustar(); return }
       const [x, y, w, h] = foco.b
       acercarA(x + w / 2, y + h / 2, ESCALA_APARATO, [w, h])
     } else {
@@ -130,7 +133,7 @@ export function PlanoLienzo({
       const t = setTimeout(() => setPulso(null), 1600)
       return () => clearTimeout(t)
     }
-  }, [foco, meta, H, acercarA])
+  }, [foco, meta, H, acercarA, ajustar])
 
   useEffect(() => {
     const onResize = () => ajustar()
@@ -299,7 +302,7 @@ export function PlanoLienzo({
 
           {mostrarEs && <CapaCastellano terms={hoja.terms} />}
 
-          {foco?.tipo === 'caja' && (
+          {foco?.tipo === 'caja' && !esCajaRespaldo(foco.b, meta.vb) && (
             <rect x={foco.b[0] - 2.5} y={foco.b[1] - 2.5} width={foco.b[2] + 5} height={foco.b[3] + 5}
                   rx={2} fill="none" stroke="var(--lc-aqua-bright)" strokeWidth={1.6} />
           )}

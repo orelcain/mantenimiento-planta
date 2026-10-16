@@ -25,7 +25,7 @@ import { usePlanoGiros } from '@/hooks/usePlanoGiros'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 import { RecorridoUbicaciones } from '@/components/planos/RecorridoUbicaciones'
 import {
-  indiceInicial, leerRecientes, mismaCaja, ordenarPuntos, paso, sumarReciente, type BusquedaReciente,
+  esCajaRespaldo, indiceInicial, leerRecientes, mismaCaja, ordenarPuntos, paso, sumarReciente, type BusquedaReciente,
 } from '@/utils/recorridoPlano'
 import { compactarTramos, compararTags } from '@/utils/designaciones'
 import { coincideTitulo, etiquetaHoja } from '@/utils/hojas'
@@ -1245,6 +1245,13 @@ function Visor({ slug }: { slug: string }) {
             onFondo={() => setSel(null)}
             giro={giroHoja} onGirar={girarHoja}
           />
+          {foco?.tipo === 'caja' && esCajaRespaldo(foco.b, meta?.vb ?? []) && (
+            <p role="status"
+               className="pointer-events-none absolute left-1/2 top-3 z-10 max-w-[90%] -translate-x-1/2 rounded-ctl border px-3 py-2 text-center text-footnote"
+               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-prep)', color: 'var(--lc-ink)' }}>
+              {sel?.tipo === 'aparato' ? `La pos. ${sel.tag}` : 'Esta posición'} no está marcada en el dibujo: búscala por su número en la figura.
+            </p>
+          )}
         </main>
 
         <aside
