@@ -1294,6 +1294,7 @@ function Visor({ slug }: { slug: string }) {
             onRotulo={(r) => { seleccionar({ tipo: 'rotulo', r }); setFoco(null) }}
             onFondo={() => setSel(null)}
             giro={giroHoja} onGirar={girarHoja}
+            escalaFoco={esDespiece ? 2.2 : undefined}
           />
           {foco?.tipo === 'caja' && esCajaRespaldo(foco.b, meta?.vb ?? []) && (
             <p role="status"
