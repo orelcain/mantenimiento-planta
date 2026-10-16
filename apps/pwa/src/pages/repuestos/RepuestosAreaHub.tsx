@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Package, PackageCheck, PackageMinus, PackageX, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { quitarEquipoDeRepuesto } from '@/hooks/repuestos/quitarEquipo'
@@ -67,13 +67,15 @@ import { ExportReportModal, type SapEquipoContext } from '@/components/repuestos
 import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/repuestos'
 import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
 import { fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
-import { CLASE_LABEL, type MaterialClase, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
+import { CLASE_LABEL, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { indicePorSap, nombreVisiblePorSap, tituloOCodigo } from '@/utils/repuestos/nombrePorSap'
 import { cn } from '@/lib/utils'
+import { ResumenStockFila, type EstadoResumenStock } from '@/components/repuestos/ResumenStockFila'
+import { resumenStock } from '@/utils/repuestos/resumenStock'
 import { hayAlgoQueExportar } from '@/utils/repuestos/alcanceDeExportacion'
 import { Button as PButton, CellIcon, ListCell, ListGroup, SegmentedControl, Sheet as PSheet } from '@/components/piel'
 import { GaleriaRepuestos } from '@/components/repuestos/GaleriaRepuestos'
@@ -126,8 +128,6 @@ function ChipBarra({ activo, className, children, ...rest }: { activo: boolean; 
   )
 }
 
-type KpiTone = 'primary' | 'emerald' | 'amber' | 'red'
-
 /**
  * Fotos de una fila: las de bodega (reales del físico) primero, luego las del catálogo.
  * Con un equipo en foco, las capturas de manual de OTRA máquina se ocultan (una pieza
@@ -138,35 +138,6 @@ function fotosDeFila(
   equiposEnFoco?: readonly string[] | null,
 ): string[] {
   return [...(r.fotos ?? []), ...fotosParaEquipos(r.fotosCatalogo ?? [], r.equiposDeFoto, equiposEnFoco)].filter(Boolean)
-}
-
-const KPI_TONE: Record<KpiTone, { text: string; chip: string; ring: string; glow: string }> = {
-  primary: { text: 'text-brand-ink',      chip: 'bg-primary/10',      ring: 'ring-primary/20',      glow: 'from-primary/[0.07]' },
-  emerald: { text: 'text-ink-ok',  chip: 'bg-ink-ok/[0.15]',  ring: 'ring-ink-ok/20',  glow: 'from-ink-ok/[0.07]' },
-  amber:   { text: 'text-ink-warn',    chip: 'bg-fill-warning/[0.15]',    ring: 'ring-fill-warning/20',    glow: 'from-fill-warning/[0.07]' },
-  red:     { text: 'text-ink-crit',      chip: 'bg-fill-critical/[0.15]',      ring: 'ring-fill-critical/20',      glow: 'from-fill-critical/[0.07]' },
-}
-
-function KpiCard({ value, label, hint, icon: Icon, tone }: {
-  value: string | number; label: string; hint?: string; icon: typeof Package; tone: KpiTone
-}) {
-  const t = KPI_TONE[tone]
-  return (
-    <div className="relative overflow-hidden rounded-card border border-border bg-card p-3 transition-colors hover:border-foreground/15 sm:p-4">
-      {/* tinte sutil de estado */}
-      <div className={['pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent', t.glow].join(' ')} />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className={['text-[length:calc(28px*var(--escala-texto,1))] font-normal leading-none tracking-[-0.01em] tabular-nums', t.text].join(' ')}>{value}</div>
-          <div className="mt-1.5 truncate text-footnote font-normal text-muted-foreground">{label}</div>
-        </div>
-        <div className={['flex h-9 w-9 shrink-0 items-center justify-center rounded-card ring-1 ring-inset', t.chip, t.ring].join(' ')}>
-          <Icon className={['h-[18px] w-[18px]', t.text].join(' ')} strokeWidth={2.25} />
-        </div>
-      </div>
-      {hint && <div className="relative mt-2.5 text-footnote font-normal text-muted-foreground">{hint}</div>}
-    </div>
-  )
 }
 
 /** Prellenado de creación al llegar desde la pestaña Códigos fabricante. */
@@ -349,11 +320,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // Faceta de equipo (chips sobre los resultados): reemplaza al desplegable «Todos los equipos».
   const [facetaEquipo, setFacetaEquipo] = useState<Faceta | null>(null)
   // «Bajo o sin stock»: chip de la barra (atajo de lo más pedido en planta).
-  const [repBajoOSin, setRepBajoOSin] = useState(false)
+  // «común sin stock» de la fila de resumen: solo vale junto con stock = 'out' (ver comunSinStockActivo).
+  const [repComunSinStock, setRepComunSinStock] = useState(false)
   const [filtrosOpen, setFiltrosOpen] = useState(false)
   // Móvil: KPIs y filtros arrancan colapsados — entre el usuario y la primera
   // fila de repuestos había ~2 pantallas de dashboard. En desktop no aplica.
-  const [mobileExtrasOpen, setMobileExtrasOpen] = useState(false)
   const [repStockFilter, setRepStockFilter] = useState<StockFilter>('all')
   const [repTipoFilter, setRepTipoFilter] = useState<string>('all')
   const [repClaseFilter, setRepClaseFilter] = useState<string>('all')
@@ -894,47 +865,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   })), [scopedRepuestos])
 
 
-  const stockKpis = useMemo(() => {
-    let ok = 0, low = 0, out = 0
-    for (const r of scopedRepuestos) {
-      if (r.stockStatus === 'ok') ok++
-      else if (r.stockStatus === 'low') low++
-      else if (r.stockStatus === 'out') out++
-    }
-    const total = scopedRepuestos.length // todos los repuestos del alcance (con y sin SAP)
-    const configurados = ok + low + out // solo los que tienen stock configurado (SAP en bodega)
-    // Los % de stock son relativos a los configurados, no al total (que incluye sin-SAP)
-    const pct = (n: number) => (configurados > 0 ? Math.round((n / configurados) * 100) : 0)
-    return { total, configurados, ok, low, out, pctOk: pct(ok), pctLow: pct(low), pctOut: pct(out) }
-  }, [scopedRepuestos])
-
-  // KPIs de catálogo (cobertura): con/sin SAP, tipos distintos, valor referencial
-  const catalogStats = useMemo(() => {
-    let conSAP = 0
-    let valor = 0
-    const tipos = new Set<string>()
-    const claseCount = new Map<MaterialClase, number>()
-    for (const r of scopedRepuestos) {
-      if (r.codigoSAP) conSAP++
-      tipos.add(tipoLabelOf(r.tipo))
-      valor += (r.costoCompra ?? r.valorUnitario ?? 0) * (r.stockActual || 0)
-      if (r.clase) claseCount.set(r.clase, (claseCount.get(r.clase) ?? 0) + 1)
-    }
-    const total = scopedRepuestos.length
-    // Desglose por clase, ordenado por frecuencia (para la línea de composición del header)
-    const clases = [...claseCount.entries()]
-      .map(([clase, count]) => ({ clase, count }))
-      .sort((a, b) => b.count - a.count)
-    return {
-      conSAP,
-      sinSAP: total - conSAP,
-      pctSAP: total > 0 ? Math.round((conSAP / total) * 100) : 0,
-      tipos: tipos.size,
-      valor,
-      clases,
-    }
-  }, [scopedRepuestos])
-
   // Qué equipo nombra la columna «Equipo» cuando hay foco o faceta (ver equipoParaMostrar).
   const equipoEnFaceta = useCallback(
     (e: { machineId: string; machineName: string }, f: Faceta) =>
@@ -998,16 +928,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     return new Set(favLists.find((x) => x.name === listFilter)?.repuestoIds ?? [])
   }, [listFilter, favLists])
 
+  const comunSinStockActivo = repComunSinStock && repStockFilter === 'out'
+
   /** Filtros de la hoja y de la barra, salvo el que se omite (para contar sus opciones). */
   const pasaFiltros = useCallback((r: AreaRepuestoRow, omitir?: 'clase' | 'tipo' | 'stock' | 'lista'): boolean => {
     if (repConFotos && fotosDeFila(r).length === 0) return false
     if (omitir !== 'lista' && idsDeLista && !idsDeLista.has(r.rowKey)) return false
     if (omitir !== 'stock' && repStockFilter !== 'all' && r.stockStatus !== repStockFilter) return false
-    if (repBajoOSin && r.stockStatus !== 'low' && r.stockStatus !== 'out') return false
+    if (omitir !== 'stock' && comunSinStockActivo && !esComun(r)) return false
     if (omitir !== 'clase' && repClaseFilter !== 'all' && (r.clase || 'repuesto') !== repClaseFilter) return false
     if (omitir !== 'tipo' && repTipoFilter !== 'all' && tipoLabelOf(r.tipo) !== repTipoFilter) return false
     return true
-  }, [repConFotos, idsDeLista, repStockFilter, repBajoOSin, repClaseFilter, repTipoFilter])
+  }, [repConFotos, idsDeLista, repStockFilter, comunSinStockActivo, repClaseFilter, repTipoFilter])
 
   // Los equipos que definen el alcance de un repuesto: la máquina del árbol o la faceta de equipo.
   const equiposDelAlcance = useCallback((r: AreaRepuestoRow, f: Faceta | null) => {
@@ -1070,6 +1002,23 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     const filas = facetaEfectiva ? base.filter((r) => filtraPorFaceta(r, facetaEfectiva, plantaDe)) : base
     return contarCon(filas, (r) => { const m = marcasDe(r, facetaEfectiva); return m.comun || m.mia })
   }, [baseSinFav, repSoloSap, facetaEfectiva, plantaDe, marcasDe])
+
+  // Resumen de la fila de stock: lo que se ve con TODOS los filtros menos el de stock (así tocar un
+  // estado no deja a los demás en cero). Mismo orden que filteredRep: búsqueda/filtros → SAP → faceta → favoritos.
+  const resumenVisible = useMemo(() => {
+    const sinStock = scopedRepuestos.filter((r) => (!coincideBusqueda || coincideBusqueda.has(r.rowKey)) && pasaFiltros(r, 'stock'))
+    const conSap = repSoloSap ? sinStock.filter((r) => !esDespiece(r)) : sinStock
+    const enFaceta = facetaEfectiva ? conSap.filter((r) => filtraPorFaceta(r, facetaEfectiva, plantaDe)) : conSap
+    return resumenStock(aplicaFavoritos(enFaceta, facetaEfectiva), esComun)
+  }, [scopedRepuestos, coincideBusqueda, pasaFiltros, repSoloSap, facetaEfectiva, plantaDe, aplicaFavoritos])
+  const estadoResumenActivo: EstadoResumenStock = comunSinStockActivo ? 'comunSinStock'
+    : repStockFilter === 'ok' || repStockFilter === 'low' || repStockFilter === 'out' ? repStockFilter : null
+  /** Tocar un estado lo fija; tocar el activo lo quita. «Común sin stock» = sin stock + solo comunes. */
+  const elegirEstadoResumen = (e: Exclude<EstadoResumenStock, null>) => {
+    if (estadoResumenActivo === e) { setRepStockFilter('all'); setRepComunSinStock(false); return }
+    setRepStockFilter(e === 'comunSinStock' ? 'out' : e)
+    setRepComunSinStock(e === 'comunSinStock')
+  }
 
   // Qué equipo nombra la columna «Equipo» cuando hay foco o faceta (ver equipoParaMostrar).
   const preferirEquipo = useMemo(() => {
@@ -1145,14 +1094,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     (repClaseFilter !== 'all' ? 1 : 0) +
     (repTipoFilter !== 'all' ? 1 : 0) +
     (repStockFilter !== 'all' ? 1 : 0) +
+    (comunSinStockActivo ? 1 : 0) +
     (!repSoloSap ? 1 : 0) +
     (listFilter !== 'all' ? 1 : 0)
   const limpiarFiltrosHoja = () => {
-    setRepClaseFilter('all'); setRepTipoFilter('all'); setRepStockFilter('all'); setRepSoloSap(true); setListFilter('all')
+    setRepClaseFilter('all'); setRepTipoFilter('all'); setRepStockFilter('all'); setRepComunSinStock(false); setRepSoloSap(true); setListFilter('all')
   }
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, facetaEfectiva, repStockFilter, repBajoOSin, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repConFotos, listFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, facetaEfectiva, repStockFilter, repComunSinStock, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repConFotos, listFilter, repPageSize])
   // La faceta de equipo es de ESTA búsqueda: al cambiar de área o de texto, se reinicia.
   useEffect(() => { setFacetaEquipo(null) }, [selectedAreaId, showingAll, repQuery])
 
@@ -1875,7 +1825,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       repClaseFilter !== 'all' ? `Clase: ${CLASE_LABEL[repClaseFilter as keyof typeof CLASE_LABEL] ?? repClaseFilter}` : '',
       repTipoFilter !== 'all' ? `Tipo: ${repTipoFilter}` : '',
       repStockFilter !== 'all' ? `Stock: ${({ ok: 'Disponible', low: 'Bajo', out: 'Sin stock', unset: 'Sin config.' } as Record<string, string>)[repStockFilter] ?? repStockFilter}` : '',
-      repBajoOSin ? 'Bajo o sin stock' : '',
+      comunSinStockActivo ? 'Solo comunes' : '',
       repFavOnly ? 'Favoritos' : '',
       repConFotos ? 'Con fotos' : '',
       listFilter !== 'all' ? `Lista: ${listFilter}` : '',
@@ -1930,7 +1880,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSelectedEquipName('')
     setSelectedRowKey(null)
     // Filtros que ya no se ven desde la entrada: si quedaran puestos, un SAP reciente podría dar cero resultados.
-    setRepStockFilter('all'); setRepClaseFilter('all'); setRepFavOnly(false); setRepBajoOSin(false)
+    setRepStockFilter('all'); setRepClaseFilter('all'); setRepFavOnly(false); setRepComunSinStock(false)
     setRepConFotos(false); setListFilter('all'); setRepSoloSap(true)
   }
   const abrirRecienteEntrada = (r: RecienteRepuesto) => {
@@ -2329,50 +2279,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             </div>
           )}
 
-          {/* KPIs — en móvil el grid de 4 cards + stats empujaba la lista ~2
-              pantallas abajo: se reemplaza por un strip de una línea (mismos
-              datos, chequeables de un vistazo) y las cards quedan tras el
-              toggle "KPIs y filtros". Desktop: sin cambios. */}
-          <div className="mb-3 flex items-center justify-between gap-2 sm:hidden">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-fill-ok" /><b>{repuestosBusy ? '…' : stockKpis.ok}</b></span>
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-fill-warning" /><b>{repuestosBusy ? '…' : stockKpis.low}</b></span>
-              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-fill-critical" /><b>{repuestosBusy ? '…' : stockKpis.out}</b></span>
-              <span className="text-muted-foreground"><b className="text-foreground">{repuestosBusy ? '…' : catalogStats.conSAP}</b> con SAP</span>
-            </div>
-            <Button
-              variant={mobileExtrasOpen ? 'default' : 'outline'}
-              size="sm"
-              className="h-11 shrink-0 gap-1.5"
-              onClick={() => setMobileExtrasOpen((v) => !v)}
-            >
-              <Settings2 className="h-4 w-4" /> KPIs
-            </Button>
-          </div>
+          {/* Resumen de stock de lo que se ve (sigue búsqueda, área, faceta y filtros, salvo el propio de stock). */}
+          <ResumenStockFila
+            resumen={resumenVisible}
+            activo={estadoResumenActivo}
+            onElegir={elegirEstadoResumen}
+            cargando={repuestosBusy}
+          />
 
-          <div className={[mobileExtrasOpen ? 'grid' : 'hidden', 'mb-6 grid-cols-2 gap-3 sm:grid sm:grid-cols-4'].join(' ')}>
-            <KpiCard value={repuestosBusy ? '…' : catalogStats.conSAP} label="Repuestos con SAP" icon={Package} tone="primary" hint={repuestosBusy ? undefined : `+${catalogStats.sinSAP} despiece sin SAP`} />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" icon={PackageCheck} tone="emerald" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}% del stock`} />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" icon={PackageMinus} tone="amber" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}% del stock`} />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" icon={PackageX} tone="red" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}% del stock`} />
-          </div>
-
-          {/* KPIs de catálogo (cobertura) */}
-          {!repuestosBusy && stockKpis.total > 0 && (
-            <div className={[mobileExtrasOpen ? 'flex' : 'hidden', 'mb-6 -mt-2 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground sm:flex'].join(' ')}>
-              <span><b className="text-foreground tabular-nums">{catalogStats.conSAP}</b> con SAP <span className="opacity-60">({catalogStats.pctSAP}%)</span></span>
-              <span className="opacity-40">·</span>
-              <span><b className="text-foreground tabular-nums">{catalogStats.sinSAP}</b> sin SAP</span>
-              <span className="opacity-40">·</span>
-              <span><b className="text-foreground tabular-nums">{catalogStats.tipos}</b> tipos distintos</span>
-              {catalogStats.valor > 0 && (
-                <>
-                  <span className="opacity-40">·</span>
-                  <span>valor inventario <b className="text-foreground tabular-nums">${catalogStats.valor.toLocaleString('es-CL')}</b></span>
-                </>
-              )}
-            </div>
-          )}
 
           {/* (Fase 4 normalización) La sección "Motores y bombas del área" se eliminó:
               los motores/bombas físicos ahora son repuestos de la colección plana y
@@ -2396,9 +2310,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 >
                   <Star className={['size-4', repFavOnly ? 'fill-current' : ''].join(' ')} aria-hidden /> Favoritos
                   {(favoritosEnScope > 0 || repFavOnly) && <span className="text-footnote font-normal tabular-nums opacity-80">{favoritosEnScope}</span>}
-                </ChipBarra>
-                <ChipBarra activo={repBajoOSin} onClick={() => setRepBajoOSin((v) => !v)} title="Repuestos con stock bajo o agotado">
-                  Bajo o sin stock
                 </ChipBarra>
                 <ChipBarra activo={repConFotos} onClick={() => setRepConFotos((v) => !v)} className={repConFotos ? '' : 'md:hidden'}>
                   <ImageIcon className="size-4" aria-hidden /> Con fotos
@@ -2831,7 +2742,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         onTipo={setRepTipoFilter}
         stocks={opcionesHoja?.stocks ?? []}
         stock={repStockFilter}
-        onStock={(v) => setRepStockFilter(v as StockFilter)}
+        onStock={(v) => { setRepStockFilter(v as StockFilter); setRepComunSinStock(false) }}
         despieceSinSap={opcionesHoja?.despiece ?? 0}
         incluirSinSap={!repSoloSap}
         onIncluirSinSap={(v) => setRepSoloSap(!v)}
