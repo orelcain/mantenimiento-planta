@@ -56,4 +56,17 @@ describe('ChipsEquipo', () => {
     expect(screen.getByRole('button', { name: /Knuro/ }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: /Todos/ }).getAttribute('aria-pressed')).toBe('false')
   })
+
+  it('con muchos equipos muestra 8 y «N más» que despliega el resto', () => {
+    const muchas = Array.from({ length: 11 }, (_, i) => ({
+      rowKey: `r${i}`,
+      equipos: [{ machineId: `m${i}`, machineName: `EQUIPO ${String.fromCharCode(65 + i)}` }],
+    }))
+    render(<ChipsEquipo rows={muchas} plantaDe={() => 'PLANTA CHONCHI'} faceta={null} onChange={vi.fn()} />)
+    const chips = () => screen.getAllByRole('button').filter((b) => b.hasAttribute('aria-pressed'))
+    expect(chips()).toHaveLength(1 + 8) // «Todos» + 8
+    fireEvent.click(screen.getByRole('button', { name: '3 más' }))
+    expect(chips()).toHaveLength(1 + 11)
+    expect(screen.getByRole('button', { name: 'Ver menos' })).toBeTruthy()
+  })
 })

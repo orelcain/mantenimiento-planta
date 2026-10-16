@@ -280,7 +280,8 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   // Equipos N:M donde se usa el material (nodeIds) y manuales heredados de ellos.
   const equiposReales = (item?.equipos ?? []).filter((e) => e.machineId)
   // Agrupado por PLANTA y familia: los equipos se llaman igual en las dos plantas.
-  const familiasEquipos = agruparDondeSeUsa(equiposReales, plantaDe)
+  // Sin plantas ocultas (Yal), igual que la lista y el teléfono.
+  const familiasEquipos = agruparDondeSeUsa(equiposVisiblesEnRepuestos(equiposReales, plantaDe), plantaDe)
   const totalEquiposUnicos = totalDondeSeUsa(familiasEquipos)
   // Teléfono: familias visibles (sin plantas ocultas) con detalle compacto, como en la lista.
   const [familiaAbierta, setFamiliaAbierta] = useState<string | null>(null)
