@@ -9,7 +9,15 @@ import { origenDeFoto } from '@/utils/repuestos/origenFoto'
 
 const ABRIR_MS = 300
 const CERRAR_MS = 150
-const ANCHO = 380
+// 3× la tarjeta original (380 px): los repuestos chicos del dibujo del manual se leen sin abrir
+// el visor (Orel, 16-10-2026: «un 200 % más»). Acotada a la pantalla.
+const ANCHO_MAX = 380 * 3
+// Si a un lado de la miniatura cabe al menos esto, va a ese lado; si no, se monta encima.
+const ANCHO_LADO_MIN = 640
+const PROPORCION_FOTO = 0.75
+// Encabezado (nombre + código) y relleno de la tarjeta, para que la foto quepa en el alto.
+const ALTO_CROMO = 84
+const ALTO_TIRA = 64
 const SEPARACION = 8
 const MARGEN = 8
 const QUERY_PC = '(hover: hover) and (pointer: fine)'
@@ -34,7 +42,7 @@ export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children, class
   const [abierta, setAbierta] = useState(false)
   const [visible, setVisible] = useState(false)
   const [activa, setActiva] = useState(0)
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  const [pos, setPos] = useState<{ left: number; top: number; ancho: number; altoFoto: number } | null>(null)
   const anclaRef = useRef<HTMLSpanElement>(null)
   const tarjetaRef = useRef<HTMLDivElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -66,15 +74,28 @@ export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children, class
   useLayoutEffect(() => {
     if (!abierta || !anclaRef.current) return
     const r = anclaRef.current.getBoundingClientRect()
-    const alto = tarjetaRef.current?.offsetHeight ?? 0
-    let left = r.right + SEPARACION
-    if (left + ANCHO > window.innerWidth - MARGEN) left = Math.max(MARGEN, r.left - SEPARACION - ANCHO)
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const derecha = vw - r.right - SEPARACION - MARGEN
+    const izquierda = r.left - SEPARACION - MARGEN
+    const ideal = Math.min(ANCHO_MAX, vw - 2 * MARGEN)
+    let ancho = ideal
+    let left: number
+    if (derecha >= ideal) left = r.right + SEPARACION
+    else if (izquierda >= ideal) left = r.left - SEPARACION - ideal
+    else if (Math.max(derecha, izquierda) >= ANCHO_LADO_MIN) {
+      ancho = Math.max(derecha, izquierda)
+      left = derecha >= izquierda ? r.right + SEPARACION : r.left - SEPARACION - ancho
+    } else left = Math.min(Math.max(MARGEN, r.left + r.width / 2 - ideal / 2), vw - ideal - MARGEN)
+    const tira = fotos.length > 1 ? ALTO_TIRA : 0
+    const altoFoto = Math.max(160, Math.min((ancho - 24) * PROPORCION_FOTO, vh - 2 * MARGEN - ALTO_CROMO - tira))
+    const alto = altoFoto + ALTO_CROMO + tira
     let top = r.top + r.height / 2 - alto / 2
-    top = Math.min(Math.max(MARGEN, top), Math.max(MARGEN, window.innerHeight - alto - MARGEN))
-    setPos({ left, top })
+    top = Math.min(Math.max(MARGEN, top), Math.max(MARGEN, vh - alto - MARGEN))
+    setPos({ left, top, ancho, altoFoto })
     const id = requestAnimationFrame(() => setVisible(true))
     return () => cancelAnimationFrame(id)
-  }, [abierta])
+  }, [abierta, fotos.length])
 
   useEffect(() => {
     if (!abierta) return
@@ -119,7 +140,7 @@ export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children, class
             position: 'fixed',
             left: pos?.left ?? 0,
             top: pos?.top ?? 0,
-            width: ANCHO,
+            width: pos?.ancho ?? ANCHO_MAX,
             opacity: visible || reducido ? 1 : 0,
             transform: visible || reducido ? 'translateX(0)' : 'translateX(-4px)',
             transition: reducido ? 'none' : 'opacity 200ms ease-out, transform 200ms ease-out',
@@ -131,7 +152,7 @@ export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children, class
             <p className="truncate text-footnote font-medium text-foreground">{nombre}</p>
             {codigo && <p className="font-mono text-footnote font-normal text-muted-foreground">{codigo}</p>}
           </div>
-          <div className="relative mx-auto h-[260px] w-[356px]">
+          <div className="relative mx-auto w-full" style={{ height: pos?.altoFoto ?? 260 }}>
             <button
               type="button"
               onClick={() => onAbrir(idx)}
