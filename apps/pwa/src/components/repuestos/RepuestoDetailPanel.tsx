@@ -129,7 +129,7 @@ function ActionBtn({ icon: Icon, label, onClick, danger, contenido }: {
       ].join(' ')}
     >
       {senal && tiene && (
-        <span className="absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold leading-none text-primary-foreground">
+        <span className="absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-medium leading-none text-primary-foreground">
           {cuantos ?? '✓'}
         </span>
       )}
@@ -520,17 +520,17 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
         <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border text-center">
           <div className="bg-card px-2 py-3">
             <div className="text-caption tracking-wide text-muted-foreground">Disponible</div>
-            <div className={['text-2xl font-bold tabular-nums', item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'].join(' ')}>
+            <div className={['text-2xl font-medium tabular-nums', item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'].join(' ')}>
               {item.bodegaId ? item.stockActual : '—'}
             </div>
           </div>
           <div className="bg-card px-2 py-3">
             <div className="text-caption tracking-wide text-muted-foreground">Mínimo</div>
-            <div className="text-2xl font-bold tabular-nums text-foreground">{item.bodegaId ? item.stockMinimo : '—'}</div>
+            <div className="text-2xl font-medium tabular-nums text-foreground">{item.bodegaId ? item.stockMinimo : '—'}</div>
           </div>
           <div className="bg-card px-2 py-3">
             <div className="text-caption tracking-wide text-muted-foreground">Máximo</div>
-            <div className="text-2xl font-bold tabular-nums text-foreground">{item.stockMaximo ?? '—'}</div>
+            <div className="text-2xl font-medium tabular-nums text-foreground">{item.stockMaximo ?? '—'}</div>
           </div>
         </div>
 
@@ -554,7 +554,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
             ) : (
               <div className="rounded-card border border-transparent bg-primary/5 p-2">
                 <div className="mb-1.5 text-caption text-muted-foreground">
-                  Antes había <span className="font-bold text-foreground">{item.bodegaId ? item.stockActual : 0}</span>. ¿Cuántas hay ahora? (0 = no había)
+                  Antes había <span className="font-medium text-foreground">{item.bodegaId ? item.stockActual : 0}</span>. ¿Cuántas hay ahora? (0 = no había)
                 </div>
                 <div className="flex gap-2">
                   <Input
@@ -709,7 +709,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
           <div className="px-4 pt-1">
             {nv.esComun ? (
               <>
-                <h2 className="text-title2 font-bold text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+                <h2 className="text-title2 font-medium text-foreground">{etiquetasNombre}{nv.titulo}</h2>
                 {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
                   <InlineEditName
                     value={item.textoBreve || ''}
@@ -724,7 +724,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                 ))}
               </>
             ) : isAdmin && onRename ? (
-              <h2 className="text-title2 font-bold text-foreground">
+              <h2 className="text-title2 font-medium text-foreground">
                 {etiquetasNombre}
                 <InlineEditName
                   value={item.textoBreve || ''}
@@ -732,12 +732,12 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                   onSave={onRename}
                   canEdit
                   placeholder="(sin nombre)"
-                  textClassName="text-title2 font-bold"
-                  inputClassName="text-title2 font-bold"
+                  textClassName="text-title2 font-medium"
+                  inputClassName="text-title2 font-medium"
                 />
               </h2>
             ) : (
-              <h2 className="text-title2 font-bold text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+              <h2 className="text-title2 font-medium text-foreground">{etiquetasNombre}{nv.titulo}</h2>
             )}
           </div>
           {/* SAP + copiar (44×44: a la derecha hay espacio) */}
@@ -759,7 +759,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               <>
                 <span className={['size-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-ink-crit' : item.stockStatus === 'low' ? 'bg-ink-warn' : 'bg-ink-ok'].join(' ')} aria-hidden />
                 <span>
-                  <b className={['font-semibold tabular-nums', tonoStock].join(' ')}>{item.stockActual} {item.unidad || 'pzas'}</b>
+                  <b className={['font-medium tabular-nums', tonoStock].join(' ')}>{item.stockActual} {item.unidad || 'pzas'}</b>
                   {item.stockStatus === 'out' ? ' · sin stock' : item.stockStatus === 'low' ? ' · bajo mínimo' : ' disponibles'} · {bodega}
                 </span>
               </>
@@ -864,7 +864,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   return (
     <aside
       style={isDesktop ? { width } : undefined}
-      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:static sm:z-auto sm:w-auto sm:shrink-0 relative"
+      className="tipo-ingenieria fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:static sm:z-auto sm:w-auto sm:shrink-0 relative"
     >
       {/* Asa de arrastre para ajustar el ancho (solo desktop) */}
       <div
@@ -875,7 +875,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
       />
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <span className="text-caption font-bold tracking-wider text-muted-foreground">Detalle del repuesto</span>
+        <span className="text-caption font-medium tracking-wider text-muted-foreground">Detalle del repuesto</span>
         <div className="flex items-center gap-1">
           {onToggleFavorite && (
             <button
@@ -913,7 +913,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
         {/* Nombre + SAP */}
         {nv.esComun ? (
           <>
-            <h2 className="text-base font-bold leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+            <h2 className="text-base font-medium leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
             {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
               <InlineEditName
                 value={item.textoBreve || ''}
@@ -929,7 +929,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
             ))}
           </>
         ) : isAdmin && onRename ? (
-          <h2 className="text-base font-bold leading-tight text-foreground">
+          <h2 className="text-base font-medium leading-tight text-foreground">
             {etiquetasNombre}
             <InlineEditName
               value={item.textoBreve || ''}
@@ -937,12 +937,12 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               onSave={onRename}
               canEdit
               placeholder="(sin nombre)"
-              textClassName="text-base font-bold leading-tight text-foreground"
-              inputClassName="text-base font-bold leading-tight"
+              textClassName="text-base font-medium leading-tight text-foreground"
+              inputClassName="text-base font-medium leading-tight"
             />
           </h2>
         ) : (
-          <h2 className="text-base font-bold leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+          <h2 className="text-base font-medium leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
         )}
         <div className="mb-3 mt-1.5 flex flex-wrap items-center gap-2">
           {item.clase && (
@@ -969,7 +969,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
             (mín/máx/conteo) sigue abajo; esto es el resumen de un vistazo. */}
         {item.bodegaId && (
           <div className="mb-3 flex items-center justify-between gap-2 rounded-card border border-border bg-muted px-3 py-2">
-            <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium tabular-nums">
               <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-fill-critical' : item.stockStatus === 'low' ? 'bg-fill-warning' : 'bg-fill-ok'].join(' ')} />
               <span className={item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'}>
                 {item.stockActual} {item.unidad || 'pzas'}

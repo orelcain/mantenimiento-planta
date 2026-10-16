@@ -58,8 +58,8 @@ function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => v
     >
       <span
         className={cn(
-          'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-subhead font-medium',
-          activo ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground',
+          'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-[length:calc(14px*var(--escala-texto,1))]',
+          activo ? 'bg-primary font-medium text-primary-foreground' : 'bg-card font-normal text-foreground',
         )}
       >
         {children}
@@ -75,7 +75,7 @@ function Cuenta({ n, activo }: { n: number; activo: boolean }) {
 function Grupo({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-1">
-      <h3 className="px-1 text-subhead font-semibold">{titulo}</h3>
+      <h3 className="px-1 text-subhead font-medium">{titulo}</h3>
       {children}
     </section>
   )
@@ -110,7 +110,7 @@ export function FiltrosRepuestosSheet(p: FiltrosRepuestosSheetProps) {
         </Button>
       }
     >
-      <div className="flex flex-col gap-4 pb-2">
+      <div className="tipo-ingenieria flex flex-col gap-4 pb-2">
         {clases.length > 1 && (
           <Grupo titulo="Clase">
             <div className="-my-1 flex flex-wrap gap-x-2">
@@ -137,7 +137,7 @@ export function FiltrosRepuestosSheet(p: FiltrosRepuestosSheetProps) {
                 <button
                   type="button"
                   onClick={() => setVerTodosTipos((v) => !v)}
-                  className="inline-flex min-h-[44px] items-center px-2 text-subhead font-medium text-brand-ink"
+                  className="inline-flex min-h-[44px] items-center px-2 text-[length:calc(14px*var(--escala-texto,1))] font-medium text-brand-ink"
                 >
                   {verTodosTipos ? 'Ver menos' : `Ver los ${tipos.length}`}
                 </button>
@@ -166,7 +166,7 @@ export function FiltrosRepuestosSheet(p: FiltrosRepuestosSheetProps) {
             className="flex min-h-[56px] w-full items-center gap-3 rounded-card bg-card px-4 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-body font-semibold">
+              <span className="text-body font-medium">
                 Piezas de despiece sin SAP <span className="font-normal tabular-nums text-muted-foreground">({p.despieceSinSap.toLocaleString('es-CL')})</span>
               </span>
               <span className="text-footnote text-muted-foreground">Piezas del dibujo que aún no tienen código SAP</span>

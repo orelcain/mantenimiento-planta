@@ -45,7 +45,7 @@ interface Props<T extends FilaGaleria> {
 function PuntoStock({ meta }: { meta: StockMetaGaleria | undefined }) {
   if (!meta) return null
   return (
-    <span className={`inline-flex items-center gap-1.5 text-caption ${meta.text}`}>
+    <span className={`inline-flex items-center gap-1.5 text-footnote font-normal ${meta.text}`}>
       <span aria-hidden className={`size-2 rounded-full ${meta.dot}`} />
       {meta.label}
     </span>
@@ -70,7 +70,7 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="tipo-ingenieria flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:gap-3">
         {mostrados.map(({ row, fotos }) => {
           const { titulo, oficial } = nombre(row)
@@ -105,7 +105,7 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
                     </FotosHoverCard>
                     {origen !== 'otra' && (
                       <span
-                        className={`pointer-events-none absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-caption font-semibold ${
+                        className={`pointer-events-none absolute bottom-2 left-2 rounded-full px-2 py-0.5 text-nota font-medium ${
                           origen === 'bodega' ? 'bg-primary/15 text-brand-ink' : 'bg-warning/15 text-ink-warn'
                         }`}
                       >
@@ -113,7 +113,7 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
                       </span>
                     )}
                     {fotos.length > 1 && (
-                      <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-caption font-semibold tabular-nums text-white">
+                      <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-nota font-medium tabular-nums text-white">
                         {fotos.length}
                       </span>
                     )}
@@ -126,7 +126,7 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
                         type="button"
                         aria-label={`Agregar foto a ${titulo}`}
                         onClick={() => onAgregarFoto(row)}
-                        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-caption font-semibold text-primary"
+                        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3 text-nota font-medium text-primary"
                       >
                         <Camera aria-hidden className="size-4" /> Agregar foto
                       </button>
@@ -141,9 +141,9 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
                 onClick={() => onAbrirFicha(row)}
                 className="flex min-h-[44px] w-full flex-col gap-0.5 px-2.5 py-2 text-left"
               >
-                <span className="line-clamp-2 text-footnote font-semibold leading-snug">{titulo}</span>
-                {oficial && <span className="line-clamp-1 text-caption text-muted-foreground">{oficial}</span>}
-                <span className="font-mono text-caption text-muted-foreground">{row.codigoSAP || '—'}</span>
+                <span className="line-clamp-2 text-footnote font-medium leading-snug">{titulo}</span>
+                {oficial && <span className="line-clamp-1 text-footnote font-normal text-muted-foreground">{oficial}</span>}
+                <span className="font-mono text-footnote font-normal text-muted-foreground">{row.codigoSAP || '—'}</span>
                 <PuntoStock meta={stockMeta[row.stockStatus]} />
               </button>
             </div>
@@ -155,7 +155,7 @@ export function GaleriaRepuestos<T extends FilaGaleria>({
         <button
           type="button"
           onClick={() => setLimite((l) => l + TARJETAS_POR_PAGINA)}
-          className="mx-auto flex min-h-[44px] items-center rounded-full bg-muted px-5 text-subhead font-medium"
+          className="mx-auto flex min-h-[44px] items-center rounded-full bg-muted px-5 text-[length:calc(14px*var(--escala-texto,1))] font-medium"
         >
           Mostrar más ({rows.length - limite})
         </button>
