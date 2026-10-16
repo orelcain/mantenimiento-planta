@@ -111,7 +111,7 @@ function FilaEquipo({ lista, item, planta, onQuitar }: {
       </div>
       {!item.quitar && <Pastilla planta={planta} />}
       {item.quitar ? (
-        <button type="button" onClick={onQuitar} className="flex min-h-[44px] items-center px-3 text-body font-semibold text-primary">
+        <button type="button" onClick={onQuitar} className="flex min-h-[44px] items-center px-3 text-body font-medium text-primary">
           Deshacer
         </button>
       ) : (
@@ -145,7 +145,7 @@ function EncabezadoLista({ lista, onRenombrar }: { lista: ListaBorrador; onRenom
       onBlur={confirmar}
       onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
       aria-label={`Nombre de la lista ${lista.nombre}`}
-      className="h-11 min-w-0 flex-1 truncate rounded-ctl bg-transparent px-2 text-subhead font-semibold focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="h-11 min-w-0 flex-1 truncate rounded-ctl bg-transparent px-2 text-subhead font-medium focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     />
   )
 }
@@ -188,7 +188,7 @@ function BloqueLista({ lista, plantaDe, onBorrador }: {
             <button
               type="button"
               onClick={() => onBorrador((b) => alternarEliminarLista(b, lista.key))}
-              className="flex min-h-[44px] items-center px-3 text-body font-semibold text-primary"
+              className="flex min-h-[44px] items-center px-3 text-body font-medium text-primary"
             >
               Deshacer
             </button>
@@ -390,7 +390,7 @@ export function EditarFavoritosSheet({
           </div>
         }
       >
-        <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-8">
+        <div className="tipo-ingenieria flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-8">
           <div className="flex flex-col gap-5">
             {borrador.length === 0 && (
               <p className="px-2 text-subhead text-muted-foreground">Aún no hay listas. Busca equipos y crea la primera.</p>
@@ -401,7 +401,7 @@ export function EditarFavoritosSheet({
           </div>
 
           <section className="flex flex-col gap-3" aria-label="Agregar equipos">
-            <h3 className="px-2 text-subhead font-semibold text-muted-foreground">Agregar equipos</h3>
+            <h3 className="px-2 text-subhead font-medium text-muted-foreground">Agregar equipos</h3>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground" aria-hidden />
               <input
@@ -441,7 +441,7 @@ export function EditarFavoritosSheet({
               </p>
             ) : grupos.map(([planta, filas]) => (
               <div key={planta} className="flex flex-col">
-                <h4 className="px-2 pb-1 text-footnote font-semibold text-muted-foreground">{planta}</h4>
+                <h4 className="px-2 pb-1 text-footnote font-medium text-muted-foreground">{planta}</h4>
                 <ul className="divide-y divide-border/60 overflow-hidden rounded-card bg-card">
                   {filas.map((r) => {
                     const ya = yaIds.has(r.id)
@@ -479,7 +479,7 @@ export function EditarFavoritosSheet({
             ))}
 
             <div className="flex flex-col gap-2">
-              <label className="px-2 text-footnote font-semibold text-muted-foreground" htmlFor="fav-destino">Agregar a la lista</label>
+              <label className="px-2 text-footnote font-medium text-muted-foreground" htmlFor="fav-destino">Agregar a la lista</label>
               <select
                 id="fav-destino"
                 value={destino}

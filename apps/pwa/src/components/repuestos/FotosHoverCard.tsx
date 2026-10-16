@@ -125,11 +125,11 @@ export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children, class
             transition: reducido ? 'none' : 'opacity 200ms ease-out, transform 200ms ease-out',
             visibility: pos ? 'visible' : 'hidden',
           }}
-          className="z-50 rounded-[26px] border border-border bg-card p-3 shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-none"
+          className="tipo-ingenieria z-50 rounded-[26px] border border-border bg-card p-3 shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-none"
         >
           <div className="mb-2 px-1">
-            <p className="truncate text-footnote font-semibold text-foreground">{nombre}</p>
-            {codigo && <p className="font-mono text-caption text-muted-foreground">{codigo}</p>}
+            <p className="truncate text-footnote font-medium text-foreground">{nombre}</p>
+            {codigo && <p className="font-mono text-footnote font-normal text-muted-foreground">{codigo}</p>}
           </div>
           <div className="relative mx-auto h-[260px] w-[356px]">
             <button
@@ -144,13 +144,13 @@ export function FotosHoverCard({ fotos, nombre, codigo, onAbrir, children, class
                 className={`h-full w-full ${origen === 'manual' ? 'bg-white object-contain' : 'object-cover'}`}
               />
             </button>
-            <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-card px-2 py-0.5 text-caption font-semibold tabular-nums text-foreground">
+            <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-card px-2 py-0.5 text-nota font-medium tabular-nums text-foreground">
               {idx + 1} de {total}
             </span>
             {origen !== 'otra' && (
               <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-card">
                 <span
-                  className={`block rounded-full px-2 py-0.5 text-caption font-semibold ${
+                  className={`block rounded-full px-2 py-0.5 text-nota font-medium ${
                     origen === 'bodega' ? 'bg-primary/15 text-brand-ink' : 'bg-warning/15 text-ink-warn'
                   }`}
                 >

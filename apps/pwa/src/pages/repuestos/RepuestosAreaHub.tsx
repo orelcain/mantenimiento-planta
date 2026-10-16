@@ -116,7 +116,7 @@ function ChipBarra({ activo, className, children, ...rest }: { activo: boolean; 
     <button type="button" aria-pressed={activo} {...rest} className={cn('group inline-flex min-h-[44px] shrink-0 items-center disabled:opacity-40', className)}>
       <span
         className={cn(
-          'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-subhead font-medium transition-colors',
+          'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-[length:calc(14px*var(--escala-texto,1))] font-medium transition-colors',
           activo ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground group-hover:bg-muted',
         )}
       >
@@ -157,14 +157,14 @@ function KpiCard({ value, label, hint, icon: Icon, tone }: {
       <div className={['pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent', t.glow].join(' ')} />
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className={['text-2xl font-bold leading-none tracking-tight tabular-nums sm:text-[27px]', t.text].join(' ')}>{value}</div>
-          <div className="mt-1.5 truncate text-caption font-medium text-muted-foreground sm:text-xs">{label}</div>
+          <div className={['text-[length:calc(28px*var(--escala-texto,1))] font-normal leading-none tracking-[-0.01em] tabular-nums', t.text].join(' ')}>{value}</div>
+          <div className="mt-1.5 truncate text-footnote font-normal text-muted-foreground">{label}</div>
         </div>
         <div className={['flex h-9 w-9 shrink-0 items-center justify-center rounded-card ring-1 ring-inset', t.chip, t.ring].join(' ')}>
           <Icon className={['h-[18px] w-[18px]', t.text].join(' ')} strokeWidth={2.25} />
         </div>
       </div>
-      {hint && <div className="relative mt-2.5 text-caption font-medium text-muted-foreground">{hint}</div>}
+      {hint && <div className="relative mt-2.5 text-footnote font-normal text-muted-foreground">{hint}</div>}
     </div>
   )
 }
@@ -1184,7 +1184,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const renderSortTh = (col: SortCol, label: string, className?: string) => (
     <th
       key={col}
-      className={['cursor-pointer select-none px-3 py-2 font-semibold transition-colors hover:text-foreground', className].filter(Boolean).join(' ')}
+      className={['cursor-pointer select-none px-3 py-2 text-nota font-medium transition-colors hover:text-foreground', className].filter(Boolean).join(' ')}
       onClick={() => toggleSort(col)}
     >
       <span className="inline-flex items-center gap-1">
@@ -1845,7 +1845,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // Si hay un equipo seleccionado, el título es el equipo (no el área); el área baja al breadcrumb.
   const title = selectedEquipKey
     ? (selectedEquipName || 'Equipo')
-    : (showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Selecciona un área'))
+    : (showingAll ? 'Todas las áreas' : (selectedNode ? (formatNombreSAP(selectedNode.nombre).nombre || selectedNode.nombre) : 'Selecciona un área'))
 
   // Marca «en BAADER 142 N2 · Chonchi» junto al buscador: dice que la búsqueda está acotada a una máquina.
   const nombreMaquinaFoco = formatNombreSAP(selectedEquipName).nombre || selectedEquipName
@@ -1952,7 +1952,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const celdaMenu = 'min-h-[52px]'
 
   return (
-    <div className="relative flex h-full bg-background">
+    <div className="tipo-ingenieria relative flex h-full bg-background">
       <AreaSidebar
         selectedAreaId={selectedAreaId}
         onSelectArea={handleSelectArea}
@@ -2096,7 +2096,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 if (v.trim() && !showingAll) setShowingAll(true)
               }}
               placeholder="Buscar SAP, repuesto, equipo o fabricante…"
-              className="h-11 pl-9"
+              className="h-11 pl-9 text-subhead font-normal"
             />
           </div>
           {marcaMaquina}
@@ -2274,7 +2274,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               )}
               <div className="flex items-center gap-2">
                 {selectedEquipKey && <Cog className="h-5 w-5 shrink-0 text-cat-7-ink" />}
-                <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
+                <h1 className="truncate text-title2 font-medium tracking-[-0.005em] text-foreground">{title}</h1>
                 {selectedNode && !repQuery.trim() && !selectedEquipKey && (
                   <Badge variant="secondary" className="tabular-nums">{eqCount} equipos</Badge>
                 )}
@@ -2406,7 +2406,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 <ChipBarra activo={false} onClick={() => setFiltrosOpen(true)} aria-haspopup="dialog">
                   <Settings2 className="size-4" aria-hidden /> Filtros
                   {filtrosActivos > 0 && (
-                    <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-footnote font-semibold tabular-nums text-primary-foreground">{filtrosActivos}</span>
+                    <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-footnote font-medium tabular-nums text-primary-foreground">{filtrosActivos}</span>
                   )}
                 </ChipBarra>
               </div>
@@ -2470,7 +2470,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <div className="overflow-hidden rounded-card border border-border">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="border-b border-border bg-muted text-left">
+                    <thead className="border-b border-border bg-muted text-left text-muted-foreground">
                       {/* En móvil solo Repuesto + favorito: la foto (96% sin foto)
                           y la columna Stock desbordaban el ancho — el stock va
                           como chip bajo el título (ver celda Repuesto). */}
@@ -2480,11 +2480,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         {renderSortTh('codigoFabricante', 'Cód. Fabricante', 'hidden md:table-cell')}
                         {renderSortTh('textoBreve', 'Repuesto')}
                         {/* Solo administración: el título ya es el primer nombre común; aquí van los demás y «+ agregar». */}
-                        {isAdmin && <th className="hidden px-3 py-2 font-semibold lg:table-cell">Otros nombres</th>}
+                        {isAdmin && <th className="hidden px-3 py-2 text-nota font-medium lg:table-cell">Otros nombres</th>}
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
                         {renderSortTh('stock', 'Stock', 'hidden md:table-cell')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
-                        <th className="hidden w-16 px-2 py-2 text-center font-semibold md:table-cell">Dibujo</th>
+                        <th className="hidden w-16 px-2 py-2 text-center text-nota font-medium md:table-cell">Dibujo</th>
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -2510,14 +2510,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           <Fragment key={r.rowKey}>
                           {showFavHeader && (
                             <tr className="bg-muted">
-                              <td colSpan={10} className="px-3 py-2 text-subhead font-semibold text-foreground">
+                              <td colSpan={10} className="px-3 py-2 text-subhead font-medium text-foreground">
                                 {seccionFav === 'comun' ? (etiquetaAlcance ? `Comunes de ${etiquetaAlcance}` : 'Comunes') : 'Mis estrellas'}
                               </td>
                             </tr>
                           )}
                           {showDespieceDivider && (
                             <tr className="bg-muted">
-                              <td colSpan={10} className="px-3 py-1.5 text-caption font-semibold tracking-wider text-muted-foreground">
+                              <td colSpan={10} className="px-3 py-1.5 text-nota font-medium text-muted-foreground">
                                 Piezas de despiece · sin código SAP
                               </td>
                             </tr>
@@ -2540,7 +2540,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 >
                                   <img src={fotos[0]} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110" />
                                   {fotos.length > 1 && (
-                                    <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-0.5 text-caption font-bold text-white">+{fotos.length - 1}</span>
+                                    <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-0.5 text-nota font-medium text-white">+{fotos.length - 1}</span>
                                   )}
                                 </button>
                                 </FotosHoverCard>
@@ -2550,7 +2550,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 </div>
                               )}
                             </td>
-                            <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">
+                            <td className="hidden px-3 py-2 font-mono text-footnote font-normal tabular-nums md:table-cell">
                               {r.codigoSAP ? (
                                 <span className="inline-flex items-center gap-1">
                                   {r.codigoSAP}
@@ -2565,7 +2565,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 </span>
                               ) : '-'}
                             </td>
-                            <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">
+                            <td className="hidden px-3 py-2 font-mono text-footnote font-normal tabular-nums md:table-cell">
                               {r.codigoFabricante
                                 ? <span className="text-muted-foreground">{r.codigoFabricante}</span>
                                 : <span className="text-muted-foreground/30">—</span>}
@@ -2575,7 +2575,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 {r.clase && (
                                   <span
                                     className={[
-                                      'shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground',
+                                      'shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 text-nota font-medium text-muted-foreground',
                                       // "Repuesto" es la clase del ~75% de las filas: en
                                       // móvil es ruido puro — solo se muestran las
                                       // distintas (insumo/herramienta/químico…).
@@ -2587,16 +2587,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   </span>
                                 )}
                                 {nv.etiquetas.map((et) => (
-                                  <span key={et} className="shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">{et}</span>
+                                  <span key={et} className="shrink-0 rounded-ctl bg-muted px-1.5 py-0.5 text-nota font-medium text-muted-foreground">{et}</span>
                                 ))}
-                                <span className="line-clamp-2 min-w-0 font-medium text-foreground">{nv.titulo}</span>
+                                <span className="line-clamp-2 min-w-0 text-subhead font-normal text-foreground">{nv.titulo}</span>
                                 {marcas && (
                                   <span className="inline-flex shrink-0 items-center gap-1">
                                     {marcas.comun && (
-                                      <span className="inline-flex items-center rounded-full bg-ink-ok/[0.15] px-2 py-0.5 text-footnote font-semibold text-ink-ok">Común</span>
+                                      <span className="inline-flex items-center rounded-full bg-ink-ok/[0.15] px-2 py-0.5 text-nota font-medium text-ink-ok">Común</span>
                                     )}
                                     {marcas.mia && (
-                                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-footnote font-semibold text-muted-foreground">
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-nota font-medium text-muted-foreground">
                                         <Star className="size-3 fill-current text-ink-warn" aria-hidden /> Mía
                                       </span>
                                     )}
@@ -2604,7 +2604,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 )}
                                 {!marcas && (isCommonPartSap(r.codigoSAP) || (r.comunEn?.length ?? 0) > 0) && (
                                   <span
-                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-ink-ok/[0.15] px-1.5 py-0.5 text-caption font-semibold text-ink-ok"
+                                    className="inline-flex shrink-0 items-center gap-0.5 rounded-ctl bg-ink-ok/[0.15] px-1.5 py-0.5 text-nota font-medium text-ink-ok"
                                     title={`Repuesto común / más usado de: ${[...new Set([...machinesForCommonSap(r.codigoSAP), ...(r.comunEn ?? [])])].map((s) => findMachineBySlug(s)?.name ?? s).join(', ')}`}
                                   >
                                     <Wrench className="h-3 w-3" /> común
@@ -2620,7 +2620,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   Stock está oculta: desbordaba el ancho y quedaba cortada) */}
                               <div className="mt-1 flex items-center gap-1.5 text-caption md:hidden">
                                 <span className={['h-2 w-2 shrink-0 rounded-full', meta.dot].join(' ')} />
-                                <span className="tabular-nums font-semibold">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
+                                <span className="tabular-nums font-normal">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
                                 <span className={meta.text}>{meta.label}</span>
                                 {r.ubicacionBodega && (
                                   <span className="text-muted-foreground">· <MapPin className="inline h-3 w-3" /> {r.ubicacionBodega}</span>
@@ -2668,7 +2668,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                     >
                                       <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
                                       {i === 2 && fotos.length > 3 && (
-                                        <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-subhead font-semibold text-white">+{fotos.length - 3}</span>
+                                        <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-subhead font-medium text-white">+{fotos.length - 3}</span>
                                       )}
                                     </button>
                                   ))}
@@ -2714,10 +2714,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               <DondeSeUsaPills equipos={r.equipos} plantaDe={plantaDe} enFocoId={selectedEquipMachineId} faceta={facetaEfectiva} totalUnidades={totalUnidades} />
                             </td>
                             <td className="hidden px-3 py-2 md:table-cell">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 text-footnote font-normal">
                                 <span className={['h-2 w-2 rounded-full', meta.dot].join(' ')} />
-                                <span className="tabular-nums font-medium">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
-                                <span className={['text-caption', meta.text].join(' ')}>{meta.label}</span>
+                                <span className="tabular-nums font-normal">{r.stockStatus === 'unset' ? '—' : r.stockActual}</span>
+                                <span className={meta.text}>{meta.label}</span>
                               </div>
                             </td>
                             <td className="hidden px-3 py-2 md:table-cell">

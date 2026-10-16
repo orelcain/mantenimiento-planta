@@ -38,7 +38,7 @@ describe('ChipsEquipo', () => {
     ]
     render(<ChipsEquipo rows={rows} plantaDe={plantaDe} faceta={null} onChange={vi.fn()} />)
     expect(screen.getByRole('button', { name: /Chonchi\s*3/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Quellon\s*1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Quellón\s*1/ })).toBeTruthy()
   })
 
   it('se oculta con 3 filas o menos', () => {

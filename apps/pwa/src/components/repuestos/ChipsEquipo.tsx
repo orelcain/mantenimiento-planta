@@ -8,6 +8,7 @@
  */
 import { useMemo } from 'react'
 import { facetasDeEquipo, ocultarFacetas, type Faceta, type FilaConEquipos } from '@/utils/repuestos/facetasEquipo'
+import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { cn } from '@/lib/utils'
 
 export interface ChipsEquipoProps {
@@ -29,8 +30,8 @@ function Chip({ activo, onClick, etiqueta, conteo }: { activo: boolean; onClick:
     >
       <span
         className={cn(
-          'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-subhead font-medium transition-colors',
-          activo ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground group-hover:bg-muted',
+          'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 text-[length:calc(14px*var(--escala-texto,1))] transition-colors',
+          activo ? 'bg-primary font-medium text-primary-foreground' : 'bg-card font-normal text-foreground group-hover:bg-muted',
         )}
       >
         {etiqueta}
@@ -55,7 +56,7 @@ export function ChipsEquipo({ rows, plantaDe, faceta, onChange, className }: Chi
           key={o.clave}
           activo={faceta?.nivel === facetas.nivel && faceta.clave === o.clave}
           onClick={() => onChange({ nivel: facetas.nivel, clave: o.clave })}
-          etiqueta={o.etiqueta}
+          etiqueta={formatNombreSAP(o.etiqueta).nombre || o.etiqueta}
           conteo={o.conteo}
         />
       ))}

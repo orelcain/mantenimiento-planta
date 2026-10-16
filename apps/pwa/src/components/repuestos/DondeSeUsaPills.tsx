@@ -60,7 +60,7 @@ export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamili
     <div className={cn('flex flex-col gap-1', className)} data-testid="donde-se-usa">
       {visibles.map((f) => (
         <div key={f.clave} className="flex flex-wrap items-center gap-1.5 text-footnote">
-          <span className="font-semibold text-foreground">{f.titulo}</span>
+          <span className="font-medium text-foreground">{f.titulo}</span>
           {f.grupos.map((g) => {
             const fuera = !!faceta && !grupoEnFaceta(g, faceta)
             const planta = variasPlantas ? plantaCorta(g.planta) : ''
@@ -73,11 +73,11 @@ export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamili
                 data-fuera={fuera ? 'true' : undefined}
                 className={cn('inline-flex items-center gap-0.5 rounded-full bg-muted py-0.5 pl-2 pr-1', fuera && 'opacity-55')}
               >
-                {planta && <span className="mr-1 font-semibold text-muted-foreground">{planta}</span>}
+                {planta && <span className="mr-1 font-medium text-muted-foreground">{planta}</span>}
                 {det.tipo === 'texto' && (
                   <span
                     data-en-foco={focoEnTexto ? 'true' : undefined}
-                    className={cn('inline-flex h-5 items-center rounded-full px-1.5 text-footnote font-semibold', focoEnTexto ? 'bg-primary text-primary-foreground' : 'text-foreground')}
+                    className={cn('inline-flex h-5 items-center rounded-full px-1.5 text-footnote font-medium', focoEnTexto ? 'bg-primary text-primary-foreground' : 'text-foreground')}
                   >
                     {det.texto}
                   </span>
@@ -90,7 +90,7 @@ export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamili
                       title={u.nombre}
                       data-en-foco={enFoco ? 'true' : undefined}
                       className={cn(
-                        'inline-flex h-5 min-w-6 items-center justify-center rounded-full px-1 text-footnote font-semibold tabular-nums',
+                        'inline-flex h-5 min-w-6 items-center justify-center rounded-full px-1 text-footnote font-normal tabular-nums',
                         enFoco ? 'bg-primary text-primary-foreground' : 'text-foreground',
                       )}
                     >

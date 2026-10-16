@@ -978,6 +978,12 @@
 }
 
 @layer utilities {
+  /* PRUEBA en Repuestos (15-10-2026): tipografía «ingeniería». Plex antes que Segoe para que
+     Windows/Android vean Plex; Apple sigue en SF Pro (DESIGN.md). Si se aprueba, pasa al token
+     global `sans` de tailwind.config.js y esta clase se elimina. */
+  .tipo-ingenieria {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "IBM Plex Sans", "Segoe UI Variable Text", system-ui, sans-serif;
+  }
   /* Fila horizontal de chips: se desplaza, sin barra visible (iOS no la muestra). */
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
