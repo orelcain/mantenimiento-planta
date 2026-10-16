@@ -117,11 +117,6 @@ export function RecorridoUbicaciones({
           })}
         </ol>
       )}
-      {!compacto && (
-        <p className="m-0 text-nota" style={{ color: 'var(--lc-ink-ghost)' }}>
-          Enter en el buscador: siguiente · Mayús + Enter: anterior
-        </p>
-      )}
     </section>
   )
 }
