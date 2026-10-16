@@ -582,7 +582,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [editarFav, setEditarFav] = useState<{ equipo?: { id: string; nombre: string } } | null>(null)
   const handleEquipStar = useCallback((machineId: string, _e: unknown, displayName?: string) => {
     if (isEquipFav(machineId)) {
-      toast({ title: 'Ya está en favoritos', description: 'Para quitarlo, usa «Editar» en Favoritos de equipos.' })
+      toast({ title: 'Ya está en favoritos', description: 'Para quitarlo, usa «Editar» en Mis equipos.' })
     } else {
       setEditarFav({ equipo: { id: machineId, nombre: displayName || machineId } })
     }
@@ -2159,31 +2159,34 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           <div className={entradaMovil ? 'hidden sm:contents' : 'contents'}>
           {/* Favoritos de equipos (listas con nombre) — colapsada por defecto, SOLO LECTURA; se edita desde la hoja (admin). */}
           {(equipFavLists.length > 0 || isAdmin) && (
-            <div className="mb-5 rounded-card border border-border bg-muted p-3 max-sm:hidden">
+            /* Una fila compacta del mismo estilo que el resto (antes: tarjeta de ~70 px con título de
+               11 px en negrita espaciada). «Mis equipos» para no confundirla con «★ Favoritos» (repuestos). */
+            <div className="mb-4 rounded-card border border-border bg-card px-3 max-sm:hidden">
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setFavBarOpen((v) => !v)}
-                  className="flex min-h-[44px] flex-1 items-center gap-1.5 text-caption font-bold tracking-wider text-muted-foreground"
+                  aria-expanded={favBarOpen}
+                  className="flex min-h-[44px] flex-1 items-center gap-2 text-subhead font-medium text-foreground"
                 >
-                  <Star className="h-3.5 w-3.5 fill-current text-muted-foreground" /> Favoritos de equipos
-                  {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
-                  <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
+                  <Star className="size-4 fill-current text-ink-warn" aria-hidden /> Mis equipos
+                  {equipFavLists.length > 0 && <span className="text-footnote font-normal tabular-nums text-muted-foreground">{equipFavTotal}</span>}
+                  <ChevronDown className={['size-4 text-muted-foreground transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} aria-hidden />
                 </button>
                 {isAdmin && (
                   <PButton variant="plain" onClick={() => setEditarFav({})}>Editar</PButton>
                 )}
               </div>
               {favBarOpen && (equipFavLists.length === 0 ? (
-                <p className="mt-2 pl-5 text-caption text-muted-foreground">Marca equipos con la estrella en «Estructura de equipos del área (admin)» o con «Editar» para crear listas.</p>
+                <p className="pb-3 pl-6 text-footnote text-muted-foreground">Marca equipos con la estrella en «Estructura de equipos del área (admin)» o con «Editar» para crear listas.</p>
               ) : (
-                <div className="mt-2 space-y-2">
+                <div className="space-y-1 pb-3">
                   {equipFavLists.map((list) => {
                     const closed = favBarClosed[list.name]
                     return (
                       <div key={list.name}>
                         <button
                           onClick={() => setFavBarClosed((p) => ({ ...p, [list.name]: !p[list.name] }))}
-                          className="flex min-h-[44px] items-center gap-1.5 text-caption font-semibold text-foreground"
+                          className="flex min-h-[44px] items-center gap-1.5 text-footnote font-medium text-foreground"
                         >
                           <ChevronDown className={['h-3.5 w-3.5 transition-transform', closed ? '-rotate-90' : ''].join(' ')} />
                           <span>{list.name}</span>
