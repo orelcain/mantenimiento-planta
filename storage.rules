@@ -120,12 +120,18 @@ service firebase.storage {
     }
 
     // Documentos de equipos subidos desde Panel de administración → «Subir archivos de equipos»
-    // (manuales, catálogos y planos de la GEA y otros; cualquier formato). Solo admin, hasta
-    // 100 MB por archivo (101 MB de margen). Lectura: la regla general de sesión de la app.
+    // (manuales, catálogos y planos de la GEA y otros; cualquier formato), hasta 100 MB por
+    // archivo (101 MB de margen). Lectura: la regla general de sesión de la app.
+    // ⚠ NO usar isAdmin() aquí: en producción deniega siempre (ver /models3d más abajo). El
+    // 16-10-2026 un admin recibió 403 al subir. La restricción a admin la dan la ruta
+    // (AdminRoute + clave) y la regla de `manuales` en Firestore (crear exige supervisor);
+    // si el registro falla, la página borra el archivo subido.
     match /documentosEquipos/{equipoId}/{fileName} {
-      allow write: if isAdmin()
+      allow write: if sesionApp()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && request.resource.size < 101 * 1024 * 1024;
-      allow delete: if isAdmin();
+      allow delete: if sesionApp()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
     // Manuales PDF de máquinas (max 50MB)

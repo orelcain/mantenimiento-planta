@@ -8,7 +8,7 @@
  */
 import { useRef, useState } from 'react'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
+import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 import { Cog, FileUp, Search, X } from 'lucide-react'
 import { auth, db, storage } from '@/services/firebase'
 import { useGlobalEquipmentSearch, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
@@ -64,7 +64,7 @@ export function SubirArchivosEquiposPage() {
         (snap) => actualizar(i, { avance: snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0 }),
         (err) => {
           logger.error('Subir archivo de equipo', err)
-          actualizar(i, { estado: 'error', error: err.code === 'storage/unauthorized' ? 'sin permiso (solo admin)' : 'no se pudo subir' })
+          actualizar(i, { estado: 'error', error: err.code === 'storage/unauthorized' ? 'sin permiso para subir' : 'no se pudo subir' })
           resolve()
         },
         async () => {
@@ -86,7 +86,9 @@ export function SubirArchivosEquiposPage() {
             actualizar(i, { estado: 'listo', avance: 1 })
           } catch (err) {
             logger.error('Registrar archivo de equipo', err instanceof Error ? err : new Error(String(err)))
-            actualizar(i, { estado: 'error', error: 'se subió, pero no se pudo registrar' })
+            // Sin registro nadie lo encontraría: se borra para no dejar un huérfano de hasta 100 MB.
+            await deleteObject(tarea.snapshot.ref).catch(() => {})
+            actualizar(i, { estado: 'error', error: 'no se pudo registrar (¿rol admin o supervisor?)' })
           }
           resolve()
         },
