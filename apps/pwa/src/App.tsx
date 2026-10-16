@@ -73,6 +73,7 @@ const DefaultRoutePage = lazyWithReload(() => import('@/pages/admin/DefaultRoute
 const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
+const SubirArchivosEquiposPage = lazyWithReload(() => import('@/pages/admin/SubirArchivosEquiposPage').then((mod) => ({ default: mod.SubirArchivosEquiposPage })))
 const ShoplogixCredentialsPage = lazyWithReload(() => import('@/pages/admin/ShoplogixCredentialsPage').then((mod) => ({ default: mod.ShoplogixCredentialsPage })))
 const AdminPanelPage = lazyWithReload(() => import('@/pages/admin/AdminPanelPage').then((mod) => ({ default: mod.AdminPanelPage })))
 const MachineCapacityPage = lazyWithReload(() => import('@/pages/admin/MachineCapacityPage').then((mod) => ({ default: mod.MachineCapacityPage })))
@@ -803,6 +804,15 @@ export function App() {
                 <RequireReAuth reason="antes de modificar el modelo de terreno">
                   <Suspense fallback={<LoadingScreen />}>
                     <MapPage />
+                  </Suspense>
+                </RequireReAuth>
+              </AdminRoute>
+            } />
+            <Route path="admin/archivos-equipos" element={
+              <AdminRoute>
+                <RequireReAuth reason="antes de subir archivos de equipos">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <SubirArchivosEquiposPage />
                   </Suspense>
                 </RequireReAuth>
               </AdminRoute>

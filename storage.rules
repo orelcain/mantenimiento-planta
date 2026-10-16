@@ -119,6 +119,15 @@ service firebase.storage {
       allow delete: if sesionApp();
     }
 
+    // Documentos de equipos subidos desde Panel de administración → «Subir archivos de equipos»
+    // (manuales, catálogos y planos de la GEA y otros; cualquier formato). Solo admin, hasta
+    // 100 MB por archivo (101 MB de margen). Lectura: la regla general de sesión de la app.
+    match /documentosEquipos/{equipoId}/{fileName} {
+      allow write: if isAdmin()
+        && request.resource.size < 101 * 1024 * 1024;
+      allow delete: if isAdmin();
+    }
+
     // Manuales PDF de máquinas (max 50MB)
     match /machines/{machineId}/manuales/{fileName} {
       allow write: if sesionApp()
