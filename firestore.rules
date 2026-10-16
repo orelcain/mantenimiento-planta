@@ -2444,6 +2444,14 @@ service cloud.firestore {
     // ============================================
     // MANUALES — Documentación técnica (F4 2026-05-04)
     // ============================================
+    // Ubicaciones del despiece corregidas a mano (modo revisión del visor, 16-10-2026):
+    // las lee cualquier sesión de catálogo; las escribe admin o supervisor.
+    match /anclasDespiece/{anclaId} {
+      allow read: if isCatalogReader();
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
     match /manuales/{manualId} {
       allow read: if isCatalogReader();
       allow create, update: if isSupervisor() && isValidDocSize();
