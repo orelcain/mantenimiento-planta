@@ -30,6 +30,16 @@ export interface DocumentacionDeRepuesto {
   manuales: number
   /** URL → equipos de las capturas de manual que dicen a qué equipos corresponden. */
   equiposDeFoto?: Record<string, string[]>
+  /** Capturas del manual que son el DIBUJO de la pieza (con la posición marcada): el respaldo
+   *  del botón «Dibujo» cuando la máquina no tiene despiece navegable. */
+  dibujosManual?: DibujoManual[]
+}
+
+/** Una captura del manual con la pieza marcada, y su rótulo corto («fig. 65 · pos. 3»). */
+export interface DibujoManual {
+  url: string
+  rotulo: string
+  equipos?: string[]
 }
 
 export const SIN_DOCUMENTACION: DocumentacionDeRepuesto = { fotos: [], tieneFicha: false, manuales: 0 }
@@ -53,6 +63,10 @@ export function documentacionDe(rep: Repuesto): DocumentacionDeRepuesto {
   for (const i of rep.imagenesManual || []) {
     if (i.url && Array.isArray(i.equipos) && i.equipos.length) equiposDeFoto[i.url] = i.equipos
   }
+  const dibujosManual = (rep.imagenesManual || []).flatMap((i) => {
+    const rotulo = i.url ? rotuloDeReferencia(i.descripcion) : null
+    return rotulo ? [{ url: i.url, rotulo, ...(i.equipos?.length ? { equipos: i.equipos } : {}) }] : []
+  })
   return {
     fotos: [...(rep.fotosReales || []), ...(rep.imagenesManual || []), ...(rep.gallery || [])]
       .map((i) => i.url)
@@ -60,7 +74,43 @@ export function documentacionDe(rep: Repuesto): DocumentacionDeRepuesto {
     tieneFicha: fichaConContenido(rep),
     manuales: (rep.vinculosManual || []).length,
     ...(Object.keys(equiposDeFoto).length ? { equiposDeFoto } : {}),
+    ...(dibujosManual.length ? { dibujosManual } : {}),
   }
+}
+
+/**
+ * Del texto de una captura del manual a un rótulo corto, o null si no es una captura con la
+ * pieza ubicada. Las cuatro fuentes que hay (medido 16-10-2026, 4.099 capturas):
+ *   «Referencia despiece Baader 200 pág. 178 - Fig. 22-1 pos. 55 (519437)» → «fig. 22-1 · pos. 55»
+ *   «Referencia GEA PowerPak 5550 · catálogo mecánico pág. 102 - pos. 50 (…)» → «pág. 102 · pos. 50»
+ *   «Referencia Marel filete · libro de repuestos 8009254 pág. 8 - dibujo 3519267 pos. 7 (…)» → «dibujo 3519267 · pos. 7»
+ *   «Referencia manual Knuro KF 3.01 pág. 120 - 999 0608 (vista general)» → «pág. 120»
+ */
+export function rotuloDeReferencia(descripcion: string | undefined | null): string | null {
+  const d = (descripcion ?? '').trim()
+  if (!/^Referencia\b/i.test(d)) return null
+  const fig = d.match(/\bFig\.\s*([\w.-]+)/i)?.[1]
+  const dib = d.match(/\bdibujo\s+([\w.-]+)/i)?.[1]
+  const pag = d.match(/\bpág\.\s*(\d+)/i)?.[1]
+  const pos = d.match(/\bpos\.\s*([\w-]+)/i)?.[1]
+  const donde = fig ? `fig. ${fig}` : dib ? `dibujo ${dib}` : pag ? `pág. ${pag}` : null
+  if (!donde) return null
+  return pos ? `${donde} · pos. ${pos}` : donde
+}
+
+/**
+ * El dibujo del manual que corresponde a lo que se mira: con un equipo en foco, el de SU manual
+ * (misma regla que `fotosParaEquipos`). Devuelve todas las capturas visibles para recorrerlas en
+ * el visor y el rótulo de la primera.
+ */
+export function dibujoDeManual(
+  dibujos: readonly DibujoManual[] | undefined,
+  contexto: readonly string[] | null | undefined,
+): { urls: string[]; rotulo: string } | null {
+  if (!dibujos?.length) return null
+  const enFoco = contexto?.length ? dibujos.filter((d) => !d.equipos || d.equipos.some((id) => contexto.includes(id))) : []
+  const lista = enFoco.length ? enFoco : dibujos
+  return { urls: lista.map((d) => d.url), rotulo: lista[0]!.rotulo }
 }
 
 /**
@@ -104,5 +154,6 @@ export function fusionarDocumentacion(
     tieneFicha: a.tieneFicha || b.tieneFicha,
     manuales: Math.max(a.manuales, b.manuales),
     ...(equiposDeFoto ? { equiposDeFoto } : {}),
+    ...(a.dibujosManual?.length || b.dibujosManual?.length ? { dibujosManual: a.dibujosManual?.length ? a.dibujosManual : b.dibujosManual } : {}),
   }
 }

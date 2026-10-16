@@ -66,7 +66,7 @@ import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ExportReportModal, type SapEquipoContext } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch, haystackMatchesAll, deriveCentro } from '@/utils/repuestos'
 import type { EquipoSap } from '@/utils/repuestos/exportBomSAP'
-import { fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
+import { dibujoDeManual, fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
 import { CLASE_LABEL, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
@@ -2420,6 +2420,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         // El equipo del filtro/foco primero; el marcador «Sin equipo» de un doc duplicado no cuenta.
                         const { nombre: equipo } = equipoParaMostrar(r.equipos, preferirEquipo)
                         const dibujo = dibujoDe(figurasDespiece, r.codigoFabricante, maquinaDeDespiece(equipo))
+                        // Sin despiece navegable, el respaldo es la captura del manual con la pieza marcada.
+                        const dibujoManual = dibujo ? null : dibujoDeManual(r.dibujosManual, equiposEnFoco)
+                        const verDibujo = dibujo
+                          ? { abrir: () => irAlDibujo(dibujo.ruta, r.rowKey), titulo: `Ver en el dibujo · fig. ${dibujo.fig}` }
+                          : dibujoManual
+                            ? { abrir: () => setRowLightbox({ photos: dibujoManual.urls, index: 0 }), titulo: `Ver en el dibujo del manual · ${dibujoManual.rotulo}` }
+                            : null
                         const isSel = selectedRowKey === r.rowKey
                         const nv = nombreVisible(r)
                         // Fotos: las de bodega (reales del físico) primero, luego las del catálogo
@@ -2571,10 +2578,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 )}
                                 {tipoLabelOf(r.tipo)}
                                 {r.codigoFabricante && <span> · <span className="font-mono text-muted-foreground">Fab {r.codigoFabricante}</span></span>}
-                                {dibujo && (
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); irAlDibujo(dibujo.ruta, r.rowKey) }}
+                                {verDibujo && (
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); verDibujo.abrir() }}
                                           className={`${AREA_TACTIL_EN_TARJETA} ml-1.5 inline-flex items-center gap-1 rounded-ctl bg-primary/10 px-1.5 text-primary`}
-                                          aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
+                                          aria-label={verDibujo.titulo}>
                                     <Shapes className="h-3 w-3" /> Dibujo
                                   </button>
                                 )}
@@ -2650,10 +2657,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               <span className="inline-block rounded-ctl bg-muted px-1.5 py-0.5 text-caption text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
                             </td>
                             <td className="hidden px-2 py-2 text-center md:table-cell">
-                              {dibujo ? (
-                                <button type="button" onClick={(e) => { e.stopPropagation(); irAlDibujo(dibujo.ruta, r.rowKey) }}
+                              {verDibujo ? (
+                                <button type="button" onClick={(e) => { e.stopPropagation(); verDibujo.abrir() }}
                                         className={[AREA_TACTIL_COMPACTA, 'inline-flex items-center justify-center rounded-ctl text-primary hover:bg-primary/10'].join(' ')}
-                                        title={`Ver en el dibujo · fig. ${dibujo.fig}`} aria-label={`Ver ${r.codigoFabricante} en el dibujo`}>
+                                        title={verDibujo.titulo} aria-label={verDibujo.titulo}>
                                   <Shapes className="h-4 w-4" />
                                 </button>
                               ) : <span className="text-muted-foreground/40">—</span>}
@@ -2794,7 +2801,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onManual={() => startAction('manual')}
           dibujo={(() => {
             const d = dibujoDe(figurasDespiece, selectedRep.codigoFabricante, maquinaDeDespiece(equipoParaMostrar(selectedRep.equipos, preferirEquipo).nombre))
-            return d ? { fig: d.fig, abrir: () => irAlDibujo(d.ruta, selectedRep.rowKey) } : null
+            if (d) return { fig: d.fig, abrir: () => irAlDibujo(d.ruta, selectedRep.rowKey) }
+            const m = dibujoDeManual(selectedRep.dibujosManual, equiposEnFoco)
+            return m ? { fig: m.rotulo, rotulo: m.rotulo, abrir: () => setRowLightbox({ photos: m.urls, index: 0 }) } : null
           })()}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}

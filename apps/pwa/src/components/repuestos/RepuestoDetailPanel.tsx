@@ -71,7 +71,8 @@ interface RepuestoDetailPanelProps {
   /** Ver vínculos al manual. */
   onManual?: () => void
   /** Figura del despiece donde va la pieza (por código de fabricante); null = no está en un despiece. */
-  dibujo?: { fig: string; abrir: () => void } | null
+  /** `rotulo`: el del dibujo del manual («fig. 65 · pos. 3»); sin él se rotula «fig. N» del despiece. */
+  dibujo?: { fig: string; rotulo?: string; abrir: () => void } | null
   /** ¿el repuesto está en favoritos? */
   isFavorite?: boolean
   /** Alternar favorito. */
@@ -817,7 +818,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               <ListGroup className="px-4" title="Documentos">
                 {onSpecs && <ListCell className="min-h-[52px]" leading={<FileText className="size-5 text-primary" />} title="Ficha técnica" value={item.tieneFicha ? undefined : 'Sin cargar'} onClick={onSpecs} />}
                 {onManual && <ListCell className="min-h-[52px]" leading={<BookOpen className="size-5 text-primary" />} title="Manual" value={manualesLoading ? undefined : ((item.manuales ?? 0) + manualesHeredados.length) || 'Sin cargar'} onClick={onManual} />}
-                {dibujo && <ListCell className="min-h-[52px]" leading={<Shapes className="size-5 text-primary" />} title={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />}
+                {dibujo && <ListCell className="min-h-[52px]" leading={<Shapes className="size-5 text-primary" />} title={`Dibujo · ${dibujo.rotulo ?? `fig. ${dibujo.fig}`}`} onClick={dibujo.abrir} />}
                 {onPhotos && <ListCell className="min-h-[52px]" leading={<ImageIcon className="size-5 text-primary" />} title="Fotos" value={allPhotos.length || 'Sin cargar'} onClick={onPhotos} />}
               </ListGroup>
             </div>
@@ -1060,7 +1061,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               afirma nada (`undefined` = sin señal), para no decir «vacío» antes de saberlo.
             */}
             {dibujo && (
-              <ActionBtn icon={Shapes} label={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />
+              <ActionBtn icon={Shapes} label={`Dibujo · ${dibujo.rotulo ?? `fig. ${dibujo.fig}`}`} onClick={dibujo.abrir} />
             )}
             {onManual && (
               <ActionBtn
