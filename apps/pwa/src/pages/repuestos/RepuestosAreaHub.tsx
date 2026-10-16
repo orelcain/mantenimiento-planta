@@ -1589,6 +1589,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
   )
 
+  // Quitar un recorte del manual (va por crudUpdate: historial y auditoría).
+  const handleSaveImagenesManual = useCallback(
+    async (imgs: import('@/types/repuestos').ImagenRepuesto[]) => {
+      if (!actionTarget) return
+      const { source } = actionTarget
+      await crudUpdate(colPathOf(source.machineId), source.repuesto.id, { imagenesManual: imgs }, source.repuesto)
+      toast({ title: 'Imagen del manual quitada', variant: 'success' })
+      await refreshCatalog()
+    },
+    [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
+  )
+
   const handleConfirmDelete = useCallback(async () => {
     if (!actionTarget || actionTarget.kind !== 'delete') return
     setSavingRep(true)
@@ -3166,6 +3178,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           machineName={actionTarget.source.machineName}
           codigoSAP={actionRep.codigoSAP}
           onSaveFotos={isAdmin ? handleSaveFotosReales : undefined}
+          onSaveImagenesManual={isAdmin ? handleSaveImagenesManual : undefined}
         />
       )}
 
