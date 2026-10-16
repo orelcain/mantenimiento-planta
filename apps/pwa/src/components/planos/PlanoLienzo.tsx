@@ -32,6 +32,11 @@ type Props = {
   /** Aumento al enfocar una caja. En el despiece se usa uno menor: el foco cae en el NÚMERO de
    *  la posición y la pieza está a un costado; con 2,8 quedaba cortada (16-10-2026, fig. 10-3). */
   escalaFoco?: number
+  /** Modo revisión: el toque sobre el dibujo marca un punto (coordenadas del dibujo, con giro
+   *  incluido) en vez de abrir lo que haya debajo. */
+  onMarcar?: (x: number, y: number) => void
+  /** Marca provisoria del modo revisión (sin zoom: el técnico ya está mirando ahí). */
+  marca?: Caja | null
 }
 
 /** La letra del plano es de ~6 pt sobre un A3 de 1131: por debajo de 2 no se lee. */
@@ -48,8 +53,9 @@ const ESCALA_COLUMNA = 1.7
  */
 export function PlanoLienzo({
   hoja, meta, mostrarEs, notasDe, foco, resaltarTag, onSalto, onBorne, onBorneLibre, onAparato, onRotulo, onFondo,
-  giro = 0, onGirar, escalaFoco = ESCALA_APARATO,
+  giro = 0, onGirar, escalaFoco = ESCALA_APARATO, onMarcar, marca = null,
 }: Props) {
+  const capaRef = useRef<SVGSVGElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const vista = useRef({ s: 1, x: 0, y: 0 })
@@ -230,6 +236,18 @@ export function PlanoLienzo({
         if (arrastroRecien.current) {
           arrastroRecien.current = false
           e.stopPropagation()
+          return
+        }
+        // Modo revisión: el toque es «aquí está el número». getScreenCTM ya trae el zoom, el
+        // paneo y el giro de la hoja: el punto sale en coordenadas del dibujo.
+        if (onMarcar && !(e.target as HTMLElement).closest('[data-controles]')) {
+          const capa = capaRef.current
+          const m = capa?.getScreenCTM()
+          if (capa && m) {
+            const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse())
+            onMarcar(pt.x, pt.y)
+          }
+          e.stopPropagation()
         }
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onFondo() }}
@@ -251,7 +269,8 @@ export function PlanoLienzo({
         <div className="absolute inset-0 [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
              dangerouslySetInnerHTML={{ __html: hoja.svg }} />
 
-        <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox={`0 0 ${W} ${H}`}>
+        <svg ref={capaRef} className="absolute inset-0 h-full w-full overflow-visible" viewBox={`0 0 ${W} ${H}`}
+             style={onMarcar ? { cursor: 'crosshair' } : undefined}>
           {pulso != null && (
             <rect x={pulsoX} y={0} width={110} height={H} fill="var(--lc-nuevo)" opacity={0.4}
                   className="motion-safe:animate-pulse" />
@@ -311,6 +330,10 @@ export function PlanoLienzo({
           {/* La pieza elegida tiene que saltar a la vista: el recuadro celeste fino pasaba
               desapercibido (Orel, 16-10-2026). Rojo como en los recortes del manual, relleno suave
               y un anillo que se expande 3 veces al llegar (no con «reducir movimiento»). */}
+          {marca && (
+            <rect x={marca[0]} y={marca[1]} width={marca[2]} height={marca[3]} rx={3} pointerEvents="none"
+                  fill="var(--lc-danger-soft)" stroke="var(--lc-danger)" strokeWidth={2.6} data-foco="marca" />
+          )}
           {foco?.tipo === 'caja' && !esCajaRespaldo(foco.b, meta.vb) && (
             <g key={foco.b.join(',')} pointerEvents="none" data-foco="seleccion">
               <rect x={foco.b[0] - 4} y={foco.b[1] - 4} width={foco.b[2] + 8} height={foco.b[3] + 8}

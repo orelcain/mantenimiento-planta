@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { esDesdeRepuestos } from '@/pages/repuestos/enlacesPieza'
+import { useIsSupervisor } from '@/store/authStore'
+import { useAnclasDespiece } from '@/hooks/useAnclasDespiece'
+import { aplicarAIndice, aplicarATags, cajaDeToque, colaRevision, hechasHoy, type PendienteRevision } from '@/utils/planos/anclasDespiece'
+import { BandaRevision, BotonesMarca, TarjetaRevision } from '@/components/planos/ModoRevision'
 import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, Clock, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, ListTree, Loader2, LayoutPanelTop, LocateFixed, MoreHorizontal, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { EncabezadoHerramienta } from '@/components/piel'
@@ -419,7 +423,21 @@ function Visor({ slug }: { slug: string }) {
     const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
     return Number.isInteger(g) && g > 0 ? g : undefined
   })
-  const { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda, buscadorListo } = usePlano(slug, inicial)
+  const { indice: indiceBase, hoja: hojaBase, abrir, cargando, error, reintentar, cargarBusqueda, buscadorListo } = usePlano(slug, inicial)
+  // Ubicaciones corregidas a mano (modo revisión): se aplican ENCIMA de los JSON de Storage.
+  const puedeRevisar = useIsSupervisor() && esDespiece
+  const { anclas, guardar: guardarAncla, error: errorAncla } = useAnclasDespiece(slug, esDespiece)
+  const vbPorHoja = useMemo(() => new Map((indiceBase?.hojas ?? []).map((h) => [h.blatt, h.vb] as const)), [indiceBase])
+  const indice = useMemo(
+    () => (indiceBase && anclas.length ? { ...indiceBase, indice: aplicarAIndice(indiceBase.indice, vbPorHoja, anclas) } : indiceBase),
+    [indiceBase, anclas, vbPorHoja],
+  )
+  const hoja = useMemo(
+    () => (hojaBase && anclas.length
+      ? { ...hojaBase, datos: { ...hojaBase.datos, tags: aplicarATags(hojaBase.datos.tags, hojaBase.blatt, anclas) } }
+      : hojaBase),
+    [hojaBase, anclas],
+  )
   // ?fig=70-8 — en el catálogo de piezas la referencia que la gente se pasa
   // por chat es la FIGURA impresa, no el número de hoja del visor. Se
   // resuelve cuando llega el índice (que es quien conoce el mapa fig→hoja).
@@ -444,6 +462,10 @@ function Visor({ slug }: { slug: string }) {
   const vinculosTerreno = usePlanoVinculos(slug, maquinaPlano.maquina)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
+  // Modo revisión: cola de ubicaciones sin marcar (o UNA, desde «Corregir ubicación»).
+  const [revision, setRevision] = useState<{ cola: (PendienteRevision & { pos?: string })[]; i: number; unica: boolean } | null>(null)
+  const [marca, setMarca] = useState<Caja | null>(null)
+  const [guardandoAncla, setGuardandoAncla] = useState(false)
   // ES por defecto: el equipo lee castellano; el aleman queda a un toque para
   // cotejar con el original. La eleccion se recuerda por equipo.
   const [mostrarEs, setMostrarEs] = useState(
@@ -897,6 +919,27 @@ function Visor({ slug }: { slug: string }) {
     [codigoRecorrido, indice],
   )
 
+  // Modo revisión (hooks ANTES de los return tempranos).
+  const pendientesRevision = useMemo(
+    () => (puedeRevisar && indice ? colaRevision(indice.indice, indice.sapPorCodigo, vbPorHoja, anclas) : []),
+    [puedeRevisar, indice, vbPorHoja, anclas],
+  )
+  const itemRevision = revision ? revision.cola[revision.i] ?? null : null
+  // La posición a ubicar: la fila de esa hoja con ese código (la que todavía no tiene marca).
+  const filaRevision = useMemo(() => {
+    if (!itemRevision || !hoja || hoja.blatt !== itemRevision.h) return null
+    const filas = (hoja.datos.filas ?? []).filter((f) => f.nr === itemRevision.codigo)
+    if (itemRevision.pos) return filas.find((f) => f.pos === itemRevision.pos) ?? null
+    return filas.find((f) => !hoja.datos.tags.some((t) => t.t === normalizarPos(f.pos))) ?? filas[0] ?? null
+  }, [itemRevision, hoja])
+  const irItemRevision = itemRevision ? `${itemRevision.h}|${itemRevision.codigo}|${revision?.i}` : null
+  useEffect(() => {
+    if (!itemRevision) return
+    setMarca(null)
+    setSel(null)
+    setRecorrido(null)
+    void irA(itemRevision.h)
+  }, [irItemRevision]) // eslint-disable-line react-hooks/exhaustive-deps
   if (error) {
     return <Aviso texto={error} onReintentar={reintentar} />
   }
@@ -950,6 +993,37 @@ function Visor({ slug }: { slug: string }) {
   const historialBusquedas = recientes.filter((r) => indice.indice[r.c])
   const terminarRecorrido = () => { setRecorrido(null); setBuscaConfirmada(null); setBusca('') }
   const recorridoBajoLaFicha = esDespiece && !esMovil && sel?.tipo === 'aparato'
+
+  const empezarRevision = () => {
+    if (!pendientesRevision.length) return
+    setRevision({ cola: pendientesRevision, i: 0, unica: false })
+  }
+  const corregirUbicacion = (pos: string, codigo: string | null) => {
+    if (!hoja) return
+    setRevision({ cola: [{ codigo: codigo ?? '', h: hoja.blatt, pos }], i: 0, unica: true })
+  }
+  const salirRevision = () => { setRevision(null); setMarca(null) }
+  const siguienteRevision = () => {
+    setMarca(null)
+    setRevision((r) => (!r || r.unica || r.i + 1 >= r.cola.length ? null : { ...r, i: r.i + 1 }))
+  }
+  const guardarRevision = async (estado: 'ubicada' | 'no-esta') => {
+    if (!itemRevision || !filaRevision) return
+    setGuardandoAncla(true)
+    const ok = await guardarAncla({
+      hoja: itemRevision.h, pos: normalizarPos(filaRevision.pos), codigo: itemRevision.codigo || filaRevision.nr || null,
+      b: estado === 'ubicada' ? marca : null, estado,
+    })
+    setGuardandoAncla(false)
+    if (!ok) return
+    const unica = revision?.unica
+    siguienteRevision()
+    // «Corregir ubicación» de una pieza: al guardar, se ve la marca nueva enfocada.
+    if (unica && estado === 'ubicada' && marca) {
+      seleccionar({ tipo: 'aparato', tag: normalizarPos(filaRevision.pos) })
+      setFoco({ tipo: 'caja', b: marca })
+    }
+  }
   // En movil el panel es una hoja inferior: cerrada = plano completo.
   const abiertoMovil = sel !== null || !!busca.trim() || ayuda || !!recorridoActivo
 
@@ -1086,6 +1160,14 @@ function Visor({ slug }: { slug: string }) {
           ))}
         </div>
 
+        {puedeRevisar && !revision && pendientesRevision.length > 0 && (
+          <button type="button" onClick={empezarRevision}
+                  title="Ubicar en el dibujo los repuestos con SAP que no tienen su número marcado"
+                  className="flex min-h-[44px] max-md:min-h-[48px] items-center gap-1.5 rounded-ctl border px-3 text-footnote font-medium"
+                  style={{ borderColor: 'var(--lc-aqua)', color: 'var(--lc-aqua-bright)' }}>
+            Revisar ubicaciones <span className="tabular-nums">({pendientesRevision.length})</span>
+          </button>
+        )}
         <div className="relative" data-menu-mas>
         <button type="button" onClick={() => setMasAbierto((v) => !v)} aria-expanded={masAbierto} aria-label="Más opciones: imprimir, sin señal, link y QR"
                 title="Imprimir, guardar sin señal, link y QR"
@@ -1162,6 +1244,11 @@ function Visor({ slug }: { slug: string }) {
           </button>
         </div>
       </header>
+
+      {revision && (
+        <BandaRevision i={revision.i} total={revision.cola.length} unica={revision.unica} guardando={guardandoAncla}
+                       onSaltar={siguienteRevision} onNoEsta={() => void guardarRevision('no-esta')} onSalir={salirRevision} />
+      )}
 
       {mostrarQR && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6"
@@ -1295,8 +1382,14 @@ function Visor({ slug }: { slug: string }) {
             onFondo={() => setSel(null)}
             giro={giroHoja} onGirar={girarHoja}
             escalaFoco={esDespiece ? 2.2 : undefined}
+            onMarcar={revision ? (x, y) => setMarca(cajaDeToque(x, y)) : undefined}
+            marca={revision ? marca : null}
           />
-          {foco?.tipo === 'caja' && esCajaRespaldo(foco.b, meta?.vb ?? []) && (
+          {revision && (
+            <BotonesMarca hayMarca={!!marca} guardando={guardandoAncla}
+                          onGuardar={() => void guardarRevision('ubicada')} onDeshacer={() => setMarca(null)} />
+          )}
+          {!revision && foco?.tipo === 'caja' && esCajaRespaldo(foco.b, meta?.vb ?? []) && (
             <p role="status"
                className="pointer-events-none absolute left-1/2 top-3 z-10 max-w-[90%] -translate-x-1/2 rounded-ctl border px-3 py-2 text-center text-footnote"
                style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-prep)', color: 'var(--lc-ink)' }}>
@@ -1374,7 +1467,11 @@ function Visor({ slug }: { slug: string }) {
               {sel ? etiquetaSel(sel) : mostrarResultados ? `Resultados de “${busca.trim()}”` : 'Panel'}
             </button>
           )}
-          {!(esMovil && minimizada) && <>
+          {!(esMovil && minimizada) && revision && itemRevision && (
+            <TarjetaRevision fila={filaRevision} codigo={itemRevision.codigo} sap={indice.sapPorCodigo?.[itemRevision.codigo]}
+                             hechas={hechasHoy(anclas)} pendientes={pendientesRevision.length} error={errorAncla} />
+          )}
+          {!(esMovil && minimizada) && !revision && <>
           {recorridoActivo && !mostrarResultados && !esVisor && !recorridoBajoLaFicha && (
             <RecorridoUbicaciones
               codigo={recorridoActivo.codigo} nombre={nombreRecorrido}
@@ -1447,6 +1544,7 @@ function Visor({ slug }: { slug: string }) {
                      anclaDeAparato={anclaDeAparato}
                      partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo}
                      vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano}
+                     onCorregirUbicacion={puedeRevisar ? corregirUbicacion : undefined}
                      recorridoBajoPieza={recorridoActivo && recorridoBajoLaFicha ? (
                        // Despiece en PC: primero la pieza (stock, bodega) y DESPUÉS los otros lugares
                        // donde va; el nombre ya lo dice la ficha (16-10-2026, panel simplificado).
@@ -1470,7 +1568,7 @@ function Visor({ slug }: { slug: string }) {
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, codigoEnRecorrido, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, onVerEnDibujo, anclaDeAparato, partes, slug,
-  sapPorCodigo, vinculosTerreno, maquinaPlano, recorridoBajoPieza = null,
+  sapPorCodigo, vinculosTerreno, maquinaPlano, recorridoBajoPieza = null, onCorregirUbicacion,
 }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
@@ -1506,6 +1604,8 @@ function Panel({
   maquinaPlano: ReturnType<typeof useMaquinaPlano>
   /** despiece en PC: el recorrido ‹ 1 de N ›, que la ficha pone justo bajo la pieza */
   recorridoBajoPieza?: ReactNode
+  /** admin/supervisor: entra a marcar a mano la posición de esta pieza */
+  onCorregirUbicacion?: (pos: string, codigo: string | null) => void
 }) {
   const [copiadoLista, setCopiadoLista] = useState(false)
   // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
@@ -1733,6 +1833,7 @@ function Panel({
           hermanas={filaSel.nr ? indice.hermanasPorCodigo?.[filaSel.nr]?.[String(hojaActual)] : undefined}
           onVerEnDibujo={onVerEnDibujo}
           recorrido={recorridoBajoPieza}
+          onCorregir={onCorregirUbicacion ? () => onCorregirUbicacion(normalizarPos(filaSel.pos), filaSel.nr ?? null) : undefined}
           ubicaciones={filaSel.nr ? (indice.indice[filaSel.nr]?.length ?? 0) : 0}
           onRecorrer={filaSel.nr && filaSel.nr !== codigoEnRecorrido
             ? () => onAbrirAparato(filaSel.nr!, tagsHoja.find((t) => normalizarPos(t.t) === normalizarPos(filaSel.pos))?.b)
@@ -1978,7 +2079,7 @@ function Resultados({ items, total, onIr, partes = [], cargando = false }: {
 function FichaPieza({
   fila, filas, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug,
   sapPorCodigo, usosPorCodigo, umbralComun, desgaste, hermanas, onVerEnDibujo, ubicaciones = 0, onRecorrer,
-  recorrido = null,
+  recorrido = null, onCorregir,
 }: {
   fila: FilaDespiece
   filas: FilaDespiece[]
@@ -2008,6 +2109,8 @@ function FichaPieza({
   onRecorrer?: () => void
   /** el recorrido ya abierto (PC), que va justo bajo la tarjeta de la pieza */
   recorrido?: ReactNode
+  /** admin/supervisor: marcar a mano dónde va esta posición en el dibujo */
+  onCorregir?: () => void
 }) {
   const [copiado, setCopiado] = useState(false)
   // la caja de ESTA posición sobre el dibujo, si el OCR la ancló
@@ -2123,6 +2226,14 @@ function FichaPieza({
           <p className="m-0 mt-2 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>Sin código de repuesto en el catálogo.</p>
         )}
       </section>
+
+      {onCorregir && (
+        <button type="button" onClick={onCorregir}
+                className="mt-2 min-h-[44px] w-full rounded-ctl border px-3 text-footnote"
+                style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+          {anclaEnDibujo ? 'Corregir ubicación en el dibujo' : 'Ubicar en el dibujo'}
+        </button>
+      )}
 
       {recorrido}
 
