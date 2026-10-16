@@ -157,3 +157,45 @@ export function equipoParaMostrar(
 export function totalDondeSeUsa(grupos: readonly GrupoDondeSeUsa[]): number {
   return grupos.reduce((n, g) => n + g.unidades.length, 0)
 }
+
+/**
+ * Plantas que Repuestos no muestra en «Dónde se usa» ni en los botones de equipo (pedido de
+ * Mantención 15-10-2026: Yal no interesa por ahora). Solo afecta la PRESENTACIÓN: los datos y
+ * la búsqueda no cambian. Para volver a mostrarla, vaciar la lista.
+ */
+export const PLANTAS_OCULTAS_EN_REPUESTOS: readonly string[] = ['yal']
+
+/** Equipos sin los de plantas ocultas (ver `PLANTAS_OCULTAS_EN_REPUESTOS`). */
+export function equiposVisiblesEnRepuestos<T extends EquipoDelRepuesto>(
+  equipos: readonly T[],
+  plantaDe: (nodeId: string) => string | undefined = () => undefined,
+): T[] {
+  if (PLANTAS_OCULTAS_EN_REPUESTOS.length === 0) return [...equipos]
+  return equipos.filter((e) => !PLANTAS_OCULTAS_EN_REPUESTOS.includes(plantaCorta(plantaDe(e.machineId)).toLowerCase()))
+}
+
+/**
+ * Detalle compacto de las unidades de una familia en una planta:
+ *  - Baader 142: modelo y no unidad — N1 es la antigua; N2 y N3, la nueva (iguales entre sí).
+ *  - Si la pieza va en TODAS las unidades de la familia en esa planta: «todas».
+ *  - Si no: las unidades («N1 N3»). Familia sin numeración: sin detalle.
+ */
+export type DetalleUnidades =
+  | { tipo: 'ninguno' }
+  | { tipo: 'texto'; texto: string; nodeIds: string[] }
+  | { tipo: 'unidades'; unidades: UnidadDondeSeUsa[] }
+
+export function detalleUnidades(g: GrupoDondeSeUsa, totalUnidades?: number): DetalleUnidades {
+  const conNumero = g.unidades.filter((u) => u.unidad)
+  if (conNumero.length === 0) return { tipo: 'ninguno' }
+  const ids = g.unidades.map((u) => u.nodeId)
+  if (/BAADER\s*142/i.test(g.familia)) {
+    const antigua = conNumero.some((u) => u.unidad === 'N1')
+    const nueva = conNumero.some((u) => u.unidad === 'N2' || u.unidad === 'N3')
+    if (antigua && nueva) return { tipo: 'texto', texto: 'antigua y nueva', nodeIds: ids }
+    if (antigua) return { tipo: 'texto', texto: 'antigua', nodeIds: ids }
+    if (nueva) return { tipo: 'texto', texto: 'nueva', nodeIds: ids }
+  }
+  if (totalUnidades && conNumero.length >= totalUnidades && totalUnidades > 1) return { tipo: 'texto', texto: 'todas', nodeIds: ids }
+  return { tipo: 'unidades', unidades: g.unidades }
+}

@@ -13,7 +13,7 @@
  * Conteo = filas ÚNICAS: una pieza montada en N1+N2+N3 cuenta una vez.
  * Reusa `agruparDondeSeUsa`: planta + nombre es la identidad del equipo.
  */
-import { agruparDondeSeUsa, plantaCorta, type EquipoDelRepuesto, type GrupoDondeSeUsa } from '@/hooks/repuestos/dondeSeUsa'
+import { agruparDondeSeUsa, equiposVisiblesEnRepuestos, plantaCorta, type EquipoDelRepuesto, type GrupoDondeSeUsa } from '@/hooks/repuestos/dondeSeUsa'
 
 export type NivelFaceta = 'familia' | 'planta' | 'unidad'
 
@@ -64,7 +64,7 @@ export function grupoEnFaceta(g: GrupoDondeSeUsa, faceta: Faceta): boolean {
 /** Valores de la faceta que tiene una fila (las claves de cada nivel, sin repetir). */
 function clavesDeFila(row: FilaConEquipos, nivel: NivelFaceta, plantaDe: PlantaDe): string[] {
   const out = new Set<string>()
-  for (const g of agruparDondeSeUsa(row.equipos, plantaDe)) {
+  for (const g of agruparDondeSeUsa(equiposVisiblesEnRepuestos(row.equipos, plantaDe), plantaDe)) {
     if (nivel === 'familia') out.add(claveFamilia(g))
     else if (nivel === 'planta') out.add(clavePlanta(g))
     else for (const u of g.unidades) out.add(u.unidad)
@@ -73,7 +73,7 @@ function clavesDeFila(row: FilaConEquipos, nivel: NivelFaceta, plantaDe: PlantaD
 }
 
 export function facetasDeEquipo(rows: readonly FilaConEquipos[], plantaDe: PlantaDe = () => undefined): Facetas {
-  const porFila = rows.map((r) => agruparDondeSeUsa(r.equipos, plantaDe))
+  const porFila = rows.map((r) => agruparDondeSeUsa(equiposVisiblesEnRepuestos(r.equipos, plantaDe), plantaDe))
   const distintas = (f: (g: GrupoDondeSeUsa) => string): number => {
     const s = new Set<string>()
     for (const gs of porFila) for (const g of gs) s.add(f(g))
@@ -103,7 +103,7 @@ export function facetasDeEquipo(rows: readonly FilaConEquipos[], plantaDe: Plant
 }
 
 export function filtraPorFaceta(row: FilaConEquipos, faceta: Faceta, plantaDe: PlantaDe = () => undefined): boolean {
-  return agruparDondeSeUsa(row.equipos, plantaDe).some((g) => grupoEnFaceta(g, faceta))
+  return agruparDondeSeUsa(equiposVisiblesEnRepuestos(row.equipos, plantaDe), plantaDe).some((g) => grupoEnFaceta(g, faceta))
 }
 
 /** La fila ya lo dice sola: ≤ 3 filas o una única opción → no se ofrece la fila de chips. */

@@ -3,7 +3,7 @@ import { facetasDeEquipo, filtraPorFaceta, ocultarFacetas } from '../facetasEqui
 
 const PLANTA: Record<string, string> = {
   b1: 'PLANTA CHONCHI', b2: 'PLANTA CHONCHI', b3: 'PLANTA CHONCHI',
-  k1: 'PLANTA CHONCHI', ky: 'PLANTA YAL', by: 'PLANTA YAL',
+  k1: 'PLANTA CHONCHI', ky: 'PLANTA QUELLON', by: 'PLANTA QUELLON',
 }
 const plantaDe = (id: string) => PLANTA[id]
 const eq = (machineId: string, machineName: string) => ({ machineId, machineName })
@@ -34,7 +34,7 @@ describe('facetasDeEquipo', () => {
   it('con una sola familia baja a planta', () => {
     const f = facetasDeEquipo([{ rowKey: 'a', equipos: [B1, BY] }, { rowKey: 'b', equipos: [B2] }], plantaDe)
     expect(f.nivel).toBe('planta')
-    expect(f.opciones.map((o) => [o.etiqueta, o.conteo])).toEqual([['Chonchi', 2], ['Yal', 1]])
+    expect(f.opciones.map((o) => [o.etiqueta, o.conteo])).toEqual([['Chonchi', 2], ['Quellon', 1]])
   })
 
   it('con una familia y una planta baja a unidad', () => {
@@ -43,7 +43,7 @@ describe('facetasDeEquipo', () => {
     expect(f.opciones.map((o) => [o.etiqueta, o.conteo])).toEqual([['N1', 2], ['N2', 1]])
   })
 
-  it('el mismo nombre en dos plantas son dos equipos (Knuro N1 Chonchi / Yal)', () => {
+  it('el mismo nombre en dos plantas son dos equipos (Knuro N1 Chonchi / Quellon)', () => {
     const rows = [{ rowKey: 'a', equipos: [K1] }, { rowKey: 'b', equipos: [KY] }]
     expect(facetasDeEquipo(rows, plantaDe).nivel).toBe('planta')
   })
@@ -54,7 +54,7 @@ describe('filtraPorFaceta', () => {
     const r = { rowKey: 'a', equipos: [B2, KY] }
     expect(filtraPorFaceta(r, { nivel: 'familia', clave: 'KNURO' }, plantaDe)).toBe(true)
     expect(filtraPorFaceta(r, { nivel: 'familia', clave: 'FISHKEN' }, plantaDe)).toBe(false)
-    expect(filtraPorFaceta(r, { nivel: 'planta', clave: 'PLANTA YAL' }, plantaDe)).toBe(true)
+    expect(filtraPorFaceta(r, { nivel: 'planta', clave: 'PLANTA QUELLON' }, plantaDe)).toBe(true)
     expect(filtraPorFaceta(r, { nivel: 'unidad', clave: 'N3' }, plantaDe)).toBe(false)
     expect(filtraPorFaceta(r, { nivel: 'unidad', clave: 'N2' }, plantaDe)).toBe(true)
   })
