@@ -39,11 +39,18 @@ function montar(onRemoveEquipo?: (id: string) => Promise<void>) {
 
 afterEach(cleanup)
 
+/** En el teléfono «Dónde se usa» va plegado por familia: hay que abrirla para ver sus unidades. */
+function abrirFamiliaSiTelefono(ancho: number) {
+  if (ancho >= 640) return
+  fireEvent.click(screen.getByText('Baader 200'))
+}
+
 describe.each([['PC', 1280], ['teléfono', 390]])('ficha del repuesto · quitar equipo (%s)', (_, ancho) => {
   it('pide confirmación y recién entonces quita ese equipo', async () => {
     viewport(ancho)
     const quitar = vi.fn(async () => {})
     montar(quitar)
+    abrirFamiliaSiTelefono(ancho)
     fireEvent.click(screen.getByRole('button', { name: 'Quitar BAADER 200' }))
     expect(quitar).not.toHaveBeenCalled()
     expect(screen.getByRole('alertdialog').textContent).toContain('¿Quitar BAADER 200 de este repuesto?')
@@ -56,6 +63,7 @@ describe.each([['PC', 1280], ['teléfono', 390]])('ficha del repuesto · quitar 
     viewport(ancho)
     const quitar = vi.fn(async () => {})
     montar(quitar)
+    abrirFamiliaSiTelefono(ancho)
     fireEvent.click(screen.getByRole('button', { name: 'Quitar BAADER 200' }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
@@ -65,6 +73,7 @@ describe.each([['PC', 1280], ['teléfono', 390]])('ficha del repuesto · quitar 
   it('sin permiso (no admin) no aparece la x', () => {
     viewport(ancho)
     montar(undefined)
+    abrirFamiliaSiTelefono(ancho)
     expect(screen.queryByRole('button', { name: /^Quitar / })).toBeNull()
   })
 })

@@ -2769,6 +2769,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onAssignSap={!selectedRep.codigoSAP ? () => { setAsignarSapValue(''); setAsignarSapOpen(true) } : undefined}
           onAssignEquipo={() => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
           onRemoveEquipo={isAdmin ? handleQuitarEquipo : undefined}
+          totalUnidades={totalUnidades}
           isAdmin={isAdmin}
           onRename={isAdmin ? handleRenameRep : undefined}
           onEditRepuesto={isAdmin ? () => startAction('edit') : undefined}
