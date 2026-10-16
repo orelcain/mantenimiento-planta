@@ -29,6 +29,7 @@ import {
   Send,
   BarChart3,
   Workflow,
+  FileUp,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -48,6 +49,13 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Credenciales Shoplogix',
     description: 'Inicio de sesión automático de la sincronización de las Baader 142',
     icon: <Key className="size-4" />,
+    section: 'sensible',
+  },
+  {
+    to: '/admin/archivos-equipos',
+    title: 'Subir archivos de equipos',
+    description: 'Manuales, catálogos y planos de hasta 100 MB (p. ej. de la GEA)',
+    icon: <FileUp className="size-4" />,
     section: 'sensible',
   },
   {
