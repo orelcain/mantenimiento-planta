@@ -6,12 +6,12 @@
  * escribir `documentosEquipos/` a un admin. Cada archivo queda en la colección `manuales` con los
  * equipos elegidos, así un repuesto de esos equipos lo hereda (ver `useManualesDeEquipos`).
  */
-import { useRef, useState } from 'react'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { useEffect, useRef, useState } from 'react'
+import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage'
 import { Cog, FileUp, Search, X } from 'lucide-react'
 import { auth, db, storage } from '@/services/firebase'
-import { useGlobalEquipmentSearch, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
+import { getGlobalEquipmentCache, useGlobalEquipmentSearch, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
 import { useManualesDeEquipos } from '@/hooks/repuestos/useManualesDeEquipos'
 import { ListCell, ListGroup } from '@/components/piel'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,31 @@ import { logger } from '@/lib/logger'
 import { formatoTamano, rutaDocumento, separarPorTamano, tituloDeArchivo } from '@/utils/admin/archivosEquipos'
 
 type Estado = 'espera' | 'subiendo' | 'listo' | 'error'
-interface Subida { archivo: File; estado: Estado; avance: number; error?: string }
+interface Subida { archivo: File; estado: Estado; avance: number; error?: string; destino?: string }
+interface Subido { id: string; titulo: string; url: string; equipos: string[]; origen?: string; en: number }
+
+/** Lo último subido desde esta página, con sus equipos: para ver dónde quedó cada archivo. */
+function useUltimosSubidos(recarga: number) {
+  const [lista, setLista] = useState<Subido[]>([])
+  useEffect(() => {
+    let vivo = true
+    // Sin orderBy: con el where obligaría a un índice compuesto; se ordena acá.
+    getDocs(query(collection(db, 'manuales'), where('origen', '==', 'admin-subida')))
+      .then((snap) => {
+        if (!vivo) return
+        const l = snap.docs.map((d) => {
+          const m = d.data()
+          return { id: d.id, titulo: m.titulo ?? 'Archivo', url: m.url ?? '', equipos: m.equipos ?? [], origen: m.machineOrigen, en: m.subidoEn?.toMillis?.() ?? 0 }
+        })
+        setLista(l.sort((a, b) => b.en - a.en).slice(0, 30))
+      })
+      .catch((err) => logger.warn('Últimos subidos', { error: err instanceof Error ? err.message : String(err) }))
+    return () => { vivo = false }
+  }, [recarga])
+  return lista
+}
+
+const nombreEquipo = (e: GlobalEquipmentResult) => e.alias || e.nombre
 
 export function SubirArchivosEquiposPage() {
   const [busca, setBusca] = useState('')
@@ -29,6 +53,8 @@ export function SubirArchivosEquiposPage() {
   const [rechazados, setRechazados] = useState<string[]>([])
   const [subiendo, setSubiendo] = useState(false)
   const [recarga, setRecarga] = useState(0)
+  const [resumen, setResumen] = useState<string | null>(null)
+  const ultimos = useUltimosSubidos(recarga)
   const inputRef = useRef<HTMLInputElement>(null)
   const { results, loading } = useGlobalEquipmentSearch(busca)
   const ids = equipos.map((e) => e.id)
@@ -38,6 +64,7 @@ export function SubirArchivosEquiposPage() {
   const elegirEquipo = (e: GlobalEquipmentResult) => {
     setEquipos((prev) => (prev.some((x) => x.id === e.id) ? prev : [...prev, e]))
     setBusca('')
+    setResumen(null)
   }
 
   const elegirArchivos = (lista: FileList | null) => {
@@ -52,7 +79,7 @@ export function SubirArchivosEquiposPage() {
     setSubidas((prev) => prev.map((s, k) => (k === i ? { ...s, ...cambio } : s)))
 
   const subirUno = (s: Subida, i: number) =>
-    new Promise<void>((resolve) => {
+    new Promise<boolean>((resolve) => {
       const principal = equipos[0]!
       const ruta = rutaDocumento(principal.id, s.archivo.name, Date.now())
       const tarea = uploadBytesResumable(ref(storage, ruta), s.archivo, {
@@ -65,7 +92,7 @@ export function SubirArchivosEquiposPage() {
         (err) => {
           logger.error('Subir archivo de equipo', err)
           actualizar(i, { estado: 'error', error: err.code === 'storage/unauthorized' ? 'sin permiso para subir' : 'no se pudo subir' })
-          resolve()
+          resolve(false)
         },
         async () => {
           try {
@@ -83,27 +110,40 @@ export function SubirArchivosEquiposPage() {
               subidoPor: auth.currentUser?.uid ?? null,
               subidoEn: serverTimestamp(),
             })
-            actualizar(i, { estado: 'listo', avance: 1 })
+            actualizar(i, { estado: 'listo', avance: 1, destino: equipos.map(nombreEquipo).join(', ') })
+            resolve(true)
+            return
           } catch (err) {
             logger.error('Registrar archivo de equipo', err instanceof Error ? err : new Error(String(err)))
             // Sin registro nadie lo encontraría: se borra para no dejar un huérfano de hasta 100 MB.
             await deleteObject(tarea.snapshot.ref).catch(() => {})
             actualizar(i, { estado: 'error', error: 'no se pudo registrar (¿rol admin o supervisor?)' })
           }
-          resolve()
+          resolve(false)
         },
       )
     })
 
   const subirTodo = async () => {
     setSubiendo(true)
+    setResumen(null)
+    const destino = equipos.map(nombreEquipo).join(', ')
     // Uno a la vez: con archivos de 100 MB en la red de planta, en paralelo se ahogan entre sí.
+    let ok = 0
+    let fallas = 0
     for (let i = 0; i < subidas.length; i++) {
       if (subidas[i]!.estado === 'listo') continue
-      await subirUno(subidas[i]!, i)
+      if (await subirUno(subidas[i]!, i)) ok++
+      else fallas++
     }
     setSubiendo(false)
     setRecarga((n) => n + 1)
+    // La tanda siguiente empieza sin equipos: antes se arrastraban y los archivos nuevos quedaban
+    // también en los equipos de la tanda anterior (16-10-2026, un manual Vistus en la GEA).
+    if (fallas === 0 && ok > 0) {
+      setResumen(`${ok} ${ok === 1 ? 'archivo guardado' : 'archivos guardados'} en ${destino}. Para subir otros, elige el equipo de nuevo.`)
+      setEquipos([])
+    }
   }
 
   const pendientes = subidas.filter((s) => s.estado !== 'listo').length
@@ -163,6 +203,7 @@ export function SubirArchivosEquiposPage() {
           <Button type="button" variant="outline" className="min-h-[44px] w-full" disabled={subiendo} onClick={() => inputRef.current?.click()}>
             <FileUp className="mr-2 size-4" /> Elegir archivos
           </Button>
+          {resumen && <p role="status" className="rounded-card bg-fill-ok/15 px-3 py-2 text-subhead text-ink-ok">{resumen}</p>}
           {rechazados.length > 0 && (
             <ul className="space-y-1 text-footnote text-ink-crit">
               {rechazados.map((r) => <li key={r}>No se sube {r}</li>)}
@@ -189,7 +230,7 @@ export function SubirArchivosEquiposPage() {
                   <p className="mt-1 text-footnote text-muted-foreground">
                     {s.estado === 'espera' && 'Listo para subir'}
                     {s.estado === 'subiendo' && `Subiendo… ${Math.round(s.avance * 100)} %`}
-                    {s.estado === 'listo' && 'Guardado'}
+                    {s.estado === 'listo' && `Guardado en ${s.destino ?? 'el equipo elegido'}`}
                     {s.estado === 'error' && <span className="text-ink-crit">Error: {s.error}</span>}
                   </p>
                 </li>
@@ -201,6 +242,17 @@ export function SubirArchivosEquiposPage() {
           </Button>
         </div>
       </ListGroup>
+
+      {ultimos.length > 0 && (
+        <ListGroup title="Últimos subidos" footer="Cada archivo con los equipos donde quedó.">
+          {ultimos.map((u) => {
+            const nombres = getGlobalEquipmentCache() ?? []
+            const donde = u.equipos.map((id) => { const e = nombres.find((x) => x.id === id); return e ? nombreEquipo(e) : null }).filter(Boolean).join(', ') || u.origen || 'sin equipo'
+            const fecha = u.en ? new Date(u.en).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
+            return <ListCell key={u.id} title={u.titulo} subtitle={`${donde}${fecha ? ` · ${fecha}` : ''}`} onClick={() => window.open(u.url, '_blank', 'noopener')} />
+          })}
+        </ListGroup>
+      )}
 
       {equipos.length > 0 && (
         <ListGroup title="Ya guardados en estos equipos" footer={manuales.length ? undefined : 'Todavía no hay archivos para estos equipos.'}>
