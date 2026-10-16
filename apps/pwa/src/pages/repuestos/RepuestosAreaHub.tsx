@@ -198,6 +198,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // el equipment cache aporta nombre/alias/path de cada nodo-equipo.
   const { loading: eqLoading } = useGlobalEquipmentSearch('', 999)
   const { isUnder, plantaDe, loading: pathsLoading } = useHierarchyPaths()
+  // Unidades que tiene cada familia en cada planta (KNURO en Chonchi: N1, N2, N3), para que
+  // «Dónde se usa» diga «todas» en vez de listar las tres.
+  const totalUnidades = useMemo(() => {
+    const todos = (getGlobalEquipmentCache() || []).filter((e) => !e.oculto && e.nombre).map((e) => ({ machineId: e.id, machineName: e.nombre }))
+    const m = new Map<string, number>()
+    for (const g of agruparDondeSeUsa(todos, plantaDe)) m.set(`${(g.planta ?? '').toUpperCase()}|${g.familia.toUpperCase()}`, g.unidades.length)
+    return (familia: string, planta: string | undefined) => m.get(`${(planta ?? '').toUpperCase()}|${familia.toUpperCase()}`)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plantaDe, eqLoading, pathsLoading])
 
   // "machines" = nodos-equipo de hierarchy (modelo plano: r.equipos[] = nodeIds).
   // machineAreas: nodeId → Set(ancestros) para pertenencia a áreas (cada nodo trae path).
@@ -2644,7 +2653,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   </button>
                                 )}
                               </div>
-                              <DondeSeUsaPills equipos={r.equipos} plantaDe={plantaDe} enFocoId={selectedEquipMachineId} faceta={facetaEfectiva} className="mt-1.5 md:hidden" />
+                              <DondeSeUsaPills equipos={r.equipos} plantaDe={plantaDe} enFocoId={selectedEquipMachineId} faceta={facetaEfectiva} totalUnidades={totalUnidades} className="mt-1.5 md:hidden" />
                               {/* Móvil: tira de hasta 3 miniaturas SOLO si la fila tiene fotos (el 96 %
                                   no tiene: sin cajón vacío). Cada una abre el visor en ESA foto. */}
                               {fotos.length > 0 && (
@@ -2702,7 +2711,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                             </td>
                             )}
                             <td className="hidden px-3 py-2 md:table-cell">
-                              <DondeSeUsaPills equipos={r.equipos} plantaDe={plantaDe} enFocoId={selectedEquipMachineId} faceta={facetaEfectiva} />
+                              <DondeSeUsaPills equipos={r.equipos} plantaDe={plantaDe} enFocoId={selectedEquipMachineId} faceta={facetaEfectiva} totalUnidades={totalUnidades} />
                             </td>
                             <td className="hidden px-3 py-2 md:table-cell">
                               <div className="flex items-center gap-1.5">

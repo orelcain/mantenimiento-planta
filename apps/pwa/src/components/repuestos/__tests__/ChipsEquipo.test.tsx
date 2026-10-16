@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ChipsEquipo } from '../ChipsEquipo'
 
-const PLANTA: Record<string, string> = { b1: 'PLANTA CHONCHI', b2: 'PLANTA CHONCHI', b3: 'PLANTA CHONCHI', k1: 'PLANTA CHONCHI', by: 'PLANTA YAL' }
+const PLANTA: Record<string, string> = { b1: 'PLANTA CHONCHI', b2: 'PLANTA CHONCHI', b3: 'PLANTA CHONCHI', k1: 'PLANTA CHONCHI', by: 'PLANTA QUELLON' }
 const plantaDe = (id: string) => PLANTA[id]
 const eq = (machineId: string, machineName: string) => ({ machineId, machineName })
 const B1 = eq('b1', 'EVISCERADORA BAADER 142 N1')
@@ -38,7 +38,7 @@ describe('ChipsEquipo', () => {
     ]
     render(<ChipsEquipo rows={rows} plantaDe={plantaDe} faceta={null} onChange={vi.fn()} />)
     expect(screen.getByRole('button', { name: /Chonchi\s*3/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Yal\s*1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Quellon\s*1/ })).toBeTruthy()
   })
 
   it('se oculta con 3 filas o menos', () => {

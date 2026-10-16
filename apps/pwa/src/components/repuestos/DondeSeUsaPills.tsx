@@ -9,8 +9,10 @@
  *  - La unidad de la máquina en foco va en cápsula de acento.
  *  - La planta que la faceta de equipo dejó fuera NO se oculta: queda al 55 %.
  *  - Más de dos familias: se muestran dos y «+N familias».
+ *  - Compacto (15-10-2026): sin la planta oculta (Yal); Baader 142 como «antigua»/«nueva»;
+ *    «todas» si va en todas las unidades; el nombre de planta solo si hay más de una.
  */
-import { agruparDondeSeUsa, plantaCorta, type EquipoDelRepuesto, type GrupoDondeSeUsa } from '@/hooks/repuestos/dondeSeUsa'
+import { agruparDondeSeUsa, detalleUnidades, equiposVisiblesEnRepuestos, plantaCorta, type EquipoDelRepuesto, type GrupoDondeSeUsa } from '@/hooks/repuestos/dondeSeUsa'
 import { grupoEnFaceta, tituloFamilia, type Faceta } from '@/utils/repuestos/facetasEquipo'
 import { cn } from '@/lib/utils'
 
@@ -22,16 +24,25 @@ export interface DondeSeUsaPillsProps {
   /** Faceta de equipo activa: lo que quede fuera se atenúa. */
   faceta?: Faceta | null
   maxFamilias?: number
+  /** Unidades que tiene la familia en esa planta (para decir «todas»). */
+  totalUnidades?: (familia: string, planta: string | undefined) => number | undefined
   className?: string
 }
 
 interface Familia { clave: string; titulo: string; grupos: GrupoDondeSeUsa[]; enFoco: boolean }
 
-export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamilias = 2, className }: DondeSeUsaPillsProps) {
-  const grupos = agruparDondeSeUsa(equipos, plantaDe)
-  if (grupos.length === 0) {
+export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamilias = 2, totalUnidades, className }: DondeSeUsaPillsProps) {
+  const todos = agruparDondeSeUsa(equipos, plantaDe)
+  if (todos.length === 0) {
     return <span className={cn('text-footnote text-muted-foreground', className)}>Transversal</span>
   }
+  const grupos = agruparDondeSeUsa(equiposVisiblesEnRepuestos(equipos, plantaDe), plantaDe)
+  if (grupos.length === 0) {
+    // Solo se usa en plantas ocultas: se nombra la familia, sin unidades.
+    const familias = [...new Set(todos.map((g) => tituloFamilia(g.familia)))]
+    return <span className={cn('text-footnote text-muted-foreground', className)}>{familias.slice(0, maxFamilias).join(' · ')} · otra planta</span>
+  }
+  const variasPlantas = new Set(grupos.map((g) => g.planta ?? '')).size > 1
   const porFamilia = new Map<string, Familia>()
   for (const g of grupos) {
     const clave = g.familia.trim().toUpperCase()
@@ -52,7 +63,10 @@ export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamili
           <span className="font-semibold text-foreground">{f.titulo}</span>
           {f.grupos.map((g) => {
             const fuera = !!faceta && !grupoEnFaceta(g, faceta)
-            const planta = plantaCorta(g.planta)
+            const planta = variasPlantas ? plantaCorta(g.planta) : ''
+            const det = detalleUnidades(g, totalUnidades?.(g.familia, g.planta))
+            if (det.tipo === 'ninguno' && !planta) return null
+            const focoEnTexto = det.tipo === 'texto' && !!enFocoId && det.nodeIds.includes(enFocoId)
             return (
               <span
                 key={`${g.planta ?? ''}|${g.familia}`}
@@ -60,7 +74,15 @@ export function DondeSeUsaPills({ equipos, plantaDe, enFocoId, faceta, maxFamili
                 className={cn('inline-flex items-center gap-0.5 rounded-full bg-muted py-0.5 pl-2 pr-1', fuera && 'opacity-55')}
               >
                 {planta && <span className="mr-1 font-semibold text-muted-foreground">{planta}</span>}
-                {g.unidades.map((u) => {
+                {det.tipo === 'texto' && (
+                  <span
+                    data-en-foco={focoEnTexto ? 'true' : undefined}
+                    className={cn('inline-flex h-5 items-center rounded-full px-1.5 text-footnote font-semibold', focoEnTexto ? 'bg-primary text-primary-foreground' : 'text-foreground')}
+                  >
+                    {det.texto}
+                  </span>
+                )}
+                {det.tipo === 'unidades' && det.unidades.map((u) => {
                   const enFoco = !!enFocoId && u.nodeId === enFocoId
                   return (
                     <span
