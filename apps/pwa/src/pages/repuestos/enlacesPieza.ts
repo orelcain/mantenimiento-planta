@@ -81,22 +81,46 @@ export function dibujoDe(
 /**
  * Lo que Áreas tenía abierto al saltar al dibujo (búsqueda escrita + repuesto
  * del panel), para reponerlo al volver con «atrás»: el hub se monta de cero y
- * lo perdía. Vive en sessionStorage y se consume UNA vez.
+ * lo perdía. Vive en sessionStorage y vale para UNA vuelta (ver `VUELTA_RELECTURA_MS`).
  */
+/** Estado de navegación con el que Repuestos abre el dibujo: el visor ofrece volver a la búsqueda. */
+export type DesdeRepuestos = { desdeRepuestos: true; busqueda: string }
+
+export function esDesdeRepuestos(estado: unknown): estado is DesdeRepuestos {
+  return !!estado && typeof estado === 'object' && (estado as { desdeRepuestos?: unknown }).desdeRepuestos === true
+}
+
 export const CLAVE_VOLVER_DEL_DIBUJO = 'repuestos:volverDelDibujo'
-export type VueltaDelDibujo = { q: string; rowKey: string | null }
+/** `todas`: la búsqueda miraba todas las áreas; `autoTodas`: fue el teclear quien la llevó ahí. */
+export type VueltaDelDibujo = { q: string; rowKey: string | null; todas?: boolean; autoTodas?: boolean }
 
 export function recordarVueltaDelDibujo(v: VueltaDelDibujo) {
   try { sessionStorage.setItem(CLAVE_VOLVER_DEL_DIBUJO, JSON.stringify(v)) } catch { /* sin storage */ }
 }
 
-export function leerVueltaDelDibujo(): VueltaDelDibujo | null {
+/**
+ * Margen en que la vuelta se puede leer de nuevo tras la primera lectura. Al cargar, el hub se
+ * monta dos veces (la primera instancia se descarta): si la primera borraba la vuelta, la que
+ * queda en pantalla la encontraba vacía y la búsqueda se perdía (16-10-2026, «clavija»).
+ */
+export const VUELTA_RELECTURA_MS = 5000
+
+export function leerVueltaDelDibujo(ahora: number = Date.now()): VueltaDelDibujo | null {
   try {
     const raw = sessionStorage.getItem(CLAVE_VOLVER_DEL_DIBUJO)
     if (!raw) return null
-    sessionStorage.removeItem(CLAVE_VOLVER_DEL_DIBUJO)
-    const v = JSON.parse(raw) as Partial<VueltaDelDibujo>
-    return { q: typeof v.q === 'string' ? v.q : '', rowKey: typeof v.rowKey === 'string' ? v.rowKey : null }
+    const v = JSON.parse(raw) as Partial<VueltaDelDibujo> & { leidaEn?: number }
+    if (typeof v.leidaEn !== 'number') sessionStorage.setItem(CLAVE_VOLVER_DEL_DIBUJO, JSON.stringify({ ...v, leidaEn: ahora }))
+    else if (ahora - v.leidaEn > VUELTA_RELECTURA_MS) {
+      sessionStorage.removeItem(CLAVE_VOLVER_DEL_DIBUJO)
+      return null
+    }
+    return {
+      q: typeof v.q === 'string' ? v.q : '',
+      rowKey: typeof v.rowKey === 'string' ? v.rowKey : null,
+      ...(v.todas === true ? { todas: true } : {}),
+      ...(v.autoTodas === true ? { autoTodas: true } : {}),
+    }
   } catch { return null }
 }
 

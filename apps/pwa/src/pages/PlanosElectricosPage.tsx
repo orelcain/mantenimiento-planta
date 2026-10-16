@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { esDesdeRepuestos } from '@/pages/repuestos/enlacesPieza'
 import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, Clock, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, Loader2, LayoutPanelTop, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { EncabezadoHerramienta } from '@/components/piel'
@@ -386,7 +387,12 @@ function Visor({ slug }: { slug: string }) {
   // entre planos (boton "Ver en el despiece") window.location puede ir un
   // tick atras del render y este visor arrancaba con la hoja del plano
   // ANTERIOR (carrera intermitente que devolvia al usuario a donde estaba).
-  const busquedaRuta = useLocation().search
+  const ubicacion = useLocation()
+  const busquedaRuta = ubicacion.search
+  // Llegó desde Repuestos («Dibujo» de una fila): se ofrece volver a la búsqueda con un toque.
+  // Se lee una vez: el visor reescribe la URL con replaceState y el estado del router no se usa más.
+  const [desdeRepuestos] = useState(() => (esDesdeRepuestos(ubicacion.state) ? ubicacion.state : null))
+  const volverAtras = useNavigate()
   const [inicial] = useState<number | undefined>(() => {
     const q = Number(new URLSearchParams(busquedaRuta).get('hoja'))
     if (Number.isInteger(q) && q > 0) return q
@@ -936,8 +942,8 @@ function Visor({ slug }: { slug: string }) {
           «‹ BAADER 142 / plano · rev» dentro del riel; ahora el título dice la máquina y el
           subtítulo el plano y su revisión. Las migas internas (hojas, panel) se conservan. */}
       <EncabezadoHerramienta
-        etiquetaVolver="Planos"
-        volverA="/aprendizaje/planos"
+        etiquetaVolver={desdeRepuestos ? 'Repuestos' : 'Planos'}
+        volverA={desdeRepuestos ? '/repuestos' : '/aprendizaje/planos'}
         titulo={cat?.maquina ?? indice.maquina}
         subtitulo={`${indice.plano} · ${indice.rev}`}
         contextoAria={`Estoy en el plano ${indice.plano} de ${cat?.maquina ?? indice.maquina}, hoja ${hoja.blatt}. `}
@@ -945,6 +951,15 @@ function Visor({ slug }: { slug: string }) {
       {/* riel de búsqueda y hojas */}
       <header className="sticky top-0 z-40 flex flex-wrap items-center gap-3 border-b px-3 py-2"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+        {desdeRepuestos && (
+          <button type="button" onClick={() => volverAtras(-1)}
+                  aria-label={desdeRepuestos.busqueda ? `Volver a la búsqueda ${desdeRepuestos.busqueda} en Repuestos` : 'Volver a Repuestos'}
+                  className="flex min-h-[44px] max-md:min-h-[48px] max-w-[260px] shrink-0 items-center gap-1 rounded-ctl border px-3 text-footnote font-medium"
+                  style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+            <ChevronLeft size={15} className="shrink-0" />
+            <span className="truncate">{desdeRepuestos.busqueda ? `Volver a «${desdeRepuestos.busqueda}»` : 'Volver a Repuestos'}</span>
+          </button>
+        )}
         <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca}
