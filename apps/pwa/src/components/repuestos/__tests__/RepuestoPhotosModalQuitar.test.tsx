@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ImagenRepuesto } from '@/types/repuestos'
 
-const borrar = vi.fn(async () => {})
+const borrar = vi.fn(async (_url: string) => {})
 vi.mock('@/services/storage', () => ({
   uploadRepuestoFoto: vi.fn(),
   deleteRepuestoFoto: (url: string) => borrar(url),
