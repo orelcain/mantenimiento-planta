@@ -2160,7 +2160,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           {/* Favoritos de equipos (listas con nombre) — colapsada por defecto, SOLO LECTURA; se edita desde la hoja (admin). */}
           {(equipFavLists.length > 0 || isAdmin) && (
             /* Una fila compacta del mismo estilo que el resto (antes: tarjeta de ~70 px con título de
-               11 px en negrita espaciada). «Mis equipos» para no confundirla con «★ Favoritos» (repuestos). */
+               11 px en negrita espaciada). «Mis equipos» para no confundirla con el chip «Favoritos» (repuestos). */
             <div className="mb-4 rounded-card border border-border bg-card px-3 max-sm:hidden">
               <div className="flex items-center gap-1.5">
                 <button
