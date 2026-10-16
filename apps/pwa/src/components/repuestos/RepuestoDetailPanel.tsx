@@ -23,7 +23,8 @@ import { Button as PielButton, ListGroup, ListCell } from '@/components/piel'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
-import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
+import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta, detalleUnidades, equiposVisiblesEnRepuestos } from '@/hooks/repuestos/dondeSeUsa'
+import { tituloFamilia } from '@/utils/repuestos/facetasEquipo'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
 
@@ -52,6 +53,8 @@ interface RepuestoDetailPanelProps {
   onAssignEquipo?: () => void
   /** Quitar un equipo de la asignación N:M (pide confirmación en el panel). Solo admin. */
   onRemoveEquipo?: (nodeId: string) => Promise<void>
+  /** Unidades de cada familia en cada planta (para decir «todas» en el teléfono). */
+  totalUnidades?: (familia: string, planta: string | undefined) => number | undefined
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
   /** ¿el usuario es admin? Habilita editar/renombrar/reubicar/eliminar. */
   isAdmin?: boolean
@@ -170,7 +173,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, totalUnidades, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -279,6 +282,28 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   // Agrupado por PLANTA y familia: los equipos se llaman igual en las dos plantas.
   const familiasEquipos = agruparDondeSeUsa(equiposReales, plantaDe)
   const totalEquiposUnicos = totalDondeSeUsa(familiasEquipos)
+  // Teléfono: familias visibles (sin plantas ocultas) con detalle compacto, como en la lista.
+  const [familiaAbierta, setFamiliaAbierta] = useState<string | null>(null)
+  const familiasMovil = (() => {
+    const grupos = agruparDondeSeUsa(equiposVisiblesEnRepuestos(equiposReales, plantaDe), plantaDe)
+    const variasPlantas = new Set(grupos.map((g) => g.planta ?? '')).size > 1
+    const m = new Map<string, { clave: string; titulo: string; grupos: typeof grupos; detalle: string; variasPlantas: boolean }>()
+    for (const g of grupos) {
+      const clave = g.familia.trim().toUpperCase()
+      const f = m.get(clave) ?? { clave, titulo: tituloFamilia(g.familia), grupos: [], detalle: '', variasPlantas }
+      f.grupos.push(g)
+      m.set(clave, f)
+    }
+    for (const f of m.values()) {
+      f.detalle = f.grupos.map((g) => {
+        const d = detalleUnidades(g, totalUnidades?.(g.familia, g.planta))
+        const txt = d.tipo === 'texto' ? d.texto : d.tipo === 'unidades' ? d.unidades.map((u) => u.unidad).filter(Boolean).join(' ') : ''
+        const pl = variasPlantas ? plantaCorta(g.planta) : ''
+        return [pl, txt].filter(Boolean).join(' ')
+      }).filter(Boolean).join(' · ')
+    }
+    return [...m.values()]
+  })()
   const etiquetaUnidad = (familia: string, unidad: string, planta?: string) =>
     `${familia}${unidad ? ` ${unidad}` : ''}${planta ? ` · ${plantaCorta(planta)}` : ''}`
   const confirmacionQuitar = quitar && onRemoveEquipo ? (
@@ -785,46 +810,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
             </div>
           )}
 
-          {/* Dónde se usa: la fila ENTERA es tocable (antes el «Ver» medía 38×32) */}
-          <div className="pb-5">
-            <ListGroup
-              className="px-4"
-              title={equiposReales.length > 0 ? `Dónde se usa · ${totalEquiposUnicos} ${totalEquiposUnicos === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
-            >
-              {equiposReales.length > 0 ? (
-                familiasEquipos.flatMap((f) =>
-                  f.unidades.map((u) => (
-                    <ListCell
-                      key={u.nodeId}
-                      className="min-h-[52px]"
-                      title={`${f.familia}${u.unidad ? ` ${u.unidad}` : ''}`}
-                      subtitle={f.planta ? plantaCorta(f.planta) : undefined}
-                      onClick={() => navigate(rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente }))}
-                      trailing={onRemoveEquipo && (
-                        <button
-                          type="button"
-                          aria-label={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)}`}
-                          onClick={(e) => { e.stopPropagation(); setQuitar({ nodeId: u.nodeId, etiqueta: etiquetaUnidad(f.familia, u.unidad, f.planta) }) }}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          className="-my-2 inline-flex size-11 items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
-                        >
-                          <X className="size-4" />
-                        </button>
-                      )}
-                    />
-                  )),
-                )
-              ) : (
-                <ListCell className="min-h-[52px]" title="Disponible para toda la planta" subtitle="Insumo o herramienta sin equipo fijo" />
-              )}
-              {onAssignEquipo && (
-                <ListCell className="min-h-[52px] text-primary" title={equiposReales.length > 0 ? 'Agregar equipo' : 'Asignar a un equipo'} onClick={onAssignEquipo} />
-              )}
-            </ListGroup>
-            {confirmacionQuitar && <div className="px-4">{confirmacionQuitar}</div>}
-          </div>
-
-          {/* Documentos */}
+          {/* Documentos: ARRIBA, junto a las fotos — es lo que se busca en terreno (antes quedaba bajo la lista de equipos, fuera de pantalla). */}
           {(onSpecs || onManual || dibujo || onPhotos) && (
             <div className="pb-5">
               <ListGroup className="px-4" title="Documentos">
@@ -835,6 +821,65 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               </ListGroup>
             </div>
           )}
+
+          {/* Dónde se usa (teléfono): una fila por familia, compacta como en la lista —sin Yal,
+              Baader 142 «antigua/nueva», «todas»—; tocarla despliega sus unidades (abrir o quitar). */}
+          <div className="pb-5">
+            <ListGroup
+              className="px-4"
+              title={equiposReales.length > 0 ? 'Dónde se usa' : 'Material transversal'}
+            >
+              {equiposReales.length > 0 ? (
+                familiasMovil.length > 0 ? familiasMovil.flatMap((f) => {
+                  const abierta = familiaAbierta === f.clave
+                  const celdas = [
+                    <ListCell
+                      key={f.clave}
+                      className="min-h-[52px]"
+                      title={f.titulo}
+                      subtitle={f.detalle || undefined}
+                      value={`${f.grupos.reduce((n, g) => n + g.unidades.length, 0)}`}
+                      onClick={() => setFamiliaAbierta(abierta ? null : f.clave)}
+                      aria-expanded={abierta}
+                    />,
+                  ]
+                  if (abierta) {
+                    for (const g of f.grupos) for (const u of g.unidades) {
+                      celdas.push(
+                        <ListCell
+                          key={u.nodeId}
+                          variant="child"
+                          className="min-h-[48px]"
+                          title={`${u.unidad || tituloFamilia(f.titulo)}${f.variasPlantas && g.planta ? ` · ${plantaCorta(g.planta)}` : ''}`}
+                          onClick={() => navigate(rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente }))}
+                          trailing={onRemoveEquipo && (
+                            <button
+                              type="button"
+                              aria-label={`Quitar ${etiquetaUnidad(g.familia, u.unidad, g.planta)}`}
+                              onClick={(e) => { e.stopPropagation(); setQuitar({ nodeId: u.nodeId, etiqueta: etiquetaUnidad(g.familia, u.unidad, g.planta) }) }}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              className="-my-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
+                            >
+                              <X className="size-4" />
+                            </button>
+                          )}
+                        />,
+                      )
+                    }
+                  }
+                  return celdas
+                }) : (
+                  <ListCell className="min-h-[52px]" title="Solo en otra planta" subtitle="Sus equipos están en una planta que Repuestos no muestra" />
+                )
+              ) : (
+                <ListCell className="min-h-[52px]" title="Disponible para toda la planta" subtitle="Insumo o herramienta sin equipo fijo" />
+              )}
+              {onAssignEquipo && (
+                <ListCell className="min-h-[52px] text-primary" title={equiposReales.length > 0 ? 'Agregar equipo' : 'Asignar a un equipo'} onClick={onAssignEquipo} />
+              )}
+            </ListGroup>
+            {confirmacionQuitar && <div className="px-4">{confirmacionQuitar}</div>}
+          </div>
 
           <div className="px-4">{resto}</div>
         </div>
