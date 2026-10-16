@@ -368,7 +368,7 @@ export function EditarFavoritosSheet({
       <Sheet
         open={open}
         onClose={intentarCerrar}
-        title="Favoritos de equipos"
+        title="Mis equipos"
         surface="grouped"
         size="wide"
         actions={
