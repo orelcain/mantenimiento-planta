@@ -42,7 +42,7 @@ import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAre
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
 import { Link, useNavigate } from 'react-router-dom'
-import { dibujoDe, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, useFigurasDespiece } from './enlacesPieza'
+import { dibujoDe, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, useFigurasDespiece, type DesdeRepuestos } from './enlacesPieza'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
@@ -263,7 +263,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     if (esTelefono()) return null
     try { return localStorage.getItem(STORAGE_KEY) } catch { return null }
   })
-  const [showingAll, setShowingAll] = useState(false)
+  // Si venimos de «atrás» desde el dibujo, reponer búsqueda, alcance y panel (una sola vuelta).
+  const [vueltaDelDibujo] = useState(() => leerVueltaDelDibujo())
+  const [showingAll, setShowingAll] = useState(() => !!vueltaDelDibujo?.todas)
 
   // Carga de datos: si el usuario mira un área puntual, traer SOLO esa área
   // (query por `areaIds`) en vez del maestro completo (~7.700 docs) — el
@@ -304,8 +306,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // machineId/nodeId del equipo enfocado → acotar repuestos por IDENTIDAD (no por nombre).
   const [selectedEquipMachineId, setSelectedEquipMachineId] = useState<string | null>(null)
 
-  // Si venimos de «atrás» desde el dibujo, reponer búsqueda y panel (se consume una vez).
-  const [vueltaDelDibujo] = useState(() => leerVueltaDelDibujo())
 
   // Filtros + paginación de la tabla de repuestos
   const [repQuery, setRepQuery] = useState(() => vueltaDelDibujo?.q ?? '')
@@ -650,7 +650,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   }, [recientes, bodegaItems])
   const [menuMasOpen, setMenuMasOpen] = useState(false)
   /** `showingAll` lo levantó el buscador (no el usuario): al borrar el texto se devuelve. */
-  const autoTodasRef = useRef(false)
+  const autoTodasRef = useRef(!!vueltaDelDibujo?.autoTodas)
   // La burbuja de ARIA tapaba estrellas y filas en todo Repuestos: en el teléfono se esconde
   // (ARIA queda en el menú ⋯ y como última fila de una búsqueda).
   useEffect(() => {
@@ -1247,9 +1247,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const figurasDespiece = useFigurasDespiece()
   const navigate = useNavigate()
   const irAlDibujo = useCallback((ruta: string, rowKey: string) => {
-    recordarVueltaDelDibujo({ q: repQuery, rowKey })
-    navigate(ruta)
-  }, [navigate, repQuery])
+    recordarVueltaDelDibujo({ q: repQuery, rowKey, todas: showingAll, autoTodas: autoTodasRef.current })
+    // El visor muestra «‹ Repuestos» (y la búsqueda) para volver con un toque.
+    navigate(ruta, { state: { desdeRepuestos: true, busqueda: repQuery.trim() } satisfies DesdeRepuestos })
+  }, [navigate, repQuery, showingAll])
   const selectedRep = useMemo(
     () => areaRepuestos.find((r) => r.rowKey === selectedRowKey) ?? null,
     [areaRepuestos, selectedRowKey],
