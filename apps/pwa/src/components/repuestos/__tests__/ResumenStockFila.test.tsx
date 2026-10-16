@@ -14,14 +14,14 @@ describe('ResumenStockFila', () => {
     expect(screen.getByRole('button', { name: /9\s*disponibles/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /1\s*bajo/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /2\s*sin stock/ })).toBeTruthy()
-    expect(screen.getByText('valor $1,2 M')).toBeTruthy()
+    expect(screen.getByText('$1,2 M')).toBeTruthy()
   })
 
   it('oculta los chips con conteo 0 y el valor 0', () => {
     render(<ResumenStockFila resumen={{ ...base, low: 0, comunSinStock: 0, valor: 0 }} activo={null} onElegir={() => {}} />)
     expect(screen.queryByRole('button', { name: /bajo/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /común/ })).toBeNull()
-    expect(screen.queryByText(/valor/)).toBeNull()
+    expect(screen.queryByText(/valor en bodega/)).toBeNull()
   })
 
   it('mantiene visible el chip activo aunque quede en 0', () => {
