@@ -3076,7 +3076,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               const already = new Set((selectedRep?.equipos || []).map((e) => e.machineId))
               const q = normalizeForSearch(asignarEquipoQuery)
               const cands = (getGlobalEquipmentCache() || [])
-                .filter((e) => !already.has(e.id) && (!q || normalizeForSearch(`${e.nombre} ${e.alias ?? ''} ${e.codigo ?? ''}`).includes(q)))
+                .filter((e) => !e.oculto && !already.has(e.id) && (!q || normalizeForSearch(`${e.nombre} ${e.alias ?? ''} ${e.codigo ?? ''}`).includes(q)))
                 .slice(0, 50)
               if (!cands.length) return <p className="px-1 py-2 text-xs text-muted-foreground">Sin equipos que coincidan.</p>
               return cands.map((e) => (
