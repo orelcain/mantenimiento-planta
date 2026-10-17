@@ -54,9 +54,12 @@ export function aplicarAIndice(
     if (a.estado !== 'ubicada' || !a.b || !a.codigo || !out[a.codigo]) continue
     const lista = out[a.codigo]!.map((p) => ({ ...p }))
     const enHoja = lista.filter((p) => p.h === a.hoja)
-    const objetivo = enHoja.length === 1 ? enHoja[0] : enHoja.find((p) => esCajaRespaldo(p.b, vbPorHoja.get(p.h) ?? []))
-    if (!objetivo) continue
-    objetivo.b = a.b
+    // Una sola aparición: esa. Varias: las que siguen sin marca. El catálogo repite filas del mismo
+    // código con la MISMA posición (pos. 4 cuatro veces en la fig. 103-3); con una sola corregida,
+    // las copias seguían en la cola (16-10-2026: 7 tareas que no se podían cerrar).
+    const objetivos = enHoja.length === 1 ? enHoja : enHoja.filter((p) => esCajaRespaldo(p.b, vbPorHoja.get(p.h) ?? []))
+    if (!objetivos.length) continue
+    for (const o of objetivos) o.b = a.b
     out[a.codigo] = lista
   }
   return out

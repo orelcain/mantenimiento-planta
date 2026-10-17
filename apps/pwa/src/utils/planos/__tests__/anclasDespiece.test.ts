@@ -31,6 +31,14 @@ describe('anclasDespiece', () => {
     expect(colaRevision(corregido, sap, VB, anclas)).toEqual([])
   })
 
+  it('un ancla cubre todas las copias sin marca del mismo código en la hoja', () => {
+    const indice = { C: [{ h: 45, c: 0, b: RESPALDO }, { h: 45, c: 0, b: RESPALDO }, { h: 20, c: 0, b: RESPALDO }] }
+    const anclas: AnclaDespiece[] = [{ hoja: 45, pos: '4', codigo: 'C', b: [5, 5, 14, 14], estado: 'ubicada' }]
+    const corregido = aplicarAIndice(indice, VB, anclas)
+    expect(corregido.C!.map((p) => p.b)).toEqual([[5, 5, 14, 14], [5, 5, 14, 14], RESPALDO])
+    expect(colaRevision(corregido, { C: {} }, VB, anclas)).toEqual([{ codigo: 'C', h: 20 }])
+  })
+
   it('«no está en este dibujo» también sale de la cola; sin SAP nunca entra', () => {
     const indice = { A: [{ h: 45, c: 0, b: RESPALDO }], B: [{ h: 45, c: 0, b: RESPALDO }] }
     const anclas: AnclaDespiece[] = [{ hoja: 45, pos: '3', codigo: 'A', b: null, estado: 'no-esta' }]
