@@ -285,6 +285,8 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .plat-nom { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plat-sub { font-size: 12px; font-weight: 400; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plat-pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); flex-shrink: 0; }
+.plat-pill.gratis { background: color-mix(in srgb, #34c759 20%, transparent); color: #1f8f3f; }
+.ver-gratis { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.28); font-size: 11px; font-weight: 700; }
 .plat-nota { font-size: 12px; color: var(--hint); margin-top: 8px; line-height: 1.4; }
 .plat-fichas { display: flex; flex-wrap: wrap; gap: 6px; }
 .plat-fichas .link-add-btn { width: auto; border-style: solid; }
@@ -2393,9 +2395,10 @@ function combinarPlataformas(al, sv, plan, titulo) {
     const k = claveSitio(nombre);
     if (!u || !/^https:/.test(u) || !k) return;
     let e = mapa.get(k);
-    if (!e) { e = { clave: k, nombre: NOMBRE_PLAT[k] || nombre, url: null, directo: false, tipo: null, logo: null, fuentes: [] }; mapa.set(k, e); }
+    if (!e) { e = { clave: k, nombre: NOMBRE_PLAT[k] || nombre, url: null, directo: false, tipo: null, gratis: false, logo: null, fuentes: [] }; mapa.set(k, e); }
     if (!e.fuentes.includes(fuente)) e.fuentes.push(fuente);
     if (extra.directo) { if (!e.directo) { e.url = u; e.directo = true; } } else if (!e.url) e.url = u;
+    if (extra.tipo === 'gratis') e.gratis = true;
     if (extra.tipo && (e.tipo == null || TIPO_ORDEN[extra.tipo] < TIPO_ORDEN[e.tipo])) e.tipo = extra.tipo;
     if (extra.logo && !e.logo && /^\/[A-Za-z0-9_.-]+$/.test(extra.logo)) e.logo = extra.logo;
     // Idiomas: solo si Kitsu los trae; nunca se completan a ojo.
@@ -2413,15 +2416,34 @@ function combinarPlataformas(al, sv, plan, titulo) {
   }
   const rango = (e) => {
     const enChile = e.tipo === 'suscripcion' || e.tipo === 'gratis';
-    if (e.pago && (enChile || !tmdbOk)) return 0;
+    if ((e.pago && (enChile || !tmdbOk)) || e.gratis) return 0;
     if (enChile) return 1;
     if (e.tipo) return 2;
     return 3;
   };
-  const lista = [...mapa.values()].sort((a, b) => rango(a) - rango(b) || plan.indexOf(a.clave) - plan.indexOf(b.clave));
-  return { lista, enlaces: d.enlaces || [], otros: d.otros || [], anilistOk: al.ok, servidorOk: sv.ok, tmdbOk };
+  const lista = [...mapa.values()].sort((a, b) => rango(a) - rango(b) || (b.pago - a.pago) || plan.indexOf(a.clave) - plan.indexOf(b.clave));
+  return { lista, youtube: d.youtube || [], enlaces: d.enlaces || [], otros: d.otros || [], anilistOk: al.ok, servidorOk: sv.ok, tmdbOk };
 }
 const _platCache = new Map();
+const _gratisPorId = new Map(); // id → true si la plataforma que abriría «Ver episodio» es gratis
+function candidatosVer(r) {
+  const preferidas = r.lista.filter((e) => e.tipo !== 'arriendo' && e.tipo !== 'compra');
+  return preferidas.length ? preferidas : r.lista;
+}
+function principalVer(id, r) {
+  const cand = candidatosVer(r);
+  return cand.find((e) => e.clave === platPrefs()[id]) || (cand.length === 1 ? cand[0] : null);
+}
+function marcarGratisBotones(id, r) {
+  const e = principalVer(id, r) || candidatosVer(r)[0];
+  const gratis = !!(e && e.gratis && e.tipo === 'gratis');
+  if (gratis) _gratisPorId.set(id, true); else _gratisPorId.delete(id);
+  document.querySelectorAll(`.ver-ep-btn[data-vid="${id}"]`).forEach((b) => {
+    const tag = b.querySelector('.ver-gratis');
+    if (gratis && !tag) b.insertAdjacentHTML('beforeend', ' <span class="ver-gratis">Gratis</span>');
+    else if (!gratis && tag) tag.remove();
+  });
+}
 function cargarPlataformas(id, titulo) {
   id = Number(id);
   const hit = _platCache.get(id);
@@ -2436,6 +2458,7 @@ function cargarPlataformas(id, titulo) {
     return combinarPlataformas(al, sv, plan, titulo);
   })();
   _platCache.set(id, p);
+  p.then((r) => { try { marcarGratisBotones(id, r); } catch { /* cosmético */ } });
   p.then((r) => { if (!r.anilistOk || !r.servidorOk) setTimeout(() => _platCache.delete(id), 120000); });
   return p;
 }
@@ -2457,8 +2480,17 @@ function idiomasTxt(e) {
   if (e.idiomas.subs.length) partes.push(`Subtítulos: ${e.idiomas.subs.map(_nombreIdioma).join(', ')}`);
   return partes.length ? `${partes.join(' · ')} (Kitsu)` : '';
 }
+// Canales oficiales de YouTube con licencia: SOLO sugerencia (búsqueda dentro del canal). Sin la API de
+// YouTube no se sabe si el título está ni si se ve en Chile (varios son de Asia).
+function htmlYoutube(r) {
+  if (!r.youtube || !r.youtube.length) return '';
+  return `<div class="plat-nota" style="margin-top:12px"><b>Puede estar en YouTube (oficial)</b> · verificar disponibilidad en Chile</div>
+    <div class="link-list" style="margin-top:6px">${r.youtube.map((y) => `<div class="link-row"><button class="link-open-btn" ${actionAttrs('openExternal', [y.url])}>
+      <span class="plat-txt"><span class="plat-nom">${safe(y.canal)}</span><span class="plat-sub">Sugerencia: busca el título en el canal oficial</span></span><span class="link-arrow">→</span></button></div>`).join('')}</div>`;
+}
 function subtituloPlat(e, r) {
-  const base = r.tmdbOk ? (e.tipo ? `${TIPO_TXT[e.tipo]} en Chile` : 'No figura en Chile') : 'Enlace oficial';
+  let base = r.tmdbOk ? (e.tipo ? `${TIPO_TXT[e.tipo]} en Chile` : 'No figura en Chile') : 'Enlace oficial';
+  if (e.gratis && e.tipo !== 'gratis') base += ' · también gratis con anuncios';
   return `${base} · ${e.fuentes.join(', ')}`;
 }
 async function loadWhereToWatch(id, titulo) {
@@ -2476,12 +2508,13 @@ async function loadWhereToWatch(id, titulo) {
     const logo = e.logo ? `<img class="plat-logo" src="https://image.tmdb.org/t/p/w92${e.logo}" alt="" loading="lazy">` : '';
     const plan = e.pago && (e.tipo === 'suscripcion' || e.tipo === 'gratis' || !r.tmdbOk) ? '<span class="plat-pill">En tu plan</span>' : '';
     return `<div class="link-row"><button class="link-open-btn" ${actionAttrs('abrirPlataforma', [id, e.clave])}>${logo}
-      <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span>${idiomasTxt(e) ? `<span class="plat-sub">${safe(idiomasTxt(e))}</span>` : ''}</span>${plan}<span class="link-arrow">→</span></button></div>`;
+      <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span>${idiomasTxt(e) ? `<span class="plat-sub">${safe(idiomasTxt(e))}</span>` : ''}</span>${e.gratis ? '<span class="plat-pill gratis">Gratis</span>' : ''}${plan}<span class="link-arrow">→</span></button></div>`;
   }).join('');
   const hayIdiomas = r.lista.some((e) => idiomasTxt(e));
   const otros = r.otros.slice(0, 5).map((o) => `${_nombrePais(o.pais)}: ${o.plataformas.join(', ')}`);
   const fuentes = [...new Set(r.lista.flatMap((e) => e.fuentes))];
   cur.innerHTML = (filas ? `<div class="link-list">${filas}</div>` : '<span style="color:var(--hint);font-size:13px">No hay plataformas oficiales conocidas para este título. Prueba con «Mis links».</span>')
+    + htmlYoutube(r)
     + (otros.length ? `<div class="plat-nota">En otros países (VPN): ${safe(otros.join(' · '))}</div>` : '')
     + (hayIdiomas ? '<div class="plat-nota">Idiomas según Kitsu: no indica región ni distingue español latino de España, y sus datos suelen ser de EE. UU. Confirma el audio y los subtítulos en la plataforma.</div>' : '')
     + (fuentes.length ? `<div class="plat-nota">Fuentes: ${safe(fuentes.join(', '))}. La disponibilidad cambia sin aviso.</div>` : '');
@@ -2513,7 +2546,7 @@ async function abrirPlataforma(id, clave) {
 function btnVerEp(id, ep, titulo, esPelicula, grande) {
   if (!id) return '';
   const label = esPelicula ? 'Ver película' : (ep ? `Ver episodio ${ep}` : 'Ver en plataforma');
-  return `<button class="ver-ep-btn${grande ? ' grande' : ''}" ${actionAttrs('verEpisodio', [id, ep || null, titulo || '', !!esPelicula], true)}>${safe(label)}</button>`;
+  return `<button class="ver-ep-btn${grande ? ' grande' : ''}" data-vid="${safe(id)}" ${actionAttrs('verEpisodio', [id, ep || null, titulo || '', !!esPelicula], true)}>${safe(label)}${_gratisPorId.get(Number(id)) ? ' <span class="ver-gratis">Gratis</span>' : ''}</button>`;
 }
 let _verCtx = null;
 async function verEpisodio(id, ep, titulo, esPelicula) {
@@ -2522,22 +2555,24 @@ async function verEpisodio(id, ep, titulo, esPelicula) {
   toast('Buscando dónde verlo…');
   let r;
   try { r = await cargarPlataformas(id, titulo); } catch { r = null; }
-  if (!r || !r.lista.length) { toast('Sin plataforma oficial conocida: mira «¿Dónde ver?» en la ficha'); return; }
-  const preferidas = r.lista.filter((e) => e.tipo !== 'arriendo' && e.tipo !== 'compra');
-  const cand = preferidas.length ? preferidas : r.lista;
+  const yt = (r && r.youtube) || [];
+  if (!r || (!r.lista.length && !yt.length)) { toast('Sin plataforma oficial conocida: mira «¿Dónde ver?» en la ficha'); return; }
+  const cand = candidatosVer(r);
   const ultima = cand.find((e) => e.clave === platPrefs()[id]);
   if (ultima || cand.length === 1) {
     const e = ultima || cand[0];
     guardarPlat(id, e.clave);
-    toast(`Abriendo ${e.nombre}` + (cand.length > 1 ? ' · cambia en «¿Dónde ver?» de la ficha' : ''));
+    toast(`Abriendo ${e.nombre}${e.gratis && e.tipo === 'gratis' ? ' (gratis)' : ''}` + (cand.length > 1 ? ' · cambia en «¿Dónde ver?» de la ficha' : ''));
     openExternal(e.url);
     return;
   }
   _verCtx = { id, cand };
   document.getElementById('ver-modal-title').textContent = esPelicula ? 'Ver película' : (ep ? `Ver episodio ${ep}` : 'Ver en plataforma');
-  document.getElementById('ver-modal-sub').textContent = `${titulo || 'Elige dónde'} · se abre la serie en la plataforma`;
+  document.getElementById('ver-modal-sub').textContent = cand.length ? `${titulo || 'Elige dónde'} · se abre la serie en la plataforma` : `${titulo || 'Sin plataformas confirmadas'} · solo sugerencias`;
   document.getElementById('ver-lista').innerHTML = cand.map((e) => `<div class="link-row"><button class="link-open-btn" ${actionAttrs('elegirPlataforma', [e.clave])}>
-    <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span></span>${e.pago ? '<span class="plat-pill">En tu plan</span>' : ''}<span class="link-arrow">→</span></button></div>`).join('');
+    <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span></span>${e.gratis ? '<span class="plat-pill gratis">Gratis</span>' : ''}${e.pago ? '<span class="plat-pill">En tu plan</span>' : ''}<span class="link-arrow">→</span></button></div>`).join('')
+    + (yt.length ? `<div class="plat-nota"><b>Puede estar en YouTube (oficial)</b> · verificar disponibilidad en Chile</div>${yt.map((y) => `<div class="link-row"><button class="link-open-btn" ${actionAttrs('openExternal', [y.url])}>
+    <span class="plat-txt"><span class="plat-nom">${safe(y.canal)}</span><span class="plat-sub">Sugerencia, no confirmado</span></span><span class="link-arrow">→</span></button></div>`).join('')}` : '');
   document.getElementById('ver-modal').classList.add('open');
 }
 function elegirPlataforma(clave) {

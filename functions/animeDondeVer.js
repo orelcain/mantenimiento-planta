@@ -22,6 +22,32 @@ const PROV_CLAVE = { 8: 'netflix', 119: 'prime', 337: 'disney', 283: 'crunchyrol
 const NOMBRE_PLAT = { crunchyroll: 'Crunchyroll', netflix: 'Netflix', prime: 'Prime Video', disney: 'Disney+', max: 'Max', appletv: 'Apple TV', youtube: 'YouTube' };
 const PLAN_DEFECTO = ['crunchyroll', 'netflix', 'prime', 'disney']; // lo que paga el usuario, si cine/datos no dice otra cosa
 
+/**
+ * Canales de YouTube oficiales que suben anime completo con licencia. Se usan SOLO como sugerencia
+ * (búsqueda dentro del canal): sin la API de YouTube no se puede confirmar que el título esté ni que
+ * se vea en Chile (muchos están limitados a Asia). Verificado el 2026-10-22 en la página de cada canal.
+ * No se agregan canales sin licencia comprobable.
+ */
+const CANALES_YOUTUBE = [
+  { nombre: 'Crunchyroll en Español', handle: 'CrunchyrollEnEspanol', idioma: 'es', fuente: 'https://www.youtube.com/@CrunchyrollEnEspanol/about', nota: 'Cuenta oficial de Crunchyroll en español (insignia de canal verificado).' },
+  { nombre: 'Crunchyroll', handle: 'Crunchyroll', idioma: 'en', fuente: 'https://www.youtube.com/@Crunchyroll/about', nota: 'Canal oficial de Crunchyroll: episodios completos, clips y tráilers (verificado).' },
+  { nombre: 'Muse Asia', handle: 'MuseAsia', idioma: 'en', fuente: 'https://www.youtube.com/@MuseAsia/about', nota: 'Muse Communication, agente autorizado de más de 30 titulares de derechos; subtítulos en inglés, región Asia.' },
+  { nombre: 'Ani-One Asia', handle: 'AniOneAsia', idioma: 'en', fuente: 'https://www.youtube.com/@AniOneAsia/about', nota: 'Canal del grupo Medialink, que declara tener los derechos de todo lo que publica (verificado); región Asia.' },
+];
+
+/** Enlaces de búsqueda dentro de cada canal oficial. Son sugerencias, nunca datos confirmados. */
+function sugerenciasYoutube(titulo) {
+  const q = String(titulo || '').trim().slice(0, 100);
+  if (!q) return [];
+  return CANALES_YOUTUBE.map((c) => ({
+    canal: c.nombre,
+    idioma: c.idioma,
+    url: `https://www.youtube.com/@${c.handle}/search?query=${encodeURIComponent(q)}`,
+    fuente: c.fuente,
+    nota: c.nota,
+  }));
+}
+
 function planDeProveedores(ids) {
   const cl = [...new Set((Array.isArray(ids) ? ids : []).map((i) => PROV_CLAVE[i]).filter(Boolean))];
   return cl.length ? cl : PLAN_DEFECTO;
@@ -236,6 +262,7 @@ async function dondeVerAnime({ fetchJson, tmdbTitulo, anilistId, titulo, region 
     region,
     paisBase: filasPais(t && t.dondeVer && t.dondeVer[region], nombreBusqueda),
     otros: t ? otrosPaises(t.dondeVer, region) : [],
+    youtube: sugerenciasYoutube(nombreBusqueda),
     fallos,
   };
 }
@@ -251,18 +278,24 @@ function elegirVerAhora(datos, { recordada, plan } = {}) {
   for (const f of (datos && datos.paisBase) || []) {
     if (f.tipo !== 'suscripcion' && f.tipo !== 'gratis') continue;
     const k = claveSitio(f.nombre);
-    if (k && !cand.has(k)) cand.set(k, { clave: k, nombre: NOMBRE_PLAT[k] || f.nombre, url: f.url, directo: false });
+    if (!k) continue;
+    if (!cand.has(k)) cand.set(k, { clave: k, nombre: NOMBRE_PLAT[k] || f.nombre, url: f.url, directo: false, gratis: false, suscripcion: false });
+    const c = cand.get(k);
+    if (f.tipo === 'gratis') c.gratis = true; else c.suscripcion = true;
   }
   for (const o of (datos && datos.oficiales) || []) {
     const c = cand.get(claveSitio(o.sitio));
     if (c && o.url) { c.url = o.url; c.directo = true; }
   }
-  const elegido = (recordada && cand.get(recordada)) || (plan || PLAN_DEFECTO).map((k) => cand.get(k)).find(Boolean);
-  return elegido && /^https:\/\//.test(elegido.url || '') ? elegido : null;
+  // Sin ninguna del plan, una plataforma gratis (con anuncios) que sea solo gratis en Chile.
+  const soloGratis = [...cand.values()].find((c) => c.gratis && !c.suscripcion);
+  const elegido = (recordada && cand.get(recordada)) || (plan || PLAN_DEFECTO).map((k) => cand.get(k)).find(Boolean) || soloGratis;
+  if (!elegido || !/^https:\/\//.test(elegido.url || '')) return null;
+  return { clave: elegido.clave, nombre: elegido.nombre, url: elegido.url, directo: elegido.directo, gratis: elegido.gratis && !elegido.suscripcion };
 }
 
 module.exports = {
-  PROV_CLAVE, NOMBRE_PLAT, PLAN_DEFECTO, planDeProveedores, elegirVerAhora,
+  PROV_CLAVE, NOMBRE_PLAT, PLAN_DEFECTO, CANALES_YOUTUBE, sugerenciasYoutube, planDeProveedores, elegirVerAhora,
   urlPlataforma, claveSitio, normIds, idsDeAnilist, enlacesFicha, normStreamingKitsu, normStreamingJikan,
   unirEnlaces, filasPais, otrosPaises, dondeVerAnime,
 };
