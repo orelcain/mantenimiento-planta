@@ -8620,6 +8620,49 @@ async function _queryAniListSeguro(query, variables) {
   throw ultimo || new Error('AniList no respondió');
 }
 
+// ── Respaldo cuando AniList no responde (Jikan → Kitsu, IDs traducidos con ARM) ──
+// Ver functions/animeRespaldo.js. La caché vive en Firestore (anime_cache/*), solo servidor.
+const animeRespaldoLib = require('./animeRespaldo');
+async function _fetchJsonAnime(url, { method = 'GET', headers, body, timeout = 8000 } = {}) {
+  const r = await fetch(url, {
+    method,
+    headers: { Accept: 'application/json', ...(headers || {}) },
+    body,
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+let _animeRespaldoInst = null;
+function _animeRespaldo() {
+  if (!_animeRespaldoInst) {
+    _animeRespaldoInst = animeRespaldoLib.crearRespaldo({
+      fetchJson: _fetchJsonAnime,
+      cache: {
+        async get(id) { const d = await db.collection('anime_cache').doc(id).get(); return d.exists ? d.data() : null; },
+        async set(id, obj) { await db.collection('anime_cache').doc(id).set(obj); },
+      },
+    });
+  }
+  return _animeRespaldoInst;
+}
+// Respaldo → forma {episode, airingAt, media} que usan los crons con AniList.
+// episode puede ser null (Jikan/Kitsu no dicen el número).
+function _comoSchedules(items) {
+  return items.map((it) => ({
+    episode: it.episode,
+    airingAt: it.airingAt,
+    media: {
+      id: it.id || it.idRespaldo,
+      respaldo: true,
+      isAdult: false,
+      title: { romaji: it.title, english: it.title },
+      averageScore: it.score,
+      format: it.format,
+    },
+  }));
+}
+
 // manual=true (herramienta de admin): no mira ni marca el "ya enviado", así un
 // disparo de prueba a media tarde no impide el resumen de las 23:00.
 async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
@@ -8641,12 +8684,25 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
   const from = Math.floor((Date.UTC(y, mo - 1, d, 0, 0, 0) - offsetMin * 60000) / 1000);
   const to = Math.floor(Date.now() / 1000) + 3600;
   const GQL = `query($f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id isAdult title{romaji english}averageScore format}}}}`;
-  const schedules = [];
-  for (let p = 1; p <= 4; p++) {
-    const json = await _queryAniListSeguro(GQL, { f: from, t: to, p });
-    const page = json.data.Page || {};
-    schedules.push(...(page.airingSchedules || []));
-    if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+  let schedules = [];
+  let fuenteRespaldo = null;
+  try {
+    for (let p = 1; p <= 4; p++) {
+      const json = await _queryAniListSeguro(GQL, { f: from, t: to, p });
+      const page = json.data.Page || {};
+      schedules.push(...(page.airingSchedules || []));
+      if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+    }
+  } catch (e) {
+    logger.warn('[anime] AniList falló en el resumen, uso respaldo:', e.message);
+    try {
+      const r = await _animeRespaldo().estrenosDia(from, to, { cachear: false });
+      schedules = _comoSchedules(r.items);
+      fuenteRespaldo = r.fuente;
+    } catch (e2) {
+      logger.error('[anime] respaldo del resumen también falló:', e2.message);
+      throw e; // sin ninguna fuente: no se marca el día como enviado
+    }
   }
   const visibles = schedules.filter((s) => s.media && !s.media.isAdult);
 
@@ -8686,7 +8742,8 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
   for (const s of visibles) {
     const id = String(s.media.id);
     const g = porSerie.get(id);
-    if (g) { g.eps.push(s.episode); g.airingAt = Math.min(g.airingAt, s.airingAt); } else porSerie.set(id, { media: s.media, eps: [s.episode], airingAt: s.airingAt });
+    // episode puede ser null con el respaldo (Jikan/Kitsu no dan el número)
+    if (g) { if (s.episode != null) g.eps.push(s.episode); g.airingAt = Math.min(g.airingAt, s.airingAt); } else porSerie.set(id, { media: s.media, eps: s.episode != null ? [s.episode] : [], airingAt: s.airingAt });
   }
 
   const FMT = { MOVIE: '🎬', ONA: '🖥️', OVA: '📀', SPECIAL: '🌟', TV: '📺', TV_SHORT: '📺' };
@@ -8696,7 +8753,7 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
   for (const [id, g] of porSerie) {
     const m = g.media;
     const eps = g.eps.sort((a, b) => a - b);
-    const epTxt = eps.length > 1 ? `ep${eps[0]}–${eps[eps.length - 1]}` : `ep${eps[0]}`;
+    const epTxt = !eps.length ? 'nuevo ep' : (eps.length > 1 ? `ep${eps[0]}–${eps[eps.length - 1]}` : `ep${eps[0]}`);
     const title = _tgHtml(String((m.title && (m.title.english || m.title.romaji)) || 'Sin título').substring(0, 40));
     const score = m.averageScore ? ` ⭐${m.averageScore}` : '';
     const fmt = FMT[m.format] || '🎞';
@@ -8727,7 +8784,8 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
       + seccion('🆕 <b>Estrenos nuevos · ep 1', premieres, premTope)
       + seccion('📡 <b>Descubrimiento', discovery, 8)
       + (cine ? seccion('🎬 <b>Llegó a tus plataformas', cine.nuevos, 5) + seccion('🍿 <b>Estrenos en cines esta semana', cine.cines, 5) : '')
-      + (hayCine ? '\n\n<i>Cine y series: datos de JustWatch vía TMDB.</i>' : '');
+      + (hayCine ? '\n\n<i>Cine y series: datos de JustWatch vía TMDB.</i>' : '')
+      + (fuenteRespaldo ? `\n\n<i>AniList no responde: lista armada con ${fuenteRespaldo === 'jikan' ? 'Jikan (MyAnimeList)' : 'Kitsu'}; puede faltar algún episodio.</i>` : '');
     if (text.length <= 3900) break;
     tracTope = Math.max(8, tracTope - 5);
     premTope = Math.max(5, premTope - 4);
@@ -8853,25 +8911,39 @@ async function _runAvisosEpisodios(botToken) {
 
   const ids = [...porId.keys()];
   const GQL = 'query($ids:[Int],$f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
-  const schedules = [];
-  for (let i = 0; i < ids.length; i += 50) {
-    for (let p = 1; p <= 3; p++) {
-      const json = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: ahora, p });
-      const page = json.data.Page || {};
-      schedules.push(...(page.airingSchedules || []));
-      if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+  let schedules = [];
+  let conRespaldo = false;
+  try {
+    for (let i = 0; i < ids.length; i += 50) {
+      for (let p = 1; p <= 3; p++) {
+        const json = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: ahora, p });
+        const page = json.data.Page || {};
+        schedules.push(...(page.airingSchedules || []));
+        if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+      }
     }
+  } catch (e) {
+    // AniList caído: estrenos del rango por Jikan/Kitsu, cruzados con los IDs de «viendo».
+    logger.warn('[anime] AniList falló en avisos, uso respaldo:', e.message);
+    let r;
+    try { r = await _animeRespaldo().episodiosEntre(desde, ahora); } catch (e2) {
+      logger.error('[anime] respaldo de avisos también falló:', e2.message);
+      throw e; // sin ninguna fuente: no se avanza ultimoCorte, el próximo ciclo reintenta
+    }
+    schedules = _comoSchedules(r.items.filter((it) => it.id && porId.has(it.id)));
+    conRespaldo = true;
   }
 
   const pendientes = [];
   const yaVistos = new Set(); // una emisión puede venir repetida entre páginas/grupos
   for (const s of schedules) {
     const a = porId.get(Number(s.media && s.media.id));
-    if (!a || (Number(a.watchedEps) || 0) >= s.episode) continue;
-    const clave = `${s.media.id}_${s.episode}`;
-    if (yaVistos.has(clave)) continue;
-    yaVistos.add(clave);
-    const ref = db.collection('anime_notifications').doc(`ep_${s.media.id}_${s.episode}`);
+    // episode null (respaldo): no se puede comparar con lo visto; la clave usa la fecha de emisión
+    if (!a || (s.episode != null && (Number(a.watchedEps) || 0) >= s.episode)) continue;
+    const idDoc = animeRespaldoLib.claveAvisoEpisodio(s.media.id, s.episode, s.airingAt);
+    if (yaVistos.has(idDoc)) continue;
+    yaVistos.add(idDoc);
+    const ref = db.collection('anime_notifications').doc(idDoc);
     if ((await ref.get()).exists) continue;
     pendientes.push({ s, ref });
   }
@@ -8880,13 +8952,14 @@ async function _runAvisosEpisodios(botToken) {
     const lineas = pendientes.map(({ s }) => {
       const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || 'Sin título').substring(0, 45));
       const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
-      return `▶️ <b>${t}</b> · ep ${s.episode} · ${h}`;
+      return `▶️ <b>${t}</b> · ${s.episode != null ? `ep ${s.episode}` : 'nuevo episodio'} · ${h}`;
     });
     const titulo = pendientes.length === 1 ? '🔔 <b>Salió un episodio de lo que estás viendo</b>' : `🔔 <b>Salieron ${pendientes.length} episodios de lo que estás viendo</b>`;
-    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}`;
+    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}${conRespaldo ? '\n\n<i>AniList no responde: aviso por hora de emisión (Jikan/Kitsu).</i>' : ''}`;
     const hora = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
     const silencio = hora >= 1 && hora < 8;
-    const botones = pendientes.slice(0, 8).map(({ s }) => [{
+    // Sin número de episodio (respaldo) no hay botón «Visto»: no sabría qué marcar.
+    const botones = pendientes.filter(({ s }) => s.episode != null).slice(0, 8).map(({ s }) => [{
       text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`,
       callback_data: `v:${s.media.id}:${s.episode}`,
     }]);
@@ -8897,7 +8970,7 @@ async function _runAvisosEpisodios(botToken) {
       result = await _sendTelegram(botToken, ANIME_CHAT_ID, plano, replyMarkup, { disable_notification: silencio, parse_mode: null });
     }
     if (!result || !result.ok) throw new Error(`Telegram no aceptó el aviso: ${(result && result.description) || 'sin respuesta'}`);
-    await Promise.all(pendientes.map(({ s, ref }) => ref.set({ media: s.media.id, ep: s.episode, avisadoEn: FieldValue.serverTimestamp() })));
+    await Promise.all(pendientes.map(({ s, ref }) => ref.set({ media: s.media.id, ep: s.episode == null ? null : s.episode, ...(conRespaldo ? { fuente: 'respaldo' } : {}), avisadoEn: FieldValue.serverTimestamp() })));
   }
   await estadoRef.set({ ultimoCorte: ahora, ultimaEjecucion: FieldValue.serverTimestamp() }, { merge: true });
   return { avisos: pendientes.length };
@@ -9037,9 +9110,16 @@ async function _episodiosDeHoy() {
   const GQL = 'query($ids:[Int],$f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
   const ids = [...porId.keys()];
   const out = [];
-  for (let i = 0; i < ids.length; i += 50) {
-    const j = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: hasta });
-    out.push(...((j.data.Page && j.data.Page.airingSchedules) || []));
+  try {
+    for (let i = 0; i < ids.length; i += 50) {
+      const j = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: hasta });
+      out.push(...((j.data.Page && j.data.Page.airingSchedules) || []));
+    }
+  } catch (e) {
+    logger.warn('[anime] AniList falló en /hoy, uso respaldo:', e.message);
+    const r = await _animeRespaldo().episodiosEntre(desde, hasta); // si también falla, sube el error original del llamador
+    out.length = 0;
+    out.push(..._comoSchedules(r.items.filter((it) => it.id && porId.has(it.id))));
   }
   return out.map((s) => ({ s, a: porId.get(Number(s.media.id)) }));
 }
@@ -9122,10 +9202,10 @@ exports.animeBotWebhook = onRequest(
             const lineas = eps.map(({ s, a }) => {
               const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || '').substring(0, 45));
               const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
-              const visto = (Number(a && a.watchedEps) || 0) >= s.episode;
-              return `${visto ? '✅' : '▶️'} <b>${t}</b> · ep ${s.episode} · ${h}`;
+              const visto = s.episode != null && (Number(a && a.watchedEps) || 0) >= s.episode;
+              return `${visto ? '✅' : '▶️'} <b>${t}</b> · ${s.episode != null ? `ep ${s.episode}` : 'nuevo episodio'} · ${h}`;
             });
-            const botones = eps.filter(({ s, a }) => (Number(a && a.watchedEps) || 0) < s.episode && s.airingAt * 1000 <= Date.now()).slice(0, 8)
+            const botones = eps.filter(({ s, a }) => s.episode != null && (Number(a && a.watchedEps) || 0) < s.episode && s.airingAt * 1000 <= Date.now()).slice(0, 8)
               .map(({ s }) => [{ text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`, callback_data: `v:${s.media.id}:${s.episode}` }]);
             await _sendTelegram(botToken, chat, `📅 <b>Hoy en lo que estás viendo</b>\n\n${lineas.join('\n')}`, { inline_keyboard: [...botones, ...abrir.inline_keyboard] });
           }
@@ -9339,7 +9419,34 @@ function _mediaProveedores(bloque) {
   };
 }
 
+// Respaldo de AnimeTracker cuando AniList no responde (Jikan → Kitsu). Mismo formato que arma el front.
+async function _animeOp(fn) {
+  try { return await fn(); } catch (e) {
+    logger.warn('[mediaApi] respaldo anime', { msg: e.message });
+    const err = new Error(e.message);
+    err.status = 502;
+    err.publico = 'Ninguna fuente de respaldo respondió';
+    throw err;
+  }
+}
+
 const _mediaOps = {
+  // Estrenos con hora entre from y to (segundos epoch, máx. 3 días).
+  async animeDia(q) {
+    const from = parseInt(q.from, 10);
+    const to = parseInt(q.to, 10);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > 3 * 86400) {
+      const err = new Error('Rango inválido'); err.status = 400; err.publico = 'Rango inválido'; throw err;
+    }
+    return _animeOp(() => _animeRespaldo().estrenosDia(from, to));
+  },
+
+  async animeBuscar(q) {
+    const texto = String(q.q || '').trim().slice(0, 100);
+    if (texto.length < 2) return { items: [], fuente: null };
+    return _animeOp(() => _animeRespaldo().buscar(texto));
+  },
+
   // Plataformas disponibles en un país (películas + series, sin duplicar).
   async plataformas(q) {
     const region = _mediaRegion(q.region);
@@ -9479,7 +9586,7 @@ exports.mediaApi = onRequest(
       res.set('Cache-Control', 'private, max-age=300');
       res.json(data);
     } catch (e) {
-      res.status(e.status || 500).json({ error: e.status === 404 ? 'No encontrado' : 'Error consultando TMDB' });
+      res.status(e.status || 500).json({ error: e.publico || (e.status === 404 ? 'No encontrado' : 'Error consultando TMDB') });
     }
   }
 );
