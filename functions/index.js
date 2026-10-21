@@ -9522,6 +9522,13 @@ const _mediaOps = {
     return r;
   },
 
+  // Episodios ya emitidos de las series de «Viendo» sin AniList (calendario de Simkl + ARM). ids = ids de AniList.
+  async animeEmitidos(q) {
+    const ids = String(q.ids || '').split(',').map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0).slice(0, 60);
+    if (!ids.length) return { fuente: 'simkl', items: {} };
+    return _animeOp(() => _animeRespaldo().emitidos(ids));
+  },
+
   // Plataformas disponibles en un país (películas + series, sin duplicar).
   async plataformas(q) {
     const region = _mediaRegion(q.region);

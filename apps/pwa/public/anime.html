@@ -287,6 +287,22 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .plat-pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); flex-shrink: 0; }
 .plat-pill.gratis { background: color-mix(in srgb, #34c759 20%, transparent); color: #1f8f3f; }
 .ver-gratis { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,.28); font-size: 11px; font-weight: 700; }
+.noche { margin: 8px 12px 4px; padding: 12px 14px; background: var(--bg2); border-radius: 16px; }
+.noche-cab { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 0; background: none; border: 0; color: var(--text); text-align: left; cursor: pointer; min-height: 44px; justify-content: center; }
+.noche-cab-t { font-size: 17px; font-weight: 600; }
+.noche-cab-s { font-size: 13px; color: var(--hint); }
+.noche-grupo { margin-top: 12px; }
+.noche-grupo-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.noche-grupo-nom { font-size: 15px; font-weight: 600; color: var(--text); }
+.noche-grupo-suma { margin-left: auto; font-size: 12px; color: var(--hint); }
+.noche-fila { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+.noche-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; cursor: pointer; }
+.noche-tit { font-size: 15px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.noche-meta { font-size: 12px; color: var(--hint); }
+.noche-fila .ver-ep-btn { margin-top: 0; flex-shrink: 0; }
+.noche-consultar { margin-top: 8px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--accent); font-size: 15px; font-weight: 600; cursor: pointer; }
+.noche-consultar:disabled { opacity: .6; }
+.noche-sin { margin-top: 10px; font-size: 12px; color: var(--hint); line-height: 1.4; }
 .plat-nota { font-size: 12px; color: var(--hint); margin-top: 8px; line-height: 1.4; }
 .plat-fichas { display: flex; flex-wrap: wrap; gap: 6px; }
 .plat-fichas .link-add-btn { width: auto; border-style: solid; }
@@ -943,6 +959,8 @@ const htmlActions = {
   _sagaQuickAdd,
   _toggleGenre,
   _toggleTag,
+  nocheConsultar,
+  nocheToggle,
   abrirPlataforma,
   elegirPlataforma,
   verEpisodio,
@@ -2216,7 +2234,8 @@ function renderList(listName) {
       ).join('')
     : `<div class="empty"><div class="big">🔍</div><p>Sin resultados para "${safe(filterText)}"</p></div>`;
 
-  c.innerHTML = toolsRow + '<div style="padding-top:4px">' + cards + '</div>';
+  c.innerHTML = (listName === 'viendo' ? `<div id="noche">${nocheHtml()}</div>` : '') + toolsRow + '<div style="padding-top:4px">' + cards + '</div>';
+  if (listName === 'viendo') iniciarNoche();
 
   if (showSwipe) _attachSwipe(listName);
   if (listName !== 'completado' && listName !== 'descartado') refreshTrackedAiring(listName);
@@ -2250,6 +2269,151 @@ function verEpHtmlFicha(id, titulo, esPelicula, sig, total, lista) {
   if (!id || lista === 'completado') return '';
   if (!esPelicula && total && sig > total) return '';
   return btnVerEp(id, sig, titulo, esPelicula, true);
+}
+// ── Qué ver esta noche ───────────────────────────────────────────────────────
+// Cabecera de «Viendo»: series con episodios ya emitidos sin ver, agrupadas por plataforma
+// (primero las que pagas, luego gratis, luego las recordadas, al final «sin plataforma conocida»).
+// Episodios emitidos = lo mejor que haya, sin inventar: AniList reciente > Simkl (op animeEmitidos) >
+// cota inferior del dato guardado. Sin ninguna de las tres: «sin dato», nunca un número supuesto.
+// Orden dentro del grupo: más episodios pendientes primero (lo atrasado es lo que se olvida; lo nuevo
+// ya lo avisa el bot), luego A–Z.
+const EMIT_TTL_MS = 30 * 60 * 1000;
+const EMIT_AL_FRESCO_MS = 12 * 60 * 60 * 1000;
+let _emit = { ts: 0, items: {}, fuente: null };
+try { const j = JSON.parse(localStorage.getItem('at_emitidos') || 'null'); if (j && j.items) _emit = j; } catch { /* sin caché */ }
+let _emitCargando = false;
+let _nocheAbierta = true;
+let _nocheConsultando = false;
+let _planNoche = null; // se llena con misPlanes(); mientras tanto vale PLAN_DEFECTO (declarado más abajo)
+const _platRes = new Map(); // id → resultado ya resuelto de cargarPlataformas (para agrupar sin pedir de nuevo)
+function emitidosDe(a) {
+  const ahora = Date.now();
+  const tope = (n) => (a.totalEps ? Math.min(n, a.totalEps) : n);
+  const c = [];
+  if (a.status === 'FINISHED' && a.totalEps) c.push({ n: a.totalEps, f: 'AniList', exacto: true });
+  const ne = a.nextEp && a.nextEp.ep;
+  if (ne) {
+    const fresco = a.nextEpFetchedAt && ahora - a.nextEpFetchedAt <= EMIT_AL_FRESCO_MS && a.nextAirAt && a.nextAirAt * 1000 > ahora;
+    if (fresco) c.push({ n: ne - 1, f: 'AniList', exacto: true });
+    else c.push({ n: a.nextAirAt && a.nextAirAt * 1000 <= ahora ? ne : ne - 1, f: 'AniList (guardado)', exacto: false });
+  }
+  const sv = _emit.items && _emit.items[a.id];
+  if (sv && Number.isInteger(sv.emitidos)) c.push({ n: sv.emitidos, f: 'Simkl', exacto: true });
+  if (!c.length) return null;
+  const mejor = c.reduce((x, y) => (y.n > x.n || (y.n === x.n && y.exacto && !x.exacto) ? y : x));
+  return { n: tope(mejor.n), f: mejor.f, min: !mejor.exacto };
+}
+function necesitaEmitidos(a) {
+  if (a.format === 'MOVIE' || (a.status === 'FINISHED' && a.totalEps)) return false;
+  const e = emitidosDe(a);
+  return !e || e.min;
+}
+async function cargarEmitidos() {
+  if (_emitCargando || Date.now() - _emit.ts < EMIT_TTL_MS) return;
+  const ids = (allLists.viendo || []).filter(necesitaEmitidos).map((a) => a.id);
+  if (!ids.length) return;
+  _emitCargando = true;
+  try {
+    const r = await respaldoApi('animeEmitidos', { ids: ids.slice(0, 60).join(',') });
+    _emit = { ts: Date.now(), items: r.items || {}, fuente: r.fuente || 'simkl' };
+    try { localStorage.setItem('at_emitidos', JSON.stringify(_emit)); } catch { /* opcional */ }
+    actualizarNoche();
+  } catch (e) {
+    _emit.ts = Date.now() - EMIT_TTL_MS + 5 * 60 * 1000; // reintenta en 5 min
+  } finally { _emitCargando = false; }
+}
+function fmtMin(m) {
+  if (!m || m <= 0) return '';
+  if (m < 60) return `${Math.round(m)} min`;
+  const h = Math.floor(m / 60), r = Math.round(m % 60);
+  return r ? `${h} h ${r} min` : `${h} h`;
+}
+function grupoNoche(a) {
+  const plan = _planNoche || PLAN_DEFECTO;
+  const res = _platRes.get(Number(a.id));
+  let clave = platPrefs()[a.id];
+  let nombre = clave ? (NOMBRE_PLAT[clave] || clave) : null;
+  let gratis = false;
+  let pago = clave ? plan.includes(clave) : false;
+  if (res) {
+    const e = principalVer(a.id, res) || candidatosVer(res)[0];
+    if (e) { clave = e.clave; nombre = e.nombre; pago = !!e.pago; gratis = e.tipo === 'gratis' && !e.pago; }
+  }
+  if (!clave) return { rango: 3, clave: '', nombre: 'Sin plataforma conocida' };
+  if (pago) return { rango: 0, orden: plan.indexOf(clave), clave, nombre, etiqueta: 'En tu plan' };
+  if (gratis) return { rango: 1, clave, nombre, etiqueta: 'Gratis' };
+  return { rango: 2, clave, nombre, etiqueta: '' };
+}
+function nocheHtml() {
+  const items = (allLists.viendo || []).filter((a) => a.format !== 'MOVIE').map((a) => {
+    const e = emitidosDe(a);
+    const w = a.watchedEps || 0;
+    return { a, w, n: e ? e.n : null, min: e ? e.min : false, f: e ? e.f : null, pend: e ? Math.max(0, e.n - w) : null };
+  });
+  const con = items.filter((x) => x.pend > 0);
+  const sin = items.filter((x) => x.pend === null);
+  if (!con.length && !sin.length) return '';
+  const grupos = new Map();
+  for (const x of con) {
+    const g = grupoNoche(x.a);
+    const k = g.clave || '_sin';
+    if (!grupos.has(k)) grupos.set(k, { ...g, filas: [] });
+    grupos.get(k).filas.push(x);
+  }
+  const lista = [...grupos.values()].sort((p, q) => p.rango - q.rango || (p.orden || 0) - (q.orden || 0) || p.nombre.localeCompare(q.nombre));
+  const eps = con.reduce((s, x) => s + x.pend, 0);
+  const minTot = con.reduce((s, x) => s + (x.a.duration ? x.pend * x.a.duration : 0), 0);
+  const sinDur = con.filter((x) => !x.a.duration).length;
+  const resumen = con.length
+    ? `${con.length} serie${con.length === 1 ? '' : 's'} · ${eps} episodio${eps === 1 ? '' : 's'}${minTot ? ` · ~${fmtMin(minTot)}${sinDur ? ` (sin dato de duración en ${sinDur})` : ''}` : ''}`
+    : 'Ninguna serie con episodios por ver confirmados';
+  const filaHtml = (x) => {
+    const a = x.a;
+    const rango = x.pend > 1 ? `ep ${x.w + 1}–${x.n}` : `ep ${x.w + 1}`;
+    const dur = a.duration ? ` · ${a.duration} min/ep · ~${fmtMin(x.pend * a.duration)}` : '';
+    return `<div class="noche-fila"><div class="noche-txt" ${actionAttrs('openAnimeDetail', [a.id])}>
+      <span class="noche-tit">${safe(a.title)}</span>
+      <span class="noche-meta">${x.min ? 'al menos ' : ''}${x.pend} por ver (${safe(rango)})${safe(dur)}</span></div>
+      ${btnVerEp(a.id, x.w + 1, a.title, false, false)}</div>`;
+  };
+  const gruposHtml = lista.map((g) => {
+    g.filas.sort((p, q) => q.pend - p.pend || String(p.a.title).localeCompare(String(q.a.title)));
+    const e = g.filas.reduce((s, x) => s + x.pend, 0);
+    const m = g.filas.reduce((s, x) => s + (x.a.duration ? x.pend * x.a.duration : 0), 0);
+    const consultar = g.rango === 3
+      ? `<button class="noche-consultar" ${actionAttrs('nocheConsultar', [], true)}${_nocheConsultando ? ' disabled' : ''}>${_nocheConsultando ? 'Consultando…' : 'Buscar dónde verlas'}</button>` : '';
+    return `<div class="noche-grupo"><div class="noche-grupo-cab"><span class="noche-grupo-nom">${safe(g.nombre)}</span>${g.etiqueta ? `<span class="plat-pill${g.etiqueta === 'Gratis' ? ' gratis' : ''}">${safe(g.etiqueta)}</span>` : ''}
+      <span class="noche-grupo-suma">${e} ep${m ? ` · ~${fmtMin(m)}` : ''}</span></div>${g.filas.map(filaHtml).join('')}${consultar}</div>`;
+  }).join('');
+  const sinHtml = sin.length
+    ? `<div class="noche-sin">Sin dato de episodios emitidos (${sin.length}): ${safe(sin.map((x) => x.a.title).slice(0, 8).join(', '))}${sin.length > 8 ? '…' : ''}. AniList no responde y Simkl no las lista; se actualizan solas cuando haya dato.</div>` : '';
+  const fuentes = [...new Set(con.map((x) => x.f).filter(Boolean))];
+  return `<div class="noche"><button class="noche-cab" ${actionAttrs('nocheToggle', [])} aria-expanded="${_nocheAbierta}">
+      <span class="noche-cab-t">Qué ver esta noche</span><span class="noche-cab-s">${safe(resumen)}</span></button>
+    ${_nocheAbierta ? `${gruposHtml}${sinHtml}${fuentes.length ? `<div class="noche-sin">Episodios emitidos según ${safe(fuentes.join(' / '))}.</div>` : ''}` : ''}</div>`;
+}
+function actualizarNoche() {
+  const el = document.getElementById('noche');
+  if (el && currentTab === 'viendo') el.innerHTML = nocheHtml();
+}
+function iniciarNoche() {
+  misPlanes().then((p) => { _planNoche = p; actualizarNoche(); });
+  cargarEmitidos();
+}
+function nocheToggle() { _nocheAbierta = !_nocheAbierta; haptic('light'); actualizarNoche(); }
+// Consulta «dónde ver» solo de las series sin plataforma conocida (máx. 12, de a 3) y reagrupa.
+async function nocheConsultar() {
+  if (_nocheConsultando) return;
+  _nocheConsultando = true;
+  haptic('light');
+  actualizarNoche();
+  try {
+    const pend = (allLists.viendo || []).filter((a) => a.format !== 'MOVIE' && !grupoNoche(a).clave && (emitidosDe(a) || { n: 0 }).n > (a.watchedEps || 0)).slice(0, 12);
+    for (let i = 0; i < pend.length; i += 3) {
+      await Promise.all(pend.slice(i, i + 3).map((a) => cargarPlataformas(a.id, a.title).catch(() => null)));
+      actualizarNoche();
+    }
+  } finally { _nocheConsultando = false; actualizarNoche(); }
 }
 function animeCard(a,listName){
   const w=a.watchedEps||0,t=a.totalEps||0,p=t?pct(w,t):0,isMovie=a.format==='MOVIE';
@@ -2458,7 +2622,7 @@ function cargarPlataformas(id, titulo) {
     return combinarPlataformas(al, sv, plan, titulo);
   })();
   _platCache.set(id, p);
-  p.then((r) => { try { marcarGratisBotones(id, r); } catch { /* cosmético */ } });
+  p.then((r) => { try { _platRes.set(id, r); marcarGratisBotones(id, r); actualizarNoche(); } catch { /* cosmético */ } });
   p.then((r) => { if (!r.anilistOk || !r.servidorOk) setTimeout(() => _platCache.delete(id), 120000); });
   return p;
 }
