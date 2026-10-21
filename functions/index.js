@@ -8639,6 +8639,7 @@ function _animeRespaldo() {
   if (!_animeRespaldoInst) {
     _animeRespaldoInst = animeRespaldoLib.crearRespaldo({
       fetchJson: _fetchJsonAnime,
+      tmdbTv: (id) => _tmdb(`/tv/${id}`, {}, 6 * MEDIA_H),
       cache: {
         async get(id) { const d = await db.collection('anime_cache').doc(id).get(); return d.exists ? d.data() : null; },
         async set(id, obj) { await db.collection('anime_cache').doc(id).set(obj); },
@@ -9526,7 +9527,13 @@ const _mediaOps = {
   async animeEmitidos(q) {
     const ids = String(q.ids || '').split(',').map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0).slice(0, 60);
     if (!ids.length) return { fuente: 'simkl', items: {} };
-    return _animeOp(() => _animeRespaldo().emitidos(ids));
+    // info = id:episodiosAniList:vistos,…  (para decidir la numeración de TMDB; opcional)
+    const info = {};
+    for (const par of String(q.info || '').split(',')) {
+      const [i, e, v] = par.split(':').map((x) => parseInt(x, 10));
+      if (Number.isInteger(i) && i > 0) info[i] = { eps: e > 0 ? e : 0, vistos: v > 0 ? v : 0 };
+    }
+    return _animeOp(() => _animeRespaldo().emitidos(ids, info));
   },
 
   // Plataformas disponibles en un país (películas + series, sin duplicar).
