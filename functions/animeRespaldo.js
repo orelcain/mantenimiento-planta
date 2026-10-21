@@ -496,7 +496,7 @@ function crearRespaldo(opciones) {
     /** Estrenos con hora dentro de [from,to] (segundos epoch). */
     async estrenosDia(from, to, { cachear = true } = {}) {
       const calcular = async () => {
-        const r = await primeroQueResponda([['jikan', () => jikanDia(ctx, from, to)], ['simkl', () => simklDia(ctx, from, to)], ['kitsu', () => kitsuDia(ctx, from, to)]]);
+        const r = await primeroQueResponda([['simkl', () => simklDia(ctx, from, to)], ['jikan', () => jikanDia(ctx, from, to)], ['kitsu', () => kitsuDia(ctx, from, to)]]);
         return { items: ordenar(r.items), fuente: r.fuente };
       };
       return cachear ? conCacheDia(`dia_${from}_${to}`, calcular) : calcular();

@@ -1674,7 +1674,7 @@ function renderDayList() {
   if (!el) return;
 
   if (dayError) {
-    el.innerHTML = '<div class="empty"><p>No se pudo cargar: AniList no responde y las fuentes de respaldo (Jikan, Simkl, Kitsu) tampoco, o no hay conexión. Toca ↻ para reintentar.</p></div>';
+    el.innerHTML = '<div class="empty"><p>No se pudo cargar: AniList no responde y las fuentes de respaldo (Simkl, Jikan, Kitsu) tampoco, o no hay conexión. Toca ↻ para reintentar.</p></div>';
     return;
   }
   if (dayLoading && !dayData.length) {

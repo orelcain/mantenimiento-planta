@@ -8620,7 +8620,7 @@ async function _queryAniListSeguro(query, variables) {
   throw ultimo || new Error('AniList no respondió');
 }
 
-// ── Respaldo cuando AniList no responde (Jikan → Kitsu, IDs traducidos con ARM) ──
+// ── Respaldo cuando AniList no responde (Simkl → Jikan → Kitsu, IDs traducidos con ARM) ──
 // Ver functions/animeRespaldo.js. La caché vive en Firestore (anime_cache/*), solo servidor.
 const animeRespaldoLib = require('./animeRespaldo');
 async function _fetchJsonAnime(url, { method = 'GET', headers, body, timeout = 8000 } = {}) {
@@ -8785,7 +8785,7 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
       + seccion('📡 <b>Descubrimiento', discovery, 8)
       + (cine ? seccion('🎬 <b>Llegó a tus plataformas', cine.nuevos, 5) + seccion('🍿 <b>Estrenos en cines esta semana', cine.cines, 5) : '')
       + (hayCine ? '\n\n<i>Cine y series: datos de JustWatch vía TMDB.</i>' : '')
-      + (fuenteRespaldo ? `\n\n<i>AniList no responde: lista armada con ${fuenteRespaldo === 'jikan' ? 'Jikan (MyAnimeList)' : 'Kitsu'}; puede faltar algún episodio.</i>` : '');
+      + (fuenteRespaldo ? `\n\n<i>AniList no responde: lista armada con ${({ simkl: 'Simkl', jikan: 'Jikan (MyAnimeList)', kitsu: 'Kitsu' })[fuenteRespaldo] || fuenteRespaldo}; puede faltar algún episodio.</i>` : '');
     if (text.length <= 3900) break;
     tracTope = Math.max(8, tracTope - 5);
     premTope = Math.max(5, premTope - 4);
@@ -8923,7 +8923,7 @@ async function _runAvisosEpisodios(botToken) {
       }
     }
   } catch (e) {
-    // AniList caído: estrenos del rango por Jikan/Kitsu, cruzados con los IDs de «viendo».
+    // AniList caído: estrenos del rango por Simkl/Jikan/Kitsu, cruzados con los IDs de «viendo».
     logger.warn('[anime] AniList falló en avisos, uso respaldo:', e.message);
     let r;
     try { r = await _animeRespaldo().episodiosEntre(desde, ahora); } catch (e2) {
@@ -8955,7 +8955,7 @@ async function _runAvisosEpisodios(botToken) {
       return `▶️ <b>${t}</b> · ${s.episode != null ? `ep ${s.episode}` : 'nuevo episodio'} · ${h}`;
     });
     const titulo = pendientes.length === 1 ? '🔔 <b>Salió un episodio de lo que estás viendo</b>' : `🔔 <b>Salieron ${pendientes.length} episodios de lo que estás viendo</b>`;
-    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}${conRespaldo ? '\n\n<i>AniList no responde: aviso por hora de emisión (Jikan/Kitsu).</i>' : ''}`;
+    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}${conRespaldo ? '\n\n<i>AniList no responde: aviso por hora de emisión (Simkl/Jikan/Kitsu).</i>' : ''}`;
     const hora = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
     const silencio = hora >= 1 && hora < 8;
     // Sin número de episodio (respaldo) no hay botón «Visto»: no sabría qué marcar.
@@ -9419,7 +9419,7 @@ function _mediaProveedores(bloque) {
   };
 }
 
-// Respaldo de AnimeTracker cuando AniList no responde (Jikan → Kitsu). Mismo formato que arma el front.
+// Respaldo de AnimeTracker cuando AniList no responde (Simkl → Jikan → Kitsu). Mismo formato que arma el front.
 async function _animeOp(fn) {
   try { return await fn(); } catch (e) {
     logger.warn('[mediaApi] respaldo anime', { msg: e.message });
