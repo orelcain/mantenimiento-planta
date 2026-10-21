@@ -2330,6 +2330,15 @@ service cloud.firestore {
           && docId == 'datos'
           && isValidDocSize();
       }
+
+      // Plataforma recordada por serie ({plat:{idAniList: clave}}): la lee el aviso «Ver ahora» del bot.
+      match /prefs/{docId} {
+        allow read: if tieneSesionAnime() && request.auth.token.anime_tg == userId;
+        allow create, update: if tieneSesionAnime()
+          && request.auth.token.anime_tg == userId
+          && docId == 'ver'
+          && isValidDocSize();
+      }
     }
 
     // ── Telegram Mini App — whitelist de chats autorizados ───────────────────
