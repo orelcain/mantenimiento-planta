@@ -277,6 +277,17 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .modal-delete { display: block; margin: 12px auto 0; background: none; border: none; color: #f87171; font-size: 12px; cursor: pointer; padding: 4px 10px; border-radius: 6px; }
 .modal-delete:active { background: rgba(239,68,68,.1); }
 .link-list { display: flex; flex-direction: column; gap: 6px; }
+.ver-ep-btn { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--acctxt); font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.ver-ep-btn.grande { width: 100%; min-height: 44px; font-size: 15px; margin: 0 0 10px; }
+.ver-ep-btn:active { opacity: .8; }
+.plat-logo { width: 28px; height: 28px; border-radius: 7px; object-fit: cover; flex-shrink: 0; }
+.plat-txt { flex: 1; min-width: 0; text-align: left; display: flex; flex-direction: column; }
+.plat-nom { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plat-sub { font-size: 12px; font-weight: 400; color: var(--hint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plat-pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); flex-shrink: 0; }
+.plat-nota { font-size: 12px; color: var(--hint); margin-top: 8px; line-height: 1.4; }
+.plat-fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.plat-fichas .link-add-btn { width: auto; border-style: solid; }
 
 /* ── Search result enrichments (progress counter + links inline) ───────────── */
 .result-progress-wrap { margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -620,6 +631,17 @@ textarea, input, select, button { font-family: inherit; }
   </div>
 </div>
 
+<div id="ver-modal" class="modal-overlay" onclick="if(event.target===this)closeVerModal()">
+  <div class="modal-content">
+    <div class="modal-title" id="ver-modal-title">Ver</div>
+    <div class="modal-sub" id="ver-modal-sub">—</div>
+    <div class="link-list" id="ver-lista"></div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="action-btn action-ghost" onclick="closeVerModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="list-modal" class="modal-overlay" onclick="if(event.target===this)closeCreateListModal()">
   <div class="modal-content">
     <div class="modal-title" id="list-modal-title">📂 Nueva lista</div>
@@ -730,7 +752,7 @@ if (tg && typeof tg.onEvent === 'function') tg.onEvent('themeChanged', aplicarTe
 // Preferencias: localStorage + CloudStorage de Telegram (Bot API 6.9), para
 // que modo, tamaño de tarjetas, vista y pantalla completa sean iguales en PC y teléfono.
 const atPrefs = (() => {
-  const CLAVES = ['at_modo', 'at_tamano', 'at_pantalla', 'at_day_view'];
+  const CLAVES = ['at_modo', 'at_tamano', 'at_pantalla', 'at_day_view', 'at_ver_plat'];
   const nube = () => !!(tg && tg.CloudStorage && (typeof tg.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('6.9')));
   function get(k, def) { try { const v = localStorage.getItem(k); return v == null ? def : v; } catch { return def; } }
   function set(k, v) {
@@ -919,6 +941,9 @@ const htmlActions = {
   _sagaQuickAdd,
   _toggleGenre,
   _toggleTag,
+  abrirPlataforma,
+  elegirPlataforma,
+  verEpisodio,
   addFromDetail: (id, list, r, el) => addFromDetail(id, list, el, r),
   changeEp,
   changeEpFromSearch,
@@ -1195,14 +1220,6 @@ const ANILIST_RELATIONS_GQL = `query($id:Int){
 }`;
 // Query para "¿Dónde ver?" — links oficiales de streaming desde AniList
 const ANILIST_WATCH_GQL = `query($id:Int){Media(id:$id,type:ANIME){externalLinks{site url type language}}}`;
-// Sitios oficiales conocidos → emoji. Fallback 📺 para el resto.
-const WATCH_SITE_EMOJI = {
-  'Crunchyroll':'🟠', 'Netflix':'🔴', 'Hulu':'🟢', 'YouTube':'▶️',
-  'Bilibili TV':'🔵', 'Bilibili':'🔵', 'bilibili':'🔵',
-  'Tencent Video':'🐧', 'WeTV':'🟣', 'iQIYI':'💚', 'Youku':'🅾️',
-  'HIDIVE':'🔶', 'Amazon Prime Video':'📦', 'Disney Plus':'🏰',
-  'Hulu':'🟢', 'Funimation':'🟪', 'VRV':'🟡',
-};
 const RELATION_LABEL = {
   PREQUEL:'Precuela', SEQUEL:'Secuela', SIDE_STORY:'Historia paralela',
   ALTERNATIVE:'Alternativa', ADAPTATION:'Adaptación', PARENT:'Obra original',
@@ -1725,7 +1742,7 @@ function estrenoGridCard(e, isTracked) {
   const trackedBadge = isTracked ? `<div class="egc-track-badge">${safe(trackMeta.emoji)} ${safe(trackMeta.name)}</div>` : '';
   const progressPill = (isTracked && e.format !== 'MOVIE' && e.tracking !== 'completado' && t)
     ? `<div class="egc-progress-pill">${safe(w)}/${safe(t)}</div>` : '';
-  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" ${e.id ? actionAttrs('openResultDetail', [{...e, episodes: t || null}]) : ''}>
+  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" ${e.id ? actionAttrs('openResultDetail', [{...e, episodes: t || null}]) : (safeUrl(e.siteUrl) ? actionAttrs('openSite', [e.siteUrl]) : '')}>
     <div class="egc-poster">
       ${safeUrl(e.cover)?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="showGridImageFallback(this)">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px">🎌</div>'}
       ${trackedBadge}
@@ -1753,7 +1770,7 @@ function estrenoCard(e, isTracked) {
         <button class="ep-btn" ${actionAttrs('changeEp', [e.id,1,e.tracking])}>+</button>
        </div>`
     : `<div class="qadd-row">${LIST_OPTS.map(l=>`<button class="qadd-btn" ${actionAttrs('quickAddEstreno', [e,l.key], true)}>${l.emoji} ${l.label}</button>`).join('')}</div>`;
-  return `<div class="estreno-card${isTracked?' is-tracked':''}" ${e.id ? actionAttrs('openResultDetail', [{...e, score: e.score, episodes: null}]) : ''}>
+  return `<div class="estreno-card${isTracked?' is-tracked':''}" ${e.id ? actionAttrs('openResultDetail', [{...e, score: e.score, episodes: null}]) : (safeUrl(e.siteUrl) ? actionAttrs('openSite', [e.siteUrl]) : '')}>
     <div class="estreno-poster">
       ${e.cover?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="this.parentElement.innerHTML='🎌'">`:'🎌'}
       <div class="estreno-time-badge">${e.sinHora ? '—' : time}</div>
@@ -1768,6 +1785,7 @@ function estrenoCard(e, isTracked) {
       </div>
       ${e.genres.length?`<div class="estreno-genres">${safe(e.genres.join(' · '))}</div>`:''}
       ${addBtns}
+      ${verEpEstreno(e, isTracked)}
     </div>
   </div>`;
 }
@@ -1878,7 +1896,7 @@ function gridCard(r) {
       badge = `<div class="tracked-badge">${emoji}</div>`;
     }
   }
-  return `<div class="grid-card" ${r.id ? actionAttrs('openResultDetail', [r]) : ''}>
+  return `<div class="grid-card" ${r.id ? actionAttrs('openResultDetail', [r]) : (safeUrl(r.siteUrl) ? actionAttrs('openSite', [r.siteUrl]) : '')}>
     <div class="grid-poster">${imgTag(r.cover,'🎌')}${badge}</div>
     <div class="grid-title">${safe(r.title)}</div>
     <div class="grid-meta">${safe(r.score?'⭐'+r.score+' · ':'')}${safe(r.format||'TV')}</div>
@@ -1931,7 +1949,7 @@ function listCard(r) {
     `<button class="qadd-btn${tracked===l.key?' active':''}" ${actionAttrs('quickAdd', [r.id,l.key], true)}>${l.emoji} ${l.label}</button>`
   ).join('');
   const nickHtml = a?.nickname ? `<div class="result-genres" style="opacity:1;color:var(--accent);font-weight:600">🏷️ ${safe(a.nickname)}</div>` : '';
-  return `<div class="result-card" ${r.id ? actionAttrs('openResultDetail', [r]) : ''}>
+  return `<div class="result-card" ${r.id ? actionAttrs('openResultDetail', [r]) : (safeUrl(r.siteUrl) ? actionAttrs('openSite', [r.siteUrl]) : '')}>
     <div class="result-poster">${imgTag(r.cover,'🎌')}</div>
     <div class="result-body">
       ${trackedHtml}
@@ -1940,7 +1958,7 @@ function listCard(r) {
       <div class="result-meta">${meta}</div>
       ${nextHtml}${genresHtml}
       ${progressHtml}${linksHtml}
-      ${r.id ? `<div class="qadd-row">${addBtns}</div>` : '<div class="result-genres">Sin enlace a AniList (fuente de respaldo): no se puede agregar a listas</div>'}
+      ${r.id ? `<div class="qadd-row">${addBtns}</div>` : '<div class="result-genres">Sin id de AniList (fuente de respaldo): toca la tarjeta para abrir su ficha; no se puede agregar a listas</div>'}
     </div>
   </div>`;
 }
@@ -2052,6 +2070,7 @@ function openResultDetail(r) {
     </div>
     <div class="detail-section" id="wtw-section-${safe(r.id)}">
       <div class="detail-section-title">¿Dónde ver?</div>
+      ${verEpHtmlFicha(r.id, r.title, r.format==='MOVIE', a ? (a.watchedEps||0)+1 : 1, a?.totalEps||r.episodes, tracked)}
       <div id="wtw-body-${safe(r.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
     ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${safe(r.nextEp.ep)}: ${safe(r.nextEp.airingAt)}</div></div>`:''}
@@ -2061,9 +2080,9 @@ function openResultDetail(r) {
       <div class="detail-section-title">Agregar a lista</div>
       <div class="list-selector">${addBtns}</div>
     </div>
-    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" ${actionAttrs('openSite', [r.siteUrl])}>Ver en AniList</button></div>`:''}`;
+    <div class="detail-section" id="enl-${safe(r.id)}">${htmlFichaInicial(r.siteUrl)}</div>`;
   openDetail();
-  loadWhereToWatch(r.id);
+  loadWhereToWatch(r.id, r.title);
 }
 
 async function _rdEp(id, delta) {
@@ -2213,6 +2232,23 @@ function _listFilterChange(listName, val) {
 }
 let _listFilterTimer = null;
 
+// «Ver episodio N»: Viendo (siguiente sin ver, si ya salió), Estrenos (el que sale hoy) y ficha.
+function verEpTarjeta(a, listName, w, t, aired) {
+  if (listName !== 'viendo' || a.format === 'MOVIE') return '';
+  const sig = w + 1;
+  if ((t && sig > t) || (aired != null && sig > aired)) return '';
+  return btnVerEp(a.id, sig, a.title, false, false);
+}
+function verEpEstreno(e, isTracked) {
+  if (!e.id || e.format === 'MOVIE' || !(e.airingAt * 1000 <= Date.now())) return '';
+  const ep = e.episode != null ? e.episode : (isTracked ? (getAnime(e.id)?.watchedEps || 0) + 1 : null);
+  return btnVerEp(e.id, ep, e.title, false, false);
+}
+function verEpHtmlFicha(id, titulo, esPelicula, sig, total, lista) {
+  if (!id || lista === 'completado') return '';
+  if (!esPelicula && total && sig > total) return '';
+  return btnVerEp(id, sig, titulo, esPelicula, true);
+}
 function animeCard(a,listName){
   const w=a.watchedEps||0,t=a.totalEps||0,p=t?pct(w,t):0,isMovie=a.format==='MOVIE';
   const aired = getAiredEp(a);
@@ -2253,7 +2289,7 @@ function animeCard(a,listName){
         ${a.format&&a.format!=='TV'?`<span class="badge-s">${safe(a.format)}</span>`:''}
         ${a.averageScore?`<span class="badge-s">⭐${safe(a.averageScore)}</span>`:''}
       </div>
-      ${progressHtml}${counter}${miniStars}
+      ${progressHtml}${counter}${verEpTarjeta(a, listName, w, t, aired)}${miniStars}
     </div>
   </div>`;
 }
@@ -2278,50 +2314,223 @@ function openAnimeDetail(id){
   detailAnime={...a,listName:getAnimeList(id)};
   renderDetailBody(a,detailAnime.listName);
   openDetail();
-  loadWhereToWatch(id);
+  loadWhereToWatch(id, a.title);
   botonVistoDetalle();
 }
 
-// "¿Dónde ver?" — consulta externalLinks oficiales de AniList y los muestra como botones.
-const _wtwCache = {};
-async function loadWhereToWatch(id){
-  const body = document.getElementById('wtw-body-'+id);
-  if(!body) return;
-  try{
-    let links = _wtwCache[id];
-    if(!links){
-      const resp = await fetch('https://graphql.anilist.co', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ query: ANILIST_WATCH_GQL, variables:{ id: Number(id) } }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || json?.errors || !json?.data) throw new Error('AniList no disponible');
-      links = (json?.data?.Media?.externalLinks || []).filter(l => l.type === 'STREAMING');
-      _wtwCache[id] = links;
-    }
-    const cur = document.getElementById('wtw-body-'+id);
-    if(!cur) return; // detalle ya cerrado
-    if(!links.length){
-      cur.innerHTML = '<span style="color:var(--hint);font-size:13px">No encontrado en plataformas oficiales conocidas. Prueba con “Mis links”.</span>';
-      return;
-    }
-    cur.innerHTML = '<div class="link-list">' + links.map(l => {
-      const emoji = WATCH_SITE_EMOJI[l.site] || '📺';
-      const lang = l.language ? ` · ${safe(l.language)}` : '';
-      return `<div class="link-row">
-        <button class="link-open-btn" ${actionAttrs('openExternal', [l.url])}>
-          <span style="font-size:15px">${emoji}</span>
-          <span class="link-domain">${safe(l.site)}${lang}</span>
-          <span class="link-arrow">→</span>
-        </button>
-      </div>`;
-    }).join('') + '</div>';
-  }catch(e){
-    const cur = document.getElementById('wtw-body-'+id);
-    if(cur) cur.innerHTML = '<span style="color:var(--hint);font-size:13px">No disponible ahora: «¿Dónde ver?» depende de AniList, que no responde, y no tiene fuente de respaldo. Prueba más tarde.</span>';
+// ── «¿Dónde ver?» y «Ver episodio» ───────────────────────────────────────────
+// Fuentes combinadas sin duplicar plataforma: enlaces oficiales de AniList (si responde) +
+// Kitsu y Jikan (streaming-links) + JustWatch vía TMDB por país (ARM y TMDB pasan por la op
+// animeDondeVer de mediaApi). Solo plataformas oficiales con licencia.
+const PLAN_DEFECTO = ['crunchyroll', 'netflix', 'prime', 'disney']; // lo que paga; se afina con cine/datos
+const PROV_CLAVE = { 8: 'netflix', 119: 'prime', 337: 'disney', 283: 'crunchyroll', 1899: 'max', 384: 'max', 350: 'appletv', 2: 'appletv', 192: 'youtube' };
+const NOMBRE_PLAT = { crunchyroll: 'Crunchyroll', netflix: 'Netflix', prime: 'Prime Video', disney: 'Disney+', max: 'Max', hidive: 'HIDIVE', appletv: 'Apple TV', youtube: 'YouTube', hulu: 'Hulu', bilibili: 'Bilibili' };
+const BUSCAR_PLAT = {
+  crunchyroll: (q) => `https://www.crunchyroll.com/search?q=${q}`,
+  netflix: (q) => `https://www.netflix.com/search?q=${q}`,
+  prime: (q) => `https://www.primevideo.com/search?phrase=${q}`,
+  disney: (q) => `https://www.disneyplus.com/search?q=${q}`,
+  max: (q) => `https://play.max.com/search?q=${q}`,
+  appletv: (q) => `https://tv.apple.com/search?term=${q}`,
+  youtube: (q) => `https://www.youtube.com/results?search_query=${q}`,
+};
+const TIPO_ORDEN = { suscripcion: 0, gratis: 1, arriendo: 2, compra: 3 };
+const TIPO_TXT = { suscripcion: 'Suscripción', gratis: 'Gratis o con anuncios', arriendo: 'Arriendo', compra: 'Compra' };
+// Misma regla que functions/animeDondeVer.js (claveSitio): «Amazon Prime Video» y «Prime Video» son una sola.
+function claveSitio(nombre) {
+  const t = String(nombre || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!t) return '';
+  if (t.includes('crunchyroll')) return 'crunchyroll';
+  if (t.includes('netflix')) return 'netflix';
+  if (t.includes('prime') || t === 'amazon') return 'prime';
+  if (t.includes('disney')) return 'disney';
+  if (t === 'max' || t.includes('hbomax')) return 'max';
+  if (t.includes('hidive')) return 'hidive';
+  if (t.includes('youtube')) return 'youtube';
+  if (t.includes('hulu')) return 'hulu';
+  if (t.includes('bilibili')) return 'bilibili';
+  if (t.includes('appletv')) return 'appletv';
+  return t;
+}
+function etiquetaSitio(u) {
+  try {
+    const h = new URL(u).hostname.replace(/^www\./, '');
+    return ({ 'anilist.co': 'AniList', 'myanimelist.net': 'MyAnimeList', 'kitsu.app': 'Kitsu', 'simkl.com': 'Simkl' })[h] || h;
+  } catch { return 'el sitio'; }
+}
+function htmlFichaInicial(url) {
+  return url ? `<button class="action-btn action-ghost" ${actionAttrs('openSite', [url])}>Ver en ${safe(etiquetaSitio(url))}</button>` : '';
+}
+let _miPlanP = null;
+function misPlanes() {
+  if (!_miPlanP) {
+    _miPlanP = (async () => {
+      try {
+        const d = await db.collection('animelists').doc(getUserId()).collection('cine').doc('datos').get();
+        const ids = d.exists ? (d.data().plataformas || []) : [];
+        const cl = [...new Set(ids.map((i) => PROV_CLAVE[i]).filter(Boolean))];
+        return cl.length ? cl : PLAN_DEFECTO;
+      } catch { return PLAN_DEFECTO; }
+    })();
+  }
+  return _miPlanP;
+}
+async function linksAniList(id) {
+  const resp = await fetch('https://graphql.anilist.co', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: ANILIST_WATCH_GQL, variables: { id: Number(id) } }),
+    signal: AbortSignal.timeout(6000),
+  });
+  const json = await resp.json();
+  if (!resp.ok || json?.errors || !json?.data) throw new Error('AniList no disponible');
+  return (json.data.Media?.externalLinks || []).filter((l) => l.type === 'STREAMING');
+}
+function combinarPlataformas(al, sv, plan, titulo) {
+  const mapa = new Map();
+  const poner = (nombre, url, fuente, extra) => {
+    const u = safeUrl(url);
+    const k = claveSitio(nombre);
+    if (!u || !/^https:/.test(u) || !k) return;
+    let e = mapa.get(k);
+    if (!e) { e = { clave: k, nombre: NOMBRE_PLAT[k] || nombre, url: null, directo: false, tipo: null, logo: null, fuentes: [] }; mapa.set(k, e); }
+    if (!e.fuentes.includes(fuente)) e.fuentes.push(fuente);
+    if (extra.directo) { if (!e.directo) { e.url = u; e.directo = true; } } else if (!e.url) e.url = u;
+    if (extra.tipo && (e.tipo == null || TIPO_ORDEN[extra.tipo] < TIPO_ORDEN[e.tipo])) e.tipo = extra.tipo;
+    if (extra.logo && !e.logo && /^\/[A-Za-z0-9_.-]+$/.test(extra.logo)) e.logo = extra.logo;
+  };
+  const d = sv.v || {};
+  for (const l of al.v) poner(l.site, l.url, 'AniList', { directo: true });
+  for (const o of d.oficiales || []) poner(o.sitio, o.url, o.fuente === 'kitsu' ? 'Kitsu' : 'Jikan', { directo: true });
+  for (const f of d.paisBase || []) poner(f.nombre, f.url, 'JustWatch (TMDB)', { tipo: f.tipo, logo: f.logo });
+  const tmdbOk = !!d.tmdb;
+  for (const e of mapa.values()) {
+    e.pago = plan.includes(e.clave);
+    // Sin enlace directo a la serie, la búsqueda dentro de la plataforma con el título.
+    if (!e.directo && BUSCAR_PLAT[e.clave] && titulo) e.url = BUSCAR_PLAT[e.clave](encodeURIComponent(titulo.slice(0, 120)));
+  }
+  const rango = (e) => {
+    const enChile = e.tipo === 'suscripcion' || e.tipo === 'gratis';
+    if (e.pago && (enChile || !tmdbOk)) return 0;
+    if (enChile) return 1;
+    if (e.tipo) return 2;
+    return 3;
+  };
+  const lista = [...mapa.values()].sort((a, b) => rango(a) - rango(b) || plan.indexOf(a.clave) - plan.indexOf(b.clave));
+  return { lista, enlaces: d.enlaces || [], otros: d.otros || [], anilistOk: al.ok, servidorOk: sv.ok, tmdbOk };
+}
+const _platCache = new Map();
+function cargarPlataformas(id, titulo) {
+  id = Number(id);
+  const hit = _platCache.get(id);
+  if (hit) return hit;
+  titulo = titulo || getAnime(id)?.title || '';
+  const p = (async () => {
+    const [al, sv, plan] = await Promise.all([
+      linksAniList(id).then((v) => ({ ok: true, v }), () => ({ ok: false, v: [] })),
+      respaldoApi('animeDondeVer', { id, titulo }).then((v) => ({ ok: true, v }), () => ({ ok: false, v: null })),
+      misPlanes(),
+    ]);
+    return combinarPlataformas(al, sv, plan, titulo);
+  })();
+  _platCache.set(id, p);
+  p.then((r) => { if (!r.anilistOk || !r.servidorOk) setTimeout(() => _platCache.delete(id), 120000); });
+  return p;
+}
+const _nombrePais = (() => {
+  let dn = null;
+  try { dn = new Intl.DisplayNames(['es'], { type: 'region' }); } catch { dn = null; }
+  return (c) => { try { return (dn && dn.of(c)) || c; } catch { return c; } };
+})();
+function subtituloPlat(e, r) {
+  const base = r.tmdbOk ? (e.tipo ? `${TIPO_TXT[e.tipo]} en Chile` : 'No figura en Chile') : 'Enlace oficial';
+  return `${base} · ${e.fuentes.join(', ')}`;
+}
+async function loadWhereToWatch(id, titulo) {
+  const body = document.getElementById('wtw-body-' + id);
+  if (!body) return;
+  let r;
+  try { r = await cargarPlataformas(id, titulo); } catch { r = null; }
+  const cur = document.getElementById('wtw-body-' + id);
+  if (!cur) return; // detalle ya cerrado
+  if (!r || (!r.anilistOk && !r.servidorOk)) {
+    cur.innerHTML = '<span style="color:var(--hint);font-size:13px">No pude consultar las fuentes (AniList y el respaldo no responden). Prueba más tarde o usa «Mis links».</span>';
+    return;
+  }
+  const filas = r.lista.map((e) => {
+    const logo = e.logo ? `<img class="plat-logo" src="https://image.tmdb.org/t/p/w92${e.logo}" alt="" loading="lazy">` : '';
+    const plan = e.pago && (e.tipo === 'suscripcion' || e.tipo === 'gratis' || !r.tmdbOk) ? '<span class="plat-pill">En tu plan</span>' : '';
+    return `<div class="link-row"><button class="link-open-btn" ${actionAttrs('abrirPlataforma', [id, e.clave])}>${logo}
+      <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span></span>${plan}<span class="link-arrow">→</span></button></div>`;
+  }).join('');
+  const otros = r.otros.slice(0, 5).map((o) => `${_nombrePais(o.pais)}: ${o.plataformas.join(', ')}`);
+  const fuentes = [...new Set(r.lista.flatMap((e) => e.fuentes))];
+  cur.innerHTML = (filas ? `<div class="link-list">${filas}</div>` : '<span style="color:var(--hint);font-size:13px">No hay plataformas oficiales conocidas para este título. Prueba con «Mis links».</span>')
+    + (otros.length ? `<div class="plat-nota">En otros países (VPN): ${safe(otros.join(' · '))}</div>` : '')
+    + (fuentes.length ? `<div class="plat-nota">Fuentes: ${safe(fuentes.join(', '))}. La disponibilidad cambia sin aviso.</div>` : '');
+  const enl = document.getElementById('enl-' + id);
+  if (enl && r.enlaces.length) {
+    enl.innerHTML = '<div class="detail-section-title">Ficha del título</div><div class="plat-fichas">'
+      + r.enlaces.map((x) => `<button class="link-add-btn" ${actionAttrs('openExternal', [x.url])}>${safe(x.sitio)}${x.sitio === 'AniList' && !r.anilistOk ? ' (no responde)' : ''}</button>`).join('') + '</div>';
   }
 }
+// Última plataforma elegida por serie (un solo valor, sincronizado por atPrefs).
+function platPrefs() { try { return JSON.parse(atPrefs.get('at_ver_plat', '{}')) || {}; } catch { return {}; } }
+function guardarPlat(id, clave) {
+  const m = platPrefs();
+  delete m[id];
+  m[id] = clave;
+  const k = Object.keys(m);
+  if (k.length > 120) for (const x of k.slice(0, k.length - 120)) delete m[x];
+  atPrefs.set('at_ver_plat', JSON.stringify(m));
+}
+async function abrirPlataforma(id, clave) {
+  const r = await cargarPlataformas(id);
+  const e = r.lista.find((x) => x.clave === clave);
+  if (!e) return;
+  guardarPlat(id, clave);
+  openExternal(e.url);
+}
+function btnVerEp(id, ep, titulo, esPelicula, grande) {
+  if (!id) return '';
+  const label = esPelicula ? 'Ver película' : (ep ? `Ver episodio ${ep}` : 'Ver en plataforma');
+  return `<button class="ver-ep-btn${grande ? ' grande' : ''}" ${actionAttrs('verEpisodio', [id, ep || null, titulo || '', !!esPelicula], true)}>${safe(label)}</button>`;
+}
+let _verCtx = null;
+async function verEpisodio(id, ep, titulo, esPelicula) {
+  haptic('medium');
+  id = Number(id);
+  toast('Buscando dónde verlo…');
+  let r;
+  try { r = await cargarPlataformas(id, titulo); } catch { r = null; }
+  if (!r || !r.lista.length) { toast('Sin plataforma oficial conocida: mira «¿Dónde ver?» en la ficha'); return; }
+  const preferidas = r.lista.filter((e) => e.tipo !== 'arriendo' && e.tipo !== 'compra');
+  const cand = preferidas.length ? preferidas : r.lista;
+  const ultima = cand.find((e) => e.clave === platPrefs()[id]);
+  if (ultima || cand.length === 1) {
+    const e = ultima || cand[0];
+    guardarPlat(id, e.clave);
+    toast(`Abriendo ${e.nombre}` + (cand.length > 1 ? ' · cambia en «¿Dónde ver?» de la ficha' : ''));
+    openExternal(e.url);
+    return;
+  }
+  _verCtx = { id, cand };
+  document.getElementById('ver-modal-title').textContent = esPelicula ? 'Ver película' : (ep ? `Ver episodio ${ep}` : 'Ver en plataforma');
+  document.getElementById('ver-modal-sub').textContent = `${titulo || 'Elige dónde'} · se abre la serie en la plataforma`;
+  document.getElementById('ver-lista').innerHTML = cand.map((e) => `<div class="link-row"><button class="link-open-btn" ${actionAttrs('elegirPlataforma', [e.clave])}>
+    <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span></span>${e.pago ? '<span class="plat-pill">En tu plan</span>' : ''}<span class="link-arrow">→</span></button></div>`).join('');
+  document.getElementById('ver-modal').classList.add('open');
+}
+function elegirPlataforma(clave) {
+  if (!_verCtx) return;
+  const e = _verCtx.cand.find((x) => x.clave === clave);
+  const id = _verCtx.id;
+  closeVerModal();
+  if (!e) return;
+  guardarPlat(id, clave);
+  openExternal(e.url);
+}
+function closeVerModal() { document.getElementById('ver-modal').classList.remove('open'); _verCtx = null; }
 // Abre un link externo desde la Mini App (Telegram WebApp o navegador)
 function openExternal(url){
   url = safeUrl(url);
@@ -2384,6 +2593,7 @@ function renderDetailBody(a,listName){
     </div>
     <div class="detail-section" id="wtw-section-${safe(a.id)}">
       <div class="detail-section-title">¿Dónde ver?</div>
+      ${verEpHtmlFicha(a.id, a.title, isMovie, w+1, t, listName)}
       <div id="wtw-body-${safe(a.id)}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
     <div class="detail-section">
@@ -2422,7 +2632,7 @@ function renderDetailBody(a,listName){
     </div>
     <div class="detail-section"><div class="detail-section-title">Lista</div><div class="list-selector">${listOpts}</div></div>
     <div class="detail-section">
-      ${a.siteUrl?`<button class="action-btn action-ghost" ${actionAttrs('openSite', [a.siteUrl])}>Ver en AniList</button>`:''}
+      <div id="enl-${safe(a.id)}">${htmlFichaInicial(a.siteUrl)}</div>
       <button class="action-btn action-danger" ${actionAttrs('deleteAnime', [a.id])}>Quitar de mis listas</button>
     </div>`;
 }
