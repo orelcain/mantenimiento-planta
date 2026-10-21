@@ -156,3 +156,63 @@ test('dondeVerAnime: id inválido o ARM caído lanzan (la op responde 502 limpio
   await assert.rejects(() => D.dondeVerAnime({ fetchJson: fetchFalso([]), tmdbTitulo: async () => null, anilistId: 'abc', region: 'CL' }), /id inválido/)
   await assert.rejects(() => D.dondeVerAnime({ fetchJson: fetchFalso([['arm', new Error('HTTP 500')]]), tmdbTitulo: async () => null, anilistId: 5, region: 'CL' }), /HTTP 500/)
 })
+
+test('normStreamingKitsu: guarda audio (dubs) y subtítulos (subs) y descarta códigos raros', () => {
+  const s = D.normStreamingKitsu({
+    data: [{ attributes: { url: 'https://www.netflix.com/title/1', subs: ['en', 'es-419', '<x>'], dubs: ['ja'] }, relationships: { streamer: { data: { id: '6' } } } },
+      { attributes: { url: 'https://www.hulu.com/x' }, relationships: { streamer: { data: { id: '1' } } } }],
+    included: [{ id: '6', type: 'streamers', attributes: { siteName: 'Netflix' } }, { id: '1', type: 'streamers', attributes: { siteName: 'Hulu' } }],
+  })
+  assert.deepStrictEqual(s[0].subs, ['en', 'es-419'])
+  assert.deepStrictEqual(s[0].dubs, ['ja'])
+  assert.deepStrictEqual([s[1].subs, s[1].dubs], [[], []]) // sin dato: vacío, nada inventado
+})
+
+test('unirEnlaces: el enlace de Kitsu y sus idiomas sobreviven aunque Jikan traiga el mismo sitio', () => {
+  const u = D.unirEnlaces(
+    [{ sitio: 'Crunchyroll', url: 'https://k', fuente: 'kitsu', subs: ['en'], dubs: ['ja'] }],
+    [{ sitio: 'Crunchyroll', url: 'https://j', fuente: 'jikan' }],
+  )
+  assert.strictEqual(u.length, 1)
+  assert.strictEqual(u[0].url, 'https://k')
+  assert.deepStrictEqual(u[0].dubs, ['ja'])
+  // al revés: Jikan primero (sin idiomas) y Kitsu después → conserva el enlace de Jikan pero toma los idiomas
+  const v = D.unirEnlaces([{ sitio: 'Netflix', url: 'https://j', fuente: 'jikan' }], [{ sitio: 'Netflix', url: 'https://k', subs: ['en'], dubs: ['ja'] }])
+  assert.strictEqual(v[0].url, 'https://j')
+  assert.deepStrictEqual(v[0].subs, ['en'])
+})
+
+test('planDeProveedores: ids de TMDB → claves; sin datos usa Crunchyroll, Netflix, Prime y Disney+', () => {
+  assert.deepStrictEqual(D.planDeProveedores([283, 8, 8, 5555]), ['crunchyroll', 'netflix'])
+  assert.deepStrictEqual(D.planDeProveedores([]), D.PLAN_DEFECTO)
+  assert.deepStrictEqual(D.planDeProveedores(undefined), D.PLAN_DEFECTO)
+})
+
+const DATOS_VER = {
+  paisBase: D.filasPais(TMDB_TITULO.dondeVer.CL, 'Shingeki'),
+  oficiales: [{ sitio: 'Crunchyroll', url: 'https://www.crunchyroll.com/series/GR3/shingeki', fuente: 'kitsu' }],
+}
+
+test('elegirVerAhora: primera del plan con suscripción en Chile; enlace directo si Kitsu lo da, si no búsqueda', () => {
+  const plan = ['netflix', 'crunchyroll']
+  const e = D.elegirVerAhora(DATOS_VER, { plan })
+  assert.strictEqual(e.clave, 'netflix')
+  assert.match(e.url, /netflix\.com\/search\?q=Shingeki/)
+  assert.strictEqual(e.directo, false)
+  const c = D.elegirVerAhora(DATOS_VER, { plan: ['crunchyroll'] })
+  assert.strictEqual(c.url, 'https://www.crunchyroll.com/series/GR3/shingeki')
+  assert.strictEqual(c.directo, true)
+})
+
+test('elegirVerAhora: la plataforma recordada manda mientras siga en Chile', () => {
+  assert.strictEqual(D.elegirVerAhora(DATOS_VER, { recordada: 'crunchyroll', plan: ['netflix'] }).clave, 'crunchyroll')
+  // recordada que ya no está en Chile → vuelve al plan
+  assert.strictEqual(D.elegirVerAhora(DATOS_VER, { recordada: 'disney', plan: ['netflix'] }).clave, 'netflix')
+})
+
+test('elegirVerAhora: arriendo/compra, otra plataforma o sin datos de TMDB → null (sin botón)', () => {
+  assert.strictEqual(D.elegirVerAhora(DATOS_VER, { plan: ['appletv'] }), null) // Apple TV solo arriendo
+  assert.strictEqual(D.elegirVerAhora(DATOS_VER, { plan: ['disney'] }), null)
+  assert.strictEqual(D.elegirVerAhora({ paisBase: [], oficiales: DATOS_VER.oficiales }, { plan: ['crunchyroll'] }), null)
+  assert.strictEqual(D.elegirVerAhora(null, {}), null)
+})

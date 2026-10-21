@@ -2398,10 +2398,12 @@ function combinarPlataformas(al, sv, plan, titulo) {
     if (extra.directo) { if (!e.directo) { e.url = u; e.directo = true; } } else if (!e.url) e.url = u;
     if (extra.tipo && (e.tipo == null || TIPO_ORDEN[extra.tipo] < TIPO_ORDEN[e.tipo])) e.tipo = extra.tipo;
     if (extra.logo && !e.logo && /^\/[A-Za-z0-9_.-]+$/.test(extra.logo)) e.logo = extra.logo;
+    // Idiomas: solo si Kitsu los trae; nunca se completan a ojo.
+    if (!e.idiomas && ((extra.subs && extra.subs.length) || (extra.dubs && extra.dubs.length))) e.idiomas = { subs: extra.subs || [], dubs: extra.dubs || [] };
   };
   const d = sv.v || {};
   for (const l of al.v) poner(l.site, l.url, 'AniList', { directo: true });
-  for (const o of d.oficiales || []) poner(o.sitio, o.url, o.fuente === 'kitsu' ? 'Kitsu' : 'Jikan', { directo: true });
+  for (const o of d.oficiales || []) poner(o.sitio, o.url, o.fuente === 'kitsu' ? 'Kitsu' : 'Jikan', { directo: true, subs: o.subs, dubs: o.dubs });
   for (const f of d.paisBase || []) poner(f.nombre, f.url, 'JustWatch (TMDB)', { tipo: f.tipo, logo: f.logo });
   const tmdbOk = !!d.tmdb;
   for (const e of mapa.values()) {
@@ -2442,6 +2444,19 @@ const _nombrePais = (() => {
   try { dn = new Intl.DisplayNames(['es'], { type: 'region' }); } catch { dn = null; }
   return (c) => { try { return (dn && dn.of(c)) || c; } catch { return c; } };
 })();
+const _nombreIdioma = (() => {
+  let dn = null;
+  try { dn = new Intl.DisplayNames(['es'], { type: 'language' }); } catch { dn = null; }
+  return (c) => { try { return (dn && dn.of(c)) || c; } catch { return c; } };
+})();
+// «Audio: japonés · Subtítulos: inglés» solo con lo que dijo Kitsu; sin dato, cadena vacía.
+function idiomasTxt(e) {
+  if (!e.idiomas) return '';
+  const partes = [];
+  if (e.idiomas.dubs.length) partes.push(`Audio: ${e.idiomas.dubs.map(_nombreIdioma).join(', ')}`);
+  if (e.idiomas.subs.length) partes.push(`Subtítulos: ${e.idiomas.subs.map(_nombreIdioma).join(', ')}`);
+  return partes.length ? `${partes.join(' · ')} (Kitsu)` : '';
+}
 function subtituloPlat(e, r) {
   const base = r.tmdbOk ? (e.tipo ? `${TIPO_TXT[e.tipo]} en Chile` : 'No figura en Chile') : 'Enlace oficial';
   return `${base} · ${e.fuentes.join(', ')}`;
@@ -2461,12 +2476,14 @@ async function loadWhereToWatch(id, titulo) {
     const logo = e.logo ? `<img class="plat-logo" src="https://image.tmdb.org/t/p/w92${e.logo}" alt="" loading="lazy">` : '';
     const plan = e.pago && (e.tipo === 'suscripcion' || e.tipo === 'gratis' || !r.tmdbOk) ? '<span class="plat-pill">En tu plan</span>' : '';
     return `<div class="link-row"><button class="link-open-btn" ${actionAttrs('abrirPlataforma', [id, e.clave])}>${logo}
-      <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span></span>${plan}<span class="link-arrow">→</span></button></div>`;
+      <span class="plat-txt"><span class="plat-nom">${safe(e.nombre)}</span><span class="plat-sub">${safe(subtituloPlat(e, r))}</span>${idiomasTxt(e) ? `<span class="plat-sub">${safe(idiomasTxt(e))}</span>` : ''}</span>${plan}<span class="link-arrow">→</span></button></div>`;
   }).join('');
+  const hayIdiomas = r.lista.some((e) => idiomasTxt(e));
   const otros = r.otros.slice(0, 5).map((o) => `${_nombrePais(o.pais)}: ${o.plataformas.join(', ')}`);
   const fuentes = [...new Set(r.lista.flatMap((e) => e.fuentes))];
   cur.innerHTML = (filas ? `<div class="link-list">${filas}</div>` : '<span style="color:var(--hint);font-size:13px">No hay plataformas oficiales conocidas para este título. Prueba con «Mis links».</span>')
     + (otros.length ? `<div class="plat-nota">En otros países (VPN): ${safe(otros.join(' · '))}</div>` : '')
+    + (hayIdiomas ? '<div class="plat-nota">Idiomas según Kitsu: no indica región ni distingue español latino de España, y sus datos suelen ser de EE. UU. Confirma el audio y los subtítulos en la plataforma.</div>' : '')
     + (fuentes.length ? `<div class="plat-nota">Fuentes: ${safe(fuentes.join(', '))}. La disponibilidad cambia sin aviso.</div>` : '');
   const enl = document.getElementById('enl-' + id);
   if (enl && r.enlaces.length) {
@@ -2483,6 +2500,8 @@ function guardarPlat(id, clave) {
   const k = Object.keys(m);
   if (k.length > 120) for (const x of k.slice(0, k.length - 120)) delete m[x];
   atPrefs.set('at_ver_plat', JSON.stringify(m));
+  // Copia en Firestore para que el aviso del bot (servidor) abra la misma plataforma en «Ver ahora».
+  try { db.collection('animelists').doc(getUserId()).collection('prefs').doc('ver').set({ plat: { [id]: clave } }, { merge: true }).catch(() => {}); } catch { /* opcional */ }
 }
 async function abrirPlataforma(id, clave) {
   const r = await cargarPlataformas(id);

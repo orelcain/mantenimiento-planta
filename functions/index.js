@@ -8898,6 +8898,50 @@ async function _cineParaResumen(dateKey) {
 // Cada 30 min revisa AniList solo para los anime de «viendo». Un aviso por
 // episodio (marca anime_notifications/ep_<id>_<ep>), agrupado en un mensaje.
 // Entre 01:00 y 08:00 (Chile) llega en silencio.
+// Botón «Ver ahora»: abre directo la plataforma oficial que el usuario paga (animeDondeVer + elegirVerAhora).
+// Nunca retrasa ni rompe el aviso: tope de 7 s en total, y una serie que falló no se reintenta por 10 min.
+const _verAhoraFallo = new Map();
+async function _datosVerAhora() {
+  let plan = animeDondeVerLib.PLAN_DEFECTO;
+  let recordadas = {};
+  const base = db.collection('animelists').doc(ANIME_CHAT_ID);
+  try {
+    const d = await base.collection('cine').doc('datos').get();
+    if (d.exists) plan = animeDondeVerLib.planDeProveedores(d.data().plataformas);
+  } catch (e) { logger.warn('[anime] plan de plataformas:', e.message); }
+  try {
+    const d = await base.collection('prefs').doc('ver').get();
+    if (d.exists && d.data().plat && typeof d.data().plat === 'object') recordadas = d.data().plat;
+  } catch (e) { logger.warn('[anime] plataforma recordada:', e.message); }
+  return { plan, recordadas };
+}
+/** items: [{id (AniList), titulo}] → Map id → {clave, nombre, url}. Solo trae lo que alcanzó a resolver. */
+async function _botonesVerAhora(items) {
+  const out = new Map();
+  const validos = items.filter((it) => Number.isInteger(it.id) && it.id > 0);
+  if (!validos.length) return out;
+  const trabajo = (async () => {
+    const { plan, recordadas } = await _datosVerAhora();
+    await Promise.all(validos.map(async ({ id, titulo }) => {
+      const f = _verAhoraFallo.get(id);
+      if (f && Date.now() - f < 10 * 60 * 1000) return;
+      try {
+        const datos = await _mediaOps.animeDondeVer({ id, titulo, region: 'CL' });
+        const e = animeDondeVerLib.elegirVerAhora(datos, { recordada: recordadas[id], plan });
+        if (e) out.set(id, e);
+      } catch (err) {
+        _verAhoraFallo.set(id, Date.now());
+        logger.warn('[anime] Ver ahora', { id, msg: err.message });
+      }
+    }));
+  })();
+  await Promise.race([trabajo.catch(() => {}), new Promise((r) => setTimeout(r, 7000))]);
+  return new Map(out);
+}
+function _filaVerAhora(e, titulo) {
+  return [{ text: `▶️ Ver ahora · ${e.nombre} · ${String(titulo || '').slice(0, 16)}`.replace(/ · $/, '').slice(0, 60), url: e.url }];
+}
+
 async function _runAvisosEpisodios(botToken) {
   const ahora = Math.floor(Date.now() / 1000);
   const estadoRef = db.collection('anime_estado').doc('avisos');
@@ -8960,11 +9004,17 @@ async function _runAvisosEpisodios(botToken) {
     const hora = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
     const silencio = hora >= 1 && hora < 8;
     // Sin número de episodio (respaldo) no hay botón «Visto»: no sabría qué marcar.
-    const botones = pendientes.filter(({ s }) => s.episode != null).slice(0, 8).map(({ s }) => [{
-      text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`,
-      callback_data: `v:${s.media.id}:${s.episode}`,
-    }]);
-    const replyMarkup = { inline_keyboard: [...botones, [{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
+    const tituloDe = (s) => String(s.media.title.english || s.media.title.romaji || '');
+    const visibles = pendientes.slice(0, 8);
+    const verAhora = await _botonesVerAhora(visibles.map(({ s }) => ({ id: Number(s.media.id), titulo: tituloDe(s) })));
+    // Por episodio: fila «Visto» y, debajo, «Ver ahora» (máx. 8 episodios = 16 filas, lejos del tope de Telegram).
+    const filas = [];
+    for (const { s } of visibles) {
+      if (s.episode != null) filas.push([{ text: `✅ Visto ep ${s.episode} · ${tituloDe(s).slice(0, 22)}`, callback_data: `v:${s.media.id}:${s.episode}` }]);
+      const e = verAhora.get(Number(s.media.id));
+      if (e) filas.push(_filaVerAhora(e, tituloDe(s)));
+    }
+    const replyMarkup = { inline_keyboard: [...filas, [{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
     let result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup, { disable_notification: silencio });
     if (!result || !result.ok) {
       const plano = text.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
@@ -8985,7 +9035,7 @@ exports.animeAvisosEpisodios = onSchedule(
     memory: '256MiB',
     retryCount: 0,
     maxInstances: 1,
-    secrets: ['ANIME_BOT_TOKEN'],
+    secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'],
   },
   async () => {
     const token = process.env.ANIME_BOT_TOKEN;
@@ -9208,7 +9258,11 @@ exports.animeBotWebhook = onRequest(
             });
             const botones = eps.filter(({ s, a }) => s.episode != null && (Number(a && a.watchedEps) || 0) < s.episode && s.airingAt * 1000 <= Date.now()).slice(0, 8)
               .map(({ s }) => [{ text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`, callback_data: `v:${s.media.id}:${s.episode}` }]);
-            await _sendTelegram(botToken, chat, `📅 <b>Hoy en lo que estás viendo</b>\n\n${lineas.join('\n')}`, { inline_keyboard: [...botones, ...abrir.inline_keyboard] });
+            const tituloDe = (s) => String(s.media.title.english || s.media.title.romaji || '');
+            const salidos = eps.filter(({ s, a }) => s.airingAt * 1000 <= Date.now() && !(s.episode != null && (Number(a && a.watchedEps) || 0) >= s.episode)).slice(0, 8);
+            const verAhora = await _botonesVerAhora(salidos.map(({ s }) => ({ id: Number(s.media.id), titulo: tituloDe(s) })));
+            const filasVer = salidos.map(({ s }) => (verAhora.get(Number(s.media.id)) ? _filaVerAhora(verAhora.get(Number(s.media.id)), tituloDe(s)) : null)).filter(Boolean);
+            await _sendTelegram(botToken, chat, `📅 <b>Hoy en lo que estás viendo</b>\n\n${lineas.join('\n')}`, { inline_keyboard: [...botones, ...filasVer, ...abrir.inline_keyboard] });
           }
         } else {
           const m = /^\/buscar(?:@\w+)?\s+(.{2,80})$/s.exec(texto);

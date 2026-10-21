@@ -17,6 +17,16 @@ const JIKAN = 'https://api.jikan.moe/v4';
 const TIMEOUT_ARM = 8000;
 const TIMEOUT_STREAMING = 6000;
 
+// Plataformas que reconocemos por proveedor de TMDB (id → clave de claveSitio) y su nombre para mostrar.
+const PROV_CLAVE = { 8: 'netflix', 119: 'prime', 337: 'disney', 283: 'crunchyroll', 1899: 'max', 384: 'max', 350: 'appletv', 2: 'appletv', 192: 'youtube' };
+const NOMBRE_PLAT = { crunchyroll: 'Crunchyroll', netflix: 'Netflix', prime: 'Prime Video', disney: 'Disney+', max: 'Max', appletv: 'Apple TV', youtube: 'YouTube' };
+const PLAN_DEFECTO = ['crunchyroll', 'netflix', 'prime', 'disney']; // lo que paga el usuario, si cine/datos no dice otra cosa
+
+function planDeProveedores(ids) {
+  const cl = [...new Set((Array.isArray(ids) ? ids : []).map((i) => PROV_CLAVE[i]).filter(Boolean))];
+  return cl.length ? cl : PLAN_DEFECTO;
+}
+
 // Búsqueda directa dentro de cada plataforma (id de proveedor de TMDB). Misma tabla que anime-cine.js.
 const BUSCAR_EN = {
   8: (q) => `https://www.netflix.com/search?q=${q}`,
@@ -108,7 +118,10 @@ function enlacesFicha(ids) {
   return out;
 }
 
-/** Kitsu /anime/{id}/streaming-links?include=streamer (JSON:API) → [{sitio,url,fuente}]. */
+const IDIOMA_OK = /^[a-z]{2,3}(-[A-Za-z0-9]{2,4})?$/;
+const idiomas = (arr) => [...new Set((Array.isArray(arr) ? arr : []).filter((x) => typeof x === 'string' && IDIOMA_OK.test(x)))].slice(0, 6);
+
+/** Kitsu /anime/{id}/streaming-links?include=streamer (JSON:API) → [{sitio,url,fuente,subs,dubs}]. */
 function normStreamingKitsu(json) {
   const nombres = new Map();
   for (const inc of (json && json.included) || []) {
@@ -121,7 +134,7 @@ function normStreamingKitsu(json) {
     const url = https(a && a.url);
     const sitio = (rel && nombres.get(String(rel.id))) || '';
     if (!url || !sitio) continue;
-    out.push({ sitio, url, fuente: 'kitsu' });
+    out.push({ sitio, url, fuente: 'kitsu', subs: idiomas(a.subs), dubs: idiomas(a.dubs) });
   }
   return out;
 }
@@ -140,17 +153,19 @@ function normStreamingJikan(json) {
 
 /** Une listas de enlaces sin repetir plataforma (gana la primera que llega). */
 function unirEnlaces(...listas) {
-  const vistos = new Set();
-  const out = [];
+  const porClave = new Map();
   for (const lista of listas) {
     for (const e of lista || []) {
       const k = claveSitio(e.sitio);
-      if (!k || vistos.has(k)) continue;
-      vistos.add(k);
-      out.push(e);
+      if (!k) continue;
+      const previo = porClave.get(k);
+      if (!previo) { porClave.set(k, { ...e }); continue; }
+      // Mismo sitio en otra fuente: el enlace de la primera gana, pero no se pierden los idiomas.
+      if (!(previo.subs && previo.subs.length) && e.subs && e.subs.length) previo.subs = e.subs;
+      if (!(previo.dubs && previo.dubs.length) && e.dubs && e.dubs.length) previo.dubs = e.dubs;
     }
   }
-  return out;
+  return [...porClave.values()];
 }
 
 async function streamingKitsu(fetchJson, kitsuId) {
@@ -225,7 +240,29 @@ async function dondeVerAnime({ fetchJson, tmdbTitulo, anilistId, titulo, region 
   };
 }
 
+/**
+ * Plataforma para el botón «Ver ahora» del aviso: SOLO si TMDB confirma suscripción o gratis en Chile.
+ * Orden: la recordada por serie (si sigue disponible) y si no la primera del plan del usuario.
+ * Enlace directo a la serie si Kitsu/Jikan lo dan; si no, la búsqueda del título en la plataforma.
+ * Devuelve null cuando no hay nada seguro: mejor sin botón que un botón a un lugar equivocado.
+ */
+function elegirVerAhora(datos, { recordada, plan } = {}) {
+  const cand = new Map();
+  for (const f of (datos && datos.paisBase) || []) {
+    if (f.tipo !== 'suscripcion' && f.tipo !== 'gratis') continue;
+    const k = claveSitio(f.nombre);
+    if (k && !cand.has(k)) cand.set(k, { clave: k, nombre: NOMBRE_PLAT[k] || f.nombre, url: f.url, directo: false });
+  }
+  for (const o of (datos && datos.oficiales) || []) {
+    const c = cand.get(claveSitio(o.sitio));
+    if (c && o.url) { c.url = o.url; c.directo = true; }
+  }
+  const elegido = (recordada && cand.get(recordada)) || (plan || PLAN_DEFECTO).map((k) => cand.get(k)).find(Boolean);
+  return elegido && /^https:\/\//.test(elegido.url || '') ? elegido : null;
+}
+
 module.exports = {
+  PROV_CLAVE, NOMBRE_PLAT, PLAN_DEFECTO, planDeProveedores, elegirVerAhora,
   urlPlataforma, claveSitio, normIds, idsDeAnilist, enlacesFicha, normStreamingKitsu, normStreamingJikan,
   unirEnlaces, filasPais, otrosPaises, dondeVerAnime,
 };
