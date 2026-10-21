@@ -29,7 +29,7 @@ export interface RepuestoFavList {
 export interface UserPreferencesData {
   favoriteLists: FavList[]
   bodegaWatchlist: string[]
-  /** Repuestos favoritos por equipo: key = nodeId del equipo */
+  /** Repuestos favoritos por equipo: key = id del nodo del equipo en la jerarquía (el que usa el hub al seleccionarlo); ids = rowKey estable (los antiguos se traducen al leer, ver utils/repuestos/favoritosEquipo). */
   repuestoFavLists?: Record<string, RepuestoFavList[]>
   /** Repuestos favoritos GLOBALES del hub área-first (rowKeys estables, no por equipo). */
   repuestoFavs?: string[]
@@ -86,12 +86,9 @@ export async function getRepuestoFavLists(userId: string, equipmentId: string): 
 
 export async function saveRepuestoFavLists(userId: string, equipmentId: string, lists: RepuestoFavList[]): Promise<void> {
   try {
-    // Leer existentes para no perder otros equipos
-    const snap = await getDoc(doc(db, COL, userId))
-    const existing = snap.exists() ? (snap.data().repuestoFavLists || {}) : {}
-    existing[equipmentId] = lists
+    // Merge profundo: solo cambia la clave de ESTE equipo; las de los demás no se tocan ni se leen.
     await setDoc(doc(db, COL, userId), {
-      repuestoFavLists: existing,
+      repuestoFavLists: { [equipmentId]: lists },
       updatedAt: serverTimestamp(),
     }, { merge: true })
   } catch (err) {

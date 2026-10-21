@@ -79,6 +79,8 @@ interface RepuestoDetailPanelProps {
   onToggleFavorite?: () => void
   /** Abrir el gestor de listas con nombre para este repuesto. */
   onAddToList?: () => void
+  /** Con un equipo seleccionado: favorito POR EQUIPO (aparte de la estrella global). */
+  favoritoEquipo?: { activo: boolean; nombreEquipo: string; abrir: () => void }
   /**
    * Guardar nombres comunes (apodos). Solo admin. En desktop también se editan
    * en la columna "Apodos" de la tabla (lg+); este campo es el ÚNICO camino en móvil.
@@ -174,7 +176,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, totalUnidades, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, totalUnidades, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, favoritoEquipo, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -683,7 +685,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   )
 
   if (!isDesktop) {
-    const hayMenu = !!onAddToList || (isAdmin && (!!onEditRepuesto || !!onDeleteRepuesto))
+    const hayMenu = !!onAddToList || !!favoritoEquipo || (isAdmin && (!!onEditRepuesto || !!onDeleteRepuesto))
     const tonoStock = item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'
     return (
       <aside className="fixed inset-0 z-50 flex h-full w-full flex-col bg-background pt-[env(safe-area-inset-top)]">
@@ -707,6 +709,11 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[13rem]">
+                  {favoritoEquipo && (
+                    <DropdownMenuItem className="min-h-[44px] gap-2 text-body" onSelect={favoritoEquipo.abrir}>
+                      <Star className={['size-4', favoritoEquipo.activo ? 'fill-current' : ''].join(' ')} /> Favorito de este equipo…
+                    </DropdownMenuItem>
+                  )}
                   {onAddToList && (
                     <DropdownMenuItem className="min-h-[44px] gap-2 text-body" onSelect={onAddToList}>
                       <ListPlus className="size-4" /> Agregar a lista
@@ -1075,6 +1082,11 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
         )}
 
         {/* Agregar a lista de favoritos con nombre */}
+        {favoritoEquipo && (
+          <Button variant="outline" size="sm" className="mb-2 w-full gap-1.5" onClick={favoritoEquipo.abrir}>
+            <Star className={['h-4 w-4', favoritoEquipo.activo ? 'fill-current' : ''].join(' ')} /> {favoritoEquipo.activo ? 'Favorito de este equipo' : 'Marcar favorito de este equipo'}…
+          </Button>
+        )}
         {onAddToList && (
           <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onAddToList}>
             <ListPlus className="h-4 w-4" /> Agregar a lista
