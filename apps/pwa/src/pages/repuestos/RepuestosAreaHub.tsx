@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle, ListPlus } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { quitarEquipoDeRepuesto } from '@/hooks/repuestos/quitarEquipo'
@@ -70,6 +70,9 @@ import { dibujoDeManual, fotosParaEquipos } from '@/hooks/repuestos/documentacio
 import { CLASE_LABEL, type Machine, type Repuesto, type RepuestoFormData, type TechnicalSpecs, type MachineImage } from '@/types/repuestos'
 import { AREA_TACTIL_COMPACTA, AREA_TACTIL_EN_TARJETA } from '@/lib/areaTactil'
 import { useRepuestoFavoritos } from '@/hooks/repuestos/useRepuestoFavoritos'
+import { useRepuestoFavoritosEquipo } from '@/hooks/repuestos/useRepuestoFavoritosEquipo'
+import { LISTA_GENERAL } from '@/utils/repuestos/favoritosEquipo'
+import { FavoritosEquipoSheet } from '@/components/repuestos/FavoritosEquipoSheet'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { indicePorSap, nombreVisiblePorSap, tituloOCodigo } from '@/utils/repuestos/nombrePorSap'
@@ -509,6 +512,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // Los favoritos salen del hook compartido: la misma lista que usan el expediente y Bodega.
   const { favKeys, toggleFav } = useRepuestoFavoritos(user?.id)
   const [repFavOnly, setRepFavOnly] = useState(false)
+  // Favoritos POR EQUIPO (se suman a los globales; viven en user_preferences.repuestoFavLists[equipo]).
+  // Clave = la del equipo seleccionado en el hub (id del nodo = r.equipos[].machineId).
+  const favEq = useRepuestoFavoritosEquipo(user?.id, selectedEquipMachineId)
+  /** null = sin filtro · '*' = «Favoritos de este equipo» (unión de listas) · otro = nombre de una lista del equipo. */
+  const [favEqFiltro, setFavEqFiltro] = useState<string | null>(null)
+  /** Repuesto cuya hoja «Favoritos de este equipo» está abierta. */
+  const [favEqRep, setFavEqRep] = useState<AreaRepuestoRow | null>(null)
+  useEffect(() => { setFavEqFiltro(null); setFavEqRep(null) }, [selectedEquipMachineId])
   // Móvil: «Con fotos» — la tira de miniaturas solo existe en filas con foto (4 % de las filas).
   const [repConFotos, setRepConFotos] = useState(false)
   // Vista «Lista» (tabla de siempre) o «Galería» (fotos + avance). Se recuerda por navegador.
@@ -931,15 +942,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const comunSinStockActivo = repComunSinStock && repStockFilter === 'out'
 
   /** Filtros de la hoja y de la barra, salvo el que se omite (para contar sus opciones). */
-  const pasaFiltros = useCallback((r: AreaRepuestoRow, omitir?: 'clase' | 'tipo' | 'stock' | 'lista'): boolean => {
+  const pasaFiltros = useCallback((r: AreaRepuestoRow, omitir?: 'clase' | 'tipo' | 'stock' | 'lista' | 'favEq'): boolean => {
     if (repConFotos && fotosDeFila(r).length === 0) return false
+    if (omitir !== 'favEq' && selectedEquipKey && favEqFiltro) {
+      if (favEqFiltro === '*' ? !favEq.esFavorito(r) : !favEq.enLista(favEqFiltro, r)) return false
+    }
     if (omitir !== 'lista' && idsDeLista && !idsDeLista.has(r.rowKey)) return false
     if (omitir !== 'stock' && repStockFilter !== 'all' && r.stockStatus !== repStockFilter) return false
     if (omitir !== 'stock' && comunSinStockActivo && !esComun(r)) return false
     if (omitir !== 'clase' && repClaseFilter !== 'all' && (r.clase || 'repuesto') !== repClaseFilter) return false
     if (omitir !== 'tipo' && repTipoFilter !== 'all' && tipoLabelOf(r.tipo) !== repTipoFilter) return false
     return true
-  }, [repConFotos, idsDeLista, repStockFilter, comunSinStockActivo, repClaseFilter, repTipoFilter])
+  }, [repConFotos, idsDeLista, repStockFilter, comunSinStockActivo, repClaseFilter, repTipoFilter, selectedEquipKey, favEqFiltro, favEq])
 
   // Los equipos que definen el alcance de un repuesto: la máquina del árbol o la faceta de equipo.
   const equiposDelAlcance = useCallback((r: AreaRepuestoRow, f: Faceta | null) => {
@@ -1002,6 +1016,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     const filas = facetaEfectiva ? base.filter((r) => filtraPorFaceta(r, facetaEfectiva, plantaDe)) : base
     return contarCon(filas, (r) => { const m = marcasDe(r, facetaEfectiva); return m.comun || m.mia })
   }, [baseSinFav, repSoloSap, facetaEfectiva, plantaDe, marcasDe])
+
+  // Chips «Favoritos de este equipo» y uno por lista: el número es lo que se verá al tocarlos
+  // (búsqueda, filtros y foco SAP puestos; el propio filtro de favoritos del equipo no cuenta).
+  const conteosFavEq = useMemo(() => {
+    if (!selectedEquipKey) return null
+    const filas = scopedRepuestos.filter((r) => (!coincideBusqueda || coincideBusqueda.has(r.rowKey)) && pasaFiltros(r, 'favEq') && (!repSoloSap || !esDespiece(r)))
+    return {
+      total: favEq.contarFavoritos(filas),
+      porLista: favEq.listas.filter((l) => l.name !== LISTA_GENERAL).map((l) => ({ nombre: l.name, n: favEq.contarEnLista(l.name, filas) })),
+    }
+  }, [selectedEquipKey, scopedRepuestos, coincideBusqueda, pasaFiltros, repSoloSap, favEq])
 
   // Resumen de la fila de stock: lo que se ve con TODOS los filtros menos el de stock (así tocar un
   // estado no deja a los demás en cero). Mismo orden que filteredRep: búsqueda/filtros → SAP → faceta → favoritos.
@@ -1102,7 +1127,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   }
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, facetaEfectiva, repStockFilter, repComunSinStock, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repConFotos, listFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, facetaEfectiva, repStockFilter, repComunSinStock, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repConFotos, listFilter, favEqFiltro, repPageSize])
   // La faceta de equipo es de ESTA búsqueda: al cambiar de área o de texto, se reinicia.
   useEffect(() => { setFacetaEquipo(null) }, [selectedAreaId, showingAll, repQuery])
 
@@ -1842,6 +1867,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       repFavOnly ? 'Favoritos' : '',
       repConFotos ? 'Con fotos' : '',
       listFilter !== 'all' ? `Lista: ${listFilter}` : '',
+      selectedEquipKey && favEqFiltro ? (favEqFiltro === '*' ? 'Favoritos de este equipo' : `Lista del equipo: ${favEqFiltro}`) : '',
       !repSoloSap ? 'Con despiece sin SAP' : '',
     ]
     return partes.filter(Boolean).join(' · ')
@@ -1894,7 +1920,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSelectedRowKey(null)
     // Filtros que ya no se ven desde la entrada: si quedaran puestos, un SAP reciente podría dar cero resultados.
     setRepStockFilter('all'); setRepClaseFilter('all'); setRepFavOnly(false); setRepComunSinStock(false)
-    setRepConFotos(false); setListFilter('all'); setRepSoloSap(true)
+    setRepConFotos(false); setListFilter('all'); setRepSoloSap(true); setFavEqFiltro(null)
   }
   const abrirRecienteEntrada = (r: RecienteRepuesto) => {
     if (r.tipo === 'equipo') { handleFavEquipClick(r.id, r.nombre); return }
@@ -2324,9 +2350,34 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                     ? 'No hay favoritos en este alcance. Los comunes de la máquina los marca un administrador; tus estrellas se marcan en cada fila.'
                     : 'Comunes de la máquina (lista compartida) y tus estrellas (personales), sin repetir.'}
                 >
-                  <Star className={['size-4', repFavOnly ? 'fill-current' : ''].join(' ')} aria-hidden /> Favoritos
+                  <Star className={['size-4', repFavOnly ? 'fill-current' : ''].join(' ')} aria-hidden /> {selectedEquipKey ? 'Favoritos (todos)' : 'Favoritos'}
                   {(favoritosEnScope > 0 || repFavOnly) && <span className="text-footnote font-normal tabular-nums opacity-80">{favoritosEnScope}</span>}
                 </ChipBarra>
+                {conteosFavEq && (
+                  <ChipBarra
+                    activo={favEqFiltro === '*'}
+                    disabled={conteosFavEq.total === 0 && favEqFiltro !== '*'}
+                    onClick={() => setFavEqFiltro((f) => (f === '*' ? null : '*'))}
+                    title={conteosFavEq.total === 0 && favEqFiltro !== '*'
+                      ? 'Este equipo aún no tiene favoritos propios. Márcalos con el botón de lista de cada fila.'
+                      : 'Repuestos que marcaste como favoritos SOLO para este equipo (todas sus listas, sin repetir).'}
+                  >
+                    <Star className={['size-4', favEqFiltro === '*' ? 'fill-current' : ''].join(' ')} aria-hidden /> Favoritos de este equipo
+                    <span className="text-footnote font-normal tabular-nums opacity-80">{conteosFavEq.total}</span>
+                  </ChipBarra>
+                )}
+                {conteosFavEq?.porLista.map((l) => (
+                  <ChipBarra
+                    key={l.nombre}
+                    activo={favEqFiltro === l.nombre}
+                    disabled={l.n === 0 && favEqFiltro !== l.nombre}
+                    onClick={() => setFavEqFiltro((f) => (f === l.nombre ? null : l.nombre))}
+                    title={`Lista «${l.nombre}» de este equipo`}
+                  >
+                    {l.nombre}
+                    <span className="text-footnote font-normal tabular-nums opacity-80">{l.n}</span>
+                  </ChipBarra>
+                ))}
                 <ChipBarra activo={repConFotos} onClick={() => setRepConFotos((v) => !v)} className={repConFotos ? '' : 'md:hidden'}>
                   <ImageIcon className="size-4" aria-hidden /> Con fotos
                 </ChipBarra>
@@ -2679,6 +2730,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               >
                                 <Star className={['h-4 w-4', favKeys.has(r.rowKey) ? 'fill-current' : ''].join(' ')} />
                               </button>
+                              {selectedEquipKey && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setFavEqRep(r) }}
+                                  className={[AREA_TACTIL_COMPACTA, 'rounded-ctl transition', favEq.esFavorito(r) ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary'].join(' ')}
+                                  title={favEq.esFavorito(r) ? 'Favorito de este equipo (editar listas)' : 'Favorito de este equipo / agregar a una lista del equipo'}
+                                  aria-label="Favorito de este equipo"
+                                >
+                                  <ListPlus className={['h-4 w-4', favEq.esFavorito(r) ? 'stroke-[2.75]' : ''].join(' ')} />
+                                </button>
+                              )}
                             </td>
                           </tr>
                           </Fragment>
@@ -2809,6 +2870,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
+          favoritoEquipo={selectedEquipKey ? { activo: favEq.esFavorito(selectedRep), nombreEquipo: selectedEquipName, abrir: () => setFavEqRep(selectedRep) } : undefined}
           onSaveApodos={isAdmin ? (arr) => persistApodos(selectedRep, arr) : undefined}
           onContar={handleContar}
           comunEn={selectedRep.comunEn}
@@ -3080,6 +3142,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         sapEquipo={sapEquipo}
         sapEquipos={sapEquipos}
         favKeys={favKeys}
+      />
+
+      {/* Favoritos POR EQUIPO del repuesto elegido (estrella del equipo + listas del equipo) */}
+      <FavoritosEquipoSheet
+        open={!!favEqRep && !!selectedEquipKey}
+        onClose={() => setFavEqRep(null)}
+        equipoNombre={formatNombreSAP(selectedEquipName).nombre || selectedEquipName || 'este equipo'}
+        repuestoTitulo={favEqRep ? tituloOCodigo(favEqRep) : ''}
+        rep={favEqRep}
+        fav={favEq}
       />
 
       {/* Gestor de listas de favoritos con nombre (para el repuesto objetivo) */}

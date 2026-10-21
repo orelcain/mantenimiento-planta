@@ -11,6 +11,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-10-21 · Claude · Repuestos: favoritos por equipo (se suman a los globales)
+- Hecho: con un equipo seleccionado en el hub aparecen los chips «Favoritos (todos)» (el de siempre, renombrado) y «Favoritos de este equipo N» + uno por lista con nombre del equipo; tocar filtra la tabla. Cada fila trae un botón de lista (44 px) y el panel de detalle un ítem «Favorito de este equipo…»; ambos abren `FavoritosEquipoSheet` (marcar, poner en listas, crear lista). Los globales (`repuestoFavs`, `useRepuestoFavoritos`, listas globales) no cambian.
+- Modelo: `user_preferences/{uid}.repuestoFavLists[equipKey] = {name, repuestoIds}[]` (el campo de 2540bad2). Clave de equipo = `selectedEquipMachineId` (id del nodo = `r.equipos[].machineId`); repuestos = `rowKeyDeRepuesto`. «Favoritos de este equipo» = unión de listas; la estrella del equipo escribe en la lista «Favoritos». Migración EN LECTURA de las listas viejas (`utils/repuestos/favoritosEquipo.ts`): `inv-<SAP>`→SAP, id estático `baader-142-…-<fab>`→`fab:<fab>` (puede calzar con más de un SAP), docId borrado se conserva sin calzar. No se borra nada; al primer cambio se guarda traducido solo esa clave.
+- Datos: `scripts/favoritos-equipo-grader.js` (dry-run por defecto, `--write`, idempotente) agregó «Sensores» (3300103452, 3300133489, 3300133488) al nodo `uLtr5iGJPmaDgiODrdJv` (CONJ BALANZA ESTATICA "STATIC GRADER") del usuario sIXdQHw0q8aCxJk90WSeryszQoO2. `saveRepuestoFavLists` ahora hace merge profundo de esa clave (antes leía y reescribía todo el mapa).
+- Archivos: hooks/repuestos/useRepuestoFavoritosEquipo.ts, utils/repuestos/favoritosEquipo.ts, components/repuestos/FavoritosEquipoSheet.tsx, RepuestosAreaHub.tsx, RepuestoDetailPanel.tsx, services/userPreferences.ts + 2 tests.
+- Verificación: vitest, tsc, eslint; hoja revisada en PC claro y celular oscuro con un arnés aparte (la app exige login, no se pudo recorrer el hub real).
+- Estado: EN REVISIÓN (PR feat/favoritos-por-equipo)
+- Sigue: probar el hub real con sesión (chips con las listas de BAADER 142 y Grader).
+
 ## 2026-10-14 · Claude · Cierre de merges: repuestos con dibujo propio (#1274) y rutas de inspección R-MAN-CH-004 (#1178)
 - Hecho: PR #1274 «feat(repuestos): cada máquina muestra su propio dibujo del manual», mergeado squash (commit c47a2fd2); build verde y deploy de la PWA completado OK. PR #1178 «Rutas de inspección: las 7 áreas del registro R-MAN-CH-004», rama actualizada contra main, build verde, mergeado squash (commit 70a47a7d); deploy de reglas Firestore (agrega `rutasInspeccion` y `recorridos`) y deploy de la PWA completados OK.
 - Verificación: prod sirve `version.json` 4.2.0 con build del 2026-10-14.
