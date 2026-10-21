@@ -117,6 +117,7 @@ function fetchFalso(rutas) {
 }
 
 test('dondeVerAnime: junta ARM + TMDB + Kitsu y tolera que Jikan esté caído', async () => {
+  D._reiniciarPausas()
   const fetchJson = fetchFalso([
     ['arm.haglund.dev', [ARM_SNK]],
     ['kitsu.app/api/edge/anime/7442/streaming-links', KITSU_STREAMING],
@@ -130,6 +131,21 @@ test('dondeVerAnime: junta ARM + TMDB + Kitsu y tolera que Jikan esté caído', 
   assert.deepStrictEqual(r.otros.map((x) => x.pais), ['JP'])
   assert.deepStrictEqual(r.fallos, ['jikan: timeout'])
   assert.strictEqual(r.enlaces[0].sitio, 'MyAnimeList')
+})
+
+test('dondeVerAnime: tras un fallo de Jikan no lo vuelve a consultar por 5 min', async () => {
+  D._reiniciarPausas()
+  const fetchJson = fetchFalso([
+    ['arm.haglund.dev', [ARM_SNK]],
+    ['kitsu.app/api/edge/anime/7442/streaming-links', KITSU_STREAMING],
+    ['api.jikan.moe', new Error('timeout')],
+  ])
+  const args = { fetchJson, tmdbTitulo: async () => TMDB_TITULO, anilistId: 16498, titulo: 'Attack on Titan', region: 'CL' }
+  await D.dondeVerAnime(args)
+  const r = await D.dondeVerAnime(args)
+  assert.strictEqual(fetchJson.llamadas.filter((u) => String(u).includes('api.jikan.moe')).length, 1)
+  assert.match(r.fallos[0], /^jikan: en pausa/)
+  D._reiniciarPausas()
 })
 
 test('dondeVerAnime: ARM sin ese título → solo enlace a AniList, sin romper', async () => {
