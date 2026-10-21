@@ -200,10 +200,20 @@ async function streamingKitsu(fetchJson, kitsuId) {
   });
   return normStreamingKitsu(j);
 }
-async function streamingJikan(fetchJson, malId) {
-  const j = await fetchJson(`${JIKAN}/anime/${malId}/streaming`, { timeout: TIMEOUT_STREAMING });
-  return normStreamingJikan(j);
+// Si Jikan falla, se salta por 5 min: cada «¿Dónde ver?» esperaba su timeout completo (~6 s).
+const PAUSA_JIKAN_MS = 5 * 60 * 1000;
+let _jikanPausaHasta = 0;
+async function streamingJikan(fetchJson, malId, ahora = Date.now()) {
+  if (ahora < _jikanPausaHasta) throw new Error('en pausa tras un fallo reciente');
+  try {
+    const j = await fetchJson(`${JIKAN}/anime/${malId}/streaming`, { timeout: TIMEOUT_STREAMING });
+    return normStreamingJikan(j);
+  } catch (e) {
+    _jikanPausaHasta = Date.now() + PAUSA_JIKAN_MS;
+    throw e;
+  }
 }
+function _reiniciarPausas() { _jikanPausaHasta = 0; }
 
 /**
  * Proveedores de un país (salida de mediaApi/titulo.dondeVer[pais]) → filas con URL de búsqueda.
@@ -296,6 +306,6 @@ function elegirVerAhora(datos, { recordada, plan } = {}) {
 
 module.exports = {
   PROV_CLAVE, NOMBRE_PLAT, PLAN_DEFECTO, CANALES_YOUTUBE, sugerenciasYoutube, planDeProveedores, elegirVerAhora,
-  urlPlataforma, claveSitio, normIds, idsDeAnilist, enlacesFicha, normStreamingKitsu, normStreamingJikan,
+  urlPlataforma, claveSitio, normIds, _reiniciarPausas, idsDeAnilist, enlacesFicha, normStreamingKitsu, normStreamingJikan,
   unirEnlaces, filasPais, otrosPaises, dondeVerAnime,
 };
