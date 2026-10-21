@@ -217,6 +217,7 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .day-actions-row { display: flex; gap: 8px; align-items: center; }
 .day-actions-row .filter-chips { flex: 1; min-width: 0; }
 .day-loading-bar { font-size: 11px; color: var(--hint); padding: 5px 14px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.fuente-respaldo { font-size: 12px; color: var(--hint); padding: 6px 14px; text-align: center; background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 8px; margin: 6px 12px; }
 .day-loading-bar::before { content: ''; width: 10px; height: 10px; border: 1.5px solid color-mix(in srgb, var(--text) 15%, transparent); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
 
 /* ── Estrenos grid view (big posters) ──────────────────────────────────────── */
@@ -879,6 +880,8 @@ let dayData = [];        // current day's episodes (already sorted by airingAt)
 let dayError = false;
 let dayLoading = false;  // true while fetching from AniList
 let dayFetchToken = 0;   // invalidates older fetches when navigating quickly
+let dayFuente = null;    // 'jikan' | 'simkl' | 'kitsu' cuando el día vino del respaldo (AniList caído)
+let searchFuente = null; // ídem para la búsqueda
 let dayView = atPrefs.get('at_day_view', 'list'); // 'list' | 'grid'
 
 // ── Recent searches ───────────────────────────────────────────────────────────
@@ -1280,6 +1283,8 @@ async function doSearch(q) {
       body: JSON.stringify({ query: gql, variables: vars }),
     });
     const json = await r.json();
+    if (!r.ok || json.errors || !json.data?.Page) throw new Error('AniList no disponible');
+    searchFuente = null;
     const media = json.data?.Page?.media || [];
     const remote = media.map(m => {
       const next = m.nextAiringEpisode;
@@ -1312,9 +1317,28 @@ async function doSearch(q) {
     lastSearchQuery = q;
     renderResults(lastSearchResults);
   } catch(e) {
+    // AniList caído: búsqueda por texto en Jikan/Kitsu vía mediaApi (los filtros sin texto no tienen respaldo).
+    if (q) {
+      try {
+        const rb = await respaldoApi('animeBuscar', { q });
+        const remote = (rb.items || []).map(m => ({
+          ...m,
+          nextEp: null,
+          tracking: m.id ? getAnimeList(m.id) : null,
+        }));
+        const localIds = new Set(localMatches.map(x => x.id));
+        lastSearchResults = [...localMatches, ...remote.filter(r => !r.id || !localIds.has(r.id))];
+        lastSearchQuery = q;
+        searchFuente = rb.fuente || 'respaldo';
+        renderResults(lastSearchResults);
+        return;
+      } catch (e2) { console.error('doSearch: fallaron AniList y el respaldo:', e2); }
+    }
     if (!localMatches.length) {
       const el = document.getElementById('search-results');
-      if (el) el.innerHTML = '<div class="empty"><div class="big">⚠️</div><p>Sin conexión</p></div>';
+      if (el) el.innerHTML = '<div class="empty"><div class="big">⚠️</div><p>' + (q
+        ? 'AniList no responde y las fuentes de respaldo tampoco, o no hay conexión.'
+        : 'AniList no responde. La búsqueda con filtros y sin texto no tiene fuente de respaldo: escribe un título.') + '</p></div>';
     }
   }
 }
@@ -1444,17 +1468,20 @@ function dayTTL(d) {
   if (diff === 0) return 60 * 60 * 1000;          // today: 1 hour
   return 6 * 60 * 60 * 1000;                       // future: 6 hours
 }
+let _cacheFuente = null; // fuente del último día leído de caché (null = AniList)
 function loadDayCache(d) {
   try {
     const raw = localStorage.getItem(LS_DAY_PREFIX + dayKey(d));
     if (!raw) return null;
-    const { ts, eps } = JSON.parse(raw);
-    if (Date.now() - ts > dayTTL(d)) { localStorage.removeItem(LS_DAY_PREFIX + dayKey(d)); return null; }
+    const { ts, eps, fuente } = JSON.parse(raw);
+    // Lo que vino del respaldo dura poco: apenas AniList vuelva, se prefiere.
+    if (Date.now() - ts > dayTTL(d) || (fuente && Date.now() - ts > 30 * 60 * 1000)) { localStorage.removeItem(LS_DAY_PREFIX + dayKey(d)); return null; }
+    _cacheFuente = fuente || null;
     return eps || [];
   } catch { return null; }
 }
-function saveDayCache(d, eps) {
-  try { localStorage.setItem(LS_DAY_PREFIX + dayKey(d), JSON.stringify({ ts: Date.now(), eps })); }
+function saveDayCache(d, eps, fuente) {
+  try { localStorage.setItem(LS_DAY_PREFIX + dayKey(d), JSON.stringify({ ts: Date.now(), eps, fuente: fuente || null })); }
   catch(e) { console.warn('day cache save:', e?.message); }
 }
 function relativeDayLabel(d) {
@@ -1534,6 +1561,25 @@ function goToday() {
   renderEstrenos();
 }
 
+// ── Respaldo cuando AniList no responde ───────────────────────────────────────
+// Todo pasa por la función mediaApi (mismo ID token que Cine); el navegador no llama a otros dominios.
+const MEDIA_API_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/mediaApi';
+const NOMBRE_FUENTE = { jikan: 'Jikan (MyAnimeList)', simkl: 'Simkl', kitsu: 'Kitsu' };
+async function respaldoApi(op, params) {
+  const user = firebase.auth().currentUser;
+  if (!user) throw new Error('Sin sesión');
+  const token = await user.getIdToken();
+  const qs = new URLSearchParams({ op, ...params }).toString();
+  const r = await fetch(`${MEDIA_API_URL}?${qs}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(25000) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
+  return data;
+}
+function avisoRespaldo(fuente, extra) {
+  if (!fuente) return '';
+  return `<div class="fuente-respaldo">Fuente de respaldo: ${safe(NOMBRE_FUENTE[fuente] || fuente)} (AniList no responde)${extra ? ' · ' + safe(extra) : ''}</div>`;
+}
+
 async function fetchDay(d, force) {
   const myToken = ++dayFetchToken;
   dayError = false;
@@ -1542,6 +1588,7 @@ async function fetchDay(d, force) {
     const cached = loadDayCache(d);
     if (cached) {
       dayData = cached;
+      dayFuente = _cacheFuente;
       dayLoading = false;
       renderDayList();
       return;
@@ -1557,6 +1604,7 @@ async function fetchDay(d, force) {
   const to   = Math.floor(end.getTime() / 1000);
 
   let allEps = [];
+  let fuente = null; // null = AniList
   let page = 1, hasNext = true;
   try {
     while (hasNext && page <= 3) {
@@ -1564,6 +1612,7 @@ async function fetchDay(d, force) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ query: DAY_GQL, variables: { from, to, page } }),
+        signal: AbortSignal.timeout(12000),
       });
       if (!r.ok) throw new Error('AniList HTTP ' + r.status);
       const json = await r.json();
@@ -1590,19 +1639,31 @@ async function fetchDay(d, force) {
       page++;
     }
     allEps.sort((a, b) => a.airingAt - b.airingAt);
-    saveDayCache(d, allEps);
+    saveDayCache(d, allEps, null);
   } catch (e) {
-    console.error('fetchDay:', e);
-    if (myToken !== dayFetchToken) return;
-    dayError = true;
-    dayLoading = false;
-    renderDayList();
-    return;
+    console.warn('fetchDay: AniList falló, pruebo el respaldo:', e);
+    try {
+      const r = await respaldoApi('animeDia', { from, to });
+      allEps = (r.items || [])
+        .filter(x => x && x.title && x.airingAt && x.airingAt >= from && x.airingAt <= to)
+        .map(x => ({ ...x, genres: x.genres || [], format: x.format || 'TV' }))
+        .sort((a, b) => a.airingAt - b.airingAt);
+      fuente = r.fuente || 'respaldo';
+      saveDayCache(d, allEps, fuente);
+    } catch (e2) {
+      console.error('fetchDay: fallaron AniList y el respaldo:', e2);
+      if (myToken !== dayFetchToken) return;
+      dayError = true;
+      dayLoading = false;
+      renderDayList();
+      return;
+    }
   }
 
   // Discard if a newer fetch superseded this one (user navigated away)
   if (myToken !== dayFetchToken) return;
 
+  dayFuente = fuente;
   dayData = allEps;
   dayLoading = false;
   renderDayList();
@@ -1613,7 +1674,7 @@ function renderDayList() {
   if (!el) return;
 
   if (dayError) {
-    el.innerHTML = '<div class="empty"><p>No se pudo cargar (sin conexión o AniList ocupado). Toca ↻ para reintentar.</p></div>';
+    el.innerHTML = '<div class="empty"><p>No se pudo cargar: AniList no responde y las fuentes de respaldo (Simkl, Jikan, Kitsu) tampoco, o no hay conexión. Toca ↻ para reintentar.</p></div>';
     return;
   }
   if (dayLoading && !dayData.length) {
@@ -1629,6 +1690,7 @@ function renderDayList() {
 
   let html = '';
   if (dayLoading) html += '<div class="day-loading-bar">Actualizando…</div>';
+  html += avisoRespaldo(dayFuente, dayFuente === 'kitsu' ? 'cobertura parcial' : (dayData.some(x => x.episode == null) ? 'sin número de episodio' : ''));
 
   if (!items.length) {
     el.innerHTML = html + '<div class="empty"><div class="big">📭</div><p>Sin estrenos este día</p></div>';
@@ -1663,15 +1725,15 @@ function estrenoGridCard(e, isTracked) {
   const trackedBadge = isTracked ? `<div class="egc-track-badge">${safe(trackMeta.emoji)} ${safe(trackMeta.name)}</div>` : '';
   const progressPill = (isTracked && e.format !== 'MOVIE' && e.tracking !== 'completado' && t)
     ? `<div class="egc-progress-pill">${safe(w)}/${safe(t)}</div>` : '';
-  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" ${actionAttrs('openResultDetail', [{...e, episodes: t || null}])}>
+  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" ${e.id ? actionAttrs('openResultDetail', [{...e, episodes: t || null}]) : ''}>
     <div class="egc-poster">
       ${safeUrl(e.cover)?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="showGridImageFallback(this)">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px">🎌</div>'}
       ${trackedBadge}
       ${progressPill}
       <div class="egc-format-icon">${fmtIcon}</div>
       <div class="egc-overlay">
-        <span class="egc-time">${time}</span>
-        <span class="egc-ep">Ep ${safe(e.episode)}</span>
+        <span class="egc-time">${e.sinHora ? '—' : time}</span>
+        ${e.episode != null ? `<span class="egc-ep">Ep ${safe(e.episode)}</span>` : ''}
       </div>
     </div>
     <div class="egc-title">${safe(e.title)}</div>
@@ -1684,23 +1746,23 @@ function estrenoCard(e, isTracked) {
   const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
   const trackMeta = getListMeta(e.tracking);
   const trackedChip = isTracked ? `<div class="tracked-chip">${safe(trackMeta.emoji)} ${safe(trackMeta.name)}</div>` : '';
-  const addBtns = isTracked
+  const addBtns = !e.id ? '<div class="estreno-genres">Sin enlace a AniList: no se puede agregar a listas</div>' : isTracked
     ? `<div class="estreno-ep-counter" data-click-stop="1">
         <button class="ep-btn" ${actionAttrs('changeEp', [e.id,-1,e.tracking])}>−</button>
         <span class="ep-count editable" ${actionAttrs('openEpModal', [e.id])} title="Tap para editar">${safe((getAnime(e.id)?.watchedEps||0))} ep</span>
         <button class="ep-btn" ${actionAttrs('changeEp', [e.id,1,e.tracking])}>+</button>
        </div>`
     : `<div class="qadd-row">${LIST_OPTS.map(l=>`<button class="qadd-btn" ${actionAttrs('quickAddEstreno', [e,l.key], true)}>${l.emoji} ${l.label}</button>`).join('')}</div>`;
-  return `<div class="estreno-card${isTracked?' is-tracked':''}" ${actionAttrs('openResultDetail', [{...e, score: e.score, episodes: null}])}>
+  return `<div class="estreno-card${isTracked?' is-tracked':''}" ${e.id ? actionAttrs('openResultDetail', [{...e, score: e.score, episodes: null}]) : ''}>
     <div class="estreno-poster">
       ${e.cover?`<img src="${safe(safeUrl(e.cover))}" loading="lazy" onerror="this.parentElement.innerHTML='🎌'">`:'🎌'}
-      <div class="estreno-time-badge">${time}</div>
+      <div class="estreno-time-badge">${e.sinHora ? '—' : time}</div>
     </div>
     <div class="estreno-body">
       ${trackedChip}
       <div class="estreno-title">${safe(e.title)}</div>
       <div class="estreno-meta">
-        <span>Ep. ${safe(e.episode)}</span>
+        ${e.episode != null ? `<span>Ep. ${safe(e.episode)}</span>` : ''}
         ${e.score?`<span>⭐ ${safe(e.score)}</span>`:''}
         <span>${fmtIcon} ${safe(e.format==='TV'?'TV':e.format==='MOVIE'?'Película':e.format)}</span>
       </div>
@@ -1797,9 +1859,9 @@ function renderResults(results) {
   if (!el) return;
   if (!results.length) { el.innerHTML='<div class="empty"><div class="big">😶</div><p>Sin resultados</p></div>'; return; }
   if (viewMode==='grid') {
-    el.innerHTML=`<div class="section-title">${results.length} resultados</div><div class="grid">${results.map(r=>gridCard(r)).join('')}</div>`;
+    el.innerHTML=`${avisoRespaldo(searchFuente)}<div class="section-title">${results.length} resultados</div><div class="grid">${results.map(r=>gridCard(r)).join('')}</div>`;
   } else {
-    el.innerHTML=`<div class="section-title">${results.length} resultados</div><div class="list-results">${results.map(r=>listCard(r)).join('')}</div>`;
+    el.innerHTML=`${avisoRespaldo(searchFuente)}<div class="section-title">${results.length} resultados</div><div class="list-results">${results.map(r=>listCard(r)).join('')}</div>`;
   }
 }
 
@@ -1816,7 +1878,7 @@ function gridCard(r) {
       badge = `<div class="tracked-badge">${emoji}</div>`;
     }
   }
-  return `<div class="grid-card" ${actionAttrs('openResultDetail', [r])}>
+  return `<div class="grid-card" ${r.id ? actionAttrs('openResultDetail', [r]) : ''}>
     <div class="grid-poster">${imgTag(r.cover,'🎌')}${badge}</div>
     <div class="grid-title">${safe(r.title)}</div>
     <div class="grid-meta">${safe(r.score?'⭐'+r.score+' · ':'')}${safe(r.format||'TV')}</div>
@@ -1869,7 +1931,7 @@ function listCard(r) {
     `<button class="qadd-btn${tracked===l.key?' active':''}" ${actionAttrs('quickAdd', [r.id,l.key], true)}>${l.emoji} ${l.label}</button>`
   ).join('');
   const nickHtml = a?.nickname ? `<div class="result-genres" style="opacity:1;color:var(--accent);font-weight:600">🏷️ ${safe(a.nickname)}</div>` : '';
-  return `<div class="result-card" ${actionAttrs('openResultDetail', [r])}>
+  return `<div class="result-card" ${r.id ? actionAttrs('openResultDetail', [r]) : ''}>
     <div class="result-poster">${imgTag(r.cover,'🎌')}</div>
     <div class="result-body">
       ${trackedHtml}
@@ -1878,7 +1940,7 @@ function listCard(r) {
       <div class="result-meta">${meta}</div>
       ${nextHtml}${genresHtml}
       ${progressHtml}${linksHtml}
-      <div class="qadd-row">${addBtns}</div>
+      ${r.id ? `<div class="qadd-row">${addBtns}</div>` : '<div class="result-genres">Sin enlace a AniList (fuente de respaldo): no se puede agregar a listas</div>'}
     </div>
   </div>`;
 }
@@ -2234,6 +2296,7 @@ async function loadWhereToWatch(id){
         body: JSON.stringify({ query: ANILIST_WATCH_GQL, variables:{ id: Number(id) } }),
       });
       const json = await resp.json();
+      if (!resp.ok || json?.errors || !json?.data) throw new Error('AniList no disponible');
       links = (json?.data?.Media?.externalLinks || []).filter(l => l.type === 'STREAMING');
       _wtwCache[id] = links;
     }
@@ -2256,7 +2319,7 @@ async function loadWhereToWatch(id){
     }).join('') + '</div>';
   }catch(e){
     const cur = document.getElementById('wtw-body-'+id);
-    if(cur) cur.innerHTML = '<span style="color:var(--hint);font-size:13px">No se pudo cargar (sin conexión a AniList).</span>';
+    if(cur) cur.innerHTML = '<span style="color:var(--hint);font-size:13px">No disponible ahora: «¿Dónde ver?» depende de AniList, que no responde, y no tiene fuente de respaldo. Prueba más tarde.</span>';
   }
 }
 // Abre un link externo desde la Mini App (Telegram WebApp o navegador)
@@ -3212,6 +3275,7 @@ async function fetchRelations(id) {
       body:    JSON.stringify({ query: ANILIST_RELATIONS_GQL, variables: { id: Number(id) } }),
     });
     const json  = await resp.json();
+    if (!resp.ok || json?.errors || !json?.data) return 'caido';
     const media = json?.data?.Media;
     if (!media) return null;
     const entries = (media.relations?.edges || [])
@@ -3236,7 +3300,7 @@ async function fetchRelations(id) {
       mainTitle: media.title?.english || media.title?.romaji || '',
       entries,
     };
-  } catch(_) { return null; }
+  } catch(_) { return 'caido'; }
 }
 
 async function openSagaPanel(animeId) {
@@ -3251,6 +3315,11 @@ async function openSagaPanel(animeId) {
   if (tg?.BackButton) tg.BackButton.show();
 
   const result = await fetchRelations(animeId);
+  if (result === 'caido') {
+    body.innerHTML = `<div class="empty"><div class="big">🔌</div><p>AniList no responde y «Relacionados» no tiene fuente de respaldo. Prueba más tarde.</p></div>`;
+    title.textContent = 'No disponible';
+    return;
+  }
   if (!result || !result.entries.length) {
     body.innerHTML = `<div class="empty"><div class="big">🔗</div><p>No se encontraron obras relacionadas en AniList.</p></div>`;
     title.textContent = 'Sin relaciones';
