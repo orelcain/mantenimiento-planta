@@ -350,6 +350,141 @@ function emitidosDeCalendario(items, malPorAnilist, ahoraS) {
   return out;
 }
 
+// ── Segunda fuente: TMDB (/tv) para lo que el calendario de Simkl no trae ─────
+
+const TTL_EMITIDOS_TMDB_MS = 6 * HORA_MS;
+
+/**
+ * Episodios emitidos según TMDB, en la numeración de la ENTRADA DE AniList. Pura (sin red).
+ *   tv:        respuesta de TMDB /tv/{id} (last/next_episode_to_air, seasons[].episode_count)
+ *   temporada: themoviedb-season de ARM (null = ARM no la sabe, p. ej. One Piece)
+ *   aniEps:    episodios de la entrada de AniList (0/null = no se sabe)
+ *   vistos:    episodios vistos (evidencia de numeración absoluta en los long-runners)
+ * Reglas (si no se puede decidir → null = «sin dato», nunca un número a ojo):
+ *  - ARM da temporada: número relativo a esa temporada. Si AniList tiene MENOS episodios que la
+ *    temporada de TMDB, la entrada es solo parte de ella (cour) y la numeración es ambigua → null.
+ *  - ARM sin temporada: con una sola temporada (o la última es la 1) absoluto = relativo. Con varias:
+ *    absoluto (suma de episode_count de las anteriores) si AniList o lo visto superan la última
+ *    temporada; relativo si AniList cabe en ella; sin evidencia o con evidencia contradictoria → null.
+ */
+function emitidosTmdb(tv, { temporada, aniEps, vistos } = {}) {
+  const last = tv && tv.last_episode_to_air;
+  if (!last || !Number.isInteger(last.season_number) || !Number.isInteger(last.episode_number)) return null;
+  const regulares = (tv.seasons || []).filter((s) => s && s.season_number >= 1 && s.episode_count > 0);
+  const cuenta = (n) => { const s = regulares.find((x) => x.season_number === n); return s ? s.episode_count : 0; };
+  const sL = last.season_number;
+  const eL = last.episode_number;
+  const next = tv.next_episode_to_air;
+  const mismoNext = next && next.season_number === sL && Number.isInteger(next.episode_number);
+  const enSL = mismoNext ? Math.max(eL, next.episode_number - 1) : eL;
+  const aniE = Number(aniEps) || 0;
+  const w = Number(vistos) || 0;
+  let n;
+  let offset = 0;
+  if (Number.isInteger(temporada) && temporada >= 1) {
+    const c = cuenta(temporada);
+    if (!c || sL < temporada) return null;
+    if (aniE && aniE < c) return null;
+    // ARM a veces apunta a la temporada 1 de una serie que ya va en la 3 (visto con Re:ZERO): si TMDB ya
+    // emitió una temporada posterior, solo sirve si la entrada de AniList es justo esa temporada completa.
+    if (sL > temporada && aniE !== c) return null;
+    n = sL > temporada ? c : enSL;
+  } else if (regulares.length <= 1 || sL === 1) {
+    n = enSL;
+  } else {
+    const cL = cuenta(sL);
+    const absoluta = (aniE > 0 && aniE > cL) || w > cL;
+    const relativa = aniE > 0 && aniE <= cL;
+    if (absoluta === relativa) return null; // sin evidencia, o contradictoria
+    if (absoluta) offset = regulares.filter((s) => s.season_number < sL).reduce((t, s) => t + s.episode_count, 0);
+    n = offset + enSL;
+  }
+  if (aniE) n = Math.min(n, aniE);
+  if (!(n >= 1)) return null;
+  let proximo = null;
+  if (mismoNext && next.air_date) {
+    const at = Date.parse(next.air_date);
+    if (Number.isFinite(at)) proximo = { ep: offset + next.episode_number, at: Math.floor(at / 1000) };
+  }
+  return { emitidos: n, proximo };
+}
+
+/** ARM: ids de AniList → { tmdb, temporada } (cacheado; los sin mapeo se reintentan a los 2 días). */
+async function tmdbDeAnilist(ctx, ids) {
+  const resultado = new Map();
+  const unicos = [...new Set(ids.map(Number).filter((n) => Number.isInteger(n) && n > 0 && n <= 50000000))];
+  if (!unicos.length) return resultado;
+  const docId = 'ids_anilist_tmdb';
+  const hoyDia = Math.floor(ctx.ahora() / DIA_MS);
+  let doc = null;
+  try { doc = await ctx.cache.get(docId); } catch { doc = null; }
+  const mapa = Object.assign({}, doc && doc.mapa);
+  const faltan = [];
+  for (const id of unicos) {
+    const v = mapa[id];
+    if (v && typeof v === 'object') resultado.set(id, v);
+    else if (Number.isFinite(v) && v < 0 && hoyDia - (-v) < REINTENTO_SIN_MAPEO_DIAS) continue;
+    else faltan.push(id);
+  }
+  let cambio = false;
+  for (let i = 0; i < faltan.length; i += 100) {
+    const lote = faltan.slice(i, i + 100);
+    let resp;
+    try {
+      resp = await ctx.fetchJson(ARM, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lote.map((id) => ({ anilist: id }))), timeout: TIMEOUT_KITSU });
+    } catch { continue; }
+    if (!Array.isArray(resp) || resp.length !== lote.length) continue;
+    lote.forEach((id, k) => {
+      const r = resp[k];
+      const t = r && Number(r.themoviedb);
+      const s = r && Number(r['themoviedb-season']);
+      const solo = r && String(r.media || '').toLowerCase() === 'movie';
+      if (Number.isInteger(t) && t > 0 && !solo) {
+        const v = { t, s: Number.isInteger(s) && s >= 1 ? s : null };
+        mapa[id] = v; resultado.set(id, v);
+      } else mapa[id] = -hoyDia;
+      cambio = true;
+    });
+  }
+  if (cambio) { try { await ctx.cache.set(docId, { mapa, ts: ctx.ahora() }); } catch { /* caché opcional */ } }
+  return resultado;
+}
+
+/** Corre `fn` sobre `lista` con a lo más `n` a la vez. */
+async function enParalelo(lista, n, fn) {
+  const cola = [...lista];
+  await Promise.all(Array.from({ length: Math.min(n, cola.length) }, async () => {
+    while (cola.length) { const x = cola.shift(); await fn(x); }
+  }));
+}
+
+/** Completa con TMDB los ids que Simkl no trae. Cachea el cálculo por id ~6 h (clave = datos de entrada). */
+async function emitidosPorTmdb(ctx, ids, info) {
+  const out = {};
+  if (!ctx.tmdbTv || !ids.length) return out;
+  const mapa = await tmdbDeAnilist(ctx, ids);
+  let doc = null;
+  try { doc = await ctx.cache.get('emitidos_tmdb'); } catch { doc = null; }
+  const guardado = Object.assign({}, doc && doc.items);
+  const ahora = ctx.ahora();
+  let cambio = false;
+  await enParalelo(ids.filter((id) => mapa.has(id)), 8, async (id) => {
+    const m = mapa.get(id);
+    const inf = (info && info[id]) || {};
+    const k = `${m.t}|${m.s}|${inf.eps || 0}|${inf.vistos || 0}`;
+    const g = guardado[id];
+    if (g && g.k === k && ahora - g.ts < TTL_EMITIDOS_TMDB_MS) { if (g.res) out[id] = g.res; return; }
+    let tv;
+    try { tv = await ctx.tmdbTv(m.t); } catch { return; } // TMDB caído para esta serie: sin dato, sin cachear
+    const r = emitidosTmdb(tv, { temporada: m.s, aniEps: inf.eps, vistos: inf.vistos });
+    guardado[id] = { k, ts: ahora, res: r };
+    cambio = true;
+    if (r) out[id] = r;
+  });
+  if (cambio) { try { await ctx.cache.set('emitidos_tmdb', { items: guardado, ts: ahora }); } catch { /* caché opcional */ } }
+  return out;
+}
+
 // ── Jikan ────────────────────────────────────────────────────────────────────
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -571,11 +706,22 @@ function crearRespaldo(opciones) {
       return primeroQueResponda([['jikan', () => jikanBuscar(ctx, t)], ['kitsu', () => kitsuBuscar(ctx, t)]]);
     },
     /** Episodios ya emitidos de los ids de AniList dados, según Simkl: { fuente, items:{id:{emitidos,proximo}} }. */
-    async emitidos(anilistIds) {
+    async emitidos(anilistIds, info) {
       const ids = [...new Set((anilistIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 60);
       if (!ids.length) return { fuente: 'simkl', items: {} };
-      const [snap, mal] = await Promise.all([simklCalendario(ctx), malDeAnilist(ctx, ids)]);
-      return { fuente: 'simkl', items: emitidosDeCalendario(snap.items, mal, Math.floor(ctx.ahora() / 1000)) };
+      // Simkl primero (calendario cacheado); TMDB solo para los ids que Simkl no trae. Si Simkl cae, TMDB sigue.
+      let simkl = {};
+      try {
+        const [snap, mal] = await Promise.all([simklCalendario(ctx), malDeAnilist(ctx, ids)]);
+        simkl = emitidosDeCalendario(snap.items, mal, Math.floor(ctx.ahora() / 1000));
+      } catch (e) { if (!ctx.tmdbTv) throw e; }
+      const tmdb = await emitidosPorTmdb(ctx, ids.filter((id) => !simkl[id]), info).catch(() => ({}));
+      const items = {};
+      for (const id of ids) {
+        if (simkl[id]) items[id] = { ...simkl[id], fuente: 'simkl' };
+        else if (tmdb[id]) items[id] = { ...tmdb[id], fuente: 'tmdb' };
+      }
+      return { fuente: 'simkl', items };
     },
     /** Para los crons: emisiones recientes sin caché de día. */
     episodiosEntre(desde, hasta) { return this.estrenosDia(desde, hasta, { cachear: false }); },
@@ -593,6 +739,6 @@ module.exports = {
   crearRespaldo, claveAvisoEpisodio,
   // exportados para pruebas
   normJikan, normKitsu, normSimkl, simklCalendario, aFormatoDia, aFormatoBusqueda, instantesJikan, diasJstDelRango,
-  mapearIds, malDeAnilist, emitidosDeCalendario, emisionesEnRango, kitsuSnapshot, claveMapeoVigente,
+  mapearIds, malDeAnilist, emitidosDeCalendario, emitidosTmdb, tmdbDeAnilist, emisionesEnRango, kitsuSnapshot, claveMapeoVigente,
   _reiniciarJikan() { _jikanCaidoHasta = 0; },
 };

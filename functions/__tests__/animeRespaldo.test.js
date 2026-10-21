@@ -316,3 +316,111 @@ test('respaldo.emitidos: AniList→MAL por ARM (cacheado) + calendario Simkl', a
   await r.emitidos([101, 102])
   assert.strictEqual(llamadas.length, 1) // el segundo pedido sale de la caché de ARM (aciertos y fallos)
 })
+
+// ── Emitidos por TMDB (segunda fuente) ────────────────────────────────────────
+// Forma de /tv/{id} según la documentación de TMDB. Los conteos son de juguete (sin token local para bajar reales).
+const tvLargo = (ultimo, siguiente) => ({
+  seasons: [{ season_number: 0, episode_count: 9 }, { season_number: 1, episode_count: 100 }, { season_number: 2, episode_count: 100 }, { season_number: 3, episode_count: 50 }],
+  last_episode_to_air: { season_number: 3, episode_number: ultimo },
+  next_episode_to_air: siguiente ? { season_number: 3, episode_number: siguiente, air_date: '2026-10-25' } : null,
+})
+const tvRezero = (sL, eL) => ({
+  seasons: [{ season_number: 1, episode_count: 25 }, { season_number: 2, episode_count: 25 }, { season_number: 3, episode_count: 16 }],
+  last_episode_to_air: { season_number: sL, episode_number: eL },
+  next_episode_to_air: null,
+})
+
+test('emitidosTmdb: long-runner sin temporada (One Piece) → numeración ABSOLUTA si lo visto supera la última temporada', () => {
+  const r = R.emitidosTmdb(tvLargo(20, 21), { temporada: null, aniEps: 0, vistos: 215 })
+  assert.strictEqual(r.emitidos, 220) // 100 + 100 + 20
+  assert.deepStrictEqual(r.proximo, { ep: 221, at: Date.parse('2026-10-25') / 1000 })
+})
+
+test('emitidosTmdb: long-runner sin evidencia (pocos vistos, AniList sin total) → sin dato, no se inventa', () => {
+  assert.strictEqual(R.emitidosTmdb(tvLargo(20), { temporada: null, aniEps: 0, vistos: 10 }), null)
+})
+
+test('emitidosTmdb: evidencia contradictoria (AniList cabe en la temporada pero lo visto la supera) → sin dato', () => {
+  assert.strictEqual(R.emitidosTmdb(tvLargo(20), { temporada: null, aniEps: 12, vistos: 200 }), null)
+})
+
+test('emitidosTmdb: AniList = una temporada entera (cabe en la última) → relativo a la temporada', () => {
+  assert.strictEqual(R.emitidosTmdb(tvLargo(20), { temporada: null, aniEps: 50, vistos: 5 }).emitidos, 20)
+})
+
+test('emitidosTmdb: Re:ZERO con temporada de ARM → relativo a esa temporada', () => {
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 3, aniEps: 16, vistos: 2 }).emitidos, 8)
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 3, aniEps: 0, vistos: 2 }).emitidos, 8)
+  // ARM apunta a la temporada 1 pero TMDB ya va en la 3 y AniList no sabe su total (caso real de Re:ZERO) → sin dato
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 1, aniEps: 0, vistos: 3 }), null)
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 1, aniEps: 16, vistos: 3 }), null)
+  // temporada anterior ya terminada → todos sus episodios
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 2, aniEps: 25, vistos: 0 }).emitidos, 25)
+})
+
+test('emitidosTmdb: temporada ambigua o inexistente → sin dato', () => {
+  // la entrada de AniList (8 eps) es solo parte de la temporada de TMDB (16): numeración ambigua
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 3, aniEps: 8, vistos: 0 }), null)
+  // la temporada que dice ARM todavía no empezó en TMDB
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 4, aniEps: 12, vistos: 0 }), null)
+  // la temporada no figura
+  assert.strictEqual(R.emitidosTmdb(tvRezero(3, 8), { temporada: 9, aniEps: 0, vistos: 0 }), null)
+  // TMDB sin episodio emitido
+  assert.strictEqual(R.emitidosTmdb({ seasons: [{ season_number: 1, episode_count: 12 }], last_episode_to_air: null }, { temporada: 1 }), null)
+  assert.strictEqual(R.emitidosTmdb(null, {}), null)
+})
+
+test('emitidosTmdb: serie de una sola temporada → absoluto = relativo; tope por el total de AniList', () => {
+  const tv = { seasons: [{ season_number: 1, episode_count: 13 }], last_episode_to_air: { season_number: 1, episode_number: 7 }, next_episode_to_air: { season_number: 1, episode_number: 9, air_date: '2026-10-30' } }
+  assert.strictEqual(R.emitidosTmdb(tv, {}).emitidos, 8) // TMDB ya listó el 9 como próximo: salieron al menos 8
+  assert.strictEqual(R.emitidosTmdb(tv, { aniEps: 6 }).emitidos, 6)
+})
+
+test('emitidos: Simkl primero; TMDB completa lo que Simkl no trae; segunda llamada sale de la caché', async () => {
+  const cache = cacheEnMemoria()
+  const pedidosTv = []
+  const ctx = {
+    cache, ahora: () => Date.parse('2026-10-22T12:00:00Z'), pausaJikanMs: 0,
+    tmdbTv: async (id) => { pedidosTv.push(id); return id === 500 ? tvLargo(20, 21) : tvRezero(3, 8) },
+    fetchJson: async (url, o) => {
+      if (url.includes('arm.haglund.dev')) {
+        const p = JSON.parse(o.body)
+        return p.map((x) => ({ 101: { anilist: 101, myanimelist: 1, themoviedb: 900, 'themoviedb-season': 1 },
+          102: { anilist: 102, myanimelist: 2, themoviedb: 500, 'themoviedb-season': null },
+          103: { anilist: 103, myanimelist: 3, themoviedb: 600, 'themoviedb-season': 3, media: 'TV' },
+          104: { anilist: 104, myanimelist: 4, themoviedb: 77, media: 'Movie' } }[x.anilist] || null))
+      }
+      return [{ ids: { simkl_id: 10, mal: '1' }, date: '2026-10-21T10:00:00+09:00', title: 'A', episode: { episode: 6 }, anime_type: 'tv' }]
+    },
+  }
+  const r = R.crearRespaldo(ctx)
+  const info = { 102: { eps: 0, vistos: 215 }, 103: { eps: 16, vistos: 1 } }
+  const a = await r.emitidos([101, 102, 103, 104, 105], info)
+  assert.strictEqual(a.items[101].fuente, 'simkl') // Simkl manda; TMDB ni se pide para el 101
+  assert.strictEqual(a.items[101].emitidos, 6)
+  assert.deepStrictEqual([a.items[102].fuente, a.items[102].emitidos], ['tmdb', 220])
+  assert.deepStrictEqual([a.items[103].fuente, a.items[103].emitidos], ['tmdb', 8])
+  assert.strictEqual(a.items[104], undefined) // película: no se consulta /tv
+  assert.strictEqual(a.items[105], undefined)
+  assert.ok(!pedidosTv.includes(900) && !pedidosTv.includes(77))
+  const n = pedidosTv.length
+  const b = await r.emitidos([102, 103], info)
+  assert.strictEqual(pedidosTv.length, n) // cálculo cacheado
+  assert.strictEqual(b.items[102].emitidos, 220)
+})
+
+test('emitidos: si Simkl cae, TMDB igual responde; si TMDB falla para una serie, esa queda sin dato', async () => {
+  const ctx = {
+    cache: cacheEnMemoria(), ahora: () => Date.parse('2026-10-22T12:00:00Z'), pausaJikanMs: 0,
+    tmdbTv: async (id) => { if (id === 2) throw new Error('TMDB 502'); return tvRezero(3, 8) },
+    fetchJson: async (url, o) => {
+      if (url.includes('simkl')) throw new Error('HTTP 503')
+      const p = JSON.parse(o.body)
+      return p.map((x) => ({ anilist: x.anilist, myanimelist: x.anilist, themoviedb: x.anilist === 1 ? 1 : 2, 'themoviedb-season': 3 }))
+    },
+  }
+  const r = await R.crearRespaldo(ctx).emitidos([1, 2], { 1: { eps: 16, vistos: 0 }, 2: { eps: 16, vistos: 0 } })
+  assert.deepStrictEqual(Object.keys(r.items), ['1'])
+  // y sin TMDB configurado, la caída de Simkl sigue siendo error (comportamiento anterior)
+  await assert.rejects(() => R.crearRespaldo({ ...ctx, tmdbTv: undefined, cache: cacheEnMemoria() }).emitidos([1]), /HTTP 503|Simkl/)
+})

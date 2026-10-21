@@ -2298,7 +2298,7 @@ function emitidosDe(a) {
     else c.push({ n: a.nextAirAt && a.nextAirAt * 1000 <= ahora ? ne : ne - 1, f: 'AniList (guardado)', exacto: false });
   }
   const sv = _emit.items && _emit.items[a.id];
-  if (sv && Number.isInteger(sv.emitidos)) c.push({ n: sv.emitidos, f: 'Simkl', exacto: true });
+  if (sv && Number.isInteger(sv.emitidos)) c.push({ n: sv.emitidos, f: sv.fuente === 'tmdb' ? 'TMDB' : 'Simkl', exacto: true });
   if (!c.length) return null;
   const mejor = c.reduce((x, y) => (y.n > x.n || (y.n === x.n && y.exacto && !x.exacto) ? y : x));
   return { n: tope(mejor.n), f: mejor.f, min: !mejor.exacto };
@@ -2310,11 +2310,14 @@ function necesitaEmitidos(a) {
 }
 async function cargarEmitidos() {
   if (_emitCargando || Date.now() - _emit.ts < EMIT_TTL_MS) return;
-  const ids = (allLists.viendo || []).filter(necesitaEmitidos).map((a) => a.id);
+  const pedir = (allLists.viendo || []).filter(necesitaEmitidos).slice(0, 60);
+  const ids = pedir.map((a) => a.id);
   if (!ids.length) return;
+  // episodios de AniList y vistos: el servidor los usa para decidir la numeración de TMDB (temporada vs. absoluta)
+  const info = pedir.map((a) => `${a.id}:${a.totalEps || 0}:${a.watchedEps || 0}`).join(',');
   _emitCargando = true;
   try {
-    const r = await respaldoApi('animeEmitidos', { ids: ids.slice(0, 60).join(',') });
+    const r = await respaldoApi('animeEmitidos', { ids: ids.join(','), info });
     _emit = { ts: Date.now(), items: r.items || {}, fuente: r.fuente || 'simkl' };
     try { localStorage.setItem('at_emitidos', JSON.stringify(_emit)); } catch { /* opcional */ }
     actualizarNoche();
