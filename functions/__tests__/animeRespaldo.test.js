@@ -336,6 +336,24 @@ test('emitidosTmdb: long-runner sin temporada (One Piece) → numeración ABSOLU
   assert.deepStrictEqual(r.proximo, { ep: 221, at: Date.parse('2026-10-25') / 1000 })
 })
 
+test('emitidosTmdb: TMDB ya numera en absoluto dentro de la temporada (One Piece real) → no suma las anteriores', () => {
+  // Medido en producción el 21-10-2026: sumar las temporadas previas daba 2335 en vez de ~1180.
+  const tv = {
+    seasons: [{ season_number: 1, episode_count: 1088 }, { season_number: 2, episode_count: 92 }],
+    number_of_episodes: 1180,
+    last_episode_to_air: { season_number: 2, episode_number: 1162 },
+    next_episode_to_air: { season_number: 2, episode_number: 1163, air_date: '2026-10-25' },
+  }
+  const r = R.emitidosTmdb(tv, { temporada: null, aniEps: 0, vistos: 1161 })
+  assert.strictEqual(r.emitidos, 1162)
+  assert.strictEqual(r.proximo.ep, 1163)
+})
+
+test('emitidosTmdb: nunca más emitidos que el total de TMDB → sin dato', () => {
+  const tv = { ...tvLargo(20, 21), number_of_episodes: 150 }
+  assert.strictEqual(R.emitidosTmdb(tv, { temporada: null, aniEps: 0, vistos: 215 }), null)
+})
+
 test('emitidosTmdb: long-runner sin evidencia (pocos vistos, AniList sin total) → sin dato, no se inventa', () => {
   assert.strictEqual(R.emitidosTmdb(tvLargo(20), { temporada: null, aniEps: 0, vistos: 10 }), null)
 })

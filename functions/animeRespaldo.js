@@ -396,11 +396,16 @@ function emitidosTmdb(tv, { temporada, aniEps, vistos } = {}) {
     const absoluta = (aniE > 0 && aniE > cL) || w > cL;
     const relativa = aniE > 0 && aniE <= cL;
     if (absoluta === relativa) return null; // sin evidencia, o contradictoria
-    if (absoluta) offset = regulares.filter((s) => s.season_number < sL).reduce((t, s) => t + s.episode_count, 0);
+    // TMDB numera algunos long-runners ya en absoluto dentro de la temporada (One Piece: la 23 empieza
+    // en el ep 1089+). Si el número supera lo que tiene la temporada, no se suman las anteriores.
+    if (absoluta && enSL <= cL) offset = regulares.filter((s) => s.season_number < sL).reduce((t, s) => t + s.episode_count, 0);
     n = offset + enSL;
   }
   if (aniE) n = Math.min(n, aniE);
   if (!(n >= 1)) return null;
+  // Freno: nunca más episodios emitidos que los que TMDB tiene en total.
+  const total = Number(tv.number_of_episodes) || regulares.reduce((t, s) => t + s.episode_count, 0);
+  if (total && n > total) return null;
   let proximo = null;
   if (mismoNext && next.air_date) {
     const at = Date.parse(next.air_date);
@@ -464,7 +469,7 @@ async function emitidosPorTmdb(ctx, ids, info) {
   if (!ctx.tmdbTv || !ids.length) return out;
   const mapa = await tmdbDeAnilist(ctx, ids);
   let doc = null;
-  try { doc = await ctx.cache.get('emitidos_tmdb'); } catch { doc = null; }
+  try { doc = await ctx.cache.get('emitidos_tmdb_v2'); } catch { doc = null; }
   const guardado = Object.assign({}, doc && doc.items);
   const ahora = ctx.ahora();
   let cambio = false;
@@ -481,7 +486,7 @@ async function emitidosPorTmdb(ctx, ids, info) {
     cambio = true;
     if (r) out[id] = r;
   });
-  if (cambio) { try { await ctx.cache.set('emitidos_tmdb', { items: guardado, ts: ahora }); } catch { /* caché opcional */ } }
+  if (cambio) { try { await ctx.cache.set('emitidos_tmdb_v2', { items: guardado, ts: ahora }); } catch { /* caché opcional */ } }
   return out;
 }
 
