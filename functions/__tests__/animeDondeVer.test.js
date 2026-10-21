@@ -216,3 +216,41 @@ test('elegirVerAhora: arriendo/compra, otra plataforma o sin datos de TMDB → n
   assert.strictEqual(D.elegirVerAhora({ paisBase: [], oficiales: DATOS_VER.oficiales }, { plan: ['crunchyroll'] }), null)
   assert.strictEqual(D.elegirVerAhora(null, {}), null)
 })
+
+test('elegirVerAhora: sin plataforma del plan, cae a una solo-gratis de Chile y lo marca', () => {
+  const datos = { paisBase: [{ id: 5, nombre: 'Tubi TV', tipo: 'gratis', url: 'https://tubitv.com/x' }, { id: 8, nombre: 'Netflix', tipo: 'suscripcion', url: 'https://n' }], oficiales: [] }
+  const e = D.elegirVerAhora(datos, { plan: ['disney'] })
+  assert.strictEqual(e.nombre, 'Tubi TV')
+  assert.strictEqual(e.gratis, true)
+  // si la del plan existe, gana la del plan (y no se marca gratis)
+  const p = D.elegirVerAhora(datos, { plan: ['netflix'] })
+  assert.strictEqual(p.clave, 'netflix')
+  assert.strictEqual(p.gratis, false)
+  // una plataforma con suscripción Y gratis no se anuncia como «gratis»
+  const mixto = { paisBase: [{ id: 283, nombre: 'Crunchyroll', tipo: 'suscripcion', url: 'https://c' }, { id: 283, nombre: 'Crunchyroll', tipo: 'gratis', url: 'https://c' }], oficiales: [] }
+  assert.strictEqual(D.elegirVerAhora(mixto, { plan: ['crunchyroll'] }).gratis, false)
+})
+
+test('sugerenciasYoutube: búsqueda dentro de cada canal oficial, título codificado, vacío sin título', () => {
+  const s = D.sugerenciasYoutube('Attack on Titan: Final')
+  assert.strictEqual(s.length, D.CANALES_YOUTUBE.length)
+  assert.strictEqual(s.find((x) => x.canal === 'Muse Asia').url, 'https://www.youtube.com/@MuseAsia/search?query=Attack%20on%20Titan%3A%20Final')
+  assert.deepStrictEqual(D.sugerenciasYoutube('  '), [])
+})
+
+test('CANALES_YOUTUBE: cada canal tiene handle válido, fuente https de youtube.com y nota; ninguno es un sitio sin licencia', () => {
+  for (const c of D.CANALES_YOUTUBE) {
+    assert.match(c.handle, /^[A-Za-z0-9_.-]{3,40}$/)
+    assert.match(c.fuente, /^https:\/\/www\.youtube\.com\/@/)
+    assert.ok(c.nota.length > 10)
+  }
+  const prohibidos = /animeflv|jkanime|animeflix|zoro|hianime|gogoanime|9anime|monoschinos/i
+  assert.ok(!prohibidos.test(JSON.stringify(D.CANALES_YOUTUBE)))
+})
+
+test('dondeVerAnime: incluye sugerencias de YouTube marcadas con el título buscado', async () => {
+  const fetchJson = fetchFalso([['arm.haglund.dev', [{ anilist: 1, media: 'TV' }]]])
+  const r = await D.dondeVerAnime({ fetchJson, tmdbTitulo: async () => null, anilistId: 1, titulo: 'Naruto', region: 'CL' })
+  assert.ok(r.youtube.length >= 3)
+  assert.match(r.youtube[0].url, /search\?query=Naruto$/)
+})

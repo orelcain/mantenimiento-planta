@@ -8939,7 +8939,7 @@ async function _botonesVerAhora(items) {
   return new Map(out);
 }
 function _filaVerAhora(e, titulo) {
-  return [{ text: `▶️ Ver ahora · ${e.nombre} · ${String(titulo || '').slice(0, 16)}`.replace(/ · $/, '').slice(0, 60), url: e.url }];
+  return [{ text: `▶️ Ver ahora · ${e.nombre}${e.gratis ? ' (gratis)' : ''} · ${String(titulo || '').slice(0, 16)}`.replace(/ · $/, '').slice(0, 60), url: e.url }];
 }
 
 async function _runAvisosEpisodios(botToken) {
