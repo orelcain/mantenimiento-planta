@@ -8623,6 +8623,7 @@ async function _queryAniListSeguro(query, variables) {
 // ── Respaldo cuando AniList no responde (Simkl → Jikan → Kitsu, IDs traducidos con ARM) ──
 // Ver functions/animeRespaldo.js. La caché vive en Firestore (anime_cache/*), solo servidor.
 const animeRespaldoLib = require('./animeRespaldo');
+const animeDondeVerLib = require('./animeDondeVer');
 async function _fetchJsonAnime(url, { method = 'GET', headers, body, timeout = 8000 } = {}) {
   const r = await fetch(url, {
     method,
@@ -9445,6 +9446,26 @@ const _mediaOps = {
     const texto = String(q.q || '').trim().slice(0, 100);
     if (texto.length < 2) return { items: [], fuente: null };
     return _animeOp(() => _animeRespaldo().buscar(texto));
+  },
+
+  // «¿Dónde ver?» de un anime sin AniList: id AniList → ARM → TMDB (JustWatch) + Kitsu/Jikan + fichas externas.
+  async animeDondeVer(q) {
+    const id = _mediaInt(q.id, 0, 1, 50000000);
+    if (!id) { const err = new Error('id inválido'); err.status = 400; err.publico = 'id inválido'; throw err; }
+    const region = _mediaRegion(q.region);
+    const titulo = String(q.titulo || '').trim().slice(0, 120);
+    const clave = `adv:${id}:${region}:${titulo}`;
+    const hit = _mediaCacheGet(clave);
+    if (hit) return hit;
+    const r = await _animeOp(() => animeDondeVerLib.dondeVerAnime({
+      fetchJson: _fetchJsonAnime,
+      tmdbTitulo: (p) => _mediaOps.titulo(p),
+      anilistId: id,
+      titulo,
+      region,
+    }));
+    if (!r.fallos.length) _mediaCacheSet(clave, r, 6 * MEDIA_H);
+    return r;
   },
 
   // Plataformas disponibles en un país (películas + series, sin duplicar).
