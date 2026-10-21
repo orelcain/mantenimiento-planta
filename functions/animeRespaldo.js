@@ -286,6 +286,70 @@ async function mapearIds(ctx, fuente, ids) {
   return resultado;
 }
 
+/** Inverso de mapearIds: ids de AniList → ids de MyAnimeList (ARM), con la misma caché y reintento. */
+async function malDeAnilist(ctx, ids) {
+  const resultado = new Map();
+  const unicos = [...new Set(ids.map(Number).filter((n) => Number.isInteger(n) && n > 0 && n <= 50000000))];
+  if (!unicos.length) return resultado;
+  const docId = 'ids_anilist_mal';
+  const hoyDia = Math.floor(ctx.ahora() / DIA_MS);
+  let doc = null;
+  try { doc = await ctx.cache.get(docId); } catch { doc = null; }
+  const mapa = Object.assign({}, doc && doc.mapa);
+  const faltan = [];
+  for (const id of unicos) {
+    const v = mapa[id];
+    if (claveMapeoVigente(v, hoyDia)) { if (v > 0) resultado.set(id, v); } else faltan.push(id);
+  }
+  let cambio = false;
+  for (let i = 0; i < faltan.length; i += 100) {
+    const lote = faltan.slice(i, i + 100);
+    let resp;
+    try {
+      resp = await ctx.fetchJson(ARM, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lote.map((id) => ({ anilist: id }))), timeout: TIMEOUT_KITSU });
+    } catch { continue; }
+    if (!Array.isArray(resp) || resp.length !== lote.length) continue;
+    lote.forEach((id, k) => {
+      const mal = resp[k] && Number(resp[k].myanimelist);
+      if (Number.isInteger(mal) && mal > 0) { mapa[id] = mal; resultado.set(id, mal); } else mapa[id] = -hoyDia;
+      cambio = true;
+    });
+  }
+  if (cambio) { try { await ctx.cache.set(docId, { mapa, ts: ctx.ahora() }); } catch { /* caché opcional */ } }
+  return resultado;
+}
+
+/**
+ * Cuántos episodios ya salieron según el calendario de Simkl (ayer…+30 días, con número de episodio).
+ * Por serie: emitidos = max(último episodio con hora ya pasada, primer episodio futuro − 1).
+ * Un episodio «solo fecha» (00:00 JST) cuenta como salido recién al terminar ese día JST.
+ * Sin entradas de la serie en el calendario no hay dato: no se devuelve nada (nunca un 0 inventado).
+ * items: salida de normSimkl; malPorAnilist: Map anilistId → malId; ahoraS: epoch en segundos.
+ */
+function emitidosDeCalendario(items, malPorAnilist, ahoraS) {
+  const porMal = new Map();
+  for (const b of items) {
+    if (!b || !b.malId || !Number.isInteger(b.episodio) || !b.airingAt) continue;
+    if (!porMal.has(b.malId)) porMal.set(b.malId, []);
+    porMal.get(b.malId).push(b);
+  }
+  const out = {};
+  for (const [anilist, mal] of malPorAnilist) {
+    const lista = porMal.get(mal);
+    if (!lista || !lista.length) continue;
+    const salio = (b) => (b.sinHora ? b.airingAt + 86400 : b.airingAt) <= ahoraS;
+    const pasados = lista.filter(salio).map((b) => b.episodio);
+    const futuros = lista.filter((b) => !salio(b));
+    const proximo = futuros.sort((x, y) => x.airingAt - y.airingAt)[0] || null;
+    const desdePasado = pasados.length ? Math.max(...pasados) : 0;
+    const desdeFuturo = proximo ? proximo.episodio - 1 : 0;
+    const emitidos = Math.max(desdePasado, desdeFuturo);
+    if (emitidos < 1) continue;
+    out[anilist] = { emitidos, proximo: proximo ? { ep: proximo.episodio, at: proximo.airingAt } : null };
+  }
+  return out;
+}
+
 // ── Jikan ────────────────────────────────────────────────────────────────────
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -506,6 +570,13 @@ function crearRespaldo(opciones) {
       if (!t) return { items: [], fuente: null };
       return primeroQueResponda([['jikan', () => jikanBuscar(ctx, t)], ['kitsu', () => kitsuBuscar(ctx, t)]]);
     },
+    /** Episodios ya emitidos de los ids de AniList dados, según Simkl: { fuente, items:{id:{emitidos,proximo}} }. */
+    async emitidos(anilistIds) {
+      const ids = [...new Set((anilistIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 60);
+      if (!ids.length) return { fuente: 'simkl', items: {} };
+      const [snap, mal] = await Promise.all([simklCalendario(ctx), malDeAnilist(ctx, ids)]);
+      return { fuente: 'simkl', items: emitidosDeCalendario(snap.items, mal, Math.floor(ctx.ahora() / 1000)) };
+    },
     /** Para los crons: emisiones recientes sin caché de día. */
     episodiosEntre(desde, hasta) { return this.estrenosDia(desde, hasta, { cachear: false }); },
   };
@@ -522,6 +593,6 @@ module.exports = {
   crearRespaldo, claveAvisoEpisodio,
   // exportados para pruebas
   normJikan, normKitsu, normSimkl, simklCalendario, aFormatoDia, aFormatoBusqueda, instantesJikan, diasJstDelRango,
-  mapearIds, emisionesEnRango, kitsuSnapshot, claveMapeoVigente,
+  mapearIds, malDeAnilist, emitidosDeCalendario, emisionesEnRango, kitsuSnapshot, claveMapeoVigente,
   _reiniciarJikan() { _jikanCaidoHasta = 0; },
 };

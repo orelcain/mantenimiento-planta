@@ -268,3 +268,51 @@ test('estrenosDia con Jikan caído usa Simkl (con número de episodio) antes que
   const viejo = Date.parse('2026-09-01T00:00:00Z') / 1000
   await assert.rejects(() => R.crearRespaldo({ ...ctx, cache: cacheEnMemoria() }).estrenosDia(viejo, viejo + 86399), /Sin respaldo disponible/)
 })
+
+// ── Episodios emitidos (Qué ver esta noche) ───────────────────────────────────
+const S = (mal, ep, iso) => R.normSimkl({ ids: { simkl_id: mal * 10, mal: String(mal) }, date: iso, title: `T${mal}`, episode: { episode: ep }, anime_type: 'tv' })
+
+test('emitidosDeCalendario: último episodio con hora pasada, o el próximo menos uno; sin dato no inventa', () => {
+  const ahora = Date.parse('2026-10-22T12:00:00Z') / 1000
+  const items = [
+    S(1, 3, '2026-10-21T10:00:00+09:00'), S(1, 4, '2026-10-28T10:00:00+09:00'), // pasado 3, futuro 4 → 3
+    S(2, 8, '2026-10-29T10:00:00+09:00'),                                       // solo futuro 8 → 7
+    S(3, 5, '2026-10-22T00:00:00+09:00'),                                       // «solo fecha» de hoy JST: aún no salió → emitidos 4
+    S(4, 2, '2026-10-20T10:00:00+09:00'),                                       // solo pasado → 2
+  ]
+  const mal = new Map([[101, 1], [102, 2], [103, 3], [104, 4], [105, 99]])
+  const r = R.emitidosDeCalendario(items, mal, ahora)
+  assert.deepStrictEqual(r[101], { emitidos: 3, proximo: { ep: 4, at: Date.parse('2026-10-28T10:00:00+09:00') / 1000 } })
+  assert.strictEqual(r[102].emitidos, 7)
+  assert.strictEqual(r[103].emitidos, 4) // ep 5 «solo fecha» de hoy aún no cuenta: el próximo es el 5, salieron 4
+  assert.deepStrictEqual(r[104], { emitidos: 2, proximo: null })
+  assert.strictEqual(r[105], undefined) // no está en el calendario
+})
+
+test('emitidosDeCalendario: «solo fecha» cuenta como salido cuando terminó ese día JST', () => {
+  const ahora = Date.parse('2026-10-22T16:00:00Z') / 1000 // 23/10 01:00 JST
+  const r = R.emitidosDeCalendario([S(3, 5, '2026-10-22T00:00:00+09:00')], new Map([[103, 3]]), ahora)
+  assert.strictEqual(r[103].emitidos, 5)
+})
+
+test('respaldo.emitidos: AniList→MAL por ARM (cacheado) + calendario Simkl', async () => {
+  const cache = cacheEnMemoria()
+  const llamadas = []
+  const ctx = {
+    cache, ahora: () => Date.parse('2026-10-22T12:00:00Z'), pausaJikanMs: 0,
+    fetchJson: async (url, o) => {
+      if (url.includes('arm.haglund.dev')) {
+        const p = JSON.parse(o.body); llamadas.push(p)
+        return p.map((x) => (x.anilist === 101 ? { anilist: 101, myanimelist: 1 } : null))
+      }
+      return [{ ids: { simkl_id: 10, mal: '1' }, date: '2026-10-21T10:00:00+09:00', title: 'A', episode: { episode: 6 }, anime_type: 'tv' }]
+    },
+  }
+  const r = R.crearRespaldo(ctx)
+  const a = await r.emitidos([101, 102, 'x', -4])
+  assert.strictEqual(a.fuente, 'simkl')
+  assert.deepStrictEqual(Object.keys(a.items), ['101'])
+  assert.strictEqual(a.items[101].emitidos, 6)
+  await r.emitidos([101, 102])
+  assert.strictEqual(llamadas.length, 1) // el segundo pedido sale de la caché de ARM (aciertos y fallos)
+})
