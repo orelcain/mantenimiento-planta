@@ -43,6 +43,19 @@ describe('dibujoDeManual', () => {
   })
 })
 
+describe('documentacionDe → dibujosManual: la vista general primero', () => {
+  it('abre en el dibujo, no en el recorte de cerca que ya es la miniatura', () => {
+    const rep = {
+      imagenesManual: [
+        { url: 'cerca', descripcion: 'Referencia manual Knuro KF 3.01 pág. 119 - 999 0216 (código enmarcado)' },
+        { url: 'general', descripcion: 'Referencia manual Knuro KF 3.01 pág. 119 - 999 0216 (vista general)' },
+      ],
+    } as unknown as Repuesto
+    expect(documentacionDe(rep).dibujosManual?.map((d) => d.url)).toEqual(['general', 'cerca'])
+    expect(documentacionDe(rep).fotos).toEqual(['cerca', 'general'])
+  })
+})
+
 describe('documentacionDe → dibujosManual', () => {
   it('solo las capturas «Referencia …» con ubicación, conservando sus equipos', () => {
     const rep = {

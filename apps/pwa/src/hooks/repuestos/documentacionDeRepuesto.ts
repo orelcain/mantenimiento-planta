@@ -63,10 +63,15 @@ export function documentacionDe(rep: Repuesto): DocumentacionDeRepuesto {
   for (const i of rep.imagenesManual || []) {
     if (i.url && Array.isArray(i.equipos) && i.equipos.length) equiposDeFoto[i.url] = i.equipos
   }
-  const dibujosManual = (rep.imagenesManual || []).flatMap((i) => {
-    const rotulo = i.url ? rotuloDeReferencia(i.descripcion) : null
-    return rotulo ? [{ url: i.url, rotulo, ...(i.equipos?.length ? { equipos: i.equipos } : {}) }] : []
-  })
+  // La «vista general» va primero: es el dibujo con la pieza marcada. El recorte de cerca
+  // («código enmarcado») es la misma imagen que la miniatura de la fila, y abrir el botón
+  // «Dibujo» en él se leía como «muestra la foto» (Danilo, 23-10-2026, Knuro 999 0216).
+  const dibujosManual = [...(rep.imagenesManual || [])]
+    .sort((a, b) => Number(esVistaGeneral(b.descripcion)) - Number(esVistaGeneral(a.descripcion)))
+    .flatMap((i) => {
+      const rotulo = i.url ? rotuloDeReferencia(i.descripcion) : null
+      return rotulo ? [{ url: i.url, rotulo, ...(i.equipos?.length ? { equipos: i.equipos } : {}) }] : []
+    })
   return {
     fotos: [...(rep.fotosReales || []), ...(rep.imagenesManual || []), ...(rep.gallery || [])]
       .map((i) => i.url)
@@ -96,6 +101,11 @@ export function rotuloDeReferencia(descripcion: string | undefined | null): stri
   const donde = fig ? `fig. ${fig}` : dib ? `dibujo ${dib}` : pag ? `pág. ${pag}` : null
   if (!donde) return null
   return pos ? `${donde} · pos. ${pos}` : donde
+}
+
+/** ¿La captura es la vista general de la figura (no el recorte de cerca del código)? */
+function esVistaGeneral(descripcion: string | undefined | null): boolean {
+  return /\(vista general\)/i.test(descripcion ?? '')
 }
 
 /**
