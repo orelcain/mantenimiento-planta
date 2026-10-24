@@ -27,8 +27,8 @@ html,body{background:var(--taller);color:var(--tinta-taller)}
 body{font-family:var(--f-doc);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
 body.embed{padding:0;background:var(--bisel)}
 body.embed .fuera{display:none}
-body.embed .envoltura{max-width:none;gap:0}
-body.embed .bisel{border-radius:0;border:0;box-shadow:none}
+body.embed .envoltura{max-width:none;gap:0;height:100vh;height:100dvh;display:grid;place-items:center}
+body.embed .bisel{border-radius:0;border:0;box-shadow:none;width:min(100%,calc(100dvh * 1.68))}
 .envoltura{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 .cabecera{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 20px}
 .cabecera h1{font-size:1.25rem;margin:0;font-weight:600}
