@@ -11,6 +11,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-10-24 · cerrador-pr · Clon HMI GEA PowerPak (PR #1318)
+- Hecho: simulador del HMI B&R de la GEA PowerPak 50520184, 35 pantallas, ayuda por parámetro (168 manual, 57 deducidas, 18 por confirmar), buscador, esquema de Producción. Ruta `/aprendizaje/hmi-gea`.
+- Verificación: tsc 0, eslint 0 errores, vitest 4029 ok, dev server dentro del iframe.
+- Estado: HECHO
+- Sigue: fotos faltantes de pantallas; confirmar en terreno los 18 parámetros.
+
 ## 2026-10-21 · Claude · Repuestos: favoritos por equipo (se suman a los globales)
 - Hecho: con un equipo seleccionado en el hub aparecen los chips «Favoritos (todos)» (el de siempre, renombrado) y «Favoritos de este equipo N» + uno por lista con nombre del equipo; tocar filtra la tabla. Cada fila trae un botón de lista (44 px) y el panel de detalle un ítem «Favorito de este equipo…»; ambos abren `FavoritosEquipoSheet` (marcar, poner en listas, crear lista). Los globales (`repuestoFavs`, `useRepuestoFavoritos`, listas globales) no cambian.
 - Modelo: `user_preferences/{uid}.repuestoFavLists[equipKey] = {name, repuestoIds}[]` (el campo de 2540bad2). Clave de equipo = `selectedEquipMachineId` (id del nodo = `r.equipos[].machineId`); repuestos = `rowKeyDeRepuesto`. «Favoritos de este equipo» = unión de listas; la estrella del equipo escribe en la lista «Favoritos». Migración EN LECTURA de las listas viejas (`utils/repuestos/favoritosEquipo.ts`): `inv-<SAP>`→SAP, id estático `baader-142-…-<fab>`→`fab:<fab>` (puede calzar con más de un SAP), docId borrado se conserva sin calzar. No se borra nada; al primer cambio se guarda traducido solo esa clave.
