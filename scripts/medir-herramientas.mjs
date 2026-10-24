@@ -55,6 +55,7 @@ const RUTAS = [
     await pagina.waitForTimeout(800)
   }],
   ['hmi-grader', '/aprendizaje/hmi-grader'],
+  ['hmi-gea', '/aprendizaje/hmi-gea'],
   ['hmi-bombeo-s2', '/aprendizaje/hmi-bombeo-s2'],
   ['perilla-5', '/aprendizaje/perilla-5'],
   ['tarjeta-a3c', '/aprendizaje/baader-142/tarjeta-a3c'],
