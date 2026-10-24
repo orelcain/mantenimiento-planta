@@ -66,6 +66,11 @@ const SPECIAL_MODULES: SpecialModule[] = [
     icon: Scale, href: '/aprendizaje/hmi-grader', stats: '12 pockets · práctica',
   },
   {
+    id: 'hmi-gea', title: 'HMI GEA PowerPak', subtitle: 'Termoformadora GEA V2',
+    description: 'Simulador de la termoformadora GEA con valores en planta y ayuda de cada parámetro.',
+    icon: Gauge, href: '/aprendizaje/hmi-gea', stats: 'Valores de planta · ayuda por parámetro',
+  },
+  {
     id: 'hmi-bombeo-s2', title: 'HMI Bombeo Acopio S2', subtitle: 'Ciclo PLC · planta Yal',
     description: 'Bombeo Sistema 2. Motor de ciclo Fase A ↔ Fase B con eventos PLC reales y sidebar interactivo.',
     icon: Wind, href: '/aprendizaje/hmi-bombeo-s2', stats: 'ciclo 90 s · 10 válvulas',

@@ -96,6 +96,7 @@ const MACHINE_TILES: Tile[] = LEARNING_MACHINES.map((m) => ({
 const HMI_TILES_BASE: Tile[] = [
   { id: 'hmi-knuro',  label: 'HMI Knuro',  sublabel: '', icon: Cpu,     href: '/aprendizaje/hmi-knuro',  color: 'slate' },
   { id: 'hmi-grader', label: 'HMI Grader', sublabel: '', icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
+  { id: 'hmi-gea',    label: 'HMI GEA PowerPak', sublabel: '', icon: Package, href: '/aprendizaje/hmi-gea', color: 'slate' },
 ]
 
 const FORMACION_TILES: Tile[] = [
