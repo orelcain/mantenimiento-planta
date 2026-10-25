@@ -452,6 +452,43 @@ button{font:inherit;color:inherit}
 .linea .fin-l{width:.18cqw;height:.9cqw;border-radius:.1cqw}
 .linea .adv-l{width:1.6cqw;height:1.4cqw;top:40.5%}
 .linea .alr-l{width:1.3cqw;height:1.3cqw;top:41%;font-size:.9cqw}
+/* ---------- ronda 3 · iteración 3 ---------- */
+:root{--azul:#3a3fb0}
+.dbtn{box-shadow:inset 0 -.19cqw .19cqw rgba(0,0,40,.25),inset 0 .12cqw .12cqw rgba(0,0,40,.15),0 0 0 .13cqw rgba(255,255,255,.55)}
+.dbtn svg{width:2.7cqw;height:2.7cqw}
+.dbtn svg.aux{width:3cqw;height:3cqw}
+.dbtn svg path,.dbtn svg circle,.dbtn svg rect{stroke-width:1.75}
+.dbtn svg.gruesa path,.dbtn svg.gruesa circle{stroke-width:2.1}
+.barra .atras svg{width:1.95cqw;height:1.95cqw}
+.barra .atras path{stroke-width:4.2}
+.barra .usuario svg{width:1.9cqw;height:1.9cqw}
+.barra .usuario span{letter-spacing:-.02em}
+.barra .receta{gap:.55cqw}
+.barra .receta i svg{width:1.7cqw;height:1.7cqw}
+.titulo{padding-top:.45cqw;box-shadow:inset 0 -.07cqw 0 rgba(0,0,0,.06)}
+.pestanas{border-bottom-color:#b0ada4}
+.pestanas button{padding-top:.25cqw}
+.pestanas button[aria-selected="true"]::after{height:.1cqw;background:#3a4a7a}
+.pastilla{box-shadow:inset 0 .12cqw .25cqw rgba(0,0,0,.13),inset 0 -.06cqw .1cqw rgba(255,255,255,.5)}
+.pastilla.solo,.pastilla.vacia{box-shadow:none}
+.dmedio .vel{transform:translateY(-.13cqw)}
+.dmedio .vel b{font-size:1.6cqw}
+.tortuga svg.t{width:2.9cqw;height:2cqw;margin-left:-.4cqw;margin-right:.75cqw}
+.tortuga .masmenos{width:2.5cqw;height:2.5cqw;box-shadow:0 0 0 .14cqw #fff,0 .08cqw .25cqw rgba(0,0,0,.3)}
+.tortuga .masmenos+.masmenos{margin-left:1.1cqw}
+.dlista .papelera{box-shadow:0 0 0 .17cqw #fff,0 .05cqw .2cqw rgba(0,0,0,.3)}
+.dlista .papelera svg{width:1.55cqw;height:1.55cqw}
+.riel .al em{width:1.25cqw;min-width:1.25cqw;height:1.25cqw;font-size:.9cqw;line-height:1.25cqw;top:.85cqw;background:#c9302c}
+.ciclos b{font-size:2.95cqw}
+.ciclos small{font-weight:500}
+.ciclos .reloj{font-size:1.78cqw;margin-top:.75cqw;word-spacing:.65cqw}
+.ciclos .vuelta svg{width:2cqw;height:2cqw}
+.ciclos .vuelta path{stroke-width:3}
+.linea .fin-l{width:.4cqw;height:.4cqw;border-radius:50%}
+.linea .alr-l{border-radius:0;box-shadow:none;clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);filter:drop-shadow(0 0 .12cqw rgba(255,255,255,.9))}
+.linea .alr-l,.linea .adv-l{filter:drop-shadow(0 0 .15cqw rgba(255,255,255,.75))}
+.linea .nota-l{top:33%;width:2.55cqw}
+.linea .nota-l i{width:2.55cqw;height:2.55cqw}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -478,10 +515,10 @@ button{font:inherit;color:inherit}
   <div class="bisel">
     <div class="pantalla" id="hmi">
       <nav class="riel" aria-label="Menú principal">
-        <button data-ir="0.1" aria-label="Dashboard"><svg viewBox="0 0 24 24" style="width:1.9cqw;height:1.75cqw"><mask id="mDash"><rect width="24" height="24" fill="#fff"/><path d="M5.2 13.4h1.6M7 8.2l1.1 1.1M12 6v1.6M17 8.2l-1.1 1.1M17.2 13.4h1.6" stroke="#000" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14.6l4-4.6" stroke="#000" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="14.6" r="1.7" fill="#000"/></mask><path d="M12 2.6a10.2 10.2 0 0 1 8.2 16.3l-.9 1.2H4.7l-.9-1.2A10.2 10.2 0 0 1 12 2.6z" fill="currentColor" mask="url(#mDash)"/></svg></button>
-        <button data-ir="7.1" aria-label="Recetas"><svg viewBox="0 0 24 24" style="width:1.7cqw;height:2.15cqw"><path d="M9 2h6.9l4.6 4.6V18.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><mask id="mDoc"><rect width="24" height="24" fill="#fff"/><path d="M7.4 13.2h8.2M7.4 16.6h8.2M7.4 19.8h8.2" stroke="#000" stroke-width="2"/></mask><path d="M4.4 4.8h8.6l4.6 4.6v13.4H4.4z" fill="currentColor" mask="url(#mDoc)"/></svg></button>
-        <button data-ir="1.1" aria-label="Producción"><svg viewBox="0 0 24 24" style="width:2.05cqw;height:2.05cqw"><mask id="mEng"><rect width="24" height="24" fill="#fff"/><circle cx="8.6" cy="8.6" r="2" fill="#000"/><circle cx="16.4" cy="16.4" r="1.6" fill="#000"/></mask><g fill="currentColor" mask="url(#mEng)"><path d="M7.6 1.8h2l.4 1.9 1.5.6 1.6-1.1 1.4 1.4-1.1 1.6.6 1.5 1.9.4v2l-1.9.4-.6 1.5 1.1 1.6-1.4 1.4-1.6-1.1-1.5.6-.4 1.9h-2l-.4-1.9-1.5-.6-1.6 1.1-1.4-1.4 1.1-1.6-.6-1.5-1.9-.4v-2l1.9-.4.6-1.5-1.1-1.6 1.4-1.4 1.6 1.1 1.5-.6z"/><path d="M15.6 10.9h1.6l.3 1.5 1.2.5 1.3-.9 1.1 1.1-.9 1.3.5 1.2 1.5.3v1.6l-1.5.3-.5 1.2.9 1.3-1.1 1.1-1.3-.9-1.2.5-.3 1.5h-1.6l-.3-1.5-1.2-.5-1.3.9-1.1-1.1.9-1.3-.5-1.2-1.5-.3v-1.6l1.5-.3.5-1.2-.9-1.3 1.1-1.1 1.3.9 1.2-.5z"/></g></svg></button>
-        <button data-ir="2.1" aria-label="Limpieza"><svg viewBox="0 0 24 24" style="width:2.05cqw;height:2.05cqw" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3.4 11.6h8l-1.1 9.6H4.5z"/><path d="M5.6 4.2l.5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5zM10.4 6.4l.35 1 1 .35-1 .35-.35 1-.35-1-1-.35 1-.35z" fill="currentColor" stroke-width=".8"/><path d="M17.6 2.4v9.4"/><path d="M14.6 12.2h6l1.4 9h-8.8z" fill="currentColor"/><path d="M15.6 21.2l.5-5.6M17.6 21.2v-5.8M19.6 21.2l-.5-5.6" stroke="#e7e0d6" stroke-width=".9"/></svg></button>
+        <button data-ir="0.1" aria-label="Dashboard"><svg viewBox="0 0 24 24" style="width:1.9cqw;height:1.75cqw"><path d="M12 3a10 10 0 0 1 8.7 14.9c-.5.9-1.4 1.4-2.4 1.1-2-.6-4.1-.9-6.3-.9s-4.3.3-6.3.9c-1 .3-1.9-.2-2.4-1.1A10 10 0 0 1 12 3z" fill="#f6f4ee"/><g fill="#8a8f99"><circle cx="5.6" cy="13.4" r="1"/><circle cx="7.4" cy="8.3" r="1"/><circle cx="12" cy="6.2" r="1"/><circle cx="16.6" cy="8.3" r="1"/><circle cx="18.4" cy="13.4" r="1"/></g><path d="M11.4 15.6l4.6-6" stroke="#444" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+        <button data-ir="7.1" aria-label="Recetas"><svg viewBox="0 0 24 24" style="width:2cqw;height:2.4cqw"><path d="M9.4 1.8h6.6l4.4 4.4v12.6" fill="none" stroke="#8a8f99" stroke-width="1.1" stroke-linejoin="round"/><mask id="mDoc"><rect width="24" height="24" fill="#fff"/><path d="M7.4 16h8.4M7.4 19.4h8.4" stroke="#000" stroke-width="2.1"/></mask><path d="M4.4 4.6h8.4l4.6 4.6v13.6H4.4z" fill="currentColor" mask="url(#mDoc)"/><path d="M12.8 4.6v4.6h4.6z" fill="#cfd2e6"/></svg></button>
+        <button data-ir="1.1" aria-label="Producción"><svg viewBox="0 0 24 24" style="width:2.15cqw;height:2.15cqw"><mask id="mEng"><rect width="24" height="24" fill="#fff"/><circle cx="8.4" cy="8.4" r="2.7" fill="#000"/><circle cx="15.8" cy="15.8" r="2.7" fill="#000"/></mask><g fill="currentColor" mask="url(#mEng)"><path d="M14.90 7.28 L14.90 9.52 L13.28 9.50 L12.63 11.07 L13.79 12.21 L12.21 13.79 L11.07 12.63 L9.50 13.28 L9.52 14.90 L7.28 14.90 L7.30 13.28 L5.73 12.63 L4.59 13.79 L3.01 12.21 L4.17 11.07 L3.52 9.50 L1.90 9.52 L1.90 7.28 L3.52 7.30 L4.17 5.73 L3.01 4.59 L4.59 3.01 L5.73 4.17 L7.30 3.52 L7.28 1.90 L9.52 1.90 L9.50 3.52 L11.07 4.17 L12.21 3.01 L13.79 4.59 L12.63 5.73 L13.28 7.30Z"/><path d="M22.30 14.68 L22.30 16.92 L20.68 16.90 L20.03 18.47 L21.19 19.61 L19.61 21.19 L18.47 20.03 L16.90 20.68 L16.92 22.30 L14.68 22.30 L14.70 20.68 L13.13 20.03 L11.99 21.19 L10.41 19.61 L11.57 18.47 L10.92 16.90 L9.30 16.92 L9.30 14.68 L10.92 14.70 L11.57 13.13 L10.41 11.99 L11.99 10.41 L13.13 11.57 L14.70 10.92 L14.68 9.30 L16.92 9.30 L16.90 10.92 L18.47 11.57 L19.61 10.41 L21.19 11.99 L20.03 13.13 L20.68 14.70Z"/></g></svg></button>
+        <button data-ir="2.1" aria-label="Limpieza"><svg viewBox="0 0 24 24" style="width:2.1cqw;height:2.1cqw" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 11.4h8.2l-1.1 9.8H4.1z"/><path d="M5.4 4.2l1.1 1.1-1.1 1.1-1.1-1.1zM9.8 6.4l.8.8-.8.8-.8-.8z" fill="currentColor" stroke-width=".7"/><path d="M15.6 2.6l2.4 9"/><path d="M14.2 12.6l5.6-1.5 3 9.4-8.4 2.2z" fill="currentColor"/><path d="M14.9 15.2l5.6-1.5" stroke="#e7e0d6" stroke-width="1.1"/></svg></button>
         <button data-ir="8.1" class="al" aria-label="Alarmas"><svg viewBox="0 0 24 24" style="width:2.2cqw;height:2.2cqw"><mask id="mAl"><rect width="24" height="24" fill="#fff"/><path d="M12 9.5v5.2" stroke="#000" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="18.2" r="1.4" fill="#000"/></mask><path d="M12 3.2c.6 0 1.1.3 1.4.8l8.5 15.2c.6 1.1-.2 2.4-1.4 2.4H3.5c-1.2 0-2-1.3-1.4-2.4L10.6 4c.3-.5.8-.8 1.4-.8z" fill="currentColor" mask="url(#mAl)"/></svg><em id="nAl">2</em></button>
         <button class="puntos" id="btnMenu" aria-label="Más pantallas"><svg viewBox="0 0 12 40"><circle cx="6" cy="7" r="3"/><circle cx="6" cy="20" r="3"/><circle cx="6" cy="33" r="3"/></svg></button>
       </nav>
@@ -490,7 +527,7 @@ button{font:inherit;color:inherit}
         <button class="pid" id="pid" aria-label="Introducir número de pantalla">1.1</button>
         <label class="lupa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="10" cy="10" r="6.5"/><path d="M15 15l6 6"/></svg><input id="filtro" placeholder="Filtrar entradas" autocomplete="off" aria-label="Buscar pantallas y parámetros"></label>
         <span class="estado-maq" id="estadoMaq">No listo</span>
-        <span class="receta"><i><svg viewBox="0 0 24 24" fill="#fff"><path d="M6 2h8l5 5v15H6z"/></svg></i><span id="receta">11 c</span></span>
+        <span class="receta"><i><svg viewBox="0 0 24 24"><mask id="mRec"><rect width="24" height="24" fill="#fff"/><path d="M8 11.6h8M8 14.6h8M8 17.6h5.4" stroke="#000" stroke-width="1.3"/><rect x="8" y="6.4" width="3.4" height="3" fill="#000" opacity=".5"/></mask><path d="M5.6 2.6h9.2l3.6 3.6v15.2H5.6z" fill="#fff" mask="url(#mRec)"/></svg></i><span id="receta">11 c</span></span>
         <span class="usuario"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="7" r="4.5"/><path d="M3 22c0-5 4-8 9-8s9 3 9 8z"/></svg><span id="usuario">GeaService</span></span>
       </div>
       <div class="titulo"><div class="migas" id="migas"></div><div class="der"><button class="guia" id="guia" aria-label="Qué es esta pantalla">?</button><span class="marca">PowerPak</span></div></div>
@@ -528,16 +565,16 @@ button{font:inherit;color:inherit}
     tacho: '<svg viewBox="0 0 24 24"><mask id="mTacho"><rect width="24" height="24" fill="#fff"/><path d="M9.4 10v8.4M12 10v8.4M14.6 10v8.4" stroke="#000" stroke-width="1.3"/></mask><g fill="#fff" mask="url(#mTacho)"><path d="M5.6 7.4h12.8l-1.1 13.4H6.7z"/><rect x="4.4" y="4.6" width="15.2" height="2.2" rx="1"/><rect x="9.6" y="2.6" width="4.8" height="2.4" rx="1"/></g></svg>'
   };
   const DB = { /* 14 botones del Dashboard, redibujados de la foto del panel (24-10-2026), viewBox 32×32 */
-    posSup: '<svg viewBox="0 0 32 32"><rect x="4" y="7.2" width="24" height="2.8" rx="1.4" fill="#fff"/><path d="M12.2 10.2L16 15.4l3.8-5.2" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/><rect x="12.4" y="16.6" width="7.2" height="7.2" rx="1.7" fill="#fff"/></svg>',
-    aux: n => `<svg viewBox="0 0 32 32"><text x="16" y="13.2" fill="#fff" text-anchor="middle" font-size="10.6" font-weight="700" font-family="Roboto,Arial" letter-spacing="-.3">AUX</text><path d="M4.6 15.2c1.8 0 2.4 1 2.4 2.6v2.6a3.6 3.6 0 0 0 3.6 3.6h10.8a3.6 3.6 0 0 0 3.6-3.6v-2.6c0-1.6.6-2.6 2.4-2.6" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3"/><text x="16" y="22.4" fill="#fff" text-anchor="middle" font-size="8" font-weight="700" font-family="Roboto,Arial">${esc(n)}</text></svg>`,
-    vacio: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 4.6v4.2M12.9 7l2.1 2.1 2.1-2.1"/><path d="M6.6 12h16.6a1.8 1.8 0 0 0 1.8-1.8V5.8"/><path d="M8.6 13v5.3a4.8 4.8 0 0 0 4.8 4.8h3.6a4.8 4.8 0 0 0 4.8-4.8V13"/><rect x="11" y="16" width="8.4" height="3.6" rx="1.8" fill="#fff" stroke="none"/></svg>',
-    gas: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9.4 10V4.8M7.6 6.6l1.8-1.8 1.8 1.8M20.6 10V4.8M18.8 6.6l1.8-1.8 1.8 1.8"/><path d="M12.6 5h4.8L15 8.8z" stroke-width="1.5"/><path d="M6.6 12h16.6a1.8 1.8 0 0 0 1.8-1.8V7.6"/><path d="M8.6 13v5.3a4.8 4.8 0 0 0 4.8 4.8h3.6a4.8 4.8 0 0 0 4.8-4.8V13"/><rect x="11" y="15.8" width="8.4" height="3.8" rx="1" stroke-width="1.4"/></svg>',
-    etiq: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="4.4" y="15.4" width="11.6" height="7.2" rx="1"/><path d="M7 19h6.4" stroke-width="1.4"/><path d="M11.2 15.2l-.6-6.2M10.2 9.4C15 6 21 5.4 26.8 7.2M26 7.6l-6.4 14.8M8.6 7.4l3.2 2.6M25.4 5.2l2.4 3.4"/></svg>',
-    bandeja: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.4 15.4c.2-2.6 3.4-3.4 4.8-1.4"/><path d="M8.4 13.2h1.4v5.4a2.6 2.6 0 0 0 2.6 2.6h10.2a2.6 2.6 0 0 0 2.6-2.6v-5.4h1.4"/><path d="M25.6 13.2c.6-1.4 1.8-1.8 2.6-1"/><rect x="10.8" y="18" width="13" height="3.2" rx="1" fill="#fff" stroke="none"/></svg>',
-    insert: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.4 6.2h-4.6v18.6h4.2"/><path d="M15.4 6.2c1.8 0 2.2 1.6 1 2.8M15 24.8c1.6 0 2-1.4 1-2.4"/><path d="M10.8 13.6h6.6c.8 0 1.4.3 2 .9l3.8 3.8H10.8"/></svg>',
-    tijera: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6"><circle cx="8.6" cy="11" r="2.4"/><circle cx="8.6" cy="21" r="2.4"/><path d="M10.8 12.4l15.4 8.4M10.8 19.6l15.4-8.4"/></svg>',
-    bobInf: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1"><path d="M3.6 12.4c3.8 0 5.6 3.4 8.2 7.2 2 2.8 4.4 4.6 7.6 4.6"/><circle cx="19.4" cy="16.4" r="7.8"/><circle cx="19.4" cy="16.4" r="2.1" fill="#fff" stroke="none"/><g fill="#fff" stroke="none"><circle cx="19.4" cy="11.4" r=".9"/><circle cx="23.7" cy="13.9" r=".9"/><circle cx="23.7" cy="18.9" r=".9"/><circle cx="19.4" cy="21.4" r=".9"/><circle cx="15.1" cy="18.9" r=".9"/><circle cx="15.1" cy="13.9" r=".9"/></g></svg>',
-    bobSup: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M8.6 16.8V7.4h17.8v18.4"/><path d="M8.6 16.8l4 3"/><circle cx="17.6" cy="19.2" r="6.4"/><circle cx="17.6" cy="19.2" r="1.8" fill="#fff" stroke="none"/><g fill="#fff" stroke="none"><circle cx="17.6" cy="15.2" r=".8"/><circle cx="21.1" cy="17.2" r=".8"/><circle cx="21.1" cy="21.2" r=".8"/><circle cx="17.6" cy="23.2" r=".8"/><circle cx="14.1" cy="21.2" r=".8"/><circle cx="14.1" cy="17.2" r=".8"/></g></svg>',
+    posSup: '<svg viewBox="0 0 32 32"><rect x="4" y="7.2" width="24" height="2.8" rx="1.4" fill="#fff"/><path d="M12.4 10.2h7.2l-2.2 4.8h-2.8z" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/><rect x="12.4" y="16.6" width="7.2" height="7.2" rx="1.7" fill="#fff"/></svg>',
+    aux: n => `<svg class="aux" viewBox="0 0 32 32"><text x="16" y="13.2" fill="#fff" text-anchor="middle" font-size="10.6" font-weight="700" font-family="Roboto,Arial" letter-spacing="-.3">AUX</text><path d="M4.6 15.2c1.8 0 2.4 1 2.4 2.6v2.6a3.6 3.6 0 0 0 3.6 3.6h10.8a3.6 3.6 0 0 0 3.6-3.6v-2.6c0-1.6.6-2.6 2.4-2.6" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3"/><text x="16" y="22.4" fill="#fff" text-anchor="middle" font-size="8" font-weight="700" font-family="Roboto,Arial">${esc(n)}</text></svg>`,
+    vacio: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 4.6v4.2M12.9 7l2.1 2.1 2.1-2.1"/><path d="M6.6 12h16.6a1.8 1.8 0 0 0 1.8-1.8V5.8"/><path d="M7.2 13v3.6a4.2 4.2 0 0 0 4.2 4.2h7.4a4.2 4.2 0 0 0 4.2-4.2V13"/><rect x="9.8" y="15.2" width="10.6" height="3.4" rx="1.7" fill="#fff" stroke="none"/></svg>',
+    gas: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9.4 10V4.8M7.6 6.6l1.8-1.8 1.8 1.8M20.6 10V4.8M18.8 6.6l1.8-1.8 1.8 1.8"/><path d="M12.6 5h4.8L15 8.8z" stroke-width="1.5"/><path d="M6.6 12h16.6a1.8 1.8 0 0 0 1.8-1.8V7.6"/><path d="M7.2 13v3.6a4.2 4.2 0 0 0 4.2 4.2h7.4a4.2 4.2 0 0 0 4.2-4.2V13"/><rect x="9.8" y="15" width="10.6" height="3.6" rx="1" stroke-width="1.4"/></svg>',
+    etiq: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="4.4" y="15.4" width="11.6" height="7.2" rx="1"/><path d="M7 19h6.4" stroke-width="1.4"/><path d="M11.2 15.2l-.6-6.4M10.6 8.8C15.4 5.8 21.2 5.4 26.6 7.2M26.6 7.2l-7 15.2"/><path d="M13.6 7.4l.5 1.4M17 6.4l.2 1.5M20.6 6.2l-.1 1.5M23.8 6.6l-.4 1.4" stroke-width="1.2"/></svg>',
+    bandeja: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.4 15.4c.2-2.6 3.4-3.4 4.8-1.4"/><path d="M8.4 13.2h1.4v5.4a2.6 2.6 0 0 0 2.6 2.6h10.2a2.6 2.6 0 0 0 2.6-2.6v-5.4h1.4"/><path d="M25.6 13.2c.6-1.4 1.8-1.8 2.6-1"/><path d="M10.8 17.4c1.4-1.2 2.6-1.2 4 0s2.6 1.2 4 0 2.6-1.2 4 0v1.4a1.6 1.6 0 0 1-1.6 1.6h-4.8l-5.6-.2z" fill="#fff" stroke="none"/></svg>',
+    insert: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.4 6.2h-4.6v18.6h4.2"/><path d="M15.4 6.2c1.8 0 2.2 1.6 1 2.8M15 24.8c1.6 0 2-1.4 1-2.4"/><path d="M10.8 13.4h6.2l5.6 2.4v2.8H10.8"/></svg>',
+    tijera: '<svg class="gruesa" viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6"><circle cx="8.6" cy="11" r="2.4"/><circle cx="8.6" cy="21" r="2.4"/><path d="M10.8 12.4l15.4 8.4M10.8 19.6l15.4-8.4"/></svg>',
+    bobInf: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1"><path d="M3.6 12.4c3.8 0 5.6 3.4 8.2 7.2 2 2.8 4.4 4.6 7.6 4.6"/><circle cx="19.4" cy="16.4" r="7.8"/><circle cx="19.4" cy="16.4" r="4.2" stroke-width="1.2"/><circle cx="19.4" cy="16.4" r="1.6" fill="#fff" stroke="none"/></svg>',
+    bobSup: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M8.6 16.8V7.4h17.8v18.4"/><path d="M8.6 16.8l4 3"/><circle cx="17.6" cy="19.2" r="6.4"/><circle cx="17.6" cy="19.2" r="3.4" stroke-width="1.2"/><circle cx="17.6" cy="19.2" r="1.4" fill="#fff" stroke="none"/></svg>',
     salida: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9"><rect x="12.4" y="4.8" width="9.8" height="3.8" rx=".8"/><path d="M6.6 11.6H23.8a2.6 2.6 0 0 1 0 5.2H12.4"/><path d="M12.4 23L25 17.8V23z"/><text x="8.4" y="25.2" fill="#fff" stroke="none" text-anchor="middle" font-size="9.5" font-weight="700" font-family="Roboto,Arial">1</text></svg>'
   };
   const SEC = { /* ícono de cabecera de sección según su nombre: marco gris redondeado + pictograma, como en el panel */
@@ -586,10 +623,11 @@ button{font:inherit;color:inherit}
     let d = '', x = 0, y = null;
     (L.seg || []).forEach(([w, n]) => { const ny = num(n) ? ARRIBA : ABAJO; if (y === null) d = `M0 ${ny}`; else if (ny !== y) d += ` V${ny}`; x += num(w); d += ` H${x}`; y = ny; });
     const [r0, paso] = (L.rejilla || [14.8, 28.06]).map(num);
-    let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="bandaAm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1cc1c" stop-opacity=".72"/><stop offset="1" stop-color="#e2b815" stop-opacity=".9"/></linearGradient></defs>`;
+    let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="bandaAm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1cc1c" stop-opacity=".62"/><stop offset="1" stop-color="#e2b815" stop-opacity=".8"/></linearGradient></defs>`;
     (L.bandas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="66" fill="url(#bandaAm)"/>`);
     (L.rojas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="66" fill="#e8603a" opacity=".75"/>`);
-    s += `<rect x="0" y="66" width="${W}" height="7" fill="#33407a" opacity=".75"/>`;
+    let xr = 0; (L.seg || []).forEach(([w, n]) => { if (num(n)) s += `<rect x="${xr.toFixed(1)}" y="${ARRIBA}" width="${num(w)}" height="${(68.6 - ARRIBA).toFixed(1)}" fill="#474f78"/>`; xr += num(w); });
+    s += `<rect x="0" y="67" width="${W + 9}" height="4.2" fill="#3c4a5c"/>`;
     for (let gx = r0; paso > 0 && gx <= W; gx += paso) s += `<line x1="${gx.toFixed(1)}" y1="0" x2="${gx.toFixed(1)}" y2="${H}" stroke="#cfd5ee" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
     s += `<path d="${d} H${W + 9}" fill="none" stroke="#fff" stroke-width="2.8" stroke-linejoin="miter" vector-effect="non-scaling-stroke"/></svg>`;
     const pos = v => `left:${num(v) / 10}%`;
@@ -701,11 +739,11 @@ button{font:inherit;color:inherit}
     const v = parseFloat(String(d.velocidad || '0').replace(',', '.')), obj = parseFloat(String(d.objetivo || '11').replace(',', '.')) || 11;
     /* velocímetro como en el panel (foto 24-10): arco de 217° (de 198,5° a −18,5°), rojo desde el inicio hasta la velocidad del último ciclo
        y amarillo desde ahí hasta el objetivo; unidades del SVG = px de la pantalla a 1600 de ancho */
-    const f = Math.min(Math.max((v || 0) / obj, 0), 1), A0 = 198.5, BAR = 217, R = 74, CX = 100, CY = 75, rad = g => g * Math.PI / 180;
+    const f = Math.min(Math.max((v || 0) / obj, 0), 1), A0 = 198.5, BAR = 217, R = 74, CX = 100, CY = 79, rad = g => g * Math.PI / 180;
     const pt = (g, r) => [(CX + r * Math.cos(rad(g))).toFixed(2), (CY - r * Math.sin(rad(g))).toFixed(2)];
-    const arco = (g0, g1, col) => { if (g0 - g1 < .05) return ''; const [x0, y0] = pt(g0, R), [x1, y1] = pt(g1, R); return `<path d="M${x0} ${y0} A${R} ${R} 0 ${g0 - g1 > 180 ? 1 : 0} 1 ${x1} ${y1}" fill="none" stroke="${col}" stroke-width="30"/>`; };
-    const gv = A0 - BAR * f, [ax, ay] = pt(gv, R - 15), [bx, by] = pt(gv, R + 15);
-    h += `<div class="medidor"><h4>Velocidad de último ciclo</h4><svg viewBox="0 0 200 120" role="img" aria-label="Velocidad de último ciclo: ${esc(d.velocidad || '—')} ciclos por minuto de ${esc(d.objetivo || '11')}">${arco(A0, gv, '#d43d35')}${arco(gv, A0 - BAR, '#dcb922')}${f > 0 && f < 1 ? `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#6b2a1c" stroke-width="1.6"/>` : ''}<text x="100" y="80" text-anchor="middle" font-size="25" font-weight="700" font-family="Roboto,Arial" fill="#2a2a2a">${esc(d.velocidad || '—')}</text><text x="100" y="103" text-anchor="middle" font-size="19" font-family="Roboto,Arial" fill="#444">Ciclos/min</text></svg></div><div class="dlista">`;
+    const arco = (g0, g1, col) => { if (g0 - g1 < .05) return ''; const [x0, y0] = pt(g0, R), [x1, y1] = pt(g1, R); return `<path d="M${x0} ${y0} A${R} ${R} 0 ${g0 - g1 > 180 ? 1 : 0} 1 ${x1} ${y1}" fill="none" stroke="${col}" stroke-width="29"/>`; };
+    const gv = A0 - BAR * f, [ax, ay] = pt(gv + 2.2, R - 14.5), [bx, by] = pt(gv, R - 5), [cx2, cy2] = pt(gv - 2.2, R - 14.5);
+    h += `<div class="medidor"><h4>Velocidad de último ciclo</h4><svg viewBox="0 0 200 120" role="img" aria-label="Velocidad de último ciclo: ${esc(d.velocidad || '—')} ciclos por minuto de ${esc(d.objetivo || '11')}">${arco(A0, gv, '#d43d35')}${arco(gv, A0 - BAR, '#dcb922')}${f > 0 && f < 1 ? `<path d="M${ax} ${ay} L${bx} ${by} L${cx2} ${cy2}z" fill="#4a2a20"/>` : ''}<text x="100" y="87" text-anchor="middle" font-size="25" font-weight="700" font-family="Roboto,Arial" fill="#2a2a2a">${esc(d.velocidad || '—')}</text><text x="100" y="108" text-anchor="middle" font-size="19" font-family="Roboto,Arial" fill="#444">Ciclos/min</text></svg></div><div class="dlista">`;
     (d.campos || []).forEach((c, i) => { h += `<div class="fila f${i}${String(c.etiqueta).startsWith('Contador') ? ' contador' : ''}"><span>${esc(c.etiqueta)}</span><span class="valor">${c.etiqueta.startsWith('Contador') ? `<span class="pastilla solo" style="text-align:center">${esc(c.valor)}</span>` : `<span class="pastilla">${esc(c.valor)}</span>`}${c.unidad ? `<span class="uni">${esc(c.unidad)}</span>` : ''}</span>${c.etiqueta.startsWith('Contador') ? `<button class="papelera" aria-label="Poner contador a cero" title="Poner contador a cero">${I.tacho}</button>` : botonInfo(c)}</div>`; });
     return h + `</div></div></div>`;
   }
