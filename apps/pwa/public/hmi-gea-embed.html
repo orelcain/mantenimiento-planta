@@ -516,21 +516,39 @@ button{font:inherit;color:inherit}
 .riel button[data-ir="1.1"] svg{transform:translateY(.18cqw)}
 .riel .al svg{width:1.95cqw!important;height:1.95cqw!important;transform:translateY(.55cqw)}
 /* ajuste por ícono: escala y desplazamiento medidos contra la caja de píxeles de cada ícono en la foto */
-.dbtn[data-icono="posSup"] svg{transform:translate(0.016cqw,-0.001cqw) scale(0.823,1.090)}
-.dbtn[data-icono^="aux"] svg{transform:translate(0.057cqw,0.112cqw) scale(0.798,0.831)}
-.dbtn[data-icono="vacio"] svg{transform:translate(0.109cqw,0.260cqw) scale(1.135,1.043)}
-.dbtn[data-icono="gas"] svg{transform:translate(0.172cqw,0.291cqw) scale(1.250,1.043)}
-.dbtn[data-icono="etiq"] svg{transform:translate(0.068cqw,0.158cqw) scale(1.127,0.898)}
-.dbtn[data-icono="bandeja"] svg{transform:translate(-0.076cqw,0.167cqw) scale(0.866,1.103)}
-.dbtn[data-icono="insert"] svg{transform:translate(0.292cqw,0.017cqw) scale(1.333,1.056)}
-.dbtn[data-icono="tijera"] svg{transform:translate(-0.012cqw,-0.084cqw) scale(0.917,0.682)}
-.dbtn[data-icono="bobInf"] svg{transform:translate(0.063cqw,0.024cqw) scale(1.000,0.967)}
+.dbtn[data-icono="posSup"] svg{transform:translate(0.032cqw,-0.130cqw) scale(0.873,0.902)}
+.dbtn[data-icono^="aux"] svg{transform:translate(0.052cqw,0.180cqw) scale(0.775,0.881)}
+.dbtn[data-icono="vacio"] svg{transform:translate(0.194cqw,0.260cqw) scale(1.030,1.043)}
+.dbtn[data-icono="gas"] svg{transform:translate(0.258cqw,0.291cqw) scale(1.144,1.043)}
+.dbtn[data-icono="etiq"] svg{transform:translate(0.021cqw,0.170cqw) scale(1.081,0.878)}
+.dbtn[data-icono="bandeja"] svg{transform:translate(-0.076cqw,0.170cqw) scale(0.897,1.038)}
+.dbtn[data-icono="insert"] svg{transform:translate(0.371cqw,0.017cqw) scale(1.207,1.056)}
+.dbtn[data-icono="tijera"] svg{transform:translate(-0.012cqw,-0.069cqw) scale(0.917,0.706)}
+.dbtn[data-icono="bobInf"] svg{transform:translate(0.071cqw,0.031cqw) scale(1.008,0.978)}
 .dbtn[data-icono="bobSup"] svg{transform:translate(0.025cqw,-0.046cqw) scale(1.173,0.943)}
 .dbtn[data-icono="salida"] svg{transform:translate(-0.109cqw,0.112cqw) scale(1.327,0.893)}
 .ciclos{padding-top:.25cqw}
 .ciclos b{font-size:2.85cqw;line-height:1.02}
 .ciclos small{font-size:1.35cqw;margin-top:.2cqw}
 .ciclos .reloj{margin-top:.45cqw}
+/* ---------- ronda 3 · iteración 5 ---------- */
+.dbtn{--fondo:var(--azul-claro)}
+.dbtn.off{--fondo:var(--azul);box-shadow:inset 0 -.19cqw .19cqw rgba(0,0,40,.25),0 0 0 .1cqw #23277e,0 0 0 .2cqw rgba(255,255,255,.45)}
+.tortuga .masmenos:first-of-type{margin-left:4.44cqw}
+.tortuga .masmenos+.masmenos{margin-left:1.375cqw}
+.tortuga .masmenos svg{width:1.9cqw;height:1.9cqw}
+.tortuga .pastilla{height:2.45cqw}
+.pastilla{background:linear-gradient(90deg,#cfcbc0,#dad7ce 45%)}
+.pastilla.solo,.pastilla.vacia{background:none}
+.barra .pid{background:#e6e4de;box-shadow:inset 0 0 0 .06cqw #b9b6ae}
+.migas .solo{color:#3b3e5e}
+.medidor h4{font-weight:500}
+.ciclos .reloj{font-size:1.9cqw;margin-top:.6cqw}
+.linea .fin-l{width:.62cqw;height:.62cqw}
+.riel .al svg{width:2cqw!important;height:2cqw!important;transform:translate(-.3cqw,.55cqw)}
+.riel .al em{box-shadow:0 0 0 .1cqw #fff}
+.riel .puntos svg{width:1cqw;height:3cqw}
+.riel button[data-ir="7.1"] svg{width:2.07cqw!important;height:2.46cqw!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -607,16 +625,16 @@ button{font:inherit;color:inherit}
     tacho: '<svg viewBox="0 0 24 24"><mask id="mTacho"><rect width="24" height="24" fill="#fff"/><path d="M9.4 10v8.4M12 10v8.4M14.6 10v8.4" stroke="#000" stroke-width="1.3"/></mask><g fill="#fff" mask="url(#mTacho)"><path d="M5.6 7.4h12.8l-1.1 13.4H6.7z"/><rect x="4.4" y="4.6" width="15.2" height="2.2" rx="1"/><rect x="9.6" y="2.6" width="4.8" height="2.4" rx="1"/></g></svg>'
   };
   const DB = { /* 14 botones del Dashboard, redibujados de la foto del panel (24-10-2026), viewBox 32×32 */
-    posSup: '<svg viewBox="0 0 32 32"><rect x="4" y="7.2" width="24" height="2.8" rx="1.4" fill="#fff"/><path d="M12.4 10.2h7.2l-2.2 4.8h-2.8z" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/><rect x="12.4" y="16.6" width="7.2" height="7.2" rx="1.7" fill="#fff"/></svg>',
-    aux: n => `<svg class="aux" viewBox="0 0 32 32"><text x="16" y="13.2" fill="#fff" text-anchor="middle" font-size="10.6" font-weight="700" font-family="Roboto,Arial" letter-spacing="-.3">AUX</text><path d="M4.6 15.2c1.8 0 2.4 1 2.4 2.6v2.6a3.6 3.6 0 0 0 3.6 3.6h10.8a3.6 3.6 0 0 0 3.6-3.6v-2.6c0-1.6.6-2.6 2.4-2.6" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3"/><text x="16" y="22.4" fill="#fff" text-anchor="middle" font-size="8" font-weight="700" font-family="Roboto,Arial">${esc(n)}</text></svg>`,
-    vacio: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 4.6v4.2M12.9 7l2.1 2.1 2.1-2.1"/><path d="M6.6 12h16.6a1.8 1.8 0 0 0 1.8-1.8V5.8"/><path d="M7.2 13v3.6a4.2 4.2 0 0 0 4.2 4.2h7.4a4.2 4.2 0 0 0 4.2-4.2V13"/><rect x="9.8" y="15.2" width="10.6" height="3.4" rx="1.7" fill="#fff" stroke="none"/></svg>',
-    gas: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9.4 10V4.8M7.6 6.6l1.8-1.8 1.8 1.8M20.6 10V4.8M18.8 6.6l1.8-1.8 1.8 1.8"/><path d="M12.6 5h4.8L15 8.8z" stroke-width="1.5"/><path d="M6.6 12h16.6a1.8 1.8 0 0 0 1.8-1.8V7.6"/><path d="M7.2 13v3.6a4.2 4.2 0 0 0 4.2 4.2h7.4a4.2 4.2 0 0 0 4.2-4.2V13"/><rect x="9.8" y="15" width="10.6" height="3.6" rx="1" stroke-width="1.4"/></svg>',
-    etiq: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="4.4" y="15.4" width="11.6" height="7.2" rx="1"/><path d="M7 19h6.4" stroke-width="1.4"/><path d="M11.2 15.2l-.6-6.4M10.6 8.8C15.4 5.8 21.2 5.4 26.6 7.2M26.6 7.2l-7 15.2"/><path d="M13.6 7.4l.5 1.4M17 6.4l.2 1.5M20.6 6.2l-.1 1.5M23.8 6.6l-.4 1.4" stroke-width="1.2"/></svg>',
-    bandeja: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.4 15.4c.2-2.6 3.4-3.4 4.8-1.4"/><path d="M8.4 13.2h1.4v5.4a2.6 2.6 0 0 0 2.6 2.6h10.2a2.6 2.6 0 0 0 2.6-2.6v-5.4h1.4"/><path d="M25.6 13.2c.6-1.4 1.8-1.8 2.6-1"/><path d="M10.8 17.4c1.4-1.2 2.6-1.2 4 0s2.6 1.2 4 0 2.6-1.2 4 0v1.4a1.6 1.6 0 0 1-1.6 1.6h-4.8l-5.6-.2z" fill="#fff" stroke="none"/></svg>',
-    insert: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.4 6.2h-4.6v18.6h4.2"/><path d="M15.4 6.2c1.8 0 2.2 1.6 1 2.8M15 24.8c1.6 0 2-1.4 1-2.4"/><path d="M10.8 13.4h6.2l5.6 2.4v2.8H10.8"/></svg>',
+    posSup: '<svg viewBox="0 0 32 32"><path d="M4.6 10.4c0-.9.6-1.4 1.4-1.4h6.4c.8-1.4 2-2.2 3.6-2.2s2.8.8 3.6 2.2H26c.8 0 1.4.5 1.4 1.4s-.6 1.4-1.4 1.4H6c-.8 0-1.4-.5-1.4-1.4z" fill="#fff"/><path d="M12.4 12.6h7.2L16 17.4z" fill="#fff"/><rect x="11.4" y="18.2" width="9.2" height="8.8" rx="2" fill="#fff"/></svg>',
+    aux: n => `<svg class="aux" viewBox="0 0 32 32"><text x="16" y="13.4" fill="#fff" stroke="#fff" stroke-width=".55" text-anchor="middle" font-size="10.8" font-weight="700" font-family="'Roboto Condensed',Roboto,Arial" letter-spacing="-.2">AUX</text><path d="M4.2 13.4c1.8 0 2.6.9 2.6 2.4v3.4a3.4 3.4 0 0 0 3.4 3.4h11.6a3.4 3.4 0 0 0 3.4-3.4v-3.4c0-1.5.8-2.4 2.6-2.4" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"/><text x="16" y="21.6" fill="#fff" text-anchor="middle" font-size="9.4" font-weight="700" font-family="Roboto,Arial">${esc(n)}</text></svg>`,
+    vacio: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15 4.6v4.2M12.9 7l2.1 2.1 2.1-2.1"/><path d="M4.8 12h18.4a1.8 1.8 0 0 0 1.8-1.8V5.8"/><path d="M7.2 13v3.6a4.2 4.2 0 0 0 4.2 4.2h7.4a4.2 4.2 0 0 0 4.2-4.2V13"/><rect x="9.8" y="15.2" width="10.6" height="3.4" rx="1.7" fill="#fff" stroke="none"/></svg>',
+    gas: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9.4 10V4.8M7.6 6.6l1.8-1.8 1.8 1.8M20.6 10V4.8M18.8 6.6l1.8-1.8 1.8 1.8"/><path d="M12.6 5h4.8L15 8.8z" stroke-width="1.5"/><path d="M4.8 12h18.4a1.8 1.8 0 0 0 1.8-1.8V7.6"/><path d="M7.2 13v3.6a4.2 4.2 0 0 0 4.2 4.2h7.4a4.2 4.2 0 0 0 4.2-4.2V13"/><rect x="9.8" y="15" width="10.6" height="3.6" rx="1" stroke-width="1.4"/></svg>',
+    etiq: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="4.4" y="15.4" width="11.6" height="7.2" rx="1"/><path d="M7 19h6.4" stroke-width="1.4"/><path d="M11.2 15.2l-.6-6.4M10.6 8.8C15.4 5.8 21.2 5.4 26.6 7.2M26.6 7.2l-7 15.2"/><path d="M8.6 7.2l3.8 3.4M25.2 5.2l2.6 4" stroke-width="1.5"/><path d="M6.8 18.2h7.6" stroke-width="1.2"/></svg>',
+    bandeja: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4.4 15.6h4.2M8.6 11.4v10.2"/><path d="M8.6 21.6h15.6V11.6h3.8"/><path d="M8.8 15.4h15.2v6.2H8.8z" fill="#fff" stroke="none"/><path d="M10.2 18.6c3.2-1.6 6.6-1.6 12.4 0" stroke="var(--fondo,#3b84e6)" stroke-width="1.4"/></svg>',
+    insert: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.4 6.2h-4.6v18.6h4.2M10.8 6.2c-1.2 0-1.8.8-1.4 1.8M10.8 24.8c-1.2 0-1.8-.8-1.4-1.8"/><path d="M15.4 6.2c1.8 0 2.2 1.6 1 2.8M15 24.8c1.6 0 2-1.4 1-2.4"/><path d="M10.8 13.4h6.2l5.6 2.4v2.8H10.8"/></svg>',
     tijera: '<svg class="gruesa" viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6"><circle cx="8.8" cy="11.4" r="2.7"/><circle cx="8.8" cy="20.6" r="2.7"/><path d="M11.2 12.8l13.6 7M11.2 19.2l13.6-7"/></svg>',
-    bobInf: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1"><path d="M3.6 12.4c3.8 0 5.6 3.4 8.2 7.2 2 2.8 4.4 4.6 7.6 4.6"/><circle cx="19.4" cy="16.4" r="7.8"/><circle cx="19.4" cy="16.4" r="5.2" fill="#fff" stroke="none"/><path d="M19.4 16.4L24.29 14.63A5.2 5.2 0 0 1 24.29 18.17zM19.4 16.4L14.51 18.17A5.2 5.2 0 0 1 14.51 14.63z" fill="#2c4fae" stroke="none" opacity=".8"/><circle cx="19.4" cy="16.4" r="1.66" fill="#fff" stroke="none"/></svg>',
-    bobSup: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M8.6 16.8V7.4h17.8v18.4"/><path d="M8.6 16.8l4 3"/><circle cx="17.6" cy="19.2" r="6.4"/><circle cx="17.6" cy="19.2" r="4.2" fill="#fff" stroke="none"/><path d="M17.6 19.2L21.55 17.77A4.2 4.2 0 0 1 21.55 20.63zM17.6 19.2L13.65 20.63A4.2 4.2 0 0 1 13.65 17.77z" fill="#2c4fae" stroke="none" opacity=".8"/><circle cx="17.6" cy="19.2" r="1.34" fill="#fff" stroke="none"/></svg>',
+    bobInf: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1"><path d="M3.6 12.4c3.8 0 5.6 3.4 8.2 7.2 2 2.8 4.4 4.6 7.6 4.6"/><circle cx="19.4" cy="16.4" r="7.8" stroke-width="2.8"/><circle cx="19.4" cy="16.4" r="4.68" fill="none" stroke="none"/><path d="M17.30 14.30L14.88 11.88A6.40 6.40 0 0 0 13.03 15.84L16.45 16.14z M21.50 18.50L23.92 20.92A6.40 6.40 0 0 0 25.77 16.96L22.35 16.66z" fill="#fff" stroke="none" opacity=".85"/><circle cx="19.4" cy="16.4" r="1.87" fill="#fff" stroke="none"/></svg>',
+    bobSup: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M8.6 16.8V7.4h17.8v18.4"/><path d="M8.6 16.8l4 3"/><circle cx="17.6" cy="19.2" r="6.4" stroke-width="2.6"/><circle cx="17.6" cy="19.2" r="3.84" fill="none" stroke="none"/><path d="M15.88 17.48L13.89 15.49A5.25 5.25 0 0 0 12.37 18.74L15.18 18.99z M19.32 20.92L21.31 22.91A5.25 5.25 0 0 0 22.83 19.66L20.02 19.41z" fill="#fff" stroke="none" opacity=".85"/><circle cx="17.6" cy="19.2" r="1.54" fill="#fff" stroke="none"/></svg>',
     salida: '<svg viewBox="0 0 32 32" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9"><rect x="12.4" y="4.8" width="9.8" height="3.8" rx=".8"/><path d="M6.6 11.6H23.8a2.6 2.6 0 0 1 0 5.2H12.4"/><path d="M12.4 23L25 17.8V23z"/><text x="8.4" y="25.2" fill="#fff" stroke="none" text-anchor="middle" font-size="9.5" font-weight="700" font-family="Roboto,Arial">1</text></svg>'
   };
   const SEC = { /* ícono de cabecera de sección según su nombre: marco gris redondeado + pictograma, como en el panel */
@@ -656,8 +674,8 @@ button{font:inherit;color:inherit}
      seg: [ancho, nivel] con nivel 1 = máquina en ciclo, 0 = detenida; x en unidades de 0 a 1000. */
   const LINEA0 = { /* transcrito de la foto del panel (15:00–17:30, 24-10-2026); x en unidades de 0 a 1000 sobre el ancho de la línea */
     seg: [[7,1],[7,0],[18.7,1],[5.5,0],[5.5,1],[7.8,0],[6.2,1],[5.5,0],[43.6,1],[14,0],[56.9,1],[1.6,0],[10.1,2],[5.5,0],[11.7,2],[14,0],[1.6,2],[13.3,0],[44.4,2],[17.9,0],[1.6,2],[3.1,0],[3.9,2],[14,0],[2.3,2],[10.9,0],[64.7,2],[3.1,0],[7.8,2],[7,0],[38.2,2],[27.3,0],[10.9,1],[14,0],[5.5,1],[5.5,0],[18.7,1],[463,0]],
-    bandas: [[193.3,2.4],[200.3,27.2],[277.5,15.4],[297.6,21.2],[445,59.2]], rojas: [[225.2,4.7],[289.2,6.2],[321.1,3.9],[494.7,10.9],[508.2,4.7],[540.1,6.2]],
-    advertencias: [194.1,213.6,287.6,311.8,471.5,503.5], alarmas: [227.6,325,491.8,543.2], notas: [143.4],
+    bandas: [[192.5,4.7],[200.3,27.2],[277.5,15.4],[305.5,14.8],[445,59.2]], rojas: [[225.2,4.7],[286,10.1],[323.4,2.3],[508.2,4.7],[538.6,7.8]],
+    advertencias: [194.1,213.6,287.6,311.8,473.8,505.8], alarmas: [227.6,325,494.1,543.2], notas: [143.4],
     horas: [['15:00',70.9],['15:30',239.3],['16:00',407.6],['16:30',576.7],['17:00',744.3],['17:30',912.6]], rejilla: [14.8, 28.06]
   };
   (function pie(){
@@ -667,7 +685,7 @@ button{font:inherit;color:inherit}
     const [r0, paso] = (L.rejilla || [14.8, 28.06]).map(num);
     let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="bandaAm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1cc1c" stop-opacity=".62"/><stop offset="1" stop-color="#e2b815" stop-opacity=".8"/></linearGradient></defs>`;
     (L.bandas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="66" fill="url(#bandaAm)"/>`);
-    (L.rojas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="66" fill="#e8603a" opacity=".75"/>`);
+    (L.rojas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="66" fill="#c94a62" opacity=".85"/>`);
     let xr = 0; (L.seg || []).forEach(([w, n]) => { if (num(n)) s += `<rect x="${xr.toFixed(1)}" y="${num(n) >= 2 ? ARRIBA - 5 : ARRIBA}" width="${num(w)}" height="${(68.6 - (num(n) >= 2 ? ARRIBA - 5 : ARRIBA)).toFixed(1)}" fill="#474f78"/>`; xr += num(w); });
     s += `<rect x="0" y="67" width="${W + 9}" height="4.2" fill="#3c4a5c"/>`;
     for (let gx = r0; paso > 0 && gx <= W; gx += paso) s += `<line x1="${gx.toFixed(1)}" y1="0" x2="${gx.toFixed(1)}" y2="${H}" stroke="#cfd5ee" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
@@ -777,7 +795,7 @@ button{font:inherit;color:inherit}
     const d = G.dash || {};
     let h = `<div class="pestanas" role="tablist"><button role="tab" aria-selected="true">Dashboard</button><button role="tab" aria-selected="false" data-falta="Pestaña Configuración del Dashboard">Configuración</button></div><div class="dash"><div class="dbots">`;
     (d.botones || []).forEach(b => { const k = ayudas.push(b) - 1; h += `<button class="dbtn${b.activo ? '' : ' off'}" data-icono="${esc(b.icono)}" data-k="${k}" aria-label="${esc(b.etiqueta)}" title="${esc(b.etiqueta)}">${String(b.icono || '').startsWith('aux') ? DB.aux(String(b.icono).slice(3)) : DB[b.icono] || ''}</button>`; });
-    h += `</div><div class="dmedio"><span class="vel"><b>${esc(d.vel || '0,0')}</b> <small>1/min</small></span><span class="tortuga"><svg class="t" viewBox="0 0 38 24" fill="none" stroke="#3a3f4b" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 16.6c0-6 5-10.2 11.2-10.2s11.2 4.2 11.2 10.2"/><path d="M2.6 16.6h25.2"/><ellipse cx="9.4" cy="19.2" rx="2.6" ry="1.6" fill="#3a3f4b" stroke="none"/><ellipse cx="21.6" cy="19.2" rx="2.6" ry="1.6" fill="#3a3f4b" stroke="none"/><path d="M26.6 15.2c1.2-1.2 2.4-2.2 4.4-2.2 1.8 0 3 1 3 2.2s-1.2 1.8-3 1.8h-3.6z" fill="#3a3f4b" stroke="none"/></svg><span class="pastilla">${esc(d.prolong || '0,00')}</span><span class="uni">s</span><button class="masmenos" aria-label="Menos"><svg viewBox="0 0 24 24"><path d="M5 12h14" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/></svg></button><button class="masmenos" aria-label="Más"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="3.8" stroke-linecap="round"/></svg></button>${botonInfo(d.prolongCampo || {etiqueta:'Tiempo de prolongación de la duración del ciclo'})}</span></div><div class="dder">`;
+    h += `</div><div class="dmedio"><span class="vel"><b>${esc(d.vel || '0,0')}</b> <small>1/min</small></span><span class="tortuga"><svg class="t" viewBox="0 0 38 24" fill="none" stroke="#3a3f4b" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 16.6c0-6 5-10.2 11.2-10.2s11.2 4.2 11.2 10.2"/><path d="M2.6 16.6h25.2"/><ellipse cx="9.4" cy="19.2" rx="2.6" ry="1.6" fill="#3a3f4b" stroke="none"/><ellipse cx="21.6" cy="19.2" rx="2.6" ry="1.6" fill="#3a3f4b" stroke="none"/><path d="M26.6 15.2c1.2-1.2 2.4-2.2 4.4-2.2 1.8 0 3 1 3 2.2s-1.2 1.8-3 1.8h-3.6z" fill="#3a3f4b" stroke="none"/></svg><span class="pastilla">${esc(d.prolong || '0,00')}</span><span class="uni">s</span><button class="masmenos" aria-label="Menos"><svg viewBox="0 0 24 24"><path d="M3.6 12h16.8" stroke="#fff" stroke-width="4.2" stroke-linecap="round"/></svg></button><button class="masmenos" aria-label="Más"><svg viewBox="0 0 24 24"><path d="M12 3.6v16.8M3.6 12h16.8" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg></button>${botonInfo(d.prolongCampo || {etiqueta:'Tiempo de prolongación de la duración del ciclo'})}</span></div><div class="dder">`;
     const v = parseFloat(String(d.velocidad || '0').replace(',', '.')), obj = parseFloat(String(d.objetivo || '11').replace(',', '.')) || 11;
     /* velocímetro como en el panel (foto 24-10): arco de 217° (de 198,5° a −18,5°), rojo desde el inicio hasta la velocidad del último ciclo
        y amarillo desde ahí hasta el objetivo; unidades del SVG = px de la pantalla a 1600 de ancho */
@@ -785,7 +803,7 @@ button{font:inherit;color:inherit}
     const pt = (g, r) => [(CX + r * Math.cos(rad(g))).toFixed(2), (CY - r * Math.sin(rad(g))).toFixed(2)];
     const arco = (g0, g1, col) => { if (g0 - g1 < .05) return ''; const [x0, y0] = pt(g0, R), [x1, y1] = pt(g1, R); return `<path d="M${x0} ${y0} A${R} ${R} 0 ${g0 - g1 > 180 ? 1 : 0} 1 ${x1} ${y1}" fill="none" stroke="${col}" stroke-width="29"/>`; };
     const gv = A0 - BAR * f, [ax, ay] = pt(gv + 2.2, R - 14.5), [bx, by] = pt(gv, R - 5), [cx2, cy2] = pt(gv - 2.2, R - 14.5);
-    h += `<div class="medidor"><h4>Velocidad de último ciclo</h4><svg viewBox="0 0 200 120" role="img" aria-label="Velocidad de último ciclo: ${esc(d.velocidad || '—')} ciclos por minuto de ${esc(d.objetivo || '11')}">${arco(A0, gv, '#d43d35')}${arco(gv, A0 - BAR, '#dcb922')}${f > 0 && f < 1 ? `<path d="M${ax} ${ay} L${bx} ${by} L${cx2} ${cy2}z" fill="#4a2a20"/>` : ''}<text x="100" y="88" text-anchor="middle" font-size="29" font-weight="700" font-family="Roboto,Arial" fill="#2a2a2a">${esc(d.velocidad || '—')}</text><text x="100" y="108" text-anchor="middle" font-size="19" font-family="Roboto,Arial" fill="#6a6a6a">Ciclos/min</text></svg></div><div class="dlista">`;
+    h += `<div class="medidor"><h4>Velocidad de último ciclo</h4><svg viewBox="0 0 200 120" role="img" aria-label="Velocidad de último ciclo: ${esc(d.velocidad || '—')} ciclos por minuto de ${esc(d.objetivo || '11')}">${arco(A0, gv, '#d43d35')}${arco(gv, A0 - BAR, '#dcb922')}${f > 0 && f < 1 ? `<path d="M${ax} ${ay} L${bx} ${by} L${cx2} ${cy2}z" fill="#4a2a20"/>` : ''}<text x="100" y="85" text-anchor="middle" font-size="29" font-weight="700" font-family="Roboto,Arial" fill="#2a2a2a">${esc(d.velocidad || '—')}</text><text x="100" y="108" text-anchor="middle" font-size="19" font-family="Roboto,Arial" fill="#6a6a6a">Ciclos/min</text></svg></div><div class="dlista">`;
     (d.campos || []).forEach((c, i) => { h += `<div class="fila f${i}${String(c.etiqueta).startsWith('Contador') ? ' contador' : ''}"><span>${esc(c.etiqueta)}</span><span class="valor">${c.etiqueta.startsWith('Contador') ? `<span class="pastilla solo" style="text-align:center">${esc(c.valor)}</span>` : `<span class="pastilla">${esc(c.valor)}</span>`}${c.unidad ? `<span class="uni">${esc(c.unidad)}</span>` : ''}</span>${c.etiqueta.startsWith('Contador') ? `<button class="papelera" aria-label="Poner contador a cero" title="Poner contador a cero">${I.tacho}</button>` : botonInfo(c)}</div>`; });
     return h + `</div></div></div>`;
   }
