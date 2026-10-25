@@ -638,6 +638,27 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Vistas por pantalla y pestaña (Analisis de Turno, Periodo, monitores).
+    // Existe para MEDIR ~2 semanas que se mira de verdad antes de recortar
+    // (decision 25-10-2026). Mismo patron que planoUsos: solo se CREA, nadie
+    // edita. Si una vista nueva no cabe aca, la escritura se pierde en
+    // silencio (registrarVista traga el error): revisar esta lista.
+    match /pantallaUsos/{usoId} {
+      allow read: if isSupervisor();
+      allow create: if isActiveUser()
+        && request.resource.data.keys().hasOnly(['plantId', 'pantalla', 'vista', 'plantLineId', 'uid', 'dia', 'ts'])
+        && request.resource.data.plantId is string
+        && request.resource.data.pantalla in ['turno', 'periodo', 'monitor']
+        && isNonEmptyString(request.resource.data.vista, 1, 40)
+        && (!('plantLineId' in request.resource.data)
+            || (request.resource.data.plantLineId is string
+                && request.resource.data.plantLineId.size() <= 60))
+        && request.resource.data.uid == request.auth.uid
+        && isNonEmptyString(request.resource.data.dia, 10, 10)
+        && request.resource.data.ts == request.time;
+      allow update, delete: if false;
+    }
+
     // ============================================
     // NOTAS SOBRE LAS FIGURAS DEL MANUAL BAADER 142
     // ============================================

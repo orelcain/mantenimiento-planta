@@ -9,6 +9,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { vistasDelTurno } from '@/services/grader/vistasDelTurno'
+import { registrarVista } from '@/services/telemetria/registrarVista'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Clock, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
@@ -523,6 +524,13 @@ export function AnalisisGraderTurnoPage() {
   useEffect(() => {
     if (!availableViews.includes(activeView)) setActiveViewState('resumen')
   }, [availableViews, activeView])
+
+  // Telemetría de uso (25-10-2026): qué pestaña se mira. Incluye la inicial.
+  // Se salta la vista que la planta no ofrece (el efecto de arriba la corrige).
+  useEffect(() => {
+    if (!availableViews.includes(activeView)) return
+    void registrarVista('turno', activeView, { plantLineId: plantLineCfg.id })
+  }, [activeView, availableViews, plantLineCfg.id])
 
   const setActiveView = useCallback((view: TurnoView) => {
     setActiveViewState(view)

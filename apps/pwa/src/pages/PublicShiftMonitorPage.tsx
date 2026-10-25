@@ -89,6 +89,7 @@ import {
   LINEAS_CON_MONITOR, lineaConMonitor, lineaDelMonitor, rutaMonitor, tokenMonitorDeLinea,
 } from '@/services/shoplogix/monitorDeLinea'
 import { useAuthStore } from '@/store/authStore'
+import { registrarVista } from '@/services/telemetria/registrarVista'
 import { Button } from '@/components/ui/button'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
 import { getFunctions, httpsCallable } from 'firebase/functions'
@@ -4488,6 +4489,13 @@ function MonitorDelToken() {
     const id = setInterval(() => setNow(Date.now()), 15_000)
     return () => clearInterval(id)
   }, [])
+
+  // Telemetría de uso (25-10-2026): qué monitor se abre. Solo escribe con
+  // sesión; las aperturas anónimas ya las cuenta publicShiftMonitorStats.
+  const plantSlugMonitor = data?.plantSlug
+  useEffect(() => {
+    if (plantSlugMonitor) void registrarVista('monitor', plantSlugMonitor)
+  }, [plantSlugMonitor])
 
   useEffect(() => {
     if (!token) { setStatus('gone'); return }
