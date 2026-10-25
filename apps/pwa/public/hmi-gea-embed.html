@@ -569,6 +569,92 @@ button{font:inherit;color:inherit}
 .riel .al em{width:1.4cqw;min-width:1.4cqw;height:1.4cqw;line-height:1.4cqw;font-size:1cqw}
 .linea small{color:#eef0f8}
 .dlista .uni{width:5.45cqw}
+/* ===== ronda 3 · vistas con el diseño del video (posiciones absolutas desde x 85 / y 122) ===== */
+.lienzo{position:static;min-height:calc(100% + 0px)}
+.lienzo>*{position:absolute}
+.lienzo .txt,.lienzo .th{white-space:nowrap;transform:translateY(-50%);font-size:1.3cqw;color:#8d8a84;line-height:1.25}
+.lienzo .txt.der,.lienzo .th.der{text-align:right}
+.lienzo .txt.centro,.lienzo .th.centro{text-align:center}
+.lienzo .txt.gris-claro{color:#aaa49b}
+.lienzo .txt.gris{color:#8d8a84}
+.lienzo .txt.chico{font-size:1.25cqw}
+.lienzo .txt.tres{white-space:normal;transform:none;font-size:1.25cqw;line-height:1.63cqw;color:#a8a29a}
+.lienzo .txt.zona{font-size:.9cqw;color:#b0a8a0}
+.lienzo .txt.val-real{font:700 1.7cqw/1 var(--f-ui);color:#3c3d38}
+.lienzo .txt.val-y{font:700 1.55cqw/1 var(--f-ui);color:#8f8a84;text-align:center}
+.lienzo .txt.uni-g{font-size:1.2cqw;color:#9a958d}
+.lienzo .txt.mini-g{font-size:.7cqw;color:#aaa49b}
+.lienzo [data-k],.lienzo [data-falta],.lienzo [data-ir]{cursor:pointer}
+.lienzo [data-k]:focus-visible,.lienzo [data-falta]:focus-visible,.lienzo [data-ir]:focus-visible{outline:2px solid var(--ambar);outline-offset:2px}
+/* botón redondo con texto a la derecha */
+.ctrl{display:flex;align-items:center;gap:.6cqw;white-space:nowrap;font-size:1.3cqw;color:#8d8a84;line-height:1.1}
+.ctrl i{border-radius:50%;background:#2e33a6;display:grid;place-items:center;flex:none;font-style:normal}
+.ctrl i svg{width:60%;height:60%}
+.ctrl.claro i{background:#2f86e4}
+.ctrl.atenuado span{color:#b3aea6}
+.ctrl.gris i{background:#cdcbbf}
+.ctrl.gris i svg *{stroke:#f2f0ea}
+.ctrl.gris i svg path[fill="#fff"]{fill:#f2f0ea}
+.linea-ancho{height:1px;background:#c9c5bb}
+.linea-ancho.fuerte{height:2px;background:#d9d6d0}
+/* pastilla de valor */
+.pild{box-sizing:border-box;background:#d5d4c9;border-radius:2cqw;display:flex;align-items:center;justify-content:flex-end;padding:0 .35cqw 0 .5cqw;font:700 1.65cqw/1 var(--f-ui);color:#34332f;white-space:nowrap;overflow:hidden}
+.pild.fecha{justify-content:center;gap:.5cqw;background:#dad7cc;font-size:1.65cqw}
+.pild.fecha i.cal{font:700 .7cqw/1 var(--f-ui);color:#fff;background:#2f6fd8;border-radius:.15cqw;padding:.25cqw .12cqw .12cqw;font-style:normal}
+.desple-r{box-sizing:border-box;background:#d5d4c9;border-radius:2cqw;display:flex;align-items:center;justify-content:space-between;padding:0 .9cqw 0 1cqw;font:700 1.65cqw/1 var(--f-ui);color:#34332f;white-space:nowrap}
+.desple-r i{width:1.1cqw;height:1.1cqw;color:#2a33b8;display:grid;place-items:center}
+.desple-r i svg{width:100%;height:100%}
+/* 1.1 Producción */
+.produccion .fn{position:absolute;max-width:none;gap:.7cqw;font-size:1.25cqw;color:#7b7f8c;line-height:1.45;white-space:nowrap}
+.produccion .fn i{width:2.2cqw;height:2.2cqw;background:#3743c4}
+.produccion .fn i svg{width:1.4cqw;height:1.4cqw}
+.produccion .fn[data-ir="1.1.12"] span{white-space:normal;width:7cqw}
+.produccion .fn[data-ir="1.1.12"]{align-items:center;margin-top:-.9cqw}
+.esq-pos .esquema{width:100%;margin:0;display:block}
+.esq-pos{pointer-events:none}
+.esq-pos .esquema:not(.gris) .est{pointer-events:auto}
+.esquema .est rect.fondo{fill:#e2e1dd}
+.esquema.gris .est rect.fondo{fill:#dcdad4}
+.lienzo .cartucho{background:#dcdad3;border-radius:.6cqw;display:grid;place-items:center}
+.lienzo .cartucho svg{width:90%;height:auto}
+.lienzo .marco{box-sizing:border-box;border:1.5px solid #c8c4bc;border-radius:.25cqw;background:rgba(255,255,255,.12)}
+/* 1.1.15 */
+.col-reg{background:#dddad4;border-radius:.5cqw}
+.col-reg b{position:absolute;left:0;right:0;height:1px;background:#cfcbc3}
+.pic-reg{display:block}
+.punto-reg{border-radius:50%;background:#9fb0b8}
+.punto-reg.on{background:#2a7fe0}
+.punto-reg.tenue{opacity:.45}
+.num-reg{box-sizing:border-box;border-radius:50%;background:#2a2fb0;color:#fff;display:grid;place-items:center;font:700 1.5cqw/1 var(--f-ui);box-shadow:0 0 0 .1cqw rgba(255,255,255,.55)}
+.ico-gris{opacity:.35;display:block}
+.ico-gris svg{width:100%;height:100%}
+.ico-gris svg *{stroke:#8d8a84}
+/* pestañas de 1.1.2 y 8.x */
+.lienzo .pest{all:unset;position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:.6cqw;font-size:1.38cqw;color:#7f7b75;cursor:pointer}
+.lienzo .pest.sel{color:#4a4743}
+.lienzo .pest.ajustes{justify-content:flex-start;padding-left:.5cqw;gap:2.6cqw}
+.lienzo .pest.ajustes i{width:2.25cqw;height:2.25cqw;border-radius:50%;background:#2e33a6;display:grid;place-items:center}
+.lienzo .pest.ajustes i svg{width:62%;height:62%}
+.pest-linea{background:#6d6a9a}
+.lienzo .th{font:700 1.75cqw/1.15 var(--f-ui);color:#57504a;transform:none}
+.lienzo .th small{display:block;font:400 1.1cqw/1.4 var(--f-ui);color:#a8a29a}
+.info.mini{position:absolute;width:1.375cqw;height:1.375cqw;font-size:.85cqw}
+/* 8.x alarmas */
+.alarmas .pest{font-size:1.42cqw}
+.fila-al{overflow:hidden}
+.fila-al>span{position:absolute;top:50%;transform:translateY(-50%);white-space:nowrap}
+.fila-al .f{font-size:1.27cqw;color:#b4ab9f}
+.fila-al .h{font:700 1.7cqw/1 var(--f-ui);color:#45403a}
+.fila-al .c{font-size:1.22cqw;color:#a39b90}
+.fila-al .r{font:700 1.6cqw/1 var(--f-ui);color:#527dc1}
+.fila-al .m{font:700 1.65cqw/1.94cqw var(--f-ui);color:#45403a;white-space:normal}
+.fila-al .u{font:700 1.65cqw/1 var(--f-ui);color:#45403a;max-width:9cqw;overflow:hidden;text-overflow:ellipsis}
+.fila-al .ic-al{display:grid;place-items:center;width:1.38cqw;height:1.38cqw;border-radius:50%;background:#e05050;color:#fff;font:700 1cqw/1 var(--f-ui)}
+.fila-al .ic-adv{display:block;width:1.5cqw;height:1.35cqw;background:#d8b81f;clip-path:polygon(50% 0,100% 100%,0 100%);position:relative}
+.fila-al .ic-adv::after{content:"!";position:absolute;left:0;right:0;bottom:.05cqw;text-align:center;font:700 .9cqw/1 var(--f-ui);color:#3a3426}
+.riel [data-ir^="8."][aria-current="true"]{background:#e0474c;color:#fff}
+.produccion~*,.pantalla[data-pantalla="1.1"] .pista-texto{display:none}
+.pantalla[data-pantalla="1.1"] .lupa,.pantalla[data-pantalla="1.1.11"] .lupa,.pantalla[data-pantalla="1.1.12"] .lupa,.pantalla[data-pantalla="1.1.15"] .lupa,.pantalla[data-pantalla="6.0"] .lupa{visibility:hidden}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -775,40 +861,54 @@ button{font:inherit;color:inherit}
   /* Estado de cada estación (barra inferior, manual): azul = parada sin error, verde = funcionando, rojo = parada de emergencia o puerta abierta.
      Si el bloque de datos trae G.estaciones[{id}|{ancla}] o G.estaciones[{id}] con {estado}, manda eso; si no, todas paradas (máquina detenida en el video). */
   const ESTADOS = {parado: ['#2563e8', 'parada sin error'], marcha: ['#3fd14a', 'funcionando'], emergencia: ['#e3262f', 'parada de emergencia o puerta abierta']};
-  const estadoEst = (id, ancla) => { const E = G.estaciones || {}, e = (E[id + '|' + ancla] || E[id] || {}).estado; return ESTADOS[e] ? e : 'parado'; };
+  const estadoEst = (id, ancla) => { const E = G.estaciones || {}, e = (E[id + '|' + ancla] || E[id] || {}).estado; return ESTADOS[e] ? e : null; };
+  /* barra de estado bajo cada estación (manual): el video no la muestra, así que solo se dibuja si los datos traen el estado */
+  const barraEstado = (x, y, w, id, ancla) => { const e = estadoEst(id, ancla); if (!e) return ''; const [col, txt] = ESTADOS[e]; return `<rect class="estado" x="${x}" y="${y}" width="${w}" height="9" fill="${col}"><title>Estado: ${txt}</title></rect>`; };
+
+  /* esquema de la máquina medido sobre el video (b-011/b-013): 1 unidad del viewBox = 1,284 px de la pantalla a 1600;
+     X 0 en px 255 e Y 0 en py 244,4. Se reutiliza en gris, sin interacción, en 1.1.12 */
+  function esquemaSVG({N = '#1d2350', V = '#3fd14a', fondo = '', cuerpo = '#cbcac6', suelo = '#cecdc9', interactivo = true, vb = '-106.7 -40.8 1146.4 459.5', clase = 'esquema', superior = true} = {}){
+    const T = 113, G2 = 122, Y = 150, F = 212, A = `stroke="${N}" stroke-linecap="round" stroke-linejoin="round"`, ff = fondo ? ` style="fill:${fondo}"` : '';
+    const pel = (a, b) => `<path d="M${a} ${F} H${b}" ${A} stroke-width="4.5" fill="none"/>`;
+    /* U colgada de la película (paredes en cx±31, fondo en 242,5) con el producto verde de contorno navy */
+    const u = (cx, fondoY = 242.5) => `<path d="M${cx-31} ${F} V${fondoY-7} a7 7 0 0 0 7 7 H${cx+24} a7 7 0 0 0 7-7 V${F}" fill="none" ${A} stroke-width="5"/>`;
+    const bandeja = cx => u(cx) + `<rect x="${cx-20.5}" y="222" width="41" height="10" rx="5" fill="${V}" stroke="${N}" stroke-width="4"/>`;
+    /* rollo: aro exterior, aro interior partido en dos arcos y centro */
+    const pt = (cx, cy, r, g) => `${(cx + r * Math.sin(g * Math.PI / 180)).toFixed(2)} ${(cy - r * Math.cos(g * Math.PI / 180)).toFixed(2)}`;
+    const arco = (cx, cy, r, g0, g1) => `M${pt(cx, cy, r, g0)} A${r} ${r} 0 ${g1 - g0 > 180 ? 1 : 0} 1 ${pt(cx, cy, r, g1)}`;
+    const rollo = (cx, cy, R, rc, sw = 4.5) => `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" ${A} stroke-width="${sw}"/><path d="${arco(cx, cy, 17, 30, 150)} ${arco(cx, cy, 17, 270, 360)}" fill="none" ${A} stroke-width="4"/><circle cx="${cx}" cy="${cy}" r="${rc}" fill="${N}"/>`;
+    const est = (i, id, nombre, ancla, dibujo) => { const x = i * G2, cx = x + T / 2;
+      const attrs = interactivo ? ` data-ir="${id}" data-ancla="${esc(ancla)}" tabindex="0" role="button" aria-label="${esc(nombre)}"` : '';
+      return `<g class="est"${attrs}>${interactivo ? `<title>${esc(nombre)} · ${id}</title>` : ''}<rect class="fondo" x="${x}" y="${Y}" width="${T}" height="150" rx="3"${ff}/>${interactivo ? barraEstado(x, Y + 141, T, id, ancla) : ''}<g class="dibujo">${dibujo(cx, x)}</g>${interactivo ? `<rect class="sel" x="${x+2}" y="${Y+2}" width="${T-4}" height="146" rx="3"/>` : ''}</g>`; };
+    let s = `<svg class="${clase}" viewBox="${vb}" ${interactivo ? 'role="group" aria-label="Esquema de la máquina"' : 'aria-hidden="true"'}>`;
+    /* bancada: cuerpo detrás de las estaciones 2 a 7, cuatro patas en carrete y suelo hasta el pie */
+    s += `<g class="bancada"><rect x="118" y="145" width="732" height="214" rx="3" fill="${cuerpo}"/>`;
+    [155, 375.5, 594, 813].forEach(lx => s += `<path d="M${lx-9.75} 359 h19.5 v11 h-2.25 v16 h2.25 v7 h-19.5 v-7 h2.25 v-16 h-2.25 z" fill="${cuerpo}"/>`);
+    s += `<rect x="-120" y="394" width="1180" height="30" fill="${suelo}"/></g>`;
+    s += est(0, '1.1.9', 'Salida', '', (cx, x) => `${pel(x, x + T)}${bandeja(cx)}<rect x="${x+1}" y="253" width="91" height="12" rx="6" fill="${N}"/><circle cx="${x+96}" cy="259" r="6.5" fill="#fff" stroke="${N}" stroke-width="3"/><circle cx="${x+96}" cy="259" r="1.8" fill="${N}"/>`);
+    s += est(1, '1.1.3', 'Sistema de película posterior', 'aspirador', (cx, x) => `${pel(x, x + T)}<circle cx="${cx-22.5}" cy="180" r="21" fill="none" ${A} stroke-width="5" stroke-linecap="butt" stroke-dasharray="8 6"/><circle cx="${cx-22.5}" cy="180" r="4" fill="${N}"/><path d="M${cx-4} 183 L${cx+36} 210" ${A} stroke-width="5" stroke-linecap="butt" stroke-dasharray="8 6"/>${bandeja(cx)}`);
+    s += est(2, '1.1.8', 'Cortador transversal', 'cort', (cx, x) => `${pel(x, x + T)}${bandeja(cx)}<rect x="${cx+40}" y="186" width="11" height="16" fill="${N}"/><path d="M${cx+40} 231 L${cx+45.5} 224 L${cx+51} 231 V266 H${cx+40} Z" fill="${N}"/>`);
+    s += est(3, '1.1.7', 'Zona de etiquetado', '', (cx, x) => `<path d="M${cx-41} 204 L${cx-21} 180 H${cx+41} L${cx+21} 204 Z" fill="none" ${A} stroke-width="5"/>${pel(x, x + T)}${bandeja(cx)}`);
+    s += est(4, '1.1.6', 'Estación de sellado', '', (cx, x) => `<rect x="${cx-33}" y="178" width="66" height="17" fill="${N}"/>${pel(x, x + T)}${bandeja(cx)}`);
+    s += est(5, '1.1.5', 'Colocar / cargar', '', (cx, x) => `<path d="M${x} ${F} H${cx-32} V234.5 a7 7 0 0 0 7 7 H${cx+23} a7 7 0 0 0 7-7 V${F} H${x+T}" fill="none" ${A} stroke-width="4.5"/><path d="M${cx-23} 164 H${cx+23} V187 L${cx+3.5} 197 V220 L${cx+23} 234 H${cx-23} L${cx-3.5} 220 V197 L${cx-23} 187 Z" fill="none" ${A} stroke-width="4"/><rect x="${cx-3.5}" y="197" width="7" height="23" fill="${N}"/><path d="M${cx-16} 178 H${cx+16} L${cx} 195 Z" fill="${V}"/><path d="M${cx-15} 231 L${cx} 223 L${cx+15} 231 Z" fill="${V}"/>`);
+    s += est(6, '1.1.4', 'Calefacción y conformado', '', (cx, x) => `<rect x="${cx-43}" y="161" width="87" height="18" rx="9" fill="none" ${A} stroke-width="4"/><path d="M${cx-36} 186 L${cx-39} 193 M${cx-18.5} 186 v7 M${cx+1} 186 v7 M${cx+20} 186 v7 M${cx+36.5} 186 L${cx+39.5} 193" ${A} stroke-width="3.5"/><path d="M${cx-47} 232 H${cx-39} V245 a7 7 0 0 0 7 7 H${cx+32} a7 7 0 0 0 7-7 V232 H${cx+47} V266 H${cx-47} Z" fill="${N}"/><path d="M${x} ${F} H${cx-31} V238 a7 7 0 0 0 7 7 H${cx+24} a7 7 0 0 0 7-7 V${F} H${x+T}" fill="none" ${A} stroke-width="4.5"/>`);
+    s += est(7, '1.1.3', 'Película inferior', 'inferior', (cx, x) => `<path d="M${x} ${F} H${x+17.5} L${x+50} 250 Q${x+56} 256.5 ${cx+13.5} 256.5" fill="none" ${A} stroke-width="4.5"/>${rollo(cx + 13.5, 227, 29.5, 3.5)}`);
+    /* caja superior (película superior): su película baja recta en cx+47 del sellado y entra a la bandeja por la izquierda */
+    if (!superior) { const c4 = 4 * G2 + T / 2; return s + `<path d="M${4*G2+103.5} 140 V203.5 H${c4-22} Q${c4-31} 203.5 ${c4-31} ${F}" fill="none" ${A} stroke-width="4.5"/></svg>`; }
+    const xs = 4 * G2, c4 = xs + T / 2, ga = interactivo ? ` data-ir="1.1.3" data-ancla="superior" tabindex="0" role="button" aria-label="Película superior"` : '';
+    s += `<g class="est"${ga}>${interactivo ? '<title>Película superior · 1.1.3</title>' : ''}<rect class="fondo" x="${xs}" y="-5" width="${T}" height="126" rx="3"${ff}/>${interactivo ? barraEstado(xs, 112, T, '1.1.3', 'superior') : ''}<g class="dibujo"><path d="M${xs+10.5} 97 V23.5 H${xs+103.5} V203.5 H${c4-22} Q${c4-31} 203.5 ${c4-31} ${F}" fill="none" ${A} stroke-width="4.5"/>${rollo(xs + 60, 71, 30, 6, 4)}<path d="M${xs+10.5} 97 L${xs+31} 84" ${A} stroke-width="4"/></g>${interactivo ? `<rect class="sel" x="${xs+2}" y="-3" width="${T-4}" height="122" rx="3"/>` : ''}</g>`;
+    /* indicadores entre la caja superior y las estaciones (significado sin confirmar en terreno) */
+    const flecha = (x, col, n) => `<g>${interactivo ? `<title>Indicador de posición${n ? ' ' + n : ''} (significado por confirmar en terreno)</title>` : ''}<path d="M${x-8} 124 h16 v16 h4 l-12 14 l-12-14 h4 z" fill="${col}" stroke-linejoin="round"/>${n ? `<text x="${x}" y="137.5" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Roboto,Arial">${n}</text>` : ''}</g>`;
+    s += flecha(503.5, '#e3262f') + flecha(535.8, '#e3262f') + flecha(568.5, V, 10) + flecha(601.3, V, 9) + flecha(730, V, 7);
+    return s + `</svg>`;
+  }
 
   function vistaProduccion(){
-    const fn = [['1.1.2','Temperaturas',I.termo],['1.1.11','Cambio Folio',I.folio],['1.1.12','Cambio Herramienta',I.herr],['1.1.15','Registro De Desvíos',I.reg]];
-    let h = `<div class="fn-fila">${fn.map(([id, n, ic]) => `<button class="fn" data-ir="${id}"><i>${ic}</i>${n}</button>`).join('')}</div>`;
-    const N = '#1d2350', V = '#3fd14a', T = 113, G2 = 122, Y = 150, F = 210, A = `stroke="${N}" stroke-linecap="round" stroke-linejoin="round"`;
-    const pel = (a, b) => `<path d="M${a} ${F} H${b}" ${A} stroke-width="5" fill="none"/>`;
-    /* envase: bandeja con producto verde; tapa = película superior ya sellada */
-    const bandeja = (cx, y = F, tapa = false) => `<path d="M${cx-38} ${y} h10 v17 a6 6 0 0 0 6 6 h44 a6 6 0 0 0 6-6 v-17 h10" fill="none" ${A} stroke-width="5"/><rect x="${cx-20}" y="${y+6}" width="40" height="9" rx="4.5" fill="${V}"/>${tapa ? `<path d="M${cx-38} ${y} H${cx+38}" ${A} stroke-width="5"/>` : ''}`;
-    const barraEstado = (x, y, w, id, ancla) => { const [col, txt] = ESTADOS[estadoEst(id, ancla)]; return `<rect class="estado" x="${x}" y="${y}" width="${w}" height="9" fill="${col}"><title>Estado: ${txt}</title></rect>`; };
-    const estacion = (i, id, nombre, ancla, dibujo) => { const x = i * G2, cx = x + T/2;
-      return `<g class="est" data-ir="${id}" data-ancla="${esc(ancla)}" tabindex="0" role="button" aria-label="${esc(nombre)}"><title>${esc(nombre)} · ${id}</title><rect class="fondo" x="${x}" y="${Y}" width="${T}" height="150" rx="3"/>${barraEstado(x, Y + 141, T, id, ancla)}<g class="dibujo">${dibujo(cx, x)}</g><rect class="sel" x="${x+2}" y="${Y+2}" width="${T-4}" height="146" rx="3"/></g>`; };
-    let s = `<svg class="esquema" viewBox="-6 -4 990 400" role="group" aria-label="Esquema de la máquina">`;
-    /* bancada: viga bajo las estaciones 1 a 7, patas con placa y piso; la salida tiene su propio soporte */
-    const b0 = G2 - 6, b1 = 8 * G2 - 3;
-    s += `<g class="bancada"><rect x="${b0}" y="306" width="${b1 - b0}" height="5" rx="1" fill="#c3c3c1"/><rect x="${b0 + 4}" y="311" width="${b1 - b0 - 8}" height="30" fill="#d6d6d4"/><path d="M${b0 + 4} 341 H${b1 - 4}" stroke="#c3c3c1" stroke-width="2"/>`;
-    [1.08, 2.95, 4.95, 6.85].forEach(k => { const lx = k * G2; s += `<path d="M${lx-7} 342 h14 l2 22 h-18 z" fill="#cbcbc9"/><rect x="${lx-17}" y="364" width="34" height="5" rx="1.5" fill="#bdbdbb"/>`; });
-    s += `<path d="M${T/2 - 4} 300 h8 v64 h-8 z" fill="#cbcbc9"/><rect x="${T/2 - 15}" y="364" width="30" height="5" rx="1.5" fill="#bdbdbb"/><rect x="-6" y="369" width="990" height="18" fill="#dadad8"/></g>`;
-    s += estacion(0, '1.1.9', 'Salida', '', (cx, x) => `<rect x="${x+8}" y="244" width="${T-16}" height="12" rx="6" fill="none" ${A} stroke-width="4"/><circle cx="${x+14}" cy="250" r="2.6" fill="${N}"/><circle cx="${x+T-14}" cy="250" r="2.6" fill="${N}"/>${bandeja(cx, 218, true)}`);
-    s += estacion(1, '1.1.3', 'Sistema de película posterior', 'aspirador', (cx, x) => `${pel(x - 5, x + T + 5)}<circle cx="${cx-26}" cy="178" r="16" fill="none" ${A} stroke-width="3" stroke-dasharray="4.5 4"/><circle cx="${cx-26}" cy="178" r="4" fill="${N}"/><path d="M${cx-11} 184 L${cx+34} 207" ${A} stroke-width="3" stroke-dasharray="6 5"/>${bandeja(cx, F, true)}`);
-    s += estacion(2, '1.1.8', 'Cortador transversal', 'cort', (cx, x) => `${pel(x - 5, x + T + 5)}${bandeja(cx - 8, F, true)}<path d="M${cx+37} 186 h10 v14 l-5 7 l-5-7 z" fill="${N}"/><path d="M${cx+37} 216 l5-4 l5 4 v32 h-10 z" fill="${N}"/>`);
-    s += estacion(3, '1.1.7', 'Zona de etiquetado', '', (cx, x) => `<path d="M${cx-34} 200 L${cx-14} 184 H${cx+42} L${cx+22} 200 Z" fill="none" ${A} stroke-width="4"/><path d="M${cx-14} 192 H${cx+20}" ${A} stroke-width="2.5"/>${pel(x - 5, x + T + 5)}${bandeja(cx, F, true)}`);
-    s += estacion(4, '1.1.6', 'Estación de sellado', '', (cx, x) => `<rect x="${cx-5}" y="172" width="10" height="10" fill="${N}"/><rect x="${cx-31}" y="182" width="62" height="14" rx="2" fill="${N}"/>${pel(x - 5, cx + 36)}<path d="M${cx+44} 150 V${F-6} a6 6 0 0 1-6 6 H${cx+30}" fill="none" ${A} stroke-width="5"/>${bandeja(cx, F, true)}`);
-    s += estacion(5, '1.1.5', 'Colocar / cargar', '', (cx, x) => `<path d="M${x-5} ${F} H${cx-44} c9 0 11 16 19 16 h50 c8 0 10-16 19-16 H${x+T+5}" fill="none" ${A} stroke-width="5"/><path d="M${cx-19} 160 H${cx+19} V167 L${cx+5} 181 V185 L${cx+19} 199 V203 H${cx-19} V199 L${cx-5} 185 V181 L${cx-19} 167 Z" fill="none" ${A} stroke-width="3.5"/><path d="M${cx-11} 169 H${cx+11} L${cx} 178 Z" fill="${V}"/><path d="M${cx-13} 200 L${cx} 188 L${cx+13} 200 Z" fill="${V}"/><rect x="${cx-16}" y="${F+4}" width="32" height="8" rx="4" fill="${V}"/>`);
-    s += estacion(6, '1.1.4', 'Calefacción y conformado', '', (cx, x) => `<rect x="${cx-34}" y="170" width="68" height="12" rx="6" fill="none" ${A} stroke-width="4"/><path d="M${cx-24} 189 v7 M${cx-8} 189 v7 M${cx+8} 189 v7 M${cx+24} 189 v7" ${A} stroke-width="3.5"/><path d="M${x-5} ${F} H${cx-40} v19 a6 6 0 0 0 6 6 h68 a6 6 0 0 0 6-6 v-19 H${x+T+5}" fill="none" ${A} stroke-width="5"/><path d="M${cx-50} ${F+4} H${cx-46} V${F+21} a10 10 0 0 0 10 10 H${cx+36} a10 10 0 0 0 10-10 V${F+4} H${cx+50} V${F+42} H${cx-50} Z" fill="${N}"/>`);
-    s += estacion(7, '1.1.3', 'Película inferior', 'inferior', (cx, x) => `<path d="M${x-5} ${F} C${cx-28} ${F} ${cx-24} 253 ${cx+10} 253" fill="none" ${A} stroke-width="5"/><circle cx="${cx+10}" cy="228" r="25" fill="none" ${A} stroke-width="5"/><circle cx="${cx+10}" cy="228" r="12" fill="none" ${A} stroke-width="3.5"/><circle cx="${cx+10}" cy="228" r="3.5" fill="${N}"/>`);
-    /* caja superior: película superior (sobre el sellado); su película baja hasta la estación de sellado */
-    const xs = 4*G2, xf = xs + T/2 + 44;
-    s += `<g class="est" data-ir="1.1.3" data-ancla="superior" tabindex="0" role="button" aria-label="Película superior"><title>Película superior · 1.1.3</title><rect class="fondo" x="${xs}" y="0" width="${T}" height="118" rx="3"/>${barraEstado(xs, 109, T, '1.1.3', 'superior')}<g class="dibujo"><path d="M${xs+14} 100 V18 H${xs+92}" fill="none" ${A} stroke-width="4"/><circle cx="${xs+62}" cy="60" r="24" fill="none" ${A} stroke-width="5"/><circle cx="${xs+62}" cy="60" r="11" fill="none" ${A} stroke-width="3.5"/><circle cx="${xs+62}" cy="60" r="3.5" fill="${N}"/><path d="M${xf-14} 60 a14 14 0 0 1 14 14 V156" fill="none" ${A} stroke-width="5"/><path d="M${xs+14} 98 L${xs+38} 78" ${A} stroke-width="4"/></g><rect class="sel" x="${xs+2}" y="2" width="${T-4}" height="114" rx="3"/></g>`;
-    /* indicadores sobre sellado/colocar (sin identificar en terreno) */
-    const flecha = (x, col, n) => `<g><title>Indicador de posición${n ? ' ' + n : ''} (significado por confirmar en terreno)</title><path d="M${x-9} 126 h18 v10 h6 l-15 13 l-15-13 h6 z" fill="${col}" stroke="rgba(0,0,0,.12)" stroke-width="1" stroke-linejoin="round"/>${n ? `<text x="${x}" y="140" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff" font-family="Roboto,Arial">${n}</text>` : ''}</g>`;
-    s += flecha(xs + 8, '#e3262f') + flecha(xs + 30, '#e3262f') + flecha(xs + 56, '#3fd14a', 10) + flecha(xs + 80, '#3fd14a', 9) + flecha(6*G2 + 4, '#3fd14a', 7);
-    s += `</svg><p class="pista-texto">Toca una estación para abrir sus parámetros. El producto avanza de derecha a izquierda.</p>`;
-    return h + s;
+    /* fila de funciones del video: círculos de 35 px con centro y 162 y centros x 829 / 1011 / 1186 / 1386 */
+    const fn = [['1.1.2','Temperaturas',I.termo,829],['1.1.11','Cambio Folio',I.folio,1011],['1.1.12','Cambio Herramienta',I.herr,1186],['1.1.15','Registro De Desvíos',I.reg,1386]];
+    let h = `<div class="lienzo produccion">` + fn.map(([id, n, ic, x]) => `<button class="fn" data-ir="${id}" style="${caja(x - 17.5, 162 - 17.5)}"><i>${ic}</i><span>${n}</span></button>`).join('');
+    h += `<span class="linea-ancho fuerte" style="${caja(118, 190, 1472)}"></span>`;
+    return h + `<div class="esq-pos" style="${caja(118, 192, 1472)}">${esquemaSVG()}</div></div>`;
   }
 
   function vistaDashboard(p){
@@ -828,16 +928,6 @@ button{font:inherit;color:inherit}
     return h + `</div></div></div>`;
   }
 
-  function vistaTemperaturas(p){
-    const t = p.tabla || {filas: []};
-    let h = `<div class="barra-acc"><div class="tpest"><span class="sel">Descripción general</span><span data-falta="Pestaña precalefacción">precalefacción</span><span data-falta="Pestaña sellado">sellado</span></div><span class="acc azul" data-falta="Botón Ajustes de temperaturas"><i>⚙</i>Ajustes</span><span class="acc" style="margin-left:auto;max-width:12cqw;font-size:1cqw"><span class="pw" style="width:2.2cqw;height:2.2cqw">${I.pw}</span>detención máquina por alarma temperatura</span></div>`;
-    h += `<table class="ttemp"><thead><tr><th>circuito calefacci…</th>${t.columnas.map(c => `<th>${esc(c.n)}<small>${esc(c.u)}</small></th>`).join('')}</tr></thead><tbody>`;
-    t.filas.forEach(f => { h += `<tr><td>${esc(f.nombre)}</td>${f.celdas.map((c, j) => { const col = t.columnas[j]; if (!c) return '<td></td>'; const k = ayudas.push(c) - 1;
-      return `<td><span class="celda">${col.editable ? `<span class="pastilla">${esc(c.valor ?? '—')}</span>` : esc(c.valor ?? '—')}${j === 1 ? `<button class="info${c.ayuda ? ' con' : ''}" data-k="${k}" aria-label="Ayuda">i</button>` : ''}</span></td>`; }).join('')}</tr>`; });
-    h += `</tbody></table><div class="pista-texto">ⓘ junto a «teórico»: explica cada columna. «real» e «Y» son lecturas del momento del video (máquina detenida).</div>`;
-    return h;
-  }
-
   function vistaRecetas(p){
     const r = p.recetas || [];
     let h = `<div class="barra-acc" style="justify-content:flex-end">${['Editar','Cargar receta','Detalles','Guardar'].map(a => `<span class="acc"><i></i>${a}</span>`).join('')}<span class="acc azul"><i>+</i>Añadir</span><span class="acc azul"><i>i</i></span></div><div style="font-size:.9cqw;color:#9aa0aa;padding-left:3cqw">Recetas</div><div class="recetas">`;
@@ -849,12 +939,141 @@ button{font:inherit;color:inherit}
     return `<div class="mosaicos">${(p.mosaicos || []).map(m => `<button class="mosaico" data-ir="${esc(m.ir)}"><i>${I.eng}</i>${esc(m.nombre)}</button>`).join('')}</div>`;
   }
 
+  /* ---------- vistas con el diseño real del video (posiciones en px de la pantalla a 1600 de ancho; origen del cuerpo en x 85, y 122) ---------- */
+  const cq = v => (v / 16).toFixed(3) + 'cqw';
+  const caja = (x, y, w, h) => `left:${cq(x - 85)};top:${cq(y - 122)}${w != null ? `;width:${cq(w)}` : ''}${h != null ? `;height:${cq(h)}` : ''}`;
+  const campoDe = (p, et) => { for (const s of p.secciones || []) for (const c of s.campos || []) if (norm(c.etiqueta) === norm(et)) return c; return null; };
+  const ayudaK = c => c ? ayudas.push(c) - 1 : -1;
+  const tocable = (c, extra = '') => { const k = ayudaK(c); return k < 0 ? '' : ` data-k="${k}" role="button" tabindex="0" aria-label="${esc(c.etiqueta)}"${extra}`; };
+  const oscuroDe = v => !/claro|activ|encend|^on$/i.test(String(v || ''));
+  const IC = {
+    pw: I.pw,
+    mano: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13.5c2.2-2.4 5-3.6 8-3.6s5.8 1.2 8 3.6"/><path d="M7 16.4c1.6-1.2 3.2-1.8 5-1.8s3.4.6 5 1.8"/><path d="M9.6 9.6l-1.8-3.2M14.4 9.6l1.8-3.2"/></svg>',
+    entrada: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M8.6 12h6.6M12.6 9.2l2.8 2.8-2.8 2.8"/></svg>',
+    play: '<svg viewBox="0 0 24 24"><path d="M9.4 7.4l7.2 4.6-7.2 4.6z" fill="#fff"/></svg>',
+    herram: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linejoin="round"><path d="M5 9.4h14l-1.4 7H6.4z"/><path d="M8.6 9.4V7h6.8v2.4"/><path d="M9.4 12.6h5.2"/></svg>',
+    diana: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3.4"/><path d="M15.6 8.4l3.6-3.6M17 4.6h2.4V7" stroke-linecap="round"/></svg>',
+    lector: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><circle cx="12" cy="6.4" r="2"/><path d="M12 8.4v4M5.6 12.4h12.8v6.4H5.6zM9 15.6h6"/></svg>',
+    lapiz: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"><rect x="4.6" y="4.6" width="14.8" height="14.8" rx="2.2"/><path d="M9 15l.6-2.6 5.4-5.4 2 2-5.4 5.4z"/></svg>',
+    recarga: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 12a6 6 0 1 1-1.8-4.3"/><path d="M18.4 4.6v3.6h-3.6"/></svg>',
+    embudo: '<svg viewBox="0 0 24 24"><path d="M5 6h14l-5.4 6.4v5.4l-3.2 1.6v-7z" fill="#fff"/></svg>',
+    puntos3: '<svg viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="6.4" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="17.6" r="1.9"/></svg>',
+    teclado: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"><rect x="4.4" y="7" width="15.2" height="10" rx="1.4"/><text x="12" y="14.4" fill="#fff" stroke="none" text-anchor="middle" font-size="6.4" font-weight="700" font-family="Roboto,Arial">123</text></svg>'
+  };
+  /* botón redondo con texto a la derecha (controles de la fila superior y de la pantalla) */
+  const ctrl = (cx, cy, txt, ico, {claro = false, atenuado = false, c = null, d = 40, gris = false, falta = ''} = {}) =>
+    `<span class="ctrl${claro ? ' claro' : ''}${atenuado ? ' atenuado' : ''}${gris ? ' gris' : ''}" style="${caja(cx - d / 2, cy - d / 2)}"${tocable(c)}${falta ? ` data-falta="${esc(falta)}" role="button" tabindex="0"` : ''}><i style="width:${cq(d)};height:${cq(d)}">${ico}</i>${txt ? `<span>${esc(txt)}</span>` : ''}</span>`;
+  const lineaAncho = y => `<span class="linea-ancho" style="${caja(118, y, 1472)}"></span>`;
+  const pild = (x0, x1, yc, v, c, {h = 38, solo = false} = {}) => `<span class="pild${solo ? ' solo' : ''}" style="${caja(x0, yc - h / 2, x1 - x0, h)}"${tocable(c)}>${v == null ? '—' : esc(v)}</span>`;
+  const txt = (x, yc, t, cls = '', ancla = 'izq') => `<span class="txt ${cls}${ancla === 'der' ? ' der' : ''}" style="${ancla === 'der' ? `right:${cq(1600 - x)};left:auto` : `left:${cq(x - 85)}`};top:${cq(yc - 122)}">${esc(t)}</span>`;
+
+  function vistaCambioFolio(p){
+    const s = (p.secciones || [])[0] || {campos: []}, cs = s.campos || [], c = i => cs[i] || null, et = i => String(c(i)?.etiqueta || '').replace(/\s*\(\d+\)$/, '');
+    let h = `<div class="lienzo">` + ctrl(798, 157, c(0)?.etiqueta || 'Manual', IC.mano, {c: c(0)}) + lineaAncho(190);
+    [[540, 332, IC.entrada], [681, 407, IC.play], [681, 481, IC.play], [720, 573, IC.play]].forEach(([x, y, ico], i) => {
+      h += txt(x - 32, y, et(i + 1), 'gris-claro', 'der') + ctrl(x, y, '', ico, {gris: true, c: c(i + 1), d: 40}); });
+    return h + `</div>`;
+  }
+
+  function vistaCambioHerramienta(p){
+    const c = et => campoDe(p, et), val = et => c(et)?.valor;
+    let h0 = `<div class="esq-pos" style="${caja(118, 192, 1472)}">${esquemaSVG({N: '#80838f', V: '#5fd4a0', fondo: '#dcdad4', cuerpo: '#c8c6c0', suelo: '#d2d0ca', interactivo: false, superior: false, vb: '-82.6 -40.8 1146.4 459.5', clase: 'esquema gris'})}</div>`;
+    let h = `<div class="lienzo">` + h0 + ctrl(800, 155, 'Activar', IC.herram, {c: c('Activar')}) + ctrl(1432, 158, 'Reset', IC.diana, {atenuado: true, c: c('Reset')});
+    h += `<span class="marco" style="${caja(150, 206, 555, 224)}"></span>` + txt(207, 220, 'Posiciones de corte', 'gris-claro chico');
+    ['1','2','3','4'].forEach((n, i) => { const y = 256 + 50 * i; h += txt(157, y, n, 'gris-claro chico') + pild(228, 345, y, val(n), c(n)) + txt(348, y, 'mm', 'uni-g'); });
+    h += txt(430, 257, '5', 'gris-claro chico') + pild(500, 612, 257, val('5'), c('5')) + txt(621, 257, 'mm', 'uni-g');
+    h += `<span class="marco" style="${caja(1022, 211, 480, 222)}"></span>` + `<span class="txt gris-claro chico centro" style="left:${cq(1022 - 85)};width:${cq(480)};top:${cq(227 - 122)}">Posiciones de herramienta</span>`;
+    ['Estación de sellado', 'Estación de formado', 'Pre-sealing station'].forEach((n, i) => { const y = 252 + 58 * i; h += txt(1025, y, n, 'gris') + pild(1296, 1408, y, val(n), c(n)) + txt(1415, y, 'mm', 'uni-g'); });
+    h += `<span class="cartucho" style="${caja(858, 236, 145, 192)}"><svg viewBox="0 0 145 192" fill="none" stroke="#5a5d70" stroke-width="7" stroke-linejoin="round"><path d="M14 138V30h110v128"/><circle cx="76" cy="88" r="40"/><circle cx="76" cy="88" r="20" stroke-width="6"/><circle cx="76" cy="88" r="6" fill="#5a5d70"/><path d="M14 132l34-20"/></svg></span>`;
+    return h + `</div>`;
+  }
+
+  function vistaRegistroDesvios(p){
+    const c = et => campoDe(p, et);
+    let h = `<div class="lienzo">` + ctrl(543.5, 157, 'Registro De Desvíos', IC.pw, {claro: true, c: c('Registro De Desvíos')}) + ctrl(776.5, 157, 'Lector', IC.lector, {c: c('Lector')}) + ctrl(979, 157, 'Progr. escritura', IC.lapiz, {c: c('Progr. escritura')});
+    const k = ayudaK(c('4 columnas de iconos con puntos azules/grises'));
+    [544, 640, 736, 832].forEach(x => h += `<span class="col-reg" style="${caja(x, 209, 87, 391)}"${k >= 0 ? ` data-k="${k}" role="button" tabindex="0" aria-label="Columnas del registro"` : ''}><b style="top:${cq(410 - 209)}"></b></span>`);
+    const G = '#5a5d70', pic = {
+      etiq: `<path d="M3 4h10M5 4v3h6V4M8 7v3" /><rect x="5.4" y="10" width="5.2" height="5" rx=".6"/><path d="M13 6c2 1 3 3.4 2.4 7.4" />`,
+      bandeja: `<path d="M2 7h3v4.4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h3"/><path d="M6.6 10h8.8"/>`,
+      cinta: `<circle cx="11" cy="6" r="2.6"/><circle cx="11" cy="6" r=".8" fill="${G}"/><rect x="3" y="11" width="16" height="3.4" rx="1.7"/><path d="M6 12.7h10" stroke-dasharray="1.4 1.4"/>`,
+      varilla: `<path d="M3 12V9.4h3M6 9.4h13M7.6 8v3"/><path d="M8.6 9.4h8.4" stroke-width="2.6"/>`,
+      sensor: `<rect x="4" y="3" width="5" height="5" rx="1"/><path d="M6.5 8v5M3 13h7"/><path d="M11 13c2.4-.4 4-2.6 4-6 .2-1.6 1.6-2.4 3-2" />`
+    };
+    const P = (x, y, n) => `<svg class="pic-reg" viewBox="0 0 22 16" style="${caja(x - 15, y - 11, 30, 22)}" fill="none" stroke="${G}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${pic[n]}</svg>`;
+    h += P(587, 298, 'etiq') + P(683, 300, 'bandeja') + P(683, 375, 'cinta') + P(683, 462, 'bandeja') + P(778, 300, 'varilla') + P(778, 375, 'cinta') + P(877, 298, 'sensor');
+    [[607, 275, 1], [592, 217, 0], [705, 275, 1], [705, 350, 0], [704, 433, 1], [801, 275, 0], [801, 350, 0], [897, 275, 1]].forEach(([x, y, a], i) => h += `<span class="punto-reg${a ? ' on' : ''}${i === 1 ? ' tenue' : ''}" style="${caja(x - 6, y - 6, 12, 12)}"></span>`);
+    const kn = ayudaK(c('Indicador numerico 13..0'));
+    for (let i = 0; i < 14; i++) h += `<span class="num-reg" style="${caja(200 + 95.9 * i - 20.5, 677 - 20.5, 41, 41)}"${kn >= 0 ? ` data-k="${kn}" role="button" tabindex="0" aria-label="Indicador ${13 - i}"` : ''}>${13 - i}</span>`;
+    h += `<span class="ico-gris" style="${caja(1518, 303, 24, 24)}">${IC.lapiz}</span><span class="ico-gris" style="${caja(1518, 478, 24, 24)}">${IC.lector}</span>`;
+    return h + `</div>`;
+  }
+
+  function vistaConfigMaquina(p){
+    const c = et => campoDe(p, et), d = c('Disponible');
+    let h = `<div class="lienzo">` + ctrl(806, 267, 'Disponible', '', {claro: !oscuroDe(d?.valor), c: d, d: 40});
+    ['Emisor', 'Destinatario', 'Tipo', 'Tipo de envío', 'Objetivo'].forEach((n, i) => { const y = 332 + 65.5 * i; h += txt(648, y, n, 'gris-claro') + pild(903, 1057, y, c(n)?.valor, c(n)); });
+    return h + ctrl(792, 703, 'Guardar datos', '', {c: c('Guardar datos')}) + `</div>`;
+  }
+
+  function vistaAjustesBasicos(p){
+    const c = et => campoDe(p, et), ind = (x, y, et) => ctrl(x, y, '', '', {claro: !oscuroDe(c(et)?.valor), c: c(et)});
+    const sel = (x0, x1, y, et) => `<span class="desple-r" style="${caja(x0, y - 23, x1 - x0, 46)}"${tocable(c(et))}>${esc(c(et)?.valor ?? '—')}<i>${CHEV}</i></span>`;
+    let h = `<div class="lienzo">` + ctrl(1148, 157, 'Ajustes ampliados', '', {c: c('Ajustes ampliados')}) + ctrl(1383, 157, 'Guardar ajustes', '', {atenuado: true, c: c('Guardar ajustes')}) + lineaAncho(190);
+    const izq = [['Tipo de la máquina', 225, 'p'], ['Número de la máquina', 289, 'p'], ['Ano de fabricacion', 355, 'p'], ['UPS disponible', 419, 'i'], ['Tipo de SAI', 487, 's'], ['Bloqueo y senalizacion disponibles', 546, 'i'], ['Interfaz de datos de la máquina (MDI)', 609, 'i']];
+    izq.forEach(([et, y, t]) => { h += txt(170, y, c(et)?.etiqueta || et, 'gris-claro'); h += t === 'p' ? pild(637, 828, y, c(et)?.valor, c(et)) : t === 'i' ? ind(804, y, et) : sel(530, 830, y, et); });
+    const der = [['Panel', 224, 's', 1236], ['Paquete de ventas seleccionado', 289, 's', 1175], ['Recetas firmadas', 355, 'i'], ['Conectividad de la línea (LineView)', 418, 'i']];
+    der.forEach(([et, y, t, x0]) => { h += txt(874, y, et, 'gris-claro'); h += t === 'i' ? ind(1513, y, et) : sel(x0, 1537, y, et); });
+    return h + `</div>`;
+  }
+
+  function vistaParametrosPLC(p){
+    const c = et => campoDe(p, et);
+    return `<div class="lienzo">` + ctrl(1164, 158, 'Config', '', {c: c('Config')}) + ctrl(1391, 158, 'Servicio', '', {atenuado: true, c: c('Servicio')}) + lineaAncho(190) + `</div>`;
+  }
+
+  function vistaTemperaturas(p){
+    const t = p.tabla || {filas: [], columnas: []};
+    let h = `<div class="lienzo">`;
+    [['Descripción general', 1], ['precalefacción', 0, 'Pestaña precalefacción'], ['sellado', 0, 'Pestaña sellado']].forEach(([n, sel, falta], i) => h += `<span class="pest${sel ? ' sel' : ''}" style="${caja(262 + 208 * i, 122, 208, 69)}"${falta ? ` data-falta="${esc(falta)}" role="button" tabindex="0"` : ''}>${esc(n)}</span>`);
+    h += `<span class="pest ajustes" style="${caja(886, 122, 208, 69)}" data-falta="Botón Ajustes de temperaturas" role="button" tabindex="0"><i>${IC.teclado}</i>Ajustes</span>`;
+    h += lineaAncho(191) + `<span class="pest-linea" style="${caja(262, 189, 206, 2.5)}"></span>`;
+    h += ctrl(1231, 161, '', I.pw, {d: 36}) + `<span class="txt gris-claro tres" style="left:${cq(1258 - 85)};top:${cq(118 - 122)};width:${cq(175)}">detención máquina por alarma temperatura</span>`;
+    const der = [610, 810, 1009, 1209, 1333];
+    h += `<span class="th" style="left:${cq(178 - 85)};top:${cq(193 - 122)}">circuito calefacci…</span>`;
+    (t.columnas || []).forEach((col, j) => { const x = der[j];
+      h += j < 5 ? `<span class="th der" style="right:${cq(1600 - x)};top:${cq(193 - 122)}">${esc(col.n)}<small>${esc(col.u)}</small></span>` : `<span class="th centro" style="left:${cq(1527 - 85 - 40)};width:${cq(80)};top:${cq(193 - 122)}">${esc(col.n)}<small>${esc(col.u)}</small></span>`; });
+    const pills = [[653, 806], [854, 1006], [1053, 1207], [1227, 1334]];
+    (t.filas || []).forEach((f, r) => { const y = 291 + 66.2 * r;
+      h += `<span class="txt zona" style="left:${cq(172 - 85)};top:${cq(y - 122)}">${esc(f.nombre)}</span>`;
+      (f.celdas || []).forEach((c, j) => { if (!c) return;
+        if (j === 0) h += `<span class="txt val-real der" style="right:${cq(1600 - 601)};top:${cq(y - 122)}"${tocable(c)}>${esc(c.valor ?? '—')}</span>`;
+        else if (j <= 4) { const [a, b] = pills[j - 1]; h += pild(a, b, y, c.valor, c, {h: 40}); if (j === 1) h += `<button class="info${c.ayuda ? ' con' : ''} mini" style="${caja(815, y - 11, 22, 22)}" data-k="${ayudaK(c)}" aria-label="Ayuda: columnas">i</button>`; }
+        else h += `<span class="txt val-y" style="left:${cq(1517 - 85 - 40)};width:${cq(80)};top:${cq(y - 122)}"${tocable(c)}>${esc(c.valor ?? '—')}</span>`; }); });
+    return h + `</div>`;
+  }
+
   function vistaAlarmas(id){
     const hist = id === '8.2', A = G.alarmas || {}, filas = hist ? (A.historial || []) : (A.actuales || []);
-    let h = `<div class="barra-acc"><div class="tpest"><button class="${hist ? '' : 'sel'}" data-ir="8.1" style="all:unset;cursor:pointer${hist ? '' : ';color:#3a3f9a;border-bottom:2px solid #3a3f9a;padding-bottom:.4cqw'}">Alarmas actuales</button><button data-ir="8.2" style="all:unset;cursor:pointer${hist ? ';color:#3a3f9a;border-bottom:2px solid #3a3f9a;padding-bottom:.4cqw' : ''}">Historial de alarmas</button></div>${hist ? '<span class="fechas"><span>23.10.2026</span><span>06:09:44</span>–<span>24.10.2026</span><span>06:09:44</span></span>' : ''}</div><table class="talarm"><tbody>`;
-    filas.forEach(a => { const adv = /advert|triang|amar/i.test(a.tipo || ''); h += `<tr data-texto="${esc(norm(a.texto))}"><td class="f">${esc(a.fecha)}</td><td class="h">${esc(a.hora)}</td><td>${adv ? '<span class="ic-adv"></span>' : '<span class="ic-al">!</span>'}</td><td class="r">R</td><td class="c">${esc(a.codigo || '')}</td><td class="m">${esc(a.texto)}</td><td class="u">${esc(a.usuario || (hist ? 'Operator…' : ''))}</td></tr>`; });
-    if (!filas.length) h += '<tr><td>Sin mensajes transcritos.</td></tr>';
-    return h + `</tbody></table>${hist ? '<p class="pista-texto">Transcrito un tramo del historial (el video no recorrió todo).</p>' : ''}`;
+    let h = `<div class="lienzo alarmas">`;
+    h += `<button class="pest${hist ? '' : ' sel'}" data-ir="8.1" style="${caja(110, 122, 240, 66)}">Alarmas actuales</button><button class="pest${hist ? ' sel' : ''}" data-ir="8.2" style="${caja(350, 122, 240, 66)}">Historial de alarmas</button>`;
+    h += lineaAncho(191) + `<span class="pest-linea" style="${caja(hist ? 350 : 110, 188, 240, 2.5)}"></span>` + txt(127, 205, 'Mensajes', 'mini-g');
+    if (hist) {
+      const cal = '<i class="cal">31</i>';
+      h += `<span class="pild fecha" style="${caja(752, 138, 188, 40)}" data-falta="Selector de fecha inicial" role="button" tabindex="0">23.10.2026${cal}</span><span class="pild fecha" style="${caja(952, 138, 126, 40)}" data-falta="Selector de hora inicial" role="button" tabindex="0">06:09:44</span>${txt(1092, 158, '–', 'gris')}<span class="pild fecha" style="${caja(1115, 138, 187, 40)}" data-falta="Selector de fecha final" role="button" tabindex="0">24.10.2026${cal}</span><span class="pild fecha" style="${caja(1313, 138, 127, 40)}" data-falta="Selector de hora final" role="button" tabindex="0">06:09:44</span>`;
+      h += `${ctrl(1489.5, 160, '', IC.embudo, {d: 39, falta: 'Filtro de alarmas'})}${ctrl(1555.5, 160, '', IC.puntos3, {d: 39, falta: 'Menú del historial'})}`;
+    } else h += `${ctrl(1556, 160, '', IC.recarga, {d: 38, falta: 'Botón de la flecha circular (función por confirmar)'})}`;
+    const X = hist ? {f: 127, h: 253, i: 391, r: 434, c: 494, t: 603, u: 1346, y0: 280} : {f: 122, h: 254, i: 401, c: 434, t: 559, y0: 253};
+    filas.forEach((a, n) => { const y = X.y0 + 66 * n, adv = /advert|triang|amar|aviso/i.test(a.tipo || '');
+      h += `<div class="fila-al" data-texto="${esc(norm(a.texto))}" style="${caja(118, y - 33, 1472, 66)}">`
+        + `<span style="left:${cq(X.f - 118)}" class="f">${esc(a.fecha)}</span><span style="left:${cq(X.h - 118)}" class="h">${esc(a.hora)}</span>`
+        + `<span style="left:${cq(X.i - 118 - 11)}">${adv ? '<span class="ic-adv"></span>' : '<span class="ic-al">!</span>'}</span>`
+        + (hist ? `<span style="left:${cq(X.r - 118)}" class="r">R</span>` : '')
+        + `<span style="left:${cq(X.c - 118)}" class="c">${esc(a.codigo || '')}</span><span style="left:${cq(X.t - 118)};width:${cq(hist ? 705 : 1000)}" class="m">${esc(a.texto)}</span>`
+        + (hist ? `<span style="left:${cq(X.u - 118)}" class="u">${esc(a.usuario || 'Operator…')}</span>` : '') + `</div>`; });
+    if (!filas.length) h += txt(122, 253, 'Sin mensajes transcritos.', 'gris');
+    const alto = X.y0 + 66 * Math.max(filas.length, 1) - 122 + 20;
+    return h + `<span style="display:block;height:${cq(alto)}"></span></div>`;
   }
 
   function vistaLimpieza(){ return `<div class="centro"><span class="boton-v on" style="font-size:1.4cqw;padding:.8cqw 2cqw">Iniciar limpieza de la pantalla</span><span>Bloquea el panel táctil unos segundos para poder limpiarlo.</span></div>`; }
@@ -879,7 +1098,8 @@ button{font:inherit;color:inherit}
     const top = id.split('.').slice(0, 2).join('.');
     document.querySelectorAll('.riel button[data-ir]').forEach(b => b.setAttribute('aria-current', String(b.dataset.ir === top || (b.dataset.ir === '8.1' && id.startsWith('8')))));
     const L = p.layout;
-    cuerpo.innerHTML = id === '1.1' ? vistaProduccion() : id.startsWith('8') ? vistaAlarmas(id) : L === 'dashboard' ? vistaDashboard(p) : L === 'temperaturas' ? vistaTemperaturas(p) : L === 'recetas' ? vistaRecetas(p) : L === 'mosaicos' ? vistaMosaicos(p) : L === 'limpieza' ? vistaLimpieza(p) : vistaSecciones(p);
+    const VISTA = {'1.1.11': vistaCambioFolio, '1.1.12': vistaCambioHerramienta, '1.1.15': vistaRegistroDesvios, '6.2': vistaConfigMaquina, '6.3': vistaAjustesBasicos, '6.4': vistaParametrosPLC};
+    cuerpo.innerHTML = VISTA[id] ? VISTA[id](p) : id === '1.1' ? vistaProduccion() : id.startsWith('8') ? vistaAlarmas(id) : L === 'dashboard' ? vistaDashboard(p) : L === 'temperaturas' ? vistaTemperaturas(p) : L === 'recetas' ? vistaRecetas(p) : L === 'mosaicos' ? vistaMosaicos(p) : L === 'limpieza' ? vistaLimpieza(p) : vistaSecciones(p);
     cuerpo.scrollTop = 0; $('#filtro').value = '';
     /* transición suave: entra desde la derecha al avanzar y desde la izquierda al volver (sin animación con prefers-reduced-motion) */
     if (iniciado) { cuerpo.classList.remove('entra-a', 'entra-b'); void cuerpo.offsetWidth; cuerpo.classList.add(guardar ? 'entra-a' : 'entra-b'); }
@@ -1092,7 +1312,7 @@ button{font:inherit;color:inherit}
   });
 
   document.addEventListener('click', e => {
-    const t = e.target.closest('[data-ir],[data-paso],.info,.pw,.dbtn,.sec-cab,.cerrar,#atras,#pid,#guia,#btnMenu,#verVertical,[data-falta]');
+    const t = e.target.closest('[data-ir],[data-paso],.info,.pw,.dbtn,.lienzo [data-k],.sec-cab,.cerrar,#atras,#pid,#guia,#btnMenu,#verVertical,[data-falta]');
     if (!t) { if (capa && !e.target.closest('.capa,.globo,.lupa')) cerrarCapa(); return; }
     if (t.id === 'verVertical') { document.body.classList.add('ver-vertical'); return; }
     if (t.id === 'atras') { if (historial.length) ir(historial.pop(), false); return; }
@@ -1101,7 +1321,7 @@ button{font:inherit;color:inherit}
     if (t.id === 'btnMenu') return menu3(t);
     if (t.dataset.paso) { if (t.dataset.paso === 'fin') return cerrarCapa(true); return verPaso(tour || [], +t.dataset.paso); }
     if (t.classList.contains('cerrar')) return cerrarCapa(true);
-    if (t.classList.contains('info') || t.classList.contains('dbtn') || t.classList.contains('pw')) return globoCampo(t);
+    if (t.classList.contains('info') || t.classList.contains('dbtn') || t.classList.contains('pw') || t.matches('.lienzo [data-k]')) return globoCampo(t);
     if (t.dataset.falta) return globoFalta(t);
     if (t.classList.contains('sec-cab')) { const s = t.parentElement, ab = s.dataset.abierta === 'false'; s.dataset.abierta = String(ab); if (t.hasAttribute('aria-expanded')) t.setAttribute('aria-expanded', String(ab)); return; }
     if (t.dataset.ir === '') return;
@@ -1113,7 +1333,7 @@ button{font:inherit;color:inherit}
     if (capa?.teclaFisica && capa.teclaFisica(e)) { e.preventDefault(); return; }
     if (e.key === 'Escape') { cerrarCapa(true); return; }
     if (tour && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !e.target.matches('input')) { e.preventDefault(); verPaso(tour, tourN + (e.key === 'ArrowRight' ? 1 : -1)); return; }
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.esquema .est, .sec-cab[role="button"]')) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', {bubbles: true})); }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.esquema .est, .sec-cab[role="button"], .lienzo [data-k], .lienzo [data-falta]')) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', {bubbles: true})); }
   });
 
   $('#nota').textContent = G.nota || '';
