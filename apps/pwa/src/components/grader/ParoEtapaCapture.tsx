@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PauseCircle, Loader2, CheckCircle2, AlertTriangle, Trash2, BarChart3 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, InfoTooltip } from '@/components/ui'
 import { SpeechTextarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
@@ -150,7 +150,8 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
           )}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Registra cuándo se detuvo una etapa que no mide Shoplogix (bombeo, chiller, cintas, Marel, corte…). Mide la disponibilidad del área.
+          Registra cuándo se detuvo una etapa sin sensor Shoplogix.{' '}
+          <InfoTooltip text={"Registra cuándo se detuvo una etapa que no mide Shoplogix (bombeo, chiller, cintas, Marel, corte…). Mide la disponibilidad del área."} iconSize={11} />
         </p>
       </CardHeader>
       <CardContent className="space-y-3">

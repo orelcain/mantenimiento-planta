@@ -426,9 +426,11 @@ export function GatesHistoryHintCard({
 
         {moves.length === 0 && saturados.length > 0 && (
           <p className="text-xs text-muted-foreground pt-1 border-t border-border">
-            No hay una gate que se pueda ceder sin dejar otro calibre sin salida.
-            Para descomprimir el {saturados[0]!.label} habría que activar una gate más
-            o revisar los rangos de peso.
+            Ninguna gate se puede ceder sin dejar un calibre sin salida.{' '}
+            <InfoTooltip
+              iconSize={11}
+              text={`No hay una gate que se pueda ceder sin dejar otro calibre sin salida. Para descomprimir el ${saturados[0]!.label} habría que activar una gate más o revisar los rangos de peso.`}
+            />
           </p>
         )}
 

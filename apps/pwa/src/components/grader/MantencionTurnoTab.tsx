@@ -17,6 +17,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Wrench, AlertTriangle, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react'
 import { Pill } from '@/components/piel'
+import { InfoTooltip } from '@/components/ui'
 import type { KpisTurnoMantencion, KpisMaquinaTurno, EventoFalla } from '@/services/shoplogix/kpisMantencionTurno'
 import { targetSospechoso, reenganches } from '@/services/shoplogix/kpisMantencionTurno'
 import { nombreCorto } from '@/services/shoplogix/ritmoPorMaquina'
@@ -239,8 +240,8 @@ function TendenciaMantencion({ plantSlug, shiftId, hastaDateKey }: {
             </div>
           ))}
           <p className="text-caption leading-snug text-muted-foreground/80">
-            Mismo eje para todas las máquinas y todos los turnos: la misma altura significa lo mismo.
-            El cero es dato — la fila plana ES la evidencia.
+            Mismo eje en todo; el cero también es dato.{' '}
+            <InfoTooltip text={"Mismo eje para todas las máquinas y todos los turnos: la misma altura significa lo mismo. El cero es dato — la fila plana ES la evidencia."} iconSize={11} />
           </p>
         </div>
       )}
@@ -494,8 +495,8 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
             de sus tramos andando alcanza el 90% del target.
           </p>
           <p className="mt-1 text-caption leading-snug text-muted-foreground">
-            O el set point está en la máquina equivocada o la máquina viene degradada — ninguna de las
-            dos se afirma sin terreno. Mientras tanto, su % de cumplimiento queda fuera de los rankings.
+            Set point por verificar; queda fuera de los rankings.{' '}
+            <InfoTooltip text={"O el set point está en la máquina equivocada o la máquina viene degradada — ninguna de las dos se afirma sin terreno. Mientras tanto, su % de cumplimiento queda fuera de los rankings."} iconSize={11} />
           </p>
           <p className="mt-1.5 text-[13px] font-medium text-ink-info">
             → Verificar el set point con Producción.

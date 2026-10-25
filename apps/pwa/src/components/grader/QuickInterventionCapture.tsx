@@ -21,7 +21,7 @@ import {
   Brain, TrendingUp, Lightbulb, Pencil, FileText,
 } from 'lucide-react'
 import { CondLeyenda } from '@/components/equipment/CondDot'
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, InfoTooltip } from '@/components/ui'
 import { SpeechTextarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
@@ -542,7 +542,8 @@ export function QuickInterventionCapture({
             Análisis IA del área
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            La IA lee el historial de intervenciones y detecta patrones, riesgo y la próxima acción preventiva — de "registramos" a "optimizamos".
+            La IA detecta patrones y riesgos en el historial de intervenciones.{' '}
+            <InfoTooltip text={"La IA lee el historial de intervenciones y detecta patrones, riesgo y la próxima acción preventiva — de \"registramos\" a \"optimizamos\"."} iconSize={11} />
           </p>
         </CardHeader>
         <CardContent className="space-y-3">

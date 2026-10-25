@@ -16,7 +16,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { Card, CardContent, Badge } from '@/components/ui'
+import { Card, CardContent, Badge, InfoTooltip } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Activity, AlertCircle, Zap,
   Timer, Gauge, Pause, AlertTriangle, Download, MessageSquare,
@@ -1407,7 +1407,7 @@ export function UpstreamMachinesPanel({
                 </p>
                 <p className="text-muted-foreground">
                   {plantSlug === 'filete'
-                    ? 'Todavía no hay turnos de la Línea 1 de Filete sincronizados desde Shoplogix para esta fecha. Cuando el sync los traiga, se verá acá el estado en vivo, paros y micro-detenciones de la línea.'
+                    ? <>Aún sin turnos de Filete en Shoplogix.{' '}<InfoTooltip text={"Todavía no hay turnos de la Línea 1 de Filete sincronizados desde Shoplogix para esta fecha. Cuando el sync los traiga, se verá acá el estado en vivo, paros y micro-detenciones de la línea."} iconSize={12} /></>
                     : 'Cuando la integración esté lista, mostrará estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'}
                 </p>
               </div>
