@@ -320,6 +320,93 @@ button{font:inherit;color:inherit}
   .girar button:focus-visible{outline:2px solid var(--ambar);outline-offset:2px}
 }
 @keyframes girar{0%,20%{transform:rotate(0)}50%,70%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
+/* ---------- ronda 3: calibración contra la foto del panel (0.1, 24-10-2026), medidas en px sobre 1600 de ancho ÷ 16 = cqw ---------- */
+:root{--barra:#242e6c;--barra-2:#1b2358;--crema:#eeede9;--crema-2:#d9d5cb;--riel:#e7e0d6;--pastilla:#dad7ce;--azul:#1c21c2;--azul-claro:#3b84e6;--pie:#121a47;--pie-2:#0e153c}
+/* el bisel es el contenedor: así los cqw de la rejilla de .pantalla se miden sobre su propio ancho (antes caían al ancho de la ventana) */
+.bisel{container-type:inline-size}
+.pantalla{grid-template-rows:4.56cqw 3.06cqw minmax(0,1fr) 7.4cqw;grid-template-columns:5.3cqw minmax(0,1fr)}
+/* barra superior: elementos en su x real */
+.barra{padding:0;gap:0;font-size:1.45cqw;background:linear-gradient(180deg,var(--barra),var(--barra-2))}
+.pantalla .barra>*{position:absolute;top:50%;transform:translateY(-50%)}
+.barra .atras{left:2.75cqw}
+.barra .atras svg{width:1.75cqw;height:1.75cqw}
+.barra .pid{left:6.9cqw;width:7.95cqw;height:2.5cqw;box-sizing:border-box;padding:0 .65cqw 0 0;display:flex;align-items:center;justify-content:flex-end;background:#efede8;color:#262a36;font-size:1.6cqw;font-weight:500;border-radius:1.25cqw;box-shadow:inset 0 -.06cqw .12cqw rgba(0,0,0,.12);min-width:0}
+.barra .lupa{left:16.4cqw;width:22cqw}
+.pantalla[data-pantalla="0.1"] .lupa{visibility:hidden}
+.barra .estado-maq{left:51.7cqw;transform:translate(-50%,-50%);margin:0;font-size:1.45cqw;color:#e8eaf4}
+.barra .receta{left:61.25cqw;margin:0;gap:.75cqw;color:#8fa9e6;font-size:1.45cqw}
+.barra .receta i{width:2.5cqw;height:2.5cqw;background:#4b8fe0}
+.barra .receta i svg{width:1.35cqw;height:1.35cqw}
+.barra .usuario{right:3.4cqw;margin:0;gap:1.25cqw;color:#eef0f8}
+.barra .usuario svg{width:1.55cqw;height:1.55cqw}
+/* fila de título */
+.titulo{align-items:center;padding:0 .6cqw 0 2.06cqw;background:#e5e3dc}
+.migas{font-size:1.3cqw}
+.migas .solo{color:#2b2f68;font-weight:700}
+.marca{align-self:center;margin:0;font-size:1.3cqw;font-weight:700;color:#262626}
+.guia{width:1.55cqw;height:1.55cqw;font-size:.95cqw}
+/* riel */
+.riel{padding-top:7.3cqw;border-right:1px solid #d6cfc3}
+.riel button{color:#1f2569}
+.riel button[aria-current="true"]{background:#3f8ae0}
+.riel .al{color:#e03a37}
+.riel .al em{right:1.15cqw;top:.15cqw;min-width:1.45cqw;font:700 1cqw/1.45cqw var(--f-ui);box-shadow:0 0 0 .14cqw var(--riel)}
+.riel .puntos{margin-bottom:.9cqw}
+.riel .puntos svg{width:1.9cqw;height:1.9cqw}
+.riel .puntos circle{fill:#2b2f4a}
+/* cuerpo: contenido alineado con «Dashboard» (x 118) y con el borde derecho (x 1590) */
+.cuerpo{padding:0 .6cqw 1.6cqw 2.06cqw}
+/* pie */
+.linea small{bottom:.35cqw;font-size:1.25cqw;font-weight:500;color:#fff;letter-spacing:0}
+.linea .fin-l{position:absolute;width:.65cqw;height:.65cqw;border-radius:50%;background:#fff;transform:translate(-50%,-50%);pointer-events:none}
+.linea .adv-l{top:38.5%;width:1.4cqw;height:1.15cqw}
+.linea .alr-l{top:38.5%;width:1.15cqw;height:1.15cqw;background:#e5352d;box-shadow:0 0 0 .1cqw rgba(255,255,255,.7);display:grid;place-items:center;color:#fff;font:700 .8cqw/1 var(--f-ui)}
+.linea .nota-l{top:31%;height:auto;width:2.4cqw}
+.linea .nota-l::after{display:none}
+.linea .nota-l i{width:2.4cqw;height:2.4cqw;box-shadow:0 0 .2cqw rgba(0,0,0,.35)}
+.ciclos{width:14.5cqw;padding-left:1.25cqw;justify-content:flex-start;padding-top:.2cqw;line-height:1}
+.ciclos b{font-size:3.4cqw;font-weight:700;line-height:1.05}
+.ciclos small{font-size:1.25cqw;margin-top:.25cqw}
+.ciclos .reloj{font-size:1.55cqw;font-weight:700;margin-top:.75cqw;word-spacing:.6cqw}
+.ciclos .vuelta{right:.95cqw;top:.6cqw;width:2.25cqw;height:2.25cqw;background:#2b37e0}
+/* dashboard 0.1: origen = x 118 (izquierda del contenido) e y 192 (línea de pestañas) */
+.pestanas{gap:0;padding:0;border-bottom:1px solid #c9c5bb;font-size:1.3cqw}
+.pestanas button{width:13cqw;height:4.375cqw;padding:0;display:grid;place-items:center;box-sizing:border-box;color:#6d6d6d}
+.pestanas button[aria-selected="true"]{color:#3a3e66}
+.pestanas button[aria-selected="true"]::after{left:0;right:0;bottom:-1px;height:.14cqw;background:#3a3d66}
+.dash{display:block;position:relative;height:37.5cqw;padding:0;gap:0}
+.dbots{position:absolute;left:5.56cqw;top:3cqw;grid-template-columns:repeat(2,7.7cqw);gap:1.375cqw 2.75cqw}
+.dbtn{height:3.56cqw;border-radius:.85cqw;background:var(--azul-claro);box-shadow:0 0 0 .09cqw rgba(255,255,255,.85),0 .12cqw .3cqw rgba(0,0,30,.28)}
+.dbtn.off{background:var(--azul)}
+.dbtn svg{width:2.3cqw;height:2.3cqw}
+.dmedio{position:absolute;left:31.06cqw;top:3cqw;display:grid;grid-auto-rows:3.56cqw;row-gap:1.375cqw;gap:1.375cqw 0;padding:0;align-items:center}
+.dmedio .vel{margin-left:5.75cqw}
+.dmedio .vel b{font-size:1.45cqw;font-weight:700;color:#262a33}
+.dmedio .vel small{font-size:1.3cqw;color:#55585f}
+.tortuga{gap:0}
+.tortuga svg.t{width:2.2cqw;height:1.6cqw;margin-right:1.06cqw}
+.tortuga .pastilla{width:7.2cqw;height:2.4cqw;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-end;padding:0 .7cqw;font-weight:700;font-size:1.5cqw}
+.tortuga .uni{margin-left:.8cqw;min-width:0;font-size:1.3cqw}
+.tortuga .masmenos{width:2.4cqw;height:2.4cqw;background:#1f2a9a;box-shadow:0 0 0 .12cqw #fff,0 .08cqw .25cqw rgba(0,0,0,.3);font-size:1.7cqw}
+.tortuga .masmenos:first-of-type{margin-left:4.25cqw}
+.tortuga .masmenos+.masmenos{margin-left:1.1cqw}
+.tortuga .info{margin-left:1.4cqw}
+.dder{display:block}
+.medidor{position:absolute;left:57.75cqw;top:3cqw;width:31.25cqw}
+.medidor h4{margin:0;height:3.56cqw;line-height:3.56cqw;font-size:1.6cqw;font-weight:700;color:#2b2b2b}
+.medidor svg{width:12.5cqw;height:7.5cqw}
+.dlista{display:block;margin:0}
+.dlista .fila{position:absolute;left:57.75cqw;width:34.25cqw;height:2.4cqw;display:block;font-size:1.22cqw;color:#5f6066}
+.dlista .fila>span:first-child{position:absolute;left:0;top:50%;transform:translateY(-50%);white-space:nowrap}
+.dlista .fila .valor{position:absolute;left:21.06cqw;top:0;height:100%;display:flex;align-items:center;gap:.4cqw}
+.dlista .pastilla{width:4.5cqw;height:2.4cqw;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-end;padding:0 .6cqw;font-weight:700;font-size:1.45cqw;color:#262a33}
+.dlista .uni{width:5.25cqw;overflow:hidden;white-space:nowrap;font-size:1.3cqw;color:#55585f}
+.dlista .fila .info{position:absolute;left:32.6cqw;top:50%;transform:translateY(-50%);width:1.45cqw;height:1.45cqw;font-size:.85cqw}
+.dlista .f0{top:18.49cqw}.dlista .f1{top:23.36cqw}.dlista .f2{top:27.55cqw}.dlista .f3{top:32.24cqw}
+.dlista .contador .valor{left:16.25cqw;width:5.25cqw;justify-content:flex-end}
+.dlista .contador .pastilla.solo{width:auto;padding:0;font-size:1.45cqw;font-weight:700}
+.dlista .papelera{position:absolute;left:28cqw;top:50%;transform:translateY(-50%);width:2.5cqw;height:2.5cqw;background:#2a2f96;box-shadow:0 0 0 .12cqw #fff}
+.dlista .papelera svg{width:1.3cqw;height:1.3cqw}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -346,11 +433,11 @@ button{font:inherit;color:inherit}
   <div class="bisel">
     <div class="pantalla" id="hmi">
       <nav class="riel" aria-label="Menú principal">
-        <button data-ir="0.1" aria-label="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3.5 17a8.5 8.5 0 1 1 17 0z"/><path d="M12 17l4.5-5.5"/><circle cx="12" cy="17" r="1.3" fill="currentColor"/></svg></button>
-        <button data-ir="7.1" aria-label="Recetas"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h8l5 5v15H6z" opacity=".95"/><path d="M9 11h7M9 14h7M9 17h5" stroke="#f4ede5" stroke-width="1.6"/></svg></button>
-        <button data-ir="1.1" aria-label="Producción"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8.5" cy="8.5" r="3.2"/><path d="M8.5 2.5v2.3M8.5 12.2v2.3M2.5 8.5h2.3M12.2 8.5h2.3M4.3 4.3l1.6 1.6M11.1 11.1l1.6 1.6M4.3 12.7l1.6-1.6M11.1 5.9l1.6-1.6"/><circle cx="16.5" cy="16.5" r="2.6"/><path d="M16.5 11.8v1.9M16.5 19.3v1.9M11.8 16.5h1.9M19.3 16.5h1.9"/></svg></button>
-        <button data-ir="2.1" aria-label="Limpieza"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 11h9l-1.5 10h-6z"/><path d="M5 11l2-4h2"/><path d="M14 3l4 9"/><path d="M15 13h6l-1 8h-4z"/></svg></button>
-        <button data-ir="8.1" class="al" aria-label="Alarmas"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5L23 21H1z"/><path d="M12 9v6M12 17.5v.5" stroke="#f4ede5" stroke-width="2.2" stroke-linecap="round"/></svg><em id="nAl">2</em></button>
+        <button data-ir="0.1" aria-label="Dashboard"><svg viewBox="0 0 24 24" style="width:2.3cqw;height:2.3cqw"><mask id="mDash"><rect width="24" height="24" fill="#fff"/><path d="M6.2 15.6h1.6M7.3 10.4l1.1 1.1M12 8.4v1.6M16.7 10.4l-1.1 1.1M16.2 15.6h1.6" stroke="#000" stroke-width="1.5" stroke-linecap="round"/><path d="M12 16.2l3.6-4.4" stroke="#000" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.2" r="1.6" fill="#000"/></mask><path d="M2.4 19.4a9.6 9.6 0 1 1 19.2 0z" fill="currentColor" mask="url(#mDash)"/></svg></button>
+        <button data-ir="7.1" aria-label="Recetas"><svg viewBox="0 0 24 24" style="width:1.75cqw;height:2.1cqw"><path d="M8.5 2.5h7.2l4.3 4.3V19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><mask id="mDoc"><rect width="24" height="24" fill="#fff"/><path d="M8 13h8M8 16h8M8 19h6" stroke="#000" stroke-width="1.5"/></mask><path d="M4.5 5h8.2l4.3 4.3V22.5H4.5z" fill="currentColor" mask="url(#mDoc)"/></svg></button>
+        <button data-ir="1.1" aria-label="Producción"><svg viewBox="0 0 24 24" style="width:2.05cqw;height:2.05cqw"><mask id="mEng"><rect width="24" height="24" fill="#fff"/><circle cx="8.6" cy="8.6" r="2" fill="#000"/><circle cx="16.4" cy="16.4" r="1.6" fill="#000"/></mask><g fill="currentColor" mask="url(#mEng)"><path d="M7.6 1.8h2l.4 1.9 1.5.6 1.6-1.1 1.4 1.4-1.1 1.6.6 1.5 1.9.4v2l-1.9.4-.6 1.5 1.1 1.6-1.4 1.4-1.6-1.1-1.5.6-.4 1.9h-2l-.4-1.9-1.5-.6-1.6 1.1-1.4-1.4 1.1-1.6-.6-1.5-1.9-.4v-2l1.9-.4.6-1.5-1.1-1.6 1.4-1.4 1.6 1.1 1.5-.6z"/><path d="M15.6 10.9h1.6l.3 1.5 1.2.5 1.3-.9 1.1 1.1-.9 1.3.5 1.2 1.5.3v1.6l-1.5.3-.5 1.2.9 1.3-1.1 1.1-1.3-.9-1.2.5-.3 1.5h-1.6l-.3-1.5-1.2-.5-1.3.9-1.1-1.1.9-1.3-.5-1.2-1.5-.3v-1.6l1.5-.3.5-1.2-.9-1.3 1.1-1.1 1.3.9 1.2-.5z"/></g></svg></button>
+        <button data-ir="2.1" aria-label="Limpieza"><svg viewBox="0 0 24 24" style="width:2.05cqw;height:2.05cqw" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M3.2 11.5h8.2l-1.1 9.7H4.3z"/><path d="M4.5 5.5l1 1M8.2 3.6v1.6M10.6 6.2l1.2-.8"/><path d="M17.4 2.6v9.6"/><path d="M13.6 21.2l1.3-8.9h5l1.3 8.9z" fill="currentColor"/></svg></button>
+        <button data-ir="8.1" class="al" aria-label="Alarmas"><svg viewBox="0 0 24 24" style="width:2.2cqw;height:2.2cqw"><mask id="mAl"><rect width="24" height="24" fill="#fff"/><path d="M12 9.5v5.2" stroke="#000" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="18.2" r="1.4" fill="#000"/></mask><path d="M12 3.2c.6 0 1.1.3 1.4.8l8.5 15.2c.6 1.1-.2 2.4-1.4 2.4H3.5c-1.2 0-2-1.3-1.4-2.4L10.6 4c.3-.5.8-.8 1.4-.8z" fill="currentColor" mask="url(#mAl)"/></svg><em id="nAl">2</em></button>
         <button class="puntos" id="btnMenu" aria-label="Más pantallas"><svg viewBox="0 0 24 24" fill="#3f47c6"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
       </nav>
       <div class="barra">
@@ -443,23 +530,28 @@ button{font:inherit;color:inherit}
   /* ---------- pie: línea de tiempo de estado de máquina ----------
      Tramo transcrito del video (13:00–15:30). Si el bloque de datos trae G.linea con la misma forma, manda G.linea.
      seg: [ancho, nivel] con nivel 1 = máquina en ciclo, 0 = detenida; x en unidades de 0 a 1000. */
-  const LINEA0 = {
-    seg: [[40,0],[6,1],[8,0],[5,1],[6,0],[30,0],[5,1],[4,0],[5,1],[5,0],[4,1],[5,0],[4,1],[6,0],[60,0],[6,1],[5,0],[5,1],[6,0],[4,1],[5,0],[40,1],[30,0],[6,1],[5,0],[5,1],[6,0],[60,0],[5,1],[4,0],[5,1],[6,0],[4,1],[5,0],[4,1],[6,0],[90,0],[6,1],[5,0],[5,1],[60,0],[5,1],[4,0],[5,1],[6,0],[4,1],[200,0]],
-    bandas: [[318,22],[420,20],[612,28],[880,14]], advertencias: [322,350,430,455,642,668,690], alarmas: [262,352,458,675,730], notas: [255,690],
-    horas: [['13:00',90],['13:30',260],['14:00',430],['14:30',600],['15:00',770],['15:30',940]]
+  const LINEA0 = { /* transcrito de la foto del panel (15:00–17:30, 24-10-2026); x en unidades de 0 a 1000 sobre el ancho de la línea */
+    seg: [[7,1],[7,0],[18.7,1],[5.5,0],[5.5,1],[7.8,0],[6.2,1],[5.5,0],[43.6,1],[14,0],[56.9,1],[1.6,0],[10.1,1],[5.5,0],[11.7,1],[14,0],[1.6,1],[13.3,0],[44.4,1],[17.9,0],[1.6,1],[3.1,0],[3.9,1],[14,0],[2.3,1],[10.9,0],[64.7,1],[3.1,0],[7.8,1],[7,0],[38.2,1],[27.3,0],[10.9,1],[14,0],[5.5,1],[5.5,0],[18.7,1],[463,0]],
+    bandas: [[202.6,24.9],[277.5,41.3],[445,55.3]], rojas: [[225.2,4.7],[289.2,6.2],[321.1,3.9],[508.2,4.7],[540.1,6.2]],
+    advertencias: [194.1,213.6,287.6,311.8,471.5,503.5], alarmas: [227.6,325,491.8,543.2], notas: [143.4],
+    horas: [['15:00',70.9],['15:30',239.3],['16:00',407.6],['16:30',576.7],['17:00',744.3],['17:30',912.6]], rejilla: [14.8, 28.06]
   };
   (function pie(){
-    const L = Object.assign({}, LINEA0, G.linea || {}), W = 1000, H = 100, ARRIBA = 47, ABAJO = 63, num = v => +v || 0;
+    const L = Object.assign({}, LINEA0, G.linea || {}), W = 1000, H = 100, ARRIBA = 49, ABAJO = 74.5, num = v => +v || 0;
     let d = '', x = 0, y = null;
     (L.seg || []).forEach(([w, n]) => { const ny = num(n) ? ARRIBA : ABAJO; if (y === null) d = `M0 ${ny}`; else if (ny !== y) d += ` V${ny}`; x += num(w); d += ` H${x}`; y = ny; });
+    const [r0, paso] = (L.rejilla || [14.8, 28.06]).map(num);
     let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">`;
-    for (let i = 0; i <= W; i += 17) s += `<line x1="${i}" y1="0" x2="${i}" y2="${H}" stroke="rgba(255,255,255,.13)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
-    (L.bandas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="${H}" fill="#f7cb1e" opacity=".9"/>`);
-    s += `<path d="${d}" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="miter" vector-effect="non-scaling-stroke"/></svg>`;
+    (L.bandas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="66" fill="#e9c419" opacity=".85"/>`);
+    (L.rojas || []).forEach(([bx, bw]) => s += `<rect x="${num(bx)}" y="0" width="${num(bw)}" height="66" fill="#e5392f" opacity=".8"/>`);
+    s += `<rect x="0" y="66" width="${W}" height="7" fill="#33407a" opacity=".75"/>`;
+    for (let gx = r0; paso > 0 && gx <= W; gx += paso) s += `<line x1="${gx.toFixed(1)}" y1="0" x2="${gx.toFixed(1)}" y2="${H}" stroke="#cfd5ee" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`;
+    s += `<path d="${d}" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="miter" vector-effect="non-scaling-stroke"/></svg>`;
     const pos = v => `left:${num(v) / 10}%`;
+    s += `<span class="fin-l" style="left:${Math.min(x, W) / 10}%;top:${y ?? ABAJO}%"></span>`;
     (L.notas || []).forEach(v => s += `<span class="nota-l" style="${pos(v)}"><i><svg viewBox="0 0 24 24"><path d="M5 19l.9-4.1L15.6 5.2a1.6 1.6 0 0 1 2.3 0l.9.9a1.6 1.6 0 0 1 0 2.3L9.1 18.1z" fill="#2f6fe0"/><path d="M5 19l4.1-.9" stroke="#2f6fe0" stroke-width="1.6"/></svg></i></span>`);
-    (L.advertencias || []).forEach(v => s += `<span class="adv-l" style="${pos(v)}"><svg viewBox="0 0 20 18"><path d="M10 1.2L19 16.8H1z" fill="#f5c518" stroke="#1b2390" stroke-width=".8" stroke-linejoin="round"/><path d="M10 6.5v5.2" stroke="#1b2390" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.3" r="1.1" fill="#1b2390"/></svg></span>`);
-    (L.alarmas || []).forEach(v => s += `<span class="alr-l" style="${pos(v)}"></span>`);
+    (L.advertencias || []).forEach(v => s += `<span class="adv-l" style="${pos(v)}"><svg viewBox="0 0 20 17"><path d="M10 1L19.2 16.3H.8z" fill="#f2cf1d" stroke="#f2cf1d" stroke-width="1.2" stroke-linejoin="round"/><path d="M10 6v5.2" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="13.7" r="1.2" fill="#fff"/></svg></span>`);
+    (L.alarmas || []).forEach(v => s += `<span class="alr-l" style="${pos(v)}">!</span>`);
     (L.horas || []).forEach(([t, v]) => s += `<small style="${pos(v)}">${esc(t)}</small>`);
     $('#linea').innerHTML = s;
   })();
@@ -562,13 +654,14 @@ button{font:inherit;color:inherit}
     (d.botones || []).forEach(b => { const k = ayudas.push(b) - 1; h += `<button class="dbtn${b.activo ? '' : ' off'}" data-k="${k}" aria-label="${esc(b.etiqueta)}" title="${esc(b.etiqueta)}">${String(b.icono || '').startsWith('aux') ? DB.aux(String(b.icono).slice(3)) : DB[b.icono] || ''}</button>`; });
     h += `</div><div class="dmedio"><span class="vel"><b>${esc(d.vel || '0,0')}</b> <small>1/min</small></span><span class="tortuga"><svg class="t" viewBox="0 0 34 22" fill="none" stroke="#3a3f4b" stroke-width="2"><path d="M4 16c0-6 5-11 12-11s11 5 11 11z"/><path d="M27 13h4l-1 4h-3M8 16v3M21 16v3"/><path d="M10 9l12 0"/></svg><span class="pastilla">${esc(d.prolong || '0,00')}</span><span class="uni">s</span><button class="masmenos" aria-label="Menos">−</button><button class="masmenos" aria-label="Más">+</button>${botonInfo(d.prolongCampo || {etiqueta:'Tiempo de prolongación de la duración del ciclo'})}</span></div><div class="dder">`;
     const v = parseFloat(String(d.velocidad || '0').replace(',', '.')), obj = parseFloat(String(d.objetivo || '11').replace(',', '.')) || 11;
-    /* velocímetro como en el panel: arco rojo desde 0 hasta la velocidad del último ciclo y amarillo desde ahí hasta el objetivo */
-    const f = Math.min(Math.max((v || 0) / obj, 0), 1), ang = Math.PI * f, R = 44, CX = 60, CY = 57;
-    const pt = (a, r) => [(CX - r * Math.cos(a)).toFixed(2), (CY - r * Math.sin(a)).toFixed(2)];
-    const arco = (a0, a1, col) => { if (a1 - a0 < 1e-3) return ''; const [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R); return `<path d="M${x0} ${y0} A${R} ${R} 0 0 1 ${x1} ${y1}" fill="none" stroke="${col}" stroke-width="14"/>`; };
-    const [ax, ay] = pt(ang, R - 9), [bx, by] = pt(ang, R + 9);
-    h += `<div class="medidor"><h4>Velocidad de último ciclo</h4><svg viewBox="0 0 120 66" role="img" aria-label="Velocidad de último ciclo: ${esc(d.velocidad || '—')} ciclos por minuto de ${esc(d.objetivo || '11')}">${arco(0, ang, '#e3262f')}${arco(ang, Math.PI, '#f5c518')}<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#2b2f38" stroke-width="2.2" stroke-linecap="round"/><text x="60" y="50" text-anchor="middle" font-size="13" font-family="Roboto,Arial" fill="#2b2f38">${esc(d.velocidad || '—')}</text><text x="60" y="62" text-anchor="middle" font-size="8" font-family="Roboto,Arial" fill="#6b6f78">Ciclos/min</text></svg></div><div class="dlista">`;
-    (d.campos || []).forEach(c => { h += `<div class="fila"><span>${esc(c.etiqueta)}</span><span class="valor">${c.etiqueta.startsWith('Contador') ? `<span class="pastilla solo" style="text-align:center">${esc(c.valor)}</span>` : `<span class="pastilla">${esc(c.valor)}</span>`}${c.unidad ? `<span class="uni">${esc(c.unidad)}</span>` : ''}</span>${c.etiqueta.startsWith('Contador') ? `<button class="papelera" aria-label="Poner contador a cero" title="Poner contador a cero">${I.tacho}</button>` : botonInfo(c)}</div>`; });
+    /* velocímetro como en el panel (foto 24-10): arco de 217° (de 198,5° a −18,5°), rojo desde el inicio hasta la velocidad del último ciclo
+       y amarillo desde ahí hasta el objetivo; unidades del SVG = px de la pantalla a 1600 de ancho */
+    const f = Math.min(Math.max((v || 0) / obj, 0), 1), A0 = 198.5, BAR = 217, R = 74.5, CX = 100, CY = 75, rad = g => g * Math.PI / 180;
+    const pt = (g, r) => [(CX + r * Math.cos(rad(g))).toFixed(2), (CY - r * Math.sin(rad(g))).toFixed(2)];
+    const arco = (g0, g1, col) => { if (g0 - g1 < .05) return ''; const [x0, y0] = pt(g0, R), [x1, y1] = pt(g1, R); return `<path d="M${x0} ${y0} A${R} ${R} 0 ${g0 - g1 > 180 ? 1 : 0} 1 ${x1} ${y1}" fill="none" stroke="${col}" stroke-width="27"/>`; };
+    const gv = A0 - BAR * f, [ax, ay] = pt(gv, R - 13.5), [bx, by] = pt(gv, R + 13.5);
+    h += `<div class="medidor"><h4>Velocidad de último ciclo</h4><svg viewBox="0 0 200 120" role="img" aria-label="Velocidad de último ciclo: ${esc(d.velocidad || '—')} ciclos por minuto de ${esc(d.objetivo || '11')}">${arco(A0, gv, '#dd3b31')}${arco(gv, A0 - BAR, '#e6c21e')}${f > 0 && f < 1 ? `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#6b2a1c" stroke-width="1.6"/>` : ''}<text x="100" y="80" text-anchor="middle" font-size="25" font-weight="700" font-family="Roboto,Arial" fill="#2a2a2a">${esc(d.velocidad || '—')}</text><text x="100" y="103" text-anchor="middle" font-size="19" font-family="Roboto,Arial" fill="#444">Ciclos/min</text></svg></div><div class="dlista">`;
+    (d.campos || []).forEach((c, i) => { h += `<div class="fila f${i}${String(c.etiqueta).startsWith('Contador') ? ' contador' : ''}"><span>${esc(c.etiqueta)}</span><span class="valor">${c.etiqueta.startsWith('Contador') ? `<span class="pastilla solo" style="text-align:center">${esc(c.valor)}</span>` : `<span class="pastilla">${esc(c.valor)}</span>`}${c.unidad ? `<span class="uni">${esc(c.unidad)}</span>` : ''}</span>${c.etiqueta.startsWith('Contador') ? `<button class="papelera" aria-label="Poner contador a cero" title="Poner contador a cero">${I.tacho}</button>` : botonInfo(c)}</div>`; });
     return h + `</div></div></div>`;
   }
 
@@ -617,7 +710,7 @@ button{font:inherit;color:inherit}
     if (guardar && id !== actual) historial.push(actual);
     actual = id; ayudas = [];
     const p = P[id] || {id, titulo: 'Alarmas', ruta: 'Alarmas'};
-    $('#pid').textContent = id;
+    $('#pid').textContent = id; hmi.dataset.pantalla = id;
     $('#migas').innerHTML = migas(p);
     $('#filtro').placeholder = id === '7.1' ? 'Búsqueda de recetas' : id.startsWith('8') ? 'Filtrar alarmas' : 'Filtrar entradas';
     const top = id.split('.').slice(0, 2).join('.');
