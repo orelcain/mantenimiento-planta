@@ -738,6 +738,22 @@ button{font:inherit;color:inherit}
 .acc-r.azul i{font-weight:900}
 .pantalla[data-pantalla="1.1.2"] .lupa,.pantalla[data-pantalla="6.2"] .lupa,.pantalla[data-pantalla="6.3"] .lupa,.pantalla[data-pantalla="6.4"] .lupa{visibility:hidden}
 .cuerpo .nota-dev{grid-column:1/-1;margin:.8cqw 0 .2cqw;padding:.5cqw 1cqw;border-left:.25cqw solid var(--ambar);background:var(--ambar-fondo);font:400 1.15cqw/1.4 var(--f-ui);color:#6b4a00}
+/* bisel medido sobre la foto del panel real (W = ancho de pantalla): borde azul 8,4 % W a los lados, 7,6 % arriba y 7,8 % abajo,
+   marco de acero de 1,7 % W y logo GEA de 11 % W. La envoltura es contenedor: --bw (ancho total del bisel) se mide en sus cqw */
+.envoltura{container-type:inline-size}
+.bisel{box-sizing:border-box;--bw:100cqw;width:var(--bw);max-width:100%;border:calc(var(--bw) * .01414) solid #969ca4;border-radius:calc(var(--bw) * .006);padding:calc(var(--bw) * .0632) calc(var(--bw) * .0699) calc(var(--bw) * .0649);box-shadow:inset 0 0 0 1px rgba(10,14,40,.55),0 18px 40px rgba(0,0,0,.45)}
+.bisel::before{left:1.8cqw;top:1.42cqw;font:600 4.45cqw/1 var(--f-ui);letter-spacing:.06em;color:#c9cdd8}
+.bisel .pantalla{box-shadow:0 0 0 .35cqw #0c1030}
+body.embed .envoltura{width:100%}
+body.embed .bisel{--bw:min(100cqw,calc(100dvh * 1.6));border:calc(var(--bw) * .01414) solid #969ca4;border-radius:0;box-shadow:inset 0 0 0 1px rgba(10,14,40,.55)}
+body.embed{overflow-x:hidden}
+@media (orientation:landscape) and (max-height:540px){
+  body.embed .bisel{padding:0;border:0;width:100%;height:100dvh;box-shadow:none}
+  body.embed .bisel .pantalla{box-shadow:none}
+}
+/* riel: el alto de cada botón sigue la proporción del panel (3,6cqw); el área táctil de 44 px va en un pseudoelemento que no mueve los íconos */
+.riel button{min-height:0}
+.riel button::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 

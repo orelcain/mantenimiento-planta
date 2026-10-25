@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.3.0' as const
+export const APP_VERSION = '4.3.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-10-25' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Clon HMI GEA: fidelidad visual contra el video' as const
+export const VERSION_NAME = 'Clon HMI GEA: bisel medido en la foto y riel en celular' as const
 
 /**
  * Nota:

@@ -58,6 +58,8 @@ export function HmiGeaPage() {
           src={iframeSrc}
           title="HMI GEA PowerPak Simulator"
           className="absolute inset-x-0 top-0 block h-full w-full border-0"
+          // iOS agranda el iframe hasta el ancho de su contenido: 1px + min-width lo deja fijo al ancho disponible
+          style={{ width: 1, minWidth: '100%' }}
           allow="fullscreen"
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
         />
