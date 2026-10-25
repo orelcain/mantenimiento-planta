@@ -14,6 +14,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { BarChart3, Loader2, CheckCircle2, Calendar, Upload, AlertCircle, ChevronDown } from 'lucide-react'
 import { logger } from '@/lib/logger'
+import { registrarVista } from '@/services/telemetria/registrarVista'
 import { cn } from '@/lib/utils'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
@@ -87,6 +88,11 @@ export function AnalisisGraderWizardPage() {
   // ── Línea/planta activa — persiste en ?linea= ──
   const lineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
   const lineConfig = getPlantLineConfig(lineId)
+
+  // Telemetría de uso (25-10-2026): al montar y al cambiar de línea.
+  useEffect(() => {
+    void registrarVista('periodo', lineId)
+  }, [lineId])
   const handleLineSelect = (id: PlantLineId) => {
     // Guard: no hacer nada si ya está seleccionada (evita re-render innecesario
     // que se percibe como "refresh" al re-clickear la tab activa).
