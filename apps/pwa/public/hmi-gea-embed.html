@@ -737,6 +737,7 @@ button{font:inherit;color:inherit}
 .recetas-r .receta-it svg{width:1.25cqw;height:1.5cqw}
 .acc-r.azul i{font-weight:900}
 .pantalla[data-pantalla="1.1.2"] .lupa,.pantalla[data-pantalla="6.2"] .lupa,.pantalla[data-pantalla="6.3"] .lupa,.pantalla[data-pantalla="6.4"] .lupa{visibility:hidden}
+.cuerpo .nota-dev{grid-column:1/-1;margin:.8cqw 0 .2cqw;padding:.5cqw 1cqw;border-left:.25cqw solid var(--ambar);background:var(--ambar-fondo);font:400 1.15cqw/1.4 var(--f-ui);color:#6b4a00}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -967,13 +968,14 @@ button{font:inherit;color:inherit}
   const UNA_COL = /dispositivo auxiliar|marco cobertor|cinta de evacuacion/;
   function vistaSecciones(p){
     let h = '';
-    if (p.fuente !== 'video') h += `<div class="aviso-falta"><b>⏳ Falta foto de la pantalla ${esc(p.id)}.</b> En la máquina: ${esc(p.como_llegar || p.ruta || p.titulo)}. Fotografía o graba cada sección abierta (toca la flecha ⌃ de cada una) y la completamos. Abajo van los parámetros que describe el manual${p.pagina ? ' (pág. ' + esc(p.pagina) + ')' : ''} con su ayuda.</div>`;
+    if (p.fuente !== 'video') h += `<div class="aviso-falta"><b>⏳ En desarrollo: falta foto de la pantalla ${esc(p.id)}.</b> En la máquina: ${esc(p.como_llegar || p.ruta || p.titulo)}. Fotografía o graba cada sección abierta (toca la flecha ⌃ de cada una) y la completamos. Abajo van los parámetros que describe el manual${p.pagina ? ' (pág. ' + esc(p.pagina) + ')' : ''} con su ayuda.</div>`;
     (p.secciones || []).forEach((s, i) => {
       const abierta = s.abierta !== false;
       const off = s.encendido === false, k = s.encendido == null ? -1 : ayudas.push({etiqueta: 'Encendido · ' + s.nombre, valor: off ? 'desactivado' : 'activado',
         ayuda: {nombre: 'Encendido de la función · ' + s.nombre, descripcion: 'Botón de encendido de la sección. Azul claro con anillo = función activada; azul oscuro = función desactivada.', origen: 'manual', pagina: 70}}) - 1;
       const pw = k < 0 ? '' : `<button class="pw${off ? ' off' : ''}" data-k="${k}" aria-label="${esc(s.nombre)}: función ${off ? 'desactivada' : 'activada'}" aria-pressed="${!off}">${I.pw}</button>`;
-      h += `<section class="seccion" data-abierta="${abierta}" data-nombre="${esc(norm(s.nombre))}"><div class="sec-cab"${(s.campos || []).length ? ` role="button" tabindex="0" aria-expanded="${abierta}"` : ''}><span class="ico" aria-hidden="true">${icoSec(s.nombre)}</span><span class="tit">${esc(s.nombre)}</span>${s.falta_foto ? '<span class="falta">⏳ falta foto</span>' : ''}${pw}${(s.campos || []).length ? `<span class="chev" aria-hidden="true">${CHEV}</span>` : '<span class="chev hueco" aria-hidden="true"></span>'}</div><div class="campos${s.una_columna || UNA_COL.test(norm(s.nombre)) ? ' una' : ''}">`;
+      h += `<section class="seccion" data-abierta="${abierta}" data-nombre="${esc(norm(s.nombre))}"><div class="sec-cab"${(s.campos || []).length ? ` role="button" tabindex="0" aria-expanded="${abierta}"` : ''}><span class="ico" aria-hidden="true">${icoSec(s.nombre)}</span><span class="tit">${esc(s.nombre)}</span>${s.falta_foto && (s.campos || []).length ? '<span class="falta" title="En desarrollo: falta foto de esta sección en la máquina; se muestran los parámetros del manual">⏳ En desarrollo · falta foto</span>' : ''}${pw}${(s.campos || []).length ? `<span class="chev" aria-hidden="true">${CHEV}</span>` : '<span class="chev hueco" aria-hidden="true"></span>'}</div><div class="campos${s.una_columna || UNA_COL.test(norm(s.nombre)) ? ' una' : ''}">`;
+      if (s.falta_foto && (s.campos || []).length) h += `<div class="nota-dev">En desarrollo: aún no hay foto de esta sección en la máquina. Mientras, van los parámetros que describe el manual${p.pagina ? ' (pág. ' + esc(p.pagina) + ')' : ''}.</div>`;
       (s.campos || []).forEach(c => { h += c.subtitulo ? `<div class="subtit">${esc(c.subtitulo)}</div>` : campoHTML(c); });
       h += `</div></section>`;
     });
