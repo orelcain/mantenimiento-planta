@@ -43,7 +43,7 @@ describe('registrarVista', () => {
     await registrarVista('turno', 'resumen', { plantLineId: 'principal' })
     await registrarVista('turno', 'resumen', { plantLineId: 'principal' })
     expect(addDoc).toHaveBeenCalledTimes(1)
-    const doc = addDoc.mock.calls[0][1] as Record<string, unknown>
+    const doc = addDoc.mock.calls[0]![1] as Record<string, unknown>
     expect(doc).toMatchObject({
       plantId: 'chonchi', pantalla: 'turno', vista: 'resumen', plantLineId: 'principal', uid: 'u1', ts: 'TS',
     })
@@ -53,7 +53,7 @@ describe('registrarVista', () => {
     await registrarVista('turno', 'resumen')
     await registrarVista('turno', 'calidad')
     expect(addDoc).toHaveBeenCalledTimes(2)
-    expect(addDoc.mock.calls[1][1]).not.toHaveProperty('plantLineId')
+    expect(addDoc.mock.calls[1]![1]).not.toHaveProperty('plantLineId')
   })
   it('sin sesión no escribe ni marca el dedupe', async () => {
     auth.currentUser = null

@@ -45,6 +45,9 @@ export async function registrarVista(
     const v = vistaNormalizada(vista)
     if (!v) return
     const { auth: a, db: base } = await import('@/services/firebase')
+    // Al abrir un link directo (monitor) la sesión aún se está restaurando:
+    // sin esperar, esa vista se perdería y el monitor quedaría subcontado.
+    await a.authStateReady?.()
     if (!a.currentUser) return
     const dia = diaSantiago()
     const clave = claveVista(pantalla, v, dia)
@@ -52,15 +55,22 @@ export async function registrarVista(
     sessionStorage.setItem(clave, '1')
     const { addDoc, collection, serverTimestamp } = await import('firebase/firestore')
     const plantLineId = extra?.plantLineId?.slice(0, 60)
-    await addDoc(collection(base, 'pantallaUsos'), {
+    const registro = {
       plantId: 'chonchi',
       pantalla,
       vista: v,
       ...(plantLineId ? { plantLineId } : {}),
       uid: a.currentUser.uid,
       dia,
-      ts: serverTimestamp(),
-    })
+    }
+    // El dev local escribe en la base de producción: si contara, las pruebas
+    // inflarían la medición (ya pasa con moduloVistas). En dev solo se anota.
+    if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+      // eslint-disable-next-line no-console
+      console.info('[registrarVista] (dev, no se escribe)', registro)
+      return
+    }
+    await addDoc(collection(base, 'pantallaUsos'), { ...registro, ts: serverTimestamp() })
   } catch (err) {
     // La telemetría jamás molesta al usuario; en desarrollo se avisa para que
     // una regla que rechaza la escritura no se pierda en silencio.
