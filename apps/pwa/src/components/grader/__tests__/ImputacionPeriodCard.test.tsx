@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, within } from '@testing-library/react'
 import { ImputacionPeriodCard, tendenciaImputacion } from '../ImputacionPeriodCard'
+import { topCausas, etiquetaDueno } from '@/services/grader/imputacionTopCausas'
 import type { PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
 
 const turno = (dateKey: string, cobertura: number) =>
@@ -78,5 +79,59 @@ describe('ImputacionPeriodCard', () => {
     expect(within(bajo.container).getByTitle(/cuánto llegó con una causal/).textContent).toBe('Sin imputar')
     const alto = render(<ImputacionPeriodCard imputacion={imp({ cobertura: 0.97 })} />)
     expect(within(alto.container).getByTitle(/cuánto llegó con una causal/).textContent).toBe('Documentado')
+  })
+})
+
+describe('topCausas (las 3 principales a la vista)', () => {
+  const H = 3600
+  const base = imp({
+    totalSec: 100 * H,
+    topCategorias: [
+      { label: 'MMPP', durationSec: 31 * H, bucket: 'externo' },
+      { label: 'Sin causal anotada', durationSec: 20 * H, bucket: 'sin-clasificar' },
+      { label: 'Falla Mecánica', durationSec: 8 * H, bucket: 'mantencion' },
+      { label: 'Operacionales', durationSec: 6 * H, bucket: 'externo' },
+      { label: 'Paros Programados', durationSec: 3 * H, bucket: 'planificado' },
+    ],
+  })
+
+  it('toma las 3 primeras, sin «Sin causal anotada», con % sobre el detenido total', () => {
+    const t = topCausas(base)
+    expect(t.map((c) => c.label)).toEqual(['MMPP', 'Falla Mecánica', 'Operacionales'])
+    expect(t[0]!.frac).toBeCloseTo(0.31)
+    expect(t[1]!.bucket).toBe('mantencion')
+  })
+
+  it('los paros programados no compiten aunque sean los más largos (octubre: 60 %)', () => {
+    const t = topCausas(imp({
+      totalSec: 100 * H,
+      topCategorias: [
+        { label: 'Paros Programados', durationSec: 60 * H, bucket: 'planificado' },
+        { label: 'MMPP', durationSec: 18 * H, bucket: 'externo' },
+        { label: 'Falla Mecánica', durationSec: 3 * H, bucket: 'mantencion' },
+      ],
+    }))
+    expect(t.map((c) => c.label)).toEqual(['MMPP', 'Falla Mecánica'])
+  })
+
+  it('con menos de 3 muestra las que haya; con 0 no muestra nada', () => {
+    expect(topCausas(imp({ topCategorias: [{ label: 'MMPP', durationSec: 3600, bucket: 'externo' }] }))).toHaveLength(1)
+    expect(topCausas(imp({ topCategorias: [] }))).toEqual([])
+    expect(topCausas(imp({ topCategorias: [{ label: 'Sin causal anotada', durationSec: 3600 }] }))).toEqual([])
+  })
+
+  it('etiqueta del dueño desde la taxonomía', () => {
+    expect(etiquetaDueno('externo')).toBe('Externo · proceso / abastecimiento')
+    expect(etiquetaDueno('mantencion')).toBe('Mantención · equipos')
+    expect(etiquetaDueno(undefined)).toBeNull()
+  })
+
+  it('la card las dibuja y el plegable dice «Ver las N causales y lo sin anotar»', () => {
+    const { container } = render(<ImputacionPeriodCard imputacion={base} />)
+    const txt = container.textContent ?? ''
+    expect(txt).toContain('Externo · proceso / abastecimiento')
+    expect(txt).toContain('31%')
+    expect(txt).toContain('Ver las 5 causales y lo sin anotar')
+    expect(container.querySelectorAll('ul[aria-label] li')).toHaveLength(3)
   })
 })

@@ -19,6 +19,7 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { dec, dec1 } from '@/utils/formatoNumeros'
+import { resolveOeeTileMode } from '@/services/grader/oeeSinCalidad'
 
 interface Props {
   plantSlug: PlantSlug
@@ -106,6 +107,7 @@ function barWidth(v: number | null, max = 1): string {
 
 const DEFS = {
   oee:     { desc: 'OEE de las EVISCERADORAS (Baader 142) — no de toda el área.\n\nMide el % del tiempo planificado en que las Baader producen a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n(A·R de las Baader · Q = calidad del Grader)\n\nNO incluye: bombeo, chiller, desangrador, cintas, Marel, corte ni etiquetado.\n\n< 50% crítico · 50‒65% aceptable · 65‒85% bueno · ≥ 85% clase mundial\n(el 85% es para una máquina/cuello de botella, no para un OEE de línea).' },
+  oeeSinQ: { desc: 'OEE SIN CALIDAD de las EVISCERADORAS (Baader 142) — no de toda el área.\n\nOEE = Disponibilidad × Rendimiento × Calidad.\nSin el Excel del Grader no hay Calidad, así que acá se muestra Disponibilidad × Rendimiento (la cuenta está debajo del número).\n\nNo es la Disponibilidad sola: es menor porque también descuenta la velocidad. Al cargar el Excel del Grader aparece la Calidad y el OEE completo.' },
   avail:   { desc: 'Porcentaje del tiempo productivo en que la máquina estuvo operativa.\n\nA = Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las Baaders.' },
   perf:    { desc: 'Velocidad real respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)' },
   quality: { desc: 'Porcentaje de piezas buenas sobre el total.\n\nQ = 1 − P0% del Grader\n\nSolo disponible cuando hay datos del Grader para ese período.' },
@@ -308,18 +310,27 @@ export function PlantKPIBoard({
               )
             })()}
 
-            {/* ── Fila 1: OEE + A + P + Q ── 2x2 mobile, 4col desde sm */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            {/* ── Fila 1: OEE + A + P (+ Q) ──
+                Sin calidad: «OEE sin calidad» (D × R) y 3 tiles.
+                Con calidad: OEE completo y 4 tiles (2x2 mobile, 4col desde sm). */}
+            {(() => {
+              const oeeMode = resolveOeeTileMode(kpis)
+              const sinQ = oeeMode.mode === 'sin-calidad'
+              const oeeVal = oeeMode.value
+              return (
+            <div className={cn('grid gap-1.5', sinQ ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4')}>
               <KPICard
-                label="OEE"
-                tooltip={DEFS.oee.desc}
-                value={kpis.oee !== null ? pct(kpis.oee) : '—'}
-                valueColor={oeeColor(kpis.oee)}
-                barValue={kpis.oee}
-                barColor={kpis.oee !== null
-                  ? (kpis.oee >= OEE_GOOD ? 'bg-fill-ok' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-primary' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
+                label={sinQ ? 'OEE sin calidad' : 'OEE'}
+                tooltip={sinQ ? DEFS.oeeSinQ.desc : DEFS.oee.desc}
+                value={oeeVal !== null ? pct(oeeVal) : '—'}
+                valueColor={oeeColor(oeeVal)}
+                barValue={oeeVal}
+                barColor={oeeVal !== null
+                  ? (oeeVal >= OEE_GOOD ? 'bg-fill-ok' : oeeVal >= KPI_CUTOFFS.oee.warnBelow ? 'bg-primary' : oeeVal >= KPI_CUTOFFS.oee.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
                   : 'bg-muted'}
-                note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (classifies ? 'Sin Q' : 'A·P solamente') : undefined}
+                note={oeeMode.mode === 'sin-calidad'
+                  ? `${dec(oeeMode.availability * 100, 1)} × ${dec(oeeMode.performance * 100, 1)}`
+                  : kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (classifies ? 'Sin Q' : 'A·P solamente') : undefined}
               />
               <KPICard
                 label="Disponibilidad"
@@ -343,6 +354,7 @@ export function PlantKPIBoard({
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
+              {!sinQ && (
               <KPICard
                 label="Calidad"
                 tooltip={DEFS.quality.desc}
@@ -356,7 +368,10 @@ export function PlantKPIBoard({
                   : undefined}
                 note={kpis.quality === null ? (classifies ? 'Sin Grader' : 'No clasifica') : undefined}
               />
+              )}
             </div>
+              )
+            })()}
 
             {/* ── Fila 2: MTTR · MTBF · Averías macro (ocultar si solo Grader) ── */}
             {!kpis.graderOnly && (

@@ -20,6 +20,7 @@ import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import type { SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { GraderShiftPeriodContainer } from '@/components/grader/GraderShiftPeriodContainer'
+import { ultimaCargaDateKey, dateKeyDdMm } from '@/services/grader/graderUltimaCarga'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
@@ -118,7 +119,7 @@ export function AnalisisGraderWizardPage() {
   )
   // Panel "Cargar Excel del Grader" — colapsable. Por defecto cerrado en mobile
   // si ya hay summaries (no es la acción primaria), abierto si está vacío.
-  const [uploadPanelExpanded, setUploadPanelExpanded] = useState(true)
+  const [uploadPanelExpanded, setUploadPanelExpanded] = useState(false)
   const [gates, setGates] = useState<GateAssignment[]>(getDefaultGates())
   const [config, setConfig] = useState<GraderAnalysisConfig>({
     intervalMinutes: 15,
@@ -163,6 +164,7 @@ export function AnalisisGraderWizardPage() {
   // Estado del panel de resumen mensual — se sincroniza con el calendario embebido
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
   const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
+  const ultimaCarga = useMemo(() => ultimaCargaDateKey(calendarSummaries), [calendarSummaries])
   // Las emite ahora la vista de período (`computePeriodMonthlyStats`); antes
   // las calculaba el calendario mensual, ya retirado.
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
@@ -372,21 +374,6 @@ export function AnalisisGraderWizardPage() {
   useEffect(() => {
     lastConfigMutationAtRef.current = Date.now()
   }, [config, gates])
-
-  // Auto-collapse del panel "Cargar Excel" cuando ya hay summaries del mes.
-  // Solo dispara una vez (cuando aparecen) — el usuario puede expandirlo manual.
-  const calendarHasSummariesRef = useRef(false)
-  useEffect(() => {
-    const hasNow = calendarSummaries.length > 0
-    if (hasNow && !calendarHasSummariesRef.current) {
-      setUploadPanelExpanded(false)
-      calendarHasSummariesRef.current = true
-    } else if (!hasNow && calendarHasSummariesRef.current) {
-      // Mes sin summaries → re-abrir para invitar a cargar
-      setUploadPanelExpanded(true)
-      calendarHasSummariesRef.current = false
-    }
-  }, [calendarSummaries.length])
 
   // Restaurar draft desde cloud
   useEffect(() => {
@@ -981,47 +968,6 @@ export function AnalisisGraderWizardPage() {
             <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
             <CurrentShiftChip plantLineId={lineId} />
           </div>
-          {/* Botón "Cargar Excel" contextual a la pestaña seleccionada.
-              Antes vivía en el header global → era ambiguo a qué planta
-              estabas cargando. Ahora queda DEBAJO de las pestañas: el
-              `lineId` de la pestaña activa se propaga al guardar el doc
-              con el prefix correcto (`yal-eviscerado__...` cuando aplica). */}
-          {lineConfig.hasGraderData && (
-            <div className="rounded-card border border-transparent bg-primary/[0.15]">
-              <button
-                type="button"
-                onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex min-h-[44px] items-center gap-2 rounded-full px-4 text-subhead font-medium text-ink-info/90 dark:text-ink-info/80 hover:bg-primary/[0.15] transition-colors"
-                title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
-              >
-                <Upload className="h-3 w-3 shrink-0" />
-                <span className="flex-1 text-left">
-                  Cargar Excel del Grader · <b className="text-primary">{lineConfig.label}</b>
-                </span>
-                {!uploadPanelExpanded && uploadedFiles.length > 0 && (
-                  <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-medium">
-                    {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
-                  </span>
-                )}
-                <ChevronDown
-                  className={cn(
-                    'h-3.5 w-3.5 shrink-0 transition-transform text-ink-info/60',
-                    uploadPanelExpanded && 'rotate-180',
-                  )}
-                />
-              </button>
-              {uploadPanelExpanded && (
-                <div className="px-2.5 pb-2.5 pt-0">
-                  <AnalisisGraderUploadPage
-                    compact
-                    onComplete={handleUploadComplete}
-                    initialFiles={uploadedFiles}
-                    onFilesChange={setUploadedFiles}
-                  />
-                </div>
-              )}
-            </div>
-          )}
           <PlantKPIBoard
             plantSlug={lineConfig.plantSlug}
             plantLineId={lineId}
@@ -1072,6 +1018,52 @@ export function AnalisisGraderWizardPage() {
           navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}${linea}`)
         }}
       />
+
+      {/* «Cargar Excel del Grader»: fila delgada al final. Los indicadores van
+          primero; la carga es poco frecuente pero sigue a un toque. Mismo
+          cargador de siempre. La fecha sale de los resúmenes del mes visible
+          (0 lecturas extra); si el mes no tiene ninguno, lo dice. */}
+      {lineConfig.hasGraderData && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setUploadPanelExpanded((v) => !v)}
+            aria-expanded={uploadPanelExpanded}
+            className="w-full flex min-h-[44px] items-center gap-2 rounded-full bg-muted/50 px-4 text-footnote text-muted-foreground hover:text-foreground transition-colors"
+            title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
+          >
+            <Upload className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 text-left min-w-0 truncate">
+              Cargar Excel del Grader
+              <span className="text-muted-foreground/70 tabular-nums">
+                {' · '}
+                {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'sin Excel en este mes'}
+              </span>
+            </span>
+            {!uploadPanelExpanded && uploadedFiles.length > 0 && (
+              <span className="text-caption px-1.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-medium shrink-0">
+                {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
+              </span>
+            )}
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 shrink-0 transition-transform',
+                uploadPanelExpanded && 'rotate-180',
+              )}
+            />
+          </button>
+          {uploadPanelExpanded && (
+            <div className="pt-2">
+              <AnalisisGraderUploadPage
+                compact
+                onComplete={handleUploadComplete}
+                initialFiles={uploadedFiles}
+                onFilesChange={setUploadedFiles}
+              />
+            </div>
+          )}
+        </div>
+      )}
       </>
       )}
 

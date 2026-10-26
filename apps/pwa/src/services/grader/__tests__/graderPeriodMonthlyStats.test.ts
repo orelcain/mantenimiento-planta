@@ -127,6 +127,8 @@ describe('cobertura de imputación del período', () => {
     expect(imp.porTurno[0]!.cobertura).toBeCloseTo(0.9)
     // Por impacto: Lógica 90 min > Falta MMPP 60 > sin causal 50.
     expect(imp.topCategorias.map(c => c.label)).toEqual(['Falla Eléctrica', 'MMPP', 'Sin causal anotada'])
+    // Cada categoría trae su dueño dominante (para la etiqueta de la card).
+    expect(imp.topCategorias.map(c => c.bucket)).toEqual(['mantencion', 'externo', 'sin-clasificar'])
   })
 
   it('el Planned Downtime no infla el tiempo detenido del período', () => {
