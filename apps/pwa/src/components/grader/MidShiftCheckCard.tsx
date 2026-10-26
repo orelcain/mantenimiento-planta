@@ -183,8 +183,8 @@ export function MidShiftCheckCard({
 
             {moves.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No hay una gate que se pueda ceder sin dejar otro calibre sin salida. Para
-                descomprimir habría que activar una gate más o revisar los rangos de peso.
+                Ninguna gate se puede ceder sin dejar un calibre sin salida.{' '}
+                <InfoTooltip text={"No hay una gate que se pueda ceder sin dejar otro calibre sin salida. Para descomprimir habría que activar una gate más o revisar los rangos de peso."} iconSize={11} />
               </p>
             )}
           </>
@@ -245,8 +245,8 @@ export function MidShiftCheckCard({
             config nueva. Es lo que después permite decir "sin la corrección de
             las 01:10 el turno habría cerrado peor". */}
         <p className="text-caption text-muted-foreground/70">
-          El cambio se registra con hora: las piezas posteriores se clasifican con la config nueva
-          y el turno queda partido en tramos, no reescrito.
+          El cambio se registra con hora y parte el turno en tramos.{' '}
+          <InfoTooltip text={"El cambio se registra con hora: las piezas posteriores se clasifican con la config nueva y el turno queda partido en tramos, no reescrito."} iconSize={11} />
         </p>
       </CardContent>
     </Card>

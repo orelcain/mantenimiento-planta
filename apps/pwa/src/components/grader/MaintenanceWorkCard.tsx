@@ -8,7 +8,7 @@
  *
  * Presentacional: recibe `work` ya computado por la página (computeMaintenanceWork).
  */
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, InfoTooltip } from '@/components/ui'
 import { Wrench, Clock, Search, ShieldCheck, TrendingUp, TrendingDown, Repeat, Loader2 } from 'lucide-react'
 import { maintenanceWorkHeadline, type MaintenanceWork } from '@/services/grader/maintenanceWork'
 
@@ -123,8 +123,8 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
             </div>
 
             <p className="text-caption text-muted-foreground leading-snug">
-              TPM: el valor no está en apagar incendios sino en convertir cada falla en prevención
-              (causa raíz → preventiva/predicción) para que el equipo no vuelva a fallar y la producción se afine.
+              TPM: cada falla debe terminar en prevención, no en apagar incendios.{' '}
+              <InfoTooltip text={"TPM: el valor no está en apagar incendios sino en convertir cada falla en prevención (causa raíz → preventiva/predicción) para que el equipo no vuelva a fallar y la producción se afine."} iconSize={11} />
             </p>
           </>
         )}

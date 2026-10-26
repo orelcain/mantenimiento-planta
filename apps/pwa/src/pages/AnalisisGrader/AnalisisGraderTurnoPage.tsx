@@ -8,10 +8,10 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
-import { vistasDelTurno } from '@/services/grader/vistasDelTurno'
+import { vistasDelTurno, vistaDesdeUrl, type VistaTurno } from '@/services/grader/vistasDelTurno'
 import { registrarVista } from '@/services/telemetria/registrarVista'
 import { logger } from '@/lib/logger'
-import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
+import { Button, Card, CardContent, Spinner, Badge, InfoTooltip } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Clock, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
@@ -166,7 +166,7 @@ function parseShiftId(raw: string | undefined): [string, string] {
  *   calidad  — ¿por qué se rechazó?     (P0 por causa, calibres, calidad, lotes)
  *   timeline — ¿cuándo pasó?
  *   gates    — ¿cómo estaban las compuertas?
- *   linea    — ¿cómo estuvieron las máquinas?  (upstream Shoplogix)
+ *   (linea)  — ya no es pestaña: sus máquinas upstream van bajo el Resumen
  *   accion   — ¿qué hago con esto?
  *
  * `calidad` nació de una observación de Orel (11-ago): "Línea" se lee ordenada
@@ -174,14 +174,12 @@ function parseShiftId(raw: string | undefined): [string, string] {
  * del Grader colgaban al final del Resumen, después de la cuota y antes de los
  * botones de compartir. Esta pestaña es su espejo.
  */
-const ALL_TURNO_VIEWS = ['resumen', 'calidad', 'gates', 'linea', 'mantencion', 'accion'] as const
-type TurnoView = (typeof ALL_TURNO_VIEWS)[number]
+type TurnoView = VistaTurno
 
 const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
   resumen:  'Resumen',
   calidad:  'Calidad',
   gates:    'Gates',
-  linea:    'Línea',
   /* mantencion — ¿cómo respondió Mantención? (MTTR/MTBF por evento, quién
      falló y cuánto costó). «Línea» describe a las máquinas; esta, a nosotros. */
   mantencion: 'Mantención',
@@ -189,10 +187,9 @@ const TURNO_VIEW_LABEL: Record<TurnoView, string> = {
 }
 
 /**
- * Motivo por el que una vista no se puede abrir. Las pestañas se muestran
- * SIEMPRE: una que aparece y desaparece según si hay Excel obliga a aprender
- * dos navegaciones distintas, y deja al usuario sin saber que existe.
- * Deshabilitada y diciendo por qué, la estructura es una sola y se va llenando.
+ * Motivo por el que una vista no se puede abrir. Calidad ya no usa esto: sin
+ * Excel no se ofrece (ver `vistasDelTurno`). Queda para «¿Qué hacer?» cuando
+ * no hay ni Excel ni datos del sensor.
  */
 const MOTIVO_SIN_EXCEL = 'Necesita el Excel del Grader — cargalo para ver esta vista'
 
@@ -489,57 +486,6 @@ export function AnalisisGraderTurnoPage() {
   // las 3 Baaders y no hay clasificación por calidad.
   const isClassificationPlant = plantLineCfg.isClassificationPlant !== false
 
-  // Gates solo en la planta que clasifica; Calidad solo en líneas que pasan por
-  // Grader (Filete no: la pestaña se abría en blanco). Ver vistasDelTurno.ts.
-  const hasGraderData = plantLineCfg.hasGraderData !== false
-  const availableViews = useMemo<TurnoView[]>(
-    () => vistasDelTurno({ clasifica: isClassificationPlant, tieneGrader: hasGraderData }),
-    [isClassificationPlant, hasGraderData],
-  )
-
-  /**
-   * Vista activa del detalle.
-   *
-   * Es estado LOCAL, no `setSearchParams`, por una razón medida: `MainLayout`
-   * monta el `<Outlet/>` dentro de un `<Suspense key={location.key}>`, y
-   * `location.key` cambia con cualquier navegación — también con una que solo
-   * toca el query string. Cambiar la vista vía router remontaba la página
-   * entera en cada clic (verificado: 1 → 3 → 5 montajes), lo que rehace todas
-   * las lecturas de Firestore y, de paso, dejaba el `chartImageRef` del PDF
-   * apuntando a una instancia muerta.
-   *
-   * Se lee `?vista=` al montar para que un link directo caiga donde toca, y se
-   * refleja con `history.replaceState` — actualiza la barra de direcciones sin
-   * generar navegación, así que no dispara el remonte.
-   *
-   * El parámetro se llama `vista` y NO `tab`: `AnalisisGraderGatesConfigPage`
-   * (montada dentro de la pestaña Gates) ya usa `?tab=` para sus sub-pestañas.
-   */
-  const [activeView, setActiveViewState] = useState<TurnoView>(() => {
-    const v = searchParams.get('vista')
-    return (ALL_TURNO_VIEWS as readonly string[]).includes(v ?? '') ? (v as TurnoView) : 'resumen'
-  })
-
-  // Si la planta no ofrece la vista (Yal no tiene Gates), caer a Resumen.
-  useEffect(() => {
-    if (!availableViews.includes(activeView)) setActiveViewState('resumen')
-  }, [availableViews, activeView])
-
-  // Telemetría de uso (25-10-2026): qué pestaña se mira. Incluye la inicial.
-  // Se salta la vista que la planta no ofrece (el efecto de arriba la corrige).
-  useEffect(() => {
-    if (!availableViews.includes(activeView)) return
-    void registrarVista('turno', activeView, { plantLineId: plantLineCfg.id })
-  }, [activeView, availableViews, plantLineCfg.id])
-
-  const setActiveView = useCallback((view: TurnoView) => {
-    setActiveViewState(view)
-    const url = new URL(window.location.href)
-    if (view === 'resumen') url.searchParams.delete('vista')
-    else url.searchParams.set('vista', view)
-    window.history.replaceState(window.history.state, '', url)
-  }, [])
-
   // Schedule efectivo de la planta — FALLBACK cuando aún no hay datos Shoplogix
   // del turno. La fuente de verdad de horarios son los scheduledStart/End del
   // doc sincronizado (ver realShiftBounds abajo): los horarios los define
@@ -717,6 +663,63 @@ export function AnalisisGraderTurnoPage() {
   const [microDetentions, setMicroDetentions] = useState<MicroDetentionsSummary | null>(null)
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
   const [loading, setLoading] = useState(true)
+
+  // Gates solo en la planta que clasifica; Calidad solo en líneas que pasan por
+  // Grader (Filete no: la pestaña se abría en blanco). Ver vistasDelTurno.ts.
+  const hasGraderData = plantLineCfg.hasGraderData !== false
+  // Sin Excel no hay Calidad. Mientras carga se cuenta como «con Excel» para
+  // que un link directo a Calidad no salte a Resumen antes de saber.
+  const tieneExcel = !!summary || loading
+  const availableViews = useMemo<TurnoView[]>(
+    () => vistasDelTurno({ clasifica: isClassificationPlant, tieneGrader: hasGraderData, tieneExcel }),
+    [isClassificationPlant, hasGraderData, tieneExcel],
+  )
+
+  /**
+   * Vista activa del detalle.
+   *
+   * Es estado LOCAL, no `setSearchParams`, por una razón medida: `MainLayout`
+   * monta el `<Outlet/>` dentro de un `<Suspense key={location.key}>`, y
+   * `location.key` cambia con cualquier navegación — también con una que solo
+   * toca el query string. Cambiar la vista vía router remontaba la página
+   * entera en cada clic (verificado: 1 → 3 → 5 montajes), lo que rehace todas
+   * las lecturas de Firestore y, de paso, dejaba el `chartImageRef` del PDF
+   * apuntando a una instancia muerta.
+   *
+   * Se lee `?vista=` al montar para que un link directo caiga donde toca, y se
+   * refleja con `history.replaceState` — actualiza la barra de direcciones sin
+   * generar navegación, así que no dispara el remonte.
+   *
+   * El parámetro se llama `vista` y NO `tab`: `AnalisisGraderGatesConfigPage`
+   * (montada dentro de la pestaña Gates) ya usa `?tab=` para sus sub-pestañas.
+   */
+  const [activeView, setActiveViewState] = useState<TurnoView>(() => {
+    // `?vista=linea` (links viejos) cae en Resumen desde el primer render.
+    return vistaDesdeUrl(searchParams.get('vista'))
+  })
+
+  // Si la planta no ofrece la vista (Yal no tiene Gates), caer a Resumen.
+  useEffect(() => {
+    if (!availableViews.includes(activeView)) setActiveViewState('resumen')
+  }, [availableViews, activeView])
+
+  // Telemetría de uso (25-10-2026): qué pestaña se mira. Incluye la inicial.
+  // Espera a que termine de cargar y a que la vista esté ofrecida: así un
+  // `?vista=calidad` sin Excel registra solo Resumen, y la clave es primitiva
+  // (no `availableViews`) para no registrar dos veces la misma vista.
+  const vistaOfrecida = availableViews.includes(activeView)
+  useEffect(() => {
+    if (loading || !vistaOfrecida) return
+    void registrarVista('turno', activeView, { plantLineId: plantLineCfg.id })
+  }, [activeView, vistaOfrecida, loading, plantLineCfg.id])
+
+  const setActiveView = useCallback((view: TurnoView) => {
+    setActiveViewState(view)
+    const url = new URL(window.location.href)
+    if (view === 'resumen') url.searchParams.delete('vista')
+    else url.searchParams.set('vista', view)
+    window.history.replaceState(window.history.state, '', url)
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [alertThreshold, setAlertThreshold] = useState(DEFAULT_P0_ALERT_PCT)
   const [criticalThreshold, setCriticalThreshold] = useState(DEFAULT_P0_CRITICAL_PCT)
@@ -2403,10 +2406,7 @@ export function AnalisisGraderTurnoPage() {
            * imputaciones de paros, y son justamente las plantas SIN Grader
            * (Filete, Eviscerado) las que llegan con el turno entero sin causa.
            */
-          disabled={summary ? undefined : {
-            calidad: MOTIVO_SIN_EXCEL,
-            ...(upstreamLine.snapshot ? {} : { accion: MOTIVO_SIN_EXCEL }),
-          }}
+          disabled={summary || upstreamLine.snapshot ? undefined : { accion: MOTIVO_SIN_EXCEL }}
         />
       )}
 
@@ -2427,11 +2427,10 @@ export function AnalisisGraderTurnoPage() {
 
       {/* Vista Shoplogix-only: sin Excel Grader pero con datos de máquinas (Yal
           u otras líneas).
-          Responde a "Resumen" y a "Línea": sin Excel las dos muestran lo mismo
-          —el estado de las máquinas—, así que en vez de dejar "Línea" muerta se
-          la deja abrir. Timeline, Gates y "¿Qué hacer?" sí quedan deshabilitadas
+          Sin Excel, Resumen muestra el estado de las máquinas (antes también lo
+          mostraba la pestaña «Línea», que se unió a Resumen). Timeline, Gates y "¿Qué hacer?" sí quedan deshabilitadas
           con su motivo, porque sin el Excel no tienen nada que mostrar. */}
-      {!summary && !loading && upstreamLine.snapshot && (activeView === 'resumen' || activeView === 'linea') && (
+      {!summary && !loading && upstreamLine.snapshot && activeView === 'resumen' && (
         <div className="space-y-4">
           {/* Scorecard principal — mismo patrón visual que HeroScorecard */}
           <ShoplogixOnlyScorecard
@@ -2671,27 +2670,6 @@ export function AnalisisGraderTurnoPage() {
       {/* Contenido principal
           Mobile (stack vertical): Scorecard → Acciones → Causas (acciones arriba del todo)
           Desktop (grid 3-col 2 filas): Scorecard + Causas izq (2 cols apilados), Acciones der (col 3 × 2 filas) */}
-      {/*
-        Calidad sin Excel del Grader: antes la pestaña quedaba COMPLETAMENTE en
-        blanco, porque todo su contenido cuelga de `summary` (el resumen del
-        Excel). Medido desde el 1 de agosto: Chonchi 51 de 77 turnos, Yal 109 de
-        109. Se dice por qué y se ofrece cargarlo.
-      */}
-      {activeView === 'calidad' && !summary && !loading && (
-        <div className="flex flex-col items-start gap-3 rounded-card border bg-card p-5 sm:flex-row sm:items-center">
-          <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-sm font-semibold text-foreground">Este turno no tiene el Excel del Grader</p>
-            <p className="max-w-prose text-sm text-muted-foreground">
-              Todo lo de esta pestaña —las causas de Puerta 0, cuándo ocurrieron y los lotes— sale de ese
-              archivo. La producción y los paros del turno ya están en Resumen y Mantención, con los datos de Shoplogix.
-            </p>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => navigate(wizardUrl)} className="shrink-0">
-            Cargar Excel
-          </Button>
-        </div>
-      )}
-
       {summary && shiftWindow && (
         <>
           {/* ════════ RESUMEN ════════ */}
@@ -2951,13 +2929,13 @@ export function AnalisisGraderTurnoPage() {
           {/* La dispersión P0 aparte se retiró (09-09, pedido de Orel): la capa por
               causa del timeline la reemplaza (marcar una causa en el panel P0). */}
 
-          {/* ════════ LÍNEA (upstream Shoplogix) ════════
+          {/* ════════ LÍNEA (upstream Shoplogix), bajo el Resumen ════════
               Evisceradoras Baader 142: lo que alimenta al Grader (tasa, cascada,
               imputación) más la correlación contra las pausas del Grader y el
               scatter. El detalle por máquina (Gantt, eventos) vive en Mantención
               desde el 09-09: las mismas tres máquinas salían en las dos pestañas. */}
           {/* Barra Shoplogix: contador de staleness + botón refresh */}
-          {activeView === 'linea' && (upstreamLine.snapshot || upstreamLine.loading) && (
+          {activeView === 'resumen' && (upstreamLine.snapshot || upstreamLine.loading) && (
             <div className="flex items-center justify-between gap-2 -mb-1 px-1">
               <span
                 className="text-caption text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
@@ -2986,7 +2964,7 @@ export function AnalisisGraderTurnoPage() {
               </div>
             </div>
           )}
-          {activeView === 'linea' && (<>
+          {activeView === 'resumen' && (<>
           <UpstreamMachinesPanel
             snapshot={upstreamLine.snapshot}
             loading={upstreamLine.loading}
@@ -3366,10 +3344,8 @@ export function AnalisisGraderTurnoPage() {
           <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-ctl bg-primary/[0.15] border border-transparent text-sm">
             <SlidersHorizontal className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
             <p className="text-muted-foreground flex-1">
-              Acá se dejan listas las <span className="font-medium text-foreground">compuertas de este turno</span>:
-              calibre, calidad, conservación y producto de cada una. Abajo está el contraste
-              contra lo que suele venir; cómo rindieron de verdad aparece al cargar el Excel
-              del Grader.
+              <span className="font-medium text-foreground">Compuertas listas</span> para este turno.{' '}
+              <InfoTooltip text={"Acá se dejan listas las compuertas de este turno: calibre, calidad, conservación y producto de cada una. Abajo está el contraste contra lo que suele venir; cómo rindieron de verdad aparece al cargar el Excel del Grader."} iconSize={12} />
             </p>
           </div>
           {gatesHistoryCard}
