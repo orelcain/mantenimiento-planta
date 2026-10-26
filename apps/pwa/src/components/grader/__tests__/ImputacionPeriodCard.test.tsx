@@ -6,7 +6,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import { render, within } from '@testing-library/react'
-import { ImputacionPeriodCard, tendenciaImputacion, topCausas, etiquetaDueno } from '../ImputacionPeriodCard'
+import { ImputacionPeriodCard, tendenciaImputacion } from '../ImputacionPeriodCard'
+import { topCausas, etiquetaDueno } from '@/services/grader/imputacionTopCausas'
 import type { PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
 
 const turno = (dateKey: string, cobertura: number) =>
