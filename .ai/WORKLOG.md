@@ -11,6 +11,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-10-25 · Claude · Análisis de turno: medir uso y simplificar pestañas
+- Contexto medido: 0 acciones de usuario en el análisis de turno desde el 12-09 (Excel, gates, imputar); `moduloVistas` da 2 usuarios en toda la app con sesión; el monitor público de filete suma 14,4 h en 30 días. Panel visual de 8 personas (gemma4 local): falta la causa de los paros, sobra texto explicativo, Línea = Resumen sin Excel, Calidad vacía.
+- Hecho (PR #1322, ya en main): `registrarVista` → colección `pantallaUsos` (usuario-pestaña-día, regla create-only; en dev no escribe). Reporte: `node scripts/uso-pantallas.cjs --dias 14`. Medición hasta el 08-11.
+- Hecho (este PR): pestaña Línea retirada (su contenido va bajo Resumen; `?vista=linea` → resumen), Calidad oculta en turnos sin Excel, 11 textos visibles a una frase con el original en InfoTooltip.
+- Verificación: tsc 0, eslint 0 errores, vitest grader 1171 ok, preview Chonchi con/sin Excel, móvil 375, claro/oscuro.
+- Estado: HECHO
+- Sigue: reporte de uso el 08-11 antes de recortar más; Yal/Filete con datos sin probar en preview; InfoTooltip mide 12 px (bajo 44 de toque, en toda la app); Atisbo en rama `feat/atisbo-banda-averia` esperando decidir si va al monitor.
+
 ## 2026-10-24 · cerrador-pr · Clon HMI GEA PowerPak (PR #1318)
 - Hecho: simulador del HMI B&R de la GEA PowerPak 50520184, 35 pantallas, ayuda por parámetro (168 manual, 57 deducidas, 18 por confirmar), buscador, esquema de Producción. Ruta `/aprendizaje/hmi-gea`.
 - Verificación: tsc 0, eslint 0 errores, vitest 4029 ok, dev server dentro del iframe.
