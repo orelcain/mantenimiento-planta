@@ -1037,7 +1037,7 @@ export function AnalisisGraderWizardPage() {
               Cargar Excel del Grader
               <span className="text-muted-foreground/70 tabular-nums">
                 {' · '}
-                {ultimaCarga ? `último cargado: ${dateKeyDdMm(ultimaCarga)}` : 'sin cargas en este mes'}
+                {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'sin Excel en este mes'}
               </span>
             </span>
             {!uploadPanelExpanded && uploadedFiles.length > 0 && (

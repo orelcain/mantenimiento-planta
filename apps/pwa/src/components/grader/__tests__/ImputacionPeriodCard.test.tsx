@@ -101,6 +101,18 @@ describe('topCausas (las 3 principales a la vista)', () => {
     expect(t[1]!.bucket).toBe('mantencion')
   })
 
+  it('los paros programados no compiten aunque sean los más largos (octubre: 60 %)', () => {
+    const t = topCausas(imp({
+      totalSec: 100 * H,
+      topCategorias: [
+        { label: 'Paros Programados', durationSec: 60 * H, bucket: 'planificado' },
+        { label: 'MMPP', durationSec: 18 * H, bucket: 'externo' },
+        { label: 'Falla Mecánica', durationSec: 3 * H, bucket: 'mantencion' },
+      ],
+    }))
+    expect(t.map((c) => c.label)).toEqual(['MMPP', 'Falla Mecánica'])
+  })
+
   it('con menos de 3 muestra las que haya; con 0 no muestra nada', () => {
     expect(topCausas(imp({ topCategorias: [{ label: 'MMPP', durationSec: 3600, bucket: 'externo' }] }))).toHaveLength(1)
     expect(topCausas(imp({ topCategorias: [] }))).toEqual([])

@@ -72,8 +72,11 @@ export interface CausaPrincipal {
  */
 export function topCausas(imp: PeriodImputacion, n = 3): CausaPrincipal[] {
   if (imp.totalSec <= 0) return []
+  // Los paros programados (colación, aseo, charla) son tiempo acordado, no una
+  // causa: en octubre eran el 60 % y tapaban a las que sí hay que atacar.
+  // Siguen en el reparto completo del plegable.
   return imp.topCategorias
-    .filter((c) => c.label !== SIN_CAUSAL && c.durationSec > 0)
+    .filter((c) => c.label !== SIN_CAUSAL && c.durationSec > 0 && c.bucket !== 'planificado')
     .slice(0, n)
     .map((c) => ({ label: c.label, durationSec: c.durationSec, frac: c.durationSec / imp.totalSec, bucket: c.bucket }))
 }
@@ -85,12 +88,16 @@ export function etiquetaDueno(b: LossBucket | undefined): string | null {
   return `${meta.label} · ${meta.owner.charAt(0).toLowerCase()}${meta.owner.slice(1)}`
 }
 
-/** Mismo código de color por dueño que la cascada del turno (LossCascadeCard). */
+/**
+ * Mismo código de color por dueño que la cascada del turno (LossCascadeCard),
+ * pero más opaco: en una barra fina sobre su pista, el 15 % de la cascada no se
+ * distinguía de la pista (contraste 1,2:1, medido en el preview).
+ */
 const BUCKET_FILL: Record<string, string> = {
-  'planificado':    'bg-muted-foreground/[0.10]',
-  'externo':        'bg-warning/[0.15] pizarra:bg-[rgb(var(--serie-otros))] pz-trama',
-  'mantencion':     'bg-destructive/[0.15] pizarra:bg-[rgb(var(--serie-1))]',
-  'sin-clasificar': 'bg-cat-6-tint/[0.15] pizarra:bg-transparent pizarra:shadow-[inset_0_0_0_1px_rgb(var(--grafico-neutro-medio))]',
+  'planificado':    'bg-muted-foreground/60',
+  'externo':        'bg-warning/80 pizarra:bg-[rgb(var(--serie-otros))] pz-trama',
+  'mantencion':     'bg-destructive/80 pizarra:bg-[rgb(var(--serie-1))]',
+  'sin-clasificar': 'bg-cat-6-tint/80 pizarra:bg-transparent pizarra:shadow-[inset_0_0_0_1px_rgb(var(--grafico-neutro-medio))]',
 }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
