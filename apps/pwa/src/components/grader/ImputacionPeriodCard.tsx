@@ -17,6 +17,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Disclosure } from '@/components/piel'
 import { fmtSecPanoramic, type PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
+import { SIN_CAUSAL } from '@/services/shoplogix/imputacionPareto'
+import { LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
 
 export type TendenciaImputacion = { dir: 'sube' | 'baja' | 'estable'; deltaPts: number } | null
 
@@ -54,6 +56,43 @@ const nivel = (pct: number) =>
   : pct >= 60 ? { text: 'text-ink-warn pizarra:text-muted-foreground', bar: 'bg-warning/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Parcial' }
   : { text: 'text-ink-crit', bar: 'bg-destructive/[0.15] pizarra:bg-[rgb(var(--grafico-falla))]', label: 'Sin imputar' }
 
+export interface CausaPrincipal {
+  label: string
+  durationSec: number
+  /** Fracción (0-1) del TIEMPO DETENIDO total del período (`totalSec`). */
+  frac: number
+  bucket?: LossBucket
+}
+
+/**
+ * Las N causales con más tiempo del reparto que la card ya calcula
+ * (`topCategorias`). Se excluye «Sin causal anotada»: no es una causa, es lo que
+ * falta por anotar y ya se ve en «sin anotar». La base del % es el tiempo
+ * detenido total (`totalSec`), la misma de «de X detenidos» en la card.
+ */
+export function topCausas(imp: PeriodImputacion, n = 3): CausaPrincipal[] {
+  if (imp.totalSec <= 0) return []
+  return imp.topCategorias
+    .filter((c) => c.label !== SIN_CAUSAL && c.durationSec > 0)
+    .slice(0, n)
+    .map((c) => ({ label: c.label, durationSec: c.durationSec, frac: c.durationSec / imp.totalSec, bucket: c.bucket }))
+}
+
+/** «Externo · proceso / abastecimiento», «Mantención · equipos». */
+export function etiquetaDueno(b: LossBucket | undefined): string | null {
+  const meta = b ? LOSS_BUCKET_META[b as keyof typeof LOSS_BUCKET_META] : undefined
+  if (!meta) return null
+  return `${meta.label} · ${meta.owner.charAt(0).toLowerCase()}${meta.owner.slice(1)}`
+}
+
+/** Mismo código de color por dueño que la cascada del turno (LossCascadeCard). */
+const BUCKET_FILL: Record<string, string> = {
+  'planificado':    'bg-muted-foreground/[0.10]',
+  'externo':        'bg-warning/[0.15] pizarra:bg-[rgb(var(--serie-otros))] pz-trama',
+  'mantencion':     'bg-destructive/[0.15] pizarra:bg-[rgb(var(--serie-1))]',
+  'sin-clasificar': 'bg-cat-6-tint/[0.15] pizarra:bg-transparent pizarra:shadow-[inset_0_0_0_1px_rgb(var(--grafico-neutro-medio))]',
+}
+
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
   if (!imputacion || imputacion.totalSec <= 0) return null
 
@@ -62,6 +101,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
   const sinCausalSec = imputacion.totalSec - imputacion.imputadoSec
   const tend = tendenciaImputacion(imputacion.porTurno)
   const serie = imputacion.porTurno
+  const causas = topCausas(imputacion)
 
   return (
     <Card className="bg-card">
@@ -124,19 +164,46 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
-          <span className="tabular-nums">
-            <b className="text-foreground/85">{fmtSecPanoramic(imputacion.imputadoSec)}</b> con causal
-          </span>
+        {/* Las 3 causales con más tiempo, a la vista: es la evidencia de DÓNDE se
+            pierde el tiempo y de quién es (Mantención / proceso), antes escondida
+            detrás del plegable. % sobre el tiempo detenido total del período. */}
+        {causas.length > 0 && (
+          <ul className="space-y-1.5" aria-label="Causales con más tiempo detenido">
+            {causas.map((c) => {
+              const dueno = etiquetaDueno(c.bucket)
+              return (
+                <li
+                  key={c.label}
+                  title={`${c.label}: ${fmtSecPanoramic(c.durationSec)} = ${(c.frac * 100).toFixed(0)}% del tiempo detenido total del período (${fmtSecPanoramic(imputacion.totalSec)}, con y sin causal anotada).`}
+                >
+                  <div className="flex items-baseline justify-between gap-2 text-footnote">
+                    <span className="min-w-0 truncate text-foreground/90">
+                      {c.label}
+                      {dueno && (
+                        <span className="ml-1.5 text-caption text-muted-foreground">{dueno}</span>
+                      )}
+                    </span>
+                    <b className="shrink-0 tabular-nums text-foreground">{(c.frac * 100).toFixed(0)}%</b>
+                  </div>
+                  <div className="mt-0.5 h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full', (c.bucket && BUCKET_FILL[c.bucket]) ?? 'bg-muted-foreground/[0.10]')}
+                      style={{ width: `${Math.min(100, Math.max(2, c.frac * 100))}%` }}
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        <p className="text-caption text-muted-foreground tabular-nums">
+          <b className="text-foreground/85">{fmtSecPanoramic(imputacion.imputadoSec)}</b> con causal
           {sinCausalSec > 0 && (
-            <span className="tabular-nums">
-              <b className="text-foreground/85">{fmtSecPanoramic(sinCausalSec)}</b> sin anotar
-            </span>
+            <> · <b className="text-foreground/85">{fmtSecPanoramic(sinCausalSec)}</b> sin anotar</>
           )}
-          <span className="tabular-nums">
-            de {fmtSecPanoramic(imputacion.totalSec)} detenidos en {imputacion.turnos} turno{imputacion.turnos === 1 ? '' : 's'}
-          </span>
-        </div>
+          {' '}· de {fmtSecPanoramic(imputacion.totalSec)} detenidos en {imputacion.turnos} turno{imputacion.turnos === 1 ? '' : 's'}
+        </p>
 
         {/* §22: el % y la tendencia responden la pregunta de la tarjeta; el
             reparto por causal es DETALLE. Se despliega en línea (variante
@@ -144,8 +211,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
         {imputacion.topCategorias.length > 0 && (
           <Disclosure
             variant="inline"
-            title="Ver reparto por causal"
-            summary={`${imputacion.topCategorias.length} causales`}
+            title={`Ver las ${imputacion.topCategorias.length} causales y lo sin anotar`}
             defaultOpen={false}
             storageKey="grader-imputacion-causales"
           >
