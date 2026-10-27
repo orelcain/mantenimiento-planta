@@ -1493,7 +1493,7 @@ function MasDelTurnoV2({ mas, inicioMs, cerrado }: { mas: MasDelTurno; inicioMs:
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
         {comp.length > 1 && (
-          <Tarjeta icono={<CalendarRange className={ic} />} titulo="Comparado con otros días" sub={cerrado ? 'turno completo' : 'a esta misma altura del turno'}>
+          <Tarjeta icono={<CalendarRange className={ic} />} titulo="Comparado con otros días" sub={cerrado ? 'el mismo turno de otros días, completo' : 'el mismo turno de otros días, a esta misma altura'}>
             {hoyComp && mediaOtros != null && (
               <>
                 <Cifra valor={firmado(hoyComp.piezas - mediaOtros)} unidad="pz vs el promedio" chica />
