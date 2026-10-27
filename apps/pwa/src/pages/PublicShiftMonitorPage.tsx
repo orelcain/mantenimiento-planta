@@ -85,6 +85,8 @@ import {
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
+import { RitmoVivoV2 } from './monitor/RitmoVivoV2'
+import { ritmoVivoDeMonitor } from './monitor/ritmoVivo'
 import { repartoSemanal } from './monitor/repartoSemanal'
 import { Pill, SegmentedControl } from '@/components/piel'
 import { useIsAdmin, useIsSupervisor } from '@/store'
@@ -6582,6 +6584,9 @@ function MonitorDelToken() {
           const pv = !turnoCerrado && contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null
           const ahoraLinea = pv?.cpm ?? null
           const ahoraPorId = pv?.porMaquina?.length ? new Map(pv.porMaquina.map((x) => [x.id, x.cpm])) : null
+          /* Solo en vivo, con el turno que se está mirando y el contador fresco: con el vivo arrastrado
+             (`recalibrando`) el «Ahora» de arriba no es el último minuto cerrado y las dos cifras no cuadrarían. */
+          const vivoV2 = esActual && pv && !pv.recalibrando ? ritmoVivoDeMonitor({ pulse: data.pulse, live, ahoraPorId }) : null
           const meta = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
           const pm = live.mantencion?.porMaquina ?? []
           const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
@@ -6700,6 +6705,7 @@ function MonitorDelToken() {
                   .filter((d) => d.piezas > 0),
               }}
               ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} parte="estado" />}
+              ritmoVivo={vivoV2 ? <RitmoVivoV2 r={vivoV2.r} maquinas={vivoV2.maquinas} /> : undefined}
               caminoMeta={
                 <TiempoDelTurno
                   tb={live.timeBreakdown}
