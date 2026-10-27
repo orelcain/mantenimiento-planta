@@ -63,7 +63,29 @@ export interface Cascada {
   minutosDetenida: number
   /** Hasta qué instante (reloj de planta) describe la cascada. */
   corteWallMs: number | null
+  /** Qué pasa vacío por la máquina: carros en la Baader 142, silletas en la 200. */
+  contenedor: Contenedor
 }
+
+export type Contenedor = 'silleta' | 'carro'
+
+/**
+ * Carro o silleta, por MODELO de máquina y no por nombre de línea: la Baader 142
+ * (Eviscerado) lleva carros; la 200 (Filete), silletas. Sin modelo registrado se
+ * mira el nombre; sin pista, silleta, que es como se habló siempre de la cascada.
+ */
+export function contenedorDe(machines: Array<{ model?: string | null; name?: string | null }> | null | undefined): Contenedor {
+  const lista = machines ?? []
+  if (lista.some((m) => /\b142\b/.test(m.model || ''))) return 'carro'
+  if (lista.some((m) => /\b200\b/.test(m.model || ''))) return 'silleta'
+  if (lista.some((m) => /\b142\b|evisc/i.test(m.name || ''))) return 'carro'
+  return 'silleta'
+}
+
+/** «Silletas vacías» / «Carros vacíos». */
+export const vaciasEtiqueta = (c: Contenedor) => (c === 'carro' ? 'Carros vacíos' : 'Silletas vacías')
+/** «silletas» / «carros», en minúscula para las frases. */
+export const contenedorPlural = (c: Contenedor) => (c === 'carro' ? 'carros' : 'silletas')
 
 /** Piezas del último tramo cerrado, y hasta cuándo llega. */
 function hastaElUltimoTramo(live: PublicMonitorLive): { piezas: number | null; corteWallMs: number | null } {
@@ -137,7 +159,8 @@ export function construirCascada({ live, ritmoMaquina }: {
   ]
   if (pzDet > 0) pasos.push({ clave: 'detenciones', etiqueta: 'Detenciones', piezas: -pzDet, minutos: Math.round(minDet), veces: vecesDet })
   if (pzMicro > 0) pasos.push({ clave: 'micro', etiqueta: 'Microdetenciones', piezas: -pzMicro, minutos: Math.round(minMicro), veces: vecesMicro })
-  if (pzVacias > 0) pasos.push({ clave: 'vacias', etiqueta: 'Silletas vacías', piezas: -pzVacias })
+  const contenedor = contenedorDe(live.machines)
+  if (pzVacias > 0) pasos.push({ clave: 'vacias', etiqueta: vaciasEtiqueta(contenedor), piezas: -pzVacias })
   pasos.push({ clave: 'producido', etiqueta: 'Hizo', piezas: producido, minutos: Math.round(enMarcha) })
 
   return {
@@ -154,5 +177,6 @@ export function construirCascada({ live, ritmoMaquina }: {
     minutosEnMarcha: Math.round(enMarcha),
     minutosDetenida: Math.round(detenida),
     corteWallMs,
+    contenedor,
   }
 }
