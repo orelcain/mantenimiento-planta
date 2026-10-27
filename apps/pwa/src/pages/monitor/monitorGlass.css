@@ -1,0 +1,206 @@
+/*
+ * PROTOTIPO (no producción): dos formas de vidrio sobre el monitor de turno,
+ * activadas con ?glass=a | ?glass=b. Referencia: reel «Glassy Dashboard V2»
+ * (code.xr, buzón 25-10).
+ *   A · vidrio total: fondo ambiental + cada tarjeta translúcida (como el reel).
+ *   B · vidrio en el cromo: tarjetas sólidas; solo la cabecera es vidrio y su
+ *       halo toma el color del estado de la línea.
+ */
+
+/* ── A · vidrio total ─────────────────────────────────────────────────── */
+[data-glass='a'] {
+  background:
+    radial-gradient(circle at 15% 10%, rgb(222 160 120 / 0.55), transparent 45%),
+    radial-gradient(circle at 85% 35%, rgb(110 170 210 / 0.55), transparent 50%),
+    radial-gradient(circle at 35% 85%, rgb(160 190 130 / 0.5), transparent 45%),
+    rgb(236 230 222) !important;
+  background-attachment: fixed !important;
+}
+.dark [data-glass='a'] {
+  background:
+    radial-gradient(circle at 15% 10%, rgb(138 90 60 / 0.9), transparent 45%),
+    radial-gradient(circle at 85% 35%, rgb(47 95 122 / 0.9), transparent 50%),
+    radial-gradient(circle at 35% 85%, rgb(93 107 70 / 0.9), transparent 45%),
+    rgb(42 38 34) !important;
+  background-attachment: fixed !important;
+}
+[data-glass='a'] .bg-card {
+  background: rgb(255 255 255 / 0.45) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border-color: rgb(255 255 255 / 0.6) !important;
+}
+.dark [data-glass='a'] .bg-card {
+  background: rgb(255 255 255 / 0.12) !important;
+  border-color: rgb(255 255 255 / 0.2) !important;
+}
+[data-glass='a'] > header {
+  background: rgb(255 255 255 / 0.25) !important;
+  border-color: transparent !important;
+}
+.dark [data-glass='a'] > header {
+  background: rgb(0 0 0 / 0.15) !important;
+}
+
+/* ── B · vidrio en el cromo ───────────────────────────────────────────── */
+[data-glass='b'], [data-glass='v2'] {
+  --halo: 52 199 89; /* produciendo */
+  isolation: isolate;
+}
+[data-glass='b'][data-estado='detenida'], [data-glass='v2'][data-estado='detenida'] { --halo: 255 59 48; }
+[data-glass='b'][data-estado='sin-datos'], [data-glass='v2'][data-estado='sin-datos'] { --halo: 142 142 147; }
+[data-glass='b']::before, [data-glass='v2']::before {
+  content: '';
+  position: fixed;
+  inset: -120px -10% auto;
+  height: 380px;
+  background: radial-gradient(ellipse at 50% 35%, rgb(var(--halo) / 0.28), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+[data-glass='b'] > *, [data-glass='v2'] > * { position: relative; z-index: 1; }
+[data-glass='b'] > header, [data-glass='v2'] > header {
+  position: sticky;
+  z-index: 10;
+  background: rgb(var(--background) / 0.55) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-glass] .bg-card, [data-glass] > header {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ── v2 · B + tarjetas de una cifra (MonitorV2.tsx) ───────────────────── */
+[data-glass='v2'] .tabular-nums { font-family: inherit !important; }
+[data-glass='v2'] .v2-cifra { font-size: 40px; }
+@media (min-width: 1024px) { [data-glass='v2'] .v2-cifra { font-size: 52px; } }
+/* El monitor de siempre queda debajo, plegado: «Ver análisis completo». */
+[data-glass='v2']:not([data-detalle='2']) .monitor-v2 ~ * { display: none !important; }
+[data-glass='v2'][data-detalle='2'] .monitor-v2 { margin-bottom: 24px; }
+
+/* ── v2 · sistema visual estilo reel («Glassy Dashboard V2») ─────────────
+   Material ESMERILADO, no transparente: tarjeta al 78 % + blur sobre un fondo
+   ambiental suave. Da la profundidad del reel sin que el texto dependa de lo
+   que haya detrás (lección de la versión A). */
+[data-glass='v2'] {
+  --v2-acento: rgb(var(--brand));
+  --v2-mant: #f59e0b;
+  --v2-ext: #38bdf8;
+  --v2-gris: rgb(142 142 147 / 0.75);
+  --v2-prog: rgb(142 142 147 / 0.4);
+  --v2-secundaria: rgb(142 142 147 / 0.55);
+  --v2-tenue: rgb(142 142 147 / 0.6);
+  --v2-reja: rgb(142 142 147 / 0.14);
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 0%, rgb(var(--brand) / 0.14), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 95% 30%, rgb(245 158 11 / 0.08), transparent 70%),
+    radial-gradient(ellipse 70% 60% at 50% 100%, rgb(52 199 89 / 0.07), transparent 70%),
+    rgb(var(--background)) !important;
+  background-attachment: fixed !important;
+}
+[data-glass='v2'] .v2-tarjeta {
+  background: rgb(var(--card) / 0.78);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgb(255 255 255 / 0.55);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
+}
+.dark [data-glass='v2'] .v2-tarjeta {
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: none;
+}
+[data-glass='v2'] .v2-icono {
+  background: rgb(var(--brand) / 0.12);
+  color: rgb(var(--brand));
+}
+[data-glass='v2'] .v2-cifra-chica { font-size: 32px; }
+@media (min-width: 1024px) { [data-glass='v2'] .v2-cifra-chica { font-size: 38px; } }
+@media (prefers-reduced-transparency: reduce) {
+  [data-glass='v2'] .v2-tarjeta { background: rgb(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* Análisis vive en un contenedor de 2 columnas CSS: el v2 trae su propia grilla. */
+[data-glass='v2'] .monitor-v2 { column-span: all; }
+
+/* ── v2 · cabecera nueva y lo que reemplaza ─────────────────────────────── */
+[data-glass='v2'] > header, [data-glass='v2'] .v1-solo { display: none !important; }
+[data-glass='v2'] .v2-barra, [data-glass='v2'] .v2-segmentado {
+  background: rgb(var(--card) / 0.72);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgb(255 255 255 / 0.55);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.08);
+}
+.dark [data-glass='v2'] .v2-barra, .dark [data-glass='v2'] .v2-segmentado {
+  border-color: rgb(255 255 255 / 0.09);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.35);
+}
+[data-glass='v2'] .v2-seg-activo, [data-glass='v2'] .v2-boton-fuerte {
+  background: rgb(var(--foreground));
+  color: rgb(var(--background));
+}
+
+/* ── v2 · el análisis completo (lo de siempre, plegado) con el mismo material ── */
+[data-glass='v2'] main section:not(.v2-tarjeta):not(section section) {
+  background: rgb(var(--card) / 0.78) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgb(255 255 255 / 0.55) !important;
+  border-radius: 26px !important;
+  padding: 20px !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
+}
+.dark [data-glass='v2'] main section:not(.v2-tarjeta):not(section section) {
+  border-color: rgb(255 255 255 / 0.08) !important;
+  box-shadow: none;
+}
+/* Sin tarjeta dentro de tarjeta: lo anidado se aplana. */
+[data-glass='v2'] main section section:not(.v2-tarjeta) {
+  background: transparent !important;
+  border: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* Rótulos de 11 px en mayúsculas → subtítulo legible, como el reel. */
+[data-glass='v2'] main .text-\[11px\] { font-size: 13px !important; }
+[data-glass='v2'] main .uppercase { text-transform: none !important; letter-spacing: 0 !important; }
+[data-glass='v2'] main .font-mono { font-family: inherit !important; }
+
+/* Los paneles de detalle viven en un portal (fuera de [data-glass]): llevan sus variables. */
+.v2-vars {
+  --v2-acento: rgb(var(--brand));
+  --v2-mant: #f59e0b;
+  --v2-ext: #38bdf8;
+  --v2-gris: rgb(142 142 147 / 0.75);
+  --v2-prog: rgb(142 142 147 / 0.4);
+  --v2-secundaria: rgb(142 142 147 / 0.55);
+  --v2-tenue: rgb(142 142 147 / 0.6);
+  --v2-reja: rgb(142 142 147 / 0.14);
+}
+.v2-panel-lateral {
+  background: rgb(var(--card) / 0.86);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  border-left: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: -20px 0 60px rgb(0 0 0 / 0.25);
+  animation: v2-entra 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes v2-entra { from { transform: translateX(40px); opacity: 0 } to { transform: none; opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .v2-panel-lateral { animation: none } }
+.v2-tip {
+  background: rgb(var(--card) / 0.92);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgb(142 142 147 / 0.25);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+[data-glass='v2'] .v2-tarjeta[role='button'] { cursor: pointer; transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1); }
+@media (hover: hover) { [data-glass='v2'] .v2-tarjeta[role='button']:hover { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { [data-glass='v2'] .v2-tarjeta[role='button']:hover { transform: none; } }
+
+/* Subtarjeta (velocidad por máquina) y rojo crítico. */
+[data-glass='v2'] .v2-subtarjeta { background: rgb(142 142 147 / 0.08); }
+[data-glass='v2'], .v2-vars { --v2-crit: #ef4444; }
