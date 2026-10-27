@@ -6678,6 +6678,13 @@ function MonitorDelToken() {
                 />
               }
               minutoAMinuto={barrasMinuto}
+              /* Las paradas cuentan sus minutos desde el primer tramo de la serie del turno (el mismo t0 de los grupos). */
+              eventoMarcado={(() => {
+                const base = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
+                if (!tramoSel || !Number.isFinite(base)) return null
+                return { desdeMs: base + tramoSel.desdeMin * 60_000, hastaMs: base + tramoSel.hastaMin * 60_000, causa: causaSel }
+              })()}
+              onQuitarEvento={() => setTramoSel(null)}
               vista={vistaV2}
               onVista={setVistaV2}
             />
