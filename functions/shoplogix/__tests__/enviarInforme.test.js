@@ -316,3 +316,29 @@ test('un envio fallido NO deja rastro de envio', async () => {
   assert.strictEqual(escrito.informePdfSentAt, undefined)
   assert.strictEqual(escrito.informePdfIntentos, 1)
 })
+
+
+// ── Para copiar al correo ───────────────────────────────────────────────────
+//
+// El correo no se envía desde el servidor: el monitor pide el informe armado y
+// quien lo pega lo manda desde su buzón. Lo que se fija acá es que sea el mismo
+// informe que va a Telegram y que no escriba nada.
+
+const { informeParaCorreo } = require('../enviarInforme')
+
+test('informeParaCorreo arma asunto, HTML y PDF sin escribir en Firestore', async () => {
+  const db = fakeDb({ machines: [maquina('Ev 1', 2160), maquina('Ev 2', 2160)] })
+  const r = await informeParaCorreo({ db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', logger: silencioso })
+  assert.match(r.asunto, /^Eviscerados Chonchi · Turno 1 · 2026-08-17 · 4\.320 piezas/)
+  assert.match(r.html, /^<!doctype html>/)
+  assert.strictEqual(r.pdf.subarray(0, 4).toString(), '%PDF')
+  assert.strictEqual(r.nombreArchivo, 'informe-turno-chonchi-2026-08-17_Turno-1.pdf')
+  assert.strictEqual(db.escrituras.length, 0, 'copiar el correo no puede marcar el turno como enviado')
+})
+
+test('informeParaCorreo respeta el mínimo de piezas', async () => {
+  const r = await informeParaCorreo({
+    db: fakeDb({ machines: [maquina('Ev 1', 10)] }), plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', logger: silencioso,
+  })
+  assert.deepStrictEqual(r, { motivo: 'sin-produccion' })
+})

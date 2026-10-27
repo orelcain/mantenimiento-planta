@@ -277,12 +277,62 @@
   --v2-mal: #c9645d;
   /* Como TEXTO en claro el coral no llega a 4,5:1 sobre el fondo: va un tono más oscuro (5,1:1). */
   --v2-mal-texto: #a8463f;
+  /* Ámbar como TEXTO en claro (el trazo #c98f3a no llega a 4,5:1) y celeste de «micro detención». */
+  --v2-atento-texto: #92400e;
+  --v2-ext-texto: #0369a1;
 }
 .dark [data-glass='v2'], .dark .v2-vars {
   --v2-atento: #e0b46e;
   --v2-mal: #e48a82;
   --v2-mal-texto: #e48a82;
+  --v2-atento-texto: #e0b46e;
+  --v2-ext-texto: #7dd3fc;
 }
+
+/* ── Ritmo en vivo · 15 min (RitmoVivoV2.tsx) ─────────────────────────────
+   Celular: una columna en el orden de lectura. PC: la tira al centro y el
+   llenado a la derecha, para que las dos curvas se lean lado a lado. */
+.rv-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.rv-l { padding-top: 14px; border-top: 1px solid rgb(var(--border) / 0.6); }
+@media (min-width: 1024px) {
+  .rv-grid {
+    grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: 'h s l' 'p s l' 'a s l' 'g s l';
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: 28px;
+    row-gap: 14px;
+    align-items: start;
+  }
+  .rv-h { grid-area: h; }
+  .rv-p { grid-area: p; }
+  .rv-a { grid-area: a; }
+  .rv-s { grid-area: s; }
+  .rv-l { grid-area: l; padding-top: 0; border-top: 0; }
+  .rv-g { grid-area: g; }
+}
+.rv-cifra { font-size: 32px; }
+@media (min-width: 1024px) { .rv-cifra { font-size: 38px; } }
+.rv-crono { font-size: 28px; line-height: 34px; font-weight: 700; }
+.rv-punto { display: inline-block; width: 7px; height: 7px; border-radius: 99px; background: var(--v2-bien); }
+.rv-grid:has(.rv-parada[data-clase='micro']) .rv-punto { background: var(--v2-ext); }
+.rv-grid:has(.rv-parada[data-clase='detencion']) .rv-punto { background: var(--v2-mal); }
+.rv-micro { display: inline-block; width: 7px; height: 7px; border-radius: 99px; border: 2px solid var(--v2-ext); background: rgb(var(--card)); }
+.rv-ver { color: var(--v2-bien); }
+.rv-tira:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 4px; border-radius: 12px; }
+.rv-parada { padding: 12px 14px; background: color-mix(in srgb, var(--v2-gris) 16%, transparent); }
+.rv-parada[data-clase='micro'] { background: color-mix(in srgb, var(--v2-ext) 12%, transparent); }
+.rv-parada[data-clase='detencion'] { background: color-mix(in srgb, var(--v2-mal) 14%, transparent); }
+.rv-parada .rv-parada-texto { color: rgb(var(--foreground)); }
+.rv-parada[data-clase='micro'] .rv-parada-texto { color: var(--v2-ext-texto); }
+.rv-parada[data-clase='detencion'] .rv-parada-texto { color: var(--v2-mal-texto); }
+.rv-parada .rv-parada-icono { color: var(--v2-gris); }
+.rv-parada[data-clase='micro'] .rv-parada-icono { color: var(--v2-ext); }
+.rv-parada[data-clase='detencion'] .rv-parada-icono { color: var(--v2-mal); }
+/* El punto de «en vivo» late suave; con movimiento reducido queda quieto. */
+@media (prefers-reduced-motion: no-preference) {
+  .rv-punto { animation: rv-late 2s ease-in-out infinite; }
+}
+@keyframes rv-late { 50% { opacity: 0.35; } }
 
 /* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con
    degradé y brillo, colores de la paleta calma. */
