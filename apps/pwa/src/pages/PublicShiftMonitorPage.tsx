@@ -77,11 +77,14 @@ import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
 import { DUENO_UI } from './monitor/duenoUi'
 import { PanelTarjetas, TarjetaTablero } from './monitor/Tablero'
+import './monitor/monitorGlass.css'
 import {
   APORTE_MIN_PROD_MIN, deltaAporte, referenciaAporte, type ReferenciaAporte,
 } from './monitor/aporteHistorico'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
-import { duenoDe } from '@/services/shoplogix/monitorEventos'
+import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
+import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
+import { repartoSemanal } from './monitor/repartoSemanal'
 import { Pill, SegmentedControl } from '@/components/piel'
 import { useIsAdmin, useIsSupervisor } from '@/store'
 import { toast } from '@/hooks/useToast'
@@ -4536,6 +4539,10 @@ function MonitorDelToken() {
    * página en cartel sería quitarle justo lo que fue a buscar.
    */
   const modoPantalla = searchParams.get('pantalla') === '1'
+  // PROTOTIPO glass (no producción): ?glass=a | ?glass=b, ver monitor/monitorGlass.css
+  const glassParam = searchParams.get('glass')
+  const glass = glassParam === 'a' || glassParam === 'b' || glassParam === 'v2' ? glassParam : undefined
+  const [vistaV2, setVistaV2] = useState<VistaV2>(0)
   /**
    * La PESTAÑA (`?ver=analisis`): el turno (lo que se vigila y cómo viene) o
    * el análisis (lo que se mira después: qué se repite, de quién fue la
@@ -5969,7 +5976,27 @@ function MonitorDelToken() {
   ) : null
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)}>
+      {glass === 'v2' && !modoPantalla && (
+        <CabeceraV2
+          titulo={lineTitle}
+          area={areaTitle ?? null}
+          estado={turnoCerrado
+            ? <Pill tone="neutral" dot>Turno terminado{live.effectiveEnd ? ` ${fmtWallTime(live.effectiveEnd)}` : ''}</Pill>
+            : <StatusPill live={live} sinDatosHaceMin={sinDatosHaceMin} />}
+          tema={botonTema}
+          cambioLinea={<CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} />}
+          navTurnos={navegacionTurnos}
+          sub={[
+            vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId),
+            fmtDateLong(vista?.dateKey || data.dateKey),
+            `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`,
+          ].filter(Boolean).join(' · ')}
+          pestana={pestana}
+          onPestana={verPestana}
+          onModoTv={entrarModoTv}
+        />
+      )}
       {/* Cabecera: qué línea, qué turno, qué día, desde qué hora */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
         {/* En PC la banda es UNA: título+detalle a la izquierda, navegación y
@@ -6138,13 +6165,13 @@ function MonitorDelToken() {
           scroll. El análisis dejó de compartir scroll con lo vivo — quien
           entra por el QR viene a ver cómo va el turno. */}
       {!modoPantalla && (
-        <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="mx-auto max-w-3xl px-4 pt-3 lg:hidden" />
+        <CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} className="v1-solo mx-auto max-w-3xl px-4 pt-3 lg:hidden" />
       )}
       {navegacionTurnos && (
-        <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{navegacionTurnos}</div>
+        <div className="v1-solo mx-auto max-w-3xl px-4 pt-3 lg:hidden">{navegacionTurnos}</div>
       )}
       {selectorPestana && (
-        <div className="mx-auto max-w-3xl px-4 pt-3 lg:hidden">{selectorPestana}</div>
+        <div className="v1-solo mx-auto max-w-3xl px-4 pt-3 lg:hidden">{selectorPestana}</div>
       )}
 
       {/*
@@ -6201,7 +6228,7 @@ function MonitorDelToken() {
             del presupuesto de 1080. */}
         {(!modoPantalla || tablero.editando) && (
           <>
-          <div className="hidden items-center justify-end gap-2 lg:flex">
+          <div className="v1-solo hidden items-center justify-end gap-2 lg:flex">
             {tablero.editando && (
               <span className="mr-auto text-[12px] text-muted-foreground">
                 Arrastra para mover · estira desde ◢ · ✕ quita la tarjeta
@@ -6257,6 +6284,124 @@ function MonitorDelToken() {
          * mismas cuatro tarjetas con props idénticos solo para cambiar el
          * orden — ahora el orden es dato, no estructura.
          */}
+        {glass === 'v2' && (() => {
+          const meta = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
+          const pm = live.mantencion?.porMaquina ?? []
+          const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
+          const fallaMin = pm.reduce((a, x) => a + x.fallaMin, 0)
+          const previos = (data.history ?? []).slice(-6).flatMap((h) => {
+            const hp = h.live?.mantencion?.porMaquina ?? []
+            const ev = hp.reduce((a, x) => a + x.eventosFalla, 0)
+            return ev > 0 ? [hp.reduce((a, x) => a + x.fallaMin, 0) / ev] : []
+          })
+          const disp = pm.map((x) => x.dispTecnicaPct).filter((x): x is number => x != null)
+          const porDueno = new Map<DuenoPerdida, number>()
+          for (const r of live.timeBreakdown?.recoverable ?? []) {
+            const d = duenoDe(r.reason).dueno
+            porDueno.set(d, (porDueno.get(d) ?? 0) + (r.equivMin ?? r.lineMin ?? r.min))
+          }
+          const hoy = comparacion.days.find((d) => d.esHoy)
+          const previo = comparacion.days.find((d) => !d.esHoy && d.curve.length > 1)
+          return (
+            <MonitorV2
+              piezas={contador.valor}
+              corteHora={!live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null}
+              meta={meta}
+              proyeccion={pace?.projectedPieces ?? null}
+              ritmo={ritmoAndando.hoy ?? live.recentPiecesPerMinute ?? null}
+              ritmoNecesario={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
+              setPoint={live.setPoint?.cpm ?? null}
+              vsAyer={vsAyer}
+              mant={live.mantencion ? {
+                fallas, fallaMin,
+                mttr: fallas > 0 ? fallaMin / fallas : null,
+                mttrPrevio: previos.length ? previos.reduce((a, x) => a + x, 0) / previos.length : null,
+                dispPct: disp.length ? disp.reduce((a, x) => a + x, 0) / disp.length : null,
+              } : null}
+              eventos={(live.mantencion?.eventos ?? []).map((e) => ({ maquina: e.maquina, desde: e.desde, hasta: e.hasta, min: e.min, causa: e.causas[0] ?? null, causas: e.causas }))}
+              rielMttr={[
+                ...(data.history ?? []).slice(-7).map((h) => {
+                  const hp = h.live?.mantencion?.porMaquina ?? []
+                  const ev = hp.reduce((a, x) => a + x.eventosFalla, 0)
+                  const d = (h.live?.scheduledStart ?? h.shiftDocId).slice(5, 10)
+                  const nom = (h as { shiftId?: string | null }).shiftId ?? h.live?.shiftName ?? h.shiftDocId
+                  const num = /turno\s*(\d+)/i.exec(nom)
+                  const t = num ? `T${num[1]}` : /noche/i.test(nom) ? 'N' : /d[ií]a/i.test(nom) ? 'D' : ''
+                  return { label: `${d.slice(3, 5)}/${d.slice(0, 2)}${t ? ' ' + t : ''}`, mttr: ev > 0 ? hp.reduce((a, x) => a + x.fallaMin, 0) / ev : null }
+                }),
+                { label: 'Hoy', mttr: fallas > 0 ? fallaMin / fallas : null, hoy: true },
+              ]}
+              perdidas={(['mantencion', 'externo', 'sin-imputar'] as DuenoPerdida[]).map((d) => ({ dueno: d, min: porDueno.get(d) ?? 0 }))}
+              causas={(live.timeBreakdown?.recoverable ?? [])
+                .map((r) => ({ causa: r.reason, min: r.equivMin ?? r.lineMin ?? r.min, dueno: duenoDe(r.reason).dueno, veces: r.count }))
+                .filter((c) => c.min > 0)
+                .sort((a, b) => b.min - a.min)}
+              maquinas={live.machines.map((m) => ({
+                name: m.name,
+                status: m.status,
+                desdeMin: m.currentSinceAt ? Math.max(0, (now - new Date(now).getTimezoneOffset() * 60_000 - Date.parse(m.currentSinceAt)) / 60_000) : null,
+                cpm: m.piecesPerHour > 0 ? m.piecesPerHour / 60 : null,
+                razon: m.currentReason,
+                piezas: m.pieces,
+                dispPct: Number.isFinite(m.uptimePct) ? m.uptimePct : null,
+              }))}
+              programadas={(live.timeBreakdown?.planned ?? []).map((r) => ({ causa: r.reason, min: r.lineMin ?? r.min })).filter((c) => c.min > 0).sort((a, b) => b.min - a.min)}
+              inicioMs={serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null}
+              cierre={pace ? {
+                hora: live.plannedEnd ? fmtWallTime(live.plannedEnd) : null,
+                quedaMin: pace.remainingMin,
+                faltan: pace.remainingPieces,
+                colacionMin: pace.pendingBreakMin,
+                extraCpm: pace.withExtraHour?.requiredPerMinute ?? null,
+                extraFactible: pace.withExtraHour?.feasible ?? null,
+              } : null}
+              ritmoInfo={{
+                recienteCpm: live.recentPiecesPerMinute ?? null,
+                recienteMin: live.recentMinutes ?? null,
+                medianaCpm: live.paceMedianCpm ?? null,
+                mejorCpm: live.paceBestCpm ?? null,
+                muestras: live.paceSamples ?? null,
+                setPointFecha: live.setPoint?.medidoEl ?? null,
+                setPointMetodo: live.setPoint?.metodo ?? null,
+              }}
+              mantPorMaquina={pm.map((x) => ({ name: x.name, disp: x.dispTecnicaPct, fallas: x.eventosFalla, fallaMin: x.fallaMin, mttr: x.mttrMin, microN: x.microN, microMin: x.microMin }))}
+              curva={hoy && hoy.curve.length > 1 ? {
+                hoy: hoy.curve,
+                previo: previo ? { label: previo.label, curve: previo.curve } : null,
+                objetivo: comparacion.optimal,
+                maxMin: comparacion.maxMinutes,
+              } : null}
+              cerrado={turnoCerrado}
+              mas={{
+                cascada,
+                tiempo: live.timeBreakdown ? {
+                  windowMin: live.timeBreakdown.windowMin,
+                  producingMin: live.timeBreakdown.producingMin,
+                  plannedMin: live.timeBreakdown.plannedMin,
+                  recoverableMin: live.timeBreakdown.recoverableMin,
+                } : null,
+                velocidad: seriesMaquinas?.map((m) => ({ nombre: m.nombre, cpm: m.serie.map((x) => x / 5), objetivo: m.targetCpm ?? null })) ?? null,
+                minuto: (() => {
+                  const sm = esActual ? data.pulse?.serieMinuto : null
+                  if (!sm?.maquinas?.length) return null
+                  const desdeMs = Date.parse(sm.desde)
+                  const largo = Math.min(...sm.maquinas.map((m) => m.cycles.length))
+                  if (!Number.isFinite(desdeMs) || largo < 2) return null
+                  const ciclos = Array.from({ length: largo }, (_, i) => sm.maquinas.reduce((a, m) => a + (m.cycles[i] ?? 0), 0))
+                  /* Cerrado, los minutos en cero DESPUÉS de la última pieza no son una línea parada: el turno ya terminó. */
+                  if (turnoCerrado) while (ciclos.length > 2 && ciclos[ciclos.length - 1] === 0) ciclos.pop()
+                  const esperado = sm.maquinas.every((m) => m.esperado != null) ? sm.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null
+                  return { desdeMs, ciclos, esperado }
+                })(),
+                comparado: comparacion.days
+                  .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))
+                  .filter((d) => d.piezas > 0),
+              }}
+              vista={vistaV2}
+              onVista={setVistaV2}
+            />
+          )
+        })()}
         <div className="tablero-turno flex flex-col gap-3 lg:grid lg:[grid-template-columns:repeat(6,minmax(0,1fr))] lg:[grid-auto-rows:minmax(56px,auto)] lg:[grid-auto-flow:dense] lg:items-stretch">
         {/* Piezas acumuladas — el número que vienen a ver */}
         <TarjetaTablero id="resultado" t={tablero}>
@@ -7171,6 +7316,22 @@ function MonitorDelToken() {
               con columnas se empaquetan. Dos columnas, no tres: a tres el
               pareto queda demasiado angosto para leer sus barras. */}
           <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
+        {glass === 'v2' && (() => {
+          const meta = data.targetPieces ?? live.quotaPieces ?? null
+          const ini = live.scheduledStart ? Date.parse(live.scheduledStart) : NaN
+          const fin = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
+          const horasTurno = !Number.isNaN(ini) && !Number.isNaN(fin) && fin > ini ? (fin - ini) / 3_600_000 : null
+          return (
+            <MonitorV2Analisis
+              pareto={pareto ? { rows: pareto.rows, totalMin: pareto.totalMin, totalPiezas: pareto.totalPiezas, shifts: pareto.shifts, porDueno: pareto.porDueno } : null}
+              semanas={repartoSemanal(data.shiftStats)}
+              horas={buildHourlyRows(serieDelTurno)}
+              metaPorHora={meta && horasTurno ? meta / horasTurno : null}
+              vista={vistaV2}
+              onVista={setVistaV2}
+            />
+          )
+        })()}
         <ParetoDeParadas
           pareto={pareto} ctx={paretoCtx} tendencia={paretoTendencia}
           porTurno={paretoPorTurno}
