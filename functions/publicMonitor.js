@@ -1183,7 +1183,10 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
   // razón en cada evento engorda el doc sin aportar nada.
   const stopReasons = []
   const eventosCrudos = []
-  for (const m of machines) {
+  // `m` = índice en `stopMachines`: de qué máquina es cada parada (Eviscerado tiene 3 Baader y
+  // el análisis tiene que poder decir cuál es la que para).
+  const stopMachines = machines.map(m => m.id)
+  for (const [mi, m] of machines.entries()) {
     for (const st of m.states || []) {
       if (st.type === 'uptime') continue
       if (esPlannedDowntime(st)) continue
@@ -1193,13 +1196,13 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
       const reason = (st.reason || st.name || 'Sin razón').trim()
       let r = stopReasons.indexOf(reason)
       if (r === -1) { stopReasons.push(reason); r = stopReasons.length - 1 }
-      eventosCrudos.push({ r, f: desde.toISOString(), s: sec })
+      eventosCrudos.push({ r, f: desde.toISOString(), s: sec, m: mi })
     }
   }
   const vistosEv = new Set()
   const stopEvents = eventosCrudos
     .filter(e => {
-      const k = `${e.r}|${e.f}|${e.s}`
+      const k = `${e.m}|${e.r}|${e.f}|${e.s}`
       if (vistosEv.has(k)) return false
       vistosEv.add(k)
       return true
@@ -1914,7 +1917,9 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
     /** Razones, para que los eventos no repitan el texto en cada uno. */
     comments: comentarios.slice(0, COMMENTS_MAX),
     stopReasons,
-    /** Detenciones ubicadas en el tiempo: `r` = índice en stopReasons. */
+    /** Ids de máquina, referenciados por índice desde `stopEvents[].m`. */
+    stopMachines,
+    /** Detenciones ubicadas en el tiempo: `r` = índice en stopReasons, `m` = índice en stopMachines. */
     stopEvents,
   }
 }

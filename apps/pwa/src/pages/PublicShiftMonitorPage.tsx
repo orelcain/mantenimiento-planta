@@ -4623,7 +4623,7 @@ function MonitorDelToken() {
   const [causaSel, setCausaSel] = useState<string | null>(null)
   /* La parada concreta que se está mirando: marca UNA banda, no las 40 de su
      causa. Se limpia al soltar la causa o al elegir otra. */
-  const [tramoSel, setTramoSel] = useState<Ventana | null>(null)
+  const [tramoSel, setTramoSel] = useState<(Ventana & { maquinaId?: string | null }) | null>(null)
   /**
    * El tramo de turno que se está mirando, en minutos desde el primer tramo
    * con dato. Vive acá porque lo COMPARTEN los dos gráficos: acercarse en la
@@ -5106,6 +5106,9 @@ function MonitorDelToken() {
         tb: live?.timeBreakdown,
         stopEvents: live?.stopEvents,
         stopReasons: live?.stopReasons,
+        /* De qué Baader fue cada parada: el análisis tiene que poder decir cuál es la que para. */
+        stopMachines: live?.stopMachines,
+        nombresMaquina: Object.fromEntries((live?.machines ?? []).map((m) => [m.id, nombreCorto(m.name)])),
         costo: costoParadas,
         cpmGlobal:
           live?.timeBreakdown && live.timeBreakdown.producingMin > 0
@@ -6678,6 +6681,13 @@ function MonitorDelToken() {
                 />
               }
               minutoAMinuto={barrasMinuto}
+              /* Las paradas cuentan sus minutos desde el primer tramo de la serie del turno (el mismo t0 de los grupos). */
+              eventoMarcado={(() => {
+                const base = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
+                if (!tramoSel || !Number.isFinite(base)) return null
+                return { desdeMs: base + tramoSel.desdeMin * 60_000, hastaMs: base + tramoSel.hastaMin * 60_000, causa: causaSel, maquinaId: tramoSel.maquinaId ?? null }
+              })()}
+              onQuitarEvento={() => setTramoSel(null)}
               vista={vistaV2}
               onVista={setVistaV2}
             />
