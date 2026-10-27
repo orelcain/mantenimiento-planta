@@ -689,6 +689,9 @@ export interface MonitorV2Props {
   cerrado: boolean
   /** Lo que se ve al tocar «Ver más del turno». */
   mas: MasDelTurno
+  /** «Ritmo de la línea» del clásico (ahora, media 15 min, promedio, meta, techo y cada máquina). Si viene,
+      reemplaza al KPI Ritmo y a la tarjeta Máquinas: cada cifra se muestra una sola vez. */
+  ritmoLinea?: ReactNode
   /** «Camino a la meta» del monitor clásico (hechas, paradas por causa, ritmo, por jugar): se ve tal cual. */
   caminoMeta?: ReactNode
   /** Velocidad minuto a minuto de todo el turno (ciclos de Shoplogix por máquina). */
@@ -854,7 +857,7 @@ export function MonitorV2(p: MonitorV2Props) {
   return (
     <div className="monitor-v2 flex flex-col gap-3 lg:gap-4">
       {/* Fila 1 · las cuatro cifras que se miran de lejos */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      <div className={`grid grid-cols-2 gap-3 lg:gap-4 ${p.ritmoLinea ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
         <Tarjeta onAbrir={abrir('piezas')} className="col-span-2 lg:col-span-1" icono={<Target className={ic} />} titulo={p.cerrado ? 'Piezas del turno' : 'Piezas ahora'} sub={p.corteHora ? `Shoplogix ${p.corteHora}` : undefined}>
           <Cifra valor={int(p.piezas)} unidad="pz" />
           {p.meta != null && pct != null && (
@@ -874,14 +877,14 @@ export function MonitorV2(p: MonitorV2Props) {
           </Tarjeta>
         )}
 
-        <Tarjeta onAbrir={abrir('ritmo')} icono={<Gauge className={ic} />} titulo="Ritmo" sub={p.ritmoAhora != null ? 'pz/min ahora' : 'pz/min promedio andando'}>
+        {!p.ritmoLinea && <Tarjeta onAbrir={abrir('ritmo')} icono={<Gauge className={ic} />} titulo="Ritmo" sub={p.ritmoAhora != null ? 'pz/min ahora' : 'pz/min promedio andando'}>
           <Cifra valor={ritmoGrande != null ? dec(ritmoGrande) : '—'} unidad="pz/min" />
           {p.ritmoNecesario != null && ritmoGrande != null
             ? <Contexto tono={ritmoGrande >= p.ritmoNecesario ? 'ok' : 'warning'} nota={p.ritmoAhora != null && p.ritmo != null ? `promedio ${dec(p.ritmo)}` : p.setPoint ? `set ${dec(p.setPoint, 0)}` : undefined}>necesita {dec(p.ritmoNecesario)}</Contexto>
             : p.vsAyer && <Contexto tono={p.vsAyer.diff >= 0 ? 'ok' : 'critical'}>{firmado(p.vsAyer.diff)} pz vs {p.vsAyer.label}</Contexto>}
-        </Tarjeta>
+        </Tarjeta>}
 
-        <Tarjeta onAbrir={abrir('mant')} className={`col-span-2 ${conProyeccion ? 'lg:col-span-1' : 'lg:col-span-2'}`} icono={<Wrench className={ic} />} titulo="Respuesta de Mantención" sub="minutos por falla técnica">
+        <Tarjeta onAbrir={abrir('mant')} className={`${conProyeccion && p.ritmoLinea ? 'col-span-1' : 'col-span-2'} ${conProyeccion || p.ritmoLinea ? 'lg:col-span-1' : 'lg:col-span-2'}`} icono={<Wrench className={ic} />} titulo="Respuesta de Mantención" sub="minutos por falla técnica">
           {p.mant && p.mant.fallas > 0 ? (
             <>
               <Cifra valor={p.mant.mttr != null ? dec(p.mant.mttr) : '—'} unidad="min" />
@@ -898,16 +901,18 @@ export function MonitorV2(p: MonitorV2Props) {
         </Tarjeta>
       </div>
 
+      {p.ritmoLinea && <div className="v2-clasico v2-ritmo">{p.ritmoLinea}</div>}
+
       {p.caminoMeta && <div className="v2-clasico">{p.caminoMeta}</div>}
 
       {/* Fila 2 · la curva del turno y las máquinas */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
         {p.curva && (
-          <Tarjeta onAbrir={abrir('curva')} className="lg:col-span-3" icono={<TrendingUp className={ic} />} titulo="Cómo viene el turno" sub="piezas acumuladas desde la primera pieza">
+          <Tarjeta onAbrir={abrir('curva')} className={p.ritmoLinea ? 'lg:col-span-4' : 'lg:col-span-3'} icono={<TrendingUp className={ic} />} titulo="Cómo viene el turno" sub="piezas acumuladas desde la primera pieza">
             <Curva curva={p.curva} inicioMs={p.inicioMs} />
           </Tarjeta>
         )}
-        <Tarjeta onAbrir={abrir('maquinas')} className={p.curva ? '' : 'lg:col-span-4'} icono={<Cpu className={ic} />} titulo="Máquinas" sub={`${corriendo} de ${p.maquinas.length} corriendo`}>
+        {!p.ritmoLinea && <Tarjeta onAbrir={abrir('maquinas')} className={p.curva ? '' : 'lg:col-span-4'} icono={<Cpu className={ic} />} titulo="Máquinas" sub={`${corriendo} de ${p.maquinas.length} corriendo`}>
           <ul className="mt-4 space-y-3">
             {p.maquinas.map((m) => (
               <li key={m.name} className="flex items-center justify-between gap-3">
@@ -923,7 +928,7 @@ export function MonitorV2(p: MonitorV2Props) {
               </li>
             ))}
           </ul>
-        </Tarjeta>
+        </Tarjeta>}
       </div>
 
       {p.minutoAMinuto && (

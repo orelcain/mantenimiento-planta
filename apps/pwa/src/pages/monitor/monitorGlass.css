@@ -322,3 +322,88 @@
 [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.w-20 {
   font-size: 13px !important;
 }
+
+/* «Ritmo de la línea» en el v2: el componente del clásico (mismas cuentas) con la piel del reel.
+   Cifra protagonista, barra en cápsula con degradé, cada máquina como fila de cifra + barra +
+   deltas en píldora. Las notas que explican cada número quedan fuera: es la vista en vivo. */
+[data-glass='v2'] .v2-ritmo > section > div:first-child {
+  font-size: 15px !important;
+  font-weight: 600;
+  color: rgb(var(--foreground));
+  gap: 10px;
+}
+[data-glass='v2'] .v2-ritmo > section > div:first-child > svg {
+  width: 32px;
+  height: 32px;
+  padding: 8px;
+  border-radius: 999px;
+  background: rgb(var(--brand) / 0.12);
+  color: rgb(var(--brand));
+}
+[data-glass='v2'] .v2-ritmo .text-\[42px\] { font-size: 56px !important; letter-spacing: -0.03em; }
+@media (min-width: 1024px) { [data-glass='v2'] .v2-ritmo .text-\[42px\] { font-size: 68px !important; } }
+[data-glass='v2'] .v2-ritmo .ml-auto .text-headline { font-size: 24px; font-weight: 600; }
+[data-glass='v2'] .v2-ritmo > section > p.text-\[11px\],
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas > p { display: none; }
+[data-glass='v2'] .v2-ritmo .text-ink-ok { color: var(--v2-bien) !important; }
+[data-glass='v2'] .v2-ritmo .bg-ink-ok { background: var(--v2-bien) !important; }
+[data-glass='v2'] .v2-ritmo .h-2\.5 { height: 14px; background: rgb(142 142 147 / 0.14) !important; }
+[data-glass='v2'] .v2-ritmo .h-2\.5 > span:first-child,
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .h-2 > span {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--v2-bien) 50%, transparent), var(--v2-bien)) !important;
+}
+[data-glass='v2'] .v2-ritmo .h-2\.5 > span:first-child { box-shadow: 0 0 16px color-mix(in srgb, var(--v2-bien) 45%, transparent); }
+[data-glass='v2'] .v2-ritmo .h-2\.5 > span.w-0\.5 { width: 3px; border-radius: 999px; background: rgb(var(--foreground)) !important; }
+[data-glass='v2'] .v2-ritmo button.border { border: 0 !important; background: rgb(var(--brand) / 0.12); padding: 4px 12px !important; }
+/* Máquinas: subtarjetas con aire, cifras grandes, deltas en píldora suave. */
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas { border-top: 0 !important; margin-top: 20px; padding-top: 0 !important; }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child { padding: 0 14px; }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas > .space-y-1\.5 { display: grid; gap: 8px; margin-top: 8px; }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas > .space-y-1\.5 > * { margin: 0 !important; }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas > .space-y-1\.5 > div {
+  min-height: 56px;
+  padding: 0 14px;
+  border-radius: 18px;
+  background: rgb(142 142 147 / 0.08);
+  gap: 12px;
+}
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .text-headline { font-size: 22px; font-weight: 600; }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-11 { width: 3.5rem; }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .h-2 { height: 10px; background: rgb(142 142 147 / 0.14) !important; }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-footnote {
+  width: auto;
+  min-width: 64px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 13px;
+}
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-ink-crit { color: var(--v2-mal) !important; background: color-mix(in srgb, var(--v2-mal) 14%, transparent); }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-ink-ok { color: var(--v2-bien) !important; background: color-mix(in srgb, var(--v2-bien) 14%, transparent); }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-muted-foreground.text-footnote { background: rgb(142 142 147 / 0.12); }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child .w-\[56px\] { min-width: 64px; width: auto; }
+@media (max-width: 639px) {
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas > .space-y-1\.5 > div { padding: 0 10px; gap: 6px; flex-wrap: wrap; }
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\] { min-width: 52px !important; padding: 2px 6px !important; font-size: 12px !important; }
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas .text-headline { font-size: 18px; }
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-11 { width: 2.75rem; }
+}
+[data-glass='v2'] .v2-ritmo .text-caption,
+[data-glass='v2'] .v2-ritmo .text-\[12px\],
+[data-glass='v2'] .v2-ritmo .text-\[11px\] { font-size: 13px !important; }
+@media (max-width: 639px) {
+  /* Cifra protagonista arriba; media 15 min y promedio del turno debajo, lado a lado. */
+  [data-glass='v2'] .v2-ritmo > section > div.mt-1\.5 { flex-wrap: wrap; row-gap: 10px; }
+  [data-glass='v2'] .v2-ritmo > section > div.mt-1\.5 > .ml-auto {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    gap: 20px;
+    text-align: left;
+  }
+  [data-glass='v2'] .v2-ritmo > section > div.mt-1\.5 > .ml-auto > div { justify-content: flex-start; flex-wrap: wrap; }
+  /* Encabezado de máquinas: en una línea, sin pisarse. */
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child { padding: 0 10px; gap: 6px; font-size: 12px !important; }
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child > * { font-size: 12px !important; white-space: nowrap; }
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child > .flex-1 { overflow: hidden; text-overflow: ellipsis; }
+}
