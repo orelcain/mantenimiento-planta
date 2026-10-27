@@ -255,6 +255,12 @@ function urlClasico(): string {
 
 const ic = 'h-3.5 w-3.5'
 
+/** «17,0 pz/min · prom. 13,2»: el ahora del contador y el promedio del turno, la misma vara del clásico. */
+function velMaquina(m: { ahora: number | null; promedio: number | null }): string {
+  if (m.ahora != null) return `${dec(m.ahora)} pz/min${m.promedio != null ? ` · prom. ${dec(m.promedio)}` : ''}`
+  return m.promedio != null ? `${dec(m.promedio)} pz/min promedio` : '—'
+}
+
 // ── Gráficos ─────────────────────────────────────────────────────────────────
 
 /** Curva suave (Catmull-Rom → Bézier): la línea del reel, no un serrucho. */
@@ -515,7 +521,10 @@ export interface MonitorV2Props {
   corteHora: string | null
   meta: number | null
   proyeccion: number | null
+  /** Promedio del turno andando: piezas ÷ minutos produciendo (el «promedio turno» del clásico). */
   ritmo: number | null
+  /** El «Ahora» del contador de Shoplogix (pulso); null con el turno cerrado o sin pulso. */
+  ritmoAhora: number | null
   ritmoNecesario: number | null
   setPoint: number | null
   vsAyer: { label: string; pieces: number; diff: number } | null
@@ -527,7 +536,7 @@ export interface MonitorV2Props {
   perdidas: Array<{ dueno: DuenoPerdida; min: number }>
   causas: Array<{ causa: string; min: number; dueno: DuenoPerdida; veces: number }>
   programadas: Array<{ causa: string; min: number }>
-  maquinas: Array<{ name: string; status: MonitorStatus; desdeMin: number | null; cpm: number | null; razon: string | null; piezas: number; dispPct: number | null }>
+  maquinas: Array<{ name: string; status: MonitorStatus; desdeMin: number | null; ahora: number | null; promedio: number | null; razon: string | null; piezas: number; dispPct: number | null }>
   curva: CurvaDatos | null
   /** Hora de planta de la primera pieza (ms wall-clock): el eje y el globo hablan en hora de reloj. */
   inicioMs: number | null
@@ -537,6 +546,10 @@ export interface MonitorV2Props {
   cerrado: boolean
   /** Lo que se ve al tocar «Ver más del turno». */
   mas: MasDelTurno
+  /** «Camino a la meta» del monitor clásico (hechas, paradas por causa, ritmo, por jugar): se ve tal cual. */
+  caminoMeta?: ReactNode
+  /** Velocidad minuto a minuto de todo el turno: la línea sumada y cada máquina. */
+  minutoAMinuto?: ReactNode
   vista: VistaV2
   onVista: (v: VistaV2) => void
 }
@@ -544,6 +557,7 @@ export interface MonitorV2Props {
 type ClaveTurno = 'piezas' | 'cierre' | 'ritmo' | 'mant' | 'curva' | 'maquinas' | 'perdido'
 
 export function MonitorV2(p: MonitorV2Props) {
+  const ritmoGrande = p.ritmoAhora ?? p.ritmo
   const [abierta, setAbierta] = useState<ClaveTurno | null>(null)
   const abrir = (k: ClaveTurno) => () => setAbierta(k)
   const pct = p.meta ? Math.round((p.piezas / p.meta) * 100) : null
@@ -593,7 +607,8 @@ export function MonitorV2(p: MonitorV2Props) {
         titulo: 'Ritmo de la línea', sub: 'Piezas por minuto mientras la línea anda',
         cuerpo: (
           <Grupo nota="«Andando» descuenta los minutos detenidos: es la velocidad real cuando la línea produce.">
-            <ListCell title="Ahora (andando)" value={p.ritmo != null ? `${dec(p.ritmo)} pz/min` : '—'} />
+            {p.ritmoAhora != null && <ListCell title="Ahora" value={`${dec(p.ritmoAhora)} pz/min`} valueSub="contador de Shoplogix" />}
+            <ListCell title="Promedio del turno (andando)" value={p.ritmo != null ? `${dec(p.ritmo)} pz/min` : '—'} />
             {p.ritmoInfo.recienteCpm != null && <ListCell title={`Últimos ${Math.round(p.ritmoInfo.recienteMin ?? 0)} min`} value={`${dec(p.ritmoInfo.recienteCpm)} pz/min`} />}
             {p.ritmoNecesario != null && <ListCell title="Necesario para la meta" value={`${dec(p.ritmoNecesario)} pz/min`} />}
             {p.ritmoInfo.medianaCpm != null && <ListCell title="Lo normal de esta línea" value={`${dec(p.ritmoInfo.medianaCpm)} pz/min`} valueSub={p.ritmoInfo.muestras ? `mediana de ${p.ritmoInfo.muestras} turnos` : undefined} />}
@@ -664,8 +679,8 @@ export function MonitorV2(p: MonitorV2Props) {
                 key={m.name}
                 title={m.name}
                 subtitle={m.status === 'detenida' ? `${m.razon ?? 'Detenida'}${m.desdeMin != null ? ` · hace ${Math.round(m.desdeMin)} min` : ''}` : m.status === 'produciendo' ? 'Corriendo' : 'Sin datos'}
-                value={m.cpm != null ? `${dec(m.cpm)} pz/min` : '—'}
-                valueSub={`${int(m.piezas)} pz${m.dispPct != null ? ` · ${dec(m.dispPct, 0)} % arriba` : ''}`}
+                value={m.ahora != null ? `${dec(m.ahora)} pz/min` : m.promedio != null ? `${dec(m.promedio)} pz/min` : '—'}
+                valueSub={`${m.ahora != null && m.promedio != null ? `promedio ${dec(m.promedio)} · ` : ''}${int(m.piezas)} pz${m.dispPct != null ? ` · ${dec(m.dispPct, 0)} % arriba` : ''}`}
               />
             ))}
           </Grupo>
@@ -716,10 +731,10 @@ export function MonitorV2(p: MonitorV2Props) {
           </Tarjeta>
         )}
 
-        <Tarjeta onAbrir={abrir('ritmo')} icono={<Gauge className={ic} />} titulo="Ritmo" sub="pz/min andando">
-          <Cifra valor={p.ritmo != null ? dec(p.ritmo) : '—'} unidad="pz/min" />
-          {p.ritmoNecesario != null && p.ritmo != null
-            ? <Contexto tono={p.ritmo >= p.ritmoNecesario ? 'ok' : 'warning'} nota={p.setPoint ? `set ${dec(p.setPoint, 0)}` : undefined}>necesita {dec(p.ritmoNecesario)}</Contexto>
+        <Tarjeta onAbrir={abrir('ritmo')} icono={<Gauge className={ic} />} titulo="Ritmo" sub={p.ritmoAhora != null ? 'pz/min ahora' : 'pz/min promedio andando'}>
+          <Cifra valor={ritmoGrande != null ? dec(ritmoGrande) : '—'} unidad="pz/min" />
+          {p.ritmoNecesario != null && ritmoGrande != null
+            ? <Contexto tono={ritmoGrande >= p.ritmoNecesario ? 'ok' : 'warning'} nota={p.ritmoAhora != null && p.ritmo != null ? `promedio ${dec(p.ritmo)}` : p.setPoint ? `set ${dec(p.setPoint, 0)}` : undefined}>necesita {dec(p.ritmoNecesario)}</Contexto>
             : p.vsAyer && <Contexto tono={p.vsAyer.diff >= 0 ? 'ok' : 'critical'}>{firmado(p.vsAyer.diff)} pz vs {p.vsAyer.label}</Contexto>}
         </Tarjeta>
 
@@ -740,6 +755,8 @@ export function MonitorV2(p: MonitorV2Props) {
         </Tarjeta>
       </div>
 
+      {p.caminoMeta && <div className="v2-clasico">{p.caminoMeta}</div>}
+
       {/* Fila 2 · la curva del turno y las máquinas */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
         {p.curva && (
@@ -754,7 +771,7 @@ export function MonitorV2(p: MonitorV2Props) {
                 <div className="min-w-0">
                   <div className="truncate text-[15px] text-foreground">{m.name}</div>
                   <div className="text-[13px] tabular-nums text-muted-foreground">
-                    {m.status === 'detenida' ? (m.razon ?? 'Detenida') : m.cpm != null ? `${dec(m.cpm)} pz/min` : '—'}
+                    {m.status === 'detenida' ? (m.razon ?? 'Detenida') : velMaquina(m)}
                   </div>
                 </div>
                 {m.status === 'detenida'
@@ -765,6 +782,12 @@ export function MonitorV2(p: MonitorV2Props) {
           </ul>
         </Tarjeta>
       </div>
+
+      {p.minutoAMinuto && (
+        <Tarjeta icono={<Activity className={ic} />} titulo="Velocidad minuto a minuto" sub="desde el inicio del turno · la línea y cada máquina">
+          <div className="mt-3">{p.minutoAMinuto}</div>
+        </Tarjeta>
+      )}
 
       {/* Fila 3 · Mantención en detalle y a dónde se fue el tiempo */}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
@@ -1055,9 +1078,7 @@ export interface MasDelTurno {
   cascada: Cascada | null
   tiempo: { windowMin: number; producingMin: number; plannedMin: number; recoverableMin: number } | null
   /** pz/min de cada máquina por tramo de 5 min, desde la primera pieza. */
-  velocidad: Array<{ nombre: string; cpm: number[]; objetivo: number | null }> | null
-  /** Ciclos de la LÍNEA minuto a minuto (suma de máquinas) y lo esperado por minuto. */
-  minuto: { desdeMs: number; ciclos: number[]; esperado: number | null } | null
+  velocidad: Array<{ nombre: string; cpm: number[]; objetivo: number | null; ahora: number | null; promedio: number | null }> | null
   /** Otros días comparados a la misma altura del turno (o completos, cerrado). */
   comparado: Array<{ label: string; piezas: number; hoy: boolean }> | null
 }
@@ -1122,14 +1143,14 @@ function TiempoV2({ t }: { t: NonNullable<MasDelTurno['tiempo']> }) {
 }
 
 /** Una mini curva por máquina: la que se queda atrás se ve sin leer números. */
-function VelocidadMaquinaV2({ m, inicioMs }: { m: { nombre: string; cpm: number[]; objetivo: number | null }; inicioMs: number | null }) {
+function VelocidadMaquinaV2({ m, inicioMs }: { m: NonNullable<MasDelTurno['velocidad']>[number]; inicioMs: number | null }) {
   const [i, setI] = useState<number | null>(null)
   const n = m.cpm.length
   const max = Math.max(1, m.objetivo ?? 0, ...m.cpm) * 1.1
   const X = (k: number) => (n > 1 ? (k / (n - 1)) * 100 : 0)
   const Y = (v: number) => 100 - (v / max) * 100
-  const ahora = m.cpm[n - 1] ?? null
-  const media = n ? m.cpm.reduce((a, x) => a + x, 0) / n : null
+  // Mismo «ahora» y «promedio» que la tarjeta Máquinas; la curva es el detalle cada 5 min.
+  const ahora = m.ahora ?? m.cpm[n - 1] ?? null
   const v = i != null ? m.cpm[i] : null
   const indice = (e: ReactPointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
@@ -1139,11 +1160,11 @@ function VelocidadMaquinaV2({ m, inicioMs }: { m: { nombre: string; cpm: number[
     <div className="v2-subtarjeta rounded-card p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-[15px] font-medium">{m.nombre}</span>
-        <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground">media {media != null ? dec(media) : '—'}</span>
+        <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground">promedio {m.promedio != null ? dec(m.promedio) : '—'}</span>
       </div>
       <div className="mt-1 flex items-baseline gap-1">
         <span className="v2-cifra-chica tabular-nums font-semibold leading-none">{ahora != null ? dec(ahora) : '—'}</span>
-        <span className="text-[13px] text-muted-foreground">pz/min último tramo</span>
+        <span className="text-[13px] text-muted-foreground">{m.ahora != null ? 'pz/min ahora' : 'pz/min último tramo'}</span>
       </div>
       <div
         className="relative mt-3 h-16 touch-pan-y lg:h-20"
@@ -1166,51 +1187,6 @@ function VelocidadMaquinaV2({ m, inicioMs }: { m: { nombre: string; cpm: number[
           </>
         )}
       </div>
-    </div>
-  )
-}
-
-/** Minuto a minuto de la línea (últimos 40 min), coloreado como lo pinta Shoplogix: ≥75 % ok, 50-75 atención, <50 crítico. */
-function MinutoV2({ d }: { d: NonNullable<MasDelTurno['minuto']> }) {
-  const { activo, en, salir } = useActivo()
-  const N = 40
-  const desde = Math.max(0, d.ciclos.length - N)
-  const ventana = d.ciclos.slice(desde)
-  const max = Math.max(1, d.esperado ?? 0, ...ventana) * 1.1
-  const tono = (c: number) => {
-    if (d.esperado == null || d.esperado <= 0) return 'var(--v2-acento)'
-    const r = c / d.esperado
-    return r >= 0.75 ? 'var(--v2-acento)' : r >= 0.5 ? 'var(--v2-mant)' : 'var(--v2-crit)'
-  }
-  const a = activo != null ? ventana[activo] : null
-  return (
-    <div className="relative mt-6" {...salir}>
-      {a != null && activo != null && (
-        <Globo x={((activo + 0.5) / ventana.length) * 100}>
-          <div className="font-medium tabular-nums">{relojDe(d.desdeMs + (desde + activo) * 60_000)}</div>
-          <div className="tabular-nums text-muted-foreground">{int(a)} ciclos{d.esperado ? ` · ${Math.round((a / d.esperado) * 100)} % de lo esperado` : ''}</div>
-        </Globo>
-      )}
-      <div className="relative flex h-32 items-end gap-[3px] lg:h-40">
-        {d.esperado != null && (
-          <div className="pointer-events-none absolute inset-x-0 border-t-2 border-dashed" style={{ bottom: `${(d.esperado / max) * 100}%`, borderColor: 'var(--v2-tenue)' }} />
-        )}
-        {ventana.map((c, k) => (
-          <div key={k} className="flex h-full min-w-0 flex-1 cursor-pointer items-end" {...en(k)}>
-            <div className="w-full rounded-[3px] transition-opacity" style={{ height: `${Math.max(2, (c / max) * 100)}%`, background: tono(c), opacity: activo != null && activo !== k ? 0.4 : 1 }} />
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-        <span>{relojDe(d.desdeMs + desde * 60_000)}</span>
-        <span>{relojDe(d.desdeMs + (d.ciclos.length - 1) * 60_000)}</span>
-      </div>
-      <Leyenda items={[
-        { color: 'var(--v2-acento)', label: '≥75 %' },
-        { color: 'var(--v2-mant)', label: '50–75 %' },
-        { color: 'var(--v2-crit)', label: '<50 %' },
-        ...(d.esperado != null ? [{ color: 'var(--v2-tenue)', label: `esperado ${dec(d.esperado, 0)}/min`, trazo: 'punteada' as const }] : []),
-      ]} />
     </div>
   )
 }
@@ -1255,11 +1231,6 @@ function MasDelTurnoV2({ mas, inicioMs, cerrado }: { mas: MasDelTurno; inicioMs:
       )}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
-        {mas.minuto && (
-          <Tarjeta icono={<Activity className={ic} />} titulo="Minuto a minuto" sub="ciclos de la línea, últimos 40 minutos">
-            <MinutoV2 d={mas.minuto} />
-          </Tarjeta>
-        )}
         {comp.length > 1 && (
           <Tarjeta icono={<CalendarRange className={ic} />} titulo="Comparado con otros días" sub={cerrado ? 'turno completo' : 'a esta misma altura del turno'}>
             {hoyComp && mediaOtros != null && (
