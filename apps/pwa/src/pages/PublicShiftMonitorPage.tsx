@@ -7441,6 +7441,7 @@ function MonitorDelToken() {
             <MonitorV2Analisis
               pareto={pareto ? { rows: pareto.rows, totalMin: pareto.totalMin, totalPiezas: pareto.totalPiezas, shifts: pareto.shifts, porDueno: pareto.porDueno } : null}
               semanas={repartoSemanal(data.shiftStats)}
+              hoy={data.dateKey ?? null}
               horas={buildHourlyRows(serieDelTurno)}
               metaPorHora={meta && horasTurno ? meta / horasTurno : null}
               vista={vistaV2}

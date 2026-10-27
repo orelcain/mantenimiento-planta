@@ -24,6 +24,7 @@ import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import type { HourlyRow } from '@/services/shoplogix/monitorHourly'
 import type { ParetoRow } from '@/services/shoplogix/monitorPareto'
 import type { SemanaReparto } from './repartoSemanal'
+import { DetalleSemanaV2 } from './DetalleSemanaV2'
 import { contenedorPlural, vaciasEtiqueta, type Cascada } from './cascadaTurno'
 import type { DetalleCascada, DuenoDetalle, HoraDetalle, RenglonDetalle } from './cascadaDetalle'
 import { DUENO_UI } from './duenoUi'
@@ -1179,6 +1180,8 @@ export function MonitorV2(p: MonitorV2Props) {
 export interface MonitorV2AnalisisProps {
   pareto: { rows: ParetoRow[]; totalMin: number; totalPiezas: number; shifts: number; porDueno: Partial<Record<DuenoPerdida, number>> } | null
   semanas: SemanaReparto[]
+  /** dateKey de hoy en hora de planta: marca la semana en curso. */
+  hoy?: string | null
   horas: HourlyRow[]
   /** pz/h que pide la meta, para la línea de referencia de «hora por hora». */
   metaPorHora: number | null
@@ -1233,25 +1236,8 @@ export function MonitorV2Analisis(p: MonitorV2AnalisisProps) {
         ),
       }
       case 'semanas': return {
-        titulo: 'De quién fue la pérdida', sub: 'Minutos de línea por semana',
-        cuerpo: (
-          <>
-            {p.semanas.slice().reverse().map((s) => (
-              <Grupo key={s.semana} titulo={`Semana del ${semanaCorta(s.semana)} · ${s.turnos} turnos · ${int(s.piezas)} pz`}>
-                {DUENOS.map((d) => (
-                  <ListCell
-                    key={d}
-                    leading={<Punto color={RELLENO[d]} />}
-                    title={DUENO_UI[d].corto}
-                    subtitle={s.causas[d].slice(0, 3).map((c) => c.causa).join(' · ') || undefined}
-                    value={horas(s.min[d])}
-                    valueSub={`≈${int(s.pz[d])} pz`}
-                  />
-                ))}
-              </Grupo>
-            ))}
-          </>
-        ),
+        titulo: 'De quién fue la pérdida', sub: 'Minutos de línea por semana · toca una semana',
+        cuerpo: <DetalleSemanaV2 semanas={p.semanas} hoy={p.hoy} />,
       }
       case 'horas': return {
         titulo: 'Hora por hora', sub: 'Desde la primera pieza del turno',

@@ -1357,3 +1357,65 @@ test('una Baader parada con las otras dos andando: 11 min de máquina, 3,7 equiv
   const re = tb.planned.find(c => c.reason === 'REUNION INICIO TURNO')
   assert.equal(re.min, 9, 'la reunión completa 09:15→09:24, no recortada en la primera pieza (09:20)')
 })
+
+
+test('shiftStats.paradas: los MISMOS tramos que cuenta `count`, ubicados en el reloj', async () => {
+  /*
+   * Detalle por semana de «De quién fue la pérdida» (27-10-2026): al tocar una
+   * causa se listan las paradas en que ocurrió. Si `count` dice 2, la lista trae
+   * 2 — salen de la misma rejilla. Dos estados solapados de la misma causa son
+   * UNA parada, no dos.
+   */
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const hDe = (d, h, m = 0) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h, m))
+  const t0 = hDe(d1, 8).getTime()
+  const parada = (h, m, sec, reason) => ({ startAt: hDe(d1, h, m).toISOString(), durationSec: sec, type: 'downtime', name: 'Detencion', reason })
+  const maq = maquinaStats(2000, t0)
+  maq.states = [
+    parada(9, 0, 300, 'CUCHILLERIA'),
+    parada(9, 2, 240, 'CUCHILLERIA'), // solapada: misma parada
+    parada(10, 20, 120, 'CUCHILLERIA'),
+    parada(10, 0, 180, 'ACUMULACION'),
+  ]
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]:   { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+  }, { [ayer]: [maq] })
+
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  const t = out.find(o => o.shiftDocId === ayer)
+  assert.ok(t, 'el turno tiene que estar')
+  const ci = t.recoverable.findIndex(c => c.reason === 'CUCHILLERIA')
+  assert.ok(ci >= 0)
+  const propias = t.paradas.filter(p => p.c === ci)
+  assert.equal(propias.length, t.recoverable[ci].count, '«N veces» y la lista cuadran')
+  assert.equal(propias.length, 2)
+  assert.equal(propias[0].t, '09:00:00')
+  assert.equal(propias[0].s, 360, '09:00 → 09:06: la solapada alarga, no suma otra')
+  assert.deepEqual(propias[0].m, [0])
+  // En orden de reloj, mezclando causas.
+  assert.deepEqual(t.paradas.map(p => p.t), ['09:00:00', '10:00:00', '10:20:00'])
+})
+
+test('shiftStats rearma un turno cacheado que todavía no trae `paradas`', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const anteayer = `${d2}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  const db = fakeShiftsDb({
+    [actual]:   { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]:     { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [anteayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 1000 }] },
+  }, { [anteayer]: [maquinaStats(1000, hDe(d2, 8).getTime())] })
+  const prev = [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', total: 777777, windowMin: 480, tbv: 3, porMaquina: [] }]
+  const out = await buildShiftStats(db, 'filete', actual, prev, [], [])
+  const viejo = out.find(o => o.shiftDocId === anteayer)
+  assert.ok(Array.isArray(viejo?.paradas), 'se rearma para sumar las paradas')
+  assert.notEqual(viejo.total, 777777)
+})
