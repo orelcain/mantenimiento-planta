@@ -267,3 +267,58 @@
   [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.flex-1 { overflow: visible; }
   [data-glass='v2'] .v2-clasico .pantalla-oculta { padding: 0 12px 12px 24px !important; }
 }
+
+/* ── Paleta calma del v2 ──────────────────────────────────────────────────
+   Lo normal en el acento; solo lo que se queda atrás toma color, y apagado
+   (ámbar y coral con poco croma): el ojo va a lo malo sin que la pantalla grite. */
+[data-glass='v2'], .v2-vars {
+  --v2-bien: rgb(var(--brand));
+  --v2-atento: #c98f3a;
+  --v2-mal: #c9645d;
+}
+.dark [data-glass='v2'], .dark .v2-vars {
+  --v2-atento: #e0b46e;
+  --v2-mal: #e48a82;
+}
+
+/* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con
+   degradé y brillo, colores de la paleta calma. */
+[data-glass='v2'] .v2-clasico > section > button > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+[data-glass='v2'] .v2-clasico > section > button > span:first-child::before {
+  content: '';
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 999px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235AA0DC' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E") center / 16px no-repeat,
+    rgb(var(--brand) / 0.12);
+}
+[data-glass='v2'] .v2-clasico .h-6 { height: 18px; gap: 4px; margin-top: 10px; }
+[data-glass='v2'] .v2-clasico .h-6 > button { opacity: 1 !important; }
+[data-glass='v2'] .v2-clasico .h-6 > button.bg-muted-foreground\/\[0\.35\] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--v2-bien) 55%, transparent), var(--v2-bien)) !important;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--v2-bien) 45%, transparent);
+}
+[data-glass='v2'] .v2-clasico .h-6 > button.border-dashed {
+  background: rgb(142 142 147 / 0.12) !important;
+  border: 0 !important;
+}
+[data-glass='v2'] .v2-clasico [class*='bg-red-6'] { background: var(--v2-mal) !important; }
+[data-glass='v2'] .v2-clasico [class*='bg-amber-6'] { background: var(--v2-atento) !important; }
+[data-glass='v2'] .v2-clasico .h-6 > button[class*='bg-red-6'] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--v2-mal) 60%, transparent), var(--v2-mal)) !important;
+}
+[data-glass='v2'] .v2-clasico [class*='text-red-'] { color: var(--v2-mal) !important; }
+[data-glass='v2'] .v2-clasico .text-ink-ok { color: var(--v2-bien) !important; }
+/* Filas: la parte abierta se distingue por un borde de luz, no por un fondo de color. */
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div:has(> .pantalla-oculta) {
+  box-shadow: inset 0 0 0 1px rgb(var(--brand) / 0.25);
+}
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.w-20 {
+  font-size: 13px !important;
+}

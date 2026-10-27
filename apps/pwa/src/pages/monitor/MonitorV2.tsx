@@ -270,15 +270,18 @@ function tonoMinuto(v: number, esperado: number | null): TonoMinuto {
   const r = v / esperado
   return r >= 0.75 ? 'ok' : r >= 0.5 ? 'warn' : 'crit'
 }
-const RELLENO_MINUTO: Record<TonoMinuto, string> = {
-  ok: 'rgb(var(--ink-ok))',
-  warn: 'rgb(var(--ink-warn))',
-  crit: 'rgb(var(--ink-crit))',
-  sin: 'var(--v2-gris)',
+/* Paleta calma: lo normal va en el acento y solo lo que se queda atrás toma color (ámbar y coral apagados). */
+const COLOR_MINUTO: Record<TonoMinuto, string> = {
+  ok: 'var(--v2-bien)',
+  warn: 'var(--v2-atento)',
+  crit: 'var(--v2-mal)',
+  sin: 'var(--v2-prog)',
 }
+const RELLENO_MINUTO = (t: TonoMinuto) => `linear-gradient(to top, color-mix(in srgb, ${COLOR_MINUTO[t]} 35%, transparent), ${COLOR_MINUTO[t]})`
 
 /**
  * Una franja por máquina y arriba la línea (la suma), una barra por minuto del turno entero.
+ * Cada franja abre con su cifra: qué parte de los minutos anduvo a ritmo (≥75 % del esperado).
  * Pasar el mouse (o tocar) marca el mismo minuto en todas las franjas y muestra sus cifras.
  */
 function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
@@ -292,14 +295,21 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
   const filas = [
     ...(varias
       ? [{
-          nombre: `Línea (las ${d.maquinas.length} suman)`,
+          nombre: 'Línea',
+          nota: `las ${d.maquinas.length} suman`,
           esperado: d.maquinas.every((m) => m.esperado != null) ? d.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null,
           cycles: suma,
           principal: true,
         }]
       : []),
-    ...d.maquinas.map((m) => ({ nombre: m.nombre, esperado: m.esperado, cycles: m.cycles, principal: !varias })),
+    ...d.maquinas.map((m) => ({ nombre: m.nombre, nota: null as string | null, esperado: m.esperado, cycles: m.cycles, principal: !varias })),
   ]
+  const aRitmo = (f: (typeof filas)[number]) => {
+    if (f.esperado == null || n === 0) return null
+    let ok = 0
+    for (let k = 0; k < n; k++) if (tonoMinuto(f.cycles[k] ?? 0, f.esperado) === 'ok') ok++
+    return Math.round((ok / n) * 100)
+  }
   const indice = (e: { clientX: number; currentTarget: HTMLDivElement }) => {
     const r = e.currentTarget.getBoundingClientRect()
     return Math.max(0, Math.min(n - 1, Math.floor(((e.clientX - r.left) / r.width) * n)))
@@ -321,42 +331,49 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
       >
         {filas.map((f) => {
           const tope = Math.max(1, (f.esperado ?? 0) * 1.15, ...f.cycles.slice(0, n))
+          const pct = aRitmo(f)
+          const yEsperado = f.esperado != null ? (f.esperado / tope) * 100 : null
           return (
-            <div key={f.nombre} className={f.principal ? 'mb-4' : 'mb-2.5'}>
-              <div className="mb-1 flex items-baseline justify-between gap-2 text-[13px]">
-                <span className={f.principal ? 'font-medium text-foreground' : 'text-muted-foreground'}>{f.nombre}</span>
-                <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {i != null ? <b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b> : null}
-                  {i != null && f.esperado != null ? ' / ' : ''}
-                  {f.esperado != null ? `${i == null ? 'esperado ' : ''}${dec(f.esperado, 0)} pz/min` : ''}
-                </span>
+            <div key={f.nombre} className={f.principal ? 'v2-subtarjeta mb-3 rounded-card p-3 lg:p-4' : 'mb-3 px-1'}>
+              <div className="mb-2 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className={f.principal ? 'text-[15px] font-semibold text-foreground' : 'text-[14px] font-medium text-foreground'}>
+                    {f.nombre}
+                    {f.nota && <span className="font-normal text-muted-foreground"> · {f.nota}</span>}
+                  </div>
+                  <div className="text-[13px] tabular-nums text-muted-foreground">
+                    {i != null
+                      ? <><b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b>{f.esperado != null ? ` de ${dec(f.esperado, 0)} esperadas` : ''} a las {relojDe(t0 + i * 60_000)}</>
+                      : f.esperado != null ? `esperado ${dec(f.esperado, 0)} pz/min` : 'pz por minuto'}
+                  </div>
+                </div>
+                {pct != null && (
+                  <div className="shrink-0 text-right">
+                    <span className={`${f.principal ? 'text-[28px] lg:text-[34px]' : 'text-[20px]'} font-semibold leading-none tabular-nums tracking-tight`}>{pct}</span>
+                    <span className="text-[13px] text-muted-foreground"> % a ritmo</span>
+                  </div>
+                )}
               </div>
-              <svg viewBox={`0 0 ${n} 100`} preserveAspectRatio="none" className={`block w-full ${f.principal ? 'h-24 lg:h-32' : 'h-10 lg:h-12'}`} aria-hidden>
-                {f.esperado != null && (
-                  <line x1={0} x2={n} y1={100 - (f.esperado / tope) * 100} y2={100 - (f.esperado / tope) * 100} stroke="var(--v2-tenue)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+              <div className={`relative flex items-end gap-0 lg:gap-px ${f.principal ? 'h-28 lg:h-36' : 'h-10 lg:h-12'}`}>
+                {yEsperado != null && (
+                  <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
                 )}
                 {f.cycles.slice(0, n).map((v, k) => {
-                  const h = Math.max(v > 0 ? 5 : 2, (v / tope) * 100)
+                  const t = tonoMinuto(v, f.esperado)
                   return (
-                    <rect key={k} x={k + 0.14} width={0.72} y={100 - h} height={h} fill={RELLENO_MINUTO[tonoMinuto(v, f.esperado)]} opacity={i == null || i === k ? 0.9 : 0.4} />
+                    <span
+                      key={k}
+                      className="min-w-0 flex-1 transition-opacity duration-150 lg:rounded-t-[3px]"
+                      style={{ height: `${Math.max(v > 0 ? 6 : 2, (v / tope) * 100)}%`, background: RELLENO_MINUTO(t), opacity: i == null || i === k ? 1 : 0.35 }}
+                    />
                   )
                 })}
-              </svg>
+              </div>
             </div>
           )
         })}
         {i != null && (
-          <>
-            <span className="pointer-events-none absolute inset-y-0 w-px" style={{ left: `${X(i)}%`, background: 'var(--v2-secundaria)' }} />
-            <Globo x={X(i)}>
-              <div className="font-medium tabular-nums">{relojDe(t0 + i * 60_000)}</div>
-              {filas.map((f) => (
-                <div key={f.nombre} className="tabular-nums text-muted-foreground">
-                  {f.principal && varias ? 'Línea' : f.nombre}: <b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)}</b>{f.esperado != null ? ` / ${dec(f.esperado, 0)}` : ''} pz
-                </div>
-              ))}
-            </Globo>
-          </>
+          <span className="pointer-events-none absolute inset-y-0 w-px" style={{ left: `${X(i)}%`, background: 'var(--v2-secundaria)' }} />
         )}
       </div>
       <div className="relative h-5 text-[12px] tabular-nums text-muted-foreground">
@@ -366,11 +383,11 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
           </span>
         ))}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
         {(['ok', 'warn', 'crit'] as const).map((t) => (
           <span key={t} className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: RELLENO_MINUTO[t] }} />
-            {t === 'ok' ? '75 % o más del esperado' : t === 'warn' ? '50 a 75 %' : 'menos de 50 %'}
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR_MINUTO[t] }} />
+            {t === 'ok' ? 'a ritmo (75 % o más del esperado)' : t === 'warn' ? '50 a 75 %' : 'menos de 50 %'}
           </span>
         ))}
         <span className="ml-auto">{cerrado ? 'turno cerrado' : `hasta las ${relojDe(t0 + (n - 1) * 60_000)}`}</span>
