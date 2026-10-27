@@ -675,6 +675,8 @@ export interface MonitorV2Props {
   /** MTTR de los turnos previos (más antiguo primero) + el de hoy al final. */
   rielMttr: Riel
   perdidas: Array<{ dueno: DuenoPerdida; min: number }>
+  /** Las mismas paradas en minutos de MÁQUINA (los que muestra «Camino a la meta»), y cuántas máquinas tiene la línea. */
+  perdidasMaquina?: { min: number; maquinas: number } | null
   causas: Array<{ causa: string; min: number; dueno: DuenoPerdida; veces: number }>
   programadas: Array<{ causa: string; min: number }>
   maquinas: Array<{ name: string; status: MonitorStatus; desdeMin: number | null; ahora: number | null; promedio: number | null; razon: string | null; piezas: number; dispPct: number | null }>
@@ -952,7 +954,7 @@ export function MonitorV2(p: MonitorV2Props) {
           )}
         </Tarjeta>
 
-        <Tarjeta onAbrir={abrir('perdido')} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub="minutos de línea, por dueño y causa">
+        <Tarjeta onAbrir={abrir('perdido')} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub={p.perdidasMaquina && p.perdidasMaquina.maquinas > 1 ? `minutos de línea: ${int(p.perdidasMaquina.min)} min de máquina ÷ ${p.perdidasMaquina.maquinas}` : 'minutos de línea, por dueño y causa'}>
           <Cifra valor={horasCifra(totalPerdida)} chica />
           {totalPerdida > 0 && (
             <>

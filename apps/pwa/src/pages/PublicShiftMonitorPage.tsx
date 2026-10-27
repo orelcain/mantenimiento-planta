@@ -6365,6 +6365,11 @@ function MonitorDelToken() {
               meta={meta}
               proyeccion={pace?.projectedPieces ?? null}
               ritmo={promedioLinea}
+              perdidasMaquina={(() => {
+                const rec = live.timeBreakdown?.recoverable ?? []
+                if (!rec.length || !rec.every((r) => r.machineMin != null)) return null
+                return { min: rec.reduce((a, r) => a + (r.machineMin ?? 0), 0), maquinas: live.machines.length }
+              })()}
               ritmoAhora={ahoraLinea}
               ritmoNecesario={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
               setPoint={live.setPoint?.cpm ?? null}
@@ -6395,7 +6400,8 @@ function MonitorDelToken() {
                 .sort((a, b) => b.min - a.min)}
               maquinas={live.machines.map((m) => ({
                 name: m.name,
-                status: m.status,
+                /* El pulso es más fresco que el estado del corte: si ya cuenta piezas, la máquina corre. */
+                status: (ahoraPorId?.get(m.id) ?? 0) > 0 ? 'produciendo' : m.status,
                 desdeMin: m.currentSinceAt ? Math.max(0, (now - new Date(now).getTimezoneOffset() * 60_000 - Date.parse(m.currentSinceAt)) / 60_000) : null,
                 ahora: ahoraPorId?.get(m.id) ?? null,
                 promedio: prodMin > 0 ? m.pieces / prodMin : null,
@@ -6463,8 +6469,9 @@ function MonitorDelToken() {
                   notas={notasDeOperador}
                   cerrado={turnoCerrado}
                   meta={data.targetPieces ?? live.quotaPieces ?? null}
-                  hechas={live.totalPieces}
-                  piezasPulso={data.pulse?.totalCycles ?? null}
+                  /* «Hechas» = el mismo contador vivo de «Piezas ahora»: en el v2 no puede haber dos cifras de piezas. */
+                  hechas={contador.valor}
+                  piezasPulso={null}
                   corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
                   cuotaAhora={comparacion.optimalAtCurrentMinute}
                   horaAhora={horaDeCuota}
