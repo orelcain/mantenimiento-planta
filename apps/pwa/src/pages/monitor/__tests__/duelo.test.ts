@@ -6,9 +6,12 @@
 import { describe, expect, it } from 'vitest'
 import type { ForecastHistoryShift, PublicMonitorLive, ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
-  bandaDeCurvas, cicloDe, compararTurnos, construirDuelo, costoMantencion, curvaDeForecast, duelosDeTurnos,
-  equipoCorregido, equipoDelTurno, esNocheDesdeHora, llenadoDePuesto, marcadorDeCiclo, nombreCorto, nombreEquipo,
-  nombresEfectivos, piezasAlMinuto, rachasPorEquipo, recordsDe, resumenDeStat, rivalDirecto, semanasDesdeAncla,
+  bandaDeCurvas, bandasDeHoras, causaCorta, cicloDe, compararTurnos, construirDuelo, costoMantencion, curvaDeForecast, duelosDeTurnos,
+  equipoCorregido, equipoDelTurno, esNocheDesdeHora, etiquetaHora, eventosCrudosDeLive, eventosEnEjeProduccion, fantasmaDeJornada,
+  fechaCorreccion, filasKpiAKpi, franjasEntre, horaTranscurrida, jornadaDe, llenadoDePuesto, marcadorDeCiclo, marcadorDePeriodo,
+  minutoDelDia, nombreCorto, nombreEquipo, nombresEfectivos, periodosDisponibles, piezasAlMinuto, rachasPorEquipo, recordsDe,
+  referenciaMismoHorario, relojDeMinuto, resumenDeStat, ritmoHoraAHora, rivalDirecto, rivalProvisional, rotuloFantasma, rotuloTurno,
+  semanaIso, semanasDesdeAncla, tendenciaSemanal,
   type ResumenTurno,
 } from '../duelo'
 
@@ -34,21 +37,32 @@ const stat = (id: string, p: Partial<ShiftStat> = {}, duelo: Partial<NonNullable
 
 /** Resumen listo para comparar, con valores neutros que cada prueba pisa. */
 const resumen = (p: Partial<ResumenTurno>): ResumenTurno => ({
-  shiftDocId: '2026-10-26_Turno Dia', dateKey: '2026-10-26', shiftId: 'Turno Dia', esNoche: false, equipo: 'rebolledo', cerrado: true,
+  shiftDocId: '2026-10-26_Turno Dia', dateKey: '2026-10-26', jornada: '2026-10-26', h0: '07:00', shiftId: 'Turno Dia', esNoche: false, equipo: 'rebolledo', cerrado: true,
   piezas: 12000, dispMin: 420, fallasN: 0, fallaMin: 0, piezasMant: 0, ritmo: 30, microMinH: 2, arranqueMin: 10, ultimaHoraPz: 1500,
   puestos: [{ clave: 'evisceradora 1', etiqueta: 'Ev 1', llenado: 90 }], ...p,
 })
 
-describe('equipoDelTurno: rotación por paridad de semana ISO', () => {
+describe('equipoDelTurno: rotación por paridad de semana ISO, contada por jornada', () => {
   it('la semana del ancla (26-10-2026): día = Rebolledo, noche = Cárdenas', () => {
     expect(equipoDelTurno('2026-10-26_Turno Dia', false)).toBe('rebolledo')
     expect(equipoDelTurno('2026-10-26_Turno Noche', true)).toBe('cardenas')
     expect(equipoDelTurno('2026-10-30_Turno Dia', false)).toBe('rebolledo') // viernes
   })
 
-  it('el domingo todavía es de la semana del lunes anterior', () => {
+  it('el domingo de día todavía es de la semana del lunes anterior', () => {
     expect(semanasDesdeAncla('2026-11-01')).toBe(0)
-    expect(equipoDelTurno('2026-11-01_Turno Noche', true)).toBe('cardenas')
+    expect(equipoDelTurno('2026-11-01_Turno Dia', false)).toBe('rebolledo')
+  })
+
+  it('la noche que parte el domingo a las 21:00 es la jornada del lunes: cuenta en la semana nueva', () => {
+    // Domingo 1-nov 21:00 → jornada lunes 2-nov (semana 2-nov: la noche es de Rebolledo).
+    expect(jornadaDe('2026-11-01', true)).toBe('2026-11-02')
+    expect(equipoDelTurno('2026-11-01_Turno Noche', true)).toBe('rebolledo')
+    // El domingo de día sigue en la semana vieja y lo hace el otro equipo: ese día y esa noche NO son rivales de la misma jornada.
+    expect(equipoDelTurno('2026-11-01_Turno Dia', false)).toBe('rebolledo')
+    // La noche del domingo 25-oct es la jornada del lunes 26-oct (ancla): noche = Cárdenas, y el día del lunes = Rebolledo.
+    expect(equipoDelTurno('2026-10-25_Turno Noche', true)).toBe('cardenas')
+    expect(equipoDelTurno('2026-10-26_Turno Dia', false)).toBe('rebolledo')
   })
 
   it('alterna cada semana, hacia adelante y hacia atrás', () => {
@@ -66,6 +80,25 @@ describe('equipoDelTurno: rotación por paridad de semana ISO', () => {
     expect(equipoCorregido('2026-10-26_Turno Noche', true, ov)).toBe(false)
     // Una corrección que coincide con la rotación no es una corrección.
     expect(equipoCorregido('2026-10-26_Turno Dia', false, { '2026-10-26_Turno Dia': 'rebolledo' })).toBe(false)
+  })
+})
+
+describe('jornadaDe: la fecha de producción', () => {
+  it('toda noche pasa a la jornada del día siguiente al de su documento; el día se queda', () => {
+    expect(jornadaDe('2026-10-27', true)).toBe('2026-10-28')
+    expect(jornadaDe('2026-10-28', false)).toBe('2026-10-28')
+  })
+
+  it('bordes de mes y de año', () => {
+    expect(jornadaDe('2026-10-31', true)).toBe('2026-11-01')
+    expect(jornadaDe('2026-12-31', true)).toBe('2027-01-01')
+    expect(jornadaDe('2028-02-28', true)).toBe('2028-02-29')
+  })
+
+  it('el turno jornada se arma igual cualquiera sea la hora de inicio que traiga la noche (08:00, 21:00 o 04:00)', () => {
+    for (const h0 of ['21:00', '23:30', '04:00']) {
+      expect(resumenDeStat(stat('2026-10-26_Turno 1', {}, { h0 }))!.jornada).toBe('2026-10-27')
+    }
   })
 })
 
@@ -200,28 +233,41 @@ describe('llenadoDePuesto', () => {
   })
 })
 
-describe('rival directo, ciclo, rachas y récords', () => {
-  // Cuatro semanas completas, un turno de día y uno de noche por semana. Semana 0 = ancla.
-  const semana = (lunes: string) => [`${lunes}_Turno Dia`, `${lunes}_Turno Noche`]
-  const lunes = ['2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02']
-  const todos = lunes.flatMap(semana)
-  /** El equipo del día gana +500 pz en cada semana; la noche empata en todo. */
-  const resumenes = todos.map((id) => {
-    const esNoche = id.includes('Noche')
-    const r = resumenDeStat(stat(id, { total: esNoche ? 10000 : 12000 }))!
-    return r
+describe('rival por jornada, ciclo, rachas y récords', () => {
+  /** Una jornada = la noche que parte la víspera + el día de esa fecha. */
+  const vispera = (dia: string) => new Date(Date.parse(`${dia}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+  const jornadaDeStats = (dia: string, pzNoche: number, pzDia: number, dispNoche = 420, dispDia = 420) => [
+    { ...resumenDeStat(stat(`${vispera(dia)}_Turno Noche`, { total: pzNoche }))!, dispMin: dispNoche },
+    { ...resumenDeStat(stat(`${dia}_Turno Dia`, { total: pzDia }))!, dispMin: dispDia },
+  ]
+
+  it('el rival directo es el otro horario de la MISMA jornada, hecho por el otro equipo', () => {
+    const todos = [...jornadaDeStats('2026-10-27', 10000, 12000), ...jornadaDeStats('2026-10-28', 10000, 12000)]
+    const noche = todos.find((r) => r.shiftDocId === '2026-10-26_Turno Noche')!
+    const dia = todos.find((r) => r.shiftDocId === '2026-10-27_Turno Dia')!
+    expect(noche.jornada).toBe('2026-10-27')
+    expect(rivalDirecto(noche, todos)!.shiftDocId).toBe('2026-10-27_Turno Dia')
+    expect(rivalDirecto(dia, todos)!.shiftDocId).toBe('2026-10-26_Turno Noche')
+    expect(rivalDirecto(dia, todos)!.equipo).not.toBe(dia.equipo)
   })
 
-  it('el rival directo es el último turno anterior del mismo horario hecho por el otro equipo', () => {
-    const hoy = resumenes.find((r) => r.shiftDocId === '2026-11-02_Turno Dia')!
-    const rival = rivalDirecto(hoy, resumenes)!
-    expect(rival.shiftDocId).toBe('2026-10-26_Turno Dia')
-    expect(rival.equipo).not.toBe(hoy.equipo)
-    // La noche se mide contra la noche, nunca contra el día.
-    const noche = resumenes.find((r) => r.shiftDocId === '2026-11-02_Turno Noche')!
-    expect(rivalDirecto(noche, resumenes)!.shiftDocId).toBe('2026-10-26_Turno Noche')
-    // El primer turno de la ventana no tiene a quién ganarle.
-    expect(rivalDirecto(resumenes.find((r) => r.shiftDocId === '2026-10-12_Turno Dia')!, resumenes)).toBeNull()
+  it('una noche cuyo día todavía no juega no tiene rival de jornada: queda el provisional, del otro horario y de antes', () => {
+    const todos = jornadaDeStats('2026-10-27', 10000, 12000)
+    const nocheNueva = resumenDeStat(stat('2026-10-27_Turno Noche', { total: 3000 }))! // jornada 28-oct
+    expect(nocheNueva.jornada).toBe('2026-10-28')
+    expect(rivalDirecto(nocheNueva, todos)).toBeNull()
+    const prov = rivalProvisional(nocheNueva, todos)!
+    expect(prov.shiftDocId).toBe('2026-10-27_Turno Dia')
+    expect(prov.esNoche).toBe(false)
+    expect(prov.equipo).not.toBe(nocheNueva.equipo)
+  })
+
+  it('si el supuesto rival lo hizo el mismo equipo (corrección manual) no hay duelo', () => {
+    const ov = { '2026-10-27_Turno Dia': 'cardenas' as const }
+    const noche = resumenDeStat(stat('2026-10-26_Turno Noche'), ov)!
+    const dia = resumenDeStat(stat('2026-10-27_Turno Dia'), ov)!
+    expect(noche.equipo).toBe(dia.equipo)
+    expect(rivalDirecto(noche, [noche, dia])).toBeNull()
   })
 
   it('el ciclo dura dos semanas y empieza en el ancla', () => {
@@ -232,77 +278,58 @@ describe('rival directo, ciclo, rachas y récords', () => {
     expect(cicloDe('2026-10-12')).toEqual({ indice: -1, inicio: '2026-10-12', fin: '2026-10-25' })
   })
 
-  it('el marcador del ciclo reparte los puntos al equipo que hizo cada turno', () => {
-    // Todos los turnos del día (12.000 pz) y de la noche (10.000) son idénticos entre semanas: todo empata,
-    // salvo que movamos uno. En la semana del 2-nov el día (Cárdenas) hace 1.000 pz más que el día de Rebolledo del 26-oct.
-    const conGanador = [...todos].map((id) => resumenDeStat(stat(id, { total: id === '2026-11-02_Turno Dia' ? 13000 : (id.includes('Noche') ? 10000 : 12000) }))!)
-    const duelos = duelosDeTurnos(conGanador)
+  it('cada jornada es un partido: los puntos van al equipo que hizo cada turno', () => {
+    // Jornada 27-oct: el día de Rebolledo (12.000 pz) le gana a la noche de Cárdenas (10.000): carrera y ritmo.
+    const duelos = duelosDeTurnos(jornadaDeStats('2026-10-27', 10000, 12000))
     const c0 = marcadorDeCiclo(duelos, 0, 0)
     expect(c0.vigente).toBe(true)
-    expect(c0.inicio).toBe('2026-10-26')
-    expect(c0.puntos.cardenas).toBe(2) // carrera y ritmo del día del 2-nov, que es de Cárdenas
-    expect(c0.puntos.rebolledo).toBe(0)
-    expect(c0.jugados.cardenas).toBe(2) // su día y su noche... 26-oct noche y 2-nov día
-    expect(c0.ganados.cardenas).toBe(1)
+    expect(c0.puntos).toEqual({ rebolledo: 2, cardenas: 0 })
+    expect(c0.ganados).toEqual({ rebolledo: 1, cardenas: 0 })
+    expect(c0.jugados).toEqual({ rebolledo: 1, cardenas: 1 })
     const previo = marcadorDeCiclo(duelos, -1, 0)
     expect(previo.vigente).toBe(false)
     expect(previo.puntos.rebolledo + previo.puntos.cardenas).toBe(0)
   })
 
-  const base = (id: string, total: number, dispMin = 420) => ({ ...resumenDeStat(stat(id, { total }))!, dispMin })
+  it('un turno sin su rival de jornada no suma ni cuenta como jugado', () => {
+    const solo = duelosDeTurnos([resumenDeStat(stat('2026-10-27_Turno Dia'))!])
+    expect(solo[0]!.marcador).toBeNull()
+    expect(marcadorDeCiclo(solo, 0, 0).jugados).toEqual({ rebolledo: 0, cardenas: 0 })
+  })
 
-  it('rachas: se suman las victorias seguidas de cada equipo', () => {
+  it('rachas: se suman las jornadas ganadas y una derrota corta la racha', () => {
     const turnos = [
-      base('2026-10-12_Turno Dia', 11000), // Rebolledo (semana -2): sin rival
-      base('2026-10-19_Turno Dia', 11500), // Cárdenas gana a Rebolledo
-      base('2026-10-26_Turno Dia', 12000), // Rebolledo gana a Cárdenas
-      base('2026-11-02_Turno Dia', 12500), // Cárdenas gana
-      base('2026-11-09_Turno Dia', 13000), // Rebolledo gana
-      base('2026-11-16_Turno Dia', 13500), // Cárdenas gana
+      ...jornadaDeStats('2026-10-27', 10000, 12000), // Rebolledo (día) gana
+      ...jornadaDeStats('2026-10-28', 9500, 12500), // Rebolledo gana
+      // Semana 2-nov: la noche (que parte el domingo) es de Rebolledo y el día de Cárdenas.
+      ...jornadaDeStats('2026-11-03', 11000, 10000), // Rebolledo (noche) gana
+      ...jornadaDeStats('2026-11-04', 11000, 13000), // Cárdenas (día) gana: corta la racha de Rebolledo
     ]
     const r = rachasPorEquipo(duelosDeTurnos(turnos))
-    // Cada equipo gana todos sus turnos: Cárdenas el 19-oct, 2-nov y 16-nov; Rebolledo el 26-oct y 9-nov.
-    expect(r.cardenas).toEqual({ actual: 3, mejor: 3 })
+    expect(r.rebolledo).toEqual({ actual: 0, mejor: 3 })
+    expect(r.cardenas).toEqual({ actual: 1, mejor: 1 })
+  })
+
+  it('rachas: una jornada sin duelo ni corta ni suma', () => {
+    const turnos = [
+      ...jornadaDeStats('2026-10-27', 10000, 12000), // Rebolledo gana
+      ...jornadaDeStats('2026-10-28', 9500, 12500, 100, 420), // la noche es un turno corto: sin duelo
+      ...jornadaDeStats('2026-10-29', 9500, 12600), // Rebolledo gana
+    ]
+    const r = rachasPorEquipo(duelosDeTurnos(turnos))
     expect(r.rebolledo).toEqual({ actual: 2, mejor: 2 })
   })
 
-  it('rachas: una derrota la corta (la mejor queda guardada)', () => {
+  it('récords: lo mejor de la ventana, con el equipo y la jornada', () => {
     const turnos = [
-      base('2026-10-19_Turno Noche', 9000), // Rebolledo (noche, semana -1): sin rival
-      base('2026-10-26_Turno Noche', 9500), // Cárdenas gana
-      base('2026-11-02_Turno Noche', 9800), // Rebolledo gana
-      base('2026-11-09_Turno Noche', 9700), // Cárdenas pierde (9.700 < 9.800)
-      base('2026-11-16_Turno Noche', 9600), // Rebolledo pierde (9.600 < 9.700)
-    ]
-    const r = rachasPorEquipo(duelosDeTurnos(turnos))
-    expect(r.cardenas).toEqual({ actual: 0, mejor: 1 })
-    expect(r.rebolledo).toEqual({ actual: 0, mejor: 1 })
-  })
-
-  it('rachas: un turno sin duelo ni la corta ni la suma', () => {
-    const turnos = [
-      base('2026-10-19_Turno Noche', 9000),
-      base('2026-10-26_Turno Noche', 9500), // Cárdenas gana
-      base('2026-11-02_Turno Noche', 9800), // Rebolledo gana
-      base('2026-11-09_Turno Noche', 9900, 100), // Cárdenas: turno corto, sin duelo
-      base('2026-11-16_Turno Noche', 9000), // Rebolledo contra un turno corto: sin duelo
-    ]
-    const r = rachasPorEquipo(duelosDeTurnos(turnos))
-    expect(r.cardenas).toEqual({ actual: 1, mejor: 1 })
-    expect(r.rebolledo).toEqual({ actual: 1, mejor: 1 })
-  })
-
-  it('récords: lo mejor de la ventana, con el equipo y el día', () => {
-    const turnos = [
-      resumenDeStat(stat('2026-10-26_Turno Dia', { total: 15000 }))!,
+      resumenDeStat(stat('2026-10-27_Turno Dia', { total: 15000 }))!,
       resumenDeStat(stat('2026-10-26_Turno Noche', { total: 11000 }))!,
-      resumenDeStat(stat('2026-11-02_Turno Noche', { total: 9000 }))!,
+      resumenDeStat(stat('2026-11-01_Turno Noche', { total: 9000 }))!,
     ]
     const r = recordsDe(duelosDeTurnos(turnos))
-    const dia = r.find((x) => x.id === 'piezas-dia')!
-    expect(dia).toMatchObject({ valor: 15000, equipo: 'rebolledo', dateKey: '2026-10-26' })
-    const noche = r.find((x) => x.id === 'piezas-noche')!
-    expect(noche).toMatchObject({ valor: 11000, equipo: 'cardenas' })
+    expect(r.find((x) => x.id === 'piezas-dia')).toMatchObject({ valor: 15000, equipo: 'rebolledo', dateKey: '2026-10-27' })
+    // La noche récord parte el 26-oct y es de la jornada del 27.
+    expect(r.find((x) => x.id === 'piezas-noche')).toMatchObject({ valor: 11000, equipo: 'cardenas', dateKey: '2026-10-27' })
   })
 
   it('costo de Mantención: piezas perdidas = minutos de falla × ritmo andando del propio turno', () => {
@@ -361,64 +388,115 @@ describe('curvas', () => {
 })
 
 describe('construirDuelo: de punta a punta con un turno en curso', () => {
-  const live = {
-    scheduledStart: '2026-11-02T07:00:00.000Z',
-    plannedEnd: '2026-11-02T15:00:00.000Z',
-    totalPieces: 3980,
+  const tras = (inicio: string, min: number) => new Date(Date.parse(inicio) + min * 60_000).toISOString()
+  const liveDe = (inicio: string, fin: string, ciclos = 3980) => ({
+    scheduledStart: inicio,
+    plannedEnd: fin,
+    totalPieces: ciclos,
     series: [
-      { t: '2026-11-02T07:10:00.000Z', pieces: 1000 },
-      { t: '2026-11-02T07:15:00.000Z', pieces: 1000 },
-      { t: '2026-11-02T07:20:00.000Z', pieces: 1000 },
-      { t: '2026-11-02T07:25:00.000Z', pieces: 980 },
+      { t: tras(inicio, 10), pieces: 1000 },
+      { t: tras(inicio, 15), pieces: 1000 },
+      { t: tras(inicio, 20), pieces: 1000 },
+      { t: tras(inicio, 25), pieces: 980 },
     ],
-    timeBreakdown: { producingMin: 100, windowMin: 120, plannedMin: 0, recoverableMin: 0, planned: [], recoverable: [] },
+    timeBreakdown: { producingMin: 100, windowMin: 120, plannedMin: 0, recoverableMin: 0, planned: [{ reason: 'COLACION', min: 30, count: 1 }], recoverable: [] },
     mantencion: { porMaquina: [{ microMin: 2 }] },
-    machines: [{ name: 'Evisceradora 1', pieces: 3980, targetCpm: 19, uptimeSec: 6000 }],
-  } as unknown as PublicMonitorLive
+    machines: [{ name: 'Evisceradora 1', pieces: ciclos, targetCpm: 19, uptimeSec: 6000 }],
+    stopReasons: ['COLACION', 'FALTA MMPP'],
+    stopEvents: [
+      { r: 0, f: tras(inicio, 40), s: 1800, m: 0 },
+      { r: 1, f: tras(inicio, 50), s: 120, m: 0 },
+    ],
+  }) as unknown as PublicMonitorLive
+  const live = liveDe('2026-11-02T07:00:00.000Z', '2026-11-02T15:00:00.000Z')
   const curvaHoy = [{ minutes: 5, pieces: 1000 }, { minutes: 10, pieces: 2000 }, { minutes: 15, pieces: 3000 }, { minutes: 20, pieces: 3980 }]
   const forecast: ForecastHistoryShift[] = [{
     shiftDocId: '2026-10-26_Turno Dia', dateKey: '2026-10-26',
     curve: [{ m: 5, p: 900 }, { m: 10, p: 1800 }, { m: 15, p: 2700 }, { m: 20, p: 3720 }, { m: 60, p: 12000 }],
     total: 12000, producingMin: 400, micro: null,
   }]
+  /** La noche de la jornada del 2-nov: parte el domingo 1-nov a las 21:00; la hizo Rebolledo (noche de la semana 2-nov). */
+  const nocheDeLaJornada = {
+    shiftDocId: '2026-11-01_Turno Noche', dateKey: '2026-11-01', shiftId: 'Turno Noche', h0: '21:00',
+    curve: [{ m: 5, p: 800 }, { m: 10, p: 1700 }, { m: 15, p: 2500 }, { m: 20, p: 3300 }, { m: 480, p: 10000 }], total: 10000, producingMin: 400,
+  }
 
-  it('el turno de Cárdenas (semana 2-nov) corre contra el último de Rebolledo y va ganando a la hora 1', () => {
+  it('el día de Cárdenas corre contra la noche de la MISMA jornada y va ganando a la 1ª hora', () => {
     const d = construirDuelo({
       shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy,
-      stats: [stat('2026-10-26_Turno Dia')], forecast,
+      stats: [stat('2026-10-26_Turno Dia'), stat('2026-11-01_Turno Noche')], forecast, rivalCurve: nocheDeLaJornada,
     })!
     expect(d.hoy.equipo).toBe('cardenas')
+    expect(d.hoy.jornada).toBe('2026-11-02')
+    expect(d.rival?.shiftDocId).toBe('2026-11-01_Turno Noche')
     expect(d.rival?.equipo).toBe('rebolledo')
+    expect(d.provisional).toBe(false)
+    expect(d.carrera?.fantasmaInfo?.tipo).toBe('jornada')
+    expect(rotuloFantasma(d.carrera!.fantasmaInfo!, 'Rebolledo')).toBe('Rebolledo · noche 02/11')
+    expect(rotuloTurno('Cárdenas', d.hoy)).toBe('Cárdenas · día 02/11')
     expect(d.carrera?.hora).toBe(1)
-    expect(d.carrera?.fantasmaPz).toBe(3720)
-    expect(d.carrera?.diferencia).toBe(260)
+    // El fantasma a la MISMA hora de producción (no su total): 3.300 pz a los 20 min, no 10.000.
+    expect(d.carrera?.fantasmaPz).toBe(3300)
+    expect(d.carrera?.diferencia).toBe(680)
     expect(d.marcador?.kpis[0]!.ganador).toBe('a')
     expect(d.marcador?.ganador).toBe('pendiente')
-    expect(d.listos).toEqual({ con: 1, de: 1 })
+    expect(d.listos).toEqual({ con: 2, de: 2 })
     expect(d.corregido).toBe(false)
   })
 
-  it('con una corrección manual el turno cambia de equipo y el aviso lo dice', () => {
+  it('el mismo horario de la semana anterior queda como dato secundario, sin puntos', () => {
     const d = construirDuelo({
       shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy,
-      stats: [stat('2026-10-26_Turno Dia')], forecast, overrides: { '2026-11-02_Turno Dia': 'rebolledo' },
+      stats: [stat('2026-10-26_Turno Dia'), stat('2026-11-01_Turno Noche')], forecast, rivalCurve: nocheDeLaJornada,
+    })!
+    expect(d.semanaAnterior?.fantasma.tipo).toBe('ultimo')
+    expect(d.semanaAnterior?.fantasma.shiftDocId).toBe('2026-10-26_Turno Dia')
+    expect(d.semanaAnterior?.pzAHora).toBe(3720)
+    expect(d.semanaAnterior?.diferencia).toBe(260)
+  })
+
+  it('mientras corre la noche, su rival de la jornada no juega: fantasma y rival provisionales (el último día del rival)', () => {
+    const liveNoche = liveDe('2026-11-02T21:00:00.000Z', '2026-11-03T05:00:00.000Z')
+    const diaPrevio = { ...nocheDeLaJornada, shiftDocId: '2026-11-02_Turno Dia', dateKey: '2026-11-02', shiftId: 'Turno Dia', h0: '07:00' }
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Noche', live: liveNoche, piezas: 3980, cerrado: false, curvaHoy,
+      stats: [stat('2026-11-02_Turno Dia')], forecast: [], rivalCurve: diaPrevio,
+    })!
+    // La noche del 2-nov es de la jornada del 3-nov y de la semana 2-nov: la hace Rebolledo; el día del 2-nov, Cárdenas.
+    expect(d.hoy.jornada).toBe('2026-11-03')
+    expect(d.hoy.equipo).toBe('rebolledo')
+    expect(d.provisional).toBe(true)
+    expect(d.rival?.shiftDocId).toBe('2026-11-02_Turno Dia')
+    expect(d.carrera?.fantasmaInfo?.tipo).toBe('provisional')
+    expect(rotuloFantasma(d.carrera!.fantasmaInfo!, 'Cárdenas')).toBe('provisional · Cárdenas día 02/11')
+    // Sin rival de jornada no hay carrera en vivo comparable con puntos: el marcador sigue pendiente.
+    expect(d.marcador?.ganador).toBe('pendiente')
+    expect(d.ciclo.jugados).toEqual({ rebolledo: 0, cardenas: 0 })
+  })
+
+  it('las paradas de hoy se ubican en el eje de horas de producción (restando el arranque)', () => {
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy, stats: [], forecast: [],
+    })!
+    // Primera pieza a las 07:10 (arranque 10 min). La colación de 30 min parte a las 07:40 → minuto 30 de producción.
+    expect(d.hoy.arranqueMin).toBe(10)
+    const colacion = d.carrera!.eventosHoy.find((e) => e.corta === 'Colación')!
+    expect(colacion).toMatchObject({ desde: 30, hasta: 60, programada: true })
+    // La falta de MMPP de 2 min no llega a 5 min: no se marca.
+    expect(d.carrera!.eventosHoy.some((e) => e.corta === 'Falta de MMPP')).toBe(false)
+  })
+
+  it('con una corrección manual el turno cambia de equipo, el aviso lo dice y no queda rival del mismo equipo', () => {
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy,
+      stats: [stat('2026-10-26_Turno Dia'), stat('2026-11-01_Turno Noche')], forecast, overrides: { '2026-11-02_Turno Dia': 'rebolledo' },
+      overridesMeta: { '2026-11-02_Turno Dia': { uid: 'u1', at: '2026-10-27T23:05:00.000Z' } },
     })!
     expect(d.hoy.equipo).toBe('rebolledo')
     expect(d.corregido).toBe(true)
-    // Rebolledo contra Rebolledo no es un duelo: el rival tiene que ser el otro equipo (no hay ninguno anterior).
+    expect(d.correccion).toEqual({ uid: 'u1', at: '2026-10-27T23:05:00.000Z' })
+    // Rebolledo contra Rebolledo no es un duelo: la noche del 1-nov también es de Rebolledo.
     expect(d.rival).toBeNull()
-  })
-
-  it('día contra noche de hoy: dato sin puntos, a igual tiempo de turno', () => {
-    const d = construirDuelo({
-      shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy, stats: [], forecast: [],
-      rivalCurve: { shiftDocId: '2026-11-01_Turno Noche', dateKey: '2026-11-01', shiftId: 'Turno Noche', h0: '21:00', curve: [{ m: 5, p: 800 }, { m: 10, p: 1700 }, { m: 15, p: 2500 }, { m: 20, p: 3300 }, { m: 480, p: 10000 }], total: 10000, producingMin: 400 },
-    })!
-    expect(d.diaNoche?.esNoche).toBe(true)
-    expect(d.diaNoche?.rivalPz).toBe(3300)
-    expect(d.diaNoche?.diferencia).toBe(680)
-    // El domingo 1-nov noche es de la semana anterior al ancla+1: lo hizo Cárdenas, igual que el día de hoy.
-    expect(d.diaNoche?.mismoEquipo).toBe(true)
   })
 
   it('sin la hora de inicio del turno no se arma el duelo', () => {
@@ -426,5 +504,298 @@ describe('construirDuelo: de punta a punta con un turno en curso', () => {
       shiftDocId: '2026-11-02_Turno Dia', live: { ...live, scheduledStart: null } as PublicMonitorLive,
       piezas: 0, cerrado: false, curvaHoy: [], stats: [], forecast: [],
     })).toBeNull()
+  })
+})
+
+describe('horas de producción transcurridas', () => {
+  it('el minuto transcurrido cae en su hora: 0–59 = 1ª, 60–119 = 2ª', () => {
+    expect(horaTranscurrida(0)).toBe(1)
+    expect(horaTranscurrida(59.9)).toBe(1)
+    expect(horaTranscurrida(60)).toBe(2)
+    expect(horaTranscurrida(472)).toBe(8)
+    expect(horaTranscurrida(-5)).toBe(1)
+    expect(etiquetaHora(3)).toBe('3ª hora')
+  })
+
+  it('las bandas del eje: la última queda a medias y no se marca como completa', () => {
+    const b = bandasDeHoras(150)
+    expect(b.map((x) => [x.n, x.desde, x.hasta, x.completa])).toEqual([[1, 0, 60, true], [2, 60, 120, true], [3, 120, 150, false]])
+    expect(bandasDeHoras(120).length).toBe(2)
+    expect(bandasDeHoras(0)).toEqual([])
+  })
+
+  it('el reloj de cada equipo sale de su hora de inicio más el arranque, y da la vuelta a medianoche', () => {
+    expect(minutoDelDia('21:00')).toBe(1260)
+    expect(minutoDelDia('sin hora')).toBeNull()
+    expect(relojDeMinuto(1260 + 10 + 3 * 60)).toBe('00:10') // 21:00 + 10 min de arranque + 3 h de producción
+    expect(relojDeMinuto(440)).toBe('07:20')
+  })
+
+  it('el ritmo hora a hora sale de la curva acumulada: pz entre dos marcas ÷ minutos cubiertos', () => {
+    const hoy = [{ minutes: 0, pieces: 0 }, { minutes: 60, pieces: 2400 }, { minutes: 120, pieces: 4200 }, { minutes: 150, pieces: 5100 }]
+    const rival = [{ minutes: 0, pieces: 0 }, { minutes: 60, pieces: 2000 }, { minutes: 120, pieces: 4400 }, { minutes: 180, pieces: 6800 }]
+    const h = ritmoHoraAHora(hoy, rival)
+    expect(h.map((x) => x.hora)).toEqual([1, 2, 3])
+    expect(h[0]).toMatchObject({ a: 40, b: 2000 / 60, parcialA: false, parcialB: false })
+    expect(h[1]).toMatchObject({ a: 30, b: 40 })
+    // La 3ª hora de hoy llegó a 150 min: 900 pz en 30 min = 30 pz/min, marcada como parcial.
+    expect(h[2]).toMatchObject({ a: 30, parcialA: true, parcialB: false })
+  })
+
+  it('una hora con menos de 15 min cubiertos no se muestra, y una curva corta no inventa horas', () => {
+    const hoy = [{ minutes: 0, pieces: 0 }, { minutes: 60, pieces: 2400 }, { minutes: 70, pieces: 2800 }]
+    const h = ritmoHoraAHora(hoy, [])
+    expect(h.map((x) => x.hora)).toEqual([1])
+    expect(h[0]!.b).toBeNull()
+    expect(ritmoHoraAHora([], [])).toEqual([])
+  })
+})
+
+describe('paradas del turno sobre el eje de horas', () => {
+  const crudos = [
+    { n: 'COLACION', o: 240, d: 30, p: 1 as const },
+    { n: 'FALTA MMPP', o: 100, d: 12 },
+    { n: 'ATASCAMIENTO', o: 0, d: 8 }, // termina antes del arranque (minuto 8 < 10)
+  ]
+
+  it('se resta el arranque para pasar de «desde el inicio planificado» a «desde la primera pieza»', () => {
+    const e = eventosEnEjeProduccion(crudos, 10)
+    expect(e.map((x) => [x.corta, x.desde, x.hasta, x.programada])).toEqual([
+      ['Falta de MMPP', 90, 102, false],
+      ['Colación', 230, 260, true],
+    ])
+  })
+
+  it('lo que terminó antes de la primera pieza se descarta y lo que la cruza se recorta en 0', () => {
+    const e = eventosEnEjeProduccion([{ n: 'ATASCAMIENTO', o: 0, d: 8 }, { n: 'CAMBIO', o: 5, d: 20 }], 10)
+    expect(e.map((x) => [x.causa, x.desde, x.hasta])).toEqual([['CAMBIO', 0, 15]])
+  })
+
+  it('sin el arranque no se adivina dónde caen', () => {
+    expect(eventosEnEjeProduccion(crudos, null)).toEqual([])
+    expect(eventosEnEjeProduccion(undefined, 10)).toEqual([])
+  })
+
+  it('nombre corto de la causa para el globo', () => {
+    expect(causaCorta('COLACION')).toBe('Colación')
+    expect(causaCorta('Colación 1')).toBe('Colación')
+    expect(causaCorta('FALTA MMPP')).toBe('Falta de MMPP')
+    expect(causaCorta('ATASCAMIENTO')).toBe('Atascamiento')
+    expect(causaCorta('UNA CAUSA MUY LARGA QUE NO CABE EN EL GLOBO')).toHaveLength(26)
+  })
+
+  it('las paradas de hoy se unen entre máquinas por causa y solo quedan las de 5 min o más', () => {
+    const live = {
+      scheduledStart: '2026-11-02T07:00:00.000Z',
+      stopReasons: ['FALTA MMPP', 'KNURO'],
+      timeBreakdown: { planned: [], recoverable: [] },
+      stopEvents: [
+        { r: 0, f: '2026-11-02T08:00:00.000Z', s: 240, m: 0 },
+        { r: 0, f: '2026-11-02T08:02:00.000Z', s: 240, m: 1 }, // se solapa con la anterior: una sola marca de 6 min
+        { r: 0, f: '2026-11-02T10:00:00.000Z', s: 200, m: 0 }, // 3 min: no llega
+        { r: 1, f: '2026-11-02T09:00:00.000Z', s: 600, m: 2 },
+      ],
+    } as unknown as PublicMonitorLive
+    expect(eventosCrudosDeLive(live)).toEqual([
+      { n: 'FALTA MMPP', o: 60, d: 6 },
+      { n: 'KNURO', o: 120, d: 10 },
+    ])
+  })
+})
+
+describe('franja, KPI a KPI y tendencia semanal', () => {
+  it('la franja cambia de color donde se cruzan las curvas', () => {
+    const a = [{ minutes: 0, pieces: 0 }, { minutes: 60, pieces: 1000 }, { minutes: 120, pieces: 1600 }]
+    const b = [{ minutes: 0, pieces: 0 }, { minutes: 60, pieces: 600 }, { minutes: 120, pieces: 2400 }]
+    const t = franjasEntre(a, b, 120)
+    expect(t.map((x) => x.adelante)).toEqual(['a', 'b'])
+    // La diferencia pasa de +400 (min 60) a −800 (min 120): se cruzan en el minuto 80.
+    const cruce = t[0]!.puntos[t[0]!.puntos.length - 1]!
+    expect(cruce.m).toBeCloseTo(80, 0)
+    expect(cruce.a).toBeCloseTo(cruce.b)
+    expect(franjasEntre(a, [], 120)).toEqual([])
+  })
+
+  it('KPI a KPI: las barras arrancan en cero y el largo es proporcional al mayor', () => {
+    const a = resumen({ piezas: 12500, ritmo: 31, microMinH: 1, arranqueMin: 5, ultimaHoraPz: 1600 })
+    const b = resumen({ equipo: 'cardenas', piezas: 12000 })
+    const filas = filasKpiAKpi(compararTurnos(a, b))
+    expect(filas.map((f) => f.rotulo)).toEqual(['Piezas con Mantención sumada', 'Ritmo', 'Micro detención', 'Hasta la primera pieza', 'Piezas de la última hora'])
+    expect(filas[0]).toMatchObject({ kpi: 'carrera', a: 12500, b: 12000, fa: 1, ganador: 'a', mejor: 'mayor' })
+    expect(filas[0]!.fb).toBeCloseTo(0.96)
+    expect(filas[2]).toMatchObject({ kpi: 'micro', mejor: 'menor', ganador: 'a' })
+    expect(filas[2]!.fa).toBeCloseTo(0.5)
+    expect(filasKpiAKpi(null)).toEqual([])
+  })
+
+  it('KPI a KPI: un dato que falta no es una barra de cero y un turno sin duelo no tiene filas', () => {
+    const a = resumen({ ritmo: null })
+    const filas = filasKpiAKpi(compararTurnos(a, resumen({ equipo: 'cardenas' })))
+    expect(filas[1]).toMatchObject({ a: null, fa: 0, ganador: 'sin-dato' })
+    expect(filasKpiAKpi(compararTurnos(resumen({ dispMin: 100 }), resumen({ equipo: 'cardenas' })))).toEqual([])
+  })
+
+  it('tendencia semanal: piezas por turno de cada equipo, por semana de producción y con su horario', () => {
+    const rs = [
+      resumenDeStat(stat('2026-10-26_Turno Dia', { total: 12000 }))!, // jornada 26-oct: Rebolledo, día
+      resumenDeStat(stat('2026-10-27_Turno Dia', { total: 13000 }))!,
+      resumenDeStat(stat('2026-10-26_Turno Noche', { total: 10000 }))!, // jornada 27-oct: Cárdenas, noche
+      resumenDeStat(stat('2026-11-01_Turno Noche', { total: 11000 }))!, // jornada lunes 2-nov: semana nueva, Rebolledo
+      resumenDeStat(stat('2026-11-03_Turno Dia', { total: 9000 }))!, // Cárdenas, día
+    ]
+    const t = tendenciaSemanal(rs)
+    expect(t.map((s) => s.lunes)).toEqual(['2026-10-26', '2026-11-02'])
+    expect(t[0]!.equipos.rebolledo).toEqual({ prom: 12500, turnos: 2, horario: 'dia' })
+    expect(t[0]!.equipos.cardenas).toEqual({ prom: 10000, turnos: 1, horario: 'noche' })
+    expect(t[1]!.equipos.rebolledo).toEqual({ prom: 11000, turnos: 1, horario: 'noche' })
+    expect(t[1]!.equipos.cardenas).toEqual({ prom: 9000, turnos: 1, horario: 'dia' })
+    expect(tendenciaSemanal([])).toEqual([])
+  })
+})
+
+describe('el mismo horario de la semana anterior y el fantasma de la jornada', () => {
+  const hoy = { shiftDocId: '2026-11-02_Turno Dia', dateKey: '2026-11-02', jornada: '2026-11-02', shiftId: 'Turno Dia', esNoche: false, equipo: 'cardenas' as const }
+  const f = (id: string, base: number): ForecastHistoryShift => ({
+    shiftDocId: id, dateKey: id.slice(0, 10), curve: [{ m: 15, p: base }, { m: 30, p: base * 2 }, { m: 60, p: base * 4 }], total: base * 40, producingMin: 400, micro: null,
+  })
+
+  it('el fantasma es el ÚLTIMO turno del rival en el mismo horario, y la banda promedia los anteriores', () => {
+    const forecast = [f('2026-10-12_Turno Dia', 100), f('2026-10-19_Turno Dia', 999), f('2026-10-26_Turno Dia', 300)]
+    const r = referenciaMismoHorario(hoy, forecast, [])
+    // Rebolledo hizo el día del 26-oct y del 12-oct; el 19-oct lo hizo Cárdenas (no es su rival).
+    expect(r.fantasma?.tipo).toBe('ultimo')
+    expect(r.fantasma?.shiftDocId).toBe('2026-10-26_Turno Dia')
+    expect(r.fantasma?.total).toBe(12000)
+    expect(r.banda?.turnos).toBe(2)
+    expect(rotuloFantasma(r.fantasma!, 'Rebolledo')).toBe('Rebolledo · día 26/10')
+  })
+
+  it('si el último turno del rival no trae curva todavía, el fantasma es el promedio y lo dice con su nombre', () => {
+    const forecast = [f('2026-10-12_Turno Dia', 100), f('2026-09-28_Turno Dia', 300)]
+    const stats = [stat('2026-10-26_Turno Dia')] // existe, pero su curva aún no está publicada
+    const r = referenciaMismoHorario(hoy, forecast, stats)
+    expect(r.fantasma?.tipo).toBe('promedio')
+    expect(r.fantasma?.turnos).toBe(2)
+    expect(rotuloFantasma(r.fantasma!, 'Rebolledo')).toBe('Rebolledo · promedio de 2 turnos')
+  })
+
+  it('sin turnos del rival no hay fantasma ni banda', () => {
+    expect(referenciaMismoHorario(hoy, [f('2026-10-19_Turno Dia', 100)], [])).toEqual({ fantasma: null, banda: null })
+  })
+
+  it('el fantasma de la jornada trae reloj y paradas del rival, ya en el eje de producción', () => {
+    const rc = {
+      shiftDocId: '2026-11-01_Turno Noche', dateKey: '2026-11-01', shiftId: 'Turno Noche', h0: '21:00',
+      curve: [{ m: 5, p: 800 }, { m: 10, p: 1700 }, { m: 15, p: 2500 }], total: 9000, producingMin: 400,
+    }
+    const st = stat('2026-11-01_Turno Noche', {}, { ini: 10, ev: [{ n: 'COLACION', o: 250, d: 30, p: 1 }] })
+    const g = fantasmaDeJornada(hoy, rc, [st])!
+    expect(g.tipo).toBe('jornada')
+    expect(g.equipo).toBe('rebolledo')
+    expect(g.inicioMin).toBe(21 * 60 + 10)
+    expect(g.eventos).toEqual([{ causa: 'COLACION', corta: 'Colación', desde: 240, hasta: 270, programada: true }])
+    // Un rival que es del mismo horario, o del mismo equipo, no es el de la jornada.
+    expect(fantasmaDeJornada({ ...hoy, esNoche: true }, rc, [st])).toBeNull()
+    expect(fantasmaDeJornada(hoy, rc, [st], { '2026-11-01_Turno Noche': 'cardenas' })).toBeNull()
+    expect(fantasmaDeJornada(hoy, null, [])).toBeNull()
+  })
+
+  it('el día del 27/10 en curso contra «2026-10-26_Turno 1»: es la noche de la MISMA jornada, no un provisional', () => {
+    const dia = { shiftDocId: '2026-10-27_Turno 2', dateKey: '2026-10-27', jornada: '2026-10-27', shiftId: 'Turno 2', esNoche: false, equipo: 'rebolledo' as const }
+    // Sin importar la hora de inicio que publique la noche, su jornada es el 27/10.
+    for (const h0 of ['21:00', '04:00']) {
+      const rc = { shiftDocId: '2026-10-26_Turno 1', dateKey: '2026-10-26', shiftId: 'Turno 1', h0, curve: [{ m: 5, p: 800 }, { m: 10, p: 1700 }, { m: 15, p: 2500 }], total: 9000, producingMin: 400 }
+      const g = fantasmaDeJornada(dia, rc, [])!
+      expect(g.tipo).toBe('jornada')
+      expect(g.jornada).toBe('2026-10-27')
+      expect(rotuloFantasma(g, 'Cárdenas')).toBe('Cárdenas · noche 27/10')
+    }
+    // El día provisional sí lleva su propia jornada, no la fecha cruda del documento.
+    const nocheHoy = { shiftDocId: '2026-10-27_Turno 1', dateKey: '2026-10-27', jornada: '2026-10-28', shiftId: 'Turno 1', esNoche: true, equipo: 'cardenas' as const }
+    const rcDia = { shiftDocId: '2026-10-27_Turno 2', dateKey: '2026-10-27', shiftId: 'Turno 2', h0: '07:20', curve: [{ m: 5, p: 800 }, { m: 10, p: 1700 }, { m: 15, p: 2500 }], total: 9000, producingMin: 400 }
+    const p = fantasmaDeJornada(nocheHoy, rcDia, [])!
+    expect(p.tipo).toBe('provisional')
+    expect(rotuloFantasma(p, 'Rebolledo')).toBe('provisional · Rebolledo día 27/10')
+  })
+
+  it('la corrección manual guarda quién y cuándo, y se muestra en hora de Chile', () => {
+    expect(fechaCorreccion('2026-10-27T23:05:00.000Z')).toBe('27/10 20:05')
+    expect(fechaCorreccion('basura')).toBeNull()
+    expect(fechaCorreccion(undefined)).toBeNull()
+  })
+})
+
+describe('marcador por semana y por mes', () => {
+  const vispera = (dia: string) => new Date(Date.parse(`${dia}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+  const jornada = (dia: string, pzNoche: number, pzDia: number) => [
+    resumenDeStat(stat(`${vispera(dia)}_Turno Noche`, { total: pzNoche }))!,
+    resumenDeStat(stat(`${dia}_Turno Dia`, { total: pzDia }))!,
+  ]
+
+  it('semana 44: puntos, ganados, empatados, perdidos y piezas por turno de cada equipo', () => {
+    const duelos = duelosDeTurnos([
+      ...jornada('2026-10-27', 10000, 12000), // día (Rebolledo) gana
+      ...jornada('2026-10-28', 10000, 12000), // día gana
+      ...jornada('2026-10-29', 12000, 12000), // empate total
+    ])
+    const m = marcadorDePeriodo(duelos, 'semana', '2026-10-26', '2026-10-29')
+    expect(m.etiqueta).toBe('Semana 44')
+    expect(m.inicio).toBe('2026-10-26')
+    expect(m.fin).toBe('2026-11-01')
+    expect(m.vigente).toBe(true)
+    expect(m.puntos).toEqual({ rebolledo: 4, cardenas: 0 })
+    expect(m.ganados).toEqual({ rebolledo: 2, cardenas: 0 })
+    expect(m.empatados).toEqual({ rebolledo: 1, cardenas: 1 })
+    expect(m.perdidos).toEqual({ rebolledo: 0, cardenas: 2 })
+    expect(m.turnos).toEqual({ rebolledo: 3, cardenas: 3 })
+    expect(m.piezasProm.rebolledo).toBe(12000)
+    expect(m.piezasProm.cardenas).toBeCloseTo(32000 / 3)
+    expect(m.ganador).toBe('rebolledo')
+  })
+
+  it('una semana sin turnos no tiene ganador ni promedios inventados', () => {
+    const m = marcadorDePeriodo([], 'semana', '2026-11-09', '2026-11-10')
+    expect(m.ganador).toBeNull()
+    expect(m.puntos).toEqual({ rebolledo: 0, cardenas: 0 })
+    expect(m.piezasProm).toEqual({ rebolledo: null, cardenas: null })
+  })
+
+  it('empate de puntos: la jornada empatada reparte «empatados» y el período se declara empate', () => {
+    const m = marcadorDePeriodo(duelosDeTurnos(jornada('2026-10-29', 12000, 12000)), 'semana', '2026-10-26', '2026-10-29')
+    expect(m.ganador).toBe('empate')
+    expect(m.empatados).toEqual({ rebolledo: 1, cardenas: 1 })
+  })
+
+  it('el mes es calendario y se cuenta por jornada: la noche del 31-oct es del 1-nov', () => {
+    const duelos = duelosDeTurnos([
+      ...jornada('2026-10-30', 10000, 12000), // 30-oct
+      ...jornada('2026-11-01', 10000, 12000), // la noche parte el 31-oct a las 21:00: jornada del 1-nov
+    ])
+    const oct = marcadorDePeriodo(duelos, 'mes', '2026-10', '2026-11-01')
+    const nov = marcadorDePeriodo(duelos, 'mes', '2026-11', '2026-11-01')
+    expect(oct.etiqueta).toBe('octubre 2026')
+    expect(oct.inicio).toBe('2026-10-01')
+    expect(oct.fin).toBe('2026-10-31')
+    expect(oct.turnos).toEqual({ rebolledo: 1, cardenas: 1 })
+    expect(nov.turnos).toEqual({ rebolledo: 1, cardenas: 1 })
+    expect(nov.vigente).toBe(true)
+    expect(oct.vigente).toBe(false)
+    // La semana del 26-oct cruza el cambio de mes: tiene las dos jornadas.
+    expect(marcadorDePeriodo(duelos, 'semana', '2026-10-26', '2026-11-01').turnos).toEqual({ rebolledo: 2, cardenas: 2 })
+  })
+
+  it('febrero bisiesto y número de semana ISO en los bordes del año', () => {
+    expect(marcadorDePeriodo([], 'mes', '2028-02', '2028-02-10').fin).toBe('2028-02-29')
+    expect(marcadorDePeriodo([], 'mes', '2026-02', '2026-02-10').fin).toBe('2026-02-28')
+    expect(semanaIso('2026-10-26')).toBe(44)
+    expect(semanaIso('2026-12-28')).toBe(53)
+    expect(semanaIso('2027-01-04')).toBe(1)
+  })
+
+  it('los períodos disponibles van del más nuevo al más viejo e incluyen siempre el de hoy', () => {
+    const duelos = duelosDeTurnos(jornada('2026-10-27', 10000, 12000))
+    expect(periodosDisponibles(duelos, '2026-11-10', 'semana')).toEqual(['2026-11-09', '2026-10-26'])
+    expect(periodosDisponibles(duelos, '2026-11-10', 'mes')).toEqual(['2026-11', '2026-10'])
+    expect(periodosDisponibles([], '2026-11-10', 'mes')).toEqual(['2026-11'])
   })
 })

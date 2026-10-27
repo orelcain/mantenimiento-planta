@@ -125,3 +125,33 @@ test('resumenDuelo: un turno sin datos no produce undefined ni null (Firestore)'
   }
   sinVacios(d, 'duelo')
 })
+
+test('eventosDelDuelo: paradas de 5 min o más, unidas entre máquinas por causa y ubicadas desde el inicio planificado', () => {
+  const { eventosDelDuelo } = require('../publicMonitor')
+  const ini = Date.parse('2026-11-02T07:00:00.000Z')
+  const l = {
+    stopReasons: ['COLACION', 'FALTA MMPP', 'KNURO'],
+    stopEvents: [
+      { r: 0, f: '2026-11-02T10:00:00.000Z', s: 1800, m: 0 },
+      { r: 0, f: '2026-11-02T10:00:00.000Z', s: 1800, m: 1 }, // misma colación en otra máquina: una sola marca
+      { r: 1, f: '2026-11-02T08:00:00.000Z', s: 240, m: 0 },
+      { r: 1, f: '2026-11-02T08:02:00.000Z', s: 240, m: 1 }, // se solapan: 6 min en total
+      { r: 2, f: '2026-11-02T09:00:00.000Z', s: 120, m: 0 }, // 2 min: no llega
+    ],
+  }
+  assert.deepEqual(eventosDelDuelo(l, ini), [
+    { n: 'FALTA MMPP', o: 60, d: 6 },
+    { n: 'COLACION', o: 180, d: 30, p: 1 },
+  ])
+  assert.deepEqual(eventosDelDuelo(l, NaN), [], 'sin inicio planificado no se ubica nada')
+  assert.deepEqual(eventosDelDuelo({}, ini), [], 'siempre un arreglo: es lo que invalida el caché viejo')
+})
+
+test('resumenDuelo: trae `ev` (siempre un arreglo) y ningún valor undefined o null', () => {
+  const d = resumenDuelo({
+    scheduledStart: '2026-11-02T07:00:00.000Z', series: [], machines: [],
+    stopReasons: ['KNURO'], stopEvents: [{ r: 0, f: '2026-11-02T09:00:00.000Z', s: 600, m: 0 }],
+  })
+  assert.deepEqual(d.ev, [{ n: 'KNURO', o: 120, d: 10 }])
+  assert.ok(Array.isArray(resumenDuelo({ series: [], machines: [] }).ev))
+})
