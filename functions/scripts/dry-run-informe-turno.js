@@ -1,6 +1,7 @@
 /**
  * Ensayo del informe post-turno: lo genera para turnos ya cerrados SIN enviar
- * nada a Telegram y sin escribir en Firestore.
+ * nada a Telegram ni por correo y sin escribir en Firestore. Deja el PDF y, al
+ * lado, el cuerpo del correo (`.html`) para abrirlo en el navegador.
  *
  * Es la verificación previa a prender la feature, y sirve igual después: cuando
  * se toque el cálculo o los textos, correr esto contra los mismos turnos y
@@ -27,7 +28,8 @@ const admin = require('firebase-admin')
 const { cotejarTurnos } = require('../shoplogix/cotejoTurnos')
 const { construirDatosInforme } = require('../shoplogix/informeTurno')
 const { generarInformeTurno } = require('../shoplogix/turnoDefensaPdf')
-const { AREA_LABEL, caption, nombreArchivo } = require('../shoplogix/enviarInforme')
+const { AREA_LABEL, caption, nombreArchivo, historialDeComparables } = require('../shoplogix/enviarInforme')
+const { correoTurnoHtml } = require('../shoplogix/correoTurno')
 
 const SALIDA = process.argv[2] || './out-informes'
 const POR_PLANTA = Number(process.argv[3] || 6)
@@ -87,11 +89,12 @@ function revisar({ datos, pdf, plant, docId }) {
   // El PDF mismo.
   const cabecera = pdf.slice(0, 5).toString()
   if (cabecera !== '%PDF-') problemas.push('el archivo no es un PDF')
-  // Las 6 láminas pueden ocupar más hojas: una tabla larga se continúa en vez
+  // Las 5 láminas (6 con el anexo de varias máquinas) pueden ocupar más hojas: una tabla larga se continúa en vez
   // de perder el final (ver `turnoDefensaPdf`). Lo que sí es sospechoso es un
   // informe que se dispara: ahí algo está cortando de más.
   const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length
-  if (paginas < 6) problemas.push(`${paginas} paginas: falta alguna lamina`)
+  const minimo = datos.resumen.maquinas > 1 ? 6 : 5
+  if (paginas < minimo) problemas.push(`${paginas} paginas: falta alguna lamina`)
   if (paginas > 10) problemas.push(`${paginas} paginas: la maqueta esta cortando de mas`)
   if (pdf.length > 400_000) problemas.push(`PDF muy pesado (${Math.round(pdf.length / 1024)} KB)`)
   const cap = caption({ meta: datos.meta, datos })
@@ -149,7 +152,9 @@ async function turnosCerrados(plant, n) {
         if (ciclos < 50) { console.log(`  ${docId.padEnd(28)} sin produccion (${ciclos}) — se omitiria`); continue }
 
         const cotejo = await cotejarTurnos({ db, plant, shiftDocId: docId }).catch(() => null)
+        const historial = await historialDeComparables({ db, plant, cotejo }).catch(() => null)
         const datos = construirDatosInforme({
+          historial,
           machines,
           windowStart: snap.docs[0].data().shiftStart,
           windowEnd: snap.docs[0].data().shiftEnd,
@@ -157,12 +162,13 @@ async function turnosCerrados(plant, n) {
           meta: {
             planta: plant,
             areaLabel: AREA_LABEL[plant] || plant,
-            turnoLabel: padre.shiftId || docId.split('_').slice(1).join('_'),
+            turnoLabel: String(padre.shiftId || docId.split('_').slice(1).join('_')).replace(/\bDia\b/, 'Día'),
             fechaLabel: docId.slice(0, 10),
           },
         })
         const pdf = generarInformeTurno(datos)
         fs.writeFileSync(path.join(SALIDA, nombreArchivo(plant, docId)), pdf)
+        fs.writeFileSync(path.join(SALIDA, nombreArchivo(plant, docId).replace(/\.pdf$/, '.html')), correoTurnoHtml(datos))
 
         const rev = revisar({ datos, pdf, plant, docId })
         revisiones.push(rev)

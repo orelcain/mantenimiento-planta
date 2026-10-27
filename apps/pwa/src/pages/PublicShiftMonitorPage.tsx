@@ -4776,11 +4776,17 @@ function MonitorDelToken() {
     setEnviandoInforme(true)
     setAvisoInforme(null)
     try {
-      const fn = httpsCallable<{ plant: string; shiftDocId: string }, { enviado: boolean; motivo?: string }>(
-        getFunctions(undefined, 'us-central1'), 'enviarInformeTurnoManual',
-      )
+      const fn = httpsCallable<
+        { plant: string; shiftDocId: string },
+        { enviado: boolean; motivo?: string; messageId?: number | null; correo?: { enviado: boolean } | null }
+      >(getFunctions(undefined, 'us-central1'), 'enviarInformeTurnoManual')
       const { data: r } = await fn({ plant: data.plantSlug, shiftDocId: data.shiftDocId })
-      setAvisoInforme(r.enviado ? 'Informe enviado a Telegram.' : `No se envió: ${r.motivo}`)
+      // El correo va aparte de Telegram: puede salir uno y fallar el otro.
+      const canales = [r.messageId !== undefined && r.messageId !== null ? 'Telegram' : null, r.correo?.enviado ? 'correo' : null]
+        .filter(Boolean).join(' y ')
+      setAvisoInforme(r.enviado
+        ? `Informe enviado${canales ? ` por ${canales}` : ''}.${r.correo && !r.correo.enviado ? ' El correo no salió.' : ''}`
+        : `No se envió: ${r.motivo}`)
     } catch (e) {
       setAvisoInforme(e instanceof Error ? e.message : 'No se pudo enviar el informe.')
     } finally {
