@@ -271,6 +271,8 @@ export interface EventoMarcado {
   desdeMs: number
   hastaMs: number
   causa: string | null
+  /** La máquina de la parada (id de `MinutoTurno.maquinas`). null = no se sabe: se marca en todas. */
+  maquinaId?: string | null
 }
 
 type TonoMinuto = 'ok' | 'warn' | 'crit' | 'sin'
@@ -391,9 +393,10 @@ function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
           esperado: d.maquinas.every((m) => m.esperado != null) ? d.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null,
           cycles: suma,
           principal: true,
+          id: null as string | null,
         }]
       : []),
-    ...d.maquinas.map((m) => ({ nombre: m.nombre, nota: null as string | null, esperado: m.esperado, cycles: m.cycles, principal: !varias })),
+    ...d.maquinas.map((m) => ({ nombre: m.nombre, nota: null as string | null, esperado: m.esperado, cycles: m.cycles, principal: !varias, id: m.id as string | null })),
   ]
   const aRitmo = (f: (typeof filas)[number]) => {
     if (f.esperado == null || n === 0) return null
@@ -430,6 +433,13 @@ function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
             const tope = Math.max(1, (f.esperado ?? 0) * 1.15, ...f.cycles.slice(0, n))
             const pct = aRitmo(f)
             const yEsperado = f.esperado != null ? (f.esperado / tope) * 100 : null
+            /* La parada marcada vive DENTRO de las barras de su máquina (y de la línea, que la suma):
+               sus minutos quedan plenos sobre un fondo tenue y el resto se apaga. Las otras máquinas
+               se apagan enteras: se ve de un vistazo cuál Baader fue. */
+            const conMarca = marcaMin != null && marcaMin.hasta > 0 && marcaMin.desde < n
+            const filaMarcada = conMarca && (f.principal || !marca?.maquinaId || f.id === marca.maquinaId)
+            const k0 = conMarca ? Math.max(0, Math.floor(marcaMin!.desde)) : -1
+            const k1 = conMarca ? Math.min(n - 1, Math.max(k0, Math.ceil(marcaMin!.hasta) - 1)) : -1
             return (
               /* Fondo y contenido en la misma celda de grilla: el fondo de la línea queda pegado
                  al borde visible (sticky) y no se va con el desplazamiento. */
@@ -458,6 +468,12 @@ function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
                     )}
                   </div>
                   <div className={`relative flex items-end ${f.principal ? 'h-28 lg:h-36' : 'h-10 lg:h-12'}`} style={{ gap: separadas ? 2 : 0 }}>
+                    {filaMarcada && (
+                      <span
+                        className="v2-marca-parada pointer-events-none absolute inset-y-0 rounded-t-[6px]"
+                        style={{ left: `${(k0 / n) * 100}%`, width: `${((k1 - k0 + 1) / n) * 100}%` }}
+                      />
+                    )}
                     {yEsperado != null && (
                       <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
                     )}
@@ -471,7 +487,9 @@ function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
                             height: `${Math.max(v > 0 ? 6 : 2, (v / tope) * 100)}%`,
                             background: RELLENO_MINUTO(t),
                             borderRadius: separadas ? '3px 3px 0 0' : 0,
-                            opacity: i == null || i === k ? 1 : 0.35,
+                            opacity: i != null ? (i === k ? 1 : 0.35)
+                              : conMarca ? (filaMarcada && k >= k0 && k <= k1 ? 1 : filaMarcada ? 0.4 : 0.22)
+                              : 1,
                           }}
                         >
                           {conNumeros && v > 0 && (
@@ -490,16 +508,6 @@ function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
               </div>
             )
           })}
-          {marcaMin && marcaMin.hasta > 0 && marcaMin.desde < n && (
-            <span
-              className="v2-marca-parada pointer-events-none absolute top-0 rounded-ctl"
-              style={{
-                bottom: 20,
-                left: `calc(${PAD_MINUTO}px + ${(Math.max(0, marcaMin.desde) / n)} * (100% - ${2 * PAD_MINUTO}px))`,
-                width: `max(6px, calc(${(Math.min(n, marcaMin.hasta) - Math.max(0, marcaMin.desde)) / n} * (100% - ${2 * PAD_MINUTO}px)))`,
-              }}
-            />
-          )}
           <div className="relative h-5 text-[12px] tabular-nums text-muted-foreground" style={{ marginInline: PAD_MINUTO }}>
             {marcas.map((k) => (
               <span key={k} className="absolute -translate-x-1/2" style={{ left: `${X(k)}%` }}>

@@ -256,8 +256,10 @@ export interface PublicMonitorLive {
   } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]
-  /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos. */
-  stopEvents?: Array<{ r: number; f: string; s: number }>
+  /** Ids de máquina referenciados por índice desde `stopEvents[].m`. Ausente en docs previos. */
+  stopMachines?: string[]
+  /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos, `m` índice de máquina. */
+  stopEvents?: Array<{ r: number; f: string; s: number; m?: number }>
   /**
    * Lo que el operador escribió en Shoplogix sobre una detención: `t` el texto,
    * `r` la causa a la que lo asoció, `f`/`h` la ventana (ISO wall-clock).
