@@ -47,6 +47,8 @@ export interface PublicMonitorMachine {
    * previos; null si el sensor nunca lo reportó.
    */
   targetCpm?: number | null
+  /** Segundos andando (estado uptime). Base del llenado por puesto del Duelo; ausente en docs previos. */
+  uptimeSec?: number
 }
 
 /**
@@ -402,6 +404,42 @@ export interface PublicShiftMonitorDoc {
    * él, cayendo a `history`/`forecastHistory`.
    */
   shiftStats?: ShiftStat[]
+  /**
+   * Duelo de equipos: la curva acumulada (desde el arranque productivo, cada 5
+   * min) del último turno CERRADO del OTRO nombre (día ↔ noche). Ver
+   * `buildRivalCurve`. null/ausente si no hay un rival presentable.
+   */
+  rivalCurve?: RivalCurve | null
+}
+
+/** Curva del último turno cerrado del otro horario. `curve` son objetos `{m, p}` (Firestore rechaza arrays anidados). */
+export interface RivalCurve {
+  shiftDocId: string
+  dateKey: string
+  shiftId: string
+  /** Hora planificada de inicio (HH:MM, hora de planta): de acá sale si fue turno de día o de noche. */
+  h0?: string
+  curve: Array<{ m: number; p: number }>
+  total: number
+  producingMin: number
+  windowMin?: number
+}
+
+/**
+ * Lo que el Duelo necesita de un turno cerrado y `ShiftStat` no traía. Las claves
+ * que faltan simplemente no existen (turnos que el backend todavía no rearma).
+ */
+export interface ShiftDuelo {
+  /** Hora planificada de inicio, HH:MM de planta. */
+  h0?: string
+  /** Minutos entre el inicio planificado y el arranque productivo. */
+  ini?: number
+  /** Piezas de la última hora del horario planificado. */
+  uh?: number
+  /** Minutos de micro detención sumados entre máquinas. */
+  mic?: number
+  /** Llenado por puesto: piezas ÷ (esperado × minutos andando), tope 100. */
+  alim: Array<{ n: string; f?: number }>
 }
 
 /** Un turno resumido, sin curva. Ver `buildShiftStats` en las functions. */
@@ -430,6 +468,8 @@ export interface ShiftStat {
    * Solo en turnos rearmados desde el 27-10-2026 (ausente = «sin dato»).
    */
   paradas?: Array<{ c: number; t: string; s: number; m?: number[] }>
+  /** Datos del Duelo de equipos; ausente en turnos anteriores al 27-10-2026 hasta que el backend los rearma. */
+  duelo?: ShiftDuelo
   tbv?: number | null
 }
 
