@@ -423,6 +423,13 @@ export interface ShiftStat {
    * lo tienen hasta que el backend las rearma.
    */
   porMaquina?: Array<{ n: string; p: number }>
+  /**
+   * Paradas recuperables del turno ubicadas en el reloj: los mismos tramos que
+   * cuenta `recoverable[].count`. `c` = índice en `recoverable`, `t` = inicio
+   * HH:MM:SS hora de planta, `s` = segundos, `m` = índices en `porMaquina`.
+   * Solo en turnos rearmados desde el 27-10-2026 (ausente = «sin dato»).
+   */
+  paradas?: Array<{ c: number; t: string; s: number; m?: number[] }>
   tbv?: number | null
 }
 

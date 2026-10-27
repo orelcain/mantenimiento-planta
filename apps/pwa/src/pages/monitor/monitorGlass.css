@@ -277,11 +277,14 @@
   --v2-mal: #c9645d;
   /* Como TEXTO en claro el coral no llega a 4,5:1 sobre el fondo: va un tono más oscuro (5,1:1). */
   --v2-mal-texto: #a8463f;
+  /* Ídem el ámbar: como texto en claro baja a 5,6:1 (#8a5f1e). */
+  --v2-atento-texto: #8a5f1e;
 }
 .dark [data-glass='v2'], .dark .v2-vars {
   --v2-atento: #e0b46e;
   --v2-mal: #e48a82;
   --v2-mal-texto: #e48a82;
+  --v2-atento-texto: #e0b46e;
 }
 
 /* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con

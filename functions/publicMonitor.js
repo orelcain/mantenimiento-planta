@@ -1435,15 +1435,39 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
    */
   const resumir = (g) => {
     let celdasCausa = 0, tramos = 0, previo = 0, celdasLinea = 0
+    const rangos = []
     for (let i = 0; i < g.length; i++) {
       if (g[i]) {
         celdasCausa++
         if (linea[i] !== 1) celdasLinea++
-        if (!previo) tramos++
+        if (!previo) { tramos++; rangos.push([i, i + 1]) } else rangos[rangos.length - 1][1] = i + 1
       }
       previo = g[i]
     }
-    return { min: aMin(celdasCausa), count: tramos, lineMin: aMin(celdasLinea) }
+    return { min: aMin(celdasCausa), count: tramos, lineMin: aMin(celdasLinea), rangos }
+  }
+
+  /*
+   * Los MISMOS tramos que cuenta `count`, ubicados en el reloj (detalle semanal
+   * de «De quién fue la pérdida», 27-10-2026: «al tocar una causa, en qué
+   * paradas ocurrió»). Salen de la misma rejilla, así que «9 veces» lista 9
+   * paradas. `t` = inicio en hora de planta (wall-clock, como todo Shoplogix),
+   * `o` = segundos desde el inicio de la rejilla (para ordenar turnos que
+   * cruzan la medianoche), `s` = segundos que duró el tramo, `m` = índices en `stopMachines` de las
+   * máquinas que tuvieron esa causa dentro del tramo.
+   */
+  const tramosDe = (reason, rangos) => {
+    if (t0Ventana == null) return []
+    const r = stopReasons.indexOf(reason)
+    const propios = stopEvents.filter(e => e.r === r)
+    return rangos.map(([a, b]) => {
+      const desde = t0Ventana + a * PASO_SEG * 1000
+      const hasta = t0Ventana + b * PASO_SEG * 1000
+      const m = [...new Set(propios
+        .filter(e => { const x = new Date(e.f).getTime(); return x < hasta && x + e.s * 1000 > desde })
+        .map(e => e.m))].sort((x, y) => x - y)
+      return { t: new Date(desde).toISOString().slice(11, 19), o: a * PASO_SEG, s: (b - a) * PASO_SEG, m }
+    })
   }
 
   const planificados = []
@@ -1451,8 +1475,14 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
   for (const [reason, g] of [...porCausa.entries()].sort()) {
     const r = resumir(g)
     if (r.min <= 0) continue
-    ;(esParoPlanificado(reason) ? planificados : recuperables)
-      .push({ reason, min: r.min, count: r.count, lineMin: r.lineMin, ...minutosDeMaquina(reason) })
+    if (esParoPlanificado(reason)) {
+      planificados.push({ reason, min: r.min, count: r.count, lineMin: r.lineMin, ...minutosDeMaquina(reason) })
+    } else {
+      recuperables.push({
+        reason, min: r.min, count: r.count, lineMin: r.lineMin, ...minutosDeMaquina(reason),
+        tramos: tramosDe(reason, r.rangos),
+      })
+    }
   }
   planificados.sort((a, b) => b.min - a.min)
   recuperables.sort((a, b) => b.min - a.min)
@@ -2302,6 +2332,25 @@ const STATS_NUEVOS_POR_CORRIDA = 5
  * Sin esto, «lo que se repite» solo podía mirar los 6 turnos de `history`, que
  * cargan la serie completa de cada uno y por eso son pocos.
  */
+/** Tope de paradas por turno en `shiftStats[].paradas` (se guardan las más largas). */
+const PARADAS_MAX = 120
+
+/** `recoverable[].tramos` → `[{ c, t, s, m }]` en orden de reloj, con tope. */
+function paradasCompactas(recoverable) {
+  const todas = []
+  recoverable.forEach((c, ci) => {
+    for (const x of c.tramos || []) {
+      if (!x || typeof x.t !== 'string' || !(x.s > 0)) continue
+      todas.push({ c: ci, t: x.t, s: x.s, m: Array.isArray(x.m) ? x.m : [], o: x.o ?? 0 })
+    }
+  })
+  const recortadas = todas.length > PARADAS_MAX
+    ? todas.slice().sort((a, b) => b.s - a.s).slice(0, PARADAS_MAX)
+    : todas
+  // Por `o` y no por `t`: en el turno de noche 01:10 va después de 23:40.
+  return recortadas.sort((a, b) => a.o - b.o).map(({ o: _o, ...x }) => x)
+}
+
 async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null) {
   const nowWall = shoplogixPolling.toChileWall(new Date())
   const desde = shiftDateKey(nowWall, -SHIFT_INDEX_LOOKBACK_DAYS)
@@ -2323,8 +2372,12 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
 
   const previos = new Map((prev || []).map(h => [h.shiftDocId, h]))
   // Lives que este mismo refresco ya construyó: se aprovechan gratis.
+  // Solo los que ya traen `tramos` por causa (lives anteriores al 27-10-2026 no
+  // los tienen y se reconstruyen para poder armar `paradas`).
   const yaConstruidos = new Map([
-    ...(history || []).filter(h => h.live?.timeBreakdown?.tbv === TBV).map(h => [h.shiftDocId, h.live]),
+    ...(history || [])
+      .filter(h => h.live?.timeBreakdown?.tbv === TBV && (h.live.timeBreakdown.recoverable || []).every(c => Array.isArray(c.tramos)))
+      .map(h => [h.shiftDocId, h.live]),
   ])
   const conCurva = new Set((forecast || []).map(f => f.shiftDocId))
 
@@ -2338,7 +2391,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined) {
+    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined) {
       out.push(cacheado); continue
     }
     /*
@@ -2410,6 +2463,17 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
          * Costo: ~3 máquinas × 40 turnos ≈ 3,5 KB. Claves cortas por eso.
          */
         porMaquina: (l.machines || []).map(m => ({ n: m.name, p: m.pieces ?? 0 })),
+        /*
+         * Cada parada recuperable del turno, ubicada en el reloj (detalle por
+         * semana de «De quién fue la pérdida», 27-10-2026). Son los tramos de
+         * LÍNEA que cuenta `recoverable[].count`: `c` = índice en `recoverable`,
+         * `t` = inicio HH:MM:SS hora de planta, `s` = segundos, `m` = índices en
+         * `porMaquina` (mismo orden que `machines`). Existe desde los turnos
+         * reconstruidos a partir del 27-10-2026; antes, la PWA dice «sin dato».
+         * Tope de PARADAS_MAX por turno (las más largas) para no engordar el doc:
+         * ~50 paradas × 40 turnos × ~35 B ≈ 70 KB.
+         */
+        paradas: paradasCompactas(tb.recoverable || []),
         /*
          * ⚠⚠ NUNCA `undefined` en un doc de Firestore: lo rechaza y el write
          * del patch falla ENTERO — no solo este campo. Pasó el 16-08: cada

@@ -88,3 +88,48 @@ describe('repartoSemanal', () => {
     expect(s!.causas.externo[0]!.causa).toBe('FALTA MMPP')
   })
 })
+
+describe('detalle por semana (27-10-2026)', () => {
+  it('guarda TODAS las causas con sus veces, no solo las 5 primeras', () => {
+    const rec = Array.from({ length: 8 }, (_, i) => ({ reason: `CAUSA ${i}`, min: 8 - i, count: i + 1 }))
+    const [s] = repartoSemanal([turno({ recoverableMin: 36, recoverable: rec })])
+    expect(s!.causas['sin-imputar']).toHaveLength(8)
+    expect(s!.causas['sin-imputar'].find((c) => c.causa === 'CAUSA 7')!.count).toBe(8)
+  })
+
+  it('suma las veces de una causa repetida en varios turnos de la semana', () => {
+    const [s] = repartoSemanal([
+      turno({ shiftDocId: 'a', recoverableMin: 5, recoverable: [{ reason: 'KNURO', min: 5, count: 2 }] }),
+      turno({ shiftDocId: 'b', recoverableMin: 5, recoverable: [{ reason: 'KNURO', min: 5, count: 3 }] }),
+    ])
+    const k = s!.causas.mantencion[0]!
+    expect(k.count).toBe(5)
+    expect(k.min).toBeCloseTo(10)
+    expect(k.equipo).toBe('Knuro')
+  })
+
+  it('guarda el detalle de cada turno, con su reparto propio', () => {
+    const [s] = repartoSemanal([
+      turno({ shiftDocId: '2026-08-25_Turno Noche', dateKey: '2026-08-25', shiftId: 'Turno Noche', recoverableMin: 4, recoverable: [{ reason: 'KNURO', min: 4, count: 1 }] }),
+      turno({ shiftDocId: '2026-08-25_Turno Dia', dateKey: '2026-08-25', shiftId: 'Turno Dia', recoverableMin: 6, recoverable: [{ reason: 'FALTA MMPP', min: 6, count: 1 }] }),
+    ])
+    expect(s!.detalle.map((t) => t.shiftId)).toEqual(['Turno Dia', 'Turno Noche'])
+    expect(s!.detalle[1]!.min.mantencion).toBeCloseTo(4)
+    expect(s!.detalle[0]!.min.externo).toBeCloseTo(6)
+  })
+
+  it('las paradas: hora de inicio y fin, causa y máquina; null si el turno es anterior al dato', () => {
+    const [s] = repartoSemanal([
+      turno({
+        shiftDocId: 'a', recoverableMin: 10,
+        recoverable: [{ reason: 'KNURO', min: 10, count: 1 }],
+        porMaquina: [{ n: 'Baader 1', p: 100 }, { n: 'Baader 2', p: 100 }],
+        paradas: [{ c: 0, t: '23:55:30', s: 600, m: [1] }],
+      }),
+      turno({ shiftDocId: 'b', recoverableMin: 1, recoverable: [{ reason: 'KNURO', min: 1, count: 1 }] }),
+    ])
+    const [a, b] = s!.detalle
+    expect(a!.paradas).toEqual([{ causa: 'KNURO', dueno: 'mantencion', inicio: '23:55', fin: '00:06', seg: 600, maquinas: ['Baader 2'] }])
+    expect(b!.paradas).toBeNull()
+  })
+})
