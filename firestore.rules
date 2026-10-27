@@ -1987,7 +1987,7 @@ service cloud.firestore {
     function dueloConfigValida() {
       return request.resource.data.keys().hasOnly(['duelo', 'updatedAt'])
         && request.resource.data.duelo is map
-        && request.resource.data.duelo.keys().hasOnly(['equipos', 'overrides'])
+        && request.resource.data.duelo.keys().hasOnly(['equipos', 'overrides', 'overridesMeta'])
         && (!('equipos' in request.resource.data.duelo)
           || (request.resource.data.duelo.equipos is map
             && request.resource.data.duelo.equipos.keys().hasOnly(['rebolledo', 'cardenas'])
@@ -1997,7 +1997,10 @@ service cloud.firestore {
             && request.resource.data.duelo.equipos.get('cardenas', '').size() <= 60))
         && (!('overrides' in request.resource.data.duelo)
           || (request.resource.data.duelo.overrides is map
-            && request.resource.data.duelo.overrides.size() <= 200));
+            && request.resource.data.duelo.overrides.size() <= 200))
+        && (!('overridesMeta' in request.resource.data.duelo)
+          || (request.resource.data.duelo.overridesMeta is map
+            && request.resource.data.duelo.overridesMeta.size() <= 200));
     }
 
     match /monitor_config/{token} {

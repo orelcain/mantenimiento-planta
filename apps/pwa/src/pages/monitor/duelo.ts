@@ -68,8 +68,21 @@ export function semanasDesdeAncla(dateKey: string): number {
 }
 
 /**
- * El equipo que hizo un turno. `shiftDocId` = `YYYY-MM-DD_<turno>`; la fecha manda,
- * no el nombre. Una corrección manual (`overrides[shiftDocId]`) gana a la rotación.
+ * La JORNADA de un turno: su fecha de PRODUCCIÓN. Shoplogix data cada turno por el día en que parte su documento
+ * (`2026-10-26_Turno 1` es la noche que alimenta la jornada del 27-10), así que TODA noche pertenece a la jornada del
+ * día siguiente a la fecha de su documento, sea cual sea la hora de inicio que traiga. El día es de su propia fecha.
+ * Ahí se juntan la noche y el día de la misma jornada, que hacen equipos distintos.
+ */
+export function jornadaDe(dateKey: string, esNoche: boolean): string {
+  if (!esNoche) return dateKey
+  const t = Date.parse(`${dateKey}T12:00:00Z`)
+  return Number.isFinite(t) ? new Date(t + DIA_MS).toISOString().slice(0, 10) : dateKey
+}
+
+/**
+ * El equipo que hizo un turno. `shiftDocId` = `YYYY-MM-DD_<turno>`. La rotación semanal se cuenta por JORNADA (la
+ * noche que parte el domingo es del lunes y de la semana nueva), no por la fecha de reloj del documento.
+ * Una corrección manual (`overrides[shiftDocId]`) gana a la rotación.
  */
 export function equipoDelTurno(
   shiftDocId: string,
@@ -78,7 +91,7 @@ export function equipoDelTurno(
 ): EquipoId {
   const corregido = overrides?.[shiftDocId]
   if (esEquipoId(corregido)) return corregido
-  const diaEsRebolledo = ((semanasDesdeAncla(shiftDocId.slice(0, 10)) % 2) + 2) % 2 === 0
+  const diaEsRebolledo = ((semanasDesdeAncla(jornadaDe(shiftDocId.slice(0, 10), esNoche)) % 2) + 2) % 2 === 0
   return esNoche === diaEsRebolledo ? 'cardenas' : 'rebolledo'
 }
 
@@ -88,7 +101,7 @@ export function equipoCorregido(
   esNoche: boolean,
   overrides?: Readonly<Record<string, EquipoId>> | null,
 ): boolean {
-  return equipoDelTurno(shiftDocId, esNoche, overrides) !== equipoDelTurno(shiftDocId, esNoche)
+  return equipoDelTurno(shiftDocId, esNoche, overrides) !== equipoDelTurno(shiftDocId, esNoche, null)
 }
 
 export type NombresEquipos = Partial<Record<EquipoId, string>>
@@ -112,9 +125,25 @@ export function nombreCorto(id: EquipoId, nombres?: NombresEquipos | null): stri
   return partes[partes.length - 1] ?? n
 }
 
+/** Quién (uid) y cuándo (ISO UTC) corrigió a mano el equipo de un turno. */
+export interface CorreccionMeta {
+  uid: string
+  at: string
+}
+
 export interface ConfigDuelo {
   equipos?: NombresEquipos
   overrides?: Record<string, EquipoId>
+  overridesMeta?: Record<string, CorreccionMeta>
+}
+
+/** «27/10 20:05» en hora de Chile a partir del ISO guardado; null si no se entiende. */
+export function fechaCorreccion(at: string | null | undefined): string | null {
+  const t = Date.parse(at ?? '')
+  if (!Number.isFinite(t)) return null
+  const p = new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(t))
+  const g = (k: string) => p.find((x) => x.type === k)?.value ?? ''
+  return `${g('day')}/${g('month')} ${g('hour')}:${g('minute')}`
 }
 
 /** Nombres efectivos: los cargados por el admin sobre los de fábrica de la línea. */
@@ -149,6 +178,10 @@ export interface PuestoTurno {
 export interface ResumenTurno {
   shiftDocId: string
   dateKey: string
+  /** Fecha de producción: la noche que parte el 27-10 a las 21:00 es la jornada del 28-10. */
+  jornada: string
+  /** Hora planificada de inicio (HH:MM). */
+  h0: string | null
   shiftId: string
   esNoche: boolean
   equipo: EquipoId
@@ -172,6 +205,7 @@ export interface ResumenTurno {
 interface EntradaResumen {
   shiftDocId: string
   dateKey: string
+  h0: string | null
   shiftId: string
   esNoche: boolean
   cerrado: boolean
@@ -190,6 +224,8 @@ function armarResumen(e: EntradaResumen): ResumenTurno {
   return {
     shiftDocId: e.shiftDocId,
     dateKey: e.dateKey,
+    jornada: jornadaDe(e.dateKey, e.esNoche),
+    h0: e.h0,
     shiftId: e.shiftId,
     esNoche: e.esNoche,
     equipo: equipoDelTurno(e.shiftDocId, e.esNoche, e.overrides),
@@ -212,7 +248,7 @@ export function resumenDeStat(t: ShiftStat, overrides?: Readonly<Record<string, 
   const esNoche = esNocheDesdeHora(t.duelo?.h0)
   if (!t.duelo || esNoche == null) return null
   return armarResumen({
-    shiftDocId: t.shiftDocId, dateKey: t.dateKey, shiftId: t.shiftId, esNoche, cerrado: true,
+    shiftDocId: t.shiftDocId, dateKey: t.dateKey, h0: t.duelo.h0 ?? null, shiftId: t.shiftId, esNoche, cerrado: true,
     piezas: t.total || 0, stat: t, duelo: t.duelo, overrides,
   })
 }
@@ -264,7 +300,7 @@ export function resumenDeLive(args: {
   const mant = live.mantencion?.porMaquina
   const mic = mant ? mant.reduce((a, m) => a + (m.microMin || 0), 0) : undefined
   return armarResumen({
-    shiftDocId, dateKey: stat.dateKey, shiftId: stat.shiftId, esNoche, cerrado, piezas, stat,
+    shiftDocId, dateKey: stat.dateKey, h0: live.scheduledStart?.slice(11, 16) ?? null, shiftId: stat.shiftId, esNoche, cerrado, piezas, stat,
     duelo: {
       ...(ini != null ? { ini } : {}),
       ...(uh != null ? { uh } : {}),
@@ -288,6 +324,8 @@ export interface FilaKpi {
   b: number | null
   unidad: string
   decimales: number
+  /** Qué valor gana la fila: el mayor (piezas, ritmo) o el menor (minutos de micro detención o de arranque). */
+  mejor: 'mayor' | 'menor'
   ganador: Resultado
 }
 
@@ -367,21 +405,21 @@ export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { ca
     nota: enVivo
       ? 'Piezas a igual tiempo de turno. El punto se confirma al cierre, sumando las piezas que las fallas técnicas le quitaron a cada equipo.'
       : 'Piezas del turno más las que las fallas técnicas le quitaron al equipo.',
-    filas: [{ rotulo: enVivo ? 'Piezas a esta hora' : 'Piezas con Mantención sumada', a: carreraA, b: carreraB, unidad: 'pz', decimales: 0, ganador: comparar(carreraA, carreraB, 'mayor') }],
+    filas: [{ rotulo: enVivo ? 'Piezas a esta hora' : 'Piezas con Mantención sumada', a: carreraA, b: carreraB, unidad: 'pz', decimales: 0, mejor: 'mayor', ganador: comparar(carreraA, carreraB, 'mayor') }],
     ganador: !cerrado && !enVivo ? 'pendiente' : comparar(carreraA, carreraB, 'mayor'),
   }
   const ritmo: KpiMarcador = {
     id: 'ritmo',
     rotulo: 'Ritmo andando',
     nota: 'Piezas por minuto sobre los minutos con piezas.',
-    filas: [{ rotulo: 'Ritmo', a: a.ritmo, b: b.ritmo, unidad: 'pz/min', decimales: 1, ganador: comparar(a.ritmo, b.ritmo, 'mayor', 1) }],
+    filas: [{ rotulo: 'Ritmo', a: a.ritmo, b: b.ritmo, unidad: 'pz/min', decimales: 1, mejor: 'mayor', ganador: comparar(a.ritmo, b.ritmo, 'mayor', 1) }],
     ganador: comparar(a.ritmo, b.ritmo, 'mayor', 1),
   }
   const micro: KpiMarcador = {
     id: 'micro',
     rotulo: 'Menos micro detenciones',
     nota: 'Minutos de micro detención por hora disponible, por máquina (clasificación oficial de Shoplogix).',
-    filas: [{ rotulo: 'Micro detención', a: a.microMinH, b: b.microMinH, unidad: 'min/h', decimales: 1, ganador: comparar(a.microMinH, b.microMinH, 'menor', 1) }],
+    filas: [{ rotulo: 'Micro detención', a: a.microMinH, b: b.microMinH, unidad: 'min/h', decimales: 1, mejor: 'menor', ganador: comparar(a.microMinH, b.microMinH, 'menor', 1) }],
     ganador: comparar(a.microMinH, b.microMinH, 'menor', 1),
   }
   const ganaArranque = comparar(a.arranqueMin, b.arranqueMin, 'menor')
@@ -391,8 +429,8 @@ export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { ca
     rotulo: 'Arranque y cierre',
     nota: 'Minutos hasta la primera pieza y piezas de la última hora. Gana quien gana los dos.',
     filas: [
-      { rotulo: 'Hasta la primera pieza', a: a.arranqueMin, b: b.arranqueMin, unidad: 'min', decimales: 0, ganador: ganaArranque },
-      { rotulo: 'Piezas de la última hora', a: a.ultimaHoraPz, b: b.ultimaHoraPz, unidad: 'pz', decimales: 0, ganador: ganaCierre },
+      { rotulo: 'Hasta la primera pieza', a: a.arranqueMin, b: b.arranqueMin, unidad: 'min', decimales: 0, mejor: 'menor', ganador: ganaArranque },
+      { rotulo: 'Piezas de la última hora', a: a.ultimaHoraPz, b: b.ultimaHoraPz, unidad: 'pz', decimales: 0, mejor: 'mayor', ganador: ganaCierre },
     ],
     ganador: combinar(ganaArranque, ganaCierre),
   }
@@ -467,6 +505,439 @@ export function bandaDeCurvas(curvas: ReadonlyArray<readonly PacePoint[]>, pasoM
   return { media, min, max, turnos: validas.length }
 }
 
+// ── Color fijo por equipo ────────────────────────────────────────────────────
+
+/** Un color por equipo en TODAS las vistas (Cárdenas = acento, Rebolledo = naranjo suave); se define en `monitorGlass.css`. */
+export const COLOR_EQUIPO: Readonly<Record<EquipoId, string>> = {
+  cardenas: 'var(--v2-eq-cardenas)',
+  rebolledo: 'var(--v2-eq-rebolledo)',
+}
+
+/** La variante para TEXTO (contraste ≥ 4,5:1 en claro y oscuro); el trazo y las barras usan `COLOR_EQUIPO`. */
+export const COLOR_EQUIPO_TEXTO: Readonly<Record<EquipoId, string>> = {
+  cardenas: 'var(--v2-eq-cardenas-texto)',
+  rebolledo: 'var(--v2-eq-rebolledo-texto)',
+}
+
+// ── El fantasma: el último turno del rival en el mismo horario ───────────────
+
+export interface FantasmaRival {
+  /**
+   * `jornada` = el turno del otro horario de LA MISMA jornada (la noche contra el día de la misma fecha de producción);
+   * `provisional` = el último turno del otro horario del rival, de una jornada anterior, mientras el de esta jornada no
+   * juega; `ultimo` = el mismo horario de la semana anterior (dato secundario); `promedio` = promedio, si no hay curva.
+   */
+  tipo: 'jornada' | 'provisional' | 'ultimo' | 'promedio'
+  equipo: EquipoId
+  /** Solo si es un turno concreto. */
+  shiftDocId: string | null
+  /** Fecha de producción de ese turno. */
+  jornada: string | null
+  esNoche: boolean
+  curva: PacePoint[]
+  /** Piezas con las que cerró ese turno (solo si es un turno concreto). */
+  total: number | null
+  /** Turnos que promedia (1 si es un turno concreto). */
+  turnos: number
+  /** Minuto del día (hora de planta) de la primera pieza de ese turno; null si no se sabe. Para el reloj del globo. */
+  inicioMin: number | null
+  /** Sus paradas de 5 min o más, ya en el eje de horas de producción. */
+  eventos: EventoTurno[]
+}
+
+export interface ReferenciaRival {
+  fantasma: FantasmaRival | null
+  /** Promedio y rango de los últimos turnos del rival (necesita al menos dos). */
+  banda: BandaRival | null
+}
+
+type TurnoHoy = Pick<ResumenTurno, 'shiftDocId' | 'dateKey' | 'jornada' | 'shiftId' | 'esNoche' | 'equipo'>
+
+/**
+ * La mitad del rótulo que dice quién y cuándo: «noche 28/10», con la fecha de PRODUCCIÓN (la jornada), no la del
+ * reloj de inicio.
+ */
+export const horarioYJornada = (esNoche: boolean, jornada: string): string => `${esNoche ? 'noche' : 'día'} ${jornada.slice(8, 10)}/${jornada.slice(5, 7)}`
+
+/**
+ * La línea punteada de la carrera: el turno del otro horario de la MISMA jornada y, mientras no existe, el último del
+ * otro horario del rival (provisional). Sale de `rivalCurve`, que el backend publica para el turno vigente: el último
+ * turno CERRADO del otro nombre. Si ese turno lo hizo el mismo equipo (borde de semana) no es un rival y no se usa.
+ */
+export function fantasmaDeJornada(
+  hoy: TurnoHoy,
+  rc: RivalCurve | null | undefined,
+  stats: readonly ShiftStat[],
+  overrides?: Readonly<Record<string, EquipoId>> | null,
+): FantasmaRival | null {
+  if (!rc || !(rc.curve?.length >= 2)) return null
+  const esNoche = esNocheDesdeHora(rc.h0) ?? !hoy.esNoche
+  if (esNoche === hoy.esNoche) return null
+  const equipo = equipoDelTurno(rc.shiftDocId, esNoche, overrides)
+  if (equipo === hoy.equipo) return null
+  const jornada = jornadaDe(rc.dateKey, esNoche)
+  return {
+    tipo: jornada === hoy.jornada ? 'jornada' : 'provisional',
+    equipo, shiftDocId: rc.shiftDocId, jornada, esNoche,
+    curva: rc.curve.map((x) => ({ minutes: x.m, pieces: x.p })),
+    total: rc.total, turnos: 1,
+    ...datosDeArranque(stats.find((x) => x.shiftDocId === rc.shiftDocId)),
+  }
+}
+
+/**
+ * El mismo horario de la semana anterior: el ÚLTIMO turno que el equipo rival hizo en el mismo horario (mismo turno,
+ * mismo lado del día). Es un dato secundario, sin puntos. Los turnos salen de `forecastHistory` y `shiftStats`; la
+ * curva, de `forecastHistory`. Si ese último turno no trae curva se usa el promedio de los anteriores, rotulado.
+ */
+export function referenciaMismoHorario(
+  hoy: TurnoHoy,
+  forecast: readonly ForecastHistoryShift[],
+  stats: readonly ShiftStat[],
+  overrides?: Readonly<Record<string, EquipoId>> | null,
+  maxBanda = 4,
+): ReferenciaRival {
+  const rival = otroEquipo(hoy.equipo)
+  const horaDe = (id: string) => stats.find((s) => s.shiftDocId === id)?.duelo?.h0
+  const ids = new Set<string>([...forecast.map((f) => f.shiftDocId), ...stats.map((s) => s.shiftDocId)])
+  const delRival = [...ids]
+    .filter((id) => {
+      if (id === hoy.shiftDocId) return false
+      if (numeroDeTurno(id.slice(11)) !== numeroDeTurno(hoy.shiftId)) return false
+      const noche = esNocheDesdeHora(horaDe(id)) ?? hoy.esNoche
+      return noche === hoy.esNoche
+        && jornadaDe(id.slice(0, 10), noche) < hoy.jornada
+        && equipoDelTurno(id, noche, overrides) === rival
+    })
+    .sort((x, y) => (x < y ? 1 : x > y ? -1 : 0))
+  if (!delRival.length) return { fantasma: null, banda: null }
+
+  const conCurva = delRival
+    .map((id) => {
+      const f = forecast.find((x) => x.shiftDocId === id)
+      return { id, f, curva: f ? curvaDeForecast(f.curve) : [] }
+    })
+    .filter((c) => c.curva.length >= 2)
+  const banda = bandaDeCurvas(conCurva.slice(0, maxBanda).map((c) => c.curva))
+  const ultimo = conCurva[0]
+  const base = { equipo: rival, esNoche: hoy.esNoche }
+  if (ultimo && ultimo.id === delRival[0]) {
+    return {
+      fantasma: { ...base, tipo: 'ultimo', shiftDocId: ultimo.id, jornada: jornadaDe(ultimo.id.slice(0, 10), hoy.esNoche), curva: ultimo.curva, total: ultimo.f?.total ?? null, turnos: 1, ...datosDeArranque(stats.find((x) => x.shiftDocId === ultimo.id)) },
+      banda,
+    }
+  }
+  if (banda) return { fantasma: { ...base, tipo: 'promedio', shiftDocId: null, jornada: null, curva: banda.media, total: null, turnos: banda.turnos, inicioMin: null, eventos: [] }, banda }
+  return { fantasma: null, banda: null }
+}
+
+/** Arranque productivo, reloj y paradas de un turno cerrado, a partir de su `shiftStats[].duelo`. */
+function datosDeArranque(st: ShiftStat | undefined): { inicioMin: number | null; eventos: EventoTurno[] } {
+  const d = st?.duelo
+  const h0 = minutoDelDia(d?.h0)
+  return {
+    inicioMin: h0 != null && d?.ini != null ? (h0 + d.ini) % 1440 : null,
+    eventos: eventosEnEjeProduccion(d?.ev, d?.ini ?? null),
+  }
+}
+
+/** «07:20» a 440. */
+export function minutoDelDia(hhmm: string | null | undefined): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm ?? '')
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null
+}
+
+/** Minuto del día a «07:20». */
+export const relojDeMinuto = (min: number): string => {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
+
+/**
+ * El rótulo de la línea punteada, con equipo, horario y jornada: «Rebolledo · día 28/10»; el provisional lo dice:
+ * «provisional · Rebolledo día 27/10»; el promedio: «Rebolledo · promedio de 3 turnos».
+ */
+export function rotuloFantasma(f: FantasmaRival, nombre: string): string {
+  if (f.tipo === 'promedio' || !f.jornada) return `${nombre} · promedio de ${f.turnos} ${f.turnos === 1 ? 'turno' : 'turnos'}`
+  const cuando = horarioYJornada(f.esNoche, f.jornada)
+  if (f.tipo === 'provisional') return `provisional · ${nombre} ${cuando}`
+  return `${nombre} · ${cuando}`
+}
+
+/** El rótulo del turno que se mira: «Cárdenas · noche 28/10». */
+export const rotuloTurno = (nombre: string, t: Pick<ResumenTurno, 'esNoche' | 'jornada'>): string => `${nombre} · ${horarioYJornada(t.esNoche, t.jornada)}`
+
+// ── Horas de producción y paradas del turno ─────────────────────────────────
+//
+// REGLA DEL EJE: las dos curvas parten de la PRIMERA PIEZA de su turno (arranque productivo), así que «1ª hora» es el
+// primer tramo de 60 min desde ahí, para los dos equipos. Las paradas se corren a ese mismo eje restándoles los
+// minutos que cada turno tardó en arrancar desde su inicio planificado.
+
+/** La hora de producción (1, 2, 3…) a la que pertenece un minuto transcurrido. */
+export const horaTranscurrida = (min: number): number => Math.floor(Math.max(0, min) / 60) + 1
+
+/** «3ª hora». */
+export const etiquetaHora = (n: number): string => `${n}ª hora`
+
+export interface BandaHora {
+  n: number
+  desde: number
+  hasta: number
+  /** La hora llega a los 60 min dentro del eje; la última suele quedar a medias. */
+  completa: boolean
+}
+
+/** Las horas que caben en un eje de `maxMin` minutos. */
+export function bandasDeHoras(maxMin: number): BandaHora[] {
+  if (!(maxMin > 0)) return []
+  const out: BandaHora[] = []
+  for (let n = 1; (n - 1) * 60 < maxMin; n++) {
+    const hasta = Math.min(n * 60, maxMin)
+    out.push({ n, desde: (n - 1) * 60, hasta, completa: hasta - (n - 1) * 60 >= 59.5 })
+  }
+  return out
+}
+
+/** Parada de 5 min o más tal como la publica el backend (`shiftStats[].duelo.ev`). */
+export interface EventoCrudo {
+  n: string
+  /** Minutos desde el inicio planificado. */
+  o: number
+  d: number
+  p?: 1
+}
+
+/** Una parada ubicada en el eje de horas de producción de su turno. */
+export interface EventoTurno {
+  causa: string
+  /** Nombre corto para el globo. */
+  corta: string
+  desde: number
+  hasta: number
+  programada: boolean
+}
+
+/** «Colación», «Falta de MMPP» o la causa en minúsculas con la primera mayúscula, recortada. */
+export function causaCorta(causa: string): string {
+  const k = normalizar(causa)
+  if (/colacion/.test(k)) return 'Colación'
+  if (/mmpp|materia prima/.test(k)) return 'Falta de MMPP'
+  const t = causa.trim().replace(/\s+/g, ' ').toLowerCase()
+  const c = t.charAt(0).toUpperCase() + t.slice(1)
+  return c.length > 26 ? `${c.slice(0, 25)}…` : c
+}
+
+/**
+ * Corre las paradas del eje «desde el inicio planificado» al de horas de producción: se resta el arranque (`ini`).
+ * Lo que terminó antes de la primera pieza no se dibuja; lo que la cruza se recorta en 0. Sin `ini` no se sabe
+ * dónde caen, y no se adivina: queda vacío.
+ */
+export function eventosEnEjeProduccion(crudos: readonly EventoCrudo[] | null | undefined, ini: number | null | undefined): EventoTurno[] {
+  if (ini == null || !Number.isFinite(ini)) return []
+  const out: EventoTurno[] = []
+  for (const e of crudos ?? []) {
+    if (!e || !(e.d > 0) || !Number.isFinite(e.o)) continue
+    const desde = e.o - ini
+    const hasta = desde + e.d
+    if (hasta <= 0) continue
+    out.push({ causa: e.n, corta: causaCorta(e.n), desde: Math.max(0, desde), hasta, programada: e.p === 1 })
+  }
+  return out.sort((x, y) => x.desde - y.desde)
+}
+
+/** Mínimo de una parada para marcarla (igual que el backend). */
+export const PARADA_MIN_SEG = 300
+
+/**
+ * Las paradas del turno que se está mirando, con el MISMO criterio que `eventosDelDuelo` del backend: unidas entre
+ * máquinas por causa, solo las de 5 min o más. Programada = la causa está en el desglose de paros programados.
+ */
+export function eventosCrudosDeLive(live: Pick<PublicMonitorLive, 'stopEvents' | 'stopReasons' | 'scheduledStart' | 'timeBreakdown'>): EventoCrudo[] {
+  const iniMs = Date.parse(live.scheduledStart ?? '')
+  if (!Number.isFinite(iniMs)) return []
+  const causas = live.stopReasons ?? []
+  const programadas = new Set((live.timeBreakdown?.planned ?? []).map((c) => c.reason))
+  const porCausa = new Map<string, Array<[number, number]>>()
+  for (const e of live.stopEvents ?? []) {
+    const n = causas[e.r]
+    const f = Date.parse(e.f)
+    if (!n || !Number.isFinite(f) || !(e.s > 0)) continue
+    porCausa.set(n, [...(porCausa.get(n) ?? []), [f, f + e.s * 1000]])
+  }
+  const out: EventoCrudo[] = []
+  for (const [n, rangos] of porCausa) {
+    const unidos: Array<[number, number]> = []
+    for (const r of [...rangos].sort((x, y) => x[0] - y[0])) {
+      const u = unidos[unidos.length - 1]
+      if (u && r[0] <= u[1]) u[1] = Math.max(u[1], r[1])
+      else unidos.push([r[0], r[1]])
+    }
+    for (const [d0, d1] of unidos) {
+      if ((d1 - d0) / 1000 < PARADA_MIN_SEG) continue
+      out.push({ n, o: Math.round((d0 - iniMs) / 60_000), d: Math.round((d1 - d0) / 60_000), ...(programadas.has(n) ? { p: 1 as const } : {}) })
+    }
+  }
+  return out.sort((x, y) => x.o - y.o)
+}
+
+// ── Franja entre las dos curvas ──────────────────────────────────────────────
+
+export interface TramoFranja {
+  /** Quién va adelante en este tramo: `a` = hoy, `b` = el fantasma. */
+  adelante: 'a' | 'b'
+  puntos: Array<{ m: number; a: number; b: number }>
+}
+
+/**
+ * Los tramos entre dos curvas acumuladas hasta el minuto `hasta`, uno por cada vez que cambia quién va adelante
+ * (el cruce se interpola, así la franja se cierra justo donde las líneas se tocan).
+ */
+export function franjasEntre(a: readonly PacePoint[], b: readonly PacePoint[], hasta: number, paso = 2): TramoFranja[] {
+  if (a.length < 2 || b.length < 2 || !(hasta > 0)) return []
+  const tramos: TramoFranja[] = []
+  let actual: TramoFranja | null = null
+  let prev: { m: number; a: number; b: number; d: number } | null = null
+  const n = Math.ceil(hasta / paso)
+  for (let i = 0; i <= n; i++) {
+    const m = Math.min(hasta, i * paso)
+    const pa = piezasAlMinuto(a, m) ?? 0
+    const pb = piezasAlMinuto(b, m) ?? 0
+    const d = pa - pb
+    const s = { m, a: pa, b: pb, d }
+    if (prev && prev.d !== 0 && d !== 0 && Math.sign(prev.d) !== Math.sign(d)) {
+      const t = prev.d / (prev.d - d)
+      const v = prev.a + t * (pa - prev.a)
+      const cruce = { m: prev.m + t * (m - prev.m), a: v, b: v }
+      actual?.puntos.push(cruce)
+      actual = { adelante: d > 0 ? 'a' : 'b', puntos: [cruce] }
+      tramos.push(actual)
+    }
+    if (d !== 0) {
+      if (!actual) {
+        actual = { adelante: d > 0 ? 'a' : 'b', puntos: prev && prev.d === 0 ? [prev] : [] }
+        tramos.push(actual)
+      }
+      actual.puntos.push(s)
+    } else if (actual) {
+      actual.puntos.push(s)
+      actual = null
+    }
+    prev = s
+  }
+  return tramos.filter((t) => t.puntos.length >= 2)
+}
+
+// ── Ritmo hora a hora ────────────────────────────────────────────────────────
+
+/** Una hora con menos de este tiempo cubierto no se muestra: 5 minutos de piezas dan un ritmo sin sentido. */
+export const MIN_CUBIERTO_HORA = 15
+
+export interface HoraRitmo {
+  /** 1 = la primera hora desde la primera pieza. */
+  hora: number
+  /** pz/min de esa hora; null = esa curva no cubre la hora. */
+  a: number | null
+  b: number | null
+  /** La hora no se completó (el turno sigue o terminó a mitad de hora): el ritmo es sobre lo cubierto. */
+  parcialA: boolean
+  parcialB: boolean
+}
+
+function ritmoDeHora(curva: readonly PacePoint[], hora: number): { pzMin: number; parcial: boolean } | null {
+  if (curva.length < 2) return null
+  const fin = curva[curva.length - 1]!.minutes
+  const ini = (hora - 1) * 60
+  const hasta = Math.min(hora * 60, fin)
+  const cubierto = hasta - ini
+  if (cubierto < MIN_CUBIERTO_HORA) return null
+  const pz = (piezasAlMinuto(curva, hasta) ?? 0) - (piezasAlMinuto(curva, ini) ?? 0)
+  return { pzMin: Math.max(0, pz) / cubierto, parcial: cubierto < 59.5 }
+}
+
+/**
+ * Ritmo de cada hora (pz/min) de dos curvas acumuladas que parten de la primera pieza. Sale de las piezas entre dos
+ * marcas de la curva, así que incluye las paradas de esa hora: es el ritmo de la hora, no el de «andando».
+ */
+export function ritmoHoraAHora(a: readonly PacePoint[], b: readonly PacePoint[], maxHoras = 12): HoraRitmo[] {
+  const fin = Math.max(a[a.length - 1]?.minutes ?? 0, b[b.length - 1]?.minutes ?? 0)
+  const out: HoraRitmo[] = []
+  for (let h = 1; h <= Math.min(maxHoras, Math.ceil(fin / 60)); h++) {
+    const ra = ritmoDeHora(a, h)
+    const rb = ritmoDeHora(b, h)
+    if (ra || rb) out.push({ hora: h, a: ra?.pzMin ?? null, b: rb?.pzMin ?? null, parcialA: ra?.parcial ?? false, parcialB: rb?.parcial ?? false })
+  }
+  return out
+}
+
+// ── KPI a KPI ────────────────────────────────────────────────────────────────
+
+export interface FilaVs {
+  /** `carrera`, `ritmo`, `micro` o `arranque`: el KPI al que pertenece (arranque y cierre comparten un punto). */
+  kpi: KpiId
+  rotulo: string
+  unidad: string
+  decimales: number
+  mejor: 'mayor' | 'menor'
+  a: number | null
+  b: number | null
+  /** Largo de cada barra, 0–1, sobre el mayor de los dos valores (las barras arrancan en cero). */
+  fa: number
+  fb: number
+  ganador: Resultado
+}
+
+/** Las filas del marcador listas para dibujar barras enfrentadas. Sin marcador (o sin duelo) no hay filas. */
+export function filasKpiAKpi(m: Marcador | null | undefined): FilaVs[] {
+  if (!m || m.sinDuelo) return []
+  return m.kpis.flatMap((k) =>
+    k.filas.map((f) => {
+      const tope = Math.max(f.a ?? 0, f.b ?? 0)
+      const frac = (v: number | null) => (v != null && tope > 0 ? Math.max(0, v) / tope : 0)
+      return { kpi: k.id, rotulo: f.rotulo, unidad: f.unidad, decimales: f.decimales, mejor: f.mejor, a: f.a, b: f.b, fa: frac(f.a), fb: frac(f.b), ganador: f.ganador }
+    }),
+  )
+}
+
+// ── Tendencia semanal ────────────────────────────────────────────────────────
+
+export interface PromedioSemana {
+  /** Piezas por turno, promedio de los turnos cerrados de ese equipo esa semana. */
+  prom: number
+  turnos: number
+  /** Cada semana un equipo hace el día y el otro la noche: el punto lo dice. */
+  horario: 'dia' | 'noche' | 'mixto'
+}
+
+export interface PuntoSemana {
+  /** Lunes de la semana ISO. */
+  lunes: string
+  equipos: Record<EquipoId, PromedioSemana | null>
+}
+
+/** Piezas por turno de cada equipo, semana a semana (las últimas `maxSemanas` con algún turno cerrado). */
+export function tendenciaSemanal(resumenes: readonly ResumenTurno[], maxSemanas = 8): PuntoSemana[] {
+  const semanas = new Map<string, ResumenTurno[]>()
+  for (const r of resumenes) {
+    if (!r.cerrado || !(r.piezas > 0)) continue
+    const k = lunesDe(r.jornada)
+    semanas.set(k, [...(semanas.get(k) ?? []), r])
+  }
+  const de = (rs: ResumenTurno[], e: EquipoId): PromedioSemana | null => {
+    const mios = rs.filter((r) => r.equipo === e)
+    if (!mios.length) return null
+    const noches = mios.filter((r) => r.esNoche).length
+    return {
+      prom: mios.reduce((acc, r) => acc + r.piezas, 0) / mios.length,
+      turnos: mios.length,
+      horario: noches === 0 ? 'dia' : noches === mios.length ? 'noche' : 'mixto',
+    }
+  }
+  return [...semanas.keys()].sort().slice(-maxSemanas).map((lunes) => ({
+    lunes,
+    equipos: { rebolledo: de(semanas.get(lunes)!, 'rebolledo'), cardenas: de(semanas.get(lunes)!, 'cardenas') },
+  }))
+}
+
 // ── El duelo completo ────────────────────────────────────────────────────────
 
 export interface TurnoDuelo {
@@ -475,24 +946,34 @@ export interface TurnoDuelo {
   marcador: Marcador | null
 }
 
-/** La clave de «mismo horario»: mismo turno por nombre y mismo lado del día. */
-const mismoHorario = (x: ResumenTurno, y: ResumenTurno) =>
-  x.esNoche === y.esNoche && numeroDeTurno(x.shiftId) === numeroDeTurno(y.shiftId)
-
+/** Orden de juego: por jornada, y dentro de ella la noche (que parte la víspera) antes que el día. */
 const antes = (x: ResumenTurno, y: ResumenTurno) =>
-  x.dateKey < y.dateKey || (x.dateKey === y.dateKey && x.shiftDocId < y.shiftDocId)
+  x.jornada < y.jornada
+  || (x.jornada === y.jornada && (x.esNoche !== y.esNoche ? x.esNoche : x.shiftDocId < y.shiftDocId))
 
-/** El último turno anterior del mismo horario hecho por el OTRO equipo. */
+/**
+ * El rival directo es el turno del OTRO horario de la MISMA jornada, hecho por el otro equipo: la noche contra el día
+ * de la misma fecha de producción. Un partido por jornada. Si ese turno todavía no existe o no cerró, no hay rival.
+ */
 export function rivalDirecto(turno: ResumenTurno, candidatos: readonly ResumenTurno[]): ResumenTurno | null {
+  return candidatos.find((c) =>
+    c.shiftDocId !== turno.shiftDocId && c.jornada === turno.jornada && c.esNoche !== turno.esNoche && c.equipo !== turno.equipo) ?? null
+}
+
+/**
+ * Mientras el rival de la jornada no juega (la noche corre primero), el provisional es el último turno del otro
+ * horario de una jornada anterior hecho por el otro equipo. Sirve para mirar, nunca para sumar puntos.
+ */
+export function rivalProvisional(turno: ResumenTurno, candidatos: readonly ResumenTurno[]): ResumenTurno | null {
   let mejor: ResumenTurno | null = null
   for (const c of candidatos) {
-    if (c.shiftDocId === turno.shiftDocId || !mismoHorario(c, turno) || c.equipo === turno.equipo || !antes(c, turno)) continue
+    if (c.jornada >= turno.jornada || c.esNoche === turno.esNoche || c.equipo === turno.equipo) continue
     if (!mejor || antes(mejor, c)) mejor = c
   }
   return mejor
 }
 
-/** Cada turno cerrado contra su rival directo, en orden cronológico. */
+/** Cada turno cerrado contra su rival de jornada, en orden de juego. Cada jornada es un partido que cuenta una vez por equipo. */
 export function duelosDeTurnos(resumenes: readonly ResumenTurno[]): TurnoDuelo[] {
   const orden = [...resumenes].sort((x, y) => (antes(x, y) ? -1 : antes(y, x) ? 1 : 0))
   return orden.map((resumen) => {
@@ -521,7 +1002,7 @@ export function marcadorDeCiclo(duelos: readonly TurnoDuelo[], indice: number, h
   const fin = new Date(base + (indice * 14 + 13) * DIA_MS).toISOString().slice(0, 10)
   const out: CicloDuelo = { inicio, fin, puntos: porEquipo(0), ganados: porEquipo(0), jugados: porEquipo(0), vigente: indice === hoyIndice }
   for (const d of duelos) {
-    if (!d.marcador || d.marcador.sinDuelo || cicloDe(d.resumen.dateKey).indice !== indice) continue
+    if (!d.marcador || d.marcador.sinDuelo || cicloDe(d.resumen.jornada).indice !== indice) continue
     const e = d.resumen.equipo
     out.puntos[e] += d.marcador.puntosA
     out.jugados[e] += 1
@@ -547,6 +1028,87 @@ export function rachasPorEquipo(duelos: readonly TurnoDuelo[]): Record<EquipoId,
   return out
 }
 
+// ── Marcador por semana y por mes ────────────────────────────────────────────
+
+export type PeriodoTipo = 'semana' | 'mes'
+
+export interface MarcadorPeriodo {
+  tipo: PeriodoTipo
+  /** Lunes ISO (semana) o `YYYY-MM` (mes). */
+  clave: string
+  /** «Semana 44» o «octubre 2026». */
+  etiqueta: string
+  inicio: string
+  fin: string
+  vigente: boolean
+  /** Puntos de los turnos cerrados con duelo que hizo cada equipo. */
+  puntos: Record<EquipoId, number>
+  ganados: Record<EquipoId, number>
+  empatados: Record<EquipoId, number>
+  perdidos: Record<EquipoId, number>
+  /** Turnos cerrados del equipo en el período, con o sin rival. */
+  turnos: Record<EquipoId, number>
+  /** Piezas por turno (promedio de sus turnos cerrados); null sin turnos. */
+  piezasProm: Record<EquipoId, number | null>
+  /** Quién gana el período por puntos; null si no hay ningún turno con duelo. */
+  ganador: EquipoId | 'empate' | null
+}
+
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'] as const
+
+/** Número de semana ISO a partir de su lunes (el jueves decide el año). */
+export function semanaIso(lunes: string): number {
+  const t = Date.parse(`${lunes}T12:00:00Z`)
+  if (!Number.isFinite(t)) return 0
+  const jueves = new Date(t + 3 * DIA_MS)
+  const ene1 = Date.UTC(jueves.getUTCFullYear(), 0, 1, 12)
+  return Math.floor((jueves.getTime() - ene1) / (7 * DIA_MS)) + 1
+}
+
+const claveDe = (tipo: PeriodoTipo, dateKey: string) => (tipo === 'semana' ? lunesDe(dateKey) : dateKey.slice(0, 7))
+
+/** Las claves de período con turnos, de la más nueva a la más vieja; la de hoy va siempre (aunque aún no tenga turnos). */
+export function periodosDisponibles(duelos: readonly TurnoDuelo[], hoyKey: string, tipo: PeriodoTipo, max = 12): string[] {
+  const claves = new Set<string>([claveDe(tipo, hoyKey), ...duelos.map((d) => claveDe(tipo, d.resumen.jornada))])
+  return [...claves].sort().reverse().slice(0, max)
+}
+
+/** Marcador de una semana o de un mes calendario completo: puntos, turnos ganados/empatados/perdidos y piezas por turno. */
+export function marcadorDePeriodo(duelos: readonly TurnoDuelo[], tipo: PeriodoTipo, clave: string, hoyKey: string): MarcadorPeriodo {
+  const out: MarcadorPeriodo = {
+    tipo, clave, etiqueta: '', inicio: '', fin: '', vigente: claveDe(tipo, hoyKey) === clave,
+    puntos: porEquipo(0), ganados: porEquipo(0), empatados: porEquipo(0), perdidos: porEquipo(0), turnos: porEquipo(0),
+    piezasProm: { rebolledo: null, cardenas: null }, ganador: null,
+  }
+  if (tipo === 'semana') {
+    out.etiqueta = `Semana ${semanaIso(clave)}`
+    out.inicio = clave
+    out.fin = new Date(Date.parse(`${clave}T12:00:00Z`) + 6 * DIA_MS).toISOString().slice(0, 10)
+  } else {
+    const [y, mm] = clave.split('-').map(Number)
+    out.etiqueta = `${MESES[(mm ?? 1) - 1] ?? clave} ${y}`
+    out.inicio = `${clave}-01`
+    out.fin = new Date(Date.UTC(y ?? 1970, mm ?? 1, 0, 12)).toISOString().slice(0, 10)
+  }
+  const sumaPz = porEquipo(0)
+  let conDuelo = 0
+  for (const d of duelos) {
+    if (claveDe(tipo, d.resumen.jornada) !== clave) continue
+    const e = d.resumen.equipo
+    if (d.resumen.cerrado && d.resumen.piezas > 0) { out.turnos[e] += 1; sumaPz[e] += d.resumen.piezas }
+    const m = d.marcador
+    if (!m || m.sinDuelo || m.ganador === 'pendiente' || m.ganador === 'sin-duelo') continue
+    conDuelo += 1
+    out.puntos[e] += m.puntosA
+    if (m.ganador === 'a') out.ganados[e] += 1
+    else if (m.ganador === 'b') out.perdidos[e] += 1
+    else out.empatados[e] += 1
+  }
+  for (const e of EQUIPOS) out.piezasProm[e] = out.turnos[e] > 0 ? sumaPz[e] / out.turnos[e] : null
+  if (conDuelo > 0) out.ganador = out.puntos.rebolledo === out.puntos.cardenas ? 'empate' : out.puntos.rebolledo > out.puntos.cardenas ? 'rebolledo' : 'cardenas'
+  return out
+}
+
 export interface RecordTurno {
   id: 'piezas-dia' | 'piezas-noche' | 'ritmo' | 'puntos'
   rotulo: string
@@ -567,7 +1129,7 @@ export function recordsDe(duelos: readonly TurnoDuelo[]): RecordTurno[] {
       const v = valor(d)
       if (v != null && Number.isFinite(v) && (!top || v > top.v)) top = { v, d }
     }
-    if (top) out.push({ id, rotulo, valor: top.v, unidad, decimales, equipo: top.d.resumen.equipo, dateKey: top.d.resumen.dateKey })
+    if (top) out.push({ id, rotulo, valor: top.v, unidad, decimales, equipo: top.d.resumen.equipo, dateKey: top.d.resumen.jornada })
   }
   mejor('piezas-dia', 'Más piezas en un turno de día', 'pz', 0, (d) => d.resumen.piezas, (d) => !d.resumen.esNoche)
   mejor('piezas-noche', 'Más piezas en un turno de noche', 'pz', 0, (d) => d.resumen.piezas, (d) => d.resumen.esNoche)
@@ -602,43 +1164,58 @@ export function costoMantencion(resumenes: readonly ResumenTurno[]): Record<Equi
 
 export interface CarreraDuelo {
   hoy: PacePoint[]
+  /** La curva que corre enfrente: el turno del otro horario de la jornada (o su provisional). */
   fantasma: PacePoint[] | null
+  /** Quién es el fantasma; null si no hay curva. */
+  fantasmaInfo: FantasmaRival | null
+  /** El equipo contra el que se corre, haya o no curva para mostrar. */
+  rivalEquipo: EquipoId
   banda: BandaRival | null
-  /** Minuto de turno que se compara (el último de hoy). */
+  /** Ritmo de cada hora, hoy contra el fantasma. */
+  ritmoHoras: HoraRitmo[]
+  /** Paradas de hoy en el eje de horas de producción. */
+  eventosHoy: EventoTurno[]
+  /** Minuto de producción que se compara (el último de hoy). */
   minuto: number
-  /** «Hora 2» = segunda hora del turno. */
+  /** «2ª hora» = segunda hora de producción. */
   hora: number
   hoyPz: number
   fantasmaPz: number | null
   diferencia: number | null
 }
 
-export interface DiaNoche {
-  equipo: EquipoId
-  esNoche: boolean
-  shiftDocId: string
-  dateKey: string
-  curva: PacePoint[]
-  total: number
-  minuto: number
-  hoyPz: number
-  rivalPz: number | null
+/** El mismo horario de la semana anterior, en una línea y sin puntos. */
+export interface SemanaAnterior {
+  fantasma: FantasmaRival
+  /** Lo que llevaba ese turno a esta misma hora de producción. */
+  pzAHora: number | null
   diferencia: number | null
-  /** Hoy y el rival los hizo el mismo equipo (el cambio de semana cae entre los dos turnos). */
-  mismoEquipo: boolean
 }
 
 export interface DatosDuelo {
   hoy: ResumenTurno
+  /** El rival de la jornada (el otro horario de la misma fecha de producción) o, mientras no juega, el provisional. */
   rival: ResumenTurno | null
+  /** El rival es el provisional: el de esta jornada todavía no juega o no cerró. El marcador no suma puntos. */
+  provisional: boolean
   marcador: Marcador | null
   carrera: CarreraDuelo | null
-  diaNoche: DiaNoche | null
+  semanaAnterior: SemanaAnterior | null
   ciclo: CicloDuelo
   cicloPrevio: CicloDuelo
   rachas: Record<EquipoId, Racha>
   records: RecordTurno[]
   costo: Record<EquipoId, CostoEquipo>
+  /** Las barras del KPI a KPI (vacío sin rival o sin duelo). */
+  kpiAKpi: FilaVs[]
+  /** Piezas por turno de cada equipo, semana a semana. */
+  tendencia: PuntoSemana[]
+  /** Cada turno cerrado contra su rival de jornada (para el marcador por semana y por mes). */
+  duelos: TurnoDuelo[]
+  /** Jornada (fecha de producción) del turno que se mira. */
+  hoyKey: string
+  /** Quién y cuándo corrigió el equipo de este turno, si lo corrigió. */
+  correccion: CorreccionMeta | null
   /** El turno fue corregido a mano respecto de la rotación. */
   corregido: boolean
   /** Turnos de `shiftStats` ya rearmados con los datos del duelo, sobre el total publicado. */
@@ -653,11 +1230,13 @@ export interface EntradaDuelo {
   cerrado: boolean
   /** Curva acumulada de hoy desde la primera pieza (`cumulativeFromStart`). */
   curvaHoy: readonly PacePoint[]
-  /** Solo para el turno vigente: el rival del otro horario. */
+  /** Solo para el turno vigente: el último turno cerrado del otro horario (la curva del rival de la jornada). */
   rivalCurve?: RivalCurve | null
   stats: readonly ShiftStat[]
   forecast: readonly ForecastHistoryShift[]
   overrides?: Readonly<Record<string, EquipoId>> | null
+  /** Quién y cuándo corrigió cada turno (`monitor_config.duelo.overridesMeta`). */
+  overridesMeta?: Readonly<Record<string, CorreccionMeta>> | null
 }
 
 /** Junta todo lo que la tarjeta y la pestaña muestran. null si el turno no trae su hora de inicio. */
@@ -670,56 +1249,64 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const cerrados = hoy.cerrado ? [...deStats, hoy] : deStats
   const duelos = duelosDeTurnos(cerrados)
 
-  const rival = rivalDirecto(hoy, deStats)
-  const curvaFantasma = rival ? e.forecast.find((f) => f.shiftDocId === rival.shiftDocId)?.curve : null
-  const fantasma = curvaFantasma ? curvaDeForecast(curvaFantasma) : null
+  /* El rival es el otro horario de LA MISMA jornada; si todavía no juega, el último del otro horario (provisional). */
+  const delaJornada = rivalDirecto(hoy, deStats)
+  const rival = delaJornada ?? rivalProvisional(hoy, deStats)
+  const provisional = rival != null && delaJornada == null
+
+  /* La línea punteada sale de la curva del rival publicada para el turno vigente. */
+  const fantasmaInfo = fantasmaDeJornada(hoy, e.rivalCurve, e.stats, e.overrides)
+  const fantasma = fantasmaInfo ? fantasmaInfo.curva : null
   const curvaHoy = [...e.curvaHoy]
   const minuto = curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.minutes : 0
   const fantasmaPz = fantasma && fantasma.length ? piezasAlMinuto(fantasma, minuto) : null
 
+  /* A igual tiempo de turno solo si el fantasma ES el rival del marcador; si no, la carrera en vivo no es comparable. */
+  const mismoRival = rival != null && fantasmaInfo != null && fantasmaInfo.shiftDocId === rival.shiftDocId
   const marcador = rival
-    ? compararTurnos(hoy, rival, { carreraEnVivo: !hoy.cerrado && fantasmaPz != null ? { a: hoy.piezas, b: fantasmaPz } : null })
+    ? compararTurnos(hoy, rival, { carreraEnVivo: !hoy.cerrado && fantasmaPz != null && mismoRival ? { a: hoy.piezas, b: fantasmaPz } : null })
     : null
 
-  /* Banda: los últimos turnos del mismo horario hechos por el equipo rival (excluye hoy). */
-  const delRival = e.forecast
-    .filter((f) => f.shiftDocId !== hoy.shiftDocId && f.shiftDocId.slice(0, 10) < hoy.dateKey && equipoDelTurno(f.shiftDocId, hoy.esNoche, e.overrides) !== hoy.equipo)
-    .sort((x, y) => (x.shiftDocId < y.shiftDocId ? 1 : -1))
-    .slice(0, 4)
-  const banda = bandaDeCurvas(delRival.map((f) => curvaDeForecast(f.curve)))
+  /* Dato secundario, sin puntos: el mismo horario de la semana anterior (noche contra noche, día contra día). */
+  const mismoHorario = referenciaMismoHorario(hoy, e.forecast, e.stats, e.overrides)
+  const banda = mismoHorario.banda
+  const semanaAnterior: SemanaAnterior | null = mismoHorario.fantasma
+    ? (() => {
+        const pzAHora = mismoHorario.fantasma.curva.length ? piezasAlMinuto(mismoHorario.fantasma.curva, minuto) : null
+        return {
+          fantasma: mismoHorario.fantasma,
+          pzAHora,
+          diferencia: pzAHora != null && curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.pieces - pzAHora : null,
+        }
+      })()
+    : null
 
   const carrera: CarreraDuelo | null = curvaHoy.length
     ? {
-        hoy: curvaHoy, fantasma, banda, minuto, hora: Math.floor(minuto / 60) + 1,
+        hoy: curvaHoy, fantasma, fantasmaInfo, rivalEquipo: otroEquipo(hoy.equipo), banda,
+        ritmoHoras: ritmoHoraAHora(curvaHoy, fantasma ?? []),
+        eventosHoy: eventosEnEjeProduccion(eventosCrudosDeLive(e.live), hoy.arranqueMin),
+        minuto, hora: horaTranscurrida(minuto),
         hoyPz: curvaHoy[curvaHoy.length - 1]!.pieces, fantasmaPz,
         diferencia: fantasmaPz != null ? curvaHoy[curvaHoy.length - 1]!.pieces - fantasmaPz : null,
       }
     : null
 
-  let diaNoche: DiaNoche | null = null
-  const rc = e.rivalCurve
-  if (rc && rc.curve?.length >= 2) {
-    const esNoche = esNocheDesdeHora(rc.h0) ?? !hoy.esNoche
-    const curva = rc.curve.map((x) => ({ minutes: x.m, pieces: x.p }))
-    const rivalPz = piezasAlMinuto(curva, minuto)
-    const equipo = equipoDelTurno(rc.shiftDocId, esNoche, e.overrides)
-    diaNoche = {
-      equipo, esNoche, shiftDocId: rc.shiftDocId, dateKey: rc.dateKey, curva, total: rc.total, minuto,
-      hoyPz: hoy.piezas, rivalPz, diferencia: rivalPz != null && curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.pieces - rivalPz : null,
-      mismoEquipo: equipo === hoy.equipo,
-    }
-  }
-
-  const ciclo = cicloDe(hoy.dateKey)
+  const ciclo = cicloDe(hoy.jornada)
   const hoyIndice = ciclo.indice
-  const delCiclo = cerrados.filter((r) => cicloDe(r.dateKey).indice === hoyIndice)
+  const delCiclo = cerrados.filter((r) => cicloDe(r.jornada).indice === hoyIndice)
   return {
-    hoy, rival, marcador, carrera, diaNoche,
+    hoy, rival, provisional, marcador, carrera, semanaAnterior,
     ciclo: marcadorDeCiclo(duelos, hoyIndice, hoyIndice),
     cicloPrevio: marcadorDeCiclo(duelos, hoyIndice - 1, hoyIndice),
     rachas: rachasPorEquipo(duelos),
     records: recordsDe(duelos),
     costo: costoMantencion(hoy.cerrado ? delCiclo : [...delCiclo, hoy]),
+    kpiAKpi: filasKpiAKpi(marcador),
+    tendencia: tendenciaSemanal(cerrados),
+    duelos,
+    hoyKey: hoy.jornada,
+    correccion: e.overridesMeta?.[hoy.shiftDocId] ?? null,
     corregido: equipoCorregido(hoy.shiftDocId, hoy.esNoche, e.overrides),
     listos: { con: deStats.length, de: e.stats.length },
   }

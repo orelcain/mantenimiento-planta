@@ -5979,6 +5979,7 @@ function MonitorDelToken() {
         stats: data.shiftStats ?? [],
         forecast: data.forecastHistory ?? [],
         overrides: configDuelo.overrides,
+        overridesMeta: configDuelo.overridesMeta,
       })
     : null
   const inicioDueloMs = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null

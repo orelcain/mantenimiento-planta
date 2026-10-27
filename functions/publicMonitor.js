@@ -2373,6 +2373,45 @@ function indiceArranqueProductivo(serie) {
   return inicio
 }
 
+/** Una parada tiene que durar al menos esto para marcarse en el gráfico del Duelo. */
+const EV_MIN_SEG = 300
+/** Tope de marcas por turno en `shiftStats[].duelo.ev` (se guardan las más largas). */
+const EV_MAX = 16
+
+/**
+ * Las paradas largas de un turno para el gráfico del Duelo: `[{ n, o, d, p? }]` con `n` = causa, `o` = minutos desde
+ * el inicio PLANIFICADO, `d` = minutos de duración y `p: 1` si es programada (colación, reunión…). Las máquinas se
+ * unen por causa (si tres Baader paran a la vez por la misma causa es UNA marca) y solo quedan las de 5 min o más.
+ * Sale de `stopEvents`, así que la colación y la falta de materia prima ya vienen ahí. Siempre devuelve un arreglo.
+ */
+function eventosDelDuelo(l, iniMs) {
+  if (!Number.isFinite(iniMs)) return []
+  const causas = l?.stopReasons || []
+  const porCausa = new Map()
+  for (const e of l?.stopEvents || []) {
+    const n = causas[e.r]
+    const f = Date.parse(e.f)
+    if (!n || !Number.isFinite(f) || !(e.s > 0)) continue
+    if (!porCausa.has(n)) porCausa.set(n, [])
+    porCausa.get(n).push([f, f + e.s * 1000])
+  }
+  const out = []
+  for (const [n, rangos] of porCausa) {
+    rangos.sort((x, y) => x[0] - y[0])
+    const unidos = []
+    for (const r of rangos) {
+      const u = unidos[unidos.length - 1]
+      if (u && r[0] <= u[1]) u[1] = Math.max(u[1], r[1])
+      else unidos.push([r[0], r[1]])
+    }
+    for (const [d0, d1] of unidos) {
+      if ((d1 - d0) / 1000 < EV_MIN_SEG) continue
+      out.push({ n, o: Math.round((d0 - iniMs) / 60_000), d: Math.round((d1 - d0) / 60_000), ...(esParoPlanificado(n) ? { p: 1 } : {}) })
+    }
+  }
+  return out.sort((x, y) => y.d - x.d).slice(0, EV_MAX).sort((x, y) => x.o - y.o)
+}
+
 /**
  * Lo que el Duelo de equipos necesita de un turno YA CERRADO y que `shiftStats`
  * no traía. Todo compacto y sin `undefined` (Firestore lo rechaza):
@@ -2382,6 +2421,8 @@ function indiceArranqueProductivo(serie) {
  *  - `uh`: piezas de la última hora del horario planificado.
  *  - `mic`: minutos de micro detención sumados entre máquinas (clasificación oficial).
  *  - `alim`: llenado por puesto = piezas ÷ (esperado × minutos andando), tope 100.
+ *  - `ev`: paradas de 5 min o más (colación, falta de materia prima, fallas…) ubicadas desde el
+ *    inicio planificado, para marcarlas en la carrera. Ver `eventosDelDuelo`.
  */
 function resumenDuelo(l) {
   const serie = (l?.series || []).filter(p => p && p.t)
@@ -2412,6 +2453,7 @@ function resumenDuelo(l) {
     ...(uh != null ? { uh } : {}),
     ...(mic != null ? { mic } : {}),
     alim,
+    ev: eventosDelDuelo(l, iniMs),
   }
 }
 
@@ -2455,7 +2497,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined) {
+    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev)) {
       out.push(cacheado); continue
     }
     /*
@@ -3108,6 +3150,7 @@ module.exports = {
   buildShiftStats,
   buildRivalCurve,
   resumenDuelo,
+  eventosDelDuelo,
   inferShiftEndFromDuration,
   buildMonitorPatch,
   archivarSerieMinuto,

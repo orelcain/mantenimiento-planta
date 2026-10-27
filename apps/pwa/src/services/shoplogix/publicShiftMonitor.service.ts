@@ -440,6 +440,11 @@ export interface ShiftDuelo {
   mic?: number
   /** Llenado por puesto: piezas ÷ (esperado × minutos andando), tope 100. */
   alim: Array<{ n: string; f?: number }>
+  /**
+   * Paradas de 5 min o más, unidas entre máquinas por causa: `n` causa, `o` minutos desde el inicio planificado,
+   * `d` minutos de duración, `p: 1` si es programada (colación, reunión). Ausente hasta que el backend rearma el turno.
+   */
+  ev?: Array<{ n: string; o: number; d: number; p?: 1 }>
 }
 
 /** Un turno resumido, sin curva. Ver `buildShiftStats` en las functions. */
