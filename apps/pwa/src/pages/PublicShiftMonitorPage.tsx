@@ -43,6 +43,7 @@ import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo
 import type { PulsoVivoElegido } from './monitor/contadorCrudo'
 import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/datoDuro'
 import { construirCascada } from './monitor/cascadaTurno'
+import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
 import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
@@ -6027,16 +6028,21 @@ function MonitorDelToken() {
     </div>
   ) : null
 
+  /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
+     solo trae la del turno vigente — Shoplogix la entrega en una
+     ventana de ~12 h). La usan las barras y el detalle de la cascada. */
+  const serieMinutoVista = esActual
+    ? (data.pulse?.serieMinuto
+      ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
+    : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
+
   /* Barras del minuto a minuto (las usan la tarjeta clásica y el v2). */
   const barrasMinuto: BarrasMinutoDatos | null = (() => {
     /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
        solo trae la del turno vigente — Shoplogix la entrega en una
        ventana de ~12 h). Turnos anteriores al archivador o cuya
        serie nació parcial no tienen entrada: curvas de 5 min. */
-    const s = esActual
-      ? (data.pulse?.serieMinuto
-        ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
-      : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
+    const s = serieMinutoVista
     if (!s?.maquinas?.length) return null
     const t0 = Date.parse(s.desde)
     const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
@@ -6684,6 +6690,7 @@ function MonitorDelToken() {
               cerrado={turnoCerrado}
               mas={{
                 cascada,
+                cascadaDetalle: cascada ? detalleCascada({ live, cascada, serieMinuto: serieMinutoVista }) : null,
                 tiempo: live.timeBreakdown ? {
                   windowMin: live.timeBreakdown.windowMin,
                   producingMin: live.timeBreakdown.producingMin,
