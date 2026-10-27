@@ -6024,6 +6024,201 @@ function MonitorDelToken() {
     return { desde: new Date(t0 + desdeIdx * 60_000).toISOString(), maquinas }
   })()
 
+  /* Cadencia: ritmo del turno andando y su lectura contra el rango habitual (tablero y v2). */
+  const turnoCpm = live.timeBreakdown && live.timeBreakdown.producingMin > 0
+    ? live.totalPieces / live.timeBreakdown.producingMin
+    : null
+  /* El contexto histórico que traía la tarjeta vieja: rango normal de
+     los turnos anteriores y racha. Se conserva como TEXTO —una cifra
+     más habría recreado el problema que este bloque vino a arreglar. */
+  const racha = turnoCpm != null && banda
+    ? rachaDeRitmos([...banda.turnos.map((t) => t.ritmo), turnoCpm])
+    : null
+  /* UN solo veredicto, por prioridad. La frase vieja daba dos a la vez
+     («en su rango normal — viene aflojando») sin resolver cuál manda. */
+  const contexto = (() => {
+    if (turnoCpm == null) return null
+    /* OJO — turno joven: el promedio de hoy es la RAMPA de partida y
+       siempre sale «abajo del rango» (la noche del 26-08: «8,4, abajo
+       del rango 20-43» con 20 min de marcha). Se dice que es parcial
+       en vez de dar un veredicto que todavía no existe. */
+    const andandoMin = live.timeBreakdown?.producingMin ?? 0
+    if (!turnoCerrado && andandoMin < 60) {
+      return `El punto de hoy es parcial (${Math.round(andandoMin)} min andando): la comparación con otros turnos vale desde ~1 h de marcha.`
+    }
+    if (!banda) {
+      return resumenesAnteriores.length === 0
+        ? 'Sin rango habitual todavía: aparece al 5º turno.'
+        : null
+    }
+    const verbo = turnoCerrado ? 'cerró' : 'va'
+    const rango = `(${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`
+    if (turnoCpm > banda.ritmo.max) return `El turno ${verbo} arriba del rango habitual de la línea ${rango}.`
+    if (turnoCpm < banda.ritmo.min) return `El turno ${verbo} abajo del rango habitual de la línea ${rango}.`
+    const ult5 = [...banda.turnos.slice(-4).map((t) => t.ritmo), turnoCpm]
+    if (ult5.length >= 4 && turnoCpm <= Math.min(...ult5)) {
+      return 'El más lento de los últimos 5 turnos — aún dentro del rango habitual.'
+    }
+    if (ult5.length >= 4 && turnoCpm >= Math.max(...ult5)) {
+      return 'El más rápido de los últimos 5 turnos.'
+    }
+    if (racha && racha.n >= 2) {
+      return `${racha.n} turnos seguidos ${racha.dir > 0 ? 'al alza' : 'a la baja'} — dentro del rango habitual.`
+    }
+    return 'Dentro del rango habitual de la línea.'
+  })()
+
+  /* Las props del ritmo (estado / minuto / rango), computadas una vez: las usan el tablero clásico y el v2. */
+  const reglaPropsBase = {
+    /* El pulso vive DENTRO de la tarjeta de ritmo: son la misma
+       pregunta —«¿cómo va ahora?»— y así viaja con ella cuando el
+       usuario la mueve. Es además el componente que refresca
+       `data.pulse`, por eso se monta siempre que el ritmo exista. */
+    pulsoNodo: (
+      <PulsoVivo
+        pulse={data.pulse}
+        token={token ?? ''}
+        cerrado={turnoCerrado}
+        onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
+      />
+    ),
+    /* El tramo en curso se cuenta por los minutos que LLEVA, no por
+       los 5 que va a durar: si no, el número de "ahora" queda siempre
+       por debajo del que muestra Shoplogix. */
+    ahora: duro15?.cpm ?? ritmoAhoraAndando(serieDelTurno, ahoraWallMs),
+    maquinas: (() => {
+      const base = conRepartoPorMaquina(
+        ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
+        seriesMaquinas,
+        serieDelTurno,
+        ahoraWallMs,
+        live.timeBreakdown?.producingMin ?? null,
+        /* El pulso por máquina SOLO cuando el número grande es el
+           pulso: la columna debe sumar exactamente lo de arriba. Los
+           ids del desglose son los machineid de Shoplogix — se
+           traducen a nombre con las máquinas del turno. Sale del VIVO
+           elegido (fresco o arrastrado): la columna acompaña al
+           número grande también durante la recalibración. */
+        (() => {
+          const pm = contador.fuente === 'pulso' ? pulsoVivo(data.pulse)?.porMaquina : null
+          if (!pm?.length) return null
+          const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+          const out = new Map<string, number>()
+          for (const x of pm) {
+            const n = nombrePorId.get(x.id)
+            if (n != null) out.set(n, x.cpm)
+          }
+          return out.size > 0 ? out : null
+        })(),
+      )
+      /* La columna «media 15 min» por máquina, del dato duro: la
+         misma ventana y vara que el número de arriba, así SUMAN. */
+      if (!base || !duro15) return base
+      const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+      const porNombre = new Map(duro15.porMaquina.map((x) => [nombrePorId.get(x.id) ?? x.id, x.cpm]))
+      return {
+        ...base,
+        maquinas: base.maquinas.map((m) =>
+          porNombre.has(m.nombre) ? { ...m, ahoraCpm: porNombre.get(m.nombre)! } : m),
+      }
+    })(),
+    /* Contra qué compite cada Baader: el promedio de sus últimos 5
+       turnos del MISMO número (T1 con T1, T2 con T2 — decisión de
+       Orel, 31-08). El shiftId sale del turno que se está MIRANDO,
+       no del vigente: navegando a un turno viejo el delta tiene que
+       ser el de ese turno. */
+    refAporte: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11)),
+    /* La segunda vara: el turno ANTERIOR solo. Orel las quiso a las
+       dos a la vista (31-08, mirándolo en prod): el último dice «¿me
+       moví desde la vez pasada?» y el promedio de 5 dice «¿esto es
+       lo mío o fue un turno raro?». */
+    refAporteUltimo: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11), 1),
+    producingMin: live.timeBreakdown?.producingMin ?? null,
+    serieLinea: serieDelTurno,
+    seriesMaquinas,
+    /*
+     * Las barras minuto a minuto salen cuando la serie ES DEL TURNO
+     * QUE SE MIRA — se comprueba por TIEMPO, no por la frescura del
+     * contador.
+     *
+     * OJO: antes el gate era `contador.fuente === 'pulso'`, y al cerrar
+     * el turno (contador vivo en 0) las barras desaparecían justo
+     * cuando la pantalla pasa a ser el informe (Orel, 29-08). La
+     * frescura del contador no dice nada sobre si la serie describe
+     * este turno; la ventana sí.
+     *
+     * La serie se RECORTA a la ventana del turno: el pulso arranca
+     * la suya en el primer bucket que Shoplogix devuelve, que puede
+     * traer minutos anteriores al turno.
+     */
+    barras: barrasMinuto,
+    /* Parada = ninguna máquina produciendo. El pulso lo confirma:
+       con la línea en colación marca 0,0 mientras el número grande
+       mostraba el ritmo de antes de parar. También con el turno
+       CERRADO: es la causa del cierre («Detención programada desde
+       las 15:09 · fin de turno»). */
+    parada: live.machinesProducing === 0 && (live.currentReason || live.currentSinceAt)
+      ? {
+        desdeHace: live.currentSinceAt ? fmtAgoWall(live.currentSinceAt, now) : null,
+        desdeHora: live.currentSinceAt ? fmtWallTime(live.currentSinceAt) : null,
+        // El sensor pone «Planned Downtime» en inglés; el resto de
+        // los motivos los escribe el operador y ya vienen en español.
+        motivo: motivoEnEspanol(live.currentReason),
+        programada: classifyLossState({
+          type: 'break',
+          reason: live.currentReason ?? undefined,
+        }) === 'planificado',
+      }
+      : null,
+    ahoraReloj: duro15?.cpmReloj ?? ritmoAhoraCpm(serieDelTurno, ahoraWallMs),
+    /* Fin del último tramo: la serie viene en hora de planta, igual
+       que el resto de la pantalla. Con el dato duro, el corte es el
+       último MINUTO cerrado. */
+    corteMs: duro15?.hastaWallMs ?? (serieDelTurno.length
+      ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
+      : null),
+    ahoraWallMs,
+    /* ⚠ El pulso SOLO si el contador vivo está respondiendo. Con el
+       contador caído, `totalCycles` viene 0 y `cpm` viene 0 —no
+       null—, así que el chip pintaba «0,0 · ahora mismo · 15:30» dos
+       renglones debajo del aviso que dice, literalmente, que el
+       contador no está respondiendo. Un cero que es ausencia de dato
+       presentado como medición. `elegirContador` ya hace ese juicio:
+       si cayó al derivado, no hay pulso que mostrar. */
+    pulso: contador.fuente === 'pulso' ? (data.pulse ?? null) : null,
+    vivo: contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null,
+    /* El objetivo, en la MISMA base que el ritmo: el requerido de
+       `pace` es sobre el reloj útil que queda, y se convierte a
+       «andando» con el uptime real del turno. */
+    pedido: pedidoAndando(
+      pace?.requiredPerMinute,
+      live.timeBreakdown?.producingMin,
+      live.timeBreakdown
+        ? Math.max(1, live.timeBreakdown.windowMin - (live.timeBreakdown.plannedMin ?? 0))
+        : null,
+    ),
+    turno: turnoCpm,
+    setCpm: setCpmVigente,
+    techoDemostrado: ritmoAndando.mejor,
+    cerrado: turnoCerrado,
+    contexto,
+    /* Últimos 4 turnos + hoy (a 375 px veinte puntos se amontonan) y
+       la escala FIJA al peor/mejor de TODA la historia corta, para
+       que la misma pendiente signifique lo mismo todos los días. */
+    chispa: turnoCpm != null && banda
+      ? <Chispa
+          turnos={banda.turnos.slice(-4)}
+          hoy={turnoCpm}
+          banda={banda.ritmo}
+          /* La escala fija por historia ya no hace falta: el dominio
+             se ancla a la BANDA (estable por construcción) — misma
+             vista todos los días. */
+          mediana={ritmoAndando.mediana}
+          muestras={ritmoAndando.muestras}
+        />
+      : undefined,
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)}>
       {glass === 'v2' && !modoPantalla && (
@@ -6458,6 +6653,7 @@ function MonitorDelToken() {
                   .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))
                   .filter((d) => d.piezas > 0),
               }}
+              ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} parte="estado" />}
               caminoMeta={
                 <TiempoDelTurno
                   tb={live.timeBreakdown}
@@ -6832,48 +7028,6 @@ function MonitorDelToken() {
 
         {/* Cadencia */}
         {(() => {
-          const turnoCpm = live.timeBreakdown && live.timeBreakdown.producingMin > 0
-            ? live.totalPieces / live.timeBreakdown.producingMin
-            : null
-          /* El contexto histórico que traía la tarjeta vieja: rango normal de
-             los turnos anteriores y racha. Se conserva como TEXTO —una cifra
-             más habría recreado el problema que este bloque vino a arreglar. */
-          const racha = turnoCpm != null && banda
-            ? rachaDeRitmos([...banda.turnos.map((t) => t.ritmo), turnoCpm])
-            : null
-          /* UN solo veredicto, por prioridad. La frase vieja daba dos a la vez
-             («en su rango normal — viene aflojando») sin resolver cuál manda. */
-          const contexto = (() => {
-            if (turnoCpm == null) return null
-            /* OJO — turno joven: el promedio de hoy es la RAMPA de partida y
-               siempre sale «abajo del rango» (la noche del 26-08: «8,4, abajo
-               del rango 20-43» con 20 min de marcha). Se dice que es parcial
-               en vez de dar un veredicto que todavía no existe. */
-            const andandoMin = live.timeBreakdown?.producingMin ?? 0
-            if (!turnoCerrado && andandoMin < 60) {
-              return `El punto de hoy es parcial (${Math.round(andandoMin)} min andando): la comparación con otros turnos vale desde ~1 h de marcha.`
-            }
-            if (!banda) {
-              return resumenesAnteriores.length === 0
-                ? 'Sin rango habitual todavía: aparece al 5º turno.'
-                : null
-            }
-            const verbo = turnoCerrado ? 'cerró' : 'va'
-            const rango = `(${fmtDec(banda.ritmo.min)}–${fmtDec(banda.ritmo.max)})`
-            if (turnoCpm > banda.ritmo.max) return `El turno ${verbo} arriba del rango habitual de la línea ${rango}.`
-            if (turnoCpm < banda.ritmo.min) return `El turno ${verbo} abajo del rango habitual de la línea ${rango}.`
-            const ult5 = [...banda.turnos.slice(-4).map((t) => t.ritmo), turnoCpm]
-            if (ult5.length >= 4 && turnoCpm <= Math.min(...ult5)) {
-              return 'El más lento de los últimos 5 turnos — aún dentro del rango habitual.'
-            }
-            if (ult5.length >= 4 && turnoCpm >= Math.max(...ult5)) {
-              return 'El más rápido de los últimos 5 turnos.'
-            }
-            if (racha && racha.n >= 2) {
-              return `${racha.n} turnos seguidos ${racha.dir > 0 ? 'al alza' : 'a la baja'} — dentro del rango habitual.`
-            }
-            return 'Dentro del rango habitual de la línea.'
-          })()
           return (
             <>
             {/* «Dónde se fueron las piezas»: el análisis táctico del turno. Va
@@ -6961,155 +7115,8 @@ function MonitorDelToken() {
             /* Las MISMAS props para las tres tarjetas en que se partió el
                ritmo (estado / minuto a minuto / rango habitual): se computan
                una vez y cada llamada renderiza su parte. */
-            const reglaProps = {
-              /* El pulso vive DENTRO de la tarjeta de ritmo: son la misma
-                 pregunta —«¿cómo va ahora?»— y así viaja con ella cuando el
-                 usuario la mueve. Es además el componente que refresca
-                 `data.pulse`, por eso se monta siempre que el ritmo exista. */
-              pulsoNodo: (
-                <PulsoVivo
-                  pulse={data.pulse}
-                  token={token ?? ''}
-                  cerrado={turnoCerrado}
-                  onPulso={p => setData(d => (d ? { ...d, pulse: p } : d))}
-                />
-              ),
-              /* El tramo en curso se cuenta por los minutos que LLEVA, no por
-                 los 5 que va a durar: si no, el número de "ahora" queda siempre
-                 por debajo del que muestra Shoplogix. */
-              ahora: duro15?.cpm ?? ritmoAhoraAndando(serieDelTurno, ahoraWallMs),
-              maquinas: (() => {
-                const base = conRepartoPorMaquina(
-                  ritmoPorMaquina(live.machines, (live.windowHours ?? 0) * 60),
-                  seriesMaquinas,
-                  serieDelTurno,
-                  ahoraWallMs,
-                  live.timeBreakdown?.producingMin ?? null,
-                  /* El pulso por máquina SOLO cuando el número grande es el
-                     pulso: la columna debe sumar exactamente lo de arriba. Los
-                     ids del desglose son los machineid de Shoplogix — se
-                     traducen a nombre con las máquinas del turno. Sale del VIVO
-                     elegido (fresco o arrastrado): la columna acompaña al
-                     número grande también durante la recalibración. */
-                  (() => {
-                    const pm = contador.fuente === 'pulso' ? pulsoVivo(data.pulse)?.porMaquina : null
-                    if (!pm?.length) return null
-                    const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
-                    const out = new Map<string, number>()
-                    for (const x of pm) {
-                      const n = nombrePorId.get(x.id)
-                      if (n != null) out.set(n, x.cpm)
-                    }
-                    return out.size > 0 ? out : null
-                  })(),
-                )
-                /* La columna «media 15 min» por máquina, del dato duro: la
-                   misma ventana y vara que el número de arriba, así SUMAN. */
-                if (!base || !duro15) return base
-                const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
-                const porNombre = new Map(duro15.porMaquina.map((x) => [nombrePorId.get(x.id) ?? x.id, x.cpm]))
-                return {
-                  ...base,
-                  maquinas: base.maquinas.map((m) =>
-                    porNombre.has(m.nombre) ? { ...m, ahoraCpm: porNombre.get(m.nombre)! } : m),
-                }
-              })(),
-              /* Contra qué compite cada Baader: el promedio de sus últimos 5
-                 turnos del MISMO número (T1 con T1, T2 con T2 — decisión de
-                 Orel, 31-08). El shiftId sale del turno que se está MIRANDO,
-                 no del vigente: navegando a un turno viejo el delta tiene que
-                 ser el de ese turno. */
-              refAporte: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11)),
-              /* La segunda vara: el turno ANTERIOR solo. Orel las quiso a las
-                 dos a la vista (31-08, mirándolo en prod): el último dice «¿me
-                 moví desde la vez pasada?» y el promedio de 5 dice «¿esto es
-                 lo mío o fue un turno raro?». */
-              refAporteUltimo: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11), 1),
-              producingMin: live.timeBreakdown?.producingMin ?? null,
-              serieLinea: serieDelTurno,
-              seriesMaquinas,
-              /*
-               * Las barras minuto a minuto salen cuando la serie ES DEL TURNO
-               * QUE SE MIRA — se comprueba por TIEMPO, no por la frescura del
-               * contador.
-               *
-               * OJO: antes el gate era `contador.fuente === 'pulso'`, y al cerrar
-               * el turno (contador vivo en 0) las barras desaparecían justo
-               * cuando la pantalla pasa a ser el informe (Orel, 29-08). La
-               * frescura del contador no dice nada sobre si la serie describe
-               * este turno; la ventana sí.
-               *
-               * La serie se RECORTA a la ventana del turno: el pulso arranca
-               * la suya en el primer bucket que Shoplogix devuelve, que puede
-               * traer minutos anteriores al turno.
-               */
-              barras: barrasMinuto,
-              /* Parada = ninguna máquina produciendo. El pulso lo confirma:
-                 con la línea en colación marca 0,0 mientras el número grande
-                 mostraba el ritmo de antes de parar. También con el turno
-                 CERRADO: es la causa del cierre («Detención programada desde
-                 las 15:09 · fin de turno»). */
-              parada: live.machinesProducing === 0 && (live.currentReason || live.currentSinceAt)
-                ? {
-                  desdeHace: live.currentSinceAt ? fmtAgoWall(live.currentSinceAt, now) : null,
-                  desdeHora: live.currentSinceAt ? fmtWallTime(live.currentSinceAt) : null,
-                  // El sensor pone «Planned Downtime» en inglés; el resto de
-                  // los motivos los escribe el operador y ya vienen en español.
-                  motivo: motivoEnEspanol(live.currentReason),
-                  programada: classifyLossState({
-                    type: 'break',
-                    reason: live.currentReason ?? undefined,
-                  }) === 'planificado',
-                }
-                : null,
-              ahoraReloj: duro15?.cpmReloj ?? ritmoAhoraCpm(serieDelTurno, ahoraWallMs),
-              /* Fin del último tramo: la serie viene en hora de planta, igual
-                 que el resto de la pantalla. Con el dato duro, el corte es el
-                 último MINUTO cerrado. */
-              corteMs: duro15?.hastaWallMs ?? (serieDelTurno.length
-                ? Date.parse(serieDelTurno[serieDelTurno.length - 1]!.t) + 5 * 60_000
-                : null),
-              ahoraWallMs,
-              /* ⚠ El pulso SOLO si el contador vivo está respondiendo. Con el
-                 contador caído, `totalCycles` viene 0 y `cpm` viene 0 —no
-                 null—, así que el chip pintaba «0,0 · ahora mismo · 15:30» dos
-                 renglones debajo del aviso que dice, literalmente, que el
-                 contador no está respondiendo. Un cero que es ausencia de dato
-                 presentado como medición. `elegirContador` ya hace ese juicio:
-                 si cayó al derivado, no hay pulso que mostrar. */
-              pulso: contador.fuente === 'pulso' ? (data.pulse ?? null) : null,
-              vivo: contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null,
-              /* El objetivo, en la MISMA base que el ritmo: el requerido de
-                 `pace` es sobre el reloj útil que queda, y se convierte a
-                 «andando» con el uptime real del turno. */
-              pedido: pedidoAndando(
-                pace?.requiredPerMinute,
-                live.timeBreakdown?.producingMin,
-                live.timeBreakdown
-                  ? Math.max(1, live.timeBreakdown.windowMin - (live.timeBreakdown.plannedMin ?? 0))
-                  : null,
-              ),
-              turno: turnoCpm,
-              setCpm: setCpmVigente,
-              techoDemostrado: ritmoAndando.mejor,
-              cerrado: turnoCerrado,
-              contexto,
-              /* Últimos 4 turnos + hoy (a 375 px veinte puntos se amontonan) y
-                 la escala FIJA al peor/mejor de TODA la historia corta, para
-                 que la misma pendiente signifique lo mismo todos los días. */
-              chispa: turnoCpm != null && banda
-                ? <Chispa
-                    turnos={banda.turnos.slice(-4)}
-                    hoy={turnoCpm}
-                    banda={banda.ritmo}
-                    /* La escala fija por historia ya no hace falta: el dominio
-                       se ancla a la BANDA (estable por construcción) — misma
-                       vista todos los días. */
-                    mediana={ritmoAndando.mediana}
-                    muestras={ritmoAndando.muestras}
-                  />
-                : undefined,
-            }
+            /* El v2 monta su propia tarjeta de ritmo con el pulso; acá no se refresca dos veces. */
+            const reglaProps = glass === 'v2' ? { ...reglaPropsBase, pulsoNodo: null } : reglaPropsBase
             return (
               <>
               <TarjetaTablero id="ritmo" t={tablero}>
