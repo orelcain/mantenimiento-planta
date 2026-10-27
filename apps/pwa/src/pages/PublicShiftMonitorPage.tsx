@@ -4541,7 +4541,11 @@ function MonitorDelToken() {
   const modoPantalla = searchParams.get('pantalla') === '1'
   // PROTOTIPO glass (no producción): ?glass=a | ?glass=b, ver monitor/monitorGlass.css
   const glassParam = searchParams.get('glass')
-  const glass = glassParam === 'a' || glassParam === 'b' || glassParam === 'v2' ? glassParam : undefined
+  // v2 es el monitor por defecto; ?glass=clasico vuelve al de antes. El Modo TV sigue con el clásico
+  // (su tablero personalizado no existe en el v2).
+  const glass = modoPantalla || glassParam === 'clasico'
+    ? undefined
+    : glassParam === 'a' || glassParam === 'b' ? glassParam : 'v2'
   const [vistaV2, setVistaV2] = useState<VistaV2>(0)
   /**
    * La PESTAÑA (`?ver=analisis`): el turno (lo que se vigila y cómo viene) o

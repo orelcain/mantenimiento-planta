@@ -239,8 +239,18 @@ function BotonDetalle({ vista, onVista, conMas = true }: { vista: VistaV2; onVis
           {vista === 2 ? 'Ocultar versión clásica' : 'Ver versión clásica (todo el detalle de antes)'}
         </button>
       )}
+      <a href={urlClasico()} className="tap-44 rounded-full px-3 py-1 text-[13px] text-muted-foreground hover:text-foreground">
+        Volver al monitor anterior
+      </a>
     </div>
   )
+}
+
+/** Misma URL con ?glass=clasico: el monitor de antes, sin el v2. */
+function urlClasico(): string {
+  const u = new URL(window.location.href)
+  u.searchParams.set('glass', 'clasico')
+  return u.pathname + u.search
 }
 
 const ic = 'h-3.5 w-3.5'
