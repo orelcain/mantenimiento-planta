@@ -12,12 +12,12 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 ```
 
 ## 2026-10-27 · Claude · Informe de turno: correo HTML + PDF rehecho
-- Hecho: `correoTurno.js` (correo de una columna: veredicto, 4 cifras, pérdida por dueño, fallas por máquina con «volvió a ritmo», cotejo con min de Mantención, lo abierto) reutilizando `construirDatosInforme`. PDF rehecho al estándar /sin-tics-visual con tildes: 5 láminas + anexo solo con varias máquinas. Canal de correo enchufable y apagado (`canalCorreo.js` devuelve null; `shiftEnd.informeCorreo.{enabled,de,para,cc}` en notificationConfig). Telegram igual.
+- Hecho: `correoTurno.js` (correo de una columna: veredicto, 4 cifras, pérdida por dueño, fallas por máquina con «volvió a ritmo», cotejo con min de Mantención, lo abierto) reutilizando `construirDatosInforme`. PDF rehecho al estándar /sin-tics-visual con tildes: 5 láminas + anexo solo con varias máquinas. Sin envío de correo desde el servidor (decisión de Orel): callable `informeTurnoCorreo` (admin) + botones «Copiar correo» (portapapeles con formato) y «Descargar PDF» en el monitor; se manda desde el Outlook propio. Telegram igual.
 - Corregido: `recuperacion` contaba la colación (Chonchi 21-10 T2: «Cintas 69 min» → 0); Mantención redondeada distinto en tabla y Telegram.
 - Datos: «respuesta/MTTR» NO se pudo cruzar — `incidents` sin registros desde 2026-08-22.
 - Verificación: node --test functions 624 ok (rotura a propósito detectada en 3 casos), tsc/eslint PWA 0, dry-run 12 turnos reales (Chonchi/Filete/Yal) sin observaciones.
 - Estado: EN REVISIÓN (PR, sin mergear — aprueba Orel)
-- Sigue: elegir canal (SMTP o Graph) y conectar `canalCorreo.js` con secret de Firebase; `resumenLinea` cacheado difiere del recálculo en algunos turnos (Chonchi 26-10 T1), no investigado.
+- Sigue: probar el pegado en Outlook real tras el deploy; `resumenLinea` cacheado difiere del recálculo en algunos turnos (Chonchi 26-10 T1), no investigado.
 
 ## 2026-10-25 · Claude · Análisis de turno: medir uso y simplificar pestañas
 - Contexto medido: 0 acciones de usuario en el análisis de turno desde el 12-09 (Excel, gates, imputar); `moduloVistas` da 2 usuarios en toda la app con sesión; el monitor público de filete suma 14,4 h en 30 días. Panel visual de 8 personas (gemma4 local): falta la causa de los paros, sobra texto explicativo, Línea = Resumen sin Excel, Calidad vacía.

@@ -33,17 +33,7 @@ const DEFAULTS = Object.freeze({
    * automáticamente. Se prende planta por planta y con el chat escrito
    * explícitamente — nunca cae al chat general por descarte.
    */
-  /**
-   * El mismo informe por correo: cuerpo HTML (correoTurno.js) + el PDF adjunto.
-   * Igual que el PDF, apagado y sin destinatarios por defecto. `para` y `cc`
-   * son listas de direcciones; `de` el remitente. Además hace falta un canal
-   * conectado (`canalCorreo.js`): sin él la config no basta y no sale nada.
-   */
-  shiftEnd:      {
-    enabled: true, delayMinutes: 10, minPieces: 50,
-    informePdf: { enabled: false, chatId: null },
-    informeCorreo: { enabled: false, de: null, para: [], cc: [] },
-  },
+  shiftEnd:      { enabled: true, delayMinutes: 10, minPieces: 50, informePdf: { enabled: false, chatId: null } },
   firstPiece:    { enabled: true },
   pieceInterval: { enabled: false, every: 1000 },
   // stoppageMinMinutes: umbral para alertar detenciones (≥N min). Bajo eso es

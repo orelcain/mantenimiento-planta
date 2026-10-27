@@ -317,89 +317,28 @@ test('un envio fallido NO deja rastro de envio', async () => {
   assert.strictEqual(escrito.informePdfIntentos, 1)
 })
 
-// ── Correo ──────────────────────────────────────────────────────────────────
+
+// ── Para copiar al correo ───────────────────────────────────────────────────
 //
-// El correo es un canal más, apagado por defecto y sin canal conectado
-// (`canalCorreo.js` devuelve null). Lo que se fija acá es que nunca arrastre a
-// Telegram y que nunca diga «enviado» si no salió.
+// El correo no se envía desde el servidor: el monitor pide el informe armado y
+// quien lo pega lo manda desde su buzón. Lo que se fija acá es que sea el mismo
+// informe que va a Telegram y que no escriba nada.
 
-const { destinatarios } = require('../enviarInforme')
+const { informeParaCorreo } = require('../enviarInforme')
 
-const conCorreo = (correo, pdf = { enabled: true, chatId: '12345' }) => ({
-  shiftEnd: { minPieces: 50, informePdf: pdf, informeCorreo: { enabled: true, de: 'mant@planta.cl', para: ['jefe@planta.cl'], cc: [], ...correo } },
-})
-
-test('destinatarios acepta lista o texto y descarta lo que no es una dirección', () => {
-  assert.deepStrictEqual(destinatarios('a@b.cl, nada; c@d.cl'), ['a@b.cl', 'c@d.cl'])
-  assert.deepStrictEqual(destinatarios(['x@y.cl', '', null]), ['x@y.cl'])
-  assert.deepStrictEqual(destinatarios(undefined), [])
-})
-
-test('correo configurado pero sin canal conectado: no sale, y Telegram sigue igual', async () => {
+test('informeParaCorreo arma asunto, HTML y PDF sin escribir en Firestore', async () => {
   const db = fakeDb({ machines: [maquina('Ev 1', 2160), maquina('Ev 2', 2160)] })
-  let telegram = 0
-  const r = await enviarInformeDeTurno({
-    db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', config: conCorreo({}),
-    enviarDocumento: async () => { telegram += 1 }, logger: silencioso,
-  })
-  assert.strictEqual(telegram, 1)
-  assert.strictEqual(r.enviado, true)
-  assert.strictEqual(r.correo, null, 'sin canal no puede decir nada del correo')
+  const r = await informeParaCorreo({ db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', logger: silencioso })
+  assert.match(r.asunto, /^Eviscerados Chonchi · Turno 1 · 2026-08-17 · 4\.320 piezas/)
+  assert.match(r.html, /^<!doctype html>/)
+  assert.strictEqual(r.pdf.subarray(0, 4).toString(), '%PDF')
+  assert.strictEqual(r.nombreArchivo, 'informe-turno-chonchi-2026-08-17_Turno-1.pdf')
+  assert.strictEqual(db.escrituras.length, 0, 'copiar el correo no puede marcar el turno como enviado')
 })
 
-test('solo correo configurado y sin canal: lo dice, no lo da por enviado', async () => {
-  const r = await enviarInformeDeTurno({
-    db: fakeDb({ machines: [maquina('Ev 1', 2160)] }), plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1',
-    config: conCorreo({}, { enabled: false, chatId: null }),
-    enviarDocumento: async () => { throw new Error('no debía llamarse') }, logger: silencioso,
+test('informeParaCorreo respeta el mínimo de piezas', async () => {
+  const r = await informeParaCorreo({
+    db: fakeDb({ machines: [maquina('Ev 1', 10)] }), plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', logger: silencioso,
   })
-  assert.deepStrictEqual(r, { enviado: false, motivo: 'sin-canal' })
-})
-
-test('con canal: el correo lleva asunto, HTML y el PDF adjunto', async () => {
-  const db = fakeDb({ machines: [maquina('Ev 1', 2160), maquina('Ev 2', 2160)] })
-  const correos = []
-  const r = await enviarInformeDeTurno({
-    db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', config: conCorreo({ cc: 'otro@planta.cl' }),
-    enviarDocumento: async () => ({ ok: true, result: { message_id: 7 } }),
-    enviarCorreo: async (m) => { correos.push(m); return { id: 'abc' } },
-    logger: silencioso,
-  })
-  assert.strictEqual(correos.length, 1)
-  const m = correos[0]
-  assert.deepStrictEqual(m.para, ['jefe@planta.cl'])
-  assert.deepStrictEqual(m.cc, ['otro@planta.cl'])
-  assert.strictEqual(m.de, 'mant@planta.cl')
-  assert.match(m.asunto, /^Eviscerados Chonchi · Turno 1 · 2026-08-17 · 4\.320 piezas/)
-  assert.match(m.html, /^<!doctype html>/)
-  assert.strictEqual(m.adjuntos[0].tipo, 'application/pdf')
-  assert.strictEqual(m.adjuntos[0].contenido.subarray(0, 4).toString(), '%PDF')
-  assert.deepStrictEqual(r.correo, { enviado: true, id: 'abc', para: 1 })
-  assert.deepStrictEqual(db.escrituras.at(-1).informePdfEnvios.at(-1).correo, { enviado: true, id: 'abc', para: 1 })
-})
-
-test('si el correo falla y Telegram salió, el turno queda enviado y el fallo anotado', async () => {
-  const db = fakeDb({ machines: [maquina('Ev 1', 2160)] })
-  const r = await enviarInformeDeTurno({
-    db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', config: conCorreo({}),
-    enviarDocumento: async () => ({ ok: true, result: { message_id: 7 } }),
-    enviarCorreo: async () => { throw new Error('SMTP 535') },
-    logger: silencioso,
-  })
-  assert.strictEqual(r.enviado, true)
-  assert.strictEqual(r.correo.enviado, false)
-  assert.match(r.correo.error, /SMTP 535/)
-  assert.ok(db.escrituras.at(-1).informePdfSentAt)
-})
-
-test('si el correo es el único canal y falla, cuenta como intento fallido', async () => {
-  const db = fakeDb({ machines: [maquina('Ev 1', 2160)] })
-  await assert.rejects(enviarInformeDeTurno({
-    db, plant: 'chonchi', shiftDocId: '2026-08-17_Turno 1', config: conCorreo({}, { enabled: false, chatId: null }),
-    enviarDocumento: async () => { throw new Error('no debía llamarse') },
-    enviarCorreo: async () => { throw new Error('buzón lleno') },
-    logger: silencioso,
-  }), /buzón lleno/)
-  assert.strictEqual(db.escrituras.at(-1).informePdfIntentos, 1)
-  assert.ok(!db.escrituras.some((e) => e.informePdfSentAt), 'quedó marcado como enviado sin haber salido')
+  assert.deepStrictEqual(r, { motivo: 'sin-produccion' })
 })

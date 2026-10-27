@@ -7548,7 +7548,6 @@ const SHOPLOGIX_PLANT_LINE_ID = {
 const notifConfigMod = require('./shoplogix/notifConfig')
 const shoplogixMachinesMod = require('./shoplogix/machines')
 const shoplogixInformeMod = require('./shoplogix/enviarInforme')
-const { canalCorreo: shoplogixCanalCorreo } = require('./shoplogix/canalCorreo')
 const { sendTelegramDocument } = require('./shoplogix/telegramDoc')
 const SHOPLOGIX_NOTIF_DEFAULTS = notifConfigMod.DEFAULTS
 
@@ -8341,7 +8340,6 @@ exports.checkShiftEndBriefs = onSchedule(
                   }
                   return res
                 },
-                enviarCorreo: shoplogixCanalCorreo(),
                 logger,
               })
               if (r.enviado) {
@@ -8349,7 +8347,7 @@ exports.checkShiftEndBriefs = onSchedule(
                 // hilo y confirmar que el mensaje existe cuando alguien dice
                 // que no le llego.
                 logger.info('[checkShiftEndBriefs] informe PDF enviado', {
-                  plant, doc: docSnap.id, bytes: r.bytes, messageId: r.messageId ?? null, correo: r.correo ?? null,
+                  plant, doc: docSnap.id, bytes: r.bytes, messageId: r.messageId ?? null,
                 })
               } else if (r.motivo !== 'apagado') {
                 logger.info('[checkShiftEndBriefs] informe PDF no enviado', { plant, doc: docSnap.id, motivo: r.motivo })
@@ -8391,11 +8389,10 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
   if (!plant || !shiftDocId) throw new HttpsError('invalid-argument', 'Faltan la planta o el turno.')
 
   const config = await getShoplogixNotifConfig(plant)
-  const paraCorreo = shoplogixInformeMod.destinatarios(config.shiftEnd?.informeCorreo?.para)
-  if (!config.shiftEnd?.informePdf?.chatId && !paraCorreo.length) {
+  if (!config.shiftEnd?.informePdf?.chatId) {
     throw new HttpsError('failed-precondition',
-      `${plant} no tiene destino configurado para el informe. `
-      + 'Se configura en notificationConfig: shiftEnd.informePdf.chatId (Telegram) o shiftEnd.informeCorreo.para (correo).')
+      `${plant} no tiene un chat de Telegram configurado para el informe. `
+      + 'Se configura en notificationConfig, campo shiftEnd.informePdf.chatId.')
   }
 
   /* ¿El turno sigue corriendo? El brief de cierre es la señal más confiable:
@@ -8412,14 +8409,7 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
       shiftDocId,
       // El botón manda aunque la planta tenga el envío automático apagado: para
       // eso está el botón.
-      config: {
-        ...config,
-        shiftEnd: {
-          ...config.shiftEnd,
-          informePdf: { ...config.shiftEnd.informePdf, enabled: true },
-          informeCorreo: { ...config.shiftEnd.informeCorreo, enabled: true },
-        },
-      },
+      config: { ...config, shiftEnd: { ...config.shiftEnd, informePdf: { ...config.shiftEnd.informePdf, enabled: true } } },
       forzar: true,
       enCurso,
       enviarDocumento: async (chatId, buffer, filename, caption) => {
@@ -8429,13 +8419,57 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
         }
         return res
       },
-      enviarCorreo: shoplogixCanalCorreo(),
       logger,
     })
     logger.info('[enviarInformeTurnoManual]', { uid, plant, shiftDocId, enCurso, ...r })
     return r
   } catch (e) {
     logger.error('[enviarInformeTurnoManual] falló', { uid, plant, shiftDocId, err: e.message })
+    throw new HttpsError('internal', e.message)
+  }
+})
+
+// ── informeTurnoCorreo ───────────────────────────────────────────────────────
+// Botones «Copiar correo» y «Descargar PDF» del monitor: devuelve el informe
+// del turno listo para pegar en un correo (asunto + HTML) y el PDF para
+// adjuntar. No envía nada: quien lo pega lo manda desde su propio buzón, así
+// no hay credenciales de correo en el servidor. Solo lectura, por eso no pide
+// reautenticar, pero sí ser admin: el informe trae lecturas del turno que no
+// son para cualquiera con el link del monitor.
+exports.informeTurnoCorreo = onCall({ region: 'us-central1' }, async (request) => {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Hay que iniciar sesión.')
+
+  const perfil = await db.collection('users').doc(uid).get()
+  if (perfil.data()?.rol !== 'admin') {
+    throw new HttpsError('permission-denied', 'Solo un administrador puede sacar el informe.')
+  }
+
+  const plant = String(request.data?.plant || '').trim()
+  const shiftDocId = String(request.data?.shiftDocId || '').trim()
+  if (!plant || !shiftDocId) throw new HttpsError('invalid-argument', 'Faltan la planta o el turno.')
+
+  // Mismo criterio que el botón de Telegram: sin brief de cierre, el turno
+  // sigue vivo y el informe sale marcado como foto parcial.
+  const turnoDoc = await db.collection('shoplogix').doc(plant).collection('shifts').doc(shiftDocId).get()
+  const enCurso = !turnoDoc.data()?.endBriefSentAt
+  const config = await getShoplogixNotifConfig(plant)
+
+  try {
+    const r = await shoplogixInformeMod.informeParaCorreo({
+      db, plant, shiftDocId, enCurso, minPiezas: config.shiftEnd?.minPieces || 50, logger,
+    })
+    if (r.motivo) return { motivo: r.motivo }
+    logger.info('[informeTurnoCorreo]', { uid, plant, shiftDocId, enCurso, bytes: r.pdf.length })
+    return {
+      asunto: r.asunto,
+      html: r.html,
+      pdfBase64: r.pdf.toString('base64'),
+      nombreArchivo: r.nombreArchivo,
+      enCurso,
+    }
+  } catch (e) {
+    logger.error('[informeTurnoCorreo] falló', { uid, plant, shiftDocId, err: e.message })
     throw new HttpsError('internal', e.message)
   }
 })

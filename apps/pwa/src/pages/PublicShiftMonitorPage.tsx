@@ -26,7 +26,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
+import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Copy, FileDown, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
+import { copiarCorreo, descargarPdf, pedirInformeCorreo, type InformeCorreo } from '@/services/shoplogix/informeTurnoCorreo'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -4776,21 +4777,57 @@ function MonitorDelToken() {
     setEnviandoInforme(true)
     setAvisoInforme(null)
     try {
-      const fn = httpsCallable<
-        { plant: string; shiftDocId: string },
-        { enviado: boolean; motivo?: string; messageId?: number | null; correo?: { enviado: boolean } | null }
-      >(getFunctions(undefined, 'us-central1'), 'enviarInformeTurnoManual')
+      const fn = httpsCallable<{ plant: string; shiftDocId: string }, { enviado: boolean; motivo?: string }>(
+        getFunctions(undefined, 'us-central1'), 'enviarInformeTurnoManual',
+      )
       const { data: r } = await fn({ plant: data.plantSlug, shiftDocId: data.shiftDocId })
-      // El correo va aparte de Telegram: puede salir uno y fallar el otro.
-      const canales = [r.messageId !== undefined && r.messageId !== null ? 'Telegram' : null, r.correo?.enviado ? 'correo' : null]
-        .filter(Boolean).join(' y ')
-      setAvisoInforme(r.enviado
-        ? `Informe enviado${canales ? ` por ${canales}` : ''}.${r.correo && !r.correo.enviado ? ' El correo no salió.' : ''}`
-        : `No se envió: ${r.motivo}`)
+      setAvisoInforme(r.enviado ? 'Informe enviado a Telegram.' : `No se envió: ${r.motivo}`)
     } catch (e) {
       setAvisoInforme(e instanceof Error ? e.message : 'No se pudo enviar el informe.')
     } finally {
       setEnviandoInforme(false)
+    }
+  }
+  /* «Copiar correo» y «Descargar PDF»: el mismo informe, para mandarlo desde
+     el Outlook de quien aprieta. Se guarda la última respuesta unos minutos
+     para que copiar y descargar no armen el informe dos veces. */
+  const [preparandoCorreo, setPreparandoCorreo] = useState<'copiar' | 'pdf' | null>(null)
+  const informeCache = useRef<{ clave: string; at: number; p: Promise<InformeCorreo> } | null>(null)
+  const informeDelTurno = (): Promise<InformeCorreo> | null => {
+    if (!data) return null
+    const clave = `${data.plantSlug}/${data.shiftDocId}`
+    const c = informeCache.current
+    if (c && c.clave === clave && Date.now() - c.at < 3 * 60_000) return c.p
+    const p = pedirInformeCorreo(data.plantSlug, data.shiftDocId)
+    p.catch(() => { informeCache.current = null })
+    informeCache.current = { clave, at: Date.now(), p }
+    return p
+  }
+  const copiarCorreoDelTurno = async () => {
+    const p = informeDelTurno()
+    if (!p) return
+    setPreparandoCorreo('copiar')
+    setAvisoInforme(null)
+    try {
+      const r = await copiarCorreo(p)
+      setAvisoInforme(`Correo copiado: pégalo en Outlook. Asunto sugerido: ${r.asunto}`)
+    } catch (e) {
+      setAvisoInforme(e instanceof Error ? e.message : 'No se pudo copiar el correo.')
+    } finally {
+      setPreparandoCorreo(null)
+    }
+  }
+  const descargarPdfDelTurno = async () => {
+    const p = informeDelTurno()
+    if (!p) return
+    setPreparandoCorreo('pdf')
+    setAvisoInforme(null)
+    try {
+      descargarPdf(await p)
+    } catch (e) {
+      setAvisoInforme(e instanceof Error ? e.message : 'No se pudo descargar el PDF.')
+    } finally {
+      setPreparandoCorreo(null)
     }
   }
   const usuarioActual = useAuthStore((st) => st.user)
@@ -7525,8 +7562,30 @@ function MonitorDelToken() {
               >
                 {enviandoInforme ? 'Enviando…' : 'Enviar informe de este turno'}
               </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={copiarCorreoDelTurno}
+                  disabled={preparandoCorreo !== null}
+                >
+                  <Copy className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {preparandoCorreo === 'copiar' ? 'Preparando…' : 'Copiar correo'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={descargarPdfDelTurno}
+                  disabled={preparandoCorreo !== null}
+                >
+                  <FileDown className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {preparandoCorreo === 'pdf' ? 'Preparando…' : 'Descargar PDF'}
+                </Button>
+              </div>
               {avisoInforme && (
-                <span className="text-xs text-muted-foreground">{avisoInforme}</span>
+                <span className="max-w-md select-text text-xs text-muted-foreground">{avisoInforme}</span>
               )}
             </div>
           )}
