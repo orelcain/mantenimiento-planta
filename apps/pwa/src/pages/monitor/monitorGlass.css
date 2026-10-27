@@ -275,10 +275,13 @@
   --v2-bien: rgb(var(--brand));
   --v2-atento: #c98f3a;
   --v2-mal: #c9645d;
+  /* Como TEXTO en claro el coral no llega a 4,5:1 sobre el fondo: va un tono más oscuro (5,1:1). */
+  --v2-mal-texto: #a8463f;
 }
 .dark [data-glass='v2'], .dark .v2-vars {
   --v2-atento: #e0b46e;
   --v2-mal: #e48a82;
+  --v2-mal-texto: #e48a82;
 }
 
 /* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con
@@ -313,7 +316,7 @@
 [data-glass='v2'] .v2-clasico .h-6 > button[class*='bg-red-6'] {
   background: linear-gradient(90deg, color-mix(in srgb, var(--v2-mal) 60%, transparent), var(--v2-mal)) !important;
 }
-[data-glass='v2'] .v2-clasico [class*='text-red-'] { color: var(--v2-mal) !important; }
+[data-glass='v2'] .v2-clasico [class*='text-red-'] { color: var(--v2-mal-texto) !important; }
 [data-glass='v2'] .v2-clasico .text-ink-ok { color: var(--v2-bien) !important; }
 /* Filas: la parte abierta se distingue por un borde de luz, no por un fondo de color. */
 [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div:has(> .pantalla-oculta) {
@@ -378,7 +381,7 @@
   text-align: center;
   font-size: 13px;
 }
-[data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-ink-crit { color: var(--v2-mal) !important; background: color-mix(in srgb, var(--v2-mal) 14%, transparent); }
+[data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-ink-crit { color: var(--v2-mal-texto) !important; background: color-mix(in srgb, var(--v2-mal) 14%, transparent); }
 [data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-ink-ok { color: var(--v2-bien) !important; background: color-mix(in srgb, var(--v2-bien) 14%, transparent); }
 [data-glass='v2'] .v2-ritmo .ritmo-maquinas .w-\[56px\].text-muted-foreground.text-footnote { background: rgb(142 142 147 / 0.12); }
 [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child .w-\[56px\] { min-width: 64px; width: auto; }
@@ -410,3 +413,6 @@
 
 /* Minuto a minuto: el desplazamiento es el gesto, la barra de scroll sobra. */
 .v2-minuto-scroll::-webkit-scrollbar { display: none; }
+
+/* «Mantención · equipos» en ámbar: el 700 de Tailwind queda en 4,4:1 sobre el fondo claro del v2; el 800 pasa. */
+html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }

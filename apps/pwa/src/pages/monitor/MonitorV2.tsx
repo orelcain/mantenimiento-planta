@@ -140,8 +140,10 @@ function Icono({ children, grande }: { children: ReactNode; grande?: boolean }) 
   return <span className={`v2-icono inline-flex shrink-0 items-center justify-center rounded-full ${grande ? 'h-10 w-10' : 'h-7 w-7'}`}>{children}</span>
 }
 
-function Tarjeta({ icono, titulo, sub, children, className = '', onAbrir }: {
+function Tarjeta({ icono, titulo, sub, children, className = '', onAbrir, iconoSoloPc }: {
   icono?: ReactNode; titulo: string; sub?: string; children: ReactNode; className?: string; onAbrir?: () => void
+  /** A media pantalla en el celular el ícono le roba el ancho al título: ahí se omite. */
+  iconoSoloPc?: boolean
 }) {
   const tocable = onAbrir
     ? {
@@ -156,10 +158,10 @@ function Tarjeta({ icono, titulo, sub, children, className = '', onAbrir }: {
     <section className={`v2-tarjeta min-w-0 rounded-card p-4 lg:p-5 ${className}`} {...tocable}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          {icono && <Icono>{icono}</Icono>}
+          {icono && <span className={iconoSoloPc ? 'hidden lg:contents' : 'contents'}><Icono>{icono}</Icono></span>}
           <div className="min-w-0">
             <h3 className="text-[15px] font-medium leading-tight text-foreground">{titulo}</h3>
-            {sub && <p className="mt-0.5 truncate text-[13px] text-muted-foreground">{sub}</p>}
+            {sub && <p className="mt-0.5 text-[13px] text-muted-foreground">{sub}</p>}
           </div>
         </div>
         {onAbrir && <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />}
@@ -995,7 +997,7 @@ export function MonitorV2(p: MonitorV2Props) {
             : p.vsAyer && <Contexto tono={p.vsAyer.diff >= 0 ? 'ok' : 'critical'}>{firmado(p.vsAyer.diff)} pz vs {p.vsAyer.label}</Contexto>}
         </Tarjeta>}
 
-        <Tarjeta onAbrir={abrir('mant')} className={`${conProyeccion && p.ritmoLinea ? 'col-span-1' : 'col-span-2'} ${conProyeccion || p.ritmoLinea ? 'lg:col-span-1' : 'lg:col-span-2'}`} icono={<Wrench className={ic} />} titulo="Respuesta de Mantención" sub="minutos por falla técnica">
+        <Tarjeta iconoSoloPc={!!(conProyeccion && p.ritmoLinea)} onAbrir={abrir('mant')} className={`${conProyeccion && p.ritmoLinea ? 'col-span-1' : 'col-span-2'} ${conProyeccion || p.ritmoLinea ? 'lg:col-span-1' : 'lg:col-span-2'}`} icono={<Wrench className={ic} />} titulo="Respuesta de Mantención" sub="minutos por falla técnica">
           {p.mant && p.mant.fallas > 0 ? (
             <>
               <Cifra valor={p.mant.mttr != null ? dec(p.mant.mttr) : '—'} unidad="min" />
