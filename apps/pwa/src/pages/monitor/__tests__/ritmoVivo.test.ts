@@ -51,6 +51,15 @@ describe('tendencia', () => {
   it('estable con oscilaciones chicas', () => {
     expect(tendenciaDe([50, 49, 51, 50, 49, 51, 50, 50, 49, 51, 50, 50], 51)!.dir).toBe('estable')
   })
+  it('detenida cuando los últimos 3 minutos son cero (antes decía «Estable · 0 → 0»)', () => {
+    const t = tendenciaDe([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 51)!
+    expect(t.dir).toBe('detenida')
+    expect(t.ceros).toBe(14)
+    expect(tendenciaDe([40, 38, 36, 30, 0, 0, 0], 51)!.dir).toBe('detenida')
+  })
+  it('dos minutos en cero todavía no es detenida', () => {
+    expect(tendenciaDe([40, 40, 40, 40, 0, 0], 51)!.dir).not.toBe('detenida')
+  })
   it('no opina con menos de 4 minutos', () => {
     expect(tendenciaDe([50, 40, 30], 51)).toBeNull()
   })

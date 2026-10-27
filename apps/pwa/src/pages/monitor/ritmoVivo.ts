@@ -79,12 +79,15 @@ export interface MaquinaVivo {
 // ── Tendencia ────────────────────────────────────────────────────────────────
 
 export interface Tendencia {
-  dir: 'subiendo' | 'estable' | 'bajando'
+  /** `detenida`: los últimos minutos cerrados vienen en cero; una recta sobre ceros decía «Estable · 0 → 0». */
+  dir: 'subiendo' | 'estable' | 'bajando' | 'detenida'
   /** Valor de la recta al inicio y al final de la ventana, en pz/min. */
   desde: number
   hasta: number
   /** Minutos cerrados que entraron en la cuenta. */
   n: number
+  /** Con `detenida`: minutos seguidos en cero al final. */
+  ceros?: number
 }
 
 /** Recta de mínimos cuadrados sobre los minutos cerrados; la dirección sale del cambio relativo al esperado. */
@@ -99,6 +102,10 @@ export function tendenciaDe(valores: number[], esperadoLinea: number): Tendencia
   const pendiente = num / den
   const desde = Math.max(0, Math.round(my - pendiente * mx))
   const hasta = Math.max(0, Math.round(my + pendiente * (n - 1 - mx)))
+  /* Tres minutos seguidos en cero al final: no es una tendencia, la línea (o la Baader) está detenida. */
+  let ceros = 0
+  for (let i = n - 1; i >= 0 && valores[i] === 0; i--) ceros++
+  if (ceros >= 3) return { dir: 'detenida', desde, hasta: 0, n, ceros }
   const rel = (hasta - desde) / esperadoLinea
   return { dir: Math.abs(rel) < UMBRAL_TENDENCIA ? 'estable' : rel > 0 ? 'subiendo' : 'bajando', desde, hasta, n }
 }

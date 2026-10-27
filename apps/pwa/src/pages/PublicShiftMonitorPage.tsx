@@ -6626,6 +6626,10 @@ function MonitorDelToken() {
           /* Solo en vivo, con el turno que se está mirando y el contador fresco: con el vivo arrastrado
              (`recalibrando`) el «Ahora» de arriba no es el último minuto cerrado y las dos cifras no cuadrarían. */
           const vivoV2 = esActual && pv && !pv.recalibrando ? ritmoVivoDeMonitor({ pulse: data.pulse, live, ahoraPorId }) : null
+          /* Pasada la hora de cierre programada, una línea quieta no es una detención que haya que anotar:
+             el 27-10 a las 15:20 la banda pedía «hay que anotar la causa» de un turno que cerró a las 15:00. */
+          const finTurnoMs = live.plannedEnd ? Date.parse(live.plannedEnd) : NaN
+          const turnoTerminadoV2 = turnoCerrado || (Number.isFinite(finTurnoMs) && ahoraWallMs >= finTurnoMs)
           const meta = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
           const pm = live.mantencion?.porMaquina ?? []
           const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
@@ -6759,6 +6763,7 @@ function MonitorDelToken() {
                     maquinas={vivoV2?.maquinas ?? []}
                     turno={barrasMinuto}
                     cerrado={turnoCerrado}
+                    turnoTerminado={turnoTerminadoV2}
                     /* Las paradas cuentan sus minutos desde el primer tramo de la serie del turno (el mismo t0 de los grupos). */
                     marca={(() => {
                       const base = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
@@ -6773,7 +6778,7 @@ function MonitorDelToken() {
                   />
                 )
                 : undefined}
-              banda={vivoV2 ? <BandaParadaV2 maquinas={vivoV2.maquinas} /> : undefined}
+              banda={vivoV2 ? <BandaParadaV2 maquinas={vivoV2.maquinas} turnoTerminado={turnoTerminadoV2} /> : undefined}
               caminoMeta={(() => {
                 /* Un solo juego de props: la tarjeta exprés de la grilla y el detalle de la capa cuentan lo mismo. */
                 const camino = {

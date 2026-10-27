@@ -18,7 +18,7 @@
  * NO repite la barra de meta ni el promedio del turno: eso vive en «Ritmo de la línea». La lógica está en
  * `ritmoVivo.ts`; todo es dato de Shoplogix ya publicado, nada se inventa.
  */
-import { Gauge, MoveRight, Timer, TrendingDown, TrendingUp } from 'lucide-react'
+import { Gauge, MoveRight, Timer, TrendingDown, TrendingUp, Pause } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
 import { Globo, Tarjeta } from './AmpliarV2'
@@ -383,6 +383,8 @@ export interface RitmoVivoV2Props {
   onQuitarMarca: () => void
   /** Promedio del turno (pz/min) de la línea (`linea`) y de cada máquina (por id), el de «aporte al promedio». */
   promedios?: Record<string, number | null>
+  /** Ya pasó la hora de cierre (o el turno se cerró): no se muestra parada en curso ni se pide anotar causa. */
+  turnoTerminado?: boolean
 }
 
 /** «Turno ›»: abre el ampliado (el turno completo minuto a minuto). */
@@ -413,7 +415,7 @@ function ParadaTarjeta({ parada }: { parada: ParadaVivo }) {
 function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null }) {
   const t = v.tendencia
   const mostrado = useCuentaCifra(v.ahora)
-  const tendColor = t?.dir === 'bajando' && t.hasta / v.esperado < 0.75
+  const tendColor = t?.dir === 'detenida' ? 'var(--v2-mal-texto)' : t?.dir === 'bajando' && t.hasta / v.esperado < 0.75
     ? (t.hasta / v.esperado < 0.5 ? 'var(--v2-mal-texto)' : 'var(--v2-atento-texto)')
     : undefined
   return (
@@ -427,10 +429,12 @@ function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null
       {t && (
         <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
           <span className="inline-flex items-center gap-1.5 text-[20px] font-semibold leading-tight text-foreground" style={tendColor ? { color: tendColor } : undefined}>
-            {t.dir === 'bajando' ? <TrendingDown className="h-[18px] w-[18px]" aria-hidden /> : t.dir === 'subiendo' ? <TrendingUp className="h-[18px] w-[18px]" aria-hidden /> : <MoveRight className="h-[18px] w-[18px]" aria-hidden />}
-            {t.dir === 'bajando' ? 'Bajando' : t.dir === 'subiendo' ? 'Subiendo' : 'Estable'}
+            {t.dir === 'detenida' ? <Pause className="h-[18px] w-[18px]" aria-hidden /> : t.dir === 'bajando' ? <TrendingDown className="h-[18px] w-[18px]" aria-hidden /> : t.dir === 'subiendo' ? <TrendingUp className="h-[18px] w-[18px]" aria-hidden /> : <MoveRight className="h-[18px] w-[18px]" aria-hidden />}
+            {t.dir === 'detenida' ? 'Detenida' : t.dir === 'bajando' ? 'Bajando' : t.dir === 'subiendo' ? 'Subiendo' : 'Estable'}
           </span>
-          <span className="text-[13px] tabular-nums text-muted-foreground">{t.desde} → {t.hasta} en {t.n} min</span>
+          <span className="text-[13px] tabular-nums text-muted-foreground">
+            {t.dir === 'detenida' ? `sin piezas hace ${t.ceros} min` : `${t.desde} → ${t.hasta} en ${t.n} min`}
+          </span>
         </div>
       )}
     </div>
@@ -439,7 +443,7 @@ function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null
 
 const LEYENDA: Array<[Tono, string]> = [['bien', '≥75 %'], ['atento', '50–75'], ['mal', '<50 del esperado']]
 
-export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca, promedios }: RitmoVivoV2Props) {
+export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca, promedios, turnoTerminado }: RitmoVivoV2Props) {
   const [sel, setSel] = useState(SEL_LINEA)
   const v = r ? vistaDeSerie(r, sel) : null
   const selId = v ? v.sel : turno?.maquinas.some((m) => m.id === sel) ? sel : SEL_LINEA
@@ -448,7 +452,8 @@ export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca,
     () => (turno && selId !== SEL_LINEA ? { ...turno, maquinas: turno.maquinas.filter((m) => m.id === selId) } : turno),
     [turno, selId],
   )
-  const parada = paradaEnCurso(maquinas)
+  /* Pasada la hora de cierre una «parada» ya no es una detención que haya que anotar: el turno terminó. */
+  const parada = turnoTerminado ? null : paradaEnCurso(maquinas)
   const claseVivo = parada ? parada.clase : 'marcha'
   const cursoColor = parada?.clase === 'detencion' ? 'var(--v2-mal)' : parada?.clase === 'micro' ? 'var(--v2-ext)' : 'var(--v2-bien)'
   const nMaq = r ? r.porMaquina.length : turno?.maquinas.length ?? 0
@@ -572,9 +577,9 @@ export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca,
  * aviso «Ahora mismo» callan la parada (CSS `:has(.rv-banda)`); en celular la banda no existe.
  * Sin parada no dibuja nada.
  */
-export function BandaParadaV2({ maquinas }: { maquinas: MaquinaVivo[] }) {
+export function BandaParadaV2({ maquinas, turnoTerminado }: { maquinas: MaquinaVivo[]; turnoTerminado?: boolean }) {
   const ahoraWall = useReloj()
-  const parada = paradaEnCurso(maquinas)
+  const parada = turnoTerminado ? null : paradaEnCurso(maquinas)
   if (!parada) return null
   const aviso = avisoParada(parada)
   return (
