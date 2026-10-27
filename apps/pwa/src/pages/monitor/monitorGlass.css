@@ -407,3 +407,6 @@
   [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child > * { font-size: 12px !important; white-space: nowrap; }
   [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child > .flex-1 { overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* Minuto a minuto: el desplazamiento es el gesto, la barra de scroll sobra. */
+.v2-minuto-scroll::-webkit-scrollbar { display: none; }

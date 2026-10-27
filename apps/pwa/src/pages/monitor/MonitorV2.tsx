@@ -14,7 +14,7 @@
  * Vistas: `CabeceraV2`, `MonitorV2` (El turno) y `MonitorV2Analisis`.
  */
 import { Activity, AlertTriangle, BarChart3, CalendarRange, ChevronDown, Clock, Cpu, Filter, Gauge, Info, Repeat, Target, Timer, TrendingUp, Tv, Wrench, X } from 'lucide-react'
-import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import type { PillTone } from '@/components/piel/Pill'
@@ -26,6 +26,7 @@ import type { ParetoRow } from '@/services/shoplogix/monitorPareto'
 import type { SemanaReparto } from './repartoSemanal'
 import type { Cascada } from './cascadaTurno'
 import { DUENO_UI } from './duenoUi'
+import { useZoomGesto, type Ventana } from './useZoomGesto'
 
 // ── Formato ──────────────────────────────────────────────────────────────────
 
@@ -279,18 +280,80 @@ const COLOR_MINUTO: Record<TonoMinuto, string> = {
 }
 const RELLENO_MINUTO = (t: TonoMinuto) => `linear-gradient(to top, color-mix(in srgb, ${COLOR_MINUTO[t]} 35%, transparent), ${COLOR_MINUTO[t]})`
 
+/** Ancho de barra con el que el número del minuto se lee bien (el mismo objetivo del clásico). */
+const PX_BARRA_V2 = 19
+/** Desde este ancho la cifra entra adentro de la barra. */
+const PX_NUMERO_V2 = 15
+/** Margen interno de cada franja: las columnas de minuto quedan alineadas entre franjas. */
+const PAD_MINUTO = 12
+const PASOS_MARCA = [5, 10, 15, 30, 60, 120]
+
 /**
- * Una franja por máquina y arriba la línea (la suma), una barra por minuto del turno entero.
- * Cada franja abre con su cifra: qué parte de los minutos anduvo a ritmo (≥75 % del esperado).
- * Pasar el mouse (o tocar) marca el mismo minuto en todas las franjas y muestra sus cifras.
+ * Una franja por máquina y arriba la línea (la suma), una barra por minuto del turno.
+ * Cada franja abre con su cifra: qué parte de los minutos del turno anduvo a ritmo (≥75 % del esperado).
+ *
+ * El zoom es el del clásico (`useZoomGesto`): en el celular abre en los últimos minutos con la
+ * cifra adentro de cada barra y siguiendo el presente; se pellizca para acercar o alejar, se
+ * arrastra para recorrer y «ver todo el turno» vuelve al turno entero. Con ancho de sobra (PC)
+ * abre con el turno completo. Pasar el mouse o tocar marca el mismo minuto en todas las franjas.
+ * Las cabeceras quedan pegadas al borde visible mientras el contenido se desplaza.
  */
 function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
   const [i, setI] = useState<number | null>(null)
   const t0 = Date.parse(d.desde)
-  let n = Math.min(...d.maquinas.map((m) => m.cycles.length))
+  /* Sin máquinas, Math.min() da Infinity y el Array.from de abajo revienta. */
+  let n = d.maquinas.length ? Math.min(...d.maquinas.map((m) => m.cycles.length)) : 0
   const suma = Array.from({ length: n }, (_, k) => d.maquinas.reduce((a, m) => a + (m.cycles[k] ?? 0), 0))
   /* Cerrado, los minutos en cero DESPUÉS de la última pieza no son una línea parada: el turno ya terminó. */
   if (cerrado) while (n > 2 && suma[n - 1] === 0) n--
+
+  const medidorRef = useRef<HTMLDivElement>(null)
+  const [anchoPx, setAnchoPx] = useState(0)
+  useEffect(() => {
+    const el = medidorRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setAnchoPx(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  /* Ventana de partida: en PC, si el turno entero entra a ~2,5 px por minuto, se muestra completo;
+     en el celular (y si no entra), los minutos que caben con cifra legible, pegados al presente. */
+  const util = Math.max(0, anchoPx - 2 * PAD_MINUTO)
+  const ventanaDef = util <= 0 ? null : anchoPx >= 600 && util >= n * 2.5 ? n : Math.max(12, Math.min(60, Math.floor(util / PX_BARRA_V2)))
+  const [tocado, setTocado] = useState(false)
+  const [ventana, setVentana] = useState<Ventana | null>(null)
+  useEffect(() => {
+    if (tocado || ventanaDef == null) return
+    setVentana(n > ventanaDef ? { desdeMin: n - ventanaDef, hastaMin: n } : null)
+  }, [n, tocado, ventanaDef])
+  const zg = useZoomGesto({
+    dominioMin: Math.max(1, n),
+    ventana,
+    /* El scroll programado también publica: es gesto de la persona solo si la vista dejó la cola. */
+    onVentana: (v) => {
+      const esCola = v != null && v.hastaMin >= n - 2
+        && ventanaDef != null && Math.abs((v.hastaMin - v.desdeMin) - ventanaDef) <= 2
+      if (!esCola) setTocado(true)
+      setVentana(v)
+    },
+  })
+  /* Mientras nadie tomó el control, el scroll queda clavado al presente. */
+  const scrollRef = zg.props.ref
+  useEffect(() => {
+    if (tocado) return
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth
+  })
+  /* Con zoom, la vista que mira la cola también avanza con los minutos nuevos; la que se fue a la historia no se toca. */
+  const nPrevRef = useRef(n)
+  useEffect(() => {
+    const prev = nPrevRef.current
+    nPrevRef.current = n
+    if (n <= prev || !tocado || ventana == null || ventana.hastaMin < prev - 2) return
+    const delta = n - prev
+    setVentana({ desdeMin: ventana.desdeMin + delta, hastaMin: ventana.hastaMin + delta })
+  }, [n, tocado, ventana])
+
   const varias = d.maquinas.length > 1
   const filas = [
     ...(varias
@@ -312,76 +375,101 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
   }
   const indice = (e: { clientX: number; currentTarget: HTMLDivElement }) => {
     const r = e.currentTarget.getBoundingClientRect()
-    return Math.max(0, Math.min(n - 1, Math.floor(((e.clientX - r.left) / r.width) * n)))
+    const ancho = r.width - 2 * PAD_MINUTO
+    return Math.max(0, Math.min(n - 1, Math.floor(((e.clientX - r.left - PAD_MINUTO) / Math.max(1, ancho)) * n)))
   }
-  /* Marcas de reloj: cada 30 min en PC; en el celular solo las horas en punto. */
-  const marcas: Array<{ k: number; hora: boolean }> = []
-  for (let k = 0; k < n; k++) {
-    const min = Math.round((t0 + k * 60_000) / 60_000) % 60
-    if (min === 0 || min === 30) marcas.push({ k, hora: min === 0 })
-  }
+  const pxBarra = util > 0 ? (util * zg.zoom) / Math.max(1, n) : 0
+  const conNumeros = pxBarra >= PX_NUMERO_V2
+  const separadas = pxBarra >= 6
+  /* Marcas de reloj con el paso más chico que no se pisa (~48 px entre marcas). */
+  const paso = PASOS_MARCA.find((p) => p * pxBarra >= 48) ?? 120
+  const marcas: number[] = []
+  for (let k = 1; k < n; k++) if (Math.round((t0 + k * 60_000) / 60_000) % paso === 0) marcas.push(k)
   const X = (k: number) => ((k + 0.5) / n) * 100
+  const pegado = { left: PAD_MINUTO, width: util > 0 ? util : undefined }
+
   return (
-    <div className="mt-4">
-      <div
-        className="relative cursor-crosshair touch-pan-y select-none"
-        onPointerMove={(e) => { if (e.pointerType === 'mouse') setI(indice(e)) }}
-        onPointerLeave={(e) => { if (e.pointerType === 'mouse') setI(null) }}
-        onClick={(e) => { e.stopPropagation(); const k = indice(e); setI((a) => (a === k ? null : k)) }}
-      >
-        {filas.map((f) => {
-          const tope = Math.max(1, (f.esperado ?? 0) * 1.15, ...f.cycles.slice(0, n))
-          const pct = aRitmo(f)
-          const yEsperado = f.esperado != null ? (f.esperado / tope) * 100 : null
-          return (
-            <div key={f.nombre} className={f.principal ? 'v2-subtarjeta mb-3 rounded-card p-3 lg:p-4' : 'mb-3 px-1'}>
-              <div className="mb-2 flex items-end justify-between gap-3">
-                <div className="min-w-0">
-                  <div className={f.principal ? 'text-[15px] font-semibold text-foreground' : 'text-[14px] font-medium text-foreground'}>
-                    {f.nombre}
-                    {f.nota && <span className="font-normal text-muted-foreground"> · {f.nota}</span>}
+    <div ref={medidorRef} className="mt-4">
+      <div {...zg.props} className="v2-minuto-scroll relative overflow-x-auto" style={{ touchAction: 'pan-x pan-y', scrollbarWidth: 'none' }}>
+        <div
+          className="relative cursor-crosshair select-none"
+          style={{ width: `${zg.zoom * 100}%` }}
+          onPointerMove={(e) => { if (e.pointerType === 'mouse') setI(indice(e)) }}
+          onPointerLeave={(e) => { if (e.pointerType === 'mouse') setI(null) }}
+          onClick={(e) => { e.stopPropagation(); const k = indice(e); setI((a) => (a === k ? null : k)) }}
+        >
+          {filas.map((f) => {
+            const tope = Math.max(1, (f.esperado ?? 0) * 1.15, ...f.cycles.slice(0, n))
+            const pct = aRitmo(f)
+            const yEsperado = f.esperado != null ? (f.esperado / tope) * 100 : null
+            return (
+              /* Fondo y contenido en la misma celda de grilla: el fondo de la línea queda pegado
+                 al borde visible (sticky) y no se va con el desplazamiento. */
+              <div key={f.nombre} className="mb-3 grid">
+                {f.principal && (
+                  <div className="v2-subtarjeta pointer-events-none sticky left-0 col-start-1 row-start-1 rounded-card" style={{ width: anchoPx || undefined }} />
+                )}
+                <div className={`relative col-start-1 row-start-1 ${f.principal ? 'py-3 lg:py-4' : ''}`} style={{ paddingInline: PAD_MINUTO }}>
+                  <div className="sticky z-10 mb-2 flex items-end justify-between gap-3" style={pegado}>
+                    <div className="min-w-0">
+                      <div className={f.principal ? 'text-[15px] font-semibold text-foreground' : 'text-[14px] font-medium text-foreground'}>
+                        {f.nombre}
+                        {f.nota && <span className="font-normal text-muted-foreground"> · {f.nota}</span>}
+                      </div>
+                      <div className="text-[13px] tabular-nums text-muted-foreground">
+                        {i != null
+                          ? <><b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b>{f.esperado != null ? ` de ${dec(f.esperado, 0)} esperadas` : ''} a las {relojDe(t0 + i * 60_000)}</>
+                          : f.esperado != null ? `esperado ${dec(f.esperado, 0)} pz/min` : 'pz por minuto'}
+                      </div>
+                    </div>
+                    {pct != null && (
+                      <div className="shrink-0 text-right">
+                        <span className={`${f.principal ? 'text-[28px] lg:text-[34px]' : 'text-[20px]'} font-semibold leading-none tabular-nums tracking-tight`}>{pct}</span>
+                        <span className="text-[13px] text-muted-foreground"> % a ritmo</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[13px] tabular-nums text-muted-foreground">
-                    {i != null
-                      ? <><b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b>{f.esperado != null ? ` de ${dec(f.esperado, 0)} esperadas` : ''} a las {relojDe(t0 + i * 60_000)}</>
-                      : f.esperado != null ? `esperado ${dec(f.esperado, 0)} pz/min` : 'pz por minuto'}
+                  <div className={`relative flex items-end ${f.principal ? 'h-28 lg:h-36' : 'h-10 lg:h-12'}`} style={{ gap: separadas ? 2 : 0 }}>
+                    {yEsperado != null && (
+                      <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
+                    )}
+                    {f.cycles.slice(0, n).map((v, k) => {
+                      const t = tonoMinuto(v, f.esperado)
+                      return (
+                        <span
+                          key={k}
+                          className="relative min-w-0 flex-1 transition-opacity duration-150"
+                          style={{
+                            height: `${Math.max(v > 0 ? 6 : 2, (v / tope) * 100)}%`,
+                            background: RELLENO_MINUTO(t),
+                            borderRadius: separadas ? '3px 3px 0 0' : 0,
+                            opacity: i == null || i === k ? 1 : 0.35,
+                          }}
+                        >
+                          {conNumeros && v > 0 && (
+                            <b className={`pointer-events-none absolute inset-x-0 bottom-0.5 text-center font-semibold tabular-nums text-foreground/90 ${f.principal ? 'text-[12px]' : 'text-[11px]'}`}>
+                              {v}
+                            </b>
+                          )}
+                        </span>
+                      )
+                    })}
+                    {i != null && (
+                      <span className="pointer-events-none absolute -inset-y-1 w-px" style={{ left: `${X(i)}%`, background: 'var(--v2-secundaria)' }} />
+                    )}
                   </div>
                 </div>
-                {pct != null && (
-                  <div className="shrink-0 text-right">
-                    <span className={`${f.principal ? 'text-[28px] lg:text-[34px]' : 'text-[20px]'} font-semibold leading-none tabular-nums tracking-tight`}>{pct}</span>
-                    <span className="text-[13px] text-muted-foreground"> % a ritmo</span>
-                  </div>
-                )}
               </div>
-              <div className={`relative flex items-end gap-0 lg:gap-px ${f.principal ? 'h-28 lg:h-36' : 'h-10 lg:h-12'}`}>
-                {yEsperado != null && (
-                  <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
-                )}
-                {f.cycles.slice(0, n).map((v, k) => {
-                  const t = tonoMinuto(v, f.esperado)
-                  return (
-                    <span
-                      key={k}
-                      className="min-w-0 flex-1 transition-opacity duration-150 lg:rounded-t-[3px]"
-                      style={{ height: `${Math.max(v > 0 ? 6 : 2, (v / tope) * 100)}%`, background: RELLENO_MINUTO(t), opacity: i == null || i === k ? 1 : 0.35 }}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-        {i != null && (
-          <span className="pointer-events-none absolute inset-y-0 w-px" style={{ left: `${X(i)}%`, background: 'var(--v2-secundaria)' }} />
-        )}
-      </div>
-      <div className="relative h-5 text-[12px] tabular-nums text-muted-foreground">
-        {marcas.map((m) => (
-          <span key={m.k} className={`absolute -translate-x-1/2 ${m.hora ? '' : 'hidden lg:inline'}`} style={{ left: `${X(m.k)}%` }}>
-            {relojDe(t0 + m.k * 60_000)}
-          </span>
-        ))}
+            )
+          })}
+          <div className="relative h-5 text-[12px] tabular-nums text-muted-foreground" style={{ marginInline: PAD_MINUTO }}>
+            {marcas.map((k) => (
+              <span key={k} className="absolute -translate-x-1/2" style={{ left: `${X(k)}%` }}>
+                {relojDe(t0 + k * 60_000)}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
         {(['ok', 'warn', 'crit'] as const).map((t) => (
@@ -391,6 +479,29 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
           </span>
         ))}
         <span className="ml-auto">{cerrado ? 'turno cerrado' : `hasta las ${relojDe(t0 + (n - 1) * 60_000)}`}</span>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-muted-foreground">
+        <span>{zg.acercado ? 'arrastra para recorrer el turno' : 'pellizca o usa ctrl + rueda para acercar'}</span>
+        {zg.acercado && (
+          <button
+            type="button"
+            onClick={() => { setTocado(true); zg.verTodo() }}
+            className="tap-44 shrink-0 rounded-full px-3 py-1.5 font-medium text-foreground"
+            style={{ background: 'rgb(142 142 147 / 0.14)' }}
+          >
+            Ver todo el turno
+          </button>
+        )}
+        {!zg.acercado && ventanaDef != null && ventanaDef < n && (
+          <button
+            type="button"
+            onClick={() => setTocado(false)}
+            className="tap-44 shrink-0 rounded-full px-3 py-1.5 font-medium text-foreground"
+            style={{ background: 'rgb(142 142 147 / 0.14)' }}
+          >
+            Últimos minutos
+          </button>
+        )}
       </div>
     </div>
   )
