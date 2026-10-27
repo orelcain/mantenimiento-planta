@@ -1600,6 +1600,9 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
       pieces,
       piecesPerHour: mHours > 0 ? pieces / mHours : 0,
       uptimePct: mTracked > 0 ? (mUptime / mTracked) * 100 : 0,
+      /* Segundos andando (estado uptime) de esta máquina: la base del llenado por
+         puesto del Duelo de equipos (piezas ÷ (esperado × minutos andando)). */
+      uptimeSec: Math.round(mUptime),
       // Piezas de ESTA máquina en cada bucket de `series` (mismo orden). Los
       // buckets sin dato van en 0 — incluida la cola extendida de paros.
       serie: series.map(p => byBucketDeMaquina.get(m.id)?.get(Date.parse(p.t)) || 0),
@@ -2351,6 +2354,67 @@ function paradasCompactas(recoverable) {
   return recortadas.sort((a, b) => a.o - b.o).map(({ o: _o, ...x }) => x)
 }
 
+/**
+ * Índice del arranque PRODUCTIVO de una serie de 5 min (primer tramo con piezas,
+ * saltando picos sueltos). Es la MISMA regla que `arranqueProductivo` de
+ * `buildMonitorLive` y que `desdePrimeraPieza` de la PWA: el eje de la curva del
+ * rival tiene que partir del mismo origen que el de hoy. -1 si no hay piezas.
+ */
+function indiceArranqueProductivo(serie) {
+  const conPz = []
+  serie.forEach((p, i) => { if ((p.pieces || 0) > 0) conPz.push(i) })
+  if (conPz.length === 0) return -1
+  let inicio = conPz[0]
+  for (let k = 1; k < conPz.length; k++) {
+    const huecoMin = (conPz[k] - conPz[k - 1] - 1) * INTERVAL_MIN
+    if (huecoMin > 60) inicio = conPz[k]
+    else break
+  }
+  return inicio
+}
+
+/**
+ * Lo que el Duelo de equipos necesita de un turno YA CERRADO y que `shiftStats`
+ * no traía. Todo compacto y sin `undefined` (Firestore lo rechaza):
+ *  - `h0`: hora planificada de inicio (HH:MM, hora de planta). De acá sale si el
+ *    turno fue de día o de noche — no del nombre.
+ *  - `ini`: minutos entre ese inicio planificado y el arranque productivo (tramos de 5 min).
+ *  - `uh`: piezas de la última hora del horario planificado.
+ *  - `mic`: minutos de micro detención sumados entre máquinas (clasificación oficial).
+ *  - `alim`: llenado por puesto = piezas ÷ (esperado × minutos andando), tope 100.
+ */
+function resumenDuelo(l) {
+  const serie = (l?.series || []).filter(p => p && p.t)
+  const iniMs = Date.parse(l?.scheduledStart ?? '')
+  const finMs = Date.parse(l?.plannedEnd ?? l?.scheduledEnd ?? '')
+  const i0 = indiceArranqueProductivo(serie)
+  const ini = i0 >= 0 && Number.isFinite(iniMs)
+    ? Math.max(0, Math.round((Date.parse(serie[i0].t) - iniMs) / 60_000))
+    : null
+  const uh = Number.isFinite(finMs) && serie.length
+    ? serie
+      .filter(p => { const t = Date.parse(p.t); return t >= finMs - 60 * 60_000 && t < finMs })
+      .reduce((a, p) => a + (p.pieces || 0), 0)
+    : null
+  const mant = l?.mantencion?.porMaquina
+  const mic = Array.isArray(mant) ? Math.round(mant.reduce((a, m) => a + (m.microMin || 0), 0) * 10) / 10 : null
+  /* ⚠ Los datos que faltan NO viajan como null: la clave simplemente no existe
+     (el test de «documento válido» exige que ningún valor sea null/undefined). */
+  const alim = (l?.machines || []).map(m => ({
+    n: m.name,
+    ...(m.targetCpm > 0 && m.uptimeSec > 0
+      ? { f: Math.min(100, Math.round((100 * (m.pieces || 0)) / (m.targetCpm * (m.uptimeSec / 60)))) }
+      : {}),
+  }))
+  return {
+    ...(Number.isFinite(iniMs) ? { h0: new Date(iniMs).toISOString().slice(11, 16) } : {}),
+    ...(ini != null ? { ini } : {}),
+    ...(uh != null ? { uh } : {}),
+    ...(mic != null ? { mic } : {}),
+    alim,
+  }
+}
+
 async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null) {
   const nowWall = shoplogixPolling.toChileWall(new Date())
   const desde = shiftDateKey(nowWall, -SHIFT_INDEX_LOOKBACK_DAYS)
@@ -2391,7 +2455,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined) {
+    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined) {
       out.push(cacheado); continue
     }
     /*
@@ -2474,6 +2538,9 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
          * ~50 paradas × 40 turnos × ~35 B ≈ 70 KB.
          */
         paradas: paradasCompactas(tb.recoverable || []),
+        /* Duelo de equipos (27-10-2026): arranque, última hora, micro detenciones
+           y llenado por puesto de este turno. Ver `resumenDuelo`. */
+        duelo: resumenDuelo(l),
         /*
          * ⚠⚠ NUNCA `undefined` en un doc de Firestore: lo rechaza y el write
          * del patch falla ENTERO — no solo este campo. Pasó el 16-08: cada
@@ -2558,6 +2625,87 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
     }
   }
   return out
+}
+
+/** Un punto cada 5 min: la curva del rival del Duelo (≈100 puntos por turno). */
+const RIVAL_STEP_MIN = 5
+
+/**
+ * Curva acumulada del turno, medida desde el arranque productivo (mismo origen
+ * que `cumulativeFromStart` de la PWA), submuestreada a `RIVAL_STEP_MIN`. Objetos
+ * {m, p} y no pares: Firestore rechaza los arrays anidados. Sin la cola vacía
+ * que el backend agrega para ver el último paro.
+ */
+function curvaDesdeArranque(live) {
+  const serie = (live?.series || []).filter(p => p && p.t)
+  const i0 = indiceArranqueProductivo(serie)
+  if (i0 < 0) return null
+  let ult = serie.length - 1
+  while (ult > i0 && !((serie[ult].pieces || 0) > 0)) ult--
+  const t0 = Date.parse(serie[i0].t)
+  if (Number.isNaN(t0)) return null
+  const curve = []
+  let acum = 0
+  let proximo = 0
+  for (let i = i0; i <= ult; i++) {
+    acum += serie[i].pieces || 0
+    const m = Math.round((Date.parse(serie[i].t) - t0) / 60_000) + INTERVAL_MIN
+    if (m >= proximo || i === ult) {
+      curve.push({ m, p: acum })
+      proximo = m + RIVAL_STEP_MIN
+    }
+  }
+  return curve.length >= 3 ? curve : null
+}
+
+/**
+ * La curva del último turno CERRADO del OTRO nombre (día ↔ noche), para el
+ * duelo directo de hoy. Un turno cerrado no cambia, así que se reusa lo ya
+ * publicado y solo se recompone si es el turno inmediatamente anterior (el
+ * re-sync móvil todavía puede moverlo) o si cambió el rival. Devuelve null si no
+ * hay un rival presentable: con `merge`, un campo que no se manda se queda.
+ */
+async function buildRivalCurve(db, plantSlug, currentShiftDocId, shiftId, prev = null, history = [], index = null, descartados = null) {
+  if (!shiftId || !currentShiftDocId) return null
+  const nowWall = shoplogixPolling.toChileWall(new Date())
+  const desde = shiftDateKey(nowWall, -7)
+  const idsCrudos = index
+    ? index.entries.map(e => e.id)
+    : (await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()).map(r => r.id)
+  const todos = idsCrudos
+    .filter(id => id !== currentShiftDocId && id.slice(11) !== 'Unscheduled' && id.slice(0, 10) >= desde && id.slice(0, 10) <= currentShiftDocId.slice(0, 10))
+    .sort()
+    .reverse()
+  const masReciente = todos[0]
+  const candidatos = todos.filter(id => id.slice(11) !== shiftId).slice(0, 3)
+  const yaConstruidos = new Map((history || [])
+    .filter(h => h.live?.timeBreakdown?.tbv === TBV)
+    .map(h => [h.shiftDocId, h.live]))
+  for (const id of candidatos) {
+    if (prev && prev.shiftDocId === id && id !== masReciente && Array.isArray(prev.curve)) return prev
+    if (descartados && id !== masReciente && descartados.has(id)) continue
+    try {
+      const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id, index)
+      const curve = live && curvaDesdeArranque(live)
+      const total = live?.totalPieces ?? 0
+      if (!curve || total < FORECAST_MIN_PIECES) { descartados?.add(id); continue }
+      const tb = live.timeBreakdown || {}
+      const h0 = Date.parse(live.scheduledStart ?? '')
+      return {
+        shiftDocId: id,
+        dateKey: id.slice(0, 10),
+        shiftId: id.slice(11),
+        ...(Number.isFinite(h0) ? { h0: new Date(h0).toISOString().slice(11, 16) } : {}),
+        curve,
+        total,
+        producingMin: tb.producingMin ?? 0,
+        ...(tb.windowMin != null ? { windowMin: tb.windowMin } : {}),
+      }
+    } catch {
+      /* este candidato no se pudo armar: se prueba el siguiente */
+    }
+  }
+  return null
 }
 
 /** Máximo de series archivadas (≈5-10 KB cada una): las mismas ~6 del historial. */
@@ -2699,6 +2847,10 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
       ),
       statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
       forecastDescartados: podado(forecastSkip, 30),
+      /* Duelo de equipos: el último turno cerrado del OTRO nombre. */
+      rivalCurve: await buildRivalCurve(
+        db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11), monitor.rivalCurve, history, index, forecastSkip,
+      ),
     }
   }
 
@@ -2759,6 +2911,10 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea, index, statsSkip),
     statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
     forecastDescartados: podado(forecastSkip, 30),
+    /* Duelo de equipos: el último turno cerrado del OTRO nombre. */
+    rivalCurve: await buildRivalCurve(
+      db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.rivalCurve, history, index, forecastSkip,
+    ),
     shiftDocId: publicado.shiftDocId,
     dateKey: publicado.shiftDocId.slice(0, 10),
     shiftId: publicado.shiftDocId.slice(11),
@@ -2950,6 +3106,8 @@ module.exports = {
   buildMonitorHistory,
   buildForecastHistory,
   buildShiftStats,
+  buildRivalCurve,
+  resumenDuelo,
   inferShiftEndFromDuration,
   buildMonitorPatch,
   archivarSerieMinuto,

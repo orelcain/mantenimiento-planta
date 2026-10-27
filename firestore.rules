@@ -1976,6 +1976,38 @@ service cloud.firestore {
       allow write: if isSupervisor();
     }
 
+    // Duelo de equipos del monitor público (27-10-2026): nombres de los dos
+    // supervisores y correcciones manuales de qué equipo hizo cada turno.
+    //   { duelo: { equipos: { rebolledo: 'Nombre', cardenas: 'Nombre' },
+    //              overrides: { '<shiftDocId>': 'rebolledo' | 'cardenas' } } }
+    // Los nombres son PÚBLICOS por decisión del plan (el monitor se abre sin
+    // sesión): lectura puntual (get, nunca list) y solo mientras el link del mismo
+    // token siga vigente. Escribe únicamente un supervisor o admin; los operadores
+    // no figuran en ningún campo (se compara por puesto, sin nombres).
+    function dueloConfigValida() {
+      return request.resource.data.keys().hasOnly(['duelo', 'updatedAt'])
+        && request.resource.data.duelo is map
+        && request.resource.data.duelo.keys().hasOnly(['equipos', 'overrides'])
+        && (!('equipos' in request.resource.data.duelo)
+          || (request.resource.data.duelo.equipos is map
+            && request.resource.data.duelo.equipos.keys().hasOnly(['rebolledo', 'cardenas'])
+            && request.resource.data.duelo.equipos.get('rebolledo', '') is string
+            && request.resource.data.duelo.equipos.get('cardenas', '') is string
+            && request.resource.data.duelo.equipos.get('rebolledo', '').size() <= 60
+            && request.resource.data.duelo.equipos.get('cardenas', '').size() <= 60))
+        && (!('overrides' in request.resource.data.duelo)
+          || (request.resource.data.duelo.overrides is map
+            && request.resource.data.duelo.overrides.size() <= 200));
+    }
+
+    match /monitor_config/{token} {
+      allow get: if exists(/databases/$(database)/documents/publicShiftMonitors/$(token))
+        && timestamp.value(get(/databases/$(database)/documents/publicShiftMonitors/$(token)).data.expiresAt) > request.time;
+      allow list: if false;
+      allow create, update: if isSupervisor() && dueloConfigValida();
+      allow delete: if isAdmin();
+    }
+
     // Contador de vistas por módulo: UN doc por día (hora de Chile), id YYYY-MM-DD.
     //   { ultimo: '<modulo>', '<modulo>': { vistas, claro|oscuro, cel|pc, u: { '<hash12 del uid>': true } } }
     // Una «vista» es un USUARIO-DÍA por módulo: el dedupe lo garantiza la regla, no el cliente.

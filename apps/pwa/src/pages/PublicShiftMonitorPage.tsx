@@ -88,7 +88,11 @@ import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
 import { BandaParadaV2, RitmoVivoV2 } from './monitor/RitmoVivoV2'
-import { ritmoVivoDeMonitor } from './monitor/ritmoVivo'
+import { ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
+import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
+import { construirDuelo, nombresEfectivos } from './monitor/duelo'
+import { useDueloConfig } from './monitor/dueloConfig'
+import type { PestanaMonitor } from './monitor/BarraLateralPC'
 import { repartoSemanal } from './monitor/repartoSemanal'
 import { Pill, SegmentedControl } from '@/components/piel'
 import { useIsAdmin, useIsSupervisor } from '@/store'
@@ -4501,6 +4505,9 @@ function MonitorDelToken() {
   const [now, setNow] = useState(() => Date.now())
   /* El cambio Eviscerado ↔ Filete (solo supervisor): lo usa la barra lateral de PC; en celular sigue `CambioDeLinea`. */
   const cambioLinea = useCambioDeLinea(data?.plantLineId, data?.plantSlug)
+  /* Duelo de equipos: nombres y correcciones de ESTE monitor (`monitor_config/{token}`); editar, solo con sesión de supervisor. */
+  const configDuelo = useDueloConfig(token)
+  const esSupervisorDuelo = useIsSupervisor()
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
   const ahoraWallMs = useMemo(() => now - new Date(now).getTimezoneOffset() * 60_000, [now])
@@ -4574,10 +4581,15 @@ function MonitorDelToken() {
    * poder compartir la vista de análisis con un link. En la TV no hay
    * pestañas: el tablero es solo lo vivo.
    */
-  const pestana = !modoPantalla && searchParams.get('ver') === 'analisis' ? 'analisis' : 'turno'
-  const verPestana = (p: 'turno' | 'analisis') => {
+  const verParam = searchParams.get('ver')
+  const pestana: PestanaMonitor = modoPantalla ? 'turno'
+    : verParam === 'analisis' ? 'analisis'
+      /* El duelo solo existe en el v2: el monitor clásico no lo dibuja. */
+      : verParam === 'duelo' && glass === 'v2' ? 'duelo'
+        : 'turno'
+  const verPestana = (p: PestanaMonitor) => {
     const n = new URLSearchParams(searchParams)
-    if (p === 'analisis') n.set('ver', 'analisis')
+    if (p !== 'turno') n.set('ver', p)
     else n.delete('ver')
     setSearchParams(n, { replace: true })
     /* Cada pestaña es una página distinta: arrancarla a mitad del scroll de
@@ -5952,6 +5964,25 @@ function MonitorDelToken() {
   const contador = elegirContador({ pulse: data.pulse, live, shiftClosed: live.shiftClosed })
   const outside = contador.fuente === 'pulso' ? contador.fueraDelHorario : (live.outsidePieces ?? 0)
 
+  /* Duelo de equipos: el turno que se mira contra el último del rival en el mismo horario. El rival del otro horario
+     (`rivalCurve`) es relativo al turno VIGENTE, así que solo se usa mirando ese. */
+  const unidadDuelo = unidadDeMaquinas(live.machines)
+  const nombresDuelo = nombresEfectivos(configDuelo, unidadDuelo)
+  const datosDuelo = glass === 'v2' && vista
+    ? construirDuelo({
+        shiftDocId: vista.shiftDocId,
+        live,
+        piezas: contador.valor,
+        cerrado: turnoCerrado,
+        curvaHoy: cumulativeFromStart(live.series),
+        rivalCurve: esActual ? data.rivalCurve : null,
+        stats: data.shiftStats ?? [],
+        forecast: data.forecastHistory ?? [],
+        overrides: configDuelo.overrides,
+      })
+    : null
+  const inicioDueloMs = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null
+
   /* Derivados del DATO DURO (buckets de 1 min) para los números vivos, SOLO
      con el pulso fresco — el mismo criterio del número grande. Careo 29-08:
      la media 15 de los tramos de 5 min decía 26,3 con la línea a 33,1 (el
@@ -6520,7 +6551,7 @@ function MonitorDelToken() {
       <main
         className={`mx-auto max-w-3xl space-y-4 px-4 py-4 ${
           /* «El turno» del v2 usa todo el ancho de PC (principal + riel); el resto conserva su tope. */
-          glass === 'v2' && pestana === 'turno' ? 'lg:max-w-none lg:px-6' : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'
+          glass === 'v2' && pestana !== 'analisis' ? 'lg:max-w-none lg:px-6' : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'
         }${modoPantalla ? ' modo-pantalla' : ''}`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -6804,6 +6835,7 @@ function MonitorDelToken() {
                 }
                 return <TiempoDelTurno {...camino} v2="expres" ampliado={<div className="v2-clasico"><TiempoDelTurno {...camino} v2="ampliado" /></div>} />
               })()}
+              duelo={<TarjetaDueloV2 datos={datosDuelo} nombres={nombresDuelo} unidad={unidadDuelo} inicioMs={inicioDueloMs} />}
               vista={vistaV2}
               onVista={setVistaV2}
             />
@@ -7483,6 +7515,18 @@ function MonitorDelToken() {
          * pestaña propia (`?ver=analisis`): dejó de compartir scroll con lo
          * vivo. El rótulo lo pone la pestaña, no un h2.
          */}
+        {pestana === 'duelo' && glass === 'v2' && (
+          <PestanaDueloV2
+            datos={datosDuelo}
+            nombres={nombresDuelo}
+            unidad={unidadDuelo}
+            inicioMs={inicioDueloMs}
+            token={token}
+            puedeEditar={esSupervisorDuelo}
+            nombresGuardados={configDuelo.equipos ?? {}}
+          />
+        )}
+
         {pestana === 'analisis' && (
         <div className="pt-1">
           {/* Acá SÍ multicolumna, al revés que arriba: entre bloques de

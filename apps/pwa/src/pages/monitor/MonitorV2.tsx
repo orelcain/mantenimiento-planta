@@ -32,6 +32,7 @@ import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { AnilloMeta, Globo, Icono, Tarjeta } from './AmpliarV2'
 import { useCuentaCifra, useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
+import type { PestanaMonitor } from './BarraLateralPC'
 
 // ── Formato ──────────────────────────────────────────────────────────────────
 
@@ -887,6 +888,8 @@ export interface MonitorV2Props {
   banda?: ReactNode
   /** «Camino a la meta» del monitor clásico (hechas, paradas por causa, ritmo, por jugar): se ve tal cual. */
   caminoMeta?: ReactNode
+  /** Tarjeta exprés del Duelo de equipos (`TarjetaDueloV2`): hora N del turno, los dos equipos y la mini carrera. */
+  duelo?: ReactNode
   vista: VistaV2
   onVista: (v: VistaV2) => void
 }
@@ -1101,6 +1104,8 @@ export function MonitorV2(p: MonitorV2Props) {
       {p.ritmoLinea && <div className="v2-clasico v2-ritmo max-lg:order-2 2xl:col-start-1 2xl:row-start-2">{p.ritmoLinea}</div>}
 
       {p.caminoMeta && <div className="v2-camino max-lg:order-4 2xl:col-start-2 2xl:row-start-2 2xl:self-start">{p.caminoMeta}</div>}
+
+      {p.duelo && <div className="min-w-0 max-lg:order-6 2xl:col-span-2 2xl:row-start-4">{p.duelo}</div>}
 
       {/* Fila 2 · la curva del turno y las máquinas */}
       <div className="grid grid-cols-1 gap-3 max-lg:order-5 lg:grid-cols-4 lg:gap-4 2xl:col-span-2 2xl:row-start-3">
@@ -1345,8 +1350,8 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
   cambioLinea: ReactNode
   navTurnos: ReactNode
   sub: string
-  pestana: 'turno' | 'analisis'
-  onPestana: (p: 'turno' | 'analisis') => void
+  pestana: PestanaMonitor
+  onPestana: (p: PestanaMonitor) => void
 }) {
   /* Celular: la barra flotante y el título grande de siempre (`lg:hidden`). PC (lg+): UNA barra de 56 px, pegada
      arriba: línea · estado · turno a la izquierda y la navegación de turnos a la derecha. Las pestañas, el cambio
@@ -1354,7 +1359,7 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
   const ancho = 'mx-auto max-w-3xl px-3'
   const pestanas = (
     <div className="v2-segmentado flex rounded-full p-1" role="tablist">
-      {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
+      {([['turno', 'El turno'], ['analisis', 'Análisis'], ['duelo', 'Duelo']] as const).map(([id, rotulo]) => (
         <button
           key={id}
           role="tab"
@@ -1387,7 +1392,7 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
         <div className="mb-4">{cambioLinea}</div>
         <div className="flex flex-col gap-4">
           <div className="min-w-0 px-1">
-            <h1 className="text-[34px] font-semibold leading-none tracking-tight">{pestana === 'turno' ? 'El turno' : 'Análisis'}</h1>
+            <h1 className="text-[34px] font-semibold leading-none tracking-tight">{pestana === 'turno' ? 'El turno' : pestana === 'analisis' ? 'Análisis' : 'Duelo'}</h1>
             <p className="mt-2 text-[15px] tabular-nums text-muted-foreground first-letter:uppercase">{sub}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

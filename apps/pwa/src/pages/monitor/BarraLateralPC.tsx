@@ -7,7 +7,7 @@
  * El botón de arriba la deja fijada abierta. El indicador del apartado activo se desliza (`transform`).
  * En celular no existe: sigue la barra de arriba de siempre.
  */
-import { BarChart3, Clock, Home, Menu, Moon, Sun, Tv } from 'lucide-react'
+import { BarChart3, Clock, Home, Menu, Moon, Sun, Trophy, Tv } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -17,9 +17,12 @@ export interface LineaLateral {
   nombre: string
 }
 
+/** Los apartados del monitor v2: lo vivo, lo que se estudia y el duelo de equipos. */
+export type PestanaMonitor = 'turno' | 'analisis' | 'duelo'
+
 export interface BarraLateralPCProps {
-  pestana: 'turno' | 'analisis'
-  onPestana: (p: 'turno' | 'analisis') => void
+  pestana: PestanaMonitor
+  onPestana: (p: PestanaMonitor) => void
   /** El cambio de línea: solo con sesión de supervisor. Sin él, ni segmento de área ni «Inicio». */
   lineas?: { actual: string; opciones: LineaLateral[]; onCambiar: (id: string) => void; cambiando: boolean } | null
   onModoTv: () => void
@@ -60,8 +63,8 @@ export function BarraLateralPC({ pestana, onPestana, lineas, onModoTv, oscuro, o
   const espera = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (espera.current) clearTimeout(espera.current) }, [])
   const abierta = fijada || hover || foco
-  /* El indicador sigue al apartado activo: 0 = botón de menú, 1 = El turno, 2 = Análisis (40 px de alto + 4 de hueco). */
-  const fila = pestana === 'turno' ? 1 : 2
+  /* El indicador sigue al apartado activo: 0 = botón de menú, 1 = El turno, 2 = Análisis, 3 = Duelo (40 px de alto + 4 de hueco). */
+  const fila = pestana === 'turno' ? 1 : pestana === 'analisis' ? 2 : 3
 
   return (
     <nav
@@ -91,6 +94,7 @@ export function BarraLateralPC({ pestana, onPestana, lineas, onModoTv, oscuro, o
         <Item icono={<Menu className="h-[18px] w-[18px]" />} rotulo={fijada ? 'Soltar menú' : 'Fijar menú'} pulsado={fijada} onClick={() => setFijada((f) => !f)} />
         <Item icono={<Clock className="h-[18px] w-[18px]" />} rotulo="El turno" activo={pestana === 'turno'} onClick={() => onPestana('turno')} />
         <Item icono={<BarChart3 className="h-[18px] w-[18px]" />} rotulo="Análisis" activo={pestana === 'analisis'} onClick={() => onPestana('analisis')} />
+        <Item icono={<Trophy className="h-[18px] w-[18px]" />} rotulo="Duelo" activo={pestana === 'duelo'} onClick={() => onPestana('duelo')} />
 
         {lineas && lineas.opciones.length > 1 && (
           <>
