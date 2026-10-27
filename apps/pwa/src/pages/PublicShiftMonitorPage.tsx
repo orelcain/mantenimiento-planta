@@ -5522,9 +5522,9 @@ function MonitorDelToken() {
         const otros = (data?.history ?? [])
           .filter((h) => !(h.dateKey === vista?.dateKey && h.shiftId === vista?.shiftId))
         if (!vista?.shiftId) return otros
-        const mismo = otros.filter((h) => h.shiftId === vista.shiftId)
-        const resto = otros.filter((h) => h.shiftId !== vista.shiftId)
-        return [...mismo, ...resto]
+        /* SOLO el mismo turno (Orel, 27-10): rellenar con días de otro turno mezclaba
+           noche con día y la comparación dejaba de decir algo. Menos días, pero comparables. */
+        return otros.filter((h) => h.shiftId === vista.shiftId)
       })().map((h) => ({ dateKey: h.dateKey, shiftId: h.shiftId, series: h.live?.series })),
       maxDays: 6,
       targetPieces: meta,
