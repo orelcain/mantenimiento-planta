@@ -5979,6 +5979,51 @@ function MonitorDelToken() {
     </div>
   ) : null
 
+  /* Barras del minuto a minuto (las usan la tarjeta clásica y el v2). */
+  const barrasMinuto: BarrasMinutoDatos | null = (() => {
+    /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
+       solo trae la del turno vigente — Shoplogix la entrega en una
+       ventana de ~12 h). Turnos anteriores al archivador o cuya
+       serie nació parcial no tienen entrada: curvas de 5 min. */
+    const s = esActual
+      ? (data.pulse?.serieMinuto
+        ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
+      : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
+    if (!s?.maquinas?.length) return null
+    const t0 = Date.parse(s.desde)
+    const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
+    if (!Number.isFinite(t0) || !(largo > 1)) return null
+    /* Ventana del turno VISTO, en la misma base wall-as-UTC. */
+    const ini = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
+    if (!Number.isFinite(ini)) return null
+    const finSched = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
+    /* ⚠ El tope del fin previsto SOLO con el turno cerrado. En vivo
+       la cola de la serie ES el presente, y el previsto puede ser
+       una estimación corta: en Yal (30-08) el turno siguió más
+       allá de su fin «historial» (20:56) y las barras quedaron
+       congeladas en 21:26 (+30 min) con el contador vivo en 21:58
+       dos tarjetas más arriba — dos «ahora» distintos en la misma
+       pantalla, la clase de contradicción que este monitor viene
+       cerrando. */
+    const fin = live.shiftClosed && Number.isFinite(finSched)
+      ? finSched + 30 * 60_000
+      : t0 + largo * 60_000
+    /* Sin solape real, la serie es de otro turno: a las curvas. */
+    const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
+    const hastaIdx = Math.min(largo, Math.round((fin - t0) / 60_000))
+    if (!(hastaIdx - desdeIdx > 1)) return null
+    const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+    const maquinas = s.maquinas.map((m) => ({
+      ...m,
+      nombre: nombrePorId.get(m.id) ?? m.id,
+      cycles: m.cycles.slice(desdeIdx, hastaIdx),
+    }))
+    /* Una serie sin una sola pieza dentro del turno no dibuja nada
+       útil (y no es de este turno): a las curvas. */
+    if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
+    return { desde: new Date(t0 + desdeIdx * 60_000).toISOString(), maquinas }
+  })()
+
   return (
     <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)}>
       {glass === 'v2' && !modoPantalla && (
@@ -6289,6 +6334,13 @@ function MonitorDelToken() {
          * orden — ahora el orden es dato, no estructura.
          */}
         {glass === 'v2' && (() => {
+          /* Las mismas varas del monitor clásico, todas de Shoplogix, para que ninguna tarjeta contradiga a otra:
+             «ahora» = contador vivo (pulso, por máquina y su suma); «promedio» = piezas ÷ minutos produciendo. */
+          const prodMin = live.timeBreakdown?.producingMin ?? 0
+          const promedioLinea = prodMin > 0 ? live.totalPieces / prodMin : null
+          const pv = !turnoCerrado && contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null
+          const ahoraLinea = pv?.cpm ?? null
+          const ahoraPorId = pv?.porMaquina?.length ? new Map(pv.porMaquina.map((x) => [x.id, x.cpm])) : null
           const meta = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
           const pm = live.mantencion?.porMaquina ?? []
           const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
@@ -6312,7 +6364,13 @@ function MonitorDelToken() {
               corteHora={!live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null}
               meta={meta}
               proyeccion={pace?.projectedPieces ?? null}
-              ritmo={ritmoAndando.hoy ?? live.recentPiecesPerMinute ?? null}
+              ritmo={promedioLinea}
+              perdidasMaquina={(() => {
+                const rec = live.timeBreakdown?.recoverable ?? []
+                if (!rec.length || !rec.every((r) => r.machineMin != null)) return null
+                return { min: rec.reduce((a, r) => a + (r.machineMin ?? 0), 0), maquinas: live.machines.length }
+              })()}
+              ritmoAhora={ahoraLinea}
               ritmoNecesario={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
               setPoint={live.setPoint?.cpm ?? null}
               vsAyer={vsAyer}
@@ -6342,9 +6400,11 @@ function MonitorDelToken() {
                 .sort((a, b) => b.min - a.min)}
               maquinas={live.machines.map((m) => ({
                 name: m.name,
-                status: m.status,
+                /* El pulso es más fresco que el estado del corte: si ya cuenta piezas, la máquina corre. */
+                status: (ahoraPorId?.get(m.id) ?? 0) > 0 ? 'produciendo' : m.status,
                 desdeMin: m.currentSinceAt ? Math.max(0, (now - new Date(now).getTimezoneOffset() * 60_000 - Date.parse(m.currentSinceAt)) / 60_000) : null,
-                cpm: m.piecesPerHour > 0 ? m.piecesPerHour / 60 : null,
+                ahora: ahoraPorId?.get(m.id) ?? null,
+                promedio: prodMin > 0 ? m.pieces / prodMin : null,
                 razon: m.currentReason,
                 piezas: m.pieces,
                 dispPct: Number.isFinite(m.uptimePct) ? m.uptimePct : null,
@@ -6384,23 +6444,44 @@ function MonitorDelToken() {
                   plannedMin: live.timeBreakdown.plannedMin,
                   recoverableMin: live.timeBreakdown.recoverableMin,
                 } : null,
-                velocidad: seriesMaquinas?.map((m) => ({ nombre: m.nombre, cpm: m.serie.map((x) => x / 5), objetivo: m.targetCpm ?? null })) ?? null,
-                minuto: (() => {
-                  const sm = esActual ? data.pulse?.serieMinuto : null
-                  if (!sm?.maquinas?.length) return null
-                  const desdeMs = Date.parse(sm.desde)
-                  const largo = Math.min(...sm.maquinas.map((m) => m.cycles.length))
-                  if (!Number.isFinite(desdeMs) || largo < 2) return null
-                  const ciclos = Array.from({ length: largo }, (_, i) => sm.maquinas.reduce((a, m) => a + (m.cycles[i] ?? 0), 0))
-                  /* Cerrado, los minutos en cero DESPUÉS de la última pieza no son una línea parada: el turno ya terminó. */
-                  if (turnoCerrado) while (ciclos.length > 2 && ciclos[ciclos.length - 1] === 0) ciclos.pop()
-                  const esperado = sm.maquinas.every((m) => m.esperado != null) ? sm.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null
-                  return { desdeMs, ciclos, esperado }
-                })(),
+                velocidad: seriesMaquinas?.map((m) => {
+                  const mq = live.machines.find((x) => x.name === m.nombre)
+                  return {
+                    nombre: m.nombre,
+                    cpm: m.serie.map((x) => x / 5),
+                    objetivo: m.targetCpm ?? null,
+                    ahora: mq ? ahoraPorId?.get(mq.id) ?? null : null,
+                    promedio: mq && prodMin > 0 ? mq.pieces / prodMin : null,
+                  }
+                }) ?? null,
                 comparado: comparacion.days
                   .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))
                   .filter((d) => d.piezas > 0),
               }}
+              caminoMeta={
+                <TiempoDelTurno
+                  tb={live.timeBreakdown}
+                  causaSel={causaSel}
+                  onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
+                  onVentana={setVentanaGrafica}
+                  onTramo={setTramoSel}
+                  proximaParada={proximaParada}
+                  notas={notasDeOperador}
+                  cerrado={turnoCerrado}
+                  meta={data.targetPieces ?? live.quotaPieces ?? null}
+                  /* «Hechas» = el mismo contador vivo de «Piezas ahora»: en el v2 no puede haber dos cifras de piezas. */
+                  hechas={contador.valor}
+                  piezasPulso={null}
+                  corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
+                  cuotaAhora={comparacion.optimalAtCurrentMinute}
+                  horaAhora={horaDeCuota}
+                  cpmAndando={live.timeBreakdown && live.timeBreakdown.producingMin > 0 ? live.totalPieces / live.timeBreakdown.producingMin : null}
+                  costo={costoParadas}
+                  grupos={gruposEventos}
+                  notasTurno={notasDeTurnoCompleto}
+                />
+              }
+              minutoAMinuto={barrasMinuto}
               vista={vistaV2}
               onVista={setVistaV2}
             />
@@ -6962,49 +7043,7 @@ function MonitorDelToken() {
                * la suya en el primer bucket que Shoplogix devuelve, que puede
                * traer minutos anteriores al turno.
                */
-              barras: (() => {
-                /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
-                   solo trae la del turno vigente — Shoplogix la entrega en una
-                   ventana de ~12 h). Turnos anteriores al archivador o cuya
-                   serie nació parcial no tienen entrada: curvas de 5 min. */
-                const s = esActual
-                  ? (data.pulse?.serieMinuto
-                    ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
-                  : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
-                if (!s?.maquinas?.length) return null
-                const t0 = Date.parse(s.desde)
-                const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
-                if (!Number.isFinite(t0) || !(largo > 1)) return null
-                /* Ventana del turno VISTO, en la misma base wall-as-UTC. */
-                const ini = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
-                if (!Number.isFinite(ini)) return null
-                const finSched = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
-                /* ⚠ El tope del fin previsto SOLO con el turno cerrado. En vivo
-                   la cola de la serie ES el presente, y el previsto puede ser
-                   una estimación corta: en Yal (30-08) el turno siguió más
-                   allá de su fin «historial» (20:56) y las barras quedaron
-                   congeladas en 21:26 (+30 min) con el contador vivo en 21:58
-                   dos tarjetas más arriba — dos «ahora» distintos en la misma
-                   pantalla, la clase de contradicción que este monitor viene
-                   cerrando. */
-                const fin = live.shiftClosed && Number.isFinite(finSched)
-                  ? finSched + 30 * 60_000
-                  : t0 + largo * 60_000
-                /* Sin solape real, la serie es de otro turno: a las curvas. */
-                const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
-                const hastaIdx = Math.min(largo, Math.round((fin - t0) / 60_000))
-                if (!(hastaIdx - desdeIdx > 1)) return null
-                const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
-                const maquinas = s.maquinas.map((m) => ({
-                  ...m,
-                  nombre: nombrePorId.get(m.id) ?? m.id,
-                  cycles: m.cycles.slice(desdeIdx, hastaIdx),
-                }))
-                /* Una serie sin una sola pieza dentro del turno no dibuja nada
-                   útil (y no es de este turno): a las curvas. */
-                if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
-                return { desde: new Date(t0 + desdeIdx * 60_000).toISOString(), maquinas }
-              })(),
+              barras: barrasMinuto,
               /* Parada = ninguna máquina produciendo. El pulso lo confirma:
                  con la línea en colación marca 0,0 mientras el número grande
                  mostraba el ritmo de antes de parar. También con el turno
