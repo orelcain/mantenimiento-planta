@@ -266,6 +266,15 @@ export interface MinutoTurno {
   maquinas: Array<{ id: string; nombre: string; esperado: number | null; cycles: number[] }>
 }
 
+/** Una parada ubicada en el reloj (ms, misma base que `MinutoTurno.desde`). */
+export interface EventoMarcado {
+  desdeMs: number
+  hastaMs: number
+  causa: string | null
+  /** La máquina de la parada (id de `MinutoTurno.maquinas`). null = no se sabe: se marca en todas. */
+  maquinaId?: string | null
+}
+
 type TonoMinuto = 'ok' | 'warn' | 'crit' | 'sin'
 /** Los cortes de Shoplogix en sus barras: ≥75 % del esperado ok, 50-75 atención, <50 crítico. */
 function tonoMinuto(v: number, esperado: number | null): TonoMinuto {
@@ -300,7 +309,9 @@ const PASOS_MARCA = [5, 10, 15, 30, 60, 120]
  * abre con el turno completo. Pasar el mouse o tocar marca el mismo minuto en todas las franjas.
  * Las cabeceras quedan pegadas al borde visible mientras el contenido se desplaza.
  */
-function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
+function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
+  d: MinutoTurno; cerrado: boolean; marca?: EventoMarcado | null; onQuitarMarca?: () => void
+}) {
   const [i, setI] = useState<number | null>(null)
   const t0 = Date.parse(d.desde)
   /* Sin máquinas, Math.min() da Infinity y el Array.from de abajo revienta. */
@@ -356,6 +367,23 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
     setVentana({ desdeMin: ventana.desdeMin + delta, hastaMin: ventana.hastaMin + delta })
   }, [n, tocado, ventana])
 
+  /* La parada marcada en minutos del gráfico. Al llegar una marca nueva, la vista se acerca a ella con
+     un respiro proporcional (mín. 3 min) para que se vea qué venía antes y después. */
+  const marcaMin = marca && Number.isFinite(t0)
+    ? { desde: (marca.desdeMs - t0) / 60_000, hasta: (marca.hastaMs - t0) / 60_000 }
+    : null
+  const marcaClave = marca ? `${marca.desdeMs}-${marca.hastaMs}` : null
+  useEffect(() => {
+    if (!marcaMin || n < 2) return
+    const aire = Math.max(3, (marcaMin.hasta - marcaMin.desde) * 0.8)
+    setTocado(true)
+    setVentana({
+      desdeMin: Math.max(0, marcaMin.desde - aire),
+      hastaMin: Math.min(n, Math.max(marcaMin.hasta + aire, marcaMin.desde + aire + 6)),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia la parada elegida
+  }, [marcaClave])
+
   const varias = d.maquinas.length > 1
   const filas = [
     ...(varias
@@ -365,9 +393,10 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
           esperado: d.maquinas.every((m) => m.esperado != null) ? d.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null,
           cycles: suma,
           principal: true,
+          id: null as string | null,
         }]
       : []),
-    ...d.maquinas.map((m) => ({ nombre: m.nombre, nota: null as string | null, esperado: m.esperado, cycles: m.cycles, principal: !varias })),
+    ...d.maquinas.map((m) => ({ nombre: m.nombre, nota: null as string | null, esperado: m.esperado, cycles: m.cycles, principal: !varias, id: m.id as string | null })),
   ]
   const aRitmo = (f: (typeof filas)[number]) => {
     if (f.esperado == null || n === 0) return null
@@ -404,6 +433,13 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
             const tope = Math.max(1, (f.esperado ?? 0) * 1.15, ...f.cycles.slice(0, n))
             const pct = aRitmo(f)
             const yEsperado = f.esperado != null ? (f.esperado / tope) * 100 : null
+            /* La parada marcada vive DENTRO de las barras de su máquina (y de la línea, que la suma):
+               sus minutos quedan plenos sobre un fondo tenue y el resto se apaga. Las otras máquinas
+               se apagan enteras: se ve de un vistazo cuál Baader fue. */
+            const conMarca = marcaMin != null && marcaMin.hasta > 0 && marcaMin.desde < n
+            const filaMarcada = conMarca && (f.principal || !marca?.maquinaId || f.id === marca.maquinaId)
+            const k0 = conMarca ? Math.max(0, Math.floor(marcaMin!.desde)) : -1
+            const k1 = conMarca ? Math.min(n - 1, Math.max(k0, Math.ceil(marcaMin!.hasta) - 1)) : -1
             return (
               /* Fondo y contenido en la misma celda de grilla: el fondo de la línea queda pegado
                  al borde visible (sticky) y no se va con el desplazamiento. */
@@ -432,6 +468,12 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
                     )}
                   </div>
                   <div className={`relative flex items-end ${f.principal ? 'h-28 lg:h-36' : 'h-10 lg:h-12'}`} style={{ gap: separadas ? 2 : 0 }}>
+                    {filaMarcada && (
+                      <span
+                        className="v2-marca-parada pointer-events-none absolute inset-y-0 rounded-t-[6px]"
+                        style={{ left: `${(k0 / n) * 100}%`, width: `${((k1 - k0 + 1) / n) * 100}%` }}
+                      />
+                    )}
                     {yEsperado != null && (
                       <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
                     )}
@@ -445,7 +487,9 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
                             height: `${Math.max(v > 0 ? 6 : 2, (v / tope) * 100)}%`,
                             background: RELLENO_MINUTO(t),
                             borderRadius: separadas ? '3px 3px 0 0' : 0,
-                            opacity: i == null || i === k ? 1 : 0.35,
+                            opacity: i != null ? (i === k ? 1 : 0.35)
+                              : conMarca ? (filaMarcada && k >= k0 && k <= k1 ? 1 : filaMarcada ? 0.4 : 0.22)
+                              : 1,
                           }}
                         >
                           {conNumeros && v > 0 && (
@@ -473,6 +517,22 @@ function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
           </div>
         </div>
       </div>
+      {marca && (
+        <div className="v2-subtarjeta mt-3 flex items-center justify-between gap-3 rounded-card px-3 py-2 text-[13px]">
+          <span className="min-w-0">
+            <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: 'var(--v2-mal)' }} />
+            <b className="font-semibold text-foreground">{marca.causa ?? 'Parada'}</b>
+            <span className="tabular-nums text-muted-foreground">
+              {' '}· {relojDe(marca.desdeMs)}–{relojDe(marca.hastaMs)} · {dec((marca.hastaMs - marca.desdeMs) / 60_000, 1)} min
+            </span>
+          </span>
+          {onQuitarMarca && (
+            <button type="button" onClick={onQuitarMarca} className="tap-44 shrink-0 rounded-full px-3 py-1 font-medium text-foreground" style={{ background: 'rgb(142 142 147 / 0.14)' }}>
+              Quitar
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
         {(['ok', 'warn', 'crit'] as const).map((t) => (
           <span key={t} className="inline-flex items-center gap-1.5">
@@ -809,6 +869,9 @@ export interface MonitorV2Props {
   caminoMeta?: ReactNode
   /** Velocidad minuto a minuto de todo el turno (ciclos de Shoplogix por máquina). */
   minutoAMinuto?: MinutoTurno | null
+  /** La parada que se eligió con «ver ›» en Camino a la meta: se marca en el minuto a minuto. */
+  eventoMarcado?: EventoMarcado | null
+  onQuitarEvento?: () => void
   vista: VistaV2
   onVista: (v: VistaV2) => void
 }
@@ -1045,9 +1108,12 @@ export function MonitorV2(p: MonitorV2Props) {
       </div>
 
       {p.minutoAMinuto && (
-        <Tarjeta icono={<Activity className={ic} />} titulo="Velocidad minuto a minuto" sub="piezas contadas por Shoplogix, desde el inicio del turno">
-          <MinutoTurnoV2 d={p.minutoAMinuto} cerrado={p.cerrado} />
-        </Tarjeta>
+        /* `grafico-turno`: el «ver ›» de cada parada desplaza hasta acá (en el clásico, al gráfico de velocidad). */
+        <div id="grafico-turno" className="scroll-mt-4">
+          <Tarjeta icono={<Activity className={ic} />} titulo="Velocidad minuto a minuto" sub="piezas contadas por Shoplogix, desde el inicio del turno">
+            <MinutoTurnoV2 d={p.minutoAMinuto} cerrado={p.cerrado} marca={p.eventoMarcado ?? null} onQuitarMarca={p.onQuitarEvento} />
+          </Tarjeta>
+        </div>
       )}
 
       {/* Fila 3 · Mantención en detalle y a dónde se fue el tiempo */}

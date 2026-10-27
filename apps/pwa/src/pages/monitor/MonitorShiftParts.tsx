@@ -182,7 +182,7 @@ export function TiempoDelTurno({
    * Marcar UNA parada en el gráfico. Sin esto, tocar una microdetención
    * pintaba las 40 de su causa y no se podía saber cuál era ni medirla.
    */
-  onTramo?: (v: Ventana | null) => void
+  onTramo?: (v: (Ventana & { maquinaId?: string | null }) | null) => void
   /** La próxima parada de convenio pronosticada: hora de reloj Y su nombre —
       «la próxima entra a las 12:50» obligaba a adivinar cuál. */
   proximaParada?: { hora: string; reason: string } | null
@@ -955,7 +955,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
   sel: string | null
   onCausa?: (c: string | null) => void
   onVentana?: (v: Ventana | null) => void
-  onTramo?: (v: Ventana | null) => void
+  onTramo?: (v: (Ventana & { maquinaId?: string | null }) | null) => void
   notas?: Map<string, NotaDeOperador[]>
   /** Solo en el grupo de convenio: cuándo entra la próxima, y cuál. */
   proximaParada?: { hora: string; reason: string } | null
@@ -1018,7 +1018,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
   sel: string | null
   onCausa?: (c: string | null) => void
   onVentana?: (v: Ventana | null) => void
-  onTramo?: (v: Ventana | null) => void
+  onTramo?: (v: (Ventana & { maquinaId?: string | null }) | null) => void
   /**
    * Lo que el operador escribió sobre ESTA causa. La causa y su explicación son
    * la misma respuesta a "¿por qué paró?", así que van juntas.
@@ -1040,6 +1040,13 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
    */
   const MUCHAS = 6
   const muchas = c.paradas.length > MUCHAS
+  const porMaquina = [...c.paradas.reduce((acc, p) => {
+    if (!p.maquina) return acc
+    const x = acc.get(p.maquina) ?? { maquina: p.maquina, veces: 0, min: 0 }
+    x.veces++
+    x.min += p.min
+    return acc.set(p.maquina, x)
+  }, new Map<string, { maquina: string; veces: number; min: number }>()).values()].sort((a, b) => b.min - a.min)
   const visibles = c.paradas
   /*
    * ⚠ El resumen se calcula con el `count` de la FILA, no con la cantidad de
@@ -1123,6 +1130,18 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
         </p>
       )}
 
+      {abierta && porMaquina.length > 1 && (
+        /* Cuál Baader es la que para: veces y minutos de esta causa en cada máquina. */
+        <p className="px-1 pt-0.5 text-[11px] tabular-nums text-muted-foreground">
+          {porMaquina.map((x, k) => (
+            <span key={x.maquina}>
+              {k > 0 && ' · '}
+              <b className="font-semibold text-foreground/80">{x.maquina}</b> {x.veces}× {fmtDec(x.min)} min
+            </span>
+          ))}
+        </p>
+      )}
+
       {abierta && c.paradas.length > 0 && (
         <div className="my-1 ml-2 border-l border-border pl-2">
           {muchas && (
@@ -1149,6 +1168,9 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
               const saltable = onVentana != null && p.desdeMin != null && p.hastaMin != null
               const contenido = (
                 <>
+                  {p.maquina && (
+                    <span className="v2-chip-maquina shrink-0 rounded-full bg-muted px-1.5 font-medium text-foreground/80">{p.maquina}</span>
+                  )}
                   <span className="tabular-nums text-muted-foreground/80">
                     {p.hora}<span className="px-0.5">→</span>{p.hasta}
                   </span>
@@ -1164,7 +1186,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
                       onClick={() => {
                         onCausa?.(c.reason)
                         /* La banda marcada es ESTA parada, no las 40 de su causa. */
-                        onTramo?.({ desdeMin: p.desdeMin!, hastaMin: p.hastaMin! })
+                        onTramo?.({ desdeMin: p.desdeMin!, hastaMin: p.hastaMin!, maquinaId: p.maquinaId ?? null })
                         /* Un respiro proporcional a la parada (mín. 3 min): pegada
                            al borde no se entiende qué venía antes ni después. */
                         const aire = Math.max(3, p.min * 0.8)

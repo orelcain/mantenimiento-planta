@@ -51,6 +51,9 @@ export interface ParadaSuelta {
    */
   desdeMin: number | null
   hastaMin: number | null
+  /** De qué máquina fue (id y nombre). null en docs anteriores a `stopMachines`. */
+  maquinaId?: string | null
+  maquina?: string | null
 }
 
 export interface CausaDelTurno {
@@ -102,12 +105,14 @@ function horaSegDe(iso: string): string {
  * pantalla son las que de verdad pesan.
  */
 function paradasPorCausa(
-  stopEvents: Array<{ r: number; f: string; s: number }>,
+  stopEvents: Array<{ r: number; f: string; s: number; m?: number }>,
   stopReasons: string[],
   /** Primer tramo con dato: el minuto 0 del eje que comparten los gráficos. */
   t0Ms: number | null,
   /** Ventana del turno: lo de afuera no es suyo. Ver el recorte más abajo. */
   ventana?: { desdeMs: number | null; hastaMs: number | null } | null,
+  /** Id y nombre de cada máquina, por el índice `m` de cada evento. */
+  maquinas?: Array<{ id: string; nombre: string | null }> | null,
 ): Map<string, ParadaSuelta[]> {
   /*
    * ⚠ EPISODIOS, no eventos crudos. El sensor parte una misma parada en varios
@@ -119,26 +124,30 @@ function paradasPorCausa(
    * episodio (con sus microhuecos adentro), que es lo que mide la grilla.
    */
   const GRILLA_SEG = 10
-  const porCausa = new Map<string, Array<{ ini: number; fin: number }>>()
+  /* Los episodios se funden POR MÁQUINA: dos Baader paradas a la vez son dos paradas, no una. */
+  const porCausa = new Map<string, Array<{ ini: number; fin: number; m: number | null }>>()
   for (const e of stopEvents) {
     const causa = stopReasons[e.r]
     const ini = Date.parse(e.f)
     if (!causa || !(e.s > 0) || Number.isNaN(ini)) continue
     const lista = porCausa.get(causa) ?? []
-    lista.push({ ini, fin: ini + e.s * 1000 })
+    lista.push({ ini, fin: ini + e.s * 1000, m: e.m ?? null })
     porCausa.set(causa, lista)
   }
 
   const m = new Map<string, ParadaSuelta[]>()
   for (const [causa, eventos] of porCausa) {
     eventos.sort((a, b) => a.ini - b.ini)
-    const episodios: Array<{ ini: number; fin: number }> = []
+    const episodios: Array<{ ini: number; fin: number; m: number | null }> = []
+    const ultimoDe = new Map<number | null, { ini: number; fin: number; m: number | null }>()
     for (const e of eventos) {
-      const ultimo = episodios[episodios.length - 1]
+      const ultimo = ultimoDe.get(e.m)
       if (ultimo && e.ini - ultimo.fin <= GRILLA_SEG * 1000) {
         ultimo.fin = Math.max(ultimo.fin, e.fin)
       } else {
-        episodios.push({ ...e })
+        const nuevo = { ...e }
+        episodios.push(nuevo)
+        ultimoDe.set(e.m, nuevo)
       }
     }
     /*
@@ -157,6 +166,7 @@ function paradasPorCausa(
       .map((ep) => ({
         ini: desde != null ? Math.max(ep.ini, desde) : ep.ini,
         fin: hasta != null ? Math.min(ep.fin, hasta) : ep.fin,
+        m: ep.m,
       }))
       .filter((ep) => ep.fin > ep.ini)
 
@@ -167,6 +177,8 @@ function paradasPorCausa(
         min: (ep.fin - ep.ini) / 60_000,
         desdeMin: t0Ms == null ? null : (ep.ini - t0Ms) / 60_000,
         hastaMin: t0Ms == null ? null : (ep.fin - t0Ms) / 60_000,
+        maquinaId: ep.m != null ? maquinas?.[ep.m]?.id ?? null : null,
+        maquina: ep.m != null ? maquinas?.[ep.m]?.nombre ?? null : null,
       }))
       .sort((a, b) => b.min - a.min))
   }
@@ -192,8 +204,11 @@ export function duenoDe(reason: string): { dueno: DuenoPerdida; categoria: strin
 
 export function agruparEventos(args: {
   tb?: PublicMonitorLive['timeBreakdown'] | null
-  stopEvents?: Array<{ r: number; f: string; s: number }> | null
+  stopEvents?: Array<{ r: number; f: string; s: number; m?: number }> | null
   stopReasons?: string[] | null
+  /** Ids de máquina por el índice `m` de cada evento, y sus nombres para mostrarlos. */
+  stopMachines?: string[] | null
+  nombresMaquina?: Record<string, string> | null
   /** Costo ya calculado al ritmo local (ver `monitorPerdidas`). */
   costo?: CostoDeParadas | null
   /** Promedio andando, de respaldo para las causas que el costo no cubra. */
@@ -212,6 +227,7 @@ export function agruparEventos(args: {
   const paradas = paradasPorCausa(
     args.stopEvents ?? [], args.stopReasons ?? [], Number.isNaN(t0Ms) ? null : t0Ms,
     args.ventana,
+    (args.stopMachines ?? []).map((id) => ({ id, nombre: args.nombresMaquina?.[id] ?? null })),
   )
   const costoPorCausa = new Map((args.costo?.porCausa ?? []).map((c) => [c.reason, c]))
   const cpm = args.cpmGlobal && args.cpmGlobal > 0 ? args.cpmGlobal : null
