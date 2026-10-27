@@ -290,26 +290,10 @@
 }
 
 /* ── Ritmo en vivo · 15 min (RitmoVivoV2.tsx) ─────────────────────────────
-   Celular: una columna en el orden de lectura. PC: la tira al centro y el
-   llenado a la derecha, para que las dos curvas se lean lado a lado. */
+   Una columna en el orden de lectura (parada, último minuto, tira, llenado, señales). En PC la tarjeta
+   vive en el riel derecho de 380/440 px: ahí tampoco caben tres columnas, así que se apila igual. */
 .rv-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .rv-l { padding-top: 14px; border-top: 1px solid rgb(var(--border) / 0.6); }
-@media (min-width: 1024px) {
-  .rv-grid {
-    grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: 'h s l' 'p s l' 'a s l' 'g s l';
-    grid-template-rows: auto auto auto 1fr;
-    column-gap: 28px;
-    row-gap: 14px;
-    align-items: start;
-  }
-  .rv-h { grid-area: h; }
-  .rv-p { grid-area: p; }
-  .rv-a { grid-area: a; }
-  .rv-s { grid-area: s; }
-  .rv-l { grid-area: l; padding-top: 0; border-top: 0; }
-  .rv-g { grid-area: g; }
-}
 .rv-cifra { font-size: 32px; }
 @media (min-width: 1024px) { .rv-cifra { font-size: 38px; } }
 .rv-crono { font-size: 28px; line-height: 34px; font-weight: 700; }
@@ -471,4 +455,106 @@ html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }
 .v2-marca-parada {
   background: linear-gradient(to top, color-mix(in srgb, var(--v2-mal) 26%, transparent), color-mix(in srgb, var(--v2-mal) 6%, transparent));
   border-top: 2px solid color-mix(in srgb, var(--v2-mal) 70%, transparent);
+}
+
+/* ── Monitor en PC (lg+): cabecera de 56 px, banda de estado y «Ritmo de la línea» horizontal ──────────
+   Layout «principal + riel» (mockup monitor-pc-layout, opción A). El celular no cambia: todo esto vive
+   bajo `min-width: 1024px` o en elementos que solo existen en PC. */
+
+/* Cabecera compacta: una barra a todo el ancho, de vidrio, con un filete abajo. Pegada arriba: la regla
+   `[data-glass='v2'] > *` (position: relative) le gana a `.sticky` de Tailwind, por eso se repite acá. */
+[data-glass='v2'] > .v2-barra-pc { position: sticky; top: 0; z-index: 20; }
+[data-glass='v2'] .v2-barra-pc {
+  background: rgb(var(--card) / 0.72);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  border-bottom: 1px solid rgb(var(--border) / 0.7);
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-glass='v2'] .v2-barra-pc, .rv-banda { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* Banda de estado: la parada en curso con su cronómetro, pegada bajo la cabecera (BandaParadaV2). Solo PC:
+   en celular la parada sigue dentro de «Ritmo en vivo». Una sola vez: la tarjeta, «Ritmo de la línea» y el
+   aviso «Ahora mismo» la callan en PC cuando la banda existe. */
+.rv-banda { display: none; --tinte: var(--v2-gris); --texto-parada: rgb(var(--foreground)); }
+.rv-banda[data-clase='micro'] { --tinte: var(--v2-ext); --texto-parada: var(--v2-ext-texto); }
+.rv-banda[data-clase='detencion'] { --tinte: var(--v2-mal); --texto-parada: var(--v2-mal-texto); }
+.rv-banda-icono { color: var(--tinte); }
+.rv-banda-rotulo { color: var(--texto-parada); }
+.rv-banda-crono { color: rgb(var(--foreground)); font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; }
+.rv-banda-detalle { color: rgb(var(--foreground) / 0.78); }
+@media (min-width: 1024px) {
+  .rv-banda {
+    display: flex;
+    position: sticky;
+    top: 56px;
+    z-index: 10;
+    grid-column: 1 / -1;
+    align-items: center;
+    gap: 18px;
+    min-height: 52px;
+    padding: 0 20px;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--tinte) 14%, rgb(var(--card) / 0.94));
+    border: 1px solid color-mix(in srgb, var(--tinte) 38%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+    box-shadow: 0 8px 0 0 rgb(var(--background) / 0.55);
+  }
+  .monitor-v2:has(.rv-banda) .rv-p { display: none; }
+  main:has(.rv-banda) .v2-ahora-mismo { display: none; }
+  /* La línea «Detención desde… · sin producir hace…» de Ritmo de la línea: ya está en la banda. */
+  .monitor-v2:has(.rv-banda) .v2-ritmo > section > div.rounded-ctl { display: none; }
+}
+
+/* «Ritmo de la línea» horizontal en PC: la cifra a la izquierda y las tres Baader a la derecha, en vez de
+   apiladas (553 px → ~250). Es el mismo componente del clásico: solo CSS. Depende del ANCHO DE LA TARJETA
+   (container query), no de la pantalla: en 2 columnas de 2xl o en un lg angosto sigue en vertical. */
+@media (min-width: 1024px) {
+  [data-glass='v2'] .v2-ritmo { container: v2ritmo / inline-size; }
+}
+/* Solo con la lista de máquinas (Eviscerado, 3 Baader): Filete tiene una y queda como estaba. */
+@container v2ritmo (min-width: 700px) {
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    column-gap: 24px;
+    row-gap: 0;
+    align-content: start;
+  }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > * { grid-column: 1; min-width: 0; }
+  /* Izquierda: título, cifra y barra de la meta. Derecha: las tres Baader y, debajo, lo que las acompaña
+     (estado, lectura de Shoplogix, parada si la banda no la dice). Así las dos columnas miden parecido. */
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div:first-child { grid-row: 1; }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.mt-1\.5 { grid-row: 2; }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.mt-3:not(.ritmo-maquinas) { grid-row: 3; }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > .ritmo-maquinas {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+    margin-top: 0;
+    padding-top: 0 !important;
+  }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > p.text-\[12px\],
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.rounded-ctl,
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.mt-2.flex { grid-column: 2; }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > p.text-\[12px\],
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.rounded-ctl { grid-row: 4; margin-top: 12px; }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.mt-2.flex { grid-row: 5; }
+  /* A 236 px la cifra grande y las dos medias no caben lado a lado: igual que en celular, se apilan. */
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.mt-1\.5 { flex-wrap: wrap; row-gap: 10px; }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.mt-1\.5 > .ml-auto {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    gap: 20px;
+    text-align: left;
+  }
+  [data-glass='v2'] .v2-ritmo > section:has(> .ritmo-maquinas) > div.mt-1\.5 > .ml-auto > div { justify-content: flex-start; flex-wrap: wrap; }
+  [data-glass='v2'] .v2-ritmo .ritmo-maquinas > .space-y-1\.5 > div { gap: 8px; }
+}
+@media (min-width: 1536px) {
+  /* Dos columnas: las tarjetas vecinas de una misma fila llegan al mismo alto. */
+  [data-glass='v2'] .monitor-v2 .v2-clasico > section { height: 100%; }
 }

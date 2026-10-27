@@ -86,7 +86,7 @@ import {
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
-import { RitmoVivoV2 } from './monitor/RitmoVivoV2'
+import { BandaParadaV2, RitmoVivoV2 } from './monitor/RitmoVivoV2'
 import { ritmoVivoDeMonitor } from './monitor/ritmoVivo'
 import { repartoSemanal } from './monitor/repartoSemanal'
 import { Pill, SegmentedControl } from '@/components/piel'
@@ -6486,9 +6486,10 @@ function MonitorDelToken() {
        * bloque, y `break-inside-avoid` impide que una tarjeta se parta en dos.
        */}
       <main
-        className={`mx-auto max-w-3xl space-y-4 px-4 py-4 lg:max-w-[1500px] 2xl:max-w-[1840px]${
-          modoPantalla ? ' modo-pantalla' : ''
-        }`}
+        className={`mx-auto max-w-3xl space-y-4 px-4 py-4 ${
+          /* «El turno» del v2 usa todo el ancho de PC (principal + riel); el resto conserva su tope. */
+          glass === 'v2' && pestana === 'turno' ? 'lg:max-w-none lg:px-6' : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'
+        }${modoPantalla ? ' modo-pantalla' : ''}`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -6501,7 +6502,7 @@ function MonitorDelToken() {
             ("Línea detenida hace 6 h" tras el cierre es lo esperable), y en
             la TV tampoco — cambiaría el alto del tablero fijo. */}
         {live.status === 'detenida' && esActual && !live.shiftClosed && (
-          <section className="pantalla-oculta rounded-2xl border border-border bg-muted px-4 py-3">
+          <section className="pantalla-oculta v2-ahora-mismo rounded-2xl border border-border bg-muted px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-600 dark:text-red-400">
               <PauseCircle className="h-3 w-3" />
               Ahora mismo
@@ -6713,6 +6714,7 @@ function MonitorDelToken() {
               }}
               ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} parte="estado" />}
               ritmoVivo={vivoV2 ? <RitmoVivoV2 r={vivoV2.r} maquinas={vivoV2.maquinas} /> : undefined}
+              banda={vivoV2 ? <BandaParadaV2 maquinas={vivoV2.maquinas} /> : undefined}
               caminoMeta={
                 <TiempoDelTurno
                   tb={live.timeBreakdown}

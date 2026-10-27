@@ -868,6 +868,8 @@ export interface MonitorV2Props {
   ritmoLinea?: ReactNode
   /** «Ritmo en vivo · 15 min»: va justo debajo de «Ritmo de la línea». Ausente con el turno cerrado o sin serie del pulso. */
   ritmoVivo?: ReactNode
+  /** Banda de estado de PC (la parada en curso con su cronómetro): primera fila de la grilla, pegada bajo la cabecera. */
+  banda?: ReactNode
   /** «Camino a la meta» del monitor clásico (hechas, paradas por causa, ritmo, por jugar): se ve tal cual. */
   caminoMeta?: ReactNode
   /** Velocidad minuto a minuto de todo el turno (ciclos de Shoplogix por máquina). */
@@ -1034,10 +1036,16 @@ export function MonitorV2(p: MonitorV2Props) {
   })()
 
   return (
-    <div className="monitor-v2 flex flex-col gap-3 lg:gap-4">
-      {/* Fila 1 · las cuatro cifras que se miran de lejos */}
-      <div className={`grid grid-cols-2 gap-3 lg:gap-4 ${p.ritmoLinea ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
-        <Tarjeta onAbrir={abrir('piezas')} className="col-span-2 lg:col-span-1" icono={<Target className={ic} />} titulo={p.cerrado ? 'Piezas del turno' : 'Piezas ahora'} sub={p.corteHora ? `Shoplogix ${p.corteHora}` : undefined}>
+    <div className="monitor-v2 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
+      {p.banda}
+
+      {/* PC: columna principal fluida + riel fijo con lo vivo y lo de Mantención. Un solo DOM: en celular los dos
+          envoltorios son `contents` y cada tarjeta lleva `max-lg:order-N`, que repite el orden de siempre
+          (cifras, ritmo de la línea, ritmo en vivo, camino a la meta, curva, minuto a minuto, fallas, más). */}
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4 2xl:grid 2xl:grid-cols-2">
+      {/* Fila 1 · las cifras que se miran de lejos */}
+      <div className={`grid grid-cols-2 gap-3 max-lg:order-1 lg:gap-4 2xl:col-span-2 2xl:row-start-1 ${p.ritmoLinea ? 'xl:grid-cols-3' : '2xl:grid-cols-4'}`}>
+        <Tarjeta onAbrir={abrir('piezas')} className={`col-span-2 ${p.ritmoLinea ? 'xl:col-span-1' : '2xl:col-span-1'}`} icono={<Target className={ic} />} titulo={p.cerrado ? 'Piezas del turno' : 'Piezas ahora'} sub={p.corteHora ? `Shoplogix ${p.corteHora}` : undefined}>
           <Cifra valor={int(p.piezas)} unidad="pz" />
           {p.meta != null && pct != null && (
             <>
@@ -1063,7 +1071,7 @@ export function MonitorV2(p: MonitorV2Props) {
             : p.vsAyer && <Contexto tono={p.vsAyer.diff >= 0 ? 'ok' : 'critical'}>{firmado(p.vsAyer.diff)} pz vs {p.vsAyer.label}</Contexto>}
         </Tarjeta>}
 
-        <Tarjeta iconoSoloPc={!!(conProyeccion && p.ritmoLinea)} onAbrir={abrir('mant')} className={`${conProyeccion && p.ritmoLinea ? 'col-span-1' : 'col-span-2'} ${conProyeccion || p.ritmoLinea ? 'lg:col-span-1' : 'lg:col-span-2'}`} icono={<Wrench className={ic} />} titulo="Respuesta de Mantención" sub="minutos por falla técnica">
+        <Tarjeta iconoSoloPc={!!(conProyeccion && p.ritmoLinea)} onAbrir={abrir('mant')} className={`${conProyeccion && p.ritmoLinea ? 'col-span-1' : 'col-span-2'} ${p.ritmoLinea ? 'xl:col-span-1' : conProyeccion ? '2xl:col-span-1' : '2xl:col-span-2'}`} icono={<Wrench className={ic} />} titulo="Respuesta de Mantención" sub="minutos por falla técnica">
           {p.mant && p.mant.fallas > 0 ? (
             <>
               <Cifra valor={p.mant.mttr != null ? dec(p.mant.mttr) : '—'} unidad="min" />
@@ -1080,14 +1088,12 @@ export function MonitorV2(p: MonitorV2Props) {
         </Tarjeta>
       </div>
 
-      {p.ritmoLinea && <div className="v2-clasico v2-ritmo">{p.ritmoLinea}</div>}
+      {p.ritmoLinea && <div className="v2-clasico v2-ritmo max-lg:order-2 2xl:col-start-1 2xl:row-start-2">{p.ritmoLinea}</div>}
 
-      {p.ritmoVivo}
-
-      {p.caminoMeta && <div className="v2-clasico">{p.caminoMeta}</div>}
+      {p.caminoMeta && <div className="v2-clasico max-lg:order-4 2xl:col-start-2 2xl:row-span-2 2xl:row-start-2">{p.caminoMeta}</div>}
 
       {/* Fila 2 · la curva del turno y las máquinas */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
+      <div className="grid grid-cols-1 gap-3 max-lg:order-5 lg:grid-cols-4 lg:gap-4 2xl:col-start-1 2xl:row-start-3 2xl:h-full">
         {p.curva && (
           <Tarjeta onAbrir={abrir('curva')} className={p.ritmoLinea ? 'lg:col-span-4' : 'lg:col-span-3'} icono={<TrendingUp className={ic} />} titulo="Cómo viene el turno" sub="piezas acumuladas desde la primera pieza">
             <Curva curva={p.curva} inicioMs={p.inicioMs} />
@@ -1114,15 +1120,26 @@ export function MonitorV2(p: MonitorV2Props) {
 
       {p.minutoAMinuto && (
         /* `grafico-turno`: el «ver ›» de cada parada desplaza hasta acá (en el clásico, al gráfico de velocidad). */
-        <div id="grafico-turno" className="scroll-mt-4">
+        <div id="grafico-turno" className="scroll-mt-4 max-lg:order-6 lg:scroll-mt-36 2xl:col-span-2 2xl:row-start-4">
           <Tarjeta icono={<Activity className={ic} />} titulo="Velocidad minuto a minuto" sub="piezas contadas por Shoplogix, desde el inicio del turno">
             <MinutoTurnoV2 d={p.minutoAMinuto} cerrado={p.cerrado} marca={p.eventoMarcado ?? null} onQuitarMarca={p.onQuitarEvento} />
           </Tarjeta>
         </div>
       )}
 
+
+      {/* «Más del turno»: al final de la columna principal, a todo el ancho en 2xl. */}
+      <div className="flex min-w-0 flex-col gap-3 max-lg:order-9 lg:gap-4 2xl:col-span-2 2xl:row-start-5">
+        {p.vista >= 1 && <MasDelTurnoV2 mas={p.mas} inicioMs={p.inicioMs} cerrado={p.cerrado} />}
+        <BotonDetalle vista={p.vista} onVista={p.onVista} />
+      </div>
+      </div>
+
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+      {p.ritmoVivo && <div className="min-w-0 max-lg:order-3">{p.ritmoVivo}</div>}
+
       {/* Fila 3 · Mantención en detalle y a dónde se fue el tiempo */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+      <div className="grid grid-cols-1 gap-3 max-lg:order-7 lg:gap-4">
         <Tarjeta onAbrir={abrir('mant')} icono={<Wrench className={ic} />} titulo="Fallas de equipos" sub={p.eventos.length ? `${p.eventos.length} en el turno · ${horas(fallasMin)}` : 'ninguna en el turno'}>
           {p.rielMttr.length > 1 && <RielMttr riel={p.rielMttr} />}
           {p.eventos.length > 0 && (
@@ -1163,9 +1180,7 @@ export function MonitorV2(p: MonitorV2Props) {
         </Tarjeta>
       </div>
 
-      {p.vista >= 1 && <MasDelTurnoV2 mas={p.mas} inicioMs={p.inicioMs} cerrado={p.cerrado} />}
-
-      <BotonDetalle vista={p.vista} onVista={p.onVista} />
+      </div>
 
       <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
         {detalle?.cuerpo}
@@ -1352,10 +1367,28 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
   onPestana: (p: 'turno' | 'analisis') => void
   onModoTv?: () => void
 }) {
-  const ancho = 'mx-auto max-w-3xl px-3 lg:max-w-[1500px] lg:px-4 2xl:max-w-[1840px]'
+  /* Celular: la barra flotante y el título grande de siempre (`lg:hidden`). PC (lg+): UNA barra de 56 px, pegada
+     arriba y a todo el ancho: línea · estado · turno a la izquierda, navegación de turnos al centro y
+     pestañas, cambio de línea, Modo TV y tema a la derecha. Sin título grande: libera ~140 px de alto. */
+  const ancho = 'mx-auto max-w-3xl px-3'
+  const pestanas = (
+    <div className="v2-segmentado flex rounded-full p-1" role="tablist">
+      {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
+        <button
+          key={id}
+          role="tab"
+          aria-selected={pestana === id}
+          onClick={() => onPestana(id)}
+          className={`tap-44 rounded-full px-4 py-1.5 text-[14px] transition-colors ${pestana === id ? 'v2-seg-activo font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          {rotulo}
+        </button>
+      ))}
+    </div>
+  )
   return (
     <>
-      <div className="v2-cabecera sticky top-0 z-20 pt-3">
+      <div className="v2-cabecera sticky top-0 z-20 pt-3 lg:hidden">
         <div className={ancho}>
           <div className="v2-barra flex h-14 items-center gap-2.5 rounded-full pl-2 pr-2">
             <Icono grande><Cpu className="h-4 w-4" /></Icono>
@@ -1364,40 +1397,44 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
               {area && <div className="truncate text-[12px] text-muted-foreground">{area}</div>}
             </div>
             <span className="hidden sm:inline-flex">{estado}</span>
-            <div className="ml-auto hidden lg:block">{cambioLinea}</div>
-            <span className="ml-auto inline-flex lg:ml-0">{tema}</span>
+            <span className="ml-auto inline-flex">{tema}</span>
           </div>
         </div>
       </div>
-      <div className={`${ancho} pt-5 lg:pt-7`}>
+      <div className={`${ancho} pt-5 lg:hidden`}>
         <div className="mb-3 sm:hidden">{estado}</div>
-        <div className="mb-4 lg:hidden">{cambioLinea}</div>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="mb-4">{cambioLinea}</div>
+        <div className="flex flex-col gap-4">
           <div className="min-w-0 px-1">
-            <h1 className="text-[34px] font-semibold leading-none tracking-tight lg:text-[44px]">{pestana === 'turno' ? 'El turno' : 'Análisis'}</h1>
+            <h1 className="text-[34px] font-semibold leading-none tracking-tight">{pestana === 'turno' ? 'El turno' : 'Análisis'}</h1>
             <p className="mt-2 text-[15px] tabular-nums text-muted-foreground first-letter:uppercase">{sub}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {navTurnos}
-            <div className="v2-segmentado flex rounded-full p-1" role="tablist">
-              {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
-                <button
-                  key={id}
-                  role="tab"
-                  aria-selected={pestana === id}
-                  onClick={() => onPestana(id)}
-                  className={`tap-44 rounded-full px-4 py-1.5 text-[14px] transition-colors ${pestana === id ? 'v2-seg-activo font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  {rotulo}
-                </button>
-              ))}
-            </div>
-            {onModoTv && (
-              <button type="button" onClick={onModoTv} className="v2-boton-fuerte tap-44 hidden items-center gap-1.5 rounded-full px-4 py-2 text-[14px] font-medium lg:inline-flex">
-                <Tv className="h-4 w-4" /> Modo TV
-              </button>
-            )}
+            {pestanas}
           </div>
+        </div>
+      </div>
+
+      <div className="v2-cabecera v2-barra-pc sticky top-0 z-20 hidden h-14 items-center gap-4 px-6 lg:flex">
+        <div className="flex min-w-0 flex-1 flex-col justify-center">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h1 className="min-w-0 truncate text-[15px] font-semibold leading-tight">{titulo}</h1>
+            {estado}
+            {area && <span className="hidden truncate text-[13px] text-muted-foreground xl:inline">{area.startsWith(titulo) ? area.slice(titulo.length).replace(/^[\s·]+/, '') || area : area}</span>}
+          </div>
+          <p className="truncate text-[13px] leading-tight tabular-nums text-muted-foreground first-letter:uppercase" title={sub}>{sub}</p>
+        </div>
+        {navTurnos}
+        <div className="flex shrink-0 items-center gap-2.5">
+          {pestanas}
+          {cambioLinea}
+          {onModoTv && (
+            <button type="button" onClick={onModoTv} className="v2-boton-fuerte tap-44 inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[14px] font-medium">
+              <Tv className="h-4 w-4" /> Modo TV
+            </button>
+          )}
+          {tema}
         </div>
       </div>
     </>

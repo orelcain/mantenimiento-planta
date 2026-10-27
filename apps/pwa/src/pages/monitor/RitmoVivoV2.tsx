@@ -20,6 +20,7 @@ import {
   paradaEnCurso,
   type LineaLlenado,
   type MaquinaVivo,
+  type ParadaVivo,
   type RitmoVivo,
   type Senal,
   type Tono,
@@ -54,6 +55,27 @@ function useReloj() {
     return () => clearInterval(id)
   }, [])
   return t - new Date(t).getTimezoneOffset() * 60_000
+}
+
+/** «La línea · detención»: el mismo rótulo en la tarjeta (celular) y en la banda de estado (PC). */
+function rotuloParada(p: ParadaVivo): string {
+  return `${p.quien} · ${p.clase === 'micro' ? 'micro detención' : p.clase === 'programada' ? 'parada programada' : 'detención'}`
+}
+
+/** «desde 13:06:21 · Shoplogix la clasifica como detención.»: lo que acompaña al cronómetro. */
+function detalleParada(p: ParadaVivo): string {
+  return `desde ${hhmmss(p.desdeMs)}${
+    p.clase === 'micro' ? ` · Shoplogix la clasifica como micro detención. En estos datos las micro duran hasta ${MICRO_MAX_MEDIDO_S} s.` : ''
+  }${p.clase === 'detencion' ? ' · Shoplogix la clasifica como detención.' : ''}${
+    p.clase === 'programada' && p.causa ? ` · ${motivoEnEspanol(p.causa)}` : ''
+  }`
+}
+
+/** El aviso que pide acción (o dice la causa anotada); null si no hay nada que avisar. */
+function avisoParada(p: ParadaVivo): string | null {
+  if (p.faltaCausa) return 'Ya es detención: hay que anotar la causa.'
+  if (p.causa && p.clase !== 'programada') return `Causa anotada: ${motivoEnEspanol(p.causa)}.`
+  return null
 }
 
 function irAlMinutoAMinuto() {
@@ -219,17 +241,13 @@ export function RitmoVivoV2({ r, maquinas }: RitmoVivoV2Props) {
               <div className="flex items-center gap-2.5">
                 <Timer className="h-5 w-5 shrink-0 rv-parada-icono" aria-hidden />
                 <span className="min-w-0 flex-1 text-[15px] font-semibold leading-tight rv-parada-texto">
-                  {parada.quien} · {parada.clase === 'micro' ? 'micro detención' : parada.clase === 'programada' ? 'parada programada' : 'detención'}
+                  {rotuloParada(parada)}
                 </span>
                 <span className="rv-crono tabular-nums rv-parada-texto" aria-label="Tiempo parada">{cronometro((ahoraWall - parada.desdeMs) / 1000)}</span>
               </div>
-              {parada.faltaCausa && <p className="mt-1.5 text-[15px] font-semibold leading-tight text-foreground">Ya es detención: hay que anotar la causa.</p>}
-              {parada.causa && parada.clase !== 'programada' && <p className="mt-1.5 text-[15px] font-semibold leading-tight text-foreground">Causa anotada: {motivoEnEspanol(parada.causa)}.</p>}
+              {avisoParada(parada) && <p className="mt-1.5 text-[15px] font-semibold leading-tight text-foreground">{avisoParada(parada)}</p>}
               <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-                desde {hhmmss(parada.desdeMs)}
-                {parada.clase === 'micro' && ` · Shoplogix la clasifica como micro detención. En estos datos las micro duran hasta ${MICRO_MAX_MEDIDO_S} s.`}
-                {parada.clase === 'detencion' && ' · Shoplogix la clasifica como detención.'}
-                {parada.clase === 'programada' && parada.causa && ` · ${motivoEnEspanol(parada.causa)}`}
+                {detalleParada(parada)}
               </p>
             </div>
           </div>
@@ -296,5 +314,30 @@ export function RitmoVivoV2({ r, maquinas }: RitmoVivoV2Props) {
         </div>
       </div>
     </section>
+  )
+}
+
+// ── La banda de estado de PC ─────────────────────────────────────────────────
+
+/**
+ * La parada en curso como UNA banda pegada bajo la cabecera, solo en PC (lg+): ahí «Ritmo en vivo»
+ * vive en el riel y la parada dejaría de verse al bajar. Misma fuente (`paradaEnCurso`) y mismo
+ * `cronometro` que la tarjeta, así el tiempo coincide. En PC la tarjeta, «Ritmo de la línea» y el
+ * aviso «Ahora mismo» callan la parada (CSS `:has(.rv-banda)`); en celular la banda no existe.
+ * Sin parada no dibuja nada.
+ */
+export function BandaParadaV2({ maquinas }: { maquinas: MaquinaVivo[] }) {
+  const ahoraWall = useReloj()
+  const parada = paradaEnCurso(maquinas)
+  if (!parada) return null
+  const aviso = avisoParada(parada)
+  return (
+    <div className="rv-banda" data-clase={parada.clase} role="status" aria-label="Parada en curso">
+      <Timer className="h-5 w-5 shrink-0 rv-banda-icono" aria-hidden />
+      <span className="rv-banda-rotulo shrink-0 text-[16px] font-semibold">{rotuloParada(parada)}</span>
+      <span className="rv-banda-crono tabular-nums" aria-label="Tiempo parada">{cronometro((ahoraWall - parada.desdeMs) / 1000)}</span>
+      <span className="rv-banda-detalle min-w-0 flex-1 truncate text-[13px]" title={detalleParada(parada)}>{detalleParada(parada)}</span>
+      {aviso && <span className="shrink-0 text-[14px] font-semibold text-foreground">{aviso}</span>}
+    </div>
   )
 }
