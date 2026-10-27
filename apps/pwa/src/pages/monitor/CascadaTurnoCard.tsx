@@ -11,7 +11,7 @@
  */
 
 
-import type { Cascada } from './cascadaTurno'
+import { contenedorPlural, type Cascada } from './cascadaTurno'
 
 const fmt = (n: number) => Math.abs(n).toLocaleString('es-CL')
 
@@ -91,8 +91,8 @@ export function CascadaTurnoCard({ cascada }: { cascada: Cascada }) {
         <p className="mt-3 text-footnote text-foreground/80">
           De las <b className="tabular-nums">{fmt(cascada.perdido)}</b> piezas que no se hicieron,{' '}
           <b className="tabular-nums">{fmt(cascada.perdidoParado)}</b> fueron con la línea parada y{' '}
-          <b className="tabular-nums">{fmt(cascada.perdidoAndando)}</b> con la línea andando y la
-          silleta vacía.{' '}
+          <b className="tabular-nums">{fmt(cascada.perdidoAndando)}</b> con la línea andando y{' '}
+          {cascada.contenedor === 'carro' ? 'el carro vacío' : 'la silleta vacía'}.{' '}
           {cascada.perdidoAndando > cascada.perdidoParado ? (
             <>La mayor parte <b>no es una falla</b>: es abastecimiento aguas arriba.</>
           ) : (
@@ -105,7 +105,7 @@ export function CascadaTurnoCard({ cascada }: { cascada: Cascada }) {
           el piso de 11 de la constitución (§9/§64), y una frase larga tampoco es
           para lo que sirve una píldora. */}
       <p className="mt-3 text-caption tabular-nums text-muted-foreground">
-        {cascada.silletasLlenasPor100} de cada 100 silletas con pieza · máquina a{' '}
+        {cascada.silletasLlenasPor100} de cada 100 {contenedorPlural(cascada.contenedor)} con pieza · máquina a{' '}
         {cascada.ritmoMaquina} pz/min · {cascada.minutosEnMarcha} min andando
       </p>
     </section>

@@ -24,7 +24,8 @@ import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import type { HourlyRow } from '@/services/shoplogix/monitorHourly'
 import type { ParetoRow } from '@/services/shoplogix/monitorPareto'
 import type { SemanaReparto } from './repartoSemanal'
-import type { Cascada } from './cascadaTurno'
+import { contenedorPlural, vaciasEtiqueta, type Cascada } from './cascadaTurno'
+import type { DetalleCascada, DuenoDetalle, HoraDetalle, RenglonDetalle } from './cascadaDetalle'
 import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 
@@ -1407,6 +1408,8 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
 
 export interface MasDelTurno {
   cascada: Cascada | null
+  /** Máquina · causa · hora de cada pérdida de la cascada, cuadrado a sus totales. */
+  cascadaDetalle?: DetalleCascada | null
   tiempo: { windowMin: number; producingMin: number; plannedMin: number; recoverableMin: number } | null
   /** pz/min de cada máquina por tramo de 5 min, desde la primera pieza. */
   velocidad: Array<{ nombre: string; cpm: number[]; objetivo: number | null; ahora: number | null; promedio: number | null }> | null
@@ -1414,9 +1417,180 @@ export interface MasDelTurno {
   comparado: Array<{ label: string; piezas: number; hoy: boolean }> | null
 }
 
-/** «Dónde se fueron las piezas»: cascada horizontal, cada pérdida cuelga de lo que quedaba. */
-function CascadaV2({ c }: { c: Cascada }) {
-  const { activo, en, salir } = useActivo()
+/** Sin imputar: rayado gris, para que no se confunda con un dueño. */
+const RAYADO = 'repeating-linear-gradient(135deg, var(--v2-gris) 0 3px, transparent 3px 6px)'
+const RELLENO_DETALLE: Record<DuenoDetalle, string> = { mantencion: 'var(--v2-mant)', externo: 'var(--v2-ext)', 'sin-imputar': RAYADO }
+const NOMBRE_DUENO: Record<DuenoDetalle, string> = { mantencion: 'Mantención', externo: 'Externo', 'sin-imputar': 'Sin imputar' }
+const pct = (n: number, t: number) => `${t > 0 ? Math.round((n / t) * 100) : 0} %`
+const vecesTxt = (n: number) => `${int(n)} ${n === 1 ? 'vez' : 'veces'}`
+
+type FilaAbrible = 'detenciones' | 'micro' | 'vacias'
+type VistaDetalle = 'maquina' | 'causa' | 'hora'
+
+/** Una barra partida por dueño (o de un solo color). `ancho` en %. */
+function BarraPartes({ partes, color, ancho, alto = 'h-2' }: { partes?: Partial<Record<DuenoDetalle, number>>; color?: string; ancho: number; alto?: string }) {
+  const tramos = partes ? DUENOS.filter((d) => (partes[d] ?? 0) > 0) : []
+  return (
+    <div className={`flex ${alto} gap-px overflow-hidden rounded-full`} style={{ width: `${Math.max(3, Math.min(100, ancho))}%` }}>
+      {tramos.length
+        ? tramos.map((d) => <i key={d} className="block h-full" style={{ flex: partes![d], background: RELLENO_DETALLE[d] }} />)
+        : <i className="block h-full w-full" style={{ background: color }} />}
+    </div>
+  )
+}
+
+/** Renglones de una vista (máquina o causa): nombre, barra, piezas y su contexto. */
+function RenglonesDetalle({ filas, total, color, sub }: { filas: RenglonDetalle[]; total: number; color: string; sub: (r: RenglonDetalle) => string }) {
+  const max = Math.max(1, ...filas.map((r) => r.piezas))
+  return (
+    <ul className="mt-3 space-y-2.5">
+      {filas.map((r) => (
+        <li key={r.nombre} className="min-w-0">
+          <div className="grid grid-cols-[minmax(0,6.5rem)_1fr_auto] items-center gap-2 text-[13px]">
+            <span className="truncate text-foreground" title={r.nombre}>{r.nombre}</span>
+            <BarraPartes partes={r.partes} color={r.dueno ? RELLENO_DETALLE[r.dueno] : color} ancho={(r.piezas / max) * 100} />
+            <span className="tabular-nums text-foreground">{firmado(-r.piezas)} pz</span>
+          </div>
+          <div className="mt-0.5 pl-0 text-[12px] tabular-nums text-muted-foreground sm:pl-[7rem]">{sub(r)} · {pct(r.piezas, total)}</div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Columnas por hora de planta. Con muchas horas los valores no caben: se nombra la más cara. */
+function HorasDetalle({ horasFila, color }: { horasFila: HoraDetalle[]; color: string }) {
+  const max = Math.max(1, ...horasFila.map((h) => h.piezas))
+  const peor = horasFila.reduce((a, h) => (h.piezas > a.piezas ? h : a), horasFila[0]!)
+  const conValor = horasFila.length <= 7
+  const parciales = horasFila.filter((h) => h.parcialMin != null)
+  return (
+    <>
+      <div className="mt-3 grid h-24 items-end gap-1.5" style={{ gridTemplateColumns: `repeat(${horasFila.length}, minmax(0, 1fr))` }}>
+        {horasFila.map((h) => (
+          <div key={h.hora} className="flex h-full min-w-0 flex-col items-stretch justify-end gap-1" title={`${h.hora} h · ${firmado(-h.piezas)} pz`}>
+            {conValor && <span className="text-center text-[12px] tabular-nums text-foreground">{h.piezas > 0 ? firmado(-h.piezas) : '0'}</span>}
+            <div className="flex flex-col-reverse overflow-hidden rounded-t-[6px] rounded-b-[2px]" style={{ height: `${(h.piezas / max) * 56}px`, minHeight: h.piezas > 0 ? 3 : 0 }}>
+              {h.partes && DUENOS.some((d) => (h.partes![d] ?? 0) > 0)
+                ? DUENOS.filter((d) => (h.partes![d] ?? 0) > 0).map((d) => <i key={d} className="block" style={{ flex: h.partes![d], background: RELLENO_DETALLE[d] }} />)
+                : <i className="block h-full" style={{ background: color }} />}
+            </div>
+            <span className="text-center text-[12px] tabular-nums text-muted-foreground">{h.hora}{h.parcialMin != null ? '*' : ''}</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[12px] tabular-nums text-muted-foreground">
+        La hora más cara: {peor.hora} h, {firmado(-peor.piezas)} pz.
+        {parciales.length ? ` * Hora incompleta: ${parciales.map((h) => `${h.hora} h (${h.parcialMin} min)`).join(', ')}.` : ''}
+      </p>
+    </>
+  )
+}
+
+const SinDato = ({ children }: { children: ReactNode }) => (
+  <p className="mt-3 rounded-[10px] border border-dashed border-muted-foreground/30 px-3 py-2.5 text-[13px] text-muted-foreground">{children}</p>
+)
+const Nota = ({ children }: { children: ReactNode }) => <p className="mt-3 text-[12px] leading-snug text-muted-foreground">{children}</p>
+
+/** El cuerpo de una fila abierta: pestañas Máquina · Causa · Hora. */
+function DetalleFila({ fila, c, d, vista, onVista }: { fila: FilaAbrible; c: Cascada; d: DetalleCascada; vista: VistaDetalle; onVista: (v: VistaDetalle) => void }) {
+  const cont = contenedorPlural(c.contenedor)
+  const pasoVacio = c.contenedor === 'carro' ? 'el carro pasó vacío' : 'la silleta pasó vacía'
+  const color = fila === 'vacias' ? 'var(--v2-ext)' : 'var(--v2-mant)'
+  const total = fila === 'detenciones' ? d.responde.total - d.responde.micro - d.responde.vacias : fila === 'micro' ? d.responde.micro : d.responde.vacias
+  const v = fila === 'detenciones' ? d.detenciones : fila === 'micro' ? d.micro : d.vacias
+  const pestanas: Array<[VistaDetalle, string]> = [['maquina', 'Máquina'], ['causa', 'Causa'], ['hora', 'Hora']]
+  let cuerpo: ReactNode = null
+  if (vista === 'maquina') {
+    cuerpo = v?.maquina?.length ? (
+      <>
+        <RenglonesDetalle filas={v.maquina} total={total} color={color} sub={(r) =>
+          fila === 'vacias' ? (r.esperado != null ? `pide ${dec(r.esperado, 0)} pz/min` : 'sin objetivo')
+            : `${r.minutos != null ? `${horas(r.minutos)} de máquina · ` : ''}${vecesTxt(r.veces ?? 0)}`} />
+        <Nota>{fila === 'vacias'
+          ? 'Repartido según lo que cada máquina se quedó bajo su esperado en los minutos que andaba.'
+          : 'Repartido según el tiempo que cada máquina estuvo detenida.'}</Nota>
+      </>
+    ) : <SinDato>Sin dato por máquina en este turno.</SinDato>
+  } else if (vista === 'causa') {
+    if (fila === 'detenciones' && v?.causa?.length) {
+      const sin = d.responde.sinImputar
+      cuerpo = (
+        <>
+          <RenglonesDetalle filas={v.causa} total={total} color={color} sub={(r) =>
+            [NOMBRE_DUENO[r.dueno ?? 'sin-imputar'], r.maquinas?.join(', '), r.veces ? vecesTxt(r.veces) : null].filter(Boolean).join(' · ')} />
+          {sin > 0 && <Nota>{int(sin)} pz ({pct(sin, total)}) sin imputar: si nadie anota la causa, no se puede defender.</Nota>}
+        </>
+      )
+    } else if (fila === 'micro' && d.micro) {
+      const seg = d.micro.segundosPromedio
+      cuerpo = (
+        <>
+          <RenglonesDetalle filas={d.micro.causa ?? []} total={total} color={color} sub={(r) =>
+            [r.veces ? vecesTxt(r.veces) : null, seg != null ? `${int(seg)} s promedio` : null].filter(Boolean).join(' · ') || 'sin detalle'} />
+          <Nota>Shoplogix las registra como «Microdetención», sin causa de origen. Se sabe la máquina, la hora y cuánto duran; el porqué, no.</Nota>
+        </>
+      )
+    } else if (fila === 'vacias') {
+      cuerpo = <SinDato>Sin dato de causa: Shoplogix no registra por qué {pasoVacio}. La línea andaba: no es tiempo de equipo detenido.</SinDato>
+    } else cuerpo = <SinDato>Sin dato de causa en este turno.</SinDato>
+  } else {
+    cuerpo = v?.hora?.length ? <HorasDetalle horasFila={v.hora} color={color} /> : <SinDato>Sin dato por hora en este turno.</SinDato>
+  }
+  return (
+    <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+      <div className="grid grid-cols-3 gap-0.5 rounded-[10px] bg-muted-foreground/[0.12] p-0.5" role="tablist" aria-label={`Detalle por ${cont}`}>
+        {pestanas.map(([id, rotulo]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={vista === id}
+            onClick={() => onVista(id)}
+            className={`tap-44 rounded-[10px] py-1.5 text-[13px] transition-colors ${vista === id ? 'bg-card font-medium text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+      {cuerpo}
+    </div>
+  )
+}
+
+/** «Quién responde de las N»: el dato que separa a Mantención del resto. */
+function QuienResponde({ d, c }: { d: DetalleCascada; c: Cascada }) {
+  const r = d.responde
+  const partes = [
+    { k: 'Mantención', n: r.mantencion, fondo: 'var(--v2-mant)', op: 1 },
+    { k: 'Externo', n: r.externo, fondo: 'var(--v2-ext)', op: 1 },
+    { k: 'Sin imputar', n: r.sinImputar, fondo: RAYADO, op: 1 },
+    { k: 'Micro', n: r.micro, fondo: 'var(--v2-mant)', op: 0.5 },
+    { k: vaciasEtiqueta(c.contenedor), n: r.vacias, fondo: 'var(--v2-ext)', op: 0.45 },
+  ].filter((x) => x.n > 0)
+  if (!partes.length) return null
+  return (
+    <div className="v2-subtarjeta mt-4 rounded-[14px] p-3">
+      <div className="text-[13px] tabular-nums text-muted-foreground">Quién responde de las {int(r.total)}</div>
+      <div className="mt-2 flex h-2.5 gap-0.5 overflow-hidden rounded-full" role="img" aria-label={partes.map((x) => `${x.k} ${int(x.n)}`).join(', ')}>
+        {partes.map((x) => <i key={x.k} className="block h-full" style={{ flex: x.n, background: x.fondo, opacity: x.op }} />)}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] tabular-nums text-foreground">
+        {partes.map((x) => (
+          <span key={x.k} className="inline-flex items-center gap-1.5">
+            <i className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: x.fondo, opacity: x.op, border: x.fondo === RAYADO ? '1px solid var(--v2-gris)' : undefined }} />
+            {x.k} {int(x.n)}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** «Dónde se fueron las piezas»: cascada horizontal; cada pérdida cuelga de lo que quedaba y se abre en su detalle. */
+function CascadaV2({ c, d }: { c: Cascada; d: DetalleCascada | null }) {
+  const [abierta, setAbierta] = useState<FilaAbrible | null>(null)
+  const [vistas, setVistas] = useState<Record<FilaAbrible, VistaDetalle>>({ detenciones: 'maquina', micro: 'maquina', vacias: 'maquina' })
   let resto = c.capacidad
   const filas = c.pasos.map((paso) => {
     if (paso.clave === 'capacidad' || paso.clave === 'producido') return { paso, desde: 0, hasta: Math.abs(paso.piezas) }
@@ -1425,25 +1599,48 @@ function CascadaV2({ c }: { c: Cascada }) {
     return { paso, desde: resto, hasta }
   })
   const color = (k: string) => (k === 'capacidad' ? 'var(--v2-secundaria)' : k === 'producido' ? 'var(--v2-acento)' : k === 'vacias' ? 'var(--v2-ext)' : 'var(--v2-mant)')
+  const info = (p: Cascada['pasos'][number]) => {
+    if (p.clave === 'vacias') return 'andando, sin pieza'
+    return [p.minutos != null ? `${horas(p.minutos)} de línea` : null, p.veces ? vecesTxt(p.veces) : null].filter(Boolean).join(' · ')
+  }
   return (
-    <ul className="mt-4 space-y-3" {...salir}>
-      {filas.map(({ paso, desde, hasta }, i) => (
-        <li key={paso.clave} className="cursor-pointer" {...en(i)}>
-          <div className="flex items-baseline justify-between gap-3 text-[15px]">
-            <span className="min-w-0 truncate text-foreground">{paso.etiqueta}</span>
-            <span className={`shrink-0 tabular-nums ${paso.piezas < 0 ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{paso.piezas < 0 ? firmado(paso.piezas) : int(paso.piezas)} pz</span>
-          </div>
-          <div className="relative mt-1.5 h-3 rounded-full bg-muted-foreground/[0.08]">
-            <div className="absolute inset-y-0 rounded-full transition-opacity" style={{ left: `${(desde / c.capacidad) * 100}%`, width: `${Math.max(0.8, ((hasta - desde) / c.capacidad) * 100)}%`, background: color(paso.clave), opacity: activo != null && activo !== i ? 0.4 : 1 }} />
-          </div>
-          {activo === i && (paso.minutos != null || paso.veces != null) && (
-            <div className="mt-1 text-[12px] tabular-nums text-muted-foreground">
-              {paso.minutos != null ? horas(paso.minutos) : ''}{paso.veces != null ? ` · ${paso.veces} ${paso.veces === 1 ? 'vez' : 'veces'}` : ''}
-            </div>
-          )}
-        </li>
-      ))}
-    </ul>
+    <>
+      {d && <QuienResponde d={d} c={c} />}
+      <ul className="mt-4 space-y-1">
+        {filas.map(({ paso, desde, hasta }) => {
+          const abrible = d != null && (paso.clave === 'detenciones' || paso.clave === 'micro' || paso.clave === 'vacias')
+          const clave = paso.clave as FilaAbrible
+          const ab = abrible && abierta === clave
+          const alternar = () => setAbierta((a) => (a === clave ? null : clave))
+          const cabeza = (
+            <>
+              <div className="flex items-baseline justify-between gap-3 text-[15px]">
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-foreground">
+                  {abrible && <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${ab ? '' : '-rotate-90'}`} aria-hidden />}
+                  <span className="truncate">{paso.etiqueta}</span>
+                </span>
+                <span className={`shrink-0 tabular-nums ${paso.piezas < 0 ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{paso.piezas < 0 ? firmado(paso.piezas) : int(paso.piezas)} pz</span>
+              </div>
+              <div className="relative mt-1.5 h-3 rounded-full bg-muted-foreground/[0.08]">
+                <div className="absolute inset-y-0 rounded-full" style={{ left: `${(desde / c.capacidad) * 100}%`, width: `${Math.max(0.8, ((hasta - desde) / c.capacidad) * 100)}%`, background: color(paso.clave) }} />
+              </div>
+              {paso.piezas < 0 && !ab && info(paso) && <div className="mt-1 text-[12px] tabular-nums text-muted-foreground">{info(paso)}</div>}
+            </>
+          )
+          return (
+            <li key={paso.clave} className={`-mx-2.5 rounded-[14px] px-2.5 py-2 ${ab ? 'v2-subtarjeta' : ''}`}>
+              {abrible ? (
+                <button type="button" className="block w-full text-left" aria-expanded={ab} onClick={(e) => { e.stopPropagation(); alternar() }}>
+                  {cabeza}
+                </button>
+              ) : cabeza}
+              {ab && d && <DetalleFila fila={clave} c={c} d={d} vista={vistas[clave]} onVista={(v) => setVistas((x) => ({ ...x, [clave]: v }))} />}
+            </li>
+          )
+        })}
+      </ul>
+      {d && !abierta && <p className="mt-2 text-[12px] text-muted-foreground">Toca una pérdida para ver máquina, causa y hora.</p>}
+    </>
   )
 }
 
@@ -1541,8 +1738,8 @@ function MasDelTurnoV2({ mas, inicioMs, cerrado }: { mas: MasDelTurno; inicioMs:
         {c && (
           <Tarjeta icono={<Filter className={ic} />} titulo="Dónde se fueron las piezas" sub={`capacidad a ${dec(c.ritmoMaquina, 0)} pz/min · ${horas(c.minutosEnMarcha + c.minutosDetenida)}`}>
             <Cifra valor={int(c.perdido)} unidad="pz no hechas" chica />
-            <Contexto tono="info" nota={`parado ${int(c.perdidoParado)} · andando ${int(c.perdidoAndando)}`}>{Math.round(c.silletasLlenasPor100)} de cada 100 silletas con pieza</Contexto>
-            <CascadaV2 c={c} />
+            <Contexto tono="info" nota={`parado ${int(c.perdidoParado)} · andando ${int(c.perdidoAndando)}`}>{Math.round(c.silletasLlenasPor100)} de cada 100 {contenedorPlural(c.contenedor)} con pieza</Contexto>
+            <CascadaV2 c={c} d={mas.cascadaDetalle ?? null} />
           </Tarjeta>
         )}
         {t && (
