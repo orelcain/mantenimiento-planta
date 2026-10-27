@@ -26,7 +26,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
+import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Copy, FileDown, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
+import { copiarCorreo, descargarPdf, pedirInformeCorreo, type InformeCorreo } from '@/services/shoplogix/informeTurnoCorreo'
 import { useTheme } from '@/hooks/useTheme'
 import {
   subscribePublicShiftMonitor,
@@ -84,6 +85,8 @@ import {
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
+import { RitmoVivoV2 } from './monitor/RitmoVivoV2'
+import { ritmoVivoDeMonitor } from './monitor/ritmoVivo'
 import { repartoSemanal } from './monitor/repartoSemanal'
 import { Pill, SegmentedControl } from '@/components/piel'
 import { useIsAdmin, useIsSupervisor } from '@/store'
@@ -4787,6 +4790,48 @@ function MonitorDelToken() {
       setEnviandoInforme(false)
     }
   }
+  /* «Copiar correo» y «Descargar PDF»: el mismo informe, para mandarlo desde
+     el Outlook de quien aprieta. Se guarda la última respuesta unos minutos
+     para que copiar y descargar no armen el informe dos veces. */
+  const [preparandoCorreo, setPreparandoCorreo] = useState<'copiar' | 'pdf' | null>(null)
+  const informeCache = useRef<{ clave: string; at: number; p: Promise<InformeCorreo> } | null>(null)
+  const informeDelTurno = (): Promise<InformeCorreo> | null => {
+    if (!data) return null
+    const clave = `${data.plantSlug}/${data.shiftDocId}`
+    const c = informeCache.current
+    if (c && c.clave === clave && Date.now() - c.at < 3 * 60_000) return c.p
+    const p = pedirInformeCorreo(data.plantSlug, data.shiftDocId)
+    p.catch(() => { informeCache.current = null })
+    informeCache.current = { clave, at: Date.now(), p }
+    return p
+  }
+  const copiarCorreoDelTurno = async () => {
+    const p = informeDelTurno()
+    if (!p) return
+    setPreparandoCorreo('copiar')
+    setAvisoInforme(null)
+    try {
+      const r = await copiarCorreo(p)
+      setAvisoInforme(`Correo copiado: pégalo en Outlook. Asunto sugerido: ${r.asunto}`)
+    } catch (e) {
+      setAvisoInforme(e instanceof Error ? e.message : 'No se pudo copiar el correo.')
+    } finally {
+      setPreparandoCorreo(null)
+    }
+  }
+  const descargarPdfDelTurno = async () => {
+    const p = informeDelTurno()
+    if (!p) return
+    setPreparandoCorreo('pdf')
+    setAvisoInforme(null)
+    try {
+      descargarPdf(await p)
+    } catch (e) {
+      setAvisoInforme(e instanceof Error ? e.message : 'No se pudo descargar el PDF.')
+    } finally {
+      setPreparandoCorreo(null)
+    }
+  }
   const usuarioActual = useAuthStore((st) => st.user)
 
   const verIndice = (n: number) => {
@@ -6539,6 +6584,9 @@ function MonitorDelToken() {
           const pv = !turnoCerrado && contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null
           const ahoraLinea = pv?.cpm ?? null
           const ahoraPorId = pv?.porMaquina?.length ? new Map(pv.porMaquina.map((x) => [x.id, x.cpm])) : null
+          /* Solo en vivo, con el turno que se está mirando y el contador fresco: con el vivo arrastrado
+             (`recalibrando`) el «Ahora» de arriba no es el último minuto cerrado y las dos cifras no cuadrarían. */
+          const vivoV2 = esActual && pv && !pv.recalibrando ? ritmoVivoDeMonitor({ pulse: data.pulse, live, ahoraPorId }) : null
           const meta = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
           const pm = live.mantencion?.porMaquina ?? []
           const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
@@ -6657,6 +6705,7 @@ function MonitorDelToken() {
                   .filter((d) => d.piezas > 0),
               }}
               ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} parte="estado" />}
+              ritmoVivo={vivoV2 ? <RitmoVivoV2 r={vivoV2.r} maquinas={vivoV2.maquinas} /> : undefined}
               caminoMeta={
                 <TiempoDelTurno
                   tb={live.timeBreakdown}
@@ -7520,8 +7569,30 @@ function MonitorDelToken() {
               >
                 {enviandoInforme ? 'Enviando…' : 'Enviar informe de este turno'}
               </Button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={copiarCorreoDelTurno}
+                  disabled={preparandoCorreo !== null}
+                >
+                  <Copy className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {preparandoCorreo === 'copiar' ? 'Preparando…' : 'Copiar correo'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={descargarPdfDelTurno}
+                  disabled={preparandoCorreo !== null}
+                >
+                  <FileDown className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {preparandoCorreo === 'pdf' ? 'Preparando…' : 'Descargar PDF'}
+                </Button>
+              </div>
               {avisoInforme && (
-                <span className="text-xs text-muted-foreground">{avisoInforme}</span>
+                <span className="max-w-md select-text text-xs text-muted-foreground">{avisoInforme}</span>
               )}
             </div>
           )}

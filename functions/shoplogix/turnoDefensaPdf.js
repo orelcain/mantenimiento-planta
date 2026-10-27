@@ -1,34 +1,38 @@
 /**
  * turnoDefensaPdf — arma el PDF del informe post-turno.
  *
- * Seis láminas, en orden de defensa y no de dato:
- *   1. Veredicto           — la frase y cuatro cifras. Si solo se mira una, es esta.
- *   2. La falla medida bien— suma vs línea, y el reparto del solapamiento.
- *   3. Cronología          — dónde ocurrió, por máquina.
- *   4. Ritmo y contención  — cuánto cayó y cuánto demoró en volver.
- *   5. Cotejo              — contra los turnos equivalentes anteriores.
- *   6. Cierre              — qué se dice en la reunión y qué queda comprometido.
+ * Cinco láminas, en orden de defensa y no de dato, más un anexo cuando la
+ * línea tiene varias máquinas:
+ *   1. Veredicto       — la frase, cuatro cifras y de quién fue la pérdida.
+ *   2. Fallas de equipo— qué falló, dónde, cuánto tardó la línea en volver, y
+ *                        la cronología de todas las detenciones por dueño.
+ *   3. Ritmo           — el ritmo bloque por bloque y dónde faltaron las piezas.
+ *   4. Cotejo          — contra los turnos equivalentes, con los min de
+ *                        Mantención de cada uno.
+ *   5. Cierre          — el párrafo para leer en la reunión y lo que queda abierto.
+ *   6. Anexo           — suma de máquinas vs minutos de línea (solo varias máquinas).
+ *
+ * Las frases salen de `correoTurno.textosCorreo`: el correo y el PDF dicen lo
+ * mismo con las mismas palabras. La forma sigue el protocolo de
+ * /sin-tics-visual (ver la paleta abajo).
  *
  * ── Rendering ───────────────────────────────────────────────────────────────
  * Los gráficos se dibujan con primitivas de jsPDF (rectángulos y líneas), no
- * con imágenes de un servicio externo. Son barras y franjas de tiempo: no
- * necesitan una librería, y así el informe no depende de que un tercero
+ * con imágenes de un servicio externo: el informe no depende de que un tercero
  * responda a las 5 de la mañana.
  *
  * ── Tildes ──────────────────────────────────────────────────────────────────
- * Los PDF que ya existen en la PWA escriben en ASCII con un `noAccents()`,
- * apoyados en que "jsPDF helvetica no renderiza tildes". Verificado el
- * 2026-08-18: el PDF declara `WinAnsiEncoding` y escribe `ó` como un solo byte
- * 0xF3, o sea las tildes salen bien. Este informe va en español correcto.
- *
- * Lo que sí hay que cuidar es lo que NO está en WinAnsi: flechas (→), ≥, ×,
- * guiones largos raros. `wa()` los traduce y descarta cualquier cosa fuera del
- * rango, para que un carácter suelto no ensucie una lámina entera.
+ * Verificado el 2026-08-18: el PDF declara `WinAnsiEncoding` y escribe `ó` como
+ * un solo byte 0xF3, o sea las tildes salen bien. Lo que NO está en WinAnsi
+ * (flechas, ≥, ×, guiones largos raros) lo traduce `wa()`.
  *
  * ── Escalas de tiempo ───────────────────────────────────────────────────────
  * Todos los instantes vienen en wall-clock-as-UTC y se formatean con getters
  * UTC: así sale la hora del reloj de planta. Convertir sería el bug.
  */
+
+const { textosCorreo, fechaLarga, listaY, etiquetaPausa, EQUIPO, ORDINAL } = require('./correoTurno')
+const { perdidaPorDueno } = require('./informeTurno')
 
 // ── Formato ──────────────────────────────────────────────────────────────────
 
@@ -79,21 +83,39 @@ const num = (n) => (typeof n === 'number' ? n.toLocaleString('es-CL') : '--')
  * decia "1 maquinas" en la cabecera y "LAS 1 - linea muerta" en el grafico, y
  * cualquiera que lo lea deja de creerle al resto de las cifras.
  */
-const maquinasTexto = (n) => (n === 1 ? '1 maquina' : `${n} maquinas`)
+const maquinasTexto = (n) => (n === 1 ? '1 máquina' : `${n} máquinas`)
 
 // ── Paleta ───────────────────────────────────────────────────────────────────
-// Misma familia que el mockup: azul petróleo de acento, semánticos aparte.
+// La misma del correo (correoTurno.js) y del protocolo de /sin-tics-visual:
+// tinta y grises, y color SOLO donde codifica un estado. Sin franjas de color
+// en la cabecera, sin cajas de KPI, sin notas con barra a la izquierda.
 const C = {
-  tinta: [12, 20, 24],
-  tinta2: [65, 83, 92],
-  tinta3: [123, 140, 149],
-  linea: [213, 221, 225],
-  fondo: [247, 249, 250],
-  acento: [11, 85, 99],
-  ok: [6, 118, 71],
-  crit: [180, 35, 24],
-  atencion: [181, 71, 8],
+  tinta: [31, 31, 31],
+  gris: [95, 99, 104],
+  marco: [227, 227, 227],
+  fila: [236, 236, 236],
+  banda: [241, 243, 244],
+  barra: [201, 205, 210],
+  oscuro: [60, 64, 67],
+  pista: [246, 247, 248],
+  pausa: [232, 234, 237],
+  rojo: [179, 38, 30],
+  ambar: [138, 90, 0],
 }
+
+/** Color de cada dueño de la pérdida: rojo = falla de equipo, ámbar = pendiente de imputar. */
+const COLOR_DUENO = {
+  mantencion: C.rojo,
+  externo: [128, 134, 139],
+  planificado: [128, 134, 139],
+  fueraDelArbol: C.ambar,
+  sinCausal: C.ambar,
+  micro: C.barra,
+  pausa: C.pausa,
+}
+
+// Cuatro cuerpos y nada intermedio (pt).
+const T = { titulo: 18, cuerpo: 10, chico: 7.5, rotulo: 7 }
 
 // ── Maquetación con flujo ────────────────────────────────────────────────────
 //
@@ -101,51 +123,51 @@ const C = {
 // hoja: no lo recorta ni avisa, simplemente no queda en el PDF. Verificado el
 // 2026-08-20 con un texto en y=260 mm sobre una hoja de 210 mm.
 //
-// Por eso la maqueta no puede ir sumando `y` a ojo, que es lo que hacía. En los
-// 8 informes que se revisaron ese día la lámina 4 se pasaba del borde SIEMPRE, y
-// con ella se perdían los KPI de ocupación de la cadena, la nota de cómo leer el
-// reparto y la nota que declara lo que el informe NO afirma. El PDF salía bien
-// formado y el bloque no estaba: nada lo delataba salvo mirar la hoja.
-//
-// Regla nueva: todo bloque pide espacio ANTES de dibujarse. Si no cabe, la
-// lámina sigue en una página de continuación. Antes una página de más que un
-// dato de menos — este informe se defiende en una reunión.
+// Por eso la maqueta no suma `y` a ojo: todo bloque pide espacio ANTES de
+// dibujarse. Si no cabe, la lámina sigue en una página de continuación. Antes
+// una página de más que un dato de menos — este informe se defiende en una
+// reunión.
 
 const W = 297 // A4 apaisado
 const H = 210
 const M = 16 // margen
 const Y_FIN = H - 12 // última línea útil del cuerpo
+const ANCHO = W - M * 2
+const mmPorPt = 0.3528
 
-/** Estado de maquetación: la hoja en curso y hasta dónde se llenó. */
-function abrirLienzo(doc) {
-  return { doc, y: 0, paginas: 0, pestania: '', titulo: '' }
+function abrirLienzo(doc, d) {
+  return { doc, d, y: 0, paginas: 0, pestania: '', titulo: '' }
 }
 
-/** Cabecera de hoja. El número de página se estampa al final, en `numerar`. */
-function encabezado(doc, { pestania, titulo, subtitulo }) {
-  doc.setFillColor(...C.acento)
-  doc.rect(0, 0, W, 7, 'F')
-  doc.setFontSize(7.5).setTextColor(255, 255, 255).setFont('helvetica', 'bold')
-  doc.text(wa(pestania.toUpperCase()), M, 4.8)
-
-  doc.setTextColor(...C.tinta).setFontSize(19).setFont('helvetica', 'bold')
-  doc.text(wa(titulo), M, 20)
-  if (subtitulo) {
-    doc.setFontSize(9.5).setFont('helvetica', 'normal').setTextColor(...C.tinta3)
-    doc.text(wa(subtitulo), M, 26.5)
-  }
-  doc.setDrawColor(...C.linea).setLineWidth(0.3)
-  doc.line(M, 30, W - M, 30)
-  return 38 // y de arranque del cuerpo
+/** Rótulo de hoja + identificación del turno, sobre un filete fino. */
+function cabeceraHoja(L, pestania) {
+  const { doc, d } = L
+  doc.setFontSize(T.rotulo).setFont('helvetica', 'bold').setTextColor(...C.gris)
+  doc.text(wa(pestania.toUpperCase()), M, 10)
+  doc.setFont('helvetica', 'normal')
+  // El número de hoja lo estampa `numerar` a la derecha; esto va antes.
+  doc.text(wa(`${d.meta.areaLabel} · ${d.meta.turnoLabel} · ${d.meta.fechaLabel}`), W - M - 14, 10, { align: 'right' })
+  doc.setDrawColor(...C.marco).setLineWidth(0.25).line(M, 12.5, W - M, 12.5)
 }
 
-/** Abre una lámina nueva. */
 function crearLamina(L, { pestania, titulo, subtitulo }) {
-  if (L.paginas > 0) L.doc.addPage()
+  const { doc } = L
+  if (L.paginas > 0) doc.addPage()
   L.paginas += 1
   L.pestania = pestania
   L.titulo = titulo
-  L.y = encabezado(L.doc, { pestania, titulo, subtitulo })
+  cabeceraHoja(L, pestania)
+  doc.setFontSize(T.titulo).setFont('helvetica', 'bold').setTextColor(...C.tinta)
+  const lineas = doc.splitTextToSize(wa(titulo), ANCHO)
+  doc.text(lineas, M, 23)
+  let y = 23 + (lineas.length - 1) * T.titulo * mmPorPt * 1.2
+  if (subtitulo) {
+    doc.setFontSize(T.chico + 1).setFont('helvetica', 'normal').setTextColor(...C.gris)
+    const sub = doc.splitTextToSize(wa(subtitulo), ANCHO)
+    doc.text(sub, M, y + 6)
+    y += 6 + (sub.length - 1) * 4
+  }
+  L.y = y + 9
   return L.y
 }
 
@@ -157,18 +179,10 @@ function continuar(L) {
   const { doc } = L
   doc.addPage()
   L.paginas += 1
-  // Cabecera compacta: repetir el título a 19 pt cuesta 38 mm de hoja y hacía
-  // que una nota de 24 mm se quedara sola en una página entera. Basta con decir
-  // de qué lámina viene.
-  doc.setFillColor(...C.acento)
-  doc.rect(0, 0, W, 7, 'F')
-  doc.setFontSize(7.5).setTextColor(255, 255, 255).setFont('helvetica', 'bold')
-  doc.text(wa(`${L.pestania} (cont.)`.toUpperCase()), M, 4.8)
-  doc.setTextColor(...C.tinta3).setFontSize(9).setFont('helvetica', 'normal')
-  doc.text(wa(`${L.titulo} - continuación`), M, 15)
-  doc.setDrawColor(...C.linea).setLineWidth(0.3)
-  doc.line(M, 18, W - M, 18)
-  L.y = 24
+  cabeceraHoja(L, `${L.pestania} (cont.)`)
+  doc.setFontSize(T.chico + 1).setFont('helvetica', 'normal').setTextColor(...C.gris)
+  doc.text(wa(`${L.titulo} - continuación`), M, 19)
+  L.y = 25
   return L.y
 }
 
@@ -178,617 +192,565 @@ function sitio(L, alto) {
   return L.y
 }
 
-/** Cuánto queda hasta el borde útil. */
-const resto = (L) => Y_FIN - L.y
+// ── Primitivas ───────────────────────────────────────────────────────────────
 
-// ── Primitivas de lámina ─────────────────────────────────────────────────────
-
-/** Caja de cifra grande. Alto fijo: 24 mm. */
-const ALTO_KPI = 24
-
-function kpi(doc, x, y, ancho, { rotulo, valor, sub, color = C.tinta }) {
-  doc.setDrawColor(...C.linea).setLineWidth(0.3).rect(x, y, ancho, ALTO_KPI)
-  doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
-  doc.text(wa(rotulo.toUpperCase()), x + 4, y + 6)
-  doc.setFontSize(17).setFont('helvetica', 'bold').setTextColor(...color)
-  doc.text(wa(valor), x + 4, y + 15)
-  if (sub) {
-    doc.setFontSize(7.5).setFont('helvetica', 'normal').setTextColor(...C.tinta2)
-    doc.text(wa(sub), x + 4, y + 20.5)
-  }
-}
-
-/** Fila de cajas repartidas a lo ancho, pidiendo espacio antes. */
-function filaKpis(L, cajas, { ancho = W - M * 2 } = {}) {
-  if (!cajas.length) return L.y
-  const y = sitio(L, ALTO_KPI)
-  const cw = (ancho - 3 * (cajas.length - 1)) / cajas.length
-  cajas.forEach((c, i) => kpi(L.doc, M + i * (cw + 3), y, cw, c))
-  L.y = y + ALTO_KPI + 3
+/** Rótulo de sección: el único nivel de versalitas del documento. */
+function rotulo(L, texto, { x = M, arriba = 2 } = {}) {
+  const y = sitio(L, arriba + 9)
+  L.doc.setFontSize(T.rotulo).setFont('helvetica', 'bold').setTextColor(...C.gris)
+  L.doc.text(wa(texto.toUpperCase()), x, y + arriba + 3)
+  L.y = y + arriba + 6
   return L.y
 }
 
-/** Alto que va a ocupar una nota, sin dibujarla. */
-function altoNota(doc, ancho, texto, { tamano = 8.5, titulo } = {}) {
-  const lineas = doc.setFontSize(tamano).setFont('helvetica', 'normal').splitTextToSize(wa(texto), ancho - 10)
-  return { lineas, alto: lineas.length * (tamano * 0.42) + (titulo ? 6 : 0) + 7 }
-}
-
 /**
- * Bloque de texto con fondo, para las notas y el veredicto.
- *
- * Si no cabe entera se pasa a la hoja siguiente completa, en vez de partirse:
- * media nota explicativa confunde más que la nota en la página de al lado.
+ * Párrafo. Con `titulo`, el rótulo va en negrita en su propia línea: es la
+ * advertencia del protocolo, sin caja ni barra de color.
  */
-function nota(L, texto, { color = C.linea, tamano = 8.5, titulo, ancho = W - M * 2, x = M } = {}) {
+function parrafo(L, texto, { titulo, tamano = T.cuerpo - 1, ancho = ANCHO, x = M, color = C.tinta, filete = false } = {}) {
   const { doc } = L
-  const { lineas, alto } = altoNota(doc, ancho, texto, { tamano, titulo })
-  const y = sitio(L, alto)
-  doc.setFillColor(...C.fondo).rect(x, y, ancho, alto, 'F')
-  doc.setFillColor(...color).rect(x, y, 1.2, alto, 'F')
-  let ty = y + 5.5
+  const alto1 = tamano * mmPorPt * 1.45
+  const lineas = doc.setFontSize(tamano).setFont('helvetica', 'normal').splitTextToSize(wa(texto), ancho)
+  const alto = lineas.length * alto1 + (titulo ? alto1 : 0) + (filete ? 4 : 0) + 2
+  let y = sitio(L, alto)
+  if (filete) {
+    doc.setDrawColor(...C.tinta).setLineWidth(0.6).line(x, y, x + ancho, y)
+    y += 4
+  }
+  y += alto1 * 0.8
   if (titulo) {
     doc.setFontSize(tamano).setFont('helvetica', 'bold').setTextColor(...C.tinta)
-    doc.text(wa(titulo), x + 5, ty)
-    ty += 5
+    doc.text(wa(titulo), x, y)
+    y += alto1
   }
-  doc.setFontSize(tamano).setFont('helvetica', 'normal').setTextColor(...C.tinta2)
-  doc.text(lineas, x + 5, ty)
-  L.y = y + alto + 5
+  doc.setFontSize(tamano).setFont('helvetica', 'normal').setTextColor(...color)
+  doc.text(lineas, x, y, { lineHeightFactor: 1.45 })
+  L.y = y + (lineas.length - 1) * alto1 + alto1 * 0.6 + 3
   return L.y
 }
 
-const ALTO_FILA = 7
-
-function cabeceraTabla(doc, x, y, cols) {
-  doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
-  let cx = x
-  for (const c of cols) {
-    doc.text(wa(c.t.toUpperCase()), c.alinear === 'der' ? cx + c.ancho - 2 : cx + 2, y, {
-      align: c.alinear === 'der' ? 'right' : 'left',
-    })
-    cx += c.ancho
+/**
+ * Párrafo que abre con un rótulo en negrita en la misma línea («Grader: la
+ * causal…»): la advertencia del protocolo, sin caja. jsPDF no mezcla pesos en
+ * un `text`, así que la primera línea se arma a mano.
+ */
+function parrafoRotulado(L, rot, texto, { tamano = T.cuerpo, ancho = ANCHO, x = M } = {}) {
+  const { doc } = L
+  const alto1 = tamano * mmPorPt * 1.45
+  doc.setFontSize(tamano).setFont('helvetica', 'bold')
+  const wRot = doc.getTextWidth(`${wa(rot)} `)
+  doc.setFont('helvetica', 'normal')
+  const palabras = wa(texto).split(' ')
+  let primera = ''
+  while (palabras.length && doc.getTextWidth(`${primera} ${palabras[0]}`.trim()) <= ancho - wRot) {
+    primera = `${primera} ${palabras.shift()}`.trim()
   }
-  const ancho = cols.reduce((a, c) => a + c.ancho, 0)
-  doc.setDrawColor(...C.linea).setLineWidth(0.3).line(x, y + 2, x + ancho, y + 2)
-  return y + 2
+  const resto = palabras.length ? doc.splitTextToSize(palabras.join(' '), ancho) : []
+  const alto = (1 + resto.length) * alto1 + 2
+  const y = sitio(L, alto) + alto1 * 0.8
+  doc.setFont('helvetica', 'bold').setTextColor(...C.tinta)
+  doc.text(wa(rot), x, y)
+  doc.setFont('helvetica', 'normal')
+  doc.text(primera, x + wRot, y)
+  if (resto.length) doc.text(resto, x, y + alto1, { lineHeightFactor: 1.45 })
+  L.y = y + resto.length * alto1 + alto1 * 0.6 + 2
+  return L.y
+}
+
+/** Cifras alineadas a la retícula, rótulo debajo, sin caja. */
+function cifras(L, lista, { x = M, ancho = ANCHO, columnas = lista.length } = {}) {
+  const { doc } = L
+  const filas = Math.ceil(lista.length / columnas)
+  const altoFila = 17
+  const y0 = sitio(L, filas * altoFila)
+  const cw = ancho / columnas
+  lista.forEach((c, i) => {
+    const cx = x + (i % columnas) * cw
+    const cy = y0 + Math.floor(i / columnas) * altoFila
+    doc.setFontSize(T.titulo).setFont('helvetica', 'bold').setTextColor(...(c.color || C.tinta))
+    doc.text(wa(c.valor), cx, cy + 7)
+    doc.setFontSize(T.chico).setFont('helvetica', 'normal').setTextColor(...C.gris)
+    doc.text(doc.splitTextToSize(wa(c.sub), cw - 4), cx, cy + 11.5)
+  })
+  L.y = y0 + filas * altoFila
+  return L.y
 }
 
 /**
- * Tabla que fluye. `cols` = [{ t, ancho, alinear }].
+ * Tabla «bordered» de macOS: marco fino, encabezado con banda gris, filetes
+ * horizontales, fila de cierre con filete de tinta. Ningún filete vertical.
+ *
+ * `cols` = [{ t, ancho, alinear }]. Cada fila: { celdas, sub?, colores?, punto? }
+ * — `sub` es una segunda línea chica bajo la primera celda; `punto` un color
+ * para el punto de estado delante de la primera celda.
  *
  * Cuando no caben todas las filas sigue en la hoja siguiente y REPITE la
  * cabecera: una tabla decapitada en la segunda hoja es ilegible en una reunión.
  * Ninguna fila se descarta — la tabla de caídas del turno del 20-08 en Filete
  * tenía 14 y solo entraban 5.
  */
-function tabla(L, cols, filas, { resaltar = -1, x = M } = {}) {
+const ALTO_CAB = 6.5
+const altoFila = (f) => (f.sub ? 10.5 : 7)
+
+function tabla(L, cols, filas, { x = M, cierre = null } = {}) {
   const { doc } = L
   const ancho = cols.reduce((a, c) => a + c.ancho, 0)
+  const todas = cierre ? [...filas, { ...cierre, esCierre: true }] : filas
   let i = 0
   let vueltas = 0
   do {
-    // Cinturón: `sitio` siempre deja la hoja en y=24 y ahí caben filas, así que
-    // el bucle avanza sí o sí. El tope es por si alguien cambia esa invariante:
-    // una Cloud Function colgada a las 5 de la mañana no deja informe ni error.
+    // Cinturón: `sitio` siempre deja la hoja con espacio, así que el bucle
+    // avanza sí o sí. El tope es por si alguien cambia esa invariante.
     vueltas += 1
-    if (vueltas > filas.length + 10) break
-    // Cabecera + al menos dos filas, si no la continuación no aporta nada.
-    const y = sitio(L, 2 + ALTO_FILA * Math.min(2, filas.length - i))
-    let fy = cabeceraTabla(doc, x, y, cols)
-    while (i < filas.length && fy + ALTO_FILA <= Y_FIN) {
-      const f = filas[i]
-      if (i === resaltar) doc.setFillColor(224, 238, 241).rect(x, fy, ancho, ALTO_FILA, 'F')
-      let cx = x
-      doc.setFontSize(8).setTextColor(...C.tinta)
+    if (vueltas > todas.length + 10) break
+    const y = sitio(L, ALTO_CAB + 7 * Math.min(2, todas.length - i))
+    // Encabezado: banda gris tenue.
+    doc.setFillColor(...C.banda).rect(x, y, ancho, ALTO_CAB, 'F')
+    doc.setFontSize(T.chico).setFont('helvetica', 'normal').setTextColor(...C.gris)
+    let cx = x
+    for (const c of cols) {
+      doc.text(wa(c.t), c.alinear === 'der' ? cx + c.ancho - 2.5 : cx + 2.5, y + 4.3, { align: c.alinear === 'der' ? 'right' : 'left' })
+      cx += c.ancho
+    }
+    let fy = y + ALTO_CAB
+    doc.setDrawColor(...C.marco).setLineWidth(0.25).line(x, fy, x + ancho, fy)
+    while (i < todas.length && fy + altoFila(todas[i]) <= Y_FIN) {
+      const f = todas[i]
+      const af = altoFila(f)
+      if (f.esCierre) doc.setDrawColor(...C.tinta).setLineWidth(0.35).line(x, fy, x + ancho, fy)
+      else if (i > 0 && fy > y + ALTO_CAB) doc.setDrawColor(...C.fila).setLineWidth(0.25).line(x, fy, x + ancho, fy)
+      cx = x
       cols.forEach((c, j) => {
-        doc.setFont('helvetica', i === resaltar ? 'bold' : 'normal')
-        if (f.colores && f.colores[j]) doc.setTextColor(...f.colores[j])
-        else doc.setTextColor(...C.tinta)
-        doc.text(wa(f.celdas[j]), c.alinear === 'der' ? cx + c.ancho - 2 : cx + 2, fy + 5, {
-          align: c.alinear === 'der' ? 'right' : 'left',
-        })
+        let tx = c.alinear === 'der' ? cx + c.ancho - 2.5 : cx + 2.5
+        if (j === 0 && f.punto) {
+          doc.setFillColor(...f.punto).circle(tx + 1, fy + 3.6, 0.9, 'F')
+          tx += 3.5
+        }
+        doc.setFontSize(T.cuerpo - 1).setFont('helvetica', f.esCierre || (f.negrita && f.negrita[j]) ? 'bold' : 'normal')
+        doc.setTextColor(...((f.colores && f.colores[j]) || C.tinta))
+        doc.text(wa(f.celdas[j]), tx, fy + 4.8, { align: c.alinear === 'der' ? 'right' : 'left' })
+        if (j === 0 && f.sub) {
+          doc.setFontSize(T.chico - 0.5).setFont('helvetica', 'normal').setTextColor(...C.gris)
+          doc.text(wa(f.sub), tx, fy + 8.6)
+        }
         cx += c.ancho
       })
-      fy += ALTO_FILA
-      doc.setDrawColor(...C.linea).line(x, fy, x + ancho, fy)
+      fy += af
       i += 1
     }
-    L.y = fy + 5
-  } while (i < filas.length)
+    // Marco fino alrededor de lo que entró en esta hoja.
+    doc.setDrawColor(...C.marco).setLineWidth(0.25).rect(x, y, ancho, fy - y)
+    L.y = fy + 4
+  } while (i < todas.length)
   return L.y
 }
 
-/** Línea suelta de texto chico, pidiendo espacio. */
-function pie(L, texto, { tamano = 7.5, color = C.tinta3, ancho = W - M * 2 } = {}) {
-  const { doc } = L
-  const lineas = doc.setFontSize(tamano).setFont('helvetica', 'normal').splitTextToSize(wa(texto), ancho)
-  const alto = lineas.length * (tamano * 0.42) + 3
-  const y = sitio(L, alto)
-  doc.setTextColor(...color)
-  doc.text(lineas, M, y + 3)
-  L.y = y + alto + 3
-  return L.y
-}
-
-/** Rótulo en negrita sobre un gráfico. */
-function rotulo(L, texto, { alto = 6 } = {}) {
-  const y = sitio(L, alto)
-  L.doc.setFontSize(8).setFont('helvetica', 'bold').setTextColor(...C.tinta)
-  L.doc.text(wa(texto), M, y + 4)
-  L.y = y + alto
-  return L.y
+/** Eje horario bajo un gráfico de tiempo. */
+function ejeHoras(doc, { t0, t1, x, ancho, y }) {
+  const sx = (ms) => x + ((ms - t0) / (t1 - t0)) * ancho
+  doc.setFontSize(T.rotulo - 0.5).setFont('helvetica', 'normal').setTextColor(...C.gris)
+  for (let t = Math.ceil(t0 / 3_600_000) * 3_600_000; t <= t1; t += 3_600_000) {
+    doc.text(wa(hhmm(t)), sx(t), y, { align: 'center' })
+  }
 }
 
 // ── Láminas ──────────────────────────────────────────────────────────────────
-
-// Seis láminas de narrativa. Las HOJAS pueden ser más: una lámina con muchas
-// filas se continúa en vez de perder el final.
+//
+// Cinco láminas de narrativa, seis con el anexo (solo líneas de varias
+// máquinas). Las HOJAS pueden ser más: una lámina con muchas filas se continúa
+// en vez de perder el final.
 const TOTAL_LAMINAS = 6
 
-function lamina1Veredicto(L, d) {
+const mantDe = (d) => d.porDueno.filas.find((f) => f.clave === 'mantencion') || { min: 0 }
+
+function lamina1Veredicto(L, d, t) {
+  const r = d.resumen
+  const unaSola = r.maquinas === 1
   crearLamina(L, {
     pestania: 'Veredicto',
-    titulo: `${d.meta.areaLabel} - ${d.meta.turnoLabel}`,
-    subtitulo: `${d.meta.fechaLabel} - ${hhmm(d.resumen.inicioMs)} a ${hhmm(d.resumen.finMs)} - ${maquinasTexto(d.resumen.maquinas)}`,
+    titulo: t.veredicto,
+    subtitulo: `${fechaLarga(d.meta.fechaLabel)} · ${hhmm(r.inicioMs)} a ${hhmm(r.finMs)} · `
+      + `${EQUIPO[d.meta.planta] || maquinasTexto(r.maquinas)}`,
   })
+  parrafo(L, t.detalle, { tamano: T.cuerpo + 1, filete: true })
+  L.y += 4
 
-  nota(L, d.textos.veredictoDetalle, {
-    color: d.textos.veredictoBueno ? C.ok : C.atencion,
-    tamano: 10,
-    titulo: d.textos.veredictoTitulo,
-  })
+  const yCol = L.y
+  const izq = 120
+  const mant = mantDe(d)
+  const perdida = d.porDueno.totalMin
+  const c = d.cotejo || {}
+  cifras(L, [
+    {
+      valor: num(r.ciclos),
+      sub: d.enCurso ? 'piezas hasta ahora' : (c.comparados >= 3 && c.medianaPrevios != null ? `piezas · mediana ${num(c.medianaPrevios)}` : 'piezas'),
+    },
+    { valor: `${perdida} min`, sub: 'pérdida de línea' },
+    { valor: `${mant.min} min`, sub: perdida ? `de Mantención · ${Math.round((mant.min / perdida) * 100)} %` : 'de Mantención' },
+    unaSola
+      ? { valor: String(d.fallas.eventos), sub: d.fallas.eventos === 1 ? 'detención de Mantención' : 'detenciones de Mantención' }
+      : { valor: durTexto(r.detencion.todasSec), sub: `con las ${r.maquinas} detenidas a la vez` },
+  ], { ancho: izq, columnas: 2 })
+  L.y += 2
+  parrafo(L, unaSola
+    ? 'La línea es una sola máquina: cada minuto detenido es un minuto sin producir. El total no incluye las pausas planificadas.'
+    : `«Min de línea» es el tiempo detenido de cada máquina dividido por las ${r.maquinas}: un minuto con una sola Baader `
+      + 'parada cuenta un tercio. Es la misma regla para Mantención y para todos los demás.',
+  { titulo: 'Cómo leer las cifras', tamano: T.chico + 0.5, ancho: izq - 6 })
+  const yIzq = L.y
 
-  filaKpis(L, [
-    {
-      rotulo: 'Produccion', valor: num(d.resumen.ciclos), sub: d.textos.produccionSub,
-      color: d.textos.veredictoBueno ? C.ok : C.tinta,
-    },
-    {
-      rotulo: 'Ritmo normal de la linea',
-      valor: d.resumen.ritmoNormal ? `${d.resumen.ritmoNormal.toFixed(1)}` : '--',
-      sub: 'piezas por minuto sin problemas',
-    },
-    {
-      rotulo: 'Linea detenida', valor: durTexto(d.resumen.detencion.todasSec),
-      sub: d.resumen.maquinas === 1 ? 'sin producir' : 'todas las maquinas a la vez', color: C.atencion,
-    },
-    {
-      rotulo: 'Atribuible a Mantencion',
-      valor: durTexto(d.resumen.mantencionEquivSec),
-      sub: `de ${durTexto(d.resumen.detencion.equivalenteLineaSec)} perdidos`,
-    },
-  ])
-
-  L.y += 3
-  if (d.resumen.causas[0]) {
-    nota(L, d.textos.notaLamina1, { color: C.acento, titulo: 'Por que esta lamina va primero' })
+  // Columna derecha: de quién fue la pérdida.
+  L.y = yCol
+  const x = M + izq + 10
+  const ancho = ANCHO - izq - 10
+  rotulo(L, 'De quién fue la pérdida', { x, arriba: 0 })
+  tabla(L, [{ t: 'Dueño', ancho: ancho - 30 }, { t: 'Min de línea', ancho: 30, alinear: 'der' }],
+    d.porDueno.filas.map((f) => ({
+      celdas: [f.etiqueta, String(f.min)],
+      punto: COLOR_DUENO[f.clave],
+      sub: f.clave === 'micro'
+        ? `${num(f.eventos)} paros cortos; el sistema no pide causal`
+        : (f.causas.slice(0, 3).map((k) => `${k.etiqueta} ${Math.round(k.sec / 60)}`).join(', ')
+          + (f.causas.length > 3 ? ` y ${f.causas.length - 3} más` : '')) || 'ninguna detención imputada',
+    })),
+    { x, cierre: { celdas: ['Total', String(perdida)] } })
+  const pausas = (r.pausas || []).map((p) => ({ e: etiquetaPausa(p.causa), m: Math.round(p.todasSec / 60) })).filter((p) => p.m > 0)
+  if (pausas.length) {
+    parrafo(L, `Las pausas planificadas van aparte, no son pérdida: ${listaY(pausas.map((p) => `${p.e} ${p.m} min`))}.`,
+      { tamano: T.chico, ancho, x, color: C.gris })
   }
+  L.y = Math.max(L.y, yIzq)
 }
 
-function lamina2Falla(L, d) {
-  /*
-   * ⚠ Esta lamina existe para corregir el doble conteo del rollup de Shoplogix,
-   * que suma las maquinas del area. Con UNA sola maquina no hay nada que
-   * corregir: suma, union, todas y equivalente son el MISMO numero, y la lamina
-   * quedaba explicando un doble conteo inexistente mientras mostraba cuatro
-   * columnas identicas — 1:17:50 cuatro veces en el informe de Filete del 20-08.
-   * Eso no es un detalle de formato: una lamina que argumenta algo que su propia
-   * tabla desmiente le quita autoridad a todo el resto del informe.
-   *
-   * Con una maquina la lamina cambia de trabajo: deja de corregir y pasa a
-   * detallar las detenciones, que es lo que si tiene para decir.
-   */
-  const unaSolaMaquina = d.resumen.maquinas === 1
-
+function lamina2Fallas(L, d) {
+  const r = d.resumen
+  const unaSola = r.maquinas === 1
+  const f = d.fallas
   crearLamina(L, {
-    pestania: unaSolaMaquina ? 'Las detenciones' : 'La falla, medida bien',
-    titulo: unaSolaMaquina ? 'En que se fue el tiempo detenido' : 'Horas-maquina no son horas de linea',
-    subtitulo: unaSolaMaquina
-      ? 'La linea es una sola maquina: cada minuto detenido es un minuto sin producir'
-      : `El resumen de area de Shoplogix suma las ${d.resumen.maquinas} maquinas`,
+    pestania: 'Fallas de equipo',
+    titulo: f.filas.length ? 'Qué falló, dónde y cuánto tardó la línea en volver' : 'Ninguna detención quedó imputada a Mantención',
+    subtitulo: f.filas.length
+      ? `${f.eventos} ${f.eventos === 1 ? 'detención imputada' : 'detenciones imputadas'} a Mantención · ${f.totalMin} min de línea`
+      : 'Las detenciones del turno fueron de otros dueños; la cronología de abajo las muestra todas.',
   })
 
-  const cols = unaSolaMaquina
-    ? [
-      { t: 'Causa', ancho: 84 },
-      { t: 'Categoria', ancho: 52 },
-      { t: 'Linea detenida', ancho: 34, alinear: 'der' },
-      { t: 'Eventos', ancho: 24, alinear: 'der' },
-      { t: 'Promedio', ancho: 28, alinear: 'der' },
-    ]
-    : [
-      { t: 'Causa', ancho: 62 },
-      { t: 'Categoria', ancho: 38 },
-      { t: 'Suma del area', ancho: 30, alinear: 'der' },
-      { t: 'Al menos 1', ancho: 26, alinear: 'der' },
-      { t: 'Todas', ancho: 24, alinear: 'der' },
-      { t: 'Equiv. linea', ancho: 28, alinear: 'der' },
-      { t: 'Eventos', ancho: 20, alinear: 'der' },
-    ]
-  // Las micro detenciones van al pie, no en la tabla: son cientos de eventos de
-  // segundos que inflan la tabla y compiten visualmente con la falla que
-  // importa. Se resumen en una linea, que es lo que aportan.
-  const micro = d.resumen.causas.find((c) => c.esMicro)
-  const causasReales = d.resumen.causas.filter((c) => !c.esMicro)
-  const filas = causasReales.map((c) => {
-    const nombre = c.imputacion && c.imputacion.hoja ? c.imputacion.hoja : c.causa
-    const categoria = c.imputacion ? c.imputacion.categoriaLabel : '--'
-    /* El promedio por evento reemplaza a las columnas que sobran: separa una
-       averia larga de muchas paradas cortas, que suman igual y se atacan
-       distinto. Es lo unico que la tabla de una maquina no decia. */
-    if (unaSolaMaquina) {
+  if (f.filas.length) {
+    tabla(L, [
+      { t: unaSola ? 'Causa' : 'Máquina · causa', ancho: 117 },
+      { t: 'Det.', ancho: 22, alinear: 'der' },
+      { t: 'Min de línea', ancho: 32, alinear: 'der' },
+      { t: 'Media por detención', ancho: 44, alinear: 'der' },
+      { t: 'Volvió a ritmo', ancho: 50, alinear: 'der' },
+    ], f.filas.map((x) => {
+      const notas = []
+      if (x.ambigua) notas.push('eléctrica o mecánica, sin separar')
+      if (x.turnosSeguidos >= 2) notas.push(`${ORDINAL[x.turnosSeguidos] || `${x.turnosSeguidos}.º`} turno equivalente seguido`)
+      let volvio = `${x.volvioMin} min`
+      if (x.volvioMin == null) volvio = 'no volvió en el turno'
+      else if (x.volvioMin === 0) volvio = 'no la sacó de ritmo'
       return {
-        celdas: [nombre, categoria, dur(c.equivalenteLineaSec), String(c.eventos),
-          c.eventos ? dur(Math.round(c.equivalenteLineaSec / c.eventos)) : '--'],
-        colores: [null, [...C.tinta3], null, null, null],
+        celdas: [unaSola ? x.etiqueta : `${x.maquinaCorta} · ${x.etiqueta}`, String(x.eventos), String(x.min), `${x.mediaMin} min`, volvio],
+        sub: notas.join(' · ') || null,
+        colores: [null, null, null, null, x.volvioMin == null ? C.rojo : (x.volvioMin === 0 ? C.gris : null)],
       }
-    }
-    return {
-      celdas: [nombre, categoria,
-        dur(c.sumaSec), dur(c.unionSec), dur(c.todasSec), dur(c.equivalenteLineaSec), String(c.eventos)],
-      colores: [null, null, [...C.tinta3], null, null, null, null],
-    }
-  })
-  filas.push({
-    celdas: unaSolaMaquina
-      ? ['TOTAL (con micro detenciones)', '', dur(d.resumen.detencion.equivalenteLineaSec), '', '']
-      : [
-        'TOTAL (con micro detenciones)', '',
-        dur(d.resumen.detencion.sumaSec), dur(d.resumen.detencion.unionSec),
-        dur(d.resumen.detencion.todasSec), dur(d.resumen.detencion.equivalenteLineaSec), '',
-      ],
-  })
-  tabla(L, cols, filas, { resaltar: 0 })
-
-  if (micro) {
-    pie(L, `Aparte: ${micro.eventos} micro detenciones, ${dur(micro.sumaSec)} sumados `
-      + `(${dur(micro.equivalenteLineaSec)} de linea). Son paros de segundos que el sistema no pide imputar; `
-      + 'se cuentan pero no compiten con las causas de arriba.')
+    }), { cierre: { celdas: ['Total', String(f.eventos), String(f.totalMin), '', ''] } })
   }
 
-  // Barra del reparto por nivel de solapamiento de la causa principal.
-  const p = d.resumen.causas[0]
-  // Con UNA maquina no hay solapamiento que repartir: la barra seria un
-  // rectangulo lleno etiquetado "LAS 1 - linea muerta", que no explica nada y
-  // ademas esta mal escrito.
-  if (p && p.unionSec > 0 && d.resumen.maquinas > 1) {
-    const y = sitio(L, 30)
-    L.y = y
-    rotulo(L, `Reparto de los ${durTexto(p.unionSec)} en que hubo alguna maquina detenida por ${p.imputacion && p.imputacion.hoja ? p.imputacion.hoja : p.causa}`)
-    const { doc } = L
-    const ancho = W - M * 2
-    const by = L.y + 2
-    let acc = 0
-    for (let k = 1; k < p.porNivelSec.length; k++) {
-      const sec = p.porNivelSec[k]
-      if (!sec) continue
-      const w = (sec / p.unionSec) * ancho
-      const alpha = k / (p.porNivelSec.length - 1)
-      doc.setFillColor(
-        Math.round(255 - (255 - C.crit[0]) * alpha),
-        Math.round(255 - (255 - C.crit[1]) * alpha),
-        Math.round(255 - (255 - C.crit[2]) * alpha),
-      )
-      doc.rect(M + acc, by, Math.max(w - 0.6, 0.6), 11, 'F')
-      doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta)
-      const etiqueta = k === p.porNivelSec.length - 1 ? `LAS ${k} - linea muerta` : `${k} detenida${k > 1 ? 's' : ''}`
-      if (w > 24) {
-        doc.text(wa(etiqueta), M + acc + 2, by + 15)
-        doc.setFont('helvetica', 'normal').setTextColor(...C.tinta2)
-        doc.text(wa(dur(sec)), M + acc + 2, by + 19)
-      }
-      acc += w
-    }
-    L.y = by + 24
-  }
-
-  nota(L, d.textos.notaLamina2, { color: C.acento, titulo: 'Como leer esta tabla' })
-}
-
-function lamina3Cronologia(L, d) {
-  const p = d.resumen.causas[0]
-  crearLamina(L, {
-    pestania: 'Cronologia',
-    titulo: p ? `Donde ocurrio: ${p.imputacion && p.imputacion.hoja ? p.imputacion.hoja : p.causa}` : 'Sin detenciones que ubicar',
-    subtitulo: p ? `${p.eventos} eventos en el turno` : '',
-  })
-  if (!p) {
-    nota(L, 'El turno no registro detenciones no programadas.', { color: C.ok })
-    return
-  }
-
+  // Cronología: cada detención y pausa, por máquina, del color de su dueño.
+  const crono = d.cronologia || []
+  if (!crono.length) return
+  L.y += 2
+  rotulo(L, 'Cada detención del turno, por máquina')
   const { doc } = L
-  const t0 = d.resumen.inicioMs
-  const t1 = d.resumen.finMs
-  const span = t1 - t0
-  const izq = M + 42
+  const t0 = r.inicioMs
+  const t1 = r.finMs
+  const izq = M + 16
   const anchoPista = W - M - izq
-  const altoPista = 11
-  const gap = 6
-  const n = d.eventosPorMaquina.length
-  const altoBloque = n * (altoPista + gap) + 12
-  let py = sitio(L, altoBloque) + 6
-
-  const sx = (ms) => izq + ((ms - t0) / span) * anchoPista
-
-  // Rejilla horaria
-  const primera = Math.ceil(t0 / 3_600_000) * 3_600_000
-  for (let t = primera; t <= t1; t += 3_600_000) {
-    doc.setDrawColor(...C.linea).setLineWidth(0.2)
-    doc.line(sx(t), py - 3, sx(t), py + n * (altoPista + gap))
-    doc.setFontSize(6.5).setTextColor(...C.tinta3).setFont('helvetica', 'normal')
-    doc.text(wa(hhmm(t)), sx(t), py + n * (altoPista + gap) + 4, { align: 'center' })
-  }
-
-  for (const m of d.eventosPorMaquina) {
-    doc.setFillColor(233, 238, 240).rect(izq, py, anchoPista, altoPista, 'F')
-    doc.setFontSize(8).setFont('helvetica', 'normal').setTextColor(...C.tinta2)
-    doc.text(wa(m.maquina), izq - 3, py + 7.5, { align: 'right' })
-    doc.setFillColor(...C.crit)
-    for (const [a, b] of m.intervalos) {
-      doc.rect(sx(a), py, Math.max(sx(b) - sx(a), 0.5), altoPista, 'F')
+  const altoPista = unaSola ? 9 : 6.5
+  const gap = 2.5
+  const alto = crono.length * (altoPista + gap) + 14
+  let py = sitio(L, alto)
+  const sx = (ms) => izq + ((Math.min(Math.max(ms, t0), t1) - t0) / (t1 - t0)) * anchoPista
+  for (const m of crono) {
+    doc.setFillColor(...C.pista).rect(izq, py, anchoPista, altoPista, 'F')
+    doc.setFontSize(T.chico).setFont('helvetica', 'normal').setTextColor(...C.gris)
+    doc.text(wa(unaSola ? 'Línea' : m.maquinaCorta), M, py + altoPista / 2 + 1.2)
+    // Pausas primero: van debajo de todo.
+    for (const pase of ['pausa', 'resto']) {
+      for (const tr of m.tramos) {
+        if ((pase === 'pausa') !== (tr.dueno === 'pausa')) continue
+        doc.setFillColor(...(COLOR_DUENO[tr.dueno] || C.gris))
+        doc.rect(sx(tr.a), py, Math.max(sx(tr.b) - sx(tr.a), 0.35), altoPista, 'F')
+      }
     }
-    doc.setFontSize(7).setTextColor(...C.tinta3)
-    doc.text(wa(dur(m.sec)), W - M + 0, py + 7.5, { align: 'right' })
     py += altoPista + gap
   }
-  L.y = py + 8
-
-  nota(L, d.textos.notaLamina3, { color: C.acento, titulo: 'Para que sirve en la reunion' })
+  ejeHoras(doc, { t0, t1, x: izq, ancho: anchoPista, y: py + 2 })
+  // Leyenda: solo los dueños que aparecen.
+  const presentes = new Set(crono.flatMap((m) => m.tramos.map((tr) => tr.dueno)))
+  const leyenda = [['mantencion', 'Mantención'], ['externo', 'Externo'], ['planificado', 'Planificado'],
+    ['fueraDelArbol', 'Causal fuera del árbol'], ['sinCausal', 'Sin causal'], ['micro', 'Micro detenciones'], ['pausa', 'Pausa planificada']]
+    .filter(([k]) => presentes.has(k))
+  let lx = izq
+  const ly = py + 8
+  doc.setFontSize(T.chico).setFont('helvetica', 'normal').setTextColor(...C.gris)
+  for (const [k, etq] of leyenda) {
+    doc.setFillColor(...COLOR_DUENO[k]).rect(lx, ly - 2.4, 3, 3, 'F')
+    doc.text(wa(etq), lx + 4.5, ly)
+    lx += 4.5 + doc.getTextWidth(wa(etq)) + 7
+  }
+  L.y = ly + 6
 }
 
-/**
- * La lámina que se salía de la hoja.
- *
- * Apila gráfico, tabla de tramos, barra del reparto, tabla de caídas, KPI de
- * recuperación, KPI de ocupación y tres notas. Con 9 tramos y 14 caídas eso son
- * dos hojas largas, y antes se dibujaba todo en una sumando `y` a ojo: lo que
- * pasaba del borde desaparecía. El orden es de más a menos defendible, así que
- * si algo queda en la segunda hoja, que sea el detalle y no el veredicto.
- */
-function lamina4Ritmo(L, d) {
+function lamina3Ritmo(L, d) {
+  const r = d.resumen
+  const rp = d.reparto || { totalPz: 0, eventos: [] }
+  let titulo = 'El ritmo del turno, bloque por bloque'
+  if (rp.totalPz === 0) titulo = 'El turno corrió a su ritmo de punta a punta'
+  else if (!rp.eventos.length) titulo = 'El turno no tuvo caídas de línea: lo que faltó fue ritmo'
   crearLamina(L, {
-    pestania: 'Donde afecto y como se contuvo',
-    titulo: d.textos.tituloLamina4 || 'El ritmo real del turno, tramo por tramo',
-    subtitulo: d.resumen.ritmoNormal
-      ? `Ritmo normal de la linea: ${d.resumen.ritmoNormal.toFixed(1)} piezas por minuto (mediana de los bloques limpios de este mismo turno)`
+    pestania: 'Ritmo y contención',
+    titulo,
+    subtitulo: r.ritmoNormal
+      ? `Ritmo normal ${r.ritmoNormal.toFixed(1).replace('.', ',')} piezas por minuto: la mediana de los bloques de 5 min sin detenciones de este mismo turno`
       : 'Sin bloques limpios: no se puede fijar un ritmo normal',
   })
   const { doc } = L
-  const ancho = W - M * 2
 
-  // Gráfico de barras del ritmo por bloque
-  const gh = 46
-  const gy = sitio(L, gh + 8)
-  const maxR = Math.max(d.resumen.ritmoNormal ? d.resumen.ritmoNormal * 1.25 : 1, ...d.bloques.map((b) => b.piezasPorMin), 1)
-  const bw = ancho / Math.max(d.bloques.length, 1)
-  d.bloques.forEach((b, i) => {
+  // Barras del ritmo por bloque: oscuras en ritmo, grises bajo él.
+  const gh = 40
+  const gy = sitio(L, gh + 10)
+  const bloques = d.bloques || []
+  const maxR = Math.max(r.ritmoNormal ? r.ritmoNormal * 1.15 : 1, ...bloques.map((b) => b.piezasPorMin), 1)
+  const t0 = r.inicioMs
+  const t1 = r.finMs
+  const izq = M + 16
+  const ancho = W - M - izq
+  const bw = ancho / Math.max(bloques.length, 1)
+  bloques.forEach((b, i) => {
     const h = (b.piezasPorMin / maxR) * gh
-    const enRitmo = d.resumen.ritmoNormal ? b.piezasPorMin >= d.resumen.ritmoNormal * 0.9 : true
-    doc.setFillColor(...(enRitmo ? C.acento : [150, 180, 188]))
-    doc.rect(M + i * bw, gy + gh - h, Math.max(bw - 0.3, 0.3), h, 'F')
+    const enRitmo = r.ritmoNormal ? b.piezasPorMin >= r.ritmoNormal * 0.9 : true
+    doc.setFillColor(...(enRitmo ? C.oscuro : C.barra))
+    doc.rect(izq + i * bw, gy + gh - h, Math.max(bw - 0.3, 0.3), h, 'F')
   })
-  if (d.resumen.ritmoNormal) {
-    const ry = gy + gh - (d.resumen.ritmoNormal / maxR) * gh
-    doc.setDrawColor(...C.ok).setLineWidth(0.5).setLineDashPattern([1.5, 1], 0)
-    doc.line(M, ry, W - M, ry)
+  doc.setDrawColor(...C.tinta).setLineWidth(0.3).line(izq, gy + gh, W - M, gy + gh)
+  doc.setFontSize(T.rotulo - 0.5).setFont('helvetica', 'normal').setTextColor(...C.gris)
+  doc.text('pz/min', M, gy + 3)
+  doc.text(wa(String(Math.round(maxR))), izq - 2, gy + 2, { align: 'right' })
+  doc.text('0', izq - 2, gy + gh, { align: 'right' })
+  if (r.ritmoNormal) {
+    const ry = gy + gh - (r.ritmoNormal / maxR) * gh
+    doc.setDrawColor(...C.tinta).setLineWidth(0.3).setLineDashPattern([1.2, 1], 0)
+    doc.line(izq, ry, W - M, ry)
     doc.setLineDashPattern([], 0)
-    doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.ok)
-    doc.text(wa(`ritmo normal ${d.resumen.ritmoNormal.toFixed(1)}`), W - M, ry - 1.5, { align: 'right' })
+    // El valor va en el margen del eje: sobre las barras tapaba las últimas.
+    doc.setTextColor(...C.tinta)
+    doc.text(wa(r.ritmoNormal.toFixed(1).replace('.', ',')), izq - 2, ry + 1, { align: 'right' })
   }
-  doc.setDrawColor(...C.linea).line(M, gy + gh, W - M, gy + gh)
-  doc.setFontSize(6.5).setTextColor(...C.tinta3).setFont('helvetica', 'normal')
-  doc.text(wa(hhmm(d.resumen.inicioMs)), M, gy + gh + 4)
-  doc.text(wa(hhmm(d.resumen.finMs)), W - M, gy + gh + 4, { align: 'right' })
-  L.y = gy + gh + 10
+  if (t0 != null && t1 != null) ejeHoras(doc, { t0, t1, x: izq, ancho, y: gy + gh + 4 })
+  L.y = gy + gh + 9
 
-  tabla(L, [
-    { t: 'Tramo', ancho: 42 },
-    { t: 'Ventana', ancho: 34 },
-    { t: 'Minutos', ancho: 24, alinear: 'der' },
-    { t: 'Piezas', ancho: 26, alinear: 'der' },
-    { t: 'Piezas/min', ancho: 28, alinear: 'der' },
-    { t: '% del ritmo normal', ancho: 40, alinear: 'der' },
-  ], d.tramos.map((t) => ({
-    celdas: [
-      t.enRitmo ? 'En ritmo' : 'Caida',
-      `${hhmm(t.inicioMs)} a ${hhmm(t.finMs)}`,
-      String(t.minutos), num(t.ciclos), t.piezasPorMin.toFixed(1),
-      `${Math.round(t.pctDelRitmo * 100)}%`,
-    ],
-    colores: [t.enRitmo ? [...C.ok] : [...C.crit], null, null, null, null,
-      t.enRitmo ? [...C.ok] : [...C.crit]],
-  })))
-
-  // ── Reparto de la perdida: parada / reenganche / degradado ───────────────
-  const rp = d.reparto || { totalPz: 0, eventos: [] }
   if (rp.totalPz > 0) {
-    // La barra y sus etiquetas son un solo bloque: partirlas deja los
-    // porcentajes huérfanos en la hoja siguiente.
-    L.y = sitio(L, 30)
-    rotulo(L, rp.eventos.length
-      ? 'Donde falto la produccion: las piezas que faltaron para el ritmo normal, segun en que estaba la linea'
-      : 'El turno no registro caidas de linea. Las piezas que faltaron para el ritmo normal se perdieron andando:')
-    const by = L.y
-    const bh = 10
+    const yCol = L.y
+    const col = 125
+    rotulo(L, `Dónde faltaron las ${num(rp.totalPz)} piezas`)
+    const by = sitio(L, 8)
     const segs = [
-      { l: 'PARADA - inevitable cuando hay falla', v: rp.paradoPz, c: C.crit },
-      { l: 'REENGANCHE - lo que se acorta conteniendo', v: rp.reenganchePz, c: C.atencion },
-      { l: 'RITMO DEGRADADO - otra palanca', v: rp.degradadoPz, c: C.tinta3 },
-    ].filter((x) => x.v > 0)
+      { l: 'Con la línea parada', v: rp.paradoPz, c: C.oscuro },
+      { l: 'Volviendo a tomar ritmo', v: rp.reenganchePz, c: C.rojo },
+      { l: 'Andando bajo su ritmo', v: rp.degradadoPz, c: C.barra },
+    ]
     let bx = M
-    for (const sgm of segs) {
-      const sw = (sgm.v / rp.totalPz) * ancho
-      doc.setFillColor(...sgm.c)
-      doc.rect(bx, by, Math.max(sw - 0.6, 0.6), bh, 'F')
-      if (sw > 42) {
-        doc.setFontSize(6.5).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
-        doc.text(wa(sgm.l), bx + 1, by + bh + 4)
-        doc.setFontSize(9).setTextColor(...C.tinta)
-        doc.text(wa(`${Math.round((sgm.v / rp.totalPz) * 100)}%  ${num(sgm.v)} pz`), bx + 1, by + bh + 9)
-      }
+    for (const sg of segs) {
+      const sw = (sg.v / rp.totalPz) * col
+      if (sw > 0) doc.setFillColor(...sg.c).rect(bx, by, Math.max(sw - 0.4, 0.4), 4, 'F')
       bx += sw
     }
-    L.y = by + bh + 14
+    L.y = by + 6
+    const pct = (v) => `${Math.round((v / rp.totalPz) * 100)} %`
+    tabla(L, [{ t: 'Cómo estaba la línea', ancho: col - 52 }, { t: 'Piezas', ancho: 26, alinear: 'der' }, { t: 'Parte', ancho: 26, alinear: 'der' }],
+      segs.map((sg) => ({ celdas: [sg.l, num(sg.v), pct(sg.v)], punto: sg.c })),
+      { cierre: { celdas: ['Total', num(rp.totalPz), '100 %'] } })
+    const yIzq = L.y
 
+    // Columna derecha: contención y capacidad.
+    L.y = yCol
+    const x = M + col + 12
+    const anchoNota = ANCHO - col - 12
+    const peor = rp.eventos.reduce((a, e) => Math.max(a, e.minReenganche || 0), 0)
+    parrafo(L, `Lo que Mantención controla es cuánto tarda la línea en volver, no cuánto dura la falla. El reenganche `
+      + `fue ${pct(rp.reenganchePz)} de lo que faltó${rp.eventos.length ? `; el más largo tomó ${peor} min` : ''}.`
+      + (rp.degradadoPz > rp.paradoPz + rp.reenganchePz
+        ? ' Lo que más costó fue andar bajo el ritmo, y eso no se arregla conteniendo mejor una avería: son micro detenciones o abastecimiento.'
+        : ''),
+    { titulo: 'Contención', tamano: T.chico + 1, x, ancho: anchoNota })
+    const oc = d.ocupacion
+    if (oc && oc.ocupacion != null) {
+      const pc = Math.round(oc.ocupacion * 100)
+      parrafo(L, d.meta.planta === 'filete'
+        ? `Con la cadena en marcha pasaron ${num(oc.pasaron)} silletas y se llenaron ${num(oc.llenas)}: ${pc} %. `
+          + 'La cadena gira siempre a 18 pz/min; lo que Shoplogix llama «pérdida de velocidad» son silletas que pasaron vacías.'
+        : `En marcha la línea usó ${pc} % de su capacidad (${num(oc.llenas)} de ${num(oc.pasaron)} a ${oc.ritmoNominal} pz/min por máquina). `
+          + 'El dato no dice si la brecha es alimentación, calibre o la máquina: eso se establece en terreno.',
+      { titulo: d.meta.planta === 'filete' ? 'Silletas' : 'Capacidad', tamano: T.chico + 1, x, ancho: anchoNota })
+    }
+    /* Las caídas van bajo las notas, en la columna derecha: a todo el ancho
+       empujaban la tabla a una hoja de continuación con dos filas. Si son
+       muchas, la tabla sigue en la hoja siguiente en esa misma columna. */
     if (rp.eventos.length) {
+      L.y += 1
+      rotulo(L, 'Cada caída de línea', { x })
       tabla(L, [
-        { t: 'Caida', ancho: 26 },
-        { t: 'Parada', ancho: 26, alinear: 'der' },
+        { t: 'Caída', ancho: 22 },
+        { t: 'Parada', ancho: 24, alinear: 'der' },
         { t: 'Piezas parada', ancho: 34, alinear: 'der' },
-        { t: 'Reenganche', ancho: 32, alinear: 'der' },
-        { t: 'Piezas reenganche', ancho: 40, alinear: 'der' },
+        { t: 'Reenganche', ancho: 28, alinear: 'der' },
+        { t: 'Piezas al volver', ancho: anchoNota - 108, alinear: 'der' },
       ], rp.eventos.map((e) => ({
-        celdas: [hhmm(e.inicioMs), `${e.minParo} min`, num(e.pzParo),
-          `${e.minReenganche} min`, num(e.pzReenganche)],
-        colores: [null, null, null, e.minReenganche >= rp.maxReengancheMin ? [...C.atencion] : [...C.ok], null],
-      })))
+        celdas: [hhmm(e.inicioMs), `${e.minParo} min`, num(e.pzParo), `${e.minReenganche} min`, num(e.pzReenganche)],
+        colores: [null, null, null, e.minReenganche >= (rp.maxReengancheMin || Infinity) ? C.rojo : null, null],
+      })), { x })
     }
+    L.y = Math.max(L.y, yIzq)
   }
-
-  filaKpis(L, d.recuperaciones.map((r) => ({
-    rotulo: `Recuperacion - ${r.causa}`,
-    valor: r.minutos == null ? 'no volvio' : `${r.minutos} min`,
-    sub: r.minutos == null ? 'la linea no recupero el ritmo' : `ultimo evento ${hhmm(r.desdeMs)}, ritmo a las ${hhmm(r.volvioMs)}`,
-    color: r.minutos == null ? C.crit : C.ok,
-  })))
-
-  // Ocupacion de la cadena: la traduccion de la "perdida de velocidad".
-  const oc = d.ocupacion
-  if (oc && oc.ocupacion != null) {
-    const pct = Math.round(oc.ocupacion * 100)
-    filaKpis(L, [
-      {
-        rotulo: d.meta.planta === 'filete' ? 'Silletas llenas' : 'Capacidad usada',
-        valor: `${pct}%`,
-        sub: `${num(oc.llenas)} de ${num(oc.pasaron)} a ${oc.ritmoNominal} pz/min`,
-        color: pct >= 80 ? C.ok : pct >= 55 ? C.tinta : C.atencion,
-      },
-      {
-        rotulo: d.meta.planta === 'filete' ? 'Silletas vacias' : 'Capacidad sin usar',
-        valor: num(oc.vacias),
-        sub: 'lo que Shoplogix llama perdida de velocidad',
-        color: C.atencion,
-      },
-      {
-        rotulo: 'Cadena en marcha',
-        valor: durTexto(oc.minutosEnMarcha * 60),
-        sub: 'solo este tiempo deja pasar capacidad',
-      },
-    ])
-    if (d.textos.notaOcupacion) {
-      nota(L, d.textos.notaOcupacion, {
-        color: C.acento,
-        titulo: d.meta.planta === 'filete' ? 'La "perdida de velocidad", traducida' : 'Sobre la "perdida de velocidad"',
-      })
-    }
-  }
-
-  if (d.textos.notaReparto) {
-    nota(L, d.textos.notaReparto, { color: C.acento, titulo: 'Como leer el reparto' })
-  }
-  nota(L, d.textos.notaLamina4, { color: C.acento, titulo: 'Lo que estos numeros si prueban' })
 }
 
-function lamina5Cotejo(L, d) {
+function lamina4Cotejo(L, d) {
+  const c = d.cotejo || { comparados: 0, filas: [] }
+  const banda = c.comparados >= 3 && c.medianaPrevios != null && c.margenHabitual != null
   crearLamina(L, {
     pestania: 'Cotejo',
-    titulo: `Contra los ${d.cotejo.comparados} turnos equivalentes anteriores`,
-    subtitulo: 'Turnos del mismo horario y duracion, con produccion real',
+    titulo: c.comparados ? `Contra los ${c.comparados} turnos equivalentes anteriores` : 'Sin turnos equivalentes para comparar',
+    subtitulo: banda
+      ? `Mismo horario y duración. Lo habitual va de ${num(c.medianaPrevios - c.margenHabitual)} a ${num(c.medianaPrevios + c.margenHabitual)} piezas`
+      : 'Mismo horario y duración',
   })
-  const { doc } = L
-  const ancho = W - M * 2
-
-  if (!d.cotejo.comparados) {
-    nota(L, 'No hay suficientes turnos equivalentes anteriores para cotejar. El informe no emite veredicto comparativo.', { color: C.atencion })
+  if (!c.comparados || !c.filas.length) {
+    parrafo(L, 'No hay suficientes turnos equivalentes anteriores para cotejar. El informe no emite veredicto comparativo.')
     return
   }
-
-  const gh = 60
-  const y = sitio(L, gh + 12)
-  const maxC = Math.max(...d.cotejo.filas.map((f) => f.ciclos || 0), 1)
-  const conDet = d.cotejo.filas.filter((f) => typeof f.detencionLineaSec === 'number')
-  const maxDet = Math.max(...conDet.map((f) => f.detencionLineaSec), 0)
-  const bw = ancho / d.cotejo.filas.length
-  d.cotejo.filas.forEach((f, i) => {
-    const h = ((f.ciclos || 0) / maxC) * gh
-    doc.setFillColor(...(f.esReferencia ? C.acento : [150, 180, 188]))
-    doc.rect(M + i * bw + bw * 0.15, y + gh - h, bw * 0.7, h, 'F')
-    doc.setFontSize(7).setFont('helvetica', f.esReferencia ? 'bold' : 'normal').setTextColor(...C.tinta2)
-    doc.text(wa(num(f.ciclos)), M + i * bw + bw * 0.5, y + gh - h - 2, { align: 'center' })
-    doc.setTextColor(...(f.esReferencia ? C.tinta : C.tinta3))
-    doc.text(wa(f.id.slice(5, 10)), M + i * bw + bw * 0.5, y + gh + 5, { align: 'center' })
-
-    // Detencion de linea de ese turno, cuando esta cacheada. Va como barra
-    // fina encima de la de produccion: la pregunta que responde es "este turno
-    // tuvo mas falla de lo normal", y para eso hay que ver las dos juntas.
-    if (typeof f.detencionLineaSec === 'number' && maxDet > 0) {
-      const hd = (f.detencionLineaSec / maxDet) * (gh * 0.35)
-      doc.setFillColor(...C.crit)
-      doc.rect(M + i * bw + bw * 0.15 + bw * 0.7 + 1, y + gh - hd, bw * 0.16, hd, 'F')
-    }
-  })
-  if (d.cotejo.medianaPrevios) {
-    const my = y + gh - (d.cotejo.medianaPrevios / maxC) * gh
-    doc.setDrawColor(...C.tinta3).setLineWidth(0.4).setLineDashPattern([1.5, 1], 0)
-    doc.line(M, my, W - M, my)
-    doc.setLineDashPattern([], 0)
-    doc.setFontSize(7).setTextColor(...C.tinta2).setFont('helvetica', 'bold')
-    doc.text(wa(`mediana ${num(d.cotejo.medianaPrevios)}`), W - M, my - 1.5, { align: 'right' })
+  if (d.enCurso) {
+    parrafo(L, 'El turno sigue en curso: se muestra contra turnos completos solo como referencia, la comparación no vale.',
+      { titulo: 'Atención', color: C.tinta })
   }
-  doc.setDrawColor(...C.linea).line(M, y + gh, W - M, y + gh)
-  L.y = y + gh + 8
+  const { doc } = L
+  const gh = 70
+  const izq = M + 30
+  const ancho = W - M - izq
+  const y = sitio(L, gh + 26)
+  const maxC = Math.max(...c.filas.map((f) => f.ciclos || 0), 1)
+  const sy = (v) => y + gh - (v / maxC) * gh
+  const bw = ancho / c.filas.length
+  if (banda) {
+    const top = sy(Math.min(c.medianaPrevios + c.margenHabitual, maxC))
+    doc.setFillColor(...C.banda).rect(izq, top, ancho, sy(c.medianaPrevios - c.margenHabitual) - top, 'F')
+  }
+  c.filas.forEach((f, i) => {
+    const h = ((f.ciclos || 0) / maxC) * gh
+    const cx = izq + i * bw + bw / 2
+    doc.setFillColor(...(f.esReferencia ? C.tinta : C.barra))
+    doc.rect(izq + i * bw + bw * 0.18, y + gh - h, bw * 0.64, h, 'F')
+    doc.setFontSize(T.chico).setFont('helvetica', f.esReferencia ? 'bold' : 'normal').setTextColor(...(f.esReferencia ? C.tinta : C.gris))
+    doc.text(wa(num(f.ciclos)), cx, y + gh - h - 1.5, { align: 'center' })
+    doc.text(wa(f.esReferencia ? 'Hoy' : `${f.id.slice(8, 10)}-${f.id.slice(5, 7)}`), cx, y + gh + 5, { align: 'center' })
+    doc.text(wa(f.mantencionSec == null ? '–' : String(Math.round(f.mantencionSec / 60))), cx, y + gh + 13, { align: 'center' })
+  })
+  doc.setDrawColor(...C.tinta).setLineWidth(0.3).line(izq, y + gh, W - M, y + gh)
+  doc.setDrawColor(...C.fila).setLineWidth(0.25).line(M, y + gh + 8, W - M, y + gh + 8)
+  doc.setFontSize(T.chico).setFont('helvetica', 'normal').setTextColor(...C.gris)
+  doc.text('Turno', M, y + gh + 5)
+  doc.text('Min de Mantención', M, y + gh + 13)
+  L.y = y + gh + 20
 
-  pie(L, conDet.length > 1
-    ? `Barra ancha: ciclos producidos. Barra fina roja: detencion de linea (${conDet.length} de ${d.cotejo.filas.length} turnos la tienen calculada).`
-    : 'Barra ancha: ciclos producidos. La detencion de los turnos previos aparecera a medida que se vayan cerrando con el informe activo.',
-  { tamano: 7 })
-
-  nota(L, d.textos.notaLamina5, { color: C.acento, titulo: 'Que dice esta comparacion' })
+  const notas = []
+  if (banda) notas.push('La franja gris es lo que estos turnos varían entre sí: un turno dentro de ella es normal, sin reproche y sin celebrarlo.')
+  else notas.push('Con menos de 3 turnos equivalentes la comparación es solo referencia.')
+  if (c.filas.some((f) => f.mantencionSec == null)) notas.push('«–» = turno sin resumen guardado al cierre.')
+  parrafo(L, notas.join(' '), { tamano: T.chico + 1, color: C.gris })
 }
 
-function lamina6Cierre(L, d) {
-  crearLamina(L, {
-    pestania: 'Cierre',
-    titulo: 'Lo que se dice en la reunion',
-    subtitulo: 'Texto listo para leer, y lo que queda comprometido',
-  })
-  const { doc } = L
-  const ancho = W - M * 2
-  nota(L, d.textos.parrafoReunion, { color: C.acento, tamano: 10 })
-
-  const yTit = sitio(L, 12)
-  doc.setFontSize(7).setFont('helvetica', 'bold').setTextColor(...C.tinta3)
-  doc.text(wa('LO QUE QUEDA ABIERTO'), M, yTit + 4)
-  L.y = yTit + 8
-
-  for (const p of d.textos.pendientes) {
-    doc.setFontSize(8.5).setFont('helvetica', 'normal')
-    const lineas = doc.splitTextToSize(wa(`- ${p}`), ancho - 4)
-    const alto = lineas.length * 4 + 2
-    const y = sitio(L, alto)
-    doc.setTextColor(...C.tinta2)
-    doc.text(lineas, M + 2, y)
-    L.y = y + alto
+function lamina5Cierre(L, d, t) {
+  crearLamina(L, { pestania: 'Cierre', titulo: 'Para leer en la reunión' })
+  parrafo(L, `${t.veredicto} ${t.detalle}`, { tamano: T.cuerpo + 2, ancho: 200, filete: true })
+  L.y += 4
+  rotulo(L, 'Queda abierto')
+  const abiertos = [...t.abiertos]
+  if (d.resumen.scrapTotal === 0) {
+    abiertos.push({
+      rotulo: 'Calidad del OEE:',
+      texto: 'sale 100 % porque Shoplogix no informa rechazo para estas máquinas; no se midió, así que ese 100 % no es un resultado.',
+    })
   }
+  if (!abiertos.length) abiertos.push({ rotulo: 'Nada pendiente:', texto: 'todas las detenciones tienen causal reconocida.' })
+  for (const a of abiertos) parrafoRotulado(L, a.rotulo, a.texto, { ancho: 230 })
+  L.y += 3
+  rotulo(L, 'Lo que este informe no dice')
+  parrafo(L, 'Cuántas piezas se habrían hecho sin las fallas. Ese número supone que había materia prima esperando y que todo '
+    + 'lo demás se habría comportado igual: un turno que no ocurrió.', { tamano: T.cuerpo, ancho: 230 })
 
-  // El pie va en la ULTIMA hoja, que con pendientes largos puede no ser esta.
-  doc.setFontSize(7).setTextColor(...C.tinta3).setFont('helvetica', 'normal')
-  doc.text(wa(d.textos.pieDeFuente), M, H - 10)
+  // El pie va en la ÚLTIMA hoja de la lámina, que con pendientes largos puede no ser esta.
+  const { doc } = L
+  doc.setFontSize(T.rotulo).setTextColor(...C.gris).setFont('helvetica', 'normal')
+  doc.text(wa(`Datos de Shoplogix, planta ${d.meta.planta}. Los tiempos son hora de planta. Generado automáticamente desde la PWA de Mantención.`), M, H - 8)
+}
+
+/**
+ * Anexo: cómo se cuentan los minutos. Existe para corregir el doble conteo del
+ * rollup de Shoplogix, que suma las máquinas del área. Con UNA sola máquina no
+ * hay nada que corregir —suma, unión, todas y equivalente son el mismo número—
+ * y la lámina no se dibuja: una lámina que argumenta algo que su propia tabla
+ * desmiente le quita autoridad al resto del informe.
+ */
+function lamina6Anexo(L, d) {
+  const r = d.resumen
+  if (r.maquinas <= 1) return
+  crearLamina(L, {
+    pestania: 'Anexo',
+    titulo: 'Cómo se cuentan los minutos',
+    subtitulo: `El resumen de área de Shoplogix suma las ${r.maquinas} máquinas; este informe no`,
+  })
+  const causas = r.causas.filter((c) => !c.esMicro)
+  const micro = r.causas.find((c) => c.esMicro)
+  tabla(L, [
+    { t: 'Causa', ancho: 85 },
+    { t: 'Suma de máquinas', ancho: 38, alinear: 'der' },
+    { t: 'Al menos 1 parada', ancho: 38, alinear: 'der' },
+    { t: `Las ${r.maquinas} paradas`, ancho: 34, alinear: 'der' },
+    { t: 'Min de línea', ancho: 46, alinear: 'der' },
+    { t: 'Det.', ancho: 24, alinear: 'der' },
+  ], causas.map((c) => ({
+    celdas: [c.imputacion && c.imputacion.hoja ? c.imputacion.hoja : c.causa, dur(c.sumaSec), dur(c.unionSec), dur(c.todasSec), dur(c.equivalenteLineaSec), String(c.eventos)],
+    sub: c.imputacion ? c.imputacion.categoriaLabel : null,
+    colores: [null, C.gris, null, null, null, null],
+    negrita: [false, false, false, false, true, false],
+  })), {
+    cierre: {
+      celdas: ['Total con micro detenciones', dur(r.detencion.sumaSec), dur(r.detencion.unionSec), dur(r.detencion.todasSec), dur(r.detencion.equivalenteLineaSec), ''],
+    },
+  })
+  if (micro) {
+    parrafo(L, `Incluye ${num(micro.eventos)} micro detenciones (${dur(micro.equivalenteLineaSec)} de línea): paros de segundos `
+      + 'que el sistema no pide imputar. Se cuentan, pero no compiten con las causas de arriba.', { tamano: T.chico + 0.5, color: C.gris })
+  }
+  const p = causas[0]
+  if (p && p.sumaSec > p.equivalenteLineaSec) {
+    parrafo(L, `${p.imputacion && p.imputacion.hoja ? p.imputacion.hoja : p.causa} aparece con ${dur(p.sumaSec)} en el resumen de área `
+      + `porque se suma en cada máquina. La línea perdió ${dur(p.equivalenteLineaSec)} de capacidad y estuvo entera detenida `
+      + `${dur(p.todasSec)}. Citar la suma multiplica la falla por el número de máquinas que tocó.`,
+    { titulo: 'Por qué importa', tamano: T.chico + 1.5, ancho: 230 })
+  }
 }
 
 /**
  * Estampa "hoja / total" cuando ya se sabe el total. No se puede hacer al
- * dibujar la cabecera: el número de hojas depende de cuántos tramos y caídas
- * tuvo el turno.
+ * dibujar la cabecera: el número de hojas depende de cuántas filas tuvo el turno.
  */
 function numerar(doc) {
   const total = doc.getNumberOfPages()
   for (let p = 1; p <= total; p++) {
     doc.setPage(p)
-    doc.setFontSize(7.5).setTextColor(255, 255, 255).setFont('helvetica', 'bold')
-    doc.text(wa(`${p} / ${total}`), W - M, 4.8, { align: 'right' })
+    doc.setFontSize(T.rotulo).setTextColor(...C.gris).setFont('helvetica', 'bold')
+    doc.text(wa(`${p} / ${total}`), W - M, 10, { align: 'right' })
   }
 }
 
@@ -812,6 +774,20 @@ function instrumentar(doc, registro) {
 // ── Entrada ──────────────────────────────────────────────────────────────────
 
 /**
+ * Datos guardados antes de que existieran `porDueno` y `fallas` (o armados a
+ * mano en un test) se completan con lo mínimo: el reparto por dueño sale de
+ * las causas, y sin máquinas no hay fallas por máquina que mostrar.
+ */
+function completar(d) {
+  return {
+    ...d,
+    porDueno: d.porDueno || perdidaPorDueno(d.resumen.causas || []),
+    fallas: d.fallas || { filas: [], totalMin: 0, eventos: 0 },
+    cronologia: d.cronologia || [],
+  }
+}
+
+/**
  * Genera el PDF y devuelve un Buffer.
  *
  * No toca Firestore ni la red: recibe los datos ya calculados. Así se puede
@@ -833,17 +809,19 @@ function generarInformeTurno(d, { registro } = {}) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   doc.setProperties({
     title: `Informe de turno - ${d.meta.areaLabel} - ${d.meta.fechaLabel}`,
-    creator: 'PWA Mantencion',
+    creator: 'PWA Mantención',
   })
   if (registro) instrumentar(doc, registro)
 
-  const L = abrirLienzo(doc)
-  lamina1Veredicto(L, d)
-  lamina2Falla(L, d)
-  lamina3Cronologia(L, d)
-  lamina4Ritmo(L, d)
-  lamina5Cotejo(L, d)
-  lamina6Cierre(L, d)
+  const datos = completar(d)
+  const t = textosCorreo(datos)
+  const L = abrirLienzo(doc, datos)
+  lamina1Veredicto(L, datos, t)
+  lamina2Fallas(L, datos)
+  lamina3Ritmo(L, datos)
+  lamina4Cotejo(L, datos)
+  lamina5Cierre(L, datos, t)
+  lamina6Anexo(L, datos)
   numerar(doc)
 
   return Buffer.from(doc.output('arraybuffer'))

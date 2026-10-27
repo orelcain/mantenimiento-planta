@@ -866,6 +866,8 @@ export interface MonitorV2Props {
   /** «Ritmo de la línea» del clásico (ahora, media 15 min, promedio, meta, techo y cada máquina). Si viene,
       reemplaza al KPI Ritmo y a la tarjeta Máquinas: cada cifra se muestra una sola vez. */
   ritmoLinea?: ReactNode
+  /** «Ritmo en vivo · 15 min»: va justo debajo de «Ritmo de la línea». Ausente con el turno cerrado o sin serie del pulso. */
+  ritmoVivo?: ReactNode
   /** «Camino a la meta» del monitor clásico (hechas, paradas por causa, ritmo, por jugar): se ve tal cual. */
   caminoMeta?: ReactNode
   /** Velocidad minuto a minuto de todo el turno (ciclos de Shoplogix por máquina). */
@@ -1079,6 +1081,8 @@ export function MonitorV2(p: MonitorV2Props) {
       </div>
 
       {p.ritmoLinea && <div className="v2-clasico v2-ritmo">{p.ritmoLinea}</div>}
+
+      {p.ritmoVivo}
 
       {p.caminoMeta && <div className="v2-clasico">{p.caminoMeta}</div>}
 

@@ -23,7 +23,7 @@
  *    categorias sale como "Electrica o Mecanica", no elige una.
  */
 
-const { impactoPorCausa, ritmoDelTurno, tramosDeRitmo, recuperacion, repartoDePerdida, ocupacionDeCadena } = require('./lineImpact')
+const { impactoPorCausa, ritmoDelTurno, tramosDeRitmo, recuperacion, intervalosDePausa, repartoDePerdida, ocupacionDeCadena } = require('./lineImpact')
 const { clasificarParaInforme } = require('./imputacion')
 const { resumirTurno, armarCotejo } = require('./cotejoTurnos')
 
@@ -98,6 +98,199 @@ function aMs(t) {
 }
 
 /**
+ * Redondea segundos a minutos de modo que la suma de las filas sea el total
+ * redondeado (resto mayor). Sin esto la tabla de fallas puede decir 6 + 6 + 4 +
+ * 4 y cerrar con 20 sobre filas que suman 19: el primero que sume en la
+ * reunión lo ve. El total es `Math.round(segundos / 60)`, el mismo redondeo de
+ * la fila de Mantención en `perdidaPorDueno`, así las dos tablas cierran igual.
+ */
+function minutosQueCuadran(secs) {
+  const total = Math.round(secs.reduce((a, s) => a + s, 0) / 60)
+  const base = secs.map((s) => Math.floor(s / 60))
+  let falta = total - base.reduce((a, m) => a + m, 0)
+  const orden = secs.map((s, i) => [s / 60 - Math.floor(s / 60), i]).sort((a, b) => b[0] - a[0])
+  for (let k = 0; falta > 0 && k < orden.length; k++, falta--) base[orden[k][1]] += 1
+  return { filas: base, total }
+}
+
+/** Nombre corto de máquina para tablas angostas: «Evisceradora 2» y «YAL Evisceradora 2» → «Ev 2». */
+function nombreCorto(nombre) {
+  return String(nombre || '').replace(/^(?:YAL\s+)?Evisceradora\s*/i, 'Ev ').trim()
+}
+
+/**
+ * De quién es cada segundo de línea perdido. Usa el `bucket` del árbol de
+ * imputación; lo que el árbol no puede asignar NO se reparte: va en su fila.
+ *   · causal fuera del árbol: alguien la anotó, pero el curso no la cubre
+ *   · sin causal: nadie la anotó
+ *   · micro detenciones: el sistema no pide causal por diseño
+ */
+const DUENOS = [
+  { clave: 'mantencion', etiqueta: 'Mantención · equipos' },
+  { clave: 'externo', etiqueta: 'Externo' },
+  { clave: 'planificado', etiqueta: 'Planificado' },
+  { clave: 'fueraDelArbol', etiqueta: 'Causal fuera del árbol' },
+  { clave: 'sinCausal', etiqueta: 'Sin causal' },
+  { clave: 'micro', etiqueta: 'Micro detenciones' },
+]
+
+function duenoDe(c) {
+  if (c.esMicro) return 'micro'
+  const i = c.imputacion || {}
+  if (i.sinCausa) return 'sinCausal'
+  if (i.fueraDelArbol) return 'fueraDelArbol'
+  if (DUENOS.some((d) => d.clave === i.bucket)) return i.bucket
+  return 'fueraDelArbol'
+}
+
+/**
+ * La tabla «de quién fue la pérdida». Mantención sale siempre, también en
+ * cero: que ninguna detención haya quedado a su nombre es el dato que el
+ * informe existe para mostrar. Las demás filas, solo si tienen minutos.
+ */
+function perdidaPorDueno(causas) {
+  const filas = DUENOS.map((d) => {
+    const propias = causas.filter((c) => duenoDe(c) === d.clave)
+    const porEtiqueta = new Map()
+    for (const c of propias) {
+      const et = d.clave === 'micro' ? 'micro detenciones' : etiquetaCausa(c)
+      const prev = porEtiqueta.get(et) || { etiqueta: et, sec: 0, eventos: 0 }
+      prev.sec += c.equivalenteLineaSec
+      prev.eventos += c.eventos
+      porEtiqueta.set(et, prev)
+    }
+    const detalle = [...porEtiqueta.values()].sort((a, b) => b.sec - a.sec)
+    return {
+      ...d,
+      sec: propias.reduce((a, c) => a + c.equivalenteLineaSec, 0),
+      eventos: propias.reduce((a, c) => a + c.eventos, 0),
+      causas: detalle,
+    }
+  }).filter((f) => f.clave === 'mantencion' || f.sec > 0)
+  /* Cada fila se redondea sola y el total es la suma de lo que se muestra. Al
+     revés (cuadrar las filas contra el total) Mantención podía salir con 19 min
+     en esta tabla y 20 en el texto de Telegram, que redondea su cifra suelta:
+     el mismo número dicho dos veces distinto. El costo es que el total puede
+     diferir en 1 min de redondear el total de segundos; por eso el correo toma
+     la pérdida de línea de AQUÍ y no de `resumen.detencion`. */
+  const conMin = filas.map((f) => ({ ...f, min: Math.round(f.sec / 60) }))
+  return {
+    filas: conMin,
+    totalSec: filas.reduce((a, f) => a + f.sec, 0),
+    totalMin: conMin.reduce((a, f) => a + f.min, 0),
+  }
+}
+
+/**
+ * Las fallas de Mantención, una fila por causa y máquina.
+ *
+ * `min` es lo que esa máquina le quitó a la LÍNEA (su tiempo detenido dividido
+ * por el número de máquinas), así las filas suman lo mismo que la fila de
+ * Mantención de `perdidaPorDueno`. `volvioMin` mide desde el fin del último
+ * evento de esa causa en esa máquina hasta que la línea recuperó su ritmo:
+ * null = no volvió en el turno, 0 = nunca la sacó de ritmo.
+ *
+ * `turnosSeguidos` sale de `historial` (turnos equivalentes anteriores, el más
+ * reciente primero): cuántos turnos seguidos, contando este, tuvo la misma
+ * causa en la misma máquina. Sin historial queda en null y no se dice nada.
+ */
+function fallasDeEquipo({ machines, causas, bloques, ritmoNormal, pasoMin = 5, windowStart, windowEnd, historial = null }) {
+  const n = machines.length || 1
+  const pausas = intervalosDePausa(machines)
+  const grupos = new Map()
+  for (const c of causas.filter((x) => duenoDe(x) === 'mantencion')) {
+    const et = etiquetaCausa(c)
+    const evs = eventosDeCausa(machines, c.causa, windowStart, windowEnd)
+    for (const pm of c.porMaquina || []) {
+      if (!pm.eventos) continue
+      const clave = `${et}|${pm.maquina}`
+      const g = grupos.get(clave) || {
+        etiqueta: et,
+        maquina: pm.maquina,
+        ambigua: !!(c.imputacion && c.imputacion.ambigua),
+        categoriaLabel: c.imputacion ? c.imputacion.categoriaLabel : null,
+        eventos: 0,
+        sec: 0,
+        ultimoFinMs: 0,
+      }
+      g.eventos += pm.eventos
+      g.sec += pm.sec
+      const ev = evs.find((e) => e.maquina === pm.maquina)
+      if (ev && ev.ultimoFinMs > g.ultimoFinMs) g.ultimoFinMs = ev.ultimoFinMs
+      grupos.set(clave, g)
+    }
+  }
+  const filas = [...grupos.values()].sort((a, b) => b.sec - a.sec)
+  const { filas: mins, total } = minutosQueCuadran(filas.map((f) => f.sec / n))
+  return {
+    filas: filas.map((f, i) => {
+      const r = f.ultimoFinMs ? recuperacion({ bloques, ritmoNormal, pasoMin, pausas, desdeMs: f.ultimoFinMs }) : { minutos: null }
+      let turnosSeguidos = null
+      if (historial && historial.length) {
+        turnosSeguidos = 1
+        for (const h of historial) {
+          if (!h.claves || !h.claves.has(`${f.etiqueta}|${f.maquina}`)) break
+          turnosSeguidos += 1
+        }
+      }
+      return {
+        etiqueta: f.etiqueta,
+        maquina: f.maquina,
+        maquinaCorta: nombreCorto(f.maquina),
+        ambigua: f.ambigua,
+        categoriaLabel: f.categoriaLabel,
+        eventos: f.eventos,
+        sec: f.sec,
+        min: mins[i],
+        mediaMin: Math.round(f.sec / f.eventos / 60),
+        volvioMin: r.minutos,
+        turnosSeguidos,
+      }
+    }),
+    totalMin: total,
+    eventos: filas.reduce((a, f) => a + f.eventos, 0),
+  }
+}
+
+/**
+ * Cada detención y pausa del turno, por máquina, con su dueño: es lo que dibuja
+ * la cronología del PDF. Mismo criterio que `impactoPorCausa` (micro = el
+ * `name` de Shoplogix, reason vacío = sin causal), recortado a la ventana.
+ */
+function cronologiaPorMaquina(machines, windowStart, windowEnd) {
+  const desde = aMs(windowStart)
+  const hasta = aMs(windowEnd)
+  return machines.map((m) => ({
+    maquina: m.machineName,
+    maquinaCorta: nombreCorto(m.machineName),
+    tramos: (m.states || [])
+      .filter((s) => s.type === 'downtime' || s.type === 'break')
+      .map((s) => {
+        let a = aMs(s.startAt)
+        let b = aMs(s.endAt)
+        if (a == null || b == null) return null
+        if (desde != null) a = Math.max(a, desde)
+        if (hasta != null) b = Math.min(b, hasta)
+        if (b <= a) return null
+        if (s.type === 'break') return { a, b, dueno: 'pausa' }
+        const esMicro = s.name === 'Micro Detencion'
+        return { a, b, dueno: duenoDe({ esMicro, imputacion: clasificarParaInforme(s.reason || '', { esMicro }) }) }
+      })
+      .filter(Boolean)
+      .sort((x, y) => x.a - y.a),
+  }))
+}
+
+/** Claves «causa|máquina» de Mantención de un turno, para `historial`. */
+function clavesDeMantencion(causas) {
+  const claves = new Set()
+  for (const c of causas.filter((x) => duenoDe(x) === 'mantencion')) {
+    for (const pm of c.porMaquina || []) if (pm.eventos) claves.add(`${etiquetaCausa(c)}|${pm.maquina}`)
+  }
+  return claves
+}
+
+/**
  * Arma el objeto completo que consume `turnoDefensaPdf.generarInformeTurno`.
  *
  * @param {object} p
@@ -107,7 +300,7 @@ function aMs(t) {
  * @param {object} p.cotejo    salida de cotejarTurnos (o null)
  * @param {object} p.meta      { areaLabel, turnoLabel, fechaLabel, planta }
  */
-function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta, enCurso = false }) {
+function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta, enCurso = false, historial = null }) {
   const resumen = resumirTurno({ machines, windowStart, windowEnd, clasificar: clasificarParaInforme })
   const ritmo = ritmoDelTurno({ machines, windowStart, windowEnd })
   const tramos = tramosDeRitmo({ bloques: ritmo.bloques, ritmoNormal: ritmo.ritmoNormal, pasoMin: ritmo.pasoMin })
@@ -118,6 +311,7 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta,
   // Recuperacion de las dos causas mas pesadas: desde el fin de su ultimo
   // evento hasta que la linea vuelve al ritmo normal. Es la medida de
   // contencion, y es lo unico de esta lamina que Mantencion controla directo.
+  const pausas = intervalosDePausa(machines)
   const recuperaciones = resumen.causas
     .filter((c) => !c.esMicro && c.equivalenteLineaSec > 0)
     .slice(0, 2)
@@ -125,7 +319,7 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta,
       const evs = eventosDeCausa(machines, c.causa, windowStart, windowEnd)
       const desdeMs = evs.reduce((a, m) => (m.ultimoFinMs && m.ultimoFinMs > a ? m.ultimoFinMs : a), 0)
       if (!desdeMs) return null
-      const r = recuperacion({ bloques: ritmo.bloques, ritmoNormal: ritmo.ritmoNormal, desdeMs })
+      const r = recuperacion({ bloques: ritmo.bloques, ritmoNormal: ritmo.ritmoNormal, pasoMin: ritmo.pasoMin, pausas, desdeMs })
       return { causa: etiquetaCausa(c), desdeMs, ...r }
     })
     .filter(Boolean)
@@ -175,9 +369,24 @@ function construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta,
     }
   }
 
+  // La fila de HOY en el cotejo lleva lo que se calculó ahora, no lo cacheado:
+  // el resumen del doc padre puede no existir aún o ser de un envío anterior.
+  if (cot && Array.isArray(cot.filas)) {
+    cot = { ...cot, filas: cot.filas.map((f) => (f.esReferencia ? { ...f, mantencionSec: resumen.mantencionEquivSec } : f)) }
+  }
+
+  const porDueno = perdidaPorDueno(resumen.causas)
+  const fallas = fallasDeEquipo({
+    machines, causas: resumen.causas, bloques: ritmo.bloques, ritmoNormal: ritmo.ritmoNormal, pasoMin: ritmo.pasoMin,
+    windowStart, windowEnd, historial,
+  })
+
   return {
     meta,
     resumen,
+    porDueno,
+    fallas,
+    cronologia: cronologiaPorMaquina(machines, windowStart, windowEnd),
     bloques: ritmo.bloques,
     tramos,
     eventosPorMaquina,
@@ -520,4 +729,7 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
   }
 }
 
-module.exports = { construirDatosInforme, construirTextos, etiquetaCausa, causaPrincipal, eventosDeCausa }
+module.exports = {
+  construirDatosInforme, construirTextos, etiquetaCausa, causaPrincipal, eventosDeCausa,
+  minutosQueCuadran, perdidaPorDueno, fallasDeEquipo, clavesDeMantencion, duenoDe, nombreCorto, cronologiaPorMaquina,
+}
