@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   calcularRitmoVivo,
   cronometro,
+  etiquetaMaquina,
   llenadoDe,
+  maquinaQueBaja,
   paradaEnCurso,
+  SEL_LINEA,
   segundosCubiertos,
   tendenciaDe,
   tonoDe,
   unidadDeMaquinas,
+  vistaDeSerie,
   type EntradaRitmoVivo,
   type MaquinaVivo,
 } from '../ritmoVivo'
@@ -46,6 +50,15 @@ describe('tendencia', () => {
   })
   it('estable con oscilaciones chicas', () => {
     expect(tendenciaDe([50, 49, 51, 50, 49, 51, 50, 50, 49, 51, 50, 50], 51)!.dir).toBe('estable')
+  })
+  it('detenida cuando los últimos 3 minutos son cero (antes decía «Estable · 0 → 0»)', () => {
+    const t = tendenciaDe([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 51)!
+    expect(t.dir).toBe('detenida')
+    expect(t.ceros).toBe(14)
+    expect(tendenciaDe([40, 38, 36, 30, 0, 0, 0], 51)!.dir).toBe('detenida')
+  })
+  it('dos minutos en cero todavía no es detenida', () => {
+    expect(tendenciaDe([40, 40, 40, 40, 0, 0], 51)!.dir).not.toBe('detenida')
   })
   it('no opina con menos de 4 minutos', () => {
     expect(tendenciaDe([50, 40, 30], 51)).toBeNull()
@@ -190,6 +203,107 @@ describe('tarjeta completa', () => {
     expect(unidadDeMaquinas([{ model: 'Baader 142', name: 'Evisceradora 1' }])).toBe('carros')
     expect(unidadDeMaquinas([{ model: 'Baader 200', name: 'B200' }])).toBe('silletas')
     expect(unidadDeMaquinas([{ model: '', name: 'Máquina X' }])).toBeNull()
+  })
+})
+
+describe('la serie por máquina, con SU esperado', () => {
+  const e = entrada([maq('1', planas(19), 19), maq('2', [...planas(16, 13), 8], 16), maq('3', planas(12), 16)], {
+    stopEvents: [], stopMachines: ['1', '2', '3'],
+    acumulado: { '1': 19 * 14 + 10, '2': 16 * 13 + 8 + 6, '3': 12 * 14 + 4 },
+  })
+  const r = calcularRitmoVivo(e, 'carros')!
+
+  it('cada Baader trae su tira de 14 minutos cerrados, su esperado y su minuto en curso', () => {
+    expect(r.porMaquina.map((m) => [m.id, m.esperado, m.minutos.length, m.curso])).toEqual([['1', 19, 14, 10], ['2', 16, 14, 6], ['3', 16, 14, 4]])
+  })
+
+  it('las series por máquina suman la de la línea, minuto a minuto', () => {
+    r.minutos.forEach((m, i) => expect(r.porMaquina.reduce((a, x) => a + x.minutos[i]!.piezas, 0)).toBe(m.piezas))
+    expect(r.curso).toBe(20)
+  })
+
+  it('el tono de cada minuto se juzga contra el esperado de ESA máquina, no el de la línea', () => {
+    expect(r.porMaquina[2]!.minutos[0]!.tono).toBe('bien') // 12 de 16 = 75 %
+    expect(r.porMaquina[1]!.minutos[13]!.tono).toBe('atento') // 8 de 16 = 50 %
+    expect(r.minutos[13]!.tono).toBe('bien') // 19+8+12 = 39 de 51 = 76 %
+  })
+
+  it('vistaDeSerie: «línea» es la suma; una máquina, la suya con su esperado; un id que no existe vuelve a la línea', () => {
+    const linea = vistaDeSerie(r, SEL_LINEA)
+    expect([linea.esperado, linea.ahora, linea.ahoraPct]).toEqual([51, 39, 76])
+    const ev2 = vistaDeSerie(r, '2')
+    expect([ev2.nombre, ev2.esperado, ev2.ahora, ev2.ahoraPct, ev2.curso]).toEqual(['Evisceradora 2', 16, 8, 50, 6])
+    expect(vistaDeSerie(r, 'nadie').sel).toBe(SEL_LINEA)
+  })
+})
+
+describe('etiqueta corta de máquina', () => {
+  it('sale del nombre real: «Evisceradora 2» es «Ev 2»', () => {
+    expect(etiquetaMaquina('Evisceradora 2')).toBe('Ev 2')
+    expect(etiquetaMaquina('  Evisceradora 3 ')).toBe('Ev 3')
+    expect(etiquetaMaquina('fileteadora-1')).toBe('Fi 1')
+  })
+  it('un nombre que no es «palabra + número» va tal cual, acotado', () => {
+    expect(etiquetaMaquina('Baader')).toBe('Baader')
+    expect(etiquetaMaquina('Línea 1')).toBe('Línea 1')
+    expect(etiquetaMaquina('Baader 2')).toBe('Baader 2')
+    expect(etiquetaMaquina('Máquina de filete grande')).toBe('Máquina d…')
+  })
+})
+
+describe('micro detenciones con su duración real', () => {
+  const cae = [16, 16, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
+  const e = entrada([maq('1', planas(15)), maq('2', cae)], {
+    stopMachines: ['1', '2'],
+    stopReasons: ['Micro Detencion', 'Detencion'],
+    stopEvents: [
+      { r: 0, f: iso(10, 5), s: 3, m: 1 },
+      { r: 0, f: iso(12, 20), s: 41, m: 1 },
+      { r: 1, f: iso(6, 0), s: 20, m: 1 }, // detención común: no es micro
+      { r: 0, f: iso(4, 30), s: 7, m: 0 },
+    ],
+  })
+  const { lineas } = llenadoDe(e, 0, 14)
+
+  it('cada micro lleva su inicio y los segundos que publica Shoplogix, por máquina', () => {
+    expect(lineas[1]!.microsDetalle.map((m) => [m.i, m.duracionS])).toEqual([[10, 3], [12, 41]])
+    expect(lineas[0]!.microsDetalle.map((m) => [m.i, m.duracionS])).toEqual([[4, 7]])
+    expect(lineas[1]!.microsDetalle[0]!.inicioMs).toBe(T0 + 10 * 60_000 + 5000)
+  })
+
+  it('las micros de otra razón no entran; `micros` marca todo minuto que toca (la de 41 s cruza al 13) y el detalle, el de su inicio', () => {
+    expect(lineas[1]!.microsDetalle).toHaveLength(2)
+    expect(lineas[1]!.micros).toEqual([10, 12, 13])
+  })
+
+  it('una micro que cae fuera de la tira no se cuenta; sin `m` no se sabe de qué máquina fue', () => {
+    const fuera = entrada([maq('1', planas(15))], { stopMachines: ['1'], stopReasons: ['Micro Detencion'], stopEvents: [{ r: 0, f: iso(-30), s: 5, m: 0 }] })
+    expect(llenadoDe(fuera, 0, 14).lineas[0]!.microsDetalle).toEqual([])
+    const viejo = entrada([maq('1', planas(15))], { stopMachines: ['1'], stopReasons: ['Micro Detencion'], stopEvents: [{ r: 0, f: iso(3), s: 5 }] })
+    expect(llenadoDe(viejo, 0, 14).lineas[0]!.microsDetalle).toEqual([])
+  })
+})
+
+describe('la máquina que baja', () => {
+  const cae = [16, 16, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5]
+  const cae2 = [16, 16, 16, 16, 15, 14, 14, 13, 13, 12, 11, 11, 10, 10]
+  const sana = planas(15)
+  const base = { stopEvents: [], stopMachines: ['1', '2', '3'] }
+
+  it('con una sola que baja, es esa', () => {
+    const r = calcularRitmoVivo(entrada([maq('1', sana), maq('2', cae), maq('3', sana)], base), 'carros')!
+    expect(maquinaQueBaja(r.lineas)?.id).toBe('2')
+  })
+
+  it('con dos que bajan, la de mayor caída', () => {
+    const r = calcularRitmoVivo(entrada([maq('1', cae2), maq('2', cae), maq('3', sana)], base), 'carros')!
+    expect(r.lineas[0]!.baja && r.lineas[1]!.baja).toBe(true)
+    expect(maquinaQueBaja(r.lineas)?.id).toBe('2')
+  })
+
+  it('si ninguna baja, ninguna: no se resalta a nadie por inventar', () => {
+    const r = calcularRitmoVivo(entrada([maq('1', sana), maq('2', sana), maq('3', sana)], base), 'carros')!
+    expect(maquinaQueBaja(r.lineas)).toBeNull()
   })
 })
 

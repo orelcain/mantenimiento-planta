@@ -1,35 +1,52 @@
 /**
- * «Ritmo en vivo · 15 min» del monitor v2 (opción A del mockup del 27-10).
+ * «Ritmo en vivo · 15 min» del monitor v2, en dos niveles (patrón exprés / ampliado del mockup del 27-10).
  *
- * Una sola pregunta: ¿cómo viene el ritmo AHORA y hacia dónde va? De arriba abajo:
- *  1. la parada en curso con su cronómetro (si la hay), clasificada por Shoplogix;
- *  2. el último minuto cerrado y la tendencia en palabras;
- *  3. la tira de 15 barras (14 cerradas + el minuto en curso llenándose);
- *  4. el llenado por máquina, en gris salvo la que baja;
- *  5. señales sobrias, sin afirmar causas.
+ * EXPRÉS (la tarjeta del riel): una sola pregunta, ¿cómo viene el ritmo AHORA y hacia dónde va?
+ *  1. la parada en curso con su cronómetro (solo celular: en PC la dice la banda de arriba);
+ *  2. un selector Línea · Ev 1 · Ev 2 · Ev 3 que cambia la tira y el «último minuto» a la suma o a UNA Baader
+ *     contra SU esperado (`serieMinuto.maquinas[].esperado`);
+ *  3. el último minuto cerrado y la tendencia en palabras;
+ *  4. la tira de 15 barras (14 cerradas + el minuto en curso llenándose), con globo al pasar el mouse;
+ *  5. el llenado: SOLO la máquina que baja va resaltada con su cifra; las otras, como dato chico.
  *
- * NO repite la barra de meta ni el promedio del turno: eso ya vive en «Ritmo de
- * la línea». La lógica está en `ritmoVivo.ts`.
+ * AMPLIADO (botón «Ampliar»): el selector, la tira grande de 15 min con su globo, el TURNO COMPLETO minuto a minuto
+ * (`MinutoTurnoV2`: línea y franjas por Baader, zoom, «Ver todo el turno» / «Últimos minutos», la parada marcada con
+ * «ver ›» de Camino a la meta), una franja de llenado por Baader (small multiples, mismo eje, cursor vertical común,
+ * globo con hora, % de llenado y cada micro detención con su duración REAL, `stopEvents[].s`) y las señales sobrias
+ * que no afirman causas. Sin pulso en vivo (turno cerrado o de otro día) la tarjeta queda solo con el turno.
+ *
+ * NO repite la barra de meta ni el promedio del turno: eso vive en «Ritmo de la línea». La lógica está en
+ * `ritmoVivo.ts`; todo es dato de Shoplogix ya publicado, nada se inventa.
  */
-import { Gauge, MoveRight, Timer, TrendingDown, TrendingUp } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Gauge, MoveRight, Timer, TrendingDown, TrendingUp, Pause } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
+import { Globo, Tarjeta } from './AmpliarV2'
+import { useAbrirAmpliado, useCuentaCifra } from './ampliarHooks'
+import { MinutoTurnoV2, type EventoMarcado, type MinutoTurno } from './MonitorV2'
 import {
   MICRO_MAX_MEDIDO_S,
+  SEL_LINEA,
   cronometro,
+  etiquetaMaquina,
+  maquinaQueBaja,
   paradaEnCurso,
+  vistaDeSerie,
   type LineaLlenado,
   type MaquinaVivo,
+  type ParadaVivo,
   type RitmoVivo,
   type Senal,
   type Tono,
+  type VistaSerie,
 } from './ritmoVivo'
 
 const r1 = (x: number) => Math.round(x * 10) / 10
 const COLOR: Record<Tono, string> = { bien: 'var(--v2-bien)', atento: 'var(--v2-atento)', mal: 'var(--v2-mal)' }
-const TEXTO_TONO: Record<'atento' | 'mal', string> = { atento: 'var(--v2-atento-texto)', mal: 'var(--v2-mal-texto)' }
+const TEXTO_TONO: Record<Tono, string> = { bien: 'var(--v2-bien)', atento: 'var(--v2-atento-texto)', mal: 'var(--v2-mal-texto)' }
 const DOT: Record<Senal['tono'], string> = { atento: 'var(--v2-atento)', mal: 'var(--v2-mal)', neutra: 'var(--v2-gris)' }
 const hhmmss = (ms: number) => new Date(ms).toISOString().slice(11, 19)
+const pct = (frac: number): Tono => (frac >= 0.75 ? 'bien' : frac >= 0.5 ? 'atento' : 'mal')
 
 /** Ancho real del contenedor: el SVG se dibuja a tamaño de pantalla, no escalado. */
 function useAncho<T extends HTMLElement>() {
@@ -46,6 +63,12 @@ function useAncho<T extends HTMLElement>() {
   return [ref, ancho] as const
 }
 
+/** Mide su ancho y se lo pasa a quien dibuja. */
+function Medido({ children, className = 'w-full' }: { children: (ancho: number) => ReactNode; className?: string }) {
+  const [ref, ancho] = useAncho<HTMLDivElement>()
+  return <div ref={ref} className={className}>{ancho > 0 && children(ancho)}</div>
+}
+
 /** Reloj de pared de la pantalla (cronómetro y «en vivo»), en la misma base que las horas del doc. */
 function useReloj() {
   const [t, setT] = useState(() => Date.now())
@@ -56,245 +79,516 @@ function useReloj() {
   return t - new Date(t).getTimezoneOffset() * 60_000
 }
 
-function irAlMinutoAMinuto() {
-  const el = document.getElementById('grafico-turno')
-  if (!el) return
-  const quieto = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  el.scrollIntoView({ behavior: quieto ? 'auto' : 'smooth', block: 'start' })
+/** El «en vivo hh:mm:ss» del encabezado: su propio reloj, para que el resto no se redibuje cada segundo. */
+function RelojVivo() {
+  const ahora = useReloj()
+  return (
+    <span className="rv-vivo inline-flex items-center gap-1.5 text-[13px] tabular-nums text-muted-foreground">
+      <i className="rv-punto" aria-hidden /><span className="sr-only">en vivo </span>{hhmmss(ahora)}
+    </span>
+  )
+}
+
+/** «La línea · detención»: el mismo rótulo en la tarjeta (celular) y en la banda de estado (PC). */
+function rotuloParada(p: ParadaVivo): string {
+  return `${p.quien} · ${p.clase === 'micro' ? 'micro detención' : p.clase === 'programada' ? 'parada programada' : 'detención'}`
+}
+
+/** «desde 13:06:21 · Shoplogix la clasifica como detención.»: lo que acompaña al cronómetro. */
+function detalleParada(p: ParadaVivo): string {
+  return `desde ${hhmmss(p.desdeMs)}${
+    p.clase === 'micro' ? ` · Shoplogix la clasifica como micro detención. En estos datos las micro duran hasta ${MICRO_MAX_MEDIDO_S} s.` : ''
+  }${p.clase === 'detencion' ? ' · Shoplogix la clasifica como detención.' : ''}${
+    p.clase === 'programada' && p.causa ? ` · ${motivoEnEspanol(p.causa)}` : ''
+  }`
+}
+
+/** El aviso que pide acción (o dice la causa anotada); null si no hay nada que avisar. */
+function avisoParada(p: ParadaVivo): string | null {
+  if (p.faltaCausa) return 'Ya es detención: hay que anotar la causa.'
+  if (p.causa && p.clase !== 'programada') return `Causa anotada: ${motivoEnEspanol(p.causa)}.`
+  return null
+}
+
+// ── Selector Línea · Ev 1 · Ev 2 · Ev 3 ──────────────────────────────────────
+
+function Selector({ opciones, valor, onCambio }: { opciones: Array<{ id: string; etiqueta: string }>; valor: string; onCambio: (id: string) => void }) {
+  const ix = Math.max(0, opciones.findIndex((o) => o.id === valor))
+  const botones = useRef<Array<HTMLButtonElement | null>>([])
+  const teclas = (e: ReactKeyboardEvent) => {
+    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    if (!d) return
+    e.preventDefault()
+    const k = (ix + d + opciones.length) % opciones.length
+    onCambio(opciones[k]!.id)
+    botones.current[k]?.focus()
+  }
+  return (
+    <div className="v2-seg" role="tablist" aria-label="Ver la línea o una Baader" style={{ gridTemplateColumns: `repeat(${opciones.length}, minmax(0, 1fr))` }} onKeyDown={teclas}>
+      <i className="v2-seg-ind" aria-hidden style={{ width: `calc((100% - 6px) / ${opciones.length})`, transform: `translateX(${ix * 100}%)` }} />
+      {opciones.map((o, k) => (
+        <button
+          key={o.id}
+          ref={(el) => { botones.current[k] = el }}
+          type="button"
+          role="tab"
+          aria-selected={o.id === valor}
+          tabIndex={o.id === valor ? 0 : -1}
+          onClick={() => onCambio(o.id)}
+          className="tap-44"
+        >
+          {o.etiqueta}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 // ── La tira de 15 barras ─────────────────────────────────────────────────────
 
-function Tira({ r, cursoColor, ancho }: { r: RitmoVivo; cursoColor: string; ancho: number }) {
-  const H = 128
+function Tira({ v, horaCurso, cursoColor, ancho, alto = 128 }: { v: VistaSerie; horaCurso: string; cursoColor: string; ancho: number; alto?: number }) {
+  const [sel, setSel] = useState<number | null>(null)
+  const H = alto
   const top = 20
   const bot = H - 22
   const slot = ancho / 15
   const bw = Math.min(slot - 4, 30)
-  const cur = r.curso ?? 0
-  const max = Math.max(r.esperadoLinea * 1.15, ...r.minutos.map((m) => m.piezas), cur)
-  const y = (v: number) => bot - (v / max) * (bot - top)
-  const yEsp = y(r.esperadoLinea)
+  const cur = v.curso ?? 0
+  const max = Math.max(v.esperado * 1.15, ...v.minutos.map((m) => m.piezas), cur)
+  const y = (n: number) => bot - (n / max) * (bot - top)
+  const yEsp = y(v.esperado)
   const cx = 14 * slot + (slot - bw) / 2
   const yc = Math.min(y(cur), bot - 1)
-  const mitad = r.minutos[Math.floor((r.minutos.length - 1) / 2)]
+  const mitad = v.minutos[Math.floor((v.minutos.length - 1) / 2)]
+  const indice = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const rc = e.currentTarget.getBoundingClientRect()
+    return Math.max(0, Math.min(14, Math.floor(((e.clientX - rc.left) / rc.width) * 15)))
+  }
+  const m = sel != null && sel < 14 ? v.minutos[sel] : null
   return (
-    <svg width={ancho} height={H} viewBox={`0 0 ${ancho} ${H}`} role="img" aria-label={`Piezas por minuto, últimos ${r.minutos.length + 1} minutos`} className="block">
-      {r.minutos.map((m, i) => {
-        const yy = Math.min(y(m.piezas), bot - 2)
-        return <rect key={m.hora} x={r1(i * slot + (slot - bw) / 2)} y={r1(yy)} width={r1(bw)} height={r1(bot - yy)} rx={3} style={{ fill: COLOR[m.tono] }}><title>{`${m.hora} · ${m.piezas} pz`}</title></rect>
-      })}
-      <rect x={r1(cx)} y={r1(yEsp)} width={r1(bw)} height={r1(bot - yEsp)} rx={3} fill="none" strokeWidth={1} strokeDasharray="3 3" style={{ stroke: cursoColor }} />
-      {r.curso != null && <rect x={r1(cx)} y={r1(yc)} width={r1(bw)} height={r1(bot - yc)} rx={3} style={{ fill: `color-mix(in srgb, ${cursoColor} 50%, transparent)` }} />}
-      <text x={r1(cx + bw / 2)} y={r1((r.curso != null ? Math.min(yc, yEsp) : yEsp) - 5)} textAnchor="middle" fontSize={11} fontWeight={600} className="fill-foreground tabular-nums">{r.curso != null ? r.curso : '—'}</text>
-      <line x1={0} x2={ancho} y1={r1(yEsp)} y2={r1(yEsp)} strokeWidth={1} strokeDasharray="4 3" style={{ stroke: 'var(--v2-tenue)' }} />
-      <text x={0} y={r1(yEsp - 5)} fontSize={11} className="fill-muted-foreground">{r.esperadoLinea} esperado</text>
-      <line x1={0} x2={ancho} y1={bot} y2={bot} strokeWidth={1} style={{ stroke: 'var(--v2-reja)' }} />
-      <text x={0} y={H - 5} fontSize={11} className="fill-muted-foreground tabular-nums">{r.minutos[0]!.hora}</text>
-      {mitad && <text x={r1(Math.floor((r.minutos.length - 1) / 2) * slot + slot / 2)} y={H - 5} fontSize={11} textAnchor="middle" className="fill-muted-foreground tabular-nums">{mitad.hora}</text>}
-      <text x={ancho} y={H - 5} fontSize={11} fontWeight={600} textAnchor="end" className="fill-foreground tabular-nums">{r.horaCurso} en curso</text>
-    </svg>
+    <div className="relative" onPointerLeave={(e) => { if (e.pointerType === 'mouse') setSel(null) }}>
+      {sel != null && (
+        <Globo x={((sel + 0.5) / 15) * 100}>
+          {m ? (
+            <>
+              <div className="font-medium tabular-nums text-foreground">{m.hora} · {v.nombre}</div>
+              <div className="tabular-nums" style={{ color: TEXTO_TONO[m.tono] }}><b>{m.piezas} pz</b> <span className="text-muted-foreground">· {Math.round((m.piezas / v.esperado) * 100)} % de {v.esperado}</span></div>
+            </>
+          ) : (
+            <>
+              <div className="font-medium tabular-nums text-foreground">{horaCurso} · en curso</div>
+              <div className="tabular-nums text-muted-foreground">{v.curso != null ? `${v.curso} pz hasta ahora` : 'sin dato todavía'}</div>
+            </>
+          )}
+        </Globo>
+      )}
+      <svg
+        width={ancho} height={H} viewBox={`0 0 ${ancho} ${H}`} role="img" aria-label={`Piezas por minuto de ${v.nombre}, últimos ${v.minutos.length + 1} minutos`} className="block"
+        onPointerMove={(e) => { if (e.pointerType === 'mouse') setSel(indice(e)) }}
+        onClick={(e) => { const k = indice(e as unknown as ReactPointerEvent<SVGSVGElement>); setSel((a) => (a === k ? null : k)) }}
+      >
+        {v.minutos.map((mm, i) => {
+          const yy = Math.min(y(mm.piezas), bot - 2)
+          return <rect key={mm.hora} x={r1(i * slot + (slot - bw) / 2)} y={r1(yy)} width={r1(bw)} height={r1(bot - yy)} rx={3} opacity={sel != null && sel !== i ? 0.45 : 1} style={{ fill: COLOR[mm.tono], transition: 'opacity 120ms' }} />
+        })}
+        <rect x={r1(cx)} y={r1(yEsp)} width={r1(bw)} height={r1(bot - yEsp)} rx={3} fill="none" strokeWidth={1} strokeDasharray="3 3" style={{ stroke: cursoColor }} />
+        {v.curso != null && <rect x={r1(cx)} y={r1(yc)} width={r1(bw)} height={r1(bot - yc)} rx={3} style={{ fill: `color-mix(in srgb, ${cursoColor} 50%, transparent)` }} />}
+        <text x={r1(cx + bw / 2)} y={r1((v.curso != null ? Math.min(yc, yEsp) : yEsp) - 5)} textAnchor="middle" fontSize={11} fontWeight={600} className="fill-foreground tabular-nums">{v.curso != null ? v.curso : '—'}</text>
+        <line x1={0} x2={ancho} y1={r1(yEsp)} y2={r1(yEsp)} strokeWidth={1} strokeDasharray="4 3" style={{ stroke: 'var(--v2-tenue)' }} />
+        <text x={0} y={r1(yEsp - 5)} fontSize={11} className="fill-muted-foreground">{v.esperado} esperado</text>
+        <line x1={0} x2={ancho} y1={bot} y2={bot} strokeWidth={1} style={{ stroke: 'var(--v2-reja)' }} />
+        <text x={0} y={H - 5} fontSize={11} className="fill-muted-foreground tabular-nums">{v.minutos[0]!.hora}</text>
+        {mitad && <text x={r1(Math.floor((v.minutos.length - 1) / 2) * slot + slot / 2)} y={H - 5} fontSize={11} textAnchor="middle" className="fill-muted-foreground tabular-nums">{mitad.hora}</text>}
+        <text x={ancho} y={H - 5} fontSize={11} fontWeight={600} textAnchor="end" className="fill-foreground tabular-nums">{horaCurso} en curso</text>
+      </svg>
+    </div>
   )
 }
 
 // ── Llenado por máquina ──────────────────────────────────────────────────────
 
-/** «Evisceradora 2» → «2»: la etiqueta corta de la línea, para que quepa al final del trazo. */
-function corto(nombre: string): string {
-  const t = nombre.split(/[\s·\-_/]+/).filter(Boolean)
-  return (t[t.length - 1] ?? nombre).slice(0, 8)
+const ultimo = (l: LineaLlenado) => [...l.fills].reverse().find((x): x is number => x != null)
+/** Tono del trazo de una máquina: el de su caída si baja; si no, neutro. */
+const tonoTrazo = (l: LineaLlenado) => (l.tono ? COLOR[l.tono] : 'var(--v2-gris)')
+
+/** La mini-curva de la máquina que baja: sus minutos con dato, en su propia escala. */
+function Chispa({ l, ancho }: { l: LineaLlenado; ancho: number }) {
+  const h = 34
+  const vals = l.fills
+  const ok = vals.filter((x): x is number => x != null)
+  if (ok.length < 2) return null
+  const lo = Math.min(...ok) - 2
+  const hi = Math.max(...ok) + 2
+  const st = ancho / Math.max(1, vals.length - 1)
+  const tramos: string[][] = [[]]
+  vals.forEach((x, i) => {
+    if (x == null) { if (tramos[tramos.length - 1]!.length) tramos.push([]) } else tramos[tramos.length - 1]!.push(`${r1(i * st)},${r1(h - 4 - ((x - lo) / (hi - lo)) * (h - 8))}`)
+  })
+  const i = vals.reduce<number>((a, x, k) => (x != null ? k : a), -1)
+  const fin = ok[ok.length - 1]!
+  return (
+    <svg width={ancho} height={h} viewBox={`0 0 ${ancho} ${h}`} aria-hidden className="block">
+      {tramos.filter((t) => t.length > 1).map((t, k) => <polyline key={k} points={t.join(' ')} fill="none" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" style={{ stroke: tonoTrazo(l) }} />)}
+      <circle cx={r1(i * st)} cy={r1(h - 4 - ((fin - lo) / (hi - lo)) * (h - 8))} r={3.5} style={{ fill: tonoTrazo(l) }} />
+    </svg>
+  )
 }
 
-function Llenado({ lineas, ancho, multi }: { lineas: LineaLlenado[]; ancho: number; multi: boolean }) {
-  const H = 104
-  const L = 28
-  const R = multi ? 64 : 46
-  const top = 8
-  const bot = H - 6
-  const pw = Math.max(40, ancho - L - R)
-  const n = lineas[0]?.fills.length ?? 0
-  const todos = lineas.flatMap((l) => l.fills).filter((v): v is number => v != null)
-  const lo = Math.max(0, Math.min(50, Math.floor((Math.min(...todos, 100) - 5) / 10) * 10))
-  const y = (v: number) => bot - ((Math.max(lo, Math.min(100, v)) - lo) / (100 - lo)) * (bot - top)
-  const x = (i: number) => L + (n > 1 ? (i * pw) / (n - 1) : 0)
-  const rejas = [100, 75, 50, 25].filter((v) => v >= lo)
-  /* Las etiquetas del final no se pisan: se separan 13 px de arriba hacia abajo. */
-  const fin: Array<{ l: LineaLlenado; ult: number | undefined; ly: number | null }> = lineas.map((l) => {
-    const ult = [...l.fills].reverse().find((v): v is number => v != null)
-    return { l, ult, ly: ult != null ? y(ult) + 4 : null }
-  })
-  /* Si la línea dejó de producir, los últimos minutos no tienen llenado: se marca el tramo y cada etiqueta
-     va pegada al final de SU trazo, no flotando en el borde derecho lejos de lo que nombra. */
-  const ultIdx = Math.max(-1, ...lineas.map((l) => l.fills.reduce<number>((a, v, i) => (v != null ? i : a), -1)))
-  const sinDatoFinal = ultIdx >= 0 && ultIdx < n - 1
-  const xEtiqueta = sinDatoFinal ? x(ultIdx) + 8 : L + pw + 8
-  const orden = fin.filter((f) => f.ly != null).sort((a, b) => a.ly! - b.ly!)
-  for (let i = 1; i < orden.length; i++) if (orden[i]!.ly! - orden[i - 1]!.ly! < 13) orden[i]!.ly = orden[i - 1]!.ly! + 13
+/** Exprés del llenado: la máquina que baja, grande; las otras, dato chico. Nadie se resalta si ninguna baja. */
+function LlenadoExpres({ r, cosa }: { r: RitmoVivo; cosa: string }) {
+  const multi = r.lineas.length > 1
+  const baja = maquinaQueBaja(r.lineas)
+  /* Con una sola máquina ES la protagonista; con varias, solo si baja. */
+  const foco = baja ?? (multi ? null : r.lineas[0] ?? null)
+  const otras = r.lineas.filter((l) => l !== foco)
+  const n = r.lineas[0]?.fills.length ?? 0
+  const microsAviso = r.lineas.filter((l) => l.microsRecientes >= 2)
+  const etq = (l: LineaLlenado) => etiquetaMaquina(l.nombre)
+  const fin = foco ? ultimo(foco) : undefined
   return (
-    <svg width={ancho} height={H} viewBox={`0 0 ${ancho} ${H}`} role="img" aria-label="Llenado por máquina, por minuto" className="block">
-      {rejas.map((v) => (
-        <g key={v}>
-          <line x1={L} x2={L + pw} y1={r1(y(v))} y2={r1(y(v))} strokeWidth={1} style={{ stroke: 'var(--v2-reja)' }} />
-          <text x={0} y={r1(y(v) + 4)} fontSize={11} className="fill-muted-foreground tabular-nums">{v}</text>
-        </g>
-      ))}
-      {sinDatoFinal && (
-        <g>
-          <rect x={r1(x(ultIdx) + (multi ? 52 : 40))} y={top} width={Math.max(0, r1(L + pw - x(ultIdx) - (multi ? 52 : 40)))} height={bot - top} rx={6} style={{ fill: 'rgb(142 142 147 / 0.10)' }} />
-          {L + pw - x(ultIdx) > 120 && (
-            <text x={r1((x(ultIdx) + (multi ? 52 : 40) + L + pw) / 2)} y={r1((top + bot) / 2 + 4)} fontSize={11} textAnchor="middle" className="fill-muted-foreground">sin llenado: no anduvo</text>
-          )}
-        </g>
+    <div className="rv-l">
+      <h4 className="mb-1.5 text-[15px] font-semibold leading-tight text-foreground">{cosa}{multi ? ', por máquina' : ''}</h4>
+      {foco && fin != null ? (
+        <div className="rv-baja">
+          <span className="rv-chip" data-tono={foco.tono ?? 'neutra'}>{foco.baja ? `${multi ? `${etq(foco)} ` : ''}baja` : 'estable'}</span>
+          <span className="rv-baja-cifra tabular-nums" style={foco.tono ? { color: TEXTO_TONO[foco.tono] } : undefined}>{fin} %</span>
+          <div className="rv-baja-chispa"><Medido>{(w) => <Chispa l={foco} ancho={Math.min(150, w)} />}</Medido></div>
+          <span className="rv-baja-sub tabular-nums">
+            {foco.baja && foco.ini != null && foco.fin != null ? `de ${foco.ini} a ${foco.fin} % en ${n} min` : `${n} min medidos`}
+            {multi && otras.length > 0 && foco.baja && otras.every((o) => o.fin != null && o.fin >= 75) ? ' · las otras sobre 75 %' : ''}
+          </span>
+        </div>
+      ) : multi ? (
+        <p className="text-[13px] leading-snug text-muted-foreground">{r.lineas.every((l) => ultimo(l) == null) ? 'Sin minutos con la máquina andando para medir el llenado.' : 'Ninguna Baader baja: el llenado va parejo.'}</p>
+      ) : (
+        <p className="text-[13px] leading-snug text-muted-foreground">Sin minutos con la máquina andando para medir el llenado.</p>
       )}
-      {lineas.map((l) => {
-        const color = l.tono ? COLOR[l.tono] : 'var(--v2-gris)'
-        /* Los minutos sin dato cortan el trazo: no se une lo que no se midió. */
-        const tramos: string[][] = [[]]
-        l.fills.forEach((v, i) => {
-          if (v == null) { if (tramos[tramos.length - 1]!.length) tramos.push([]) } else tramos[tramos.length - 1]!.push(`${r1(x(i))},${r1(y(v))}`)
-        })
-        return (
-          <g key={l.id}>
-            {tramos.filter((t) => t.length > 1).map((t, k) => (
-              <polyline key={k} points={t.join(' ')} fill="none" strokeWidth={l.baja ? 2.4 : 1.6} strokeLinejoin="round" strokeLinecap="round" style={{ stroke: color }} />
-            ))}
-            {/* Un minuto suelto con dato no tiene con qué unirse: va como punto, no desaparece. */}
-            {tramos.filter((t) => t.length === 1).map((t, k) => {
-              const [cx, cy] = t[0]!.split(',')
-              return <circle key={`p${k}`} cx={cx} cy={cy} r={2} style={{ fill: color }} />
-            })}
-            {l.micros.map((i) => l.fills[i] != null && (
-              <circle key={i} cx={r1(x(i))} cy={r1(y(l.fills[i]!))} r={3.5} strokeWidth={2} className="fill-card" style={{ stroke: 'var(--v2-ext)' }} />
-            ))}
-          </g>
-        )
-      })}
-      {fin.map(({ l, ult, ly }) => ult != null && ly != null && (
-        <text key={l.id} x={r1(xEtiqueta)} y={r1(ly)} fontSize={11} fontWeight={l.baja ? 600 : 400} className={`tabular-nums ${l.baja ? '' : 'fill-muted-foreground'}`} style={l.baja && l.tono ? { fill: TEXTO_TONO[l.tono === 'mal' ? 'mal' : 'atento'] } : undefined}>
-          {multi ? `${corto(l.nombre)}  ` : ''}{ult} %
-        </text>
-      ))}
-    </svg>
+      {(otras.length > 0 && multi) && (
+        <div className="rv-otros tabular-nums">
+          {otras.map((l) => {
+            const u = ultimo(l)
+            return <span key={l.id}>{etq(l)} <b>{u != null ? `${u} %` : '—'}</b></span>
+          })}
+          {microsAviso.map((l) => <span key={`m${l.id}`} className="rv-micro-txt"><i className="rv-micro-marca" aria-hidden />{etq(l)}: {l.microsRecientes} micro en 7 min</span>)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Franjas por Baader: small multiples con el mismo eje, cursor vertical común y globo con la micro y su duración real. */
+function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }) {
+  const [idx, setIdx] = useState<number | null>(null)
+  const lineas = r.lineas
+  const n = lineas[0]?.fills.length ?? 0
+  if (!n) return null
+  const lc = ancho < 500 ? 64 : 88
+  const pw = ancho - lc - 8
+  const slot = pw / n
+  const rh = ancho < 500 ? 52 : 60
+  const gp = 12
+  const tot = lineas.length * rh + (lineas.length - 1) * gp
+  const x = (i: number) => lc + (i + 0.5) * slot
+  const todos = lineas.flatMap((l) => l.fills).filter((q): q is number => q != null)
+  /* Eje 40–100 %; si algún minuto cae bajo 40 el piso baja de a 10 para que ninguno quede fuera de la franja. */
+  const lo = Math.max(0, Math.min(40, Math.floor((Math.min(...todos, 100) - 5) / 10) * 10))
+  const Y = (q: number, y0: number) => y0 + 3 + (1 - (Math.max(lo, Math.min(100, q)) - lo) / (100 - lo)) * (rh - 12)
+  const paso = [1, 2, 3, 5].find((p) => slot * p >= 46) ?? 5
+  const indice = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const rc = e.currentTarget.getBoundingClientRect()
+    const px = ((e.clientX - rc.left) / rc.width) * ancho
+    return Math.max(0, Math.min(n - 1, Math.floor((px - lc) / slot)))
+  }
+  const tip = idx != null ? { px: x(idx), hora: r.minutos[idx]?.hora ?? '' } : null
+  return (
+    <div className="relative" onPointerLeave={(e) => { if (e.pointerType === 'mouse') setIdx(null) }}>
+      {tip && idx != null && (
+        <div className="v2-tip pointer-events-none absolute top-0 z-10 whitespace-nowrap rounded-ctl px-3 py-2 text-[13px] leading-snug" style={{ left: Math.max(0, tip.px + 14 + 200 > ancho ? tip.px - 14 - 210 : tip.px + 14) }}>
+          <div className="font-semibold tabular-nums text-foreground">{tip.hora}</div>
+          {lineas.map((l) => {
+            const f = l.fills[idx]
+            const ms = l.microsDetalle.filter((q) => q.i === idx)
+            return (
+              <div key={l.id} className="tabular-nums" style={{ opacity: sel !== SEL_LINEA && sel !== l.id ? 0.55 : 1 }}>
+                <span className="text-muted-foreground">{etiquetaMaquina(l.nombre)} · </span>
+                {f != null ? <b style={{ color: TEXTO_TONO[pct(f / 100)] }}>{f} %</b> : <span className="text-muted-foreground">sin dato</span>}
+                {ms.map((q) => <span key={q.inicioMs} className="rv-micro-txt"> <i className="rv-micro-marca" aria-hidden />micro {cronometro(q.duracionS)}</span>)}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <svg
+        width={ancho} height={tot + 26} viewBox={`0 0 ${ancho} ${tot + 26}`} role="img" aria-label="Llenado por minuto de cada máquina, una franja por Baader" className="block touch-pan-y"
+        onPointerMove={(e) => { if (e.pointerType === 'mouse') setIdx(indice(e)) }}
+        onClick={(e) => { const k = indice(e as unknown as ReactPointerEvent<SVGSVGElement>); setIdx((a) => (a === k ? null : k)) }}
+      >
+        {lineas.map((l, k) => {
+          const y0 = k * (rh + gp)
+          const atenuada = sel !== SEL_LINEA && sel !== l.id
+          const u = ultimo(l)
+          /* Como en el mockup: cada franja toma el tono de SU último llenado (≥75 % bien, 50–75 atento, <50 mal). */
+          const tonoU = u != null ? pct(u / 100) : null
+          const color = tonoU ? COLOR[tonoU] : 'var(--v2-gris)'
+          /* Los minutos sin dato cortan el trazo: no se une lo que no se midió. */
+          const tramos: Array<Array<[number, number]>> = [[]]
+          l.fills.forEach((q, i) => {
+            if (q == null) { if (tramos[tramos.length - 1]!.length) tramos.push([]) } else tramos[tramos.length - 1]!.push([x(i), Y(q, y0)])
+          })
+          return (
+            <g key={l.id} opacity={atenuada ? 0.4 : 1} style={{ transition: 'opacity 200ms' }}>
+              <rect x={lc} y={y0} width={pw} height={rh} rx={8} style={{ fill: 'var(--v2-reja)' }} opacity={0.6} />
+              {lo < 75 && <line x1={lc} x2={lc + pw} y1={r1(Y(75, y0))} y2={r1(Y(75, y0))} strokeWidth={1} strokeDasharray="3 4" style={{ stroke: 'var(--v2-tenue)' }} />}
+              {tramos.filter((t) => t.length > 1).map((t, q) => (
+                <g key={q}>
+                  <path d={`M${r1(t[0]![0])},${y0 + rh - 3} ${t.map(([px, py]) => `L${r1(px)},${r1(py)}`).join(' ')} L${r1(t[t.length - 1]![0])},${y0 + rh - 3} Z`} opacity={0.14} style={{ fill: color }} />
+                  <polyline points={t.map(([px, py]) => `${r1(px)},${r1(py)}`).join(' ')} fill="none" strokeWidth={l.baja ? 2.4 : 1.8} strokeLinejoin="round" strokeLinecap="round" style={{ stroke: color }} />
+                </g>
+              ))}
+              {tramos.filter((t) => t.length === 1).map((t, q) => <circle key={`p${q}`} cx={r1(t[0]![0])} cy={r1(t[0]![1])} r={2.5} style={{ fill: color }} />)}
+              {l.microsDetalle.map((q) => {
+                const px = lc + ((q.inicioMs - r.inicioTiraMs) / 60_000) * slot
+                return <rect key={q.inicioMs} x={r1(Math.max(lc, px))} y={y0 + rh - 8} width={r1(Math.max(4, (q.duracionS / 60) * slot))} height={6} rx={2} style={{ fill: 'var(--v2-ext)' }}><title>{`micro detención de ${cronometro(q.duracionS)}`}</title></rect>
+              })}
+              {u != null && <circle cx={r1(x(l.fills.reduce<number>((a, q, i) => (q != null ? i : a), -1)))} cy={r1(Y(u, y0))} r={3.5} style={{ fill: color }} />}
+              <text x={0} y={y0 + 22} fontSize={13} fontWeight={600} className="fill-foreground">{etiquetaMaquina(l.nombre)}</text>
+              <text x={0} y={y0 + 42} fontSize={13} fontWeight={700} className="tabular-nums" style={{ fill: tonoU ? TEXTO_TONO[tonoU] : undefined }}>{u != null ? `${u} %` : '—'}</text>
+            </g>
+          )
+        })}
+        {Array.from({ length: n }, (_, i) => (
+          <line key={i} x1={r1(x(i))} x2={r1(x(i))} y1={tot + 3} y2={tot + (i % paso === 0 ? 9 : 6)} strokeWidth={1} style={{ stroke: 'var(--v2-tenue)' }} />
+        ))}
+        {Array.from({ length: n }, (_, i) => i).filter((i) => i % paso === 0).map((i) => (
+          <text key={i} x={r1(x(i))} y={tot + 22} textAnchor="middle" fontSize={11} className="fill-muted-foreground tabular-nums">{r.minutos[i]?.hora}</text>
+        ))}
+        {ancho >= 500 && <text x={0} y={tot + 22} fontSize={11} className="fill-muted-foreground">eje {lo}–100 %</text>}
+        {idx != null && <line x1={r1(x(idx))} x2={r1(x(idx))} y1={0} y2={tot} strokeWidth={1} opacity={0.55} style={{ stroke: 'rgb(var(--foreground))' }} />}
+      </svg>
+    </div>
   )
 }
 
 // ── La tarjeta ───────────────────────────────────────────────────────────────
 
 export interface RitmoVivoV2Props {
-  r: RitmoVivo
+  /** Los últimos 15 min; null sin pulso en vivo (turno cerrado o de otro día): queda solo el turno completo. */
+  r: RitmoVivo | null
   maquinas: MaquinaVivo[]
+  /** El turno completo minuto a minuto (ciclos de Shoplogix por máquina). */
+  turno: MinutoTurno | null
+  cerrado: boolean
+  /** La parada elegida con «ver ›» en Camino a la meta: abre el ampliado con ella marcada y la vista acercada. */
+  marca: EventoMarcado | null
+  onQuitarMarca: () => void
+  /** Promedio del turno (pz/min) de la línea (`linea`) y de cada máquina (por id), el de «aporte al promedio». */
+  promedios?: Record<string, number | null>
+  /** Ya pasó la hora de cierre (o el turno se cerró): no se muestra parada en curso ni se pide anotar causa. */
+  turnoTerminado?: boolean
 }
 
-export function RitmoVivoV2({ r, maquinas }: RitmoVivoV2Props) {
-  const ahoraWall = useReloj()
-  const [refTira, anchoTira] = useAncho<HTMLDivElement>()
-  const [refLlen, anchoLlen] = useAncho<HTMLDivElement>()
-  const parada = paradaEnCurso(maquinas)
-  const claseVivo = parada ? parada.clase : 'marcha'
-  const cursoColor = parada?.clase === 'detencion' ? 'var(--v2-mal)' : parada?.clase === 'micro' ? 'var(--v2-ext)' : 'var(--v2-bien)'
-  const t = r.tendencia
-  const multi = r.lineas.length > 1
-  const cosa = r.unidad ? `${r.unidad[0]!.toUpperCase()}${r.unidad.slice(1)} con pieza` : 'Llenado'
-  const tendColor = t?.dir === 'bajando' && t.hasta / r.esperadoLinea < 0.75
-    ? (t.hasta / r.esperadoLinea < 0.5 ? 'var(--v2-mal-texto)' : 'var(--v2-atento-texto)')
-    : undefined
-  const hayMicros = r.lineas.some((l) => l.micros.length > 0)
-  /* Con la máquina parada casi todo el tramo no hay trazo que dibujar: se dice en una línea. */
-  const medible = r.lineas.some((l) => l.fills.filter((v) => v != null).length >= 2)
+/** «Turno ›»: abre el ampliado (el turno completo minuto a minuto). */
+function BotonTurno() {
+  const abrir = useAbrirAmpliado()
+  return <button type="button" onClick={() => abrir?.()} aria-label="Ver el turno completo minuto a minuto" className="rv-ver tap-44 inline-flex shrink-0 items-center text-[15px] font-semibold">Turno ›</button>
+}
 
+/** La parada en curso con su cronómetro (celular; en PC la dice la banda). */
+function ParadaTarjeta({ parada }: { parada: ParadaVivo }) {
+  const ahora = useReloj()
   return (
-    <section className="v2-tarjeta rv min-w-0 rounded-card p-4 lg:p-5" aria-label="Ritmo en vivo, últimos 15 minutos" data-parada={claseVivo}>
-      <div className="rv-grid">
-        <div className="rv-h flex items-center gap-2.5">
-          <span className="v2-icono inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full"><Gauge className="h-[18px] w-[18px]" aria-hidden /></span>
-          <h3 className="min-w-0 flex-1 text-[17px] font-semibold leading-snug text-foreground">Ritmo en vivo</h3>
-          <span className="rv-vivo inline-flex items-center gap-1.5 text-[13px] tabular-nums text-muted-foreground">
-            <i className="rv-punto" aria-hidden /><span className="sr-only">en vivo </span>{hhmmss(ahoraWall)}
+    <div className="rv-p">
+      <div className="rv-parada rounded-card" data-clase={parada.clase} role="status">
+        <div className="flex items-center gap-2.5">
+          <Timer className="h-5 w-5 shrink-0 rv-parada-icono" aria-hidden />
+          <span className="min-w-0 flex-1 text-[15px] font-semibold leading-tight rv-parada-texto">{rotuloParada(parada)}</span>
+          <span className="rv-crono tabular-nums rv-parada-texto" aria-label="Tiempo parada">{cronometro((ahora - parada.desdeMs) / 1000)}</span>
+        </div>
+        {avisoParada(parada) && <p className="mt-1.5 text-[15px] font-semibold leading-tight text-foreground">{avisoParada(parada)}</p>}
+        <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{detalleParada(parada)}</p>
+      </div>
+    </div>
+  )
+}
+
+/** El «último minuto» y la tendencia de lo que se está viendo (la línea o una Baader). */
+function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null }) {
+  const t = v.tendencia
+  const mostrado = useCuentaCifra(v.ahora)
+  const tendColor = t?.dir === 'detenida' ? 'var(--v2-mal-texto)' : t?.dir === 'bajando' && t.hasta / v.esperado < 0.75
+    ? (t.hasta / v.esperado < 0.5 ? 'var(--v2-mal-texto)' : 'var(--v2-atento-texto)')
+    : undefined
+  return (
+    <div className="rv-a flex items-end justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-[13px] text-muted-foreground">Último minuto · {v.nombre}</span>
+        <span className="flex items-baseline gap-1.5"><span className="rv-cifra tabular-nums font-bold leading-none text-foreground">{mostrado}</span><span className="text-[15px] text-muted-foreground">pz/min</span></span>
+        <span className="text-[13px] tabular-nums text-muted-foreground">{v.ahoraPct} % de {v.esperado}</span>
+        {promedio != null && <span className="text-[13px] tabular-nums text-muted-foreground">promedio del turno <b className="font-semibold text-foreground">{promedio.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</b> pz/min</span>}
+      </div>
+      {t && (
+        <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+          <span className="inline-flex items-center gap-1.5 text-[20px] font-semibold leading-tight text-foreground" style={tendColor ? { color: tendColor } : undefined}>
+            {t.dir === 'detenida' ? <Pause className="h-[18px] w-[18px]" aria-hidden /> : t.dir === 'bajando' ? <TrendingDown className="h-[18px] w-[18px]" aria-hidden /> : t.dir === 'subiendo' ? <TrendingUp className="h-[18px] w-[18px]" aria-hidden /> : <MoveRight className="h-[18px] w-[18px]" aria-hidden />}
+            {t.dir === 'detenida' ? 'Detenida' : t.dir === 'bajando' ? 'Bajando' : t.dir === 'subiendo' ? 'Subiendo' : 'Estable'}
+          </span>
+          <span className="text-[13px] tabular-nums text-muted-foreground">
+            {t.dir === 'detenida' ? `sin piezas hace ${t.ceros} min` : `${t.desde} → ${t.hasta} en ${t.n} min`}
           </span>
         </div>
+      )}
+    </div>
+  )
+}
 
-        {parada && (
-          <div className="rv-p">
-            <div className="rv-parada rounded-card" data-clase={parada.clase} role="status">
-              <div className="flex items-center gap-2.5">
-                <Timer className="h-5 w-5 shrink-0 rv-parada-icono" aria-hidden />
-                <span className="min-w-0 flex-1 text-[15px] font-semibold leading-tight rv-parada-texto">
-                  {parada.quien} · {parada.clase === 'micro' ? 'micro detención' : parada.clase === 'programada' ? 'parada programada' : 'detención'}
-                </span>
-                <span className="rv-crono tabular-nums rv-parada-texto" aria-label="Tiempo parada">{cronometro((ahoraWall - parada.desdeMs) / 1000)}</span>
-              </div>
-              {parada.faltaCausa && <p className="mt-1.5 text-[15px] font-semibold leading-tight text-foreground">Ya es detención: hay que anotar la causa.</p>}
-              {parada.causa && parada.clase !== 'programada' && <p className="mt-1.5 text-[15px] font-semibold leading-tight text-foreground">Causa anotada: {motivoEnEspanol(parada.causa)}.</p>}
-              <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-                desde {hhmmss(parada.desdeMs)}
-                {parada.clase === 'micro' && ` · Shoplogix la clasifica como micro detención. En estos datos las micro duran hasta ${MICRO_MAX_MEDIDO_S} s.`}
-                {parada.clase === 'detencion' && ' · Shoplogix la clasifica como detención.'}
-                {parada.clase === 'programada' && parada.causa && ` · ${motivoEnEspanol(parada.causa)}`}
-              </p>
-            </div>
-          </div>
-        )}
+const LEYENDA: Array<[Tono, string]> = [['bien', '≥75 %'], ['atento', '50–75'], ['mal', '<50 del esperado']]
 
-        <div className="rv-a flex items-end justify-between gap-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[13px] text-muted-foreground">Último minuto</span>
-            <span className="flex items-baseline gap-1.5"><span className="rv-cifra tabular-nums font-bold leading-none text-foreground">{r.ahora}</span><span className="text-[15px] text-muted-foreground">pz/min</span></span>
-            <span className="text-[13px] tabular-nums text-muted-foreground">{r.ahoraPct} % de {r.esperadoLinea}</span>
+export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca, promedios, turnoTerminado }: RitmoVivoV2Props) {
+  const [sel, setSel] = useState(SEL_LINEA)
+  const v = r ? vistaDeSerie(r, sel) : null
+  const selId = v ? v.sel : turno?.maquinas.some((m) => m.id === sel) ? sel : SEL_LINEA
+  /* Elegida una Baader, el turno completo muestra solo esa; con «Línea», la suma y cada una. */
+  const turnoVista = useMemo(
+    () => (turno && selId !== SEL_LINEA ? { ...turno, maquinas: turno.maquinas.filter((m) => m.id === selId) } : turno),
+    [turno, selId],
+  )
+  /* Pasada la hora de cierre una «parada» ya no es una detención que haya que anotar: el turno terminó. */
+  const parada = turnoTerminado ? null : paradaEnCurso(maquinas)
+  const claseVivo = parada ? parada.clase : 'marcha'
+  const cursoColor = parada?.clase === 'detencion' ? 'var(--v2-mal)' : parada?.clase === 'micro' ? 'var(--v2-ext)' : 'var(--v2-bien)'
+  const nMaq = r ? r.porMaquina.length : turno?.maquinas.length ?? 0
+  const multi = nMaq > 1
+  const cosa = r?.unidad ? `${r.unidad[0]!.toUpperCase()}${r.unidad.slice(1)} con pieza` : 'Llenado'
+  const opciones = [{ id: SEL_LINEA, etiqueta: 'Línea' }, ...(r ? r.porMaquina : turno?.maquinas ?? []).map((m) => ({ id: m.id, etiqueta: etiquetaMaquina(m.nombre) }))]
+  const hayMicros = !!r && r.lineas.some((l) => l.microsDetalle.length > 0)
+  /* Con la máquina parada casi todo el tramo no hay trazo que dibujar: se dice en una línea. */
+  const medible = !!r && r.lineas.some((l) => l.fills.filter((q) => q != null).length >= 2)
+  const selector = multi ? <Selector opciones={opciones} valor={selId} onCambio={setSel} /> : null
+  const leyenda = (
+    <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">
+      {LEYENDA.map(([k, txt]) => (
+        <span key={k} className="inline-flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-[2px]" style={{ background: COLOR[k] }} />{txt}</span>
+      ))}
+    </span>
+  )
+
+  const senales = r && (
+    <ul className="flex flex-col gap-2">
+      {r.senales.map((s) => (
+        <li key={s.texto} className="flex items-start gap-2.5">
+          <i className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: DOT[s.tono] }} aria-hidden />
+          <span className="text-[15px] leading-snug text-foreground">{s.texto}</span>
+        </li>
+      ))}
+    </ul>
+  )
+
+  const ampliado = (
+    <div className="rv-amp space-y-5">
+      {selector}
+      {r && v && (
+        <div className="rv-amp-top">
+          <div className="flex min-w-0 flex-col gap-2">
+            <UltimoMinuto v={v} promedio={promedios?.[v.sel] ?? null} />
+            {leyenda}
           </div>
-          {t && (
-            <div className="flex flex-col items-end gap-0.5 text-right">
-              <span className="inline-flex items-center gap-1.5 text-[20px] font-semibold leading-tight text-foreground" style={tendColor ? { color: tendColor } : undefined}>
-                {t.dir === 'bajando' ? <TrendingDown className="h-[18px] w-[18px]" aria-hidden /> : t.dir === 'subiendo' ? <TrendingUp className="h-[18px] w-[18px]" aria-hidden /> : <MoveRight className="h-[18px] w-[18px]" aria-hidden />}
-                {t.dir === 'bajando' ? 'Bajando' : t.dir === 'subiendo' ? 'Subiendo' : 'Estable'}
-              </span>
-              <span className="text-[13px] tabular-nums text-muted-foreground">{t.desde} → {t.hasta} en {t.n} min</span>
-            </div>
-          )}
+          <Medido className="min-w-0">{(w) => <Tira v={v} horaCurso={r.horaCurso} cursoColor={cursoColor} ancho={w} alto={132} />}</Medido>
         </div>
-
-        <div className="rv-s">
-          <button type="button" onClick={irAlMinutoAMinuto} aria-label="Ver el turno minuto a minuto" className="rv-tira tap-44 block w-full text-left">
-            <div ref={refTira} className="w-full">{anchoTira > 0 && <Tira r={r} cursoColor={cursoColor} ancho={anchoTira} />}</div>
-            <span className="mt-2 flex items-center justify-between gap-2">
-              <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">
-                {([['bien', '≥75 %'], ['atento', '50–75'], ['mal', '<50 del esperado']] as const).map(([k, txt]) => (
-                  <span key={k} className="inline-flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-[2px]" style={{ background: COLOR[k] }} />{txt}</span>
-                ))}
-              </span>
-              <span className="rv-ver inline-flex shrink-0 items-center text-[15px] font-semibold">Turno ›</span>
-            </span>
-          </button>
+      )}
+      {turnoVista && (
+        <div className={r ? 'rv-l' : ''}>
+          <h4 className="text-[15px] font-semibold leading-tight text-foreground">El turno completo, minuto a minuto</h4>
+          <p className="text-[13px] text-muted-foreground">piezas contadas por Shoplogix desde el inicio del turno{selId !== SEL_LINEA ? ' · solo la Baader elegida' : ''} · el mismo eje de tiempo que las franjas de abajo</p>
+          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} />
         </div>
-
-        {r.lineas.length > 0 && (
-          <div className="rv-l">
-            <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <h4 className="text-[15px] font-semibold leading-tight text-foreground">{cosa}{multi ? ', por máquina' : ''}</h4>
-              <span className="text-[13px] text-muted-foreground">% por minuto</span>
+      )}
+      {r && r.lineas.length > 0 && (
+        <div className="rv-l">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <div>
+              <h4 className="text-[15px] font-semibold leading-tight text-foreground">{cosa}{multi ? ', por máquina' : ''} · últimos 15 minutos</h4>
+              <p className="text-[13px] text-muted-foreground">% de {r.unidad ?? 'llenado'} en cada minuto · una franja por Baader, mismo eje · guía en 75 %</p>
             </div>
-            {medible
-              ? <div ref={refLlen} className="w-full">{anchoLlen > 0 && <Llenado lineas={r.lineas} ancho={anchoLlen} multi={multi} />}</div>
-              : <p className="text-[15px] leading-snug text-muted-foreground">Sin minutos con la máquina andando para medir el llenado.</p>}
-            <div className="mt-1 flex items-center justify-between gap-2 text-[13px] text-muted-foreground">
-              <span>{medible ? r.minutos[0]!.hora : ''}</span>
-              {hayMicros && <span className="inline-flex items-center gap-1.5"><i className="rv-micro" aria-hidden />micro detención de esa máquina</span>}
-              <span>{medible ? r.minutos[r.minutos.length - 1]!.hora : ''}</span>
-            </div>
+            {hayMicros && <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground"><i className="rv-micro-marca" aria-hidden />micro detención (ancho = duración)</span>}
           </div>
-        )}
-
+          {medible
+            ? <div className="mt-3"><Medido>{(w) => <Franjas r={r} ancho={w} sel={selId} />}</Medido></div>
+            : <p className="mt-2 text-[15px] leading-snug text-muted-foreground">Sin minutos con la máquina andando para medir el llenado.</p>}
+        </div>
+      )}
+      {r && senales && (
         <div className="rv-g">
           <span className="text-[13px] text-muted-foreground">Señales</span>
-          <ul className="mt-1.5 flex flex-col gap-2">
-            {r.senales.map((s) => (
-              <li key={s.texto} className="flex items-start gap-2.5">
-                <i className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: DOT[s.tono] }} aria-hidden />
-                <span className="text-[15px] leading-snug text-foreground">{s.texto}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-1.5">{senales}</div>
         </div>
-      </div>
-    </section>
+      )}
+      {r && (
+        <p className="text-[12px] leading-snug text-muted-foreground">
+          Llenado de cada minuto: piezas ÷ lo que la máquina daba andando a su esperado; los minutos con menos de 30 s andando no tienen dato.
+          Cada micro detención muestra su inicio y su duración tal como los publica Shoplogix.
+        </p>
+      )}
+    </div>
+  )
+
+  return (
+    <Tarjeta
+      className="rv"
+      icono={<Gauge className="h-[18px] w-[18px]" aria-hidden />}
+      titulo={r ? 'Ritmo en vivo' : 'Ritmo del turno'}
+      sub={r ? 'últimos 15 minutos' : 'minuto a minuto'}
+      etiqueta={r ? 'Ritmo en vivo, últimos 15 minutos' : 'Ritmo del turno, minuto a minuto'}
+      datos={{ 'data-parada': claseVivo }}
+      derecha={r ? <span className="rv-reloj"><RelojVivo /></span> : undefined}
+      ampliado={ampliado}
+      subAmpliado={r ? (multi ? 'el turno completo y los últimos 15 minutos · la línea y cada Baader' : 'el turno completo y los últimos 15 minutos') : 'el turno completo, minuto a minuto'}
+      abrirCon={marca && turno ? `${marca.desdeMs}-${marca.hastaMs}` : null}
+    >
+      {r && v ? (
+        <div className="rv-grid mt-3">
+          {parada && <ParadaTarjeta parada={parada} />}
+          {selector}
+          <UltimoMinuto v={v} />
+          <div className="rv-s">
+            <Medido>{(w) => <Tira v={v} horaCurso={r.horaCurso} cursoColor={cursoColor} ancho={w} />}</Medido>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {leyenda}
+              <BotonTurno />
+            </div>
+          </div>
+          {r.lineas.length > 0 && <LlenadoExpres r={r} cosa={cosa} />}
+        </div>
+      ) : (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-[13px] leading-snug text-muted-foreground">{cerrado ? 'El turno terminado, minuto a minuto.' : 'Sin ritmo en vivo ahora: el turno, minuto a minuto.'}</p>
+          <BotonTurno />
+        </div>
+      )}
+    </Tarjeta>
+  )
+}
+
+// ── La banda de estado de PC ─────────────────────────────────────────────────
+
+/**
+ * La parada en curso como UNA banda pegada bajo la cabecera, solo en PC (lg+): ahí «Ritmo en vivo»
+ * vive en el riel y la parada dejaría de verse al bajar. Misma fuente (`paradaEnCurso`) y mismo
+ * `cronometro` que la tarjeta, así el tiempo coincide. En PC la tarjeta, «Ritmo de la línea» y el
+ * aviso «Ahora mismo» callan la parada (CSS `:has(.rv-banda)`); en celular la banda no existe.
+ * Sin parada no dibuja nada.
+ */
+export function BandaParadaV2({ maquinas, turnoTerminado }: { maquinas: MaquinaVivo[]; turnoTerminado?: boolean }) {
+  const ahoraWall = useReloj()
+  const parada = turnoTerminado ? null : paradaEnCurso(maquinas)
+  if (!parada) return null
+  const aviso = avisoParada(parada)
+  return (
+    <div className="rv-banda" data-clase={parada.clase} role="status" aria-label="Parada en curso">
+      <Timer className="h-5 w-5 shrink-0 rv-banda-icono" aria-hidden />
+      <span className="rv-banda-rotulo shrink-0 text-[16px] font-semibold">{rotuloParada(parada)}</span>
+      <span className="rv-banda-crono tabular-nums" aria-label="Tiempo parada">{cronometro((ahoraWall - parada.desdeMs) / 1000)}</span>
+      <span className="rv-banda-detalle min-w-0 flex-1 truncate text-[13px]" title={detalleParada(parada)}>{detalleParada(parada)}</span>
+      {aviso && <span className="shrink-0 text-[14px] font-semibold text-foreground">{aviso}</span>}
+    </div>
   )
 }

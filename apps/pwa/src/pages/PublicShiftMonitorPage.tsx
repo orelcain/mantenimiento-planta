@@ -35,7 +35,7 @@ import {
   type PublicShiftMonitorDoc,
   type PublicMonitorLive,
 } from '@/services/shoplogix/publicShiftMonitor.service'
-import { buildHourlyRows, peakPieces } from '@/services/shoplogix/monitorHourly'
+import { buildHourlyRows, peakPieces, piezasPorHoraDeMaquina } from '@/services/shoplogix/monitorHourly'
 import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
@@ -74,6 +74,7 @@ import { llenadoDeSilletas, specDeMaquina, comoDeCada100, type LlenadoSilletas }
 import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
+import { BarraLateralPC } from './monitor/BarraLateralPC'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
@@ -86,7 +87,7 @@ import {
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
-import { RitmoVivoV2 } from './monitor/RitmoVivoV2'
+import { BandaParadaV2, RitmoVivoV2 } from './monitor/RitmoVivoV2'
 import { ritmoVivoDeMonitor } from './monitor/ritmoVivo'
 import { repartoSemanal } from './monitor/repartoSemanal'
 import { Pill, SegmentedControl } from '@/components/piel'
@@ -2711,7 +2712,7 @@ function RielDeRacha({ riel, hoy }: {
         {cols.map((c, i) => {
           const esHoy = i === cols.length - 1
           return (
-            <div key={c.etiqueta} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+            <div key={`${c.etiqueta}-${i}`} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
               {c.mttr != null ? (
                 <>
                   <span
@@ -2745,7 +2746,7 @@ function RielDeRacha({ riel, hoy }: {
       <div className="mt-1 flex gap-1 text-center text-[11px] tabular-nums text-muted-foreground/80">
         {cols.map((c, i) => (
           <span
-            key={c.etiqueta}
+            key={`${c.etiqueta}-${i}`}
             className="min-w-0 flex-1"
             style={i === cols.length - 1 ? { color: 'var(--mon-hoy)', fontWeight: 600 } : undefined}
           >
@@ -3661,7 +3662,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   )
 }
 
-function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, refAporteUltimo, producingMin }: {
+function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, refAporteUltimo, producingMin, ahoraRepetido }: {
   /**
    * Qué TARJETA del tablero renderiza esta llamada (pedido de Orel, 30-08:
    * «separemos esto en 3 partes para poder acomodarlo mejor»). Era UNA
@@ -3710,6 +3711,12 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
   refAporteUltimo?: ReferenciaAporte | null
   /** Minutos produciendo de la línea en el turno visto: la puerta del delta. */
   producingMin?: number | null
+  /**
+   * v2 en PC: el «Ahora» de esta tarjeta ES el último minuto de «Ritmo en vivo» (la misma cifra del mismo
+   * contador): se marca para que la hoja de estilos de PC lo calle y la cifra viva una sola vez. Lo decide
+   * el llamador comparando los dos números, nunca se supone.
+   */
+  ahoraRepetido?: boolean
   /**
    * La línea NO está produciendo ahora mismo (colación o paro).
    *
@@ -3881,7 +3888,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
           contexto. Sin pulso (contador caído), se cae a la media con su
           etiqueta honesta. */}
       <div className="mt-1.5 flex items-end gap-x-3">
-        <div className="min-w-0">
+        <div className="min-w-0" data-ahora-vivo={ahoraRepetido ? 'repetido' : undefined}>
           <div className="text-caption text-muted-foreground">Ahora</div>
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
@@ -3974,7 +3981,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
       {/* Qué expresa cada cifra, dicho UNA vez (pedido de Orel, 26-08: tres
           ritmos sin explicación se leían como contradicción). */}
       {!parada && !cerrado && vivo != null && ahora != null && (
-        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80" data-ahora-vivo={ahoraRepetido ? 'repetido' : undefined}>
           <b className="text-muted-foreground">Ahora</b> salta con la línea;{' '}
           la <b className="text-muted-foreground">media 15 min</b> es el ritmo sostenido reciente
           (solo minutos andando); el <b className="text-muted-foreground">promedio</b> es todo el
@@ -4416,11 +4423,7 @@ export function PublicShiftMonitorPage() {
  * Producción) sigue mostrando una sola línea, y generar el token de la otra
  * exige ese rol en el backend.
  */
-function CambioDeLinea({ plantLineId, plantSlug, className }: {
-  plantLineId: string | null | undefined
-  plantSlug: string | null | undefined
-  className?: string
-}) {
+function useCambioDeLinea(plantLineId: string | null | undefined, plantSlug: string | null | undefined) {
   const navigate = useNavigate()
   const esSupervisor = useIsSupervisor()
   const [cambiando, setCambiando] = useState(false)
@@ -4442,6 +4445,17 @@ function CambioDeLinea({ plantLineId, plantSlug, className }: {
       setCambiando(false)
     }
   }
+  return { actual, cambiando, cambiar }
+}
+
+function CambioDeLinea({ plantLineId, plantSlug, className }: {
+  plantLineId: string | null | undefined
+  plantSlug: string | null | undefined
+  className?: string
+}) {
+  const cambio = useCambioDeLinea(plantLineId, plantSlug)
+  if (!cambio) return null
+  const { actual, cambiando, cambiar } = cambio
 
   return (
     <nav aria-label="Cambiar de monitor" className={`flex items-center gap-2 ${className ?? ''}`}>
@@ -4485,6 +4499,8 @@ function MonitorDelToken() {
   /* El historial de pesos, plegado por defecto (pedido de Orel, 29-08). */
   const [verPesos, setVerPesos] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  /* El cambio Eviscerado ↔ Filete (solo supervisor): lo usa la barra lateral de PC; en celular sigue `CambioDeLinea`. */
+  const cambioLinea = useCambioDeLinea(data?.plantLineId, data?.plantSlug)
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
   const ahoraWallMs = useMemo(() => now - new Date(now).getTimezoneOffset() * 60_000, [now])
@@ -6274,7 +6290,24 @@ function MonitorDelToken() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)}>
+    <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)} data-barra={glass === 'v2' && !modoPantalla ? 'si' : undefined}>
+      {glass === 'v2' && !modoPantalla && (
+        <BarraLateralPC
+          pestana={pestana}
+          onPestana={verPestana}
+          lineas={cambioLinea
+            ? {
+                actual: cambioLinea.actual.id,
+                opciones: LINEAS_CON_MONITOR.map((id) => ({ id, nombre: lineaConMonitor(id)?.areaLabel ?? id })),
+                onCambiar: (id) => { void cambioLinea.cambiar(id) },
+                cambiando: cambioLinea.cambiando,
+              }
+            : null}
+          onModoTv={entrarModoTv}
+          oscuro={isDark}
+          onTema={toggleTheme}
+        />
+      )}
       {glass === 'v2' && !modoPantalla && (
         <CabeceraV2
           titulo={lineTitle}
@@ -6292,7 +6325,6 @@ function MonitorDelToken() {
           ].filter(Boolean).join(' · ')}
           pestana={pestana}
           onPestana={verPestana}
-          onModoTv={entrarModoTv}
         />
       )}
       {/* Cabecera: qué línea, qué turno, qué día, desde qué hora */}
@@ -6486,9 +6518,10 @@ function MonitorDelToken() {
        * bloque, y `break-inside-avoid` impide que una tarjeta se parta en dos.
        */}
       <main
-        className={`mx-auto max-w-3xl space-y-4 px-4 py-4 lg:max-w-[1500px] 2xl:max-w-[1840px]${
-          modoPantalla ? ' modo-pantalla' : ''
-        }`}
+        className={`mx-auto max-w-3xl space-y-4 px-4 py-4 ${
+          /* «El turno» del v2 usa todo el ancho de PC (principal + riel); el resto conserva su tope. */
+          glass === 'v2' && pestana === 'turno' ? 'lg:max-w-none lg:px-6' : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'
+        }${modoPantalla ? ' modo-pantalla' : ''}`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -6501,7 +6534,7 @@ function MonitorDelToken() {
             ("Línea detenida hace 6 h" tras el cierre es lo esperable), y en
             la TV tampoco — cambiaría el alto del tablero fijo. */}
         {live.status === 'detenida' && esActual && !live.shiftClosed && (
-          <section className="pantalla-oculta rounded-2xl border border-border bg-muted px-4 py-3">
+          <section className="pantalla-oculta v2-ahora-mismo rounded-2xl border border-border bg-muted px-4 py-3">
             <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-red-600 dark:text-red-400">
               <PauseCircle className="h-3 w-3" />
               Ahora mismo
@@ -6593,6 +6626,10 @@ function MonitorDelToken() {
           /* Solo en vivo, con el turno que se está mirando y el contador fresco: con el vivo arrastrado
              (`recalibrando`) el «Ahora» de arriba no es el último minuto cerrado y las dos cifras no cuadrarían. */
           const vivoV2 = esActual && pv && !pv.recalibrando ? ritmoVivoDeMonitor({ pulse: data.pulse, live, ahoraPorId }) : null
+          /* Pasada la hora de cierre programada, una línea quieta no es una detención que haya que anotar:
+             el 27-10 a las 15:20 la banda pedía «hay que anotar la causa» de un turno que cerró a las 15:00. */
+          const finTurnoMs = live.plannedEnd ? Date.parse(live.plannedEnd) : NaN
+          const turnoTerminadoV2 = turnoCerrado || (Number.isFinite(finTurnoMs) && ahoraWallMs >= finTurnoMs)
           const meta = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
           const pm = live.mantencion?.porMaquina ?? []
           const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
@@ -6614,6 +6651,21 @@ function MonitorDelToken() {
             <MonitorV2
               piezas={contador.valor}
               corteHora={!live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null}
+              cuota={comparacion.optimalAtCurrentMinute != null ? { piezas: comparacion.optimalAtCurrentMinute, hora: horaDeCuota } : null}
+              horas={(() => {
+                /* Hora a hora de Piezas ahora: las filas del Análisis (misma serie, mismo arranque) y, por Baader, sus piezas en
+                   esas MISMAS horas: salen de la serie por máquina alineada a la de la línea, así que suman la hora de la línea. */
+                const filas = buildHourlyRows(serieDelTurno)
+                if (!filas.length) return null
+                const ini = live.scheduledStart ? Date.parse(live.scheduledStart) : NaN
+                const fin = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
+                const horasTurno = !Number.isNaN(ini) && !Number.isNaN(fin) && fin > ini ? (fin - ini) / 3_600_000 : null
+                return {
+                  filas,
+                  metaPorHora: meta && horasTurno ? meta / horasTurno : null,
+                  porMaquina: (seriesMaquinas ?? []).map((m) => ({ nombre: m.nombre, piezas: piezasPorHoraDeMaquina(serieDelTurno, filas, m.serie) })),
+                }
+              })()}
               meta={meta}
               proyeccion={pace?.projectedPieces ?? null}
               ritmo={promedioLinea}
@@ -6697,53 +6749,61 @@ function MonitorDelToken() {
                   plannedMin: live.timeBreakdown.plannedMin,
                   recoverableMin: live.timeBreakdown.recoverableMin,
                 } : null,
-                velocidad: seriesMaquinas?.map((m) => {
-                  const mq = live.machines.find((x) => x.name === m.nombre)
-                  return {
-                    nombre: m.nombre,
-                    cpm: m.serie.map((x) => x / 5),
-                    objetivo: m.targetCpm ?? null,
-                    ahora: mq ? ahoraPorId?.get(mq.id) ?? null : null,
-                    promedio: mq && prodMin > 0 ? mq.pieces / prodMin : null,
-                  }
-                }) ?? null,
                 comparado: comparacion.days
                   .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))
                   .filter((d) => d.piezas > 0),
               }}
-              ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} parte="estado" />}
-              ritmoVivo={vivoV2 ? <RitmoVivoV2 r={vivoV2.r} maquinas={vivoV2.maquinas} /> : undefined}
-              caminoMeta={
-                <TiempoDelTurno
-                  tb={live.timeBreakdown}
-                  causaSel={causaSel}
-                  onCausa={(c) => { setCausaSel(c); setTramoSel(null) }}
-                  onVentana={setVentanaGrafica}
-                  onTramo={setTramoSel}
-                  proximaParada={proximaParada}
-                  notas={notasDeOperador}
-                  cerrado={turnoCerrado}
-                  meta={data.targetPieces ?? live.quotaPieces ?? null}
+              ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} ahoraRepetido={vivoV2 != null && pv != null && pv.cpm === vivoV2.r.ahora} parte="estado" />}
+              ritmoVivo={vivoV2 || barrasMinuto
+                ? (
+                  /* El turno minuto a minuto vive en el ampliado de «Ritmo en vivo»; sin pulso en vivo (turno cerrado o
+                     visto de otro día) la tarjeta queda solo con ese turno. «ver ›» de una parada lo abre con ella marcada. */
+                  <RitmoVivoV2
+                    r={vivoV2?.r ?? null}
+                    maquinas={vivoV2?.maquinas ?? []}
+                    turno={barrasMinuto}
+                    cerrado={turnoCerrado}
+                    turnoTerminado={turnoTerminadoV2}
+                    /* Las paradas cuentan sus minutos desde el primer tramo de la serie del turno (el mismo t0 de los grupos). */
+                    marca={(() => {
+                      const base = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
+                      if (!tramoSel || !Number.isFinite(base)) return null
+                      return { desdeMs: base + tramoSel.desdeMin * 60_000, hastaMs: base + tramoSel.hastaMin * 60_000, causa: causaSel, maquinaId: tramoSel.maquinaId ?? null }
+                    })()}
+                    onQuitarMarca={() => setTramoSel(null)}
+                    promedios={{
+                      linea: promedioLinea,
+                      ...Object.fromEntries(live.machines.map((m) => [m.id, prodMin > 0 ? m.pieces / prodMin : null])),
+                    }}
+                  />
+                )
+                : undefined}
+              banda={vivoV2 ? <BandaParadaV2 maquinas={vivoV2.maquinas} turnoTerminado={turnoTerminadoV2} /> : undefined}
+              caminoMeta={(() => {
+                /* Un solo juego de props: la tarjeta exprés de la grilla y el detalle de la capa cuentan lo mismo. */
+                const camino = {
+                  tb: live.timeBreakdown,
+                  causaSel,
+                  onCausa: (c: string | null) => { setCausaSel(c); setTramoSel(null) },
+                  onVentana: setVentanaGrafica,
+                  onTramo: setTramoSel,
+                  proximaParada,
+                  notas: notasDeOperador,
+                  cerrado: turnoCerrado,
+                  meta: data.targetPieces ?? live.quotaPieces ?? null,
                   /* «Hechas» = el mismo contador vivo de «Piezas ahora»: en el v2 no puede haber dos cifras de piezas. */
-                  hechas={contador.valor}
-                  piezasPulso={null}
-                  corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
-                  cuotaAhora={comparacion.optimalAtCurrentMinute}
-                  horaAhora={horaDeCuota}
-                  cpmAndando={live.timeBreakdown && live.timeBreakdown.producingMin > 0 ? live.totalPieces / live.timeBreakdown.producingMin : null}
-                  costo={costoParadas}
-                  grupos={gruposEventos}
-                  notasTurno={notasDeTurnoCompleto}
-                />
-              }
-              minutoAMinuto={barrasMinuto}
-              /* Las paradas cuentan sus minutos desde el primer tramo de la serie del turno (el mismo t0 de los grupos). */
-              eventoMarcado={(() => {
-                const base = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
-                if (!tramoSel || !Number.isFinite(base)) return null
-                return { desdeMs: base + tramoSel.desdeMin * 60_000, hastaMs: base + tramoSel.hastaMin * 60_000, causa: causaSel, maquinaId: tramoSel.maquinaId ?? null }
+                  hechas: contador.valor,
+                  piezasPulso: null,
+                  corteHora: horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null),
+                  cuotaAhora: comparacion.optimalAtCurrentMinute,
+                  horaAhora: horaDeCuota,
+                  cpmAndando: live.timeBreakdown && live.timeBreakdown.producingMin > 0 ? live.totalPieces / live.timeBreakdown.producingMin : null,
+                  costo: costoParadas,
+                  grupos: gruposEventos,
+                  notasTurno: notasDeTurnoCompleto,
+                }
+                return <TiempoDelTurno {...camino} v2="expres" ampliado={<div className="v2-clasico"><TiempoDelTurno {...camino} v2="ampliado" /></div>} />
               })()}
-              onQuitarEvento={() => setTramoSel(null)}
               vista={vistaV2}
               onVista={setVistaV2}
             />
