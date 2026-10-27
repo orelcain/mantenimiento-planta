@@ -6474,7 +6474,7 @@ function MonitorDelToken() {
                   notasTurno={notasDeTurnoCompleto}
                 />
               }
-              minutoAMinuto={barrasMinuto ? <BarrasMinuto datos={barrasMinuto} cerrado={turnoCerrado} /> : null}
+              minutoAMinuto={barrasMinuto}
               vista={vistaV2}
               onVista={setVistaV2}
             />

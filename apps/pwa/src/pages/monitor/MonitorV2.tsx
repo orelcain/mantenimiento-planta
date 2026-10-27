@@ -255,6 +255,130 @@ function urlClasico(): string {
 
 const ic = 'h-3.5 w-3.5'
 
+// ── Velocidad minuto a minuto ────────────────────────────────────────────────
+
+/** Ciclos por minuto de cada máquina, tal como los entrega Shoplogix (el pulso del turno). */
+export interface MinutoTurno {
+  desde: string
+  maquinas: Array<{ id: string; nombre: string; esperado: number | null; cycles: number[] }>
+}
+
+type TonoMinuto = 'ok' | 'warn' | 'crit' | 'sin'
+/** Los cortes de Shoplogix en sus barras: ≥75 % del esperado ok, 50-75 atención, <50 crítico. */
+function tonoMinuto(v: number, esperado: number | null): TonoMinuto {
+  if (esperado == null || esperado <= 0) return v > 0 ? 'ok' : 'sin'
+  const r = v / esperado
+  return r >= 0.75 ? 'ok' : r >= 0.5 ? 'warn' : 'crit'
+}
+const RELLENO_MINUTO: Record<TonoMinuto, string> = {
+  ok: 'rgb(var(--ink-ok))',
+  warn: 'rgb(var(--ink-warn))',
+  crit: 'rgb(var(--ink-crit))',
+  sin: 'var(--v2-gris)',
+}
+
+/**
+ * Una franja por máquina y arriba la línea (la suma), una barra por minuto del turno entero.
+ * Pasar el mouse (o tocar) marca el mismo minuto en todas las franjas y muestra sus cifras.
+ */
+function MinutoTurnoV2({ d, cerrado }: { d: MinutoTurno; cerrado: boolean }) {
+  const [i, setI] = useState<number | null>(null)
+  const t0 = Date.parse(d.desde)
+  let n = Math.min(...d.maquinas.map((m) => m.cycles.length))
+  const suma = Array.from({ length: n }, (_, k) => d.maquinas.reduce((a, m) => a + (m.cycles[k] ?? 0), 0))
+  /* Cerrado, los minutos en cero DESPUÉS de la última pieza no son una línea parada: el turno ya terminó. */
+  if (cerrado) while (n > 2 && suma[n - 1] === 0) n--
+  const varias = d.maquinas.length > 1
+  const filas = [
+    ...(varias
+      ? [{
+          nombre: `Línea (las ${d.maquinas.length} suman)`,
+          esperado: d.maquinas.every((m) => m.esperado != null) ? d.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null,
+          cycles: suma,
+          principal: true,
+        }]
+      : []),
+    ...d.maquinas.map((m) => ({ nombre: m.nombre, esperado: m.esperado, cycles: m.cycles, principal: !varias })),
+  ]
+  const indice = (e: { clientX: number; currentTarget: HTMLDivElement }) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    return Math.max(0, Math.min(n - 1, Math.floor(((e.clientX - r.left) / r.width) * n)))
+  }
+  /* Marcas de reloj: cada 30 min en PC; en el celular solo las horas en punto. */
+  const marcas: Array<{ k: number; hora: boolean }> = []
+  for (let k = 0; k < n; k++) {
+    const min = Math.round((t0 + k * 60_000) / 60_000) % 60
+    if (min === 0 || min === 30) marcas.push({ k, hora: min === 0 })
+  }
+  const X = (k: number) => ((k + 0.5) / n) * 100
+  return (
+    <div className="mt-4">
+      <div
+        className="relative cursor-crosshair touch-pan-y select-none"
+        onPointerMove={(e) => { if (e.pointerType === 'mouse') setI(indice(e)) }}
+        onPointerLeave={(e) => { if (e.pointerType === 'mouse') setI(null) }}
+        onClick={(e) => { e.stopPropagation(); const k = indice(e); setI((a) => (a === k ? null : k)) }}
+      >
+        {filas.map((f) => {
+          const tope = Math.max(1, (f.esperado ?? 0) * 1.15, ...f.cycles.slice(0, n))
+          return (
+            <div key={f.nombre} className={f.principal ? 'mb-4' : 'mb-2.5'}>
+              <div className="mb-1 flex items-baseline justify-between gap-2 text-[13px]">
+                <span className={f.principal ? 'font-medium text-foreground' : 'text-muted-foreground'}>{f.nombre}</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {i != null ? <b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b> : null}
+                  {i != null && f.esperado != null ? ' / ' : ''}
+                  {f.esperado != null ? `${i == null ? 'esperado ' : ''}${dec(f.esperado, 0)} pz/min` : ''}
+                </span>
+              </div>
+              <svg viewBox={`0 0 ${n} 100`} preserveAspectRatio="none" className={`block w-full ${f.principal ? 'h-24 lg:h-32' : 'h-10 lg:h-12'}`} aria-hidden>
+                {f.esperado != null && (
+                  <line x1={0} x2={n} y1={100 - (f.esperado / tope) * 100} y2={100 - (f.esperado / tope) * 100} stroke="var(--v2-tenue)" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+                )}
+                {f.cycles.slice(0, n).map((v, k) => {
+                  const h = Math.max(v > 0 ? 5 : 2, (v / tope) * 100)
+                  return (
+                    <rect key={k} x={k + 0.14} width={0.72} y={100 - h} height={h} fill={RELLENO_MINUTO[tonoMinuto(v, f.esperado)]} opacity={i == null || i === k ? 0.9 : 0.4} />
+                  )
+                })}
+              </svg>
+            </div>
+          )
+        })}
+        {i != null && (
+          <>
+            <span className="pointer-events-none absolute inset-y-0 w-px" style={{ left: `${X(i)}%`, background: 'var(--v2-secundaria)' }} />
+            <Globo x={X(i)}>
+              <div className="font-medium tabular-nums">{relojDe(t0 + i * 60_000)}</div>
+              {filas.map((f) => (
+                <div key={f.nombre} className="tabular-nums text-muted-foreground">
+                  {f.principal && varias ? 'Línea' : f.nombre}: <b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)}</b>{f.esperado != null ? ` / ${dec(f.esperado, 0)}` : ''} pz
+                </div>
+              ))}
+            </Globo>
+          </>
+        )}
+      </div>
+      <div className="relative h-5 text-[12px] tabular-nums text-muted-foreground">
+        {marcas.map((m) => (
+          <span key={m.k} className={`absolute -translate-x-1/2 ${m.hora ? '' : 'hidden lg:inline'}`} style={{ left: `${X(m.k)}%` }}>
+            {relojDe(t0 + m.k * 60_000)}
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+        {(['ok', 'warn', 'crit'] as const).map((t) => (
+          <span key={t} className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: RELLENO_MINUTO[t] }} />
+            {t === 'ok' ? '75 % o más del esperado' : t === 'warn' ? '50 a 75 %' : 'menos de 50 %'}
+          </span>
+        ))}
+        <span className="ml-auto">{cerrado ? 'turno cerrado' : `hasta las ${relojDe(t0 + (n - 1) * 60_000)}`}</span>
+      </div>
+    </div>
+  )
+}
+
 /** «17,0 pz/min · prom. 13,2»: el ahora del contador y el promedio del turno, la misma vara del clásico. */
 function velMaquina(m: { ahora: number | null; promedio: number | null }): string {
   if (m.ahora != null) return `${dec(m.ahora)} pz/min${m.promedio != null ? ` · prom. ${dec(m.promedio)}` : ''}`
@@ -548,8 +672,8 @@ export interface MonitorV2Props {
   mas: MasDelTurno
   /** «Camino a la meta» del monitor clásico (hechas, paradas por causa, ritmo, por jugar): se ve tal cual. */
   caminoMeta?: ReactNode
-  /** Velocidad minuto a minuto de todo el turno: la línea sumada y cada máquina. */
-  minutoAMinuto?: ReactNode
+  /** Velocidad minuto a minuto de todo el turno (ciclos de Shoplogix por máquina). */
+  minutoAMinuto?: MinutoTurno | null
   vista: VistaV2
   onVista: (v: VistaV2) => void
 }
@@ -784,8 +908,8 @@ export function MonitorV2(p: MonitorV2Props) {
       </div>
 
       {p.minutoAMinuto && (
-        <Tarjeta icono={<Activity className={ic} />} titulo="Velocidad minuto a minuto" sub="desde el inicio del turno · la línea y cada máquina">
-          <div className="mt-3">{p.minutoAMinuto}</div>
+        <Tarjeta icono={<Activity className={ic} />} titulo="Velocidad minuto a minuto" sub="piezas contadas por Shoplogix, desde el inicio del turno">
+          <MinutoTurnoV2 d={p.minutoAMinuto} cerrado={p.cerrado} />
         </Tarjeta>
       )}
 

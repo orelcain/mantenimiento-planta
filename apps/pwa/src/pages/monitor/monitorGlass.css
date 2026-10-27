@@ -204,3 +204,66 @@
 /* Subtarjeta (velocidad por máquina) y rojo crítico. */
 [data-glass='v2'] .v2-subtarjeta { background: rgb(142 142 147 / 0.08); }
 [data-glass='v2'], .v2-vars { --v2-crit: #ef4444; }
+
+/* «Camino a la meta» en el v2: el componente del clásico (sus cuentas, intactas) con la piel del reel.
+   Tarjeta esmerilada, barra en cápsula, filas como subtarjetas con cifra grande. */
+[data-glass='v2'] .v2-clasico > section {
+  background: rgb(var(--card) / 0.78) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgb(255 255 255 / 0.55) !important;
+  border-radius: 26px !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
+  padding: 20px !important;
+}
+.dark [data-glass='v2'] .v2-clasico > section { border-color: rgb(255 255 255 / 0.08) !important; box-shadow: none; }
+[data-glass='v2'] .v2-clasico > section > button > span:first-child {
+  font-size: 15px !important;
+  font-weight: 600;
+  color: rgb(var(--foreground));
+}
+[data-glass='v2'] .v2-clasico > section > button > span:last-child { font-size: 15px !important; }
+/* La barra: cápsula gruesa, Hechas en el acento. */
+[data-glass='v2'] .v2-clasico .h-6 { height: 14px; gap: 3px; }
+[data-glass='v2'] .v2-clasico .h-6 > button { border-radius: 999px !important; }
+[data-glass='v2'] .v2-clasico .h-6 > button.bg-muted-foreground\/\[0\.35\] { background: var(--v2-acento) !important; }
+/* Las filas: subtarjetas separadas por aire, no por líneas. */
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted {
+  background: transparent !important;
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  overflow: visible;
+}
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div {
+  border: 0 !important;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgb(142 142 147 / 0.08);
+}
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button {
+  min-height: 56px;
+  padding: 0 16px;
+  font-size: 15px !important;
+  background: transparent !important;
+}
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.tabular-nums.font-semibold {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > i {
+  width: 10px !important;
+  height: 10px !important;
+}
+[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > i.bg-muted-foreground\/\[0\.5\] { background: var(--v2-acento) !important; }
+[data-glass='v2'] .v2-clasico .bg-primary\/\[0\.08\] { background: transparent !important; }
+[data-glass='v2'] .v2-clasico .pantalla-oculta { padding: 0 16px 16px 36px !important; font-size: 14px !important; }
+[data-glass='v2'] .v2-clasico .pantalla-oculta li button { min-height: 40px; border-radius: 12px; font-size: 14px !important; }
+[data-glass='v2'] .v2-clasico > section > div > p:last-of-type { margin-top: 16px; font-size: 15px !important; }
+@media (max-width: 639px) {
+  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button { padding: 0 12px; gap: 8px; }
+  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.tabular-nums.font-semibold { font-size: 18px; }
+  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.w-20 { width: auto; min-width: 2.5rem; }
+  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.flex-1 { overflow: visible; }
+  [data-glass='v2'] .v2-clasico .pantalla-oculta { padding: 0 12px 12px 24px !important; }
+}
