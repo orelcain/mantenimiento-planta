@@ -247,8 +247,9 @@ describe('la parada en curso: micro o detención lo dice Shoplogix', () => {
   })
 
   it('cronómetro mm:ss', () => {
-    expect(cronometro(64)).toBe('1:04')
-    expect(cronometro(3725)).toBe('1:02:05')
-    expect(cronometro(-3)).toBe('0:00')
+    expect(cronometro(64)).toBe('1 min 04 s')
+    expect(cronometro(795)).toBe('13 min 15 s')
+    expect(cronometro(3725)).toBe('1 h 02 min')
+    expect(cronometro(-3)).toBe('0 s')
   })
 })
