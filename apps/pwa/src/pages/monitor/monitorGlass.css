@@ -76,8 +76,8 @@
 
 /* ── v2 · B + tarjetas de una cifra (MonitorV2.tsx) ───────────────────── */
 [data-glass='v2'] .tabular-nums { font-family: inherit !important; }
-[data-glass='v2'] .v2-cifra { font-size: 40px; }
-@media (min-width: 1024px) { [data-glass='v2'] .v2-cifra { font-size: 52px; } }
+:is([data-glass='v2'], .v2-piel) .v2-cifra { font-size: 40px; }
+@media (min-width: 1024px) { :is([data-glass='v2'], .v2-piel) .v2-cifra { font-size: 52px; } }
 /* El monitor de siempre queda debajo, plegado: «Ver análisis completo». */
 [data-glass='v2']:not([data-detalle='2']) .monitor-v2 ~ * { display: none !important; }
 [data-glass='v2'][data-detalle='2'] .monitor-v2 { margin-bottom: 24px; }
@@ -113,12 +113,12 @@
   border-color: rgb(255 255 255 / 0.08);
   box-shadow: none;
 }
-[data-glass='v2'] .v2-icono {
+:is([data-glass='v2'], .v2-piel) .v2-icono {
   background: rgb(var(--brand) / 0.12);
   color: rgb(var(--brand));
 }
-[data-glass='v2'] .v2-cifra-chica { font-size: 32px; }
-@media (min-width: 1024px) { [data-glass='v2'] .v2-cifra-chica { font-size: 38px; } }
+:is([data-glass='v2'], .v2-piel) .v2-cifra-chica { font-size: 32px; }
+@media (min-width: 1024px) { :is([data-glass='v2'], .v2-piel) .v2-cifra-chica { font-size: 38px; } }
 @media (prefers-reduced-transparency: reduce) {
   [data-glass='v2'] .v2-tarjeta { background: rgb(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
@@ -197,17 +197,17 @@
   border: 1px solid rgb(142 142 147 / 0.25);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
 }
-[data-glass='v2'] .v2-tarjeta[role='button'] { cursor: pointer; transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1); }
+[data-glass='v2'] .v2-tarjeta[role='button'] { cursor: pointer; transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 260ms ease; }
 @media (hover: hover) { [data-glass='v2'] .v2-tarjeta[role='button']:hover { transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { [data-glass='v2'] .v2-tarjeta[role='button']:hover { transform: none; } }
 
 /* Subtarjeta (velocidad por máquina) y rojo crítico. */
-[data-glass='v2'] .v2-subtarjeta { background: rgb(142 142 147 / 0.08); }
+:is([data-glass='v2'], .v2-piel) .v2-subtarjeta { background: rgb(142 142 147 / 0.08); }
 [data-glass='v2'], .v2-vars { --v2-crit: #ef4444; }
 
 /* «Camino a la meta» en el v2: el componente del clásico (sus cuentas, intactas) con la piel del reel.
    Tarjeta esmerilada, barra en cápsula, filas como subtarjetas con cifra grande. */
-[data-glass='v2'] .v2-clasico > section {
+:is([data-glass='v2'], .v2-piel) .v2-clasico > section {
   background: rgb(var(--card) / 0.78) !important;
   -webkit-backdrop-filter: blur(24px) saturate(160%);
   backdrop-filter: blur(24px) saturate(160%);
@@ -216,56 +216,56 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
   padding: 20px !important;
 }
-.dark [data-glass='v2'] .v2-clasico > section { border-color: rgb(255 255 255 / 0.08) !important; box-shadow: none; }
-[data-glass='v2'] .v2-clasico > section > button > span:first-child {
+.dark :is([data-glass='v2'], .v2-piel) .v2-clasico > section { border-color: rgb(255 255 255 / 0.08) !important; box-shadow: none; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico > section > button > span:first-child {
   font-size: 15px !important;
   font-weight: 600;
   color: rgb(var(--foreground));
 }
-[data-glass='v2'] .v2-clasico > section > button > span:last-child { font-size: 15px !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico > section > button > span:last-child { font-size: 15px !important; }
 /* La barra: cápsula gruesa, Hechas en el acento. */
-[data-glass='v2'] .v2-clasico .h-6 { height: 14px; gap: 3px; }
-[data-glass='v2'] .v2-clasico .h-6 > button { border-radius: 999px !important; }
-[data-glass='v2'] .v2-clasico .h-6 > button.bg-muted-foreground\/\[0\.35\] { background: var(--v2-acento) !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 { height: 14px; gap: 3px; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 > button { border-radius: 999px !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 > button.bg-muted-foreground\/\[0\.35\] { background: var(--v2-acento) !important; }
 /* Las filas: subtarjetas separadas por aire, no por líneas. */
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted {
   background: transparent !important;
   display: grid;
   gap: 8px;
   margin-top: 16px;
   overflow: visible;
 }
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div {
   border: 0 !important;
   border-radius: 18px;
   overflow: hidden;
   background: rgb(142 142 147 / 0.08);
 }
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button {
   min-height: 56px;
   padding: 0 16px;
   font-size: 15px !important;
   background: transparent !important;
 }
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.tabular-nums.font-semibold {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.tabular-nums.font-semibold {
   font-size: 22px;
   letter-spacing: -0.01em;
 }
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > i {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button > i {
   width: 10px !important;
   height: 10px !important;
 }
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > i.bg-muted-foreground\/\[0\.5\] { background: var(--v2-acento) !important; }
-[data-glass='v2'] .v2-clasico .bg-primary\/\[0\.08\] { background: transparent !important; }
-[data-glass='v2'] .v2-clasico .pantalla-oculta { padding: 0 16px 16px 36px !important; font-size: 14px !important; }
-[data-glass='v2'] .v2-clasico .pantalla-oculta li button { min-height: 40px; border-radius: 12px; font-size: 14px !important; }
-[data-glass='v2'] .v2-clasico > section > div > p:last-of-type { margin-top: 16px; font-size: 15px !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button > i.bg-muted-foreground\/\[0\.5\] { background: var(--v2-acento) !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .bg-primary\/\[0\.08\] { background: transparent !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .pantalla-oculta { padding: 0 16px 16px 36px !important; font-size: 14px !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .pantalla-oculta li button { min-height: 40px; border-radius: 12px; font-size: 14px !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico > section > div > p:last-of-type { margin-top: 16px; font-size: 15px !important; }
 @media (max-width: 639px) {
-  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button { padding: 0 12px; gap: 8px; }
-  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.tabular-nums.font-semibold { font-size: 18px; }
-  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.w-20 { width: auto; min-width: 2.5rem; }
-  [data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.flex-1 { overflow: visible; }
-  [data-glass='v2'] .v2-clasico .pantalla-oculta { padding: 0 12px 12px 24px !important; }
+  :is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button { padding: 0 12px; gap: 8px; }
+  :is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.tabular-nums.font-semibold { font-size: 18px; }
+  :is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.w-20 { width: auto; min-width: 2.5rem; }
+  :is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.flex-1 { overflow: visible; }
+  :is([data-glass='v2'], .v2-piel) .v2-clasico .pantalla-oculta { padding: 0 12px 12px 24px !important; }
 }
 
 /* ── Paleta calma del v2 ──────────────────────────────────────────────────
@@ -320,12 +320,12 @@
 
 /* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con
    degradé y brillo, colores de la paleta calma. */
-[data-glass='v2'] .v2-clasico > section > button > span:first-child {
+:is([data-glass='v2'], .v2-piel) .v2-clasico > section > button > span:first-child {
   display: inline-flex;
   align-items: center;
   gap: 10px;
 }
-[data-glass='v2'] .v2-clasico > section > button > span:first-child::before {
+:is([data-glass='v2'], .v2-piel) .v2-clasico > section > button > span:first-child::before {
   content: '';
   width: 32px;
   height: 32px;
@@ -335,28 +335,28 @@
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235AA0DC' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E") center / 16px no-repeat,
     rgb(var(--brand) / 0.12);
 }
-[data-glass='v2'] .v2-clasico .h-6 { height: 18px; gap: 4px; margin-top: 10px; }
-[data-glass='v2'] .v2-clasico .h-6 > button { opacity: 1 !important; }
-[data-glass='v2'] .v2-clasico .h-6 > button.bg-muted-foreground\/\[0\.35\] {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 { height: 18px; gap: 4px; margin-top: 10px; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 > button { opacity: 1 !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 > button.bg-muted-foreground\/\[0\.35\] {
   background: linear-gradient(90deg, color-mix(in srgb, var(--v2-bien) 55%, transparent), var(--v2-bien)) !important;
   box-shadow: 0 0 16px color-mix(in srgb, var(--v2-bien) 45%, transparent);
 }
-[data-glass='v2'] .v2-clasico .h-6 > button.border-dashed {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 > button.border-dashed {
   background: rgb(142 142 147 / 0.12) !important;
   border: 0 !important;
 }
-[data-glass='v2'] .v2-clasico [class*='bg-red-6'] { background: var(--v2-mal) !important; }
-[data-glass='v2'] .v2-clasico [class*='bg-amber-6'] { background: var(--v2-atento) !important; }
-[data-glass='v2'] .v2-clasico .h-6 > button[class*='bg-red-6'] {
+:is([data-glass='v2'], .v2-piel) .v2-clasico [class*='bg-red-6'] { background: var(--v2-mal) !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico [class*='bg-amber-6'] { background: var(--v2-atento) !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .h-6 > button[class*='bg-red-6'] {
   background: linear-gradient(90deg, color-mix(in srgb, var(--v2-mal) 60%, transparent), var(--v2-mal)) !important;
 }
-[data-glass='v2'] .v2-clasico [class*='text-red-'] { color: var(--v2-mal-texto) !important; }
-[data-glass='v2'] .v2-clasico .text-ink-ok { color: var(--v2-bien) !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico [class*='text-red-'] { color: var(--v2-mal-texto) !important; }
+:is([data-glass='v2'], .v2-piel) .v2-clasico .text-ink-ok { color: var(--v2-bien) !important; }
 /* Filas: la parte abierta se distingue por un borde de luz, no por un fondo de color. */
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div:has(> .pantalla-oculta) {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div:has(> .pantalla-oculta) {
   box-shadow: inset 0 0 0 1px rgb(var(--brand) / 0.25);
 }
-[data-glass='v2'] .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.w-20 {
+:is([data-glass='v2'], .v2-piel) .v2-clasico .rounded-\[10px\].bg-muted > div > button > span.w-20 {
   font-size: 13px !important;
 }
 
@@ -557,4 +557,138 @@ html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }
 @media (min-width: 1536px) {
   /* Dos columnas: las tarjetas vecinas de una misma fila llegan al mismo alto. */
   [data-glass='v2'] .monitor-v2 .v2-clasico > section { height: 100%; }
+}
+
+/* ══ Exprés / ampliado + barra lateral (mockup «Monitor PC exprés y ampliado», 27-10, opción A) ═══════════════
+   Tokens: radios 26 (tarjeta y capa) · 99 (botones y segmentado) · 12 (ítem lateral y globo) · relleno de
+   controles `--v2-relleno`. Movimiento: solo transform/opacity; la excepción documentada es el anillo de meta.
+   Todo lo animado se apaga con `prefers-reduced-motion` (al final del bloque). */
+[data-glass='v2'], .v2-vars { --v2-relleno: rgb(142 142 147 / 0.16); }
+
+/* Botón «Ampliar» / «Reducir»: pastilla de 30 px de dibujo y 44 de toque (`tap-44`). */
+.v2-amp {
+  display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px 0 9px; flex: none;
+  border-radius: 999px; background: var(--v2-relleno); color: rgb(var(--foreground) / 0.82);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: transform 150ms cubic-bezier(0.32, 0.72, 0, 1), color 150ms;
+}
+.v2-amp:hover { color: rgb(var(--foreground)); }
+@media (min-width: 1024px) and (max-width: 1365px) { .v2-amp-compacta { padding: 0 9px; } .v2-amp-compacta > span { display: none; } }
+.v2-amp:active { transform: scale(0.96); }
+.v2-amp:focus-visible, .v2-seg > button:focus-visible, .v2-lat-item:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 2px; }
+
+/* La capa: del ancho de 2 columnas, pegada a la tarjeta que la abre; la tarjeta de origen desaparece debajo
+   (nace de ella) y el resto de la página se atenúa al 60 %. */
+.v2-capa-raiz { position: fixed; inset: 0; z-index: 100; }
+.v2-capa-velo { position: absolute; inset: 0; }
+.v2-capa {
+  position: fixed; display: flex; flex-direction: column; transform-origin: 0 0; overflow: hidden;
+  border-radius: 26px; color: rgb(var(--foreground));
+  background: rgb(var(--card) / 0.97); border: 1px solid rgb(255 255 255 / 0.55);
+  box-shadow: 0 24px 60px rgb(30 30 28 / 0.2);
+}
+.dark .v2-capa { border-color: rgb(255 255 255 / 0.08); box-shadow: 0 24px 60px rgb(0 0 0 / 0.5); }
+.v2-capa-interior { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.v2-capa-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 24px 12px; }
+.v2-capa-cuerpo { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 4px 24px 24px; }
+[data-origen] { opacity: 0 !important; transition: none !important; }
+[data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-clasico > section, .v2-barra-pc, .rv-banda) { transition: opacity 260ms ease; }
+html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-clasico > section, .v2-barra-pc, .rv-banda):not([data-origen]) { opacity: 0.6; }
+@media (prefers-reduced-transparency: reduce) { .v2-capa { background: rgb(var(--card)); } }
+/* En la capa y la hoja el contenido va fuera de `[data-glass]`: lo chico de las filas del clásico sube a 13 px. */
+.v2-piel .text-\[11px\], .v2-piel .text-\[11\.5px\], .v2-piel .text-\[12px\] { font-size: 13px !important; }
+.v2-piel .uppercase { text-transform: none !important; letter-spacing: 0 !important; }
+
+/* Selector segmentado Línea · Ev 1 · Ev 2 · Ev 3: el indicador se desliza (translateX, 250 ms). */
+.v2-seg { position: relative; display: grid; border-radius: 999px; padding: 3px; background: var(--v2-relleno); }
+.v2-seg > button { position: relative; z-index: 1; height: 30px; border-radius: 999px; font-size: 13px; font-weight: 600; color: rgb(var(--foreground) / 0.8); transition: color 200ms; }
+.v2-seg > button[aria-selected='true'] { color: rgb(var(--foreground)); }
+.v2-seg-ind { position: absolute; left: 3px; top: 3px; bottom: 3px; border-radius: 999px; background: rgb(var(--card)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.18); transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1); }
+
+/* Ritmo en vivo, exprés: la que baja, resaltada; las otras, dato chico. */
+.rv-chip { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 3px 10px; background: var(--v2-relleno); color: rgb(var(--foreground)); }
+.rv-chip[data-tono='atento'] { color: var(--v2-atento-texto); }
+.rv-chip[data-tono='mal'] { color: var(--v2-mal-texto); }
+.rv-baja { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 6px 12px; }
+.rv-baja-cifra { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.rv-baja-chispa { min-width: 0; }
+.rv-baja-sub { grid-column: 1 / -1; font-size: 13px; color: rgb(var(--muted-foreground)); }
+.rv-otros { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 13px; color: rgb(var(--muted-foreground)); }
+.rv-otros b { color: rgb(var(--foreground)); font-weight: 600; }
+.rv-micro-txt { color: var(--v2-ext-texto); font-weight: 600; }
+.rv-micro-marca { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: var(--v2-ext); margin-right: 4px; }
+.rv-amp-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: end; }
+@media (min-width: 1024px) { .v2-capa .rv-amp-top { grid-template-columns: 270px minmax(0, 1fr); gap: 24px; } }
+.v2-capa .rv-a { flex-wrap: wrap; row-gap: 8px; }
+
+/* Camino a la meta, exprés: barra + cuatro cifras. */
+.v2-camino-barra { display: flex; gap: 3px; height: 12px; }
+.v2-camino-barra > span { height: 100%; border-radius: 6px; }
+.v2-camino-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px 12px; margin: 0; }
+.v2-camino-cifras dd { margin: 0; }
+
+/* Anillo de meta (Piezas ahora): ÚNICO que anima stroke-dashoffset, 1,1 s una vez; SVG de 44 px. */
+.v2-anillo-pr { transition: stroke-dashoffset 1.1s cubic-bezier(0.22, 0.9, 0.24, 1); }
+
+/* Entrada escalonada de tarjetas (la clase la pone y la quita `useEntradaEscalonada`): 35 ms entre cada una y,
+   como pide DESIGN.md §8, a lo más 5 escalones: de la quinta en adelante entran juntas. */
+@keyframes v2-entra-tarjeta { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.v2-entra { animation: v2-entra-tarjeta 420ms cubic-bezier(0.22, 0.9, 0.24, 1) backwards; animation-delay: calc(var(--k, 0) * 35ms); }
+
+/* «Ahora» de «Ritmo de la línea» en PC: es el último minuto de «Ritmo en vivo» (lo marca el llamador solo si
+   las dos cifras son iguales). La tarjeta queda con media de 15 min, promedio del turno, techo y cada máquina. */
+@media (min-width: 1024px) {
+  .v2-ritmo [data-ahora-vivo='repetido'] { display: none; }
+  .v2-ritmo [data-ahora-vivo='repetido'] ~ .ml-auto { margin-left: 0; text-align: left; }
+}
+
+/* Barra lateral de PC: riel de 56 px que se abre a 200 sin empujar nada (fondo con scaleX, rótulos con opacity). */
+.v2-lateral { display: none; }
+@media (min-width: 1024px) {
+  [data-glass='v2'] > .v2-lateral { display: block; position: fixed; left: 0; top: 0; bottom: 0; width: 200px; z-index: 40; pointer-events: none; }
+  [data-glass='v2'][data-barra] { padding-left: 56px; }
+}
+.v2-lat-fondo {
+  position: absolute; inset: 0; transform-origin: 0 0; transform: scaleX(0.28);
+  background: rgb(var(--card) / 0.78); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
+  border-right: 1px solid rgb(var(--border) / 0.7);
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.v2-lat-sombra { position: absolute; inset: 0; box-shadow: 0 24px 60px rgb(0 0 0 / 0.22); opacity: 0; transition: opacity 260ms; pointer-events: none; }
+.v2-lateral[data-abierta='si'] .v2-lat-fondo { transform: none; }
+.v2-lateral[data-abierta='si'] .v2-lat-sombra { opacity: 1; }
+.v2-lat-items { position: relative; height: 100%; width: 56px; display: flex; flex-direction: column; gap: 4px; padding: 8px; pointer-events: auto; overflow: hidden; }
+.v2-lateral[data-abierta='si'] .v2-lat-items { width: 200px; }
+.v2-lat-item {
+  position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; flex: none; width: 40px; height: 40px;
+  border-radius: 12px; overflow: hidden; text-align: left; cursor: pointer; color: rgb(var(--foreground) / 0.8);
+}
+.v2-lateral[data-abierta='si'] .v2-lat-item { width: 184px; }
+.v2-lat-item:hover { color: rgb(var(--foreground)); }
+.v2-lat-item[disabled] { opacity: 0.5; cursor: default; }
+.v2-lat-activo { color: var(--v2-bien); }
+.v2-lat-ico { width: 40px; height: 40px; display: grid; place-items: center; flex: none; }
+.v2-lat-rot { font-size: 14px; font-weight: 550; white-space: nowrap; opacity: 0; transform: translateX(-6px); transition: opacity 180ms, transform 220ms cubic-bezier(0.32, 0.72, 0, 1); }
+.v2-lateral[data-abierta='si'] .v2-lat-rot { opacity: 1; transform: none; transition-delay: 60ms; }
+.v2-lat-ind {
+  position: absolute; left: 8px; top: 8px; width: 184px; height: 40px; border-radius: 12px; background: var(--v2-relleno);
+  transform-origin: 0 50%; transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1); pointer-events: none; z-index: 0;
+}
+.v2-lat-sep { flex: none; height: 1px; width: 24px; margin: 6px 8px; background: rgb(var(--border) / 0.6); }
+.v2-lateral[data-abierta='si'] .v2-lat-sep { width: 168px; }
+.v2-lat-area { display: flex; flex-direction: column; gap: 2px; }
+.v2-lat-area-rot { height: 14px; padding-left: 12px; font-size: 12px; line-height: 14px; color: rgb(var(--muted-foreground)); opacity: 0; transition: opacity 180ms; }
+.v2-lateral[data-abierta='si'] .v2-lat-area-rot { opacity: 1; }
+.v2-lat-item-area, .v2-lat-item-area .v2-lat-ico { height: 34px; }
+.v2-lat-chip { width: 30px; height: 24px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; font-weight: 700; border: 1px solid rgb(var(--border) / 0.8); }
+.v2-lat-activo .v2-lat-chip { background: var(--v2-bien); color: rgb(var(--background)); border-color: transparent; }
+.v2-lat-hueco { flex: 1; }
+@media (prefers-reduced-transparency: reduce) { .v2-lat-fondo { background: rgb(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* Reducir movimiento: sin resorte, sin desplazamiento, sin cuentas ni entradas; solo aparece. */
+@media (prefers-reduced-motion: reduce) {
+  .v2-entra { animation: none; }
+  .v2-anillo-pr, .v2-seg-ind, .v2-seg > button, .v2-amp, .v2-lat-fondo, .v2-lat-sombra, .v2-lat-ind, .v2-lat-rot, .v2-lat-area-rot { transition: none; }
+  .v2-amp:active { transform: none; }
+  [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-clasico > section, .v2-barra-pc, .rv-banda) { transition: none; }
 }

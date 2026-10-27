@@ -111,3 +111,25 @@ export function buildHourlyRows(series: MonitorSeriesPoint[] | null | undefined)
 export function peakPieces(rows: HourlyRow[]): number {
   return rows.reduce((max, r) => Math.max(max, r.pieces), 0)
 }
+
+/**
+ * Las piezas de UNA máquina en las MISMAS horas que `rows` (las de la línea): `valores[i]` son las piezas de la
+ * máquina en el tramo `series[i]`. Usa el mismo arranque y el mismo corte de hora que `buildHourlyRows`, así que
+ * con una serie por máquina que suma la de la línea, las máquinas suman la línea en cada hora.
+ */
+export function piezasPorHoraDeMaquina(
+  series: MonitorSeriesPoint[],
+  rows: HourlyRow[],
+  valores: number[],
+): number[] {
+  if (rows.length === 0) return []
+  const t0 = Date.parse(rows[0]!.from)
+  const porIndice = new Map<number, number>()
+  series.forEach((p, i) => {
+    const ms = Date.parse(p.t)
+    if (Number.isNaN(ms) || ms < t0) return
+    const idx = Math.floor((ms - t0) / (60 * 60_000)) + 1
+    porIndice.set(idx, (porIndice.get(idx) ?? 0) + (valores[i] ?? 0))
+  })
+  return rows.map((r) => porIndice.get(r.index) ?? 0)
+}

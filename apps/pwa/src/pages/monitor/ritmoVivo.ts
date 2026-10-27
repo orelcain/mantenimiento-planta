@@ -153,6 +153,29 @@ export function paradasPorMaquina(e: Pick<EntradaRitmoVivo, 'stopEvents' | 'stop
   return { separa, todas, micro }
 }
 
+/**
+ * Las micro detenciones de cada máquina SIN unir, con inicio y duración tal como las publica Shoplogix
+ * (`stopEvents[].f` y `.s`). Sin `stopMachines`/`m` no se sabe de qué máquina fue cada una: devuelve vacío.
+ */
+export function microsPorMaquina(e: Pick<EntradaRitmoVivo, 'stopEvents' | 'stopReasons' | 'stopMachines'>): Map<string, Array<{ inicioMs: number; duracionS: number }>> {
+  const out = new Map<string, Array<{ inicioMs: number; duracionS: number }>>()
+  const ids = e.stopMachines ?? []
+  const eventos = e.stopEvents ?? []
+  if (!ids.length || !eventos.every((x) => x.m != null && ids[x.m] != null)) return out
+  for (const x of eventos) {
+    if (!esMicroDetencion(e.stopReasons?.[x.r])) continue
+    const a = Date.parse(x.f)
+    if (!Number.isFinite(a) || !(x.s > 0)) continue
+    const id = ids[x.m!]!
+    const item = { inicioMs: a, duracionS: x.s }
+    const l = out.get(id)
+    if (l) l.push(item)
+    else out.set(id, [item])
+  }
+  for (const l of out.values()) l.sort((p, q) => p.inicioMs - q.inicioMs)
+  return out
+}
+
 /** Segundos de [ini, fin) cubiertos por los intervalos (ya unidos). */
 export function segundosCubiertos(iv: Intervalo[] | undefined, ini: number, fin: number): number {
   if (!iv?.length) return 0
@@ -174,6 +197,16 @@ export interface MinutoLinea {
   tono: Tono
 }
 
+/** Una micro detención de una máquina, con su duración REAL (`stopEvents[].s`). */
+export interface MicroDetalle {
+  /** Índice del minuto (0 = primero de la tira) en que empezó, o 0 si empezó antes de la tira. */
+  i: number
+  /** Inicio real, wall-as-UTC ms. */
+  inicioMs: number
+  /** Duración real en segundos, tal como la publica Shoplogix. */
+  duracionS: number
+}
+
 export interface LineaLlenado {
   id: string
   nombre: string
@@ -182,6 +215,8 @@ export interface LineaLlenado {
   fills: Array<number | null>
   /** Índices de minuto con micro detención de ESA máquina. */
   micros: number[]
+  /** Cada micro de ESA máquina que toca la tira, con inicio y duración real. */
+  microsDetalle: MicroDetalle[]
   ini: number | null
   fin: number | null
   baja: boolean
@@ -192,8 +227,22 @@ export interface LineaLlenado {
 export type SenalTono = 'atento' | 'mal' | 'neutra'
 export interface Senal { tono: SenalTono; texto: string }
 
+/** La tira de 15 min de UNA Baader, con SU esperado (`serieMinuto.maquinas[].esperado`). */
+export interface SerieMaquina {
+  id: string
+  nombre: string
+  esperado: number
+  minutos: MinutoLinea[]
+  /** Piezas del minuto en curso de ESTA máquina, o null si el dato no cuadra. */
+  curso: number | null
+}
+
 export interface RitmoVivo {
   minutos: MinutoLinea[]
+  /** La misma tira, máquina por máquina (en el orden de la serie). */
+  porMaquina: SerieMaquina[]
+  /** Inicio del primer minuto de la tira, wall-as-UTC ms (para ubicar una micro dentro del minuto). */
+  inicioTiraMs: number
   esperadoLinea: number
   /** Piezas del último minuto cerrado (= el «Ahora» de la tarjeta de ritmo). */
   ahora: number
@@ -231,6 +280,7 @@ const rangoTxt = (v: number[]) => {
 export function llenadoDe(e: EntradaRitmoVivo, i0: number, n: number): { lineas: LineaLlenado[]; separaParadas: boolean } {
   const t0 = Date.parse(e.serie.desde)
   const pp = paradasPorMaquina(e)
+  const mp = microsPorMaquina(e)
   const lineas: LineaLlenado[] = []
   for (const m of e.serie.maquinas) {
     if (!(m.esperado != null && m.esperado > 0)) continue
@@ -251,6 +301,13 @@ export function llenadoDe(e: EntradaRitmoVivo, i0: number, n: number): { lineas:
       }
       if (segundosCubiertos(pp.micro.get(m.id), ini, fin) > 0) micros.push(i - i0)
     }
+    const iniVentana = t0 + i0 * 60_000
+    const finVentana = t0 + n * 60_000
+    const microsDetalle: MicroDetalle[] = []
+    for (const mi of mp.get(m.id) ?? []) {
+      if (mi.inicioMs + mi.duracionS * 1000 <= iniVentana || mi.inicioMs >= finVentana) continue
+      microsDetalle.push({ i: Math.max(0, Math.floor((mi.inicioMs - t0) / 60_000) - i0), inicioMs: mi.inicioMs, duracionS: mi.duracionS })
+    }
     const validos = fills.filter((x): x is number => x != null)
     const ini = validos.length >= 6 ? Math.round(media(validos.slice(0, 3))) : null
     const fin = validos.length >= 6 ? Math.round(media(validos.slice(-3))) : null
@@ -261,6 +318,7 @@ export function llenadoDe(e: EntradaRitmoVivo, i0: number, n: number): { lineas:
       esperado: m.esperado,
       fills,
       micros,
+      microsDetalle,
       ini,
       fin,
       baja,
@@ -328,6 +386,25 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
   }
   const ahora = minutos[minutos.length - 1]!.piezas
 
+  /* El minuto en curso de cada máquina: acumulado de la última lectura menos lo ya cerrado. Un parcial
+     imposible (serie recortada, minutos sin cerrar) no se dibuja. */
+  const cursoDe = (m: MaquinaSerie): number | null => {
+    const acc = e.acumulado?.[m.id]
+    if (acc == null) return null
+    const c = Math.max(0, acc - m.cycles.slice(0, n).reduce((x, y) => x + y, 0))
+    return c > m.esperado! * 1.5 ? null : c
+  }
+  const porMaquina: SerieMaquina[] = maq.map((m) => ({
+    id: m.id,
+    nombre: m.nombre,
+    esperado: m.esperado!,
+    curso: cursoDe(m),
+    minutos: Array.from({ length: n - i0 }, (_, k) => {
+      const piezas = m.cycles[i0 + k] ?? 0
+      return { hora: hh(t0 + (i0 + k) * 60_000), piezas, tono: tonoDe(piezas / m.esperado!) }
+    }),
+  }))
+
   let curso: number | null = null
   if (e.acumulado && maq.every((m) => e.acumulado![m.id] != null)) {
     curso = maq.reduce((a, m) => a + Math.max(0, e.acumulado![m.id]! - m.cycles.slice(0, n).reduce((x, y) => x + y, 0)), 0)
@@ -338,6 +415,8 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
   const { lineas, separaParadas } = llenadoDe(e, i0, n)
   return {
     minutos,
+    porMaquina,
+    inicioTiraMs: t0 + i0 * 60_000,
     esperadoLinea,
     ahora,
     ahoraPct: Math.round((ahora / esperadoLinea) * 100),
@@ -349,6 +428,66 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
     senales: senalesDe(lineas, unidad, separaParadas),
     unidad,
   }
+}
+
+// ── Qué se ve: la línea o una Baader ─────────────────────────────────────────
+
+/** Lo que dibuja la tira de 15 min y el «último minuto»: la suma de la línea o UNA Baader con su esperado. */
+export interface VistaSerie {
+  /** `SEL_LINEA` o el id de la máquina. */
+  sel: string
+  nombre: string
+  esperado: number
+  minutos: MinutoLinea[]
+  curso: number | null
+  /** Piezas del último minuto cerrado. */
+  ahora: number
+  ahoraPct: number
+  tendencia: Tendencia | null
+}
+
+export const SEL_LINEA = 'linea'
+
+/**
+ * La etiqueta corta de una máquina para el selector y las franjas, sacada de su nombre REAL:
+ * «Evisceradora 2» → «Ev 2». Un nombre que no calza con «palabra + número» va tal cual (acotado).
+ */
+export function etiquetaMaquina(nombre: string): string {
+  const t = nombre.trim()
+  /* Solo se abrevia una palabra larga («Evisceradora», «Fileteadora»); «Línea 1» o «Baader 2» ya caben tal cual. */
+  const m = /^(\p{L}{2})\p{L}{6,}[\s\-_]*(\d+)$/u.exec(t)
+  if (m) return `${m[1]![0]!.toUpperCase()}${m[1]![1]!.toLowerCase()} ${m[2]}`
+  return t.length > 10 ? `${t.slice(0, 9)}…` : t
+}
+
+/** La serie de lo elegido; una selección que ya no existe (otra línea, otro turno) vuelve a la línea. */
+export function vistaDeSerie(r: RitmoVivo, sel: string): VistaSerie {
+  const m = sel === SEL_LINEA ? null : r.porMaquina.find((x) => x.id === sel) ?? null
+  const minutos = m ? m.minutos : r.minutos
+  const esperado = m ? m.esperado : r.esperadoLinea
+  const ahora = minutos[minutos.length - 1]?.piezas ?? 0
+  return {
+    sel: m ? m.id : SEL_LINEA,
+    nombre: m ? m.nombre : 'Línea',
+    esperado,
+    minutos,
+    curso: m ? m.curso : r.curso,
+    ahora,
+    ahoraPct: Math.round((ahora / esperado) * 100),
+    tendencia: m ? tendenciaDe(minutos.map((x) => x.piezas), esperado) : r.tendencia,
+  }
+}
+
+/** La Baader que baja (mayor caída de llenado sobre `CAIDA_LLENADO_PP`); si ninguna baja, null. */
+export function maquinaQueBaja(lineas: LineaLlenado[]): LineaLlenado | null {
+  let mejor: LineaLlenado | null = null
+  let caida = 0
+  for (const l of lineas) {
+    if (!l.baja || l.ini == null || l.fin == null) continue
+    const c = l.ini - l.fin
+    if (c > caida) { mejor = l; caida = c }
+  }
+  return mejor
 }
 
 // ── La parada en curso ───────────────────────────────────────────────────────
