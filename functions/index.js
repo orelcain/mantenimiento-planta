@@ -8429,6 +8429,51 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
   }
 })
 
+// ── informeTurnoCorreo ───────────────────────────────────────────────────────
+// Botones «Copiar correo» y «Descargar PDF» del monitor: devuelve el informe
+// del turno listo para pegar en un correo (asunto + HTML) y el PDF para
+// adjuntar. No envía nada: quien lo pega lo manda desde su propio buzón, así
+// no hay credenciales de correo en el servidor. Solo lectura, por eso no pide
+// reautenticar, pero sí ser admin: el informe trae lecturas del turno que no
+// son para cualquiera con el link del monitor.
+exports.informeTurnoCorreo = onCall({ region: 'us-central1' }, async (request) => {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Hay que iniciar sesión.')
+
+  const perfil = await db.collection('users').doc(uid).get()
+  if (perfil.data()?.rol !== 'admin') {
+    throw new HttpsError('permission-denied', 'Solo un administrador puede sacar el informe.')
+  }
+
+  const plant = String(request.data?.plant || '').trim()
+  const shiftDocId = String(request.data?.shiftDocId || '').trim()
+  if (!plant || !shiftDocId) throw new HttpsError('invalid-argument', 'Faltan la planta o el turno.')
+
+  // Mismo criterio que el botón de Telegram: sin brief de cierre, el turno
+  // sigue vivo y el informe sale marcado como foto parcial.
+  const turnoDoc = await db.collection('shoplogix').doc(plant).collection('shifts').doc(shiftDocId).get()
+  const enCurso = !turnoDoc.data()?.endBriefSentAt
+  const config = await getShoplogixNotifConfig(plant)
+
+  try {
+    const r = await shoplogixInformeMod.informeParaCorreo({
+      db, plant, shiftDocId, enCurso, minPiezas: config.shiftEnd?.minPieces || 50, logger,
+    })
+    if (r.motivo) return { motivo: r.motivo }
+    logger.info('[informeTurnoCorreo]', { uid, plant, shiftDocId, enCurso, bytes: r.pdf.length })
+    return {
+      asunto: r.asunto,
+      html: r.html,
+      pdfBase64: r.pdf.toString('base64'),
+      nombreArchivo: r.nombreArchivo,
+      enCurso,
+    }
+  } catch (e) {
+    logger.error('[informeTurnoCorreo] falló', { uid, plant, shiftDocId, err: e.message })
+    throw new HttpsError('internal', e.message)
+  }
+})
+
 // ── checkShiftReconciliation ─────────────────────────────────────────────────
 // Cron cada 30 minutos. Verifica que el brief de FIN de turno ya enviado (ver
 // `endBriefSnapshot` en checkShiftEndBriefs) siga coincidiendo con lo que

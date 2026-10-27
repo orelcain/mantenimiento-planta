@@ -33,8 +33,9 @@
  */
 
 const { cotejarTurnos, resumirTurno } = require('./cotejoTurnos')
-const { construirDatosInforme } = require('./informeTurno')
+const { construirDatosInforme, clavesDeMantencion } = require('./informeTurno')
 const { generarInformeTurno } = require('./turnoDefensaPdf')
+const { correoTurnoHtml, asuntoCorreo } = require('./correoTurno')
 const { clasificarParaInforme } = require('./imputacion')
 
 /** Reintentos antes de rendirse con un turno. */
@@ -50,6 +51,50 @@ const AREA_LABEL = {
 function nombreArchivo(plant, shiftDocId) {
   const limpio = shiftDocId.replace(/[^\w.-]+/g, '-')
   return `informe-turno-${plant}-${limpio}.pdf`
+}
+
+/** Lee los docs de máquina de un turno, en la forma que consume el informe. */
+async function leerMaquinas(ref) {
+  const snap = await ref.collection('machines').get()
+  const machines = snap.docs.map((d) => {
+    const x = d.data()
+    return {
+      machineName: x.machineName || d.id,
+      states: x.states || [],
+      intervals: x.intervals || [],
+      totalCycles: x.totalCycles || 0,
+    }
+  }).sort((a, b) => a.machineName.localeCompare(b.machineName, 'es'))
+  const primero = snap.empty ? {} : snap.docs[0].data()
+  return { machines, windowStart: primero.shiftStart, windowEnd: primero.shiftEnd, vacio: snap.empty }
+}
+
+/**
+ * Las fallas de Mantención de los últimos `k` turnos equivalentes, el más
+ * reciente primero. Es lo que permite decir «tercer turno seguido con Knuro en
+ * Ev 2». Se recalcula desde las máquinas y no desde `resumenLinea`, que se
+ * guarda sin el detalle de causas. Un turno que no se puede leer corta la
+ * racha: mejor no afirmar una repetición que afirmarla de más.
+ */
+async function historialDeComparables({ db, plant, cotejo, k = 3, logger = console }) {
+  const previos = ((cotejo && cotejo.filas) || [])
+    .filter((f) => !f.esReferencia)
+    .sort((a, b) => b.inicioMs - a.inicioMs)
+    .slice(0, k)
+  const col = db.collection('shoplogix').doc(plant).collection('shifts')
+  const historial = []
+  for (const f of previos) {
+    try {
+      const { machines, windowStart, windowEnd, vacio } = await leerMaquinas(col.doc(f.id))
+      if (vacio) break
+      const r = resumirTurno({ machines, windowStart, windowEnd, clasificar: clasificarParaInforme })
+      historial.push({ id: f.id, claves: clavesDeMantencion(r.causas) })
+    } catch (e) {
+      logger.warn('[informeTurno] historial incompleto', { plant, id: f.id, err: e.message })
+      break
+    }
+  }
+  return historial
 }
 
 /**
@@ -79,7 +124,60 @@ function caption({ meta, datos }) {
 }
 
 /**
- * Genera y envía el informe del turno.
+ * Arma el informe de un turno: datos, PDF y meta. No envía ni escribe nada.
+ * Lo usan el envío por Telegram y el botón «Copiar correo» del monitor, así los
+ * dos dicen lo mismo.
+ *
+ * El cotejo y el historial pueden fallar sin que el informe deje de tener
+ * sentido: sin comparables las láminas lo dicen y el resto sigue igual.
+ */
+async function armarInforme({ db, plant, shiftDocId, padre, machines, windowStart, windowEnd, enCurso = false, logger = console }) {
+  let cotejo = null
+  try {
+    cotejo = await cotejarTurnos({ db, plant, shiftDocId })
+  } catch (e) {
+    logger.warn('[informeTurno] cotejo no disponible', { plant, shiftDocId, err: e.message })
+  }
+
+  const meta = {
+    planta: plant,
+    areaLabel: AREA_LABEL[plant] || plant,
+    // «Turno Dia» llega sin tilde desde Shoplogix; el informe va en español correcto.
+    turnoLabel: String(padre.shiftId || shiftDocId.split('_').slice(1).join('_')).replace(/\bDia\b/, 'Día'),
+    fechaLabel: shiftDocId.slice(0, 10),
+  }
+
+  let historial = null
+  try {
+    historial = await historialDeComparables({ db, plant, cotejo, logger })
+  } catch (e) {
+    logger.warn('[informeTurno] historial no disponible', { plant, shiftDocId, err: e.message })
+  }
+
+  const datos = construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta, enCurso, historial })
+  return { meta, datos, pdf: generarInformeTurno(datos) }
+}
+
+/**
+ * El informe listo para pegar en un correo: asunto, cuerpo HTML y el PDF para
+ * adjuntar. Lo pide el botón «Copiar correo» del monitor; quien lo pega lo
+ * manda desde su propio buzón, así que no hay credenciales de correo que
+ * guardar en ninguna parte.
+ *
+ * @returns {Promise<{asunto, html, pdf: Buffer, nombreArchivo} | {motivo: string}>}
+ */
+async function informeParaCorreo({ db, plant, shiftDocId, enCurso = false, minPiezas = 50, logger = console }) {
+  const ref = db.collection('shoplogix').doc(plant).collection('shifts').doc(shiftDocId)
+  const padre = (await ref.get()).data() || {}
+  const { machines, windowStart, windowEnd, vacio } = await leerMaquinas(ref)
+  if (vacio) return { motivo: 'sin-maquinas' }
+  if (machines.reduce((a, m) => a + m.totalCycles, 0) < minPiezas) return { motivo: 'sin-produccion' }
+  const { datos, pdf } = await armarInforme({ db, plant, shiftDocId, padre, machines, windowStart, windowEnd, enCurso, logger })
+  return { asunto: asuntoCorreo(datos), html: correoTurnoHtml(datos), pdf, nombreArchivo: nombreArchivo(plant, shiftDocId) }
+}
+
+/**
+ * Genera y envía el informe del turno por Telegram.
  *
  * @param {object}   p
  * @param {*}        p.db          Firestore
@@ -115,44 +213,14 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
   const intentos = padre.informePdfIntentos || 0
   if (!forzar && intentos >= MAX_INTENTOS) return { enviado: false, motivo: 'demasiados-intentos', intentos }
 
-  const snap = await ref.collection('machines').get()
-  if (snap.empty) return { enviado: false, motivo: 'sin-maquinas' }
-
-  const machines = snap.docs.map((d) => {
-    const x = d.data()
-    return {
-      machineName: x.machineName || d.id,
-      states: x.states || [],
-      intervals: x.intervals || [],
-      totalCycles: x.totalCycles || 0,
-    }
-  }).sort((a, b) => a.machineName.localeCompare(b.machineName, 'es'))
+  const { machines, windowStart, windowEnd, vacio } = await leerMaquinas(ref)
+  if (vacio) return { enviado: false, motivo: 'sin-maquinas' }
 
   const ciclos = machines.reduce((a, m) => a + m.totalCycles, 0)
   const minPiezas = (config.shiftEnd && config.shiftEnd.minPieces) || 50
   if (ciclos < minPiezas) return { enviado: false, motivo: 'sin-produccion' }
 
-  const windowStart = snap.docs[0].data().shiftStart
-  const windowEnd = snap.docs[0].data().shiftEnd
-
-  // El cotejo puede fallar sin que el informe deje de tener sentido: sin
-  // comparables las láminas 1 y 5 lo dicen y el resto sigue igual.
-  let cotejo = null
-  try {
-    cotejo = await cotejarTurnos({ db, plant, shiftDocId })
-  } catch (e) {
-    logger.warn('[informeTurno] cotejo no disponible', { plant, shiftDocId, err: e.message })
-  }
-
-  const meta = {
-    planta: plant,
-    areaLabel: AREA_LABEL[plant] || plant,
-    turnoLabel: padre.shiftId || shiftDocId.split('_').slice(1).join('_'),
-    fechaLabel: shiftDocId.slice(0, 10),
-  }
-
-  const datos = construirDatosInforme({ machines, windowStart, windowEnd, cotejo, meta, enCurso })
-  const pdf = generarInformeTurno(datos)
+  const { meta, datos, pdf } = await armarInforme({ db, plant, shiftDocId, padre, machines, windowStart, windowEnd, enCurso, logger })
 
   // `enviarDocumento` DEBE lanzar si el envio no se concreto. Telegram responde
   // {ok:false} sin lanzar, y si eso se toma por bueno el turno queda marcado
@@ -212,4 +280,7 @@ async function enviarInformeDeTurno({ db, plant, shiftDocId, config, enviarDocum
   return { enviado: true, bytes: pdf.length, messageId }
 }
 
-module.exports = { enviarInformeDeTurno, nombreArchivo, caption, AREA_LABEL, MAX_INTENTOS }
+module.exports = {
+  enviarInformeDeTurno, informeParaCorreo, armarInforme, nombreArchivo, caption, AREA_LABEL, MAX_INTENTOS,
+  leerMaquinas, historialDeComparables,
+}
