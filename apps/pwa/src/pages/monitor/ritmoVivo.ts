@@ -21,7 +21,9 @@ import { classifyLossState } from '@/services/shoplogix/lossBuckets'
 /** Cuánto duran, como máximo, las micro detenciones en los datos medidos (nota informativa, jamás decide un color). */
 export const MICRO_MAX_MEDIDO_S = 90
 /** Menos de esto andando en un minuto = no hay dato de llenado de ese minuto. */
-export const ANDANDO_MIN_S = 20
+/* Medio minuto: con menos, el minuto en que arranca una parada (p. ej. 21 s andando y 0 piezas por el
+   rezago del contador) se leía como «0 % de carros con pieza» cuando en verdad la máquina se detuvo. */
+export const ANDANDO_MIN_S = 30
 /** Cuántos minutos CERRADOS caben en la tira (el 15º es el minuto en curso). */
 export const MINUTOS_CERRADOS = 14
 /** Caída de llenado (puntos porcentuales, inicio → fin) a partir de la cual una máquina «baja». */
@@ -176,7 +178,7 @@ export interface LineaLlenado {
   id: string
   nombre: string
   esperado: number
-  /** % de llenado por minuto cerrado (0–100); null = sin dato (parada o <20 s andando). */
+  /** % de llenado por minuto cerrado (0–100); null = sin dato (parada o <30 s andando). */
   fills: Array<number | null>
   /** Índices de minuto con micro detención de ESA máquina. */
   micros: number[]
@@ -397,13 +399,14 @@ export function paradaEnCurso(maquinas: MaquinaVivo[]): ParadaVivo | null {
   }
 }
 
-/** mm:ss (o h:mm:ss) del cronómetro; nunca negativo. */
+/** Duración con unidades («13 min 15 s», «1 h 02 min»): «13:15» se leía como una hora del reloj. Nunca negativa. */
 export function cronometro(seg: number): string {
   const s = Math.max(0, Math.floor(seg))
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   const ss = String(s % 60).padStart(2, '0')
-  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`
+  if (h > 0) return `${h} h ${String(m).padStart(2, '0')} min`
+  return m > 0 ? `${m} min ${ss} s` : `${s % 60} s`
 }
 
 // ── Del doc del monitor a la tarjeta ─────────────────────────────────────────

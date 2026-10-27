@@ -123,6 +123,11 @@ function Llenado({ lineas, ancho, multi }: { lineas: LineaLlenado[]; ancho: numb
     const ult = [...l.fills].reverse().find((v): v is number => v != null)
     return { l, ult, ly: ult != null ? y(ult) + 4 : null }
   })
+  /* Si la línea dejó de producir, los últimos minutos no tienen llenado: se marca el tramo y cada etiqueta
+     va pegada al final de SU trazo, no flotando en el borde derecho lejos de lo que nombra. */
+  const ultIdx = Math.max(-1, ...lineas.map((l) => l.fills.reduce<number>((a, v, i) => (v != null ? i : a), -1)))
+  const sinDatoFinal = ultIdx >= 0 && ultIdx < n - 1
+  const xEtiqueta = sinDatoFinal ? x(ultIdx) + 8 : L + pw + 8
   const orden = fin.filter((f) => f.ly != null).sort((a, b) => a.ly! - b.ly!)
   for (let i = 1; i < orden.length; i++) if (orden[i]!.ly! - orden[i - 1]!.ly! < 13) orden[i]!.ly = orden[i - 1]!.ly! + 13
   return (
@@ -133,6 +138,14 @@ function Llenado({ lineas, ancho, multi }: { lineas: LineaLlenado[]; ancho: numb
           <text x={0} y={r1(y(v) + 4)} fontSize={11} className="fill-muted-foreground tabular-nums">{v}</text>
         </g>
       ))}
+      {sinDatoFinal && (
+        <g>
+          <rect x={r1(x(ultIdx) + (multi ? 52 : 40))} y={top} width={Math.max(0, r1(L + pw - x(ultIdx) - (multi ? 52 : 40)))} height={bot - top} rx={6} style={{ fill: 'rgb(142 142 147 / 0.10)' }} />
+          {L + pw - x(ultIdx) > 120 && (
+            <text x={r1((x(ultIdx) + (multi ? 52 : 40) + L + pw) / 2)} y={r1((top + bot) / 2 + 4)} fontSize={11} textAnchor="middle" className="fill-muted-foreground">sin llenado: no anduvo</text>
+          )}
+        </g>
+      )}
       {lineas.map((l) => {
         const color = l.tono ? COLOR[l.tono] : 'var(--v2-gris)'
         /* Los minutos sin dato cortan el trazo: no se une lo que no se midió. */
@@ -145,6 +158,11 @@ function Llenado({ lineas, ancho, multi }: { lineas: LineaLlenado[]; ancho: numb
             {tramos.filter((t) => t.length > 1).map((t, k) => (
               <polyline key={k} points={t.join(' ')} fill="none" strokeWidth={l.baja ? 2.4 : 1.6} strokeLinejoin="round" strokeLinecap="round" style={{ stroke: color }} />
             ))}
+            {/* Un minuto suelto con dato no tiene con qué unirse: va como punto, no desaparece. */}
+            {tramos.filter((t) => t.length === 1).map((t, k) => {
+              const [cx, cy] = t[0]!.split(',')
+              return <circle key={`p${k}`} cx={cx} cy={cy} r={2} style={{ fill: color }} />
+            })}
             {l.micros.map((i) => l.fills[i] != null && (
               <circle key={i} cx={r1(x(i))} cy={r1(y(l.fills[i]!))} r={3.5} strokeWidth={2} className="fill-card" style={{ stroke: 'var(--v2-ext)' }} />
             ))}
@@ -152,7 +170,7 @@ function Llenado({ lineas, ancho, multi }: { lineas: LineaLlenado[]; ancho: numb
         )
       })}
       {fin.map(({ l, ult, ly }) => ult != null && ly != null && (
-        <text key={l.id} x={L + pw + 8} y={r1(ly)} fontSize={11} fontWeight={l.baja ? 600 : 400} className={`tabular-nums ${l.baja ? '' : 'fill-muted-foreground'}`} style={l.baja && l.tono ? { fill: TEXTO_TONO[l.tono === 'mal' ? 'mal' : 'atento'] } : undefined}>
+        <text key={l.id} x={r1(xEtiqueta)} y={r1(ly)} fontSize={11} fontWeight={l.baja ? 600 : 400} className={`tabular-nums ${l.baja ? '' : 'fill-muted-foreground'}`} style={l.baja && l.tono ? { fill: TEXTO_TONO[l.tono === 'mal' ? 'mal' : 'atento'] } : undefined}>
           {multi ? `${corto(l.nombre)}  ` : ''}{ult} %
         </text>
       ))}
