@@ -101,20 +101,34 @@ export function BarraLateralPC({ pestana, onPestana, lineas, onModoTv, oscuro, o
             <div className="v2-lat-sep" aria-hidden />
             <div role="group" aria-label="Línea del monitor" className="v2-lat-area">
               <span className="v2-lat-area-rot" aria-hidden>Área</span>
-              {lineas.opciones.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => lineas.onCambiar(o.id)}
-                  disabled={lineas.cambiando}
-                  aria-pressed={o.id === lineas.actual}
-                  aria-label={o.nombre}
-                  className={`v2-lat-item v2-lat-item-area tap-44${o.id === lineas.actual ? ' v2-lat-activo' : ''}`}
-                >
-                  <span className="v2-lat-ico"><span className="v2-lat-chip">{o.nombre.slice(0, 2)}</span></span>
-                  <span className="v2-lat-rot">{o.nombre}</span>
-                </button>
-              ))}
+              {lineas.opciones.map((o) => {
+                const cuerpo = (
+                  <>
+                    <span className="v2-lat-ico"><span className="v2-lat-chip">{o.nombre.slice(0, 2)}</span></span>
+                    <span className="v2-lat-rot">{o.nombre}</span>
+                  </>
+                )
+                /* La línea en la que ya estás es un estado, no una acción: sin botón ni cursor de botón. */
+                if (o.id === lineas.actual) {
+                  return (
+                    <div key={o.id} aria-current="true" className="v2-lat-item v2-lat-item-area v2-lat-actual tap-44 v2-lat-activo">
+                      {cuerpo}
+                    </div>
+                  )
+                }
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => lineas.onCambiar(o.id)}
+                    disabled={lineas.cambiando}
+                    aria-label={o.nombre}
+                    className="v2-lat-item v2-lat-item-area tap-44"
+                  >
+                    {cuerpo}
+                  </button>
+                )
+              })}
             </div>
           </>
         )}
