@@ -13,7 +13,7 @@
  *
  * Vistas: `CabeceraV2`, `MonitorV2` (El turno) y `MonitorV2Analisis`.
  */
-import { AlertTriangle, BarChart3, CalendarRange, ChevronDown, Clock, Cpu, Filter, Repeat, Timer, Wrench, X } from 'lucide-react'
+import { AlertTriangle, BarChart3, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Clock, Cpu, Filter, Minimize2, Repeat, Timer, Wrench, X } from 'lucide-react'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
@@ -34,6 +34,7 @@ import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
 import type { PestanaMonitor } from './BarraLateralPC'
 import { piezasMostradas } from './aEstaHora'
+import { cifraTurnoAnterior } from './ejeTurno'
 import { FranjaCinta } from './FranjaCinta'
 import { GraficoRitmoVivo, type EjeDatos } from './GraficoRitmoVivo'
 import { useRelojDeDatos } from './useRelojDeDatos'
@@ -93,7 +94,15 @@ function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
   }, [abierto, pc, onClose])
   if (!pc) {
     return (
-      <Sheet open={abierto} onClose={onClose} title={titulo} description={sub} surface="grouped">
+      <Sheet
+        open={abierto}
+        onClose={onClose}
+        title={titulo}
+        description={sub}
+        surface="grouped"
+        /* El mismo «Reducir» de Piezas, Camino y Ritmo en vivo: todas las hojas de cifras se cierran igual. */
+        headerAction={<button type="button" onClick={onClose} className="v2-amp tap-44" aria-label={`Reducir ${titulo}`}><Minimize2 className="h-3.5 w-3.5" aria-hidden /><span>Reducir</span></button>}
+      >
         <div className="v2-vars space-y-5 pb-4">{children}</div>
       </Sheet>
     )
@@ -121,6 +130,27 @@ function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
 
 function Grupo({ titulo, nota, children }: { titulo?: string; nota?: string; children: ReactNode }) {
   return <ListGroup title={titulo} footer={nota}>{children}</ListGroup>
+}
+
+/**
+ * La fila de cifra de las hojas de detalle (Piezas del turno, Ritmo de la línea, Respuesta de Mantención): el rótulo a 15/400
+ * a la izquierda y la cifra a 17/600 (tabular) a la derecha, con su nota a 12 px bajo cada uno; mínimo 44 px de alto.
+ * Es local a propósito: el `ListCell` compartido, en celular, pone el rótulo grande y la cifra chica debajo (la jerarquía
+ * al revés para una hoja de números) y lo usan otras pantallas.
+ */
+function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNode; value: ReactNode; valueSub?: ReactNode; subtitle?: ReactNode }) {
+  return (
+    <div className="relative flex min-h-[44px] items-center justify-between gap-3 px-4 py-2.5 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[''] first:before:hidden">
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] leading-tight text-foreground">{title}</div>
+        {subtitle && <div className="mt-0.5 text-[12px] leading-tight text-muted-foreground">{subtitle}</div>}
+      </div>
+      <div className="shrink-0 text-right tabular-nums">
+        <div className="text-[17px] font-semibold leading-tight text-foreground">{value}</div>
+        {valueSub && <div className="mt-0.5 text-[12px] leading-tight text-muted-foreground">{valueSub}</div>}
+      </div>
+    </div>
+  )
 }
 
 const Punto = ({ color }: { color: string }) => <i className="block h-3 w-3 rounded-full" style={{ background: color }} />
@@ -715,7 +745,16 @@ function RielMttr({ riel }: { riel: Riel }) {
         ))}
       </div>
       <div className="mt-1 flex gap-1.5">
-        {riel.map((r, i) => <span key={`${r.label}-l${i}`} className={`min-w-0 flex-1 truncate text-center text-[11px] ${r.hoy ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>{r.hoy ? 'Hoy' : r.label}</span>)}
+        {/* El rótulo es «27/10 T2»: en dos renglones («27/10» / «T2»), nunca cortado con «…» (a 375 px ningún rótulo cabía en uno). */}
+        {riel.map((r, i) => {
+          const [dia, turno] = r.hoy ? ['Hoy', ''] : r.label.split(' ')
+          return (
+            <span key={`${r.label}-l${i}`} className={`min-w-0 flex-1 text-center text-[11px] leading-[13px] ${r.hoy ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+              {dia}
+              {turno ? <><br />{turno}</> : null}
+            </span>
+          )
+        })}
       </div>
     </div>
   )
@@ -753,7 +792,7 @@ function BarrasSemana({ semanas }: { semanas: SemanaReparto[] }) {
   )
 }
 
-function BarrasHora({ filas, metaPorHora }: { filas: HourlyRow[]; metaPorHora: number | null }) {
+function BarrasHora({ filas, metaPorHora, cerrado = false }: { filas: HourlyRow[]; metaPorHora: number | null; cerrado?: boolean }) {
   const { activo, en, salir } = useActivo()
   const max = Math.max(1, metaPorHora ?? 0, ...filas.map((h) => h.piecesPerHour)) * 1.08
   const mejor = filas.filter((h) => !h.partial).reduce<HourlyRow | null>((a, h) => (!a || h.pieces > a.pieces ? h : a), null)
@@ -762,7 +801,7 @@ function BarrasHora({ filas, metaPorHora }: { filas: HourlyRow[]; metaPorHora: n
     <div className="relative mt-6" {...salir}>
       {a && activo != null && (
         <Globo x={((activo + 0.5) / filas.length) * 100}>
-          <div className="font-medium tabular-nums text-foreground">{hhmm(a.from)}–{hhmm(a.to)}{a.partial ? ' · en curso' : ''}</div>
+          <div className="font-medium tabular-nums text-foreground">{hhmm(a.from)}–{hhmm(a.to)}{a.partial && !cerrado ? ' · en curso' : ''}</div>
           <div className="tabular-nums text-muted-foreground">{int(a.pieces)} pz · {int(a.piecesPerHour)} pz/h</div>
           {metaPorHora != null && <div className="tabular-nums text-muted-foreground">{firmado(a.piecesPerHour - metaPorHora)} pz/h vs meta</div>}
         </Globo>
@@ -806,7 +845,7 @@ function BarrasHora({ filas, metaPorHora }: { filas: HourlyRow[]; metaPorHora: n
  * piezas de la línea y de CADA Baader en esas mismas horas, marcando la mejor y la peor hora completa.
  * Línea y Baader salen de la misma serie de 5 min del turno, así que en cada hora las Baader suman la línea.
  */
-function HoraAHora({ filas, metaPorHora, porMaquina, total }: { filas: HourlyRow[]; metaPorHora: number | null; porMaquina: Array<{ nombre: string; piezas: number[] }>; total: number }) {
+function HoraAHora({ filas, metaPorHora, porMaquina, total, cerrado = false }: { filas: HourlyRow[]; metaPorHora: number | null; porMaquina: Array<{ nombre: string; piezas: number[] }>; total: number; cerrado?: boolean }) {
   const sumaHoras = filas.reduce((a, h) => a + h.pieces, 0)
   const completas = filas.filter((h) => !h.partial)
   const mejor = completas.reduce<HourlyRow | null>((a, h) => (!a || h.pieces > a.pieces ? h : a), null)
@@ -816,7 +855,7 @@ function HoraAHora({ filas, metaPorHora, porMaquina, total }: { filas: HourlyRow
     <div>
       <h4 className="text-[15px] font-semibold leading-tight text-foreground">Hora a hora</h4>
       <p className="text-[13px] text-muted-foreground">piezas de cada hora desde el arranque{metaPorHora != null ? ` · punteada: meta de ${int(metaPorHora)} pz por hora` : ''}</p>
-      <BarrasHora filas={filas} metaPorHora={metaPorHora} />
+      <BarrasHora filas={filas} metaPorHora={metaPorHora} cerrado={cerrado} />
       <div className="mt-4 overflow-x-auto">
         <div role="table" aria-label="Piezas por hora de la línea y de cada máquina" className="min-w-[420px] text-[13px] tabular-nums">
           <div role="row" className="grid gap-x-3 border-b border-border/60 pb-1.5 font-medium text-muted-foreground" style={{ gridTemplateColumns: cols }}>
@@ -825,7 +864,8 @@ function HoraAHora({ filas, metaPorHora, porMaquina, total }: { filas: HourlyRow
             {porMaquina.map((m) => <span key={m.nombre} role="columnheader" className="truncate text-right">{etiquetaMaquina(m.nombre)}</span>)}
           </div>
           {filas.map((h, i) => {
-            const marca = h.partial ? 'en curso' : h === mejor && mejor !== peor ? 'mejor' : h === peor && mejor !== peor ? 'peor' : null
+            /* «en curso» solo con el turno en vivo: cerrado, la última hora está incompleta pero ya no corre. */
+            const marca = h.partial ? (cerrado ? null : 'en curso') : h === mejor && mejor !== peor ? 'mejor' : h === peor && mejor !== peor ? 'peor' : null
             return (
               <div key={h.hourStart} role="row" className="grid items-baseline gap-x-3 border-b border-border/30 py-1.5 last:border-0" style={{ gridTemplateColumns: cols }}>
                 <span role="cell" className="text-foreground">
@@ -841,7 +881,7 @@ function HoraAHora({ filas, metaPorHora, porMaquina, total }: { filas: HourlyRow
       </div>
       {sumaHoras !== total && (
         <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
-          Las horas suman {int(sumaHoras)} pz: llegan hasta el último tramo de 5 min que Shoplogix sincronizó. «Piezas del turno» ({int(total)}) es la cifra de la franja, leída de Shoplogix, y suma además {int(Math.abs(total - sumaHoras))} pz del tramo en curso{total < sumaHoras ? ' (ajuste del contador)' : ''}.
+          Las horas suman {int(sumaHoras)} pz: llegan hasta el último tramo de 5 min que Shoplogix sincronizó. «Piezas del turno» ({int(total)}) es la cifra de la franja, leída de Shoplogix, y suma además {int(Math.abs(total - sumaHoras))} pz del {cerrado ? 'último tramo' : 'tramo en curso'}{total < sumaHoras ? ' (ajuste del contador)' : ''}.
         </p>
       )}
     </div>
@@ -916,6 +956,9 @@ export interface MonitorV2Props {
    * vivo como techo. Sin ella (turno cerrado, sin serie, contador caído) la cifra sigue la recta de siempre.
    */
   repro?: { entrada: EntradaRep | null; tope: Tope | null } | null
+  /** La causa de la detención en curso (`live.currentReason`, en español): va en la nota del «en pausa» de Contra la meta,
+      porque el aviso «Ahora mismo» que la daba se calla cuando la franja está en pantalla. null si no hay o no se sabe. */
+  causaParada?: string | null
 }
 
 type ClaveTurno = 'cierre' | 'ritmo' | 'mant' | 'maquinas' | 'perdido'
@@ -976,13 +1019,14 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         titulo: 'Ritmo de la línea', sub: 'Piezas por minuto mientras la línea anda',
         cuerpo: (
           <Grupo nota="«Andando» descuenta los minutos detenidos: es la velocidad real cuando la línea produce.">
-            {p.ritmoAhora != null && <ListCell title="Ahora" value={`${dec(p.ritmoAhora)} pz/min`} valueSub="contador de Shoplogix" />}
-            <ListCell title="Promedio del turno (andando)" value={p.ritmo != null ? `${dec(p.ritmo)} pz/min` : '—'} />
-            {p.ritmoInfo.recienteCpm != null && <ListCell title={`Últimos ${Math.round(p.ritmoInfo.recienteMin ?? 0)} min`} value={`${dec(p.ritmoInfo.recienteCpm)} pz/min`} />}
-            {necesarioAndando != null && <ListCell title="Necesario para la meta" value={`${dec(necesarioAndando)} pz/min`} valueSub="mientras la línea anda" />}
-            {p.ritmoInfo.medianaCpm != null && <ListCell title="Lo normal de esta línea" value={`${dec(p.ritmoInfo.medianaCpm)} pz/min`} valueSub={p.ritmoInfo.muestras ? `mediana de ${p.ritmoInfo.muestras} turnos` : undefined} />}
-            {p.ritmoInfo.mejorCpm != null && <ListCell title="Mejor turno" value={`${dec(p.ritmoInfo.mejorCpm)} pz/min`} />}
-            {p.setPoint != null && <ListCell title="Set point" value={`${dec(p.setPoint, 0)} pz/min`} valueSub={[p.ritmoInfo.setPointMetodo, p.ritmoInfo.setPointFecha].filter(Boolean).join(' · ') || undefined} />}
+            {p.ritmoAhora != null && <FilaCifra title="Ahora" value={`${dec(p.ritmoAhora)} pz/min`} valueSub="contador de Shoplogix" />}
+            {/* La misma media de 15 min que la franja (`ritmoMedia15`): la cadencia de 30 min que había aquí ya no se dice en ninguna parte. */}
+            {!p.cerrado && p.ritmoMedia15 != null && <FilaCifra title="Media 15 min (andando)" value={`${dec(p.ritmoMedia15)} pz/min`} />}
+            <FilaCifra title="Promedio del turno (andando)" value={p.ritmo != null ? `${dec(p.ritmo)} pz/min` : '—'} />
+            {necesarioAndando != null && <FilaCifra title="Necesario para la meta" value={`${dec(necesarioAndando)} pz/min`} valueSub="mientras la línea anda" />}
+            {p.ritmoInfo.medianaCpm != null && <FilaCifra title="Lo normal de esta línea" value={`${dec(p.ritmoInfo.medianaCpm)} pz/min`} valueSub={p.ritmoInfo.muestras ? `mediana de ${p.ritmoInfo.muestras} turnos` : undefined} />}
+            {p.ritmoInfo.mejorCpm != null && <FilaCifra title="Mejor turno" value={`${dec(p.ritmoInfo.mejorCpm)} pz/min`} />}
+            {p.setPoint != null && <FilaCifra title="Set point" value={`${dec(p.setPoint, 0)} pz/min`} valueSub={[p.ritmoInfo.setPointMetodo, p.ritmoInfo.setPointFecha].filter(Boolean).join(' · ') || undefined} />}
           </Grupo>
         ),
       }
@@ -991,14 +1035,14 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         cuerpo: (
           <>
             <Grupo nota="Minutos por falla = minutos de falla técnica ÷ número de fallas (MTTR). Turnos previos: promedio de los últimos con fallas.">
-              <ListCell title="Hoy" value={p.mant?.mttr != null ? `${dec(p.mant.mttr)} min por falla` : '—'} />
-              {p.mant?.mttrPrevio != null && <ListCell title="Turnos previos" value={`${dec(p.mant.mttrPrevio)} min por falla`} valueSub={deltaMttr != null ? `${firmado(deltaMttr, (n) => dec(n))} min hoy` : undefined} />}
-              {p.mant?.dispPct != null && <ListCell title="Disponibilidad técnica" value={`${dec(p.mant.dispPct)} %`} />}
+              <FilaCifra title="Hoy" value={p.mant?.mttr != null ? `${dec(p.mant.mttr)} min por falla` : p.mant && p.mant.fallas === 0 ? 'sin fallas' : '—'} />
+              {p.mant?.mttrPrevio != null && <FilaCifra title="Turnos previos" value={`${dec(p.mant.mttrPrevio)} min por falla`} valueSub={deltaMttr != null ? `${firmado(deltaMttr, (n) => dec(n))} min hoy` : undefined} />}
+              {p.mant?.dispPct != null && <FilaCifra title="Disponibilidad técnica" value={`${dec(p.mant.dispPct)} %`} />}
             </Grupo>
             {p.mantPorMaquina.length > 0 && (
               <Grupo titulo="Por máquina">
                 {p.mantPorMaquina.map((m) => (
-                  <ListCell
+                  <FilaCifra
                     key={m.name}
                     title={m.name}
                     subtitle={`${m.fallas} ${m.fallas === 1 ? 'falla' : 'fallas'} · ${horas(m.fallaMin)}${m.microN ? ` · ${m.microN} micro (${horas(m.microMin)})` : ''}`}
@@ -1011,7 +1055,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
             {p.eventos.length > 0 && (
               <Grupo titulo="Fallas del turno">
                 {p.eventos.slice().reverse().map((e, i) => (
-                  <ListCell key={`${e.desde}-${i}`} title={e.causas.join(' · ') || 'Falla técnica'} subtitle={`${e.maquina} · ${hhmm(e.desde)}–${hhmm(e.hasta)}`} value={horas(e.min)} />
+                  <FilaCifra key={`${e.desde}-${i}`} title={e.causas.join(' · ') || 'Falla técnica'} subtitle={`${e.maquina} · ${hhmm(e.desde)}–${hhmm(e.hasta)}`} value={horas(e.min)} />
                 ))}
               </Grupo>
             )}
@@ -1057,6 +1101,22 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   }
   const detalle = detalleDe(abierta)
 
+  /* El turno anterior con UNA cifra, la MISMA de la leyenda del gráfico (`cifraTurnoAnterior`): en vivo, el valor de su curva en el
+     mismo minuto desde la primera pieza (lo que se dibuja); cerrado, su total (el mismo de «Comparado con otros días»).
+     Sin gráfico o sin lectura (no hay con qué alinear el minuto) queda la de siempre, `p.vsAyer`. */
+  const previoUna = (() => {
+    const previo = p.curva?.previo
+    const eje = p.eje
+    if (!previo || !eje) return null
+    const ult = reloj.cuadro().ultima
+    if (!p.cerrado && ult?.atMs == null) return null
+    const totalMin = (eje.finMs - eje.iniMs) / 60_000
+    const ultimaMin = ult?.atMs != null ? Math.min(totalMin, Math.max(0, (ult.atMs - eje.iniMs) / 60_000)) : 0
+    const baseMin = eje.primeraPiezaMs != null ? (eje.primeraPiezaMs - eje.iniMs) / 60_000 : 0
+    const c = cifraTurnoAnterior({ curva: previo.curve, cerrado: p.cerrado, ultimaMin, baseMin })
+    return c ? { label: previo.label, ...c, diff: (ult?.valor ?? p.piezas) - c.piezas } : null
+  })()
+
   /* Piezas ahora, ampliado: la curva acumulada real del turno contra el mismo turno de otros días y el ritmo de la meta,
      con cursor; debajo el turno HORA A HORA (línea y cada Baader) y la lista de siempre (meta, faltan, contra ayer). */
   const ampliadoPiezas = (
@@ -1078,15 +1138,20 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
           proyeccion={conProyeccion && p.curva.maxMin > finCurva + 1 ? { min: p.curva.maxMin, piezas: p.proyeccion! } : null}
         />
       )}
-      {p.horas && p.horas.filas.length > 0 && <HoraAHora filas={p.horas.filas} metaPorHora={p.horas.metaPorHora} porMaquina={p.horas.porMaquina} total={mostradas} />}
+      {p.horas && p.horas.filas.length > 0 && <HoraAHora filas={p.horas.filas} metaPorHora={p.horas.metaPorHora} porMaquina={p.horas.porMaquina} total={mostradas} cerrado={p.cerrado} />}
       <Grupo>
-        {p.meta != null && <ListCell title="Meta del turno" value={`${int(p.meta)} pz`} />}
-        {p.meta != null && <ListCell title="Faltan" value={`${int(Math.max(0, p.meta - mostradas))} pz`} valueSub={pct != null ? `${pct} % hecho` : undefined} />}
-        {p.vsAyer && <ListCell title={`${p.vsAyer.label} a esta altura`} value={`${int(p.vsAyer.pieces)} pz`} valueSub={`${firmado(p.vsAyer.diff)} hoy`} />}
+        {p.meta != null && <FilaCifra title="Meta del turno" value={`${int(p.meta)} pz`} />}
+        {/* Con la meta cumplida «Faltan 0 pz» no dice nada: se dice cuánto se pasó. */}
+        {p.meta != null && (mostradas >= p.meta
+          ? <FilaCifra title="Sobre la meta" value={`${firmado(mostradas - p.meta)} pz`} valueSub={pct != null ? `${pct} % hecho` : undefined} />
+          : <FilaCifra title="Faltan" value={`${int(p.meta - mostradas)} pz`} valueSub={pct != null ? `${pct} % hecho` : undefined} />)}
+        {previoUna
+          ? <FilaCifra title={`${previoUna.label} ${previoUna.modo === 'al-cierre' ? 'al cierre' : 'a esta hora'}`} value={`${int(previoUna.piezas)} pz`} valueSub={`${firmado(previoUna.diff)} ${p.cerrado ? 'este turno' : 'hoy'}`} />
+          : p.vsAyer && <FilaCifra title={`${p.vsAyer.label} a esta altura`} value={`${int(p.vsAyer.pieces)} pz`} valueSub={`${firmado(p.vsAyer.diff)} hoy`} />}
       </Grupo>
       {p.maquinas.length > 1 && (
         <Grupo titulo="Por máquina">
-          {p.maquinas.map((m) => <ListCell key={m.name} title={m.name} value={`${int(m.piezas)} pz`} />)}
+          {p.maquinas.map((m) => <FilaCifra key={m.name} title={m.name} value={`${int(m.piezas)} pz`} />)}
         </Grupo>
       )}
     </div>
@@ -1342,22 +1407,78 @@ export function MonitorV2Analisis(p: MonitorV2AnalisisProps) {
 
 // ── Cabecera (barra flotante + título grande, como el reel) ─────────────────
 
-export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos, sub, pestana, onPestana }: {
+/** La navegación de turnos del celular (< 768 px): `‹ fecha ›` en UN renglón; el texto de la fecha lo pone `CabeceraV2`. */
+export interface NavTurnosMovil {
+  /** Cuántos turnos atrás se está mirando (0 = el actual). */
+  atras: number
+  puedeAnterior: boolean
+  onAnterior: () => void
+  onSiguiente: () => void
+  /** Atajo al presente: el chip «Ir al actual» sale siempre que no se mira el turno actual. */
+  onActual: () => void
+}
+
+/**
+ * `‹ Turno 1 · mar 27 oct · 21:30 → 04:50 ›`: las flechas son de 44 × 44 y solo ícono (con su nombre accesible); el texto
+ * puede bajar a dos renglones dentro de los 44 px en vez de cortarse. Mirando un turno viejo, debajo dice cuántos turnos atrás
+ * es y ofrece volver al actual. Sin historial (un solo turno) no hay flechas: solo la fecha.
+ */
+function FilaTurnoMovil({ texto, nav }: { texto: string; nav: NavTurnosMovil | null }) {
+  const flecha = 'inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30'
+  return (
+    <div className="flex min-h-[44px] items-center justify-between gap-1" role="group" aria-label="Turno que se mira">
+      {nav && (
+        <button type="button" aria-label="Turno anterior" disabled={!nav.puedeAnterior} onClick={nav.onAnterior} className={flecha}>
+          <ChevronLeft className="h-[20px] w-[20px]" aria-hidden />
+        </button>
+      )}
+      <div className="min-w-0 flex-1 px-1 text-center">
+        <p className="text-[13px] leading-[18px] tabular-nums text-foreground/80 first-letter:uppercase">{texto}</p>
+        {nav && nav.atras > 0 && (
+          <div className="mt-0.5 flex items-center justify-center gap-2 text-[12px] leading-[16px] text-muted-foreground">
+            <span>hace {nav.atras} {nav.atras === 1 ? 'turno' : 'turnos'}</span>
+            <button type="button" onClick={nav.onActual} className="tap-44 rounded-full bg-primary/[0.13] px-2 py-0.5 text-[12px] font-semibold text-foreground transition-opacity hover:opacity-80">
+              Ir al actual
+            </button>
+          </div>
+        )}
+      </div>
+      {nav && (
+        <button type="button" aria-label="Turno siguiente" disabled={nav.atras === 0} onClick={nav.onSiguiente} className={flecha}>
+          <ChevronRight className="h-[20px] w-[20px]" aria-hidden />
+        </button>
+      )}
+    </div>
+  )
+}
+
+export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos, sub, pestana, onPestana, selectorPc, marca, subCorto, navMovil }: {
   titulo: string
   area: string | null
   estado: ReactNode
   tema: ReactNode
-  /** El cambio de línea (Eviscerado ↔ Filete). Solo existe con sesión de supervisor. */
+  /** El cambio de línea en el celular (Eviscerado ↔ Filete, y «Inicio» con sesión de supervisor). */
   cambioLinea: ReactNode
   navTurnos: ReactNode
   sub: string
   pestana: PestanaMonitor
   onPestana: (p: PestanaMonitor) => void
+  /** El selector de línea DENTRO de la barra de PC (El turno y Análisis); reemplaza al texto del área. El Duelo no lo pasa: trae el suyo. */
+  selectorPc?: ReactNode
+  /** De dónde salen las cifras, UNA vez en toda la vista: «Shoplogix 02:35». Solo con el turno en vivo. */
+  marca?: string | null
+  /** La fecha en corto del celular («Turno 1 · mar 27 oct · 21:30 → 04:50»); sin ella, `sub`. */
+  subCorto?: string
+  /** La navegación de turnos del celular en un renglón; null = sin historial. */
+  navMovil?: NavTurnosMovil | null
 }) {
-  /* Celular: la barra flotante y el título grande de siempre (`lg:hidden`). PC (lg+): UNA barra de 56 px, pegada
-     arriba: línea · estado · turno a la izquierda y la navegación de turnos a la derecha. Las pestañas, el cambio
-     de línea, Modo TV, el tema y Inicio viven en la barra lateral (`BarraLateralPC`). Sin título grande. */
-  const ancho = 'mx-auto max-w-3xl px-3'
+  /* Celular (< lg): la barra flotante y PEGADA arriba (48 px + 8 de aire; el estado y de dónde salen las cifras van de
+     subtítulo, así siempre se ve si el turno está en vivo, detenido o terminado), el selector de línea, `‹ fecha ›` en un
+     renglón y las pestañas. El título grande («El turno») solo se muestra desde 768 px: debajo, el segmentado ya titula
+     (queda para los lectores de pantalla). PC (lg+): UNA barra de 56 px, pegada arriba: línea · estado · turno y su
+     horario a la izquierda, el selector de línea y la navegación de turnos a la derecha. Las pestañas, Modo TV, el tema
+     e Inicio viven en la barra lateral (`BarraLateralPC`). Sin título grande. */
+  const ancho = `mx-auto max-w-3xl ${pestana === 'turno' ? 'px-[16px] md:max-w-none' : 'px-3'}`
   const pestanas = (
     <div className="v2-segmentado flex rounded-full p-1" role="tablist">
       {([['turno', 'El turno'], ['analisis', 'Análisis'], ['duelo', 'Duelo']] as const).map(([id, rotulo]) => (
@@ -1373,45 +1494,57 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
       ))}
     </div>
   )
+  /* La barra de PC arranca donde arranca el contenido: 24 px (32 desde 1600) en El turno; el resto de las pestañas conserva su gutter. */
+  const pcPad = pestana === 'turno' ? 'px-[24px] min-[1600px]:px-[32px]' : 'px-6'
   return (
     <>
-      <div className="v2-cabecera sticky top-0 z-20 pt-3 lg:hidden">
+      <div className="v2-cabecera sticky top-0 z-20 pt-[8px] lg:hidden">
         <div className={ancho}>
-          <div className="v2-barra flex h-14 items-center gap-2.5 rounded-full pl-2 pr-2">
+          <div className="v2-barra flex h-[48px] items-center gap-2.5 rounded-full pl-2 pr-2">
             <Icono grande><Cpu className="h-4 w-4" /></Icono>
             <div className="min-w-0">
               <div className="truncate text-[15px] font-semibold leading-tight">{titulo}</div>
-              {area && <div className="truncate text-[12px] text-muted-foreground">{area}</div>}
+              {/* Un renglón de 16 px: si la marca no cabe junto al estado baja al renglón de abajo y queda oculta (todo o nada: la
+                  hora cortada con «…» no sirve de nada). */}
+              <div className="flex h-[16px] min-w-0 flex-wrap items-center gap-x-1 overflow-hidden text-[12px] leading-[16px] md:hidden">
+                <span className="v2-estado-mini shrink-0">{estado}</span>
+                {marca && <span className="whitespace-nowrap tabular-nums text-muted-foreground">· {marca}</span>}
+              </div>
+              {(area || marca) && <div className="hidden truncate text-[12px] text-muted-foreground md:block">{[area, marca].filter(Boolean).join(' · ')}</div>}
             </div>
-            <span className="hidden sm:inline-flex">{estado}</span>
+            <span className="hidden md:inline-flex">{estado}</span>
             <span className="ml-auto inline-flex">{tema}</span>
           </div>
         </div>
       </div>
-      <div className={`${ancho} pt-5 lg:hidden`}>
-        <div className="mb-3 sm:hidden">{estado}</div>
-        <div className="mb-4">{cambioLinea}</div>
-        <div className="flex flex-col gap-4">
-          <div className="min-w-0 px-1">
-            <h1 className="text-[34px] font-semibold leading-none tracking-tight">{pestana === 'turno' ? 'El turno' : pestana === 'analisis' ? 'Análisis' : 'Duelo'}</h1>
-            <p className="mt-2 text-[15px] tabular-nums text-muted-foreground first-letter:uppercase">{sub}</p>
+      <div className={`${ancho} pt-[12px] md:pt-5 lg:hidden`}>
+        {cambioLinea && <div className="mb-[8px] md:mb-4">{cambioLinea}</div>}
+        <div className="flex flex-col gap-[8px] md:gap-4">
+          <div className="contents min-w-0 px-1 md:block">
+            <h1 className="sr-only text-[34px] font-semibold leading-none tracking-tight md:not-sr-only">{pestana === 'turno' ? 'El turno' : pestana === 'analisis' ? 'Análisis' : 'Duelo'}</h1>
+            <p className="mt-2 hidden text-[15px] tabular-nums text-muted-foreground first-letter:uppercase md:block">{sub}</p>
           </div>
+          <div className="md:hidden"><FilaTurnoMovil texto={subCorto ?? sub} nav={navMovil ?? null} /></div>
           <div className="flex flex-wrap items-center gap-2">
-            {navTurnos}
+            <div className="hidden md:contents">{navTurnos}</div>
             {pestanas}
           </div>
         </div>
       </div>
 
-      <div className="v2-cabecera v2-barra-pc sticky top-0 z-20 hidden h-14 items-center gap-4 px-6 lg:flex">
+      <div className={`v2-cabecera v2-barra-pc sticky top-0 z-20 hidden h-14 items-center gap-4 ${pcPad} lg:flex`}>
         <div className="flex min-w-0 flex-1 flex-col justify-center">
           <div className="flex min-w-0 items-center gap-2.5">
             <h1 className="min-w-0 truncate text-[15px] font-semibold leading-tight">{titulo}</h1>
             {estado}
-            {area && <span className="hidden truncate text-[13px] text-muted-foreground xl:inline">{area.startsWith(titulo) ? area.slice(titulo.length).replace(/^[\s·]+/, '') || area : area}</span>}
+            {!selectorPc && area && <span className="hidden truncate text-[13px] text-muted-foreground xl:inline">{area.startsWith(titulo) ? area.slice(titulo.length).replace(/^[\s·]+/, '') || area : area}</span>}
           </div>
-          <p className="truncate text-[13px] leading-tight tabular-nums text-muted-foreground first-letter:uppercase" title={sub}>{sub}</p>
+          <p className="flex min-w-0 items-baseline text-[13px] leading-tight tabular-nums text-muted-foreground" title={marca ? `${sub} · ${marca}` : sub}>
+            <span className="min-w-0 truncate first-letter:uppercase">{sub}</span>
+            {marca && <span className="shrink-0 whitespace-nowrap">&nbsp;· {marca}</span>}
+          </p>
         </div>
+        {selectorPc}
         {navTurnos}
       </div>
     </>
@@ -1660,7 +1793,8 @@ function CascadaV2({ c, d }: { c: Cascada; d: DetalleCascada | null }) {
 function TiempoV2({ t }: { t: NonNullable<MasDelTurno['tiempo']> }) {
   const partes = [
     { k: 'Produciendo', min: t.producingMin, color: 'var(--v2-acento)' },
-    { k: 'Programado (colación, aseo)', min: t.plannedMin, color: 'var(--v2-prog)' },
+    /* El punto de la leyenda en `--v2-gris` (75 %): el 40 % de `--v2-prog` daba ~1,5:1 sobre la tarjeta, bajo el 3:1 de un gráfico. */
+    { k: 'Programado (colación, aseo)', min: t.plannedMin, color: 'var(--v2-gris)' },
     // Solo la línea ENTERA detenida: por eso es menos que «Tiempo perdido», que suma también las paradas de una máquina de N.
     { k: 'Línea entera detenida', min: t.recoverableMin, color: 'var(--v2-mant)' },
   ]

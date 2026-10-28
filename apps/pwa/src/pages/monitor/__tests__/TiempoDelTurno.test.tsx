@@ -674,3 +674,48 @@ describe('TiempoDelTurno · las paradas pueden costar MÁS que la brecha (28-09-
     expect(texto).not.toMatch(/ritmo por debajo del necesario/)
   })
 })
+
+describe('TiempoDelTurno · los tramos de la barra del ampliado no son destino de toque en el celular', () => {
+  const TB: PublicMonitorLive['timeBreakdown'] = {
+    ...ANTES_DE_LA_COLACION,
+    recoverable: [{ reason: 'FALLA OPERACIONAL', min: 8, count: 2, lineMin: 8 }],
+  }
+  const ancho = (px: number) => {
+    window.matchMedia = ((q: string) => {
+      const min = /min-width:\s*(\d+)px/.exec(q)
+      return { matches: min ? px >= Number(min[1]) : false, media: q, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false }
+    }) as unknown as typeof window.matchMedia
+  }
+  const tramos = () => {
+    const c = render(
+      <TiempoDelTurno tb={TB} cerrado meta={5000} hechas={3919} cpmAndando={13.5}
+        grupos={agruparEventos({ tb: TB, cpmGlobal: 13.5 })} />,
+    ).container
+    return Array.from(c.querySelectorAll('div[class*="h-6"] > button')) as HTMLButtonElement[]
+  }
+
+  it('bajo 768 px: fuera del foco y del lector, sin eventos (las filas de 44 px de abajo abren lo mismo)', () => {
+    ancho(375)
+    const t = tramos()
+    expect(t.length).toBeGreaterThan(1)
+    for (const b of t) {
+      expect(b.getAttribute('tabindex')).toBe('-1')
+      expect(b.getAttribute('aria-hidden')).toBe('true')
+      expect(b.getAttribute('aria-label')).toBeNull()
+      expect(b.className).toContain('pointer-events-none')
+    }
+  })
+
+  it('desde 768 px siguen siendo atajos con su nombre y su estado', () => {
+    ancho(1366)
+    const t = tramos()
+    expect(t.length).toBeGreaterThan(1)
+    for (const b of t) {
+      expect(b.getAttribute('tabindex')).toBeNull()
+      expect(b.getAttribute('aria-hidden')).toBeNull()
+      expect(b.getAttribute('aria-label')).toMatch(/ver detalle$/)
+      expect(b.getAttribute('aria-expanded')).not.toBeNull()
+      expect(b.className).not.toContain('pointer-events-none')
+    }
+  })
+})

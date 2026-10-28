@@ -8,7 +8,7 @@
 
 import { desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
 import { useRef, useState, type ReactNode } from 'react'
-import { ChevronDown, Maximize2 } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { DUENO_META, veredictoFallaDeMaquina, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
@@ -19,8 +19,9 @@ import { MonitorCompareChart } from './MonitorCompareChart'
 import type { Ventana } from './useZoomGesto'
 import type { NotaDeOperador } from './notasOperador'
 import { CapaAmpliada } from './AmpliarV2'
-import { useCerrarCapa } from './ampliarHooks'
+import { useAnchoMin, useCerrarCapa } from './ampliarHooks'
 import { aEstaHora } from './aEstaHora'
+import { RotuloFranja, Tocable } from './FranjaTocable'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -147,43 +148,58 @@ function fmtDurMin(min: number): string {
   return m > 0 ? `${h} h ${m} min` : `${h} h`
 }
 
+/** Un tramo de la barra de Camino a la meta. `hueco` = lo que aún no se juega: reja con un borde de 1 px, no un relleno. */
+interface TramoCamino { rotulo: string; color: string; ancho: number; hueco?: boolean }
+/** Una cifra de la leyenda: la MISMA clave, orden y color que su tramo; `u` es la unidad («pz») y va aparte, más chica. */
+interface CifraCamino { k: string; v: string; u?: string; punto: string; hueco?: boolean }
+
+/** El hueco de «por jugar»: la reja de siempre + un borde de 1 px en gris (el relleno solo no se veía). */
+const BORDE_HUECO = 'inset 0 0 0 1px var(--v2-gris)'
+
 /**
- * La quinta celda de la franja de «El turno»: título, «Ampliar» (abre el MISMO ampliado de Camino a la meta), la barra de
- * tramos proporcionales a la meta (separados 3 px) y tres cifras chicas. Sin marco: el vidrio lo pone la franja.
+ * La quinta celda de la franja de «El turno»: el rótulo con su chevron, la barra de tramos proporcionales a la meta
+ * (separados 3 px) y la leyenda, que es LOS tramos dibujados (mismo orden y color, todo en piezas). La celda ENTERA abre el
+ * MISMO ampliado de Camino a la meta (sin botón «Ampliar»: una sola señal en toda la franja, el chevron).
+ * `raya` = dónde cae la meta (0–1 de la barra) cuando se superó y la escala creció; se dice en el nombre accesible.
  */
-function CeldaCamino({ titulo, tramos, cifras, ampliado }: {
+function CeldaCamino({ titulo, tramos, cifras, ampliado, raya }: {
   titulo: string
-  tramos: Array<{ rotulo: string; color: string; ancho: number }>
-  cifras: Array<{ k: string; v: string; punto: string }>
+  tramos: TramoCamino[]
+  cifras: CifraCamino[]
   ampliado?: ReactNode
+  raya?: { f: number; texto: string } | null
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const botonRef = useRef<HTMLButtonElement>(null)
+  const zonaRef = useRef<HTMLDivElement>(null)
   const [abierta, setAbierta] = useState(false)
-  const cerrar = () => { setAbierta(false); botonRef.current?.focus({ preventScroll: true }) }
-  return (
-    <div ref={ref} className="fc-camino">
-      <div className="flex items-center justify-between gap-2">
-        <span className="fc-rotulo">{titulo}</span>
-        {ampliado != null && (
-          <button ref={botonRef} type="button" onClick={() => setAbierta((a) => !a)} aria-expanded={abierta} aria-haspopup="dialog" aria-label={`Ampliar ${titulo}`} className="v2-amp tap-44 fc-amp">
-            <Maximize2 className="h-3.5 w-3.5" aria-hidden />
-            <span className="max-md:hidden">Ampliar</span>
-            <span className="md:hidden">Ver</span>
-          </button>
-        )}
+  const cerrar = () => { setAbierta(false); zonaRef.current?.focus({ preventScroll: true }) }
+  const descripcion = [...tramos.map((t) => `${Math.round(t.ancho)} % ${t.rotulo}`), ...(raya ? [raya.texto] : [])].join(', ')
+  const cuerpo = (
+    <>
+      <div className="fc-cab">
+        <RotuloFranja tocable={ampliado != null}>{titulo}</RotuloFranja>
       </div>
-      <div className="fc-camino-barra" role="img" aria-label={tramos.map((t) => `${Math.round(t.ancho)} % ${t.rotulo}`).join(', ')}>
-        {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4 }} />)}
+      <div className="fc-camino-barra" role="img" aria-label={descripcion}>
+        {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4, boxShadow: t.hueco ? BORDE_HUECO : undefined }} />)}
+        {raya && <i className="fc-camino-raya" style={{ left: `calc(${(raya.f * 100).toFixed(2)}% - ${(Math.max(0, tramos.length - 1) * 3 * raya.f + 1).toFixed(1)}px)` }} />}
       </div>
-      <dl className="fc-camino-cifras">
+      <dl className="fc-dl fc-camino-cifras" style={{ ['--n' as string]: cifras.length }}>
         {cifras.map((c) => (
-          <div key={c.k} className="min-w-0">
-            <dt><i className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.punto }} aria-hidden /><span className="truncate">{c.k}</span></dt>
-            <dd className="tabular-nums">{c.v}</dd>
+          <div key={c.k}>
+            <dt><i className="fc-pto" style={{ background: c.punto, boxShadow: c.hueco ? BORDE_HUECO : undefined }} aria-hidden /><span>{c.k}</span></dt>
+            <dd className="tabular-nums">{c.v}{c.u && <> <small>{c.u}</small></>}</dd>
           </div>
         ))}
       </dl>
+    </>
+  )
+  return (
+    <div ref={ref} className="fc-camino">
+      {ampliado != null ? (
+        <Tocable onAbrir={() => setAbierta((a) => !a)} etiqueta={titulo} nombre={`${titulo}: ${descripcion}. Ver detalle`} abierta={abierta} zonaRef={zonaRef}>
+          {cuerpo}
+        </Tocable>
+      ) : cuerpo}
       {ampliado != null && (
         <CapaAmpliada abierta={abierta} onCerrar={cerrar} origen={ref} titulo={titulo} sub="causas y paradas, por Baader">
           {ampliado}
@@ -304,6 +320,9 @@ export function TiempoDelTurno({
    * no lo vería nadie. Quien mira otra parte la pliega, y un tap la devuelve.
    */
   const [parte, setParte] = useState<'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado' | null>('paradas')
+  /* Bajo 768 px los tramos de la barra (22 × 18 px, mucho menos de los 44 del piso táctil) no son destino de toque: las filas de 44 px
+     de abajo abren lo mismo. Quedan como dibujo (sin foco, sin lector de pantalla, sin eventos). */
+  const movil = !useAnchoMin(768)
   /* En la capa ampliada del v2 todas las filas van abiertas: es el detalle completo. */
   const todo = v2 === 'ampliado'
   const alternarParte = (p: 'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado') =>
@@ -475,38 +494,47 @@ export function TiempoDelTurno({
   const ultimoImputable = [...gruposVisibles].reverse().find((g) => g.dueno !== 'programado')?.dueno
 
   /* ── v2 celda: la quinta celda de la franja de «El turno» ─────────────────────────────────────────
-     La barra reparte la meta (hechas / paradas / ritmo / por jugar) en tramos proporcionales; las tres cifras chicas salen de
-     las mismas cuentas de arriba: nada se recalcula. «A esta hora» ya vive en la celda de al lado (la misma resta: `aEstaHora`). */
+     La barra reparte la meta en tramos proporcionales y la leyenda ES esos tramos: mismo orden, mismo color, todo en piezas
+     (Hechas · Paradas · Por ritmo · Por jugar, este último solo en vivo). Salen de las mismas cuentas de arriba: nada se
+     recalcula. «Programado» es TIEMPO, no piezas: vive en el ampliado. «A esta hora» ya vive en la celda de al lado (`aEstaHora`).
+     «Por ritmo» es lo que falta DESPUÉS de lo hecho y de las paradas, contra la vara de la resta: cerrado, la meta; en vivo,
+     la cuota a esta hora (lo que la cuota aún no pide es «por jugar»: meta − cuota). */
   if (v2 === 'celda') {
     const titulo = hayBrecha || superada ? 'Camino a la meta' : 'A dónde se va el tiempo'
     /* «7 min» con la unidad; desde una hora, «1 h 02 min». */
     const durTxt = (min: number) => (min >= 60 ? fmtDurMin(min) : `${Math.round(min)} min`)
-    const tramos = restaVisible && metaOk != null && hechas != null && perdidas != null && porRitmo != null
-      ? [
-          { v: hechas, color: 'var(--v2-bien)', rotulo: 'hechas' },
-          { v: hayBrecha ? perdidas : 0, color: 'var(--v2-mal)', rotulo: 'perdidas en paradas' },
-          { v: hayBrecha ? porRitmo : 0, color: 'var(--v2-atento)', rotulo: 'por ritmo' },
-          { v: porJugarBarra, color: 'var(--v2-relleno)', rotulo: 'aún por jugar' },
-        ].filter((t) => t.v > 0).map((t) => ({ ...t, ancho: (t.v / metaOk) * 100 }))
-      : [
-          { v: tb.producingMin, color: 'var(--v2-bien)', rotulo: 'produciendo', ancho: pct(tb.producingMin) },
-          { v: tb.plannedMin, color: 'var(--v2-prog)', rotulo: 'programado', ancho: pct(tb.plannedMin) },
-          { v: tb.recoverableMin, color: 'var(--v2-mal)', rotulo: 'paradas evitables', ancho: pct(tb.recoverableMin) },
-        ].filter((t) => t.v > 0)
-    const cifras: Array<{ k: string; v: string; punto: string }> = restaVisible && metaOk != null
-      ? [
-          { k: 'Hechas', v: fmtInt(hechas!), punto: 'var(--v2-acento)' },
-          { k: 'En paradas', v: fmtInt(perdidasReales ?? perdidas ?? 0), punto: 'var(--v2-mal)' },
-          porJugarBarra > 0 && !cerrado
-            ? { k: 'Por jugar', v: fmtInt(porJugarBarra), punto: 'var(--v2-prog)' }
-            : { k: 'Programado', v: durTxt(tb.plannedMin), punto: 'var(--v2-prog)' },
-        ]
-      : [
-          { k: 'Produciendo', v: durTxt(tb.producingMin), punto: 'var(--v2-acento)' },
-          { k: 'Paradas evitables', v: durTxt(tb.recoverableMin), punto: 'var(--v2-mal)' },
-          { k: 'Programado', v: durTxt(tb.plannedMin), punto: 'var(--v2-prog)' },
-        ]
-    return <CeldaCamino titulo={titulo} tramos={tramos} cifras={cifras} ampliado={ampliado} />
+    let tramos: TramoCamino[]
+    let cifras: CifraCamino[]
+    let raya: { f: number; texto: string } | null = null
+    if (restaVisible && metaOk != null && hechas != null && perdidas != null && porRitmo != null) {
+      /* La cifra de «Paradas» es la real (la misma del ampliado); el tramo, la que cabe en la brecha (la barra reparte la meta). */
+      const paradas = Math.round(perdidasReales ?? perdidas)
+      /* Meta SUPERADA de verdad: lo hecho ya pasa la meta y la barra deja de repartirla. La escala crece hasta
+         hechas + paradas (para que el tramo rojo siga a la vista) y una raya marca dónde estaba la meta. */
+      const sobre = hechas >= metaOk
+      const escala = sobre ? Math.max(metaOk, hechas + paradas) : metaOk
+      const items: Array<{ k: string; rotulo: string; v: number; tramo: number; color: string; hueco?: boolean }> = [
+        { k: 'Hechas', rotulo: 'hechas', v: hechas, tramo: hechas, color: 'var(--v2-acento)' },
+        ...(sobre || hayBrecha ? [{ k: 'Paradas', rotulo: 'perdidas en paradas', v: paradas, tramo: sobre ? paradas : perdidas, color: 'var(--v2-mal)' }] : []),
+        ...(hayBrecha ? [{ k: 'Por ritmo', rotulo: 'por ritmo', v: porRitmo, tramo: porRitmo, color: 'var(--v2-atento)' }] : []),
+        ...(!sobre && !cerrado && porJugarBarra > 0 ? [{ k: 'Por jugar', rotulo: 'aún por jugar', v: porJugarBarra, tramo: porJugarBarra, color: 'var(--v2-reja)', hueco: true }] : []),
+      ]
+      tramos = items.filter((t) => t.tramo > 0).map((t) => ({ rotulo: t.rotulo, color: t.color, ancho: (t.tramo / escala) * 100, hueco: t.hueco }))
+      cifras = items.map((t) => ({ k: t.k, v: fmtInt(t.v), u: 'pz', punto: t.color, hueco: t.hueco }))
+      if (sobre) raya = { f: metaOk / escala, texto: `la raya marca la meta de ${fmtInt(metaOk)} pz: la escala crece para mostrar lo hecho y lo perdido en paradas` }
+    } else {
+      tramos = [
+        { v: tb.producingMin, color: 'var(--v2-bien)', rotulo: 'produciendo', ancho: pct(tb.producingMin) },
+        { v: tb.plannedMin, color: 'var(--v2-gris)', rotulo: 'programado', ancho: pct(tb.plannedMin) },
+        { v: tb.recoverableMin, color: 'var(--v2-mal)', rotulo: 'paradas evitables', ancho: pct(tb.recoverableMin) },
+      ].filter((t) => t.v > 0)
+      cifras = [
+        { k: 'Produciendo', v: durTxt(tb.producingMin), punto: 'var(--v2-acento)' },
+        { k: 'Paradas evitables', v: durTxt(tb.recoverableMin), punto: 'var(--v2-mal)' },
+        { k: 'Programado', v: durTxt(tb.plannedMin), punto: 'var(--v2-gris)' },
+      ]
+    }
+    return <CeldaCamino titulo={titulo} tramos={tramos} cifras={cifras} ampliado={ampliado} raya={raya} />
   }
 
   return (
@@ -569,9 +597,11 @@ export function TiempoDelTurno({
                 key={s.p}
                 type="button"
                 onClick={() => alternarParte(s.p)}
-                aria-expanded={parte === s.p}
-                aria-label={`${fmtInt(s.v)} piezas ${s.rotulo} — ver detalle`}
-                className={`rounded-[4px] transition-opacity ${s.cls} ${!todo && parte != null && parte !== s.p ? 'opacity-30' : ''}`}
+                aria-expanded={movil ? undefined : parte === s.p}
+                aria-label={movil ? undefined : `${fmtInt(s.v)} piezas ${s.rotulo} — ver detalle`}
+                aria-hidden={movil ? true : undefined}
+                tabIndex={movil ? -1 : undefined}
+                className={`rounded-[4px] transition-opacity ${s.cls} ${movil ? 'pointer-events-none' : ''} ${!todo && parte != null && parte !== s.p ? 'opacity-30' : ''}`}
                 style={s.flex ? { flex: '1 1 0%' } : { width: `${(s.v / metaOk) * 100}%`, minWidth: 3 }}
               />
             ))}

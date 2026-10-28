@@ -132,6 +132,13 @@ function fmtDateLong(dateKey: string): string {
   return d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+/** «mar 27 oct»: el día en corto para la barra del celular, donde «martes, 27 de octubre» no cabe en un renglón con el turno. */
+function fmtDateShort(dateKey: string): string {
+  const d = new Date(`${dateKey}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return dateKey
+  return d.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '').replace(/\./g, '')
+}
+
 /**
  * «mar 18» — el día en corto, para turnos que cruzan la medianoche.
  *
@@ -551,7 +558,7 @@ function CuentaAtrasPulso({ at }: { at: string | null | undefined }) {
      este contador se calla en vez de decir «llegando…» para siempre. */
   if (restante < -55) return null
   return (
-    <span className="tabular-nums text-muted-foreground/70">
+    <span className="tabular-nums text-muted-foreground">
       {restante > 0 ? `· se refresca en ~${restante} s` : '· llegando…'}
     </span>
   )
@@ -3809,7 +3816,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
   /* ── Cada máquina: la tabla («ahora», aporte al promedio, vs último, vs prom. 5) ─────────────────────────────
      Una función y no un trozo del JSX: la tarjeta de estado la lleva debajo de la cifra y `parte="maquinas"` la lleva SOLA
      («Cada máquina · aporte» del v2, que ya no repite las cifras de ritmo). */
-  const tablaMaquinas = (): React.ReactNode => {
+  const tablaMaquinas = (v2 = false): React.ReactNode => {
     if (!(maquinas && maquinas.maquinas.length > 1)) return null
     /* La columna izquierda, por prioridad (Orel, 27-08): el AHORA real de
        cada máquina —el pulso del contador, que por construcción SUMA el
@@ -3824,7 +3831,9 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
        0,0 y la columna desaparecía entera — «si es cero que salga cero»
        (Orel, 29-08). Un hueco donde debería ir un cero se lee como dato
        que falta; el cero dice lo que pasa. */
-    const conCero = Boolean(parada) || cerrado
+    /* Con el turno CERRADO en «Cada máquina · aporte» del v2 la columna «ahora» no va: ninguna produce y un 0,0 por máquina no dice
+       nada que el aporte de al lado no diga. En vivo (aunque la línea esté detenida) se queda: «si es cero que salga cero». */
+    const conCero = (Boolean(parada) || cerrado) && !(v2 && cerrado)
     const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
     /* Los deltas solo tienen sentido sobre el aporte (la misma vara que la
        muestra histórica) y con el turno ya rodado: ver APORTE_MIN_PROD_MIN.
@@ -3863,11 +3872,19 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
          sube a la columna derecha, a la altura del número grande. */
       <div className="ritmo-maquinas mt-3 border-t border-border/50 pt-2.5">
         <div className="flex items-baseline gap-2 text-caption text-muted-foreground">
-          <span className="min-w-0 flex-1">
-            Cada máquina
-            {(conPulsoMaq || conCero) && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
-            {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
-          </span>
+          {v2 ? (
+            /* En el v2 el título «Cada máquina» ya está arriba: la primera columna dice solo su vara, sobre su número. */
+            <span className="min-w-0 flex-1 pl-[calc(2.25rem+0.5rem)]">
+              {(conPulsoMaq || conCero) && <b className="font-semibold text-foreground/80">ahora</b>}
+              {conReparto && <b className="font-semibold text-foreground/80">media 15 min</b>}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1">
+              Cada máquina
+              {(conPulsoMaq || conCero) && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
+              {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
+            </span>
+          )}
           <b className="font-semibold text-foreground/80">
             {conAporte ? 'aporte al promedio' : 'promedio andando'}
           </b>
@@ -3901,7 +3918,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
                     {conCero ? fmtDec(0) : fmtDec((conPulsoMaq ? m.pulsoCpm : m.ahoraCpm) ?? 0)}
                   </span>
                 )}
-                <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                <span className={`h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted${v2 ? ' max-[399px]:hidden' : ''}`}>
                   {pct != null && (
                     <span
                       className={`block h-full rounded-full ${color}`}
@@ -3909,7 +3926,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
                     />
                   )}
                 </span>
-                <span className="w-11 shrink-0 text-right text-headline tabular-nums text-foreground">
+                <span className={`w-11 shrink-0 text-right text-headline tabular-nums text-foreground${v2 ? ' max-[399px]:ml-auto' : ''}`}>
                   {conAporte ? fmtDec(m.aporteCpm ?? 0) : fmtDec(m.cpm)}
                 </span>
                 {/* Contra sí misma, dos varas: el turno anterior y el
@@ -3957,20 +3974,15 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
      bloque de estado que no repite la franja). La tabla va un nivel adentro: la grilla de dos columnas del CSS de PC
      (`.v2-ritmo > section:has(> .ritmo-maquinas)`) es de la tarjeta de estado y acá dejaría una columna vacía. */
   if (parte === 'maquinas') {
-    const tabla = tablaMaquinas()
+    const tabla = tablaMaquinas(true)
     /* Una sola Baader (Filete) no tiene tabla que repartir: queda solo el control del pulso, si hay lectura. */
     if (!tabla) return pulsoNodo ? <>{pulsoNodo}</> : null
     return (
       <section className="rounded-card border border-border bg-card p-4">
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Gauge className="h-3 w-3" />
-          Cada máquina · aporte
-          {turno != null && (
-            <span className="font-normal text-muted-foreground">
-              · al promedio del turno, <b className="font-semibold tabular-nums text-foreground">{fmtDec(turno)} pz/min</b>
-            </span>
-          )}
-        </div>
+        {/* El mismo título que «Ritmo en vivo» (17/600) y una línea que dice qué suma cada Baader. Sin el promedio del turno: esa cifra
+            ya está en la franja y repetirla aquí era una segunda cifra de lo mismo. */}
+        <h3 className="text-[17px] font-semibold leading-[22px] text-foreground">Cada máquina</h3>
+        <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">lo que suma cada Baader al ritmo de la línea</p>
         <div>{tabla}</div>
         {pulsoNodo}
       </section>
@@ -6359,6 +6371,11 @@ function MonitorDelToken() {
       : undefined,
   }
 
+  /* El horario de la barra («21:30 → 04:50»): el previsto en curso, el real cerrado. La hora de la última lectura del contador
+     de Shoplogix (`corteHoraV2`) va con él en la barra: todas las cifras de «El turno» salen de esa lectura. */
+  const rangoBarra = `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`
+  const corteHoraV2 = !live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null
+
   return (
     <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)} data-barra={glass === 'v2' && !modoPantalla ? 'si' : undefined}>
       {glass === 'v2' && !modoPantalla && (
@@ -6396,8 +6413,20 @@ function MonitorDelToken() {
           sub={[
             vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId),
             fmtDateLong(vista?.dateKey || data.dateKey),
-            `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`,
+            rangoBarra,
           ].filter(Boolean).join(' · ')}
+          subCorto={[
+            vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId),
+            fmtDateShort(vista?.dateKey || data.dateKey),
+            rangoBarra,
+          ].filter(Boolean).join(' · ')}
+          /* El selector de línea vive en la barra de PC (El turno y Análisis); el Duelo trae el suyo en su lienzo. */
+          selectorPc={pestana !== 'duelo' && lineasMonitor ? <SelectorLinea lineas={lineasMonitor} className="v2-selector-barra" /> : null}
+          /* De dónde salen todas las cifras, UNA vez: la hora de la última lectura del contador de Shoplogix (solo en vivo). */
+          marca={corteHoraV2 ? `Shoplogix ${corteHoraV2}` : null}
+          navMovil={vistas.length > 1 && !modoPantalla
+            ? { atras: idx, puedeAnterior: idx < vistas.length - 1, onAnterior: () => irA(1), onSiguiente: () => irA(-1), onActual: () => verIndice(0) }
+            : null}
           pestana={pestana}
           onPestana={verPestana}
         />
@@ -6593,9 +6622,12 @@ function MonitorDelToken() {
        * bloque, y `break-inside-avoid` impide que una tarjeta se parta en dos.
        */}
       <main
-        className={`mx-auto max-w-3xl space-y-4 px-4 py-4 ${
-          /* «El turno» del v2 usa todo el ancho de PC (márgenes de 16 / 24 / 32 px); el resto conserva su tope. */
-          glass === 'v2' && pestana !== 'analisis' ? `lg:max-w-none ${pestana === 'turno' ? 'lg:px-[24px] min-[1600px]:px-[32px]' : 'lg:px-6'}` : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'
+        className={`mx-auto max-w-3xl space-y-4 py-4 ${
+          /* «El turno» del v2 usa todo el ancho desde 768 px (sin el tope de 672: dejaba ~58 px muertos por lado) y sus márgenes en
+             px (16 / 24 / 32), que no dependen de la raíz de 14 px; Análisis y Duelo conservan su tope y su gutter. */
+          glass === 'v2' && pestana === 'turno'
+            ? 'px-[16px] md:max-w-none lg:px-[24px] min-[1600px]:px-[32px]'
+            : `px-4 ${glass === 'v2' && pestana !== 'analisis' ? 'lg:max-w-none lg:px-6' : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'}`
         }${modoPantalla ? ' modo-pantalla' : ''}`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -6603,11 +6635,8 @@ function MonitorDelToken() {
         {/* Pestaña «El turno»: la vigilancia y el estado, como TABLERO
             personalizable. En la TV la pestaña es siempre esta y el tablero
             no corre: la TV muestra el trío fijo de siempre. */}
-        {/* El selector de línea de PC (lg+) arriba de El turno y de Análisis; el Duelo trae el suyo. En celular vive en la
-            cabecera. */}
-        {glass === 'v2' && !modoPantalla && pestana !== 'duelo' && lineasMonitor && (
-          <SelectorLinea lineas={lineasMonitor} className="fila-linea-pc dpc-linea" />
-        )}
+        {/* El selector de línea ya no es una fila de este `<main>`: en PC vive en la barra (`CabeceraV2`, El turno y Análisis), en el
+            celular en la cabecera; el Duelo trae el suyo. */}
         {pestana === 'turno' && (<>
         {/* La alerta de línea detenida va FUERA del tablero, arriba: una
             alerta no es una tarjeta que se reordena. Cerrado no se muestra
@@ -6736,6 +6765,8 @@ function MonitorDelToken() {
             ? {
                 iniMs: iniEjeMs,
                 finMs: finEjeMs,
+                /* Turno cerrado: el fin REAL, el mismo `live.effectiveEnd` de la cabecera («Turno terminado 04:50»). */
+                finRealMs: live.effectiveEnd ? Date.parse(live.effectiveEnd) : null,
                 minuto: barrasMinuto,
                 primeraPiezaMs,
                 /* Detenida por el estado que ya existe: todas las máquinas paradas (pulso fresco) o el estado del corte. Cerrado, nunca. */
@@ -6783,7 +6814,8 @@ function MonitorDelToken() {
               repro={repro}
               eje={eje}
               piezas={contador.valor}
-              corteHora={!live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null}
+              corteHora={corteHoraV2}
+              causaParada={live.currentReason ? motivoEnEspanol(live.currentReason) : null}
               cuota={comparacion.optimalAtCurrentMinute != null ? { piezas: comparacion.optimalAtCurrentMinute, hora: horaDeCuota } : null}
               horas={(() => {
                 /* Hora a hora de Piezas ahora: las filas del Análisis (misma serie, mismo arranque) y, por Baader, sus piezas en

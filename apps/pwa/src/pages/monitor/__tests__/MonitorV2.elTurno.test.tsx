@@ -194,3 +194,101 @@ describe('MonitorV2 · «El turno» ordenado', () => {
     expect(capa).not.toContain('30,1')
   })
 })
+
+describe('MonitorV2 · hojas de detalle (FilaCifra, «Reducir», rótulos del riel)', () => {
+  /* El ancho se simula por consulta: la hoja del celular (< 1024) y el panel lateral de PC no son el mismo componente. */
+  const ancho = (px: number) => {
+    window.matchMedia = ((q: string) => {
+      const min = /min-width:\s*(\d+)px/.exec(q)
+      return { matches: min ? px >= Number(min[1]) : false, media: q, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false }
+    }) as unknown as typeof window.matchMedia
+  }
+  const abrir = (c: ReturnType<typeof render>, nombre: string) => fireEvent.click(c.getByRole('button', { name: nombre }))
+  const hora = (i: number, partial: boolean) => ({
+    hourStart: `2026-10-27T${String(21 + i).padStart(2, '0')}:30:00.000Z`, index: i + 1,
+    from: `2026-10-27T${String(21 + i).padStart(2, '0')}:30:00.000Z`, to: `2026-10-27T${String(22 + i).padStart(2, '0')}:30:00.000Z`,
+    pieces: 2000, minutesCovered: partial ? 35 : 60, piecesPerHour: 2000, partial,
+  })
+
+  it('«Ritmo de la línea»: la media de 15 min (andando) reemplaza a «Últimos 30 min» y solo en vivo', () => {
+    const vivo = render(<MonitorV2 {...props(0)} />)
+    abrir(vivo, 'Ritmo de la línea: ver detalle')
+    const capa = vivo.getByRole('dialog').textContent ?? ''
+    expect(capa).toContain('Media 15 min (andando)')
+    expect(capa).toContain('44,8 pz/min')
+    expect(capa).not.toContain('Últimos')
+    cleanup()
+    const cerrado = render(<MonitorV2 {...props(0)} cerrado ritmoAhora={null} />)
+    abrir(cerrado, 'Ritmo de la línea: ver detalle')
+    expect(cerrado.getByRole('dialog').textContent).not.toContain('Media 15 min')
+  })
+
+  it('«Respuesta de Mantención»: sin fallas dice «sin fallas», no «—»', () => {
+    const { getByRole } = render(<MonitorV2 {...props(0)} />)
+    abrir({ getByRole } as ReturnType<typeof render>, 'Mantención: ver detalle')
+    const filas = Array.from(getByRole('dialog').querySelectorAll('div[class*="min-h-[44px]"]')).map((f) => f.textContent ?? '')
+    expect(filas.find((f) => f.startsWith('Hoy'))).toBe('Hoysin fallas')
+  })
+
+  it('las filas de las hojas son FilaCifra: el rótulo a 15/400 y la cifra a 17/600 a la derecha, 44 px de alto mínimo', () => {
+    const { getByRole } = render(<MonitorV2 {...props(0)} />)
+    abrir({ getByRole } as ReturnType<typeof render>, 'Ritmo de la línea: ver detalle')
+    const fila = Array.from(getByRole('dialog').querySelectorAll('div[class*="min-h-[44px]"]')).find((f) => f.textContent?.startsWith('Promedio del turno')) as HTMLElement
+    expect(fila).toBeTruthy()
+    expect(fila.className).toContain('min-h-[44px]')
+    const [izq, der] = Array.from(fila.children) as HTMLElement[]
+    expect(izq!.firstElementChild!.className).toContain('text-[15px]')
+    expect(izq!.firstElementChild!.className).not.toContain('font-semibold')
+    expect(der!.firstElementChild!.className).toContain('text-[17px]')
+    expect(der!.firstElementChild!.className).toContain('font-semibold')
+    expect(der!.className).toContain('tabular-nums')
+  })
+
+  it('en el celular las hojas de Ritmo y Mantención traen «Reducir» (como Piezas, Camino y Ritmo en vivo)', () => {
+    ancho(390)
+    const c = render(<MonitorV2 {...props(0)} />)
+    abrir(c, 'Ritmo de la línea: ver detalle')
+    expect(c.getByRole('button', { name: 'Reducir Ritmo de la línea' })).toBeTruthy()
+    fireEvent.click(c.getByRole('button', { name: 'Reducir Ritmo de la línea' }))
+    expect(c.queryByRole('button', { name: 'Reducir Ritmo de la línea' })).toBeNull()
+    abrir(c, 'Mantención: ver detalle')
+    expect(c.getByRole('button', { name: 'Reducir Respuesta de Mantención' })).toBeTruthy()
+  })
+
+  it('«Piezas del turno»: con la meta cumplida dice «Sobre la meta +479 pz», no «Faltan 0 pz»', () => {
+    const sobre = render(<MonitorV2 {...props(0)} piezas={15479} proyeccion={null} cerrado />)
+    abrir(sobre, 'Piezas del turno: ver detalle')
+    const capa = sobre.getByRole('dialog').textContent ?? ''
+    expect(capa).toContain('Sobre la meta')
+    expect(capa).toContain('+479 pz')
+    expect(capa).not.toContain('Faltan')
+    cleanup()
+    const falta = render(<MonitorV2 {...props(0)} />)
+    abrir(falta, 'Piezas del turno: ver detalle')
+    const c2 = falta.getByRole('dialog').textContent ?? ''
+    expect(c2).toContain('Faltan')
+    expect(c2).not.toContain('Sobre la meta')
+  })
+
+  it('«Piezas del turno»: la hora incompleta dice «en curso» solo con el turno en vivo', () => {
+    const horas = { filas: [hora(0, false), hora(1, true)], metaPorHora: 2000, porMaquina: [] }
+    const vivo = render(<MonitorV2 {...props(0)} horas={horas} />)
+    abrir(vivo, 'Piezas del turno: ver detalle')
+    expect(vivo.getByRole('dialog').textContent).toContain('en curso')
+    cleanup()
+    const cerrado = render(<MonitorV2 {...props(0)} horas={horas} cerrado proyeccion={null} />)
+    abrir(cerrado, 'Piezas del turno: ver detalle')
+    const capa = cerrado.getByRole('dialog').textContent ?? ''
+    expect(capa).not.toContain('en curso')
+    expect(capa).not.toContain('tramo en curso')
+  })
+
+  it('«Fallas de equipos» (Ver más): el rótulo del riel va en dos renglones, «27/10» y «T2», sin truncar', () => {
+    const riel = [{ label: '26/10 T1', mttr: 12 }, { label: '27/10 T2', mttr: null }, { label: 'Hoy', mttr: null, hoy: true }]
+    const { container } = render(<MonitorV2 {...props(1)} rielMttr={riel} />)
+    const rotulos = Array.from(container.querySelectorAll('[aria-label="Minutos por falla en los últimos turnos"]')[0]!.parentElement!.querySelectorAll('span.text-center'))
+    expect(rotulos).toHaveLength(3)
+    expect(rotulos.map((r) => r.innerHTML.replace('<br>', '|'))).toEqual(['26/10|T1', '27/10|T2', 'Hoy'])
+    expect(rotulos.every((r) => !r.className.includes('truncate'))).toBe(true)
+  })
+})

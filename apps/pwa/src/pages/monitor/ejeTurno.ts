@@ -17,7 +17,12 @@ export const int = (n: number) => Math.round(n).toLocaleString('es-CL')
 export const firmado = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${int(Math.abs(n))}`
 /** HH:MM de un instante wall-as-UTC (la hora de planta). */
 export const relojDe = (ms: number) => new Date(ms).toISOString().slice(11, 16)
-export const horasMin = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`)
+/** «X h Y min», «N min» o, bajo 1 min, «N s» (una parada de 40 s no es «0 min»). */
+export function horasMin(min: number): string {
+  if (min > 0 && min < 1) return `${Math.max(1, Math.round(min * 60))} s`
+  const t = Math.max(0, Math.round(min))
+  return t >= 60 ? `${Math.floor(t / 60)} h ${t % 60} min` : `${t} min`
+}
 
 // ── Escalas ──────────────────────────────────────────────────────────────────
 
@@ -32,11 +37,63 @@ export function escalaY(tope: number): { paso: number; max: number } {
  * Escala del acumulado de «Ritmo en vivo»: el tope es el mayor valor que se dibuja (meta, proyección, hoy, turno
  * anterior) y el máximo, el múltiplo del paso justo por encima. Paso 1.000 hasta 8.000, 2.000 hasta 20.000 y 5.000
  * después; la rejilla va cada 2 pasos (15.623 → 0…16.000, rejilla de 4.000): sin la mitad de arriba vacía.
+ * Si el máximo cae en un múltiplo IMPAR del paso (la raya de arriba no existiría: 5.000 con rejilla de 2.000) o el aire
+ * sobre la curva es menor a 4 %, sube al múltiplo de la rejilla: 5.000 → 6.000 (rayas 0, 2, 4 y 6 mil); 15.479 → 16.000.
  */
 export function escalaAcumulado(tope: number): { paso: number; max: number; rejilla: number } {
   const t = Math.max(1, tope)
   const paso = t <= 8000 ? 1000 : t <= 20000 ? 2000 : 5000
-  return { paso, max: Math.ceil(t / paso) * paso, rejilla: paso * 2 }
+  const rejilla = paso * 2
+  let max = Math.ceil(t / paso) * paso
+  if ((max / paso) % 2 !== 0 || (max - t) / max < 0.04) max = Math.ceil(t / rejilla) * rejilla
+  return { paso, max, rejilla }
+}
+
+export interface EscalaVentana { yMin: number; yMax: number; paso: number; rejilla: number }
+
+/**
+ * Escala Y con zoom: el dominio de lo que se ve en la ventana (`min`…`max` de los datos visibles). Paso 100 hasta un
+ * rango de 800, 200 hasta 2.000, 500 hasta 5.000 y 1.000 después; la rejilla va cada 2 pasos y el tope cae en una raya.
+ * `yMin` es múltiplo del paso y `yMax` múltiplo de la rejilla (la raya de arriba existe). Deja un 4 % de aire arriba y abajo
+ * (si la curva toca el borde, sube un paso). Nunca baja de 0.
+ */
+export function escalaVentana(min: number, max: number): EscalaVentana {
+  const lo = Math.max(0, Math.min(min, max))
+  const hi = Math.max(lo, max)
+  const rango = hi - lo
+  const paso = rango <= 800 ? 100 : rango <= 2000 ? 200 : rango <= 5000 ? 500 : 1000
+  const rejilla = paso * 2
+  let yMin = Math.max(0, Math.floor(lo / paso) * paso)
+  let yMax = Math.ceil(hi / paso) * paso
+  if (yMax <= yMin) yMax = yMin + rejilla
+  if (yMin > 0 && (lo - yMin) < (yMax - yMin) * 0.04) yMin = Math.max(0, yMin - paso)
+  if ((yMax - hi) < (yMax - yMin) * 0.04) yMax += paso
+  yMax = Math.ceil(yMax / rejilla) * rejilla
+  return { yMin, yMax, paso, rejilla }
+}
+
+/** Las rayas de la rejilla: los múltiplos de `rejilla` (números redondos) entre `yMin` y `yMax`. En «Turno» (yMin 0) parten de 0. */
+export function rayasY(yMin: number, yMax: number, rejilla: number): number[] {
+  const out: number[] = []
+  for (let v = (Math.ceil(yMin / rejilla - 1e-9) || 0) * rejilla; v <= yMax + 1e-6; v += rejilla) out.push(v)
+  return out
+}
+
+/**
+ * El mínimo y el máximo de lo que se dibuja dentro de la ventana `[desdeMin, hastaMin]`: los puntos de cada curva que
+ * caen adentro más su valor interpolado en los dos bordes. null si ninguna curva toca la ventana.
+ */
+export function dominioVisible(curvas: Punto[][], desdeMin: number, hastaMin: number): { min: number; max: number } | null {
+  let min = Infinity
+  let max = -Infinity
+  const ver = (v: number | null) => { if (v != null) { min = Math.min(min, v); max = Math.max(max, v) } }
+  for (const ps of curvas) {
+    if (ps.length === 0) continue
+    ver(valorEnCurva(ps, desdeMin))
+    ver(valorEnCurva(ps, hastaMin))
+    for (const q of ps) if (q.min >= desdeMin && q.min <= hastaMin) ver(q.v)
+  }
+  return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null
 }
 
 // ── Marcas de hora ───────────────────────────────────────────────────────────
@@ -48,19 +105,59 @@ export function pasoMarcas(pxPorMin: number, minPx: number): number {
   return PASOS_MARCA_MIN.find((p) => p * pxPorMin >= minPx) ?? 240
 }
 
+export type AnclaRotulo = 'start' | 'middle' | 'end'
+
+/** Cuánto ocupa a lo ancho el texto «02:35 ahora» (o «04:50 fin») según el tamaño de la letra: 64 px a 12 px y 59 px a 11 px. */
+export const anchoRotuloAhora = (fontSize: number) => (fontSize >= 12 ? 64 : 59)
+
 /**
- * Minutos (desde el inicio del turno) donde va una hora en el eje X: cada `pasoMarcas` y el fin del turno si queda
- * lugar. La marca que cae a menos de `ahoraPx` del «ahora» se omite: ahí va el rótulo «02:35 ahora».
+ * Minutos (desde el inicio del turno) donde va una hora en el eje X.
+ *
+ * Con `iniMs` (el inicio del turno, hora de planta) las marcas caen en múltiplos de reloj del paso (22:00, 23:00… con paso
+ * 60; 00:00, 02:00… con 120) y el inicio del turno solo se rotula si queda a 0,6·`minPx` o más de la primera marca; sin
+ * `iniMs` parten del inicio. El fin del turno se agrega si queda lugar.
+ *
+ * Con el «ahora» rotulado en el eje, las marcas que chocarían con su rótulo se omiten. Con `ahoraAncla` y `ahoraRotuloPx`
+ * la zona sin marcas sigue la ancla del texto (hacia la izquierda si es 'end', hacia la derecha si 'start', simétrica si
+ * 'middle'), contando el ancho de la marca (`marcaPx`) y 8 px de aire; sin ellos, ±`ahoraPx` alrededor del ahora.
  */
-export function marcasEje(args: { totalMin: number; pxPorMin: number; minPx: number; ahoraMin: number | null; ahoraPx: number }): number[] {
-  const { totalMin, pxPorMin, minPx, ahoraMin, ahoraPx } = args
+export function marcasEje(args: {
+  totalMin: number
+  pxPorMin: number
+  minPx: number
+  ahoraMin: number | null
+  ahoraPx: number
+  iniMs?: number
+  ahoraAncla?: AnclaRotulo
+  ahoraRotuloPx?: number
+  marcaPx?: number
+}): number[] {
+  const { totalMin, pxPorMin, minPx, ahoraMin, ahoraPx, iniMs, ahoraAncla, ahoraRotuloPx } = args
+  const marcaPx = args.marcaPx ?? 32
   if (!(totalMin > 0) || !(pxPorMin > 0)) return []
   const paso = pasoMarcas(pxPorMin, minPx)
   const out: number[] = []
-  for (let t = 0; t <= totalMin; t += paso) out.push(t)
-  const ultimo = out[out.length - 1]!
-  if (ultimo < totalMin && (totalMin - ultimo) * pxPorMin >= minPx * 0.45) out.push(totalMin)
-  return ahoraMin == null ? out : out.filter((t) => Math.abs(t - ahoraMin) * pxPorMin >= ahoraPx)
+  let primera = 0
+  if (iniMs != null && Number.isFinite(iniMs)) {
+    const ini = iniMs / 60_000
+    primera = ((paso - (((ini % paso) + paso) % paso)) % paso)
+    if (primera > 0 && primera * pxPorMin >= minPx * 0.6) out.push(0)
+  }
+  for (let t = primera; t <= totalMin + 1e-9; t += paso) out.push(t)
+  const ultimo = out[out.length - 1]
+  if (ultimo != null && ultimo < totalMin && (totalMin - ultimo) * pxPorMin >= minPx * 0.45) out.push(totalMin)
+  if (ahoraMin == null) return out
+  if (ahoraAncla && ahoraRotuloPx) {
+    const xa = ahoraMin * pxPorMin
+    const [l0, l1] = ahoraAncla === 'end' ? [xa - ahoraRotuloPx, xa] : ahoraAncla === 'start' ? [xa, xa + ahoraRotuloPx] : [xa - ahoraRotuloPx / 2, xa + ahoraRotuloPx / 2]
+    return out.filter((t) => {
+      const x = t * pxPorMin
+      /* El texto de la marca: pegado a la izquierda en el inicio, a la derecha en el fin y centrado en el resto. */
+      const [m0, m1] = t <= 0 ? [x, x + marcaPx] : t >= totalMin ? [x - marcaPx, x] : [x - marcaPx / 2, x + marcaPx / 2]
+      return m1 + 8 <= l0 || m0 - 8 >= l1
+    })
+  }
+  return out.filter((t) => Math.abs(t - ahoraMin) * pxPorMin >= ahoraPx)
 }
 
 // ── Zoom «Turno | 1 h | 15 min» ──────────────────────────────────────────────
@@ -314,6 +411,8 @@ export interface ParadaEje {
   dueno: DuenoPerdida
   causa: string
   maquina: string | null
+  /** El id de la máquina (el mismo de `minuto.maquinas`): de ahí sale el nombre que la fila ya usa. */
+  maquinaId?: string | null
 }
 
 /**
@@ -333,6 +432,7 @@ export function paradasEnEje(grupos: GrupoDelTurno[] | null | undefined, t0Ms: n
           dueno: g.dueno,
           causa: c.reason,
           maquina: p.maquina ?? null,
+          maquinaId: p.maquinaId ?? null,
         })
       }
     }
@@ -340,16 +440,45 @@ export function paradasEnEje(grupos: GrupoDelTurno[] | null | undefined, t0Ms: n
   return out.sort((a, b) => a.desdeMin - b.desdeMin)
 }
 
+const cubre = (p: ParadaEje, m: number) => m >= p.desdeMin && m < Math.max(p.hastaMin, p.desdeMin + 1)
+
 /** La parada que cubre el minuto `m` (la más larga si hay varias), o null. */
 export function paradaEn(paradas: ParadaEje[], m: number): ParadaEje | null {
-  let mejor: ParadaEje | null = null
-  for (const p of paradas) {
-    if (m >= p.desdeMin && m < Math.max(p.hastaMin, p.desdeMin + 1)) {
-      if (!mejor || p.hastaMin - p.desdeMin > mejor.hastaMin - mejor.desdeMin) mejor = p
-    }
-  }
-  return mejor
+  return paradasEn(paradas, m)[0] ?? null
 }
+
+/** TODAS las paradas que cubren el minuto `m` (una por máquina parada), la más larga primero. */
+export function paradasEn(paradas: ParadaEje[], m: number): ParadaEje[] {
+  return paradas.filter((p) => cubre(p, m)).sort((a, b) => (b.hastaMin - b.desdeMin) - (a.hastaMin - a.desdeMin))
+}
+
+/**
+ * Los intervalos de parada fusionados (sin las programadas): lo que el reloj de planta vio detenido, sin contar dos
+ * veces lo que dos Baader paran a la vez. Con `limites` se recorta al tramo que el eje muestra.
+ */
+export function intervalosDeParada(paradas: ParadaEje[], limites?: { min: number; max: number }): Array<[number, number]> {
+  const lo = limites?.min ?? -Infinity
+  const hi = limites?.max ?? Infinity
+  const iv = paradas
+    .filter((p) => p.dueno !== 'programado')
+    .map((p): [number, number] => [Math.max(lo, p.desdeMin), Math.min(hi, p.hastaMin)])
+    .filter(([a, b]) => b > a)
+    .sort((a, b) => a[0] - b[0])
+  const out: Array<[number, number]> = []
+  for (const [a, b] of iv) {
+    const u = out[out.length - 1]
+    if (u && a <= u[1]) u[1] = Math.max(u[1], b)
+    else out.push([a, b])
+  }
+  return out
+}
+
+/** Minutos de RELOJ con alguna parada (unión de intervalos, sin programadas): tres Baader paradas a la vez cuentan una vez. */
+export const minutosConParada = (paradas: ParadaEje[], limites?: { min: number; max: number }) =>
+  intervalosDeParada(paradas, limites).reduce((a, [x, y]) => a + (y - x), 0)
+
+/** Cuántos episodios de parada hay una vez fusionados los que se solapan (sin programadas). */
+export const episodiosParada = (paradas: ParadaEje[], limites?: { min: number; max: number }) => intervalosDeParada(paradas, limites).length
 
 /** El color de cada dueño en rellenos y swatches, y la trama de Mantención (rayas oscuras sobre el ámbar, para no depender solo del color). */
 export const RELLENO_DUENO = { mantencion: 'var(--v2-mant)', externo: 'var(--v2-ext)', 'sin-imputar': 'var(--v2-gris)', programado: 'var(--v2-prog)' } as const
@@ -411,4 +540,93 @@ export function disenar(w: number, tam: TamanoGrafico, nMaquinas: number, conBar
   const ejeX = paradas.y0 + m.ev + 8
   const pr = m.der + (tam === 'chico' ? 4 : 0)
   return { tam, pl: m.lab, pr, plotW: Math.max(40, w - m.lab - pr), pt, acum: { y0: pt, h: m.acum }, barras, carriles, paradas, ejeX, alto: ejeX + 18 }
+}
+
+// ── Barras con poco ancho: cubetas ───────────────────────────────────────────
+
+/** Minutos por cubeta: 1 desde 2 px por minuto; debajo, los que hagan falta para ≥ 3 px por barra (a 375 en «Turno» son 6). */
+export const minutosPorCubeta = (pxPorMin: number) => (pxPorMin >= 2 || !(pxPorMin > 0) ? 1 : Math.ceil(3 / pxPorMin))
+
+export interface Cubeta {
+  /** Primer minuto de la serie (índice) y cuántos cubre. */
+  k0: number
+  len: number
+  /** Promedio de pz/min de los minutos CERRADOS de la cubeta (sin ellos, los parciales). */
+  prom: number
+  /** Promedio del esperado de esos mismos minutos; null si alguno no tiene. */
+  esperado: number | null
+  /** Todos sus minutos son parciales (alguna Baader aún no los entregó): se dibuja atenuada. */
+  parcial: boolean
+}
+
+/**
+ * Agrupa la serie de la línea en cubetas de `c` minutos para que cada barra mida lo suficiente. Un minuto parcial
+ * (índice ≥ `completos`: no todas las Baader lo entregaron) no entra al promedio si la cubeta tiene minutos cerrados:
+ * dibujaría un bajón falso. El globo sigue leyendo el minuto exacto.
+ */
+export function cubetasDeLinea(suma: number[], esperado: Array<number | null>, c: number, completos: number): Cubeta[] {
+  const out: Cubeta[] = []
+  for (let k0 = 0; k0 < suma.length; k0 += c) {
+    const len = Math.min(c, suma.length - k0)
+    const ks = Array.from({ length: len }, (_, i) => k0 + i)
+    const cerrados = ks.filter((k) => k < completos)
+    const usar = cerrados.length > 0 ? cerrados : ks
+    const prom = usar.reduce((a, k) => a + (suma[k] ?? 0), 0) / usar.length
+    const esp = usar.map((k) => esperado[k] ?? null)
+    out.push({ k0, len, prom, esperado: esp.some((e) => e == null) ? null : esp.reduce<number>((a, e) => a + (e ?? 0), 0) / esp.length, parcial: cerrados.length === 0 && completos < suma.length })
+  }
+  return out
+}
+
+/**
+ * El tono de una cubeta de una fila Ev: el PEOR tono con dato que ocupe 2 o más de sus minutos (1 si la cubeta es de un
+ * minuto); si ninguno llega, el peor presente. Sin ningún minuto con dato, neutro.
+ */
+export function tonoDeCubeta(tonos: TonoRitmo[]): TonoRitmo {
+  const orden: Array<Exclude<TonoRitmo, 'sin'>> = ['mal', 'atento', 'bien']
+  const piso = Math.min(2, tonos.length)
+  for (const t of orden) if (tonos.filter((x) => x === t).length >= piso) return t
+  return orden.find((t) => tonos.includes(t)) ?? 'sin'
+}
+
+// ── Turno cerrado: hasta dónde llega el eje ──────────────────────────────────
+
+/**
+ * El fin del eje. En vivo, el fin previsto. Cerrado: nunca menos que el previsto (un corte anticipado no encoge el eje) y
+ * lo que alcance el fin real o el último minuto con dato, para que se vea la cola.
+ */
+export function finDelEje(args: { finMs: number; cerrado: boolean; finRealMs?: number | null; ultimoDatoMs?: number | null }): number {
+  const { finMs, cerrado, finRealMs, ultimoDatoMs } = args
+  if (!cerrado) return finMs
+  return Math.max(finMs, finRealMs != null && Number.isFinite(finRealMs) ? finRealMs : 0, ultimoDatoMs != null && Number.isFinite(ultimoDatoMs) ? ultimoDatoMs : 0)
+}
+
+// ── Turno anterior: UNA sola cifra ───────────────────────────────────────────
+
+/**
+ * La cifra del turno anterior que dicen la leyenda y la hoja «Piezas del turno» (una sola definición):
+ * - EN VIVO: el valor de su curva en el mismo minuto desde la primera pieza (lo que se dibuja);
+ * - CERRADO: su total (el último punto de su curva COMPLETA, el mismo de «Comparado con otros días»).
+ * `curva` está en minutos desde SU primera pieza y se dibuja corrida `baseMin` (la primera pieza de hoy, en minutos desde
+ * el inicio del turno); `ultimaMin` es la punta de hoy en minutos desde el inicio. null si la curva no llega a ese minuto
+ * (no se extrapola).
+ */
+export function cifraTurnoAnterior(args: { curva: Array<{ minutes: number; pieces: number }> | null | undefined; cerrado: boolean; ultimaMin: number; baseMin: number }): { piezas: number; modo: 'al-cierre' | 'a-esta-hora' } | null {
+  const { curva, cerrado, ultimaMin, baseMin } = args
+  if (!curva || curva.length < 2) return null
+  if (cerrado) return { piezas: curva[curva.length - 1]!.pieces, modo: 'al-cierre' }
+  const v = valorEnCurva([{ min: 0, v: 0 }, ...curva.map((q) => ({ min: q.minutes + baseMin, v: q.pieces }))], ultimaMin)
+  return v == null ? null : { piezas: v, modo: 'a-esta-hora' }
+}
+
+// ── Rótulos que se cruzan ────────────────────────────────────────────────────
+
+/**
+ * Separa dos rótulos que se cruzan en el lienzo («a esta hora» y «al cierre»): si distan menos de `minDist` en y, la
+ * brecha baja a `yCierre + minDist`; si no cabe, el cierre sube a `yBrecha − minDist`. `yMax` es el piso del lienzo.
+ */
+export function separarRotulos(yBrecha: number, yCierre: number, yMax: number, minDist = 16): { yBrecha: number; yCierre: number } {
+  if (Math.abs(yBrecha - yCierre) >= minDist) return { yBrecha, yCierre }
+  if (yCierre + minDist <= yMax) return { yBrecha: yCierre + minDist, yCierre }
+  return { yBrecha, yCierre: yBrecha - minDist }
 }

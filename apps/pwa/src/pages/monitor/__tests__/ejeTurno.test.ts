@@ -6,9 +6,11 @@
 import { describe, expect, it } from 'vitest'
 import type { GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import {
-  acumulado, celdaBaader, disenar, escalaAcumulado, escalaY, esperadoPorMinuto, filasBaader, marcasEje, minutosCompletos, minutosVisibles, paradaEn,
-  paradasEnEje, pasoMarcas, pctAndando, pctARitmo, proyeccion, recortarCurva, sumaPorMinuto, tamanoGrafico, tonoRitmo, trazoHastaLectura,
-  valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
+  acumulado, anchoRotuloAhora, celdaBaader, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado, escalaVentana,
+  escalaY, esperadoPorMinuto, filasBaader, finDelEje, horasMin, marcasEje, minutosCompletos, minutosConParada, minutosPorCubeta, minutosVisibles,
+  paradaEn, paradasEn, paradasEnEje, pasoMarcas, pctAndando, pctARitmo, proyeccion, rayasY, recortarCurva, separarRotulos, sumaPorMinuto, tamanoGrafico,
+  tonoDeCubeta, tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
+  type ParadaEje,
 } from '../ejeTurno'
 
 describe('escala Y del acumulado', () => {
@@ -18,19 +20,32 @@ describe('escala Y del acumulado', () => {
   it('paso 1.000 hasta 8.000, 2.000 hasta 20.000 y 5.000 después; la rejilla va cada 2 pasos', () => {
     expect(escalaAcumulado(7200)).toEqual({ paso: 1000, max: 8000, rejilla: 2000 })
     expect(escalaAcumulado(8000)).toEqual({ paso: 1000, max: 8000, rejilla: 2000 })
-    expect(escalaAcumulado(8001)).toEqual({ paso: 2000, max: 10000, rejilla: 4000 })
     expect(escalaAcumulado(20000)).toEqual({ paso: 2000, max: 20000, rejilla: 4000 })
-    expect(escalaAcumulado(21000)).toEqual({ paso: 5000, max: 25000, rejilla: 10000 })
+  })
+  it('el máximo es siempre múltiplo de la rejilla: la raya de arriba existe (5.000 → 6.000, no 5.000 con rayas en 0, 2 y 4 mil)', () => {
+    expect(escalaAcumulado(5000)).toEqual({ paso: 1000, max: 6000, rejilla: 2000 })
+    expect(escalaAcumulado(8001)).toEqual({ paso: 2000, max: 12000, rejilla: 4000 })
+    expect(escalaAcumulado(21000)).toEqual({ paso: 5000, max: 30000, rejilla: 10000 })
+    for (const tope of [1, 950, 2546, 5000, 7200, 9000, 14543, 15479, 15623, 19999, 21000, 26000]) {
+      const { max, rejilla } = escalaAcumulado(tope)
+      expect(max % rejilla).toBe(0)
+    }
+  })
+  it('con el acumulado a menos de 4 % del tope sube a la siguiente raya (15.479 y 15.623 se quedan en 16.000)', () => {
+    expect(escalaAcumulado(15479).max).toBe(16000)
+    expect(escalaAcumulado(15623).max).toBe(16000)
+    expect(escalaAcumulado(15990).max).toBe(16000)
+    expect(escalaAcumulado(16001).max).toBe(20000)
   })
   it('el máximo nunca queda por debajo de lo que se dibuja y no deja la mitad de arriba vacía', () => {
     for (const tope of [1, 950, 2546, 9000, 14543, 15000, 15623, 19999]) {
       const { max } = escalaAcumulado(tope)
       expect(max).toBeGreaterThanOrEqual(tope)
-      expect(max).toBeLessThan(tope + (tope > 8000 ? 2000 : 1000) + 1)
+      expect(max).toBeLessThan(tope + (tope > 8000 ? 4000 : 2000) + 1)
     }
   })
   it('sin nada que dibujar da una escala mínima', () => {
-    expect(escalaAcumulado(0)).toEqual({ paso: 1000, max: 1000, rejilla: 2000 })
+    expect(escalaAcumulado(0)).toEqual({ paso: 1000, max: 2000, rejilla: 2000 })
   })
   it('la escala del Duelo no cambió (la usa DueloPC)', () => {
     expect(escalaY(2546)).toEqual({ paso: 1000, max: 3000 })
@@ -364,5 +379,211 @@ describe('alturas del gráfico', () => {
   })
   it('1366×768 deja lugar: gráfico de 384 px + 118 de tarjeta (502) + franja de 153 + cabecera de 76 + aire de 12 ≤ 768', () => {
     expect(76 + 153 + 12 + (disenar(1276, 'medio', 3, true).alto + 118)).toBeLessThanOrEqual(768)
+  })
+})
+
+
+// ── Pulido G3 ────────────────────────────────────────────────────────────────
+
+const parada = (desdeMin: number, hastaMin: number, extra: Partial<ParadaEje> = {}): ParadaEje => ({ desdeMin, hastaMin, dueno: 'sin-imputar', causa: 'Detencion', maquina: null, ...extra })
+
+describe('paradas: tiempo de reloj y episodios (no la suma por máquina)', () => {
+  const tres = [
+    parada(70, 125, { maquinaId: 'a', maquina: 'Evisceradora 1' }),
+    parada(70, 125, { maquinaId: 'b', maquina: 'Evisceradora 2' }),
+    parada(70, 125, { maquinaId: 'c', maquina: 'Evisceradora 3' }),
+  ]
+  it('3 paradas idénticas en Ev1–3 son 55 min de reloj y 1 episodio (la suma daba 165)', () => {
+    expect(minutosConParada(tres)).toBe(55)
+    expect(episodiosParada(tres)).toBe(1)
+  })
+  it('las paradas que se solapan o se tocan se fusionan; las separadas cuentan aparte', () => {
+    const ps = [parada(10, 20), parada(15, 30), parada(30, 40), parada(100, 105)]
+    expect(minutosConParada(ps)).toBe(35)
+    expect(episodiosParada(ps)).toBe(2)
+  })
+  it('las programadas no cuentan y lo que sale del eje se recorta', () => {
+    const ps = [parada(10, 20, { dueno: 'programado' }), parada(-5, 10), parada(440, 470)]
+    expect(minutosConParada(ps)).toBe(45)
+    expect(minutosConParada(ps, { min: 0, max: 450 })).toBe(20)
+    expect(episodiosParada(ps, { min: 0, max: 450 })).toBe(2)
+    expect(minutosConParada([])).toBe(0)
+    expect(episodiosParada([])).toBe(0)
+  })
+  it('`paradasEn` devuelve TODAS las que cubren el minuto, la más larga primero', () => {
+    const ps = [...tres, parada(60, 200, { maquinaId: 'd' }), parada(300, 310)]
+    const en = paradasEn(ps, 100.5)
+    expect(en.length).toBe(4)
+    expect(en[0]!.maquinaId).toBe('d')
+    expect(paradasEn(ps, 250)).toEqual([])
+    expect(paradaEn(ps, 100.5)?.maquinaId).toBe('d')
+  })
+  it('`paradasEnEje` conserva el id de la máquina', () => {
+    const grupos: GrupoDelTurno[] = [{ dueno: 'sin-imputar', min: 5, piezas: 0, causas: [{ reason: 'X', min: 5, count: 1, piezas: 0, categoria: null, extension: false, paradas: [{ hora: '22:10', hasta: '22:15', min: 5, desdeMin: 40, hastaMin: 45, maquina: 'Evisceradora 1', maquinaId: 'a' }] }] }]
+    expect(paradasEnEje(grupos, 0, 0)[0]!.maquinaId).toBe('a')
+  })
+})
+
+describe('horasMin', () => {
+  it('«X h Y min», «N min» y, bajo 1 min, segundos (no «0 min»)', () => {
+    expect(horasMin(125)).toBe('2 h 5 min')
+    expect(horasMin(55)).toBe('55 min')
+    expect(horasMin(0.6)).toBe('36 s')
+    expect(horasMin(0.01)).toBe('1 s')
+    expect(horasMin(0)).toBe('0 min')
+    expect(horasMin(119.6)).toBe('2 h 0 min')
+  })
+})
+
+describe('escala Y con zoom', () => {
+  it('el dominio sale de los datos visibles, con paso 100 / 200 / 500 / 1.000 según el rango y la rejilla cada 2 pasos', () => {
+    const casos: Array<[number, number, number]> = [[9300, 9800, 100], [13500, 15479, 200], [4000, 8000, 500], [1000, 9000, 1000]]
+    for (const [min, max, paso] of casos) {
+      const e = escalaVentana(min, max)
+      expect(e.paso).toBe(paso)
+      expect(e.rejilla).toBe(paso * 2)
+      expect(e.yMin).toBeLessThanOrEqual(min)
+      expect(e.yMax).toBeGreaterThanOrEqual(max)
+      expect(e.yMin % paso).toBe(0)
+      expect(e.yMax % e.rejilla).toBe(0)
+    }
+  })
+  it('deja aire arriba y abajo y nunca baja de 0', () => {
+    const e = escalaVentana(9400, 9800)
+    expect(e.yMin).toBeLessThan(9400)
+    expect(e.yMax).toBeGreaterThan(9800)
+    expect(escalaVentana(0, 300).yMin).toBe(0)
+    const plano = escalaVentana(5000, 5000)
+    expect(plano.yMax).toBeGreaterThan(plano.yMin)
+  })
+  it('las rayas son múltiplos de la rejilla (números redondos) y la última cae en `yMax`', () => {
+    expect(rayasY(0, 6000, 2000)).toEqual([0, 2000, 4000, 6000])
+    const e = escalaVentana(12700, 15300)
+    expect(e.paso).toBe(500)
+    const r = rayasY(e.yMin, e.yMax, e.rejilla)
+    expect(r.every((v) => v % e.rejilla === 0 && v >= e.yMin && v <= e.yMax)).toBe(true)
+    expect(r[r.length - 1]).toBe(e.yMax)
+    expect(e.yMin).toBe(12500)
+    expect(r).toEqual([13000, 14000, 15000, 16000])
+  })
+  it('`dominioVisible` toma los puntos dentro de la ventana y el valor interpolado en sus bordes', () => {
+    const a = [{ min: 0, v: 0 }, { min: 100, v: 1000 }]
+    const b = [{ min: 0, v: 0 }, { min: 100, v: 500 }]
+    expect(dominioVisible([a, b], 40, 60)).toEqual({ min: 200, max: 600 })
+    expect(dominioVisible([a], 200, 300)).toBeNull()
+    expect(dominioVisible([[]], 0, 10)).toBeNull()
+  })
+})
+
+describe('horas del eje X en múltiplos de reloj', () => {
+  const ini2130 = Date.UTC(2026, 9, 27, 21, 30)
+  const ini2140 = Date.UTC(2026, 9, 27, 21, 40)
+  const horas = (iniMs: number, marcas: number[]) => marcas.map((t) => new Date(iniMs + t * 60_000).toISOString().slice(11, 16))
+  it('turno que parte a las 21:30: 22:00, 23:00… y el inicio rotulado porque queda lejos de la primera marca', () => {
+    const m = marcasEje({ totalMin: 450, pxPorMin: 2.5, minPx: 100, ahoraMin: null, ahoraPx: 0, iniMs: ini2130 })
+    expect(horas(ini2130, m)).toEqual(['21:30', '22:00', '23:00', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00'])
+  })
+  it('turno que parte a las 21:40: la primera marca es 22:00 y el inicio NO se rotula si queda a menos de 0,6 de paso', () => {
+    const m = marcasEje({ totalMin: 450, pxPorMin: 2.5, minPx: 100, ahoraMin: null, ahoraPx: 0, iniMs: ini2140 })
+    expect(horas(ini2140, m)).toEqual(['22:00', '23:00', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00'])
+    expect(m).not.toContain(0)
+  })
+  it('con paso de 2 h cae en horas pares', () => {
+    const m = marcasEje({ totalMin: 450, pxPorMin: 0.58, minPx: 64, ahoraMin: null, ahoraPx: 0, iniMs: ini2130 })
+    expect(horas(ini2130, m).filter((_, i) => i > 0 && i < m.length - 1).every((h) => Number(h.slice(0, 2)) % 2 === 0 && h.endsWith(':00'))).toBe(true)
+  })
+  it('rótulo del «ahora» con ancla `end`: se omite la marca que se montaría sobre él (antes 04:30 pisaba «05:00 ahora»)', () => {
+    const m = marcasEje({ totalMin: 450, pxPorMin: 2.5, minPx: 100, ahoraMin: 435, ahoraPx: 64, iniMs: ini2130, ahoraAncla: 'end', ahoraRotuloPx: anchoRotuloAhora(12) })
+    expect(m).not.toContain(450)
+    expect(m).toContain(390)
+  })
+  it('con ancla `end` la zona sin marcas va hacia la izquierda: la marca de la derecha del texto no estorba', () => {
+    const m = marcasEje({ totalMin: 450, pxPorMin: 2.5, minPx: 100, ahoraMin: 300, ahoraPx: 64, iniMs: ini2130, ahoraAncla: 'end', ahoraRotuloPx: 64 })
+    expect(m).not.toContain(270)
+    expect(m).toContain(330)
+  })
+  it('con ancla `start` la zona va hacia la derecha y con `middle` es simétrica', () => {
+    const s = marcasEje({ totalMin: 450, pxPorMin: 2.5, minPx: 100, ahoraMin: 10, ahoraPx: 64, iniMs: ini2130, ahoraAncla: 'start', ahoraRotuloPx: 64 })
+    expect(s).not.toContain(0)
+    expect(s).not.toContain(30)
+    expect(s).toContain(90)
+    const c = marcasEje({ totalMin: 450, pxPorMin: 2.5, minPx: 100, ahoraMin: 215, ahoraPx: 64, iniMs: ini2130, ahoraAncla: 'middle', ahoraRotuloPx: 64 })
+    expect(c).not.toContain(210)
+    expect(c).toContain(150)
+    expect(c).toContain(270)
+  })
+  it('el ancho del rótulo: 64 px a 12 px y 59 px a 11 px', () => {
+    expect([anchoRotuloAhora(12), anchoRotuloAhora(11)]).toEqual([64, 59])
+  })
+})
+
+describe('cubetas de las barras con poco ancho', () => {
+  it('desde 2 px por minuto se dibuja minuto a minuto; debajo, cubetas de ≥ 3 px (a 375 en «Turno»: 6 min)', () => {
+    expect(minutosPorCubeta(3.5)).toBe(1)
+    expect(minutosPorCubeta(2)).toBe(1)
+    expect(minutosPorCubeta(1.99)).toBe(2)
+    expect(minutosPorCubeta(0.58)).toBe(6)
+    expect(minutosPorCubeta(0)).toBe(1)
+  })
+  it('la cubeta promedia pz/min y el esperado; el minuto parcial no entra al promedio si hay minutos cerrados', () => {
+    const suma = [10, 12, 14, 10, 10, 0]
+    const esp = suma.map(() => 20)
+    const cs = cubetasDeLinea(suma, esp, 3, 5)
+    expect(cs.length).toBe(2)
+    expect(cs[0]).toMatchObject({ k0: 0, len: 3, prom: 12, esperado: 20, parcial: false })
+    expect(cs[1]).toMatchObject({ k0: 3, len: 3, prom: 10, parcial: false })
+  })
+  it('una cubeta toda parcial se marca para dibujarla atenuada; sin esperado en algún minuto no hay esperado', () => {
+    const cs = cubetasDeLinea([10, 10, 10, 4], [20, 20, 20, null], 3, 3)
+    expect(cs[1]).toMatchObject({ prom: 4, esperado: null, parcial: true })
+    expect(cs[0]!.parcial).toBe(false)
+    expect(cubetasDeLinea([10, 10], [20, 20], 1, 2).every((c) => !c.parcial)).toBe(true)
+  })
+  it('la fila Ev toma el peor tono que ocupe 2 o más minutos de la cubeta', () => {
+    expect(tonoDeCubeta(['bien', 'bien', 'mal', 'bien', 'bien', 'bien'])).toBe('bien')
+    expect(tonoDeCubeta(['mal', 'mal', 'bien', 'bien', 'atento', 'sin'])).toBe('mal')
+    expect(tonoDeCubeta(['atento', 'atento', 'bien', 'bien', 'bien', 'bien'])).toBe('atento')
+    expect(tonoDeCubeta(['mal', 'bien'])).toBe('mal')
+    expect(tonoDeCubeta(['mal'])).toBe('mal')
+    expect(tonoDeCubeta(['sin', 'sin'])).toBe('sin')
+  })
+})
+
+describe('turno cerrado: hasta dónde llega el eje', () => {
+  const fin = Date.UTC(2026, 9, 28, 5, 0)
+  it('en vivo, el fin previsto', () => {
+    expect(finDelEje({ finMs: fin, cerrado: false, finRealMs: fin + 600_000 })).toBe(fin)
+  })
+  it('cerrado nunca encoge el eje (corte anticipado) y llega al fin real o al último dato si pasan del previsto', () => {
+    expect(finDelEje({ finMs: fin, cerrado: true, finRealMs: fin - 10 * 60_000, ultimoDatoMs: fin - 10 * 60_000 })).toBe(fin)
+    expect(finDelEje({ finMs: fin, cerrado: true, finRealMs: fin + 5 * 60_000 })).toBe(fin + 5 * 60_000)
+    expect(finDelEje({ finMs: fin, cerrado: true, finRealMs: null, ultimoDatoMs: fin + 2 * 60_000 })).toBe(fin + 2 * 60_000)
+    expect(finDelEje({ finMs: fin, cerrado: true, finRealMs: NaN })).toBe(fin)
+  })
+})
+
+describe('turno anterior: UNA cifra', () => {
+  const previo = [{ minutes: 5, pieces: 90 }, { minutes: 300, pieces: 9325 }, { minutes: 440, pieces: 14000 }]
+  it('en vivo es el valor de su curva en el mismo minuto desde la primera pieza (lo que se dibuja)', () => {
+    const c = cifraTurnoAnterior({ curva: previo, cerrado: false, ultimaMin: 305, baseMin: 5 })
+    expect(c).toEqual({ piezas: 9325, modo: 'a-esta-hora' })
+    expect(cifraTurnoAnterior({ curva: previo, cerrado: false, ultimaMin: 500, baseMin: 5 })).toBeNull()
+  })
+  it('cerrado es su total, el último punto de su curva COMPLETA (el mismo de «Comparado con otros días»)', () => {
+    expect(cifraTurnoAnterior({ curva: previo, cerrado: true, ultimaMin: 440, baseMin: 5 })).toEqual({ piezas: 14000, modo: 'al-cierre' })
+  })
+  it('sin curva (o con un solo punto) no hay cifra', () => {
+    expect(cifraTurnoAnterior({ curva: null, cerrado: false, ultimaMin: 10, baseMin: 0 })).toBeNull()
+    expect(cifraTurnoAnterior({ curva: [previo[0]!], cerrado: true, ultimaMin: 10, baseMin: 0 })).toBeNull()
+  })
+})
+
+describe('rótulos en vivo que se cruzan', () => {
+  it('la brecha baja a `yCierre + 16`; si no cabe, el cierre sube', () => {
+    expect(separarRotulos(100, 105, 200)).toEqual({ yBrecha: 121, yCierre: 105 })
+    expect(separarRotulos(190, 195, 200)).toEqual({ yBrecha: 190, yCierre: 174 })
+  })
+  it('lejos uno del otro no se tocan', () => {
+    expect(separarRotulos(100, 140, 200)).toEqual({ yBrecha: 100, yCierre: 140 })
   })
 })
