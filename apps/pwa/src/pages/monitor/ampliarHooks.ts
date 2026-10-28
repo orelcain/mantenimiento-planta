@@ -32,6 +32,22 @@ export function useAnchoMin(px: number) {
   return ok
 }
 
+/** Medida de un elemento, al día con su tamaño (lo usan los lienzos SVG de «El turno» y del Duelo en PC). */
+export function useTamano() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [t, setT] = useState({ w: 0, h: 0 })
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const medir = () => setT((a) => (a.w === el.clientWidth && a.h === el.clientHeight ? a : { w: el.clientWidth, h: el.clientHeight }))
+    medir()
+    const ro = new ResizeObserver(medir)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, t] as const
+}
+
 /** «Reducir movimiento» del sistema: sin resorte, sin desplazamiento, sin cuentas. */
 export function useMovimientoReducido() {
   const q = '(prefers-reduced-motion: reduce)'

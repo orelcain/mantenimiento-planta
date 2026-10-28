@@ -10,8 +10,10 @@
 import { useState, type ReactNode } from 'react'
 import { Flag, Trophy, Wrench } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, SegmentedControl } from '@/components/piel'
+import { useAnchoMin } from './ampliarHooks'
 import { Tarjeta } from './AmpliarV2'
 import { CarreraDueloV2 } from './CarreraDueloV2'
+import { DueloPC, type DueloPCExtra } from './DueloPC'
 import { fijarEquipoDelTurno, guardarNombresDuelo } from './dueloConfig'
 import {
   COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, EQUIPOS, etiquetaHora, fechaCorreccion, nombreCorto, nombreEquipo, otroEquipo, relojDeMinuto, rotuloFantasma, rotuloTurno, textoCorreContraEstaCurva,
@@ -607,12 +609,43 @@ function SelectorLineaDuelo({ lineas, className }: { lineas: LineasDuelo; classN
   )
 }
 
-export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeEditar, nombresGuardados, lineas }: DueloUiProps & {
+export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeEditar, nombresGuardados, lineas, pc }: DueloUiProps & {
   token: string | undefined
   puedeEditar: boolean
   nombresGuardados: NombresEquipos
   lineas?: LineasDuelo | null
+  /** Lo que el Duelo en PC necesita además de `datos`; sin él (o con menos de 1280 px) se arma la pestaña de siempre. */
+  pc?: DueloPCExtra | null
 }) {
+  const anchoPc = useAnchoMin(1280)
+  if (datos && pc && anchoPc) {
+    /* Opción B «Eje» (5b): una sola pantalla sin scroll. Arriba, y solo si hace falta, una fila fina con el selector de
+       línea (sin sesión) y los avisos; el editor de supervisores queda debajo del pliegue. */
+    const hayAviso = datos.corregido || datos.listos.con < datos.listos.de
+    const hayHermanas = !!lineas && lineas.hermanas.length > 0
+    return (
+      <div className="monitor-v2">
+        <DueloPC
+          datos={datos}
+          nombres={nombres}
+          unidad={unidad}
+          inicioMs={inicioMs}
+          extra={pc}
+          superior={hayHermanas || hayAviso ? (
+            <>
+              {hayHermanas && <SelectorLineaDuelo lineas={lineas!} className="dpc-linea" />}
+              {hayAviso && <div className="ml-auto"><AvisoDuelo d={datos} nombres={nombres} /></div>}
+            </>
+          ) : null}
+        />
+        {puedeEditar && token && (
+          <div className="mt-4 max-w-[560px]">
+            <EditorDuelo token={token} d={datos} nombres={nombres} nombresGuardados={nombresGuardados} />
+          </div>
+        )}
+      </div>
+    )
+  }
   if (!datos) {
     return (
       <div className="monitor-v2 flex flex-col gap-3">

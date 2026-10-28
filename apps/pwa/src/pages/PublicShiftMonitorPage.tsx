@@ -7552,6 +7552,16 @@ function MonitorDelToken() {
             token={token}
             puedeEditar={esSupervisorDuelo}
             nombresGuardados={configDuelo.equipos ?? {}}
+            pc={datosDuelo
+              ? {
+                  live,
+                  stats: data.shiftStats ?? [],
+                  serieHoy: serieMinutoVista ?? null,
+                  series: data.seriesMinuto ?? null,
+                  lectura: { valor: contador.valor, atMs: contador.corteWallMs },
+                  semilla: (data.pulse?.lecturas ?? []).map((l) => l.totalCycles),
+                }
+              : null}
             lineas={data.lineasHermanas && data.lineasHermanas.length > 0
               ? {
                   actual: data.areaLabel ?? data.lineLabel ?? 'Esta línea',

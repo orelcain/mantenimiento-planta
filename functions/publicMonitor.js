@@ -1673,6 +1673,23 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
        monitor no registra las imputaciones» (28-08, verificado contra la
        fuente: las imputaciones estaban, el payload no las publicaba). */
     const imputadasAcc = {}
+    /* Micro detención por HORA DE PRODUCCIÓN (hora 1 = los primeros 60 min desde la primera pieza, el mismo origen que
+       `curvaCompacta`), en segundos de MÁQUINA sumados entre máquinas: la MISMA regla que `microMin` (clasificación oficial
+       sobre los states saneados), así que `microH` suma lo que suma `mic` en `resumenDuelo`. Un tramo se reparte entre las
+       horas que cruza; lo que cae antes de la primera pieza va a la hora 1 y lo posterior al fin, a la última, para que el
+       total no se pierda. Sin primera pieza no hay eje: queda vacío. */
+    const t0Prod = arranqueProductivo ? arranqueProductivo.getTime() : null
+    const nHorasMicro = t0Prod != null ? Math.min(16, Math.max(1, Math.ceil((fin.getTime() - t0Prod) / 3_600_000))) : 0
+    const microSegPorHora = new Array(nHorasMicro).fill(0)
+    const repartirMicro = (aMs, bMs) => {
+      if (!nHorasMicro) return
+      for (let h = 0; h < nHorasMicro; h++) {
+        const desde = h === 0 ? -Infinity : t0Prod + h * 3_600_000
+        const hasta = h === nHorasMicro - 1 ? Infinity : t0Prod + (h + 1) * 3_600_000
+        const seg = (Math.min(bMs, hasta) - Math.max(aMs, desde)) / 1000
+        if (seg > 0) microSegPorHora[h] += seg
+      }
+    }
     const porMaquina = machines.map((m) => {
       /* Los states traen Timestamps de Firestore; el módulo espera fechas
          parseables (`new Date(Timestamp)` da NaN y el saneo lo bota todo). */
@@ -1694,6 +1711,12 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
           ]),
       )
       const k = kpisMantencion.kpisDeMaquina(saneados)
+      for (const s of saneados) {
+        if (kpisMantencion.clasificaCausa(s) !== 'micro') continue
+        /* `durationSec` ya es el solape con la ventana: el tramo recortado arranca en max(inicio, ventana.start). */
+        const a = Math.max(new Date(s.startAt).getTime(), ventana.start.getTime())
+        repartirMicro(a, a + s.durationSec * 1000)
+      }
       for (const e of k.eventosFalla) {
         eventosTodos.push({
           maquina: m.machineName || m.id,
@@ -1739,6 +1762,8 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
     })
     return {
       porMaquina,
+      /** Micro detención (min de máquina, suma entre máquinas) por hora de producción. Ver `repartirMicro`. */
+      microH: microSegPorHora.map((s) => Math.round(s / 6) / 10),
       /** Los eventos del turno, del más caro al más barato. Tope chico: el doc es público. */
       eventos: eventosTodos.sort((a, b) => b.min - a.min).slice(0, 6),
       /** Minutos con TODAS las máquinas detenidas sin causa a la vez. */
@@ -2425,7 +2450,7 @@ function eventosDelDuelo(l, iniMs) {
  *    inicio planificado, para marcarlas en la carrera. Ver `eventosDelDuelo`.
  *  - `cv`/`cvp`/`cvm`: curva acumulada compacta (cada 15 min) para correr un turno pasado. Ver `curvaCompacta`.
  */
-function resumenDuelo(l) {
+function resumenDuelo(l, serieMin = null) {
   const serie = (l?.series || []).filter(p => p && p.t)
   const iniMs = Date.parse(l?.scheduledStart ?? '')
   const finMs = Date.parse(l?.plannedEnd ?? l?.scheduledEnd ?? '')
@@ -2456,7 +2481,46 @@ function resumenDuelo(l) {
     alim,
     ev: eventosDelDuelo(l, iniMs),
     ...curvaCompacta(l),
+    /* Micro por hora de producción y por máquina, con la MISMA regla que `mic` (ver `microH` en `buildMonitorLive`):
+       `micH` suma ≈ `mic` y `micM` es `mic` por máquina, en el orden de `machines`. Siempre arreglos (vacíos sin dato):
+       `micH` presente es lo que marca al turno como ya rearmado en el caché. */
+    micH: Array.isArray(l?.mantencion?.microH) ? l.mantencion.microH : [],
+    micM: Array.isArray(mant) ? mant.map((m) => Math.round((m.microMin || 0) * 10) / 10) : [],
+    ...minutosA90(serieMin, l?.machines),
   }
+}
+
+/** Una máquina rinde «a ritmo» cuando produce al menos esta fracción de su esperado en el minuto. */
+const V90_FRACCION = 0.9
+
+/**
+ * Minutos sostenidos a ≥ 90 % del esperado, de la serie minuto a minuto ARCHIVADA del turno (`seriesMinuto`):
+ *  - `v90`: minutos en que la LÍNEA (suma de máquinas) produjo ≥ 90 % de la suma de sus esperados.
+ *  - `v90m`: lo mismo por máquina, en el orden de `machines` (máquina que falta en la serie: no se publica nada).
+ * Sin esperado en alguna máquina no se puede afirmar «a ritmo»: `v90` y `v90m` no viajan, pero `v90m: []` queda como
+ * marca de «ya mirado» (si no, el caché volvería a rearmar ese turno para siempre). Sin serie: `{}` (la clave
+ * no existe y el turno sigue sin dato, que es lo honesto: Shoplogix no devuelve el minuto a minuto de turnos viejos).
+ */
+function minutosA90(serieMin, machines) {
+  if (!serieMin) return {}
+  if (!Array.isArray(serieMin.maquinas) || !serieMin.maquinas.length || !Array.isArray(machines) || !machines.length) return { v90m: [] }
+  const porId = new Map(serieMin.maquinas.map((m) => [m.id, m]))
+  const mias = machines.map((m) => porId.get(m.id))
+  if (mias.some((m) => !m || !Array.isArray(m.cycles) || !(m.esperado > 0))) return { v90m: [] }
+  const largo = Math.min(...mias.map((m) => m.cycles.length))
+  const esperadoLinea = mias.reduce((a, m) => a + m.esperado, 0)
+  let linea = 0
+  const porMaq = mias.map(() => 0)
+  for (let i = 0; i < largo; i++) {
+    let suma = 0
+    mias.forEach((m, k) => {
+      const c = m.cycles[i] || 0
+      suma += c
+      if (c >= V90_FRACCION * m.esperado) porMaq[k]++
+    })
+    if (suma >= V90_FRACCION * esperadoLinea) linea++
+  }
+  return { v90: linea, v90m: porMaq }
 }
 
 /** Paso (min) de la curva compacta `shiftStats[].duelo.cv`: ~32 puntos por turno de 8 h. */
@@ -2497,7 +2561,7 @@ function curvaCompacta(live, paso = DUELO_CV_PASO_MIN) {
   return { cv, cvp: paso, cvm: fin.m }
 }
 
-async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null) {
+async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null, seriesMin = []) {
   const nowWall = shoplogixPolling.toChileWall(new Date())
   const desde = shiftDateKey(nowWall, -SHIFT_INDEX_LOOKBACK_DAYS)
 
@@ -2522,10 +2586,14 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
   // los tienen y se reconstruyen para poder armar `paradas`).
   const yaConstruidos = new Map([
     ...(history || [])
-      .filter(h => h.live?.timeBreakdown?.tbv === TBV && (h.live.timeBreakdown.recoverable || []).every(c => Array.isArray(c.tramos)))
+      .filter(h => h.live?.timeBreakdown?.tbv === TBV && (h.live.timeBreakdown.recoverable || []).every(c => Array.isArray(c.tramos))
+        /* Los lives anteriores al micro por hora no lo traen: reusarlos sellaría `micH: []` para siempre. */
+        && (h.live.mantencion == null || Array.isArray(h.live.mantencion.microH)))
       .map(h => [h.shiftDocId, h.live]),
   ])
   const conCurva = new Set((forecast || []).map(f => f.shiftDocId))
+  /* Series minuto a minuto archivadas (≤ 6 turnos): de ahí salen los minutos a ≥ 90 % de `duelo.v90`. */
+  const serieDe = new Map((seriesMin || []).filter(e => e && e.shiftDocId).map(e => [e.shiftDocId, e]))
 
   const out = []
   let nuevos = 0
@@ -2537,7 +2605,12 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev) && Array.isArray(cacheado.duelo.cv)) {
+    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev) && Array.isArray(cacheado.duelo.cv)
+      /* 5b (28-10-2026): micro por hora/máquina y minutos de línea por causa. Un turno sin ellos se rearma de a
+         STATS_NUEVOS_POR_CORRIDA; y uno que ahora SÍ tiene su serie minuto a minuto archivada y aún no trae `v90m`, una vez. */
+      && Array.isArray(cacheado.duelo.micH) && Array.isArray(cacheado.duelo.micM)
+      && (cacheado.recoverable || []).every(c => c.lineMin !== undefined)
+      && (Array.isArray(cacheado.duelo.v90m) || !serieDe.has(id))) {
       out.push(cacheado); continue
     }
     /*
@@ -2593,6 +2666,10 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
            Solo reason/min/count — ni paradas sueltas ni comentarios. */
         recoverable: (tb.recoverable || []).map(c => ({
           reason: c.reason, min: c.min, count: c.count ?? 0,
+          /* Minutos de LÍNEA y equivalentes (peso 1/N por máquina) de la causa, los mismos que muestra «El turno»:
+             el «Por qué» del Duelo usa `equivMin ?? lineMin ?? min` y cuadra con él. Solo si el desglose los trae. */
+          ...(Number.isFinite(c.lineMin) ? { lineMin: c.lineMin } : {}),
+          ...(Number.isFinite(c.equivMin) ? { equivMin: c.equivMin } : {}),
         })),
         /*
          * Piezas de CADA máquina en ese turno (pedido de Orel, 31-08: «que cada
@@ -2622,7 +2699,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
         paradas: paradasCompactas(tb.recoverable || []),
         /* Duelo de equipos (27-10-2026): arranque, última hora, micro detenciones
            y llenado por puesto de este turno. Ver `resumenDuelo`. */
-        duelo: resumenDuelo(l),
+        duelo: resumenDuelo(l, serieDe.get(id)),
         /*
          * ⚠⚠ NUNCA `undefined` en un doc de Firestore: lo rechaza y el write
          * del patch falla ENTERO — no solo este campo. Pasó el 16-08: cada
@@ -3038,7 +3115,7 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     forecastHistory: fhLinea,
     /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
        un turno contra el otro. Ver `buildShiftStats`. */
-    shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea, index, statsSkip),
+    shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea, index, statsSkip, seriesMinuto || monitor.seriesMinuto || []),
     statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
     forecastDescartados: podado(forecastSkip, 30),
     /* Duelo de equipos: el último turno cerrado del OTRO nombre. */
@@ -3240,6 +3317,7 @@ module.exports = {
   buildShiftStats,
   buildRivalCurve,
   resumenDuelo,
+  minutosA90,
   curvaCompacta,
   eventosDelDuelo,
   lineasHermanasDe,
