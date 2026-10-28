@@ -248,6 +248,12 @@ export interface PublicMonitorLive {
      */
     sinImputarLineaMin?: number
     /**
+     * Micro detención (min de máquina, sumada entre máquinas) por HORA DE PRODUCCIÓN: la hora 1 son los primeros 60 min
+     * desde la primera pieza. Suma lo mismo que `porMaquina[].microMin` (misma clasificación). Ausente en docs previos
+     * al 28-10-2026 (el Duelo en PC dice «sin dato»).
+     */
+    microH?: number[]
+    /**
      * Las causas IMPUTADAS del turno (todas: técnicas, externas, programadas
      * y excedidas — minutos de máquina sumados), de la más cara a la más
      * barata. Es lo que faltaba para que la tarjeta CUANTIFIQUE las
@@ -457,6 +463,19 @@ export interface ShiftDuelo {
   cvp?: number
   /** Minuto en que cae el último valor de `cv`. */
   cvm?: number
+  /**
+   * Micro detención por hora de producción (min de máquina, sumados) y por máquina (orden de `alim`/`porMaquina`), con la
+   * MISMA regla que `mic`. `[]` = sin dato; ausentes hasta que el backend rearma el turno (28-10-2026).
+   */
+  micH?: number[]
+  micM?: number[]
+  /**
+   * Minutos sostenidos a ≥ 90 % del esperado: de la línea (`v90`) y de cada máquina (`v90m`, orden de `porMaquina`).
+   * Salen de la serie minuto a minuto archivada: turnos sin ella no los traen (no se inventan). `v90m: []` = mirado
+   * sin poder afirmarlo (sin esperado en alguna máquina).
+   */
+  v90?: number
+  v90m?: number[]
 }
 
 /** Un turno resumido, sin curva. Ver `buildShiftStats` en las functions. */
@@ -469,8 +488,12 @@ export interface ShiftStat {
   windowMin?: number | null
   plannedMin?: number | null
   recoverableMin?: number | null
-  /** Causas recuperables del turno: `reason`, minutos y cantidad de paradas. */
-  recoverable?: Array<{ reason: string; min: number; count: number }>
+  /**
+   * Causas recuperables del turno: `reason`, minutos (de máquina) y cantidad de paradas. `lineMin` = minutos en que la
+   * LÍNEA entera estuvo detenida por la causa y `equivMin` = minutos de máquina × 1/N: los mismos que usa «El turno».
+   * Ausentes hasta que el backend rearma el turno (28-10-2026).
+   */
+  recoverable?: Array<{ reason: string; min: number; count: number; lineMin?: number; equivMin?: number }>
   /**
    * Piezas de cada máquina en ese turno (`n` nombre, `p` piezas). Con
    * `producingMin` reconstruye el «aporte al promedio» de turnos pasados —

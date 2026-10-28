@@ -18,7 +18,7 @@ import { Maximize2 } from 'lucide-react'
 import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
 import { Pill } from '@/components/piel'
 import { CapaAmpliada } from './AmpliarV2'
-import { useMovimientoReducido } from './ampliarHooks'
+import { useMovimientoReducido, useTamano } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
 import {
   acumulado, disenar, escalaY, finDelEje, minutosVisibles, paradaEn, pasoMarcas, pctARitmo, proyeccion, sumaPorMinuto,
@@ -55,22 +55,6 @@ const r1 = (n: number) => Math.round(n * 10) / 10
 const relojDe = (ms: number) => new Date(ms).toISOString().slice(11, 16)
 const horasMin = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`)
 const acota = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n))
-
-/** Medida de un elemento, al día con su tamaño. */
-function useTamano() {
-  const ref = useRef<HTMLDivElement>(null)
-  const [t, setT] = useState({ w: 0, h: 0 })
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const medir = () => setT((a) => (a.w === el.clientWidth && a.h === el.clientHeight ? a : { w: el.clientWidth, h: el.clientHeight }))
-    medir()
-    const ro = new ResizeObserver(medir)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  return [ref, t] as const
-}
 
 const COLOR_TONO: Record<TonoRitmo, string> = {
   bien: 'var(--v2-bien)',
