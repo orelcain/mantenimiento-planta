@@ -2841,6 +2841,53 @@ function ordenarSensorComoActual(shiftDocId, live, history) {
   }
 }
 
+/** Cada cuánto se vuelven a buscar las líneas hermanas: cambian cuando alguien genera o vence un link, no cada refresco. */
+const HERMANAS_TTL_MS = 60 * 60 * 1000
+
+/**
+ * Los otros monitores de LÍNEA vigentes de la misma planta (`chonchi-eviscerado` y `chonchi-filete`), para el
+ * selector «Eviscerado | Filete» del Duelo, que tiene que funcionar sin sesión. Una sola consulta por rango sobre
+ * `plantLineId` (solo lee los de esa planta); de cada línea se queda con el link que vence más tarde. Devuelve
+ * `[{ nombre, token }]` ordenado por nombre, o null si el monitor no trae `plantLineId` con prefijo de planta.
+ */
+async function lineasHermanasDe(db, monitor, nowMs = Date.now()) {
+  const id = String(monitor?.plantLineId || '')
+  const corte = id.indexOf('-')
+  if (corte <= 0) return null
+  const planta = id.slice(0, corte)
+  const snap = await db.collection(COLLECTION)
+    .where('plantLineId', '>=', `${planta}-`)
+    .where('plantLineId', '<', `${planta}.`)
+    .get()
+  const ahora = new Date(nowMs).toISOString()
+  const porLinea = new Map()
+  for (const d of snap.docs) {
+    const x = d.data() || {}
+    if (x.mode !== 'line' || !x.plantLineId || x.plantLineId === id || d.id === monitor.token) continue
+    if (String(x.expiresAt || '') <= ahora) continue
+    const previo = porLinea.get(x.plantLineId)
+    if (!previo || String(x.expiresAt) > String(previo.expiresAt)) {
+      porLinea.set(x.plantLineId, { token: d.id, nombre: x.areaLabel || x.plantLineId, expiresAt: x.expiresAt })
+    }
+  }
+  return [...porLinea.values()]
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    .map(({ nombre, token }) => ({ nombre, token }))
+}
+
+/** El trozo del parche con las líneas hermanas; vacío si aún están al día o no se pudieron buscar. */
+async function patchHermanas(db, monitor, nowMs = Date.now()) {
+  if (!monitor?.plantLineId) return {}
+  const at = Date.parse(monitor.lineasHermanasAt || '')
+  if (Array.isArray(monitor.lineasHermanas) && Number.isFinite(at) && nowMs - at < HERMANAS_TTL_MS) return {}
+  try {
+    const lineas = await lineasHermanasDe(db, monitor, nowMs)
+    return lineas ? { lineasHermanas: lineas, lineasHermanasAt: new Date(nowMs).toISOString() } : {}
+  } catch {
+    return {}
+  }
+}
+
 async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map(), shiftIndexByPlant = new Map()) {
   const plantSlug = monitor.plantSlug
   if (!plantSlug) return null
@@ -2893,6 +2940,7 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
       rivalCurve: await buildRivalCurve(
         db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11), monitor.rivalCurve, history, index, forecastSkip,
       ),
+      ...(await patchHermanas(db, monitor)),
     }
   }
 
@@ -2957,6 +3005,8 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     rivalCurve: await buildRivalCurve(
       db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.rivalCurve, history, index, forecastSkip,
     ),
+    /* Selector de línea del Duelo (sin sesión): los otros monitores vigentes de la planta. */
+    ...(await patchHermanas(db, monitor)),
     shiftDocId: publicado.shiftDocId,
     dateKey: publicado.shiftDocId.slice(0, 10),
     shiftId: publicado.shiftDocId.slice(11),
@@ -3151,6 +3201,8 @@ module.exports = {
   buildRivalCurve,
   resumenDuelo,
   eventosDelDuelo,
+  lineasHermanasDe,
+  patchHermanas,
   inferShiftEndFromDuration,
   buildMonitorPatch,
   archivarSerieMinuto,

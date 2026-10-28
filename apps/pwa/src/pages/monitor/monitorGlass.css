@@ -709,3 +709,21 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 @media (prefers-reduced-motion: reduce) {
   .duelo-barra-x, .duelo-barra-y { animation: none; }
 }
+
+/* ── Duelo · layout PC (pestaña, desde 1280 px) ──────────────────────────────
+   En celular y en el ampliado todo sigue apilado. En la pestaña a ancho de PC (`.duelo-pc`) las filas enfrentadas
+   pasan a una sola línea (cifra pegada a su barra, ganador al final) y algunas piezas cambian de lugar. */
+.fila-vs-pc, .duelo-pc-solo { display: none; }
+@media (min-width: 1280px) {
+  .duelo-pc .fila-vs-m, .duelo-pc .duelo-pc-oculto { display: none; }
+  .duelo-pc .fila-vs-pc { display: grid; }
+  .duelo-pc .duelo-pc-solo { display: block; }
+}
+
+/* El SegmentedControl compartido pinta la pastilla elegida con `bg-card`; dentro del monitor v2 oscuro resolvía a blanco
+   con texto claro (1,29:1). Aquí la pastilla es un tinte del propio color de texto sobre la pista: el contraste del texto
+   contra su fondo no depende de qué valor tome --card en el contexto. Solo dentro de `.monitor-v2`. */
+.monitor-v2 [role='tablist'].bg-muted > button[aria-selected='true'] > span.bg-card {
+  background: rgb(var(--foreground) / 0.16);
+  box-shadow: none;
+}

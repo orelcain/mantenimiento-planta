@@ -155,3 +155,62 @@ test('resumenDuelo: trae `ev` (siempre un arreglo) y ningún valor undefined o n
   assert.deepEqual(d.ev, [{ n: 'KNURO', o: 120, d: 10 }])
   assert.ok(Array.isArray(resumenDuelo({ series: [], machines: [] }).ev))
 })
+
+/** Un `db` de mentira con solo lo que usa la búsqueda de hermanas: collection().where().where().get(). */
+function dbConMonitores(docs) {
+  const consultas = []
+  return {
+    consultas,
+    collection: () => ({
+      where(campo, op, valor) {
+        const filtros = [[campo, op, valor]]
+        const q = { where(c, o, v) { filtros.push([c, o, v]); return q }, async get() { consultas.push(filtros); return { docs } } }
+        return q
+      },
+    }),
+  }
+}
+const docMon = (id, data) => ({ id, data: () => data })
+const AHORA = Date.parse('2026-10-27T12:00:00.000Z')
+const vence = (dias) => new Date(AHORA + dias * 86_400_000).toISOString()
+
+test('lineasHermanasDe: los otros monitores de línea vigentes de la misma planta, sin sesión y sin repetir línea', async () => {
+  const { lineasHermanasDe } = require('../publicMonitor')
+  const db = dbConMonitores([
+    docMon('tok-evi', { mode: 'line', plantLineId: 'chonchi-eviscerado', areaLabel: 'Eviscerado', expiresAt: vence(10) }),
+    docMon('tok-fil-viejo', { mode: 'line', plantLineId: 'chonchi-filete', areaLabel: 'Filete', expiresAt: vence(3) }),
+    docMon('tok-fil', { mode: 'line', plantLineId: 'chonchi-filete', areaLabel: 'Filete', expiresAt: vence(20) }),
+    docMon('tok-vencido', { mode: 'line', plantLineId: 'chonchi-otra', areaLabel: 'Otra', expiresAt: vence(-1) }),
+    docMon('tok-fijo', { mode: 'token', plantLineId: 'chonchi-embalaje', areaLabel: 'Embalaje', expiresAt: vence(5) }),
+  ])
+  const r = await lineasHermanasDe(db, { token: 'tok-evi', plantLineId: 'chonchi-eviscerado' }, AHORA)
+  assert.deepEqual(r, [{ nombre: 'Filete', token: 'tok-fil' }], 'sin sí misma, sin vencidos, sin links de turno fijo y con el link que vence más tarde')
+  assert.deepEqual(db.consultas[0], [['plantLineId', '>=', 'chonchi-'], ['plantLineId', '<', 'chonchi.']], 'una sola consulta por rango, solo de esa planta')
+})
+
+test('lineasHermanasDe: sin hermanas vigentes devuelve [] y un monitor sin plantLineId no consulta nada', async () => {
+  const { lineasHermanasDe } = require('../publicMonitor')
+  const solo = dbConMonitores([docMon('a', { mode: 'line', plantLineId: 'chonchi-eviscerado', areaLabel: 'Eviscerado', expiresAt: vence(5) })])
+  assert.deepEqual(await lineasHermanasDe(solo, { token: 'a', plantLineId: 'chonchi-eviscerado' }, AHORA), [])
+  const sin = dbConMonitores([])
+  assert.equal(await lineasHermanasDe(sin, { token: 'a', plantLineId: null }, AHORA), null)
+  assert.equal(sin.consultas.length, 0)
+})
+
+test('patchHermanas: se vuelve a buscar solo si pasó una hora; un error no rompe el parche', async () => {
+  const { patchHermanas } = require('../publicMonitor')
+  const db = dbConMonitores([docMon('b', { mode: 'line', plantLineId: 'chonchi-filete', areaLabel: 'Filete', expiresAt: vence(5) })])
+  const monitor = { token: 'a', plantLineId: 'chonchi-eviscerado' }
+  const nuevo = await patchHermanas(db, monitor, AHORA)
+  assert.deepEqual(nuevo.lineasHermanas, [{ nombre: 'Filete', token: 'b' }])
+  assert.equal(nuevo.lineasHermanasAt, new Date(AHORA).toISOString())
+  // Al día: no consulta (no cuesta lecturas en cada refresco).
+  const antes = db.consultas.length
+  assert.deepEqual(await patchHermanas(db, { ...monitor, ...nuevo }, AHORA + 10 * 60_000), {})
+  assert.equal(db.consultas.length, antes)
+  // Pasada la hora, vuelve a buscar.
+  assert.ok((await patchHermanas(db, { ...monitor, ...nuevo }, AHORA + 2 * 3600_000)).lineasHermanas)
+  // Un error de Firestore no tumba el refresco.
+  const roto = { collection: () => ({ where: () => ({ where: () => ({ get: async () => { throw new Error('boom') } }) }) }) }
+  assert.deepEqual(await patchHermanas(roto, monitor, AHORA), {})
+})

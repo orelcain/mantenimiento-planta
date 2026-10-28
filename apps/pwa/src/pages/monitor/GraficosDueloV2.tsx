@@ -58,19 +58,55 @@ function Mitad({ lado, texto, frac, opaca, id, retraso }: { lado: 'izq' | 'der';
   )
 }
 
-function FilaEnfrentada({ rotulo, nota, a, b, textoA, textoB, fa, fb, ganador, k }: {
+/** Una barra que crece desde el centro hacia afuera; el equipo que no gana la fila va más tenue. */
+function BarraCentro({ lado, frac, opaca, id, retraso }: { lado: 'izq' | 'der'; frac: number; opaca: boolean; id: EquipoId; retraso: number }) {
+  const izq = lado === 'izq'
+  return (
+    <div className={`flex h-2.5 min-w-0 overflow-hidden rounded-full bg-muted-foreground/[0.12] ${izq ? 'justify-end' : 'justify-start'}`}>
+      {frac > 0 && (
+        <div
+          className="duelo-barra-x h-full rounded-full"
+          style={{ width: `${Math.max(3, frac * 100)}%`, background: COLOR_EQUIPO[id], opacity: opaca ? 1 : 0.42, ['--origen' as string]: izq ? 'right' : 'left', animationDelay: `${retraso}ms` }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Una fila enfrentada. En celular y en el ampliado: rótulo y ganador arriba, cada valor sobre su barra. En la pestaña a
+ * ancho de PC (`.duelo-pc`, desde 1280 px) se cambia por una sola línea: rótulo, cifra pegada a su barra, las dos barras
+ * desde el centro, la otra cifra y el ganador al final. `ancho` fija la columna del rótulo según el gráfico.
+ */
+function FilaEnfrentada({ rotulo, nota, a, b, textoA, textoB, fa, fb, ganador, k, ancho }: {
   rotulo: string; nota?: string; a: LadoDuelo; b: LadoDuelo; textoA: string; textoB: string; fa: number; fb: number; ganador: Resultado; k: number
+  ancho: 'kpi' | 'puesto'
 }) {
   const sinGanador = ganador !== 'a' && ganador !== 'b'
+  const opacaA = sinGanador || ganador === 'a'
+  const opacaB = sinGanador || ganador === 'b'
+  const columnas = ancho === 'kpi'
+    ? 'grid-cols-[minmax(0,11rem)_4.5rem_minmax(0,1fr)_minmax(0,1fr)_4.5rem_minmax(0,9rem)]'
+    : 'grid-cols-[2.5rem_3rem_minmax(0,1fr)_minmax(0,1fr)_3rem_minmax(0,6rem)]'
   return (
     <li className="min-w-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 text-[15px] text-foreground">{rotulo}{nota && <span className="text-[13px] text-muted-foreground"> · {nota}</span>}</span>
-        <Ganador r={ganador} a={a} b={b} />
+      <div className="fila-vs-m">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="min-w-0 text-[15px] text-foreground">{rotulo}{nota && <span className="text-[13px] text-muted-foreground"> · {nota}</span>}</span>
+          <Ganador r={ganador} a={a} b={b} />
+        </div>
+        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+          <Mitad lado="izq" texto={textoA} frac={fa} opaca={opacaA} id={a.id} retraso={k * 40} />
+          <Mitad lado="der" texto={textoB} frac={fb} opaca={opacaB} id={b.id} retraso={k * 40} />
+        </div>
       </div>
-      <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-        <Mitad lado="izq" texto={textoA} frac={fa} opaca={sinGanador || ganador === 'a'} id={a.id} retraso={k * 40} />
-        <Mitad lado="der" texto={textoB} frac={fb} opaca={sinGanador || ganador === 'b'} id={b.id} retraso={k * 40} />
+      <div className={`fila-vs-pc items-center gap-x-2 py-1.5 ${columnas}`}>
+        <span className="min-w-0 text-[15px] leading-tight text-foreground">{rotulo}{nota && <span className="block text-[13px] text-muted-foreground">{nota}</span>}</span>
+        <span className="text-right text-[13px] tabular-nums text-foreground">{textoA}</span>
+        <BarraCentro lado="izq" frac={fa} opaca={opacaA} id={a.id} retraso={k * 40} />
+        <BarraCentro lado="der" frac={fb} opaca={opacaB} id={b.id} retraso={k * 40} />
+        <span className="text-left text-[13px] tabular-nums text-foreground">{textoB}</span>
+        <span className="justify-self-end"><Ganador r={ganador} a={a} b={b} /></span>
       </div>
     </li>
   )
@@ -95,7 +131,7 @@ export function KpiAKpiV2({ filas, a, b }: { filas: FilaVs[]; a: LadoDuelo; b: L
   return (
     <div className="mt-4">
       <Cabecera a={a} b={b} />
-      <ul className="mt-3 space-y-4">
+      <ul className="mt-3 max-w-[760px] space-y-4 xl:space-y-0">
         {filas.map((f, i) => (
           <FilaEnfrentada
             key={`${f.kpi}${f.rotulo}`}
@@ -104,6 +140,7 @@ export function KpiAKpiV2({ filas, a, b }: { filas: FilaVs[]; a: LadoDuelo; b: L
             nota={f.mejor === 'menor' ? 'menos es mejor' : undefined}
             a={a}
             b={b}
+            ancho="kpi"
             textoA={valorKpi(f.a, f.unidad, f.decimales)}
             textoB={valorKpi(f.b, f.unidad, f.decimales)}
             fa={f.fa}
@@ -126,12 +163,13 @@ export function PuestosVsV2({ puestos, a, b }: { puestos: PuestoMarcador[]; a: L
   return (
     <div className="mt-4">
       <Cabecera a={a} b={b} centro={`Puestos ganados: ${a.nombre} ${ganaA} – ${ganaB} ${b.nombre}`} />
-      <ul className="mt-3 space-y-4">
+      <ul className="mt-3 max-w-[520px] space-y-4 xl:space-y-0">
         {puestos.map((p, i) => (
           <FilaEnfrentada
             key={p.clave}
             k={i}
             rotulo={p.etiqueta}
+            ancho="puesto"
             a={a}
             b={b}
             textoA={pct(p.a)}
@@ -343,6 +381,43 @@ export function PeriodoDueloV2({ duelos, hoyKey, nombreDe }: { duelos: TurnoDuel
             </dl>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Resumen compacto para la columna del marcador en PC ──────────────────────
+
+/** Semana y mes actuales y la racha, en tres líneas: lo que el marcador de la jornada lleva al lado en PC. */
+export function ResumenCompactoV2({ duelos, hoyKey, rachas, nombreDe }: {
+  duelos: TurnoDuelo[]
+  hoyKey: string
+  rachas: Record<EquipoId, { actual: number; mejor: number }>
+  nombreDe: (e: EquipoId) => string
+}) {
+  const filas = (['semana', 'mes'] as const).map((tipo) => marcadorDePeriodo(duelos, tipo, periodosDisponibles(duelos, hoyKey, tipo)[0]!, hoyKey))
+  const quien = (e: EquipoId, pt: number) => (
+    <span style={{ color: COLOR_EQUIPO_TEXTO[e] }}>{nombreDe(e)} {pt}</span>
+  )
+  const lider = EQUIPOS.reduce<EquipoId | null>((m, e) => (rachas[e].actual > (m ? rachas[m].actual : 0) ? e : m), null)
+  return (
+    <div className="mt-4 text-[14px]">
+      {filas.map((mp) => {
+        const [x, y]: EquipoId[] = mp.puntos.cardenas >= mp.puntos.rebolledo ? ['cardenas', 'rebolledo'] : ['rebolledo', 'cardenas']
+        return (
+          <div key={mp.tipo} className="flex items-baseline justify-between gap-3 border-t py-2" style={{ borderColor: 'var(--v2-reja)' }}>
+            <span className="text-foreground">{mp.etiqueta}{mp.vigente ? ' (actual)' : ''}</span>
+            {mp.ganador == null
+              ? <span className="text-muted-foreground">sin jornadas cerradas</span>
+              : <span className="tabular-nums">{quien(x!, mp.puntos[x!])} – {quien(y!, mp.puntos[y!])}</span>}
+          </div>
+        )
+      })}
+      <div className="flex items-baseline justify-between gap-3 border-t py-2" style={{ borderColor: 'var(--v2-reja)' }}>
+        <span className="text-foreground">Racha</span>
+        {lider
+          ? <span className="tabular-nums" style={{ color: COLOR_EQUIPO_TEXTO[lider] }}>{nombreDe(lider)} {rachas[lider].actual} {rachas[lider].actual === 1 ? 'jornada' : 'jornadas'}</span>
+          : <span className="text-muted-foreground">sin racha en curso</span>}
       </div>
     </div>
   )

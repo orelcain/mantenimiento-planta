@@ -505,6 +505,54 @@ export function bandaDeCurvas(curvas: ReadonlyArray<readonly PacePoint[]>, pasoM
   return { media, min, max, turnos: validas.length }
 }
 
+// ── La referencia propia: el promedio del equipo en su mismo horario ─────────
+
+/**
+ * Lo que corre solo (la noche, que abre la jornada, o un día sin noche): su propia referencia en gris, el promedio y
+ * el rango de los últimos turnos DEL MISMO EQUIPO en el mismo horario (los de `forecastHistory`, que son del mismo
+ * turno por nombre). Con un solo turno es ese turno; sin ninguno, null.
+ */
+export function referenciaPropia(
+  hoy: TurnoHoy,
+  forecast: readonly ForecastHistoryShift[],
+  stats: readonly ShiftStat[],
+  overrides?: Readonly<Record<string, EquipoId>> | null,
+  maxN = 4,
+): BandaRival | null {
+  const horaDe = (id: string) => stats.find((s) => s.shiftDocId === id)?.duelo?.h0
+  const curvas = forecast
+    .filter((f) => {
+      if (f.shiftDocId === hoy.shiftDocId || numeroDeTurno(f.shiftDocId.slice(11)) !== numeroDeTurno(hoy.shiftId)) return false
+      const noche = esNocheDesdeHora(horaDe(f.shiftDocId)) ?? hoy.esNoche
+      return noche === hoy.esNoche && jornadaDe(f.shiftDocId.slice(0, 10), noche) < hoy.jornada && equipoDelTurno(f.shiftDocId, noche, overrides) === hoy.equipo
+    })
+    .sort((x, y) => (x.shiftDocId < y.shiftDocId ? 1 : x.shiftDocId > y.shiftDocId ? -1 : 0))
+    .map((f) => curvaDeForecast(f.curve))
+    .filter((c) => c.length >= 2)
+    .slice(0, maxN)
+  if (curvas.length === 0) return null
+  if (curvas.length === 1) return { media: curvas[0]!, min: curvas[0]!, max: curvas[0]!, turnos: 1 }
+  return bandaDeCurvas(curvas)
+}
+
+/**
+ * Pone el último punto de la curva al día con el contador en vivo (el mismo número de «Piezas ahora»): la curva
+ * llega hasta el último tramo cerrado y se queda atrás. Si ya hay curva, se agrega (o se corrige) el punto de «ahora»;
+ * si todavía no hay ningún tramo con piezas pero el contador ya cuenta, queda un punto con ese total.
+ * `ahoraMin` = minuto de producción al que corresponde el contador; sin él, el punto se pone en el último minuto.
+ */
+export function curvaConContador(curva: readonly PacePoint[], piezas: number, ahoraMin?: number | null): PacePoint[] {
+  const out = [...curva]
+  if (!(piezas > 0)) return out
+  const ultimo = out[out.length - 1]
+  if (!ultimo) return [{ minutes: Math.max(1, Math.round(ahoraMin ?? 1)), pieces: piezas }]
+  if (piezas <= ultimo.pieces) return out
+  const minutes = Math.max(ultimo.minutes, Math.round(ahoraMin ?? ultimo.minutes))
+  if (minutes === ultimo.minutes) out[out.length - 1] = { minutes, pieces: piezas }
+  else out.push({ minutes, pieces: piezas })
+  return out
+}
+
 // ── Color fijo por equipo ────────────────────────────────────────────────────
 
 /** Un color por equipo en TODAS las vistas (Cárdenas = acento, Rebolledo = naranjo suave); se define en `monitorGlass.css`. */
@@ -523,11 +571,10 @@ export const COLOR_EQUIPO_TEXTO: Readonly<Record<EquipoId, string>> = {
 
 export interface FantasmaRival {
   /**
-   * `jornada` = el turno del otro horario de LA MISMA jornada (la noche contra el día de la misma fecha de producción);
-   * `provisional` = el último turno del otro horario del rival, de una jornada anterior, mientras el de esta jornada no
-   * juega; `ultimo` = el mismo horario de la semana anterior (dato secundario); `promedio` = promedio, si no hay curva.
+   * `jornada` = la noche de LA MISMA jornada, que ya cerró (solo la corre el día); `ultimo` = el mismo horario de la
+   * semana anterior (dato secundario); `promedio` = promedio, si el último turno no trae curva.
    */
-  tipo: 'jornada' | 'provisional' | 'ultimo' | 'promedio'
+  tipo: 'jornada' | 'ultimo' | 'promedio'
   equipo: EquipoId
   /** Solo si es un turno concreto. */
   shiftDocId: string | null
@@ -560,9 +607,9 @@ type TurnoHoy = Pick<ResumenTurno, 'shiftDocId' | 'dateKey' | 'jornada' | 'shift
 export const horarioYJornada = (esNoche: boolean, jornada: string): string => `${esNoche ? 'noche' : 'día'} ${jornada.slice(8, 10)}/${jornada.slice(5, 7)}`
 
 /**
- * La línea punteada de la carrera: el turno del otro horario de la MISMA jornada y, mientras no existe, el último del
- * otro horario del rival (provisional). Sale de `rivalCurve`, que el backend publica para el turno vigente: el último
- * turno CERRADO del otro nombre. Si ese turno lo hizo el mismo equipo (borde de semana) no es un rival y no se usa.
+ * La línea punteada de la carrera del DÍA: la noche de la MISMA jornada, ya cerrada. Sale de `rivalCurve`, que el
+ * backend publica para el turno vigente: el último turno CERRADO del otro nombre. Si no es de esta jornada o lo hizo
+ * el mismo equipo no es el rival y no se usa: la noche abre la jornada y no compite con nadie mientras corre.
  */
 export function fantasmaDeJornada(
   hoy: TurnoHoy,
@@ -576,8 +623,9 @@ export function fantasmaDeJornada(
   const equipo = equipoDelTurno(rc.shiftDocId, esNoche, overrides)
   if (equipo === hoy.equipo) return null
   const jornada = jornadaDe(rc.dateKey, esNoche)
+  if (jornada !== hoy.jornada) return null
   return {
-    tipo: jornada === hoy.jornada ? 'jornada' : 'provisional',
+    tipo: 'jornada',
     equipo, shiftDocId: rc.shiftDocId, jornada, esNoche,
     curva: rc.curve.map((x) => ({ minutes: x.m, pieces: x.p })),
     total: rc.total, turnos: 1,
@@ -653,16 +701,18 @@ export const relojDeMinuto = (min: number): string => {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 }
 
-/**
- * El rótulo de la línea punteada, con equipo, horario y jornada: «Rebolledo · día 28/10»; el provisional lo dice:
- * «provisional · Rebolledo día 27/10»; el promedio: «Rebolledo · promedio de 3 turnos».
- */
+/** El rótulo de la línea punteada, con equipo, horario y jornada: «Rebolledo · día 28/10»; el promedio: «Rebolledo · promedio de 3 turnos». */
 export function rotuloFantasma(f: FantasmaRival, nombre: string): string {
   if (f.tipo === 'promedio' || !f.jornada) return `${nombre} · promedio de ${f.turnos} ${f.turnos === 1 ? 'turno' : 'turnos'}`
-  const cuando = horarioYJornada(f.esNoche, f.jornada)
-  if (f.tipo === 'provisional') return `provisional · ${nombre} ${cuando}`
-  return `${nombre} · ${cuando}`
+  return `${nombre} · ${horarioYJornada(f.esNoche, f.jornada)}`
 }
+
+/**
+ * La frase de la noche que abre la jornada: quién corre contra su curva, cuándo y desde qué hora. La usan la carrera
+ * y la tarjeta exprés, para que digan lo mismo: «Rebolledo corre contra esta curva el 28/10 desde las 07:15».
+ */
+export const textoCorreContraEstaCurva = (rival: string, jornada: string, inicioDia: string | null): string =>
+  `${rival} corre contra esta curva el ${jornada.slice(8, 10)}/${jornada.slice(5, 7)} ${inicioDia ? `desde las ${inicioDia}` : 'en el turno día'}`
 
 /** El rótulo del turno que se mira: «Cárdenas · noche 28/10». */
 export const rotuloTurno = (nombre: string, t: Pick<ResumenTurno, 'esNoche' | 'jornada'>): string => `${nombre} · ${horarioYJornada(t.esNoche, t.jornada)}`
@@ -960,19 +1010,6 @@ export function rivalDirecto(turno: ResumenTurno, candidatos: readonly ResumenTu
     c.shiftDocId !== turno.shiftDocId && c.jornada === turno.jornada && c.esNoche !== turno.esNoche && c.equipo !== turno.equipo) ?? null
 }
 
-/**
- * Mientras el rival de la jornada no juega (la noche corre primero), el provisional es el último turno del otro
- * horario de una jornada anterior hecho por el otro equipo. Sirve para mirar, nunca para sumar puntos.
- */
-export function rivalProvisional(turno: ResumenTurno, candidatos: readonly ResumenTurno[]): ResumenTurno | null {
-  let mejor: ResumenTurno | null = null
-  for (const c of candidatos) {
-    if (c.jornada >= turno.jornada || c.esNoche === turno.esNoche || c.equipo === turno.equipo) continue
-    if (!mejor || antes(mejor, c)) mejor = c
-  }
-  return mejor
-}
-
 /** Cada turno cerrado contra su rival de jornada, en orden de juego. Cada jornada es un partido que cuenta una vez por equipo. */
 export function duelosDeTurnos(resumenes: readonly ResumenTurno[]): TurnoDuelo[] {
   const orden = [...resumenes].sort((x, y) => (antes(x, y) ? -1 : antes(y, x) ? 1 : 0))
@@ -1164,13 +1201,18 @@ export function costoMantencion(resumenes: readonly ResumenTurno[]): Record<Equi
 
 export interface CarreraDuelo {
   hoy: PacePoint[]
-  /** La curva que corre enfrente: el turno del otro horario de la jornada (o su provisional). */
+  /** La curva que corre enfrente: la noche de la misma jornada (solo la corre el día). */
   fantasma: PacePoint[] | null
   /** Quién es el fantasma; null si no hay curva. */
   fantasmaInfo: FantasmaRival | null
   /** El equipo contra el que se corre, haya o no curva para mostrar. */
   rivalEquipo: EquipoId
+  /**
+   * La referencia en gris: con fantasma, el rango del rival en el mismo horario; sin él (la noche que abre la jornada,
+   * o un día sin noche), el promedio y rango del PROPIO equipo (`bandaPropia`).
+   */
   banda: BandaRival | null
+  bandaPropia: boolean
   /** Ritmo de cada hora, hoy contra el fantasma. */
   ritmoHoras: HoraRitmo[]
   /** Paradas de hoy en el eje de horas de producción. */
@@ -1194,10 +1236,14 @@ export interface SemanaAnterior {
 
 export interface DatosDuelo {
   hoy: ResumenTurno
-  /** El rival de la jornada (el otro horario de la misma fecha de producción) o, mientras no juega, el provisional. */
+  /** El rival de la jornada: la noche si miramos el día, o el día si miramos una noche ya cerrada. Null mientras no existe o la noche corre. */
   rival: ResumenTurno | null
-  /** El rival es el provisional: el de esta jornada todavía no juega o no cerró. El marcador no suma puntos. */
-  provisional: boolean
+  /** Este turno es la NOCHE: abre la jornada y no compite con nadie mientras corre. */
+  abreJornada: boolean
+  /** La noche ya cerró y su día todavía no: la jornada espera a este equipo para asignar puntos. */
+  esperando: EquipoId | null
+  /** HH:MM de inicio planificado del turno día, si se conoce (para «corre contra esta curva mañana desde las…»). */
+  inicioDia: string | null
   marcador: Marcador | null
   carrera: CarreraDuelo | null
   semanaAnterior: SemanaAnterior | null
@@ -1225,8 +1271,10 @@ export interface DatosDuelo {
 export interface EntradaDuelo {
   shiftDocId: string
   live: PublicMonitorLive
-  /** El contador que muestra la pantalla. */
+  /** El contador EN VIVO que muestra la pantalla («Piezas ahora»): manda sobre el último punto de la curva. */
   piezas: number
+  /** Hora de planta (wall-clock en ms) a la que corresponde ese contador; extiende la curva hasta «ahora». */
+  ahoraMs?: number | null
   cerrado: boolean
   /** Curva acumulada de hoy desde la primera pieza (`cumulativeFromStart`). */
   curvaHoy: readonly PacePoint[]
@@ -1249,46 +1297,55 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const cerrados = hoy.cerrado ? [...deStats, hoy] : deStats
   const duelos = duelosDeTurnos(cerrados)
 
-  /* El rival es el otro horario de LA MISMA jornada; si todavía no juega, el último del otro horario (provisional). */
-  const delaJornada = rivalDirecto(hoy, deStats)
-  const rival = delaJornada ?? rivalProvisional(hoy, deStats)
-  const provisional = rival != null && delaJornada == null
+  /* La NOCHE abre la jornada y no compite con nadie mientras corre: el rival (el día de la misma fecha) juega después.
+     Cerrada, se compara solo si su día ya cerró. El DÍA corre contra la noche de su jornada, que ya cerró. */
+  const abreJornada = hoy.esNoche
+  const rival = abreJornada && !hoy.cerrado ? null : rivalDirecto(hoy, deStats)
+  const esperando = abreJornada && hoy.cerrado && !rival ? otroEquipo(hoy.equipo) : null
+  const inicioDia = [...deStats].filter((r) => !r.esNoche && r.h0).sort((x, y) => (antes(x, y) ? 1 : -1))[0]?.h0 ?? null
 
-  /* La línea punteada sale de la curva del rival publicada para el turno vigente. */
-  const fantasmaInfo = fantasmaDeJornada(hoy, e.rivalCurve, e.stats, e.overrides)
+  /* La línea punteada sale de la curva del rival publicada para el turno vigente, y solo la corre el día. */
+  const fantasmaInfo = abreJornada ? null : fantasmaDeJornada(hoy, e.rivalCurve, e.stats, e.overrides)
   const fantasma = fantasmaInfo ? fantasmaInfo.curva : null
-  const curvaHoy = [...e.curvaHoy]
+
+  /* El total y el punto actual son el contador EN VIVO, no el último tramo cerrado de la curva. */
+  const primeraPieza = desdePrimeraPieza(e.live.series).find((p) => (p.pieces ?? 0) > 0)
+  const t0 = primeraPieza?.t ? Date.parse(primeraPieza.t) : NaN
+  const ahoraMin = e.ahoraMs != null && Number.isFinite(t0) ? (e.ahoraMs - t0) / 60_000 : null
+  const curvaHoy = curvaConContador(e.curvaHoy, e.piezas, ahoraMin)
   const minuto = curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.minutes : 0
+  const hoyPz = e.piezas > 0 ? e.piezas : curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.pieces : 0
   const fantasmaPz = fantasma && fantasma.length ? piezasAlMinuto(fantasma, minuto) : null
 
-  /* A igual tiempo de turno solo si el fantasma ES el rival del marcador; si no, la carrera en vivo no es comparable. */
+  /* A igual tiempo de turno solo si el fantasma ES el rival del marcador. */
   const mismoRival = rival != null && fantasmaInfo != null && fantasmaInfo.shiftDocId === rival.shiftDocId
   const marcador = rival
     ? compararTurnos(hoy, rival, { carreraEnVivo: !hoy.cerrado && fantasmaPz != null && mismoRival ? { a: hoy.piezas, b: fantasmaPz } : null })
     : null
 
-  /* Dato secundario, sin puntos: el mismo horario de la semana anterior (noche contra noche, día contra día). */
+  /* Dato secundario, sin puntos: el mismo horario de la semana anterior. No aplica a la noche que corre sola. */
   const mismoHorario = referenciaMismoHorario(hoy, e.forecast, e.stats, e.overrides)
-  const banda = mismoHorario.banda
-  const semanaAnterior: SemanaAnterior | null = mismoHorario.fantasma
+  const propia = fantasmaInfo ? null : referenciaPropia(hoy, e.forecast, e.stats, e.overrides)
+  const banda = fantasmaInfo ? mismoHorario.banda : propia
+  const semanaAnterior: SemanaAnterior | null = mismoHorario.fantasma && !(abreJornada && !hoy.cerrado)
     ? (() => {
         const pzAHora = mismoHorario.fantasma.curva.length ? piezasAlMinuto(mismoHorario.fantasma.curva, minuto) : null
         return {
           fantasma: mismoHorario.fantasma,
           pzAHora,
-          diferencia: pzAHora != null && curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.pieces - pzAHora : null,
+          diferencia: pzAHora != null && curvaHoy.length ? hoyPz - pzAHora : null,
         }
       })()
     : null
 
   const carrera: CarreraDuelo | null = curvaHoy.length
     ? {
-        hoy: curvaHoy, fantasma, fantasmaInfo, rivalEquipo: otroEquipo(hoy.equipo), banda,
+        hoy: curvaHoy, fantasma, fantasmaInfo, rivalEquipo: otroEquipo(hoy.equipo), banda, bandaPropia: fantasmaInfo == null,
         ritmoHoras: ritmoHoraAHora(curvaHoy, fantasma ?? []),
         eventosHoy: eventosEnEjeProduccion(eventosCrudosDeLive(e.live), hoy.arranqueMin),
         minuto, hora: horaTranscurrida(minuto),
-        hoyPz: curvaHoy[curvaHoy.length - 1]!.pieces, fantasmaPz,
-        diferencia: fantasmaPz != null ? curvaHoy[curvaHoy.length - 1]!.pieces - fantasmaPz : null,
+        hoyPz, fantasmaPz,
+        diferencia: fantasmaPz != null ? hoyPz - fantasmaPz : null,
       }
     : null
 
@@ -1296,7 +1353,7 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const hoyIndice = ciclo.indice
   const delCiclo = cerrados.filter((r) => cicloDe(r.jornada).indice === hoyIndice)
   return {
-    hoy, rival, provisional, marcador, carrera, semanaAnterior,
+    hoy, rival, abreJornada, esperando, inicioDia, marcador, carrera, semanaAnterior,
     ciclo: marcadorDeCiclo(duelos, hoyIndice, hoyIndice),
     cicloPrevio: marcadorDeCiclo(duelos, hoyIndice - 1, hoyIndice),
     rachas: rachasPorEquipo(duelos),

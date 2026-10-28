@@ -333,6 +333,8 @@ export interface PulsoMonitor {
 
 export interface PublicShiftMonitorDoc {
   token: string
+  /** Los otros monitores de línea vigentes de la misma planta (para el selector del Duelo, sin sesión). */
+  lineasHermanas?: Array<{ nombre: string; token: string }>
   mode?: MonitorMode
   plantSlug: string
   dateKey: string
