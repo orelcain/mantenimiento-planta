@@ -68,19 +68,21 @@ function Seccion({ titulo, sub, plano, icono, children, className }: { titulo: s
 const Nota = ({ children }: { children: ReactNode }) => <p className="mt-3 text-[13px] leading-snug text-muted-foreground">{children}</p>
 
 function Cifras({ izq, der }: { izq: { nombre: string; valor: string; unidad?: string; color: string }; der: { nombre: string; valor: string; unidad?: string; color: string } | null }) {
+  /* El nombre puede bajar a un 2.º renglón («Cárdenas a la misma hora» a 375 px) en vez de cortarse con «…»: cada columna es un subgrid de
+     dos filas (nombre · cifra) y la fila del nombre mide lo del más alto, así las dos cifras quedan en la misma base. */
   const col = (c: { nombre: string; valor: string; unidad?: string; color: string }) => (
-    <div className="min-w-0">
-      <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-        <i className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: c.color }} aria-hidden="true" />
-        <span className="truncate">{c.nombre}</span>
+    <div className="row-span-2 grid min-w-0 [grid-template-rows:subgrid]">
+      <div className="flex items-start gap-1.5 text-[13px] leading-[18px] text-muted-foreground">
+        <i className="mt-[5px] inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: c.color }} aria-hidden="true" />
+        <span className="min-w-0">{c.nombre}</span>
       </div>
-      <div className="mt-1 flex items-baseline gap-1.5">
+      <div className="flex items-baseline gap-1.5">
         <span className="v2-cifra-chica tabular-nums font-semibold leading-none tracking-tight text-foreground">{c.valor}</span>
         {c.unidad && <span className="text-[15px] text-muted-foreground">{c.unidad}</span>}
       </div>
     </div>
   )
-  return <div className="mt-3 grid grid-cols-2 gap-3">{col(izq)}{der && col(der)}</div>
+  return <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">{col(izq)}{der && col(der)}</div>
 }
 
 // ── Bloques ──────────────────────────────────────────────────────────────────
@@ -122,7 +124,7 @@ function BloqueCarrera({ d, nombres, inicioMs, plano, className }: { d: DatosDue
             <p className="mt-2 text-[13px] leading-snug text-muted-foreground">Esperando a {b.nombre}: la jornada suma puntos cuando cierre su turno de día.</p>
           ) : c.fantasmaPz != null && fan ? (
             <p className="mt-2 text-[13px] leading-snug tabular-nums text-muted-foreground">
-              A la misma hora de producción ({horas(c.minuto)}), {rotuloFantasma(fan, b.nombre)} llevaba {int(c.fantasmaPz)} pz
+              A la misma hora de producción ({horas(c.minuto)}), {rotuloFantasma(fan, b.nombre)}: {int(c.fantasmaPz)} pz hechas
               {fan.total != null ? `; ese turno cerró con ${int(fan.total)} pz` : ''}.
             </p>
           ) : d.rival ? (
@@ -147,13 +149,13 @@ function BloqueCarrera({ d, nombres, inicioMs, plano, className }: { d: DatosDue
               : undefined}
             conMediaDeBanda={fan?.tipo !== 'promedio'}
             alto={plano ? 240 : undefined}
-            ariaLabel={`Piezas acumuladas por hora de producción de ${a.nombre} contra ${b.nombre}`}
+            ariaLabel={`Piezas hechas por hora de producción de ${a.nombre} contra ${b.nombre}`}
           />
           {d.semanaAnterior && (
             <Nota>
               Mismo horario de la semana anterior, sin puntos: {rotuloFantasma(d.semanaAnterior.fantasma, b.nombre)}
               {d.semanaAnterior.pzAHora != null && d.semanaAnterior.diferencia != null
-                ? ` llevaba ${int(d.semanaAnterior.pzAHora)} pz a esta hora (${a.nombre} ${firmado(d.semanaAnterior.diferencia)} pz).`
+                ? `, ${int(d.semanaAnterior.pzAHora)} pz hechas a esta hora (${a.nombre} ${firmado(d.semanaAnterior.diferencia)} pz).`
                 : '.'}
             </Nota>
           )}
@@ -169,7 +171,7 @@ function BloqueRitmo({ d, nombres, plano, className }: { d: DatosDuelo; nombres:
   const { a, b } = lados(d, nombres)
   const horasRitmo = d.carrera?.ritmoHoras ?? []
   return (
-    <Seccion titulo="Ritmo hora a hora" sub="pz/min de cada hora de producción, con las paradas adentro" plano={plano} className={className}>
+    <Seccion titulo="Ritmo hora a hora" sub="pz/min de cada hora de producción, con las detenciones adentro" plano={plano} className={className}>
       {horasRitmo.length > 0 && d.carrera?.fantasma ? (
         <RitmoHoraV2 horas={horasRitmo} a={a} b={b} nombreRival={b.nombre} />
       ) : d.abreJornada && !d.hoy.cerrado ? (
@@ -459,7 +461,7 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
             mini
             hoy={{ nombre: a.nombre, color: COLOR_EQUIPO[a.id], colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy }}
             banda={c.banda}
-            ariaLabel={`Piezas acumuladas de ${a.nombre} en la noche que abre la jornada ${jornada}`}
+            ariaLabel={`Piezas hechas de ${a.nombre} en la noche que abre la jornada ${jornada}`}
           />
         </>
       ) : c && c.fantasmaPz != null && fan ? (
@@ -481,7 +483,7 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
             mini
             hoy={{ nombre: a.nombre, color: COLOR_EQUIPO[a.id], colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy }}
             rival={{ nombre: b.nombre, color: COLOR_EQUIPO[fan.equipo], curva: fan.curva }}
-            ariaLabel={`Piezas acumuladas de ${a.nombre} contra ${b.nombre} a la misma hora de producción`}
+            ariaLabel={`Piezas hechas de ${a.nombre} contra ${b.nombre} a la misma hora de producción`}
           />
         </>
       ) : c ? (

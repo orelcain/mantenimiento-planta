@@ -40,7 +40,7 @@ describe('veredictoFallaDeMaquina', () => {
   it('con paradas imputadas y ninguna de Mantención, sí lo afirma', () => {
     const v = veredictoFallaDeMaquina([grupo('externo', 40)])!
     expect(v.sinImputarMin).toBe(0)
-    expect(v.texto).toBe('✓ Ninguna parada por falla de máquina en este turno.')
+    expect(v.texto).toBe('✓ Ninguna detención por falla de máquina en este turno.')
   })
 
   it('si queda tiempo sin imputar, la frase dice hasta dónde llega', () => {

@@ -422,7 +422,7 @@ export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { ca
     nota: enVivo
       ? 'Piezas a igual tiempo de turno. El punto se confirma al cierre, sumando las piezas que las fallas técnicas le quitaron a cada equipo.'
       : 'Piezas del turno más las que las fallas técnicas le quitaron al equipo.',
-    filas: [{ rotulo: enVivo ? 'Piezas a esta hora' : 'Piezas con Mantención sumada', a: carreraA, b: carreraB, unidad: 'pz', decimales: 0, mejor: 'mayor', ganador: comparar(carreraA, carreraB, 'mayor') }],
+    filas: [{ rotulo: enVivo ? 'Hechas a esta hora' : 'Piezas con Mantención sumada', a: carreraA, b: carreraB, unidad: 'pz', decimales: 0, mejor: 'mayor', ganador: comparar(carreraA, carreraB, 'mayor') }],
     ganador: !cerrado && !enVivo ? 'pendiente' : comparar(carreraA, carreraB, 'mayor'),
   }
   const ritmo: KpiMarcador = {

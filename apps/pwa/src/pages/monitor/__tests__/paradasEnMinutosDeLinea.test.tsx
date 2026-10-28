@@ -71,7 +71,7 @@ const texto = () => render(
 describe('las paradas se valorizan en minutos de LÍNEA', () => {
   it('OJO: 12 min de línea a 34,9 pz/min son ~420 pz, no 2.066', () => {
     const t = texto()
-    const m = /Paradas[^\d]*([\d.]+) pz/.exec(t)
+    const m = /Detenciones[^\d]*([\d.]+) pz/.exec(t)
     expect(m).not.toBeNull()
     const pz = Number(m![1]!.replace(/\./g, ''))
     // Con `lineMin` (12 de línea) el costo cae al orden de los 400.
@@ -81,7 +81,7 @@ describe('las paradas se valorizan en minutos de LÍNEA', () => {
 
   it('el costo no puede pedir un ritmo que la línea no da', () => {
     const t = texto()
-    const pz = Number(/Paradas[^\d]*([\d.]+) pz/.exec(t)![1]!.replace(/\./g, ''))
+    const pz = Number(/Detenciones[^\d]*([\d.]+) pz/.exec(t)![1]!.replace(/\./g, ''))
     // 12 minutos de línea detenida: cualquier cifra que implique más de 60
     // pz/min es imposible en una línea de tres Baader.
     expect(pz / 12).toBeLessThan(60)

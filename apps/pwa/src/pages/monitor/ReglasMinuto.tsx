@@ -171,7 +171,7 @@ function Cuadre({ rep, minuto }: { rep: Reproduccion; minuto: MinutoVista }) {
     <p ref={ref} className="rm-cuadre tabular-nums" data-on="false">
       <i aria-hidden />
       cierre {horaDeWall(minuto.finMs)} · {cerrado != null ? int(cerrado) : '–'} pz = suma de las Baader
-      {resto != null && resto > 0 ? ` · el contador de planta va ${int(resto)} adelante (minuto en curso)` : ''}
+      {resto != null && resto > 0 ? ` · el contador de planta lleva ${int(resto)} más (minuto en curso)` : ''}
     </p>
   )
 }

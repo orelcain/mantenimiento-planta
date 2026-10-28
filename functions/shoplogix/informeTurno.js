@@ -529,8 +529,8 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
       + 'Una causa que el arbol de imputacion no puede separar sale como "Electrica o Mecanica": el dato de Shoplogix no distingue cual fue.'
 
   const notaLamina3 = unaSolaMaquina
-    ? 'Permite responder a que hora fue sin abrir Shoplogix, y ver como se repartieron las paradas en el turno: '
-      + 'muchas paradas cortas y seguidas son un problema de flujo, y una sola parada larga es una averia. '
+    ? 'Permite responder a que hora fue sin abrir Shoplogix, y ver como se repartieron las detenciones en el turno: '
+      + 'muchas detenciones cortas y seguidas son un problema de flujo, y una sola detencion larga es una averia. '
       + 'No es lo mismo aunque sumen los mismos minutos.'
     : 'Permite responder a que hora fue sin abrir Shoplogix, y muestra si las maquinas cayeron juntas '
       + '(un problema de linea) o escalonadas (fallas independientes). Cuando varias caen a la misma hora, casi siempre es '
@@ -701,7 +701,7 @@ function construirTextos({ resumen, recuperaciones, reparto, ocupacion, cotejo, 
   if (enCurso) {
     const hasta = resumen.finMs ? hhmm(resumen.finMs) : null
     veredictoTitulo = 'Turno EN CURSO — foto parcial'
-    veredictoDetalle = `Van ${num(resumen.ciclos)} ciclos${hasta ? ` con datos hasta las ${hasta}` : ''}. `
+    veredictoDetalle = `${num(resumen.ciclos)} ciclos hechos${hasta ? ` con datos hasta las ${hasta}` : ''}. `
       + 'Este informe se pidio a mitad del turno: los numeros son de lo que va corrido y pueden cambiar '
       + 'bastante antes del cierre. El cotejo con otros turnos compara un turno incompleto contra turnos '
       + 'completos, asi que ahi la comparacion NO vale.'

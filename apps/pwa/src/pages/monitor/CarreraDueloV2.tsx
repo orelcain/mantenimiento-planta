@@ -208,7 +208,7 @@ export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda
           </>
         )}
         {!mini && (
-          <span className="pointer-events-none absolute left-0 top-0 -translate-y-full text-[11px] tabular-nums text-muted-foreground">eje: hasta {int(techo)} pz acumuladas</span>
+          <span className="pointer-events-none absolute left-0 top-0 -translate-y-full text-[11px] tabular-nums text-muted-foreground">eje: hasta {int(techo)} pz hechas</span>
         )}
       </div>
       {!mini && rival && rival.eventos && rival.eventos.length > 0 && <div className="mt-2">{carril(rival)}</div>}
@@ -226,7 +226,7 @@ export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda
             <span className="inline-flex items-center gap-1.5"><i className="h-[3px] w-4 rounded-full" style={{ background: hoy.color }} />{hoy.rotulo ?? hoy.nombre}</span>
             {rival && <span className="inline-flex items-center gap-1.5"><i className="h-0 w-4 border-t-[3px] border-dashed" style={{ borderColor: rival.color }} />{rival.rotulo ?? rival.nombre}</span>}
             {banda && <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-4 rounded-[3px]" style={{ background: 'var(--v2-tenue)', opacity: 0.35 }} />{bandaRotulo ?? `Promedio y rango del rival (${banda.turnos} turnos)`}</span>}
-            {hayParadas && <span className="inline-flex items-center gap-1.5"><i className="h-1.5 w-4 rounded-full" style={{ background: 'var(--v2-tenue)' }} />Paradas de 5 min o más en alguna máquina (las programadas, más suaves)</span>}
+            {hayParadas && <span className="inline-flex items-center gap-1.5"><i className="h-1.5 w-4 rounded-full" style={{ background: 'var(--v2-tenue)' }} />Detenciones de 5 min o más en alguna máquina (las programadas, más suaves)</span>}
           </div>
         </>
       )}

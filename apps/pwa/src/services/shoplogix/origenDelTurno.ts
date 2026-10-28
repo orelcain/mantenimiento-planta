@@ -91,7 +91,7 @@ export function veredictoOrigenDelTurno(
         `cayeron en colación o reunión, que no es causa)`
       : ''
     const sinImprevista =
-      `Ninguno de los ${e.totalParos} paros coincidió con una parada imprevista de las ` +
+      `Ninguno de los ${e.totalParos} paros coincidió con una detención imprevista de las ` +
       `Baader${programados}`
 
     if (pctRitmo != null) {

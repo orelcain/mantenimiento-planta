@@ -362,10 +362,10 @@ export function veredictoFallaDeMaquina(
 
   const sinImputarMin = grupos.find((g) => g.dueno === 'sin-imputar')?.min ?? 0
   if (sinImputarMin <= 0) {
-    return { texto: '✓ Ninguna parada por falla de máquina en este turno.', sinImputarMin: 0 }
+    return { texto: '✓ Ninguna detención por falla de máquina en este turno.', sinImputarMin: 0 }
   }
   return {
-    texto: `✓ Ninguna parada con causa anotada fue falla de máquina · quedan ${fmtDur(sinImputarMin)} sin imputar.`,
+    texto: `✓ Ninguna detención con causa anotada fue falla de máquina · quedan ${fmtDur(sinImputarMin)} sin imputar.`,
     sinImputarMin,
   }
 }

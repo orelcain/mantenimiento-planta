@@ -296,34 +296,17 @@
   --v2-ext-texto: #7dd3fc;
 }
 
-/* ── Ritmo en vivo · 15 min (RitmoVivoV2.tsx) ─────────────────────────────
-   Una columna en el orden de lectura (parada, último minuto, tira, llenado, señales). En PC la tarjeta
-   vive en el riel derecho de 380/440 px: ahí tampoco caben tres columnas, así que se apila igual. */
-.rv-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+/* ── Detalle de «Ampliar» de Ritmo en vivo (RitmoVivoV2.tsx): llenado por Baader, señales y la banda de parada ── */
 .rv-l { padding-top: 14px; border-top: 1px solid rgb(var(--border) / 0.6); }
 .rv-cifra { font-size: 32px; }
 @media (min-width: 1024px) { .rv-cifra { font-size: 38px; } }
-.rv-crono { font-size: 28px; line-height: 34px; font-weight: 700; }
-.rv-punto { display: inline-block; width: 7px; height: 7px; border-radius: 99px; background: var(--v2-bien); }
-.rv-grid:has(.rv-parada[data-clase='micro']) .rv-punto { background: var(--v2-ext); }
-.rv-grid:has(.rv-parada[data-clase='detencion']) .rv-punto { background: var(--v2-mal); }
 .rv-micro { display: inline-block; width: 7px; height: 7px; border-radius: 99px; border: 2px solid var(--v2-ext); background: rgb(var(--card)); }
-.rv-ver { color: var(--v2-bien); }
 .rv-tira:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 4px; border-radius: 12px; }
-.rv-parada { padding: 12px 14px; background: color-mix(in srgb, var(--v2-gris) 16%, transparent); }
-.rv-parada[data-clase='micro'] { background: color-mix(in srgb, var(--v2-ext) 12%, transparent); }
-.rv-parada[data-clase='detencion'] { background: color-mix(in srgb, var(--v2-mal) 14%, transparent); }
-.rv-parada .rv-parada-texto { color: rgb(var(--foreground)); }
-.rv-parada[data-clase='micro'] .rv-parada-texto { color: var(--v2-ext-texto); }
-.rv-parada[data-clase='detencion'] .rv-parada-texto { color: var(--v2-mal-texto); }
-.rv-parada .rv-parada-icono { color: var(--v2-gris); }
-.rv-parada[data-clase='micro'] .rv-parada-icono { color: var(--v2-ext); }
-.rv-parada[data-clase='detencion'] .rv-parada-icono { color: var(--v2-mal); }
-/* El punto de «en vivo» late suave; con movimiento reducido queda quieto. */
-@media (prefers-reduced-motion: no-preference) {
-  .rv-punto { animation: rv-late 2s ease-in-out infinite; }
-}
-@keyframes rv-late { 50% { opacity: 0.35; } }
+
+/* «Mal» distinguible del ámbar en barras de 1–2 px y filas de 10–14 px (ΔE 12 → ~19 contra --v2-atento). Derivado de tokens: en claro el
+   coral de TEXTO, en oscuro el coral un 18 % hacia negro. Lo usa el gráfico «Ritmo en vivo»; `.fc` (la franja) puede tomarlo para sus puntos. */
+.rv-grafico, .fc, .rb-det { --rv-mal: var(--v2-mal-texto); }
+.dark .rv-grafico, .dark .fc, .dark .rb-det { --rv-mal: color-mix(in srgb, var(--v2-mal) 82%, black); }
 
 /* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con
    degradé y brillo, colores de la paleta calma. */
@@ -452,6 +435,9 @@
   [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child > .flex-1 { overflow: hidden; text-overflow: ellipsis; }
 }
 
+/* «Cada máquina · aporte» sin tabla (una sola Baader, como Filete) no pinta nada: tampoco su hueco en la columna. */
+.monitor-v2 > .v2-ritmo:empty { display: none; }
+
 /* Minuto a minuto: el desplazamiento es el gesto, la barra de scroll sobra. */
 .v2-minuto-scroll::-webkit-scrollbar { display: none; }
 
@@ -469,8 +455,10 @@ html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }
    bajo `min-width: 1024px` o en elementos que solo existen en PC. */
 
 /* Cabecera compacta: una barra a todo el ancho, de vidrio, con un filete abajo. Pegada arriba: la regla
-   `[data-glass='v2'] > *` (position: relative) le gana a `.sticky` de Tailwind, por eso se repite acá. */
-[data-glass='v2'] > .v2-barra-pc { position: sticky; top: 0; z-index: 20; }
+   `[data-glass='v2'] > *` (position: relative) le gana a `.sticky` de Tailwind, por eso se repite acá. Vale para las dos
+   cabeceras (`.v2-cabecera`: la flotante del celular y la barra de PC): sin esto la del celular se iba con el scroll y
+   al bajar al gráfico ya no se veía de qué línea era ni si el turno estaba en vivo, detenido o terminado. */
+[data-glass='v2'] > .v2-cabecera { position: sticky; top: 0; z-index: 20; }
 [data-glass='v2'] .v2-barra-pc {
   background: rgb(var(--card) / 0.72);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
@@ -481,10 +469,25 @@ html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }
   [data-glass='v2'] .v2-barra-pc, .rv-banda { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-/* Banda de estado: la parada en curso con su cronómetro, pegada bajo la cabecera (BandaParadaV2). Solo PC:
-   en celular la parada sigue dentro de «Ritmo en vivo». Una sola vez: la tarjeta, «Ritmo de la línea» y el
-   aviso «Ahora mismo» la callan en PC cuando la banda existe. */
-.rv-banda { display: none; --tinte: var(--v2-gris); --texto-parada: rgb(var(--foreground)); }
+/* Banda de estado: la parada en curso con su cronómetro, arriba de «El turno» (BandaParadaV2), en PC y en celular:
+   «Ritmo en vivo» ya no es una tarjeta que la diga. En PC va pegada bajo la cabecera; en celular, en el flujo y con el
+   detalle en su propia línea. Una sola vez: «Ritmo de la línea» y el aviso «Ahora mismo» la callan cuando la banda existe. */
+.rv-banda {
+  --tinte: var(--v2-gris); --texto-parada: rgb(var(--foreground));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 52px; padding: 10px 16px; border-radius: 16px;
+  background: color-mix(in srgb, var(--tinte) 14%, rgb(var(--card) / 0.94));
+  border: 1px solid color-mix(in srgb, var(--tinte) 38%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+.rv-banda .rv-banda-detalle { flex: 1 1 100%; white-space: normal; overflow: visible; text-overflow: clip; }
+main:has(.rv-banda) .v2-ahora-mismo { display: none; }
+/* Con la franja en pantalla (en TODOS los anchos) la línea detenida ya la dicen ella y el gráfico, y la causa va en la nota
+   del «en pausa» de Contra la meta: el aviso «Ahora mismo» lo repetía y gastaba alto. Sin franja queda como respaldo. */
+main:has(.fc) .v2-ahora-mismo { display: none; }
+/* El `space-y-4` del <main> también cuenta a los hermanos ocultos (el aviso «Ahora mismo» y la fila de Personalizar son `display: none`):
+   sin esto «El turno» arrancaba 14–16 px más abajo de lo que dice el relleno del <main>. Con la franja, todo lo que lo precede está oculto. */
+[data-glass='v2'] main:has(.fc) > .monitor-v2 { margin-top: 0; }
 .rv-banda[data-clase='micro'] { --tinte: var(--v2-ext); --texto-parada: var(--v2-ext-texto); }
 .rv-banda[data-clase='detencion'] { --tinte: var(--v2-mal); --texto-parada: var(--v2-mal-texto); }
 .rv-banda-icono { color: var(--tinte); }
@@ -493,24 +496,15 @@ html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }
 .rv-banda-detalle { color: rgb(var(--foreground) / 0.78); }
 @media (min-width: 1024px) {
   .rv-banda {
-    display: flex;
     position: sticky;
     top: 56px;
     z-index: 10;
-    grid-column: 1 / -1;
-    align-items: center;
+    flex-wrap: nowrap;
     gap: 18px;
-    min-height: 52px;
     padding: 0 20px;
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--tinte) 14%, rgb(var(--card) / 0.94));
-    border: 1px solid color-mix(in srgb, var(--tinte) 38%, transparent);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    backdrop-filter: blur(24px) saturate(160%);
     box-shadow: 0 8px 0 0 rgb(var(--background) / 0.55);
   }
-  .monitor-v2:has(.rv-banda) .rv-p { display: none; }
-  main:has(.rv-banda) .v2-ahora-mismo { display: none; }
+  .rv-banda .rv-banda-detalle { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* La línea «Detención desde… · sin producir hace…» de Ritmo de la línea: ya está en la banda. */
   .monitor-v2:has(.rv-banda) .v2-ritmo > section > div.rounded-ctl { display: none; }
 }
@@ -612,27 +606,11 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .v2-seg > button[aria-selected='true'] { color: rgb(var(--foreground)); }
 .v2-seg-ind { position: absolute; left: 3px; top: 3px; bottom: 3px; border-radius: 999px; background: rgb(var(--card)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.18); transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1); }
 
-/* Ritmo en vivo, exprés: la que baja, resaltada; las otras, dato chico. */
-.rv-chip { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 3px 10px; background: var(--v2-relleno); color: rgb(var(--foreground)); }
-.rv-chip[data-tono='atento'] { color: var(--v2-atento-texto); }
-.rv-chip[data-tono='mal'] { color: var(--v2-mal-texto); }
-.rv-baja { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 6px 12px; }
-.rv-baja-cifra { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
-.rv-baja-chispa { min-width: 0; }
-.rv-baja-sub { grid-column: 1 / -1; font-size: 13px; color: rgb(var(--muted-foreground)); }
-.rv-otros { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 13px; color: rgb(var(--muted-foreground)); }
-.rv-otros b { color: rgb(var(--foreground)); font-weight: 600; }
 .rv-micro-txt { color: var(--v2-ext-texto); font-weight: 600; }
 .rv-micro-marca { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: var(--v2-ext); margin-right: 4px; }
 .rv-amp-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: end; }
 @media (min-width: 1024px) { .v2-capa .rv-amp-top { grid-template-columns: 270px minmax(0, 1fr); gap: 24px; } }
 .v2-capa .rv-a { flex-wrap: wrap; row-gap: 8px; }
-
-/* Camino a la meta, exprés: barra + cuatro cifras. */
-.v2-camino-barra { display: flex; gap: 3px; height: 12px; }
-.v2-camino-barra > span { height: 100%; border-radius: 6px; }
-.v2-camino-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px 12px; margin: 0; }
-.v2-camino-cifras dd { margin: 0; }
 
 /* Anillo de meta (Piezas ahora): ÚNICO que anima stroke-dashoffset, 1,1 s una vez; SVG de 44 px. */
 .v2-anillo-pr { transition: stroke-dashoffset 1.1s cubic-bezier(0.22, 0.9, 0.24, 1); }
@@ -641,13 +619,6 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
    como pide DESIGN.md §8, a lo más 5 escalones: de la quinta en adelante entran juntas. */
 @keyframes v2-entra-tarjeta { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .v2-entra { animation: v2-entra-tarjeta 420ms cubic-bezier(0.22, 0.9, 0.24, 1) backwards; animation-delay: calc(var(--k, 0) * 35ms); }
-
-/* «Ahora» de «Ritmo de la línea» en PC: es el último minuto de «Ritmo en vivo» (lo marca el llamador solo si
-   las dos cifras son iguales). La tarjeta queda con media de 15 min, promedio del turno, techo y cada máquina. */
-@media (min-width: 1024px) {
-  .v2-ritmo [data-ahora-vivo='repetido'] { display: none; }
-  .v2-ritmo [data-ahora-vivo='repetido'] ~ .ml-auto { margin-left: 0; text-align: left; }
-}
 
 /* Barra lateral de PC: riel de 56 px que se abre a 200 sin empujar nada (fondo con scaleX, rótulos con opacity). */
 .v2-lateral { display: none; }
@@ -722,43 +693,393 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
   box-shadow: none;
 }
 
-/* ── Eje del turno · «El turno» en PC ancho (≥ 1280 px) ──────────────────────
-   Opción B del 27-10 (docs/mockups/monitor_pc_opcionB.html). Una pantalla sin scroll: el alto es el de la
-   ventana menos la cabecera (56) y el aire de la página (32); las tarjetas de siempre quedan debajo del pliegue.
-   Grilla (1920×1080): lienzo 1fr · riel de 440, separación 16. A 1366×768 (o menos de 1600 de ancho / 900 de
-   alto): riel de 340, separación 12, cifras de 52 a 38 px y de 38 a 28. Movimiento: solo transform y opacity. */
-.eje-pc { display: none; }
+/* ── Franja «cinta» de «El turno» (FranjaCinta.tsx · opción A del 28-10, pulida) ───────────────────────────────────
+   Cinco cifras de lado a lado, iguales en PC y celular. ≥ 768 px: UNA tarjeta de vidrio con las celdas separadas por aire
+   (sin bordes); debajo, cada celda en su tarjeta (grilla de 2) y Camino a la meta a todo el ancho. Tokens: ninguno nuevo
+   (`--v2-*` y los de texto de siempre). Cifras con `tabular-nums`; piso de 11 px (acá, 12 en las notas).
+   Una Baader sola (Filete) quita su celda (`data-sin-baader`) y sin desglose del tiempo no hay Camino (`data-sin-camino`):
+   cada caso tiene su grilla en todos los anchos. */
+.fc { display: grid; min-width: 0; --fc-m: 26px; }
+.fc-celda { min-width: 0; }
+/* ≥ 1280: cuatro celdas, Piezas · Ritmo (la tarjeta A3, la más ancha) · Contra la meta · Camino. Con 32 px de hueco: la sub-tarjeta de
+   Ritmo se sale 12 px de su celda por cada lado y todavía quedan 20 hasta la celda vecina (la «A esta hora» no se pega a su borde). */
 @media (min-width: 1280px) {
-  .monitor-v2[data-eje='si'] .v2-fila-cifras { display: none; }
-  main:has(.monitor-v2[data-eje='si']) .v2-ahora-mismo { display: none; }
-  .eje-pc { display: flex; flex-direction: column; gap: 12px; height: max(600px, calc(100dvh - 88px)); min-height: 0; }
-  .eje-pc .rv-banda { position: static; flex: none; }
-  .eje-vista { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; }
-  .eje-vista > section { min-height: 0; }
+  .fc { grid-template-columns: 1fr 2.5fr 1.18fr 1fr; column-gap: 32px; padding: 14px 22px; align-items: start; }
+  .fc[data-sin-camino] { grid-template-columns: 1fr 2.5fr 1.18fr; }
+  .fc[data-sin-baader] { grid-template-columns: 1.2fr 1.2fr 1.4fr 1.3fr; }
+  .fc[data-sin-baader][data-sin-camino] { grid-template-columns: 1.2fr 1.2fr 1.4fr; }
 }
-.eje-riel { gap: 22px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
-.eje-sec { display: flex; flex-direction: column; flex-shrink: 0; min-width: 0; }
-.eje-par { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex-shrink: 0; }
-.eje-h3 { margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; color: rgb(var(--foreground)); }
-.eje-big { font-size: 52px; line-height: 56px; font-weight: 700; letter-spacing: -0.5px; color: rgb(var(--foreground)); }
-.eje-mid { font-size: 38px; line-height: 42px; font-weight: 700; letter-spacing: -0.3px; color: rgb(var(--foreground)); }
-.eje-u { margin-left: 4px; font-size: 17px; font-weight: 500; color: rgb(var(--muted-foreground)); }
-.eje-fn { margin: 0; font-size: 13px; line-height: 18px; color: rgb(var(--muted-foreground)); }
-.eje-cap { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
-.eje-fn b, .eje-cap b { font-weight: 600; }
-.eje-pista, .eje-escala { position: relative; height: 8px; margin-top: 10px; border-radius: 4px; background: var(--v2-relleno); }
-.eje-pista-llena { position: absolute; inset: 0; border-radius: 4px; background: var(--v2-bien); transform-origin: 0 50%; }
-.eje-pista-marca { position: absolute; top: -4px; width: 2px; height: 16px; border-radius: 1px; background: rgb(var(--foreground)); }
-.eje-escala-marca { position: absolute; top: -3px; width: 2px; height: 14px; border-radius: 1px; background: rgb(var(--foreground) / 0.7); }
-.eje-barrita { height: 8px; overflow: hidden; border-radius: 4px; background: var(--v2-relleno); }
-.eje-barrita > i { display: block; height: 100%; border-radius: 4px; }
-.eje-fila-dueno { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-.eje-fila-camino { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-.eje-tocable { cursor: pointer; border-radius: 12px; }
-.eje-tocable:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 4px; }
-.eje-enlace { align-self: flex-start; margin-top: 6px; font-size: 12px; line-height: 16px; color: rgb(var(--brand-ink)); cursor: pointer; }
-.eje-enlace:hover { text-decoration: underline; }
-.eje-enlace:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 2px; border-radius: 4px; }
+@media (min-width: 1600px) { .fc { column-gap: 44px; padding: 20px 28px; } }
+/* 768–1279: Piezas (2) y Ritmo (4) arriba, Meta y Camino (3 y 3) abajo; sin Camino la Meta ocupa el ancho; sin Baader, dos y dos
+   (Ritmo de una cifra, 3 columnas como Piezas). Los 28 px de aire vertical son 20 + los 8 que la sub-tarjeta de Ritmo se sale. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .fc { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 28px 32px; padding: 18px 22px; align-items: start; }
+  .fc-c-piezas { grid-column: span 2; }
+  .fc-c-ritmo { grid-column: span 4; }
+  .fc-c-meta, .fc-c-camino { grid-column: span 3; }
+  .fc[data-sin-camino] .fc-c-meta { grid-column: 1 / -1; }
+  .fc[data-sin-baader] .fc-c-piezas, .fc[data-sin-baader] .fc-c-ritmo { grid-column: span 3; }
+}
+/* La tarjeta Ritmo (A3) sobre su propia superficie, la de `.v2-subtarjeta`: sin borde ni sombra, 22 de radio; se sale 8 px de la
+   celda arriba y abajo y 12 a los lados (el relleno la devuelve a su sitio): la franja no crece. Con una sola Baader (la celda
+   de una cifra) no lleva superficie. */
+@media (min-width: 768px) {
+  .fc:not([data-sin-baader]) > .fc-c-ritmo { align-self: stretch; margin: -8px -12px; padding: 8px 12px; border-radius: 22px; background: rgb(142 142 147 / 0.08); }
+}
+/* < 768: con varias Baader Piezas · Meta y luego Ritmo a todo el ancho (la tabla lo necesita); Camino a la meta debajo, a todo el
+   ancho. Con una sola: Piezas · Ritmo y la Meta a todo el ancho, con sus dos cifras lado a lado. */
+.fc-apilada { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fc-apilada .fc-celda { padding: 14px 14px 16px; }
+.fc-apilada .fc-c-camino { grid-column: 1 / -1; }
+.fc-apilada:not([data-sin-baader]) .fc-c-ritmo { grid-column: 1 / -1; }
+.fc-apilada[data-sin-baader] .fc-c-meta { grid-column: 1 / -1; }
+@media (min-width: 768px) { .fc { --fc-m: 30px; } }
+@media (min-width: 1600px) { .fc { --fc-m: 34px; } }
+
+.fc-rotulo { display: flex; align-items: center; gap: 4px; font-size: 15px; line-height: 20px; font-weight: 600; color: rgb(var(--foreground)); white-space: nowrap; }
+/* El chevron de «esto abre su detalle»: UNA sola señal en toda la franja, 4 px tras el rótulo. */
+.fc-chev { width: 14px; height: 14px; flex: none; color: rgb(var(--muted-foreground) / 0.8); transition: color 150ms; }
+/* Cabecera de celda: el rótulo y, a la derecha, su nota. Un renglón de 20 px para que las cifras grandes arranquen a la misma
+   altura en todas las celdas; con notas largas en el PC la nota se corta con «…», nunca salta de renglón. */
+.fc-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 8px; min-height: 20px; }
+.fc-cab > .fc-rotulo { flex: none; }
+.fc-nota { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.fc-nota b { font-weight: 600; color: rgb(var(--foreground)); }
+.fc-nota-der { min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 1280px) { .fc-cab { flex-wrap: nowrap; } }
+/* A 1280 la celda de Ritmo mide 192 px: rótulo (132) + nota «min 08:08» (52) ya no dejan 8 px de aire entre ambos. Con 4 px sobra y
+   la hora del minuto no se corta con «…» en ningún minuto del turno. */
+@media (min-width: 1280px) { .fc-c-ritmo .fc-cab { column-gap: 4px; } }
+/* 768–1279: el rótulo y su nota pueden ir en dos renglones; 36 px de cabecera en TODAS las celdas para que las cifras de una
+   misma fila queden a la misma altura. */
+@media (min-width: 768px) and (max-width: 1279px) { .fc-cab { min-height: 36px; align-content: flex-start; } }
+/* < 768: la celda es angosta (≈ 137 px útiles): la nota pasa debajo del rótulo y puede ocupar dos renglones. */
+.fc-apilada .fc-nota-der { white-space: normal; text-align: left; overflow: visible; }
+/* El rótulo cabe en una celda de 166 px, pero no en una de 138 (320 px de pantalla): ahí baja de renglón en vez de salirse. */
+.fc-apilada .fc-rotulo { white-space: normal; }
+.fc-apilada .fc-cab > .fc-rotulo { flex: 0 1 auto; }
+/* …y las cifras de dos celdas vecinas (Piezas · Ritmo de una cifra) arrancan a la misma altura. */
+.fc-apilada .fc-c-piezas .fc-cab, .fc-apilada[data-sin-baader] .fc-c-ritmo .fc-cab { min-height: 36px; align-content: flex-start; }
+.fc-u { font-size: 17px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+/* Lo que se toca. El tinte de hover es un pseudo-elemento que desborda la zona (8 px arriba y abajo, 10 a los lados): no mueve el
+   layout y el anillo de foco (offset 4) queda dentro del hueco entre celdas. `:active` hunde la zona un 2 %. */
+.fc-tocable { position: relative; isolation: isolate; cursor: pointer; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+.fc-tocable::before { content: ''; position: absolute; inset: -8px -10px; z-index: -1; border-radius: 16px; background: transparent; transition: background-color 150ms; }
+.fc-tocable:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 4px; }
+@media (hover: hover) {
+  .fc-tocable:hover::before { background: rgb(var(--foreground) / 0.05); }
+  .fc-tocable:hover .fc-chev { color: rgb(var(--foreground)); }
+}
+.fc-tocable:active { transform: scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  .fc-tocable:active { transform: none; }
+  .fc-tocable::before, .fc-chev { transition: none; }
+}
+/* Las referencias chicas (Ritmo y Camino): clave 12 px, valor 15/600. */
+.fc-dl { margin: 0; }
+.fc-dl dt { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.fc-dl dd { margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; color: rgb(var(--foreground)); }
+.fc-dl dd small { font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+.fc-pto { display: block; width: 8px; height: 8px; flex: none; border-radius: 999px; }
+
+/* 1 · Piezas del turno */
+.fc-piezas-fila { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; margin-top: 6px; }
+.fc-cifra-p { font-size: 40px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
+.fc-barra { position: relative; height: 16px; margin-top: 10px; }
+.fc-barra-riel, .fc-barra-hecho { position: absolute; left: 0; right: 0; top: 4px; height: 8px; border-radius: 999px; }
+.fc-barra-riel { background: var(--v2-reja); }
+.fc-barra-hecho { background: var(--v2-acento); transform-origin: 0 50%; }
+.fc-barra-raya { position: absolute; top: 0; width: 2px; height: 16px; border-radius: 1px; background: rgb(var(--foreground)); }
+/* UNA nota en un renglón: «64 % de 15.000» a la izquierda y «▮ tocaban 10.667» a la derecha; la marca de 2×10 px es su leyenda. */
+.fc-nota-piezas { display: flex; justify-content: space-between; align-items: center; gap: 2px 8px; margin-top: 2px; white-space: nowrap; }
+.fc-pct b { color: rgb(var(--brand-ink)); }
+.fc-tocaban { display: inline-flex; align-items: center; gap: 4px; }
+.fc-raya-mini { display: inline-block; flex: none; width: 2px; height: 10px; border-radius: 1px; background: rgb(var(--foreground)); }
+@media (min-width: 1600px) { .fc-nota-piezas { font-size: 13px; line-height: 17px; } }
+.fc-apilada .fc-nota-piezas { flex-wrap: wrap; white-space: normal; }
+
+/* 2 · Ritmo (A3 «sub-tarjeta», RitmoBaaders.tsx): una mini tabla donde la Línea es la primera fila y cada columna suma hacia ella.
+   Las filas son subgrids de `.rb` y las columnas se piden por NOMBRE de línea (`nom pz min sep ap vu v5 fin`): el encabezado y
+   sus números comparten columna y alineación. Lo que cambia con el ancho lo decide el contenedor (`.rb-caja`): bajo 470 px no
+   hay columna de piezas; bajo 360 px (celular) la Línea ocupa dos columnas y sus referencias van en una fila propia.
+   Las variables arman el `grid-template-columns` según lo que hay (modo minuto o promedio, qué comparaciones hay). */
+.rb-caja { container: rb / inline-size; min-width: 0; }
+.rb {
+  --rb-gap: 14px;
+  --rb-nom: [nom] max-content;
+  --rb-pz: [pz] max-content;
+  --rb-min: [min] minmax(0, 1fr);
+  --rb-sepap: [sep] 1px [ap] max-content;
+  --rb-vs: [vu] max-content [v5] max-content [fin];
+  display: grid; min-width: 0; column-gap: var(--rb-gap); font-variant-numeric: tabular-nums;
+  grid-template-columns: var(--rb-nom) var(--rb-pz) var(--rb-min) var(--rb-sepap) var(--rb-vs);
+}
+/* Sin serie por minuto o cerrado: la columna flexible ES el aporte («14,6 pz/min»); no hay minuto ni raya. */
+.rb[data-modo='promedio'] { --rb-min: [min sep ap] minmax(0, 1fr); --rb-sepap: ; }
+.rb[data-vs='ultimo'], .rb[data-vs='previos'] { --rb-vs: [vu] max-content [fin]; }
+.rb[data-vs='ninguno'] { --rb-vs: [vu v5 fin]; }
+.rb-f { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; padding-block: 1.5px; min-width: 0; }
+.rb-f > * { min-width: 0; grid-row: 1; }
+.rb-f > [data-col='nom'] { grid-column: nom; }
+.rb-f > [data-col='pz'] { grid-column: pz; }
+.rb-f > [data-col='min'] { grid-column: min; }
+.rb-f > [data-col='ap'] { grid-column: ap; }
+.rb-f > [data-col='vu'] { grid-column: vu; }
+.rb-f > [data-col='v5'] { grid-column: v5; }
+.rb-f > [data-col='ap'], .rb-f > [data-col='vu'], .rb-f > [data-col='v5'], .rb-f > [data-col='pz'], .rb-vs, .rb-pzc { justify-self: end; text-align: right; }
+/* La raya vertical de 1 px entre el minuto y el turno: una celda por fila que se estira (con 1,5 px de margen negativo cubre el
+   relleno de la fila) y se junta en una sola línea desde los encabezados hasta la última Ev. */
+.rb-sep { grid-column: sep; grid-row: 1 / span 2; justify-self: center; align-self: stretch; width: 1px; margin-block: -1.5px; background: rgb(var(--border) / 0.6); }
+
+/* Encabezados de grupo (13/16 600) y de columna (12/14 muted), cada uno en la grilla de sus números. */
+.rb-f-grupos { padding-block: 0 2px; }
+.rb-rot { grid-column: nom / min; grid-row: 1; justify-self: start; }
+.rb-rot .fc-rotulo { font-size: 15px; line-height: 16px; }
+.rb-g { font-size: 13px; line-height: 16px; font-weight: 600; color: rgb(var(--foreground)); white-space: nowrap; }
+.rb-g-min { grid-column: min; }
+.rb-g-prom { grid-column: ap / fin; }
+.rb-g-hora { margin-left: 4px; font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+.rb-h { font-size: 12px; line-height: 14px; color: rgb(var(--muted-foreground)); white-space: nowrap; }
+.rb-h-d, .rb-h-ap, .rb-h-der { justify-self: end; text-align: right; }
+/* «vs último», «vs prom. 5»: dos trozos que bajan a dos renglones («vs» / «último») en el celular y en «vs turnos previos». */
+.rb-h-d { display: flex; flex-wrap: wrap; justify-content: flex-end; column-gap: 0.25em; }
+.rb[data-vs='previos'] .rb-h-d { flex-direction: column; align-items: flex-end; }
+.rb-h-min { grid-column: min; }
+
+/* La fila Línea: su rótulo, la cifra grande y el aporte van en la MISMA línea base (la fila alinea por línea base, y el rótulo es
+   texto puro con el hueco del punto de las Ev: 8 + 6 px de relleno). Las referencias, debajo de la cifra. */
+.rb-n { position: relative; padding-left: 14px; font-size: 15px; line-height: 18px; font-weight: 600; white-space: nowrap; color: rgb(var(--foreground)); }
+.rb-n-linea { font-size: 13px; line-height: 17px; }
+.rb-punto { position: absolute; left: 0; top: 5px; width: 8px; height: 8px; border-radius: 999px; }
+.rb-linea-fig { white-space: nowrap; }
+.rb-big { font-size: 34px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
+.rb-big-u { margin-left: 6px; font-size: 15px; color: rgb(var(--muted-foreground)); white-space: nowrap; }
+.rb-ap-l { font-size: 20px; line-height: 24px; font-weight: 600; color: rgb(var(--foreground)); white-space: nowrap; }
+.rb-refs { grid-column: min; grid-row: 2; display: flex; flex-wrap: wrap; column-gap: 12px; padding-top: 2px; font-size: 12px; line-height: 15px; color: rgb(var(--muted-foreground)); }
+.rb-ref { white-space: nowrap; }
+.rb-ref b { margin-left: 4px; font-size: 13px; font-weight: 600; color: rgb(var(--foreground)); }
+.rb-f-hsep { padding-block: 1.5px; }
+.rb-hsep { grid-column: nom / fin; align-self: center; height: 1px; background: rgb(var(--border) / 0.6); }
+.rb-nota { font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+
+/* Las filas Ev (18 px): nombre con su punto, piezas con su unidad, «19 de 19» con su pista y el hueco de la palabra, aporte y
+   comparaciones. */
+.rb-pzc { white-space: nowrap; font-size: 15px; line-height: 18px; font-weight: 600; color: rgb(var(--foreground)); }
+.rb-pz-u { font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+.rb-min { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rb-min-t { flex: none; min-width: 3.9em; font-size: 13px; line-height: 18px; color: rgb(var(--muted-foreground)); white-space: nowrap; }
+.rb-min-t b { font-weight: 600; color: rgb(var(--foreground)); }
+.rb-pista { flex: 1 1 auto; min-width: 28px; height: 4px; overflow: hidden; border-radius: 999px; background: var(--v2-reja); }
+.rb-pista > span { display: block; height: 100%; border-radius: 999px; }
+.rb-est { flex: none; width: var(--rb-hueco, 56px); font-size: 13px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.rb-anduvo { font-size: 12px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+.rb-ap { font-size: 15px; line-height: 18px; font-weight: 600; color: rgb(var(--foreground)); white-space: nowrap; }
+.rb-u { margin-left: 4px; font-size: 12px; color: rgb(var(--muted-foreground)); white-space: nowrap; }
+.rb-min-prom { display: block; white-space: nowrap; }
+/* Comparaciones: texto sin cápsula. ▲ en el acento, ▼ en el rojo de texto, y bajo 0,3 «— 0,2» en raya (ni logro ni caída). */
+.rb-d { font-size: 13px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.rb-d-l { font-size: 15px; line-height: 20px; }
+.rb-vs { line-height: 18px; }
+.rb-f-linea .rb-vs { line-height: 20px; }
+.rb-d-sube { color: var(--v2-bien); }
+.rb-d-baja { color: var(--v2-mal-texto); }
+.rb-d-raya { font-weight: 400; color: rgb(var(--muted-foreground)); }
+.rb-d-vacio { font-weight: 400; color: rgb(var(--muted-foreground) / 0.7); }
+
+/* Contenedor angosto (< 470 px: la tarjeta a 1280, o una tableta): sin la columna de piezas (Piezas del turno ya las dice
+   y el detalle trae las de cada Baader) y la pista puede encogerse. */
+@container rb (max-width: 469px) {
+  .rb { --rb-nom: [nom pz] max-content; --rb-pz: ; }
+  .rb-f > [data-col='pz'] { display: none; }
+}
+/* Y bajo 430 px la palabra («detenida», «lenta») o «anduvo N s» ya no cabe junto a la pista: baja a un renglón propio dentro de la
+   celda del minuto (sin ocupar nada en las filas que no la llevan). */
+@container rb (max-width: 429px) {
+  .rb-min { flex-wrap: wrap; row-gap: 0; }
+  .rb-est { flex: 1 0 100%; width: auto; line-height: 15px; }
+  .rb-est-vacio { display: none; }
+}
+/* Celular (< 360 px de contenedor): la Línea ocupa dos columnas y se rotula sola, sus referencias van en una fila propia y a todo
+   el ancho, «vs último» y «vs prom. N» en dos renglones, «Ritmo ›» en su renglón y los grupos en el siguiente. */
+@container rb (max-width: 359px) {
+  .rb { --rb-gap: 10px; }
+  .rb-f-grupos .rb-rot { grid-column: 1 / -1; grid-row: 1; }
+  .rb-f-grupos .rb-g { grid-row: 2; }
+  .rb-f-grupos .rb-g-min { grid-column: nom / sep; }
+  .rb-n-linea { display: none; }
+  .rb[data-modo='minuto'] .rb-f-cols > .rb-h-min { grid-column: nom / sep; }
+  .rb-f-grupos .rb-sep { grid-row: 2; }
+  .rb-f-linea > .rb-linea-fig { grid-column: nom / sep; }
+  .rb[data-modo='promedio'] .rb-f-linea > .rb-linea-fig { grid-column: nom / vu; }
+  .rb-refs { grid-column: 1 / -1; padding-bottom: 4px; }
+  .rb-h-d { flex-direction: column; align-items: flex-end; line-height: 13px; }
+  .rb-big { font-size: 32px; }
+}
+@media (min-width: 1600px) {
+  .rb { --rb-gap: 22px; }
+  .rb-f { padding-block: 2px; }
+  .rb-g { font-size: 14px; line-height: 18px; }
+  .rb-h { font-size: 13px; line-height: 17px; }
+  .rb-big { font-size: 38px; }
+  .rb-pzc, .rb-pz { font-size: 17px; line-height: 20px; }
+  .rb-pz-u { font-size: 13px; }
+  .rb-ap { font-size: 17px; line-height: 20px; }
+  .rb-ap-l { font-size: 22px; line-height: 26px; }
+  .rb-d { font-size: 14px; }
+  .rb-d-l { font-size: 17px; }
+  .rb-refs { font-size: 13px; }
+  .rb-ref b { font-size: 15px; }
+  .rb-min-t { font-size: 14px; line-height: 20px; }
+  .rb-d, .rb-vs { line-height: 20px; }
+  .rb-f-linea .rb-vs { line-height: 22px; }
+  .rb-est { --rb-hueco: 62px; font-size: 14px; }
+  .rb-n { line-height: 20px; }
+  .rb-n-linea { line-height: 19px; }
+  .rb-punto { top: 6px; }
+}
+
+/* El detalle (`RitmoDetalle`, en el panel lateral de 460 px o la hoja del celular): la misma tabla con «ahora» y en cápsulas,
+   un segundo renglón por Baader con su % del turno andando, el pulso, los carros (estimación) y las referencias de la línea. */
+.rb-det { container: rbd / inline-size; display: grid; gap: 16px; padding-inline: 8px; font-variant-numeric: tabular-nums; }
+.rb-dt {
+  --rb-nom: [nom] max-content;
+  --rb-pz: [pz] max-content;
+  --rb-ahora: [ahora] max-content;
+  --rb-ap: [ap] max-content;
+  --rb-vs: [vu] max-content [v5] max-content [fin];
+  display: grid; column-gap: 8px; row-gap: 0;
+  grid-template-columns: var(--rb-nom) var(--rb-pz) [min] minmax(0, 1fr) var(--rb-ahora) var(--rb-ap) var(--rb-vs);
+}
+.rb-det[data-ahora='no'] .rb-dt { --rb-ahora: ; }
+.rb-det[data-minuto='no'] .rb-dt { --rb-ap: ; }
+.rb-det[data-vs='ultimo'] .rb-dt, .rb-det[data-vs='previos'] .rb-dt { --rb-vs: [vu] max-content [fin]; }
+.rb-det[data-vs='ninguno'] .rb-dt { --rb-vs: [vu v5 fin]; }
+.rb-dt > .rb-f, .rb-bloque { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; }
+.rb-dt .rb-f-cols { padding-bottom: 4px; }
+.rb-f-linea-d { padding-block: 6px 8px; }
+.rb-f-ev-d { padding-block: 6px 0; }
+.rb-n-d { font-size: 17px; line-height: 22px; font-weight: 700; }
+.rb-det .rb-n { font-size: 15px; line-height: 20px; }
+.rb-det .rb-n-linea { font-size: 17px; line-height: 22px; font-weight: 700; }
+.rb-det .rb-punto { top: 6px; }
+.rb-det .rb-min-t { font-size: 14px; line-height: 20px; }
+.rb-det .rb-est { width: auto; font-size: 13px; line-height: 20px; }
+.rb-det-l { font-size: 17px; line-height: 22px; font-weight: 700; color: rgb(var(--foreground)); }
+.rb-det-v { font-size: 15px; line-height: 20px; font-weight: 600; color: rgb(var(--foreground)); white-space: nowrap; }
+.rb-det .rb-f > [data-col='pz'] { grid-column: pz; }
+.rb-det .rb-f > [data-col='ahora'] { grid-column: ahora; justify-self: end; text-align: right; }
+.rb-det .rb-ap { font-size: 15px; line-height: 20px; }
+.rb-pil { display: inline-block; min-width: 50px; padding: 2px 8px; border-radius: 999px; font-size: 12px; line-height: 18px; font-weight: 600; text-align: center; white-space: nowrap; }
+.rb-pil-l { font-size: 12px; }
+.rb-pil-sube { color: var(--v2-bien); background: color-mix(in srgb, var(--v2-bien) 14%, transparent); }
+.rb-pil-baja { color: var(--v2-mal-texto); background: color-mix(in srgb, var(--v2-mal) 14%, transparent); }
+.rb-pil-raya { font-weight: 400; color: rgb(var(--muted-foreground)); background: var(--v2-relleno); }
+.rb-sub { grid-column: pz / fin; display: flex; align-items: flex-start; gap: 8px; padding-block: 2px 4px; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.rb-dt > .rb-sub { grid-column: 1 / -1; }
+.rb-sub b { font-weight: 600; color: rgb(var(--foreground)); }
+.rb-solo-hoja { display: none; }
+.rb-and { flex: none; width: 56px; height: 3px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: var(--v2-reja); }
+.rb-and > span { display: block; height: 100%; border-radius: 999px; }
+.rb-tit { margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: rgb(var(--muted-foreground)); }
+.rb-est-nota { margin: 2px 0 8px; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.rb-carros { display: grid; grid-template-columns: max-content repeat(4, max-content); justify-content: space-between; column-gap: 10px; row-gap: 6px; align-items: baseline; padding: 12px 16px; border-radius: 22px; background: rgb(142 142 147 / 0.08); }
+.rb-cf { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; }
+.rb-cv { font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap; color: rgb(var(--foreground)); }
+.rb-cv.ln { font-weight: 700; }
+.rb-carros .r, .rb-carros .rb-h-der { justify-self: end; text-align: right; }
+.rb-pie { margin: 0; padding-inline: 4px; font-size: 12px; line-height: 17px; color: rgb(var(--muted-foreground)); }
+.rb-pie b { font-weight: 600; color: rgb(var(--foreground)); }
+/* Hoja del celular: sin columna de piezas (van en el renglón de «andando»). */
+@container rbd (max-width: 400px) {
+  .rb-dt { --rb-nom: [nom pz] max-content; --rb-pz: ; column-gap: 6px; }
+  .rb-det .rb-f > [data-col='pz'], .rb-det .rb-h[data-col='pz'] { display: none; }
+  .rb-sub { grid-column: nom / fin; }
+  .rb-solo-hoja { display: inline; }
+  /* «carros con pieza» baja a dos renglones y la palabra («lenta», «detenida») a su propio renglón bajo el «9 de 19»: sin pisar «ahora». */
+  .rb-det .rb-h[data-col='min'] { white-space: normal; line-height: 13px; }
+  .rb-det .rb-min { flex-wrap: wrap; row-gap: 0; }
+  .rb-det .rb-est { flex: 1 0 100%; line-height: 16px; }
+}
+
+/* 3 · Ritmo de la línea */
+.fc-ritmo-fila { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 6px; margin-top: 6px; }
+.fc-ritmo-fila .fc-u { font-size: 15px; }
+.fc-ritmo-estado { font-size: 13px; font-weight: 600; }
+/* «andando» del promedio: en la nota (celular) o junto a la unidad (desde 768 px). */
+.fc-desde-768 { display: none; }
+@media (min-width: 768px) { .fc-solo-movil { display: none; } .fc-desde-768 { display: inline; } }
+.fc-cifra-c { font-size: 32px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
+.fc-barra-fina { height: 6px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: var(--v2-reja); }
+.fc-barra-fina > div { height: 100%; border-radius: 999px; }
+.fc-ritmo-refs { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; margin-top: 10px; }
+
+/* 4 · Contra la meta + Mantención */
+.fc-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; row-gap: 4px; }
+.fc-apilada .fc-meta-grid { grid-template-columns: 1fr; row-gap: 10px; }
+.fc-apilada[data-sin-baader] .fc-meta-grid { grid-template-columns: 1fr 1fr; }
+/* Con UNA sola cifra (cerrado, sin cuota o sin meta) ocupa la celda entera. */
+.fc .fc-meta-grid.fc-meta-uno { grid-template-columns: 1fr; }
+.fc-cifra-m { margin: 6px 0 2px; font-size: var(--fc-m); line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+.fc-cifra-m small { font-size: 15px; font-weight: 400; letter-spacing: 0; color: rgb(var(--muted-foreground)); }
+/* «en pausa» a 20/600 en la MISMA caja de la cifra grande (misma altura de línea): las bases de las dos columnas se alinean. */
+.fc-pausa { font-size: 20px; font-weight: 600; line-height: calc(var(--fc-m) * 1.1); letter-spacing: 0; }
+/* «línea detenida» y, SIN banda de parada a la vista, su causa (la que daba el aviso «Ahora mismo») en un segundo renglón: puede bajar
+   de línea pero nunca se corta con «…» (a 1280/1366 «línea detenida · <causa>» no cabía en el ancho de media celda). */
+.fc-nota-pausa { min-width: 0; white-space: nowrap; }
+.fc-apilada .fc-nota-pausa { white-space: normal; }
+.fc-nota-causa { min-width: 0; white-space: normal; overflow-wrap: break-word; }
+/* (Antes, con 5 cifras se callaba la unidad «pz»: la palabra «adelante»/«atrás» que la reemplazó no se puede callar, baja de renglón.) */
+/* «105 adelante» / «45 atrás»: la palabra ocupa el hueco de la unidad y NO se calla (sin el signo sería otra cifra): donde no cabe junto al
+   número baja bajo él (13/16), igual en «A esta hora», «Al cierre» y «Resultado». Medido el 28-10 con la columna de media celda:
+   1280–1599 (99–126 px) no cabe ni con 3 cifras («523 adelante» = 115–122 px) → siempre debajo; 1600–1919 (126–159 px) no cabe con 4
+   cifras (≈ 140 px) → debajo desde 4 cifras; con 5 cifras («12.345») baja en todos los anchos. */
+.fc-meta-grid:not(.fc-meta-uno) .fc-cifra-dif.fc-cifra-5 small { display: block; margin-top: 2px; font-size: 13px; line-height: 16px; }
+@media (min-width: 1280px) and (max-width: 1599px) { .fc-meta-grid:not(.fc-meta-uno) .fc-cifra-dif small { display: block; margin-top: 2px; font-size: 13px; line-height: 16px; } }
+@media (min-width: 1600px) and (max-width: 1919px) { .fc-meta-grid:not(.fc-meta-uno) .fc-cifra-dif.fc-cifra-d4 small { display: block; margin-top: 2px; font-size: 13px; line-height: 16px; } }
+/* Con UNA sola cifra (`fc-meta-uno`: cerrado, sin cuota) la celda entera es su columna y la palabra cabe al lado en todos los anchos. */
+/* «meta a esta hora N» (nota de Piezas): «a esta hora» solo donde hay sitio. Medido: a 1600 px la nota mide 227 px y la frase larga pide 242. */
+.fc-hora-larga { display: none; }
+.fc-apilada .fc-hora-larga { display: inline; }
+@media (min-width: 1760px) { .fc-hora-larga { display: inline; } }
+/* Mantención en dos renglones: el rótulo con su chevron, y debajo el dato (el número a 17/600, el resto a 15/600). */
+.fc-mant { margin-top: 8px; min-height: 44px; }
+.fc-mant-cab { display: flex; align-items: center; gap: 6px; }
+.fc-mant-rotulo { font-size: 13px; line-height: 18px; font-weight: 600; color: rgb(var(--foreground)); }
+.fc-nota-m { margin-top: 2px; font-size: 13px; line-height: 22px; }
+.fc-nota-m b { font-size: 15px; }
+.fc-nota-m .fc-mant-n { font-size: 17px; }
+/* 1280–1599: con fallas el dato pasaba a dos renglones y estiraba toda la franja; «vs previos» sigue en su detalle. */
+@media (min-width: 1280px) and (max-width: 1599px) { .fc-vs-previos { display: none; } }
+
+/* 5 · Camino a la meta (TiempoDelTurno v2="celda"): la leyenda ES los tramos de la barra. */
+.fc-camino { min-width: 0; }
+.fc-camino-barra { position: relative; display: flex; gap: 3px; height: 10px; margin-top: 10px; }
+.fc-camino-barra > span { height: 100%; border-radius: 999px; }
+/* Meta superada: la escala crece y una raya de 2 px marca dónde estaba la meta (como en la barra de Piezas). */
+.fc-camino-raya { position: absolute; top: -3px; width: 2px; height: 16px; border-radius: 1px; background: rgb(var(--foreground)); }
+.fc-camino-cifras { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin-top: 8px; }
+/* 2×2 bajo 768 y entre 1280 y 1839 (la celda mide ~180–269 px: cuatro columnas con cifras de cinco dígitos, «12.739 pz», no
+   caben a 1600 y partirían un rótulo o se saldrían; a 1760–1764 «Por ritmo» bajaba de renglón y la fila se salía 4 px: con las cuatro
+   en cinco dígitos piden 250 px + 3 huecos y la celda mide 255 allí y 262 a 1800); una fila de columnas al ancho de su texto en
+   768–1279 y desde 1840 (medido el 28-10 con cuatro cifras de cinco dígitos, sin partir ni salirse). */
+@media (min-width: 768px) and (max-width: 1279px), (min-width: 1840px) {
+  .fc-camino-cifras { grid-template-columns: repeat(var(--n, 4), auto); justify-content: space-between; column-gap: 8px; }
+}
+/* Un rótulo («Por ritmo») nunca parte a otro renglón: si no cabe, la grilla pasa a 2×2 (arriba), no el texto a dos líneas. */
+.fc-camino-cifras dt > span { min-width: 0; white-space: nowrap; }
+/* «12.739 pz» no parte su unidad a otro renglón; entre 1760 y 1919 el hueco entre columnas baja a 4 px para que cuatro cifras,
+   una de ellas de cinco dígitos, queden juntas (celda de 256 px: 234 de texto + 3 huecos). */
+.fc-camino-cifras dd { white-space: nowrap; }
+@media (min-width: 1840px) and (max-width: 1919px) { .fc-camino-cifras { column-gap: 4px; } }
+
+@media (min-width: 768px) {
+  .fc-cifra-p { font-size: 48px; }
+  .fc-cifra-c { font-size: 34px; }
+}
+@media (min-width: 1600px) {
+  .fc-cifra-p { font-size: 52px; }
+  .fc-cifra-c { font-size: 38px; }
+}
 
 /* Reloj de datos: la barra nueva crece desde su base y la proyección aparece (400 ms, la curva de la piel). */
 @keyframes eje-barra { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -767,19 +1088,6 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .eje-aparece { animation: eje-aparece 400ms cubic-bezier(0.22, 0.9, 0.24, 1) backwards; }
 @media (prefers-reduced-motion: reduce) {
   .eje-barra-nueva, .eje-aparece { animation: none; }
-}
-
-@media (min-width: 1280px) and ((max-width: 1599px) or (max-height: 899px)) {
-  .eje-pc .eje-vista { grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
-  [data-glass='v2'] .eje-pc .eje-lienzo, [data-glass='v2'] .eje-pc .eje-riel { padding: 14px 16px; }
-  .eje-pc .eje-riel { gap: 12px; }
-  .eje-pc .eje-par { gap: 12px; }
-  .eje-pc .eje-big { font-size: 38px; line-height: 42px; }
-  .eje-pc .eje-mid { font-size: 28px; line-height: 32px; }
-  .eje-pc .eje-h3 { font-size: 15px; line-height: 20px; }
-  .eje-pc .eje-x13, .eje-pc .eje-sub { display: none; }
-  .eje-pc .eje-fila-dueno { grid-template-columns: 96px minmax(0, 1fr) auto; gap: 8px; }
-  .eje-pc .eje-fila-camino { grid-template-columns: 124px minmax(0, 1fr) auto; gap: 8px; }
 }
 
 /* ── Duelo en PC (≥ 1280 px) · opción B «Eje» (28-10) ─────────────────────────────────────────────────────────────
@@ -996,12 +1304,14 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
   .dpc-eqv { font-size: 22px; line-height: 26px; } .dpc-eqv > .dpc-u { font-size: 13px; }
 }
 
-/* Selector de línea (Eviscerado | Filete) arriba de El turno y de Análisis, solo PC. «El turno» descuenta su alto
-   (34 px del selector + 16 del `space-y-4` de la página) para seguir sin scroll. */
-.fila-linea-pc { display: none; }
-@media (min-width: 1024px) {
-  .fila-linea-pc { display: block; }
+/* Selector de línea (Eviscerado | Filete) DENTRO de la barra de PC, en El turno y Análisis: 220 × 32 px (ocupaba una fila
+   entera de 48 px bajo la barra). Con puntero táctil (iPad en horizontal) vuelve a 44. El Duelo trae el suyo en su lienzo. */
+.v2-selector-barra { width: 220px; flex: none; }
+.v2-selector-barra [role='tablist'], .v2-selector-barra [role='tablist'] > button { height: 32px; }
+@media (pointer: coarse) {
+  .v2-selector-barra [role='tablist'], .v2-selector-barra [role='tablist'] > button { height: 44px; }
 }
-@media (min-width: 1280px) {
-  main:has(.fila-linea-pc) .eje-pc { height: max(600px, calc(100dvh - 88px - 50px)); }
-}
+
+/* El estado de la línea como subtítulo de la barra del celular (< 768 px): el mismo punto y texto de la píldora, a 12 px y
+   sin su fondo (la barra ya es el contenedor). */
+.v2-estado-mini > span { padding: 0; background: transparent; font-size: 12px; line-height: 18px; }

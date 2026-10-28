@@ -70,6 +70,24 @@ export const useCerrarCapa = () => useContext(CapaCtx)
 export const AbrirCtx = createContext<(() => void) | null>(null)
 export const useAbrirAmpliado = () => useContext(AbrirCtx)
 
+/**
+ * Abrir el ampliado por pedido ajeno: cuando `clave` CAMBIA (no al montar) y no es vacía, llama a `abrir` tras 400 ms,
+ * para que la capa/hoja que lo pidió termine de cerrarse (dos hojas a la vez dejarían el scroll de la página bloqueado).
+ * Es el «ver ›» de una parada en Camino a la meta.
+ */
+export function useAbrirPorClave(clave: string | null | undefined, abrir: () => void) {
+  const vista = useRef(clave)
+  const abrirRef = useRef(abrir)
+  abrirRef.current = abrir
+  useEffect(() => {
+    if (clave === vista.current) return
+    vista.current = clave
+    if (!clave) return
+    const id = setTimeout(() => abrirRef.current(), 400)
+    return () => clearTimeout(id)
+  }, [clave])
+}
+
 // ── Cifras que cuentan ───────────────────────────────────────────────────────
 
 /**

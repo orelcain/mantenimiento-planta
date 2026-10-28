@@ -43,7 +43,7 @@ describe('VsAyerBloque · el residuo es una nota al pie, no una causa', () => {
     const t = texto()
     expect(t).toMatch(/El turno duró menos/i)
     expect(t).toMatch(/Más convenio/i)
-    expect(t).toMatch(/Menos paradas evitables/i)
+    expect(t).toMatch(/Menos detenciones evitables/i)
     // La historia del día: hizo menos, pero NO por lentitud.
     expect(t).toMatch(/no por lentitud/i)
     expect(t).toMatch(/Línea más rápida/i)

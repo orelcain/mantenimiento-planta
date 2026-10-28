@@ -215,6 +215,23 @@ export function acumuladoHasta(cycles: readonly number[], k: number): number {
   return s
 }
 
+/** El contador de cada Baader al cerrar el último minuto cerrado de la serie (Σ cycles hasta ahí). Vacío sin minutos. */
+export function finalesCerrados(e: Pick<EntradaRep, 'maquinas'>): number[] {
+  const largo = minutosCerrados(e)
+  return largo < 1 ? [] : e.maquinas.map((m) => acumuladoHasta(m.cycles, largo - 1))
+}
+
+/**
+ * Lo que la reproducción muestra EN REPOSO (cuando el último minuto ya cayó entero): Σ de los minutos cerrados, topado por
+ * el contador vivo. Es `totalFinal` del cuadro, calculado desde la entrada sin esperar al hook: la franja, el gráfico y
+ * Camino a la meta lo usan para decir lo mismo en «A esta hora». null sin serie (nada que reproducir).
+ */
+export function totalEnReposo(e: Pick<EntradaRep, 'maquinas'> | null | undefined, limite: Tope | null | undefined): number | null {
+  if (!e) return null
+  const finales = finalesCerrados(e)
+  return finales.length ? tope(suma(finales), limite?.total) : null
+}
+
 /**
  * Registra la serie que llegó. Devuelve el MISMO objeto si no hay un minuto cerrado nuevo (así el llamador compara por
  * identidad: una lectura repetida no reinicia nada). Con un minuto nuevo, el que se reproduce es SOLO el último: si

@@ -277,11 +277,11 @@ function DetalleTurno({ turnos }: { turnos: TurnoReparto[] }) {
               </ul>
             ) : <p className="mt-2 text-[13px] text-muted-foreground">Sin pérdidas recuperables registradas.</p>}
             <div className="mt-2 border-t pt-2" style={{ borderColor: 'var(--v2-reja)' }}>
-              <div className="text-[13px] font-medium text-muted-foreground">Paradas en el reloj</div>
+              <div className="text-[13px] font-medium text-muted-foreground">Detenciones en el reloj</div>
               {t.paradas == null
                 ? <p className="text-[13px] text-muted-foreground">Sin dato: las horas se registran en los turnos desde el 27-10.</p>
                 : t.paradas.length === 0
-                  ? <p className="text-[13px] text-muted-foreground">Sin paradas recuperables.</p>
+                  ? <p className="text-[13px] text-muted-foreground">Sin detenciones recuperables.</p>
                   : <ul>{t.paradas.map((p, i) => <FilaParada key={i} p={p} contexto={p.causa} />)}</ul>}
             </div>
           </Bloque>
@@ -409,7 +409,7 @@ function PestanaCausas({ s, ant }: { s: SemanaReparto; ant: SemanaReparto | null
                 </button>
                 {abiertaEsta && (
                   <div className="mb-2 ml-3.5 rounded-[14px] px-3 py-2" style={{ background: 'var(--v2-reja)' }}>
-                    <div className="text-[13px] font-medium text-muted-foreground">Paradas en que ocurrió</div>
+                    <div className="text-[13px] font-medium text-muted-foreground">Detenciones en que ocurrió</div>
                     {paradas.length > 0
                       ? <ul>{paradas.map(({ p, t }, i) => <FilaParada key={i} p={p} contexto={`${diaCorto(t.dateKey)} · ${etiquetaTurno(t.shiftId).corto}`} />)}</ul>
                       : <p className="text-[13px] text-muted-foreground">Sin dato de horas para esta causa en la semana.</p>}
@@ -496,7 +496,7 @@ function PestanaEquipos({ semanas, sel }: { semanas: SemanaReparto[]; sel: numbe
   return (
     <>
       <Bloque className="mt-3">
-        {filas.length === 0 && <p className="text-[13px] text-muted-foreground">Sin paradas de Mantención esta semana.</p>}
+        {filas.length === 0 && <p className="text-[13px] text-muted-foreground">Sin detenciones de Mantención esta semana.</p>}
         <ul className="divide-y" style={{ borderColor: 'var(--v2-reja)' }}>
           {filas.map(([k, e]) => {
             const prev = ant ? mapas[sel - 1]!.get(k)?.min ?? 0 : null
@@ -509,7 +509,7 @@ function PestanaEquipos({ semanas, sel }: { semanas: SemanaReparto[]; sel: numbe
                 </div>
                 <div className="ml-4 mt-0.5 flex items-center justify-between gap-2">
                   <span className="min-w-0 text-[13px] tabular-nums text-muted-foreground">
-                    {e.count} {e.count === 1 ? 'parada' : 'paradas'} · ≈{int(e.pz)} pz
+                    {e.count} {e.count === 1 ? 'detención' : 'detenciones'} · ≈{int(e.pz)} pz
                     {prev != null && <> · <Delta v={e.min - prev} dueno="mantencion" sufijo=" min" /></>}
                   </span>
                   <Chispa serie={mapas.map((m) => m.get(k)?.min ?? 0)} sel={sel} />
@@ -526,16 +526,16 @@ function PestanaEquipos({ semanas, sel }: { semanas: SemanaReparto[]; sel: numbe
       </Bloque>
       {maquinas.length > 1 && (
         <>
-          <Titulo>Paradas de Mantención por máquina</Titulo>
+          <Titulo>Detenciones de Mantención por máquina</Titulo>
           <Bloque>
             <ul className="divide-y" style={{ borderColor: 'var(--v2-reja)' }}>
               {maquinas.map(([n, c]) => (
                 <li key={n} className="flex items-baseline justify-between py-2 text-[15px]" style={{ borderColor: 'var(--v2-reja)' }}>
-                  <span>{n}</span><span className="font-semibold tabular-nums">{c} {c === 1 ? 'parada' : 'paradas'}</span>
+                  <span>{n}</span><span className="font-semibold tabular-nums">{c} {c === 1 ? 'detención' : 'detenciones'}</span>
                 </li>
               ))}
             </ul>
-            <p className="mt-1 text-[12px] text-muted-foreground">En {conDato} de {s.turnos} turnos con dato de máquina. Una parada que tomó dos máquinas cuenta en ambas.</p>
+            <p className="mt-1 text-[12px] text-muted-foreground">En {conDato} de {s.turnos} turnos con dato de máquina. Una detención que tomó dos máquinas cuenta en ambas.</p>
           </Bloque>
         </>
       )}
