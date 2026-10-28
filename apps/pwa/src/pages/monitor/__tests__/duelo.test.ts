@@ -84,9 +84,38 @@ describe('equipoDelTurno: rotación por paridad de semana ISO, contada por jorna
 })
 
 describe('jornadaDe: la fecha de producción', () => {
-  it('toda noche pasa a la jornada del día siguiente al de su documento; el día se queda', () => {
+  it('la noche sin hora conocida pasa al día siguiente; el día se queda', () => {
     expect(jornadaDe('2026-10-27', true)).toBe('2026-10-28')
     expect(jornadaDe('2026-10-28', false)).toBe('2026-10-28')
+  })
+
+  it('se decide por el inicio PLANIFICADO: 00:00 conserva la fecha del documento, 21:30 pasa al día siguiente', () => {
+    expect(jornadaDe('2026-10-26', true, '00:00', '2026-10-26_Turno 1 Lunes')).toBe('2026-10-26')
+    expect(jornadaDe('2026-10-26', true, '21:30', '2026-10-26_Turno 1')).toBe('2026-10-27')
+    expect(jornadaDe('2026-10-26', true, '17:00')).toBe('2026-10-27')
+    expect(jornadaDe('2026-10-26', true, '04:59')).toBe('2026-10-26')
+    expect(jornadaDe('2026-10-26', false, '07:00')).toBe('2026-10-26')
+  })
+
+  it('respaldo sin hora: el nombre con día de la semana (con o sin tilde) arranca a las 00:00', () => {
+    expect(jornadaDe('2026-10-26', true, null, '2026-10-26_Turno 1 Lunes')).toBe('2026-10-26')
+    expect(jornadaDe('2026-10-31', true, undefined, '2026-10-31_Turno 1 Sábado')).toBe('2026-10-31')
+    expect(jornadaDe('2026-10-26', true, null, '2026-10-26_Turno 1')).toBe('2026-10-27')
+  })
+
+  it('caso real semana 44: ninguna jornada tiene dos noches y la rotación da Cárdenas de noche, Rebolledo de día', () => {
+    const noches = [
+      stat('2026-10-26_Turno 1 Lunes', {}, { h0: '00:00' }), // lun 26 00:00 → jornada lun 26
+      stat('2026-10-26_Turno 1', {}, { h0: '21:30' }), // lun 26 21:30 → jornada mar 27
+      stat('2026-10-27_Turno 1', {}, { h0: '21:30' }), // mar 27 21:30 → jornada mié 28
+    ]
+    const rs = noches.map((n) => resumenDeStat(n)!)
+    expect(rs.map((r) => r.jornada)).toEqual(['2026-10-26', '2026-10-27', '2026-10-28'])
+    expect(new Set(rs.map((r) => r.jornada)).size).toBe(rs.length) // una jornada no tiene dos noches
+    expect(rs.every((r) => r.esNoche && r.equipo === 'cardenas')).toBe(true)
+    const dia = resumenDeStat(stat('2026-10-26_Turno Dia'))!
+    expect(dia.equipo).toBe('rebolledo')
+    expect(dia.jornada).toBe('2026-10-26')
   })
 
   it('bordes de mes y de año', () => {
@@ -95,9 +124,12 @@ describe('jornadaDe: la fecha de producción', () => {
     expect(jornadaDe('2028-02-28', true)).toBe('2028-02-29')
   })
 
-  it('el turno jornada se arma igual cualquiera sea la hora de inicio que traiga la noche (08:00, 21:00 o 04:00)', () => {
-    for (const h0 of ['21:00', '23:30', '04:00']) {
+  it('la noche que arranca antes de las 05:00 no se corre; la de 17:00 en adelante sí', () => {
+    for (const h0 of ['21:00', '23:30', '17:00']) {
       expect(resumenDeStat(stat('2026-10-26_Turno 1', {}, { h0 }))!.jornada).toBe('2026-10-27')
+    }
+    for (const h0 of ['00:00', '04:00']) {
+      expect(resumenDeStat(stat('2026-10-26_Turno 1', {}, { h0 }))!.jornada).toBe('2026-10-26')
     }
   })
 })
@@ -862,8 +894,8 @@ describe('el mismo horario de la semana anterior y el fantasma de la jornada', (
 
   it('el día del 27/10 en curso contra «2026-10-26_Turno 1»: es la noche de la MISMA jornada, no un provisional', () => {
     const dia = { shiftDocId: '2026-10-27_Turno 2', dateKey: '2026-10-27', jornada: '2026-10-27', shiftId: 'Turno 2', esNoche: false, equipo: 'rebolledo' as const }
-    // Sin importar la hora de inicio que publique la noche, su jornada es el 27/10.
-    for (const h0 of ['21:00', '04:00']) {
+    // La noche del 26 que arranca a las 21:00 o a las 23:30 es la jornada del 27/10.
+    for (const h0 of ['21:00', '23:30']) {
       const rc = { shiftDocId: '2026-10-26_Turno 1', dateKey: '2026-10-26', shiftId: 'Turno 1', h0, curve: [{ m: 5, p: 800 }, { m: 10, p: 1700 }, { m: 15, p: 2500 }], total: 9000, producingMin: 400 }
       const g = fantasmaDeJornada(dia, rc, [])!
       expect(g.tipo).toBe('jornada')

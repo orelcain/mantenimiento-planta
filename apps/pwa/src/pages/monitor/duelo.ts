@@ -68,13 +68,28 @@ export function semanasDesdeAncla(dateKey: string): number {
 }
 
 /**
- * La JORNADA de un turno: su fecha de PRODUCCIÓN. Shoplogix data cada turno por el día en que parte su documento
- * (`2026-10-26_Turno 1` es la noche que alimenta la jornada del 27-10), así que TODA noche pertenece a la jornada del
- * día siguiente a la fecha de su documento, sea cual sea la hora de inicio que traiga. El día es de su propia fecha.
+ * La JORNADA de un turno: su fecha de PRODUCCIÓN. Se decide con la HORA PLANIFICADA DE INICIO (`h0`, de
+ * `scheduledStart`; NO la de la primera pieza) y la fecha del documento:
+ *  - inicio ≥ 17:00 (la noche que arranca a las 21:30): jornada = fecha del documento + 1 día;
+ *  - inicio 00:00–04:59 (la noche que arranca pasada la medianoche): el documento YA lleva la fecha de producción;
+ *  - de día: la fecha del documento.
  * Ahí se juntan la noche y el día de la misma jornada, que hacen equipos distintos.
+ *
+ * Por qué NO una regla única «toda noche = día siguiente»: `2026-10-26_Turno 1 Lunes` arranca a las 00:00 del lunes y
+ * ya se llama por su fecha de producción; con la regla única caía en la jornada 27-10 (que quedaba con dos noches y la
+ * 26-10 con ninguna), el marcador de la semana 44 salía «Cárdenas 10 – 1» en vez de «2 – 0» y el 27-10 se comparaba
+ * contra 15.801 pz en vez de 15.427.
+ *
+ * Sin `h0` (turno que el backend aún no rearmó): si se pasa `shiftDocId` y la noche lleva día de la semana en el
+ * nombre, se toma como inicio 00:00 y no se corre; el resto de las noches se corre un día.
  */
-export function jornadaDe(dateKey: string, esNoche: boolean): string {
+export function jornadaDe(dateKey: string, esNoche: boolean, h0?: string | null, shiftDocId?: string): string {
   if (!esNoche) return dateKey
+  const m = /^(\d{1,2}):(\d{2})/.exec(h0 ?? '')
+  const arrancaPasadaMedianoche = m
+    ? Number(m[1]) < 5
+    : shiftDocId != null && /(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\s*$/.test(normalizar(shiftDocId.slice(11)))
+  if (arrancaPasadaMedianoche) return dateKey
   const t = Date.parse(`${dateKey}T12:00:00Z`)
   return Number.isFinite(t) ? new Date(t + DIA_MS).toISOString().slice(0, 10) : dateKey
 }
@@ -88,10 +103,11 @@ export function equipoDelTurno(
   shiftDocId: string,
   esNoche: boolean,
   overrides?: Readonly<Record<string, EquipoId>> | null,
+  h0?: string | null,
 ): EquipoId {
   const corregido = overrides?.[shiftDocId]
   if (esEquipoId(corregido)) return corregido
-  const diaEsRebolledo = ((semanasDesdeAncla(jornadaDe(shiftDocId.slice(0, 10), esNoche)) % 2) + 2) % 2 === 0
+  const diaEsRebolledo = ((semanasDesdeAncla(jornadaDe(shiftDocId.slice(0, 10), esNoche, h0, shiftDocId)) % 2) + 2) % 2 === 0
   return esNoche === diaEsRebolledo ? 'cardenas' : 'rebolledo'
 }
 
@@ -100,8 +116,9 @@ export function equipoCorregido(
   shiftDocId: string,
   esNoche: boolean,
   overrides?: Readonly<Record<string, EquipoId>> | null,
+  h0?: string | null,
 ): boolean {
-  return equipoDelTurno(shiftDocId, esNoche, overrides) !== equipoDelTurno(shiftDocId, esNoche, null)
+  return equipoDelTurno(shiftDocId, esNoche, overrides, h0) !== equipoDelTurno(shiftDocId, esNoche, null, h0)
 }
 
 export type NombresEquipos = Partial<Record<EquipoId, string>>
@@ -224,11 +241,11 @@ function armarResumen(e: EntradaResumen): ResumenTurno {
   return {
     shiftDocId: e.shiftDocId,
     dateKey: e.dateKey,
-    jornada: jornadaDe(e.dateKey, e.esNoche),
+    jornada: jornadaDe(e.dateKey, e.esNoche, e.h0, e.shiftDocId),
     h0: e.h0,
     shiftId: e.shiftId,
     esNoche: e.esNoche,
-    equipo: equipoDelTurno(e.shiftDocId, e.esNoche, e.overrides),
+    equipo: equipoDelTurno(e.shiftDocId, e.esNoche, e.overrides, e.h0),
     cerrado: e.cerrado,
     piezas: e.piezas,
     dispMin,
@@ -524,7 +541,7 @@ export function referenciaPropia(
     .filter((f) => {
       if (f.shiftDocId === hoy.shiftDocId || numeroDeTurno(f.shiftDocId.slice(11)) !== numeroDeTurno(hoy.shiftId)) return false
       const noche = esNocheDesdeHora(horaDe(f.shiftDocId)) ?? hoy.esNoche
-      return noche === hoy.esNoche && jornadaDe(f.shiftDocId.slice(0, 10), noche) < hoy.jornada && equipoDelTurno(f.shiftDocId, noche, overrides) === hoy.equipo
+      return noche === hoy.esNoche && jornadaDe(f.shiftDocId.slice(0, 10), noche, horaDe(f.shiftDocId), f.shiftDocId) < hoy.jornada && equipoDelTurno(f.shiftDocId, noche, overrides, horaDe(f.shiftDocId)) === hoy.equipo
     })
     .sort((x, y) => (x.shiftDocId < y.shiftDocId ? 1 : x.shiftDocId > y.shiftDocId ? -1 : 0))
     .map((f) => curvaDeForecast(f.curve))
@@ -620,9 +637,9 @@ export function fantasmaDeJornada(
   if (!rc || !(rc.curve?.length >= 2)) return null
   const esNoche = esNocheDesdeHora(rc.h0) ?? !hoy.esNoche
   if (esNoche === hoy.esNoche) return null
-  const equipo = equipoDelTurno(rc.shiftDocId, esNoche, overrides)
+  const equipo = equipoDelTurno(rc.shiftDocId, esNoche, overrides, rc.h0)
   if (equipo === hoy.equipo) return null
-  const jornada = jornadaDe(rc.dateKey, esNoche)
+  const jornada = jornadaDe(rc.dateKey, esNoche, rc.h0, rc.shiftDocId)
   if (jornada !== hoy.jornada) return null
   return {
     tipo: 'jornada',
@@ -683,8 +700,8 @@ export function referenciaMismoHorario(
       if (numeroDeTurno(id.slice(11)) !== numeroDeTurno(hoy.shiftId)) return false
       const noche = esNocheDesdeHora(horaDe(id)) ?? hoy.esNoche
       return noche === hoy.esNoche
-        && jornadaDe(id.slice(0, 10), noche) < hoy.jornada
-        && equipoDelTurno(id, noche, overrides) === rival
+        && jornadaDe(id.slice(0, 10), noche, horaDe(id), id) < hoy.jornada
+        && equipoDelTurno(id, noche, overrides, horaDe(id)) === rival
     })
     .sort((x, y) => (x < y ? 1 : x > y ? -1 : 0))
   if (!delRival.length) return { fantasma: null, banda: null }
@@ -700,7 +717,7 @@ export function referenciaMismoHorario(
   const base = { equipo: rival, esNoche: hoy.esNoche }
   if (ultimo && ultimo.id === delRival[0]) {
     return {
-      fantasma: { ...base, tipo: 'ultimo', shiftDocId: ultimo.id, jornada: jornadaDe(ultimo.id.slice(0, 10), hoy.esNoche), curva: ultimo.curva, total: ultimo.f?.total ?? null, turnos: 1, ...datosDeArranque(stats.find((x) => x.shiftDocId === ultimo.id)) },
+      fantasma: { ...base, tipo: 'ultimo', shiftDocId: ultimo.id, jornada: jornadaDe(ultimo.id.slice(0, 10), hoy.esNoche, horaDe(ultimo.id), ultimo.id), curva: ultimo.curva, total: ultimo.f?.total ?? null, turnos: 1, ...datosDeArranque(stats.find((x) => x.shiftDocId === ultimo.id)) },
       banda,
     }
   }
