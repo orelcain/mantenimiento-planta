@@ -92,6 +92,7 @@ import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
 import { paradasEnEje } from './monitor/ejeTurno'
 import { ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
+import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
 import { useDueloConfig } from './monitor/dueloConfig'
 import type { PestanaMonitor } from './monitor/BarraLateralPC'
@@ -4506,8 +4507,6 @@ function MonitorDelToken() {
   /* El historial de pesos, plegado por defecto (pedido de Orel, 29-08). */
   const [verPesos, setVerPesos] = useState(false)
   const [now, setNow] = useState(() => Date.now())
-  /* El cambio Eviscerado ↔ Filete (solo supervisor): lo usa la barra lateral de PC; en celular sigue `CambioDeLinea`. */
-  const cambioLinea = useCambioDeLinea(data?.plantLineId, data?.plantSlug)
   /* Duelo de equipos: nombres y correcciones de ESTE monitor (`monitor_config/{token}`); editar, solo con sesión de supervisor. */
   const configDuelo = useDueloConfig(token)
   const navigate = useNavigate()
@@ -5970,6 +5969,14 @@ function MonitorDelToken() {
 
   /* Duelo de equipos: el turno que se mira contra el último del rival en el mismo horario. El rival del otro horario
      (`rivalCurve`) es relativo al turno VIGENTE, así que solo se usa mirando ese. */
+  /* Las otras líneas con monitor vigente (sin sesión): alimenta el selector de El turno, Análisis y Duelo. */
+  const lineasMonitor: LineasMonitor | null = data.lineasHermanas && data.lineasHermanas.length > 0
+    ? {
+        actual: data.areaLabel ?? data.lineLabel ?? 'Esta línea',
+        hermanas: data.lineasHermanas,
+        onIr: (tk) => navigate(rutaMonitorConservandoVista(tk, searchParams)),
+      }
+    : null
   const unidadDuelo = unidadDeMaquinas(live.machines)
   const nombresDuelo = nombresEfectivos(configDuelo, unidadDuelo)
   const datosDuelo = glass === 'v2' && vista
@@ -6332,14 +6339,7 @@ function MonitorDelToken() {
         <BarraLateralPC
           pestana={pestana}
           onPestana={verPestana}
-          lineas={cambioLinea
-            ? {
-                actual: cambioLinea.actual.id,
-                opciones: LINEAS_CON_MONITOR.map((id) => ({ id, nombre: lineaConMonitor(id)?.areaLabel ?? id })),
-                onCambiar: (id) => { void cambioLinea.cambiar(id) },
-                cambiando: cambioLinea.cambiando,
-              }
-            : null}
+          conInicio={esSupervisorDuelo}
           onModoTv={entrarModoTv}
           oscuro={isDark}
           onTema={toggleTheme}
@@ -6353,7 +6353,19 @@ function MonitorDelToken() {
             ? <Pill tone="neutral" dot>Turno terminado{live.effectiveEnd ? ` ${fmtWallTime(live.effectiveEnd)}` : ''}</Pill>
             : <StatusPill live={live} sinDatosHaceMin={sinDatosHaceMin} />}
           tema={botonTema}
-          cambioLinea={<CambioDeLinea plantLineId={data.plantLineId} plantSlug={data.plantSlug} />}
+          cambioLinea={pestana !== 'duelo' && (lineasMonitor || esSupervisorDuelo)
+            ? (
+                <div className="flex items-center gap-2">
+                  {esSupervisorDuelo && (
+                    <Link to="/" className="flex min-h-[44px] shrink-0 items-center gap-0.5 rounded-full pl-1 pr-2 text-subhead font-medium text-primary transition-opacity hover:opacity-80">
+                      <ChevronLeft className="size-5" aria-hidden />
+                      Inicio
+                    </Link>
+                  )}
+                  <SelectorLinea lineas={lineasMonitor} className="min-w-0 flex-1" />
+                </div>
+              )
+            : null}
           navTurnos={navegacionTurnos}
           sub={[
             vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId),
@@ -6565,6 +6577,11 @@ function MonitorDelToken() {
         {/* Pestaña «El turno»: la vigilancia y el estado, como TABLERO
             personalizable. En la TV la pestaña es siempre esta y el tablero
             no corre: la TV muestra el trío fijo de siempre. */}
+        {/* El selector de línea de PC (lg+) arriba de El turno y de Análisis; el Duelo trae el suyo. En celular vive en la
+            cabecera. La fila cuenta en el alto de «El turno» en PC (`.fila-linea-pc`). */}
+        {glass === 'v2' && !modoPantalla && pestana !== 'duelo' && lineasMonitor && (
+          <SelectorLinea lineas={lineasMonitor} className="fila-linea-pc dpc-linea" />
+        )}
         {pestana === 'turno' && (<>
         {/* La alerta de línea detenida va FUERA del tablero, arriba: una
             alerta no es una tarjeta que se reordena. Cerrado no se muestra
@@ -7575,13 +7592,7 @@ function MonitorDelToken() {
                   semilla: (data.pulse?.lecturas ?? []).map((l) => l.totalCycles),
                 }
               : null}
-            lineas={data.lineasHermanas && data.lineasHermanas.length > 0
-              ? {
-                  actual: data.areaLabel ?? data.lineLabel ?? 'Esta línea',
-                  hermanas: data.lineasHermanas,
-                  onIr: (tk) => navigate(rutaMonitorConservandoVista(tk, searchParams)),
-                }
-              : null}
+            lineas={lineasMonitor}
           />
         )}
 

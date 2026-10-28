@@ -3,7 +3,8 @@
  *
  * Riel de 56 px fijo a la izquierda que se abre a 200 px al pasar el mouse (con 120 ms de espera) o con el teclado,
  * SIN empujar el contenido: el fondo crece con `scaleX` y los rótulos aparecen con `opacity`; la página no se mueve.
- * Lleva lo que antes ocupaba la cabecera: El turno · Análisis · Eviscerado/Filete · Modo TV · tema · Inicio.
+ * Lleva lo que antes ocupaba la cabecera: El turno · Análisis · Duelo · Modo TV · tema · Inicio. El cambio de línea
+ * (Eviscerado | Filete) ya no vive acá: es el selector de arriba de cada pestaña (`SelectorLinea`).
  * El botón de arriba la deja fijada abierta. El indicador del apartado activo se desliza (`transform`).
  * En celular no existe: sigue la barra de arriba de siempre.
  */
@@ -11,20 +12,14 @@ import { BarChart3, Clock, Home, Menu, Moon, Sun, Trophy, Tv } from 'lucide-reac
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-export interface LineaLateral {
-  id: string
-  /** «Eviscerado» / «Filete», tal como lo nombra la línea. */
-  nombre: string
-}
-
 /** Los apartados del monitor v2: lo vivo, lo que se estudia y el duelo de equipos. */
 export type PestanaMonitor = 'turno' | 'analisis' | 'duelo'
 
 export interface BarraLateralPCProps {
   pestana: PestanaMonitor
   onPestana: (p: PestanaMonitor) => void
-  /** El cambio de línea: solo con sesión de supervisor. Sin él, ni segmento de área ni «Inicio». */
-  lineas?: { actual: string; opciones: LineaLateral[]; onCambiar: (id: string) => void; cambiando: boolean } | null
+  /** «Inicio»: solo con sesión de supervisor (el link público no tiene a dónde volver). */
+  conInicio?: boolean
   onModoTv: () => void
   oscuro: boolean
   onTema: () => void
@@ -56,7 +51,7 @@ function Item({ icono, rotulo, activo, onClick, to, pulsado, nombre, atenuado }:
   )
 }
 
-export function BarraLateralPC({ pestana, onPestana, lineas, onModoTv, oscuro, onTema }: BarraLateralPCProps) {
+export function BarraLateralPC({ pestana, onPestana, conInicio, onModoTv, oscuro, onTema }: BarraLateralPCProps) {
   const [fijada, setFijada] = useState(false)
   const [hover, setHover] = useState(false)
   const [foco, setFoco] = useState(false)
@@ -96,43 +91,6 @@ export function BarraLateralPC({ pestana, onPestana, lineas, onModoTv, oscuro, o
         <Item icono={<BarChart3 className="h-[18px] w-[18px]" />} rotulo="Análisis" activo={pestana === 'analisis'} onClick={() => onPestana('analisis')} />
         <Item icono={<Trophy className="h-[18px] w-[18px]" />} rotulo="Duelo" activo={pestana === 'duelo'} onClick={() => onPestana('duelo')} />
 
-        {lineas && lineas.opciones.length > 1 && (
-          <>
-            <div className="v2-lat-sep" aria-hidden />
-            <div role="group" aria-label="Línea del monitor" className="v2-lat-area">
-              <span className="v2-lat-area-rot" aria-hidden>Área</span>
-              {lineas.opciones.map((o) => {
-                const cuerpo = (
-                  <>
-                    <span className="v2-lat-ico"><span className="v2-lat-chip">{o.nombre.slice(0, 2)}</span></span>
-                    <span className="v2-lat-rot">{o.nombre}</span>
-                  </>
-                )
-                /* La línea en la que ya estás es un estado, no una acción: sin botón ni cursor de botón. */
-                if (o.id === lineas.actual) {
-                  return (
-                    <div key={o.id} aria-current="true" className="v2-lat-item v2-lat-item-area v2-lat-actual tap-44 v2-lat-activo">
-                      {cuerpo}
-                    </div>
-                  )
-                }
-                return (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => lineas.onCambiar(o.id)}
-                    disabled={lineas.cambiando}
-                    aria-label={o.nombre}
-                    className="v2-lat-item v2-lat-item-area tap-44"
-                  >
-                    {cuerpo}
-                  </button>
-                )
-              })}
-            </div>
-          </>
-        )}
-
         <div className="v2-lat-sep" aria-hidden />
         <Item icono={<Tv className="h-[18px] w-[18px]" />} rotulo="Modo TV" onClick={onModoTv} />
         <span className="v2-lat-hueco" aria-hidden />
@@ -142,7 +100,7 @@ export function BarraLateralPC({ pestana, onPestana, lineas, onModoTv, oscuro, o
           nombre={oscuro ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
           onClick={onTema}
         />
-        {lineas && <Item icono={<Home className="h-[18px] w-[18px]" />} rotulo="Inicio" to="/" />}
+        {conInicio && <Item icono={<Home className="h-[18px] w-[18px]" />} rotulo="Inicio" to="/" />}
       </div>
     </nav>
   )

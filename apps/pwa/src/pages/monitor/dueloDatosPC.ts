@@ -461,6 +461,8 @@ export interface FilaRiel {
   unidad: string
   dec: number
   gan: GanFila
+  /** Nombre del puesto de alimentación (solo en las filas `alim-*`): lo usa el globo de ayuda. */
+  puesto?: string
 }
 
 export interface EntradaRiel {
@@ -491,17 +493,17 @@ export function filasRiel(e: EntradaRiel): FilaRiel[] {
   const filas: FilaRiel[] = []
 
   const car = kpi('carrera')?.filas[0]
-  if (car) filas.push({ id: 'carrera', rotulo: 'Carrera', sub: enCurso ? 'a la misma hora de producción' : 'piezas, con Mantención sumada', ...dosLados(car.a, car.b), unidad: 'pz', dec: 0, gan: ladoDe(car.ganador, hoy) })
+  if (car) filas.push({ id: 'carrera', rotulo: 'Carrera', sub: enCurso ? 'piezas a la misma hora' : 'piezas, con Mantención sumada', ...dosLados(car.a, car.b), unidad: 'pz', dec: 0, gan: ladoDe(car.ganador, hoy) })
   const rit = kpi('ritmo')?.filas[0]
-  if (rit) filas.push({ id: 'ritmo', rotulo: 'Ritmo andando', sub: 'pz por minuto con piezas', ...dosLados(rit.a, rit.b), unidad: 'pz/min', dec: 1, gan: ladoDe(rit.ganador, hoy) })
+  if (rit) filas.push({ id: 'ritmo', rotulo: 'Ritmo andando', sub: 'piezas por minuto', ...dosLados(rit.a, rit.b), unidad: 'pz/min', dec: 1, gan: ladoDe(rit.ganador, hoy) })
   const mic = kpi('micro')?.filas[0]
-  if (mic) filas.push({ id: 'micro', rotulo: 'Micro detención', sub: 'min por hora y Baader · menos es mejor', ...dosLados(mic.a, mic.b), unidad: 'min/h', dec: 1, gan: ladoDe(mic.ganador, hoy) })
+  if (mic) filas.push({ id: 'micro', rotulo: 'Micro detención', sub: 'minutos por hora · menos gana', ...dosLados(mic.a, mic.b), unidad: 'min/h', dec: 1, gan: ladoDe(mic.ganador, hoy) })
   const arr = kpi('arranque')
   if (arr && arr.filas.length >= 2) {
     const [ini, uh] = arr.filas as [typeof arr.filas[number], typeof arr.filas[number]]
-    const t = (x: number | null, y: number | null) => `${x != null ? Math.round(x).toLocaleString('es-CL') : '—'} · ${y != null && !enCurso ? Math.round(y).toLocaleString('es-CL') : '—'}`
+    const t = (x: number | null, y: number | null) => `${x != null ? Math.round(x).toLocaleString('es-CL') : '—'} min · ${y != null && !enCurso ? Math.round(y).toLocaleString('es-CL') : '—'} pz`
     filas.push({
-      id: 'arranque', rotulo: 'Arranque y cierre', sub: enCurso ? 'el cierre se juega al final' : '1.ª pieza (min) · última hora (pz)',
+      id: 'arranque', rotulo: 'Arranque y cierre', sub: enCurso ? 'el cierre se juega al final' : 'minutos a la 1.ª pieza y piezas de la última hora',
       ...dosLados(enCurso ? null : uh.a, enCurso ? null : uh.b), ...txtLados(t(ini.a, uh.a), t(ini.b, uh.b)), unidad: 'pz', dec: 0, gan: ladoDe(arr.ganador, hoy),
     })
   }
@@ -513,19 +515,19 @@ export function filasRiel(e: EntradaRiel): FilaRiel[] {
       const pc = gp.filter((g) => g === 'c').length
       const pr = gp.filter((g) => g === 'r').length
       filas.push({
-        id: 'alim', rotulo: 'Alimentación', sub: '', c: pc, r: pr, ...txtLados(`${pc} pt`, `${pr} pt`),
+        id: 'alim', rotulo: 'Alimentación', sub: 'puestos ganados', c: pc, r: pr, ...txtLados(`${pc} ${pc === 1 ? 'punto' : 'puntos'}`, `${pr} ${pr === 1 ? 'punto' : 'puntos'}`),
         unidad: 'pt', dec: 0, gan: enCurso ? 'pend' : pc > pr ? 'c' : pr > pc ? 'r' : 'empate',
       })
     } else {
       puestos.forEach((p, i) => filas.push({
-        id: `alim-${p.clave}`, rotulo: `Alim. ${p.etiqueta}`, sub: enCurso ? 'se compara al cierre' : `${e.unidad ?? 'puestos'} con pieza / tiempo andando`,
-        ...dosLados(p.a, p.b), unidad: '%', dec: 0, gan: enCurso ? 'pend' : gp[i]!,
+        id: `alim-${p.clave}`, rotulo: `Alimentación ${p.etiqueta}`, sub: enCurso ? 'se compara al cierre' : `${e.unidad ?? 'puestos'} con pieza / tiempo andando`,
+        ...dosLados(p.a, p.b), unidad: '%', dec: 0, gan: enCurso ? 'pend' : gp[i]!, puesto: p.etiqueta,
       }))
     }
   }
 
   const v = (eq: EquipoId) => lados[eq]?.v90 ?? null
-  filas.push({ id: 'sostenida', rotulo: 'Sostenida', sub: 'min a ≥ 90 % del esperado · sin punto', c: v('cardenas'), r: v('rebolledo'), unidad: 'min', dec: 0, gan: 'info' })
+  filas.push({ id: 'sostenida', rotulo: 'Minutos a buen ritmo', sub: '≥ 90 % de lo esperado · sin punto', c: v('cardenas'), r: v('rebolledo'), unidad: 'min', dec: 0, gan: 'info' })
   return filas
 }
 
@@ -552,12 +554,12 @@ export function filasSinRival(d: DatosDuelo, lados: Record<EquipoId, LadoEje | n
   const h = d.hoy
   const mio = lados[h.equipo]
   const filas: FilaRiel[] = [
-    { id: 'carrera', rotulo: 'Carrera', sub: 'contra su promedio de noche a esta hora', c: h.piezas, r: promedioCarrera, unidad: 'pz', dec: 0, gan: 'sin' },
-    { id: 'ritmo', rotulo: 'Ritmo andando', sub: 'pz por minuto con piezas', c: h.ritmo, r: null, unidad: 'pz/min', dec: 1, gan: 'sin' },
-    { id: 'micro', rotulo: 'Micro detención', sub: 'min por hora y Baader', c: h.microMinH, r: null, unidad: 'min/h', dec: 1, gan: 'sin' },
-    { id: 'arranque', rotulo: 'Arranque', sub: 'min hasta la 1.ª pieza', c: h.arranqueMin, r: null, unidad: 'min', dec: 0, gan: 'sin' },
-    ...h.puestos.map((p): FilaRiel => ({ id: `alim-${p.clave}`, rotulo: `Alim. ${p.etiqueta}`, sub: 'en vivo', c: p.llenado, r: null, unidad: '%', dec: 0, gan: 'sin' })),
-    { id: 'sostenida', rotulo: 'Sostenida', sub: 'min a ≥ 90 % del esperado', c: mio?.v90 ?? null, r: null, unidad: 'min', dec: 0, gan: 'sin' },
+    { id: 'carrera', rotulo: 'Carrera', sub: 'piezas contra su promedio a esta hora', c: h.piezas, r: promedioCarrera, unidad: 'pz', dec: 0, gan: 'sin' },
+    { id: 'ritmo', rotulo: 'Ritmo andando', sub: 'piezas por minuto', c: h.ritmo, r: null, unidad: 'pz/min', dec: 1, gan: 'sin' },
+    { id: 'micro', rotulo: 'Micro detención', sub: 'minutos por hora', c: h.microMinH, r: null, unidad: 'min/h', dec: 1, gan: 'sin' },
+    { id: 'arranque', rotulo: 'Arranque', sub: 'minutos hasta la 1.ª pieza', c: h.arranqueMin, r: null, unidad: 'min', dec: 0, gan: 'sin' },
+    ...h.puestos.map((p): FilaRiel => ({ id: `alim-${p.clave}`, rotulo: `Alimentación ${p.etiqueta}`, sub: 'en vivo', c: p.llenado, r: null, unidad: '%', dec: 0, gan: 'sin', puesto: p.etiqueta })),
+    { id: 'sostenida', rotulo: 'Minutos a buen ritmo', sub: '≥ 90 % de lo esperado', c: mio?.v90 ?? null, r: null, unidad: 'min', dec: 0, gan: 'sin' },
   ]
   return filas
 }
