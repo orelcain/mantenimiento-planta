@@ -123,8 +123,8 @@ export function CarreraCalma({ d, lados, nombres, inicioMs, cel }: CarreraCalmaP
     return out
   }
   const relleno = m.tramos.map((t) => {
-    const arriba = t.puntos.map((p) => `${p.m === t.puntos[0]!.m ? 'M' : 'L'}${X(p.m).toFixed(1)} ${Y(p.c).toFixed(1)}`).join('')
-    const abajo = [...t.puntos].reverse().map((p) => `L${X(p.m).toFixed(1)} ${Y(p.r).toFixed(1)}`).join('')
+    const arriba = t.puntos.map((p) => `${p.m === t.puntos[0]!.m ? 'M' : 'L'}${X(p.m).toFixed(1)} ${Y(p.c).toFixed(1)}`).join('') // decimal-tecnico: coordenada SVG
+    const abajo = [...t.puntos].reverse().map((p) => `L${X(p.m).toFixed(1)} ${Y(p.r).toFixed(1)}`).join('') // decimal-tecnico: coordenada SVG
     return { lider: t.lider, d: `${arriba}${abajo}Z` }
   })
 
@@ -241,10 +241,10 @@ export function CarreraCalma({ d, lados, nombres, inicioMs, cel }: CarreraCalmaP
         {!m.dosLados && c.banda && c.banda.min.length > 1 && (
           <>
             <path
-              d={`${c.banda.max.map((p, i) => `${i ? 'L' : 'M'}${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('')}${[...c.banda.min].reverse().map((p) => `L${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('')}Z`}
+              d={`${c.banda.max.map((p, i) => `${i ? 'L' : 'M'}${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('')}${[...c.banda.min].reverse().map((p) => `L${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('')}Z` /* decimal-tecnico: coordenada SVG */}
               className="dc-banda"
             />
-            <path d={c.banda.media.map((p, i) => `${i ? 'L' : 'M'}${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('')} className="dc-media" />
+            <path d={c.banda.media.map((p, i) => `${i ? 'L' : 'M'}${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('')} /* decimal-tecnico: coordenada SVG */ className="dc-media" />
           </>
         )}
 
@@ -257,7 +257,7 @@ export function CarreraCalma({ d, lados, nombres, inicioMs, cel }: CarreraCalmaP
               {(cv.proyectado || cv.xFin > m.AH) && (
                 <path
                   d={cv.proyectado
-                    ? `M${X(m.AH).toFixed(1)} ${Y(piezasALaMismaHora(cv.curva, cv.fin) ?? 0).toFixed(1)}L${X(cv.xFin).toFixed(1)} ${Y(cv.yFin).toFixed(1)}`
+                    ? `M${X(m.AH).toFixed(1)} ${Y(piezasALaMismaHora(cv.curva, cv.fin) ?? 0).toFixed(1)}L${X(cv.xFin).toFixed(1)} ${Y(cv.yFin).toFixed(1)}` /* decimal-tecnico: coordenada SVG */
                     : trazoSuave(Array.from({ length: Math.ceil((cv.fin - m.AH) / 4) + 1 }, (_, i) => { const mm = Math.min(cv.fin, m.AH + i * 4); return [X(mm), Y(piezasALaMismaHora(cv.curva, mm) ?? 0)] as [number, number] }))}
                   fill="none" stroke={COLOR[eq]} strokeWidth={1.6} strokeDasharray="4 4" opacity={0.75}
                 />
@@ -305,18 +305,18 @@ export function CarreraCalma({ d, lados, nombres, inicioMs, cel }: CarreraCalmaP
             ))}
             {m.tramos.map((t, i) => {
               const pts = t.puntos.map((p) => [X(p.m), YW(p.c - p.r)] as [number, number])
-              const area = `M${pts[0]![0].toFixed(1)} ${zero}${pts.map((p) => `L${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('')}L${pts[pts.length - 1]![0].toFixed(1)} ${zero}Z`
+              const area = `M${pts[0]![0].toFixed(1)} ${zero}${pts.map((p) => `L${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('')}L${pts[pts.length - 1]![0].toFixed(1)} ${zero}Z` // decimal-tecnico: coordenada SVG
               return (
                 <g key={i}>
                   <path d={area} fill={COLOR[t.lider]} opacity={0.3} />
-                  <path d={pts.map((p, j) => `${j ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('')} fill="none" stroke={COLOR[t.lider]} strokeWidth={2} strokeLinejoin="round" />
+                  <path d={pts.map((p, j) => `${j ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('')} /* decimal-tecnico: coordenada SVG */ fill="none" stroke={COLOR[t.lider]} strokeWidth={2} strokeLinejoin="round" />
                 </g>
               )
             })}
             <line x1={x0} x2={x1} y1={zero} y2={zero} className="dc-cero" />
             {m.presentes.every((e) => m.curvas[e]!.proyectado || !m.curvas[e]!.enCurso) && m.curvas.cardenas && m.curvas.rebolledo && m.xMax > m.AH && (
               <path
-                d={`M${xAhora.toFixed(1)} ${YW(firmada(m.AH)).toFixed(1)}L${X(Math.max(m.curvas.cardenas.xFin, m.curvas.rebolledo.xFin)).toFixed(1)} ${YW(m.curvas.cardenas.yFin - m.curvas.rebolledo.yFin).toFixed(1)}`}
+                d={`M${xAhora.toFixed(1)} ${YW(firmada(m.AH)).toFixed(1)}L${X(Math.max(m.curvas.cardenas.xFin, m.curvas.rebolledo.xFin)).toFixed(1)} ${YW(m.curvas.cardenas.yFin - m.curvas.rebolledo.yFin).toFixed(1)}` /* decimal-tecnico: coordenada SVG */}
                 fill="none" className="dc-proy" strokeWidth={1.5} strokeDasharray="4 4"
               />
             )}

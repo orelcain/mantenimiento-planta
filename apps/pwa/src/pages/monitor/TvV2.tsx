@@ -218,8 +218,8 @@ function CarreraTv({ d, nombres, previstoMin }: { d: DatosDuelo; nombres?: Nombr
     const hoyS: string[] = []
     const rivS: string[] = []
     for (let mi = 0; mi <= ahora; mi += 3) {
-      hoyS.push(`${X(mi).toFixed(1)} ${Y(piezasAlMinuto(c.hoy, mi) ?? 0).toFixed(1)}`)
-      rivS.push(`${X(mi).toFixed(1)} ${Y(piezasAlMinuto(fan, mi) ?? 0).toFixed(1)}`)
+      hoyS.push(`${X(mi).toFixed(1)} ${Y(piezasAlMinuto(c.hoy, mi) ?? 0).toFixed(1)}`) // decimal-tecnico: coordenada SVG
+      rivS.push(`${X(mi).toFixed(1)} ${Y(piezasAlMinuto(fan, mi) ?? 0).toFixed(1)}`) // decimal-tecnico: coordenada SVG
     }
     area = `M${hoyS.join('L')}L${rivS.reverse().join('L')}Z`
   }
@@ -255,7 +255,7 @@ function CarreraTv({ d, nombres, previstoMin }: { d: DatosDuelo; nombres?: Nombr
       <line x1={x0} x2={x1} y1={yBandaBase} y2={yBandaBase} style={{ stroke: 'var(--tv-line)' }} strokeWidth={2} />
       {area && <path d={area} style={{ fill: 'var(--tv-fg2)', opacity: 0.22 }} />}
       {tramos.filter((t) => t.lider && t.puntos.length > 1).map((t, i) => (
-        <path key={i} d={`M${VX(t.puntos[0]!.minuto).toFixed(1)} ${yBandaBase}${t.puntos.map((q) => `L${VX(q.minuto).toFixed(1)} ${VY(q.ventaja).toFixed(1)}`).join('')}L${VX(t.puntos[t.puntos.length - 1]!.minuto).toFixed(1)} ${yBandaBase}Z`}
+        <path key={i} d={`M${VX(t.puntos[0]!.minuto).toFixed(1)} ${yBandaBase}${t.puntos.map((q) => `L${VX(q.minuto).toFixed(1)} ${VY(q.ventaja).toFixed(1)}`).join('')}L${VX(t.puntos[t.puntos.length - 1]!.minuto).toFixed(1)} ${yBandaBase}Z` /* decimal-tecnico: coordenada SVG */}
           style={{ fill: COL[t.lider!], opacity: 0.85 }} />
       ))}
       {fan && <path d={trazoCurva(fan, maxMin, X, Y)} fill="none" style={{ stroke: COL[eqRiv] }} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />}

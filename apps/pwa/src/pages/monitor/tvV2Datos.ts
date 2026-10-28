@@ -58,7 +58,7 @@ export function trazoCurva(curva: readonly PacePoint[], hastaMin: number, X: (m:
   if (!pts.length) return ''
   const paso = Math.max(1, Math.ceil(pts.length / 200))
   const usados = pts.filter((_, i) => i % paso === 0 || i === pts.length - 1)
-  return usados.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('')
+  return usados.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p.minutes).toFixed(1)} ${Y(p.pieces).toFixed(1)}`).join('') // decimal-tecnico: coordenada SVG
 }
 
 /** El punto de mayor ventaja de la serie (para el 2.º rótulo clave). null si nunca hubo ventaja. */
