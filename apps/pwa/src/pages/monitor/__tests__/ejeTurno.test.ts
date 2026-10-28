@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import type { GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import {
   acumulado, anchoRotuloAhora, celdaBaader, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado, escalaVentana,
-  escalaY, esperadoPorMinuto, filasBaader, finDelEje, horasMin, marcasEje, minutosCompletos, minutosConParada, minutosPorCubeta, minutosVisibles,
+  anclaRotuloAhora, brechaALaIzquierda, escalaY, esperadoPorMinuto, filasBaader, finDelEje, horasMin, marcasEje, minutosCompletos, minutosConParada, minutosPorCubeta, minutosVisibles,
   paradaEn, paradasEn, paradasEnEje, pasoMarcas, pctAndando, pctARitmo, proyeccion, rayasY, recortarCurva, separarRotulos, sumaPorMinuto, tamanoGrafico,
   tonoDeCubeta, tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
   type ParadaEje,
@@ -302,6 +302,8 @@ describe('filas Ev: sin falsos rojos', () => {
     expect(a!.celdas.map((x) => x.tono)).toEqual(['sin', 'sin', 'sin', 'sin'])
     expect(a!.celdas.map((x) => x.estado)).toEqual(['sin-dato', 'detenida', 'sin-dato', 'sin-dato'])
     expect(b!.celdas.map((x) => x.tono)).toEqual(['bien', 'bien', 'sin', 'sin'])
+    /* Un minuto que su serie aún no trae es «sin dato», no «detenida»: la Baader solo va atrasada. */
+    expect(b!.celdas.map((x) => x.estado)).toEqual(['andando', 'andando', 'sin-dato', 'sin-dato'])
   })
 
   it('% a ritmo cuenta solo los minutos con dato', () => {
@@ -512,8 +514,45 @@ describe('horas del eje X en múltiplos de reloj', () => {
     expect(c).toContain(150)
     expect(c).toContain(270)
   })
+  it('celular (255 px de lienzo): el fin del turno no se rotula si su texto pisaría la hora de al lado (antes «14:00» y «15:00» se montaban 6 px)', () => {
+    const ini = Date.UTC(2026, 9, 28, 8, 0)
+    const pxMin = 255 / 420
+    const sin = marcasEje({ totalMin: 420, pxPorMin: pxMin, minPx: 64, ahoraMin: null, ahoraPx: 0, iniMs: ini, marcaPx: 27 })
+    expect(horas(ini, sin)).toEqual(['08:00', '10:00', '12:00', '14:00'])
+    /* Con 90 min entre la última hora y el fin (Filete 08:00 → 15:30) sí caben las dos. */
+    const con = marcasEje({ totalMin: 450, pxPorMin: 255 / 450, minPx: 64, ahoraMin: null, ahoraPx: 0, iniMs: ini, marcaPx: 27 })
+    expect(horas(ini, con)).toEqual(['08:00', '10:00', '12:00', '14:00', '15:30'])
+  })
+  it('celular: el inicio del turno tampoco se rotula si su texto pisaría la primera hora (turno que parte 13 min antes de las 08:00)', () => {
+    const ini = Date.UTC(2026, 9, 28, 7, 47)
+    const m = marcasEje({ totalMin: 420, pxPorMin: 255 / 420, minPx: 64, ahoraMin: null, ahoraPx: 0, iniMs: ini, marcaPx: 27 })
+    expect(m[0]).toBe(13)
+    expect(horas(ini, m)[0]).toBe('08:00')
+  })
   it('el ancho del rótulo: 64 px a 12 px y 59 px a 11 px', () => {
     expect([anchoRotuloAhora(12), anchoRotuloAhora(11)]).toEqual([64, 59])
+  })
+})
+
+describe('rótulos en vivo contra el borde VISIBLE (con zoom, la ventana)', () => {
+  const ancho = anchoRotuloAhora(11)
+  it('en el medio, centrado sobre la raya', () => {
+    expect(anclaRotuloAhora({ xAhora: 130, visIni: 0, visDer: 261, anchoRotulo: ancho })).toEqual({ ancla: 'middle', x: 130 })
+  })
+  it('cerca del borde derecho se ancla hacia adentro, y si la raya quedó FUERA de la ventana el texto se acota al borde (turno cerrado con zoom de 15 min: «04:50 fin» se salía 29 px)', () => {
+    expect(anclaRotuloAhora({ xAhora: 245, visIni: 0, visDer: 261, anchoRotulo: ancho })).toEqual({ ancla: 'end', x: 245 })
+    expect(anclaRotuloAhora({ xAhora: 268, visIni: 0, visDer: 261, anchoRotulo: ancho })).toEqual({ ancla: 'end', x: 259 })
+  })
+  it('cerca del borde izquierdo de la ventana se ancla hacia adentro', () => {
+    expect(anclaRotuloAhora({ xAhora: 1010, visIni: 1000, visDer: 1261, anchoRotulo: ancho })).toEqual({ ancla: 'start', x: 1010 })
+    expect(anclaRotuloAhora({ xAhora: 990, visIni: 1000, visDer: 1261, anchoRotulo: ancho })).toEqual({ ancla: 'start', x: 1002 })
+  })
+  it('«a esta hora»: a la derecha de la punta si cabe en lo visible; si no, a su izquierda (a 375 con zoom de 1 h se cortaba 56 px)', () => {
+    const texto = 'a esta hora +108'.length * 7.4
+    expect(brechaALaIzquierda(100, texto, 261)).toBe(false)
+    expect(brechaALaIzquierda(222, texto, 261)).toBe(true)
+    /* Sin zoom la «ventana» es el lienzo entero: la punta a medio camino sigue cabiendo. */
+    expect(brechaALaIzquierda(900, texto, 3000)).toBe(false)
   })
 })
 
@@ -546,6 +585,9 @@ describe('cubetas de las barras con poco ancho', () => {
     expect(tonoDeCubeta(['mal', 'bien'])).toBe('mal')
     expect(tonoDeCubeta(['mal'])).toBe('mal')
     expect(tonoDeCubeta(['sin', 'sin'])).toBe('sin')
+  })
+  it('una cubeta sin ningún minuto no se pinta de rojo: es neutra', () => {
+    expect(tonoDeCubeta([])).toBe('sin')
   })
 })
 

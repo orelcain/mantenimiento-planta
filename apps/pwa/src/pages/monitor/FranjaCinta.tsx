@@ -155,7 +155,26 @@ const PUNTO_ESTADO: Record<EstadoBaader, string> = { andando: 'var(--v2-acento)'
 /** La palabra solo la llevan «lenta» y «detenida»: «parcial» y «sin dato» son puntos grises, sin palabra. */
 const TEXTO_ESTADO: Partial<Record<EstadoBaader, string>> = { lenta: 'var(--v2-atento-texto)', detenida: 'var(--v2-mal-texto)' }
 
-function CadaBaader({ filas, unidad, cerrado }: { filas: FilaBaader[]; unidad: 'carros' | 'silletas' | null; cerrado: boolean }) {
+/**
+ * Las piezas de una Baader siguen al MISMO reloj que la cifra grande de «Piezas del turno»: con la reproducción del último minuto
+ * activa cada Baader sube un escalón por pieza (`rep.porMaquina`, cuya suma es la cifra de la línea en cada cuadro), así las
+ * tres cuadran con el total en todo instante y no solo cuando la reproducción llegó al contador. Sin reproducción (turno
+ * cerrado, sin serie por minuto) vale `respaldo`. El texto se escribe solo cuando cambia el entero.
+ */
+export function PiezasBaader({ reloj, id, respaldo, className }: { reloj: RelojDeDatos; id: string; respaldo: number; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const ultimo = useRef(int(respaldo))
+  useEffect(() => reloj.alCuadro((c) => {
+    const el = ref.current
+    if (!el) return
+    const t = int(c.rep?.porMaquina.find((m) => m.id === id)?.valor ?? respaldo)
+    /* Se compara con lo que HAY en el nodo: React reescribe el texto con `respaldo` cuando éste cambia. */
+    if (t !== ultimo.current || el.textContent !== t) { ultimo.current = t; el.textContent = t }
+  }), [reloj, id, respaldo])
+  return <span ref={ref} className={className}>{int(respaldo)}</span>
+}
+
+function CadaBaader({ filas, unidad, cerrado, reloj }: { filas: FilaBaader[]; unidad: 'carros' | 'silletas' | null; cerrado: boolean; reloj: RelojDeDatos }) {
   return (
     <>
       <div className="fc-cab">
@@ -172,7 +191,7 @@ function CadaBaader({ filas, unidad, cerrado }: { filas: FilaBaader[]; unidad: '
           return (
             <li key={f.id} className="fc-baader" title={f.llenado != null ? `${etiquetaMaquina(f.nombre)}: ${f.llenado} % de lo que daba mientras anduvo` : undefined}>
               <span className="fc-baader-nombre"><i style={{ background: f.estado ? PUNTO_ESTADO[f.estado] : 'var(--v2-gris)' }} aria-hidden />{etiquetaMaquina(f.nombre)}</span>
-              <span className="fc-baader-pz tabular-nums">{int(f.piezas)}</span>
+              <PiezasBaader reloj={reloj} id={f.id} respaldo={f.piezas} className="fc-baader-pz tabular-nums" />
               <div className="fc-baader-ritmo">
                 <div className="fc-baader-linea tabular-nums">
                   <span>
@@ -395,7 +414,7 @@ export function FranjaCinta({ p, reloj, ampliadoPiezas, abrir, camino }: {
         </div>
       ),
     },
-    ...(conBaader ? [{ clave: 'baader', clase: 'fc-c-baader', nodo: <CadaBaader filas={filas} unidad={e?.unidad ?? null} cerrado={p.cerrado} /> }] : []),
+    ...(conBaader ? [{ clave: 'baader', clase: 'fc-c-baader', nodo: <CadaBaader filas={filas} unidad={e?.unidad ?? null} cerrado={p.cerrado} reloj={reloj} /> }] : []),
     { clave: 'ritmo', clase: 'fc-c-ritmo', nodo: <Tocable onAbrir={() => abrir('ritmo')} etiqueta="Ritmo de la línea"><RitmoLinea p={p} e={e} unica={unica} /></Tocable> },
     { clave: 'meta', clase: 'fc-c-meta', nodo: <ContraLaMeta p={p} e={e} reloj={reloj} abrir={abrir} /> },
     ...(camino != null ? [{ clave: 'camino', clase: 'fc-c-camino v2-camino', nodo: camino }] : []),

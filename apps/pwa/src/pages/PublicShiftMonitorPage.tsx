@@ -3873,11 +3873,16 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
       <div className="ritmo-maquinas mt-3 border-t border-border/50 pt-2.5">
         <div className="flex items-baseline gap-2 text-caption text-muted-foreground">
           {v2 ? (
-            /* En el v2 el título «Cada máquina» ya está arriba: la primera columna dice solo su vara, sobre su número. */
-            <span className="min-w-0 flex-1 pl-[calc(2.25rem+0.5rem)]">
-              {(conPulsoMaq || conCero) && <b className="font-semibold text-foreground/80">ahora</b>}
-              {conReparto && <b className="font-semibold text-foreground/80">media 15 min</b>}
-            </span>
+            /* En el v2 el título «Cada máquina» ya está arriba: la primera columna dice solo su vara, sobre su número. El hueco del
+               nombre (`w-9`, el mismo de las filas) va aparte, como elemento: con un padding en `rem` la columna se corría 2 px bajo
+               640 px (el gap baja a 6) y a 375 px la dejaba sin ancho: el rótulo «ahora» no se veía. */
+            <>
+              <span className="w-9 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1">
+                {(conPulsoMaq || conCero) && <b className="font-semibold text-foreground/80">ahora</b>}
+                {conReparto && <b className="font-semibold text-foreground/80">media 15 min</b>}
+              </span>
+            </>
           ) : (
             <span className="min-w-0 flex-1">
               Cada máquina
@@ -3886,7 +3891,10 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
             </span>
           )}
           <b className="font-semibold text-foreground/80">
-            {conAporte ? 'aporte al promedio' : 'promedio andando'}
+            {v2
+              /* Bajo 400 px la barra no se dibuja y el encabezado no cabe con su nombre largo: queda la primera palabra. */
+              ? <><span className="max-[399px]:hidden">{conAporte ? 'aporte al promedio' : 'promedio andando'}</span><span className="hidden max-[399px]:inline">{conAporte ? 'aporte' : 'promedio'}</span></>
+              : conAporte ? 'aporte al promedio' : 'promedio andando'}
           </b>
           {/* Un rótulo por columna de delta, con el mismo ancho que la
               celda: «vs sí misma» no decía contra QUÉ (Orel, 31-08). */}

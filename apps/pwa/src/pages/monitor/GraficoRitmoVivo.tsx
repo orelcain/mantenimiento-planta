@@ -23,7 +23,7 @@ import { CapaAmpliada } from './AmpliarV2'
 import { useAbrirPorClave, useTamano } from './ampliarHooks'
 import { aEstaHora, piezasMostradas } from './aEstaHora'
 import {
-  RELLENO_DUENO, TRAMA_MANT, acumulado, anchoRotuloAhora, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado,
+  RELLENO_DUENO, TRAMA_MANT, acumulado, anchoRotuloAhora, anclaRotuloAhora, brechaALaIzquierda, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado,
   escalaVentana, esperadoPorMinuto, filasBaader, finDelEje, firmado, horasMin, int, marcasEje, minutosConParada, minutosCompletos, minutosPorCubeta,
   minutosVisibles, paradasEn, pctAndando, proyeccion, rayasY, recortarCurva, relojDe, separarRotulos, sumaPorMinuto, tamanoGrafico, tonoDeCubeta,
   tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
@@ -177,21 +177,27 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const fs = chico ? 11 : 12
   const horaAhora = relojDe(m.iniMs + ultima.min * 60_000)
   const xAhora = x(ultima.min)
-  const anclaAhora: AnclaRotulo = xAhora > x(totalMin) - 48 ? 'end' : xAhora < 48 ? 'start' : 'middle'
-  const marcas = marcasEje({
-    totalMin, pxPorMin: pxMin, minPx: chico ? 64 : 100, ahoraMin: ultima.min, ahoraPx: chico ? 84 : 64,
-    iniMs: m.iniMs, ahoraAncla: anclaAhora, ahoraRotuloPx: anchoRotuloAhora(fs),
-  })
-  /* Con zoom, una hora a menos de 18 px del borde visible se ancla hacia adentro; fuera de la ventana se omite. */
+  /* El lienzo VISIBLE: con zoom es la ventana del scroller, no el lienzo entero. Los rótulos se anclan y se acotan a ella (con el
+     turno cerrado el fin real puede quedar unos minutos después de la ventana, que termina 15 % delante del último dato). */
   const visIni = m.vent ? m.vent.desdeMin * pxMin : 0
-  const visAncho = m.vent ? (m.vent.hastaMin - m.vent.desdeMin) * pxMin : W
+  const visDer = m.vent ? m.vent.hastaMin * pxMin : W
+  const visAncho = visDer - visIni
+  const anchoRot = anchoRotuloAhora(fs)
+  const { ancla: anclaAhora, x: xRotAhora } = anclaRotuloAhora({ xAhora, visIni, visDer, anchoRotulo: anchoRot })
+  /* El texto de una hora mide 26 px a 11 px de letra y 29 a 12 px: es lo que `marcasEje` necesita para no pisar dos marcas. */
+  const marcaPx = chico ? 27 : 30
+  const marcas = marcasEje({
+    totalMin, pxPorMin: pxMin, minPx: chico ? 64 : 100, ahoraMin: xRotAhora / pxMin, ahoraPx: chico ? 84 : 64,
+    iniMs: m.iniMs, ahoraAncla: anclaAhora, ahoraRotuloPx: anchoRot, marcaPx,
+  })
+  /* Una hora a menos de 16 px del borde visible (el del lienzo o el de la ventana) se ancla hacia adentro: centrada se cortaría
+     («…8:00»). Con zoom, fuera de la ventana se omite. */
   const anclaMarca = (t: number): AnclaRotulo | null => {
     const natural: AnclaRotulo = t <= 0 ? 'start' : t >= totalMin ? 'end' : 'middle'
-    if (!m.vent) return natural
     const xv = x(t) - visIni
-    if (xv < 0 || xv > visAncho) return null
-    if (xv < 18) return 'start'
-    if (visAncho - xv < 18) return 'end'
+    if (m.vent && (xv < 0 || xv > visAncho)) return null
+    if (xv < 16) return 'start'
+    if (visAncho - xv < 16) return 'end'
     return natural
   }
 
@@ -258,7 +264,11 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const ordenParadas = [...m.paradas.filter((q) => q.desdeMin < totalMin && q.hastaMin > 0)].sort((a, b) => ORDEN_DUENO[a.dueno] - ORDEN_DUENO[b.dueno])
   const finProy = m.proy?.hasta
   const gap = m.aHora
-  const brechaIzq = xAhora + 20 + 110 > W
+  const textoBrecha = gap != null ? `a esta hora ${firmado(gap)}` : ''
+  /* El rótulo de «a esta hora» va a la derecha de la punta; si no cabe en lo que se VE (con zoom la ventana termina poco después
+     de la punta), pasa a su izquierda. Texto de 12 px/600: ~7,4 px por carácter. */
+  const anchoBrecha = textoBrecha.length * 7.4
+  const brechaIzq = brechaALaIzquierda(xAhora, anchoBrecha, visDer)
   const baseY = d.paradas.y0 + d.paradas.h
   const idTrama = `${uid}trama`
   const idClip = `${uid}clip`
@@ -270,15 +280,14 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const ryProyTxt = finProy ? acota(y(finProy.v), topBanda + 14, pisoBanda - 12) : 0
   /* En el celular «a esta hora» y «al cierre» comparten el borde derecho: si se cruzan, la brecha baja (o el cierre sube). */
   const textoCierre = chico && finProy ? (m.detenida ? 'detenida · proyección en pausa' : `al cierre ${int(finProy.v)}`) : null
-  const textoBrecha = gap != null ? `a esta hora ${firmado(gap)}` : ''
   let yBrechaTxt = m.cuota && gap != null ? (y(ultima.v) + y(m.cuota.piezas)) / 2 + 4 : 0
   let yCierreTxt = ryProyTxt - 8
   if (textoCierre && m.cuota && gap != null) {
-    const wB = textoBrecha.length * 6.6, wC = textoCierre.length * 6.4
+    const wB = anchoBrecha, wC = textoCierre.length * 7.2
     const b0 = brechaIzq ? xAhora - 20 - wB : xAhora + 20
     const b1 = b0 + wB
     const c0 = W - AIRE_DER - 4 - wC
-    if (b0 < W - AIRE_DER - 4 && b1 > c0) ({ yBrecha: yBrechaTxt, yCierre: yCierreTxt } = separarRotulos(yBrechaTxt, yCierreTxt, pisoBanda - 2))
+    if (b0 < W - AIRE_DER - 4 && b1 + 6 > c0) ({ yBrecha: yBrechaTxt, yCierre: yCierreTxt } = separarRotulos(yBrechaTxt, yCierreTxt, pisoBanda - 2))
   }
 
   return (
@@ -404,7 +413,7 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
         const ancla = anclaMarca(t)
         return ancla && <text key={t} x={r1(x(t))} y={d.ejeX + 12} textAnchor={ancla} fontSize={fs} className="fill-muted-foreground tabular-nums">{relojDe(m.iniMs + t * 60_000)}</text>
       })}
-      <text x={r1(xAhora)} y={d.ejeX + 12} textAnchor={anclaAhora} fontSize={fs} fontWeight={600} className="fill-foreground tabular-nums">{horaAhora} {m.finReal ? 'fin' : 'ahora'}</text>
+      <text x={r1(xRotAhora)} y={d.ejeX + 12} textAnchor={anclaAhora} fontSize={fs} fontWeight={600} className="fill-foreground tabular-nums">{horaAhora} {m.finReal ? 'fin' : 'ahora'}</text>
     </svg>
   )
 })
@@ -573,7 +582,8 @@ function leer(m: Modelo, min: number): LecturaGlobo {
 /**
  * El globo del minuto. En PC y tabletas flota junto al cursor (280 px). En el celular (`compacto`) no flota: va anclado a
  * la tarjeta, sobre el bloque título/leyenda/segmentado, para que el lienzo y la raya del minuto queden a la vista;
- * 5 renglones de 13/18 px y un ✕ de 44 px de área táctil.
+ * renglones de 12/16 px (con 13/18 el caso más cargado, una parada con tres Baader en estados distintos, llegaba a 8 renglones y
+ * 170 px: su borde tapaba el inicio de la raya) y un ✕ de 44 px de área táctil.
  */
 function Globo({ info, style, compacto, onCerrar }: { info: LecturaGlobo; style?: CSSProperties; compacto?: boolean; onCerrar?: () => void }) {
   const dif = info.dif
@@ -598,9 +608,13 @@ function Globo({ info, style, compacto, onCerrar }: { info: LecturaGlobo; style?
     </div>
   )
 
+  /* Con una parada en el minuto y todas las Baader en «detenida» o «sin dato», la lista repite lo que ya dice la fila de la parada
+     («Las 3 Baader»): en el celular se omite. Con ella el globo llegaba a 9 renglones y su borde tapaba el inicio de la raya del minuto. */
+  const listaRedundante = p != null && info.baaders.every((q) => q.celda.estado === 'detenida' || q.celda.estado === 'sin-dato')
+
   if (compacto) {
     return (
-      <div className="v2-tip absolute inset-x-[12px] top-[12px] z-[2] box-border rounded-[22px] py-2.5 pl-4 pr-[52px] text-[13px] leading-[18px]" role="group" aria-label="Lectura del minuto">
+      <div className="v2-tip absolute inset-x-[12px] top-[12px] z-[2] box-border rounded-[22px] py-2.5 pl-4 pr-[52px] text-[12px] leading-4" role="group" aria-label="Lectura del minuto">
         {/* `tap-44` fija `position: relative`: el ✕ va en un contenedor absoluto, no él mismo. */}
         <span className="absolute right-[8px] top-[8px]">
           <button type="button" onClick={onCerrar} aria-label="Cerrar la lectura del minuto" className="tap-44 inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2" style={{ outlineColor: 'var(--v2-bien)' }}>
@@ -620,7 +634,7 @@ function Globo({ info, style, compacto, onCerrar }: { info: LecturaGlobo; style?
             {info.parcial && <span className="ml-1 font-semibold" style={{ color: 'var(--v2-atento-texto)' }}>· {info.parcial}</span>}
           </div>
         )}
-        {baaders.length > 0 && <ul className="flex flex-wrap gap-x-3 gap-y-0">{baaders}</ul>}
+        {baaders.length > 0 && !listaRedundante && <ul className="flex flex-wrap gap-x-3 gap-y-0">{baaders}</ul>}
         {p && (
           <div className="mt-1">
             <div className="flex items-baseline justify-between gap-2">
@@ -975,7 +989,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const chico = tam === 'chico'
   const sub = p.cerrado && finReal != null
     ? `${relojDe(e.iniMs)} → ${relojDe(finReal)} · terminado`
-    : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}${p.corteHora ? ` · leído de Shoplogix ${p.corteHora}` : ''}`
+    : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
   const resumen = `Piezas acumuladas del turno: ${int(mostradas)}${p.meta ? ` de ${int(p.meta)}` : ''}${p.proyeccion != null && !p.cerrado ? `, al cierre ${int(p.proyeccion)}` : ''}. Debajo, el ritmo por minuto, cada Baader y las paradas en las mismas horas.`
   const hayProy = modelo?.proy != null
   const titulo = (
@@ -1016,7 +1030,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
             type="button"
             onClick={() => elegir(z)}
             aria-pressed={on}
-            className={`tap-44 h-[26px] rounded-full px-[12px] text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 ${on ? 'font-semibold' : 'text-foreground'}`}
+            className={`tap-44 h-[26px] min-w-[44px] rounded-full px-[12px] text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 ${on ? 'font-semibold' : 'text-foreground'}`}
             style={{ outlineColor: 'var(--v2-bien)', ...(on ? { background: 'rgb(var(--foreground))', color: 'rgb(var(--background))' } : null) }}
           >
             {rotulo}

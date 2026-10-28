@@ -218,17 +218,17 @@ function BotonDetalle({ vista, onVista, conMas = true }: { vista: VistaV2; onVis
       <button
         type="button"
         onClick={() => onVista(abierto ? 0 : conMas ? 1 : 2)}
-        className="tap-44 flex items-center gap-1.5 rounded-full px-4 py-2 text-[15px] text-primary transition-colors hover:bg-primary/10"
+        className="tap-44 flex min-h-[44px] items-center gap-1.5 rounded-full px-4 py-2 text-[15px] text-primary transition-colors hover:bg-primary/10"
       >
         {abierto ? 'Ver menos' : conMas ? 'Ver más del turno' : 'Ver versión clásica'}
         <ChevronDown className={`h-4 w-4 transition-transform ${abierto ? 'rotate-180' : ''}`} />
       </button>
       {conMas && vista >= 1 && (
-        <button type="button" onClick={() => onVista(vista === 2 ? 1 : 2)} className="tap-44 rounded-full px-3 py-1 text-[13px] text-muted-foreground hover:text-foreground">
+        <button type="button" onClick={() => onVista(vista === 2 ? 1 : 2)} className="tap-44 inline-flex min-h-[44px] items-center rounded-full px-3 py-1 text-[13px] text-muted-foreground hover:text-foreground">
           {vista === 2 ? 'Ocultar versión clásica' : 'Ver versión clásica (todo el detalle de antes)'}
         </button>
       )}
-      <a href={urlClasico()} className="tap-44 rounded-full px-3 py-1 text-[13px] text-muted-foreground hover:text-foreground">
+      <a href={urlClasico()} className="tap-44 inline-flex min-h-[44px] items-center rounded-full px-3 py-1 text-[13px] text-muted-foreground hover:text-foreground">
         Volver al monitor anterior
       </a>
     </div>
@@ -1117,6 +1117,11 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
     return c ? { label: previo.label, ...c, diff: (ult?.valor ?? p.piezas) - c.piezas } : null
   })()
 
+  /* «a esta altura» (`p.vsAyer`, alineado por el arranque del turno y no por la primera pieza) solo sale donde no hay con qué
+     alinear el minuto: sin gráfico, o sin lectura del contador. Con gráfico y lectura pero una curva previa que no llega a ese
+     minuto, la leyenda no dice cifra y la hoja tampoco: UNA sola definición del turno anterior, no dos alineaciones distintas. */
+  const previoSinAlinear = !p.curva?.previo || !p.eje || (!p.cerrado && reloj.cuadro().ultima?.atMs == null)
+
   /* Piezas ahora, ampliado: la curva acumulada real del turno contra el mismo turno de otros días y el ritmo de la meta,
      con cursor; debajo el turno HORA A HORA (línea y cada Baader) y la lista de siempre (meta, faltan, contra ayer). */
   const ampliadoPiezas = (
@@ -1147,7 +1152,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
           : <FilaCifra title="Faltan" value={`${int(p.meta - mostradas)} pz`} valueSub={pct != null ? `${pct} % hecho` : undefined} />)}
         {previoUna
           ? <FilaCifra title={`${previoUna.label} ${previoUna.modo === 'al-cierre' ? 'al cierre' : 'a esta hora'}`} value={`${int(previoUna.piezas)} pz`} valueSub={`${firmado(previoUna.diff)} ${p.cerrado ? 'este turno' : 'hoy'}`} />
-          : p.vsAyer && <FilaCifra title={`${p.vsAyer.label} a esta altura`} value={`${int(p.vsAyer.pieces)} pz`} valueSub={`${firmado(p.vsAyer.diff)} hoy`} />}
+          : previoSinAlinear && p.vsAyer && <FilaCifra title={`${p.vsAyer.label} a esta altura`} value={`${int(p.vsAyer.pieces)} pz`} valueSub={`${firmado(p.vsAyer.diff)} hoy`} />}
       </Grupo>
       {p.maquinas.length > 1 && (
         <Grupo titulo="Por máquina">
@@ -1213,7 +1218,8 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
                       <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--v2-mant)' }} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-2 text-[15px]">
-                          <span className="truncate text-foreground">{e.causa ?? 'Falla técnica'}</span>
+                          {/* La causa baja de renglón en vez de cortarse con «…» («Baader 200/CUCHILLERIA RASCAD…» a 375 px). */}
+                          <span className="min-w-0 break-words text-foreground">{e.causa ?? 'Falla técnica'}</span>
                           <span className="shrink-0 tabular-nums font-medium text-foreground">{horas(e.min)}</span>
                         </div>
                         <div className="text-[13px] tabular-nums text-muted-foreground">{e.maquina} · {hhmm(e.desde)}–{hhmm(e.hasta)}</div>

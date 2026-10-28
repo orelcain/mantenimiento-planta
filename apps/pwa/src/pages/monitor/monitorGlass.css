@@ -736,6 +736,9 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .fc-nota b { font-weight: 600; color: rgb(var(--foreground)); }
 .fc-nota-der { min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (min-width: 1280px) { .fc-cab { flex-wrap: nowrap; } }
+/* A 1280 la celda de Ritmo mide 192 px: rótulo (132) + nota «min 08:08» (52) ya no dejan 8 px de aire entre ambos. Con 4 px sobra y
+   la hora del minuto no se corta con «…» en ningún minuto del turno. */
+@media (min-width: 1280px) { .fc-c-ritmo .fc-cab { column-gap: 4px; } }
 /* 768–1279: el rótulo y su nota pueden ir en dos renglones; 36 px de cabecera en TODAS las celdas para que las cifras de una
    misma fila queden a la misma altura. */
 @media (min-width: 768px) and (max-width: 1279px) { .fc-cab { min-height: 36px; align-content: flex-start; } }
@@ -839,7 +842,9 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
    va en su `title`); en el celular la celda es angosta y la causa baja de renglón en vez de cortarse. */
 .fc-nota-pausa { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fc-apilada .fc-nota-pausa { white-space: normal; overflow: visible; }
-/* Con 5 cifras («−12.345») la cifra no cabe en media celda (a 1600 px se salía 18 px): se calla la unidad, en todos los anchos. */
+/* Con 5 cifras («−12.345») la cifra no cabe en media celda (a 1600 px se salía 18 px): se calla la unidad, en todos los anchos.
+   Medido el 28-10 con la unidad puesta: 151 px de cifra en una media celda de 126 a 1600 px y 161 en 161 a 1920 px; la regla de
+   «solo bajo 1600» de la spec dejaría la cifra saliéndose de la celda en 1600–1919, por eso no se acotó. */
 .fc-cifra-5 small { display: none; }
 /* Mantención en dos renglones: el rótulo con su chevron, y debajo el dato (el número a 17/600, el resto a 15/600). */
 .fc-mant { margin-top: 8px; min-height: 44px; }
@@ -858,11 +863,16 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 /* Meta superada: la escala crece y una raya de 2 px marca dónde estaba la meta (como en la barra de Piezas). */
 .fc-camino-raya { position: absolute; top: -3px; width: 2px; height: 16px; border-radius: 1px; background: rgb(var(--foreground)); }
 .fc-camino-cifras { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin-top: 8px; }
-/* 2×2 bajo 768 y entre 1280 y 1599 (la celda mide ~180–230 px); una fila de columnas al ancho de su texto en 768–1279 y desde 1600. */
-@media (min-width: 768px) and (max-width: 1279px), (min-width: 1600px) {
+/* 2×2 bajo 768 y entre 1280 y 1759 (la celda mide ~180–255 px: cuatro columnas con una cifra de cinco dígitos, «12.739 pz», no
+   caben a 1600 y partirían un rótulo o se saldrían); una fila de columnas al ancho de su texto en 768–1279 y desde 1760 (medido). */
+@media (min-width: 768px) and (max-width: 1279px), (min-width: 1760px) {
   .fc-camino-cifras { grid-template-columns: repeat(var(--n, 4), auto); justify-content: space-between; column-gap: 8px; }
 }
 .fc-camino-cifras dt > span { min-width: 0; }
+/* «12.739 pz» no parte su unidad a otro renglón; entre 1760 y 1919 el hueco entre columnas baja a 4 px para que cuatro cifras,
+   una de ellas de cinco dígitos, queden juntas (celda de 256 px: 234 de texto + 3 huecos). */
+.fc-camino-cifras dd { white-space: nowrap; }
+@media (min-width: 1760px) and (max-width: 1919px) { .fc-camino-cifras { column-gap: 4px; } }
 
 @media (min-width: 768px) {
   .fc-cifra-p { font-size: 48px; }

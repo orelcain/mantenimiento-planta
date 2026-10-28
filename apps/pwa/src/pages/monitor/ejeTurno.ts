@@ -111,6 +111,25 @@ export type AnclaRotulo = 'start' | 'middle' | 'end'
 export const anchoRotuloAhora = (fontSize: number) => (fontSize >= 12 ? 64 : 59)
 
 /**
+ * Dónde y cómo se escribe el rótulo «HH:MM ahora» (o «HH:MM fin») en el eje: centrado sobre la raya, o pegado hacia adentro si la
+ * raya queda a menos de medio texto (más 2 px) del borde VISIBLE. Con zoom el borde visible es el de la ventana, no el del lienzo
+ * entero; y con el turno cerrado el fin real puede quedar unos minutos después de la ventana (que termina 15 % delante del último
+ * dato): el texto se acota al borde visible en vez de salirse. `x` es la posición del texto (la de su ancla).
+ */
+export function anclaRotuloAhora(args: { xAhora: number; visIni: number; visDer: number; anchoRotulo: number }): { ancla: AnclaRotulo; x: number } {
+  const { xAhora, visIni, visDer, anchoRotulo } = args
+  if (xAhora > visDer - anchoRotulo / 2 - 2) return { ancla: 'end', x: Math.min(xAhora, visDer - 2) }
+  if (xAhora < visIni + anchoRotulo / 2 + 2) return { ancla: 'start', x: Math.max(xAhora, visIni + 2) }
+  return { ancla: 'middle', x: xAhora }
+}
+
+/**
+ * «a esta hora ±N» va a la derecha de la punta (20 px); si el texto no cabe en lo que se VE (con zoom la ventana termina poco
+ * después de la punta), pasa a su izquierda. `anchoTexto` es el ancho estimado del rótulo.
+ */
+export const brechaALaIzquierda = (xAhora: number, anchoTexto: number, visDer: number): boolean => xAhora + 20 + anchoTexto > visDer - 2
+
+/**
  * Minutos (desde el inicio del turno) donde va una hora en el eje X.
  *
  * Con `iniMs` (el inicio del turno, hora de planta) las marcas caen en múltiplos de reloj del paso (22:00, 23:00… con paso
@@ -136,16 +155,19 @@ export function marcasEje(args: {
   const marcaPx = args.marcaPx ?? 32
   if (!(totalMin > 0) || !(pxPorMin > 0)) return []
   const paso = pasoMarcas(pxPorMin, minPx)
+  /* El inicio y el fin llevan su texto PEGADO al borde (hacia adentro) y la marca de al lado va centrada: para no pisarse hace falta
+     ancho y medio de texto entre sus posiciones, más 4 px de aire. */
+  const sinPisar = marcaPx * 1.5 + 4
   const out: number[] = []
   let primera = 0
   if (iniMs != null && Number.isFinite(iniMs)) {
     const ini = iniMs / 60_000
     primera = ((paso - (((ini % paso) + paso) % paso)) % paso)
-    if (primera > 0 && primera * pxPorMin >= minPx * 0.6) out.push(0)
+    if (primera > 0 && primera * pxPorMin >= Math.max(minPx * 0.6, sinPisar)) out.push(0)
   }
   for (let t = primera; t <= totalMin + 1e-9; t += paso) out.push(t)
   const ultimo = out[out.length - 1]
-  if (ultimo != null && ultimo < totalMin && (totalMin - ultimo) * pxPorMin >= minPx * 0.45) out.push(totalMin)
+  if (ultimo != null && ultimo < totalMin && (totalMin - ultimo) * pxPorMin >= Math.max(minPx * 0.45, sinPisar)) out.push(totalMin)
   if (ahoraMin == null) return out
   if (ahoraAncla && ahoraRotuloPx) {
     const xa = ahoraMin * pxPorMin
@@ -388,7 +410,8 @@ export function filasBaader(
       id: m.id,
       llenados: Array.from({ length: n }, (_, k) => (l && k < m.cycles.length ? l.fills[k] ?? null : null)),
       celdas: Array.from({ length: n }, (_, k): CeldaBaader => {
-        if (k >= m.cycles.length) return { tono: 'sin', estado: 'detenida' }
+        /* Una Baader que solo va atrasada un minuto no está detenida: ese minuto aún no llegó, queda sin dato. */
+        if (k >= m.cycles.length) return { tono: 'sin', estado: 'sin-dato' }
         const piezas = m.cycles[k] ?? 0
         if (l) return celdaBaader(l.fills[k], piezas, ceroSinParada(m.id, k))
         return piezas > 0 ? { tono: 'sin', estado: 'sin-dato' } : { tono: 'sin', estado: ceroSinParada(m.id, k) ? 'sin-dato' : 'detenida' }
@@ -583,6 +606,7 @@ export function cubetasDeLinea(suma: number[], esperado: Array<number | null>, c
  * minuto); si ninguno llega, el peor presente. Sin ningún minuto con dato, neutro.
  */
 export function tonoDeCubeta(tonos: TonoRitmo[]): TonoRitmo {
+  if (tonos.length === 0) return 'sin'
   const orden: Array<Exclude<TonoRitmo, 'sin'>> = ['mal', 'atento', 'bien']
   const piso = Math.min(2, tonos.length)
   for (const t of orden) if (tonos.filter((x) => x === t).length >= piso) return t

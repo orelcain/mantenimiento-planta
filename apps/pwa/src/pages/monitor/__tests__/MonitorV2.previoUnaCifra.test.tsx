@@ -141,4 +141,14 @@ describe('turno anterior · una sola cifra en la leyenda y en la hoja «Piezas d
     expect(hoja).toContain('lun 26 a esta altura')
     expect(hoja).toContain('9.111 pz')
   })
+
+  it('con gráfico y lectura pero una curva previa que no llega a ese minuto: ni la leyenda ni la hoja dicen cifra (no hay una segunda alineación)', () => {
+    const corta = { ...curva, previo: { label: 'lun 26', curve: [{ minutes: 0, pieces: 0 }] } }
+    const { container, getByRole } = render(<MonitorV2 {...props({ curva: corta })} />)
+    expect(container.querySelector('.rv-grafico')!.textContent ?? '').not.toContain('lun 26 ·')
+    fireEvent.click(getByRole('button', { name: 'Piezas del turno: ver detalle' }))
+    const hoja = getByRole('dialog').textContent ?? ''
+    expect(hoja).not.toContain('a esta altura')
+    expect(hoja).not.toContain('9.111')
+  })
 })

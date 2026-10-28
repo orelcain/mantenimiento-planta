@@ -7,13 +7,13 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
-import { FranjaCinta } from '../FranjaCinta'
+import { FranjaCinta, PiezasBaader } from '../FranjaCinta'
 import { GraficoRitmoVivo, type EjeDatos } from '../GraficoRitmoVivo'
 import { TiempoDelTurno } from '../MonitorShiftParts'
 import type { MonitorV2Props } from '../MonitorV2'
 import { aEstaHora, piezasMostradas } from '../aEstaHora'
 import { armarTope, type EntradaRep } from '../reproduccionMinuto'
-import type { RelojDeDatos } from '../useRelojDeDatos'
+import type { CuadroReloj, RelojDeDatos } from '../useRelojDeDatos'
 
 const INI = Date.UTC(2026, 9, 27, 21, 30)
 const AHORA = 305
@@ -586,5 +586,42 @@ describe('«A esta hora» es la misma cifra en la franja, el gráfico y Camino a
     expect(f).not.toContain('−977 pz')
     expect(g).toContain('a esta hora −996')
     expect(c).toMatch(/−996\s*pz/)
+  })
+})
+
+describe('Piezas de cada Baader · siguen al mismo reloj que la cifra grande', () => {
+  /** Un reloj que emite UN cuadro al suscribirse (como el real: `alCuadro` llama a `fn` con el cuadro de ahora). */
+  const relojCon = (cuadro: Partial<CuadroReloj>): RelojDeDatos => ({
+    cuadro: () => ({ valor: null, frac: 1, previa: null, ultima: null, atrasada: false, ...cuadro }),
+    alCuadro: (fn) => { fn({ valor: null, frac: 1, previa: null, ultima: null, atrasada: false, ...cuadro }); return () => {} },
+    version: 1, detenida: false, reducido: false,
+  })
+
+  it('con la reproducción activa dicen el valor de ESA Baader en el cuadro (su suma es la cifra de la línea), no el contador ya llegado', () => {
+    const rep = {
+      frac: 0.5, seg: 30, total: 1655, totalPiso: 1640, totalFinal: 1668, atrasada: false, animando: true,
+      porMaquina: [
+        { id: 'a', valor: 470, encendidas: 5, n: 9, estado: 'andando' as const },
+        { id: 'b', valor: 520, encendidas: 4, n: 8, estado: 'andando' as const },
+        { id: 'c', valor: 665, encendidas: 3, n: 9, estado: 'andando' as const },
+      ],
+    }
+    const r = relojCon({ valor: 1655, rep })
+    const { container } = render(<><PiezasBaader reloj={r} id="a" respaldo={474} /><PiezasBaader reloj={r} id="b" respaldo={528} /><PiezasBaader reloj={r} id="c" respaldo={666} /></>)
+    const v = [...container.querySelectorAll('span')].map((x) => Number((x.textContent ?? '').replace(/\./g, '')))
+    expect(v).toEqual([470, 520, 665])
+    expect(v.reduce((a, b) => a + b, 0)).toBe(1655)
+  })
+
+  it('sin reproducción (turno cerrado, sin serie por minuto) dicen su cifra de siempre', () => {
+    const { container } = render(<PiezasBaader reloj={relojCon({ valor: 5384 })} id="a" respaldo={5384} className="fc-baader-pz" />)
+    expect(container.textContent).toBe('5.384')
+    expect(container.querySelector('.fc-baader-pz')).not.toBeNull()
+  })
+
+  it('una Baader que la reproducción no trae (id distinto) se queda con su respaldo', () => {
+    const rep = { frac: 1, seg: 60, total: 10, totalPiso: 10, totalFinal: 10, atrasada: false, animando: false, porMaquina: [{ id: 'z', valor: 10, encendidas: 0, n: 0, estado: 'andando' as const }] }
+    const { container } = render(<PiezasBaader reloj={relojCon({ valor: 10, rep })} id="a" respaldo={1234} />)
+    expect(container.textContent).toBe('1.234')
   })
 })

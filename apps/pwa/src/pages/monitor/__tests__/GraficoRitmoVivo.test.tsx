@@ -92,7 +92,9 @@ describe('GraficoRitmoVivo', () => {
   it('dibuja título, subtítulo, leyenda de 4, atajos de zoom y el «ahora»', () => {
     render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     expect(screen.getByRole('heading', { name: 'Ritmo en vivo' })).toBeTruthy()
-    expect(screen.getByText('21:30 → 05:00 · leído de Shoplogix 02:35')).toBeTruthy()
+    /* La marca «Shoplogix HH:MM» va UNA vez en la barra del monitor: el subtítulo del gráfico solo dice el rango del turno. */
+    expect(screen.getByText('21:30 → 05:00')).toBeTruthy()
+    expect(screen.queryByText(/leído de Shoplogix/)).toBeNull()
     for (const t of ['hoy', 'ritmo de la meta', 'proyección', 'lun 26 · 9.325 a esta hora']) expect(screen.getByText(t)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Turno' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: '1 h' }).getAttribute('aria-pressed')).toBe('false')
