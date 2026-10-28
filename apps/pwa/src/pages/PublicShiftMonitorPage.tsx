@@ -88,13 +88,15 @@ import { armarAporte } from './monitor/aporteBaaders'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, type VistaV2 } from './monitor/MonitorV2'
+import { TvV2 } from './monitor/TvV2'
+import { estadoTv } from './monitor/tvV2Datos'
 import { AnalisisV2 } from './monitor/AnalisisV2'
 import { datosDeHoy } from './monitor/analisisV2Datos'
 import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
 import { piezasMostradas } from './monitor/aEstaHora'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
-import { hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
+import { etiquetaMaquina, hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -4609,9 +4611,9 @@ function MonitorDelToken() {
   const modoPantalla = searchParams.get('pantalla') === '1'
   // PROTOTIPO glass (no producción): ?glass=a | ?glass=b, ver monitor/monitorGlass.css
   const glassParam = searchParams.get('glass')
-  // v2 es el monitor por defecto; ?glass=clasico vuelve al de antes. El Modo TV sigue con el clásico
-  // (su tablero personalizado no existe en el v2).
-  const glass = modoPantalla || glassParam === 'clasico'
+  // v2 es el monitor por defecto; ?glass=clasico vuelve al de antes (también con ?pantalla=1: el respaldo de la TV).
+  // El Modo TV usa el v2 con su propia pantalla fija (`TvV2`); el tablero personalizable solo existe en el clásico.
+  const glass = glassParam === 'clasico'
     ? undefined
     : glassParam === 'a' || glassParam === 'b' ? glassParam : 'v2'
   const [vistaV2, setVistaV2] = useState<VistaV2>(0)
@@ -6377,6 +6379,70 @@ function MonitorDelToken() {
      de Shoplogix (`corteHoraV2`) va con él en la barra: todas las cifras de «El turno» salen de esa lectura. */
   const rangoBarra = `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`
   const corteHoraV2 = !live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null
+
+  /* Modo TV (`?pantalla=1`) sobre el v2: una pantalla fija de 1920×1080 con las MISMAS cifras que recibe `MonitorV2`
+     (el contador de Shoplogix, la meta a esta hora, el ritmo de 15 min, el Duelo) y nada más. Sin fetch propio. */
+  if (modoPantalla && glass === 'v2') {
+    const pvTv = !turnoCerrado && contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null
+    const ahoraPorIdTv = pvTv?.porMaquina?.length ? new Map(pvTv.porMaquina.map((x) => [x.id, x.cpm])) : null
+    const prodMinTv = live.timeBreakdown?.producingMin ?? 0
+    const promedioTv = prodMinTv > 0 ? live.totalPieces / prodMinTv : null
+    const techoTv = live.machines.length > 0 && live.machines.every((m) => (m.targetCpm ?? 0) > 0) ? live.machines.reduce((a, m) => a + (m.targetCpm ?? 0), 0) : null
+    const ritmo15Tv = turnoCerrado ? promedioTv : (duro15?.cpm ?? pvTv?.cpm ?? null)
+    const cuotaTv = comparacion.optimalAtCurrentMinute
+    const metaTv = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
+    const detenidasDesde = live.machines
+      .filter((m) => m.status !== 'produciendo' && m.currentSinceAt)
+      .map((m) => m.currentSinceAt as string)
+      .sort()
+    const pmTv = live.mantencion?.porMaquina ?? []
+    const fallasTv = pmTv.reduce((a, x) => a + x.eventosFalla, 0)
+    const fallaMinTv = pmTv.reduce((a, x) => a + x.fallaMin, 0)
+    const cierreProg = live.plannedEnd ?? live.scheduledEnd ?? ''
+    const previstoMinTv = (() => {
+      const t0 = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
+      const fin = Date.parse(cierreProg)
+      return Number.isFinite(t0) && Number.isFinite(fin) && fin > t0 ? (fin - t0) / 60_000 : null
+    })()
+    return (
+      <TvV2
+        linea={lineTitle}
+        turno={[vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId), rangoBarra].filter(Boolean).join(' · ')}
+        estado={estadoTv({
+          cerrado: turnoCerrado,
+          status: live.status,
+          sinDatosHaceMin,
+          viejo: sinDatosHaceMin != null && sinDatosHaceMin >= MIN_PARA_VIEJO,
+          desde: live.status === 'detenida' && detenidasDesde.length ? fmtWallTime(detenidasDesde[detenidasDesde.length - 1]) : null,
+          cierre: live.effectiveEnd ? fmtWallTime(live.effectiveEnd) : null,
+        })}
+        reloj={turnoCerrado ? null : new Date(ahoraWallMs).toISOString().slice(11, 16)}
+        piezas={contador.valor}
+        lectura={corteHoraV2}
+        metaAhora={cuotaTv ?? null}
+        metaTurno={metaTv}
+        ritmo={{
+          rotulo: turnoCerrado ? 'Ritmo · promedio del turno' : 'Ritmo · últimos 15 min',
+          valor: ritmo15Tv,
+          unidad: 'pz/min',
+          secRotulo: 'esperado',
+          sec: techoTv,
+          chips: live.machines.map((m) => {
+            const v = ahoraPorIdTv?.get(m.id) ?? null
+            return {
+              nombre: etiquetaMaquina(m.name),
+              valor: v != null ? fmtDec(v) : m.status === 'produciendo' ? '—' : '0,0',
+              baja: v != null ? v <= 0 || (m.targetCpm ? v < m.targetCpm * 0.5 : false) : m.status !== 'produciendo',
+            }
+          }),
+        }}
+        mantTurno={{ fallas: fallasTv, fallaMin: fallaMinTv, mttr: fallasTv > 0 ? fallaMinTv / fallasTv : null }}
+        duelo={datosDuelo}
+        nombres={nombresDuelo}
+        previstoMin={previstoMinTv}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)} data-barra={glass === 'v2' && !modoPantalla ? 'si' : undefined}>
