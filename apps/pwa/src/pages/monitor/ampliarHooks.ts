@@ -18,6 +18,20 @@ export function useEsPc() {
   return pc
 }
 
+/** ¿La ventana mide al menos `px` de ancho? (la vista «Eje del turno» del monitor empieza en 1280). */
+export function useAnchoMin(px: number) {
+  const q = `(min-width: ${px}px)`
+  const [ok, setOk] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches)
+  useEffect(() => {
+    const m = window.matchMedia(q)
+    const f = () => setOk(m.matches)
+    f()
+    m.addEventListener('change', f)
+    return () => m.removeEventListener('change', f)
+  }, [q])
+  return ok
+}
+
 /** «Reducir movimiento» del sistema: sin resorte, sin desplazamiento, sin cuentas. */
 export function useMovimientoReducido() {
   const q = '(prefers-reduced-motion: reduce)'

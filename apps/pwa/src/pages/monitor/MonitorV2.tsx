@@ -30,9 +30,12 @@ import type { DetalleCascada, DuenoDetalle, HoraDetalle, RenglonDetalle } from '
 import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { AnilloMeta, Globo, Icono, Tarjeta } from './AmpliarV2'
-import { useCuentaCifra, useEntradaEscalonada, useEsPc } from './ampliarHooks'
+import { useAnchoMin, useCuentaCifra, useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
 import type { PestanaMonitor } from './BarraLateralPC'
+import { CifraViva, EjeTurnoPC, type EjeDatos } from './EjeTurnoPC'
+import { useRelojDeDatos } from './useRelojDeDatos'
+import type { Lectura } from './relojDeDatos'
 
 // ── Formato ──────────────────────────────────────────────────────────────────
 
@@ -120,7 +123,7 @@ const Punto = ({ color }: { color: string }) => <i className="block h-3 w-3 roun
 
 // ── Primitivos de tarjeta ────────────────────────────────────────────────────
 
-function Cifra({ valor, unidad, chica }: { valor: string; unidad?: string; chica?: boolean }) {
+function Cifra({ valor, unidad, chica }: { valor: ReactNode; unidad?: string; chica?: boolean }) {
   return (
     <div className="mt-3 flex items-baseline gap-1.5">
       <span className={`${chica ? 'v2-cifra-chica' : 'v2-cifra'} tabular-nums font-semibold leading-none tracking-tight text-foreground`}>{valor}</span>
@@ -892,6 +895,12 @@ export interface MonitorV2Props {
   duelo?: ReactNode
   vista: VistaV2
   onVista: (v: VistaV2) => void
+  /** La última lectura del contador de Shoplogix (valor y hora de planta): el reloj de datos mueve la cifra grande entre lecturas. */
+  lectura?: Lectura | null
+  /** Valores de las últimas lecturas del contador (más viejo primero): para saber si la línea paró desde antes de abrir la página. */
+  semilla?: number[]
+  /** «El turno» en PC (≥ 1280 px) como eje de tiempo común. Sin él, o en menos de 1280 px, las tarjetas de siempre. */
+  eje?: EjeDatos | null
 }
 
 type ClaveTurno = 'cierre' | 'ritmo' | 'mant' | 'maquinas' | 'perdido'
@@ -899,8 +908,11 @@ type ClaveTurno = 'cierre' | 'ritmo' | 'mant' | 'maquinas' | 'perdido'
 export function MonitorV2(p: MonitorV2Props) {
   const raizRef = useRef<HTMLDivElement>(null)
   useEntradaEscalonada(raizRef)
+  /* El reloj de datos: la cifra de piezas (celular y PC) y la punta de la curva avanzan entre lecturas reales de Shoplogix. */
+  const reloj = useRelojDeDatos(p.lectura ?? null, p.semilla)
+  /* PC ancho: «El turno» como eje (rama aparte; lo que no está en esa vista sigue debajo, en las tarjetas de siempre). */
+  const pcEje = useAnchoMin(1280) && p.eje != null
   /* Las cifras grandes cuentan solo cuando el dato cambia de verdad (nunca al montar). */
-  const piezasMostradas = useCuentaCifra(p.piezas)
   const cierreMostrado = useCuentaCifra(p.proyeccion ?? 0)
   const ritmoGrande = p.ritmoAhora ?? p.ritmo
   const [abierta, setAbierta] = useState<ClaveTurno | null>(null)
@@ -1051,17 +1063,19 @@ export function MonitorV2(p: MonitorV2Props) {
   )
 
   return (
-    <div ref={raizRef} className="monitor-v2 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
-      {p.banda}
+    <div ref={raizRef} data-eje={pcEje ? 'si' : undefined} className="monitor-v2 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
+      {pcEje
+        ? <div className="min-w-0 lg:col-span-2"><EjeTurnoPC p={p} reloj={reloj} ampliadoPiezas={ampliadoPiezas} cierreMostrado={cierreMostrado} abrir={(k) => setAbierta(k)} banda={p.banda} /></div>
+        : p.banda}
 
       {/* PC: columna principal fluida + riel fijo con lo vivo y lo de Mantención. Un solo DOM: en celular los dos
           envoltorios son `contents` y cada tarjeta lleva `max-lg:order-N`, que repite el orden de siempre
           (cifras, ritmo de la línea, ritmo en vivo, camino a la meta, curva, minuto a minuto, fallas, más). */}
       <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4 2xl:grid 2xl:grid-cols-2">
       {/* Fila 1 · las cifras que se miran de lejos */}
-      <div className={`grid grid-cols-2 gap-3 max-lg:order-1 lg:gap-4 2xl:col-span-2 2xl:row-start-1 ${p.ritmoLinea ? 'xl:grid-cols-3' : '2xl:grid-cols-4'}`}>
+      <div className={`v2-fila-cifras grid grid-cols-2 gap-3 max-lg:order-1 lg:gap-4 2xl:col-span-2 2xl:row-start-1 ${p.ritmoLinea ? 'xl:grid-cols-3' : '2xl:grid-cols-4'}`}>
         <Tarjeta compacta ampliado={ampliadoPiezas} subAmpliado={p.curva ? 'acumulado del turno contra el ritmo de la meta' : undefined} className={`col-span-2 ${p.ritmoLinea ? 'xl:col-span-1' : '2xl:col-span-1'}`} icono={<Target className={ic} />} titulo={p.cerrado ? 'Piezas del turno' : 'Piezas ahora'} sub={p.corteHora ? `Shoplogix ${p.corteHora}` : undefined}>
-          <Cifra valor={int(piezasMostradas)} unidad="pz" />
+          <Cifra valor={<CifraViva reloj={reloj} respaldo={p.piezas} />} unidad="pz" />
           {p.meta != null && pct != null && (
             <div className="mt-3 flex items-center gap-3">
               <AnilloMeta frac={pct / 100} rotulo={`${pct} % de la meta del turno`} />
