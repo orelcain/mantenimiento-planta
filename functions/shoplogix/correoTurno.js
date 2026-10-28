@@ -123,7 +123,7 @@ function textosCorreo(datos) {
   // ── Frase 1: cómo quedó el turno ──────────────────────────────────────────
   let veredicto
   if (datos.enCurso) {
-    veredicto = `Turno en curso: van ${piezas} piezas, con datos hasta las ${hhmm(r.finMs)}.`
+    veredicto = `Turno en curso: ${piezas} piezas hechas, con datos hasta las ${hhmm(r.finMs)}.`
   } else if (c.veredicto === 'mejor-del-periodo') {
     veredicto = `Mejor turno de los últimos ${n} equivalentes: ${piezas} piezas.`
   } else if (c.veredicto === 'sobre-la-mediana') {

@@ -554,7 +554,7 @@ export function filasSinRival(d: DatosDuelo, lados: Record<EquipoId, LadoEje | n
   const h = d.hoy
   const mio = lados[h.equipo]
   const filas: FilaRiel[] = [
-    { id: 'carrera', rotulo: 'Carrera', sub: 'piezas contra su promedio a esta hora', c: h.piezas, r: promedioCarrera, unidad: 'pz', dec: 0, gan: 'sin' },
+    { id: 'carrera', rotulo: 'Carrera', sub: 'hechas contra su promedio a esta hora', c: h.piezas, r: promedioCarrera, unidad: 'pz', dec: 0, gan: 'sin' },
     { id: 'ritmo', rotulo: 'Ritmo andando', sub: 'piezas por minuto', c: h.ritmo, r: null, unidad: 'pz/min', dec: 1, gan: 'sin' },
     { id: 'micro', rotulo: 'Micro detención', sub: 'minutos por hora', c: h.microMinH, r: null, unidad: 'min/h', dec: 1, gan: 'sin' },
     { id: 'arranque', rotulo: 'Arranque', sub: 'minutos hasta la 1.ª pieza', c: h.arranqueMin, r: null, unidad: 'min', dec: 0, gan: 'sin' },

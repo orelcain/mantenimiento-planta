@@ -15,6 +15,27 @@ import type { Ventana } from './useZoomGesto'
 
 export const int = (n: number) => Math.round(n).toLocaleString('es-CL')
 export const firmado = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${int(Math.abs(n))}`
+/**
+ * La diferencia contra la meta a esa hora, en palabras de planta (glosario único del monitor, 28-10): «105 adelante»,
+ * «45 atrás» y «al día» con 0 (redondeado: 0,4 es «al día»). Distinto de `firmado`, que sigue siendo ±N para las
+ * tasas (pz/h) y otras comparaciones.
+ */
+export function adelanteAtras(n: number): string {
+  const r = Math.round(n)
+  return r > 0 ? `${int(r)} adelante` : r < 0 ? `${int(-r)} atrás` : 'al día'
+}
+/** «623 adelante de la meta» / «42 atrás de la meta»; con 0 (redondeado), «en la meta» (no «al día de la meta»). */
+export function deLaMeta(n: number): string {
+  return Math.round(n) === 0 ? 'en la meta' : `${adelanteAtras(n)} de la meta`
+}
+/**
+ * Lo mismo en dos partes para la cifra grande: el número (sin signo) y la palabra que va en el hueco de la unidad.
+ * Con 0, solo la palabra «al día» y ningún número.
+ */
+export function partesAdelanteAtras(n: number): { cifra: string; palabra: 'adelante' | 'atrás' | 'al día' } {
+  const r = Math.round(n)
+  return r > 0 ? { cifra: int(r), palabra: 'adelante' } : r < 0 ? { cifra: int(-r), palabra: 'atrás' } : { cifra: '', palabra: 'al día' }
+}
 /** HH:MM de un instante wall-as-UTC (la hora de planta). */
 export const relojDe = (ms: number) => new Date(ms).toISOString().slice(11, 16)
 /** «X h Y min», «N min» o, bajo 1 min, «N s» (una parada de 40 s no es «0 min»). */
@@ -515,9 +536,9 @@ export const tamanoGrafico = (w: number): TamanoGrafico => (w >= 1480 ? 'grande'
 
 /** Las medidas del mockup aprobado (1920 / 1366 / 375): columna de rótulos izquierda y derecha y alto de cada banda. */
 const MEDIDAS: Record<TamanoGrafico, { lab: number; der: number; acum: number; barras: number; ev: number }> = {
-  grande: { lab: 52, der: 128, acum: 290, barras: 84, ev: 14 },
-  medio: { lab: 48, der: 104, acum: 206, barras: 60, ev: 11 },
-  chico: { lab: 44, der: 0, acum: 160, barras: 48, ev: 10 },
+  grande: { lab: 74, der: 128, acum: 290, barras: 84, ev: 14 },
+  medio: { lab: 70, der: 104, acum: 206, barras: 60, ev: 11 },
+  chico: { lab: 70, der: 0, acum: 160, barras: 48, ev: 10 },
 }
 
 export interface Diseno {

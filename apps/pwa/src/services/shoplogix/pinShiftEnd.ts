@@ -192,12 +192,12 @@ export async function setShiftQuota(params: {
   const docId = CONFIG_DOC_ID[params.plantSlug]
   if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
   if (params.piezas != null && !(params.piezas > 0)) {
-    throw new Error('La cuota tiene que ser un número de piezas mayor que cero.')
+    throw new Error('La meta tiene que ser un número de piezas mayor que cero.')
   }
   // Un dedo de más (150.000 en vez de 15.000) quedaría fijado como meta del
   // turno y descolocaría todos los porcentajes de la pantalla.
   if (params.piezas != null && params.piezas > 200_000) {
-    throw new Error('Esa cuota es demasiado alta: revisa el número.')
+    throw new Error('Esa meta es demasiado alta: revisa el número.')
   }
 
   const ref = doc(db, COLLECTION, docId)

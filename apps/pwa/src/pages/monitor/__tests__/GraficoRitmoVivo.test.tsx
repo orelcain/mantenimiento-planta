@@ -95,7 +95,7 @@ describe('GraficoRitmoVivo', () => {
     /* La marca «Shoplogix HH:MM» va UNA vez en la barra del monitor: el subtítulo del gráfico solo dice el rango del turno. */
     expect(screen.getByText('21:30 → 05:00')).toBeTruthy()
     expect(screen.queryByText(/leído de Shoplogix/)).toBeNull()
-    for (const t of ['hoy', 'ritmo de la meta', 'proyección', 'lun 26 · 9.325 a esta hora']) expect(screen.getByText(t)).toBeTruthy()
+    for (const t of ['hoy', 'ritmo de la meta', 'proyección', 'lun 26 · 9.325 hechas a esta hora']) expect(screen.getByText(t)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Turno' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: '1 h' }).getAttribute('aria-pressed')).toBe('false')
     expect(screen.getByRole('button', { name: '15 min' })).toBeTruthy()
@@ -104,9 +104,9 @@ describe('GraficoRitmoVivo', () => {
     /* Meta 15.000 y proyección 15.623 → 0…16.000, rejilla cada 4.000 (no 20.000). */
     expect(screen.getByText('16.000')).toBeTruthy()
     expect(screen.queryByText('20.000')).toBeNull()
-    expect(screen.getByText('Paradas')).toBeTruthy()
+    expect(screen.getByText('Detenciones')).toBeTruthy()
     /* Columna derecha: los episodios en la fila de Paradas y los minutos de RELOJ con parada en la fila de las horas. */
-    expect(screen.getByText('1 parada')).toBeTruthy()
+    expect(screen.getByText('1 detención')).toBeTruthy()
     expect(screen.getByText('1 h 0 min')).toBeTruthy()
   })
 
@@ -121,14 +121,18 @@ describe('GraficoRitmoVivo', () => {
     expect(screen.getByRole('button', { name: 'Turno' }).getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('el globo del minuto en curso dice la misma «a esta hora» que el rótulo del gráfico', () => {
+  it('el globo del minuto en curso dice la misma diferencia contra la «meta a esta hora» que el rótulo del gráfico («977 atrás»)', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     /* Sin globo, la cifra ya está en el rótulo junto a la punta: 9.690 − 10.667. */
-    expect(screen.getAllByText('a esta hora −977').length).toBe(1)
+    expect(screen.getAllByText('977 atrás').length).toBe(1)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    /* x del minuto 305 dentro del gráfico (1.626 px de ancho, 6 de aire a la derecha: 1.620 px para 450 min). */
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((305.5 / 450) * 1620), buttons: 0 }) })
-    expect(screen.getByRole('tooltip').textContent).toContain('(−977)')
+    /* x del minuto 305 dentro del gráfico (1.604 px de ancho, 6 de aire a la derecha: 1.598 px para 450 min). */
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((305.5 / 450) * 1598), buttons: 0 }) })
+    expect(screen.getByRole('tooltip').textContent).toContain('(977 atrás)')
+    /* El minuto en curso de un turno en vivo: «Meta a esta hora» (un minuto pasado dice «a esa hora»), y «Hechas» en vez de «Acumulado». */
+    expect(screen.getByRole('tooltip').textContent).toContain('Meta a esta hora')
+    expect(screen.getByRole('tooltip').textContent).toContain('Hechas')
+    expect(screen.getByRole('tooltip').textContent).not.toMatch(/Tocaban|Acumulado/)
     expect(screen.getByRole('tooltip').textContent).toContain('9.690 pz')
     expect(screen.getByRole('tooltip').textContent).toContain('10.667')
   })
@@ -136,7 +140,7 @@ describe('GraficoRitmoVivo', () => {
   it('un minuto con la línea en cero lista cada Baader sin acusarla y nombra la parada y su dueño', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1620), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1598), buttons: 0 }) })
     const globo = screen.getByRole('tooltip').textContent ?? ''
     expect(globo).toContain('Ritmo de la línea')
     expect(globo).toContain('0 de 51 pz/min')
@@ -148,7 +152,7 @@ describe('GraficoRitmoVivo', () => {
   it('un minuto con la línea en cero SIN parada registrada no acusa: cada Baader queda «sin dato», no «detenida»', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={{ ...eje, paradasMaquina: null }} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1620), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1598), buttons: 0 }) })
     const globo = screen.getByRole('tooltip').textContent ?? ''
     expect((globo.match(/sin dato/g) ?? []).length).toBe(3)
     expect(globo).not.toContain('detenida')
@@ -157,10 +161,10 @@ describe('GraficoRitmoVivo', () => {
   it('el globo no es una región viva (no anuncia cada movimiento) y sigue siendo el mismo nodo mientras el cursor está en el mismo minuto', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.2 / 450) * 1620), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.2 / 450) * 1598), buttons: 0 }) })
     const globo = screen.getByRole('tooltip')
     expect(screen.queryByRole('status')).toBeNull()
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.8 / 450) * 1620), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.8 / 450) * 1598), buttons: 0 }) })
     expect(screen.getByRole('tooltip')).toBe(globo)
   })
 
@@ -177,16 +181,18 @@ describe('GraficoRitmoVivo', () => {
     }
     const conRepro = { ...p, repro: { entrada, tope: armarTope(9690, null) } } as unknown as MonitorV2Props
     const { container } = render(<GraficoRitmoVivo p={conRepro} e={eje} reloj={reloj} />)
-    expect(container.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain('Piezas acumuladas del turno: 9.671 de 15.000')
+    expect(container.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain('Hechas del turno: 9.671 de 15.000')
   })
 
   it('el globo también sale con un toque; tocar el mismo minuto o fuera lo cierra', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    const x = Math.round((250.5 / 450) * 1620)
+    const x = Math.round((250.5 / 450) * 1598)
     act(() => { fireEvent.pointerDown(lienzo, { pointerType: 'touch', clientX: x }) })
     act(() => { fireEvent.click(lienzo, { clientX: x }) })
-    expect(screen.getByRole('tooltip').textContent).toContain('Acumulado')
+    /* Un minuto PASADO: «Meta a esa hora» (no «a esta hora») y la diferencia en palabras. */
+    expect(screen.getByRole('tooltip').textContent).toContain('Hechas')
+    expect(screen.getByRole('tooltip').textContent).toContain('Meta a esa hora')
     act(() => { fireEvent.click(lienzo, { clientX: x }) })
     expect(screen.queryByRole('tooltip')).toBeNull()
     act(() => { fireEvent.click(lienzo, { clientX: x }) })
@@ -205,12 +211,12 @@ describe('GraficoRitmoVivo', () => {
 
   it('la leyenda ⓘ abre el globo de estados y dueños y Esc lo cierra', () => {
     render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
-    expect(screen.queryByText('Paradas, por dueño')).toBeNull()
+    expect(screen.queryByText('Detenciones, por dueño')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Qué significan los colores' }))
-    expect(screen.getByText('Paradas, por dueño')).toBeTruthy()
+    expect(screen.getByText('Detenciones, por dueño')).toBeTruthy()
     expect(screen.getByText('75 % o más del esperado')).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByText('Paradas, por dueño')).toBeNull()
+    expect(screen.queryByText('Detenciones, por dueño')).toBeNull()
   })
 
   it('en el celular (375) la leyenda baja, el segmentado va en su fila y los rótulos de la derecha van dentro', () => {
@@ -225,14 +231,14 @@ describe('GraficoRitmoVivo', () => {
     const cerrado = { ...p, cerrado: true, proyeccion: null } as unknown as MonitorV2Props
     render(<GraficoRitmoVivo p={cerrado} e={eje} reloj={reloj} />)
     expect(screen.queryByText('proyección')).toBeNull()
-    expect(screen.queryByText(/^a esta hora/)).toBeNull()
+    expect(screen.queryByText(/^[d.]+ (adelante|atrás)$/)).toBeNull()
   })
 })
 
 // ── Pulido G3 ────────────────────────────────────────────────────────────────
 
-/** x (px) del minuto `m` dentro del lienzo de 1.626 px (1.620 para 450 min: 6 de aire a la derecha). */
-const xDe = (m: number) => Math.round((m / 450) * 1620)
+/** x (px) del minuto `m` dentro del lienzo de 1.604 px (1.598 para 450 min: 6 de aire a la derecha). */
+const xDe = (m: number) => Math.round((m / 450) * 1598)
 
 describe('GraficoRitmoVivo · táctil', () => {
   it('un toque o un deslizar sobre el gráfico no llega a la página (que cambiaría de turno con 60 px)', () => {
@@ -287,9 +293,9 @@ describe('GraficoRitmoVivo · táctil', () => {
 describe('GraficoRitmoVivo · paradas y globo', () => {
   const tres = [0, 1, 2].map((i) => ({ desdeMin: 100, hastaMin: 155, dueno: 'sin-imputar' as const, causa: 'Detencion', maquina: `Evisceradora ${i + 1}`, maquinaId: ['a', 'b', 'c'][i]! }))
 
-  it('el rótulo de la derecha cuenta tiempo de RELOJ y episodios: 3 paradas idénticas son «1 parada» y 55 min', () => {
+  it('el rótulo de la derecha cuenta tiempo de RELOJ y episodios: 3 detenciones idénticas son «1 detención» y 55 min', () => {
     render(<GraficoRitmoVivo p={p} e={{ ...eje, paradas: tres }} reloj={reloj} />)
-    expect(screen.getByText('1 parada')).toBeTruthy()
+    expect(screen.getByText('1 detención')).toBeTruthy()
     expect(screen.getByText('55 min')).toBeTruthy()
     expect(screen.queryByText(/165/)).toBeNull()
   })
@@ -365,15 +371,15 @@ describe('GraficoRitmoVivo · turno cerrado', () => {
 describe('GraficoRitmoVivo · leyenda del turno anterior', () => {
   it('en vivo dice la cifra a esta hora y la diferencia con hoy en el color que corresponde', () => {
     render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
-    expect(screen.getByText('lun 26 · 9.325 a esta hora')).toBeTruthy()
-    const dif = screen.getByText('· hoy +365')
+    expect(screen.getByText('lun 26 · 9.325 hechas a esta hora')).toBeTruthy()
+    const dif = screen.getByText('· hoy 365 adelante')
     expect(dif.style.color).toContain('brand-ink')
   })
 
   it('con menos que el turno anterior la diferencia va en rojo de texto', () => {
     const menos = { ...p, curva: { ...p.curva!, previo: { label: 'lun 26', curve: [{ minutes: 5, pieces: 90 }, { minutes: AHORA, pieces: 12000 }, { minutes: 440, pieces: 14000 }] } } } as unknown as MonitorV2Props
     render(<GraficoRitmoVivo p={menos} e={eje} reloj={reloj} />)
-    expect(screen.getByText('· hoy −2.310').style.color).toContain('v2-mal-texto')
+    expect(screen.getByText('· hoy 2.310 atrás').style.color).toContain('v2-mal-texto')
   })
 
   it('en el celular la etiqueta del turno anterior es corta', () => {

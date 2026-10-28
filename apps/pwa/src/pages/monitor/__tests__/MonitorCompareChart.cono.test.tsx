@@ -74,7 +74,7 @@ describe('MonitorCompareChart · cono de proyección', () => {
     // Con el cono llegando a 470 y la curva de hoy a 300, el ancho del área
     // tiene que dar para los 470: si el eje se quedara en 300, la proyección
     // se dibujaría fuera del gráfico.
-    const conCono = pintar(CONO).container.querySelector('svg[aria-label*="acumuladas"]')
+    const conCono = pintar(CONO).container.querySelector('svg[aria-label*="hechas"]')
     expect(conCono).toBeTruthy()
     const puntos = [...conCono!.querySelectorAll('path')]
       .flatMap((p) => (p.getAttribute('d') ?? '').match(/[\d.]+,/g) ?? [])

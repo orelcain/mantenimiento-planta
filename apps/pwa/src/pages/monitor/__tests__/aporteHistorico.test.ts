@@ -110,6 +110,46 @@ describe('referenciaAporte', () => {
   })
 })
 
+describe('referenciaAporte · el turno que se está mirando no es su propia referencia (bug de «vs último» = «— 0,0»)', () => {
+  /* Mirando un turno PASADO, ese turno está entre los `stats`: sin excluirlo, «vs último» se comparaba consigo mismo. */
+  const stats: ShiftStat[] = [
+    turno('2026-10-28', 'Turno 2', 400, { 'Ev 1': 6000 }), // 15,0 — posterior al visto
+    turno('2026-10-27', 'Turno 2', 400, { 'Ev 1': 5200 }), // 13,0 — el que se mira
+    turno('2026-10-26', 'Turno 2', 400, { 'Ev 1': 4000 }), // 10,0 — el último anterior
+    turno('2026-10-25', 'Turno 2', 400, { 'Ev 1': 3200 }), // 8,0
+    turno('2026-10-27', 'Turno 1', 400, { 'Ev 1': 9999 }), // otro número
+  ]
+  const visto = '2026-10-27_Turno 2'
+
+  it('sin excluir, la muestra del turno 27 lleva adentro al propio turno 27 (el defecto)', () => {
+    expect(referenciaAporte(stats, 'Turno 2')!.porMaquina.get('Ev 1')).toBeCloseTo((15 + 13 + 10 + 8) / 4, 6)
+  })
+
+  it('con el turno visto excluido, «último» es el turno anterior (y no se compara consigo mismo)', () => {
+    const ultimo = referenciaAporte(stats, 'Turno 2', 1, visto)!
+    expect(ultimo.desde).toBe('2026-10-26')
+    expect(ultimo.porMaquina.get('Ev 1')).toBeCloseTo(10, 6)
+    /* El aporte de ese turno (13,0) contra su referencia real: +3,0, no 0,0. */
+    expect(deltaAporte(ultimo, 'Ev 1', 13, 400)).toBeCloseTo(3, 6)
+  })
+
+  it('«vs prom. N» tampoco lleva adentro el turno visto ni los posteriores: solo los anteriores del mismo número', () => {
+    const r = referenciaAporte(stats, 'Turno 2', 5, visto)!
+    expect(r.turnos).toBe(2)
+    expect(r.porMaquina.get('Ev 1')).toBeCloseTo((10 + 8) / 2, 6)
+  })
+
+  it('con el turno en curso (no está en los stats) no cambia nada', () => {
+    const hoy = '2026-10-29_Turno 2'
+    expect(referenciaAporte(stats, 'Turno 2', 1, hoy)!.desde).toBe('2026-10-28')
+    expect(referenciaAporte(stats, 'Turno 2', 5, hoy)!.turnos).toBe(4)
+  })
+
+  it('si el único turno comparable es el visto no inventa referencia', () => {
+    expect(referenciaAporte([turno('2026-10-27', 'Turno 2', 400, { 'Ev 1': 5200 })], 'Turno 2', 1, visto)).toBeNull()
+  })
+})
+
 describe('deltaAporte', () => {
   const ref = referenciaAporte([
     turno('2026-08-28', 'Turno 1', 400, { 'Ev 1': 4000 }), // 10,0

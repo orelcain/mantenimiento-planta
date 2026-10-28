@@ -3,6 +3,7 @@ import {
   calcularRitmoVivo,
   cronometro,
   etiquetaMaquina,
+  hayBandaParada,
   llenadoDe,
   maquinaQueBaja,
   paradaEnCurso,
@@ -11,6 +12,7 @@ import {
   tendenciaDe,
   tonoDe,
   unidadDeMaquinas,
+  vaciosTurnoDe,
   vistaDeSerie,
   type EntradaRitmoVivo,
   type MaquinaVivo,
@@ -312,6 +314,14 @@ describe('la parada en curso: micro o detención lo dice Shoplogix', () => {
     id: '1', nombre: 'Evisceradora 1', status: 'detenida', razon, desdeMs: T0, programada: false, ...extra,
   })
 
+  it('hayBandaParada: es la misma regla que la banda (hay parada en curso y el turno no terminó): la franja no repite la causa que la banda ya dice', () => {
+    expect(hayBandaParada([m('Detencion')])).toBe(true)
+    expect(hayBandaParada([m('KNURO')])).toBe(true)
+    expect(hayBandaParada([m('Detencion')], true)).toBe(false)
+    expect(hayBandaParada([m(null, { status: 'produciendo', desdeMs: null })])).toBe(false)
+    expect(hayBandaParada([])).toBe(false)
+  })
+
   it('«Micro Detencion» es micro, sin mirar cuánto lleva: celeste aunque pase de 90 s', () => {
     const p = paradaEnCurso([m('Micro Detencion')])!
     expect(p.clase).toBe('micro')
@@ -365,5 +375,92 @@ describe('la parada en curso: micro o detención lo dice Shoplogix', () => {
     expect(cronometro(795)).toBe('13 min 15 s')
     expect(cronometro(3725)).toBe('1 h 02 min')
     expect(cronometro(-3)).toBe('0 s')
+  })
+})
+
+describe('carros vacíos del turno (estimación: velocidad seteada × tiempo andando − lo contado)', () => {
+  /* Dos Baader de 16 y 20 por minuto. Minutos: 0 y 1 andando completos; 2 con Ev A parada 40 s (20 s andando < 30: no cuenta);
+     3 con la LÍNEA entera en cero (no se distingue de una parada pactada); 4 con Ev B parada 15 s (45 s andando). */
+  const A = maq('A', [14, 16, 0, 0, 12], 16)
+  const B = maq('B', [18, 20, 5, 0, 15], 20)
+  const paradas = {
+    stopEvents: [
+      { r: 0, f: iso(2, 20), s: 40, m: 0 },
+      { r: 0, f: iso(4, 0), s: 15, m: 1 },
+    ],
+    stopReasons: ['Detencion'],
+    stopMachines: ['A', 'B'],
+    enCurso: [],
+  }
+
+  it('cuenta solo los minutos válidos: ≥ 30 s andando y la línea no entera en cero', () => {
+    const v = vaciosTurnoDe({ desde: iso(0), maquinas: [A, B] }, 5, paradas)
+    const [a, b] = v.maquinas
+    /* A: minutos 0, 1 y 4 (el 2 anduvo 20 s, el 3 es línea en cero) → 16 + 16 + 16 = 48 pasaron; contó 14 + 16 + 12 = 42. */
+    expect(a).toMatchObject({ id: 'A', pasaron: 48, conPieza: 42, vacios: 6 })
+    expect(a!.pct).toBeCloseTo(87.5, 6)
+    /* B: minutos 0, 1, 2 (andando todo el 2: la parada fue de A) y 4 (45 s): 20 + 20 + 20 + 15 = 75 pasaron; contó 18 + 20 + 5 + 15 = 58. */
+    expect(b).toMatchObject({ id: 'B', pasaron: 75, conPieza: 58, vacios: 17 })
+    expect(v.minutos).toBe(4)
+  })
+
+  it('la línea es la SUMA de sus Baader (ya redondeadas) y su % sale de esas sumas', () => {
+    const v = vaciosTurnoDe({ desde: iso(0), maquinas: [A, B] }, 5, paradas)
+    expect(v.linea.pasaron).toBe(48 + 75)
+    expect(v.linea.conPieza).toBe(42 + 58)
+    expect(v.linea.vacios).toBe(6 + 17)
+    expect(v.linea.pct).toBeCloseTo((100 / 123) * 100, 6)
+  })
+
+  it('«vacíos» no baja de 0: una Baader que contó más de lo que daba su velocidad seteada no resta carros', () => {
+    const rapida = maq('R', [20, 20], 16)
+    const v = vaciosTurnoDe({ desde: iso(0), maquinas: [rapida] }, 2)
+    expect(v.maquinas[0]).toMatchObject({ pasaron: 32, conPieza: 40, vacios: 0 })
+    expect(v.maquinas[0]!.pct).toBe(100)
+    expect(v.linea.vacios).toBe(0)
+  })
+
+  it('una Baader sin esperado no entra (no hay vara), y un minuto que su serie aún no tiene no es un cero', () => {
+    const sin = maq('S', [10, 10], null)
+    const corta = maq('C', [16], 16)
+    const largaB = maq('B', [16, 16], 16)
+    const v = vaciosTurnoDe({ desde: iso(0), maquinas: [sin, corta, largaB] }, 2)
+    expect(v.maquinas.map((m) => m.id)).toEqual(['C', 'B'])
+    expect(v.maquinas[0]).toMatchObject({ pasaron: 16, conPieza: 16, vacios: 0 })
+    expect(v.maquinas[1]).toMatchObject({ pasaron: 32, conPieza: 32, vacios: 0 })
+  })
+
+  it('sin paradas por máquina se supone andando todo el minuto; sin minutos válidos no hay % (null, no 0)', () => {
+    const v = vaciosTurnoDe({ desde: iso(0), maquinas: [maq('A', [8, 8], 16)] }, 2)
+    expect(v.maquinas[0]).toMatchObject({ pasaron: 32, conPieza: 16, vacios: 16 })
+    const nada = vaciosTurnoDe({ desde: iso(0), maquinas: [maq('A', [0, 0], 16)] }, 2)
+    expect(nada.maquinas[0]).toMatchObject({ pasaron: 0, conPieza: 0, vacios: 0, pct: null })
+    expect(nada.linea.pct).toBeNull()
+    expect(nada.minutos).toBe(0)
+  })
+
+  it('referencia medida a las 10:12: cada Baader y la Línea cuadran a la vista (Σ = Línea)', () => {
+    /* Un minuto con esperado = pasaron reproduce las cifras medidas sin fabricar una serie de 300 minutos. */
+    const un = (id: string, pasaron: number, conto: number) => maq(id, [conto], pasaron)
+    const ev = vaciosTurnoDe({ desde: iso(0), maquinas: [un('1', 2727, 2198), un('2', 2367, 1881), un('3', 2564, 2224)] }, 1)
+    expect(ev.maquinas.map((m) => [m.pasaron, m.conPieza, m.vacios])).toEqual([[2727, 2198, 529], [2367, 1881, 486], [2564, 2224, 340]])
+    expect(ev.maquinas[0]!.pct).toBeCloseTo(80.6, 1)
+    expect(ev.linea).toMatchObject({ pasaron: 7658, conPieza: 6303, vacios: 1355 })
+    expect(ev.linea.pct!).toBeCloseTo(82.3, 1)
+    const fi = vaciosTurnoDe({ desde: iso(0), maquinas: [un('F', 2373, 1589)] }, 1)
+    expect(fi.linea).toMatchObject({ pasaron: 2373, conPieza: 1589, vacios: 784 })
+    expect(fi.linea.pct!).toBeCloseTo(67.0, 1)
+  })
+
+  it('una Baader que cuenta más de lo que su velocidad permite no compensa a las otras: la Línea suma los vacíos de cada una', () => {
+    const v = vaciosTurnoDe({ desde: iso(0), maquinas: [maq('A', [20], 16), maq('B', [20], 32)] }, 1)
+    expect(v.maquinas.map((m) => m.vacios)).toEqual([0, 12])
+    expect(v.linea).toMatchObject({ pasaron: 48, conPieza: 40, vacios: 12 })
+    expect(v.linea.pasaron - v.linea.conPieza).toBe(8)
+  })
+
+  it('con la parada en curso de una Baader, el minuto en que ya estaba detenida no entra', () => {
+    const v = vaciosTurnoDe({ desde: iso(0), maquinas: [maq('A', [16, 16, 16], 16)] }, 3, { stopEvents: null, stopReasons: null, stopMachines: null, enCurso: [{ id: 'A', desdeMs: T0 + 2 * 60_000 }] })
+    expect(v.maquinas[0]).toMatchObject({ pasaron: 32, conPieza: 32 })
   })
 })

@@ -337,7 +337,7 @@ const EjeSvg = memo(function EjeSvg({ m, reloj, uid, cursor }: { m: ModeloEje; r
           <circle cx={r1(x((vivo.previa ?? vivo.ultima).min))} cy={r1(y((vivo.previa ?? vivo.ultima).v))} r={4.5} fill={COLOR_EQUIPO[vivo.eq]} stroke="rgb(var(--background))" strokeWidth={2} />
         </g>
       )}
-      {etiquetas.map(({ l, yy: ey, lx }) => tg(l.eq, `${l.rotulo} · ${int(l.total)} piezas acumuladas${l.enCurso ? ' hasta ahora' : ' al cierre del turno'}`, (
+      {etiquetas.map(({ l, yy: ey, lx }) => tg(l.eq, `${l.rotulo} · ${int(l.total)} piezas hechas${l.enCurso ? ' hasta ahora' : ' al cierre del turno'}`, (
         <>
           <text x={r1(lx)} y={r1(ey)} fontSize={compacto ? 12 : 13} fontWeight={600} {...colEq(l.eq)}>{l.nombre}</text>
           <text x={r1(lx)} y={r1(ey + 16)} fontSize={compacto ? 12 : 13} fontWeight={600} className="fill-foreground tabular-nums">{int(l.total)} piezas</text>
@@ -439,7 +439,7 @@ const EjeSvg = memo(function EjeSvg({ m, reloj, uid, cursor }: { m: ModeloEje; r
       })}
 
       {/* Carril 4 · paradas de 5 min o más, por dueño */}
-      {rotuloCarril(yPar, 2 * L.par + 3, compacto ? 'Paradas ≥ 5 min' : 'Paradas de 5 min o más', undefined, tips.paradas)}
+      {rotuloCarril(yPar, 2 * L.par + 3, compacto ? 'Detenciones ≥ 5 min' : 'Detenciones de 5 min o más', undefined, tips.paradas)}
       {EQ.map((e, i) => {
         const l = lados[e]
         const y0 = yPar + i * (L.par + 3)
@@ -675,7 +675,7 @@ function Lienzo({ p, d, lados, reloj, compacto }: { p: DueloPCProps; d: DatosDue
     ? d.esperando ? `${nombreCorto(hoyEq, nombres)} cerró la noche · el día juega después` : 'cerrada · horas contadas desde la primera pieza de cada turno'
     : d.abreJornada ? `en vivo · ${hora}.ª hora · la noche abre la jornada sin rival`
       : d.rival ? `en vivo · ${hora}.ª hora de producción · contra ${nombreCorto(d.rival.equipo, nombres)}, ya cerrada` : `en vivo · ${hora}.ª hora · sin turno de noche`
-  const resumen = `Carrera de la jornada ${jornada}: ${EQ.map((e) => lados[e]).filter((l): l is LadoEje => l != null).map((l) => `${l.nombre} ${int(l.total)} pz`).join(', ')}. Debajo, para cada equipo: el ritmo por hora, quién ganó cada hora, los minutos a buen ritmo, las paradas de 5 minutos o más y los minutos perdidos en micro detenciones por hora.`
+  const resumen = `Carrera de la jornada ${jornada}: ${EQ.map((e) => lados[e]).filter((l): l is LadoEje => l != null).map((l) => `${l.nombre} ${int(l.total)} pz`).join(', ')}. Debajo, para cada equipo: el ritmo por hora, quién ganó cada hora, los minutos a buen ritmo, las detenciones de 5 minutos o más y los minutos perdidos en micro detenciones por hora.`
   const ultimoMin = modelo?.vivo?.ultima.min ?? d.carrera?.minuto ?? 0
 
   return (
@@ -719,7 +719,7 @@ function Lienzo({ p, d, lados, reloj, compacto }: { p: DueloPCProps; d: DatosDue
 // ── Por qué ──────────────────────────────────────────────────────────────────
 
 const FILAS_PQ: Array<{ k: DuenoPQ; rotulo: string; sub: string }> = [
-  { k: 'mic', rotulo: 'Micro detención', sub: 'operación · paradas cortas' },
+  { k: 'mic', rotulo: 'Micro detención', sub: 'operación · detenciones cortas' },
   { k: 'sin', rotulo: 'Sin imputar', sub: 'nadie anotó la causa' },
   { k: 'mant', rotulo: 'Mantención · equipos', sub: 'falla técnica, no resta puntos' },
   { k: 'ext', rotulo: 'Externo', sub: 'materia prima, rechazo, servicios' },

@@ -26,16 +26,16 @@ export function tipsCarriles(n: NombresPar, esperado: number | null): Record<'ri
     ritmo: `Ritmo por hora. Unidad: piezas por minuto (pz/min). Es el promedio de cada hora de producción, contada desde la primera pieza del turno. En cada hora, la barra de la izquierda es ${n.a} y la de la derecha ${n.b}. Las rayas punteadas marcan el ritmo esperado y su ${PCT90}.${esp}`,
     gano: `Quién ganó cada hora. Compara el ritmo de la misma hora de los dos equipos: gana el que sacó más piezas por minuto, y la cifra es la diferencia en pz/min. Una diferencia menor a ${dec(EMPATE_HORA, 2)} pz/min es empate. A la derecha, las horas ganadas por cada equipo; la hora que aún corre no se cuenta.`,
     sost: `Minutos a buen ritmo. Unidad: minutos de producción. Cuenta los minutos en que la línea rindió al menos ${PCT90} de lo esperado. La barra de color es cada minuto a buen ritmo; el tramo claro es lo que duró el turno. No da punto: es un dato para analizar.`,
-    paradas: 'Paradas de 5 minutos o más. Cada bloque es una parada y su largo es su duración; al lado va la causa. El dueño de la parada se ve por el relleno: con trama, Mantención; color liso, Externo; gris, Sin imputar; contorno punteado, Programada (colación, reunión).',
-    micro: 'Micro detenciones. Unidad: minutos perdidos en cada hora de producción. Son las paradas cortas que la máquina registra como «Micro Detención»; se suman los minutos de las máquinas de la línea. Más oscuro es más minutos; menos es mejor.',
+    paradas: 'Detenciones de 5 minutos o más. Cada bloque es una detención y su largo es su duración; al lado va la causa. El dueño de la detención se ve por el relleno: con trama, Mantención; color liso, Externo; gris, Sin imputar; contorno punteado, Programada (colación, reunión).',
+    micro: 'Micro detenciones. Unidad: minutos perdidos en cada hora de producción. Son las detenciones cortas que la máquina registra como «Micro Detención»; se suman los minutos de las máquinas de la línea. Más oscuro es más minutos; menos es mejor.',
   }
 }
 
 export const TIPS_LEYENDA = {
-  mantencion: 'Mantención: la parada tiene una causa técnica de equipos. No resta puntos al equipo; sus piezas se suman a su carrera.',
+  mantencion: 'Mantención: la detención tiene una causa técnica de equipos. No resta puntos al equipo; sus piezas se suman a su carrera.',
   externo: 'Externo: la causa viene de fuera de la línea (materia prima, rechazo, servicios).',
-  sinImputar: 'Sin imputar: nadie anotó la causa de la parada.',
-  programada: 'Programada: parada prevista, como la colación y la reunión de inicio. No cuenta como pérdida.',
+  sinImputar: 'Sin imputar: nadie anotó la causa de la detención.',
+  programada: 'Programada: detención prevista, como la colación y la reunión de inicio. No cuenta como pérdida.',
 } as const
 
 // ── Barras, paradas y celdas ─────────────────────────────────────────────────
@@ -60,7 +60,7 @@ export function tipParada(p: { nombre: string; desdeMin: number; causa: string; 
 }
 
 export const tipParadasTotal = (nombre: string, n: number, min: number) =>
-  `${nombre} · ${plural(n, 'parada', 'paradas')} de 5 min o más, ${int(min)} min en total (sin contar las programadas)`
+  `${nombre} · ${plural(n, 'detención', 'detenciones')} de 5 min o más, ${int(min)} min en total (sin contar las programadas)`
 
 export const tipMicro = (nombre: string, hora: number, min: number, enCurso: boolean) =>
   `${nombre} · ${ordinalHora(hora)} · ${dec(min)} min perdidos en micro detenciones${enCurso ? ' (hora en curso)' : ''}`
@@ -80,7 +80,7 @@ export function tipFilaKpi(f: FilaRiel, o: { enCurso: boolean; unidad: 'carros' 
   if (o.soloHoy) return `${f.rotulo}: ${f.sub}. Este turno corre solo, así que no suma ni quita puntos; el valor de la derecha es su promedio de referencia.`
   if (f.id === 'carrera') return `Carrera: piezas del turno${o.enCurso ? ' a la misma hora de producción' : ', con las piezas que Mantención les quitó sumadas'}. Punto: gana quien sacó más piezas.`
   if (f.id === 'ritmo') return 'Ritmo andando: piezas por minuto mientras la línea produce. Punto: gana el ritmo más alto.'
-  if (f.id === 'micro') return 'Micro detención: minutos perdidos por hora en paradas cortas de las máquinas. Punto: gana quien perdió menos minutos.'
+  if (f.id === 'micro') return 'Micro detención: minutos perdidos por hora en detenciones cortas de las máquinas. Punto: gana quien perdió menos minutos.'
   if (f.id === 'arranque') return 'Arranque y cierre: minutos hasta la primera pieza (menos es mejor) y piezas de la última hora (más es mejor). Punto: gana quien gana las dos; el cierre se define al terminar el turno.'
   if (f.id === 'alim') return 'Alimentación: puntos ganados entre los puestos de alimentación. Cada puesto da un punto; el detalle por puesto se ve con más ancho de pantalla.'
   if (f.id.startsWith('alim-')) {

@@ -84,14 +84,15 @@ import './monitor/monitorGlass.css'
 import {
   APORTE_MIN_PROD_MIN, deltaAporte, referenciaAporte, type ReferenciaAporte,
 } from './monitor/aporteHistorico'
+import { armarAporte } from './monitor/aporteBaaders'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
 import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
 import { piezasMostradas } from './monitor/aEstaHora'
-import { paradasEnEje } from './monitor/ejeTurno'
-import { ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
+import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
+import { hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -799,7 +800,7 @@ function CeldaStat({ k, v, sub, delta }: { k: string; v: string; sub?: string; d
         {sub && <span className="text-[11px] text-muted-foreground"> {sub}</span>}
         {delta != null && (
           <span className={`text-[11px] tabular-nums ${delta >= 0 ? 'text-ink-ok' : 'text-ink-warn'}`}>
-            {' '}{delta >= 0 ? '+' : '−'}{fmtInt(Math.abs(delta))}
+            {' '}{adelanteAtras(delta)}
           </span>
         )}
       </div>
@@ -849,7 +850,7 @@ function EditorCuota({ actual, pesoConocido, onGuardar, conToneladas = true }: {
         }}
         className="tap-44 ml-1 rounded-full border border-border px-2 py-0.5 text-caption normal-case tracking-normal hover:bg-muted"
       >
-        {actual != null ? 'Cambiar cuota' : 'Poner cuota'}
+        {actual != null ? 'Cambiar meta' : 'Poner meta'}
       </button>
     )
   }
@@ -1649,7 +1650,7 @@ function Sparkbars({
               <span className="text-rose-700 dark:text-rose-300">
                 {' '}- {detalle.paro.variasCausas ? 'detenida' : detalle.paro.causa}{' '}
                 {fmtDurationSec(detalle.paro.sec)}
-                {detalle.paro.cuantas > 1 && ` en ${detalle.paro.cuantas} paradas`}
+                {detalle.paro.cuantas > 1 && ` en ${detalle.paro.cuantas} detenciones`}
               </span>
             )}
             {/* El comentario del operador es el unico texto en castellano del
@@ -1764,7 +1765,7 @@ function Sparkbars({
         {convenio.length > 0 && (
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-muted-foreground/15" />
-            parada de convenio
+            detención de convenio
           </span>
         )}
         {cierre != null && cierreMs != null && (
@@ -2037,7 +2038,7 @@ function RitmoNecesario({
     return (
       <p className="mt-2 flex items-center gap-1.5 text-[12px] text-emerald-800 dark:text-emerald-300">
         <Target className="h-3.5 w-3.5 shrink-0" />
-        Meta cumplida — todo lo que salga de acá en adelante va por encima.
+        Meta cumplida — desde ahora, todo lo que salga suma adelante de la meta.
       </p>
     )
   }
@@ -2076,10 +2077,10 @@ function RitmoNecesario({
         </p>
         {vsAyer && (
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            {vsAyer.label} a esta altura llevaba{' '}
-            <span className="tabular-nums text-foreground/90">{fmtInt(vsAyer.pieces)} pz</span>{' '}
+            {vsAyer.label} a esta hora:{' '}
+            <span className="tabular-nums text-foreground/90">{fmtInt(vsAyer.pieces)} hechas</span>{' '}
             <span className={vsAyer.diff >= 0 ? 'text-ink-ok' : 'text-ink-warn'}>
-              ({vsAyer.diff >= 0 ? '+' : '−'}{fmtInt(Math.abs(vsAyer.diff))})
+              ({adelanteAtras(vsAyer.diff)})
             </span>
             {' '}— esa comparación sí vale desde el arranque.
           </p>
@@ -2303,7 +2304,7 @@ function RitmoNecesario({
           v={fmtDurationSec((pace.workMin + pace.pendingBreakMin) * 60)}
           sub={`(${fmtDurationSec(pace.workMin * 60)} prod.)`}
         />
-        {vsAyer && <CeldaStat k="Ayer a esta altura" v={fmtInt(vsAyer.pieces)} delta={vsAyer.diff} />}
+        {vsAyer && <CeldaStat k="Ayer a esta hora" v={fmtInt(vsAyer.pieces)} delta={vsAyer.diff} />}
       </div>
       {/* Los DOS horizontes ya no van como prosa: son la banda del metro de
           arriba. Su versión en palabras (auditable, con el ± y la explicación
@@ -2429,7 +2430,7 @@ function RitmoNecesario({
           <p className="pl-[5.5rem] text-[11px] leading-snug text-muted-foreground/80">
             Descontando{' '}
             <span className="tabular-nums">{fmtDurationSec(pace.pendingBreakMin * 60)}</span> de
-            paradas de convenio que faltan: el ritmo se pide sobre el tiempo en que la línea
+            detenciones de convenio que faltan: el ritmo se pide sobre el tiempo en que la línea
             produce, no sobre el reloj.
           </p>
         )}
@@ -2655,7 +2656,7 @@ function PorHora({ series, paradas, pulse }: {
               {' '}(<span className="tabular-nums">{Math.round(floja.culpable.min)} min</span> dentro de esa hora)</>)
             /* Sin una parada que la explique no se inventa un culpable: puede
                ser alimentación aguas arriba, y eso no lo sabe esta pantalla. */
-            : '. Ninguna parada registrada la explica.'}
+            : '. Ninguna detención registrada la explica.'}
         </p>
       )}
       <p className="mt-2 text-[11px] text-muted-foreground/80">
@@ -3977,24 +3978,13 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
     )
   }
 
-  /* ── «Cada máquina · aporte» (v2) ───────────────────────────────────────
-     Solo la tabla, con su encabezado y el control del pulso («Leído de Shoplogix… · actualizar ahora», que es lo único del
-     bloque de estado que no repite la franja). La tabla va un nivel adentro: la grilla de dos columnas del CSS de PC
-     (`.v2-ritmo > section:has(> .ritmo-maquinas)`) es de la tarjeta de estado y acá dejaría una columna vacía. */
+  /* ── Bajo el gráfico (v2) ───────────────────────────────────────────────
+     La tabla «Cada máquina · aporte» ya no va: vive en la tarjeta Ritmo de la franja (`RitmoBaaders`, con los datos de
+     `armarAporte`) y en su detalle. Queda solo el control del pulso («se refresca en ~N s · actualizar ahora»), lo único del
+     bloque que no repite la franja y que refresca `data.pulse`; sin lectura, nada (como en Filete). `tablaMaquinas` sigue
+     siendo de la tarjeta de estado del clásico y de la TV. */
   if (parte === 'maquinas') {
-    const tabla = tablaMaquinas(true)
-    /* Una sola Baader (Filete) no tiene tabla que repartir: queda solo el control del pulso, si hay lectura. */
-    if (!tabla) return pulsoNodo ? <>{pulsoNodo}</> : null
-    return (
-      <section className="rounded-card border border-border bg-card p-4">
-        {/* El mismo título que «Ritmo en vivo» (17/600) y una línea que dice qué suma cada Baader. Sin el promedio del turno: esa cifra
-            ya está en la franja y repetirla aquí era una segunda cifra de lo mismo. */}
-        <h3 className="text-[17px] font-semibold leading-[22px] text-foreground">Cada máquina</h3>
-        <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">lo que suma cada Baader al ritmo de la línea</p>
-        <div>{tabla}</div>
-        {pulsoNodo}
-      </section>
-    )
+    return pulsoNodo ? <>{pulsoNodo}</> : null
   }
 
   /* ── Tarjeta «Velocidad minuto a minuto» ──────────────────────────────
@@ -6287,12 +6277,12 @@ function MonitorDelToken() {
        Orel, 31-08). El shiftId sale del turno que se está MIRANDO,
        no del vigente: navegando a un turno viejo el delta tiene que
        ser el de ese turno. */
-    refAporte: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11)),
+    refAporte: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11), undefined, vista?.shiftDocId),
     /* La segunda vara: el turno ANTERIOR solo. Orel las quiso a las
        dos a la vista (31-08, mirándolo en prod): el último dice «¿me
        moví desde la vez pasada?» y el promedio de 5 dice «¿esto es
        lo mío o fue un turno raro?». */
-    refAporteUltimo: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11), 1),
+    refAporteUltimo: referenciaAporte(data.shiftStats, (vista?.shiftDocId ?? '').slice(11), 1, vista?.shiftDocId),
     producingMin: live.timeBreakdown?.producingMin ?? null,
     serieLinea: serieDelTurno,
     seriesMaquinas,
@@ -6824,6 +6814,7 @@ function MonitorDelToken() {
               piezas={contador.valor}
               corteHora={corteHoraV2}
               causaParada={live.currentReason ? motivoEnEspanol(live.currentReason) : null}
+              turnoId={vista?.shiftDocId ?? data.shiftDocId}
               cuota={comparacion.optimalAtCurrentMinute != null ? { piezas: comparacion.optimalAtCurrentMinute, hora: horaDeCuota } : null}
               horas={(() => {
                 /* Hora a hora de Piezas ahora: las filas del Análisis (misma serie, mismo arranque) y, por Baader, sus piezas en
@@ -6926,8 +6917,21 @@ function MonitorDelToken() {
                   .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))
                   .filter((d) => d.piezas > 0),
               }}
-              /* Solo la tabla «Cada máquina · aporte»: las cifras de ritmo viven en la franja, una sola vez. */
+              /* Bajo el gráfico solo queda el control del pulso: la tabla «Cada máquina · aporte» es ahora la tarjeta Ritmo de la franja. */
               ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} parte="maquinas" />}
+              /* La tarjeta Ritmo y su detalle: aporte de cada Baader al promedio y cómo se compara consigo misma. Con las referencias que
+                 EXCLUYEN el turno que se está mirando (mirando un turno pasado «vs último» se comparaba consigo mismo). */
+              aporte={armarAporte({
+                maquinas: reglaPropsBase.maquinas,
+                producingMin: reglaPropsBase.producingMin,
+                refUltimo: reglaPropsBase.refAporteUltimo,
+                refProm: reglaPropsBase.refAporte,
+                promedioLinea,
+                parada: Boolean(reglaPropsBase.parada),
+                cerrado: turnoCerrado,
+                pulsoFresco: reglaPropsBase.vivo != null,
+              })}
+              ritmoPulso={reglaPropsBase.pulsoNodo}
               ritmoMedia15={duro15?.cpm ?? null}
               ritmoPedido={reglaPropsBase.pedido ?? null}
               ritmoVivoAbrirCon={marcaRitmo && barrasMinuto ? `${marcaRitmo.desdeMs}-${marcaRitmo.hastaMs}` : null}
@@ -6953,6 +6957,7 @@ function MonitorDelToken() {
                 )
                 : undefined}
               banda={vivoV2 ? <BandaParadaV2 maquinas={vivoV2.maquinas} turnoTerminado={turnoTerminadoV2} /> : undefined}
+              conBanda={vivoV2 ? hayBandaParada(vivoV2.maquinas, turnoTerminadoV2) : false}
               /* Sin desglose del tiempo no hay celda: la franja queda en cuatro. */
               caminoMeta={!(live.timeBreakdown && live.timeBreakdown.windowMin > 0) ? undefined : (() => {
                 /* Un solo juego de props: la celda de la franja y el detalle de la capa cuentan lo mismo. */
@@ -6994,7 +6999,7 @@ function MonitorDelToken() {
             <Activity className="h-3 w-3" />
             {/* Cerrado, la tarjeta cambia de pregunta: ya no es «cuántas van»
                 sino «cómo quedó» — todo lo que cuelga de ella habla en pasado. */}
-            {turnoCerrado ? 'Resultado del turno' : esActual ? 'Piezas procesadas en la jornada' : 'Piezas de ese turno'}
+            {turnoCerrado ? 'Resultado del turno' : esActual ? 'Hechas en la jornada' : 'Hechas en ese turno'}
           </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(contador.valor)}</span>
@@ -7024,12 +7029,11 @@ function MonitorDelToken() {
             return (
               <p className="mt-1.5 text-[15px] text-foreground">
                 {live.totalPieces >= meta ? (
-                  <>Meta cumplida: cerró con{' '}
-                    <b className="tabular-nums">{fmtInt(live.totalPieces - meta)} pz</b> sobre la meta de{' '}
+                  <>Meta cumplida: cerró{' '}
+                    <b className="tabular-nums">{live.totalPieces > meta ? `${adelanteAtras(live.totalPieces - meta)} de` : 'justo en'}</b> la meta de{' '}
                     <span className="tabular-nums">{fmtInt(meta)}</span>.</>
                 ) : (
-                  <>Cerró con <b className="tabular-nums">{pct}%</b> de la meta — faltaron{' '}
-                    <b className="tabular-nums">{fmtInt(meta - live.totalPieces)}</b> de{' '}
+                  <>Cerró con <b className="tabular-nums">{pct} %</b>: <b className="tabular-nums">{adelanteAtras(live.totalPieces - meta)}</b> de la meta de{' '}
                     <span className="tabular-nums">{fmtInt(meta)}</span>.</>
                 )}
               </p>
@@ -7146,7 +7150,7 @@ function MonitorDelToken() {
               entre un dato viejo y un dato viejo que se hace pasar por vivo. */}
           {contador.motivoFallback && (
             <p className="mt-1 text-[11px] text-muted-foreground/80">
-              {contador.motivoFallback}: se muestra el acumulado de los tramos de 5 min.
+              {contador.motivoFallback}: se muestra lo hecho sumando los tramos de 5 min.
             </p>
           )}
 
@@ -7249,9 +7253,9 @@ function MonitorDelToken() {
           {metaHero == null && onGuardarCuota && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-ctl bg-muted px-3 py-2">
               <div className="min-w-0 flex-1">
-                <div className="text-[13px] text-foreground">Sin cuota cargada para este turno</div>
+                <div className="text-[13px] text-foreground">Sin meta cargada para este turno</div>
                 <div className="text-[11px] text-muted-foreground/80">
-                  Con la cuota (en toneladas o piezas) aparecen la barra de meta y el camino a cumplirla.
+                  Con la meta (en toneladas o piezas) aparecen la barra de meta y el camino a cumplirla.
                 </div>
               </div>
               <EditorCuota
@@ -7487,7 +7491,7 @@ function MonitorDelToken() {
                 ? `${fmtDurationSec(live.timeBreakdown.producingMin * 60)} · del tiempo disponible`
                 : fmtDurationSec(live.uptimeSec)
             }
-            sub="Disponible = el turno menos colación, reuniones y paradas programadas."
+            sub="Disponible = el turno menos colación, reuniones y detenciones programadas."
           />
         </TarjetaTablero>
 
@@ -7755,7 +7759,7 @@ function MonitorDelToken() {
                         "Ahora mismo" de línea solo salta si paran TODAS. */}
                     {!live.shiftClosed && m.status === 'detenida' && m.currentReason && (
                       <span className="block truncate text-[11px] text-red-600 dark:text-red-400">
-                        parada · {m.currentReason}
+                        detenida · {m.currentReason}
                         {m.currentSinceAt && ` (${fmtAgoWall(m.currentSinceAt, now)})`}
                       </span>
                     )}

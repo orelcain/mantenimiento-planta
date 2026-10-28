@@ -104,7 +104,7 @@ afterEach(() => {
 const numeros = (t: string) => (t.match(/\d{1,3}(?:\.\d{3})+|\d+/g) ?? []).map((n) => Number(n.replace(/\./g, '')))
 
 describe('turno anterior · una sola cifra en la leyenda y en la hoja «Piezas del turno»', () => {
-  it('cerrado: los dos dicen el TOTAL del turno anterior (el último punto de su curva) y no el de «a esta altura»', () => {
+  it('cerrado: los dos dicen el TOTAL del turno anterior (el último punto de su curva) y no el de «a esta hora»', () => {
     const { container, getByRole } = render(<MonitorV2 {...props({ cerrado: true, proyeccion: null })} />)
     const leyenda = container.querySelector('.rv-grafico')!.textContent ?? ''
     expect(leyenda).toContain('lun 26 · 14.000 al cierre')
@@ -112,7 +112,7 @@ describe('turno anterior · una sola cifra en la leyenda y en la hoja «Piezas d
     const hoja = getByRole('dialog').textContent ?? ''
     expect(hoja).toContain('lun 26 al cierre')
     expect(hoja).toContain('14.000 pz')
-    expect(hoja).not.toContain('a esta altura')
+    expect(hoja).not.toContain('lun 26 a esta hora')
     expect(hoja).not.toContain('9.111')
     expect(hoja).toContain('este turno')
   })
@@ -120,7 +120,7 @@ describe('turno anterior · una sola cifra en la leyenda y en la hoja «Piezas d
   it('en vivo: los dos dicen el valor de la curva previa en el mismo minuto desde la primera pieza (lo que se dibuja)', () => {
     const { container, getByRole } = render(<MonitorV2 {...props()} />)
     const leyenda = container.querySelector('.rv-grafico')!.textContent ?? ''
-    const m = /lun 26 · ([\d.]+) a esta hora/.exec(leyenda)
+    const m = /lun 26 · ([\d.]+) hechas a esta hora/.exec(leyenda)
     expect(m).not.toBeNull()
     const enLeyenda = Number(m![1]!.replace(/\./g, ''))
     /* La punta está en el minuto 305 y la primera pieza en el 5: su curva a los 300 min = 6.000 + 100/240 × 8.000. */
@@ -138,8 +138,9 @@ describe('turno anterior · una sola cifra en la leyenda y en la hoja «Piezas d
     const { getByRole } = render(<MonitorV2 {...props({ lectura: null })} />)
     fireEvent.click(getByRole('button', { name: 'Piezas del turno: ver detalle' }))
     const hoja = getByRole('dialog').textContent ?? ''
-    expect(hoja).toContain('lun 26 a esta altura')
+    expect(hoja).toContain('lun 26 a esta hora')
     expect(hoja).toContain('9.111 pz')
+    expect(hoja).toContain('579 adelante hoy')
   })
 
   it('con gráfico y lectura pero una curva previa que no llega a ese minuto: ni la leyenda ni la hoja dicen cifra (no hay una segunda alineación)', () => {

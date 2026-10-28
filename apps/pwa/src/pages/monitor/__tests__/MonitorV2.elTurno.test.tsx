@@ -1,6 +1,7 @@
 /**
  * «El turno» del monitor v2 tiene UN solo orden en todos los anchos (opción A «cinta»): la parada en curso → la franja →
- * «Ritmo en vivo» → «Cada máquina · aporte» → «Ver más del turno». Duelo, fallas y tiempo perdido solo con «Ver más».
+ * «Ritmo en vivo» → control del pulso (la tabla «Cada máquina» es ahora la tarjeta Ritmo de la franja) → «Ver más del turno». Duelo,
+ * fallas y tiempo perdido solo con «Ver más».
  * Se prueba el esqueleto con datos de ejemplo: no hay fork de PC, nada se repite y nada de lo que salió reaparece.
  */
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -62,7 +63,7 @@ const props = (vista: 0 | 1 | 2): MonitorV2Props => ({
   mas: { cascada: null, cascadaDetalle: null, tiempo: null, comparado: [] },
   eje,
   banda: <div role="status">parada en curso</div>,
-  ritmoLinea: <p>tabla de cada máquina</p>,
+  ritmoLinea: <p>control del pulso</p>,
   caminoMeta: <p>camino a la meta</p>,
   duelo: <p>duelo de equipos</p>,
   ritmoVivoAmpliado: <p>detalle de ritmo en vivo</p>,
@@ -93,12 +94,30 @@ afterEach(() => {
 
 const texto = (el: Element) => el.textContent ?? ''
 
+describe('MonitorV2 · al pasar a otro turno la cifra grande salta directo', () => {
+  it('de 8.370 (en vivo) a 15.479 (cerrado): la cifra dice 15.479 de inmediato y no cuenta hacia arriba; con el mismo turno, sí', () => {
+    const enVivo = { ...props(0), piezas: 8370, lectura: { valor: 8370, atMs: 100 * 60_000 }, turnoId: 'vivo' }
+    const { container, rerender } = render(<MonitorV2 {...enVivo} />)
+    expect(container.querySelector('.fc-cifra-p')?.textContent).toBe('8.370')
+    /* «Anterior»: el turno cerrado entra con SU total y la hora de su última lectura (otra hora). */
+    const cerrado = { ...props(0), piezas: 15479, proyeccion: null, cerrado: true, lectura: { valor: 15479, atMs: 5 * 60_000 }, turnoId: 'cerrado' }
+    rerender(<MonitorV2 {...cerrado} />)
+    expect(container.querySelector('.fc-cifra-p')?.textContent).toBe('15.479')
+    /* El mismo turno con piezas nuevas conserva la recta: arranca en la cifra anterior y sube. */
+    const mismo = { ...props(0), piezas: 8400, lectura: { valor: 8400, atMs: 101 * 60_000 }, turnoId: 'vivo' }
+    cleanup()
+    const a = render(<MonitorV2 {...enVivo} />)
+    a.rerender(<MonitorV2 {...mismo} />)
+    expect(a.container.querySelector('.fc-cifra-p')?.textContent).toBe('8.370')
+  })
+})
+
 describe('MonitorV2 · «El turno» ordenado', () => {
-  it('el orden: banda → franja → Ritmo en vivo → Cada máquina → Ver más', () => {
+  it('el orden: banda → franja → Ritmo en vivo → control del pulso → Ver más', () => {
     const { container } = render(<MonitorV2 {...props(0)} />)
     const hijos = Array.from(container.querySelector('.monitor-v2')!.children)
     const idx = (frag: string) => hijos.findIndex((h) => texto(h).includes(frag))
-    const pos = [idx('parada en curso'), idx('Piezas del turno'), idx('Ritmo en vivo'), idx('tabla de cada máquina'), idx('Ver más del turno')]
+    const pos = [idx('parada en curso'), idx('Piezas del turno'), idx('Ritmo en vivo'), idx('control del pulso'), idx('Ver más del turno')]
     expect(pos.every((i) => i >= 0)).toBe(true)
     expect([...pos].sort((a, b) => a - b)).toEqual(pos)
   })
@@ -114,11 +133,16 @@ describe('MonitorV2 · «El turno» ordenado', () => {
     expect(t).not.toContain('El turno en un solo eje')
   })
 
-  it('cada cifra una sola vez: «Piezas del turno», «Ritmo de la línea» y el «Ritmo en vivo» del gráfico', () => {
+  it('cada cifra una sola vez: «Piezas del turno», la tarjeta «Ritmo» (la línea y cada Baader) y el «Ritmo en vivo» del gráfico', () => {
     const { container } = render(<MonitorV2 {...props(0)} />)
     const t = texto(container)
     expect(t.split('Piezas del turno').length - 1).toBe(1)
-    expect(t.split('Ritmo de la línea').length - 1).toBe(1)
+    /* UN solo rótulo «Ritmo» en la franja, y la tabla «Cada máquina» ya no está bajo el gráfico. */
+    expect(Array.from(container.querySelectorAll('.fc-rotulo')).filter((r) => r.textContent === 'Ritmo')).toHaveLength(1)
+    expect(container.querySelectorAll('.rb')).toHaveLength(1)
+    expect(t).not.toContain('Ritmo de la línea')
+    expect(t).not.toContain('Cada máquina')
+    expect(t).not.toContain('Cada Baader')
     expect(container.querySelectorAll('h3').length).toBeGreaterThan(0)
     expect(Array.from(container.querySelectorAll('h3')).filter((h) => h.textContent === 'Ritmo en vivo')).toHaveLength(1)
   })
@@ -186,9 +210,9 @@ describe('MonitorV2 · «El turno» ordenado', () => {
     expect(capa).toContain('5.329')
   })
 
-  it('el detalle de «Ritmo de la línea» pide «necesario» en la misma base andando que la franja', () => {
+  it('el detalle de «Ritmo» pide «necesario» en la misma base andando que la franja', () => {
     const { getByRole } = render(<MonitorV2 {...props(0)} ritmoNecesario={30.1} ritmoPedido={36.7} />)
-    fireEvent.click(getByRole('button', { name: 'Ritmo de la línea: ver detalle' }))
+    fireEvent.click(getByRole('button', { name: 'Ritmo: ver detalle' }))
     const capa = getByRole('dialog').textContent ?? ''
     expect(capa).toContain('36,7')
     expect(capa).not.toContain('30,1')
@@ -210,16 +234,16 @@ describe('MonitorV2 · hojas de detalle (FilaCifra, «Reducir», rótulos del ri
     pieces: 2000, minutesCovered: partial ? 35 : 60, piecesPerHour: 2000, partial,
   })
 
-  it('«Ritmo de la línea»: la media de 15 min (andando) reemplaza a «Últimos 30 min» y solo en vivo', () => {
+  it('«Ritmo»: la media de 15 min (andando) reemplaza a «Últimos 30 min» y solo en vivo', () => {
     const vivo = render(<MonitorV2 {...props(0)} />)
-    abrir(vivo, 'Ritmo de la línea: ver detalle')
+    abrir(vivo, 'Ritmo: ver detalle')
     const capa = vivo.getByRole('dialog').textContent ?? ''
     expect(capa).toContain('Media 15 min (andando)')
     expect(capa).toContain('44,8 pz/min')
     expect(capa).not.toContain('Últimos')
     cleanup()
     const cerrado = render(<MonitorV2 {...props(0)} cerrado ritmoAhora={null} />)
-    abrir(cerrado, 'Ritmo de la línea: ver detalle')
+    abrir(cerrado, 'Ritmo: ver detalle')
     expect(cerrado.getByRole('dialog').textContent).not.toContain('Media 15 min')
   })
 
@@ -232,8 +256,8 @@ describe('MonitorV2 · hojas de detalle (FilaCifra, «Reducir», rótulos del ri
 
   it('las filas de las hojas son FilaCifra: el rótulo a 15/400 y la cifra a 17/600 a la derecha, 44 px de alto mínimo', () => {
     const { getByRole } = render(<MonitorV2 {...props(0)} />)
-    abrir({ getByRole } as ReturnType<typeof render>, 'Ritmo de la línea: ver detalle')
-    const fila = Array.from(getByRole('dialog').querySelectorAll('div[class*="min-h-[44px]"]')).find((f) => f.textContent?.startsWith('Promedio del turno')) as HTMLElement
+    abrir({ getByRole } as ReturnType<typeof render>, 'Ritmo: ver detalle')
+    const fila = Array.from(getByRole('dialog').querySelectorAll('div[class*="min-h-[44px]"]')).find((f) => f.textContent?.startsWith('Necesario para la meta')) as HTMLElement
     expect(fila).toBeTruthy()
     expect(fila.className).toContain('min-h-[44px]')
     const [izq, der] = Array.from(fila.children) as HTMLElement[]
@@ -247,27 +271,28 @@ describe('MonitorV2 · hojas de detalle (FilaCifra, «Reducir», rótulos del ri
   it('en el celular las hojas de Ritmo y Mantención traen «Reducir» (como Piezas, Camino y Ritmo en vivo)', () => {
     ancho(390)
     const c = render(<MonitorV2 {...props(0)} />)
-    abrir(c, 'Ritmo de la línea: ver detalle')
-    expect(c.getByRole('button', { name: 'Reducir Ritmo de la línea' })).toBeTruthy()
-    fireEvent.click(c.getByRole('button', { name: 'Reducir Ritmo de la línea' }))
-    expect(c.queryByRole('button', { name: 'Reducir Ritmo de la línea' })).toBeNull()
+    abrir(c, 'Ritmo: ver detalle')
+    expect(c.getByRole('button', { name: 'Reducir Ritmo' })).toBeTruthy()
+    fireEvent.click(c.getByRole('button', { name: 'Reducir Ritmo' }))
+    expect(c.queryByRole('button', { name: 'Reducir Ritmo' })).toBeNull()
     abrir(c, 'Mantención: ver detalle')
     expect(c.getByRole('button', { name: 'Reducir Respuesta de Mantención' })).toBeTruthy()
   })
 
-  it('«Piezas del turno»: con la meta cumplida dice «Sobre la meta +479 pz», no «Faltan 0 pz»', () => {
+  it('«Piezas del turno»: con la meta cumplida dice «Meta superada · 479 pz adelante», no «Faltan 0 pz»', () => {
     const sobre = render(<MonitorV2 {...props(0)} piezas={15479} proyeccion={null} cerrado />)
     abrir(sobre, 'Piezas del turno: ver detalle')
     const capa = sobre.getByRole('dialog').textContent ?? ''
-    expect(capa).toContain('Sobre la meta')
-    expect(capa).toContain('+479 pz')
+    expect(capa).toContain('Meta superada')
+    expect(capa).toContain('479 pz adelante')
+    expect(capa).not.toContain('+479')
     expect(capa).not.toContain('Faltan')
     cleanup()
     const falta = render(<MonitorV2 {...props(0)} />)
     abrir(falta, 'Piezas del turno: ver detalle')
     const c2 = falta.getByRole('dialog').textContent ?? ''
     expect(c2).toContain('Faltan')
-    expect(c2).not.toContain('Sobre la meta')
+    expect(c2).not.toContain('Meta superada')
   })
 
   it('«Piezas del turno»: la hora incompleta dice «en curso» solo con el turno en vivo', () => {

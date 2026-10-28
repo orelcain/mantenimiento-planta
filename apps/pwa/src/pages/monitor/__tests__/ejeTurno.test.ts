@@ -6,12 +6,47 @@
 import { describe, expect, it } from 'vitest'
 import type { GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import {
-  acumulado, anchoRotuloAhora, celdaBaader, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado, escalaVentana,
-  anclaRotuloAhora, brechaALaIzquierda, escalaY, esperadoPorMinuto, filasBaader, finDelEje, horasMin, marcasEje, minutosCompletos, minutosConParada, minutosPorCubeta, minutosVisibles,
+  acumulado, adelanteAtras, anchoRotuloAhora, celdaBaader, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, deLaMeta, escalaAcumulado, escalaVentana,
+  anclaRotuloAhora, brechaALaIzquierda, escalaY, esperadoPorMinuto, filasBaader, finDelEje, firmado, horasMin, marcasEje, minutosCompletos, minutosConParada, minutosPorCubeta, minutosVisibles,
   paradaEn, paradasEn, paradasEnEje, pasoMarcas, pctAndando, pctARitmo, proyeccion, rayasY, recortarCurva, separarRotulos, sumaPorMinuto, tamanoGrafico,
-  tonoDeCubeta, tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
+  partesAdelanteAtras, tonoDeCubeta, tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
   type ParadaEje,
 } from '../ejeTurno'
+
+describe('adelanteAtras: la diferencia contra la meta a esa hora, en palabras de planta', () => {
+  it('positivo es «N adelante», negativo «N atrás» y cero «al día»', () => {
+    expect(adelanteAtras(105)).toBe('105 adelante')
+    expect(adelanteAtras(-45)).toBe('45 atrás')
+    expect(adelanteAtras(0)).toBe('al día')
+  })
+  it('redondea antes de decidir: 0,4 y −0,4 son «al día»; 0,6 es «1 adelante»', () => {
+    expect(adelanteAtras(0.4)).toBe('al día')
+    expect(adelanteAtras(-0.4)).toBe('al día')
+    expect(adelanteAtras(0.6)).toBe('1 adelante')
+    expect(adelanteAtras(-0.6)).toBe('1 atrás')
+  })
+  it('separa miles con punto como el resto del monitor y no lleva signo', () => {
+    expect(adelanteAtras(1234)).toBe('1.234 adelante')
+    expect(adelanteAtras(-12345)).toBe('12.345 atrás')
+    expect(adelanteAtras(-12345)).not.toMatch(/[+−-]/)
+  })
+  it('en dos partes (cifra grande): número sin signo y palabra; con 0 solo «al día»', () => {
+    expect(partesAdelanteAtras(105)).toEqual({ cifra: '105', palabra: 'adelante' })
+    expect(partesAdelanteAtras(-45)).toEqual({ cifra: '45', palabra: 'atrás' })
+    expect(partesAdelanteAtras(0)).toEqual({ cifra: '', palabra: 'al día' })
+  })
+  it('deLaMeta: «623 adelante de la meta», «42 atrás de la meta» y «en la meta» con 0', () => {
+    expect(deLaMeta(623)).toBe('623 adelante de la meta')
+    expect(deLaMeta(-42)).toBe('42 atrás de la meta')
+    expect(deLaMeta(0)).toBe('en la meta')
+    expect(deLaMeta(0.3)).toBe('en la meta')
+  })
+  it('firmado() no cambia: sigue siendo ±N (lo usan las tasas pz/h y otras comparaciones)', () => {
+    expect(firmado(7)).toBe('+7')
+    expect(firmado(-7)).toBe('−7')
+    expect(firmado(0)).toBe('0')
+  })
+})
 
 describe('escala Y del acumulado', () => {
   it('con proyección 15.623 y meta 15.000: 0…16.000 y rejilla cada 4.000', () => {
@@ -356,10 +391,10 @@ describe('alturas del gráfico', () => {
     expect([g.carriles[0]!.h, m.carriles[0]!.h, c.carriles[0]!.h]).toEqual([14, 11, 10])
     expect([g.paradas.h, m.paradas.h, c.paradas.h]).toEqual([14, 11, 10])
   })
-  it('columna de rótulos: 52/48/44 a la izquierda y 128/104/4 a la derecha (en el celular los rótulos van dentro)', () => {
+  it('columna de rótulos: 74/70/70 («Detenciones» cabe) a la izquierda y 128/104/4 a la derecha (en el celular los rótulos van dentro)', () => {
     expect([disenar(1806, 'grande', 3, true), disenar(1276, 'medio', 3, true), disenar(309, 'chico', 3, true)].map((d) => [d.pl, d.pr]))
-      .toEqual([[52, 128], [48, 104], [44, 4]])
-    expect(disenar(1806, 'grande', 3, true).plotW).toBe(1626)
+      .toEqual([[74, 128], [70, 104], [70, 4]])
+    expect(disenar(1806, 'grande', 3, true).plotW).toBe(1604)
   })
   for (const [w, tam] of [[1806, 'grande'], [1276, 'medio'], [309, 'chico']] as const) {
     it(`cada banda queda debajo de la anterior y las filas no se pisan (${w} px)`, () => {

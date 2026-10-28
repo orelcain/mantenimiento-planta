@@ -1,6 +1,7 @@
 /**
- * La franja «cinta» de «El turno»: cinco celdas en el mismo orden en PC y celular, y UNA sola cifra de «A esta hora» en
- * la franja, el gráfico y Camino a la meta. jsdom no mide ni dibuja: el ancho se simula y la geometría fina la prueba
+ * La franja «cinta» de «El turno»: sus celdas en el mismo orden en PC y celular (Piezas · Ritmo · Contra la meta · Camino), y UNA
+ * sola cifra de «A esta hora» en la franja, el gráfico y Camino a la meta. La tarjeta Ritmo (A3) y sus reglas de datos se prueban
+ * en `RitmoBaaders.test.tsx` y `aporteBaaders.test.ts`. jsdom no mide ni dibuja: el ancho se simula y la geometría fina la prueba
  * `ejeTurno.test.ts` y el navegador. Sin `jest-dom`: se asierta sobre el texto renderizado.
  */
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -105,11 +106,11 @@ afterEach(() => {
 const franja = (props: MonitorV2Props = p, camino?: React.ReactNode) =>
   render(<FranjaCinta p={props} reloj={reloj} ampliadoPiezas={<div>detalle de piezas</div>} abrir={() => {}} camino={camino} />)
 
-describe('FranjaCinta · las cinco celdas', () => {
-  it('dice las cinco cosas en su orden y con su texto', () => {
+describe('FranjaCinta · las celdas', () => {
+  it('dice las cosas en su orden y con su texto', () => {
     const { container } = franja()
     const t = container.textContent ?? ''
-    const orden = ['Piezas del turno', 'Cada Baader', 'Ritmo de la línea', 'A esta hora', 'Al cierre', 'Mantención']
+    const orden = ['Piezas del turno', 'Ritmo', 'Línea', 'A esta hora', 'Al cierre', 'Mantención']
     let desde = 0
     for (const r of orden) {
       const i = t.indexOf(r, desde)
@@ -122,10 +123,13 @@ describe('FranjaCinta · las cinco celdas', () => {
     expect(t).not.toMatch(/raya blanca|la raya:/i)
   })
 
-  it('«Piezas del turno»: UNA nota en un renglón, «64 % de 15.000» y «▮ tocaban 10.667» (la marca de 2×10 px es su leyenda)', () => {
+  it('«Piezas del turno»: UNA nota en un renglón, «64 % de 15.000» y «▮ meta a esta hora 10.667» (la marca de 2×10 px es su leyenda)', () => {
     const { container } = franja()
     const nota = container.querySelector('.fc-nota-piezas')!
-    expect(nota.textContent).toBe('64 % de 15.000tocaban 10.667')
+    /* «a esta hora» va en su propio span: el CSS lo muestra donde hay sitio (celdas apiladas y desde 1600 px); en 1280–1599 queda «meta 10.667». */
+    expect(nota.textContent).toBe('64 % de 15.000meta a esta hora 10.667')
+    expect(nota.querySelector('.fc-tocaban .fc-hora-larga')?.textContent).toBe(' a esta hora')
+    expect(nota.textContent).not.toMatch(/tocaban/)
     expect(nota.querySelector('.fc-pct b')?.textContent).toBe('64 %')
     expect(nota.querySelector('.fc-tocaban .fc-raya-mini')).not.toBeNull()
     expect(container.querySelectorAll('.fc-nota-piezas')).toHaveLength(1)
@@ -150,71 +154,90 @@ describe('FranjaCinta · las cinco celdas', () => {
     expect(raya.style.left).toContain('71.1')
   })
 
-  it('«Ritmo de la línea»: último minuto cerrado de su esperado y las tres varas en la misma base andando', () => {
+  it('«Ritmo»: la Línea con el último minuto cerrado de su esperado y sus referencias (15 min, necesario) en la misma base andando', () => {
     const { container } = franja()
     const t = container.textContent ?? ''
     /* 18 + 10 + 16 = 44 de 19 + 16 + 16 = 51. */
-    expect(container.querySelector('.fc-cifra-c')?.textContent).toBe('44')
-    /* «de 51 pz/min» va en la fila de la cifra; la nota «de 51 esperado · 86 %» salió (la barra fina y su color lo dicen). */
-    expect(container.querySelector('.fc-ritmo-fila .fc-u')?.textContent).toBe('de 51 pz/min')
-    expect(t).not.toContain('esperado · 86 %')
-    /* La nota de la cabecera es corta: «min 02:34», no «último minuto 02:34». */
-    expect(container.querySelector('.fc-c-ritmo .fc-cab .fc-nota-der')?.textContent).toBe('min 02:34')
-    expect(t).not.toContain('último minuto')
-    /* Las tres referencias, en un dl de tres columnas (clave 12 px, valor 15/600), con los mismos datos de siempre. */
-    const refs = Array.from(container.querySelectorAll('.fc-ritmo-refs > div')).map((d) => `${d.querySelector('dt')?.textContent} ${d.querySelector('dd')?.textContent}`)
-    expect(refs).toEqual(['15 min 44,8', 'turno 41,0', 'necesario 36,7'])
-    /* La cadencia de reloj de 30 min (27,6) ya no está en la vista. */
+    expect(container.querySelector('.rb-big')?.textContent).toBe('44')
+    expect(container.querySelector('.rb-big-u')?.textContent).toBe('de 51 pz/min')
+    /* El grupo dice «Último minuto» con su hora (02:34), no «min 02:34». */
+    expect(container.querySelector('.rb-g-min')?.textContent).toBe('Último minuto 02:34')
+    expect(container.querySelector('.rb-h-min')?.textContent).toBe('carros con pieza')
+    expect(container.querySelector('.rb-g-prom')?.textContent).toBe('Promedio del turno')
+    const refs = Array.from(container.querySelectorAll('.rb-ref')).map((r) => r.textContent)
+    expect(refs).toEqual(['15 min44,8', 'necesario36,7'])
+    /* La cadencia de reloj de 30 min (27,6) y el «turno» suelto ya no están en la vista. */
     expect(t).not.toContain('27,6')
     expect(t).not.toContain('media 30 min')
   })
 
-  it('«Ritmo de la línea» con el turno cerrado: no repite la cifra grande; compara con el mejor turno y lo normal si existen', () => {
+  it('«Ritmo» con el turno cerrado: la cifra es el promedio andando, sin columnas de minuto; compara con el mejor turno y lo normal si existen', () => {
     const cerrado = con({ cerrado: true, piezas: 15400, proyeccion: null, ritmo: 42.1, ritmoInfo: { ...base.ritmoInfo, mejorCpm: 47.3, medianaCpm: 40.2 } })
     const { container } = franja(cerrado)
-    expect(container.querySelector('.fc-cifra-c')?.textContent).toBe('42,1')
+    expect(container.querySelector('.rb')?.getAttribute('data-modo')).toBe('promedio')
+    expect(container.querySelector('.rb-big')?.textContent).toBe('42,1')
+    expect(container.querySelector('.rb-big-u')?.textContent).toBe('pz/min andando')
     expect((container.textContent ?? '').match(/42,1/g)).toHaveLength(1)
-    expect(Array.from(container.querySelectorAll('.fc-ritmo-refs > div')).map((d) => `${d.querySelector('dt')?.textContent} ${d.querySelector('dd')?.textContent}`)).toEqual(['mejor turno 47,3', 'normal 40,2'])
+    expect(container.querySelector('.rb-g-min')).toBeNull()
+    expect(container.querySelector('.rb-sep')).toBeNull()
+    expect(container.querySelector('.rb-h-min')?.textContent).toBe('aporte al promedio')
+    expect(Array.from(container.querySelectorAll('.rb-ref')).map((r) => r.textContent)).toEqual(['mejor turno47,3', 'normal40,2'])
+    /* Cada Baader: su promedio andando, y punto gris (el turno ya cerró). */
+    const ev = Array.from(container.querySelectorAll('.rb-f-ev'))
+    expect(ev.map((f) => f.querySelector('.rb-min')?.textContent)).toEqual(['16,0pz/min', '14,0pz/min', '14,0pz/min'])
+    for (const f of ev) expect((f.querySelector('.rb-punto') as HTMLElement).style.background).toBe('var(--v2-gris)')
     cleanup()
     /* Sin esos datos no inventa nada: ni referencias ni renglón vacío. */
     const sin = franja(con({ cerrado: true, piezas: 15400, proyeccion: null, ritmo: 42.1, ritmoInfo: { ...base.ritmoInfo, mejorCpm: null, medianaCpm: null } })).container
-    expect(sin.querySelector('.fc-ritmo-refs')).toBeNull()
+    expect(sin.querySelector('.rb-refs')).toBeNull()
   })
 
-  it('«Ritmo de la línea» sale UNA sola vez en toda la franja', () => {
+  it('«Ritmo» sale UNA sola vez en toda la franja, con su chevron', () => {
     const { container } = franja()
-    expect((container.textContent ?? '').split('Ritmo de la línea').length - 1).toBe(1)
+    expect(Array.from(container.querySelectorAll('.fc-rotulo')).filter((r) => r.textContent === 'Ritmo')).toHaveLength(1)
+    expect(container.querySelector('.rb-rot .fc-chev')).not.toBeNull()
+    expect(container.textContent).not.toContain('Ritmo de la línea')
+    expect(container.textContent).not.toContain('Cada Baader')
   })
 
-  it('«Cada Baader»: la palabra solo aparece si la Baader no anda, y «carros» dice qué se cuenta', () => {
+  it('cada Baader: la palabra solo aparece si no anda, el número de la detenida es su conteo (nunca «—») y «carros» dice qué se cuenta', () => {
     const { container } = franja(con({ maquinas: maquinas.map((m, i) => (i === 2 ? { ...m, status: 'detenida' } : m)) }))
-    const filas = Array.from(container.querySelectorAll('.fc-baader')).map((li) => li.textContent ?? '')
+    const filas = Array.from(container.querySelectorAll('.rb-f-ev')).map((li) => li.querySelector('.rb-min')?.textContent ?? '')
     expect(filas).toHaveLength(3)
     /* Ev 1: 18 de 19 → andando, sin palabra. */
-    expect(filas[0]).toContain('3.316')
-    expect(filas[0]).toContain('18 de 19 pz/min')
-    expect(filas[0]).not.toMatch(/andando|lenta|detenida/)
+    expect(filas[0]).toBe('18 de 19')
     /* Ev 2: 10 de 16 = 62 % → lenta (atento). */
-    expect(filas[1]).toContain('10 de 16 pz/min')
-    expect(filas[1]).toContain('lenta')
-    /* Ev 3: parada ahora (pulso fresco) manda sobre lo que dijo su último minuto. */
-    expect(filas[2]).toContain('detenida')
-    expect(container.textContent).toContain('carros · pz/min vs esperado')
+    expect(filas[1]).toBe('10 de 16lenta')
+    /* Ev 3: parada ahora (pulso fresco) manda sobre lo que dijo su último minuto. El hueco de la palabra lo reservan TODAS las filas. */
+    expect(filas[2]).toBe('16 de 16detenida')
+    expect(container.querySelectorAll('.rb-est')).toHaveLength(3)
+    expect(container.querySelector('.rb-h-min')?.textContent).toBe('carros con pieza')
+    /* Colores: lenta en el ámbar de texto, detenida en el rojo de texto con el número también en rojo. */
+    const est = Array.from(container.querySelectorAll('.rb-est')) as HTMLElement[]
+    expect(est[1]!.style.color).toBe('var(--v2-atento-texto)')
+    expect(est[2]!.style.color).toBe('var(--v2-mal-texto)')
+    expect((container.querySelectorAll('.rb-f-ev')[2]!.querySelector('.rb-min-t b') as HTMLElement).style.color).toBe('var(--v2-mal-texto)')
   })
 
-  it('«Ritmo de la línea» con un minuto que solo una Baader entregó: vale el último minuto de TODAS, no la suma de una sola', () => {
+  it('sin ninguna palabra ni «anduvo N s» no se reserva el hueco (las pistas ocupan el ancho)', () => {
+    /* Las tres a ritmo (esperado − 1 en el último minuto, sin paradas): ninguna dice nada. */
+    const aRitmo = { ...eje, minuto: { desde: eje.minuto!.desde, maquinas: maquinasSerie.map((m) => ({ ...m, cycles: serie(m.esperado - 1, m.esperado - 1) })) } }
+    expect(franja(con({ eje: aRitmo })).container.querySelectorAll('.rb-est')).toHaveLength(0)
+  })
+
+  it('«Ritmo» con un minuto que solo una Baader entregó: vale el último minuto de TODAS, no la suma de una sola', () => {
     const [a, b, c] = maquinasSerie
     const aMedias = { ...eje, minuto: { desde: eje.minuto!.desde, maquinas: [{ ...a!, cycles: [...a!.cycles, 5] }, b!, c!] } }
     const { container } = franja(con({ eje: aMedias }))
-    expect(container.querySelector('.fc-cifra-c')?.textContent).toBe('44')
-    expect(container.querySelector('.fc-ritmo-fila .fc-u')?.textContent).toBe('de 51 pz/min')
-    expect(container.querySelector('.fc-c-ritmo .fc-cab .fc-nota-der')?.textContent).toBe('min 02:34')
+    expect(container.querySelector('.rb-big')?.textContent).toBe('44')
+    expect(container.querySelector('.rb-big-u')?.textContent).toBe('de 51 pz/min')
+    expect(container.querySelector('.rb-g-min')?.textContent).toBe('Último minuto 02:34')
   })
 
   it('la línea entera en cero sin parada registrada no pone «detenida» en cada Baader; con la parada registrada, sí', () => {
     const enCero = { ...eje, minuto: { desde: eje.minuto!.desde, maquinas: maquinasSerie.map((m) => ({ ...m, cycles: [...m.cycles.slice(0, -1), 0] })) } }
     const sin = franja(con({ eje: enCero }))
-    for (const li of Array.from(sin.container.querySelectorAll('.fc-baader'))) expect(li.textContent).not.toMatch(/detenida|parcial|sin dato/)
+    for (const li of Array.from(sin.container.querySelectorAll('.rb-f-ev'))) expect(li.textContent).not.toMatch(/detenida|parcial|sin dato/)
     cleanup()
     const paradasMaquina = {
       stopEvents: [0, 1, 2].map((m) => ({ r: 0, f: new Date(INI + (AHORA - 1) * 60_000).toISOString(), s: 60, m })),
@@ -223,24 +246,37 @@ describe('FranjaCinta · las cinco celdas', () => {
       enCurso: [],
     }
     const con1 = franja(con({ eje: { ...enCero, paradasMaquina } }))
-    for (const li of Array.from(con1.container.querySelectorAll('.fc-baader'))) expect(li.textContent).toContain('detenida')
+    for (const li of Array.from(con1.container.querySelectorAll('.rb-f-ev'))) expect(li.textContent).toContain('detenida')
   })
 
   it('cada fila lleva en su título el llenado normalizado en el que se basan su punto, su palabra y su barra', () => {
     const { container } = franja()
     /* Ev 1: 18 de 19 andando todo el minuto = 95 %. */
-    expect(container.querySelectorAll('.fc-baader')[0]!.getAttribute('title')).toContain('95 % de lo que daba mientras anduvo')
+    expect(container.querySelectorAll('.rb-f-ev')[0]!.getAttribute('title')).toContain('95 % de lo que daba mientras anduvo')
   })
 
-  it('«A esta hora» y «Al cierre»: −977 contra lo que tocaba y +623 contra la meta', () => {
+  it('«A esta hora» y «Al cierre»: 977 atrás de la meta a esta hora y 623 adelante de la meta (cifra sin signo, la palabra en el hueco de la unidad)', () => {
     const { container } = franja()
     const t = container.textContent ?? ''
-    expect(t).toContain('−977 pz')
-    expect(t).toContain('hechas − tocaban')
-    expect(t).not.toContain('hechas − las que tocaban')
-    expect(t).toContain('+623 pz')
+    expect(t).toContain('977 atrás')
+    expect(t).toContain('hechas − meta')
+    expect(t).not.toMatch(/tocaban|hechas − las que tocaban/)
+    expect(t).toContain('623 adelante')
+    expect(t).not.toMatch(/[+−]\s?(977|623)/)
     expect(t).toContain('proyección 15.623')
     expect(t).not.toContain('proyección 15.623 − meta')
+    /* El número y la palabra: «977» en la cifra y «atrás» en el hueco de la unidad (<small>), con el color de siempre. */
+    const celdaAHora = container.querySelector('.fc-meta-grid > div')!
+    expect(celdaAHora.querySelector('.fc-cifra-dif')?.firstChild?.textContent).toBe('977')
+    expect(celdaAHora.querySelector('.fc-cifra-dif small')?.textContent).toBe('atrás')
+    expect((celdaAHora.querySelector('.fc-cifra-dif') as HTMLElement).style.color).toBe('var(--v2-mal-texto)')
+  })
+
+  it('con 0 de diferencia la cifra dice «al día» (a tamaño de cifra y sin unidad)', () => {
+    const { container } = franja(con({ piezas: 10667, cuota: { piezas: 10667, hora: '02:35' } }))
+    const celda = container.querySelector('.fc-meta-grid > div')!
+    expect(celda.querySelector('.fc-cifra-dif')?.textContent).toBe('al día')
+    expect(celda.querySelector('.fc-cifra-dif small')).toBeNull()
   })
 
   it('Contra la meta con dos cifras va en dos columnas; con UNA sola ocupa la celda entera (`fc-meta-uno`)', () => {
@@ -253,10 +289,11 @@ describe('FranjaCinta · las cinco celdas', () => {
     expect(franja(con({ cuota: null })).container.querySelector('.fc-meta-grid')?.className).toContain('fc-meta-uno')
   })
 
-  it('una cifra de 5 dígitos (−12.345) lo dice para que el CSS calle la unidad bajo 1600 px', () => {
+  it('una cifra de 5 dígitos (12.345 atrás) lo dice para que el CSS baje la palabra bajo el número (sin signo no se puede callar)', () => {
     const { container } = franja(con({ piezas: 0, cuota: { piezas: 12345, hora: '02:35' } }))
-    expect(container.textContent).toContain('−12.345 pz')
-    expect(container.querySelector('.fc-cifra-5')?.textContent).toContain('−12.345')
+    expect(container.textContent).toContain('12.345 atrás')
+    expect(container.querySelector('.fc-cifra-5')?.textContent).toContain('12.345')
+    expect(container.querySelector('.fc-cifra-5.fc-cifra-dif small')?.textContent).toBe('atrás')
     cleanup()
     expect(franja().container.querySelector('.fc-cifra-5')).toBeNull()
   })
@@ -287,18 +324,26 @@ describe('FranjaCinta · las cinco celdas', () => {
     expect(container.querySelector('.fc-cifra-m.fc-pausa')?.textContent).toBe('en pausa')
   })
 
-  it('línea detenida: la causa (la del aviso «Ahora mismo», que la franja calla) va en la nota del «en pausa», con su título completo', () => {
+  it('línea detenida: con banda de parada la nota dice solo «línea detenida»; sin banda, la causa va en un segundo renglón (sin elipsis ni título)', () => {
     const sinCausa = franja(con({ eje: { ...eje, detenidaEstado: true } }))
     expect(sinCausa.container.querySelector('.fc-nota-pausa')?.textContent).toBe('línea detenida')
-    expect(sinCausa.container.querySelector('.fc-nota-pausa')?.getAttribute('title')).toBeNull()
+    expect(sinCausa.container.querySelector('.fc-nota-causa')).toBeNull()
     cleanup()
+    /* SIN banda: «línea detenida» y, debajo, la causa en su propio renglón (puede bajar de línea: nunca se corta con «…»). */
     const { container } = franja(con({ eje: { ...eje, detenidaEstado: true }, causaParada: 'Detención programada' }))
-    const nota = container.querySelector('.fc-nota-pausa')
-    expect(nota?.textContent).toBe('línea detenida · Detención programada')
-    expect(nota?.getAttribute('title')).toBe('línea detenida · Detención programada')
+    expect(container.querySelector('.fc-nota-pausa')?.textContent).toBe('línea detenida')
+    expect(container.querySelector('.fc-nota-causa')?.textContent).toBe('Detención programada')
+    expect(container.querySelector('.fc-nota-pausa')?.getAttribute('title')).toBeNull()
+    cleanup()
+    /* CON banda de parada a la vista (ella ya dice la causa): solo «línea detenida», sin segundo renglón. */
+    const conBanda = franja(con({ eje: { ...eje, detenidaEstado: true }, causaParada: 'Detención programada', conBanda: true })).container
+    expect(conBanda.querySelector('.fc-nota-pausa')?.textContent).toBe('línea detenida')
+    expect(conBanda.querySelector('.fc-nota-causa')).toBeNull()
+    expect(conBanda.textContent).not.toContain('Detención programada')
     /* En marcha no hay nota de pausa, aunque llegue una causa vieja. */
     cleanup()
     expect(franja(con({ causaParada: 'Detención programada' })).container.querySelector('.fc-nota-pausa')).toBeNull()
+    expect(franja(con({ causaParada: 'Detención programada' })).container.querySelector('.fc-nota-causa')).toBeNull()
   })
 
   it('turno cerrado: sin «A esta hora» ni «Al cierre», el resultado contra la meta', () => {
@@ -307,14 +352,19 @@ describe('FranjaCinta · las cinco celdas', () => {
     expect(t).not.toContain('A esta hora')
     expect(t).not.toContain('Al cierre')
     expect(t).toContain('Resultado del turno')
-    expect(t).toContain('+400 pz')
+    expect(t).toContain('400 adelante')
+    expect(t).not.toContain('+400')
+    /* «meta 15.000» no se parte entre renglones: lleva un espacio duro. */
+    expect(t).toContain('15.400 hechas · meta\u00a015.000')
   })
 
   it('sin serie por minuto no inventa el último minuto: queda el «ahora» del pulso', () => {
     const { container } = franja(con({ eje: null }))
-    expect(container.querySelector('.fc-cifra-c')?.textContent).toBe('44,0')
-    expect(container.textContent).not.toContain('último minuto')
-    expect(container.querySelectorAll('.fc-baader')).toHaveLength(3)
+    /* Sin serie por minuto no hay columnas de minuto: la cifra es el promedio andando de la línea y cada Baader dice el suyo. */
+    expect(container.querySelector('.rb')?.getAttribute('data-modo')).toBe('promedio')
+    expect(container.querySelector('.rb-big')?.textContent).toBe('41,0')
+    expect(container.textContent).not.toContain('Último minuto')
+    expect(container.querySelectorAll('.rb-f-ev')).toHaveLength(3)
   })
 
   it('tocar «Piezas del turno» abre su detalle de siempre (la curva y la hora a hora)', () => {
@@ -328,23 +378,25 @@ describe('FranjaCinta · las cinco celdas', () => {
     const camino = <div>camino a la meta</div>
     const pc = franja(p, camino)
     expect(pc.container.querySelectorAll('.v2-tarjeta')).toHaveLength(1)
-    expect(pc.container.querySelector('section.fc')?.getAttribute('data-celdas')).toBe('5')
+    expect(pc.container.querySelector('section.fc')?.getAttribute('data-celdas')).toBe('4')
     expect(pc.container.querySelector('.v2-camino')?.textContent).toBe('camino a la meta')
     cleanup()
     ancho = 375
     const movil = franja(p, camino)
-    expect(movil.container.querySelectorAll('.v2-tarjeta')).toHaveLength(5)
+    expect(movil.container.querySelectorAll('.v2-tarjeta')).toHaveLength(4)
     expect(movil.container.querySelector('.fc-apilada')).not.toBeNull()
+    /* El orden de lectura es el de la pantalla: Piezas · Meta, luego Ritmo a todo el ancho y Camino. */
+    expect(Array.from(movil.container.querySelectorAll('.fc-apilada > .fc-celda')).map((c) => c.className.split(' ').find((x) => x.startsWith('fc-c-')))).toEqual(['fc-c-piezas', 'fc-c-meta', 'fc-c-ritmo', 'fc-c-camino'])
     expect(movil.container.querySelector('.fc-c-camino')?.className).toContain('v2-camino')
   })
 
-  it('sin Camino a la meta (sin desglose del tiempo) la franja queda en cuatro celdas', () => {
+  it('sin Camino a la meta (sin desglose del tiempo) la franja queda en tres celdas', () => {
     const { container } = franja()
-    expect(container.querySelector('section.fc')?.getAttribute('data-celdas')).toBe('4')
+    expect(container.querySelector('section.fc')?.getAttribute('data-celdas')).toBe('3')
     expect(container.querySelector('.v2-camino')).toBeNull()
   })
 
-  it('cada caso de cuatro celdas lleva su propio atributo (sin Camino, sin Baader) para que la grilla sepa cuál es', () => {
+  it('cada caso lleva su propio atributo (sin Camino, sin Baader) para que la grilla sepa cuál es', () => {
     const sinCamino = franja().container.querySelector('section.fc')!
     expect(sinCamino.getAttribute('data-sin-camino')).toBe('true')
     expect(sinCamino.hasAttribute('data-sin-baader')).toBe(false)
@@ -361,12 +413,12 @@ describe('FranjaCinta · las cinco celdas', () => {
     expect(sinBaader.hasAttribute('data-sin-camino')).toBe(false)
   })
 
-  it('una sola Baader (Filete): sin celda «Cada Baader»; si no anda, su palabra va junto a la cifra de Ritmo', () => {
+  it('una sola Baader (Filete): sin tabla (la línea sería ella misma); si no anda, su palabra va junto a la cifra de Ritmo', () => {
     const [a] = maquinasSerie
     /* 10 de 19 = 53 % → lenta. */
     const lenta = { ...a!, cycles: serie(17, 10) }
     const { container } = franja(con({ maquinas: [maquinas[0]!], eje: { ...eje, minuto: { desde: eje.minuto!.desde, maquinas: [lenta] } } }))
-    expect(container.querySelector('.fc-c-baader')).toBeNull()
+    expect(container.querySelector('.rb')).toBeNull()
     expect(container.textContent).not.toContain('Cada Baader')
     expect(container.textContent).not.toContain('carros')
     expect(container.querySelector('.fc-cifra-c')?.textContent).toBe('10')
@@ -384,30 +436,35 @@ describe('FranjaCinta · las cinco celdas', () => {
 
   it('una sola señal de «esto se toca»: el chevron tras el rótulo de cada zona tocable, y todas abren un diálogo', () => {
     const { container, getAllByRole } = franja()
-    /* Piezas, Ritmo, Al cierre y Mantención; Cada Baader y A esta hora no abren nada. */
+    /* Piezas, Ritmo, Al cierre y Mantención; «A esta hora» no abre nada. */
     expect(container.querySelectorAll('.fc-chev')).toHaveLength(4)
     for (const z of getAllByRole('button')) {
       expect(z.getAttribute('aria-haspopup')).toBe('dialog')
       expect(z.querySelector('.fc-chev')).not.toBeNull()
       expect(z.querySelector('.fc-chev')?.getAttribute('aria-hidden')).toBe('true')
     }
-    expect(container.querySelector('.fc-c-baader .fc-chev')).toBeNull()
   })
 
-  it('«Cada Baader»: las piezas salen del contador vivo cuando suma lo mismo que la cifra grande; si no, del doc del corte', () => {
+  it('piezas de cada Baader: del contador vivo cuando suma lo mismo que la cifra grande (Σ Baader = Piezas del turno); si no, del doc del corte', () => {
     const entrada: EntradaRep = { desdeMs: INI, maquinas: [], paradas: {}, pulsoAtMs: null }
     /* PSM solo arma `porMaquina` si `totalCycles === contador` (la guarda): llega ya decidido en `repro.tope`. */
+    const piezasDe = (c: HTMLElement) => Array.from(c.querySelectorAll('.rb-pz')).map((x) => x.textContent)
     const conGuarda = franja(con({ repro: { entrada, tope: armarTope(9690, { a: 3400, b: 3000, c: 3290 }) } })).container
-    expect(Array.from(conGuarda.querySelectorAll('.fc-baader-pz')).map((x) => x.textContent)).toEqual(['3.400', '3.000', '3.290'])
+    expect(piezasDe(conGuarda)).toEqual(['3.400', '3.000', '3.290'])
+    expect(3400 + 3000 + 3290).toBe(9690)
+    expect(conGuarda.querySelector('.fc-cifra-p')?.textContent).toBe('9.690')
+    /* Cada número lleva su unidad: «3.400 pz», sin encabezado «piezas» colgando arriba. */
+    expect(conGuarda.querySelector('.rb-pzc')?.textContent).toBe('3.400 pz')
+    expect(conGuarda.textContent).not.toMatch(/\bpiezas\b/)
     cleanup()
     const sinGuarda = franja(con({ repro: { entrada, tope: armarTope(9690, null) } })).container
-    expect(Array.from(sinGuarda.querySelectorAll('.fc-baader-pz')).map((x) => x.textContent)).toEqual(['3.316', '3.077', '3.297'])
+    expect(piezasDe(sinGuarda)).toEqual(['3.316', '3.077', '3.297'])
     cleanup()
     const sinRepro = franja().container
-    expect(Array.from(sinRepro.querySelectorAll('.fc-baader-pz')).map((x) => x.textContent)).toEqual(['3.316', '3.077', '3.297'])
+    expect(piezasDe(sinRepro)).toEqual(['3.316', '3.077', '3.297'])
   })
 
-  it('«Cada Baader»: el número y la barra son el conteo crudo del minuto; si anduvo menos de 55 s, la nota dice cuántos', () => {
+  it('cada Baader: el número y la barra son el conteo crudo del minuto; si anduvo menos de 55 s, la nota dice cuántos', () => {
     /* Ev 2 paró 25 s del último minuto cerrado: anduvo 35 s. 10 pz en 35 s dan 107 % de lo que daba andando (andando), pero el
        número «10 de 16» y la barra (62,5 %) siguen siendo lo que Shoplogix contó. */
     const paradasMaquina = {
@@ -417,20 +474,21 @@ describe('FranjaCinta · las cinco celdas', () => {
       enCurso: [],
     }
     const { container } = franja(con({ eje: { ...eje, paradasMaquina } }))
-    const filas = Array.from(container.querySelectorAll('.fc-baader'))
-    expect(filas[1]!.querySelector('.fc-baader-nota')?.textContent).toBe('anduvo 35 s')
-    expect(filas[1]!.textContent).toContain('10 de 16 pz/min')
-    expect((filas[1]!.querySelector('.fc-baader-pista > div') as HTMLElement).style.width).toBe('62.5%')
+    const filas = Array.from(container.querySelectorAll('.rb-f-ev'))
+    expect(filas[1]!.querySelector('.rb-anduvo')?.textContent).toBe('anduvo 35 s')
+    expect(filas[1]!.querySelector('.rb-min-t')?.textContent).toBe('10 de 16')
+    expect((filas[1]!.querySelector('.rb-pista > span') as HTMLElement).style.width).toBe('62.5%')
     /* Punto normalizado: a ritmo cuando anduvo, no «lenta» por el conteo crudo. */
-    expect((filas[1]!.querySelector('.fc-baader-nombre > i') as HTMLElement).style.background).toBe('var(--v2-acento)')
+    expect((filas[1]!.querySelector('.rb-punto') as HTMLElement).style.background).toBe('var(--v2-acento)')
     expect(filas[1]!.textContent).not.toMatch(/lenta|detenida/)
-    /* Las que anduvieron el minuto entero no llevan nota. */
-    expect(filas[0]!.querySelector('.fc-baader-nota')).toBeNull()
-    expect(filas[2]!.querySelector('.fc-baader-nota')).toBeNull()
+    /* Las que anduvieron el minuto entero no llevan nota, pero reservan el hueco (las pistas empiezan y terminan igual). */
+    expect(filas[0]!.querySelector('.rb-anduvo')).toBeNull()
+    expect(filas[2]!.querySelector('.rb-anduvo')).toBeNull()
+    expect(container.querySelectorAll('.rb-est')).toHaveLength(3)
   })
 
-  it('«Cada Baader» sin paradas registradas, o parada el minuto entero, no inventa «anduvo N s»', () => {
-    expect(franja().container.querySelector('.fc-baader-nota')).toBeNull()
+  it('cada Baader sin paradas registradas, o parada el minuto entero, no inventa «anduvo N s»', () => {
+    expect(franja().container.querySelector('.rb-anduvo')).toBeNull()
     cleanup()
     const todoElMinuto = {
       stopEvents: [{ r: 0, f: new Date(INI + (AHORA - 1) * 60_000).toISOString(), s: 60, m: 1 }],
@@ -438,7 +496,7 @@ describe('FranjaCinta · las cinco celdas', () => {
       stopMachines: ['a', 'b', 'c'],
       enCurso: [],
     }
-    expect(franja(con({ eje: { ...eje, paradasMaquina: todoElMinuto } })).container.querySelector('.fc-baader-nota')).toBeNull()
+    expect(franja(con({ eje: { ...eje, paradasMaquina: todoElMinuto } })).container.querySelector('.rb-anduvo')).toBeNull()
   })
 })
 
@@ -460,15 +518,18 @@ describe('Camino a la meta como celda: la leyenda ES los tramos de la barra, en 
 
   it('en vivo: Hechas · Paradas · Por ritmo · Por jugar, en piezas y en el orden de la barra; «Programado» (minutos) ya no está', () => {
     const { container } = celda({ hechas: 9690 })
-    expect(leyenda(container)).toEqual(['Hechas 9.690 pz', 'Paradas 2.460 pz', 'Por ritmo 0 pz', 'Por jugar 4.333 pz'])
+    expect(leyenda(container)).toEqual(['Hechas 9.690 pz', 'Detenciones 2.460 pz', 'Por ritmo 0 pz', 'Por jugar 4.333 pz'])
     expect(container.textContent).not.toContain('Programado')
     expect(container.textContent).not.toMatch(/\d min\b/)
-    /* La barra reparte la meta: hechas · paradas (la parte que cabe en la brecha) · por jugar (sin «por ritmo»: es 0). */
+    /* La leyenda ES lo dibujado, con el número real de cada tramo: hechas · paradas (2.460, las reales, mayores que la brecha de 977) ·
+       por jugar (sin «por ritmo»: es 0). La suma pasa la meta (16.483): la escala crece hasta ella y una raya marca la meta. */
     const a = anchos(container)
     expect(a).toHaveLength(3)
-    expect(a[0]).toBeCloseTo((9690 / 15000) * 100, 1)
-    expect(a[2]).toBeCloseTo((4333 / 15000) * 100, 1)
+    expect(a[0]).toBeCloseTo((9690 / 16483) * 100, 1)
+    expect(a[1]).toBeCloseTo((2460 / 16483) * 100, 1)
+    expect(a[2]).toBeCloseTo((4333 / 16483) * 100, 1)
     expect(a.reduce((x, y) => x + y, 0)).toBeCloseTo(100, 1)
+    expect(container.querySelector('.fc-camino-raya')).not.toBeNull()
     /* «Por jugar»: la reja con un borde de 1 px, en el tramo y en su punto (no un relleno que no se ve). */
     const tramos = Array.from(container.querySelectorAll('.fc-camino-barra > span')) as HTMLElement[]
     expect(tramos[2]!.style.background).toBe('var(--v2-reja)')
@@ -484,20 +545,20 @@ describe('Camino a la meta como celda: la leyenda ES los tramos de la barra, en 
     const { container } = render(
       <TiempoDelTurno tb={tb10} cerrado={false} meta={15000} hechas={9690} cuotaAhora={10667} horaAhora="02:35" cpmAndando={41} grupos={agruparEventos({ tb: tb10, cpmGlobal: 41 })} v2="celda" ampliado={<div />} />,
     )
-    expect(leyenda(container.parentElement!)).toEqual(['Hechas 9.690 pz', 'Paradas 410 pz', 'Por ritmo 567 pz', 'Por jugar 4.333 pz'])
+    expect(leyenda(container.parentElement!)).toEqual(['Hechas 9.690 pz', 'Detenciones 410 pz', 'Por ritmo 567 pz', 'Por jugar 4.333 pz'])
     expect(9690 + 410 + 567 + 4333).toBe(15000)
   })
 
   it('cerrado: Hechas · Paradas · Por ritmo (meta − hechas − paradas), sin «Por jugar»', () => {
     const { container } = celda({ cerrado: true, hechas: 12000 })
-    expect(leyenda(container)).toEqual(['Hechas 12.000 pz', 'Paradas 2.460 pz', 'Por ritmo 540 pz'])
+    expect(leyenda(container)).toEqual(['Hechas 12.000 pz', 'Detenciones 2.460 pz', 'Por ritmo 540 pz'])
     expect(anchos(container).reduce((x, y) => x + y, 0)).toBeCloseTo(100, 1)
     expect(container.querySelector('.fc-camino-raya')).toBeNull()
   })
 
   it('meta superada: la escala crece hasta hechas + paradas, el tramo rojo sigue a la vista y una raya marca la meta (también en el nombre accesible)', () => {
     const { container, getByRole } = celda({ cerrado: true, hechas: 15479 })
-    expect(leyenda(container)).toEqual(['Hechas 15.479 pz', 'Paradas 2.460 pz'])
+    expect(leyenda(container)).toEqual(['Hechas 15.479 pz', 'Detenciones 2.460 pz'])
     const a = anchos(container)
     expect(a).toHaveLength(2)
     expect(a[0]).toBeCloseTo((15479 / (15479 + 2460)) * 100, 1)
@@ -509,9 +570,48 @@ describe('Camino a la meta como celda: la leyenda ES los tramos de la barra, en 
     expect(nombre).toContain('la raya marca la meta de 15.000 pz')
   })
 
+  it('paradas mayores que la brecha (Ev 9.162 · 3.330 · 0 · 5.525): la leyenda ES los tramos dibujados con el número real, la escala crece hasta la suma (18.017) y la raya marca la meta', () => {
+    /* 60 min de línea detenida × 55,5 pz/min = 3.330 pz de paradas reales; la cuota a esta hora es 9.475 (por jugar 15.000 − 9.475 = 5.525)
+       y la brecha contra ella 313: las paradas explican más que la brecha, y el tramo ya no se topa a 313. */
+    const { container, getByRole } = render(
+      <TiempoDelTurno
+        tb={tb} cerrado={false} meta={15000} hechas={9162} cuotaAhora={9475} horaAhora="02:35" cpmAndando={55.5}
+        grupos={agruparEventos({ tb, cpmGlobal: 55.5 })} v2="celda" ampliado={<div />}
+      />,
+    )
+    expect(leyenda(container)).toEqual(['Hechas 9.162 pz', 'Detenciones 3.330 pz', 'Por ritmo 0 pz', 'Por jugar 5.525 pz'])
+    const suma = 9162 + 3330 + 0 + 5525
+    expect(suma).toBe(18017)
+    const a = anchos(container)
+    /* «Por ritmo» es 0: no se dibuja; los otros tres miden su valor real sobre 18.017. */
+    expect(a).toHaveLength(3)
+    expect(a[0]).toBeCloseTo((9162 / suma) * 100, 1)
+    expect(a[1]).toBeCloseTo((3330 / suma) * 100, 1)
+    expect(a[2]).toBeCloseTo((5525 / suma) * 100, 1)
+    expect(a.reduce((x, y) => x + y, 0)).toBeCloseTo(100, 1)
+    /* La raya de 2 px en la meta: 15.000 de 18.017 = 83,25 % (menos los 3 px × 2 huecos × 0,8325 y la media raya). */
+    const raya = container.querySelector('.fc-camino-raya') as HTMLElement
+    expect(raya).not.toBeNull()
+    expect(raya.style.left).toBe('calc(83.25% - 6.0px)')
+    /* El nombre accesible lo dice: la raya, la meta y que los tramos suman más. */
+    const nombre = getByRole('button', { name: /^Camino a la meta:/ }).getAttribute('aria-label') ?? ''
+    expect(nombre).toContain('la raya marca la meta de 15.000 pz')
+    expect(nombre).toContain('los tramos suman 18.017 pz')
+  })
+
+  it('si las paradas caben en la brecha las cuatro partes suman exactamente la meta: sin raya ni escala crecida', () => {
+    const tb10: PublicMonitorLive['timeBreakdown'] = { ...tb, producingMin: 390, recoverableMin: 10, recoverable: [{ reason: 'Detencion', min: 10, count: 1, lineMin: 10 }] }
+    const { container } = render(
+      <TiempoDelTurno tb={tb10} cerrado={false} meta={15000} hechas={9690} cuotaAhora={10667} horaAhora="02:35" cpmAndando={41} grupos={agruparEventos({ tb: tb10, cpmGlobal: 41 })} v2="celda" ampliado={<div />} />,
+    )
+    expect(container.querySelector('.fc-camino-raya')).toBeNull()
+    expect(anchos(container.parentElement!).reduce((x, y) => x + y, 0)).toBeCloseTo(100, 1)
+    expect((9690 / 15000) * 100).toBeCloseTo(anchos(container.parentElement!)[0]!, 1)
+  })
+
   it('sin la cuenta en piezas (sin ritmo andando) cae a los minutos, cada tramo con su cifra, y sin raya', () => {
     const { container } = celda({ hechas: 9690, cpmAndando: null })
-    expect(leyenda(container)).toEqual(['Produciendo 5 h 40 min', 'Paradas evitables 1 h', 'Programado 50 min'])
+    expect(leyenda(container)).toEqual(['Produciendo 5 h 40 min', 'Detenciones evitables 1 h', 'Programado 50 min'])
     expect(container.querySelector('.fc-camino-raya')).toBeNull()
   })
 
@@ -556,9 +656,9 @@ describe('«A esta hora» es la misma cifra en la franja, el gráfico y Camino a
     const f = franja().container.textContent ?? ''
     const g = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />).container.textContent ?? ''
     const c = camino(piezasMostradas(null, 9690))
-    expect(f).toContain('−977 pz')
-    expect(g).toContain('a esta hora −977')
-    expect(c).toMatch(/−977\s*pz/)
+    expect(f).toContain('977 atrás')
+    expect(g).toContain('977 atrás')
+    expect(c).toMatch(/977\s*atrás/)
     expect(c).toMatch(/a esta hora/i)
   })
 
@@ -582,10 +682,10 @@ describe('«A esta hora» es la misma cifra en la franja, el gráfico y Camino a
     const f = franja(conRepro).container.textContent ?? ''
     const g = render(<GraficoRitmoVivo p={conRepro} e={eje} reloj={reloj} />).container.textContent ?? ''
     const c = camino(mostradas)
-    expect(f).toContain('−996 pz')
-    expect(f).not.toContain('−977 pz')
-    expect(g).toContain('a esta hora −996')
-    expect(c).toMatch(/−996\s*pz/)
+    expect(f).toContain('996 atrás')
+    expect(f).not.toContain('977 atrás')
+    expect(g).toContain('996 atrás')
+    expect(c).toMatch(/996\s*atrás/)
   })
 })
 
@@ -614,9 +714,9 @@ describe('Piezas de cada Baader · siguen al mismo reloj que la cifra grande', (
   })
 
   it('sin reproducción (turno cerrado, sin serie por minuto) dicen su cifra de siempre', () => {
-    const { container } = render(<PiezasBaader reloj={relojCon({ valor: 5384 })} id="a" respaldo={5384} className="fc-baader-pz" />)
+    const { container } = render(<PiezasBaader reloj={relojCon({ valor: 5384 })} id="a" respaldo={5384} className="rb-pz" />)
     expect(container.textContent).toBe('5.384')
-    expect(container.querySelector('.fc-baader-pz')).not.toBeNull()
+    expect(container.querySelector('.rb-pz')).not.toBeNull()
   })
 
   it('una Baader que la reproducción no trae (id distinto) se queda con su respaldo', () => {

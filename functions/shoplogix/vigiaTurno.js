@@ -169,7 +169,7 @@ function evaluarVigia(lectura, st, nombres) {
     if (st.paroN === umbral) {
       const causa = lectura.reason || '(sin causa anotada)'
       ev.push(pactada
-        ? `🕐 <b>Parada pactada que se alarga</b>: la línea lleva ~${umbral} min sin producir · ${causa} · ${pz.toLocaleString()} pz`
+        ? `🕐 <b>Detención pactada que se alarga</b>: la línea lleva ~${umbral} min sin producir · ${causa} · ${pz.toLocaleString()} pz`
         : `⛔ <b>Línea detenida</b> hace ~${umbral} min · causa: ${causa} · ${pz.toLocaleString()} pz`)
       st.paroAvisado = true
     }

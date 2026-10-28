@@ -24,7 +24,7 @@ import { useAbrirPorClave, useTamano } from './ampliarHooks'
 import { aEstaHora, piezasMostradas } from './aEstaHora'
 import {
   RELLENO_DUENO, TRAMA_MANT, acumulado, anchoRotuloAhora, anclaRotuloAhora, brechaALaIzquierda, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado,
-  escalaVentana, esperadoPorMinuto, filasBaader, finDelEje, firmado, horasMin, int, marcasEje, minutosConParada, minutosCompletos, minutosPorCubeta,
+  adelanteAtras, escalaVentana, esperadoPorMinuto, filasBaader, finDelEje, horasMin, int, marcasEje, minutosConParada, minutosCompletos, minutosPorCubeta,
   minutosVisibles, paradasEn, pctAndando, proyeccion, rayasY, recortarCurva, relojDe, separarRotulos, sumaPorMinuto, tamanoGrafico, tonoDeCubeta,
   tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
   type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type TonoRitmo, type Zoom,
@@ -264,7 +264,7 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const ordenParadas = [...m.paradas.filter((q) => q.desdeMin < totalMin && q.hastaMin > 0)].sort((a, b) => ORDEN_DUENO[a.dueno] - ORDEN_DUENO[b.dueno])
   const finProy = m.proy?.hasta
   const gap = m.aHora
-  const textoBrecha = gap != null ? `a esta hora ${firmado(gap)}` : ''
+  const textoBrecha = gap != null ? adelanteAtras(gap) : ''
   /* El rótulo de «a esta hora» va a la derecha de la punta; si no cabe en lo que se VE (con zoom la ventana termina poco después
      de la punta), pasa a su izquierda. Texto de 12 px/600: ~7,4 px por carácter. */
   const anchoBrecha = textoBrecha.length * 7.4
@@ -461,7 +461,7 @@ function RotulosIzq({ m }: { m: Modelo }) {
         const c = d.carriles[i]
         return c ? <text key={q.id} x={xr} y={r1(c.y0 + c.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">{etiquetaMaquina(q.nombre)}</text> : null
       })}
-      <text x={xr} y={r1(d.paradas.y0 + d.paradas.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">Paradas</text>
+      <text x={xr} y={r1(d.paradas.y0 + d.paradas.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">Detenciones</text>
     </svg>
   )
 }
@@ -490,7 +490,7 @@ function RotulosDer({ m }: { m: Modelo }) {
         <g className="tabular-nums">
           <text x={xr} y={r1(yFin - 6)} fontSize={12} className="fill-muted-foreground">{m.cerrado ? 'cierre' : 'al cierre'}</text>
           <text x={xr} y={r1(yFin + 10)} fontSize={12} fontWeight={600} style={{ fill: 'rgb(var(--brand-ink))' }}>{int(vFin)} pz</text>
-          {vsMeta != null && <text x={xr} y={r1(yFin + 26)} fontSize={12} style={{ fill: vsMeta < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))' }}>{firmado(vsMeta)} vs meta</text>}
+          {vsMeta != null && <text x={xr} y={r1(yFin + 26)} fontSize={12} style={{ fill: vsMeta < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))' }}>{/* Sin «de la meta»: la columna mide 104 px (128 en pantallas grandes) y «532 adelante de la meta» pide 127; el rótulo de arriba («al cierre») ya dice contra qué es. */}{Math.round(vsMeta) === 0 ? 'en la meta' : adelanteAtras(vsMeta)}</text>}
         </g>
       ))}
       {d.barras && m.esperadoLinea != null && (
@@ -503,7 +503,7 @@ function RotulosDer({ m }: { m: Modelo }) {
         return t ? <text key={q.id} x={xr} y={r1(c.y0 + c.h / 2 + 4)} fontSize={12} className="fill-muted-foreground tabular-nums">{t}</text> : null
       })}
       <text x={xr} y={r1(d.paradas.y0 + d.paradas.h / 2 + 4)} fontSize={12} className="fill-muted-foreground tabular-nums">
-        {nParadas > 0 ? `${nParadas} ${nParadas === 1 ? 'parada' : 'paradas'}` : 'sin paradas'}
+        {nParadas > 0 ? `${nParadas} ${nParadas === 1 ? 'detención' : 'detenciones'}` : 'sin detenciones'}
       </text>
       {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 12)} fontSize={12} fontWeight={600} className="fill-foreground tabular-nums">{horasMin(minParadas)}</text>}
     </svg>
@@ -520,7 +520,9 @@ interface LecturaGlobo {
   acum: number | null
   futuro: boolean
   tocaban: number | null
-  /** Acumulado − tocaban. El minuto en curso usa «A esta hora» de la vista; los demás, la resta de sus dos valores. */
+  /** El minuto en curso de un turno en vivo: su meta es «a esta hora»; la de un minuto pasado, «a esa hora». */
+  ahora: boolean
+  /** Hechas − meta a esa hora. El minuto en curso usa «A esta hora» de la vista; los demás, la resta de sus dos valores. */
   dif: number | null
   linea: number | null
   esperadoLinea: number | null
@@ -557,7 +559,7 @@ function leer(m: Modelo, min: number): LecturaGlobo {
     const crudo = (q.maquinaId ? m.maquinas.find((x) => x.id === q.maquinaId)?.nombre : null) ?? q.maquina
     if (crudo) { const e = etiquetaMaquina(crudo); if (!nombres.includes(e)) nombres.push(e) }
   }
-  const quienes = !parada ? null : nombres.length === 0 ? 'Parada de línea' : m.maquinas.length > 1 && nombres.length >= m.maquinas.length ? `Las ${m.maquinas.length} Baader` : nombres.join(' · ')
+  const quienes = !parada ? null : nombres.length === 0 ? 'Detención de línea' : m.maquinas.length > 1 && nombres.length >= m.maquinas.length ? `Las ${m.maquinas.length} Baader` : nombres.join(' · ')
   const faltan = enSerie ? m.maquinas.filter((q) => k >= q.cycles.length).map((q) => etiquetaMaquina(q.nombre)) : []
   return {
     xMin: kMid,
@@ -566,6 +568,7 @@ function leer(m: Modelo, min: number): LecturaGlobo {
     acum,
     futuro,
     tocaban,
+    ahora: enAhora && !m.cerrado,
     dif,
     linea: enSerie ? m.suma[k]! : null,
     esperadoLinea: enSerie ? m.esperadoMin[k] ?? null : null,
@@ -624,8 +627,8 @@ function Globo({ info, style, compacto, onCerrar }: { info: LecturaGlobo; style?
         <div className="tabular-nums"><b className="font-semibold text-foreground">{info.hora}</b> <span className="text-muted-foreground">minuto {info.rango}</span></div>
         {info.acum != null && (
           <div className="tabular-nums text-muted-foreground">
-            {info.futuro ? 'Proyección' : 'Acumulado'} <b className="font-semibold text-foreground">{int(info.acum)} pz</b>
-            {info.tocaban != null && <> · tocaban <span className="text-foreground">{int(info.tocaban)}</span>{dif != null && <span className="ml-1" style={colorDif}>({firmado(dif)})</span>}</>}
+            {info.futuro ? 'Proyección' : 'Hechas'} <b className="font-semibold text-foreground">{int(info.acum)} pz</b>
+            {info.tocaban != null && <> · meta a {info.ahora ? 'esta' : 'esa'} hora <span className="text-foreground">{int(info.tocaban)}</span>{dif != null && <span className="ml-1" style={colorDif}>({adelanteAtras(dif)})</span>}</>}
           </div>
         )}
         {info.linea != null && (
@@ -657,16 +660,16 @@ function Globo({ info, style, compacto, onCerrar }: { info: LecturaGlobo; style?
       <dl className="mt-2 grid grid-cols-[auto_auto] justify-between gap-x-4 gap-y-1 text-[13px] tabular-nums">
         {info.acum != null && (
           <>
-            <dt className="text-muted-foreground">{info.futuro ? 'Proyección' : 'Acumulado'}</dt>
+            <dt className="text-muted-foreground">{info.futuro ? 'Proyección' : 'Hechas'}</dt>
             <dd className="text-right font-semibold text-foreground">{int(info.acum)} pz</dd>
           </>
         )}
         {info.tocaban != null && (
           <>
-            <dt className="text-muted-foreground">Tocaban</dt>
+            <dt className="text-muted-foreground">{info.ahora ? 'Meta a esta hora' : 'Meta a esa hora'}</dt>
             <dd className="text-right text-foreground">
               {int(info.tocaban)}
-              {dif != null && <span className="ml-1" style={colorDif}>({firmado(dif)})</span>}
+              {dif != null && <span className="ml-1" style={colorDif}>({adelanteAtras(dif)})</span>}
             </dd>
           </>
         )}
@@ -756,7 +759,7 @@ function InfoLeyenda({ ayuda }: { ayuda: string }) {
             <li className="flex items-center gap-2">{cuadro('var(--v2-atento)')}entre 50 y 75 %</li>
             <li className="flex items-center gap-2">{cuadro('var(--rv-mal)')}menos de 50 %</li>
           </ul>
-          <div className="mt-3 font-semibold">Paradas, por dueño</div>
+          <div className="mt-3 font-semibold">Detenciones, por dueño</div>
           <ul className="mt-1.5 grid gap-1 text-muted-foreground">
             <li className="flex items-center gap-2">{cuadro(TRAMA_MANT)}Mantención</li>
             <li className="flex items-center gap-2">{cuadro('var(--v2-ext)')}Externo</li>
@@ -990,7 +993,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const sub = p.cerrado && finReal != null
     ? `${relojDe(e.iniMs)} → ${relojDe(finReal)} · terminado`
     : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
-  const resumen = `Piezas acumuladas del turno: ${int(mostradas)}${p.meta ? ` de ${int(p.meta)}` : ''}${p.proyeccion != null && !p.cerrado ? `, al cierre ${int(p.proyeccion)}` : ''}. Debajo, el ritmo por minuto, cada Baader y las paradas en las mismas horas.`
+  const resumen = `Hechas del turno: ${int(mostradas)}${p.meta ? ` de ${int(p.meta)}` : ''}${p.proyeccion != null && !p.cerrado ? `, al cierre ${int(p.proyeccion)}` : ''}. Debajo, el ritmo por minuto, cada Baader y las detenciones en las mismas horas.`
   const hayProy = modelo?.proy != null
   const titulo = (
     <div className="min-w-0">
@@ -1010,8 +1013,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
           trazo="previo" color="rgb(var(--muted-foreground))" opacidad={0.65}
           rotulo={(
             <>
-              {`${modelo.previoLabel} · ${int(pc.piezas)}${chico ? '' : pc.modo === 'al-cierre' ? ' al cierre' : ' a esta hora'}`}
-              {difHoy != null && <span className="font-semibold" style={{ color: difHoy < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))' }}>{` · ${p.cerrado ? 'este turno' : 'hoy'} ${firmado(difHoy)}`}</span>}
+              {`${modelo.previoLabel} · ${int(pc.piezas)}${chico ? '' : pc.modo === 'al-cierre' ? ' al cierre' : ' hechas a esta hora'}`}
+              {difHoy != null && <span className="font-semibold" style={{ color: difHoy < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))' }}>{` · ${p.cerrado ? 'este turno' : 'hoy'} ${adelanteAtras(difHoy)}`}</span>}
             </>
           )}
         />

@@ -4,11 +4,11 @@
  * fila de cuatro tarjetas de antes.
  *
  *   1. Piezas del turno · cifra viva (reloj de datos), barra con la raya de las que tocaban y UNA nota: «% de la meta» · «tocaban N».
- *   2. Cada Baader · piezas, ritmo del último minuto cerrado contra su esperado y su estado (la palabra solo si no anda).
- *      Con UNA sola Baader (Filete) la celda no va: su palabra pasa a la cifra de Ritmo.
- *   3. Ritmo de la línea · UNA sola vez en toda la vista: último minuto cerrado «de N pz/min» y las referencias en un dl.
- *   4. Contra la meta · «A esta hora» y «Al cierre», y debajo Mantención en dos renglones.
- *   5. Camino a la meta · la barra de tramos y su leyenda en piezas, la celda entera tocable (`TiempoDelTurno v2="celda"`).
+ *   2. Ritmo · la A3 «sub-tarjeta» (`RitmoBaaders`): la Línea y cada Baader en una mini tabla (piezas, último minuto contra su
+ *      esperado, aporte al promedio y cómo se compara consigo misma). UNA sola vez en toda la vista.
+ *      Con UNA sola Baader (Filete) la tabla no va: queda la celda de una cifra (`RitmoLinea`) con su palabra si no anda.
+ *   3. Contra la meta · «A esta hora» y «Al cierre», y debajo Mantención en dos renglones.
+ *   4. Camino a la meta · la barra de tramos y su leyenda en piezas, la celda entera tocable (`TiempoDelTurno v2="celda"`).
  *
  * ≥ 768 px es UNA tarjeta de vidrio con las celdas separadas por aire (sin bordes); debajo, cada celda en su tarjeta.
  * «A esta hora» sale de `aEstaHora` (la misma resta del gráfico y de Camino a la meta). Toda cifra viene de Shoplogix
@@ -21,15 +21,33 @@ import { CapaAmpliada } from './AmpliarV2'
 import { aEstaHora, piezasMostradas } from './aEstaHora'
 import { useAnchoMin, useCuentaCifra } from './ampliarHooks'
 import { CifraViva } from './CifraViva'
-import { esperadoPorMinuto, filasBaader, firmado, int, minutosCompletos, minutosVisibles, relojDe, sumaPorMinuto, tonoRitmo, type EstadoBaader, type TonoRitmo } from './ejeTurno'
+import { esperadoPorMinuto, int, minutosCompletos, partesAdelanteAtras, relojDe, sumaPorMinuto, tonoRitmo, type EstadoBaader, type TonoRitmo } from './ejeTurno'
 import { ChevronFranja, RotuloFranja, Tocable } from './FranjaTocable'
 import type { EjeDatos } from './GraficoRitmoVivo'
 import type { MonitorV2Props } from './MonitorV2'
-import { etiquetaMaquina, paradasPorMaquina, segundosCubiertos } from './ritmoVivo'
+import { filasDeBaader, TEXTO_ESTADO } from './baadersMinuto'
+import { PiezasBaader, RitmoBaaders } from './RitmoBaaders'
 import type { RelojDeDatos } from './useRelojDeDatos'
+
+/* `PiezasBaader` vive con la tarjeta Ritmo; se re-exporta aquí porque es la pieza que la franja ha dicho siempre. */
+export { PiezasBaader }
 
 const dec = (n: number, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
 const acota = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n))
+
+/**
+ * La cifra grande de «A esta hora» y del resultado cerrado: el número SIN signo y la palabra («adelante», «atrás») en el hueco de
+ * la unidad (glosario único del monitor, 28-10). Con 0 es «al día», a tamaño de cifra y sin unidad. El color es el de siempre (lo
+ * pone quien llama). Con 5 cifras (`fc-cifra-5`) o en una celda angosta la palabra baja bajo el número: sin el signo no se puede callar.
+ */
+function CifraAdelanteAtras({ n, cinco, color }: { n: number; cinco: string; color: string }) {
+  const { cifra, palabra } = partesAdelanteAtras(n)
+  return (
+    <div className={`fc-cifra-m fc-cifra-dif tabular-nums${cinco}`} style={{ color }}>
+      {cifra ? <>{cifra} <small>{palabra}</small></> : palabra}
+    </div>
+  )
+}
 
 /** Las celdas que abren el panel de detalle de siempre (no son botones con marco: el toque es la celda). */
 export type ClaveFranja = 'cierre' | 'ritmo' | 'mant'
@@ -75,143 +93,10 @@ function PiezasVivas({ reloj, respaldo, meta, cuota, cerrado }: { reloj: RelojDe
           </div>
           <p className="fc-nota fc-nota-piezas tabular-nums">
             <span className="fc-pct"><b ref={pctRef}>{Math.floor((respaldo / meta) * 100)} %</b> de {int(meta)}</span>
-            {raya != null && <span className="fc-tocaban"><i className="fc-raya-mini" aria-hidden />tocaban <b>{int(raya)}</b></span>}
+            {raya != null && <span className="fc-tocaban"><i className="fc-raya-mini" aria-hidden />meta<span className="fc-hora-larga"> a esta hora</span> <b>{int(raya)}</b></span>}
           </p>
         </>
       ) : null}
-    </>
-  )
-}
-
-// ── Cada Baader ──────────────────────────────────────────────────────────────
-
-interface FilaBaader {
-  id: string
-  nombre: string
-  piezas: number
-  /** Piezas del último minuto cerrado y lo que daba esa Baader a su esperado. */
-  ritmo: number | null
-  esperado: number | null
-  /** Con el turno cerrado no hay «último minuto» que importe: se dice su promedio andando. */
-  promedio: number | null
-  /** null = sin dato (no se acusa a la Baader de lo que no se sabe). */
-  estado: EstadoBaader | null
-  /** % de llenado de ese minuto normalizado por los segundos andando: la base del punto y la palabra. */
-  llenado: number | null
-  /** Segundos que esa Baader anduvo del último minuto cerrado (60 − paradas); null si no se sabe. */
-  anduvoS: number | null
-}
-
-/** Debajo de esto el minuto no se anduvo entero: se dice cuántos segundos fueron (el número crudo no es de un minuto completo). */
-const ANDUVO_COMPLETO_S = 55
-
-/**
- * Una fila por Baader: sus piezas, el último minuto cerrado contra su esperado (la serie por minuto de Shoplogix) y su
- * estado con la MISMA normalización que las filas Ev del gráfico (`filasBaader`: segundos andando, línea en cero = sin
- * dato). Una Baader parada ahora (pulso fresco) manda sobre lo que dijo su último minuto.
- *
- * Las piezas de cada Baader salen del contador vivo cuando suma lo mismo que la cifra grande (`repro.tope.porMaquina` ya
- * trae esa guarda: PSM solo la arma si `totalCycles === contador`); si no, del doc del corte (`m.piezas`). Así la cifra
- * de cada una y la de la línea cuentan del mismo momento.
- */
-function filasDeBaader(p: MonitorV2Props, e: EjeDatos | null): FilaBaader[] {
-  const vivo = !p.cerrado
-  const minuto = e?.minuto ?? null
-  if (minuto && minuto.maquinas.length > 0) {
-    const n = minutosVisibles(minuto.maquinas, p.cerrado)
-    const celdas = n > 0 ? filasBaader(minuto, n, e?.paradasMaquina) : []
-    const paradas = e?.paradasMaquina ? paradasPorMaquina(e.paradasMaquina) : null
-    const delContador = p.repro?.tope?.porMaquina ?? null
-    return minuto.maquinas.map((q) => {
-      const m = p.maquinas.find((x) => x.name === q.nombre)
-      const k = n - 1
-      const hay = k >= 0 && k < q.cycles.length
-      const fila = celdas.find((c) => c.id === q.id)
-      let estado: EstadoBaader | null = vivo && hay ? fila?.celdas[k]?.estado ?? null : null
-      if (vivo && m?.status === 'detenida') estado = 'detenida'
-      const ini = Date.parse(minuto.desde) + k * 60_000
-      const crudo = delContador?.[q.id]
-      return {
-        id: q.id, nombre: q.nombre,
-        piezas: crudo != null && Number.isFinite(crudo) ? crudo : m?.piezas ?? q.cycles.reduce((a, b) => a + b, 0),
-        ritmo: vivo && hay ? q.cycles[k] ?? 0 : null,
-        esperado: q.esperado,
-        promedio: m?.promedio ?? null,
-        estado,
-        llenado: vivo && hay ? fila?.llenados[k] ?? null : null,
-        anduvoS: vivo && hay && paradas && Number.isFinite(ini) ? 60 - segundosCubiertos(paradas.todas.get(q.id), ini, ini + 60_000) : null,
-      }
-    })
-  }
-  return p.maquinas.map((m) => ({
-    id: m.name, nombre: m.name, piezas: m.piezas, ritmo: null, esperado: null, promedio: m.promedio,
-    estado: vivo && m.status === 'detenida' ? 'detenida' : null,
-    llenado: null,
-    anduvoS: null,
-  }))
-}
-
-const PUNTO_ESTADO: Record<EstadoBaader, string> = { andando: 'var(--v2-acento)', lenta: 'var(--v2-atento)', detenida: MAL, parcial: 'var(--v2-gris)', 'sin-dato': 'var(--v2-gris)' }
-/** La palabra solo la llevan «lenta» y «detenida»: «parcial» y «sin dato» son puntos grises, sin palabra. */
-const TEXTO_ESTADO: Partial<Record<EstadoBaader, string>> = { lenta: 'var(--v2-atento-texto)', detenida: 'var(--v2-mal-texto)' }
-
-/**
- * Las piezas de una Baader siguen al MISMO reloj que la cifra grande de «Piezas del turno»: con la reproducción del último minuto
- * activa cada Baader sube un escalón por pieza (`rep.porMaquina`, cuya suma es la cifra de la línea en cada cuadro), así las
- * tres cuadran con el total en todo instante y no solo cuando la reproducción llegó al contador. Sin reproducción (turno
- * cerrado, sin serie por minuto) vale `respaldo`. El texto se escribe solo cuando cambia el entero.
- */
-export function PiezasBaader({ reloj, id, respaldo, className }: { reloj: RelojDeDatos; id: string; respaldo: number; className?: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const ultimo = useRef(int(respaldo))
-  useEffect(() => reloj.alCuadro((c) => {
-    const el = ref.current
-    if (!el) return
-    const t = int(c.rep?.porMaquina.find((m) => m.id === id)?.valor ?? respaldo)
-    /* Se compara con lo que HAY en el nodo: React reescribe el texto con `respaldo` cuando éste cambia. */
-    if (t !== ultimo.current || el.textContent !== t) { ultimo.current = t; el.textContent = t }
-  }), [reloj, id, respaldo])
-  return <span ref={ref} className={className}>{int(respaldo)}</span>
-}
-
-function CadaBaader({ filas, unidad, cerrado, reloj }: { filas: FilaBaader[]; unidad: 'carros' | 'silletas' | null; cerrado: boolean; reloj: RelojDeDatos }) {
-  return (
-    <>
-      <div className="fc-cab">
-        <RotuloFranja>Cada Baader</RotuloFranja>
-        <span className="fc-nota fc-nota-der">{cerrado ? `${unidad ?? 'pz'} · promedio andando` : <>{unidad ?? 'pz'} · pz/min<span className="fc-vs-esperado"> vs esperado</span></>}</span>
-      </div>
-      <ul className="fc-baaders">
-        {filas.map((f) => {
-          /* El número y la barra son el conteo CRUDO del minuto (el que Shoplogix contó); el punto y la palabra, la base
-             normalizada por segundos andando. Si la Baader no anduvo el minuto entero, la nota dice cuántos segundos fueron. */
-          const frac = f.ritmo != null && f.esperado != null && f.esperado > 0 ? acota(f.ritmo / f.esperado, 0, 1) : null
-          const palabra = f.estado != null && f.estado in TEXTO_ESTADO ? f.estado : null
-          const anduvo = !cerrado && f.anduvoS != null && f.anduvoS > 0 && Math.round(f.anduvoS) < ANDUVO_COMPLETO_S ? Math.round(f.anduvoS) : null
-          return (
-            <li key={f.id} className="fc-baader" title={f.llenado != null ? `${etiquetaMaquina(f.nombre)}: ${f.llenado} % de lo que daba mientras anduvo` : undefined}>
-              <span className="fc-baader-nombre"><i style={{ background: f.estado ? PUNTO_ESTADO[f.estado] : 'var(--v2-gris)' }} aria-hidden />{etiquetaMaquina(f.nombre)}</span>
-              <PiezasBaader reloj={reloj} id={f.id} respaldo={f.piezas} className="fc-baader-pz tabular-nums" />
-              <div className="fc-baader-ritmo">
-                <div className="fc-baader-linea tabular-nums">
-                  <span>
-                    {cerrado
-                      ? (f.promedio != null ? <><b>{dec(f.promedio)}</b> pz/min</> : null)
-                      : f.ritmo != null ? <><b>{int(f.ritmo)}</b>{f.esperado != null ? ` de ${int(f.esperado)}` : ''}<span className="fc-pzmin"> pz/min</span></> : null}
-                  </span>
-                  {palabra && <span className="fc-baader-estado" style={{ color: TEXTO_ESTADO[palabra] ?? 'rgb(var(--muted-foreground))' }}>{palabra}</span>}
-                </div>
-                {frac != null && (
-                  <div className="fc-baader-pista" aria-hidden>
-                    <div style={{ width: `${frac * 100}%`, background: f.estado ? PUNTO_ESTADO[f.estado] : 'var(--v2-acento)' }} />
-                  </div>
-                )}
-                {anduvo != null && <div className="fc-baader-nota tabular-nums">anduvo {anduvo} s</div>}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
     </>
   )
 }
@@ -259,7 +144,7 @@ function RitmoLinea({ p, e, unica }: { p: MonitorV2Props; e: EjeDatos | null; un
   return (
     <>
       <div className="fc-cab">
-        <RotuloFranja tocable>Ritmo de la línea</RotuloFranja>
+        <RotuloFranja tocable>Ritmo</RotuloFranja>
         <span className="fc-nota fc-nota-der">{nota}{promedio && <span className="fc-solo-movil"> andando</span>}</span>
       </div>
       <div className="fc-ritmo-fila">
@@ -293,8 +178,9 @@ function ContraLaMeta({ p, e, reloj, abrir }: { p: MonitorV2Props; e: EjeDatos |
   const aHora = p.cerrado ? null : aEstaHora(piezasMostradas(p.repro, p.piezas), p.cuota?.piezas, p.meta)
   const conProyeccion = !p.cerrado && p.proyeccion != null
   const color = (v: number) => (v < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))')
-  /* Con 5 cifras («−12.345») la cifra grande no cabe en media celda: se calla la unidad (el CSS lo hace con esta clase). */
-  const cifras5 = (v: number) => (Math.abs(Math.round(v)) >= 10_000 ? ' fc-cifra-5' : '')
+  /* La palabra («adelante», «atrás») ocupa el hueco de la unidad y, sin el signo, no se puede callar: cuando no cabe junto al número
+     baja bajo él. El CSS decide según el ancho y estas clases: `fc-cifra-d4` (4 o más cifras: «1.234») y `fc-cifra-5` (5: «12.345»). */
+  const cifras5 = (v: number) => { const a = Math.abs(Math.round(v)); return a >= 10_000 ? ' fc-cifra-5 fc-cifra-d4' : a >= 1_000 ? ' fc-cifra-d4' : '' }
 
   const deltaMttr = p.mant?.mttr != null && p.mant.mttrPrevio != null ? p.mant.mttr - p.mant.mttrPrevio : null
 
@@ -309,14 +195,16 @@ function ContraLaMeta({ p, e, reloj, abrir }: { p: MonitorV2Props; e: EjeDatos |
           <>
             {/* «en pausa» a 20/600 en la caja de la cifra grande: las bases de las dos columnas quedan alineadas. */}
             <div className="fc-cifra-m fc-pausa tabular-nums" style={{ color: 'rgb(var(--muted-foreground))' }}>en pausa</div>
-            {/* La causa (la que daba el aviso «Ahora mismo», que la franja calla en todos los anchos) va aquí: un renglón con elipsis. */}
-            <div className="fc-nota fc-nota-pausa" title={p.causaParada ? `línea detenida · ${p.causaParada}` : undefined}>línea detenida{p.causaParada ? ` · ${p.causaParada}` : ''}</div>
+            {/* Con la banda de parada a la vista (ya dice la causa) la nota dice solo «línea detenida». Sin banda, la causa (la que daba el
+                aviso «Ahora mismo», que la franja calla) va en un segundo renglón que puede bajar de línea: nunca se corta con «…». */}
+            <div className="fc-nota fc-nota-pausa">línea detenida</div>
+            {!p.conBanda && p.causaParada && <div className="fc-nota fc-nota-causa">{p.causaParada}</div>}
           </>
         ) : (
           <>
-            <div className={`fc-cifra-m tabular-nums${dif != null ? cifras5(dif) : ''}`} style={{ color: dif != null ? color(dif) : undefined }}>
-              {dif != null ? firmado(dif) : int(cierreMostrado)} <small>pz</small>
-            </div>
+            {dif != null
+              ? <CifraAdelanteAtras n={dif} cinco={cifras5(dif)} color={color(dif)} />
+              : <div className="fc-cifra-m tabular-nums">{int(cierreMostrado)} <small>pz</small></div>}
             <div className="fc-nota tabular-nums">{dif != null ? `proyección ${int(cierreMostrado)}` : 'a este ritmo'}</div>
           </>
         )}
@@ -327,8 +215,8 @@ function ContraLaMeta({ p, e, reloj, abrir }: { p: MonitorV2Props; e: EjeDatos |
     segunda = (
       <div>
         <div className="fc-rotulo">Resultado del turno</div>
-        <div className={`fc-cifra-m tabular-nums${cifras5(dif)}`} style={{ color: color(dif) }}>{firmado(dif)} <small>pz</small></div>
-        <div className="fc-nota tabular-nums">{int(p.piezas)} − meta {int(meta)}</div>
+        <CifraAdelanteAtras n={dif} cinco={cifras5(dif)} color={color(dif)} />
+        <div className="fc-nota tabular-nums">{int(p.piezas)} hechas · meta{'\u00a0'}{int(meta)}</div>
       </div>
     )
   } else if (meta != null) {
@@ -349,8 +237,8 @@ function ContraLaMeta({ p, e, reloj, abrir }: { p: MonitorV2Props; e: EjeDatos |
         {aHora != null && (
           <div>
             <div className="fc-rotulo">A esta hora</div>
-            <div className={`fc-cifra-m tabular-nums${cifras5(aHora)}`} style={{ color: color(aHora) }}>{firmado(aHora)} <small>pz</small></div>
-            <div className="fc-nota">hechas − tocaban</div>
+            <CifraAdelanteAtras n={aHora} cinco={cifras5(aHora)} color={color(aHora)} />
+            <div className="fc-nota">hechas − meta</div>
           </div>
         )}
         {segunda}
@@ -392,33 +280,43 @@ export function FranjaCinta({ p, reloj, ampliadoPiezas, abrir, camino }: {
   const [ampliada, setAmpliada] = useState(false)
   const piezasRef = useRef<HTMLDivElement>(null)
   const filas = filasDeBaader(p, e)
-  /* Con UNA sola Baader (Filete) la celda «Cada Baader» repetía las piezas y el ritmo de sus vecinas: no va, y la palabra de
-     esa máquina («lenta», «detenida») pasa a la cifra de Ritmo. */
+  /* Con UNA sola Baader (Filete) la tabla repetiría la cifra de la línea: queda la celda de una cifra y la palabra de esa
+     máquina («lenta», «detenida») va junto a ella. */
   const conBaader = filas.length > 1
   const unica = filas.length === 1 ? filas[0]!.estado : null
 
-  const celdas: Array<{ clave: string; clase: string; nodo: ReactNode }> = [
-    {
-      clave: 'piezas', clase: 'fc-c-piezas',
-      nodo: (
-        <div ref={piezasRef}>
-          <Tocable onAbrir={() => setAmpliada((a) => !a)} etiqueta="Piezas del turno" abierta={ampliada}>
-            <div className="fc-cab">
-              <RotuloFranja tocable>Piezas del turno</RotuloFranja>
-            </div>
-            <PiezasVivas reloj={reloj} respaldo={p.piezas} meta={p.meta && p.meta > 0 ? p.meta : null} cuota={p.cuota?.piezas ?? null} cerrado={p.cerrado} />
-          </Tocable>
-          <CapaAmpliada abierta={ampliada} onCerrar={() => setAmpliada(false)} origen={piezasRef} titulo="Piezas del turno" sub={p.curva ? 'acumulado del turno contra el ritmo de la meta' : undefined}>
-            {ampliadoPiezas}
-          </CapaAmpliada>
-        </div>
-      ),
-    },
-    ...(conBaader ? [{ clave: 'baader', clase: 'fc-c-baader', nodo: <CadaBaader filas={filas} unidad={e?.unidad ?? null} cerrado={p.cerrado} reloj={reloj} /> }] : []),
-    { clave: 'ritmo', clase: 'fc-c-ritmo', nodo: <Tocable onAbrir={() => abrir('ritmo')} etiqueta="Ritmo de la línea"><RitmoLinea p={p} e={e} unica={unica} /></Tocable> },
-    { clave: 'meta', clase: 'fc-c-meta', nodo: <ContraLaMeta p={p} e={e} reloj={reloj} abrir={abrir} /> },
-    ...(camino != null ? [{ clave: 'camino', clase: 'fc-c-camino v2-camino', nodo: camino }] : []),
-  ]
+  const piezasCelda = {
+    clave: 'piezas', clase: 'fc-c-piezas',
+    nodo: (
+      <div ref={piezasRef}>
+        <Tocable onAbrir={() => setAmpliada((a) => !a)} etiqueta="Piezas del turno" abierta={ampliada}>
+          <div className="fc-cab">
+            <RotuloFranja tocable>Piezas del turno</RotuloFranja>
+          </div>
+          <PiezasVivas reloj={reloj} respaldo={p.piezas} meta={p.meta && p.meta > 0 ? p.meta : null} cuota={p.cuota?.piezas ?? null} cerrado={p.cerrado} />
+        </Tocable>
+        <CapaAmpliada abierta={ampliada} onCerrar={() => setAmpliada(false)} origen={piezasRef} titulo="Piezas del turno" sub={p.curva ? 'hechas del turno contra el ritmo de la meta' : undefined}>
+          {ampliadoPiezas}
+        </CapaAmpliada>
+      </div>
+    ),
+  }
+  /* La A3: con varias Baader la celda Ritmo es la mini tabla (Línea + cada Baader); con una sola, la celda de una cifra. */
+  const ritmoCelda = {
+    clave: 'ritmo', clase: 'fc-c-ritmo',
+    nodo: (
+      <Tocable onAbrir={() => abrir('ritmo')} etiqueta="Ritmo">
+        {conBaader ? <RitmoBaaders p={p} e={e} reloj={reloj} filas={filas} /> : <RitmoLinea p={p} e={e} unica={unica} />}
+      </Tocable>
+    ),
+  }
+  const metaCelda = { clave: 'meta', clase: 'fc-c-meta', nodo: <ContraLaMeta p={p} e={e} reloj={reloj} abrir={abrir} /> }
+  const caminoCelda = camino != null ? [{ clave: 'camino', clase: 'fc-c-camino v2-camino', nodo: camino }] : []
+  /* El orden de lectura es el de la pantalla: en el celular con varias Baader, Piezas · Meta y luego Ritmo a todo el ancho
+     (la tabla necesita el ancho); con una sola, Piezas · Ritmo y la Meta debajo. */
+  const celdas: Array<{ clave: string; clase: string; nodo: ReactNode }> = apilada && conBaader
+    ? [piezasCelda, metaCelda, ritmoCelda, ...caminoCelda]
+    : [piezasCelda, ritmoCelda, metaCelda, ...caminoCelda]
   /* Dos casos distintos dan cuatro celdas (sin Baader o sin Camino): cada uno con su atributo para que la grilla sepa cuál es. */
   const atributos = { 'data-celdas': celdas.length, 'data-sin-baader': conBaader ? undefined : 'true', 'data-sin-camino': camino != null ? undefined : 'true' }
 

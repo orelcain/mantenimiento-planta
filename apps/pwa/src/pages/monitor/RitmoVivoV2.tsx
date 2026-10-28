@@ -76,7 +76,7 @@ function useReloj() {
 
 /** «La línea · detención»: el mismo rótulo en la tarjeta (celular) y en la banda de estado (PC). */
 function rotuloParada(p: ParadaVivo): string {
-  return `${p.quien} · ${p.clase === 'micro' ? 'micro detención' : p.clase === 'programada' ? 'parada programada' : 'detención'}`
+  return `${p.quien} · ${p.clase === 'micro' ? 'micro detención' : p.clase === 'programada' ? 'detención programada' : 'detención'}`
 }
 
 /** «desde 13:06:21 · Shoplogix la clasifica como detención.»: lo que acompaña al cronómetro. */
@@ -460,10 +460,10 @@ export function BandaParadaV2({ maquinas, turnoTerminado }: { maquinas: MaquinaV
   if (!parada) return null
   const aviso = avisoParada(parada)
   return (
-    <div className="rv-banda" data-clase={parada.clase} role="status" aria-label="Parada en curso">
+    <div className="rv-banda" data-clase={parada.clase} role="status" aria-label="Detención en curso">
       <Timer className="h-5 w-5 shrink-0 rv-banda-icono" aria-hidden />
       <span className="rv-banda-rotulo shrink-0 text-[16px] font-semibold">{rotuloParada(parada)}</span>
-      <span className="rv-banda-crono tabular-nums" aria-label="Tiempo parada">{cronometro((ahoraWall - parada.desdeMs) / 1000)}</span>
+      <span className="rv-banda-crono tabular-nums" aria-label="Tiempo detenida">{cronometro((ahoraWall - parada.desdeMs) / 1000)}</span>
       <span className="rv-banda-detalle min-w-0 flex-1 truncate text-[13px]" title={detalleParada(parada)}>{detalleParada(parada)}</span>
       {aviso && <span className="shrink-0 text-[14px] font-semibold text-foreground">{aviso}</span>}
     </div>

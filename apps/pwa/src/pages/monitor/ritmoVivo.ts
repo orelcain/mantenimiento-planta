@@ -336,6 +336,79 @@ export function llenadoDe(e: EntradaRitmoVivo, i0: number, n: number): { lineas:
   return { lineas, separaParadas: pp.separa }
 }
 
+// ── Carros (o silletas) vacíos del turno ─────────────────────────────────────
+
+export interface VaciosMaquina {
+  id: string
+  nombre: string
+  /** Lo que pasó mientras la Baader andaba: velocidad seteada (`esperado`) × segundos andando ÷ 60, en los minutos válidos. */
+  pasaron: number
+  /** Las piezas que la Baader contó en esos mismos minutos. */
+  conPieza: number
+  /** `pasaron − conPieza`, con piso en 0. */
+  vacios: number
+  /** `conPieza ÷ pasaron`, de 0 a 100; null si no pasó ninguno. */
+  pct: number | null
+}
+
+export interface VaciosTurno {
+  maquinas: VaciosMaquina[]
+  /** La línea es la SUMA de sus Baader (cada cifra ya redondeada: lo que se ve en la tabla suma lo que dice la fila de la línea). */
+  linea: Omit<VaciosMaquina, 'id' | 'nombre'>
+  /** Cuántos minutos del turno entraron (al menos una Baader con dato válido). */
+  minutos: number
+}
+
+/**
+ * ESTIMACIÓN de los carros (o silletas) que llegaron a cada Baader sin pescado: la capacidad de la máquina mientras anduvo
+ * contra lo que contó. Misma regla de minutos válidos que `llenadoDe`: una Baader sin esperado no entra, un minuto con menos de
+ * `ANDANDO_MIN_S` andando no cuenta y un minuto con la línea entera en cero tampoco (no se distingue de una parada pactada que
+ * no viaja en `stopEvents`). Un minuto que la serie de esa Baader aún no tiene tampoco cuenta (no es un cero).
+ *
+ * `vacios` son carros que pasaron sin pieza: pescado que no llegó a la Baader, no una falla de la máquina.
+ * Cada cifra por Baader se redondea ANTES de sumar la línea y de restar, así la tabla cuadra a la vista.
+ */
+export function vaciosTurnoDe(
+  serie: { desde: string; maquinas: MaquinaSerie[] },
+  n: number,
+  paradas?: Pick<EntradaRitmoVivo, 'stopEvents' | 'stopReasons' | 'stopMachines' | 'enCurso'> | null,
+): VaciosTurno {
+  const t0 = Date.parse(serie.desde)
+  const pp = paradasPorMaquina({ stopEvents: paradas?.stopEvents ?? null, stopReasons: paradas?.stopReasons ?? null, stopMachines: paradas?.stopMachines ?? null, enCurso: paradas?.enCurso ?? [] })
+  const usados = new Set<number>()
+  const maquinas: VaciosMaquina[] = []
+  if (Number.isFinite(t0)) {
+    for (const m of serie.maquinas) {
+      if (!(m.esperado != null && m.esperado > 0)) continue
+      let capacidad = 0
+      let conPieza = 0
+      for (let i = 0; i < n && i < m.cycles.length; i++) {
+        const ini = t0 + i * 60_000
+        const andando = 60 - segundosCubiertos(pp.todas.get(m.id), ini, ini + 60_000)
+        const lineaEnCero = serie.maquinas.every((x) => (x.cycles[i] ?? 0) === 0)
+        if (andando < ANDANDO_MIN_S || lineaEnCero) continue
+        capacidad += m.esperado * (andando / 60)
+        conPieza += m.cycles[i] ?? 0
+        usados.add(i)
+      }
+      const pasaron = Math.round(capacidad)
+      maquinas.push({
+        id: m.id, nombre: m.nombre, pasaron, conPieza,
+        vacios: Math.max(0, pasaron - conPieza),
+        pct: pasaron > 0 ? Math.min(100, (conPieza / pasaron) * 100) : null,
+      })
+    }
+  }
+  const suma = (f: (x: VaciosMaquina) => number) => maquinas.reduce((a, x) => a + f(x), 0)
+  const pasaron = suma((x) => x.pasaron)
+  const conPieza = suma((x) => x.conPieza)
+  return {
+    maquinas,
+    linea: { pasaron, conPieza, vacios: suma((x) => x.vacios), pct: pasaron > 0 ? Math.min(100, (conPieza / pasaron) * 100) : null },
+    minutos: usados.size,
+  }
+}
+
 /** Señales sobrias: lo que el dato muestra y qué mirar; nunca afirman una causa. */
 export function senalesDe(lineas: LineaLlenado[], unidad: 'carros' | 'silletas' | null, separaParadas: boolean): Senal[] {
   const cosa = unidad ? `${unidad} con pieza` : 'llenado'
@@ -543,6 +616,11 @@ export function paradaEnCurso(maquinas: MaquinaVivo[]): ParadaVivo | null {
     desdeMs: p.m.desdeMs!,
     estado: p.m.razon ?? 'Detención',
   }
+}
+
+/** ¿La banda de parada (`BandaParadaV2`) va a dibujar algo? La misma regla que ella: así la franja sabe si la causa ya está a la vista. */
+export function hayBandaParada(maquinas: MaquinaVivo[], turnoTerminado?: boolean): boolean {
+  return !turnoTerminado && paradaEnCurso(maquinas) != null
 }
 
 /** Duración con unidades («13 min 15 s», «1 h 02 min»): «13:15» se leía como una hora del reloj. Nunca negativa. */
