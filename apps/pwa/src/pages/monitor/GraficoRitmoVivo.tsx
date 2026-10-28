@@ -17,11 +17,12 @@
  * Todo sale de las funciones de datos que ya existen (`ritmoVivo`, `monitorEventos`…): este archivo solo ubica y dibuja.
  */
 import { Info, Maximize2, X } from 'lucide-react'
-import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
+import { memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
 import { DUENO_META } from '@/services/shoplogix/monitorEventos'
 import { CapaAmpliada } from './AmpliarV2'
 import { useAbrirPorClave, useTamano } from './ampliarHooks'
-import { aEstaHora, piezasMostradas } from './aEstaHora'
+import { aEstaHora, horaDelCuadro, piezasMostradas } from './aEstaHora'
+import { useCifrasVivas, VistaVivaCtx, type CifrasVivas } from './useCifrasVivas'
 import {
   RELLENO_DUENO, TRAMA_MANT, acumulado, anchoRotuloAhora, anclaRotuloAhora, brechaALaIzquierda, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado,
   adelanteAtras, escalaVentana, esperadoPorMinuto, filasBaader, finDelEje, horasMin, int, marcasEje, minutosConParada, minutosCompletos, minutosPorCubeta,
@@ -118,6 +119,8 @@ interface Modelo {
   cuota: { piezas: number; hora: string | null } | null
   /** «A esta hora» de la vista (`aEstaHora`): la misma cifra de la franja y de Camino a la meta. null con el turno cerrado o sin cuota. */
   aHora: number | null
+  /** PR B: la cuota en la hora de planta de cada cuadro (`VistaVivaCtx`). Con ella la brecha sigue a la punta. */
+  cuotaEn: ((tMs: number) => number | null) | null
   paradas: ParadaEje[]
   barraNueva: boolean
   cerrado: boolean
@@ -150,6 +153,9 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const clipRef = useRef<SVGRectElement>(null)
   const puntaRef = useRef<SVGGElement>(null)
   const proyRef = useRef<SVGLineElement>(null)
+  const brechaRef = useRef<SVGGElement>(null)
+  const brechaLineaRef = useRef<SVGLineElement>(null)
+  const brechaTextoRef = useRef<SVGTextElement>(null)
 
   /* Entre lecturas: la punta y el clip van de la lectura anterior a la última; la proyección parte de la punta. */
   const aplicar = (c: CuadroReloj) => {
@@ -165,6 +171,24 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
     if (proyRef.current && m.proy) {
       const ex = g.x(m.proy.hasta.min), ey = g.y(m.proy.hasta.v)
       proyRef.current.setAttribute('transform', `matrix(${r1(ex - hx)} ${r1(ey - hy)} 0 1 ${r1(hx)} ${r1(hy)})`)
+    }
+    /* PR B: «A esta hora» junto a la punta, con las piezas y la cuota del MISMO instante (la cifra de la franja). */
+    if (m.cuotaEn && !m.cerrado && brechaRef.current && brechaLineaRef.current && brechaTextoRef.current) {
+      const t = horaDelCuadro(c)
+      const cuota = t != null ? m.cuotaEn(t) : null
+      const gap = aEstaHora(v, cuota, m.meta)
+      if (cuota != null && gap != null) {
+        brechaRef.current.setAttribute('transform', `translate(${r1(hx - g.x(u.min))} 0)`)
+        brechaLineaRef.current.setAttribute('y1', String(r1(g.y(v))))
+        brechaLineaRef.current.setAttribute('y2', String(r1(g.y(cuota))))
+        brechaLineaRef.current.setAttribute('stroke', gap < 0 ? 'var(--v2-mal)' : 'var(--v2-bien)')
+        /* Se mueve lo que se movió el medio de la brecha desde el reposo: así respeta la separación con «al cierre» (celular). */
+        const y0 = Number(brechaTextoRef.current.dataset.y0), mid0 = Number(brechaTextoRef.current.dataset.mid0)
+        brechaTextoRef.current.setAttribute('y', String(r1(y0 + (g.y(v) + g.y(cuota)) / 2 - mid0)))
+        brechaTextoRef.current.style.fill = gap < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))'
+        const txt = adelanteAtras(gap)
+        if (brechaTextoRef.current.textContent !== txt) brechaTextoRef.current.textContent = txt
+      }
     }
   }
   /* Sin dependencias a propósito: se vuelve a suscribir en cada render para leer el modelo vigente. */
@@ -359,9 +383,11 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
 
         {/* A esta hora: la brecha contra lo que tocaba, junto a la punta (la MISMA cifra de la franja y de Camino a la meta) */}
         {m.cuota && gap != null && (
-          <g className="eje-aparece" key={`brecha-${ultima.v}`}>
-            <line x1={r1(xAhora + (brechaIzq ? -14 : 14))} x2={r1(xAhora + (brechaIzq ? -14 : 14))} y1={r1(y(ultima.v))} y2={r1(y(m.cuota.piezas))} stroke={gap < 0 ? 'var(--v2-mal)' : 'var(--v2-bien)'} strokeWidth={1.5} />
+          <g ref={brechaRef} className="eje-aparece" key={`brecha-${ultima.v}`}>
+            <line ref={brechaLineaRef} x1={r1(xAhora + (brechaIzq ? -14 : 14))} x2={r1(xAhora + (brechaIzq ? -14 : 14))} y1={r1(y(ultima.v))} y2={r1(y(m.cuota.piezas))} stroke={gap < 0 ? 'var(--v2-mal)' : 'var(--v2-bien)'} strokeWidth={1.5} />
             <text
+              ref={brechaTextoRef}
+              data-y0={yBrechaTxt} data-mid0={(y(ultima.v) + y(m.cuota.piezas)) / 2}
               x={r1(xAhora + (brechaIzq ? -20 : 20))} y={r1(yBrechaTxt)}
               textAnchor={brechaIzq ? 'end' : 'start'} fontSize={12} fontWeight={600} className="tabular-nums"
               style={{ fill: gap < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))', ...HALO }}
@@ -541,14 +567,16 @@ interface LecturaGlobo {
  * Todo del modelo ya armado. El minuto en curso usa EXACTAMENTE la punta y la cuota que ven la franja y Camino a la
  * meta (una sola definición de «a esta hora»); los demás, el trazo, la curva de la meta y la serie por minuto.
  */
-function leer(m: Modelo, min: number): LecturaGlobo {
+function leer(m: Modelo, min: number, vivas?: CifrasVivas | null): LecturaGlobo {
   const k0 = Math.floor(min)
   const kMid = k0 + 0.5
   const enAhora = k0 === Math.floor(m.ultima.min)
   const futuro = !enAhora && kMid > m.ultima.min
-  const acum = enAhora ? m.ultima.v : futuro ? (m.proy ? valorEnCurva([m.proy.desde, m.proy.hasta], kMid) : null) : valorEnCurva(m.trazo, kMid)
-  const tocaban = enAhora && m.cuota && !m.cerrado ? m.cuota.piezas : valorEnCurva(m.objetivo, kMid)
-  const dif = enAhora && m.aHora != null ? m.aHora : acum != null && tocaban != null && !futuro ? acum - tocaban : null
+  /* El minuto en curso, con las cifras del MISMO instante que la franja (PR B); sin ellas, las de reposo. */
+  const vivo = enAhora && vivas && vivas.aHora != null && !m.cerrado ? vivas : null
+  const acum = vivo ? vivo.hechas : enAhora ? m.ultima.v : futuro ? (m.proy ? valorEnCurva([m.proy.desde, m.proy.hasta], kMid) : null) : valorEnCurva(m.trazo, kMid)
+  const tocaban = vivo ? vivo.cuota : enAhora && m.cuota && !m.cerrado ? m.cuota.piezas : valorEnCurva(m.objetivo, kMid)
+  const dif = vivo ? vivo.aHora : enAhora && m.aHora != null ? m.aHora : acum != null && tocaban != null && !futuro ? acum - tocaban : null
   const k = k0 - m.offsetMin
   const enSerie = k >= 0 && k < m.n
   const paradas = paradasEn(m.paradas, kMid)
@@ -818,6 +846,9 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   /* «A esta hora»: una sola definición para toda la vista (franja, este rótulo, el globo y Camino a la meta). */
   const mostradas = piezasMostradas(p.repro, p.piezas)
   const aHora = p.cerrado ? null : aEstaHora(mostradas, p.cuota?.piezas, p.meta)
+  /* PR B: la cuota en la hora de cada cuadro y las cifras del instante (globo del minuto en curso). */
+  const cuotaEn = useContext(VistaVivaCtx)?.cuotaEn ?? null
+  const vivas = useCifrasVivas()
   const nPrev = useRef<number | null>(null)
   /* Turno cerrado: el fin REAL (el de la cabecera) y el eje hasta lo que alcance, sin encogerse (un corte anticipado no lo acorta). */
   const finReal = p.cerrado && e.finRealMs != null && Number.isFinite(e.finRealMs) ? e.finRealMs : null
@@ -889,11 +920,11 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     return {
       w, d, iniMs: e.iniMs, totalMin, yMin: 0, yMax, rejilla, vent: null, n, offsetMin, suma, completos: conSerie ? minutosCompletos(minuto.maquinas) : 0,
       esperadoMin: conSerie ? esperadoPorMinuto(minuto.maquinas, n) : [], esperadoLinea, topBarra: Math.ceil((Math.max(esperadoLinea ?? 0, ...suma, 10) * 1.15) / 10) * 10, maquinas, trazo, previa, ultima, proy, detenida,
-      meta: p.meta, objetivo, previoPts, previoLabel: p.curva?.previo?.label ?? null, previoCifra, finReal: finReal != null, cuota: p.cuota ?? null, aHora, paradas: e.paradas,
+      meta: p.meta, objetivo, previoPts, previoLabel: p.curva?.previo?.label ?? null, previoCifra, finReal: finReal != null, cuota: p.cuota ?? null, aHora, cuotaEn, paradas: e.paradas,
       barraNueva, cerrado: p.cerrado, unidad: e.unidad,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se rehace con cada lectura (`reloj.version`) y con los datos del turno
-  }, [w, e, totalMin, finReal, p.piezas, p.proyeccion, p.meta, p.cuota, p.curva, p.cerrado, detenida, aHora, reloj.version])
+  }, [w, e, totalMin, finReal, p.piezas, p.proyeccion, p.meta, p.cuota, p.curva, p.cerrado, detenida, aHora, cuotaEn, reloj.version])
   useEffect(() => { nPrev.current = modeloBase?.n ?? nPrev.current })
 
   /* Con zoom, el dominio Y es el de los datos visibles en la ventana (hoy, ritmo de la meta, turno anterior, proyección);
@@ -983,7 +1014,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     return () => document.removeEventListener('pointerdown', fuera)
   }, [hayGlobo, medidor])
 
-  const info = modelo && cursor ? leer(modelo, cursor.min) : null
+  const info = modelo && cursor ? leer(modelo, cursor.min, vivas) : null
   const globoIzq = modelo && cursor ? modelo.d.pl + cursor.xv + 14 : 0
   const globoX = modelo ? (globoIzq + 280 > modelo.w ? Math.max(0, globoIzq - 28 - 280) : globoIzq) : 0
 

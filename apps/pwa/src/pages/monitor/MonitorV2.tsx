@@ -15,13 +15,13 @@
  */
 /* eslint-disable react-refresh/only-export-components -- el formato y los primitivos se comparten con AnalisisV2 (a esos solo se les agregó `export`) */
 import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Clock, Cpu, Filter, Minimize2, Wrench, X } from 'lucide-react'
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import type { PillTone } from '@/components/piel/Pill'
 import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import type { MonitorStatus } from '@/services/shoplogix/publicShiftMonitor.service'
-import type { PacePoint } from '@/services/shoplogix/monitorCompare'
+import { cuotaA, type PacePoint } from '@/services/shoplogix/monitorCompare'
 import type { HourlyRow } from '@/services/shoplogix/monitorHourly'
 import type { ParetoRow } from '@/services/shoplogix/monitorPareto'
 import type { SemanaReparto } from './repartoSemanal'
@@ -33,7 +33,9 @@ import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
 import type { PestanaMonitor } from './BarraLateralPC'
-import { piezasMostradas } from './aEstaHora'
+import { minutoDeDatos, piezasMostradas } from './aEstaHora'
+import { useCifrasVivas, VistaVivaCtx, type VistaViva } from './useCifrasVivas'
+import { CifraViva } from './CifraViva'
 import { adelanteAtras, cifraTurnoAnterior, deLaMeta, minutosCompletos } from './ejeTurno'
 import { FranjaCinta } from './FranjaCinta'
 import { filasDeBaader } from './baadersMinuto'
@@ -159,6 +161,26 @@ export function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNo
 export const Punto = ({ color }: { color: string }) => <i className="block h-3 w-3 rounded-full" style={{ background: color }} />
 
 // ── Primitivos de tarjeta ────────────────────────────────────────────────────
+
+/** «meta a las 14:32 10.667» del ampliado de Piezas: la cuota y su hora en el MISMO instante que la cifra (`useCifrasVivas`). */
+function MetaALaHoraViva({ hora, piezas }: { hora: string | null; piezas: number }) {
+  const v = useCifrasVivas()
+  const h = v?.tMs != null ? relojDe(v.tMs) : hora
+  return (
+    <span className="text-[13px] tabular-nums text-muted-foreground">
+      meta {h ? `a las ${h}` : 'a esta hora'} <b className="font-semibold text-foreground">{int(v?.cuota ?? piezas)}</b>
+    </span>
+  )
+}
+
+/** «Faltan» / «Meta superada» del ampliado, con las piezas del mismo instante que la cifra grande. */
+function FaltanViva({ meta, mostradas }: { meta: number; mostradas: number }) {
+  const hechas = useCifrasVivas()?.hechas ?? mostradas
+  const pct = Math.round((hechas / meta) * 100)
+  return hechas >= meta
+    ? <FilaCifra title="Meta superada" value={hechas - meta > 0 ? `${int(hechas - meta)} pz adelante` : 'en la meta'} valueSub={`${pct} % hecho`} />
+    : <FilaCifra title="Faltan" value={`${int(meta - hechas)} pz`} valueSub={`${pct} % hecho`} />
+}
 
 function Cifra({ valor, unidad, chica }: { valor: ReactNode; unidad?: string; chica?: boolean }) {
   return (
@@ -869,7 +891,13 @@ export interface MonitorV2Props {
   /** El turno hora a hora (las mismas filas del Análisis) con la meta por hora y las piezas de cada Baader en esas mismas horas. */
   horas?: { filas: HourlyRow[]; metaPorHora: number | null; porMaquina: Array<{ nombre: string; piezas: number[] }> } | null
   /** Lo que tocaba a esta hora según la cuota (la MISMA cifra que «Camino a la meta»): la vara de la curva ampliada. */
-  cuota?: { piezas: number; hora: string | null } | null
+  cuota?: {
+    piezas: number
+    hora: string | null
+    /** La curva de la cuota (minutos desde la primera pieza) y ese origen: con ellos la vista la lee en la hora de cada cuadro. */
+    optimal?: PacePoint[] | null
+    primeraPiezaMs?: number | null
+  } | null
   meta: number | null
   proyeccion: number | null
   /** Promedio del turno andando: piezas ÷ minutos produciendo (el «promedio turno» del clásico). */
@@ -969,7 +997,18 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   /* Las piezas que la vista dice en TODAS partes (franja, gráfico, Camino a la meta y este detalle): lo que la reproducción
      muestra en reposo, o el contador vivo sin ella. El detalle de «Piezas del turno» no puede decir otra cifra que la celda. */
   const mostradas = piezasMostradas(p.repro, p.piezas)
-  const pct = p.meta ? Math.round((mostradas / p.meta) * 100) : null
+  /* PR B: el reloj y la cuota en la hora de CADA cuadro, para que hechas, cuota y «A esta hora» avancen juntas (`useCifrasVivas`). */
+  const optimal = p.cuota?.optimal ?? null
+  const origenCuota = p.cuota?.primeraPiezaMs ?? null
+  const metaVista = p.meta ?? null
+  const cuotaEn = useMemo(
+    () => (optimal && origenCuota != null ? (tMs: number) => cuotaA(optimal, minutoDeDatos(tMs, origenCuota), metaVista) : null),
+    [optimal, origenCuota, metaVista],
+  )
+  const vistaViva = useMemo<VistaViva>(
+    () => ({ reloj, cuotaEn, meta: metaVista, mostradas, cerrado: p.cerrado }),
+    [reloj, cuotaEn, metaVista, mostradas, p.cerrado],
+  )
   /* «Necesario para la meta» en base andando, como lo dice la franja; sin él (turno cerrado, sin pace) el de reloj de siempre. */
   const necesarioAndando = p.ritmoPedido ?? p.ritmoNecesario
   const cierreVsMeta = p.proyeccion != null && p.meta ? p.proyeccion - p.meta : null
@@ -1131,12 +1170,8 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   const ampliadoPiezas = (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <Cifra valor={int(mostradas)} unidad="pz" />
-        {p.cuota && !p.cerrado && (
-          <span className="text-[13px] tabular-nums text-muted-foreground">
-            meta {p.cuota.hora ? `a las ${p.cuota.hora}` : 'a esta hora'} <b className="font-semibold text-foreground">{int(p.cuota.piezas)}</b>
-          </span>
-        )}
+        <Cifra valor={<CifraViva reloj={reloj} respaldo={mostradas} />} unidad="pz" />
+        {p.cuota && !p.cerrado && <MetaALaHoraViva hora={p.cuota.hora} piezas={p.cuota.piezas} />}
       </div>
       {p.curva && (
         <Curva
@@ -1152,9 +1187,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
       <Grupo>
         {p.meta != null && <FilaCifra title="Meta del turno" value={`${int(p.meta)} pz`} />}
         {/* Con la meta cumplida «Faltan 0 pz» no dice nada: se dice cuánto se pasó. */}
-        {p.meta != null && (mostradas >= p.meta
-          ? <FilaCifra title="Meta superada" value={mostradas - p.meta > 0 ? `${int(mostradas - p.meta)} pz adelante` : 'en la meta'} valueSub={pct != null ? `${pct} % hecho` : undefined} />
-          : <FilaCifra title="Faltan" value={`${int(p.meta - mostradas)} pz`} valueSub={pct != null ? `${pct} % hecho` : undefined} />)}
+        {p.meta != null && <FaltanViva meta={p.meta} mostradas={mostradas} />}
         {previoUna
           ? <FilaCifra title={`${previoUna.label} ${previoUna.modo === 'al-cierre' ? 'al cierre' : 'a esta hora'}`} value={`${int(previoUna.piezas)} pz`} valueSub={`${adelanteAtras(previoUna.diff)} ${p.cerrado ? 'este turno' : 'hoy'}`} />
           : previoSinAlinear && p.vsAyer && <FilaCifra title={`${p.vsAyer.label} a esta hora`} value={`${int(p.vsAyer.pieces)} pz`} valueSub={`${adelanteAtras(p.vsAyer.diff)} hoy`} />}
@@ -1168,6 +1201,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   )
 
   return (
+    <VistaVivaCtx.Provider value={vistaViva}>
     <div ref={raizRef} className="monitor-v2 flex flex-col gap-[12px] min-[1600px]:gap-[16px]">
       {/* UN solo orden en todos los anchos: la parada en curso (si hay) → la franja de cifras → «Ritmo en vivo» (el gráfico
           unido) → «Cada máquina · aporte» → «Ver más del turno». Duelo, fallas y tiempo perdido viven bajo «Ver más». */}
@@ -1263,6 +1297,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         {detalle?.cuerpo}
       </PanelDetalle>
     </div>
+    </VistaVivaCtx.Provider>
   )
 }
 
