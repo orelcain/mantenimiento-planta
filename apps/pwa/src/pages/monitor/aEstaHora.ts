@@ -53,3 +53,42 @@ export function minutoDeDatos(tMs: number | null | undefined, primeraPiezaMs: nu
 export function barrasDesdeMs(inicioTurnoMs: number, primeraPiezaMs: number | null | undefined): number {
   return primeraPiezaMs != null && Number.isFinite(primeraPiezaMs) && primeraPiezaMs < inicioTurnoMs ? primeraPiezaMs : inicioTurnoMs
 }
+
+/** Lo que la vista necesita de un cuadro del reloj de datos (`CuadroReloj`), sin importar React. */
+interface CuadroParaHora {
+  valor: number | null
+  frac: number
+  previa: { valor: number; atMs: number | null } | null
+  ultima: { valor: number; atMs: number | null } | null
+}
+
+/**
+ * La hora de los datos de ESTE cuadro: con la reproducción, el segundo del minuto que se está reproduciendo
+ * (`previa.atMs` = inicio del minuto, `ultima.atMs` = su fin = T de `horaDeLosDatos`); con la recta entre dos lecturas,
+ * el mismo avance. En reposo (frac = 1) es exactamente T, así que la vista quieta dice lo mismo que el PR A2.
+ */
+export function horaDelCuadro(c: CuadroParaHora): number | null {
+  const u = c.ultima?.atMs
+  if (u == null || !Number.isFinite(u)) return null
+  const p = c.previa?.atMs
+  if (p == null || !Number.isFinite(p) || p >= u) return u
+  const f = Math.min(1, Math.max(0, c.frac))
+  return p + (u - p) * f
+}
+
+/**
+ * «A esta hora» de UN instante: las piezas de ese cuadro menos la cuota en SU hora (`cuotaEn(t)`), las dos del mismo
+ * segundo. Las piezas avanzan pieza a pieza y la cuota segundo a segundo: la resta no salta al cambiar de minuto.
+ * `respaldo` (las mostradas en reposo) cuando el cuadro aún no tiene valor.
+ */
+export function cifrasDelCuadro(
+  c: CuadroParaHora,
+  cuotaEn: ((tMs: number) => number | null) | null | undefined,
+  meta: number | null | undefined,
+  respaldo: number,
+): { hechas: number; cuota: number | null; aHora: number | null; tMs: number | null } {
+  const hechas = c.valor ?? respaldo
+  const tMs = horaDelCuadro(c)
+  const cuota = cuotaEn && tMs != null ? cuotaEn(tMs) : null
+  return { hechas, cuota, aHora: aEstaHora(hechas, cuota, meta), tMs }
+}

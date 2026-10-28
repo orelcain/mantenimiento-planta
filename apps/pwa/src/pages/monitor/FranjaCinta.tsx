@@ -15,6 +15,7 @@
  * por props que ya existían: aquí solo se ubican y se dicen. La marca «Shoplogix HH:MM» va UNA vez en la barra del
  * monitor (todas las cifras salen de la misma lectura), no en una celda. Lo que se toca lleva el chevron (`FranjaTocable`).
  */
+import { useCifrasVivas } from './useCifrasVivas'
 import { Wrench } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CapaAmpliada } from './AmpliarV2'
@@ -77,7 +78,9 @@ function PiezasVivas({ reloj, respaldo, meta, cuota, cerrado }: { reloj: RelojDe
       if (pctRef.current && (t !== ultimo.current || pctRef.current.textContent !== t)) { ultimo.current = t; pctRef.current.textContent = t }
     })
   }, [reloj, respaldo, meta])
-  const raya = meta && !cerrado && cuota != null && cuota > 0 && cuota < meta ? cuota : null
+  /* PR B: la cuota del MISMO instante que la cifra (avanza segundo a segundo con la reproducción del minuto). */
+  const cuotaViva = useCifrasVivas()?.cuota ?? cuota
+  const raya = meta && !cerrado && cuotaViva != null && cuotaViva > 0 && cuotaViva < meta ? cuotaViva : null
   return (
     <>
       <div className="fc-piezas-fila">
@@ -175,7 +178,9 @@ function ContraLaMeta({ p, e, reloj, abrir }: { p: MonitorV2Props; e: EjeDatos |
   const cierreMostrado = useCuentaCifra(p.proyeccion ?? 0)
   const meta = p.meta != null && p.meta > 0 ? p.meta : null
   const detenida = !p.cerrado && (reloj.detenida || (e?.detenidaEstado ?? false))
-  const aHora = p.cerrado ? null : aEstaHora(piezasMostradas(p.repro, p.piezas), p.cuota?.piezas, p.meta)
+  /* PR B: hechas y cuota del mismo instante del reloj (pieza a pieza); sin reloj de vista, la resta en reposo de siempre. */
+  const vivas = useCifrasVivas()
+  const aHora = p.cerrado ? null : (vivas?.aHora ?? aEstaHora(piezasMostradas(p.repro, p.piezas), p.cuota?.piezas, p.meta))
   const conProyeccion = !p.cerrado && p.proyeccion != null
   const color = (v: number) => (v < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))')
   /* La palabra («adelante», «atrás») ocupa el hueco de la unidad y, sin el signo, no se puede callar: cuando no cabe junto al número
