@@ -10,7 +10,7 @@
 import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import { Globo } from './AmpliarV2'
-import { bandasDeHoras, etiquetaHora, franjasEntre, horaTranscurrida, piezasAlMinuto, type BandaRival, type EventoTurno } from './duelo'
+import { bandasDeHoras, etiquetaHora, franjasEntre, horaTranscurrida, piezasALaMismaHora, type BandaRival, type EventoTurno } from './duelo'
 
 const int = (n: number) => Math.round(n).toLocaleString('es-CL')
 const minutosTxt = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`)
@@ -82,8 +82,8 @@ export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda
     const r = e.currentTarget.getBoundingClientRect()
     setM(Math.max(0, Math.min(maxMin, ((e.clientX - r.left) / r.width) * maxMin)))
   }
-  const vHoy = m != null ? (m <= (ultHoy?.minutes ?? 0) ? piezasAlMinuto(hoy.curva, m) : null) : null
-  const vRival = m != null && rival ? piezasAlMinuto(rival.curva, m) : null
+  const vHoy = m != null ? (m <= (ultHoy?.minutes ?? 0) ? piezasALaMismaHora(hoy.curva, m) : null) : null
+  const vRival = m != null && rival ? piezasALaMismaHora(rival.curva, m) : null
   const punto = (v: number | null, color: string, r: number) => v != null && m != null && (
     <span className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[rgb(var(--card))]" style={{ left: `${X(m)}%`, top: `${Y(v)}%`, width: r * 2, height: r * 2, background: color }} />
   )
@@ -176,7 +176,7 @@ export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda
         )}
         {/* A la misma hora: donde estaba el fantasma cuando hoy llegó hasta acá. */}
         {!mini && rival && ultHoy && m == null && ultHoy.minutes < (ultRival?.minutes ?? 0) - 1 && (() => {
-          const v = piezasAlMinuto(rival.curva, ultHoy.minutes)
+          const v = piezasALaMismaHora(rival.curva, ultHoy.minutes)
           return v != null ? <span className="pointer-events-none absolute h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${X(ultHoy.minutes)}%`, top: `${Y(v)}%`, background: rival.color, opacity: 0.7 }} /> : null
         })()}
         {!mini && m == null && finHoy && rotuloFin(hoy, finHoy, hoyArriba)}

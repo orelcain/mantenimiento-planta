@@ -6015,6 +6015,14 @@ function MonitorDelToken() {
         onIr: (tk) => navigate(rutaMonitorConservandoVista(tk, searchParams)),
       }
     : null
+  /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
+     solo trae la del turno vigente — Shoplogix la entrega en una
+     ventana de ~12 h). La usan las barras y el detalle de la cascada. */
+  const serieMinutoVista = esActual
+    ? (data.pulse?.serieMinuto
+      ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
+    : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
+
   const unidadDuelo = unidadDeMaquinas(live.machines)
   const nombresDuelo = nombresEfectivos(configDuelo, unidadDuelo)
   const datosDuelo = glass === 'v2' && vista
@@ -6028,6 +6036,8 @@ function MonitorDelToken() {
         rivalCurve: esActual ? data.rivalCurve : null,
         stats: data.shiftStats ?? [],
         forecast: data.forecastHistory ?? [],
+        serieHoy: serieMinutoVista ?? null,
+        series: data.seriesMinuto ?? null,
         overrides: configDuelo.overrides,
         overridesMeta: configDuelo.overridesMeta,
       })
@@ -6125,14 +6135,6 @@ function MonitorDelToken() {
       ))}
     </div>
   ) : null
-
-  /* Mirando un turno VIEJO, la serie sale del ARCHIVO (el pulso
-     solo trae la del turno vigente — Shoplogix la entrega en una
-     ventana de ~12 h). La usan las barras y el detalle de la cascada. */
-  const serieMinutoVista = esActual
-    ? (data.pulse?.serieMinuto
-      ?? data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId))
-    : data.seriesMinuto?.find((e) => e.shiftDocId === vista?.shiftDocId)
 
   /* Barras del minuto a minuto (las usan la tarjeta clásica y el v2). */
   const barrasMinuto: BarrasMinutoDatos | null = (() => {

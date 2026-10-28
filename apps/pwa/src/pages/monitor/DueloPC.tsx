@@ -37,7 +37,7 @@ import {
   type DuenoParada, type LadoHora,
 } from './dueloTextos'
 import {
-  COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, nombreCorto, piezasAlMinuto, textoCorreContraEstaCurva,
+  COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, nombreCorto, piezasAlMinuto, piezasALaMismaHora, textoCorreContraEstaCurva,
   type BandaRival, type DatosDuelo, type EquipoId, type NombresEquipos,
 } from './duelo'
 import {
@@ -574,8 +574,9 @@ function CifrasLienzo({ d, lados, reloj, hoyEq, nombres, banda, ultimoMin }: {
     )
   }
   if (rival && enCurso) {
-    const aHoraRival = piezasAlMinuto(rival.curva, ultimoMin) ?? 0
-    const dif = d.carrera?.hoyPz != null ? d.carrera.hoyPz - aHoraRival : 0
+    /* Las mismas cifras del indicador de carrera: `piezasALaMismaHora` al minuto de los datos, no al del reloj animado. */
+    const aHoraRival = d.carrera?.fantasmaPz ?? piezasALaMismaHora(rival.curva, d.carrera?.minuto ?? ultimoMin) ?? 0
+    const dif = d.carrera?.diferencia ?? 0
     const lider = dif === 0 ? null : dif > 0 ? hoy : rival
     return (
       <>
@@ -583,7 +584,7 @@ function CifrasLienzo({ d, lados, reloj, hoyEq, nombres, banda, ultimoMin }: {
           {fila(hoy.eq, hoy.nombre, `en vivo, ${hora}.ª hora`, <CifraViva reloj={reloj} respaldo={hoy.total} />)}
           {fila(rival.eq, rival.nombre, `a la misma hora, ${turno(rival)}`, int(aHoraRival))}
         </div>
-        {lider ? chip(lider.eq, `${lider.nombre} va ganando por ${int(Math.abs(dif))} pz · ${hora}.ª hora`) : chip('n', `Parejos · ${hora}.ª hora`)}
+        {lider ? chip(lider.eq, `${lider.nombre} va ${int(Math.abs(dif))} adelante · ${hora}.ª hora`) : chip('n', `Parejos · ${hora}.ª hora`)}
       </>
     )
   }
@@ -654,7 +655,7 @@ function Lienzo({ p, d, lados, reloj, compacto }: { p: DueloPCProps; d: DatosDue
     const filas = EQ.map((e) => {
       const l = m.lados[e]
       const tope = l ? (l.enCurso && m.vivo ? m.vivo.ultima.min : l.finMin) : 0
-      return l && cursor <= tope ? { l, pz: piezasAlMinuto(l.curva, cursor) ?? 0 } : null
+      return l && cursor <= tope ? { l, pz: piezasALaMismaHora(l.curva, cursor) ?? 0 } : null
     })
     const [a, b] = filas
     return { filas, dif: a && b ? a.pz - b.pz : null }
@@ -740,7 +741,7 @@ function PorQue({ d, nombres, extra, compacto, lados }: { d: DatosDuelo; nombres
   const orden = [...FILAS_PQ.slice(0, 4)].sort((a, b) => (c.cardenas?.min[b.k] ?? 0) + (c.rebolledo?.min[b.k] ?? 0) - (c.cardenas?.min[a.k] ?? 0) - (c.rebolledo?.min[a.k] ?? 0))
   const filas = [...orden, FILAS_PQ[4]!]
   const mx = Math.max(1, ...filas.flatMap((f) => EQ.map((e) => c[e]?.min[f.k] ?? 0)))
-const sub = `minutos de línea detenida, sin contar programadas${periodo !== 'jornada' ? ' · turnos cerrados' : ''}${periodo === 'jornada' && enCurso ? ' · hasta ahora' : ''}`
+  const sub = `minutos de línea detenida, sin contar programadas${periodo !== 'jornada' ? ' · turnos cerrados' : ''}${periodo === 'jornada' && pq.corte ? ` · ${pq.corte.etiqueta}` : ''}`
   const alcance = periodo === 'jornada' ? 'en la jornada' : periodo === 'semana' ? 'en la semana' : 'en el mes'
   const totalLado = (e: EquipoId) => (c[e] && c[e]!.sinDato < c[e]!.turnos ? ` · ${int(sinProgramadas(c[e]))} min` : '')
   const sinDatoN = EQ.reduce((a, e) => a + (c[e]?.sinDato ?? 0), 0)
@@ -989,9 +990,9 @@ function Riel({ d, nombres, lados, unidad, compacto }: { d: DatosDuelo; nombres:
     if (!soloHoy) return filasRiel({ d, lados, compacto, unidad })
     const b = d.carrera?.banda
     const ref = b && d.carrera ? piezasAlMinuto(b.media, Math.min(d.carrera.minuto, b.media[b.media.length - 1]?.minutes ?? 0)) : null
-    return filasSinRival(d, lados, ref)
+    return filasSinRival(d, ref)
   }, [d, lados, compacto, unidad, soloHoy])
-  const puntaje = useMemo(() => puntajeRiel(d, filas), [d, filas])
+  const puntaje = useMemo(() => puntajeRiel(d), [d])
   const per = useMemo(() => periodosRiel(d), [d])
   const jornadas = useMemo(() => filasJornadas(d), [d])
   const m = d.marcador
@@ -1045,7 +1046,7 @@ function Riel({ d, nombres, lados, unidad, compacto }: { d: DatosDuelo; nombres:
             <div className="dpc-sc"><span className="dpc-cap" style={{ color: COLOR_EQUIPO_TEXTO.rebolledo }}>{compacto ? nom('rebolledo') : `${nom('rebolledo')} · puntos`}</span><b style={{ color: COLOR_EQUIPO_TEXTO.rebolledo }}>{puntaje.r}</b></div>
             <span className="dpc-fn">
               {puntaje.provisional
-                ? <>{puntaje.pendientes} {puntaje.pendientes === 1 ? 'punto se juega' : 'puntos se juegan'}<br />en el cierre del turno</>
+                ? <>{puntaje.enJuego} {puntaje.enJuego === 1 ? 'punto en juego' : 'puntos en juego'}<br />se firman al cierre</>
                 : lider ? <>Gana <b style={{ color: COLOR_EQUIPO_TEXTO[lider] }}>{nom(lider)}</b><br />{difPz != null ? `${firmado(lider === 'cardenas' ? difPz : -difPz)} pz en la carrera` : ''}</> : 'Jornada empatada'}
             </span>
           </div>

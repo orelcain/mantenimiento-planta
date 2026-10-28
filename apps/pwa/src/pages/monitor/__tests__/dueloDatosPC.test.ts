@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { PublicMonitorLive, ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
-import { construirDuelo } from '../duelo'
+import { construirDuelo, puntajeJornada } from '../duelo'
 import {
   arranqueEnSerie, causasDeLinea, causasDeLive, causasDeStat, construirLados, construirPorQue, duenoPQ, escalaSemanas, esperadoDeLinea, filasJornadas,
   filasRiel, horasDeCurva, horasGanadas, maxMinutosEje, microDeLive, microDeStat, periodosRiel, puntajeRiel, semanasPC, sinProgramadas,
@@ -303,7 +303,8 @@ describe('riel: KPI a KPI, marcador, periodos y jornadas', () => {
     expect(ar.cTxt).toBe('15 min · 1.900 pz')
     expect(ar.rTxt).toBe('15 min · 1.700 pz')
     expect(filas.find((f) => f.id === 'alim-evisceradora 1')?.sub).toContain('carros')
-    expect(filas[filas.length - 1]).toMatchObject({ id: 'sostenida', c: 100, r: 80, gan: 'info' })
+    /* «Minutos a buen ritmo» ya no es una fila del riel: no es indicador y no da punto. */
+    expect(filas.some((f) => f.id === 'sostenida')).toBe(false)
   })
 
   it('en pantalla angosta las alimentaciones se juntan en una fila de puntos', () => {
@@ -315,14 +316,14 @@ describe('riel: KPI a KPI, marcador, periodos y jornadas', () => {
   })
 
   it('el marcador cerrado es el oficial (con Cárdenas a la izquierda) y el de un turno en curso es provisional', () => {
-    const filas = filasRiel({ d, lados, compacto: false })
-    const p = puntajeRiel(d, filas)!
+    const p = puntajeRiel(d)!
     expect(p.provisional).toBe(false)
     expect(p.c + p.r).toBeGreaterThan(0)
     expect(p.c).toBe(d.hoy.equipo === 'cardenas' ? d.marcador!.puntosA : d.marcador!.puntosB)
-    const enCurso = puntajeRiel({ ...d, hoy: { ...d.hoy, cerrado: false } }, filas.map((f) => (f.id.startsWith('alim') ? { ...f, gan: 'pend' as const } : f)))!
+    const abierto = { ...d.marcador!, cerrado: false, ganador: 'pendiente' as const }
+    const enCurso = puntajeRiel({ ...d, hoy: { ...d.hoy, cerrado: false }, puntaje: puntajeJornada(abierto) })!
     expect(enCurso.provisional).toBe(true)
-    expect(enCurso.pendientes).toBe(2)
+    expect(enCurso.enJuego).toBeGreaterThan(0)
   })
 
   it('semana y mes: jornadas ganadas y puntos por equipo; el mes lleva su nombre', () => {
