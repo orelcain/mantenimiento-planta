@@ -21,6 +21,7 @@ import type { NotaDeOperador } from './notasOperador'
 import { CapaAmpliada } from './AmpliarV2'
 import { useAnchoMin, useCerrarCapa } from './ampliarHooks'
 import { aEstaHora } from './aEstaHora'
+import { useCifrasVivas } from './useCifrasVivas'
 import { adelanteAtras } from './ejeTurno'
 import { RotuloFranja, Tocable } from './FranjaTocable'
 
@@ -237,9 +238,9 @@ function CeldaCamino({ titulo, tramos, cifras, ampliado, raya }: {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas,
+  tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas: hechasBase,
   piezasPulso, corteHora,
-  cuotaAhora, horaAhora, cpmAndando, costo, grupos, notasTurno, v2, ampliado,
+  cuotaAhora: cuotaBase, horaAhora: horaBase, cpmAndando, costo, grupos, notasTurno, v2, ampliado,
 }: {
   /**
    * Solo en el monitor v2. `celda`: la quinta celda de la franja de «El turno», sin marco (título, botón «Ampliar» que abre
@@ -309,6 +310,12 @@ export function TiempoDelTurno({
    */
   notasTurno?: string[]
 }) {
+  /* PR B: en el v2, hechas, cuota y su hora del MISMO instante del reloj (avanzan con la reproducción del minuto). En el
+     clásico (sin contexto) o cerrado, las de siempre. */
+  const vivas = useCifrasVivas()
+  const hechas = vivas ? vivas.hechas : hechasBase
+  const cuotaAhora = vivas?.cuota ?? cuotaBase
+  const horaAhora = vivas?.tMs != null ? new Date(vivas.tMs).toISOString().slice(11, 16) : horaBase
   /*
    * Acordeón por parte (mockup v3): cada parte de la barra abre SU detalle,
    * uno a la vez. Los minutos del turno viven como texto bajo «Hechas» — la

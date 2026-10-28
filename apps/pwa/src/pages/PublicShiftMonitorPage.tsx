@@ -6831,7 +6831,13 @@ function MonitorDelToken() {
               corteHora={corteHoraV2}
               causaParada={live.currentReason ? motivoEnEspanol(live.currentReason) : null}
               turnoId={vista?.shiftDocId ?? data.shiftDocId}
-              cuota={comparacion.optimalAtCurrentMinute != null ? { piezas: comparacion.optimalAtCurrentMinute, hora: horaDeCuota } : null}
+              cuota={comparacion.optimalAtCurrentMinute != null ? {
+                piezas: comparacion.optimalAtCurrentMinute,
+                hora: horaDeCuota,
+                /* PR B: la curva de la cuota y su origen, para que la vista la lea en la hora de CADA cuadro (`cuotaEn`). */
+                optimal: comparacion.optimal,
+                primeraPiezaMs: serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null,
+              } : null}
               horas={(() => {
                 /* Hora a hora de Piezas ahora: las filas del Análisis (misma serie, mismo arranque) y, por Baader, sus piezas en
                    esas MISMAS horas: salen de la serie por máquina alineada a la de la línea, así que suman la hora de la línea. */
