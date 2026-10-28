@@ -300,8 +300,8 @@ describe('riel: KPI a KPI, marcador, periodos y jornadas', () => {
     expect(car.c).toBeGreaterThan(car.r!) // la noche de Cárdenas (15.000) contra el día de Rebolledo (13.500)
     expect(car.gan).toBe('c')
     const ar = filas.find((f) => f.id === 'arranque')!
-    expect(ar.cTxt).toBe('15 · 1.900')
-    expect(ar.rTxt).toBe('15 · 1.700')
+    expect(ar.cTxt).toBe('15 min · 1.900 pz')
+    expect(ar.rTxt).toBe('15 min · 1.700 pz')
     expect(filas.find((f) => f.id === 'alim-evisceradora 1')?.sub).toContain('carros')
     expect(filas[filas.length - 1]).toMatchObject({ id: 'sostenida', c: 100, r: 80, gan: 'info' })
   })
@@ -311,7 +311,7 @@ describe('riel: KPI a KPI, marcador, periodos y jornadas', () => {
     const corto = filasRiel({ d, lados, compacto: true })
     expect(ancho.filter((f) => f.id.startsWith('alim')).length).toBe(2)
     expect(corto.filter((f) => f.id.startsWith('alim')).length).toBe(1)
-    expect(corto.find((f) => f.id === 'alim')!.cTxt).toMatch(/pt$/)
+    expect(corto.find((f) => f.id === 'alim')!.cTxt).toMatch(/puntos?$/)
   })
 
   it('el marcador cerrado es el oficial (con Cárdenas a la izquierda) y el de un turno en curso es provisional', () => {

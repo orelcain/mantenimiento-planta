@@ -14,6 +14,7 @@ import { useAnchoMin } from './ampliarHooks'
 import { Tarjeta } from './AmpliarV2'
 import { CarreraDueloV2 } from './CarreraDueloV2'
 import { DueloPC, type DueloPCExtra } from './DueloPC'
+import { SelectorLinea, type LineasMonitor } from './SelectorLinea'
 import { fijarEquipoDelTurno, guardarNombresDuelo } from './dueloConfig'
 import {
   COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, EQUIPOS, etiquetaHora, fechaCorreccion, nombreCorto, nombreEquipo, otroEquipo, relojDeMinuto, rotuloFantasma, rotuloTurno, textoCorreContraEstaCurva,
@@ -584,30 +585,8 @@ function EditorDuelo({ token, d, nombres, nombresGuardados, className }: { token
   )
 }
 
-/** Las otras líneas de la planta con monitor vigente (`lineasHermanas`) y el nombre de esta. */
-export interface LineasDuelo {
-  actual: string
-  hermanas: Array<{ nombre: string; token: string }>
-  onIr: (token: string) => void
-}
-
-/** «Eviscerado | Filete»: cambia de línea con el link público de la otra, sin sesión. */
-function SelectorLineaDuelo({ lineas, className }: { lineas: LineasDuelo; className?: string }) {
-  const todas = [{ nombre: lineas.actual, token: '' }, ...lineas.hermanas].sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
-  return (
-    <div className={className}>
-      <SegmentedControl
-        ariaLabel="Línea del duelo"
-        value={lineas.actual}
-        segments={todas.map((l) => ({ value: l.nombre, label: l.nombre }))}
-        onChange={(nombre) => {
-          const destino = lineas.hermanas.find((h) => h.nombre === nombre)
-          if (destino) lineas.onIr(destino.token)
-        }}
-      />
-    </div>
-  )
-}
+/** Antes vivía acá; es el mismo tipo del selector compartido. */
+export type LineasDuelo = LineasMonitor
 
 export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeEditar, nombresGuardados, lineas, pc }: DueloUiProps & {
   token: string | undefined
@@ -633,7 +612,7 @@ export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeE
           extra={pc}
           superior={hayHermanas || hayAviso ? (
             <>
-              {hayHermanas && <SelectorLineaDuelo lineas={lineas!} className="dpc-linea" />}
+              {hayHermanas && <SelectorLinea lineas={lineas!} className="dpc-linea" />}
               {hayAviso && <div className="ml-auto"><AvisoDuelo d={datos} nombres={nombres} /></div>}
             </>
           ) : null}
@@ -649,7 +628,7 @@ export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeE
   if (!datos) {
     return (
       <div className="monitor-v2 flex flex-col gap-3">
-        {lineas && lineas.hermanas.length > 0 && <SelectorLineaDuelo lineas={lineas} />}
+        {lineas && lineas.hermanas.length > 0 && <SelectorLinea lineas={lineas} />}
         <Tarjeta icono={<Trophy className="h-3.5 w-3.5" />} titulo="Duelo de equipos" sub="noche contra día">
           <p className="mt-3 text-[15px] text-muted-foreground">El duelo aparece cuando el turno trae su hora de inicio planificada.</p>
         </Tarjeta>
@@ -662,7 +641,7 @@ export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeE
   return (
     <div className="monitor-v2 duelo-pc flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 xl:grid-cols-12">
       {lineas && lineas.hermanas.length > 0 && (
-        <SelectorLineaDuelo lineas={lineas} className="lg:col-span-2 xl:order-first xl:col-span-12" />
+        <SelectorLinea lineas={lineas} className="lg:col-span-2 xl:order-first xl:col-span-12" />
       )}
       <div className="flex min-w-0 flex-col gap-3 lg:gap-4 xl:contents">
         <div className="xl:order-1 xl:col-span-12"><AvisoDuelo d={datos} nombres={nombres} /></div>
