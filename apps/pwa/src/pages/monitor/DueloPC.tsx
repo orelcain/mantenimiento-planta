@@ -27,8 +27,8 @@ import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, typ
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import type { PublicMonitorLive, ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
 import { useTamano } from './ampliarHooks'
-import { CifraViva } from './EjeTurnoPC'
-import { escalaY } from './ejeTurno'
+import { CifraViva } from './CifraViva'
+import { TRAMA_MANT, escalaY } from './ejeTurno'
 import type { Lectura } from './relojDeDatos'
 import { useRelojDeDatos, type CuadroReloj, type RelojDeDatos } from './useRelojDeDatos'
 import { useGloboDuelo } from './GloboDuelo'
@@ -97,8 +97,6 @@ function useCompactoPC() {
   return c
 }
 
-/** La trama de Mantención en HTML (swatches): rayas oscuras sobre el ámbar, para no depender solo del color. */
-const TRAMA_MANT = 'repeating-linear-gradient(135deg, rgb(0 0 0 / 0.4) 0 2px, transparent 2px 5px), var(--v2-mant)'
 const FONDO_DUENO: Record<DuenoPQ, string> = {
   mic: 'var(--v2-gris)', sin: 'var(--v2-gris)', mant: TRAMA_MANT, ext: 'var(--v2-ext)', prog: 'transparent',
 }

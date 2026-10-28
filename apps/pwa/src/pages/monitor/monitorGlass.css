@@ -296,34 +296,12 @@
   --v2-ext-texto: #7dd3fc;
 }
 
-/* ── Ritmo en vivo · 15 min (RitmoVivoV2.tsx) ─────────────────────────────
-   Una columna en el orden de lectura (parada, último minuto, tira, llenado, señales). En PC la tarjeta
-   vive en el riel derecho de 380/440 px: ahí tampoco caben tres columnas, así que se apila igual. */
-.rv-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+/* ── Detalle de «Ampliar» de Ritmo en vivo (RitmoVivoV2.tsx): llenado por Baader, señales y la banda de parada ── */
 .rv-l { padding-top: 14px; border-top: 1px solid rgb(var(--border) / 0.6); }
 .rv-cifra { font-size: 32px; }
 @media (min-width: 1024px) { .rv-cifra { font-size: 38px; } }
-.rv-crono { font-size: 28px; line-height: 34px; font-weight: 700; }
-.rv-punto { display: inline-block; width: 7px; height: 7px; border-radius: 99px; background: var(--v2-bien); }
-.rv-grid:has(.rv-parada[data-clase='micro']) .rv-punto { background: var(--v2-ext); }
-.rv-grid:has(.rv-parada[data-clase='detencion']) .rv-punto { background: var(--v2-mal); }
 .rv-micro { display: inline-block; width: 7px; height: 7px; border-radius: 99px; border: 2px solid var(--v2-ext); background: rgb(var(--card)); }
-.rv-ver { color: var(--v2-bien); }
 .rv-tira:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 4px; border-radius: 12px; }
-.rv-parada { padding: 12px 14px; background: color-mix(in srgb, var(--v2-gris) 16%, transparent); }
-.rv-parada[data-clase='micro'] { background: color-mix(in srgb, var(--v2-ext) 12%, transparent); }
-.rv-parada[data-clase='detencion'] { background: color-mix(in srgb, var(--v2-mal) 14%, transparent); }
-.rv-parada .rv-parada-texto { color: rgb(var(--foreground)); }
-.rv-parada[data-clase='micro'] .rv-parada-texto { color: var(--v2-ext-texto); }
-.rv-parada[data-clase='detencion'] .rv-parada-texto { color: var(--v2-mal-texto); }
-.rv-parada .rv-parada-icono { color: var(--v2-gris); }
-.rv-parada[data-clase='micro'] .rv-parada-icono { color: var(--v2-ext); }
-.rv-parada[data-clase='detencion'] .rv-parada-icono { color: var(--v2-mal); }
-/* El punto de «en vivo» late suave; con movimiento reducido queda quieto. */
-@media (prefers-reduced-motion: no-preference) {
-  .rv-punto { animation: rv-late 2s ease-in-out infinite; }
-}
-@keyframes rv-late { 50% { opacity: 0.35; } }
 
 /* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con
    degradé y brillo, colores de la paleta calma. */
@@ -452,6 +430,9 @@
   [data-glass='v2'] .v2-ritmo .ritmo-maquinas > div:first-child > .flex-1 { overflow: hidden; text-overflow: ellipsis; }
 }
 
+/* «Cada máquina · aporte» sin tabla (una sola Baader, como Filete) no pinta nada: tampoco su hueco en la columna. */
+.monitor-v2 > .v2-ritmo:empty { display: none; }
+
 /* Minuto a minuto: el desplazamiento es el gesto, la barra de scroll sobra. */
 .v2-minuto-scroll::-webkit-scrollbar { display: none; }
 
@@ -481,10 +462,21 @@ html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }
   [data-glass='v2'] .v2-barra-pc, .rv-banda { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-/* Banda de estado: la parada en curso con su cronómetro, pegada bajo la cabecera (BandaParadaV2). Solo PC:
-   en celular la parada sigue dentro de «Ritmo en vivo». Una sola vez: la tarjeta, «Ritmo de la línea» y el
-   aviso «Ahora mismo» la callan en PC cuando la banda existe. */
-.rv-banda { display: none; --tinte: var(--v2-gris); --texto-parada: rgb(var(--foreground)); }
+/* Banda de estado: la parada en curso con su cronómetro, arriba de «El turno» (BandaParadaV2), en PC y en celular:
+   «Ritmo en vivo» ya no es una tarjeta que la diga. En PC va pegada bajo la cabecera; en celular, en el flujo y con el
+   detalle en su propia línea. Una sola vez: «Ritmo de la línea» y el aviso «Ahora mismo» la callan cuando la banda existe. */
+.rv-banda {
+  --tinte: var(--v2-gris); --texto-parada: rgb(var(--foreground));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 52px; padding: 10px 16px; border-radius: 16px;
+  background: color-mix(in srgb, var(--tinte) 14%, rgb(var(--card) / 0.94));
+  border: 1px solid color-mix(in srgb, var(--tinte) 38%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+.rv-banda .rv-banda-detalle { flex: 1 1 100%; white-space: normal; overflow: visible; text-overflow: clip; }
+main:has(.rv-banda) .v2-ahora-mismo { display: none; }
+/* Con el gráfico de «El turno» en PC la línea detenida ya la dicen la franja y el gráfico: el aviso duplicaba y gastaba alto. */
+@media (min-width: 1280px) { main:has(.rv-grafico) .v2-ahora-mismo { display: none; } }
 .rv-banda[data-clase='micro'] { --tinte: var(--v2-ext); --texto-parada: var(--v2-ext-texto); }
 .rv-banda[data-clase='detencion'] { --tinte: var(--v2-mal); --texto-parada: var(--v2-mal-texto); }
 .rv-banda-icono { color: var(--tinte); }
@@ -493,24 +485,15 @@ html:not(.dark) [data-glass='v2'] .text-amber-700 { color: #92400e; }
 .rv-banda-detalle { color: rgb(var(--foreground) / 0.78); }
 @media (min-width: 1024px) {
   .rv-banda {
-    display: flex;
     position: sticky;
     top: 56px;
     z-index: 10;
-    grid-column: 1 / -1;
-    align-items: center;
+    flex-wrap: nowrap;
     gap: 18px;
-    min-height: 52px;
     padding: 0 20px;
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--tinte) 14%, rgb(var(--card) / 0.94));
-    border: 1px solid color-mix(in srgb, var(--tinte) 38%, transparent);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    backdrop-filter: blur(24px) saturate(160%);
     box-shadow: 0 8px 0 0 rgb(var(--background) / 0.55);
   }
-  .monitor-v2:has(.rv-banda) .rv-p { display: none; }
-  main:has(.rv-banda) .v2-ahora-mismo { display: none; }
+  .rv-banda .rv-banda-detalle { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* La línea «Detención desde… · sin producir hace…» de Ritmo de la línea: ya está en la banda. */
   .monitor-v2:has(.rv-banda) .v2-ritmo > section > div.rounded-ctl { display: none; }
 }
@@ -612,27 +595,11 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .v2-seg > button[aria-selected='true'] { color: rgb(var(--foreground)); }
 .v2-seg-ind { position: absolute; left: 3px; top: 3px; bottom: 3px; border-radius: 999px; background: rgb(var(--card)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.18); transition: transform 250ms cubic-bezier(0.32, 0.72, 0, 1); }
 
-/* Ritmo en vivo, exprés: la que baja, resaltada; las otras, dato chico. */
-.rv-chip { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 3px 10px; background: var(--v2-relleno); color: rgb(var(--foreground)); }
-.rv-chip[data-tono='atento'] { color: var(--v2-atento-texto); }
-.rv-chip[data-tono='mal'] { color: var(--v2-mal-texto); }
-.rv-baja { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 6px 12px; }
-.rv-baja-cifra { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
-.rv-baja-chispa { min-width: 0; }
-.rv-baja-sub { grid-column: 1 / -1; font-size: 13px; color: rgb(var(--muted-foreground)); }
-.rv-otros { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 13px; color: rgb(var(--muted-foreground)); }
-.rv-otros b { color: rgb(var(--foreground)); font-weight: 600; }
 .rv-micro-txt { color: var(--v2-ext-texto); font-weight: 600; }
 .rv-micro-marca { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: var(--v2-ext); margin-right: 4px; }
 .rv-amp-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: end; }
 @media (min-width: 1024px) { .v2-capa .rv-amp-top { grid-template-columns: 270px minmax(0, 1fr); gap: 24px; } }
 .v2-capa .rv-a { flex-wrap: wrap; row-gap: 8px; }
-
-/* Camino a la meta, exprés: barra + cuatro cifras. */
-.v2-camino-barra { display: flex; gap: 3px; height: 12px; }
-.v2-camino-barra > span { height: 100%; border-radius: 6px; }
-.v2-camino-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px 12px; margin: 0; }
-.v2-camino-cifras dd { margin: 0; }
 
 /* Anillo de meta (Piezas ahora): ÚNICO que anima stroke-dashoffset, 1,1 s una vez; SVG de 44 px. */
 .v2-anillo-pr { transition: stroke-dashoffset 1.1s cubic-bezier(0.22, 0.9, 0.24, 1); }
@@ -641,13 +608,6 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
    como pide DESIGN.md §8, a lo más 5 escalones: de la quinta en adelante entran juntas. */
 @keyframes v2-entra-tarjeta { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .v2-entra { animation: v2-entra-tarjeta 420ms cubic-bezier(0.22, 0.9, 0.24, 1) backwards; animation-delay: calc(var(--k, 0) * 35ms); }
-
-/* «Ahora» de «Ritmo de la línea» en PC: es el último minuto de «Ritmo en vivo» (lo marca el llamador solo si
-   las dos cifras son iguales). La tarjeta queda con media de 15 min, promedio del turno, techo y cada máquina. */
-@media (min-width: 1024px) {
-  .v2-ritmo [data-ahora-vivo='repetido'] { display: none; }
-  .v2-ritmo [data-ahora-vivo='repetido'] ~ .ml-auto { margin-left: 0; text-align: left; }
-}
 
 /* Barra lateral de PC: riel de 56 px que se abre a 200 sin empujar nada (fondo con scaleX, rótulos con opacity). */
 .v2-lateral { display: none; }
@@ -722,43 +682,116 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
   box-shadow: none;
 }
 
-/* ── Eje del turno · «El turno» en PC ancho (≥ 1280 px) ──────────────────────
-   Opción B del 27-10 (docs/mockups/monitor_pc_opcionB.html). Una pantalla sin scroll: el alto es el de la
-   ventana menos la cabecera (56) y el aire de la página (32); las tarjetas de siempre quedan debajo del pliegue.
-   Grilla (1920×1080): lienzo 1fr · riel de 440, separación 16. A 1366×768 (o menos de 1600 de ancho / 900 de
-   alto): riel de 340, separación 12, cifras de 52 a 38 px y de 38 a 28. Movimiento: solo transform y opacity. */
-.eje-pc { display: none; }
+/* ── Franja «cinta» de «El turno» (FranjaCinta.tsx · opción A del 28-10) ──────────────────────────────────────────
+   Cinco cifras de lado a lado, iguales en PC y celular. ≥ 768 px: UNA tarjeta de vidrio con las celdas separadas por aire
+   (sin bordes); debajo, cada celda en su tarjeta (grilla de 2) y Camino a la meta a todo el ancho. Tokens: ninguno nuevo
+   (`--v2-*` y los de texto de siempre). Cifras con `tabular-nums`; piso de 11 px (acá, 12 en las notas). */
+.fc { display: grid; min-width: 0; }
+.fc-celda { min-width: 0; }
 @media (min-width: 1280px) {
-  .monitor-v2[data-eje='si'] .v2-fila-cifras { display: none; }
-  main:has(.monitor-v2[data-eje='si']) .v2-ahora-mismo { display: none; }
-  .eje-pc { display: flex; flex-direction: column; gap: 12px; height: max(600px, calc(100dvh - 88px)); min-height: 0; }
-  .eje-pc .rv-banda { position: static; flex: none; }
-  .eje-vista { flex: 1 1 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; }
-  .eje-vista > section { min-height: 0; }
+  .fc { grid-template-columns: 1.2fr 1.45fr 1fr 1.3fr 1.15fr; column-gap: 28px; padding: 18px 22px; align-items: start; }
+  .fc[data-celdas='4'] { grid-template-columns: 1.2fr 1.45fr 1fr 1.3fr; }
 }
-.eje-riel { gap: 22px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; }
-.eje-sec { display: flex; flex-direction: column; flex-shrink: 0; min-width: 0; }
-.eje-par { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex-shrink: 0; }
-.eje-h3 { margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; color: rgb(var(--foreground)); }
-.eje-big { font-size: 52px; line-height: 56px; font-weight: 700; letter-spacing: -0.5px; color: rgb(var(--foreground)); }
-.eje-mid { font-size: 38px; line-height: 42px; font-weight: 700; letter-spacing: -0.3px; color: rgb(var(--foreground)); }
-.eje-u { margin-left: 4px; font-size: 17px; font-weight: 500; color: rgb(var(--muted-foreground)); }
-.eje-fn { margin: 0; font-size: 13px; line-height: 18px; color: rgb(var(--muted-foreground)); }
-.eje-cap { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
-.eje-fn b, .eje-cap b { font-weight: 600; }
-.eje-pista, .eje-escala { position: relative; height: 8px; margin-top: 10px; border-radius: 4px; background: var(--v2-relleno); }
-.eje-pista-llena { position: absolute; inset: 0; border-radius: 4px; background: var(--v2-bien); transform-origin: 0 50%; }
-.eje-pista-marca { position: absolute; top: -4px; width: 2px; height: 16px; border-radius: 1px; background: rgb(var(--foreground)); }
-.eje-escala-marca { position: absolute; top: -3px; width: 2px; height: 14px; border-radius: 1px; background: rgb(var(--foreground) / 0.7); }
-.eje-barrita { height: 8px; overflow: hidden; border-radius: 4px; background: var(--v2-relleno); }
-.eje-barrita > i { display: block; height: 100%; border-radius: 4px; }
-.eje-fila-dueno { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-.eje-fila-camino { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-.eje-tocable { cursor: pointer; border-radius: 12px; }
-.eje-tocable:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 4px; }
-.eje-enlace { align-self: flex-start; margin-top: 6px; font-size: 12px; line-height: 16px; color: rgb(var(--brand-ink)); cursor: pointer; }
-.eje-enlace:hover { text-decoration: underline; }
-.eje-enlace:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 2px; border-radius: 4px; }
+@media (min-width: 1600px) { .fc { column-gap: 40px; padding: 20px 28px; } }
+/* 768–1279: tres arriba y dos abajo (con cuatro celdas, la última ocupa el ancho). */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .fc { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 20px 24px; padding: 18px 22px; align-items: start; }
+  .fc-c-piezas, .fc-c-baader, .fc-c-ritmo { grid-column: span 2; }
+  .fc-c-meta, .fc-c-camino { grid-column: span 3; }
+  .fc[data-celdas='4'] .fc-c-meta { grid-column: 1 / -1; }
+}
+/* < 768: orden Piezas · Cada Baader / Ritmo · Contra la meta; Camino a la meta debajo, a todo el ancho. */
+.fc-apilada { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fc-apilada .fc-celda { padding: 14px 14px 16px; }
+.fc-apilada .fc-c-camino { grid-column: 1 / -1; }
+
+.fc-rotulo { font-size: 15px; line-height: 20px; font-weight: 600; color: rgb(var(--foreground)); }
+.fc-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 8px; }
+.fc-nota { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.fc-nota b { font-weight: 600; color: rgb(var(--foreground)); }
+.fc-nota-der { text-align: right; }
+.fc-nota-b { margin-top: 4px; font-size: 13px; line-height: 17px; }
+.fc-u { font-size: 17px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+.fc-tocable { cursor: pointer; border-radius: 12px; }
+.fc-tocable:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 4px; }
+
+/* 1 · Piezas del turno */
+.fc-piezas-fila { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; margin-top: 6px; }
+.fc-cifra-p { font-size: 40px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
+.fc-pct { font-size: 15px; color: rgb(var(--muted-foreground)); }
+.fc-pct b { font-weight: 600; color: rgb(var(--brand-ink)); }
+.fc-barra { position: relative; height: 16px; margin-top: 12px; }
+.fc-barra-riel, .fc-barra-hecho { position: absolute; left: 0; right: 0; top: 4px; height: 8px; border-radius: 999px; }
+.fc-barra-riel { background: var(--v2-reja); }
+.fc-barra-hecho { background: var(--v2-acento); transform-origin: 0 50%; }
+.fc-barra-raya { position: absolute; top: 0; width: 2px; height: 16px; border-radius: 1px; background: rgb(var(--foreground)); }
+
+/* 2 · Cada Baader */
+.fc-baaders { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.fc-baader { display: grid; grid-template-columns: 56px 72px minmax(0, 1fr); align-items: center; column-gap: 12px; }
+.fc-baader-nombre { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.fc-baader-nombre > i { width: 8px; height: 8px; flex: none; border-radius: 999px; }
+.fc-baader-pz { font-size: 20px; line-height: 24px; font-weight: 600; text-align: right; }
+.fc-baader-ritmo { min-width: 0; }
+.fc-baader-linea { display: flex; flex-wrap: nowrap; white-space: nowrap; justify-content: space-between; column-gap: 6px; font-size: 13px; line-height: 17px; color: rgb(var(--muted-foreground)); }
+.fc-baader-linea b { font-weight: 600; color: rgb(var(--foreground)); }
+.fc-baader-estado { font-weight: 600; }
+/* Con la palabra («detenida», «lenta») la unidad sobra: el encabezado ya dice «pz/min vs esperado» y la fila no cabe en una línea. */
+@media (max-width: 1599px) { .fc-baader-linea:has(.fc-baader-estado) .fc-pzmin { display: none; } }
+.fc-baader-pista { height: 4px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: var(--v2-reja); }
+.fc-baader-pista > div { height: 100%; border-radius: 999px; }
+@media (min-width: 1600px) { .fc-baaders { gap: 10px; margin-top: 10px; } }
+@media (max-width: 767px) {
+  .fc-baader { grid-template-columns: minmax(0, 1fr) auto; row-gap: 1px; }
+  .fc-baader-pz { font-size: 17px; line-height: 22px; }
+  .fc-baader-ritmo { grid-column: 1 / -1; }
+  .fc-baader-linea { font-size: 12px; line-height: 16px; white-space: nowrap; }
+}
+
+/* 3 · Ritmo de la línea */
+.fc-ritmo-fila { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+.fc-ritmo-fila .fc-u { font-size: 15px; }
+.fc-cifra-c { font-size: 32px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; color: rgb(var(--foreground)); }
+.fc-barra-fina { height: 6px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: var(--v2-reja); }
+.fc-barra-fina > div { height: 100%; border-radius: 999px; }
+
+/* 4 · Contra la meta + Mantención */
+.fc-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; row-gap: 4px; }
+.fc-apilada .fc-meta-grid { grid-template-columns: 1fr; row-gap: 10px; }
+.fc-cifra-m { margin: 4px 0 2px; font-size: 26px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; }
+.fc-cifra-m small { font-size: 15px; font-weight: 400; letter-spacing: 0; color: rgb(var(--muted-foreground)); }
+.fc-mant { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 12px; }
+.fc-mant-rotulo { font-size: 13px; line-height: 18px; font-weight: 600; color: rgb(var(--foreground)); }
+.fc-nota-m { margin: 0; font-size: 13px; line-height: 18px; }
+/* 1280–1599: con fallas la línea de Mantención pasaba a tres renglones y estiraba toda la franja; «vs previos» sigue en su detalle. */
+@media (min-width: 1280px) and (max-width: 1599px) { .fc-vs-previos { display: none; } }
+
+/* 5 · Camino a la meta (TiempoDelTurno v2="celda") */
+.fc-camino { min-width: 0; }
+.v2-amp.fc-amp { height: 32px; }
+.fc-camino-barra { display: flex; gap: 3px; height: 10px; margin-top: 12px; }
+.fc-camino-barra > span { height: 100%; border-radius: 999px; }
+.fc-camino-cifras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; margin: 12px 0 0; }
+.fc-camino-cifras dt { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.fc-camino-cifras dt > i { display: block; }
+.fc-camino-cifras dd { margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; color: rgb(var(--foreground)); }
+/* 1280–1599: la celda mide ~200 px y tres columnas iguales cortaban «En paradas» y «Programado» con puntos suspensivos:
+   columnas al ancho de su texto (11 px, el piso) repartidas de lado a lado. */
+@media (min-width: 1280px) and (max-width: 1599px) {
+  .fc-camino-cifras { grid-template-columns: repeat(3, auto); justify-content: space-between; column-gap: 8px; }
+  .fc-camino-cifras dt { gap: 4px; font-size: 11px; }
+}
+
+@media (min-width: 768px) {
+  .fc-cifra-p { font-size: 48px; }
+  .fc-cifra-c { font-size: 34px; }
+  .fc-cifra-m { font-size: 30px; }
+}
+@media (min-width: 1600px) {
+  .fc-cifra-p { font-size: 52px; }
+  .fc-cifra-c { font-size: 38px; }
+  .fc-cifra-m { font-size: 34px; }
+}
 
 /* Reloj de datos: la barra nueva crece desde su base y la proyección aparece (400 ms, la curva de la piel). */
 @keyframes eje-barra { from { transform: scaleY(0); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -767,19 +800,6 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .eje-aparece { animation: eje-aparece 400ms cubic-bezier(0.22, 0.9, 0.24, 1) backwards; }
 @media (prefers-reduced-motion: reduce) {
   .eje-barra-nueva, .eje-aparece { animation: none; }
-}
-
-@media (min-width: 1280px) and ((max-width: 1599px) or (max-height: 899px)) {
-  .eje-pc .eje-vista { grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
-  [data-glass='v2'] .eje-pc .eje-lienzo, [data-glass='v2'] .eje-pc .eje-riel { padding: 14px 16px; }
-  .eje-pc .eje-riel { gap: 12px; }
-  .eje-pc .eje-par { gap: 12px; }
-  .eje-pc .eje-big { font-size: 38px; line-height: 42px; }
-  .eje-pc .eje-mid { font-size: 28px; line-height: 32px; }
-  .eje-pc .eje-h3 { font-size: 15px; line-height: 20px; }
-  .eje-pc .eje-x13, .eje-pc .eje-sub { display: none; }
-  .eje-pc .eje-fila-dueno { grid-template-columns: 96px minmax(0, 1fr) auto; gap: 8px; }
-  .eje-pc .eje-fila-camino { grid-template-columns: 124px minmax(0, 1fr) auto; gap: 8px; }
 }
 
 /* ── Duelo en PC (≥ 1280 px) · opción B «Eje» (28-10) ─────────────────────────────────────────────────────────────
@@ -996,12 +1016,8 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
   .dpc-eqv { font-size: 22px; line-height: 26px; } .dpc-eqv > .dpc-u { font-size: 13px; }
 }
 
-/* Selector de línea (Eviscerado | Filete) arriba de El turno y de Análisis, solo PC. «El turno» descuenta su alto
-   (34 px del selector + 16 del `space-y-4` de la página) para seguir sin scroll. */
+/* Selector de línea (Eviscerado | Filete) arriba de El turno y de Análisis, solo PC. */
 .fila-linea-pc { display: none; }
 @media (min-width: 1024px) {
   .fila-linea-pc { display: block; }
-}
-@media (min-width: 1280px) {
-  main:has(.fila-linea-pc) .eje-pc { height: max(600px, calc(100dvh - 88px - 50px)); }
 }

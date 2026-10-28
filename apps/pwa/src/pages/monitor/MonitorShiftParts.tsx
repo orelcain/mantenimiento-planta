@@ -7,8 +7,8 @@
  */
 
 import { desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
-import { useState, type ReactNode } from 'react'
-import { ChevronDown, Flag } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Maximize2 } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { DUENO_META, veredictoFallaDeMaquina, type CausaDelTurno, type GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
@@ -18,8 +18,9 @@ import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/sh
 import { MonitorCompareChart } from './MonitorCompareChart'
 import type { Ventana } from './useZoomGesto'
 import type { NotaDeOperador } from './notasOperador'
-import { Tarjeta } from './AmpliarV2'
+import { CapaAmpliada } from './AmpliarV2'
 import { useCerrarCapa } from './ampliarHooks'
+import { aEstaHora } from './aEstaHora'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -36,7 +37,7 @@ const fmtDec = (n: number) => nf1.format(n || 0)
  * El estado se guarda por `id` en `localStorage`, si no cada refresco (30 s)
  * volvería a abrir todo.
  */
-export function Bloque({ id, titulo, extra, defaultAbierto = true, plano = false, children }: {
+export function Bloque({ id, titulo, extra, defaultAbierto = true, plano = false, extraPlano = false, children }: {
   id: string
   titulo: string
   /** Dato que se sigue viendo con el bloque cerrado. */
@@ -44,6 +45,8 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, plano = false
   defaultAbierto?: boolean
   /** Sin marco, sin título y sin plegar: el contenido a secas (lo usa la capa ampliada del v2, que ya trae su título). */
   plano?: boolean
+  /** En modo `plano`, el dato de `extra` abre el contenido en vez de perderse (Camino a la meta: «−977 pz a esta hora»). */
+  extraPlano?: boolean
   children: React.ReactNode
 }) {
   /*
@@ -75,7 +78,7 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, plano = false
     })
   }
 
-  if (plano) return <div>{children}</div>
+  if (plano) return <div>{extraPlano && extra != null && <p className="mb-3 text-[17px] leading-snug text-foreground">{extra}</p>}{children}</div>
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
       <button
@@ -145,6 +148,52 @@ function fmtDurMin(min: number): string {
 }
 
 /**
+ * La quinta celda de la franja de «El turno»: título, «Ampliar» (abre el MISMO ampliado de Camino a la meta), la barra de
+ * tramos proporcionales a la meta (separados 3 px) y tres cifras chicas. Sin marco: el vidrio lo pone la franja.
+ */
+function CeldaCamino({ titulo, tramos, cifras, ampliado }: {
+  titulo: string
+  tramos: Array<{ rotulo: string; color: string; ancho: number }>
+  cifras: Array<{ k: string; v: string; punto: string }>
+  ampliado?: ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const botonRef = useRef<HTMLButtonElement>(null)
+  const [abierta, setAbierta] = useState(false)
+  const cerrar = () => { setAbierta(false); botonRef.current?.focus({ preventScroll: true }) }
+  return (
+    <div ref={ref} className="fc-camino">
+      <div className="flex items-center justify-between gap-2">
+        <span className="fc-rotulo">{titulo}</span>
+        {ampliado != null && (
+          <button ref={botonRef} type="button" onClick={() => setAbierta((a) => !a)} aria-expanded={abierta} aria-haspopup="dialog" aria-label={`Ampliar ${titulo}`} className="v2-amp tap-44 fc-amp">
+            <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+            <span className="max-md:hidden">Ampliar</span>
+            <span className="md:hidden">Ver</span>
+          </button>
+        )}
+      </div>
+      <div className="fc-camino-barra" role="img" aria-label={tramos.map((t) => `${Math.round(t.ancho)} % ${t.rotulo}`).join(', ')}>
+        {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4 }} />)}
+      </div>
+      <dl className="fc-camino-cifras">
+        {cifras.map((c) => (
+          <div key={c.k} className="min-w-0">
+            <dt><i className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.punto }} aria-hidden /><span className="truncate">{c.k}</span></dt>
+            <dd className="tabular-nums">{c.v}</dd>
+          </div>
+        ))}
+      </dl>
+      {ampliado != null && (
+        <CapaAmpliada abierta={abierta} onCerrar={cerrar} origen={ref} titulo={titulo} sub="causas y paradas, por Baader">
+          {ampliado}
+        </CapaAmpliada>
+      )}
+    </div>
+  )
+}
+
+/**
  * Por qué no llegamos: la brecha explicada, y a dónde se fue el tiempo.
  *
  * ── La resta que faltaba ────────────────────────────────────────────────────
@@ -176,12 +225,13 @@ export function TiempoDelTurno({
   cuotaAhora, horaAhora, cpmAndando, costo, grupos, notasTurno, v2, ampliado,
 }: {
   /**
-   * Solo en el monitor v2. `expres`: la tarjeta de siempre en la grilla (barra + 4 cifras) con su botón «Ampliar»,
-   * que abre `ampliado`. `ampliado`: el componente completo, sin marco ni título (los pone la capa), con todas las
-   * filas abiertas y, bajo cada causa, cuánto fue de cada Baader. Sin `v2`: el de siempre.
+   * Solo en el monitor v2. `celda`: la quinta celda de la franja de «El turno», sin marco (título, botón «Ampliar» que abre
+   * `ampliado`, barra de tramos proporcionales a la meta y tres cifras chicas). `ampliado`: el componente completo, sin marco
+   * ni título (los pone la capa), con todas las filas abiertas y, bajo cada causa, cuánto fue de cada Baader. Sin `v2`: el
+   * de siempre.
    */
-  v2?: 'expres' | 'ampliado'
-  /** El contenido de la capa ampliada (la misma tarjeta con `v2="ampliado"`). Solo con `v2="expres"`. */
+  v2?: 'celda' | 'ampliado'
+  /** El contenido de la capa ampliada (la misma tarjeta con `v2="ampliado"`). Solo con `v2="celda"`. */
   ampliado?: ReactNode
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
@@ -360,7 +410,10 @@ export function TiempoDelTurno({
     ? Math.min(Math.round(cuotaAhora), metaOk)
     : null
   const referencia = cerrado ? metaOk : cuotaOk
-  const brecha = referencia != null && hechas != null ? Math.max(0, referencia - hechas) : null
+  /* «A esta hora» sale del helper de toda la vista (`aEstaHora`: mostradas − las que tocaban): la misma resta en la
+     franja, el gráfico y acá. Cerrado, la vara es la meta completa. */
+  const resta = referencia != null && hechas != null ? aEstaHora(hechas, referencia, metaOk) : null
+  const brecha = resta != null ? Math.max(0, -resta) : null
   const hayBrecha = brecha != null && brecha > 0
   /*
    * Meta cumplida (regla de Orel: «seamos positivos — ¿qué pasa si se llega?»).
@@ -370,7 +423,7 @@ export function TiempoDelTurno({
    * de Mantención que existe.
    */
   const superada = referencia != null && hechas != null && referencia > 0 && brecha === 0
-  const excedente = superada ? Math.max(0, Math.round(hechas! - referencia!)) : 0
+  const excedente = superada ? Math.max(0, resta ?? 0) : 0
   const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
   const porRitmo = (hayBrecha || superada) && perdidas != null ? Math.max(0, (brecha ?? 0) - perdidas) : null
   /**
@@ -421,26 +474,13 @@ export function TiempoDelTurno({
   const veredicto = veredictoFallaDeMaquina(gruposVisibles)
   const ultimoImputable = [...gruposVisibles].reverse().find((g) => g.dueno !== 'programado')?.dueno
 
-  /* ── v2 exprés: barra + cuatro cifras, y el botón «Ampliar» ──────────────────────────────────────
-     La barra reparte la meta (hechas / paradas / ritmo / por jugar) sin repetir la cifra de «Hechas», que es
-     la de «Piezas ahora». Las cuatro cifras salen de las mismas cuentas de arriba: nada se recalcula. */
-  if (v2 === 'expres') {
+  /* ── v2 celda: la quinta celda de la franja de «El turno» ─────────────────────────────────────────
+     La barra reparte la meta (hechas / paradas / ritmo / por jugar) en tramos proporcionales; las tres cifras chicas salen de
+     las mismas cuentas de arriba: nada se recalcula. «A esta hora» ya vive en la celda de al lado (la misma resta: `aEstaHora`). */
+  if (v2 === 'celda') {
     const titulo = hayBrecha || superada ? 'Camino a la meta' : 'A dónde se va el tiempo'
-    const sub = hayBrecha ? 'dónde quedaron las piezas que faltan' : superada ? 'en la meta; esto costaron las paradas' : 'cómo se repartió el tiempo del turno'
-    /* «7 min» con la unidad chica; desde una hora, «1 h 02 min» sin unidad aparte. */
-    const durCifra = (min: number) => (min >= 60 ? { v: fmtDurMin(min), u: '' } : { v: String(Math.round(min)), u: 'min' })
-    const cifras: Array<{ k: string; v: string; u: string; punto?: string; tono?: 'mal' | 'ok' }> = restaVisible && metaOk != null
-      ? [
-          { k: 'A esta hora', v: hayBrecha ? `−${fmtInt(brecha!)}` : `+${fmtInt(excedente)}`, u: 'pz', tono: hayBrecha ? 'mal' : 'ok' },
-          { k: 'Paradas', v: fmtInt(perdidasReales ?? perdidas ?? 0), u: 'pz', punto: 'var(--v2-mal)' },
-          ...(porJugarBarra > 0 && !cerrado ? [{ k: 'Por jugar', v: fmtInt(porJugarBarra), u: 'pz', punto: 'var(--v2-secundaria)' }] : []),
-          { k: 'Programado', ...durCifra(tb.plannedMin) },
-        ]
-      : [
-          { k: 'Produciendo', ...durCifra(tb.producingMin), punto: 'var(--v2-bien)' },
-          { k: 'Paradas evitables', ...durCifra(tb.recoverableMin), punto: 'var(--v2-mal)' },
-          { k: 'Programado', ...durCifra(tb.plannedMin) },
-        ]
+    /* «7 min» con la unidad; desde una hora, «1 h 02 min». */
+    const durTxt = (min: number) => (min >= 60 ? fmtDurMin(min) : `${Math.round(min)} min`)
     const tramos = restaVisible && metaOk != null && hechas != null && perdidas != null && porRitmo != null
       ? [
           { v: hechas, color: 'var(--v2-bien)', rotulo: 'hechas' },
@@ -453,32 +493,28 @@ export function TiempoDelTurno({
           { v: tb.plannedMin, color: 'var(--v2-prog)', rotulo: 'programado', ancho: pct(tb.plannedMin) },
           { v: tb.recoverableMin, color: 'var(--v2-mal)', rotulo: 'paradas evitables', ancho: pct(tb.recoverableMin) },
         ].filter((t) => t.v > 0)
-    return (
-      <Tarjeta icono={<Flag className="h-3.5 w-3.5" />} titulo={titulo} sub={sub} ampliado={ampliado} subAmpliado="causas y paradas, por Baader">
-        <div className="v2-camino-barra mt-4" role="img" aria-label={tramos.map((t) => `${Math.round(t.ancho)} % ${t.rotulo}`).join(', ')}>
-          {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4 }} />)}
-        </div>
-        <dl className="v2-camino-cifras mt-4">
-          {cifras.map((c) => (
-            <div key={c.k} className="min-w-0">
-              <dt className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                {c.punto && <i className="h-2 w-2 shrink-0 rounded-[3px]" style={{ background: c.punto }} aria-hidden />}
-                <span className="truncate">{c.k}</span>
-              </dt>
-              <dd className="mt-0.5 text-[24px] font-semibold leading-tight tracking-tight tabular-nums" style={c.tono ? { color: c.tono === 'mal' ? 'var(--v2-mal-texto)' : 'var(--v2-bien)' } : undefined}>
-                {c.v}{c.u && <small className="ml-1 text-[13px] font-medium text-muted-foreground">{c.u}</small>}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </Tarjeta>
-    )
+    const cifras: Array<{ k: string; v: string; punto: string }> = restaVisible && metaOk != null
+      ? [
+          { k: 'Hechas', v: fmtInt(hechas!), punto: 'var(--v2-acento)' },
+          { k: 'En paradas', v: fmtInt(perdidasReales ?? perdidas ?? 0), punto: 'var(--v2-mal)' },
+          porJugarBarra > 0 && !cerrado
+            ? { k: 'Por jugar', v: fmtInt(porJugarBarra), punto: 'var(--v2-prog)' }
+            : { k: 'Programado', v: durTxt(tb.plannedMin), punto: 'var(--v2-prog)' },
+        ]
+      : [
+          { k: 'Produciendo', v: durTxt(tb.producingMin), punto: 'var(--v2-acento)' },
+          { k: 'Paradas evitables', v: durTxt(tb.recoverableMin), punto: 'var(--v2-mal)' },
+          { k: 'Programado', v: durTxt(tb.plannedMin), punto: 'var(--v2-prog)' },
+        ]
+    return <CeldaCamino titulo={titulo} tramos={tramos} cifras={cifras} ampliado={ampliado} />
   }
 
   return (
     <Bloque
       id="tiempo"
       plano={todo}
+      /* En la capa ampliada la resta contra la cuota abre el contenido: es la MISMA cifra de «A esta hora» de la franja. */
+      extraPlano={todo && (hayBrecha || superada)}
       // El título depende de si hay algo que explicar: con la meta cumplida,
       // "Por qué no llegamos" sería un titular falso.
       /* «Camino a la meta» funciona perdiendo, ganando y en vivo — el nombre
@@ -1200,7 +1236,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquina
       {/* La categoría del curso, para que la etiqueta no sea nuestra: si el
           árbol dice que ATASCAMIENTO es MMPP, nadie discute la fila. */}
       {c.categoria && (
-        <p className="px-1 text-[9.5px] text-muted-foreground/80">
+        <p className="px-1 text-[11px] text-muted-foreground/80">
           {c.categoria}
           {c.extension && <span className="ml-1 normal-case tracking-normal">· fuera del curso</span>}
         </p>

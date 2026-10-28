@@ -15,7 +15,7 @@ import { Info, Maximize2, Minimize2 } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Sheet } from '@/components/piel'
-import { AbrirCtx, CapaCtx, useEsPc, useMovimientoReducido } from './ampliarHooks'
+import { AbrirCtx, CapaCtx, useAbrirPorClave, useEsPc, useMovimientoReducido } from './ampliarHooks'
 
 
 // ── Primitivos de tarjeta ────────────────────────────────────────────────────
@@ -66,16 +66,7 @@ export function Tarjeta({ icono, titulo, sub, children, className = '', onAbrir,
   const [abierta, setAbierta] = useState(false)
   const conAmpliado = ampliado != null
   const previaAbierta = useRef(false)
-  /* Abrir por pedido ajeno: espera 400 ms para que la capa/hoja que lo pidió termine de cerrarse (dos hojas a la vez
-     dejarían el scroll de la página bloqueado). */
-  const claveVista = useRef(abrirCon)
-  useEffect(() => {
-    if (abrirCon === claveVista.current) return
-    claveVista.current = abrirCon
-    if (!abrirCon) return
-    const id = setTimeout(() => setAbierta(true), 400)
-    return () => clearTimeout(id)
-  }, [abrirCon])
+  useAbrirPorClave(abrirCon, () => setAbierta(true))
   /* Al reducir, el foco vuelve al botón que abrió (después de que la capa suelta el resto de la página). */
   useEffect(() => {
     if (previaAbierta.current && !abierta) botonRef.current?.focus({ preventScroll: true })

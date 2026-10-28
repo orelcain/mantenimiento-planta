@@ -1,28 +1,23 @@
 /**
- * «Ritmo en vivo · 15 min» del monitor v2, en dos niveles (patrón exprés / ampliado del mockup del 27-10).
+ * Lo que vive detrás de «Ritmo en vivo» en «El turno»: el detalle de «Ampliar» del gráfico y la banda de parada en curso.
+ * La tarjeta exprés de 15 min que había acá la reemplazó el gráfico unido (`GraficoRitmoVivo`, opción A «cinta» del 28-10).
  *
- * EXPRÉS (la tarjeta del riel): una sola pregunta, ¿cómo viene el ritmo AHORA y hacia dónde va?
- *  1. la parada en curso con su cronómetro (solo celular: en PC la dice la banda de arriba);
- *  2. un selector Línea · Ev 1 · Ev 2 · Ev 3 que cambia la tira y el «último minuto» a la suma o a UNA Baader
- *     contra SU esperado (`serieMinuto.maquinas[].esperado`);
- *  3. el último minuto cerrado y la tendencia en palabras;
- *  4. la tira de 15 barras (14 cerradas + el minuto en curso llenándose), con globo al pasar el mouse;
- *  5. el llenado: SOLO la máquina que baja va resaltada con su cifra; las otras, como dato chico.
+ * AMPLIADO (botón «Ampliar» del gráfico): el selector Línea · Ev 1 · Ev 2 · Ev 3 (la suma o UNA Baader contra SU esperado,
+ * `serieMinuto.maquinas[].esperado`), el último minuto cerrado con su tendencia en palabras, la tira grande de 15 min con
+ * su globo, el TURNO COMPLETO minuto a minuto (`MinutoTurnoV2`: línea y franjas por Baader, zoom, la parada marcada con
+ * «ver ›» de Camino a la meta), una franja de llenado por Baader (small multiples, mismo eje, cursor vertical común, globo
+ * con hora, % de llenado y cada micro detención con su duración REAL, `stopEvents[].s`), las señales sobrias que no
+ * afirman causas y «Último minuto, pieza a pieza» (`ReglasMinuto`). Sin pulso en vivo (turno cerrado o de otro día) queda
+ * solo el turno.
  *
- * AMPLIADO (botón «Ampliar»): el selector, la tira grande de 15 min con su globo, el TURNO COMPLETO minuto a minuto
- * (`MinutoTurnoV2`: línea y franjas por Baader, zoom, «Ver todo el turno» / «Últimos minutos», la parada marcada con
- * «ver ›» de Camino a la meta), una franja de llenado por Baader (small multiples, mismo eje, cursor vertical común,
- * globo con hora, % de llenado y cada micro detención con su duración REAL, `stopEvents[].s`) y las señales sobrias
- * que no afirman causas. Sin pulso en vivo (turno cerrado o de otro día) la tarjeta queda solo con el turno.
- *
- * NO repite la barra de meta ni el promedio del turno: eso vive en «Ritmo de la línea». La lógica está en
- * `ritmoVivo.ts`; todo es dato de Shoplogix ya publicado, nada se inventa.
+ * NO repite la barra de meta ni el promedio del turno: eso vive en la franja. La lógica está en `ritmoVivo.ts`; todo es
+ * dato de Shoplogix ya publicado, nada se inventa.
  */
-import { Gauge, MoveRight, Timer, TrendingDown, TrendingUp, Pause } from 'lucide-react'
+import { MoveRight, Timer, TrendingDown, TrendingUp, Pause } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
-import { Globo, Tarjeta } from './AmpliarV2'
-import { useAbrirAmpliado, useCuentaCifra } from './ampliarHooks'
+import { Globo } from './AmpliarV2'
+import { useCuentaCifra } from './ampliarHooks'
 import { MinutoTurnoV2, type EventoMarcado, type MinutoTurno } from './MonitorV2'
 import { ReglasMinuto } from './ReglasMinuto'
 import {
@@ -30,7 +25,6 @@ import {
   SEL_LINEA,
   cronometro,
   etiquetaMaquina,
-  maquinaQueBaja,
   paradaEnCurso,
   vistaDeSerie,
   type LineaLlenado,
@@ -78,16 +72,6 @@ function useReloj() {
     return () => clearInterval(id)
   }, [])
   return t - new Date(t).getTimezoneOffset() * 60_000
-}
-
-/** El «en vivo hh:mm:ss» del encabezado: su propio reloj, para que el resto no se redibuje cada segundo. */
-function RelojVivo() {
-  const ahora = useReloj()
-  return (
-    <span className="rv-vivo inline-flex items-center gap-1.5 text-[13px] tabular-nums text-muted-foreground">
-      <i className="rv-punto" aria-hidden /><span className="sr-only">en vivo </span>{hhmmss(ahora)}
-    </span>
-  )
 }
 
 /** «La línea · detención»: el mismo rótulo en la tarjeta (celular) y en la banda de estado (PC). */
@@ -209,74 +193,6 @@ function Tira({ v, horaCurso, cursoColor, ancho, alto = 128 }: { v: VistaSerie; 
 // ── Llenado por máquina ──────────────────────────────────────────────────────
 
 const ultimo = (l: LineaLlenado) => [...l.fills].reverse().find((x): x is number => x != null)
-/** Tono del trazo de una máquina: el de su caída si baja; si no, neutro. */
-const tonoTrazo = (l: LineaLlenado) => (l.tono ? COLOR[l.tono] : 'var(--v2-gris)')
-
-/** La mini-curva de la máquina que baja: sus minutos con dato, en su propia escala. */
-function Chispa({ l, ancho }: { l: LineaLlenado; ancho: number }) {
-  const h = 34
-  const vals = l.fills
-  const ok = vals.filter((x): x is number => x != null)
-  if (ok.length < 2) return null
-  const lo = Math.min(...ok) - 2
-  const hi = Math.max(...ok) + 2
-  const st = ancho / Math.max(1, vals.length - 1)
-  const tramos: string[][] = [[]]
-  vals.forEach((x, i) => {
-    if (x == null) { if (tramos[tramos.length - 1]!.length) tramos.push([]) } else tramos[tramos.length - 1]!.push(`${r1(i * st)},${r1(h - 4 - ((x - lo) / (hi - lo)) * (h - 8))}`)
-  })
-  const i = vals.reduce<number>((a, x, k) => (x != null ? k : a), -1)
-  const fin = ok[ok.length - 1]!
-  return (
-    <svg width={ancho} height={h} viewBox={`0 0 ${ancho} ${h}`} aria-hidden className="block">
-      {tramos.filter((t) => t.length > 1).map((t, k) => <polyline key={k} points={t.join(' ')} fill="none" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" style={{ stroke: tonoTrazo(l) }} />)}
-      <circle cx={r1(i * st)} cy={r1(h - 4 - ((fin - lo) / (hi - lo)) * (h - 8))} r={3.5} style={{ fill: tonoTrazo(l) }} />
-    </svg>
-  )
-}
-
-/** Exprés del llenado: la máquina que baja, grande; las otras, dato chico. Nadie se resalta si ninguna baja. */
-function LlenadoExpres({ r, cosa }: { r: RitmoVivo; cosa: string }) {
-  const multi = r.lineas.length > 1
-  const baja = maquinaQueBaja(r.lineas)
-  /* Con una sola máquina ES la protagonista; con varias, solo si baja. */
-  const foco = baja ?? (multi ? null : r.lineas[0] ?? null)
-  const otras = r.lineas.filter((l) => l !== foco)
-  const n = r.lineas[0]?.fills.length ?? 0
-  const microsAviso = r.lineas.filter((l) => l.microsRecientes >= 2)
-  const etq = (l: LineaLlenado) => etiquetaMaquina(l.nombre)
-  const fin = foco ? ultimo(foco) : undefined
-  return (
-    <div className="rv-l">
-      <h4 className="mb-1.5 text-[15px] font-semibold leading-tight text-foreground">{cosa}{multi ? ', por máquina' : ''}</h4>
-      {foco && fin != null ? (
-        <div className="rv-baja">
-          <span className="rv-chip" data-tono={foco.tono ?? 'neutra'}>{foco.baja ? `${multi ? `${etq(foco)} ` : ''}baja` : 'estable'}</span>
-          <span className="rv-baja-cifra tabular-nums" style={foco.tono ? { color: TEXTO_TONO[foco.tono] } : undefined}>{fin} %</span>
-          <div className="rv-baja-chispa"><Medido>{(w) => <Chispa l={foco} ancho={Math.min(150, w)} />}</Medido></div>
-          <span className="rv-baja-sub tabular-nums">
-            {foco.baja && foco.ini != null && foco.fin != null ? `de ${foco.ini} a ${foco.fin} % en ${n} min` : `${n} min medidos`}
-            {multi && otras.length > 0 && foco.baja && otras.every((o) => o.fin != null && o.fin >= 75) ? ' · las otras sobre 75 %' : ''}
-          </span>
-        </div>
-      ) : multi ? (
-        <p className="text-[13px] leading-snug text-muted-foreground">{r.lineas.every((l) => ultimo(l) == null) ? 'Sin minutos con la máquina andando para medir el llenado.' : 'Ninguna Baader baja: el llenado va parejo.'}</p>
-      ) : (
-        <p className="text-[13px] leading-snug text-muted-foreground">Sin minutos con la máquina andando para medir el llenado.</p>
-      )}
-      {(otras.length > 0 && multi) && (
-        <div className="rv-otros tabular-nums">
-          {otras.map((l) => {
-            const u = ultimo(l)
-            return <span key={l.id}>{etq(l)} <b>{u != null ? `${u} %` : '—'}</b></span>
-          })}
-          {microsAviso.map((l) => <span key={`m${l.id}`} className="rv-micro-txt"><i className="rv-micro-marca" aria-hidden />{etq(l)}: {l.microsRecientes} micro en 7 min</span>)}
-        </div>
-      )}
-    </div>
-  )
-}
-
 /** Franjas por Baader: small multiples con el mismo eje, cursor vertical común y globo con la micro y su duración real. */
 function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }) {
   const [idx, setIdx] = useState<number | null>(null)
@@ -370,48 +286,6 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
   )
 }
 
-// ── La tarjeta ───────────────────────────────────────────────────────────────
-
-export interface RitmoVivoV2Props {
-  /** Los últimos 15 min; null sin pulso en vivo (turno cerrado o de otro día): queda solo el turno completo. */
-  r: RitmoVivo | null
-  maquinas: MaquinaVivo[]
-  /** El turno completo minuto a minuto (ciclos de Shoplogix por máquina). */
-  turno: MinutoTurno | null
-  cerrado: boolean
-  /** La parada elegida con «ver ›» en Camino a la meta: abre el ampliado con ella marcada y la vista acercada. */
-  marca: EventoMarcado | null
-  onQuitarMarca: () => void
-  /** Promedio del turno (pz/min) de la línea (`linea`) y de cada máquina (por id), el de «aporte al promedio». */
-  promedios?: Record<string, number | null>
-  /** Ya pasó la hora de cierre (o el turno se cerró): no se muestra parada en curso ni se pide anotar causa. */
-  turnoTerminado?: boolean
-}
-
-/** «Turno ›»: abre el ampliado (el turno completo minuto a minuto). */
-function BotonTurno() {
-  const abrir = useAbrirAmpliado()
-  return <button type="button" onClick={() => abrir?.()} aria-label="Ver el turno completo minuto a minuto" className="rv-ver tap-44 inline-flex shrink-0 items-center text-[15px] font-semibold">Turno ›</button>
-}
-
-/** La parada en curso con su cronómetro (celular; en PC la dice la banda). */
-function ParadaTarjeta({ parada }: { parada: ParadaVivo }) {
-  const ahora = useReloj()
-  return (
-    <div className="rv-p">
-      <div className="rv-parada rounded-card" data-clase={parada.clase} role="status">
-        <div className="flex items-center gap-2.5">
-          <Timer className="h-5 w-5 shrink-0 rv-parada-icono" aria-hidden />
-          <span className="min-w-0 flex-1 text-[15px] font-semibold leading-tight rv-parada-texto">{rotuloParada(parada)}</span>
-          <span className="rv-crono tabular-nums rv-parada-texto" aria-label="Tiempo parada">{cronometro((ahora - parada.desdeMs) / 1000)}</span>
-        </div>
-        {avisoParada(parada) && <p className="mt-1.5 text-[15px] font-semibold leading-tight text-foreground">{avisoParada(parada)}</p>}
-        <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{detalleParada(parada)}</p>
-      </div>
-    </div>
-  )
-}
-
 /** El «último minuto» y la tendencia de lo que se está viendo (la línea o una Baader). */
 function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null }) {
   const t = v.tendencia
@@ -444,34 +318,73 @@ function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null
 
 const LEYENDA: Array<[Tono, string]> = [['bien', '≥75 %'], ['atento', '50–75'], ['mal', '<50 del esperado']]
 
-export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca, promedios, turnoTerminado }: RitmoVivoV2Props) {
-  const [sel, setSel] = useState(SEL_LINEA)
+/** Las opciones del selector: la línea y cada Baader (de la tira en vivo o, sin ella, del turno completo). */
+const opcionesDe = (r: RitmoVivo | null, turno: MinutoTurno | null) =>
+  [{ id: SEL_LINEA, etiqueta: 'Línea' }, ...(r ? r.porMaquina : turno?.maquinas ?? []).map((m) => ({ id: m.id, etiqueta: etiquetaMaquina(m.nombre) }))]
+
+/** Lo elegido: la serie de la línea o de una Baader; una elección que ya no existe (otra línea, otro turno) vuelve a la línea. */
+function seleccionDe(r: RitmoVivo | null, turno: MinutoTurno | null, sel: string) {
   const v = r ? vistaDeSerie(r, sel) : null
   const selId = v ? v.sel : turno?.maquinas.some((m) => m.id === sel) ? sel : SEL_LINEA
-  /* Elegida una Baader, el turno completo muestra solo esa; con «Línea», la suma y cada una. */
-  const turnoVista = useMemo(
-    () => (turno && selId !== SEL_LINEA ? { ...turno, maquinas: turno.maquinas.filter((m) => m.id === selId) } : turno),
-    [turno, selId],
-  )
-  /* Pasada la hora de cierre una «parada» ya no es una detención que haya que anotar: el turno terminó. */
-  const parada = turnoTerminado ? null : paradaEnCurso(maquinas)
-  const claseVivo = parada ? parada.clase : 'marcha'
-  const cursoColor = parada?.clase === 'detencion' ? 'var(--v2-mal)' : parada?.clase === 'micro' ? 'var(--v2-ext)' : 'var(--v2-bien)'
-  const nMaq = r ? r.porMaquina.length : turno?.maquinas.length ?? 0
-  const multi = nMaq > 1
-  const cosa = r?.unidad ? `${r.unidad[0]!.toUpperCase()}${r.unidad.slice(1)} con pieza` : 'Llenado'
-  const opciones = [{ id: SEL_LINEA, etiqueta: 'Línea' }, ...(r ? r.porMaquina : turno?.maquinas ?? []).map((m) => ({ id: m.id, etiqueta: etiquetaMaquina(m.nombre) }))]
-  const hayMicros = !!r && r.lineas.some((l) => l.microsDetalle.length > 0)
-  /* Con la máquina parada casi todo el tramo no hay trazo que dibujar: se dice en una línea. */
-  const medible = !!r && r.lineas.some((l) => l.fills.filter((q) => q != null).length >= 2)
-  const selector = multi ? <Selector opciones={opciones} valor={selId} onCambio={setSel} /> : null
-  const leyenda = (
+  return { v, selId }
+}
+
+/** El color de la barra del minuto en curso: el de la parada (detención = coral, micro = celeste) o el acento si marcha. */
+const colorCurso = (parada: ParadaVivo | null) => (parada?.clase === 'detencion' ? 'var(--v2-mal)' : parada?.clase === 'micro' ? 'var(--v2-ext)' : 'var(--v2-bien)')
+
+/** Los tres tonos de las barras: ≥75 %, 50–75 y <50 del esperado. */
+function LeyendaTonos() {
+  return (
     <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">
       {LEYENDA.map(([k, txt]) => (
         <span key={k} className="inline-flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-[2px]" style={{ background: COLOR[k] }} />{txt}</span>
       ))}
     </span>
   )
+}
+
+export interface RitmoVivoAmpliadoProps {
+  /** Los últimos 15 min; null sin pulso en vivo (turno cerrado o de otro día): queda solo el turno completo. */
+  r: RitmoVivo | null
+  /** El turno completo minuto a minuto (ciclos de Shoplogix por máquina). */
+  turno: MinutoTurno | null
+  cerrado: boolean
+  /** La parada elegida con «ver ›» en Camino a la meta: el turno completo se acerca a ella. */
+  marca: EventoMarcado | null
+  onQuitarMarca: () => void
+  /** Promedio del turno (pz/min) de la línea (`linea`) y de cada máquina (por id), el de «aporte al promedio». */
+  promedios?: Record<string, number | null>
+  /** Máquinas con su estado vivo y si el turno ya terminó: de ahí sale el color del minuto en curso. */
+  maquinas?: MaquinaVivo[]
+  turnoTerminado?: boolean
+  /** Con «Último minuto, pieza a pieza» (`ReglasMinuto`) bajo el último minuto: va una sola vez en toda la vista. */
+  conReglas?: boolean
+  /** La Baader elegida, si la comparte quien lo abre. Sin ella, el ampliado lleva su propia elección. */
+  sel?: string
+  onSel?: (id: string) => void
+}
+
+/**
+ * El detalle de «Ritmo en vivo»: selector Línea/Ev, último minuto con la tira de 15 min, el turno completo minuto a
+ * minuto (`MinutoTurnoV2`), el llenado por Baader, las señales y, con `conReglas`, «Último minuto, pieza a pieza».
+ * Lo abre el gráfico unido de «El turno» (`GraficoRitmoVivo`).
+ */
+export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel }: RitmoVivoAmpliadoProps) {
+  const [selLocal, setSelLocal] = useState(SEL_LINEA)
+  const sel = selProp ?? selLocal
+  const { v, selId } = seleccionDe(r, turno, sel)
+  /* Elegida una Baader, el turno completo muestra solo esa; con «Línea», la suma y cada una. */
+  const turnoVista = useMemo(
+    () => (turno && selId !== SEL_LINEA ? { ...turno, maquinas: turno.maquinas.filter((m) => m.id === selId) } : turno),
+    [turno, selId],
+  )
+  const cursoColor = colorCurso(turnoTerminado ? null : paradaEnCurso(maquinas ?? []))
+  const multi = (r ? r.porMaquina.length : turno?.maquinas.length ?? 0) > 1
+  const cosa = r?.unidad ? `${r.unidad[0]!.toUpperCase()}${r.unidad.slice(1)} con pieza` : 'Llenado'
+  const hayMicros = !!r && r.lineas.some((l) => l.microsDetalle.length > 0)
+  /* Con la máquina parada casi todo el tramo no hay trazo que dibujar: se dice en una línea. */
+  const medible = !!r && r.lineas.some((l) => l.fills.filter((q) => q != null).length >= 2)
+  const selector = multi ? <Selector opciones={opcionesDe(r, turno)} valor={selId} onCambio={onSel ?? setSelLocal} /> : null
 
   const senales = r && (
     <ul className="flex flex-col gap-2">
@@ -484,18 +397,19 @@ export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca,
     </ul>
   )
 
-  const ampliado = (
+  return (
     <div className="rv-amp space-y-5">
       {selector}
       {r && v && (
         <div className="rv-amp-top">
           <div className="flex min-w-0 flex-col gap-2">
             <UltimoMinuto v={v} promedio={promedios?.[v.sel] ?? null} />
-            {leyenda}
+            <LeyendaTonos />
           </div>
           <Medido className="min-w-0">{(w) => <Tira v={v} horaCurso={r.horaCurso} cursoColor={cursoColor} ancho={w} alto={132} />}</Medido>
         </div>
       )}
+      {conReglas && <ReglasMinuto />}
       {turnoVista && (
         <div className={r ? 'rv-l' : ''}>
           <h4 className="text-[15px] font-semibold leading-tight text-foreground">El turno completo, minuto a minuto</h4>
@@ -531,53 +445,14 @@ export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca,
       )}
     </div>
   )
-
-  return (
-    <Tarjeta
-      className="rv"
-      icono={<Gauge className="h-[18px] w-[18px]" aria-hidden />}
-      titulo={r ? 'Ritmo en vivo' : 'Ritmo del turno'}
-      sub={r ? 'últimos 15 minutos' : 'minuto a minuto'}
-      etiqueta={r ? 'Ritmo en vivo, últimos 15 minutos' : 'Ritmo del turno, minuto a minuto'}
-      datos={{ 'data-parada': claseVivo }}
-      derecha={r ? <span className="rv-reloj"><RelojVivo /></span> : undefined}
-      ampliado={ampliado}
-      subAmpliado={r ? (multi ? 'el turno completo y los últimos 15 minutos · la línea y cada Baader' : 'el turno completo y los últimos 15 minutos') : 'el turno completo, minuto a minuto'}
-      abrirCon={marca && turno ? `${marca.desdeMs}-${marca.hastaMs}` : null}
-    >
-      {r && v ? (
-        <div className="rv-grid mt-3">
-          {parada && <ParadaTarjeta parada={parada} />}
-          {selector}
-          <UltimoMinuto v={v} />
-          <ReglasMinuto />
-          <div className="rv-s">
-            <Medido>{(w) => <Tira v={v} horaCurso={r.horaCurso} cursoColor={cursoColor} ancho={w} />}</Medido>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              {leyenda}
-              <BotonTurno />
-            </div>
-          </div>
-          {r.lineas.length > 0 && <LlenadoExpres r={r} cosa={cosa} />}
-        </div>
-      ) : (
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <p className="text-[13px] leading-snug text-muted-foreground">{cerrado ? 'El turno terminado, minuto a minuto.' : 'Sin ritmo en vivo ahora: el turno, minuto a minuto.'}</p>
-          <BotonTurno />
-        </div>
-      )}
-    </Tarjeta>
-  )
 }
 
 // ── La banda de estado de PC ─────────────────────────────────────────────────
 
 /**
- * La parada en curso como UNA banda pegada bajo la cabecera, solo en PC (lg+): ahí «Ritmo en vivo»
- * vive en el riel y la parada dejaría de verse al bajar. Misma fuente (`paradaEnCurso`) y mismo
- * `cronometro` que la tarjeta, así el tiempo coincide. En PC la tarjeta, «Ritmo de la línea» y el
- * aviso «Ahora mismo» callan la parada (CSS `:has(.rv-banda)`); en celular la banda no existe.
- * Sin parada no dibuja nada.
+ * La parada en curso como UNA banda arriba de «El turno», en PC (pegada bajo la cabecera) y en celular (en el flujo).
+ * Misma fuente (`paradaEnCurso`) y mismo `cronometro` que el resto del monitor. Con la banda, el aviso «Ahora mismo» de la
+ * página calla la parada (CSS `:has(.rv-banda)`). Sin parada no dibuja nada.
  */
 export function BandaParadaV2({ maquinas, turnoTerminado }: { maquinas: MaquinaVivo[]; turnoTerminado?: boolean }) {
   const ahoraWall = useReloj()

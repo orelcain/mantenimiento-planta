@@ -1,42 +1,98 @@
 /**
- * Tests del eje del turno: eje que crece, proyección (una sola fuente para «Al cierre», detenida = plana),
- * trazo que no retrocede, tonos de Shoplogix, paradas en el eje y carriles que caben y no se pisan.
+ * Tests del gráfico «Ritmo en vivo»: escalas Y, horas del eje, zoom «Turno | 1 h | 15 min», proyección (una sola fuente
+ * para «Al cierre», detenida = plana), trazo que no retrocede, tonos de Shoplogix, filas por Baader sin falsos rojos,
+ * paradas en el eje y alturas que caben y no se pisan.
  */
 import { describe, expect, it } from 'vitest'
 import type { GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import {
-  CURVA_MIN, acumulado, disenar, escalaY, finDelEje, minutosVisibles, paradaEn, paradasEnEje, pasoMarcas, pctARitmo,
-  proyeccion, sumaPorMinuto, tonoRitmo, trazoHastaLectura, valorEnCurva,
+  acumulado, celdaBaader, disenar, escalaAcumulado, escalaY, esperadoPorMinuto, filasBaader, marcasEje, minutosCompletos, minutosVisibles, paradaEn,
+  paradasEnEje, pasoMarcas, pctAndando, pctARitmo, proyeccion, recortarCurva, sumaPorMinuto, tamanoGrafico, tonoRitmo, trazoHastaLectura,
+  valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
 } from '../ejeTurno'
 
-describe('eje que crece', () => {
-  it('al principio asoma 90 min por delante del ahora', () => {
-    expect(finDelEje(51, 450)).toBe(150)
-    expect(finDelEje(0, 450)).toBe(90)
+describe('escala Y del acumulado', () => {
+  it('con proyección 15.623 y meta 15.000: 0…16.000 y rejilla cada 4.000', () => {
+    expect(escalaAcumulado(15623)).toEqual({ paso: 2000, max: 16000, rejilla: 4000 })
   })
-  it('más adelante asoma la mitad de lo transcurrido', () => {
-    expect(finDelEje(240, 450)).toBe(360)
-    expect(finDelEje(200, 450)).toBe(300)
+  it('paso 1.000 hasta 8.000, 2.000 hasta 20.000 y 5.000 después; la rejilla va cada 2 pasos', () => {
+    expect(escalaAcumulado(7200)).toEqual({ paso: 1000, max: 8000, rejilla: 2000 })
+    expect(escalaAcumulado(8000)).toEqual({ paso: 1000, max: 8000, rejilla: 2000 })
+    expect(escalaAcumulado(8001)).toEqual({ paso: 2000, max: 10000, rejilla: 4000 })
+    expect(escalaAcumulado(20000)).toEqual({ paso: 2000, max: 20000, rejilla: 4000 })
+    expect(escalaAcumulado(21000)).toEqual({ paso: 5000, max: 25000, rejilla: 10000 })
   })
-  it('nunca pasa del fin del turno y desde los 300 min (5 h) ya se ve entero', () => {
-    expect(finDelEje(400, 450)).toBe(450)
-    expect(finDelEje(450, 450)).toBe(450)
-    expect(finDelEje(180, 450)).toBe(270)
-    expect(finDelEje(300, 450)).toBe(450)
+  it('el máximo nunca queda por debajo de lo que se dibuja y no deja la mitad de arriba vacía', () => {
+    for (const tope of [1, 950, 2546, 9000, 14543, 15000, 15623, 19999]) {
+      const { max } = escalaAcumulado(tope)
+      expect(max).toBeGreaterThanOrEqual(tope)
+      expect(max).toBeLessThan(tope + (tope > 8000 ? 2000 : 1000) + 1)
+    }
   })
-  it('crece de a pasos de 15 min, no minuto a minuto', () => {
-    expect(finDelEje(51, 450)).toBe(finDelEje(54, 450))
-    expect(finDelEje(61, 450)).toBe(finDelEje(51, 450) + 15)
-    for (const n of [7, 51, 133, 299]) expect(finDelEje(n, 450) % 15).toBe(0)
+  it('sin nada que dibujar da una escala mínima', () => {
+    expect(escalaAcumulado(0)).toEqual({ paso: 1000, max: 1000, rejilla: 2000 })
   })
-  it('marcas cada 30 min en eje corto y cada hora en el largo', () => {
-    expect(pasoMarcas(150)).toBe(30)
-    expect(pasoMarcas(450)).toBe(60)
-  })
-  it('la escala Y es redonda y deja aire sobre el tope', () => {
+  it('la escala del Duelo no cambió (la usa DueloPC)', () => {
     expect(escalaY(2546)).toEqual({ paso: 1000, max: 3000 })
     expect(escalaY(14543)).toEqual({ paso: 5000, max: 20000 })
     expect(escalaY(9000)).toEqual({ paso: 2000, max: 10000 })
+  })
+})
+
+describe('horas del eje X', () => {
+  it('pantalla de 1920: cada 30 min y sin la marca pegada al «ahora» (02:35)', () => {
+    const m = marcasEje({ totalMin: 450, pxPorMin: 3.6, minPx: 100, ahoraMin: 305, ahoraPx: 64 })
+    expect(m[0]).toBe(0)
+    expect(m[m.length - 1]).toBe(450)
+    expect(m).not.toContain(300)
+    expect(m).toContain(330)
+    expect(m).toContain(270)
+  })
+  it('1366: cada hora y el fin del turno', () => {
+    expect(marcasEje({ totalMin: 450, pxPorMin: 2.5, minPx: 100, ahoraMin: null, ahoraPx: 0 })).toEqual([0, 60, 120, 180, 240, 300, 360, 420, 450])
+  })
+  it('375: cada 2 h y el fin del turno', () => {
+    expect(marcasEje({ totalMin: 450, pxPorMin: 0.58, minPx: 64, ahoraMin: null, ahoraPx: 0 })).toEqual([0, 120, 240, 360, 450])
+  })
+  it('el fin del turno no se rotula si quedaría pegado a la última marca', () => {
+    const m = marcasEje({ totalMin: 455, pxPorMin: 3.6, minPx: 100, ahoraMin: null, ahoraPx: 0 })
+    expect(m[m.length - 1]).toBe(450)
+  })
+  it('el paso baja al acercarse: con «15 min» (108 px por minuto) hay una marca por minuto', () => {
+    expect(pasoMarcas(108, 100)).toBe(1)
+    expect(pasoMarcas(3.6, 100)).toBe(30)
+    expect(pasoMarcas(0.001, 100)).toBe(240)
+  })
+  it('sin turno o sin ancho no hay marcas', () => {
+    expect(marcasEje({ totalMin: 0, pxPorMin: 3, minPx: 100, ahoraMin: null, ahoraPx: 0 })).toEqual([])
+    expect(marcasEje({ totalMin: 450, pxPorMin: 0, minPx: 100, ahoraMin: null, ahoraPx: 0 })).toEqual([])
+  })
+})
+
+describe('zoom «Turno | 1 h | 15 min»', () => {
+  it('«Turno» no tiene ventana: se ve todo', () => {
+    expect(ventanaDe('turno', 305, 450)).toBeNull()
+  })
+  it('«1 h» y «15 min» terminan un poco por delante del ahora', () => {
+    expect(ventanaDe('1h', 305, 450)).toEqual({ desdeMin: 254, hastaMin: 314 })
+    const v = ventanaDe('15m', 305, 450)!
+    expect(v.hastaMin - v.desdeMin).toBeCloseTo(15, 9)
+    expect(v.hastaMin).toBeCloseTo(307.25, 9)
+  })
+  it('no se sale del turno: al principio parte en 0 y al final termina en el cierre', () => {
+    expect(ventanaDe('1h', 10, 450)).toEqual({ desdeMin: 0, hastaMin: 60 })
+    expect(ventanaDe('1h', 450, 450)).toEqual({ desdeMin: 390, hastaMin: 450 })
+    expect(ventanaDe('1h', 20, 30)).toEqual({ desdeMin: 0, hastaMin: 30 })
+  })
+  it('reconoce el atajo por el ancho de la ventana; un zoom a mano no es ninguno', () => {
+    expect(zoomActivo(null)).toBe('turno')
+    expect(zoomActivo({ desdeMin: 254, hastaMin: 314 })).toBe('1h')
+    expect(zoomActivo({ desdeMin: 292, hastaMin: 307 })).toBe('15m')
+    expect(zoomActivo({ desdeMin: 100, hastaMin: 250 })).toBeNull()
+  })
+  it('el tope de zoom del hook deja alcanzar «15 min» en cualquier turno', () => {
+    for (const total of [60, 450, 600]) expect(zoomMaxPara(total)).toBeGreaterThanOrEqual(total / 15)
+    expect(zoomMaxPara(60)).toBe(12)
   })
 })
 
@@ -62,6 +118,13 @@ describe('trazo de la curva', () => {
     expect(valorEnCurva(ps, 5)).toBe(50)
     expect(valorEnCurva(ps, 11)).toBeNull()
     expect(valorEnCurva([], 1)).toBeNull()
+  })
+  it('recorta la curva del turno anterior en el fin del eje sin extrapolar', () => {
+    const ps = [{ min: 0, v: 0 }, { min: 10, v: 100 }, { min: 20, v: 300 }]
+    expect(recortarCurva(ps, 15)).toEqual([{ min: 0, v: 0 }, { min: 10, v: 100 }, { min: 15, v: 200 }])
+    expect(recortarCurva(ps, 30)).toEqual(ps)
+    expect(recortarCurva(ps, 10)).toEqual([{ min: 0, v: 0 }, { min: 10, v: 100 }])
+    expect(recortarCurva([], 10)).toEqual([])
   })
 })
 
@@ -103,7 +166,8 @@ describe('minuto a minuto', () => {
     expect(tonoRitmo(25, 51)).toBe('mal')
     expect(tonoRitmo(null, 51)).toBe('sin')
     expect(tonoRitmo(0, null)).toBe('sin')
-    expect(tonoRitmo(3, null)).toBe('bien')
+    /* Sin esperado no hay vara con qué juzgar: con piezas tampoco es «bien» (misma regla que ritmoVivo.ts). */
+    expect(tonoRitmo(3, null)).toBe('sin')
   })
   it('% a ritmo cuenta solo los minutos con dato', () => {
     expect(pctARitmo([20, 20, 5, 12], 20)).toBe(50)
@@ -117,6 +181,118 @@ describe('minuto a minuto', () => {
     expect(minutosVisibles(m, false)).toBe(4)
     expect(minutosVisibles(m, true)).toBe(2)
     expect(minutosVisibles([], true)).toBe(0)
+  })
+  it('una serie más corta no borra el último minuto de las demás', () => {
+    const m = [{ cycles: [1, 2, 3] }, { cycles: [1, 2, 3, 4, 5] }]
+    expect(minutosVisibles(m, false)).toBe(5)
+    expect(sumaPorMinuto(m, 5)).toEqual([2, 4, 6, 4, 5])
+  })
+  it('para la cifra de la LÍNEA vale el último minuto que todas entregaron (el menor de los largos)', () => {
+    const m = [{ cycles: [1, 2, 3] }, { cycles: [1, 2, 3, 4, 5] }]
+    expect(minutosCompletos(m)).toBe(3)
+    expect(minutosCompletos([{ cycles: [1, 2] }, { cycles: [] }])).toBe(0)
+    expect(minutosCompletos([])).toBe(0)
+  })
+  it('el esperado de la línea de cada minuto suma solo a las máquinas que tienen ese minuto', () => {
+    const m = [{ cycles: [1, 2, 3], esperado: 19 }, { cycles: [1, 2], esperado: 16 }]
+    expect(esperadoPorMinuto(m, 3)).toEqual([35, 35, 19])
+    expect(esperadoPorMinuto([{ cycles: [1], esperado: null }], 1)).toEqual([null])
+    expect(esperadoPorMinuto([], 2)).toEqual([null, null])
+  })
+})
+
+describe('filas Ev: sin falsos rojos', () => {
+  const ini = Date.UTC(2026, 9, 27, 21, 30)
+  const desde = new Date(ini).toISOString()
+  const hora = (min: number) => new Date(ini + min * 60_000).toISOString()
+  const maq = (id: string, esperado: number | null, cycles: number[]) => ({ id, nombre: `Evisceradora ${id}`, esperado, cycles })
+
+  it('cada minuto cae en el tono y la palabra de Shoplogix', () => {
+    expect(celdaBaader(99, 11)).toEqual({ tono: 'bien', estado: 'andando' })
+    expect(celdaBaader(63, 12)).toEqual({ tono: 'atento', estado: 'lenta' })
+    expect(celdaBaader(42, 8)).toEqual({ tono: 'mal', estado: 'lenta' })
+    expect(celdaBaader(0, 0)).toEqual({ tono: 'mal', estado: 'detenida' })
+    expect(celdaBaader(null, 0)).toEqual({ tono: 'sin', estado: 'detenida' })
+    expect(celdaBaader(null, 5)).toEqual({ tono: 'sin', estado: 'parcial' })
+    /* La línea entera en cero sin una parada que lo explique: no se afirma «detenida». */
+    expect(celdaBaader(null, 0, true)).toEqual({ tono: 'sin', estado: 'sin-dato' })
+    expect(celdaBaader(null, 5, true)).toEqual({ tono: 'sin', estado: 'parcial' })
+  })
+
+  it('línea en cero: la fila queda neutra, no roja (el conteo crudo la pintaba mal)', () => {
+    const serie = { desde, maquinas: [maq('A', 19, [19, 19, 0, 0, 19]), maq('B', 16, [16, 16, 0, 0, 16]), maq('C', 16, [16, 16, 0, 0, 16])] }
+    expect(tonoRitmo(0, 19)).toBe('mal')
+    const filas = filasBaader(serie, 5)
+    for (const f of filas) {
+      expect(f.celdas.map((c) => c.tono)).toEqual(['bien', 'bien', 'sin', 'sin', 'bien'])
+      /* Sin una parada registrada que lo explique, el minuto en cero de TODA la línea es «sin dato», no «detenida». */
+      expect(f.celdas[2]!.estado).toBe('sin-dato')
+    }
+  })
+
+  it('línea en cero CON una parada registrada que cubre el minuto: sí es «detenida»', () => {
+    const serie = { desde, maquinas: [maq('A', 19, [19, 19, 0, 0, 19]), maq('B', 16, [16, 16, 0, 0, 16]), maq('C', 16, [16, 16, 0, 0, 16])] }
+    const paradas = { stopEvents: [0, 1, 2].map((m) => ({ r: 0, f: hora(2), s: 120, m })), stopReasons: ['Detencion'], stopMachines: ['A', 'B', 'C'], enCurso: [] }
+    for (const f of filasBaader(serie, 5, paradas)) {
+      expect(f.celdas.map((c) => c.estado)).toEqual(['andando', 'andando', 'detenida', 'detenida', 'andando'])
+    }
+  })
+
+  it('Baader lenta con la línea andando: roja solo bajo 50 %, ámbar entre 50 y 75', () => {
+    const serie = { desde, maquinas: [maq('A', 19, [19, 8, 12, 19]), maq('B', 16, [16, 16, 16, 16]), maq('C', 16, [16, 16, 16, 16])] }
+    const [a, b, c] = filasBaader(serie, 4)
+    expect(a!.celdas.map((x) => x.tono)).toEqual(['bien', 'mal', 'atento', 'bien'])
+    expect(a!.celdas[1]!.estado).toBe('lenta')
+    expect(a!.celdas[2]!.estado).toBe('lenta')
+    /* El llenado normalizado de cada minuto sale con las celdas: es la base del punto, la palabra y la barra de la franja. */
+    expect(a!.llenados).toEqual([100, 42, 63, 100])
+    expect(b!.celdas.every((x) => x.tono === 'bien' && x.estado === 'andando')).toBe(true)
+    expect(c!.celdas.every((x) => x.tono === 'bien')).toBe(true)
+  })
+
+  it('con la línea andando, una Baader en cero es «detenida» y roja', () => {
+    const serie = { desde, maquinas: [maq('A', 19, [19, 0, 19]), maq('B', 16, [16, 16, 16])] }
+    const [a] = filasBaader(serie, 3)
+    expect(a!.celdas[1]).toEqual({ tono: 'mal', estado: 'detenida' })
+  })
+
+  it('minuto parcial de arranque: se mide contra los segundos andando, no contra el minuto entero', () => {
+    /* A estuvo parada los primeros 25 s del minuto 1: andando 35 s. 11 de 19 contado crudo es 58 % (atento);
+       contra lo que daba andando (19 × 35/60 = 11,1) es 99 %: arrancó bien. */
+    const serie = { desde, maquinas: [maq('A', 19, [19, 11, 19]), maq('B', 16, [16, 16, 16])] }
+    const paradas = { stopEvents: [{ r: 0, f: hora(1), s: 25, m: 0 }], stopReasons: ['Detencion'], stopMachines: ['A', 'B'], enCurso: [] }
+    expect(tonoRitmo(11, 19)).toBe('atento')
+    const [a] = filasBaader(serie, 3, paradas)
+    expect(a!.celdas[1]).toEqual({ tono: 'bien', estado: 'andando' })
+  })
+
+  it('menos de 30 s andando no tiene dato: ni rojo ni verde', () => {
+    const serie = { desde, maquinas: [maq('A', 19, [19, 3, 19]), maq('B', 16, [16, 16, 16])] }
+    const paradas = { stopEvents: [{ r: 0, f: hora(1), s: 40, m: 0 }], stopReasons: ['Detencion'], stopMachines: ['A', 'B'], enCurso: [] }
+    const [a] = filasBaader(serie, 3, paradas)
+    expect(a!.celdas[1]).toEqual({ tono: 'sin', estado: 'parcial' })
+  })
+
+  it('la parada en curso (que aún no está en stopEvents) deja sin dato esos minutos', () => {
+    const serie = { desde, maquinas: [maq('A', 19, [19, 19, 19, 19]), maq('B', 16, [16, 16, 16, 0])] }
+    const paradas = { stopEvents: [], stopReasons: [], stopMachines: ['A', 'B'], enCurso: [{ id: 'B', desdeMs: ini + 3 * 60_000 }] }
+    const [a, b] = filasBaader(serie, 4, paradas)
+    expect(b!.celdas.map((x) => x.tono)).toEqual(['bien', 'bien', 'bien', 'sin'])
+    expect(a!.celdas[3]!.tono).toBe('bien')
+  })
+
+  it('sin esperado no hay vara: con piezas queda sin dato (no «andando»); una serie corta deja sin dato su último minuto', () => {
+    const serie = { desde, maquinas: [maq('A', null, [5, 0, 5, 5]), maq('B', 16, [16, 16])] }
+    const [a, b] = filasBaader(serie, 4)
+    expect(a!.celdas.map((x) => x.tono)).toEqual(['sin', 'sin', 'sin', 'sin'])
+    expect(a!.celdas.map((x) => x.estado)).toEqual(['sin-dato', 'detenida', 'sin-dato', 'sin-dato'])
+    expect(b!.celdas.map((x) => x.tono)).toEqual(['bien', 'bien', 'sin', 'sin'])
+  })
+
+  it('% a ritmo cuenta solo los minutos con dato', () => {
+    expect(pctAndando([{ tono: 'bien', estado: 'andando' }, { tono: 'bien', estado: 'andando' }, { tono: 'mal', estado: 'lenta' }, { tono: 'sin', estado: 'detenida' }])).toBe(67)
+    expect(pctAndando([{ tono: 'sin', estado: 'detenida' }])).toBeNull()
+    expect(pctAndando([])).toBeNull()
   })
 })
 
@@ -143,21 +319,50 @@ describe('paradas en el eje', () => {
   })
 })
 
-describe('diseño vertical', () => {
-  for (const [w, h, compacto] of [[1352, 880, false], [910, 590, true], [910, 520, true]] as const) {
-    it(`cabe y no se pisa en ${w}×${h}`, () => {
-      const d = disenar(w, h, 3, compacto)
-      expect(d.curva.h).toBeGreaterThanOrEqual(CURVA_MIN)
-      expect(d.barras.y0).toBeGreaterThan(d.curva.y0 + d.curva.h)
-      expect(d.carriles[0]!.y0).toBeGreaterThan(d.barras.y0 + d.barras.h)
-      for (let i = 1; i < d.carriles.length; i++) expect(d.carriles[i]!.y0).toBeGreaterThanOrEqual(d.carriles[i - 1]!.y0 + d.carriles[i - 1]!.h)
-      expect(d.paradas.y0).toBeGreaterThan(d.carriles[2]!.y0 + d.carriles[2]!.h)
-      expect(d.ejeX).toBeLessThanOrEqual(h - 4)
-      expect(d.plotW).toBeGreaterThan(300)
+describe('alturas del gráfico', () => {
+  it('el tamaño sale del ancho del gráfico: 1920, 1366 y 375', () => {
+    expect(tamanoGrafico(1806)).toBe('grande')
+    expect(tamanoGrafico(1480)).toBe('grande')
+    expect(tamanoGrafico(1479)).toBe('medio')
+    expect(tamanoGrafico(1276)).toBe('medio')
+    expect(tamanoGrafico(600)).toBe('medio')
+    expect(tamanoGrafico(599)).toBe('chico')
+    expect(tamanoGrafico(309)).toBe('chico')
+  })
+  it('con 3 Baader mide 504 / 384 / 322 px y las bandas del mockup', () => {
+    const g = disenar(1806, 'grande', 3, true)
+    const m = disenar(1276, 'medio', 3, true)
+    const c = disenar(309, 'chico', 3, true)
+    expect([g.alto, m.alto, c.alto]).toEqual([504, 384, 322])
+    expect([g.acum.h, m.acum.h, c.acum.h]).toEqual([290, 206, 160])
+    expect([g.barras!.h, m.barras!.h, c.barras!.h]).toEqual([84, 60, 48])
+    expect([g.carriles[0]!.h, m.carriles[0]!.h, c.carriles[0]!.h]).toEqual([14, 11, 10])
+    expect([g.paradas.h, m.paradas.h, c.paradas.h]).toEqual([14, 11, 10])
+  })
+  it('columna de rótulos: 52/48/44 a la izquierda y 128/104/4 a la derecha (en el celular los rótulos van dentro)', () => {
+    expect([disenar(1806, 'grande', 3, true), disenar(1276, 'medio', 3, true), disenar(309, 'chico', 3, true)].map((d) => [d.pl, d.pr]))
+      .toEqual([[52, 128], [48, 104], [44, 4]])
+    expect(disenar(1806, 'grande', 3, true).plotW).toBe(1626)
+  })
+  for (const [w, tam] of [[1806, 'grande'], [1276, 'medio'], [309, 'chico']] as const) {
+    it(`cada banda queda debajo de la anterior y las filas no se pisan (${w} px)`, () => {
+      const d = disenar(w, tam, 3, true)
+      expect(d.barras!.y0).toBeGreaterThanOrEqual(d.acum.y0 + d.acum.h + 16)
+      expect(d.carriles[0]!.y0).toBeGreaterThanOrEqual(d.barras!.y0 + d.barras!.h + 10)
+      for (let i = 1; i < d.carriles.length; i++) expect(d.carriles[i]!.y0).toBe(d.carriles[i - 1]!.y0 + d.carriles[i - 1]!.h + 3)
+      expect(d.paradas.y0).toBeGreaterThanOrEqual(d.carriles[2]!.y0 + d.carriles[2]!.h + 6)
+      expect(d.ejeX).toBe(d.paradas.y0 + d.paradas.h + 8)
+      expect(d.alto).toBe(d.ejeX + 18)
     })
   }
-  it('compacto: carriles de 18 y margen de 150; amplio: 26 y 170', () => {
-    expect(disenar(1000, 600, 3, true)).toMatchObject({ pr: 150, carriles: [{ h: 18 }, { h: 18 }, { h: 18 }] })
-    expect(disenar(1400, 900, 3, false)).toMatchObject({ pr: 170, carriles: [{ h: 26 }, { h: 26 }, { h: 26 }] })
+  it('con una sola Baader (Filete) el alto se ajusta; sin serie por minuto no hay barras ni filas', () => {
+    expect(disenar(1806, 'grande', 1, true).alto).toBe(504 - 2 * 14 - 2 * 3)
+    const sin = disenar(1806, 'grande', 3, false)
+    expect(sin.barras).toBeNull()
+    expect(sin.carriles).toEqual([])
+    expect(sin.alto).toBe(10 + 290 + 16 + 14 + 8 + 18)
+  })
+  it('1366×768 deja lugar: gráfico de 384 px + 118 de tarjeta (502) + franja de 153 + cabecera de 76 + aire de 12 ≤ 768', () => {
+    expect(76 + 153 + 12 + (disenar(1276, 'medio', 3, true).alto + 118)).toBeLessThanOrEqual(768)
   })
 })

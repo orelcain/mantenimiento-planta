@@ -87,8 +87,9 @@ import {
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
-import { BandaParadaV2, RitmoVivoV2 } from './monitor/RitmoVivoV2'
+import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
+import { piezasMostradas } from './monitor/aEstaHora'
 import { paradasEnEje } from './monitor/ejeTurno'
 import { ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
@@ -3669,7 +3670,7 @@ function BarrasMinuto({ datos, cerrado }: { datos: BarrasMinutoDatos; cerrado?: 
   )
 }
 
-function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, refAporteUltimo, producingMin, ahoraRepetido }: {
+function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDemostrado, onEditarSetPoint, cerrado, contexto, chispa, corteMs, ahoraWallMs, pulso, pulsoNodo, vivo, maquinas, parada, serieLinea, seriesMaquinas, barras, refAporte, refAporteUltimo, producingMin }: {
   /**
    * Qué TARJETA del tablero renderiza esta llamada (pedido de Orel, 30-08:
    * «separemos esto en 3 partes para poder acomodarlo mejor»). Era UNA
@@ -3677,7 +3678,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
    * minuto— y así ninguna se podía mover ni dimensionar por separado. El
    * call-site arma las props UNA vez y llama tres veces.
    */
-  parte: 'estado' | 'minuto' | 'rango'
+  parte: 'estado' | 'minuto' | 'rango' | 'maquinas'
   /**
    * Ritmo de ahora ANDANDO, en pz/min: los últimos 15 min descontando los
    * tramos parados. Va en esta base y no en la de reloj porque es contra lo
@@ -3718,12 +3719,6 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
   refAporteUltimo?: ReferenciaAporte | null
   /** Minutos produciendo de la línea en el turno visto: la puerta del delta. */
   producingMin?: number | null
-  /**
-   * v2 en PC: el «Ahora» de esta tarjeta ES el último minuto de «Ritmo en vivo» (la misma cifra del mismo
-   * contador): se marca para que la hoja de estilos de PC lo calle y la cifra viva una sola vez. Lo decide
-   * el llamador comparando los dos números, nunca se supone.
-   */
-  ahoraRepetido?: boolean
   /**
    * La línea NO está produciendo ahora mismo (colación o paro).
    *
@@ -3811,6 +3806,177 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
   const colorPunto = estado === 'ok'
     ? 'text-ink-ok' : estado === 'lento' ? 'text-ink-warn' : 'text-ink-crit'
 
+  /* ── Cada máquina: la tabla («ahora», aporte al promedio, vs último, vs prom. 5) ─────────────────────────────
+     Una función y no un trozo del JSX: la tarjeta de estado la lleva debajo de la cifra y `parte="maquinas"` la lleva SOLA
+     («Cada máquina · aporte» del v2, que ya no repite las cifras de ritmo). */
+  const tablaMaquinas = (): React.ReactNode => {
+    if (!(maquinas && maquinas.maquinas.length > 1)) return null
+    /* La columna izquierda, por prioridad (Orel, 27-08): el AHORA real de
+       cada máquina —el pulso del contador, que por construcción SUMA el
+       «Ahora» grande—, y solo si el desglose del pulso no está, la media
+       de 15 min (que suma la media de arriba). Dos varas posibles, nunca
+       las dos: cada una con su rótulo. */
+    const conPulsoMaq = !parada && !cerrado && vivo != null
+      && maquinas.maquinas.every((m) => m.pulsoCpm != null)
+    const conReparto = !conPulsoMaq && !parada && !cerrado
+      && maquinas.maquinas.every((m) => m.ahoraCpm != null)
+    /* Línea DETENIDA (o turno cerrado): el número grande de arriba muestra
+       0,0 y la columna desaparecía entera — «si es cero que salga cero»
+       (Orel, 29-08). Un hueco donde debería ir un cero se lee como dato
+       que falta; el cero dice lo que pasa. */
+    const conCero = Boolean(parada) || cerrado
+    const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
+    /* Los deltas solo tienen sentido sobre el aporte (la misma vara que la
+       muestra histórica) y con el turno ya rodado: ver APORTE_MIN_PROD_MIN.
+       Son DOS columnas (Orel, 31-08): contra el turno anterior y contra el
+       promedio de los últimos 5 del mismo turno. La del promedio se calla
+       cuando la muestra tiene un solo turno: repetiría la otra columna. */
+    const rodado = (producingMin ?? 0) >= APORTE_MIN_PROD_MIN
+    const conDeltaUlt = conAporte && rodado && refAporteUltimo != null
+    const conDelta5 = conAporte && rodado && refAporte != null && refAporte.turnos > 1
+    const conDelta = conDeltaUlt || conDelta5
+    /** Una celda de delta, alineada con su rótulo del encabezado. */
+    const celdaDelta = (
+      ref: ReferenciaAporte | null | undefined,
+      m: RitmosPorMaquina['maquinas'][number],
+    ) => {
+      const d = deltaAporte(ref ?? null, m.nombre, m.aporteCpm, producingMin)
+      if (d == null) {
+        return <span className="w-[56px] shrink-0 text-right text-footnote text-muted-foreground/60">·</span>
+      }
+      /* Menos de 0,3 pz/min es ruido: raya en tinta neutra — ni logro ni
+         caída. Con color, cada turno parecería un veredicto. */
+      const chico = Math.abs(d) < 0.3
+      return (
+        <span
+          className={`w-[56px] shrink-0 text-right text-footnote tabular-nums ${
+            chico ? 'text-muted-foreground' : d > 0 ? 'text-ink-ok' : 'text-ink-crit'
+          }`}
+          title={`${m.nombre}: ${fmtDec(m.aporteCpm ?? 0)} pz/min ahora contra ${fmtDec((m.aporteCpm ?? 0) - d)} de referencia`}
+        >
+          {chico ? '—' : d > 0 ? '▲' : '▼'} {fmtDec(Math.abs(d))}
+        </span>
+      )
+    }
+    return (
+      /* `ritmo-maquinas`: gancho del modo pantalla — en la TV este bloque
+         sube a la columna derecha, a la altura del número grande. */
+      <div className="ritmo-maquinas mt-3 border-t border-border/50 pt-2.5">
+        <div className="flex items-baseline gap-2 text-caption text-muted-foreground">
+          <span className="min-w-0 flex-1">
+            Cada máquina
+            {(conPulsoMaq || conCero) && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
+            {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
+          </span>
+          <b className="font-semibold text-foreground/80">
+            {conAporte ? 'aporte al promedio' : 'promedio andando'}
+          </b>
+          {/* Un rótulo por columna de delta, con el mismo ancho que la
+              celda: «vs sí misma» no decía contra QUÉ (Orel, 31-08). */}
+          {conDeltaUlt && (
+            <span className="w-[56px] shrink-0 text-right font-normal">vs último</span>
+          )}
+          {conDelta5 && (
+            <span className="w-[56px] shrink-0 text-right font-normal">
+              vs prom. {refAporte!.turnos}
+            </span>
+          )}
+        </div>
+        <div className="mt-1.5 space-y-1.5">
+          {maquinas.maquinas.map((m) => {
+            const pct = m.uptimePct
+            const color = pct == null ? 'bg-muted-foreground/40'
+              : pct >= 75 ? 'bg-ink-ok' : pct >= 50 ? 'bg-ink-warn' : 'bg-ink-crit'
+            return (
+              <div
+                key={m.nombre}
+                className="flex items-center gap-2"
+                title={`${m.nombre}: ${fmtInt(m.piezas)} pz · mientras anduvo ${fmtDec(m.cpm)} pz/min · ${pct != null ? `${Math.round(pct)}% del turno andando` : 'sin uptime'}`}
+              >
+                <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(m.nombre)}</span>
+                {(conPulsoMaq || conReparto || conCero) && (
+                  <span className={`w-11 shrink-0 text-headline tabular-nums ${
+                    conCero ? 'text-muted-foreground' : 'text-foreground'
+                  }`}>
+                    {conCero ? fmtDec(0) : fmtDec((conPulsoMaq ? m.pulsoCpm : m.ahoraCpm) ?? 0)}
+                  </span>
+                )}
+                <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                  {pct != null && (
+                    <span
+                      className={`block h-full rounded-full ${color}`}
+                      style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
+                    />
+                  )}
+                </span>
+                <span className="w-11 shrink-0 text-right text-headline tabular-nums text-foreground">
+                  {conAporte ? fmtDec(m.aporteCpm ?? 0) : fmtDec(m.cpm)}
+                </span>
+                {/* Contra sí misma, dos varas: el turno anterior y el
+                    promedio de los últimos. Se renderizan en TODAS las
+                    filas cuando hay muestra (aunque una máquina no esté en
+                    ella, que va en raya) para que la columna no se
+                    desalinee. */}
+                {conDeltaUlt && celdaDelta(refAporteUltimo, m)}
+                {conDelta5 && celdaDelta(refAporte, m)}
+              </div>
+            )
+          })}
+        </div>
+        <p className="pantalla-oculta mt-1.5 text-caption leading-snug text-muted-foreground/80">
+          {conPulsoMaq && <>Izquierda: el <b>ahora</b> de cada una, del mismo contador — las tres suman el «Ahora» de arriba. </>}
+          {conCero && (
+            cerrado
+              ? <>Izquierda: el <b>ahora</b> de cada una — el turno cerró, ninguna está produciendo. </>
+              : <>Izquierda: el <b>ahora</b> de cada una — la línea está detenida, las {maquinas.maquinas.length} en cero. </>
+          )}
+          {conReparto && <>Izquierda: lo que cada una pone en la <b>media 15 min</b> — las tres suman la de arriba. </>}
+          {conAporte
+            ? <>Derecha: su aporte al <b>promedio del turno</b> — suman el promedio de la línea. </>
+            : <>Derecha: su ritmo promedio mientras anduvo. </>}
+          La barra es el % del turno que estuvo andando.
+          {conDelta && (
+            <> Las columnas <b>▲▼</b> comparan cada Baader consigo misma, no con las
+              otras:{conDeltaUlt && <> <b>vs último</b> es contra el turno anterior del
+              mismo turno</>}{conDeltaUlt && conDelta5 && ' y'}{conDelta5 && <> <b>vs
+              prom. {refAporte!.turnos}</b> contra el promedio de sus últimos{' '}
+              {refAporte!.turnos}</>}.</>
+          )}
+        </p>
+        {fraseMaquinas(maquinas) !== '' && (
+          <p className="pantalla-oculta mt-1 text-caption leading-snug text-muted-foreground/80">
+            {fraseMaquinas(maquinas)}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  /* ── «Cada máquina · aporte» (v2) ───────────────────────────────────────
+     Solo la tabla, con su encabezado y el control del pulso («Leído de Shoplogix… · actualizar ahora», que es lo único del
+     bloque de estado que no repite la franja). La tabla va un nivel adentro: la grilla de dos columnas del CSS de PC
+     (`.v2-ritmo > section:has(> .ritmo-maquinas)`) es de la tarjeta de estado y acá dejaría una columna vacía. */
+  if (parte === 'maquinas') {
+    const tabla = tablaMaquinas()
+    /* Una sola Baader (Filete) no tiene tabla que repartir: queda solo el control del pulso, si hay lectura. */
+    if (!tabla) return pulsoNodo ? <>{pulsoNodo}</> : null
+    return (
+      <section className="rounded-card border border-border bg-card p-4">
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Gauge className="h-3 w-3" />
+          Cada máquina · aporte
+          {turno != null && (
+            <span className="font-normal text-muted-foreground">
+              · al promedio del turno, <b className="font-semibold tabular-nums text-foreground">{fmtDec(turno)} pz/min</b>
+            </span>
+          )}
+        </div>
+        <div>{tabla}</div>
+        {pulsoNodo}
+      </section>
+    )
+  }
+
   /* ── Tarjeta «Velocidad minuto a minuto» ──────────────────────────────
      Las barras del dato duro cuando el pulso publica la serie; si no, las
      curvas de 5 min de siempre (turnos pasados y docs sin la serie). El
@@ -3895,7 +4061,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
           contexto. Sin pulso (contador caído), se cae a la media con su
           etiqueta honesta. */}
       <div className="mt-1.5 flex items-end gap-x-3">
-        <div className="min-w-0" data-ahora-vivo={ahoraRepetido ? 'repetido' : undefined}>
+        <div className="min-w-0">
           <div className="text-caption text-muted-foreground">Ahora</div>
           <div className="flex flex-wrap items-baseline gap-x-1.5">
             <span className="text-[42px] font-semibold leading-none tabular-nums text-foreground">
@@ -3988,7 +4154,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
       {/* Qué expresa cada cifra, dicho UNA vez (pedido de Orel, 26-08: tres
           ritmos sin explicación se leían como contradicción). */}
       {!parada && !cerrado && vivo != null && ahora != null && (
-        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80" data-ahora-vivo={ahoraRepetido ? 'repetido' : undefined}>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
           <b className="text-muted-foreground">Ahora</b> salta con la línea;{' '}
           la <b className="text-muted-foreground">media 15 min</b> es el ritmo sostenido reciente
           (solo minutos andando); el <b className="text-muted-foreground">promedio</b> es todo el
@@ -4113,147 +4279,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
           (`repartoAhoraAndando`) y el aporte al promedio (piezas ÷ minutos
           produciendo de la línea). El «mientras anduvo» no se pierde: queda en
           el globito de cada fila y, sobre todo, en las curvas de abajo. */}
-      {maquinas && maquinas.maquinas.length > 1 && (() => {
-        /* La columna izquierda, por prioridad (Orel, 27-08): el AHORA real de
-           cada máquina —el pulso del contador, que por construcción SUMA el
-           «Ahora» grande—, y solo si el desglose del pulso no está, la media
-           de 15 min (que suma la media de arriba). Dos varas posibles, nunca
-           las dos: cada una con su rótulo. */
-        const conPulsoMaq = !parada && !cerrado && vivo != null
-          && maquinas.maquinas.every((m) => m.pulsoCpm != null)
-        const conReparto = !conPulsoMaq && !parada && !cerrado
-          && maquinas.maquinas.every((m) => m.ahoraCpm != null)
-        /* Línea DETENIDA (o turno cerrado): el número grande de arriba muestra
-           0,0 y la columna desaparecía entera — «si es cero que salga cero»
-           (Orel, 29-08). Un hueco donde debería ir un cero se lee como dato
-           que falta; el cero dice lo que pasa. */
-        const conCero = Boolean(parada) || cerrado
-        const conAporte = maquinas.maquinas.every((m) => m.aporteCpm != null)
-        /* Los deltas solo tienen sentido sobre el aporte (la misma vara que la
-           muestra histórica) y con el turno ya rodado: ver APORTE_MIN_PROD_MIN.
-           Son DOS columnas (Orel, 31-08): contra el turno anterior y contra el
-           promedio de los últimos 5 del mismo turno. La del promedio se calla
-           cuando la muestra tiene un solo turno: repetiría la otra columna. */
-        const rodado = (producingMin ?? 0) >= APORTE_MIN_PROD_MIN
-        const conDeltaUlt = conAporte && rodado && refAporteUltimo != null
-        const conDelta5 = conAporte && rodado && refAporte != null && refAporte.turnos > 1
-        const conDelta = conDeltaUlt || conDelta5
-        /** Una celda de delta, alineada con su rótulo del encabezado. */
-        const celdaDelta = (
-          ref: ReferenciaAporte | null | undefined,
-          m: RitmosPorMaquina['maquinas'][number],
-        ) => {
-          const d = deltaAporte(ref ?? null, m.nombre, m.aporteCpm, producingMin)
-          if (d == null) {
-            return <span className="w-[56px] shrink-0 text-right text-footnote text-muted-foreground/60">·</span>
-          }
-          /* Menos de 0,3 pz/min es ruido: raya en tinta neutra — ni logro ni
-             caída. Con color, cada turno parecería un veredicto. */
-          const chico = Math.abs(d) < 0.3
-          return (
-            <span
-              className={`w-[56px] shrink-0 text-right text-footnote tabular-nums ${
-                chico ? 'text-muted-foreground' : d > 0 ? 'text-ink-ok' : 'text-ink-crit'
-              }`}
-              title={`${m.nombre}: ${fmtDec(m.aporteCpm ?? 0)} pz/min ahora contra ${fmtDec((m.aporteCpm ?? 0) - d)} de referencia`}
-            >
-              {chico ? '—' : d > 0 ? '▲' : '▼'} {fmtDec(Math.abs(d))}
-            </span>
-          )
-        }
-        return (
-          /* `ritmo-maquinas`: gancho del modo pantalla — en la TV este bloque
-             sube a la columna derecha, a la altura del número grande. */
-          <div className="ritmo-maquinas mt-3 border-t border-border/50 pt-2.5">
-            <div className="flex items-baseline gap-2 text-caption text-muted-foreground">
-              <span className="min-w-0 flex-1">
-                Cada máquina
-                {(conPulsoMaq || conCero) && <> · <b className="font-semibold text-foreground/80">ahora</b></>}
-                {conReparto && <> · <b className="font-semibold text-foreground/80">media 15 min</b></>}
-              </span>
-              <b className="font-semibold text-foreground/80">
-                {conAporte ? 'aporte al promedio' : 'promedio andando'}
-              </b>
-              {/* Un rótulo por columna de delta, con el mismo ancho que la
-                  celda: «vs sí misma» no decía contra QUÉ (Orel, 31-08). */}
-              {conDeltaUlt && (
-                <span className="w-[56px] shrink-0 text-right font-normal">vs último</span>
-              )}
-              {conDelta5 && (
-                <span className="w-[56px] shrink-0 text-right font-normal">
-                  vs prom. {refAporte!.turnos}
-                </span>
-              )}
-            </div>
-            <div className="mt-1.5 space-y-1.5">
-              {maquinas.maquinas.map((m) => {
-                const pct = m.uptimePct
-                const color = pct == null ? 'bg-muted-foreground/40'
-                  : pct >= 75 ? 'bg-ink-ok' : pct >= 50 ? 'bg-ink-warn' : 'bg-ink-crit'
-                return (
-                  <div
-                    key={m.nombre}
-                    className="flex items-center gap-2"
-                    title={`${m.nombre}: ${fmtInt(m.piezas)} pz · mientras anduvo ${fmtDec(m.cpm)} pz/min · ${pct != null ? `${Math.round(pct)}% del turno andando` : 'sin uptime'}`}
-                  >
-                    <span className="w-9 shrink-0 text-footnote text-muted-foreground">{nombreCorto(m.nombre)}</span>
-                    {(conPulsoMaq || conReparto || conCero) && (
-                      <span className={`w-11 shrink-0 text-headline tabular-nums ${
-                        conCero ? 'text-muted-foreground' : 'text-foreground'
-                      }`}>
-                        {conCero ? fmtDec(0) : fmtDec((conPulsoMaq ? m.pulsoCpm : m.ahoraCpm) ?? 0)}
-                      </span>
-                    )}
-                    <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-                      {pct != null && (
-                        <span
-                          className={`block h-full rounded-full ${color}`}
-                          style={{ width: `${Math.min(100, Math.max(2, pct))}%` }}
-                        />
-                      )}
-                    </span>
-                    <span className="w-11 shrink-0 text-right text-headline tabular-nums text-foreground">
-                      {conAporte ? fmtDec(m.aporteCpm ?? 0) : fmtDec(m.cpm)}
-                    </span>
-                    {/* Contra sí misma, dos varas: el turno anterior y el
-                        promedio de los últimos. Se renderizan en TODAS las
-                        filas cuando hay muestra (aunque una máquina no esté en
-                        ella, que va en raya) para que la columna no se
-                        desalinee. */}
-                    {conDeltaUlt && celdaDelta(refAporteUltimo, m)}
-                    {conDelta5 && celdaDelta(refAporte, m)}
-                  </div>
-                )
-              })}
-            </div>
-            <p className="pantalla-oculta mt-1.5 text-caption leading-snug text-muted-foreground/80">
-              {conPulsoMaq && <>Izquierda: el <b>ahora</b> de cada una, del mismo contador — las tres suman el «Ahora» de arriba. </>}
-              {conCero && (
-                cerrado
-                  ? <>Izquierda: el <b>ahora</b> de cada una — el turno cerró, ninguna está produciendo. </>
-                  : <>Izquierda: el <b>ahora</b> de cada una — la línea está detenida, las {maquinas.maquinas.length} en cero. </>
-              )}
-              {conReparto && <>Izquierda: lo que cada una pone en la <b>media 15 min</b> — las tres suman la de arriba. </>}
-              {conAporte
-                ? <>Derecha: su aporte al <b>promedio del turno</b> — suman el promedio de la línea. </>
-                : <>Derecha: su ritmo promedio mientras anduvo. </>}
-              La barra es el % del turno que estuvo andando.
-              {conDelta && (
-                <> Las columnas <b>▲▼</b> comparan cada Baader consigo misma, no con las
-                  otras:{conDeltaUlt && <> <b>vs último</b> es contra el turno anterior del
-                  mismo turno</>}{conDeltaUlt && conDelta5 && ' y'}{conDelta5 && <> <b>vs
-                  prom. {refAporte!.turnos}</b> contra el promedio de sus últimos{' '}
-                  {refAporte!.turnos}</>}.</>
-              )}
-            </p>
-            {fraseMaquinas(maquinas) !== '' && (
-              <p className="pantalla-oculta mt-1 text-caption leading-snug text-muted-foreground/80">
-                {fraseMaquinas(maquinas)}
-              </p>
-            )}
-          </div>
-        )
-      })()}
+      {tablaMaquinas()}
 
       {/* La hora de corte. El número grande describe los últimos 15 min, pero
           un tramo no existe hasta que cierra: sin decir hasta cuándo, quien lo
@@ -6568,8 +6594,8 @@ function MonitorDelToken() {
        */}
       <main
         className={`mx-auto max-w-3xl space-y-4 px-4 py-4 ${
-          /* «El turno» del v2 usa todo el ancho de PC (principal + riel); el resto conserva su tope. */
-          glass === 'v2' && pestana !== 'analisis' ? 'lg:max-w-none lg:px-6' : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'
+          /* «El turno» del v2 usa todo el ancho de PC (márgenes de 16 / 24 / 32 px); el resto conserva su tope. */
+          glass === 'v2' && pestana !== 'analisis' ? `lg:max-w-none ${pestana === 'turno' ? 'lg:px-[24px] min-[1600px]:px-[32px]' : 'lg:px-6'}` : 'lg:max-w-[1500px] 2xl:max-w-[1840px]'
         }${modoPantalla ? ' modo-pantalla' : ''}`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
@@ -6578,7 +6604,7 @@ function MonitorDelToken() {
             personalizable. En la TV la pestaña es siempre esta y el tablero
             no corre: la TV muestra el trío fijo de siempre. */}
         {/* El selector de línea de PC (lg+) arriba de El turno y de Análisis; el Duelo trae el suyo. En celular vive en la
-            cabecera. La fila cuenta en el alto de «El turno» en PC (`.fila-linea-pc`). */}
+            cabecera. */}
         {glass === 'v2' && !modoPantalla && pestana !== 'duelo' && lineasMonitor && (
           <SelectorLinea lineas={lineasMonitor} className="fila-linea-pc dpc-linea" />
         )}
@@ -6717,26 +6743,44 @@ function MonitorDelToken() {
                   ? vivoV2.maquinas.length > 0 && vivoV2.maquinas.every((m) => m.status === 'detenida')
                   : live.status === 'detenida'),
                 paradas: paradasEnEje(gruposEventos, primeraPiezaMs, iniEjeMs),
-                llenado: vivoV2 ? vivoV2.r.lineas.map((l) => ({ id: l.id, ultimo: [...l.fills].reverse().find((q): q is number => q != null) ?? null })) : null,
+                llenado: vivoV2 ? vivoV2.r.lineas.map((l) => ({ id: l.id, ultimo: l.fills[l.fills.length - 1] ?? null })) : null,
                 unidad: vivoV2?.r.unidad ?? null,
+                /* Las filas Ev se normalizan como el llenado de «Ritmo en vivo»: segundos andando por minuto (paradas por máquina) y la línea en cero = sin dato. */
+                paradasMaquina: {
+                  stopEvents: live.stopEvents,
+                  stopReasons: live.stopReasons,
+                  stopMachines: live.stopMachines,
+                  enCurso: (vivoV2?.maquinas ?? []).filter((m) => m.status === 'detenida' && m.desdeMs != null).map((m) => ({ id: m.id, desdeMs: m.desdeMs! })),
+                },
               }
             : null
+          /* Fase 6: el último minuto cerrado, pieza a pieza. Solo con el turno en vivo y el contador crudo respondiendo
+             (el mismo de «Piezas ahora», que además es el techo: la reproducción jamás lo supera). `serie` es la de las
+             barras de minuto, ya recortada al inicio del turno. */
+          const repro = (() => {
+            if (turnoCerrado || !esActual || contador.fuente !== 'pulso') return null
+            const lecturas = data.pulse?.lecturas ?? []
+            const ult = lecturas[lecturas.length - 1]
+            return {
+              entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at }),
+              tope: armarTope(contador.valor, ult && ult.totalCycles === contador.valor ? ult.porMaquina : null),
+            }
+          })()
+          /* UNA base para «A esta hora» en toda la vista (franja, gráfico y su globo, Camino a la meta y su ampliado):
+             lo que la reproducción muestra en reposo (Σ minutos cerrados topada por el contador vivo) o, sin ella, el contador. */
+          const hechasMostradas = piezasMostradas(repro, contador.valor)
+          /* La parada elegida con «ver ›» en Camino a la meta, en minutos del gráfico. Las paradas cuentan sus minutos desde
+             el primer tramo de la serie del turno (el mismo t0 de los grupos). */
+          const marcaRitmo = (() => {
+            const base = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
+            if (!tramoSel || !Number.isFinite(base)) return null
+            return { desdeMs: base + tramoSel.desdeMin * 60_000, hastaMs: base + tramoSel.hastaMin * 60_000, causa: causaSel, maquinaId: tramoSel.maquinaId ?? null }
+          })()
           return (
             <MonitorV2
               lectura={{ valor: contador.valor, atMs: contador.corteWallMs }}
               semilla={(data.pulse?.lecturas ?? []).map((l) => l.totalCycles)}
-              /* Fase 6: el último minuto cerrado, pieza a pieza. Solo con el turno en vivo y el contador crudo respondiendo
-                 (el mismo de «Piezas ahora», que además es el techo: la reproducción jamás lo supera). `serie` es la de las
-                 barras de minuto, ya recortada al inicio del turno. */
-              repro={(() => {
-                if (turnoCerrado || !esActual || contador.fuente !== 'pulso') return null
-                const lecturas = data.pulse?.lecturas ?? []
-                const ult = lecturas[lecturas.length - 1]
-                return {
-                  entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at }),
-                  tope: armarTope(contador.valor, ult && ult.totalCycles === contador.valor ? ult.porMaquina : null),
-                }
-              })()}
+              repro={repro}
               eje={eje}
               piezas={contador.valor}
               corteHora={!live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null}
@@ -6842,34 +6886,36 @@ function MonitorDelToken() {
                   .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))
                   .filter((d) => d.piezas > 0),
               }}
-              ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} ahoraRepetido={vivoV2 != null && pv != null && pv.cpm === vivoV2.r.ahora} parte="estado" />}
-              ritmoVivo={vivoV2 || barrasMinuto
+              /* Solo la tabla «Cada máquina · aporte»: las cifras de ritmo viven en la franja, una sola vez. */
+              ritmoLinea={<ReglaDeRitmo {...reglaPropsBase} parte="maquinas" />}
+              ritmoMedia15={duro15?.cpm ?? null}
+              ritmoPedido={reglaPropsBase.pedido ?? null}
+              ritmoVivoAbrirCon={marcaRitmo && barrasMinuto ? `${marcaRitmo.desdeMs}-${marcaRitmo.hastaMs}` : null}
+              ritmoVivoAmpliado={vivoV2 || barrasMinuto
                 ? (
-                  /* El turno minuto a minuto vive en el ampliado de «Ritmo en vivo»; sin pulso en vivo (turno cerrado o
-                     visto de otro día) la tarjeta queda solo con ese turno. «ver ›» de una parada lo abre con ella marcada. */
-                  <RitmoVivoV2
+                  /* El detalle de «Ampliar» del gráfico: el turno minuto a minuto, el llenado por Baader, las señales y
+                     «Último minuto, pieza a pieza». Sin pulso en vivo (turno cerrado o visto de otro día) queda solo ese
+                     turno. «ver ›» de una parada lo abre con ella marcada. */
+                  <RitmoVivoAmpliado
                     r={vivoV2?.r ?? null}
                     maquinas={vivoV2?.maquinas ?? []}
                     turno={barrasMinuto}
                     cerrado={turnoCerrado}
                     turnoTerminado={turnoTerminadoV2}
-                    /* Las paradas cuentan sus minutos desde el primer tramo de la serie del turno (el mismo t0 de los grupos). */
-                    marca={(() => {
-                      const base = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : NaN
-                      if (!tramoSel || !Number.isFinite(base)) return null
-                      return { desdeMs: base + tramoSel.desdeMin * 60_000, hastaMs: base + tramoSel.hastaMin * 60_000, causa: causaSel, maquinaId: tramoSel.maquinaId ?? null }
-                    })()}
+                    marca={marcaRitmo}
                     onQuitarMarca={() => setTramoSel(null)}
                     promedios={{
                       linea: promedioLinea,
                       ...Object.fromEntries(live.machines.map((m) => [m.id, prodMin > 0 ? m.pieces / prodMin : null])),
                     }}
+                    conReglas
                   />
                 )
                 : undefined}
               banda={vivoV2 ? <BandaParadaV2 maquinas={vivoV2.maquinas} turnoTerminado={turnoTerminadoV2} /> : undefined}
-              caminoMeta={(() => {
-                /* Un solo juego de props: la tarjeta exprés de la grilla y el detalle de la capa cuentan lo mismo. */
+              /* Sin desglose del tiempo no hay celda: la franja queda en cuatro. */
+              caminoMeta={!(live.timeBreakdown && live.timeBreakdown.windowMin > 0) ? undefined : (() => {
+                /* Un solo juego de props: la celda de la franja y el detalle de la capa cuentan lo mismo. */
                 const camino = {
                   tb: live.timeBreakdown,
                   causaSel,
@@ -6880,8 +6926,9 @@ function MonitorDelToken() {
                   notas: notasDeOperador,
                   cerrado: turnoCerrado,
                   meta: data.targetPieces ?? live.quotaPieces ?? null,
-                  /* «Hechas» = el mismo contador vivo de «Piezas ahora»: en el v2 no puede haber dos cifras de piezas. */
-                  hechas: contador.valor,
+                  /* «Hechas» = las piezas mostradas en reposo (la base de «A esta hora» de toda la vista): en el v2 no puede
+                     haber dos cifras de piezas ni dos restas contra la cuota. */
+                  hechas: hechasMostradas,
                   piezasPulso: null,
                   corteHora: horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null),
                   cuotaAhora: comparacion.optimalAtCurrentMinute,
@@ -6891,7 +6938,7 @@ function MonitorDelToken() {
                   grupos: gruposEventos,
                   notasTurno: notasDeTurnoCompleto,
                 }
-                return <TiempoDelTurno {...camino} v2="expres" ampliado={<div className="v2-clasico"><TiempoDelTurno {...camino} v2="ampliado" /></div>} />
+                return <TiempoDelTurno {...camino} v2="celda" ampliado={<div className="v2-clasico"><TiempoDelTurno {...camino} v2="ampliado" /></div>} />
               })()}
               duelo={<TarjetaDueloV2 datos={datosDuelo} nombres={nombresDuelo} unidad={unidadDuelo} inicioMs={inicioDueloMs} />}
               vista={vistaV2}

@@ -13,7 +13,7 @@
  *
  * Vistas: `CabeceraV2`, `MonitorV2` (El turno) y `MonitorV2Analisis`.
  */
-import { AlertTriangle, BarChart3, CalendarRange, ChevronDown, Clock, Cpu, Filter, Gauge, Repeat, Target, Timer, TrendingUp, Wrench, X } from 'lucide-react'
+import { AlertTriangle, BarChart3, CalendarRange, ChevronDown, Clock, Cpu, Filter, Repeat, Timer, Wrench, X } from 'lucide-react'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
@@ -29,11 +29,13 @@ import { contenedorPlural, vaciasEtiqueta, type Cascada } from './cascadaTurno'
 import type { DetalleCascada, DuenoDetalle, HoraDetalle, RenglonDetalle } from './cascadaDetalle'
 import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
-import { AnilloMeta, Globo, Icono, Tarjeta } from './AmpliarV2'
-import { useAnchoMin, useCuentaCifra, useEntradaEscalonada, useEsPc } from './ampliarHooks'
+import { Globo, Icono, Tarjeta } from './AmpliarV2'
+import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
 import type { PestanaMonitor } from './BarraLateralPC'
-import { CifraViva, EjeTurnoPC, type EjeDatos } from './EjeTurnoPC'
+import { piezasMostradas } from './aEstaHora'
+import { FranjaCinta } from './FranjaCinta'
+import { GraficoRitmoVivo, type EjeDatos } from './GraficoRitmoVivo'
 import { useRelojDeDatos } from './useRelojDeDatos'
 import { ReproduccionCtx, useReproduccionMinuto, type Reproduccion } from './useReproduccionMinuto'
 import type { EntradaRep, Tope } from './reproduccionMinuto'
@@ -839,7 +841,7 @@ function HoraAHora({ filas, metaPorHora, porMaquina, total }: { filas: HourlyRow
       </div>
       {sumaHoras !== total && (
         <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
-          Las horas suman {int(sumaHoras)} pz: llegan hasta el último tramo de 5 min que Shoplogix sincronizó. «Piezas ahora» ({int(total)}) es el contador vivo y suma además {int(Math.abs(total - sumaHoras))} pz del tramo en curso{total < sumaHoras ? ' (ajuste del contador)' : ''}.
+          Las horas suman {int(sumaHoras)} pz: llegan hasta el último tramo de 5 min que Shoplogix sincronizó. «Piezas del turno» ({int(total)}) es la cifra de la franja, leída de Shoplogix, y suma además {int(Math.abs(total - sumaHoras))} pz del tramo en curso{total < sumaHoras ? ' (ajuste del contador)' : ''}.
         </p>
       )}
     </div>
@@ -884,16 +886,22 @@ export interface MonitorV2Props {
   cerrado: boolean
   /** Lo que se ve al tocar «Ver más del turno». */
   mas: MasDelTurno
-  /** «Ritmo de la línea» del clásico (ahora, media 15 min, promedio, meta, techo y cada máquina). Si viene,
-      reemplaza al KPI Ritmo y a la tarjeta Máquinas: cada cifra se muestra una sola vez. */
+  /** «Cada máquina · aporte»: solo la tabla de `ReglaDeRitmo` (ahora, aporte al promedio, vs último, vs prom. 5), sin repetir
+      las cifras de ritmo, que viven en la franja. Si falta, la tarjeta Máquinas de siempre. */
   ritmoLinea?: ReactNode
-  /** «Ritmo en vivo · 15 min»: va justo debajo de «Ritmo de la línea». Ausente con el turno cerrado o sin serie del pulso. */
-  ritmoVivo?: ReactNode
-  /** Banda de estado de PC (la parada en curso con su cronómetro): primera fila de la grilla, pegada bajo la cabecera. */
+  /** Media de 15 min de la línea, andando (`duro15.cpm`): la nota de «Ritmo de la línea» en la franja. null sin dato. */
+  ritmoMedia15?: number | null
+  /** Ritmo andando que pide la meta (el «para la meta» de la regla del clásico): la misma base que la media y el promedio. */
+  ritmoPedido?: number | null
+  /** El detalle de «Ampliar» del gráfico «Ritmo en vivo» (`RitmoVivoAmpliado`, con «Último minuto, pieza a pieza»). */
+  ritmoVivoAmpliado?: ReactNode
+  /** Clave que, al CAMBIAR, abre ese detalle: el «ver ›» de una parada en Camino a la meta. */
+  ritmoVivoAbrirCon?: string | null
+  /** Banda de estado (la parada en curso con su cronómetro): arriba de todo, en PC y en celular. Sin parada no dibuja nada. */
   banda?: ReactNode
-  /** «Camino a la meta» del monitor clásico (hechas, paradas por causa, ritmo, por jugar): se ve tal cual. */
+  /** «Camino a la meta» del monitor clásico como celda de la franja (`TiempoDelTurno v2="celda"`, con su «Ampliar»). */
   caminoMeta?: ReactNode
-  /** Tarjeta exprés del Duelo de equipos (`TarjetaDueloV2`): hora N del turno, los dos equipos y la mini carrera. */
+  /** Tarjeta exprés del Duelo de equipos (`TarjetaDueloV2`): hora N del turno, los dos equipos y la mini carrera. Solo con «Ver más». */
   duelo?: ReactNode
   vista: VistaV2
   onVista: (v: VistaV2) => void
@@ -901,7 +909,7 @@ export interface MonitorV2Props {
   lectura?: Lectura | null
   /** Valores de las últimas lecturas del contador (más viejo primero): para saber si la línea paró desde antes de abrir la página. */
   semilla?: number[]
-  /** «El turno» en PC (≥ 1280 px) como eje de tiempo común. Sin él, o en menos de 1280 px, las tarjetas de siempre. */
+  /** El gráfico «Ritmo en vivo» (acumulado, barras por minuto, cada Baader y paradas en un mismo eje de tiempo). Sin él no hay gráfico. */
   eje?: EjeDatos | null
   /**
    * Reproducción del último minuto (Fase 6): el minuto cerrado de la serie vuelto a pasar pieza a pieza, con el contador
@@ -932,14 +940,14 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
      Con la reproducción activa la cifra sube un escalón por pieza del último minuto cerrado; si no, la recta de siempre. */
   const relojRecta = useRelojDeDatos(p.lectura ?? null, p.semilla)
   const reloj = p.rep.activa ? p.rep.reloj : relojRecta
-  /* PC ancho: «El turno» como eje (rama aparte; lo que no está en esa vista sigue debajo, en las tarjetas de siempre). */
-  const pcEje = useAnchoMin(1280) && p.eje != null
-  /* Las cifras grandes cuentan solo cuando el dato cambia de verdad (nunca al montar). */
-  const cierreMostrado = useCuentaCifra(p.proyeccion ?? 0)
-  const ritmoGrande = p.ritmoAhora ?? p.ritmo
   const [abierta, setAbierta] = useState<ClaveTurno | null>(null)
   const abrir = (k: ClaveTurno) => () => setAbierta(k)
-  const pct = p.meta ? Math.round((p.piezas / p.meta) * 100) : null
+  /* Las piezas que la vista dice en TODAS partes (franja, gráfico, Camino a la meta y este detalle): lo que la reproducción
+     muestra en reposo, o el contador vivo sin ella. El detalle de «Piezas del turno» no puede decir otra cifra que la celda. */
+  const mostradas = piezasMostradas(p.repro, p.piezas)
+  const pct = p.meta ? Math.round((mostradas / p.meta) * 100) : null
+  /* «Necesario para la meta» en base andando, como lo dice la franja; sin él (turno cerrado, sin pace) el de reloj de siempre. */
+  const necesarioAndando = p.ritmoPedido ?? p.ritmoNecesario
   const cierreVsMeta = p.proyeccion != null && p.meta ? p.proyeccion - p.meta : null
   const deltaMttr = p.mant?.mttr != null && p.mant.mttrPrevio != null ? p.mant.mttr - p.mant.mttrPrevio : null
   const totalPerdida = p.perdidas.reduce((a, x) => a + x.min, 0)
@@ -971,7 +979,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
             {p.ritmoAhora != null && <ListCell title="Ahora" value={`${dec(p.ritmoAhora)} pz/min`} valueSub="contador de Shoplogix" />}
             <ListCell title="Promedio del turno (andando)" value={p.ritmo != null ? `${dec(p.ritmo)} pz/min` : '—'} />
             {p.ritmoInfo.recienteCpm != null && <ListCell title={`Últimos ${Math.round(p.ritmoInfo.recienteMin ?? 0)} min`} value={`${dec(p.ritmoInfo.recienteCpm)} pz/min`} />}
-            {p.ritmoNecesario != null && <ListCell title="Necesario para la meta" value={`${dec(p.ritmoNecesario)} pz/min`} />}
+            {necesarioAndando != null && <ListCell title="Necesario para la meta" value={`${dec(necesarioAndando)} pz/min`} valueSub="mientras la línea anda" />}
             {p.ritmoInfo.medianaCpm != null && <ListCell title="Lo normal de esta línea" value={`${dec(p.ritmoInfo.medianaCpm)} pz/min`} valueSub={p.ritmoInfo.muestras ? `mediana de ${p.ritmoInfo.muestras} turnos` : undefined} />}
             {p.ritmoInfo.mejorCpm != null && <ListCell title="Mejor turno" value={`${dec(p.ritmoInfo.mejorCpm)} pz/min`} />}
             {p.setPoint != null && <ListCell title="Set point" value={`${dec(p.setPoint, 0)} pz/min`} valueSub={[p.ritmoInfo.setPointMetodo, p.ritmoInfo.setPointFecha].filter(Boolean).join(' · ') || undefined} />}
@@ -1054,7 +1062,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   const ampliadoPiezas = (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <Cifra valor={int(p.piezas)} unidad="pz" />
+        <Cifra valor={int(mostradas)} unidad="pz" />
         {p.cuota && !p.cerrado && (
           <span className="text-[13px] tabular-nums text-muted-foreground">
             tocaban <b className="font-semibold text-foreground">{int(p.cuota.piezas)}</b>{p.cuota.hora ? ` a las ${p.cuota.hora}` : ' a esta hora'}
@@ -1070,10 +1078,10 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
           proyeccion={conProyeccion && p.curva.maxMin > finCurva + 1 ? { min: p.curva.maxMin, piezas: p.proyeccion! } : null}
         />
       )}
-      {p.horas && p.horas.filas.length > 0 && <HoraAHora filas={p.horas.filas} metaPorHora={p.horas.metaPorHora} porMaquina={p.horas.porMaquina} total={p.piezas} />}
+      {p.horas && p.horas.filas.length > 0 && <HoraAHora filas={p.horas.filas} metaPorHora={p.horas.metaPorHora} porMaquina={p.horas.porMaquina} total={mostradas} />}
       <Grupo>
         {p.meta != null && <ListCell title="Meta del turno" value={`${int(p.meta)} pz`} />}
-        {p.meta != null && <ListCell title="Faltan" value={`${int(Math.max(0, p.meta - p.piezas))} pz`} valueSub={pct != null ? `${pct} % hecho` : undefined} />}
+        {p.meta != null && <ListCell title="Faltan" value={`${int(Math.max(0, p.meta - mostradas))} pz`} valueSub={pct != null ? `${pct} % hecho` : undefined} />}
         {p.vsAyer && <ListCell title={`${p.vsAyer.label} a esta altura`} value={`${int(p.vsAyer.pieces)} pz`} valueSub={`${firmado(p.vsAyer.diff)} hoy`} />}
       </Grupo>
       {p.maquinas.length > 1 && (
@@ -1085,138 +1093,95 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   )
 
   return (
-    <div ref={raizRef} data-eje={pcEje ? 'si' : undefined} className="monitor-v2 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
-      {pcEje
-        ? <div className="min-w-0 lg:col-span-2"><EjeTurnoPC p={p} reloj={reloj} ampliadoPiezas={ampliadoPiezas} cierreMostrado={cierreMostrado} abrir={(k) => setAbierta(k)} banda={p.banda} /></div>
-        : p.banda}
+    <div ref={raizRef} className="monitor-v2 flex flex-col gap-[12px] min-[1600px]:gap-[16px]">
+      {/* UN solo orden en todos los anchos: la parada en curso (si hay) → la franja de cifras → «Ritmo en vivo» (el gráfico
+          unido) → «Cada máquina · aporte» → «Ver más del turno». Duelo, fallas y tiempo perdido viven bajo «Ver más». */}
+      {p.banda}
 
-      {/* PC: columna principal fluida + riel fijo con lo vivo y lo de Mantención. Un solo DOM: en celular los dos
-          envoltorios son `contents` y cada tarjeta lleva `max-lg:order-N`, que repite el orden de siempre
-          (cifras, ritmo de la línea, ritmo en vivo, camino a la meta, curva, minuto a minuto, fallas, más). */}
-      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4 2xl:grid 2xl:grid-cols-2">
-      {/* Fila 1 · las cifras que se miran de lejos */}
-      <div className={`v2-fila-cifras grid grid-cols-2 gap-3 max-lg:order-1 lg:gap-4 2xl:col-span-2 2xl:row-start-1 ${p.ritmoLinea ? 'xl:grid-cols-3' : '2xl:grid-cols-4'}`}>
-        <Tarjeta compacta ampliado={ampliadoPiezas} subAmpliado={p.curva ? 'acumulado del turno contra el ritmo de la meta' : undefined} className={`col-span-2 ${p.ritmoLinea ? 'xl:col-span-1' : '2xl:col-span-1'}`} icono={<Target className={ic} />} titulo={p.cerrado ? 'Piezas del turno' : 'Piezas ahora'} sub={p.corteHora ? `Shoplogix ${p.corteHora}` : undefined}>
-          <Cifra valor={<CifraViva reloj={reloj} respaldo={p.piezas} />} unidad="pz" />
-          {p.meta != null && pct != null && (
-            <div className="mt-3 flex items-center gap-3">
-              <AnilloMeta frac={pct / 100} rotulo={`${pct} % de la meta del turno`} />
-              <span className="text-[13px] leading-snug text-muted-foreground">de la meta del turno,<br /><b className="font-semibold tabular-nums text-foreground">{int(p.meta)} pz</b></span>
-            </div>
-          )}
-        </Tarjeta>
+      <FranjaCinta p={p} reloj={reloj} ampliadoPiezas={ampliadoPiezas} abrir={(k) => setAbierta(k)} camino={p.caminoMeta} />
 
-        {conProyeccion && (
-          <Tarjeta onAbrir={abrir('cierre')} icono={<TrendingUp className={ic} />} titulo="Al cierre" sub="a este ritmo">
-            <Cifra valor={int(cierreMostrado)} unidad="pz" />
-            {cierreVsMeta != null && <Contexto tono={cierreVsMeta >= 0 ? 'ok' : 'critical'}>{firmado(cierreVsMeta)} vs meta</Contexto>}
+      {p.eje
+        ? <GraficoRitmoVivo p={p} e={p.eje} reloj={reloj} ampliado={p.ritmoVivoAmpliado} abrirCon={p.ritmoVivoAbrirCon} />
+        : (
+          /* El gráfico necesita el inicio y el fin previsto del turno y la serie por minuto (o la curva de hoy): sin ellos se dice. */
+          <section className="v2-tarjeta rounded-card px-5 py-4" aria-label="Ritmo en vivo">
+            <h3 className="text-[17px] font-semibold leading-[22px] text-foreground">Ritmo en vivo</h3>
+            <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">Sin el fin previsto del turno o sin la serie por minuto de Shoplogix no se puede dibujar el gráfico.</p>
+          </section>
+        )}
+
+      {/* Cada máquina · aporte. */}
+      {p.ritmoLinea
+        ? <div className="v2-clasico v2-ritmo min-w-0">{p.ritmoLinea}</div>
+        : (
+          <Tarjeta onAbrir={abrir('maquinas')} icono={<Cpu className={ic} />} titulo="Máquinas" sub={`${corriendo} de ${p.maquinas.length} corriendo`}>
+            <ul className="mt-4 space-y-3">
+              {p.maquinas.map((m) => (
+                <li key={m.name} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[15px] text-foreground">{m.name}</div>
+                    <div className="text-[13px] tabular-nums text-muted-foreground">
+                      {m.status === 'detenida' ? (m.razon ?? 'Detenida') : velMaquina(m)}
+                    </div>
+                  </div>
+                  {m.status === 'detenida'
+                    ? <Pill tone="critical" dot className="tabular-nums">{m.desdeMin != null ? `${Math.round(m.desdeMin)} min` : 'Parada'}</Pill>
+                    : m.status === 'produciendo' ? <Pill tone="ok" dot>Corre</Pill> : <Pill tone="neutral">Sin datos</Pill>}
+                </li>
+              ))}
+            </ul>
           </Tarjeta>
         )}
 
-        {!p.ritmoLinea && <Tarjeta onAbrir={abrir('ritmo')} icono={<Gauge className={ic} />} titulo="Ritmo" sub={p.ritmoAhora != null ? 'pz/min ahora' : 'pz/min promedio andando'}>
-          <Cifra valor={ritmoGrande != null ? dec(ritmoGrande) : '—'} unidad="pz/min" />
-          {p.ritmoNecesario != null && ritmoGrande != null
-            ? <Contexto tono={ritmoGrande >= p.ritmoNecesario ? 'ok' : 'warning'} nota={p.ritmoAhora != null && p.ritmo != null ? `promedio ${dec(p.ritmo)}` : p.setPoint ? `set ${dec(p.setPoint, 0)}` : undefined}>necesita {dec(p.ritmoNecesario)}</Contexto>
-            : p.vsAyer && <Contexto tono={p.vsAyer.diff >= 0 ? 'ok' : 'critical'}>{firmado(p.vsAyer.diff)} pz vs {p.vsAyer.label}</Contexto>}
-        </Tarjeta>}
+      {/* «Ver más del turno»: lo que ya no vive en la vista principal (el Duelo exprés, las fallas y a dónde se fue el tiempo)
+          y, debajo, lo de siempre. */}
+      {p.vista >= 1 && (
+        <>
+          {p.duelo && <div className="min-w-0">{p.duelo}</div>}
+          <div className="grid grid-cols-1 gap-3 min-[1024px]:grid-cols-2 min-[1600px]:gap-4">
+            <Tarjeta ampliado={detalleDe('mant')?.cuerpo} subAmpliado={detalleDe('mant')?.sub} icono={<Wrench className={ic} />} titulo="Fallas de equipos" sub={p.eventos.length ? `${p.eventos.length} en el turno · ${horas(fallasMin)}` : 'ninguna en el turno'}>
+              {p.rielMttr.length > 1 && <RielMttr riel={p.rielMttr} />}
+              {p.eventos.length > 0 && (
+                <ol className="mt-4 space-y-3">
+                  {p.eventos.slice(-4).reverse().map((e, i) => (
+                    <li key={`${e.desde}-${i}`} className="flex items-start gap-3">
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--v2-mant)' }} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2 text-[15px]">
+                          <span className="truncate text-foreground">{e.causa ?? 'Falla técnica'}</span>
+                          <span className="shrink-0 tabular-nums font-medium text-foreground">{horas(e.min)}</span>
+                        </div>
+                        <div className="text-[13px] tabular-nums text-muted-foreground">{e.maquina} · {hhmm(e.desde)}–{hhmm(e.hasta)}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Tarjeta>
 
-        <Tarjeta iconoSoloPc={!!(conProyeccion && p.ritmoLinea)} onAbrir={abrir('mant')} className={`${conProyeccion && p.ritmoLinea ? 'col-span-1' : 'col-span-2'} ${p.ritmoLinea ? 'xl:col-span-1' : conProyeccion ? '2xl:col-span-1' : '2xl:col-span-2'}`} icono={<Wrench className={ic} />} titulo="Respuesta de Mantención" sub="minutos por falla técnica">
-          {p.mant && p.mant.fallas > 0 ? (
-            <>
-              <Cifra valor={p.mant.mttr != null ? dec(p.mant.mttr) : '—'} unidad="min" />
-              {deltaMttr != null
-                ? <Contexto tono={deltaMttr <= 0 ? 'ok' : 'warning'} nota={`${p.mant.fallas} ${p.mant.fallas === 1 ? 'falla' : 'fallas'}`}>{firmado(deltaMttr, (n) => dec(n))} min vs turnos previos</Contexto>
-                : <Contexto tono="neutral">{p.mant.fallas} {p.mant.fallas === 1 ? 'falla' : 'fallas'} · {horas(p.mant.fallaMin)}</Contexto>}
-            </>
-          ) : (
-            <>
-              <Cifra valor="0" unidad="fallas" />
-              <Contexto tono="ok">Sin fallas de equipos</Contexto>
-            </>
-          )}
-        </Tarjeta>
-      </div>
-
-      {p.ritmoLinea && <div className="v2-clasico v2-ritmo max-lg:order-2 2xl:col-start-1 2xl:row-start-2">{p.ritmoLinea}</div>}
-
-      {p.caminoMeta && <div className="v2-camino max-lg:order-4 2xl:col-start-2 2xl:row-start-2 2xl:self-start">{p.caminoMeta}</div>}
-
-      {p.duelo && <div className="min-w-0 max-lg:order-6 2xl:col-span-2 2xl:row-start-4">{p.duelo}</div>}
-
-      {/* Fila 2 · la curva del turno y las máquinas */}
-      <div className="grid grid-cols-1 gap-3 max-lg:order-5 lg:grid-cols-4 lg:gap-4 2xl:col-span-2 2xl:row-start-3">
-        {!p.ritmoLinea && <Tarjeta onAbrir={abrir('maquinas')} className="lg:col-span-4" icono={<Cpu className={ic} />} titulo="Máquinas" sub={`${corriendo} de ${p.maquinas.length} corriendo`}>
-          <ul className="mt-4 space-y-3">
-            {p.maquinas.map((m) => (
-              <li key={m.name} className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-[15px] text-foreground">{m.name}</div>
-                  <div className="text-[13px] tabular-nums text-muted-foreground">
-                    {m.status === 'detenida' ? (m.razon ?? 'Detenida') : velMaquina(m)}
+            <Tarjeta ampliado={detalleDe('perdido')?.cuerpo} subAmpliado={detalleDe('perdido')?.sub} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub={p.perdidasMaquina && p.perdidasMaquina.maquinas > 1 ? `minutos de línea: ${int(p.perdidasMaquina.min)} min de máquina ÷ ${p.perdidasMaquina.maquinas}` : 'minutos de línea, por dueño y causa'}>
+              <Cifra valor={horasCifra(totalPerdida)} chica />
+              {totalPerdida > 0 && (
+                <>
+                  <div className="mt-3 flex h-2.5 gap-1 overflow-hidden">
+                    {p.perdidas.filter((x) => x.min > 0).map((x) => (
+                      <div key={x.dueno} className="h-full rounded-full" style={{ flex: x.min, background: RELLENO[x.dueno] }} />
+                    ))}
                   </div>
-                </div>
-                {m.status === 'detenida'
-                  ? <Pill tone="critical" dot className="tabular-nums">{m.desdeMin != null ? `${Math.round(m.desdeMin)} min` : 'Parada'}</Pill>
-                  : m.status === 'produciendo' ? <Pill tone="ok" dot>Corre</Pill> : <Pill tone="neutral">Sin datos</Pill>}
-              </li>
-            ))}
-          </ul>
-        </Tarjeta>}
-      </div>
-
-      {/* «Más del turno»: al final de la columna principal, a todo el ancho en 2xl. */}
-      <div className="flex min-w-0 flex-col gap-3 max-lg:order-9 lg:gap-4 2xl:col-span-2 2xl:row-start-5">
-        {p.vista >= 1 && <MasDelTurnoV2 mas={p.mas} cerrado={p.cerrado} />}
-        <BotonDetalle vista={p.vista} onVista={p.onVista} />
-      </div>
-      </div>
-
-      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-      {p.ritmoVivo && <div className="min-w-0 max-lg:order-3">{p.ritmoVivo}</div>}
-
-      {/* Fila 3 · Mantención en detalle y a dónde se fue el tiempo */}
-      <div className="grid grid-cols-1 gap-3 max-lg:order-7 lg:gap-4">
-        <Tarjeta ampliado={detalleDe('mant')?.cuerpo} subAmpliado={detalleDe('mant')?.sub} icono={<Wrench className={ic} />} titulo="Fallas de equipos" sub={p.eventos.length ? `${p.eventos.length} en el turno · ${horas(fallasMin)}` : 'ninguna en el turno'}>
-          {p.rielMttr.length > 1 && <RielMttr riel={p.rielMttr} />}
-          {p.eventos.length > 0 && (
-            <ol className="mt-4 space-y-3">
-              {p.eventos.slice(-4).reverse().map((e, i) => (
-                <li key={`${e.desde}-${i}`} className="flex items-start gap-3">
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--v2-mant)' }} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2 text-[15px]">
-                      <span className="truncate text-foreground">{e.causa ?? 'Falla técnica'}</span>
-                      <span className="shrink-0 tabular-nums font-medium text-foreground">{horas(e.min)}</span>
-                    </div>
-                    <div className="text-[13px] tabular-nums text-muted-foreground">{e.maquina} · {hhmm(e.desde)}–{hhmm(e.hasta)}</div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Tarjeta>
-
-        <Tarjeta ampliado={detalleDe('perdido')?.cuerpo} subAmpliado={detalleDe('perdido')?.sub} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub={p.perdidasMaquina && p.perdidasMaquina.maquinas > 1 ? `minutos de línea: ${int(p.perdidasMaquina.min)} min de máquina ÷ ${p.perdidasMaquina.maquinas}` : 'minutos de línea, por dueño y causa'}>
-          <Cifra valor={horasCifra(totalPerdida)} chica />
-          {totalPerdida > 0 && (
-            <>
-              <div className="mt-3 flex h-2.5 gap-1 overflow-hidden">
-                {p.perdidas.filter((x) => x.min > 0).map((x) => (
-                  <div key={x.dueno} className="h-full rounded-full" style={{ flex: x.min, background: RELLENO[x.dueno] }} />
-                ))}
-              </div>
-              <Leyenda items={p.perdidas.filter((x) => x.min > 0).map((x) => ({ color: RELLENO[x.dueno], label: `${DUENO_UI[x.dueno].corto} ${horas(x.min)}` }))} />
-              <ul className="mt-4 space-y-3">
-                {p.causas.slice(0, 4).map((c) => (
-                  <FilaBarra key={c.causa} label={c.causa} valor={horas(c.min)} frac={c.min / maxCausa} color={RELLENO[c.dueno]} />
-                ))}
-              </ul>
-            </>
-          )}
-        </Tarjeta>
-      </div>
-
-      </div>
+                  <Leyenda items={p.perdidas.filter((x) => x.min > 0).map((x) => ({ color: RELLENO[x.dueno], label: `${DUENO_UI[x.dueno].corto} ${horas(x.min)}` }))} />
+                  <ul className="mt-4 space-y-3">
+                    {p.causas.slice(0, 4).map((c) => (
+                      <FilaBarra key={c.causa} label={c.causa} valor={horas(c.min)} frac={c.min / maxCausa} color={RELLENO[c.dueno]} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </Tarjeta>
+          </div>
+          <MasDelTurnoV2 mas={p.mas} cerrado={p.cerrado} />
+        </>
+      )}
+      <BotonDetalle vista={p.vista} onVista={p.onVista} />
 
       <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
         {detalle?.cuerpo}
