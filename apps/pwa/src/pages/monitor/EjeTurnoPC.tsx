@@ -20,6 +20,7 @@ import { Pill } from '@/components/piel'
 import { CapaAmpliada } from './AmpliarV2'
 import { useMovimientoReducido, useTamano } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
+import { ReglasMinuto } from './ReglasMinuto'
 import {
   acumulado, disenar, escalaY, finDelEje, minutosVisibles, paradaEn, pasoMarcas, pctARitmo, proyeccion, sumaPorMinuto,
   tonoRitmo, trazoHastaLectura, valorEnCurva, type Diseno, type ParadaEje, type Punto, type TonoRitmo,
@@ -79,7 +80,9 @@ export function CifraViva({ reloj, respaldo, className }: { reloj: RelojDeDatos;
     const el = ref.current
     if (!el) return
     const t = int(c.valor ?? respaldo)
-    if (t !== ultimo.current) { ultimo.current = t; el.textContent = t }
+    /* Se compara con lo que HAY en el nodo: React reescribe el texto con `respaldo` cuando éste cambia, y el valor que
+       muestra la reproducción (un escalón por pieza) puede ir por debajo de él. */
+    if (t !== ultimo.current || el.textContent !== t) { ultimo.current = t; el.textContent = t }
   }), [reloj, respaldo])
   return <span ref={ref} className={className}>{int(respaldo)}</span>
 }
@@ -98,7 +101,7 @@ function PiezasVivas({ reloj, respaldo, meta, cuota }: { reloj: RelojDeDatos; re
       const v = c.valor ?? respaldo
       if (barRef.current) barRef.current.style.transform = `scaleX(${acota(v / meta, 0, 1)})`
       const t = `${Math.floor((v / meta) * 100)} %`
-      if (pctRef.current && t !== ultimo.current) { ultimo.current = t; pctRef.current.textContent = t }
+      if (pctRef.current && (t !== ultimo.current || pctRef.current.textContent !== t)) { ultimo.current = t; pctRef.current.textContent = t }
     })
   }, [reloj, respaldo, meta])
   return (
@@ -621,6 +624,9 @@ function Riel({ p, reloj, detenida, ampliadoPiezas, cierreMostrado, abrir, e }: 
           {ampliadoPiezas}
         </CapaAmpliada>
       </section>
+
+      {/* Fase 6: el último minuto cerrado, pieza a pieza y Baader por Baader. Sin reproducción activa no dibuja nada. */}
+      <ReglasMinuto />
 
       <div className="eje-par">
         <Tocable onAbrir={() => abrir('cierre')} etiqueta={conProyeccion ? 'Al cierre' : 'Meta del turno'} className="eje-sec">
