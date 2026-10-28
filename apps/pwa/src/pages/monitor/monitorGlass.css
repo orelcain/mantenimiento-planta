@@ -88,8 +88,8 @@
    que haya detrás (lección de la versión A). */
 [data-glass='v2'] {
   --v2-acento: rgb(var(--brand));
-  --v2-mant: #f59e0b;
-  --v2-ext: #38bdf8;
+  --v2-mant: #c2780a;
+  --v2-ext: #5f6b75;
   --v2-gris: rgb(142 142 147 / 0.75);
   --v2-prog: rgb(142 142 147 / 0.4);
   --v2-secundaria: rgb(142 142 147 / 0.55);
@@ -172,8 +172,8 @@
 /* Los paneles de detalle viven en un portal (fuera de [data-glass]): llevan sus variables. */
 .v2-vars {
   --v2-acento: rgb(var(--brand));
-  --v2-mant: #f59e0b;
-  --v2-ext: #38bdf8;
+  --v2-mant: #c2780a;
+  --v2-ext: #5f6b75;
   --v2-gris: rgb(142 142 147 / 0.75);
   --v2-prog: rgb(142 142 147 / 0.4);
   --v2-secundaria: rgb(142 142 147 / 0.55);
@@ -279,7 +279,7 @@
   --v2-mal-texto: #a8463f;
   /* Ámbar como TEXTO en claro (el trazo #c98f3a no llega a 4,5:1) y celeste de «micro detención». */
   --v2-atento-texto: #92400e;
-  --v2-ext-texto: #0369a1;
+  --v2-ext-texto: #5f6b75;
   /* Duelo de equipos: un color fijo por equipo en todas las vistas. Cárdenas = el acento; Rebolledo = naranjo suave,
      mezcla de los tonos calmos ámbar y coral (no hay un naranjo propio y así sigue el tema claro u oscuro). */
   --v2-eq-cardenas: var(--v2-acento);
@@ -293,7 +293,10 @@
   --v2-mal: #e48a82;
   --v2-mal-texto: #e48a82;
   --v2-atento-texto: #e0b46e;
-  --v2-ext-texto: #7dd3fc;
+  --v2-ext-texto: #9aa6b0;
+  /* Mantención y Externo (v7 del Análisis): el ámbar #f59e0b no da 3:1 sobre blanco, por eso en claro va #c2780a. */
+  --v2-mant: #f59e0b;
+  --v2-ext: #9aa6b0;
 }
 
 /* ── Detalle de «Ampliar» de Ritmo en vivo (RitmoVivoV2.tsx): llenado por Baader, señales y la banda de parada ── */

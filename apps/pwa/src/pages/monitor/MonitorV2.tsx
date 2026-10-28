@@ -13,6 +13,7 @@
  *
  * Vistas: `CabeceraV2`, `MonitorV2` (El turno) y `MonitorV2Analisis`.
  */
+/* eslint-disable react-refresh/only-export-components -- el formato y los primitivos se comparten con AnalisisV2 (a esos solo se les agregó `export`) */
 import { AlertTriangle, BarChart3, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Clock, Cpu, Filter, Minimize2, Repeat, Timer, Wrench, X } from 'lucide-react'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -47,18 +48,18 @@ import type { Lectura } from './relojDeDatos'
 
 // ── Formato ──────────────────────────────────────────────────────────────────
 
-const int = (n: number) => Math.round(n).toLocaleString('es-CL')
-const dec = (n: number, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
-const firmado = (n: number, f: (x: number) => string = int) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${f(Math.abs(n))}`
-const horas = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`)
-const hhmm = (iso: string) => iso.slice(11, 16)
+export const int = (n: number) => Math.round(n).toLocaleString('es-CL')
+export const dec = (n: number, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
+export const firmado = (n: number, f: (x: number) => string = int) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${f(Math.abs(n))}`
+export const horas = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`)
+export const hhmm = (iso: string) => iso.slice(11, 16)
 /** Para una cifra grande: «8,2 h» cabe en media tarjeta de celular; «8 h 13 min» no. */
 const horasCifra = (min: number) => (min >= 60 ? `${dec(min / 60)} h` : `${Math.round(min)} min`)
 const relojDe = (ms: number) => new Date(ms).toISOString().slice(11, 16)
-const semanaCorta = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`
+export const semanaCorta = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`
 
 /** Color de relleno por dueño, como variable CSS (el SVG no lee clases bg-*). */
-const RELLENO: Record<DuenoPerdida, string> = {
+export const RELLENO: Record<DuenoPerdida, string> = {
   mantencion: 'var(--v2-mant)',
   externo: 'var(--v2-ext)',
   'sin-imputar': 'var(--v2-gris)',
@@ -85,7 +86,7 @@ function useActivo() {
 
 // ── Detalle: hoja (celular) / panel lateral (PC) ─────────────────────────────
 
-function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
+export function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
   abierto: boolean; titulo: string; sub?: string; onClose: () => void; children: ReactNode
 }) {
   const pc = useEsPc()
@@ -131,7 +132,7 @@ function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
   )
 }
 
-function Grupo({ titulo, nota, children }: { titulo?: string; nota?: string; children: ReactNode }) {
+export function Grupo({ titulo, nota, children }: { titulo?: string; nota?: string; children: ReactNode }) {
   return <ListGroup title={titulo} footer={nota}>{children}</ListGroup>
 }
 
@@ -141,7 +142,7 @@ function Grupo({ titulo, nota, children }: { titulo?: string; nota?: string; chi
  * Es local a propósito: el `ListCell` compartido, en celular, pone el rótulo grande y la cifra chica debajo (la jerarquía
  * al revés para una hoja de números) y lo usan otras pantallas.
  */
-function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNode; value: ReactNode; valueSub?: ReactNode; subtitle?: ReactNode }) {
+export function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNode; value: ReactNode; valueSub?: ReactNode; subtitle?: ReactNode }) {
   return (
     <div className="relative flex min-h-[44px] items-center justify-between gap-3 px-4 py-2.5 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[''] first:before:hidden">
       <div className="min-w-0 flex-1">
@@ -156,7 +157,7 @@ function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNode; val
   )
 }
 
-const Punto = ({ color }: { color: string }) => <i className="block h-3 w-3 rounded-full" style={{ background: color }} />
+export const Punto = ({ color }: { color: string }) => <i className="block h-3 w-3 rounded-full" style={{ background: color }} />
 
 // ── Primitivos de tarjeta ────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ function Contexto({ tono, children, nota }: { tono: PillTone; children: ReactNod
   )
 }
 
-function Leyenda({ items }: { items: Array<{ color: string; label: string; trazo?: 'linea' | 'punteada' }> }) {
+export function Leyenda({ items }: { items: Array<{ color: string; label: string; trazo?: 'linea' | 'punteada' }> }) {
   return (
     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
       {items.map((it) => (
