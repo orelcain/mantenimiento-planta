@@ -38,7 +38,7 @@ export interface SerieCarrera {
   /** Variante del mismo color para TEXTO (`COLOR_EQUIPO_TEXTO`, contraste ≥ 4,5:1); sin ella se usa `color`. */
   colorTexto?: string
   curva: readonly PacePoint[]
-  /** Paradas de 5 min o más, en el eje de horas de producción de esta serie. */
+  /** Detenciones de 5 min o más, en el eje de horas de producción de esta serie. */
   eventos?: readonly EventoTurno[]
   /** Hora de reloj de planta a los `min` minutos de producción; null si no se sabe. */
   reloj?: (min: number) => string | null
@@ -132,7 +132,7 @@ export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda
     </div>
   )
   const eventosEn = (serie: SerieCarrera, min: number) => (serie.eventos ?? []).filter((ev) => min >= ev.desde && min <= ev.hasta)
-  const hayParadas = (hoy.eventos?.length ?? 0) + (rival?.eventos?.length ?? 0) > 0
+  const hayDetenciones = (hoy.eventos?.length ?? 0) + (rival?.eventos?.length ?? 0) > 0
   const relojHoy = m != null ? hoy.reloj?.(m) ?? null : null
   const relojRival = m != null ? rival?.reloj?.(m) ?? null : null
   const carrilHoy = !mini && (hoy.eventos?.length ?? 0) > 0
@@ -226,7 +226,7 @@ export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda
             <span className="inline-flex items-center gap-1.5"><i className="h-[3px] w-4 rounded-full" style={{ background: hoy.color }} />{hoy.rotulo ?? hoy.nombre}</span>
             {rival && <span className="inline-flex items-center gap-1.5"><i className="h-0 w-4 border-t-[3px] border-dashed" style={{ borderColor: rival.color }} />{rival.rotulo ?? rival.nombre}</span>}
             {banda && <span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-4 rounded-[3px]" style={{ background: 'var(--v2-tenue)', opacity: 0.35 }} />{bandaRotulo ?? `Promedio y rango del rival (${banda.turnos} turnos)`}</span>}
-            {hayParadas && <span className="inline-flex items-center gap-1.5"><i className="h-1.5 w-4 rounded-full" style={{ background: 'var(--v2-tenue)' }} />Detenciones de 5 min o más en alguna máquina (las programadas, más suaves)</span>}
+            {hayDetenciones && <span className="inline-flex items-center gap-1.5"><i className="h-1.5 w-4 rounded-full" style={{ background: 'var(--v2-tenue)' }} />Detenciones de 5 min o más en alguna máquina (las programadas, más suaves)</span>}
           </div>
         </>
       )}

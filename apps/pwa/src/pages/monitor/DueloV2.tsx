@@ -10,7 +10,6 @@
 import { useState, type ReactNode } from 'react'
 import { Flag, Trophy, Wrench } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, SegmentedControl } from '@/components/piel'
-import { useAnchoMin } from './ampliarHooks'
 import { Tarjeta } from './AmpliarV2'
 import { CarreraDueloV2 } from './CarreraDueloV2'
 import { DueloPC, type DueloPCExtra } from './DueloPC'
@@ -265,7 +264,7 @@ function FilaCiclo({ c, nombres, hoy }: { c: CicloDuelo; nombres: NombresEquipos
             <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted-foreground/[0.12]">
               <div className="duelo-barra-x h-full rounded-full" style={{ width: `${Math.max(2, (c.puntos[e] / max) * 100)}%`, background: COLOR_EQUIPO[e] }} />
             </div>
-            <div className="mt-1 text-[13px] tabular-nums text-muted-foreground">{c.ganados[e]} de {c.jugados[e]} {c.jugados[e] === 1 ? 'turno ganado' : 'turnos ganados'}</div>
+            <div className="mt-1 text-[13px] tabular-nums text-muted-foreground">{c.ganados[e]} de {c.jugados[e]} {c.jugados[e] === 1 ? 'jornada ganada' : 'jornadas ganadas'}</div>
           </li>
         ))}
       </ul>
@@ -333,7 +332,7 @@ function BloqueRecords({ d, nombres, plano, className }: { d: DatosDuelo; nombre
         <Nota>Todavía no hay turnos con datos suficientes para armar récords.</Nota>
       )}
       <div className="mt-3">
-        <ListGroup title="Racha de turnos ganados">
+        <ListGroup title="Racha de jornadas ganadas">
           {EQUIPOS.map((e) => (
             <ListCell key={e} title={nombreCorto(e, nombres)} subtitle={`mejor racha: ${rachaTxt(d.rachas[e].mejor)}`} value={rachaTxt(d.rachas[e].actual)} />
           ))}
@@ -600,10 +599,9 @@ export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeE
   /** Lo que el Duelo en PC necesita además de `datos`; sin él (o con menos de 1280 px) se arma la pestaña de siempre. */
   pc?: DueloPCExtra | null
 }) {
-  const anchoPc = useAnchoMin(1280)
-  if (datos && pc && anchoPc) {
-    /* Opción B «Eje» (5b): una sola pantalla sin scroll. Arriba, y solo si hace falta, una fila fina con el selector de
-       línea (sin sesión) y los avisos; el editor de supervisores queda debajo del pliegue. */
+  if (datos && pc) {
+    /* Duelo «calmo» (28-10): el MISMO componente en PC y en celular, con revelado progresivo. Arriba, y solo si hace falta,
+       una fila fina con el selector de línea (sin sesión) y los avisos; el editor de supervisores queda debajo. */
     const hayAviso = datos.corregido || datos.listos.con < datos.listos.de
     const hayHermanas = !!lineas && lineas.hermanas.length > 0
     return (
@@ -616,7 +614,7 @@ export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeE
           extra={pc}
           superior={hayHermanas || hayAviso ? (
             <>
-              {hayHermanas && <SelectorLinea lineas={lineas!} className="dpc-linea" />}
+              {hayHermanas && <SelectorLinea lineas={lineas!} className="dc-linea" />}
               {hayAviso && <div className="ml-auto"><AvisoDuelo d={datos} nombres={nombres} /></div>}
             </>
           ) : null}

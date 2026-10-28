@@ -6427,7 +6427,8 @@ function MonitorDelToken() {
           unidad: 'pz/min',
           secRotulo: 'esperado',
           sec: techoTv,
-          chips: live.machines.map((m) => {
+          // Con el turno cerrado el «ahora» por máquina es 0: no se muestra.
+          chips: turnoCerrado ? [] : live.machines.map((m) => {
             const v = ahoraPorIdTv?.get(m.id) ?? null
             return {
               nombre: etiquetaMaquina(m.name),
