@@ -436,6 +436,7 @@ propia de la app modulando una variable de opacidad.
 - Animar **solo** `transform` y `opacity`. Nunca layout.
 - Un protagonista por pantalla. Stagger máx. 5 elementos, 70 ms.
 - Todo dentro de `@media (prefers-reduced-motion: reduce)`. Nada supera 1.2 s.
+- **Excepción · reloj de datos** (monitor de turno, 27-10): la cifra de piezas y la punta de la curva se interpolan en línea recta (`linear`: una curva con freno mentiría sobre el ritmo) SOLO entre dos lecturas reales de Shoplogix y duran el intervalo medido entre ellas (tope 90 s), por encima de 1.2 s. No es una animación decorativa: es un reloj de datos, como el cronómetro del ritmo en vivo. Reglas: nunca supera la última lectura (no extrapola ni predice), se congela si la lectura siguiente se atrasa, y con `prefers-reduced-motion` salta directo a cada lectura. Solo `transform` y `opacity` en el DOM (clip y translate para la curva, `scaleY` para la barra nueva, 400 ms con `cubic-bezier(.22,.9,.24,1)`). Código: `monitor/relojDeDatos.ts` (lógica pura) y `useRelojDeDatos.ts`.
 
 ---
 

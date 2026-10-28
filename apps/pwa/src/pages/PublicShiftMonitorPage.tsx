@@ -88,6 +88,7 @@ import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
 import { BandaParadaV2, RitmoVivoV2 } from './monitor/RitmoVivoV2'
+import { paradasEnEje } from './monitor/ejeTurno'
 import { ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -6681,8 +6682,31 @@ function MonitorDelToken() {
           }
           const hoy = comparacion.days.find((d) => d.esHoy)
           const previo = comparacion.days.find((d) => !d.esHoy && d.curve.length > 1)
+          /* «El turno» en PC como eje de tiempo común (≥ 1280 px): el eje va del inicio de la serie del turno al fin previsto.
+             Todo sale de lo que ya se calcula acá arriba; sin serie minuto a minuto ni curva, no hay eje y manda la vista de siempre. */
+          const primeraPiezaMs = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null
+          const iniEjeMs = barrasMinuto ? Date.parse(barrasMinuto.desde) : primeraPiezaMs
+          const finEjeMs = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
+          const eje = iniEjeMs != null && Number.isFinite(iniEjeMs) && Number.isFinite(finEjeMs) && finEjeMs > iniEjeMs && (barrasMinuto || (hoy && hoy.curve.length > 1))
+            ? {
+                iniMs: iniEjeMs,
+                finMs: finEjeMs,
+                minuto: barrasMinuto,
+                primeraPiezaMs,
+                /* Detenida por el estado que ya existe: todas las máquinas paradas (pulso fresco) o el estado del corte. Cerrado, nunca. */
+                detenidaEstado: esActual && !turnoTerminadoV2 && (vivoV2
+                  ? vivoV2.maquinas.length > 0 && vivoV2.maquinas.every((m) => m.status === 'detenida')
+                  : live.status === 'detenida'),
+                paradas: paradasEnEje(gruposEventos, primeraPiezaMs, iniEjeMs),
+                llenado: vivoV2 ? vivoV2.r.lineas.map((l) => ({ id: l.id, ultimo: [...l.fills].reverse().find((q): q is number => q != null) ?? null })) : null,
+                unidad: vivoV2?.r.unidad ?? null,
+              }
+            : null
           return (
             <MonitorV2
+              lectura={{ valor: contador.valor, atMs: contador.corteWallMs }}
+              semilla={(data.pulse?.lecturas ?? []).map((l) => l.totalCycles)}
+              eje={eje}
               piezas={contador.valor}
               corteHora={!live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null}
               cuota={comparacion.optimalAtCurrentMinute != null ? { piezas: comparacion.optimalAtCurrentMinute, hora: horaDeCuota } : null}
