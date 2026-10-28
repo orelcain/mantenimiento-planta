@@ -4507,6 +4507,7 @@ function MonitorDelToken() {
   const cambioLinea = useCambioDeLinea(data?.plantLineId, data?.plantSlug)
   /* Duelo de equipos: nombres y correcciones de ESTE monitor (`monitor_config/{token}`); editar, solo con sesión de supervisor. */
   const configDuelo = useDueloConfig(token)
+  const navigate = useNavigate()
   const esSupervisorDuelo = useIsSupervisor()
   /* Los `t` de la serie son wall-clock sellados como UTC; para compararlos con
      el reloj hay que llevar "ahora" a esa misma base (igual que `fmtAgoWall`). */
@@ -5973,6 +5974,7 @@ function MonitorDelToken() {
         shiftDocId: vista.shiftDocId,
         live,
         piezas: contador.valor,
+        ahoraMs: contador.corteWallMs,
         cerrado: turnoCerrado,
         curvaHoy: cumulativeFromStart(live.series),
         rivalCurve: esActual ? data.rivalCurve : null,
@@ -7525,6 +7527,13 @@ function MonitorDelToken() {
             token={token}
             puedeEditar={esSupervisorDuelo}
             nombresGuardados={configDuelo.equipos ?? {}}
+            lineas={data.lineasHermanas && data.lineasHermanas.length > 0
+              ? {
+                  actual: data.areaLabel ?? data.lineLabel ?? 'Esta línea',
+                  hermanas: data.lineasHermanas,
+                  onIr: (tk) => navigate(`${rutaMonitor(tk)}?glass=v2&ver=duelo`),
+                }
+              : null}
           />
         )}
 

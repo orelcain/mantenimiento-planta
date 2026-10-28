@@ -6,11 +6,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ForecastHistoryShift, PublicMonitorLive, ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
-  bandaDeCurvas, bandasDeHoras, causaCorta, cicloDe, compararTurnos, construirDuelo, costoMantencion, curvaDeForecast, duelosDeTurnos,
+  bandaDeCurvas, bandasDeHoras, curvaConContador, referenciaPropia, causaCorta, cicloDe, compararTurnos, construirDuelo, costoMantencion, curvaDeForecast, duelosDeTurnos,
   equipoCorregido, equipoDelTurno, esNocheDesdeHora, etiquetaHora, eventosCrudosDeLive, eventosEnEjeProduccion, fantasmaDeJornada,
   fechaCorreccion, filasKpiAKpi, franjasEntre, horaTranscurrida, jornadaDe, llenadoDePuesto, marcadorDeCiclo, marcadorDePeriodo,
   minutoDelDia, nombreCorto, nombreEquipo, nombresEfectivos, periodosDisponibles, piezasAlMinuto, rachasPorEquipo, recordsDe,
-  referenciaMismoHorario, relojDeMinuto, resumenDeStat, ritmoHoraAHora, rivalDirecto, rivalProvisional, rotuloFantasma, rotuloTurno,
+  referenciaMismoHorario, relojDeMinuto, resumenDeStat, ritmoHoraAHora, rivalDirecto, rotuloFantasma, rotuloTurno,
   semanaIso, semanasDesdeAncla, tendenciaSemanal,
   type ResumenTurno,
 } from '../duelo'
@@ -251,15 +251,13 @@ describe('rival por jornada, ciclo, rachas y récords', () => {
     expect(rivalDirecto(dia, todos)!.equipo).not.toBe(dia.equipo)
   })
 
-  it('una noche cuyo día todavía no juega no tiene rival de jornada: queda el provisional, del otro horario y de antes', () => {
+  it('una noche cuyo día todavía no juega no tiene rival de jornada: no compite con nadie', () => {
     const todos = jornadaDeStats('2026-10-27', 10000, 12000)
     const nocheNueva = resumenDeStat(stat('2026-10-27_Turno Noche', { total: 3000 }))! // jornada 28-oct
     expect(nocheNueva.jornada).toBe('2026-10-28')
     expect(rivalDirecto(nocheNueva, todos)).toBeNull()
-    const prov = rivalProvisional(nocheNueva, todos)!
-    expect(prov.shiftDocId).toBe('2026-10-27_Turno Dia')
-    expect(prov.esNoche).toBe(false)
-    expect(prov.equipo).not.toBe(nocheNueva.equipo)
+    // Su día es el del 28-oct, no el del 27: el turno día de la jornada anterior NO es su rival.
+    expect(rivalDirecto(nocheNueva, [...todos, nocheNueva])).toBeNull()
   })
 
   it('si el supuesto rival lo hizo el mismo equipo (corrección manual) no hay duelo', () => {
@@ -430,7 +428,8 @@ describe('construirDuelo: de punta a punta con un turno en curso', () => {
     expect(d.hoy.jornada).toBe('2026-11-02')
     expect(d.rival?.shiftDocId).toBe('2026-11-01_Turno Noche')
     expect(d.rival?.equipo).toBe('rebolledo')
-    expect(d.provisional).toBe(false)
+    expect(d.abreJornada).toBe(false)
+    expect(d.esperando).toBeNull()
     expect(d.carrera?.fantasmaInfo?.tipo).toBe('jornada')
     expect(rotuloFantasma(d.carrera!.fantasmaInfo!, 'Rebolledo')).toBe('Rebolledo · noche 02/11')
     expect(rotuloTurno('Cárdenas', d.hoy)).toBe('Cárdenas · día 02/11')
@@ -455,23 +454,90 @@ describe('construirDuelo: de punta a punta con un turno en curso', () => {
     expect(d.semanaAnterior?.diferencia).toBe(260)
   })
 
-  it('mientras corre la noche, su rival de la jornada no juega: fantasma y rival provisionales (el último día del rival)', () => {
+  it('la noche en curso abre la jornada: sin rival, sin fantasma, sin marcador y con su propia referencia', () => {
     const liveNoche = liveDe('2026-11-02T21:00:00.000Z', '2026-11-03T05:00:00.000Z')
-    const diaPrevio = { ...nocheDeLaJornada, shiftDocId: '2026-11-02_Turno Dia', dateKey: '2026-11-02', shiftId: 'Turno Dia', h0: '07:00' }
+    const diaPrevio = { ...nocheDeLaJornada, shiftDocId: '2026-11-02_Turno Dia', dateKey: '2026-11-02', shiftId: 'Turno Dia', h0: '07:20' }
+    // Dos noches anteriores del mismo equipo (Rebolledo) con curva, para su promedio propio.
+    const propias: ForecastHistoryShift[] = ['2026-10-05_Turno Noche', '2026-10-19_Turno Noche'].map((id) => ({
+      shiftDocId: id, dateKey: id.slice(0, 10), curve: [{ m: 15, p: 500 }, { m: 30, p: 1000 }, { m: 60, p: 2200 }], total: 9000, producingMin: 400, micro: null,
+    }))
     const d = construirDuelo({
       shiftDocId: '2026-11-02_Turno Noche', live: liveNoche, piezas: 3980, cerrado: false, curvaHoy,
-      stats: [stat('2026-11-02_Turno Dia')], forecast: [], rivalCurve: diaPrevio,
+      stats: [stat('2026-11-02_Turno Dia'), stat('2026-10-05_Turno Noche'), stat('2026-10-19_Turno Noche')], forecast: propias, rivalCurve: diaPrevio,
     })!
-    // La noche del 2-nov es de la jornada del 3-nov y de la semana 2-nov: la hace Rebolledo; el día del 2-nov, Cárdenas.
+    // La noche del 2-nov es de la jornada del 3-nov y de la semana 2-nov: la hace Rebolledo; el día del 2-nov (otra jornada) NO es su rival.
     expect(d.hoy.jornada).toBe('2026-11-03')
     expect(d.hoy.equipo).toBe('rebolledo')
-    expect(d.provisional).toBe(true)
-    expect(d.rival?.shiftDocId).toBe('2026-11-02_Turno Dia')
-    expect(d.carrera?.fantasmaInfo?.tipo).toBe('provisional')
-    expect(rotuloFantasma(d.carrera!.fantasmaInfo!, 'Cárdenas')).toBe('provisional · Cárdenas día 02/11')
-    // Sin rival de jornada no hay carrera en vivo comparable con puntos: el marcador sigue pendiente.
-    expect(d.marcador?.ganador).toBe('pendiente')
+    expect(d.abreJornada).toBe(true)
+    expect(d.rival).toBeNull()
+    expect(d.marcador).toBeNull()
+    expect(d.kpiAKpi).toEqual([])
+    expect(d.carrera?.fantasmaInfo).toBeNull()
+    expect(d.carrera?.fantasmaPz).toBeNull()
+    expect(d.carrera?.diferencia).toBeNull()
+    expect(d.semanaAnterior).toBeNull()
+    expect(d.esperando).toBeNull()
+    // Su referencia en gris es SU promedio de noche; el inicio del turno día viene del último día publicado.
+    expect(d.carrera?.bandaPropia).toBe(true)
+    expect(d.carrera?.banda?.turnos).toBe(2)
+    expect(d.inicioDia).toBe('07:00')
     expect(d.ciclo.jugados).toEqual({ rebolledo: 0, cardenas: 0 })
+  })
+
+  it('la noche cerrada sin su día queda «esperando» al otro equipo y sin puntos', () => {
+    const liveNoche = liveDe('2026-11-02T21:00:00.000Z', '2026-11-03T05:00:00.000Z')
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Noche', live: liveNoche, piezas: 9000, cerrado: true, curvaHoy,
+      stats: [stat('2026-11-02_Turno Dia')], forecast: [],
+    })!
+    expect(d.esperando).toBe('cardenas')
+    expect(d.rival).toBeNull()
+    expect(d.marcador).toBeNull()
+    expect(d.ciclo.puntos).toEqual({ rebolledo: 0, cardenas: 0 })
+    expect(d.ciclo.jugados).toEqual({ rebolledo: 0, cardenas: 0 })
+  })
+
+  it('la noche cerrada con su día ya cerrado sí se compara y suma puntos', () => {
+    const liveNoche = liveDe('2026-11-02T21:00:00.000Z', '2026-11-03T05:00:00.000Z')
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Noche', live: liveNoche, piezas: 11000, cerrado: true, curvaHoy,
+      stats: [stat('2026-11-03_Turno Dia', { total: 9000, windowMin: 120, plannedMin: 0 })], forecast: [],
+    })!
+    expect(d.esperando).toBeNull()
+    expect(d.rival?.shiftDocId).toBe('2026-11-03_Turno Dia')
+    expect(d.marcador?.ganador).toBe('a')
+    expect(d.ciclo.puntos.rebolledo).toBe(d.marcador?.puntosA)
+  })
+
+  it('un día sin noche en su jornada corre solo, con su propia referencia', () => {
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy, stats: [stat('2026-10-26_Turno Dia')], forecast,
+    })!
+    expect(d.rival).toBeNull()
+    expect(d.marcador).toBeNull()
+    expect(d.esperando).toBeNull()
+    expect(d.carrera?.bandaPropia).toBe(true)
+  })
+
+  it('el total y el punto actual son el contador en vivo, no el último tramo de la curva', () => {
+    // La curva llega a 3.980 pz en el minuto 20; el contador en vivo ya marca 4.500 y corresponde al minuto 25 de producción.
+    const t0 = Date.parse('2026-11-02T07:10:00.000Z')
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Dia', live, piezas: 4500, ahoraMs: t0 + 25 * 60_000, cerrado: false, curvaHoy, stats: [], forecast: [],
+    })!
+    expect(d.hoy.piezas).toBe(4500)
+    expect(d.carrera?.hoyPz).toBe(4500)
+    expect(d.carrera?.hoy[d.carrera.hoy.length - 1]).toEqual({ minutes: 25, pieces: 4500 })
+    expect(d.carrera?.minuto).toBe(25)
+  })
+
+  it('si el contador ya cuenta pero aún no hay ningún tramo con piezas, la carrera existe con ese total', () => {
+    const vacia = { ...live, series: [] } as unknown as PublicMonitorLive
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Dia', live: vacia, piezas: 11, cerrado: false, curvaHoy: [], stats: [], forecast: [],
+    })!
+    expect(d.carrera?.hoyPz).toBe(11)
+    expect(d.hoy.piezas).toBe(11)
   })
 
   it('las paradas de hoy se ubican en el eje de horas de producción (restando el arranque)', () => {
@@ -710,12 +776,35 @@ describe('el mismo horario de la semana anterior y el fantasma de la jornada', (
       expect(g.jornada).toBe('2026-10-27')
       expect(rotuloFantasma(g, 'Cárdenas')).toBe('Cárdenas · noche 27/10')
     }
-    // El día provisional sí lleva su propia jornada, no la fecha cruda del documento.
+    // La noche que abre la jornada no tiene fantasma: el día de la jornada anterior NO se le pone enfrente.
     const nocheHoy = { shiftDocId: '2026-10-27_Turno 1', dateKey: '2026-10-27', jornada: '2026-10-28', shiftId: 'Turno 1', esNoche: true, equipo: 'cardenas' as const }
     const rcDia = { shiftDocId: '2026-10-27_Turno 2', dateKey: '2026-10-27', shiftId: 'Turno 2', h0: '07:20', curve: [{ m: 5, p: 800 }, { m: 10, p: 1700 }, { m: 15, p: 2500 }], total: 9000, producingMin: 400 }
-    const p = fantasmaDeJornada(nocheHoy, rcDia, [])!
-    expect(p.tipo).toBe('provisional')
-    expect(rotuloFantasma(p, 'Rebolledo')).toBe('provisional · Rebolledo día 27/10')
+    expect(fantasmaDeJornada(nocheHoy, rcDia, [])).toBeNull()
+  })
+
+  it('curvaConContador: el último punto llega a «ahora» con el total en vivo', () => {
+    const curva = [{ minutes: 5, pieces: 100 }, { minutes: 10, pieces: 229 }]
+    expect(curvaConContador(curva, 387, 14)).toEqual([...curva, { minutes: 14, pieces: 387 }])
+    // Sin hora de «ahora» o en el mismo minuto, se corrige el último punto en vez de duplicar el eje.
+    expect(curvaConContador(curva, 387)).toEqual([curva[0], { minutes: 10, pieces: 387 }])
+    expect(curvaConContador(curva, 387, 10)).toEqual([curva[0], { minutes: 10, pieces: 387 }])
+    // Un contador que va por detrás o en cero no recorta la curva.
+    expect(curvaConContador(curva, 200, 14)).toEqual(curva)
+    expect(curvaConContador(curva, 0, 14)).toEqual(curva)
+    // Filete: el contador cuenta 11 pero aún no hay tramo con piezas.
+    expect(curvaConContador([], 11, 3)).toEqual([{ minutes: 3, pieces: 11 }])
+    expect(curvaConContador([], 0)).toEqual([])
+  })
+
+  it('referenciaPropia: promedio y rango del MISMO equipo en el mismo horario; sin turnos propios, nada', () => {
+    const hoy = { shiftDocId: '2026-11-02_Turno Noche', dateKey: '2026-11-02', jornada: '2026-11-03', shiftId: 'Turno Noche', esNoche: true, equipo: 'rebolledo' as const }
+    const f = (id: string, base: number): ForecastHistoryShift => ({ shiftDocId: id, dateKey: id.slice(0, 10), curve: [{ m: 15, p: base }, { m: 30, p: base * 2 }, { m: 60, p: base * 4 }], total: 1, producingMin: 1, micro: null })
+    // Rebolledo hizo las noches del 5-oct y del 19-oct (semanas impares); la del 12-oct la hizo Cárdenas.
+    const ref = referenciaPropia(hoy, [f('2026-10-05_Turno Noche', 100), f('2026-10-12_Turno Noche', 999), f('2026-10-19_Turno Noche', 300)], [])
+    expect(ref?.turnos).toBe(2)
+    expect(ref?.media[ref.media.length - 1]!.pieces).toBe(800)
+    expect(referenciaPropia(hoy, [f('2026-10-19_Turno Noche', 300)], [])?.turnos).toBe(1)
+    expect(referenciaPropia(hoy, [f('2026-10-12_Turno Noche', 999)], [])).toBeNull()
   })
 
   it('la corrección manual guarda quién y cuándo, y se muestra en hora de Chile', () => {

@@ -14,11 +14,11 @@ import { Tarjeta } from './AmpliarV2'
 import { CarreraDueloV2 } from './CarreraDueloV2'
 import { fijarEquipoDelTurno, guardarNombresDuelo } from './dueloConfig'
 import {
-  COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, EQUIPOS, etiquetaHora, fechaCorreccion, nombreCorto, nombreEquipo, otroEquipo, relojDeMinuto, rotuloFantasma, rotuloTurno,
+  COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, EQUIPOS, etiquetaHora, fechaCorreccion, nombreCorto, nombreEquipo, otroEquipo, relojDeMinuto, rotuloFantasma, rotuloTurno, textoCorreContraEstaCurva,
   type CicloDuelo, type DatosDuelo, type EquipoId, type NombresEquipos,
 } from './duelo'
 import { dec1 } from '@/utils/formatoNumeros'
-import { KpiAKpiV2, PeriodoDueloV2, PuestosVsV2, RitmoHoraV2, TendenciaSemanalV2, type LadoDuelo } from './GraficosDueloV2'
+import { KpiAKpiV2, PeriodoDueloV2, ResumenCompactoV2, PuestosVsV2, RitmoHoraV2, TendenciaSemanalV2, type LadoDuelo } from './GraficosDueloV2'
 
 // ── Formato ──────────────────────────────────────────────────────────────────
 
@@ -82,21 +82,27 @@ function Cifras({ izq, der }: { izq: { nombre: string; valor: string; unidad?: s
 
 // ── Bloques ──────────────────────────────────────────────────────────────────
 
-function BloqueCarrera({ d, nombres, inicioMs, plano }: { d: DatosDuelo; nombres: NombresEquipos; inicioMs: number | null; plano: boolean }) {
+function BloqueCarrera({ d, nombres, inicioMs, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; inicioMs: number | null; plano: boolean; className?: string }) {
   const c = d.carrera
   const { a, b } = lados(d, nombres)
   const fan = c?.fantasmaInfo ?? null
   const colorA = COLOR_EQUIPO[a.id]
   const sub = c ? `${etiquetaHora(c.hora)} de producción · ${d.hoy.cerrado ? 'cerrado' : 'en vivo'}` : 'Todavía no hay piezas'
   const lider = c?.diferencia != null && c.diferencia !== 0 ? (c.diferencia > 0 ? a : b) : null
+  /* La noche abre la jornada y corre sola; el día sin noche también. */
+  const abre = d.abreJornada && !d.hoy.cerrado
+  const jornada = fechaCorta(d.hoy.jornada)
+  const corre = abre ? 'abre' : d.esperando ? 'espera' : 'compite'
   return (
-    <Seccion titulo="Carrera" sub={sub} plano={plano} icono={<Flag className="h-3.5 w-3.5" />}>
+    <Seccion titulo="Carrera" sub={sub} plano={plano} className={className} icono={<Flag className="h-3.5 w-3.5" />}>
       {c ? (
         <>
-          <div className="mt-3 text-[13px] text-muted-foreground">{rotuloTurno(a.nombre, d.hoy)} lleva</div>
+          <div className="mt-3 text-[13px] text-muted-foreground">
+            {corre === 'abre' ? `${a.nombre} abre la jornada ${jornada}` : corre === 'espera' ? `${a.nombre} cerró la jornada ${jornada} con` : `${rotuloTurno(a.nombre, d.hoy)} lleva`}
+          </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <span className="v2-cifra-chica tabular-nums font-semibold leading-none tracking-tight text-foreground">{int(c.hoyPz)} pz</span>
-            {c.diferencia != null && (
+            {c.diferencia != null && corre === 'compite' && (
               c.diferencia === 0
                 ? <span className="text-[17px] font-semibold text-muted-foreground">Parejos con {b.nombre}</span>
                 : <span className="text-[22px] font-semibold leading-none tabular-nums" style={{ color: COLOR_EQUIPO_TEXTO[lider!.id] }}>
@@ -105,14 +111,21 @@ function BloqueCarrera({ d, nombres, inicioMs, plano }: { d: DatosDuelo; nombres
             )}
             {lider && <span className="sr-only">{lider.nombre} va adelante</span>}
           </div>
-          {c.fantasmaPz != null && fan ? (
+          {corre === 'abre' ? (
+            <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+              {textoCorreContraEstaCurva(b.nombre, d.hoy.jornada, d.inicioDia)}. Mientras la noche corre no compite con nadie ni suma puntos.
+            </p>
+          ) : corre === 'espera' ? (
+            <p className="mt-2 text-[13px] leading-snug text-muted-foreground">Esperando a {b.nombre}: la jornada suma puntos cuando cierre su turno de día.</p>
+          ) : c.fantasmaPz != null && fan ? (
             <p className="mt-2 text-[13px] leading-snug tabular-nums text-muted-foreground">
               A la misma hora de producción ({horas(c.minuto)}), {rotuloFantasma(fan, b.nombre)} llevaba {int(c.fantasmaPz)} pz
               {fan.total != null ? `; ese turno cerró con ${int(fan.total)} pz` : ''}.
-              {fan.tipo === 'provisional' && ` Es el último turno ${fan.esNoche ? 'de noche' : 'de día'} de ${b.nombre}: el de esta jornada todavía no juega.`}
             </p>
-          ) : (
+          ) : d.rival ? (
             <Nota>Todavía no hay una curva de {b.nombre} del otro horario para comparar a esta hora{d.hoy.cerrado ? '' : ': aparece cuando el monitor la publique'}.</Nota>
+          ) : (
+            <Nota>Esta jornada no tiene turno de noche: {a.nombre} corre solo, contra su propia referencia en gris.</Nota>
           )}
           <CarreraDueloV2
             hoy={{
@@ -124,7 +137,11 @@ function BloqueCarrera({ d, nombres, inicioMs, plano }: { d: DatosDuelo; nombres
               reloj: fan.inicioMin != null ? (m) => relojDeMinuto(fan.inicioMin! + m) : undefined,
             } : null}
             banda={c.banda}
-            bandaRotulo={c.banda ? `${b.nombre} · promedio y rango de sus últimos ${c.banda.turnos} turnos de ${d.hoy.esNoche ? 'noche' : 'día'}` : undefined}
+            bandaRotulo={c.banda
+              ? c.bandaPropia
+                ? `${a.nombre} · su promedio de ${d.hoy.esNoche ? 'noche' : 'día'} (${c.banda.turnos} ${c.banda.turnos === 1 ? 'turno' : 'turnos'})`
+                : `${b.nombre} · promedio y rango de sus últimos ${c.banda.turnos} turnos de ${d.hoy.esNoche ? 'noche' : 'día'}`
+              : undefined}
             conMediaDeBanda={fan?.tipo !== 'promedio'}
             alto={plano ? 240 : undefined}
             ariaLabel={`Piezas acumuladas por hora de producción de ${a.nombre} contra ${b.nombre}`}
@@ -145,13 +162,15 @@ function BloqueCarrera({ d, nombres, inicioMs, plano }: { d: DatosDuelo; nombres
   )
 }
 
-function BloqueRitmo({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean }) {
+function BloqueRitmo({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   const { a, b } = lados(d, nombres)
   const horasRitmo = d.carrera?.ritmoHoras ?? []
   return (
-    <Seccion titulo="Ritmo hora a hora" sub="pz/min de cada hora de producción, con las paradas adentro" plano={plano}>
+    <Seccion titulo="Ritmo hora a hora" sub="pz/min de cada hora de producción, con las paradas adentro" plano={plano} className={className}>
       {horasRitmo.length > 0 && d.carrera?.fantasma ? (
         <RitmoHoraV2 horas={horasRitmo} a={a} b={b} nombreRival={b.nombre} />
+      ) : d.abreJornada && !d.hoy.cerrado ? (
+        <Nota>La noche abre la jornada y no compite con nadie: el ritmo hora a hora se compara cuando juegue el día.</Nota>
       ) : (
         <Nota>Todavía no hay horas de producción de los dos equipos para comparar.</Nota>
       )}
@@ -160,19 +179,26 @@ function BloqueRitmo({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEqu
   )
 }
 
-function BloqueMarcador({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean }) {
+function BloqueMarcador({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   const m = d.marcador
   const { a, b } = lados(d, nombres)
   if (!m || !d.rival) {
     return (
-      <Seccion titulo="Marcador de la jornada" sub="La noche contra el día de la misma fecha de producción" plano={plano} icono={<Trophy className="h-3.5 w-3.5" />}>
-        <Nota>Todavía no hay un turno del rival en el otro horario con los datos del duelo.</Nota>
+      <Seccion titulo="Marcador de la jornada" sub="La noche contra el día de la misma fecha de producción" plano={plano} className={className} icono={<Trophy className="h-3.5 w-3.5" />}>
+        <Nota>
+          {d.abreJornada && !d.hoy.cerrado
+            ? `La noche abre la jornada y no compite con nadie mientras corre. Los puntos se asignan cuando cierran la noche y el día; ${b.nombre} juega el día del ${fechaCorta(d.hoy.jornada)}.`
+            : d.esperando
+              ? `La noche ya cerró y espera a ${b.nombre}: la jornada suma puntos cuando cierre su turno de día.`
+              : 'Esta jornada no tiene turno de noche, o su rival todavía no trae los datos del duelo: no hay con quién comparar ni puntos que asignar.'}
+        </Nota>
+        <div className="duelo-pc-solo"><ResumenCompactoV2 duelos={d.duelos} hoyKey={d.hoyKey} rachas={d.rachas} nombreDe={(e) => nombreCorto(e, nombres)} /></div>
       </Seccion>
     )
   }
-  const sub = `${rotuloTurno(a.nombre, d.hoy)} contra ${rotuloTurno(b.nombre, d.rival)}${d.hoy.cerrado && !d.provisional ? '' : ' · provisional'}`
+  const sub = `${rotuloTurno(a.nombre, d.hoy)} contra ${rotuloTurno(b.nombre, d.rival)}${d.hoy.cerrado ? '' : ' · en juego'}`
   return (
-    <Seccion titulo="Marcador de la jornada" sub={sub} plano={plano} icono={<Trophy className="h-3.5 w-3.5" />}>
+    <Seccion titulo="Marcador de la jornada" sub={sub} plano={plano} className={className} icono={<Trophy className="h-3.5 w-3.5" />}>
       {m.sinDuelo ? (
         <>
           <div className="mt-3"><Pill tone="neutral">Sin duelo</Pill></div>
@@ -187,16 +213,30 @@ function BloqueMarcador({ d, nombres, plano }: { d: DatosDuelo; nombres: Nombres
             </span>
           </div>
           <div className="mt-2 text-[13px] text-muted-foreground">
-            {d.provisional
-              ? `El rival de esta jornada todavía no juega: se compara con su último turno ${d.rival.esNoche ? 'de noche' : 'de día'} y no suma puntos.`
-              : m.ganador === 'pendiente' ? 'El turno sigue en curso: los puntos se confirman al cierre.' : m.ganador === 'empate' ? 'Jornada empatada.' : `Gana la jornada ${m.ganador === 'a' ? a.nombre : b.nombre}.`}
+            {m.ganador === 'pendiente' ? 'El turno sigue en curso: los puntos se confirman al cierre, cuando los dos turnos de la jornada hayan cerrado.' : m.ganador === 'empate' ? 'Jornada empatada.' : `Gana la jornada ${m.ganador === 'a' ? a.nombre : b.nombre}.`}
           </div>
-          <KpiAKpiV2 filas={d.kpiAKpi} a={a} b={b} />
-          <Nota>Un punto por KPI y uno por puesto de alimentación; arranque y cierre valen un solo punto (gana quien gana los dos). Las fallas técnicas no restan: sus piezas se suman al equipo. En «menos es mejor» gana la barra más corta.</Nota>
+          <div className="duelo-pc-oculto">
+            <KpiAKpiV2 filas={d.kpiAKpi} a={a} b={b} />
+            <Nota>{NOTA_PUNTOS}</Nota>
+          </div>
         </>
       )}
       {d.hoy.fallasN > 0 && <Nota>Las {d.hoy.fallasN} {d.hoy.fallasN === 1 ? 'falla técnica' : 'fallas técnicas'} de {a.nombre} ({horas(d.hoy.fallaMin)}) se descuentan del tiempo comparable.</Nota>}
+      <div className="duelo-pc-solo"><ResumenCompactoV2 duelos={d.duelos} hoyKey={d.hoyKey} rachas={d.rachas} nombreDe={(e) => nombreCorto(e, nombres)} /></div>
     </Seccion>
+  )
+}
+
+const NOTA_PUNTOS = 'Un punto por KPI y uno por puesto de alimentación; arranque y cierre valen un solo punto (gana quien gana los dos). Las fallas técnicas no restan: sus piezas se suman al equipo. En «menos es mejor» gana la barra más corta.'
+
+/** KPI a KPI como tarjeta propia: solo en la pestaña a ancho de PC (en celular va dentro del marcador de la jornada). */
+function BloqueKpiPC({ d, nombres, className }: { d: DatosDuelo; nombres: NombresEquipos; className?: string }) {
+  const { a, b } = lados(d, nombres)
+  const hay = d.marcador && !d.marcador.sinDuelo && d.rival && d.kpiAKpi.length > 0
+  return (
+    <Tarjeta titulo="KPI a KPI" sub="cada equipo empuja la barra hacia su lado" className={`duelo-pc-solo ${className ?? ''}`}>
+      {hay ? <><KpiAKpiV2 filas={d.kpiAKpi} a={a} b={b} /><Nota>{NOTA_PUNTOS}</Nota></> : <Nota>Se compara cuando cierran los dos turnos de la jornada.</Nota>}
+    </Tarjeta>
   )
 }
 
@@ -226,10 +266,10 @@ function FilaCiclo({ c, nombres, hoy }: { c: CicloDuelo; nombres: NombresEquipos
   )
 }
 
-function BloqueCiclo({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean }) {
+function BloqueCiclo({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   const hay = (c: CicloDuelo) => c.jugados.rebolledo + c.jugados.cardenas > 0
   return (
-    <Seccion titulo="Marcador del ciclo" sub="Dos semanas: cada equipo hace día y noche" plano={plano} icono={<Trophy className="h-3.5 w-3.5" />}>
+    <Seccion titulo="Marcador del ciclo" sub="Dos semanas: cada equipo hace día y noche" plano={plano} className={className} icono={<Trophy className="h-3.5 w-3.5" />}>
       {hay(d.ciclo) || hay(d.cicloPrevio) ? (
         <ul className="mt-4 space-y-5">
           <FilaCiclo c={d.ciclo} nombres={nombres} hoy={d.hoy.equipo} />
@@ -243,19 +283,19 @@ function BloqueCiclo({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEqu
   )
 }
 
-function BloquePeriodo({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean }) {
+function BloquePeriodo({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   return (
-    <Seccion titulo="Quién gana la semana y el mes" sub="Puntos de las jornadas cerradas, por fecha de producción" plano={plano} icono={<Trophy className="h-3.5 w-3.5" />}>
+    <Seccion titulo="Quién gana la semana y el mes" sub="Puntos de las jornadas cerradas, por fecha de producción" plano={plano} className={className} icono={<Trophy className="h-3.5 w-3.5" />}>
       <PeriodoDueloV2 duelos={d.duelos} hoyKey={d.hoyKey} nombreDe={(e) => nombreCorto(e, nombres)} />
       <Nota>Cuenta los turnos que el monitor tiene publicados; un mes con pocos días publicados puede estar incompleto. La semana va de lunes a domingo; el mes, calendario completo.</Nota>
     </Seccion>
   )
 }
 
-function BloqueTendencia({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean }) {
+function BloqueTendencia({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   const { a, b } = lados(d, nombres)
   return (
-    <Seccion titulo="Tendencia semanal" sub="Piezas por turno de cada equipo" plano={plano}>
+    <Seccion titulo="Tendencia semanal" sub="Piezas por turno de cada equipo" plano={plano} className={className}>
       {d.tendencia.length >= 2 ? (
         <TendenciaSemanalV2 semanas={d.tendencia} a={a} b={b} />
       ) : (
@@ -265,10 +305,10 @@ function BloqueTendencia({ d, nombres, plano }: { d: DatosDuelo; nombres: Nombre
   )
 }
 
-function BloqueRecords({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean }) {
+function BloqueRecords({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   const rachaTxt = (n: number) => `${n} ${n === 1 ? 'turno' : 'turnos'}`
   return (
-    <Seccion titulo="Récords y rachas" sub="De los últimos turnos publicados de la línea" plano={plano}>
+    <Seccion titulo="Récords y rachas" sub="De los últimos turnos publicados de la línea" plano={plano} className={className}>
       {d.records.length > 0 ? (
         <div className="mt-3">
           <ListGroup title="Récords">
@@ -296,9 +336,9 @@ function BloqueRecords({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresE
   )
 }
 
-function BloqueCosto({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean }) {
+function BloqueCosto({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   return (
-    <Seccion titulo="Costo de Mantención" sub="Lo que las fallas técnicas le quitaron a cada equipo en este ciclo" plano={plano} icono={<Wrench className="h-3.5 w-3.5" />}>
+    <Seccion titulo="Costo de Mantención" sub="Lo que las fallas técnicas le quitaron a cada equipo en este ciclo" plano={plano} className={className} icono={<Wrench className="h-3.5 w-3.5" />}>
       <div className="mt-3">
         <ListGroup>
           {EQUIPOS.map((e) => {
@@ -324,16 +364,16 @@ function BloqueCosto({ d, nombres, plano }: { d: DatosDuelo; nombres: NombresEqu
   )
 }
 
-function BloqueAlimentacion({ d, nombres, unidad, plano }: { d: DatosDuelo; nombres: NombresEquipos; unidad: 'carros' | 'silletas' | null; plano: boolean }) {
+function BloqueAlimentacion({ d, nombres, unidad, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; unidad: 'carros' | 'silletas' | null; plano: boolean; className?: string }) {
   const m = d.marcador
   const { a, b } = lados(d, nombres)
   const cosa = unidad ?? 'posiciones'
   return (
-    <Seccion titulo="Alimentación por puesto" sub={`${cosa} con pieza sobre el tiempo andando`} plano={plano}>
+    <Seccion titulo="Alimentación por puesto" sub={`${cosa} con pieza sobre el tiempo andando`} plano={plano} className={className}>
       {m && !m.sinDuelo && m.puestos.length > 0 && d.rival ? (
         <PuestosVsV2 puestos={m.puestos} a={a} b={b} />
       ) : (
-        <Nota>{m?.sinDuelo ? 'Este turno quedó sin duelo.' : 'Todavía no hay un turno rival con el llenado por puesto.'}</Nota>
+        <Nota>{m?.sinDuelo ? 'Este turno quedó sin duelo.' : 'Se compara cuando cierran los dos turnos de la jornada.'}</Nota>
       )}
       <Nota>Piezas del puesto ÷ (esperado de Shoplogix × minutos andando), de 0 a 100 %. Un punto por puesto ganado; los puestos se comparan sin nombres de operadores.</Nota>
     </Seccion>
@@ -391,7 +431,11 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
   const { a, b } = lados(datos, nombres)
   const fan = c?.fantasmaInfo ?? null
   const m = datos.marcador
-  const sub = c ? `${etiquetaHora(c.hora)} de producción · ${a.nombre} contra ${b.nombre}` : 'el turno todavía no parte'
+  const sola = datos.abreJornada && (!datos.hoy.cerrado || datos.esperando != null)
+  const jornada = fechaCorta(datos.hoy.jornada)
+  const sub = c
+    ? sola ? `${etiquetaHora(c.hora)} de producción · ${a.nombre} ${datos.hoy.cerrado ? 'cerró' : 'abre'} la jornada` : `${etiquetaHora(c.hora)} de producción · ${a.nombre} contra ${b.nombre}`
+    : 'el turno todavía no parte'
   const lider = c?.diferencia != null && c.diferencia !== 0 ? (c.diferencia > 0 ? a : b) : null
   return (
     <Tarjeta
@@ -402,7 +446,20 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
       ampliado={<CuerpoDuelo datos={datos} nombres={nombres} unidad={unidad} inicioMs={inicioMs} />}
       subAmpliado="carrera, ritmo, marcador, semana y mes, ciclo, tendencia, récords y costo de Mantención"
     >
-      {c && c.fantasmaPz != null && fan ? (
+      {c && sola ? (
+        <>
+          <Cifras izq={{ nombre: `${a.nombre} ${datos.hoy.cerrado ? 'cerró' : 'abre'} la jornada ${jornada}`, valor: int(c.hoyPz), unidad: 'pz', color: COLOR_EQUIPO[a.id] }} der={null} />
+          <p className="mt-3 text-[13px] leading-snug text-muted-foreground">
+            {datos.hoy.cerrado ? `Esperando a ${b.nombre}: juega el turno día del ${jornada}.` : `${textoCorreContraEstaCurva(b.nombre, datos.hoy.jornada, datos.inicioDia)}.`}
+          </p>
+          <CarreraDueloV2
+            mini
+            hoy={{ nombre: a.nombre, color: COLOR_EQUIPO[a.id], colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy }}
+            banda={c.banda}
+            ariaLabel={`Piezas acumuladas de ${a.nombre} en la noche que abre la jornada ${jornada}`}
+          />
+        </>
+      ) : c && c.fantasmaPz != null && fan ? (
         <>
           <Cifras
             izq={{ nombre: rotuloTurno(a.nombre, datos.hoy), valor: int(c.hoyPz), unidad: 'pz', color: COLOR_EQUIPO[a.id] }}
@@ -414,7 +471,7 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
             ) : (
               <span className="text-[15px] text-muted-foreground">Parejos</span>
             )}
-            {m && !m.sinDuelo && <span className="text-[13px] tabular-nums text-muted-foreground">marcador {m.puntosA} – {m.puntosB}{datos.hoy.cerrado && !datos.provisional ? '' : ' provisorio'}</span>}
+            {m && !m.sinDuelo && <span className="text-[13px] tabular-nums text-muted-foreground">marcador {m.puntosA} – {m.puntosB}{datos.hoy.cerrado ? '' : ' en juego'}</span>}
             {m?.sinDuelo && <span className="text-[13px] text-muted-foreground">sin duelo en este turno</span>}
           </div>
           <CarreraDueloV2
@@ -427,7 +484,9 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
       ) : c ? (
         <>
           <Cifras izq={{ nombre: rotuloTurno(a.nombre, datos.hoy), valor: int(c.hoyPz), unidad: 'pz', color: COLOR_EQUIPO[a.id] }} der={null} />
-          <p className="mt-3 text-[13px] leading-snug text-muted-foreground">Todavía no hay una curva de {b.nombre} del otro horario para comparar.</p>
+          <p className="mt-3 text-[13px] leading-snug text-muted-foreground">
+            {datos.rival ? `Todavía no hay una curva de ${b.nombre} del otro horario para comparar.` : 'Esta jornada no tiene turno de noche: corre solo, contra su referencia.'}
+          </p>
         </>
       ) : (
         <p className="mt-3 text-[13px] text-muted-foreground">La carrera parte con la primera pieza del turno.</p>
@@ -445,7 +504,7 @@ type Eleccion = 'auto' | EquipoId
  * escribe al tocarlo: pide confirmación («¿Asignar este turno a X?»), porque un toque accidental dejaba turnos
  * «corregidos a mano» sin que nadie lo hubiera querido.
  */
-function EditorDuelo({ token, d, nombres, nombresGuardados }: { token: string; d: DatosDuelo; nombres: NombresEquipos; nombresGuardados: NombresEquipos }) {
+function EditorDuelo({ token, d, nombres, nombresGuardados, className }: { token: string; d: DatosDuelo; nombres: NombresEquipos; nombresGuardados: NombresEquipos; className?: string }) {
   const [borrador, setBorrador] = useState<NombresEquipos>({ rebolledo: nombresGuardados.rebolledo ?? '', cardenas: nombresGuardados.cardenas ?? '' })
   const [estado, setEstado] = useState<'quieto' | 'guardando' | 'guardado' | 'error'>('quieto')
   const sinCambios = EQUIPOS.every((e) => (borrador[e] ?? '').trim() === (nombresGuardados[e] ?? '').trim())
@@ -472,7 +531,7 @@ function EditorDuelo({ token, d, nombres, nombresGuardados }: { token: string; d
     ? '¿Volver este turno a la rotación automática?'
     : pendiente ? `¿Asignar este turno a ${nombreCorto(pendiente, nombres)}?` : ''
   return (
-    <Tarjeta titulo="Equipos del duelo" sub="solo con sesión de supervisor">
+    <Tarjeta titulo="Equipos del duelo" sub="solo con sesión de supervisor" className={className}>
       <div className="mt-3 space-y-3">
         {EQUIPOS.map((e, i) => (
           <label key={e} className="block">
@@ -523,34 +582,70 @@ function EditorDuelo({ token, d, nombres, nombresGuardados }: { token: string; d
   )
 }
 
-export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeEditar, nombresGuardados }: DueloUiProps & {
+/** Las otras líneas de la planta con monitor vigente (`lineasHermanas`) y el nombre de esta. */
+export interface LineasDuelo {
+  actual: string
+  hermanas: Array<{ nombre: string; token: string }>
+  onIr: (token: string) => void
+}
+
+/** «Eviscerado | Filete»: cambia de línea con el link público de la otra, sin sesión. */
+function SelectorLineaDuelo({ lineas, className }: { lineas: LineasDuelo; className?: string }) {
+  const todas = [{ nombre: lineas.actual, token: '' }, ...lineas.hermanas].sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'))
+  return (
+    <div className={className}>
+      <SegmentedControl
+        ariaLabel="Línea del duelo"
+        value={lineas.actual}
+        segments={todas.map((l) => ({ value: l.nombre, label: l.nombre }))}
+        onChange={(nombre) => {
+          const destino = lineas.hermanas.find((h) => h.nombre === nombre)
+          if (destino) lineas.onIr(destino.token)
+        }}
+      />
+    </div>
+  )
+}
+
+export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeEditar, nombresGuardados, lineas }: DueloUiProps & {
   token: string | undefined
   puedeEditar: boolean
   nombresGuardados: NombresEquipos
+  lineas?: LineasDuelo | null
 }) {
   if (!datos) {
     return (
-      <Tarjeta icono={<Trophy className="h-3.5 w-3.5" />} titulo="Duelo de equipos" sub="noche contra día">
-        <p className="mt-3 text-[15px] text-muted-foreground">El duelo aparece cuando el turno trae su hora de inicio planificada.</p>
-      </Tarjeta>
+      <div className="monitor-v2 flex flex-col gap-3">
+        {lineas && lineas.hermanas.length > 0 && <SelectorLineaDuelo lineas={lineas} />}
+        <Tarjeta icono={<Trophy className="h-3.5 w-3.5" />} titulo="Duelo de equipos" sub="noche contra día">
+          <p className="mt-3 text-[15px] text-muted-foreground">El duelo aparece cuando el turno trae su hora de inicio planificada.</p>
+        </Tarjeta>
+      </div>
     )
   }
+  /* A ancho de PC (≥ 1280 px) las dos columnas se deshacen (`xl:contents`) y todas las piezas caen en una grilla de 12:
+     carrera 8 + marcador 4; KPI a KPI 6 + ritmo 6; alimentación, tendencia y récords 4 cada uno; costo, semana y mes,
+     ciclo y editor cierran. En celular y hasta lg el orden sigue siendo el de siempre. */
   return (
-    <div className="monitor-v2 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
-      <div className="flex min-w-0 flex-col gap-3 lg:gap-4">
-        <AvisoDuelo d={datos} nombres={nombres} />
-        <BloqueCarrera d={datos} nombres={nombres} inicioMs={inicioMs} plano={false} />
-        <BloqueRitmo d={datos} nombres={nombres} plano={false} />
-        <BloqueMarcador d={datos} nombres={nombres} plano={false} />
-        <BloqueAlimentacion d={datos} nombres={nombres} unidad={unidad} plano={false} />
+    <div className="monitor-v2 duelo-pc flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-4 xl:grid-cols-12">
+      {lineas && lineas.hermanas.length > 0 && (
+        <SelectorLineaDuelo lineas={lineas} className="lg:col-span-2 xl:order-first xl:col-span-12" />
+      )}
+      <div className="flex min-w-0 flex-col gap-3 lg:gap-4 xl:contents">
+        <div className="xl:order-1 xl:col-span-12"><AvisoDuelo d={datos} nombres={nombres} /></div>
+        <BloqueCarrera d={datos} nombres={nombres} inicioMs={inicioMs} plano={false} className="xl:order-2 xl:col-span-8" />
+        <BloqueRitmo d={datos} nombres={nombres} plano={false} className="xl:order-5 xl:col-span-6" />
+        <BloqueMarcador d={datos} nombres={nombres} plano={false} className="xl:order-3 xl:col-span-4" />
+        <BloqueAlimentacion d={datos} nombres={nombres} unidad={unidad} plano={false} className="xl:order-6 xl:col-span-4" />
       </div>
-      <div className="flex min-w-0 flex-col gap-3 lg:gap-4">
-        <BloquePeriodo d={datos} nombres={nombres} plano={false} />
-        <BloqueCiclo d={datos} nombres={nombres} plano={false} />
-        <BloqueTendencia d={datos} nombres={nombres} plano={false} />
-        <BloqueRecords d={datos} nombres={nombres} plano={false} />
-        <BloqueCosto d={datos} nombres={nombres} plano={false} />
-        {puedeEditar && token && <EditorDuelo token={token} d={datos} nombres={nombres} nombresGuardados={nombresGuardados} />}
+      <BloqueKpiPC d={datos} nombres={nombres} className="xl:order-4 xl:col-span-6" />
+      <div className="flex min-w-0 flex-col gap-3 lg:gap-4 xl:contents">
+        <BloquePeriodo d={datos} nombres={nombres} plano={false} className="xl:order-10 xl:col-span-4" />
+        <BloqueCiclo d={datos} nombres={nombres} plano={false} className="xl:order-11 xl:col-span-4" />
+        <BloqueTendencia d={datos} nombres={nombres} plano={false} className="xl:order-7 xl:col-span-4" />
+        <BloqueRecords d={datos} nombres={nombres} plano={false} className="xl:order-8 xl:col-span-4" />
+        <BloqueCosto d={datos} nombres={nombres} plano={false} className="xl:order-9 xl:col-span-4" />
+        {puedeEditar && token && <EditorDuelo token={token} d={datos} nombres={nombres} nombresGuardados={nombresGuardados} className="xl:order-12 xl:col-span-4" />}
       </div>
     </div>
   )

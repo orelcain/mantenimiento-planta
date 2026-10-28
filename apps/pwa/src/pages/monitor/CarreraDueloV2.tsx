@@ -141,7 +141,7 @@ export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda
     <div className="mt-3">
       {carrilHoy && <div className="mb-6">{carril(hoy)}</div>}
       <div
-        className={`relative touch-pan-y select-none ${alto || mini ? '' : 'h-[190px] lg:h-[260px]'} ${!mini && !carrilHoy ? 'mt-3' : ''}`}
+        className={`relative touch-pan-y select-none ${alto || mini ? '' : 'h-[190px] lg:h-[260px] xl:h-[300px]'} ${!mini && !carrilHoy ? 'mt-3' : ''}`}
         style={alto ? { height: alto } : mini ? { height: 56 } : undefined}
         onPointerMove={mini ? undefined : mover}
         onPointerDown={mini ? undefined : (e) => { e.stopPropagation(); mover(e) }}
