@@ -85,6 +85,19 @@ export async function tokenMonitorDeLinea(linea: PlantLineConfig): Promise<strin
 
 export const rutaMonitor = (token: string) => `/monitor/${token}`
 
+/**
+ * Ruta al monitor de OTRA línea conservando la pestaña (`ver=analisis|duelo`; «turno» es la ausencia de `ver`)
+ * y la piel (`glass=`, por defecto `v2`). No arrastra `turno`, `pantalla` ni nada más: son de la línea de origen.
+ */
+export function rutaMonitorConservandoVista(token: string, actual: URLSearchParams | string = ''): string {
+  const p = typeof actual === 'string' ? new URLSearchParams(actual) : actual
+  const q = new URLSearchParams()
+  q.set('glass', p.get('glass') || 'v2')
+  const ver = p.get('ver')
+  if (ver === 'analisis' || ver === 'duelo') q.set('ver', ver)
+  return `${rutaMonitor(token)}?${q.toString()}`
+}
+
 // ─── ¿Hay turno en curso? ─────────────────────────────────────────────────────
 
 /** «2026-09-21» en hora de planta: los ids de turno llevan la fecha local. */

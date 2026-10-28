@@ -674,6 +674,7 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .v2-lat-item:hover { color: rgb(var(--foreground)); }
 .v2-lat-item[disabled] { opacity: 0.5; cursor: default; }
 .v2-lat-activo { color: var(--v2-bien); }
+.v2-lat-actual, .v2-lat-actual:hover { cursor: default; color: var(--v2-bien); }
 .v2-lat-ico { width: 40px; height: 40px; display: grid; place-items: center; flex: none; }
 .v2-lat-rot { font-size: 14px; font-weight: 550; white-space: nowrap; opacity: 0; transform: translateX(-6px); transition: opacity 180ms, transform 220ms cubic-bezier(0.32, 0.72, 0, 1); }
 .v2-lateral[data-abierta='si'] .v2-lat-rot { opacity: 1; transform: none; transition-delay: 60ms; }

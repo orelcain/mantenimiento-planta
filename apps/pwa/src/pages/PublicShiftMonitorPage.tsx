@@ -99,7 +99,7 @@ import { Pill, SegmentedControl } from '@/components/piel'
 import { useIsAdmin, useIsSupervisor } from '@/store'
 import { toast } from '@/hooks/useToast'
 import {
-  LINEAS_CON_MONITOR, lineaConMonitor, lineaDelMonitor, rutaMonitor, tokenMonitorDeLinea,
+  LINEAS_CON_MONITOR, lineaConMonitor, lineaDelMonitor, rutaMonitorConservandoVista, tokenMonitorDeLinea,
 } from '@/services/shoplogix/monitorDeLinea'
 import { useAuthStore } from '@/store/authStore'
 import { registrarVista } from '@/services/telemetria/registrarVista'
@@ -4430,6 +4430,7 @@ export function PublicShiftMonitorPage() {
  */
 function useCambioDeLinea(plantLineId: string | null | undefined, plantSlug: string | null | undefined) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const esSupervisor = useIsSupervisor()
   const [cambiando, setCambiando] = useState(false)
   const actual = lineaDelMonitor(plantLineId, plantSlug)
@@ -4440,7 +4441,7 @@ function useCambioDeLinea(plantLineId: string | null | undefined, plantSlug: str
     if (!destino || destino.id === actual.id || cambiando) return
     setCambiando(true)
     try {
-      navigate(rutaMonitor(await tokenMonitorDeLinea(destino)))
+      navigate(rutaMonitorConservandoVista(await tokenMonitorDeLinea(destino), searchParams))
     } catch (err) {
       toast({
         title: 'No se pudo abrir el monitor',
@@ -7555,7 +7556,7 @@ function MonitorDelToken() {
               ? {
                   actual: data.areaLabel ?? data.lineLabel ?? 'Esta línea',
                   hermanas: data.lineasHermanas,
-                  onIr: (tk) => navigate(`${rutaMonitor(tk)}?glass=v2&ver=duelo`),
+                  onIr: (tk) => navigate(rutaMonitorConservandoVista(tk, searchParams)),
                 }
               : null}
           />
