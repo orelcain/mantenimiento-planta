@@ -35,6 +35,8 @@ import { etiquetaMaquina } from './ritmoVivo'
 import type { PestanaMonitor } from './BarraLateralPC'
 import { CifraViva, EjeTurnoPC, type EjeDatos } from './EjeTurnoPC'
 import { useRelojDeDatos } from './useRelojDeDatos'
+import { ReproduccionCtx, useReproduccionMinuto, type Reproduccion } from './useReproduccionMinuto'
+import type { EntradaRep, Tope } from './reproduccionMinuto'
 import type { Lectura } from './relojDeDatos'
 
 // ── Formato ──────────────────────────────────────────────────────────────────
@@ -901,15 +903,35 @@ export interface MonitorV2Props {
   semilla?: number[]
   /** «El turno» en PC (≥ 1280 px) como eje de tiempo común. Sin él, o en menos de 1280 px, las tarjetas de siempre. */
   eje?: EjeDatos | null
+  /**
+   * Reproducción del último minuto (Fase 6): el minuto cerrado de la serie vuelto a pasar pieza a pieza, con el contador
+   * vivo como techo. Sin ella (turno cerrado, sin serie, contador caído) la cifra sigue la recta de siempre.
+   */
+  repro?: { entrada: EntradaRep | null; tope: Tope | null } | null
 }
 
 type ClaveTurno = 'cierre' | 'ritmo' | 'mant' | 'maquinas' | 'perdido'
 
+/**
+ * El monitor v2. Aquí vive la reproducción del último minuto y se reparte por contexto a las tarjetas que la dibujan
+ * (aunque lleguen como `ReactNode` desde la página): `useReproduccion()`.
+ */
 export function MonitorV2(p: MonitorV2Props) {
+  const rep = useReproduccionMinuto(p.repro?.entrada ?? null, p.repro?.tope ?? null)
+  return (
+    <ReproduccionCtx.Provider value={rep}>
+      <MonitorV2Cuerpo {...p} rep={rep} />
+    </ReproduccionCtx.Provider>
+  )
+}
+
+function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   const raizRef = useRef<HTMLDivElement>(null)
   useEntradaEscalonada(raizRef)
-  /* El reloj de datos: la cifra de piezas (celular y PC) y la punta de la curva avanzan entre lecturas reales de Shoplogix. */
-  const reloj = useRelojDeDatos(p.lectura ?? null, p.semilla)
+  /* El reloj de datos: la cifra de piezas (celular y PC) y la punta de la curva avanzan entre lecturas reales de Shoplogix.
+     Con la reproducción activa la cifra sube un escalón por pieza del último minuto cerrado; si no, la recta de siempre. */
+  const relojRecta = useRelojDeDatos(p.lectura ?? null, p.semilla)
+  const reloj = p.rep.activa ? p.rep.reloj : relojRecta
   /* PC ancho: «El turno» como eje (rama aparte; lo que no está en esa vista sigue debajo, en las tarjetas de siempre). */
   const pcEje = useAnchoMin(1280) && p.eje != null
   /* Las cifras grandes cuentan solo cuando el dato cambia de verdad (nunca al montar). */

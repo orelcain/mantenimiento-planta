@@ -88,6 +88,7 @@ import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
 import { BandaParadaV2, RitmoVivoV2 } from './monitor/RitmoVivoV2'
+import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
 import { paradasEnEje } from './monitor/ejeTurno'
 import { ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
@@ -6707,6 +6708,18 @@ function MonitorDelToken() {
             <MonitorV2
               lectura={{ valor: contador.valor, atMs: contador.corteWallMs }}
               semilla={(data.pulse?.lecturas ?? []).map((l) => l.totalCycles)}
+              /* Fase 6: el último minuto cerrado, pieza a pieza. Solo con el turno en vivo y el contador crudo respondiendo
+                 (el mismo de «Piezas ahora», que además es el techo: la reproducción jamás lo supera). `serie` es la de las
+                 barras de minuto, ya recortada al inicio del turno. */
+              repro={(() => {
+                if (turnoCerrado || !esActual || contador.fuente !== 'pulso') return null
+                const lecturas = data.pulse?.lecturas ?? []
+                const ult = lecturas[lecturas.length - 1]
+                return {
+                  entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at }),
+                  tope: armarTope(contador.valor, ult && ult.totalCycles === contador.valor ? ult.porMaquina : null),
+                }
+              })()}
               eje={eje}
               piezas={contador.valor}
               corteHora={!live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null}

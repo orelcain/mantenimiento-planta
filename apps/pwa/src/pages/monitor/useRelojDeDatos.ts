@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useMovimientoReducido } from './ampliarHooks'
+import type { CuadroRep } from './reproduccionMinuto'
 import {
   detenidaPorLecturas, fraccion, interpolando, lecturaAtrasada, registrarLectura, relojInicial, valorMostrado,
   type EstadoReloj, type Lectura,
@@ -24,6 +25,8 @@ export interface CuadroReloj {
   ultima: Lectura | null
   /** La lectura siguiente se atrasó: todo está quieto en la última. */
   atrasada: boolean
+  /** Solo con la reproducción del último minuto: el desglose por Baader de este instante (`useReproduccionMinuto`). */
+  rep?: CuadroRep
 }
 
 export interface RelojDeDatos {

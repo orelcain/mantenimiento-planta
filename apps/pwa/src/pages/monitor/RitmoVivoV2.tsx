@@ -24,6 +24,7 @@ import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
 import { Globo, Tarjeta } from './AmpliarV2'
 import { useAbrirAmpliado, useCuentaCifra } from './ampliarHooks'
 import { MinutoTurnoV2, type EventoMarcado, type MinutoTurno } from './MonitorV2'
+import { ReglasMinuto } from './ReglasMinuto'
 import {
   MICRO_MAX_MEDIDO_S,
   SEL_LINEA,
@@ -549,6 +550,7 @@ export function RitmoVivoV2({ r, maquinas, turno, cerrado, marca, onQuitarMarca,
           {parada && <ParadaTarjeta parada={parada} />}
           {selector}
           <UltimoMinuto v={v} />
+          <ReglasMinuto />
           <div className="rv-s">
             <Medido>{(w) => <Tira v={v} horaCurso={r.horaCurso} cursoColor={cursoColor} ancho={w} />}</Medido>
             <div className="mt-2 flex items-center justify-between gap-2">
