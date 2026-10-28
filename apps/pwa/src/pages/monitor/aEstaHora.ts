@@ -3,7 +3,7 @@
  * ampliado): lo que se muestra menos lo que tocaba a esta hora. Antes cada bloque restaba contra una base distinta
  * (contador vivo, punta del reloj) y la misma vista decía −953, −977 y −979. Puro, sin React: se prueba aparte.
  */
-import { totalEnReposo, type EntradaRep, type Tope } from './reproduccionMinuto'
+import { minutosCerrados, totalEnReposo, type EntradaRep, type Tope } from './reproduccionMinuto'
 
 /**
  * Las piezas que la vista muestra «en reposo»: con la reproducción del último minuto activa, la suma de los minutos
@@ -21,4 +21,27 @@ export function aEstaHora(mostradas: number, cuota: number | null | undefined, m
   if (cuota == null || !Number.isFinite(cuota) || cuota <= 0) return null
   const vara = meta != null && meta > 0 ? Math.min(cuota, meta) : cuota
   return Math.round(mostradas) - Math.round(vara)
+}
+
+/**
+ * La HORA DE LOS DATOS (T, reloj de planta wall-as-UTC): el instante al que corresponden las piezas mostradas. Con la
+ * reproducción activa, el fin del último minuto cerrado (`desdeMs + minutos cerrados`), que es lo que suma
+ * `totalEnReposo`; si no, el corte del contador. La cuota se evalúa en ESTA T, nunca en el fin del tramo de 5 min en
+ * curso ni en el reloj del navegador: restar piezas de una hora contra la cuota de otra es justo el diente de sierra que
+ * esto cierra. null si no se sabe.
+ */
+export function horaDeLosDatos(repro: { entrada: EntradaRep | null } | null | undefined, corteWallMs: number | null | undefined): number | null {
+  const e = repro?.entrada
+  if (e) {
+    const n = minutosCerrados(e)
+    if (n >= 1) return e.desdeMs + n * 60_000
+  }
+  return corteWallMs != null && Number.isFinite(corteWallMs) ? corteWallMs : null
+}
+
+/** Minutos de T desde la primera pieza del turno (el origen de la curva y de la cuota). null si falta alguno o T es anterior. */
+export function minutoDeDatos(tMs: number | null | undefined, primeraPiezaMs: number | null | undefined): number | null {
+  if (tMs == null || primeraPiezaMs == null || !Number.isFinite(tMs) || !Number.isFinite(primeraPiezaMs)) return null
+  const m = (tMs - primeraPiezaMs) / 60_000
+  return m > 0 ? m : null
 }
