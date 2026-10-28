@@ -182,7 +182,7 @@ function CeldaCamino({ titulo, tramos, cifras, ampliado, raya }: {
       </div>
       <div className="fc-camino-barra" role="img" aria-label={descripcion}>
         {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4, boxShadow: t.hueco ? BORDE_HUECO : undefined }} />)}
-        {raya && <i className="fc-camino-raya" style={{ left: `calc(${(raya.f * 100).toFixed(2)}% - ${(Math.max(0, tramos.length - 1) * 3 * raya.f + 1).toFixed(1)}px)` }} />}
+        {raya && <i className="fc-camino-raya" style={{ left: `calc(${(raya.f * 100).toFixed(2)}% - ${(Math.max(0, tramos.length - 1) * 3 * raya.f + 1).toFixed(1)}px)` }} />}{/* decimal-tecnico: posición CSS */}
       </div>
       <dl className="fc-dl fc-camino-cifras" style={{ ['--n' as string]: cifras.length }}>
         {cifras.map((c) => (
