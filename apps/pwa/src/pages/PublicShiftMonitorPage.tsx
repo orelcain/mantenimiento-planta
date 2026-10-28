@@ -86,8 +86,10 @@ import {
 } from './monitor/aporteHistorico'
 import { armarAporte } from './monitor/aporteBaaders'
 import { useTablero, type TarjetaLayout } from './monitor/tableroLayout'
-import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
-import { CabeceraV2, MonitorV2, MonitorV2Analisis, type VistaV2 } from './monitor/MonitorV2'
+import { duenoDe } from '@/services/shoplogix/monitorEventos'
+import { CabeceraV2, MonitorV2, type VistaV2 } from './monitor/MonitorV2'
+import { AnalisisV2 } from './monitor/AnalisisV2'
+import { datosDeHoy } from './monitor/analisisV2Datos'
 import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
 import { piezasMostradas } from './monitor/aEstaHora'
@@ -6741,17 +6743,9 @@ function MonitorDelToken() {
           const pm = live.mantencion?.porMaquina ?? []
           const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
           const fallaMin = pm.reduce((a, x) => a + x.fallaMin, 0)
-          const previos = (data.history ?? []).slice(-6).flatMap((h) => {
-            const hp = h.live?.mantencion?.porMaquina ?? []
-            const ev = hp.reduce((a, x) => a + x.eventosFalla, 0)
-            return ev > 0 ? [hp.reduce((a, x) => a + x.fallaMin, 0) / ev] : []
-          })
-          const disp = pm.map((x) => x.dispTecnicaPct).filter((x): x is number => x != null)
-          const porDueno = new Map<DuenoPerdida, number>()
-          for (const r of live.timeBreakdown?.recoverable ?? []) {
-            const d = duenoDe(r.reason).dueno
-            porDueno.set(d, (porDueno.get(d) ?? 0) + (r.equivMin ?? r.lineMin ?? r.min))
-          }
+          /* Pérdidas, causas, fallas y respuesta de Mantención de hoy: UNA función (`datosDeHoy`) que también usa Análisis,
+             así «Tiempo perdido» de aquí y «Detenciones de hoy» de allá no pueden separarse. */
+          const datosHoy = datosDeHoy(live, data.history)
           const hoy = comparacion.days.find((d) => d.esHoy)
           const previo = comparacion.days.find((d) => !d.esHoy && d.curve.length > 1)
           /* «El turno» en PC como eje de tiempo común (≥ 1280 px): el eje va del inicio de la serie del turno al fin previsto.
@@ -6842,13 +6836,8 @@ function MonitorDelToken() {
               ritmoNecesario={pace && pace.requiredPerMinute > 0 ? pace.requiredPerMinute : null}
               setPoint={live.setPoint?.cpm ?? null}
               vsAyer={vsAyer}
-              mant={live.mantencion ? {
-                fallas, fallaMin,
-                mttr: fallas > 0 ? fallaMin / fallas : null,
-                mttrPrevio: previos.length ? previos.reduce((a, x) => a + x, 0) / previos.length : null,
-                dispPct: disp.length ? disp.reduce((a, x) => a + x, 0) / disp.length : null,
-              } : null}
-              eventos={(live.mantencion?.eventos ?? []).map((e) => ({ maquina: e.maquina, desde: e.desde, hasta: e.hasta, min: e.min, causa: e.causas[0] ?? null, causas: e.causas }))}
+              mant={datosHoy.mant}
+              eventos={datosHoy.eventos}
               rielMttr={[
                 ...(data.history ?? []).slice(-7).map((h) => {
                   const hp = h.live?.mantencion?.porMaquina ?? []
@@ -6861,11 +6850,8 @@ function MonitorDelToken() {
                 }),
                 { label: 'Hoy', mttr: fallas > 0 ? fallaMin / fallas : null, hoy: true },
               ]}
-              perdidas={(['mantencion', 'externo', 'sin-imputar'] as DuenoPerdida[]).map((d) => ({ dueno: d, min: porDueno.get(d) ?? 0 }))}
-              causas={(live.timeBreakdown?.recoverable ?? [])
-                .map((r) => ({ causa: r.reason, min: r.equivMin ?? r.lineMin ?? r.min, dueno: duenoDe(r.reason).dueno, veces: r.count }))
-                .filter((c) => c.min > 0)
-                .sort((a, b) => b.min - a.min)}
+              perdidas={datosHoy.perdidas}
+              causas={datosHoy.causas}
               maquinas={live.machines.map((m) => ({
                 name: m.name,
                 /* El pulso es más fresco que el estado del corte: si ya cuenta piezas, la máquina corre. */
@@ -7701,13 +7687,20 @@ function MonitorDelToken() {
           const ini = live.scheduledStart ? Date.parse(live.scheduledStart) : NaN
           const fin = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
           const horasTurno = !Number.isNaN(ini) && !Number.isNaN(fin) && fin > ini ? (fin - ini) / 3_600_000 : null
+          const datosHoy = datosDeHoy(live, data.history)
           return (
-            <MonitorV2Analisis
+            <AnalisisV2
               pareto={pareto ? { rows: pareto.rows, totalMin: pareto.totalMin, totalPiezas: pareto.totalPiezas, shifts: pareto.shifts, porDueno: pareto.porDueno } : null}
               semanas={repartoSemanal(data.shiftStats)}
               hoy={data.dateKey ?? null}
               horas={buildHourlyRows(serieDelTurno)}
               metaPorHora={meta && horasTurno ? meta / horasTurno : null}
+              perdidas={datosHoy.perdidas}
+              causas={datosHoy.causas}
+              eventos={datosHoy.eventos}
+              mant={datosHoy.mant}
+              cerrado={turnoCerrado}
+              microPorHora={live.mantencion?.microH ?? null}
               vista={vistaV2}
               onVista={setVistaV2}
             />

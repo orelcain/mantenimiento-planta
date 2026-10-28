@@ -11,9 +11,10 @@
  *    panel lateral en PC.
  * Lo de siempre sigue debajo, plegado en «Ver análisis completo».
  *
- * Vistas: `CabeceraV2`, `MonitorV2` (El turno) y `MonitorV2Analisis`.
+ * Vistas: `CabeceraV2`, `MonitorV2` (El turno) y los tipos de Análisis (la vista vive en `AnalisisV2`).
  */
-import { AlertTriangle, BarChart3, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Clock, Cpu, Filter, Minimize2, Repeat, Timer, Wrench, X } from 'lucide-react'
+/* eslint-disable react-refresh/only-export-components -- el formato y los primitivos se comparten con AnalisisV2 (a esos solo se les agregó `export`) */
+import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Clock, Cpu, Filter, Minimize2, Wrench, X } from 'lucide-react'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
@@ -24,7 +25,6 @@ import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import type { HourlyRow } from '@/services/shoplogix/monitorHourly'
 import type { ParetoRow } from '@/services/shoplogix/monitorPareto'
 import type { SemanaReparto } from './repartoSemanal'
-import { DetalleSemanaV2 } from './DetalleSemanaV2'
 import { contenedorPlural, vaciasEtiqueta, type Cascada } from './cascadaTurno'
 import type { DetalleCascada, DuenoDetalle, HoraDetalle, RenglonDetalle } from './cascadaDetalle'
 import { DUENO_UI } from './duenoUi'
@@ -47,18 +47,18 @@ import type { Lectura } from './relojDeDatos'
 
 // ── Formato ──────────────────────────────────────────────────────────────────
 
-const int = (n: number) => Math.round(n).toLocaleString('es-CL')
-const dec = (n: number, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
-const firmado = (n: number, f: (x: number) => string = int) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${f(Math.abs(n))}`
-const horas = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`)
-const hhmm = (iso: string) => iso.slice(11, 16)
+export const int = (n: number) => Math.round(n).toLocaleString('es-CL')
+export const dec = (n: number, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
+export const firmado = (n: number, f: (x: number) => string = int) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${f(Math.abs(n))}`
+export const horas = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`)
+export const hhmm = (iso: string) => iso.slice(11, 16)
 /** Para una cifra grande: «8,2 h» cabe en media tarjeta de celular; «8 h 13 min» no. */
 const horasCifra = (min: number) => (min >= 60 ? `${dec(min / 60)} h` : `${Math.round(min)} min`)
 const relojDe = (ms: number) => new Date(ms).toISOString().slice(11, 16)
-const semanaCorta = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`
+export const semanaCorta = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`
 
 /** Color de relleno por dueño, como variable CSS (el SVG no lee clases bg-*). */
-const RELLENO: Record<DuenoPerdida, string> = {
+export const RELLENO: Record<DuenoPerdida, string> = {
   mantencion: 'var(--v2-mant)',
   externo: 'var(--v2-ext)',
   'sin-imputar': 'var(--v2-gris)',
@@ -85,7 +85,7 @@ function useActivo() {
 
 // ── Detalle: hoja (celular) / panel lateral (PC) ─────────────────────────────
 
-function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
+export function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
   abierto: boolean; titulo: string; sub?: string; onClose: () => void; children: ReactNode
 }) {
   const pc = useEsPc()
@@ -131,7 +131,7 @@ function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
   )
 }
 
-function Grupo({ titulo, nota, children }: { titulo?: string; nota?: string; children: ReactNode }) {
+export function Grupo({ titulo, nota, children }: { titulo?: string; nota?: string; children: ReactNode }) {
   return <ListGroup title={titulo} footer={nota}>{children}</ListGroup>
 }
 
@@ -141,7 +141,7 @@ function Grupo({ titulo, nota, children }: { titulo?: string; nota?: string; chi
  * Es local a propósito: el `ListCell` compartido, en celular, pone el rótulo grande y la cifra chica debajo (la jerarquía
  * al revés para una hoja de números) y lo usan otras pantallas.
  */
-function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNode; value: ReactNode; valueSub?: ReactNode; subtitle?: ReactNode }) {
+export function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNode; value: ReactNode; valueSub?: ReactNode; subtitle?: ReactNode }) {
   return (
     <div className="relative flex min-h-[44px] items-center justify-between gap-3 px-4 py-2.5 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[''] first:before:hidden">
       <div className="min-w-0 flex-1">
@@ -156,7 +156,7 @@ function FilaCifra({ title, value, valueSub, subtitle }: { title: ReactNode; val
   )
 }
 
-const Punto = ({ color }: { color: string }) => <i className="block h-3 w-3 rounded-full" style={{ background: color }} />
+export const Punto = ({ color }: { color: string }) => <i className="block h-3 w-3 rounded-full" style={{ background: color }} />
 
 // ── Primitivos de tarjeta ────────────────────────────────────────────────────
 
@@ -178,7 +178,7 @@ function Contexto({ tono, children, nota }: { tono: PillTone; children: ReactNod
   )
 }
 
-function Leyenda({ items }: { items: Array<{ color: string; label: string; trazo?: 'linea' | 'punteada' }> }) {
+export function Leyenda({ items }: { items: Array<{ color: string; label: string; trazo?: 'linea' | 'punteada' }> }) {
   return (
     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
       {items.map((it) => (
@@ -765,38 +765,6 @@ function RielMttr({ riel }: { riel: Riel }) {
   )
 }
 
-function BarrasSemana({ semanas }: { semanas: SemanaReparto[] }) {
-  const { activo, en, salir } = useActivo()
-  const tot = (s: SemanaReparto) => DUENOS.reduce((a, d) => a + s.min[d], 0)
-  const max = Math.max(1, ...semanas.map(tot))
-  const a = activo != null ? semanas[activo] : null
-  return (
-    <div className="relative mt-5" {...salir}>
-      {a && activo != null && (
-        <Globo x={((activo + 0.5) / semanas.length) * 100}>
-          <div className="font-medium text-foreground">Semana del {semanaCorta(a.semana)} · {a.turnos} turnos</div>
-          {DUENOS.map((d) => a.min[d] > 0 && (
-            <div key={d} className="tabular-nums text-muted-foreground"><span style={{ color: RELLENO[d] }}>●</span> {DUENO_UI[d].corto} {horas(a.min[d])}</div>
-          ))}
-        </Globo>
-      )}
-      <div className="flex h-40 items-end gap-2 lg:h-56 lg:gap-3">
-        {semanas.map((s, i) => (
-          <div key={s.semana} className="flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-end gap-[3px] transition-opacity" style={{ opacity: activo != null && activo !== i ? 0.45 : 1 }} {...en(i)}>
-            {DUENOS.slice().reverse().map((d) => s.min[d] > 0 && (
-              <div key={d} className="w-full rounded-ctl" style={{ height: `${(s.min[d] / max) * 100}%`, background: RELLENO[d], minHeight: 3 }} />
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-2 lg:gap-3">
-        {semanas.map((s) => <span key={s.semana} className="min-w-0 flex-1 truncate text-center text-[11px] tabular-nums text-muted-foreground">{semanaCorta(s.semana)}</span>)}
-      </div>
-      <Leyenda items={DUENOS.map((d) => ({ color: RELLENO[d], label: DUENO_UI[d].corto }))} />
-    </div>
-  )
-}
-
 function BarrasHora({ filas, metaPorHora, cerrado = false }: { filas: HourlyRow[]; metaPorHora: number | null; cerrado?: boolean }) {
   const { activo, en, salir } = useActivo()
   const max = Math.max(1, metaPorHora ?? 0, ...filas.map((h) => h.piecesPerHour)) * 1.08
@@ -1310,142 +1278,6 @@ export interface MonitorV2AnalisisProps {
   metaPorHora: number | null
   vista: VistaV2
   onVista: (v: VistaV2) => void
-}
-
-type ClaveAnalisis = 'pareto' | 'semanas' | 'horas'
-
-export function MonitorV2Analisis(p: MonitorV2AnalisisProps) {
-  const raizRef = useRef<HTMLDivElement>(null)
-  useEntradaEscalonada(raizRef)
-  const [abierta, setAbierta] = useState<ClaveAnalisis | null>(null)
-  const abrir = (k: ClaveAnalisis) => () => setAbierta(k)
-  const pareto = p.pareto
-  const mantMin = pareto?.porDueno.mantencion ?? 0
-  const mantPct = pareto && pareto.totalMin > 0 ? Math.round((mantMin / pareto.totalMin) * 100) : null
-  const filas = pareto?.rows.slice(0, 6) ?? []
-  const maxFila = Math.max(1, ...filas.map((r) => r.minutes))
-  const [semAnt, semAct] = p.semanas.slice(-2)
-  const pctMant = (s?: SemanaReparto) => {
-    if (!s) return null
-    const t = s.min.mantencion + s.min.externo + s.min['sin-imputar']
-    return t > 0 ? (s.min.mantencion / t) * 100 : null
-  }
-  const pAct = pctMant(semAct)
-  const pAnt = pctMant(semAnt)
-  const completas = p.horas.filter((h) => !h.partial)
-  const mejor = completas.reduce<HourlyRow | null>((a, h) => (!a || h.pieces > a.pieces ? h : a), null)
-  const peor = completas.reduce<HourlyRow | null>((a, h) => (!a || h.pieces < a.pieces ? h : a), null)
-
-  const detalle = ((): { titulo: string; sub?: string; cuerpo: ReactNode } | null => {
-    switch (abierta) {
-      case 'pareto': return {
-        titulo: 'Qué se repite', sub: pareto ? `Últimos ${pareto.shifts} turnos · ${horas(pareto.totalMin)} · ≈${int(pareto.totalPiezas)} pz` : undefined,
-        cuerpo: pareto && (
-          <>
-            <Grupo titulo="Por dueño">
-              {DUENOS.map((d) => <ListCell key={d} leading={<Punto color={RELLENO[d]} />} title={DUENO_UI[d].corto} value={horas(pareto.porDueno[d] ?? 0)} valueSub={pareto.totalMin ? `${Math.round(((pareto.porDueno[d] ?? 0) / pareto.totalMin) * 100)} %` : undefined} />)}
-            </Grupo>
-            <Grupo titulo="Todas las causas" nota="Piezas valorizadas al ritmo del turno en que ocurrió cada detención. Las detenciones de convenio no entran.">
-              {pareto.rows.map((r) => (
-                <ListCell
-                  key={r.label}
-                  leading={<Punto color={RELLENO[r.dueno as DuenoPerdida] ?? 'var(--v2-gris)'} />}
-                  title={r.label}
-                  subtitle={`en ${r.shifts} de ${pareto.shifts} turnos · ${r.count} detenciones · acumulado ${Math.round(r.cumPct)} %`}
-                  value={horas(r.minutes)}
-                  valueSub={`≈${int(r.piezas)} pz`}
-                />
-              ))}
-            </Grupo>
-          </>
-        ),
-      }
-      case 'semanas': return {
-        titulo: 'De quién fue la pérdida', sub: 'Minutos de línea por semana · toca una semana',
-        cuerpo: <DetalleSemanaV2 semanas={p.semanas} hoy={p.hoy} />,
-      }
-      case 'horas': return {
-        titulo: 'Hora por hora', sub: 'Desde la primera pieza del turno',
-        cuerpo: (
-          <Grupo nota="La hora en curso no se compara de igual a igual: está incompleta.">
-            {p.horas.map((h) => (
-              <ListCell
-                key={h.hourStart}
-                title={`${hhmm(h.from)}–${hhmm(h.to)}`}
-                subtitle={h.partial ? 'en curso' : h === mejor ? 'mejor hora' : h === peor ? 'peor hora' : undefined}
-                value={`${int(h.pieces)} pz`}
-                valueSub={`${int(h.piecesPerHour)} pz/h${p.metaPorHora != null ? ` · ${firmado(h.piecesPerHour - p.metaPorHora)} vs meta` : ''}`}
-              />
-            ))}
-          </Grupo>
-        ),
-      }
-      default: return null
-    }
-  })()
-
-  return (
-    <div ref={raizRef} className="monitor-v2 flex flex-col gap-3 lg:gap-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        <Tarjeta onAbrir={abrir('pareto')} icono={<Repeat className={ic} />} titulo="Tiempo perdido" sub={pareto ? `últimos ${pareto.shifts} turnos` : undefined}>
-          <Cifra valor={pareto ? horasCifra(pareto.totalMin) : '—'} chica />
-          {pareto && <Contexto tono="neutral">≈ {int(pareto.totalPiezas)} pz</Contexto>}
-        </Tarjeta>
-        <Tarjeta onAbrir={abrir('pareto')} icono={<Wrench className={ic} />} titulo="Peso de Mantención" sub="del tiempo perdido">
-          <Cifra valor={mantPct != null ? `${mantPct} %` : '—'} chica />
-          {pareto && <Contexto tono="warning">{horas(mantMin)} de equipos</Contexto>}
-        </Tarjeta>
-        <Tarjeta onAbrir={abrir('semanas')} icono={<CalendarRange className={ic} />} titulo="Esta semana" sub={semAct ? `equipos sobre lo perdido · ${semAct.turnos} ${semAct.turnos === 1 ? 'turno' : 'turnos'}` : 'equipos sobre lo perdido'}>
-          <Cifra valor={pAct != null ? `${Math.round(pAct)} %` : '—'} chica />
-          {pAct != null && pAnt != null && (
-            <Contexto tono={pAct <= pAnt ? 'ok' : 'warning'}>{firmado(Math.round(pAct - pAnt))} pts vs semana anterior</Contexto>
-          )}
-        </Tarjeta>
-        <Tarjeta onAbrir={abrir('horas')} icono={<Timer className={ic} />} titulo="Mejor hora de hoy" sub={mejor ? `${hhmm(mejor.from)}–${hhmm(mejor.to)}` : undefined}>
-          <Cifra valor={mejor ? int(mejor.pieces) : '—'} unidad="pz" chica />
-          {peor && mejor && peor !== mejor && <Contexto tono="critical" nota={`${hhmm(peor.from)}–${hhmm(peor.to)}`}>peor {int(peor.pieces)} pz</Contexto>}
-        </Tarjeta>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
-        <Tarjeta onAbrir={abrir('pareto')} icono={<AlertTriangle className={ic} />} titulo="Qué se repite" sub={pareto ? `causas de los últimos ${pareto.shifts} turnos` : 'sin historial'}>
-          {filas.length > 0 && (
-            <>
-              <ul className="mt-4 space-y-3.5">
-                {filas.map((r) => (
-                  <FilaBarra
-                    key={r.label}
-                    label={r.label}
-                    valor={`${horas(r.minutes)} · ≈${int(r.piezas)} pz`}
-                    sub={`en ${r.shifts} de ${pareto!.shifts} turnos`}
-                    frac={r.minutes / maxFila}
-                    color={RELLENO[r.dueno as DuenoPerdida] ?? 'var(--v2-gris)'}
-                  />
-                ))}
-              </ul>
-              <Leyenda items={DUENOS.map((d) => ({ color: RELLENO[d], label: DUENO_UI[d].corto }))} />
-            </>
-          )}
-        </Tarjeta>
-
-        <Tarjeta onAbrir={abrir('semanas')} icono={<BarChart3 className={ic} />} titulo="De quién fue la pérdida" sub={`minutos de línea por semana · ${p.semanas.length} semanas`}>
-          {p.semanas.length > 0 && <BarrasSemana semanas={p.semanas} />}
-        </Tarjeta>
-      </div>
-
-      {p.horas.length > 0 && (
-        <Tarjeta onAbrir={abrir('horas')} icono={<Clock className={ic} />} titulo="Hora por hora" sub="piezas de cada hora desde el arranque">
-          <BarrasHora filas={p.horas} metaPorHora={p.metaPorHora} />
-        </Tarjeta>
-      )}
-
-      <BotonDetalle vista={p.vista} onVista={p.onVista} conMas={false} />
-
-      <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
-        {detalle?.cuerpo}
-      </PanelDetalle>
-    </div>
-  )
 }
 
 // ── Cabecera (barra flotante + título grande, como el reel) ─────────────────
