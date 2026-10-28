@@ -10,7 +10,7 @@ import {
   equipoCorregido, equipoDelTurno, esNocheDesdeHora, etiquetaHora, eventosCrudosDeLive, eventosEnEjeProduccion, fantasmaDeJornada,
   fechaCorreccion, filasKpiAKpi, franjasEntre, horaTranscurrida, jornadaDe, llenadoDePuesto, marcadorDeCiclo, marcadorDePeriodo,
   minutoDelDia, nombreCorto, nombreEquipo, nombresEfectivos, periodosDisponibles, piezasAlMinuto, rachasPorEquipo, recordsDe,
-  referenciaMismoHorario, relojDeMinuto, resumenDeStat, ritmoHoraAHora, rivalDirecto, rotuloFantasma, rotuloTurno,
+  referenciaMismoHorario, relojDeMinuto, curvaDeCv, fantasmaDeStat, resumenDeStat, ritmoHoraAHora, rivalDirecto, rotuloFantasma, rotuloTurno,
   semanaIso, semanasDesdeAncla, tendenciaSemanal,
   type ResumenTurno,
 } from '../duelo'
@@ -452,6 +452,100 @@ describe('construirDuelo: de punta a punta con un turno en curso', () => {
     expect(d.semanaAnterior?.fantasma.shiftDocId).toBe('2026-10-26_Turno Dia')
     expect(d.semanaAnterior?.pzAHora).toBe(3720)
     expect(d.semanaAnterior?.diferencia).toBe(260)
+  })
+
+  /** `cv` de 15 en 15 min: el último valor es el cierre y cae en el minuto `cvm`. */
+  const cvNoche = { cv: [800, 1700, 2500, 3300, 10000], cvp: 15, cvm: 70 }
+  const cvDia = { cv: [900, 1800, 2700, 3600, 12000], cvp: 15, cvm: 70 }
+
+  it('curvaDeCv: pasos fijos de cvp y el último punto en cvm; sin curva, vacío', () => {
+    expect(curvaDeCv({ cv: [10, 20, 30], cvp: 15, cvm: 40 })).toEqual([
+      { minutes: 15, pieces: 10 }, { minutes: 30, pieces: 20 }, { minutes: 40, pieces: 30 },
+    ])
+    expect(curvaDeCv({ cv: [10, 20, 30], cvp: 15 })).toEqual([
+      { minutes: 15, pieces: 10 }, { minutes: 30, pieces: 20 }, { minutes: 45, pieces: 30 },
+    ])
+    expect(curvaDeCv({ cv: [], cvp: 15 })).toEqual([])
+    expect(curvaDeCv({ cv: [5] })).toEqual([])
+    expect(curvaDeCv(undefined)).toEqual([])
+  })
+
+  it('turno PASADO (el día de Cárdenas, cerrado): la carrera trae la curva de la noche de su jornada, de `cv`', () => {
+    const liveDia = liveDe('2026-11-02T07:00:00.000Z', '2026-11-02T15:00:00.000Z')
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Dia', live: liveDia, piezas: 3980, cerrado: true, curvaHoy, rivalCurve: null,
+      stats: [stat('2026-11-01_Turno Noche', { total: 10000 }, cvNoche)], forecast: [],
+    })!
+    expect(d.rival?.shiftDocId).toBe('2026-11-01_Turno Noche')
+    expect(d.carrera?.fantasmaInfo?.tipo).toBe('jornada')
+    expect(d.carrera?.fantasmaInfo?.shiftDocId).toBe('2026-11-01_Turno Noche')
+    expect(d.carrera?.fantasmaInfo?.equipo).toBe('rebolledo')
+    expect(d.carrera?.fantasmaInfo?.total).toBe(10000)
+    expect(d.carrera?.fantasma?.length).toBe(5)
+    // A los 20 min de producción: entre 800 (15 min) y 1.700 (30 min).
+    expect(d.carrera?.fantasmaPz).toBeCloseTo(800 + (5 / 15) * 900, 5)
+  })
+
+  it('turno vigente: manda `rivalCurve` (más resolución) y `cv` queda de respaldo', () => {
+    const stats = [stat('2026-11-01_Turno Noche', { total: 10000 }, cvNoche)]
+    const base = { shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy, stats, forecast: [] as ForecastHistoryShift[] }
+    expect(construirDuelo({ ...base, rivalCurve: nocheDeLaJornada })!.carrera?.fantasmaPz).toBe(3300)
+    const respaldo = construirDuelo({ ...base, rivalCurve: null })!
+    expect(respaldo.carrera?.fantasmaInfo?.tipo).toBe('jornada')
+    expect(respaldo.carrera?.fantasma?.length).toBe(5)
+  })
+
+  it('noche PASADA con su día ya publicado: corre contra el día de su jornada', () => {
+    // Noche del 1-nov 21:00 = jornada 2-nov, de Rebolledo; su día (2-nov, Cárdenas) ya cerró con curva.
+    const liveNoche = liveDe('2026-11-01T21:00:00.000Z', '2026-11-02T05:00:00.000Z')
+    const d = construirDuelo({
+      shiftDocId: '2026-11-01_Turno Noche', live: liveNoche, piezas: 3980, cerrado: true, curvaHoy, rivalCurve: null,
+      stats: [stat('2026-11-02_Turno Dia', { total: 12000 }, cvDia)], forecast: [],
+    })!
+    expect(d.hoy.jornada).toBe('2026-11-02')
+    expect(d.abreJornada).toBe(true)
+    expect(d.rival?.shiftDocId).toBe('2026-11-02_Turno Dia')
+    expect(d.esperando).toBeNull()
+    expect(d.carrera?.fantasmaInfo?.shiftDocId).toBe('2026-11-02_Turno Dia')
+    expect(d.carrera?.fantasmaInfo?.equipo).toBe('cardenas')
+    expect(d.carrera?.fantasmaInfo?.esNoche).toBe(false)
+    expect(d.carrera?.bandaPropia).toBe(false)
+    expect(d.carrera?.fantasmaPz).not.toBeNull()
+  })
+
+  it('noche pasada cuyo día aún no existe: queda esperando, sin fantasma', () => {
+    const liveNoche = liveDe('2026-11-01T21:00:00.000Z', '2026-11-02T05:00:00.000Z')
+    const d = construirDuelo({
+      shiftDocId: '2026-11-01_Turno Noche', live: liveNoche, piezas: 3980, cerrado: true, curvaHoy, rivalCurve: null,
+      stats: [stat('2026-10-26_Turno Dia', {}, cvDia)], forecast: [],
+    })!
+    expect(d.rival).toBeNull()
+    expect(d.esperando).toBe('cardenas')
+    expect(d.carrera?.fantasmaInfo).toBeNull()
+  })
+
+  it('día pasado sin noche en su jornada: sin rival ni fantasma', () => {
+    const liveDia = liveDe('2026-11-02T07:00:00.000Z', '2026-11-02T15:00:00.000Z')
+    const d = construirDuelo({
+      shiftDocId: '2026-11-02_Turno Dia', live: liveDia, piezas: 3980, cerrado: true, curvaHoy, rivalCurve: null,
+      stats: [stat('2026-10-26_Turno Noche', {}, cvNoche)], forecast: [],
+    })!
+    expect(d.rival).toBeNull()
+    expect(d.carrera?.fantasmaInfo).toBeNull()
+  })
+
+  it('turno pasado cuyo rival no trae `cv` (aún no rearmado o sin curva): hay rival pero no fantasma', () => {
+    const liveDia = liveDe('2026-11-02T07:00:00.000Z', '2026-11-02T15:00:00.000Z')
+    for (const sinCurva of [{}, { cv: [], cvp: 15 }]) {
+      const d = construirDuelo({
+        shiftDocId: '2026-11-02_Turno Dia', live: liveDia, piezas: 3980, cerrado: true, curvaHoy, rivalCurve: null,
+        stats: [stat('2026-11-01_Turno Noche', {}, sinCurva)], forecast: [],
+      })!
+      expect(d.rival?.shiftDocId).toBe('2026-11-01_Turno Noche')
+      expect(d.carrera?.fantasmaInfo).toBeNull()
+      expect(d.carrera?.fantasmaPz).toBeNull()
+    }
+    expect(fantasmaDeStat(resumen({ shiftDocId: '2026-11-01_Turno Noche' }), [stat('2026-11-01_Turno Noche')])).toBeNull()
   })
 
   it('la noche en curso abre la jornada: sin rival, sin fantasma, sin marcador y con su propia referencia', () => {

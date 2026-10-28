@@ -214,3 +214,36 @@ test('patchHermanas: se vuelve a buscar solo si pasó una hora; un error no romp
   const roto = { collection: () => ({ where: () => ({ where: () => ({ get: async () => { throw new Error('boom') } }) }) }) }
   assert.deepEqual(await patchHermanas(roto, monitor, AHORA), {})
 })
+
+test('curvaCompacta: acumulada cada 15 min desde el arranque productivo, el último valor es el cierre', () => {
+  const { curvaCompacta } = require('../publicMonitor')
+  const dia = hace(1)
+  // 4 tramos vacíos y luego 40 tramos de 60 pz (200 min): arranque a las 07:20.
+  const live = { series: serie(dia, 7, 40, 60, 4) }
+  const c = curvaCompacta(live)
+  assert.equal(c.cvp, 15)
+  assert.equal(c.cvm, 200)
+  assert.equal(c.cv.length, 14, 'ceil(200 / 15) puntos')
+  assert.equal(c.cv[0], 180, 'a los 15 min: 3 tramos × 60')
+  assert.equal(c.cv[12], 2340)
+  assert.equal(c.cv[13], 2400, 'el último valor es el total del turno, en el minuto cvm')
+  assert.deepEqual(c.cv, [...c.cv].sort((x, y) => x - y), 'acumulada: nunca baja')
+})
+
+test('curvaCompacta: sin curva devuelve cv vacío (nunca null/undefined) y un turno de 8 h cabe en ~32 puntos', () => {
+  const { curvaCompacta } = require('../publicMonitor')
+  assert.deepEqual(curvaCompacta({ series: [] }), { cv: [], cvp: 15 })
+  assert.deepEqual(curvaCompacta(null), { cv: [], cvp: 15 })
+  const dia = hace(1)
+  const c = curvaCompacta({ series: serie(dia, 7, 96, 50) })
+  assert.equal(c.cv.length, 32)
+  assert.equal(c.cvm, 480)
+})
+
+test('resumenDuelo: publica la curva compacta y el caché se invalida si falta `cv`', () => {
+  const dia = hace(1)
+  const d = resumenDuelo({ scheduledStart: iso(dia, 7), series: serie(dia, 7, 20, 10), machines: [] })
+  assert.ok(Array.isArray(d.cv) && d.cv.length > 0)
+  assert.equal(d.cvp, 15)
+  assert.ok(Array.isArray(resumenDuelo({ series: [], machines: [] }).cv), 'siempre un arreglo: así el caché distingue «sin curva» de «no rearmado»')
+})

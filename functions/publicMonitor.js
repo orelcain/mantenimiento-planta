@@ -2423,6 +2423,7 @@ function eventosDelDuelo(l, iniMs) {
  *  - `alim`: llenado por puesto = piezas ÷ (esperado × minutos andando), tope 100.
  *  - `ev`: paradas de 5 min o más (colación, falta de materia prima, fallas…) ubicadas desde el
  *    inicio planificado, para marcarlas en la carrera. Ver `eventosDelDuelo`.
+ *  - `cv`/`cvp`/`cvm`: curva acumulada compacta (cada 15 min) para correr un turno pasado. Ver `curvaCompacta`.
  */
 function resumenDuelo(l) {
   const serie = (l?.series || []).filter(p => p && p.t)
@@ -2454,7 +2455,46 @@ function resumenDuelo(l) {
     ...(mic != null ? { mic } : {}),
     alim,
     ev: eventosDelDuelo(l, iniMs),
+    ...curvaCompacta(l),
   }
+}
+
+/** Paso (min) de la curva compacta `shiftStats[].duelo.cv`: ~32 puntos por turno de 8 h. */
+const DUELO_CV_PASO_MIN = 15
+
+/**
+ * Curva acumulada compacta de un turno cerrado, para que el Duelo corra un turno PASADO contra el del otro horario
+ * de su jornada (`rivalCurve` solo existe para el turno vigente). Mismo origen que `curvaDesdeArranque` (el arranque
+ * productivo). Formato: `cv` = piezas acumuladas a los minutos `paso, 2·paso, …`; el ÚLTIMO valor es el cierre del
+ * turno y cae en el minuto `cvm` (casi nunca múltiplo del paso). `cvp` = paso. Sin curva: `cv: []` (nunca null ni
+ * undefined: Firestore) — y un arreglo siempre presente es lo que marca el turno como ya rearmado en el caché.
+ */
+function curvaCompacta(live, paso = DUELO_CV_PASO_MIN) {
+  const vacia = { cv: [], cvp: paso }
+  const serie = (live?.series || []).filter(p => p && p.t)
+  const i0 = indiceArranqueProductivo(serie)
+  if (i0 < 0) return vacia
+  let ult = serie.length - 1
+  while (ult > i0 && !((serie[ult].pieces || 0) > 0)) ult--
+  const t0 = Date.parse(serie[i0].t)
+  if (Number.isNaN(t0)) return vacia
+  const pts = []
+  let acum = 0
+  for (let i = i0; i <= ult; i++) {
+    acum += serie[i].pieces || 0
+    pts.push({ m: Math.round((Date.parse(serie[i].t) - t0) / 60_000) + INTERVAL_MIN, p: acum })
+  }
+  const fin = pts[pts.length - 1]
+  if (!fin || !(fin.m > 0)) return vacia
+  const n = Math.ceil(fin.m / paso)
+  const cv = []
+  let j = 0
+  for (let k = 1; k < n; k++) {
+    while (j + 1 < pts.length && pts[j + 1].m <= k * paso) j++
+    cv.push(pts[j].m <= k * paso ? pts[j].p : 0)
+  }
+  cv.push(fin.p)
+  return { cv, cvp: paso, cvm: fin.m }
 }
 
 async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null) {
@@ -2497,7 +2537,7 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev)) {
+    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev) && Array.isArray(cacheado.duelo.cv)) {
       out.push(cacheado); continue
     }
     /*
@@ -3200,6 +3240,7 @@ module.exports = {
   buildShiftStats,
   buildRivalCurve,
   resumenDuelo,
+  curvaCompacta,
   eventosDelDuelo,
   lineasHermanasDe,
   patchHermanas,
