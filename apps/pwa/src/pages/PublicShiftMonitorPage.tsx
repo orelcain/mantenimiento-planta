@@ -92,7 +92,7 @@ import { AnalisisV2 } from './monitor/AnalisisV2'
 import { datosDeHoy } from './monitor/analisisV2Datos'
 import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
-import { horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
+import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
 import { hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
@@ -6146,8 +6146,12 @@ function MonitorDelToken() {
     const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
     if (!Number.isFinite(t0) || !(largo > 1)) return null
     /* Ventana del turno VISTO, en la misma base wall-as-UTC. */
-    const ini = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
-    if (!Number.isFinite(ini)) return null
+    const iniTurno = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
+    if (!Number.isFinite(iniTurno)) return null
+    /* Si la línea produjo ANTES del inicio programado, las barras parten en la primera pieza (Orel, 28-10): esas piezas
+       están en el contador de Shoplogix y en la curva, así que también van en «hechas». La reproducción las topa al
+       contador, así que «hechas» nunca lo pasa. */
+    const ini = barrasDesdeMs(iniTurno, serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null)
     const finSched = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
     /* ⚠ El tope del fin previsto SOLO con el turno cerrado. En vivo
        la cola de la serie ES el presente, y el previsto puede ser

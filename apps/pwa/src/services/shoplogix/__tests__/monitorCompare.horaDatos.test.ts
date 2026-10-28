@@ -14,7 +14,7 @@ import {
 } from '../monitorCompare'
 import { desdePrimeraPieza } from '../monitorActividad'
 import type { MonitorSeriesPoint } from '../monitorHourly'
-import { aEstaHora, horaDeLosDatos, minutoDeDatos } from '@/pages/monitor/aEstaHora'
+import { aEstaHora, barrasDesdeMs, horaDeLosDatos, minutoDeDatos } from '@/pages/monitor/aEstaHora'
 import { cifraTurnoAnterior } from '@/pages/monitor/ejeTurno'
 
 function serie(desde: string, piezasPorTramo: number[]): MonitorSeriesPoint[] {
@@ -116,5 +116,13 @@ describe('horaDeLosDatos', () => {
     expect(horaDeLosDatos({ entrada }, 999_999)).toBe(3 * 60_000)
     expect(horaDeLosDatos(null, 123)).toBe(123)
     expect(horaDeLosDatos({ entrada: null }, null)).toBeNull()
+  })
+})
+
+describe('barras desde la primera pieza si fue antes del inicio (D2, decisión de Orel)', () => {
+  it('produjo antes: las barras parten en la primera pieza; si no, en el inicio del turno', () => {
+    expect(barrasDesdeMs(1_000, 400)).toBe(400)
+    expect(barrasDesdeMs(1_000, 1_600)).toBe(1_000)
+    expect(barrasDesdeMs(1_000, null)).toBe(1_000)
   })
 })

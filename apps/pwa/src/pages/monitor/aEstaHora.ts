@@ -45,3 +45,11 @@ export function minutoDeDatos(tMs: number | null | undefined, primeraPiezaMs: nu
   const m = (tMs - primeraPiezaMs) / 60_000
   return m > 0 ? m : null
 }
+
+/**
+ * Desde dónde arrancan las barras de minuto: el inicio del turno, o la primera pieza si la línea produjo antes
+ * (decisión de Orel, 28-10: esas piezas cuentan en «hechas», como en el contador de Shoplogix y en la curva).
+ */
+export function barrasDesdeMs(inicioTurnoMs: number, primeraPiezaMs: number | null | undefined): number {
+  return primeraPiezaMs != null && Number.isFinite(primeraPiezaMs) && primeraPiezaMs < inicioTurnoMs ? primeraPiezaMs : inicioTurnoMs
+}
