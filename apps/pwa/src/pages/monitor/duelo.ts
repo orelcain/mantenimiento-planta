@@ -634,6 +634,35 @@ export function fantasmaDeJornada(
 }
 
 /**
+ * `shiftStats[].duelo.cv` a puntos de curva (mismo eje que `rivalCurve`: minutos desde el arranque productivo). Vacío
+ * si el turno no trae curva o el paso es inválido.
+ */
+export function curvaDeCv(d: Pick<ShiftDuelo, 'cv' | 'cvp' | 'cvm'> | null | undefined): PacePoint[] {
+  const cv = d?.cv
+  const paso = d?.cvp
+  if (!cv || cv.length < 2 || !paso || !(paso > 0)) return []
+  const fin = d?.cvm != null && d.cvm > (cv.length - 1) * paso ? d.cvm : cv.length * paso
+  return cv.map((pieces, i) => ({ minutes: i === cv.length - 1 ? fin : (i + 1) * paso, pieces }))
+}
+
+/**
+ * La línea punteada de un turno que ya pasó (o de cualquier turno si `rivalCurve` no está): la curva compacta del
+ * rival directo de la MISMA jornada, de `shiftStats[].duelo.cv`. El rival lo decide `rivalDirecto` (otro horario, misma
+ * jornada, otro equipo); aquí solo se arma. null si ese turno no trae curva.
+ */
+export function fantasmaDeStat(rival: ResumenTurno, stats: readonly ShiftStat[]): FantasmaRival | null {
+  const st = stats.find((x) => x.shiftDocId === rival.shiftDocId)
+  const curva = curvaDeCv(st?.duelo)
+  if (!st || curva.length < 2) return null
+  return {
+    tipo: 'jornada',
+    equipo: rival.equipo, shiftDocId: rival.shiftDocId, jornada: rival.jornada, esNoche: rival.esNoche,
+    curva, total: curva[curva.length - 1]!.pieces, turnos: 1,
+    ...datosDeArranque(st),
+  }
+}
+
+/**
  * El mismo horario de la semana anterior: el ÚLTIMO turno que el equipo rival hizo en el mismo horario (mismo turno,
  * mismo lado del día). Es un dato secundario, sin puntos. Los turnos salen de `forecastHistory` y `shiftStats`; la
  * curva, de `forecastHistory`. Si ese último turno no trae curva se usa el promedio de los anteriores, rotulado.
@@ -1304,8 +1333,12 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const esperando = abreJornada && hoy.cerrado && !rival ? otroEquipo(hoy.equipo) : null
   const inicioDia = [...deStats].filter((r) => !r.esNoche && r.h0).sort((x, y) => (antes(x, y) ? 1 : -1))[0]?.h0 ?? null
 
-  /* La línea punteada sale de la curva del rival publicada para el turno vigente, y solo la corre el día. */
-  const fantasmaInfo = abreJornada ? null : fantasmaDeJornada(hoy, e.rivalCurve, e.stats, e.overrides)
+  /* La línea punteada: el día corre contra la noche de su jornada con `rivalCurve` (más resolución, solo del turno
+     vigente) y, si no está, con la curva compacta del rival en `shiftStats`. Un turno PASADO no tiene `rivalCurve`:
+     usa siempre la compacta. La noche que corre no compite; la noche cerrada se compara con su día si ya existe. */
+  const fantasmaInfo = abreJornada && !hoy.cerrado
+    ? null
+    : (abreJornada ? null : fantasmaDeJornada(hoy, e.rivalCurve, e.stats, e.overrides)) ?? (rival ? fantasmaDeStat(rival, e.stats) : null)
   const fantasma = fantasmaInfo ? fantasmaInfo.curva : null
 
   /* El total y el punto actual son el contador EN VIVO, no el último tramo cerrado de la curva. */

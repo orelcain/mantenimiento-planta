@@ -447,6 +447,16 @@ export interface ShiftDuelo {
    * `d` minutos de duración, `p: 1` si es programada (colación, reunión). Ausente hasta que el backend rearma el turno.
    */
   ev?: Array<{ n: string; o: number; d: number; p?: 1 }>
+  /**
+   * Curva acumulada compacta del turno: piezas a los minutos `cvp, 2·cvp, …` desde el arranque productivo; el último
+   * valor es el cierre y cae en el minuto `cvm`. `[]` = el turno no tiene curva. Ausente hasta que el backend rearma
+   * el turno. Con ella un turno PASADO corre contra el del otro horario de su jornada (`rivalCurve` es solo del vigente).
+   */
+  cv?: number[]
+  /** Paso de `cv`, en minutos. */
+  cvp?: number
+  /** Minuto en que cae el último valor de `cv`. */
+  cvm?: number
 }
 
 /** Un turno resumido, sin curva. Ver `buildShiftStats` en las functions. */
