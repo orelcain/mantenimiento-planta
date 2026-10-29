@@ -28,5 +28,6 @@ export {
   rachasPorEquipo,
   recordsDe,
   costoDeMantencionPeriodo,
+  costoMantencion,
 } from './duelo'
 export { unidadDeMaquinas } from './ritmoVivo'
