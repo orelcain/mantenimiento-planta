@@ -9989,6 +9989,41 @@ exports.recordatorioProtocoloBaader142 = onSchedule(
 const publicMonitorMod = require('./publicMonitor')
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cierre congelado del Duelo de equipos (29-10-2026) — lógica en dueloCierre.js
+// Plan: ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_CIERRE_DUELO.md (fase 2, MODO SOMBRA:
+// escribe `dueloCierres/{planta}_{YYYY-MM}` y todavía nada lo lee).
+// ─────────────────────────────────────────────────────────────────────────────
+/*
+ * 06:30 y 18:30 hora de planta. La de las 18:30 es la que importa: el último
+ * re-sync de Shoplogix de una jornada J corre a las 12:00 de J+3, así que a las
+ * 18:30 de J+3 ya tiene su dato final y en J+4 se sella. Dos al día para que una
+ * corrida fallida no atrase el sellado un día entero.
+ * Costo: ~6 lecturas y 1–2 escrituras por planta y corrida (la primera, que
+ * sella octubre, ~45 lecturas).
+ */
+exports.cerrarDuelo = onSchedule(
+  {
+    schedule: '30 6,18 * * *',
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 120,
+    // El bundle de index.js no arranca en 128MiB (ver shoplogixTokenRefresh).
+    memory: '256MiB',
+    retryCount: 1,
+  },
+  async () => {
+    const dueloCierre = require('./dueloCierre')
+    const hoyKey = shoplogixPolling.toChileWall(new Date()).toISOString().slice(0, 10)
+    for (const planta of dueloCierre.PLANTAS_DUELO) {
+      try {
+        await dueloCierre.ejecutarCierre(db, planta, { hoyKey, logger })
+      } catch (err) {
+        logger.error('[cerrarDuelo] error planta', { planta, err: err?.message })
+      }
+    }
+  }
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Pase de la Bitácora (QR + PIN personal, 16-09-2026) — lógica en paseBitacora.js
 // Sin triggers ni crons: solo corre cuando un técnico escanea el QR o un
 // supervisor administra el pase. Costo fijo cero.
