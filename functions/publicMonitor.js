@@ -72,6 +72,12 @@ const COLLECTION = 'publicShiftMonitors'
 
 /** Versión vigente del desglose de tiempos (`timeBreakdown.tbv`). Ver buildMonitorLive. */
 const TBV = 3
+/**
+ * Versión de la clasificación de causas de `live.mantencion` (fallas, MTTR, disponibilidad). 2 = árbol oficial de
+ * imputación (29-10-2026, #1359: FALLA OPERACIONAL, ATASCAMIENTO… dejaron de contarse como Mantención). Un turno del
+ * historial medido con otra versión se rearma, si no «Anterior» mostraría para siempre las fallas viejas.
+ */
+const MANT_CLASIF = 2
 
 /** Intervalo de producción de Shoplogix: 5 minutos fijos. */
 const INTERVAL_MIN = 5
@@ -1761,6 +1767,8 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
       }
     })
     return {
+      /** Versión de la clasificación de causas (`MANT_CLASIF`): un turno cacheado con otra se rearma. */
+      clasif: MANT_CLASIF,
       porMaquina,
       /** Micro detención (min de máquina, suma entre máquinas) por hora de producción. Ver `repartirMicro`. */
       microH: microSegPorHora.map((s) => Math.round(s / 6) / 10),
@@ -2225,7 +2233,8 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
     // i === 0 es el turno inmediatamente anterior: puede seguir moviéndose.
     // Y solo se reusa un live medido con la rejilla vigente: uno viejo dejaría
     // «Anterior» mostrando el desglose recortado para siempre.
-    if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === TBV) { out.push(cacheado); continue }
+    if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === TBV
+      && (cacheado.live.mantencion == null || cacheado.live.mantencion.clasif === MANT_CLASIF)) { out.push(cacheado); continue }
     try {
       const live = await buildMonitorLive(db, plantSlug, id, index, t.fuente ?? null)
       if (!live) continue
@@ -2331,12 +2340,12 @@ function resumirParaForecast(live) {
 
 
 /**
- * Cuántos turnos guarda el arreglo liviano de estadísticas. 40 son ~20 días
- * con dos turnos: alcanza para ventanas de «últimos 30» sin acercarse al
- * límite de 1 MB del documento (medido el 16-08: el doc entero pesaba 74 KB y
- * cada entrada de estas ronda los 0,4 KB, así que 40 suman ~16 KB).
+ * Cuántos turnos guarda el arreglo liviano de estadísticas. 62 = un mes de 31 días con dos turnos: el «mes» del Duelo
+ * cubre el mes ENTERO (con 40, ~20 días, se le caían los primeros días). Medido el 29-10: cada entrada pesa 3,6 KB
+ * (Eviscerado) y el doc 291 KB; con 62 queda en ~370 KB, lejos del límite de 1 MB. Las 22 nuevas se arman de a
+ * `STATS_NUEVOS_POR_CORRIDA`.
  */
-const STATS_MAX = 40
+const STATS_MAX = 62
 /**
  * Cuántas entradas NUEVAS se construyen por corrida.
  *
