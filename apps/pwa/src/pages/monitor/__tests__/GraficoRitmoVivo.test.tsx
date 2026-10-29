@@ -571,8 +571,8 @@ describe('leyenda y rótulo de detenciones', () => {
     expect(t).not.toContain('hoy 365 adelante')
   })
 
-  it('el tiempo de detenciones dice que mide minutos con «alguna Baader parada»', () => {
+  it('el tiempo de detenciones dice que mide minutos con «alguna Baader detenida» (glosario: detenciones, no paradas)', () => {
     render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
-    expect(screen.getByText('alguna Baader parada')).toBeTruthy()
+    expect(screen.getByText('alguna Baader detenida')).toBeTruthy()
   })
 })
