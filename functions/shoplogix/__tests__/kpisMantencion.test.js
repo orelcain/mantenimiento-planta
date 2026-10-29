@@ -26,6 +26,18 @@ describe('clasificaCausa', () => {
     [{ type: 'downtime', name: 'Detencion', reason: 'KNURO' }, 'falla'],
     [{ type: 'downtime', name: 'Detencion', reason: 'LOGICA' }, 'falla'],
     [{ type: 'downtime', name: 'Detencion', reason: '' }, 'sin-imputar'],
+    // 29-10: el árbol oficial manda. Operacionales, MMPP y servicios NO son de Mantención (el 28-10 día contaba 13 fallas y eran 6).
+    [{ type: 'downtime', name: 'Detencion', reason: 'FALLA OPERACIONAL' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'ATASCAMIENTO' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'AJUSTE OPERADOR' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'RETRASO ASEO' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'AGUA' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'CINTAS (MECANICA)' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Equipo Auxiliar/GEA' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'AJUSTE MANTENIMIENTO' }, 'falla'],
+    // Fuera del árbol: siguen los patrones de siempre.
+    [{ type: 'break', name: 'Detencion', reason: 'Limpieza de Ducto' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Planta De Riles' }, 'falla'],
   ]
   for (const [st, esperado] of casos) {
     test(`${st.name}/${st.reason || '∅'} → ${esperado}`, () => {
