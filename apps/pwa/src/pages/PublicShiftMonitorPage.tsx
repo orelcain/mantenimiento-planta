@@ -49,7 +49,7 @@ import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
 import {
-  buildDayComparison, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
+  buildDayComparison, alinearAHoraDeDatos, optimalPace, plannedBreaks, mergeBreaks, cumulativeFromStart,
   breakMinutesBetween, extendOngoingBreaks,
   type PlannedBreak,
   prediccionConvenio,
@@ -92,7 +92,8 @@ import { AnalisisV2 } from './monitor/AnalisisV2'
 import { datosDeHoy } from './monitor/analisisV2Datos'
 import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
-import { piezasMostradas } from './monitor/aEstaHora'
+import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
+import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
 import { hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
@@ -4979,7 +4980,8 @@ function MonitorDelToken() {
         // acá garantiza que un día las dos versiones difieran.
         plannedReasons: (l?.timeBreakdown?.planned ?? []).map((x) => x.reason),
       })
-    const minutoActual = live?.series?.length ? live.series.length * 5 : 0
+    /* Minutos desde la PRIMERA PIEZA (la base de `plannedBreaks` y de la curva), no desde el primer tramo de la serie. */
+    const minutoActual = serieDelTurno.length * 5
     /*
      * ⚠ Por TURNO y no aplanado: la predicción necesita saber en cuántos
      * turnos aparece cada causa. Aplanado, la detención programada de UN día
@@ -5273,10 +5275,6 @@ function MonitorDelToken() {
     return frescuraDelRitmo(Date.parse(ult) + 5 * 60_000, ahoraWallMs)?.haceMin ?? null
   }, [serieDelTurno, ahoraWallMs])
 
-  const horaDeCuota = useMemo(
-    () => horaDeLaCuota(live?.plannedEnd, ahoraWallMs),
-    [live?.plannedEnd, ahoraWallMs],
-  )
 
   /*
    * ¿Este turno se quedó sin convenio registrado? Medido en el turno del
@@ -5490,7 +5488,7 @@ function MonitorDelToken() {
      * Minutos contados desde la primera pieza, la base de `breaks`.
      */
     const t0 = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0]!.t) : NaN
-    const desdeMin = live.series?.length ? live.series.length * 5 : 0
+    const desdeMin = serieDelTurno.length * 5
     const hastaMin = !Number.isNaN(t0) && live.plannedEnd
       ? (Date.parse(live.plannedEnd) - t0) / 60_000
       : desdeMin
@@ -5551,7 +5549,7 @@ function MonitorDelToken() {
    * Las paradas de hoy son hechos; para las que todavía no ocurrieron se usan
    * las de los días anteriores como pronóstico.
    */
-  const comparacion = useMemo(() => {
+  const comparacionBase = useMemo(() => {
     /*
      * SOLO la cuota puesta por una persona (link o config del turno): sin
      * ella, el comparador contrasta contra los otros días y punto — presentar
@@ -5651,14 +5649,16 @@ function MonitorDelToken() {
       hoyVivo: (() => {
         if (!esActual || !live?.series?.length) return null
         const cont = elegirContador({ pulse: data?.pulse ?? null, live, shiftClosed: live.shiftClosed })
-        const t0c = Date.parse(live.series[0]!.t)
-        if (cont.fuente !== 'pulso' || cont.corteWallMs == null || Number.isNaN(t0c)) return null
-        return { pieces: cont.valor, minute: (cont.corteWallMs - t0c) / 60_000 }
+        /* Desde la PRIMERA PIEZA, como la curva a la que se agrega: desde el primer tramo de la serie el punto vivo
+           quedaba tantos minutos adelante como tramos vacíos traía el arranque. */
+        const minute = minutoDeDatos(cont.corteWallMs, serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null)
+        if (cont.fuente !== 'pulso' || minute == null) return null
+        return { pieces: cont.valor, minute }
       })(),
     })
     // El turno VISTO entra en las dependencias: al navegar a otro turno la
     // comparación tiene que rearmarse contra los días previos a ESE.
-  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, metaLink, breaksTurno, esActual, data?.pulse])
+  }, [live, inicioReal, vista?.dateKey, vista?.shiftId, data?.history, metaLink, breaksTurno, esActual, data?.pulse, serieDelTurno])
 
   /*
    * Pronóstico del cierre. Se alimenta del `history` que YA viaja en el doc:
@@ -5693,7 +5693,7 @@ function MonitorDelToken() {
           }))
     return buildForecast({
       todayCurve: cumulativeFromStart(live?.series),
-      currentMinute: comparacion.currentMinute,
+      currentMinute: comparacionBase.currentMinute,
       history: historial,
       targetPieces: metaFc,
       shiftClosed: live?.shiftClosed,
@@ -5704,7 +5704,7 @@ function MonitorDelToken() {
         porDelanteMin: pace?.pendingBreakMin ?? 0,
       },
     })
-  }, [live, data?.history, data?.forecastHistory, metaLink, comparacion.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
+  }, [live, data?.history, data?.forecastHistory, metaLink, comparacionBase.currentMinute, vista?.shiftId, pace?.pendingBreakMin])
 
   /**
    * Hasta cuándo mide el pronóstico, y cuánto sería si el turno cortara en su
@@ -5890,15 +5890,15 @@ function MonitorDelToken() {
    * la tarjeta de arriba.
    */
   const vsAyer = useMemo(() => {
-    const hoy = comparacion.days.find((d) => d.esHoy)
-    const previo = comparacion.days.find((d) => !d.esHoy && d.atCurrentMinute != null)
+    const hoy = comparacionBase.days.find((d) => d.esHoy)
+    const previo = comparacionBase.days.find((d) => !d.esHoy && d.atCurrentMinute != null)
     if (!hoy?.atCurrentMinute || !previo?.atCurrentMinute) return null
     return {
       label: previo.label,
       pieces: previo.atCurrentMinute,
       diff: hoy.atCurrentMinute - previo.atCurrentMinute,
     }
-  }, [comparacion.days])
+  }, [comparacionBase.days])
 
   /**
    * La hora de reloj de la próxima parada de convenio que todavía no empezó.
@@ -5916,9 +5916,9 @@ function MonitorDelToken() {
     // `plannedBreaks` cuenta sus minutos. Con `scheduledStart` la hora salía
     // corrida (hoy 07:45 contra 07:40: cinco minutos tarde).
     const base = serieDelTurno[0]?.t ?? live?.scheduledStart
-    if (!base || comparacion.currentMinute == null) return null
-    const prox = comparacion.breaks
-      .filter((b) => b.fromMin > comparacion.currentMinute!)
+    if (!base || comparacionBase.currentMinute == null) return null
+    const prox = comparacionBase.breaks
+      .filter((b) => b.fromMin > comparacionBase.currentMinute!)
       .sort((a, b) => a.fromMin - b.fromMin)[0]
     if (!prox) return null
     /*
@@ -5931,7 +5931,7 @@ function MonitorDelToken() {
       hora: fmtWallTime(new Date(Date.parse(base) + prox.fromMin * 60_000).toISOString()),
       reason: prox.reason,
     }
-  }, [serieDelTurno, live?.scheduledStart, comparacion.breaks, comparacion.currentMinute])
+  }, [serieDelTurno, live?.scheduledStart, comparacionBase.breaks, comparacionBase.currentMinute])
 
   if (status === 'loading') {
     return (
@@ -6146,8 +6146,12 @@ function MonitorDelToken() {
     const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
     if (!Number.isFinite(t0) || !(largo > 1)) return null
     /* Ventana del turno VISTO, en la misma base wall-as-UTC. */
-    const ini = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
-    if (!Number.isFinite(ini)) return null
+    const iniTurno = Date.parse(live.effectiveStart ?? live.scheduledStart ?? '')
+    if (!Number.isFinite(iniTurno)) return null
+    /* Si la línea produjo ANTES del inicio programado, las barras parten en la primera pieza (Orel, 28-10): esas piezas
+       están en el contador de Shoplogix y en la curva, así que también van en «hechas». La reproducción las topa al
+       contador, así que «hechas» nunca lo pasa. */
+    const ini = barrasDesdeMs(iniTurno, serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null)
     const finSched = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
     /* ⚠ El tope del fin previsto SOLO con el turno cerrado. En vivo
        la cola de la serie ES el presente, y el previsto puede ser
@@ -6175,6 +6179,34 @@ function MonitorDelToken() {
     if (!maquinas.some((m) => m.cycles.some((v) => v > 0))) return null
     return { desde: new Date(t0 + desdeIdx * 60_000).toISOString(), maquinas }
   })()
+
+  /* Fase 6: el último minuto cerrado, pieza a pieza. Solo con el turno en vivo y el contador crudo respondiendo
+     (el mismo de «Piezas ahora», que además es el techo: la reproducción jamás lo supera). `serie` es la de las
+     barras de minuto, ya recortada al inicio del turno. Vive afuera de la vista v2 porque el clásico resta contra
+     la MISMA base (una sola «A esta hora» en toda la app). */
+  const repro = (() => {
+    if (turnoCerrado || !esActual || contador.fuente !== 'pulso') return null
+    const lecturas = data.pulse?.lecturas ?? []
+    const ult = lecturas[lecturas.length - 1]
+    return {
+      entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at }),
+      tope: armarTope(contador.valor, ult && ult.totalCycles === contador.valor ? ult.porMaquina : null),
+    }
+  })()
+  /* UNA base para «A esta hora» en toda la app (franja, gráfico y su globo, Camino a la meta y su ampliado, y el
+     clásico): lo que la reproducción muestra en reposo (Σ minutos cerrados topada por el contador vivo) o, sin ella,
+     el contador. */
+  const hechasMostradas = piezasMostradas(repro, contador.valor)
+  /* …y la hora a la que corresponden esas piezas (T). La cuota, «Comparado con otros días» y la leyenda del gráfico
+     se leen en ESTA T, no en el fin del tramo de 5 min en curso (ver `alinearAHoraDeDatos`). Solo en vivo: cerrado o
+     mirando otro turno, la comparación queda como está (totales). */
+  const horaDatosMs = esActual && !turnoCerrado ? horaDeLosDatos(repro, contador.corteWallMs) : null
+  const comparacion = alinearAHoraDeDatos(comparacionBase, {
+    minutoDatos: minutoDeDatos(horaDatosMs, serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null),
+    mostradas: hechasMostradas,
+  })
+  /* La hora que nombra la cuota («meta a las 14:32»): la de los datos, topada en el cierre (`horaDeLaCuota`). */
+  const horaDeCuota = horaDeLaCuota(live.plannedEnd, horaDatosMs ?? ahoraWallMs)
 
   /* Cadencia: ritmo del turno andando y su lectura contra el rango habitual (tablero y v2). */
   const turnoCpm = live.timeBreakdown && live.timeBreakdown.producingMin > 0
@@ -6309,7 +6341,12 @@ function MonitorDelToken() {
        mostraba el ritmo de antes de parar. También con el turno
        CERRADO: es la causa del cierre («Detención programada desde
        las 15:09 · fin de turno»). */
-    parada: live.machinesProducing === 0 && (live.currentReason || live.currentSinceAt)
+    parada: lineaDetenida({
+      machinesProducing: live.machinesProducing,
+      conCausa: Boolean(live.currentReason || live.currentSinceAt),
+      /* El pulso solo cuenta en vivo: cerrado, la parada es la causa del cierre. */
+      pulsoPorMaquina: !turnoCerrado && contador.fuente === 'pulso' ? (pulsoVivo(data.pulse)?.porMaquina ?? []).map((x) => x.cpm) : null,
+    })
       ? {
         desdeHace: live.currentSinceAt ? fmtAgoWall(live.currentSinceAt, now) : null,
         desdeHora: live.currentSinceAt ? fmtWallTime(live.currentSinceAt) : null,
@@ -6777,21 +6814,6 @@ function MonitorDelToken() {
                 },
               }
             : null
-          /* Fase 6: el último minuto cerrado, pieza a pieza. Solo con el turno en vivo y el contador crudo respondiendo
-             (el mismo de «Piezas ahora», que además es el techo: la reproducción jamás lo supera). `serie` es la de las
-             barras de minuto, ya recortada al inicio del turno. */
-          const repro = (() => {
-            if (turnoCerrado || !esActual || contador.fuente !== 'pulso') return null
-            const lecturas = data.pulse?.lecturas ?? []
-            const ult = lecturas[lecturas.length - 1]
-            return {
-              entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at }),
-              tope: armarTope(contador.valor, ult && ult.totalCycles === contador.valor ? ult.porMaquina : null),
-            }
-          })()
-          /* UNA base para «A esta hora» en toda la vista (franja, gráfico y su globo, Camino a la meta y su ampliado):
-             lo que la reproducción muestra en reposo (Σ minutos cerrados topada por el contador vivo) o, sin ella, el contador. */
-          const hechasMostradas = piezasMostradas(repro, contador.valor)
           /* La parada elegida con «ver ›» en Camino a la meta, en minutos del gráfico. Las paradas cuentan sus minutos desde
              el primer tramo de la serie del turno (el mismo t0 de los grupos). */
           const marcaRitmo = (() => {
@@ -7571,8 +7593,10 @@ function MonitorDelToken() {
                  el "ritmo" absorberia lo que aun no se juega. */
               cerrado={turnoCerrado}
               meta={data.targetPieces ?? live.quotaPieces ?? null}
-              hechas={live.totalPieces}
-              piezasPulso={data.pulse?.totalCycles ?? null}
+              /* La MISMA base que el v2 (`hechasMostradas`, en la hora de los datos) y la misma cuota en esa hora: con
+                 `live.totalPieces` (el corte del doc) y la cuota del fin del tramo, la app tenía dos «A esta hora». */
+              hechas={hechasMostradas}
+              piezasPulso={null}
               corteHora={horaPlanta(live.lastSyncAt ? Date.parse(live.lastSyncAt) - new Date().getTimezoneOffset() * 60_000 : null)}
               cuotaAhora={comparacion.optimalAtCurrentMinute}
               horaAhora={horaDeCuota}
