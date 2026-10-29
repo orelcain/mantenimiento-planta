@@ -16,7 +16,7 @@ import type { CuadroReloj, RelojDeDatos } from '../useRelojDeDatos'
 /* La carrera se pinta en SVG de tamaño medido y el detalle es una hoja: aquí solo importa el `d` que reciben. */
 vi.mock('../CarreraCalma', () => ({
   CarreraCalma: ({ d }: { d: DatosDuelo }) => (
-    <span data-t="carrera" data-hoy={d.carrera?.hoyPz} data-rival={d.carrera?.fantasmaPz} data-dif={d.carrera?.diferencia} data-cabeza={d.carrera?.hoy.at(-1)?.pieces} data-cabeza-min={d.carrera?.hoy.at(-1)?.minutes} />
+    <span data-t="carrera" data-hoy={d.carrera?.hoyPz} data-rival={d.carrera?.fantasmaPz} data-dif={d.carrera?.diferencia} data-cabeza={d.carrera?.hoy[d.carrera.hoy.length - 1]?.pieces} data-cabeza-min={d.carrera?.hoy[d.carrera.hoy.length - 1]?.minutes} />
   ),
 }))
 vi.mock('../DetalleDuelo', () => ({ DetalleDuelo: () => null }))
@@ -73,7 +73,7 @@ describe('datosAlReloj: la carrera puesta en el instante del cuadro', () => {
     expect(r.marcador?.kpis[0]!.ganador).toBe('a')
     /* no muta lo recibido */
     expect(d.carrera?.hoyPz).toBe(3980)
-    expect(d.carrera?.hoy.at(-1)).toEqual({ minutes: 20, pieces: 3980 })
+    expect(d.carrera?.hoy[d.carrera.hoy.length - 1]).toEqual({ minutes: 20, pieces: 3980 })
   })
 
   it('sin cuadro, con el turno cerrado o sin minuto del cuadro devuelve el mismo objeto', () => {
