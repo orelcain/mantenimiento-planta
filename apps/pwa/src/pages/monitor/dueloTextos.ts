@@ -1,9 +1,10 @@
 /**
  * Textos de ayuda del Duelo para PC: lo que sale en el globo al pasar el mouse, enfocar con el teclado o tocar un
- * rótulo, una barra, una parada, una celda o una fila. Son funciones puras para poder probarlas: ninguna inventa un
+ * rótulo, una barra, una detención, una celda o una fila. Son funciones puras para poder probarlas: ninguna inventa un
  * dato, solo ordenan lo que el Duelo ya calculó (nombre, hora, minutos, unidad) y explican la regla que ya existe en
  * `duelo.ts` (cómo se cuenta cada cosa y quién gana el punto).
  */
+import type { FraseEmpate } from './duelo'
 import { EMPATE_HORA, UMBRAL_SOSTENIDA, type FilaRiel, type FilaJornada } from './dueloDatosPC'
 
 export const int = (n: number) => Math.round(n).toLocaleString('es-CL')
@@ -38,7 +39,7 @@ export const TIPS_LEYENDA = {
   programada: 'Programada: detención prevista, como la colación y la reunión de inicio. No cuenta como pérdida.',
 } as const
 
-// ── Barras, paradas y celdas ─────────────────────────────────────────────────
+// ── Barras, detenciones y celdas ─────────────────────────────────────────────
 
 export interface LadoHora { nombre: string; v: number | null; parcial: boolean }
 
@@ -81,13 +82,12 @@ export function tipFilaKpi(f: FilaRiel, o: { enCurso: boolean; unidad: 'carros' 
   if (f.id === 'carrera') return `Carrera: piezas del turno${o.enCurso ? ' a la misma hora de producción' : ', con las piezas que Mantención les quitó sumadas'}. Punto: gana quien sacó más piezas.`
   if (f.id === 'ritmo') return 'Ritmo andando: piezas por minuto mientras la línea produce. Punto: gana el ritmo más alto.'
   if (f.id === 'micro') return 'Micro detención: minutos perdidos por hora en detenciones cortas de las máquinas. Punto: gana quien perdió menos minutos.'
-  if (f.id === 'arranque') return 'Arranque y cierre: minutos hasta la primera pieza (menos es mejor) y piezas de la última hora (más es mejor). Punto: gana quien gana las dos; el cierre se define al terminar el turno.'
+  if (f.id === 'arranque') return `Arranque y cierre: minutos desde el inicio planificado hasta que el turno arranca (menos es mejor; Eviscerado, al ${PCT90} del ritmo esperado; Filete, con la primera pieza) y piezas de la última hora (más es mejor). Punto: gana quien gana las dos; se firma al terminar el turno.`
   if (f.id === 'alim') return 'Alimentación: puntos ganados entre los puestos de alimentación. Cada puesto da un punto; el detalle por puesto se ve con más ancho de pantalla.'
   if (f.id.startsWith('alim-')) {
     const u = o.unidad ?? 'puestos'
     return `Alimentación de ${o.etiquetaPuesto ?? 'este puesto'}: porcentaje de ${u} con pieza sobre el tiempo andando. Punto: gana el porcentaje más alto.`
   }
-  if (f.id === 'sostenida') return `Minutos a buen ritmo: minutos de producción en que la línea rindió al menos ${PCT90} de lo esperado. Es un dato para analizar: no da punto.`
   return `${f.rotulo}: ${f.sub}`
 }
 
@@ -101,4 +101,31 @@ export function tipFilaJornada(f: FilaJornada, n: { cardenas: string; rebolledo:
   const pts = f.puntos ? ` · puntos ${Math.max(f.puntos.c, f.puntos.r)} a ${Math.min(f.puntos.c, f.puntos.r)}` : ''
   const dif = f.dif != null ? ` · ventaja en piezas del ganador: ${f.dif > 0 ? '+' : f.dif < 0 ? '−' : ''}${int(Math.abs(f.dif))} pz${f.dif < 0 ? ' (ganó por puntos con menos piezas)' : ''}` : ''
   return `${base} · ganó ${n[f.ganador]}${pts}${dif}`
+}
+
+// ── Carrera: adelante / atrás, y lo que le falta al que va atrás ─────────────
+
+/** «1 h 19 min», «45 min», «2 h». */
+export function duracion(min: number): string {
+  const m = Math.max(0, Math.round(min))
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  return h === 0 ? `${r} min` : r === 0 ? `${h} h` : `${h} h ${r} min`
+}
+
+/** La ventaja a la misma hora, en el lenguaje del glosario: «Cárdenas 280 adelante» / «Cárdenas 280 atrás»; sin diferencia, «parejos». */
+export function textoAdelanteAtras(nombre: string, hechasMenosRival: number): string {
+  const n = Math.round(hechasMenosRival)
+  return n === 0 ? 'parejos' : n > 0 ? `${nombre} ${int(n)} adelante` : `${nombre} ${int(-n)} atrás`
+}
+
+/**
+ * La frase de empate de la carrera: lo que necesita el que va atrás contra lo que hace y lo que puede. Ej.: «Cárdenas
+ * necesita 37,8 pz/min en 1 h 19 min para llegar a las 13.400 de Rebolledo; va a 37,2 y su techo es 42,2.»
+ */
+export function textoFraseEmpate(f: FraseEmpate, n: { equipo: string; rival: string }): string {
+  const va = f.ritmoActual != null ? `; va a ${dec(f.ritmoActual)}` : ''
+  const techo = f.techo != null ? `${f.ritmoActual != null ? ' y' : ';'} su techo es ${dec(f.techo)}` : ''
+  const cierre = f.alcanzable === false ? ' Con el techo de la línea no alcanza.' : ''
+  return `${n.equipo} necesita ${dec(f.necesitaPzMin)} pz/min en ${duracion(f.minutosQueQuedan)} para llegar a las ${int(f.metaPz)} de ${n.rival}${va}${techo}.${cierre}`
 }

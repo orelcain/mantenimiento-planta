@@ -15,8 +15,15 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Hecho: cron diario `recalcularFallaRepetida` (05:45, chonchi/yal/filete, 300 días) → `shoplogixReincidencia/{planta}` con serie mensual (marca «pocos datos» < 30 fallas) y ranking de causas con su azar. El Monitor lo publica en `fallaRepetida` (+ avisos del turno en cada refresco). Análisis: tarjeta «¿Las reparaciones aguantan o la falla vuelve?» (2A) con meta 30 %. El turno: aviso «Falla que suele volver» 30 min tras soltar un paro de causa con tasa ≥ 30 % y ≥ 10 fallas (3A, sin botones: el Monitor es de solo lectura).
 - Archivos: `functions/shoplogix/fallaRepetida.js` (+ test), `functions/index.js`, `functions/publicMonitor.js`, `publicShiftMonitor.service.ts`, `AnalisisV2.tsx` + css, `AvisoFallaRepetida.tsx`, `avisosVigentes.ts`, `PublicShiftMonitorPage.tsx`.
 - Verificación: functions 645 ok; vitest 4655 ok; tsc 0; eslint 29 (tope 30); audit-piel igual. Módulo corrido sobre el volcado real: Chonchi ago 62 % de 170, sep 43 % de 47, oct 30 % de 76 = estudio. Preview con arnés temporal (no commiteado) en claro/oscuro/375 px.
-- Estado: EN REVISIÓN (PR, sin mergear — aprueba Orel)
+- Estado: HECHO (mergeado 29-10, OK de Orel)
 - Sigue: la tarjeta y el aviso aparecen después de la primera corrida del cron (05:45 del día siguiente al deploy) o de correrlo a mano. ≈ 6.000 lecturas/día entre las 3 plantas.
+
+## 2026-10-28 · Claude · Falla repetida (PR 1): card en Análisis de Turno
+- Hecho: estudio de factibilidad «predictiva por microdetenciones» (solo lectura): las micros no anticipan fallas con horas de aviso; la señal real es la reincidencia (misma causa, misma máquina, ≤ 8 h de operación: Motores 63 % vs 6 % al azar, Lógica 61 % vs 7 %). Plan en OneDrive `ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_PREDICTIVA_MICRODETENCIONES.md`. Card `FallasRepetidasCard` (opción 1A del mockup) bajo Cascada + Imputación: máquina · causa · «N veces de M en el turno», mirando también el día previo.
+- Archivos: `services/shoplogix/fallaRepetida.ts` (+ test), `hooks/useFallasRepetidas.ts`, `components/grader/FallasRepetidasCard.tsx`, `UpstreamMachinesPanel.tsx`.
+- Verificación: tsc 0, eslint sin warnings nuevos, vitest 4661 ok, audit-piel igual. Helper corrido sobre el volcado real: Chonchi 07-08 T2 da Ev2·Lógica 5/5, Ev3·Lógica 5/5, Ev2·Motores 2/3, Ev3·Motores 2/2, Ev1·Motores 1/2 = estudio. Preview NO verificado: el worktree no tiene `.env.local` (no se copió el de producción).
+- Estado: HECHO (mergeado 29-10, OK de Orel)
+- Sigue: PR 2 = Cloud Function que precalcula la reincidencia por mes y por paro → serie en Período (2A) y aviso al cerrar paro en el Monitor (3A, umbral ≥ 30 %).
 
 ## 2026-10-27 · Claude · Informe de turno: correo HTML + PDF rehecho
 - Hecho: `correoTurno.js` (correo de una columna: veredicto, 4 cifras, pérdida por dueño, fallas por máquina con «volvió a ritmo», cotejo con min de Mantención, lo abierto) reutilizando `construirDatosInforme`. PDF rehecho al estándar /sin-tics-visual con tildes: 5 láminas + anexo solo con varias máquinas. Sin envío de correo desde el servidor (decisión de Orel): callable `informeTurnoCorreo` (admin) + botones «Copiar correo» (portapapeles con formato) y «Descargar PDF» en el monitor; se manda desde el Outlook propio. Telegram igual.

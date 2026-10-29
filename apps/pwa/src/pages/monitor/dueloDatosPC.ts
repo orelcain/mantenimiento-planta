@@ -19,9 +19,10 @@ import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import type { PublicMonitorLive, ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
   curvaDeCv, eventosEnEjeProduccion, marcadorDePeriodo, nombreCorto, ritmoHoraAHora, rotuloFantasma, rotuloTurno, semanaIso,
-  type DatosDuelo, type EquipoId, type EventoTurno, type NombresEquipos, type PuntoSemana, type PromedioSemana, type Resultado,
+  type CorteDuelo, type DatosDuelo, type EquipoId, type EventoTurno, type NombresEquipos, type PuntoEnJuego, type PuntoSemana, type PromedioSemana, type Resultado,
 } from './duelo'
 import { lunesDe } from './repartoSemanal'
+import { sostenidaDeSerie, sumaDeLinea, type SerieMinuto, type Sostenida } from './dueloSerie'
 import { normalizar } from './ritmoVivo'
 
 const r1 = (n: number) => Math.round(n * 10) / 10
@@ -36,69 +37,11 @@ export function letraEquipo(id: EquipoId, nombres?: NombresEquipos | null): stri
   return g ? `G${g[1]}` : (n.charAt(0) || '?').toUpperCase()
 }
 
-// ── Serie minuto a minuto: minutos sostenidos a ≥ 90 % ───────────────────────
-
-/** Un minuto de la línea cuenta como «sostenido» cuando rinde al menos esta fracción de su esperado. */
-export const UMBRAL_SOSTENIDA = 0.9
-
-export interface SerieMinuto {
-  desde: string
-  maquinas: Array<{ id: string; esperado: number | null; cycles: number[] }>
-}
-
-/** Suma por minuto de la línea y su esperado (null si alguna máquina no trae esperado: no se puede afirmar «a ritmo»). */
-export function sumaDeLinea(s: SerieMinuto | null | undefined): { suma: number[]; esperado: number | null } | null {
-  if (!s?.maquinas?.length) return null
-  const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
-  if (!(largo > 0)) return null
-  const suma = Array.from({ length: largo }, (_, i) => s.maquinas.reduce((a, m) => a + (m.cycles[i] ?? 0), 0))
-  const completo = s.maquinas.every((m) => m.esperado != null && m.esperado > 0)
-  return { suma, esperado: completo ? s.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null }
-}
-
-/**
- * Minuto del arranque PRODUCTIVO en una serie por minuto: el primero con piezas, saltando picos sueltos (más de 60 min
- * de vacío hasta lo siguiente). Es la misma regla que el backend (`indiceArranqueProductivo`) y la de la curva del Duelo.
- * -1 si no hay piezas.
- */
-export function arranqueEnSerie(suma: readonly number[]): number {
-  const conPz: number[] = []
-  suma.forEach((v, i) => { if (v > 0) conPz.push(i) })
-  if (conPz.length === 0) return -1
-  let inicio = conPz[0]!
-  for (let k = 1; k < conPz.length; k++) {
-    if (conPz[k]! - conPz[k - 1]! - 1 > 60) inicio = conPz[k]!
-    else break
-  }
-  return inicio
-}
-
-export interface Sostenida {
-  /** Minutos (desde la primera pieza, el mismo eje de la carrera) en que la línea rindió ≥ 90 % de su esperado. */
-  minutos: number[]
-  /** Esperado de la línea (pz/min). */
-  esperado: number
-}
-
-const CINCO_MIN = 300_000
-
-/**
- * Los minutos sostenidos de un turno, ubicados en el eje de producción. El origen es el inicio del tramo de 5 min de la
- * primera pieza (como `curvaCompacta`), así que cae en el mismo minuto que la curva. null sin serie o sin esperado.
- */
-export function sostenidaDeSerie(s: SerieMinuto | null | undefined): Sostenida | null {
-  const base = sumaDeLinea(s)
-  if (!s || !base || base.esperado == null) return null
-  const desdeMs = Date.parse(s.desde)
-  const i0 = arranqueEnSerie(base.suma)
-  if (!Number.isFinite(desdeMs) || i0 < 0) return null
-  const t0 = Math.floor((desdeMs + i0 * 60_000) / CINCO_MIN) * CINCO_MIN
-  const minutos: number[] = []
-  for (let i = i0; i < base.suma.length; i++) {
-    if (base.suma[i]! >= UMBRAL_SOSTENIDA * base.esperado) minutos.push(Math.round((desdeMs + i * 60_000 - t0) / 60_000))
-  }
-  return { minutos, esperado: base.esperado }
-}
+// ── Serie minuto a minuto: vive en `dueloSerie.ts` (módulo hoja) y se re-exporta acá ──
+export {
+  UMBRAL_SOSTENIDA, arranqueEnSerie, sostenidaDeSerie, sumaDeLinea,
+  type SerieMinuto, type Sostenida,
+} from './dueloSerie'
 
 // ── Ritmo por hora y hora ganada ─────────────────────────────────────────────
 
@@ -161,6 +104,11 @@ export interface MicroLado {
   m: Array<{ n: string; min: number }> | null
   /** Total del turno (= `mic`); null sin dato. */
   total: number | null
+  /**
+   * Minutos de micro de cada máquina en cada hora de producción (filas en el orden de `m`, columnas = horas), para el mapa
+   * de calor. null = el backend todavía no lo publica (`mantencion.porMaquina[].microH` / `duelo.micHM`): no se inventa.
+   */
+  hm?: number[][] | null
 }
 
 const sumaR1 = (xs: readonly number[]) => r1(xs.reduce((a, b) => a + b, 0))
@@ -170,7 +118,9 @@ export function microDeLive(live: Pick<PublicMonitorLive, 'mantencion'> | null |
   const mt = live?.mantencion
   const h = mt && Array.isArray(mt.microH) && mt.microH.length > 0 ? mt.microH : null
   const m = mt?.porMaquina?.length ? mt.porMaquina.map((x) => ({ n: x.name, min: x.microMin ?? 0 })) : null
-  return { h, m, total: m ? sumaR1(m.map((x) => x.min)) : h ? sumaR1(h) : null }
+  const porMaq = mt?.porMaquina
+  const hm = porMaq?.length && porMaq.every((x) => Array.isArray(x.microH) && x.microH.length > 0) ? porMaq.map((x) => x.microH!) : null
+  return { h, m, total: m ? sumaR1(m.map((x) => x.min)) : h ? sumaR1(h) : null, ...(hm ? { hm } : {}) }
 }
 
 /** Micro de un turno cerrado, desde `shiftStats[].duelo` (`micH`, `micM`, `mic`). */
@@ -181,7 +131,8 @@ export function microDeStat(st: ShiftStat | null | undefined): MicroLado {
   const m = Array.isArray(d.micM) && d.micM.length > 0
     ? d.micM.map((min, i) => ({ n: d.alim[i]?.n ?? st?.porMaquina?.[i]?.n ?? `Máquina ${i + 1}`, min }))
     : null
-  return { h, m, total: d.mic ?? (m ? sumaR1(m.map((x) => x.min)) : null) }
+  const hm = Array.isArray(d.micHM) && d.micHM.length > 0 && d.micHM.every((x) => Array.isArray(x) && x.length > 0) ? d.micHM : null
+  return { h, m, total: d.mic ?? (m ? sumaR1(m.map((x) => x.min)) : null), ...(hm ? { hm } : {}) }
 }
 
 /**
@@ -192,7 +143,75 @@ export function microDeHoy(live: Pick<PublicMonitorLive, 'mantencion'> | null | 
   const a = microDeLive(live)
   if (a.h && a.m) return a
   const b = microDeStat(st)
-  return { h: a.h ?? b.h, m: a.m ?? b.m, total: a.total ?? b.total }
+  const hm = a.hm ?? b.hm
+  return { h: a.h ?? b.h, m: a.m ?? b.m, total: a.total ?? b.total, ...(hm ? { hm } : {}) }
+}
+
+/**
+ * Micro detención «hasta la misma hora»: los minutos de micro de las N máquinas hasta el minuto de producción pedido, ÷ las
+ * horas transcurridas, ÷ N máquinas = minutos por hora por máquina. Es la fórmula de la cifra del duelo (0,7 y 1,2 min/h/máq.).
+ * La hora a medias entra en proporción a lo transcurrido. null sin micro por hora, sin máquinas o con menos de un minuto.
+ */
+export function microALaMismaHora(
+  h: readonly number[] | null | undefined,
+  hastaMin: number,
+  nMaquinas: number,
+): { totalMin: number; horas: number; minPorHoraPorMaquina: number } | null {
+  if (!h?.length || !(nMaquinas > 0) || !(hastaMin >= 1)) return null
+  const horas = hastaMin / 60
+  let total = 0
+  for (let i = 0; i < h.length && i * 60 < hastaMin; i++) total += (h[i] ?? 0) * Math.min(1, (hastaMin - i * 60) / 60)
+  return { totalMin: r1(total), horas, minPorHoraPorMaquina: total / horas / nMaquinas }
+}
+
+export interface MatrizMicro {
+  /** Horas de producción (columnas). */
+  horas: number
+  /** Una fila por Baader, en el orden publicado. `celdas[i]` = minutos de micro en la hora i+1; vacío = el backend aún no publica la matriz. */
+  maquinas: Array<{ n: string; celdas: number[]; total: number }>
+  /** Minutos por hora de las máquinas sumadas (el margen de abajo); null sin dato. */
+  totalPorHora: number[] | null
+  /** Total del turno, las máquinas sumadas; null sin dato. */
+  totalTurno: number | null
+  /** La Baader con más minutos de micro en el turno. */
+  baaderPeor: { n: string; min: number } | null
+  /** La celda más oscura del mapa de calor. null si la matriz por máquina y hora no está publicada. */
+  celdaPeor: { n: string; hora: number; min: number } | null
+  /** Hay minutos por máquina y por hora (se puede pintar el mapa de calor entero). */
+  conCeldas: boolean
+}
+
+/** La matriz Baader × hora de producción de un equipo: minutos por celda, total por Baader y la Baader peor. */
+export function matrizMicro(micro: MicroLado | null | undefined): MatrizMicro {
+  const vacia: MatrizMicro = { horas: 0, maquinas: [], totalPorHora: null, totalTurno: null, baaderPeor: null, celdaPeor: null, conCeldas: false }
+  if (!micro) return vacia
+  const conCeldas = !!micro.hm && !!micro.m && micro.hm.length === micro.m.length
+  const maquinas = (micro.m ?? []).map((x, i) => ({ n: x.n, celdas: conCeldas ? micro.hm![i]!.map(r1) : [], total: r1(x.min) }))
+  const horas = Math.max(micro.h?.length ?? 0, ...maquinas.map((x) => x.celdas.length))
+  let celdaPeor: MatrizMicro['celdaPeor'] = null
+  for (const mq of maquinas) mq.celdas.forEach((min, i) => { if (!celdaPeor || min > celdaPeor.min) celdaPeor = { n: mq.n, hora: i + 1, min } })
+  const peor = maquinas.reduce<{ n: string; min: number } | null>((acc, x) => (!acc || x.total > acc.min ? { n: x.n, min: x.total } : acc), null)
+  return {
+    horas, maquinas, totalPorHora: micro.h ? micro.h.map(r1) : null, totalTurno: micro.total,
+    baaderPeor: peor && peor.min > 0 ? peor : null, celdaPeor: celdaPeor && (celdaPeor as { min: number }).min > 0 ? celdaPeor : null, conCeldas,
+  }
+}
+
+export interface MicroEquipo {
+  /** Total del turno (min de máquina, máquinas sumadas); null sin dato. */
+  totalTurno: number | null
+  /** Hasta la misma hora de producción: minutos por hora por máquina; null sin dato. */
+  minPorHoraPorMaquina: number | null
+  hastaMin: number
+  nMaquinas: number
+  matriz: MatrizMicro
+}
+
+/** Todo lo de micro detención de un equipo para la cabecera y el mapa de calor, de UNA sola fuente (`MicroLado`). */
+export function microDelEquipo(micro: MicroLado | null | undefined, hastaMin: number): MicroEquipo {
+  const nMaquinas = micro?.m?.length ?? 0
+  const f = microALaMismaHora(micro?.h, hastaMin, nMaquinas)
+  return { totalTurno: micro?.total ?? null, minPorHoraPorMaquina: f ? f.minPorHoraPorMaquina : null, hastaMin, nMaquinas, matriz: matrizMicro(micro) }
 }
 
 // ── Los dos lados del eje ────────────────────────────────────────────────────
@@ -211,7 +230,7 @@ export interface LadoEje {
   /** Minuto de producción del último punto de la curva. */
   finMin: number
   horas: HoraLado[]
-  /** Paradas de 5 min o más, ya en el eje de producción. */
+  /** Detenciones de 5 min o más, ya en el eje de producción. */
   eventos: EventoTurno[]
   /** Minutos sostenidos a ≥ 90 % (para dibujar la franja); null sin serie minuto a minuto. */
   sost: Sostenida | null
@@ -319,7 +338,7 @@ type CausaCruda = { reason: string; min: number; count?: number; lineMin?: numbe
 
 /**
  * Los minutos de LÍNEA por causa de un turno, como los cuenta «El turno» (`equivMin ?? lineMin`). Si alguna causa no
- * los trae, null: no se afirma (y no se escala ni se usan los minutos de máquina). Sin causas, `[]` (no hubo paradas).
+ * los trae, null: no se afirma (y no se escala ni se usan los minutos de máquina). Sin causas, `[]` (no hubo detenciones).
  */
 export function causasDeLinea(rec: readonly CausaCruda[] | null | undefined): CausaLinea[] | null {
   if (!rec) return null
@@ -328,7 +347,7 @@ export function causasDeLinea(rec: readonly CausaCruda[] | null | undefined): Ca
 }
 
 /**
- * Minutos programados (colación, reunión…) de las paradas de 5 min o más, DENTRO de las horas de producción del turno:
+ * Minutos programados (colación, reunión…) de las detenciones de 5 min o más, DENTRO de las horas de producción del turno:
  * lo que se pasa del último minuto (la detención programada del cierre dura horas) no es del turno.
  */
 export const minutosProgramados = (eventos: readonly EventoTurno[], finMin: number): number =>
@@ -363,14 +382,14 @@ export function cerrarCausas(acc: CausasLado): CausasLado {
   return acc
 }
 
-/** Un turno cerrado de `shiftStats` en minutos de línea por causa + sus paradas programadas. */
+/** Un turno cerrado de `shiftStats` en minutos de línea por causa + sus detenciones programadas. */
 export function causasDeStat(t: ShiftStat): { causas: CausaLinea[] | null; programadas: number } {
   const curva = curvaDeCv(t.duelo)
   const fin = curva.length ? curva[curva.length - 1]!.minutes : Infinity
   return { causas: causasDeLinea(t.recoverable), programadas: minutosProgramados(eventosEnEjeProduccion(t.duelo?.ev, t.duelo?.ini), fin) }
 }
 
-/** El turno que se mira, desde su `live` y las paradas ya ubicadas en su eje de producción. */
+/** El turno que se mira, desde su `live` y las detenciones ya ubicadas en su eje de producción. */
 export function causasDeLive(live: Pick<PublicMonitorLive, 'timeBreakdown'>, eventos: readonly EventoTurno[], finMin: number): { causas: CausaLinea[] | null; programadas: number } {
   return { causas: causasDeLinea(live.timeBreakdown?.recoverable), programadas: minutosProgramados(eventos, finMin) }
 }
@@ -407,6 +426,8 @@ export interface EntradaPorQue {
 }
 
 export interface PorQue {
+  /** El corte de los minutos (el mismo de las detenciones de la carrera); null si el turno aún no trae curva. */
+  corte: CorteDuelo | null
   causas: Record<EquipoId, CausasLado | null>
   /** Micro por máquina (min de máquina), sumado en el periodo; null = sin dato en ese equipo. */
   micro: Record<EquipoId, Array<{ n: string; min: number }> | null>
@@ -421,11 +442,10 @@ export function construirPorQue(e: EntradaPorQue): PorQue {
   const mic: Record<EquipoId, Map<string, number> | null> = { cardenas: null, rebolledo: null }
   const pzMant: Record<EquipoId, number | null> = { cardenas: null, rebolledo: null }
   const turnos: Record<EquipoId, number> = { cardenas: 0, rebolledo: 0 }
-  const resumenes = new Map([...e.d.duelos.map((x) => x.resumen), e.d.hoy, ...(e.d.rival ? [e.d.rival] : [])].map((r) => [r.shiftDocId, r]))
   for (const t of turnosDelPeriodo(e.d, e.periodo)) {
     const st = e.stats.find((s) => s.shiftDocId === t.shiftDocId)
     if (!t.esHoy && !st) continue
-    const { causas, programadas } = t.esHoy ? causasDeLive(e.live, e.d.carrera?.eventosHoy ?? [], e.d.carrera?.hoy[e.d.carrera.hoy.length - 1]?.minutes ?? Infinity) : causasDeStat(st!)
+    const { causas, programadas } = t.esHoy ? causasDeLive(e.live, e.d.carrera?.eventosHoy ?? [], e.d.carrera?.corte.minuto ?? Infinity) : causasDeStat(st!)
     acc[t.eq] = acumularCausas(acc[t.eq] ?? causasVacias(), causas, programadas)
     turnos[t.eq]++
     const micro = t.esHoy ? microDeHoy(e.live, st) : microDeStat(st)
@@ -434,11 +454,11 @@ export function construirPorQue(e: EntradaPorQue): PorQue {
       for (const x of micro.m) m.set(x.n, r1((m.get(x.n) ?? 0) + x.min))
       mic[t.eq] = m
     }
-    if (e.periodo === 'jornada') pzMant[t.eq] = Math.round(resumenes.get(t.shiftDocId)?.piezasMant ?? 0)
+    if (e.periodo === 'jornada') pzMant[t.eq] = Math.round(e.d.costoHoy.equipos[t.eq].piezasPerdidas)
   }
   for (const k of ['cardenas', 'rebolledo'] as const) if (acc[k]) cerrarCausas(acc[k]!)
   const lista = (m: Map<string, number> | null) => (m ? [...m].map(([n, min]) => ({ n, min })) : null)
-  return { causas: acc, micro: { cardenas: lista(mic.cardenas), rebolledo: lista(mic.rebolledo) }, piezasMant: pzMant, turnos }
+  return { corte: e.d.carrera?.corte ?? null, causas: acc, micro: { cardenas: lista(mic.cardenas), rebolledo: lista(mic.rebolledo) }, piezasMant: pzMant, turnos }
 }
 
 /** Minutos de «Por qué» sin los programados (es lo que se dice en el subtítulo). */
@@ -481,7 +501,7 @@ const ladoDe = (r: Resultado, hoy: EquipoId): GanFila =>
 
 /** Filas del KPI a KPI (con rival). Cárdenas a la izquierda y Rebolledo a la derecha, sea cual sea el turno que se mira. */
 export function filasRiel(e: EntradaRiel): FilaRiel[] {
-  const { d, lados, compacto } = e
+  const { d, compacto } = e
   const m = d.marcador
   if (!m || m.sinDuelo || !d.rival) return []
   const hoy = d.hoy.equipo
@@ -503,7 +523,7 @@ export function filasRiel(e: EntradaRiel): FilaRiel[] {
     const [ini, uh] = arr.filas as [typeof arr.filas[number], typeof arr.filas[number]]
     const t = (x: number | null, y: number | null) => `${x != null ? Math.round(x).toLocaleString('es-CL') : '—'} min · ${y != null && !enCurso ? Math.round(y).toLocaleString('es-CL') : '—'} pz`
     filas.push({
-      id: 'arranque', rotulo: 'Arranque y cierre', sub: enCurso ? 'el cierre se juega al final' : 'minutos a la 1.ª pieza y piezas de la última hora',
+      id: 'arranque', rotulo: 'Arranque y cierre', sub: enCurso ? 'el cierre se juega al final' : `${subArranque(d.hoy.arranqueModo)} y piezas de la última hora`,
       ...dosLados(enCurso ? null : uh.a, enCurso ? null : uh.b), ...txtLados(t(ini.a, uh.a), t(ini.b, uh.b)), unidad: 'pz', dec: 0, gan: ladoDe(arr.ganador, hoy),
     })
   }
@@ -526,40 +546,47 @@ export function filasRiel(e: EntradaRiel): FilaRiel[] {
     }
   }
 
-  const v = (eq: EquipoId) => lados[eq]?.v90 ?? null
-  filas.push({ id: 'sostenida', rotulo: 'Minutos a buen ritmo', sub: '≥ 90 % de lo esperado · sin punto', c: v('cardenas'), r: v('rebolledo'), unidad: 'min', dec: 0, gan: 'info' })
   return filas
 }
 
-/** Puntos de cada equipo: los oficiales con el turno cerrado y, en curso, solo lo ya decidido (provisional). */
-export function puntajeRiel(d: DatosDuelo, filas: readonly FilaRiel[]): { c: number; r: number; pendientes: number; provisional: boolean } | null {
-  const m = d.marcador
-  if (!m || m.sinDuelo) return null
-  if (d.hoy.cerrado) {
-    return d.hoy.equipo === 'cardenas'
-      ? { c: m.puntosA, r: m.puntosB, pendientes: 0, provisional: false }
-      : { c: m.puntosB, r: m.puntosA, pendientes: 0, provisional: false }
-  }
-  const puntuables = filas.filter((f) => f.id !== 'sostenida')
+/** «Minutos a buen ritmo» ya no es una fila del riel ni da punto: queda como dato en el carril de la carrera. */
+const subArranque = (modo: 'ritmo90' | 'primera-pieza') => (modo === 'ritmo90' ? 'minutos al 90 % del ritmo' : 'minutos a la 1.ª pieza')
+
+export interface PuntajeRiel {
+  /** Puntos FIRMES de Cárdenas y de Rebolledo (con la jornada cerrada, todos). */
+  c: number
+  r: number
+  /** Puntos que todavía se juegan (arranque y cierre, alimentación). */
+  enJuego: number
+  detalleEnJuego: Array<{ indicador: PuntoEnJuego['indicador']; rotulo: string; puesto?: string; adelante: 'c' | 'r' | null }>
+  /** La jornada sigue abierta: lo firme puede crecer. */
+  provisional: boolean
+}
+
+/** El puntaje de la jornada con Cárdenas a la izquierda: el MISMO `puntajeJornada` que lee el celular, puesto en sus casillas. */
+export function puntajeRiel(d: DatosDuelo): PuntajeRiel | null {
+  const p = d.puntaje
+  if (!p) return null
+  const hoyEsC = d.hoy.equipo === 'cardenas'
+  const lado = (x: 'a' | 'b' | null): 'c' | 'r' | null => (x == null ? null : (x === 'a') === hoyEsC ? 'c' : 'r')
   return {
-    c: puntuables.filter((f) => f.gan === 'c').length,
-    r: puntuables.filter((f) => f.gan === 'r').length,
-    pendientes: puntuables.filter((f) => f.gan === 'pend').length,
-    provisional: true,
+    c: hoyEsC ? p.firmes.a : p.firmes.b,
+    r: hoyEsC ? p.firmes.b : p.firmes.a,
+    enJuego: p.enJuego,
+    detalleEnJuego: p.detalleEnJuego.map((x) => ({ indicador: x.indicador, rotulo: x.rotulo, ...(x.puesto ? { puesto: x.puesto } : {}), adelante: lado(x.quienVaAdelante) })),
+    provisional: !p.cerrada,
   }
 }
 
 /** Filas del KPI a KPI cuando el turno que se mira corre solo (la noche abre la jornada): su valor y, en gris, su promedio. */
-export function filasSinRival(d: DatosDuelo, lados: Record<EquipoId, LadoEje | null>, promedioCarrera: number | null): FilaRiel[] {
+export function filasSinRival(d: DatosDuelo, promedioCarrera: number | null): FilaRiel[] {
   const h = d.hoy
-  const mio = lados[h.equipo]
   const filas: FilaRiel[] = [
     { id: 'carrera', rotulo: 'Carrera', sub: 'hechas contra su promedio a esta hora', c: h.piezas, r: promedioCarrera, unidad: 'pz', dec: 0, gan: 'sin' },
     { id: 'ritmo', rotulo: 'Ritmo andando', sub: 'piezas por minuto', c: h.ritmo, r: null, unidad: 'pz/min', dec: 1, gan: 'sin' },
     { id: 'micro', rotulo: 'Micro detención', sub: 'minutos por hora', c: h.microMinH, r: null, unidad: 'min/h', dec: 1, gan: 'sin' },
-    { id: 'arranque', rotulo: 'Arranque', sub: 'minutos hasta la 1.ª pieza', c: h.arranqueMin, r: null, unidad: 'min', dec: 0, gan: 'sin' },
+    { id: 'arranque', rotulo: 'Arranque', sub: subArranque(h.arranqueModo), c: h.arranqueMin, r: null, unidad: 'min', dec: 0, gan: 'sin' },
     ...h.puestos.map((p): FilaRiel => ({ id: `alim-${p.clave}`, rotulo: `Alimentación ${p.etiqueta}`, sub: 'en vivo', c: p.llenado, r: null, unidad: '%', dec: 0, gan: 'sin', puesto: p.etiqueta })),
-    { id: 'sostenida', rotulo: 'Minutos a buen ritmo', sub: '≥ 90 % de lo esperado', c: mio?.v90 ?? null, r: null, unidad: 'min', dec: 0, gan: 'sin' },
   ]
   return filas
 }
@@ -597,11 +624,19 @@ export interface FilaJornada {
   /** Puntos de cada equipo (Cárdenas, Rebolledo) cuando la jornada está jugada. */
   puntos: { c: number; r: number } | null
   ganador: EquipoId | 'empate' | null
-  /** Diferencia de piezas a favor del ganador. */
+  /**
+   * Ventaja en piezas con el signo relativo al GANADOR (no a noche/día): positiva si el ganador también sacó más piezas,
+   * negativa si ganó por puntos con menos piezas. 0 en empate. Sin jornada jugada, null.
+   */
   dif: number | null
+  /** Quién sacó más piezas (puede no ser el ganador); 'empate' si igualaron. */
+  liderPiezas: EquipoId | 'empate' | null
   /** «noche en curso», «día en curso», «día por jugar»: la jornada que aún no se cierra. */
   vivo: string | null
 }
+
+/** `noche − día` en piezas → la ventaja del ganador: si ganó la noche es tal cual; si ganó el día, el signo se da vuelta. */
+export const ventajaDelGanador = (ganoLaNoche: boolean, nocheMenosDia: number): number => (ganoLaNoche ? nocheMenosDia : -nocheMenosDia)
 
 /** Las jornadas del mes de la que se mira: la más nueva primero. Incluye la jornada en curso o por jugar. */
 export function filasJornadas(d: DatosDuelo): FilaJornada[] {
@@ -623,7 +658,8 @@ export function filasJornadas(d: DatosDuelo): FilaJornada[] {
     const dn = n.resumen.piezas - dia.resumen.piezas
     filas.push({
       jornada, noche: { eq: n.resumen.equipo, pz: n.resumen.piezas }, dia: { eq: dia.resumen.equipo, pz: dia.resumen.piezas },
-      puntos, ganador, dif: ganador === 'empate' ? 0 : ganador === n.resumen.equipo ? dn : -dn, vivo: null,
+      puntos, ganador, dif: ganador === 'empate' ? 0 : ventajaDelGanador(ganador === n.resumen.equipo, dn),
+      liderPiezas: dn === 0 ? 'empate' : dn > 0 ? n.resumen.equipo : dia.resumen.equipo, vivo: null,
     })
   }
   filas.sort((a, b) => (a.jornada < b.jornada ? 1 : a.jornada > b.jornada ? -1 : 0))
@@ -636,7 +672,7 @@ export function filasJornadas(d: DatosDuelo): FilaJornada[] {
       jornada: d.hoyKey,
       noche: h.esNoche ? mio : suyo,
       dia: h.esNoche ? suyo : mio,
-      puntos: null, ganador: null, dif: null,
+      puntos: null, ganador: null, dif: null, liderPiezas: null,
       vivo: h.cerrado ? 'día por jugar' : h.esNoche ? 'noche en curso' : 'día en curso',
     })
   }

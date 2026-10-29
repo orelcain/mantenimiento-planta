@@ -15,7 +15,9 @@
  *     OTRO equipo (la semana anterior). Esa es la «tabla justa»: noche contra
  *     noche, día contra día.
  *  3. Un punto por KPI ganado (carrera, ritmo andando, micro detenciones,
- *     arranque y cierre) y un punto por cada puesto de alimentación ganado.
+ *     arranque y cierre) y un punto por cada puesto de alimentación ganado. «Minutos a buen ritmo» NO es indicador.
+ *     Marcador de la jornada = `puntajeJornada`: puntos FIRMES (carrera, ritmo, micro) y puntos EN JUEGO (arranque y
+ *     cierre, alimentación) hasta que cierra la jornada; PC y celular leen la misma función.
  *  4. Las fallas técnicas NO restan puntos: se descuentan del tiempo comparable y
  *     sus piezas (minutos de falla × ritmo andando del propio turno) se SUMAN al
  *     total del equipo en la carrera. Van al bloque «Costo de Mantención».
@@ -30,7 +32,9 @@ import type {
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import { desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
+import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import { numeroDeTurno } from './aporteHistorico'
+import { arranqueDeTurno, type ModoArranque, type SerieMinuto } from './dueloSerie'
 import { lunesDe, repartoDeTurno } from './repartoSemanal'
 import { etiquetaMaquina, normalizar, unidadDeMaquinas } from './ritmoVivo'
 
@@ -214,7 +218,14 @@ export interface ResumenTurno {
   ritmo: number | null
   /** Minutos de micro detención por hora disponible, por máquina. */
   microMinH: number | null
+  /**
+   * Arranque del turno en minutos, medido SIEMPRE desde el inicio planificado (`scheduledStart`) y según `arranqueModo`:
+   * Eviscerado = hasta el 90 % del ritmo esperado; Filete = hasta la primera pieza. null = todavía no arranca o sin dato.
+   */
   arranqueMin: number | null
+  arranqueModo: ModoArranque
+  /** Minutos entre el inicio planificado y la primera pieza productiva: corre el eje de producción (no es el KPI de arranque). */
+  iniProdMin: number | null
   ultimaHoraPz: number | null
   puestos: PuestoTurno[]
 }
@@ -229,6 +240,8 @@ interface EntradaResumen {
   piezas: number
   stat: ShiftStat
   duelo: Pick<ShiftDuelo, 'ini' | 'uh' | 'mic' | 'alim'>
+  /** El arranque ya medido (modo y minutos). Sin él: primera pieza según `duelo.ini`. */
+  arranque?: { modo: ModoArranque; min: number | null }
   overrides?: Readonly<Record<string, EquipoId>> | null
 }
 
@@ -254,19 +267,41 @@ function armarResumen(e: EntradaResumen): ResumenTurno {
     piezasMant: rp.pz.mantencion,
     ritmo: e.stat.producingMin > 0 ? e.piezas / e.stat.producingMin : null,
     microMinH: e.duelo.mic != null && dispMin != null && dispMin > 0 ? e.duelo.mic / nMaq / (dispMin / 60) : null,
-    arranqueMin: e.duelo.ini ?? null,
+    arranqueMin: e.arranque ? e.arranque.min : e.duelo.ini ?? null,
+    arranqueModo: e.arranque?.modo ?? 'primera-pieza',
+    iniProdMin: e.duelo.ini ?? null,
     ultimaHoraPz: e.duelo.uh ?? null,
     puestos: e.duelo.alim.map((p) => ({ clave: normalizar(p.n), etiqueta: etiquetaMaquina(p.n), llenado: p.f ?? null })),
   }
 }
 
+/** Cómo se mide el arranque de un turno y con qué serie minuto a minuto (si la hay). */
+export interface OpcionesArranque {
+  modo: ModoArranque
+  serie?: SerieMinuto | null
+}
+
+/** Eviscerado (carros, Baader 142) arranca al 90 % del ritmo; el resto (Filete) con la primera pieza. */
+export const modoArranqueDe = (unidad: 'carros' | 'silletas' | null): ModoArranque => (unidad === 'carros' ? 'ritmo90' : 'primera-pieza')
+
+/**
+ * El arranque de un turno cerrado, desde su inicio planificado (`dateKey` + `h0`). Con la serie minuto a minuto se mide al
+ * minuto; sin ella, `primera-pieza` cae a `duelo.ini` (tramos de 5 min, mismo origen) y `ritmo90` queda en «sin dato».
+ */
+function arranqueDeStat(t: ShiftStat, o: OpcionesArranque): { modo: ModoArranque; min: number | null } {
+  const inicioPlanMs = Date.parse(`${t.dateKey}T${t.duelo?.h0 ?? ''}:00Z`)
+  const fino = arranqueDeTurno({ modo: o.modo, inicioPlanMs, serie: o.serie })
+  return { modo: o.modo, min: fino ?? (o.modo === 'primera-pieza' ? t.duelo?.ini ?? null : null) }
+}
+
 /** Un turno cerrado de `shiftStats`; null si el backend todavía no lo rearmó con los datos del duelo. */
-export function resumenDeStat(t: ShiftStat, overrides?: Readonly<Record<string, EquipoId>> | null): ResumenTurno | null {
+export function resumenDeStat(t: ShiftStat, overrides?: Readonly<Record<string, EquipoId>> | null, arranque?: OpcionesArranque): ResumenTurno | null {
   const esNoche = esNocheDesdeHora(t.duelo?.h0)
   if (!t.duelo || esNoche == null) return null
   return armarResumen({
     shiftDocId: t.shiftDocId, dateKey: t.dateKey, h0: t.duelo.h0 ?? null, shiftId: t.shiftId, esNoche, cerrado: true,
     piezas: t.total || 0, stat: t, duelo: t.duelo, overrides,
+    ...(arranque ? { arranque: arranqueDeStat(t, arranque) } : {}),
   })
 }
 
@@ -287,6 +322,8 @@ export function resumenDeLive(args: {
   piezas?: number
   cerrado: boolean
   overrides?: Readonly<Record<string, EquipoId>> | null
+  /** Modo y serie minuto a minuto para medir el arranque desde `scheduledStart`. Sin él, primera pieza por tramos de 5 min. */
+  arranque?: OpcionesArranque
 }): ResumenTurno | null {
   const { shiftDocId, live, cerrado, overrides } = args
   const esNoche = esNocheDesdeHora(live.scheduledStart?.slice(11, 16))
@@ -316,8 +353,13 @@ export function resumenDeLive(args: {
     : undefined
   const mant = live.mantencion?.porMaquina
   const mic = mant ? mant.reduce((a, m) => a + (m.microMin || 0), 0) : undefined
+  const inicioPlanMs = Date.parse(live.scheduledStart ?? '')
+  const arranque = args.arranque
+    ? { modo: args.arranque.modo, min: arranqueDeTurno({ modo: args.arranque.modo, inicioPlanMs, serie: args.arranque.serie, tramos: live.series }) }
+    : undefined
   return armarResumen({
     shiftDocId, dateKey: stat.dateKey, h0: live.scheduledStart?.slice(11, 16) ?? null, shiftId: stat.shiftId, esNoche, cerrado, piezas, stat,
+    ...(arranque ? { arranque } : {}),
     duelo: {
       ...(ini != null ? { ini } : {}),
       ...(uh != null ? { uh } : {}),
@@ -365,14 +407,16 @@ export interface PuestoMarcador {
 
 export interface Marcador {
   sinDuelo: boolean
+  /** El turno de A ya cerró: todos los puntos son firmes. */
+  cerrado: boolean
   motivo: string | null
   /** Los KPI de cabecera (carrera, ritmo, micro, arranque y cierre). */
   kpis: KpiMarcador[]
   puestos: PuestoMarcador[]
   puntosA: number
   puntosB: number
-  /** Cuántos puntos hay en juego (4 KPI + los puestos con dato en ambos). */
-  enJuego: number
+  /** Cuántos puntos se pueden ganar en total (4 KPI + los puestos con dato en ambos). No es «en juego»: eso lo dice `puntajeJornada`. */
+  puntosPosibles: number
   /** Quién gana el turno: sólo con el turno de A cerrado y puntos decididos. */
   ganador: 'a' | 'b' | 'empate' | 'pendiente' | 'sin-duelo'
 }
@@ -409,7 +453,7 @@ export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { ca
     const chico = Math.min(a.dispMin, b.dispMin)
     const grande = Math.max(a.dispMin, b.dispMin)
     if (grande > 0 && chico / grande < FRACCION_SIN_DUELO) {
-      return { sinDuelo: true, motivo: `Uno de los turnos tuvo menos del ${Math.round(FRACCION_SIN_DUELO * 100)} % de los minutos del otro`, kpis: [], puestos: [], puntosA: 0, puntosB: 0, enJuego: 0, ganador: 'sin-duelo' }
+      return { sinDuelo: true, cerrado, motivo: `Uno de los turnos tuvo menos del ${Math.round(FRACCION_SIN_DUELO * 100)} % de los minutos del otro`, kpis: [], puestos: [], puntosA: 0, puntosB: 0, puntosPosibles: 0, ganador: 'sin-duelo' }
     }
   }
 
@@ -441,12 +485,13 @@ export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { ca
   }
   const ganaArranque = comparar(a.arranqueMin, b.arranqueMin, 'menor')
   const ganaCierre: Resultado = !cerrado ? 'pendiente' : comparar(a.ultimaHoraPz, b.ultimaHoraPz, 'mayor')
+  const al90 = a.arranqueModo === 'ritmo90'
   const arranque: KpiMarcador = {
     id: 'arranque',
     rotulo: 'Arranque y cierre',
-    nota: 'Minutos hasta la primera pieza y piezas de la última hora. Gana quien gana los dos.',
+    nota: `${al90 ? 'Minutos desde el inicio planificado hasta el 90 % del ritmo esperado' : 'Minutos desde el inicio planificado hasta la primera pieza'} y piezas de la última hora. Gana quien gana los dos.`,
     filas: [
-      { rotulo: 'Hasta la primera pieza', a: a.arranqueMin, b: b.arranqueMin, unidad: 'min', decimales: 0, mejor: 'menor', ganador: ganaArranque },
+      { rotulo: al90 ? 'Hasta el 90 % del ritmo' : 'Hasta la primera pieza', a: a.arranqueMin, b: b.arranqueMin, unidad: 'min', decimales: 0, mejor: 'menor', ganador: ganaArranque },
       { rotulo: 'Piezas de la última hora', a: a.ultimaHoraPz, b: b.ultimaHoraPz, unidad: 'pz', decimales: 0, mejor: 'mayor', ganador: ganaCierre },
     ],
     ganador: combinar(ganaArranque, ganaCierre),
@@ -463,16 +508,69 @@ export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { ca
   const todos: Resultado[] = [...kpis.map((k) => k.ganador), ...puestos.map((p) => p.ganador)]
   const puntosA = todos.filter((r) => r === 'a').length
   const puntosB = todos.filter((r) => r === 'b').length
-  const enJuego = todos.filter((r) => r !== 'sin-dato').length
+  const puntosPosibles = todos.filter((r) => r !== 'sin-dato').length
   return {
-    sinDuelo: false, motivo: null, kpis, puestos, puntosA, puntosB, enJuego,
+    sinDuelo: false, cerrado, motivo: null, kpis, puestos, puntosA, puntosB, puntosPosibles,
     ganador: !cerrado ? 'pendiente' : puntosA === puntosB ? 'empate' : puntosA > puntosB ? 'a' : 'b',
   }
 }
 
+// ── Puntaje de la jornada: firmes y en juego ─────────────────────────────────
+
+/** Indicador que da punto: los cuatro KPI y la alimentación (un punto por puesto). «Minutos a buen ritmo» no está. */
+export type IndicadorPunto = KpiId | 'alimentacion'
+
+export interface PuntoEnJuego {
+  indicador: IndicadorPunto
+  rotulo: string
+  /** Solo en `alimentacion`: el puesto («Ev 1»). */
+  puesto?: string
+  /** Quién va adelante hoy en ese indicador: `a` = el turno que se mira, `b` = su rival; null = parejos o sin dato todavía. */
+  quienVaAdelante: 'a' | 'b' | null
+}
+
+export interface PuntajeJornada {
+  /** Puntos ya decididos: carrera, ritmo y micro detención ganados. Con la jornada cerrada, todos los puntos. */
+  firmes: { a: number; b: number }
+  /** Puntos que todavía se juegan (arranque y cierre, alimentación; la carrera mientras no hay con qué comparar). */
+  enJuego: number
+  detalleEnJuego: PuntoEnJuego[]
+  /** La jornada cerró: ya no hay nada en juego. */
+  cerrada: boolean
+}
+
+const KPI_FIRMES: readonly KpiId[] = ['carrera', 'ritmo', 'micro']
+
+/**
+ * EL marcador de la jornada, el mismo para el PC y el celular. Los puntos firmes son los que no se reabren con el turno
+ * corriendo (carrera, ritmo, micro detención); el arranque y cierre y la alimentación quedan «en juego» y se firman al
+ * cierre, aunque hoy alguien vaya adelante. Con la jornada cerrada todo pasa a firme. Un «sin duelo» no tiene puntaje (null).
+ */
+export function puntajeJornada(m: Marcador | null | undefined): PuntajeJornada | null {
+  if (!m || m.sinDuelo) return null
+  if (m.cerrado) return { firmes: { a: m.puntosA, b: m.puntosB }, enJuego: 0, detalleEnJuego: [], cerrada: true }
+  const firmes = { a: 0, b: 0 }
+  const detalleEnJuego: PuntoEnJuego[] = []
+  const adelante = (r: Resultado | undefined): 'a' | 'b' | null => (r === 'a' || r === 'b' ? r : null)
+  for (const k of m.kpis) {
+    if (KPI_FIRMES.includes(k.id)) {
+      if (k.ganador === 'a') firmes.a += 1
+      else if (k.ganador === 'b') firmes.b += 1
+      else if (k.ganador === 'pendiente') detalleEnJuego.push({ indicador: k.id, rotulo: k.rotulo, quienVaAdelante: adelante(k.filas[0]?.ganador) })
+    } else if (k.ganador !== 'sin-dato') {
+      detalleEnJuego.push({ indicador: k.id, rotulo: k.rotulo, quienVaAdelante: adelante(k.filas[0]?.ganador) })
+    }
+  }
+  for (const p of m.puestos) {
+    if (p.ganador === 'sin-dato') continue
+    detalleEnJuego.push({ indicador: 'alimentacion', rotulo: `Alimentación ${p.etiqueta}`, puesto: p.etiqueta, quienVaAdelante: adelante(p.ganador) })
+  }
+  return { firmes, enJuego: detalleEnJuego.length, detalleEnJuego, cerrada: false }
+}
+
 // ── Curvas ───────────────────────────────────────────────────────────────────
 
-/** Piezas acumuladas a los `min` minutos (interpolado); pasado el final, el total: ese turno ya terminó. */
+/** Hechas a los `min` minutos (interpolado); pasado el final, el total: ese turno ya terminó. */
 export function piezasAlMinuto(curva: readonly PacePoint[], min: number): number | null {
   if (!curva.length) return null
   if (min <= 0) return 0
@@ -484,6 +582,55 @@ export function piezasAlMinuto(curva: readonly PacePoint[], min: number): number
     if (min >= x.minutes && min <= y.minutes) return y.minutes === x.minutes ? y.pieces : x.pieces + ((min - x.minutes) / (y.minutes - x.minutes)) * (y.pieces - x.pieces)
   }
   return curva[curva.length - 1]!.pieces
+}
+
+/**
+ * «Hechas a la misma hora»: UNA sola función para la cabecera, el indicador de carrera, la tabla, el globo y la TV. Lee la
+ * curva acumulada del turno (la minuto a minuto si se tiene; si no, la compacta `cv`) en el MINUTO DE PRODUCCIÓN pedido
+ * (1.ª hora = minutos 0 a 60 desde la primera pieza, no la hora de reloj) y devuelve piezas enteras. Pasado el final del
+ * turno devuelve su total; sin curva, null.
+ */
+export function piezasALaMismaHora(serie: readonly PacePoint[], minutoDeProduccion: number): number | null {
+  const v = piezasAlMinuto(serie, minutoDeProduccion)
+  return v == null ? null : Math.round(v)
+}
+
+export interface PuntoVentaja {
+  /** Minuto de producción. */
+  minuto: number
+  /** Hechas de cada equipo a ese minuto (`piezasALaMismaHora`). */
+  hechas: Record<EquipoId, number>
+  /** Quién va adelante (N adelante / N atrás); null = parejos. */
+  lider: EquipoId | null
+  /** Piezas de ventaja del líder (siempre ≥ 0). */
+  ventaja: number
+}
+
+/**
+ * La serie de ventaja a la misma hora, minuto a minuto de producción desde 0 hasta `hastaMin`: para la carrera v6 (línea
+ * de ventaja, quién lidera y por cuánto en cada instante). Mismos valores que el indicador, porque sale de la misma función.
+ */
+export function serieVentaja(
+  a: { equipo: EquipoId; curva: readonly PacePoint[] },
+  b: { equipo: EquipoId; curva: readonly PacePoint[] },
+  hastaMin: number,
+  pasoMin = 1,
+): PuntoVentaja[] {
+  if (a.equipo === b.equipo || a.curva.length < 2 || b.curva.length < 2 || !(hastaMin > 0) || !(pasoMin > 0)) return []
+  const out: PuntoVentaja[] = []
+  const punto = (minuto: number): PuntoVentaja => {
+    const pa = piezasALaMismaHora(a.curva, minuto) ?? 0
+    const pb = piezasALaMismaHora(b.curva, minuto) ?? 0
+    return {
+      minuto,
+      hechas: { [a.equipo]: pa, [b.equipo]: pb } as Record<EquipoId, number>,
+      lider: pa === pb ? null : pa > pb ? a.equipo : b.equipo,
+      ventaja: Math.abs(pa - pb),
+    }
+  }
+  for (let m = 0; m < hastaMin; m += pasoMin) out.push(punto(m))
+  out.push(punto(hastaMin))
+  return out
 }
 
 /** `{m, p}` del backend → puntos; si arranca con tramos vacíos se corre el eje al primer tramo con piezas. */
@@ -605,7 +752,7 @@ export interface FantasmaRival {
   turnos: number
   /** Minuto del día (hora de planta) de la primera pieza de ese turno; null si no se sabe. Para el reloj del globo. */
   inicioMin: number | null
-  /** Sus paradas de 5 min o más, ya en el eje de horas de producción. */
+  /** Sus detenciones de 5 min o más, ya en el eje de horas de producción. */
   eventos: EventoTurno[]
 }
 
@@ -725,7 +872,7 @@ export function referenciaMismoHorario(
   return { fantasma: null, banda: null }
 }
 
-/** Arranque productivo, reloj y paradas de un turno cerrado, a partir de su `shiftStats[].duelo`. */
+/** Arranque productivo, reloj y detenciones de un turno cerrado, a partir de su `shiftStats[].duelo`. */
 function datosDeArranque(st: ShiftStat | undefined): { inicioMin: number | null; eventos: EventoTurno[] } {
   const d = st?.duelo
   const h0 = minutoDelDia(d?.h0)
@@ -763,10 +910,10 @@ export const textoCorreContraEstaCurva = (rival: string, jornada: string, inicio
 /** El rótulo del turno que se mira: «Cárdenas · noche 28/10». */
 export const rotuloTurno = (nombre: string, t: Pick<ResumenTurno, 'esNoche' | 'jornada'>): string => `${nombre} · ${horarioYJornada(t.esNoche, t.jornada)}`
 
-// ── Horas de producción y paradas del turno ─────────────────────────────────
+// ── Horas de producción y detenciones del turno ─────────────────────────────────
 //
 // REGLA DEL EJE: las dos curvas parten de la PRIMERA PIEZA de su turno (arranque productivo), así que «1ª hora» es el
-// primer tramo de 60 min desde ahí, para los dos equipos. Las paradas se corren a ese mismo eje restándoles los
+// primer tramo de 60 min desde ahí, para los dos equipos. Las detenciones se corren a ese mismo eje restándoles los
 // minutos que cada turno tardó en arrancar desde su inicio planificado.
 
 /** La hora de producción (1, 2, 3…) a la que pertenece un minuto transcurrido. */
@@ -794,7 +941,7 @@ export function bandasDeHoras(maxMin: number): BandaHora[] {
   return out
 }
 
-/** Parada de 5 min o más tal como la publica el backend (`shiftStats[].duelo.ev`). */
+/** Detención de 5 min o más tal como la publica el backend (`shiftStats[].duelo.ev`). */
 export interface EventoCrudo {
   n: string
   /** Minutos desde el inicio planificado. */
@@ -803,7 +950,7 @@ export interface EventoCrudo {
   p?: 1
 }
 
-/** Una parada ubicada en el eje de horas de producción de su turno. */
+/** Una detención ubicada en el eje de horas de producción de su turno. */
 export interface EventoTurno {
   causa: string
   /** Nombre corto para el globo. */
@@ -824,7 +971,7 @@ export function causaCorta(causa: string): string {
 }
 
 /**
- * Corre las paradas del eje «desde el inicio planificado» al de horas de producción: se resta el arranque (`ini`).
+ * Corre las detenciones del eje «desde el inicio planificado» al de horas de producción: se resta el arranque (`ini`).
  * Lo que terminó antes de la primera pieza no se dibuja; lo que la cruza se recorta en 0. Sin `ini` no se sabe
  * dónde caen, y no se adivina: queda vacío.
  */
@@ -841,11 +988,11 @@ export function eventosEnEjeProduccion(crudos: readonly EventoCrudo[] | null | u
   return out.sort((x, y) => x.desde - y.desde)
 }
 
-/** Mínimo de una parada para marcarla (igual que el backend). */
+/** Mínimo de una detención para marcarla (igual que el backend). */
 export const PARADA_MIN_SEG = 300
 
 /**
- * Las paradas del turno que se está mirando, con el MISMO criterio que `eventosDelDuelo` del backend: unidas entre
+ * Las detenciones del turno que se está mirando, con el MISMO criterio que `eventosDelDuelo` del backend: unidas entre
  * máquinas por causa, solo las de 5 min o más. Programada = la causa está en el desglose de paros programados.
  */
 export function eventosCrudosDeLive(live: Pick<PublicMonitorLive, 'stopEvents' | 'stopReasons' | 'scheduledStart' | 'timeBreakdown'>): EventoCrudo[] {
@@ -952,7 +1099,7 @@ function ritmoDeHora(curva: readonly PacePoint[], hora: number): { pzMin: number
 
 /**
  * Ritmo de cada hora (pz/min) de dos curvas acumuladas que parten de la primera pieza. Sale de las piezas entre dos
- * marcas de la curva, así que incluye las paradas de esa hora: es el ritmo de la hora, no el de «andando».
+ * marcas de la curva, así que incluye las detenciones de esa hora: es el ritmo de la hora, no el de «andando».
  */
 export function ritmoHoraAHora(a: readonly PacePoint[], b: readonly PacePoint[], maxHoras = 12): HoraRitmo[] {
   const fin = Math.max(a[a.length - 1]?.minutes ?? 0, b[b.length - 1]?.minutes ?? 0)
@@ -1230,6 +1377,171 @@ export interface CostoEquipo {
   minPorFalla: number | null
 }
 
+export type PeriodoCosto = 'hoy' | 'ciclo'
+
+export interface CostoPeriodo {
+  /** `hoy` = la jornada que se mira (la noche y el día); `ciclo` = las dos semanas del ciclo en curso. */
+  periodo: PeriodoCosto
+  /** Para el rótulo: «jornada 28/10» o «ciclo 26/10 al 08/11». */
+  etiqueta: string
+  inicio: string
+  fin: string
+  equipos: Record<EquipoId, CostoEquipo>
+}
+
+const ddmm = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`
+
+/**
+ * El costo de Mantención con el período a la vista, de UNA sola fuente (`piezasMant` / `fallaMin` de cada ResumenTurno):
+ * `hoy` = los turnos de la jornada de `hoy`; `ciclo` = los del ciclo de dos semanas de `hoy`. `resumenes` trae los turnos
+ * cerrados y el que se mira (aunque siga corriendo: su costo es hasta ahora).
+ */
+export function costoDeMantencionPeriodo(resumenes: readonly ResumenTurno[], hoy: Pick<ResumenTurno, 'jornada'>, periodo: PeriodoCosto): CostoPeriodo {
+  const ciclo = cicloDe(hoy.jornada)
+  const delPeriodo = resumenes.filter((r) => (periodo === 'hoy' ? r.jornada === hoy.jornada : cicloDe(r.jornada).indice === ciclo.indice))
+  return {
+    periodo,
+    etiqueta: periodo === 'hoy' ? `jornada ${ddmm(hoy.jornada)}` : `ciclo ${ddmm(ciclo.inicio)} al ${ddmm(ciclo.fin)}`,
+    inicio: periodo === 'hoy' ? hoy.jornada : ciclo.inicio,
+    fin: periodo === 'hoy' ? hoy.jornada : ciclo.fin,
+    equipos: costoMantencion(delPeriodo),
+  }
+}
+
+// ── Corte, detenciones y proyección de la carrera ────────────────────────────
+
+/** El corte que comparten el carril «Detenciones ≥ 5 min» y «Por qué se perdió tiempo»: el rótulo lo dice tal cual. */
+export interface CorteDuelo {
+  /** El turno sigue corriendo: la cifra es «hasta ahora». */
+  hastaAhora: boolean
+  /** Minuto de producción hasta donde se cuenta. En curso = el último tramo de 5 min CERRADO (como `timeBreakdown`). */
+  minuto: number
+  /** Hora de producción (1, 2, 3…) a la que cae el corte. */
+  hora: number
+  etiqueta: string
+}
+
+const TRAMO_CERRADO_MIN = 5
+
+export function corteDelDuelo(cerrado: boolean, minutoAhora: number): CorteDuelo {
+  const minuto = cerrado ? Math.max(0, Math.round(minutoAhora)) : Math.max(0, Math.floor(minutoAhora / TRAMO_CERRADO_MIN) * TRAMO_CERRADO_MIN)
+  const hora = horaTranscurrida(minuto)
+  return {
+    hastaAhora: !cerrado, minuto, hora,
+    etiqueta: cerrado ? `turno completo · ${minuto} min de producción` : `hasta ahora · minuto ${minuto} de producción (${etiquetaHora(hora)})`,
+  }
+}
+
+/** Deja las detenciones que caen antes del corte, recortando la que lo cruza. Cerrado: tal cual. */
+export function detencionesHastaElCorte(eventos: readonly EventoTurno[], corte: CorteDuelo): EventoTurno[] {
+  if (!corte.hastaAhora) return [...eventos]
+  return eventos.filter((e) => e.desde < corte.minuto).map((e) => ({ ...e, hasta: Math.min(e.hasta, corte.minuto) }))
+}
+
+export type DuenoDetencion = 'mantencion' | 'externo' | 'sin-imputar' | 'prog'
+
+/** Una detención de 5 min o más para pintarla como pin en la carrera. */
+export interface DetencionPin {
+  /** Minuto de producción en que empieza. */
+  desdeMin: number
+  hastaMin: number
+  duracionMin: number
+  causa: string
+  corta: string
+  programada: boolean
+  /** Falla técnica: la causa es de equipos (Mantención) y no es programada. */
+  fallaTecnica: boolean
+  dueno: DuenoDetencion
+}
+
+export function pinesDeDetenciones(eventos: readonly EventoTurno[]): DetencionPin[] {
+  return eventos.map((e) => {
+    const d = duenoDe(e.causa).dueno
+    const dueno: DuenoDetencion = e.programada ? 'prog' : d === 'mantencion' ? 'mantencion' : d === 'externo' ? 'externo' : 'sin-imputar'
+    return {
+      desdeMin: e.desde, hastaMin: e.hasta, duracionMin: Math.max(0, e.hasta - e.desde), causa: e.causa, corta: e.corta,
+      programada: e.programada, fallaTecnica: dueno === 'mantencion', dueno,
+    }
+  })
+}
+
+/** Los últimos minutos con los que se mide «el ritmo de ahora» (el de la proyección y el de la frase de empate). */
+export const VENTANA_RITMO_ACTUAL_MIN = 30
+
+/** pz/min de los últimos `ventanaMin` minutos de la curva; null con menos de 5 minutos de curva. */
+export function ritmoActualDeCurva(curva: readonly PacePoint[], ventanaMin = VENTANA_RITMO_ACTUAL_MIN): number | null {
+  if (curva.length < 2) return null
+  const fin = curva[curva.length - 1]!.minutes
+  const ini = Math.max(0, fin - ventanaMin)
+  if (fin - ini < 5) return null
+  return ((piezasAlMinuto(curva, fin) ?? 0) - (piezasAlMinuto(curva, ini) ?? 0)) / (fin - ini)
+}
+
+export interface ProyeccionEquipo {
+  equipo: EquipoId
+  /** Hechas hasta ahora (o al cierre, si el turno cerró). */
+  hechas: number
+  /** pz/min de los últimos 30 min; null en un turno cerrado o sin curva. */
+  ritmoActual: number | null
+  /** Minutos de producción que le quedan al turno; 0 si cerró; null si no se sabe cuándo termina. */
+  minutosQueQuedan: number | null
+  /** Hechas + ritmo actual × minutos que quedan; cerrado = sus hechas; null si falta un dato. */
+  proyeccion: number | null
+  /** Lo máximo que puede rendir la línea (la suma de lo esperado de sus máquinas); null si no se sabe. */
+  techo: number | null
+  cerrado: boolean
+}
+
+export function proyeccionAlCierre(o: {
+  equipo: EquipoId
+  curva: readonly PacePoint[]
+  hechas: number
+  /** Minuto de producción de ahora. */
+  minuto: number
+  /** Minuto de producción en que termina el turno planificado. */
+  finPrevistoMin: number | null
+  cerrado: boolean
+  techo: number | null
+}): ProyeccionEquipo {
+  if (o.cerrado) return { equipo: o.equipo, hechas: o.hechas, ritmoActual: null, minutosQueQuedan: 0, proyeccion: o.hechas, techo: o.techo, cerrado: true }
+  const ritmoActual = ritmoActualDeCurva(o.curva)
+  const minutosQueQuedan = o.finPrevistoMin != null ? Math.max(0, o.finPrevistoMin - o.minuto) : null
+  return {
+    equipo: o.equipo, hechas: o.hechas, ritmoActual, minutosQueQuedan, techo: o.techo, cerrado: false,
+    proyeccion: ritmoActual != null && minutosQueQuedan != null ? o.hechas + ritmoActual * minutosQueQuedan : null,
+  }
+}
+
+/** «Necesita 37,8 pz/min en 1 h 19 min; va a 37,2; su techo es 42,2»: lo que le falta al que va atrás para alcanzar la meta del otro. */
+export interface FraseEmpate {
+  /** El que va atrás (proyección menor) y su rival. */
+  equipo: EquipoId
+  rival: EquipoId
+  /** La meta: lo que el rival hizo (cerrado) o proyecta al cierre. */
+  metaPz: number
+  hechas: number
+  minutosQueQuedan: number
+  /** (meta − hechas) ÷ minutos que quedan. */
+  necesitaPzMin: number
+  ritmoActual: number | null
+  techo: number | null
+  /** ¿Lo que necesita cabe bajo el techo de la línea? null si no se conoce el techo. */
+  alcanzable: boolean | null
+}
+
+/** null si alguna proyección falta, van parejos o el que va atrás ya cerró (no puede hacer nada). Usa piezas brutas, sin las de Mantención. */
+export function fraseDeEmpate(a: ProyeccionEquipo, b: ProyeccionEquipo): FraseEmpate | null {
+  if (a.proyeccion == null || b.proyeccion == null || Math.round(a.proyeccion) === Math.round(b.proyeccion)) return null
+  const [atras, rival] = a.proyeccion < b.proyeccion ? [a, b] : [b, a]
+  if (atras.cerrado || atras.minutosQueQuedan == null || !(atras.minutosQueQuedan > 0)) return null
+  const necesitaPzMin = (rival.proyeccion! - atras.hechas) / atras.minutosQueQuedan
+  return {
+    equipo: atras.equipo, rival: rival.equipo, metaPz: Math.round(rival.proyeccion!), hechas: atras.hechas,
+    minutosQueQuedan: atras.minutosQueQuedan, necesitaPzMin, ritmoActual: atras.ritmoActual, techo: atras.techo,
+    alcanzable: atras.techo != null ? necesitaPzMin <= atras.techo : null,
+  }
+}
+
 /** Lo que las fallas técnicas le quitaron a cada equipo en los turnos dados. */
 export function costoMantencion(resumenes: readonly ResumenTurno[]): Record<EquipoId, CostoEquipo> {
   const vacio = (): CostoEquipo => ({ turnos: 0, fallasN: 0, fallaMin: 0, piezasPerdidas: 0, minPorFalla: null })
@@ -1261,8 +1573,18 @@ export interface CarreraDuelo {
   bandaPropia: boolean
   /** Ritmo de cada hora, hoy contra el fantasma. */
   ritmoHoras: HoraRitmo[]
-  /** Paradas de hoy en el eje de horas de producción. */
+  /** Detenciones de hoy en el eje de horas de producción, hasta el `corte`. */
   eventosHoy: EventoTurno[]
+  /** El corte de las detenciones y de «Por qué se perdió tiempo»: es el mismo y se rotula igual. */
+  corte: CorteDuelo
+  /** Detenciones de 5 min o más de cada equipo (hoy hasta el corte; el rival, su turno completo) para pintarlas como pines. */
+  detenciones: Partial<Record<EquipoId, DetencionPin[]>>
+  /** Ventaja a la misma hora, minuto a minuto de producción (vacía sin la curva del rival). */
+  ventaja: PuntoVentaja[]
+  /** Proyección al cierre de cada equipo (ritmo actual × minutos que quedan); el rival que cerró proyecta lo que hizo. */
+  proyeccion: Partial<Record<EquipoId, ProyeccionEquipo>>
+  /** Lo que necesita el que va atrás para alcanzar al otro; null si no hay con qué calcularla. */
+  fraseEmpate: FraseEmpate | null
   /** Minuto de producción que se compara (el último de hoy). */
   minuto: number
   /** «2ª hora» = segunda hora de producción. */
@@ -1275,7 +1597,7 @@ export interface CarreraDuelo {
 /** El mismo horario de la semana anterior, en una línea y sin puntos. */
 export interface SemanaAnterior {
   fantasma: FantasmaRival
-  /** Lo que llevaba ese turno a esta misma hora de producción. */
+  /** Las hechas de ese turno a esta misma hora de producción. */
   pzAHora: number | null
   diferencia: number | null
 }
@@ -1297,7 +1619,11 @@ export interface DatosDuelo {
   cicloPrevio: CicloDuelo
   rachas: Record<EquipoId, Racha>
   records: RecordTurno[]
-  costo: Record<EquipoId, CostoEquipo>
+  /** El puntaje de la jornada (firmes y en juego), el mismo para PC y celular; null sin rival o sin duelo. */
+  puntaje: PuntajeJornada | null
+  /** Costo de Mantención del CICLO en curso (dos semanas), y el de la JORNADA que se mira: cada uno dice su período. */
+  costo: CostoPeriodo
+  costoHoy: CostoPeriodo
   /** Las barras del KPI a KPI (vacío sin rival o sin duelo). */
   kpiAKpi: FilaVs[]
   /** Piezas por turno de cada equipo, semana a semana. */
@@ -1328,17 +1654,30 @@ export interface EntradaDuelo {
   rivalCurve?: RivalCurve | null
   stats: readonly ShiftStat[]
   forecast: readonly ForecastHistoryShift[]
+  /** Serie minuto a minuto del turno que se mira: mide el arranque al 90 % del ritmo (Eviscerado). */
+  serieHoy?: SerieMinuto | null
+  /** Series archivadas de los últimos turnos (`seriesMinuto`): el arranque de los turnos del rival. */
+  series?: ReadonlyArray<SerieMinuto & { shiftDocId: string }> | null
   overrides?: Readonly<Record<string, EquipoId>> | null
   /** Quién y cuándo corrigió cada turno (`monitor_config.duelo.overridesMeta`). */
   overridesMeta?: Readonly<Record<string, CorreccionMeta>> | null
 }
 
+/** El techo de la línea: la suma de lo esperado (`targetCpm`) de sus máquinas; null si alguna no lo trae (no se inventa). */
+export function techoDeLinea(live: Pick<PublicMonitorLive, 'machines'>): number | null {
+  const ms = live.machines ?? []
+  return ms.length > 0 && ms.every((m) => (m.targetCpm ?? 0) > 0) ? ms.reduce((a, m) => a + (m.targetCpm ?? 0), 0) : null
+}
+
 /** Junta todo lo que la tarjeta y la pestaña muestran. null si el turno no trae su hora de inicio. */
 export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
-  const hoy = resumenDeLive({ shiftDocId: e.shiftDocId, live: e.live, piezas: e.piezas, cerrado: e.cerrado, overrides: e.overrides })
+  const modo = modoArranqueDe(unidadDeMaquinas(e.live.machines))
+  const hoy = resumenDeLive({ shiftDocId: e.shiftDocId, live: e.live, piezas: e.piezas, cerrado: e.cerrado, overrides: e.overrides, arranque: { modo, serie: e.serieHoy } })
   if (!hoy) return null
 
-  const deStats = e.stats.map((s) => resumenDeStat(s, e.overrides)).filter((r): r is ResumenTurno => r != null && r.shiftDocId !== hoy.shiftDocId)
+  const deStats = e.stats
+    .map((s) => resumenDeStat(s, e.overrides, { modo, serie: e.series?.find((x) => x.shiftDocId === s.shiftDocId) }))
+    .filter((r): r is ResumenTurno => r != null && r.shiftDocId !== hoy.shiftDocId)
   /* Para el ciclo, los récords y el costo, el turno de hoy cuenta si ya cerró. */
   const cerrados = hoy.cerrado ? [...deStats, hoy] : deStats
   const duelos = duelosDeTurnos(cerrados)
@@ -1365,7 +1704,7 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const curvaHoy = curvaConContador(e.curvaHoy, e.piezas, ahoraMin)
   const minuto = curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.minutes : 0
   const hoyPz = e.piezas > 0 ? e.piezas : curvaHoy.length ? curvaHoy[curvaHoy.length - 1]!.pieces : 0
-  const fantasmaPz = fantasma && fantasma.length ? piezasAlMinuto(fantasma, minuto) : null
+  const fantasmaPz = fantasma && fantasma.length ? piezasALaMismaHora(fantasma, minuto) : null
 
   /* A igual tiempo de turno solo si el fantasma ES el rival del marcador. */
   const mismoRival = rival != null && fantasmaInfo != null && fantasmaInfo.shiftDocId === rival.shiftDocId
@@ -1379,7 +1718,7 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const banda = fantasmaInfo ? mismoHorario.banda : propia
   const semanaAnterior: SemanaAnterior | null = mismoHorario.fantasma && !(abreJornada && !hoy.cerrado)
     ? (() => {
-        const pzAHora = mismoHorario.fantasma.curva.length ? piezasAlMinuto(mismoHorario.fantasma.curva, minuto) : null
+        const pzAHora = mismoHorario.fantasma.curva.length ? piezasALaMismaHora(mismoHorario.fantasma.curva, minuto) : null
         return {
           fantasma: mismoHorario.fantasma,
           pzAHora,
@@ -1388,11 +1727,25 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
       })()
     : null
 
+  const corte = corteDelDuelo(hoy.cerrado, minuto)
+  const eventosHoy = detencionesHastaElCorte(eventosEnEjeProduccion(eventosCrudosDeLive(e.live), hoy.iniProdMin), corte)
+  const finPlanMs = Date.parse(e.live.plannedEnd ?? e.live.scheduledEnd ?? '')
+  const finPrevistoMin = Number.isFinite(finPlanMs) && Number.isFinite(t0) ? (finPlanMs - t0) / 60_000 : null
+  const techo = techoDeLinea(e.live)
+  const proyHoy = proyeccionAlCierre({ equipo: hoy.equipo, curva: curvaHoy, hechas: hoyPz, minuto, finPrevistoMin, cerrado: hoy.cerrado, techo })
+  const rivalEq = otroEquipo(hoy.equipo)
+  const proyRival: ProyeccionEquipo | null = fantasmaInfo && fantasmaInfo.total != null
+    ? { equipo: rivalEq, hechas: fantasmaInfo.total, ritmoActual: null, minutosQueQuedan: 0, proyeccion: fantasmaInfo.total, techo, cerrado: true }
+    : null
   const carrera: CarreraDuelo | null = curvaHoy.length
     ? {
-        hoy: curvaHoy, fantasma, fantasmaInfo, rivalEquipo: otroEquipo(hoy.equipo), banda, bandaPropia: fantasmaInfo == null,
+        hoy: curvaHoy, fantasma, fantasmaInfo, rivalEquipo: rivalEq, banda, bandaPropia: fantasmaInfo == null,
         ritmoHoras: ritmoHoraAHora(curvaHoy, fantasma ?? []),
-        eventosHoy: eventosEnEjeProduccion(eventosCrudosDeLive(e.live), hoy.arranqueMin),
+        eventosHoy, corte,
+        detenciones: { [hoy.equipo]: pinesDeDetenciones(eventosHoy), ...(fantasmaInfo ? { [rivalEq]: pinesDeDetenciones(fantasmaInfo.eventos) } : {}) },
+        ventaja: fantasma ? serieVentaja({ equipo: hoy.equipo, curva: curvaHoy }, { equipo: rivalEq, curva: fantasma }, minuto) : [],
+        proyeccion: { [hoy.equipo]: proyHoy, ...(proyRival ? { [rivalEq]: proyRival } : {}) },
+        fraseEmpate: proyRival ? fraseDeEmpate(proyHoy, proyRival) : null,
         minuto, hora: horaTranscurrida(minuto),
         hoyPz, fantasmaPz,
         diferencia: fantasmaPz != null ? hoyPz - fantasmaPz : null,
@@ -1401,14 +1754,17 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
 
   const ciclo = cicloDe(hoy.jornada)
   const hoyIndice = ciclo.indice
-  const delCiclo = cerrados.filter((r) => cicloDe(r.jornada).indice === hoyIndice)
+  /* El costo cuenta el turno que se mira aunque siga corriendo (hasta ahora): ciclo y jornada salen de la misma lista. */
+  const paraCosto = [...deStats, hoy]
   return {
     hoy, rival, abreJornada, esperando, inicioDia, marcador, carrera, semanaAnterior,
     ciclo: marcadorDeCiclo(duelos, hoyIndice, hoyIndice),
     cicloPrevio: marcadorDeCiclo(duelos, hoyIndice - 1, hoyIndice),
     rachas: rachasPorEquipo(duelos),
     records: recordsDe(duelos),
-    costo: costoMantencion(hoy.cerrado ? delCiclo : [...delCiclo, hoy]),
+    puntaje: puntajeJornada(marcador),
+    costo: costoDeMantencionPeriodo(paraCosto, hoy, 'ciclo'),
+    costoHoy: costoDeMantencionPeriodo(paraCosto, hoy, 'hoy'),
     kpiAKpi: filasKpiAKpi(marcador),
     tendencia: tendenciaSemanal(cerrados),
     duelos,
