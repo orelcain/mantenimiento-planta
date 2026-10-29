@@ -4,8 +4,8 @@
  * fallas y tiempo perdido solo con «Ver más».
  * Se prueba el esqueleto con datos de ejemplo: no hay fork de PC, nada se repite y nada de lo que salió reaparece.
  */
-import { cleanup, fireEvent, render } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MonitorV2, type MonitorV2Props } from '../MonitorV2'
 import type { EjeDatos } from '../GraficoRitmoVivo'
 import { armarTope, type EntradaRep } from '../reproduccionMinuto'
@@ -189,25 +189,29 @@ describe('MonitorV2 · «El turno» ordenado', () => {
     expect(container.querySelector('.rv-grafico')).not.toBeNull()
   })
 
-  it('el detalle de «Piezas del turno» dice la misma cifra que la celda: con reproducción, la suma de los minutos cerrados', () => {
-    /* Σ cycles = 9.671; el contador de planta va 19 adelante por el minuto en curso. */
+  it('el detalle de «Piezas del turno» dice la misma cifra que la celda: con la cola, la del instante reproducido (no el contador de planta)', () => {
+    /* 3 minutos cerrados: la cola arranca con 2 en cola, así que al cargar la cifra es la del primer minuto cerrado (8.800), no el
+       contador de planta (9.690) ni la suma de todo lo cerrado (9.671). */
     const entrada: EntradaRep = {
       desdeMs: INI,
       maquinas: [
-        { id: 'a', nombre: 'Evisceradora 1', esperado: 19, cycles: [3309] },
-        { id: 'b', nombre: 'Evisceradora 2', esperado: 16, cycles: [3071] },
-        { id: 'c', nombre: 'Evisceradora 3', esperado: 16, cycles: [3291] },
+        { id: 'a', nombre: 'Evisceradora 1', esperado: 19, cycles: [3000, 200, 109] },
+        { id: 'b', nombre: 'Evisceradora 2', esperado: 16, cycles: [2800, 150, 121] },
+        { id: 'c', nombre: 'Evisceradora 3', esperado: 16, cycles: [3000, 150, 141] },
       ],
       paradas: {},
       pulsoAtMs: null,
     }
-    const { getByRole } = render(<MonitorV2 {...props(0)} repro={{ entrada, tope: armarTope(9690, null) }} />)
+    const { getByRole, container } = render(<MonitorV2 {...props(0)} repro={{ entrada, tope: armarTope(9690, null) }} />)
+    const celda = container.querySelector('.fc-cifra-p')?.textContent
+    expect(celda).toBe('8.800')
     fireEvent.click(getByRole('button', { name: 'Piezas del turno: ver detalle' }))
     const capa = getByRole('dialog').textContent ?? ''
-    expect(capa).toContain('9.671')
+    expect(capa).toContain('8.800')
     expect(capa).not.toContain('9.690')
+    expect(capa).not.toContain('9.671')
     /* Faltan = meta − lo mostrado. */
-    expect(capa).toContain('5.329')
+    expect(capa).toContain('6.200')
   })
 
   it('el detalle de «Ritmo» pide «necesario» en la misma base andando que la franja', () => {
@@ -315,5 +319,83 @@ describe('MonitorV2 · hojas de detalle (FilaCifra, «Reducir», rótulos del ri
     expect(rotulos).toHaveLength(3)
     expect(rotulos.map((r) => r.innerHTML.replace('<br>', '|'))).toEqual(['26/10|T1', '27/10|T2', 'Hoy'])
     expect(rotulos.every((r) => !r.className.includes('truncate'))).toBe(true)
+  })
+})
+
+describe('MonitorV2 · todo lo que se mueve sigue al reloj único de la cola', () => {
+  const num = (t: string | null | undefined) => Number((t ?? '').replace(/\./g, ''))
+  const abrir = (c: ReturnType<typeof render>, nombre: string) => fireEvent.click(c.getByRole('button', { name: nombre }))
+  const entradaCola: EntradaRep = {
+    desdeMs: INI,
+    maquinas: [
+      { id: 'a', nombre: 'Evisceradora 1', esperado: 19, cycles: [3000, 200, 109, 40] },
+      { id: 'b', nombre: 'Evisceradora 2', esperado: 16, cycles: [2800, 150, 121, 40] },
+    ],
+    paradas: {},
+    pulsoAtMs: null,
+  }
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance'] })
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('«Al cierre» es UNA cifra: la proyección (15.623) en la franja y en el ampliado, aunque las hechas del cuadro suban; «Faltan para la meta» sí sigue a las hechas', () => {
+    const cierre = { hora: '04:50', quedaMin: 100, faltan: 5310, colacionMin: 0, extraCpm: null, extraFactible: null }
+    const c = render(<MonitorV2 {...props(0)} cierre={cierre} repro={{ entrada: entradaCola, tope: armarTope(9690, null) }} />)
+    const container = c.container
+    const lee = () => {
+      const hechas = num(container.querySelector('.fc-cifra-p')?.textContent)
+      const nota = [...container.querySelectorAll('.fc-nota')].map((n) => n.textContent ?? '').find((t) => t.startsWith('proyección')) ?? ''
+      return { hechas, cierre: num(nota.replace('proyección', '').trim()) }
+    }
+    const a = lee()
+    /* El cuadro va por detrás del contador (9.690): `hechas + (proyección − contador)` daría otra cifra. */
+    expect(a.hechas).toBeLessThan(9690)
+    expect(a.cierre).toBe(15623)
+    act(() => { vi.advanceTimersByTime(40_000) })
+    const b = lee()
+    expect(b.hechas).toBeGreaterThan(a.hechas)
+    expect(b.cierre).toBe(15623)
+    abrir(c, 'Al cierre: ver detalle')
+    const capa = c.getByRole('dialog').textContent ?? ''
+    expect(capa).toContain('15.623 pz')
+    /* «Faltan para la meta» = meta − hechas del cuadro (la misma resta de «Faltan» en Piezas del turno), no el 5.310 del contador. */
+    const faltan = num(/Faltan para la meta([\d.]+) pz/.exec(capa)?.[1])
+    expect(faltan).not.toBe(5310)
+    expect(faltan + num(container.querySelector('.fc-cifra-p')?.textContent)).toBeGreaterThanOrEqual(15000 - 3)
+    expect(faltan + num(container.querySelector('.fc-cifra-p')?.textContent)).toBeLessThanOrEqual(15000 + 3)
+  })
+
+  it('«Hora a hora»: con la serie de 5 min por delante del cuadro (la hora anterior ya suma más que las hechas) las horas igual suman la cifra grande', () => {
+    const filaSerie = (i: number, pieces: number, partial: boolean) => ({
+      hourStart: new Date(INI + i * 3_600_000).toISOString(), index: i + 1, from: new Date(INI + i * 3_600_000).toISOString(),
+      to: new Date(INI + (i + 1) * 3_600_000).toISOString(), pieces, minutesCovered: partial ? 5 : 60, piecesPerHour: pieces, partial,
+    })
+    /* la serie ya dio 7.000 en la hora 1 y abrió la 2; el cuadro (≈ 5.900) todavía está dentro de la hora 1 */
+    const horas = { filas: [filaSerie(0, 7000, false), filaSerie(1, 120, true)], metaPorHora: 2000, porMaquina: [] }
+    const c = render(<MonitorV2 {...props(0)} horas={horas} repro={{ entrada: entradaCola, tope: armarTope(9690, null) }} />)
+    abrir(c, 'Piezas del turno: ver detalle')
+    act(() => { vi.advanceTimersByTime(20_000) })
+    const capa = c.getByRole('dialog')
+    const grande = num(capa.querySelector('.v2-cifra')?.textContent)
+    const filasTabla = [...capa.querySelectorAll('[role="row"]')].slice(1)
+    const celdas = filasTabla.map((f) => num(f.querySelectorAll('[role="cell"]')[1]?.textContent))
+    expect(filasTabla).toHaveLength(1)
+    expect(celdas.reduce((a, x) => a + x, 0)).toBe(grande)
+    expect(capa.textContent).not.toContain('Las horas suman')
+  })
+
+  it('«Por máquina» del ampliado: cada Baader dice lo de su cuadro y las dos suman la cifra de «Piezas del turno»', () => {
+    const { container, getByRole } = render(<MonitorV2 {...props(0)} repro={{ entrada: entradaCola, tope: armarTope(9690, null) }} />)
+    fireEvent.click(getByRole('button', { name: 'Piezas del turno: ver detalle' }))
+    act(() => { vi.advanceTimersByTime(20_000) })
+    const capa = getByRole('dialog')
+    const grande = num(capa.querySelector('.v2-cifra')?.textContent)
+    const m = /Por máquinaEvisceradora 1([\d.]+) pzEvisceradora 2([\d.]+) pz/.exec(capa.textContent ?? '')
+    expect(m).not.toBeNull()
+    /* cada Baader es lo del cuadro (no las 4.800 / 4.200 estáticas de `p.maquinas`) y suman la cifra grande */
+    expect(num(m![1]) + num(m![2])).toBe(grande)
+    expect(num(m![1])).not.toBe(4800)
+    expect(container).toBeTruthy()
   })
 })

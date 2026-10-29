@@ -1,25 +1,33 @@
 /**
- * «Reproducción del último minuto» del monitor de turno (Fase 6 del Duelo; DESIGN.md §8, excepción «reloj de datos»).
+ * «Cola de reproducción» del monitor de turno (jitter buffer; spec `docs/SPEC_MONITOR_EN_VIVO_COLA.md`, §1 y §2).
  *
  * Lógica pura, sin React ni DOM: la usa `useReproduccionMinuto` y la prueban los tests.
  *
  * ── Qué hace ────────────────────────────────────────────────────────────────
- * El monitor no inventa piezas: vuelve a pasar, con desfase, el último minuto CERRADO que Shoplogix ya entregó
- * (`pulse.serieMinuto`), pieza a pieza y Baader por Baader. Las `n` piezas de una Baader en el minuto caen una a una,
- * repartidas en los segundos que la máquina ANDUVO (el minuto menos sus detenciones de `live.stopEvents`):
- * la pieza j cae en el segundo andando `U·(j+0,5)/n`. Parejo y centrado, sin azar: no se conoce el segundo real.
+ * Shoplogix publica los minutos cerrados a ráfagas (rezago 66–185 s) y el pulso, cada 60 s, trae 0, 1 o 2 minutos
+ * (medido 2,1,0,0,2,2,1,0). El monitor no inventa piezas: encola TODO minuto cerrado nuevo y lo vuelve a pasar EN ORDEN,
+ * pieza a pieza y Baader por Baader, con un desfase aproximado de 3 min respecto del reloj de planta:
  *
- *   · el avance es por MINUTO CERRADO de la serie, no por lectura del contador (3 de cada 10 lecturas vienen repetidas);
- *   · el minuto dura lo que de verdad pasó entre dos llegadas (`intervaloMedido`, tope 90 s);
- *   · al cerrar el minuto cada Baader vale EXACTAMENTE Σ cycles[0..k] y la línea es la suma de las Baader;
- *   · nunca se muestra más de lo que registra el contador vivo de Shoplogix (`Tope`): ni por Baader ni en total;
- *   · si la lectura se atrasa (> 1,5 × el intervalo) todo se queda quieto en el total cerrado;
- *   · un contador que baja (otro turno, reconciliación), otra serie o un hueco de más de 3 min NO se anima: salta.
+ *   · hay UN solo instante reproducido (`tMs`, hora de planta). Todo lo que se mueve en pantalla se lee de él;
+ *   · el instante avanza a ×1 y nunca pasa del fin del último minuto en cola (`finCola`): con la cola vacía el reloj queda
+ *     CONGELADO, sin inventar piezas;
+ *   · atraso = finCola − tMs. Con atraso ≤ 186 s la velocidad es ×1; sobre eso sube a ×1,12 y desde 240 s a ×1,25, con
+ *     rampas (sin escalones bruscos) para ponerse al día sin saltar nada;
+ *   · solo se SALTA (snap) si el atraso pasa de 8 min, si cambia la serie (otro turno, recarga) o si el contador baja.
+ *     El snap deja el reloj como al cargar: en el total al cierre del minuto «último cerrado − 2», con esos 2 en cola;
+ *   · el reparto dentro del minuto es el de siempre (regla del minuto: las piezas caen en los segundos que anduvo cada
+ *     Baader, cruzando las paradas de `stopEvents`); al cierre de cada minuto cada Baader vale EXACTAMENTE Σ cycles[0..k]
+ *     y la línea es la suma de las Baader;
+ *   · nunca se muestra más de lo que registra el contador vivo de Shoplogix (`Tope`), ni por Baader ni en total, y aun
+ *     así total = Σ Baader en todo cuadro (el exceso se descuenta de las Baader);
+ *   · «reducir movimiento» NO frena el conteo: es dato, no adorno. Lo que se apaga (+N flotante, deslizamiento de la
+ *     cinta, tweens) lo apaga la UI; este módulo no mira esa preferencia.
  *
  * ── Dos relojes distintos (⚠) ───────────────────────────────────────────────
  * `serieMinuto.desde` y `stopEvents[].f` vienen en HORA DE PLANTA marcada con una Z falsa (wall-clock-as-UTC);
  * `pulse.at` y `lecturas[].at` vienen en UTC REAL. Entre sí solo se comparan los de la misma base. Para mostrar la hora
  * de una lectura real se convierte con `horaPlantaDeUtc` (America/Santiago), nunca con `toISOString().slice(11, 16)`.
+ * El tiempo del propio reproductor (`relojMs`, `llegadaMs`, `vacioDesdeMs`) es el monótono `performance.now()`.
  *
  * ── Orden de `stopEvents[].m` ───────────────────────────────────────────────
  * `m` indexa `live.stopMachines` (functions/publicMonitor.js: `stopMachines = machines.map(m => m.id)`), que sale en el
@@ -27,14 +35,28 @@
  * orden de `live.machines`.
  */
 import { aWallClockMs } from './contadorCrudo'
-import { intervaloMedido, lecturaAtrasada, relojInicial, type EstadoReloj } from './relojDeDatos'
 
 export const SEG_MINUTO = 60
 export const MIN_MS = 60_000
-/** Más minutos que esto sin verse = hueco (pestaña dormida, sync caído): salta, no se anima. */
-export const MINUTOS_HUECO_MAX = 3
 /** Una Baader que anduvo menos que esto del minuto está «parcial». */
 export const SEG_PARCIAL = 58
+
+/** Minutos en cola al cargar o al saltar: el reloj parte en el total al cierre del minuto «último cerrado − COLA_INICIAL_MIN». */
+export const COLA_INICIAL_MIN = 2
+/** Hasta este atraso la velocidad es ×1. */
+export const ATRASO_NOMINAL_S = 186
+/** Desde este atraso la velocidad llega a ×1,25. */
+export const ATRASO_RAPIDO_S = 240
+export const FACTOR_PONIENDOSE = 1.12
+export const FACTOR_RAPIDO = 1.25
+/** Ancho de las rampas del factor (s de atraso): de ×1 a ×1,12 desde 186 s y de ×1,12 a ×1,25 desde 240 s. */
+export const RAMPA_S = 12
+/** Más atraso que esto (8 min) y se salta en vez de ponerse al día. */
+export const ATRASO_SALTO_S = 480
+/** Una cola vacía solo es «atrasado» pasado un pulso entero (60 s, `functions/shoplogix/pulse.js`) sin minuto nuevo. */
+export const GRACIA_ATRASADO_MS = 60_000
+/** El instante reproducido avanza en pasos de a lo más esto (el factor depende del atraso, que cambia mientras avanza). */
+const PASO_MAX_MS = 500
 
 /** Un tramo del minuto, en segundos [a, b) desde su inicio. */
 export type Tramo = readonly [number, number]
@@ -163,6 +185,15 @@ export interface Tope {
 
 export type EstadoMaquina = 'andando' | 'parcial' | 'detenida'
 
+/**
+ * Cómo va el reloj (spec §1):
+ *   · `vivo`: la cola tiene al menos un minuto o se está reproduciendo;
+ *   · `poniendose`: velocidad > ×1 (hay que mostrar el atraso en s);
+ *   · `atrasado`: cola vacía y el minuto esperado no llegó en un pulso entero: reloj CONGELADO;
+ *   · `detenida`: el minuto que corre llegó con 0 piezas en toda la línea (el reloj sigue, la cifra no sube).
+ */
+export type EstadoVivo = 'vivo' | 'poniendose' | 'atrasado' | 'detenida'
+
 export interface MinutoMaq {
   id: string
   nombre: string
@@ -180,28 +211,38 @@ export interface MinutoMaq {
 export interface EstadoRep {
   desdeMs: number | null
   ids: string[]
-  /** Minutos cerrados vistos; el que se reproduce es el índice `cerrados - 1`. */
+  /** Minutos cerrados vistos (la cola llega hasta el fin del minuto `cerrados - 1`). */
   cerrados: number
-  minuto: MinutoMaq[]
-  /** Contador de cada Baader al empezar el minuto (= Σ cycles hasta el minuto anterior). */
-  piso: number[]
-  /** Y al cerrarlo (= Σ cycles hasta este minuto). */
+  /** La serie vista: piezas de cada minuto cerrado por Baader. */
+  maquinas: MaquinaRep[]
+  paradas: Record<string, ParadaMs[]>
+  /** Contador de cada Baader al fin del último minuto en cola (= Σ cycles). */
   final: number[]
-  /** Reloj monotónico (performance.now) en que entró el minuto. */
+  /** Σ cycles[0..j-1] por Baader: `acum[i][j]` es el contador de la Baader i al empezar el minuto j. */
+  acum: number[][]
+  /** El instante reproducido, en hora de planta (wall-as-UTC). Nunca pasa de `finCola`. */
+  tMs: number
+  /** Hasta qué `performance.now()` se avanzó `tMs`. */
+  relojMs: number
+  /** `performance.now()` en que la cola se vació (null mientras haya algo que reproducir). */
+  vacioDesdeMs: number | null
+  /** Reloj monotónico en que entró el último minuto cerrado. */
   llegadaMs: number
   pulsoAtMs: number | null
-  /** Cuánto dura la reproducción del minuto. 0 = salto, sin animar. */
-  duracionMs: number
-  /** Total de la línea en los dos últimos minutos cerrados (para saber si la línea paró). */
-  recientes: number[]
+  /** Cuántas veces se saltó (cambio de serie, contador que baja, atraso > 8 min): quien dibuja lo usa para no animar ese paso. */
+  saltos: number
+  /** Minutos ya armados (horario por Baader), por índice: se calculan al pedirlos. */
+  cache: Map<number, MinutoMaq[]>
 }
 
 export const repInicial = (): EstadoRep => ({
-  desdeMs: null, ids: [], cerrados: 0, minuto: [], piso: [], final: [], llegadaMs: 0, pulsoAtMs: null, duracionMs: 0, recientes: [],
+  desdeMs: null, ids: [], cerrados: 0, maquinas: [], paradas: {}, final: [], acum: [], tMs: 0, relojMs: 0,
+  vacioDesdeMs: null, llegadaMs: 0, pulsoAtMs: null, saltos: 0, cache: new Map(),
 })
 
 const suma = (v: readonly number[]) => v.reduce((a, b) => a + b, 0)
 const mismosIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i])
+const acota = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n))
 
 /** Minutos cerrados que trae la serie (el menor de las Baader: si una viene corta, no se inventa su minuto). */
 export function minutosCerrados(e: Pick<EntradaRep, 'maquinas'>): number {
@@ -221,36 +262,115 @@ export function finalesCerrados(e: Pick<EntradaRep, 'maquinas'>): number[] {
   return largo < 1 ? [] : e.maquinas.map((m) => acumuladoHasta(m.cycles, largo - 1))
 }
 
+const tope = (v: number, t: number | null | undefined) => (t != null && Number.isFinite(t) ? Math.min(v, t) : v)
+
 /**
- * Lo que la reproducción muestra EN REPOSO (cuando el último minuto ya cayó entero): Σ de los minutos cerrados, topado por
- * el contador vivo. Es `totalFinal` del cuadro, calculado desde la entrada sin esperar al hook: la franja, el gráfico y
- * Camino a la meta lo usan para decir lo mismo en «A esta hora». null sin serie (nada que reproducir).
+ * Los contadores por Baader topados por lo que registra el contador vivo, con el total = Σ Baader siempre: primero el
+ * techo de cada Baader y, si aun así la suma pasa del contador de la línea, el exceso se descuenta de las últimas Baader
+ * (caso raro: la serie va por delante del contador). Devuelve los valores en el mismo orden.
+ */
+export function toparContadores(ids: readonly string[], valores: readonly number[], limite: Tope | null | undefined): number[] {
+  const out = valores.map((v, i) => tope(v, limite?.porMaquina?.[ids[i]!]))
+  let exceso = limite?.total != null && Number.isFinite(limite.total) ? suma(out) - limite.total : 0
+  for (let i = out.length - 1; i >= 0 && exceso > 0; i--) {
+    const quita = Math.min(out[i]!, exceso)
+    out[i] = out[i]! - quita
+    exceso -= quita
+  }
+  return out
+}
+
+/**
+ * Lo que se muestra EN REPOSO cuando la cola se vació: Σ de los minutos cerrados, topada por el contador vivo. Con la
+ * cola corriendo la cifra va por detrás de este valor (el desfase). Lo usan los lugares que no se mueven por cuadro
+ * (respaldo antes del primer cuadro, pie «el contador de planta lleva N más»). null sin serie.
  */
 export function totalEnReposo(e: Pick<EntradaRep, 'maquinas'> | null | undefined, limite: Tope | null | undefined): number | null {
   if (!e) return null
   const finales = finalesCerrados(e)
-  return finales.length ? tope(suma(finales), limite?.total) : null
+  return finales.length ? suma(toparContadores(e.maquinas.map((m) => m.id), finales, limite)) : null
 }
 
-/**
- * Registra la serie que llegó. Devuelve el MISMO objeto si no hay un minuto cerrado nuevo (así el llamador compara por
- * identidad: una lectura repetida no reinicia nada). Con un minuto nuevo, el que se reproduce es SOLO el último: si
- * llegaron varios de golpe, los anteriores saltan a su total.
- */
-export function registrarSerie(est: EstadoRep, e: EntradaRep, llegadaMs: number): EstadoRep {
-  const largo = minutosCerrados(e)
-  if (largo < 1) return est
-  const ids = e.maquinas.map((m) => m.id)
-  const mismaSerie = est.desdeMs === e.desdeMs && mismosIds(ids, est.ids)
-  if (mismaSerie && est.cerrados === largo) return est
+// ── La velocidad ─────────────────────────────────────────────────────────────
 
-  const k = largo - 1
-  const inicioMinuto = e.desdeMs + k * MIN_MS
-  const final = e.maquinas.map((m) => acumuladoHasta(m.cycles, k))
-  const piso = e.maquinas.map((m) => acumuladoHasta(m.cycles, k - 1))
-  const minuto: MinutoMaq[] = e.maquinas.map((m) => {
-    const n = Math.max(0, Math.round(m.cycles[k] ?? 0))
-    const tramos = tramosAndando(e.paradas[m.id] ?? [], inicioMinuto)
+/**
+ * Factor de velocidad según el atraso (s): ×1 hasta 186 s; rampa a ×1,12 en 12 s; ×1,12 hasta 240 s; rampa a ×1,25 en
+ * 12 s; ×1,25 de ahí en adelante. Continuo: no hay escalón que se note en el contador.
+ */
+export function factorVelocidad(atrasoS: number): number {
+  if (!(atrasoS > ATRASO_NOMINAL_S)) return 1
+  if (atrasoS < ATRASO_NOMINAL_S + RAMPA_S) return 1 + (FACTOR_PONIENDOSE - 1) * ((atrasoS - ATRASO_NOMINAL_S) / RAMPA_S)
+  if (atrasoS <= ATRASO_RAPIDO_S) return FACTOR_PONIENDOSE
+  if (atrasoS < ATRASO_RAPIDO_S + RAMPA_S) return FACTOR_PONIENDOSE + (FACTOR_RAPIDO - FACTOR_PONIENDOSE) * ((atrasoS - ATRASO_RAPIDO_S) / RAMPA_S)
+  return FACTOR_RAPIDO
+}
+
+/** El fin del último minuto en cola (hora de planta). */
+export const finCola = (est: Pick<EstadoRep, 'desdeMs' | 'cerrados'>): number => (est.desdeMs ?? 0) + est.cerrados * MIN_MS
+
+/** Atraso en s: lo que falta por reproducir de lo que ya llegó. */
+export const atrasoS = (est: EstadoRep): number => Math.max(0, (finCola(est) - est.tMs) / 1000)
+
+// ── El reloj corre ───────────────────────────────────────────────────────────
+
+/**
+ * Avanza el instante reproducido hasta `ahoraMs` (performance.now). Devuelve el MISMO objeto si no hay nada que mover
+ * (reloj congelado en el fin de la cola o sin tiempo transcurrido). Nunca retrocede ni pasa del fin de la cola; al
+ * llegar a él anota cuándo se vació la cola, con el instante exacto dentro del paso.
+ */
+export function avanzar(est: EstadoRep, ahoraMs: number): EstadoRep {
+  if (est.cerrados < 1 || est.desdeMs == null) return est
+  let dt = ahoraMs - est.relojMs
+  if (!(dt > 0)) return est
+  const fin = finCola(est)
+  if (est.tMs >= fin) return { ...est, relojMs: ahoraMs, tMs: fin }
+  let t = est.tMs
+  let r = est.relojMs
+  let vacio: number | null = null
+  while (dt > 0) {
+    const paso = Math.min(dt, PASO_MAX_MS)
+    const f = factorVelocidad((fin - t) / 1000)
+    if (t + paso * f >= fin) { vacio = r + (fin - t) / f; t = fin; break }
+    t += paso * f
+    r += paso
+    dt -= paso
+  }
+  return { ...est, tMs: t, relojMs: ahoraMs, vacioDesdeMs: vacio }
+}
+
+/** ¿Hay minutos por reproducir? (el hook corre cuadro a cuadro solo mientras sea cierto) */
+export function reproduciendo(est: EstadoRep, ahoraMs: number): boolean {
+  const e = avanzar(est, ahoraMs)
+  return e.cerrados > 0 && e.tMs < finCola(e)
+}
+
+/** Cuántos ms faltan para el próximo cambio de estado SIN cuadros (la cola vacía pasa a «atrasado»). null si no hay. */
+export function proximoCambioMs(est: EstadoRep, ahoraMs: number): number | null {
+  const e = avanzar(est, ahoraMs)
+  if (e.cerrados < 1 || e.tMs < finCola(e) || e.vacioDesdeMs == null) return null
+  const falta = e.vacioDesdeMs + GRACIA_ATRASADO_MS - ahoraMs
+  return falta > 0 ? falta : null
+}
+
+/** El minuto que corre: su índice y los segundos que lleva. Con la cola vacía, el último minuto, entero. */
+export function posicion(est: EstadoRep): { j: number; seg: number } {
+  if (est.cerrados < 1 || est.desdeMs == null) return { j: 0, seg: 0 }
+  const rel = est.tMs - est.desdeMs
+  if (est.tMs >= finCola(est)) return { j: est.cerrados - 1, seg: SEG_MINUTO }
+  const j = acota(Math.floor(rel / MIN_MS), 0, est.cerrados - 1)
+  return { j, seg: acota((rel - j * MIN_MS) / 1000, 0, SEG_MINUTO) }
+}
+
+// ── Registrar lo que llega ───────────────────────────────────────────────────
+
+/** El minuto `j` armado por Baader (horario, tramos, estado). Se calcula una vez por minuto y se recuerda. */
+export function minutoEn(est: EstadoRep, j: number): MinutoMaq[] {
+  const hecho = est.cache.get(j)
+  if (hecho) return hecho
+  const inicioMinuto = (est.desdeMs ?? 0) + j * MIN_MS
+  const minuto: MinutoMaq[] = est.maquinas.map((m) => {
+    const n = Math.max(0, Math.round(m.cycles[j] ?? 0))
+    const tramos = tramosAndando(est.paradas[m.id] ?? [], inicioMinuto)
     const seg = segundosAndando(tramos)
     return {
       id: m.id, nombre: m.nombre, modelo: m.modelo ?? null, esperado: m.esperado, n,
@@ -258,57 +378,71 @@ export function registrarSerie(est: EstadoRep, e: EntradaRep, llegadaMs: number)
       estado: n === 0 ? 'detenida' : seg < SEG_PARCIAL ? 'parcial' : 'andando',
     }
   })
-  const totalMin = (j: number) => suma(e.maquinas.map((m) => m.cycles[j] ?? 0))
-  const recientes = k >= 1 ? [totalMin(k - 1), totalMin(k)] : [totalMin(k)]
+  est.cache.set(j, minuto)
+  return minuto
+}
 
-  /* Solo se anima un minuto que llega pegado al anterior de la MISMA serie y sin que el contador baje. */
-  let duracionMs = 0
-  if (mismaSerie && largo > est.cerrados && largo - est.cerrados <= MINUTOS_HUECO_MAX && !final.some((v, i) => v < (est.final[i] ?? 0))) {
-    duracionMs = intervaloMedido(
-      { valor: suma(est.final), atMs: est.pulsoAtMs },
-      { valor: suma(final), atMs: e.pulsoAtMs },
-      est.llegadaMs, llegadaMs,
-    )
+/** Σ de las piezas de la línea en el minuto `j`. */
+const piezasDelMinuto = (est: EstadoRep, j: number) => suma(est.maquinas.map((m) => m.cycles[j] ?? 0))
+
+/**
+ * Registra la serie que llegó. Devuelve el MISMO objeto si no hay un minuto cerrado nuevo (así el llamador compara por
+ * identidad: una lectura repetida no reinicia nada). Con minutos nuevos, TODOS entran a la cola y se reproducen en orden.
+ * Salta (snap) solo si cambia la serie, si el contador baja o si el atraso pasaría de 8 min.
+ */
+export function registrarSerie(est: EstadoRep, e: EntradaRep, llegadaMs: number): EstadoRep {
+  const largo = minutosCerrados(e)
+  if (largo < 1) return est
+  const ids = e.maquinas.map((m) => m.id)
+  const mismaSerie = est.cerrados > 0 && est.desdeMs === e.desdeMs && mismosIds(ids, est.ids)
+  if (mismaSerie && est.cerrados === largo) return est
+
+  const final = e.maquinas.map((m) => acumuladoHasta(m.cycles, largo - 1))
+  const acum = e.maquinas.map((m) => {
+    const a = [0]
+    for (let j = 0; j < largo; j++) a.push(a[j]! + (m.cycles[j] ?? 0))
+    return a
+  })
+  const fin = e.desdeMs + largo * MIN_MS
+  const alCargar = Math.max(e.desdeMs, fin - COLA_INICIAL_MIN * MIN_MS)
+
+  let salta = !mismaSerie || largo < est.cerrados || final.some((v, i) => v < (est.final[i] ?? 0))
+  let tMs = alCargar
+  if (!salta) {
+    const previo = avanzar(est, llegadaMs)
+    if ((fin - previo.tMs) / 1000 > ATRASO_SALTO_S) salta = true
+    else tMs = previo.tMs
   }
-  return { desdeMs: e.desdeMs, ids, cerrados: largo, minuto, piso, final, llegadaMs, pulsoAtMs: e.pulsoAtMs, duracionMs, recientes }
+  return {
+    desdeMs: e.desdeMs, ids, cerrados: largo, maquinas: e.maquinas, paradas: e.paradas, final, acum,
+    tMs, relojMs: llegadaMs, vacioDesdeMs: null, llegadaMs, pulsoAtMs: e.pulsoAtMs,
+    saltos: est.saltos + (est.cerrados > 0 && salta ? 1 : 0), cache: new Map(),
+  }
 }
 
 // ── El cuadro de este instante ───────────────────────────────────────────────
 
-/** Qué parte del minuto ya corrió (0..1). Sin animación o con «reducir movimiento», 1: el minuto cae entero. */
-export function fraccionRep(est: EstadoRep, ahoraMs: number, reducido: boolean): number {
-  if (reducido || est.duracionMs <= 0) return 1
-  return Math.min(1, Math.max(0, (ahoraMs - est.llegadaMs) / est.duracionMs))
-}
-
-/** ¿Sigue corriendo el minuto? (el hook apaga el cuadro por cuadro cuando ya no) */
-export function reproduciendo(est: EstadoRep, ahoraMs: number, reducido: boolean): boolean {
-  return est.cerrados > 0 && est.duracionMs > 0 && !reducido && ahoraMs - est.llegadaMs < est.duracionMs
-}
-
-/**
- * Pasado 1,5 × el intervalo sin minuto nuevo, la reproducción está congelada en el total cerrado.
- * Es `lecturaAtrasada` de siempre, aplicada a la llegada del último minuto.
- */
-export function repAtrasada(est: EstadoRep, ahoraMs: number): boolean {
-  if (est.cerrados < 1) return false
-  const reloj: EstadoReloj = { ...relojInicial(), ultima: { valor: suma(est.final), atMs: est.pulsoAtMs }, llegadaMs: est.llegadaMs, duracionMs: est.duracionMs }
-  return lecturaAtrasada(reloj, ahoraMs)
-}
-
-/** «sin lectura nueva desde hh:mm»: la hora de planta en que llegó el último minuto. */
+/** «sin datos desde hh:mm»: la hora de planta en que llegó el último minuto (la del pulso real convertida). */
 export function desdeUltimaLectura(est: EstadoRep): string | null {
   if (est.pulsoAtMs != null) return horaPlantaDeUtc(est.pulsoAtMs)
-  return est.desdeMs != null ? horaDeWall(est.desdeMs + est.cerrados * MIN_MS) : null
+  return est.desdeMs != null && est.cerrados > 0 ? horaDeWall(finCola(est)) : null
 }
 
-/** La línea paró: los dos últimos minutos cerrados sin una sola pieza. */
+/** La línea paró: el minuto que corre y el anterior, sin una sola pieza. */
 export function detenidaRep(est: EstadoRep): boolean {
-  return est.recientes.length >= 2 && est.recientes.every((t) => t === 0)
+  if (est.cerrados < 1) return false
+  const { j } = posicion(est)
+  return j >= 1 && piezasDelMinuto(est, j) === 0 && piezasDelMinuto(est, j - 1) === 0
+}
+
+/** ¿Cola vacía hace más de un pulso, sin minuto nuevo? (con `est` ya avanzado hasta `ahoraMs`) */
+function estaAtrasado(est: EstadoRep, ahoraMs: number): boolean {
+  return est.cerrados > 0 && est.tMs >= finCola(est) && est.vacioDesdeMs != null && ahoraMs - est.vacioDesdeMs >= GRACIA_ATRASADO_MS
 }
 
 export interface VistaMaq {
   id: string
+  nombre: string
   /** Lo que se muestra: contador de la Baader (escalón por pieza), sin pasar del contador vivo. */
   valor: number
   /** Piezas del minuto que ya cayeron. */
@@ -316,43 +450,75 @@ export interface VistaMaq {
   /** Piezas del minuto. */
   n: number
   estado: EstadoMaquina
+  /** Segundos por pieza del último minuto cerrado de esta Baader (60 / piezas); null si ese minuto estuvo detenida o aún no hay. */
+  cadenciaS: number | null
+  /** Piezas del último minuto cerrado (el que da `cadenciaS`); null si aún no hay. */
+  piezasMinutoCerrado: number | null
+  /** Cuánto del minuto que corre ya pasó (0..1): el mismo reloj para toda la línea. */
+  progreso: number
 }
 
 export interface CuadroRep {
+  /** Qué parte del minuto que corre ya pasó (0..1). */
   frac: number
   /** Segundo del minuto en que va el cabezal (0..60). */
   seg: number
+  /** El instante reproducido, hora de planta (wall-as-UTC): el ÚNICO reloj de toda la pantalla. */
+  tMs: number
+  /** Índice del minuto que corre, desde el inicio de la serie. */
+  minutoIdx: number
   total: number
-  /** Total al empezar el minuto y al cerrarlo (ya topados), para la recta de la curva. */
+  /** Total al empezar el minuto que corre y al cerrarlo (ya topados): la recta de la curva y de las barras. */
   totalPiso: number
   totalFinal: number
   porMaquina: VistaMaq[]
+  estado: EstadoVivo
+  /** Lo que falta por reproducir de lo que ya llegó (s). */
+  atrasoS: number
+  /** Velocidad actual del reloj (1 = en tiempo real). */
+  factor: number
+  /** «sin datos desde HH:MM»: hora de planta de la última lectura que trajo un minuto nuevo. */
+  ultimaLecturaHHMM: string | null
+  /** Estado `atrasado`: el reloj está congelado en el total de la cola. */
   atrasada: boolean
+  /** Hay minutos por reproducir (el reloj se mueve). */
   animando: boolean
+  /** Saltos acumulados (`EstadoRep.saltos`): si cambia entre dos cuadros, el paso no se anima. */
+  saltos: number
 }
-
-const tope = (v: number, t: number | null | undefined) => (t != null && Number.isFinite(t) ? Math.min(v, t) : v)
 
 /**
  * Lo que se ve ahora: cada Baader = su contador al empezar el minuto + las piezas que ya cayeron, y la línea es la
- * suma. Es la recta de `relojDeDatos` convertida en escalones: nunca sale de [piso, cierre] ni pasa del contador vivo.
+ * suma. Nunca sale de [piso, cierre] del minuto que corre ni pasa del contador vivo. Avanza el reloj hasta `ahoraMs`
+ * sin guardarlo (el hook guarda con `avanzar`); pedirlo dos veces con el mismo `ahoraMs` da lo mismo.
  */
-export function cuadroRep(est: EstadoRep, limite: Tope | null, ahoraMs: number, reducido: boolean): CuadroRep {
-  const frac = fraccionRep(est, ahoraMs, reducido)
-  const seg = frac * SEG_MINUTO
-  const porMaquina: VistaMaq[] = est.minuto.map((m, i) => {
-    const encendidas = piezasEncendidas(m.horario, seg)
-    const valor = tope((est.piso[i] ?? 0) + encendidas, limite?.porMaquina?.[m.id])
-    return { id: m.id, valor, encendidas, n: m.n, estado: m.estado }
+export function cuadroRep(est0: EstadoRep, limite: Tope | null, ahoraMs: number): CuadroRep {
+  const est = avanzar(est0, ahoraMs)
+  const { j, seg } = posicion(est)
+  const minuto = est.cerrados > 0 ? minutoEn(est, j) : []
+  const ids = est.ids
+  const crudo = minuto.map((m, i) => (est.acum[i]?.[j] ?? 0) + piezasEncendidas(m.horario, seg))
+  const valores = toparContadores(ids, crudo, limite)
+  const piso = toparContadores(ids, est.acum.map((a) => a[j] ?? 0), limite)
+  const cierre = toparContadores(ids, est.acum.map((a) => a[j + 1] ?? 0), limite)
+  const previo = j >= 1 ? minutoEn(est, j - 1) : null
+  const porMaquina: VistaMaq[] = minuto.map((m, i) => {
+    const n1 = previo?.[i]?.n ?? null
+    return {
+      id: m.id, nombre: m.nombre, valor: valores[i] ?? 0, encendidas: piezasEncendidas(m.horario, seg), n: m.n, estado: m.estado,
+      cadenciaS: n1 != null && n1 > 0 ? SEG_MINUTO / n1 : null, piezasMinutoCerrado: n1, progreso: seg / SEG_MINUTO,
+    }
   })
+  const fac = est.cerrados > 0 && est.tMs < finCola(est) ? factorVelocidad(atrasoS(est)) : 1
+  const atrasado = estaAtrasado(est, ahoraMs)
+  const estado: EstadoVivo = atrasado ? 'atrasado'
+    : est.cerrados > 0 && piezasDelMinuto(est, j) === 0 ? 'detenida'
+      : fac > 1 ? 'poniendose' : 'vivo'
   return {
-    frac, seg,
-    total: tope(suma(porMaquina.map((m) => m.valor)), limite?.total),
-    totalPiso: tope(suma(est.piso), limite?.total),
-    totalFinal: tope(suma(est.final), limite?.total),
-    porMaquina,
-    atrasada: repAtrasada(est, ahoraMs),
-    animando: reproduciendo(est, ahoraMs, reducido),
+    frac: seg / SEG_MINUTO, seg, tMs: est.tMs, minutoIdx: j,
+    total: suma(valores), totalPiso: suma(piso), totalFinal: suma(cierre), porMaquina,
+    estado, atrasoS: atrasoS(est), factor: fac, ultimaLecturaHHMM: desdeUltimaLectura(est),
+    atrasada: atrasado, animando: est.cerrados > 0 && est.tMs < finCola(est), saltos: est.saltos,
   }
 }
 

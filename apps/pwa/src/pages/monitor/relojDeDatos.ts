@@ -3,6 +3,11 @@
  *
  * Lógica pura, sin React ni DOM: la usa `useRelojDeDatos` y la prueban los tests.
  *
+ * ⚠ Es solo el RESPALDO de la cifra: cuando hay serie por minuto (todas las líneas, Filete incluido) el reloj de la pantalla es
+ * la cola de reproducción (`reproduccionMinuto.ts`, spec `docs/SPEC_MONITOR_EN_VIVO_COLA.md`), que NO usa este módulo: ni el
+ * tope de 90 s ni el corte de 180 s de aquí fijan su duración (la cola avanza a ×1 con desfase y se pone al día con un factor).
+ * Esta recta queda para lo que no tiene serie por minuto (turno cerrado, serie ausente) y para su propia prueba.
+ *
  * ── Qué hace ────────────────────────────────────────────────────────────────
  * Shoplogix entrega una lectura del contador cada ~1 min. Entre dos lecturas la
  * cifra grande y la punta de la curva avanzan en LÍNEA RECTA desde la lectura
