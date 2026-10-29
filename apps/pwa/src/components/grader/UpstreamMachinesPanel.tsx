@@ -57,6 +57,7 @@ import { MachineSpeedMeaningCard } from './MachineSpeedMeaningCard'
 import { StateDetailPanel } from './StateDetailPanel'
 import { LossCascadeCard } from './LossCascadeCard'
 import { ImputacionParetoCard } from './ImputacionParetoCard'
+import { FallasRepetidasCard } from './FallasRepetidasCard'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { slxStateColor, slxStateTrama, slxSuavizarAcento } from '@/services/shoplogix/shoplogixColors'
@@ -1502,6 +1503,13 @@ export function UpstreamMachinesPanel({
                   <ImputacionParetoCard machines={snapshot.machines} />
                 </div>
               </div>
+            )}
+
+            {/* Paros de Mantención cuya causa volvió en la misma máquina en
+                ≤ 8 h de operación: la reparación que hay que revisar. Ver
+                FallasRepetidasCard. Demo no: lee turnos previos de Firestore. */}
+            {snapshot && snapshot.machines.length > 0 && dataSource !== 'demo' && (
+              <FallasRepetidasCard machines={snapshot.machines} plantSlug={plantSlug} />
             )}
 
             {/* El Gantt, las barras de 5 min y los eventos de cada máquina se

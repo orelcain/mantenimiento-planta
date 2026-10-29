@@ -6,7 +6,7 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 ## En curso
 
-- [ ] **Falla repetida (reincidencia de paros de Mantención)** — EN CURSO — claude (rama `feat/falla-repetida-turno`).
+- [ ] **Falla repetida (reincidencia de paros de Mantención)** — EN REVISIÓN (PR 1) — claude (rama `feat/falla-repetida-turno`).
   Estudio y plan: OneDrive `ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_PREDICTIVA_MICRODETENCIONES.md`.
   PR 1: helper + card 1A en Análisis de Turno (lee el turno y los 3 anteriores). PR 2: Cloud Function que
   precalcula por mes y por paro → serie en Período (2A) y aviso al cerrar paro en el Monitor (3A).

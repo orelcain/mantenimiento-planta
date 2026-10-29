@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-10-28 · Claude · Falla repetida (PR 1): card en Análisis de Turno
+- Hecho: estudio de factibilidad «predictiva por microdetenciones» (solo lectura): las micros no anticipan fallas con horas de aviso; la señal real es la reincidencia (misma causa, misma máquina, ≤ 8 h de operación: Motores 63 % vs 6 % al azar, Lógica 61 % vs 7 %). Plan en OneDrive `ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_PREDICTIVA_MICRODETENCIONES.md`. Card `FallasRepetidasCard` (opción 1A del mockup) bajo Cascada + Imputación: máquina · causa · «N veces de M en el turno», mirando también el día previo.
+- Archivos: `services/shoplogix/fallaRepetida.ts` (+ test), `hooks/useFallasRepetidas.ts`, `components/grader/FallasRepetidasCard.tsx`, `UpstreamMachinesPanel.tsx`.
+- Verificación: tsc 0, eslint sin warnings nuevos, vitest 4661 ok, audit-piel igual. Helper corrido sobre el volcado real: Chonchi 07-08 T2 da Ev2·Lógica 5/5, Ev3·Lógica 5/5, Ev2·Motores 2/3, Ev3·Motores 2/2, Ev1·Motores 1/2 = estudio. Preview NO verificado: el worktree no tiene `.env.local` (no se copió el de producción).
+- Estado: EN REVISIÓN (PR, sin mergear — aprueba Orel)
+- Sigue: PR 2 = Cloud Function que precalcula la reincidencia por mes y por paro → serie en Período (2A) y aviso al cerrar paro en el Monitor (3A, umbral ≥ 30 %).
+
 ## 2026-10-27 · Claude · Informe de turno: correo HTML + PDF rehecho
 - Hecho: `correoTurno.js` (correo de una columna: veredicto, 4 cifras, pérdida por dueño, fallas por máquina con «volvió a ritmo», cotejo con min de Mantención, lo abierto) reutilizando `construirDatosInforme`. PDF rehecho al estándar /sin-tics-visual con tildes: 5 láminas + anexo solo con varias máquinas. Sin envío de correo desde el servidor (decisión de Orel): callable `informeTurnoCorreo` (admin) + botones «Copiar correo» (portapapeles con formato) y «Descargar PDF» en el monitor; se manda desde el Outlook propio. Telegram igual.
 - Corregido: `recuperacion` contaba la colación (Chonchi 21-10 T2: «Cintas 69 min» → 0); Mantención redondeada distinto en tabla y Telegram.
