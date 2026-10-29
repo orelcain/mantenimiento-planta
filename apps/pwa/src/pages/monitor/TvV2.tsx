@@ -4,11 +4,17 @@
  * piezas hechas contra la meta a esta hora, a la derecha el ritmo y Mantención, abajo la franja del Duelo (marcador con
  * puntos firmes + «N en juego» y la carrera con la ventaja a la misma hora, en horas de producción).
  *
- * Una sola cifra de piezas: el contador directo de Shoplogix con la hora de su lectura. Las cifras vienen de la página
- * (las mismas que recibe `MonitorV2`) y del Duelo (`DatosDuelo`); acá solo se dibuja. Las cuentas están en `tvV2Datos.ts`.
+ * Una sola cifra de piezas, del MISMO reloj que «El turno» y el Duelo (P4, 29-10): dentro de `ProveedorReproduccion` las
+ * hechas, la meta a esta hora y el Duelo salen del cuadro reproducido (`useCifrasVivas` + `datosAlReloj`); antes la TV iba
+ * con el contador y quedaba ~3 min (~90 pz) delante de las otras pantallas. Sin reproducción, el contador de siempre.
+ * Las cuentas están en `tvV2Datos.ts`.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { nombreCorto, piezasAlMinuto, type DatosDuelo, type EquipoId, type NombresEquipos } from './duelo'
+import { datosAlReloj } from './dueloAlReloj'
+import { useCarreraViva } from './useCarreraViva'
+import { useCifrasVivas } from './useCifrasVivas'
+import { useReproduccion } from './useReproduccionMinuto'
 import {
   bandasHoraTv, difMeta, escalaTv, int, marcadorTv, mantTv, maxEjeTv, mayorVentaja, pctDe, sinMarcadorTexto, tituloCarreraTv,
   tramosVentaja, trazoCurva, type EstadoTv,
@@ -46,13 +52,23 @@ export interface TvV2Props {
   nombres?: NombresEquipos | null
   /** Minutos previstos del turno (para el largo del eje). */
   previstoMin?: number | null
+  /** Hora de planta (ms) de la primera pieza: el origen del Duelo al reloj de la reproducción. */
+  inicioMs?: number | null
 }
 
 const COL: Record<EquipoId, string> = { cardenas: 'var(--v2-eq-cardenas)', rebolledo: 'var(--v2-eq-rebolledo)' }
 const CLS: Record<EquipoId, string> = { cardenas: 'tv-c', rebolledo: 'tv-r' }
 const CLS_SVG: Record<EquipoId, string> = { cardenas: 'tc', rebolledo: 'tr' }
 
-export function TvV2(p: TvV2Props) {
+export function TvV2(props: TvV2Props) {
+  const vivas = useCifrasVivas()
+  const rep = useReproduccion()
+  const viva = useCarreraViva(props.duelo && !props.duelo.hoy.cerrado && rep?.activa ? rep.reloj : null, props.inicioMs ?? null, props.duelo?.carrera?.fantasmaInfo?.curva ?? null)
+  const duelo = useMemo(() => (props.duelo ? datosAlReloj(props.duelo, viva) : null), [props.duelo, viva])
+  const hhmm = (t: number) => new Date(t).toISOString().slice(11, 16)
+  const p: TvV2Props = vivas
+    ? { ...props, piezas: vivas.hechas, metaAhora: vivas.cuota ?? props.metaAhora, lectura: vivas.tMs != null ? hhmm(vivas.tMs) : props.lectura, duelo }
+    : { ...props, duelo }
   const [vp, setVp] = useState(() => ({ w: typeof window === 'undefined' ? 1920 : window.innerWidth, h: typeof window === 'undefined' ? 1080 : window.innerHeight }))
   useEffect(() => {
     const f = () => setVp({ w: window.innerWidth, h: window.innerHeight })
@@ -85,7 +101,7 @@ export function TvV2(p: TvV2Props) {
             <section className="tv-tarjeta tv-hero" aria-label="Piezas hechas">
               <span className="tv-rot">Piezas hechas</span>
               <div className="tv-cifra" data-testid="tv-piezas">{int(p.piezas)}</div>
-              <span className="tv-lect">{p.lectura ? `contador de Shoplogix · leído a las ${p.lectura}` : 'contador de Shoplogix'}</span>
+              <span className="tv-lect">{p.lectura ? (vivas ? `contador de Shoplogix · minuto ${p.lectura}` : `contador de Shoplogix · leído a las ${p.lectura}`) : 'contador de Shoplogix'}</span>
               {(p.metaAhora != null || p.metaTurno != null) && (
                 <>
                   <div className="tv-metas">
