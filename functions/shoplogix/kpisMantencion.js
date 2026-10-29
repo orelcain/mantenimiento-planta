@@ -18,12 +18,15 @@
 
 'use strict'
 
+const { matchImputacion } = require('./imputacion')
+
 // ── Clasificación de causas ──────────────────────────────────────────────────
 //
-// Cuatro familias + producción. Aproximación por patrones sobre el reason
-// (los operadores escriben a mano y varía la grafía): el árbol de imputación
-// completo (46 hojas) vive en la PWA; cuando este módulo lo necesite más fino,
-// el árbol se extrae a un JSON compartido — no duplicarlo acá a mano.
+// Cuatro familias + producción. Manda el árbol oficial de imputación
+// (`imputacion.js`, espejo del de la PWA, 46 hojas): sin él FALLA OPERACIONAL,
+// ATASCAMIENTO, AJUSTE OPERADOR, AGUA, SAP… caían en «falla» y se le cargaban
+// a Mantención (29-10: el turno de día del 28-10 decía 13 fallas y eran 6; la
+// PWA ya decía 6). Lo que el árbol no conoce sigue por los patrones de abajo.
 //
 //  - planificado: pactado con Personas (colación, reunión, ejercicio…). No es
 //    pérdida de nadie: exigir recuperarlo es pedir un imposible.
@@ -38,6 +41,7 @@
 
 const RE_PLANIFICADO = /COLACI|DETENCION PROGRAMADA|REUNION|EJERCICIO|CHARLA|ASEO|LIMPIEZA|SANITIZ|PLANNED\s*DOWNTIME|CAMBIO DE TURNO/
 const RE_EXTERNO = /MMPP|MATERIA PRIMA|FALTA PERSONAL|ACUMULACION|RECHAZO|ABASTEC|ESPERA/
+const BUCKET_A_CLASE = { mantencion: 'falla', externo: 'externo', planificado: 'planificado', 'fuera-turno': 'planificado' }
 
 function normaliza(s) {
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
@@ -51,6 +55,10 @@ function clasificaCausa(state) {
   const r = normaliza(reason || name)
   if (/EXCEDID/i.test(name)) return 'excedido'
   if (/MICRO/i.test(name) && !reason) return 'micro'
+  if (reason) {
+    const clase = BUCKET_A_CLASE[matchImputacion(reason).bucket]
+    if (clase) return clase
+  }
   if (RE_PLANIFICADO.test(r)) return 'planificado'
   if (RE_EXTERNO.test(r)) return 'externo'
   if (!reason) return 'sin-imputar'
