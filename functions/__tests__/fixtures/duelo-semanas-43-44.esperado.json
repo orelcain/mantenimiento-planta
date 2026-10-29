@@ -1,0 +1,1256 @@
+{
+ "eviscerado": {
+  "modo": "ritmo90",
+  "turnos": [
+   {
+    "id": "2026-10-28_Turno 2",
+    "jornada": "2026-10-28",
+    "noche": false,
+    "equipo": "rebolledo",
+    "piezas": 15641,
+    "piezasMant": 100.82408821034775
+   },
+   {
+    "id": "2026-10-28_Turno 1",
+    "jornada": "2026-10-29",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 16085,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-27_Turno 2",
+    "jornada": "2026-10-27",
+    "noche": false,
+    "equipo": "rebolledo",
+    "piezas": 13541,
+    "piezasMant": 129.49775755177416
+   },
+   {
+    "id": "2026-10-27_Turno 1",
+    "jornada": "2026-10-28",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 15479,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-26_Turno 2",
+    "jornada": "2026-10-26",
+    "noche": false,
+    "equipo": "rebolledo",
+    "piezas": 14308,
+    "piezasMant": 66.63806365111847
+   },
+   {
+    "id": "2026-10-26_Turno 1 Lunes",
+    "jornada": "2026-10-26",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 15801,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-26_Turno 1",
+    "jornada": "2026-10-27",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 15427,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-24_Turno 2",
+    "jornada": "2026-10-24",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 16260,
+    "piezasMant": 107.93073593073592
+   },
+   {
+    "id": "2026-10-23_Turno 2",
+    "jornada": "2026-10-23",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 11377,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-23_Turno 1",
+    "jornada": "2026-10-24",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 15190,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-22_Turno 2",
+    "jornada": "2026-10-22",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 15345,
+    "piezasMant": 65.02118644067797
+   },
+   {
+    "id": "2026-10-22_Turno 1",
+    "jornada": "2026-10-23",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 11897,
+    "piezasMant": 73.81523472540616
+   },
+   {
+    "id": "2026-10-21_Turno 2",
+    "jornada": "2026-10-21",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 15495,
+    "piezasMant": 265.4600253807107
+   },
+   {
+    "id": "2026-10-21_Turno 1",
+    "jornada": "2026-10-22",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 15362,
+    "piezasMant": 149.4681081081081
+   },
+   {
+    "id": "2026-10-20_Turno 2",
+    "jornada": "2026-10-20",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 14624,
+    "piezasMant": 12.614396192742415
+   },
+   {
+    "id": "2026-10-20_Turno 1",
+    "jornada": "2026-10-21",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 14153,
+    "piezasMant": 236.50163826998687
+   },
+   {
+    "id": "2026-10-19_Turno 2",
+    "jornada": "2026-10-19",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 15194,
+    "piezasMant": 177.64267446108875
+   },
+   {
+    "id": "2026-10-19_Turno 1 Lunes",
+    "jornada": "2026-10-19",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 17107,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-19_Turno 1",
+    "jornada": "2026-10-20",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 14598,
+    "piezasMant": 0
+   }
+  ],
+  "jornadas": [
+   {
+    "jornada": "2026-10-19",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 1,
+      "b": 5
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-20",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "a",
+    "puntaje": {
+     "firmes": {
+      "a": 3,
+      "b": 2
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "a"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-21",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "a",
+    "puntaje": {
+     "firmes": {
+      "a": 4,
+      "b": 2
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "a"
+     ],
+     [
+      "ritmo",
+      "a"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-22",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 1,
+      "b": 4
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "empate"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-23",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 1,
+      "b": 5
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-24",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "a",
+    "puntaje": {
+     "firmes": {
+      "a": 5,
+      "b": 1
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "a"
+     ],
+     [
+      "ritmo",
+      "a"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-26",
+    "dia": "rebolledo",
+    "noche": "cardenas",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 1,
+      "b": 4
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-27",
+    "dia": "rebolledo",
+    "noche": "cardenas",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 1,
+      "b": 4
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-28",
+    "dia": "rebolledo",
+    "noche": "cardenas",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 2,
+      "b": 4
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "a"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "sin-dato"
+     ]
+    ]
+   }
+  ],
+  "semanas": [
+   {
+    "tipo": "semana",
+    "clave": "2026-10-19",
+    "etiqueta": "Semana 43",
+    "inicio": "2026-10-19",
+    "fin": "2026-10-25",
+    "vigente": false,
+    "puntos": {
+     "rebolledo": 19,
+     "cardenas": 15
+    },
+    "ganados": {
+     "rebolledo": 3,
+     "cardenas": 3
+    },
+    "empatados": {
+     "rebolledo": 0,
+     "cardenas": 0
+    },
+    "perdidos": {
+     "rebolledo": 3,
+     "cardenas": 3
+    },
+    "turnos": {
+     "rebolledo": 6,
+     "cardenas": 6
+    },
+    "piezasProm": {
+     "rebolledo": 14717.833333333334,
+     "cardenas": 14715.833333333334
+    },
+    "ganador": "rebolledo"
+   },
+   {
+    "tipo": "semana",
+    "clave": "2026-10-26",
+    "etiqueta": "Semana 44",
+    "inicio": "2026-10-26",
+    "fin": "2026-11-01",
+    "vigente": true,
+    "puntos": {
+     "rebolledo": 4,
+     "cardenas": 12
+    },
+    "ganados": {
+     "rebolledo": 0,
+     "cardenas": 3
+    },
+    "empatados": {
+     "rebolledo": 0,
+     "cardenas": 0
+    },
+    "perdidos": {
+     "rebolledo": 3,
+     "cardenas": 0
+    },
+    "turnos": {
+     "rebolledo": 3,
+     "cardenas": 4
+    },
+    "piezasProm": {
+     "rebolledo": 14496.666666666666,
+     "cardenas": 15698
+    },
+    "ganador": "cardenas"
+   }
+  ],
+  "mes": {
+   "tipo": "mes",
+   "clave": "2026-10",
+   "etiqueta": "octubre 2026",
+   "inicio": "2026-10-01",
+   "fin": "2026-10-31",
+   "vigente": true,
+   "puntos": {
+    "rebolledo": 23,
+    "cardenas": 27
+   },
+   "ganados": {
+    "rebolledo": 3,
+    "cardenas": 6
+   },
+   "empatados": {
+    "rebolledo": 0,
+    "cardenas": 0
+   },
+   "perdidos": {
+    "rebolledo": 6,
+    "cardenas": 3
+   },
+   "turnos": {
+    "rebolledo": 9,
+    "cardenas": 10
+   },
+   "piezasProm": {
+    "rebolledo": 14644.111111111111,
+    "cardenas": 15108.7
+   },
+   "ganador": "cardenas"
+  },
+  "costoCiclo": {
+   "periodo": "ciclo",
+   "etiqueta": "ciclo 26/10 al 08/11",
+   "inicio": "2026-10-26",
+   "fin": "2026-11-08",
+   "equipos": {
+    "rebolledo": {
+     "turnos": 3,
+     "fallasN": 10,
+     "fallaMin": 7.76949806949807,
+     "piezasPerdidas": 296.9599094132404,
+     "minPorFalla": 0.776949806949807
+    },
+    "cardenas": {
+     "turnos": 4,
+     "fallasN": 0,
+     "fallaMin": 0,
+     "piezasPerdidas": 0,
+     "minPorFalla": null
+    }
+   }
+  },
+  "rachas": {
+   "rebolledo": {
+    "actual": 0,
+    "mejor": 2
+   },
+   "cardenas": {
+    "actual": 4,
+    "mejor": 4
+   }
+  },
+  "records": [
+   {
+    "id": "piezas-dia",
+    "rotulo": "Más piezas en un turno de día",
+    "valor": 16260,
+    "unidad": "pz",
+    "decimales": 0,
+    "equipo": "cardenas",
+    "dateKey": "2026-10-24"
+   },
+   {
+    "id": "piezas-noche",
+    "rotulo": "Más piezas en un turno de noche",
+    "valor": 17107,
+    "unidad": "pz",
+    "decimales": 0,
+    "equipo": "rebolledo",
+    "dateKey": "2026-10-19"
+   },
+   {
+    "id": "ritmo",
+    "rotulo": "Mejor ritmo andando",
+    "valor": 42.982412060301506,
+    "unidad": "pz/min",
+    "decimales": 1,
+    "equipo": "rebolledo",
+    "dateKey": "2026-10-19"
+   },
+   {
+    "id": "puntos",
+    "rotulo": "Más puntos en un turno",
+    "valor": 5,
+    "unidad": "pt",
+    "decimales": 0,
+    "equipo": "rebolledo",
+    "dateKey": "2026-10-19"
+   }
+  ]
+ },
+ "filete": {
+  "modo": "primera-pieza",
+  "turnos": [
+   {
+    "id": "2026-10-28_Turno Noche",
+    "jornada": "2026-10-29",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 4185,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-28_Turno Dia",
+    "jornada": "2026-10-28",
+    "noche": false,
+    "equipo": "rebolledo",
+    "piezas": 4653,
+    "piezasMant": 413.103481392557
+   },
+   {
+    "id": "2026-10-27_Turno Noche",
+    "jornada": "2026-10-28",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 3866,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-27_Turno Dia",
+    "jornada": "2026-10-27",
+    "noche": false,
+    "equipo": "rebolledo",
+    "piezas": 4059,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-26_Turno Noche L",
+    "jornada": "2026-10-26",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 2941,
+    "piezasMant": 1653.9628687009404
+   },
+   {
+    "id": "2026-10-26_Turno Noche",
+    "jornada": "2026-10-27",
+    "noche": true,
+    "equipo": "cardenas",
+    "piezas": 4780,
+    "piezasMant": 99.28783382789318
+   },
+   {
+    "id": "2026-10-26_Turno Dia",
+    "jornada": "2026-10-26",
+    "noche": false,
+    "equipo": "rebolledo",
+    "piezas": 4816,
+    "piezasMant": 339.39393939393943
+   },
+   {
+    "id": "2026-10-24_Turno Dia",
+    "jornada": "2026-10-24",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 3945,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-23_Turno Noche",
+    "jornada": "2026-10-24",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 4552,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-23_Turno Dia",
+    "jornada": "2026-10-23",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 3734,
+    "piezasMant": 683.0895656068071
+   },
+   {
+    "id": "2026-10-22_Turno Noche",
+    "jornada": "2026-10-23",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 4515,
+    "piezasMant": 713.5775862068965
+   },
+   {
+    "id": "2026-10-22_Turno Dia",
+    "jornada": "2026-10-22",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 3961,
+    "piezasMant": 496.6771159874608
+   },
+   {
+    "id": "2026-10-21_Turno Noche",
+    "jornada": "2026-10-22",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 4794,
+    "piezasMant": 90.45283018867926
+   },
+   {
+    "id": "2026-10-21_Turno Dia",
+    "jornada": "2026-10-21",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 4075,
+    "piezasMant": 330.40540540540536
+   },
+   {
+    "id": "2026-10-20_Turno Noche",
+    "jornada": "2026-10-21",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 3201,
+    "piezasMant": 2126.5079148471614
+   },
+   {
+    "id": "2026-10-20_Turno Dia",
+    "jornada": "2026-10-20",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 4325,
+    "piezasMant": 200
+   },
+   {
+    "id": "2026-10-19_Turno Noche L",
+    "jornada": "2026-10-19",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 5130,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-19_Turno Noche",
+    "jornada": "2026-10-20",
+    "noche": true,
+    "equipo": "rebolledo",
+    "piezas": 4884,
+    "piezasMant": 0
+   },
+   {
+    "id": "2026-10-19_Turno Dia",
+    "jornada": "2026-10-19",
+    "noche": false,
+    "equipo": "cardenas",
+    "piezas": 5171,
+    "piezasMant": 43.332402234636874
+   }
+  ],
+  "jornadas": [
+   {
+    "jornada": "2026-10-19",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "a",
+    "puntaje": {
+     "firmes": {
+      "a": 4,
+      "b": 0
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "a"
+     ],
+     [
+      "ritmo",
+      "a"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "empate"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-20",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 1,
+      "b": 4
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "b"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-21",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 1,
+      "b": 3
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "empate"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-22",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 0,
+      "b": 5
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "b"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-23",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 0,
+      "b": 5
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "b"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-24",
+    "dia": "cardenas",
+    "noche": "rebolledo",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 0,
+      "b": 4
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "b"
+     ],
+     [
+      "arranque",
+      "empate"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-26",
+    "dia": "rebolledo",
+    "noche": "cardenas",
+    "ganador": "a",
+    "puntaje": {
+     "firmes": {
+      "a": 5,
+      "b": 0
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "a"
+     ],
+     [
+      "ritmo",
+      "a"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "a"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-27",
+    "dia": "rebolledo",
+    "noche": "cardenas",
+    "ganador": "b",
+    "puntaje": {
+     "firmes": {
+      "a": 2,
+      "b": 3
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "b"
+     ],
+     [
+      "ritmo",
+      "b"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "a"
+     ]
+    ]
+   },
+   {
+    "jornada": "2026-10-28",
+    "dia": "rebolledo",
+    "noche": "cardenas",
+    "ganador": "a",
+    "puntaje": {
+     "firmes": {
+      "a": 5,
+      "b": 0
+     },
+     "enJuego": 0,
+     "detalleEnJuego": [],
+     "cerrada": true
+    },
+    "kpis": [
+     [
+      "carrera",
+      "a"
+     ],
+     [
+      "ritmo",
+      "a"
+     ],
+     [
+      "micro",
+      "a"
+     ],
+     [
+      "arranque",
+      "a"
+     ]
+    ]
+   }
+  ],
+  "semanas": [
+   {
+    "tipo": "semana",
+    "clave": "2026-10-19",
+    "etiqueta": "Semana 43",
+    "inicio": "2026-10-19",
+    "fin": "2026-10-25",
+    "vigente": false,
+    "puntos": {
+     "rebolledo": 21,
+     "cardenas": 6
+    },
+    "ganados": {
+     "rebolledo": 5,
+     "cardenas": 1
+    },
+    "empatados": {
+     "rebolledo": 0,
+     "cardenas": 0
+    },
+    "perdidos": {
+     "rebolledo": 1,
+     "cardenas": 5
+    },
+    "turnos": {
+     "rebolledo": 6,
+     "cardenas": 6
+    },
+    "piezasProm": {
+     "rebolledo": 4512.666666666667,
+     "cardenas": 4201.833333333333
+    },
+    "ganador": "rebolledo"
+   },
+   {
+    "tipo": "semana",
+    "clave": "2026-10-26",
+    "etiqueta": "Semana 44",
+    "inicio": "2026-10-26",
+    "fin": "2026-11-01",
+    "vigente": true,
+    "puntos": {
+     "rebolledo": 12,
+     "cardenas": 3
+    },
+    "ganados": {
+     "rebolledo": 2,
+     "cardenas": 1
+    },
+    "empatados": {
+     "rebolledo": 0,
+     "cardenas": 0
+    },
+    "perdidos": {
+     "rebolledo": 1,
+     "cardenas": 2
+    },
+    "turnos": {
+     "rebolledo": 3,
+     "cardenas": 4
+    },
+    "piezasProm": {
+     "rebolledo": 4509.333333333333,
+     "cardenas": 3943
+    },
+    "ganador": "rebolledo"
+   }
+  ],
+  "mes": {
+   "tipo": "mes",
+   "clave": "2026-10",
+   "etiqueta": "octubre 2026",
+   "inicio": "2026-10-01",
+   "fin": "2026-10-31",
+   "vigente": true,
+   "puntos": {
+    "rebolledo": 33,
+    "cardenas": 9
+   },
+   "ganados": {
+    "rebolledo": 7,
+    "cardenas": 2
+   },
+   "empatados": {
+    "rebolledo": 0,
+    "cardenas": 0
+   },
+   "perdidos": {
+    "rebolledo": 2,
+    "cardenas": 7
+   },
+   "turnos": {
+    "rebolledo": 9,
+    "cardenas": 10
+   },
+   "piezasProm": {
+    "rebolledo": 4511.555555555556,
+    "cardenas": 4098.3
+   },
+   "ganador": "rebolledo"
+  },
+  "costoCiclo": {
+   "periodo": "ciclo",
+   "etiqueta": "ciclo 26/10 al 08/11",
+   "inicio": "2026-10-26",
+   "fin": "2026-11-08",
+   "equipos": {
+    "rebolledo": {
+     "turnos": 3,
+     "fallasN": 9,
+     "fallaMin": 57.27663344407531,
+     "piezasPerdidas": 752.4974207864964,
+     "minPorFalla": 6.364070382675035
+    },
+    "cardenas": {
+     "turnos": 4,
+     "fallasN": 19,
+     "fallaMin": 135.78527607361963,
+     "piezasPerdidas": 1753.2507025288335,
+     "minPorFalla": 7.146593477558928
+    }
+   }
+  },
+  "rachas": {
+   "rebolledo": {
+    "actual": 1,
+    "mejor": 6
+   },
+   "cardenas": {
+    "actual": 0,
+    "mejor": 1
+   }
+  },
+  "records": [
+   {
+    "id": "piezas-dia",
+    "rotulo": "Más piezas en un turno de día",
+    "valor": 5171,
+    "unidad": "pz",
+    "decimales": 0,
+    "equipo": "cardenas",
+    "dateKey": "2026-10-19"
+   },
+   {
+    "id": "piezas-noche",
+    "rotulo": "Más piezas en un turno de noche",
+    "valor": 5130,
+    "unidad": "pz",
+    "decimales": 0,
+    "equipo": "rebolledo",
+    "dateKey": "2026-10-19"
+   },
+   {
+    "id": "ritmo",
+    "rotulo": "Mejor ritmo andando",
+    "valor": 14.44413407821229,
+    "unidad": "pz/min",
+    "decimales": 1,
+    "equipo": "cardenas",
+    "dateKey": "2026-10-19"
+   },
+   {
+    "id": "puntos",
+    "rotulo": "Más puntos en un turno",
+    "valor": 5,
+    "unidad": "pt",
+    "decimales": 0,
+    "equipo": "rebolledo",
+    "dateKey": "2026-10-22"
+   }
+  ]
+ }
+}
