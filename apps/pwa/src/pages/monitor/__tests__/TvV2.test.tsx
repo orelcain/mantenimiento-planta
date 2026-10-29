@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { TvV2, type TvV2Props } from '../TvV2'
 import type { DatosDuelo } from '../duelo'
 import { PALABRAS_PROHIBIDAS_TV } from '../tvV2Datos'
+import { VistaVivaCtx, type VistaViva } from '../useCifrasVivas'
+import type { RelojDeDatos } from '../useRelojDeDatos'
 
 afterEach(cleanup)
 
@@ -76,6 +78,16 @@ describe('TvV2', () => {
     render(<TvV2 {...props()} duelo={null} mantTurno={{ fallas: 2, fallaMin: 12, mttr: 6 }} />)
     expect(screen.getByText('Todavía no hay turno para comparar.')).toBeTruthy()
     expect(screen.getByText(/Mantención · este turno/)).toBeTruthy()
+  })
+  it('P4 (29-10): con la reproducción activa muestra las hechas y la meta del MISMO cuadro que El turno, no el contador', () => {
+    const t = Date.parse('2026-10-29T12:13:00.000Z')
+    const cuadro = { valor: 7891, frac: 1, previa: null, ultima: { valor: 7891, atMs: t }, atrasada: false }
+    const reloj: RelojDeDatos = { cuadro: () => cuadro, alCuadro: (fn) => { fn(cuadro); return () => {} }, version: 1, detenida: false, reducido: false }
+    const vista: VistaViva = { reloj, cuotaEn: () => 9587, meta: 15000, mostradas: 7985, cerrado: false }
+    render(<VistaVivaCtx.Provider value={vista}><TvV2 {...props()} piezas={7985} metaAhora={9645} duelo={null} /></VistaVivaCtx.Provider>)
+    expect(screen.getByTestId('tv-piezas').textContent).toBe('7.891')
+    expect(screen.getByText('9.587')).toBeTruthy()
+    expect(screen.queryByText('9.645')).toBeNull()
   })
   it('no usa las palabras prohibidas del glosario', () => {
     const { container } = render(<TvV2 {...props()} />)
