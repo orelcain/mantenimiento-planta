@@ -91,6 +91,8 @@ import { CabeceraV2, MonitorV2, type VistaV2 } from './monitor/MonitorV2'
 import { TvV2 } from './monitor/TvV2'
 import { estadoTv } from './monitor/tvV2Datos'
 import { AnalisisV2 } from './monitor/AnalisisV2'
+import { AvisoFallaRepetida } from './monitor/AvisoFallaRepetida'
+import { avisosVigentes } from './monitor/avisosVigentes'
 import { datosDeHoy } from './monitor/analisisV2Datos'
 import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
@@ -6765,6 +6767,12 @@ function MonitorDelToken() {
           </section>
         )}
 
+        {/* Falla que suele volver: una máquina recién soltada tras un paro de
+            una causa con reincidencia alta. Solo en el turno actual y vivo. */}
+        {esActual && !live.shiftClosed && (
+          <AvisoFallaRepetida avisos={avisosVigentes(data.fallaRepetida?.avisos, now)} />
+        )}
+
         {/* Personalizar: abierto a cualquiera con el link (decisión de Orel,
             30-08) — cada aparato guarda SU orden, el link sigue mostrando el
             de fábrica a quien nunca toca nada. Solo en pantallas anchas:
@@ -7794,6 +7802,7 @@ function MonitorDelToken() {
               mant={datosHoy.mant}
               cerrado={turnoCerrado}
               microPorHora={live.mantencion?.microH ?? null}
+              fallaRepetida={data.fallaRepetida ?? null}
               vista={vistaV2}
               onVista={setVistaV2}
             />

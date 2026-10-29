@@ -24,6 +24,7 @@ import { PanelDetalle, dec, firmado, hhmm, horas, int, semanaCorta, type Monitor
 import { DUENO_UI } from './duenoUi'
 import { detencionesPorHora, metaAEstaHora, paretoAcumulado, type CausaHoy, type DetencionesHora, type EventoHoy, type MantHoy, type PerdidaHoy } from './analisisV2Datos'
 import { lunesDe, type SemanaReparto } from './repartoSemanal'
+import type { FallaRepetidaMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import './analisisV2.css'
 
 export interface AnalisisV2Props extends MonitorV2AnalisisProps {
@@ -39,9 +40,27 @@ export interface AnalisisV2Props extends MonitorV2AnalisisProps {
   cerrado: boolean
   /** Micro detención (min de máquina) por hora de producción, si el backend la publicó. */
   microPorHora?: number[] | null
+  /** Reincidencia de las fallas de equipos (cron diario); null/ausente sin la tarjeta. */
+  fallaRepetida?: FallaRepetidaMonitor | null
 }
 
-type Clave = 'hora' | 'det' | 'rep' | 'peso' | 'quien'
+/** Meta de reincidencia propuesta en el plan (28-10-2026): menos de 3 de cada 10 fallas vuelven. */
+const META_REINCIDENCIA = 0.3
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+/** «ago» (o «ago 2025» si el año no es el de referencia): «oct 26» se leía como el 26 de octubre. */
+const nombreMes = (ym: string, anio?: string, largo = false) => {
+  const m = MESES[Number(ym.slice(5, 7)) - 1] ?? ym.slice(5, 7)
+  const txt = largo ? m : m.slice(0, 3)
+  return anio && ym.slice(0, 4) !== anio ? `${txt} ${ym.slice(0, 4)}` : txt
+}
+const pct0 = (x: number) => `${Math.round(x * 100)} %`
+/** Contra la meta con el % REDONDEADO que se muestra: 30,3 % se lee «30» y no puede decir «sobre». */
+const tonoMeta = (tasa: number): 'ok' | 'neutro' | 'mal' => {
+  const r = Math.round(tasa * 100), meta = Math.round(META_REINCIDENCIA * 100)
+  return r < meta ? 'ok' : r === meta ? 'neutro' : 'mal'
+}
+
+type Clave = 'hora' | 'det' | 'rep' | 'peso' | 'quien' | 'falla'
 type Marca = 'mant' | 'ext' | 'si' | 'mal' | 'prog'
 
 const marcaDe = (d: DuenoPerdida): Marca => (d === 'mantencion' ? 'mant' : d === 'externo' ? 'ext' : d === 'sin-imputar' ? 'si' : 'prog')
@@ -302,6 +321,21 @@ export function AnalisisV2(p: AnalisisV2Props) {
   const minPrevio = previasT5.length ? Math.min(...previasT5.map(shareSi)) : null
   const maxSemana = Math.max(1, ...semanas.map(totSem))
 
+  // ── T6 · ¿Las reparaciones aguantan? ───────────────────────────────────────
+  const fr = p.fallaRepetida ?? null
+  const mesesFr = (fr?.meses ?? []).slice(-8)
+  const mesesSolidos = mesesFr.filter((m) => !m.pocosDatos)
+  const mesFr = mesesSolidos[mesesSolidos.length - 1] ?? null
+  const mesFrAnt = mesesSolidos[mesesSolidos.length - 2] ?? null
+  const anioFr = (mesesFr[mesesFr.length - 1]?.mes ?? '').slice(0, 4)
+  const causasFr = (fr?.causas ?? []).filter((c) => c.episodios >= 10).slice().sort((a, b) => b.tasa - a.tasa)
+  const peorCausaFr = causasFr[0] ?? null
+  const azarFr = (() => {
+    const cs = fr?.causas ?? []
+    const n = cs.reduce((a, c) => a + c.episodios, 0)
+    return n > 0 ? cs.reduce((a, c) => a + c.azar * c.episodios, 0) / n : null
+  })()
+
   const nomSemana = (s: SemanaReparto) => (s === semAct && esSemanaActual ? 'Esta semana' : `Sem. ${semanaCorta(s.semana)}`)
 
   // ── Textos con valor concreto (sirven a la tarjeta y a su detalle) ─────────
@@ -441,6 +475,36 @@ export function AnalisisV2(p: AnalisisV2Props) {
                 {mants.length === 0 ? <Nota>Ninguna causa de equipos aparece entre las de estos turnos.</Nota> : mants.slice(0, 6).map((r) => (
                   <Ev key={r.label} label={r.label} sub={`en ${r.shifts} de ${nTurnos} turnos`} valor={horas(r.minutes)} frac={r.minutes / Math.max(1, mants[0]?.minutes ?? 1)} tipo="mant" />
                 ))}
+              </Sec>
+            </div>
+          ),
+        }
+      }
+      case 'falla': {
+        if (!fr) return null
+        return {
+          titulo: '¿Las reparaciones aguantan o la falla vuelve?',
+          sub: `Fallas de equipos que vuelven en la misma máquina antes de 8 h de operación${fr.desde ? ` · desde ${fr.desde.slice(8, 10)}-${fr.desde.slice(5, 7)}` : ''}`,
+          cuerpo: (
+            <div className="an-d">
+              <Resp nota="Una falla que vuelve es una reparación que no quedó resuelta. La serie sirve de línea base: una baja cuenta como aporte cuando acompaña un cambio en cómo se repara.">
+                {peorCausaFr
+                  ? <><b className={tonoMeta(peorCausaFr.tasa) === 'mal' ? 'an-mal' : 'an-bien'}>{peorCausaFr.causa}</b> vuelve {Math.round(peorCausaFr.tasa * 10)} de cada 10 veces ({peorCausaFr.vuelven} de {peorCausaFr.episodios}); desde un momento cualquiera de operación, {pct0(peorCausaFr.azar)}.</>
+                  : 'Todavía no hay causas con 10 o más fallas para comparar.'}
+              </Resp>
+              <Sec n={1} titulo="Por causa, todo el período">
+                {fr.causas.slice(0, 10).map((c) => (
+                  <Ev key={c.causa} label={c.causa} sub={`${c.vuelven} de ${c.episodios} volvieron · azar ${pct0(c.azar)}${c.episodios < 10 ? ' · pocos datos' : ''}`} valor={pct0(c.tasa)} frac={c.tasa} tipo={c.episodios < 10 ? 'neutro' : tonoMeta(c.tasa) === 'mal' ? 'mal' : 'mant'} tono={c.episodios >= 10 && tonoMeta(c.tasa) === 'mal' ? 'mal' : undefined} />
+                ))}
+              </Sec>
+              <Sec n={2} titulo="Mes a mes, todas las causas">
+                {mesesFr.map((m) => (
+                  <Ev key={m.mes} label={nombreMes(m.mes, anioFr, true)} sub={`${m.vuelven} de ${m.episodios} fallas${m.pocosDatos ? ' · pocos datos' : ''}`} valor={pct0(m.tasa)} frac={m.tasa} tipo={m.pocosDatos ? 'neutro' : tonoMeta(m.tasa) === 'mal' ? 'mal' : 'mant'} />
+                ))}
+                <Nota>Meses con menos de 30 fallas van en gris: su porcentaje se mueve mucho con una o dos fallas.</Nota>
+              </Sec>
+              <Sec n={3} titulo="Cómo se cuenta">
+                <Nota>Falla: paro de equipos de 2 min o más (sin «Ajuste mantenimiento» ni trabajos de contratistas). Paros de la misma causa a menos de 12 min son una sola falla. Vuelve: la misma causa aparece en la misma máquina antes de 8 h de operación (se cuentan las horas produciendo, no las de reloj). Azar: cuántas veces aparecería la causa en las 8 h siguientes a un momento cualquiera.</Nota>
               </Sec>
             </div>
           ),
@@ -783,6 +847,41 @@ export function AnalisisV2(p: AnalisisV2Props) {
             </article>
           </div>
         </div>
+
+        {/* T6 · ¿Las reparaciones aguantan? — reincidencia mes a mes (cron diario). */}
+        {fr && mesesFr.length > 0 && (
+          <article className="an-c an-c-fr" aria-label="Fallas que vuelven">
+            <Cabeza
+              pregunta="¿Las reparaciones aguantan o la falla vuelve?"
+              kpi={mesFr ? Math.round(mesFr.tasa * 100) : '—'}
+              unidad={mesFr ? `% de las fallas volvió · ${nombreMes(mesFr.mes, anioFr, true)}` : 'sin un mes con datos suficientes'}
+              estado={mesFr ? { ok: <Estado tono="ok">Bajo la meta</Estado>, neutro: <Estado tono="neutro">En el límite de la meta</Estado>, mal: <Estado tono="mal">Sobre la meta</Estado> }[tonoMeta(mesFr.tasa)] : undefined}
+              refer={mesFr ? (
+                <>
+                  <Dato texto={<>Fallas de equipos que volvieron en la misma máquina antes de 8 h de operación ÷ fallas del mes. {nombreMes(mesFr.mes, anioFr, true)}: {mesFr.vuelven} de {mesFr.episodios}.</>}>volvió</Dato>
+                  {mesFrAnt && <> · {nombreMes(mesFrAnt.mes, anioFr, true)} {pct0(mesFrAnt.tasa)}</>}
+                  {' '}· meta bajo {pct0(META_REINCIDENCIA)}
+                  {azarFr != null && <> · <Dato texto="Cuántas veces aparecería la misma causa en las 8 h siguientes a un momento cualquiera de operación: la referencia para saber si un porcentaje es alto.">azar ≈ {pct0(azarFr)}</Dato></>}
+                </>
+              ) : undefined}
+              resp={peorCausaFr ? <>{peorCausaFr.causa} vuelve {Math.round(peorCausaFr.tasa * 10)} de cada 10 veces ({peorCausaFr.vuelven} de {peorCausaFr.episodios}).</> : undefined}
+            />
+            <div className="an-ls">
+              {mesesFr.map((m) => (
+                <button key={m.mes} type="button" className={`an-row an-row-w${m.pocosDatos ? ' an-fr-poco' : ''}`} onClick={abrir('falla')}>
+                  <span className="an-n"><span className="an-nn"><b>{nombreMes(m.mes, anioFr)}</b><small>{m.vuelven} de {m.episodios}{m.pocosDatos ? ' · pocos datos' : ''}</small></span></span>
+                  <span className="an-bt an-fr-bt">
+                    <i className={`an-s ${m.pocosDatos ? 'an-s-neutro' : tonoMeta(m.tasa) === 'mal' ? 'an-s-mal' : 'an-s-mant'}`} style={{ width: `${Math.max(1.5, m.tasa * 100)}%` }} />
+                    <em className="an-fr-meta" style={{ left: `${META_REINCIDENCIA * 100}%` }} aria-hidden />
+                  </span>
+                  <span className="an-vv">{pct0(m.tasa)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="an-nt">barra = % de fallas que volvió en ≤ 8 h de operación · raya = meta {pct0(META_REINCIDENCIA)} · en gris, meses con menos de 30 fallas</div>
+            <Ver texto="por causa, contra el azar" onClick={abrir('falla')} etiqueta="fallas que vuelven" />
+          </article>
+        )}
       </Bloque>
 
       <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>

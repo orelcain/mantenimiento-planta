@@ -7943,6 +7943,30 @@ exports.recalcularUmbralesParos = onSchedule(
   },
 )
 
+// ── recalcularFallaRepetida ─────────────────────────────────────────────────
+// Diario 05:45: reincidencia de los paros de Mantención por planta (misma causa
+// y máquina que vuelve en ≤ 8 h de operación) con los últimos 300 días. Deja
+// serie mensual + ranking de causas en `shoplogixReincidencia/{planta}`, que el
+// Monitor publica (tarjeta en Análisis + aviso al soltar un paro). Ver
+// `shoplogix/fallaRepetida.js`. ≈ turnos × máquinas lecturas por planta y día.
+const PLANTAS_FALLA_REPETIDA = ['chonchi', 'yal', 'filete']
+exports.recalcularFallaRepetida = onSchedule(
+  { schedule: 'every day 05:45', timeZone: 'America/Santiago', region: 'us-central1', memory: '1GiB', timeoutSeconds: 540 },
+  async () => {
+    const fallaRepetida = require('./shoplogix/fallaRepetida')
+    const hoyDateKey = shoplogixPolling.toChileWall(new Date()).toISOString().slice(0, 10)
+    for (const plantSlug of PLANTAS_FALLA_REPETIDA) {
+      try {
+        const r = await fallaRepetida.calcularReincidenciaPlanta({ db, plantSlug, hoyDateKey, FieldPath })
+        await db.doc(`shoplogixReincidencia/${plantSlug}`).set({ ...r, calculadoEl: new Date() })
+        logger.info(`[recalcularFallaRepetida] ${plantSlug}: ${r.turnos} turnos, ${r.causas.length} causas, ${r.meses.length} meses`)
+      } catch (e) {
+        logger.error(`[recalcularFallaRepetida] ${plantSlug} falló:`, e.message)
+      }
+    }
+  },
+)
+
 // ── checkShiftStartDelays ─────────────────────────────────────────────────────
 // Cron cada 5 minutos. Revisa docs pendientes en shoplogixShiftDelayChecks.
 // Un check vencido NO alerta a ciegas: evaluarDelayCheck (turnoBrief.js)
@@ -10232,12 +10256,13 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     // `loadShiftIndex`: el índice es lo que mató los barridos por-función).
     const currentByPlant = new Map()
     const indexByPlant = new Map()
+    const fallaByPlant = new Map()
     let refrescados = 0
 
     const hallazgosMonitor = []
     for (const d of activos) {
       try {
-        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant)
+        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant, fallaByPlant)
         if (!patch) continue
         await d.ref.set(patch, { merge: true })
         refrescados++

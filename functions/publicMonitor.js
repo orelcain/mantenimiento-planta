@@ -3005,7 +3005,44 @@ async function patchHermanas(db, monitor, nowMs = Date.now()) {
   }
 }
 
-async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map(), shiftIndexByPlant = new Map()) {
+/**
+ * Falla repetida para el Monitor (28-10-2026): la serie mensual y el ranking de
+ * causas que el cron `recalcularFallaRepetida` dejó en
+ * `shoplogixReincidencia/{planta}`, más los avisos de ESTE turno: máquinas que
+ * acaban de soltar un paro de una causa que vuelve en ≤ 8 h de operación al
+ * menos 3 de cada 10 veces. Costo: 1 lectura del resumen + las máquinas del
+ * turno, una vez por planta y evento. Nunca tumba el refresco: ante cualquier
+ * error devuelve null y el Monitor no muestra la tarjeta.
+ */
+async function buildFallaRepetida(db, plantSlug, shiftDocId, cache = new Map()) {
+  const k = `${plantSlug}|${shiftDocId}`
+  if (cache.has(k)) return cache.get(k)
+  let out = null
+  try {
+    const fallaRepetida = require('./shoplogix/fallaRepetida')
+    const resumen = await db.doc(`shoplogixReincidencia/${plantSlug}`).get()
+    if (resumen.exists) {
+      const r = resumen.data() || {}
+      const causas = Array.isArray(r.causas) ? r.causas : []
+      const ms = await db.collection(`shoplogix/${plantSlug}/shifts/${shiftDocId}/machines`).get()
+      const maquinas = ms.docs.map(m => ({ id: m.id, name: String(m.data()?.machineName || m.id), states: m.data()?.states || [] }))
+      const nowWallMs = shoplogixPolling.toChileWall(new Date()).getTime()
+      out = {
+        meses: Array.isArray(r.meses) ? r.meses : [],
+        causas: causas.slice(0, 10),
+        avisos: fallaRepetida.avisosFallaRepetida(maquinas, causas, nowWallMs),
+        desde: r.desde || null,
+        calculadoEl: r.calculadoEl?.toDate ? r.calculadoEl.toDate().toISOString() : (r.calculadoEl || null),
+      }
+    }
+  } catch (e) {
+    out = null
+  }
+  cache.set(k, out)
+  return out
+}
+
+async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map(), shiftIndexByPlant = new Map(), fallaByPlant = new Map()) {
   const plantSlug = monitor.plantSlug
   if (!plantSlug) return null
 
@@ -3058,6 +3095,8 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
         db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11), monitor.rivalCurve, history, index, forecastSkip,
       ),
       ...(await patchHermanas(db, monitor)),
+      /* Falla repetida: serie mensual, ranking y avisos al soltar un paro. */
+      fallaRepetida: await buildFallaRepetida(db, plantSlug, monitor.shiftDocId, fallaByPlant),
     }
   }
 
@@ -3124,6 +3163,8 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     ),
     /* Selector de línea del Duelo (sin sesión): los otros monitores vigentes de la planta. */
     ...(await patchHermanas(db, monitor)),
+    /* Falla repetida: serie mensual, ranking y avisos al soltar un paro. */
+    fallaRepetida: await buildFallaRepetida(db, plantSlug, publicado.shiftDocId, fallaByPlant),
     shiftDocId: publicado.shiftDocId,
     dateKey: publicado.shiftDocId.slice(0, 10),
     shiftId: publicado.shiftDocId.slice(11),
@@ -3308,6 +3349,7 @@ function huellaEstable(v) {
 }
 
 module.exports = {
+  buildFallaRepetida,
   COLLECTION,
   esTurnoSellado,
   CLOSE_MARGIN_MS,
