@@ -4,6 +4,7 @@
  * carrera v6 (ventaja minuto a minuto, proyección, frase de empate, pines de detenciones y corte común).
  * Fixtures sintéticos chicos.
  */
+import { pedidoAndando } from '@/services/shoplogix/monitorRitmo'
 import { describe, expect, it } from 'vitest'
 import type { ForecastHistoryShift, PublicMonitorLive, ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
@@ -400,6 +401,20 @@ describe('proyección al cierre y frase de empate', () => {
     expect(f.alcanzable).toBe(true)
     const fuera = fraseDeEmpate({ ...hoy, techo: 32 }, rival)!
     expect(fuera.alcanzable).toBe(false)
+  })
+
+  it('29-10: «necesita» va andando (como El turno) y por eso 48,8 de reloj NO cabe bajo un techo de 50,0', () => {
+    const base = { equipo: 'rebolledo' as const, hechas: 7886, ritmoActual: 40.4, minutosQueQuedan: 168, proyeccion: 14670, techo: 50, cerrado: false }
+    const rival = { equipo: 'cardenas' as const, hechas: 16085, ritmoActual: null, minutosQueQuedan: 0, proyeccion: 16085, techo: 50, cerrado: true }
+    /* Sin tiempos del turno queda el de reloj (el caso viejo: parecía alcanzable). */
+    const reloj = fraseDeEmpate(base, rival)!
+    expect(reloj.necesitaPzMin).toBeCloseTo(48.8, 1)
+    expect(reloj.alcanzable).toBe(true)
+    /* 336 min produciendo de 400 disponibles: 48,8 de reloj = 58,1 andando. */
+    const f = fraseDeEmpate({ ...base, andando: { producingMin: 336, disponibleMin: 400 } }, rival)!
+    expect(f.necesitaPzMin).toBeCloseTo(pedidoAndando(48.8, 336, 400)!, 1)
+    expect(f.necesitaPzMin).toBeCloseTo(58.1, 0)
+    expect(f.alcanzable).toBe(false)
   })
 
   it('sin con qué calcular, parejos o el que va atrás ya cerró, no hay frase', () => {
