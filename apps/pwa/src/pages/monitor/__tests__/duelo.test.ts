@@ -38,7 +38,7 @@ const stat = (id: string, p: Partial<ShiftStat> = {}, duelo: Partial<NonNullable
 /** Resumen listo para comparar, con valores neutros que cada prueba pisa. */
 const resumen = (p: Partial<ResumenTurno>): ResumenTurno => ({
   shiftDocId: '2026-10-26_Turno Dia', dateKey: '2026-10-26', jornada: '2026-10-26', h0: '07:00', shiftId: 'Turno Dia', esNoche: false, equipo: 'rebolledo', cerrado: true,
-  piezas: 12000, dispMin: 420, fallasN: 0, fallaMin: 0, piezasMant: 0, ritmo: 30, microMinH: 2, arranqueMin: 10, ultimaHoraPz: 1500,
+  piezas: 12000, dispMin: 420, fallasN: 0, fallaMin: 0, piezasMant: 0, ritmo: 30, microMinH: 2, arranqueMin: 10, arranqueModo: 'primera-pieza', iniProdMin: 10, ultimaHoraPz: 1500,
   puestos: [{ clave: 'evisceradora 1', etiqueta: 'Ev 1', llenado: 90 }], ...p,
 })
 
@@ -224,7 +224,7 @@ describe('compararTurnos: un punto por KPI y por puesto', () => {
     const m = compararTurnos(resumen({ microMinH: null }), resumen({ equipo: 'cardenas', microMinH: 1 }))
     expect(m.kpis.find((k) => k.id === 'micro')!.ganador).toBe('sin-dato')
     expect(m.puntosB).toBe(0)
-    expect(m.enJuego).toBe(4) // 3 KPI con dato + 1 puesto
+    expect(m.puntosPosibles).toBe(4) // 3 KPI con dato + 1 puesto
   })
 
   it('un punto por puesto ganado, cruzando por nombre y sin nombres de operadores', () => {
@@ -668,10 +668,12 @@ describe('construirDuelo: de punta a punta con un turno en curso', () => {
 
   it('las paradas de hoy se ubican en el eje de horas de producción (restando el arranque)', () => {
     const d = construirDuelo({
-      shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy, stats: [], forecast: [],
+      shiftDocId: '2026-11-02_Turno Dia', live, piezas: 3980, cerrado: false, curvaHoy: [...curvaHoy, { minutes: 62, pieces: 3980 }], stats: [], forecast: [],
     })!
     // Primera pieza a las 07:10 (arranque 10 min). La colación de 30 min parte a las 07:40 → minuto 30 de producción.
-    expect(d.hoy.arranqueMin).toBe(10)
+    expect(d.hoy.iniProdMin).toBe(10)
+    // El corte es el último tramo de 5 min cerrado, y las detenciones llegan hasta ahí.
+    expect(d.carrera!.corte).toMatchObject({ hastaAhora: true, minuto: 60 })
     const colacion = d.carrera!.eventosHoy.find((e) => e.corta === 'Colación')!
     expect(colacion).toMatchObject({ desde: 30, hasta: 60, programada: true })
     // La falta de MMPP de 2 min no llega a 5 min: no se marca.

@@ -227,6 +227,8 @@ export interface PublicMonitorLive {
       mtbfMin: number | null
       microN: number
       microMin: number
+      /** Micro (min) de ESTA máquina por hora de producción. Ausente hasta que el backend lo publique. */
+      microH?: number[]
       /** Detenciones sin causa anotada: con esto la tarjeta no reclama 100%
           mientras haya paros que nadie imputó. Ausente en docs previos. */
       sinImputarN?: number
@@ -469,6 +471,11 @@ export interface ShiftDuelo {
    */
   micH?: number[]
   micM?: number[]
+  /**
+   * Micro por máquina Y por hora de producción (filas en el orden de `micM`): el mapa de calor Baader × hora. Todavía NO lo
+   * publica el backend: ausente = «sin dato» por celda (no se reparte el total por hora entre máquinas).
+   */
+  micHM?: number[][]
   /**
    * Minutos sostenidos a ≥ 90 % del esperado: de la línea (`v90`) y de cada máquina (`v90m`, orden de `porMaquina`).
    * Salen de la serie minuto a minuto archivada: turnos sin ella no los traen (no se inventan). `v90m: []` = mirado

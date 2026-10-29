@@ -1,0 +1,107 @@
+/*
+ * Modo TV v2 (`?pantalla=1`) · lienzo fijo de 1920×1080 escalado al viewport (entra también en 1366×768).
+ * Referencia aprobada: docs/mockups/tv_v2.html, variante A. Tarjetas opacas (sin vidrio: en una TV con reflejo baja el
+ * contraste), sin hover ni globos. Escala: cifra principal 248 px, secundarias ≥ 60 px, rótulos ≥ 24 px, nada bajo 22 px.
+ * Tema: la clase `.dark` del documento (el mecanismo del v2); los tokens de texto de equipo dan ≥ 7:1 en los dos temas.
+ */
+.tvv2 {
+  --tv-bg: #F2F1EC; --tv-card: #FFFFFF; --tv-fg: #1D1D1C; --tv-fg2: #4E4D4A; --tv-line: #D4D3CF;
+  --tv-reja: rgb(142 142 147 / .18); --tv-sub: #ECEBE6;
+  --tv-crit: #B1272D; --tv-crit-tv: #8C1A20; --tv-crit-fondo: #9E1F25; --tv-sobre-crit: #FFFFFF; --tv-mant: #F59E0B;
+  --v2-eq-cardenas: #2A6BA6; --v2-eq-rebolledo: #C97F47;
+  --v2-eq-cardenas-tv: #1F527F; --v2-eq-rebolledo-tv: #8A3A1C;
+  position: fixed; inset: 0; overflow: hidden; background: var(--tv-bg); color: var(--tv-fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  user-select: none; cursor: none;
+}
+.dark .tvv2 {
+  --tv-bg: #171614; --tv-card: #222120; --tv-fg: #E8E2D7; --tv-fg2: #BDB6AA; --tv-line: #3E3D3A;
+  --tv-reja: rgb(142 142 147 / .16); --tv-sub: #2A2927;
+  --tv-crit: #C9353B; --tv-crit-tv: #FF9A90; --tv-crit-fondo: #A02228;
+  --v2-eq-cardenas: #7DB4EE; --v2-eq-rebolledo: #E2A476;
+  --v2-eq-cardenas-tv: #7DB4EE; --v2-eq-rebolledo-tv: #E2A476;
+  color-scheme: dark;
+}
+.tvv2 *, .tvv2 *::before, .tvv2 *::after { box-sizing: border-box; }
+.tvv2-lienzo {
+  position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0;
+  padding: 36px 44px; display: grid; grid-template-rows: 92px 1fr; gap: 24px;
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.tvv2 .tv-c { color: var(--v2-eq-cardenas-tv); }
+.tvv2 .tv-r { color: var(--v2-eq-rebolledo-tv); }
+
+.tvv2 .tv-barra { display: flex; align-items: center; gap: 28px; min-width: 0; }
+.tvv2 .tv-linea { font-size: 46px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+.tvv2 .tv-turno { font-size: 28px; color: var(--tv-fg2); white-space: nowrap; min-width: 0; overflow: hidden; }
+.tvv2 .tv-estado {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 14px; font-size: 36px; font-weight: 700;
+  padding: 12px 28px; border-radius: 999px; background: var(--tv-sub); color: var(--tv-fg); white-space: nowrap;
+}
+.tvv2 .tv-estado::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--tv-fg2); }
+.tvv2 .tv-estado[data-det='1'] { background: var(--tv-crit-fondo); color: var(--tv-sobre-crit); }
+.tvv2 .tv-estado[data-det='1']::before { background: var(--tv-sobre-crit); }
+.tvv2 .tv-reloj { font-size: 64px; font-weight: 700; letter-spacing: -.02em; }
+
+.tvv2 .tv-cuerpo { display: grid; grid-template-rows: 1fr 292px; gap: 24px; min-height: 0; }
+.tvv2 .tv-arriba { display: grid; grid-template-columns: 1fr 640px; gap: 24px; min-height: 0; }
+.tvv2 .tv-derecha { display: grid; grid-template-rows: 1fr 1fr; gap: 24px; min-height: 0; }
+
+.tvv2 .tv-tarjeta {
+  background: var(--tv-card); border-radius: 28px; padding: 28px 36px; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; border: 1px solid var(--tv-line);
+}
+.tvv2 .tv-rot { font-size: 28px; font-weight: 600; color: var(--tv-fg2); letter-spacing: .01em; }
+.tvv2 .tv-rot2 { font-size: 24px; color: var(--tv-fg2); }
+
+.tvv2 .tv-hero .tv-cifra { font-size: 248px; font-weight: 750; letter-spacing: -.035em; line-height: .9; margin-top: 8px; }
+.tvv2 .tv-hero .tv-lect { font-size: 26px; color: var(--tv-fg2); margin-top: 12px; }
+.tvv2 .tv-metas { display: grid; grid-template-columns: auto auto 1fr; gap: 0 56px; align-items: end; margin-top: auto; padding-top: 20px; border-top: 2px solid var(--tv-reja); }
+.tvv2 .tv-metas .tv-v { font-size: 72px; font-weight: 700; letter-spacing: -.02em; margin-top: 6px; }
+.tvv2 .tv-dif {
+  justify-self: end; display: flex; align-items: center; gap: 16px; font-size: 72px; font-weight: 750; letter-spacing: -.02em;
+  padding: 6px 28px; border-radius: 20px; background: var(--tv-sub);
+}
+.tvv2 .tv-dif .tv-tri { width: 0; height: 0; border-left: 22px solid transparent; border-right: 22px solid transparent; }
+.tvv2 .tv-dif[data-ad='1'] .tv-tri { border-bottom: 34px solid var(--tv-fg); }
+.tvv2 .tv-dif[data-ad='0'] { color: var(--tv-crit-tv); background: color-mix(in srgb, var(--tv-crit) 12%, var(--tv-card)); }
+.tvv2 .tv-dif[data-ad='0'] .tv-tri { border-top: 34px solid var(--tv-crit-tv); }
+.tvv2 .tv-dif small { font-size: 32px; font-weight: 600; }
+.tvv2 .tv-barra-meta { position: relative; height: 22px; border-radius: 11px; background: var(--tv-sub); margin-top: 20px; }
+.tvv2 .tv-barra-meta i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 11px; background: var(--tv-fg); }
+.tvv2 .tv-barra-meta b { position: absolute; top: -10px; bottom: -10px; width: 5px; border-radius: 3px; background: var(--tv-fg2); }
+.tvv2 .tv-barra-meta-lab { display: flex; justify-content: space-between; font-size: 24px; color: var(--tv-fg2); margin-top: 8px; }
+
+.tvv2 .tv-mini { display: grid; gap: 12px; padding: 24px 32px; align-content: space-between; }
+.tvv2 .tv-fila { display: flex; align-items: baseline; gap: 14px; }
+.tvv2 .tv-big { font-size: 104px; font-weight: 750; letter-spacing: -.03em; line-height: .95; }
+.tvv2 .tv-u { font-size: 30px; font-weight: 600; color: var(--tv-fg2); }
+.tvv2 .tv-sec { font-size: 60px; font-weight: 700; letter-spacing: -.02em; }
+.tvv2 .tv-chips { display: flex; gap: 12px; flex-wrap: wrap; }
+.tvv2 .tv-chips span { font-size: 26px; padding: 6px 14px; border-radius: 14px; white-space: nowrap; background: var(--tv-sub); }
+.tvv2 .tv-chips span b { font-weight: 700; margin-left: 8px; }
+.tvv2 .tv-chips span[data-baja='1'] { background: color-mix(in srgb, var(--tv-crit) 14%, var(--tv-card)); color: var(--tv-crit-tv); }
+.tvv2 .tv-mant .tv-rot::before {
+  content: ""; display: inline-block; width: 22px; height: 22px; border-radius: 5px; margin-right: 12px; vertical-align: -2px;
+  background: repeating-linear-gradient(135deg, var(--tv-mant) 0 3px, transparent 3px 6px); border: 2px solid var(--tv-mant);
+}
+
+.tvv2 .tv-duelo { display: grid; align-items: stretch; grid-template-columns: 700px 1fr; gap: 32px; padding: 20px 36px; }
+.tvv2 .tv-duelo-izq { display: grid; align-content: space-between; min-width: 0; }
+.tvv2 .tv-marcador { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; }
+.tvv2 .tv-marc { display: grid; grid-template-columns: auto auto auto; align-items: end; gap: 0 20px; justify-content: start; }
+.tvv2 .tv-eq { display: grid; justify-items: center; }
+.tvv2 .tv-eq span { font-size: 30px; font-weight: 700; }
+.tvv2 .tv-eq b { font-size: 124px; font-weight: 750; line-height: .9; letter-spacing: -.03em; }
+.tvv2 .tv-gu { font-size: 80px; color: var(--tv-fg2); padding-bottom: 12px; }
+.tvv2 .tv-enjuego { display: grid; gap: 4px; max-width: 270px; font-size: 30px; font-weight: 700; border: 3px dashed rgb(142 142 147 / .75); border-radius: 16px; padding: 8px 18px; }
+.tvv2 .tv-enjuego small { font-size: 24px; font-weight: 500; color: var(--tv-fg2); }
+.tvv2 .tv-sin { font-size: 36px; font-weight: 600; color: var(--tv-fg2); line-height: 1.2; }
+.tvv2 .tv-duelo-der { display: grid; grid-template-rows: auto 1fr; gap: 6px; min-height: 0; }
+.tvv2 .tv-tit { font-size: 40px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+.tvv2 .tv-tit em { font-style: normal; color: var(--tv-fg2); font-weight: 500; }
+.tvv2 .tv-carrera { position: relative; min-height: 0; }
+.tvv2 .tv-carrera svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.tvv2 .t1 { fill: var(--tv-fg); } .tvv2 .t2 { fill: var(--tv-fg2); }
+.tvv2 .tc { fill: var(--v2-eq-cardenas-tv); } .tvv2 .tr { fill: var(--v2-eq-rebolledo-tv); }
+.tvv2 .tv-halo { paint-order: stroke; stroke: var(--tv-card); stroke-width: 8px; stroke-linejoin: round; }
