@@ -2357,6 +2357,39 @@ const STATS_MAX = 62
 const STATS_NUEVOS_POR_CORRIDA = 5
 
 /**
+ * Gracia de las imputaciones tardías (fase 3 de `docs/PLAN_CIERRE_DUELO.md`, 29-10-2026).
+ *
+ * ⚠ Las causas se imputan DESPUÉS del turno. El re-sync móvil las trae a
+ * `shoplogix/` hasta J+3 a las 12:00 (ayer cada hora; hace 2 y 3 días, una vez
+ * al día), pero el caché de abajo reusaba toda entrada con `i > 0`: las noches
+ * Ev del 27 y 28-10 siguieron con «Detencion» 96 y 91 min sin imputar cuando
+ * Shoplogix ya decía ACUMULACION RECHAZO, Falta MMPP… Si la causa hubiera sido
+ * técnica, el Duelo habría contado mal la falla sin ningún aviso.
+ *
+ * Por eso una entrada de los últimos STATS_GRACIA_DIAS se rearma cuando cambia
+ * la huella de su turno (`hu`). `lastSyncAt` no sirve de huella: el re-sync
+ * horario lo mueve aunque nada cambie. Tope por corrida aparte del de nuevos.
+ */
+const STATS_GRACIA_DIAS = 3
+const STATS_GRACIA_POR_CORRIDA = 2
+
+/**
+ * Huella de lo que puede cambiar en un turno cerrado: piezas y causas por
+ * máquina. Sale del doc padre que el índice ya leyó (`machines[].stateAggregates`,
+ * sumado por el sync desde los mismos states), así que no cuesta lecturas.
+ * null = el padre no trae agregados: sin huella no se rearma nada.
+ */
+function huellaTurno(parent) {
+  const ms = Array.isArray(parent?.machines) ? parent.machines : []
+  if (!ms.some(m => Array.isArray(m?.stateAggregates))) return null
+  const base = ms
+    .map(m => [String(m.machineid ?? m.name ?? ''), m.totalCycles ?? 0,
+      (m.stateAggregates || []).map(s => [s.type ?? '', s.name ?? '', s.reason ?? '', s.durationSec ?? 0, s.count ?? 0].join('|')).sort()])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+  return require('crypto').createHash('sha1').update(JSON.stringify(base)).digest('base64').slice(0, 12)
+}
+
+/**
  * Estadística LIVIANA de los últimos turnos, de TODOS los nombres.
  *
  * Por qué existe además de `forecastHistory`:
@@ -2604,17 +2637,26 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
   /* Series minuto a minuto archivadas (≤ 6 turnos): de ahí salen los minutos a ≥ 90 % de `duelo.v90`. */
   const serieDe = new Map((seriesMin || []).filter(e => e && e.shiftDocId).map(e => [e.shiftDocId, e]))
 
+  /* Sin índice (llamadores esporádicos) no hay huella: se conserva el caché de siempre. */
+  const desdeGracia = shiftDateKey(nowWall, -STATS_GRACIA_DIAS)
+  const huellaDe = (id) => (index ? huellaTurno(index.byId.get(id)?.data) : null)
+
   const out = []
   let nuevos = 0
+  let rearmadosGracia = 0
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i]
     const cacheado = previos.get(id)
+    const hu = huellaDe(id)
+    /* Una entrada sin `hu` (anterior a este cambio, o armada con un live del historial) cuenta como cambio: se rearma una vez. */
+    const cambioEnGracia = i > 0 && !!cacheado && hu != null && id.slice(0, 10) >= desdeGracia && cacheado.hu !== hu
+    if (cambioEnGracia && rearmadosGracia >= STATS_GRACIA_POR_CORRIDA) { out.push(cacheado); continue }
     // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
     // `porMaquina` entra con el mismo criterio que `expected` en el pronóstico:
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev) && Array.isArray(cacheado.duelo.cv)
+    if (cacheado && i > 0 && !cambioEnGracia && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev) && Array.isArray(cacheado.duelo.cv)
       /* 5b (28-10-2026): micro por hora/máquina y minutos de línea por causa. Un turno sin ellos se rearma de a
          STATS_NUEVOS_POR_CORRIDA; y uno que ahora SÍ tiene su serie minuto a minuto archivada y aún no trae `v90m`, una vez. */
       && Array.isArray(cacheado.duelo.micH) && Array.isArray(cacheado.duelo.micM)
@@ -2632,14 +2674,16 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
      * se vuelve a mirar (salvo en i === 0, que aún puede moverse).
      */
     if (descartados && i > 0 && !cacheado && descartados.has(id)) continue
-    const live = yaConstruidos.get(id)
-    if (!live && nuevos >= STATS_NUEVOS_POR_CORRIDA) {
+    /* Si cambió en gracia, el live del historial puede ser el viejo: se lee de nuevo desde `shoplogix/`. */
+    const live = cambioEnGracia ? null : yaConstruidos.get(id)
+    if (!live && !cambioEnGracia && nuevos >= STATS_NUEVOS_POR_CORRIDA) {
       if (cacheado) out.push(cacheado)
       continue
     }
     try {
       const l = live || await buildMonitorLive(db, plantSlug, id, index)
-      if (!live) nuevos++
+      if (cambioEnGracia) rearmadosGracia++
+      else if (!live) nuevos++
       const tb = l?.timeBreakdown
       if (!tb || !(tb.windowMin > 0)) {
         if (cacheado) out.push(cacheado)
@@ -2719,6 +2763,8 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
          * escribiendo. El campo solo existe cuando es true.
          */
         ...(conCurva.has(id) ? { tieneCurva: true } : {}),
+        /* Huella del turno con que se armó; solo si el live se leyó recién (uno del historial puede venir de antes). */
+        ...(!live && hu != null ? { hu } : {}),
         tbv: tb.tbv ?? null,
       })
     } catch {
@@ -3366,6 +3412,9 @@ module.exports = {
   buildMonitorHistory,
   buildForecastHistory,
   buildShiftStats,
+  huellaTurno,
+  STATS_GRACIA_DIAS,
+  STATS_GRACIA_POR_CORRIDA,
   buildRivalCurve,
   resumenDuelo,
   minutosA90,

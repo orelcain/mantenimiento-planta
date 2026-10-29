@@ -1530,3 +1530,112 @@ test('shiftStats.duelo: v90 sale de la serie minuto a minuto archivada y un turn
   assert.notEqual(conSerie.find(o => o.shiftDocId === anteayer).total, 777777)
   assert.equal(conSerie.find(o => o.shiftDocId === anteayer).duelo.v90, 3)
 })
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Gracia de imputaciones tardías (fase 3 de PLAN_CIERRE_DUELO, 29-10-2026):
+ * las causas se imputan después del turno y el re-sync las trae hasta J+3.
+ * Una entrada de esos días se rearma cuando cambia la huella de su turno.
+ * ────────────────────────────────────────────────────────────────────────── */
+const { huellaTurno, STATS_GRACIA_DIAS, STATS_GRACIA_POR_CORRIDA } = require('../publicMonitor')
+
+test('huellaTurno cambia con una causa imputada y no con el orden ni con lastSyncAt', () => {
+  const agg = (reason) => [{ type: 'downtime', name: 'Detencion', reason, durationSec: 600, count: 1 }]
+  const p = (reason, extra = {}) => ({ ...extra, machines: [
+    { machineid: 'a', totalCycles: 10, stateAggregates: agg(reason) },
+    { machineid: 'b', totalCycles: 20, stateAggregates: [] },
+  ] })
+  const sinImputar = huellaTurno(p(''))
+  assert.ok(sinImputar)
+  assert.notEqual(huellaTurno(p('ACUMULACION RECHAZO')), sinImputar, 'imputar la causa cambia la huella')
+  assert.equal(huellaTurno(p('', { lastSyncAt: new Date() })), sinImputar, 'el re-sync horario solo mueve lastSyncAt')
+  const alReves = { machines: [...p('').machines].reverse() }
+  assert.equal(huellaTurno(alReves), sinImputar, 'el orden de las máquinas no importa')
+  assert.equal(huellaTurno({ machines: [{ totalCycles: 5 }] }), null, 'sin agregados no hay huella')
+  assert.equal(huellaTurno(undefined), null)
+})
+
+const { describe } = require('node:test')
+
+describe('shiftStats: gracia de imputaciones tardías', () => {
+  const DIA = 86_400_000
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  /** Escenario: hoy + turnos de hace 1..n días; `reason` = la causa que Shoplogix tiene HOY en cada uno. */
+  const escenario = (dias, reason = 'ACUMULACION RECHAZO', nombres = ['Turno Dia']) => {
+    const w = nowWall()
+    const actual = `${dk(w)}_Turno Dia`
+    const parents = { [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] } }
+    const machines = {}
+    const ids = []
+    for (const n of dias) for (const nombre of nombres) {
+      const d = dk(new Date(w.getTime() - n * DIA))
+      const id = `${d}_${nombre}`
+      const h0 = nombre === 'Turno Noche' ? 13 : 4
+      ids.push(id)
+      const m = maquinaStats(2000, hDe(d, h0).getTime())
+      m.states = [{ startAt: hDe(d, h0 + 1).toISOString(), durationSec: 600, type: 'downtime', name: 'Detencion', reason }]
+      machines[id] = [m]
+      parents[id] = { shiftId: nombre, scheduledStart: hDe(d, h0), scheduledEnd: hDe(d, h0 + 8),
+        machines: [{ machineid: 'b200', totalCycles: 2000, stateAggregates: [{ type: 'downtime', name: 'Detencion', reason, durationSec: 600, count: 1 }] }] }
+    }
+    const entries = Object.entries(parents).map(([id, data]) => ({ id, data }))
+    const index = { plantSlug: 'filete', desde: '2000-01-01', entries, byId: new Map(entries.map(e => [e.id, e])) }
+    return { db: fakeShiftsDb(parents, machines), actual, ids, index }
+  }
+  /** Lo publicado antes de imputar: armado con la causa vacía y marcado con un total imposible. */
+  const publicadoAntes = async (dias) => {
+    const e = escenario(dias, '')
+    const out = await buildShiftStats(e.db, 'filete', e.actual, [], [], [], e.index)
+    return out.map(o => ({ ...o, total: 777777 }))
+  }
+
+  test('una entrada en gracia se rearma cuando Shoplogix imputa la causa, y queda con la causa nueva', async () => {
+    const prev = await publicadoAntes([1, 2])
+    const e = escenario([1, 2])
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    const t = out.find(o => o.shiftDocId === e.ids[1])
+    assert.notEqual(t.total, 777777, 'cambió la huella: se rearma')
+    assert.ok(t.recoverable.some(c => c.reason === 'ACUMULACION RECHAZO'), 'con la causa imputada')
+    assert.equal(t.hu, huellaTurno(e.index.byId.get(e.ids[1]).data))
+    // Rearmada, la siguiente corrida la reusa tal cual.
+    const otra = await buildShiftStats(e.db, 'filete', e.actual, out.map(o => ({ ...o, total: 888888 })), [], [], e.index)
+    assert.equal(otra.find(o => o.shiftDocId === e.ids[1]).total, 888888, 'sin cambio: se reusa')
+  })
+
+  test('fuera de la gracia lo publicado queda fijo aunque Shoplogix cambie', async () => {
+    const lejos = STATS_GRACIA_DIAS + 2
+    const prev = await publicadoAntes([1, lejos])
+    const e = escenario([1, lejos])
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    assert.equal(out.find(o => o.shiftDocId === e.ids[1]).total, 777777)
+  })
+
+  test('sin índice no hay huella: el caché se reusa como antes', async () => {
+    const prev = await publicadoAntes([1, 2])
+    const e = escenario([1, 2])
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [])
+    assert.equal(out.find(o => o.shiftDocId === e.ids[1]).total, 777777)
+  })
+
+  test('tope por corrida: con más cambios que el tope, el resto espera a la próxima', async () => {
+    // Día y noche de ayer y anteayer: i = 0 siempre se rearma; los otros tres cambian y el tope deja pasar 2.
+    const nombres = ['Turno Dia', 'Turno Noche']
+    const prev = (await buildShiftStats(escenario([1, 2], '', nombres).db, 'filete', escenario([1, 2], '', nombres).actual, [], [], [], escenario([1, 2], '', nombres).index))
+      .map(o => ({ ...o, total: 777777 }))
+    const e = escenario([1, 2], 'ACUMULACION RECHAZO', nombres)
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    assert.equal(out.length, 4, 'los cuatro turnos siguen en el arreglo')
+    const rearmados = out.filter((o, i) => i > 0 && o.total !== 777777).length
+    assert.equal(rearmados, STATS_GRACIA_POR_CORRIDA)
+    const despues = await buildShiftStats(e.db, 'filete', e.actual, out, [], [], e.index)
+    assert.equal(despues.filter(o => o.total === 777777).length, 0, 'la corrida siguiente rearma el que faltaba')
+  })
+
+  test('una entrada en gracia sin huella guardada se rearma una vez', async () => {
+    const prev = (await publicadoAntes([1, 2])).map(({ hu: _h, ...o }) => o)
+    const e = escenario([1, 2], '')
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    const t = out.find(o => o.shiftDocId === e.ids[1])
+    assert.notEqual(t.total, 777777)
+    assert.ok(t.hu)
+  })
+})
