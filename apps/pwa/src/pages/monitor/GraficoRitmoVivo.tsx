@@ -547,7 +547,7 @@ function RotulosDer({ m }: { m: Modelo }) {
       </text>
       {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 12)} fontSize={12} fontWeight={600} className="fill-foreground tabular-nums">{horasMin(minParadas)}</text>}
       {/* Mide el reloj con ALGUNA Baader detenida, no la línea entera (Análisis cuenta la línea completa: otra cifra, otra medida). */}
-      {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 25)} fontSize={11} className="fill-muted-foreground">alguna Baader parada</text>}
+      {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 25)} fontSize={11} className="fill-muted-foreground">alguna Baader detenida</text>}
     </svg>
   )
 }
