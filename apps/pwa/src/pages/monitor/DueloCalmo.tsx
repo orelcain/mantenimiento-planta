@@ -18,7 +18,7 @@ import { useTamano } from './ampliarHooks'
 import { CarreraCalma } from './CarreraCalma'
 import { DetalleDuelo } from './DetalleDuelo'
 import { COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, nombreCorto, type DatosDuelo, type EquipoId, type NombresEquipos } from './duelo'
-import { construirLados, microDelEquipo, type SerieMinuto } from './dueloDatosPC'
+import { construirLados, microALaMismaHora, microDelEquipo, type SerieMinuto } from './dueloDatosPC'
 import { EQ_ORDEN, TEMAS, equipoDeLado, filasDePuntos, fraseDeVentaja, modeloMarcador, tendenciaDeVentaja, type FilaPunto, type Lado, type ModeloMarcador, type TemaDuelo } from './dueloCalma'
 import { datosAlReloj } from './dueloAlReloj'
 import { dec, int, textoFraseEmpate } from './dueloTextos'
@@ -84,7 +84,8 @@ export function DueloCalmo(p: DueloPCProps) {
     const micro = { cardenas: { totalTurno: null as number | null, nMaquinas: 0 }, rebolledo: { totalTurno: null as number | null, nMaquinas: 0 } }
     for (const e of EQ_ORDEN) {
       const l = lados[e]
-      if (l) { const m = microDelEquipo(l.micro, minuto); micro[e] = { totalTurno: m.totalTurno, nMaquinas: m.nMaquinas } }
+      /* En vivo, el total al lado de la cifra es el de la MISMA hora (la cifra ya lo es): no el turno entero del rival. */
+      if (l) { const m = microDelEquipo(l.micro, minuto); micro[e] = { totalTurno: d.hoy.cerrado ? m.totalTurno : microALaMismaHora(l.micro?.h, minuto, m.nMaquinas)?.totalMin ?? null, nMaquinas: m.nMaquinas } }
     }
     return filasDePuntos({ d, nombres, micro })
   }, [d, nombres, lados, minuto])
@@ -239,7 +240,7 @@ function FilasPuntos({ filas, nombres }: { filas: FilaPunto[]; nombres: NombresE
       <span className="dc-v dc-num" data-gana={gana ? '1' : undefined}>
         <b>{gana && <i className="dc-pt" aria-hidden="true" style={{ background: COLOR_EQUIPO[equipoDeLado(l)] }} />}{v != null ? dec(v, f.dec) : '—'}</b>
         {gana && <span className="dc-sr"> gana el punto</span>}
-        {f.id === 'micro' && (l === 'c' ? f.totalC : f.totalR) != null && <small>{dec((l === 'c' ? f.totalC : f.totalR)!)} min en el turno</small>}
+        {f.id === 'micro' && (l === 'c' ? f.totalC : f.totalR) != null && <small>{dec((l === 'c' ? f.totalC : f.totalR)!)} min {f.totalRotulo ?? 'en el turno'}</small>}
       </span>
     )
   }

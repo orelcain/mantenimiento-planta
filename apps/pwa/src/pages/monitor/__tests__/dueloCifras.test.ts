@@ -351,6 +351,31 @@ describe('corte de las detenciones y de «Por qué se perdió tiempo»', () => {
 
 // ── Proyección y frase de empate ─────────────────────────────────────────────
 
+describe('29-10: el Duelo dice lo mismo que El turno a la misma hora', () => {
+  it('con la «Al cierre» de El turno, la proyección es ESA y el ritmo es el implícito', () => {
+    const curva = [{ minutes: 0, pieces: 0 }, { minutes: 100, pieces: 3000 }]
+    const p = proyeccionAlCierre({ equipo: 'rebolledo', curva, hechas: 3000, minuto: 100, finPrevistoMin: 280, cerrado: false, techo: 50, oficial: 8400 })
+    expect(p.proyeccion).toBe(8400)
+    expect(p.ritmoActual).toBeCloseTo((8400 - 3000) / 180, 5)
+    expect(p.oficial).toBe(true)
+    // Sin la oficial, la de siempre (30 min de curva).
+    expect(proyeccionAlCierre({ equipo: 'rebolledo', curva, hechas: 3000, minuto: 100, finPrevistoMin: 280, cerrado: false, techo: 50 }).proyeccion).toBeCloseTo(3000 + 30 * 180, 3)
+  })
+  it('micro en vivo: el rival cerrado se mide hasta el mismo minuto, no con su turno entero', () => {
+    const r = resumen({})
+    const hoy = { ...r, cerrado: false, microMinH: 1.5 }
+    const rival = { ...r, shiftDocId: '2026-10-28_Turno 1', equipo: 'cardenas' as const, cerrado: true, microMinH: 0.7 }
+    // Noche real del 28-10: 15,2 min de micro en 8 h, pero 12,8 hasta el minuto 292 (4 h 52 min).
+    const microNoche = [4, 0.8, 2.3, 4, 2, 1.3, 0.3, 0.5]
+    const enVivo = { a: microALaMismaHora([5.8, 7.5, 2, 2.8, 2.8], 292, 3)!.minPorHoraPorMaquina, b: microALaMismaHora(microNoche, 292, 3)!.minPorHoraPorMaquina }
+    const fila = compararTurnos(hoy, rival, { microEnVivo: enVivo }).kpis.find((k) => k.id === 'micro')!.filas[0]!
+    expect(fila.b).toBeCloseTo((4 + 0.8 + 2.3 + 4 + 2 * 52 / 60) / (292 / 60) / 3, 5) // 0,9 y no 0,7
+    expect(fila.a).toBeCloseTo(enVivo.a, 5)
+    // Cerrado, manda el turno completo.
+    expect(compararTurnos({ ...hoy, cerrado: true }, rival, { microEnVivo: enVivo }).kpis.find((k) => k.id === 'micro')!.filas[0]!.b).toBe(0.7)
+  })
+})
+
 describe('proyección al cierre y frase de empate', () => {
   /** 30 pz/min constantes durante 100 min. */
   const curva = [{ minutes: 0, pieces: 0 }, { minutes: 50, pieces: 1500 }, { minutes: 100, pieces: 3000 }]

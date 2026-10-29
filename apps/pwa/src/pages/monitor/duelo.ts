@@ -446,8 +446,9 @@ function combinar(x: Resultado, y: Resultado): Resultado {
  * `carreraEnVivo` reemplaza la carrera final por piezas a igual tiempo
  * transcurrido: con el turno de A todavía corriendo, comparar su parcial contra
  * el total del rival sería injusto. En ese caso el punto es provisorio.
+ * `microEnVivo` hace lo mismo con la micro detención (min/h/máq. hasta el mismo minuto de producción).
  */
-export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { carreraEnVivo?: { a: number; b: number } | null }): Marcador {
+export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { carreraEnVivo?: { a: number; b: number } | null; microEnVivo?: { a: number; b: number } | null }): Marcador {
   const cerrado = a.cerrado
   if (a.dispMin != null && b.dispMin != null && cerrado) {
     const chico = Math.min(a.dispMin, b.dispMin)
@@ -476,12 +477,19 @@ export function compararTurnos(a: ResumenTurno, b: ResumenTurno, opciones?: { ca
     filas: [{ rotulo: 'Ritmo', a: a.ritmo, b: b.ritmo, unidad: 'pz/min', decimales: 1, mejor: 'mayor', ganador: comparar(a.ritmo, b.ritmo, 'mayor', 1) }],
     ganador: comparar(a.ritmo, b.ritmo, 'mayor', 1),
   }
+  /* En vivo, hasta el mismo minuto de producción: el 29-10 el rival cerrado entraba con su turno ENTERO (0,7 = 15,1 min en
+     7,6 h) bajo el rótulo «hasta la misma hora»; a esa hora llevaba 12,8 min (0,9). */
+  const microVivo = !cerrado ? opciones?.microEnVivo ?? null : null
+  const microA = microVivo ? microVivo.a : a.microMinH
+  const microB = microVivo ? microVivo.b : b.microMinH
   const micro: KpiMarcador = {
     id: 'micro',
     rotulo: 'Menos micro detenciones',
-    nota: 'Minutos de micro detención por hora disponible, por máquina (clasificación oficial de Shoplogix).',
-    filas: [{ rotulo: 'Micro detención', a: a.microMinH, b: b.microMinH, unidad: 'min/h', decimales: 1, mejor: 'menor', ganador: comparar(a.microMinH, b.microMinH, 'menor', 1) }],
-    ganador: comparar(a.microMinH, b.microMinH, 'menor', 1),
+    nota: microVivo
+      ? 'Minutos de micro detención por hora de producción, por máquina, hasta el mismo minuto de los dos turnos (clasificación oficial de Shoplogix).'
+      : 'Minutos de micro detención por hora disponible, por máquina (clasificación oficial de Shoplogix).',
+    filas: [{ rotulo: 'Micro detención', a: microA, b: microB, unidad: 'min/h', decimales: 1, mejor: 'menor', ganador: comparar(microA, microB, 'menor', 1) }],
+    ganador: comparar(microA, microB, 'menor', 1),
   }
   const ganaArranque = comparar(a.arranqueMin, b.arranqueMin, 'menor')
   const ganaCierre: Resultado = !cerrado ? 'pendiente' : comparar(a.ultimaHoraPz, b.ultimaHoraPz, 'mayor')
@@ -593,6 +601,39 @@ export function piezasAlMinuto(curva: readonly PacePoint[], min: number): number
 export function piezasALaMismaHora(serie: readonly PacePoint[], minutoDeProduccion: number): number | null {
   const v = piezasAlMinuto(serie, minutoDeProduccion)
   return v == null ? null : Math.round(v)
+}
+
+/**
+ * Micro detención «hasta la misma hora»: los minutos de micro de las N máquinas hasta el minuto de producción pedido, ÷ las
+ * horas transcurridas, ÷ N máquinas = minutos por hora por máquina. Es la fórmula de la cifra del duelo (0,7 y 1,2 min/h/máq.).
+ * La hora a medias entra en proporción a lo transcurrido. null sin micro por hora, sin máquinas o con menos de un minuto.
+ */
+export function microALaMismaHora(
+  h: readonly number[] | null | undefined,
+  hastaMin: number,
+  nMaquinas: number,
+): { totalMin: number; horas: number; minPorHoraPorMaquina: number } | null {
+  if (!h?.length || !(nMaquinas > 0) || !(hastaMin >= 1)) return null
+  const horas = hastaMin / 60
+  let total = 0
+  for (let i = 0; i < h.length && i * 60 < hastaMin; i++) total += (h[i] ?? 0) * Math.min(1, (hastaMin - i * 60) / 60)
+  return { totalMin: Math.round(total * 10) / 10, horas, minPorHoraPorMaquina: total / horas / nMaquinas }
+}
+
+/** Las dos micro (hoy y rival) al mismo minuto, para `compararTurnos`; null si a alguno le falta la micro por hora. */
+export function microEnVivoDe(m: MicroHorasDuelo | null | undefined, minuto: number): { a: number; b: number } | null {
+  if (!m) return null
+  const a = microALaMismaHora(m.hoy, minuto, m.nHoy)
+  const b = microALaMismaHora(m.rival, minuto, m.nRival)
+  return a && b ? { a: a.minPorHoraPorMaquina, b: b.minPorHoraPorMaquina } : null
+}
+
+/** Micro por hora de producción de hoy y de su rival (backend `mantencion.microH` / `duelo.micH`) y cuántas Baader cuenta cada uno. */
+export interface MicroHorasDuelo {
+  hoy: number[] | null
+  rival: number[] | null
+  nHoy: number
+  nRival: number
 }
 
 export interface PuntoVentaja {
@@ -1490,6 +1531,8 @@ export interface ProyeccionEquipo {
   /** Lo máximo que puede rendir la línea (la suma de lo esperado de sus máquinas); null si no se sabe. */
   techo: number | null
   cerrado: boolean
+  /** La proyección es la «Al cierre» de El turno (`oficial`), no la de 30 min de la curva. */
+  oficial?: boolean
 }
 
 export function proyeccionAlCierre(o: {
@@ -1502,10 +1545,22 @@ export function proyeccionAlCierre(o: {
   finPrevistoMin: number | null
   cerrado: boolean
   techo: number | null
+  /**
+   * «Al cierre» de El turno (contador + ritmo × minutos productivos que quedan). Manda sobre la de 30 min: el 29-10 el mismo
+   * turno decía 14.182 en El turno y ≈ 14.662 en el Duelo (antes, 14.172 contra 13.216). El ritmo pasa a ser el implícito.
+   */
+  oficial?: number | null
 }): ProyeccionEquipo {
   if (o.cerrado) return { equipo: o.equipo, hechas: o.hechas, ritmoActual: null, minutosQueQuedan: 0, proyeccion: o.hechas, techo: o.techo, cerrado: true }
-  const ritmoActual = ritmoActualDeCurva(o.curva)
   const minutosQueQuedan = o.finPrevistoMin != null ? Math.max(0, o.finPrevistoMin - o.minuto) : null
+  if (o.oficial != null && Number.isFinite(o.oficial) && minutosQueQuedan != null && minutosQueQuedan > 0) {
+    const proyeccion = Math.max(o.hechas, o.oficial)
+    return {
+      equipo: o.equipo, hechas: o.hechas, ritmoActual: (proyeccion - o.hechas) / minutosQueQuedan, minutosQueQuedan,
+      techo: o.techo, cerrado: false, proyeccion, oficial: true,
+    }
+  }
+  const ritmoActual = ritmoActualDeCurva(o.curva)
   return {
     equipo: o.equipo, hechas: o.hechas, ritmoActual, minutosQueQuedan, techo: o.techo, cerrado: false,
     proyeccion: ritmoActual != null && minutosQueQuedan != null ? o.hechas + ritmoActual * minutosQueQuedan : null,
@@ -1612,6 +1667,8 @@ export interface DatosDuelo {
   esperando: EquipoId | null
   /** HH:MM de inicio planificado del turno día, si se conoce (para «corre contra esta curva mañana desde las…»). */
   inicioDia: string | null
+  /** Micro por hora de hoy y del rival: con el día corriendo, el marcador la compara al mismo minuto (`microEnVivoDe`). */
+  microHoras?: MicroHorasDuelo | null
   marcador: Marcador | null
   carrera: CarreraDuelo | null
   semanaAnterior: SemanaAnterior | null
@@ -1661,6 +1718,8 @@ export interface EntradaDuelo {
   overrides?: Readonly<Record<string, EquipoId>> | null
   /** Quién y cuándo corrigió cada turno (`monitor_config.duelo.overridesMeta`). */
   overridesMeta?: Readonly<Record<string, CorreccionMeta>> | null
+  /** «Al cierre» de El turno (`pace.projectedPieces`): UNA proyección en todo el monitor. */
+  proyeccionOficial?: number | null
 }
 
 /** El techo de la línea: la suma de lo esperado (`targetCpm`) de sus máquinas; null si alguna no lo trae (no se inventa). */
@@ -1708,8 +1767,22 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
 
   /* A igual tiempo de turno solo si el fantasma ES el rival del marcador. */
   const mismoRival = rival != null && fantasmaInfo != null && fantasmaInfo.shiftDocId === rival.shiftDocId
+  const statHoy = e.stats.find((s) => s.shiftDocId === hoy.shiftDocId)
+  const statRival = rival ? e.stats.find((s) => s.shiftDocId === rival.shiftDocId) : null
+  const microH = (h: number[] | null | undefined) => (Array.isArray(h) && h.length > 0 ? h : null)
+  const microHoras: MicroHorasDuelo | null = rival
+    ? {
+        hoy: microH(e.live.mantencion?.microH) ?? microH(statHoy?.duelo?.micH),
+        rival: microH(statRival?.duelo?.micH),
+        nHoy: Math.max(1, hoy.puestos.length),
+        nRival: Math.max(1, rival.puestos.length),
+      }
+    : null
   const marcador = rival
-    ? compararTurnos(hoy, rival, { carreraEnVivo: !hoy.cerrado && fantasmaPz != null && mismoRival ? { a: hoy.piezas, b: fantasmaPz } : null })
+    ? compararTurnos(hoy, rival, {
+        carreraEnVivo: !hoy.cerrado && fantasmaPz != null && mismoRival ? { a: hoy.piezas, b: fantasmaPz } : null,
+        microEnVivo: !hoy.cerrado ? microEnVivoDe(microHoras, minuto) : null,
+      })
     : null
 
   /* Dato secundario, sin puntos: el mismo horario de la semana anterior. No aplica a la noche que corre sola. */
@@ -1732,7 +1805,7 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const finPlanMs = Date.parse(e.live.plannedEnd ?? e.live.scheduledEnd ?? '')
   const finPrevistoMin = Number.isFinite(finPlanMs) && Number.isFinite(t0) ? (finPlanMs - t0) / 60_000 : null
   const techo = techoDeLinea(e.live)
-  const proyHoy = proyeccionAlCierre({ equipo: hoy.equipo, curva: curvaHoy, hechas: hoyPz, minuto, finPrevistoMin, cerrado: hoy.cerrado, techo })
+  const proyHoy = proyeccionAlCierre({ equipo: hoy.equipo, curva: curvaHoy, hechas: hoyPz, minuto, finPrevistoMin, cerrado: hoy.cerrado, techo, oficial: e.proyeccionOficial })
   const rivalEq = otroEquipo(hoy.equipo)
   const proyRival: ProyeccionEquipo | null = fantasmaInfo && fantasmaInfo.total != null
     ? { equipo: rivalEq, hechas: fantasmaInfo.total, ritmoActual: null, minutosQueQuedan: 0, proyeccion: fantasmaInfo.total, techo, cerrado: true }
@@ -1757,7 +1830,7 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   /* El costo cuenta el turno que se mira aunque siga corriendo (hasta ahora): ciclo y jornada salen de la misma lista. */
   const paraCosto = [...deStats, hoy]
   return {
-    hoy, rival, abreJornada, esperando, inicioDia, marcador, carrera, semanaAnterior,
+    hoy, rival, abreJornada, esperando, inicioDia, marcador, carrera, semanaAnterior, microHoras,
     ciclo: marcadorDeCiclo(duelos, hoyIndice, hoyIndice),
     cicloPrevio: marcadorDeCiclo(duelos, hoyIndice - 1, hoyIndice),
     rachas: rachasPorEquipo(duelos),
