@@ -6455,7 +6455,17 @@ function MonitorDelToken() {
       const fin = Date.parse(cierreProg)
       return Number.isFinite(t0) && Number.isFinite(fin) && fin > t0 ? (fin - t0) / 60_000 : null
     })()
+    /* P4 (29-10): la TV dentro del MISMO reloj de reproducción que «El turno» y el Duelo (mismas props que abajo). */
     return (
+      <ProveedorReproduccion
+        entrada={repro?.entrada ?? null}
+        tope={repro?.tope ?? null}
+        optimal={comparacion.optimal ?? null}
+        primeraPiezaMs={serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null}
+        meta={data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null}
+        mostradas={hechasMostradas}
+        cerrado={turnoCerrado}
+      >
       <TvV2
         linea={lineTitle}
         turno={[vista?.extraordinario ? 'Turno extraordinario' : (vista?.shiftId || data.shiftId), rangoBarra].filter(Boolean).join(' · ')}
@@ -6492,7 +6502,9 @@ function MonitorDelToken() {
         duelo={datosDuelo}
         nombres={nombresDuelo}
         previstoMin={previstoMinTv}
+        inicioMs={inicioDueloMs}
       />
+      </ProveedorReproduccion>
     )
   }
 
