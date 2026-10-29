@@ -793,6 +793,12 @@ test('el historial reusa lo ya publicado salvo el turno inmediatamente anterior'
   ]
   const histViejo = await buildMonitorHistory(db, 'filete', actual, prevViejo)
   assert.equal(histViejo[1].live.totalPieces, 1000, 'sin la rejilla vigente no se reusa')
+
+  // 29-10 (#1359): un live con `mantencion` medida con la clasificación vieja (sin `clasif`) se rearma; si no, «Anterior»
+  // seguía contando FALLA OPERACIONAL como falla de Mantención. Con la vigente se reusa.
+  const conMant = (clasif) => [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888, timeBreakdown: { tbv: 3 }, mantencion: { porMaquina: [], ...(clasif ? { clasif } : {}) } } }]
+  assert.equal((await buildMonitorHistory(db, 'filete', actual, conMant(null)))[1].live.totalPieces, 1000, 'clasificación vieja: se rearma')
+  assert.equal((await buildMonitorHistory(db, 'filete', actual, conMant(2)))[1].live.totalPieces, 888888, 'clasificación vigente: se reusa')
 })
 
 test('Unscheduled NUNCA gana como turno vigente, ni con mucha producción', async () => {
