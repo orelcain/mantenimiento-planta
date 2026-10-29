@@ -147,8 +147,10 @@ export interface MantTv {
   periodo: string
   fallas: number
   fallaMin: number
-  /** Minutos de línea por falla; null sin fallas. */
+  /** MTTR (min de máquina por falla). La jornada no lo trae: sus minutos son de LÍNEA, no de reparación. */
   mttr: number | null
+  /** Minutos de LÍNEA detenida por las fallas técnicas (la jornada); null cuando la cifra es el MTTR del turno. */
+  lineaMin?: number | null
   /** Piezas que las fallas técnicas quitaron (suma de los dos equipos). */
   piezasPerdidas: number
   porEquipo: Array<{ equipo: EquipoId; nombre: string; fallas: number }>
@@ -163,7 +165,10 @@ export function mantTv(d: DatosDuelo | null | undefined, nombres?: NombresEquipo
     periodo: c.etiqueta,
     fallas,
     fallaMin,
-    mttr: fallas > 0 ? fallaMin / fallas : null,
+    /* 29-10: `fallaMin` de la jornada es tiempo de LÍNEA (las causas repartidas a prorrata): dividido por fallas daba
+       «MTTR 0,4 min» el 28-10 día, con fallas reales de 5 a 7 min por Baader. No es un MTTR: se muestra como línea detenida. */
+    mttr: null,
+    lineaMin: fallaMin,
     piezasPerdidas: Math.round(EQUIPOS.reduce((a, e) => a + c.equipos[e].piezasPerdidas, 0)),
     porEquipo: (['cardenas', 'rebolledo'] as const).map((e) => ({ equipo: e, nombre: nombreCorto(e, nombres), fallas: c.equipos[e].fallasN })),
   }

@@ -59,6 +59,12 @@ describe('TvV2', () => {
     expect(m.textContent).toContain('4 en juego')
     expect(m.textContent).toContain('arranque y cierre · alimentación ×3')
   })
+  it('la jornada muestra minutos de línea detenida, nunca un MTTR (sus minutos no son de reparación)', () => {
+    const { container } = render(<TvV2 {...props()} />)
+    const mant = container.querySelector('.tv-mant')!.textContent ?? ''
+    expect(mant).not.toContain('MTTR')
+    expect(mant).toContain('línea detenida')
+  })
   it('Mantención dice su período y el eje va en horas de producción', () => {
     const { container } = render(<TvV2 {...props()} />)
     expect(screen.getByText(/Mantención · jornada 28\/10/)).toBeTruthy()

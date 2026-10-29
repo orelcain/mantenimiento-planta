@@ -6431,7 +6431,11 @@ function MonitorDelToken() {
      (el contador de Shoplogix, la meta a esta hora, el ritmo de 15 min, el Duelo) y nada más. Sin fetch propio. */
   if (modoPantalla && glass === 'v2') {
     const pvTv = !turnoCerrado && contador.fuente === 'pulso' ? pulsoVivo(data.pulse) : null
-    const ahoraPorIdTv = pvTv?.porMaquina?.length ? new Map(pvTv.porMaquina.map((x) => [x.id, x.cpm])) : null
+    /* Cada Baader con la MISMA ventana que la cifra grande («últimos 15 min»), para que sumen lo de arriba. Antes iba el
+       último minuto del pulso: el 29-10 12:15 la TV decía 40,1 arriba y 7,0 · 14,0 · 16,0 abajo (15 min: 13,7 · 13,2 · 13,2). */
+    const ahoraPorIdTv = duro15?.porMaquina.length
+      ? new Map(duro15.porMaquina.map((x) => [x.id, x.cpm]))
+      : pvTv?.porMaquina?.length ? new Map(pvTv.porMaquina.map((x) => [x.id, x.cpm])) : null
     const prodMinTv = live.timeBreakdown?.producingMin ?? 0
     const promedioTv = prodMinTv > 0 ? live.totalPieces / prodMinTv : null
     const techoTv = live.machines.length > 0 && live.machines.every((m) => (m.targetCpm ?? 0) > 0) ? live.machines.reduce((a, m) => a + (m.targetCpm ?? 0), 0) : null
