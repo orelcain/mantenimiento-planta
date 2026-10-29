@@ -18,7 +18,7 @@ import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
 import type { PublicMonitorLive, ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
 import {
-  curvaDeCv, eventosEnEjeProduccion, marcadorDePeriodo, nombreCorto, ritmoHoraAHora, rotuloFantasma, rotuloTurno, semanaIso,
+  curvaDeCv, eventosEnEjeProduccion, microALaMismaHora, marcadorDePeriodo, nombreCorto, ritmoHoraAHora, rotuloFantasma, rotuloTurno, semanaIso,
   type CorteDuelo, type DatosDuelo, type EquipoId, type EventoTurno, type NombresEquipos, type PuntoEnJuego, type PuntoSemana, type PromedioSemana, type Resultado,
 } from './duelo'
 import { lunesDe } from './repartoSemanal'
@@ -147,22 +147,8 @@ export function microDeHoy(live: Pick<PublicMonitorLive, 'mantencion'> | null | 
   return { h: a.h ?? b.h, m: a.m ?? b.m, total: a.total ?? b.total, ...(hm ? { hm } : {}) }
 }
 
-/**
- * Micro detención «hasta la misma hora»: los minutos de micro de las N máquinas hasta el minuto de producción pedido, ÷ las
- * horas transcurridas, ÷ N máquinas = minutos por hora por máquina. Es la fórmula de la cifra del duelo (0,7 y 1,2 min/h/máq.).
- * La hora a medias entra en proporción a lo transcurrido. null sin micro por hora, sin máquinas o con menos de un minuto.
- */
-export function microALaMismaHora(
-  h: readonly number[] | null | undefined,
-  hastaMin: number,
-  nMaquinas: number,
-): { totalMin: number; horas: number; minPorHoraPorMaquina: number } | null {
-  if (!h?.length || !(nMaquinas > 0) || !(hastaMin >= 1)) return null
-  const horas = hastaMin / 60
-  let total = 0
-  for (let i = 0; i < h.length && i * 60 < hastaMin; i++) total += (h[i] ?? 0) * Math.min(1, (hastaMin - i * 60) / 60)
-  return { totalMin: r1(total), horas, minPorHoraPorMaquina: total / horas / nMaquinas }
-}
+/** Vive en `duelo.ts` (la usa el marcador); se reexporta para el mapa de calor y los tests. */
+export { microALaMismaHora }
 
 export interface MatrizMicro {
   /** Horas de producción (columnas). */

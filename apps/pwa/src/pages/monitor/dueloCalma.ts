@@ -258,6 +258,8 @@ export interface FilaPunto {
   /** Solo micro detención: total del turno de cada equipo, al lado de la cifra normalizada. */
   totalC?: number | null
   totalR?: number | null
+  /** De qué tramo es ese total: «en el turno» (cerrado) o «hasta esta hora» (en vivo, igual que la cifra). */
+  totalRotulo?: string
   nMaquinas?: number | null
 }
 
@@ -305,6 +307,7 @@ export function filasDePuntos(e: EntradaFilas): FilaPunto[] {
     if (f.id === 'micro') {
       fila.totalC = e.micro.cardenas.totalTurno
       fila.totalR = e.micro.rebolledo.totalTurno
+      fila.totalRotulo = enCurso ? 'hasta esta hora' : 'en el turno'
       fila.nMaquinas = Math.max(e.micro.cardenas.nMaquinas, e.micro.rebolledo.nMaquinas) || null
     }
     out.push(fila)
