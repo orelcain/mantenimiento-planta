@@ -13,7 +13,7 @@
  * Función pura. Sin cuadro (turno cerrado, sin reproducción activa, sin curva) devuelve `d` tal cual.
  */
 import {
-  compararTurnos, filasKpiAKpi, fraseDeEmpate, horaTranscurrida, proyeccionAlCierre, puntajeJornada, serieVentaja,
+  compararTurnos, filasKpiAKpi, fraseDeEmpate, horaTranscurrida, microEnVivoDe, proyeccionAlCierre, puntajeJornada, serieVentaja,
   type DatosDuelo, type ProyeccionEquipo,
 } from './duelo'
 import type { CarreraViva } from './useCarreraViva'
@@ -36,7 +36,7 @@ export function datosAlReloj(d: DatosDuelo, viva: CarreraViva | null): DatosDuel
   const py = c.proyeccion[d.hoy.equipo]
   const finPrevistoMin = py && !py.cerrado && py.minutosQueQuedan != null && py.minutosQueQuedan > 0 ? c.minuto + py.minutosQueQuedan : null
   const proyHoy: ProyeccionEquipo | undefined = py && finPrevistoMin != null
-    ? proyeccionAlCierre({ equipo: d.hoy.equipo, curva, hechas, minuto, finPrevistoMin, cerrado: false, techo: py.techo })
+    ? proyeccionAlCierre({ equipo: d.hoy.equipo, curva, hechas, minuto, finPrevistoMin, cerrado: false, techo: py.techo, oficial: py.oficial ? py.proyeccion : null })
     : py
   const proyRival = c.proyeccion[c.rivalEquipo]
   const proyeccion = { ...c.proyeccion, ...(proyHoy ? { [d.hoy.equipo]: proyHoy } : {}) }
@@ -45,7 +45,7 @@ export function datosAlReloj(d: DatosDuelo, viva: CarreraViva | null): DatosDuel
   /* El marcador cuenta la fila «Carrera» con las piezas a igual tiempo SOLO si el fantasma es el rival del marcador. */
   const mismoRival = d.rival != null && c.fantasmaInfo != null && c.fantasmaInfo.shiftDocId === d.rival.shiftDocId
   const marcador = d.rival && d.marcador && fantasmaPz != null && mismoRival
-    ? compararTurnos(d.hoy, d.rival, { carreraEnVivo: { a: hechas, b: fantasmaPz } })
+    ? compararTurnos(d.hoy, d.rival, { carreraEnVivo: { a: hechas, b: fantasmaPz }, microEnVivo: microEnVivoDe(d.microHoras, minuto) })
     : d.marcador
 
   return {

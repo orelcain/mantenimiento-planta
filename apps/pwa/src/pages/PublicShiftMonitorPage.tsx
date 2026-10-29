@@ -6051,6 +6051,7 @@ function MonitorDelToken() {
         series: data.seriesMinuto ?? null,
         overrides: configDuelo.overrides,
         overridesMeta: configDuelo.overridesMeta,
+        proyeccionOficial: turnoCerrado ? null : pace?.projectedPieces ?? null,
       })
     : null
   const inicioDueloMs = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null
