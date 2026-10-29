@@ -418,6 +418,56 @@ export interface PublicShiftMonitorDoc {
    * `buildRivalCurve`. null/ausente si no hay un rival presentable.
    */
   rivalCurve?: RivalCurve | null
+  /**
+   * Falla repetida (28-10-2026): paros de Mantención cuya misma causa vuelve en
+   * la misma máquina en ≤ 8 h de operación. Serie y ranking los calcula el cron
+   * diario `recalcularFallaRepetida`; los avisos, cada refresco. Ausente hasta
+   * la primera corrida del cron; null si falló.
+   */
+  fallaRepetida?: FallaRepetidaMonitor | null
+}
+
+export interface FallaRepetidaMes {
+  /** YYYY-MM */
+  mes: string
+  /** Episodios con 8 h de operación por delante (los demás todavía no se saben). */
+  episodios: number
+  /** De esos, cuántos volvieron en ≤ 8 h de operación. */
+  vuelven: number
+  tasa: number
+  /** Menos de 30 episodios: la tasa del mes es ruido. */
+  pocosDatos: boolean
+}
+
+export interface FallaRepetidaCausa {
+  causa: string
+  episodios: number
+  vuelven: number
+  tasa: number
+  /** Tasa de un momento cualquiera de operación (la referencia contra la que se lee `tasa`). */
+  azar: number
+}
+
+export interface FallaRepetidaAviso {
+  machineId: string
+  machineName: string
+  causa: string
+  /** Fin del paro, wall-clock-as-UTC. */
+  finAt: string
+  vuelven: number
+  episodios: number
+  /** «6 de cada 10». */
+  deCada10: number
+  /** Este paro ya era la vuelta de uno anterior del turno. */
+  esRepeticion: boolean
+}
+
+export interface FallaRepetidaMonitor {
+  meses: FallaRepetidaMes[]
+  causas: FallaRepetidaCausa[]
+  avisos: FallaRepetidaAviso[]
+  desde: string | null
+  calculadoEl: string | null
 }
 
 /** Curva del último turno cerrado del otro horario. `curve` son objetos `{m, p}` (Firestore rechaza arrays anidados). */

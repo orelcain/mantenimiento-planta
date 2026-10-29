@@ -248,3 +248,9 @@
   .an-h { --h: 256px; --gut: 52px; --bw: 52px; }
 }
 @media (prefers-reduced-motion: reduce) { .an-row, .an-col { transition: none; } }
+
+/* T6 · Fallas que vuelven (28-10-2026): barra de tasa con la raya de la meta encima. */
+.an-c-fr { margin-top: 8px; }
+.an-fr-bt { position: relative; background: var(--v2-reja); }
+.an-fr-meta { position: absolute; top: -3px; bottom: -3px; width: 1.5px; margin-left: -0.75px; background: rgb(var(--foreground) / 0.55); }
+.an-fr-poco .an-vv, .an-fr-poco b { color: rgb(var(--muted-foreground)); font-weight: 400; }

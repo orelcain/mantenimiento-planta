@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-10-28 · Claude · Falla repetida (PR 2): cron + Monitor (serie y aviso)
+- Hecho: cron diario `recalcularFallaRepetida` (05:45, chonchi/yal/filete, 300 días) → `shoplogixReincidencia/{planta}` con serie mensual (marca «pocos datos» < 30 fallas) y ranking de causas con su azar. El Monitor lo publica en `fallaRepetida` (+ avisos del turno en cada refresco). Análisis: tarjeta «¿Las reparaciones aguantan o la falla vuelve?» (2A) con meta 30 %. El turno: aviso «Falla que suele volver» 30 min tras soltar un paro de causa con tasa ≥ 30 % y ≥ 10 fallas (3A, sin botones: el Monitor es de solo lectura).
+- Archivos: `functions/shoplogix/fallaRepetida.js` (+ test), `functions/index.js`, `functions/publicMonitor.js`, `publicShiftMonitor.service.ts`, `AnalisisV2.tsx` + css, `AvisoFallaRepetida.tsx`, `avisosVigentes.ts`, `PublicShiftMonitorPage.tsx`.
+- Verificación: functions 645 ok; vitest 4655 ok; tsc 0; eslint 29 (tope 30); audit-piel igual. Módulo corrido sobre el volcado real: Chonchi ago 62 % de 170, sep 43 % de 47, oct 30 % de 76 = estudio. Preview con arnés temporal (no commiteado) en claro/oscuro/375 px.
+- Estado: EN REVISIÓN (PR, sin mergear — aprueba Orel)
+- Sigue: la tarjeta y el aviso aparecen después de la primera corrida del cron (05:45 del día siguiente al deploy) o de correrlo a mano. ≈ 6.000 lecturas/día entre las 3 plantas.
+
 ## 2026-10-27 · Claude · Informe de turno: correo HTML + PDF rehecho
 - Hecho: `correoTurno.js` (correo de una columna: veredicto, 4 cifras, pérdida por dueño, fallas por máquina con «volvió a ritmo», cotejo con min de Mantención, lo abierto) reutilizando `construirDatosInforme`. PDF rehecho al estándar /sin-tics-visual con tildes: 5 láminas + anexo solo con varias máquinas. Sin envío de correo desde el servidor (decisión de Orel): callable `informeTurnoCorreo` (admin) + botones «Copiar correo» (portapapeles con formato) y «Descargar PDF» en el monitor; se manda desde el Outlook propio. Telegram igual.
 - Corregido: `recuperacion` contaba la colación (Chonchi 21-10 T2: «Cintas 69 min» → 0); Mantención redondeada distinto en tabla y Telegram.
