@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tipFilaJornada, tipHora, tipMicro, tipParada, tipSost, tipsCarriles } from '../dueloTextos'
+import { duracion, textoAdelanteAtras, textoFraseEmpate, tipFilaJornada, tipHora, tipMicro, tipParada, tipSost, tipsCarriles } from '../dueloTextos'
 
 describe('dueloTextos · globos del Duelo', () => {
   it('la hora dice quién gana y por cuánto, con unidad', () => {
@@ -40,11 +40,32 @@ describe('dueloTextos · globos del Duelo', () => {
   it('la fila de jornada nombra a cada equipo y la ventaja negativa se explica', () => {
     const t = tipFilaJornada({
       jornada: '2026-10-27', noche: { eq: 'cardenas', pz: 15427 }, dia: { eq: 'rebolledo', pz: 13541 },
-      puntos: { c: 10, r: 2 }, ganador: 'cardenas', dif: -5, vivo: null,
+      puntos: { c: 10, r: 2 }, ganador: 'cardenas', dif: -5, liderPiezas: 'rebolledo', vivo: null,
     }, { cardenas: 'Cárdenas', rebolledo: 'Rebolledo' })
     expect(t).toContain('noche: Cárdenas 15.427 pz')
     expect(t).toContain('día: Rebolledo 13.541 pz')
     expect(t).toContain('puntos 10 a 2')
     expect(t).toContain('ganó por puntos con menos piezas')
+  })
+})
+
+describe('dueloTextos · carrera con el glosario', () => {
+  it('la ventaja se dice «N adelante / N atrás», nunca con signo suelto', () => {
+    expect(textoAdelanteAtras('Cárdenas', 280)).toBe('Cárdenas 280 adelante')
+    expect(textoAdelanteAtras('Cárdenas', -280)).toBe('Cárdenas 280 atrás')
+    expect(textoAdelanteAtras('Cárdenas', 0)).toBe('parejos')
+  })
+
+  it('la duración se lee en horas y minutos', () => {
+    expect(duracion(79)).toBe('1 h 19 min')
+    expect(duracion(45)).toBe('45 min')
+    expect(duracion(120)).toBe('2 h')
+  })
+
+  it('la frase de empate trae lo que necesita, lo que hace y su techo', () => {
+    const f = { equipo: 'cardenas', rival: 'rebolledo', metaPz: 13400, hechas: 10400, minutosQueQuedan: 79, necesitaPzMin: 37.8, ritmoActual: 37.2, techo: 42.2, alcanzable: true } as const
+    expect(textoFraseEmpate(f, { equipo: 'Cárdenas', rival: 'Rebolledo' }))
+      .toBe('Cárdenas necesita 37,8 pz/min en 1 h 19 min para llegar a las 13.400 de Rebolledo; va a 37,2 y su techo es 42,2.')
+    expect(textoFraseEmpate({ ...f, necesitaPzMin: 50, alcanzable: false }, { equipo: 'Cárdenas', rival: 'Rebolledo' })).toContain('no alcanza')
   })
 })

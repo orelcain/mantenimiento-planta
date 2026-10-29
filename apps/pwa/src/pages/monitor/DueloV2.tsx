@@ -10,7 +10,6 @@
 import { useState, type ReactNode } from 'react'
 import { Flag, Trophy, Wrench } from 'lucide-react'
 import { Button, ListCell, ListGroup, Pill, SegmentedControl } from '@/components/piel'
-import { useAnchoMin } from './ampliarHooks'
 import { Tarjeta } from './AmpliarV2'
 import { CarreraDueloV2 } from './CarreraDueloV2'
 import { DueloPC, type DueloPCExtra } from './DueloPC'
@@ -103,7 +102,7 @@ function BloqueCarrera({ d, nombres, inicioMs, plano, className }: { d: DatosDue
       {c ? (
         <>
           <div className="mt-3 text-[13px] text-muted-foreground">
-            {corre === 'abre' ? `${a.nombre} abre la jornada ${jornada}` : corre === 'espera' ? `${a.nombre} cerró la jornada ${jornada} con` : `${rotuloTurno(a.nombre, d.hoy)} lleva`}
+            {corre === 'abre' ? `${a.nombre} abre la jornada ${jornada}` : corre === 'espera' ? `${a.nombre} cerró la jornada ${jornada} con` : `${rotuloTurno(a.nombre, d.hoy)} · hechas`}
           </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <span className="v2-cifra-chica tabular-nums font-semibold leading-none tracking-tight text-foreground">{int(c.hoyPz)} pz</span>
@@ -111,7 +110,7 @@ function BloqueCarrera({ d, nombres, inicioMs, plano, className }: { d: DatosDue
               c.diferencia === 0
                 ? <span className="text-[17px] font-semibold text-muted-foreground">Parejos con {b.nombre}</span>
                 : <span className="text-[22px] font-semibold leading-none tabular-nums" style={{ color: COLOR_EQUIPO_TEXTO[lider!.id] }}>
-                    {c.diferencia > 0 ? `${firmado(c.diferencia)} pz sobre ${b.nombre}` : `${b.nombre} ${firmado(-c.diferencia)} pz`}
+                    {c.diferencia > 0 ? `${int(c.diferencia)} adelante de ${b.nombre}` : `${int(-c.diferencia)} atrás de ${b.nombre}`}
                   </span>
             )}
             {lider && <span className="sr-only">{lider.nombre} va adelante</span>}
@@ -186,6 +185,7 @@ function BloqueRitmo({ d, nombres, plano, className }: { d: DatosDuelo; nombres:
 
 function BloqueMarcador({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   const m = d.marcador
+  const puntaje = d.puntaje
   const { a, b } = lados(d, nombres)
   if (!m || !d.rival) {
     return (
@@ -212,7 +212,8 @@ function BloqueMarcador({ d, nombres, plano, className }: { d: DatosDuelo; nombr
       ) : (
         <>
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 tabular-nums">
-            <span className="v2-cifra-chica font-semibold leading-none text-foreground">{m.puntosA} – {m.puntosB}</span>
+            <span className="v2-cifra-chica font-semibold leading-none text-foreground">{puntaje?.firmes.a ?? m.puntosA} – {puntaje?.firmes.b ?? m.puntosB}</span>
+            {puntaje && puntaje.enJuego > 0 && <span className="text-[13px] text-muted-foreground">{puntaje.enJuego} en juego</span>}
             <span className="text-[15px] text-muted-foreground">
               <span style={{ color: COLOR_EQUIPO_TEXTO[a.id] }}>{a.nombre}</span> contra <span style={{ color: COLOR_EQUIPO_TEXTO[b.id] }}>{b.nombre}</span>
             </span>
@@ -263,7 +264,7 @@ function FilaCiclo({ c, nombres, hoy }: { c: CicloDuelo; nombres: NombresEquipos
             <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted-foreground/[0.12]">
               <div className="duelo-barra-x h-full rounded-full" style={{ width: `${Math.max(2, (c.puntos[e] / max) * 100)}%`, background: COLOR_EQUIPO[e] }} />
             </div>
-            <div className="mt-1 text-[13px] tabular-nums text-muted-foreground">{c.ganados[e]} de {c.jugados[e]} {c.jugados[e] === 1 ? 'turno ganado' : 'turnos ganados'}</div>
+            <div className="mt-1 text-[13px] tabular-nums text-muted-foreground">{c.ganados[e]} de {c.jugados[e]} {c.jugados[e] === 1 ? 'jornada ganada' : 'jornadas ganadas'}</div>
           </li>
         ))}
       </ul>
@@ -331,7 +332,7 @@ function BloqueRecords({ d, nombres, plano, className }: { d: DatosDuelo; nombre
         <Nota>Todavía no hay turnos con datos suficientes para armar récords.</Nota>
       )}
       <div className="mt-3">
-        <ListGroup title="Racha de turnos ganados">
+        <ListGroup title="Racha de jornadas ganadas">
           {EQUIPOS.map((e) => (
             <ListCell key={e} title={nombreCorto(e, nombres)} subtitle={`mejor racha: ${rachaTxt(d.rachas[e].mejor)}`} value={rachaTxt(d.rachas[e].actual)} />
           ))}
@@ -343,17 +344,17 @@ function BloqueRecords({ d, nombres, plano, className }: { d: DatosDuelo; nombre
 
 function BloqueCosto({ d, nombres, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; plano: boolean; className?: string }) {
   return (
-    <Seccion titulo="Costo de Mantención" sub="Lo que las fallas técnicas le quitaron a cada equipo en este ciclo" plano={plano} className={className} icono={<Wrench className="h-3.5 w-3.5" />}>
+    <Seccion titulo="Costo de Mantención" sub={`Lo que las fallas técnicas le quitaron a cada equipo en el ${d.costo.etiqueta}`} plano={plano} className={className} icono={<Wrench className="h-3.5 w-3.5" />}>
       <div className="mt-3">
         <ListGroup>
           {EQUIPOS.map((e) => {
-            const c = d.costo[e]
+            const c = d.costo.equipos[e]
             return (
               <ListCell
                 key={e}
                 title={nombreCorto(e, nombres)}
                 subtitle={c.turnos === 0
-                  ? 'sin turnos en el ciclo'
+                  ? `sin turnos en el ${d.costo.periodo === 'ciclo' ? 'ciclo' : 'período'}`
                   : c.fallasN === 0
                     ? `${c.turnos} ${c.turnos === 1 ? 'turno' : 'turnos'} sin fallas técnicas`
                     : `${c.fallasN} ${c.fallasN === 1 ? 'falla' : 'fallas'} · ${horas(c.fallaMin)}${c.minPorFalla != null ? ` · ${dec1(c.minPorFalla)} min por falla` : ''}`}
@@ -472,11 +473,11 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
           />
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             {lider ? (
-              <span className="text-[17px] font-semibold tabular-nums" style={{ color: COLOR_EQUIPO_TEXTO[lider.id] }}>{lider.nombre} {firmado(Math.abs(c.diferencia ?? 0))} pz</span>
+              <span className="text-[17px] font-semibold tabular-nums" style={{ color: COLOR_EQUIPO_TEXTO[lider.id] }}>{lider.nombre} {int(Math.abs(c.diferencia ?? 0))} adelante</span>
             ) : (
               <span className="text-[15px] text-muted-foreground">Parejos</span>
             )}
-            {m && !m.sinDuelo && <span className="text-[13px] tabular-nums text-muted-foreground">marcador {m.puntosA} – {m.puntosB}{datos.hoy.cerrado ? '' : ' en juego'}</span>}
+            {m && !m.sinDuelo && <span className="text-[13px] tabular-nums text-muted-foreground">marcador {datos.puntaje?.firmes.a ?? m.puntosA} – {datos.puntaje?.firmes.b ?? m.puntosB}{datos.puntaje && datos.puntaje.enJuego > 0 ? ` · ${datos.puntaje.enJuego} en juego` : ''}</span>}
             {m?.sinDuelo && <span className="text-[13px] text-muted-foreground">sin duelo en este turno</span>}
           </div>
           <CarreraDueloV2
@@ -598,10 +599,9 @@ export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeE
   /** Lo que el Duelo en PC necesita además de `datos`; sin él (o con menos de 1280 px) se arma la pestaña de siempre. */
   pc?: DueloPCExtra | null
 }) {
-  const anchoPc = useAnchoMin(1280)
-  if (datos && pc && anchoPc) {
-    /* Opción B «Eje» (5b): una sola pantalla sin scroll. Arriba, y solo si hace falta, una fila fina con el selector de
-       línea (sin sesión) y los avisos; el editor de supervisores queda debajo del pliegue. */
+  if (datos && pc) {
+    /* Duelo «calmo» (28-10): el MISMO componente en PC y en celular, con revelado progresivo. Arriba, y solo si hace falta,
+       una fila fina con el selector de línea (sin sesión) y los avisos; el editor de supervisores queda debajo. */
     const hayAviso = datos.corregido || datos.listos.con < datos.listos.de
     const hayHermanas = !!lineas && lineas.hermanas.length > 0
     return (
@@ -614,7 +614,7 @@ export function PestanaDueloV2({ datos, nombres, unidad, inicioMs, token, puedeE
           extra={pc}
           superior={hayHermanas || hayAviso ? (
             <>
-              {hayHermanas && <SelectorLinea lineas={lineas!} className="dpc-linea" />}
+              {hayHermanas && <SelectorLinea lineas={lineas!} className="dc-linea" />}
               {hayAviso && <div className="ml-auto"><AvisoDuelo d={datos} nombres={nombres} /></div>}
             </>
           ) : null}
