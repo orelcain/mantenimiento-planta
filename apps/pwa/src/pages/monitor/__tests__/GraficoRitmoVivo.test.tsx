@@ -550,3 +550,29 @@ describe('GraficoRitmoVivo · sigue al reloj único de la cola', () => {
   })
 
 })
+
+describe('leyenda y rótulo de detenciones', () => {
+  it('«hoy N atrás/adelante» sale de las hechas de la cifra grande (9.671), no de la serie al minuto (9.690)', () => {
+    const entrada = {
+      desdeMs: INI,
+      maquinas: [
+        { id: 'a', nombre: 'Evisceradora 1', esperado: 19, cycles: [3309] },
+        { id: 'b', nombre: 'Evisceradora 2', esperado: 16, cycles: [3071] },
+        { id: 'c', nombre: 'Evisceradora 3', esperado: 16, cycles: [3291] },
+      ],
+      paradas: {},
+      pulsoAtMs: null,
+    }
+    const conRepro = { ...p, repro: { entrada, tope: armarTope(9690, null) } } as unknown as MonitorV2Props
+    const { container } = render(<GraficoRitmoVivo p={conRepro} e={eje} reloj={reloj} />)
+    const t = container.textContent ?? ''
+    expect(t).toContain('lun 26 · 9.325 hechas a esta hora')
+    expect(t).toContain('hoy 346 adelante')
+    expect(t).not.toContain('hoy 365 adelante')
+  })
+
+  it('el tiempo de detenciones dice que mide minutos con «alguna Baader parada»', () => {
+    render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+    expect(screen.getByText('alguna Baader parada')).toBeTruthy()
+  })
+})

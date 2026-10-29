@@ -546,6 +546,8 @@ function RotulosDer({ m }: { m: Modelo }) {
         {nParadas > 0 ? `${nParadas} ${nParadas === 1 ? 'detención' : 'detenciones'}` : 'sin detenciones'}
       </text>
       {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 12)} fontSize={12} fontWeight={600} className="fill-foreground tabular-nums">{horasMin(minParadas)}</text>}
+      {/* Mide el reloj con ALGUNA Baader detenida, no la línea entera (Análisis cuenta la línea completa: otra cifra, otra medida). */}
+      {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 25)} fontSize={11} className="fill-muted-foreground">alguna Baader parada</text>}
     </svg>
   )
 }
@@ -1066,7 +1068,10 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     </div>
   )
   const pc = modelo?.previoCifra
-  const difHoy = pc && modelo ? modelo.ultima.v - pc.piezas : null
+  /* «Hoy N atrás» sale de las MISMAS hechas de la cifra grande (cuadro vivo o, sin él, las mostradas), no de la serie al minuto:
+     8.812 − 7.891 son 921, no 887. */
+  const hechasHoy = vivas?.hechas ?? mostradas
+  const difHoy = pc && modelo ? hechasHoy - pc.piezas : null
   const leyenda = (
     <div className={`flex flex-wrap items-center gap-x-[14px] gap-y-1.5 text-[12px] leading-4 text-muted-foreground ${chico ? '' : 'ml-auto'}`}>
       <Muestra trazo="hoy" color="var(--v2-acento)" rotulo={p.cerrado ? 'este turno' : 'hoy'} />
