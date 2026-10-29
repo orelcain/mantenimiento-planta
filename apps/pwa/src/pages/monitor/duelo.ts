@@ -33,6 +33,7 @@ import type {
 import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import { desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
 import { duenoDe } from '@/services/shoplogix/monitorEventos'
+import { pedidoAndando } from '@/services/shoplogix/monitorRitmo'
 import { numeroDeTurno } from './aporteHistorico'
 import { arranqueDeTurno, type ModoArranque, type SerieMinuto } from './dueloSerie'
 import { lunesDe, repartoDeTurno } from './repartoSemanal'
@@ -1533,6 +1534,13 @@ export interface ProyeccionEquipo {
   cerrado: boolean
   /** La proyección es la «Al cierre» de El turno (`oficial`), no la de 30 min de la curva. */
   oficial?: boolean
+  /** Minutos produciendo y disponibles del turno: con ellos lo que se pide de reloj pasa a «andando», la vara del techo. */
+  andando?: AndandoDelTurno | null
+}
+
+export interface AndandoDelTurno {
+  producingMin: number
+  disponibleMin: number
 }
 
 export function proyeccionAlCierre(o: {
@@ -1550,6 +1558,7 @@ export function proyeccionAlCierre(o: {
    * turno decía 14.182 en El turno y ≈ 14.662 en el Duelo (antes, 14.172 contra 13.216). El ritmo pasa a ser el implícito.
    */
   oficial?: number | null
+  andando?: AndandoDelTurno | null
 }): ProyeccionEquipo {
   if (o.cerrado) return { equipo: o.equipo, hechas: o.hechas, ritmoActual: null, minutosQueQuedan: 0, proyeccion: o.hechas, techo: o.techo, cerrado: true }
   const minutosQueQuedan = o.finPrevistoMin != null ? Math.max(0, o.finPrevistoMin - o.minuto) : null
@@ -1557,12 +1566,12 @@ export function proyeccionAlCierre(o: {
     const proyeccion = Math.max(o.hechas, o.oficial)
     return {
       equipo: o.equipo, hechas: o.hechas, ritmoActual: (proyeccion - o.hechas) / minutosQueQuedan, minutosQueQuedan,
-      techo: o.techo, cerrado: false, proyeccion, oficial: true,
+      techo: o.techo, cerrado: false, proyeccion, oficial: true, andando: o.andando,
     }
   }
   const ritmoActual = ritmoActualDeCurva(o.curva)
   return {
-    equipo: o.equipo, hechas: o.hechas, ritmoActual, minutosQueQuedan, techo: o.techo, cerrado: false,
+    equipo: o.equipo, hechas: o.hechas, ritmoActual, minutosQueQuedan, techo: o.techo, cerrado: false, andando: o.andando,
     proyeccion: ritmoActual != null && minutosQueQuedan != null ? o.hechas + ritmoActual * minutosQueQuedan : null,
   }
 }
@@ -1576,7 +1585,7 @@ export interface FraseEmpate {
   metaPz: number
   hechas: number
   minutosQueQuedan: number
-  /** (meta − hechas) ÷ minutos que quedan. */
+  /** (meta − hechas) ÷ minutos que quedan, pasado a «andando» (como «necesario» de El turno) para compararlo con el techo. */
   necesitaPzMin: number
   ritmoActual: number | null
   techo: number | null
@@ -1589,7 +1598,10 @@ export function fraseDeEmpate(a: ProyeccionEquipo, b: ProyeccionEquipo): FraseEm
   if (a.proyeccion == null || b.proyeccion == null || Math.round(a.proyeccion) === Math.round(b.proyeccion)) return null
   const [atras, rival] = a.proyeccion < b.proyeccion ? [a, b] : [b, a]
   if (atras.cerrado || atras.minutosQueQuedan == null || !(atras.minutosQueQuedan > 0)) return null
-  const necesitaPzMin = (rival.proyeccion! - atras.hechas) / atras.minutosQueQuedan
+  const necesitaReloj = (rival.proyeccion! - atras.hechas) / atras.minutosQueQuedan
+  /* El techo es ANDANDO (suma de `targetCpm`) y los minutos que quedan son de reloj, colación incluida: comparados tal cual,
+     48,8 «cabía» bajo 50,0 cuando andando eran ~58. Sin tiempos del turno queda el de reloj. */
+  const necesitaPzMin = pedidoAndando(necesitaReloj, atras.andando?.producingMin, atras.andando?.disponibleMin) ?? necesitaReloj
   return {
     equipo: atras.equipo, rival: rival.equipo, metaPz: Math.round(rival.proyeccion!), hechas: atras.hechas,
     minutosQueQuedan: atras.minutosQueQuedan, necesitaPzMin, ritmoActual: atras.ritmoActual, techo: atras.techo,
@@ -1722,6 +1734,13 @@ export interface EntradaDuelo {
   proyeccionOficial?: number | null
 }
 
+/** Minutos produciendo y disponibles (ventana − convenio) del turno, como los de «necesario» en El turno; null sin desglose. */
+export function andandoDeLive(live: Pick<PublicMonitorLive, 'timeBreakdown'>): AndandoDelTurno | null {
+  const tb = live.timeBreakdown
+  if (!tb || tb.producingMin == null) return null
+  return { producingMin: tb.producingMin, disponibleMin: Math.max(1, tb.windowMin - (tb.plannedMin ?? 0)) }
+}
+
 /** El techo de la línea: la suma de lo esperado (`targetCpm`) de sus máquinas; null si alguna no lo trae (no se inventa). */
 export function techoDeLinea(live: Pick<PublicMonitorLive, 'machines'>): number | null {
   const ms = live.machines ?? []
@@ -1805,7 +1824,7 @@ export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const finPlanMs = Date.parse(e.live.plannedEnd ?? e.live.scheduledEnd ?? '')
   const finPrevistoMin = Number.isFinite(finPlanMs) && Number.isFinite(t0) ? (finPlanMs - t0) / 60_000 : null
   const techo = techoDeLinea(e.live)
-  const proyHoy = proyeccionAlCierre({ equipo: hoy.equipo, curva: curvaHoy, hechas: hoyPz, minuto, finPrevistoMin, cerrado: hoy.cerrado, techo, oficial: e.proyeccionOficial })
+  const proyHoy = proyeccionAlCierre({ equipo: hoy.equipo, curva: curvaHoy, hechas: hoyPz, minuto, finPrevistoMin, cerrado: hoy.cerrado, techo, oficial: e.proyeccionOficial, andando: andandoDeLive(e.live) })
   const rivalEq = otroEquipo(hoy.equipo)
   const proyRival: ProyeccionEquipo | null = fantasmaInfo && fantasmaInfo.total != null
     ? { equipo: rivalEq, hechas: fantasmaInfo.total, ritmoActual: null, minutosQueQuedan: 0, proyeccion: fantasmaInfo.total, techo, cerrado: true }

@@ -36,7 +36,7 @@ export function datosAlReloj(d: DatosDuelo, viva: CarreraViva | null): DatosDuel
   const py = c.proyeccion[d.hoy.equipo]
   const finPrevistoMin = py && !py.cerrado && py.minutosQueQuedan != null && py.minutosQueQuedan > 0 ? c.minuto + py.minutosQueQuedan : null
   const proyHoy: ProyeccionEquipo | undefined = py && finPrevistoMin != null
-    ? proyeccionAlCierre({ equipo: d.hoy.equipo, curva, hechas, minuto, finPrevistoMin, cerrado: false, techo: py.techo, oficial: py.oficial ? py.proyeccion : null })
+    ? proyeccionAlCierre({ equipo: d.hoy.equipo, curva, hechas, minuto, finPrevistoMin, cerrado: false, techo: py.techo, oficial: py.oficial ? py.proyeccion : null, andando: py.andando })
     : py
   const proyRival = c.proyeccion[c.rivalEquipo]
   const proyeccion = { ...c.proyeccion, ...(proyHoy ? { [d.hoy.equipo]: proyHoy } : {}) }
