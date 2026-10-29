@@ -36,7 +36,7 @@ import {
   type PublicMonitorLive,
 } from '@/services/shoplogix/publicShiftMonitor.service'
 import { buildHourlyRows, peakPieces, piezasPorHoraDeMaquina } from '@/services/shoplogix/monitorHourly'
-import { computePaceToTarget, lineMaxPerHour, type PaceToTarget } from '@/services/shoplogix/monitorPace'
+import { computePaceToTarget, lineMaxPerHour, type PaceInput, type PaceToTarget } from '@/services/shoplogix/monitorPace'
 import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@/services/shoplogix/monitorActividad'
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo'
@@ -92,6 +92,8 @@ import { AnalisisV2 } from './monitor/AnalisisV2'
 import { datosDeHoy } from './monitor/analisisV2Datos'
 import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
+import { ProveedorReproduccion } from './monitor/ProveedorReproduccion'
+import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/HechasVivas'
 import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
@@ -5477,7 +5479,7 @@ function MonitorDelToken() {
    * que llevar el reloj al mismo marco antes de restar, o el tiempo restante
    * sale corrido las horas del huso.
    */
-  const pace = useMemo(() => {
+  const paceCalc = useMemo(() => {
     if (!live) return null
     const nowWallMs = now - new Date(now).getTimezoneOffset() * 60_000
     /*
@@ -5492,7 +5494,7 @@ function MonitorDelToken() {
     const hastaMin = !Number.isNaN(t0) && live.plannedEnd
       ? (Date.parse(live.plannedEnd) - t0) / 60_000
       : desdeMin
-    return computePaceToTarget({
+    const input: PaceInput = {
       // La cuota del link primero; si no, la de la config del turno.
       targetPieces: metaLink ?? live.quotaPieces,
       /* Sin cuota puesta por una persona, NO hay meta que perseguir (regla de
@@ -5534,8 +5536,13 @@ function MonitorDelToken() {
         : lineMaxPerHour(metaSensor, live.scheduledStart, live.plannedEnd),
       shiftClosed: live.shiftClosed,
       pendingBreakMin: Number.isNaN(t0) ? 0 : breakMinutesBetween(breaksTurno, desdeMin, hastaMin),
-    })
+    }
+    return { input, pace: computePaceToTarget(input) }
   }, [live, metaLink, data?.pulse, now, breaksTurno, ritmoAndando, serieDelTurno, metaSensor])
+  const pace = paceCalc?.pace ?? null
+  /* El mismo cálculo con las piezas que entrega el reloj de la cola: la tarjeta «Para llegar a la meta» del Modo TV lo recalcula con
+     las hechas del cuadro (`PaceVivo`), para que «hechas + faltan = meta» junto a la cifra grande. */
+  const paceInput = paceCalc?.input ?? null
 
   /*
    * Comparador con los turnos anteriores, a la misma altura de turno.
@@ -6414,6 +6421,15 @@ function MonitorDelToken() {
   const corteHoraV2 = !live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null
 
   return (
+    <ProveedorReproduccion
+      entrada={repro?.entrada ?? null}
+      tope={repro?.tope ?? null}
+      optimal={comparacion.optimal ?? null}
+      primeraPiezaMs={serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null}
+      meta={data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null}
+      mostradas={hechasMostradas}
+      cerrado={turnoCerrado}
+    >
     <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)} data-barra={glass === 'v2' && !modoPantalla ? 'si' : undefined}>
       {glass === 'v2' && !modoPantalla && (
         <BarraLateralPC
@@ -7016,8 +7032,10 @@ function MonitorDelToken() {
             {turnoCerrado ? 'Resultado del turno' : esActual ? 'Hechas en la jornada' : 'Hechas en ese turno'}
           </div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-5xl font-bold tabular-nums leading-none">{fmtInt(contador.valor)}</span>
+            {/* Modo TV incluido: la cifra grande lee el MISMO reloj de la cola que «El turno» y el Duelo (`ProveedorReproduccion`). */}
+            <CifraRepViva respaldo={contador.valor} className="text-5xl font-bold tabular-nums leading-none" />
             <span className="text-sm text-muted-foreground/80">piezas</span>
+            <FloteRepViva />
             {/* UNA sola hora de corte en toda la pantalla (pedido de Orel,
                 13-ago y 20-ago). Antes acá decía «datos hasta las 23:00» por los
                 buckets y el pie decía «Shoplogix marca ... a las 22:56» por el
@@ -7179,7 +7197,7 @@ function MonitorDelToken() {
                   dentro fueron 13.401. Quien sumaba no le daba, y este bloque
                   existe justamente para que el total cuadre con lo que la gente
                   contó en la línea. */}
-              <span className="tabular-nums">{fmtInt(Math.max(0, contador.valor - outside))} dentro del turno</span>
+              <span className="tabular-nums"><HechasVivas respaldo={contador.valor}>{(v) => fmtInt(Math.max(0, v - outside))}</HechasVivas> dentro del turno</span>
               <span className="text-muted-foreground/80">+</span>
               <Pill tone="warning" className="tabular-nums normal-case">
                 {fmtInt(outside)} fuera del horario
@@ -7236,10 +7254,14 @@ function MonitorDelToken() {
                     )}
                     {/* El relleno con el contador del héroe — el mismo número
                         que el 3.097 grande de arriba, no los buckets. */}
-                    <span
-                      className="absolute inset-y-1 left-0 rounded-r-sm bg-sky-500 dark:bg-sky-400 transition-[width] duration-700"
-                      style={{ width: `${pctDe(contador.valor)}%` }}
-                    />
+                    <HechasVivas respaldo={contador.valor}>
+                      {(v) => (
+                        <span
+                          className="absolute inset-y-1 left-0 rounded-r-sm bg-sky-500 dark:bg-sky-400"
+                          style={{ width: `${pctDe(v)}%` }}
+                        />
+                      )}
+                    </HechasVivas>
                     <span
                       className="absolute inset-y-0 w-[2.5px] bg-foreground"
                       style={{ left: `${pctDe(meta)}%` }}
@@ -7284,8 +7306,8 @@ function MonitorDelToken() {
           {/* Fuera del bloque de la meta: la recomendación también aplica
               cuando el link se creó sin cuota, midiendo contra lo que el sensor
               espera del turno — que es la mayoría de los links repartidos. */}
-          {!turnoCerrado && <RitmoNecesario
-            pace={pace}
+          {!turnoCerrado && <PaceVivo input={paceInput} pace={pace}>{(paceV) => <RitmoNecesario
+            pace={paceV}
             origenObjetivo={objetivoSensor?.origen ?? null}
             turnosObjetivo={objetivoSensor?.turnos ?? null}
             sinDatosHaceMin={sinDatosHaceMin}
@@ -7318,7 +7340,7 @@ function MonitorDelToken() {
               bestCpm: live.paceBestCpm ?? null,
               muestras: live.paceSamples ?? null,
             } : null}
-          />}
+          />}</PaceVivo>}
 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span>
@@ -7918,5 +7940,6 @@ function MonitorDelToken() {
         onConfirmed={enviarInforme}
       />
     </div>
+    </ProveedorReproduccion>
   )
 }

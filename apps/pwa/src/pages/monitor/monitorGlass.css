@@ -1224,19 +1224,14 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
   .dpc-grid > .dpc-card { animation: eje-aparece 400ms cubic-bezier(0.22, 0.9, 0.24, 1) backwards; }
 }
 
-/* ── Reproducción del último minuto · «regla del minuto» (Fase 6, mockup A del 28-10) ─────────────────────────────
-   Una regla de 0 a 60 s por Baader con las piezas del minuto en tenue y un cabezal que las enciende. Tokens: ninguno nuevo
-   (bien/atento/mal, `--v2-prog` para lo pendiente, `--v2-relleno`/`--v2-reja` para la pista). Movimiento: solo `transform` y
-   `opacity` — cabezal por cuadro (excepción «reloj de datos», DESIGN.md §8), pulso por pieza 600 ms, barra de ritmo 1 s.
-   Textos desde 11 px, cifras con tabular-nums. Con `prefers-reduced-motion` no hay cabezal ni pulsos. */
+/* ── «Último minuto, pieza a pieza» · cinta continua de 60 s por Baader (spec §5, mockup `piezas-en-vivo.html` del 29-10) ───────
+   Una cinta (canvas) por Baader con una marca por pieza, su cadencia «1 cada X,X s» y la barra de ritmo (scaleX 600 ms). Tokens:
+   ninguno nuevo (`--v2-bien`, `--v2-relleno`/`--v2-reja`, `--v2-gris`). Textos desde 11 px, cifras con tabular-nums. Con
+   `prefers-reduced-motion` la cinta es una regla en bucle, sin deslizar. */
 .rm { container-type: inline-size; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .rm-hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .rm-h { margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; color: rgb(var(--foreground)); }
 .rm-cap { font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
-.rm-nota { display: inline-flex; align-items: center; gap: 7px; margin-left: auto; padding: 3px 10px; border-radius: 999px; background: var(--v2-relleno); font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
-.rm-nota-punto { width: 7px; height: 7px; border-radius: 99px; background: var(--v2-bien); }
-.rm-nota[data-estado='retenida'] { color: var(--v2-atento-texto); }
-.rm-nota[data-estado='retenida'] .rm-nota-punto { background: var(--v2-atento); }
 .rm-filas { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .rm-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'nom cnt' 'pista pista' 'rit rit'; align-items: center; gap: 6px 12px; padding: 10px 0; border-top: 1px solid var(--v2-reja); }
 .rm-fila:first-child { border-top: 0; }
@@ -1255,18 +1250,19 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .rm-est > i { width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
 .rm-est[data-e='parcial'] { background: color-mix(in srgb, var(--v2-atento) 16%, transparent); color: var(--v2-atento-texto); }
 .rm-est[data-e='detenida'] { background: color-mix(in srgb, var(--v2-mal) 16%, transparent); color: var(--v2-mal-texto); }
-.rm-regla { position: relative; height: 30px; overflow: hidden; border-radius: 8px; background: var(--v2-relleno); }
-.rm-q { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--v2-reja); }
-.rm-stop { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--v2-mal) 26%, transparent) 0 4px, transparent 4px 8px); }
-.rm-mk { position: absolute; top: 8px; width: 6px; height: 14px; margin-left: -3px; border-radius: 2px; background: var(--v2-prog); opacity: 0.45; }
-.rm-mk.rm-sil { top: 10px; height: 12px; border-radius: 2px 2px 6px 6px; }
-.rm-mk[data-on='true'] { background: var(--v2-bien); opacity: 1; }
-.rm-mk[data-pulso='true'] { animation: rm-pulso 600ms cubic-bezier(0.22, 0.9, 0.24, 1); }
-@keyframes rm-pulso { from { transform: scale(1.9); opacity: 0.6; } to { transform: none; opacity: 1; } }
-.rm-ph { position: absolute; inset: 0; opacity: 0; pointer-events: none; will-change: transform; transition: opacity 300ms cubic-bezier(0.22, 0.9, 0.24, 1); }
-.rm-ph > i { position: absolute; left: 0; top: 3px; bottom: 3px; width: 2px; margin-left: -1px; border-radius: 1px; background: rgb(var(--foreground)); }
+/* La cinta continua de 60 s (canvas, `CintaBaader`): alto 28 PC / 24 móvil. `data-estado` lo pone el reloj: con Shoplogix atrasado el
+   reloj está congelado y la cinta baja al 45 %. `color` es el del texto: el canvas lo lee para el cabezal. */
+.rm-pista-fila { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.rm-cinta { display: block; flex: 1 1 auto; min-width: 0; width: 100%; height: 28px; border-radius: 8px; background: var(--v2-relleno); color: rgb(var(--foreground)); transition: opacity 300ms cubic-bezier(0.22, 0.9, 0.24, 1); }
+.rm-cinta[data-estado='atrasado'] { opacity: 0.45; }
+@media (max-width: 640px) { .rm-cinta { height: 24px; } }
+.rm-cad { flex: none; min-width: 92px; font-size: 13px; line-height: 18px; font-weight: 600; text-align: right; white-space: nowrap; color: rgb(var(--foreground)); }
+.rm-cad[data-det='true'] { color: var(--v2-mal-texto); }
+@container (max-width: 519px) { .rm-cad { min-width: 0; } }
+.rm-linea { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'nom' 'rit'; }
+@container (min-width: 520px) { .rm-linea { grid-template-columns: 96px 84px minmax(0, 1fr) 150px; grid-template-areas: 'nom cnt pista rit'; } }
 .rm-rb { position: relative; height: 6px; margin-top: 6px; border-radius: 3px; background: var(--v2-reja); }
-.rm-rb > i { position: absolute; inset: 0; border-radius: 3px; background: var(--v2-bien); transform-origin: 0 50%; transition: transform 1s cubic-bezier(0.22, 0.9, 0.24, 1), background-color 400ms; }
+.rm-rb > i { position: absolute; inset: 0; border-radius: 3px; background: var(--v2-bien); transform-origin: 0 50%; transition: transform 600ms cubic-bezier(0.22, 0.9, 0.24, 1), background-color 400ms; }
 .rm-rb > i[data-tono='atento'] { background: var(--v2-atento); }
 .rm-rb > i[data-tono='mal'] { background: var(--v2-mal); }
 .rm-rb > i[data-tono='sin'] { background: var(--v2-prog); }
@@ -1275,9 +1271,7 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .rm-cuadre[data-on='true'] { opacity: 1; }
 .rm-cuadre > i { flex: none; width: 7px; height: 7px; border-radius: 99px; background: var(--v2-bien); }
 @media (prefers-reduced-motion: reduce) {
-  .rm-mk[data-pulso='true'] { animation: none; }
-  .rm-ph { display: none; }
-  .rm-rb > i, .rm-cuadre { transition: none; }
+  .rm-rb > i, .rm-cuadre, .rm-cinta { transition: none; }
 }
 
 /* Claridad del Duelo (PC): globo de ayuda, cifras pegadas a su dueño y encabezado de la carrera por equipo. */
@@ -1318,3 +1312,42 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 /* El estado de la línea como subtítulo de la barra del celular (< 768 px): el mismo punto y texto de la píldora, a 12 px y
    sin su fondo (la barra ya es el contenedor). */
 .v2-estado-mini > span { padding: 0; background: transparent; font-size: 12px; line-height: 18px; }
+/* ── Monitor en vivo con cola (spec SPEC_MONITOR_EN_VIVO_COLA §3, §4 y §6; mockup `piezas-en-vivo.html` del 29-10) ───────────────
+   Chip de desfase en la cabecera, «+N» flotante sobre las piezas y franja de rango bajo «Ritmo en vivo». Tokens: ninguno nuevo
+   (`--v2-relleno`, `--v2-bien`, `--v2-atento`/`-texto`, `--v2-mal`/`-texto`, `--brand-ink`). Solo transform/opacity se animan. */
+.v2-chip-desfase { display: inline-flex; align-items: center; gap: 7px; flex: 0 1 auto; min-width: 0; height: 28px; padding: 0 11px; border-radius: 999px; background: var(--v2-relleno); font-size: 13px; line-height: 28px; font-weight: 600; white-space: nowrap; color: rgb(var(--foreground) / 0.85); }
+.v2-chip-desfase > i { flex: none; width: 7px; height: 7px; border-radius: 99px; background: var(--v2-bien); }
+.v2-chip-desfase-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.v2-chip-desfase[data-st='vivo'] > i { animation: v2-latido 2.4s ease-in-out infinite; }
+.v2-chip-desfase[data-st='atrasado'] { background: color-mix(in srgb, var(--v2-atento) 18%, transparent); color: var(--v2-atento-texto); }
+.v2-chip-desfase[data-st='atrasado'] > i { background: var(--v2-atento); }
+.v2-chip-desfase[data-st='detenida'] { background: color-mix(in srgb, var(--v2-mal) 16%, transparent); color: var(--v2-mal-texto); }
+.v2-chip-desfase[data-st='detenida'] > i { background: var(--v2-mal); }
+@keyframes v2-latido { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* El «+N»: un nodo de 0 × 0 tras la cifra y su unidad (el hueco de 8 px de la fila es el que lo separa) y el «+N» en el borde superior. Lo anima WAAPI (`FloteMas`). */
+.flote-zona { position: relative; align-self: flex-start; flex: none; width: 0; height: 0; }
+.flote { position: absolute; left: 0; top: 2px; font-size: 17px; line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: rgb(var(--brand-ink)); opacity: 0; pointer-events: none; }
+@media (max-width: 767px) { .flote { font-size: 15px; } }
+.flote-tv { font-size: 28px; }
+
+/* La franja de rango: 44 de alto, radio 10; ventana con borde 1,5 `--v2-bien` y relleno brand/.10; asas de 4 × 20 a la vista y 44 al toque. */
+.rv-rango-caja { margin-top: 10px; }
+.rv-rango { position: relative; height: 44px; border-radius: 10px; background: var(--v2-relleno); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.rv-rango:active { cursor: grabbing; }
+.rv-rango > svg { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 10px; pointer-events: none; }
+.rv-rango-vent { position: absolute; top: 0; bottom: 0; box-sizing: border-box; border: 1.5px solid var(--v2-bien); border-radius: 10px; background: rgb(var(--brand) / 0.10); }
+.rv-rango-asa { position: absolute; top: 0; bottom: 0; width: 44px; max-width: 50%; outline: none; }
+.rv-rango-asa::before { content: ''; position: absolute; top: 11px; bottom: 11px; width: 4px; border-radius: 2px; background: var(--v2-bien); }
+.rv-rango-asa-i { left: 0; cursor: ew-resize; }
+.rv-rango-asa-i::before { left: 4px; }
+.rv-rango-asa-d { right: 0; cursor: ew-resize; }
+.rv-rango-asa-d::before { right: 4px; }
+.rv-rango-asa:focus-visible::before { outline: 2px solid var(--v2-bien); outline-offset: 2px; }
+.rv-pista-rueda { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); padding: 8px 14px; border-radius: 12px; background: rgb(var(--foreground) / 0.82); color: rgb(var(--background)); font-size: 13px; line-height: 18px; font-weight: 600; white-space: nowrap; opacity: 0; transition: opacity 200ms; pointer-events: none; z-index: 5; }
+.rv-pista-rueda[data-ver='true'] { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .v2-chip-desfase[data-st='vivo'] > i { animation: none; }
+  .flote { display: none; }
+  .rv-pista-rueda { transition: none; }
+}

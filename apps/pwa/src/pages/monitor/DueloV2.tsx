@@ -13,6 +13,8 @@ import { Button, ListCell, ListGroup, Pill, SegmentedControl } from '@/component
 import { useAnchoMin } from './ampliarHooks'
 import { Tarjeta } from './AmpliarV2'
 import { CarreraDueloV2 } from './CarreraDueloV2'
+import { useCarreraViva } from './useCarreraViva'
+import { useReproduccion } from './useReproduccionMinuto'
 import { DueloPC, type DueloPCExtra } from './DueloPC'
 import { SelectorLinea, type LineasMonitor } from './SelectorLinea'
 import { fijarEquipoDelTurno, guardarNombresDuelo } from './dueloConfig'
@@ -85,12 +87,32 @@ function Cifras({ izq, der }: { izq: { nombre: string; valor: string; unidad?: s
   return <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">{col(izq)}{der && col(der)}</div>
 }
 
+/**
+ * La carrera del cuadro: `datos.carrera` con las piezas de hoy, las del rival y la diferencia puestas en el instante del reloj
+ * único (cola de reproducción). Sin reloj (turno cerrado, sin serie por minuto) devuelve la carrera tal cual y `viva` null.
+ */
+/** La cabeza viva de la curva de hoy (minuto y piezas del cuadro); null sin reloj. */
+const cabezaDe = (v: { hechas: number | null; min: number | null } | null) => (v && v.hechas != null && v.min != null ? { minutes: v.min, pieces: v.hechas } : null)
+
+function useCarreraDelCuadro(c: DatosDuelo['carrera'], curvaRival: Parameters<typeof useCarreraViva>[2], inicioMs: number | null, enCurso: boolean) {
+  const rep = useReproduccion()
+  const viva = useCarreraViva(enCurso && rep?.activa ? rep.reloj : null, inicioMs, curvaRival)
+  if (!c || !viva || viva.hechas == null) return { c, viva: null }
+  const rival = c.fantasmaPz != null ? viva.rival ?? c.fantasmaPz : null
+  return {
+    viva,
+    c: { ...c, hoyPz: viva.hechas, fantasmaPz: rival, diferencia: rival != null ? viva.hechas - rival : c.diferencia },
+  }
+}
+
 // ── Bloques ──────────────────────────────────────────────────────────────────
 
 function BloqueCarrera({ d, nombres, inicioMs, plano, className }: { d: DatosDuelo; nombres: NombresEquipos; inicioMs: number | null; plano: boolean; className?: string }) {
-  const c = d.carrera
+  const c0 = d.carrera
   const { a, b } = lados(d, nombres)
-  const fan = c?.fantasmaInfo ?? null
+  const fan = c0?.fantasmaInfo ?? null
+  /* Con el turno en curso, la carrera sigue al reloj único: las piezas de hoy y las del rival en el MISMO instante del cuadro. */
+  const { c, viva } = useCarreraDelCuadro(c0, fan?.curva ?? null, inicioMs, !d.hoy.cerrado)
   const colorA = COLOR_EQUIPO[a.id]
   const sub = c ? `${etiquetaHora(c.hora)} de producción · ${d.hoy.cerrado ? 'cerrado' : 'en vivo'}` : 'Todavía no hay piezas'
   const lider = c?.diferencia != null && c.diferencia !== 0 ? (c.diferencia > 0 ? a : b) : null
@@ -135,6 +157,7 @@ function BloqueCarrera({ d, nombres, inicioMs, plano, className }: { d: DatosDue
           <CarreraDueloV2
             hoy={{
               nombre: a.nombre, rotulo: rotuloTurno(a.nombre, d.hoy), color: colorA, colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy, eventos: c.eventosHoy,
+              cabeza: cabezaDe(viva),
               reloj: inicioMs != null ? (m) => relojUtc(inicioMs + m * 60_000) : undefined,
             }}
             rival={fan ? {
@@ -425,6 +448,8 @@ function AvisoDuelo({ d, nombres }: { d: DatosDuelo; nombres: NombresEquipos }) 
 // ── Tarjeta exprés de «El turno» ─────────────────────────────────────────────
 
 export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: DueloUiProps & { className?: string }) {
+  /* La carrera sigue al reloj único (el mismo de «El turno» y el Modo TV). El hook va antes del `return` de «sin datos». */
+  const { c, viva } = useCarreraDelCuadro(datos?.carrera ?? null, datos?.carrera?.fantasmaInfo?.curva ?? null, inicioMs, datos != null && !datos.hoy.cerrado)
   if (!datos) {
     return (
       <Tarjeta icono={<Trophy className="h-3.5 w-3.5" />} titulo="Duelo" sub="noche contra día" className={className}>
@@ -432,7 +457,6 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
       </Tarjeta>
     )
   }
-  const c = datos.carrera
   const { a, b } = lados(datos, nombres)
   const fan = c?.fantasmaInfo ?? null
   const m = datos.marcador
@@ -459,7 +483,7 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
           </p>
           <CarreraDueloV2
             mini
-            hoy={{ nombre: a.nombre, color: COLOR_EQUIPO[a.id], colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy }}
+            hoy={{ nombre: a.nombre, color: COLOR_EQUIPO[a.id], colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy, cabeza: cabezaDe(viva) }}
             banda={c.banda}
             ariaLabel={`Piezas hechas de ${a.nombre} en la noche que abre la jornada ${jornada}`}
           />
@@ -481,7 +505,7 @@ export function TarjetaDueloV2({ datos, nombres, unidad, inicioMs, className }: 
           </div>
           <CarreraDueloV2
             mini
-            hoy={{ nombre: a.nombre, color: COLOR_EQUIPO[a.id], colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy }}
+            hoy={{ nombre: a.nombre, color: COLOR_EQUIPO[a.id], colorTexto: COLOR_EQUIPO_TEXTO[a.id], curva: c.hoy, cabeza: cabezaDe(viva) }}
             rival={{ nombre: b.nombre, color: COLOR_EQUIPO[fan.equipo], curva: fan.curva }}
             ariaLabel={`Piezas hechas de ${a.nombre} contra ${b.nombre} a la misma hora de producción`}
           />

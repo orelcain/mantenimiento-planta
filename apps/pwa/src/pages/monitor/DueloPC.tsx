@@ -31,6 +31,9 @@ import { CifraViva } from './CifraViva'
 import { TRAMA_MANT, escalaY } from './ejeTurno'
 import type { Lectura } from './relojDeDatos'
 import { useRelojDeDatos, type CuadroReloj, type RelojDeDatos } from './useRelojDeDatos'
+import { useReproduccion } from './useReproduccionMinuto'
+import { HechasDeReloj } from './HechasVivas'
+import { useCarreraViva } from './useCarreraViva'
 import { useGloboDuelo } from './GloboDuelo'
 import {
   TIPS_LEYENDA, dec, int, tipFilaJornada, tipFilaKpi, tipHora, tipMicro, tipMicroTotal, tipParada, tipParadasTotal, tipSost, tipsCarriles,
@@ -337,12 +340,19 @@ const EjeSvg = memo(function EjeSvg({ m, reloj, uid, cursor }: { m: ModeloEje; r
           <circle cx={r1(x((vivo.previa ?? vivo.ultima).min))} cy={r1(y((vivo.previa ?? vivo.ultima).v))} r={4.5} fill={COLOR_EQUIPO[vivo.eq]} stroke="rgb(var(--background))" strokeWidth={2} />
         </g>
       )}
-      {etiquetas.map(({ l, yy: ey, lx }) => tg(l.eq, `${l.rotulo} · ${int(l.total)} piezas hechas${l.enCurso ? ' hasta ahora' : ' al cierre del turno'}`, (
-        <>
-          <text x={r1(lx)} y={r1(ey)} fontSize={compacto ? 12 : 13} fontWeight={600} {...colEq(l.eq)}>{l.nombre}</text>
-          <text x={r1(lx)} y={r1(ey + 16)} fontSize={compacto ? 12 : 13} fontWeight={600} className="fill-foreground tabular-nums">{int(l.total)} piezas</text>
-        </>
-      )))}
+      {etiquetas.map(({ l, yy: ey, lx }) => {
+        /* El turno en curso dice las piezas del MISMO reloj que la cabecera (la cola de reproducción): su `total` es el contador vivo,
+           que va 2-4 min adelante de la punta. Cerrado, o el de otro turno, el total de siempre. */
+        const vivaLado = l.enCurso && vivo?.eq === l.eq
+        return tg(l.eq, `${l.rotulo} · ${vivaLado ? '' : `${int(l.total)} `}piezas hechas${l.enCurso ? ' hasta ahora' : ' al cierre del turno'}`, (
+          <>
+            <text x={r1(lx)} y={r1(ey)} fontSize={compacto ? 12 : 13} fontWeight={600} {...colEq(l.eq)}>{l.nombre}</text>
+            <HechasDeReloj reloj={vivaLado ? reloj : null} respaldo={l.total}>
+              {(n) => <text x={r1(lx)} y={r1(ey + 16)} fontSize={compacto ? 12 : 13} fontWeight={600} className="fill-foreground tabular-nums">{int(n)} piezas</text>}
+            </HechasDeReloj>
+          </>
+        ))
+      })}
 
       {/* Carril 1 · ritmo hora a hora: dos barras por hora, Cárdenas a la izquierda */}
       {rotuloCarril(yRit, L.rit, 'Ritmo por hora', compacto ? 'piezas por min' : 'piezas por minuto', tips.ritmo)}
@@ -535,7 +545,7 @@ const EjeSvg = memo(function EjeSvg({ m, reloj, uid, cursor }: { m: ModeloEje; r
  * Encabezado de la carrera: cada equipo en su propia fila, con su nombre, su turno y su cifra en la misma línea
  * («Rebolledo · día 27/10 · 13.541 pz»), y la ventaja en una línea aparte. La cifra nunca queda suelta.
  */
-function CifrasLienzo({ d, lados, reloj, hoyEq, nombres, banda, ultimoMin }: {
+function CifrasLienzo({ d, lados, reloj, hoyEq, nombres, banda, ultimoMin, inicioMs }: {
   d: DatosDuelo
   lados: Record<EquipoId, LadoEje | null>
   reloj: RelojDeDatos
@@ -543,13 +553,16 @@ function CifrasLienzo({ d, lados, reloj, hoyEq, nombres, banda, ultimoMin }: {
   nombres: NombresEquipos
   banda: ModeloEje['banda']
   ultimoMin: number
+  inicioMs: number | null
 }) {
   const hoy = lados[hoyEq]
   const rival = lados[d.rival?.equipo ?? (hoyEq === 'cardenas' ? 'rebolledo' : 'cardenas')]
-  if (!hoy) return null
   const enCurso = !d.hoy.cerrado
+  /* Hooks antes de cualquier `return`: la carrera en vivo (hechas de hoy y del rival en el instante del cuadro). */
+  const viva = useCarreraViva(enCurso && !!hoy && !!rival ? reloj : null, inicioMs, rival?.curva ?? null)
+  if (!hoy) return null
   const jornada = fechaCorta(d.hoy.jornada)
-  const hora = Math.floor(ultimoMin / 60) + 1
+  const hora = viva?.hora ?? Math.floor(ultimoMin / 60) + 1
   const chip = (eq: EquipoId | 'n', t: string) => <div className="dpc-ventaja"><span className="dpc-chip" data-eq={eq}>{t}</span></div>
   /* «Rebolledo · día 27/10» -> el turno es lo que sigue al nombre. */
   const turno = (l: LadoEje) => l.rotulo.startsWith(l.nombre) ? l.rotulo.slice(l.nombre.length).replace(/^\s*·\s*/, '') : l.rotulo
@@ -574,8 +587,8 @@ function CifrasLienzo({ d, lados, reloj, hoyEq, nombres, banda, ultimoMin }: {
     )
   }
   if (rival && enCurso) {
-    const aHoraRival = piezasAlMinuto(rival.curva, ultimoMin) ?? 0
-    const dif = d.carrera?.hoyPz != null ? d.carrera.hoyPz - aHoraRival : 0
+    const aHoraRival = viva?.rival ?? piezasAlMinuto(rival.curva, ultimoMin) ?? 0
+    const dif = d.carrera?.hoyPz != null ? (viva?.hechas ?? d.carrera.hoyPz) - aHoraRival : 0
     const lider = dif === 0 ? null : dif > 0 ? hoy : rival
     return (
       <>
@@ -699,7 +712,7 @@ function Lienzo({ p, d, lados, reloj, compacto }: { p: DueloPCProps; d: DatosDue
         {!lados.cardenas && !lados.rebolledo && <p className="dpc-fn" style={{ position: 'absolute', left: 14, top: 8 }}>La carrera aparece con la primera pieza del turno.</p>}
         {modelo && (
           <div className="dpc-ov" style={{ left: modelo.x0 + 14 }}>
-            <CifrasLienzo d={d} lados={lados} reloj={reloj} hoyEq={hoyEq} nombres={nombres} banda={modelo.banda} ultimoMin={ultimoMin} />
+            <CifrasLienzo d={d} lados={lados} reloj={reloj} hoyEq={hoyEq} nombres={nombres} banda={modelo.banda} ultimoMin={ultimoMin} inicioMs={inicioMs} />
           </div>
         )}
         {modelo && info && (
@@ -980,7 +993,7 @@ function valorFila(f: FilaRiel, lado: 'c' | 'r'): ReactNode {
   return <>{f.dec ? dec(v, f.dec) : int(v)}{u && <span className="dpc-un">{u}</span>}</>
 }
 
-function Riel({ d, nombres, lados, unidad, compacto }: { d: DatosDuelo; nombres: NombresEquipos; lados: Record<EquipoId, LadoEje | null>; unidad: 'carros' | 'silletas' | null; compacto: boolean }) {
+function Riel({ d, nombres, lados, unidad, compacto, reloj }: { d: DatosDuelo; nombres: NombresEquipos; lados: Record<EquipoId, LadoEje | null>; unidad: 'carros' | 'silletas' | null; compacto: boolean; reloj: RelojDeDatos | null }) {
   const nom = (e: EquipoId) => nombreCorto(e, nombres)
   const enCurso = !d.hoy.cerrado
   const soloHoy = !d.rival || !d.marcador
@@ -1051,7 +1064,7 @@ function Riel({ d, nombres, lados, unidad, compacto }: { d: DatosDuelo; nombres:
           </div>
         ) : (
           <div className="dpc-score">
-            <b style={{ color: COLOR_EQUIPO_TEXTO[d.hoy.equipo] }}>{int(d.hoy.piezas)}</b>
+            <b style={{ color: COLOR_EQUIPO_TEXTO[d.hoy.equipo] }}><HechasDeReloj reloj={enCurso ? reloj : null} respaldo={d.hoy.piezas}>{(n) => int(n)}</HechasDeReloj></b>
             <span className="dpc-fn">pz de {nom(d.hoy.equipo)} {d.hoy.esNoche ? 'en la noche' : 'en el día'}.<br />{d.hoy.esNoche ? `${nom(d.hoy.equipo === 'cardenas' ? 'rebolledo' : 'cardenas')} juega el día${d.inicioDia ? ` desde las ${d.inicioDia}` : ''}.` : 'Sin turno de noche en esta jornada.'}</span>
           </div>
         )}
@@ -1141,7 +1154,11 @@ function Riel({ d, nombres, lados, unidad, compacto }: { d: DatosDuelo; nombres:
 export function DueloPC(p: DueloPCProps) {
   const { datos: d, extra } = p
   const compacto = useCompactoPC()
-  const reloj = useRelojDeDatos(!d.hoy.cerrado ? extra.lectura : null, extra.semilla)
+  /* UN solo reloj con «El turno» y el Modo TV: el de la cola de reproducción (`ProveedorReproduccion`). Sin él (turno cerrado, sin
+     serie por minuto, sin proveedor) la recta de siempre entre las lecturas del contador. */
+  const rep = useReproduccion()
+  const recta = useRelojDeDatos(!d.hoy.cerrado ? extra.lectura : null, extra.semilla)
+  const reloj = rep?.activa && !d.hoy.cerrado ? rep.reloj : recta
   const lados = useMemo(
     () => construirLados({ d, nombres: p.nombres, live: extra.live, stats: extra.stats, serieHoy: extra.serieHoy, series: extra.series }),
     [d, p.nombres, extra.live, extra.stats, extra.serieHoy, extra.series],
@@ -1154,7 +1171,7 @@ export function DueloPC(p: DueloPCProps) {
         <Lienzo p={p} d={d} lados={lados} reloj={reloj} compacto={compacto} />
         <PorQue d={d} nombres={p.nombres} extra={extra} compacto={compacto} lados={lados} />
         <SemanaASemana d={d} compacto={compacto} nombres={p.nombres} />
-        <Riel d={d} nombres={p.nombres} lados={lados} unidad={p.unidad} compacto={compacto} />
+        <Riel d={d} nombres={p.nombres} lados={lados} unidad={p.unidad} compacto={compacto} reloj={reloj} />
       </div>
       {globo}
     </div>

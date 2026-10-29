@@ -22,6 +22,7 @@ import { CapaAmpliada } from './AmpliarV2'
 import { aEstaHora, piezasMostradas } from './aEstaHora'
 import { useAnchoMin, useCuentaCifra } from './ampliarHooks'
 import { CifraViva } from './CifraViva'
+import { FloteMas } from './FloteMas'
 import { esperadoPorMinuto, int, minutosCompletos, partesAdelanteAtras, relojDe, sumaPorMinuto, tonoRitmo, type EstadoBaader, type TonoRitmo } from './ejeTurno'
 import { ChevronFranja, RotuloFranja, Tocable } from './FranjaTocable'
 import type { EjeDatos } from './GraficoRitmoVivo'
@@ -86,6 +87,7 @@ function PiezasVivas({ reloj, respaldo, meta, cuota, cerrado }: { reloj: RelojDe
       <div className="fc-piezas-fila">
         <CifraViva reloj={reloj} respaldo={respaldo} className="fc-cifra-p tabular-nums" />
         <span className="fc-u">pz</span>
+        <FloteMas reloj={reloj} />
       </div>
       {meta ? (
         <>
@@ -175,11 +177,16 @@ function RitmoLinea({ p, e, unica }: { p: MonitorV2Props; e: EjeDatos | null; un
 // ── Contra la meta + Mantención ──────────────────────────────────────────────
 
 function ContraLaMeta({ p, e, reloj, abrir }: { p: MonitorV2Props; e: EjeDatos | null; reloj: RelojDeDatos; abrir: (k: ClaveFranja) => void }) {
-  const cierreMostrado = useCuentaCifra(p.proyeccion ?? 0)
+  const cierreTween = useCuentaCifra(p.proyeccion ?? 0)
   const meta = p.meta != null && p.meta > 0 ? p.meta : null
   const detenida = !p.cerrado && (reloj.detenida || (e?.detenidaEstado ?? false))
   /* PR B: hechas y cuota del mismo instante del reloj (pieza a pieza); sin reloj de vista, la resta en reposo de siempre. */
   const vivas = useCifrasVivas()
+  /* «Al cierre» es UNA cifra en toda la pantalla (franja, ampliado, gráfico): la proyección de siempre, `p.proyeccion` = piezas del
+     contador + ritmo × minutos productivos que quedan. NO se arma con las hechas del cuadro: la reproducción va 2-4 min atrás del
+     contador y esas piezas ya se hicieron, así que `hechas + resto` quedaría bajo en lo que falta reproducir. Cambia con cada lectura
+     nueva, no con cada pieza reproducida. */
+  const cierreMostrado = cierreTween
   const aHora = p.cerrado ? null : (vivas?.aHora ?? aEstaHora(piezasMostradas(p.repro, p.piezas), p.cuota?.piezas, p.meta))
   const conProyeccion = !p.cerrado && p.proyeccion != null
   const color = (v: number) => (v < 0 ? 'var(--v2-mal-texto)' : 'rgb(var(--brand-ink))')

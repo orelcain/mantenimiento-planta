@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraficoRitmoVivo, type EjeDatos } from '../GraficoRitmoVivo'
 import type { MonitorV2Props } from '../MonitorV2'
 import { armarTope } from '../reproduccionMinuto'
-import type { RelojDeDatos } from '../useRelojDeDatos'
+import type { CuadroReloj, RelojDeDatos } from '../useRelojDeDatos'
 
 const INI = Date.UTC(2026, 9, 27, 21, 30)
 const AHORA = 305
@@ -446,4 +446,107 @@ describe('GraficoRitmoVivo · ⓘ dentro de la pantalla', () => {
       expect(screen.queryByRole('tooltip')).toBeNull()
     } finally { Element.prototype.getBoundingClientRect = original }
   })
+})
+
+describe('GraficoRitmoVivo · sigue al reloj único de la cola', () => {
+  /** Un reloj de cola en el minuto `j` (mitad del minuto): el cuadro trae `rep` como el del hook. */
+  const relojCola = (j: number): RelojDeDatos => {
+    const cuadro = () => ({
+      valor: 4000 + 20, frac: 0.5,
+      previa: { valor: 4000, atMs: INI + j * 60_000 }, ultima: { valor: 4040, atMs: INI + (j + 1) * 60_000 }, atrasada: false,
+      rep: { frac: 0.5, seg: 30, tMs: INI + (j + 0.5) * 60_000, minutoIdx: j, total: 4020, totalPiso: 4000, totalFinal: 4040, porMaquina: [], estado: 'vivo', atrasoS: 120, factor: 1, ultimaLecturaHHMM: '02:35', atrasada: false, animando: true, saltos: 0 },
+    })
+    return { cuadro, alCuadro: (fn: (c: CuadroReloj) => void) => { fn(cuadro() as unknown as CuadroReloj); return () => {} }, version: 1, detenida: false, reducido: false } as unknown as RelojDeDatos
+  }
+  /** Barras por minuto dibujadas: los `M` de los trazos de relleno liso (las filas por Baader llevan opacidad). */
+  const barras = (c: HTMLElement) =>
+    [...c.querySelectorAll('svg path')].filter((q) => (q.getAttribute('fill') ?? '').startsWith('var(--') && !q.getAttribute('fill-opacity'))
+      .reduce((a, q) => a + ((q.getAttribute('d') ?? '').match(/M/g)?.length ?? 0), 0)
+
+  it('las barras llegan solo hasta el minuto que corre: los minutos que esperan en la cola no se dibujan todavía', () => {
+    const sinCola = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+    const todas = barras(sinCola.container)
+    cleanup()
+    const conCola = render(<GraficoRitmoVivo p={p} e={eje} reloj={relojCola(200)} />)
+    const jugadas = barras(conCola.container)
+    expect(todas).toBeGreaterThan(200)
+    expect(jugadas).toBeLessThan(todas - 80)
+    expect(jugadas).toBeGreaterThan(100)
+  })
+
+  it('el minuto que corre es su propia barra, que crece con transform (sin layout); sin cola no hay barra en curso', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={relojCola(200)} />)
+    const viva = container.querySelector('rect[style*="scaleY"]') as SVGRectElement | null
+    expect(viva).not.toBeNull()
+    expect(viva!.getAttribute('style')).toContain('scaleY(0.5')
+    cleanup()
+    const sin = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+    expect(sin.container.querySelector('rect[style*="scaleY"]')).toBeNull()
+  })
+  it('«al cierre» es la proyección de siempre (15.623) también con la cola atrasada: no se arma con las piezas del cuadro, que van detrás del contador', () => {
+    /* El cuadro va en 4.020 y el contador (p.piezas) en 9.690: `cuadro + (proyección − contador)` diría 9.953, bajo por las piezas que ya se hicieron. */
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 309 })
+    const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={relojCola(200)} />)
+    expect(container.textContent).toContain('al cierre 15.623')
+    expect(container.textContent).not.toContain('al cierre 9.953')
+  })
+
+  describe('franja de rango y pista de la rueda (spec §6)', () => {
+    it('la franja de 44 px va bajo el gráfico con su mini curva y la ventana cubriendo todo el turno', () => {
+      const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+      const franja = container.querySelector('.rv-rango') as HTMLElement
+      expect(franja).not.toBeNull()
+      expect(franja.querySelector('svg path')?.getAttribute('d')).toMatch(/^M0.00 /)
+      const vent = franja.querySelector('.rv-rango-vent') as HTMLElement
+      expect(vent.style.left).toBe('0%')
+      expect(vent.style.width).toBe('100%')
+      /* Las dos asas son controles con nombre y valor para quien no ve. */
+      expect(screen.getByRole('slider', { name: 'Inicio de lo que se ve' }).getAttribute('aria-valuenow')).toBe('0')
+      expect(screen.getByRole('slider', { name: 'Fin de lo que se ve' }).getAttribute('aria-valuenow')).toBe('450')
+    })
+
+    it('los atajos mueven la ventana de la franja: «1 h» deja 60 min y «Turno» la vuelve a todo el turno', () => {
+      const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+      fireEvent.click(screen.getByRole('button', { name: '1 h' }))
+      const vent = container.querySelector('.rv-rango-vent') as HTMLElement
+      expect(parseFloat(vent.style.width)).toBeCloseTo((60 / 450) * 100, 1)
+      fireEvent.click(screen.getByRole('button', { name: '15 min' }))
+      expect(parseFloat(vent.style.width)).toBeCloseTo((15 / 450) * 100, 1)
+      fireEvent.click(screen.getByRole('button', { name: 'Turno' }))
+      expect(vent.style.width).toBe('100%')
+    })
+
+    it('mover un asa por teclado acerca el gráfico: el atajo deja de marcar «Turno»', () => {
+      render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+      fireEvent.keyDown(screen.getByRole('slider', { name: 'Inicio de lo que se ve' }), { key: 'ArrowRight' })
+      expect(screen.getByRole('slider', { name: 'Inicio de lo que se ve' }).getAttribute('aria-valuenow')).toBe('5')
+      expect(screen.getByRole('button', { name: 'Turno' }).getAttribute('aria-pressed')).toBe('false')
+    })
+
+    it('la rueda SIN Ctrl no se secuestra y muestra 1,6 s la pista; con Ctrl sí se captura', () => {
+      vi.useFakeTimers()
+      try {
+        const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+        const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+        const pista = container.querySelector('.rv-pista-rueda') as HTMLElement
+        expect(pista.textContent).toBe('Ctrl + rueda o pellizca para acercar')
+        expect(pista.getAttribute('data-ver')).toBe('false')
+        const sin = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })
+        act(() => { lienzo.dispatchEvent(sin) })
+        expect(sin.defaultPrevented).toBe(false)
+        expect(pista.getAttribute('data-ver')).toBe('true')
+        act(() => { vi.advanceTimersByTime(1500) })
+        expect(pista.getAttribute('data-ver')).toBe('true')
+        act(() => { vi.advanceTimersByTime(150) })
+        expect(pista.getAttribute('data-ver')).toBe('false')
+        const con = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true })
+        /* jsdom ignora `ctrlKey` en el constructor de WheelEvent: se fija a mano. */
+        Object.defineProperty(con, 'ctrlKey', { value: true })
+        act(() => { lienzo.dispatchEvent(con) })
+        expect(con.defaultPrevented).toBe(true)
+        expect(pista.getAttribute('data-ver')).toBe('false')
+      } finally { vi.useRealTimers() }
+    })
+  })
+
 })

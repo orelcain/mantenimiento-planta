@@ -9,6 +9,8 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CabeceraV2, type NavTurnosMovil } from '../MonitorV2'
 import { SelectorLinea } from '../SelectorLinea'
+import { ReproduccionCtx } from '../useReproduccionMinuto'
+import type { RelojDeDatos } from '../useRelojDeDatos'
 
 afterEach(cleanup)
 
@@ -36,6 +38,35 @@ const cabecera = (extra: Partial<Parameters<typeof CabeceraV2>[0]> = {}) =>
 
 const barraPc = (c: HTMLElement) => c.querySelector('.v2-barra-pc') as HTMLElement
 const barraMovil = (c: HTMLElement) => c.querySelector('.v2-cabecera:not(.v2-barra-pc)') as HTMLElement
+
+describe('CabeceraV2 · chip de desfase (spec §3)', () => {
+  const reloj = (rep: Record<string, unknown>): RelojDeDatos => ({
+    cuadro: () => ({ valor: 1, frac: 0, previa: null, ultima: null, atrasada: false, rep: rep as never }),
+    alCuadro: (fn) => { fn({ valor: 1, frac: 0, previa: null, ultima: null, atrasada: false, rep: rep as never }); return () => {} },
+    version: 0, detenida: false, reducido: false,
+  })
+  const conReproduccion = (rep: Record<string, unknown>) => (
+    <ReproduccionCtx.Provider value={{ activa: true, reloj: reloj(rep), minuto: null, tope: null }}>
+      <CabeceraV2 titulo="P. Principal" area="P. Principal · Eviscerado" estado={<span>Produciendo</span>} tema={<button aria-label="tema" />} cambioLinea={null} navTurnos={null} sub="Turno 1" pestana="turno" onPestana={() => {}} />
+    </ReproduccionCtx.Provider>
+  )
+
+  it('con la reproducción activa el chip va en la barra de PC y en el celular, con el texto del estado del reloj', () => {
+    const { container } = render(conReproduccion({ estado: 'atrasado', ultimaLecturaHHMM: '23:52' }))
+    const chips = container.querySelectorAll('.v2-chip-desfase')
+    expect(chips).toHaveLength(2)
+    expect(barraPc(container).querySelector('.v2-chip-desfase')).not.toBeNull()
+    for (const c of chips) { expect(c.textContent).toBe('Shoplogix atrasado · sin datos desde 23:52'); expect((c as HTMLElement).dataset.st).toBe('atrasado') }
+  })
+
+  it('sin reproducción (turno cerrado, o sin serie por minuto) no hay chip ni el hueco que lo llevaría', () => {
+    const { container } = cabecera()
+    expect(container.querySelector('.v2-chip-desfase')).toBeNull()
+    const hueco = container.querySelector('[class~="empty:hidden"]')
+    expect(hueco).not.toBeNull()
+    expect(hueco!.childElementCount).toBe(0)
+  })
+})
 
 describe('CabeceraV2 · barra de PC', () => {
   it('el selector de línea va DENTRO de la barra, entre el título y la navegación, y reemplaza al texto del área', () => {

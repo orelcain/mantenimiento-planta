@@ -7,7 +7,7 @@
  * origen); el eje Y arranca en 0. Cada línea lleva el color FIJO de su equipo (`COLOR_EQUIPO`), su nombre y su total
  * al final; la franja entre las dos toma el color de quien va adelante; el globo muestra a los dos y la diferencia.
  */
-import { useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import type { PacePoint } from '@/services/shoplogix/monitorCompare'
 import { Globo } from './AmpliarV2'
 import { bandasDeHoras, etiquetaHora, franjasEntre, horaTranscurrida, piezasAlMinuto, type BandaRival, type EventoTurno } from './duelo'
@@ -38,6 +38,9 @@ export interface SerieCarrera {
   /** Variante del mismo color para TEXTO (`COLOR_EQUIPO_TEXTO`, contraste ≥ 4,5:1); sin ella se usa `color`. */
   colorTexto?: string
   curva: readonly PacePoint[]
+  /** La cabeza viva (hora y piezas del cuadro del reloj único): reemplaza el tramo final de la curva para que el rótulo y la
+      punta digan lo mismo que la cifra de la tarjeta. Solo para la serie de hoy en curso. */
+  cabeza?: PacePoint | null
   /** Paradas de 5 min o más, en el eje de horas de producción de esta serie. */
   eventos?: readonly EventoTurno[]
   /** Hora de reloj de planta a los `min` minutos de producción; null si no se sabe. */
@@ -61,8 +64,14 @@ export interface CarreraDueloProps {
   ariaLabel: string
 }
 
-export function CarreraDueloV2({ hoy, rival, banda, bandaRotulo, conMediaDeBanda = true, alto, mini, ariaLabel }: CarreraDueloProps) {
+export function CarreraDueloV2({ hoy: hoyProp, rival, banda, bandaRotulo, conMediaDeBanda = true, alto, mini, ariaLabel }: CarreraDueloProps) {
   const [m, setM] = useState<number | null>(null)
+  /* Con cabeza viva, la curva de hoy llega hasta ella (lo posterior, si lo hay, no se ha reproducido todavía). */
+  const cabeza = hoyProp.cabeza
+  const hoy = useMemo(
+    () => (cabeza ? { ...hoyProp, curva: [...hoyProp.curva.filter((q) => q.minutes < cabeza.minutes), cabeza] } : hoyProp),
+    [hoyProp, cabeza],
+  )
   const ultHoy = hoy.curva[hoy.curva.length - 1]
   const ultRival = rival?.curva[rival.curva.length - 1]
   const maxMin = Math.max(1, ultHoy?.minutes ?? 0, ultRival?.minutes ?? 0, banda?.media[banda.media.length - 1]?.minutes ?? 0)

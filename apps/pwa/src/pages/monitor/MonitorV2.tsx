@@ -33,9 +33,10 @@ import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina } from './ritmoVivo'
 import type { PestanaMonitor } from './BarraLateralPC'
-import { minutoDeDatos, piezasMostradas } from './aEstaHora'
+import { horaDelCuadro, minutoDeDatos, piezasMostradas } from './aEstaHora'
 import { useCifrasVivas, VistaVivaCtx, type VistaViva } from './useCifrasVivas'
 import { CifraViva } from './CifraViva'
+import { horasEnCuadro } from './horaAHoraViva'
 import { adelanteAtras, cifraTurnoAnterior, deLaMeta, minutosCompletos } from './ejeTurno'
 import { FranjaCinta } from './FranjaCinta'
 import { filasDeBaader } from './baadersMinuto'
@@ -43,7 +44,8 @@ import { RitmoDetalle } from './RitmoBaaders'
 import type { DatosAporte } from './aporteBaaders'
 import { GraficoRitmoVivo, type EjeDatos } from './GraficoRitmoVivo'
 import { useRelojDeDatos } from './useRelojDeDatos'
-import { ReproduccionCtx, useReproduccionMinuto, type Reproduccion } from './useReproduccionMinuto'
+import { ChipDesfase } from './ChipDesfase'
+import { ReproduccionCtx, useReproduccion, useReproduccionMinuto, type Reproduccion } from './useReproduccionMinuto'
 import type { EntradaRep, Tope } from './reproduccionMinuto'
 import type { Lectura } from './relojDeDatos'
 
@@ -173,6 +175,17 @@ function MetaALaHoraViva({ hora, piezas }: { hora: string | null; piezas: number
   )
 }
 
+/** El turno anterior a esta hora, con el «N adelante / atrás» del MISMO cuadro que la cifra grande (`useCifrasVivas`). */
+function FilaPrevioViva({ calc, respaldo, cerrado }: {
+  calc: (tMs: number | null, hechas: number) => { label: string; modo: 'al-cierre' | 'a-esta-hora'; piezas: number; diff: number } | null
+  respaldo: { label: string; modo: 'al-cierre' | 'a-esta-hora'; piezas: number; diff: number }
+  cerrado: boolean
+}) {
+  const v = useCifrasVivas()
+  const c = (v && !cerrado ? calc(v.tMs, v.hechas) : null) ?? respaldo
+  return <FilaCifra title={`${c.label} ${c.modo === 'al-cierre' ? 'al cierre' : 'a esta hora'}`} value={`${int(c.piezas)} pz`} valueSub={`${adelanteAtras(c.diff)} ${cerrado ? 'este turno' : 'hoy'}`} />
+}
+
 /** «Faltan» / «Meta superada» del ampliado, con las piezas del mismo instante que la cifra grande. */
 function FaltanViva({ meta, mostradas }: { meta: number; mostradas: number }) {
   const hechas = useCifrasVivas()?.hechas ?? mostradas
@@ -180,6 +193,18 @@ function FaltanViva({ meta, mostradas }: { meta: number; mostradas: number }) {
   return hechas >= meta
     ? <FilaCifra title="Meta superada" value={hechas - meta > 0 ? `${int(hechas - meta)} pz adelante` : 'en la meta'} valueSub={`${pct} % hecho`} />
     : <FilaCifra title="Faltan" value={`${int(meta - hechas)} pz`} valueSub={`${pct} % hecho`} />
+}
+
+/** «Faltan para la meta» del detalle «Al cierre»: la meta menos las hechas del cuadro, la misma resta de «Faltan» en «Piezas del turno». */
+function FaltanMetaCierreViva({ faltan, meta }: { faltan: number; meta: number | null }) {
+  const hechas = useCifrasVivas()?.hechas
+  return <>{int(hechas != null && meta != null ? Math.max(0, meta - Math.round(hechas)) : faltan)} pz</>
+}
+
+/** «Por máquina» del ampliado: las piezas de esa Baader en el MISMO cuadro que la cifra grande (suman «Piezas del turno»). */
+function PiezasMaquinaViva({ nombre, piezas }: { nombre: string; piezas: number }) {
+  const v = useCifrasVivas()?.porMaquina?.find((m) => m.nombre === nombre)?.valor ?? piezas
+  return <>{int(v)} pz</>
 }
 
 function Cifra({ valor, unidad, chica }: { valor: ReactNode; unidad?: string; chica?: boolean }) {
@@ -840,7 +865,16 @@ function BarrasHora({ filas, metaPorHora, cerrado = false }: { filas: HourlyRow[
  * piezas de la línea y de CADA Baader en esas mismas horas, marcando la mejor y la peor hora completa.
  * Línea y Baader salen de la misma serie de 5 min del turno, así que en cada hora las Baader suman la línea.
  */
-function HoraAHora({ filas, metaPorHora, porMaquina, total, cerrado = false }: { filas: HourlyRow[]; metaPorHora: number | null; porMaquina: Array<{ nombre: string; piezas: number[] }>; total: number; cerrado?: boolean }) {
+function HoraAHora({ filas: filasBase, metaPorHora, porMaquina: porMaquinaBase, total: totalBase, cerrado = false }: { filas: HourlyRow[]; metaPorHora: number | null; porMaquina: Array<{ nombre: string; piezas: number[] }>; total: number; cerrado?: boolean }) {
+  /* La hora en curso sigue al reloj de la cola (el mismo instante que la cifra grande): `horasEnCuadro` decide la hora por el instante
+     del cuadro y arma la fila en curso con lo que falta para las hechas, para la línea y para cada Baader; las horas cerradas no se
+     mueven. Cerrado, o sin reloj de vista, la tabla de siempre. */
+  const vivas = useCifrasVivas()
+  const enVivo = !cerrado && vivas != null && vivas.tMs != null
+  const total = vivas && !cerrado ? Math.round(vivas.hechas) : totalBase
+  const { filas, porMaquina } = enVivo && vivas
+    ? horasEnCuadro({ filas: filasBase, porMaquina: porMaquinaBase, hechas: vivas.hechas, hechasPorMaquina: vivas.porMaquina, tMs: vivas.tMs })
+    : { filas: filasBase, porMaquina: porMaquinaBase }
   const sumaHoras = filas.reduce((a, h) => a + h.pieces, 0)
   const completas = filas.filter((h) => !h.partial)
   const mejor = completas.reduce<HourlyRow | null>((a, h) => (!a || h.pieces > a.pieces ? h : a), null)
@@ -977,6 +1011,13 @@ type ClaveTurno = 'cierre' | 'ritmo' | 'mant' | 'maquinas' | 'perdido'
  * (aunque lleguen como `ReactNode` desde la página): `useReproduccion()`.
  */
 export function MonitorV2(p: MonitorV2Props) {
+  /* Con la página en un `ProveedorReproduccion` hay UN solo reloj para todo (franja, Duelo, TV): se usa ese. Sin él (tests,
+     pantallas sueltas) el monitor arma el suyo. */
+  const compartida = useReproduccion()
+  return compartida ? <MonitorV2Cuerpo {...p} rep={compartida} /> : <MonitorV2ConReloj {...p} />
+}
+
+function MonitorV2ConReloj(p: MonitorV2Props) {
   const rep = useReproduccionMinuto(p.repro?.entrada ?? null, p.repro?.tope ?? null)
   return (
     <ReproduccionCtx.Provider value={rep}>
@@ -1027,7 +1068,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         cuerpo: (
           <Grupo nota="Piezas de ahora + el ritmo andando × los minutos productivos que quedan (sin la colación pendiente).">
             {p.proyeccion != null && <ListCell title="Proyección" value={`${int(p.proyeccion)} pz`} valueSub={cierreVsMeta != null ? deLaMeta(cierreVsMeta) : undefined} />}
-            {p.cierre?.faltan != null && <ListCell title="Faltan para la meta" value={`${int(p.cierre.faltan)} pz`} />}
+            {p.cierre?.faltan != null && <ListCell title="Faltan para la meta" value={<FaltanMetaCierreViva faltan={p.cierre.faltan} meta={p.meta ?? null} />} />}
             {p.cierre?.quedaMin != null && <ListCell title="Tiempo que queda" value={horas(p.cierre.quedaMin)} />}
             {p.cierre?.colacionMin != null && p.cierre.colacionMin > 0 && <ListCell title="Colación pendiente" value={horas(p.cierre.colacionMin)} />}
             {p.ritmoNecesario != null && <ListCell title="Ritmo necesario" value={`${dec(p.ritmoNecesario)} pz/min`} />}
@@ -1147,17 +1188,23 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   /* El turno anterior con UNA cifra, la MISMA de la leyenda del gráfico (`cifraTurnoAnterior`): en vivo, el valor de su curva en el
      mismo minuto desde la primera pieza (lo que se dibuja); cerrado, su total (el mismo de «Comparado con otros días»).
      Sin gráfico o sin lectura (no hay con qué alinear el minuto) queda la de siempre, `p.vsAyer`. */
-  const previoUna = (() => {
+  /* La UNA cifra del turno anterior, en la hora del cuadro: `calcPrevio` la calcula para un instante y sus piezas (la fila viva la
+     vuelve a pedir con cada pieza, así «N adelante / atrás» se mueve con la cifra grande). Sin reloj, el instante y las piezas
+     del cuadro de ahora. */
+  const calcPrevio = (tCuadro: number | null, hechas: number) => {
     const previo = p.curva?.previo
     const eje = p.eje
     if (!previo || !eje) return null
-    const ult = reloj.cuadro().ultima
-    if (!p.cerrado && ult?.atMs == null) return null
     const totalMin = (eje.finMs - eje.iniMs) / 60_000
-    const ultimaMin = ult?.atMs != null ? Math.min(totalMin, Math.max(0, (ult.atMs - eje.iniMs) / 60_000)) : 0
+    const ultimaMin = tCuadro != null ? Math.min(totalMin, Math.max(0, (tCuadro - eje.iniMs) / 60_000)) : 0
     const baseMin = eje.primeraPiezaMs != null ? (eje.primeraPiezaMs - eje.iniMs) / 60_000 : 0
     const c = cifraTurnoAnterior({ curva: previo.curve, cerrado: p.cerrado, ultimaMin, baseMin })
-    return c ? { label: previo.label, ...c, diff: (ult?.valor ?? p.piezas) - c.piezas } : null
+    return c ? { label: previo.label, ...c, diff: hechas - c.piezas } : null
+  }
+  const previoUna = (() => {
+    const cuadro = reloj.cuadro()
+    if (!p.cerrado && cuadro.ultima?.atMs == null) return null
+    return calcPrevio(horaDelCuadro(cuadro), cuadro.valor ?? p.piezas)
   })()
 
   /* «a esta altura» (`p.vsAyer`, alineado por el arranque del turno y no por la primera pieza) solo sale donde no hay con qué
@@ -1189,12 +1236,12 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         {/* Con la meta cumplida «Faltan 0 pz» no dice nada: se dice cuánto se pasó. */}
         {p.meta != null && <FaltanViva meta={p.meta} mostradas={mostradas} />}
         {previoUna
-          ? <FilaCifra title={`${previoUna.label} ${previoUna.modo === 'al-cierre' ? 'al cierre' : 'a esta hora'}`} value={`${int(previoUna.piezas)} pz`} valueSub={`${adelanteAtras(previoUna.diff)} ${p.cerrado ? 'este turno' : 'hoy'}`} />
+          ? <FilaPrevioViva calc={calcPrevio} respaldo={previoUna} cerrado={p.cerrado} />
           : previoSinAlinear && p.vsAyer && <FilaCifra title={`${p.vsAyer.label} a esta hora`} value={`${int(p.vsAyer.pieces)} pz`} valueSub={`${adelanteAtras(p.vsAyer.diff)} hoy`} />}
       </Grupo>
       {p.maquinas.length > 1 && (
         <Grupo titulo="Por máquina">
-          {p.maquinas.map((m) => <FilaCifra key={m.name} title={m.name} value={`${int(m.piezas)} pz`} />)}
+          {p.maquinas.map((m) => <FilaCifra key={m.name} title={m.name} value={<PiezasMaquinaViva nombre={m.name} piezas={m.piezas} />} />)}
         </Grupo>
       )}
     </div>
@@ -1436,6 +1483,7 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
             <p className="mt-2 hidden text-[15px] tabular-nums text-muted-foreground first-letter:uppercase md:block">{sub}</p>
           </div>
           <div className="md:hidden"><FilaTurnoMovil texto={subCorto ?? sub} nav={navMovil ?? null} /></div>
+          <div className="flex min-w-0 px-1 empty:hidden"><ChipDesfase /></div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="hidden md:contents">{navTurnos}</div>
             {pestanas}
@@ -1448,6 +1496,7 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
           <div className="flex min-w-0 items-center gap-2.5">
             <h1 className="min-w-0 truncate text-[15px] font-semibold leading-tight">{titulo}</h1>
             {estado}
+            <ChipDesfase />
             {!selectorPc && area && <span className="hidden truncate text-[13px] text-muted-foreground xl:inline">{area.startsWith(titulo) ? area.slice(titulo.length).replace(/^[\s·]+/, '') || area : area}</span>}
           </div>
           <p className="flex min-w-0 items-baseline text-[13px] leading-tight tabular-nums text-muted-foreground" title={marca ? `${sub} · ${marca}` : sub}>
