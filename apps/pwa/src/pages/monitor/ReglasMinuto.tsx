@@ -1,52 +1,32 @@
 /**
- * «Regla del minuto» (Fase 6 del Duelo, variante A del mockup `docs/mockups/reproduccion_minuto.html`).
+ * «Último minuto, pieza a pieza» — la CINTA CONTINUA por Baader (spec §5 de SPEC_MONITOR_EN_VIVO_COLA; antes, la «regla del minuto»
+ * de la Fase 6 del Duelo).
  *
- * Una regla de 0 a 60 s por Baader (Ev 1, Ev 2, Ev 3 en Eviscerado; B200 en Filete) con los carros (Baader 142) o las
- * silletas (Baader 200) del minuto marcados en tenue y un cabezal que los va encendiendo. Los segundos en que la
- * Baader estuvo detenida llevan trama. Es el minuto CERRADO que Shoplogix ya entregó, vuelto a pasar con desfase:
- * no se inventa ni una pieza (lógica en `reproduccionMinuto.ts`).
+ * Cada Baader (Ev 1, Ev 2, Ev 3 en Eviscerado; B200 en Filete) lleva una cinta de 60 s que corre sin detenerse entre minuto y
+ * minuto (la cola de reproducción la alimenta) con una marca por pieza que pasa a la cadencia propia de esa Baader, y el texto
+ * «1 cada X,X s» (60 ÷ piezas del último minuto cerrado; «—» si estuvo detenida). Los segundos en que la Baader estuvo parada
+ * llevan trama. Es lo que Shoplogix ya entregó, vuelto a pasar con desfase: no se inventa ni una pieza (lógica en
+ * `reproduccionMinuto.ts`; el dibujo en `cintaCanvas.ts` / `CintaBaader.tsx`).
  *
- * Movimiento (DESIGN.md §8, excepción «reloj de datos»): solo `transform` y `opacity`. El cabezal es un `translateX`
- * por cuadro; cada pieza pulsa con escala y opacidad (600 ms); la barra de ritmo se desliza con `scaleX` en 1 s. Con
- * `prefers-reduced-motion` no hay cabezal ni pulsos: el minuto cae entero al llegar.
+ * Las barras de ritmo (cada Baader y la de la línea) se llenan con `scaleX` en 600 ms cuando cierra cada minuto. El estado del
+ * reloj (en vivo, poniéndose al día, Shoplogix atrasado, línea detenida) lo dice el chip de la cabecera (`ChipDesfase`), no esta nota.
+ * Con `prefers-reduced-motion` la cinta es una regla en bucle sin deslizamiento y no hay pulsos.
  */
-import { memo, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { CintaBaader } from './CintaBaader'
+import { textoCadencia } from './cintaCanvas'
 import { useCuentaCifra } from './ampliarHooks'
 import { tonoRitmo } from './ejeTurno'
-import { SEG_MINUTO, horaDeWall, horaPlantaDeUtc, type MinutoMaq } from './reproduccionMinuto'
+import { horaDeWall, type MinutoMaq, type VistaMaq } from './reproduccionMinuto'
 import { unidadDeMaquinas, etiquetaMaquina } from './ritmoVivo'
 import { useReproduccion, type MinutoVista, type Reproduccion } from './useReproduccionMinuto'
-import type { CuadroReloj } from './useRelojDeDatos'
 
 const int = (n: number) => Math.round(n).toLocaleString('es-CL')
 
-/** El texto fijo que pide el spec, tal cual. */
-export const NOTA_REPRODUCCION = 'reproducción del último minuto · 1 min de desfase'
+/** Lo que dura el llenado de una barra al cerrar un minuto. */
+export const BARRA_MS = 600
 
 const unidadDe = (m: MinutoMaq): 'carros' | 'silletas' => unidadDeMaquinas([{ model: m.modelo, name: m.nombre }]) ?? 'carros'
-
-// ── La nota ──────────────────────────────────────────────────────────────────
-
-/**
- * «reproducción del último minuto · 1 min de desfase». Si la lectura se atrasa (pasado 1,5 × el intervalo) cambia a
- * «sin lectura nueva desde hh:mm» y el punto pasa a ámbar: lo que se ve está quieto en el último minuto cerrado.
- */
-export function NotaReproduccion({ rep, minuto }: { rep: Reproduccion; minuto: MinutoVista }) {
-  const [atrasada, setAtrasada] = useState(() => rep.reloj.cuadro().atrasada)
-  useEffect(() => {
-    const ver = () => setAtrasada(rep.reloj.cuadro().atrasada)
-    ver()
-    const t = setInterval(ver, 1000)
-    return () => clearInterval(t)
-  }, [rep.reloj])
-  const desde = horaPlantaDeUtc(minuto.pulsoAtMs) ?? horaDeWall(minuto.finMs)
-  return (
-    <span className="rm-nota" role="status" aria-live="polite" data-estado={atrasada ? 'retenida' : 'ok'}>
-      <i className="rm-nota-punto" aria-hidden />
-      <span>{atrasada ? `sin lectura nueva desde ${desde}` : NOTA_REPRODUCCION}</span>
-    </span>
-  )
-}
 
 // ── Una Baader ───────────────────────────────────────────────────────────────
 
@@ -65,90 +45,68 @@ function ContadorMaq({ rep, id }: { rep: Reproduccion; id: string }) {
   return <span ref={ref}>{ultimo.current}</span>
 }
 
-/** Los segundos del minuto en que la Baader NO andaba: el complemento de sus tramos andando. */
-function huecos(m: MinutoMaq): Array<[number, number]> {
-  const out: Array<[number, number]> = []
-  let previo = 0
-  for (const [a, b] of [...m.tramos, [SEG_MINUTO, SEG_MINUTO] as const]) {
-    if (a - previo > 0.5) out.push([previo, a])
-    previo = b
-  }
-  return out
-}
-
-const pct = (seg: number) => `${(seg / SEG_MINUTO) * 100}%`
-
-const Regla = memo(function Regla({ rep, m }: { rep: Reproduccion; m: MinutoMaq }) {
-  const marcas = useRef<Array<HTMLElement | null>>([])
-  const cabezal = useRef<HTMLDivElement>(null)
-  const sil = unidadDe(m) === 'silletas'
-  const reducido = rep.reloj.reducido
-
-  useEffect(() => {
-    let previas = 0
-    let primera = true
-    return rep.reloj.alCuadro((c: CuadroReloj) => {
-      const r = c.rep?.porMaquina.find((x) => x.id === m.id)
-      if (!r) return
-      /* Las piezas se encienden en orden: solo se toca el nodo cuando sube la cuenta; la 1ª vez (o al saltar) sin pulso. */
-      for (let j = previas; j < r.encendidas; j++) {
-        const el = marcas.current[j]
-        if (!el) continue
-        el.dataset.on = 'true'
-        if (!primera && c.rep?.animando) {
-          el.dataset.pulso = 'true'
-          el.addEventListener('animationend', () => { delete el.dataset.pulso }, { once: true })
-        }
-      }
-      previas = Math.max(previas, r.encendidas)
-      primera = false
-      const ph = cabezal.current
-      if (ph) {
-        ph.style.transform = `translateX(${(c.frac * 100).toFixed(2)}%)` // decimal-tecnico: porcentaje CSS del cabezal
-        ph.style.opacity = c.rep?.animando ? '0.7' : '0'
-      }
-    })
-  }, [rep.reloj, m])
-
-  return (
-    <div className="rm-regla" aria-hidden>
-      {[15, 30, 45].map((s) => <i key={s} className="rm-q" style={{ left: pct(s) }} />)}
-      {huecos(m).map(([a, b]) => <i key={a} className="rm-stop" style={{ left: pct(a), width: pct(b - a) }} />)}
-      {m.horario.map((t, j) => (
-        <i key={j} ref={(el) => { marcas.current[j] = el }} className={`rm-mk${sil ? ' rm-sil' : ''}`} style={{ left: pct(t) }} />
-      ))}
-      {!reducido && <div ref={cabezal} className="rm-ph"><i /></div>}
-    </div>
-  )
-})
-
 const ESTADO_TXT: Record<MinutoMaq['estado'], (m: MinutoMaq) => string> = {
   andando: () => 'andando',
   parcial: (m) => `anduvo ${Math.round(m.segAndando)} s`,
   detenida: () => 'detenida',
 }
 
-function FilaMaq({ rep, m, iniMs }: { rep: Reproduccion; m: MinutoMaq; iniMs: number }) {
-  const ritmo = useCuentaCifra(m.n, 1000)
-  const tono = tonoRitmo(m.n, m.esperado)
-  const tope = m.esperado != null && m.esperado > 0 ? m.esperado * 1.3 : Math.max(m.n, 1)
+/** La barra de ritmo: escala de 0 a 1 con el tono del ritmo contra lo esperado, y la raya de lo esperado. */
+function BarraRitmo({ n, esperado }: { n: number; esperado: number | null }) {
+  const tono = tonoRitmo(n, esperado)
+  const tope = esperado != null && esperado > 0 ? esperado * 1.3 : Math.max(n, 1)
+  return (
+    <div className="rm-rb" aria-hidden>
+      <i data-tono={tono} style={{ transform: `scaleX(${Math.min(1, n / tope).toFixed(3)})` }} />
+      {esperado != null && esperado > 0 && <em style={{ left: `${(esperado / tope) * 100}%` }} />}
+    </div>
+  )
+}
+
+/**
+ * Una fila. NO se vuelve a montar con cada minuto (la cinta es continua y la barra se llena sobre sí misma): lo que cambia
+ * al cerrar un minuto es `r` (la cadencia y las piezas del último minuto cerrado, de ese cuadro del reloj).
+ */
+function FilaMaq({ rep, m, r }: { rep: Reproduccion; m: MinutoMaq; r: VistaMaq | undefined }) {
+  /* El ritmo y la cadencia son del ÚLTIMO MINUTO CERRADO (el que acaba de terminar de reproducirse); en el primer minuto tras
+     cargar aún no hay uno anterior y vale el que corre. Cambian una vez por minuto, no por pieza. */
+  const nCerrado = r?.piezasMinutoCerrado ?? m.n
+  const cadencia = r?.piezasMinutoCerrado != null ? r.cadenciaS : nCerrado > 0 ? 60 / nCerrado : null
+  const ritmo = useCuentaCifra(nCerrado, BARRA_MS)
+  const etiqueta = etiquetaMaquina(m.nombre)
   return (
     <li className="rm-fila">
       <div className="rm-nom">
-        <span className="rm-n">{etiquetaMaquina(m.nombre)}</span>
+        <span className="rm-n">{etiqueta}</span>
         <span className="rm-est" data-e={m.estado}><i aria-hidden />{ESTADO_TXT[m.estado](m)}</span>
       </div>
       <div className="rm-cnt tabular-nums"><ContadorMaq rep={rep} id={m.id} /><small>pz</small></div>
       <div className="rm-pista">
-        <Regla key={iniMs} rep={rep} m={m} />
-        <span className="rm-cap">{unidadDe(m)} del minuto · {m.n} {m.n === 1 ? 'pieza' : 'piezas'}</span>
+        <div className="rm-pista-fila">
+          <CintaBaader rep={rep} id={m.id} etiqueta={`${etiqueta}: ${unidadDe(m)} de los últimos 60 s`} />
+          <span className="rm-cad tabular-nums" data-det={cadencia == null ? 'true' : undefined}>{textoCadencia(cadencia)}</span>
+        </div>
+        <span className="rm-cap">{unidadDe(m)} de los últimos 60 s</span>
       </div>
       <div className="rm-rit">
         <div className="tabular-nums"><b>{int(ritmo)}</b>{m.esperado != null && <small> de {int(m.esperado)} pz/min</small>}</div>
-        <div className="rm-rb" aria-hidden>
-          <i data-tono={tono} style={{ transform: `scaleX(${Math.min(1, m.n / tope).toFixed(3)})` }} />
-          {m.esperado != null && m.esperado > 0 && <em style={{ left: `${(m.esperado / tope) * 100}%` }} />}
-        </div>
+        <BarraRitmo n={nCerrado} esperado={m.esperado} />
+      </div>
+    </li>
+  )
+}
+
+/** La línea: la suma de las Baader del último minuto cerrado contra la suma de lo esperado, con su barra. */
+function FilaLinea({ m, r }: { m: MinutoMaq[]; r: Array<VistaMaq | undefined> }) {
+  const n = m.reduce((s, q, i) => s + (r[i]?.piezasMinutoCerrado ?? q.n), 0)
+  const esperado = m.every((q) => q.esperado != null) ? m.reduce((s, q) => s + (q.esperado ?? 0), 0) : null
+  const ritmo = useCuentaCifra(n, BARRA_MS)
+  return (
+    <li className="rm-fila rm-linea">
+      <div className="rm-nom"><span className="rm-n">Línea</span></div>
+      <div className="rm-rit">
+        <div className="tabular-nums"><b>{int(ritmo)}</b>{esperado != null && esperado > 0 && <small> de {int(esperado)} pz/min</small>}</div>
+        <BarraRitmo n={n} esperado={esperado} />
       </div>
     </li>
   )
@@ -171,28 +129,29 @@ function Cuadre({ rep, minuto }: { rep: Reproduccion; minuto: MinutoVista }) {
     <p ref={ref} className="rm-cuadre tabular-nums" data-on="false">
       <i aria-hidden />
       cierre {horaDeWall(minuto.finMs)} · {cerrado != null ? int(cerrado) : '–'} pz = suma de las Baader
-      {resto != null && resto > 0 ? ` · el contador de planta lleva ${int(resto)} más (minuto en curso)` : ''}
+      {resto != null && resto > 0 ? ` · el contador de planta lleva ${int(resto)} más (minutos en cola)` : ''}
     </p>
   )
 }
 
-/** El bloque completo: título, nota y una regla por Baader. Sin reproducción activa (turno cerrado, sin serie) no dibuja nada. */
+/** El bloque completo: título y una cinta por Baader. Sin reproducción activa (turno cerrado, sin serie) no dibuja nada. */
 export function ReglasMinuto({ titulo = 'Último minuto, pieza a pieza' }: { titulo?: string }) {
   const rep = useReproduccion()
   const minuto = rep?.minuto
   if (!rep || !rep.activa || !minuto || minuto.maquinas.length === 0) return null
+  const vistas = rep.reloj.cuadro().rep?.porMaquina ?? []
+  const deMaq = (id: string) => vistas.find((v) => v.id === id)
   return (
     <section className="rm" aria-label={titulo}>
       <div className="rm-hd">
         <h4 className="rm-h">{titulo}</h4>
-        <span className="rm-cap tabular-nums">{horaDeWall(minuto.iniMs)}–{horaDeWall(minuto.finMs)}</span>
-        <NotaReproduccion rep={rep} minuto={minuto} />
+        <span className="rm-cap tabular-nums">últimos 60 s</span>
       </div>
       <ul className="rm-filas">
-        {minuto.maquinas.map((m) => <FilaMaq key={m.id} rep={rep} m={m} iniMs={minuto.iniMs} />)}
+        {minuto.maquinas.map((m) => <FilaMaq key={m.id} rep={rep} m={m} r={deMaq(m.id)} />)}
+        {minuto.maquinas.length > 1 && <FilaLinea m={minuto.maquinas} r={minuto.maquinas.map((m) => deMaq(m.id))} />}
       </ul>
       <Cuadre rep={rep} minuto={minuto} />
     </section>
   )
 }
-

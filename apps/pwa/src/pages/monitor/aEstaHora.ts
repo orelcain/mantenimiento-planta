@@ -6,8 +6,10 @@
 import { minutosCerrados, totalEnReposo, type EntradaRep, type Tope } from './reproduccionMinuto'
 
 /**
- * Las piezas que la vista muestra «en reposo»: con la reproducción del último minuto activa, la suma de los minutos
- * cerrados topada por el contador vivo (`totalEnReposo`); si no, el contador vivo (`contador`, que también es el techo).
+ * Las piezas que la vista muestra «en reposo»: con la cola de reproducción activa, la suma de los minutos cerrados
+ * topada por el contador vivo (`totalEnReposo`: donde el reloj queda al vaciar la cola); si no, el contador vivo
+ * (`contador`, que también es el techo). Es el RESPALDO y el valor de los lugares que no se mueven por cuadro: lo que se
+ * mueve (cifra, Camino, Duelo, TV…) lee el cuadro del reloj, que va ~3 min por detrás de este valor mientras la cola corre.
  */
 export function piezasMostradas(repro: { entrada: EntradaRep | null; tope: Tope | null } | null | undefined, contador: number): number {
   return totalEnReposo(repro?.entrada, repro?.tope) ?? contador
@@ -60,12 +62,14 @@ interface CuadroParaHora {
   frac: number
   previa: { valor: number; atMs: number | null } | null
   ultima: { valor: number; atMs: number | null } | null
+  /** Con la cola de reproducción: lo que dice cada Baader en este cuadro (suman `valor`). */
+  rep?: { porMaquina: ReadonlyArray<{ id: string; nombre: string; valor: number }> }
 }
 
 /**
- * La hora de los datos de ESTE cuadro: con la reproducción, el segundo del minuto que se está reproduciendo
- * (`previa.atMs` = inicio del minuto, `ultima.atMs` = su fin = T de `horaDeLosDatos`); con la recta entre dos lecturas,
- * el mismo avance. En reposo (frac = 1) es exactamente T, así que la vista quieta dice lo mismo que el PR A2.
+ * La hora de los datos de ESTE cuadro: con la cola de reproducción, el instante reproducido (`previa.atMs` = inicio del
+ * minuto que corre, `ultima.atMs` = su fin; el avance es `frac`); con la recta entre dos lecturas, el mismo avance.
+ * Con la cola vacía (frac = 1) es exactamente T, el fin del último minuto cerrado (`horaDeLosDatos`).
  */
 export function horaDelCuadro(c: CuadroParaHora): number | null {
   const u = c.ultima?.atMs
@@ -86,9 +90,12 @@ export function cifrasDelCuadro(
   cuotaEn: ((tMs: number) => number | null) | null | undefined,
   meta: number | null | undefined,
   respaldo: number,
-): { hechas: number; cuota: number | null; aHora: number | null; tMs: number | null } {
+): { hechas: number; cuota: number | null; aHora: number | null; tMs: number | null; porMaquina: Array<{ id: string; nombre: string; valor: number }> | null } {
   const hechas = c.valor ?? respaldo
   const tMs = horaDelCuadro(c)
   const cuota = cuotaEn && tMs != null ? cuotaEn(tMs) : null
-  return { hechas, cuota, aHora: aEstaHora(hechas, cuota, meta), tMs }
+  return {
+    hechas, cuota, aHora: aEstaHora(hechas, cuota, meta), tMs,
+    porMaquina: c.rep ? c.rep.porMaquina.map((m) => ({ id: m.id, nombre: m.nombre, valor: m.valor })) : null,
+  }
 }

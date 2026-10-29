@@ -20,9 +20,12 @@ import { DetalleDuelo } from './DetalleDuelo'
 import { COLOR_EQUIPO, COLOR_EQUIPO_TEXTO, nombreCorto, type DatosDuelo, type EquipoId, type NombresEquipos } from './duelo'
 import { construirLados, microDelEquipo, type SerieMinuto } from './dueloDatosPC'
 import { EQ_ORDEN, TEMAS, equipoDeLado, filasDePuntos, fraseDeVentaja, modeloMarcador, tendenciaDeVentaja, type FilaPunto, type Lado, type ModeloMarcador, type TemaDuelo } from './dueloCalma'
+import { datosAlReloj } from './dueloAlReloj'
 import { dec, int, textoFraseEmpate } from './dueloTextos'
 import { useGloboDuelo } from './GloboDuelo'
 import type { Lectura } from './relojDeDatos'
+import { useCarreraViva } from './useCarreraViva'
+import { useReproduccion } from './useReproduccionMinuto'
 import './duelo.css'
 
 // ── Lo que la página le pasa ─────────────────────────────────────────────────
@@ -55,7 +58,14 @@ const fechaCorta = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`
 const colT = (e: EquipoId) => ({ color: COLOR_EQUIPO_TEXTO[e] })
 
 export function DueloCalmo(p: DueloPCProps) {
-  const { datos: d, extra, nombres } = p
+  const { datos: d0, extra, nombres } = p
+  /* UN solo reloj con «El turno» y el Modo TV: el de la cola de reproducción (`ProveedorReproduccion`). Con el turno en curso, las
+     hechas de hoy, las del rival a la misma hora y la cabeza de la curva salen del CUADRO de ese reloj (`useCarreraViva`: cambia
+     solo con un entero, no por cuadro) y no del contador vivo, que va 2-4 min adelante. Sin reloj (turno cerrado, sin serie por
+     minuto, sin proveedor) `d` queda tal cual. */
+  const rep = useReproduccion()
+  const viva = useCarreraViva(!d0.hoy.cerrado && rep?.activa ? rep.reloj : null, p.inicioMs, d0.carrera?.fantasmaInfo?.curva ?? null)
+  const d = useMemo(() => datosAlReloj(d0, viva), [d0, viva])
   const [ref, { w }] = useTamano()
   const [tema, setTema] = useState<TemaDuelo | null>(null)
   const disparador = useRef<HTMLElement | null>(null)

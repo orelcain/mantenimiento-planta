@@ -3,7 +3,7 @@
  * cuota en función de la hora (`cuotaEn(t)`), y UN hook que entrega hechas, cuota y «A esta hora» del MISMO instante. Así la
  * franja, Camino a la meta y el ampliado avanzan juntos pieza a pieza y nunca restan piezas de un segundo contra la cuota de
  * otro. El estado cambia solo cuando cambia un entero (una pieza, o una pieza de cuota): no hay un render por cuadro.
- * Con «reducir movimiento» el reloj ya entrega el minuto entero (fraccionRep = 1), así que todo queda en reposo.
+ * Con «reducir movimiento» el conteo sigue pieza a pieza (es dato): este módulo no mira esa preferencia.
  */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { cifrasDelCuadro } from './aEstaHora'
@@ -26,6 +26,8 @@ export interface CifrasVivas {
   cuota: number | null
   aHora: number | null
   tMs: number | null
+  /** Lo que dice cada Baader en el mismo cuadro (suman `hechas`); null sin la cola de reproducción. */
+  porMaquina: Array<{ id: string; nombre: string; valor: number }> | null
 }
 
 const iguales = (a: CifrasVivas, b: CifrasVivas) =>

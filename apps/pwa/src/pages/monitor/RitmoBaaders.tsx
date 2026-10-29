@@ -14,7 +14,7 @@
  * (`.rb-caja`): bajo 470 px sin la columna de piezas; bajo 360 px (celular) la Línea ocupa dos columnas y sus referencias van en
  * una fila propia. Toda cifra viene de Shoplogix por props que ya existían; aquí solo se ubican y se dicen.
  */
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { RotuloFranja } from './FranjaTocable'
 import { esperadoPorMinuto, int, minutosCompletos, relojDe, sumaPorMinuto } from './ejeTurno'
 import type { EjeDatos } from './GraficoRitmoVivo'
@@ -35,15 +35,17 @@ const acota = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n))
  */
 export function PiezasBaader({ reloj, id, respaldo, className }: { reloj: RelojDeDatos; id: string; respaldo: number; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
-  const ultimo = useRef(int(respaldo))
+  /* Ni un frame con el contador vivo: el primer pintado ya es lo que dice el reloj (como `CifraViva`). */
+  const [inicial] = useState(() => int(reloj.cuadro().rep?.porMaquina.find((m) => m.id === id)?.valor ?? respaldo))
+  const ultimo = useRef(inicial)
   useEffect(() => reloj.alCuadro((c) => {
     const el = ref.current
     if (!el) return
     const t = int(c.rep?.porMaquina.find((m) => m.id === id)?.valor ?? respaldo)
-    /* Se compara con lo que HAY en el nodo: React reescribe el texto con `respaldo` cuando éste cambia. */
+    /* Se compara con lo que HAY en el nodo, no solo con lo último escrito. */
     if (t !== ultimo.current || el.textContent !== t) { ultimo.current = t; el.textContent = t }
   }), [reloj, id, respaldo])
-  return <span ref={ref} className={className}>{int(respaldo)}</span>
+  return <span ref={ref} className={className}>{inicial}</span>
 }
 
 /** La fila de aporte de una Baader (por nombre, sin importar tildes ni mayúsculas); null si no hay. */

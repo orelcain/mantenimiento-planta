@@ -17,7 +17,7 @@
  * Todo sale de las funciones de datos que ya existen (`ritmoVivo`, `monitorEventos`…): este archivo solo ubica y dibuja.
  */
 import { Info, Maximize2, X } from 'lucide-react'
-import { memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
+import { memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
 import { DUENO_META } from '@/services/shoplogix/monitorEventos'
 import { CapaAmpliada } from './AmpliarV2'
 import { useAbrirPorClave, useTamano } from './ampliarHooks'
@@ -33,6 +33,7 @@ import {
 import { etiquetaMaquina } from './ritmoVivo'
 import type { CuadroReloj, RelojDeDatos } from './useRelojDeDatos'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
+import { FranjaRango } from './FranjaRango'
 import type { MinutoTurno, MonitorV2Props } from './MonitorV2'
 
 // ── Datos que la página le pasa ──────────────────────────────────────────────
@@ -122,7 +123,8 @@ interface Modelo {
   /** PR B: la cuota en la hora de planta de cada cuadro (`VistaVivaCtx`). Con ella la brecha sigue a la punta. */
   cuotaEn: ((tMs: number) => number | null) | null
   paradas: ParadaEje[]
-  barraNueva: boolean
+  /** El minuto que corre es la última barra: crece cuadro a cuadro con las piezas que ya cayeron (`f0`: cuánto lleva al armar el modelo). null si no hay cola. */
+  enCurso: { f0: number } | null
   cerrado: boolean
   unidad: 'carros' | 'silletas' | null
 }
@@ -156,6 +158,7 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const brechaRef = useRef<SVGGElement>(null)
   const brechaLineaRef = useRef<SVGLineElement>(null)
   const brechaTextoRef = useRef<SVGTextElement>(null)
+  const barraRef = useRef<SVGRectElement>(null)
 
   /* Entre lecturas: la punta y el clip van de la lectura anterior a la última; la proyección parte de la punta. */
   const aplicar = (c: CuadroReloj) => {
@@ -168,9 +171,17 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
     const ox = g.x((p ?? u).min), oy = g.y((p ?? u).v)
     clipRef.current?.setAttribute('transform', `translate(${r1(hx)} 0)`)
     puntaRef.current?.setAttribute('transform', `translate(${r1(hx - ox)} ${r1(hy - oy)})`)
+    /* El extremo «al cierre» no se mueve con la reproducción: es la proyección de siempre (`p.proyeccion`), el mismo número de la franja
+       y del ampliado; solo el arranque de la línea sigue a la punta. */
     if (proyRef.current && m.proy) {
       const ex = g.x(m.proy.hasta.min), ey = g.y(m.proy.hasta.v)
       proyRef.current.setAttribute('transform', `matrix(${r1(ex - hx)} ${r1(ey - hy)} 0 1 ${r1(hx)} ${r1(hy)})`)
+    }
+    /* La barra del minuto que corre crece con las piezas que ya cayeron (transform, sin layout). */
+    if (barraRef.current && m.enCurso && c.rep) {
+      const span = c.rep.totalFinal - c.rep.totalPiso
+      const f = span > 0 ? Math.min(1, Math.max(0, (c.rep.total - c.rep.totalPiso) / span)) : 1
+      barraRef.current.style.transform = `scaleY(${f.toFixed(4)})`
     }
     /* PR B: «A esta hora» junto a la punta, con las piezas y la cuota del MISMO instante (la cifra de la franja). */
     if (m.cuotaEn && !m.cerrado && brechaRef.current && brechaLineaRef.current && brechaTextoRef.current) {
@@ -244,7 +255,7 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
         const by = yb(v)
         const bh = barras.y0 + barras.h - by
         const parcial = k >= m.completos
-        if (m.barraNueva && k === m.suma.length - 1) { nuevas.push({ x: bx, y: by, h: bh, w: bw, tono, parcial }); return }
+        if (m.enCurso && k === m.suma.length - 1) { nuevas.push({ x: bx, y: by, h: bh, w: bw, tono, parcial }); return }
         ;(parcial ? parcialTono : porTono)[tono] += rect(bx, by, bw, bh)
       })
     } else {
@@ -405,7 +416,10 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
       {(['bien', 'atento', 'mal', 'sin'] as const).map((t) => porTono[t] && <path key={t} d={porTono[t]} fill={COLOR_TONO[t]} />)}
       {(['bien', 'atento', 'mal', 'sin'] as const).map((t) => parcialTono[t] && <path key={`p-${t}`} d={parcialTono[t]} fill={COLOR_TONO[t]} fillOpacity={0.45} />)}
       {nuevas.map((q) => (
-        <rect key={`n-${m.suma.length}`} className="eje-barra-nueva" x={r1(q.x)} y={r1(q.y)} width={r1(q.w)} height={r1(q.h)} fill={COLOR_TONO[q.tono]} fillOpacity={q.parcial ? 0.45 : undefined} />
+        <rect
+          key={`n-${m.suma.length}`} ref={barraRef} x={r1(q.x)} y={r1(q.y)} width={r1(q.w)} height={r1(q.h)} fill={COLOR_TONO[q.tono]} fillOpacity={q.parcial ? 0.45 : undefined}
+          style={{ transformBox: 'fill-box', transformOrigin: '50% 100%', transform: `scaleY(${(m.enCurso?.f0 ?? 1).toFixed(4)})` }}
+        />
       ))}
 
       {/* Una fila por Baader: andando casi no se nota; lenta o detenida con la línea andando toma color */}
@@ -806,6 +820,9 @@ function InfoLeyenda({ ayuda }: { ayuda: string }) {
 
 const SEGMENTOS: Array<[Zoom, string]> = [['turno', 'Turno'], ['1h', '1 h'], ['15m', '15 min']]
 
+/** Cuánto dura la pista de la rueda sin Ctrl. */
+export const PISTA_RUEDA_MS = 1600
+
 const AYUDA_PC = 'Pasa el cursor sobre un minuto para verlo. Ctrl + rueda o pellizco para acercar, arrastra para recorrer. Doble clic vuelve al turno.'
 const AYUDA_TACTIL = 'Toca un minuto · pellizca para acercar · arrastra para recorrer'
 
@@ -849,7 +866,6 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   /* PR B: la cuota en la hora de cada cuadro y las cifras del instante (globo del minuto en curso). */
   const cuotaEn = useContext(VistaVivaCtx)?.cuotaEn ?? null
   const vivas = useCifrasVivas()
-  const nPrev = useRef<number | null>(null)
   /* Turno cerrado: el fin REAL (el de la cabecera) y el eje hasta lo que alcance, sin encogerse (un corte anticipado no lo acorta). */
   const finReal = p.cerrado && e.finRealMs != null && Number.isFinite(e.finRealMs) ? e.finRealMs : null
   const ultimoDatoMs = useMemo(() => {
@@ -867,7 +883,12 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const modeloBase = useMemo<Modelo | null>(() => {
     if (w < 200 || !(totalMin > 0)) return null
     const cuadro = reloj.cuadro()
-    const minuto = e.minuto
+    /* Con la cola de reproducción, las barras llegan solo hasta el minuto que corre (el reloj único): los minutos que ya llegaron
+       pero aún no se reproducen esperan en la cola. El que corre es la última barra y crece con las piezas del cuadro. */
+    const nCola = e.minuto && cuadro.rep && !p.cerrado && cuadro.ultima?.atMs != null ? Math.round((cuadro.ultima.atMs - Date.parse(e.minuto.desde)) / 60_000) : 0
+    const minuto = e.minuto && nCola >= 1
+      ? { ...e.minuto, maquinas: e.minuto.maquinas.map((q) => (q.cycles.length > nCola ? { ...q, cycles: q.cycles.slice(0, nCola) } : q)) }
+      : e.minuto
     const n = minuto ? minutosVisibles(minuto.maquinas, p.cerrado) : 0
     const conSerie = minuto != null && n > 0
     const offsetMin = minuto ? Math.round((Date.parse(minuto.desde) - e.iniMs) / 60_000) : 0
@@ -916,16 +937,19 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       : []
     const esperadoLinea = conSerie && minuto.maquinas.every((q) => q.esperado != null) ? minuto.maquinas.reduce((a, q) => a + (q.esperado ?? 0), 0) : null
     const d = disenar(w, tamanoGrafico(w), maquinas.length, conSerie)
-    const barraNueva = nPrev.current != null && n > nPrev.current
+    let enCurso: Modelo['enCurso'] = null
+    if (conSerie && nCola >= 1 && cuadro.rep && cuadro.rep.animando) {
+      const span = cuadro.rep.totalFinal - cuadro.rep.totalPiso
+      enCurso = { f0: span > 0 ? Math.min(1, Math.max(0, (cuadro.rep.total - cuadro.rep.totalPiso) / span)) : 1 }
+    }
     return {
       w, d, iniMs: e.iniMs, totalMin, yMin: 0, yMax, rejilla, vent: null, n, offsetMin, suma, completos: conSerie ? minutosCompletos(minuto.maquinas) : 0,
       esperadoMin: conSerie ? esperadoPorMinuto(minuto.maquinas, n) : [], esperadoLinea, topBarra: Math.ceil((Math.max(esperadoLinea ?? 0, ...suma, 10) * 1.15) / 10) * 10, maquinas, trazo, previa, ultima, proy, detenida,
       meta: p.meta, objetivo, previoPts, previoLabel: p.curva?.previo?.label ?? null, previoCifra, finReal: finReal != null, cuota: p.cuota ?? null, aHora, cuotaEn, paradas: e.paradas,
-      barraNueva, cerrado: p.cerrado, unidad: e.unidad,
+      enCurso, cerrado: p.cerrado, unidad: e.unidad,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se rehace con cada lectura (`reloj.version`) y con los datos del turno
   }, [w, e, totalMin, finReal, p.piezas, p.proyeccion, p.meta, p.cuota, p.curva, p.cerrado, detenida, aHora, cuotaEn, reloj.version])
-  useEffect(() => { nPrev.current = modeloBase?.n ?? nPrev.current })
 
   /* Con zoom, el dominio Y es el de los datos visibles en la ventana (hoy, ritmo de la meta, turno anterior, proyección);
      se recalcula cuando el hook publica la ventana (al frenar el paneo), no en cada píxel. En «Turno», igual que siempre. */
@@ -947,7 +971,16 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     const esperada = ventanaDe(z, ahoraMin, totalMin)
     setSigue(esperada && v && Math.abs(esperada.hastaMin - v.hastaMin) <= 2 ? z : 'turno')
   }
-  const zg = useZoomGesto({ dominioMin: Math.max(1, totalMin), ventana, onVentana: alVentana, zoomMax: zoomMaxPara(totalMin) })
+  /* La rueda SIN Ctrl no se secuestra: la página sigue su scroll y aquí solo sale la pista «Ctrl + rueda o pellizca para acercar» (1,6 s). */
+  const [pistaRueda, setPistaRueda] = useState(false)
+  const pistaTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mostrarPista = useCallback(() => {
+    setPistaRueda(true)
+    if (pistaTimer.current) clearTimeout(pistaTimer.current)
+    pistaTimer.current = setTimeout(() => setPistaRueda(false), PISTA_RUEDA_MS)
+  }, [])
+  useEffect(() => () => { if (pistaTimer.current) clearTimeout(pistaTimer.current) }, [])
+  const zg = useZoomGesto({ dominioMin: Math.max(1, totalMin), ventana, onVentana: alVentana, zoomMax: zoomMaxPara(totalMin), onRuedaSinModificador: mostrarPista })
   /* Con un atajo activo la ventana avanza con el presente (cada lectura nueva); recorrida a mano, se queda donde la dejaron. */
   useEffect(() => {
     if (sigue === 'turno' || !modeloBase) return
@@ -1124,7 +1157,14 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
           {modelo && (modelo.d.pr > 4 ? <RotulosDer m={modelo} /> : <div className="shrink-0" style={{ width: modelo.d.pr }} aria-hidden />)}
         </div>
         {modelo && info && !chico && <Globo info={info} style={{ left: globoX, top: modelo.d.pt + 18 }} />}
+        <div className="rv-pista-rueda" data-ver={pistaRueda ? 'true' : 'false'} aria-hidden>Ctrl + rueda o pellizca para acercar</div>
       </div>
+      {/* La franja de rango (spec §6): la ventana compartida del gráfico con sus dos asas; moverla acerca o aleja. */}
+      {modeloBase && (
+        <div className="rv-rango-caja">
+          <FranjaRango totalMin={totalMin} ventana={ventana} onVentana={alVentana} puntos={modeloBase.trazo} yMax={modeloBase.yMax} />
+        </div>
+      )}
       {tactil && <p className="mt-2 text-[12px] leading-4 text-muted-foreground">{AYUDA_TACTIL}</p>}
       {/* En el celular el globo no flota sobre el lienzo: se ancla a la tarjeta, arriba, y la raya del minuto queda a la vista. */}
       {modelo && info && chico && <div data-globo-minuto=""><Globo info={info} compacto onCerrar={() => setCursor(null)} /></div>}
