@@ -1747,15 +1747,29 @@ export function techoDeLinea(live: Pick<PublicMonitorLive, 'machines'>): number 
   return ms.length > 0 && ms.every((m) => (m.targetCpm ?? 0) > 0) ? ms.reduce((a, m) => a + (m.targetCpm ?? 0), 0) : null
 }
 
+/**
+ * Los turnos cerrados de `shiftStats` como resúmenes del duelo, con la corrección manual y el arranque de la línea.
+ * Es la MISMA entrada para la pantalla y para el cierre congelado del backend (`functions/lib/dueloNucleo.cjs`):
+ * si cambia acá, cambia en los dos.
+ */
+export function resumenesDeStats(
+  stats: readonly ShiftStat[],
+  overrides: Readonly<Record<string, EquipoId>> | null | undefined,
+  modo: ModoArranque,
+  series?: ReadonlyArray<SerieMinuto & { shiftDocId: string }> | null,
+): ResumenTurno[] {
+  return stats
+    .map((s) => resumenDeStat(s, overrides, { modo, serie: series?.find((x) => x.shiftDocId === s.shiftDocId) }))
+    .filter((r): r is ResumenTurno => r != null)
+}
+
 /** Junta todo lo que la tarjeta y la pestaña muestran. null si el turno no trae su hora de inicio. */
 export function construirDuelo(e: EntradaDuelo): DatosDuelo | null {
   const modo = modoArranqueDe(unidadDeMaquinas(e.live.machines))
   const hoy = resumenDeLive({ shiftDocId: e.shiftDocId, live: e.live, piezas: e.piezas, cerrado: e.cerrado, overrides: e.overrides, arranque: { modo, serie: e.serieHoy } })
   if (!hoy) return null
 
-  const deStats = e.stats
-    .map((s) => resumenDeStat(s, e.overrides, { modo, serie: e.series?.find((x) => x.shiftDocId === s.shiftDocId) }))
-    .filter((r): r is ResumenTurno => r != null && r.shiftDocId !== hoy.shiftDocId)
+  const deStats = resumenesDeStats(e.stats, e.overrides, modo, e.series).filter((r) => r.shiftDocId !== hoy.shiftDocId)
   /* Para el ciclo, los récords y el costo, el turno de hoy cuenta si ya cerró. */
   const cerrados = hoy.cerrado ? [...deStats, hoy] : deStats
   const duelos = duelosDeTurnos(cerrados)
