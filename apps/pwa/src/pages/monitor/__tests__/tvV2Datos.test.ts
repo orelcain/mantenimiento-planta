@@ -100,8 +100,12 @@ describe('Mantención de hoy', () => {
   it('suma los dos equipos de la jornada y dice el período', () => {
     const m = mantTv(duelo())!
     expect(m).toMatchObject({ periodo: 'jornada 28/10', fallas: 5, fallaMin: 26, piezasPerdidas: 701 })
-    expect(m.mttr).toBeCloseTo(5.2, 5)
     expect(mantTv(null)).toBeNull()
+  })
+  it('los minutos de la jornada son de LÍNEA: no se presentan como MTTR (29-10: «MTTR 0,4 min» con fallas de 5-7 min)', () => {
+    const m = mantTv(duelo())!
+    expect(m.mttr).toBeNull()
+    expect(m.lineaMin).toBe(26)
   })
 })
 

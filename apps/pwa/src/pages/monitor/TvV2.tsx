@@ -135,10 +135,15 @@ export function TvV2(p: TvV2Props) {
                     <div className="tv-fila">
                       <span className="tv-big">{mant.fallas}</span>
                       <span className="tv-u">{mant.fallas === 1 ? 'falla técnica' : 'fallas técnicas'}</span>
-                      {mant.mttr != null && (
+                      {mant.mttr != null ? (
                         <>
                           <span className="tv-rot2" style={{ marginLeft: 'auto' }}>MTTR</span>
                           <span className="tv-sec">{dec(mant.mttr)}</span><span className="tv-u">min</span>
+                        </>
+                      ) : mant.fallas > 0 && 'lineaMin' in mant && mant.lineaMin != null && (
+                        <>
+                          <span className="tv-rot2" style={{ marginLeft: 'auto' }}>línea detenida</span>
+                          <span className="tv-sec">{dec(mant.lineaMin)}</span><span className="tv-u">min</span>
                         </>
                       )}
                     </div>
