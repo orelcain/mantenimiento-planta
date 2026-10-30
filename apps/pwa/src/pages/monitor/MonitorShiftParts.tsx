@@ -1225,27 +1225,48 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquina
    *
    * Las que no calzan con ninguna parada visible NO se tiran: quedan en la
    * lista de abajo. Perder lo que escribió el piso ya nos costó una vez.
+   *
+   * ⚠ Shoplogix cuelga el comentario del BLOQUE HORARIO en que se escribió
+   * (23:30→00:30), no de la detención. Mostrar ese tramo se leía como «una
+   * detención de 1 hora» al lado de «23 min · 3 detenciones» (Orel, 30-10).
+   * Por eso la nota va a la detención más larga que cae dentro de su bloque y
+   * muestra la hora de ESA detención; si no calza con ninguna, va sin hora.
    */
   const TOLERANCIA_MIN = 2
-  const notaDe = (p: { desdeMin: number | null; hastaMin: number | null }) =>
-    (notas ?? []).filter((n) =>
-      n.desdeMin != null && p.desdeMin != null && p.hastaMin != null &&
-      n.desdeMin >= p.desdeMin - TOLERANCIA_MIN && n.desdeMin <= p.hastaMin + TOLERANCIA_MIN)
-  const emparejadas = new Set(
-    (c.paradas ?? []).flatMap((p) => notaDe(p)).map((n) => n.texto),
-  )
-  const sueltas = (notas ?? []).filter((n) => !emparejadas.has(n.texto))
+  type Parada = CausaDelTurno['paradas'][number]
+  const paradaDe = (n: NotaDeOperador): Parada | null => {
+    if (n.desdeMin == null) return null
+    const fin = (n.hastaMin ?? n.desdeMin) + TOLERANCIA_MIN
+    const ini = n.desdeMin - TOLERANCIA_MIN
+    let mejor: Parada | null = null
+    for (const p of c.paradas) {
+      if (p.desdeMin == null || p.hastaMin == null) continue
+      if (p.desdeMin <= fin && p.hastaMin >= ini && (!mejor || p.min > mejor.min)) mejor = p
+    }
+    return mejor
+  }
+  const notaDe = (p: Parada) => (notas ?? []).filter((n) => paradaDe(n) === p)
+  const sueltas = (notas ?? []).filter((n) => paradaDe(n) == null)
 
   const cifras = (
     <span className="shrink-0 tabular-nums">
       {c.piezas != null && (
         <span className="font-semibold text-red-700 dark:text-red-400">{fmtInt(c.piezas)} pz</span>
       )}
-      <span className="text-muted-foreground">
-        {c.piezas != null ? ' · ' : ''}{Math.round(c.min)} min{c.count > 0 ? ` · ${c.count}×` : ''}
-      </span>
+      {c.piezas == null && <span className="text-muted-foreground">{Math.round(c.min)} min</span>}
     </span>
   )
+
+  /*
+   * «3×» no decía de qué: los 23 min son la SUMA de las 3 detenciones (Orel,
+   * 30-10). Va en su propia línea porque al lado de las piezas dejaba el nombre
+   * de la causa en 32 px a 375 de ancho.
+   */
+  const resumen = [
+    c.count > 0 ? `${c.count} ${c.count === 1 ? 'detención' : 'detenciones'}` : null,
+    `${Math.round(c.min)} min${c.count > 1 ? ' en total' : ''}`,
+    c.categoria,
+  ].filter(Boolean).join(' · ')
 
   const nombre = (
     <span className="min-w-0 truncate">
@@ -1282,12 +1303,9 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquina
 
       {/* La categoría del curso, para que la etiqueta no sea nuestra: si el
           árbol dice que ATASCAMIENTO es MMPP, nadie discute la fila. */}
-      {c.categoria && (
-        <p className="px-1 text-[11px] text-muted-foreground/80">
-          {c.categoria}
-          {c.extension && <span className="ml-1 normal-case tracking-normal">· fuera del curso</span>}
-        </p>
-      )}
+      {/* «fuera del curso» (hoja agregada para la B200) era jerga nuestra: en
+          planta no decía nada (Orel, 30-10). El dato sigue en `c.extension`. */}
+      <p className="px-1 text-[11px] tabular-nums text-muted-foreground/80">{resumen}</p>
 
       {(abierta || detalleMaquinas) && porMaquina.length > 1 && (
         /* Cuál Baader es la que para: veces y minutos de esta causa en cada máquina. */
@@ -1391,11 +1409,22 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquina
           muestran todas — son la señal de que el piso explicó algo. */}
       {(abierta ? sueltas : (notas ?? [])).length > 0 && (
         <ul className="mt-0.5 space-y-0.5 border-l-2 border-primary pl-2">
-          {(abierta ? sueltas : (notas ?? [])).map((n, i) => (
-            <li key={`${n.desde}-${i}`} className="text-[11px] leading-snug text-muted-foreground">
-              <span className="tabular-nums">
-                {n.desde}{n.hasta && n.hasta !== n.desde && <>→{n.hasta}</>}
-              </span> · «{n.texto}»
+          {/* Dos notas de la MISMA detención (una larga que cruza dos bloques
+              horarios) van juntas, con la hora una sola vez. */}
+          {[...(abierta ? sueltas : (notas ?? [])).reduce((acc, n) => {
+            const p = paradaDe(n)
+            const k = p ? `${p.hora}-${p.hasta}` : `suelta-${n.texto}`
+            const g = acc.get(k) ?? { p, textos: [] as string[] }
+            g.textos.push(n.texto)
+            return acc.set(k, g)
+          }, new Map<string, { p: Parada | null; textos: string[] }>()).entries()].map(([k, { p, textos }]) => (
+            <li key={k} className="text-[11px] leading-snug text-muted-foreground">
+              {p && (
+                <span className="tabular-nums">
+                  {p.hora}→{p.hasta} · {fmtDec(p.min)} min ·{' '}
+                </span>
+              )}
+              {textos.map((t) => `«${t}»`).join(' · ')}
             </li>
           ))}
         </ul>
