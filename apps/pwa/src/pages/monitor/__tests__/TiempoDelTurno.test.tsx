@@ -522,7 +522,33 @@ describe('TiempoDelTurno · el comentario del operador vive DENTRO de su parada'
     fireEvent.click(r.getByRole('button', { name: /CUCHILLERIA DORSAL/ }))
     const t = r.container.textContent ?? ''
     expect(t).toMatch(/se revisa el eje/)
-    expect(t).toMatch(/14:40→14:45/)   // con su tramo, para poder ubicarlo
+    // Sin hora: el tramo de Shoplogix es el bloque en que se escribió, no una detención.
+    expect(t).not.toMatch(/14:40→14:45/)
+  })
+
+  it('el bloque horario del comentario NO se muestra: va la hora de su detención', () => {
+    /*
+     * Orel, 30-10: «23:30→00:30 · cadena pegada» al lado de «23 min · 3×» se
+     * leía como una detención de 1 hora. Shoplogix cuelga el comentario del
+     * bloque horario; la nota va a la detención más larga dentro de ese bloque.
+     */
+    const notas = notasPorCausa(
+      [{ r: 'Baader 200/CUCHILLERIA DORSAL', f: '2026-08-13T09:00:00.000Z', h: '2026-08-13T10:00:00.000Z', t: 'cadena pegada' }],
+      (iso) => iso.slice(11, 16), T0,
+    )
+    const t = render(
+      <TiempoDelTurno
+        tb={TB} cerrado meta={5000} hechas={3919} cpmAndando={13.5}
+        onCausa={() => {}} onVentana={() => {}} notas={notas}
+        grupos={agruparEventos({
+          tb: TB, stopEvents: EVENTOS, stopReasons: ['Baader 200/CUCHILLERIA DORSAL'],
+          cpmGlobal: 13.5, t0: T0,
+        })}
+      />,
+    ).container.textContent ?? ''
+    expect(t).toMatch(/cadena pegada/)
+    expect(t).not.toMatch(/09:00→10:00/)
+    expect(t).toMatch(/09:17[^«]*«cadena pegada»/)   // la de 10 min, no la de 3
   })
 
   it('con la causa cerrada se siguen viendo: son la señal de que el piso explicó algo', () => {
@@ -638,8 +664,9 @@ describe('TiempoDelTurno · minutos de máquina (tbv 3, 28-09-2026)', () => {
         grupos={agruparEventos({ tb: TB3, cpmGlobal: 36 })} />,
     ).container.textContent ?? ''
     expect(t).toMatch(/PUNTO CERO/)
-    expect(t).toMatch(/133 pz · 11 min · 1×/)     // 3,7 × 36 — antes «0 pz · 0 min»
-    expect(t).toMatch(/565 pz · 47 min · 74×/)    // 15,7 × 36
+    // Piezas a la derecha; «N detenciones · X min en total» en la línea de abajo.
+    expect(t).toMatch(/133 pz1 detención · 11 min/)               // 3,7 × 36 — antes «0 pz · 0 min»
+    expect(t).toMatch(/565 pz74 detenciones · 47 min en total/)    // 15,7 × 36
     expect(t).toMatch(/de máquina/)
   })
 })
