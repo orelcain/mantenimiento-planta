@@ -1,0 +1,110 @@
+/**
+ * Las marcas ▼ y los cuadros de color de las 5 causas de una micro deben dar ≥ 3:1 contra la tarjeta, en claro y en oscuro (WCAG 2.x,
+ * objetos gráficos). Lee los colores REALES: el mapa `COLOR_CAUSA` que dibuja el gráfico, los tokens `--v2-*` de monitorGlass.css y los
+ * colores de tarjeta de cada piel de index.css. Misma cuenta que `scripts/check-contrast-pizarra.mjs` (que lee index.css de la misma manera).
+ * Si alguien vuelve a poner el ámbar de `--v2-atento` (2,8:1 en claro) o el gris translúcido (2,3:1) en «Ritmo bajo» o «Sin contexto», falla aquí.
+ */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { CAUSAS_MICRO, COLOR_CAUSA, ROTULO_CAUSA } from '../microCausa'
+
+type Rgb = [number, number, number]
+interface Color { rgb: Rgb; alfa: number }
+
+const leer = (ruta: string) => readFileSync(resolve(__dirname, ruta), 'utf8').replace(/\r\n/g, '\n')
+const indexCss = leer('../../../index.css')
+const glassCss = leer('../monitorGlass.css').replace(/\/\*[\s\S]*?\*\//g, '')
+
+// ── Matemática de contraste (WCAG 2.x) ───────────────────────────────────────
+const aRgb = (hex: string): Rgb => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255] }
+const luminancia = ([r, g, b]: Rgb) => {
+  const f = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4 }
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+const contraste = (a: Rgb, b: Rgb) => { const x = luminancia(a), y = luminancia(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05) }
+/** `fg` con su alfa sobre `base`: lo que ve el ojo de un color translúcido. */
+const sobre = (base: Rgb, fg: Rgb, alfa: number): Rgb => base.map((v, i) => fg[i]! * alfa + v * (1 - alfa)) as Rgb
+
+// ── Los tokens de index.css (cada piel) y de monitorGlass.css (tema claro y oscuro) ───────────
+function bloque(css: string, selector: string) {
+  const i = css.indexOf(`${selector} {`)
+  if (i < 0) throw new Error(`no encontré el bloque ${selector} en index.css`)
+  return css.slice(i, css.indexOf('\n}', i))
+}
+function triple(selector: string, nombre: string): Rgb {
+  const m = new RegExp(`--${nombre}:\\s*(\\d+) (\\d+) (\\d+)`).exec(bloque(indexCss, selector))
+  if (!m) throw new Error(`falta --${nombre} en ${selector}`)
+  return [Number(m[1]), Number(m[2]), Number(m[3])]
+}
+/** Todas las declaraciones `--token: valor` de monitorGlass.css para el tema claro (`[data-glass='v2']`, `.v2-vars`) o el oscuro (`.dark …`). */
+function declaraciones(oscuro: boolean) {
+  const sirve = oscuro
+    ? (s: string) => s === ".dark [data-glass='v2']" || s === '.dark .v2-vars'
+    : (s: string) => s === "[data-glass='v2']" || s === '.v2-vars'
+  const out = new Map<string, string>()
+  for (const b of glassCss.matchAll(/(?:^|\n)([^{}\n@][^{}]*)\{([^{}]*)\}/g)) {
+    if (!b[1]!.split(',').some((s) => sirve(s.trim()))) continue
+    for (const d of b[2]!.matchAll(/--([\w-]+):\s*([^;]+);/g)) out.set(d[1]!, d[2]!.trim())
+  }
+  return out
+}
+const CLARO = declaraciones(false)
+const OSCURO = declaraciones(true)
+
+/** Resuelve un valor CSS a un color: #hex, rgb(r g b [/ a]), rgb(var(--foreground)), var(--token), color-mix(in srgb, A p%, B) y black. */
+function evaluar(valor: string, oscuro: boolean, texto: Rgb): Color {
+  const t = valor.trim()
+  let m: RegExpExecArray | null
+  if (/^#[0-9a-f]{6}$/i.test(t)) return { rgb: aRgb(t), alfa: 1 }
+  if ((m = /^rgb\((\d+) (\d+) (\d+)(?: \/ ([\d.]+))?\)$/.exec(t))) return { rgb: [+m[1]!, +m[2]!, +m[3]!], alfa: m[4] ? +m[4] : 1 }
+  if (t === 'rgb(var(--foreground))') return { rgb: texto, alfa: 1 }
+  if (t === 'black') return { rgb: [0, 0, 0], alfa: 1 }
+  if ((m = /^var\(--([\w-]+)\)$/.exec(t))) {
+    const v = (oscuro ? OSCURO.get(m[1]!) : undefined) ?? CLARO.get(m[1]!)
+    if (v == null) throw new Error(`no existe el token --${m[1]} en monitorGlass.css`)
+    return evaluar(v, oscuro, texto)
+  }
+  if ((m = /^color-mix\(in srgb, (.+?) ([\d.]+)%, (.+)\)$/.exec(t))) {
+    const a = evaluar(m[1]!, oscuro, texto).rgb, b = evaluar(m[3]!, oscuro, texto).rgb, p = +m[2]! / 100
+    return { rgb: a.map((v, i) => v * p + b[i]! * (1 - p)) as Rgb, alfa: 1 }
+  }
+  throw new Error(`no sé evaluar «${t}»`)
+}
+
+const PIELES = [
+  { nombre: 'Pizarra · claro', selector: ':root[data-skin="apple"][data-paleta="pizarra"]:not(.dark)', oscuro: false },
+  { nombre: 'Pizarra · oscuro', selector: ':root[data-skin="apple"][data-paleta="pizarra"].dark', oscuro: true },
+  { nombre: 'Apple · claro', selector: ':root[data-skin="apple"]', oscuro: false },
+  { nombre: 'Apple · oscuro', selector: ':root[data-skin="apple"].dark', oscuro: true },
+  { nombre: 'Clásica · claro', selector: ':root', oscuro: false },
+  { nombre: 'Clásica · oscuro', selector: '.dark', oscuro: true },
+]
+
+describe('contraste de las causas de una micro (marcas y cuadros ≥ 3:1 contra la tarjeta)', () => {
+  for (const piel of PIELES) {
+    it(`${piel.nombre}: las 5 causas dan ≥ 3:1 sobre la tarjeta, la tarjeta esmerilada y el globo`, () => {
+      const fondo = triple(piel.selector, 'background')
+      const tarjeta = triple(piel.selector, 'card')
+      const texto = triple(piel.selector, 'foreground')
+      /* Donde se ven: la tarjeta pelada, la tarjeta esmerilada del monitor (card al 78 % sobre el fondo) y el globo (card al 92 % sobre ella). */
+      const esmerilada = sobre(fondo, tarjeta, 0.78)
+      const superficies: Array<[string, Rgb]> = [['tarjeta', tarjeta], ['tarjeta esmerilada', esmerilada], ['globo', sobre(esmerilada, tarjeta, 0.92)]]
+      for (const causa of CAUSAS_MICRO) {
+        const c = evaluar(COLOR_CAUSA[causa], piel.oscuro, texto)
+        for (const [nombre, s] of superficies) {
+          const r = contraste(c.alfa < 1 ? sobre(s, c.rgb, c.alfa) : c.rgb, s)
+          expect(r, `${ROTULO_CAUSA[causa]} (${COLOR_CAUSA[causa]}) sobre ${nombre} en ${piel.nombre}: ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(3)
+        }
+      }
+    })
+  }
+
+  it('Ritmo bajo y Sin contexto ya no usan los tokens que daban 2,8:1 y 2,3:1 en claro (--v2-atento y --v2-gris)', () => {
+    expect(COLOR_CAUSA.ritmo).not.toBe('var(--v2-atento)')
+    expect(COLOR_CAUSA.sin).not.toBe('var(--v2-gris)')
+    /* El oscuro conserva los de siempre: ya pasaban. */
+    expect(OSCURO.get('v2-causa-ritmo')).toBe('var(--v2-atento)')
+    expect(OSCURO.get('v2-causa-sin')).toBe('var(--v2-gris)')
+  })
+})

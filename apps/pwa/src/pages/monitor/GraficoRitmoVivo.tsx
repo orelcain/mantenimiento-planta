@@ -21,7 +21,7 @@
  *
  * Todo sale de las funciones de datos que ya existen (`ritmoVivo`, `monitorEventos`…): este archivo solo ubica y dibuja.
  */
-import { Info, Maximize2, X } from 'lucide-react'
+import { Check, Info, Maximize2, Minus, X } from 'lucide-react'
 import { memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
 import { DUENO_META } from '@/services/shoplogix/monitorEventos'
 import { CapaAmpliada } from './AmpliarV2'
@@ -35,7 +35,7 @@ import {
   tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
   type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type TonoRitmo, type Zoom,
 } from './ejeTurno'
-import { CAUSAS_MICRO, ROTULO_CAUSA, clasificarMicros, contarPorCausa, realEstimadoS, type CausaMicro, type MicroClasificada } from './microCausa'
+import { CAUSAS_MICRO, COLOR_CAUSA, OCULTO_S, ROTULO_CAUSA, clasificarMicros, contarPorCausa, numerosPorCelda, realEstimadoS, type CausaMicro, type MicroClasificada } from './microCausa'
 import { etiquetaMaquina } from './ritmoVivo'
 import type { CuadroReloj, RelojDeDatos } from './useRelojDeDatos'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
@@ -93,14 +93,6 @@ const COLOR_TONO: Record<TonoRitmo, string> = {
 /** Las filas Ev: andando apenas se nota (acento 38 %), lo que se atrasa o se detiene toma color (85 %). */
 const OPACIDAD_FILA: Record<'bien' | 'atento' | 'mal', number> = { bien: 0.38, atento: 0.85, mal: 0.85 }
 const ORDEN_DUENO: Record<ParadaEje['dueno'], number> = { programado: 0, 'sin-imputar': 1, externo: 2, mantencion: 3 }
-/** El color de cada causa probable de una micro: solo tokens `--v2-*` que existen en claro y en oscuro. */
-const COLOR_CAUSA: Record<CausaMicro, string> = {
-  arranque: 'rgb(var(--foreground))',
-  linea: 'var(--v2-ext)',
-  paro: 'var(--v2-mal)',
-  carros: 'var(--v2-atento)',
-  sin: 'var(--v2-gris)',
-}
 const dec = (n: number, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
 /** «09:31:13»: la hora de la micro con segundos (wall-as-UTC, como `relojDe`). */
 const horaConSegundos = (ms: number) => new Date(ms).toISOString().slice(11, 19)
@@ -350,8 +342,8 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const tw = grande ? 10 : 8
   const th = grande ? 8 : 7
   const xMicro = (q: MicroClasificada) => x((q.inicioMs - m.iniMs) / 60_000)
-  const triangulos: Record<CausaMicro, string> = { arranque: '', linea: '', paro: '', carros: '', sin: '' }
-  const barritas: Record<CausaMicro, string> = { arranque: '', linea: '', paro: '', carros: '', sin: '' }
+  const triangulos: Record<CausaMicro, string> = { arranque: '', linea: '', paro: '', ritmo: '', sin: '' }
+  const barritas: Record<CausaMicro, string> = { arranque: '', linea: '', paro: '', ritmo: '', sin: '' }
   const rayasLinea = new Set<number>()
   for (const q of m.micros) {
     const c = d.carriles[q.fila]
@@ -846,45 +838,141 @@ function Globo({ info, style, compacto, onCerrar }: { info: LecturaGlobo; style?
 
 // ── El globo de una micro ────────────────────────────────────────────────────
 
-/**
- * Qué pasó alrededor de una micro y por qué se marcó con esa causa. Siempre «probable, no imputada»: son reglas de contexto
- * (`microCausa.ts`), no un diagnóstico. En PC flota (380 px) justo sobre las filas, al lado de la marca; en el celular
- * (`compacto`) va pegado bajo el gráfico (no arriba de la tarjeta: con el dedo en las marcas, ese borde queda fuera de pantalla), con un ✕ de 44 px.
- */
-function GloboMicro({ q, style, compacto, onCerrar }: { q: MicroClasificada; style?: CSSProperties; compacto?: boolean; onCerrar?: () => void }) {
-  const nom = etiquetaMaquina(q.nombre)
-  const v = (n: number | null) => (n == null ? '—' : int(n))
-  const esp = q.ritmo.esperado
-  const otras = q.otras.map((o) => `${etiquetaMaquina(o.nombre)} ${v(o.piezas)}${o.esperado != null ? ` de ${int(o.esperado)}` : ''} pz/min`).join(' · ')
-  const cuerpo = (
-    <>
-      <div className={compacto ? 'font-semibold tabular-nums text-foreground' : 'text-[15px] font-semibold leading-5 tabular-nums text-foreground'}>{horaConSegundos(q.inicioMs)} · {nom} · micro de {q.duracionS} s</div>
-      <p className="tabular-nums text-muted-foreground">Real estimado: unos {realEstimadoS(q.duracionS)} s <span>(lo anotado + ~20 s que Shoplogix no ve)</span></p>
-      <p className={`${compacto ? 'mt-1' : 'mt-2'} tabular-nums text-foreground`}>Ritmo de {nom}: {v(q.ritmo.anterior)} el minuto anterior · {v(q.ritmo.micro)} el de la micro · {v(q.ritmo.siguiente)} el siguiente{esp != null ? ` (esperado ${int(esp)} pz/min)` : ''}</p>
-      {otras && <p className="tabular-nums text-muted-foreground">Las otras en ese minuto: {otras}</p>}
-      <p className={`${compacto ? 'mt-1' : 'mt-2'} flex items-center gap-1.5 text-foreground`}>
-        <i className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: COLOR_CAUSA[q.causa], boxShadow: 'inset 0 0 0 1px var(--v2-tenue)' }} aria-hidden />
-        <span>Causa probable: <b className="font-semibold">{ROTULO_CAUSA[q.causa]}</b></span>
-      </p>
-      <p className="text-muted-foreground">{q.porque}</p>
-      <p className="text-muted-foreground">Probable, no imputada. Se confirma en terreno.</p>
-    </>
+/** Ancho del globo en PC (dos columnas) y aire mínimo a cada lado dentro del gráfico. Con menos de `GLOBO_PC_MIN_W` de gráfico va en una columna, bajo él. */
+const GLOBO_PC_ANCHO = 640
+const GLOBO_PC_AIRE = 8
+const GLOBO_PC_MIN_W = 720
+
+/** La marca ▼ de una micro (con `hueco`, ▽ sin relleno: «ya estaba parando») en el color de su causa. `data-glifo` es el carácter equivalente para quien exporte el texto. */
+function MarcaMicro({ color, hueco, rotulo }: { color: string; hueco?: boolean; rotulo?: string }) {
+  return (
+    <svg className="tri" width={8} height={7} viewBox="0 0 8 7" role={rotulo ? 'img' : undefined} aria-label={rotulo} aria-hidden={rotulo ? undefined : true} data-glifo={hueco ? '▽' : '▼'}>
+      {hueco
+        ? <path d="M.9 .75h6.2L4 6.2z" fill="none" stroke={color} strokeWidth={1.25} strokeLinejoin="round" />
+        : <path d="M0 0h8L4 7z" fill={color} />}
+    </svg>
   )
+}
+
+/** ✓ razón que respalda sin celda propia · ✕ regla que se evaluó y no se cumplió · guion: la regla no se evalúa. */
+function MarcaRegla({ tipo }: { tipo: 'ok' | 'no' | 'sin' }) {
+  if (tipo === 'ok') return <span className="okc" role="img" aria-label="Respalda la causa" data-glifo="✓"><Check className="ico" aria-hidden /></span>
+  if (tipo === 'sin') return <span className="xc nd" role="img" aria-label="No se evalúa" data-glifo="—"><Minus className="ico" aria-hidden /></span>
+  return <span className="xc" role="img" aria-label="No se cumplió" data-glifo="✕"><X className="ico" aria-hidden /></span>
+}
+
+/**
+ * Qué pasó alrededor de una micro y por qué se marcó con esa causa (`microCausa.ts`). Siempre «probable, no imputada»: son reglas de
+ * contexto, no un diagnóstico. A la izquierda, la causa y las razones numeradas, cada una con su cifra; a la derecha, la tabla por Baader
+ * (piezas por minuto de los minutos k−2 a k+1) donde cada número aparece en la celda que lo prueba, y debajo las reglas que no
+ * aplicaron. En PC flota (640 px, dos columnas) justo sobre las filas, al lado de la marca; en el celular (`compacto`) va en una
+ * columna pegada bajo el gráfico (no arriba de la tarjeta: con el dedo en las marcas, ese borde queda fuera de pantalla), con un ✕ de 44 px.
+ * Toda cifra sale de `q`: aquí solo se ubica y se dibuja.
+ */
+export function GloboMicro({ q, style, compacto, onCerrar }: { q: MicroClasificada; style?: CSSProperties; compacto?: boolean; onCerrar?: () => void }) {
+  const nom = etiquetaMaquina(q.nombre)
+  const numeros = numerosPorCelda(q)
+  const { tabla } = q
+  const encabezado = (
+    <header className="gm-cab">
+      <div className="gm-tit tabular-nums">{horaConSegundos(q.inicioMs)} · {nom} · micro de {q.duracionS}&nbsp;s</div>
+      <div className="gm-sub tabular-nums">≈ {realEstimadoS(q.duracionS)}&nbsp;s reales (Shoplogix no ve ~{OCULTO_S}&nbsp;s)</div>
+    </header>
+  )
+  const causa = (
+    <section className="gm-grupos" aria-label="Causa probable">
+      <div className="gm-rot">Causa probable</div>
+      <div className="gm-grupo">
+        <div className="gm-causa">
+          <i className="sw" style={{ background: COLOR_CAUSA[q.causa] }} aria-hidden />
+          <span>{ROTULO_CAUSA[q.causa]}</span>
+        </div>
+        {q.causa === 'sin' && <p className="gm-nota">Ninguna regla la explica.</p>}
+        {q.razones.length > 0 && (
+          <ul className="gm-evs">
+            {q.razones.map((r, i) => (
+              <li key={i} className="gm-ev">
+                {r.celdas.length > 0 ? <b className="ref" role="img" aria-label={`razón ${i + 1}`}>{i + 1}</b> : <MarcaRegla tipo="ok" />}
+                <span className="cifra tabular-nums">{r.cifra}</span>
+                <span className="gm-txt tabular-nums">{r.texto}{r.detalle && <span className="de">{r.detalle}</span>}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  )
+  const datos = (
+    <div className="gm-datos">
+      <table className="gm-tabla">
+        <thead>
+          <tr>
+            <th scope="col" className="c0">pz/min</th>
+            {tabla.horas.map((h, i) => <th key={h} scope="col" className={i === 2 ? 'cm' : undefined}>{h}</th>)}
+            <th scope="col" className="esp">Esperado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tabla.filas.map((f, j) => (
+            <tr key={f.id} className={f.ella ? 'ella' : undefined}>
+              <th scope="row">{f.nombre}</th>
+              {f.piezas.map((v, i) => {
+                const refs = numeros.get(`${j}:${i - 2}`) ?? []
+                return (
+                  <td key={i} className={[i === 2 ? 'cm' : '', refs.length > 0 ? 'conref' : ''].filter(Boolean).join(' ') || undefined}>
+                    <span className="cel">
+                      {refs.map((n) => <b key={n} className="ref" role="img" aria-label={`razón ${n}`}>{n}</b>)}
+                      {i === 2 && f.microEnK && <MarcaMicro color={COLOR_CAUSA[f.microEnK]} rotulo="micro" />}
+                      {i === 1 && f.inicioPrevio && f.microEnK && <MarcaMicro color={COLOR_CAUSA[f.microEnK]} hueco rotulo="ya estaba parando" />}
+                      <span className="v">{v == null ? '—' : int(v)}</span>
+                    </span>
+                  </td>
+                )
+              })}
+              <td className="esp">{f.esperado == null ? '—' : int(f.esperado)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {tabla.leyendaInicio && (
+        <p className="gm-ley-tri"><MarcaMicro color={COLOR_CAUSA[q.causa]} hueco /><span>{tabla.leyendaInicio}</span></p>
+      )}
+      {q.descartadas.length > 0 && (
+        <ul className="gm-desc" aria-label="Reglas que no aplicaron">
+          {q.descartadas.map((d) => (
+            <li key={d.regla}>
+              <MarcaRegla tipo={d.estado} />
+              <span className="tabular-nums"><b>{ROTULO_CAUSA[d.regla]}</b> · {d.texto}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+  const pie = <p className="gm-pie">Probable, no imputada. Se confirma en terreno.</p>
   if (compacto) {
     return (
-      <div className="v2-tip relative box-border rounded-[22px] py-2.5 pl-4 pr-[52px] text-[12px] leading-4" role="group" aria-label="Micro detención y su causa probable">
+      <div className="v2-tip gm movil" role="group" aria-label="Micro detención y su causa probable">
         <span className="absolute right-[8px] top-[8px]">
           <button type="button" onClick={onCerrar} aria-label="Cerrar la lectura de la micro" className="tap-44 inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2" style={{ outlineColor: 'var(--v2-bien)' }}>
             <X className="h-4 w-4" aria-hidden />
           </button>
         </span>
-        {cuerpo}
+        {encabezado}
+        {causa}
+        {datos}
+        {pie}
       </div>
     )
   }
   return (
-    <div className="v2-tip pointer-events-none absolute z-10 box-border w-[380px] rounded-[22px] px-4 py-3.5 text-[13px] leading-[18px]" style={style} role="tooltip">
-      {cuerpo}
+    <div className="v2-tip gm pc2 pointer-events-none absolute z-10" style={style} role="tooltip" aria-label="Micro detención y su causa probable">
+      {encabezado}
+      <div className="gm-cols">
+        {causa}
+        {datos}
+      </div>
+      {pie}
     </div>
   )
 }
@@ -1109,7 +1197,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     const separaMicro = !!pm && (pm.stopMachines?.length ?? 0) > 0 && (pm.stopEvents ?? []).every((x) => x.m != null && pm.stopMachines?.[x.m] != null)
     const conMicro = conSerie && separaMicro
     const micros = conMicro && e.minuto
-      ? clasificarMicros({ serie: e.minuto, stopEvents: pm?.stopEvents, stopReasons: pm?.stopReasons, stopMachines: pm?.stopMachines, inicioTurnoMs: e.iniMs })
+      ? clasificarMicros({ serie: e.minuto, stopEvents: pm?.stopEvents, stopReasons: pm?.stopReasons, stopMachines: pm?.stopMachines, enCurso: pm?.enCurso, inicioTurnoMs: e.iniMs })
         .filter((q) => { const mn = (q.inicioMs - e.iniMs) / 60_000; return mn >= 0 && mn < totalMin && mn <= ultima.min })
       : []
     const esperadoLinea = conSerie && minuto.maquinas.every((q) => q.esperado != null) ? minuto.maquinas.reduce((a, q) => a + (q.esperado ?? 0), 0) : null
@@ -1251,13 +1339,15 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const globoIzq = modelo && cursor ? modelo.d.pl + cursor.xv + 14 : 0
   const globoX = modelo ? (globoIzq + 280 > modelo.w ? Math.max(0, globoIzq - 28 - 280) : globoIzq) : 0
   const microInfo = modelo && microSel ? modelo.micros.find((q) => q.id === microSel.id) ?? null : null
-  const microIzq = modelo && microSel ? modelo.d.pl + microSel.xv + 14 : 0
-  const microX = modelo ? (microIzq + 380 > modelo.w ? Math.max(0, microIzq - 28 - 380) : microIzq) : 0
+  /* El globo de 640 px se centra sobre la marca y se acota dentro del gráfico: left = clamp(x − 320, 8, ancho − 648). */
+  const microX = modelo && microSel ? acota(modelo.d.pl + microSel.xv - GLOBO_PC_ANCHO / 2, GLOBO_PC_AIRE, modelo.w - GLOBO_PC_ANCHO - GLOBO_PC_AIRE) : 0
   const conteoMicro = modelo ? contarPorCausa(modelo.micros) : null
 
   // ── Lo que se ve alrededor ──
   const tam = modelo ? modelo.d.tam : tamanoGrafico(w)
   const chico = tam === 'chico'
+  /* Con menos de 720 px de gráfico el globo de dos columnas no cabe: va como en el celular, bajo el gráfico. */
+  const globoCompacto = chico || (modelo != null && modelo.w < GLOBO_PC_MIN_W)
   const sub = p.cerrado && finReal != null
     ? `${relojDe(e.iniMs)} → ${relojDe(finReal)} · terminado`
     : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
@@ -1303,7 +1393,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       {modelo && modelo.micros.some((q) => q.causa === 'linea') && (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
           <svg width={4} height={12} aria-hidden><path d="M2 0V12" stroke="rgb(var(--foreground))" strokeOpacity={0.6} strokeWidth={1.2} strokeDasharray="3 3" fill="none" /></svg>
-          micro a la vez en 2 o 3 Baader
+          parada a la vez en 2 o 3 Baader
         </span>
       )}
       <InfoLeyenda ayuda={tactil ? AYUDA_TACTIL : AYUDA_PC} />
@@ -1323,7 +1413,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       )}
       {modelo.micros.length > 0 && (
         <ul className="rv-mc-chips" aria-label="Micro detenciones por causa probable">
-          {CAUSAS_MICRO.filter((k) => k !== 'linea' || modelo.maquinas.length > 1).map((k) => (
+          {CAUSAS_MICRO.filter((k) => (k !== 'linea' && k !== 'ritmo') || modelo.maquinas.length > 1).map((k) => (
             <li key={k} className="rv-mc-chip" data-causa={k}>
               <i style={{ background: COLOR_CAUSA[k] }} aria-hidden />
               {ROTULO_CAUSA[k]} <b className="tabular-nums">{conteoMicro[k]}</b>
@@ -1411,8 +1501,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
         </div>
         {modelo && info && !chico && <Globo info={info} style={{ left: globoX, top: modelo.d.pt + 18 }} />}
         {/* Su borde de abajo queda 10 px sobre la primera fila Ev: pegado a la marca, sin tapar las filas. */}
-        {modelo && microInfo && !chico && <GloboMicro q={microInfo} style={{ left: microX, bottom: modelo.d.alto - (modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0) + 10 }} />}
-        {modelo && microInfo && chico && (
+        {modelo && microInfo && !globoCompacto && <GloboMicro q={microInfo} style={{ left: microX, bottom: modelo.d.alto - (modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0) + 10 }} />}
+        {modelo && microInfo && globoCompacto && (
           <div data-globo-minuto="" className="absolute inset-x-0 z-[3]" style={{ top: modelo.d.alto + 8 }}>
             <GloboMicro q={microInfo} compacto onCerrar={() => setMicroSel(null)} />
           </div>

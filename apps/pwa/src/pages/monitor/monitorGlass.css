@@ -287,6 +287,11 @@
   /* Para TEXTO: en claro el trazo naranjo da 2,8:1; estas variantes parten de los tonos de texto (como --v2-mal-texto). */
   --v2-eq-cardenas-texto: rgb(var(--brand-ink));
   --v2-eq-rebolledo-texto: color-mix(in srgb, var(--v2-atento-texto) 62%, var(--v2-mal-texto));
+  /* Causas de una micro (marcas ▼ del gráfico y cuadros de color de las chips y del globo): las marcas van a ≥ 3:1 contra la tarjeta.
+     En claro, el ámbar de «Ritmo bajo» (--v2-atento) da 2,8:1 y el gris de «Sin contexto» (--v2-gris) 2,3:1: aquí van más cerrados
+     (3,9:1 y 3,8:1). Las otras tres causas ya pasan con sus tokens de siempre. Medido con la misma cuenta de check-contrast-pizarra. */
+  --v2-causa-ritmo: color-mix(in srgb, var(--v2-atento) 84%, black);
+  --v2-causa-sin: color-mix(in srgb, rgb(142 142 147) 92%, black);
 }
 .dark [data-glass='v2'], .dark .v2-vars {
   --v2-atento: #e0b46e;
@@ -294,6 +299,9 @@
   --v2-mal-texto: #e48a82;
   --v2-atento-texto: #e0b46e;
   --v2-ext-texto: #9aa6b0;
+  /* En oscuro los dos ya dan ≥ 3:1 (8,4:1 y 3,4:1 en la tarjeta de Pizarra): se quedan como estaban. */
+  --v2-causa-ritmo: var(--v2-atento);
+  --v2-causa-sin: var(--v2-gris);
   /* Mantención y Externo (v7 del Análisis): el ámbar #f59e0b no da 3:1 sobre blanco, por eso en claro va #c2780a. */
   --v2-mant: #f59e0b;
   --v2-ext: #9aa6b0;
@@ -1219,3 +1227,65 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .rv-mc[data-tam='medio'] .rv-mc-aviso { white-space: nowrap; }
 .rv-mc-anduvo { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
 .rv-mc-anduvo b { font-weight: 600; color: rgb(var(--foreground)); }
+
+/* ── Globo de una micro por Baader (GloboMicro, opción C) ─────────────────────────────────────────────────────────────
+   A la izquierda, la causa probable y las razones numeradas (cada una con su cifra); a la derecha, la tabla por Baader, donde cada
+   número aparece en la celda que lo prueba, y debajo las reglas que no aplicaron. PC: 640 px en dos columnas, flotando sobre las
+   filas Ev. Celular (y gráfico de menos de 720 px): una columna del ancho del gráfico, bajo él. Solo tokens que ya existen. */
+.gm { box-sizing: border-box; display: grid; gap: 10px; text-align: left; border-radius: 22px; color: rgb(var(--foreground)); font-size: 13px; line-height: 18px; }
+.gm *, .gm *::before, .gm *::after { box-sizing: border-box; }
+.gm p { margin: 0; }
+/* En PC la posición la da la clase `absolute` del globo (Tailwind): aquí no se fija, o se pisarían según el orden de las hojas. El celular sí necesita el contexto para su botón de cerrar. */
+.gm.pc2 { width: 640px; padding: 14px 18px; }
+.gm.movil { position: relative; padding: 12px 16px 14px; }
+.gm-cab { display: grid; gap: 2px; }
+/* El margen de 32 px para el botón de cerrar va solo en la cabecera, no en todo el globo (antes: 52 px en todo el ancho). */
+.gm.movil .gm-cab { padding-right: 32px; }
+.gm-tit { font-size: 15px; line-height: 20px; font-weight: 600; }
+.gm-sub, .gm-rot, .gm-pie, .gm-ley-tri { font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.gm-sub, .gm-txt, .gm-desc span, .gm-nota { text-wrap: pretty; }
+.gm-grupos { display: grid; gap: 8px; align-content: start; }
+.gm-grupo { display: grid; gap: 2px; }
+.gm-causa { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 8px; align-items: center; font-size: 15px; line-height: 20px; font-weight: 600; }
+.gm-causa .sw { justify-self: center; }
+.gm .sw { flex: none; display: inline-block; width: 10px; height: 10px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--v2-tenue); }
+.gm-nota { font-size: 13px; line-height: 18px; padding-left: 24px; }
+/* El número de una razón: el mismo círculo en la lista y en la celda de la tabla. */
+.gm .ref { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 999px; font-size: 11px; line-height: 1; font-weight: 600; font-style: normal; font-variant-numeric: tabular-nums; background: rgb(var(--foreground)); color: rgb(var(--card)); }
+.gm .ico { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+.gm .okc, .gm .xc { display: grid; place-items: center; height: 18px; }
+.gm .xc .ico { width: 12px; height: 12px; }
+.gm .xc.nd .ico { width: 10px; height: 10px; stroke-width: 2.5; }
+.gm .tri { flex: none; display: inline-block; }
+/* Razones: la cifra al ancho de la más larga del globo («10 de 16») y el texto en su propia columna. */
+.gm-evs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 16px max-content minmax(0, 1fr); column-gap: 8px; row-gap: 4px; }
+.gm-ev { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: 8px; align-items: start; padding-block: 1px; }
+.gm-ev > .ref, .gm-ev > .okc { margin-top: 2px; }
+.gm-ev > .okc { height: 16px; }
+.gm-ev .cifra { font-size: 15px; line-height: 20px; font-weight: 600; white-space: nowrap; }
+.gm-ev .gm-txt { font-size: 13px; line-height: 18px; padding-top: 1px; text-wrap: balance; }
+.gm-ev .de { display: block; color: rgb(var(--muted-foreground)); text-wrap: pretty; }
+.gm-datos { display: grid; gap: 10px; align-content: start; }
+.gm.pc2 .gm-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(272px, max-content); column-gap: 24px; align-items: start; }
+.gm.pc2 .gm-datos { padding-top: 2px; }
+/* Las reglas que no aplicaron: una línea por regla, ✕ si se evaluó y no se cumplió, guion si no se evalúa. */
+.gm-desc { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); contain: inline-size; }
+.gm-desc li { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 8px; align-items: start; }
+.gm-desc .xc { height: 16px; }
+.gm-desc b { font-weight: 600; }
+/* La tabla por Baader: la fila de la micro destacada y la columna del minuto de la micro resaltada. */
+.gm-tabla { width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; color: inherit; font-size: inherit; line-height: inherit; font-weight: 400; }
+.gm-tabla th, .gm-tabla td { padding: 2px 6px; text-align: right; white-space: nowrap; vertical-align: middle; }
+.gm-tabla thead th { font-size: 12px; line-height: 16px; font-weight: 400; color: rgb(var(--muted-foreground)); padding-top: 4px; padding-bottom: 3px; }
+.gm-tabla thead th.c0, .gm-tabla tbody th { text-align: left; padding-left: 0; }
+.gm-tabla tbody th { font-weight: 400; color: rgb(var(--muted-foreground)); font-size: 13px; line-height: 18px; }
+.gm-tabla tbody tr.ella th { color: rgb(var(--foreground)); font-weight: 600; }
+.gm-tabla td { font-size: 13px; line-height: 18px; }
+.gm-tabla .esp { color: rgb(var(--muted-foreground)); padding-right: 0; }
+.gm-tabla .cm { background: rgb(142 142 147 / 0.10); }
+.gm-tabla thead th.cm { border-radius: 8px 8px 0 0; color: rgb(var(--foreground)); font-weight: 600; }
+.gm-tabla tbody tr:last-child td.cm { border-radius: 0 0 8px 8px; }
+.gm-tabla .cel { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.gm-tabla td.conref .v { font-weight: 600; }
+.gm.movil .gm-tabla th, .gm.movil .gm-tabla td { padding-left: 5px; padding-right: 5px; }
+.gm-ley-tri { display: flex; align-items: center; gap: 5px; font-size: 11px; line-height: 14px; margin-top: -4px; }
