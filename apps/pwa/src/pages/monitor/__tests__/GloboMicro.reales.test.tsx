@@ -37,7 +37,7 @@ describe('GloboMicro · casos reales', () => {
       '✕ No es arranque: la última detención de 10 min o más de Ev 1 terminó a las 13:35',
       '✕ No es tras detención: la última detención de Ev 1 terminó hace 9,5 min',
       '— No se revisó «ritmo bajo»: Shoplogix anota con 15 a 30 s de atraso y la micro quedó en los primeros 15 s del minuto: probablemente empezó en el minuto 15:09, así que ese minuto no se puede comparar con su ritmo normal',
-      'Causa probable: no queda registrada. Se confirma en terreno.',
+      'La calcula el monitor y no queda anotada en Shoplogix: se confirma en terreno.',
     ])
   })
 
@@ -55,7 +55,7 @@ describe('GloboMicro · casos reales', () => {
       '✕ No es arranque: ya pasaron 10 min desde que empezó el turno (09:15) y Ev 1 no tuvo detenciones de 10 min o más',
       '✕ No es línea común: ninguna otra Baader tuvo micro ni detención en los 15 s antes o después',
       '✕ No es tras detención: la última detención de Ev 1 terminó hace 15,5 min',
-      'Causa probable: no queda registrada. Se confirma en terreno.',
+      'La calcula el monitor y no queda anotada en Shoplogix: se confirma en terreno.',
     ])
   })
 
@@ -90,7 +90,7 @@ describe('GloboMicro · casos reales', () => {
       '✕ No es arranque: la última detención de 10 min o más de Ev 1 terminó a las 13:35',
       '✕ No es tras detención: la última detención de Ev 1 terminó hace 12,5 min',
       '— No se revisó «ritmo bajo»: Shoplogix anota con 15 a 30 s de atraso y la micro quedó en los primeros 15 s del minuto: probablemente empezó en el minuto 15:12, así que ese minuto no se puede comparar con su ritmo normal',
-      'Causa probable: no queda registrada. Se confirma en terreno.',
+      'La calcula el monitor y no queda anotada en Shoplogix: se confirma en terreno.',
     ])
   })
 

@@ -955,7 +955,7 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo }: { q: Micr
       ))}
     </ul>
   )
-  const pie = <p className="gm-pie">{q.causa === 'sin' ? 'No hay causa probable. Hay que verlo en terreno.' : 'Causa probable: no queda registrada. Se confirma en terreno.'}</p>
+  const pie = <p className="gm-pie">{q.causa === 'sin' ? 'No hay causa probable. Hay que verlo en terreno.' : 'La calcula el monitor y no queda anotada en Shoplogix: se confirma en terreno.'}</p>
   if (compacto) {
     return (
       <div className="v2-tip gm movil" role="group" aria-label="Micro detención y su causa probable">
@@ -1345,6 +1345,10 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   /** La micro elegida (con el cursor encima o con un toque) y dónde estaba el puntero en la ventana: el globo de la micro reemplaza al del minuto. */
   const [microSel, setMicroSel] = useState<{ id: string; xv: number } | null>(null)
   const tipoRef = useRef('mouse')
+  /* Tras un toque, WebKit inventa eventos de mouse: al desplazar la página para traer el globo a la vista, un `pointerleave` de tipo
+     'mouse' lo cerraba a los ~0,3 s (medido el 02-11 en WebKit con toque, 375 px). Si lo último en el gráfico fue un dedo, el mouse no
+     abre ni cierra globos; un clic con el mouse lo devuelve. */
+  const esMouse = (ev: { pointerType: string }) => ev.pointerType === 'mouse' && tipoRef.current === 'mouse'
   /** Dedo: dónde empezó el gesto y si ya es un arrastre horizontal (recorrer minutos); tras uno, el «click» final no abre ni cierra nada. */
   const dedoRef = useRef<{ x: number; y: number; arrastra: boolean } | null>(null)
   const { ref: scrollRef, onPointerDown: zDown, onPointerMove: zMove, onPointerLeave: zLeave, ...zResto } = zg.props
@@ -1383,7 +1387,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       if (nuevo) setCursor((a) => (mismoMinuto(a, nuevo) ? a : nuevo))
       return
     }
-    if (ev.pointerType !== 'mouse') return
+    if (!esMouse(ev)) return
     /* Sobre una marca de micro sale su globo; en el resto de la fila, el del minuto. */
     const sobre = ev.buttons === 0 ? microEn(ev, false) : null
     setMicroSel((a) => (a?.id === sobre?.id ? a : sobre))
@@ -1572,7 +1576,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
             {...zResto}
             onPointerDown={(ev) => { tipoRef.current = ev.pointerType; dedoRef.current = ev.pointerType === 'touch' ? { x: ev.clientX, y: ev.clientY, arrastra: false } : null; zDown(ev) }}
             onPointerMove={mover}
-            onPointerLeave={(ev) => { zLeave(); if (ev.pointerType === 'mouse') { setCursor(null); setMicroSel(null) } }}
+            onPointerLeave={(ev) => { zLeave(); if (esMouse(ev)) { setCursor(null); setMicroSel(null) } }}
             onTouchStart={frenaToque}
             onTouchEnd={frenaToque}
             onClick={tocar}

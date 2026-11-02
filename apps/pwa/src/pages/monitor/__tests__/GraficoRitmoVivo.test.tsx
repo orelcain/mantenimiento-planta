@@ -711,7 +711,7 @@ describe('GraficoRitmoVivo · micro con causa probable', () => {
     expect(g).toContain('No se revisó «ritmo bajo»: Shoplogix anota con 15 a 30 s de atraso y la micro quedó en los primeros 15 s del minuto: probablemente empezó en el minuto 21:59, así que ese minuto no se puede comparar con su ritmo normal')
     expect(g).toContain('la parada pudo empezar en este minuto (Shoplogix la anota con 15 a 30 s de atraso)')
     expect(g).not.toMatch(/ya venía de antes|ya estaba parando/)
-    expect(g).toContain('Causa probable: no queda registrada. Se confirma en terreno.')
+    expect(g).toContain('La calcula el monitor y no queda anotada en Shoplogix: se confirma en terreno.')
     expect(g).not.toMatch(/falta de pescado|baja velocidad|carros|venían lentas/i)
   })
 
@@ -761,6 +761,24 @@ describe('GraficoRitmoVivo · micro con causa probable', () => {
     act(() => { fireEvent.click(lienzo, { clientX: xMicro + 15, clientY: yFila(1) }) })
     expect(sp(screen.getByRole('tooltip').querySelector('.gm-causa')!.textContent)).toBe('Línea común')
     act(() => { fireEvent.click(lienzo, { clientX: xMicro + 15, clientY: yFila(1) }) })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('abierto con el dedo, el mouse que inventa WebKit al desplazar la página no lo cierra; un clic con el mouse le devuelve el mando', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+    const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+    const causa = () => sp(screen.queryByRole('tooltip')?.querySelector('.gm-causa')?.textContent ?? '')
+    act(() => { fireEvent.pointerDown(lienzo, { pointerType: 'touch', clientX: xMicro + 15, clientY: yFila(1) }) })
+    act(() => { fireEvent.click(lienzo, { clientX: xMicro + 15, clientY: yFila(1) }) })
+    expect(causa()).toBe('Línea común')
+    /* Lo que emitió WebKit el 02-11 (375 px) al traer el globo a la vista: movimiento y salida de tipo 'mouse', lejos de la marca. */
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xDe(200.5), clientY: yFila(0), buttons: 0 }) })
+    act(() => { fireEvent.pointerLeave(lienzo, { pointerType: 'mouse' }) })
+    expect(causa()).toBe('Línea común')
+    /* Tras un clic con el mouse, salir del gráfico con el mouse lo cierra, como siempre. */
+    act(() => { fireEvent.pointerDown(lienzo, { pointerType: 'mouse', clientX: xMicro, clientY: yFila(0) }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xMicro, clientY: yFila(0), buttons: 0 }) })
+    act(() => { fireEvent.pointerLeave(lienzo, { pointerType: 'mouse' }) })
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
