@@ -287,11 +287,14 @@
   /* Para TEXTO: en claro el trazo naranjo da 2,8:1; estas variantes parten de los tonos de texto (como --v2-mal-texto). */
   --v2-eq-cardenas-texto: rgb(var(--brand-ink));
   --v2-eq-rebolledo-texto: color-mix(in srgb, var(--v2-atento-texto) 62%, var(--v2-mal-texto));
-  /* Causas de una micro (marcas ▼ del gráfico y cuadros de color de las chips y del globo): las marcas van a ≥ 3:1 contra la tarjeta.
-     En claro, el ámbar de «Ritmo bajo» (--v2-atento) da 2,8:1 y el gris de «Sin contexto» (--v2-gris) 2,3:1: aquí van más cerrados
-     (3,9:1 y 3,8:1). Las otras tres causas ya pasan con sus tokens de siempre. Medido con la misma cuenta de check-contrast-pizarra. */
-  --v2-causa-ritmo: color-mix(in srgb, var(--v2-atento) 84%, black);
-  --v2-causa-sin: color-mix(in srgb, rgb(142 142 147) 92%, black);
+  /* Causas de una micro (marcas ▼ del gráfico y cuadros de color de las chips y del globo): las marcas van a ≥ 3:1 contra la tarjeta Y contra
+     el fondo local donde se dibujan (el chip gris, la columna resaltada de la tabla), en las tres pieles. En claro, el coral de «Tras detención»
+     (--v2-mal), el ámbar de «Ritmo bajo» (--v2-atento, 2,8:1 contra la tarjeta) y el gris de «Sin contexto» (--v2-gris, 2,3:1) van más cerrados;
+     el gris es un gris cálido (no azulado) para no confundirse con «Línea común». Medido en `__tests__/contrasteCausasMicro.test.ts`, que
+     lee estos mismos tokens. */
+  --v2-causa-paro: color-mix(in srgb, var(--v2-mal) 92%, black);
+  --v2-causa-ritmo: color-mix(in srgb, var(--v2-atento) 78%, black);
+  --v2-causa-sin: rgb(124 122 118);
 }
 .dark [data-glass='v2'], .dark .v2-vars {
   --v2-atento: #e0b46e;
@@ -299,9 +302,11 @@
   --v2-mal-texto: #e48a82;
   --v2-atento-texto: #e0b46e;
   --v2-ext-texto: #9aa6b0;
-  /* En oscuro los dos ya dan ≥ 3:1 (8,4:1 y 3,4:1 en la tarjeta de Pizarra): se quedan como estaban. */
+  /* En oscuro el coral y el ámbar ya dan ≥ 3:1 en todas las superficies. El gris NO: `--v2-gris` es translúcido (75 %) y sobre el chip bajaba a
+     2,6:1 en Apple oscuro; aquí es un gris cálido OPACO (3,2:1 como mínimo). */
+  --v2-causa-paro: var(--v2-mal);
   --v2-causa-ritmo: var(--v2-atento);
-  --v2-causa-sin: var(--v2-gris);
+  --v2-causa-sin: rgb(140 138 134);
   /* Mantención y Externo (v7 del Análisis): el ámbar #f59e0b no da 3:1 sobre blanco, por eso en claro va #c2780a. */
   --v2-mant: #f59e0b;
   --v2-ext: #9aa6b0;
@@ -1237,7 +1242,8 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .gm p { margin: 0; }
 /* En PC la posición la da la clase `absolute` del globo (Tailwind): aquí no se fija, o se pisarían según el orden de las hojas. El celular sí necesita el contexto para su botón de cerrar. */
 .gm.pc2 { width: 640px; padding: 14px 18px; }
-.gm.movil { position: relative; padding: 12px 16px 14px; }
+/* En una columna va en el flujo de la tarjeta, con fondo OPACO: translúcido dejaba ver los chips y la franja de rango que quedan bajo él. */
+.gm.movil { position: relative; padding: 12px 16px 14px; background: rgb(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .gm-cab { display: grid; gap: 2px; }
 /* El margen de 32 px para el botón de cerrar va solo en la cabecera, no en todo el globo (antes: 52 px en todo el ancho). */
 .gm.movil .gm-cab { padding-right: 32px; }
@@ -1288,4 +1294,5 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .gm-tabla .cel { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .gm-tabla td.conref .v { font-weight: 600; }
 .gm.movil .gm-tabla th, .gm.movil .gm-tabla td { padding-left: 5px; padding-right: 5px; }
-.gm-ley-tri { display: flex; align-items: center; gap: 5px; font-size: 11px; line-height: 14px; margin-top: -4px; }
+/* `contain: inline-size`: la leyenda es larga y, sin esto, su ancho de una sola línea ensancha la columna derecha y estrecha la izquierda (el globo se estiraba a 600-800 px). */
+.gm-ley-tri { display: flex; align-items: center; gap: 5px; font-size: 11px; line-height: 14px; margin-top: -4px; contain: inline-size; }

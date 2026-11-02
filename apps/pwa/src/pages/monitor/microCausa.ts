@@ -23,10 +23,14 @@
  * Lo que el usuario lee no dice POR QUÉ cayó el conteo (el sensor solo cuenta lo que pasa) ni usa el nombre de un estado oficial
  * de Shoplogix que se lee como falla de la máquina, o sea de Mantención: en Chonchi la Baader gira a ritmo fijo y lo que cambia
  * es cuántos pescados cuenta el sensor. «Ritmo bajo» describe el número, no la causa.
+ *
+ * Fidelidad de lo que se afirma: lo que sale del doc (una hora, un conteo, una duración) se dice como hecho; lo que es una
+ * inferencia (que una parada «ya había empezado» porque Shoplogix la anota con atraso) se dice como «probablemente» o «pudo».
+ * Una razón que usa el ritmo propio dice «ritmo normal»; una que usa el esperado dice «esperado»: nunca una cifra sin saber de qué es.
  */
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 import { dec1 } from '@/utils/formatoNumeros'
-import { esMicroDetencion, etiquetaMaquina, paradasPorMaquina, segundosCubiertos, unir, ANDANDO_MIN_S, type Intervalo } from './ritmoVivo'
+import { cronometro, esMicroDetencion, etiquetaMaquina, paradasPorMaquina, segundosCubiertos, unir, ANDANDO_MIN_S, type Intervalo } from './ritmoVivo'
 
 export type CausaMicro = 'arranque' | 'linea' | 'paro' | 'ritmo' | 'sin'
 
@@ -43,14 +47,16 @@ export const ROTULO_CAUSA: Record<CausaMicro, string> = {
 
 /**
  * El color de cada causa probable de una micro (marcas ▼ del gráfico, cuadros de las chips y del globo): solo tokens `--v2-*` de
- * monitorGlass.css, que existen en claro y en oscuro. Las marcas y los cuadros van a ≥ 3:1 contra la tarjeta: «Ritmo bajo» y «Sin contexto»
- * usan las variantes `--v2-causa-*`, que en claro son más cerradas que el ámbar (`--v2-atento`, 2,8:1) y el gris (`--v2-gris`, 2,3:1) del
- * resto del monitor. Lo mide `__tests__/contrasteCausasMicro.test.ts` leyendo este mismo mapa.
+ * monitorGlass.css, que existen en claro y en oscuro. Las marcas y los cuadros van a ≥ 3:1 contra la tarjeta Y contra el fondo local
+ * donde se dibujan (el chip gris, la columna resaltada de la tabla): «Tras detención», «Ritmo bajo» y «Sin contexto» usan las variantes
+ * `--v2-causa-*`, que en claro son más cerradas que el coral, el ámbar (`--v2-atento`, 2,8:1) y el gris (`--v2-gris`, 2,3:1) del resto
+ * del monitor, y en oscuro «Sin contexto» es un gris OPACO (el `--v2-gris` es translúcido y sobre el chip bajaba a 2,6:1). Lo mide
+ * `__tests__/contrasteCausasMicro.test.ts` leyendo este mismo mapa.
  */
 export const COLOR_CAUSA: Record<CausaMicro, string> = {
   arranque: 'rgb(var(--foreground))',
   linea: 'var(--v2-ext)',
-  paro: 'var(--v2-mal)',
+  paro: 'var(--v2-causa-paro)',
   ritmo: 'var(--v2-causa-ritmo)',
   sin: 'var(--v2-causa-sin)',
 }
@@ -69,7 +75,14 @@ export const ARRANQUE_VENTANA_S = 600
  * «Línea común»: otra Baader con una micro O con una detención NO programada cuyo inicio está a ±15 s del de la micro.
  * Shoplogix registra en pasos de 15 s: dos paradas del mismo paso (o contiguos) no son casualidad de una máquina, son de
  * la línea (estudio, LIN-a/b). Con una sola Baader (Filete) no aplica: no hay otra con quién coincidir. La regla no se
- * parte en subtipos. Datos: en 7 turnos de Chonchi suma 14 micro (de 16,9 % a 20,8 %), 3,5 veces sobre el azar.
+ * parte en subtipos. Datos: en 7 turnos de Chonchi suma 14 micro (de 16,9 % a 20,8 %: de 60 a 74 de 356); muy sobre el azar
+ * (3,5 veces en la validación; 4,7 con una permutación simple de los inicios: 20 observadas contra 4,2 esperadas).
+ *
+ * DECISIÓN CONSCIENTE (límite exacto): el ±15 s se compara al milisegundo (≤ 15.000 ms), tal como se validó. Los inicios de
+ * Shoplogix van de a un paso de 15 s con ruido de milisegundos, así que dos paradas a UN paso de distancia entran o no según
+ * 2 a 9 ms. En los 5 turnos de Chonchi son 7 de 262 micro (2,7 %) las que quedan fuera por 15,002 a 15,009 s y caen en «Sin
+ * contexto»; con una tolerancia de 15,01 s pasarían a «Línea común» (52 → 59) y «Sin contexto» bajaría de 147 a 140. Se deja como está
+ * para no mover los totales validados; cambiarlo es una decisión de Mantención, no de este código (hay una prueba que fija el límite).
  */
 export const LINEA_COMUN_TOL_S = 15
 /**
@@ -86,11 +99,16 @@ export const TRAS_DETENCION_S = 120
 export const RITMO_BAJO = 0.75
 /**
  * La micro empieza esto o más después del inicio de su minuto, o la regla de ritmo bajo NO se evalúa. Shoplogix anota la
- * micro 15-30 s después de que la Baader deja de contar piezas: si cae en :00-:14, el minuto anterior ya trae parte de la
- * misma parada y compararlo con el ritmo sería medir la micro contra sí misma. Datos: en 5 turnos de Chonchi, el 78 %
- * de esas micro tiene el minuto anterior «bajo», contra 42 % del resto (base 22,6 %).
+ * micro 15-30 s después de que la Baader deja de contar piezas: si cae en :00-:14, el minuto anterior PROBABLEMENTE ya trae parte de
+ * la misma parada y compararlo con el ritmo sería medir la micro contra sí misma. Es una inferencia por el atraso de Shoplogix, no
+ * un dato de cada micro: por eso el globo dice «probablemente» y «pudo». Datos (5 turnos de Chonchi, 262 micro; «bajo» = menos del
+ * 75 % de su ritmo propio, la misma definición de la regla): el minuto anterior viene bajo en el 65 % de las micro que empiezan en
+ * :00-:14 (37 de 57) contra el 30 % del resto (45 de 152); la base, cualquier minuto de una Baader, es 13,5 % (550 de 4.066).
+ * Medido contra el ESPERADO sale 79 % contra 43 %: la conclusión es la misma, pero esa es otra definición de «bajo».
  */
 export const INICIO_MINUTO_S = 15
+/** Cuánto atrasa Shoplogix en anotar una micro (15-30 s después de que dejan de pasar pescados): es el porqué de `INICIO_MINUTO_S`. */
+export const ATRASO_ANOTA = '15 a 30 s'
 /** El ritmo propio es la mediana de los últimos 15 minutos cerrados (anteriores al minuto que se mide) en que anduvo 60 s. */
 export const RITMO_MINUTOS = 15
 /** Mínimo de esos minutos para fiarse de la mediana; con menos, la regla no se evalúa. */
@@ -99,6 +117,24 @@ export const RITMO_MIN_MINUTOS = 8
 export const RITMO_MIN_BAADER = 2
 /** Lo que Shoplogix no ve de cada micro (estudio, «tiempo oculto»: 17-23 s por micro): real ≈ anotado + ~20 s. */
 export const OCULTO_S = 20
+
+const MIN_ARRANQUE = ARRANQUE_VENTANA_S / 60
+const MIN_PAUSA = ARRANQUE_PARADA_MIN_S / 60
+const MIN_TRAS = TRAS_DETENCION_S / 60
+const PCT_BAJO = Math.round(RITMO_BAJO * 100)
+
+/**
+ * Qué significa cada causa, en palabras de planta (el ⓘ de la leyenda y el `title` de cada chip). Dicen lo que la regla mide, no por qué pasó:
+ * «Ritmo bajo» no atribuye la falla a nadie y «Sin contexto» no dice que no haya causa, sino que los datos no la muestran. Las cifras salen
+ * de las mismas constantes que usan las reglas.
+ */
+export const DEFINICION_CAUSA: Record<CausaMicro, string> = {
+  arranque: `Primeros ${MIN_ARRANQUE} min del turno, o hasta ${MIN_ARRANQUE} min después de una detención de ${MIN_PAUSA} min o más de esa Baader.`,
+  linea: `Otra Baader tuvo una micro o una detención no programada en los ${LINEA_COMUN_TOL_S} s antes o después de esta.`,
+  paro: `Hasta ${MIN_TRAS} min después de terminar una detención de esa Baader.`,
+  ritmo: `El minuto anterior esa Baader hizo menos del ${PCT_BAJO} % de lo que venía haciendo. No dice por qué.`,
+  sin: 'Ninguna de las causas anteriores la explica. No quiere decir que no tenga causa: los datos no la muestran.',
+}
 
 // ── Entradas y salida ────────────────────────────────────────────────────────
 
@@ -144,6 +180,9 @@ export interface ReglaDescartada {
   regla: CausaMicro
   /** `no`: se evaluó y no se cumplió (✕). `sin`: no se evalúa (—). */
   estado: 'no' | 'sin'
+  /** Lo que se dice de la regla, en negrita: «No es arranque:» (✕) o «No se revisó «ritmo bajo»:» (—). */
+  titulo: string
+  /** El porqué, con su cifra y su límite. */
   texto: string
 }
 
@@ -158,7 +197,10 @@ export interface FilaGlobo {
   piezas: Array<number | null>
   /** ▼ en el minuto k: esta Baader tiene una micro que empieza ahí; trae la causa de ESA micro (su color). */
   microEnK: CausaMicro | null
-  /** ▽ en el minuto k−1: su micro cayó en :00-:14, así que la parada ya venía de antes. */
+  /**
+   * ▽ en el minuto k−1: la parada de esta Baader que explica el globo (su micro, o la micro o la detención no programada que empieza a ±15 s de
+   * la del globo) quedó anotada en los primeros 15 s del minuto k. Shoplogix la anota con 15 a 30 s de atraso, así que PUDO empezar en k−1.
+   */
   inicioPrevio: boolean
 }
 
@@ -192,8 +234,8 @@ export interface MicroClasificada {
 
 interface Evento { fila: number; ini: number; fin: number; s: number; razon: string | null; micro: boolean; programada: boolean }
 
-/** Otra Baader que paró a ±`LINEA_COMUN_TOL_S` del inicio de la micro (`deltaMs` < 0: antes; `d`: su minuto respecto del de la micro). */
-interface Coincidencia { fila: number; micro: boolean; programada: boolean; s: number; razon: string | null; deltaMs: number; d: -1 | 0 | 1 }
+/** Otra Baader que paró a ±`LINEA_COMUN_TOL_S` del inicio de la micro (`deltaMs` < 0: antes; `ini`: su inicio anotado; `d`: su minuto respecto del de la micro). */
+interface Coincidencia { fila: number; micro: boolean; programada: boolean; s: number; razon: string | null; ini: number; deltaMs: number; d: -1 | 0 | 1 }
 
 interface MedidaRitmo {
   /** Piezas del minuto medido; null si ese minuto no existe o no cierra. */
@@ -233,13 +275,16 @@ const cifraTxt = (n: number) => {
   const r = Math.round(n * 10) / 10
   return Number.isInteger(r) ? r.toLocaleString('es-CL') : dec1(r)
 }
-/** Lo corto en segundos, lo largo en minutos con coma: «45 s», «2,3 min». */
-const dur = (s: number) => (s < 120 ? seg(s) : `${cifraTxt(s / 60)}${NB}min`)
+/** Una duración como en el resto del monitor (`cronometro`): «45 s», «2 min 15 s», «10 min», «1 h 02 min». Sin «00 s» al final. */
+const dur = (s: number) => {
+  const t = Math.round(s)
+  return t < 60 ? seg(t) : conNB(cronometro(t).replace(/ 00 s$/, ''))
+}
+/** Un tiempo corrido entre dos cosas, en minutos con coma: «9,5 min». */
 const minTxt = (min: number) => `${cifraTxt(min)}${NB}min`
 const deDe = (a: number | string, b: number | string) => `${a}${NB}de${NB}${b}`
 const conNB = (texto: string) => texto.replace(/ /g, NB)
 const hhmm = (ms: number) => new Date(ms).toISOString().slice(11, 16)
-const hhmmss = (ms: number) => new Date(ms).toISOString().slice(11, 19)
 
 /**
  * El motivo de una parada como lo muestra el resto del monitor, sin mayúsculas sostenidas: la etiqueta oficial del árbol de
@@ -327,7 +372,11 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
   const piezasEn = (fila: number, k: number): number | null => (k >= 0 && k < completos ? serie.maquinas[fila]!.cycles[k] ?? 0 : null)
   const nom = (fila: number) => etiquetaMaquina(serie.maquinas[fila]!.nombre)
   const minutoDe = (ms: number) => Math.floor((ms - t0) / 60_000)
+  /** El segundo (0 a 59,99) del minuto de la serie en que cae un instante. */
+  const segundoDelMinuto = (ms: number) => ((((ms - t0) % 60_000) + 60_000) % 60_000) / 1000
   const horaMinuto = (k: number) => hhmm(t0 + k * 60_000)
+  /** ¿Hay inicio de turno que mostrar? Con un `inicioTurnoMs` que no es un número, la regla de arranque por inicio no aplica y no se escribe su hora. */
+  const hayInicioTurno = Number.isFinite(e.inicioTurnoMs)
 
   /** Segundos de reloj que la Baader anduvo en el minuto k (60 − lo cubierto por cualquiera de sus paradas, también la que sigue abierta). */
   const memoAndando = new Map<number, number>()
@@ -370,7 +419,7 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
 
   const evaluar = (m: Evento): Evaluacion => {
     const k = minutoDe(m.ini)
-    const seg0 = ((((m.ini - t0) % 60_000) + 60_000) % 60_000) / 1000
+    const seg0 = segundoDelMinuto(m.ini)
 
     // 1 · Arranque: en los primeros 10 min del gráfico (desde la primera pieza o el inicio programado) o hasta 10 min después
     // del fin de una pausa de 10 min o más de esa Baader.
@@ -382,13 +431,13 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
       .filter((p) => p.fila === m.fila && p.fin > u.a && p.ini < u.b)
       .reduce<Evento | null>((mayor, p) => (!mayor || p.s > mayor.s ? p : mayor), null)?.razon ?? null
     const pausa = ultimaLarga && m.ini - ultimaLarga.b < ARRANQUE_VENTANA_S * 1000 ? { ...ultimaLarga, razon: motivoDe(ultimaLarga) } : null
-    const aplicaArranque = pausa != null || m.ini - e.inicioTurnoMs < ARRANQUE_VENTANA_S * 1000
+    const aplicaArranque = pausa != null || (hayInicioTurno && m.ini - e.inicioTurnoMs < ARRANQUE_VENTANA_S * 1000)
 
     // 2 · Línea común: otra Baader con una micro o con una detención NO programada que empieza a ±15 s.
     const cercanas = eventos
       .filter((y) => y.fila !== m.fila && Math.abs(y.ini - m.ini) <= LINEA_COMUN_TOL_S * 1000)
       .sort((a, b) => Math.abs(a.ini - m.ini) - Math.abs(b.ini - m.ini))
-      .map((y): Coincidencia => ({ fila: y.fila, micro: y.micro, programada: y.programada, s: y.s, razon: y.razon, deltaMs: y.ini - m.ini, d: (minutoDe(y.ini) - k) as -1 | 0 | 1 }))
+      .map((y): Coincidencia => ({ fila: y.fila, micro: y.micro, programada: y.programada, s: y.s, razon: y.razon, ini: y.ini, deltaMs: y.ini - m.ini, d: (minutoDe(y.ini) - k) as -1 | 0 | 1 }))
     /* Una por Baader, la más cercana (vienen ordenadas por cercanía). */
     const unaPorBaader = (lista: Coincidencia[]) => lista.filter((c, i) => lista.findIndex((z) => z.fila === c.fila) === i)
     const otros = unaPorBaader(cercanas.filter((c) => !c.programada))
@@ -448,17 +497,22 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
           celdas: [],
         })
       } else {
-        razones.push({ cifra: minTxt((m.ini - e.inicioTurnoMs) / 60_000), texto: 'desde el inicio del turno', detalle: hhmm(e.inicioTurnoMs), celdas: [] })
+        /* Math.max: una micro anotada antes del inicio del gráfico no es «−0,1 min desde el inicio». */
+        razones.push({ cifra: minTxt(Math.max(0, (m.ini - e.inicioTurnoMs) / 60_000)), texto: 'desde el inicio del turno', detalle: hhmm(e.inicioTurnoMs), celdas: [] })
       }
     } else if (causa === 'linea') {
-      const mismoSegundo = x.linea.otros.every((c) => Math.abs(c.deltaMs) < 1000)
+      /* «A la misma hora»: dentro del mismo segundo (lo que Shoplogix anota y la cabecera muestra, hh:mm:ss). Con más diferencia, se dice cuánta. */
+      const todasMicro = x.linea.otros.every((c) => c.micro)
       const lista = [{ fila: m.fila, micro: true, s: m.s, deltaMs: 0, d: 0 as const }, ...x.linea.otros]
+      const maxDifS = Math.max(...x.linea.otros.map((c) => Math.abs(c.deltaMs))) / 1000
       razones.push({
         cifra: deDe(lista.length, n),
-        texto: mismoSegundo ? 'Baader pararon en el mismo segundo' : 'Baader pararon casi a la vez',
+        texto: `Baader con ${todasMicro ? 'micro' : 'parada'} anotada ${maxDifS < 1 ? 'a la misma hora' : `casi a la vez (hasta ${seg(maxDifS)} de diferencia)`}`,
         detalle: lista.map((c) => {
-          const desfase = Math.abs(c.deltaMs) >= 1000 ? ` (${seg(Math.abs(c.deltaMs) / 1000)} ${c.deltaMs < 0 ? 'antes' : 'después'})` : ''
-          return `${conNB(nom(c.fila))} ${dur(c.s)}${c.micro ? '' : ' (detención)'}${desfase}`
+          /* Con una detención en la lista, cada una dice qué fue; el desfase se escribe como lo que es («empezó 5 s después»), no entre paréntesis. */
+          const tipo = todasMicro ? '' : `${c.micro ? 'micro' : 'detención'} de `
+          const desfase = Math.abs(c.deltaMs) >= 1000 ? `, empezó ${seg(Math.abs(c.deltaMs) / 1000)} ${c.deltaMs < 0 ? 'antes' : 'después'}` : ''
+          return `${conNB(nom(c.fila))} ${tipo}${dur(c.s)}${desfase}`
         }).join(' · '),
         celdas: lista.map((c) => ({ fila: c.fila, d: c.d })),
       })
@@ -466,12 +520,13 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
       const u = x.paro.ultimo
       razones.push({ cifra: seg((m.ini - u.fin) / 1000), texto: `desde que terminó una detención de ${dur(u.s)}`, detalle: motivoLegible(u.razon), celdas: [] })
     } else if (causa === 'ritmo') {
+      /* «10 de 16» es contra el RITMO PROPIO (su ritmo normal escalado por los segundos que anduvo), y el corte es el 75 % de ESA cifra. */
       const { medida, kA } = x.ritmo
       const de = (medida.ritmo ?? 0) * (medida.anduvo / 60)
       razones.push({
-        cifra: deDe(medida.piezas ?? 0, cifraTxt(de)),
-        texto: `${conNB(nombre)} a las ${horaMinuto(kA)}, el minuto antes${medida.anduvo < 60 ? ` (anduvo ${seg(medida.anduvo)})` : ''}`,
-        detalle: `su ritmo de los últimos ${RITMO_MINUTOS} min: ${cifraTxt(medida.ritmo ?? 0)}${NB}pz/min`,
+        cifra: `${deDe(medida.piezas ?? 0, cifraTxt(de))}${NB}pz`,
+        texto: `${conNB(nombre)} en el minuto ${horaMinuto(kA)}, el minuto anterior a la micro${medida.anduvo < 60 ? ` (anduvo ${seg(medida.anduvo)})` : ''}`,
+        detalle: `Su ritmo normal (${RITMO_MINUTOS} min previos, sin paradas): ${cifraTxt(medida.ritmo ?? 0)}${NB}pz/min${medida.anduvo < 60 ? `, o sea ${cifraTxt(de)}${NB}pz en los ${seg(medida.anduvo)} que anduvo` : ''}. Menos de ${cifraTxt(medida.corte ?? 0)} (el ${PCT_BAJO}${NB}%) cuenta como poco.`,
         celdas: [{ fila: m.fila, d: -1 }],
       })
     }
@@ -486,29 +541,40 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
         celdas: serie.maquinas.map((_, j) => ({ fila: j, d: -1 as const })),
       })
     }
-    // · Otra Baader que en el minuto k anduvo los 60 s (ninguna parada anotada lo toca) y dio menos del 75 % de su ritmo propio.
+    // · Otra Baader que en el minuto k anduvo los 60 s (ninguna parada anotada lo toca) y dio menos del 75 % de su ritmo propio. La cifra se
+    //   muestra contra el ESPERADO («8 de 16»), así que además tiene que verse baja contra él: sin esto, un ritmo propio mayor que el esperado
+    //   podría mostrar «12 de 16» como «también bajó». Con los datos reales todas las notas cumplen las dos.
     for (let j = 0; j < n; j++) {
       if (j === m.fila) continue
       const md = medir(j, k)
       if (md.piezas == null || md.anduvo !== 60 || md.ritmo == null || !(md.piezas < RITMO_BAJO * md.ritmo)) continue
       const esp = serie.maquinas[j]!.esperado
+      if (esp != null && !(md.piezas < RITMO_BAJO * esp)) continue
       razones.push({
-        cifra: esp != null ? deDe(md.piezas, esp) : `${md.piezas}${NB}pz`,
-        texto: `${conNB(nom(j))} sin parada anotada en ${horaMinuto(k)}`,
-        detalle: 'posible micro de 0 s',
+        cifra: `${esp != null ? deDe(md.piezas, esp) : md.piezas}${NB}pz`,
+        texto: `${conNB(nom(j))} también bajó en el minuto ${horaMinuto(k)}${esp != null ? ` (esperado: ${esp})` : ''}`,
+        detalle: `sin parada anotada: posible micro muy corta (de 0${NB}s)`,
         celdas: [{ fila: j, d: 0 }],
       })
     }
 
     // Las reglas que no aplicaron (✕ con su cifra, — si no se evalúan). Una regla que se cumple pero pierde por orden de
     // precedencia no es «descartada»: no se lista como ✕ (sería falso).
+    //   Cada una dice QUÉ no es (o qué no se revisó) y la cifra que lo prueba. El límite de cada causa vive en su definición
+    //   (`DEFINICION_CAUSA`: la ayuda ⓘ y el `title` de cada chip), no se repite en cada línea: el globo es largo y las líneas se leen enteras.
+    const nombreRegla = (c: CausaMicro) => ROTULO_CAUSA[c].toLowerCase()
+    const noEs = (c: CausaMicro) => `No es ${nombreRegla(c)}:`
+    const noSeRevisa = (c: CausaMicro) => `No se revisó «${nombreRegla(c)}»:`
     if (causa !== 'arranque' && !x.arranque.aplica) {
       descartadas.push({
         regla: 'arranque',
         estado: 'no',
+        titulo: noEs('arranque'),
         texto: x.arranque.ultimaLarga
-          ? `la última pausa larga terminó a las ${hhmm(x.arranque.ultimaLarga.b)}`
-          : `no hubo pausas largas desde el inicio del turno (${hhmm(e.inicioTurnoMs)})`,
+          ? `la última detención de ${minTxt(MIN_PAUSA)} o más de ${conNB(nombre)} terminó a las ${hhmm(x.arranque.ultimaLarga.b)}`
+          : hayInicioTurno
+            ? `ya pasaron ${minTxt(MIN_ARRANQUE)} desde que empezó el turno (${hhmm(e.inicioTurnoMs)}) y ${conNB(nombre)} no tuvo detenciones de ${minTxt(MIN_PAUSA)} o más`
+            : `${conNB(nombre)} no tuvo detenciones de ${minTxt(MIN_PAUSA)} o más antes de la micro`,
       })
     }
     if (causa !== 'linea' && n > 1 && !x.linea.aplica) {
@@ -516,35 +582,49 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
       descartadas.push({
         regla: 'linea',
         estado: 'no',
+        titulo: noEs('linea'),
         texto: prog
-          ? `ninguna otra Baader paró a ±${LINEA_COMUN_TOL_S}${NB}s, salvo una parada programada: ${conNB(nom(prog.fila))}${motivoLegible(prog.razon) ? ` (${motivoLegible(prog.razon)})` : ''}`
-          : `ninguna otra Baader paró a ±${LINEA_COMUN_TOL_S}${NB}s`,
+          ? `ninguna otra Baader tuvo micro ni detención no programada en los ${LINEA_COMUN_TOL_S}${NB}s antes o después (${conNB(nom(prog.fila))} paró, pero era programada${motivoLegible(prog.razon) ? `: ${motivoLegible(prog.razon)}` : ''})`
+          : `ninguna otra Baader tuvo micro ni detención en los ${LINEA_COMUN_TOL_S}${NB}s antes o después`,
       })
     }
     if (causa !== 'paro' && !x.paro.aplica) {
       descartadas.push({
         regla: 'paro',
         estado: 'no',
-        texto: x.paro.ultimo ? `la última detención fue hace ${minTxt((m.ini - x.paro.ultimo.fin) / 60_000)}` : 'no hubo detenciones antes de la micro',
+        titulo: noEs('paro'),
+        texto: x.paro.ultimo
+          ? `la última detención de ${conNB(nombre)} terminó hace ${minTxt((m.ini - x.paro.ultimo.fin) / 60_000)}`
+          : `${conNB(nombre)} no tuvo detenciones antes de la micro`,
       })
     }
     if (causa !== 'ritmo' && x.ritmo.estado !== 'cumple') {
       const { estado, medida, kA } = x.ritmo
       const hace = horaMinuto(kA)
       let texto: string
-      if (estado === 'una-baader') texto = 'no se usa en Filete: su ritmo cambia mucho y no explica las micro'
-      else if (estado === 'inicio') {
-        /* «Por eso el minuto sale bajo» solo si de verdad sale bajo: sin esto la regla lo habría marcado. */
-        texto = `no se evalúa: Shoplogix anotó la micro al empezar el minuto (${hhmmss(m.ini)}). La parada ya venía de antes${medida.bajo ? `, por eso el minuto ${hace} sale bajo` : ''}`
-      } else if (estado === 'sin-minuto') texto = 'no se evalúa: todavía no hay datos del minuto anterior'
-      else if (estado === 'poco-andando') texto = `no se evalúa: en ${hace} la Baader anduvo solo ${seg(medida.anduvo)}`
-      else if (estado === 'sin-ritmo') texto = `no se evalúa: no hay ${RITMO_MIN_MINUTOS} minutos completos andando para medir su ritmo propio`
-      else texto = `${deDe(medida.piezas ?? 0, cifraTxt((medida.ritmo ?? 0) * (medida.anduvo / 60)))} en ${hace}, el minuto antes: no bajó del ${Math.round(RITMO_BAJO * 100)}${NB}% de su ritmo`
-      descartadas.push({ regla: 'ritmo', estado: estado === 'no' ? 'no' : 'sin', texto })
+      if (estado === 'una-baader') {
+        texto = 'en Filete la mayoría de los minutos ya va bajo lo esperado y no serviría para explicar una micro'
+      } else if (estado === 'inicio') {
+        /* Una inferencia, no un dato: por el atraso de Shoplogix la parada PROBABLEMENTE empezó en el minuto anterior. */
+        texto = `Shoplogix anota con ${ATRASO_ANOTA} de atraso y la micro quedó en los primeros ${INICIO_MINUTO_S}${NB}s del minuto: probablemente empezó en el minuto ${hace}, así que ese minuto no se puede comparar con su ritmo normal`
+      } else if (estado === 'sin-minuto') {
+        texto = kA < 0 ? 'la serie del turno empieza ahí: no hay minuto anterior' : `todavía no cierra el minuto anterior (${hace})`
+      } else if (estado === 'poco-andando') {
+        texto = `en el minuto ${hace} ${conNB(nombre)} anduvo solo ${seg(medida.anduvo)} (hacen falta ${ANDANDO_MIN_S}${NB}s para medir su ritmo)`
+      } else if (estado === 'sin-ritmo') {
+        texto = `${conNB(nombre)} no tiene ${RITMO_MIN_MINUTOS} minutos completos andando entre los ${RITMO_MINUTOS} anteriores para saber su ritmo normal`
+      } else {
+        texto = `${deDe(medida.piezas ?? 0, cifraTxt((medida.ritmo ?? 0) * (medida.anduvo / 60)))}${NB}pz en el minuto ${hace}, el anterior a la micro: no bajó del ${PCT_BAJO}${NB}% de su ritmo normal`
+      }
+      const titulo = estado === 'no' ? noEs('ritmo') : estado === 'una-baader' ? `«${ROTULO_CAUSA.ritmo}» no se usa con una sola Baader:` : noSeRevisa('ritmo')
+      descartadas.push({ regla: 'ritmo', estado: estado === 'no' ? 'no' : 'sin', titulo, texto })
     }
 
     // La tabla: una fila por Baader, minutos k−2 … k+1.
     const microsDeK = (fila: number) => micros.filter((v) => v.fila === fila && minutoDe(v.ini) === k)
+    /* ▽ (la parada PUDO empezar en k−1): la parada que explica el globo quedó anotada en los primeros 15 s del minuto k. Es la propia micro y, de las
+       otras Baader, la micro o la detención no programada que empieza a ±15 s (las de `linea.otros`; una programada no explica nada). */
+    const enInicio = (ms: number) => segundoDelMinuto(ms) < INICIO_MINUTO_S
     const filas: FilaGlobo[] = serie.maquinas.map((q, j) => {
       const enK = microsDeK(j)
       const propia = j === m.fila ? m : enK[0]
@@ -555,13 +635,13 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
         ella: j === m.fila,
         piezas: [k - 2, k - 1, k, k + 1].map((kk) => piezasEn(j, kk)),
         microEnK: propia ? evaluaciones.get(propia)?.causa ?? 'sin' : null,
-        inicioPrevio: k >= 1 && enK.some((v) => ((((v.ini - t0) % 60_000) + 60_000) % 60_000) / 1000 < INICIO_MINUTO_S),
+        inicioPrevio: k >= 1 && (j === m.fila ? enInicio(m.ini) : x.linea.otros.some((c) => c.fila === j && c.d === 0 && enInicio(c.ini))),
       }
     })
     const tabla: TablaGlobo = {
       horas: [k - 2, k - 1, k, k + 1].map(horaMinuto),
       filas,
-      leyendaInicio: filas.some((f) => f.inicioPrevio) ? 'ya estaba parando (Shoplogix lo anota después)' : null,
+      leyendaInicio: filas.some((f) => f.inicioPrevio) ? `la parada pudo empezar en este minuto (Shoplogix la anota con ${ATRASO_ANOTA} de atraso)` : null,
     }
     return { razones, descartadas, tabla }
   }

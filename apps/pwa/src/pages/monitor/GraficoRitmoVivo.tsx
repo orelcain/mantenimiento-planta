@@ -22,7 +22,7 @@
  * Todo sale de las funciones de datos que ya existen (`ritmoVivo`, `monitorEventos`…): este archivo solo ubica y dibuja.
  */
 import { Check, Info, Maximize2, Minus, X } from 'lucide-react'
-import { memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type TouchEvent as ReactTouchEvent } from 'react'
+import { memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TouchEvent as ReactTouchEvent } from 'react'
 import { DUENO_META } from '@/services/shoplogix/monitorEventos'
 import { CapaAmpliada } from './AmpliarV2'
 import { useAbrirPorClave, useTamano } from './ampliarHooks'
@@ -35,7 +35,8 @@ import {
   tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
   type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type TonoRitmo, type Zoom,
 } from './ejeTurno'
-import { CAUSAS_MICRO, COLOR_CAUSA, OCULTO_S, ROTULO_CAUSA, clasificarMicros, contarPorCausa, numerosPorCelda, realEstimadoS, type CausaMicro, type MicroClasificada } from './microCausa'
+import { CAUSAS_MICRO, COLOR_CAUSA, DEFINICION_CAUSA, OCULTO_S, ROTULO_CAUSA, clasificarMicros, contarPorCausa, numerosPorCelda, realEstimadoS, type CausaMicro, type MicroClasificada } from './microCausa'
+import { GLOBO_SOBRE_FILA, ubicarGloboPc } from './globoPosicion'
 import { etiquetaMaquina } from './ritmoVivo'
 import type { CuadroReloj, RelojDeDatos } from './useRelojDeDatos'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
@@ -866,28 +867,30 @@ function MarcaRegla({ tipo }: { tipo: 'ok' | 'no' | 'sin' }) {
  * contexto, no un diagnóstico. A la izquierda, la causa y las razones numeradas, cada una con su cifra; a la derecha, la tabla por Baader
  * (piezas por minuto de los minutos k−2 a k+1) donde cada número aparece en la celda que lo prueba, y debajo las reglas que no
  * aplicaron. En PC flota (640 px, dos columnas) justo sobre las filas, al lado de la marca; en el celular (`compacto`) va en una
- * columna pegada bajo el gráfico (no arriba de la tarjeta: con el dedo en las marcas, ese borde queda fuera de pantalla), con un ✕ de 44 px.
- * Toda cifra sale de `q`: aquí solo se ubica y se dibuja.
+ * columna en el flujo de la tarjeta, justo bajo el gráfico (empuja lo de abajo en vez de taparlo; no arriba de la tarjeta: con el dedo en las
+ * marcas, ese borde queda fuera de pantalla), con un ✕ de 44 px.
+ * Toda cifra sale de `q`: aquí solo se ubica y se dibuja. Lo que es inferencia (la parada pudo empezar antes) se dice «probablemente» o «pudo».
  */
-export function GloboMicro({ q, style, compacto, onCerrar }: { q: MicroClasificada; style?: CSSProperties; compacto?: boolean; onCerrar?: () => void }) {
+export function GloboMicro({ q, style, compacto, onCerrar, refGlobo }: { q: MicroClasificada; style?: CSSProperties; compacto?: boolean; onCerrar?: () => void; refGlobo?: Ref<HTMLDivElement> }) {
   const nom = etiquetaMaquina(q.nombre)
   const numeros = numerosPorCelda(q)
   const { tabla } = q
   const encabezado = (
     <header className="gm-cab">
-      <div className="gm-tit tabular-nums">{horaConSegundos(q.inicioMs)} · {nom} · micro de {q.duracionS}&nbsp;s</div>
-      <div className="gm-sub tabular-nums">≈ {realEstimadoS(q.duracionS)}&nbsp;s reales (Shoplogix no ve ~{OCULTO_S}&nbsp;s)</div>
+      <div className="gm-tit tabular-nums">{nom} · micro de {q.duracionS}&nbsp;s anotada a las {horaConSegundos(q.inicioMs)}</div>
+      <div className="gm-sub tabular-nums">Unos {realEstimadoS(q.duracionS)}&nbsp;s en total: {q.duracionS}&nbsp;s anotados + unos {OCULTO_S}&nbsp;s del inicio que Shoplogix no anota (estimado)</div>
     </header>
   )
   const causa = (
     <section className="gm-grupos" aria-label="Causa probable">
-      <div className="gm-rot">Causa probable</div>
+      {/* Sin causa clara no hay «causa probable»: el rótulo se omite y el pie lo dice. */}
+      {q.causa !== 'sin' && <div className="gm-rot">Causa probable</div>}
       <div className="gm-grupo">
         <div className="gm-causa">
           <i className="sw" style={{ background: COLOR_CAUSA[q.causa] }} aria-hidden />
           <span>{ROTULO_CAUSA[q.causa]}</span>
         </div>
-        {q.causa === 'sin' && <p className="gm-nota">Ninguna regla la explica.</p>}
+        {q.causa === 'sin' && <p className="gm-nota">Ninguna de las causas que se revisan la explica. No quiere decir que no tenga causa: los datos no la muestran.</p>}
         {q.razones.length > 0 && (
           <ul className="gm-evs">
             {q.razones.map((r, i) => (
@@ -923,7 +926,8 @@ export function GloboMicro({ q, style, compacto, onCerrar }: { q: MicroClasifica
                     <span className="cel">
                       {refs.map((n) => <b key={n} className="ref" role="img" aria-label={`razón ${n}`}>{n}</b>)}
                       {i === 2 && f.microEnK && <MarcaMicro color={COLOR_CAUSA[f.microEnK]} rotulo="micro" />}
-                      {i === 1 && f.inicioPrevio && f.microEnK && <MarcaMicro color={COLOR_CAUSA[f.microEnK]} hueco rotulo="ya estaba parando" />}
+                      {/* ▽: la parada pudo empezar en este minuto. Si la Baader no tiene una micro en k (la suya fue una detención), toma el color de la causa del globo. */}
+                      {i === 1 && f.inicioPrevio && <MarcaMicro color={COLOR_CAUSA[f.microEnK ?? q.causa]} hueco rotulo="la parada pudo empezar en este minuto" />}
                       <span className="v">{v == null ? '—' : int(v)}</span>
                     </span>
                   </td>
@@ -937,19 +941,21 @@ export function GloboMicro({ q, style, compacto, onCerrar }: { q: MicroClasifica
       {tabla.leyendaInicio && (
         <p className="gm-ley-tri"><MarcaMicro color={COLOR_CAUSA[q.causa]} hueco /><span>{tabla.leyendaInicio}</span></p>
       )}
-      {q.descartadas.length > 0 && (
-        <ul className="gm-desc" aria-label="Reglas que no aplicaron">
-          {q.descartadas.map((d) => (
-            <li key={d.regla}>
-              <MarcaRegla tipo={d.estado} />
-              <span className="tabular-nums"><b>{ROTULO_CAUSA[d.regla]}</b> · {d.texto}</span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   )
-  const pie = <p className="gm-pie">Probable, no imputada. Se confirma en terreno.</p>
+  /* Las reglas que no aplicaron, debajo de la tabla: en PC a todo el ancho del globo (a media columna cada línea se partía en 3 o 4 y el globo
+     crecía 100 px); en el celular ya es una sola columna. */
+  const reglas = q.descartadas.length > 0 && (
+    <ul className="gm-desc" aria-label="Reglas que no aplicaron">
+      {q.descartadas.map((d) => (
+        <li key={d.regla}>
+          <MarcaRegla tipo={d.estado} />
+          <span className="tabular-nums"><b>{d.titulo}</b> {d.texto}</span>
+        </li>
+      ))}
+    </ul>
+  )
+  const pie = <p className="gm-pie">{q.causa === 'sin' ? 'No hay causa probable. Hay que verlo en terreno.' : 'Causa probable: no queda registrada. Se confirma en terreno.'}</p>
   if (compacto) {
     return (
       <div className="v2-tip gm movil" role="group" aria-label="Micro detención y su causa probable">
@@ -961,20 +967,62 @@ export function GloboMicro({ q, style, compacto, onCerrar }: { q: MicroClasifica
         {encabezado}
         {causa}
         {datos}
+        {reglas}
         {pie}
       </div>
     )
   }
   return (
-    <div className="v2-tip gm pc2 pointer-events-none absolute z-10" style={style} role="tooltip" aria-label="Micro detención y su causa probable">
+    <div ref={refGlobo} className="v2-tip gm pc2 pointer-events-none absolute z-10" style={style} role="tooltip" aria-label="Micro detención y su causa probable">
       {encabezado}
       <div className="gm-cols">
         {causa}
         {datos}
       </div>
+      {reglas}
       {pie}
     </div>
   )
+}
+
+/**
+ * El globo de PC ubicado sobre la primera fila Ev (`ubicarGloboPc`): lo mide ya dibujado y, si arriba no cabe sin quedar bajo el encabezado
+ * fijo de la página, lo baja lo justo (y, si así pasa sobre la primera fila Ev, lo corre a un lado de la marca para no taparla). Antes de medir
+ * (y en el primer cuadro) va anclado por abajo y centrado, como siempre; la medida se hace antes de pintar, así que no se ve el salto. Se vuelve
+ * a medir al cambiar de micro, al hacer scroll y al cambiar el tamaño de la ventana.
+ */
+function GloboMicroPc({ q, marcaX, anchoGrafico, filaTop, alto, lienzo }: { q: MicroClasificada; marcaX: number; anchoGrafico: number; filaTop: number; alto: number; lienzo: RefObject<HTMLDivElement | null> }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [sitio, setSitio] = useState<{ top: number; left: number } | null>(null)
+  /* Centrado sobre la marca y acotado al gráfico: left = clamp(x − 320, 8, ancho − 648). Es la posición de siempre y la de antes de medir. */
+  const izqMin = GLOBO_PC_AIRE
+  const derMax = anchoGrafico - GLOBO_PC_AIRE
+  const centrado = acota(marcaX - GLOBO_PC_ANCHO / 2, izqMin, derMax - GLOBO_PC_ANCHO)
+  const ubicar = useCallback(() => {
+    const globo = ref.current
+    const base = lienzo.current
+    if (!globo || !base) return
+    /* La barra fija de PC (`.v2-barra-pc`, sticky z-20) queda encima de las tarjetas: el globo arranca debajo de ella. */
+    const barra = document.querySelector('.v2-barra-pc')?.getBoundingClientRect()
+    const u = ubicarGloboPc({
+      lienzoTop: base.getBoundingClientRect().top,
+      filaTop,
+      alto: globo.offsetHeight,
+      minTop: (barra && barra.height > 0 ? barra.bottom : 0) + GLOBO_PC_AIRE,
+      marcaX,
+      ancho: GLOBO_PC_ANCHO,
+      izqMin,
+      derMax,
+    })
+    setSitio((a) => (a && a.top === u.top && a.left === u.left ? a : { top: u.top, left: u.left }))
+  }, [filaTop, lienzo, marcaX, izqMin, derMax])
+  useLayoutEffect(() => { ubicar() }, [ubicar, q.id])
+  useEffect(() => {
+    window.addEventListener('scroll', ubicar, true)
+    window.addEventListener('resize', ubicar)
+    return () => { window.removeEventListener('scroll', ubicar, true); window.removeEventListener('resize', ubicar) }
+  }, [ubicar])
+  return <GloboMicro q={q} refGlobo={ref} style={sitio == null ? { left: centrado, bottom: alto - filaTop + GLOBO_SOBRE_FILA } : { left: sitio.left, top: sitio.top }} />
 }
 
 /** La micro elegida: su raya (a lo alto de las filas y los carriles) y un aro en cada una de sus marcas. */
@@ -1007,10 +1055,11 @@ function Muestra({ trazo, color, opacidad, rotulo }: { trazo: 'hoy' | 'meta' | '
 }
 
 /**
- * Los estados de color y los dueños de las paradas, más «Cómo usarlo» (se abre con un toque o Enter). El globo no se sale de
+ * Los estados de color y los dueños de las paradas, más «Cómo usarlo» y, si hay micro con hora, qué significa cada causa probable
+ * (`causas`; en el celular no hay hover para el `title` de los chips) (se abre con un toque o Enter). El globo no se sale de
  * la pantalla: a 16 px de los bordes y de ancho min(270 px, ancho − 32 px). Tocar fuera y Escape lo cierran.
  */
-function InfoLeyenda({ ayuda }: { ayuda: string }) {
+function InfoLeyenda({ ayuda, causas }: { ayuda: string; causas?: readonly CausaMicro[] }) {
   const [abierto, setAbierto] = useState(false)
   const [pos, setPos] = useState({ izq: 0, ancho: 270 })
   const id = useId()
@@ -1066,6 +1115,20 @@ function InfoLeyenda({ ayuda }: { ayuda: string }) {
           </ul>
           <div className="mt-3 font-semibold">Cómo usarlo</div>
           <p className="mt-1.5 text-muted-foreground">{ayuda}</p>
+          {causas && causas.length > 0 && (
+            <>
+              <div className="mt-3 font-semibold">Micro: causa probable</div>
+              <ul className="mt-1.5 grid gap-1.5 text-[12px] leading-4 text-muted-foreground">
+                {causas.map((k) => (
+                  <li key={k} className="flex items-start gap-2">
+                    <i className="mt-[3px] h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: COLOR_CAUSA[k] }} aria-hidden />
+                    <span><b className="font-semibold text-foreground">{ROTULO_CAUSA[k]}</b>: {DEFINICION_CAUSA[k]}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[12px] leading-4 text-muted-foreground">Cada micro cuenta una sola vez, en la primera causa que cumple (de arriba hacia abajo).</p>
+            </>
+          )}
         </div>
       )}
     </span>
@@ -1075,6 +1138,25 @@ function InfoLeyenda({ ayuda }: { ayuda: string }) {
 // ── El gráfico ───────────────────────────────────────────────────────────────
 
 const SEGMENTOS: Array<[Zoom, string]> = [['turno', 'Turno'], ['1h', '1 h'], ['15m', '15 min']]
+
+/**
+ * El aviso bajo los chips: cuántas micro del turno se ven y cuántas no (las de 0 s no traen hora y no se pueden marcar), y que cada micro cuenta
+ * una sola vez. `total` es el total del turno (con las de 0 s); si no se sabe, o es menor que las que se ven, no se inventa la diferencia.
+ * `corto`: la línea compacta de 1366 px, que va junto a los chips.
+ */
+function avisoMicro(conHora: number, total: number | null, corto: boolean): string {
+  const resto = total != null && total >= conHora ? total - conHora : null
+  if (corto) {
+    return resto != null ? `${conHora} de ${int(total!)} con hora · las otras ${int(resto)} son de 0 s y no se marcan` : `${conHora} con hora · las de 0 s no traen hora`
+  }
+  const unaVez = 'Cada micro cuenta una sola vez, en la primera causa que cumple (de izquierda a derecha).'
+  return resto != null
+    ? `Aquí se ven ${conHora} de las ${int(total!)} micro del turno: las de 15 s o más, que Shoplogix entrega con hora. Las otras ${int(resto)} son muy cortas (de 0 s): están en el total, pero no traen hora y no se pueden marcar. ${unaVez}`
+    : `Aquí se ven las ${conHora} micro de 15 s o más, que Shoplogix entrega con hora. Las de 0 s no traen hora y no se pueden marcar. ${unaVez}`
+}
+
+/** Las causas que se muestran (chips y ayuda ⓘ): con una sola Baader (Filete) «Línea común» y «Ritmo bajo» no existen, así que no se listan. */
+const causasDe = (nMaquinas: number): CausaMicro[] => CAUSAS_MICRO.filter((k) => (k !== 'linea' && k !== 'ritmo') || nMaquinas > 1)
 
 /** Cuánto dura la pista de la rueda sin Ctrl. */
 export const PISTA_RUEDA_MS = 1600
@@ -1331,16 +1413,17 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       const t = ev.target as Element | null
       if (!medidor.current?.contains(t as Node) && !t?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null) }
     }
+    /* Escape lo cierra, como cualquier globo (con el teclado no hay otra forma de quitarlo). */
+    const tecla = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { setCursor(null); setMicroSel(null) } }
     document.addEventListener('pointerdown', fuera)
-    return () => document.removeEventListener('pointerdown', fuera)
+    document.addEventListener('keydown', tecla)
+    return () => { document.removeEventListener('pointerdown', fuera); document.removeEventListener('keydown', tecla) }
   }, [hayGlobo, medidor])
 
   const info = modelo && cursor ? leer(modelo, cursor.min, vivas) : null
   const globoIzq = modelo && cursor ? modelo.d.pl + cursor.xv + 14 : 0
   const globoX = modelo ? (globoIzq + 280 > modelo.w ? Math.max(0, globoIzq - 28 - 280) : globoIzq) : 0
   const microInfo = modelo && microSel ? modelo.micros.find((q) => q.id === microSel.id) ?? null : null
-  /* El globo de 640 px se centra sobre la marca y se acota dentro del gráfico: left = clamp(x − 320, 8, ancho − 648). */
-  const microX = modelo && microSel ? acota(modelo.d.pl + microSel.xv - GLOBO_PC_ANCHO / 2, GLOBO_PC_AIRE, modelo.w - GLOBO_PC_ANCHO - GLOBO_PC_AIRE) : 0
   const conteoMicro = modelo ? contarPorCausa(modelo.micros) : null
 
   // ── Lo que se ve alrededor ──
@@ -1348,6 +1431,18 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const chico = tam === 'chico'
   /* Con menos de 720 px de gráfico el globo de dos columnas no cabe: va como en el celular, bajo el gráfico. */
   const globoCompacto = chico || (modelo != null && modelo.w < GLOBO_PC_MIN_W)
+  /* El globo de una columna se abre bajo el gráfico, que en el celular puede quedar bajo el pliegue de la pantalla: al abrirlo se trae a la vista (lo mínimo). */
+  const globoMovilRef = useRef<HTMLDivElement>(null)
+  const idMicro = microSel?.id ?? null
+  useEffect(() => {
+    const el = globoMovilRef.current
+    if (idMicro == null || !globoCompacto || !el) return
+    /* El encabezado fijo de la página (`.v2-cabecera`, sticky z-20) tapa la parte de arriba de la ventana: el globo no se alinea bajo él (`scroll-margin-top`). */
+    const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
+    el.style.scrollMarginTop = `${bajoLaBarra + GLOBO_PC_AIRE}px`
+    const reducido = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    el.scrollIntoView?.({ block: 'nearest', behavior: reducido ? 'auto' : 'smooth' })
+  }, [idMicro, globoCompacto])
   const sub = p.cerrado && finReal != null
     ? `${relojDe(e.iniMs)} → ${relojDe(finReal)} · terminado`
     : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
@@ -1387,16 +1482,16 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       {modelo && modelo.micros.length > 0 && (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
           <svg width={10} height={8} aria-hidden><path d="M0 0h10l-5 8z" fill="rgb(var(--muted-foreground))" /></svg>
-          micro en su Baader
+          micro en su Baader (el color es la causa probable)
         </span>
       )}
       {modelo && modelo.micros.some((q) => q.causa === 'linea') && (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
           <svg width={4} height={12} aria-hidden><path d="M2 0V12" stroke="rgb(var(--foreground))" strokeOpacity={0.6} strokeWidth={1.2} strokeDasharray="3 3" fill="none" /></svg>
-          parada a la vez en 2 o 3 Baader
+          parada casi a la vez en 2 o 3 Baader
         </span>
       )}
-      <InfoLeyenda ayuda={tactil ? AYUDA_TACTIL : AYUDA_PC} />
+      <InfoLeyenda ayuda={tactil ? AYUDA_TACTIL : AYUDA_PC} causas={modelo && modelo.micros.length > 0 ? causasDe(modelo.maquinas.length) : undefined} />
     </div>
   )
   /* Bajo el gráfico: cuántas micro hay de cada causa probable y el aviso de lo que NO se ve (las de 0 s no llegan con hora). */
@@ -1413,19 +1508,15 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       )}
       {modelo.micros.length > 0 && (
         <ul className="rv-mc-chips" aria-label="Micro detenciones por causa probable">
-          {CAUSAS_MICRO.filter((k) => (k !== 'linea' && k !== 'ritmo') || modelo.maquinas.length > 1).map((k) => (
-            <li key={k} className="rv-mc-chip" data-causa={k}>
+          {causasDe(modelo.maquinas.length).map((k) => (
+            <li key={k} className="rv-mc-chip" data-causa={k} title={DEFINICION_CAUSA[k]}>
               <i style={{ background: COLOR_CAUSA[k] }} aria-hidden />
               {ROTULO_CAUSA[k]} <b className="tabular-nums">{conteoMicro[k]}</b>
             </li>
           ))}
         </ul>
       )}
-      <p className="rv-mc-aviso">
-        {tam === 'medio'
-          ? `${modelo.micros.length} con hora · las de 0 s no llegan`
-          : `Se marcan las ${modelo.micros.length} micro que llegan con hora (15 s o más). Las de 0 s no se publican con hora y no aparecen.`}
-      </p>
+      <p className="rv-mc-aviso">{avisoMicro(modelo.micros.length, modelo.microTotal, tam === 'medio')}</p>
     </div>
   ) : null
   /* Segmentado de 32 px fijos en todos los anchos (botones de 26 + p-[3px]); `tap-44` conserva el área táctil de 44. */
@@ -1500,15 +1591,17 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
           {modelo && (modelo.d.pr > 4 ? <RotulosDer m={modelo} /> : <div className="shrink-0" style={{ width: modelo.d.pr }} aria-hidden />)}
         </div>
         {modelo && info && !chico && <Globo info={info} style={{ left: globoX, top: modelo.d.pt + 18 }} />}
-        {/* Su borde de abajo queda 10 px sobre la primera fila Ev: pegado a la marca, sin tapar las filas. */}
-        {modelo && microInfo && !globoCompacto && <GloboMicro q={microInfo} style={{ left: microX, bottom: modelo.d.alto - (modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0) + 10 }} />}
-        {modelo && microInfo && globoCompacto && (
-          <div data-globo-minuto="" className="absolute inset-x-0 z-[3]" style={{ top: modelo.d.alto + 8 }}>
-            <GloboMicro q={microInfo} compacto onCerrar={() => setMicroSel(null)} />
-          </div>
-        )}
+        {/* Su borde de abajo queda 10 px sobre la primera fila Ev (pegado a la marca, sin tapar las filas) y, si así quedara bajo el encabezado fijo, se baja lo justo. */}
+        {modelo && microInfo && microSel && !globoCompacto && <GloboMicroPc q={microInfo} marcaX={modelo.d.pl + microSel.xv} anchoGrafico={modelo.w} filaTop={modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0} alto={modelo.d.alto} lienzo={medidor} />}
         <div className="rv-pista-rueda" data-ver={pistaRueda ? 'true' : 'false'} aria-hidden>Ctrl + rueda o pellizca para acercar</div>
       </div>
+      {/* En el celular (y en un gráfico de menos de 720 px) el globo va en una columna EN EL FLUJO, justo bajo el gráfico: empuja lo de abajo en vez de taparlo
+          y queda dentro de la tarjeta. Al abrirlo se trae a la vista (`scrollIntoView`). */}
+      {modelo && microInfo && globoCompacto && (
+        <div ref={globoMovilRef} data-globo-minuto="" className="relative z-[3]" style={{ marginTop: 8 }}>
+          <GloboMicro q={microInfo} compacto onCerrar={() => setMicroSel(null)} />
+        </div>
+      )}
       {/* La franja de rango (spec §6): la ventana compartida del gráfico con sus dos asas; moverla acerca o aleja. */}
       {modeloBase && (
         <div className="rv-rango-caja">

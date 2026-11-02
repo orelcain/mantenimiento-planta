@@ -25,6 +25,7 @@ export function lineasDelGlobo(globo: Element): string[] {
   if (tit) out.push(limpio(tit.textContent))
   const sub = unico(globo, '.gm-sub')
   if (sub) out.push(limpio(sub.textContent))
+  /* «Causa probable» solo está cuando hay una causa probable (con «Sin contexto» se omite). */
   const rot = unico(globo, '.gm-rot')
   if (rot) out.push(limpio(rot.textContent))
   const causa = unico(globo, '.gm-causa')
@@ -41,10 +42,9 @@ export function lineasDelGlobo(globo: Element): string[] {
   globo.querySelectorAll('tbody tr').forEach((tr) => out.push(Array.from(tr.querySelectorAll('th,td')).map((c) => (c.tagName === 'TH' ? limpio(c.textContent) : celda(c))).join(' | ')))
   const ley = unico(globo, '.gm-ley-tri')
   if (ley) out.push(`${glifo(ley)} ${limpio(ley.querySelector('span')!.textContent)}`)
+  /* Cada regla que no aplicó: su marca (✕ o —) y la frase entera, con el título en negrita al principio («No es arranque: …»). */
   globo.querySelectorAll('.gm-desc li').forEach((li) => {
-    const regla = limpio(li.querySelector('b')!.textContent)
-    const resto = limpio(li.querySelector('span:not([data-glifo])')!.textContent).replace(`${regla} · `, '')
-    out.push(`${glifo(li.querySelector('[data-glifo]'))} ${regla} · ${resto}`)
+    out.push(`${glifo(li.querySelector('[data-glifo]'))} ${limpio(li.querySelector('span:not([data-glifo])')!.textContent)}`)
   })
   const pie = unico(globo, '.gm-pie')
   if (pie) out.push(limpio(pie.textContent))
