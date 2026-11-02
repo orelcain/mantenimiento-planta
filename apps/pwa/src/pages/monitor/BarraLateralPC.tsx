@@ -3,12 +3,12 @@
  *
  * Riel de 56 px fijo a la izquierda que se abre a 200 px al pasar el mouse (con 120 ms de espera) o con el teclado,
  * SIN empujar el contenido: el fondo crece con `scaleX` y los rótulos aparecen con `opacity`; la página no se mueve.
- * Lleva lo que antes ocupaba la cabecera: El turno · Análisis · Duelo · Modo TV · tema · Inicio. El cambio de línea
+ * Lleva lo que antes ocupaba la cabecera: El turno · Análisis · Duelo · Modo TV · Compartir · tema · Inicio. El cambio de línea
  * (Eviscerado | Filete) ya no vive acá: es el selector de arriba de cada pestaña (`SelectorLinea`).
  * El botón de arriba la deja fijada abierta. El indicador del apartado activo se desliza (`transform`).
  * En celular no existe: sigue la barra de arriba de siempre.
  */
-import { BarChart3, Clock, Home, Menu, Moon, Sun, Trophy, Tv } from 'lucide-react'
+import { BarChart3, Clock, Home, Menu, Moon, QrCode, Sun, Trophy, Tv } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -21,6 +21,8 @@ export interface BarraLateralPCProps {
   /** «Inicio»: solo con sesión de supervisor (el link público no tiene a dónde volver). */
   conInicio?: boolean
   onModoTv: () => void
+  /** «Compartir»: el enlace público del monitor con su QR. */
+  onCompartir?: () => void
   oscuro: boolean
   onTema: () => void
 }
@@ -51,7 +53,7 @@ function Item({ icono, rotulo, activo, onClick, to, pulsado, nombre, atenuado }:
   )
 }
 
-export function BarraLateralPC({ pestana, onPestana, conInicio, onModoTv, oscuro, onTema }: BarraLateralPCProps) {
+export function BarraLateralPC({ pestana, onPestana, conInicio, onModoTv, onCompartir, oscuro, onTema }: BarraLateralPCProps) {
   const [fijada, setFijada] = useState(false)
   const [hover, setHover] = useState(false)
   const [foco, setFoco] = useState(false)
@@ -93,6 +95,7 @@ export function BarraLateralPC({ pestana, onPestana, conInicio, onModoTv, oscuro
 
         <div className="v2-lat-sep" aria-hidden />
         <Item icono={<Tv className="h-[18px] w-[18px]" />} rotulo="Modo TV" onClick={onModoTv} />
+        {onCompartir && <Item icono={<QrCode className="h-[18px] w-[18px]" />} rotulo="Compartir" nombre="Compartir el monitor (enlace y QR)" onClick={onCompartir} />}
         <span className="v2-lat-hueco" aria-hidden />
         <Item
           icono={oscuro ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}

@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Copy, FileDown, Gauge, Hourglass, Moon, PauseCircle, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
+import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Copy, FileDown, Gauge, Hourglass, Moon, PauseCircle, QrCode, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
 import { copiarCorreo, descargarPdf, pedirInformeCorreo, type InformeCorreo } from '@/services/shoplogix/informeTurnoCorreo'
 import { useTheme } from '@/hooks/useTheme'
 import {
@@ -75,6 +75,7 @@ import { ParetoDeParadas } from './monitor/MonitorPareto'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { BarraLateralPC } from './monitor/BarraLateralPC'
+import { CompartirMonitorSheet } from './monitor/CompartirMonitor'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
 import { VsAyerBloque } from './monitor/MonitorVsAyer'
 import { RepartoDuenoSemanal } from './monitor/RepartoDuenoSemanal'
@@ -4535,6 +4536,8 @@ function MonitorDelToken() {
   const { isDark, toggleTheme } = useTheme()
   const [data, setData] = useState<PublicShiftMonitorDoc | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'gone' | 'sin-conexion'>('loading')
+  /* «Compartir»: enlace público + QR del monitor (barra lateral en PC, botón junto al tema en el celular). */
+  const [compartirAbierto, setCompartirAbierto] = useState(false)
   /*
    * Cuota y peso RECIÉN guardados desde esta pantalla: el backend los publica
    * en el próximo refresco (~5 min) y mientras tanto la tarjeta no mostraba
@@ -6519,12 +6522,16 @@ function MonitorDelToken() {
       cerrado={turnoCerrado}
     >
     <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)} data-barra={glass === 'v2' && !modoPantalla ? 'si' : undefined}>
+      {token && (
+        <CompartirMonitorSheet open={compartirAbierto} onClose={() => setCompartirAbierto(false)} token={token} linea={lineTitle} />
+      )}
       {glass === 'v2' && !modoPantalla && (
         <BarraLateralPC
           pestana={pestana}
           onPestana={verPestana}
           conInicio={esSupervisorDuelo}
           onModoTv={entrarModoTv}
+          onCompartir={() => setCompartirAbierto(true)}
           oscuro={isDark}
           onTema={toggleTheme}
         />
@@ -6536,7 +6543,19 @@ function MonitorDelToken() {
           estado={turnoCerrado
             ? <Pill tone="neutral" dot>Turno terminado{live.effectiveEnd ? ` ${fmtWallTime(live.effectiveEnd)}` : ''}</Pill>
             : <StatusPill live={live} sinDatosHaceMin={sinDatosHaceMin} />}
-          tema={botonTema}
+          tema={(
+            <span className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCompartirAbierto(true)}
+                className="tap-44 shrink-0 rounded-full border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                title="Compartir el monitor (enlace y QR)"
+                aria-label="Compartir el monitor (enlace y QR)"
+              >
+                <QrCode className="h-4 w-4" />
+              </button>
+              {botonTema}
+            </span>
+          )}
           cambioLinea={pestana !== 'duelo' && (lineasMonitor || esSupervisorDuelo)
             ? (
                 <div className="flex items-center gap-2">

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.4.0' as const
+export const APP_VERSION = '4.5.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-02' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Clon HMI GEA: 9 pantallas nuevas desde las fotos del 01-11' as const
+export const VERSION_NAME = 'Monitor de línea: enlace y QR para compartir' as const
 
 /**
  * Nota:
