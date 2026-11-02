@@ -538,7 +538,8 @@ export const tamanoGrafico = (w: number): TamanoGrafico => (w >= 1480 ? 'grande'
  * Las medidas del mockup aprobado (1920 / 1366 / 375): columna de rótulos izquierda y derecha y alto de cada banda.
  * `ev` es el alto de la fila de paradas; `carril` el de cada fila Ev (su curva de piezas por minuto arriba y, abajo,
  * `tira` px de la cinta de color: 1 min = 1 celda); `micro` el del carril «Micro».
- * En 1366 × 768 (`medio`) el acumulado y las barras ceden 56 y 10 px a las filas nuevas y al resumen de micro (chips + aviso en una línea de 30 px): el gráfico sigue cabiendo. El acumulado no baja de 150.
+ * En 1366 × 768 (`medio`) el acumulado y las barras ceden 56 y 10 px a las filas nuevas: el gráfico entra entero en la primera pantalla
+ * (medido el 02-11: termina en el px 715); el rango y el resumen de micro quedan justo debajo (769 y 799). El acumulado no baja de 150.
  */
 const MEDIDAS: Record<TamanoGrafico, { lab: number; der: number; acum: number; barras: number; ev: number; carril: number; tira: number; micro: number }> = {
   grande: { lab: 74, der: 128, acum: 290, barras: 84, ev: 14, carril: 34, tira: 9, micro: 16 },

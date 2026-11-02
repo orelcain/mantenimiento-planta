@@ -145,8 +145,9 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
     return 60 - segundosCubiertos(unidas.todas.get(serie.maquinas[fila]!.id), ini, ini + 60_000)
   }
   /**
-   * Minutos COMPLETOS de la serie: el último elemento de `cycles` puede ser el minuto en curso (parcial) y no sirve
-   * para decir que una Baader venía baja. Se usa el menor largo entre las Baader.
+   * Minutos COMPLETOS de la serie. `pulse.js` publica solo minutos cerrados, hasta el último cerrado en TODAS las Baader
+   * (`minutoComun`): el minuto en curso no viene. Se usa el menor largo entre las Baader por si un doc trae largos distintos;
+   * restarle uno botaría un minuto cerrado.
    */
   const completos = Math.min(...serie.maquinas.map((q) => q.cycles.length))
   const piezasEn = (fila: number, k: number): number | null => (k >= 0 && k < completos ? serie.maquinas[fila]!.cycles[k] ?? 0 : null)

@@ -1274,8 +1274,11 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
      8.812 − 7.891 son 921, no 887. */
   const hechasHoy = vivas?.hechas ?? mostradas
   const difHoy = pc && modelo ? hechasHoy - pc.piezas : null
+  /* Fuera del celular la leyenda ocupa el espacio entre el título y los botones y se parte en DOS líneas ahí mismo. Con
+     `ml-auto` pedía su propia fila y empujaba los botones a una tercera: medido el 02-11 en 1366 × 768, la cabecera pasaba
+     de 40 a 107 px. */
   const leyenda = (
-    <div className={`flex flex-wrap items-center gap-x-[14px] gap-y-1.5 text-[12px] leading-4 text-muted-foreground ${chico ? '' : 'ml-auto'}`}>
+    <div className={`flex flex-wrap items-center gap-x-[14px] gap-y-1.5 text-[12px] leading-4 text-muted-foreground ${chico ? '' : 'min-w-0 flex-1 justify-end'}`}>
       <Muestra trazo="hoy" color="var(--v2-acento)" rotulo={p.cerrado ? 'este turno' : 'hoy'} />
       {modelo && modelo.objetivo.length > 1 && <Muestra trazo="meta" color="rgb(var(--muted-foreground))" opacidad={0.8} rotulo="ritmo de la meta" />}
       {hayProy && <Muestra trazo="proy" color="var(--v2-acento)" rotulo="proyección" />}

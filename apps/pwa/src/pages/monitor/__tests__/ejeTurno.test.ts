@@ -426,13 +426,19 @@ describe('alturas del gráfico', () => {
     expect(sin.carriles).toEqual([])
     expect(sin.alto).toBe(10 + 290 + 16 + 14 + 8 + 18)
   })
-  it('1366×768 deja lugar: gráfico de 379 px + 118 de tarjeta + resumen de micro de 30 px + franja de 153 + cabecera de 76 + aire de 12 ≤ 768', () => {
-    /* El resumen de micro (`.rv-mc[data-tam='medio']` en monitorGlass.css) es UNA línea: chips de 24 px + 6 px de margen superior. */
-    const RESUMEN_MICRO_MEDIO = 24 + 6
-    const alto = disenar(1276, 'medio', 3, true, true).alto
-    expect(76 + 153 + 12 + (alto + 118 + RESUMEN_MICRO_MEDIO)).toBeLessThanOrEqual(768)
-    /* El acumulado de 1366 cede para eso, pero no baja de 150 px. */
-    expect(disenar(1276, 'medio', 3, true, true).acum.h).toBeGreaterThanOrEqual(150)
+  it('1366×768: el gráfico entero (hasta la fila de horas) entra en la primera pantalla, con las medidas reales de la página', () => {
+    /*
+     * Medido el 02-11-2026 con Playwright en 1366 × 768 (monitor público de Chonchi, tema claro), en px desde el tope de la
+     * página: «Ritmo en vivo» empieza en 269 (cabecera de la página + franja + aire); siguen 17 de relleno, la cabecera de
+     * la sección (40, con la leyenda en dos líneas al lado del título), 10 de aire y el gráfico. Debajo van el rango (10 + 44)
+     * y el resumen de micro (6 + 24), que terminan en 769 y 799: el resumen queda 31 px bajo el borde. Antes del carril
+     * «Micro» el rango ya terminaba en 774. (Las medidas anteriores de este test eran las del mockup: 76 + 153 + 12.)
+     */
+    const ARRIBA_DEL_GRAFICO = 269 + 17 + 40 + 10
+    const d = disenar(1276, 'medio', 3, true, true)
+    expect(ARRIBA_DEL_GRAFICO + d.alto).toBeLessThanOrEqual(768)
+    /* El acumulado de 1366 ya está en su piso: no se le quita más alto para hacer lugar. */
+    expect(d.acum.h).toBeGreaterThanOrEqual(150)
   })
 })
 
