@@ -754,6 +754,49 @@ body.embed{overflow-x:hidden}
 /* riel: el alto de cada botón sigue la proporción del panel (3,6cqw); el área táctil de 44 px va en un pseudoelemento que no mueve los íconos */
 .riel button{min-height:0}
 .riel button::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+/* ===== pantallas fotografiadas el 01-11-2026 ===== */
+.riel .extra{background:#4a8fdc;color:#fff;margin-top:auto;cursor:default}
+.riel .extra svg{width:2.1cqw;height:2.1cqw}
+.riel .extra[hidden]{display:none}
+.riel .extra:not([hidden])+.puntos{margin-top:0}
+.esq-pos .esquema.gris .est[data-ir]{pointer-events:auto;cursor:pointer}
+.esq-pos .esquema.gris .est[data-ir]:hover rect.fondo{fill:#d3d8e8}
+.esq-pos .esquema.gris .est[data-ir]:focus-visible{outline:2px solid var(--ambar)}
+.cuerpo .campo .casilla{width:1.9cqw;height:1.9cqw;box-sizing:border-box;border-radius:.3cqw;background:#e2dfd9;box-shadow:inset 0 0 0 .1cqw #cfcbc4;margin-right:.55cqw;cursor:pointer}
+.cuerpo .campo .lampara.mov{position:relative;width:2.8cqw;height:2.8cqw;margin-right:.1cqw;cursor:pointer}
+.cuerpo .campo .lampara.mov::after{content:"";position:absolute;inset:28%;border:.2cqw solid #efede8;border-right-color:transparent;border-radius:50%}
+.lienzo .txt.tit-pant{font:700 1.62cqw/1 var(--f-ui);color:#55565a}
+.rejilla-env{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:.25cqw;background:#efede8;cursor:pointer}
+.rejilla-env i{background:#8fce1c;display:block}
+.ico-edit{display:block;opacity:.75}
+.ico-edit svg{width:100%;height:100%}
+.ico-edit svg *{stroke:#5a5d70}
+.lienzo .txt.cifra-chica{font:500 1.35cqw/1 var(--f-ui);color:#3a3a37}
+.lienzo .txt.cifra-grande{font:700 2.4cqw/1 var(--f-ui);color:#2e2e2b}
+.lienzo .txt.rot-azul{font:500 .95cqw/1 var(--f-ui);color:#3a7bd5}
+.disco-gris{border-radius:50%;background:#dcd9d1}
+.fila-al .m.fina{font:400 1.3cqw/1.4 var(--f-ui);color:#9a958d;white-space:nowrap}
+.fila-al .c{color:#a39b90}
+.mosaico-p{all:unset;position:absolute;box-sizing:border-box;cursor:pointer;background:#dcd8d1;border-radius:.75cqw;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.9cqw;padding:2cqw .45cqw 0;font-size:1.25cqw;line-height:1.35;color:#8e8f93;text-align:center}
+.mosaico-p.sin-ico{justify-content:center;padding-top:0}
+.mosaico-p i{width:5.8cqw;height:5.8cqw;display:block;flex:none}
+.mosaico-p i svg{width:100%;height:100%;display:block}
+.mosaico-p:hover{background:#d2d6e6}
+.mosaico-p:focus-visible{outline:2px solid var(--ambar);outline-offset:2px}
+.capa.velo-gea{inset:0;background:rgba(255,255,255,.42);border-radius:0;box-shadow:none;z-index:12}
+.velo-gea .modal-gea{position:absolute;left:26.3cqw;top:16.4cqw;width:47.7cqw;height:22.7cqw;box-sizing:border-box;background:#f6f4f0;border:1px solid #d9d5cf;box-shadow:0 .4cqw 1.6cqw rgba(30,30,60,.18)}
+.modal-gea h3{position:absolute;left:2.6cqw;top:2.2cqw;margin:0;font:700 1.95cqw/1 var(--f-ui);color:#2c2c2c}
+.modal-gea .x{all:unset;cursor:pointer;position:absolute;right:2.75cqw;top:1.95cqw;width:2.5cqw;height:2.5cqw;border-radius:50%;background:#2a2fb0;display:grid;place-items:center}
+.modal-gea .x svg{width:60%;height:60%}
+.modal-gea .ex{position:absolute;left:2.85cqw;top:7.2cqw;width:6.4cqw;height:6.4cqw;border-radius:50%;background:#3a8fe2;color:#fff;display:grid;place-items:center;font:700 4.2cqw/1 var(--f-ui)}
+.modal-gea p{position:absolute;left:10.1cqw;top:10.4cqw;margin:0;transform:translateY(-50%);font:400 1.3cqw/1 var(--f-ui);color:#6f6b66}
+.modal-gea .ok{all:unset;cursor:pointer;position:absolute;left:21.6cqw;top:17.4cqw;display:flex;align-items:center;gap:.6cqw;font:400 1.3cqw/1 var(--f-ui);color:#6f6b66}
+.modal-gea .ok i{width:2.4cqw;height:2.4cqw;border-radius:50%;background:#2a2fb0;display:grid;place-items:center}
+.modal-gea .ok i svg{width:62%;height:62%}
+.modal-gea small{position:absolute;right:1.2cqw;bottom:.8cqw;font:400 .8cqw/1 var(--f-ui);color:#b3aea6}
+.modal-gea .x:focus-visible,.modal-gea .ok:focus-visible{outline:2px solid var(--ambar);outline-offset:3px}
+.modal-gea .x::after,.modal-gea .ok::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.pantalla[data-pantalla="9.0"] .lupa,.pantalla[data-pantalla="13.0"] .lupa{visibility:hidden}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -785,6 +828,7 @@ body.embed{overflow-x:hidden}
         <button data-ir="1.1" aria-label="Producción"><svg viewBox="0 0 24 24" style="width:2.15cqw;height:2.15cqw"><mask id="mEng"><rect width="24" height="24" fill="#fff"/><circle cx="8.4" cy="8.4" r="2.7" fill="#000"/><circle cx="15.8" cy="15.8" r="2.7" fill="#000"/></mask><g fill="currentColor" mask="url(#mEng)"><path d="M14.90 7.28 L14.90 9.52 L13.28 9.50 L12.63 11.07 L13.79 12.21 L12.21 13.79 L11.07 12.63 L9.50 13.28 L9.52 14.90 L7.28 14.90 L7.30 13.28 L5.73 12.63 L4.59 13.79 L3.01 12.21 L4.17 11.07 L3.52 9.50 L1.90 9.52 L1.90 7.28 L3.52 7.30 L4.17 5.73 L3.01 4.59 L4.59 3.01 L5.73 4.17 L7.30 3.52 L7.28 1.90 L9.52 1.90 L9.50 3.52 L11.07 4.17 L12.21 3.01 L13.79 4.59 L12.63 5.73 L13.28 7.30Z"/><path d="M22.30 14.68 L22.30 16.92 L20.68 16.90 L20.03 18.47 L21.19 19.61 L19.61 21.19 L18.47 20.03 L16.90 20.68 L16.92 22.30 L14.68 22.30 L14.70 20.68 L13.13 20.03 L11.99 21.19 L10.41 19.61 L11.57 18.47 L10.92 16.90 L9.30 16.92 L9.30 14.68 L10.92 14.70 L11.57 13.13 L10.41 11.99 L11.99 10.41 L13.13 11.57 L14.70 10.92 L14.68 9.30 L16.92 9.30 L16.90 10.92 L18.47 11.57 L19.61 10.41 L21.19 11.99 L20.03 13.13 L20.68 14.70Z"/></g></svg></button>
         <button data-ir="2.1" aria-label="Limpieza"><svg viewBox="0 0 24 24" style="width:2.1cqw;height:2.1cqw" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M3 11.4h8.2l-1.1 9.8H4.1z"/><path d="M5.4 4.2l1.1 1.1-1.1 1.1-1.1-1.1zM9.8 6.4l.8.8-.8.8-.8-.8z" fill="currentColor" stroke-width=".7"/><path d="M15.6 2.6l2.4 9"/><path d="M14.2 12.6l5.6-1.5 3 9.4-8.4 2.2z" fill="currentColor"/><path d="M14.9 15.2l5.6-1.5" stroke="#e7e0d6" stroke-width="1.1"/></svg></button>
         <button data-ir="8.1" class="al" aria-label="Alarmas"><svg viewBox="0 0 24 24" style="width:2.2cqw;height:2.2cqw"><mask id="mAl"><rect width="24" height="24" fill="#fff"/><path d="M12 9.5v5.2" stroke="#000" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="18.2" r="1.4" fill="#000"/></mask><path d="M12 3.2c.6 0 1.1.3 1.4.8l8.5 15.2c.6 1.1-.2 2.4-1.4 2.4H3.5c-1.2 0-2-1.3-1.4-2.4L10.6 4c.3-.5.8-.8 1.4-.8z" fill="currentColor" mask="url(#mAl)"/></svg><em id="nAl">2</em></button>
+        <button class="extra" id="rielExtra" aria-current="true" hidden tabindex="-1"></button>
         <button class="puntos" id="btnMenu" aria-label="Más pantallas"><svg viewBox="0 0 12 40"><circle cx="6" cy="7.5" r="4"/><circle cx="6" cy="20" r="4"/><circle cx="6" cy="32.5" r="4"/></svg></button>
       </nav>
       <div class="barra">
@@ -945,7 +989,7 @@ body.embed{overflow-x:hidden}
   $('#nAl').textContent = (G.alarmas?.actuales || []).length || 2;
 
   /* ---------- índice exterior ---------- */
-  function estadoDe(p){ if (!p) return 'falta'; if (p.fuente !== 'video') return 'falta'; return (p.secciones || []).some(s => s.falta_foto) ? 'parcial' : 'ok'; }
+  function estadoDe(p){ if (!p) return 'falta'; if (FOTO_1101.has(p.id)) return 'ok'; if (p.fuente !== 'video') return 'falta'; return (p.secciones || []).some(s => s.falta_foto) ? 'parcial' : 'ok'; }
   const rotulo = {ok:'con valores', parcial:'faltan secciones', falta:'falta foto'};
   function indice(){
     $('#indice').innerHTML = (G.orden || Object.keys(P)).map(id => { const p = P[id], e = estadoDe(p);
@@ -1007,7 +1051,7 @@ body.embed{overflow-x:hidden}
 
   /* esquema de la máquina medido sobre el video (b-011/b-013): 1 unidad del viewBox = 1,284 px de la pantalla a 1600;
      X 0 en px 255 e Y 0 en py 244,4. Se reutiliza en gris, sin interacción, en 1.1.12 */
-  function esquemaSVG({N = '#1d2350', V = '#3fd14a', fondo = '', cuerpo = '#cbcac6', suelo = '#cecdc9', interactivo = true, vb = '-106.7 -40.8 1146.4 459.5', clase = 'esquema', superior = true, sueloX = [-84, 985]} = {}){
+  function esquemaSVG({N = '#1d2350', V = '#3fd14a', fondo = '', cuerpo = '#cbcac6', suelo = '#cecdc9', interactivo = true, vb = '-106.7 -40.8 1146.4 459.5', clase = 'esquema', superior = true, sueloX = [-84, 985], enlaces = {}} = {}){
     const T = 113, G2 = 122, Y = 150, F = 212, A = `stroke="${N}" stroke-linecap="round" stroke-linejoin="round"`, ff = fondo ? ` style="fill:${fondo}"` : '';
     const pel = (a, b) => `<path d="M${a} ${F} H${b}" ${A} stroke-width="4.5" fill="none"/>`;
     /* U colgada de la película (paredes en cx±31, fondo en 242,5) con el producto verde de contorno navy */
@@ -1018,7 +1062,7 @@ body.embed{overflow-x:hidden}
     const arco = (cx, cy, r, g0, g1) => `M${pt(cx, cy, r, g0)} A${r} ${r} 0 ${g1 - g0 > 180 ? 1 : 0} 1 ${pt(cx, cy, r, g1)}`;
     const rollo = (cx, cy, R, rc, sw = 4.5) => `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" ${A} stroke-width="${sw}"/><path d="${arco(cx, cy, 17, 30, 150)} ${arco(cx, cy, 17, 270, 360)}" fill="none" ${A} stroke-width="4"/><circle cx="${cx}" cy="${cy}" r="${rc}" fill="${N}"/>`;
     const est = (i, id, nombre, ancla, dibujo) => { const x = i * G2, cx = x + T / 2;
-      const attrs = interactivo ? ` data-ir="${id}" data-ancla="${esc(ancla)}" tabindex="0" role="button" aria-label="${esc(nombre)}"` : '';
+      const attrs = interactivo ? ` data-ir="${id}" data-ancla="${esc(ancla)}" tabindex="0" role="button" aria-label="${esc(nombre)}"` : enlaces[i] ? ` data-ir="${enlaces[i]}" tabindex="0" role="button" aria-label="${esc(nombre)}: cambio de herramienta"` : '';
       return `<g class="est"${attrs}>${interactivo ? `<title>${esc(nombre)} · ${id}</title>` : ''}<rect class="fondo" x="${x}" y="${Y}" width="${T}" height="150" rx="3"${ff}/>${interactivo ? barraEstado(x, Y + 141, T, id, ancla) : ''}<g class="dibujo">${dibujo(cx, x)}</g>${interactivo ? `<rect class="sel" x="${x+2}" y="${Y+2}" width="${T-4}" height="146" rx="3"/>` : ''}</g>`; };
     let s = `<svg class="${clase}" viewBox="${vb}" ${interactivo ? 'role="group" aria-label="Esquema de la máquina"' : 'aria-hidden="true"'}>`;
     /* bancada: cuerpo detrás de las estaciones 2 a 7, cuatro patas en carrete y suelo hasta el pie */
@@ -1124,7 +1168,7 @@ body.embed{overflow-x:hidden}
 
   function vistaCambioHerramienta(p){
     const c = et => campoDe(p, et), val = et => c(et)?.valor;
-    let h0 = `<div class="esq-pos" style="${caja(118, 192, 1472)}">${esquemaSVG({N: '#80838f', V: '#5fd4a0', fondo: '#dcdad4', cuerpo: '#c8c6c0', suelo: '#d2d0ca', interactivo: false, superior: false, vb: '-82.6 -40.8 1146.4 459.5', clase: 'esquema gris', sueloX: [-85, 1031]})}</div>`;
+    let h0 = `<div class="esq-pos" style="${caja(118, 192, 1472)}">${esquemaSVG({N: '#80838f', V: '#5fd4a0', fondo: '#dcdad4', cuerpo: '#c8c6c0', suelo: '#d2d0ca', interactivo: false, superior: false, vb: '-82.6 -40.8 1146.4 459.5', clase: 'esquema gris', sueloX: [-85, 1031], enlaces: {4: '1.1.12.3', 6: '1.1.12.1'}})}</div>`;
     let h = `<div class="lienzo">` + h0 + ctrl(800, 155, 'Activar', IC.herram, {c: c('Activar')}) + ctrl(1432, 158, 'Reset', IC.diana, {atenuado: true, c: c('Reset')});
     h += `<span class="marco" style="${caja(150, 206, 555, 224)}"></span>` + txt(207, 220, 'Posiciones de corte', 'gris-claro chico');
     ['1','2','3','4'].forEach((n, i) => { const y = 256 + 50 * i; h += txt(157, y, n, 'gris-claro chico') + pild(228, 345, y, val(n), c(n)) + txt(348, y, 'mm', 'uni-g'); });
@@ -1225,17 +1269,95 @@ body.embed{overflow-x:hidden}
 
   function vistaLimpieza(){ return `<div class="centro"><span class="boton-v on" style="font-size:1.4cqw;padding:.8cqw 2cqw">Iniciar limpieza de la pantalla</span><span>Bloquea el panel táctil unos segundos para poder limpiarlo.</span></div>`; }
 
+  /* ---------- pantallas fotografiadas el 01-11-2026 (posiciones en px de la pantalla a 1600; origen del cuerpo en x 85, y 122) ---------- */
+  /* rutas y títulos tal como los muestra el panel (los datos traen la ruta del manual) */
+  const MIGAS_PANEL = {
+    '1.1.12.1': 'Producción > Cambio Herramienta > Cambio De Herramienta Estación De Conformado',
+    '1.1.12.3': 'Producción > Cambio Herramienta > Cambio De Herramienta Estación De Sellado',
+    '1.1.15.3': 'Producción > Registro De Desvíos > Registro De Desplazamiento, Registradores, Embalaje Individual',
+    '1.1.15.6': 'Producción > Registro De Desvíos > Registro De Desplazamiento, Embalaje Individual',
+    '4.3': 'Datos de producción > Protocolo de cambios', '9.0': 'Documentación', '13.0': 'Mantenimiento y Servicio técnico'
+  };
+  /* pantallas que el panel no abre: muestra «Operación de la página · ¡Página no disponible!» */
+  const NO_DISPONIBLE = new Set(['1.1.2.7', '9.4']);
+  const FOTO_1101 = new Set(['1.1.12.1', '1.1.12.3', '1.1.15.3', '1.1.15.6', '4.3', '9.0', '13.0']);
+  const ICS = {
+    rearmar: '<svg viewBox="0 0 40 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 9.5a6.5 6.5 0 1 1-6.6-.6"/><path d="M14.4 5.6v3.6h3.6"/><text x="27" y="10" font-size="7.5" font-family="Roboto,Arial" fill="currentColor" stroke="none">R</text></svg>',
+    cambio: '<svg viewBox="0 0 40 28" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 6h16M18 6v4h12V6"/><path d="M15 14h18v5a2 2 0 0 1-2 2H17a2 2 0 0 1-2-2z"/><path d="M5 15h5l-2-2M5 21h5l-2 2"/><path d="M6 13v10"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.5l4 4 8-9"/></svg>'
+  };
+  function cabSec(nombre, ico, {pw = null, abierta = null, c = null} = {}){
+    const k = c ? ayudaK(c) : -1;
+    return `<div class="sec-cab"${abierta == null ? '' : ` role="button" tabindex="0" aria-expanded="${abierta}"`}><span class="ico" aria-hidden="true">${ico}</span><span class="tit">${esc(nombre)}</span>${pw == null ? '' : `<button class="pw${pw ? '' : ' off'}"${k >= 0 ? ` data-k="${k}"` : ''} aria-label="${esc(nombre)}">${I.pw}</button>`}${abierta == null ? '<span class="chev hueco" aria-hidden="true"></span>' : `<span class="chev" aria-hidden="true">${CHEV}</span>`}</div>`;
+  }
+  /* 1.1.12.1 y 1.1.12.3: rearme del sistema de seguridad + estado del cambio de herramienta de la estación */
+  function vistaCambioHerrEstacion(p){
+    const estacion = p.id === '1.1.12.1' ? 'conformado' : 'sellado', c = et => campoDe(p, et);
+    let h = `<section class="seccion" data-abierta="true">${cabSec('Rearmar sistema de seguridad', ICS.rearmar, {pw: false, c: c('Reiniciar el sistema de seguridad')})}<div class="campos"></div></section>`;
+    h += `<section class="seccion" data-abierta="true" data-nombre="cambio">${cabSec('Cambio de herramienta estación de ' + estacion, ICS.cambio, {abierta: true})}<div class="campos una">`;
+    [['Estado OK', 'caja'], ['Inicialización OK', 'caja'], ['Movimiento activo', 'lampara']].forEach(([et, t]) => {
+      const cc = c(et) || {etiqueta: et}, k = ayudaK(cc);
+      h += `<div class="campo" data-texto="${esc(norm(et))}"><span class="et">${esc(et)}</span><span class="valor"><span class="${t === 'caja' ? 'casilla' : 'lampara mov'}" role="button" tabindex="0" data-k="${k}" aria-label="${esc(et)}"></span></span><span></span></div>`; });
+    return h + `</div></section>`;
+  }
+  /* 1.1.15.3: el panel la muestra vacía; 1.1.15.6: cuadrícula de envases (2 × 2, verde = sin desvío) */
+  function vistaVacia(){ return `<div class="lienzo"></div>`; }
+  function vistaEnvaseIndividual(p){
+    let h = `<div class="lienzo">` + txt(180, 170, 'Registro De Desplazamiento, Emb…', 'tit-pant') + `<span class="rejilla-env" style="${caja(297, 232, 840, 460)}" data-falta="Envase individual: qué indica cada casilla" role="button" tabindex="0">${'<i></i>'.repeat(4)}</span>`;
+    h += `<span class="ico-edit" style="${caja(1217, 530, 24, 24)}">${IC.lapiz}</span>` + txt(1262, 542, '0', 'cifra-chica') + txt(1222, 645, '0', 'cifra-grande') + txt(1220, 678, 'Máscara', 'rot-azul');
+    return h + `</div>`;
+  }
+  /* 4.3 Protocolo de cambios: filtro de fechas como el historial de alarmas y la lista de mensajes */
+  function vistaProtocolo(){
+    const cal = '<i class="cal">31</i>', pf = (x0, x1, t, f) => `<span class="pild fecha" style="${caja(x0, 140, x1 - x0, 40)}" data-falta="${f}" role="button" tabindex="0">${t}</span>`;
+    let h = `<div class="lienzo">` + pf(677, 861, '31.10.2026' + cal, 'Selector de fecha inicial') + pf(871, 995, '17:35:47', 'Selector de hora inicial') + txt(1012, 160, '–', 'guion') + pf(1042, 1229, '01.11.2026' + cal, 'Selector de fecha final') + pf(1242, 1368, '16:35:47', 'Selector de hora final');
+    h += ctrl(1411, 160, '', IC.embudo, {d: 39, falta: 'Filtro del protocolo'}) + `<span class="disco-gris" style="${caja(1456, 140, 40, 40)}"></span>` + ctrl(1540, 160, '', IC.puntos3, {d: 39, falta: 'Menú del protocolo'});
+    h += lineaAncho(188) + txt(121, 206, '1 Mensaje', 'mini-g');
+    h += `<div class="fila-al" style="${caja(118, 244 - 33, 1472, 66)}"><span style="left:${cq(130 - 118)}" class="f">2026-11-01</span><span style="left:${cq(244 - 118)}" class="h">16:18:23</span><span style="left:${cq(367 - 118)}" class="c">Iniciar sesión</span><span style="left:${cq(518 - 118)}" class="m fina">Modificación del inicio de sesión del usuario de 'Default' a 'GeaService'</span><span style="left:${cq(1344 - 118)}" class="u">GeaService</span></div>`;
+    return h + `</div>`;
+  }
+  /* 9.0 Documentación y 13.0 Mantenimiento: mosaicos de 248 × 184 con texto arriba y pictograma abajo */
+  const PIC = {
+    neumatico: '<svg viewBox="0 0 90 90" fill="none" stroke="#2a2fb0" stroke-width="3.2"><rect x="10" y="10" width="70" height="70"/><path d="M24 64V30h50M24 30v-6M30 36h44v8H30zM30 50h44M62 50v18M56 62l6 7 6-7"/><path d="M20 42l4-6 4 6"/></svg>',
+    conjunto: '<svg viewBox="0 0 90 90"><rect x="8" y="8" width="74" height="74" fill="#2a2fd0"/><g fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"><circle cx="24" cy="24" r="4"/><circle cx="62" cy="22" r="4"/><circle cx="66" cy="46" r="4"/><circle cx="26" cy="66" r="4"/><circle cx="46" cy="66" r="4"/><circle cx="66" cy="66" r="4"/><path d="M28 24h12l6 10h16M24 28v14l10 6v14M62 26v6M50 66h12M30 66h12M66 50v12"/></g></svg>',
+    manual: '<svg viewBox="0 0 90 90"><path d="M8 18l18-4v58l-18 6z M82 18l-18-4v58l18 6z" fill="#2a2fd0"/><path d="M58 30h14M58 40h14M58 50h14" stroke="#fff" stroke-width="3"/><circle cx="38" cy="34" r="12" fill="#2a2fd0"/><path d="M16 78c2-16 12-24 22-24s20 8 22 24z" fill="#2a2fd0"/></svg>',
+    mano: '<svg viewBox="0 0 90 90" fill="none" stroke="#2b2f68" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 40c6-8 16-10 26-10h28c4 0 4 6 0 6H44"/><path d="M58 30l10-10M66 34l12-10M70 40l12-8M44 36h22c4 0 4 6 0 6H40"/><path d="M8 54c8 4 20 6 34 4l28 4c5 0 6-6 1-7L42 50"/></svg>',
+    servicio: '<svg viewBox="0 0 90 90"><path d="M64 10a16 16 0 0 0-17 22L14 64a7 7 0 0 0 10 10l32-33a16 16 0 0 0 22-17l-10 10-10-3-3-10z" fill="#2a2fd0"/><rect x="34" y="48" width="48" height="30" rx="3" fill="#fff" stroke="#2a2fd0" stroke-width="3.5"/><text x="58" y="71" text-anchor="middle" font-size="19" font-weight="700" font-family="Roboto,Arial" fill="#2a2fd0">123</text></svg>',
+    instalacion: `<svg viewBox="0 0 90 90"><path d="${(() => { let q = ''; for (let k = 0; k < 16; k++) { const a0 = Math.PI * k / 8, a1 = Math.PI * (k + 1) / 8, r = k % 2 ? 22 : 30; q += (k ? 'L' : 'M') + (52 + r * Math.cos(a0 + .1)).toFixed(1) + ' ' + (36 + r * Math.sin(a0 + .1)).toFixed(1) + 'L' + (52 + r * Math.cos(a1 - .1)).toFixed(1) + ' ' + (36 + r * Math.sin(a1 - .1)).toFixed(1); } return q + 'Z'; })()}" fill="#2a2fd0"/><circle cx="52" cy="36" r="9" fill="#efede8"/><path d="${(() => { let q = ''; for (let k = 0; k < 16; k++) { const a0 = Math.PI * k / 8, a1 = Math.PI * (k + 1) / 8, r = k % 2 ? 9 : 13; q += (k ? 'L' : 'M') + (20 + r * Math.cos(a0 + .1)).toFixed(1) + ' ' + (70 + r * Math.sin(a0 + .1)).toFixed(1) + 'L' + (20 + r * Math.cos(a1 - .1)).toFixed(1) + ' ' + (70 + r * Math.sin(a1 - .1)).toFixed(1); } return q + 'Z'; })()}" fill="#2a2fd0"/><circle cx="20" cy="70" r="4" fill="#efede8"/></svg>`,
+    respaldo: '<svg viewBox="0 0 90 90"><ellipse cx="38" cy="16" rx="22" ry="7" fill="#2a2fd0"/><path d="M16 22v12c0 4 10 7 22 7s22-3 22-7V22c0 4-10 7-22 7s-22-3-22-7zM16 40v12c0 4 10 7 22 7s22-3 22-7V40c0 4-10 7-22 7s-22-3-22-7zM16 58v12c0 4 10 7 22 7 3 0 6 0 8-1" fill="#2a2fd0"/><path d="M50 72a14 14 0 0 1 24-12M78 62a14 14 0 0 1-24 12" fill="none" stroke="#2a2fd0" stroke-width="4.5" stroke-linecap="round"/><path d="M72 52l3 9-9 1M56 82l-3-9 9-1" fill="#2a2fd0"/></svg>',
+    log: '<svg viewBox="0 0 90 90"><rect x="6" y="4" width="78" height="82" fill="#2a2fd0"/><g fill="none" stroke="#fff" stroke-width="3.6"><path d="M28 14v8M38 14v8M48 14v8M58 14v8M18 28h8M18 38h8M64 28h8M64 38h8"/><rect x="26" y="22" width="38" height="24"/><path d="M36 46V34h18v12"/></g><rect x="14" y="54" width="62" height="26" fill="#fff"/><text x="45" y="75" text-anchor="middle" font-size="21" font-weight="700" font-family="Roboto,Arial" fill="#2a2fd0">LOG</text></svg>'
+  };
+  const MOSAICOS_PANEL = {
+    '9.0': {y: 222, items: [['Catálogo de refacciones herramientas'], ['Diagrama neumático', 'neumatico'], ['Catálogo de refacciones mecánicas'], ['Esquema de conjunto', 'conjunto'], ['Manual de instrucciones', 'manual']], x: [144, 419, 692, 963, 1240]},
+    '13.0': {y: 153, items: [['Modo manual', 'mano'], ['Ajustes de servicio', 'servicio'], ['Cambiar la instalación de la máquina', 'instalacion'], ['Asegurar y restablecer', 'respaldo'], ['Diagnostico del sistema', 'log']], x: [151, 428, 704, 977, 1252]}
+  };
+  function vistaMosaicosPanel(p){
+    const M = MOSAICOS_PANEL[p.id];
+    let h = `<div class="lienzo">`;
+    if (p.id === '9.0') h += ctrl(1420, 155, 'Importació', '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v9M8 10.5l4 4 4-4M6 17h12"/></svg>', {d: 40, falta: 'Importación de documentos'}) + lineaAncho(193);
+    M.items.forEach(([n, pic], i) => h += `<button class="mosaico-p${pic ? '' : ' sin-ico'}" style="${caja(M.x[i], M.y, 248, 182)}" data-falta="${esc(n)}"><span>${esc(n)}</span>${pic ? `<i>${PIC[pic]}</i>` : ''}</button>`);
+    return h + `</div>`;
+  }
+  /* «Operación de la página»: el panel avisa que la pantalla no está disponible y se queda donde estaba */
+  function noDisponible(id){
+    const m = document.createElement('div'); m.className = 'capa velo-gea'; m.setAttribute('role', 'alertdialog'); m.setAttribute('aria-labelledby', 'opT');
+    m.innerHTML = `<div class="modal-gea"><h3 id="opT">Operación de la página</h3><button class="x" aria-label="Cerrar">${'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>'}</button><span class="ex">!</span><p>¡Página no disponible!</p><button class="ok"><i>${ICS.check}</i>OK</button><small>Pantalla ${esc(id)}</small></div>`;
+    ponerCapa(m, document.activeElement); m.querySelector('.ok').focus({preventScroll: true});
+    m.addEventListener('click', e => { if (e.target.closest('.ok,.x')) cerrarCapa(true); });
+  }
+
   /* ---------- navegación ---------- */
   function migas(p){
-    const partes = (p.ruta || p.titulo || '').split('>').map(s => s.trim()).filter(Boolean);
+    const partes = (MIGAS_PANEL[p.id] || p.ruta || p.titulo || '').split('>').map(s => s.trim()).filter(Boolean);
     if (partes.length < 2) return `<span class="solo">${esc(partes[0] || p.titulo || '')}</span>`;
-    const padre = {Producción: '1.1', Configuración: '6.0', Alarmas: '8.1'};
+    const padre = {Producción: '1.1', Configuración: '6.0', Alarmas: '8.1', 'Cambio Herramienta': '1.1.12', 'Registro De Desvíos': '1.1.15'};
     return partes.map((t, i) => i < partes.length - 1 ? `<button data-ir="${padre[t] || ''}">${esc(t)}</button><span>&gt;</span>` : `<b>${esc(t)}</b>`).join(' ');
   }
   function ir(id, guardar = true, ancla = null){
     cerrarCapa();
     if (!id) return;
     if (!P[id] && !['8.1','8.2'].includes(id)) return;
+    if (NO_DISPONIBLE.has(id)) { noDisponible(id); return; }
     if (guardar && id !== actual) historial.push(actual);
     actual = id; ayudas = [];
     const p = P[id] || {id, titulo: 'Alarmas', ruta: 'Alarmas'};
@@ -1244,8 +1366,11 @@ body.embed{overflow-x:hidden}
     $('#filtro').placeholder = id === '7.1' ? 'Búsqueda de recetas' : id.startsWith('8') ? 'Filtrar alarmas' : 'Filtrar entradas';
     const top = id.split('.').slice(0, 2).join('.');
     document.querySelectorAll('.riel button[data-ir]').forEach(b => b.setAttribute('aria-current', String(b.dataset.ir === top || (b.dataset.ir === '8.1' && id.startsWith('8')))));
+    const im = (G.menu3 || []).findIndex(x => x.id === id), extra = $('#rielExtra');
+    if (extra) { extra.hidden = im < 0; if (im >= 0) { extra.innerHTML = M3[im] || ''; extra.setAttribute('aria-label', p.titulo || id); } }
     const L = p.layout;
-    const VISTA = {'1.1.11': vistaCambioFolio, '1.1.12': vistaCambioHerramienta, '1.1.15': vistaRegistroDesvios, '6.2': vistaConfigMaquina, '6.3': vistaAjustesBasicos, '6.4': vistaParametrosPLC};
+    const VISTA = {'1.1.11': vistaCambioFolio, '1.1.12': vistaCambioHerramienta, '1.1.15': vistaRegistroDesvios, '6.2': vistaConfigMaquina, '6.3': vistaAjustesBasicos, '6.4': vistaParametrosPLC,
+      '1.1.12.1': vistaCambioHerrEstacion, '1.1.12.3': vistaCambioHerrEstacion, '1.1.15.3': vistaVacia, '1.1.15.6': vistaEnvaseIndividual, '4.3': vistaProtocolo, '9.0': vistaMosaicosPanel, '13.0': vistaMosaicosPanel};
     cuerpo.innerHTML = VISTA[id] ? VISTA[id](p) : id === '1.1' ? vistaProduccion() : id.startsWith('8') ? vistaAlarmas(id) : L === 'dashboard' ? vistaDashboard(p) : L === 'temperaturas' ? vistaTemperaturas(p) : L === 'recetas' ? vistaRecetas(p) : L === 'mosaicos' ? vistaMosaicos(p) : L === 'limpieza' ? vistaLimpieza(p) : vistaSecciones(p);
     cuerpo.scrollTop = 0; $('#filtro').value = '';
     /* transición suave: entra desde la derecha al avanzar y desde la izquierda al volver (sin animación con prefers-reduced-motion) */
