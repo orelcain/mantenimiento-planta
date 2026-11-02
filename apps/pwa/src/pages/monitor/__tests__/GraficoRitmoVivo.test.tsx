@@ -6,6 +6,7 @@
  */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { disenar } from '../ejeTurno'
 import { GraficoRitmoVivo, type EjeDatos } from '../GraficoRitmoVivo'
 import type { MonitorV2Props } from '../MonitorV2'
 import { armarTope } from '../reproduccionMinuto'
@@ -285,7 +286,7 @@ describe('GraficoRitmoVivo · táctil', () => {
     window.matchMedia = ((q: string) => ({ matches: q.includes('pointer: coarse'), media: q, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false })) as unknown as typeof window.matchMedia
     try {
       render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
-      expect(screen.getByText('Toca un minuto · pellizca para acercar · arrastra para recorrer')).toBeTruthy()
+      expect(screen.getByText('Toca un minuto o una marca ▼ · pellizca para acercar · arrastra para recorrer')).toBeTruthy()
     } finally { window.matchMedia = antes }
   })
 })
@@ -332,7 +333,8 @@ describe('GraficoRitmoVivo · paradas y globo', () => {
     const lenta = { ...eje, paradas: [], paradasMaquina: null, minuto: { ...eje.minuto!, maquinas: eje.minuto!.maquinas.map((m) => (m.id === 'a' ? { ...m, cycles: m.cycles.map(() => 3) } : m)) } }
     const { container } = render(<GraficoRitmoVivo p={p} e={lenta} reloj={reloj} />)
     expect(container.innerHTML).toContain('fill="var(--rv-mal)"')
-    expect(container.innerHTML).not.toContain('fill="var(--v2-mal)"')
+    /* Las marcas de micro «tras detención» sí usan `--v2-mal` (en un grupo `<g fill>`); las barras y celdas, no. */
+    expect(container.querySelector('rect[fill="var(--v2-mal)"]')).toBeNull()
   })
 })
 
@@ -574,5 +576,125 @@ describe('leyenda y rótulo de detenciones', () => {
   it('el tiempo de detenciones dice que mide minutos con «alguna Baader detenida» (glosario: detenciones, no paradas)', () => {
     render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     expect(screen.getByText('alguna Baader detenida')).toBeTruthy()
+  })
+})
+
+describe('GraficoRitmoVivo · micro con causa probable', () => {
+  const hora = (min: number, seg: number) => new Date(INI + min * 60_000 + seg * 1000).toISOString()
+  /* Ev 1 y Ev 2 marcan micro con 7 s de diferencia al minuto 30 (línea común); Ev 3 una sola al minuto 60 (sin contexto). */
+  const microEventos = [
+    { r: 1, f: hora(30, 13), s: 15, m: 0 },
+    { r: 1, f: hora(30, 20), s: 30, m: 1 },
+    { r: 1, f: hora(60, 0), s: 15, m: 2 },
+  ]
+  const conMicro: EjeDatos = {
+    ...eje,
+    microTotal: 9,
+    ritmoAnduvo: [{ nombre: 'Evisceradora 1', cpm: 18.2 }, { nombre: 'Evisceradora 2', cpm: 15.4 }, { nombre: 'Evisceradora 3', cpm: 15.9 }],
+    paradasMaquina: { ...eje.paradasMaquina!, stopEvents: [...eje.paradasMaquina!.stopEvents!, ...microEventos], stopReasons: ['Detencion', 'Micro Detencion'] },
+  }
+  const d = disenar(1806, 'grande', 3, true, true)
+  const yFila = (i: number) => d.carriles[i]!.y0 + d.carriles[i]!.h / 2
+  const yMicro = d.micro!.y0 + d.micro!.h / 2
+  /* El minuto 30 + 13 s. */
+  const xMicro = xDe(30 + 13 / 60)
+
+  it('dice cuántas micro hay por causa y avisa lo que no se ve (las de 0 s no llegan con hora)', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+    const chips = Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => c.textContent)
+    expect(chips).toEqual(['Arranque 0', 'Línea común 2', 'Tras detención 0', 'Carros vacíos 0', 'Sin contexto 1'])
+    expect(screen.getByText('Se marcan las 3 micro que llegan con hora (15 s o más). Las de 0 s no se publican con hora y no aparecen.')).toBeTruthy()
+  })
+
+  it('a 1366 (tamaño medio) el aviso va abreviado y en la misma línea compacta que los chips', () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 1276 })
+    try {
+      const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+      const mc = container.querySelector('.rv-mc')!
+      expect(mc.getAttribute('data-tam')).toBe('medio')
+      expect(mc.querySelector('.rv-mc-aviso')!.textContent).toBe('3 con hora · las de 0 s no llegan')
+      expect(container.textContent).not.toContain('Se marcan las')
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 1806 })
+    }
+  })
+
+  it('la columna de la derecha: «N con hora · de M» y, por Baader, «anduvo a X pz/min · esperado N» con el ritmo que ya usa el monitor', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+    const t = container.textContent ?? ''
+    expect(t).toContain('3 con hora · de 9')
+    expect(t).toContain('anduvo a 18,2 pz/min')
+    expect(t).toContain('esperado 19')
+    expect(t).toContain('anduvo a 15,4 pz/min')
+    expect(t).toContain('esperado 16')
+  })
+
+  it('sin el total del turno omite «de M»; sin ritmo andando no dice «anduvo a»', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={{ ...conMicro, microTotal: null, ritmoAnduvo: null }} reloj={reloj} />)
+    const t = container.textContent ?? ''
+    expect(t).toContain('3 con hora')
+    expect(t).not.toContain('con hora · de')
+    expect(t).not.toContain('anduvo a')
+  })
+
+  it('sin paradas por máquina no hay carril «Micro» ni aviso (no se adivina de qué Baader fue cada una)', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={{ ...eje, paradasMaquina: null }} reloj={reloj} />)
+    expect(container.querySelector('.rv-mc')).toBeNull()
+    expect(container.textContent).not.toContain('con hora')
+  })
+
+  it('con el mouse sobre la marca sale el globo de la micro: hora, real estimado, ritmo, las otras, causa probable y el aviso de «probable»', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+    const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xMicro, clientY: yFila(0), buttons: 0 }) })
+    const globos = screen.getAllByRole('tooltip')
+    expect(globos).toHaveLength(1)
+    const g = globos[0]!.textContent ?? ''
+    expect(g).toContain('22:00:13 · Ev 1 · micro de 15 s')
+    expect(g).toContain('Real estimado: unos 35 s (lo anotado + ~20 s que Shoplogix no ve)')
+    expect(g).toContain('Ritmo de Ev 1: 17 el minuto anterior · 17 el de la micro · 17 el siguiente (esperado 19 pz/min)')
+    expect(g).toContain('Las otras en ese minuto: Ev 2 14 de 16 pz/min · Ev 3 14 de 16 pz/min')
+    expect(g).toContain('Causa probable: Línea común')
+    expect(g).toContain('otra Baader marcó micro a ±15 s (Ev 2)')
+    expect(g).toContain('Probable, no imputada. Se confirma en terreno.')
+  })
+
+  it('la marca del carril «Micro» también abre el globo; lejos de las marcas sigue saliendo el del minuto', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+    const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xMicro, clientY: yMicro, buttons: 0 }) })
+    expect(screen.getByRole('tooltip').textContent).toContain('Causa probable')
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xDe(200.5), clientY: yFila(0), buttons: 0 }) })
+    expect(screen.getByRole('tooltip').textContent).not.toContain('Causa probable')
+    expect(screen.getByRole('tooltip').textContent).toContain('minuto')
+    act(() => { fireEvent.pointerLeave(lienzo, { pointerType: 'mouse' }) })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('con el dedo basta con tocar a 15 px de la marca (área de 44 px); tocar otra vez la cierra', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+    const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+    act(() => { fireEvent.pointerDown(lienzo, { pointerType: 'touch', clientX: xMicro + 15, clientY: yFila(1) }) })
+    act(() => { fireEvent.click(lienzo, { clientX: xMicro + 15, clientY: yFila(1) }) })
+    expect(screen.getByRole('tooltip').textContent).toContain('Causa probable: Línea común')
+    act(() => { fireEvent.click(lienzo, { clientX: xMicro + 15, clientY: yFila(1) }) })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('Filete (una Baader): sin chip de «Línea común» y el globo no tiene «las otras»', () => {
+    const uno: EjeDatos = {
+      ...conMicro,
+      minuto: { ...eje.minuto!, maquinas: [eje.minuto!.maquinas[0]!] },
+      ritmoAnduvo: [{ nombre: 'Evisceradora 1', cpm: 18.2 }],
+      paradasMaquina: { ...conMicro.paradasMaquina!, stopMachines: ['a'], stopEvents: [{ r: 1, f: hora(30, 13), s: 15, m: 0 }] },
+    }
+    const { container } = render(<GraficoRitmoVivo p={p} e={uno} reloj={reloj} />)
+    expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => c.getAttribute('data-causa'))).toEqual(['arranque', 'paro', 'carros', 'sin'])
+    const d1 = disenar(1806, 'grande', 1, true, true)
+    const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xMicro, clientY: d1.carriles[0]!.y0 + d1.carriles[0]!.h / 2, buttons: 0 }) })
+    const g = screen.getByRole('tooltip').textContent ?? ''
+    expect(g).toContain('Ev 1 · micro de 15 s')
+    expect(g).not.toContain('Las otras')
   })
 })

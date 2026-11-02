@@ -6941,6 +6941,10 @@ function MonitorDelToken() {
                   stopMachines: live.stopMachines,
                   enCurso: (vivoV2?.maquinas ?? []).filter((m) => m.status === 'detenida' && m.desdeMs != null).map((m) => ({ id: m.id, desdeMs: m.desdeMs! })),
                 },
+                /* Micro por Baader: el ritmo «mientras anduvo» es el mismo `ritmoPorMaquina.cpm` de la tarjeta Ritmo (una sola cifra),
+                   y «de M» es el total de micro del turno (`microN`, con las de 0 s que no llegan con hora). */
+                ritmoAnduvo: reglaPropsBase.maquinas?.maquinas.map((m) => ({ nombre: m.nombre, cpm: m.cpm })) ?? null,
+                microTotal: pm.length > 0 ? pm.reduce((a, x) => a + x.microN, 0) : null,
               }
             : null
           /* La parada elegida con «ver ›» en Camino a la meta, en minutos del gráfico. Las paradas cuentan sus minutos desde

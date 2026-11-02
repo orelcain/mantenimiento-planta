@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-02 · Claude · Monitor: micro por Baader con causa probable (v4.6.0)
+- Hecho: en «Ritmo en vivo» (Eviscerado y Filete), curva fina de pz/min de cada Baader contra su esperado, marca ▼ por micro con el color de su causa probable, carril «Micro» («N con hora · de M»), chips por causa más el aviso de que las micro de 0 s no llegan con hora, y globo con el ritmo del minuto anterior, el de la micro y el siguiente. La causa sale de `microCausa.ts` (pura, solo en pantalla, no guarda nada): arranque → línea común (±15 s) → tras detención (2 min) → carros vacíos (< 75 % el minuto anterior) → sin contexto. Umbrales del estudio de microdetenciones de Chonchi (ago-oct).
+- Archivos: `pages/monitor/microCausa.ts` (+ test), `GraficoRitmoVivo.tsx`, `ejeTurno.ts`, `ritmoVivo.ts`, `monitorGlass.css`, `PublicShiftMonitorPage.tsx`.
+- Verificación: tsc 0; eslint 29 (tope 30); vitest 4901 ok; audits ok; build ok. Playwright en el monitor público de Chonchi: en 1366 × 768 el gráfico entra entero (px 715) y el resumen de micro queda 31 px bajo el borde. La leyenda va en dos líneas al lado del título: con `ml-auto` la cabecera pasaba de 40 a 107 px. El test de alto de 1366 usa ahora las medidas reales (antes, las del mockup) y se rompió a propósito.
+- Estado: HECHO (PR #1374, mergeado el 02-11 con el OK de merge)
+- Sigue: las micro de 0 s (~60 %) no se ven porque `publicMonitor.js` descarta `durationSec <= 0`. Para confirmar la «línea común» hay que registrar en terreno 30-60 micro simultáneas.
+
 ## 2026-10-28 · Claude · Falla repetida (PR 2): cron + Monitor (serie y aviso)
 - Hecho: cron diario `recalcularFallaRepetida` (05:45, chonchi/yal/filete, 300 días) → `shoplogixReincidencia/{planta}` con serie mensual (marca «pocos datos» < 30 fallas) y ranking de causas con su azar. El Monitor lo publica en `fallaRepetida` (+ avisos del turno en cada refresco). Análisis: tarjeta «¿Las reparaciones aguantan o la falla vuelve?» (2A) con meta 30 %. El turno: aviso «Falla que suele volver» 30 min tras soltar un paro de causa con tasa ≥ 30 % y ≥ 10 fallas (3A, sin botones: el Monitor es de solo lectura).
 - Archivos: `functions/shoplogix/fallaRepetida.js` (+ test), `functions/index.js`, `functions/publicMonitor.js`, `publicShiftMonitor.service.ts`, `AnalisisV2.tsx` + css, `AvisoFallaRepetida.tsx`, `avisosVigentes.ts`, `PublicShiftMonitorPage.tsx`.

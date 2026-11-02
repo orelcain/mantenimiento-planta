@@ -112,9 +112,9 @@ export function tendenciaDe(valores: number[], esperadoLinea: number): Tendencia
 
 // ── Paradas por máquina ──────────────────────────────────────────────────────
 
-type Intervalo = [number, number]
+export type Intervalo = [number, number]
 
-function unir(iv: Intervalo[]): Intervalo[] {
+export function unir(iv: Intervalo[]): Intervalo[] {
   const orden = iv.slice().sort((a, b) => a[0] - b[0])
   const out: Intervalo[] = []
   for (const [a, b] of orden) {
