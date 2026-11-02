@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
 import {
-  acumulado, adelanteAtras, anchoRotuloAhora, celdaBaader, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, deLaMeta, escalaAcumulado, escalaVentana,
+  acumulado, adelanteAtras, anchoRotuloAhora, celdaBaader, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, deLaMeta, microBajoPuntero, escalaAcumulado, escalaVentana,
   anclaRotuloAhora, brechaALaIzquierda, escalaY, esperadoPorMinuto, filasBaader, finDelEje, firmado, horasMin, marcasEje, minutosCompletos, minutosConParada, minutosPorCubeta, minutosVisibles,
   paradaEn, paradasEn, paradasEnEje, pasoMarcas, pctAndando, pctARitmo, proyeccion, rayasY, recortarCurva, separarRotulos, sumaPorMinuto, tamanoGrafico,
   partesAdelanteAtras, tonoDeCubeta, tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
@@ -381,41 +381,53 @@ describe('alturas del gráfico', () => {
     expect(tamanoGrafico(599)).toBe('chico')
     expect(tamanoGrafico(309)).toBe('chico')
   })
-  it('con 3 Baader mide 504 / 384 / 322 px y las bandas del mockup', () => {
-    const g = disenar(1806, 'grande', 3, true)
-    const m = disenar(1276, 'medio', 3, true)
-    const c = disenar(309, 'chico', 3, true)
-    expect([g.alto, m.alto, c.alto]).toEqual([504, 384, 322])
-    expect([g.acum.h, m.acum.h, c.acum.h]).toEqual([290, 206, 160])
-    expect([g.barras!.h, m.barras!.h, c.barras!.h]).toEqual([84, 60, 48])
-    expect([g.carriles[0]!.h, m.carriles[0]!.h, c.carriles[0]!.h]).toEqual([14, 11, 10])
+  it('con 3 Baader y carril «Micro» mide 584 / 405 / 386 px (sin él, 564 / 389 / 370) y las bandas del mockup', () => {
+    const g = disenar(1806, 'grande', 3, true, true)
+    const m = disenar(1276, 'medio', 3, true, true)
+    const c = disenar(309, 'chico', 3, true, true)
+    expect([g.alto, m.alto, c.alto]).toEqual([584, 405, 386])
+    expect([disenar(1806, 'grande', 3, true).alto, disenar(1276, 'medio', 3, true).alto, disenar(309, 'chico', 3, true).alto]).toEqual([564, 389, 370])
+    expect([g.acum.h, m.acum.h, c.acum.h]).toEqual([290, 176, 160])
+    expect([g.barras!.h, m.barras!.h, c.barras!.h]).toEqual([84, 50, 48])
+    /* La fila Ev lleva la curva arriba y la cinta de color (`tira`) pegada al fondo. */
+    expect([g.carriles[0]!.h, m.carriles[0]!.h, c.carriles[0]!.h]).toEqual([34, 26, 26])
+    expect([g.tira, m.tira, c.tira]).toEqual([9, 8, 7])
     expect([g.paradas.h, m.paradas.h, c.paradas.h]).toEqual([14, 11, 10])
+    expect([g.micro!.h, m.micro!.h, c.micro!.h]).toEqual([16, 12, 12])
   })
-  it('columna de rótulos: 74/70/70 («Detenciones» cabe) a la izquierda y 128/104/4 a la derecha (en el celular los rótulos van dentro)', () => {
+  it('columna de rótulos: 74/70/70 («Detenciones» cabe) a la izquierda y 128/120/4 a la derecha (en el celular los rótulos van dentro)', () => {
     expect([disenar(1806, 'grande', 3, true), disenar(1276, 'medio', 3, true), disenar(309, 'chico', 3, true)].map((d) => [d.pl, d.pr]))
-      .toEqual([[74, 128], [70, 104], [70, 4]])
+      .toEqual([[74, 128], [70, 120], [70, 4]])
     expect(disenar(1806, 'grande', 3, true).plotW).toBe(1604)
   })
   for (const [w, tam] of [[1806, 'grande'], [1276, 'medio'], [309, 'chico']] as const) {
     it(`cada banda queda debajo de la anterior y las filas no se pisan (${w} px)`, () => {
-      const d = disenar(w, tam, 3, true)
+      const d = disenar(w, tam, 3, true, true)
       expect(d.barras!.y0).toBeGreaterThanOrEqual(d.acum.y0 + d.acum.h + 16)
       expect(d.carriles[0]!.y0).toBeGreaterThanOrEqual(d.barras!.y0 + d.barras!.h + 10)
       for (let i = 1; i < d.carriles.length; i++) expect(d.carriles[i]!.y0).toBe(d.carriles[i - 1]!.y0 + d.carriles[i - 1]!.h + 3)
       expect(d.paradas.y0).toBeGreaterThanOrEqual(d.carriles[2]!.y0 + d.carriles[2]!.h + 6)
-      expect(d.ejeX).toBe(d.paradas.y0 + d.paradas.h + 8)
+      expect(d.micro!.y0).toBe(d.paradas.y0 + d.paradas.h + 4)
+      expect(d.ejeX).toBe(d.micro!.y0 + d.micro!.h + 8)
       expect(d.alto).toBe(d.ejeX + 18)
     })
   }
+  it('sin carril «Micro» las horas siguen a las detenciones', () => {
+    const d = disenar(1806, 'grande', 3, true)
+    expect(d.micro).toBeNull()
+    expect(d.ejeX).toBe(d.paradas.y0 + d.paradas.h + 8)
+    /* Sin serie por minuto tampoco hay carril, aunque se pida. */
+    expect(disenar(1806, 'grande', 3, false, true).micro).toBeNull()
+  })
   it('con una sola Baader (Filete) el alto se ajusta; sin serie por minuto no hay barras ni filas', () => {
-    expect(disenar(1806, 'grande', 1, true).alto).toBe(504 - 2 * 14 - 2 * 3)
+    expect(disenar(1806, 'grande', 1, true).alto).toBe(564 - 2 * 34 - 2 * 3)
     const sin = disenar(1806, 'grande', 3, false)
     expect(sin.barras).toBeNull()
     expect(sin.carriles).toEqual([])
     expect(sin.alto).toBe(10 + 290 + 16 + 14 + 8 + 18)
   })
-  it('1366×768 deja lugar: gráfico de 384 px + 118 de tarjeta (502) + franja de 153 + cabecera de 76 + aire de 12 ≤ 768', () => {
-    expect(76 + 153 + 12 + (disenar(1276, 'medio', 3, true).alto + 118)).toBeLessThanOrEqual(768)
+  it('1366×768 deja lugar: gráfico de 405 px (con el carril «Micro») + 118 de tarjeta + franja de 153 + cabecera de 76 + aire de 12 ≤ 768', () => {
+    expect(76 + 153 + 12 + (disenar(1276, 'medio', 3, true, true).alto + 118)).toBeLessThanOrEqual(768)
   })
 })
 
@@ -662,5 +674,39 @@ describe('rótulos en vivo que se cruzan', () => {
   })
   it('lejos uno del otro no se tocan', () => {
     expect(separarRotulos(100, 140, 200)).toEqual({ yBrecha: 100, yCierre: 140 })
+  })
+})
+
+describe('microBajoPuntero', () => {
+  const INI = 0
+  const PX = 3
+  const d = disenar(1806, 'grande', 3, true, true)
+  /* Una micro de la Ev 2 (fila 1) al minuto 100 → x = 300; otra de la Ev 1 al minuto 110 → x = 330. */
+  const micros = [{ id: 'a', fila: 1, inicioMs: 100 * 60_000 }, { id: 'b', fila: 0, inicioMs: 110 * 60_000 }]
+  const centro = (c: { y0: number; h: number }) => c.y0 + c.h / 2
+  const busca = (x: number, y: number, toque: boolean) => microBajoPuntero({ micros, d, iniMs: INI, pxMin: PX, x, y, toque })
+
+  it('con el dedo el área es de 44 × 44 px aunque la marca mida 10', () => {
+    expect(busca(300 + 22, centro(d.carriles[1]!) + 22, true)).toBe('a')
+    expect(busca(300 - 22, centro(d.carriles[1]!) - 22, true)).toBe('a')
+    expect(busca(300 + 23, centro(d.carriles[1]!), true)).toBeNull()
+    expect(busca(300, centro(d.carriles[1]!) + 23, true)).toBeNull()
+  })
+  it('con el mouse el área es más justa: ±10 px de ancho y el alto de la fila', () => {
+    expect(busca(300 + 10, centro(d.carriles[1]!), false)).toBe('a')
+    expect(busca(300 + 11, centro(d.carriles[1]!), false)).toBeNull()
+    expect(busca(300, d.carriles[1]!.y0 + d.carriles[1]!.h + 3, false)).toBe('a')
+    expect(busca(300, d.carriles[1]!.y0 + d.carriles[1]!.h + 20, false)).toBeNull()
+  })
+  it('la marca del carril «Micro» también cuenta, y gana la más cercana', () => {
+    expect(busca(300, centro(d.micro!), false)).toBe('a')
+    expect(busca(330, centro(d.micro!), false)).toBe('b')
+    /* A medio camino entre las dos (x = 315), con el dedo: gana la que queda más cerca. */
+    expect(busca(318, centro(d.micro!), true)).toBe('b')
+    expect(busca(312, centro(d.micro!), true)).toBe('a')
+  })
+  it('lejos de toda marca, o sin micro, es null', () => {
+    expect(busca(600, centro(d.carriles[0]!), true)).toBeNull()
+    expect(microBajoPuntero({ micros: [], d, iniMs: INI, pxMin: PX, x: 300, y: centro(d.micro!), toque: true })).toBeNull()
   })
 })

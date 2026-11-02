@@ -534,11 +534,16 @@ export const TRAMA_MANT = 'repeating-linear-gradient(135deg, rgb(0 0 0 / 0.4) 0 
 export type TamanoGrafico = 'grande' | 'medio' | 'chico'
 export const tamanoGrafico = (w: number): TamanoGrafico => (w >= 1480 ? 'grande' : w >= 600 ? 'medio' : 'chico')
 
-/** Las medidas del mockup aprobado (1920 / 1366 / 375): columna de rótulos izquierda y derecha y alto de cada banda. */
-const MEDIDAS: Record<TamanoGrafico, { lab: number; der: number; acum: number; barras: number; ev: number }> = {
-  grande: { lab: 74, der: 128, acum: 290, barras: 84, ev: 14 },
-  medio: { lab: 70, der: 104, acum: 206, barras: 60, ev: 11 },
-  chico: { lab: 70, der: 0, acum: 160, barras: 48, ev: 10 },
+/**
+ * Las medidas del mockup aprobado (1920 / 1366 / 375): columna de rótulos izquierda y derecha y alto de cada banda.
+ * `ev` es el alto de la fila de paradas; `carril` el de cada fila Ev (su curva de piezas por minuto arriba y, abajo,
+ * `tira` px de la cinta de color: 1 min = 1 celda); `micro` el del carril «Micro».
+ * En 1366 × 768 (`medio`) el acumulado y las barras ceden 30 y 10 px a las filas nuevas: el gráfico sigue cabiendo.
+ */
+const MEDIDAS: Record<TamanoGrafico, { lab: number; der: number; acum: number; barras: number; ev: number; carril: number; tira: number; micro: number }> = {
+  grande: { lab: 74, der: 128, acum: 290, barras: 84, ev: 14, carril: 34, tira: 9, micro: 16 },
+  medio: { lab: 70, der: 120, acum: 176, barras: 50, ev: 11, carril: 26, tira: 8, micro: 12 },
+  chico: { lab: 70, der: 0, acum: 160, barras: 48, ev: 10, carril: 26, tira: 7, micro: 12 },
 }
 
 export interface Diseno {
@@ -551,18 +556,24 @@ export interface Diseno {
   acum: { y0: number; h: number }
   /** null sin serie minuto a minuto. */
   barras: { y0: number; h: number } | null
+  /** Una fila por Baader: la curva de piezas por minuto arriba y la cinta de color (`tira` px) pegada al fondo. */
   carriles: Array<{ y0: number; h: number }>
+  /** Alto de la cinta de color de cada fila Ev (abajo de la fila). */
+  tira: number
   paradas: { y0: number; h: number }
+  /** El carril «Micro» (una marca por micro con hora), debajo de las detenciones. null si el doc no dice de qué máquina fue cada parada. */
+  micro: { y0: number; h: number } | null
   /** Parte alta de la fila de horas (el texto va 12 px más abajo). */
   ejeX: number
   alto: number
 }
 
 /**
- * Reparte el alto: acumulado · +16 · barras por minuto · +10 · una fila por Baader (sep 3) · +6 · paradas · +8 · horas (18).
- * Con 3 Baader da 504 / 384 / 322 px a 1920 / 1366 / 375. Sin serie por minuto no hay barras ni filas (solo +16).
+ * Reparte el alto: acumulado · +16 · barras por minuto · +10 · una fila por Baader (sep 3) · +6 · paradas · (+4 · micro) · +8 ·
+ * horas (18). Con 3 Baader y carril «Micro» da 584 / 405 / 386 px a 1920 / 1366 / 375. Sin serie por minuto no hay barras
+ * ni filas (solo +16); sin `conMicro` no hay carril «Micro».
  */
-export function disenar(w: number, tam: TamanoGrafico, nMaquinas: number, conBarras: boolean): Diseno {
+export function disenar(w: number, tam: TamanoGrafico, nMaquinas: number, conBarras: boolean, conMicro = false): Diseno {
   const m = MEDIDAS[tam]
   const pt = 10
   let y = pt + m.acum
@@ -576,14 +587,54 @@ export function disenar(w: number, tam: TamanoGrafico, nMaquinas: number, conBar
   const carriles: Diseno['carriles'] = []
   if (filas > 0) {
     y += 10
-    for (let i = 0; i < filas; i++) carriles.push({ y0: y + i * (m.ev + 3), h: m.ev })
-    y += filas * m.ev + (filas - 1) * 3
+    for (let i = 0; i < filas; i++) carriles.push({ y0: y + i * (m.carril + 3), h: m.carril })
+    y += filas * m.carril + (filas - 1) * 3
   }
   y += conBarras ? 6 : 16
   const paradas = { y0: y, h: m.ev }
-  const ejeX = paradas.y0 + m.ev + 8
+  let fondo = paradas.y0 + m.ev
+  let micro: Diseno['micro'] = null
+  if (conBarras && conMicro) {
+    micro = { y0: fondo + 4, h: m.micro }
+    fondo = micro.y0 + m.micro
+  }
+  const ejeX = fondo + 8
   const pr = m.der + (tam === 'chico' ? 4 : 0)
-  return { tam, pl: m.lab, pr, plotW: Math.max(40, w - m.lab - pr), pt, acum: { y0: pt, h: m.acum }, barras, carriles, paradas, ejeX, alto: ejeX + 18 }
+  return { tam, pl: m.lab, pr, plotW: Math.max(40, w - m.lab - pr), pt, acum: { y0: pt, h: m.acum }, barras, carriles, tira: m.tira, paradas, micro, ejeX, alto: ejeX + 18 }
+}
+
+// ── Qué micro hay bajo el dedo o el cursor ───────────────────────────────────
+
+/**
+ * La micro cuya marca queda bajo el puntero (x, y en el lienzo, en px), o null. Cada micro tiene dos marcas: la ▼ sobre la fila
+ * de su Baader y la del carril «Micro»; las dos cuentan. Con el dedo (`toque`) el área es de 44 × 44 px (HIG) aunque la marca
+ * mida 10: se acierta sin apuntar. Con el mouse es más justa (±10 px de ancho, el alto de la fila) para que el globo del minuto
+ * siga saliendo en el resto de la fila. Gana la marca más cercana al puntero.
+ */
+export function microBajoPuntero(args: {
+  micros: ReadonlyArray<{ id: string; fila: number; inicioMs: number }>
+  d: Diseno
+  iniMs: number
+  pxMin: number
+  x: number
+  y: number
+  toque: boolean
+}): string | null {
+  const { micros, d, iniMs, pxMin, x, y, toque } = args
+  let mejor: { id: string; dist: number } | null = null
+  for (const q of micros) {
+    const cx = ((q.inicioMs - iniMs) / 60_000) * pxMin
+    const dx = Math.abs(x - cx)
+    const alto = toque ? 22 : null
+    for (const c of [d.carriles[q.fila], d.micro]) {
+      if (!c) continue
+      const dy = Math.abs(y - (c.y0 + c.h / 2))
+      if (dx > (toque ? 22 : 10) || dy > (alto ?? c.h / 2 + 3)) continue
+      const dist = Math.hypot(dx, dy)
+      if (!mejor || dist < mejor.dist) mejor = { id: q.id, dist }
+    }
+  }
+  return mejor?.id ?? null
 }
 
 // ── Barras con poco ancho: cubetas ───────────────────────────────────────────
