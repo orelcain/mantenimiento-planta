@@ -95,9 +95,9 @@ const OPACIDAD_FILA: Record<'bien' | 'atento' | 'mal', number> = { bien: 0.38, a
 const ORDEN_DUENO: Record<ParadaEje['dueno'], number> = { programado: 0, 'sin-imputar': 1, externo: 2, mantencion: 3 }
 /** El color de cada causa probable de una micro: solo tokens `--v2-*` que existen en claro y en oscuro. */
 const COLOR_CAUSA: Record<CausaMicro, string> = {
-  arranque: 'var(--v2-prog)',
+  arranque: 'rgb(var(--foreground))',
   linea: 'var(--v2-ext)',
-  paro: 'var(--v2-mant)',
+  paro: 'var(--v2-mal)',
   carros: 'var(--v2-atento)',
   sin: 'var(--v2-gris)',
 }
@@ -520,7 +520,7 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
       })}
 
       {/* Micro con hora: ▼ sobre la fila de su Baader y una marca en el carril «Micro», del color de su causa probable (halo del color de la tarjeta) */}
-      {d.micro && <rect x={0} y={d.micro.y0} width={W} height={d.micro.h} rx={3} fill="rgb(142 142 147 / 0.08)" />}
+      {d.micro && <rect x={0} y={d.micro.y0} width={W} height={d.micro.h} rx={3} fill="var(--v2-relleno)" />}
       {CAUSAS_MICRO.map((k) => (
         <g key={k} fill={COLOR_CAUSA[k]}>
           {triangulos[k] && <path d={triangulos[k]} style={{ paintOrder: 'stroke', stroke: 'rgb(var(--card))', strokeWidth: 2, strokeLinejoin: 'round' }} />}
@@ -863,7 +863,7 @@ function GloboMicro({ q, style, compacto, onCerrar }: { q: MicroClasificada; sty
       <p className={`${compacto ? 'mt-1' : 'mt-2'} tabular-nums text-foreground`}>Ritmo de {nom}: {v(q.ritmo.anterior)} el minuto anterior · {v(q.ritmo.micro)} el de la micro · {v(q.ritmo.siguiente)} el siguiente{esp != null ? ` (esperado ${int(esp)} pz/min)` : ''}</p>
       {otras && <p className="tabular-nums text-muted-foreground">Las otras en ese minuto: {otras}</p>}
       <p className={`${compacto ? 'mt-1' : 'mt-2'} flex items-center gap-1.5 text-foreground`}>
-        <i className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: COLOR_CAUSA[q.causa], boxShadow: 'inset 0 0 0 1px rgb(142 142 147 / 0.5)' }} aria-hidden />
+        <i className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: COLOR_CAUSA[q.causa], boxShadow: 'inset 0 0 0 1px var(--v2-tenue)' }} aria-hidden />
         <span>Causa probable: <b className="font-semibold">{ROTULO_CAUSA[q.causa]}</b></span>
       </p>
       <p className="text-muted-foreground">{q.porque}</p>
@@ -1308,7 +1308,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   )
   /* Bajo el gráfico: cuántas micro hay de cada causa probable y el aviso de lo que NO se ve (las de 0 s no llegan con hora). */
   const resumenMicro = modelo && modelo.conMicro && conteoMicro ? (
-    <div className="rv-mc">
+    <div className="rv-mc" data-tam={tam}>
       {chico && modelo.maquinas.some((q) => q.anduvo != null) && (
         <p className="rv-mc-anduvo tabular-nums">
           Anduvo a{' '}
@@ -1328,7 +1328,11 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
           ))}
         </ul>
       )}
-      <p className="rv-mc-aviso">Se marcan las {modelo.micros.length} micro que llegan con hora (15 s o más). Las de 0 s no se publican con hora y no aparecen.</p>
+      <p className="rv-mc-aviso">
+        {tam === 'medio'
+          ? `${modelo.micros.length} con hora · las de 0 s no llegan`
+          : `Se marcan las ${modelo.micros.length} micro que llegan con hora (15 s o más). Las de 0 s no se publican con hora y no aparecen.`}
+      </p>
     </div>
   ) : null
   /* Segmentado de 32 px fijos en todos los anchos (botones de 26 + p-[3px]); `tap-44` conserva el área táctil de 44. */

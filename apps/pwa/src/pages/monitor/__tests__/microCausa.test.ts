@@ -50,6 +50,21 @@ describe('microCausa · una regla por caso', () => {
     expect(r[0]!.causa).not.toBe('arranque')
   })
 
+  it('arranque: una pausa partida en dos registros contiguos se cuenta entera', () => {
+    /* 400 s + 300 s seguidos = 700 s de pausa: cada pedazo solo no llega a 600 s, juntos sí. La micro cae 300 s después del fin. */
+    const partida = [parada(T, 400, 0), parada(T + 400, 300, 0), micro(T + 700 + 300, 15, 0)]
+    expect(clasificarMicros(entrada(partida))[0]!.causa).toBe('arranque')
+    /* Lo mismo con registros que se solapan. */
+    const solapada = [parada(T, 500, 0), parada(T + 300, 400, 0), micro(T + 700 + 300, 15, 0)]
+    expect(clasificarMicros(entrada(solapada))[0]!.causa).toBe('arranque')
+    /* Con un hueco entre los dos pedazos son dos paradas cortas: no abren arranque. */
+    const conHueco = [parada(T, 400, 0), parada(T + 500, 300, 0), micro(T + 800 + 300, 15, 0)]
+    expect(clasificarMicros(entrada(conHueco))[0]!.causa).not.toBe('arranque')
+    /* Una micro pegada a la pausa no la une con ella (solo las detenciones que no son micro cuentan). */
+    const conMicro = [parada(T, 400, 0), micro(T + 400, 200, 0), micro(T + 700 + 300, 15, 0)]
+    expect(clasificarMicros(entrada(conMicro)).slice(-1)[0]!.causa).not.toBe('arranque')
+  })
+
   it('arranque: los primeros 600 s del turno', () => {
     const r = clasificarMicros(entrada([micro(ARRANQUE_VENTANA_S - 15, 15, 2)]))
     expect(r[0]).toMatchObject({ causa: 'arranque', fila: 2 })
@@ -60,8 +75,8 @@ describe('microCausa · una regla por caso', () => {
   it('línea común: otra Baader marca micro con inicio a ±15 s (las dos quedan marcadas)', () => {
     const r = clasificarMicros(entrada([micro(T, 15, 0), micro(T + LINEA_COMUN_TOL_S, 30, 2)]))
     expect(r.map((x) => x.causa)).toEqual(['linea', 'linea'])
-    expect(r[0]!.porque).toContain('Ev 3')
-    expect(r[1]!.porque).toContain('Ev 1')
+    expect(r[0]!.porque).toBe('otra Baader marcó micro a ±15 s (Ev 3)')
+    expect(r[1]!.porque).toBe('otra Baader marcó micro a ±15 s (Ev 1)')
   })
 
   it('línea común: a más de 15 s ya no coincide', () => {
@@ -118,12 +133,66 @@ describe('microCausa · una regla por caso', () => {
   })
 })
 
+describe('microCausa · minuto parcial, Baader bajas e inicio del turno', () => {
+  it('el minuto en curso (parcial) no sirve para «carros vacíos»: solo cuentan los minutos que entregaron todas las Baader', () => {
+    /* 31 minutos en Ev 2 (el 31º, el índice 30, es el minuto en curso y viene en 2) y 30 en las otras: la micro cae en el minuto 31,
+       su minuto anterior es el parcial y no puede acusar a nadie. */
+    const s = serie(30)
+    s.maquinas[1]!.cycles.push(2)
+    expect(s.maquinas[1]!.cycles).toHaveLength(31)
+    const r = clasificarMicros(entrada([micro(31 * 60 + 5, 15, 1)], s))
+    expect(r[0]).toMatchObject({ causa: 'sin', fila: 1, minuto: 31 })
+    expect(r[0]!.ritmo).toMatchObject({ anterior: null, micro: null, siguiente: null })
+    /* Contraste: con el minuto anterior ya entregado por las tres (31 elementos cada una), sí es carros vacíos. */
+    const completa = serie(31, (j, k) => (j === 1 && k === 30 ? 2 : ESP[j]!))
+    expect(clasificarMicros(entrada([micro(31 * 60 + 5, 15, 1)], completa))[0]!.causa).toBe('carros')
+  })
+
+  it('«las tres bajas» tampoco mira el minuto parcial de las otras', () => {
+    /* Las tres bajas en el 29; en el 30 solo Ev 1 y Ev 2 entregaron. La micro cae en el 30: su minuto anterior (29) es completo. */
+    const s = serie(30, (j, k) => (k === 29 ? Math.floor(ESP[j]! * 0.5) : ESP[j]!))
+    const r = clasificarMicros(entrada([micro(30 * 60 + 5, 15, 0)], s))
+    expect(r[0]!.causa).toBe('carros')
+    expect(r[0]!.porque).toContain('las tres Baader venían bajas')
+  })
+
+  it('con dos Baader bajas el texto dice «todas las Baader venían bajas», no «las tres»', () => {
+    const dos = serie(60, (j, k) => (k === 29 ? Math.floor(ESP[j]! * 0.5) : ESP[j]!), 2)
+    const r = clasificarMicros(entrada([micro(30 * 60 + 5, 15, 0)], dos))
+    expect(r[0]!.causa).toBe('carros')
+    expect(r[0]!.porque).toContain('todas las Baader venían bajas: falta de pescado en la línea')
+    expect(r[0]!.porque).not.toContain('las tres')
+    /* Si solo una de las dos venía baja, no hay «falta de pescado». */
+    const una = serie(60, (j, k) => (j === 0 && k === 29 ? 3 : ESP[j]!), 2)
+    expect(clasificarMicros(entrada([micro(30 * 60 + 5, 15, 0)], una))[0]!.porque).not.toContain('venían bajas')
+  })
+
+  it('el inicio del turno puede ser distinto del inicio de la serie: los 10 min de arranque cuentan desde `inicioTurnoMs`', () => {
+    /* La serie parte en T0; el turno (o la primera pieza) en T0 + 1200 s. Una micro en T0 + 1300 s está a 100 s del inicio. */
+    const inicio = T0 + 1200_000
+    const r = clasificarMicros(entrada([micro(1300, 15, 0)], serie(), { inicioTurnoMs: inicio }))
+    expect(r[0]!.causa).toBe('arranque')
+    /* Con el inicio en T0 esa misma micro (a 1300 s) ya no es arranque. */
+    expect(clasificarMicros(entrada([micro(1300, 15, 0)]))[0]!.causa).toBe('sin')
+    /* Y a 600 s o más del inicio del turno (no de la serie) deja de serlo. */
+    expect(clasificarMicros(entrada([micro(1200 + ARRANQUE_VENTANA_S, 15, 0)], serie(), { inicioTurnoMs: inicio }))[0]!.causa).toBe('sin')
+  })
+})
+
 describe('microCausa · precedencia', () => {
   it('arranque gana a línea común, tras detención y carros vacíos', () => {
-    /* Parada larga de Ev 1; 2 min después, micro de Ev 1 y de Ev 2 a la vez, con el minuto anterior bajo. */
-    const s = serie(60, (j, k) => (k === 31 ? 3 : ESP[j]!))
-    const r = clasificarMicros(entrada([parada(T, 700, 0), micro(T + 700 + 100, 15, 0), micro(T + 700 + 100, 15, 1)], s))
+    /* Parada larga de Ev 1 (T → T + 700); 100 s después, micro de Ev 1 y de Ev 2 a la vez (minuto 43). El minuto anterior
+       (42) viene bajo en las tres: sin el arranque, la de Ev 1 saldría línea común (y, más abajo, carros vacíos). */
+    const s = serie(60, (j, k) => (k === 42 ? 3 : ESP[j]!))
+    const seg = T + 700 + 100
+    expect(Math.floor(seg / 60)).toBe(43)
+    const r = clasificarMicros(entrada([parada(T, 700, 0), micro(seg, 15, 0), micro(seg, 15, 1)], s))
     expect(r.find((x) => x.fila === 0)!.causa).toBe('arranque')
+    /* Contraste: la micro de Ev 2 a la misma hora NO es arranque (la pausa fue de Ev 1): sale línea común. */
+    expect(r.find((x) => x.fila === 1)!.causa).toBe('linea')
+    /* Y sin la pausa larga, la de Ev 1 ya no es arranque. */
+    const sinPausa = clasificarMicros(entrada([micro(seg, 15, 0), micro(seg, 15, 1)], s))
+    expect(sinPausa.map((x) => x.causa)).toEqual(['linea', 'linea'])
   })
 
   it('línea común gana a tras detención y a carros vacíos', () => {

@@ -16,7 +16,7 @@
  * Precedencia (gana la primera, como en el estudio: «ARR → LIN → MAN → …»): arranque → línea común → tras detención →
  * carros vacíos → sin contexto.
  */
-import { esMicroDetencion, etiquetaMaquina, paradasPorMaquina, segundosCubiertos, ANDANDO_MIN_S } from './ritmoVivo'
+import { esMicroDetencion, etiquetaMaquina, paradasPorMaquina, segundosCubiertos, unir, ANDANDO_MIN_S, type Intervalo } from './ritmoVivo'
 
 export type CausaMicro = 'arranque' | 'linea' | 'paro' | 'carros' | 'sin'
 
@@ -74,7 +74,7 @@ export interface EntradaMicroCausa {
   stopEvents?: Array<{ r: number; f: string; s: number; m?: number }> | null
   stopReasons?: string[] | null
   stopMachines?: string[] | null
-  /** Inicio del turno (ms, wall-as-UTC): los primeros `ARRANQUE_VENTANA_S` s son arranque. */
+  /** Inicio del gráfico (ms, wall-as-UTC; desde la primera pieza o el inicio programado): los primeros `ARRANQUE_VENTANA_S` s son arranque. */
   inicioTurnoMs: number
 }
 
@@ -132,6 +132,10 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
   }
   const micros = eventos.filter((v) => v.micro).sort((a, b) => a.ini - b.ini)
   const paros = eventos.filter((v) => !v.micro)
+  /** Detenciones (no micro) de cada Baader UNIDAS: una pausa partida en dos registros se cuenta entera para el arranque. */
+  const parosUnidos = new Map<number, Intervalo[]>()
+  for (const p of paros) parosUnidos.set(p.fila, [...(parosUnidos.get(p.fila) ?? []), [p.ini, p.fin] as Intervalo])
+  for (const [fila, iv] of parosUnidos) parosUnidos.set(fila, unir(iv))
   const unidas = paradasPorMaquina({ stopEvents: eventosCrudos, stopReasons: e.stopReasons, stopMachines: ids, enCurso: [] })
   const n = serie.maquinas.length
 
@@ -140,12 +144,17 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
     const ini = t0 + k * 60_000
     return 60 - segundosCubiertos(unidas.todas.get(serie.maquinas[fila]!.id), ini, ini + 60_000)
   }
-  const piezasEn = (fila: number, k: number): number | null => (k >= 0 && k < (serie.maquinas[fila]!.cycles.length) ? serie.maquinas[fila]!.cycles[k] ?? 0 : null)
+  /**
+   * Minutos COMPLETOS de la serie: el último elemento de `cycles` puede ser el minuto en curso (parcial) y no sirve
+   * para decir que una Baader venía baja. Se usa el menor largo entre las Baader.
+   */
+  const completos = Math.min(...serie.maquinas.map((q) => q.cycles.length))
+  const piezasEn = (fila: number, k: number): number | null => (k >= 0 && k < completos ? serie.maquinas[fila]!.cycles[k] ?? 0 : null)
   const nom = (fila: number) => etiquetaMaquina(serie.maquinas[fila]!.nombre)
 
   const causaDe = (m: Evento, k: number): { causa: CausaMicro; porque: string } => {
-    // 1 · Arranque: en los primeros 10 min del turno o hasta 10 min después del fin de una parada de 10 min o más de esa Baader.
-    const tras = paros.find((p) => p.fila === m.fila && p.fin - p.ini >= ARRANQUE_PARADA_MIN_S * 1000 && m.ini >= p.fin && m.ini - p.fin < ARRANQUE_VENTANA_S * 1000)
+    // 1 · Arranque: en los primeros 10 min del gráfico (desde la primera pieza o el inicio programado) o hasta 10 min después del fin de una parada de 10 min o más de esa Baader.
+    const tras = (parosUnidos.get(m.fila) ?? []).find(([a, b]) => b - a >= ARRANQUE_PARADA_MIN_S * 1000 && m.ini >= b && m.ini - b < ARRANQUE_VENTANA_S * 1000)
     if (tras || m.ini - e.inicioTurnoMs < ARRANQUE_VENTANA_S * 1000) {
       return { causa: 'arranque', porque: tras ? 'dentro de los 10 min siguientes a una detención de 10 min o más de esta Baader' : 'dentro de los primeros 10 min del turno' }
     }
@@ -153,7 +162,7 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
     const otras = micros.filter((y) => y.fila !== m.fila && Math.abs(y.ini - m.ini) <= LINEA_COMUN_TOL_S * 1000)
     if (otras.length > 0) {
       const quienes = [...new Set(otras.map((y) => nom(y.fila)))].join(', ')
-      return { causa: 'linea', porque: `otra Baader marcó micro en el mismo paso de 15 s (${quienes})` }
+      return { causa: 'linea', porque: `otra Baader marcó micro a ±15 s (${quienes})` }
     }
     // 3 · Tras detención: hasta 2 min después del fin de una detención (no micro) de esa Baader.
     if (paros.some((p) => p.fila === m.fila && m.ini >= p.fin && m.ini - p.fin < TRAS_DETENCION_S * 1000)) {
@@ -164,7 +173,7 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
     const q = serie.maquinas[m.fila]!
     const anduvo = kA >= 0 ? andando(m.fila, kA) : 0
     const piezas = piezasEn(m.fila, kA)
-    if (kA >= 0 && piezas != null && q.esperado != null && q.esperado > 0 && anduvo >= ANDANDO_MIN_S && piezas < CARROS_BAJOS * q.esperado * (anduvo / 60)) {
+    if (kA >= 0 && kA < completos && piezas != null && q.esperado != null && q.esperado > 0 && anduvo >= ANDANDO_MIN_S && piezas < CARROS_BAJOS * q.esperado * (anduvo / 60)) {
       const todas = n > 1 && serie.maquinas.every((o, j) => {
         const p = piezasEn(j, kA)
         return p != null && o.esperado != null && o.esperado > 0 && p < CARROS_BAJOS * o.esperado

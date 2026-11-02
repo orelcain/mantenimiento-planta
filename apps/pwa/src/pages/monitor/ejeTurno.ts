@@ -538,11 +538,11 @@ export const tamanoGrafico = (w: number): TamanoGrafico => (w >= 1480 ? 'grande'
  * Las medidas del mockup aprobado (1920 / 1366 / 375): columna de rótulos izquierda y derecha y alto de cada banda.
  * `ev` es el alto de la fila de paradas; `carril` el de cada fila Ev (su curva de piezas por minuto arriba y, abajo,
  * `tira` px de la cinta de color: 1 min = 1 celda); `micro` el del carril «Micro».
- * En 1366 × 768 (`medio`) el acumulado y las barras ceden 30 y 10 px a las filas nuevas: el gráfico sigue cabiendo.
+ * En 1366 × 768 (`medio`) el acumulado y las barras ceden 56 y 10 px a las filas nuevas y al resumen de micro (chips + aviso en una línea de 30 px): el gráfico sigue cabiendo. El acumulado no baja de 150.
  */
 const MEDIDAS: Record<TamanoGrafico, { lab: number; der: number; acum: number; barras: number; ev: number; carril: number; tira: number; micro: number }> = {
   grande: { lab: 74, der: 128, acum: 290, barras: 84, ev: 14, carril: 34, tira: 9, micro: 16 },
-  medio: { lab: 70, der: 120, acum: 176, barras: 50, ev: 11, carril: 26, tira: 8, micro: 12 },
+  medio: { lab: 70, der: 120, acum: 150, barras: 50, ev: 11, carril: 26, tira: 8, micro: 12 },
   chico: { lab: 70, der: 0, acum: 160, barras: 48, ev: 10, carril: 26, tira: 7, micro: 12 },
 }
 
@@ -605,10 +605,14 @@ export function disenar(w: number, tam: TamanoGrafico, nMaquinas: number, conBar
 
 // ── Qué micro hay bajo el dedo o el cursor ───────────────────────────────────
 
+/** Media anchura del área de toque con el dedo en vista completa (px por minuto < 2). */
+const TOQUE_X_VISTA_COMPLETA = 12
+
 /**
  * La micro cuya marca queda bajo el puntero (x, y en el lienzo, en px), o null. Cada micro tiene dos marcas: la ▼ sobre la fila
  * de su Baader y la del carril «Micro»; las dos cuentan. Con el dedo (`toque`) el área es de 44 × 44 px (HIG) aunque la marca
- * mida 10: se acierta sin apuntar. Con el mouse es más justa (±10 px de ancho, el alto de la fila) para que el globo del minuto
+ * mida 10: se acierta sin apuntar. Con la vista completa (`pxMin` < 2: las micro quedan a pocos px una de otra) el ancho baja a ±12 px, para que
+ * tocar entre dos marcas abra el globo del minuto y no el de una micro vecina; el ±22 queda para el zoom acercado. Con el mouse es más justa (±10 px de ancho, el alto de la fila) para que el globo del minuto
  * siga saliendo en el resto de la fila. Gana la marca más cercana al puntero.
  */
 export function microBajoPuntero(args: {
@@ -626,10 +630,11 @@ export function microBajoPuntero(args: {
     const cx = ((q.inicioMs - iniMs) / 60_000) * pxMin
     const dx = Math.abs(x - cx)
     const alto = toque ? 22 : null
+    const tolX = toque ? (pxMin < 2 ? TOQUE_X_VISTA_COMPLETA : 22) : 10
     for (const c of [d.carriles[q.fila], d.micro]) {
       if (!c) continue
       const dy = Math.abs(y - (c.y0 + c.h / 2))
-      if (dx > (toque ? 22 : 10) || dy > (alto ?? c.h / 2 + 3)) continue
+      if (dx > tolX || dy > (alto ?? c.h / 2 + 3)) continue
       const dist = Math.hypot(dx, dy)
       if (!mejor || dist < mejor.dist) mejor = { id: q.id, dist }
     }

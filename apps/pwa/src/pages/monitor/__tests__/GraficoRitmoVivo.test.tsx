@@ -333,7 +333,8 @@ describe('GraficoRitmoVivo · paradas y globo', () => {
     const lenta = { ...eje, paradas: [], paradasMaquina: null, minuto: { ...eje.minuto!, maquinas: eje.minuto!.maquinas.map((m) => (m.id === 'a' ? { ...m, cycles: m.cycles.map(() => 3) } : m)) } }
     const { container } = render(<GraficoRitmoVivo p={p} e={lenta} reloj={reloj} />)
     expect(container.innerHTML).toContain('fill="var(--rv-mal)"')
-    expect(container.innerHTML).not.toContain('fill="var(--v2-mal)"')
+    /* Las marcas de micro «tras detención» sí usan `--v2-mal` (en un grupo `<g fill>`); las barras y celdas, no. */
+    expect(container.querySelector('rect[fill="var(--v2-mal)"]')).toBeNull()
   })
 })
 
@@ -605,6 +606,19 @@ describe('GraficoRitmoVivo · micro con causa probable', () => {
     expect(screen.getByText('Se marcan las 3 micro que llegan con hora (15 s o más). Las de 0 s no se publican con hora y no aparecen.')).toBeTruthy()
   })
 
+  it('a 1366 (tamaño medio) el aviso va abreviado y en la misma línea compacta que los chips', () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 1276 })
+    try {
+      const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
+      const mc = container.querySelector('.rv-mc')!
+      expect(mc.getAttribute('data-tam')).toBe('medio')
+      expect(mc.querySelector('.rv-mc-aviso')!.textContent).toBe('3 con hora · las de 0 s no llegan')
+      expect(container.textContent).not.toContain('Se marcan las')
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 1806 })
+    }
+  })
+
   it('la columna de la derecha: «N con hora · de M» y, por Baader, «anduvo a X pz/min · esperado N» con el ritmo que ya usa el monitor', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
     const t = container.textContent ?? ''
@@ -641,7 +655,7 @@ describe('GraficoRitmoVivo · micro con causa probable', () => {
     expect(g).toContain('Ritmo de Ev 1: 17 el minuto anterior · 17 el de la micro · 17 el siguiente (esperado 19 pz/min)')
     expect(g).toContain('Las otras en ese minuto: Ev 2 14 de 16 pz/min · Ev 3 14 de 16 pz/min')
     expect(g).toContain('Causa probable: Línea común')
-    expect(g).toContain('otra Baader marcó micro en el mismo paso de 15 s (Ev 2)')
+    expect(g).toContain('otra Baader marcó micro a ±15 s (Ev 2)')
     expect(g).toContain('Probable, no imputada. Se confirma en terreno.')
   })
 

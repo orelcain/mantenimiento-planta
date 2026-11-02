@@ -381,13 +381,13 @@ describe('alturas del gráfico', () => {
     expect(tamanoGrafico(599)).toBe('chico')
     expect(tamanoGrafico(309)).toBe('chico')
   })
-  it('con 3 Baader y carril «Micro» mide 584 / 405 / 386 px (sin él, 564 / 389 / 370) y las bandas del mockup', () => {
+  it('con 3 Baader y carril «Micro» mide 584 / 379 / 386 px (sin él, 564 / 363 / 370) y las bandas del mockup', () => {
     const g = disenar(1806, 'grande', 3, true, true)
     const m = disenar(1276, 'medio', 3, true, true)
     const c = disenar(309, 'chico', 3, true, true)
-    expect([g.alto, m.alto, c.alto]).toEqual([584, 405, 386])
-    expect([disenar(1806, 'grande', 3, true).alto, disenar(1276, 'medio', 3, true).alto, disenar(309, 'chico', 3, true).alto]).toEqual([564, 389, 370])
-    expect([g.acum.h, m.acum.h, c.acum.h]).toEqual([290, 176, 160])
+    expect([g.alto, m.alto, c.alto]).toEqual([584, 379, 386])
+    expect([disenar(1806, 'grande', 3, true).alto, disenar(1276, 'medio', 3, true).alto, disenar(309, 'chico', 3, true).alto]).toEqual([564, 363, 370])
+    expect([g.acum.h, m.acum.h, c.acum.h]).toEqual([290, 150, 160])
     expect([g.barras!.h, m.barras!.h, c.barras!.h]).toEqual([84, 50, 48])
     /* La fila Ev lleva la curva arriba y la cinta de color (`tira`) pegada al fondo. */
     expect([g.carriles[0]!.h, m.carriles[0]!.h, c.carriles[0]!.h]).toEqual([34, 26, 26])
@@ -426,8 +426,13 @@ describe('alturas del gráfico', () => {
     expect(sin.carriles).toEqual([])
     expect(sin.alto).toBe(10 + 290 + 16 + 14 + 8 + 18)
   })
-  it('1366×768 deja lugar: gráfico de 405 px (con el carril «Micro») + 118 de tarjeta + franja de 153 + cabecera de 76 + aire de 12 ≤ 768', () => {
-    expect(76 + 153 + 12 + (disenar(1276, 'medio', 3, true, true).alto + 118)).toBeLessThanOrEqual(768)
+  it('1366×768 deja lugar: gráfico de 379 px + 118 de tarjeta + resumen de micro de 30 px + franja de 153 + cabecera de 76 + aire de 12 ≤ 768', () => {
+    /* El resumen de micro (`.rv-mc[data-tam='medio']` en monitorGlass.css) es UNA línea: chips de 24 px + 6 px de margen superior. */
+    const RESUMEN_MICRO_MEDIO = 24 + 6
+    const alto = disenar(1276, 'medio', 3, true, true).alto
+    expect(76 + 153 + 12 + (alto + 118 + RESUMEN_MICRO_MEDIO)).toBeLessThanOrEqual(768)
+    /* El acumulado de 1366 cede para eso, pero no baja de 150 px. */
+    expect(disenar(1276, 'medio', 3, true, true).acum.h).toBeGreaterThanOrEqual(150)
   })
 })
 
@@ -697,6 +702,26 @@ describe('microBajoPuntero', () => {
     expect(busca(300 + 11, centro(d.carriles[1]!), false)).toBeNull()
     expect(busca(300, d.carriles[1]!.y0 + d.carriles[1]!.h + 3, false)).toBe('a')
     expect(busca(300, d.carriles[1]!.y0 + d.carriles[1]!.h + 20, false)).toBeNull()
+  })
+  it('vista completa (0,7 px por minuto): con el dedo el ancho baja a ±12 px; tocar a 30 px de una micro abre el globo del minuto', () => {
+    const PXC = 0.7
+    /* Dos micro a 10 min una de la otra: x = 700 y x = 707 en vista completa. */
+    const cerca = [{ id: 'a', fila: 1, inicioMs: 1000 * 60_000 }, { id: 'b', fila: 1, inicioMs: 1010 * 60_000 }]
+    const toca = (x: number) => microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: PXC, x, y: centro(d.carriles[1]!), toque: true })
+    expect(toca(700 + 30)).toBeNull()
+    expect(toca(700 - 30)).toBeNull()
+    expect(toca(700 - 12)).toBe('a')
+    expect(toca(700 - 13)).toBeNull()
+    expect(toca(707 + 12)).toBe('b')
+    expect(toca(707 + 13)).toBeNull()
+    /* Entre las dos gana la más cercana. */
+    expect(toca(706)).toBe('b')
+    expect(toca(702)).toBe('a')
+    /* Con el zoom acercado (2 px por minuto o más) el área sigue en ±22. */
+    expect(microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: 2, x: 2000 - 22, y: centro(d.carriles[1]!), toque: true })).toBe('a')
+    expect(microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: 2, x: 2000 - 23, y: centro(d.carriles[1]!), toque: true })).toBeNull()
+    /* El alto no cambia: 22 px sobre y bajo el centro de la fila. */
+    expect(microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: PXC, x: 700, y: centro(d.carriles[1]!) + 22, toque: true })).toBe('a')
   })
   it('la marca del carril «Micro» también cuenta, y gana la más cercana', () => {
     expect(busca(300, centro(d.micro!), false)).toBe('a')
