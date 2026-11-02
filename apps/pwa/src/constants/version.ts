@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.6.0' as const
+export const APP_VERSION = '4.7.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-02' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Monitor del turno: micro por Baader con causa probable' as const
+export const VERSION_NAME = 'Monitor del turno: globo de la micro por Baader y reglas nuevas de causa probable' as const
 
 /**
  * Nota:
