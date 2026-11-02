@@ -13,7 +13,7 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 
 ## 2026-11-02 · Claude · Monitor: globo de la micro por Baader y reglas «Línea común» y «Ritmo bajo» (v4.7.0, PR #1375)
 - Hecho: el globo de la micro pasa a una tabla por Baader con la causa y sus cifras. «Línea común» ahora es una micro o una detención no programada a ±15 s. «Ritmo bajo» reemplaza a «Carros vacíos»: micro a 15 s o más de su minuto, con el minuto anterior bajo el 75 % del ritmo propio. Además, el aviso «N de M micro», las definiciones en el ⓘ y el globo del celular dentro de la página, que ya no se cierra solo en WebKit.
-- Archivos: `pages/monitor/microCausa.ts`, `GraficoRitmoVivo.tsx`, `ejeTurno.ts`, `monitorGlass.css` (+ tests), versión 4.7.0.
+- Archivos: `pages/monitor/microCausa.ts`, `GraficoRitmoVivo.tsx`, `globoPosicion.ts` (nuevo), `monitorGlass.css` (+ tests y fixtures de 8 turnos reales), versión 4.7.0.
 - Verificación: tsc 0; eslint 29 avisos (tope 30); vitest 4995 ok (8 omitidos); audits ok; build ok. Fidelidad: 339 micro reales idénticas al script validado (Chonchi 262 = 26/52/3/34/147; Filete 77 = 9/0/6/0/62); en vivo, 70 globos con 0 diferencias.
 - Estado: EN REVISIÓN, esperando el OK de merge.
 - Sigue: decidir la tolerancia de ±15 s al milisegundo (7 de 262 micro) y si «Planned Downtime» va en la taxonomía de programadas; probar en un iPhone real; el PR 2 (zoom «minuto por dentro») y el PR 3 (reclasificación sugerida).
