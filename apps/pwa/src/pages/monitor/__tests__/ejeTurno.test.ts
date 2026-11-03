@@ -709,25 +709,34 @@ describe('microBajoPuntero', () => {
     expect(busca(300, d.carriles[1]!.y0 + d.carriles[1]!.h + 3, false)).toBe('a')
     expect(busca(300, d.carriles[1]!.y0 + d.carriles[1]!.h + 20, false)).toBeNull()
   })
-  it('vista completa (0,7 px por minuto): con el dedo el ancho baja a ±12 px; tocar a 30 px de una micro abre el globo del minuto', () => {
+  it('vista completa (0,7 px por minuto): con el dedo el área es de 44 px como en cualquier zoom (antes bajaba a ±12); gana la marca más cercana', () => {
     const PXC = 0.7
     /* Dos micro a 10 min una de la otra: x = 700 y x = 707 en vista completa. */
     const cerca = [{ id: 'a', fila: 1, inicioMs: 1000 * 60_000 }, { id: 'b', fila: 1, inicioMs: 1010 * 60_000 }]
     const toca = (x: number) => microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: PXC, x, y: centro(d.carriles[1]!), toque: true })
-    expect(toca(700 + 30)).toBeNull()
-    expect(toca(700 - 30)).toBeNull()
-    expect(toca(700 - 12)).toBe('a')
-    expect(toca(700 - 13)).toBeNull()
-    expect(toca(707 + 12)).toBe('b')
-    expect(toca(707 + 13)).toBeNull()
+    expect(toca(700 - 22)).toBe('a')
+    expect(toca(700 - 23)).toBeNull()
+    expect(toca(707 + 22)).toBe('b')
+    expect(toca(707 + 23)).toBeNull()
+    /* 12 px de una marca ya contaban; 13 a 22 px, que antes no alcanzaban a ninguna, ahora sí. */
+    expect(toca(700 - 18)).toBe('a')
     /* Entre las dos gana la más cercana. */
     expect(toca(706)).toBe('b')
     expect(toca(702)).toBe('a')
-    /* Con el zoom acercado (2 px por minuto o más) el área sigue en ±22. */
-    expect(microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: 2, x: 2000 - 22, y: centro(d.carriles[1]!), toque: true })).toBe('a')
-    expect(microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: 2, x: 2000 - 23, y: centro(d.carriles[1]!), toque: true })).toBeNull()
     /* El alto no cambia: 22 px sobre y bajo el centro de la fila. */
     expect(microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: PXC, x: 700, y: centro(d.carriles[1]!) + 22, toque: true })).toBe('a')
+    expect(microBajoPuntero({ micros: cerca, d, iniMs: INI, pxMin: PXC, x: 700, y: centro(d.carriles[1]!) + 23, toque: true })).toBeNull()
+  })
+  it('con el zoom (desde 12 px por minuto) la marca del carril mide lo que dura la micro: encima de su tramo cuenta, y a ±10 px de él con el mouse', () => {
+    /* A 103 px por minuto, una micro de 45 s empieza en x = 103 y mide 77 px. */
+    const una = [{ id: 'a', fila: 1, inicioMs: 60_000, duracionS: 45 }]
+    const mide = (x: number, toque: boolean) => microBajoPuntero({ micros: una, d, iniMs: INI, pxMin: 103, x, y: centro(d.micro!), toque })
+    expect(mide(103 + 60, false)).toBe('a')
+    expect(mide(103 + 77 + 10, false)).toBe('a')
+    expect(mide(103 + 77 + 11, false)).toBeNull()
+    expect(mide(103 + 77 + 22, true)).toBe('a')
+    /* Con poco zoom (menos de 12 px por minuto) la marca sigue siendo un punto. */
+    expect(microBajoPuntero({ micros: una, d, iniMs: INI, pxMin: 3, x: 3 + 11, y: centro(d.micro!), toque: false })).toBeNull()
   })
   it('la marca del carril «Micro» también cuenta, y gana la más cercana', () => {
     expect(busca(300, centro(d.micro!), false)).toBe('a')
