@@ -6,7 +6,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { calibracionDe } from '../causasCalibracion'
 import { GloboMicro } from '../GraficoRitmoVivo'
 import { ResumenCausasMicro } from '../ResumenCausas'
@@ -32,10 +32,57 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(container.querySelector('.rv-cz-de')!.textContent).toContain('\u00a0')
   })
 
-  it('con el total del turno conocido, junto a la cifra va «(+M de 0 s)»; con el total igual a las que se ven, no', () => {
-    expect(sp(resumen({ microTotal: 53 }).container.querySelector('.rv-cz-cifra')!.textContent)).toBe('~8 de 46 (+7 de 0 s)')
+  it('las micro de 0 s NO van en la cifra grande: con el total del turno conocido, bajo la barra va una línea muted de 10 palabras o menos; con el total igual a las que se ven, no hay línea', () => {
+    const { container } = resumen({ microTotal: 53 })
+    expect(sp(container.querySelector('.rv-cz-cifra')!.textContent)).toBe('~8 de 46')
+    const l = container.querySelector('.rv-cz-ceros')!
+    expect(sp(l.textContent)).toBe('Shoplogix anota además 7 micro de 0 s, sin duración')
+    expect(sp(l.textContent).split(/\s+/).length).toBeLessThanOrEqual(10)
+    /* Está DESPUÉS de la barra (y de su leyenda), no dentro de la cifra. */
+    const barra = container.querySelector('.rv-cz-barra')!
+    expect(barra.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(container.querySelector('.rv-cz-cifra .rv-cz-ceros')).toBeNull()
     cleanup()
-    expect(sp(resumen({ microTotal: 46 }).container.querySelector('.rv-cz-cifra')!.textContent)).toBe('~8 de 46')
+    expect(resumen({ microTotal: 46 }).container.querySelector('.rv-cz-ceros')).toBeNull()
+  })
+
+  it('cuando el estimado es 0 la cifra dice «0 de N con causa probable», sin «~», en la cifra, en los chips, en la barra para quien no la ve y en el ⓘ', () => {
+    const filete = clasificarDoc(FILETE_0211_DIA, { planta: 'filete' })
+    const { container } = render(<ResumenCausasMicro micros={filete} planta="filete" cal={calibracionDe('filete')} microTotal={49} nBaader={1} />)
+    const c = sp(container.querySelector('.rv-cz-cifra')!.textContent)
+    expect(c).toBe('0 de 20')
+    expect(c).not.toContain('~')
+    expect(sp(container.querySelector('.rv-cz-rot')!.textContent)).toContain('con causa probable')
+    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('Shoplogix anota además 29 micro de 0 s, sin duración')
+    const chips = Array.from(container.querySelectorAll('.rv-mc-chip')).map((x) => sp(x.textContent))
+    expect(chips[0]).toBe('Arranque 0 de 2 · 1 min 45 s')
+    expect(container.querySelector('.rv-cz-barra')!.getAttribute('aria-label')).not.toContain('~0')
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Qué significan la causa probable y la posible' })) })
+    expect(sp(container.querySelector('.rv-cz-info')!.textContent)).toContain('Causa probable (0)')
+  })
+
+  it('los chips de una causa SIN micro no se dibujan (ni su marca): Filete Turno Día no muestra «Al volver de una detención 0 · 0 s» ni «Otra Baader paró»', () => {
+    const filete = clasificarDoc(FILETE_0211_DIA, { planta: 'filete' })
+    const { container } = render(<ResumenCausasMicro micros={filete} planta="filete" cal={calibracionDe('filete')} microTotal={null} nBaader={1} />)
+    const causas = Array.from(container.querySelectorAll('.rv-mc-chip')).map((x) => x.getAttribute('data-causa'))
+    expect(causas).toEqual(['arranque', 'sin'])
+    expect(causas).toEqual(Array.from(container.querySelectorAll('.rv-cz-barra .s')).map((x) => x.getAttribute('data-causa')))
+    expect(sp(container.querySelector('.rv-mc-chips')!.textContent)).not.toMatch(/\b0 · 0 s/)
+  })
+
+  it('el chip es dos bloques que no se parten: el nombre y «cifra · tiempo» (con la píldora) en un bloque que no se corta, para que en 375 px baje entero a su línea', () => {
+    const { container } = resumen()
+    for (const chip of Array.from(container.querySelectorAll('.rv-mc-chip'))) {
+      expect(chip.querySelector('.rv-mc-txt > .rv-mc-nom')).not.toBeNull()
+      expect(chip.querySelector('.rv-mc-txt > .rv-mc-num b')).not.toBeNull()
+    }
+    const volver = container.querySelector('.rv-mc-chip[data-causa="paro"]')!
+    expect(sp(volver.querySelector('.rv-mc-nom')!.textContent)).toBe('Al volver de una detención')
+    /* La píldora va dentro del bloque de la cifra: queda junto a «1 · 15 s» y no suelta. */
+    expect(sp(volver.querySelector('.rv-mc-num')!.textContent)).toBe('1 · 15 s en observación')
+    const css = readFileSync(resolve(__dirname, '..', 'monitorGlass.css'), 'utf8')
+    expect(css).toMatch(/\.rv-mc-num \{ white-space: nowrap; \}/)
+    expect(css).toMatch(/\.rv-mc-txt \{ display: flex; flex-wrap: wrap;/)
   })
 
   it('los chips dicen cuántas son probables y el tiempo detenido: «Arranque ~1 de 3 · 1 min 15 s», «Otra Baader paró ~7 de 18 · 11 min 30 s», «Al volver de una detención 1 · 15 s» y «Sin contexto 24 · 10 min 45 s»', () => {
@@ -43,7 +90,7 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => sp(c.textContent))).toEqual([
       'Arranque ~1 de 3 · 1 min 15 s',
       'Otra Baader paró ~7 de 18 · 11 min 30 s',
-      'Al volver de una detención 1 · 15 sen observación',
+      'Al volver de una detención 1 · 15 s en observación',
       'Sin contexto 24 · 10 min 45 s',
     ])
     /* El tiempo lleva rótulo: una línea muted sobre los chips. */
@@ -54,11 +101,11 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     const { container } = resumen()
     const pildoras = Array.from(container.querySelectorAll('.rv-mc-chip .pill')).map((p) => [p.closest('.rv-mc-chip')!.getAttribute('data-causa'), sp(p.textContent)])
     expect(pildoras).toEqual([['paro', 'en observación']])
-    /* En Yal esa misma forma está activa: no hay píldora, y la cifra de la causa lleva «~». */
+    /* En Yal esa misma forma está activa: no hay píldora, y la cifra de la causa es 0 de 1 (el estimado es 0: sin «~»). */
     cleanup()
     const yal = render(<ResumenCausasMicro micros={micros} planta="yal" cal={calibracionDe('yal')} microTotal={null} nBaader={3} />)
     expect(yal.container.querySelectorAll('.rv-mc-chip .pill')).toHaveLength(0)
-    expect(sp(yal.container.querySelector('.rv-mc-chip[data-causa="paro"]')!.textContent)).toBe('Al volver de una detención ~0 de 1 · 15 s')
+    expect(sp(yal.container.querySelector('.rv-mc-chip[data-causa="paro"]')!.textContent)).toBe('Al volver de una detención 0 de 1 · 15 s')
   })
 
   it('la barra: un tramo por causa, de ancho PROPORCIONAL a las micro (3 · 18 · 1 · 24), en el orden Arranque → Otra Baader paró → Al volver → Sin contexto', () => {
@@ -139,6 +186,50 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(sp(panel.textContent)).toContain('Causa probable (~8)')
     act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(container.querySelector('.rv-cz-info')).toBeNull()
+  })
+
+  it('el ⓘ va por encima de lo que le sigue y no se sale de la ventana: z-index más alto en la tarjeta, alto máximo con scroll por dentro y, en el celular, se trae a la vista al abrirlo', () => {
+    const css = readFileSync(resolve(__dirname, '..', 'monitorGlass.css'), 'utf8')
+    expect(css).toContain('.v2-tarjeta:has(.rv-cz-info) { z-index: 30; }')
+    expect(css).toMatch(/\.rv-cz-info \{[^}]*overflow-y: auto;/)
+    const { container } = resumen()
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Qué significan la causa probable y la posible' })) })
+    const px = parseInt((container.querySelector('.rv-cz-info') as HTMLElement).style.maxHeight, 10)
+    expect(px).toBeGreaterThanOrEqual(160)
+    expect(px).toBeLessThanOrEqual(window.innerHeight)
+    cleanup()
+    /* Celular (menos de 1024 px): al abrir, el panel se trae a la vista (`scrollIntoView` lo mínimo). */
+    const ancho = window.innerWidth
+    const antes = HTMLElement.prototype.scrollIntoView
+    const visto = vi.fn()
+    HTMLElement.prototype.scrollIntoView = visto
+    window.innerWidth = 375
+    try {
+      const mv = resumen()
+      expect(visto).not.toHaveBeenCalled()
+      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Qué significan la causa probable y la posible' })) })
+      expect(visto).toHaveBeenCalledTimes(1)
+      expect(visto.mock.instances[0]).toBe(mv.container.querySelector('.rv-cz-info'))
+    } finally {
+      window.innerWidth = ancho
+      HTMLElement.prototype.scrollIntoView = antes
+    }
+  })
+
+  it('«En observación» del ⓘ dice el motivo de la planta: Chonchi, «no fueron más seguidas»; Yal, «muy pocas micro así» (15 en las 8 semanas), sin decir lo opuesto', () => {
+    const texto = (planta: 'chonchi' | 'yal') => {
+      const r = render(<ResumenCausasMicro micros={micros} planta={planta} cal={calibracionDe(planta)} microTotal={null} nBaader={3} />)
+      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Qué significan la causa probable y la posible' })) })
+      const t = sp(r.container.querySelector('.rv-cz-info')!.textContent)
+      cleanup()
+      return t
+    }
+    const ch = texto('chonchi')
+    expect(ch).toContain('En observación: en las 8 semanas, esas micro no fueron más seguidas que en cualquier otro momento del turno.')
+    expect(ch).not.toContain('muy pocas')
+    const yal = texto('yal')
+    expect(yal).toContain('En observación: en las 8 semanas, hubo muy pocas micro así para estimar cuántas se explican.')
+    expect(yal).not.toContain('no fueron más seguidas')
   })
 
   it('con Yal el ⓘ dice «hasta 1 min 30 s» para «Al volver de una detención» (la calibración de Yal), y con Chonchi «hasta 2 min»', () => {

@@ -11,7 +11,7 @@
  */
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 import { dec1 } from '@/utils/formatoNumeros'
-import { fechaDMA, SEMANAS_VENTANA, type CalibracionPlanta, type ParametrosCausas } from './causasCalibracion'
+import { fechaDMA, SEMANAS_VENTANA, type CalibracionPlanta, type MotivoObservacion, type ParametrosCausas } from './causasCalibracion'
 import type { CausaMicro, EvidenciaMicro, FormaMicro, ModoLinea } from './microCausa'
 import { cronometro } from './ritmoVivo'
 
@@ -96,25 +96,25 @@ export const TXT_RESUMEN = {
 }
 
 /** «~8 de 46» → sus dos partes: la cifra y «de 46». */
-export const cifraProbable = (probable: number) => `~${probable}`
+export const cifraProbable = (probable: number) => (probable > 0 ? `~${probable}` : '0')
 export const deTotal = (total: number) => `de${NB}${total}`
 /** Sin calibración no hay «~»: la cifra dice solo cuántas micro hay. */
 export const cifraSinCalibrar = (total: number) => `${total}${NB}micro`
-/** «(+7 de 0 s)»: las micro que no llegan con hora ni duración, cuando se sabe el total del turno. */
-export const masDeCeroSegundos = (m: number) => `(+${m}${NB}de${NB}0${NB}s)`
+/** Bajo la barra, en una línea muted: las micro que Shoplogix anota sin duración (de 0 s) y que no llegan con hora, cuando se sabe el total del turno. */
+export const microDeCeroSegundos = (m: number) => `Shoplogix anota además ${m}${NB}micro de${NB}0${NB}s, sin duración`
 
 /** El texto del chip de una causa: «Arranque», «~1 de 3», «1 min 15 s». Sin estimado (`probable` null) la cifra es solo la cantidad. */
 export function textoChip(causa: CausaMicro, n: number, probable: number | null, segundos: number) {
   return {
     nombre: ROTULO_CAUSA[causa],
-    cifra: probable == null || n === 0 ? String(n) : `~${probable}${NB}de${NB}${n}`,
+    cifra: probable == null || n === 0 ? String(n) : `${probable > 0 ? '~' : ''}${probable}${NB}de${NB}${n}`,
     tiempo: dur(segundos),
   }
 }
 
 /** La descripción de la barra para quien no la ve: «46 micro: ~1 de 3 Arranque, …». */
 export function ariaBarra(total: number, filas: Array<{ causa: CausaMicro; n: number; probable: number | null }>): string {
-  return `${total} micro: ${filas.filter((f) => f.n > 0).map((f) => `${f.probable == null ? f.n : `~${f.probable} de ${f.n}`} ${ROTULO_CAUSA[f.causa]}`).join(', ')}`
+  return `${total} micro: ${filas.filter((f) => f.n > 0).map((f) => `${f.probable == null ? f.n : `${f.probable > 0 ? '~' : ''}${f.probable} de ${f.n}`} ${ROTULO_CAUSA[f.causa]}`).join(', ')}`
 }
 
 /** Para el `aria-label` del gráfico: cuántas micro se ven. */
@@ -174,13 +174,21 @@ export function notasAyuda(args: {
     notas.push([
       { negrita: true, texto: 'Causa posible' },
       { texto: ': la micro coincidió con eso. ' },
-      { negrita: true, texto: `Causa probable (~${probableTotal ?? 0})` },
+      { negrita: true, texto: `Causa probable (${cifraProbable(probableTotal ?? 0)})` },
       { texto: `: cuántas de esas coincidencias superan lo que se ve en cualquier momento del turno, estimado con las ${desde} (Causas v3, ${cal.nombre}). Ninguna micro ocurre porque sí: si no se explica, es porque los datos todavía no muestran su causa.` },
     ])
-    notas.push([
-      { negrita: true, texto: 'En observación' },
-      { texto: `: en las ${SEMANAS_VENTANA} semanas, esas micro no fueron más seguidas que en cualquier otro momento del turno. Se muestran, pero no suman a la causa probable.` },
-    ])
+    /* «En observación» tiene dos motivos que dicen cosas OPUESTAS (pocas micro / no fueron más seguidas): se dice solo el que tiene esta planta. */
+    const motivos = new Set(Object.values(cal.categorias).map((c) => (c?.estado === 'en observación' ? c.motivo ?? 'sin_exceso' : null)))
+    const porQue = [
+      motivos.has('sin_exceso') ? 'esas micro no fueron más seguidas que en cualquier otro momento del turno' : null,
+      motivos.has('pocas') ? 'hubo muy pocas micro así para estimar cuántas se explican' : null,
+    ].filter((x): x is string => x != null)
+    if (porQue.length > 0) {
+      notas.push([
+        { negrita: true, texto: 'En observación' },
+        { texto: `: en las ${SEMANAS_VENTANA} semanas, ${porQue.join(', o bien ')}. Se muestran, pero no suman a la causa probable.` },
+      ])
+    }
   } else {
     notas.push([{ texto: TXT_RESUMEN.sinCalibracion }])
   }
@@ -197,6 +205,8 @@ export function notasAyuda(args: {
 export const ARIA_GLOBO = 'Micro detención y su causa posible'
 export const TXT_GLOBO = {
   verDetalle: 'Ver detalle',
+  /** En PC, con el mouse solo encima de la marca: el globo no recibe el mouse, así que en vez del botón se dice cómo abrirlo. */
+  pistaClic: 'Clic en la marca para ver el detalle',
   causaPosible: 'Causa posible:',
   cerrar: 'Cerrar la lectura de la micro',
   pieGeneral: 'Causa posible no prueba que eso la provocó: lo calcula el monitor y se confirma en terreno.',
@@ -213,7 +223,7 @@ export function tituloGlobo(nombre: string, duracionS: number, hora: string) {
 }
 
 /** Qué hizo otra Baader respecto de la micro (`deltaS` < 0: antes). */
-const cuando = (deltaS: number) => (deltaS === 0 ? 'a la vez' : `${seg(Math.abs(deltaS))} ${deltaS < 0 ? 'antes' : 'después'}`)
+const cuando = (deltaS: number) => (deltaS === 0 ? 'a la vez' : `${dur(Math.abs(deltaS))} ${deltaS < 0 ? 'antes' : 'después'}`)
 const listaY = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`)
 
 /**
@@ -224,7 +234,8 @@ export function lineaCausa(ev: EvidenciaMicro): { prefijo: string | null; nombre
   const prefijo = TXT_GLOBO.causaPosible
   switch (ev.forma) {
     case 'arranque': {
-      const n = minEntero(ev.minutos)
+      /* La duración exacta (los pasos de Shoplogix son de 15 s): «a 9 min 36 s», nunca «a 10 min» si la micro está dentro de los 10. */
+      const n = dur(Math.abs(ev.minutos) * 60)
       const detalle = ev.origen === 'pausa'
         ? `a ${n} de volver de una detención de ${dur(ev.pausaS ?? 0)}`
         : ev.minutos < 0
@@ -244,7 +255,7 @@ export function lineaCausa(ev: EvidenciaMicro): { prefijo: string | null; nombre
         const quien = listaY(nombres.map(conNB))
         if (o.micro) return `${quien} con micro ${cuando(o.deltaS)}`
         const motivo = motivoLegible(o.razon)
-        return `${quien} se detuvo ${cuando(o.deltaS)}${motivo ? ` por ${motivo}` : ''}`
+        return `${quien} ${nombres.length > 1 ? 'se detuvieron' : 'se detuvo'} ${cuando(o.deltaS)}${motivo ? ` por ${motivo}` : ''}`
       })
       return { prefijo, nombre: ROTULO_CAUSA.linea, detalle: listaY(partes) }
     }
@@ -256,10 +267,10 @@ export function lineaCausa(ev: EvidenciaMicro): { prefijo: string | null; nombre
     }
     case 'linea_tras_paro_otra': {
       const motivo = motivoLegible(ev.razon)
-      return { prefijo, nombre: ROTULO_CAUSA.linea, detalle: `${conNB(ev.nombre)} se detuvo ${seg(ev.haceS)} antes${motivo ? ` por ${motivo}` : ''}` }
+      return { prefijo, nombre: ROTULO_CAUSA.linea, detalle: `${conNB(ev.nombre)} se detuvo ${dur(ev.haceS)} antes${motivo ? ` por ${motivo}` : ''}` }
     }
     case 'paro':
-      return { prefijo, nombre: ROTULO_CAUSA.paro, detalle: `su detención terminó ${seg(ev.haceS)} antes` }
+      return { prefijo, nombre: ROTULO_CAUSA.paro, detalle: `su detención terminó ${dur(ev.haceS)} antes` }
     default:
       return { prefijo: null, nombre: ROTULO_CAUSA.sin, detalle: 'nada alrededor en los datos' }
   }
@@ -281,8 +292,10 @@ export function detalleForma(ev: EvidenciaMicro, propia: { fila: number; nombre:
 }
 
 /** La causa está «en observación» en esta planta: se muestra, pero no suma a la causa probable. */
-export const textoObservacion = (planta: string, fecha: string) =>
-  `En observación: en ${planta}, en las ${SEMANAS_VENTANA} semanas al ${fechaDMA(fecha)}, estas micro no fueron más seguidas que en cualquier otro momento del turno. No suman a la causa probable.`
+export const textoObservacion = (planta: string, fecha: string, motivo: MotivoObservacion = 'sin_exceso', obs: number | null = null) =>
+  motivo === 'pocas'
+    ? `En observación: en ${planta}, en las ${SEMANAS_VENTANA} semanas, hubo ${obs != null ? `solo ${obs}` : 'muy pocas'} micro así, muy pocas para estimar. No suman a la causa probable.`
+    : `En observación: en ${planta}, en las ${SEMANAS_VENTANA} semanas al ${fechaDMA(fecha)}, estas micro no fueron más seguidas que en cualquier otro momento del turno. No suman a la causa probable.`
 
 // ── Reglas que no aplicaron (el «✕» del detalle) ─────────────────────────────
 
@@ -298,6 +311,10 @@ export function textoDescarteArranque(a: { nombre: string; ventanaMin: number; p
 }
 
 export function textoDescarteLinea(a: {
+  /** Los parámetros de la planta: de ellos salen las ventanas que se dicen. */
+  P: ParametrosCausas
+  /** La planta tiene 3 o más Baader y la regla «en cadena» está encendida: solo entonces se dice que no se cumplió. */
+  conCadena: boolean
   /** Otra Baader que se detuvo antes, pero por un motivo que no cuenta (sin imputar, mecánico…). */
   fuera: { nombre: string; haceS: number; razon: string | null } | null
   /** Otra Baader con una detención programada a ±15 s. */
@@ -305,17 +322,21 @@ export function textoDescarteLinea(a: {
 }): string {
   if (a.fuera) {
     const motivo = motivoLegible(a.fuera.razon)
-    return `${conNB(a.fuera.nombre)} se detuvo ${seg(a.fuera.haceS)} antes, pero ${motivo ? `por ${motivo}` : 'sin imputar'}, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena`
+    return `${conNB(a.fuera.nombre)} se detuvo ${dur(a.fuera.haceS)} antes, pero ${motivo ? `por ${motivo}` : 'sin imputar'}, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena`
   }
   if (a.programada) {
     const motivo = motivoLegible(a.programada.razon)
     return `ninguna otra Baader tuvo micro ni detención no programada a ±15${NB}s (${conNB(a.programada.nombre)} se detuvo, pero era programada${motivo ? `: ${motivo}` : ''})`
   }
-  return `las otras Baader no se detuvieron en los 2${NB}min antes ni en el minuto después`
+  /* Solo lo que se evaluó (las tres formas de «Otra Baader paró»): una micro suelta de otra Baader dentro de esas ventanas NO activa ninguna regla, así que no se puede
+     decir que «no se detuvieron». */
+  const cadena = a.conCadena ? `, las otras dos no tuvieron micro en cadena (entre 22,5 y ${segDeMs(a.P.CAD_HI)}${NB}s antes o después)` : ''
+  const previa = a.P.OTR ? ` y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5${NB}s y ${minEntero(a.P.OTR_HI / 60_000)} antes)` : ''
+  return `ninguna otra Baader se detuvo a ±15${NB}s${cadena}${previa}`
 }
 
-export function textoDescarteVolver(a: { nombre: string; haceMin: number | null }): string {
-  return a.haceMin != null
-    ? `la última detención de ${conNB(a.nombre)} terminó hace ${minTxt(a.haceMin)}`
+export function textoDescarteVolver(a: { nombre: string; haceS: number | null }): string {
+  return a.haceS != null
+    ? `la última detención de ${conNB(a.nombre)} terminó hace ${dur(a.haceS)}`
     : `${conNB(a.nombre)} no tuvo detenciones antes de la micro`
 }

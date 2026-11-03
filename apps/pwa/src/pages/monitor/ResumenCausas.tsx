@@ -10,10 +10,11 @@
  */
 import { Info } from 'lucide-react'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { AIRE_BORDE, bordeLibreArriba, traerALaVista } from './bordeLibre'
 import type { CalibracionPlanta } from './causasCalibracion'
 import { COLOR_CAUSA, parametrosDe, resumirCausas, type CausaMicro, type MicroClasificada, type ResumenCausa } from './microCausa'
 import {
-  AYUDA_INTRO, TXT_RESUMEN, ariaBarra, cifraProbable, cifraSinCalibrar, definicionCausa, deTotal, itemsAyuda, masDeCeroSegundos, notasAyuda, textoChip,
+  AYUDA_INTRO, TXT_RESUMEN, ariaBarra, cifraProbable, cifraSinCalibrar, definicionCausa, deTotal, itemsAyuda, microDeCeroSegundos, notasAyuda, textoChip,
 } from './textosCausas'
 
 type Marca = 'solido' | 'mixto' | 'rayado' | 'borde'
@@ -38,10 +39,15 @@ function MuestraCausa({ causa, marca }: { causa: CausaMicro; marca: Marca }) {
   )
 }
 
-/** El ⓘ: «Micro: causa probable y posible». Se abre con un toque, clic o Enter; Escape y tocar fuera lo cierran; no se sale de la pantalla. */
+/**
+ * El ⓘ: «Micro: causa probable y posible». Se abre con un toque, clic o Enter; Escape y tocar fuera lo cierran; no se sale de la pantalla: se corre hacia adentro
+ * a lo ancho, su alto máximo es lo que cabe en la ventana (con scroll por dentro si el texto es más largo) y en el celular se trae a la vista al abrirlo. Va por
+ * ENCIMA de las tarjetas que le siguen (CSS: `.v2-tarjeta:has(.rv-cz-info)`), de modo que el botón «Ver más del turno» ya no se mezcla con sus reglas.
+ */
 function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: ReturnType<typeof resumirCausas>; cal: (CalibracionPlanta & { nombre: string }) | null; planta: string | null | undefined; conVarias: boolean; verHora: number }) {
   const [abierto, setAbierto] = useState(false)
-  const [pos, setPos] = useState({ izq: 0, ancho: 420 })
+  const [pos, setPos] = useState<{ izq: number; ancho: number; maxAlto: number | null; arriba: boolean }>({ izq: 0, ancho: 420, maxAlto: null, arriba: false })
+  const panel = useRef<HTMLDivElement>(null)
   const id = useId()
   const ref = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -62,8 +68,22 @@ function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: Re
     let izq = 0
     if (b.left + ancho > vw - 16) izq = vw - 16 - ancho - b.left
     if (b.left + izq < 16) izq = 16 - b.left
-    setPos((a) => (a.izq === izq && a.ancho === ancho ? a : { izq, ancho }))
+    /* El alto: lo que cabe entre el botón y el borde de la ventana (abajo) o entre el botón y lo fijo de la página (arriba). En PC, si el texto no cabe abajo y arriba
+       hay más sitio, se abre hacia arriba; en el celular se abre siempre hacia abajo y se trae a la vista (abajo). */
+    const vh = window.innerHeight || document.documentElement.clientHeight
+    const celular = vw < 1024
+    const abajo = vh - b.bottom - 8 - 16
+    const arribaLibre = b.top - 8 - (bordeLibreArriba() + AIRE_BORDE)
+    const contenido = panel.current?.scrollHeight ?? 0
+    const arriba = !celular && contenido > abajo && arribaLibre > abajo
+    const maxAlto = celular ? Math.max(200, vh - (bordeLibreArriba() + AIRE_BORDE) - 24) : Math.max(160, arriba ? arribaLibre : abajo)
+    setPos((a) => (a.izq === izq && a.ancho === ancho && a.maxAlto === maxAlto && a.arriba === arriba ? a : { izq, ancho, maxAlto, arriba }))
   }, [abierto])
+  /* En el celular el panel se trae a la vista entero al abrirlo (con el botón cerca del pie de la pantalla quedaba fuera). */
+  useEffect(() => {
+    if (!abierto || pos.maxAlto == null || !panel.current) return
+    if ((document.documentElement.clientWidth || window.innerWidth) < 1024) traerALaVista(panel.current)
+  }, [abierto, pos.maxAlto])
   const P = parametrosDe(planta)
   const items = itemsAyuda(P, conVarias)
   const notas = notasAyuda({ cal, probableTotal: resumen.probableTotal, porModo: conVarias ? resumen.porModo : null, verHora })
@@ -81,7 +101,7 @@ function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: Re
         <Info className="h-[18px] w-[18px]" aria-hidden />
       </button>
       {abierto && (
-        <div id={id} role="tooltip" className="v2-tip rv-cz-info" style={{ left: pos.izq, width: pos.ancho }}>
+        <div ref={panel} id={id} role="tooltip" className="v2-tip rv-cz-info" data-arriba={pos.arriba ? '' : undefined} style={{ left: pos.izq, width: pos.ancho, maxHeight: pos.maxAlto ?? undefined }}>
           <div className="ip-tit">{TXT_RESUMEN.tituloAyuda}</div>
           <p>{AYUDA_INTRO}</p>
           <ol>
@@ -98,7 +118,8 @@ function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: Re
 
 /**
  * El resumen. `microTotal` es el total de micro del turno (con las de 0 s, que no llegan con hora ni duración): si se conoce y es mayor que las que se
- * ven, junto a la cifra va «(+M de 0 s)». `nBaader`: con una sola Baader (Filete) «Otra Baader paró» no existe y no se lista.
+ * ven, bajo la barra va una línea muted («Shoplogix anota además 135 micro de 0 s, sin duración»), no junto a la cifra. Cuando el estimado es 0, la cifra dice
+ * «0 de N con causa probable», sin «~». Los chips de una causa sin micro no se dibujan (la barra tampoco). `nBaader`: con una sola Baader (Filete) «Otra Baader paró» no existe y no se lista.
  */
 export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }: { micros: readonly MicroClasificada[]; planta?: string | null; cal: (CalibracionPlanta & { nombre: string }) | null; microTotal: number | null; nBaader: number }) {
   const resumen = resumirCausas(micros, cal)
@@ -113,7 +134,6 @@ export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }:
       <div className="rv-cz-cab">
         <span className="rv-cz-cifra tabular-nums">
           {calibrada ? <>{cifraProbable(resumen.probableTotal ?? 0)}<span className="rv-cz-de"> {deTotal(total)}</span></> : cifraSinCalibrar(total)}
-          {ceros != null && <span className="rv-cz-ceros"> {masDeCeroSegundos(ceros)}</span>}
         </span>
         {calibrada && (
           <span className="rv-cz-rot">
@@ -141,16 +161,19 @@ export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }:
           <i className="lg sol" aria-hidden />{TXT_RESUMEN.leyendaProbable}<i className="lg ray" aria-hidden />{TXT_RESUMEN.leyendaPosible}
         </p>
       )}
+      {ceros != null && <p className="rv-cz-ceros">{microDeCeroSegundos(ceros)}</p>}
       <p className="rv-cz-rotchips">{TXT_RESUMEN.rotuloChips}</p>
       <ul className="rv-mc-chips" aria-label={TXT_RESUMEN.ariaChips}>
-        {causas.map((c) => {
+        {tramos.map((c) => {
           /* Una causa en observación no suma al estimado: el chip dice solo cuántas son («Al volver de una detención 1 · 15 s»), con su píldora. */
           const t = textoChip(c.causa, c.n, c.enObservacion ? null : c.probable, c.segundos)
           return (
             <li key={c.causa} className="rv-mc-chip" data-causa={c.causa} title={definicionCausa(c.causa, parametrosDe(planta), conVarias)}>
               <MuestraCausa causa={c.causa} marca={marcaDe(c, calibrada)} />
-              {t.nombre} <b className="tabular-nums">{t.cifra}</b> · {t.tiempo}
-              {c.enObservacion && <span className="pill">{TXT_RESUMEN.enObservacion}</span>}
+              <span className="rv-mc-txt">
+                <span className="rv-mc-nom">{t.nombre}</span>{' '}
+                <span className="rv-mc-num"><b className="tabular-nums">{t.cifra}</b> · {t.tiempo}{c.enObservacion && <> <span className="pill">{TXT_RESUMEN.enObservacion}</span></>}</span>
+              </span>
             </li>
           )
         })}

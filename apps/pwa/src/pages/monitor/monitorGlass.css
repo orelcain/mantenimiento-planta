@@ -1290,7 +1290,7 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .rv-cz-cab { position: relative; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
 .rv-cz-cifra { font-size: 34px; line-height: 38px; font-weight: 600; letter-spacing: -0.01em; }
 .rv-cz-de { font-size: 20px; line-height: 24px; font-weight: 600; letter-spacing: 0; color: rgb(var(--muted-foreground)); }
-.rv-cz-ceros { font-size: 15px; line-height: 20px; font-weight: 400; letter-spacing: 0; color: rgb(var(--muted-foreground)); }
+.rv-cz-ceros { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
 .rv-cz-rot { font-size: 15px; line-height: 20px; color: rgb(var(--muted-foreground)); }
 .rv-cz .solo-mv { display: none; }
 /* Bajo 420 px «estimado» pasa a «est.» y la cifra baja a 30/34. */
@@ -1315,8 +1315,12 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .rv-cz-ley .lg.ray { margin-left: 10px; box-shadow: inset 0 0 0 1px rgb(var(--muted-foreground)); background: repeating-linear-gradient(135deg, rgb(var(--muted-foreground)) 0 1.5px, transparent 1.5px 4.5px); }
 .rv-cz-rotchips { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
 .rv-mc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.rv-mc-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 11px; border-radius: 999px; background: var(--v2-relleno); font-size: 13px; line-height: 18px; color: rgb(var(--foreground) / 0.85); }
-.rv-mc-chip > b { font-weight: 600; color: rgb(var(--foreground)); }
+.rv-mc-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; max-width: 100%; box-sizing: border-box; padding: 5px 11px; border-radius: 16px; background: var(--v2-relleno); font-size: 13px; line-height: 18px; color: rgb(var(--foreground) / 0.85); }
+.rv-mc-chip b { font-weight: 600; color: rgb(var(--foreground)); }
+/* El nombre y «cifra · tiempo» son dos bloques: caben en una línea o, si no, el segundo baja entero a su propia línea (sin «·» colgado ni cifras sueltas). */
+.rv-mc-txt { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 5px; min-width: 0; }
+.rv-mc-num { white-space: nowrap; }
+.rv-mc-num .pill { margin-left: 2px; vertical-align: 1px; }
 /* La marca de cada chip es el mismo dibujo de su tramo de la barra: sólido, mitad sólido y mitad rayado, rayado o contorno. */
 .rv-sw { flex: none; display: inline-flex; width: 14px; height: 10px; border-radius: 2px; background: var(--c); }
 .rv-sw[data-marca='borde'] { background: none; box-shadow: inset 0 0 0 1.5px var(--c); }
@@ -1325,7 +1329,12 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .rv-sw[data-marca='mixto'] u { flex: 1; }
 .pill { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 999px; background: rgb(142 142 147 / 0.18); font-size: 12px; line-height: 18px; font-weight: 600; color: rgb(var(--muted-foreground)); white-space: nowrap; }
 /* El ⓘ del resumen: «Micro: causa probable y posible». */
-.rv-cz-info { position: absolute; top: calc(100% + 8px); z-index: 20; box-sizing: border-box; padding: 14px 16px; display: grid; gap: 8px; border-radius: 22px; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+/* El ⓘ va por ENCIMA de todo lo que le sigue: la tarjeta (con backdrop-filter, un contexto de apilamiento) sube de nivel mientras lo tiene abierto, y el panel
+   tiene alto máximo (lo fija el componente, según la ventana) con scroll por dentro y fondo OPACO (el de vidrio dejaba ver, sin desenfocar, el texto de abajo: el
+   desenfoque no actúa dentro de una tarjeta que ya es de vidrio). */
+.v2-tarjeta:has(.rv-cz-info) { z-index: 30; }
+.rv-cz-info[data-arriba] { top: auto; bottom: calc(100% + 8px); }
+.rv-cz-info { position: absolute; top: calc(100% + 8px); z-index: 20; overflow-y: auto; overscroll-behavior: contain; background: rgb(var(--card)); -webkit-backdrop-filter: none; backdrop-filter: none; box-sizing: border-box; padding: 14px 16px; display: grid; gap: 8px; border-radius: 22px; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
 .rv-cz-info .ip-tit { font-size: 13px; line-height: 18px; font-weight: 600; color: rgb(var(--foreground)); }
 .rv-cz-info ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; }
 .rv-cz-info b { color: rgb(var(--foreground)); font-weight: 600; }
@@ -1364,7 +1373,10 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .gm .tri { flex: none; display: inline-block; }
 /* «Ver detalle»: botón de 13/18 600 en el color de marca, con 44 px de toque (el área extra no cambia lo que se ve). */
 .gm-ver { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; line-height: 18px; font-weight: 600; color: rgb(var(--brand)); cursor: pointer; }
-.gm-ver::before { content: ''; position: absolute; inset: -8px; }
+/* El área de toque de 44 px la da `tap-44` (index.css, ::after centrado de 44 × 44), como la de la ✕: se mide en el elemento, no se adivina con un ::before. */
+.gm-pista { font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+/* PC con el globo fijo: la ✕ ocupa la esquina, así que el encabezado le deja lugar. */
+.gm.pc2.fijo .gm-cab { padding-right: 32px; }
 .gm-ver:focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 2px; border-radius: 6px; }
 .gm-ver .chev { transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1); }
 .gm-ver[aria-expanded='true'] .chev { transform: rotate(180deg); }

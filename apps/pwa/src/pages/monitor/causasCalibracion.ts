@@ -7,7 +7,8 @@
  * archivo y esa copia juntos.
  *
  * Por planta: la ventana, la fecha y los parámetros del algoritmo. Por forma de causa: `estado` («activa» suma a la causa probable; «en observación»
- * se muestra pero no suma) y `precision_estimada` (la fracción de esas micro que supera lo habitual del turno).
+ * se muestra pero no suma) y `precision_estimada` (la fracción de esas micro que supera lo habitual del turno). Las «en observación» llevan además su `motivo`
+ * (`pocas`: pocas micro; `sin_exceso`: no fueron más seguidas que lo habitual) y las `obs` de la ventana.
  *
  * Las claves de planta son el `plantSlug` del doc del monitor. Una línea que no está aquí NO tiene calibración: no se estima la causa probable.
  */
@@ -16,7 +17,16 @@
 export type FormaCalibrada = 'arranque' | 'linea_a_la_vez' | 'linea_en_cadena' | 'linea_tras_paro_otra' | 'paro'
 export type EstadoForma = 'activa' | 'en observación'
 
-export interface CalibracionForma { estado: EstadoForma; precision_estimada: number }
+/**
+ * Por qué una forma queda «en observación»:
+ *  · `pocas`: tuvo pocas micro en las 8 semanas (menos de `N_MIN` = 30). No alcanza para estimar, aunque el exceso dé alto.
+ *  · `sin_exceso`: tuvo micro de sobra, pero no fueron más seguidas que en cualquier otro momento del turno (la cota baja del IC95 del lift no pasa de 1).
+ * Dicen cosas OPUESTAS al técnico, así que el texto de la observación no puede ser el mismo.
+ */
+export type MotivoObservacion = 'pocas' | 'sin_exceso'
+
+/** `motivo` y `obs` (las micro de la ventana) van solo en las formas «en observación»; se derivan de `obs`, `lift` e `ic95` del json (una prueba lo comprueba). */
+export interface CalibracionForma { estado: EstadoForma; precision_estimada: number; motivo?: MotivoObservacion; obs?: number }
 
 /** Parámetros del algoritmo, en ms (como en `causas_v3.py`): ARR = ventana del arranque, TRAS = «Al volver de una detención», CAD_HI y OTR_HI = topes de «en cadena» y «detención previa». */
 export interface ParametrosCausas { ARR: number; PROD: boolean; TRAS: number; CAD: boolean; CAD_HI: number; OTR: boolean; OTR_HI: number; OTR_TODAS: boolean }
@@ -46,7 +56,7 @@ export const CALIBRACION_V3: Record<'chonchi' | 'yal' | 'filete', CalibracionPla
       linea_a_la_vez: { estado: 'activa', precision_estimada: 0.388 },
       linea_en_cadena: { estado: 'activa', precision_estimada: 0.514 },
       linea_tras_paro_otra: { estado: 'activa', precision_estimada: 0.454 },
-      paro: { estado: 'en observación', precision_estimada: -0.238 },
+      paro: { estado: 'en observación', precision_estimada: -0.238, motivo: 'sin_exceso', obs: 152 },
     },
   },
   yal: {
@@ -56,7 +66,7 @@ export const CALIBRACION_V3: Record<'chonchi' | 'yal' | 'filete', CalibracionPla
     categorias: {
       arranque: { estado: 'activa', precision_estimada: 0.119 },
       linea_a_la_vez: { estado: 'activa', precision_estimada: 0.616 },
-      linea_en_cadena: { estado: 'en observación', precision_estimada: 0.729 },
+      linea_en_cadena: { estado: 'en observación', precision_estimada: 0.729, motivo: 'pocas', obs: 15 },
       linea_tras_paro_otra: { estado: 'activa', precision_estimada: 0.556 },
       paro: { estado: 'activa', precision_estimada: 0.315 },
     },
@@ -67,7 +77,7 @@ export const CALIBRACION_V3: Record<'chonchi' | 'yal' | 'filete', CalibracionPla
     parametros: { ARR: 600000, PROD: true, TRAS: 120000, CAD: true, CAD_HI: 52500, OTR: true, OTR_HI: 127500, OTR_TODAS: false },
     categorias: {
       arranque: { estado: 'activa', precision_estimada: 0.176 },
-      paro: { estado: 'en observación', precision_estimada: 0.042 },
+      paro: { estado: 'en observación', precision_estimada: 0.042, motivo: 'sin_exceso', obs: 139 },
     },
   },
 }

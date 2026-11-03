@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ARRANQUE_PARADA_MIN_S, CAUSAS_MICRO, FAMILIAS_LINEA, INICIO_MINUTO_S, LINEA_COMUN_TOL_S, TRAS_DETENCION_S,
+  ARRANQUE_PARADA_MIN_S, CAUSAS_MICRO, FAMILIAS_LINEA, INICIO_MINUTO_S, LINEA_COMUN_TOL_S,
   clasificarMicros, contarPorCausa, familia, motivoLegible, numerosPorCelda, type EntradaMicroCausa, type MicroClasificada,
 } from '../microCausa'
 import { ATRASO_ANOTA, ROTULO_CAUSA, definicionCausa, detalleForma, lineaCausa } from '../textosCausas'
 import { PARAMETROS_V3 } from '../causasCalibracion'
 
 const T0 = Date.parse('2026-11-02T09:15:00.000Z')
+/** La ventana de «Al volver de una detención» sin calibración (v3): 120 s. */
+const TRAS_DETENCION_S = PARAMETROS_V3.TRAS / 1000
 const iso = (seg: number) => new Date(T0 + seg * 1000).toISOString()
 const ESP = [18, 16, 16]
 const ids = ['a', 'b', 'c']
@@ -54,7 +56,8 @@ describe('microCausa v3 · una regla por caso', () => {
     expect(r).toHaveLength(1)
     expect(r[0]).toMatchObject({ causa: 'arranque', forma: 'arranque', modo: null, fila: 0, duracionS: 15 })
     expect(r[0]!.evidencia).toMatchObject({ forma: 'arranque', origen: 'pausa', pausaS: 600 })
-    expect(detalleDe(r[0]!)).toBe('a 10 min de volver de una detención de 10 min')
+    /* La duración EXACTA (los 599 s de este caso), no redondeada a «10 min»: la micro está dentro de la ventana de 10. */
+    expect(detalleDe(r[0]!)).toBe('a 9 min 59 s de volver de una detención de 10 min')
     expect(r[0]!.celdas).toEqual([])
   })
 
@@ -92,14 +95,14 @@ describe('microCausa v3 · una regla por caso', () => {
     const r = clasificarMicros(entrada([colacion(T, 3000, 0), parada(T + 3000, 120, 0), micro(T + 3120 + 200, 15, 0)]))
     expect(r[0]!.causa).toBe('arranque')
     /* 3.000 s de colación + 120 s seguidos = 52 min de pausa; la micro cae 200 s (3,3 min) después de volver. */
-    expect(detalleDe(r[0]!)).toBe('a 3 min de volver de una detención de 52 min')
+    expect(detalleDe(r[0]!)).toBe('a 3 min 20 s de volver de una detención de 52 min')
   })
 
   it('arranque: los primeros 600 s de producción, desde el inicio programado', () => {
     const r = clasificarMicros(entrada([micro(PARAMETROS_V3.ARR / 1000 - 15, 15, 2)]))
     expect(r[0]).toMatchObject({ causa: 'arranque', fila: 2 })
     expect(r[0]!.evidencia).toMatchObject({ forma: 'arranque', origen: 'produccion' })
-    expect(detalleDe(r[0]!)).toBe('a 10 min de empezar a producir')
+    expect(detalleDe(r[0]!)).toBe('a 9 min 45 s de empezar a producir')
     expect(clasificarMicros(entrada([micro(PARAMETROS_V3.ARR / 1000, 15, 2)]))[0]!.causa).not.toBe('arranque')
   })
 
@@ -108,7 +111,7 @@ describe('microCausa v3 · una regla por caso', () => {
     const tarde = serie(60, (j, k) => (j === 0 && k < 20 ? 0 : ESP[j]!))
     const r = clasificarMicros(entrada([micro(1300, 15, 0)], tarde))
     expect(r[0]!.causa).toBe('arranque')
-    expect(detalleDe(r[0]!)).toBe('a 2 min de empezar a producir')
+    expect(detalleDe(r[0]!)).toBe('a 1 min 40 s de empezar a producir')
     /* A 600 s de la primera producción ya no lo es. */
     expect(clasificarMicros(entrada([micro(1200 + 600, 15, 0)], tarde))[0]!.causa).toBe('sin')
     /* Entran también las que empiezan ANTES de la primera producción. */
@@ -200,6 +203,54 @@ describe('microCausa v3 · una regla por caso', () => {
     expect(detalleDe(dist)).toBe('Ev 2 con micro 30 s después y Ev 3 45 s antes')
   })
 
+  it('línea · lo que se descarta dice SOLO lo que se evaluó: una micro suelta de otra Baader a 30 s (no es «a la vez» ni cierra la cadena) no se niega con «no se detuvieron»', () => {
+    /* Ev 2 tuvo una micro 30 s después de la de Ev 1: está dentro de la ventana de «en cadena» (22,5 a 52,5 s) pero falta Ev 3, así que ninguna regla de «Otra Baader paró» aplica. */
+    const r = clasificarMicros(entrada([micro(M30, 15, 0), micro(M30 + 30, 15, 1)]))
+    expect(r[0]!.causa).toBe('sin')
+    const t = sp(r[0]!.descartadas.find((d) => d.regla === 'linea')!.texto)
+    expect(t).toBe('ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)')
+    expect(t).not.toMatch(/no se detuvieron/)
+    /* Y dice cada una de las tres formas, con sus ventanas: a la vez (±15 s), en cadena (22,5 a 52,5 s) y detención previa (22,5 s a 2 min antes). */
+    expect(t).toMatch(/±15 s/)
+    expect(t).toMatch(/en cadena \(entre 22,5 y 52,5 s antes o después\)/)
+    expect(t).toMatch(/detención previa .*\(entre 22,5 s y 2 min antes\)/)
+  })
+
+  it('línea · lo que se descarta con solo dos Baader no habla de la cadena (la regla no existe ahí) y las ventanas salen de los parámetros de la planta', () => {
+    const dos = serie(60, (j) => ESP[j]!, 2)
+    const t = sp(clasificarMicros(entrada([micro(M30, 15, 0)], dos))[0]!.descartadas.find((d) => d.regla === 'linea')!.texto)
+    expect(t).toBe('ninguna otra Baader se detuvo a ±15 s y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)')
+    expect(t).not.toMatch(/cadena/)
+  })
+
+  it('línea · con dos Baader detenidas a la vez el texto va en plural («Ev 2 y Ev 3 se detuvieron»), con la duración en el formato del monitor', () => {
+    const q = clasificarMicros(entrada([micro(M30, 15, 0), { r: 3, f: iso(M30 + 5), s: 90, m: 1 }, { r: 3, f: iso(M30 + 5), s: 90, m: 2 }]))[0]!
+    expect(q).toMatchObject({ causa: 'linea', modo: 'a_la_vez' })
+    expect(detalleDe(q)).toBe('Ev 2 y Ev 3 se detuvieron 5 s después por Acumulación rechazo')
+    /* Una sola: singular. */
+    const una = clasificarMicros(entrada([micro(M30, 15, 0), { r: 3, f: iso(M30 + 5), s: 90, m: 1 }]))[0]!
+    expect(detalleDe(una)).toBe('Ev 2 se detuvo 5 s después por Acumulación rechazo')
+  })
+
+  it('el arranque dice la duración EXACTA, nunca «a 10 min» si la micro está dentro de los 10: 9 min 36 s', () => {
+    const r = clasificarMicros(entrada([micro(9 * 60 + 36, 15, 0)]))
+    expect(r[0]!.causa).toBe('arranque')
+    expect(detalleDe(r[0]!)).toBe('a 9 min 36 s de empezar a producir')
+    expect(detalleDe(r[0]!)).not.toMatch(/a 10 min/)
+  })
+
+  it('las duraciones del globo NO llevan minutos con decimal ni segundos de más de un minuto («hace 30,5 min», «120 s», «103 min»)', () => {
+    const t = 3 * 3600
+    const lej = clasificarMicros(entrada([parada(t - 1830 - 200, 200, 0), micro(t, 15, 0)]))[0]!
+    const desc = sp(lej.descartadas.find((d) => d.regla === 'paro')!.texto)
+    expect(desc).toBe('la última detención de Ev 1 terminó hace 30 min 30 s')
+    const largo = clasificarMicros(entrada([parada(t - 6180 - 200, 200, 0), micro(t, 15, 0)]))[0]!
+    expect(sp(largo.descartadas.find((d) => d.regla === 'paro')!.texto)).toBe('la última detención de Ev 1 terminó hace 1 h 43 min')
+    const dosMin = clasificarMicros(entrada([micro(M30, 15, 0), acum(M30 * 1000 - 120_000, 60, 1)]))[0]!
+    expect(detalleDe(dosMin)).toMatch(/se detuvo 2 min antes/)
+    for (const x of [desc, ...textos(lej), ...textos(largo), ...textos(dosMin)]) expect(x).not.toMatch(/\d,\d min|\b1\d\d s\b/)
+  })
+
   it('línea · en cadena: si falta UNA de las otras dos no hay cadena; con dos Baader no existe', () => {
     expect(clasificarMicros(entrada([micro(M30, 15, 0), micro(M30 + 30, 15, 1)]))[0]!.causa).toBe('sin')
     const dos = serie(60, (j) => ESP[j]!, 2)
@@ -223,7 +274,7 @@ describe('microCausa v3 · una regla por caso', () => {
     const q = clasificarMicros(entrada([acum(t - 90_000, 60, 1), microMs(t, 60, 0)]))[0]!
     expect(q).toMatchObject({ causa: 'linea', modo: 'tras_paro_otra', forma: 'linea_tras_paro_otra' })
     expect(q.evidencia).toMatchObject({ forma: 'linea_tras_paro_otra', nombre: 'Ev 2', haceS: 90, durS: 60 })
-    expect(detalleDe(q)).toBe(`Ev 2 se detuvo 90 s antes por ${sp(motivoLegible('ACUMULACION RECHAZO'))}`)
+    expect(detalleDe(q)).toBe(`Ev 2 se detuvo 1 min 30 s antes por ${sp(motivoLegible('ACUMULACION RECHAZO'))}`)
     expect(sp(detalleForma(q.evidencia, { fila: 0, nombre: 'Ev 1', durS: 60 }))).toBe('Forma: detención previa. La detención de Ev 2 fue no programada y duró 1 min.')
     /* La detención de Ev 2 inició en el minuto 28 (k − 2): su celda es la de la tabla. */
     expect(q.celdas).toEqual([{ fila: 1, d: -2 }])
@@ -240,11 +291,11 @@ describe('microCausa v3 · una regla por caso', () => {
     const mec = clasificarMicros(entrada([cintas(t - 90_000, 60, 1), microMs(t, 15, 0)]))[0]!
     expect(familia('CINTAS')).toBe('MEC')
     expect(mec.causa).toBe('sin')
-    expect(sp(mec.descartadas.find((d) => d.regla === 'linea')!.texto)).toBe(`Ev 2 se detuvo 90 s antes, pero por ${sp(motivoLegible('CINTAS'))}, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena`)
+    expect(sp(mec.descartadas.find((d) => d.regla === 'linea')!.texto)).toBe(`Ev 2 se detuvo 1 min 30 s antes, pero por ${sp(motivoLegible('CINTAS'))}, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena`)
     /* Sin imputar («Detencion»): se dice «sin imputar». */
     const sinImp = clasificarMicros(entrada([{ r: 0, f: new Date(T0 + t - 75_000).toISOString(), s: 60, m: 1 }, microMs(t, 15, 0)]))[0]!
     expect(sinImp.causa).toBe('sin')
-    expect(sp(sinImp.descartadas.find((d) => d.regla === 'linea')!.texto)).toBe('Ev 2 se detuvo 75 s antes, pero sin imputar, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena')
+    expect(sp(sinImp.descartadas.find((d) => d.regla === 'linea')!.texto)).toBe('Ev 2 se detuvo 1 min 15 s antes, pero sin imputar, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena')
     expect(clasificarMicros(entrada([{ r: 2, f: new Date(T0 + t - 90_000).toISOString(), s: 60, m: 1 }, microMs(t, 15, 0)]))[0]!.causa).toBe('sin')
     expect(clasificarMicros(entrada([microMs(t - 90_000, 60, 1), microMs(t, 15, 0)]))[0]!.causa).toBe('sin')
   })
@@ -274,7 +325,7 @@ describe('microCausa v3 · una regla por caso', () => {
     const r = clasificarMicros(entrada([parada(T, 200, 1), micro(T + 200 + TRAS_DETENCION_S - 1, 15, 1)]))
     expect(r[0]).toMatchObject({ causa: 'paro', forma: 'paro', modo: null, fila: 1 })
     expect(r[0]!.evidencia).toMatchObject({ forma: 'paro', haceS: 119, durS: 200 })
-    expect(detalleDe(r[0]!)).toBe('su detención terminó 119 s antes')
+    expect(detalleDe(r[0]!)).toBe('su detención terminó 1 min 59 s antes')
     expect(sp(detalleForma(r[0]!.evidencia, { fila: 1, nombre: 'Ev 2', durS: 15 }))).toBe('La detención de Ev 2 duró 3 min 20 s.')
     expect(clasificarMicros(entrada([parada(T, 200, 1), micro(T + 200 + TRAS_DETENCION_S, 15, 1)]))[0]!.causa).not.toBe('paro')
   })
@@ -291,7 +342,7 @@ describe('microCausa v3 · una regla por caso', () => {
     expect(lineaCausa(r[0]!.evidencia)).toEqual({ prefijo: null, nombre: 'Sin contexto', detalle: 'nada alrededor en los datos' })
     expect(r[0]!.descartadas.map((d) => [d.regla, sp(d.titulo), sp(d.texto)])).toEqual([
       ['arranque', 'No es arranque:', 'ya pasaron 10 min desde que Ev 1 empezó a producir (09:15) y no tuvo detenciones de 10 min o más'],
-      ['linea', 'No es «Otra Baader paró»:', 'las otras Baader no se detuvieron en los 2 min antes ni en el minuto después'],
+      ['linea', 'No es «Otra Baader paró»:', 'ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)'],
       ['paro', 'No es «Al volver de una detención»:', 'Ev 1 no tuvo detenciones antes de la micro'],
     ])
   })
@@ -300,8 +351,8 @@ describe('microCausa v3 · una regla por caso', () => {
     const r = clasificarMicros(entrada([parada(T - 1800, 1200, 0), parada(T - 400, 60, 0), micro(T + 300, 15, 0)]))
     expect(r[0]!.causa).toBe('sin')
     expect(sp(r[0]!.descartadas.find((d) => d.regla === 'arranque')!.texto)).toBe('la última detención de 10 min o más de Ev 1 terminó a las 09:35')
-    /* La última detención terminó en T − 340 y la micro empieza en T + 300: 640 s = 10,7 min. */
-    expect(sp(r[0]!.descartadas.find((d) => d.regla === 'paro')!.texto)).toBe('la última detención de Ev 1 terminó hace 10,7 min')
+    /* La última detención terminó en T − 340 y la micro empieza en T + 300: 640 s, en el formato del monitor (nunca «10,7 min»). */
+    expect(sp(r[0]!.descartadas.find((d) => d.regla === 'paro')!.texto)).toBe('la última detención de Ev 1 terminó hace 10 min 40 s')
   })
 })
 
@@ -457,7 +508,7 @@ describe('microCausa v3 · el inicio del turno', () => {
     const r = clasificarMicros(entrada([micro(1300, 15, 0)], serie(), { inicioTurnoMs: inicio }))
     expect(r[0]!.causa).toBe('arranque')
     /* El inicio programado es posterior a la primera producción (T0): el arranque cuenta desde el inicio del turno y así se dice. */
-    expect(detalleDe(r[0]!)).toBe('a 2 min de empezar el turno')
+    expect(detalleDe(r[0]!)).toBe('a 1 min 40 s de empezar el turno')
     /* Con el inicio en T0 esa misma micro (a 1300 s) ya no es arranque. */
     expect(clasificarMicros(entrada([micro(1300, 15, 0)]))[0]!.causa).toBe('sin')
     /* Y a 600 s o más del inicio del turno (no de la serie) deja de serlo. */
@@ -508,8 +559,8 @@ describe('microCausa v3 · sin datos y textos', () => {
     expect(forma(135)).toBe('Forma: a la vez. Ev 1 15 s · Ev 3 detención de 2 min 15 s.')
     /* El arranque dice cuánto estuvo detenida: «10 min 50 s» y «1 h 15 min». */
     const tras = (s: number) => sp(lineaCausa(clasificarMicros(entrada([parada(0, s, 0), micro(s + 100, 15, 0)], serie(120)))[0]!.evidencia).detalle)
-    expect(tras(650)).toBe('a 2 min de volver de una detención de 10 min 50 s')
-    expect(tras(4500)).toBe('a 2 min de volver de una detención de 1 h 15 min')
+    expect(tras(650)).toBe('a 1 min 40 s de volver de una detención de 10 min 50 s')
+    expect(tras(4500)).toBe('a 1 min 40 s de volver de una detención de 1 h 15 min')
   })
 
   it('un inicio de turno que no es un número no rompe la clasificación: el arranque cuenta desde la primera producción y no se escribe una hora inventada', () => {

@@ -8,7 +8,9 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { disenar } from '../ejeTurno'
 import { GloboMicro, GraficoRitmoVivo, type EjeDatos } from '../GraficoRitmoVivo'
+import { PARAMETROS_V3 } from '../causasCalibracion'
 import { clasificarMicros } from '../microCausa'
+import { definicionCausa } from '../textosCausas'
 import type { MonitorV2Props } from '../MonitorV2'
 import { armarTope } from '../reproduccionMinuto'
 import type { CuadroReloj, RelojDeDatos } from '../useRelojDeDatos'
@@ -631,14 +633,16 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
   /* El minuto 30 + 13 s. */
   const xMicro = xDe(30 + 13 / 60)
 
-  it('sin calibración para la línea (el doc no trae planta): la cifra dice «3 micro (+6 de 0 s)», sin «~», y los chips muestran solo micro y tiempo', () => {
+  it('sin calibración para la línea (el doc no trae planta): la cifra dice «3 micro» (las 6 de 0 s van en su línea bajo la barra), sin «~», y los chips muestran solo micro y tiempo', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
-    expect(sp(container.querySelector('.rv-cz-cifra')!.textContent)).toBe('3 micro (+6 de 0 s)')
+    expect(sp(container.querySelector('.rv-cz-cifra')!.textContent)).toBe('3 micro')
+    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('Shoplogix anota además 6 micro de 0 s, sin duración')
     expect(container.querySelector('.rv-cz-rot')).toBeNull()
     expect(container.querySelector('.rv-cz-ley')).toBeNull()
     expect(sp(container.querySelector('.rv-cz-rotchips')!.textContent)).toBe('micro · tiempo detenido')
     const chips = Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => sp(c.textContent))
-    expect(chips).toEqual(['Arranque 0 · 0 s', 'Otra Baader paró 2 · 45 s', 'Al volver de una detención 0 · 0 s', 'Sin contexto 1 · 15 s'])
+    /* Las causas sin micro no tienen chip (la barra tampoco las dibuja). */
+    expect(chips).toEqual(['Otra Baader paró 2 · 45 s', 'Sin contexto 1 · 15 s'])
     for (const c of chips) expect(c).not.toContain('~')
     /* Ya no hay aviso largo: lo que explicaba (las de 0 s) vive en el ⓘ. */
     expect(container.querySelector('.rv-mc-aviso')).toBeNull()
@@ -647,13 +651,13 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
   it('con calibración (planta chonchi): «~1 de 3 · con causa probable · estimado», chips «Otra Baader paró ~1 de 2 · 45 s» y la leyenda «causa probable · causa posible»', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={{ ...conMicro, planta: 'chonchi' }} reloj={reloj} />)
     const cifra = container.querySelector('.rv-cz-cifra')!
-    expect(sp(cifra.textContent)).toBe('~1 de 3 (+6 de 0 s)')
+    expect(sp(cifra.textContent)).toBe('~1 de 3')
     expect(sp(container.querySelector('.rv-cz-rot')!.textContent)).toBe('con causa probable · estimadoest.')
     expect(sp(container.querySelector('.rv-cz-rot .solo-pc')!.textContent)).toBe('estimado')
     expect(sp(container.querySelector('.rv-cz-rot .solo-mv')!.textContent)).toBe('est.')
     expect(sp(container.querySelector('.rv-cz-ley')!.textContent)).toBe('causa probablecausa posible')
     expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => sp(c.textContent))).toEqual([
-      'Arranque 0 · 0 s', 'Otra Baader paró ~1 de 2 · 45 s', 'Al volver de una detención 0 · 0 s', 'Sin contexto 1 · 15 s',
+      'Otra Baader paró ~1 de 2 · 45 s', 'Sin contexto 1 · 15 s',
     ])
   })
 
@@ -671,20 +675,22 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
 
   it('la marca de cada chip es el mismo dibujo de su tramo: mixto (sólido y rayado), contorno para «Sin contexto», rayado cuando lo probable es 0', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={{ ...conMicro, planta: 'chonchi' }} reloj={reloj} />)
-    const marca = (k: string) => container.querySelector(`.rv-mc-chip[data-causa="${k}"] .rv-sw`)!.getAttribute('data-marca')
+    const marca = (k: string) => container.querySelector(`.rv-mc-chip[data-causa="${k}"] .rv-sw`)?.getAttribute('data-marca')
     expect(marca('linea')).toBe('mixto')
     expect(marca('sin')).toBe('borde')
-    expect(marca('arranque')).toBe('rayado')
-    expect(marca('paro')).toBe('rayado')
+    /* Una causa sin micro no tiene chip: ni marca. («Rayado» cuando lo probable es 0 lo prueba ResumenCausas.test.tsx con «Al volver de una detención».) */
+    expect(container.querySelector('.rv-mc-chip[data-causa="arranque"]')).toBeNull()
+    expect(container.querySelector('.rv-mc-chip[data-causa="paro"]')).toBeNull()
   })
 
   it('cada chip explica su causa (title) con las cifras de los parámetros de la planta', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
     const titulos = Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => [c.getAttribute('data-causa'), sp(c.getAttribute('title'))])
-    expect(titulos.map(([k]) => k)).toEqual(['arranque', 'linea', 'paro', 'sin'])
-    expect(titulos[0]![1]).toBe('en los primeros 10 min desde que esa Baader empieza a producir, o desde que vuelve de una detención suya de 10 min o más.')
-    expect(titulos[2]![1]).toBe('hasta 2 min después de que terminó una detención de esa misma Baader.')
-    expect(titulos[3]![1]).toBe('ninguna de las anteriores. Los datos de Shoplogix aún no muestran su causa.')
+    /* Solo las causas con micro tienen chip; la definición de las demás vive en `definicionCausa` y en el ⓘ. */
+    expect(titulos.map(([k]) => k)).toEqual(['linea', 'sin'])
+    expect(titulos[1]![1]).toBe('ninguna de las anteriores. Los datos de Shoplogix aún no muestran su causa.')
+    expect(sp(definicionCausa('arranque', PARAMETROS_V3, true))).toBe('en los primeros 10 min desde que esa Baader empieza a producir, o desde que vuelve de una detención suya de 10 min o más.')
+    expect(sp(definicionCausa('paro', PARAMETROS_V3, true))).toBe('hasta 2 min después de que terminó una detención de esa misma Baader.')
   })
 
   it('el ⓘ «Micro: causa probable y posible»: las seis reglas en el orden en que se evalúan, las notas y lo que llega de las micro de 0 s', () => {
@@ -788,8 +794,9 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
       ['Ev 2', '14', '14', '1·14', '14', '16'],
       ['Ev 3', '14', '14', '14', '14', '16'],
     ])
-    /* Por defecto no hay detalle: «Ver detalle» está cerrado. */
-    expect(screen.getByRole('button', { name: /Ver detalle/ }).getAttribute('aria-expanded')).toBe('false')
+    /* Con el mouse solo encima el globo no recibe el mouse: NO hay botón (parecía uno y no se podía alcanzar). Una pista dice cómo abrirlo, y no hay detalle. */
+    expect(screen.queryByRole('button', { name: /Ver detalle/ })).toBeNull()
+    expect(sp(globo.querySelector('.gm-pista')!.textContent)).toBe('Clic en la marca para ver el detalle')
     expect(globo.querySelector('.gm-dc')).toBeNull()
   })
 
@@ -898,9 +905,11 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
   describe('dónde cae el globo respecto del encabezado fijo de la página (PC)', () => {
     const rect = (top: number, h: number) => ({ top, bottom: top + h, left: 0, right: 0, width: 0, height: h, x: 0, y: top, toJSON: () => ({}) }) as DOMRect
     /** Simula la geometría que jsdom no tiene: el encabezado fijo (49 px), el lienzo a 170,75 px de la ventana y el alto del globo. */
-    const conGeometria = (altoGlobo: number, barra: boolean, correr: () => void) => {
+    const conGeometria = (altoGlobo: number, barra: boolean, correr: () => void, banda?: 'pegada' | 'en-el-flujo') => {
       const espiaRect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
         if (this.classList.contains('v2-barra-pc')) return rect(0, 49)
+        /* La banda de la detención en curso: 52 px de alto, pegada bajo la cabecera de 56 px (borde de abajo en 108 px de la ventana). */
+        if (this.classList.contains('rv-banda')) return rect(56, 52)
         if (this.classList.contains('relative') && this.firstElementChild?.getAttribute('role') === 'img') return rect(170.75, 379)
         return rect(0, 0)
       })
@@ -908,6 +917,7 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
         return this.classList.contains('gm') ? altoGlobo : 0
       })
       if (barra) { const b = document.createElement('div'); b.className = 'v2-barra-pc'; document.body.appendChild(b) }
+      if (banda) { const b = document.createElement('div'); b.className = 'rv-banda'; b.style.position = banda === 'pegada' ? 'sticky' : 'static'; document.body.appendChild(b) }
       try { correr() } finally { espiaRect.mockRestore(); espiaAlto.mockRestore() }
     }
     const abrir = () => {
@@ -934,6 +944,31 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
         expect(parseFloat(globo.style.top) + 300).toBe(d.carriles[0]!.y0 - 10)
         expect(parseFloat(globo.style.left)).toBe(8)
       })
+    })
+
+    it('la banda de la detención en curso (.rv-banda, pegada bajo la cabecera, borde de abajo en 108 px) también cuenta: el globo arranca 8 px bajo ELLA (116 px de la ventana), no bajo la cabecera (57)', () => {
+      conGeometria(600, true, () => {
+        const globo = abrir()
+        expect(parseFloat(globo.style.top)).toBe(116 - 170.75)
+        expect(parseFloat(globo.style.top) + 170.75).toBeGreaterThanOrEqual(108)
+        expect(globo.style.bottom).toBe('')
+        /* Bajado así, se corre a un lado de la marca (a su derecha) para no taparla. */
+        expect(parseFloat(globo.style.left)).toBe(d.pl + xMicro + 14)
+      }, 'pegada')
+    })
+
+    it('la banda que va en el flujo de la página (celular: no es sticky) no tapa nada y no mueve el globo', () => {
+      conGeometria(600, true, () => {
+        const globo = abrir()
+        expect(parseFloat(globo.style.top)).toBe(57 - 170.75)
+      }, 'en-el-flujo')
+    })
+
+    it('si la banda deja sitio arriba el globo queda donde siempre (su borde de abajo 10 px sobre la fila Ev 1)', () => {
+      conGeometria(300, true, () => {
+        const globo = abrir()
+        expect(parseFloat(globo.style.top) + 300).toBe(d.carriles[0]!.y0 - 10)
+      }, 'pegada')
     })
 
     it('sin encabezado fijo en la página no se corre por él (solo por el borde de la ventana)', () => {
@@ -1003,13 +1038,16 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
       paradasMaquina: { ...conMicro.paradasMaquina!, stopMachines: ['a'], stopEvents: [{ r: 1, f: hora(30, 13), s: 15, m: 0 }] },
     }
     const { container } = render(<GraficoRitmoVivo p={p} e={uno} reloj={reloj} />)
-    expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => c.getAttribute('data-causa'))).toEqual(['arranque', 'paro', 'sin'])
+    expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => c.getAttribute('data-causa'))).toEqual(['sin'])
     const d1 = disenar(1806, 'grande', 1, true, true)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xMicro, clientY: d1.carriles[0]!.y0 + d1.carriles[0]!.h / 2, buttons: 0 }) })
-    const globo = screen.getByRole('tooltip')
-    expect(sp(globo.textContent)).toContain('Ev 1 · micro de 15 s')
-    expect(globo.querySelectorAll('tbody tr')).toHaveLength(1)
+    const y1 = d1.carriles[0]!.y0 + d1.carriles[0]!.h / 2
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xMicro, clientY: y1, buttons: 0 }) })
+    expect(sp(screen.getByRole('tooltip').textContent)).toContain('Ev 1 · micro de 15 s')
+    expect(screen.getByRole('tooltip').querySelectorAll('tbody tr')).toHaveLength(1)
+    /* Un clic en la marca lo deja fijo: entonces sí está el botón. */
+    act(() => { fireEvent.click(lienzo, { clientX: xMicro, clientY: y1 }) })
+    const globo = screen.getByRole('group', { name: 'Micro detención y su causa posible' })
     act(() => { fireEvent.click(screen.getByRole('button', { name: /Ver detalle/ })) })
     const g = sp(globo.textContent)
     expect(g).not.toContain('Otra Baader paró')
@@ -1044,10 +1082,11 @@ describe('GloboMicro · variante del celular (una columna) y marcas', () => {
     expect(cerrar).toHaveBeenCalledTimes(1)
   })
 
-  it('en PC (dos columnas) va como tooltip, solo con el botón «Ver detalle»; la fila de la micro y su columna quedan marcadas, y cada marca dice qué es', () => {
+  it('en PC (dos columnas) va como tooltip y SIN botones (el mouse no llega): la pista dice cómo abrir el detalle; fijo trae «Ver detalle» y la ✕. La fila de la micro y su columna quedan marcadas, y cada marca dice qué es', () => {
     const { container } = render(<GloboMicro q={q} />)
     expect(screen.getByRole('tooltip').className).toContain('pc2')
-    expect(screen.getAllByRole('button').map((b) => sp(b.textContent))).toEqual(['Ver detalle'])
+    expect(screen.queryAllByRole('button')).toEqual([])
+    expect(sp(container.querySelector('.gm-pista')!.textContent)).toBe('Clic en la marca para ver el detalle')
     expect(container.querySelector('.gm-cols')).not.toBeNull()
     expect(container.querySelectorAll('tbody tr.ella')).toHaveLength(1)
     expect(container.querySelector('thead th.cm')!.textContent).toBe('09:45')
@@ -1055,6 +1094,9 @@ describe('GloboMicro · variante del celular (una columna) y marcas', () => {
     expect(screen.getAllByRole('img', { name: 'micro' })).toHaveLength(2)
     /* El ① tiene nombre y aparece en la línea de causa y en las dos celdas de la tabla que lo prueban. */
     expect(screen.getAllByRole('img', { name: 'razón 1' }).length).toBe(3)
+    cleanup()
+    render(<GloboMicro q={q} fijo onCerrar={() => {}} />)
+    expect(screen.getAllByRole('button').map((b) => sp(b.textContent || b.getAttribute('aria-label'))).sort()).toEqual(['Cerrar la lectura de la micro', 'Ver detalle'])
   })
 
 })

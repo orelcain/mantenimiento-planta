@@ -72,7 +72,7 @@ describe('textosCausas · vocabulario: nada de «casualidad», «azar», «paro�
       const cal = calibracionDe(t.planta === 'Chonchi' ? 'chonchi' : 'filete')
       const r = resumirCausas(micros, cal)
       const textos: string[] = [T.ariaBarra(r.total, r.causas), ...r.causas.flatMap((c) => Object.values(T.textoChip(c.causa, c.n, c.probable, c.segundos)))]
-      textos.push(T.cifraSinCalibrar(r.total), T.masDeCeroSegundos(7), T.cifraProbable(r.probableTotal ?? 0), T.deTotal(r.total), T.resumenAccesibleMicro(micros.length))
+      textos.push(T.cifraSinCalibrar(r.total), T.microDeCeroSegundos(7), T.cifraProbable(r.probableTotal ?? 0), T.deTotal(r.total), T.resumenAccesibleMicro(micros.length))
       for (const q of micros) {
         const l = T.lineaCausa(q.evidencia)
         const tit = T.tituloGlobo('Ev 1', q.duracionS, '10:00:00')
@@ -102,7 +102,8 @@ describe('textosCausas · vocabulario: nada de «casualidad», «azar», «paro�
     expect(sp(T.textoChip('sin', 24, null, 645).tiempo)).toBe('10 min 45 s')
     expect(sp(T.cifraProbable(8) + T.deTotal(46))).toBe('~8de 46')
     expect(sp(T.cifraSinCalibrar(46))).toBe('46 micro')
-    expect(sp(T.masDeCeroSegundos(7))).toBe('(+7 de 0 s)')
+    expect(sp(T.microDeCeroSegundos(135))).toBe('Shoplogix anota además 135 micro de 0 s, sin duración')
+    expect(T.microDeCeroSegundos(135).split(/\s+/).length).toBeLessThanOrEqual(10)
     expect(T.TXT_RESUMEN.rotuloChips).toBe('micro · tiempo detenido')
     const t = T.tituloGlobo('Ev 2', 60, '10:02:13')
     expect(sp(`${t.principal} ${t.sinAnotar} · ${t.hora}`)).toBe('Ev 2 · micro de 60 s (+~20 s sin anotar) · 10:02:13')

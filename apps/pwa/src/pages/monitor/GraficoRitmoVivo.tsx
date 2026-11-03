@@ -28,7 +28,7 @@
  * Todo sale de las funciones de datos que ya existen (`ritmoVivo`, `monitorEventos`…): este archivo solo ubica y dibuja.
  */
 import { Info, Maximize2, X } from 'lucide-react'
-import { memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TouchEvent as ReactTouchEvent } from 'react'
+import { memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TouchEvent as ReactTouchEvent } from 'react'
 import { DUENO_META, duenoDe } from '@/services/shoplogix/monitorEventos'
 import { CapaAmpliada } from './AmpliarV2'
 import { useAbrirPorClave, useTamano } from './ampliarHooks'
@@ -43,10 +43,11 @@ import {
   type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type Tramo, type TonoRitmo, type Zoom,
 } from './ejeTurno'
 import { calibracionDe, type CalibracionPlanta } from './causasCalibracion'
-import { CAUSAS_MICRO, COLOR_CAUSA, clasificarMicros, estadoDeForma, motivoLegible, numerosPorCelda, type CausaMicro, type MicroClasificada } from './microCausa'
+import { CAUSAS_MICRO, COLOR_CAUSA, clasificarMicros, motivoLegible, numerosPorCelda, observacionDeForma, type CausaMicro, type MicroClasificada } from './microCausa'
 import { ResumenCausasMicro } from './ResumenCausas'
 import { ARIA_GLOBO, TXT_GLOBO, TXT_RESUMEN, detalleForma, lineaCausa, resumenAccesibleMicro, textoObservacion, tituloGlobo } from './textosCausas'
 import { GLOBO_SOBRE_FILA, ubicarGloboPc } from './globoPosicion'
+import { AIRE_BORDE, bordeLibreArriba, traerALaVista } from './bordeLibre'
 import { GloboMinuto, MARCAS_15S } from './GloboMinuto'
 import { lecturaDelMinuto, type BaaderMinuto } from './minutoPorDentro'
 import { etiquetaMaquina, paradasDetalle, type ParadaDetalle } from './ritmoVivo'
@@ -1016,16 +1017,8 @@ function Globo({ info, style, compacto, onCerrar }: { info: LecturaGlobo; style?
 
 /** Ancho del globo en PC (dos columnas) y aire mínimo a cada lado dentro del gráfico. Con menos de `GLOBO_PC_MIN_W` de gráfico va en una columna, bajo él. */
 const GLOBO_PC_ANCHO = 640
-const GLOBO_PC_AIRE = 8
+const GLOBO_PC_AIRE = AIRE_BORDE
 const GLOBO_PC_MIN_W = 720
-
-/** Trae un globo del celular a la vista, lo mínimo, sin dejarlo bajo el encabezado fijo de la página (`.v2-cabecera`, sticky z-20: `scroll-margin-top`). */
-function traerALaVista(el: HTMLElement) {
-  const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
-  el.style.scrollMarginTop = `${bajoLaBarra + GLOBO_PC_AIRE}px`
-  const reducido = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
-  el.scrollIntoView?.({ block: 'nearest', behavior: reducido ? 'auto' : 'smooth' })
-}
 
 /** La marca ▼ de una micro (con `hueco`, ▽ sin relleno: «ya estaba parando») en el color de su causa. `data-glifo` es el carácter equivalente para quien exporte el texto. */
 function MarcaMicro({ color, hueco, rotulo }: { color: string; hueco?: boolean; rotulo?: string }) {
@@ -1051,7 +1044,9 @@ function MarcaRegla() {
  * viven en `textosCausas.ts`. En PC flota (640 px, dos columnas) justo sobre las filas, al lado de la marca; en el celular (`compacto`) va en una columna
  * en el flujo de la tarjeta, justo bajo el gráfico (empuja lo de abajo en vez de taparlo; no arriba de la tarjeta: con el dedo en las marcas, ese borde
  * queda fuera de pantalla), con un ✕ de 44 px.
- * `fijo` (PC): el globo recibe el mouse (un clic en la marca lo deja así) para poder abrir «Ver detalle»; si no, flota sin frenar el puntero.
+ * `fijo` (PC): el globo recibe el mouse (un clic en la marca lo deja así) para poder abrir «Ver detalle», y trae su ✕ de 44 px; si no (solo el mouse encima de la
+ * marca), flota sin frenar el puntero y en vez del botón dice, sin ser un botón, cómo abrirlo: «Clic en la marca para ver el detalle». Al abrir «Ver detalle» el globo
+ * se trae a la vista entero (`traerALaVista`).
  * Toda cifra sale de `q`: aquí solo se ubica y se dibuja. Lo que es inferencia (la detención pudo empezar antes) se dice «pudo».
  */
 export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, alCambiarAlto, onSalir }: { q: MicroClasificada; style?: CSSProperties; compacto?: boolean; onCerrar?: () => void; refGlobo?: Ref<HTMLDivElement>; cal?: (CalibracionPlanta & { nombre: string }) | null; fijo?: boolean; alCambiarAlto?: () => void; onSalir?: (ev: ReactPointerEvent<HTMLDivElement>) => void }) {
@@ -1060,11 +1055,24 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
   const { tabla } = q
   const [abierto, setAbierto] = useState(false)
   const idDetalle = useId()
+  /* PC con el mouse solo encima de la marca: el globo no recibe el mouse, así que no hay botón (se dice cómo abrirlo). */
+  const soloHover = !compacto && !fijo
+  const raiz = useRef<HTMLDivElement | null>(null)
+  const asignarRaiz = useCallback((el: HTMLDivElement | null) => {
+    raiz.current = el
+    if (typeof refGlobo === 'function') refGlobo(el)
+    else if (refGlobo) (refGlobo as MutableRefObject<HTMLDivElement | null>).current = el
+  }, [refGlobo])
+  /* Al soltar el globo fijo, el detalle vuelve a cerrado. */
+  useEffect(() => { if (soloHover) setAbierto(false) }, [soloHover])
   /* Al abrir o cerrar «Ver detalle» el globo cambia de alto: el de PC se vuelve a ubicar. */
   useLayoutEffect(() => { alCambiarAlto?.() }, [abierto, alCambiarAlto])
+  /* Abierto, el globo crece: se trae a la vista entero (con el pie y las reglas), sin quedar bajo lo fijo de la página. */
+  useEffect(() => { if (abierto && raiz.current) traerALaVista(raiz.current) }, [abierto])
   const t = tituloGlobo(nom, q.duracionS, horaConSegundos(q.inicioMs))
   const linea = lineaCausa(q.evidencia)
-  const enObservacion = estadoDeForma(cal ?? null, q.forma) === 'en observación'
+  const observacion = observacionDeForma(cal ?? null, q.forma)
+  const enObservacion = observacion != null
   const forma = detalleForma(q.evidencia, { fila: q.fila, nombre: nom, durS: q.duracionS })
   const encabezado = (
     <header className="gm-cab">
@@ -1120,14 +1128,18 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
   /* «Ver detalle»: un botón nativo (clic, toque, Enter y espacio) con 44 px de toque; parte cerrado. */
   const detalle = (
     <div className="gm-det">
-      <button type="button" className="gm-ver" aria-expanded={abierto} aria-controls={idDetalle} onClick={() => setAbierto((a) => !a)}>
-        <span>{TXT_GLOBO.verDetalle}</span>
-        <svg className="chev" width={9} height={9} viewBox="0 0 9 9" aria-hidden><path d="M1.5 3l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" /></svg>
-      </button>
-      {abierto && (
+      {soloHover ? (
+        <p className="gm-pista">{TXT_GLOBO.pistaClic}</p>
+      ) : (
+        <button type="button" className="gm-ver tap-44" aria-expanded={abierto} aria-controls={idDetalle} onClick={() => setAbierto((a) => !a)}>
+          <span>{TXT_GLOBO.verDetalle}</span>
+          <svg className="chev" width={9} height={9} viewBox="0 0 9 9" aria-hidden><path d="M1.5 3l3 3 3-3" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+      )}
+      {abierto && !soloHover && (
         <div id={idDetalle} className="gm-dc">
           {forma && <p>{forma}</p>}
-          {enObservacion && cal && <p>{textoObservacion(cal.nombre, cal.fecha)}</p>}
+          {observacion && cal && <p>{textoObservacion(cal.nombre, cal.fecha, observacion.motivo, observacion.obs)}</p>}
           {tabla.leyendaInicio && (
             <p className="gm-ley-tri"><MarcaMicro color={COLOR_CAUSA[q.causa]} hueco /><span>{tabla.leyendaInicio}</span></p>
           )}
@@ -1146,14 +1158,18 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
       )}
     </div>
   )
+  /* La ✕ de 44 px de toque: en el celular siempre; en PC solo con el globo fijo (el que recibe el mouse). */
+  const cerrar = (
+    <span className="absolute right-[8px] top-[8px]">
+      <button type="button" onClick={onCerrar} aria-label={TXT_GLOBO.cerrar} className="tap-44 inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2" style={{ outlineColor: 'var(--v2-bien)' }}>
+        <X className="h-4 w-4" aria-hidden />
+      </button>
+    </span>
+  )
   if (compacto) {
     return (
-      <div className="v2-tip gm movil" role="group" aria-label={ARIA_GLOBO}>
-        <span className="absolute right-[8px] top-[8px]">
-          <button type="button" onClick={onCerrar} aria-label={TXT_GLOBO.cerrar} className="tap-44 inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2" style={{ outlineColor: 'var(--v2-bien)' }}>
-            <X className="h-4 w-4" aria-hidden />
-          </button>
-        </span>
+      <div ref={asignarRaiz} className="v2-tip gm movil" role="group" aria-label={ARIA_GLOBO}>
+        {cerrar}
         {encabezado}
         {causa}
         {datos}
@@ -1162,7 +1178,8 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
     )
   }
   return (
-    <div ref={refGlobo} className={`v2-tip gm pc2 absolute z-10 ${fijo ? '' : 'pointer-events-none'}`} data-globo-minuto={fijo ? '' : undefined} onPointerLeave={fijo ? onSalir : undefined} style={style} role={fijo ? 'group' : 'tooltip'} aria-label={ARIA_GLOBO}>
+    <div ref={asignarRaiz} className={`v2-tip gm pc2 absolute z-10 ${fijo ? 'fijo' : 'pointer-events-none'}`} data-globo-minuto={fijo ? '' : undefined} onPointerLeave={fijo ? onSalir : undefined} style={style} role={fijo ? 'group' : 'tooltip'} aria-label={ARIA_GLOBO}>
+      {fijo && onCerrar && cerrar}
       {encabezado}
       <div className="gm-cols">
         {causa}
@@ -1179,7 +1196,7 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
  * (y en el primer cuadro) va anclado por abajo y centrado, como siempre; la medida se hace antes de pintar, así que no se ve el salto. Se vuelve
  * a medir al cambiar de micro, al hacer scroll y al cambiar el tamaño de la ventana.
  */
-function GloboMicroPc({ q, marcaX, anchoGrafico, filaTop, alto, lienzo, cal, fijo, onSalir }: { q: MicroClasificada; marcaX: number; anchoGrafico: number; filaTop: number; alto: number; lienzo: RefObject<HTMLDivElement | null>; cal: (CalibracionPlanta & { nombre: string }) | null; fijo: boolean; onSalir: (ev: ReactPointerEvent<HTMLDivElement>) => void }) {
+function GloboMicroPc({ q, marcaX, anchoGrafico, filaTop, alto, lienzo, cal, fijo, onSalir, onCerrar }: { q: MicroClasificada; marcaX: number; anchoGrafico: number; filaTop: number; alto: number; lienzo: RefObject<HTMLDivElement | null>; cal: (CalibracionPlanta & { nombre: string }) | null; fijo: boolean; onSalir: (ev: ReactPointerEvent<HTMLDivElement>) => void; onCerrar: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [sitio, setSitio] = useState<{ top: number; left: number } | null>(null)
   /* Centrado sobre la marca y acotado al gráfico: left = clamp(x − 320, 8, ancho − 648). Es la posición de siempre y la de antes de medir. */
@@ -1190,13 +1207,13 @@ function GloboMicroPc({ q, marcaX, anchoGrafico, filaTop, alto, lienzo, cal, fij
     const globo = ref.current
     const base = lienzo.current
     if (!globo || !base) return
-    /* La barra fija de PC (`.v2-barra-pc`, sticky z-20) queda encima de las tarjetas: el globo arranca debajo de ella. */
-    const barra = document.querySelector('.v2-barra-pc')?.getBoundingClientRect()
+    /* Lo fijo de PC (la barra `.v2-barra-pc` z-20 y la banda de la detención `.rv-banda` z-10) queda encima de las tarjetas: el globo arranca debajo de ello
+       y, si arriba no cabe, se abre hacia abajo (`ubicarGloboPc`). */
     const u = ubicarGloboPc({
       lienzoTop: base.getBoundingClientRect().top,
       filaTop,
       alto: globo.offsetHeight,
-      minTop: (barra && barra.height > 0 ? barra.bottom : 0) + GLOBO_PC_AIRE,
+      minTop: bordeLibreArriba() + GLOBO_PC_AIRE,
       marcaX,
       ancho: GLOBO_PC_ANCHO,
       izqMin,
@@ -1210,7 +1227,7 @@ function GloboMicroPc({ q, marcaX, anchoGrafico, filaTop, alto, lienzo, cal, fij
     window.addEventListener('resize', ubicar)
     return () => { window.removeEventListener('scroll', ubicar, true); window.removeEventListener('resize', ubicar) }
   }, [ubicar])
-  return <GloboMicro q={q} refGlobo={ref} cal={cal} fijo={fijo} onSalir={onSalir} alCambiarAlto={ubicar} style={sitio == null ? { left: centrado, bottom: alto - filaTop + GLOBO_SOBRE_FILA } : { left: sitio.left, top: sitio.top }} />
+  return <GloboMicro q={q} refGlobo={ref} cal={cal} fijo={fijo} onSalir={onSalir} onCerrar={onCerrar} alCambiarAlto={ubicar} style={sitio == null ? { left: centrado, bottom: alto - filaTop + GLOBO_SOBRE_FILA } : { left: sitio.left, top: sitio.top }} />
 }
 
 /**
@@ -1247,8 +1264,7 @@ function GloboMinutoPc({ m, lectura, xv0, px, resumen, parcial, microAbierta, fi
        Si su borde de abajo pasa de la ventana, sube lo que falte; sin pasar bajo el encabezado fijo de la página ni sobre el borde de arriba de la ventana. */
     const lienzo = g.offsetParent?.getBoundingClientRect()
     if (gh > 0 && lienzo && typeof window !== 'undefined' && window.innerHeight > 0) {
-      const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
-      const tope = bajoLaBarra + GLOBO_PC_AIRE - lienzo.top
+      const tope = bordeLibreArriba() + GLOBO_PC_AIRE - lienzo.top
       const maxTop = window.innerHeight - GLOBO_PC_AIRE - lienzo.top - gh
       top = Math.max(Math.min(top, maxTop), tope)
     }
@@ -1683,6 +1699,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     if (a && (scrollRef.current?.contains(a) || a.closest?.('[data-globo-minuto]'))) return
     setCursor(null); setMicroSel(null); setFijo(false)
   }
+  /* La ✕ del globo fijo: lo suelta y lo cierra (con el mouse la única otra salida era otro clic en el gráfico). */
+  const soltarGloboMicro = () => { setCursor(null); setMicroSel(null); setFijo(false) }
   const microInfo = modelo && microSel ? modelo.micros.find((q) => q.id === microSel.id) ?? null : null
 
   // ── Lo que se ve alrededor ──
@@ -1862,7 +1880,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
           <GloboMinutoPc m={modelo} lectura={lectura} xv0={Math.floor(cursor!.min) * pxMinAct - (scrollRef.current?.scrollLeft ?? 0)} px={pxMinAct} resumen={resumenMinuto} parcial={info.parcial} microAbierta={microSel?.id ?? null} fijo={fijo} onMicroHover={abrirMicroDeGlobo} onMicroClick={alternarMicroDeGlobo} onSalir={salirDelGlobo} />
         )}
         {/* Su borde de abajo queda 10 px sobre la primera fila Ev (pegado a la marca, sin tapar las filas) y, si así quedara bajo el encabezado fijo, se baja lo justo. */}
-        {modelo && microInfo && microSel && !globoCompacto && <GloboMicroPc q={microInfo} marcaX={modelo.d.pl + microSel.xv} anchoGrafico={modelo.w} filaTop={modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0} alto={modelo.d.alto} lienzo={medidor} cal={cal} fijo={microFija} onSalir={salirDelGloboMicro} />}
+        {modelo && microInfo && microSel && !globoCompacto && <GloboMicroPc q={microInfo} marcaX={modelo.d.pl + microSel.xv} anchoGrafico={modelo.w} filaTop={modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0} alto={modelo.d.alto} lienzo={medidor} cal={cal} fijo={microFija} onSalir={salirDelGloboMicro} onCerrar={soltarGloboMicro} />}
         <div className="rv-pista-rueda" data-ver={pistaRueda ? 'true' : 'false'} aria-hidden>Ctrl + rueda o pellizca para acercar</div>
       </div>
       {/* En el celular (y en un gráfico de menos de 720 px) el globo va en una columna EN EL FLUJO, justo bajo el gráfico: empuja lo de abajo en vez de taparlo

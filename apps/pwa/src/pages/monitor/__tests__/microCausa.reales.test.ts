@@ -36,7 +36,7 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
     expect(q.celdas).toEqual([{ fila: 0, d: 0 }, { fila: 1, d: 0 }])
     expect(q.descartadas.map((d) => [d.regla, sp(d.titulo), sp(d.texto)])).toEqual([
       ['arranque', 'No es arranque:', 'la última detención de 10 min o más de Ev 1 terminó a las 13:35'],
-      ['paro', 'No es «Al volver de una detención»:', 'la última detención de Ev 1 terminó hace 9,5 min'],
+      ['paro', 'No es «Al volver de una detención»:', 'la última detención de Ev 1 terminó hace 9 min 30 s'],
     ])
     for (const t of textos(q)) expect(t).not.toMatch(COMO_HECHO)
   })
@@ -66,15 +66,15 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
     expect(q.tabla.leyendaInicio).toBeNull()
     expect(q.descartadas.map((d) => [d.regla, sp(d.titulo), sp(d.texto)])).toEqual([
       ['arranque', 'No es arranque:', 'ya pasaron 10 min desde que Ev 1 empezó a producir (09:23) y no tuvo detenciones de 10 min o más'],
-      ['linea', 'No es «Otra Baader paró»:', 'las otras Baader no se detuvieron en los 2 min antes ni en el minuto después'],
-      ['paro', 'No es «Al volver de una detención»:', 'la última detención de Ev 1 terminó hace 15,5 min'],
+      ['linea', 'No es «Otra Baader paró»:', 'ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)'],
+      ['paro', 'No es «Al volver de una detención»:', 'la última detención de Ev 1 terminó hace 15 min 30 s'],
     ])
   })
 
-  it('10:02:13 Ev 2: «detención previa» (Ev 1 se detuvo 90 s antes por acumulación de rechazo), con el ① en la celda de la detención y ▽ en el minuto anterior', () => {
+  it('10:02:13 Ev 2: «detención previa» (Ev 1 se detuvo 1 min 30 s antes por acumulación de rechazo), con el ① en la celda de la detención y ▽ en el minuto anterior', () => {
     const q = buscarMicro(micros, '10:02:13', 'Evisceradora 2')
     expect(q).toMatchObject({ causa: 'linea', modo: 'tras_paro_otra', duracionS: 60 })
-    expect(detalleDe(q)).toBe(`Ev 1 se detuvo 90 s antes por ${sp(motivoLegible('ACUMULACION RECHAZO'))}`)
+    expect(detalleDe(q)).toBe(`Ev 1 se detuvo 1 min 30 s antes por ${sp(motivoLegible('ACUMULACION RECHAZO'))}`)
     expect(sp(detalleForma(q.evidencia, { fila: 1, nombre: 'Ev 2', durS: 60 }))).toBe('Forma: detención previa. La detención de Ev 1 fue no programada y duró 1 min 30 s.')
     expect(q.celdas).toEqual([{ fila: 0, d: -2 }])
     expect(q.tabla.filas.map((f) => f.inicioPrevio)).toEqual([false, true, false])
@@ -88,14 +88,14 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
     expect(q.celdas).toEqual([{ fila: 0, d: 0 }, { fila: 1, d: 1 }, { fila: 2, d: 1 }])
   })
 
-  it('15:18:45 Ev 1: «Al volver de una detención» (su detención terminó 75 s antes); la detención de Ev 2 antes era «sin imputar» y no cuenta', () => {
+  it('15:18:45 Ev 1: «Al volver de una detención» (su detención terminó 1 min 15 s antes); la detención de Ev 2 antes era «sin imputar» y no cuenta', () => {
     const q = buscarMicro(micros, '15:18:45', EV1)
     expect(q).toMatchObject({ causa: 'paro', modo: null, forma: 'paro' })
     expect(lineaCausa(q.evidencia)).toMatchObject({ prefijo: 'Causa posible:', nombre: 'Al volver de una detención' })
-    expect(detalleDe(q)).toBe('su detención terminó 75 s antes')
+    expect(detalleDe(q)).toBe('su detención terminó 1 min 15 s antes')
     expect(sp(detalleForma(q.evidencia, { fila: 0, nombre: 'Ev 1', durS: 15 }))).toBe('La detención de Ev 1 duró 2 min 30 s.')
     expect(q.descartadas.map((d) => [d.regla, sp(d.titulo)])).toEqual([['arranque', 'No es arranque:'], ['linea', 'No es «Otra Baader paró»:']])
-    expect(sp(q.descartadas[1]!.texto)).toBe('Ev 2 se detuvo 75 s antes, pero sin imputar, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena')
+    expect(sp(q.descartadas[1]!.texto)).toBe('Ev 2 se detuvo 1 min 15 s antes, pero sin imputar, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena')
   })
 
   it('15:13:00 Ev 1: «a la vez» por DETENCIÓN (Ev 3 entra en una detención) y, si se quita la micro simultánea de Ev 2, sigue siéndolo', () => {
@@ -214,7 +214,7 @@ describe('microCausa v3 · Filete 02-11 Turno Día (casos reales)', () => {
     expect(q.tabla.filas.map((f) => [f.nombre, ...f.piezas, f.esperado])).toEqual([['Linea 1', 14, 11, 6, 13, 20]])
     expect(q.descartadas.map((d) => d.regla)).toEqual(['arranque', 'paro'])
     expect(sp(q.descartadas[0]!.texto)).toBe('la última detención de 10 min o más de Linea 1 terminó a las 14:16')
-    expect(sp(q.descartadas[1]!.texto)).toBe('la última detención de Linea 1 terminó hace 23,5 min')
+    expect(sp(q.descartadas[1]!.texto)).toBe('la última detención de Linea 1 terminó hace 23 min 30 s')
   })
 
   it('en Filete ninguna micro sale «Otra Baader paró» (una sola Baader); el turno completo da lo que la referencia ejecutable', () => {

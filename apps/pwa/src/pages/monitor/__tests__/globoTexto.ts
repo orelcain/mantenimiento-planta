@@ -44,6 +44,9 @@ export function lineasDelGlobo(globo: Element): string[] {
   globo.querySelectorAll('tbody tr').forEach((tr) => out.push(Array.from(tr.querySelectorAll('th,td')).map((c) => (c.tagName === 'TH' ? limpio(c.textContent) : celda(c))).join(' | ')))
   const ver = globo.querySelector('.gm-ver')
   if (ver) out.push(`${limpio(ver.textContent)} (${ver.getAttribute('aria-expanded') === 'true' ? 'abierto' : 'cerrado'})`)
+  /* PC con el mouse solo encima de la marca: en vez del botón, una pista que no es botón. */
+  const pista = globo.querySelector('.gm-pista')
+  if (pista) out.push(`(pista) ${limpio(pista.textContent)}`)
   /* El detalle, en el orden en que se lee: forma, observación, leyenda de ▽, cada regla que no aplicó con su ✕ y el pie. */
   globo.querySelectorAll('.gm-dc > *').forEach((el) => {
     if (el.classList.contains('gm-ley-tri')) out.push(`${glifo(el.querySelector('[data-glifo]'))} ${limpio(el.querySelector('span')!.textContent)}`)

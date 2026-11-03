@@ -7,13 +7,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { CALIBRACION_V3, NOMBRE_PLANTA, PARAMETROS_V3, SEMANAS_VENTANA, calibracionDe, fechaDMA, type CalibracionPlanta, type FormaCalibrada } from '../causasCalibracion'
-import { estadoDeForma, formaDe, resumirCausas, type CausaMicro, type FormaMicro, type MicroClasificada, type ModoLinea } from '../microCausa'
+import { estadoDeForma, formaDe, observacionDeForma, resumirCausas, type CausaMicro, type FormaMicro, type MicroClasificada, type ModoLinea } from '../microCausa'
 import { CHONCHI_0211_T2, clasificarDoc } from './microFixtures'
 
 interface JsonCal {
   fecha: string
-  regla: { VENTANA_SEM: number }
-  plantas: Record<string, { ventana: [string, string]; parametros: Record<string, number | boolean>; categorias: Record<string, { estado: string; precision_estimada: number }> }>
+  regla: { VENTANA_SEM: number; N_MIN: number }
+  plantas: Record<string, { ventana: [string, string]; parametros: Record<string, number | boolean>; categorias: Record<string, { estado: string; precision_estimada: number; obs: number; lift: number; ic95: [number, number] }> }>
 }
 const J = JSON.parse(readFileSync(resolve(__dirname, 'fixtures', 'calibracion_v3_2026-11-02.json'), 'utf8')) as JsonCal
 
@@ -57,6 +57,41 @@ describe('causasCalibracion · los valores son los del json de la corrida, copia
     expect(calibracionDe('otra-linea')).toBeNull()
     expect(calibracionDe('constructor')).toBeNull()
     expect(fechaDMA('2026-11-02')).toBe('02-11-2026')
+  })
+
+  it('el motivo de cada forma «en observación» se DERIVA del json (obs, lift, ic95): pocas si obs < N_MIN; sin exceso si la cota baja del IC95 es ≤ 1; las activas no llevan motivo', () => {
+    let enObservacion = 0
+    for (const planta of ['chonchi', 'yal', 'filete'] as const) {
+      for (const [forma, c] of Object.entries(CALIBRACION_V3[planta].categorias)) {
+        const ref = J.plantas[planta]!.categorias[forma]!
+        if (ref.estado === 'activa') {
+          expect(c.motivo, `${planta} ${forma}`).toBeUndefined()
+          expect(c.obs, `${planta} ${forma}`).toBeUndefined()
+          continue
+        }
+        enObservacion++
+        const esperado = ref.obs < J.regla.N_MIN ? 'pocas' : ref.ic95[0] <= 1 ? 'sin_exceso' : null
+        expect(esperado, `${planta} ${forma}: el json no explica por qué está en observación`).not.toBeNull()
+        expect(c.motivo, `${planta} ${forma} motivo`).toBe(esperado)
+        expect(c.obs, `${planta} ${forma} obs`).toBe(ref.obs)
+      }
+    }
+    expect(enObservacion).toBe(3)
+    /* Los tres casos de hoy: Chonchi y Filete «Al volver» sin exceso (lift 0,808 y 1,044); Yal «en cadena» por pocas (15 < 30) aunque el lift dé 3,685. */
+    expect(CALIBRACION_V3.chonchi.categorias.paro).toMatchObject({ motivo: 'sin_exceso', obs: 152 })
+    expect(CALIBRACION_V3.filete.categorias.paro).toMatchObject({ motivo: 'sin_exceso', obs: 139 })
+    expect(CALIBRACION_V3.yal.categorias.linea_en_cadena).toMatchObject({ motivo: 'pocas', obs: 15 })
+    expect(J.plantas.yal!.categorias.linea_en_cadena!.lift).toBeGreaterThan(3)
+  })
+
+  it('observacionDeForma: el motivo y las micro de la ventana de una forma en observación; null si está activa, no calibrada, «sin contexto» o sin calibración', () => {
+    expect(observacionDeForma(calibracionDe('yal'), 'linea_en_cadena')).toEqual({ motivo: 'pocas', obs: 15 })
+    expect(observacionDeForma(calibracionDe('chonchi'), 'paro')).toEqual({ motivo: 'sin_exceso', obs: 152 })
+    expect(observacionDeForma(calibracionDe('chonchi'), 'linea_en_cadena')).toBeNull()
+    expect(observacionDeForma(calibracionDe('yal'), 'paro')).toBeNull()
+    expect(observacionDeForma(calibracionDe('filete'), 'linea_a_la_vez')).toBeNull()
+    expect(observacionDeForma(calibracionDe('chonchi'), 'sin')).toBeNull()
+    expect(observacionDeForma(null, 'paro')).toBeNull()
   })
 
   it('el estado de cada forma sale de la calibración: «Al volver de una detención» en observación en Chonchi y Filete, activa en Yal; en cadena en observación solo en Yal', () => {

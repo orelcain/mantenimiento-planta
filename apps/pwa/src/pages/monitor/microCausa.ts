@@ -27,7 +27,7 @@
  * aplicaron y la tabla por Baader. Toda cifra sale del doc: aquí no se escribe ninguna a mano. Los textos viven en `textosCausas.ts`.
  */
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
-import { calibracionDe, PARAMETROS_V3, type CalibracionPlanta, type EstadoForma, type FormaCalibrada, type ParametrosCausas } from './causasCalibracion'
+import { calibracionDe, PARAMETROS_V3, type CalibracionPlanta, type EstadoForma, type FormaCalibrada, type MotivoObservacion, type ParametrosCausas } from './causasCalibracion'
 import { etiquetaMaquina, esMicroDetencion, unir, type Intervalo } from './ritmoVivo'
 import {
   ATRASO_ANOTA, OCULTO_S, ROTULO_CAUSA, TXT_GLOBO, motivoLegible, textoDescarteArranque, textoDescarteLinea, textoDescarteVolver, tituloDescarte,
@@ -73,8 +73,6 @@ export const ARRANQUE_PARADA_MIN_S = 600
  * límite: 15 s al segundo entra aunque sean 15,999 s crudos; 16 s ya no. Con una sola Baader (Filete) no aplica.
  */
 export const LINEA_COMUN_TOL_S = 15
-/** Lo que vale la ventana de «Al volver de una detención» sin calibración (v3). Con calibración manda la de la planta (Yal: 90 s). */
-export const TRAS_DETENCION_S = PARAMETROS_V3.TRAS / 1000
 /** «En cadena»: el piso de la ventana (22,5 s), igual en todas las plantas. */
 export const CADENA_LO_MS = 22_500
 /** «Detención previa»: el piso de la ventana (22,5 s) y las familias de motivo que cuentan (de `causas_v3.py`). */
@@ -294,6 +292,12 @@ export interface ResumenCausas {
 /** El estado de una forma en la calibración de la planta; null si no hay calibración o esa forma no está en ella. */
 export const estadoDeForma = (cal: CalibracionPlanta | null, forma: FormaMicro): EstadoForma | null =>
   cal && forma !== 'sin' ? cal.categorias[forma]?.estado ?? null : null
+
+/** Por qué una forma está «en observación» (pocas micro o sin exceso) y cuántas micro tuvo en la ventana; null si no está en observación. */
+export const observacionDeForma = (cal: CalibracionPlanta | null, forma: FormaMicro): { motivo: MotivoObservacion; obs: number | null } | null => {
+  const c = cal && forma !== 'sin' ? cal.categorias[forma] : undefined
+  return c && c.estado === 'en observación' ? { motivo: c.motivo ?? 'sin_exceso', obs: c.obs ?? null } : null
+}
 
 const FORMAS_DE: Record<CausaMicro, readonly FormaCalibrada[]> = {
   arranque: ['arranque'],
@@ -530,6 +534,8 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
         regla: 'linea',
         titulo: tituloDescarte('linea'),
         texto: textoDescarteLinea({
+          P,
+          conCadena: P.CAD && n >= 3,
           fuera: f ? { nombre: nom(f.fila), haceS: Math.round(f.haceMs / 1000), razon: f.razon } : null,
           programada: prog ? { nombre: nom(prog.fila), razon: prog.razon } : null,
         }),
@@ -539,7 +545,7 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
       descartadas.push({
         regla: 'paro',
         titulo: tituloDescarte('paro'),
-        texto: textoDescarteVolver({ nombre, haceMin: x.paro.ultimo ? (m.ini - x.paro.ultimo.fin) / 60_000 : null }),
+        texto: textoDescarteVolver({ nombre, haceS: x.paro.ultimo ? Math.round((m.ini - x.paro.ultimo.fin) / 1000) : null }),
       })
     }
 
