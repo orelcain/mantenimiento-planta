@@ -324,6 +324,68 @@
 .rv-grafico, .fc, .rb-det { --rv-mal: var(--v2-mal-texto); }
 .dark .rv-grafico, .dark .fc, .dark .rb-det { --rv-mal: color-mix(in srgb, var(--v2-mal) 82%, black); }
 
+/* «El minuto por dentro» (zoom de «Ritmo en vivo»): cada token deriva de uno que ya existe (el texto 1 o el gris de las marcas). Contrastes medidos
+   sobre la tarjeta real (78 % sobre el fondo) en `scripts/check-contrast-pizarra.mjs`: detenida 15,2:1 / 11,4:1, micro 3,5:1 / 4,5:1,
+   escalón 9,8:1 / 8,7:1. */
+.rv-grafico {
+  --rv-detenida: rgb(var(--foreground));
+  --rv-velo: rgb(var(--foreground) / 0.07);
+  --rv-micro: color-mix(in srgb, rgb(142 142 147) 88%, rgb(var(--foreground)));
+  --rv-escalon: rgb(var(--foreground) / 0.85);
+  --rv-guia: rgb(142 142 147 / 0.30);
+  --rv-minuto: rgb(142 142 147 / 0.16);
+  --rv-foco: rgb(var(--foreground) / 0.05);
+}
+/* En Penumbra el gris opaco ya da 4,5:1 sobre el carril. */
+.dark .rv-grafico { --rv-micro: rgb(142 142 147); }
+
+/* ── Globo del minuto por dentro (GloboMinuto): el minuto en 60 s, Baader por Baader, con cada parada al segundo ─────────────────────────────
+   PC: 476 px (452 en 1366), flota sobre las filas; celular: una columna anclada arriba de la tarjeta. Solo tokens que ya existen. */
+.rv-gm { box-sizing: border-box; width: 476px; max-width: calc(100% - 16px); border-radius: 22px; padding: 12px 16px 11px; font-size: 13px; line-height: 18px; text-align: left; color: rgb(var(--foreground)); }
+.rv-gm[data-tam='medio'] { width: 452px; }
+/* En PC el globo no frena el mouse (el cursor sigue recorriendo los minutos por debajo): solo sus filas de micro lo reciben. */
+.rv-gm:not(.compacto) { pointer-events: none; }
+.rv-gm button.rv-gm-ev { pointer-events: auto; }
+.rv-gm *, .rv-gm *::before, .rv-gm *::after { box-sizing: border-box; }
+.rv-gm p { margin: 0; }
+.rv-gm-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.rv-gm-cab b { font-size: 17px; line-height: 22px; font-weight: 600; }
+.rv-gm-cab span, .rv-gm-hechas, .rv-gm-nota, .rv-gm-sec h4, .rv-gm-perd, .rv-gm-tabla .enc { color: rgb(var(--muted-foreground)); }
+.rv-gm-cab span { font-size: 12px; }
+.rv-gm-lin { margin-top: 6px; }
+.rv-gm-hechas { margin-top: 2px; font-size: 12px; line-height: 16px; }
+.rv-gm-perd { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 2px; font-size: 12px; line-height: 16px; }
+.rv-gm-perd span { display: inline-flex; align-items: center; gap: 5px; }
+.rv-gm-perd i { flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.rv-gm-perd .sub { flex-basis: 100%; display: block; }
+.rv-gm-tabla { display: grid; grid-template-columns: max-content 192px 22px 54px auto; align-items: center; column-gap: 10px; row-gap: 6px; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.rv-gm-fila { display: contents; }
+.rv-gm-tabla .enc { font-size: 11px; line-height: 14px; }
+.rv-gm-tabla .num { text-align: right; }
+.rv-gm-tabla .bq { font-weight: 600; }
+.rv-gm-tabla svg { display: block; overflow: visible; }
+.rv-gm-tabla .rit { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.rv-gm-tabla .rit i { flex: none; width: 8px; height: 8px; border-radius: 99px; }
+.rv-gm-tabla .mut { color: rgb(var(--muted-foreground)); }
+.rv-gm-sec { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgb(142 142 147 / 0.22); }
+.rv-gm-sec h4 { margin: 0 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; }
+.rv-gm-ev { display: flex; align-items: baseline; gap: 6px; width: 100%; margin: 0; padding: 1px 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; font-variant-numeric: tabular-nums; }
+.rv-gm-ev + .rv-gm-ev { margin-top: 2px; }
+.rv-gm-ev .sw { flex: none; width: 10px; height: 10px; border-radius: 2px; transform: translateY(1px); }
+.rv-gm-ev .tri { flex: none; width: 10px; height: 8px; }
+.rv-gm-ev b { font-weight: 600; }
+.rv-gm-ev .falta { color: var(--v2-atento-texto); font-weight: 600; }
+/* La micro se puede abrir: con el mouse o el dedo sale su globo (causa probable y tabla). */
+button.rv-gm-ev { cursor: pointer; border-radius: 6px; }
+button.rv-gm-ev:hover, button.rv-gm-ev[aria-expanded='true'] { background: rgb(142 142 147 / 0.14); }
+button.rv-gm-ev:focus-visible { outline: 2px solid var(--v2-bien); outline-offset: 1px; }
+.rv-gm-nota { margin-top: 5px; font-size: 12px; line-height: 16px; }
+/* Celular: una columna, una línea por parada, con inset de 10 px y la ✕ de 44 px de área táctil. */
+.rv-gm.compacto { width: auto; max-width: none; font-size: 12px; line-height: 16px; padding: 10px 52px 10px 14px; border-radius: 20px; }
+.rv-gm.compacto .rv-gm-cab b { font-size: 15px; }
+.rv-gm.compacto .rv-gm-tabla { grid-template-columns: max-content 132px auto; row-gap: 4px; margin-top: 6px; }
+.rv-gm.compacto .rv-gm-sec { margin-top: 6px; padding-top: 5px; }
+
 /* «Camino a la meta», segunda vuelta: ícono como las demás tarjetas, barra con
    degradé y brillo, colores de la paleta calma. */
 :is([data-glass='v2'], .v2-piel) .v2-clasico > section > button > span:first-child {

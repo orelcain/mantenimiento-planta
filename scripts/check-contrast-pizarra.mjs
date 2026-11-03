@@ -71,6 +71,19 @@ function apca(txt, bg) {
   return s > -0.1 ? 0 : (s + 0.027) * 100
 }
 
+
+// ── Tokens de «Ritmo en vivo» (monitorGlass.css) ─────────────────────────────
+const glass = readFileSync(resolve(raiz, 'apps/pwa/src/pages/monitor/monitorGlass.css'), 'utf8').replace(/\r\n/g, '\n')
+/** El primer valor hex de `--nombre` DESPUÉS de la posición `desde` del CSS de monitorGlass (Día: el bloque claro; Penumbra: el de `.dark`). */
+function glassHex(nombre, desde = 0) {
+  const m = glass.slice(desde).match(new RegExp(`--${nombre}:\\s*(#[0-9a-fA-F]{6})`))
+  if (!m) throw new Error(`No encontré --${nombre} en monitorGlass.css`)
+  return m[1].toLowerCase()
+}
+const idxOscuro = glass.indexOf(".dark [data-glass='v2'], .dark .v2-vars {")
+if (idxOscuro < 0) throw new Error('No encontré el bloque oscuro de monitorGlass.css')
+const GRIS_MARCA = '#8e8e93'
+
 const resultados = []
 function wcag(etiqueta, texto, fondo, min = 4.5) {
   const r = ratio(texto, fondo), ok = r >= min
@@ -188,6 +201,27 @@ for (const { nombre, sel, penumbra } of INTENSIDADES) {
     const ok = t['grafico-falla'] === t[ref]
     console.log(`${ok ? 'OK  ' : 'FAIL'} --grafico-falla = --${ref} (${t['grafico-falla']} vs ${t[ref]})`)
     resultados.push({ etiqueta: `--grafico-falla = --${ref} ${nombre}`, ok, valor: 0 })
+  }
+
+  // ── «El minuto por dentro» (zoom de «Ritmo en vivo»): las marcas nuevas sobre la fila de una Baader ────────────────
+  // La tarjeta real es la tarjeta al 78 % sobre el fondo; la fila (carril) le suma el gris de las marcas al 8 %; el velo de una detención, el texto 1 al 7 %.
+  // Los tokens --rv-* derivan de estos mismos (monitorGlass.css): detenida = texto 1, micro = gris 88 % + texto 1 12 % en Día / gris en Penumbra,
+  // escalón = texto 1 al 85 %.
+  console.log(`\n=== PIZARRA ${nombre} — el minuto por dentro (marcas ≥ 3:1, rótulos ≥ 4,5:1 sobre la fila) ===`)
+  {
+    const tarjeta = componer(bg, card, 0.78)
+    const fila = componer(tarjeta, GRIS_MARCA, 0.08)
+    const velo = componer(fila, t.foreground, 0.07)
+    const micro = penumbra ? GRIS_MARCA : componer(GRIS_MARCA, t.foreground, 0.12)
+    const atento = penumbra ? glassHex('v2-atento-texto', idxOscuro) : glassHex('v2-atento-texto')
+    wcag('--rv-detenida (bloque de la detención) sobre la fila', t.foreground, fila, 3)
+    wcag('--rv-micro (muesca de la micro) sobre la fila', micro, fila, 3)
+    wcag('--rv-escalon (escalón del ritmo) sobre la fila', componer(fila, t.foreground, 0.85), fila, 3)
+    wcag('rótulo de una parada (texto 2) sobre la fila', t['muted-foreground'], fila)
+    wcag('rótulo de una parada (texto 2) sobre el velo de la detención', t['muted-foreground'], velo)
+    wcag('«falta dueño» (ámbar de texto) sobre el velo de la detención', atento, velo)
+    wcag('rótulo :15 :30 :45 (texto 2) sobre la tarjeta', t['muted-foreground'], tarjeta)
+    info('--rv-guia (guías del minuto: decorativas, no cuentan)', componer(tarjeta, GRIS_MARCA, 0.30), tarjeta)
   }
 
   console.log(`\n=== PIZARRA ${nombre} — mon-* (series del monitor, marcas ≥ 3:1 sobre la tarjeta) ===`)
