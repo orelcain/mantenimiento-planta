@@ -86,6 +86,12 @@ export interface LecturaMinuto {
   piezas: number | null
   esperadoBruto: number | null
   faltaron: FaltaronMinuto | null
+  /**
+   * El resto de lo que faltó («por ritmo») no se puede atribuir a ningún ritmo: la línea contó 0 en el minuto y ninguna Baader tiene ritmo
+   * andando medible (todas «sin dato», «poco tiempo» o detenidas). Una parada pactada que Shoplogix no anota y un minuto sin pescado se ven igual
+   * (0 piezas): el globo lo dice «sin explicar» en vez de cargárselo al ritmo. Caso real: Filete 11:23.
+   */
+  restoSinExplicar: boolean
   /** Lo programado del minuto: los segundos si son iguales en todas las Baader con programada, y el motivo. */
   programado: { s: number | null; motivo: string | null } | null
   filas: FilaMinuto[]
@@ -164,6 +170,7 @@ export function lecturaDelMinuto(args: { iniMs: number; baaders: BaaderMinuto[];
     piezas: todas ? faltaron?.piezas ?? baaders.reduce((a, b) => a + (b.piezas ?? 0), 0) : null,
     esperadoBruto: todas ? baaders.reduce((a, b) => a + (b.esperado ?? 0), 0) : null,
     faltaron,
+    restoSinExplicar: faltaron != null && faltaron.piezas === 0 && !filas.some((f) => f.estado === 'ritmo'),
     programado,
     filas,
     detenciones,

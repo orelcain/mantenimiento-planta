@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
 import {
-  andandoDelMinuto, andandoSegundos, duracionExacta, episodiosParada, esParadaMicro, faltaronDelMinuto, filasBaader, minutosConParada, paradasEnEje, relojConSegundos, ritmoAndando, tramosDelMinuto,
+  andandoDelMinuto, andandoSegundos, duracionExacta, episodiosParada, esParadaMicro, faltaronDelMinuto, filasBaader, intervalosDeParada, minutosConParada, paradasEnEje, relojConSegundos, ritmoAndando, tramosDelMinuto, type Tramo,
 } from '../ejeTurno'
 import { lecturaDelMinuto, type BaaderMinuto } from '../minutoPorDentro'
 import { clasificarMicros } from '../microCausa'
@@ -172,6 +172,17 @@ describe('faltaronDelMinuto', () => {
   it('sin paradas todo lo que falta es «ritmo»', () => {
     expect(faltaronDelMinuto([{ esperado: 18, piezas: 13 }, { esperado: 16, piezas: 16 }], [[], []])).toMatchObject({ esperado: 34, piezas: 29, faltaron: 5, detencion: 0, micro: 0, ritmo: 5 })
   })
+  it('una detención en curso encima de una micro de la misma Baader no cuenta dos veces los segundos que se montan (cada segundo, en una sola parada)', () => {
+    const par = (tipo: 'micro' | 'detencion' | 'programada', desdeS: number, hastaS: number): Tramo => ({
+      tipo, desdeS, hastaS, parada: { tipo, iniMs: desdeS * 1000, finMs: hastaS * 1000, durS: hastaS - desdeS, inicioCrudoMs: desdeS * 1000, razon: null },
+    })
+    /* Esperado 20 pz/min. Detención de 0 a 48 s y micro de 36 a 60 s: 12 s montados. Detención 48 s = 16 pz; micro solo los 12 s que quedan = 4 pz (no 8). */
+    const F = faltaronDelMinuto([{ esperado: 20, piezas: 0 }], [[par('detencion', 0, 48), par('micro', 36, 60)]])!
+    expect(F).toMatchObject({ detencion: 16, micro: 4, faltaron: 20, ritmo: 0 })
+    /* Una detención encima de la colación: la colación ya se descontó del esperado, así que esos segundos no son detención. */
+    const G = faltaronDelMinuto([{ esperado: 20, piezas: 0 }], [[par('programada', 0, 30), par('detencion', 20, 60)]])!
+    expect(G).toMatchObject({ esperado: 10, detencion: 10, micro: 0, ritmo: 0 })
+  })
 })
 
 describe('columna derecha: detenciones (sin micro) con el piso al segundo', () => {
@@ -192,6 +203,13 @@ describe('columna derecha: detenciones (sin micro) con el piso al segundo', () =
     const { paradas, lim } = paradasDe(CHONCHI_0211_T2)
     const sinMicro = paradas.filter((p) => !esParadaMicro(p))
     expect(episodiosParada(sinMicro, lim)).toBe(5)
+  })
+  it('Chonchi 02-11: con la micro incluida, el piso al segundo pasa los episodios de 35 a 33 (la columna derecha no los cuenta: solo detenciones)', () => {
+    const { paradas, lim } = paradasDe(CHONCHI_0211_T2)
+    expect(episodiosParada(paradas, lim)).toBe(33)
+    /* Sin el piso (a mano, con los milisegundos) eran 35: dos pares de paradas pegadas a menos de 1 s se contaban por separado. */
+    const crudo = intervalosDeParada(paradas, lim).length
+    expect(crudo).toBe(35)
   })
   it('el piso no cambia los minutos de reloj con alguna Baader detenida (micro incluida)', () => {
     const { paradas, lim } = paradasDe(CHONCHI_0211_T2)

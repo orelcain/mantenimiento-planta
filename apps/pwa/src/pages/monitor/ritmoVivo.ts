@@ -147,14 +147,19 @@ export function paradasPorMaquina(e: Pick<EntradaRitmoVivo, 'stopEvents' | 'stop
   if (separa) {
     for (const x of eventos) {
       const id = ids[x.m!]!
-      const a = Date.parse(x.f)
-      if (!Number.isFinite(a) || !(x.s > 0)) continue
+      const a0 = Date.parse(x.f)
+      if (!Number.isFinite(a0) || !(x.s > 0)) continue
+      /* Misma regla del segundo que `paradasDetalle`: el inicio se baja al segundo y el fin es ese inicio más la duración. Así los segundos
+         andando del llenado, del tono de la celda y de la compuerta del ritmo son los mismos que dice el globo del minuto (Chonchi 02-11:
+         15:00 Ev 1, 15:17 Ev 1 y 15:21 Ev 2 andaban 30 s con el piso y 29,60, 29,44 y 29,37 con los milisegundos crudos: el globo decía
+         «30 s andando» y «sin dato» a la vez). */
+      const a = Math.floor(a0 / 1000) * 1000
       const iv: Intervalo = [a, a + x.s * 1000]
       poner(todas, id, iv)
       if (esMicroDetencion(e.stopReasons?.[x.r])) poner(micro, id, iv)
     }
   }
-  for (const p of e.enCurso) poner(todas, p.id, [p.desdeMs, Number.POSITIVE_INFINITY])
+  for (const p of e.enCurso) poner(todas, p.id, [Math.floor(p.desdeMs / 1000) * 1000, Number.POSITIVE_INFINITY])
   for (const [id, l] of todas) todas.set(id, unir(l))
   for (const [id, l] of micro) micro.set(id, unir(l))
   return { separa, todas, micro }

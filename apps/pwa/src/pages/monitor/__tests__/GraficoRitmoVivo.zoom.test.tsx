@@ -94,7 +94,7 @@ describe('GraficoRitmoVivo · el minuto por dentro (zoom «15 min»)', () => {
     expect(container.querySelector('path[stroke="var(--rv-escalon)"]')).toBeNull()
     expect(container.querySelector('path[fill="var(--rv-detenida)"]')).toBeNull()
     expect(screen.getByText('1 detención')).toBeTruthy()
-    expect(screen.queryByText('ritmo andando de cada Baader')).toBeNull()
+    expect(screen.queryByText(/^ritmo andando de cada Baader/)).toBeNull()
     expect(screen.getByText('piezas por minuto de cada Baader')).toBeTruthy()
   })
 
@@ -105,7 +105,9 @@ describe('GraficoRitmoVivo · el minuto por dentro (zoom «15 min»)', () => {
     expect(container.querySelector('path[fill="var(--rv-detenida)"]')).not.toBeNull()
     expect(container.querySelector('path[fill="var(--rv-velo)"]')).not.toBeNull()
     expect(container.querySelector('path[fill="var(--rv-micro)"]')).not.toBeNull()
-    expect(screen.getByText('ritmo andando de cada Baader')).toBeTruthy()
+    /* El escalón es una división, no una medida: la leyenda lo dice calculado (y el trazo lleva el mismo rótulo). */
+    expect(screen.getByText('ritmo andando de cada Baader (calculado: piezas del minuto ÷ segundos andando)')).toBeTruthy()
+    expect(container.querySelector('path[stroke="var(--rv-escalon)"] title')?.textContent).toBe('Ritmo andando, calculado: piezas del minuto ÷ segundos andando')
     for (const t of ['micro', 'detención', 'programada']) expect(screen.getAllByText(t).length).toBeGreaterThan(0)
     expect(screen.getByText('1 detención')).toBeTruthy()
     /* El rótulo de la detención (cabe en 135 s a ~93 px por minuto) y el de la micro (45 s: ~70 px). */
@@ -142,11 +144,41 @@ describe('GraficoRitmoVivo · el minuto por dentro (zoom «15 min»)', () => {
     expect(screen.queryByRole('tooltip', { name: 'Micro detención y su causa probable' })).toBeNull()
   })
 
+  it('PC: el globo sigue al mouse y no recibe el puntero; un clic en el gráfico lo deja FIJO (ya no cambia de minuto y recibe el mouse) y otro lo suelta', () => {
+    const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+    fireEvent.click(screen.getByRole('button', { name: '15 min' }))
+    const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+    const hora = () => (screen.getByRole('tooltip', { name: 'El minuto por dentro' }).querySelector('.rv-gm-cab b') as HTMLElement).textContent
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 3.5), buttons: 0 }) })
+    expect(hora()).toBe('21:33')
+    expect(screen.getByRole('tooltip', { name: 'El minuto por dentro' }).getAttribute('data-fijo')).toBeNull()
+    /* Sin fijar, mover el mouse cambia de minuto (por eso las filas de micro no se alcanzaban). */
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 4.5), buttons: 0 }) })
+    expect(hora()).toBe('21:34')
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 3.5), buttons: 0 }) })
+    act(() => { fireEvent.click(lienzo, { clientX: xZoom(container, 3.5) }) })
+    expect(screen.getByRole('tooltip', { name: 'El minuto por dentro' }).getAttribute('data-fijo')).toBe('true')
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 4.5), buttons: 0 }) })
+    expect(hora()).toBe('21:33')
+    /* Salir del gráfico hacia el globo fijo no lo cierra; hacia otra parte, sí. */
+    const globo = screen.getByRole('tooltip', { name: 'El minuto por dentro' })
+    act(() => { fireEvent.pointerLeave(lienzo, { pointerType: 'mouse', relatedTarget: globo }) })
+    expect(screen.queryByRole('tooltip', { name: 'El minuto por dentro' })).not.toBeNull()
+    act(() => { fireEvent.pointerLeave(globo, { pointerType: 'mouse', relatedTarget: document.body }) })
+    expect(screen.queryByRole('tooltip', { name: 'El minuto por dentro' })).toBeNull()
+    /* Otro clic lo suelta. */
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 3.5), buttons: 0 }) })
+    act(() => { fireEvent.click(lienzo, { clientX: xZoom(container, 3.5) }) })
+    act(() => { fireEvent.click(lienzo, { clientX: xZoom(container, 3.5) }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 4.5), buttons: 0 }) })
+    expect(hora()).toBe('21:34')
+  })
+
   it('sin paradas por máquina (doc anterior) el zoom queda como siempre: el globo de siempre y la curva fina', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={{ ...eje, paradasMaquina: null }} reloj={reloj} />)
     fireEvent.click(screen.getByRole('button', { name: '15 min' }))
     expect(container.querySelector('path[stroke="var(--rv-escalon)"]')).toBeNull()
-    expect(screen.queryByText('ritmo andando de cada Baader')).toBeNull()
+    expect(screen.queryByText(/^ritmo andando de cada Baader/)).toBeNull()
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
     act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 250.5), buttons: 0 }) })
     expect(screen.getByRole('tooltip').textContent).toContain('Meta a esa hora')

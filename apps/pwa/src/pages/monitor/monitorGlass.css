@@ -346,6 +346,8 @@
 /* En PC el globo no frena el mouse (el cursor sigue recorriendo los minutos por debajo): solo sus filas de micro lo reciben. */
 .rv-gm:not(.compacto) { pointer-events: none; }
 .rv-gm button.rv-gm-ev { pointer-events: auto; }
+/* Fijo con un clic: deja de seguir al puntero y recibe el mouse entero, para llegar a las filas de micro. */
+.rv-gm[data-fijo='true'] { pointer-events: auto; }
 .rv-gm *, .rv-gm *::before, .rv-gm *::after { box-sizing: border-box; }
 .rv-gm p { margin: 0; }
 .rv-gm-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

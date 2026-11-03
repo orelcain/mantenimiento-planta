@@ -183,6 +183,13 @@ function lecturaDeMinuto(m: Modelo, k: number) {
   return lecturaDelMinuto({ iniMs: m.iniMs + (m.offsetMin + k) * 60_000, baaders, micros: m.micros })
 }
 
+/**
+ * Cómo se dice el «ritmo andando» (el escalón del gráfico, la leyenda y la columna del globo): es una división, no una medida. Shoplogix cuenta piezas
+ * por minuto y no hay producción por segundo; las piezas de un minuto pudieron caer de otro (Chonchi 02-11: 82 de 789 minutos de Baader pasan de 100 %
+ * de su velocidad seteada, el máximo es 141 %). Por eso va rotulado «calculado».
+ */
+const RITMO_ANDANDO_CALCULADO = 'Ritmo andando, calculado: piezas del minuto ÷ segundos andando'
+
 /** Ancho estimado de un rótulo de 11 px en peso 600 (no se mide con canvas: en jsdom no hay, y el cálculo tiene que ser el mismo en todas partes). */
 const anchoRotulo11 = (t: string) => t.length * 6
 
@@ -391,7 +398,8 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
     const yv = (v: number) => abajo - Math.min(1.1, v / q.esperado!) * (abajo - arriba)
     if (conDetalle && det) {
       /* El escalón: el ritmo MIENTRAS ANDUVO de cada minuto (piezas ÷ segundos andando) contra el esperado, solo sobre los tramos andados. Las piezas
-         son por minuto, no por segundo: la altura es plana en todo el tramo andado del minuto. Un minuto sin dato corta el trazo. */
+         son por minuto, no por segundo: la altura es plana en todo el tramo andado del minuto y es CALCULADA (`RITMO_ANDANDO_CALCULADO`). Un minuto
+         sin dato corta el trazo. */
       let esc = ''
       let prevX = Number.NEGATIVE_INFINITY
       for (let k = 0; k < m.n; k++) {
@@ -625,7 +633,7 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
         <g key={m.maquinas[i]!.id}>
           <line x1={0} x2={W} y1={r1(cv.arriba)} y2={r1(cv.arriba)} stroke="var(--v2-tenue)" strokeWidth={1} strokeDasharray="3 4" />
           {cv.puntos.includes(' ') && <polyline points={cv.puntos} fill="none" stroke="rgb(var(--foreground))" strokeOpacity={0.85} strokeWidth={1.4} strokeLinejoin="round" strokeLinecap="round" />}
-          {cv.escalon && <path d={cv.escalon} fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6} />}
+          {cv.escalon && <path d={cv.escalon} fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6}><title>{RITMO_ANDANDO_CALCULADO}</title></path>}
         </g>
       ))}
 
@@ -1189,9 +1197,10 @@ function GloboMicroPc({ q, marcaX, anchoGrafico, filaTop, alto, lienzo }: { q: M
 /**
  * El globo del minuto por dentro en PC: flota sobre las filas (el borde de abajo 8 px sobre la primera fila Ev, como `GloboMicro`) y, si no cabe
  * (1366 × 768: hay 226 px de aire y el globo mide más), arranca arriba del gráfico. Va a la izquierda del minuto si hay lugar y a la derecha si no.
- * No frena el mouse: solo sus filas de micro lo reciben (abren su globo).
+ * No frena el mouse (sigue al minuto bajo el puntero y se corre al acercarse): para llegar a sus filas de micro, un clic en el gráfico lo deja
+ * FIJO (`fijo`) y entonces recibe el mouse. Siempre cabe en la pantalla: si su borde de abajo pasa de la ventana, sube lo que falte.
  */
-function GloboMinutoPc({ m, lectura, xv0, px, resumen, parcial, microAbierta, onMicroHover, onMicroClick }: {
+function GloboMinutoPc({ m, lectura, xv0, px, resumen, parcial, microAbierta, fijo, onMicroHover, onMicroClick, onSalir }: {
   m: Modelo
   lectura: ReturnType<typeof lecturaDelMinuto>
   xv0: number
@@ -1199,8 +1208,11 @@ function GloboMinutoPc({ m, lectura, xv0, px, resumen, parcial, microAbierta, on
   resumen: { acum: number | null; futuro: boolean; tocaban: number | null; ahora: boolean; dif: number | null } | null
   parcial: string | null
   microAbierta: string | null
+  fijo: boolean
   onMicroHover: (id: string | null) => void
   onMicroClick: (id: string) => void
+  /** Fijo y el mouse salió del globo hacia fuera del gráfico: se cierra. */
+  onSalir: (ev: ReactPointerEvent<HTMLDivElement>) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [sitio, setSitio] = useState<{ top: number; left: number } | null>(null)
@@ -1210,14 +1222,24 @@ function GloboMinutoPc({ m, lectura, xv0, px, resumen, parcial, microAbierta, on
     const g = ref.current
     if (!g) return
     const gw = g.offsetWidth
-    const top = Math.max(d.pt + 2, (d.carriles[0]?.y0 ?? d.paradas.y0) - 8 - g.offsetHeight)
+    const gh = g.offsetHeight
+    let top = Math.max(d.pt + 2, (d.carriles[0]?.y0 ?? d.paradas.y0) - 8 - gh)
+    /* Que el globo quepa en la PANTALLA, no solo en el gráfico: en 1366 × 768 el de abajo se salía 34 px y se perdía el párrafo del tiempo oculto de la micro.
+       Si su borde de abajo pasa de la ventana, sube lo que falte; sin pasar bajo el encabezado fijo de la página ni sobre el borde de arriba de la ventana. */
+    const lienzo = g.offsetParent?.getBoundingClientRect()
+    if (gh > 0 && lienzo && typeof window !== 'undefined' && window.innerHeight > 0) {
+      const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
+      const tope = bajoLaBarra + GLOBO_PC_AIRE - lienzo.top
+      const maxTop = window.innerHeight - GLOBO_PC_AIRE - lienzo.top - gh
+      top = Math.max(Math.min(top, maxTop), tope)
+    }
     const izq = xv0 - gw - 16
     const left = d.pl + (izq >= 0 ? izq : Math.max(0, Math.min(d.plotW - gw, xv0 + px + 16)))
     setSitio((a) => (a && a.top === top && a.left === left ? a : { top, left }))
   }, [d, lectura, xv0, px])
   return (
     <GloboMinuto
-      refGlobo={ref} lectura={lectura} tam={m.d.tam} resumen={resumen} parcial={parcial} microAbierta={microAbierta} onMicroHover={onMicroHover} onMicroClick={onMicroClick}
+      refGlobo={ref} lectura={lectura} tam={m.d.tam} resumen={resumen} parcial={parcial} microAbierta={microAbierta} fijo={fijo} onMicroHover={onMicroHover} onMicroClick={onMicroClick} onPointerLeave={onSalir}
       style={sitio ? { left: sitio.left, top: sitio.top } : { left: 0, top: 0, visibility: 'hidden' }}
     />
   )
@@ -1544,6 +1566,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const [cursor, setCursor] = useState<{ min: number; xv: number } | null>(null)
   /** La micro elegida (con el cursor encima o con un toque) y dónde estaba el puntero en la ventana: el globo de la micro reemplaza al del minuto. */
   const [microSel, setMicroSel] = useState<{ id: string; xv: number } | null>(null)
+  /** PC con el zoom del minuto por dentro: un clic deja el globo del minuto quieto y el mouse puede llegar a sus filas de micro (si no, el globo seguía al puntero y se corría al acercarse). */
+  const [fijo, setFijo] = useState(false)
   const tipoRef = useRef('mouse')
   /* Tras un toque, WebKit inventa eventos de mouse: al desplazar la página para traer el globo a la vista, un `pointerleave` de tipo
      'mouse' lo cerraba a los ~0,3 s (medido el 02-11 en WebKit con toque, 375 px). Si lo último en el gráfico fue un dedo, el mouse no
@@ -1588,6 +1612,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       return
     }
     if (!esMouse(ev)) return
+    /* Con el globo fijo el puntero puede recorrer el gráfico sin mover ni cerrar nada. */
+    if (fijo) return
     /* Sobre una marca de micro sale su globo; en el resto de la fila, el del minuto. */
     const sobre = ev.buttons === 0 ? microEn(ev, false) : null
     setMicroSel((a) => (a?.id === sobre?.id ? a : sobre))
@@ -1595,7 +1621,11 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     setCursor((a) => (mismoMinuto(a, nuevo) ? a : nuevo))
   }
   const tocar = (ev: { clientX: number; clientY: number }) => {
-    if (tipoRef.current === 'mouse') return
+    if (tipoRef.current === 'mouse') {
+      /* Un clic con el mouse deja fijo el globo del minuto (y otro lo suelta). Solo con el zoom donde el globo trae las filas de micro. */
+      if (cursor && modelo?.detalle && pxPorMinuto(W, modelo.totalMin) >= EXACTO_PX_MIN) setFijo((a) => !a)
+      return
+    }
     if (dedoRef.current?.arrastra) { dedoRef.current = null; return }
     /* Un toque sobre una marca abre (o cierra) el globo de esa micro; en cualquier otra parte, el del minuto. */
     const sobre = microEn(ev, true)
@@ -1612,13 +1642,13 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const frenaToque = (ev: ReactTouchEvent) => ev.stopPropagation()
   const hayGlobo = cursor !== null || microSel !== null
   useEffect(() => {
-    if (!hayGlobo) return
+    if (!hayGlobo) { setFijo(false); return }
     const fuera = (ev: PointerEvent) => {
       const t = ev.target as Element | null
-      if (!medidor.current?.contains(t as Node) && !t?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null) }
+      if (!medidor.current?.contains(t as Node) && !t?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null); setFijo(false) }
     }
     /* Escape lo cierra, como cualquier globo (con el teclado no hay otra forma de quitarlo). */
-    const tecla = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { setCursor(null); setMicroSel(null) } }
+    const tecla = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { setCursor(null); setMicroSel(null); setFijo(false) } }
     document.addEventListener('pointerdown', fuera)
     document.addEventListener('keydown', tecla)
     return () => { document.removeEventListener('pointerdown', fuera); document.removeEventListener('keydown', tecla) }
@@ -1646,6 +1676,13 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     if (!q || !modelo) return
     const xv = ((q.inicioMs - modelo.iniMs) / 60_000) * pxMinAct - (scrollRef.current?.scrollLeft ?? 0)
     setMicroSel((a) => (a?.id === id ? null : { id, xv }))
+  }
+  /* Fijo, el mouse puede ir del globo al gráfico y volver; si sale hacia cualquier otra parte (o hacia el globo de la micro), todo se cierra como siempre. */
+  const salirDelGlobo = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    if (!fijo || ev.pointerType !== 'mouse') return
+    const a = ev.relatedTarget as Element | null
+    if (a && (scrollRef.current?.contains(a) || a.closest?.('[data-globo-minuto]'))) return
+    setCursor(null); setMicroSel(null); setFijo(false)
   }
   const microInfo = modelo && microSel ? modelo.micros.find((q) => q.id === microSel.id) ?? null : null
   const conteoMicro = modelo ? contarPorCausa(modelo.micros) : null
@@ -1706,7 +1743,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
         />
       )}
       {modelo && modelo.maquinas.some((q) => q.esperado != null) && (conEscalon
-        ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={18} height={10} aria-hidden><path d="M0 7H8V2H18" fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6} /></svg>ritmo andando de cada Baader</span>
+        ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={18} height={10} aria-hidden><path d="M0 7H8V2H18" fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6} /></svg>ritmo andando de cada Baader (calculado: piezas del minuto ÷ segundos andando)</span>
         : <Muestra trazo="curva" color="rgb(var(--foreground))" opacidad={0.85} rotulo="piezas por minuto de cada Baader" />)}
       {exactoUI && (
         <>
@@ -1808,11 +1845,11 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
             {...zResto}
             onPointerDown={(ev) => { tipoRef.current = ev.pointerType; dedoRef.current = ev.pointerType === 'touch' ? { x: ev.clientX, y: ev.clientY, arrastra: false } : null; zDown(ev) }}
             onPointerMove={mover}
-            onPointerLeave={(ev) => { zLeave(); if (esMouse(ev) && !(ev.relatedTarget as Element | null)?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null) } }}
+            onPointerLeave={(ev) => { zLeave(); if (esMouse(ev) && !(ev.relatedTarget as Element | null)?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null); setFijo(false) } }}
             onTouchStart={frenaToque}
             onTouchEnd={frenaToque}
             onClick={tocar}
-            onScroll={() => { setCursor(null); setMicroSel(null) }}
+            onScroll={() => { setCursor(null); setMicroSel(null); setFijo(false) }}
             className="v2-minuto-scroll relative min-w-0 flex-1 overflow-x-auto overflow-y-hidden"
             style={{ touchAction: zg.acercado ? 'pan-x pan-y' : 'pan-y', scrollbarWidth: 'none', height: modelo?.d.alto }}
           >
@@ -1828,7 +1865,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
         </div>
         {modelo && info && !chico && !lectura && <Globo info={info} style={{ left: globoX, top: modelo.d.pt + 18 }} />}
         {modelo && info && !chico && lectura && (
-          <GloboMinutoPc m={modelo} lectura={lectura} xv0={Math.floor(cursor!.min) * pxMinAct - (scrollRef.current?.scrollLeft ?? 0)} px={pxMinAct} resumen={resumenMinuto} parcial={info.parcial} microAbierta={microSel?.id ?? null} onMicroHover={abrirMicroDeGlobo} onMicroClick={alternarMicroDeGlobo} />
+          <GloboMinutoPc m={modelo} lectura={lectura} xv0={Math.floor(cursor!.min) * pxMinAct - (scrollRef.current?.scrollLeft ?? 0)} px={pxMinAct} resumen={resumenMinuto} parcial={info.parcial} microAbierta={microSel?.id ?? null} fijo={fijo} onMicroHover={abrirMicroDeGlobo} onMicroClick={alternarMicroDeGlobo} onSalir={salirDelGlobo} />
         )}
         {/* Su borde de abajo queda 10 px sobre la primera fila Ev (pegado a la marca, sin tapar las filas) y, si así quedara bajo el encabezado fijo, se baja lo justo. */}
         {modelo && microInfo && microSel && !globoCompacto && <GloboMicroPc q={microInfo} marcaX={modelo.d.pl + microSel.xv} anchoGrafico={modelo.w} filaTop={modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0} alto={modelo.d.alto} lienzo={medidor} />}

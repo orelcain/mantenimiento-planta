@@ -539,7 +539,7 @@ export const esParadaMicro = (p: ParadaEje) => esMicroDetencion(p.causa)
  *
  * El inicio y el fin se bajan al SEGUNDO antes de fusionar, la misma regla que `paradasDetalle` (Shoplogix pone ruido de milisegundos sobre
  * su paso de 15 s). Caso real, Chonchi 02-11: la detención de Ev 1 termina 15:17:30,564 y la de Ev 2 empieza 15:17:30,607, a 43 ms; sin el
- * piso eran dos episodios y a la vista (al segundo) es una sola, pegada. Con él, 6 detenciones sin micro pasan a 5. Los minutos de
+ * piso eran dos episodios y a la vista (al segundo) es una sola, pegada. Con él, 6 detenciones sin micro pasan a 5 (con la micro incluida, 35 episodios pasan a 33: el spec decía 35 y es el valor de antes del piso). Los minutos de
  * reloj (`minutosConParada`) no se tocan: el piso mueve cada borde menos de 1 s.
  */
 export const episodiosParada = (paradas: ParadaEje[], limites?: { min: number; max: number }) => {
@@ -605,6 +605,24 @@ export function segundosDeTipo(tramos: Tramo[], tipo: TipoParada): number {
 }
 
 /**
+ * Segundos de un tipo de parada que NO caen dentro de las de mayor prioridad (programada > detención > micro). Si dos paradas de una misma
+ * Baader se montan (una detención en curso encima de una micro), esos segundos se cuentan una sola vez, en la de mayor prioridad: el reparto de
+ * lo que faltó no los suma dos veces. Es la unión de ambos tipos menos la unión de los de mayor prioridad.
+ */
+function segundosSinMontar(tramos: Tramo[], tipo: TipoParada, mayores: TipoParada[]): number {
+  const union = (tipos: TipoParada[]) => {
+    let t = 0
+    let total = 0
+    for (const s of tramos.filter((x) => tipos.includes(x.tipo)).sort((p, q) => p.desdeS - q.desdeS)) {
+      const a = Math.max(t, s.desdeS)
+      if (s.hastaS > a) { total += s.hastaS - a; t = s.hastaS }
+    }
+    return total
+  }
+  return union([tipo, ...mayores]) - union(mayores)
+}
+
+/**
  * El ritmo de la Baader MIENTRAS ANDUVO en un minuto: piezas ÷ segundos andando × 60. null si anduvo menos de `ANDANDO_MIN_S` o si el
  * llenado normalizado de ese minuto no tiene dato (`llenado` null: la línea entera en cero sin parada que lo explique; no se afirma).
  */
@@ -650,8 +668,8 @@ export function faltaronDelMinuto(maquinas: Array<{ esperado: number | null; pie
     const prog = segundosDeTipo(tr, 'programada')
     programadaS.push(prog)
     esperado += (m.esperado! * (60 - prog)) / 60
-    det += (m.esperado! * segundosDeTipo(tr, 'detencion')) / 60
-    mic += (m.esperado! * segundosDeTipo(tr, 'micro')) / 60
+    det += (m.esperado! * segundosSinMontar(tr, 'detencion', ['programada'])) / 60
+    mic += (m.esperado! * segundosSinMontar(tr, 'micro', ['programada', 'detencion'])) / 60
     piezas += m.piezas!
   })
   const faltaron = r1(esperado - piezas)
