@@ -3061,8 +3061,9 @@ async function patchHermanas(db, monitor, nowMs = Date.now()) {
 }
 
 /**
- * Falla repetida para el Monitor (28-10-2026): la serie mensual y el ranking de
- * causas que el cron `recalcularFallaRepetida` dejó en
+ * Falla repetida para el Monitor (28-10-2026): la serie mensual, el ranking de
+ * causas y la serie semanal `semanas` («fallas repetidas de Mantención», 03-11-2026)
+ * que el cron `recalcularFallaRepetida` dejó en
  * `shoplogixReincidencia/{planta}`, más los avisos de ESTE turno: máquinas que
  * acaban de soltar un paro de una causa que vuelve en ≤ 8 h de operación al
  * menos 3 de cada 10 veces. Costo: 1 lectura del resumen + las máquinas del
@@ -3084,6 +3085,7 @@ async function buildFallaRepetida(db, plantSlug, shiftDocId, cache = new Map()) 
       const nowWallMs = shoplogixPolling.toChileWall(new Date()).getTime()
       out = {
         meses: Array.isArray(r.meses) ? r.meses : [],
+        semanas: Array.isArray(r.semanas) ? r.semanas : [],
         causas: causas.slice(0, 10),
         avisos: fallaRepetida.avisosFallaRepetida(maquinas, causas, nowWallMs),
         desde: r.desde || null,

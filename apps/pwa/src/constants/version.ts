@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.9.0' as const
+export const APP_VERSION = '4.10.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
@@ -13,7 +13,7 @@ export const VERSION_DATE = '2026-11-03' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Causas v3 de las micro: Otra Baader paró, causa probable y posible' as const
+export const VERSION_NAME = 'Monitor: «Cerca:» en el globo de la micro y KPI de fallas repetidas de Mantención' as const
 
 /**
  * Nota:

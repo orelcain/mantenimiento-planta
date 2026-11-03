@@ -6,6 +6,9 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { AnalisisV2, type AnalisisV2Props } from '../AnalisisV2'
 import type { HourlyRow } from '@/services/shoplogix/monitorHourly'
+import type { FallaRepetidaMonitor, FallaRepetidaSemana } from '@/services/shoplogix/publicShiftMonitor.service'
+import fixture from './fixtures/fallas_mantencion_semanas_2026-11-02.json'
+import { PROHIBIDAS } from './vocabulario'
 
 beforeAll(() => {
   if (!window.matchMedia) {
@@ -104,5 +107,75 @@ describe('AnalisisV2', () => {
     expect(screen.getAllByText('¿Cuánto se detuvo la línea hoy y de quién fue?').length).toBeGreaterThan(0)
     expect(screen.getByText('Cada falla de equipo')).toBeTruthy()
     expect(screen.getByText(/Evisceradora 1 · 08:20–08:26/)).toBeTruthy()
+  })
+})
+
+describe('Tarjeta «¿Tras una falla de máquina (Mantención), viene otra antes de 2 h?»', () => {
+  const tarjeta = { name: 'Fallas repetidas de Mantención' }
+  const verDetalle = { name: 'Ver detalle: fallas repetidas de Mantención' }
+  const frCon = (semanas?: FallaRepetidaSemana[]): FallaRepetidaMonitor => ({ meses: [], causas: [], avisos: [], desde: null, calculadoEl: null, semanas })
+  /** Con el `hoy` del fixture: lunes 2026-11-02, la semana en curso. */
+  const conFallas = (semanas?: FallaRepetidaSemana[]): AnalisisV2Props => ({ ...base(), hoy: '2026-11-02', fallaRepetida: frCon(semanas) })
+  const chonchi: FallaRepetidaSemana[] = fixture.chonchi
+  const yal: FallaRepetidaSemana[] = fixture.yal
+
+  it('Chonchi: 9 % contra 37 %, «Mejor», −28 pts y la raya del promedio de 9 meses', () => {
+    render(<AnalisisV2 {...conFallas(chonchi)} />)
+    const card = screen.getByRole('article', tarjeta)
+    expect(within(card).getByText('¿Tras una falla de máquina (Mantención), viene otra antes de 2 h?')).toBeTruthy()
+    expect(within(card).getByText('9')).toBeTruthy()
+    expect(within(card).getByText('% tuvo otra en la misma Baader')).toBeTruthy()
+    expect(within(card).getByText('Mejor que las 4 semanas anteriores')).toBeTruthy()
+    expect(card.querySelector('.an-ref')?.textContent).toBe('−28 pts contra las 4 semanas anteriores (37 %)')
+    expect(within(card).getByText('Últimas 4 semanas')).toBeTruthy()
+    expect(within(card).getByText('05-10 al 01-11 · 4 de 44')).toBeTruthy()
+    expect(within(card).getByText('9 %')).toBeTruthy()
+    expect(within(card).getByText('4 semanas antes')).toBeTruthy()
+    expect(within(card).getByText('07-09 al 04-10 · 13 de 35')).toBeTruthy()
+    expect(within(card).getByText('37 %')).toBeTruthy()
+    expect(within(card).getByText('promedio de 9 meses: 26 %')).toBeTruthy()
+  })
+
+  it('Yal: 24 % contra 7 %, «Peor», +17 pts', () => {
+    render(<AnalisisV2 {...conFallas(yal)} />)
+    const card = screen.getByRole('article', tarjeta)
+    expect(within(card).getByText('24')).toBeTruthy()
+    expect(within(card).getByText('Peor que las 4 semanas anteriores')).toBeTruthy()
+    expect(card.querySelector('.an-ref')?.textContent).toBe('+17 pts contra las 4 semanas anteriores (7 %)')
+    expect(within(card).getByText('7 %')).toBeTruthy()
+  })
+
+  it('sin `semanas` no hay tarjeta', () => {
+    render(<AnalisisV2 {...conFallas(undefined)} />)
+    expect(screen.queryByRole('article', tarjeta)).toBeNull()
+  })
+
+  it('sin `fallaRepetida` del backend no hay tarjeta', () => {
+    render(<AnalisisV2 {...base()} />)
+    expect(screen.queryByRole('article', tarjeta)).toBeNull()
+  })
+
+  it('«Ver detalle» abre el panel con las semanas: la en curso fuera de la cifra y el resumen de 4 y 4', () => {
+    render(<AnalisisV2 {...conFallas(chonchi)} />)
+    fireEvent.click(screen.getByRole('button', verDetalle))
+    expect(screen.getByText('Semana a semana · fallas de más de 5 min')).toBeTruthy()
+    expect(screen.getByText('Semana del 02-11 · en curso')).toBeTruthy()
+    expect(screen.getByText('Semana del 26-10')).toBeTruthy()
+    expect(screen.getByText('Semana del 28-09')).toBeTruthy()
+    expect(screen.getByText('Últimas 4')).toBeTruthy()
+    expect(screen.getByText('4 antes')).toBeTruthy()
+    expect(screen.getByText('La semana en curso no entra en la cifra.')).toBeTruthy()
+    expect(screen.getByText('Una semana sola va de 0 a 52 %: por eso la tarjeta suma 4.')).toBeTruthy()
+  })
+
+  it('ningún texto nuevo casa con PROHIBIDAS ni dice «desvío»', () => {
+    render(<AnalisisV2 {...conFallas(chonchi)} />)
+    const card = screen.getByRole('article', tarjeta)
+    expect(PROHIBIDAS.test(card.textContent ?? '')).toBe(false)
+    expect(card.textContent).not.toMatch(/desvío/i)
+    fireEvent.click(screen.getByRole('button', verDetalle))
+    const panel = screen.getByRole('dialog')
+    expect(PROHIBIDAS.test(panel.textContent ?? '')).toBe(false)
+    expect(panel.textContent).not.toMatch(/desvío/i)
   })
 })

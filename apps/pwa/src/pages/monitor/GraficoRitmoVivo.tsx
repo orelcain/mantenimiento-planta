@@ -45,7 +45,7 @@ import {
 import { calibracionDe, type CalibracionPlanta } from './causasCalibracion'
 import { CAUSAS_MICRO, COLOR_CAUSA, clasificarMicros, motivoLegible, numerosPorCelda, observacionDeForma, type CausaMicro, type MicroClasificada } from './microCausa'
 import { ResumenCausasMicro } from './ResumenCausas'
-import { ARIA_GLOBO, TXT_GLOBO, TXT_RESUMEN, detalleForma, lineaCausa, resumenAccesibleMicro, textoObservacion, tituloGlobo } from './textosCausas'
+import { ARIA_GLOBO, TXT_GLOBO, TXT_RESUMEN, detalleCerca, detalleForma, lineaCausa, lineaCerca, resumenAccesibleMicro, textoObservacion, tituloGlobo } from './textosCausas'
 import { GLOBO_SOBRE_FILA, ubicarGloboPc } from './globoPosicion'
 import { AIRE_BORDE, bordeLibreArriba, traerALaVista } from './bordeLibre'
 import { GloboMinuto, MARCAS_15S } from './GloboMinuto'
@@ -1039,8 +1039,9 @@ function MarcaRegla() {
 /**
  * Qué pasó alrededor de una micro y qué causa POSIBLE tiene (`microCausa.ts`). Siempre «posible, no imputada»: son reglas de contexto, no un
  * diagnóstico. Por defecto se ven tres piezas: el encabezado en una línea, UNA línea de causa armada con los datos (con su ① si una celda de la tabla la
- * prueba) y la tabla por Baader (piezas por minuto de los minutos k−2 a k+1), donde ese mismo número aparece en la celda que lo prueba. «Ver detalle»
- * parte cerrado y abre la forma con su duración, si la causa está en observación, la leyenda de ▽, las reglas que no aplicaron y el pie. Los textos
+ * prueba) y la tabla por Baader (piezas por minuto de los minutos k−2 a k+1), donde ese mismo número aparece en la celda que lo prueba. Si hay una detención
+ * anotada a 5 min o menos (`q.cerca`), va además una línea «Cerca:» bajo la tabla: un hecho del registro, nunca una causa. «Ver detalle»
+ * parte cerrado y abre la forma con su duración, si la causa está en observación, la leyenda de ▽, las reglas que no aplicaron, el párrafo «Cerca:» y el pie. Los textos
  * viven en `textosCausas.ts`. En PC flota (640 px, dos columnas) justo sobre las filas, al lado de la marca; en el celular (`compacto`) va en una columna
  * en el flujo de la tarjeta, justo bajo el gráfico (empuja lo de abajo en vez de taparlo; no arriba de la tarjeta: con el dedo en las marcas, ese borde
  * queda fuera de pantalla), con un ✕ de 44 px.
@@ -1125,6 +1126,10 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
       </table>
     </div>
   )
+  /* «Cerca:» (`lineaCerca`): a todo el ancho bajo la tabla, sin caja ni color propio; y su párrafo en el detalle abierto (`detalleCerca`). */
+  const cercaTxt = lineaCerca(q.cerca)
+  const cerca = cercaTxt != null && <p className="gm-cerca tabular-nums"><b>{TXT_GLOBO.cerca}</b> {cercaTxt}</p>
+  const detCerca = detalleCerca(q.cerca)
   /* «Ver detalle»: un botón nativo (clic, toque, Enter y espacio) con 44 px de toque; parte cerrado. */
   const detalle = (
     <div className="gm-det">
@@ -1153,6 +1158,7 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
               ))}
             </ul>
           )}
+          {detCerca && <p><b>{detCerca.titulo}</b> {detCerca.texto}</p>}
           <p className="gm-pie">{q.causa === 'sin' ? TXT_GLOBO.pieSin : TXT_GLOBO.pieGeneral}</p>
         </div>
       )}
@@ -1173,6 +1179,7 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
         {encabezado}
         {causa}
         {datos}
+        {cerca}
         {detalle}
       </div>
     )
@@ -1185,6 +1192,7 @@ export function GloboMicro({ q, style, compacto, onCerrar, refGlobo, cal, fijo, 
         {causa}
         {datos}
       </div>
+      {cerca}
       {detalle}
     </div>
   )

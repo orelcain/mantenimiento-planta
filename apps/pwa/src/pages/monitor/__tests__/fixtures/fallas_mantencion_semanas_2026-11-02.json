@@ -1,0 +1,501 @@
+{
+ "_fuente": "Semanas del KPI «fallas repetidas de Mantención» al 2026-11-02: volcado de solo lectura de Firestore del 02-11-2026 a las 23:10 (estudio de imputaciones, ext.json), turnos con nombre, ventana de 300 días (desde 2026-01-06). Falla = detención de más de 300 s con hoja del bucket mantención; se unen las de la misma Baader con menos de 10 min entre fin e inicio; repetida = la siguiente de la misma Baader empieza ≤ 2 h después del fin. La semana del 2026-11-02 va en curso.",
+ "chonchi": [
+  {
+   "semana": "2026-02-02",
+   "turnos": 12,
+   "fallas": 10,
+   "repetidas": 4
+  },
+  {
+   "semana": "2026-02-09",
+   "turnos": 12,
+   "fallas": 8,
+   "repetidas": 5
+  },
+  {
+   "semana": "2026-02-16",
+   "turnos": 12,
+   "fallas": 9,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-02-23",
+   "turnos": 12,
+   "fallas": 4,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-04-27",
+   "turnos": 8,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-05-04",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-05-11",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-05-18",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-05-25",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-01",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-08",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-15",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-22",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-29",
+   "turnos": 11,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-07-06",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-07-13",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-07-20",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-07-27",
+   "turnos": 12,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-08-03",
+   "turnos": 12,
+   "fallas": 38,
+   "repetidas": 11
+  },
+  {
+   "semana": "2026-08-10",
+   "turnos": 12,
+   "fallas": 18,
+   "repetidas": 5
+  },
+  {
+   "semana": "2026-08-17",
+   "turnos": 12,
+   "fallas": 19,
+   "repetidas": 6
+  },
+  {
+   "semana": "2026-08-24",
+   "turnos": 12,
+   "fallas": 12,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-08-31",
+   "turnos": 12,
+   "fallas": 3,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-09-07",
+   "turnos": 12,
+   "fallas": 3,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-09-14",
+   "turnos": 12,
+   "fallas": 4,
+   "repetidas": 1
+  },
+  {
+   "semana": "2026-09-21",
+   "turnos": 12,
+   "fallas": 7,
+   "repetidas": 1
+  },
+  {
+   "semana": "2026-09-28",
+   "turnos": 12,
+   "fallas": 21,
+   "repetidas": 11
+  },
+  {
+   "semana": "2026-10-05",
+   "turnos": 12,
+   "fallas": 16,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-10-12",
+   "turnos": 12,
+   "fallas": 4,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-10-19",
+   "turnos": 12,
+   "fallas": 20,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-10-26",
+   "turnos": 12,
+   "fallas": 4,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-11-02",
+   "turnos": 3,
+   "fallas": 3,
+   "repetidas": 0
+  }
+ ],
+ "yal": [
+  {
+   "semana": "2026-01-26",
+   "turnos": 2,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-02-02",
+   "turnos": 17,
+   "fallas": 5,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-02-09",
+   "turnos": 17,
+   "fallas": 13,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-02-16",
+   "turnos": 17,
+   "fallas": 2,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-02-23",
+   "turnos": 15,
+   "fallas": 8,
+   "repetidas": 3
+  },
+  {
+   "semana": "2026-04-20",
+   "turnos": 2,
+   "fallas": 4,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-04-27",
+   "turnos": 12,
+   "fallas": 7,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-05-04",
+   "turnos": 12,
+   "fallas": 1,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-05-11",
+   "turnos": 12,
+   "fallas": 13,
+   "repetidas": 3
+  },
+  {
+   "semana": "2026-05-18",
+   "turnos": 9,
+   "fallas": 2,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-05-25",
+   "turnos": 7,
+   "fallas": 2,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-01",
+   "turnos": 7,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-08",
+   "turnos": 7,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-15",
+   "turnos": 7,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-22",
+   "turnos": 7,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-06-29",
+   "turnos": 7,
+   "fallas": 5,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-07-06",
+   "turnos": 11,
+   "fallas": 14,
+   "repetidas": 4
+  },
+  {
+   "semana": "2026-07-13",
+   "turnos": 11,
+   "fallas": 6,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-07-20",
+   "turnos": 11,
+   "fallas": 15,
+   "repetidas": 5
+  },
+  {
+   "semana": "2026-07-27",
+   "turnos": 11,
+   "fallas": 6,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-08-03",
+   "turnos": 17,
+   "fallas": 10,
+   "repetidas": 3
+  },
+  {
+   "semana": "2026-08-10",
+   "turnos": 17,
+   "fallas": 4,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-08-17",
+   "turnos": 17,
+   "fallas": 9,
+   "repetidas": 1
+  },
+  {
+   "semana": "2026-08-24",
+   "turnos": 17,
+   "fallas": 5,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-08-31",
+   "turnos": 17,
+   "fallas": 9,
+   "repetidas": 1
+  },
+  {
+   "semana": "2026-09-07",
+   "turnos": 17,
+   "fallas": 6,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-09-14",
+   "turnos": 17,
+   "fallas": 3,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-09-21",
+   "turnos": 17,
+   "fallas": 12,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-09-28",
+   "turnos": 17,
+   "fallas": 9,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-10-05",
+   "turnos": 17,
+   "fallas": 14,
+   "repetidas": 4
+  },
+  {
+   "semana": "2026-10-12",
+   "turnos": 17,
+   "fallas": 10,
+   "repetidas": 4
+  },
+  {
+   "semana": "2026-10-19",
+   "turnos": 17,
+   "fallas": 16,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-10-26",
+   "turnos": 17,
+   "fallas": 6,
+   "repetidas": 1
+  },
+  {
+   "semana": "2026-11-02",
+   "turnos": 3,
+   "fallas": 5,
+   "repetidas": 1
+  }
+ ],
+ "filete": [
+  {
+   "semana": "2026-07-20",
+   "turnos": 6,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-07-27",
+   "turnos": 6,
+   "fallas": 0,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-08-03",
+   "turnos": 12,
+   "fallas": 6,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-08-10",
+   "turnos": 12,
+   "fallas": 5,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-08-17",
+   "turnos": 12,
+   "fallas": 2,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-08-24",
+   "turnos": 12,
+   "fallas": 5,
+   "repetidas": 0
+  },
+  {
+   "semana": "2026-08-31",
+   "turnos": 12,
+   "fallas": 10,
+   "repetidas": 3
+  },
+  {
+   "semana": "2026-09-07",
+   "turnos": 12,
+   "fallas": 8,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-09-14",
+   "turnos": 12,
+   "fallas": 4,
+   "repetidas": 1
+  },
+  {
+   "semana": "2026-09-21",
+   "turnos": 12,
+   "fallas": 6,
+   "repetidas": 1
+  },
+  {
+   "semana": "2026-09-28",
+   "turnos": 12,
+   "fallas": 17,
+   "repetidas": 5
+  },
+  {
+   "semana": "2026-10-05",
+   "turnos": 12,
+   "fallas": 12,
+   "repetidas": 5
+  },
+  {
+   "semana": "2026-10-12",
+   "turnos": 12,
+   "fallas": 7,
+   "repetidas": 2
+  },
+  {
+   "semana": "2026-10-19",
+   "turnos": 12,
+   "fallas": 15,
+   "repetidas": 3
+  },
+  {
+   "semana": "2026-10-26",
+   "turnos": 12,
+   "fallas": 20,
+   "repetidas": 10
+  },
+  {
+   "semana": "2026-11-02",
+   "turnos": 3,
+   "fallas": 1,
+   "repetidas": 0
+  }
+ ]
+}

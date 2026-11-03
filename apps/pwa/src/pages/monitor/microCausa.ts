@@ -25,15 +25,18 @@
  *
  * Además de la causa, cada micro trae lo que el globo muestra: la evidencia con sus cifras, las celdas de la tabla que la prueban, las reglas que NO
  * aplicaron y la tabla por Baader. Toda cifra sale del doc: aquí no se escribe ninguna a mano. Los textos viven en `textosCausas.ts`.
+ *
+ * «Cerca:» (`cerca`) es otro dato y tampoco es una causa: la detención con motivo de hoja que el supervisor anotó a 5 min o menos de la micro, en cualquier
+ * Baader (estudio de imputaciones 03-11-2026, §3.2 y §8.2). Es un hecho del registro, con su hora y su distancia; si la causa de la micro ya la nombra, no se repite.
  */
-import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
+import { matchImputacion, normalizeReason } from '@/services/shoplogix/imputacionTaxonomy'
 import { calibracionDe, PARAMETROS_V3, type CalibracionPlanta, type EstadoForma, type FormaCalibrada, type MotivoObservacion, type ParametrosCausas } from './causasCalibracion'
 import { etiquetaMaquina, esMicroDetencion, unir, type Intervalo } from './ritmoVivo'
 import {
-  ATRASO_ANOTA, OCULTO_S, ROTULO_CAUSA, TXT_GLOBO, motivoLegible, textoDescarteArranque, textoDescarteLinea, textoDescarteVolver, tituloDescarte,
+  ATRASO_ANOTA, CERCA_MAX_S, OCULTO_S, ROTULO_CAUSA, TXT_GLOBO, motivoLegible, textoDescarteArranque, textoDescarteLinea, textoDescarteVolver, tituloDescarte,
 } from './textosCausas'
 
-export { ATRASO_ANOTA, OCULTO_S, ROTULO_CAUSA, motivoLegible }
+export { ATRASO_ANOTA, CERCA_MAX_S, OCULTO_S, ROTULO_CAUSA, motivoLegible }
 
 export type CausaMicro = 'arranque' | 'linea' | 'paro' | 'sin'
 /** Las formas de «Otra Baader paró»: solo se dicen en el detalle y en el ⓘ. */
@@ -102,6 +105,18 @@ export function familia(razon: string | null | undefined): string {
   if (n.startsWith('CUMPLIMIENTO CUOTA') || n.startsWith('CONTRASTACION') || n.startsWith('PUNTO CERO') || n.startsWith('FLOW ICE')) return 'PLAN'
   if (['MOTORES', 'CINTAS', 'BOMBAS', 'CORREAS', 'PERNOS', 'CUCHILL', 'GEA', 'BALANZAS', 'FALLA OPERACIONAL'].some((k) => n.includes(k))) return 'MEC'
   return 'OTRO'
+}
+
+/**
+ * El nombre de la hoja de la taxonomía de la app que lleva una detención («Falta MMPP» para «Falta MMPP Flujo Acopio»), o null si no sirve para «Cerca:»:
+ * sin razón, «Detención» y «Sin razón» no dicen nada; una razón sin hoja («Limpieza de Ducto») tampoco; y una planificada (colación, cambio de turno…) no es un motivo.
+ */
+export function motivoConHoja(razon: string | null | undefined): string | null {
+  const n = normalizeReason(razon)
+  if (n === '' || n === 'DETENCION' || n === 'SIN RAZON') return null
+  const m = matchImputacion(razon)
+  if (!m.leaf || m.bucket === 'planificado') return null
+  return m.leaf.label
 }
 
 /** Los parámetros que valen para una planta: los de su calibración, o los de v3 si no tiene. */
@@ -191,6 +206,26 @@ export interface TablaGlobo {
   leyendaInicio: string | null
 }
 
+/** La detención anotada cerca de una micro («Cerca:»): un hecho del registro, con su motivo de hoja y su distancia. */
+export interface CercaMicro {
+  /** Índice de la Baader de la detención en la serie. */
+  fila: number
+  /** «Ev 3», con `etiquetaMaquina`. */
+  nombre: string
+  /** El texto de Shoplogix, tal cual («Falta MMPP Flujo Acopio»). */
+  razon: string
+  /** La hoja de la taxonomía («Falta MMPP»). */
+  motivo: string
+  /** Inicio de la detención (ms). */
+  inicioMs: number
+  /** Duración anotada de la detención (s). */
+  durS: number
+  /** Math.round((inicio de la micro − inicio de la detención) / 1000): > 0 = la detención empezó antes. */
+  deltaS: number
+  /** La causa de la micro ya nombra ESTA detención: el globo no repite la línea «Cerca:». */
+  nombrada: boolean
+}
+
 export interface MicroClasificada {
   /** Estable entre lecturas: máquina + inicio. */
   id: string
@@ -214,6 +249,8 @@ export interface MicroClasificada {
   /** Las reglas que no aplicaron, en orden de precedencia. */
   descartadas: ReglaDescartada[]
   tabla: TablaGlobo
+  /** La detención con motivo anotada a 5 min o menos de la micro (`CERCA_MAX_S`), o null. Si `nombrada`, el globo no la repite. */
+  cerca: CercaMicro | null
 }
 
 interface Evento { fila: number; ini: number; fin: number; s: number; razon: string | null; micro: boolean; programada: boolean }
@@ -365,6 +402,12 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
   }
   const micros = eventos.filter((v) => v.micro).sort((a, b) => a.ini - b.ini)
   const paros = eventos.filter((v) => !v.micro)
+  /* «Cerca:» (`CercaMicro`): las detenciones con motivo de hoja que no son programadas, de cualquier Baader (también la de la micro); por inicio y luego por fila. */
+  const candidatasCerca = paros
+    .filter((v) => !v.programada)
+    .map((v) => ({ v, motivo: motivoConHoja(v.razon) }))
+    .filter((c): c is { v: Evento; motivo: string } => c.motivo != null)
+    .sort((a, b) => a.v.ini - b.v.ini || a.v.fila - b.v.fila)
   /** Detenciones (no micro) de cada Baader UNIDAS: una pausa partida en dos registros se cuenta entera para el arranque. */
   const parosUnidos = new Map<number, Intervalo[]>()
   for (const p of paros) parosUnidos.set(p.fila, [...(parosUnidos.get(p.fila) ?? []), [p.ini, p.fin] as Intervalo])
@@ -575,6 +618,24 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
     return { evidencia: evidenciaDe(x), celdas: celdasDe(x), descartadas, tabla }
   }
 
+  /** La detención con motivo más cercana a la micro (≤ CERCA_MAX_S, en ms). Empate: la de menor inicio y luego la de menor fila (la lista ya viene así). */
+  const cercaDe = (x: Evaluacion): CercaMicro | null => {
+    let elegida: { v: Evento; motivo: string } | null = null
+    for (const c of candidatasCerca) {
+      const dif = Math.abs(x.m.ini - c.v.ini)
+      if (dif > CERCA_MAX_S * 1000) continue
+      if (elegida == null || dif < Math.abs(x.m.ini - elegida.v.ini)) elegida = c
+    }
+    if (elegida == null) return null
+    const { v, motivo } = elegida
+    /* Lo que el globo ya nombra: la otra Baader de «a la vez» (solo si es una detención, no una micro) o la de «detención previa» que muestra la evidencia. */
+    const evidencia = x.modo === 'tras_paro_otra' ? x.otra.reduce((a, b) => (b.haceMs < a.haceMs ? b : a)) : null
+    const nombrada = x.modo === 'a_la_vez'
+      ? x.linea.otros.some((c) => !c.micro && c.fila === v.fila && c.ini === v.ini)
+      : evidencia != null && evidencia.fila === v.fila && evidencia.ini === v.ini
+    return { fila: v.fila, nombre: nom(v.fila), razon: v.razon ?? '', motivo, inicioMs: v.ini, durS: v.s, deltaS: Math.round((x.m.ini - v.ini) / 1000), nombrada }
+  }
+
   return micros.map((m): MicroClasificada => {
     const q = serie.maquinas[m.fila]!
     const x = evaluaciones.get(m)!
@@ -590,6 +651,7 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
       forma: formaDe(x.causa, x.modo),
       minuto: x.k,
       ...explicar(x),
+      cerca: cercaDe(x),
     }
   })
 }
