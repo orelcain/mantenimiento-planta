@@ -78,11 +78,12 @@ export const ARRANQUE_VENTANA_S = 600
  * parte en subtipos. Datos: en 7 turnos de Chonchi suma 14 micro (de 16,9 % a 20,8 %: de 60 a 74 de 356); muy sobre el azar
  * (3,5 veces en la validación; 4,7 con una permutación simple de los inicios: 20 observadas contra 4,2 esperadas).
  *
- * DECISIÓN CONSCIENTE (límite exacto): el ±15 s se compara al milisegundo (≤ 15.000 ms), tal como se validó. Los inicios de
- * Shoplogix van de a un paso de 15 s con ruido de milisegundos, así que dos paradas a UN paso de distancia entran o no según
- * 2 a 9 ms. En los 5 turnos de Chonchi son 7 de 262 micro (2,7 %) las que quedan fuera por 15,002 a 15,009 s y caen en «Sin
- * contexto»; con una tolerancia de 15,01 s pasarían a «Línea común» (52 → 59) y «Sin contexto» bajaría de 147 a 140. Se deja como está
- * para no mover los totales validados; cambiarlo es una decisión de Mantención, no de este código (hay una prueba que fija el límite).
+ * AL SEGUNDO (decisión de Mantención, 02-11-2026): los dos inicios se bajan al segundo antes de comparar, la misma regla del
+ * segundo que usa el zoom del minuto (`paradasDetalle`). Shoplogix anota en pasos de 15 s con ruido de milisegundos: comparadas al
+ * milisegundo (≤ 15.000 ms), dos paradas a UN paso entraban o no según 2 a 9 ms, y en 5 turnos de Chonchi quedaban fuera 7 de 262
+ * micro (por 15,002 a 15,009 s). Al segundo, en esos 5 turnos «Línea común» pasa de 52 a 59 y «Sin contexto» de 147 a 140; Filete no
+ * cambia. Lo recalculó aparte el script de la validación con la misma regla (`reglas_v3.mjs`). Una prueba fija el límite: 15 s al
+ * segundo entra aunque sean 15,999 s crudos; 16 s ya no.
  */
 export const LINEA_COMUN_TOL_S = 15
 /**
@@ -234,7 +235,7 @@ export interface MicroClasificada {
 
 interface Evento { fila: number; ini: number; fin: number; s: number; razon: string | null; micro: boolean; programada: boolean }
 
-/** Otra Baader que paró a ±`LINEA_COMUN_TOL_S` del inicio de la micro (`deltaMs` < 0: antes; `ini`: su inicio anotado; `d`: su minuto respecto del de la micro). */
+/** Otra Baader que paró a ±`LINEA_COMUN_TOL_S` del inicio de la micro (`deltaMs`: la diferencia de inicios al segundo, < 0 si fue antes; `ini`: su inicio anotado; `d`: su minuto respecto del de la micro). */
 interface Coincidencia { fila: number; micro: boolean; programada: boolean; s: number; razon: string | null; ini: number; deltaMs: number; d: -1 | 0 | 1 }
 
 interface MedidaRitmo {
@@ -433,11 +434,12 @@ export function clasificarMicros(e: EntradaMicroCausa): MicroClasificada[] {
     const pausa = ultimaLarga && m.ini - ultimaLarga.b < ARRANQUE_VENTANA_S * 1000 ? { ...ultimaLarga, razon: motivoDe(ultimaLarga) } : null
     const aplicaArranque = pausa != null || (hayInicioTurno && m.ini - e.inicioTurnoMs < ARRANQUE_VENTANA_S * 1000)
 
-    // 2 · Línea común: otra Baader con una micro o con una detención NO programada que empieza a ±15 s.
+    // 2 · Línea común: otra Baader con una micro o con una detención NO programada que empieza a ±15 s, con los inicios al segundo.
+    const difS = (y: Evento) => Math.floor(y.ini / 1000) - Math.floor(m.ini / 1000)
     const cercanas = eventos
-      .filter((y) => y.fila !== m.fila && Math.abs(y.ini - m.ini) <= LINEA_COMUN_TOL_S * 1000)
-      .sort((a, b) => Math.abs(a.ini - m.ini) - Math.abs(b.ini - m.ini))
-      .map((y): Coincidencia => ({ fila: y.fila, micro: y.micro, programada: y.programada, s: y.s, razon: y.razon, ini: y.ini, deltaMs: y.ini - m.ini, d: (minutoDe(y.ini) - k) as -1 | 0 | 1 }))
+      .filter((y) => y.fila !== m.fila && Math.abs(difS(y)) <= LINEA_COMUN_TOL_S)
+      .sort((a, b) => Math.abs(difS(a)) - Math.abs(difS(b)) || Math.abs(a.ini - m.ini) - Math.abs(b.ini - m.ini))
+      .map((y): Coincidencia => ({ fila: y.fila, micro: y.micro, programada: y.programada, s: y.s, razon: y.razon, ini: y.ini, deltaMs: difS(y) * 1000, d: (minutoDe(y.ini) - k) as -1 | 0 | 1 }))
     /* Una por Baader, la más cercana (vienen ordenadas por cercanía). */
     const unaPorBaader = (lista: Coincidencia[]) => lista.filter((c, i) => lista.findIndex((z) => z.fila === c.fila) === i)
     const otros = unaPorBaader(cercanas.filter((c) => !c.programada))
