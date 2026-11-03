@@ -1,11 +1,11 @@
 /**
- * El texto que el usuario lee en un globo de micro ya renderizado, una línea por cosa y con las marcas que son dibujo (①, ✓, ✕, —, ▼, ▽)
- * escritas como carácter: `textContent` a secas pega el número de una razón con la cifra de su celda («1» + «17» = «117») y pierde
- * cuál regla es ✕ y cuál «no se evalúa». Los espacios duros (U+00A0) salen como espacio normal.
+ * El texto que el usuario lee en un globo de micro ya renderizado, una línea por cosa y con las marcas que son dibujo (①, ✕, ▼, ▽, la píldora «en observación»)
+ * escritas como carácter: `textContent` a secas pega el número de una razón con la cifra de su celda («1» + «17» = «117») y pierde cuál marca es cuál.
+ * Los espacios duros (U+00A0) salen como espacio normal. Por defecto el globo trae tres piezas (encabezado, línea de causa, tabla) y el botón «Ver detalle»;
+ * abierto, trae además el detalle (forma, observación, leyenda de ▽, reglas que no aplicaron y pie).
  */
 const CIRCULOS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨']
 const limpio = (t: string | null | undefined) => (t ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
-const unico = (raiz: ParentNode, sel: string) => raiz.querySelector(sel)
 const numero = (n: Element) => CIRCULOS[Number(n.textContent) - 1] ?? `(${n.textContent})`
 const glifo = (el: Element | null) => el?.closest('[data-glifo]')?.getAttribute('data-glifo') ?? el?.querySelector('[data-glifo]')?.getAttribute('data-glifo') ?? ''
 
@@ -19,34 +19,36 @@ function celda(c: Element): string {
   return partes.join(' ')
 }
 
+/** La línea de causa: el texto con el ① donde va y la píldora entre corchetes. */
+function lineaDeCausa(causa: Element): string {
+  const partes: string[] = []
+  const recorre = (n: Node) => {
+    if (n.nodeType === 3) { partes.push(n.textContent ?? ''); return }
+    const el = n as Element
+    if (el.classList?.contains('ref')) partes.push(numero(el))
+    else if (el.classList?.contains('pill')) partes.push(`[${limpio(el.textContent)}]`)
+    else if (el.tagName === 'I') return
+    else n.childNodes.forEach(recorre)
+  }
+  causa.childNodes.forEach(recorre)
+  return limpio(partes.join(''))
+}
+
 export function lineasDelGlobo(globo: Element): string[] {
   const out: string[] = []
-  const tit = unico(globo, '.gm-tit')
+  const tit = globo.querySelector('.gm-tit')
   if (tit) out.push(limpio(tit.textContent))
-  const sub = unico(globo, '.gm-sub')
-  if (sub) out.push(limpio(sub.textContent))
-  /* «Causa probable» solo está cuando hay una causa probable (con «Sin contexto» se omite). */
-  const rot = unico(globo, '.gm-rot')
-  if (rot) out.push(limpio(rot.textContent))
-  const causa = unico(globo, '.gm-causa')
-  if (causa) out.push(limpio(causa.textContent))
-  globo.querySelectorAll('.gm-nota').forEach((n) => out.push(limpio(n.textContent)))
-  globo.querySelectorAll('li.gm-ev').forEach((li) => {
-    const lead = li.querySelector('.ref') ? numero(li.querySelector('.ref')!) : glifo(li.querySelector('.okc'))
-    const de = li.querySelector('.de')
-    const cuerpo = li.querySelector('.gm-txt')!
-    const texto = limpio(Array.from(cuerpo.childNodes).filter((n) => n !== de).map((n) => n.textContent).join(''))
-    out.push([lead, limpio(li.querySelector('.cifra')!.textContent), texto, de ? limpio(de.textContent) : ''].filter(Boolean).join(' · ').replace(`${lead} · `, `${lead} `))
-  })
+  const causa = globo.querySelector('.gm-causa4')
+  if (causa) out.push(lineaDeCausa(causa))
   globo.querySelectorAll('thead tr').forEach((tr) => out.push(Array.from(tr.querySelectorAll('th')).map((t) => limpio(t.textContent)).join(' | ')))
   globo.querySelectorAll('tbody tr').forEach((tr) => out.push(Array.from(tr.querySelectorAll('th,td')).map((c) => (c.tagName === 'TH' ? limpio(c.textContent) : celda(c))).join(' | ')))
-  const ley = unico(globo, '.gm-ley-tri')
-  if (ley) out.push(`${glifo(ley)} ${limpio(ley.querySelector('span')!.textContent)}`)
-  /* Cada regla que no aplicó: su marca (✕ o —) y la frase entera, con el título en negrita al principio («No es arranque: …»). */
-  globo.querySelectorAll('.gm-desc li').forEach((li) => {
-    out.push(`${glifo(li.querySelector('[data-glifo]'))} ${limpio(li.querySelector('span:not([data-glifo])')!.textContent)}`)
+  const ver = globo.querySelector('.gm-ver')
+  if (ver) out.push(`${limpio(ver.textContent)} (${ver.getAttribute('aria-expanded') === 'true' ? 'abierto' : 'cerrado'})`)
+  /* El detalle, en el orden en que se lee: forma, observación, leyenda de ▽, cada regla que no aplicó con su ✕ y el pie. */
+  globo.querySelectorAll('.gm-dc > *').forEach((el) => {
+    if (el.classList.contains('gm-ley-tri')) out.push(`${glifo(el.querySelector('[data-glifo]'))} ${limpio(el.querySelector('span')!.textContent)}`)
+    else if (el.classList.contains('gm-desc')) el.querySelectorAll('li').forEach((li) => out.push(`${glifo(li.querySelector('[data-glifo]'))} ${limpio(li.querySelector('span:not([data-glifo])')!.textContent)}`))
+    else out.push(limpio(el.textContent))
   })
-  const pie = unico(globo, '.gm-pie')
-  if (pie) out.push(limpio(pie.textContent))
   return out
 }

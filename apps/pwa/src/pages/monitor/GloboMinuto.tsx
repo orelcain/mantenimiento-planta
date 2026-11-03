@@ -4,7 +4,7 @@
  * Todo lo que dice sale de `lecturaDelMinuto` (`minutoPorDentro.ts`): aquí solo se ordena y se dibuja. Lo que es calculado se dice
  * calculado (el reparto de lo que faltó usa el esperado por segundo detenido: no hay producción medida por segundo) y lo que es estimado,
  * estimado (los ~20 s que cada micro esconde). En PC flota sobre las filas; en el celular (`compacto`) va anclado arriba de la tarjeta.
- * Una fila de micro se puede abrir (toque, Enter, o el mouse encima con el globo fijo por un clic): sale su `GloboMicro`, con la causa probable y la tabla.
+ * Una fila de micro se puede abrir (toque, Enter, o el mouse encima con el globo fijo por un clic): sale su `GloboMicro`, con la causa posible y la tabla.
  */
 import { X } from 'lucide-react'
 import type { CSSProperties, ReactElement, Ref } from 'react'
@@ -105,7 +105,7 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
   /* Lo que faltó, en tres partes que suman lo que faltó (cada una con un decimal, en piezas). Un «por ritmo» negativo no se muestra como número
      negativo: el resto del minuto contó MÁS de lo esperado, y eso se dice con su unidad, sin afirmar cómo anduvo (las piezas son por minuto: pudieron
      caer de otro). Si la línea contó 0 y ninguna Baader tiene ritmo medible, el resto no se le carga al ritmo: queda «sin explicar» (Filete 11:23). */
-  const rotuloRitmo = ROTULO_CAUSA.ritmo.toLowerCase()
+  const rotuloRitmo = 'ritmo bajo'
   const perd = hay && faltoAlgo && F ? (
     <div className="rv-gm-perd tabular-nums">
       {F.detencion > 0.04 && <span><i style={{ background: 'var(--rv-detenida)' }} aria-hidden />{pz(F.detencion)} pz por detención</span>}
@@ -161,7 +161,7 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
     <div key={`d${i}`} className="rv-gm-ev">
       <i className="sw" style={{ background: 'var(--rv-detenida)' }} aria-hidden />
       <span>
-        {quien(p)} {p.abierta ? <>desde {p.desde} · parada en curso, todavía sin clasificar</> : <>{p.desde} → {p.hasta} · <b>{duracionDeParada(p)}</b> · {p.dueno === 'sin-imputar' ? <>Sin imputar <span className="falta">· falta dueño</span></> : <>{p.duenoTxt}{p.motivo ? ` · ${p.motivo}` : ''}</>}</>}
+        {quien(p)} {p.abierta ? <>desde {p.desde} · detención en curso, todavía sin clasificar</> : <>{p.desde} → {p.hasta} · <b>{duracionDeParada(p)}</b> · {p.dueno === 'sin-imputar' ? <>Sin imputar <span className="falta">· falta dueño</span></> : <>{p.duenoTxt}{p.motivo ? ` · ${p.motivo}` : ''}</>}</>}
       </span>
     </div>
   )
@@ -187,7 +187,7 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
         type="button"
         className={`rv-gm-ev${compacto ? ' tap-44' : ''}`}
         aria-expanded={microAbierta === id}
-        aria-label={`Ver la causa probable de la micro de ${p.baader} de las ${p.desde}`}
+        aria-label={`Ver la causa posible de la micro de ${p.baader} de las ${p.desde}`}
         onPointerEnter={(ev) => { if (ev.pointerType === 'mouse') onMicroHover?.(id) }}
         onPointerLeave={(ev) => { if (ev.pointerType === 'mouse') onMicroHover?.(null) }}
         /* Con el mouse ya se abrió al pasar por encima: el clic no lo cierra. Un toque o el teclado (Enter) lo abren y lo cierran. */
@@ -198,7 +198,7 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
     )
   }
 
-  /* Celular: una línea por parada y las micro iguales (mismo inicio, duración y causa) se agrupan: «Ev 1 y Ev 2 15:13:00 · 15 s micro · línea común». */
+  /* Celular: una línea por parada y las micro iguales (mismo inicio, duración y causa) se agrupan: «Ev 1 y Ev 2 15:13:00 · 15 s micro · Otra Baader paró». */
   const eventosCompactos = (() => {
     const out: ReactElement[] = []
     L.detenciones.forEach((p, i) => out.push(
@@ -220,7 +220,7 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
       else grupos.push({ p, nombres: [p.baader] })
     }
     grupos.forEach(({ p, nombres }, i) => {
-      const causa = p.causa ? ` · ${ROTULO_CAUSA[p.causa].toLowerCase()}` : ''
+      const causa = p.causa ? ` · ${ROTULO_CAUSA[p.causa]}` : ''
       const contenido = (
         <>
           <Triangulo color={COLOR_CAUSA[p.causa ?? 'sin']} />
@@ -230,7 +230,7 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
       if (!p.microId) { out.push(<div key={`m${i}`} className="rv-gm-ev">{contenido}</div>); return }
       const id = p.microId
       out.push(
-        <button key={`m${i}`} type="button" className="rv-gm-ev tap-44" aria-expanded={microAbierta === id} aria-label={`Ver la causa probable de la micro de ${lista(nombres)} de las ${p.desde}`} onClick={() => onMicroClick?.(id)}>
+        <button key={`m${i}`} type="button" className="rv-gm-ev tap-44" aria-expanded={microAbierta === id} aria-label={`Ver la causa posible de la micro de ${lista(nombres)} de las ${p.desde}`} onClick={() => onMicroClick?.(id)}>
           {contenido}
         </button>,
       )
@@ -240,13 +240,13 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
 
   const sinParadas = L.detenciones.length === 0 && L.programadas.length === 0 && L.micros.length === 0
   const secciones = compacto ? (
-    <div className="rv-gm-sec">{sinParadas ? <span className="text-muted-foreground">Sin paradas en este minuto</span> : eventosCompactos}</div>
+    <div className="rv-gm-sec">{sinParadas ? <span className="text-muted-foreground">Sin detenciones en este minuto</span> : eventosCompactos}</div>
   ) : (
     <>
       {L.detenciones.length > 0 && <div className="rv-gm-sec"><h4>Detención · se imputa</h4>{L.detenciones.map(filaDetencion)}</div>}
       {L.programadas.length > 0 && <div className="rv-gm-sec"><h4>Programada</h4>{L.programadas.map(filaProgramada)}</div>}
-      {L.micros.length > 0 && <div className="rv-gm-sec"><h4>Micro · no se imputa: causa probable, se confirma en terreno</h4>{L.micros.map((p, i) => filaMicro(p, i))}</div>}
-      {sinParadas && <div className="rv-gm-sec"><h4>Sin paradas en este minuto</h4></div>}
+      {L.micros.length > 0 && <div className="rv-gm-sec"><h4>Micro · no se imputa: causa posible, se confirma en terreno</h4>{L.micros.map((p, i) => filaMicro(p, i))}</div>}
+      {sinParadas && <div className="rv-gm-sec"><h4>Sin detenciones en este minuto</h4></div>}
     </>
   )
 
@@ -273,7 +273,7 @@ export function GloboMinuto({ lectura, tam, compacto, resumen, parcial, microAbi
         ? <p className="rv-gm-nota">Cada micro esconde unos {OCULTO_S} s (estimado, de 17 a 23 s) que cuentan como andando; pueden caer en este minuto o en uno anterior.</p>
         : <p className="rv-gm-nota">Cada micro esconde unos {OCULTO_S} s más que Shoplogix no anota (estimado, de 17 a 23 s) y cuenta como andando: pudieron caer en este minuto o en uno anterior.</p>)}
       {hayMicroAbrible && (
-        <p className="rv-gm-nota">{fijo ? 'Globo fijo: pasa el mouse por una micro para ver su causa probable. Otro clic en el gráfico lo suelta.' : 'Haz clic en el gráfico para dejar este globo fijo y abrir la causa probable de cada micro.'}</p>
+        <p className="rv-gm-nota">{fijo ? 'Globo fijo: pasa el mouse por una micro para ver su causa posible. Otro clic en el gráfico lo suelta.' : 'Haz clic en el gráfico para dejar este globo fijo y abrir la causa posible de cada micro.'}</p>
       )}
     </>
   )

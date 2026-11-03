@@ -64,7 +64,7 @@ export interface DetencionDelMinuto extends ParadaDelMinuto {
 }
 
 export interface MicroDelMinuto extends ParadaDelMinuto {
-  /** La causa probable (`clasificarMicros`); null si esa micro no está clasificada (por ejemplo, empieza después del último dato). */
+  /** La causa posible (`clasificarMicros`); null si esa micro no está clasificada (por ejemplo, empieza después del último dato). */
   causa: CausaMicro | null
   /** El id de la micro clasificada: con él el globo abre su `GloboMicro`. */
   microId: string | null
@@ -98,7 +98,7 @@ export interface LecturaMinuto {
   detenciones: DetencionDelMinuto[]
   programadas: ProgramadaDelMinuto[]
   micros: MicroDelMinuto[]
-  /** «Las 3 pararon en el mismo segundo: 15:13:00.» (sin el punto final) o null. */
+  /** «Las 3 se detuvieron en el mismo segundo: 15:13:00.» (sin el punto final) o null. */
   mismoSegundo: string | null
 }
 
@@ -137,7 +137,7 @@ export function lecturaDelMinuto(args: { iniMs: number; baaders: BaaderMinuto[];
         const motivo = p.abierta ? null : motivoLegible(p.razon)
         detenciones.push({ ...base(b, p), dueno, motivo, duenoTxt: dueno ? DUENO_META[dueno].label : null })
       } else if (p.tipo === 'programada') {
-        programadas.push({ ...base(b, p), motivo: motivoLegible(p.razon) ?? 'Parada programada' })
+        programadas.push({ ...base(b, p), motivo: motivoLegible(p.razon) ?? 'Detención programada' })
       } else {
         const q = micros.find((x) => x.maquinaId === b.id && x.inicioMs === p.inicioCrudoMs) ?? null
         microsMin.push({ ...base(b, p), causa: q?.causa ?? null, microId: q?.id ?? null })
@@ -149,11 +149,11 @@ export function lecturaDelMinuto(args: { iniMs: number; baaders: BaaderMinuto[];
   programadas.sort(porHora)
   microsMin.sort(porHora)
 
-  /* «Las 3 pararon en el mismo segundo»: dos o más Baader distintas empiezan una parada (no programada) en ese minuto, todas en el mismo segundo. */
+  /* «Las 3 se detuvieron en el mismo segundo»: dos o más Baader distintas empiezan una detención (no programada) en ese minuto, todas en el mismo segundo. */
   let mismoSegundo: string | null = null
   if (inicios.length >= 2 && new Set(inicios.map((x) => x.iniMs)).size === 1 && new Set(inicios.map((x) => x.baaderId)).size === inicios.length) {
     const todasParan = inicios.length === baaders.length && baaders.length > 1
-    mismoSegundo = `${todasParan ? `Las ${baaders.length}` : inicios.map((x) => x.nombre).join(' y ')} pararon en el mismo segundo: ${relojConSegundos(inicios[0]!.iniMs)}`
+    mismoSegundo = `${todasParan ? `Las ${baaders.length}` : inicios.map((x) => x.nombre).join(' y ')} se detuvieron en el mismo segundo: ${relojConSegundos(inicios[0]!.iniMs)}`
   }
 
   const segProg = faltaron?.programadaS ?? []

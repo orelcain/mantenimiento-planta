@@ -1,0 +1,227 @@
+{
+ "version_algoritmo": "v3",
+ "calibracion": 0,
+ "fecha": "2026-11-02",
+ "azar": "permutación dentro del turno en bloques de 30 min, sin pisar micro (duración + 15 s), R=40",
+ "regla": {
+  "VENTANA_SEM": 8,
+  "MIN_SEM": 3,
+  "N_MIN": 30,
+  "FP_TOPE": 0.7,
+  "MEJORA_MIN": 0.05,
+  "PASO_MAX": 1,
+  "BOOT": 200
+ },
+ "plantas": {
+  "chonchi": {
+   "ventana": [
+    "2026-W37",
+    "2026-W44"
+   ],
+   "turnos": 90,
+   "parametros": {
+    "ARR": 600000,
+    "PROD": true,
+    "TRAS": 120000,
+    "CAD": true,
+    "CAD_HI": 52500,
+    "OTR": true,
+    "OTR_HI": 127500,
+    "OTR_TODAS": false
+   },
+   "cambios": {},
+   "categorias": {
+    "arranque": {
+     "estado": "activa",
+     "obs": 842.0,
+     "esperado": 650.4,
+     "lift": 1.295,
+     "ic95": [
+      1.22,
+      1.372
+     ],
+     "exceso_por_turno": 2.129,
+     "precision_estimada": 0.228
+    },
+    "linea_a_la_vez": {
+     "estado": "activa",
+     "obs": 1369.0,
+     "esperado": 837.3,
+     "lift": 1.635,
+     "ic95": [
+      1.498,
+      1.796
+     ],
+     "exceso_por_turno": 5.908,
+     "precision_estimada": 0.388
+    },
+    "paro": {
+     "estado": "en observación",
+     "obs": 152.0,
+     "esperado": 188.1,
+     "lift": 0.808,
+     "ic95": [
+      0.686,
+      0.924
+     ],
+     "exceso_por_turno": -0.401,
+     "precision_estimada": -0.238
+    },
+    "linea_en_cadena": {
+     "estado": "activa",
+     "obs": 101.0,
+     "esperado": 49.1,
+     "lift": 2.056,
+     "ic95": [
+      1.696,
+      2.524
+     ],
+     "exceso_por_turno": 0.576,
+     "precision_estimada": 0.514
+    },
+    "linea_tras_paro_otra": {
+     "estado": "activa",
+     "obs": 97.0,
+     "esperado": 52.9,
+     "lift": 1.832,
+     "ic95": [
+      1.481,
+      2.33
+     ],
+     "exceso_por_turno": 0.49,
+     "precision_estimada": 0.454
+    }
+   }
+  },
+  "yal": {
+   "ventana": [
+    "2026-W37",
+    "2026-W44"
+   ],
+   "turnos": 124,
+   "parametros": {
+    "ARR": 600000,
+    "PROD": true,
+    "TRAS": 90000,
+    "CAD": true,
+    "CAD_HI": 52500,
+    "OTR": true,
+    "OTR_HI": 127500,
+    "OTR_TODAS": false
+   },
+   "cambios": {
+    "TRAS": [
+     120000,
+     90000,
+     "cambia"
+    ]
+   },
+   "categorias": {
+    "arranque": {
+     "estado": "activa",
+     "obs": 303.0,
+     "esperado": 266.9,
+     "lift": 1.135,
+     "ic95": [
+      1.021,
+      1.255
+     ],
+     "exceso_por_turno": 0.291,
+     "precision_estimada": 0.119
+    },
+    "linea_a_la_vez": {
+     "estado": "activa",
+     "obs": 423.0,
+     "esperado": 162.6,
+     "lift": 2.602,
+     "ic95": [
+      2.318,
+      2.992
+     ],
+     "exceso_por_turno": 2.1,
+     "precision_estimada": 0.616
+    },
+    "paro": {
+     "estado": "activa",
+     "obs": 77.0,
+     "esperado": 52.8,
+     "lift": 1.459,
+     "ic95": [
+      1.171,
+      1.784
+     ],
+     "exceso_por_turno": 0.195,
+     "precision_estimada": 0.315
+    },
+    "linea_en_cadena": {
+     "estado": "en observación",
+     "obs": 15.0,
+     "esperado": 4.1,
+     "lift": 3.685,
+     "ic95": [
+      1.91,
+      6.33
+     ],
+     "exceso_por_turno": 0.088,
+     "precision_estimada": 0.729
+    },
+    "linea_tras_paro_otra": {
+     "estado": "activa",
+     "obs": 48.0,
+     "esperado": 21.3,
+     "lift": 2.254,
+     "ic95": [
+      1.579,
+      3.394
+     ],
+     "exceso_por_turno": 0.215,
+     "precision_estimada": 0.556
+    }
+   }
+  },
+  "filete": {
+   "ventana": [
+    "2026-W37",
+    "2026-W44"
+   ],
+   "turnos": 87,
+   "parametros": {
+    "ARR": 600000,
+    "PROD": true,
+    "TRAS": 120000,
+    "CAD": true,
+    "CAD_HI": 52500,
+    "OTR": true,
+    "OTR_HI": 127500,
+    "OTR_TODAS": false
+   },
+   "cambios": {},
+   "categorias": {
+    "arranque": {
+     "estado": "activa",
+     "obs": 238.0,
+     "esperado": 196.0,
+     "lift": 1.214,
+     "ic95": [
+      1.12,
+      1.324
+     ],
+     "exceso_por_turno": 0.482,
+     "precision_estimada": 0.176
+    },
+    "paro": {
+     "estado": "en observación",
+     "obs": 139.0,
+     "esperado": 133.1,
+     "lift": 1.044,
+     "ic95": [
+      0.89,
+      1.218
+     ],
+     "exceso_por_turno": 0.068,
+     "precision_estimada": 0.042
+    }
+   }
+  }
+ }
+}

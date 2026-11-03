@@ -128,7 +128,7 @@ describe('llenado con y sin paradas superpuestas', () => {
     expect(separaParadas).toBe(false)
     expect(lineas[0]!.fills[3]).toBe(50)
     const r = calcularRitmoVivo(e, 'carros')!
-    expect(r.senales.some((s) => /sin separar paradas/i.test(s.texto))).toBe(true)
+    expect(r.senales.some((s) => /sin separar detenciones/i.test(s.texto))).toBe(true)
   })
 
   it('un minuto con toda la línea en cero no se pinta como mal llenado', () => {

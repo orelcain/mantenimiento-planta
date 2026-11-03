@@ -1,11 +1,12 @@
 /**
- * Las marcas ▼ y los cuadros de color de las 5 causas de una micro deben dar ≥ 3:1 contra la tarjeta Y contra el fondo local donde se
+ * Las marcas ▼, los tramos de la barra del resumen (sólidos, rayados y de contorno) y los cuadros de color de las 4 causas de una micro (v3) deben dar ≥ 3:1 contra la tarjeta Y contra el fondo local donde se
  * dibujan (el chip gris del resumen, la columna resaltada de la tabla del globo), en claro y en oscuro y en las tres pieles (WCAG 2.x,
  * objetos gráficos). Lee los colores REALES: el mapa `COLOR_CAUSA` que dibuja el gráfico, los tokens `--v2-*` de monitorGlass.css y los
  * colores de tarjeta de cada piel de index.css. Misma cuenta que `scripts/check-contrast-pizarra.mjs` (que lee index.css de la misma manera),
  * que solo mide contra la tarjeta: por eso aquí se mide además contra el chip (`--v2-relleno`, gris al 16 % sobre la tarjeta), donde el gris
  * translúcido de «Sin contexto» en oscuro bajaba a 2,6:1 y, en la piel clásica clara, el coral, el ámbar y el gris a 2,8:1.
- * Si alguien vuelve a poner el ámbar de `--v2-atento` (2,8:1 en claro) o el gris translúcido (2,3:1) en «Ritmo bajo» o «Sin contexto», falla aquí.
+ * Si alguien vuelve a poner el coral de `--v2-mal` (2,8:1 en claro) o el gris translúcido (2,3:1) en «Al volver de una detención» o «Sin contexto», falla aquí.
+ * Los tramos de la barra dibujan el color de la causa (relleno, trama o contorno de 1 a 1,5 px): el contraste es el del color contra la superficie donde se apoya.
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -89,7 +90,7 @@ const GRIS: Rgb = [142, 142, 147]
 
 describe('contraste de las causas de una micro (marcas y cuadros ≥ 3:1 contra la tarjeta y contra el fondo local)', () => {
   for (const piel of PIELES) {
-    it(`${piel.nombre}: las 5 causas dan ≥ 3:1 sobre la tarjeta, la esmerilada, el globo, el chip y la columna resaltada`, () => {
+    it(`${piel.nombre}: las 4 causas dan ≥ 3:1 (tramo de la barra, marca ▼, cuadro) sobre la tarjeta, la esmerilada, el globo, el chip y la columna resaltada`, () => {
       const fondo = triple(piel.selector, 'background')
       const tarjeta = triple(piel.selector, 'card')
       const texto = triple(piel.selector, 'foreground')
@@ -115,13 +116,22 @@ describe('contraste de las causas de una micro (marcas y cuadros ≥ 3:1 contra 
     })
   }
 
-  it('Ritmo bajo y Sin contexto ya no usan los tokens que daban 2,8:1 y 2,3:1 en claro (--v2-atento y --v2-gris), ni Tras detención el coral de siempre', () => {
-    expect(COLOR_CAUSA.ritmo).not.toBe('var(--v2-atento)')
+  for (const piel of PIELES) {
+    it(`${piel.nombre}: la marca de la leyenda de la barra (el gris de texto secundario) da ≥ 3:1 sobre la tarjeta`, () => {
+      const tarjeta = triple(piel.selector, 'card')
+      const gris = triple(piel.selector, 'muted-foreground')
+      expect(contraste(gris, tarjeta)).toBeGreaterThanOrEqual(3)
+    })
+  }
+
+  it('Sin contexto ya no usa el gris que daba 2,3:1 en claro (--v2-gris), ni Al volver de una detención el coral de siempre (--v2-mal, 2,8:1)', () => {
+    expect(Object.keys(COLOR_CAUSA)).toEqual(['arranque', 'linea', 'paro', 'sin'])
     expect(COLOR_CAUSA.sin).not.toBe('var(--v2-gris)')
     expect(COLOR_CAUSA.paro).not.toBe('var(--v2-mal)')
-    /* El oscuro conserva el coral y el ámbar (ya pasaban en todas las superficies). */
+    /* El oscuro conserva el coral (ya pasaba en todas las superficies). «Ritmo bajo» ya no tiene token: salió de las causas de micro. */
     expect(OSCURO.get('v2-causa-paro')).toBe('var(--v2-mal)')
-    expect(OSCURO.get('v2-causa-ritmo')).toBe('var(--v2-atento)')
+    expect(OSCURO.has('v2-causa-ritmo')).toBe(false)
+    expect(CLARO.has('v2-causa-ritmo')).toBe(false)
   })
 
   it('el gris de «Sin contexto» en oscuro es OPACO: el `--v2-gris` translúcido sobre el chip bajaba a 2,6:1', () => {
