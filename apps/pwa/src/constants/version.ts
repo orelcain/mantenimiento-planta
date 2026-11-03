@@ -2,18 +2,18 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.8.0' as const
+export const APP_VERSION = '4.9.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-11-02' as const
+export const VERSION_DATE = '2026-11-03' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Monitor: el minuto por dentro en «Ritmo en vivo» (cada parada al segundo, globo del minuto que reparte lo que faltó) y «Línea común» al segundo' as const
+export const VERSION_NAME = 'Causas v3 de las micro: Otra Baader paró, causa probable y posible' as const
 
 /**
  * Nota:

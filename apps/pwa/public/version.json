@@ -1,7 +1,7 @@
 {
-  "version": "4.8.0",
-  "buildDate": "2026-11-02",
-  "buildTimestamp": 1793669957541,
+  "version": "4.9.0",
+  "buildDate": "2026-11-03",
+  "buildTimestamp": 1793723989713,
   "features": [
     "Catálogo de variadores: 8 fichas con ~300 parámetros verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»",
     "Grader: la matriz de turnos reemplaza al calendario mensual y el detalle del turno queda en 4 pestañas",

@@ -129,7 +129,7 @@ describe('el globo del minuto · casos reales', () => {
     expect(e3).toMatchObject({ andandoS: 0, estado: 'detenida' })
     expect(L.detenciones.map((d) => [d.baader, d.desde, d.hasta, d.durS, d.dueno])).toEqual([['Ev 3', '15:13:00', '15:15:15', 135, 'sin-imputar']])
     expect(L.micros.map((m) => [m.baader, m.desde, m.hasta, m.durS, m.causa])).toEqual([['Ev 1', '15:13:00', '15:13:15', 15, 'linea'], ['Ev 2', '15:13:00', '15:13:15', 15, 'linea']])
-    expect(L.mismoSegundo).toBe('Las 3 pararon en el mismo segundo: 15:13:00')
+    expect(L.mismoSegundo).toBe('Las 3 se detuvieron en el mismo segundo: 15:13:00')
   })
   it('las tres partes suman lo que faltó, exacto y con un decimal, en cada minuto de los dos turnos', () => {
     for (const [doc, ini, fin] of [[CHONCHI_0211_T2, '09:20', '15:24'], [FILETE_0211_DIA, '09:40', '15:20']] as const) {

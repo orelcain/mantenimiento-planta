@@ -6945,6 +6945,8 @@ function MonitorDelToken() {
                    y «de M» es el total de micro del turno (`microN`, con las de 0 s que no llegan con hora). */
                 ritmoAnduvo: reglaPropsBase.maquinas?.maquinas.map((m) => ({ nombre: m.nombre, cpm: m.cpm })) ?? null,
                 microTotal: pm.length > 0 ? pm.reduce((a, x) => a + x.microN, 0) : null,
+                /* La planta del doc: de ella salen los parámetros y la calibración de las causas de las micro (`causasCalibracion.ts`). */
+                planta: data.plantSlug,
               }
             : null
           /* La parada elegida con «ver ›» en Camino a la meta, en minutos del gráfico. Las paradas cuentan sus minutos desde

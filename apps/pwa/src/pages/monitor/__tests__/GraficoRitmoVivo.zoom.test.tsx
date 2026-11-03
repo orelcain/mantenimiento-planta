@@ -130,18 +130,18 @@ describe('GraficoRitmoVivo · el minuto por dentro (zoom «15 min»)', () => {
     expect(textos(container)).toEqual(expect.arrayContaining([':15', ':30', ':45']))
   })
 
-  it('con el mouse encima de la fila de la micro del globo sale su globo (causa probable); al salir se cierra', () => {
+  it('con el mouse encima de la fila de la micro del globo sale su globo (causa posible); al salir se cierra', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     fireEvent.click(screen.getByRole('button', { name: '15 min' }))
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
     act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: xZoom(container, 3.5), buttons: 0 }) })
     const fila = container.querySelector('button.rv-gm-ev') as HTMLElement
     expect(fila).not.toBeNull()
-    expect(screen.queryByRole('tooltip', { name: 'Micro detención y su causa probable' })).toBeNull()
+    expect(screen.queryByRole('tooltip', { name: 'Micro detención y su causa posible' })).toBeNull()
     act(() => { fireEvent.pointerEnter(fila, { pointerType: 'mouse' }) })
-    expect(screen.getByRole('tooltip', { name: 'Micro detención y su causa probable' })).toBeTruthy()
+    expect(screen.getByRole('tooltip', { name: 'Micro detención y su causa posible' })).toBeTruthy()
     act(() => { fireEvent.pointerLeave(fila, { pointerType: 'mouse' }) })
-    expect(screen.queryByRole('tooltip', { name: 'Micro detención y su causa probable' })).toBeNull()
+    expect(screen.queryByRole('tooltip', { name: 'Micro detención y su causa posible' })).toBeNull()
   })
 
   it('PC: el globo sigue al mouse y no recibe el puntero; un clic en el gráfico lo deja FIJO (ya no cambia de minuto y recibe el mouse) y otro lo suelta', () => {

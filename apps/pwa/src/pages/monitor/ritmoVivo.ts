@@ -506,7 +506,7 @@ export function senalesDe(lineas: LineaLlenado[], unidad: 'carros' | 'silletas' 
     }
   }
   if (!separaParadas) {
-    out.push({ tono: 'neutra', texto: 'Llenado sin separar paradas: este registro no dice de qué máquina fue cada una.' })
+    out.push({ tono: 'neutra', texto: 'Llenado sin separar detenciones: este registro no dice de qué máquina fue cada una.' })
   }
   return out
 }
