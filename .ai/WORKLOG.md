@@ -11,11 +11,18 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-03 · Claude · Monitor: causas v3 de las micro en «Ritmo en vivo» (v4.9.0, PR #1377)
+- Hecho: cada micro se clasifica con las causas v3 del estudio del 02-11 (9 meses de Shoplogix, solo lectura): Arranque (desde que esa Baader empieza a producir), «Otra Baader paró» (a la vez ±15 s, en cadena 22,5–52,5 s o detención previa 22,5 s–2 min), «Al volver de una detención» («en observación» en Chonchi y Filete) y Sin contexto. «Ritmo bajo» sale: viene del atraso con que Shoplogix anota la micro. El resumen del turno dice cuántas micro tienen causa probable (calibración de 8 semanas al 02-11 en `causasCalibracion.ts`; una barra: probable sólido, posible rayado). El globo lleva encabezado, el hecho y la tabla, y el resto va bajo «Ver detalle». Las micro de 0 s se cuentan aparte («Shoplogix anotó 205 micro: estas 70 y 135 de 0 s»).
+- Archivos: `pages/monitor/microCausa.ts`, `GraficoRitmoVivo.tsx`, `GloboMinuto.tsx`, `monitorGlass.css`, `textosCausas.ts`, `causasCalibracion.ts`, `bordeLibre.ts` y `ResumenCausas.tsx` (los cuatro últimos, nuevos) + tests y fixtures de 10 turnos validados; versión 4.9.0.
+- Verificación: CI local completo: tsc 0; eslint 29 avisos (tope 30); vitest 5128 ok (8 omitidos); functions 647 de 647; los 4 audits y el build ok. Fidelidad: las 339 micro reales (Chonchi 262 + Filete 77) salen iguales al golden de `causas_v3.py` en causa, forma y modo, con 0 diferencias. Rotura a propósito: se detectaron los 5 mutantes del spec y los 19 de las correcciones. Navegador: 1366 oscuro y 375 claro, Chromium y WebKit con toque. Prueba de 5 s con 8 lectores: total y causa probable, 8 de 8.
+- Estado: EN REVISIÓN (PR abierto; el merge espera el OK del usuario).
+- Sigue: probar en un iPhone real (solo se vio WebKit emulado); «en cadena» y Yal no se vieron en pantalla; el texto de las micro de 0 s no se probó de nuevo con lectores. Fuera de este PR: la línea «Anduvo a Ev 1 15,5 de 18…», el rojo de «Al volver de una detención» (3 de 8 lo leyeron como alarma) y las marcas sin foco de teclado.
+
 ## 2026-11-02 · Claude · Monitor: el minuto por dentro en «Ritmo en vivo» y «Línea común» al segundo (v4.8.0, PR #1376)
 - Hecho: al acercar «Ritmo en vivo» (12 px por minuto o más), cada parada se dibuja al segundo. El globo del minuto lista cada parada con su hora y su duración exacta, y reparte lo que faltó «por detención · por micro · por ritmo bajo» (calculado con el esperado por segundo detenido). La columna derecha cuenta solo detenciones. Una sola regla del segundo (inicio al segundo, fin = inicio + duración): Chonchi 02-11 da 5 detenciones. «Línea común» compara los inicios al segundo: Chonchi, 5 turnos = 26/59/3/34/140 (al milisegundo eran 52 y 147). En el celular el globo del minuto se trae a la vista al abrirlo; antes quedaba fuera de la pantalla, y ya pasaba en main.
 - Archivos: `pages/monitor/minutoPorDentro.ts` y `GloboMinuto.tsx` (nuevos), `GraficoRitmoVivo.tsx`, `ejeTurno.ts`, `ritmoVivo.ts`, `microCausa.ts`, `monitorGlass.css`, `scripts/check-contrast-pizarra.mjs` (+ tests y fixtures), versión 4.8.0.
 - Verificación: tsc 0; eslint 29 avisos (tope 30); vitest 5041 ok (8 omitidos); audits ok; contraste 266 pares, 0 fallan; build ok. Fidelidad: 724 minutos reales del 02-11 con 0 diferencias contra un script aparte; reparto de causas igual al del script de la validación, turno por turno. Navegador: 1366 oscuro y 375 claro, Chromium y WebKit con toque.
-- Estado: EN REVISIÓN (PR abierto; el merge espera el OK del usuario).
+- Estado: HECHO (mergeado el 02-11-2026 como 7766340).
 - Sigue: probar en un iPhone real (toque en el zoom «Turno», rendimiento a «15 min»); el PR 3 (reclasificación sugerida de cada micro y del total del turno).
 
 ## 2026-11-02 · Claude · Monitor: globo de la micro por Baader y reglas «Línea común» y «Ritmo bajo» (v4.7.0, PR #1375)
