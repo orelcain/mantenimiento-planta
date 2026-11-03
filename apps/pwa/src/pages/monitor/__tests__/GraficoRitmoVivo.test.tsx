@@ -636,7 +636,7 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
   it('sin calibración para la línea (el doc no trae planta): la cifra dice «3 micro» (las 6 de 0 s van en su línea bajo la barra), sin «~», y los chips muestran solo micro y tiempo', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
     expect(sp(container.querySelector('.rv-cz-cifra')!.textContent)).toBe('3 micro')
-    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('De 9 micro, 6 duran 0 s y no se clasifican.')
+    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('Shoplogix anotó 9 micro: estas 3 y 6 de 0 s, sin duración.')
     expect(container.querySelector('.rv-cz-rot')).toBeNull()
     expect(container.querySelector('.rv-cz-ley')).toBeNull()
     expect(container.querySelector('.rv-cz-rotchips')).toBeNull()

@@ -99,8 +99,11 @@ export const cifraProbable = (probable: number) => (probable > 0 ? `~${probable}
 export const deTotal = (total: number) => `de${NB}${total}${NB}micro`
 /** Sin calibración no hay «~»: la cifra dice solo cuántas micro hay. */
 export const cifraSinCalibrar = (total: number) => `${total}${NB}micro`
-/** Bajo la barra, en una línea muted: las micro que Shoplogix anota sin duración (de 0 s) y que no llegan con hora, cuando se sabe el total del turno. */
-export const microDeCeroSegundos = (total: number, m: number) => `De ${total}${NB}micro, ${m} duran 0${NB}s y no se clasifican.`
+/**
+ * Bajo la barra, en una línea muted: liga el total de Shoplogix con las micro que se ven, cuando se sabe el total del turno. Las de 0 s no traen duración
+ * y no se clasifican. Con «De 205 micro, 135 duran 0 s…» los 8 lectores de la prueba de 5 s no sabían si el turno tuvo 70 o 205: por eso dice «estas 70».
+ */
+export const microDeCeroSegundos = (total: number, m: number) => `Shoplogix anotó ${total}${NB}micro: estas ${total - m} y ${m} de 0${NB}s, sin duración.`
 
 /** El texto del chip de una causa: «Arranque», «~1 de 3», «1 min 15 s». Sin estimado (`probable` null) la cifra es solo la cantidad. */
 export function textoChip(causa: CausaMicro, n: number, probable: number | null, segundos: number) {

@@ -118,7 +118,7 @@ function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: Re
 
 /**
  * El resumen. `microTotal` es el total de micro del turno (con las de 0 s, que no llegan con hora ni duración): si se conoce y es mayor que las que se
- * ven, bajo la barra va una línea muted («De 205 micro, 135 duran 0 s y no se clasifican.»), no junto a la cifra. Cuando el estimado es 0, la cifra dice
+ * ven, bajo la barra va una línea muted («Shoplogix anotó 205 micro: estas 70 y 135 de 0 s, sin duración.»), no junto a la cifra. Cuando el estimado es 0, la cifra dice
  * «0 de N con causa probable», sin «~». Los chips de una causa sin micro no se dibujan (la barra tampoco). `nBaader`: con una sola Baader (Filete) «Otra Baader paró» no existe y no se lista.
  */
 export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }: { micros: readonly MicroClasificada[]; planta?: string | null; cal: (CalibracionPlanta & { nombre: string }) | null; microTotal: number | null; nBaader: number }) {

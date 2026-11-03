@@ -32,12 +32,12 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(container.querySelector('.rv-cz-de')!.textContent).toContain('\u00a0')
   })
 
-  it('las micro de 0 s NO van en la cifra grande: con el total del turno conocido, bajo la barra va una línea muted de 12 palabras o menos; con el total igual a las que se ven, no hay línea', () => {
+  it('las micro de 0 s NO van en la cifra grande: con el total del turno conocido, bajo la barra va una línea muted de 13 palabras o menos, que liga el total con las que se ven; con el total igual a las que se ven, no hay línea', () => {
     const { container } = resumen({ microTotal: 53 })
     expect(sp(container.querySelector('.rv-cz-cifra')!.textContent)).toBe('~8 de 46 micro')
     const l = container.querySelector('.rv-cz-ceros')!
-    expect(sp(l.textContent)).toBe('De 53 micro, 7 duran 0 s y no se clasifican.')
-    expect(sp(l.textContent).split(/\s+/).length).toBeLessThanOrEqual(12)
+    expect(sp(l.textContent)).toBe('Shoplogix anotó 53 micro: estas 46 y 7 de 0 s, sin duración.')
+    expect(sp(l.textContent).split(/\s+/).length).toBeLessThanOrEqual(13)
     /* Está DESPUÉS de la barra (y de su leyenda), no dentro de la cifra. */
     const barra = container.querySelector('.rv-cz-barra')!
     expect(barra.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -53,7 +53,7 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(c).toBe('0 de 20 micro')
     expect(c).not.toContain('~')
     expect(sp(container.querySelector('.rv-cz-rot')!.textContent)).toContain('con causa probable')
-    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('De 49 micro, 29 duran 0 s y no se clasifican.')
+    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('Shoplogix anotó 49 micro: estas 20 y 29 de 0 s, sin duración.')
     const chips = Array.from(container.querySelectorAll('.rv-mc-chip')).map((x) => sp(x.textContent))
     expect(chips[0]).toBe('Arranque 0 de 2 micro · 1 min 45 s')
     expect(container.querySelector('.rv-cz-barra')!.getAttribute('aria-label')).not.toContain('~0')
