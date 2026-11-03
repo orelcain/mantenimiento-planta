@@ -3,7 +3,7 @@
  *  1. la cifra «~8 de 46 · con causa probable · estimado» con el ⓘ al lado;
  *  2. una barra de 16 px con las micro en orden (Arranque → Otra Baader paró → Al volver de una detención → Sin contexto): lo probable en sólido del color de
  *     la causa y el resto de la causa, la causa posible, rayado; «Sin contexto» con contorno; una causa en observación, toda rayada;
- *  3. la leyenda «■ causa probable · ▨ causa posible», el rótulo «micro · tiempo detenido» y los chips, cuya marca es el MISMO dibujo de su tramo.
+ *  3. la leyenda «■ causa probable · ▨ causa posible · sin contexto, con contorno» y los chips, cuya marca es el MISMO dibujo de su tramo.
  * Sin calibración para la línea no hay «~»: la cifra dice «46 micro», los chips muestran solo micro y tiempo y el ⓘ lo dice.
  *
  * Lógica de cuentas en `microCausa.ts` (`resumirCausas`); todos los textos en `textosCausas.ts`.
@@ -118,7 +118,7 @@ function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: Re
 
 /**
  * El resumen. `microTotal` es el total de micro del turno (con las de 0 s, que no llegan con hora ni duración): si se conoce y es mayor que las que se
- * ven, bajo la barra va una línea muted («Shoplogix anota además 135 micro de 0 s, sin duración»), no junto a la cifra. Cuando el estimado es 0, la cifra dice
+ * ven, bajo la barra va una línea muted («De 205 micro, 135 duran 0 s y no se clasifican.»), no junto a la cifra. Cuando el estimado es 0, la cifra dice
  * «0 de N con causa probable», sin «~». Los chips de una causa sin micro no se dibujan (la barra tampoco). `nBaader`: con una sola Baader (Filete) «Otra Baader paró» no existe y no se lista.
  */
 export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }: { micros: readonly MicroClasificada[]; planta?: string | null; cal: (CalibracionPlanta & { nombre: string }) | null; microTotal: number | null; nBaader: number }) {
@@ -158,21 +158,20 @@ export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }:
       </div>
       {calibrada && (
         <p className="rv-cz-ley">
-          <i className="lg sol" aria-hidden />{TXT_RESUMEN.leyendaProbable}<i className="lg ray" aria-hidden />{TXT_RESUMEN.leyendaPosible}
+          <i className="lg sol" aria-hidden />{TXT_RESUMEN.leyendaProbable}<i className="lg ray" aria-hidden />{TXT_RESUMEN.leyendaPosible}<i className="lg bor" aria-hidden />{TXT_RESUMEN.leyendaSin}
         </p>
       )}
-      {ceros != null && <p className="rv-cz-ceros">{microDeCeroSegundos(ceros)}</p>}
-      <p className="rv-cz-rotchips">{TXT_RESUMEN.rotuloChips}</p>
+      {ceros != null && <p className="rv-cz-ceros">{microDeCeroSegundos(microTotal as number, ceros)}</p>}
       <ul className="rv-mc-chips" aria-label={TXT_RESUMEN.ariaChips}>
         {tramos.map((c) => {
-          /* Una causa en observación no suma al estimado: el chip dice solo cuántas son («Al volver de una detención 1 · 15 s»), con su píldora. */
-          const t = textoChip(c.causa, c.n, c.enObservacion ? null : c.probable, c.segundos)
+          /* Una causa en observación no suma al estimado: el chip dice «0 de 2 micro · 30 s», con su marca rayada y sin píldora (la explicación va en el globo y el ⓘ). */
+          const t = textoChip(c.causa, c.n, c.enObservacion ? 0 : c.probable, c.segundos)
           return (
             <li key={c.causa} className="rv-mc-chip" data-causa={c.causa} title={definicionCausa(c.causa, parametrosDe(planta), conVarias)}>
               <MuestraCausa causa={c.causa} marca={marcaDe(c, calibrada)} />
               <span className="rv-mc-txt">
                 <span className="rv-mc-nom">{t.nombre}</span>{' '}
-                <span className="rv-mc-num"><b className="tabular-nums">{t.cifra}</b> · {t.tiempo}{c.enObservacion && <> <span className="pill">{TXT_RESUMEN.enObservacion}</span></>}</span>
+                <span className="rv-mc-num"><b className="tabular-nums">{t.cifra}</b> · {t.tiempo}</span>
               </span>
             </li>
           )

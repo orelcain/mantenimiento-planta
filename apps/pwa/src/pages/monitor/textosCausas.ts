@@ -79,12 +79,11 @@ export const TXT_RESUMEN = {
   /** Leyenda de la barra. */
   leyendaProbable: 'causa probable',
   leyendaPosible: 'causa posible',
+  leyendaSin: 'sin contexto',
   /** Junto a la cifra grande: «~8 de 46 · con causa probable · estimado». En el celular, «est.». */
   conCausaProbable: 'con causa probable',
   estimado: 'estimado',
   estimadoCorto: 'est.',
-  /** Rótulo de la línea de chips (el tiempo lleva rótulo). */
-  rotuloChips: 'micro · tiempo detenido',
   ariaChips: 'Micro detenciones por causa',
   ariaAyuda: 'Qué significan la causa probable y la posible',
   tituloAyuda: 'Micro: causa probable y posible',
@@ -97,17 +96,17 @@ export const TXT_RESUMEN = {
 
 /** «~8 de 46» → sus dos partes: la cifra y «de 46». */
 export const cifraProbable = (probable: number) => (probable > 0 ? `~${probable}` : '0')
-export const deTotal = (total: number) => `de${NB}${total}`
+export const deTotal = (total: number) => `de${NB}${total}${NB}micro`
 /** Sin calibración no hay «~»: la cifra dice solo cuántas micro hay. */
 export const cifraSinCalibrar = (total: number) => `${total}${NB}micro`
 /** Bajo la barra, en una línea muted: las micro que Shoplogix anota sin duración (de 0 s) y que no llegan con hora, cuando se sabe el total del turno. */
-export const microDeCeroSegundos = (m: number) => `Shoplogix anota además ${m}${NB}micro de${NB}0${NB}s, sin duración`
+export const microDeCeroSegundos = (total: number, m: number) => `De ${total}${NB}micro, ${m} duran 0${NB}s y no se clasifican.`
 
 /** El texto del chip de una causa: «Arranque», «~1 de 3», «1 min 15 s». Sin estimado (`probable` null) la cifra es solo la cantidad. */
 export function textoChip(causa: CausaMicro, n: number, probable: number | null, segundos: number) {
   return {
     nombre: ROTULO_CAUSA[causa],
-    cifra: probable == null || n === 0 ? String(n) : `${probable > 0 ? '~' : ''}${probable}${NB}de${NB}${n}`,
+    cifra: probable == null || n === 0 ? `${n}${NB}micro` : `${probable > 0 ? '~' : ''}${probable}${NB}de${NB}${n}${NB}micro`,
     tiempo: dur(segundos),
   }
 }

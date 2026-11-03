@@ -1313,7 +1313,7 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .rv-cz-ley .lg { display: inline-block; width: 12px; height: 10px; border-radius: 2px; }
 .rv-cz-ley .lg.sol { background: rgb(var(--muted-foreground)); }
 .rv-cz-ley .lg.ray { margin-left: 10px; box-shadow: inset 0 0 0 1px rgb(var(--muted-foreground)); background: repeating-linear-gradient(135deg, rgb(var(--muted-foreground)) 0 1.5px, transparent 1.5px 4.5px); }
-.rv-cz-rotchips { margin: 0; font-size: 12px; line-height: 16px; color: rgb(var(--muted-foreground)); }
+.rv-cz-ley .lg.bor { margin-left: 10px; box-shadow: inset 0 0 0 1.5px rgb(var(--muted-foreground)); }
 .rv-mc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .rv-mc-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; max-width: 100%; box-sizing: border-box; padding: 5px 11px; border-radius: 16px; background: var(--v2-relleno); font-size: 13px; line-height: 18px; color: rgb(var(--foreground) / 0.85); }
 .rv-mc-chip b { font-weight: 600; color: rgb(var(--foreground)); }

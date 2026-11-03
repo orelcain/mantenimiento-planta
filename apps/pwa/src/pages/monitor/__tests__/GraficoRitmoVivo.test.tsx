@@ -636,13 +636,13 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
   it('sin calibración para la línea (el doc no trae planta): la cifra dice «3 micro» (las 6 de 0 s van en su línea bajo la barra), sin «~», y los chips muestran solo micro y tiempo', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={conMicro} reloj={reloj} />)
     expect(sp(container.querySelector('.rv-cz-cifra')!.textContent)).toBe('3 micro')
-    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('Shoplogix anota además 6 micro de 0 s, sin duración')
+    expect(sp(container.querySelector('.rv-cz-ceros')!.textContent)).toBe('De 9 micro, 6 duran 0 s y no se clasifican.')
     expect(container.querySelector('.rv-cz-rot')).toBeNull()
     expect(container.querySelector('.rv-cz-ley')).toBeNull()
-    expect(sp(container.querySelector('.rv-cz-rotchips')!.textContent)).toBe('micro · tiempo detenido')
+    expect(container.querySelector('.rv-cz-rotchips')).toBeNull()
     const chips = Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => sp(c.textContent))
     /* Las causas sin micro no tienen chip (la barra tampoco las dibuja). */
-    expect(chips).toEqual(['Otra Baader paró 2 · 45 s', 'Sin contexto 1 · 15 s'])
+    expect(chips).toEqual(['Otra Baader paró 2 micro · 45 s', 'Sin contexto 1 micro · 15 s'])
     for (const c of chips) expect(c).not.toContain('~')
     /* Ya no hay aviso largo: lo que explicaba (las de 0 s) vive en el ⓘ. */
     expect(container.querySelector('.rv-mc-aviso')).toBeNull()
@@ -651,13 +651,13 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
   it('con calibración (planta chonchi): «~1 de 3 · con causa probable · estimado», chips «Otra Baader paró ~1 de 2 · 45 s» y la leyenda «causa probable · causa posible»', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={{ ...conMicro, planta: 'chonchi' }} reloj={reloj} />)
     const cifra = container.querySelector('.rv-cz-cifra')!
-    expect(sp(cifra.textContent)).toBe('~1 de 3')
+    expect(sp(cifra.textContent)).toBe('~1 de 3 micro')
     expect(sp(container.querySelector('.rv-cz-rot')!.textContent)).toBe('con causa probable · estimadoest.')
     expect(sp(container.querySelector('.rv-cz-rot .solo-pc')!.textContent)).toBe('estimado')
     expect(sp(container.querySelector('.rv-cz-rot .solo-mv')!.textContent)).toBe('est.')
-    expect(sp(container.querySelector('.rv-cz-ley')!.textContent)).toBe('causa probablecausa posible')
+    expect(sp(container.querySelector('.rv-cz-ley')!.textContent)).toBe('causa probablecausa posiblesin contexto')
     expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => sp(c.textContent))).toEqual([
-      'Otra Baader paró ~1 de 2 · 45 s', 'Sin contexto 1 · 15 s',
+      'Otra Baader paró ~1 de 2 micro · 45 s', 'Sin contexto 1 micro · 15 s',
     ])
   })
 
