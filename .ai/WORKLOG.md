@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-02 · Claude · Monitor: el minuto por dentro en «Ritmo en vivo» y «Línea común» al segundo (v4.8.0, PR #1376)
+- Hecho: al acercar «Ritmo en vivo» (12 px por minuto o más), cada parada se dibuja al segundo. El globo del minuto lista cada parada con su hora y su duración exacta, y reparte lo que faltó «por detención · por micro · por ritmo bajo» (calculado con el esperado por segundo detenido). La columna derecha cuenta solo detenciones. Una sola regla del segundo (inicio al segundo, fin = inicio + duración): Chonchi 02-11 da 5 detenciones. «Línea común» compara los inicios al segundo: Chonchi, 5 turnos = 26/59/3/34/140 (al milisegundo eran 52 y 147). En el celular el globo del minuto se trae a la vista al abrirlo; antes quedaba fuera de la pantalla, y ya pasaba en main.
+- Archivos: `pages/monitor/minutoPorDentro.ts` y `GloboMinuto.tsx` (nuevos), `GraficoRitmoVivo.tsx`, `ejeTurno.ts`, `ritmoVivo.ts`, `microCausa.ts`, `monitorGlass.css`, `scripts/check-contrast-pizarra.mjs` (+ tests y fixtures), versión 4.8.0.
+- Verificación: tsc 0; eslint 29 avisos (tope 30); vitest 5041 ok (8 omitidos); audits ok; contraste 266 pares, 0 fallan; build ok. Fidelidad: 724 minutos reales del 02-11 con 0 diferencias contra un script aparte; reparto de causas igual al del script de la validación, turno por turno. Navegador: 1366 oscuro y 375 claro, Chromium y WebKit con toque.
+- Estado: EN REVISIÓN (PR abierto; el merge espera el OK del usuario).
+- Sigue: probar en un iPhone real (toque en el zoom «Turno», rendimiento a «15 min»); el PR 3 (reclasificación sugerida de cada micro y del total del turno).
+
 ## 2026-11-02 · Claude · Monitor: globo de la micro por Baader y reglas «Línea común» y «Ritmo bajo» (v4.7.0, PR #1375)
 - Hecho: el globo de la micro pasa a una tabla por Baader con la causa y sus cifras. «Línea común» ahora es una micro o una detención no programada a ±15 s. «Ritmo bajo» reemplaza a «Carros vacíos»: micro a 15 s o más de su minuto, con el minuto anterior bajo el 75 % del ritmo propio. Además, el aviso «N de M micro», las definiciones en el ⓘ y el globo del celular dentro de la página, que ya no se cierra solo en WebKit.
 - Archivos: `pages/monitor/microCausa.ts`, `GraficoRitmoVivo.tsx`, `globoPosicion.ts` (nuevo), `monitorGlass.css` (+ tests y fixtures de 8 turnos reales), versión 4.7.0.

@@ -127,7 +127,7 @@ describe('microCausa · Chonchi 02-11 Turno 2 (casos reales)', () => {
       const esperado = q.tabla.filas.map((_, j) => {
         if (q.minuto < 1) return false
         if (j === q.fila) return enInicio(q.inicioMs)
-        return eventos.some((e) => e.fila === j && (e.micro || !e.programada) && Math.abs(e.ini - q.inicioMs) <= 15_000 && Math.floor((e.ini - t0) / 60_000) === q.minuto && enInicio(e.ini))
+        return eventos.some((e) => e.fila === j && (e.micro || !e.programada) && Math.abs(Math.floor(e.ini / 1000) - Math.floor(q.inicioMs / 1000)) <= 15 && Math.floor((e.ini - t0) / 60_000) === q.minuto && enInicio(e.ini))
       })
       expect(q.tabla.filas.map((f) => f.inicioPrevio), `${q.nombre} ${new Date(q.inicioMs).toISOString().slice(11, 19)}`).toEqual(esperado)
       marcadas += esperado.filter(Boolean).length
@@ -135,14 +135,14 @@ describe('microCausa · Chonchi 02-11 Turno 2 (casos reales)', () => {
     expect(marcadas).toBeGreaterThan(0)
   })
 
-  it('el turno 02-11 T2 completo: 46 micro, Arranque 0 · Línea común 17 · Tras detención 1 · Ritmo bajo 6 · Sin contexto 22 (lo que da el script validado)', () => {
+  it('el turno 02-11 T2 completo: 46 micro, Arranque 0 · Línea común 18 · Tras detención 1 · Ritmo bajo 6 · Sin contexto 21 (lo que da el script validado, al segundo)', () => {
     expect(micros).toHaveLength(46)
-    expect(contarPorCausa(micros)).toEqual({ arranque: 0, linea: 17, paro: 1, ritmo: 6, sin: 22 })
+    expect(contarPorCausa(micros)).toEqual({ arranque: 0, linea: 18, paro: 1, ritmo: 6, sin: 21 })
   })
 
   it('con el inicio de la SERIE como inicio del turno (lo que le pasa el gráfico) el reparto de este turno es el mismo', () => {
     const conSerie = clasificarDoc(CHONCHI_0211_T2, { inicioTurnoMs: Date.parse(CHONCHI_0211_T2.pulse.serieMinuto.desde) })
-    expect(contarPorCausa(conSerie)).toEqual({ arranque: 0, linea: 17, paro: 1, ritmo: 6, sin: 22 })
+    expect(contarPorCausa(conSerie)).toEqual({ arranque: 0, linea: 18, paro: 1, ritmo: 6, sin: 21 })
   })
 
   it('las paradas programadas son las de la taxonomía de la app y coinciden con las que el propio doc declara en timeBreakdown.planned', () => {

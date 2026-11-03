@@ -147,14 +147,19 @@ export function paradasPorMaquina(e: Pick<EntradaRitmoVivo, 'stopEvents' | 'stop
   if (separa) {
     for (const x of eventos) {
       const id = ids[x.m!]!
-      const a = Date.parse(x.f)
-      if (!Number.isFinite(a) || !(x.s > 0)) continue
+      const a0 = Date.parse(x.f)
+      if (!Number.isFinite(a0) || !(x.s > 0)) continue
+      /* Misma regla del segundo que `paradasDetalle`: el inicio se baja al segundo y el fin es ese inicio más la duración. Así los segundos
+         andando del llenado, del tono de la celda y de la compuerta del ritmo son los mismos que dice el globo del minuto (Chonchi 02-11:
+         15:00 Ev 1, 15:17 Ev 1 y 15:21 Ev 2 andaban 30 s con el piso y 29,60, 29,44 y 29,37 con los milisegundos crudos: el globo decía
+         «30 s andando» y «sin dato» a la vez). */
+      const a = Math.floor(a0 / 1000) * 1000
       const iv: Intervalo = [a, a + x.s * 1000]
       poner(todas, id, iv)
       if (esMicroDetencion(e.stopReasons?.[x.r])) poner(micro, id, iv)
     }
   }
-  for (const p of e.enCurso) poner(todas, p.id, [p.desdeMs, Number.POSITIVE_INFINITY])
+  for (const p of e.enCurso) poner(todas, p.id, [Math.floor(p.desdeMs / 1000) * 1000, Number.POSITIVE_INFINITY])
   for (const [id, l] of todas) todas.set(id, unir(l))
   for (const [id, l] of micro) micro.set(id, unir(l))
   return { separa, todas, micro }
@@ -180,6 +185,65 @@ export function microsPorMaquina(e: Pick<EntradaRitmoVivo, 'stopEvents' | 'stopR
     else out.set(id, [item])
   }
   for (const l of out.values()) l.sort((p, q) => p.inicioMs - q.inicioMs)
+  return out
+}
+
+export type TipoParada = 'micro' | 'detencion' | 'programada'
+
+/**
+ * Una parada de una máquina tal como la anota Shoplogix (sin unir con otras), lista para dibujarse al segundo.
+ *
+ * REGLA ÚNICA DEL SEGUNDO: Shoplogix manda el inicio con ruido de milisegundos (entre 0,001 y 0,997 s sobre su paso de 15 s). Aquí el inicio
+ * se baja al segundo (`Math.floor`) y el fin es ese inicio más la duración entera de la parada: lo que mira el usuario son segundos, y así
+ * dos paradas pegadas (una termina 15:17:30,564 y la otra empieza 15:17:30,607) quedan pegadas, no separadas por 43 ms. Caso medido: el
+ * fin de la colación del Filete 02-11 está guardado en 14:16:29,949; con el dato crudo la Baader «andaba» 30,05 s de ese minuto, con el
+ * piso 31 s. Un solo criterio para el inicio, el fin y los segundos andando.
+ */
+export interface ParadaDetalle {
+  tipo: TipoParada
+  /** Inicio bajado al segundo (wall-as-UTC ms). */
+  iniMs: number
+  /** Fin = `iniMs` + duración (infinito en una parada en curso). */
+  finMs: number
+  /** Duración anotada, en segundos (infinito en una parada en curso). */
+  durS: number
+  /** El inicio tal como viene del doc (con milisegundos): sirve para reconocer la misma parada en `clasificarMicros`. */
+  inicioCrudoMs: number
+  /** El motivo que anotó Shoplogix («Micro Detencion», «COLACION», «Detencion»…); null en una parada en curso. */
+  razon: string | null
+  /** Sigue en curso: todavía no tiene fin ni motivo en el doc (se sabe solo que la máquina está detenida). */
+  abierta?: boolean
+}
+
+/**
+ * Las paradas de cada máquina SIN unir, con su tipo: micro (`esMicroDetencion`), programada (el mismo criterio de `ritmoVivoDeMonitor`: el
+ * motivo cae en «planificado») o detención (todo lo demás). Más la parada en curso (`enCurso`), de tipo detención y marcada `abierta`:
+ * su motivo no viaja en el doc. Sin `stopMachines`/`m` no se sabe de qué máquina fue cada parada: devuelve solo las en curso.
+ */
+export function paradasDetalle(e: Pick<EntradaRitmoVivo, 'stopEvents' | 'stopReasons' | 'stopMachines' | 'enCurso'>): Map<string, ParadaDetalle[]> {
+  const out = new Map<string, ParadaDetalle[]>()
+  const poner = (id: string, p: ParadaDetalle) => {
+    const l = out.get(id)
+    if (l) l.push(p)
+    else out.set(id, [p])
+  }
+  const eventos = e.stopEvents ?? []
+  const ids = e.stopMachines ?? []
+  if (ids.length > 0 && eventos.every((x) => x.m != null && ids[x.m] != null)) {
+    for (const x of eventos) {
+      const a = Date.parse(x.f)
+      if (!Number.isFinite(a) || !(x.s > 0)) continue
+      const razon = e.stopReasons?.[x.r] ?? null
+      const tipo: TipoParada = esMicroDetencion(razon) ? 'micro' : classifyLossState({ type: 'break', reason: razon ?? undefined }) === 'planificado' ? 'programada' : 'detencion'
+      const iniMs = Math.floor(a / 1000) * 1000
+      poner(ids[x.m!]!, { tipo, iniMs, finMs: iniMs + x.s * 1000, durS: x.s, inicioCrudoMs: a, razon })
+    }
+  }
+  for (const p of e.enCurso) {
+    const iniMs = Math.floor(p.desdeMs / 1000) * 1000
+    poner(p.id, { tipo: 'detencion', iniMs, finMs: Number.POSITIVE_INFINITY, durS: Number.POSITIVE_INFINITY, inicioCrudoMs: p.desdeMs, razon: null, abierta: true })
+  }
+  for (const l of out.values()) l.sort((p, q) => p.iniMs - q.iniMs || p.finMs - q.finMs)
   return out
 }
 

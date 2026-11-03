@@ -8,7 +8,7 @@
  * El eje siempre abarca el turno COMPLETO; acercarse es zoom horizontal (`useZoomGesto`), no otro eje.
  */
 import type { DuenoPerdida, GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
-import { ANDANDO_MIN_S, llenadoDe, paradasPorMaquina, segundosCubiertos, tonoDe, type EntradaRitmoVivo, type MaquinaSerie } from './ritmoVivo'
+import { ANDANDO_MIN_S, esMicroDetencion, llenadoDe, paradasPorMaquina, segundosCubiertos, tonoDe, type EntradaRitmoVivo, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
 import type { Ventana } from './useZoomGesto'
 
 // ── Formatos ─────────────────────────────────────────────────────────────────
@@ -317,6 +317,16 @@ export function proyeccion(args: { punta: Punto; finEje: number; totalMin: numbe
 
 export type TonoRitmo = 'bien' | 'atento' | 'mal' | 'sin'
 
+export const COLOR_TONO: Record<TonoRitmo, string> = {
+  bien: 'var(--v2-bien)',
+  atento: 'var(--v2-atento)',
+  /* `--rv-mal` (monitorGlass.css): un tono más profundo que el coral de la franja, para distinguirlo del ámbar en barras de 1–2 px. */
+  mal: 'var(--rv-mal)',
+  sin: 'var(--v2-gris)',
+}
+/** Las filas Ev: andando apenas se nota (acento 38 %), lo que se atrasa o se detiene toma color (85 %). */
+export const OPACIDAD_FILA: Record<'bien' | 'atento' | 'mal', number> = { bien: 0.38, atento: 0.85, mal: 0.85 }
+
 /**
  * Los cortes de Shoplogix: ≥75 % del esperado bien, 50–75 atento, <50 mal. Sin esperado no hay vara con qué juzgar
  * (misma regla que `ritmoVivo.ts`: se calla): neutro, jamás «bien» solo porque hubo piezas.
@@ -521,8 +531,165 @@ export function intervalosDeParada(paradas: ParadaEje[], limites?: { min: number
 export const minutosConParada = (paradas: ParadaEje[], limites?: { min: number; max: number }) =>
   intervalosDeParada(paradas, limites).reduce((a, [x, y]) => a + (y - x), 0)
 
-/** Cuántos episodios de parada hay una vez fusionados los que se solapan (sin programadas). */
-export const episodiosParada = (paradas: ParadaEje[], limites?: { min: number; max: number }) => intervalosDeParada(paradas, limites).length
+/** La parada es una micro detención (Shoplogix la anota como «Micro Detencion»). */
+export const esParadaMicro = (p: ParadaEje) => esMicroDetencion(p.causa)
+
+/**
+ * Cuántos episodios de parada hay una vez fusionados los que se solapan (sin programadas).
+ *
+ * El inicio y el fin se bajan al SEGUNDO antes de fusionar, la misma regla que `paradasDetalle` (Shoplogix pone ruido de milisegundos sobre
+ * su paso de 15 s). Caso real, Chonchi 02-11: la detención de Ev 1 termina 15:17:30,564 y la de Ev 2 empieza 15:17:30,607, a 43 ms; sin el
+ * piso eran dos episodios y a la vista (al segundo) es una sola, pegada. Con él, 6 detenciones sin micro pasan a 5 (con la micro incluida, 35 episodios pasan a 33: el spec decía 35 y es el valor de antes del piso). Los minutos de
+ * reloj (`minutosConParada`) no se tocan: el piso mueve cada borde menos de 1 s.
+ */
+export const episodiosParada = (paradas: ParadaEje[], limites?: { min: number; max: number }) => {
+  const alSegundo = (min: number) => Math.floor(min * 60 + 1e-6) / 60
+  return intervalosDeParada(paradas.map((p) => ({ ...p, desdeMin: alSegundo(p.desdeMin), hastaMin: alSegundo(p.hastaMin) })), limites).length
+}
+
+// ── El minuto por dentro (zoom de «Ritmo en vivo») ───────────────────────────
+
+/** Desde estos px por minuto se ve cada parada exacta al segundo (sin rótulos): bloques en vez de celdas de 1 minuto. Medido: 1 h en 1920 da 26. */
+export const EXACTO_PX_MIN = 12
+/** Desde estos px por minuto caben los rótulos de cada parada, el escalón del ritmo y las marcas cada 15 s. Medido: 15 min da 103 en 1920, 68 en 1366, 16 en el celular. */
+export const DETALLE_PX_MIN = 48
+
+/** Un tramo de una parada dentro de UN minuto, en segundos de 0 a 60. `parada` es la parada entera (con su hora de inicio y su duración exacta). */
+export interface Tramo {
+  tipo: TipoParada
+  desdeS: number
+  hastaS: number
+  parada: ParadaDetalle
+}
+
+/**
+ * Lo que las paradas de UNA Baader ocupan del minuto que parte en `iniMs`, recortado a 0–60 s y en orden. Una parada que cruza minutos
+ * aparece en cada uno con su tramo; `parada` sigue siendo la entera. Los inicios ya vienen bajados al segundo (`paradasDetalle`).
+ */
+export function tramosDelMinuto(paradas: ParadaDetalle[] | undefined, iniMs: number): Tramo[] {
+  const out: Tramo[] = []
+  if (!paradas) return out
+  const finMs = iniMs + 60_000
+  for (const p of paradas) {
+    if (p.iniMs >= finMs) break
+    if (p.finMs <= iniMs) continue
+    out.push({ tipo: p.tipo, desdeS: Math.max(0, (p.iniMs - iniMs) / 1000), hastaS: Math.min(60, (p.finMs - iniMs) / 1000), parada: p })
+  }
+  return out
+}
+
+/** Los intervalos `[a, b]` (segundos) en que la Baader andó: el minuto menos todas sus paradas (micro, detención y programada). */
+export function andandoDelMinuto(tramos: Tramo[]): Array<[number, number]> {
+  const out: Array<[number, number]> = []
+  let t = 0
+  for (const s of [...tramos].sort((p, q) => p.desdeS - q.desdeS)) {
+    if (s.desdeS > t) out.push([t, s.desdeS])
+    t = Math.max(t, s.hastaS)
+  }
+  if (t < 60) out.push([t, 60])
+  return out
+}
+
+/** Segundos andando del minuto (60 menos lo parado). */
+export const andandoSegundos = (tramos: Tramo[]) => andandoDelMinuto(tramos).reduce((a, [x, y]) => a + (y - x), 0)
+
+/** Segundos de un tipo de parada dentro del minuto, sin contar dos veces lo que se solapa. */
+export function segundosDeTipo(tramos: Tramo[], tipo: TipoParada): number {
+  let t = 0
+  let total = 0
+  for (const s of tramos.filter((x) => x.tipo === tipo).sort((p, q) => p.desdeS - q.desdeS)) {
+    const a = Math.max(t, s.desdeS)
+    if (s.hastaS > a) { total += s.hastaS - a; t = s.hastaS }
+  }
+  return total
+}
+
+/**
+ * Segundos de un tipo de parada que NO caen dentro de las de mayor prioridad (programada > detención > micro). Si dos paradas de una misma
+ * Baader se montan (una detención en curso encima de una micro), esos segundos se cuentan una sola vez, en la de mayor prioridad: el reparto de
+ * lo que faltó no los suma dos veces. Es la unión de ambos tipos menos la unión de los de mayor prioridad.
+ */
+function segundosSinMontar(tramos: Tramo[], tipo: TipoParada, mayores: TipoParada[]): number {
+  const union = (tipos: TipoParada[]) => {
+    let t = 0
+    let total = 0
+    for (const s of tramos.filter((x) => tipos.includes(x.tipo)).sort((p, q) => p.desdeS - q.desdeS)) {
+      const a = Math.max(t, s.desdeS)
+      if (s.hastaS > a) { total += s.hastaS - a; t = s.hastaS }
+    }
+    return total
+  }
+  return union([tipo, ...mayores]) - union(mayores)
+}
+
+/**
+ * El ritmo de la Baader MIENTRAS ANDUVO en un minuto: piezas ÷ segundos andando × 60. null si anduvo menos de `ANDANDO_MIN_S` o si el
+ * llenado normalizado de ese minuto no tiene dato (`llenado` null: la línea entera en cero sin parada que lo explique; no se afirma).
+ */
+export function ritmoAndando(piezas: number, andandoS: number, llenado: number | null | undefined): number | null {
+  if (llenado == null || andandoS < ANDANDO_MIN_S) return null
+  return piezas / (andandoS / 60)
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10
+
+export interface FaltaronMinuto {
+  /** Lo esperado en el minuto, descontando lo programado de cada Baader: Σ esperado × (60 − programada) ÷ 60. */
+  esperado: number
+  /** Las piezas que contó la línea en el minuto. */
+  piezas: number
+  /** `esperado − piezas`, con un decimal. Negativo: la línea hizo más de lo esperado. */
+  faltaron: number
+  /** Lo que faltó repartido (con un decimal; suman exactamente `faltaron`): detenciones, micro y lo demás («ritmo»). */
+  detencion: number
+  micro: number
+  /** Puede salir negativo: en los segundos que anduvo, la línea hizo más de lo esperado. */
+  ritmo: number
+  /** Segundos programados de cada Baader (en el mismo orden de la entrada). */
+  programadaS: number[]
+}
+
+/**
+ * Cuánto faltó en un minuto y de qué es. No hay producción medida por segundo (Shoplogix cuenta piezas por minuto): el reparto es CALCULADO con
+ * el esperado de cada Baader por segundo detenido. «por detención» = Σ esperado × segundos de detención ÷ 60; «por micro», lo mismo con
+ * los segundos de micro; «por ritmo» es lo que queda (faltaron − detención − micro): lo que no se explica por tiempo parado. La programada no
+ * cuenta: se descuenta del esperado. Las tres cifras van redondeadas a un decimal y «ritmo» se saca de las redondeadas, para que a la vista
+ * detención + micro + ritmo = faltaron, exacto. null si alguna Baader no tiene esperado (sin vara no se calcula) o no tiene el minuto.
+ */
+export function faltaronDelMinuto(maquinas: Array<{ esperado: number | null; piezas: number | null }>, tramosPorMaquina: Tramo[][]): FaltaronMinuto | null {
+  if (maquinas.length === 0 || maquinas.some((m) => m.esperado == null || !(m.esperado > 0) || m.piezas == null)) return null
+  let esperado = 0
+  let piezas = 0
+  let det = 0
+  let mic = 0
+  const programadaS: number[] = []
+  maquinas.forEach((m, i) => {
+    const tr = tramosPorMaquina[i] ?? []
+    const prog = segundosDeTipo(tr, 'programada')
+    programadaS.push(prog)
+    esperado += (m.esperado! * (60 - prog)) / 60
+    det += (m.esperado! * segundosSinMontar(tr, 'detencion', ['programada'])) / 60
+    mic += (m.esperado! * segundosSinMontar(tr, 'micro', ['programada', 'detencion'])) / 60
+    piezas += m.piezas!
+  })
+  const faltaron = r1(esperado - piezas)
+  const detencion = r1(det)
+  const micro = r1(mic)
+  return { esperado: r1(esperado), piezas, faltaron, detencion, micro, ritmo: r1(faltaron - detencion - micro), programadaS }
+}
+
+/** «45 s», «2 min», «2 min 15 s», «1 h 2 min 5 s»: la duración exacta de una parada. */
+export function duracionExacta(s: number): string {
+  const t = Math.max(0, Math.round(s))
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
+  const ss = t % 60
+  const partes = [h > 0 ? `${h} h` : '', m > 0 ? `${m} min` : '', ss > 0 || t === 0 ? `${ss} s` : ''].filter(Boolean)
+  return partes.join(' ')
+}
+
+/** «15:13:00»: la hora de planta con segundos (wall-as-UTC, como `relojDe`). */
+export const relojConSegundos = (ms: number) => new Date(ms).toISOString().slice(11, 19)
 
 /** El color de cada dueño en rellenos y swatches, y la trama de Mantención (rayas oscuras sobre el ámbar, para no depender solo del color). */
 export const RELLENO_DUENO = { mantencion: 'var(--v2-mant)', externo: 'var(--v2-ext)', 'sin-imputar': 'var(--v2-gris)', programado: 'var(--v2-prog)' } as const
@@ -606,18 +773,16 @@ export function disenar(w: number, tam: TamanoGrafico, nMaquinas: number, conBar
 
 // ── Qué micro hay bajo el dedo o el cursor ───────────────────────────────────
 
-/** Media anchura del área de toque con el dedo en vista completa (px por minuto < 2). */
-const TOQUE_X_VISTA_COMPLETA = 12
-
 /**
  * La micro cuya marca queda bajo el puntero (x, y en el lienzo, en px), o null. Cada micro tiene dos marcas: la ▼ sobre la fila
  * de su Baader y la del carril «Micro»; las dos cuentan. Con el dedo (`toque`) el área es de 44 × 44 px (HIG) aunque la marca
- * mida 10: se acierta sin apuntar. Con la vista completa (`pxMin` < 2: las micro quedan a pocos px una de otra) el ancho baja a ±12 px, para que
- * tocar entre dos marcas abra el globo del minuto y no el de una micro vecina; el ±22 queda para el zoom acercado. Con el mouse es más justa (±10 px de ancho, el alto de la fila) para que el globo del minuto
- * siga saliendo en el resto de la fila. Gana la marca más cercana al puntero.
+ * mida 10: se acierta sin apuntar, y vale en TODOS los zooms. Antes, en vista completa (`pxMin` < 2) el ancho bajaba a ±12 px (24 de ancho):
+ * con las marcas a 7 px una de otra en el celular, había micro que ningún toque alcanzaba. Con marcas pegadas gana la más cercana al
+ * puntero; si no hay ninguna a ±22 px sigue saliendo el globo del minuto. Con el mouse es más justa (±10 px de ancho, el alto de la fila)
+ * para que el globo del minuto siga saliendo en el resto de la fila.
  */
 export function microBajoPuntero(args: {
-  micros: ReadonlyArray<{ id: string; fila: number; inicioMs: number }>
+  micros: ReadonlyArray<{ id: string; fila: number; inicioMs: number; duracionS?: number }>
   d: Diseno
   iniMs: number
   pxMin: number
@@ -629,9 +794,11 @@ export function microBajoPuntero(args: {
   let mejor: { id: string; dist: number } | null = null
   for (const q of micros) {
     const cx = ((q.inicioMs - iniMs) / 60_000) * pxMin
-    const dx = Math.abs(x - cx)
+    /* Desde `EXACTO_PX_MIN` la marca del carril «Micro» mide lo que dura la micro: encima de ese tramo cuenta como encima de la marca. */
+    const ancho = pxMin >= EXACTO_PX_MIN && q.duracionS ? (q.duracionS / 60) * pxMin : 0
+    const dx = x < cx ? cx - x : x > cx + ancho ? x - (cx + ancho) : 0
     const alto = toque ? 22 : null
-    const tolX = toque ? (pxMin < 2 ? TOQUE_X_VISTA_COMPLETA : 22) : 10
+    const tolX = toque ? 22 : 10
     for (const c of [d.carriles[q.fila], d.micro]) {
       if (!c) continue
       const dy = Math.abs(y - (c.y0 + c.h / 2))

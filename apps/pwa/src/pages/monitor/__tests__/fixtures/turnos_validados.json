@@ -1,5 +1,5 @@
 {
- "_fuente": "Los otros turnos con serie por minuto que usó la validación de las reglas (historial de los monitores públicos de Chonchi y Filete, 28-10 a 02-11-2026), recortados a las claves que usa microCausa. Los dos turnos del 02-11 tienen su fixture propio. `esperado` son los conteos por causa que da el script validado (reglas_v2.mjs), una implementación aparte de microCausa.ts.",
+ "_fuente": "Los otros turnos con serie por minuto que usó la validación de las reglas (historial de los monitores públicos de Chonchi y Filete, 28-10 a 02-11-2026), recortados a las claves que usa microCausa. Los dos turnos del 02-11 tienen su fixture propio. `esperado` son los conteos por causa que da el script validado, una implementación aparte de microCausa.ts: reglas_v3.mjs, igual a reglas_v2.mjs salvo que «Línea común» compara los inicios al segundo (decisión del 02-11).",
  "turnos": [
   {
    "id": "2026-11-02_Turno 1 Lunes",
@@ -8,10 +8,10 @@
    "micro": 62,
    "esperado": {
     "arranque": 9,
-    "linea": 10,
+    "linea": 11,
     "paro": 0,
     "ritmo": 9,
-    "sin": 34
+    "sin": 33
    },
    "doc": {
     "live": {
@@ -156,10 +156,10 @@
    "micro": 26,
    "esperado": {
     "arranque": 1,
-    "linea": 2,
+    "linea": 4,
     "paro": 0,
     "ritmo": 2,
-    "sin": 21
+    "sin": 19
    },
    "doc": {
     "live": {
@@ -259,10 +259,10 @@
    "micro": 60,
    "esperado": {
     "arranque": 6,
-    "linea": 12,
+    "linea": 14,
     "paro": 0,
     "ritmo": 7,
-    "sin": 35
+    "sin": 33
    },
    "doc": {
     "live": {
@@ -409,10 +409,10 @@
    "micro": 68,
    "esperado": {
     "arranque": 10,
-    "linea": 11,
+    "linea": 12,
     "paro": 2,
     "ritmo": 10,
-    "sin": 35
+    "sin": 34
    },
    "doc": {
     "live": {

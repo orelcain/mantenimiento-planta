@@ -115,14 +115,24 @@ describe('microCausa · una regla por caso', () => {
     expect(lejos.map((x) => x.causa)).not.toContain('linea')
   })
 
-  it('línea común: el límite de ±15 s es EXACTO al milisegundo (decisión consciente, ver LINEA_COMUN_TOL_S): 15.000 ms entra, 15.002 ms no', () => {
-    /* Los inicios de Shoplogix van de a un paso de 15 s con ruido de milisegundos: dos paradas a un paso entran o no según 2 a 9 ms. */
-    expect(clasificarMicros(entrada([microMs(T * 1000, 15, 0), microMs(T * 1000 + 15_000, 15, 2)])).map((x) => x.causa)).toEqual(['linea', 'linea'])
-    expect(clasificarMicros(entrada([microMs(T * 1000, 15, 0), microMs(T * 1000 + 15_001, 15, 2)])).map((x) => x.causa)).not.toContain('linea')
-    expect(clasificarMicros(entrada([microMs(T * 1000, 15, 0), microMs(T * 1000 + 15_002, 15, 2)])).map((x) => x.causa)).not.toContain('linea')
+  it('línea común: el ±15 s se compara AL SEGUNDO (decisión de Mantención, ver LINEA_COMUN_TOL_S): 15 s entra aunque sean 15,999 s crudos, 16 s no', () => {
+    /* Los inicios de Shoplogix van de a un paso de 15 s con ruido de milisegundos: al milisegundo, dos paradas a un paso entraban o no según 2 a 9 ms. */
+    const t = T * 1000
+    const causas = (a: number, b: number) => clasificarMicros(entrada([microMs(a, 15, 0), microMs(b, 15, 2)])).map((x) => x.causa)
+    expect(causas(t, t + 15_000)).toEqual(['linea', 'linea'])
+    expect(causas(t, t + 15_002)).toEqual(['linea', 'linea'])
+    expect(causas(t, t + 15_999)).toEqual(['linea', 'linea'])
+    expect(causas(t, t + 16_000)).not.toContain('linea')
+    expect(causas(t + 999, t + 16_000)).not.toContain('linea')
     /* Hacia atrás es igual. */
-    expect(clasificarMicros(entrada([microMs(T * 1000, 15, 0), microMs(T * 1000 - 15_000, 15, 2)])).map((x) => x.causa)).toEqual(['linea', 'linea'])
-    expect(clasificarMicros(entrada([microMs(T * 1000, 15, 0), microMs(T * 1000 - 15_002, 15, 2)])).map((x) => x.causa)).not.toContain('linea')
+    expect(causas(t, t - 15_000)).toEqual(['linea', 'linea'])
+    expect(causas(t + 999, t - 15_000)).toEqual(['linea', 'linea'])
+    expect(causas(t, t - 15_001)).not.toContain('linea')
+    /* El globo dice la diferencia al segundo, la misma con la que se decide: 14,053 s crudos son «15 s», no «14 s». */
+    const r = clasificarMicros(entrada([microMs(t + 949, 15, 0), microMs(t + 15_002, 15, 2)]))
+    expect(r.map((x) => x.causa)).toEqual(['linea', 'linea'])
+    expect(sp(r[0]!.razones[0]!.texto)).toBe('Baader con micro anotada casi a la vez (hasta 15 s de diferencia)')
+    expect(sp(r[0]!.razones[0]!.detalle)).toBe('Ev 1 15 s · Ev 3 15 s, empezó 15 s después')
   })
 
   it('línea común: una detención NO programada de otra Baader a ±15 s también cuenta (aunque esa Baader no tenga micro)', () => {

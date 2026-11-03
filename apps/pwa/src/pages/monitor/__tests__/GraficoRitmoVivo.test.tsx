@@ -417,6 +417,35 @@ describe('GraficoRitmoVivo · celular', () => {
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Cerrar la lectura del minuto' })) })
     expect(screen.queryByRole('group', { name: 'Lectura del minuto' })).toBeNull()
   })
+
+  it('al abrirlo se trae a la vista, bajo el encabezado fijo: anclado arriba de la tarjeta, quien mira el gráfico lo tenía fuera de la pantalla', () => {
+    const vistos: Element[] = []
+    const alVer = vi.fn(function (this: Element) { vistos.push(this) })
+    Element.prototype.scrollIntoView = alVer
+    /* El encabezado fijo del celular (56 px de alto): el globo queda 8 px bajo él. */
+    const barra = document.createElement('div')
+    barra.className = 'v2-cabecera'
+    document.body.appendChild(barra)
+    const espia = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const h = this.classList.contains('v2-cabecera') ? 56 : 0
+      return { top: 0, bottom: h, left: 0, right: 0, width: 0, height: h, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+    })
+    try {
+      const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
+      const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
+      const x = Math.round((130.5 / 450) * 303)
+      act(() => { fireEvent.pointerDown(lienzo, { pointerType: 'touch', clientX: x }) })
+      act(() => { fireEvent.click(lienzo, { clientX: x }) })
+      const globo = screen.getByRole('group', { name: 'Lectura del minuto' })
+      expect(vistos).toEqual([globo])
+      expect(alVer).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' })
+      expect(globo.style.scrollMarginTop).toBe('64px')
+    } finally {
+      espia.mockRestore()
+      barra.remove()
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+    }
+  })
 })
 
 describe('GraficoRitmoVivo · escala Y con zoom', () => {

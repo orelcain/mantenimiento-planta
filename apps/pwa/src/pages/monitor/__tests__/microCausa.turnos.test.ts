@@ -1,6 +1,7 @@
 /**
- * Los totales VALIDADOS de las reglas, protegidos con datos reales: 5 turnos de Chonchi (262 micro: Arranque 26 · Línea común 52 · Tras detención 3 ·
- * Ritmo bajo 34 · Sin contexto 147) y 5 de Filete (77 micro: 9 · 0 · 6 · 0 · 62), del 28-10 al 02-11-2026.
+ * Los totales VALIDADOS de las reglas, protegidos con datos reales: 5 turnos de Chonchi (262 micro: Arranque 26 · Línea común 59 · Tras detención 3 ·
+ * Ritmo bajo 34 · Sin contexto 140) y 5 de Filete (77 micro: 9 · 0 · 6 · 0 · 62), del 28-10 al 02-11-2026. «Línea común» compara los inicios al
+ * segundo (decisión del 02-11): al milisegundo eran 52 y 147.
  *
  * Los conteos por turno de `fixtures/turnos_validados.json` los dio el script de la validación (`reglas_v2.mjs`), una implementación APARTE de
  * `microCausa.ts` que se escribió y corrió sobre los mismos docs: si el clasificador se desvía en una sola micro, falla aquí con el turno. Los
@@ -19,7 +20,7 @@ const { turnos: otros } = JSON.parse(readFileSync(resolve(__dirname, 'fixtures',
 
 const conDocPropio = (id: string, planta: TurnoValidado['planta'], turno: string, micro: number, esperado: Conteo, doc: DocMicro): TurnoValidado => ({ id, planta, turno, micro, esperado, doc })
 const TURNOS: TurnoValidado[] = [
-  conDocPropio('2026-11-02_Turno 2', 'Chonchi', 'Turno 2', 46, { arranque: 0, linea: 17, paro: 1, ritmo: 6, sin: 22 }, CHONCHI_0211_T2),
+  conDocPropio('2026-11-02_Turno 2', 'Chonchi', 'Turno 2', 46, { arranque: 0, linea: 18, paro: 1, ritmo: 6, sin: 21 }, CHONCHI_0211_T2),
   conDocPropio('2026-11-02_Turno Dia', 'Filete', 'Turno Dia', 20, { arranque: 2, linea: 0, paro: 0, ritmo: 0, sin: 18 }, FILETE_0211_DIA),
   ...otros,
 ]
@@ -45,9 +46,9 @@ describe('microCausa · los totales validados (5 turnos de Chonchi y 5 de Filete
     })
   }
 
-  it('Chonchi, los 5 turnos: 262 micro · Arranque 26 · Línea común 52 · Tras detención 3 · Ritmo bajo 34 · Sin contexto 147', () => {
+  it('Chonchi, los 5 turnos: 262 micro · Arranque 26 · Línea común 59 · Tras detención 3 · Ritmo bajo 34 · Sin contexto 140', () => {
     const real = suma(de('Chonchi'), (t) => contarPorCausa(clasificar(t)))
-    expect(real).toEqual({ arranque: 26, linea: 52, paro: 3, ritmo: 34, sin: 147 })
+    expect(real).toEqual({ arranque: 26, linea: 59, paro: 3, ritmo: 34, sin: 140 })
     expect(Object.values(real).reduce((a, b) => a + b, 0)).toBe(262)
     /* «Sin contexto» sigue siendo la causa más grande: es la salida honesta. */
     expect(Math.max(...CAUSAS_MICRO.map((k) => real[k]))).toBe(real.sin)

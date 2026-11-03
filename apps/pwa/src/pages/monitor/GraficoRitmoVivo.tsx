@@ -19,25 +19,34 @@
  * (`microCausa.ts`). Un carril «Micro» debajo de las detenciones las junta; al tocar o pasar sobre una marca, su globo
  * dice qué pasó alrededor y por qué se marcó así. «Probable, no imputada»: se confirma en terreno.
  *
+ * El minuto por dentro (02-11, zoom): desde `EXACTO_PX_MIN` (12 px por minuto: «1 h» en 1920 da 26) cada parada se dibuja al segundo en la fila de su Baader (detención =
+ * bloque de tinta con un velo sobre la fila, micro = muesca gris, programada = marco punteado), la cinta pinta solo los segundos andados y el globo del minuto es
+ * `GloboMinuto`; desde `DETALLE_PX_MIN` (48: «15 min» en 1920 da 103) se agregan el escalón del ritmo andando, los rótulos de cada parada y las marcas cada 15 s.
+ * La micro se dibuja una sola vez por carril (su fila y el carril «Micro») y nunca en «Detenciones», que cuenta solo detenciones. Los segundos salen de
+ * `paradasDetalle` (inicio bajado al segundo) y las cifras del globo de `minutoPorDentro.ts`; no hay producción por segundo: lo repartido va rotulado «calculado».
+ *
  * Todo sale de las funciones de datos que ya existen (`ritmoVivo`, `monitorEventos`…): este archivo solo ubica y dibuja.
  */
 import { Check, Info, Maximize2, Minus, X } from 'lucide-react'
 import { memo, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref, type RefObject, type TouchEvent as ReactTouchEvent } from 'react'
-import { DUENO_META } from '@/services/shoplogix/monitorEventos'
+import { DUENO_META, duenoDe } from '@/services/shoplogix/monitorEventos'
 import { CapaAmpliada } from './AmpliarV2'
 import { useAbrirPorClave, useTamano } from './ampliarHooks'
 import { aEstaHora, horaDelCuadro, piezasMostradas } from './aEstaHora'
 import { useCifrasVivas, VistaVivaCtx, type CifrasVivas } from './useCifrasVivas'
 import {
-  RELLENO_DUENO, TRAMA_MANT, acumulado, anchoRotuloAhora, anclaRotuloAhora, brechaALaIzquierda, cifraTurnoAnterior, cubetasDeLinea, disenar, dominioVisible, episodiosParada, escalaAcumulado,
+  COLOR_TONO, DETALLE_PX_MIN, EXACTO_PX_MIN, OPACIDAD_FILA, RELLENO_DUENO, TRAMA_MANT, acumulado, anchoRotuloAhora, anclaRotuloAhora, andandoDelMinuto, andandoSegundos, brechaALaIzquierda, cifraTurnoAnterior, cubetasDeLinea,
+  disenar, dominioVisible, duracionExacta, episodiosParada, escalaAcumulado, esParadaMicro, ritmoAndando, tramosDelMinuto, relojConSegundos,
   adelanteAtras, escalaVentana, esperadoPorMinuto, filasBaader, finDelEje, horasMin, int, marcasEje, minutosConParada, minutosCompletos, minutosPorCubeta,
   microBajoPuntero, minutosVisibles, paradasEn, pctAndando, proyeccion, rayasY, recortarCurva, relojDe, separarRotulos, sumaPorMinuto, tamanoGrafico, tonoDeCubeta,
   tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
-  type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type TonoRitmo, type Zoom,
+  type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type Tramo, type TonoRitmo, type Zoom,
 } from './ejeTurno'
-import { CAUSAS_MICRO, COLOR_CAUSA, DEFINICION_CAUSA, OCULTO_S, ROTULO_CAUSA, clasificarMicros, contarPorCausa, numerosPorCelda, realEstimadoS, type CausaMicro, type MicroClasificada } from './microCausa'
+import { CAUSAS_MICRO, COLOR_CAUSA, DEFINICION_CAUSA, OCULTO_S, ROTULO_CAUSA, clasificarMicros, contarPorCausa, motivoLegible, numerosPorCelda, realEstimadoS, type CausaMicro, type MicroClasificada } from './microCausa'
 import { GLOBO_SOBRE_FILA, ubicarGloboPc } from './globoPosicion'
-import { etiquetaMaquina } from './ritmoVivo'
+import { GloboMinuto, MARCAS_15S } from './GloboMinuto'
+import { lecturaDelMinuto, type BaaderMinuto } from './minutoPorDentro'
+import { etiquetaMaquina, paradasDetalle, type ParadaDetalle } from './ritmoVivo'
 import type { CuadroReloj, RelojDeDatos } from './useRelojDeDatos'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { FranjaRango } from './FranjaRango'
@@ -84,15 +93,6 @@ const acota = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n))
 /** Una barra o celda como trazo de path (un solo nodo por tono en vez de cientos de rects). */
 const rect = (x: number, y: number, w: number, h: number) => `M${r1(x)} ${r1(y)}h${r1(w)}v${r1(h)}h${-r1(w)}z`
 
-const COLOR_TONO: Record<TonoRitmo, string> = {
-  bien: 'var(--v2-bien)',
-  atento: 'var(--v2-atento)',
-  /* `--rv-mal` (monitorGlass.css): un tono más profundo que el coral de la franja, para distinguirlo del ámbar en barras de 1–2 px. */
-  mal: 'var(--rv-mal)',
-  sin: 'var(--v2-gris)',
-}
-/** Las filas Ev: andando apenas se nota (acento 38 %), lo que se atrasa o se detiene toma color (85 %). */
-const OPACIDAD_FILA: Record<'bien' | 'atento' | 'mal', number> = { bien: 0.38, atento: 0.85, mal: 0.85 }
 const ORDEN_DUENO: Record<ParadaEje['dueno'], number> = { programado: 0, 'sin-imputar': 1, externo: 2, mantencion: 3 }
 const dec = (n: number, d = 1) => n.toLocaleString('es-CL', { minimumFractionDigits: d, maximumFractionDigits: d })
 /** «09:31:13»: la hora de la micro con segundos (wall-as-UTC, como `relojDe`). */
@@ -120,7 +120,12 @@ interface Modelo {
   esperadoLinea: number | null
   /** Tope de la escala de las barras por minuto (pz/min). */
   topBarra: number
-  maquinas: Array<{ id: string; nombre: string; esperado: number | null; cycles: number[]; celdas: CeldaBaader[]; pct: number | null; ultimoLlenado: number | null; anduvo: number | null }>
+  maquinas: Array<{ id: string; nombre: string; esperado: number | null; cycles: number[]; celdas: CeldaBaader[]; llenados: Array<number | null>; pct: number | null; ultimoLlenado: number | null; anduvo: number | null }>
+  /**
+   * El minuto por dentro: las paradas de cada Baader al segundo (`paradasDetalle`) y, por Baader y por minuto de la serie, lo que ocupan
+   * (`tramos`), los segundos que anduvo y su ritmo mientras anduvo. null sin paradas por máquina (doc anterior) o sin serie.
+   */
+  detalle: { paradas: Map<string, ParadaDetalle[]>; minutos: MinutoBaader[][] } | null
   /** Las micro con hora que ya pasaron, con su causa probable (`clasificarMicros`). Vacío sin paradas por máquina. */
   micros: MicroClasificada[]
   /** Hay carril «Micro»: el doc dice de qué Baader fue cada parada. */
@@ -152,6 +157,42 @@ interface Modelo {
   unidad: 'carros' | 'silletas' | null
 }
 
+/** Una Baader en un minuto de la serie: sus tramos de parada, los segundos que anduvo y su ritmo mientras anduvo (null = sin dato). */
+interface MinutoBaader { tramos: Tramo[]; andandoS: number; ritmo: number | null }
+
+/** Lo que ocupa cada parada en cada minuto de la serie, por Baader. El tono sigue saliendo de `filasBaader`; aquí solo se ubican los segundos. */
+function detalleDeMinutos(maquinas: Modelo['maquinas'], desde: string, n: number, pm: ParadasMaquina): NonNullable<Modelo['detalle']> {
+  const paradas = paradasDetalle({ stopEvents: pm.stopEvents, stopReasons: pm.stopReasons, stopMachines: pm.stopMachines, enCurso: pm.enCurso ?? [] })
+  const t0 = Date.parse(desde)
+  const minutos = maquinas.map((q) => Array.from({ length: n }, (_, k): MinutoBaader => {
+    const tramos = tramosDelMinuto(paradas.get(q.id), t0 + k * 60_000)
+    const andandoS = andandoSegundos(tramos)
+    const piezas = q.cycles[k]
+    return { tramos, andandoS, ritmo: piezas == null ? null : ritmoAndando(piezas, andandoS, q.llenados[k]) }
+  }))
+  return { paradas, minutos }
+}
+
+/** Lo que dice el globo del minuto `k` de la serie (índice), armado desde el modelo: ver `minutoPorDentro.ts`. */
+function lecturaDeMinuto(m: Modelo, k: number) {
+  const det = m.detalle!
+  const baaders: BaaderMinuto[] = m.maquinas.map((q, i) => {
+    const mb = det.minutos[i]![k]!
+    return { id: q.id, nombre: etiquetaMaquina(q.nombre), esperado: q.esperado, piezas: k < q.cycles.length ? q.cycles[k]! : null, tono: q.celdas[k]?.tono ?? 'sin', tramos: mb.tramos, andandoS: mb.andandoS, ritmo: mb.ritmo }
+  })
+  return lecturaDelMinuto({ iniMs: m.iniMs + (m.offsetMin + k) * 60_000, baaders, micros: m.micros })
+}
+
+/**
+ * Cómo se dice el «ritmo andando» (el escalón del gráfico, la leyenda y la columna del globo): es una división, no una medida. Shoplogix cuenta piezas
+ * por minuto y no hay producción por segundo; las piezas de un minuto pudieron caer de otro (Chonchi 02-11: 82 de 789 minutos de Baader pasan de 100 %
+ * de su velocidad seteada, el máximo es 141 %). Por eso va rotulado «calculado».
+ */
+const RITMO_ANDANDO_CALCULADO = 'Ritmo andando, calculado: piezas del minuto ÷ segundos andando'
+
+/** Ancho estimado de un rótulo de 11 px en peso 600 (no se mide con canvas: en jsdom no hay, y el cálculo tiene que ser el mismo en todas partes). */
+const anchoRotulo11 = (t: string) => t.length * 6
+
 const yAcum = (m: Modelo, v: number) => m.d.acum.y0 + (1 - (v - m.yMin) / (m.yMax - m.yMin)) * m.d.acum.h
 const maxV = (ps: Punto[]) => ps.reduce((a, q) => Math.max(a, q.v), 0)
 const enBanda = (m: Modelo, v: number) => v >= m.yMin - 1e-6 && v <= m.yMax + 1e-6
@@ -176,6 +217,11 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
   const pxMin = pxPorMinuto(W, totalMin)
   const x = (min: number) => min * pxMin
   const y = (v: number) => yAcum(m, v)
+  /* El minuto por dentro: desde `EXACTO_PX_MIN` cada parada se dibuja con su largo exacto (bloques en vez de celdas de 1 min); desde `DETALLE_PX_MIN`
+     caben además los rótulos, el escalón del ritmo y las marcas cada 15 s. Sin paradas por máquina (doc anterior) queda todo como siempre. */
+  const det = m.detalle
+  const exacto = det != null && pxMin >= EXACTO_PX_MIN
+  const conDetalle = exacto && pxMin >= DETALLE_PX_MIN
   const geo = useRef<Geo>({ x, y })
   geo.current = { x, y }
   const clipRef = useRef<SVGRectElement>(null)
@@ -301,6 +347,27 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
     const c = d.carriles[i]
     const tramos = { bien: '', atento: '', mal: '' }
     if (!c) return { q, c, tramos }
+    if (exacto && det) {
+      /* La cinta pinta SOLO los segundos andados de cada minuto, con el tono de ese minuto (el de su celda): una parada es un hueco, con 1 px de
+         aire del color de la tarjeta junto a ella. Los tramos andados que se tocan y son del mismo tono se unen (sin rayitas entre minutos). */
+      const cur: { seg: { tono: 'bien' | 'atento' | 'mal'; a: number; b: number } | null } = { seg: null }
+      const cierra = () => { if (cur.seg) tramos[cur.seg.tono] += rect(cur.seg.a, c.y0 + c.h - d.tira, cur.seg.b - cur.seg.a, d.tira); cur.seg = null }
+      for (let k = 0; k < m.n; k++) {
+        const mm = m.offsetMin + k
+        if (mm >= totalMin) break
+        const tono = q.celdas[k]?.tono ?? 'sin'
+        if (tono === 'sin') { cierra(); continue }
+        for (const [a, b] of andandoDelMinuto(det.minutos[i]![k]!.tramos)) {
+          const x0 = x(mm + a / 60) + (a > 0 ? 1 : 0)
+          const x1 = x(mm + b / 60) - (b < 60 ? 1 : 0)
+          if (x1 - x0 <= 0.5) continue
+          if (cur.seg && cur.seg.tono === tono && Math.abs(cur.seg.b - x0) < 0.01) cur.seg.b = x1
+          else { cierra(); cur.seg = { tono, a: x0, b: x1 } }
+        }
+      }
+      cierra()
+      return { q, c, tramos }
+    }
     const tonos: Array<{ k0: number; tono: TonoRitmo }> = []
     for (let k0 = 0; k0 < m.n; k0 += cub) {
       const celdas = Array.from({ length: Math.min(cub, m.n - k0) }, (_, j) => (m.offsetMin + k0 + j < totalMin ? (q.celdas[k0 + j]?.tono ?? 'sin') : 'sin'))
@@ -329,6 +396,27 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
     const arriba = c.y0 + 4
     const abajo = c.y0 + c.h - d.tira - 2
     const yv = (v: number) => abajo - Math.min(1.1, v / q.esperado!) * (abajo - arriba)
+    if (conDetalle && det) {
+      /* El escalón: el ritmo MIENTRAS ANDUVO de cada minuto (piezas ÷ segundos andando) contra el esperado, solo sobre los tramos andados. Las piezas
+         son por minuto, no por segundo: la altura es plana en todo el tramo andado del minuto y es CALCULADA (`RITMO_ANDANDO_CALCULADO`). Un minuto
+         sin dato corta el trazo. */
+      let esc = ''
+      let prevX = Number.NEGATIVE_INFINITY
+      for (let k = 0; k < m.n; k++) {
+        const mm = m.offsetMin + k
+        if (mm >= totalMin) break
+        const mb = det.minutos[i]![k]!
+        if (mb.ritmo == null) { prevX = Number.NEGATIVE_INFINITY; continue }
+        const yy = r1(yv(mb.ritmo))
+        for (const [a, b] of andandoDelMinuto(mb.tramos)) {
+          const x0 = x(mm + a / 60)
+          const x1 = x(mm + b / 60)
+          esc += Math.abs(prevX - x0) < 0.6 ? `V${yy}H${r1(x1)}` : `M${r1(x0)} ${yy}H${r1(x1)}`
+          prevX = x1
+        }
+      }
+      return { arriba, puntos: '', escalon: esc }
+    }
     const pts: string[] = []
     for (let k0 = 0; k0 < m.n; k0 += cub) {
       const ks = Array.from({ length: Math.min(cub, m.n - k0) }, (_, j) => k0 + j).filter((k) => k < q.cycles.length)
@@ -336,13 +424,14 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
       const prom = ks.reduce((a, k) => a + (q.cycles[k] ?? 0), 0) / ks.length
       pts.push(`${r1(x(m.offsetMin + k0 + ks.length / 2))},${r1(yv(prom))}`)
     }
-    return { arriba, puntos: pts.join(' ') }
+    return { arriba, puntos: pts.join(' '), escalon: '' }
   })
   /* Las micro con hora, en su minuto exacto: una ▼ sobre la fila de su Baader y una marca en el carril «Micro», del color de su causa. */
   const grande = d.tam === 'grande'
   const tw = grande ? 10 : 8
   const th = grande ? 8 : 7
-  const xMicro = (q: MicroClasificada) => x((q.inicioMs - m.iniMs) / 60_000)
+  /* Con el zoom, el inicio se baja al segundo (`paradasDetalle`): la ▼, la muesca de la fila y la del carril quedan en el mismo punto. */
+  const xMicro = (q: MicroClasificada) => x(((exacto ? Math.floor(q.inicioMs / 1000) * 1000 : q.inicioMs) - m.iniMs) / 60_000)
   const triangulos: Record<CausaMicro, string> = { arranque: '', linea: '', paro: '', ritmo: '', sin: '' }
   const barritas: Record<CausaMicro, string> = { arranque: '', linea: '', paro: '', ritmo: '', sin: '' }
   const rayasLinea = new Set<number>()
@@ -350,14 +439,61 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
     const c = d.carriles[q.fila]
     const mx = xMicro(q)
     if (c) triangulos[q.causa] += `M${r1(mx - tw / 2)} ${r1(c.y0)}h${tw}l${-tw / 2} ${th}z`
-    if (d.micro) barritas[q.causa] += rect(mx - 2, d.micro.y0 + 2, 4, d.micro.h - 4)
+    if (d.micro && !exacto) barritas[q.causa] += rect(mx - 2, d.micro.y0 + 2, 4, d.micro.h - 4)
     if (q.causa === 'linea') rayasLinea.add(r1(mx))
   }
   const carrilTop = d.carriles[0]?.y0 ?? 0
   const carrilFondo = d.carriles.length > 0 ? d.carriles[d.carriles.length - 1]!.y0 + d.carriles[d.carriles.length - 1]!.h : 0
 
-  // Paradas: las programadas debajo, Mantención arriba de todo.
-  const ordenParadas = [...m.paradas.filter((q) => q.desdeMin < totalMin && q.hastaMin > 0)].sort((a, b) => ORDEN_DUENO[a.dueno] - ORDEN_DUENO[b.dueno])
+  /* Las paradas en la fila de su Baader, al segundo (desde `EXACTO_PX_MIN`): 4 paths en total, uno por forma. La detención es un bloque de tinta a
+     todo el alto de la cinta con un velo sobre la fila; la micro, una muesca gris de la mitad de la cinta pegada arriba (nunca en la fila
+     «Detenciones»); la programada, un marco punteado de toda la fila. Con detalle, cada una lleva su rótulo si cabe (se prueba el largo y, si no, el corto). */
+  let paraVelo = ''
+  let paraDetenida = ''
+  let paraMicro = ''
+  let paraProgramada = ''
+  const rotulos: Array<{ x: number; y: number; t: string; extra: string | null }> = []
+  const microsExactas = exacto ? [...m.micros].sort((p, q) => q.duracionS - p.duracionS) : []
+  if (exacto && det) {
+    m.maquinas.forEach((q, i) => {
+      const c = d.carriles[i]
+      if (!c) return
+      const tapeY = c.y0 + c.h - d.tira
+      for (const p of det.paradas.get(q.id) ?? []) {
+        const a = (p.iniMs - m.iniMs) / 60_000
+        const b = p.abierta ? ultima.min : (p.finMs - m.iniMs) / 60_000
+        if (b <= 0 || a >= totalMin || b <= a) continue
+        const x0 = x(Math.max(0, a))
+        const wv = x(Math.min(totalMin, b)) - x0
+        if (wv <= 0) continue
+        if (p.tipo === 'detencion') {
+          paraVelo += rect(x0, c.y0, wv, c.h - d.tira)
+          paraDetenida += rect(x0, tapeY, wv, d.tira)
+        } else if (p.tipo === 'programada') paraProgramada += rect(x0 + 0.5, c.y0 + 0.5, Math.max(1, wv - 1), c.h - 1)
+        else paraMicro += rect(x0, tapeY, Math.max(2, wv), d.tira - 4)
+        if (!conDetalle) continue
+        const cabe = (t: string) => anchoRotulo11(t) + 6 <= wv
+        const dur = p.abierta ? '' : duracionExacta(p.durS)
+        let t: string | undefined
+        let extra: string | null = null
+        if (p.tipo === 'micro') t = [`micro ${dur}`, dur].find(cabe)
+        else if (p.tipo === 'detencion') {
+          if (p.abierta) t = ['Parada en curso'].find(cabe)
+          else {
+            t = [`Detención ${dur}`, dur].find(cabe)
+            if (t?.startsWith('Detención') && duenoDe(p.razon ?? '').dueno === 'sin-imputar' && cabe(`${t} · falta dueño`)) extra = 'falta dueño'
+          }
+        } else {
+          const motivo = motivoLegible(p.razon) ?? 'Parada programada'
+          t = [`${motivo} · programada · hasta ${relojConSegundos(p.finMs)}`, `${motivo} · programada`].find(cabe)
+        }
+        if (t) rotulos.push({ x: x0 + 3, y: tapeY - 5, t, extra })
+      }
+    })
+  }
+
+  // Paradas: las programadas debajo, Mantención arriba de todo. La micro no va en esta fila (tiene su carril «Micro» y su ▼): solo detenciones y programadas.
+  const ordenParadas = [...m.paradas.filter((q) => q.desdeMin < totalMin && q.hastaMin > 0 && !(m.conMicro && esParadaMicro(q)))].sort((a, b) => ORDEN_DUENO[a.dueno] - ORDEN_DUENO[b.dueno])
   const finProy = m.proy?.hasta
   const gap = m.aHora
   const textoBrecha = gap != null ? adelanteAtras(gap) : ''
@@ -407,6 +543,8 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
       {barras && <line x1={0} x2={W} y1={r1(barras.y0 + barras.h)} y2={r1(barras.y0 + barras.h)} stroke="var(--v2-reja)" />}
       {d.carriles.map((c, i) => <rect key={i} x={0} y={c.y0} width={W} height={c.h} rx={3} fill="rgb(142 142 147 / 0.08)" />)}
       <rect x={0} y={d.paradas.y0} width={W} height={d.paradas.h} rx={3} fill="rgb(142 142 147 / 0.08)" />
+      {/* Con detalle, una raya fina en cada minuto sobre las filas y los carriles: se cuenta a ojo y se ubica una parada en su minuto. */}
+      {conDetalle && d.carriles.length > 0 && <path d={Array.from({ length: Math.max(0, Math.ceil(totalMin) - 1) }, (_, j) => `M${r1(x(j + 1))} ${carrilTop}V${baseY}`).join('')} fill="none" stroke="var(--rv-minuto)" />}
 
       <g clipPath={`url(#${idBanda})`}>
         {/* El turno anterior equivalente: su curva COMPLETA, visible (3,4:1 en claro, 4,1:1 en oscuro), sólida y fina */}
@@ -495,7 +633,20 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
         <g key={m.maquinas[i]!.id}>
           <line x1={0} x2={W} y1={r1(cv.arriba)} y2={r1(cv.arriba)} stroke="var(--v2-tenue)" strokeWidth={1} strokeDasharray="3 4" />
           {cv.puntos.includes(' ') && <polyline points={cv.puntos} fill="none" stroke="rgb(var(--foreground))" strokeOpacity={0.85} strokeWidth={1.4} strokeLinejoin="round" strokeLinecap="round" />}
+          {cv.escalon && <path d={cv.escalon} fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6}><title>{RITMO_ANDANDO_CALCULADO}</title></path>}
         </g>
+      ))}
+
+      {/* Las paradas en la fila de su Baader, al segundo: velo, detención, micro y programada (un path por forma) y sus rótulos */}
+      {paraVelo && <path d={paraVelo} fill="var(--rv-velo)" />}
+      {paraDetenida && <path d={paraDetenida} fill="var(--rv-detenida)" />}
+      {paraMicro && <path d={paraMicro} fill="var(--rv-micro)" />}
+      {paraProgramada && <path d={paraProgramada} fill="none" stroke="var(--v2-gris)" strokeDasharray="3 3" />}
+      {rotulos.map((r, i) => (
+        <text key={i} x={r1(r.x)} y={r1(r.y)} fontSize={11} fontWeight={600} className="tabular-nums" style={{ fill: 'rgb(var(--muted-foreground))' }}>
+          {r.t}
+          {r.extra && <tspan style={{ fill: 'var(--v2-atento-texto)' }}> · {r.extra}</tspan>}
+        </text>
       ))}
 
       {/* Línea común: una raya punteada que cruza las filas de las Baader en el instante de una micro simultánea */}
@@ -514,6 +665,10 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
 
       {/* Micro con hora: ▼ sobre la fila de su Baader y una marca en el carril «Micro», del color de su causa probable (halo del color de la tarjeta) */}
       {d.micro && <rect x={0} y={d.micro.y0} width={W} height={d.micro.h} rx={3} fill="var(--v2-relleno)" />}
+      {/* Con el zoom, cada micro del carril mide lo que dura (mínimo 3 px): la más larga primero y la corta encima, con un trazo de 1 px del color de la tarjeta para que se vean las dos. */}
+      {d.micro && microsExactas.map((q) => (
+        <rect key={q.id} x={r1(xMicro(q))} y={d.micro!.y0 + 3} width={r1(Math.max(3, (q.duracionS / 60) * pxMin))} height={d.micro!.h - 6} rx={2} fill={COLOR_CAUSA[q.causa]} stroke="rgb(var(--card))" strokeWidth={1} />
+      ))}
       {CAUSAS_MICRO.map((k) => (
         <g key={k} fill={COLOR_CAUSA[k]}>
           {triangulos[k] && <path d={triangulos[k]} style={{ paintOrder: 'stroke', stroke: 'rgb(var(--card))', strokeWidth: 2, strokeLinejoin: 'round' }} />}
@@ -529,7 +684,8 @@ const LienzoSvg = memo(function LienzoSvg({ m, W, reloj, uid }: { m: Modelo; W: 
         </g>
       </g>
 
-      {/* Eje X compartido */}
+      {/* Eje X compartido. Con detalle, marcas cada 15 s sobre la fila de horas: el minuto de 6 px y las de 15, 30 y 45 s de 4 px. */}
+      {conDetalle && <path d={Array.from({ length: Math.ceil(totalMin) }, (_, j) => `M${r1(x(j))} ${d.ejeX - 7}v6${MARCAS_15S.map((s) => `M${r1(x(j + s / 60))} ${d.ejeX - 5}v4`).join('')}`).join('')} fill="none" stroke="var(--v2-tenue)" />}
       {marcas.map((t) => {
         const ancla = anclaMarca(t)
         return ancla && <text key={t} x={r1(x(t))} y={d.ejeX + 12} textAnchor={ancla} fontSize={fs} className="fill-muted-foreground tabular-nums">{relojDe(m.iniMs + t * 60_000)}</text>
@@ -544,9 +700,20 @@ function CursorSvg({ m, W, info }: { m: Modelo; W: number; info: LecturaGlobo })
   const px = pxPorMinuto(W, m.totalMin)
   const xm = info.xMin * px
   const baseY = fondoLienzo(m.d)
+  /* El minuto señalado con el zoom: una banda desde las barras hasta el carril «Micro» y, con detalle, las guías de :15 :30 :45 con su rótulo
+     (arriba de las filas, entre ellas y las barras: abajo chocaban con la hora siguiente). Va aquí y no en el lienzo para que el lienzo no se
+     redibuje al mover el cursor. */
+  const exacto = m.detalle != null && px >= EXACTO_PX_MIN
+  const guias = exacto && px >= DETALLE_PX_MIN
+  const x0 = Math.floor(info.xMin) * px
+  const top = m.d.carriles[0]?.y0 ?? m.d.paradas.y0
   return (
     <svg width={W} height={m.d.alto} viewBox={`0 0 ${W} ${m.d.alto}`} className="pointer-events-none absolute left-0 top-0 block" aria-hidden>
-      <line x1={r1(xm)} x2={r1(xm)} y1={m.d.acum.y0} y2={baseY} stroke="rgb(var(--foreground))" strokeWidth={1.5} />
+      {exacto && <rect x={r1(x0)} y={(m.d.barras?.y0 ?? top) - 4} width={r1(px)} height={r1(baseY - (m.d.barras?.y0 ?? top) + 4)} fill="var(--rv-foco)" />}
+      {guias && MARCAS_15S.map((s) => <line key={s} x1={r1(x0 + (px * s) / 60)} x2={r1(x0 + (px * s) / 60)} y1={top} y2={baseY} stroke="var(--rv-guia)" />)}
+      {guias && MARCAS_15S.map((s) => <text key={`t${s}`} x={r1(x0 + (px * s) / 60)} y={top - 2} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-muted-foreground tabular-nums" style={HALO}>:{s}</text>)}
+      {/* Con el zoom la banda y las guías reemplazan a la raya del medio (que taparía la guía de :30). */}
+      {!exacto && <line x1={r1(xm)} x2={r1(xm)} y1={m.d.acum.y0} y2={baseY} stroke="rgb(var(--foreground))" strokeWidth={1.5} />}
       {info.acum != null && enBanda(m, info.acum) && <circle cx={r1(xm)} cy={r1(yAcum(m, info.acum))} r={4.5} fill="rgb(var(--foreground))" stroke="rgb(var(--background))" strokeWidth={2} />}
     </svg>
   )
@@ -597,7 +764,9 @@ function RotulosDer({ m }: { m: Modelo }) {
   /* Paradas = tiempo de RELOJ con alguna parada (unión de intervalos, sin programadas) y episodios fusionados: tres Baader
      paradas a la vez cuentan una vez (la suma por máquina daba casi 5 h en un turno de 7 h 20 min). */
   const lim = { min: 0, max: m.totalMin }
-  const nParadas = episodiosParada(m.paradas, lim)
+  /* La columna cuenta DETENCIONES: la micro tiene su carril («N con hora · de M»). Sin carril «Micro» (doc anterior) las micro siguen en la fila y se cuentan. El tiempo
+     «con alguna Baader detenida» incluye la micro: Shoplogix la suma al tiempo detenido. */
+  const nParadas = episodiosParada(m.conMicro ? m.paradas.filter((q) => !esParadaMicro(q)) : m.paradas, lim)
   const minParadas = minutosConParada(m.paradas, lim)
   const fin = m.proy?.hasta ?? null
   const vFin = fin ? fin.v : m.cerrado ? m.ultima.v : null
@@ -643,9 +812,9 @@ function RotulosDer({ m }: { m: Modelo }) {
           {m.micros.length} con hora{m.microTotal != null ? ` · de ${int(m.microTotal)}` : ''}
         </text>
       )}
-      {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 12)} fontSize={12} fontWeight={600} className="fill-foreground tabular-nums">{horasMin(minParadas)}</text>}
+      {minParadas > 0 && <text x={xr} y={r1(d.ejeX + 12)} fontSize={12} fontWeight={600} className="fill-foreground tabular-nums">{horasMin(minParadas)}</text>}
       {/* Mide el reloj con ALGUNA Baader detenida, no la línea entera (Análisis cuenta la línea completa: otra cifra, otra medida). */}
-      {nParadas > 0 && <text x={xr} y={r1(d.ejeX + 25)} fontSize={11} className="fill-muted-foreground">alguna Baader detenida</text>}
+      {minParadas > 0 && <text x={xr} y={r1(d.ejeX + 25)} fontSize={11} className="fill-muted-foreground">alguna Baader detenida</text>}
     </svg>
   )
 }
@@ -844,6 +1013,14 @@ const GLOBO_PC_ANCHO = 640
 const GLOBO_PC_AIRE = 8
 const GLOBO_PC_MIN_W = 720
 
+/** Trae un globo del celular a la vista, lo mínimo, sin dejarlo bajo el encabezado fijo de la página (`.v2-cabecera`, sticky z-20: `scroll-margin-top`). */
+function traerALaVista(el: HTMLElement) {
+  const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
+  el.style.scrollMarginTop = `${bajoLaBarra + GLOBO_PC_AIRE}px`
+  const reducido = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+  el.scrollIntoView?.({ block: 'nearest', behavior: reducido ? 'auto' : 'smooth' })
+}
+
 /** La marca ▼ de una micro (con `hueco`, ▽ sin relleno: «ya estaba parando») en el color de su causa. `data-glifo` es el carácter equivalente para quien exporte el texto. */
 function MarcaMicro({ color, hueco, rotulo }: { color: string; hueco?: boolean; rotulo?: string }) {
   return (
@@ -1023,6 +1200,57 @@ function GloboMicroPc({ q, marcaX, anchoGrafico, filaTop, alto, lienzo }: { q: M
     return () => { window.removeEventListener('scroll', ubicar, true); window.removeEventListener('resize', ubicar) }
   }, [ubicar])
   return <GloboMicro q={q} refGlobo={ref} style={sitio == null ? { left: centrado, bottom: alto - filaTop + GLOBO_SOBRE_FILA } : { left: sitio.left, top: sitio.top }} />
+}
+
+/**
+ * El globo del minuto por dentro en PC: flota sobre las filas (el borde de abajo 8 px sobre la primera fila Ev, como `GloboMicro`) y, si no cabe
+ * (1366 × 768: hay 226 px de aire y el globo mide más), arranca arriba del gráfico. Va a la izquierda del minuto si hay lugar y a la derecha si no.
+ * No frena el mouse (sigue al minuto bajo el puntero y se corre al acercarse): para llegar a sus filas de micro, un clic en el gráfico lo deja
+ * FIJO (`fijo`) y entonces recibe el mouse. Siempre cabe en la pantalla: si su borde de abajo pasa de la ventana, sube lo que falte.
+ */
+function GloboMinutoPc({ m, lectura, xv0, px, resumen, parcial, microAbierta, fijo, onMicroHover, onMicroClick, onSalir }: {
+  m: Modelo
+  lectura: ReturnType<typeof lecturaDelMinuto>
+  xv0: number
+  px: number
+  resumen: { acum: number | null; futuro: boolean; tocaban: number | null; ahora: boolean; dif: number | null } | null
+  parcial: string | null
+  microAbierta: string | null
+  fijo: boolean
+  onMicroHover: (id: string | null) => void
+  onMicroClick: (id: string) => void
+  /** Fijo y el mouse salió del globo hacia fuera del gráfico: se cierra. */
+  onSalir: (ev: ReactPointerEvent<HTMLDivElement>) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [sitio, setSitio] = useState<{ top: number; left: number } | null>(null)
+  /* Se mide en cada minuto nuevo (el globo cambia de alto con lo que dice: `lectura` es nueva en cada dibujo) y solo se actualiza si el sitio cambió. */
+  const { d } = m
+  useLayoutEffect(() => {
+    const g = ref.current
+    if (!g) return
+    const gw = g.offsetWidth
+    const gh = g.offsetHeight
+    let top = Math.max(d.pt + 2, (d.carriles[0]?.y0 ?? d.paradas.y0) - 8 - gh)
+    /* Que el globo quepa en la PANTALLA, no solo en el gráfico: en 1366 × 768 el de abajo se salía 34 px y se perdía el párrafo del tiempo oculto de la micro.
+       Si su borde de abajo pasa de la ventana, sube lo que falte; sin pasar bajo el encabezado fijo de la página ni sobre el borde de arriba de la ventana. */
+    const lienzo = g.offsetParent?.getBoundingClientRect()
+    if (gh > 0 && lienzo && typeof window !== 'undefined' && window.innerHeight > 0) {
+      const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
+      const tope = bajoLaBarra + GLOBO_PC_AIRE - lienzo.top
+      const maxTop = window.innerHeight - GLOBO_PC_AIRE - lienzo.top - gh
+      top = Math.max(Math.min(top, maxTop), tope)
+    }
+    const izq = xv0 - gw - 16
+    const left = d.pl + (izq >= 0 ? izq : Math.max(0, Math.min(d.plotW - gw, xv0 + px + 16)))
+    setSitio((a) => (a && a.top === top && a.left === left ? a : { top, left }))
+  }, [d, lectura, xv0, px])
+  return (
+    <GloboMinuto
+      refGlobo={ref} lectura={lectura} tam={m.d.tam} resumen={resumen} parcial={parcial} microAbierta={microAbierta} fijo={fijo} onMicroHover={onMicroHover} onMicroClick={onMicroClick} onPointerLeave={onSalir}
+      style={sitio ? { left: sitio.left, top: sitio.top } : { left: 0, top: 0, visibility: 'hidden' }}
+    />
+  )
 }
 
 /** La micro elegida: su raya (a lo alto de las filas y los carriles) y un aro en cada una de sus marcas. */
@@ -1270,8 +1498,9 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     const maquinas = conSerie
       ? minuto.maquinas.map((q) => {
         const celdas = filas.find((f) => f.id === q.id)?.celdas ?? []
+        const llenados = filas.find((f) => f.id === q.id)?.llenados ?? []
         const anduvo = e.ritmoAnduvo?.find((r) => r.nombre.trim() === q.nombre.trim())?.cpm
-        return { id: q.id, nombre: q.nombre, esperado: q.esperado, cycles: q.cycles, celdas, pct: pctAndando(celdas), ultimoLlenado: e.llenado?.find((l) => l.id === q.id)?.ultimo ?? null, anduvo: anduvo != null && Number.isFinite(anduvo) ? anduvo : null }
+        return { id: q.id, nombre: q.nombre, esperado: q.esperado, cycles: q.cycles, celdas, llenados, pct: pctAndando(celdas), ultimoLlenado: e.llenado?.find((l) => l.id === q.id)?.ultimo ?? null, anduvo: anduvo != null && Number.isFinite(anduvo) ? anduvo : null }
       })
       : []
     /* Micro con hora: solo si el doc dice de qué Baader fue cada parada. Las que ya pasaron (no las del minuto que aún no llega). */
@@ -1284,6 +1513,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       : []
     const esperadoLinea = conSerie && minuto.maquinas.every((q) => q.esperado != null) ? minuto.maquinas.reduce((a, q) => a + (q.esperado ?? 0), 0) : null
     const d = disenar(w, tamanoGrafico(w), maquinas.length, conSerie, conMicro)
+    const detalle = conMicro && minuto && pm ? detalleDeMinutos(maquinas, minuto.desde, n, pm) : null
     let enCurso: Modelo['enCurso'] = null
     if (conSerie && nCola >= 1 && cuadro.rep && cuadro.rep.animando) {
       const span = cuadro.rep.totalFinal - cuadro.rep.totalPiso
@@ -1293,7 +1523,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       w, d, iniMs: e.iniMs, totalMin, yMin: 0, yMax, rejilla, vent: null, n, offsetMin, suma, completos: conSerie ? minutosCompletos(minuto.maquinas) : 0,
       esperadoMin: conSerie ? esperadoPorMinuto(minuto.maquinas, n) : [], esperadoLinea, topBarra: Math.ceil((Math.max(esperadoLinea ?? 0, ...suma, 10) * 1.15) / 10) * 10, maquinas, trazo, previa, ultima, proy, detenida,
       meta: p.meta, objetivo, previoPts, previoLabel: p.curva?.previo?.label ?? null, previoCifra, finReal: finReal != null, cuota: p.cuota ?? null, aHora, cuotaEn, paradas: e.paradas,
-      enCurso, cerrado: p.cerrado, unidad: e.unidad, micros, conMicro, microTotal: e.microTotal ?? null,
+      enCurso, cerrado: p.cerrado, unidad: e.unidad, micros, conMicro, microTotal: e.microTotal ?? null, detalle,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- se rehace con cada lectura (`reloj.version`) y con los datos del turno
   }, [w, e, totalMin, finReal, p.piezas, p.proyeccion, p.meta, p.cuota, p.curva, p.cerrado, detenida, aHora, cuotaEn, reloj.version])
@@ -1344,6 +1574,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const [cursor, setCursor] = useState<{ min: number; xv: number } | null>(null)
   /** La micro elegida (con el cursor encima o con un toque) y dónde estaba el puntero en la ventana: el globo de la micro reemplaza al del minuto. */
   const [microSel, setMicroSel] = useState<{ id: string; xv: number } | null>(null)
+  /** PC con el zoom del minuto por dentro: un clic deja el globo del minuto quieto y el mouse puede llegar a sus filas de micro (si no, el globo seguía al puntero y se corría al acercarse). */
+  const [fijo, setFijo] = useState(false)
   const tipoRef = useRef('mouse')
   /* Tras un toque, WebKit inventa eventos de mouse: al desplazar la página para traer el globo a la vista, un `pointerleave` de tipo
      'mouse' lo cerraba a los ~0,3 s (medido el 02-11 en WebKit con toque, 375 px). Si lo último en el gráfico fue un dedo, el mouse no
@@ -1388,6 +1620,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       return
     }
     if (!esMouse(ev)) return
+    /* Con el globo fijo el puntero puede recorrer el gráfico sin mover ni cerrar nada. */
+    if (fijo) return
     /* Sobre una marca de micro sale su globo; en el resto de la fila, el del minuto. */
     const sobre = ev.buttons === 0 ? microEn(ev, false) : null
     setMicroSel((a) => (a?.id === sobre?.id ? a : sobre))
@@ -1395,7 +1629,11 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     setCursor((a) => (mismoMinuto(a, nuevo) ? a : nuevo))
   }
   const tocar = (ev: { clientX: number; clientY: number }) => {
-    if (tipoRef.current === 'mouse') return
+    if (tipoRef.current === 'mouse') {
+      /* Un clic con el mouse deja fijo el globo del minuto (y otro lo suelta). Solo con el zoom donde el globo trae las filas de micro. */
+      if (cursor && modelo?.detalle && pxPorMinuto(W, modelo.totalMin) >= EXACTO_PX_MIN) setFijo((a) => !a)
+      return
+    }
     if (dedoRef.current?.arrastra) { dedoRef.current = null; return }
     /* Un toque sobre una marca abre (o cierra) el globo de esa micro; en cualquier otra parte, el del minuto. */
     const sobre = microEn(ev, true)
@@ -1412,13 +1650,13 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const frenaToque = (ev: ReactTouchEvent) => ev.stopPropagation()
   const hayGlobo = cursor !== null || microSel !== null
   useEffect(() => {
-    if (!hayGlobo) return
+    if (!hayGlobo) { setFijo(false); return }
     const fuera = (ev: PointerEvent) => {
       const t = ev.target as Element | null
-      if (!medidor.current?.contains(t as Node) && !t?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null) }
+      if (!medidor.current?.contains(t as Node) && !t?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null); setFijo(false) }
     }
     /* Escape lo cierra, como cualquier globo (con el teclado no hay otra forma de quitarlo). */
-    const tecla = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { setCursor(null); setMicroSel(null) } }
+    const tecla = (ev: KeyboardEvent) => { if (ev.key === 'Escape') { setCursor(null); setMicroSel(null); setFijo(false) } }
     document.addEventListener('pointerdown', fuera)
     document.addEventListener('keydown', tecla)
     return () => { document.removeEventListener('pointerdown', fuera); document.removeEventListener('keydown', tecla) }
@@ -1427,6 +1665,33 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const info = modelo && cursor ? leer(modelo, cursor.min, vivas) : null
   const globoIzq = modelo && cursor ? modelo.d.pl + cursor.xv + 14 : 0
   const globoX = modelo ? (globoIzq + 280 > modelo.w ? Math.max(0, globoIzq - 28 - 280) : globoIzq) : 0
+  /* El minuto por dentro: con el zoom que deja ver cada parada al segundo (`EXACTO_PX_MIN`) el globo del minuto es otro (`GloboMinuto`): el minuto en 60 s,
+     Baader por Baader. Solo en un minuto que la serie tiene y que ya pasó; en el resto (y con menos zoom) sigue el globo de siempre. */
+  const pxMinAct = modelo ? pxPorMinuto(W, modelo.totalMin) : 0
+  const kMinuto = modelo && info ? Math.floor(cursor!.min) - modelo.offsetMin : -1
+  const lectura = modelo?.detalle && info && !info.futuro && pxMinAct >= EXACTO_PX_MIN && kMinuto >= 0 && kMinuto < modelo.n ? lecturaDeMinuto(modelo, kMinuto) : null
+  const resumenMinuto = info ? { acum: info.acum, futuro: info.futuro, tocaban: info.tocaban, ahora: info.ahora, dif: info.dif } : null
+  /* El mouse encima de una fila de micro del globo abre su globo (como sobre la marca); al salir, se cierra. Un toque o un clic en la fila lo abre y lo cierra. */
+  const abrirMicroDeGlobo = (id: string | null) => {
+    if (id == null) { setMicroSel(null); return }
+    const q = modelo?.micros.find((x) => x.id === id)
+    if (!q || !modelo) return
+    const xv = ((q.inicioMs - modelo.iniMs) / 60_000) * pxMinAct - (scrollRef.current?.scrollLeft ?? 0)
+    setMicroSel((a) => (a?.id === id ? a : { id, xv }))
+  }
+  const alternarMicroDeGlobo = (id: string) => {
+    const q = modelo?.micros.find((x) => x.id === id)
+    if (!q || !modelo) return
+    const xv = ((q.inicioMs - modelo.iniMs) / 60_000) * pxMinAct - (scrollRef.current?.scrollLeft ?? 0)
+    setMicroSel((a) => (a?.id === id ? null : { id, xv }))
+  }
+  /* Fijo, el mouse puede ir del globo al gráfico y volver; si sale hacia cualquier otra parte (o hacia el globo de la micro), todo se cierra como siempre. */
+  const salirDelGlobo = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    if (!fijo || ev.pointerType !== 'mouse') return
+    const a = ev.relatedTarget as Element | null
+    if (a && (scrollRef.current?.contains(a) || a.closest?.('[data-globo-minuto]'))) return
+    setCursor(null); setMicroSel(null); setFijo(false)
+  }
   const microInfo = modelo && microSel ? modelo.micros.find((q) => q.id === microSel.id) ?? null : null
   const conteoMicro = modelo ? contarPorCausa(modelo.micros) : null
 
@@ -1441,12 +1706,18 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   useEffect(() => {
     const el = globoMovilRef.current
     if (idMicro == null || !globoCompacto || !el) return
-    /* El encabezado fijo de la página (`.v2-cabecera`, sticky z-20) tapa la parte de arriba de la ventana: el globo no se alinea bajo él (`scroll-margin-top`). */
-    const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
-    el.style.scrollMarginTop = `${bajoLaBarra + GLOBO_PC_AIRE}px`
-    const reducido = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
-    el.scrollIntoView?.({ block: 'nearest', behavior: reducido ? 'auto' : 'smooth' })
+    traerALaVista(el)
   }, [idMicro, globoCompacto])
+  /* El globo del minuto del celular se ancla arriba de la tarjeta, y quien mira el gráfico tiene ese borde fuera de la pantalla o bajo el
+     encabezado fijo. Medido el 02-11 a 375 px: con el gráfico a 20 px del encabezado el globo quedaba entero fuera, y a 120 px se le perdían
+     la hora y el ✕ (ya pasaba en main con el globo de siempre). Al abrir cada minuto se trae a la vista, lo mínimo, como el de la micro. */
+  const globoMinutoMovilRef = useRef<HTMLDivElement>(null)
+  const minutoMovil = chico && cursor ? Math.floor(cursor.min) : null
+  useEffect(() => {
+    const el = globoMinutoMovilRef.current?.firstElementChild
+    if (minutoMovil == null || !(el instanceof HTMLElement)) return
+    traerALaVista(el)
+  }, [minutoMovil])
   const sub = p.cerrado && finReal != null
     ? `${relojDe(e.iniMs)} → ${relojDe(finReal)} · terminado`
     : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
@@ -1458,6 +1729,9 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       <p className="text-[13px] leading-[18px] text-muted-foreground">{sub}</p>
     </div>
   )
+  /* El minuto por dentro: con ese zoom la leyenda dice las formas nuevas (micro, detención, programada) y, con detalle, el escalón en vez de la curva. */
+  const exactoUI = modelo?.detalle != null && pxMinAct >= EXACTO_PX_MIN
+  const conEscalon = exactoUI && pxMinAct >= DETALLE_PX_MIN
   const pc = modelo?.previoCifra
   /* «Hoy N atrás» sale de las MISMAS hechas de la cifra grande (cuadro vivo o, sin él, las mostradas), no de la serie al minuto:
      8.812 − 7.891 son 921, no 887. */
@@ -1482,7 +1756,16 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
           )}
         />
       )}
-      {modelo && modelo.maquinas.some((q) => q.esperado != null) && <Muestra trazo="curva" color="rgb(var(--foreground))" opacidad={0.85} rotulo="piezas por minuto de cada Baader" />}
+      {modelo && modelo.maquinas.some((q) => q.esperado != null) && (conEscalon
+        ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={18} height={10} aria-hidden><path d="M0 7H8V2H18" fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6} /></svg>ritmo andando de cada Baader (calculado: piezas del minuto ÷ segundos andando)</span>
+        : <Muestra trazo="curva" color="rgb(var(--foreground))" opacidad={0.85} rotulo="piezas por minuto de cada Baader" />)}
+      {exactoUI && (
+        <>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={14} height={9} aria-hidden><rect width={14} height={5} fill="var(--rv-micro)" /><rect y={5} width={14} height={4} fill="rgb(142 142 147 / 0.12)" /></svg>micro</span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={14} height={9} aria-hidden><rect width={14} height={9} fill="var(--rv-detenida)" /></svg>detención</span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={14} height={10} aria-hidden><rect x={0.5} y={0.5} width={13} height={9} rx={2} fill="none" stroke="var(--v2-gris)" strokeDasharray="3 3" /></svg>programada</span>
+        </>
+      )}
       {modelo && modelo.micros.length > 0 && (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
           <svg width={10} height={8} aria-hidden><path d="M0 0h10l-5 8z" fill="rgb(var(--muted-foreground))" /></svg>
@@ -1576,11 +1859,11 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
             {...zResto}
             onPointerDown={(ev) => { tipoRef.current = ev.pointerType; dedoRef.current = ev.pointerType === 'touch' ? { x: ev.clientX, y: ev.clientY, arrastra: false } : null; zDown(ev) }}
             onPointerMove={mover}
-            onPointerLeave={(ev) => { zLeave(); if (esMouse(ev)) { setCursor(null); setMicroSel(null) } }}
+            onPointerLeave={(ev) => { zLeave(); if (esMouse(ev) && !(ev.relatedTarget as Element | null)?.closest?.('[data-globo-minuto]')) { setCursor(null); setMicroSel(null); setFijo(false) } }}
             onTouchStart={frenaToque}
             onTouchEnd={frenaToque}
             onClick={tocar}
-            onScroll={() => { setCursor(null); setMicroSel(null) }}
+            onScroll={() => { setCursor(null); setMicroSel(null); setFijo(false) }}
             className="v2-minuto-scroll relative min-w-0 flex-1 overflow-x-auto overflow-y-hidden"
             style={{ touchAction: zg.acercado ? 'pan-x pan-y' : 'pan-y', scrollbarWidth: 'none', height: modelo?.d.alto }}
           >
@@ -1594,7 +1877,10 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
           </div>
           {modelo && (modelo.d.pr > 4 ? <RotulosDer m={modelo} /> : <div className="shrink-0" style={{ width: modelo.d.pr }} aria-hidden />)}
         </div>
-        {modelo && info && !chico && <Globo info={info} style={{ left: globoX, top: modelo.d.pt + 18 }} />}
+        {modelo && info && !chico && !lectura && <Globo info={info} style={{ left: globoX, top: modelo.d.pt + 18 }} />}
+        {modelo && info && !chico && lectura && (
+          <GloboMinutoPc m={modelo} lectura={lectura} xv0={Math.floor(cursor!.min) * pxMinAct - (scrollRef.current?.scrollLeft ?? 0)} px={pxMinAct} resumen={resumenMinuto} parcial={info.parcial} microAbierta={microSel?.id ?? null} fijo={fijo} onMicroHover={abrirMicroDeGlobo} onMicroClick={alternarMicroDeGlobo} onSalir={salirDelGlobo} />
+        )}
         {/* Su borde de abajo queda 10 px sobre la primera fila Ev (pegado a la marca, sin tapar las filas) y, si así quedara bajo el encabezado fijo, se baja lo justo. */}
         {modelo && microInfo && microSel && !globoCompacto && <GloboMicroPc q={microInfo} marcaX={modelo.d.pl + microSel.xv} anchoGrafico={modelo.w} filaTop={modelo.d.carriles[0]?.y0 ?? modelo.d.paradas.y0} alto={modelo.d.alto} lienzo={medidor} />}
         <div className="rv-pista-rueda" data-ver={pistaRueda ? 'true' : 'false'} aria-hidden>Ctrl + rueda o pellizca para acercar</div>
@@ -1615,7 +1901,13 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       {resumenMicro}
       {tactil && <p className="mt-2 text-[12px] leading-4 text-muted-foreground">{AYUDA_TACTIL}</p>}
       {/* En el celular el globo no flota sobre el lienzo: se ancla a la tarjeta, arriba, y la raya del minuto queda a la vista. */}
-      {modelo && info && chico && <div data-globo-minuto=""><Globo info={info} compacto onCerrar={() => setCursor(null)} /></div>}
+      {modelo && info && chico && (
+        <div ref={globoMinutoMovilRef} data-globo-minuto="">
+          {lectura
+            ? <GloboMinuto lectura={lectura} tam={tam} compacto parcial={info.parcial} microAbierta={microSel?.id ?? null} onMicroClick={alternarMicroDeGlobo} onCerrar={() => setCursor(null)} />
+            : <Globo info={info} compacto onCerrar={() => setCursor(null)} />}
+        </div>
+      )}
 
       {ampliado != null && (
         <CapaAmpliada abierta={ampliada} onCerrar={() => setAmpliada(false)} origen={tarjetaRef} titulo="Ritmo en vivo" sub={sub}>
