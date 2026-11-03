@@ -1013,6 +1013,14 @@ const GLOBO_PC_ANCHO = 640
 const GLOBO_PC_AIRE = 8
 const GLOBO_PC_MIN_W = 720
 
+/** Trae un globo del celular a la vista, lo mínimo, sin dejarlo bajo el encabezado fijo de la página (`.v2-cabecera`, sticky z-20: `scroll-margin-top`). */
+function traerALaVista(el: HTMLElement) {
+  const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
+  el.style.scrollMarginTop = `${bajoLaBarra + GLOBO_PC_AIRE}px`
+  const reducido = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+  el.scrollIntoView?.({ block: 'nearest', behavior: reducido ? 'auto' : 'smooth' })
+}
+
 /** La marca ▼ de una micro (con `hueco`, ▽ sin relleno: «ya estaba parando») en el color de su causa. `data-glifo` es el carácter equivalente para quien exporte el texto. */
 function MarcaMicro({ color, hueco, rotulo }: { color: string; hueco?: boolean; rotulo?: string }) {
   return (
@@ -1698,12 +1706,18 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   useEffect(() => {
     const el = globoMovilRef.current
     if (idMicro == null || !globoCompacto || !el) return
-    /* El encabezado fijo de la página (`.v2-cabecera`, sticky z-20) tapa la parte de arriba de la ventana: el globo no se alinea bajo él (`scroll-margin-top`). */
-    const bajoLaBarra = Math.max(0, ...Array.from(document.querySelectorAll('.v2-cabecera')).map((b) => b.getBoundingClientRect().bottom))
-    el.style.scrollMarginTop = `${bajoLaBarra + GLOBO_PC_AIRE}px`
-    const reducido = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
-    el.scrollIntoView?.({ block: 'nearest', behavior: reducido ? 'auto' : 'smooth' })
+    traerALaVista(el)
   }, [idMicro, globoCompacto])
+  /* El globo del minuto del celular se ancla arriba de la tarjeta, y quien mira el gráfico tiene ese borde fuera de la pantalla o bajo el
+     encabezado fijo. Medido el 02-11 a 375 px: con el gráfico a 20 px del encabezado el globo quedaba entero fuera, y a 120 px se le perdían
+     la hora y el ✕ (ya pasaba en main con el globo de siempre). Al abrir cada minuto se trae a la vista, lo mínimo, como el de la micro. */
+  const globoMinutoMovilRef = useRef<HTMLDivElement>(null)
+  const minutoMovil = chico && cursor ? Math.floor(cursor.min) : null
+  useEffect(() => {
+    const el = globoMinutoMovilRef.current?.firstElementChild
+    if (minutoMovil == null || !(el instanceof HTMLElement)) return
+    traerALaVista(el)
+  }, [minutoMovil])
   const sub = p.cerrado && finReal != null
     ? `${relojDe(e.iniMs)} → ${relojDe(finReal)} · terminado`
     : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
@@ -1888,7 +1902,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       {tactil && <p className="mt-2 text-[12px] leading-4 text-muted-foreground">{AYUDA_TACTIL}</p>}
       {/* En el celular el globo no flota sobre el lienzo: se ancla a la tarjeta, arriba, y la raya del minuto queda a la vista. */}
       {modelo && info && chico && (
-        <div data-globo-minuto="">
+        <div ref={globoMinutoMovilRef} data-globo-minuto="">
           {lectura
             ? <GloboMinuto lectura={lectura} tam={tam} compacto parcial={info.parcial} microAbierta={microSel?.id ?? null} onMicroClick={alternarMicroDeGlobo} onCerrar={() => setCursor(null)} />
             : <Globo info={info} compacto onCerrar={() => setCursor(null)} />}
