@@ -93,7 +93,7 @@ export function computeAreaOee(kpis: PlantKPIs | null, stops: StageStop[]): Area
   const anotadoMin = anotados.reduce((a, s) => a + (s.duracionMin || 0), 0)
   const porCausa = new Map<string, number>()
   for (const s of anotados) {
-    const label = (s.causa || '').trim() || 'Paro anotado sin texto'
+    const label = (s.causa || '').trim() || 'Detención anotada sin texto'
     porCausa.set(label, (porCausa.get(label) ?? 0) + (s.duracionMin || 0))
   }
 
@@ -110,7 +110,7 @@ export function computeAreaOee(kpis: PlantKPIs | null, stops: StageStop[]): Area
 
   const perdidas: AreaLoss[] = [
     ...[...porCausa.entries()].map(([label, min]) => ({ label, min, fuente: 'maquina' as const })),
-    ...(sinAnotar > 0 ? [{ label: 'Paros sin causa anotada', min: sinAnotar, fuente: 'maquina' as const }] : []),
+    ...(sinAnotar > 0 ? [{ label: 'Detenciones sin causa anotada', min: sinAnotar, fuente: 'maquina' as const }] : []),
     ...[...porEtapa.entries()].map(([label, min]) => ({ label, min, fuente: 'etapa' as const })),
   ].sort((a, b) => b.min - a.min)
 

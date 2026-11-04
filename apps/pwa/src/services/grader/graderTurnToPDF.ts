@@ -290,7 +290,7 @@ export async function exportTurnToPDF(params: {
 
     autoTable(doc, {
       startY: y,
-      head: [['Máquina', 'Uptime %', 'Produciendo', 'Descansos', 'Paros', 'Ciclos']],
+      head: [['Máquina', 'Uptime %', 'Produciendo', 'Descansos', 'Detenciones', 'Ciclos']],
       body: upstreamRows,
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 2 },

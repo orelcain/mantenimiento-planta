@@ -86,8 +86,8 @@ function BarraReparto({ x, ventanaMin, ventana, microAlert }: {
           {abierta ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
           <span className="text-headline text-foreground">{nombreCorto(x.maquina.machineName)}</span>
           {microAlert && (
-            <Pill tone="warning" className="normal-case" title="Micro-paros muy por sobre el promedio de la línea">
-              <AlertTriangle className="h-3 w-3" /> micro-paros
+            <Pill tone="warning" className="normal-case" title="Microdetenciones muy por sobre el promedio de la línea">
+              <AlertTriangle className="h-3 w-3" /> microdetenciones
             </Pill>
           )}
         </span>
@@ -97,7 +97,7 @@ function BarraReparto({ x, ventanaMin, ventana, microAlert }: {
       </button>
       <div className="flex h-3.5 overflow-hidden rounded-full bg-muted">
         {seg(r.falla, FILL.falla, 'Falla técnica')}
-        {seg(r.micro, FILL.micro, 'Micro-paros')}
+        {seg(r.micro, FILL.micro, 'Microdetenciones')}
         {seg(r.externo + r.excedido, FILL.externo, 'Externo y excedido')}
         {seg(r.planificado, FILL.planificado, 'Planificado')}
         {seg(r.produccion, FILL.produccion, 'Produciendo')}
@@ -141,7 +141,7 @@ function EventoLane({ evento, fallas }: { evento: EventoFalla & { maquina: strin
       </div>
       <div className="flex justify-between text-caption tabular-nums text-muted-foreground/80">
         <span>{hh(evento.desde)}</span>
-        {evento.paros > 1 && <span>{evento.paros - 1} arranque{evento.paros > 2 ? 's' : ''} fallido{evento.paros > 2 ? 's' : ''} entre paros</span>}
+        {evento.paros > 1 && <span>{evento.paros - 1} arranque{evento.paros > 2 ? 's' : ''} fallido{evento.paros > 2 ? 's' : ''} entre detenciones</span>}
         <span>{hh(evento.hasta)}</span>
       </div>
     </div>
@@ -379,8 +379,8 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
               <div className="col-span-2 border-t border-border/50 pt-2">
                 <div className="text-headline text-foreground">
                   {reengancheMayor === 0
-                    ? 'Reenganche inmediato (≤5 min) tras el paro mayor'
-                    : <>Reenganche en <span className="tabular-nums">≤{fmtInt(reengancheMayor + 5)} min</span> tras el paro mayor</>}
+                    ? 'Reenganche inmediato (≤5 min) tras la detención mayor'
+                    : <>Reenganche en <span className="tabular-nums">≤{fmtInt(reengancheMayor + 5)} min</span> tras la detención mayor</>}
                 </div>
                 <div className="text-footnote text-muted-foreground">
                   De vuelta al ritmo demostrado de la máquina, medido en tramos de 5 min.
@@ -473,7 +473,7 @@ export function MantencionTurnoTab({ kpis, loading, plantSlug, shiftId, dateKey 
               </div>
             </div>
             <Pill tone="critical" className="tabular-nums normal-case">
-              1 evento · {eventoMayor.paros} paro{eventoMayor.paros === 1 ? '' : 's'}
+              1 evento · {eventoMayor.paros} {eventoMayor.paros === 1 ? 'detención' : 'detenciones'}
             </Pill>
           </div>
           <div className="mt-3">

@@ -36,7 +36,7 @@ type Tramo = 'produccion' | 'sin-produccion' | 'sin-datos'
 
 const ESTILO: Record<Tramo, { clase: string; label: string }> = {
   'produccion':     { clase: 'bg-success/[0.15]', label: 'Con piezas' },
-  'sin-produccion': { clase: 'bg-muted-foreground/[0.10]',   label: 'Sin piezas (línea parada)' },
+  'sin-produccion': { clase: 'bg-muted-foreground/[0.10]',   label: 'Sin piezas (línea detenida)' },
   'sin-datos':      { clase: 'bg-warning/[0.15] [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(251,191,36,0.35)_3px,rgba(251,191,36,0.35)_6px)]', label: 'Sin datos del Grader' },
 }
 

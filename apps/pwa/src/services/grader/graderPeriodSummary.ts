@@ -242,7 +242,7 @@ function buildDetailRows(
     // mes", que solo lo rankea. Se nombra la causa antes que la posición.
     let flag = '—'
     let tone: PeriodRow['tone'] = 'neutral'
-    if (stopped) { flag = 'máquina parada'; tone = 'bad' }
+    if (stopped) { flag = 'máquina detenida'; tone = 'bad' }
     else if (isWorst) { flag = 'peor del mes'; tone = 'bad' }
     else if (isBest) { flag = 'mejor del mes'; tone = 'ok' }
 
@@ -435,7 +435,7 @@ export function buildPeriodSummary(input: BuildPeriodSummaryInput): PeriodSummar
     // el techo sigue ahí, solo que en paros cortos y repetidos.
     ask = `Mantención sostiene ${dec1(mttrMin)} min de reparación por avería. ` +
       `Con ${pct(avgUptime)} de disponibilidad promedio, la pérdida no está en cuánto demora cada ` +
-      'reparación sino en cuántas veces hay que hacerla: el paso siguiente es atacar las causas de paro más repetidas.'
+      'reparación sino en cuántas veces hay que hacerla: el paso siguiente es atacar las causas de detención más repetidas.'
   } else if (mttrMin != null) {
     ask = `Mantención sostiene ${dec1(mttrMin)} min de reparación por avería y la línea estuvo disponible ` +
       `${avgUptime != null ? pct(avgUptime) : 'la mayor parte'} del tiempo. ` +

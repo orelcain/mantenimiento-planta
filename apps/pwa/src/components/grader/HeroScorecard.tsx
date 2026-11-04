@@ -153,7 +153,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, upstream
               </span>
             )}
             {throughputPerMin && (
-              <span title="Throughput promedio: piezas ÷ minutos productivos (excluye colación y paros).">
+              <span title="Throughput promedio: piezas ÷ minutos productivos (excluye colación y detenciones).">
                 <b className="tabular-nums text-foreground">{throughputPerMin}</b> pz/min
               </span>
             )}

@@ -199,7 +199,7 @@ export function deriveSuggestions(
       id: `upstream-attend-${topMachine.machineid}`,
       category: 'terreno',
       title: `Atender ${shortMachineName(topMachine.machineName)} (mantención prioritaria)`,
-      description: `Esta máquina causó ${fmtDur(topMachine.totalOverlapSec)} de paro del Grader en ${topMachine.pauseCount} evento${topMachine.pauseCount !== 1 ? 's' : ''} (${sharePct.toFixed(0)}% del paro upstream atribuido a máquinas). Priorizar mantención reduce tiempo muerto sin tener que cambiar configuración del Grader.`,
+      description: `Esta máquina causó ${fmtDur(topMachine.totalOverlapSec)} de detención del Grader en ${topMachine.pauseCount} evento${topMachine.pauseCount !== 1 ? 's' : ''} (${sharePct.toFixed(0)}% de la detención upstream atribuida a máquinas). Priorizar mantención reduce tiempo muerto sin tener que cambiar configuración del Grader.`,
       severity: topMachine.totalOverlapSec >= 1800 ? 'critical' : 'warning',
     })
   }

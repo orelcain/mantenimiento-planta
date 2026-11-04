@@ -703,7 +703,7 @@ function LineTimeSummaryBadges({ totals }: { totals: LineTimeTotals }) {
         <Badge
           variant="outline"
           className="bg-destructive/[0.15] border-transparent text-ink-crit tabular-nums text-caption px-2 py-0.5 h-5 gap-1"
-          title="Tiempo total de detención/paro (suma de las 3 Baaders)"
+          title="Tiempo total de detención (suma de las 3 Baaders)"
         >
           <PauseCircle className="h-3 w-3" />
           {fmtDurationSec(totals.downtimeSec)}
@@ -912,8 +912,8 @@ export function MachineShiftDetail({ shift, expanded, onToggle, windowStart, win
           breakdown={shift.shiftRuntimeBreakdown}
           shiftRuntime={shift.shiftRuntime}
         />
-        <span className="flex items-center gap-1" title="Paros (Break)">
-          <Pause className="w-3 h-3" /> {breaks} paros
+        <span className="flex items-center gap-1" title="Detenciones (Break)">
+          <Pause className="w-3 h-3" /> {breaks} detenciones
         </span>
         {micro > 0 && (
           <span className="text-cat-7-ink flex items-center gap-1" title="Micro Detenciones (<5 min)">
@@ -1315,12 +1315,12 @@ export function UpstreamMachinesPanel({
                 variant="outline"
                 className="bg-cat-4-tint/[0.15] border-transparent text-cat-4-ink text-caption px-2 py-0.5 h-5 gap-1 cursor-help"
                 title={
-                  `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream (±2 min). ` +
+                  `${correlationSummary.upstreamCaused} de ${correlationSummary.total} detenciones del Grader coinciden con detenciones upstream (±2 min). ` +
                   `Probable root cause en línea Baader. Ver detalle en card de correlación abajo.`
                 }
               >
                 <AlertTriangle className="w-3 h-3" />
-                {correlationSummary.upstreamCaused} {correlationSummary.upstreamCaused === 1 ? 'paro' : 'paros'} coincidente{correlationSummary.upstreamCaused !== 1 ? 's' : ''}
+                {correlationSummary.upstreamCaused} {correlationSummary.upstreamCaused === 1 ? 'detención' : 'detenciones'} coincidente{correlationSummary.upstreamCaused !== 1 ? 's' : ''}
               </Badge>
             )}
             {loading && <span>Cargando…</span>}
@@ -1366,7 +1366,7 @@ export function UpstreamMachinesPanel({
                 onClick={() => {
                   if (!snapshot) return
                   const subtitle = correlationSummary && correlationSummary.upstreamCaused > 0
-                    ? `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream`
+                    ? `${correlationSummary.upstreamCaused} de ${correlationSummary.total} detenciones del Grader coinciden con detenciones upstream`
                     : `${snapshot.machines.length} máquinas — sincronizado al Grader`
                   void exportCombinedTimelinePng(timelineSync.connectGroupId, {
                     title: `Análisis de turno · ${snapshot.dateKey} · ${snapshot.shiftId}`,
@@ -1408,8 +1408,8 @@ export function UpstreamMachinesPanel({
                 </p>
                 <p className="text-muted-foreground">
                   {plantSlug === 'filete'
-                    ? <>Aún sin turnos de Filete en Shoplogix.{' '}<InfoTooltip text={"Todavía no hay turnos de la Línea 1 de Filete sincronizados desde Shoplogix para esta fecha. Cuando el sync los traiga, se verá acá el estado en vivo, paros y micro-detenciones de la línea."} iconSize={12} /></>
-                    : 'Cuando la integración esté lista, mostrará estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'}
+                    ? <>Aún sin turnos de Filete en Shoplogix.{' '}<InfoTooltip text={"Todavía no hay turnos de la Línea 1 de Filete sincronizados desde Shoplogix para esta fecha. Cuando el sync los traiga, se verá acá el estado en vivo, detenciones y micro-detenciones de la línea."} iconSize={12} /></>
+                    : 'Cuando la integración esté lista, mostrará estado en vivo de las 3 Baaders 142, detenciones, Micro Detenciones y correlación con los P0 del Grader.'}
                 </p>
               </div>
             )}
@@ -1523,7 +1523,7 @@ export function UpstreamMachinesPanel({
                 data-testid="linea-ver-mantencion"
               >
                 <Wrench className="h-4 w-4 shrink-0" />
-                <span className="flex-1">Gantt, paros y comentarios de cada máquina: en Mantención, bajo su barra de reparto</span>
+                <span className="flex-1">Gantt, detenciones y comentarios de cada máquina: en Mantención, bajo su barra de reparto</span>
                 <ChevronRight className="h-4 w-4 shrink-0" />
               </button>
             )}

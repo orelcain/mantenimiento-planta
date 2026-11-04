@@ -51,7 +51,7 @@ export interface PauseDetectionResult {
 function tierFor(durSec: number, pausaMax: number, largaMax: number): PauseTier {
   if (durSec < pausaMax) return 'pausa'
   if (durSec < largaMax) return 'larga'
-  return 'parada'
+  return 'parada' // vocab-ok: clave compartida de PauseTier
 }
 
 function isColacionCandidate(

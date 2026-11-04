@@ -19,7 +19,7 @@ export const GRADER_GLOSSARY: Record<string, {
   p0:            { label: 'P0',            alts: ['punto cero', 'gate 0'], description: 'Porcentaje de piezas rechazadas (no clasificadas). Objetivo < 2 %' },
   z2:            { label: 'Z2',            alts: ['controlador'],           description: 'Controlador Marelec Z2: cerebro de la clasificadora. Pantalla táctil en panel lateral' },
   sm221:         { label: 'SM221',                                           description: 'Tarjeta de entradas/salidas del Z2. Fallo → piezas no se clasifican' },
-  tambor:        { label: 'Motor tambor',  alts: ['moto tambor'],           description: 'Motor del tambor de la cinta de aceleración. Fallo → cinta parada' },
+  tambor:        { label: 'Motor tambor',  alts: ['moto tambor'],           description: 'Motor del tambor de la cinta de aceleración. Fallo → cinta detenida' },
   cintaAcel:     { label: 'Cinta de aceleración', alts: ['2ª cinta'],      description: 'Cinta que acelera las piezas antes del pesaje para separarlas' },
   botonAzul:     { label: 'Botón azul',                                     description: 'Botón de reset manual en el panel del Z2. Reinicia la clasificación sin apagar el equipo' },
   tachometro:    { label: 'Tacómetro',     alts: ['taco'],                  description: 'Sensor de velocidad de la cinta principal. Drift → throughput mal calculado' },

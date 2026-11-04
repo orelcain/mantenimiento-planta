@@ -52,7 +52,7 @@ export function FallasRepetidasCard({
             ? <span className="text-muted-foreground">revisando turnos previos…</span>
             : <>
                 <b className={repeticiones > 0 ? 'text-sm text-ink-warn' : 'text-sm text-ink-ok'}>{repeticiones}</b>
-                {' '}de {episodiosTurno} {episodiosTurno === 1 ? 'paro' : 'paros'} volvió
+                {' '}de {episodiosTurno} {episodiosTurno === 1 ? 'detención' : 'detenciones'} volvió
               </>}
         </span>
       </button>
@@ -62,8 +62,8 @@ export function FallasRepetidasCard({
           {grupos.length === 0 ? (
             <div className="rounded-ctl border border-dashed border-border px-3 py-2.5 text-caption text-muted-foreground">
               {episodiosTurno === 0
-                ? 'No hubo paros de Mantención en este turno.'
-                : `Ningún paro de Mantención repitió su causa en la misma máquina dentro de ${FALLA_REPETIDA.ventanaOpH} h de operación.`}
+                ? 'No hubo detenciones de Mantención en este turno.'
+                : `Ninguna detención de Mantención repitió su causa en la misma máquina dentro de ${FALLA_REPETIDA.ventanaOpH} h de operación.`}
             </div>
           ) : (
             <ul className="divide-y divide-border/50">
@@ -95,8 +95,8 @@ export function FallasRepetidasCard({
           )}
 
           <p className="text-caption text-muted-foreground">
-            Se repite = misma causa y misma máquina antes de {FALLA_REPETIDA.ventanaOpH} h de operación desde el paro
-            anterior. Paros de ≥ 2 min; «Ajuste mantenimiento» no cuenta.
+            Se repite = misma causa y misma máquina antes de {FALLA_REPETIDA.ventanaOpH} h de operación desde la detención
+            anterior. Detenciones de ≥ 2 min; «Ajuste mantenimiento» no cuenta.
             {!loading && turnosPrevios === 0 && ' Sin turnos previos: solo se ven las vueltas dentro de este turno.'}
           </p>
         </div>

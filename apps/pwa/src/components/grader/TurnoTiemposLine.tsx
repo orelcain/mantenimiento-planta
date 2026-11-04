@@ -85,7 +85,7 @@ export function TurnoTiemposLine({
       {atrasoNotable && (
         <span
           className={cn('flex items-center gap-1 text-ink-warn cursor-help')}
-          title="Tiempo entre la hora programada de inicio y la primera pieza registrada. No es un paro de máquina: es turno que nunca arrancó."
+          title="Tiempo entre la hora programada de inicio y la primera pieza registrada. No es una detención de máquina: es turno que nunca arrancó."
         >
           <AlertTriangle className="w-3 h-3 shrink-0" />
           arrancó <b className="tabular-nums">{fmtDurationMin(atrasoMin!)}</b> tarde
@@ -95,7 +95,7 @@ export function TurnoTiemposLine({
       {minutosActivos != null && minutosActivos > 0 && (
         <span
           className="ml-auto text-muted-foreground cursor-help tabular-nums"
-          title="Minutos con al menos un registro del Grader. Excluye los paros, así que es menor que el rango de producción."
+          title="Minutos con al menos un registro del Grader. Excluye las detenciones, así que es menor que el rango de producción."
         >
           {fmtDurationMin(minutosActivos)} activos
         </span>

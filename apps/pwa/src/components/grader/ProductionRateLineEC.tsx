@@ -602,7 +602,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
            del gráfico, donde el texto puede fluir. */
         label: { show: false },
         data: stoppedWithTarget.map(([from, to]) => ([
-          { xAxis: from, name: 'parada con objetivo' },
+          { xAxis: from, name: 'detenida con objetivo' },
           { xAxis: to },
         ])),
       } : undefined,
@@ -782,7 +782,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd, showGap
             className="inline-block w-4 h-2.5 shrink-0 rounded-[2px] border border-dashed"
             style={{ background: elegir('rgba(176,112,109,0.16)', 'grafico-falla', 0.12), borderColor: elegir('rgba(176,112,109,0.45)', 'grafico-falla', 0.6) }}
           />
-          Tramos sombreados: la máquina estaba parada mientras el objetivo corría
+          Tramos sombreados: la máquina estaba detenida mientras el objetivo corría
           — pérdida por detención, no por ritmo lento.
         </p>
       )}

@@ -127,3 +127,8 @@ Los otros tres que figuraban acá ya están cerrados (verificado contra el códi
 comentario histórico en `services/aria/tools/repuestos.ts`; y **Mapas (`CatalogoBases`)** ya no existe en
 el código. Pendiente menor que sí sigue vivo: `EquipoPlacementTool` + `equipoToPlaceId` inertes en
 `PlantaLeafletEditable.tsx`.
+
+## 2026-11-04 · Vocabulario del Grader
+
+- Textos visibles: detención/detenciones y microdetención/microdetenciones; estados de máquina: detenida/detenido. Conservar las claves compartidas de PauseTier (`parada`) y el origen persistido `paro_sensor`, con excepción `vocab-ok` en su línea. Los PDF sin tildes conservan ese estilo.
+- Lo vigila `components/grader/__tests__/vocabularioGrader.test.ts`: lee `components/grader`, `pages/AnalisisGrader` y `services/grader` con el parser de TypeScript (solo literales, plantillas y texto JSX) y usa el patrón `PROHIBIDAS` de `pages/monitor/__tests__/vocabulario.ts`. Para sumar otra carpeta, agregarla a `CARPETAS`.
