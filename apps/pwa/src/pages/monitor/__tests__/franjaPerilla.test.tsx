@@ -163,3 +163,45 @@ describe('funciones puras que usa la franja', () => {
     expect(bandasEnteras({ cpm: null, fuente: 'shoplogix' })).toBeNull()
   })
 })
+
+/* Maquetación de la cabecera de cada franja. jsdom no calcula anchos: estas pruebas fijan las clases que los dan (bajo 640 px,
+   grilla con el nombre en minmax(0, 1fr) y las cifras de 72 y 80 px; desde 640 px, flex y las cifras de 76 y 120 px como antes).
+   Las líneas que ocupa cada texto se miden en el navegador (Playwright, banco de la perilla). */
+describe('maquetación de la cabecera de cada franja (clases de anchos)', () => {
+  const cabeceraDe = (container: HTMLElement, texto: string) =>
+    Array.from(container.querySelectorAll<HTMLElement>('.sticky.z-10.mb-2')).find((el) => el.textContent?.includes(texto))!
+
+  it('bajo 640 px la cabecera es grilla (nombre en minmax(0, 1fr) y el grupo de cifras); desde 640 px vuelve a flex', () => {
+    const { container } = renderFranja(turno(cyc(15), cyc(18)), null)
+    const cab = cabeceraDe(container, 'Evisceradora 1')
+    expect(cab.className).toContain('grid grid-cols-[minmax(0,1fr)_auto]')
+    expect(cab.className).toContain('sm:flex sm:justify-between')
+  })
+
+  it('las dos cifras miden 72 y 80 px bajo 640 px (76 y 120 desde 640) y no llevan ancho en línea', () => {
+    const { container } = renderFranja(turno(cyc(15), cyc(18)), null)
+    const [carros, minutos] = Array.from(cabeceraDe(container, 'Evisceradora 1').querySelectorAll<HTMLElement>('div.text-right'))
+    expect(carros!.className).toContain('w-[72px] sm:w-[76px]')
+    expect(minutos!.className).toContain('w-[80px] sm:w-[120px]')
+    expect(carros!.getAttribute('style')).toBeNull()
+    expect(minutos!.getAttribute('style')).toBeNull()
+  })
+
+  it('«con N o más por minuto» se parte en «con N o más» y «por minuto» solo bajo 640 px; el texto no cambia', () => {
+    const { container } = renderFranja(turno(cyc(15), cyc(18)), null)
+    const pie = cabeceraDe(container, 'Evisceradora 1').querySelector<HTMLElement>('.leading-snug')!
+    expect(pie.textContent).toBe('con 17 o más por minuto')
+    expect(pie.querySelector('br')?.className).toBe('sm:hidden')
+  })
+
+  it('los rótulos de arriba siguen las mismas columnas y se parten en «carros / con pieza» y «minutos / a ritmo» bajo 640 px', () => {
+    const { container } = renderFranja(turno(cyc(15), cyc(18)), null)
+    const spans = Array.from(container.querySelectorAll<HTMLElement>('span'))
+    const carros = spans.find((s) => s.textContent === 'carros con pieza')!
+    const minutos = spans.find((s) => s.textContent === 'minutos a ritmo')!
+    expect(carros.className).toContain('w-[72px] sm:w-[76px]')
+    expect(minutos.className).toContain('w-[80px] sm:w-[120px]')
+    expect(carros.querySelector('br')?.className).toBe('sm:hidden')
+    expect(minutos.querySelector('br')?.className).toBe('sm:hidden')
+  })
+})

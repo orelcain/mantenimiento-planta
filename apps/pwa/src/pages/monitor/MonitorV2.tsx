@@ -350,10 +350,10 @@ const PX_NUMERO_V2 = 15
 const PAD_MINUTO = 12
 const PASOS_MARCA = [5, 10, 15, 30, 60, 120]
 
-/** Una cifra de la franja: el porcentaje y, si hay, una línea corta debajo. Ancho fijo: las columnas cuadran con sus rótulos de arriba. */
-function CifraFranja({ ancho, valor, pie, principal }: { ancho: number; valor: number | null; pie?: string | null; principal: boolean }) {
+/** Una cifra de la franja: el porcentaje y, si hay, una línea corta debajo. Ancho fijo (clase de Tailwind: 72 o 80 px bajo 640 px, 76 o 120 desde 640): las columnas cuadran con sus rótulos de arriba. */
+function CifraFranja({ ancho, valor, pie, principal }: { ancho: string; valor: number | null; pie?: ReactNode; principal: boolean }) {
   return (
-    <div className="text-right" style={{ width: ancho }}>
+    <div className={`text-right ${ancho}`}>
       <span className={`${principal ? 'text-[28px] lg:text-[34px]' : 'text-[22px]'} font-semibold leading-none tabular-nums tracking-tight`}>
         {valor != null ? Math.round(valor) : '—'}
       </span>
@@ -520,10 +520,11 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
 
   return (
     <div ref={medidorRef} className="mt-4">
-      {/* Rótulos una sola vez, arriba: cada columna cuadra con su cifra en cada franja (mismo ancho y mismo margen derecho). */}
+      {/* Rótulos una sola vez, arriba: cada columna cuadra con su cifra en cada franja (mismo ancho y mismo margen derecho).
+          Bajo 640 px cada rótulo se parte dentro de su columna (72 y 80 px; el mockup aprobado usa 72 en las dos); desde 640 px, como antes. */}
       <div className="flex justify-end gap-3.5 pr-3 text-right text-[12px] leading-[15px] text-muted-foreground">
-        <span className="w-[76px]">carros con pieza</span>
-        <span className="w-[120px]">minutos a ritmo</span>
+        <span className="w-[72px] sm:w-[76px]">carros <br className="sm:hidden" />con pieza</span>
+        <span className="w-[80px] sm:w-[120px]">minutos <br className="sm:hidden" />a ritmo</span>
       </div>
       <div {...zg.props} className="v2-minuto-scroll relative overflow-x-auto" style={{ touchAction: 'pan-x pan-y', scrollbarWidth: 'none' }}>
         <div
@@ -554,7 +555,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
                   <div className="v2-subtarjeta pointer-events-none sticky left-0 col-start-1 row-start-1 rounded-card" style={{ width: anchoPx || undefined }} />
                 )}
                 <div className={`relative col-start-1 row-start-1 ${f.principal ? 'py-3 lg:py-4' : ''}`} style={{ paddingInline: PAD_MINUTO }}>
-                  <div className="sticky z-10 mb-2 flex items-end justify-between gap-3" style={pegado}>
+                  <div className="sticky z-10 mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:justify-between" style={pegado}>
                     <div className="min-w-0">
                       <div className={f.principal ? 'text-[15px] font-semibold text-foreground' : 'text-[14px] font-medium text-foreground'}>
                         {f.nombre}
@@ -582,8 +583,8 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
                       )}
                     </div>
                     <div className="flex shrink-0 gap-3.5">
-                      <CifraFranja ancho={76} valor={carrosDe(f.id)} principal={f.principal} />
-                      <CifraFranja ancho={120} valor={pct} pie={umbral != null ? `con ${umbral} o más por minuto` : null} principal={f.principal} />
+                      <CifraFranja ancho="w-[72px] sm:w-[76px]" valor={carrosDe(f.id)} principal={f.principal} />
+                      <CifraFranja ancho="w-[80px] sm:w-[120px]" valor={pct} pie={umbral != null ? <>con {umbral} o más <br className="sm:hidden" />por minuto</> : null} principal={f.principal} />
                     </div>
                   </div>
                   {editando === f.id && puedeEditar && perillaEditor && f.id != null && (
