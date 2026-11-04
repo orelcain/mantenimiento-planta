@@ -36,8 +36,9 @@ import { desgloseDe, detencionesPorMinuto, varaCambio, type Desglose } from './d
 import { BotonInfo, GloboCarros, GloboRitmo } from './GlobosFranja'
 import { DesglosePiezas } from './DesglosePiezas'
 import { detencionLinea } from './desgloseVista'
-import { bandasEnteras, diaMesPerilla, MODO_UMBRAL_POR_OMISION, perillaVigenteEn, tonoVara, umbralEntero, type PerillaPublica, type PerillasDeLinea, type VaraUmbral } from './perilla'
+import { bandasEnteras, diaMesPerilla, MODO_UMBRAL_POR_OMISION, perillaVigenteEn, tonoVara, umbralEntero, type ModoUmbral, type PerillaPublica, type PerillasDeLinea, type VaraUmbral } from './perilla'
 import { EditorPerilla, type PerillaEditorDatos } from './EditorPerilla'
+import { EditorUmbral, type EfectoBaader, type UmbralEditorDatos } from './EditorUmbral'
 import { useIsAdmin } from '@/store/authStore'
 import type { PestanaMonitor } from './BarraLateralPC'
 import { horaDelCuadro, minutoDeDatos, piezasMostradas } from './aEstaHora'
@@ -337,6 +338,20 @@ export function pctARitmoFila(cycles: number[], varaK: VaraDeMinuto[], n: number
   for (let k = 0; k < n; k++) if (tonoDeMinuto(cycles[k] ?? 0, varaK[k] ?? { cpm: null, fuente: 'shoplogix' }) === 'ok') ok++
   return Math.round((ok / n) * 100)
 }
+
+/**
+ * Lo que la tarjeta «Minutos a ritmo de la línea» muestra de una Baader con cada modo (A2-2b): el umbral del último minuto y el % de
+ * minutos a ritmo de todo el turno, con la vara de cada minuto escrita en ese modo (solo las de perilla; las de Shoplogix no cambian).
+ * Usa `umbralEntero` y `pctARitmoFila`, igual que la franja: con el modo vigente, da lo mismo que la franja. Puro.
+ */
+export function efectoDeModos(cycles: number[], varaK: VaraDeMinuto[], n: number, esperado: number | null): Record<ModoUmbral, { umbral: number | null; pct: number | null }> {
+  const kUlt = Math.max(0, n - 1)
+  const con = (modo: ModoUmbral) => {
+    const vk = varaK.map((v) => (v.fuente === 'perilla' ? { ...v, modo } : v))
+    return { umbral: vk[kUlt] ? umbralEntero(vk[kUlt]) : null, pct: pctARitmoFila(cycles, vk, n, esperado) }
+  }
+  return { calibrado: con('calibrado'), optimo: con('optimo') }
+}
 /* Paleta calma: lo normal va en el acento y solo lo que se queda atrás toma color (ámbar y coral apagados). */
 const COLOR_MINUTO: Record<TonoMinuto, string> = {
   ok: 'var(--v2-bien)',
@@ -378,18 +393,21 @@ function CifraFranja({ ancho, valor, pie, principal }: { ancho: string; valor: n
  * abre con el turno completo. Pasar el mouse o tocar marca el mismo minuto en todas las franjas.
  * Las cabeceras quedan pegadas al borde visible mientras el contenido se desplaza.
  */
-export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carros, perillaEditor, paradas }: {
+export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carros, perillaEditor, umbralEditor, paradas }: {
   d: MinutoTurno; cerrado: boolean; marca?: EventoMarcado | null; onQuitarMarca?: () => void; perillas?: PerillasDeLinea | null
   /** Carros con pieza del turno completo (`vaciosTurnoDe` sobre la serie entera). La franja no los recalcula: la Baader elegida no cambia la regla. */
   carros?: VaciosTurno | null
   /** Quién puede anotar la perilla (solo admin): la línea y quien firma. Sin ella, la franja no ofrece el editor. */
   perillaEditor?: PerillaEditorDatos | null
+  /** Quién puede cambiar el modo del umbral (solo admin, como `perillaEditor`). Sin ella, la cabecera no ofrece «Cambiar». */
+  umbralEditor?: UmbralEditorDatos | null
   /** Las detenciones del turno (los 4 campos de `paradasDetalle`): de ahí salen el desglose y sus causas. Sin ellas, todo anda. */
   paradas?: ParadasMaquina | null
 }) {
   const [i, setI] = useState<number | null>(null)
   const esAdmin = useIsAdmin()
   const [editando, setEditando] = useState<string | null>(null)
+  const [editandoUmbral, setEditandoUmbral] = useState(false)
   /* El globo abierto de la franja («clave» + qué ⓘ: `c1:` carros, `c2:` minutos a ritmo) y la fila con el desglose abierto. La línea
      se llama «linea» en ambos. */
   const [globo, setGlobo] = useState<string | null>(null)
@@ -531,7 +549,17 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
   }
   /* El editor de la perilla: solo admin y solo si la página lo ofrece (línea vigente, sesión con datos). */
   const puedeEditar = esAdmin && perillaEditor != null
-  const indice = (e: { clientX: number; currentTarget: HTMLDivElement }) => {
+  /* El modo del umbral (A2-2b): el publicado, o calibrado por omisión. Solo admin y con datos de línea, como el editor de perilla. */
+  const modoVigente: ModoUmbral = perillas?.modo ?? MODO_UMBRAL_POR_OMISION
+  const puedeEditarUmbral = esAdmin && umbralEditor != null
+  /* El efecto por Baader de cada modo (la tarjeta U2): solo las Baaders, la línea no va en la tabla. */
+  const efectoBaaders: EfectoBaader[] = puedeEditarUmbral
+    ? filas.filter((f) => f.id != null).map((f) => {
+      const e = efectoDeModos(f.cycles, f.varaK, n, f.esperado)
+      return { nombre: f.nombre, perilla: f.vigente ? f.vigente.cpm : null, calibrado: e.calibrado, optimo: e.optimo }
+    })
+    : []
+  const indice =(e: { clientX: number; currentTarget: HTMLDivElement }) => {
     const r = e.currentTarget.getBoundingClientRect()
     const ancho = r.width - 2 * PAD_MINUTO
     return Math.max(0, Math.min(n - 1, Math.floor(((e.clientX - r.left - PAD_MINUTO) / Math.max(1, ancho)) * n)))
@@ -550,10 +578,23 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
     <div ref={medidorRef} className="mt-4">
       {/* Rótulos una sola vez, arriba: cada columna cuadra con su cifra en cada franja (mismo ancho y mismo margen derecho).
           Bajo 640 px cada rótulo se parte dentro de su columna (72 y 80 px; el mockup aprobado usa 72 en las dos); desde 640 px, como antes. */}
-      <div className="flex justify-end gap-3.5 pr-3 text-right text-[12px] leading-[15px] text-muted-foreground">
+      <div className="flex items-end justify-end gap-3.5 pr-3 text-right text-[12px] leading-[15px] text-muted-foreground">
+        {puedeEditarUmbral && (
+          <span className="mr-auto text-left">
+            Umbral {modoVigente === 'optimo' ? 'óptimo' : 'calibrado'} ·{' '}
+            <button type="button" aria-expanded={editandoUmbral} onClick={() => setEditandoUmbral((v) => !v)} className="tap-44 font-semibold text-brand-ink">
+              Cambiar
+            </button>
+          </span>
+        )}
         <span className="w-[72px] sm:w-[76px]">carros <br className="sm:hidden" />con pieza</span>
-        <span className="w-[80px] sm:w-[120px]">minutos <br className="sm:hidden" />a ritmo</span>
+        <span className="w-[80px] sm:w-[120px]">minutos <br className="sm:hidden" />a ritmo{modoVigente === 'optimo' ? ' óptimo' : ''}</span>
       </div>
+      {editandoUmbral && puedeEditarUmbral && umbralEditor && (
+        <div className="mb-3">
+          <EditorUmbral datos={umbralEditor} modoVigente={modoVigente} perillas={perillas} efecto={efectoBaaders} onCerrar={() => setEditandoUmbral(false)} />
+        </div>
+      )}
       <div {...zg.props} className="v2-minuto-scroll relative overflow-x-auto" style={{ touchAction: 'pan-x pan-y', scrollbarWidth: 'none' }}>
         <div
           className="relative cursor-crosshair select-none"

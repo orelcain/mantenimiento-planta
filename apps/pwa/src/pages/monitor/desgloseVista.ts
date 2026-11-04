@@ -3,8 +3,8 @@
  * de cada causa, el rótulo de la vara, la detención de la línea por minuto y el hook que abre un globo. Va en un `.ts` aparte porque
  * los archivos de componente solo exportan componentes (react-refresh).
  */
-import { useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
+import { type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { CATEGORIA_META, IMPUTACION_LEAVES, matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 import { detencionesPorMinuto } from './desglose'
 import type { ParadaDetalle } from './ritmoVivo'
 import type { VaraUmbral } from './perilla'
@@ -18,10 +18,35 @@ export function tiempoTexto(x: number, u: Unidad): string {
   return u === 'h' ? `${Math.floor(x / 60)} h ${pad(x % 60)}` : `${x}`
 }
 
-/** Nombre legible de un motivo de Shoplogix (la taxonomía; sin « - Paro»). Un motivo que la taxonomía no conoce se muestra tal cual. */
+/** Sin tilde y en minúsculas: la clave con la que se busca una palabra en la taxonomía. */
+const sinTilde = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+/** Palabras con tilde de la taxonomía («Detención», «Colación»…), por su forma sin tilde. Se arma una vez. */
+let tildes: Map<string, string> | null = null
+function palabrasConTilde(): Map<string, string> {
+  if (tildes) return tildes
+  tildes = new Map()
+  const textos = [...IMPUTACION_LEAVES.map((l) => l.label), ...Object.values(CATEGORIA_META).flatMap((m) => [m.label, m.short])]
+  for (const texto of textos) {
+    for (const palabra of texto.split(/\s+/)) {
+      const minusc = palabra.toLowerCase()
+      if (minusc !== sinTilde(minusc)) tildes.set(sinTilde(minusc), minusc)
+    }
+  }
+  return tildes
+}
+
+/**
+ * Nombre legible de un motivo de Shoplogix (sin « - Paro»). Si la taxonomía reconoce el motivo, su nombre oficial. Si no, el motivo
+ * en minúsculas con las tildes que la taxonomía ya usa («Micro Detencion» → «micro detención»). Una palabra que la taxonomía no
+ * conoce queda tal cual, sin inventar tilde.
+ */
 export function nombreCausa(razon: string): string {
   const leaf = matchImputacion(razon).leaf
-  return (leaf ? leaf.label : razon.trim()).replace(/\s*-\s*Paro$/i, '')
+  if (leaf) return leaf.label.replace(/\s*-\s*Paro$/i, '')
+  const base = razon.trim().replace(/\s*-\s*Paro$/i, '').toLowerCase()
+  const con = palabrasConTilde()
+  return base.split(/(\s+)/).map((p) => (/^\s+$/.test(p) ? p : (con.get(sinTilde(p)) ?? p))).join('')
 }
 
 /** Lo que el rótulo «a ritmo» dice entre paréntesis: de dónde sale el umbral. */
@@ -59,17 +84,13 @@ export function detencionLinea(porMaquina: Array<ParadaDetalle[] | undefined>, t
 }
 
 /**
- * Abre y cierra un globo: un toque alterna; con mouse, queda abierto mientras el puntero esté encima. Quien llama guarda el estado
- * (`abierto`) y lo cambia con `alCambiar`. El clic que sigue a un puntero de mouse no alterna (ya abrió al pasar).
+ * Abre y cierra un globo: SOLO con clic o toque, con mouse o con dedo (A2-2b: el puntero encima no abre nada, así el desglose no se
+ * mueve sin que lo pidan). Quien llama guarda el estado (`abierto`) y lo cambia con `alCambiar`.
  */
 export function useGlobo(abierto: boolean, alCambiar: (v: boolean) => void) {
-  const porRaton = useRef(false)
   return {
     'aria-expanded': abierto,
-    onPointerDown: (e: ReactPointerEvent<HTMLElement>) => { porRaton.current = e.pointerType === 'mouse' },
-    onPointerEnter: (e: ReactPointerEvent<HTMLElement>) => { if (e.pointerType === 'mouse') alCambiar(true) },
-    onPointerLeave: (e: ReactPointerEvent<HTMLElement>) => { if (e.pointerType === 'mouse') alCambiar(false) },
-    onClick: () => { if (!porRaton.current) alCambiar(!abierto) },
+    onClick: () => alCambiar(!abierto),
   }
 }
 

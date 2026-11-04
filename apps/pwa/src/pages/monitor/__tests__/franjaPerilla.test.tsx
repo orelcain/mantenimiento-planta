@@ -259,6 +259,18 @@ describe('los ⓘ de la franja y «Ver desglose»', () => {
     expect(container.querySelector('[role="dialog"][aria-label="Minutos a ritmo de la Evisceradora 1"]')).toBeNull()
   })
 
+  it('el puntero encima de un ⓘ no abre el globo: solo el clic o el toque (A2-2b, nada se mueve sin clic)', () => {
+    const { container } = renderFranja(turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18)), null)
+    const info = botonInfo(container, ETQ_RITMO)
+    fireEvent.pointerOver(info, { pointerType: 'mouse' })
+    fireEvent.pointerEnter(info, { pointerType: 'mouse' })
+    expect(info.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('[role="dialog"][aria-label="Minutos a ritmo de la Evisceradora 1"]')).toBeNull()
+    fireEvent.click(info)
+    expect(info.getAttribute('aria-expanded')).toBe('true')
+    expect(container.querySelector('[role="dialog"][aria-label="Minutos a ritmo de la Evisceradora 1"]')).not.toBeNull()
+  })
+
   it('«Ver desglose» del globo abre el panel de la Baader con su suma a ritmo igual al 60 % del frente', () => {
     const { container, getByText } = renderFranja(turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18)), null)
     fireEvent.click(botonInfo(container, ETQ_RITMO))

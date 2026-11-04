@@ -142,7 +142,7 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
           type="button"
           disabled={!puedeGuardar}
           onClick={() => void guardar()}
-          className="tap-44 h-[44px] rounded-full px-5 text-[15px] font-semibold text-white disabled:opacity-40"
+          className="tap-44 h-[44px] rounded-full px-5 text-[15px] font-semibold text-brand-foreground disabled:opacity-40"
           style={{ background: 'var(--v2-acento)' }}
         >
           {estado === 'guardando' ? 'Guardando…' : 'Guardar'}

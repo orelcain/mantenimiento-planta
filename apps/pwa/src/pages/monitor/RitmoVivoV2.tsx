@@ -22,6 +22,7 @@ import { MinutoTurnoV2, type EventoMarcado, type MinutoTurno } from './MonitorV2
 import { MODO_UMBRAL_POR_OMISION, rotuloRaya, tonoDePorcentajeVara, umbralEntero, type FuenteVara, type PerillasDeLinea, type VaraUmbral } from './perilla'
 import type { ParadasMaquina } from './ejeTurno'
 import type { PerillaEditorDatos } from './EditorPerilla'
+import type { UmbralEditorDatos } from './EditorUmbral'
 import { ReglasMinuto } from './ReglasMinuto'
 import {
   MICRO_MAX_MEDIDO_S,
@@ -397,6 +398,8 @@ export interface RitmoVivoAmpliadoProps {
   carros?: VaciosTurno | null
   /** Quién puede anotar la perilla (solo admin). Sin ella, la franja no ofrece el editor. */
   perillaEditor?: PerillaEditorDatos | null
+  /** Quién puede cambiar el modo del umbral «a ritmo» (solo admin). Sin ello, la franja no ofrece «Cambiar». */
+  umbralEditor?: UmbralEditorDatos | null
   /** Las detenciones del turno (los 4 campos de `paradasDetalle`): el desglose de la franja sale de ellas. */
   paradas?: ParadasMaquina | null
 }
@@ -406,7 +409,7 @@ export interface RitmoVivoAmpliadoProps {
  * minuto (`MinutoTurnoV2`), el llenado por Baader, las señales y, con `conReglas`, «Último minuto, pieza a pieza».
  * Lo abre el gráfico unido de «El turno» (`GraficoRitmoVivo`).
  */
-export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel, perillas, carros, perillaEditor, paradas }: RitmoVivoAmpliadoProps) {
+export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel, perillas, carros, perillaEditor, umbralEditor, paradas }: RitmoVivoAmpliadoProps) {
   const [selLocal, setSelLocal] = useState(SEL_LINEA)
   const sel = selProp ?? selLocal
   const { v, selId } = seleccionDe(r, turno, sel)
@@ -451,7 +454,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
         <div className={r ? 'rv-l' : ''}>
           <h4 className="text-[15px] font-semibold leading-tight text-foreground">El turno completo, minuto a minuto</h4>
           <p className="text-[13px] text-muted-foreground">piezas contadas por Shoplogix desde el inicio del turno{selId !== SEL_LINEA ? ' · solo la Baader elegida' : ''} · el mismo eje de tiempo que las franjas de abajo</p>
-          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} carros={carros} perillaEditor={perillaEditor} paradas={paradas} />
+          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} carros={carros} perillaEditor={perillaEditor} umbralEditor={umbralEditor} paradas={paradas} />
         </div>
       )}
       {r && r.lineas.length > 0 && (

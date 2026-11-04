@@ -7117,6 +7117,7 @@ function MonitorDelToken() {
                     carros={carrosDelTurno}
                     paradas={paradasDelTurno}
                     perillaEditor={esAdminMonitor && esActual && data.plantSlug ? { plantSlug: data.plantSlug, por: porDeUsuario(usuarioActual) } : null}
+                    umbralEditor={esAdminMonitor && esActual && data.plantSlug ? { plantSlug: data.plantSlug, por: porDeUsuario(usuarioActual) } : null}
                     cerrado={turnoCerrado}
                     turnoTerminado={turnoTerminadoV2}
                     marca={marcaRitmo}

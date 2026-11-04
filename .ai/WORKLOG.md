@@ -11,6 +11,16 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-04 · Claude · Monitor: desglose de la perilla y control del umbral «a ritmo», A2-2 (v4.12.0)
+- Hecho: la franja «El turno completo» muestra el desglose de cada Baader y de la línea (A2-2a). El admin elige el modo del umbral «a ritmo» (A2-2b): tarjeta «Minutos a ritmo de la línea» con Calibrado | Óptimo, efecto por Baader con cada modo, Guardar apagado sin cambio y quién/cuándo lo anotó. Los globos ⓘ se abren solo con clic o toque (antes el puntero encima los abría y movía el contenido). Una causa que la taxonomía no conoce sale en minúsculas y con tilde («micro detención»), sin « - Paro» (`nombreCausa`). Guardar de la perilla usa `text-brand-foreground`.
+- Archivos: `pages/monitor/EditorUmbral.tsx` (nuevo); `MonitorV2.tsx` (`efectoDeModos`, «Cambiar» en la cabecera, tarjeta); `desgloseVista.ts` (`useGlobo` sin hover, `nombreCausa` con tildes); `GlobosFranja.tsx` (doc); `EditorPerilla.tsx`; `RitmoVivoV2.tsx` y `PublicShiftMonitorPage.tsx` (prop `umbralEditor`); pruebas `__tests__/editorUmbral.test.tsx` (nuevo), `__tests__/desgloseVista.test.ts` (nuevo), `franjaPerilla.test.tsx` (hover) y `desglosePiezas.test.tsx` (causa sin taxonomía); versión 4.12.0 (`apps/pwa/package.json`, `version.ts`, `version.json`, `VERSION.md`, `CHANGELOG.md`). Banco SIN commit: `src/__banco_perilla__/Banco.tsx` y su stub de `pinShiftEnd`.
+- Verificación, antes → después: tsc 0 → 0; eslint 0 errores y 1 aviso → 0 errores y el mismo aviso (MonitorShiftParts, previo); vitest `src/pages/monitor` 77 archivos, 1404 ok, 1 omitida → 79 archivos, 1425 ok (+21), 1 omitida, 0 fallas; audit-piel OK sin crecer → OK; `release:pwa:verify` falla (sin `## [4.11.0]` en CHANGELOG, ya fallaba) → OK 4.12.0. Mutante: Guardar habilitado sin cambio → falla 1 prueba («Guardar queda apagado sin cambio…»); revertido y confirmado con `cmp`.
+- Estado: EN REVISIÓN (commit local en `feat/perilla-a2-desglose`, sin push ni PR). Falta verificar en navegador el banco (secciones 2b y 2c, claro y oscuro): lo hace `verificador-web`.
+- Sigue: (1) CHANGELOG no tiene encabezado de 4.11.0 (ni de 4.1 a 4.10); el verify solo mira la versión actual. (2) `useGlobo` ya no usa hooks: renombrarlo a `propsGlobo` cuando se toque. (3) Foto de la pantalla de la Ev 1 al final de un turno, para contrastar el 91 % del pie de carros.
+- Retro · funcionó: el mutante de Guardar cayó en una sola prueba y con el nombre del caso; el helper de causas tiene su prueba con las cifras escritas a mano.
+- Retro · costó de más: una corrida extra por una prueba vieja de `desglosePiezas` que fijaba el «tal cual» de la causa (el desvío que se corrige). El stub del banco no exportaba las dos funciones nuevas; se vio al leerlo, no con una corrida.
+- Retro · regla: al cambiar la semántica de un helper, buscar primero sus pruebas con grep; los stubs del banco se revisan contra los exports que importa el monitor.
+
 ## 2026-11-04 · Claude · Monitor: la perilla de cada Baader pasa a ser la vara, fase A (v4.11.0)
 - Fase A completa, en 13 commits de `feat/monitor-perilla`:
   - perilla por máquina, con fecha en hora de planta, historial y regla de solo admin, probada con el emulador;

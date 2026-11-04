@@ -119,8 +119,8 @@ describe('detención: el detalle de la fila 0 y sus causas', () => {
     expect(nombreCausa('COLACION')).toBe('Colación')
     expect(nombreCausa('EJERCICIO COMPENSATORIO - Paro')).toBe('Ejercicio compensatorio')
     expect(nombreCausa('AJUSTE OPERADOR')).toBe('Ajuste operador')
-    /* Un motivo que la taxonomía no conoce se muestra tal cual lo anotó Shoplogix. */
-    expect(nombreCausa('Limpieza de Ducto')).toBe('Limpieza de Ducto')
+    /* Un motivo que la taxonomía no conoce sale en minúsculas (A2-2b). */
+    expect(nombreCausa('Limpieza de Ducto')).toBe('limpieza de ducto')
   })
 })
 

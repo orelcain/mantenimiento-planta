@@ -2,7 +2,7 @@
  * Los globos de la franja «El turno completo» (A2-2a): el ⓘ de «minutos a ritmo» (con «Ver desglose») y el ⓘ de «carros con pieza»
  * (solo en las Baaders). Los textos salen de la sección «OK de la Etapa 2» del spec (mockup v7); las cifras las calcula quien llama.
  *
- * Abrir y cerrar: un toque alterna; con mouse, el globo queda abierto mientras el puntero esté encima. `aria-expanded` sigue el estado.
+ * Abrir y cerrar: solo con clic o toque (el puntero encima no abre nada). `aria-expanded` sigue el estado.
  * Va en flujo (no flotando): el zoom de la franja recorta lo que se sale de su caja.
  */
 import type { ReactNode } from 'react'
