@@ -221,7 +221,9 @@ describe('perilla', () => {
     const conMetas = cascadaPorMeta(args(PERILLAS_IGUAL_A_META))
     expect(sinPerillas.linea.perilla).toBe(0)
     for (const b of sinPerillas.baaders) expect(b.perilla).toBe(0)
-    expect(sinPerillas).toEqual(conMetas)
+    /* Lo único que cambia entre estas dos es «hay perilla anotada» (`conPerilla`): quitada de ambos lados, todo lo demás es igual. */
+    const sinMarca = (c: ReturnType<typeof cascadaPorMeta>) => ({ linea: c.linea, baaders: c.baaders.map((b) => ({ ...b, conPerilla: false })) })
+    expect(sinMarca(sinPerillas)).toEqual(sinMarca(conMetas))
   })
 
   it('una perilla por encima de la meta no resta (piso en 0): Ev 2 con 17 sobre su meta 16', () => {
@@ -339,5 +341,24 @@ describe('tipo de cada parada en el desglose (B-2)', () => {
     expect(tipoParaDesglose({ tipo: 'programada', razon: 'Limpieza de Ducto' })).toBe('detencion')
     expect(tipoParaDesglose({ tipo: 'micro', razon: 'Micro Detencion' })).toBe('micro')
     expect(tipoParaDesglose({ tipo: 'detencion', razon: 'AJUSTE OPERADOR' })).toBe('detencion')
+  })
+})
+
+describe('aguas arriba y perilla anotada, por vista (para el «Ver detalle» del tablero v2)', () => {
+  it('detenciones.aguas y micro.aguas de la línea suman las de las Baader', () => {
+    const baaders = [ev1!, ev2!, ev3!]
+    expect(linea.detenciones.aguas).toBe(baaders.reduce((a, b) => a + b.detenciones.aguas, 0))
+    expect(linea.micro.aguas).toBe(baaders.reduce((a, b) => a + b.micro.aguas, 0))
+  })
+
+  it('la detención aguas arriba del turno es la limpieza de ducto (123 pz), y no pasa de la detención total', () => {
+    expect(linea.detenciones.aguas).toBe(123)
+    expect(linea.detenciones.aguas).toBeLessThanOrEqual(linea.detenciones.piezas)
+  })
+
+  it('conPerilla es true en cada Baader con perilla (también si iguala a la meta) y false sin perillas', () => {
+    expect(cascada.baaders.every((b) => b.conPerilla)).toBe(true)
+    expect(cascadaPorMeta(args(PERILLAS_IGUAL_A_META)).baaders.every((b) => b.conPerilla)).toBe(true)
+    expect(cascadaPorMeta(args(null)).baaders.every((b) => b.conPerilla === false)).toBe(true)
   })
 })

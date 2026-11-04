@@ -72,8 +72,9 @@ export interface PiezasVista {
   perilla: number
   /** Podía hacer con la perilla. */
   podiaConPerilla: number
-  detenciones: { min: number; veces: number; piezas: number }
-  micro: { min: number; veces: number; piezas: number }
+  /** `aguas` = la parte de `piezas` que es aguas arriba (por Baader ya redondeada; la línea suma). */
+  detenciones: { min: number; veces: number; piezas: number; aguas: number }
+  micro: { min: number; veces: number; piezas: number; aguas: number }
   vacios: number
   hizo: number
   /** Lo que no se hizo: podía − hizo (la suma de perilla, detenciones, micro y vacíos cuando `cuadra`). */
@@ -98,6 +99,8 @@ export interface BaaderCascada extends PiezasVista {
   vara: number | null
   /** Motivo de la perilla vigente al final del turno («por el Knuro»). null si no hay perilla o no tiene motivo. */
   motivo: string | null
+  /** Hay una perilla anotada vigente al final del turno (aunque su vara sea igual a la meta). */
+  conPerilla: boolean
   /**
    * La Baader no tiene meta de Shoplogix usable (null o ≤ 0). NO entra en la cascada de la línea; su vista lleva solo el aviso y
    * sus cifras van en cero, para que nadie las lea como si fueran suyas.
@@ -152,6 +155,8 @@ interface Calculo {
   vara: number | null
   /** Motivo de esa misma perilla (el instante es el del `vara`); null si no hay perilla o no tiene motivo. */
   motivo: string | null
+  /** Hay perilla anotada vigente al final del turno (el mismo instante que `vara` y `motivo`). */
+  conPerilla: boolean
 }
 
 /** Minutos del turno de una Baader con sus segundos por clase. Una pasada por las paradas; después, todo sale por minuto. */
@@ -257,6 +262,7 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
     expMeta: meta * andTodo,
     vara: varaEnMinuto(m, t0, n - 1, perillas),
     motivo: perillaVigenteEn(perillas, m.id, t0 + (n - 1) * MS_MINUTO)?.motivo ?? null,
+    conPerilla: perillaVigenteEn(perillas, m.id, t0 + (n - 1) * MS_MINUTO) != null,
   }
 }
 
@@ -327,8 +333,8 @@ function vistaDe(lista: Calculo[]): PiezasVista {
     podia: cap,
     perilla: per,
     podiaConPerilla: sumar(lista, 'daba'),
-    detenciones: { min: sumar(lista, 'minDet'), veces: sumar(lista, 'vDet'), piezas: det },
-    micro: { min: sumar(lista, 'minMicro'), veces: sumar(lista, 'vMicro'), piezas: micro },
+    detenciones: { min: sumar(lista, 'minDet'), veces: sumar(lista, 'vDet'), piezas: det, aguas: detAg },
+    micro: { min: sumar(lista, 'minMicro'), veces: sumar(lista, 'vMicro'), piezas: micro, aguas: microAg },
     vacios: vac,
     hizo,
     perdido: cap - hizo,
@@ -357,6 +363,7 @@ export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
       meta: c.meta,
       vara: c.vara,
       motivo: c.motivo,
+      conPerilla: c.conPerilla,
       sinMeta: !tieneMeta(c),
       ...vistaDe(tieneMeta(c) ? [c] : []),
     })),

@@ -47,7 +47,8 @@ import { construirCascada, contenedorDe } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
 import { TarjetaCascada } from './monitor/CascadaTurnoCard'
-import { cascadaPorMeta, minutosDelTurno } from './monitor/cascadaPerilla'
+import { cascadaPorMeta, minutosDelTurno, type CascadaArgs } from './monitor/cascadaPerilla'
+import { detalleCascadaMeta } from './monitor/cascadaMetaDetalle'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
 import {
@@ -6084,16 +6085,20 @@ function MonitorDelToken() {
     const n = minutosDelTurno({ desde: s.desde, largo, plannedEnd: live.plannedEnd, effectiveEnd: live.effectiveEnd, shiftClosed: live.shiftClosed })
     if (!(n > 1) || !Number.isFinite(Date.parse(s.desde))) return null
     const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+    const args: CascadaArgs = {
+      serie: {
+        desde: s.desde,
+        maquinas: s.maquinas.map((m) => ({ id: m.id, nombre: nombrePorId.get(m.id) ?? m.id, esperado: m.esperado, cycles: m.cycles })),
+      },
+      n,
+      paradas: paradasDetalle({ stopEvents: live.stopEvents, stopReasons: live.stopReasons, stopMachines: live.stopMachines, enCurso: [] }),
+      perillas: live.perillas ?? null,
+    }
+    const cascada = cascadaPorMeta(args)
     return {
-      cascada: cascadaPorMeta({
-        serie: {
-          desde: s.desde,
-          maquinas: s.maquinas.map((m) => ({ id: m.id, nombre: nombrePorId.get(m.id) ?? m.id, esperado: m.esperado, cycles: m.cycles })),
-        },
-        n,
-        paradas: paradasDetalle({ stopEvents: live.stopEvents, stopReasons: live.stopReasons, stopMachines: live.stopMachines, enCurso: [] }),
-        perillas: live.perillas ?? null,
-      }),
+      cascada,
+      /* El «Ver detalle»: cada lista reparte un escalón de `cascada`, con los mismos `args` (las mismas paradas y perillas). */
+      detalle: detalleCascadaMeta(args, cascada),
       minutos: n,
       /* Carros o silletas, por la máquina (la 142 lleva carros; la 200, silletas): el rótulo de los vacíos. */
       contenedor: contenedorDe(live.machines),
@@ -7103,6 +7108,7 @@ function MonitorDelToken() {
               mas={{
                 cascada,
                 cascadaDetalle: cascada ? detalleCascada({ live, cascada, serieMinuto: serieMinutoVista }) : null,
+                cascadaMeta: cascadaMeta ? { cascada: cascadaMeta.cascada, detalle: cascadaMeta.detalle, contenedor: cascadaMeta.contenedor } : null,
                 tiempo: live.timeBreakdown ? {
                   windowMin: live.timeBreakdown.windowMin,
                   producingMin: live.timeBreakdown.producingMin,

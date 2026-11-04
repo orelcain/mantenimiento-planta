@@ -25,8 +25,10 @@ import { cuotaA, type PacePoint } from '@/services/shoplogix/monitorCompare'
 import type { HourlyRow } from '@/services/shoplogix/monitorHourly'
 import type { ParetoRow } from '@/services/shoplogix/monitorPareto'
 import type { SemanaReparto } from './repartoSemanal'
-import { contenedorPlural, vaciasEtiqueta, type Cascada } from './cascadaTurno'
+import { contenedorPlural, vaciasEtiqueta, type Cascada, type Contenedor } from './cascadaTurno'
 import type { DetalleCascada, DuenoDetalle, HoraDetalle, RenglonDetalle } from './cascadaDetalle'
+import type { DetalleCascadaMeta } from './cascadaMetaDetalle'
+import { CascadaMetaV2 } from './CascadaMetaV2'
 import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
@@ -36,7 +38,7 @@ import { desgloseDe, detencionesPorMinuto, varaCambio, type Desglose } from './d
 import { BotonInfo, GloboCarros, GloboRitmo } from './GlobosFranja'
 import { DesglosePiezas } from './DesglosePiezas'
 import { detencionLinea } from './desgloseVista'
-import { cascadaPorMeta } from './cascadaPerilla'
+import { cascadaPorMeta, type CascadaPorMeta } from './cascadaPerilla'
 import { bandasEnteras, diaMesPerilla, MODO_UMBRAL_POR_OMISION, perillaVigenteEn, tonoVara, umbralEntero, type ModoUmbral, type PerillaPublica, type PerillasDeLinea, type VaraUmbral } from './perilla'
 import { EditorPerilla, type PerillaEditorDatos } from './EditorPerilla'
 import { EditorUmbral, type EfectoBaader, type UmbralEditorDatos } from './EditorUmbral'
@@ -1787,6 +1789,8 @@ export interface MasDelTurno {
   cascada: Cascada | null
   /** Máquina · causa · hora de cada pérdida de la cascada, cuadrado a sus totales. */
   cascadaDetalle?: DetalleCascada | null
+  /** La cascada a la meta de Shoplogix con la perilla y su «Ver detalle». Sin ella (turno sin serie), se pinta la cascada anterior. */
+  cascadaMeta?: { cascada: CascadaPorMeta; detalle: DetalleCascadaMeta; contenedor: Contenedor } | null
   tiempo: { windowMin: number; producingMin: number; plannedMin: number; recoverableMin: number } | null
   /** Otros días comparados a la misma altura del turno (o completos, cerrado). */
   comparado: Array<{ label: string; piezas: number; hoy: boolean }> | null
@@ -2062,10 +2066,12 @@ function MasDelTurnoV2({ mas, cerrado }: { mas: MasDelTurno; cerrado: boolean })
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
-        {c && (
+        {mas.cascadaMeta ? (
+          <CascadaMetaV2 cascada={mas.cascadaMeta.cascada} detalle={mas.cascadaMeta.detalle} contenedor={mas.cascadaMeta.contenedor} />
+        ) : c && (
           <Tarjeta icono={<Filter className={ic} />} titulo="Dónde se fueron las piezas" sub={`capacidad a ${dec(c.ritmoMaquina, 0)} pz/min · ${horas(c.minutosEnMarcha + c.minutosDetenida)}`}>
             <Cifra valor={int(c.perdido)} unidad="pz no hechas" chica />
-            <Contexto tono="info" nota={`parado ${int(c.perdidoParado)} · andando ${int(c.perdidoAndando)}`}>{Math.round(c.silletasLlenasPor100)} de cada 100 {contenedorPlural(c.contenedor)} con pieza</Contexto>
+            <Contexto tono="info" nota={`detenida ${int(c.perdidoParado)} · andando ${int(c.perdidoAndando)}`}>{Math.round(c.silletasLlenasPor100)} de cada 100 {contenedorPlural(c.contenedor)} con pieza</Contexto>
             <CascadaV2 c={c} d={mas.cascadaDetalle ?? null} />
           </Tarjeta>
         )}
