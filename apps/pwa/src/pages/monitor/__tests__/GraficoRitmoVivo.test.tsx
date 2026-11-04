@@ -384,6 +384,70 @@ describe('GraficoRitmoVivo · turno cerrado', () => {
   })
 })
 
+/* Turno cerrado como lo entrega la página (medido en Firestore, 04-11): el eje arranca en la PRIMERA PIEZA (07:20, `barrasMinuto.desde`)
+   y termina en el fin previsto, que es también el fin real (15:00). La serie trae 490 minutos (hasta 15:30): de 15:00 en adelante,
+   ceros en las tres Baader, y sus tres detenciones caen después del fin. Con el turno cerrado nada de eso puede dibujarse. */
+describe('GraficoRitmoVivo · turno cerrado con serie y detenciones después del fin', () => {
+  const INI_PRIMERA = Date.UTC(2026, 10, 4, 7, 20)
+  const FIN_MIN = 460
+  const cerradoTarde = { ...p, cerrado: true, proyeccion: null } as unknown as MonitorV2Props
+  const serieTarde = (esperado: number) => Array.from({ length: 490 }, (_, k) => (k < FIN_MIN ? esperado - 2 : 0))
+  const tarde: EjeDatos = {
+    iniMs: INI_PRIMERA,
+    finMs: INI_PRIMERA + FIN_MIN * 60_000,
+    finRealMs: INI_PRIMERA + FIN_MIN * 60_000,
+    minuto: {
+      desde: new Date(INI_PRIMERA).toISOString(),
+      maquinas: [
+        { id: 'a', nombre: 'Evisceradora 1', esperado: 19, cycles: serieTarde(19) },
+        { id: 'b', nombre: 'Evisceradora 2', esperado: 16, cycles: serieTarde(16) },
+        { id: 'c', nombre: 'Evisceradora 3', esperado: 16, cycles: serieTarde(16) },
+      ],
+    },
+    primeraPiezaMs: INI_PRIMERA,
+    detenidaEstado: false,
+    paradas: [{ desdeMin: FIN_MIN, hastaMin: FIN_MIN + 29, dueno: 'sin-imputar', causa: 'Detencion', maquina: null }],
+    paradasMaquina: {
+      stopEvents: [0, 1, 2].map((m) => ({ r: 0, f: new Date(INI_PRIMERA + FIN_MIN * 60_000).toISOString(), s: 1740, m })),
+      stopReasons: ['Detencion'],
+      stopMachines: ['a', 'b', 'c'],
+      enCurso: [],
+    },
+    llenado: [{ id: 'a', ultimo: FIN_MIN - 1 }, { id: 'b', ultimo: FIN_MIN - 1 }, { id: 'c', ultimo: FIN_MIN - 1 }],
+    unidad: 'carros',
+  }
+
+  it('nada se dibuja después del fin (15:00): ni horas del eje, ni el «fin» pasado de su borde, ni barras o bandas más allá', () => {
+    const { container } = render(<GraficoRitmoVivo p={cerradoTarde} e={tarde} reloj={reloj} />)
+    /* Toda hora que el gráfico escribe (eje, rótulos): ninguna pasa de las 15:00. */
+    const horas = (container.textContent ?? '').match(/\b\d{2}:\d{2}\b/g) ?? []
+    expect(horas.filter((h) => h > '15:00')).toEqual([])
+    /* El lienzo: el ancho del gráfico principal y el «fin» pegado a su borde derecho (6 px de aire, como en el dibujo). */
+    const W = Math.max(...[...container.querySelectorAll('svg')].map((s) => Number(s.getAttribute('width') ?? 0)))
+    const fin = [...container.querySelectorAll('text')].find((t) => (t.textContent ?? '').endsWith(' fin'))
+    expect(Number(fin?.getAttribute('x'))).toBeCloseTo(W - 6, 0)
+    /* Lo que se dibuja, con su borde derecho (rectángulos y líneas) o su primer punto (trazos). Los fondos de ancho completo y las
+       rejillas horizontales van de 0 a W: son del lienzo entero y no cuentan. */
+    const fondo = (a: number, b: number) => a <= 0.5 && b >= W - 0.5
+    const extremos: number[] = []
+    container.querySelectorAll('svg rect').forEach((q) => {
+      const a = Number(q.getAttribute('x') ?? 0)
+      const b = a + Number(q.getAttribute('width') ?? 0)
+      if (!fondo(a, b)) extremos.push(b)
+    })
+    container.querySelectorAll('svg line').forEach((q) => {
+      const a = Number(q.getAttribute('x1') ?? q.getAttribute('x') ?? 0)
+      const b = Number(q.getAttribute('x2') ?? q.getAttribute('x') ?? a)
+      if (!fondo(Math.min(a, b), Math.max(a, b))) extremos.push(Math.max(a, b))
+    })
+    container.querySelectorAll('svg path').forEach((q) => {
+      const m = q.getAttribute('d')?.match(/M(-?[\d.]+)/)
+      if (m) extremos.push(Number(m[1]))
+    })
+    expect(extremos.filter((x) => x > W - 6 + 0.5)).toEqual([])
+  })
+})
+
 describe('GraficoRitmoVivo · leyenda del turno anterior', () => {
   it('en vivo dice la cifra a esta hora y la diferencia con hoy en el color que corresponde', () => {
     render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)

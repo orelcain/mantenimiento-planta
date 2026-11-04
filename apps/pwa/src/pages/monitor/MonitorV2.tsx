@@ -1791,7 +1791,8 @@ export interface MasDelTurno {
   cascadaDetalle?: DetalleCascada | null
   /** La cascada a la meta de Shoplogix con la perilla y su «Ver detalle». Sin ella (turno sin serie), se pinta la cascada anterior. */
   cascadaMeta?: { cascada: CascadaPorMeta; detalle: DetalleCascadaMeta; contenedor: Contenedor } | null
-  tiempo: { windowMin: number; producingMin: number; plannedMin: number; recoverableMin: number } | null
+  /** `desde`/`hasta`: el rango del turno (solo cerrado; la página lo arma con la ventana y el fin real). `nMaquinas`: el N de la línea. */
+  tiempo: { windowMin: number; producingMin: number; plannedMin: number; recoverableMin: number; desde?: string | null; hasta?: string | null; nMaquinas?: number | null } | null
   /** Otros días comparados a la misma altura del turno (o completos, cerrado). */
   comparado: Array<{ label: string; piezas: number; hoy: boolean }> | null
 }
@@ -2028,7 +2029,7 @@ function TiempoV2({ t }: { t: NonNullable<MasDelTurno['tiempo']> }) {
   const partes = [
     { k: 'Produciendo', min: t.producingMin, color: 'var(--v2-acento)' },
     /* El punto de la leyenda en `--v2-gris` (75 %): el 40 % de `--v2-prog` daba ~1,5:1 sobre la tarjeta, bajo el 3:1 de un gráfico. */
-    { k: 'Programado (colación, aseo)', min: t.plannedMin, color: 'var(--v2-gris)' },
+    { k: (t.nMaquinas ?? 0) > 1 ? 'Detención programada, toda la línea' : 'Detención programada', min: t.plannedMin, color: 'var(--v2-gris)' },
     // Solo la línea ENTERA detenida: por eso es menos que «Tiempo perdido», que suma también las paradas de una máquina de N.
     { k: 'Línea entera detenida', min: t.recoverableMin, color: 'var(--v2-mant)' },
   ]
@@ -2076,7 +2077,7 @@ function MasDelTurnoV2({ mas, cerrado }: { mas: MasDelTurno; cerrado: boolean })
           </Tarjeta>
         )}
         {t && (
-          <Tarjeta icono={<Clock className={ic} />} titulo="Tiempo del turno" sub={`${horas(t.windowMin)} ${cerrado ? 'de turno' : 'transcurridos'}`}>
+          <Tarjeta icono={<Clock className={ic} />} titulo="Tiempo del turno" sub={`${horas(t.windowMin)} ${cerrado ? 'de turno' : 'transcurridos'}${cerrado && t.desde && t.hasta ? ` · ${hhmm(t.desde)} → ${hhmm(t.hasta)}` : ''}`}>
             <Cifra valor={`${Math.round((t.producingMin / Math.max(1, t.windowMin)) * 100)} %`} unidad="del tiempo produciendo" chica />
             <TiempoV2 t={t} />
           </Tarjeta>

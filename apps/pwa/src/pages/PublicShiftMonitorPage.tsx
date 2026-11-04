@@ -142,6 +142,15 @@ function fmtWallTime(isoStr: string | null | undefined): string {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
 
+/** Rango del tiempo del turno, solo con el turno cerrado: `hasta` = el fin real; `desde` = fin − la ventana (la ventana arranca en la
+ *  reunión de inicio, no en la primera pieza). Sin fin real o sin ventana no hay rango. */
+function rangoDelTurno(live: { shiftClosed: boolean; effectiveEnd: string | null; timeBreakdown?: { windowMin: number } | null }): { desde: string | null; hasta: string | null } {
+  const hasta = live.shiftClosed ? live.effectiveEnd ?? null : null
+  const fin = hasta ? Date.parse(hasta) : NaN
+  const windowMin = live.timeBreakdown?.windowMin ?? 0
+  return { desde: Number.isFinite(fin) && windowMin > 0 ? new Date(fin - windowMin * 60_000).toISOString() : null, hasta }
+}
+
 function fmtDateLong(dateKey: string): string {
   const d = new Date(`${dateKey}T12:00:00`)
   if (Number.isNaN(d.getTime())) return dateKey
@@ -4342,7 +4351,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
       {ahora != null && ahoraReloj != null && ahoraReloj > 0 && Math.abs(ahora - ahoraReloj) > 0.05 && (
         <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
           Son los últimos 15 min <b className="text-foreground/80">cuando la línea corre</b>.
-          Contando también los minutos parados de ese tramo:{' '}
+          Contando también los minutos detenidos de ese tramo:{' '}
           <b className="tabular-nums text-foreground/80">{fmtDec(ahoraReloj)}</b> pz/min de reloj.
         </p>
       )}
@@ -7118,6 +7127,8 @@ function MonitorDelToken() {
                   producingMin: live.timeBreakdown.producingMin,
                   plannedMin: live.timeBreakdown.plannedMin,
                   recoverableMin: live.timeBreakdown.recoverableMin,
+                  ...rangoDelTurno(live),
+                  nMaquinas: live.timeBreakdown.nMaquinas ?? live.machines?.length ?? null,
                 } : null,
                 comparado: comparacion.days
                   .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))

@@ -4,7 +4,7 @@
  * fallas y tiempo perdido solo con «Ver más».
  * Se prueba el esqueleto con datos de ejemplo: no hay fork de PC, nada se repite y nada de lo que salió reaparece.
  */
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MonitorV2, type MonitorV2Props } from '../MonitorV2'
 import type { EjeDatos } from '../GraficoRitmoVivo'
@@ -397,5 +397,40 @@ describe('MonitorV2 · todo lo que se mueve sigue al reloj único de la cola', (
     expect(num(m![1]) + num(m![2])).toBe(grande)
     expect(num(m![1])).not.toBe(4800)
     expect(container).toBeTruthy()
+  })
+})
+
+/* «Tiempo del turno» dentro de «Más del turno» (vista ≥ 1): el turno cerrado dice su rango y la parte programada es de la línea entera. */
+describe('MonitorV2 · Tiempo del turno: rango con el turno cerrado y detención programada de la línea', () => {
+  /* 465 min de ventana (07:15 → 15:00), 61 min programados: los datos que entrega la página. */
+  const tiempo = (nMaquinas: number | null, cerrado: boolean) => ({
+    windowMin: 465, producingMin: 300, plannedMin: 61, recoverableMin: 104,
+    desde: cerrado ? '2026-11-04T07:15:00.000Z' : null,
+    hasta: cerrado ? '2026-11-04T15:00:00.000Z' : null,
+    nMaquinas,
+  })
+  const con = (t: ReturnType<typeof tiempo>, cerrado: boolean): MonitorV2Props => ({ ...props(1), cerrado, mas: { ...props(1).mas, tiempo: t } })
+
+  it('turno cerrado: el subtítulo dice «7 h 45 min de turno · 07:15 → 15:00»', () => {
+    const { container } = render(<MonitorV2 {...con(tiempo(3, true), true)} />)
+    expect(texto(container)).toContain('7 h 45 min de turno · 07:15 → 15:00')
+  })
+
+  it('en vivo no hay rango: dice «transcurridos» y ningún horario, aunque el dato traiga desde y hasta', () => {
+    const { container } = render(<MonitorV2 {...con({ ...tiempo(3, false), desde: '2026-11-04T07:15:00.000Z', hasta: '2026-11-04T15:00:00.000Z' }, false)} />)
+    expect(texto(container)).toContain('7 h 45 min transcurridos')
+    expect(texto(container)).not.toContain('07:15 →')
+  })
+
+  it('con tres máquinas la parte programada dice «Detención programada, toda la línea» (ya no «colación, aseo»)', () => {
+    const { container } = render(<MonitorV2 {...con(tiempo(3, true), true)} />)
+    expect(screen.getByText('Detención programada, toda la línea')).toBeTruthy()
+    expect(texto(container)).not.toContain('colación, aseo')
+  })
+
+  it('con una sola máquina la parte programada dice «Detención programada» a secas', () => {
+    render(<MonitorV2 {...con(tiempo(1, true), true)} />)
+    expect(screen.getByText('Detención programada')).toBeTruthy()
+    expect(screen.queryByText('Detención programada, toda la línea')).toBeNull()
   })
 })
