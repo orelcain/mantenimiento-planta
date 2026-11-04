@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import fixture from './fixtures/chonchi_0311_turno1_minutos.json'
-import { cascadaPorMeta, esAguasArriba, esProgramada, minutosDelTurno, rendimientoPartido, tipoParaDesglose, type CascadaArgs } from '../cascadaPerilla'
+import { cascadaPorMeta, esAguasArriba, esProgramada, etiquetaVista, minutosDelTurno, rendimientoPartido, tipoParaDesglose, type CascadaArgs } from '../cascadaPerilla'
 import { paradasDetalle, type EntradaRitmoVivo } from '../ritmoVivo'
 import type { PerillasDeLinea } from '../perilla'
 
@@ -239,13 +239,13 @@ describe('perilla', () => {
 })
 
 describe('rendimiento partido', () => {
-  it('faltan 13,7 pts = 2,0 de la perilla (378 pz) + 11,7 que faltaron para llegar a ella (2.213 pz)', () => {
+  it('faltan 13,7 pts = 2,0 de la perilla (378 pz) + 11,7 que faltaron para llegar a ella (2.227 pz, los vacíos de la cascada)', () => {
     const r = rendimientoPartido(args(PERILLAS_17_16_16))
     expect(r.ptsFalta).toBeCloseTo(13.7286, 3)
     expect(r.ptsPerilla).toBeCloseTo(2.0027, 3)
     expect(r.ptsFaltoPerilla).toBeCloseTo(11.7259, 3)
     expect(r.piezasPerilla).toBe(378)
-    expect(r.piezasFaltoPerilla).toBe(2_213)
+    expect(r.piezasFaltoPerilla).toBe(2_227)
   })
 
   it('el rendimiento sale de los minutos andando: 86,3 % con la base de 18.874 pz', () => {
@@ -299,6 +299,16 @@ describe('dueños de lo que no se hizo (B-2)', () => {
     expect(esProgramada('Ejercicio compensatorio - Paro')).toBe(true)
     expect(esProgramada('Limpieza de Ducto')).toBe(false)
   })
+
+  it('programada = la regla del backend (esParoPlanificado): espacios dobles y mayúsculas, y no ducto ni ajuste', () => {
+    expect(esProgramada('EJERCICIO  COMPENSATORIO')).toBe(true)
+    expect(esProgramada('DETENCION PROGRAMADA')).toBe(true)
+    expect(esProgramada('Colación')).toBe(true)
+    expect(esProgramada('REUNION INICIO TURNO')).toBe(true)
+    expect(esProgramada('AJUSTE OPERADOR')).toBe(false)
+    expect(esProgramada('Limpieza de Ducto')).toBe(false)
+    expect(esProgramada(null)).toBe(false)
+  })
 })
 
 describe('piezas de la cascada para la vista (B-2)', () => {
@@ -318,10 +328,14 @@ describe('piezas de la cascada para la vista (B-2)', () => {
 })
 
 describe('rendimiento por vista (fila «Al rendimiento le faltan», B-2)', () => {
-  it('la línea: faltan 13,7 pts, 2.213 piezas bajo la perilla y 378 de la perilla más lenta', () => {
+  it('la línea: faltan 13,7 pts, 2.227 piezas bajo la perilla (los vacíos de la cascada) y 378 de la perilla más lenta', () => {
     expect(linea.rendimiento.ptsFalta).toBeCloseTo(13.7, 1)
     expect(linea.rendimiento.piezasPerilla).toBe(378)
-    expect(linea.rendimiento.piezasFaltoPerilla).toBe(2_213)
+    expect(linea.rendimiento.piezasFaltoPerilla).toBe(2_227)
+  })
+
+  it('piezasFaltoPerilla de la línea y de cada Baader es igual a sus vacíos de la cascada', () => {
+    for (const v of [linea, ev1!, ev2!, ev3!]) expect(v.rendimiento.piezasFaltoPerilla).toBe(v.vacios)
   })
 
   it('cada Baader lleva su propio rendimiento; la línea suma sus minutos andando y sus piezas', () => {
@@ -360,5 +374,27 @@ describe('aguas arriba y perilla anotada, por vista (para el «Ver detalle» del
     expect(cascada.baaders.every((b) => b.conPerilla)).toBe(true)
     expect(cascadaPorMeta(args(PERILLAS_IGUAL_A_META)).baaders.every((b) => b.conPerilla)).toBe(true)
     expect(cascadaPorMeta(args(null)).baaders.every((b) => b.conPerilla === false)).toBe(true)
+  })
+})
+
+/* Shoplogix manda «EJERCICIO  COMPENSATORIO» con dos espacios (Filete 04-11). Entra por `paradasDetalle`, como en producción. */
+describe('detención programada en la cascada: una parada de ejercicio con dos espacios no es detención', () => {
+  const evento = { r: 0, f: new Date(T0 + 100 * 60_000).toISOString(), s: 300, m: 0 }
+  const soloEjercicio = paradasDetalle({ stopEvents: [evento], stopReasons: ['EJERCICIO  COMPENSATORIO'], stopMachines: IDS, enCurso: [] })
+  const e1 = cascadaPorMeta({ serie, n: N, paradas: soloEjercicio, perillas: PERILLAS_17_16_16 }).baaders[0]!
+
+  it('5 min de ejercicio salen del tiempo de producción y no suman detenciones ni micro', () => {
+    expect(e1.minProgramada).toBeCloseTo(5, 6)
+    expect(e1.minProduccion).toBeCloseTo(N - 5, 6)
+    expect(e1.detenciones.min).toBe(0)
+    expect(e1.detenciones.veces).toBe(0)
+    expect(e1.micro.min).toBe(0)
+  })
+})
+
+describe('etiqueta de la vista: la misma en la tarjeta de la cascada y en el detalle de la meta', () => {
+  it('«Evisceradora 1» pasa a «Ev 1»; un nombre sin «Evisceradora» queda igual', () => {
+    expect(etiquetaVista('Evisceradora 1')).toBe('Ev 1')
+    expect(etiquetaVista('Baader 200')).toBe('Baader 200')
   })
 })

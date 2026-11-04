@@ -144,13 +144,13 @@ describe('CascadaTurnoCard: Baader sin meta de Shoplogix (Ev 1 con esperado 0)',
 })
 
 describe('CascadaTurnoCard: fila de rendimiento, rótulo y regresión (B-2)', () => {
-  it('arriba de los escalones: la línea dice 13,7 pts con 378 de la perilla y 2.213 bajo ella', () => {
+  it('arriba de los escalones: la línea dice 13,7 pts con 378 de la perilla y 2.227 bajo ella', () => {
     const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
     const texto = container.textContent ?? ''
     expect(texto).toContain('Al rendimiento le faltan')
     expect(texto).toContain('13,7 pts')
     expect(texto).toContain('de producción · 378 piezas')
-    expect(texto).toContain('vacíos y micro · 2.213 piezas')
+    expect(texto).toContain('silletas vacías · 2.227 piezas')
     expect(texto.indexOf('Al rendimiento le faltan')).toBeLessThan(texto.indexOf('Podía hacer a la meta'))
   })
 
@@ -204,5 +204,75 @@ describe('CascadaTurnoCard: fila de rendimiento, rótulo y regresión (B-2)', ()
   it('sin ninguna de las dos, no hay tarjeta', () => {
     const { container } = render(<TarjetaCascada meta={null} anterior={null} />)
     expect(container.textContent ?? '').toBe('')
+  })
+})
+
+describe('CascadaTurnoCard: la fila de rendimiento nombra el contenedor y su ⓘ explica los vacíos (D)', () => {
+  it('con carros, la fila dice «carros vacíos · 2.227 piezas», no «vacíos y micro»', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} contenedor="carro" />)
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('carros vacíos · 2.227 piezas')
+    expect(texto).not.toContain('vacíos y micro')
+  })
+
+  it('el ⓘ dice que lo que faltó para llegar a la perilla son los carros vacíos, o las silletas vacías en Filete', () => {
+    const carro = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} contenedor="carro" />)
+    fireEvent.click(carro.getByRole('button', { name: 'Cómo se calcula el rendimiento' }))
+    expect(carro.container.textContent ?? '').toContain('lo que faltó para llegar a la perilla son los carros vacíos. Las piezas son las de la cascada.')
+    carro.unmount()
+    const silleta = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} contenedor="silleta" />)
+    fireEvent.click(silleta.getByRole('button', { name: 'Cómo se calcula el rendimiento' }))
+    expect(silleta.container.textContent ?? '').toContain('lo que faltó para llegar a la perilla son las silletas vacías. Las piezas son las de la cascada.')
+  })
+})
+
+describe('CascadaTurnoCard: el pie de la Baader lleva la perilla solo si está anotada (conPerilla)', () => {
+  it('con perilla 17 anotada, el pie de Ev 1 dice «perilla 17»', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    expect(container.textContent ?? '').toContain('Ev 1: meta de Shoplogix 18 pz/min, perilla 17.')
+  })
+
+  it('con perilla anotada igual a la meta (Ev 2), el pie dice «perilla 16» y el detalle «igual a su meta»', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 2' }))
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('Ev 2: meta de Shoplogix 16 pz/min, perilla 16.')
+    expect(texto).toContain('igual a su meta')
+    expect(texto).not.toContain('sin perilla anotada')
+  })
+
+  it('sin perilla anotada, el pie de Ev 1 no dice «perilla» y el detalle dice «sin perilla anotada» en vez de «igual a su meta»', () => {
+    const sinPerillas = cascadaPorMeta({ serie, n: N, paradas, perillas: null })
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={sinPerillas} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('Ev 1: meta de Shoplogix 18 pz/min.')
+    expect(texto).not.toContain('perilla 18')
+    expect(texto).toContain('sin perilla anotada')
+    expect(texto).not.toContain('igual a su meta')
+  })
+})
+
+describe('CascadaTurnoCard: la línea dice que la programada es el promedio de las Baader que cuentan', () => {
+  it('con tres Baader, la línea lo dice; con Ev 1 elegida, no', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    expect(container.textContent ?? '').toContain('de detención programada, promedio de las 3 Baader: colación, reunión y ejercicio), que no es pérdida de nadie')
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('de detención programada: colación, reunión y ejercicio), que no es pérdida de nadie')
+    expect(texto).not.toContain('promedio de las')
+  })
+
+  it('con Ev 1 sin meta, la línea cuenta el promedio de las dos Baader que cuentan', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascadaSinMeta} minutosTurno={N} />)
+    expect(container.textContent ?? '').toContain('promedio de las 2 Baader: colación')
+  })
+
+  it('con una sola máquina no dice promedio', () => {
+    const una = cascadaPorMeta({ serie: { ...serie, maquinas: [serie.maquinas[0]!] }, n: N, paradas, perillas: PERILLAS })
+    const { container } = render(<CascadaTurnoCard cascada={una} minutosTurno={N} contenedor="silleta" />)
+    expect(container.textContent ?? '').toContain('de detención programada: colación, reunión y ejercicio)')
+    expect(container.textContent ?? '').not.toContain('promedio de las')
   })
 })

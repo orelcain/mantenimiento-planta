@@ -14,7 +14,7 @@
  * programada, se ignora; micro, va a micro; el resto, a detención. La línea suma solo las Baader que cuentan (con meta).
  */
 import { ANDANDO_MIN_S, esMicroDetencion, varaEnMinuto, type MaquinaSerie, type ParadaDetalle } from './ritmoVivo'
-import { esAguasArriba, esProgramada, type BaaderCascada, type CascadaArgs, type CascadaPorMeta, type PiezasVista } from './cascadaPerilla'
+import { esAguasArriba, esProgramada, etiquetaVista, type BaaderCascada, type CascadaArgs, type CascadaPorMeta, type PiezasVista } from './cascadaPerilla'
 import { nombreCausa } from './desgloseVista'
 import { repartir } from './cascadaDetalle'
 
@@ -60,8 +60,8 @@ export interface DetalleCascadaMeta {
   porBaader: Record<string, DetalleVistaMeta>
 }
 
-/** «Evisceradora 1» → «Ev 1» (así lo nombra el encargo y el mockup). Copia de la de `CascadaTurnoCard`. */
-export const etiquetaVista = (nombre: string): string => nombre.replace(/^Evisceradora\s*/i, 'Ev ')
+/* La etiqueta corta vive en `cascadaPerilla` (la misma que usa `CascadaTurnoCard`). Se reexporta para quien ya la importa de aquí. */
+export { etiquetaVista }
 
 /** Reparto que cierra exacto al total. Sin total o sin pesos positivos, todo en cero: nunca se rellena con otra cosa. */
 function repartoDe(total: number, pesos: number[]): number[] {
