@@ -69,8 +69,8 @@ describe('GloboMinuto · casos reales', () => {
       'Detención · se imputa',
       'Ev 3 15:13:00 → 15:15:15 · 2 min 15 s · Sin imputar · falta dueño',
       'Micro · no se imputa: causa posible, se confirma en terreno',
-      'Ev 1 15:13:00 → 15:13:15 · 15 s · Otra Baader paró',
-      'Ev 2 15:13:00 → 15:13:15 · 15 s · Otra Baader paró',
+      'Ev 1 15:13:00 → 15:13:15 · 15 s · Otra Baader se detuvo',
+      'Ev 2 15:13:00 → 15:13:15 · 15 s · Otra Baader se detuvo',
       'Las 3 se detuvieron en el mismo segundo: 15:13:00.',
       'Ritmo andando, calculado: piezas del minuto ÷ segundos andando.',
       'Cada micro esconde unos 20 s más que Shoplogix no anota (estimado, de 17 a 23 s) y cuenta como andando: pudieron caer en este minuto o en uno anterior.',
@@ -80,8 +80,8 @@ describe('GloboMinuto · casos reales', () => {
     const l = lineas(pc(CHONCHI_0211_T2, '15:10'))
     expect(l).toContain('Ev 1 | 5 | 15 s | — poco tiempo andando')
     expect(l).toContain('Ev 2 | 5 | 30 s | 10 de 16 · 63 %')
-    expect(l).toContain('Ev 1 15:10:00 → 15:10:45 · 45 s · Otra Baader paró')
-    expect(l).toContain('Ev 2 15:10:00 → 15:10:30 · 30 s · Otra Baader paró')
+    expect(l).toContain('Ev 1 15:10:00 → 15:10:45 · 45 s · Otra Baader se detuvo')
+    expect(l).toContain('Ev 2 15:10:00 → 15:10:30 · 30 s · Otra Baader se detuvo')
   })
   it('Filete 14:16: sin «de 20» (20 − 8 no son los 2,3 que faltaron): «esperado 10,3 pz (31 s sin colación)», y la colación con su hora de inicio, de fin y duración; sin reparto en tres', () => {
     const l = lineas(pc(FILETE_0211_DIA, '14:16'))
@@ -137,10 +137,10 @@ describe('GloboMinuto · casos reales', () => {
     const t = lineas(pc(CHONCHI_0211_T2, '15:13')).join(' ')
     expect(t).not.toMatch(/\btic\b|bucket|mediana|stopEvents|k−1|k-1/i)
   })
-  it('el celular: una línea por parada, con las micro iguales agrupadas («Ev 1 y Ev 2 15:13:00 · 15 s micro · Otra Baader paró»)', () => {
+  it('el celular: una línea por parada, con las micro iguales agrupadas («Ev 1 y Ev 2 15:13:00 · 15 s micro · Otra Baader se detuvo»)', () => {
     const r = render(<GloboMinuto lectura={lecturaDeDoc(CHONCHI_0211_T2, '15:13')} tam="chico" compacto onCerrar={() => {}} />)
     const l = lineas(r.container.querySelector('.rv-gm')!)
-    expect(l).toContain('Ev 1 y Ev 2 15:13:00 · 15 s micro · Otra Baader paró')
+    expect(l).toContain('Ev 1 y Ev 2 15:13:00 · 15 s micro · Otra Baader se detuvo')
     expect(l).toContain('Ev 3 15:13:00 · 2 min 15 s detención · falta dueño')
     expect(l).toContain('Ev 3 | detenida')
     /* En el celular también sale el tiempo oculto de la micro, rotulado estimado y con el «en este minuto o en uno anterior». */

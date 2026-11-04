@@ -68,7 +68,7 @@ export function motivoLegible(razon: string | null | undefined): string | null {
 /** El nombre de cada causa en pantalla. */
 export const ROTULO_CAUSA: Record<CausaMicro, string> = {
   arranque: 'Arranque',
-  linea: 'Otra Baader paró',
+  linea: 'Otra Baader se detuvo',
   paro: 'Al volver de una detención',
   sin: 'Sin contexto',
 }

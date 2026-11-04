@@ -27,10 +27,10 @@ const globoDe = (q: MicroClasificada, { compacto = false, abierto = false, plant
 }
 
 describe('GloboMicro v3 · casos reales', () => {
-  it('Chonchi 15:10:00 Ev 1 · «Otra Baader paró · a la vez»: por defecto, encabezado en una línea, UNA línea de causa con su ① y la tabla; «Ver detalle» cerrado', () => {
+  it('Chonchi 15:10:00 Ev 1 · «Otra Baader se detuvo · a la vez»: por defecto, encabezado en una línea, UNA línea de causa con su ① y la tabla; «Ver detalle» cerrado', () => {
     expect(lineasDelGlobo(globoDe(buscarMicro(chonchi, '15:10:00', 'Evisceradora 1')))).toEqual([
       'Ev 1 · micro de 45 s (+~20 s sin anotar) · 15:10:00',
-      'Causa posible: Otra Baader paró · Ev 2 con micro a la vez ①',
+      'Causa posible: Otra Baader se detuvo · Ev 2 con micro a la vez ①',
       'pz/min | 15:08 | 15:09 | 15:10 | 15:11 | Esperado',
       'Ev 1 | 14 | ▽ 10 | ① ▼ 5 | 11 | 18',
       'Ev 2 | 15 | ▽ 12 | ① ▼ 5 | 15 | 16',
@@ -55,7 +55,7 @@ describe('GloboMicro v3 · casos reales', () => {
     const cerrado = lineasDelGlobo(globoDe(q))
     expect(cerrado.slice(0, 2)).toEqual([
       'Ev 2 · micro de 60 s (+~20 s sin anotar) · 10:02:13',
-      expect.stringMatching(/^Causa posible: Otra Baader paró · Ev 1 se detuvo 1 min 30 s antes por Acumulación.* ①$/),
+      expect.stringMatching(/^Causa posible: Otra Baader se detuvo · Ev 1 se detuvo 1 min 30 s antes por Acumulación.* ①$/),
     ])
     expect(cerrado[3]).toMatch(/^Ev 1 \| ① \d+ \|/)
     cleanup()
@@ -70,7 +70,7 @@ describe('GloboMicro v3 · casos reales', () => {
 
   it('Chonchi 15:19:45 Ev 1 · «en cadena»: Ev 2 y Ev 3 con micro 30 s después, y la forma con las tres duraciones', () => {
     const q = buscarMicro(chonchi, '15:19:45', 'Evisceradora 1')
-    expect(lineasDelGlobo(globoDe(q))[1]).toBe('Causa posible: Otra Baader paró · Ev 2 y Ev 3 con micro 30 s después ①')
+    expect(lineasDelGlobo(globoDe(q))[1]).toBe('Causa posible: Otra Baader se detuvo · Ev 2 y Ev 3 con micro 30 s después ①')
     cleanup()
     expect(lineasDelGlobo(globoDe(q, { abierto: true })).filter((l) => l.startsWith('Forma'))).toEqual(['Forma: en cadena. Ev 1 15 s · Ev 2 1 min 15 s · Ev 3 1 min.'])
   })
@@ -100,13 +100,13 @@ describe('GloboMicro v3 · casos reales', () => {
     expect(abierto.slice(6)).toEqual([
       'Ver detalle (abierto)',
       '✕ No es arranque: ya pasaron 10 min desde que Ev 1 empezó a producir (09:23) y no tuvo detenciones de 10 min o más',
-      '✕ No es «Otra Baader paró»: ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)',
+      '✕ No es «Otra Baader se detuvo»: ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)',
       '✕ No es «Al volver de una detención»: la última detención de Ev 1 terminó hace 15 min 30 s',
       'Los datos aún no la explican. Hay que verlo en terreno.',
     ])
   })
 
-  it('Filete 14:40:00 · Sin contexto: una sola fila en la tabla, sin «Otra Baader paró» entre las reglas y con el pie «Los datos aún no la explican»', () => {
+  it('Filete 14:40:00 · Sin contexto: una sola fila en la tabla, sin «Otra Baader se detuvo» entre las reglas y con el pie «Los datos aún no la explican»', () => {
     const q = buscarMicro(filete, '14:40:00', 'Linea 1')
     expect(lineasDelGlobo(globoDe(q, { planta: 'filete', abierto: true }))).toEqual([
       'Linea 1 · micro de 30 s (+~20 s sin anotar) · 14:40:00',
@@ -124,7 +124,7 @@ describe('GloboMicro v3 · casos reales', () => {
   it('Chonchi 15:13:00 Ev 1 · «a la vez» por detención: Ev 2 con micro y Ev 3 detenida 2 min 15 s, y ▽ también en el 5 de Ev 3', () => {
     const q = buscarMicro(chonchi, '15:13:00', 'Evisceradora 1')
     const l = lineasDelGlobo(globoDe(q, { abierto: true }))
-    expect(l[1]).toMatch(/^Causa posible: Otra Baader paró · Ev 2 con micro a la vez y Ev 3 se detuvo a la vez .*①$/)
+    expect(l[1]).toMatch(/^Causa posible: Otra Baader se detuvo · Ev 2 con micro a la vez y Ev 3 se detuvo a la vez .*①$/)
     expect(l.slice(2, 6)).toEqual([
       'pz/min | 15:11 | 15:12 | 15:13 | 15:14 | Esperado',
       'Ev 1 | 11 | ▽ 9 | ① ▼ 7 | 4 | 18',
@@ -145,7 +145,7 @@ describe('GloboMicro v3 · casos reales', () => {
     expect(movil.getAttribute('aria-label')).toBe('Micro detención y su causa posible')
   })
 
-  it('las marcas llevan el color de SU causa: ▼ y ▽ de «Otra Baader paró» en el de esa causa; los cuadros usan los tokens de causa', () => {
+  it('las marcas llevan el color de SU causa: ▼ y ▽ de «Otra Baader se detuvo» en el de esa causa; los cuadros usan los tokens de causa', () => {
     const globo = globoDe(buscarMicro(chonchi, '15:10:00', 'Evisceradora 1'))
     const llenos = Array.from(globo.querySelectorAll('tbody [data-glifo="▼"] path')).map((p) => p.getAttribute('fill'))
     const huecos = Array.from(globo.querySelectorAll('tbody [data-glifo="▽"] path')).map((p) => p.getAttribute('stroke'))
@@ -341,8 +341,8 @@ describe('GloboMicro v3 · la leyenda de ▽ solo sale cuando la tabla muestra u
 describe('GloboMicro · exportar los textos para el revisor', () => {
   it.skipIf(!process.env.TEXTOS_GLOBO_SALIDA)('escribe el texto de los casos reales en TEXTOS_GLOBO_SALIDA', () => {
     const casos = [
-      { caso: 'CASO 1 · Chonchi, Turno 2 del 02-11 · Ev 1 15:10:00 · Otra Baader paró · a la vez', q: buscarMicro(chonchi, '15:10:00', 'Evisceradora 1'), planta: 'chonchi' },
-      { caso: 'CASO 2 · Chonchi, Turno 2 del 02-11 · Ev 2 10:02:13 · Otra Baader paró · detención previa', q: buscarMicro(chonchi, '10:02:13', 'Evisceradora 2'), planta: 'chonchi' },
+      { caso: 'CASO 1 · Chonchi, Turno 2 del 02-11 · Ev 1 15:10:00 · Otra Baader se detuvo · a la vez', q: buscarMicro(chonchi, '15:10:00', 'Evisceradora 1'), planta: 'chonchi' },
+      { caso: 'CASO 2 · Chonchi, Turno 2 del 02-11 · Ev 2 10:02:13 · Otra Baader se detuvo · detención previa', q: buscarMicro(chonchi, '10:02:13', 'Evisceradora 2'), planta: 'chonchi' },
       { caso: 'CASO 3 · Chonchi, Turno 2 del 02-11 · Ev 1 15:18:45 · Al volver de una detención (en observación)', q: buscarMicro(chonchi, '15:18:45', 'Evisceradora 1'), planta: 'chonchi' },
       { caso: 'CASO 4 · Filete, Turno Día del 02-11 · Linea 1 14:40:00 · Sin contexto', q: buscarMicro(filete, '14:40:00', 'Linea 1'), planta: 'filete' },
     ]

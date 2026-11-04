@@ -114,7 +114,7 @@ const prob = (micros: MicroClasificada[], cal: CalibracionPlanta | null) => resu
 const de = (r: ReturnType<typeof resumirCausas>, c: CausaMicro) => r.causas.find((x) => x.causa === c)!
 
 describe('causa probable · el estimado agregado con la calibración', () => {
-  it('Chonchi 02-11 Turno 2: Arranque ~1 y Otra Baader paró ~7 (15 × 0,388 + 1 × 0,514 + 2 × 0,454 = 7,24), «Al volver» en observación, total ~8 de 46', () => {
+  it('Chonchi 02-11 Turno 2: Arranque ~1 y Otra Baader se detuvo ~7 (15 × 0,388 + 1 × 0,514 + 2 × 0,454 = 7,24), «Al volver» en observación, total ~8 de 46', () => {
     const micros = clasificarDoc(CHONCHI_0211_T2, { planta: 'chonchi' })
     const r = resumirCausas(micros, calibracionDe('chonchi'))
     expect(r.calibrada).toBe(true)

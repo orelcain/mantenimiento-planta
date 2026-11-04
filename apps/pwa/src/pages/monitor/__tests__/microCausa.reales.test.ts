@@ -25,11 +25,11 @@ const detalleDe = (q: MicroClasificada) => sp(lineaCausa(q.evidencia).detalle)
 describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
   const micros = clasificarDoc(CHONCHI_0211_T2, { planta: 'chonchi' })
 
-  it('15:10:00 Ev 1, micro de 45 s: «Otra Baader paró · a la vez» (Ev 2 con micro de 30 s a la vez), ① en Ev 1 y Ev 2, y las reglas que no aplicaron', () => {
+  it('15:10:00 Ev 1, micro de 45 s: «Otra Baader se detuvo · a la vez» (Ev 2 con micro de 30 s a la vez), ① en Ev 1 y Ev 2, y las reglas que no aplicaron', () => {
     const q = buscarMicro(micros, '15:10:00', EV1)
     expect(q.duracionS).toBe(45)
     expect(q).toMatchObject({ causa: 'linea', modo: 'a_la_vez', forma: 'linea_a_la_vez' })
-    expect(lineaCausa(q.evidencia)).toMatchObject({ prefijo: 'Causa posible:', nombre: 'Otra Baader paró' })
+    expect(lineaCausa(q.evidencia)).toMatchObject({ prefijo: 'Causa posible:', nombre: 'Otra Baader se detuvo' })
     expect(detalleDe(q)).toBe('Ev 2 con micro a la vez')
     expect(sp(detalleForma(q.evidencia, { fila: 0, nombre: 'Ev 1', durS: 45 }))).toBe('Forma: a la vez. Ev 1 45 s · Ev 2 30 s.')
     /* El ① cae en la celda que lo prueba: Ev 1 y Ev 2 a las 15:10 (v3 ya no lleva el ② de «Ev 3 también bajó», que era una nota de ritmo). */
@@ -66,7 +66,7 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
     expect(q.tabla.leyendaInicio).toBeNull()
     expect(q.descartadas.map((d) => [d.regla, sp(d.titulo), sp(d.texto)])).toEqual([
       ['arranque', 'No es arranque:', 'ya pasaron 10 min desde que Ev 1 empezó a producir (09:23) y no tuvo detenciones de 10 min o más'],
-      ['linea', 'No es «Otra Baader paró»:', 'ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)'],
+      ['linea', 'No es «Otra Baader se detuvo»:', 'ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)'],
       ['paro', 'No es «Al volver de una detención»:', 'la última detención de Ev 1 terminó hace 15 min 30 s'],
     ])
   })
@@ -94,7 +94,7 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
     expect(lineaCausa(q.evidencia)).toMatchObject({ prefijo: 'Causa posible:', nombre: 'Al volver de una detención' })
     expect(detalleDe(q)).toBe('su detención terminó 1 min 15 s antes')
     expect(sp(detalleForma(q.evidencia, { fila: 0, nombre: 'Ev 1', durS: 15 }))).toBe('La detención de Ev 1 duró 2 min 30 s.')
-    expect(q.descartadas.map((d) => [d.regla, sp(d.titulo)])).toEqual([['arranque', 'No es arranque:'], ['linea', 'No es «Otra Baader paró»:']])
+    expect(q.descartadas.map((d) => [d.regla, sp(d.titulo)])).toEqual([['arranque', 'No es arranque:'], ['linea', 'No es «Otra Baader se detuvo»:']])
     expect(sp(q.descartadas[1]!.texto)).toBe('Ev 2 se detuvo 1 min 15 s antes, pero sin imputar, y eso no cuenta. Ninguna otra Baader coincidió a la vez ni en cadena')
   })
 
@@ -155,7 +155,7 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
     expect(marcadas).toBeGreaterThan(0)
   })
 
-  it('el turno 02-11 T2 completo: 46 micro, Arranque 3 · Otra Baader paró 18 (a la vez 15 · en cadena 1 · detención previa 2) · Al volver de una detención 1 · Sin contexto 24', () => {
+  it('el turno 02-11 T2 completo: 46 micro, Arranque 3 · Otra Baader se detuvo 18 (a la vez 15 · en cadena 1 · detención previa 2) · Al volver de una detención 1 · Sin contexto 24', () => {
     expect(micros).toHaveLength(46)
     expect(contarPorCausa(micros)).toEqual({ arranque: 3, linea: 18, paro: 1, sin: 24 })
     expect(contarPorForma(micros)).toEqual({ arranque: 3, linea_a_la_vez: 15, linea_en_cadena: 1, linea_tras_paro_otra: 2, paro: 1, sin: 24 })
@@ -205,7 +205,7 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
 describe('microCausa v3 · Filete 02-11 Turno Día (casos reales)', () => {
   const micros = clasificarDoc(FILETE_0211_DIA, { planta: 'filete' })
 
-  it('14:40:00: Sin contexto (primeros 15 s del minuto; con una sola Baader no existe «Otra Baader paró»)', () => {
+  it('14:40:00: Sin contexto (primeros 15 s del minuto; con una sola Baader no existe «Otra Baader se detuvo»)', () => {
     const q = buscarMicro(micros, '14:40:00', 'Linea 1')
     expect(q.duracionS).toBe(30)
     expect(q.causa).toBe('sin')
@@ -217,7 +217,7 @@ describe('microCausa v3 · Filete 02-11 Turno Día (casos reales)', () => {
     expect(sp(q.descartadas[1]!.texto)).toBe('la última detención de Linea 1 terminó hace 23 min 30 s')
   })
 
-  it('en Filete ninguna micro sale «Otra Baader paró» (una sola Baader); el turno completo da lo que la referencia ejecutable', () => {
+  it('en Filete ninguna micro sale «Otra Baader se detuvo» (una sola Baader); el turno completo da lo que la referencia ejecutable', () => {
     expect(micros).toHaveLength(20)
     expect(contarPorCausa(micros)).toEqual({ arranque: 2, linea: 0, paro: 0, sin: 18 })
     for (const q of micros) {

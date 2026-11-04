@@ -61,7 +61,7 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(sp(container.querySelector('.rv-cz-info')!.textContent)).toContain('Causa probable (0)')
   })
 
-  it('los chips de una causa SIN micro no se dibujan (ni su marca): Filete Turno Día no muestra «Al volver de una detención 0 · 0 s» ni «Otra Baader paró»', () => {
+  it('los chips de una causa SIN micro no se dibujan (ni su marca): Filete Turno Día no muestra «Al volver de una detención 0 · 0 s» ni «Otra Baader se detuvo»', () => {
     const filete = clasificarDoc(FILETE_0211_DIA, { planta: 'filete' })
     const { container } = render(<ResumenCausasMicro micros={filete} planta="filete" cal={calibracionDe('filete')} microTotal={null} nBaader={1} />)
     const causas = Array.from(container.querySelectorAll('.rv-mc-chip')).map((x) => x.getAttribute('data-causa'))
@@ -85,11 +85,11 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(css).toMatch(/\.rv-mc-txt \{ display: flex; flex-wrap: wrap;/)
   })
 
-  it('los chips dicen cuántas son probables y el tiempo detenido: «Arranque ~1 de 3 micro · 1 min 15 s», «Otra Baader paró ~7 de 18 micro · 11 min 30 s», «Al volver de una detención 0 de 1 micro · 15 s» y «Sin contexto 24 micro · 10 min 45 s»', () => {
+  it('los chips dicen cuántas son probables y el tiempo detenido: «Arranque ~1 de 3 micro · 1 min 15 s», «Otra Baader se detuvo ~7 de 18 micro · 11 min 30 s», «Al volver de una detención 0 de 1 micro · 15 s» y «Sin contexto 24 micro · 10 min 45 s»', () => {
     const { container } = resumen()
     expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => sp(c.textContent))).toEqual([
       'Arranque ~1 de 3 micro · 1 min 15 s',
-      'Otra Baader paró ~7 de 18 micro · 11 min 30 s',
+      'Otra Baader se detuvo ~7 de 18 micro · 11 min 30 s',
       'Al volver de una detención 0 de 1 micro · 15 s',
       'Sin contexto 24 micro · 10 min 45 s',
     ])
@@ -109,7 +109,7 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(sp(yal.container.querySelector('.rv-mc-chip[data-causa="paro"]')!.textContent)).toBe('Al volver de una detención 0 de 1 micro · 15 s')
   })
 
-  it('la barra: un tramo por causa, de ancho PROPORCIONAL a las micro (3 · 18 · 1 · 24), en el orden Arranque → Otra Baader paró → Al volver → Sin contexto', () => {
+  it('la barra: un tramo por causa, de ancho PROPORCIONAL a las micro (3 · 18 · 1 · 24), en el orden Arranque → Otra Baader se detuvo → Al volver → Sin contexto', () => {
     const { container } = resumen()
     const tramos = Array.from(container.querySelectorAll('.rv-cz-barra .s')) as HTMLElement[]
     expect(tramos.map((t) => [t.getAttribute('data-causa'), Number(t.style.flexGrow)])).toEqual([['arranque', 3], ['linea', 18], ['paro', 1], ['sin', 24]])
@@ -126,7 +126,7 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(tramos[3]!.children).toHaveLength(0)
     expect(container.querySelector('.rv-cz-barra')!.getAttribute('role')).toBe('img')
     /* Para quien no la ve: cuántas son probables de cada causa, y la causa en observación solo con su cantidad. */
-    expect(container.querySelector('.rv-cz-barra')!.getAttribute('aria-label')).toBe('46 micro: ~1 de 3 Arranque, ~7 de 18 Otra Baader paró, 1 Al volver de una detención, 24 Sin contexto')
+    expect(container.querySelector('.rv-cz-barra')!.getAttribute('aria-label')).toBe('46 micro: ~1 de 3 Arranque, ~7 de 18 Otra Baader se detuvo, 1 Al volver de una detención, 24 Sin contexto')
   })
 
   it('las hojas de estilo dibujan lo que dice el spec: barra de 16 px, 2 px entre causas, rayado a 135° de 1,5 px cada 4,5 px, contorno interior de 1 px y de 1,5 px para «Sin contexto»', () => {
@@ -168,14 +168,14 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(container.querySelector('.rv-cz-rot')).toBeNull()
     expect(container.querySelector('.rv-cz-ley')).toBeNull()
     expect(Array.from(container.querySelectorAll('.rv-mc-chip')).map((c) => sp(c.textContent))).toEqual([
-      'Arranque 3 micro · 1 min 15 s', 'Otra Baader paró 18 micro · 11 min 30 s', 'Al volver de una detención 1 micro · 15 s', 'Sin contexto 24 micro · 10 min 45 s',
+      'Arranque 3 micro · 1 min 15 s', 'Otra Baader se detuvo 18 micro · 11 min 30 s', 'Al volver de una detención 1 micro · 15 s', 'Sin contexto 24 micro · 10 min 45 s',
     ])
     expect(container.querySelector('.pill')).toBeNull()
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Qué significan la causa probable y la posible' })) })
     expect(sp(container.querySelector('.rv-cz-info')!.textContent)).toContain('Esta línea todavía no tiene calibración: no se estima la causa probable.')
   })
 
-  it('el ⓘ abre con un clic y se cierra con Escape; trae las seis reglas en el orden en que se evalúan y «Este turno, Otra Baader paró 18 = a la vez 15 · en cadena 1 · detención previa 2.»', () => {
+  it('el ⓘ abre con un clic y se cierra con Escape; trae las seis reglas en el orden en que se evalúan y «Este turno, Otra Baader se detuvo 18 = a la vez 15 · en cadena 1 · detención previa 2.»', () => {
     const { container } = resumen()
     const b = screen.getByRole('button', { name: 'Qué significan la causa probable y la posible' })
     expect(b.getAttribute('aria-expanded')).toBe('false')
@@ -183,9 +183,9 @@ describe('ResumenCausasMicro · Chonchi 02-11 Turno 2', () => {
     expect(b.getAttribute('aria-expanded')).toBe('true')
     const panel = container.querySelector('.rv-cz-info')!
     expect(Array.from(panel.querySelectorAll('ol li b')).map((x) => sp(x.textContent))).toEqual([
-      'Arranque', 'Otra Baader paró · a la vez', 'Al volver de una detención', 'Otra Baader paró · en cadena', 'Otra Baader paró · detención previa', 'Sin contexto',
+      'Arranque', 'Otra Baader se detuvo · a la vez', 'Al volver de una detención', 'Otra Baader se detuvo · en cadena', 'Otra Baader se detuvo · detención previa', 'Sin contexto',
     ])
-    expect(sp(panel.textContent)).toContain('Este turno, Otra Baader paró 18 = a la vez 15 · en cadena 1 · detención previa 2.')
+    expect(sp(panel.textContent)).toContain('Este turno, Otra Baader se detuvo 18 = a la vez 15 · en cadena 1 · detención previa 2.')
     expect(sp(panel.textContent)).toContain('Causa probable (~8)')
     act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
     expect(container.querySelector('.rv-cz-info')).toBeNull()
