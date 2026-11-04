@@ -84,18 +84,19 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
   return (
     <div role="group" aria-label={`Perilla de la ${nombre}`} className="v2-subtarjeta mb-3 rounded-[26px] px-4 pb-3 pt-3.5">
       <p className="text-[15px] font-semibold leading-tight text-foreground">Perilla de la {nombre}</p>
+      {/* Alturas en píxeles: `h-11` es rem, y en escritorio la raíz escala a 87,5 % (index.css): el botón medía 38,5 px a 1280. */}
       <div className="mt-2.5 flex items-center gap-3">
         <button
           type="button"
           aria-label="Bajar"
           disabled={valor == null || valor <= MIN_CPM}
           onClick={() => mover(-1)}
-          className="tap-44 grid h-11 w-11 shrink-0 place-items-center rounded-full text-[22px] font-medium leading-none text-foreground disabled:opacity-40"
+          className="tap-44 grid h-[44px] w-[44px] shrink-0 place-items-center rounded-full text-[22px] font-medium leading-none text-foreground disabled:opacity-40"
           style={{ background: 'rgb(142 142 147 / 0.14)' }}
         >
           −
         </button>
-        <span className="grid h-11 min-w-[76px] place-items-center rounded-[10px] border border-border bg-background px-3 text-[28px] font-semibold leading-[34px] tabular-nums text-foreground">
+        <span className="grid h-[44px] min-w-[76px] place-items-center rounded-[10px] border border-border bg-background px-3 text-[28px] font-semibold leading-[34px] tabular-nums text-foreground">
           {valor ?? '—'}
         </span>
         <button
@@ -103,7 +104,7 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
           aria-label="Subir"
           disabled={valor == null || valor >= MAX_CPM}
           onClick={() => mover(1)}
-          className="tap-44 grid h-11 w-11 shrink-0 place-items-center rounded-full text-[22px] font-medium leading-none text-foreground disabled:opacity-40"
+          className="tap-44 grid h-[44px] w-[44px] shrink-0 place-items-center rounded-full text-[22px] font-medium leading-none text-foreground disabled:opacity-40"
           style={{ background: 'rgb(142 142 147 / 0.14)' }}
         >
           +
@@ -134,14 +135,14 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
       {estado === 'guardado' && <p className="mt-3 text-[13px] leading-[18px] text-muted-foreground">guardado · se aplica con el próximo dato</p>}
       {estado === 'error' && <p className="mt-3 text-[13px] leading-[18px]" style={{ color: 'var(--v2-mal-texto)' }}>No se pudo guardar. Intente de nuevo.</p>}
       <div className="mt-3 flex justify-end gap-2">
-        <button type="button" onClick={onCerrar} className="tap-44 h-11 rounded-full px-4 text-[15px] font-semibold text-brand-ink">
+        <button type="button" onClick={onCerrar} className="tap-44 h-[44px] rounded-full px-4 text-[15px] font-semibold text-brand-ink">
           Cancelar
         </button>
         <button
           type="button"
           disabled={!puedeGuardar}
           onClick={() => void guardar()}
-          className="tap-44 h-11 rounded-full px-5 text-[15px] font-semibold text-white disabled:opacity-40"
+          className="tap-44 h-[44px] rounded-full px-5 text-[15px] font-semibold text-white disabled:opacity-40"
           style={{ background: 'var(--v2-acento)' }}
         >
           {estado === 'guardando' ? 'Guardando…' : 'Guardar'}
