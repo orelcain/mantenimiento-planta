@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.15.0] - 2026-11-04
+Monitor: el tablero («Más del turno») pasa a la cascada a la meta de Shoplogix, la misma de la vista clásica.
+
+### Cambiado
+- «Dónde se fueron las piezas» del tablero: N pz bajo la meta, «Quién responde» (Mantención y operación · aguas arriba · producción por la perilla), la cascada podía a la meta → perilla → podía con la perilla → detenciones → micro → vacíos → hizo, con el dueño en cada fila, el cuadre y lo que le falta al rendimiento. Selector Línea | Ev 1 | Ev 2 | Ev 3.
+- «Ver detalle»: al tocar detenciones, micro o vacíos se abre Causa · Baader · Hora. Cada vista reparte las piezas de su fila y suma lo mismo.
+- «Faltó para llegar a la perilla» dice «carros vacíos» (o «silletas vacías») con las piezas de la cascada: las detenciones y las micro le restan a la disponibilidad, no al rendimiento.
+- Tiempo del turno: «7 h 45 min de turno · 07:15 → 15:00» y «Detención programada, toda la línea» (antes «Programado (colación, aseo)»: el aseo no entraba).
+- Filete (una máquina): la franja ampliada dice «la máquina» en vez de «cada Baader»; el ⓘ del set point abre con un toque.
+- Textos: «Detención programada», «detenida», «minutos detenidos», «microdetenciones» e «Imputado: Ejercicio compensatorio» (sin « - Paro»).
+
+### Corregido
+- La detención programada de la cascada usa la misma regla que el servidor: el «EJERCICIO  COMPENSATORIO» con dos espacios de Shoplogix ya no cuenta como detención de Mantención y operación (Filete: 56 → 64 min, igual que el tiempo del turno).
+- La cascada clásica ya no dice «perilla 20» en una máquina sin perilla anotada («sin perilla anotada»).
+
 ## [4.14.0] - 2026-11-04
 Monitor: el motivo de la perilla («por el Knuro») se ve en la franja y en la cascada.
 

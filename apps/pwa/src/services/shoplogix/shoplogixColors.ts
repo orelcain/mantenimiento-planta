@@ -42,9 +42,9 @@ import { elegirColor, hayPizarra } from '@/lib/coloresGrafico'
  * monitor público, que es la pantalla de la TV de planta.
  */
 const ESTADO_SISTEMA_ES: Readonly<Record<string, string>> = {
-  'planned downtime': 'Parada programada',
+  'planned downtime': 'Detención programada',
   'unscheduled': 'Fuera de turno',
-  'unscheduled downtime': 'Parada no programada',
+  'unscheduled downtime': 'Detención no programada',
   'running': 'Produciendo',
   'idle': 'Sin producir',
   'no job': 'Sin trabajo asignado',

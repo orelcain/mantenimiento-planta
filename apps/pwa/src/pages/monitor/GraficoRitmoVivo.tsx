@@ -778,6 +778,8 @@ function RotulosIzq({ m }: { m: Modelo }) {
 /** Cierre proyectado, esperado de la línea, llenado de cada Baader y paradas (PC; en el celular no hay columna). */
 function RotulosDer({ m }: { m: Modelo }) {
   const { d } = m
+  /* Con una sola Baader (Filete) el rótulo dice «máquina», no «alguna Baader»: la planta tiene una máquina y no varias. */
+  const varias = m.maquinas.length > 1
   const xr = 8
   /* Las dos líneas nuevas de cada fila miden hasta 20 caracteres: en la columna de 120 px (1366) van a 11 px, el piso. */
   const fsDer = d.tam === 'grande' ? 12 : 11
@@ -834,7 +836,7 @@ function RotulosDer({ m }: { m: Modelo }) {
       )}
       {minParadas > 0 && <text x={xr} y={r1(d.ejeX + 12)} fontSize={12} fontWeight={600} className="fill-foreground tabular-nums">{horasMin(minParadas)}</text>}
       {/* Mide el reloj con ALGUNA Baader detenida, no la línea entera (Análisis cuenta la línea completa: otra cifra, otra medida). */}
-      {minParadas > 0 && <text x={xr} y={r1(d.ejeX + 25)} fontSize={11} className="fill-muted-foreground">alguna Baader detenida</text>}
+      {minParadas > 0 && <text x={xr} y={r1(d.ejeX + 25)} fontSize={11} className="fill-muted-foreground">{varias ? 'alguna Baader detenida' : 'máquina detenida'}</text>}
     </svg>
   )
 }
@@ -1764,6 +1766,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   const exactoUI = modelo?.detalle != null && pxMinAct >= EXACTO_PX_MIN
   const conEscalon = exactoUI && pxMinAct >= DETALLE_PX_MIN
   const pc = modelo?.previoCifra
+  /* Con una sola máquina (Filete) los rótulos dicen «la máquina»; con varias, «cada Baader», como antes. */
+  const varias = modelo != null && modelo.maquinas.length > 1
   /* «Hoy N atrás» sale de las MISMAS hechas de la cifra grande (cuadro vivo o, sin él, las mostradas), no de la serie al minuto:
      8.812 − 7.891 son 921, no 887. */
   const hechasHoy = vivas?.hechas ?? mostradas
@@ -1788,8 +1792,8 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
         />
       )}
       {modelo && modelo.maquinas.some((q) => q.esperado != null) && (conEscalon
-        ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={18} height={10} aria-hidden><path d="M0 7H8V2H18" fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6} /></svg>ritmo andando de cada Baader (calculado: piezas del minuto ÷ segundos andando)</span>
-        : <Muestra trazo="curva" color="rgb(var(--foreground))" opacidad={0.85} rotulo="piezas por minuto de cada Baader" />)}
+        ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={18} height={10} aria-hidden><path d="M0 7H8V2H18" fill="none" stroke="var(--rv-escalon)" strokeWidth={1.6} /></svg>{`ritmo andando de ${varias ? 'cada Baader' : 'la máquina'} (calculado: piezas del minuto ÷ segundos andando)`}</span>
+        : <Muestra trazo="curva" color="rgb(var(--foreground))" opacidad={0.85} rotulo={`piezas por minuto de ${varias ? 'cada Baader' : 'la máquina'}`} />)}
       {exactoUI && (
         <>
           <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><svg width={14} height={9} aria-hidden><rect width={14} height={5} fill="var(--rv-micro)" /><rect y={5} width={14} height={4} fill="rgb(142 142 147 / 0.12)" /></svg>micro</span>
@@ -1800,7 +1804,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       {modelo && modelo.micros.length > 0 && (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
           <svg width={10} height={8} aria-hidden><path d="M0 0h10l-5 8z" fill="rgb(var(--muted-foreground))" /></svg>
-          {TXT_RESUMEN.marcaEnBaader}
+          {varias ? TXT_RESUMEN.marcaEnBaader : TXT_RESUMEN.marcaEnMaquina}
         </span>
       )}
       {modelo && modelo.micros.some((q) => q.modo === 'a_la_vez') && (

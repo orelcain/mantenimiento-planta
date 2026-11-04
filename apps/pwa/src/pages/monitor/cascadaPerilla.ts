@@ -19,15 +19,21 @@ import { ANDANDO_MIN_S, esMicroDetencion, normalizar, varaEnMinuto, type Maquina
 import { perillaVigenteEn, type PerillasDeLinea } from './perilla'
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 
-/* Lo que el mockup cuenta como programado: colación, reunión de inicio de turno y ejercicio compensatorio. Va normalizado. */
-const PROGRAMADAS = new Set(['colacion', 'reunion inicio turno', 'ejercicio compensatorio - paro'])
 const MS_MINUTO = 60_000
 
+/* Las causas programadas: la MISMA lista que `esParoPlanificado` usa en `functions/publicMonitor.js`. Van normalizadas. */
+const CAUSAS_PROGRAMADAS = ['colacion', 'detencion programada', 'reunion inicio turno', 'ejercicio compensatorio']
+
 /**
- * ¿La razón es detención programada (la que se descuenta del turno para dar el tiempo de producción)? Es el MISMO conjunto
- * que usa la cascada; `DesglosePiezas` (A2) lo usa también para que el «sin la detención programada» cuadre con ella.
+ * ¿La razón es detención programada (la que se descuenta del turno para dar el tiempo de producción)? Es la MISMA regla que
+ * `esParoPlanificado` en `functions/publicMonitor.js`: texto normalizado, espacios internos colapsados y `includes` de alguna
+ * causa programada. Así «EJERCICIO  COMPENSATORIO» (dos espacios, como lo manda Shoplogix) cuenta igual que en el backend.
+ * `DesglosePiezas` (A2) lo usa también para que el «sin la detención programada» cuadre con la cascada.
  */
-export const esProgramada = (razon: string | null | undefined): boolean => PROGRAMADAS.has(normalizar(razon))
+export const esProgramada = (razon: string | null | undefined): boolean => {
+  const r = normalizar(razon).replace(/\s+/g, ' ')
+  return r !== '' && CAUSAS_PROGRAMADAS.some((c) => r.includes(c))
+}
 
 /**
  * El tipo de una parada en el desglose de «Ver detalle». `paradasDetalle` marca como `programada` todo lo que el legado
@@ -36,6 +42,9 @@ export const esProgramada = (razon: string | null | undefined): boolean => PROGR
  */
 export const tipoParaDesglose = (p: { tipo: TipoParada; razon: string | null }): TipoParada =>
   p.tipo === 'programada' && !esProgramada(p.razon) ? 'detencion' : p.tipo
+
+/** «Evisceradora 1» → «Ev 1» (así lo nombra el encargo y el mockup). La usan la tarjeta de la cascada y el detalle de la meta. */
+export const etiquetaVista = (nombre: string): string => nombre.replace(/^Evisceradora\s*/i, 'Ev ')
 
 /**
  * Dueño «aguas arriba»: SOLO el flujo de pescado que frena la línea antes de las Baader. Son la falta de MMPP y el
@@ -72,8 +81,9 @@ export interface PiezasVista {
   perilla: number
   /** Podía hacer con la perilla. */
   podiaConPerilla: number
-  detenciones: { min: number; veces: number; piezas: number }
-  micro: { min: number; veces: number; piezas: number }
+  /** `aguas` = la parte de `piezas` que es aguas arriba (por Baader ya redondeada; la línea suma). */
+  detenciones: { min: number; veces: number; piezas: number; aguas: number }
+  micro: { min: number; veces: number; piezas: number; aguas: number }
   vacios: number
   hizo: number
   /** Lo que no se hizo: podía − hizo (la suma de perilla, detenciones, micro y vacíos cuando `cuadra`). */
@@ -98,6 +108,8 @@ export interface BaaderCascada extends PiezasVista {
   vara: number | null
   /** Motivo de la perilla vigente al final del turno («por el Knuro»). null si no hay perilla o no tiene motivo. */
   motivo: string | null
+  /** Hay una perilla anotada vigente al final del turno (aunque su vara sea igual a la meta). */
+  conPerilla: boolean
   /**
    * La Baader no tiene meta de Shoplogix usable (null o ≤ 0). NO entra en la cascada de la línea; su vista lleva solo el aviso y
    * sus cifras van en cero, para que nadie las lea como si fueran suyas.
@@ -120,9 +132,10 @@ export interface RendimientoPartido {
   ptsFalta: number
   /** Puntos que se van en la perilla más lenta. */
   ptsPerilla: number
-  /** Puntos que faltaron para llegar a la perilla (vacíos y micro). */
+  /** Puntos que faltaron para llegar a la perilla: lo que falta del rendimiento menos la perilla (`ptsFalta − ptsPerilla`). */
   ptsFaltoPerilla: number
   piezasPerilla: number
+  /** Piezas de los vacíos de la cascada de esa vista: lo que de verdad falta para llegar a la perilla. Los pts no cambian, así que pueden diferir de estas piezas en unas pocas. */
   piezasFaltoPerilla: number
 }
 
@@ -152,6 +165,8 @@ interface Calculo {
   vara: number | null
   /** Motivo de esa misma perilla (el instante es el del `vara`); null si no hay perilla o no tiene motivo. */
   motivo: string | null
+  /** Hay perilla anotada vigente al final del turno (el mismo instante que `vara` y `motivo`). */
+  conPerilla: boolean
 }
 
 /** Minutos del turno de una Baader con sus segundos por clase. Una pasada por las paradas; después, todo sale por minuto. */
@@ -172,7 +187,7 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
       s.parada += ov
       if (!p.razon) continue
       const razon = normalizar(p.razon)
-      if (PROGRAMADAS.has(razon)) {
+      if (esProgramada(p.razon)) {
         s.prog += ov
         continue
       }
@@ -257,6 +272,7 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
     expMeta: meta * andTodo,
     vara: varaEnMinuto(m, t0, n - 1, perillas),
     motivo: perillaVigenteEn(perillas, m.id, t0 + (n - 1) * MS_MINUTO)?.motivo ?? null,
+    conPerilla: perillaVigenteEn(perillas, m.id, t0 + (n - 1) * MS_MINUTO) != null,
   }
 }
 
@@ -306,7 +322,7 @@ function rendimientoDe(lista: Calculo[]): RendimientoPartido {
     ptsPerilla,
     ptsFaltoPerilla,
     piezasPerilla,
-    piezasFaltoPerilla: Math.round((expMeta * ptsFaltoPerilla) / 100),
+    piezasFaltoPerilla: sumar(lista, 'vac'),
   }
 }
 
@@ -327,8 +343,8 @@ function vistaDe(lista: Calculo[]): PiezasVista {
     podia: cap,
     perilla: per,
     podiaConPerilla: sumar(lista, 'daba'),
-    detenciones: { min: sumar(lista, 'minDet'), veces: sumar(lista, 'vDet'), piezas: det },
-    micro: { min: sumar(lista, 'minMicro'), veces: sumar(lista, 'vMicro'), piezas: micro },
+    detenciones: { min: sumar(lista, 'minDet'), veces: sumar(lista, 'vDet'), piezas: det, aguas: detAg },
+    micro: { min: sumar(lista, 'minMicro'), veces: sumar(lista, 'vMicro'), piezas: micro, aguas: microAg },
     vacios: vac,
     hizo,
     perdido: cap - hizo,
@@ -357,6 +373,7 @@ export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
       meta: c.meta,
       vara: c.vara,
       motivo: c.motivo,
+      conPerilla: c.conPerilla,
       sinMeta: !tieneMeta(c),
       ...vistaDe(tieneMeta(c) ? [c] : []),
     })),
@@ -364,9 +381,9 @@ export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
 }
 
 /**
- * La partición del rendimiento: hizo / (meta × minutos andando). Solo cuentan los minutos andando, por eso sus piezas no son
- * las de la cascada (que usa todo el tiempo de producción). La perilla y lo que faltó para llegar a ella suman exacto al
- * rendimiento que falta.
+ * La partición del rendimiento: hizo / (meta × minutos andando). Solo cuentan los minutos andando, así que su base no es el
+ * tiempo de producción de la cascada. En puntos, la perilla y lo que faltó para llegar a ella suman el rendimiento que falta.
+ * En piezas, lo que faltó son los vacíos de la cascada (`piezasFaltoPerilla`): pueden diferir de los puntos en unas pocas.
  */
 export function rendimientoPartido(args: CascadaArgs): RendimientoPartido {
   return rendimientoDe(calcularTodo(args).filter(tieneMeta))

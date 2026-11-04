@@ -47,7 +47,8 @@ import { construirCascada, contenedorDe } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
 import { TarjetaCascada } from './monitor/CascadaTurnoCard'
-import { cascadaPorMeta, minutosDelTurno } from './monitor/cascadaPerilla'
+import { cascadaPorMeta, minutosDelTurno, type CascadaArgs } from './monitor/cascadaPerilla'
+import { detalleCascadaMeta } from './monitor/cascadaMetaDetalle'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
 import {
@@ -74,6 +75,8 @@ import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { bandaNormal, nombreDeDia, rachaDeRitmos, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
 import { llenadoDeSilletas, specDeMaquina, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
+import { BotonInfo } from './monitor/GlobosFranja'
+import { nombreCausa } from './monitor/desgloseVista'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { BarraLateralPC } from './monitor/BarraLateralPC'
@@ -137,6 +140,15 @@ function fmtWallTime(isoStr: string | null | undefined): string {
   const d = new Date(isoStr)
   if (Number.isNaN(d.getTime())) return '—'
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+/** Rango del tiempo del turno, solo con el turno cerrado: `hasta` = el fin real; `desde` = fin − la ventana (la ventana arranca en la
+ *  reunión de inicio, no en la primera pieza). Sin fin real o sin ventana no hay rango. */
+function rangoDelTurno(live: { shiftClosed: boolean; effectiveEnd: string | null; timeBreakdown?: { windowMin: number } | null }): { desde: string | null; hasta: string | null } {
+  const hasta = live.shiftClosed ? live.effectiveEnd ?? null : null
+  const fin = hasta ? Date.parse(hasta) : NaN
+  const windowMin = live.timeBreakdown?.windowMin ?? 0
+  return { desde: Number.isFinite(fin) && windowMin > 0 ? new Date(fin - windowMin * 60_000).toISOString() : null, hasta }
 }
 
 function fmtDateLong(dateKey: string): string {
@@ -1134,6 +1146,8 @@ function Sparkbars({
     onVentana,
   })
   const zoom = g.zoom
+  /* El ⓘ del set point: en el celular no hay hover, así que abre y cierra con un toque (como los demás ⓘ del monitor). */
+  const [infoSetPoint, setInfoSetPoint] = useState(false)
   if (!series || series.length === 0) return null
 
   const max = Math.max(...series.map(p => p.pieces), 1)
@@ -1733,21 +1747,21 @@ function Sparkbars({
         {/* El techo de la máquina, no el mejor tramo: es lo que hace que el
             hueco de arriba signifique algo. */}
         {setCpm != null && setCpm > 0 && setCpm <= escala && (
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
-            <span className="tabular-nums">{fmtCpm(setCpm)}</span> lo que da la máquina
-            {/* Editado por un supervisor: 18 medidos con cronómetro no es un
-                dato del PLC, y presentarlo sin fuente lo hacía parecer uno. */}
-            {fuenteSetPoint && (
-              <span
-                className="cursor-help border-b border-dotted border-muted-foreground/50 text-muted-foreground/80"
-                title={fuenteSetPoint}
-              >
-                ⓘ
-              </span>
+          <>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
+              <span className="tabular-nums">{fmtCpm(setCpm)}</span> lo que da la máquina
+              {/* Editado por un supervisor: 18 medidos con cronómetro no es un
+                  dato del PLC, y presentarlo sin fuente lo hacía parecer uno. */}
+              {fuenteSetPoint && (
+                <BotonInfo etiqueta="De dónde sale «lo que da la máquina»" abierto={infoSetPoint} alCambiar={setInfoSetPoint} />
+              )}
+              {onGuardarSetPoint && <EditorSetPoint actual={setCpm} onGuardar={onGuardarSetPoint} />}
+            </span>
+            {fuenteSetPoint && infoSetPoint && (
+              <p className="basis-full text-caption text-muted-foreground">{fuenteSetPoint}</p>
             )}
-            {onGuardarSetPoint && <EditorSetPoint actual={setCpm} onGuardar={onGuardarSetPoint} />}
-          </span>
+          </>
         )}
         {refsDibujables.map((r) => (
           <span key={r.label} className="inline-flex items-center gap-1">
@@ -3046,7 +3060,7 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
               }`}
             >
               {i > 0 && <span className="text-muted-foreground"> · </span>}
-              {x.causa} <b>{fmtInt(x.min)}</b>
+              {nombreCausa(x.causa)} <b>{fmtInt(x.min)}</b>
             </span>
           ))}
           <span className="text-muted-foreground/70"> min de máquina.</span>
@@ -4337,7 +4351,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
       {ahora != null && ahoraReloj != null && ahoraReloj > 0 && Math.abs(ahora - ahoraReloj) > 0.05 && (
         <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
           Son los últimos 15 min <b className="text-foreground/80">cuando la línea corre</b>.
-          Contando también los minutos parados de ese tramo:{' '}
+          Contando también los minutos detenidos de ese tramo:{' '}
           <b className="tabular-nums text-foreground/80">{fmtDec(ahoraReloj)}</b> pz/min de reloj.
         </p>
       )}
@@ -6084,16 +6098,20 @@ function MonitorDelToken() {
     const n = minutosDelTurno({ desde: s.desde, largo, plannedEnd: live.plannedEnd, effectiveEnd: live.effectiveEnd, shiftClosed: live.shiftClosed })
     if (!(n > 1) || !Number.isFinite(Date.parse(s.desde))) return null
     const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+    const args: CascadaArgs = {
+      serie: {
+        desde: s.desde,
+        maquinas: s.maquinas.map((m) => ({ id: m.id, nombre: nombrePorId.get(m.id) ?? m.id, esperado: m.esperado, cycles: m.cycles })),
+      },
+      n,
+      paradas: paradasDetalle({ stopEvents: live.stopEvents, stopReasons: live.stopReasons, stopMachines: live.stopMachines, enCurso: [] }),
+      perillas: live.perillas ?? null,
+    }
+    const cascada = cascadaPorMeta(args)
     return {
-      cascada: cascadaPorMeta({
-        serie: {
-          desde: s.desde,
-          maquinas: s.maquinas.map((m) => ({ id: m.id, nombre: nombrePorId.get(m.id) ?? m.id, esperado: m.esperado, cycles: m.cycles })),
-        },
-        n,
-        paradas: paradasDetalle({ stopEvents: live.stopEvents, stopReasons: live.stopReasons, stopMachines: live.stopMachines, enCurso: [] }),
-        perillas: live.perillas ?? null,
-      }),
+      cascada,
+      /* El «Ver detalle»: cada lista reparte un escalón de `cascada`, con los mismos `args` (las mismas paradas y perillas). */
+      detalle: detalleCascadaMeta(args, cascada),
       minutos: n,
       /* Carros o silletas, por la máquina (la 142 lleva carros; la 200, silletas): el rótulo de los vacíos. */
       contenedor: contenedorDe(live.machines),
@@ -7103,11 +7121,14 @@ function MonitorDelToken() {
               mas={{
                 cascada,
                 cascadaDetalle: cascada ? detalleCascada({ live, cascada, serieMinuto: serieMinutoVista }) : null,
+                cascadaMeta: cascadaMeta ? { cascada: cascadaMeta.cascada, detalle: cascadaMeta.detalle, contenedor: cascadaMeta.contenedor } : null,
                 tiempo: live.timeBreakdown ? {
                   windowMin: live.timeBreakdown.windowMin,
                   producingMin: live.timeBreakdown.producingMin,
                   plannedMin: live.timeBreakdown.plannedMin,
                   recoverableMin: live.timeBreakdown.recoverableMin,
+                  ...rangoDelTurno(live),
+                  nMaquinas: live.timeBreakdown.nMaquinas ?? live.machines?.length ?? null,
                 } : null,
                 comparado: comparacion.days
                   .map((d) => ({ label: d.label, piezas: turnoCerrado ? d.totalPieces : (d.atCurrentMinute ?? d.totalPieces), hoy: d.esHoy }))

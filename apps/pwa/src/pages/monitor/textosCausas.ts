@@ -98,6 +98,8 @@ export const TXT_RESUMEN = {
   sinCalibracion: 'Esta línea todavía no tiene calibración: no se estima la causa probable.',
   /** En la leyenda del gráfico. */
   marcaEnBaader: 'micro en su Baader (el color es la causa posible)',
+  /** Igual, con una sola máquina (Filete): no se habla de Baader. */
+  marcaEnMaquina: 'micro en la máquina (el color es la causa posible)',
   marcaALaVez: 'detención casi a la vez en 2 o 3 Baader',
 }
 

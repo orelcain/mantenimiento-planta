@@ -12,16 +12,13 @@ import { FilaRendimientoPerilla } from '@/components/grader/FilaRendimientoPeril
 import { BotonInfo } from './GlobosFranja'
 import { CascadaTurnoAnterior } from './CascadaTurnoAnterior'
 import { vaciasEtiqueta, type Cascada, type Contenedor } from './cascadaTurno'
-import type { CascadaPorMeta, PiezasVista } from './cascadaPerilla'
+import { etiquetaVista, type CascadaPorMeta, type PiezasVista } from './cascadaPerilla'
 
 /* La cascada a la meta de Shoplogix con la perilla (Fase B). Las cifras salen de `cascadaPerilla.ts`; aquí solo se
    muestran y se elige la vista (Línea o una Baader). Cada vista cuadra sola: podía − perilla − detenciones − micro −
    vacíos = hizo. El tamaño de texto más chico es 11 px (`text-caption`). */
 
 const fmt = (n: number) => Math.round(Math.abs(n)).toLocaleString('es-CL')
-
-/** «Evisceradora 1» → «Ev 1» (así lo nombra el encargo y el mockup). */
-const etiquetaVista = (nombre: string) => nombre.replace(/^Evisceradora\s*/i, 'Ev ')
 
 /** Tono de cada escalón con los tokens de la piel Pizarra (`--v2-*`). Ningún hex nuevo. */
 const TONO = {
@@ -87,13 +84,18 @@ export function CascadaTurnoCard({ cascada, minutosTurno, contenedor = 'silleta'
      paréntesis, para que no se confunda con el separador de las Baader. */
   const conMotivo = (motivo: string | null) => (motivo ? ` · ${motivo}` : '')
   const conMotivoEntre = (motivo: string | null) => (motivo ? ` (${motivo})` : '')
+  /* Sin perilla anotada, la vara cae en la meta: decirlo así, no «igual a su meta», que sugiere una perilla puesta a propósito. */
   const perillas = baader
-    ? baader.vara != null && baader.vara !== baader.meta
-      ? `${baader.vara} en vez de ${baader.meta}${conMotivo(baader.motivo)}`
-      : 'igual a su meta'
+    ? !baader.conPerilla
+      ? 'sin perilla anotada'
+      : baader.vara != null && baader.vara !== baader.meta
+        ? `${baader.vara} en vez de ${baader.meta}${conMotivo(baader.motivo)}`
+        : 'igual a su meta'
     : cuentan.filter((b) => b.perilla > 0).map((b) => `${etiquetaVista(b.nombre)} ${b.vara} en vez de ${b.meta}${conMotivoEntre(b.motivo)}`).join(' · ') || 'ninguna más lenta que su meta'
 
-  const escalones = escalonesDe(v, metas, perillas, baader == null && cuentan.length > 1 ? cuentan.length : null, contenedor)
+  /* En la línea con más de una Baader que cuenta, el tiempo de producción es el promedio de esas Baader, y se dice. */
+  const varias = baader == null && cuentan.length > 1 ? cuentan.length : null
+  const escalones = escalonesDe(v, metas, perillas, varias, contenedor)
   const d = v.duenos
 
   return (
@@ -127,7 +129,7 @@ export function CascadaTurnoCard({ cascada, minutosTurno, contenedor = 'silleta'
         <>
           {/* La partición del rendimiento de la vista elegida (la cuenta la cascada en `cascadaPerilla.ts`): arriba de los escalones. */}
           <div className="mt-3">
-            <FilaRendimientoPerilla r={v.rendimiento} />
+            <FilaRendimientoPerilla r={v.rendimiento} contenedor={contenedor} />
           </div>
 
           <div className="mt-3 flex items-baseline justify-between gap-3">
@@ -135,7 +137,7 @@ export function CascadaTurnoCard({ cascada, minutosTurno, contenedor = 'silleta'
             <span className="text-footnote font-semibold tabular-nums text-foreground">{fmt(v.minProduccion)} min</span>
           </div>
           <p className="text-caption tabular-nums text-muted-foreground">
-            ({minutosTurno} del turno − {fmt(v.minProgramada)} de detención programada: colación, reunión y ejercicio), que no es pérdida de nadie
+            ({minutosTurno} del turno − {fmt(v.minProgramada)} de detención programada{varias ? `, promedio de las ${varias} Baader` : ''}: colación, reunión y ejercicio), que no es pérdida de nadie
           </p>
 
           <div className="mt-3 flex flex-col gap-2.5">
@@ -190,7 +192,7 @@ export function CascadaTurnoCard({ cascada, minutosTurno, contenedor = 'silleta'
       {!baader?.sinMeta && (
         <p className="mt-3 text-caption tabular-nums text-muted-foreground">
           {baader
-            ? `${etiquetaVista(baader.nombre)}: meta de Shoplogix ${baader.meta} pz/min${baader.vara != null ? `, perilla ${baader.vara}` : ''}.`
+            ? `${etiquetaVista(baader.nombre)}: meta de Shoplogix ${baader.meta} pz/min${baader.conPerilla && baader.vara != null ? `, perilla ${baader.vara}` : ''}.`
             : `Perilla: la velocidad puesta en cada Baader. Meta de Shoplogix: ${cuentan.map((b) => b.meta).join(' · ')} pz/min.`}
         </p>
       )}

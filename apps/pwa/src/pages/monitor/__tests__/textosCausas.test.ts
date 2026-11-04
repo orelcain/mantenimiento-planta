@@ -34,7 +34,7 @@ function cadenas(v: unknown, out: string[] = []): string[] {
 const sp = (s: string) => s.replace(/\u00a0/g, ' ')
 
 describe('textosCausas · vocabulario: nada de «casualidad», «azar», «paro» ni «parada(s)»', () => {
-  it('la expresión prohibida detecta lo que debe (y no «paró», que ya no es el nombre de la causa)', () => {
+  it('la expresión prohibida atrapa «casualidad», «azar», «paro(s)» y «parada(s)», y deja pasar «detención» y «se detuvo»', () => {
     for (const mala of ['por casualidad', 'al azar', 'un paro', 'los paros', 'Parada programada', 'las paradas', 'PARO']) expect(mala).toMatch(PROHIBIDAS)
     for (const buena of ['Otra Baader se detuvo', 'detención', 'se detuvo', 'Al volver de una detención', 'comparar', 'separar']) expect(buena).not.toMatch(PROHIBIDAS)
   })

@@ -805,7 +805,7 @@ export function TiempoDelTurno({
                         <p className="mt-1.5 text-muted-foreground/80">
                           <b>Por qué anduvo más lento, esto no lo dice.</b> Las causas habituales son
                           menos producto llegando desde aguas arriba, calibre distinto al del set
-                          point, o microparadas más cortas que el umbral con que Shoplogix las
+                          point, o microdetenciones más cortas que el umbral con que Shoplogix las
                           registra. Confirmarlo es pregunta de terreno, no del dato.
                         </p>
                       </>
