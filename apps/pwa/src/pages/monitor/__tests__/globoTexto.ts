@@ -1,8 +1,8 @@
 /**
  * El texto que el usuario lee en un globo de micro ya renderizado, una línea por cosa y con las marcas que son dibujo (①, ✕, ▼, ▽, la píldora «en observación»)
  * escritas como carácter: `textContent` a secas pega el número de una razón con la cifra de su celda («1» + «17» = «117») y pierde cuál marca es cuál.
- * Los espacios duros (U+00A0) salen como espacio normal. Por defecto el globo trae tres piezas (encabezado, línea de causa, tabla) y el botón «Ver detalle»;
- * abierto, trae además el detalle (forma, observación, leyenda de ▽, reglas que no aplicaron y pie).
+ * Los espacios duros (U+00A0) salen como espacio normal. Por defecto el globo trae tres piezas (encabezado, línea de causa, tabla), la línea «Cerca:» si la hay,
+ * y el botón «Ver detalle»; abierto, trae además el detalle (forma, observación, leyenda de ▽, reglas que no aplicaron, párrafo «Cerca:» y pie).
  */
 const CIRCULOS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨']
 const limpio = (t: string | null | undefined) => (t ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
@@ -42,6 +42,9 @@ export function lineasDelGlobo(globo: Element): string[] {
   if (causa) out.push(lineaDeCausa(causa))
   globo.querySelectorAll('thead tr').forEach((tr) => out.push(Array.from(tr.querySelectorAll('th')).map((t) => limpio(t.textContent)).join(' | ')))
   globo.querySelectorAll('tbody tr').forEach((tr) => out.push(Array.from(tr.querySelectorAll('th,td')).map((c) => (c.tagName === 'TH' ? limpio(c.textContent) : celda(c))).join(' | ')))
+  /* «Cerca:» va bajo la tabla y antes de «Ver detalle» (en PC y en celular). */
+  const cerca = globo.querySelector('.gm-cerca')
+  if (cerca) out.push(limpio(cerca.textContent))
   const ver = globo.querySelector('.gm-ver')
   if (ver) out.push(`${limpio(ver.textContent)} (${ver.getAttribute('aria-expanded') === 'true' ? 'abierto' : 'cerrado'})`)
   /* PC con el mouse solo encima de la marca: en vez del botón, una pista que no es botón. */

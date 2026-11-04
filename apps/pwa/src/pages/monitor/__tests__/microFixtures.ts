@@ -3,6 +3,7 @@
  * clasificador (`fixtures/*.json`): las paradas por máquina (`stopEvents`, `stopReasons`, `stopMachines`), las máquinas, el inicio
  * programado, las paradas programadas del doc (`timeBreakdown.planned`) y la serie por minuto (`pulse.serieMinuto`).
  *  · Chonchi, Turno 2 (3 Baader): `chonchi_0211_turno2.json`, la lectura de las 15:24.
+ *  · Chonchi, Turno 2 al cierre: `chonchi_0211_turno2_cierre.json` (las mismas detenciones con los motivos anotados después), con la serie de las 15:24.
  *  · Filete, Turno Día (1 Baader): `filete_0211_dia.json`.
  * Las horas son hora de planta sellada como UTC: no se convierte zona.
  */
@@ -27,6 +28,11 @@ const leer = (archivo: string) => JSON.parse(readFileSync(resolve(__dirname, 'fi
 
 export const CHONCHI_0211_T2: DocMicro = leer('chonchi_0211_turno2.json')
 export const FILETE_0211_DIA: DocMicro = leer('filete_0211_dia.json')
+
+/** Las detenciones del turno completo con los motivos anotados después (mismas máquinas y orden que el doc de las 15:24). */
+const CIERRE = JSON.parse(readFileSync(resolve(__dirname, 'fixtures', 'chonchi_0211_turno2_cierre.json'), 'utf8')) as Pick<DocMicro['live'], 'stopEvents' | 'stopReasons'>
+/** El doc de las 15:24 con las detenciones y los motivos del cierre; la serie sigue siendo la de las 15:24 (las columnas después salen vacías). */
+export const CHONCHI_0211_T2_CIERRE: DocMicro = { ...CHONCHI_0211_T2, live: { ...CHONCHI_0211_T2.live, stopEvents: CIERRE.stopEvents, stopReasons: CIERRE.stopReasons } }
 
 /** La entrada del clasificador como la arma la página: el inicio del turno es el programado (en estos dos turnos coincide con el de la serie). */
 export function entradaDeDoc(doc: DocMicro, extra: Partial<EntradaMicroCausa> = {}): EntradaMicroCausa {

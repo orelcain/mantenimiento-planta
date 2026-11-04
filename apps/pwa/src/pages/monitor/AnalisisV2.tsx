@@ -24,6 +24,8 @@ import { PanelDetalle, dec, firmado, hhmm, horas, int, semanaCorta, type Monitor
 import { DUENO_UI } from './duenoUi'
 import { detencionesPorHora, metaAEstaHora, paretoAcumulado, type CausaHoy, type DetencionesHora, type EventoHoy, type MantHoy, type PerdidaHoy } from './analisisV2Datos'
 import { lunesDe, type SemanaReparto } from './repartoSemanal'
+import { resumenFallasRepetidas, type FilaSemanaFallas, type ResumenFallasRepetidas, type TramoFallas } from './fallasRepetidasKpi'
+import { deDe } from './textosCausas'
 import type { FallaRepetidaMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import './analisisV2.css'
 
@@ -54,13 +56,17 @@ const nombreMes = (ym: string, anio?: string, largo = false) => {
   return anio && ym.slice(0, 4) !== anio ? `${txt} ${ym.slice(0, 4)}` : txt
 }
 const pct0 = (x: number) => `${Math.round(x * 100)} %`
+/** Fecha corta de un lunes o domingo (YYYY-MM-DD) como «dd-mm», igual que las fechas de la tarjeta de T6. */
+const ddmm = (k: string) => `${k.slice(8, 10)}-${k.slice(5, 7)}`
+/** «05-10 al 01-11 · 4 de 44»: «4 de 44» con espacios duros, para que a 390 px no quede «44» solo en el renglón. */
+const tramoTxt = (t: TramoFallas) => `${ddmm(t.desde)} al ${ddmm(t.hasta)} · ${deDe(t.repetidas, t.fallas)}`
 /** Contra la meta con el % REDONDEADO que se muestra: 30,3 % se lee «30» y no puede decir «sobre». */
 const tonoMeta = (tasa: number): 'ok' | 'neutro' | 'mal' => {
   const r = Math.round(tasa * 100), meta = Math.round(META_REINCIDENCIA * 100)
   return r < meta ? 'ok' : r === meta ? 'neutro' : 'mal'
 }
 
-type Clave = 'hora' | 'det' | 'rep' | 'peso' | 'quien' | 'falla'
+type Clave = 'hora' | 'det' | 'rep' | 'peso' | 'quien' | 'falla' | 'fallasMant'
 type Marca = 'mant' | 'ext' | 'si' | 'mal' | 'prog'
 
 const marcaDe = (d: DuenoPerdida): Marca => (d === 'mantencion' ? 'mant' : d === 'externo' ? 'ext' : d === 'sin-imputar' ? 'si' : 'prog')
@@ -336,6 +342,9 @@ export function AnalisisV2(p: AnalisisV2Props) {
     return n > 0 ? cs.reduce((a, c) => a + c.azar * c.episodios, 0) / n : null
   })()
 
+  // ── Fallas repetidas de Mantención: 4 semanas cerradas contra las 4 anteriores (sirve a su tarjeta y a su detalle) ──
+  const fallasMant = resumenFallasRepetidas(p.fallaRepetida?.semanas, p.hoy)
+
   const nomSemana = (s: SemanaReparto) => (s === semAct && esSemanaActual ? 'Esta semana' : `Sem. ${semanaCorta(s.semana)}`)
 
   // ── Textos con valor concreto (sirven a la tarjeta y a su detalle) ─────────
@@ -508,6 +517,14 @@ export function AnalisisV2(p: AnalisisV2Props) {
               </Sec>
             </div>
           ),
+        }
+      }
+      case 'fallasMant': {
+        if (!fallasMant) return null
+        return {
+          titulo: '¿Tras una falla de máquina (Mantención), viene otra antes de 2 h?',
+          sub: 'Semana a semana · fallas de más de 5 min',
+          cuerpo: <DetalleFallasMant r={fallasMant} />,
         }
       }
       case 'peso': {
@@ -882,6 +899,8 @@ export function AnalisisV2(p: AnalisisV2Props) {
             <Ver texto="por causa, contra el azar" onClick={abrir('falla')} etiqueta="fallas que vuelven" />
           </article>
         )}
+        {/* Fallas repetidas de Mantención (03-11-2026): aparece con su propia serie, sin depender de T6. */}
+        {fallasMant && <TarjetaFallasMant r={fallasMant} onVer={abrir('fallasMant')} />}
       </Bloque>
 
       <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
@@ -893,12 +912,101 @@ export function AnalisisV2(p: AnalisisV2Props) {
 
 const horasTxt = (min: number) => (min >= 60 ? `${dec(min / 60)} h` : `${Math.round(min)} min`)
 
-function FilaPeso({ etiqueta, sub, pct, max, fuerte, onClick }: { etiqueta: string; sub: string; pct: number; max: number; fuerte?: boolean; onClick: () => void }) {
+function FilaPeso({ etiqueta, sub, pct, max, fuerte, onClick, raya, tipo = 'mant' }: { etiqueta: string; sub: string; pct: number | null; max: number; fuerte?: boolean; onClick: () => void; raya?: number; tipo?: 'mant' | 'neutro' }) {
   return (
     <button type="button" className="an-row an-row-w" onClick={onClick}>
       <span className="an-n"><span className="an-nn"><b>{etiqueta}</b><small>{sub}</small></span></span>
-      <span className="an-bt"><i className="an-s an-s-mant" style={{ width: `${(pct / max) * 100}%` }} /></span>
-      <span className={`an-vv${fuerte ? ' an-fu' : ''}`}>{Math.round(pct)} %</span>
+      <span className={`an-bt${raya != null ? ' an-fr-bt' : ''}`}>
+        <i className={`an-s ${tipo === 'neutro' ? 'an-s-neutro' : 'an-s-mant'}`} style={{ width: `${((pct ?? 0) / max) * 100}%` }} />
+        {raya != null && <em className="an-fr-meta" style={{ left: `${(raya / max) * 100}%` }} aria-hidden />}
+      </span>
+      <span className={`an-vv${fuerte ? ' an-fu' : ''}`}>{pct != null ? `${Math.round(pct)} %` : '—'}</span>
     </button>
+  )
+}
+
+/** Escala de la tarjeta: el mayor de los % (4 últimas, 4 anteriores y promedio), hacia arriba a la decena; mínimo 10. */
+function escalaFallasMant(r: ResumenFallasRepetidas): number {
+  const mayor = Math.max(r.ultimas.pct ?? 0, r.anteriores.pct ?? 0, r.promedio.pct ?? 0)
+  return Math.max(10, Math.ceil(mayor / 10) * 10)
+}
+
+/** Tarjeta «¿Tras una falla de máquina (Mantención), viene otra antes de 2 h?»: bajo T6, dentro de «Lo que se repite». */
+function TarjetaFallasMant({ r, onVer }: { r: ResumenFallasRepetidas; onVer: () => void }) {
+  const { ultimas: u, anteriores: a, promedio: pr, deltaPts, estado } = r
+  const max = escalaFallasMant(r)
+  const estadoTxt: ReactNode = estado
+    ? { mejor: <Estado tono="ok">Mejor que las 4 semanas anteriores</Estado>, peor: <Estado tono="mal">Peor que las 4 semanas anteriores</Estado>, igual: <Estado tono="neutro">Igual que las 4 semanas anteriores</Estado> }[estado]
+    : null
+  return (
+    <article className="an-c an-c-fr" aria-label="Fallas repetidas de Mantención">
+      <Cabeza
+        pregunta="¿Tras una falla de máquina (Mantención), viene otra antes de 2 h?"
+        kpi={u.pct != null ? Math.round(u.pct) : '—'}
+        unidad={u.pct != null ? '% tuvo otra en la misma Baader' : 'sin fallas de más de 5 min en las últimas 4 semanas'}
+        estado={estadoTxt}
+        refer={deltaPts != null && a.pct != null ? (
+          <><b className={estado === 'mejor' ? 'an-bien' : estado === 'peor' ? 'an-mal' : undefined}>{firmado(deltaPts)} pts</b> contra las 4 semanas anteriores ({Math.round(a.pct)} %)</>
+        ) : undefined}
+      />
+      <div className="an-ls">
+        <FilaPeso etiqueta="Últimas 4 semanas" sub={tramoTxt(u)} pct={u.pct} max={max} raya={pr.pct ?? undefined} tipo="neutro" fuerte onClick={onVer} />
+        <FilaPeso etiqueta="4 semanas antes" sub={tramoTxt(a)} pct={a.pct} max={max} raya={pr.pct ?? undefined} tipo="neutro" onClick={onVer} />
+      </div>
+      {pr.pct != null && (
+        <div className="an-nt">raya = <Dato texto={<>Fallas de máquina (Mantención) de más de 5 min que tuvieron otra en la misma Baader antes de 2 h, en las {pr.semanas} semanas cerradas desde el {ddmm(pr.desde)}: {pr.repetidas} de {pr.fallas}. Shoplogix no separa una reparación que no aguantó de un turno con malas condiciones (lotes, MMPP).</>}>promedio de {pr.meses} meses: {Math.round(pr.pct)} %</Dato></div>
+      )}
+      <Ver texto="semana a semana" onClick={onVer} etiqueta="fallas repetidas de Mantención" />
+    </article>
+  )
+}
+
+/** Detalle de «fallas repetidas de Mantención»: la respuesta, semana a semana y cómo se cuenta. */
+function DetalleFallasMant({ r }: { r: ResumenFallasRepetidas }) {
+  const { ultimas: u, anteriores: a, promedio: pr, filas } = r
+  const max = escalaFallasMant(r)
+  const pctTxt = (x: number | null) => (x != null ? `${Math.round(x)} %` : '—')
+  const filaSemana = (f: FilaSemanaFallas) => (
+    <Ev
+      key={f.semana}
+      label={f.tramo === 'curso' ? `Semana del ${ddmm(f.semana)} · en curso` : `Semana del ${ddmm(f.semana)}`}
+      sub={f.turnos === 0 ? 'sin turnos' : `${f.fallas} fallas · ${f.repetidas} con otra`}
+      valor={pctTxt(f.pct)}
+      frac={f.pct != null ? f.pct / max : null}
+      tipo="neutro"
+    />
+  )
+  const filaResumen = (t: TramoFallas, etiqueta: string) => (
+    <Ev
+      label={<b>{etiqueta}</b>}
+      sub={tramoTxt(t)}
+      valor={pctTxt(t.pct)}
+      frac={t.pct != null ? t.pct / max : null}
+      tipo="neutro"
+    />
+  )
+  const conFallas = filas.flatMap((f) => (f.tramo !== 'curso' && f.pct != null ? [Math.round(f.pct)] : []))
+  const minS = conFallas.length ? Math.min(...conFallas) : null
+  const maxS = conFallas.length ? Math.max(...conFallas) : null
+  return (
+    <div className="an-d">
+      <Resp nota="Si sube, hay que ver si son reparaciones que no aguantan o turnos con malas condiciones (lotes, MMPP): los datos de Shoplogix no lo separan.">
+        {u.pct != null
+          ? <><b>{Math.round(u.pct)} %</b> de las fallas de máquina de las últimas 4 semanas tuvo otra en la misma Baader antes de 2 h ({u.repetidas} de {u.fallas}); las 4 anteriores, {a.pct != null ? `${Math.round(a.pct)} % (${a.repetidas} de ${a.fallas})` : 'sin fallas de más de 5 min'}.</>
+          : 'Sin fallas de más de 5 min en las últimas 4 semanas.'}
+      </Resp>
+      <Sec n={1} titulo="Semana a semana">
+        {filas.filter((f) => f.tramo === 'curso').map(filaSemana)}
+        {filas.filter((f) => f.tramo === 'ultimas').map(filaSemana)}
+        {filaResumen(u, 'Últimas 4')}
+        {filas.filter((f) => f.tramo === 'anteriores').map(filaSemana)}
+        {filaResumen(a, '4 antes')}
+        <Nota>La semana en curso no entra en la cifra.</Nota>
+        {minS != null && maxS != null && minS !== maxS && <Nota>Una semana sola va de {minS} a {maxS} %: por eso la tarjeta suma 4.</Nota>}
+      </Sec>
+      <Sec n={2} titulo="Cómo se cuenta">
+        <Nota>Falla: detención de más de 5 min con un motivo de falla de máquina (Mantención) del árbol de imputación, incluidos el ajuste de mantenimiento y los trabajos de contratistas. Las de la misma Baader con menos de 10 min entre el fin de una y el inicio de la siguiente son una sola. Tuvo otra: la misma Baader volvió a fallar antes de 2 h desde el fin. Se comparan las 4 últimas semanas cerradas con las 4 anteriores; un cambio de menos de 5 puntos se dice «Igual». Promedio: las {pr.semanas} semanas cerradas desde el {ddmm(pr.desde)} ({pr.repetidas} de {pr.fallas}).</Nota>
+      </Sec>
+    </div>
   )
 }

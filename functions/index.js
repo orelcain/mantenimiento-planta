@@ -7949,6 +7949,8 @@ exports.recalcularUmbralesParos = onSchedule(
 // serie mensual + ranking de causas en `shoplogixReincidencia/{planta}`, que el
 // Monitor publica (tarjeta en Análisis + aviso al soltar un paro). Ver
 // `shoplogix/fallaRepetida.js`. ≈ turnos × máquinas lecturas por planta y día.
+// También deja `semanas`: la serie semanal de «fallas repetidas de Mantención» (KPI
+// aparte de esta reincidencia; sin horas de operación). Sin lecturas extra.
 const PLANTAS_FALLA_REPETIDA = ['chonchi', 'yal', 'filete']
 exports.recalcularFallaRepetida = onSchedule(
   { schedule: 'every day 05:45', timeZone: 'America/Santiago', region: 'us-central1', memory: '1GiB', timeoutSeconds: 540 },
@@ -7959,7 +7961,7 @@ exports.recalcularFallaRepetida = onSchedule(
       try {
         const r = await fallaRepetida.calcularReincidenciaPlanta({ db, plantSlug, hoyDateKey, FieldPath })
         await db.doc(`shoplogixReincidencia/${plantSlug}`).set({ ...r, calculadoEl: new Date() })
-        logger.info(`[recalcularFallaRepetida] ${plantSlug}: ${r.turnos} turnos, ${r.causas.length} causas, ${r.meses.length} meses`)
+        logger.info(`[recalcularFallaRepetida] ${plantSlug}: ${r.turnos} turnos, ${r.causas.length} causas, ${r.meses.length} meses, ${r.semanas.length} semanas`)
       } catch (e) {
         logger.error(`[recalcularFallaRepetida] ${plantSlug} falló:`, e.message)
       }

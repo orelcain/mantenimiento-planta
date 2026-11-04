@@ -92,9 +92,9 @@ describe('GloboMicro v3 · casos reales', () => {
     expect(sinCal.join('\n')).not.toMatch(/observación/)
   })
 
-  it('Chonchi 10:17:43 Ev 1 · Sin contexto (en v4.8.0 salía «Ritmo bajo»): «Sin contexto · nada alrededor en los datos», sin «Causa posible» y con el pie «Los datos aún no la explican»', () => {
+  it('Chonchi 10:17:43 Ev 1 · Sin contexto (en v4.8.0 salía «Ritmo bajo»): «Sin contexto · los datos aún no muestran su causa», sin «Causa posible» y con el pie «Los datos aún no la explican»', () => {
     const q = buscarMicro(chonchi, '10:17:43', 'Evisceradora 1')
-    expect(lineasDelGlobo(globoDe(q)).slice(0, 2)).toEqual(['Ev 1 · micro de 15 s (+~20 s sin anotar) · 10:17:43', 'Sin contexto · nada alrededor en los datos'])
+    expect(lineasDelGlobo(globoDe(q)).slice(0, 2)).toEqual(['Ev 1 · micro de 15 s (+~20 s sin anotar) · 10:17:43', 'Sin contexto · los datos aún no muestran su causa'])
     cleanup()
     const abierto = lineasDelGlobo(globoDe(q, { abierto: true }))
     expect(abierto.slice(6)).toEqual([
@@ -110,7 +110,7 @@ describe('GloboMicro v3 · casos reales', () => {
     const q = buscarMicro(filete, '14:40:00', 'Linea 1')
     expect(lineasDelGlobo(globoDe(q, { planta: 'filete', abierto: true }))).toEqual([
       'Linea 1 · micro de 30 s (+~20 s sin anotar) · 14:40:00',
-      'Sin contexto · nada alrededor en los datos',
+      'Sin contexto · los datos aún no muestran su causa',
       'pz/min | 14:38 | 14:39 | 14:40 | 14:41 | Esperado',
       'Linea 1 | 14 | ▽ 11 | ▼ 6 | 13 | 20',
       'Ver detalle (abierto)',

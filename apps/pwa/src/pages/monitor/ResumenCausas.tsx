@@ -14,7 +14,8 @@ import { AIRE_BORDE, bordeLibreArriba, traerALaVista } from './bordeLibre'
 import type { CalibracionPlanta } from './causasCalibracion'
 import { COLOR_CAUSA, parametrosDe, resumirCausas, type CausaMicro, type MicroClasificada, type ResumenCausa } from './microCausa'
 import {
-  AYUDA_INTRO, TXT_RESUMEN, ariaBarra, cifraProbable, cifraSinCalibrar, definicionCausa, deTotal, itemsAyuda, microDeCeroSegundos, notasAyuda, textoChip,
+  AYUDA_INTRO, TXT_RESUMEN, ariaBarra, cifraProbable, cifraSinCalibrar, definicionCausa, deTotal, itemsAyuda, microDeCeroSegundos, notaCerca, notasAyuda, textoChip,
+  type NotaAyuda,
 } from './textosCausas'
 
 type Marca = 'solido' | 'mixto' | 'rayado' | 'borde'
@@ -44,7 +45,7 @@ function MuestraCausa({ causa, marca }: { causa: CausaMicro; marca: Marca }) {
  * a lo ancho, su alto máximo es lo que cabe en la ventana (con scroll por dentro si el texto es más largo) y en el celular se trae a la vista al abrirlo. Va por
  * ENCIMA de las tarjetas que le siguen (CSS: `.v2-tarjeta:has(.rv-cz-info)`), de modo que el botón «Ver más del turno» ya no se mezcla con sus reglas.
  */
-function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: ReturnType<typeof resumirCausas>; cal: (CalibracionPlanta & { nombre: string }) | null; planta: string | null | undefined; conVarias: boolean; verHora: number }) {
+function AyudaCausas({ resumen, cal, planta, conVarias, verHora, cerca }: { resumen: ReturnType<typeof resumirCausas>; cal: (CalibracionPlanta & { nombre: string }) | null; planta: string | null | undefined; conVarias: boolean; verHora: number; cerca: NotaAyuda | null }) {
   const [abierto, setAbierto] = useState(false)
   const [pos, setPos] = useState<{ izq: number; ancho: number; maxAlto: number | null; arriba: boolean }>({ izq: 0, ancho: 420, maxAlto: null, arriba: false })
   const panel = useRef<HTMLDivElement>(null)
@@ -86,7 +87,7 @@ function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: Re
   }, [abierto, pos.maxAlto])
   const P = parametrosDe(planta)
   const items = itemsAyuda(P, conVarias)
-  const notas = notasAyuda({ cal, probableTotal: resumen.probableTotal, porModo: conVarias ? resumen.porModo : null, verHora })
+  const notas = notasAyuda({ cal, probableTotal: resumen.probableTotal, porModo: conVarias ? resumen.porModo : null, verHora, cerca })
   return (
     <span ref={ref} className="relative inline-flex self-center">
       <button
@@ -123,6 +124,7 @@ function AyudaCausas({ resumen, cal, planta, conVarias, verHora }: { resumen: Re
  */
 export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }: { micros: readonly MicroClasificada[]; planta?: string | null; cal: (CalibracionPlanta & { nombre: string }) | null; microTotal: number | null; nBaader: number }) {
   const resumen = resumirCausas(micros, cal)
+  const cerca = notaCerca(micros)
   const conVarias = nBaader > 1
   const causas = resumen.causas.filter((c) => c.causa !== 'linea' || conVarias)
   const total = resumen.total
@@ -140,7 +142,7 @@ export function ResumenCausasMicro({ micros, planta, cal, microTotal, nBaader }:
             {TXT_RESUMEN.conCausaProbable} · <span className="solo-pc">{TXT_RESUMEN.estimado}</span><span className="solo-mv" aria-hidden>{TXT_RESUMEN.estimadoCorto}</span>
           </span>
         )}
-        <AyudaCausas resumen={resumen} cal={cal} planta={planta} conVarias={conVarias} verHora={total} />
+        <AyudaCausas resumen={resumen} cal={cal} planta={planta} conVarias={conVarias} verHora={total} cerca={cerca} />
       </div>
       <div className="rv-cz-barra" role="img" aria-label={ariaBarra(total, causas.map((c) => ({ causa: c.causa, n: c.n, probable: c.enObservacion ? null : c.probable })))}>
         {tramos.map((c) => {

@@ -464,12 +464,25 @@ export interface FallaRepetidaAviso {
   esRepeticion: boolean
 }
 
+/** Una semana con turnos del KPI «fallas repetidas de Mantención» (la serie la arma el cron; el cálculo de tramos está en `fallasRepetidasKpi.ts`). */
+export interface FallaRepetidaSemana {
+  /** Lunes de la semana, YYYY-MM-DD. */
+  semana: string
+  turnos: number
+  /** Fallas de máquina (Mantención) de más de 5 min. */
+  fallas: number
+  /** De esas, cuántas tuvieron otra en la misma Baader antes de 2 h. */
+  repetidas: number
+}
+
 export interface FallaRepetidaMonitor {
   meses: FallaRepetidaMes[]
   causas: FallaRepetidaCausa[]
   avisos: FallaRepetidaAviso[]
   desde: string | null
   calculadoEl: string | null
+  /** Serie semanal (la semana en curso incluida) del KPI de Análisis «Lo que se repite». Ausente si el cron aún no la calculó. */
+  semanas?: FallaRepetidaSemana[]
 }
 
 /** Curva del último turno cerrado del otro horario. `curve` son objetos `{m, p}` (Firestore rechaza arrays anidados). */

@@ -339,7 +339,7 @@ describe('microCausa v3 · una regla por caso', () => {
     const r = clasificarMicros(entrada([micro(M30, 15, 0)]))
     expect(r[0]!.causa).toBe('sin')
     expect(r[0]).toMatchObject({ modo: null, forma: 'sin', celdas: [] })
-    expect(lineaCausa(r[0]!.evidencia)).toEqual({ prefijo: null, nombre: 'Sin contexto', detalle: 'nada alrededor en los datos' })
+    expect(lineaCausa(r[0]!.evidencia)).toEqual({ prefijo: null, nombre: 'Sin contexto', detalle: 'los datos aún no muestran su causa' })
     expect(r[0]!.descartadas.map((d) => [d.regla, sp(d.titulo), sp(d.texto)])).toEqual([
       ['arranque', 'No es arranque:', 'ya pasaron 10 min desde que Ev 1 empezó a producir (09:15) y no tuvo detenciones de 10 min o más'],
       ['linea', 'No es «Otra Baader paró»:', 'ninguna otra Baader se detuvo a ±15 s, las otras dos no tuvieron micro en cadena (entre 22,5 y 52,5 s antes o después) y no hubo una detención previa por acumulación, atascamiento, materia prima o ajuste del operador (entre 22,5 s y 2 min antes)'],

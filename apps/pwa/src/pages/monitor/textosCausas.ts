@@ -12,7 +12,7 @@
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 import { dec1 } from '@/utils/formatoNumeros'
 import { fechaDMA, SEMANAS_VENTANA, type CalibracionPlanta, type MotivoObservacion, type ParametrosCausas } from './causasCalibracion'
-import type { CausaMicro, EvidenciaMicro, FormaMicro, ModoLinea } from './microCausa'
+import type { CausaMicro, CercaMicro, EvidenciaMicro, FormaMicro, MicroClasificada, ModoLinea } from './microCausa'
 import { cronometro } from './ritmoVivo'
 
 // ── Formatos ─────────────────────────────────────────────────────────────────
@@ -40,6 +40,12 @@ const minEntero = (min: number) => `${Math.round(min)}${NB}min`
 export const OCULTO_S = 20
 /** Cuánto atrasa Shoplogix en anotar una micro (15-30 s después de que dejan de pasar pescados). */
 export const ATRASO_ANOTA = '15 a 30 s'
+/**
+ * «Cerca:» del globo: la detención con motivo que el supervisor anotó a 5 min o menos de la micro, en cualquier Baader. Un hecho del registro, no una
+ * causa (estudio de imputaciones 03-11-2026, §3.2 y §8.2: `ARIA_MANTENIMIENTO_PLANTA/docs/ESTUDIO_MODELO_IMPUTACIONES_2026-11-03.md`). Vive aquí, y
+ * `microCausa.ts` la reexporta, para que este módulo siga importando solo tipos de allá.
+ */
+export const CERCA_MAX_S = 300
 
 /**
  * El motivo de una detención como lo muestra el resto del monitor, sin mayúsculas sostenidas: la etiqueta oficial del árbol de imputación
@@ -162,14 +168,15 @@ export const AYUDA_INTRO = 'Cada micro cuenta una sola vez, en la primera que cu
 /** Una nota del ⓘ: partes de texto, algunas en negrita. */
 export type NotaAyuda = Array<{ negrita?: boolean; texto: string }>
 
-/** Las notas del ⓘ bajo la lista. `cal` null: la línea no tiene calibración y no se dice cómo se estima. */
+/** Las notas del ⓘ bajo la lista. `cal` null: la línea no tiene calibración y no se dice cómo se estima. `cerca` (de `notaCerca`) va la última. */
 export function notasAyuda(args: {
   cal: (CalibracionPlanta & { nombre: string }) | null
   probableTotal: number | null
   porModo: Record<ModoLinea, number> | null
   verHora: number
+  cerca?: NotaAyuda | null
 }): NotaAyuda[] {
-  const { cal, probableTotal, porModo, verHora } = args
+  const { cal, probableTotal, porModo, verHora, cerca } = args
   const notas: NotaAyuda[] = []
   if (cal) {
     const desde = `${SEMANAS_VENTANA} semanas al ${fechaDMA(cal.fecha)}`
@@ -199,6 +206,7 @@ export function notasAyuda(args: {
     notas.push([{ texto: `Este turno, ${ROTULO_CAUSA.linea} ${total} = ${ROTULO_FORMA.a_la_vez} ${porModo.a_la_vez} · ${ROTULO_FORMA.en_cadena} ${porModo.en_cadena} · ${ROTULO_FORMA.tras_paro_otra} ${porModo.tras_paro_otra}.` }])
   }
   notas.push([{ texto: `Se ven las ${verHora} micro de 15${NB}s o más. Las de 0${NB}s Shoplogix las anota con hora, pero sin duración. Al monitor llega solo cuántas son.` }])
+  if (cerca) notas.push(cerca)
   return notas
 }
 
@@ -210,6 +218,8 @@ export const TXT_GLOBO = {
   /** En PC, con el mouse solo encima de la marca: el globo no recibe el mouse, así que en vez del botón se dice cómo abrirlo. */
   pistaClic: 'Clic en la marca para ver el detalle',
   causaPosible: 'Causa posible:',
+  /** La línea de la detención anotada cerca (`lineaCerca`): un hecho del registro, no una causa. */
+  cerca: 'Cerca:',
   cerrar: 'Cerrar la lectura de la micro',
   pieGeneral: 'Causa posible no prueba que eso la provocó: lo calcula el monitor y se confirma en terreno.',
   pieSin: 'Los datos aún no la explican. Hay que verlo en terreno.',
@@ -274,7 +284,7 @@ export function lineaCausa(ev: EvidenciaMicro): { prefijo: string | null; nombre
     case 'paro':
       return { prefijo, nombre: ROTULO_CAUSA.paro, detalle: `su detención terminó ${dur(ev.haceS)} antes` }
     default:
-      return { prefijo: null, nombre: ROTULO_CAUSA.sin, detalle: 'nada alrededor en los datos' }
+      return { prefijo: null, nombre: ROTULO_CAUSA.sin, detalle: 'los datos aún no muestran su causa' }
   }
 }
 
@@ -291,6 +301,49 @@ export function detalleForma(ev: EvidenciaMicro, propia: { fila: number; nombre:
   if (ev.forma === 'linea_tras_paro_otra') return `Forma: ${ROTULO_FORMA.tras_paro_otra}. La detención de ${conNB(ev.nombre)} fue no programada y duró ${dur(ev.durS)}.`
   if (ev.forma === 'paro') return `La detención de ${conNB(propia.nombre)} duró ${dur(ev.durS)}.`
   return null
+}
+
+// ── «Cerca:» (`CercaMicro`): un hecho del registro, nunca una causa ──────────────
+
+/** La hora de un instante de planta (sellada como UTC, como el resto del monitor): «15:13». */
+const horaPlanta = (ms: number) => new Date(ms).toISOString().slice(11, 16)
+
+/**
+ * La línea «Cerca:» del globo: «Falta MMPP en Ev 3, a las 15:13 (3 min después)». Null si no hay detención cerca o si la causa de la micro ya la nombra.
+ * Ojo al signo: `deltaS` de `CercaMicro` es > 0 cuando la detención empezó ANTES (al revés que `cuando()`, que mira la otra Baader).
+ */
+export function lineaCerca(c: CercaMicro | null): string | null {
+  if (!c || c.nombrada) return null
+  const rel = c.deltaS === 0 ? 'al mismo tiempo' : `${dur(Math.abs(c.deltaS))} ${c.deltaS > 0 ? 'antes' : 'después'}`
+  return `${c.motivo} en ${conNB(c.nombre)}, a las ${horaPlanta(c.inicioMs)} (${rel})`
+}
+
+/** El párrafo «Cerca:» del detalle abierto del globo; null si no hay línea. */
+export function detalleCerca(c: CercaMicro | null): { titulo: string; texto: string } | null {
+  if (!c || lineaCerca(c) == null) return null
+  return {
+    titulo: TXT_GLOBO.cerca,
+    texto: `la detención con motivo que anotó el supervisor a ${CERCA_MAX_S / 60}${NB}min o menos, en cualquier Baader. Duró ${dur(c.durS)}. Es un hecho del registro: no dice por qué ocurrió esta micro.`,
+  }
+}
+
+/**
+ * La nota del ⓘ: cuántas micro tienen una detención anotada cerca y de qué motivo. Se nombran las dos hojas más frecuentes; el resto suma «N otra(s)»
+ * (micro, que es femenino). Cuentan también las que la causa ya nombra. Null si ninguna micro tiene una.
+ */
+export function notaCerca(micros: readonly MicroClasificada[]): NotaAyuda | null {
+  const cercas = micros.flatMap((q) => (q.cerca ? [q.cerca] : []))
+  if (cercas.length === 0) return null
+  const porMotivo = new Map<string, number>()
+  for (const c of cercas) porMotivo.set(c.motivo, (porMotivo.get(c.motivo) ?? 0) + 1)
+  const grupos = [...porMotivo].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))
+  const partes = grupos.slice(0, 2).map(([motivo, n]) => `${n}${NB}${motivo}`)
+  const resto = grupos.slice(2).reduce((s, [, n]) => s + n, 0)
+  if (resto > 0) partes.push(`${resto}${NB}${resto === 1 ? 'otra' : 'otras'}`)
+  return [
+    { negrita: true, texto: 'Cerca' },
+    { texto: `: ${cercas.length}${NB}de${NB}${micros.length}${NB}micro ${cercas.length === 1 ? 'tiene' : 'tienen'} una detención anotada a ${CERCA_MAX_S / 60}${NB}min o menos: ${listaY(partes)}. Es lo que anotó el supervisor; no dice por qué ocurrió cada micro.` },
+  ]
 }
 
 /** La causa está «en observación» en esta planta: se muestra, pero no suma a la causa probable. */

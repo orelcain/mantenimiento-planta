@@ -59,7 +59,7 @@ describe('microCausa v3 · Chonchi 02-11 Turno 2 (casos reales)', () => {
     const q = buscarMicro(micros, '10:17:43', EV1)
     expect(q.duracionS).toBe(15)
     expect(q.causa).toBe('sin')
-    expect(lineaCausa(q.evidencia)).toEqual({ prefijo: null, nombre: 'Sin contexto', detalle: 'nada alrededor en los datos' })
+    expect(lineaCausa(q.evidencia)).toEqual({ prefijo: null, nombre: 'Sin contexto', detalle: 'los datos aún no muestran su causa' })
     expect(q.celdas).toEqual([])
     expect(q.tabla.filas[0]!.piezas).toEqual([14, 10, 5, 16])
     expect(q.tabla.filas.every((f) => !f.inicioPrevio)).toBe(true)

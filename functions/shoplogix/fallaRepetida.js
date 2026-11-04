@@ -22,6 +22,18 @@
  *   · Las cuchillerías de la Baader 200 se juntan en «Cuchillería».
  *
  * Todo es PURO salvo `calcularReincidenciaPlanta` (IO acotado, lo usa el cron).
+ *
+ * ── Serie semanal «fallas repetidas de Mantención» (`semanasFallasMantencion`) ──
+ * KPI APARTE de la reincidencia de arriba: no es por causa, no usa horas de
+ * operación y no excluye ninguna hoja de Mantención (ni «Ajuste mantenimiento» ni
+ * «Trabajos contratistas / propios»). Fuente: estudio de imputaciones 03-11-2026, §8.3.
+ *   · Falla: state que no es `uptime`, de más de 300 s (300 exacto no cuenta), con
+ *     hoja del bucket mantención. El mismo state en varios turnos cuenta una vez.
+ *   · Se une con la anterior de la misma máquina si empieza a menos de 10 min de
+ *     que esa termine. Repetida: la siguiente de la misma máquina empieza ≤ 2 h
+ *     después del fin de esta.
+ *   · Semana: lunes de la FECHA DEL TURNO (no la del state). Se saltan los turnos
+ *     «Unscheduled» y la primera semana de la ventana, que queda incompleta.
  */
 
 const { matchImputacion } = require('./imputacion')
@@ -36,6 +48,10 @@ const UMBRAL_AVISO = 0.3
 /** …y con historia suficiente para que la tasa signifique algo. */
 const MIN_EPISODIOS_AVISO = 10
 const DIAS_HISTORIA = 300
+/** Serie semanal «fallas repetidas de Mantención» (estudio 03-11-2026, §8.3). */
+const FALLA_MANT_MIN_SEC = 300
+const UNIR_FALLAS_MS = 10 * 60_000
+const REPETIDA_MS = 2 * 3_600_000
 
 const EXCLUIDAS = new Set(['Ajuste mantenimiento', 'Trabajos contratistas / propios'])
 
@@ -221,11 +237,90 @@ function avisosFallaRepetida(maquinasTurno, causas, nowWallMs, ventanaMs = 30 * 
   return avisos
 }
 
+/** Lunes de la semana de una fecha 'YYYY-MM-DD' (aritmética UTC sobre la fecha de pared). */
+function lunesDe(fecha) {
+  const d = new Date(`${fecha}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+  return d.toISOString().slice(0, 10)
+}
+
+/** Primer lunes que cuenta desde `desde`: el mismo si ya es lunes; si no, el siguiente. */
+function primerLunesDesde(desde) {
+  const l = lunesDe(desde)
+  if (l === desde) return l
+  const d = new Date(`${l}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + 7)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Fecha 'YYYY-MM-DD' real, no solo con forma de fecha. */
+const fechaValida = (f) => /^\d{4}-\d{2}-\d{2}$/.test(f) && Number.isFinite(Date.parse(`${f}T12:00:00Z`))
+
+/**
+ * Serie semanal del KPI «fallas repetidas de Mantención». PURA: no lee nada.
+ * @param {Array<{id:string, maquinas:Array<{machineid:string, name:string, states:Array}>}>} turnos
+ *   Turnos con nombre. Los de id «Unscheduled» se saltan también aquí, por si el llamador no los filtró.
+ * @param {{desde:string}} opts  'YYYY-MM-DD'. La semana que contiene `desde` queda fuera si no empieza en lunes.
+ * @returns {Array<{semana:string, turnos:number, fallas:number, repetidas:number}>}
+ *   Una entrada por semana con al menos un turno (fallas 0 vale), ordenada por semana.
+ */
+function semanasFallasMantencion(turnos, { desde }) {
+  const lunes0 = primerLunesDesde(desde)
+  const porSemana = new Map()
+  const porMaquina = new Map() // machineid → Map(clave → { ini, fin, semana })
+  const ordenados = [...turnos].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  for (const t of ordenados) {
+    if (t.id.includes('Unscheduled')) continue
+    const fecha = t.id.slice(0, 10)
+    if (!fechaValida(fecha)) continue
+    const semana = lunesDe(fecha)
+    if (semana < lunes0) continue
+    const w = porSemana.get(semana) || { semana, turnos: 0, fallas: 0, repetidas: 0 }
+    w.turnos++
+    porSemana.set(semana, w)
+    for (const m of t.maquinas || []) {
+      const vistos = porMaquina.get(m.machineid) || new Map()
+      porMaquina.set(m.machineid, vistos)
+      for (const s of m.states || []) {
+        if (s?.type === 'uptime') continue
+        const ini = ms(s?.startAt)
+        if (ini == null) continue
+        const dur = Number(s.durationSec) || 0
+        if (!(dur > FALLA_MANT_MIN_SEC)) continue
+        const { leaf } = matchImputacion(String(s.reason || s.name || '').trim())
+        if (!leaf || leaf.bucket !== 'mantencion') continue
+        const k = `${ini}|${s.type}|${s.name}|${s.reason}`
+        const fin = ini + dur * 1000
+        const prev = vistos.get(k)
+        if (!prev) vistos.set(k, { ini, fin, semana })
+        else prev.fin = Math.max(prev.fin, fin)
+      }
+    }
+  }
+  for (const vistos of porMaquina.values()) {
+    const lista = [...vistos.values()].sort((a, b) => a.ini - b.ini)
+    const fallas = []
+    for (const x of lista) {
+      const u = fallas[fallas.length - 1]
+      if (u && x.ini - u.fin < UNIR_FALLAS_MS) u.fin = Math.max(u.fin, x.fin)
+      else fallas.push({ ...x })
+    }
+    fallas.forEach((f, i) => {
+      const w = porSemana.get(f.semana)
+      w.fallas++
+      const sig = fallas[i + 1]
+      if (sig && sig.ini - f.fin <= REPETIDA_MS) w.repetidas++
+    })
+  }
+  return [...porSemana.values()].sort((a, b) => (a.semana < b.semana ? -1 : a.semana > b.semana ? 1 : 0))
+}
+
 /**
  * Cron: reincidencia de una planta con los últimos DIAS_HISTORIA días. Lee por
  * RANGO de documentId y la subcolección `machines` de cada turno (incluye
  * `Unscheduled`: ahí cae producción fuera de horario; sus states repetidos se
  * deduplican). Costo por planta y corrida: ≈ turnos × máquinas lecturas.
+ * También deja `semanas` (serie semanal de fallas repetidas de Mantención) sin lecturas extra.
  */
 async function calcularReincidenciaPlanta({ db, plantSlug, hoyDateKey, FieldPath }) {
   const desdeD = new Date(`${hoyDateKey}T00:00:00Z`)
@@ -236,22 +331,29 @@ async function calcularReincidenciaPlanta({ db, plantSlug, hoyDateKey, FieldPath
     .where(FieldPath.documentId(), '<=', `${hoyDateKey}_`)
     .get()
   const porMaquina = new Map()
+  const turnosNombrados = []
   let turnos = 0
   for (const doc of snap.docs) {
     const ms_ = await doc.ref.collection('machines').get()
     turnos++
+    const maquinasTurno = []
     for (const m of ms_.docs) {
       const d = m.data() || {}
-      const cur = porMaquina.get(m.id) || { machineid: m.id, name: String(d.machineName || d.name || m.id), states: [] }
+      const name = String(d.machineName || d.name || m.id)
+      const cur = porMaquina.get(m.id) || { machineid: m.id, name, states: [] }
       for (const s of d.states || []) cur.states.push(s)
       porMaquina.set(m.id, cur)
+      maquinasTurno.push({ machineid: m.id, name, states: d.states || [] })
     }
+    if (!doc.id.includes('Unscheduled')) turnosNombrados.push({ id: doc.id, maquinas: maquinasTurno })
   }
   const { meses, causas } = resumirReincidencia([...porMaquina.values()])
   return {
     desde, hasta: hoyDateKey, turnos,
     definicion: { ventanaOpH: VENTANA_OP_H, encadenarMin: ENCADENAR_MS / 60_000, minDurSec: MIN_DUR_SEC, minEpisodiosMes: MIN_EPISODIOS_MES },
     meses, causas,
+    semanas: semanasFallasMantencion(turnosNombrados, { desde }),
+    definicionSemanas: { minDurSec: FALLA_MANT_MIN_SEC, unirMin: UNIR_FALLAS_MS / 60_000, repetidaH: REPETIDA_MS / 3_600_000 },
   }
 }
 
@@ -259,4 +361,5 @@ module.exports = {
   VENTANA_OP_H, ENCADENAR_MS, MIN_DUR_SEC, MIN_EPISODIOS_MES, UMBRAL_AVISO, MIN_EPISODIOS_AVISO, DIAS_HISTORIA,
   causaDeFalla, normalizarStates, relojOperacion, episodiosMaquina, resumirReincidencia, avisosFallaRepetida,
   calcularReincidenciaPlanta,
+  FALLA_MANT_MIN_SEC, UNIR_FALLAS_MS, REPETIDA_MS, lunesDe, primerLunesDesde, semanasFallasMantencion,
 }
