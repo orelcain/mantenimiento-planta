@@ -8,6 +8,7 @@ import { AnalisisV2, type AnalisisV2Props } from '../AnalisisV2'
 import { AvisoFallaRepetida } from '../AvisoFallaRepetida'
 import { avisosVigentes } from '../avisosVigentes'
 import type { FallaRepetidaAviso, FallaRepetidaMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
+import { PROHIBIDAS } from './vocabulario'
 
 beforeAll(() => {
   if (!window.matchMedia) {
@@ -50,10 +51,26 @@ describe('Tarjeta «¿Las reparaciones aguantan?»', () => {
     expect(within(card).getByText(/10 de 27 · pocos datos/)).toBeTruthy()
   })
 
-  it('abre el detalle por causa con el azar', () => {
+  it('abre el detalle por causa contra la referencia', () => {
     render(<AnalisisV2 {...props({ fallaRepetida: fr })} />)
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle: fallas que vuelven' }))
-    expect(screen.getByText(/41 de 64 volvieron · azar 7 %/)).toBeTruthy()
+    expect(screen.getByText(/41 de 64 volvieron · referencia 7 %/)).toBeTruthy()
+  })
+
+  it('ni la tarjeta ni su detalle casan con PROHIBIDAS: dicen «detención» y «referencia»', () => {
+    render(<AnalisisV2 {...props({ fallaRepetida: fr })} />)
+    const card = screen.getByRole('article', { name: 'Fallas que vuelven' })
+    const ver = within(card).getByRole('button', { name: 'Ver detalle: fallas que vuelven' })
+    expect(PROHIBIDAS.test(card.textContent ?? '')).toBe(false)
+    // Referencia ponderada por episodios: (64 × 6,8 % + 60 × 6,2 % + 16 × 3,7 %) ÷ 140 = 6 %.
+    expect(within(card).getByRole('button', { name: 'referencia ≈ 6 %' })).toBeTruthy()
+    expect(ver.textContent).toContain('por causa, contra la referencia')
+    fireEvent.click(ver)
+    const panel = screen.getByRole('dialog')
+    expect(PROHIBIDAS.test(panel.textContent ?? '')).toBe(false)
+    expect(panel.textContent).toContain('Falla: detención de equipos de 2 min o más')
+    expect(panel.textContent).toContain('Detenciones de la misma causa a menos de 12 min son una sola falla.')
+    expect(panel.textContent).toContain('Referencia: cuántas veces aparecería la causa en las 8 h siguientes a un momento cualquiera de operación.')
   })
 
   it('no aparece sin datos del backend', () => {

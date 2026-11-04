@@ -503,7 +503,7 @@ export function AnalisisV2(p: AnalisisV2Props) {
               </Resp>
               <Sec n={1} titulo="Por causa, todo el período">
                 {fr.causas.slice(0, 10).map((c) => (
-                  <Ev key={c.causa} label={c.causa} sub={`${c.vuelven} de ${c.episodios} volvieron · azar ${pct0(c.azar)}${c.episodios < 10 ? ' · pocos datos' : ''}`} valor={pct0(c.tasa)} frac={c.tasa} tipo={c.episodios < 10 ? 'neutro' : tonoMeta(c.tasa) === 'mal' ? 'mal' : 'mant'} tono={c.episodios >= 10 && tonoMeta(c.tasa) === 'mal' ? 'mal' : undefined} />
+                  <Ev key={c.causa} label={c.causa} sub={`${c.vuelven} de ${c.episodios} volvieron · referencia ${pct0(c.azar)}${c.episodios < 10 ? ' · pocos datos' : ''}`} valor={pct0(c.tasa)} frac={c.tasa} tipo={c.episodios < 10 ? 'neutro' : tonoMeta(c.tasa) === 'mal' ? 'mal' : 'mant'} tono={c.episodios >= 10 && tonoMeta(c.tasa) === 'mal' ? 'mal' : undefined} />
                 ))}
               </Sec>
               <Sec n={2} titulo="Mes a mes, todas las causas">
@@ -513,7 +513,7 @@ export function AnalisisV2(p: AnalisisV2Props) {
                 <Nota>Meses con menos de 30 fallas van en gris: su porcentaje se mueve mucho con una o dos fallas.</Nota>
               </Sec>
               <Sec n={3} titulo="Cómo se cuenta">
-                <Nota>Falla: paro de equipos de 2 min o más (sin «Ajuste mantenimiento» ni trabajos de contratistas). Paros de la misma causa a menos de 12 min son una sola falla. Vuelve: la misma causa aparece en la misma máquina antes de 8 h de operación (se cuentan las horas produciendo, no las de reloj). Azar: cuántas veces aparecería la causa en las 8 h siguientes a un momento cualquiera.</Nota>
+                <Nota>Falla: detención de equipos de 2 min o más (sin «Ajuste mantenimiento» ni trabajos de contratistas). Detenciones de la misma causa a menos de 12 min son una sola falla. Vuelve: la misma causa aparece en la misma máquina antes de 8 h de operación (se cuentan las horas produciendo, no las de reloj). Referencia: cuántas veces aparecería la causa en las 8 h siguientes a un momento cualquiera de operación.</Nota>
               </Sec>
             </div>
           ),
@@ -878,7 +878,7 @@ export function AnalisisV2(p: AnalisisV2Props) {
                   <Dato texto={<>Fallas de equipos que volvieron en la misma máquina antes de 8 h de operación ÷ fallas del mes. {nombreMes(mesFr.mes, anioFr, true)}: {mesFr.vuelven} de {mesFr.episodios}.</>}>volvió</Dato>
                   {mesFrAnt && <> · {nombreMes(mesFrAnt.mes, anioFr, true)} {pct0(mesFrAnt.tasa)}</>}
                   {' '}· meta bajo {pct0(META_REINCIDENCIA)}
-                  {azarFr != null && <> · <Dato texto="Cuántas veces aparecería la misma causa en las 8 h siguientes a un momento cualquiera de operación: la referencia para saber si un porcentaje es alto.">azar ≈ {pct0(azarFr)}</Dato></>}
+                  {azarFr != null && <> · <Dato texto="Cuántas veces aparecería la misma causa en las 8 h siguientes a un momento cualquiera de operación: la referencia para saber si un porcentaje es alto.">referencia ≈ {pct0(azarFr)}</Dato></>}
                 </>
               ) : undefined}
               resp={peorCausaFr ? <>{peorCausaFr.causa} vuelve {Math.round(peorCausaFr.tasa * 10)} de cada 10 veces ({peorCausaFr.vuelven} de {peorCausaFr.episodios}).</> : undefined}
@@ -896,7 +896,7 @@ export function AnalisisV2(p: AnalisisV2Props) {
               ))}
             </div>
             <div className="an-nt">barra = % de fallas que volvió en ≤ 8 h de operación · raya = meta {pct0(META_REINCIDENCIA)} · en gris, meses con menos de 30 fallas</div>
-            <Ver texto="por causa, contra el azar" onClick={abrir('falla')} etiqueta="fallas que vuelven" />
+            <Ver texto="por causa, contra la referencia" onClick={abrir('falla')} etiqueta="fallas que vuelven" />
           </article>
         )}
         {/* Fallas repetidas de Mantención (03-11-2026): aparece con su propia serie, sin depender de T6. */}
