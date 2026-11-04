@@ -119,7 +119,7 @@ function RitmoLinea({ p, e, unica }: { p: MonitorV2Props; e: EjeDatos | null; un
   const n = minuto ? minutosCompletos(minuto.maquinas) : 0
   const conMinuto = minuto != null && n > 0 && !p.cerrado
   const ultimo = conMinuto ? sumaPorMinuto(minuto.maquinas, n)[n - 1] ?? 0 : null
-  const esperado = conMinuto ? esperadoPorMinuto(minuto.maquinas, n)[n - 1] ?? null : null
+  const esperado = conMinuto ? esperadoPorMinuto(minuto.maquinas, n, { desde: minuto.desde, perillas: e?.perillas })[n - 1] ?? null : null
   const hora = conMinuto ? relojDe(Date.parse(minuto.desde) + (n - 1) * 60_000) : null
   /* Sin serie por minuto (o con el turno cerrado) la cifra es la que ya había: el «ahora» del pulso o el promedio andando. */
   const grande = conMinuto ? ultimo : (p.cerrado ? p.ritmo : p.ritmoAhora ?? p.ritmo)

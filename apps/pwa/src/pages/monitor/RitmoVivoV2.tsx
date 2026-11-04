@@ -19,6 +19,7 @@ import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
 import { Globo } from './AmpliarV2'
 import { useCuentaCifra } from './ampliarHooks'
 import { MinutoTurnoV2, type EventoMarcado, type MinutoTurno } from './MonitorV2'
+import type { PerillasDeLinea } from './perilla'
 import { ReglasMinuto } from './ReglasMinuto'
 import {
   MICRO_MAX_MEDIDO_S,
@@ -362,6 +363,8 @@ export interface RitmoVivoAmpliadoProps {
   /** La Baader elegida, si la comparte quien lo abre. Sin ella, el ampliado lleva su propia elección. */
   sel?: string
   onSel?: (id: string) => void
+  /** Perillas de la línea (`live.perillas`): el «esperado» de cada minuto del turno es la vara de ese minuto. */
+  perillas?: PerillasDeLinea | null
 }
 
 /**
@@ -369,7 +372,7 @@ export interface RitmoVivoAmpliadoProps {
  * minuto (`MinutoTurnoV2`), el llenado por Baader, las señales y, con `conReglas`, «Último minuto, pieza a pieza».
  * Lo abre el gráfico unido de «El turno» (`GraficoRitmoVivo`).
  */
-export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel }: RitmoVivoAmpliadoProps) {
+export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel, perillas }: RitmoVivoAmpliadoProps) {
   const [selLocal, setSelLocal] = useState(SEL_LINEA)
   const sel = selProp ?? selLocal
   const { v, selId } = seleccionDe(r, turno, sel)
@@ -414,7 +417,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
         <div className={r ? 'rv-l' : ''}>
           <h4 className="text-[15px] font-semibold leading-tight text-foreground">El turno completo, minuto a minuto</h4>
           <p className="text-[13px] text-muted-foreground">piezas contadas por Shoplogix desde el inicio del turno{selId !== SEL_LINEA ? ' · solo la Baader elegida' : ''} · el mismo eje de tiempo que las franjas de abajo</p>
-          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} />
+          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} />
         </div>
       )}
       {r && r.lineas.length > 0 && (

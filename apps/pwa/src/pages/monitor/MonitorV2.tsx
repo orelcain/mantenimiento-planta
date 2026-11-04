@@ -31,7 +31,8 @@ import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
-import { etiquetaMaquina } from './ritmoVivo'
+import { etiquetaMaquina, varaEnMinuto } from './ritmoVivo'
+import type { PerillasDeLinea } from './perilla'
 import type { PestanaMonitor } from './BarraLateralPC'
 import { horaDelCuadro, minutoDeDatos, piezasMostradas } from './aEstaHora'
 import { useCifrasVivas, VistaVivaCtx, type VistaViva } from './useCifrasVivas'
@@ -318,6 +319,17 @@ function tonoMinuto(v: number, esperado: number | null): TonoMinuto {
   const r = v / esperado
   return r >= 0.75 ? 'ok' : r >= 0.5 ? 'warn' : 'crit'
 }
+
+/**
+ * % de los `n` minutos en que la fila anduvo a ritmo, cada minuto contra SU vara (`esperadoK[k]`). Null si la fila no tiene
+ * esperado de Shoplogix o no hay minutos. Puro: lo prueba `__tests__/perillaConsumidores.test.ts`.
+ */
+export function pctARitmoFila(cycles: number[], esperadoK: Array<number | null>, n: number, esperado: number | null): number | null {
+  if (esperado == null || n === 0) return null
+  let ok = 0
+  for (let k = 0; k < n; k++) if (tonoMinuto(cycles[k] ?? 0, esperadoK[k] ?? null) === 'ok') ok++
+  return Math.round((ok / n) * 100)
+}
 /* Paleta calma: lo normal va en el acento y solo lo que se queda atrás toma color (ámbar y coral apagados). */
 const COLOR_MINUTO: Record<TonoMinuto, string> = {
   ok: 'var(--v2-bien)',
@@ -345,8 +357,8 @@ const PASOS_MARCA = [5, 10, 15, 30, 60, 120]
  * abre con el turno completo. Pasar el mouse o tocar marca el mismo minuto en todas las franjas.
  * Las cabeceras quedan pegadas al borde visible mientras el contenido se desplaza.
  */
-export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
-  d: MinutoTurno; cerrado: boolean; marca?: EventoMarcado | null; onQuitarMarca?: () => void
+export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas }: {
+  d: MinutoTurno; cerrado: boolean; marca?: EventoMarcado | null; onQuitarMarca?: () => void; perillas?: PerillasDeLinea | null
 }) {
   const [i, setI] = useState<number | null>(null)
   const t0 = Date.parse(d.desde)
@@ -421,25 +433,33 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
   }, [marcaClave])
 
   const varias = d.maquinas.length > 1
+  /* La vara de cada minuto: la perilla vigente o, si no hay, el esperado de Shoplogix (sin perillas, el mismo esperado de siempre).
+     El escalar de la fila («esperado N pz/min», la referencia) va con el último minuto. */
+  const kUlt = Math.max(0, n - 1)
+  const varasDeLinea = (k: number) => d.maquinas.map((m) => varaEnMinuto(m, t0, k, perillas))
+  const esperadoLineaK = Array.from({ length: n }, (_, k) => {
+    const vs = varasDeLinea(k)
+    return vs.every((v) => v != null) ? vs.reduce<number>((a, v) => a + (v ?? 0), 0) : null
+  })
   const filas = [
     ...(varias
       ? [{
           nombre: 'Línea',
           nota: `las ${d.maquinas.length} suman`,
-          esperado: d.maquinas.every((m) => m.esperado != null) ? d.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null,
+          esperado: d.maquinas.every((m) => m.esperado != null) ? varasDeLinea(kUlt).reduce<number>((a, v) => a + (v ?? 0), 0) : null,
+          esperadoK: esperadoLineaK,
           cycles: suma,
           principal: true,
           id: null as string | null,
         }]
       : []),
-    ...d.maquinas.map((m) => ({ nombre: m.nombre, nota: null as string | null, esperado: m.esperado, cycles: m.cycles, principal: !varias, id: m.id as string | null })),
+    ...d.maquinas.map((m) => ({
+      nombre: m.nombre, nota: null as string | null, esperado: varaEnMinuto(m, t0, kUlt, perillas),
+      esperadoK: Array.from({ length: n }, (_, k) => varaEnMinuto(m, t0, k, perillas)),
+      cycles: m.cycles, principal: !varias, id: m.id as string | null,
+    })),
   ]
-  const aRitmo = (f: (typeof filas)[number]) => {
-    if (f.esperado == null || n === 0) return null
-    let ok = 0
-    for (let k = 0; k < n; k++) if (tonoMinuto(f.cycles[k] ?? 0, f.esperado) === 'ok') ok++
-    return Math.round((ok / n) * 100)
-  }
+  const aRitmo = (f: (typeof filas)[number]) => pctARitmoFila(f.cycles, f.esperadoK, n, f.esperado)
   const indice = (e: { clientX: number; currentTarget: HTMLDivElement }) => {
     const r = e.currentTarget.getBoundingClientRect()
     const ancho = r.width - 2 * PAD_MINUTO
@@ -492,7 +512,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
                       </div>
                       <div className="text-[13px] tabular-nums text-muted-foreground">
                         {i != null
-                          ? <><b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b>{f.esperado != null ? ` de ${dec(f.esperado, 0)} esperadas` : ''} a las {relojDe(t0 + i * 60_000)}</>
+                          ? <><b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b>{f.esperadoK[i] != null ? ` de ${dec(f.esperadoK[i]!, 0)} esperadas` : ''} a las {relojDe(t0 + i * 60_000)}</>
                           : f.esperado != null ? `esperado ${dec(f.esperado, 0)} pz/min` : 'pz por minuto'}
                       </div>
                     </div>
@@ -514,7 +534,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
                       <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
                     )}
                     {f.cycles.slice(0, n).map((v, k) => {
-                      const t = tonoMinuto(v, f.esperado)
+                      const t = tonoMinuto(v, f.esperadoK[k] ?? null)
                       return (
                         <span
                           key={k}

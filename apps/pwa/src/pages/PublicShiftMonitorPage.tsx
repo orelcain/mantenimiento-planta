@@ -102,7 +102,7 @@ import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/Hec
 import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
-import { etiquetaMaquina, hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas } from './monitor/ritmoVivo'
+import { etiquetaMaquina, hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas, varaEnMinuto } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -6206,7 +6206,7 @@ function MonitorDelToken() {
     const lecturas = data.pulse?.lecturas ?? []
     const ult = lecturas[lecturas.length - 1]
     return {
-      entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at }),
+      entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at, perillas: live.perillas ?? null }),
       tope: armarTope(contador.valor, ult && ult.totalCycles === contador.valor ? ult.porMaquina : null),
     }
   })()
@@ -6441,7 +6441,12 @@ function MonitorDelToken() {
       : pvTv?.porMaquina?.length ? new Map(pvTv.porMaquina.map((x) => [x.id, x.cpm])) : null
     const prodMinTv = live.timeBreakdown?.producingMin ?? 0
     const promedioTv = prodMinTv > 0 ? live.totalPieces / prodMinTv : null
-    const techoTv = live.machines.length > 0 && live.machines.every((m) => (m.targetCpm ?? 0) > 0) ? live.machines.reduce((a, m) => a + (m.targetCpm ?? 0), 0) : null
+    /* La vara de la TV es la del momento que se mira: ahora (turno en vivo) o el último minuto de la serie (turno cerrado).
+       Sin perillas es el esperado de Shoplogix (`targetCpm`), como siempre. */
+    const finSerieTv = barrasMinuto?.maquinas.length ? Date.parse(barrasMinuto.desde) + Math.max(0, Math.min(...barrasMinuto.maquinas.map((q) => q.cycles.length)) - 1) * 60_000 : null
+    const tRefTv = turnoCerrado ? finSerieTv : ahoraWallMs
+    const varaTv = (m: (typeof live.machines)[number]) => varaEnMinuto({ id: m.id, esperado: m.targetCpm ?? null }, tRefTv ?? NaN, 0, live.perillas)
+    const techoTv = live.machines.length > 0 && live.machines.every((m) => (m.targetCpm ?? 0) > 0) ? live.machines.reduce((a, m) => a + (varaTv(m) ?? 0), 0) : null
     const ritmo15Tv = turnoCerrado ? promedioTv : (duro15?.cpm ?? pvTv?.cpm ?? null)
     const cuotaTv = comparacion.optimalAtCurrentMinute
     const metaTv = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
@@ -6497,7 +6502,7 @@ function MonitorDelToken() {
             return {
               nombre: etiquetaMaquina(m.name),
               valor: v != null ? fmtDec(v) : m.status === 'produciendo' ? '—' : '0,0',
-              baja: v != null ? v <= 0 || (m.targetCpm ? v < m.targetCpm * 0.5 : false) : m.status !== 'produciendo',
+              baja: v != null ? v <= 0 || (m.targetCpm ? v < (varaTv(m) ?? 0) * 0.5 : false) : m.status !== 'produciendo',
             }
           }),
         }}
@@ -6926,6 +6931,7 @@ function MonitorDelToken() {
                 /* Turno cerrado: el fin REAL, el mismo `live.effectiveEnd` de la cabecera («Turno terminado 04:50»). */
                 finRealMs: live.effectiveEnd ? Date.parse(live.effectiveEnd) : null,
                 minuto: barrasMinuto,
+                perillas: live.perillas ?? null,
                 primeraPiezaMs,
                 /* Detenida por el estado que ya existe: todas las máquinas paradas (pulso fresco) o el estado del corte. Cerrado, nunca. */
                 detenidaEstado: esActual && !turnoTerminadoV2 && (vivoV2
@@ -7093,6 +7099,7 @@ function MonitorDelToken() {
                     r={vivoV2?.r ?? null}
                     maquinas={vivoV2?.maquinas ?? []}
                     turno={barrasMinuto}
+                    perillas={live.perillas ?? null}
                     cerrado={turnoCerrado}
                     turnoTerminado={turnoTerminadoV2}
                     marca={marcaRitmo}

@@ -8,7 +8,8 @@
  * El eje siempre abarca el turno COMPLETO; acercarse es zoom horizontal (`useZoomGesto`), no otro eje.
  */
 import type { DuenoPerdida, GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
-import { ANDANDO_MIN_S, esMicroDetencion, llenadoDe, paradasPorMaquina, segundosCubiertos, tonoDe, type EntradaRitmoVivo, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
+import { ANDANDO_MIN_S, esMicroDetencion, llenadoDe, paradasPorMaquina, segundosCubiertos, tonoDe, varaEnMinuto, type EntradaRitmoVivo, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
+import type { PerillasDeLinea } from './perilla'
 import type { Ventana } from './useZoomGesto'
 
 // ── Formatos ─────────────────────────────────────────────────────────────────
@@ -353,11 +354,17 @@ export function sumaPorMinuto(maquinas: Array<{ cycles: number[] }>, n: number):
  * El esperado de la línea en cada minuto: la suma de los esperados de las máquinas QUE TIENEN ese minuto (la misma
  * base que `sumaPorMinuto`). null si alguna de ellas no tiene esperado, o si ninguna tiene el minuto.
  */
-export function esperadoPorMinuto(maquinas: Array<{ cycles: number[]; esperado: number | null }>, n: number): Array<number | null> {
+export function esperadoPorMinuto(
+  maquinas: Array<{ id?: string; cycles: number[]; esperado: number | null }>,
+  n: number,
+  vara?: { desde: string; perillas?: PerillasDeLinea | null } | null,
+): Array<number | null> {
+  const t0 = vara ? Date.parse(vara.desde) : NaN
   return Array.from({ length: n }, (_, k) => {
     const con = maquinas.filter((m) => k < m.cycles.length)
     if (con.length === 0 || con.some((m) => m.esperado == null || m.esperado <= 0)) return null
-    return con.reduce((a, m) => a + m.esperado!, 0)
+    /* Con `vara`, cada Baader aporta la vara de ESE minuto (perilla vigente o esperado de Shoplogix); sin ella, su esperado. */
+    return con.reduce((a, m) => a + (vara ? varaEnMinuto(m, t0, k, vara.perillas)! : m.esperado!), 0)
   })
 }
 
@@ -419,6 +426,7 @@ export function filasBaader(
   serie: { desde: string; maquinas: MaquinaSerie[] },
   n: number,
   paradas?: ParadasMaquina | null,
+  perillas?: PerillasDeLinea | null,
 ): Array<{ id: string; celdas: CeldaBaader[]; llenados: Array<number | null> }> {
   const entrada = {
     stopEvents: paradas?.stopEvents ?? null,
@@ -426,7 +434,7 @@ export function filasBaader(
     stopMachines: paradas?.stopMachines ?? null,
     enCurso: paradas?.enCurso ?? [],
   }
-  const { lineas } = llenadoDe({ serie, acumulado: null, ...entrada }, 0, n)
+  const { lineas } = llenadoDe({ serie, acumulado: null, perillas, ...entrada }, 0, n)
   const pp = paradasPorMaquina(entrada)
   const t0 = Date.parse(serie.desde)
   /* Cero de TODA la línea sin una parada de esa Baader que cubra el minuto (≥ 30 s): no se afirma que esté detenida. */

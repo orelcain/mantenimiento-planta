@@ -73,7 +73,7 @@ export function RitmoBaaders({ p, e, reloj, filas }: { p: MonitorV2Props; e: Eje
   const n = minuto ? minutosCompletos(minuto.maquinas) : 0
   const conMinuto = minuto != null && n > 0 && !p.cerrado
   const ultimo = conMinuto ? sumaPorMinuto(minuto.maquinas, n)[n - 1] ?? 0 : null
-  const esperado = conMinuto ? esperadoPorMinuto(minuto.maquinas, n)[n - 1] ?? null : null
+  const esperado = conMinuto ? esperadoPorMinuto(minuto.maquinas, n, { desde: minuto.desde, perillas: e?.perillas })[n - 1] ?? null : null
   const hora = conMinuto ? relojDe(Date.parse(minuto.desde) + (n - 1) * 60_000) : null
   const unidad = e?.unidad ?? null
 
@@ -207,7 +207,7 @@ export function RitmoDetalle({ p, reloj, filas, referencias }: { p: MonitorV2Pro
   const n = minuto ? minutosCompletos(minuto.maquinas) : 0
   const conMinuto = minuto != null && n > 0 && !p.cerrado
   const ultimo = conMinuto ? sumaPorMinuto(minuto.maquinas, n)[n - 1] ?? 0 : null
-  const esperado = conMinuto ? esperadoPorMinuto(minuto.maquinas, n)[n - 1] ?? null : null
+  const esperado = conMinuto ? esperadoPorMinuto(minuto.maquinas, n, { desde: minuto.desde, perillas: e?.perillas })[n - 1] ?? null : null
   const unidad = e?.unidad ?? null
   const varias = filas.length > 1
   const previos = ap?.antesDeRodar === true
@@ -223,7 +223,7 @@ export function RitmoDetalle({ p, reloj, filas, referencias }: { p: MonitorV2Pro
     return c ? <span className={`rb-pil rb-pil-${c.clase}${linea ? ' rb-pil-l' : ''}`}>{c.texto}</span> : <span className="rb-d rb-d-vacio" aria-label="sin referencia">·</span>
   }
 
-  const vacios = minuto && n > 0 ? vaciosTurnoDe(minuto, n, e?.paradasMaquina) : null
+  const vacios = minuto && n > 0 ? vaciosTurnoDe(minuto, n, e?.paradasMaquina, e?.perillas) : null
   const conVacios = vacios != null && vacios.maquinas.length > 0 && vacios.linea.pasaron > 0
   const Unidad = unidad ? unidad[0]!.toUpperCase() + unidad.slice(1) : 'Carros'
   const unidadSing = unidad ?? 'carros'
