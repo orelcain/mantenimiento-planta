@@ -11,6 +11,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-04 · Claude · Una sola definición de «detención programada» para la cascada y el servidor (v4.15.2)
+- Hecho: la lista de causas programadas pasa a `functions/lib/causasProgramadas.json` (vive en `functions/` porque el deploy de Functions solo sube esa carpeta); la leen `esProgramada` (`cascadaPerilla.ts`, import relativo) y `esParoPlanificado` (`publicMonitor.js`, `require`). Tabla compartida `functions/__tests__/fixtures/causasProgramadas.casos.json` (18 casos, incluye «EJERCICIO  COMPENSATORIO» con dos espacios, tabulación, tildes, ducto y vacíos) que corren `programadaParidad.test.ts` (vitest) y `functions/__tests__/programadaParidad.test.js` (`node --test`). Candado de identidad (`toBe` / `strictEqual`): si alguien vuelve a pegar la lista, aunque sea idéntica, falla. Vocabulario: «se detuvo» y «Las detenciones de menos de…» en la ayuda de `SensorStopsCausePanel.tsx`, «Upstream detenido» en `ShiftTimelineView.tsx`.
+- Verificación: tsc 0; eslint de los archivos tocados sin avisos; vitest 5506 ok, 8 omitidas; functions 695 ok; audits de gráficos, piel, voseo y decimales sin deuda nueva; `vite build` ok con la lista dentro del bundle. 5 mutantes atrapados (front sin colapsar espacios, servidor sin colapsar espacios, copia idéntica en el front, copia idéntica en el servidor, JSON sin «ejercicio compensatorio»).
+- Estado: EN REVISIÓN (PR).
+- Sigue: `SensorStopsCausePanel.tsx` aún dice «Causa de los paros» (título), «Paro de N min…» (hallazgo guardado) y «paros» en los 3 botones de la lista; `vocabulario.ts` solo vigila el monitor. `vigiaTurno.js` (`RE_PROGRAMADA`) y `kpisMantencion.js`/`kpisMantencionTurno.ts` (`RE_PLANIFICADO`) usan otras listas de «planificado», más anchas (charla, aseo, limpieza): no son esta regla, pero tampoco están atadas.
+- Retro · funcionó: la tabla de casos en JSON la corren los dos runtimes sin traer `firebase-admin` al front; el mutante de copia idéntica obligó a agregar el candado de identidad, que la tabla sola no daba.
+- Retro · costó de más: 1 corrida de mutantes perdida (el `sed` no calzó en 2 de 4 y el hook de CRLF bloqueó el primero); el script de node con texto exacto y restauración de bytes queda como forma de correr mutantes.
+
 ## 2026-11-04 · Claude · Monitor: el rótulo del tiempo del turno no se corta en el celular (v4.15.1)
 - Hecho: la revisión en producción de la 4.15.0 (verificador-web, 2 monitores × 375/1280 × claro/oscuro) pasó cascada, cuadre, detalle y vocabulario; a 375 px «Detención programada, toda la línea» se cortaba con «…» (span `truncate` de 174 px para 242). Ahora ocupa dos líneas. Archivos: `MonitorV2.tsx` (`TiempoV2`) y `MonitorV2.elTurno.test.tsx`; versión 4.15.1.
 - Verificación: vitest del archivo 25/25; mutante (vuelve `truncate`) → 1 falla, revertido.

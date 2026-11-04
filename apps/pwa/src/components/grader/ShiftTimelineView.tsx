@@ -1270,7 +1270,7 @@ export function ShiftTimelineView({
                 else { byReason.set(b.reason, { count: 1, totalMin: b.durationMin, color: b.color }) }
               }
               const sorted = [...byReason.entries()].sort(([, a], [, b]) => b.totalMin - a.totalMin)
-              lines.push('<span style="color:#94a3b8">Upstream parado:</span>')
+              lines.push('<span style="color:#94a3b8">Upstream detenido:</span>')
               for (const [reason, info] of sorted.slice(0, 4)) {
                 const machinesLabel = info.count === 1 ? '1 Baader' : `${info.count} Baaders`
                 lines.push(`&nbsp;&nbsp;<span style="color:${info.color}">▮</span> <b>${reason}</b> · ${machinesLabel}`)

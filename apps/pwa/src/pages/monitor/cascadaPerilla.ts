@@ -18,17 +18,22 @@
 import { ANDANDO_MIN_S, esMicroDetencion, normalizar, varaEnMinuto, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
 import { perillaVigenteEn, type PerillasDeLinea } from './perilla'
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
+/* Las causas programadas, normalizadas. Es el MISMO archivo que lee `esParoPlanificado` en `functions/publicMonitor.js`:
+   vive en `functions/` porque el deploy de Functions solo sube esa carpeta. */
+import CAUSAS_PROGRAMADAS from '../../../../../functions/lib/causasProgramadas.json'
+
+/** Exportada solo para que la prueba de paridad confirme que es el JSON y no una copia. */
+export { CAUSAS_PROGRAMADAS }
 
 const MS_MINUTO = 60_000
-
-/* Las causas programadas: la MISMA lista que `esParoPlanificado` usa en `functions/publicMonitor.js`. Van normalizadas. */
-const CAUSAS_PROGRAMADAS = ['colacion', 'detencion programada', 'reunion inicio turno', 'ejercicio compensatorio']
 
 /**
  * ¿La razón es detención programada (la que se descuenta del turno para dar el tiempo de producción)? Es la MISMA regla que
  * `esParoPlanificado` en `functions/publicMonitor.js`: texto normalizado, espacios internos colapsados y `includes` de alguna
  * causa programada. Así «EJERCICIO  COMPENSATORIO» (dos espacios, como lo manda Shoplogix) cuenta igual que en el backend.
  * `DesglosePiezas` (A2) lo usa también para que el «sin la detención programada» cuadre con la cascada.
+ * Paridad: `functions/__tests__/fixtures/causasProgramadas.casos.json` la corren `programadaParidad.test.ts` (aquí) y
+ * `functions/__tests__/programadaParidad.test.js` (servidor); si las dos reglas se separan, falla una de las dos.
  */
 export const esProgramada = (razon: string | null | undefined): boolean => {
   const r = normalizar(razon).replace(/\s+/g, ' ')

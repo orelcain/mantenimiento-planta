@@ -179,13 +179,14 @@ function esPlannedDowntime(state) {
  *
  * Lista confirmada por Orel el 12-08. Se compara sin tildes ni mayúsculas
  * porque Shoplogix escribe las causas a mano y ya varían entre turnos.
+ *
+ * La lista vive en `lib/causasProgramadas.json` y la PWA importa ese MISMO
+ * archivo (`esProgramada` en `cascadaPerilla.ts`). La tabla
+ * `__tests__/fixtures/causasProgramadas.casos.json` la corren las dos pruebas
+ * de paridad (aquí y en vitest): si las reglas se separan, el monitor y la
+ * cascada vuelven a dar minutos programados distintos (fue 56 contra 64 min).
  */
-const CAUSAS_PLANIFICADAS = [
-  'colacion',
-  'detencion programada',
-  'reunion inicio turno',
-  'ejercicio compensatorio',
-]
+const CAUSAS_PLANIFICADAS = require('./lib/causasProgramadas.json')
 
 function esParoPlanificado(reason) {
   /*
@@ -3504,6 +3505,8 @@ module.exports = {
   loadShiftIndex,
   parentSinCambioReal,
   // exportados para tests
+  esParoPlanificado,
+  CAUSAS_PLANIFICADAS,
   cierreOficialCoherente,
   bloquesDelSensor,
   ordenarSensorComoActual,
