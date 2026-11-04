@@ -1,8 +1,9 @@
 {
-  "version": "4.12.0",
+  "version": "4.13.0",
   "buildDate": "2026-11-04",
-  "buildTimestamp": 1793809574435,
+  "buildTimestamp": 1793814436075,
   "features": [
+    "Monitor: la cascada de cada Baader mide contra la meta de Shoplogix con la perilla, y dice de quién es cada pieza que no se hizo",
     "Catálogo de variadores: 8 fichas con ~300 parámetros verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»",
     "Grader: la matriz de turnos reemplaza al calendario mensual y el detalle del turno queda en 4 pestañas",
     "Grader: resumen ejecutivo del turno como PNG y desglose de Puerta 0 con input propio",
