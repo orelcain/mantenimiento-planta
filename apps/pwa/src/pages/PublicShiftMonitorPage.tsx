@@ -47,7 +47,7 @@ import { construirCascada } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
 import { TarjetaCascada } from './monitor/CascadaTurnoCard'
-import { cascadaPorMeta } from './monitor/cascadaPerilla'
+import { cascadaPorMeta, minutosDelTurno } from './monitor/cascadaPerilla'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
 import {
@@ -6079,8 +6079,10 @@ function MonitorDelToken() {
   const cascadaMeta = (() => {
     const s = serieMinutoVista
     if (!s?.maquinas?.length) return null
+    /* El tiempo del turno no sigue el reloj: la serie puede traer minutos de después del cierre (15:37 con cierre a las 15:00). */
     const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
-    if (!(largo > 1) || !Number.isFinite(Date.parse(s.desde))) return null
+    const n = minutosDelTurno({ desde: s.desde, largo, plannedEnd: live.plannedEnd, effectiveEnd: live.effectiveEnd, shiftClosed: live.shiftClosed })
+    if (!(n > 1) || !Number.isFinite(Date.parse(s.desde))) return null
     const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
     return {
       cascada: cascadaPorMeta({
@@ -6088,11 +6090,11 @@ function MonitorDelToken() {
           desde: s.desde,
           maquinas: s.maquinas.map((m) => ({ id: m.id, nombre: nombrePorId.get(m.id) ?? m.id, esperado: m.esperado, cycles: m.cycles })),
         },
-        n: largo,
+        n,
         paradas: paradasDetalle({ stopEvents: live.stopEvents, stopReasons: live.stopReasons, stopMachines: live.stopMachines, enCurso: [] }),
         perillas: live.perillas ?? null,
       }),
-      minutos: largo,
+      minutos: n,
     }
   })()
 

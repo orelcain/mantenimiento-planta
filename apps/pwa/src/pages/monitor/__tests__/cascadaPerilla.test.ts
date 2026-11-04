@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import fixture from './fixtures/chonchi_0311_turno1_minutos.json'
-import { cascadaPorMeta, esAguasArriba, esProgramada, rendimientoPartido, tipoParaDesglose, type CascadaArgs } from '../cascadaPerilla'
+import { cascadaPorMeta, esAguasArriba, esProgramada, minutosDelTurno, rendimientoPartido, tipoParaDesglose, type CascadaArgs } from '../cascadaPerilla'
 import { paradasDetalle, type EntradaRitmoVivo } from '../ritmoVivo'
 import type { PerillasDeLinea } from '../perilla'
 
@@ -92,6 +92,87 @@ describe('cifras objetivo del turno Chonchi 03-11 (perillas 17 · 16 · 16)', ()
     expect(ev3!.perilla).toBe(0)
     expect(ev2!.podiaConPerilla).toBe(ev2!.podia)
     expect(ev3!.podiaConPerilla).toBe(ev3!.podia)
+  })
+})
+
+/* Ev 1 sin meta de Shoplogix (esperado 0): antes la línea sumaba su «hizo» sin su «podía» y no cuadraba (16.370 ≠ 13.738 − …). */
+describe('Baader sin meta: no entra en la línea y el cuadre de la línea da exacto', () => {
+  const serieSinMeta: CascadaArgs['serie'] = { ...serie, maquinas: serie.maquinas.map((m, i) => (i === 0 ? { ...m, esperado: 0 } : m)) }
+  const sinMeta = cascadaPorMeta({ serie: serieSinMeta, n: N, paradas, perillas: PERILLAS_17_16_16 })
+  const [s1, s2, s3] = sinMeta.baaders
+  const L = sinMeta.linea
+
+  it('Ev 1 queda marcada sin meta, con cifras en cero (su vista no muestra escalones)', () => {
+    expect(s1!.sinMeta).toBe(true)
+    expect(s1!.podia).toBe(0)
+    expect(s1!.hizo).toBe(0)
+    expect(s2!.sinMeta).toBe(false)
+    expect(s3!.sinMeta).toBe(false)
+  })
+
+  it('la línea suma solo Ev 2 y Ev 3: podía, perilla, detenciones, micro, vacíos y hizo', () => {
+    expect(L.podia).toBe(ev2!.podia + ev3!.podia)
+    expect(L.perilla).toBe(ev2!.perilla + ev3!.perilla)
+    expect(L.detenciones.piezas).toBe(ev2!.detenciones.piezas + ev3!.detenciones.piezas)
+    expect(L.micro.piezas).toBe(ev2!.micro.piezas + ev3!.micro.piezas)
+    expect(L.vacios).toBe(ev2!.vacios + ev3!.vacios)
+    expect(L.hizo).toBe(ev2!.hizo + ev3!.hizo)
+    expect(L.hizo).toBe(10_391)
+  })
+
+  it('el cuadre de la línea da exacto: podía − perilla − detenciones − micro − vacíos = hizo', () => {
+    expect(L.podia - L.perilla - L.detenciones.piezas - L.micro.piezas - L.vacios).toBe(L.hizo)
+    expect(L.cuadra).toBe(true)
+  })
+
+  it('el rendimiento de la línea tampoco cuenta a Ev 1 (sus piezas sin meta no inflan el «hizo»)', () => {
+    const r = rendimientoPartido({ serie: serieSinMeta, n: N, paradas, perillas: PERILLAS_17_16_16 })
+    expect(r.hizo).toBe(ev2!.hizo + ev3!.hizo)
+    expect(r.ptsFalta).toBeGreaterThan(0)
+    expect(L.rendimiento.hizo).toBe(r.hizo)
+  })
+
+  it('la pérdida de la línea sigue positiva (se muestra su línea de dueños)', () => {
+    expect(L.perdido).toBeGreaterThan(0)
+    expect(L.perdido).toBe(L.podia - L.hizo)
+  })
+})
+
+/* El tiempo del turno no sigue el reloj: la serie puede traer minutos de después del cierre (15:37 con cierre a las 15:00). */
+describe('tiempo del turno: se corta en el fin del turno (minutosDelTurno)', () => {
+  const enMinuto = (k: number) => new Date(T0 + k * 60_000).toISOString()
+
+  it('turno cerrado a los N minutos: una serie de N + 42 cuenta N', () => {
+    expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: enMinuto(N), effectiveEnd: enMinuto(N), shiftClosed: true })).toBe(N)
+  })
+
+  it('manda el menor entre plannedEnd y el cierre real', () => {
+    expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: enMinuto(N), effectiveEnd: enMinuto(N - 10), shiftClosed: true })).toBe(N - 10)
+  })
+
+  it('con el turno abierto no cuenta el cierre real, pero sí plannedEnd', () => {
+    expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: enMinuto(N), effectiveEnd: enMinuto(N - 10), shiftClosed: false })).toBe(N)
+  })
+
+  it('sin ningún fin conocido vale el largo de la serie; una serie más corta que el fin manda la serie', () => {
+    expect(minutosDelTurno({ desde, largo: 497 })).toBe(497)
+    expect(minutosDelTurno({ desde, largo: 300, plannedEnd: enMinuto(N) })).toBe(300)
+  })
+
+  it('un fin a medio minuto cuenta solo los minutos completos', () => {
+    expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: new Date(T0 + N * 60_000 + 30_000).toISOString() })).toBe(N)
+  })
+
+  it('con la serie de 42 minutos de más, la cascada no cambia: podía, hizo y tiempo de producción son los de N', () => {
+    const conExtra: CascadaArgs['serie'] = {
+      ...serie,
+      maquinas: serie.maquinas.map((m) => ({ ...m, cycles: [...m.cycles, ...Array.from({ length: 42 }, () => 18)] })),
+    }
+    const n = minutosDelTurno({ desde, largo: N + 42, plannedEnd: enMinuto(N), effectiveEnd: enMinuto(N), shiftClosed: true })
+    const cortada = cascadaPorMeta({ serie: conExtra, n, paradas, perillas: PERILLAS_17_16_16 })
+    expect(cortada.linea.podia).toBe(linea.podia)
+    expect(cortada.linea.hizo).toBe(linea.hizo)
+    expect(cortada.linea.minProduccion).toBeCloseTo(linea.minProduccion, 6)
   })
 })
 

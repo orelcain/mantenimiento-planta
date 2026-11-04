@@ -98,6 +98,11 @@ export interface BaaderCascada extends PiezasVista {
   vara: number | null
   /** Motivo de la perilla vigente al final del turno («por el Knuro»). null si no hay perilla o no tiene motivo. */
   motivo: string | null
+  /**
+   * La Baader no tiene meta de Shoplogix usable (null o ≤ 0). NO entra en la cascada de la línea; su vista lleva solo el aviso y
+   * sus cifras van en cero, para que nadie las lea como si fueran suyas.
+   */
+  sinMeta: boolean
 }
 
 export interface CascadaPorMeta {
@@ -259,6 +264,29 @@ function calcularTodo(args: CascadaArgs): Calculo[] {
   return args.serie.maquinas.map((m) => calcularBaader(m, args))
 }
 
+/** Una Baader entra en la cuenta solo con una meta de Shoplogix usable (> 0). Sin ella no hay «podía», ni vara, ni cuadre. */
+const tieneMeta = (c: Calculo): boolean => c.meta > 0
+
+/**
+ * Los minutos del turno que cuenta la cascada: el largo de la serie, cortado en el fin del turno. El fin es el menor entre
+ * `plannedEnd` y, con el turno cerrado, `effectiveEnd`. Sin ningún fin conocido, vale el largo de la serie. Solo cuentan los
+ * minutos completos antes del fin: así el tiempo del turno no sigue el reloj cuando la serie ya trae minutos de después del cierre.
+ */
+export function minutosDelTurno(args: {
+  desde: string
+  largo: number
+  plannedEnd?: string | null
+  effectiveEnd?: string | null
+  shiftClosed?: boolean
+}): number {
+  const t0 = Date.parse(args.desde)
+  const fines = [args.plannedEnd, args.shiftClosed ? args.effectiveEnd : null]
+    .map((x) => (x ? Date.parse(x) : NaN))
+    .filter((ms) => Number.isFinite(ms))
+  if (!fines.length || !Number.isFinite(t0)) return args.largo
+  return Math.max(0, Math.min(args.largo, Math.floor((Math.min(...fines) - t0) / MS_MINUTO)))
+}
+
 const sumar = (lista: Calculo[], k: keyof Calculo) => lista.reduce((a, c) => a + (c[k] as number), 0)
 
 /** La partición del rendimiento de una lista de Baader (una o todas): hizo / (meta × minutos andando). */
@@ -320,15 +348,17 @@ function vistaDe(lista: Calculo[]): PiezasVista {
  */
 export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
   const calc = calcularTodo(args)
+  const usables = calc.filter(tieneMeta)
   return {
-    linea: vistaDe(calc),
+    linea: vistaDe(usables),
     baaders: calc.map((c) => ({
       id: c.id,
       nombre: c.nombre,
       meta: c.meta,
       vara: c.vara,
       motivo: c.motivo,
-      ...vistaDe([c]),
+      sinMeta: !tieneMeta(c),
+      ...vistaDe(tieneMeta(c) ? [c] : []),
     })),
   }
 }
@@ -339,5 +369,5 @@ export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
  * rendimiento que falta.
  */
 export function rendimientoPartido(args: CascadaArgs): RendimientoPartido {
-  return rendimientoDe(calcularTodo(args))
+  return rendimientoDe(calcularTodo(args).filter(tieneMeta))
 }
