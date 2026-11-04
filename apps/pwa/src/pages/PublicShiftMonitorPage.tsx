@@ -102,7 +102,7 @@ import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/Hec
 import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
-import { etiquetaMaquina, hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas, varaEnMinuto } from './monitor/ritmoVivo'
+import { etiquetaMaquina, hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -6906,6 +6906,16 @@ function MonitorDelToken() {
           /* Solo en vivo, con el turno que se está mirando y el contador fresco: con el vivo arrastrado
              (`recalibrando`) el «Ahora» de arriba no es el último minuto cerrado y las dos cifras no cuadrarían. */
           const vivoV2 = esActual && pv && !pv.recalibrando ? ritmoVivoDeMonitor({ pulse: data.pulse, live, ahoraPorId }) : null
+          /* Carros con pieza del turno ENTERO, no de la Baader elegida: la línea entera decide qué minuto es válido (misma regla
+             que el llenado de «Ritmo en vivo»). Por eso se calcula aquí, con la serie completa, y no dentro de la franja. */
+          const carrosDelTurno = barrasMinuto && barrasMinuto.maquinas.length > 0
+            ? vaciosTurnoDe(barrasMinuto, Math.min(...barrasMinuto.maquinas.map((q) => q.cycles.length)), {
+              stopEvents: live.stopEvents,
+              stopReasons: live.stopReasons,
+              stopMachines: live.stopMachines,
+              enCurso: (vivoV2?.maquinas ?? []).filter((m) => m.status === 'detenida' && m.desdeMs != null).map((m) => ({ id: m.id, desdeMs: m.desdeMs! })),
+            }, live.perillas ?? null)
+            : null
           /* Pasada la hora de cierre programada, una línea quieta no es una detención que haya que anotar:
              el 27-10 a las 15:20 la banda pedía «hay que anotar la causa» de un turno que cerró a las 15:00. */
           const finTurnoMs = live.plannedEnd ? Date.parse(live.plannedEnd) : NaN
@@ -7100,6 +7110,8 @@ function MonitorDelToken() {
                     maquinas={vivoV2?.maquinas ?? []}
                     turno={barrasMinuto}
                     perillas={live.perillas ?? null}
+                    carros={carrosDelTurno}
+                    perillaEditor={esAdminMonitor && esActual && data.plantSlug ? { plantSlug: data.plantSlug, por: usuarioActual?.email ?? null } : null}
                     cerrado={turnoCerrado}
                     turnoTerminado={turnoTerminadoV2}
                     marca={marcaRitmo}

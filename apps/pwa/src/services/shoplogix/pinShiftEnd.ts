@@ -212,6 +212,19 @@ export async function setMonitorPerilla(params: {
 }
 
 /**
+ * El historial de perillas de la línea, tal como se guardó (el más viejo primero). Lo lee el editor de la franja, y solo un
+ * admin lo abre: el monitor público no trae `por`, así que quien anotó sale de aquí. La regla de lectura es la de Firestore
+ * (`graderModuleConfigs` lo deja leer a cualquier sesión). Sin documento o sin historial, lista vacía.
+ */
+export async function leerPerillasHistorial(plantSlug: PlantSlug | string): Promise<PerillaHistorial[]> {
+  const docId = CONFIG_DOC_ID[plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${plantSlug}`)
+  const snap = await getDoc(doc(db, COLLECTION, docId))
+  const historial = snap.data()?.monitorPerillasHistorial
+  return Array.isArray(historial) ? (historial as PerillaHistorial[]) : []
+}
+
+/**
  * La cuota del turno, editable desde el monitor.
  *
  * Pedido de Orel (26-08): «la cuota ponla en el monitor para seleccionarla,

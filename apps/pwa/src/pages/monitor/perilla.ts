@@ -43,18 +43,31 @@ export function perillaEn(
   machineId: string,
   tMs: number,
 ): number | null {
+  return perillaVigenteEn(perillas, machineId, tMs)?.cpm ?? null
+}
+
+/**
+ * La anotación de perilla vigente para una máquina en `tMs`: su velocidad y su `desde`. Es la misma regla que `perillaEn`
+ * (que se apoya en ella): la más reciente con `desde <= tMs`. Null si no había ninguna o si `tMs` no es finito. La franja
+ * la usa para decir «anotada dd-mm» y para el editor.
+ */
+export function perillaVigenteEn(
+  perillas: PerillasDeLinea | null | undefined,
+  machineId: string,
+  tMs: number,
+): PerillaPublica | null {
   if (!perillas || !Number.isFinite(tMs)) return null
   const candidatas: PerillaPublica[] = [
     ...(perillas.historial ?? []).filter((h) => h.machineId === machineId),
     ...(perillas.actual?.[machineId] ? [perillas.actual[machineId]] : []),
   ]
-  let vigente: { cpm: number; t: number } | null = null
+  let vigente: { entrada: PerillaPublica; t: number } | null = null
   for (const c of candidatas) {
     const t = Date.parse(c.desde)
     if (!Number.isFinite(t) || !Number.isFinite(c.cpm) || t > tMs) continue
-    if (!vigente || t >= vigente.t) vigente = { cpm: c.cpm, t }
+    if (!vigente || t >= vigente.t) vigente = { entrada: c, t }
   }
-  return vigente ? vigente.cpm : null
+  return vigente ? vigente.entrada : null
 }
 
 /**
@@ -120,6 +133,26 @@ export function umbralEntero(vara: { cpm: number | null; fuente: FuenteVara }): 
   if (vara.cpm == null || !(vara.cpm > 0)) return null
   return vara.fuente === 'perilla' ? umbralARitmo(vara.cpm) : Math.ceil(vara.cpm * 0.75 - EPSILON_UMBRAL)
 }
+
+/**
+ * Los dos enteros que separan los tonos de una vara, según `tonoVara` (la única regla): `aRitmo` es el primer entero «a ritmo»
+ * (el de `umbralEntero`) y `bajo` el primero «bajo»; de `bajo` a `aRitmo - 1` es «bajo» y debajo de `bajo` es «muy bajo».
+ * Si no hay ningún entero «bajo», `bajo` queda igual a `aRitmo`. Null sin vara.
+ */
+export function bandasEnteras(vara: { cpm: number | null; fuente: FuenteVara }): { aRitmo: number; bajo: number } | null {
+  const aRitmo = umbralEntero(vara)
+  if (aRitmo == null) return null
+  let bajo = aRitmo
+  for (let v = 0; v < aRitmo; v++) {
+    if (tonoVara(v, vara) !== 'mal') { bajo = v; break }
+  }
+  return { aRitmo, bajo }
+}
+
+/** «04-11»: día y mes de un `desde`. Se corta el texto (no se convierte): el `desde` ya viene en hora de planta. */
+export const diaMesPerilla = (desde: string): string => `${desde.slice(8, 10)}-${desde.slice(5, 7)}`
+/** «01:20»: la hora de un `desde`, sin convertir zona (misma convención que `diaMesPerilla`). */
+export const horaPerilla = (desde: string): string => desde.slice(11, 16)
 
 /**
  * `desde` de una anotación: la hora de PLANTA (America/Santiago) sellada como UTC, la
