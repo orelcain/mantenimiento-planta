@@ -8,7 +8,8 @@
  * El eje siempre abarca el turno COMPLETO; acercarse es zoom horizontal (`useZoomGesto`), no otro eje.
  */
 import type { DuenoPerdida, GrupoDelTurno } from '@/services/shoplogix/monitorEventos'
-import { ANDANDO_MIN_S, esMicroDetencion, llenadoDe, paradasPorMaquina, segundosCubiertos, tonoDe, type EntradaRitmoVivo, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
+import { ANDANDO_MIN_S, esMicroDetencion, llenadoDe, paradasPorMaquina, segundosCubiertos, tonoDe, varaEnMinuto, type EntradaRitmoVivo, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
+import type { PerillasDeLinea } from './perilla'
 import type { Ventana } from './useZoomGesto'
 
 // ── Formatos ─────────────────────────────────────────────────────────────────
@@ -353,11 +354,17 @@ export function sumaPorMinuto(maquinas: Array<{ cycles: number[] }>, n: number):
  * El esperado de la línea en cada minuto: la suma de los esperados de las máquinas QUE TIENEN ese minuto (la misma
  * base que `sumaPorMinuto`). null si alguna de ellas no tiene esperado, o si ninguna tiene el minuto.
  */
-export function esperadoPorMinuto(maquinas: Array<{ cycles: number[]; esperado: number | null }>, n: number): Array<number | null> {
+export function esperadoPorMinuto(
+  maquinas: Array<{ id?: string; cycles: number[]; esperado: number | null }>,
+  n: number,
+  vara?: { desde: string; perillas?: PerillasDeLinea | null } | null,
+): Array<number | null> {
+  const t0 = vara ? Date.parse(vara.desde) : NaN
   return Array.from({ length: n }, (_, k) => {
     const con = maquinas.filter((m) => k < m.cycles.length)
     if (con.length === 0 || con.some((m) => m.esperado == null || m.esperado <= 0)) return null
-    return con.reduce((a, m) => a + m.esperado!, 0)
+    /* Con `vara`, cada Baader aporta la vara de ESE minuto (perilla vigente o esperado de Shoplogix); sin ella, su esperado. */
+    return con.reduce((a, m) => a + (vara ? varaEnMinuto(m, t0, k, vara.perillas)! : m.esperado!), 0)
   })
 }
 
@@ -419,6 +426,7 @@ export function filasBaader(
   serie: { desde: string; maquinas: MaquinaSerie[] },
   n: number,
   paradas?: ParadasMaquina | null,
+  perillas?: PerillasDeLinea | null,
 ): Array<{ id: string; celdas: CeldaBaader[]; llenados: Array<number | null> }> {
   const entrada = {
     stopEvents: paradas?.stopEvents ?? null,
@@ -426,7 +434,7 @@ export function filasBaader(
     stopMachines: paradas?.stopMachines ?? null,
     enCurso: paradas?.enCurso ?? [],
   }
-  const { lineas } = llenadoDe({ serie, acumulado: null, ...entrada }, 0, n)
+  const { lineas } = llenadoDe({ serie, acumulado: null, perillas, ...entrada }, 0, n)
   const pp = paradasPorMaquina(entrada)
   const t0 = Date.parse(serie.desde)
   /* Cero de TODA la línea sin una parada de esa Baader que cubra el minuto (≥ 30 s): no se afirma que esté detenida. */
@@ -707,11 +715,13 @@ export const tamanoGrafico = (w: number): TamanoGrafico => (w >= 1480 ? 'grande'
  * `tira` px de la cinta de color: 1 min = 1 celda); `micro` el del carril «Micro».
  * En 1366 × 768 (`medio`) el acumulado y las barras ceden 56 y 10 px a las filas nuevas: el gráfico entra entero en la primera pantalla
  * (medido el 02-11: termina en el px 715); el rango y el resumen de micro quedan justo debajo (769 y 799). El acumulado no baja de 150.
+ * `lab` (rótulos de la izquierda) es 88 / 82 / 82: «Shoplogix 16» mide 79,2 px a 12 px (grande) y 72,6 px a 11 px (medio y celular),
+ * con cifras tabulares, y se ancla a 8 px del borde de la columna. Con 74 y 70 sobresalía por la izquierda (10,6 px en el celular).
  */
 const MEDIDAS: Record<TamanoGrafico, { lab: number; der: number; acum: number; barras: number; ev: number; carril: number; tira: number; micro: number }> = {
-  grande: { lab: 74, der: 128, acum: 290, barras: 84, ev: 14, carril: 34, tira: 9, micro: 16 },
-  medio: { lab: 70, der: 120, acum: 150, barras: 50, ev: 11, carril: 26, tira: 8, micro: 12 },
-  chico: { lab: 70, der: 0, acum: 160, barras: 48, ev: 10, carril: 26, tira: 7, micro: 12 },
+  grande: { lab: 88, der: 128, acum: 290, barras: 84, ev: 14, carril: 34, tira: 9, micro: 16 },
+  medio: { lab: 82, der: 120, acum: 150, barras: 50, ev: 11, carril: 26, tira: 8, micro: 12 },
+  chico: { lab: 82, der: 0, acum: 160, barras: 48, ev: 10, carril: 26, tira: 7, micro: 12 },
 }
 
 export interface Diseno {

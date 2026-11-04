@@ -6,7 +6,7 @@ import type { EstadoBaader } from './ejeTurno'
 import { filasBaader, minutosVisibles } from './ejeTurno'
 import type { EjeDatos } from './GraficoRitmoVivo'
 import type { MonitorV2Props } from './MonitorV2'
-import { paradasPorMaquina, segundosCubiertos } from './ritmoVivo'
+import { paradasPorMaquina, segundosCubiertos, varaEnMinuto } from './ritmoVivo'
 
 /* «Mal» con `--rv-mal` (monitorGlass.css, también lo usa el gráfico): un tono que se distingue del ámbar en barras y puntos chicos. */
 export const MAL = 'var(--rv-mal, var(--v2-mal))'
@@ -50,7 +50,7 @@ export function filasDeBaader(p: MonitorV2Props, e: EjeDatos | null): FilaBaader
   const minuto = e?.minuto ?? null
   if (minuto && minuto.maquinas.length > 0) {
     const n = minutosVisibles(minuto.maquinas, p.cerrado)
-    const celdas = n > 0 ? filasBaader(minuto, n, e?.paradasMaquina) : []
+    const celdas = n > 0 ? filasBaader(minuto, n, e?.paradasMaquina, e?.perillas) : []
     const paradas = e?.paradasMaquina ? paradasPorMaquina(e.paradasMaquina) : null
     const delContador = p.repro?.tope?.porMaquina ?? null
     return minuto.maquinas.map((q) => {
@@ -66,7 +66,7 @@ export function filasDeBaader(p: MonitorV2Props, e: EjeDatos | null): FilaBaader
         id: q.id, nombre: q.nombre,
         piezas: crudo != null && Number.isFinite(crudo) ? crudo : m?.piezas ?? q.cycles.reduce((a, b) => a + b, 0),
         ritmo: vivo && hay ? q.cycles[k] ?? 0 : null,
-        esperado: q.esperado,
+        esperado: varaEnMinuto(q, Date.parse(minuto.desde), Math.max(0, k), e?.perillas),
         promedio: m?.promedio ?? null,
         estado,
         llenado: vivo && hay ? fila?.llenados[k] ?? null : null,

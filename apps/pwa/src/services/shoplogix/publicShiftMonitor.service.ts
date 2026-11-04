@@ -117,6 +117,12 @@ export interface PublicMonitorLive {
    * `medidoEl`/`metodo`/`por` viajan porque la fuente es parte del dato.
    */
   setPoint?: { cpm: number; medidoEl: string | null; metodo: string | null; por: string | null } | null
+  /**
+   * Perillas (velocidad configurada en cada máquina) de la línea. `actual` = la
+   * vigente por máquina; `historial` = todas las anotaciones (máx. 100), la más
+   * nueva al final. Null si la línea no tiene ninguna perilla anotada.
+   */
+  perillas?: { actual: Record<string, { cpm: number; desde: string }>; historial: Array<{ cpm: number; desde: string; machineId: string }> } | null
   /** Nombre del turno según Shoplogix — con él se fija el cierre de ESTE turno. */
   shiftName?: string | null
   /** Turnos anteriores usados, cuando se aprendió del historial. */

@@ -42,6 +42,8 @@ import {
   tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
   type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type Tramo, type TonoRitmo, type Zoom,
 } from './ejeTurno'
+import { varaDeMinuto, varaEnMinuto } from './ritmoVivo'
+import type { FuenteVara, PerillasDeLinea } from './perilla'
 import { calibracionDe, type CalibracionPlanta } from './causasCalibracion'
 import { CAUSAS_MICRO, COLOR_CAUSA, clasificarMicros, motivoLegible, numerosPorCelda, observacionDeForma, type CausaMicro, type MicroClasificada } from './microCausa'
 import { ResumenCausasMicro } from './ResumenCausas'
@@ -72,7 +74,7 @@ export interface EjeDatos {
   /** La línea se ve detenida por el estado que ya existe (máquinas detenidas / `currentReason`). */
   detenidaEstado: boolean
   paradas: ParadaEje[]
-  /** Último % de llenado de cada máquina y su unidad (carros / silletas). */
+  /** Cifra del panel de cada máquina (promedio de 15 min, `llenadoDelPanel`; `ultimo` es el nombre de antes) y su unidad (carros / silletas). */
   llenado: Array<{ id: string; ultimo: number | null }> | null
   unidad: 'carros' | 'silletas' | null
   /**
@@ -90,6 +92,8 @@ export interface EjeDatos {
   microTotal?: number | null
   /** La planta del doc (`plantSlug`: chonchi, yal, filete): de ella salen los parámetros y la calibración de las causas de las micro. Ausente o sin calibración: no se estima la causa probable. */
   planta?: string | null
+  /** Perillas de la línea (`live.perillas`): la vara de cada minuto es la perilla vigente o, si no hay, el esperado de Shoplogix. */
+  perillas?: PerillasDeLinea | null
 }
 
 // ── Utilidades ───────────────────────────────────────────────────────────────
@@ -126,7 +130,7 @@ interface Modelo {
   esperadoLinea: number | null
   /** Tope de la escala de las barras por minuto (pz/min). */
   topBarra: number
-  maquinas: Array<{ id: string; nombre: string; esperado: number | null; cycles: number[]; celdas: CeldaBaader[]; llenados: Array<number | null>; pct: number | null; ultimoLlenado: number | null; anduvo: number | null }>
+  maquinas: Array<{ id: string; nombre: string; esperado: number | null; fuente: FuenteVara; esperadoK: Array<number | null>; cycles: number[]; celdas: CeldaBaader[]; llenados: Array<number | null>; pct: number | null; ultimoLlenado: number | null; anduvo: number | null }>
   /**
    * El minuto por dentro: las paradas de cada Baader al segundo (`paradasDetalle`) y, por Baader y por minuto de la serie, lo que ocupan
    * (`tramos`), los segundos que anduvo y su ritmo mientras anduvo. null sin paradas por máquina (doc anterior) o sin serie.
@@ -184,7 +188,7 @@ function lecturaDeMinuto(m: Modelo, k: number) {
   const det = m.detalle!
   const baaders: BaaderMinuto[] = m.maquinas.map((q, i) => {
     const mb = det.minutos[i]![k]!
-    return { id: q.id, nombre: etiquetaMaquina(q.nombre), esperado: q.esperado, piezas: k < q.cycles.length ? q.cycles[k]! : null, tono: q.celdas[k]?.tono ?? 'sin', tramos: mb.tramos, andandoS: mb.andandoS, ritmo: mb.ritmo }
+    return { id: q.id, nombre: etiquetaMaquina(q.nombre), esperado: q.esperadoK[k] ?? null, piezas: k < q.cycles.length ? q.cycles[k]! : null, tono: q.celdas[k]?.tono ?? 'sin', tramos: mb.tramos, andandoS: mb.andandoS, ritmo: mb.ritmo }
   })
   return lecturaDelMinuto({ iniMs: m.iniMs + (m.offsetMin + k) * 60_000, baaders, micros: m.micros })
 }
@@ -754,7 +758,16 @@ function RotulosIzq({ m }: { m: Modelo }) {
       )}
       {m.maquinas.map((q, i) => {
         const c = d.carriles[i]
-        return c ? <text key={q.id} x={xr} y={r1(c.y0 + c.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">{etiquetaMaquina(q.nombre)}</text> : null
+        if (!c) return null
+        /* Dos renglones por Baader: el nombre y, debajo, su vara («perilla 17»; sin perilla, «Shoplogix 16» en el tono de atento). */
+        return (
+          <g key={q.id}>
+            <text x={xr} y={r1(c.y0 + c.h / 2 - 2)} textAnchor="end" fontSize={fs} className="fill-foreground">{etiquetaMaquina(q.nombre)}</text>
+            {q.esperado != null && (q.fuente === 'perilla'
+              ? <text x={xr} y={r1(c.y0 + c.h / 2 + 10)} textAnchor="end" fontSize={fs} className="fill-muted-foreground tabular-nums">perilla {int(q.esperado)}</text>
+              : <text x={xr} y={r1(c.y0 + c.h / 2 + 10)} textAnchor="end" fontSize={fs} fontWeight={600} className="tabular-nums" style={{ fill: 'var(--v2-atento-texto)' }}>Shoplogix {int(q.esperado)}</text>)}
+          </g>
+        )
       })}
       <text x={xr} y={r1(d.paradas.y0 + d.paradas.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">Detenciones</text>
       {d.micro && <text x={xr} y={r1(d.micro.y0 + d.micro.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">Micro</text>}
@@ -891,7 +904,7 @@ function leer(m: Modelo, min: number, vivas?: CifrasVivas | null): LecturaGlobo 
     linea: enSerie ? m.suma[k]! : null,
     esperadoLinea: enSerie ? m.esperadoMin[k] ?? null : null,
     baaders: enSerie
-      ? m.maquinas.filter((q) => k < q.cycles.length).map((q) => ({ id: q.id, nombre: etiquetaMaquina(q.nombre), v: q.cycles[k] ?? 0, esperado: q.esperado, celda: q.celdas[k]! }))
+      ? m.maquinas.filter((q) => k < q.cycles.length).map((q) => ({ id: q.id, nombre: etiquetaMaquina(q.nombre), v: q.cycles[k] ?? 0, esperado: q.esperadoK[k] ?? null, celda: q.celdas[k]! }))
       : [],
     parada,
     paradaQuienes: quienes,
@@ -1365,9 +1378,9 @@ function InfoLeyenda({ ayuda }: { ayuda: string }) {
         <div id={id} role="tooltip" className="v2-tip absolute top-full z-20 mt-2 box-border rounded-[22px] px-4 py-3.5 text-[13px] leading-snug text-foreground" style={{ left: pos.izq, width: pos.ancho }}>
           <div className="font-semibold">Barras y filas Ev</div>
           <ul className="mt-1.5 grid gap-1 text-muted-foreground">
-            <li className="flex items-center gap-2">{cuadro('var(--v2-bien)')}75 % o más del esperado</li>
-            <li className="flex items-center gap-2">{cuadro('var(--v2-atento)')}entre 50 y 75 %</li>
-            <li className="flex items-center gap-2">{cuadro('var(--rv-mal)')}menos de 50 %</li>
+            <li className="flex items-center gap-2">{cuadro('var(--v2-bien)')}a ritmo: llega a la raya de su máquina</li>
+            <li className="flex items-center gap-2">{cuadro('var(--v2-atento)')}bajo: bajo la raya, pero la mitad o más</li>
+            <li className="flex items-center gap-2">{cuadro('var(--rv-mal)')}muy bajo: menos de la mitad</li>
           </ul>
           <div className="mt-3 font-semibold">Detenciones, por dueño</div>
           <ul className="mt-1.5 grid gap-1 text-muted-foreground">
@@ -1496,13 +1509,15 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     const tope = Math.max(p.meta ?? 0, proy?.hasta.v ?? 0, ultima.v, maxV(objetivo), maxV(previoPts))
     const { max: yMax, rejilla } = escalaAcumulado(tope)
 
-    const filas = conSerie ? filasBaader({ desde: minuto.desde, maquinas: minuto.maquinas }, n, e.paradasMaquina) : []
+    const filas = conSerie ? filasBaader({ desde: minuto.desde, maquinas: minuto.maquinas }, n, e.paradasMaquina, e.perillas) : []
     const maquinas = conSerie
       ? minuto.maquinas.map((q) => {
         const celdas = filas.find((f) => f.id === q.id)?.celdas ?? []
         const llenados = filas.find((f) => f.id === q.id)?.llenados ?? []
         const anduvo = e.ritmoAnduvo?.find((r) => r.nombre.trim() === q.nombre.trim())?.cpm
-        return { id: q.id, nombre: q.nombre, esperado: q.esperado, cycles: q.cycles, celdas, llenados, pct: pctAndando(celdas), ultimoLlenado: e.llenado?.find((l) => l.id === q.id)?.ultimo ?? null, anduvo: anduvo != null && Number.isFinite(anduvo) ? anduvo : null }
+        /* `esperadoK`: la vara de CADA minuto de esta Baader (el globo y su cifra «de X» leen ese minuto); `esperado` es la del último. */
+        const esperadoK = Array.from({ length: n }, (_, k) => varaEnMinuto(q, Date.parse(minuto.desde), k, e.perillas))
+        return { id: q.id, nombre: q.nombre, esperado: esperadoK[Math.max(0, n - 1)] ?? null, fuente: varaDeMinuto(q, Date.parse(minuto.desde), Math.max(0, n - 1), e.perillas).fuente, esperadoK, cycles: q.cycles, celdas, llenados, pct: pctAndando(celdas), ultimoLlenado: e.llenado?.find((l) => l.id === q.id)?.ultimo ?? null, anduvo: anduvo != null && Number.isFinite(anduvo) ? anduvo : null }
       })
       : []
     /* Micro con hora: solo si el doc dice de qué Baader fue cada parada. Las que ya pasaron (no las del minuto que aún no llega). */
@@ -1513,7 +1528,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
       ? clasificarMicros({ serie: e.minuto, stopEvents: pm?.stopEvents, stopReasons: pm?.stopReasons, stopMachines: pm?.stopMachines, inicioTurnoMs: e.iniMs, planta: e.planta })
         .filter((q) => { const mn = (q.inicioMs - e.iniMs) / 60_000; return mn >= 0 && mn < totalMin && mn <= ultima.min })
       : []
-    const esperadoLinea = conSerie && minuto.maquinas.every((q) => q.esperado != null) ? minuto.maquinas.reduce((a, q) => a + (q.esperado ?? 0), 0) : null
+    const esperadoLinea = conSerie && minuto.maquinas.every((q) => q.esperado != null) ? minuto.maquinas.reduce((a, q) => a + (varaEnMinuto(q, Date.parse(minuto.desde), Math.max(0, n - 1), e.perillas) ?? 0), 0) : null
     const d = disenar(w, tamanoGrafico(w), maquinas.length, conSerie, conMicro)
     const detalle = conMicro && minuto && pm ? detalleDeMinutos(maquinas, minuto.desde, n, pm) : null
     let enCurso: Modelo['enCurso'] = null
@@ -1523,7 +1538,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     }
     return {
       w, d, iniMs: e.iniMs, totalMin, yMin: 0, yMax, rejilla, vent: null, n, offsetMin, suma, completos: conSerie ? minutosCompletos(minuto.maquinas) : 0,
-      esperadoMin: conSerie ? esperadoPorMinuto(minuto.maquinas, n) : [], esperadoLinea, topBarra: Math.ceil((Math.max(esperadoLinea ?? 0, ...suma, 10) * 1.15) / 10) * 10, maquinas, trazo, previa, ultima, proy, detenida,
+      esperadoMin: conSerie ? esperadoPorMinuto(minuto.maquinas, n, { desde: minuto.desde, perillas: e.perillas }) : [], esperadoLinea, topBarra: Math.ceil((Math.max(esperadoLinea ?? 0, ...suma, 10) * 1.15) / 10) * 10, maquinas, trazo, previa, ultima, proy, detenida,
       meta: p.meta, objetivo, previoPts, previoLabel: p.curva?.previo?.label ?? null, previoCifra, finReal: finReal != null, cuota: p.cuota ?? null, aHora, cuotaEn, paradas: e.paradas,
       enCurso, cerrado: p.cerrado, unidad: e.unidad, micros, conMicro, microTotal: e.microTotal ?? null, detalle,
     }

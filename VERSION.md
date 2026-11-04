@@ -1,14 +1,27 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v4.10.1**
+## Versión Actual: **v4.11.0**
 
-**Fecha de lanzamiento**: 4 de agosto de 2026  \
+**Fecha de lanzamiento**: 4 de noviembre de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v4.11.0 — Monitor: la perilla de cada Baader pasa a ser la vara (04/11/2026)
+- 🎛️ **Perilla por Baader**: un admin anota la velocidad de la perilla de cada máquina (pz/min), con fecha en hora de planta e historial. Se guarda en `graderModuleConfigs`, y `firestore.rules` deja escribirla solo a admin. Llega al monitor público por `loadPlannedShift`, sin el nombre de quien la anotó
+- 📏 **La vara de «Ritmo en vivo» es la perilla** vigente en cada minuto. Sin perilla anotada sigue la de Shoplogix, igual que antes
+- ✅ **Con perilla, «a ritmo» es la perilla completa**: con 17, 17 o más por minuto. Sin perilla sigue el 75 % de la meta de Shoplogix
+- 📊 **Dos números por máquina en la franja**, con la vara escrita bajo el nombre:
+  - «carros con pieza», que cuenta solo mientras la Baader anda, como su pantalla;
+  - «minutos a ritmo», que cuenta todo el turno, así que cada detención resta.
+- ✏️ **Editor de la perilla** dentro de la franja, solo para admin, con historial. Muestra el nombre visible, nunca el correo completo
+- 📈 **Panel de 15 minutos**: la cifra es el promedio de la ventana (Σ piezas ÷ Σ de lo que daba andando), ya no el último minuto. La raya marca «a ritmo» con su entero: «17 o más» con perilla, «12 o más» sin ella
+- 🏷️ **La vara en el gráfico**: bajo cada Baader dice «perilla 17» o, sin perilla anotada, «Shoplogix 16»
+- ⚖️ **No cambian el Duelo, la cascada, el OEE ni los KPI**: siguen contra la meta de Shoplogix. La cascada y la pérdida «perilla bajo la meta» van en la fase B
+- 🚀 **Al mergear a `main`** se despliegan solas las reglas de Firestore (`deploy-firestore-rules.yml`, porque cambia `firestore.rules`) y las Cloud Functions (`deploy-functions.yml`)
 
 ### v4.0.0 — Variadores, matriz de turnos y auditoría de Aprendizaje (04/08/2026)
 - ⚡ **Catálogo de variadores**: 8 fichas, ~300 parámetros en 61 menús verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»

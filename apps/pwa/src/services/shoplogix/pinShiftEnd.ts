@@ -16,6 +16,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from '@/services/firestoreTracked'
 import { db } from '../firebase'
 import type { PlantSlug } from './shoplogixMachines'
+import { construirPerilla } from '@/lib/horaDePlanta'
 
 const COLLECTION = 'graderModuleConfigs'
 
@@ -151,6 +152,76 @@ export async function setMonitorSetPoint(params: {
     monitorSetPointHistorial: [...historial, ...(previo ? [previo] : [])].slice(-20),
     updatedAt: serverTimestamp(),
   }, { merge: true })
+}
+
+/**
+ * Velocidad de la perilla de UNA máquina, en pz/min. `desde` es ISO y marca
+ * cuándo entró en vigor: al anotar es siempre «ahora». `por` es quién la anotó.
+ */
+export type PerillaMaquina = {
+  cpm: number
+  desde: string
+  por: string | null
+}
+
+/** Una entrada del historial de perillas: la máquina y lo que se anotó para ella. */
+export type PerillaHistorial = PerillaMaquina & { machineId: string }
+
+/** El historial guarda como máximo estas entradas; la más vieja sale primero. */
+const HISTORIAL_PERILLAS_MAX = 100
+
+/**
+ * Anota la velocidad de la perilla de UNA máquina de la línea.
+ *
+ * Documento: el mismo que lee `loadPlannedShift` (functions/publicMonitor.js) para
+ * esa línea. Se resuelve con `CONFIG_DOC_ID[plantSlug]`, la misma tabla que usa el
+ * backend: chonchi → `global`, yal → `yal-eviscerado`, filete → `chonchi-filete`.
+ * Si las dos tablas divergieran, la anotación quedaría en un documento que nadie
+ * lee, por eso no hay una segunda tabla aquí.
+ *
+ * `desde` es siempre el momento de anotar: no se acepta una fecha de vigencia
+ * anterior, porque fecharla hacia atrás cambiaría lo que ya se midió.
+ *
+ * Quién puede escribir: solo admin. Las reglas de `graderModuleConfigs` lo exigen
+ * con `affectedKeys` sobre `monitorPerillas` y `monitorPerillasHistorial`. Esta
+ * función no vuelve a comprobar el rol: la UI lo oculta y las reglas lo bloquean.
+ */
+export async function setMonitorPerilla(params: {
+  plantSlug: PlantSlug | string
+  machineId: string
+  cpm: number
+  por: string | null
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  if (!params.machineId) throw new Error('Falta la máquina de la perilla')
+  if (!(params.cpm >= 5 && params.cpm <= 30)) throw new Error('Perilla fuera de rango (5 a 30 pz/min)')
+
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const historialPrevio: PerillaHistorial[] = Array.isArray(snap.data()?.monitorPerillasHistorial)
+    ? snap.data()!.monitorPerillasHistorial
+    : []
+  const nueva: PerillaMaquina = construirPerilla({ cpm: params.cpm, por: params.por, nowMs: Date.now() })
+  await setDoc(ref, {
+    // Merge profundo: escribe solo esta máquina y deja intactas las demás.
+    monitorPerillas: { [params.machineId]: nueva },
+    monitorPerillasHistorial: [...historialPrevio, { ...nueva, machineId: params.machineId }].slice(-HISTORIAL_PERILLAS_MAX),
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
+}
+
+/**
+ * El historial de perillas de la línea, tal como se guardó (el más viejo primero). Lo lee el editor de la franja, y solo un
+ * admin lo abre: el monitor público no trae `por`, así que quien anotó sale de aquí. La regla de lectura es la de Firestore
+ * (`graderModuleConfigs` lo deja leer a cualquier sesión). Sin documento o sin historial, lista vacía.
+ */
+export async function leerPerillasHistorial(plantSlug: PlantSlug | string): Promise<PerillaHistorial[]> {
+  const docId = CONFIG_DOC_ID[plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${plantSlug}`)
+  const snap = await getDoc(doc(db, COLLECTION, docId))
+  const historial = snap.data()?.monitorPerillasHistorial
+  return Array.isArray(historial) ? (historial as PerillaHistorial[]) : []
 }
 
 /**

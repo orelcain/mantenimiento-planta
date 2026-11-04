@@ -14,7 +14,7 @@
  * Vistas: `CabeceraV2`, `MonitorV2` (El turno) y los tipos de Análisis (la vista vive en `AnalisisV2`).
  */
 /* eslint-disable react-refresh/only-export-components -- el formato y los primitivos se comparten con AnalisisV2 (a esos solo se les agregó `export`) */
-import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Clock, Cpu, Filter, Minimize2, Wrench, X } from 'lucide-react'
+import { CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Clock, Cpu, Filter, Info, Minimize2, Wrench, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
@@ -31,7 +31,10 @@ import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
-import { etiquetaMaquina } from './ritmoVivo'
+import { etiquetaMaquina, varaDeMinuto, type VaciosTurno } from './ritmoVivo'
+import { bandasEnteras, diaMesPerilla, perillaVigenteEn, tonoVara, umbralEntero, type FuenteVara, type PerillaPublica, type PerillasDeLinea } from './perilla'
+import { EditorPerilla, type PerillaEditorDatos } from './EditorPerilla'
+import { useIsAdmin } from '@/store/authStore'
 import type { PestanaMonitor } from './BarraLateralPC'
 import { horaDelCuadro, minutoDeDatos, piezasMostradas } from './aEstaHora'
 import { useCifrasVivas, VistaVivaCtx, type VistaViva } from './useCifrasVivas'
@@ -312,11 +315,23 @@ export interface EventoMarcado {
 }
 
 type TonoMinuto = 'ok' | 'warn' | 'crit' | 'sin'
-/** Los cortes de Shoplogix en sus barras: ≥75 % del esperado ok, 50-75 atención, <50 crítico. */
-function tonoMinuto(v: number, esperado: number | null): TonoMinuto {
-  if (esperado == null || esperado <= 0) return v > 0 ? 'ok' : 'sin'
-  const r = v / esperado
-  return r >= 0.75 ? 'ok' : r >= 0.5 ? 'warn' : 'crit'
+/** Una vara de minuto: su valor y de dónde sale (perilla o Shoplogix). */
+export type VaraDeMinuto = { cpm: number | null; fuente: FuenteVara }
+/** Tono de un minuto contra SU vara: con perilla, «a ritmo» es la perilla completa; sin perilla, el 75 % de siempre. */
+function tonoDeMinuto(v: number, vara: VaraDeMinuto): TonoMinuto {
+  const t = tonoVara(v, vara)
+  return t === 'bien' ? 'ok' : t === 'atento' ? 'warn' : t === 'mal' ? 'crit' : 'sin'
+}
+
+/**
+ * % de los `n` minutos en que la fila anduvo a ritmo, cada minuto contra SU vara (`varaK[k]`, con su fuente). Null si la fila
+ * no tiene esperado de Shoplogix o no hay minutos. Puro: lo prueba `__tests__/perillaConsumidores.test.ts`.
+ */
+export function pctARitmoFila(cycles: number[], varaK: VaraDeMinuto[], n: number, esperado: number | null): number | null {
+  if (esperado == null || n === 0) return null
+  let ok = 0
+  for (let k = 0; k < n; k++) if (tonoDeMinuto(cycles[k] ?? 0, varaK[k] ?? { cpm: null, fuente: 'shoplogix' }) === 'ok') ok++
+  return Math.round((ok / n) * 100)
 }
 /* Paleta calma: lo normal va en el acento y solo lo que se queda atrás toma color (ámbar y coral apagados). */
 const COLOR_MINUTO: Record<TonoMinuto, string> = {
@@ -335,9 +350,23 @@ const PX_NUMERO_V2 = 15
 const PAD_MINUTO = 12
 const PASOS_MARCA = [5, 10, 15, 30, 60, 120]
 
+/** Una cifra de la franja: el porcentaje y, si hay, una línea corta debajo. Ancho fijo (clase de Tailwind: 72 o 80 px bajo 640 px, 76 o 120 desde 640): las columnas cuadran con sus rótulos de arriba. */
+function CifraFranja({ ancho, valor, pie, principal }: { ancho: string; valor: number | null; pie?: ReactNode; principal: boolean }) {
+  return (
+    <div className={`text-right ${ancho}`}>
+      <span className={`${principal ? 'text-[28px] lg:text-[34px]' : 'text-[22px]'} font-semibold leading-none tabular-nums tracking-tight`}>
+        {valor != null ? Math.round(valor) : '—'}
+      </span>
+      {valor != null && <span className="text-[13px] text-muted-foreground"> %</span>}
+      {pie && <div className="text-[12px] leading-snug text-muted-foreground">{pie}</div>}
+    </div>
+  )
+}
+
 /**
  * Una franja por máquina y arriba la línea (la suma), una barra por minuto del turno.
- * Cada franja abre con su cifra: qué parte de los minutos del turno anduvo a ritmo (≥75 % del esperado).
+ * Cada franja abre con sus dos cifras: carros con pieza (lo que contó sobre lo que daba andando, con la vara de cada minuto) y
+ * minutos a ritmo (sobre todo el turno: la detención resta). Bajo el nombre va su vara, y con `perillaEditor` (solo admin) el editor.
  *
  * El zoom es el del clásico (`useZoomGesto`): en el celular abre en los últimos minutos con la
  * cifra adentro de cada barra y siguiendo el presente; se pellizca para acercar o alejar, se
@@ -345,10 +374,17 @@ const PASOS_MARCA = [5, 10, 15, 30, 60, 120]
  * abre con el turno completo. Pasar el mouse o tocar marca el mismo minuto en todas las franjas.
  * Las cabeceras quedan pegadas al borde visible mientras el contenido se desplaza.
  */
-export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
-  d: MinutoTurno; cerrado: boolean; marca?: EventoMarcado | null; onQuitarMarca?: () => void
+export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carros, perillaEditor }: {
+  d: MinutoTurno; cerrado: boolean; marca?: EventoMarcado | null; onQuitarMarca?: () => void; perillas?: PerillasDeLinea | null
+  /** Carros con pieza del turno completo (`vaciosTurnoDe` sobre la serie entera). La franja no los recalcula: la Baader elegida no cambia la regla. */
+  carros?: VaciosTurno | null
+  /** Quién puede anotar la perilla (solo admin): la línea y quien firma. Sin ella, la franja no ofrece el editor. */
+  perillaEditor?: PerillaEditorDatos | null
 }) {
   const [i, setI] = useState<number | null>(null)
+  const esAdmin = useIsAdmin()
+  const [editando, setEditando] = useState<string | null>(null)
+  const [infoAbierta, setInfoAbierta] = useState(false)
   const t0 = Date.parse(d.desde)
   /* Sin máquinas, Math.min() da Infinity y el Array.from de abajo revienta. */
   let n = d.maquinas.length ? Math.min(...d.maquinas.map((m) => m.cycles.length)) : 0
@@ -421,25 +457,52 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
   }, [marcaClave])
 
   const varias = d.maquinas.length > 1
+  /* La vara de cada minuto: la perilla vigente o, si no hay, el esperado de Shoplogix (sin perillas, el mismo esperado de siempre).
+     El escalar de la fila («esperado N pz/min», la referencia) va con el último minuto. */
+  const kUlt = Math.max(0, n - 1)
+  const varasDeLinea = (k: number) => d.maquinas.map((m) => varaDeMinuto(m, t0, k, perillas))
+  /* La línea va a ritmo con la perilla completa solo si TODAS sus Baaders la tienen en ese minuto; si una va con el esperado
+     de Shoplogix, la línea va al 75 % de la suma (igual que el mockup aprobado: 37 con 17 + 16 + 16 y una sin perilla). */
+  const varaLineaK: VaraDeMinuto[] = Array.from({ length: n }, (_, k) => {
+    const vs = varasDeLinea(k)
+    if (!vs.every((v) => v.cpm != null)) return { cpm: null, fuente: 'shoplogix' }
+    return { cpm: vs.reduce<number>((a, v) => a + (v.cpm ?? 0), 0), fuente: vs.every((v) => v.fuente === 'perilla') ? 'perilla' : 'shoplogix' }
+  })
   const filas = [
     ...(varias
       ? [{
           nombre: 'Línea',
           nota: `las ${d.maquinas.length} suman`,
-          esperado: d.maquinas.every((m) => m.esperado != null) ? d.maquinas.reduce((a, m) => a + (m.esperado ?? 0), 0) : null,
+          esperado: d.maquinas.every((m) => m.esperado != null) ? varasDeLinea(kUlt).reduce<number>((a, v) => a + (v.cpm ?? 0), 0) : null,
+          esperadoK: varaLineaK.map((v) => v.cpm),
+          varaK: varaLineaK,
           cycles: suma,
           principal: true,
           id: null as string | null,
+          meta: null as number | null,
+          vigente: null as PerillaPublica | null,
         }]
       : []),
-    ...d.maquinas.map((m) => ({ nombre: m.nombre, nota: null as string | null, esperado: m.esperado, cycles: m.cycles, principal: !varias, id: m.id as string | null })),
+    ...d.maquinas.map((m) => {
+      const varaK = Array.from({ length: n }, (_, k) => varaDeMinuto(m, t0, k, perillas))
+      return {
+        nombre: m.nombre, nota: null as string | null, esperado: varaDeMinuto(m, t0, kUlt, perillas).cpm,
+        esperadoK: varaK.map((v) => v.cpm), varaK,
+        cycles: m.cycles, principal: !varias, id: m.id as string | null,
+        /* La meta es el esperado de Shoplogix tal cual (sin perilla); la vara de la fila ya es la perilla cuando la hay. */
+        meta: m.esperado, vigente: perillaVigenteEn(perillas, m.id, t0 + kUlt * 60_000),
+      }
+    }),
   ]
-  const aRitmo = (f: (typeof filas)[number]) => {
-    if (f.esperado == null || n === 0) return null
-    let ok = 0
-    for (let k = 0; k < n; k++) if (tonoMinuto(f.cycles[k] ?? 0, f.esperado) === 'ok') ok++
-    return Math.round((ok / n) * 100)
+  const aRitmo = (f: (typeof filas)[number]) => pctARitmoFila(f.cycles, f.varaK, n, f.esperado)
+  /* Carros con pieza: el de cada Baader; la línea, la suma, solo si todas tienen vara (como su esperado). */
+  const carrosDe = (id: string | null): number | null => {
+    if (!carros) return null
+    if (id == null) return d.maquinas.every((m) => m.esperado != null) ? carros.linea.pct : null
+    return carros.maquinas.find((x) => x.id === id)?.pct ?? null
   }
+  /* El editor de la perilla: solo admin y solo si la página lo ofrece (línea vigente, sesión con datos). */
+  const puedeEditar = esAdmin && perillaEditor != null
   const indice = (e: { clientX: number; currentTarget: HTMLDivElement }) => {
     const r = e.currentTarget.getBoundingClientRect()
     const ancho = r.width - 2 * PAD_MINUTO
@@ -457,6 +520,12 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
 
   return (
     <div ref={medidorRef} className="mt-4">
+      {/* Rótulos una sola vez, arriba: cada columna cuadra con su cifra en cada franja (mismo ancho y mismo margen derecho).
+          Bajo 640 px cada rótulo se parte dentro de su columna (72 y 80 px; el mockup aprobado usa 72 en las dos); desde 640 px, como antes. */}
+      <div className="flex justify-end gap-3.5 pr-3 text-right text-[12px] leading-[15px] text-muted-foreground">
+        <span className="w-[72px] sm:w-[76px]">carros <br className="sm:hidden" />con pieza</span>
+        <span className="w-[80px] sm:w-[120px]">minutos <br className="sm:hidden" />a ritmo</span>
+      </div>
       <div {...zg.props} className="v2-minuto-scroll relative overflow-x-auto" style={{ touchAction: 'pan-x pan-y', scrollbarWidth: 'none' }}>
         <div
           className="relative cursor-crosshair select-none"
@@ -468,6 +537,8 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
           {filas.map((f) => {
             const tope = Math.max(1, (f.esperado ?? 0) * 1.15, ...f.cycles.slice(0, n))
             const pct = aRitmo(f)
+            /* «con N o más por minuto»: el umbral entero de la vara vigente al final del turno (con perilla, la perilla completa). */
+            const umbral = f.varaK[kUlt] ? umbralEntero(f.varaK[kUlt]) : null
             const yEsperado = f.esperado != null ? (f.esperado / tope) * 100 : null
             /* La parada marcada vive DENTRO de las barras de su máquina (y de la línea, que la suma):
                sus minutos quedan plenos sobre un fondo tenue y el resto se apaga. Las otras máquinas
@@ -484,7 +555,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
                   <div className="v2-subtarjeta pointer-events-none sticky left-0 col-start-1 row-start-1 rounded-card" style={{ width: anchoPx || undefined }} />
                 )}
                 <div className={`relative col-start-1 row-start-1 ${f.principal ? 'py-3 lg:py-4' : ''}`} style={{ paddingInline: PAD_MINUTO }}>
-                  <div className="sticky z-10 mb-2 flex items-end justify-between gap-3" style={pegado}>
+                  <div className="sticky z-10 mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:justify-between" style={pegado}>
                     <div className="min-w-0">
                       <div className={f.principal ? 'text-[15px] font-semibold text-foreground' : 'text-[14px] font-medium text-foreground'}>
                         {f.nombre}
@@ -492,17 +563,43 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
                       </div>
                       <div className="text-[13px] tabular-nums text-muted-foreground">
                         {i != null
-                          ? <><b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b>{f.esperado != null ? ` de ${dec(f.esperado, 0)} esperadas` : ''} a las {relojDe(t0 + i * 60_000)}</>
-                          : f.esperado != null ? `esperado ${dec(f.esperado, 0)} pz/min` : 'pz por minuto'}
+                          ? <><b className="font-semibold text-foreground">{int(f.cycles[i] ?? 0)} pz</b>{f.esperadoK[i] != null ? ` de ${dec(f.esperadoK[i]!, 0)} esperadas` : ''} a las {relojDe(t0 + i * 60_000)}</>
+                          : f.principal
+                            ? (f.esperado != null ? `esperado ${dec(f.esperado, 0)} pz/min` : 'pz por minuto')
+                            : <>{f.vigente
+                                ? <>perilla {int(f.vigente.cpm)} · anotada {diaMesPerilla(f.vigente.desde)}</>
+                                : <span style={{ color: 'var(--v2-atento-texto)' }}>sin perilla anotada</span>}
+                              {f.meta != null ? ` · meta Shoplogix ${dec(f.meta, 0)}` : ''}</>}
                       </div>
+                      {puedeEditar && !f.principal && f.id != null && (
+                        <button
+                          type="button"
+                          aria-expanded={editando === f.id}
+                          onClick={() => setEditando(editando === f.id ? null : f.id)}
+                          className="tap-44 mt-0.5 block text-left text-[13px] font-semibold text-brand-ink"
+                        >
+                          {f.vigente ? 'Cambiar perilla' : 'Anotar perilla'}
+                        </button>
+                      )}
                     </div>
-                    {pct != null && (
-                      <div className="shrink-0 text-right">
-                        <span className={`${f.principal ? 'text-[28px] lg:text-[34px]' : 'text-[20px]'} font-semibold leading-none tabular-nums tracking-tight`}>{pct}</span>
-                        <span className="text-[13px] text-muted-foreground"> % a ritmo</span>
-                      </div>
-                    )}
+                    <div className="flex shrink-0 gap-3.5">
+                      <CifraFranja ancho="w-[72px] sm:w-[76px]" valor={carrosDe(f.id)} principal={f.principal} />
+                      <CifraFranja ancho="w-[80px] sm:w-[120px]" valor={pct} pie={umbral != null ? <>con {umbral} o más <br className="sm:hidden" />por minuto</> : null} principal={f.principal} />
+                    </div>
                   </div>
+                  {editando === f.id && puedeEditar && perillaEditor && f.id != null && (
+                    <div className="sticky z-10" style={pegado}>
+                      <EditorPerilla
+                        machineId={f.id}
+                        nombre={f.nombre}
+                        datos={perillaEditor}
+                        vigente={f.vigente}
+                        meta={f.meta}
+                        perillas={perillas}
+                        onCerrar={() => setEditando(null)}
+                      />
+                    </div>
+                  )}
                   <div className={`relative flex items-end ${f.principal ? 'h-28 lg:h-36' : 'h-10 lg:h-12'}`} style={{ gap: separadas ? 2 : 0 }}>
                     {filaMarcada && (
                       <span
@@ -514,7 +611,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
                       <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
                     )}
                     {f.cycles.slice(0, n).map((v, k) => {
-                      const t = tonoMinuto(v, f.esperado)
+                      const t = tonoDeMinuto(v, f.varaK[k] ?? { cpm: null, fuente: 'shoplogix' })
                       return (
                         <span
                           key={k}
@@ -573,11 +670,37 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca }: {
         {(['ok', 'warn', 'crit'] as const).map((t) => (
           <span key={t} className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR_MINUTO[t] }} />
-            {t === 'ok' ? 'a ritmo (75 % o más del esperado)' : t === 'warn' ? '50 a 75 %' : 'menos de 50 %'}
+            {t === 'ok' ? 'a ritmo' : t === 'warn' ? 'bajo' : 'muy bajo'}
           </span>
         ))}
+        <button
+          type="button"
+          aria-label="Enteros de cada máquina"
+          aria-expanded={infoAbierta}
+          onClick={() => setInfoAbierta((v) => !v)}
+          className="tap-44 inline-flex h-[22px] w-[22px] items-center justify-center rounded-full text-muted-foreground"
+          style={{ border: '1px solid currentColor' }}
+        >
+          <Info className={ic} aria-hidden />
+        </button>
         <span className="ml-auto">{cerrado ? 'turno cerrado' : `hasta las ${relojDe(t0 + (n - 1) * 60_000)}`}</span>
       </div>
+      {infoAbierta && (
+        <ul className="v2-subtarjeta mt-2 space-y-1 rounded-card px-3 py-2 text-[13px] leading-snug text-muted-foreground">
+          {d.maquinas.map((m) => {
+            const b = bandasEnteras(varaDeMinuto(m, t0, kUlt, perillas))
+            const texto = b == null
+              ? 'sin vara para juzgar sus minutos'
+              : b.bajo < b.aRitmo
+                ? `a ritmo con ${b.aRitmo} o más; bajo de ${b.bajo} a ${b.aRitmo - 1}; muy bajo con ${b.bajo - 1} o menos`
+                : `a ritmo con ${b.aRitmo} o más; muy bajo con ${b.aRitmo - 1} o menos`
+            return <li key={m.id}>{etiquetaMaquina(m.nombre)}: {texto}</li>
+          })}
+        </ul>
+      )}
+      <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+        <b className="font-semibold text-foreground">Carros con pieza</b> cuenta solo mientras la Baader anda, como su pantalla. <b className="font-semibold text-foreground">Minutos a ritmo</b> cuenta todo el turno: cada detención resta.
+      </p>
       <div className="mt-2 flex items-center justify-between gap-3 text-[13px] text-muted-foreground">
         <span>{zg.acercado ? 'arrastra para recorrer el turno' : 'pellizca o usa ctrl + rueda para acercar'}</span>
         {zg.acercado && (

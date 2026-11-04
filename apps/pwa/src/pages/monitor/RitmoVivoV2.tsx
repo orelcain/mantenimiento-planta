@@ -19,6 +19,8 @@ import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
 import { Globo } from './AmpliarV2'
 import { useCuentaCifra } from './ampliarHooks'
 import { MinutoTurnoV2, type EventoMarcado, type MinutoTurno } from './MonitorV2'
+import { rotuloRaya, tonoDePorcentajeVara, umbralEntero, type FuenteVara, type PerillasDeLinea } from './perilla'
+import type { PerillaEditorDatos } from './EditorPerilla'
 import { ReglasMinuto } from './ReglasMinuto'
 import {
   MICRO_MAX_MEDIDO_S,
@@ -33,6 +35,7 @@ import {
   type RitmoVivo,
   type Senal,
   type Tono,
+  type VaciosTurno,
   type VistaSerie,
 } from './ritmoVivo'
 
@@ -41,7 +44,11 @@ const COLOR: Record<Tono, string> = { bien: 'var(--v2-bien)', atento: 'var(--v2-
 const TEXTO_TONO: Record<Tono, string> = { bien: 'var(--v2-bien)', atento: 'var(--v2-atento-texto)', mal: 'var(--v2-mal-texto)' }
 const DOT: Record<Senal['tono'], string> = { atento: 'var(--v2-atento)', mal: 'var(--v2-mal)', neutra: 'var(--v2-gris)' }
 const hhmmss = (ms: number) => new Date(ms).toISOString().slice(11, 19)
-const pct = (frac: number): Tono => (frac >= 0.75 ? 'bien' : frac >= 0.5 ? 'atento' : 'mal')
+/** El color de una cifra de carros según su tono con la vara de su fila (la misma regla de «a ritmo» que la franja). Sin vara, sin color. */
+const colorDeCifra = (cifra: number | null, vara: { cpm: number | null; fuente: FuenteVara }): string | undefined => {
+  const t = tonoDePorcentajeVara(cifra, vara)
+  return t === 'sin' ? undefined : TEXTO_TONO[t]
+}
 
 /** Ancho real del contenedor: el SVG se dibuja a tamaño de pantalla, no escalado. */
 function useAncho<T extends HTMLElement>() {
@@ -199,10 +206,10 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
   const lineas = r.lineas
   const n = lineas[0]?.fills.length ?? 0
   if (!n) return null
-  const lc = ancho < 500 ? 64 : 88
+  const lc = ancho < 500 ? 72 : 88
   const pw = ancho - lc - 8
   const slot = pw / n
-  const rh = ancho < 500 ? 52 : 60
+  const rh = ancho < 500 ? 56 : 60
   const gp = 12
   const tot = lineas.length * rh + (lineas.length - 1) * gp
   const x = (i: number) => lc + (i + 0.5) * slot
@@ -228,7 +235,7 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
             return (
               <div key={l.id} className="tabular-nums" style={{ opacity: sel !== SEL_LINEA && sel !== l.id ? 0.55 : 1 }}>
                 <span className="text-muted-foreground">{etiquetaMaquina(l.nombre)} · </span>
-                {f != null ? <b style={{ color: TEXTO_TONO[pct(f / 100)] }}>{f} %</b> : <span className="text-muted-foreground">sin dato</span>}
+                {f != null ? <b style={{ color: colorDeCifra(f, { cpm: l.esperado, fuente: l.fuente }) }}>{f} %</b> : <span className="text-muted-foreground">sin dato</span>}
                 {ms.map((q) => <span key={q.inicioMs} className="rv-micro-txt"> <i className="rv-micro-marca" aria-hidden />micro {cronometro(q.duracionS)}</span>)}
               </div>
             )
@@ -243,10 +250,17 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
         {lineas.map((l, k) => {
           const y0 = k * (rh + gp)
           const atenuada = sel !== SEL_LINEA && sel !== l.id
-          const u = ultimo(l)
-          /* Como en el mockup: cada franja toma el tono de SU último llenado (≥75 % bien, 50–75 atento, <50 mal). */
-          const tonoU = u != null ? pct(u / 100) : null
-          const color = tonoU ? COLOR[tonoU] : 'var(--v2-gris)'
+          /* La cifra de la fila es el promedio de la ventana de la franja (Σ piezas ÷ Σ vara × andando), no el último minuto. Su color
+             sale de la misma regla que la raya («a ritmo»). */
+          const vara = { cpm: l.esperado, fuente: l.fuente }
+          const prom = r.carrosVentana.maquinas.find((x) => x.id === l.id)?.pct ?? null
+          const tonoP = tonoDePorcentajeVara(prom, vara)
+          const color = tonoP === 'sin' ? 'var(--v2-gris)' : COLOR[tonoP]
+          /* La raya «a ritmo» de la vara: su entero (con perilla, la perilla completa: 100 %; sin ella, el 75 %) y el rótulo. */
+          const umbral = umbralEntero(vara)
+          const yUmbral = umbral != null ? Y((umbral / l.esperado) * 100, y0) : null
+          const rotulo = rotuloRaya(vara)
+          const ult = ultimo(l)
           /* Los minutos sin dato cortan el trazo: no se une lo que no se midió. */
           const tramos: Array<Array<[number, number]>> = [[]]
           l.fills.forEach((q, i) => {
@@ -255,7 +269,7 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
           return (
             <g key={l.id} opacity={atenuada ? 0.4 : 1} style={{ transition: 'opacity 200ms' }}>
               <rect x={lc} y={y0} width={pw} height={rh} rx={8} style={{ fill: 'var(--v2-reja)' }} opacity={0.6} />
-              {lo < 75 && <line x1={lc} x2={lc + pw} y1={r1(Y(75, y0))} y2={r1(Y(75, y0))} strokeWidth={1} strokeDasharray="3 4" style={{ stroke: 'var(--v2-tenue)' }} />}
+              {yUmbral != null && <line x1={lc} x2={lc + pw} y1={r1(yUmbral)} y2={r1(yUmbral)} strokeWidth={1} strokeDasharray="3 4" style={{ stroke: 'var(--v2-tenue)' }} />}
               {tramos.filter((t) => t.length > 1).map((t, q) => (
                 <g key={q}>
                   <path d={`M${r1(t[0]![0])},${y0 + rh - 3} ${t.map(([px, py]) => `L${r1(px)},${r1(py)}`).join(' ')} L${r1(t[t.length - 1]![0])},${y0 + rh - 3} Z`} opacity={0.14} style={{ fill: color }} />
@@ -263,13 +277,19 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
                 </g>
               ))}
               {tramos.filter((t) => t.length === 1).map((t, q) => <circle key={`p${q}`} cx={r1(t[0]![0])} cy={r1(t[0]![1])} r={2.5} style={{ fill: color }} />)}
+              {/* Al inicio de la raya: a la derecha, el punto del último minuto tapaba parte del rótulo. Va DESPUÉS de la línea de datos,
+                  que cruza su inicio, con halo del color de la tarjeta para que se lea encima de ella. */}
+              {yUmbral != null && rotulo && <text x={lc + 6} y={r1(yUmbral + 13)} fontSize={11} className="fill-muted-foreground tabular-nums" style={{ paintOrder: 'stroke', stroke: 'rgb(var(--card))', strokeWidth: 3, strokeLinejoin: 'round' }}>{rotulo}</text>}
               {l.microsDetalle.map((q) => {
                 const px = lc + ((q.inicioMs - r.inicioTiraMs) / 60_000) * slot
                 return <rect key={q.inicioMs} x={r1(Math.max(lc, px))} y={y0 + rh - 8} width={r1(Math.max(4, (q.duracionS / 60) * slot))} height={6} rx={2} style={{ fill: 'var(--v2-ext)' }}><title>{`micro detención de ${cronometro(q.duracionS)}`}</title></rect>
               })}
-              {u != null && <circle cx={r1(x(l.fills.reduce<number>((a, q, i) => (q != null ? i : a), -1)))} cy={r1(Y(u, y0))} r={3.5} style={{ fill: color }} />}
-              <text x={0} y={y0 + 22} fontSize={13} fontWeight={600} className="fill-foreground">{etiquetaMaquina(l.nombre)}</text>
-              <text x={0} y={y0 + 42} fontSize={13} fontWeight={700} className="tabular-nums" style={{ fill: tonoU ? TEXTO_TONO[tonoU] : undefined }}>{u != null ? `${u} %` : '—'}</text>
+              {ult != null && <circle cx={r1(x(l.fills.reduce<number>((a, q, i) => (q != null ? i : a), -1)))} cy={r1(Y(ult, y0))} r={3.5} style={{ fill: color }} />}
+              <text x={0} y={y0 + 20} fontSize={13} fontWeight={600} className="fill-foreground">{etiquetaMaquina(l.nombre)}</text>
+              <text x={0} y={y0 + 38} fontSize={13} fontWeight={700} className="tabular-nums" style={{ fill: tonoP === 'sin' ? undefined : TEXTO_TONO[tonoP] }}>{prom != null ? `${Math.round(prom)} %` : '—'}</text>
+              {l.fuente === 'perilla'
+                ? <text x={0} y={y0 + 53} fontSize={11} className="fill-muted-foreground tabular-nums">perilla {Math.round(l.esperado)}</text>
+                : <text x={0} y={y0 + 53} fontSize={11} fontWeight={600} className="tabular-nums" style={{ fill: 'var(--v2-atento-texto)' }}>Shoplogix {Math.round(l.esperado)}</text>}
             </g>
           )
         })}
@@ -316,7 +336,8 @@ function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null
   )
 }
 
-const LEYENDA: Array<[Tono, string]> = [['bien', '≥75 %'], ['atento', '50–75'], ['mal', '<50 del esperado']]
+/* La regla de cada tono contra la raya de SU máquina (con perilla, la perilla completa; sin ella, el 75 % del esperado). Los enteros van en el ⓘ. */
+const LEYENDA: Array<[Tono, string]> = [['bien', 'a ritmo: llega a la raya de su máquina'], ['atento', 'bajo: bajo la raya, pero la mitad o más'], ['mal', 'muy bajo: menos de la mitad']]
 
 /** Las opciones del selector: la línea y cada Baader (de la tira en vivo o, sin ella, del turno completo). */
 const opcionesDe = (r: RitmoVivo | null, turno: MinutoTurno | null) =>
@@ -332,7 +353,7 @@ function seleccionDe(r: RitmoVivo | null, turno: MinutoTurno | null, sel: string
 /** El color de la barra del minuto en curso: el de la parada (detención = coral, micro = celeste) o el acento si marcha. */
 const colorCurso = (parada: ParadaVivo | null) => (parada?.clase === 'detencion' ? 'var(--v2-mal)' : parada?.clase === 'micro' ? 'var(--v2-ext)' : 'var(--v2-bien)')
 
-/** Los tres tonos de las barras: ≥75 %, 50–75 y <50 del esperado. */
+/** Los tres tonos de las barras, con sus nombres de la regla «a ritmo», «bajo» y «muy bajo». */
 function LeyendaTonos() {
   return (
     <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">
@@ -362,6 +383,12 @@ export interface RitmoVivoAmpliadoProps {
   /** La Baader elegida, si la comparte quien lo abre. Sin ella, el ampliado lleva su propia elección. */
   sel?: string
   onSel?: (id: string) => void
+  /** Perillas de la línea (`live.perillas`): el «esperado» de cada minuto del turno es la vara de ese minuto. */
+  perillas?: PerillasDeLinea | null
+  /** Carros con pieza del turno completo (`vaciosTurnoDe` sobre la serie entera), calculados en la página: la Baader elegida no cambia la regla. */
+  carros?: VaciosTurno | null
+  /** Quién puede anotar la perilla (solo admin). Sin ella, la franja no ofrece el editor. */
+  perillaEditor?: PerillaEditorDatos | null
 }
 
 /**
@@ -369,7 +396,7 @@ export interface RitmoVivoAmpliadoProps {
  * minuto (`MinutoTurnoV2`), el llenado por Baader, las señales y, con `conReglas`, «Último minuto, pieza a pieza».
  * Lo abre el gráfico unido de «El turno» (`GraficoRitmoVivo`).
  */
-export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel }: RitmoVivoAmpliadoProps) {
+export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel, perillas, carros, perillaEditor }: RitmoVivoAmpliadoProps) {
   const [selLocal, setSelLocal] = useState(SEL_LINEA)
   const sel = selProp ?? selLocal
   const { v, selId } = seleccionDe(r, turno, sel)
@@ -414,7 +441,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
         <div className={r ? 'rv-l' : ''}>
           <h4 className="text-[15px] font-semibold leading-tight text-foreground">El turno completo, minuto a minuto</h4>
           <p className="text-[13px] text-muted-foreground">piezas contadas por Shoplogix desde el inicio del turno{selId !== SEL_LINEA ? ' · solo la Baader elegida' : ''} · el mismo eje de tiempo que las franjas de abajo</p>
-          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} />
+          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} carros={carros} perillaEditor={perillaEditor} />
         </div>
       )}
       {r && r.lineas.length > 0 && (
@@ -422,7 +449,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <div>
               <h4 className="text-[15px] font-semibold leading-tight text-foreground">{cosa}{multi ? ', por máquina' : ''} · últimos 15 minutos</h4>
-              <p className="text-[13px] text-muted-foreground">% de {r.unidad ?? 'llenado'} en cada minuto · una franja por Baader, mismo eje · guía en 75 %</p>
+              <p className="text-[13px] text-muted-foreground">{r.unidad ? `${r.unidad} con pieza` : 'llenado'} en cada minuto · 100 % es la velocidad escrita bajo cada nombre · la raya marca a ritmo</p>
             </div>
             {hayMicros && <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground"><i className="rv-micro-marca" aria-hidden />micro detención (ancho = duración)</span>}
           </div>
@@ -439,7 +466,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
       )}
       {r && (
         <p className="text-[12px] leading-snug text-muted-foreground">
-          Llenado de cada minuto: piezas ÷ lo que la máquina daba andando a su esperado; los minutos con menos de 30 s andando no tienen dato.
+          Llenado de cada minuto: piezas ÷ lo que la máquina daba andando a su esperado; los minutos con menos de 30 s andando no tienen dato. La cifra de cada Baader es el promedio de los minutos de la franja: Σ piezas ÷ Σ de lo que daba andando, con la vara de cada minuto.
           Cada micro detención muestra su inicio y su duración tal como los publica Shoplogix.
         </p>
       )}

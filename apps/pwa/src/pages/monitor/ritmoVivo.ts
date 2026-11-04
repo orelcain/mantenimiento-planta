@@ -17,6 +17,7 @@
  */
 import type { PublicMonitorLive, PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import { classifyLossState } from '@/services/shoplogix/lossBuckets'
+import { varaMinuto, type FuenteVara, type PerillasDeLinea } from './perilla'
 
 /** Cuánto duran, como máximo, las micro detenciones en los datos medidos (nota informativa, jamás decide un color). */
 export const MICRO_MAX_MEDIDO_S = 90
@@ -54,6 +55,28 @@ export interface MaquinaSerie {
   cycles: number[]
 }
 
+/**
+ * Vara de una Baader en el minuto `k` (`t0` = inicio del minuto 0, wall-as-UTC): la perilla vigente en ese instante o, si no
+ * hay, el esperado de Shoplogix (`varaMinuto`). Sin perillas devuelve `m.esperado` tal cual. Null solo si la Baader no tiene
+ * esperado de Shoplogix: ese dato sigue siendo la compuerta y quien llama ya la aplica. Sin `t0` finito no se consulta la
+ * perilla: `perillaEn` con NaN la daría por vigente en cualquier instante.
+ */
+export function varaEnMinuto(m: { id?: string; esperado: number | null }, t0: number, k: number, perillas?: PerillasDeLinea | null): number | null {
+  if (m.esperado == null) return null
+  if (m.id == null || !Number.isFinite(t0)) return m.esperado
+  return varaMinuto(perillas, m.id, t0 + k * 60_000, m.esperado).cpm
+}
+
+/**
+ * La misma vara que `varaEnMinuto`, con su fuente (perilla o Shoplogix). El tono de
+ * «a ritmo» depende de la fuente: con perilla es la perilla completa.
+ */
+export function varaDeMinuto(m: { id?: string; esperado: number | null }, t0: number, k: number, perillas?: PerillasDeLinea | null): { cpm: number | null; fuente: FuenteVara } {
+  if (m.esperado == null) return { cpm: null, fuente: 'shoplogix' }
+  if (m.id == null || !Number.isFinite(t0)) return { cpm: m.esperado, fuente: 'shoplogix' }
+  return varaMinuto(perillas, m.id, t0 + k * 60_000, m.esperado)
+}
+
 export interface EntradaRitmoVivo {
   serie: { desde: string; maquinas: MaquinaSerie[] }
   /** Acumulado del turno por máquina en la última lectura (minuto parcial incluido). */
@@ -61,6 +84,8 @@ export interface EntradaRitmoVivo {
   stopEvents?: Array<{ r: number; f: string; s: number; m?: number }> | null
   stopReasons?: string[] | null
   stopMachines?: string[] | null
+  /** Perillas de la línea (`live.perillas`): sin ellas, la vara de cada minuto es el esperado de Shoplogix. */
+  perillas?: PerillasDeLinea | null
   /** Máquinas detenidas AHORA (la parada en curso no está en `stopEvents`). */
   enCurso: Array<{ id: string; desdeMs: number }>
 }
@@ -282,6 +307,8 @@ export interface LineaLlenado {
   id: string
   nombre: string
   esperado: number
+  /** De dónde sale la vara del último minuto: la perilla o el esperado de Shoplogix (`varaDeMinuto`). */
+  fuente: FuenteVara
   /** % de llenado por minuto cerrado (0–100); null = sin dato (parada o <30 s andando). */
   fills: Array<number | null>
   /** Índices de minuto con micro detención de ESA máquina. */
@@ -326,6 +353,8 @@ export interface RitmoVivo {
   lineas: LineaLlenado[]
   /** Falso en docs anteriores a `stopMachines`: el llenado no separa las paradas. */
   separaParadas: boolean
+  /** Carros con pieza de los minutos cerrados de `lineas` (la ventana de la franja), con la regla de `vaciosTurnoDe`: Σ piezas ÷ Σ (vara × fracción andando). Es la cifra del panel, no el último minuto. */
+  carrosVentana: VaciosTurno
   senales: Senal[]
   unidad: 'carros' | 'silletas' | null
 }
@@ -367,7 +396,8 @@ export function llenadoDe(e: EntradaRitmoVivo, i0: number, n: number): { lineas:
       if (andando < ANDANDO_MIN_S || lineaEnCero) {
         fills.push(null)
       } else {
-        const v = (m.cycles[i] ?? 0) / (m.esperado * (andando / 60))
+        const vara = varaEnMinuto(m, t0, i, e.perillas)!
+        const v = (m.cycles[i] ?? 0) / (vara * (andando / 60))
         fills.push(Math.min(100, Math.round(v * 100)))
       }
       if (segundosCubiertos(pp.micro.get(m.id), ini, fin) > 0) micros.push(i - i0)
@@ -383,10 +413,12 @@ export function llenadoDe(e: EntradaRitmoVivo, i0: number, n: number): { lineas:
     const ini = validos.length >= 6 ? Math.round(media(validos.slice(0, 3))) : null
     const fin = validos.length >= 6 ? Math.round(media(validos.slice(-3))) : null
     const baja = ini != null && fin != null && ini - fin >= CAIDA_LLENADO_PP
+    const varaUltimo = varaDeMinuto(m, t0, Math.max(0, n - 1), e.perillas)
     lineas.push({
       id: m.id,
       nombre: m.nombre,
-      esperado: m.esperado,
+      esperado: varaUltimo.cpm!,
+      fuente: varaUltimo.fuente,
       fills,
       micros,
       microsDetalle,
@@ -436,6 +468,7 @@ export function vaciosTurnoDe(
   serie: { desde: string; maquinas: MaquinaSerie[] },
   n: number,
   paradas?: Pick<EntradaRitmoVivo, 'stopEvents' | 'stopReasons' | 'stopMachines' | 'enCurso'> | null,
+  perillas?: PerillasDeLinea | null,
 ): VaciosTurno {
   const t0 = Date.parse(serie.desde)
   const pp = paradasPorMaquina({ stopEvents: paradas?.stopEvents ?? null, stopReasons: paradas?.stopReasons ?? null, stopMachines: paradas?.stopMachines ?? null, enCurso: paradas?.enCurso ?? [] })
@@ -451,7 +484,7 @@ export function vaciosTurnoDe(
         const andando = 60 - segundosCubiertos(pp.todas.get(m.id), ini, ini + 60_000)
         const lineaEnCero = serie.maquinas.every((x) => (x.cycles[i] ?? 0) === 0)
         if (andando < ANDANDO_MIN_S || lineaEnCero) continue
-        capacidad += m.esperado * (andando / 60)
+        capacidad += varaEnMinuto(m, t0, i, perillas)! * (andando / 60)
         conPieza += m.cycles[i] ?? 0
         usados.add(i)
       }
@@ -473,32 +506,40 @@ export function vaciosTurnoDe(
   }
 }
 
-/** Señales sobrias: lo que el dato muestra y qué mirar; nunca afirman una causa. */
-export function senalesDe(lineas: LineaLlenado[], unidad: 'carros' | 'silletas' | null, separaParadas: boolean): Senal[] {
+/**
+ * Señales sobrias: lo que el dato muestra y qué mirar; nunca afirman una causa. Las cifras que citan son las del PANEL
+ * (`cifraPanel`, de `carrosVentana`: los mismos 15 min y la misma regla). La caída compara el inicio y el fin de la tira
+ * (3 minutos cada uno), que no es esa cifra: por eso la caída se dice SIN porcentajes. Así hay un solo número por máquina.
+ */
+export function senalesDe(lineas: LineaLlenado[], unidad: 'carros' | 'silletas' | null, separaParadas: boolean, cifraPanel: Record<string, number | null> = {}): Senal[] {
   const cosa = unidad ? `${unidad} con pieza` : 'llenado'
   const out: Senal[] = []
   const n = lineas.length
   const medidas = lineas.filter((l) => l.ini != null && l.fin != null)
   const bajan = medidas.filter((l) => l.baja)
+  /* Sin una cifra del panel por cada máquina medida no se cita ninguna: no se muestra un rango a medias. */
+  const citable = medidas.length > 0 && medidas.every((l) => cifraPanel[l.id] != null)
+  const valoresPanel = citable ? medidas.map((l) => cifraPanel[l.id]!) : []
   if (medidas.length === 0) {
     out.push({ tono: 'neutra', texto: 'Todavía no hay minutos con llenado medible para dar una señal.' })
   } else if (n > 1) {
     if (bajan.length === n) {
-      out.push({ tono: 'atento', texto: `Bajan las ${n} a la vez: de ${rangoTxt(lineas.map((l) => l.ini!))} % a ${rangoTxt(lineas.map((l) => l.fin!))} % de ${cosa}. Cuando caen juntas conviene revisar la alimentación o la MMPP; el dato no confirma la causa.` })
+      out.push({ tono: 'atento', texto: `Bajan las ${n} a la vez en los 15 min de ${cosa}. Cuando caen juntas conviene revisar la alimentación o la MMPP; el dato no confirma la causa.` })
     } else if (bajan.length === 1) {
       const b = bajan[0]!
-      const otras = medidas.filter((l) => !l.baja)
-      out.push({ tono: 'atento', texto: `Solo baja ${b.nombre}: de ${b.ini} % a ${b.fin} % de ${cosa}${otras.length ? `; las otras siguen en ${rangoTxt(otras.map((l) => l.fin!))} %` : ''}. Conviene revisar esa máquina.` })
+      const otras = medidas.filter((l) => !l.baja).length
+      out.push({ tono: 'atento', texto: `Solo baja ${b.nombre} en los 15 min de ${cosa}${otras ? '; las otras no bajan' : ''}. Conviene revisar esa máquina.` })
     } else if (bajan.length > 1) {
-      out.push({ tono: 'atento', texto: `Bajan ${bajan.map((l) => l.nombre).join(' y ')}: ${bajan.map((l) => `${l.ini} → ${l.fin} %`).join(' y ')} de ${cosa}. El dato no confirma la causa.` })
+      out.push({ tono: 'atento', texto: `Bajan ${bajan.map((l) => l.nombre).join(' y ')} en los 15 min de ${cosa}. El dato no confirma la causa.` })
     } else {
-      out.push({ tono: 'neutra', texto: `Llenado parejo${n > 1 ? ` en las ${n}` : ''}: ${rangoTxt(medidas.map((l) => l.fin!))} % de ${cosa}. Sin señales.` })
+      out.push({ tono: 'neutra', texto: citable ? `Llenado parejo en las ${n}: ${rangoTxt(valoresPanel)} % de ${cosa}. Sin señales.` : `Llenado parejo en las ${n}. Sin señales.` })
     }
   } else {
     const l = medidas[0]!
+    const cap = `${cosa[0]!.toUpperCase()}${cosa.slice(1)}`
     out.push(l.baja
-      ? { tono: 'atento', texto: `${cosa[0]!.toUpperCase()}${cosa.slice(1)} baja de ${l.ini} % a ${l.fin} % en 15 min. Conviene revisar la máquina.` }
-      : { tono: 'neutra', texto: `${cosa[0]!.toUpperCase()}${cosa.slice(1)} estable, ${l.fin} %. Sin señales.` })
+      ? { tono: 'atento', texto: `${cap} baja en los 15 min. Conviene revisar la máquina.` }
+      : { tono: 'neutra', texto: citable ? `${cap} estable, ${valoresPanel[0]} %. Sin señales.` : `${cap} estable. Sin señales.` })
   }
   for (const l of medidas) {
     if (l.baja && l.microsRecientes >= 2) {
@@ -521,12 +562,16 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
   if (n < 4) return null
   /* Sin el esperado oficial de TODAS las máquinas no hay vara: se calla en vez de adivinar. */
   if (maq.some((m) => !(m.esperado != null && m.esperado > 0))) return null
-  const esperadoLinea = maq.reduce((a, m) => a + m.esperado!, 0)
+  const perillas = e.perillas
+  /* La vara de la línea en el minuto i: la suma de la vara de cada Baader en ese minuto (sin perillas, la suma de sus esperados). */
+  const varaLineaEn = (i: number) => maq.reduce((a, m) => a + varaEnMinuto(m, t0, i, perillas)!, 0)
+  /* Los escalares de la tarjeta («de X», ahora %, tendencia) van con la vara del último minuto cerrado. */
+  const esperadoLinea = varaLineaEn(n - 1)
   const i0 = Math.max(0, n - MINUTOS_CERRADOS)
   const minutos: MinutoLinea[] = []
   for (let i = i0; i < n; i++) {
     const piezas = maq.reduce((a, m) => a + (m.cycles[i] ?? 0), 0)
-    minutos.push({ hora: hh(t0 + i * 60_000), piezas, tono: tonoDe(piezas / esperadoLinea) })
+    minutos.push({ hora: hh(t0 + i * 60_000), piezas, tono: tonoDe(piezas / varaLineaEn(i)) })
   }
   const ahora = minutos[minutos.length - 1]!.piezas
 
@@ -536,16 +581,16 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
     const acc = e.acumulado?.[m.id]
     if (acc == null) return null
     const c = Math.max(0, acc - m.cycles.slice(0, n).reduce((x, y) => x + y, 0))
-    return c > m.esperado! * 1.5 ? null : c
+    return c > varaEnMinuto(m, t0, n, perillas)! * 1.5 ? null : c
   }
   const porMaquina: SerieMaquina[] = maq.map((m) => ({
     id: m.id,
     nombre: m.nombre,
-    esperado: m.esperado!,
+    esperado: varaEnMinuto(m, t0, n - 1, perillas)!,
     curso: cursoDe(m),
     minutos: Array.from({ length: n - i0 }, (_, k) => {
       const piezas = m.cycles[i0 + k] ?? 0
-      return { hora: hh(t0 + (i0 + k) * 60_000), piezas, tono: tonoDe(piezas / m.esperado!) }
+      return { hora: hh(t0 + (i0 + k) * 60_000), piezas, tono: tonoDe(piezas / varaEnMinuto(m, t0, i0 + k, perillas)!) }
     }),
   }))
 
@@ -553,10 +598,20 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
   if (e.acumulado && maq.every((m) => e.acumulado![m.id] != null)) {
     curso = maq.reduce((a, m) => a + Math.max(0, e.acumulado![m.id]! - m.cycles.slice(0, n).reduce((x, y) => x + y, 0)), 0)
     /* Un parcial imposible (serie recortada, minutos sin cerrar) no se dibuja. */
-    if (curso > esperadoLinea * 1.5) curso = null
+    if (curso > varaLineaEn(n) * 1.5) curso = null
   }
 
   const { lineas, separaParadas } = llenadoDe(e, i0, n)
+  /* Carros con pieza de la misma ventana que dibuja el panel (los minutos cerrados de `lineas`), con la regla de `vaciosTurnoDe`
+     sobre la serie recortada a esa ventana. Es Σ piezas ÷ Σ (vara × fracción andando): ni el último minuto ni un promedio de porcentajes. */
+  const carrosVentana = vaciosTurnoDe(
+    { desde: new Date(t0 + i0 * 60_000).toISOString(), maquinas: maq.map((m) => ({ ...m, cycles: m.cycles.slice(i0, n) })) },
+    n - i0,
+    e,
+    e.perillas,
+  )
+  /* La cifra del panel de cada Baader (`carrosVentana`, redondeada como se muestra): la señal la cita tal cual. */
+  const cifraPanel: Record<string, number | null> = Object.fromEntries(carrosVentana.maquinas.map((x) => [x.id, x.pct == null ? null : Math.round(x.pct)]))
   return {
     minutos,
     porMaquina,
@@ -569,9 +624,22 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
     horaCurso: hh(t0 + n * 60_000),
     lineas,
     separaParadas,
-    senales: senalesDe(lineas, unidad, separaParadas),
+    carrosVentana,
+    senales: senalesDe(lineas, unidad, separaParadas, cifraPanel),
     unidad,
   }
+}
+
+/**
+ * El llenado que la tarjeta «Ritmo en vivo» pone a la derecha de cada Baader: la MISMA cifra del panel de 15 min
+ * (`carrosVentana`, redondeada como se muestra), no el último minuto. La página y el banco llaman a esta función, así
+ * las dos columnas salen de una sola fuente. El nombre `ultimo` es de antes: ya no es el último minuto.
+ */
+export function llenadoDelPanel(r: RitmoVivo): Array<{ id: string; ultimo: number | null }> {
+  return r.lineas.map((l) => {
+    const pct = r.carrosVentana.maquinas.find((x) => x.id === l.id)?.pct
+    return { id: l.id, ultimo: pct == null ? null : Math.round(pct) }
+  })
 }
 
 // ── Qué se ve: la línea o una Baader ─────────────────────────────────────────
@@ -735,6 +803,7 @@ export function ritmoVivoDeMonitor(args: {
     stopEvents: live.stopEvents,
     stopReasons: live.stopReasons,
     stopMachines: live.stopMachines,
+    perillas: live.perillas,
     enCurso: maquinas.filter((m) => m.status === 'detenida' && m.desdeMs != null).map((m) => ({ id: m.id, desdeMs: m.desdeMs! })),
   }, unidadDeMaquinas(live.machines))
   return r ? { r, maquinas } : null

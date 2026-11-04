@@ -1832,9 +1832,14 @@ service cloud.firestore {
     }
 
     // ANÁLISIS GRADER - Configuracion global del modulo
+    // La perilla por máquina (monitorPerillas, monitorPerillasHistorial) la anota SOLO admin.
+    // El resto del doc sigue para supervisor. affectedKeys: escribir otros campos no toca esta regla.
     match /graderModuleConfigs/{configId} {
       allow read: if isNotAnonymous();
-      allow create, update: if isSupervisor();
+      allow create: if isSupervisor()
+        && (!request.resource.data.keys().hasAny(['monitorPerillas', 'monitorPerillasHistorial']) || isAdmin());
+      allow update: if isSupervisor()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['monitorPerillas', 'monitorPerillasHistorial']) || isAdmin());
       allow delete: if isAdmin();
     }
 

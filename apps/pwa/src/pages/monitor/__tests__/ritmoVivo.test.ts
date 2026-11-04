@@ -175,6 +175,23 @@ describe('señales', () => {
     expect(r.lineas[2]!.microsRecientes).toBe(2)
     expect(r.senales.some((s) => /2 micro detenciones en 7 min/.test(s.texto) && /Señal temprana/.test(s.texto))).toBe(true)
   })
+
+  it('el llenado parejo cita la cifra del panel (15 min, Σ ÷ Σ), no la de los últimos 3 minutos', () => {
+    /* 11 minutos a 12 pz (75 % de 16) y los 3 últimos a 16 (100 %): el fin de la tira da 100, pero el panel promedia los 14 min:
+       180 de 224 = 80 %. La señal dice 80, el mismo número que el panel. */
+    const cola = [...Array.from({ length: 11 }, () => 12), 16, 16, 16]
+    const r = calcularRitmoVivo(entrada([maq('1', cola), maq('2', cola), maq('3', cola)], base), 'carros')!
+    expect(r.carrosVentana.maquinas.map((m) => Math.round(m.pct!))).toEqual([80, 80, 80])
+    expect(r.senales[0]!.texto).toBe('Llenado parejo en las 3: 80 % de carros con pieza. Sin señales.')
+  })
+
+  it('la caída se dice sin porcentajes: no compite con la cifra del panel', () => {
+    const solo = calcularRitmoVivo(entrada([maq('1', sana), maq('2', sana), maq('3', cae)], base), 'carros')!
+    const todas = calcularRitmoVivo(entrada([maq('1', cae), maq('2', cae), maq('3', cae)], base), 'carros')!
+    expect(solo.senales[0]!.texto).toMatch(/Solo baja Evisceradora 3/)
+    expect(solo.senales[0]!.texto).not.toMatch(/%/)
+    expect(todas.senales[0]!.texto).not.toMatch(/%/)
+  })
 })
 
 describe('tarjeta completa', () => {
@@ -375,6 +392,42 @@ describe('la parada en curso: micro o detención lo dice Shoplogix', () => {
     expect(cronometro(795)).toBe('13 min 15 s')
     expect(cronometro(3725)).toBe('1 h 02 min')
     expect(cronometro(-3)).toBe('0 s')
+  })
+})
+
+describe('carros con pieza de los 15 min de la franja (carrosVentana): promedio de la ventana, no el último minuto', () => {
+  it('es Σ piezas ÷ Σ capacidad de los minutos cerrados, no el porcentaje del último', () => {
+    /* 13 minutos a 10 pz y el último a 16 (100 % de 16): Σ 146 de 224 = 65,2 %. El último minuto daría 100. */
+    const cycles = [...Array.from({ length: 13 }, () => 10), 16]
+    const r = calcularRitmoVivo(entrada([maq('ev1', cycles, 16)]), 'carros')!
+    const v = r.carrosVentana.maquinas.find((x) => x.id === 'ev1')!
+    expect(v.conPieza).toBe(146)
+    expect(v.pasaron).toBe(224)
+    expect(v.pct).toBeCloseTo(65.18, 1)
+    expect(v.pct).not.toBe(100)
+  })
+
+  it('pondera por la vara de cada minuto: con perilla que cambia a mitad de la ventana no promedia porcentajes', () => {
+    /* Minutos 0 a 6: vara 16 y 8 pz cada uno (50 %). Minutos 7 a 13: perilla 12 desde el minuto 7 y 12 pz (100 %).
+       Σ 56 + 84 = 140 de 7·16 + 7·12 = 196 → 71,4 %. El promedio de porcentajes daría 75 %. */
+    const cycles = [...Array.from({ length: 7 }, () => 8), ...Array.from({ length: 7 }, () => 12)]
+    const perillas = { actual: { ev1: { cpm: 12, desde: iso(7) } }, historial: [] }
+    const r = calcularRitmoVivo(entrada([maq('ev1', cycles, 16)], { perillas }), 'carros')!
+    const v = r.carrosVentana.maquinas.find((x) => x.id === 'ev1')!
+    expect(v.conPieza).toBe(140)
+    expect(v.pasaron).toBe(196)
+    expect(v.pct).toBeCloseTo(71.43, 1)
+  })
+
+  it('un minuto con detención que deja menos de 30 s andando no entra en la ventana', () => {
+    /* 14 minutos a 16 pz; el minuto 5 tiene una detención de 50 s (10 s andando): no cuenta ni en piezas ni en capacidad. */
+    const cycles = Array.from({ length: 14 }, () => 16)
+    cycles[5] = 0
+    const e = entrada([maq('ev1', cycles, 16)], { stopEvents: [{ r: 0, f: iso(5, 5), s: 50, m: 0 }], stopReasons: ['Detencion'], stopMachines: ['ev1'] })
+    const v = calcularRitmoVivo(e, 'carros')!.carrosVentana.maquinas.find((x) => x.id === 'ev1')!
+    expect(v.pasaron).toBe(13 * 16)
+    expect(v.conPieza).toBe(13 * 16)
+    expect(v.pct).toBe(100)
   })
 })
 

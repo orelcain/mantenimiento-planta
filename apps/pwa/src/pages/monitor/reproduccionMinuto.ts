@@ -35,6 +35,8 @@
  * orden de `live.machines`.
  */
 import { aWallClockMs } from './contadorCrudo'
+import type { PerillasDeLinea } from './perilla'
+import { varaEnMinuto } from './ritmoVivo'
 
 export const SEG_MINUTO = 60
 export const MIN_MS = 60_000
@@ -166,6 +168,8 @@ export interface MaquinaRep {
   esperado: number | null
   /** Piezas de cada minuto CERRADO desde el inicio del turno. */
   cycles: number[]
+  /** La vara de cada minuto (perilla vigente o esperado de Shoplogix). Ausente: vale `esperado` en todos los minutos. */
+  varaPorMinuto?: Array<number | null>
 }
 
 export interface EntradaRep {
@@ -373,7 +377,7 @@ export function minutoEn(est: EstadoRep, j: number): MinutoMaq[] {
     const tramos = tramosAndando(est.paradas[m.id] ?? [], inicioMinuto)
     const seg = segundosAndando(tramos)
     return {
-      id: m.id, nombre: m.nombre, modelo: m.modelo ?? null, esperado: m.esperado, n,
+      id: m.id, nombre: m.nombre, modelo: m.modelo ?? null, esperado: m.varaPorMinuto?.[j] ?? m.esperado, n,
       horario: horarioPiezas(n, tramos), tramos, segAndando: seg,
       estado: n === 0 ? 'detenida' : seg < SEG_PARCIAL ? 'parcial' : 'andando',
     }
@@ -536,6 +540,8 @@ export function armarEntradaRep(a: {
   stopMachines?: readonly string[] | null
   /** `pulse.at`: UTC real. */
   pulseAt?: string | null
+  /** Perillas de la línea: con ellas, cada minuto de cada Baader lleva su vara (`varaPorMinuto`). */
+  perillas?: PerillasDeLinea | null
 }): EntradaRep | null {
   const s = a.serie
   if (!s?.maquinas?.length) return null
@@ -545,7 +551,10 @@ export function armarEntradaRep(a: {
   const modelo = new Map(a.machines.map((m) => [m.id, m.model ?? null]))
   const entrada: EntradaRep = {
     desdeMs,
-    maquinas: s.maquinas.map((m) => ({ id: m.id, nombre: m.nombre, modelo: modelo.get(m.id) ?? null, esperado: m.esperado, cycles: m.cycles })),
+    maquinas: s.maquinas.map((m): MaquinaRep => {
+      const base = { id: m.id, nombre: m.nombre, modelo: modelo.get(m.id) ?? null, esperado: m.esperado, cycles: m.cycles }
+      return a.perillas ? { ...base, varaPorMinuto: m.cycles.map((_, j) => varaEnMinuto(m, desdeMs, j, a.perillas)) } : base
+    }),
     paradas: paradasPorMaquina(a.stopEvents, a.stopMachines, a.machines.map((m) => m.id)),
     pulsoAtMs: Number.isFinite(pulsoAtMs) ? pulsoAtMs : null,
   }
