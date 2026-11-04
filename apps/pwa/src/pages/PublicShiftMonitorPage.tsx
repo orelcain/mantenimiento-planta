@@ -75,6 +75,8 @@ import { costoDeParadas } from '@/services/shoplogix/monitorPerdidas'
 import { bandaNormal, nombreDeDia, rachaDeRitmos, recordsDeLinea, vsAyer as compararVsAyer, type TurnoResumen } from '@/services/shoplogix/monitorVsAyer'
 import { llenadoDeSilletas, specDeMaquina, comoDeCada100, type LlenadoSilletas } from '@/services/shoplogix/monitorMaquina'
 import { ParetoDeParadas } from './monitor/MonitorPareto'
+import { BotonInfo } from './monitor/GlobosFranja'
+import { nombreCausa } from './monitor/desgloseVista'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
 import { BarraLateralPC } from './monitor/BarraLateralPC'
@@ -1135,6 +1137,8 @@ function Sparkbars({
     onVentana,
   })
   const zoom = g.zoom
+  /* El ⓘ del set point: en el celular no hay hover, así que abre y cierra con un toque (como los demás ⓘ del monitor). */
+  const [infoSetPoint, setInfoSetPoint] = useState(false)
   if (!series || series.length === 0) return null
 
   const max = Math.max(...series.map(p => p.pieces), 1)
@@ -1734,21 +1738,21 @@ function Sparkbars({
         {/* El techo de la máquina, no el mejor tramo: es lo que hace que el
             hueco de arriba signifique algo. */}
         {setCpm != null && setCpm > 0 && setCpm <= escala && (
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
-            <span className="tabular-nums">{fmtCpm(setCpm)}</span> lo que da la máquina
-            {/* Editado por un supervisor: 18 medidos con cronómetro no es un
-                dato del PLC, y presentarlo sin fuente lo hacía parecer uno. */}
-            {fuenteSetPoint && (
-              <span
-                className="cursor-help border-b border-dotted border-muted-foreground/50 text-muted-foreground/80"
-                title={fuenteSetPoint}
-              >
-                ⓘ
-              </span>
+          <>
+            <span className="inline-flex items-center gap-1">
+              <span className="inline-block h-2 w-3 border-t-2 border-dashed border-amber-600 dark:border-amber-400" />
+              <span className="tabular-nums">{fmtCpm(setCpm)}</span> lo que da la máquina
+              {/* Editado por un supervisor: 18 medidos con cronómetro no es un
+                  dato del PLC, y presentarlo sin fuente lo hacía parecer uno. */}
+              {fuenteSetPoint && (
+                <BotonInfo etiqueta="De dónde sale «lo que da la máquina»" abierto={infoSetPoint} alCambiar={setInfoSetPoint} />
+              )}
+              {onGuardarSetPoint && <EditorSetPoint actual={setCpm} onGuardar={onGuardarSetPoint} />}
+            </span>
+            {fuenteSetPoint && infoSetPoint && (
+              <p className="basis-full text-caption text-muted-foreground">{fuenteSetPoint}</p>
             )}
-            {onGuardarSetPoint && <EditorSetPoint actual={setCpm} onGuardar={onGuardarSetPoint} />}
-          </span>
+          </>
         )}
         {refsDibujables.map((r) => (
           <span key={r.label} className="inline-flex items-center gap-1">
@@ -3047,7 +3051,7 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
               }`}
             >
               {i > 0 && <span className="text-muted-foreground"> · </span>}
-              {x.causa} <b>{fmtInt(x.min)}</b>
+              {nombreCausa(x.causa)} <b>{fmtInt(x.min)}</b>
             </span>
           ))}
           <span className="text-muted-foreground/70"> min de máquina.</span>

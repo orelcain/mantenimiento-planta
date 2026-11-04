@@ -91,7 +91,7 @@ export function CascadaTurnoAnterior({ cascada }: { cascada: Cascada }) {
       {cascada.perdido > 0 && (
         <p className="mt-3 text-footnote text-foreground/80">
           De las <b className="tabular-nums">{fmt(cascada.perdido)}</b> piezas que no se hicieron,{' '}
-          <b className="tabular-nums">{fmt(cascada.perdidoParado)}</b> fueron con la línea parada y{' '}
+          <b className="tabular-nums">{fmt(cascada.perdidoParado)}</b> fueron con la línea detenida y{' '}
           <b className="tabular-nums">{fmt(cascada.perdidoAndando)}</b> con la línea andando y{' '}
           {cascada.contenedor === 'carro' ? 'el carro vacío' : 'la silleta vacía'}.{' '}
           {cascada.perdidoAndando > cascada.perdidoParado ? (

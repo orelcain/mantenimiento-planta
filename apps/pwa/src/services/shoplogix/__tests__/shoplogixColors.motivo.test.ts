@@ -6,7 +6,7 @@ describe('motivoEnEspanol · el monitor público habla en español', () => {
     // De los 42 motivos distintos que hay en los datos, «Planned Downtime» es
     // el único en inglés (301 apariciones): no lo escribe un operador, lo pone
     // Shoplogix. Se veía así en la pantalla de la TV de planta.
-    expect(motivoEnEspanol('Planned Downtime')).toBe('Parada programada')
+    expect(motivoEnEspanol('Planned Downtime')).toBe('Detención programada')
   })
 
   it('no toca las causas que escribe el operador', () => {
@@ -17,7 +17,7 @@ describe('motivoEnEspanol · el monitor público habla en español', () => {
   })
 
   it('no distingue mayúsculas ni espacios de sobra', () => {
-    expect(motivoEnEspanol('  planned downtime ')).toBe('Parada programada')
+    expect(motivoEnEspanol('  planned downtime ')).toBe('Detención programada')
     expect(motivoEnEspanol('UNSCHEDULED')).toBe('Fuera de turno')
   })
 

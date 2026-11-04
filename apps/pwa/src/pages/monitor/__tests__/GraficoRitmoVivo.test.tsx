@@ -1066,6 +1066,30 @@ describe('GraficoRitmoVivo · micro con causa posible y probable (causas v3)', (
     expect(Array.from(container.querySelectorAll('.rv-cz-info ol li b')).map((b) => sp(b.textContent))).toEqual(['Arranque', 'Al volver de una detención', 'Sin contexto'])
     expect(sp(container.querySelector('.rv-cz-info')!.textContent)).not.toContain('Otra Baader se detuvo')
   })
+
+  it('con una sola máquina (Filete) los rótulos dicen «máquina» y no «Baader»: «máquina detenida», «piezas por minuto de la máquina», «micro en la máquina» y, con el zoom de 15 min, «ritmo andando de la máquina»', () => {
+    const una: EjeDatos = {
+      ...conMicro,
+      planta: 'filete',
+      minuto: { ...eje.minuto!, maquinas: [eje.minuto!.maquinas[0]!] },
+      ritmoAnduvo: [{ nombre: 'Evisceradora 1', cpm: 18.2 }],
+      paradasMaquina: {
+        ...conMicro.paradasMaquina!,
+        stopMachines: ['a'],
+        stopEvents: [{ r: 0, f: hora(100, 0), s: 3600, m: 0 }, { r: 1, f: hora(30, 13), s: 15, m: 0 }],
+      },
+    }
+    const { container } = render(<GraficoRitmoVivo p={p} e={una} reloj={reloj} />)
+    const t = sp(container.textContent)
+    expect(screen.getByText('máquina detenida')).toBeTruthy()
+    expect(screen.getByText('piezas por minuto de la máquina')).toBeTruthy()
+    expect(t).toContain('micro en la máquina (el color es la causa posible)')
+    for (const viejo of ['alguna Baader detenida', 'piezas por minuto de cada Baader', 'micro en su Baader', 'de cada Baader']) expect(t).not.toContain(viejo)
+    /* Con el zoom de 15 min, el escalón del ritmo se nombra con la máquina, igual que el resto de los rótulos. */
+    fireEvent.click(screen.getByRole('button', { name: '15 min' }))
+    expect(screen.getByText('ritmo andando de la máquina (calculado: piezas del minuto ÷ segundos andando)')).toBeTruthy()
+    expect(sp(container.textContent)).not.toContain('ritmo andando de cada Baader')
+  })
 })
 
 describe('GloboMicro · variante del celular (una columna) y marcas', () => {
