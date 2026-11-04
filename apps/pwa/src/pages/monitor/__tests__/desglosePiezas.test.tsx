@@ -74,7 +74,9 @@ describe('filas y porcentajes de la Evisceradora 1', () => {
   it('cada zona suma su % y las filas bajo 16 suman lo que dice el pie del spec', () => {
     const { container } = renderEv1()
     expect(container.textContent).toContain('Bajo 16 sin detención: 15 min de marcha inicial y 74 de falta de pescado.')
-    expect(container.textContent).toContain('Sin colación: a ritmo 276 de 399 min (69 %).')
+    /* Descuenta TODAS las programadas del fixture (colación 56 + reunión 2 + ejercicio 4 = 62 min), no solo la colación. */
+    expect(container.textContent).toContain('Sin la detención programada: a ritmo 276 de 393 min (70 %).')
+    expect(container.textContent).not.toContain('Sin colación')
   })
 })
 

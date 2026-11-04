@@ -179,7 +179,8 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
   const todas = d.zonas.flatMap((z) => filasDe(z, linea))
   const max = Math.max(1, ...todas.map((f) => f.n))
   const nRitmo = d.zonas[0]?.n ?? 0
-  const nCol = linea ? 0 : todas.reduce((a, f) => a + Object.entries(f.razones).reduce((s, [r, c]) => s + (normalizar(r) === 'colacion' ? c : 0), 0), 0)
+  /* Todas las programadas (colación, reunión, ejercicio…), no solo la colación: su tiempo no es de nadie y se descuenta del turno. */
+  const nProg = linea ? 0 : todas.reduce((a, f) => a + Object.entries(f.razones).reduce((s, [r, c]) => s + (tipoDe.get(r) === 'programada' ? c : 0), 0), 0)
   const pctTotal = d.zonas.reduce((a, z) => a + z.pct, 0)
   const bajoSin = d.bajoSinDetencion
   const marcha = d.marchaInicial
@@ -381,11 +382,11 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
         ? <p className="mt-2.5 text-[13px] leading-[18px] text-muted-foreground">Un minuto de la línea cuenta con detención si alguna de sus Baader tuvo una.</p>
         : (
           <>
-            {nCol > 0 && n - nCol > 0 && (
+            {nProg > 0 && n - nProg > 0 && (
               <p className="mt-2.5 text-[13px] leading-[18px] tabular-nums text-muted-foreground">
-                {'Sin colación: a ritmo '}
-                <b className="font-semibold text-foreground">{`${tiempoTexto(nRitmo, u)} de ${tiempoTexto(n - nCol, u)}${u === 'h' ? '' : ' min'}`}</b>
-                {` (${Math.round((nRitmo / (n - nCol)) * 100)} %).`}
+                {'Sin la detención programada: a ritmo '}
+                <b className="font-semibold text-foreground">{`${tiempoTexto(nRitmo, u)} de ${tiempoTexto(n - nProg, u)}${u === 'h' ? '' : ' min'}`}</b>
+                {` (${Math.round((nRitmo / (n - nProg)) * 100)} %).`}
               </p>
             )}
             <p className="mt-2.5 text-[13px] leading-[18px] tabular-nums text-muted-foreground">
