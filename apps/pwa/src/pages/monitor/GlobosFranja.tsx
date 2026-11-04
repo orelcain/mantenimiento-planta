@@ -68,7 +68,7 @@ export function GloboRitmo(d: DatosGloboRitmo) {
         ? (
           <>
             <p className="mt-2">{`La línea suma la vara de sus Baader (${p}). Mientras una no tenga perilla, el umbral es el 75 % de esa suma; con las 3, la suma de sus umbrales.`}</p>
-            {d.carros != null && <p className="mt-2">Carros con pieza de la línea: <b className="font-semibold text-foreground">{d.carros} %</b>, la suma de sus Baader.</p>}
+            {d.carros != null && <p className="mt-2">Carros con pieza de la línea: <b className="font-semibold text-foreground">{Math.round(d.carros)} %</b>, la suma de sus Baader.</p>}
           </>
         )
         : (
@@ -81,7 +81,7 @@ export function GloboRitmo(d: DatosGloboRitmo) {
                   : `El umbral es la perilla ${p} menos 1: con la cadena llena, Shoplogix registra ${p - 1}, ${p} o ${p + 1} según dónde cae el corte de cada minuto.`}
               {` De los otros ${otros}, ${d.detenida} con la Baader detenida y ${d.bajo} bajo ${d.umbral}.`}
             </p>
-            {d.carros != null && <p className="mt-2">Con la pantalla de la Baader se compara <b className="font-semibold text-foreground">carros con pieza: {d.carros} %</b>.</p>}
+            {d.carros != null && <p className="mt-2">Con la pantalla de la Baader se compara <b className="font-semibold text-foreground">carros con pieza: {Math.round(d.carros)} %</b>.</p>}
           </>
         )}
       <button
@@ -111,7 +111,7 @@ export function GloboCarros(d: DatosGloboCarros) {
     : `la meta de Shoplogix (${d.meta}), porque no tiene perilla anotada`
   return (
     <Globo etiqueta={`Carros con pieza de la ${d.nombre}`}>
-      <p className="text-[15px] font-semibold leading-snug text-foreground">{`${d.carros} % de los carros llevaron pieza.`}</p>
+      <p className="text-[15px] font-semibold leading-snug text-foreground">{`${Math.round(d.carros)} % de los carros llevaron pieza.`}</p>
       <p className="mt-2">{`Se calcula con los datos de Shoplogix: piezas contadas ÷ las que habrían pasado con ${vara}. Solo cuentan los minutos en que la Baader anduvo 30 s o más, sin los de la línea entera en cero.`}</p>
       <p className="mt-2">Por eso, en teoría, debería ser similar a la ocupación de carros que muestra la pantalla de la Baader.</p>
     </Globo>

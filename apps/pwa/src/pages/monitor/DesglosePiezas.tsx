@@ -263,7 +263,23 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
           Cerrar
         </button>
       </div>
-      <p className="mt-1 text-[13px] leading-snug tabular-nums text-muted-foreground">{subtitulo}</p>
+      {/* El selector min | h va en la línea del subtítulo: en la cabecera de columnas pisaba «piezas por minuto» en celulares angostos. */}
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="min-w-0 text-[13px] leading-snug tabular-nums text-muted-foreground">{subtitulo}</p>
+        <span role="group" aria-label="Unidad del tiempo" className="ml-auto inline-grid grid-flow-col gap-0.5 rounded-full p-0.5" style={{ background: 'rgb(142 142 147 / 0.14)' }}>
+          {(['min', 'h'] as const).map((x) => (
+            <button
+              key={x}
+              type="button"
+              aria-pressed={u === x}
+              onClick={() => elegirUnidad(x)}
+              className={`tap-44 h-[24px] min-w-[34px] rounded-full px-2 text-[12px] font-semibold leading-4 ${u === x ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
+            >
+              {x}
+            </button>
+          ))}
+        </span>
+      </div>
       {cambio && (
         <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">
           {`La perilla cambió durante el turno: el desglose usa la vigente (${vara.cpm}).`}
@@ -273,21 +289,7 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
       {/* Cabecera de columnas: piezas · unidad · % del turno. El selector min | h cambia las cifras de tiempo, no los %. */}
       <div className={`${PLANTILLA} mt-2.5 items-end pb-1`}>
         <span className="pl-2 pb-1.5 text-[12px] leading-[15px] text-muted-foreground">piezas por minuto</span>
-        <span className="flex justify-end pb-0.5">
-          <span role="group" aria-label="Unidad del tiempo" className="inline-grid grid-flow-col gap-0.5 rounded-full p-0.5" style={{ background: 'rgb(142 142 147 / 0.14)' }}>
-            {(['min', 'h'] as const).map((x) => (
-              <button
-                key={x}
-                type="button"
-                aria-pressed={u === x}
-                onClick={() => elegirUnidad(x)}
-                className={`tap-44 h-[24px] min-w-[34px] rounded-full px-2 text-[12px] font-semibold leading-4 ${u === x ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}
-              >
-                {x}
-              </button>
-            ))}
-          </span>
-        </span>
+        <span />
         <span className="pb-1.5 text-right text-[12px] leading-[15px] text-muted-foreground">{u === 'h' ? 'horas' : 'min'}</span>
         <span className="pb-1.5 text-right text-[12px] leading-[15px] text-muted-foreground">% del <br />turno</span>
       </div>
