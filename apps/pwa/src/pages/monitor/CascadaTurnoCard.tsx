@@ -8,7 +8,10 @@
 
 import { useState } from 'react'
 import { SegmentedControl, type Segment } from '@/components/piel/SegmentedControl'
+import { FilaRendimientoPerilla } from '@/components/grader/FilaRendimientoPerilla'
 import { BotonInfo } from './GlobosFranja'
+import { CascadaTurnoAnterior } from './CascadaTurnoAnterior'
+import type { Cascada } from './cascadaTurno'
 import type { CascadaPorMeta, PiezasVista } from './cascadaPerilla'
 
 /* La cascada a la meta de Shoplogix con la perilla (Fase B). Las cifras salen de `cascadaPerilla.ts`; aquí solo se
@@ -55,7 +58,7 @@ function escalonesDe(v: PiezasVista, metas: string, perillas: string, sumaBaader
       resta: true,
     },
     { clave: 'micro', etiqueta: 'Microdetenciones', detalle: `${min(v.micro.min)} min · ${v.micro.veces} ×`, piezas: v.micro.piezas, resta: true },
-    { clave: 'vacios', etiqueta: 'Vacíos', piezas: v.vacios, resta: true },
+    { clave: 'vacios', etiqueta: 'Carros vacíos', piezas: v.vacios, resta: true },
     { clave: 'hizo', etiqueta: 'Hizo', piezas: v.hizo, resta: false },
   ]
 }
@@ -105,6 +108,11 @@ export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPo
         <SegmentedControl value={vista} onChange={setVista} segments={segmentos} ariaLabel="Ver por Baader" />
       </div>
 
+      {/* La partición del rendimiento de la vista elegida (la cuenta la cascada en `cascadaPerilla.ts`): arriba de los escalones. */}
+      <div className="mt-3">
+        <FilaRendimientoPerilla r={v.rendimiento} />
+      </div>
+
       <div className="mt-3 flex items-baseline justify-between gap-3">
         <span className="text-footnote text-foreground/80">Tiempo de producción</span>
         <span className="text-footnote font-semibold tabular-nums text-foreground">{fmt(v.minProduccion)} min</span>
@@ -150,7 +158,7 @@ export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPo
       {/* La línea de dueños, por vista: quién debe mover cada parte de lo que no se hizo. */}
       {v.perdido > 0 && (
         <p className="mt-2 text-footnote tabular-nums text-foreground/80">
-          De <b>{fmt(v.perdido)}</b> piezas bajo la meta, <b>{fmt(d.mantOp)}</b> son de Mantención y operación, <b>{fmt(d.aguas)}</b> de aguas arriba (vacíos y detenciones de acopio, bombeo o ducto) y <b>{fmt(d.produccion)}</b> de producción (perilla).
+          De <b>{fmt(v.perdido)}</b> piezas bajo la meta, <b>{fmt(d.mantOp)}</b> son de Mantención y operación, <b>{fmt(d.aguas)}</b> de aguas arriba (vacíos y detenciones de MMPP, abastecimiento, acopio, bombeo o ducto) y <b>{fmt(d.produccion)}</b> de producción (perilla).
         </p>
       )}
 
@@ -161,4 +169,20 @@ export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPo
       </p>
     </section>
   )
+}
+
+/**
+ * La tarjeta «Dónde se fueron las piezas» del monitor: la cascada a la meta con la perilla cuando el turno trae la serie por
+ * minuto; si no, la cascada anterior (`construirCascada`), como antes de B-2. Sin ninguna, no hay tarjeta.
+ */
+export function TarjetaCascada({
+  meta,
+  anterior,
+}: {
+  meta: { cascada: CascadaPorMeta; minutos: number } | null
+  anterior: Cascada | null
+}) {
+  if (meta) return <CascadaTurnoCard cascada={meta.cascada} minutosTurno={meta.minutos} />
+  if (anterior) return <CascadaTurnoAnterior cascada={anterior} />
+  return null
 }

@@ -15,7 +15,7 @@
  *  · Vacíos = lo que falta para cuadrar, con piso en 0.
  *  · La detención sin razón cuenta como minutos andando menos, pero no entra en detenciones, micro ni programada (igual que el mockup).
  */
-import { ANDANDO_MIN_S, esMicroDetencion, normalizar, varaEnMinuto, type MaquinaSerie, type ParadaDetalle } from './ritmoVivo'
+import { ANDANDO_MIN_S, esMicroDetencion, normalizar, varaEnMinuto, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
 import type { PerillasDeLinea } from './perilla'
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 
@@ -30,13 +30,25 @@ const MS_MINUTO = 60_000
 export const esProgramada = (razon: string | null | undefined): boolean => PROGRAMADAS.has(normalizar(razon))
 
 /**
- * Dueño «aguas arriba»: lo que frena la línea antes de las Baader (abastecimiento, acopio, bombeo, ducto) y las causas
- * `externo` del árbol. Se decide AQUÍ y no en `imputacionTaxonomy`: agregar hojas o cambiar `LIMPIEZA` movería otras cifras.
+ * El tipo de una parada en el desglose de «Ver detalle». `paradasDetalle` marca como `programada` todo lo que el legado
+ * (`classifyLossState`) llama planificado, incluida la limpieza de ducto. Aquí solo es programada lo que `esProgramada`;
+ * lo demás sigue su tipo (micro u otra detención).
+ */
+export const tipoParaDesglose = (p: { tipo: TipoParada; razon: string | null }): TipoParada =>
+  p.tipo === 'programada' && !esProgramada(p.razon) ? 'detencion' : p.tipo
+
+/**
+ * Dueño «aguas arriba»: SOLO el flujo de pescado que frena la línea antes de las Baader. Son la falta de MMPP y el
+ * abastecimiento (categorías `mmpp` y `abastecimiento` del árbol), el acopio, el bombeo y la limpieza de ducto (por texto).
+ * Lo demás de `externo` (ajuste del operador, cambio de lote, cumplimiento de cuota…) es de Mantención y operación.
+ * Se decide AQUÍ y no en `imputacionTaxonomy`: cambiar la taxonomía movería cifras de otras pantallas.
  */
 const AGUAS_ARRIBA_TEXTO = /\b(DUCTO|ACOPIO|BOMBEO)\b/
+const CATEGORIAS_AGUAS_ARRIBA = new Set(['mmpp', 'abastecimiento'])
 export const esAguasArriba = (razon: string | null | undefined): boolean => {
-  const r = normalizar(razon).toUpperCase()
-  return AGUAS_ARRIBA_TEXTO.test(r) || matchImputacion(razon).bucket === 'externo'
+  if (AGUAS_ARRIBA_TEXTO.test(normalizar(razon).toUpperCase())) return true
+  const categorias = matchImputacion(razon).leaf?.categorias ?? []
+  return categorias.some((c) => CATEGORIAS_AGUAS_ARRIBA.has(c))
 }
 
 export interface CascadaArgs {
@@ -66,6 +78,8 @@ export interface PiezasVista {
   hizo: number
   /** Lo que no se hizo: podía − hizo (la suma de perilla, detenciones, micro y vacíos cuando `cuadra`). */
   perdido: number
+  /** La partición del rendimiento de ESTA vista (minutos andando × meta): la fila «Al rendimiento le faltan». */
+  rendimiento: RendimientoPartido
   /** podía − perilla − detenciones − micro − vacíos = hizo. */
   cuadra: boolean
   /**
@@ -242,6 +256,27 @@ function calcularTodo(args: CascadaArgs): Calculo[] {
 
 const sumar = (lista: Calculo[], k: keyof Calculo) => lista.reduce((a, c) => a + (c[k] as number), 0)
 
+/** La partición del rendimiento de una lista de Baader (una o todas): hizo / (meta × minutos andando). */
+function rendimientoDe(lista: Calculo[]): RendimientoPartido {
+  const expMeta = sumar(lista, 'expMeta')
+  const hizo = sumar(lista, 'hizo')
+  const piezasPerilla = sumar(lista, 'per')
+  const rendimiento = expMeta > 0 ? hizo / expMeta : 0
+  const ptsFalta = 100 - rendimiento * 100
+  const ptsPerilla = expMeta > 0 ? (piezasPerilla / expMeta) * 100 : 0
+  const ptsFaltoPerilla = ptsFalta - ptsPerilla
+  return {
+    expMeta,
+    hizo,
+    rendimiento,
+    ptsFalta,
+    ptsPerilla,
+    ptsFaltoPerilla,
+    piezasPerilla,
+    piezasFaltoPerilla: Math.round((expMeta * ptsFaltoPerilla) / 100),
+  }
+}
+
 /** Una vista (línea o Baader) a partir de los cálculos de sus Baader. La línea suma; el tiempo de producción promedia. */
 function vistaDe(lista: Calculo[]): PiezasVista {
   const N = lista.length || 1
@@ -264,6 +299,7 @@ function vistaDe(lista: Calculo[]): PiezasVista {
     vacios: vac,
     hizo,
     perdido: cap - hizo,
+    rendimiento: rendimientoDe(lista),
     cuadra: cap - per - det - micro - vac === hizo,
     duenos: {
       mantOp: det - detAg + (micro - microAg),
@@ -297,22 +333,5 @@ export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
  * rendimiento que falta.
  */
 export function rendimientoPartido(args: CascadaArgs): RendimientoPartido {
-  const calc = calcularTodo(args)
-  const expMeta = sumar(calc, 'expMeta')
-  const hizo = sumar(calc, 'hizo')
-  const piezasPerilla = sumar(calc, 'per')
-  const rendimiento = expMeta > 0 ? hizo / expMeta : 0
-  const ptsFalta = 100 - rendimiento * 100
-  const ptsPerilla = expMeta > 0 ? (piezasPerilla / expMeta) * 100 : 0
-  const ptsFaltoPerilla = ptsFalta - ptsPerilla
-  return {
-    expMeta,
-    hizo,
-    rendimiento,
-    ptsFalta,
-    ptsPerilla,
-    ptsFaltoPerilla,
-    piezasPerilla,
-    piezasFaltoPerilla: Math.round((expMeta * ptsFaltoPerilla) / 100),
-  }
+  return rendimientoDe(calcularTodo(args))
 }

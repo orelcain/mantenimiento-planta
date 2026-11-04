@@ -110,6 +110,16 @@ describe('detención: el detalle de la fila 0 y sus causas', () => {
     expect(container.textContent).toContain('Ocultar detalle')
   })
 
+  it('la limpieza de ducto marcada «programada» por el legado va en otras detenciones, no en programadas (B-2)', () => {
+    /* `paradasDetalle` la marca programada (legado LIMPIEZA); la fila 0 tiene 4 min de limpieza y 3 de ajuste del operador. */
+    const legado = paradas.map((p) => (p.razon === 'Limpieza de Ducto' ? { ...p, tipo: 'programada' as const } : p))
+    const { container, getByText } = render(
+      <DesglosePiezas nombre="Evisceradora 1" linea={false} n={N} desglose={desglose()} vara={VARA} paradas={legado} cambio={false} onCerrar={() => {}} />,
+    )
+    fireEvent.click(getByText('Ver detalle', { exact: false }))
+    expect(container.textContent).toContain('colación 55 min · otras programadas 4 · micro 2 · otras detenciones 7')
+  })
+
   it('las causas reparten el % de la fila 0: colación 12 % de los 15 %', () => {
     const { container, getByText } = renderEv1()
     fireEvent.click(getByText('Ver detalle', { exact: false }))

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import fixture from './fixtures/chonchi_0311_turno1_minutos.json'
-import { cascadaPorMeta, esAguasArriba, esProgramada, rendimientoPartido, type CascadaArgs } from '../cascadaPerilla'
+import { cascadaPorMeta, esAguasArriba, esProgramada, rendimientoPartido, tipoParaDesglose, type CascadaArgs } from '../cascadaPerilla'
 import { paradasDetalle, type EntradaRitmoVivo } from '../ritmoVivo'
 import type { PerillasDeLinea } from '../perilla'
 
@@ -162,14 +162,23 @@ describe('dueños de lo que no se hizo (B-2)', () => {
     for (const v of [linea, ev1!, ev2!, ev3!]) expect(v.duenos.aguas).toBeGreaterThanOrEqual(v.vacios)
   })
 
-  it('clasifica el dueño por razón: ducto, acopio, bombeo y «externo» van aguas arriba; las demás no', () => {
+  it('aguas arriba = solo flujo de pescado: MMPP, abastecimiento, acopio, bombeo y ducto', () => {
     expect(esAguasArriba('Limpieza de Ducto')).toBe(true)
     expect(esAguasArriba('ACOPIO de pescado')).toBe(true)
     expect(esAguasArriba('Bombeo')).toBe(true)
     expect(esAguasArriba('FALTA MMPP')).toBe(true)
+    expect(esAguasArriba('Atascamiento')).toBe(true)
+    expect(esAguasArriba('AGUA')).toBe(true)
     expect(esAguasArriba('Micro Detencion')).toBe(false)
     expect(esAguasArriba('MOTORES')).toBe(false)
     expect(esAguasArriba('Cuchillería')).toBe(false)
+  })
+
+  it('«externo» que no es flujo de pescado es de Mantención y operación: AJUSTE OPERADOR, cambio de lote, cuota, personal', () => {
+    expect(esAguasArriba('AJUSTE OPERADOR')).toBe(false)
+    expect(esAguasArriba('CAMBIO LOTE / MMPP')).toBe(false)
+    expect(esAguasArriba('CUMPLIMIENTO CUOTA')).toBe(false)
+    expect(esAguasArriba('FALTA PERSONAL')).toBe(false)
   })
 
   it('programada = solo colación, reunión de inicio y ejercicio; limpieza de ducto NO es programada', () => {
@@ -193,5 +202,32 @@ describe('piezas de la cascada para la vista (B-2)', () => {
     const sinPerillas = cascadaPorMeta(args(null))
     expect(sinPerillas.baaders[0]!.vara).toBe(18)
     expect(sinPerillas.linea.perdido).toBe(sinPerillas.linea.podia - sinPerillas.linea.hizo)
+  })
+})
+
+describe('rendimiento por vista (fila «Al rendimiento le faltan», B-2)', () => {
+  it('la línea: faltan 13,7 pts, 2.213 piezas bajo la perilla y 378 de la perilla más lenta', () => {
+    expect(linea.rendimiento.ptsFalta).toBeCloseTo(13.7, 1)
+    expect(linea.rendimiento.piezasPerilla).toBe(378)
+    expect(linea.rendimiento.piezasFaltoPerilla).toBe(2_213)
+  })
+
+  it('cada Baader lleva su propio rendimiento; la línea suma sus minutos andando y sus piezas', () => {
+    expect(ev1!.rendimiento.piezasPerilla).toBe(378)
+    expect(ev2!.rendimiento.piezasPerilla).toBe(0)
+    const sumaExp = [ev1!, ev2!, ev3!].reduce((a, b) => a + b.rendimiento.expMeta, 0)
+    const sumaHizo = [ev1!, ev2!, ev3!].reduce((a, b) => a + b.rendimiento.hizo, 0)
+    expect(linea.rendimiento.expMeta).toBeCloseTo(sumaExp, 6)
+    expect(linea.rendimiento.hizo).toBe(sumaHizo)
+    expect(linea.rendimiento.hizo).toBe(linea.hizo)
+  })
+})
+
+describe('tipo de cada parada en el desglose (B-2)', () => {
+  it('lo programado es solo colación, reunión y ejercicio; la limpieza de ducto marcada programada pasa a detención', () => {
+    expect(tipoParaDesglose({ tipo: 'programada', razon: 'COLACION' })).toBe('programada')
+    expect(tipoParaDesglose({ tipo: 'programada', razon: 'Limpieza de Ducto' })).toBe('detencion')
+    expect(tipoParaDesglose({ tipo: 'micro', razon: 'Micro Detencion' })).toBe('micro')
+    expect(tipoParaDesglose({ tipo: 'detencion', razon: 'AJUSTE OPERADOR' })).toBe('detencion')
   })
 })

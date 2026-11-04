@@ -46,7 +46,7 @@ import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/dat
 import { construirCascada } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
-import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
+import { TarjetaCascada } from './monitor/CascadaTurnoCard'
 import { cascadaPorMeta } from './monitor/cascadaPerilla'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
@@ -7553,9 +7553,9 @@ function MonitorDelToken() {
                 las piezas a la línea (hallazgo del rediseño 26-08).
                 En la TV nace OCULTA (fábrica de TV), no ausente: así se puede
                 agregar desde Personalizar cuando la sala la quiera ver. */}
-            {cascadaMeta && (
+            {(cascadaMeta || cascada) && (
               <TarjetaTablero id="cascada" t={tablero}>
-                <CascadaTurnoCard cascada={cascadaMeta.cascada} minutosTurno={cascadaMeta.minutos} />
+                <TarjetaCascada meta={cascadaMeta} anterior={cascada} />
               </TarjetaTablero>
             )}
             {/* La respuesta de Mantención, junto al «dónde se fueron las

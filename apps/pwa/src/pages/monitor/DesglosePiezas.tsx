@@ -14,7 +14,7 @@ import { repartirPorMayorResto, type BloqueZona, type Desglose, type ZonaDesglos
 import { normalizar, type ParadaDetalle, type TipoParada } from './ritmoVivo'
 import { alTeclearGlobo, nombreCausa, sufijoRitmo, tiempoTexto, useGlobo, type Unidad } from './desgloseVista'
 import type { VaraUmbral } from './perilla'
-import { esProgramada } from './cascadaPerilla'
+import { esProgramada, tipoParaDesglose } from './cascadaPerilla'
 
 const CLAVE_UNIDAD = 'monitor.desglose.unidad'
 /** Columnas: piezas · barra · tiempo · «% del turno». Desde 640 px la barra es de 300 px (PC). */
@@ -171,7 +171,7 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
   }
 
   const tipoDe = new Map<string, TipoParada>()
-  for (const p of paradas) if (p.razon != null && !tipoDe.has(p.razon)) tipoDe.set(p.razon, p.tipo)
+  for (const p of paradas) if (p.razon != null && !tipoDe.has(p.razon)) tipoDe.set(p.razon, tipoParaDesglose(p))
   const causasDe = (f: Fila): Causa[] => Object.entries(f.razones).map(([razon, c]) => ({
     razon, nombre: nombreCausa(razon), n: c, tipo: tipoDe.get(razon) ?? 'detencion',
   }))

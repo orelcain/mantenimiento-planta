@@ -6,7 +6,9 @@
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import fixture from './fixtures/chonchi_0311_turno1_minutos.json'
-import { CascadaTurnoCard } from '../CascadaTurnoCard'
+import { CascadaTurnoCard, TarjetaCascada } from '../CascadaTurnoCard'
+import { construirCascada } from '../cascadaTurno'
+import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import { cascadaPorMeta, type CascadaArgs } from '../cascadaPerilla'
 import { paradasDetalle, type EntradaRitmoVivo } from '../ritmoVivo'
 import type { PerillasDeLinea } from '../perilla'
@@ -68,5 +70,55 @@ describe('CascadaTurnoCard: dueños por vista', () => {
     const { container, getByRole } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
     fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
     expect(container.textContent ?? '').toContain(`Cuadre: ${es(7_114)} − ${es(378)} − ${es(148)} − ${es(106)} − ${es(590)} = ${es(5_892)} piezas hechas.`)
+  })
+})
+
+describe('CascadaTurnoCard: fila de rendimiento, rótulo y regresión (B-2)', () => {
+  it('arriba de los escalones: la línea dice 13,7 pts con 378 de la perilla y 2.213 bajo ella', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('Al rendimiento le faltan')
+    expect(texto).toContain('13,7 pts')
+    expect(texto).toContain('de producción · 378 piezas')
+    expect(texto).toContain('vacíos y micro · 2.213 piezas')
+    expect(texto.indexOf('Al rendimiento le faltan')).toBeLessThan(texto.indexOf('Podía hacer a la meta'))
+  })
+
+  it('la fila cambia con el selector: Ev 2 no tiene parte de producción, Ev 1 sí', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 2' }))
+    expect(container.textContent ?? '').toContain('de producción · 0 piezas')
+    expect(container.textContent ?? '').not.toContain('de producción · 378 piezas')
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    expect(container.textContent ?? '').toContain('de producción · 378 piezas')
+  })
+
+  it('el rótulo es «Carros vacíos»', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    expect(container.textContent ?? '').toContain('Carros vacíos')
+  })
+
+  it('sin serie por minuto, la tarjeta vuelve a la cascada anterior (construirCascada), como antes de B-2', () => {
+    const live = {
+      totalPieces: 924, shiftPieces: 924,
+      series: [{ t: '2026-08-20T22:55:00.000Z', pieces: 462 }, { t: '2026-08-20T23:05:00.000Z', pieces: 462 }],
+      timeBreakdown: { windowMin: 95, producingMin: 81, plannedMin: 0, recoverableMin: 14, planned: [], recoverable: [{ reason: 'Detencion', min: 10, count: 4, lineMin: 10 }] },
+    } as unknown as PublicMonitorLive
+    const anterior = construirCascada({ live, ritmoMaquina: 18 })!
+    expect(anterior).not.toBeNull()
+    const { container, unmount } = render(<TarjetaCascada meta={null} anterior={anterior} />)
+    const sinMeta = container.textContent ?? ''
+    expect(sinMeta).toContain('Dónde se fueron las piezas')
+    expect(sinMeta).toContain('andando')
+    expect(sinMeta).not.toContain('Cuadre:')
+    expect(sinMeta).not.toContain('Tiempo de producción')
+    unmount()
+    const { container: nueva } = render(<TarjetaCascada meta={{ cascada, minutos: N }} anterior={anterior} />)
+    expect(nueva.textContent ?? '').toContain('Cuadre:')
+  })
+
+  it('sin ninguna de las dos, no hay tarjeta', () => {
+    const { container } = render(<TarjetaCascada meta={null} anterior={null} />)
+    expect(container.textContent ?? '').toBe('')
   })
 })

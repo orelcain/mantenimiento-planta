@@ -2,9 +2,9 @@
  * «Al rendimiento le faltan X pts»: la partición del rendimiento con la perilla (Fase B).
  *
  * Dos partes: «perilla más lenta que la meta» (producción) y «faltó para llegar a la perilla» (vacíos y micro).
- * Las cifras vienen ya calculadas de `rendimientoPartido` (`cascadaPerilla.ts`); esta fila solo las pinta.
- * Va bajo la fila del OEE de `PlantKPIBoard`, que la recibe por prop: la pantalla que la usa la pasa cuando tiene la serie
- * por minuto y las perillas del turno.
+ * Las cifras vienen ya calculadas por `cascadaPerilla.ts` (`rendimiento` de cada vista); esta fila solo las pinta.
+ * La usa la tarjeta de la cascada del monitor (`CascadaTurnoCard`), arriba de los escalones, por Baader y por línea.
+ * `PlantKPIBoard` la tiene como prop opcional sin enchufar.
  */
 import type { RendimientoPartido } from '@/pages/monitor/cascadaPerilla'
 import { BotonInfo } from '@/pages/monitor/GlobosFranja'
@@ -28,8 +28,8 @@ export function FilaRendimientoPerilla({ r }: { r: RendimientoPartido }) {
       </div>
       {info && (
         <p className="mt-2 text-nota text-muted-foreground">
-          El rendimiento cuenta solo los minutos andando, por eso sus piezas no son las de la cascada de abajo (que usa todo
-          el tiempo de producción). Cuadra con ella en lo que no es de la perilla.
+          El rendimiento cuenta solo los minutos andando (meta × minutos andando), por eso sus piezas no son las de la
+          cascada, que usa todo el tiempo de producción. La perilla y lo que faltó para llegar a ella suman los pts que faltan.
         </p>
       )}
       <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-muted">
