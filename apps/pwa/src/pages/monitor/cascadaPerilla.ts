@@ -16,7 +16,7 @@
  *  · La detención sin razón cuenta como minutos andando menos, pero no entra en detenciones, micro ni programada (igual que el mockup).
  */
 import { ANDANDO_MIN_S, esMicroDetencion, normalizar, varaEnMinuto, type MaquinaSerie, type ParadaDetalle, type TipoParada } from './ritmoVivo'
-import type { PerillasDeLinea } from './perilla'
+import { perillaVigenteEn, type PerillasDeLinea } from './perilla'
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 
 /* Lo que el mockup cuenta como programado: colación, reunión de inicio de turno y ejercicio compensatorio. Va normalizado. */
@@ -96,6 +96,8 @@ export interface BaaderCascada extends PiezasVista {
   meta: number
   /** Vara vigente al final del turno (pz/min), la misma que usa el desglose. Sin perilla, es la meta de Shoplogix. */
   vara: number | null
+  /** Motivo de la perilla vigente al final del turno («por el Knuro»). null si no hay perilla o no tiene motivo. */
+  motivo: string | null
 }
 
 export interface CascadaPorMeta {
@@ -143,6 +145,8 @@ interface Calculo {
   expMeta: number
   /** Perilla vigente al final del turno; null si la Baader no tiene meta. */
   vara: number | null
+  /** Motivo de esa misma perilla (el instante es el del `vara`); null si no hay perilla o no tiene motivo. */
+  motivo: string | null
 }
 
 /** Minutos del turno de una Baader con sus segundos por clase. Una pasada por las paradas; después, todo sale por minuto. */
@@ -247,6 +251,7 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
     andTodo,
     expMeta: meta * andTodo,
     vara: varaEnMinuto(m, t0, n - 1, perillas),
+    motivo: perillaVigenteEn(perillas, m.id, t0 + (n - 1) * MS_MINUTO)?.motivo ?? null,
   }
 }
 
@@ -322,6 +327,7 @@ export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
       nombre: c.nombre,
       meta: c.meta,
       vara: c.vara,
+      motivo: c.motivo,
       ...vistaDe([c]),
     })),
   }

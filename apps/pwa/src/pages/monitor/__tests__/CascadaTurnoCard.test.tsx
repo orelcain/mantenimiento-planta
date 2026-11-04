@@ -73,6 +73,37 @@ describe('CascadaTurnoCard: dueños por vista', () => {
   })
 })
 
+describe('CascadaTurnoCard: el motivo de la perilla en el escalón', () => {
+  const PERILLAS_CON_MOTIVO: PerillasDeLinea = {
+    actual: {
+      [IDS[0]!]: { cpm: 17, desde, motivo: 'por el Knuro' },
+      [IDS[1]!]: { cpm: 16, desde },
+      [IDS[2]!]: { cpm: 16, desde },
+    },
+    historial: [],
+  }
+  const cascadaConMotivo = cascadaPorMeta({ serie, n: N, paradas, perillas: PERILLAS_CON_MOTIVO })
+
+  it('en Ev 1, el detalle «Perilla más lenta» dice «17 en vez de 18 · por el Knuro»', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascadaConMotivo} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    expect(container.textContent ?? '').toContain('17 en vez de 18 · por el Knuro')
+  })
+
+  it('en la línea, la Baader con pérdida lleva su motivo: «Ev 1 17 en vez de 18 · por el Knuro»', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascadaConMotivo} minutosTurno={N} />)
+    expect(container.textContent ?? '').toContain('Ev 1 17 en vez de 18 · por el Knuro')
+  })
+
+  it('sin motivo, el detalle queda como antes: «17 en vez de 18» y no aparece ningún motivo', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('17 en vez de 18')
+    expect(texto).not.toContain('por el Knuro')
+  })
+})
+
 describe('CascadaTurnoCard: fila de rendimiento, rótulo y regresión (B-2)', () => {
   it('arriba de los escalones: la línea dice 13,7 pts con 378 de la perilla y 2.213 bajo ella', () => {
     const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)

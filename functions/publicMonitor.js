@@ -832,16 +832,21 @@ function normShiftName(s) {
   return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 }
 
+/** Tope del motivo publicado de una perilla, en caracteres (la PWA lo aplica al guardar; aquí se vuelve a aplicar). */
+const MOTIVO_PERILLA_MAX = 60
+
 /**
  * Una perilla de velocidad, saneada. Null si no es usable: sin un cpm positivo
- * o sin `desde` con fecha válida, no se publica. Solo sale `cpm` y `desde`: el
- * monitor público no muestra quién anotó (el editor de admin lo lee de graderModuleConfigs).
+ * o sin `desde` con fecha válida, no se publica. Salen `cpm`, `desde` y, solo si
+ * hay texto, `motivo` (recortado y con tope de 60). Nunca `por`: el monitor público
+ * no muestra quién anotó (el editor de admin lo lee de graderModuleConfigs).
  */
 function normPerilla(v) {
   const cpm = Number(v?.cpm)
   const t = typeof v?.desde === 'string' ? Date.parse(v.desde) : NaN
   if (!(cpm > 0) || !Number.isFinite(t)) return null
-  return { cpm, desde: v.desde }
+  const motivo = typeof v?.motivo === 'string' ? Array.from(v.motivo.trim()).slice(0, MOTIVO_PERILLA_MAX).join('').trim() : ''
+  return motivo ? { cpm, desde: v.desde, motivo } : { cpm, desde: v.desde }
 }
 
 /**

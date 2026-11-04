@@ -83,3 +83,43 @@ test('leerPerillas sin perillas ni modo válido devuelve null, aunque monitorUmb
   assert.equal(leerPerillas({ monitorUmbralARitmo: null }), null)
   assert.equal(leerPerillas({ monitorUmbralARitmo: { modo: 'otro' } }), null)
 })
+
+test('normPerilla publica el motivo recortado de espacios, y nunca quién anotó', () => {
+  assert.deepEqual(
+    normPerilla({ cpm: 17, desde: DESDE, por: 'Orel C.', motivo: '  por el Knuro  ' }),
+    { cpm: 17, desde: DESDE, motivo: 'por el Knuro' },
+  )
+})
+
+test('normPerilla no publica motivo vacío, de solo espacios ni que no sea texto', () => {
+  assert.deepEqual(normPerilla({ cpm: 17, desde: DESDE, motivo: '' }), { cpm: 17, desde: DESDE })
+  assert.deepEqual(normPerilla({ cpm: 17, desde: DESDE, motivo: '   ' }), { cpm: 17, desde: DESDE })
+  assert.deepEqual(normPerilla({ cpm: 17, desde: DESDE, motivo: null }), { cpm: 17, desde: DESDE })
+  assert.deepEqual(normPerilla({ cpm: 17, desde: DESDE, motivo: 5 }), { cpm: 17, desde: DESDE })
+})
+
+test('normPerilla recorta el motivo a 60 caracteres', () => {
+  const p = normPerilla({ cpm: 17, desde: DESDE, motivo: 'a'.repeat(80) })
+  assert.equal(p.motivo, 'a'.repeat(60))
+})
+
+test('normPerilla cuenta caracteres y no parte un emoji al recortar', () => {
+  const p = normPerilla({ cpm: 17, desde: DESDE, motivo: '😀'.repeat(61) })
+  assert.equal(Array.from(p.motivo).length, 60)
+  assert.equal(p.motivo, '😀'.repeat(60))
+})
+
+test('leerPerillas publica el motivo de la vigente y del historial, sin quién anotó', () => {
+  const perillas = leerPerillas({
+    monitorPerillas: { ev1: { cpm: 17, desde: DESDE, por: 'Orel C.', motivo: 'por el Knuro' } },
+    monitorPerillasHistorial: [{ machineId: 'ev1', cpm: 17, desde: DESDE, por: 'Orel C.', motivo: 'por el Knuro' }],
+  })
+  assert.deepEqual(perillas.actual, { ev1: { cpm: 17, desde: DESDE, motivo: 'por el Knuro' } })
+  assert.deepEqual(perillas.historial, [{ cpm: 17, desde: DESDE, machineId: 'ev1', motivo: 'por el Knuro' }])
+  assert.equal(JSON.stringify(perillas).includes('Orel'), false)
+})
+
+test('leerPerillas: una perilla guardada sin motivo (cadena vacía, como la escribe la PWA) sale sin la clave motivo', () => {
+  const perillas = leerPerillas({ monitorPerillas: { ev1: { cpm: 17, desde: DESDE, por: 'x', motivo: '' } } })
+  assert.deepEqual(perillas.actual, { ev1: { cpm: 17, desde: DESDE } })
+})

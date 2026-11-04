@@ -77,11 +77,13 @@ export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPo
   const metas = baader
     ? `${baader.meta} pz/min`
     : `${cascada.baaders.map((b) => b.meta).join(' + ')} pz/min`
+  /* El motivo («por el Knuro») va después de la cifra: explica la pérdida para que nadie la lea como falla. */
+  const conMotivo = (motivo: string | null) => (motivo ? ` · ${motivo}` : '')
   const perillas = baader
     ? baader.vara != null && baader.vara !== baader.meta
-      ? `${baader.vara} en vez de ${baader.meta}`
+      ? `${baader.vara} en vez de ${baader.meta}${conMotivo(baader.motivo)}`
       : 'igual a su meta'
-    : cascada.baaders.filter((b) => b.perilla > 0).map((b) => `${etiquetaVista(b.nombre)} ${b.vara} en vez de ${b.meta}`).join(' · ') || 'ninguna más lenta que su meta'
+    : cascada.baaders.filter((b) => b.perilla > 0).map((b) => `${etiquetaVista(b.nombre)} ${b.vara} en vez de ${b.meta}${conMotivo(b.motivo)}`).join(' · ') || 'ninguna más lenta que su meta'
 
   const escalones = escalonesDe(v, metas, perillas, baader == null)
   const d = v.duenos

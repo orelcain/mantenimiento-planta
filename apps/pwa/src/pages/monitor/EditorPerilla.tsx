@@ -2,13 +2,13 @@
  * EditorPerilla — anotar la velocidad de la perilla de UNA Baader desde la franja «El turno completo» (solo admin).
  *
  * `MinutoTurnoV2` lo abre bajo el nombre de la máquina, dentro de su fila, como tarjeta sobre las barras. Guardar llama a
- * `setMonitorPerilla` con la línea (`plantSlug`) y quien anota (`por`), igual que el editor del set point. El historial con
+ * `setMonitorPerilla` con la línea (`plantSlug`), quien anota (`por`) y el motivo opcional («por el Knuro»), igual que el editor del set point. El historial con
  * `por` se lee de Firestore con la sesión de quien mira: el monitor público solo trae `{cpm, desde}`.
  *
  * Lo que la franja muestra de la perilla sale del dato publicado (`perillas`), no de un estado local. Después de guardar,
  * el editor dice «guardado · se aplica con el próximo dato» y lo sigue diciendo hasta que llega un dato publicado nuevo.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { leerPerillasHistorial, setMonitorPerilla, type PerillaHistorial } from '@/services/shoplogix/pinShiftEnd'
 import { diaMesPerilla, horaPerilla, quienAnoto, umbralARitmo, type PerillaPublica, type PerillasDeLinea } from './perilla'
 
@@ -21,6 +21,8 @@ export interface PerillaEditorDatos {
 /** El rango que acepta el servicio: pz/min enteros de 5 a 30. */
 const MIN_CPM = 5
 const MAX_CPM = 30
+/** Tope del motivo, en caracteres: el mismo que aplica el servicio al guardar y el servidor al publicar. */
+const MAX_MOTIVO = 60
 /** Cuántas anotaciones del historial se muestran (la más reciente primero). */
 const HISTORIAL_VISIBLE = 5
 
@@ -41,6 +43,9 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
   /* Sin perilla se propone la meta de Shoplogix si cae en el rango: es el número que la app ya muestra, no uno inventado. */
   const propuesto = meta != null && meta >= MIN_CPM && meta <= MAX_CPM ? Math.round(meta) : null
   const [valor, setValor] = useState<number | null>(vigente ? vigente.cpm : propuesto)
+  /* Motivo opcional: precargado con el vigente. Es texto libre, así que no hay propuesta. */
+  const [motivo, setMotivo] = useState<string>(vigente?.motivo ?? '')
+  const idMotivo = useId()
   const [estado, setEstado] = useState<Estado>('listo')
   const [historial, setHistorial] = useState<PerillaHistorial[] | null>(null)
   const [errorHistorial, setErrorHistorial] = useState(false)
@@ -65,8 +70,10 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
     setEstado((e) => (e === 'guardado' ? 'listo' : e))
   }, [perillas])
 
-  /* Sin cambio no se guarda: con perilla anotada, Guardar exige un valor distinto del vigente. */
-  const cambio = valor != null && valor !== (vigente ? vigente.cpm : null)
+  /* Sin cambio no se guarda: con perilla anotada, Guardar exige un valor distinto del vigente, o un motivo distinto.
+     Añadir «por el Knuro» a una perilla que ya está en 17 no debe obligar a moverla. */
+  const motivoLimpio = motivo.trim()
+  const cambio = valor != null && (valor !== (vigente ? vigente.cpm : null) || motivoLimpio !== (vigente?.motivo ?? ''))
   const puedeGuardar = cambio && estado === 'listo'
   const mover = (delta: number) => setValor((v) => (v == null ? null : Math.min(MAX_CPM, Math.max(MIN_CPM, v + delta))))
 
@@ -74,7 +81,7 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
     if (valor == null || !puedeGuardar) return
     setEstado('guardando')
     try {
-      await setMonitorPerilla({ plantSlug: datos.plantSlug, machineId, cpm: valor, por: datos.por })
+      await setMonitorPerilla({ plantSlug: datos.plantSlug, machineId, cpm: valor, por: datos.por, motivo: motivoLimpio })
       setEstado('guardado')
     } catch {
       setEstado('error')
@@ -116,6 +123,19 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
           ? <>Con {valor}: a ritmo con <b className="font-semibold text-foreground">{umbralARitmo(valor, perillas?.modo)} o más por minuto</b>{meta != null ? ` · meta Shoplogix ${Math.round(meta)}` : ''}</>
           : 'Sin valor propuesto: la máquina no tiene meta de Shoplogix.'}
       </p>
+      <div className="mt-3">
+        <label htmlFor={idMotivo} className="block text-[13px] font-semibold leading-[18px] text-muted-foreground">Motivo (opcional)</label>
+        {/* Alto en píxeles, como los botones del editor: el tamaño táctil no sigue la escala de la raíz (index.css). */}
+        <input
+          id={idMotivo}
+          type="text"
+          value={motivo}
+          maxLength={MAX_MOTIVO}
+          placeholder="por ejemplo: por el Knuro"
+          onChange={(e) => setMotivo(e.target.value)}
+          className="mt-1 h-[44px] w-full rounded-ctl border border-border bg-background px-3 text-[15px] text-foreground placeholder:text-muted-foreground"
+        />
+      </div>
       <p className="mt-3.5 text-[13px] font-semibold leading-[18px] text-muted-foreground">Historial</p>
       {errorHistorial
         ? <p className="mt-1 text-[13px] text-muted-foreground">No se pudo leer el historial.</p>

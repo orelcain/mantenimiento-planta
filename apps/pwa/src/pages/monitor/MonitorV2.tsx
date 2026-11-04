@@ -641,7 +641,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
                           : f.principal
                             ? (f.esperado != null ? `esperado ${dec(f.esperado, 0)} pz/min` : 'pz por minuto')
                             : <>{f.vigente
-                                ? <>perilla {int(f.vigente.cpm)} · <span className="whitespace-nowrap">anotada {diaMesPerilla(f.vigente.desde)}</span></>
+                                ? <>perilla {int(f.vigente.cpm)} · <span className="whitespace-nowrap">anotada {diaMesPerilla(f.vigente.desde)}</span>{f.vigente.motivo ? <> · {f.vigente.motivo}</> : null}</>
                                 : <span style={{ color: 'var(--v2-atento-texto)' }}>sin perilla anotada</span>}
                               {f.meta != null ? ` · meta Shoplogix ${dec(f.meta, 0)}` : ''}</>}
                       </div>

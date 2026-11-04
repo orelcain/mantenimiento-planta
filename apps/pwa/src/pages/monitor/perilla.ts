@@ -13,10 +13,10 @@
  * esperado de Shoplogix.
  */
 /**
- * Lo que el monitor público ve de una perilla: velocidad y cuándo entró en vigor.
- * Quién la anotó no sale del servidor (functions/publicMonitor.js, normPerilla).
+ * Lo que el monitor público ve de una perilla: velocidad, cuándo entró en vigor y, si el admin lo anotó, el motivo
+ * («por el Knuro»): explica por qué va por debajo de la meta. Quién la anotó no sale del servidor (functions/publicMonitor.js, normPerilla).
  */
-export type PerillaPublica = { cpm: number; desde: string }
+export type PerillaPublica = { cpm: number; desde: string; motivo?: string }
 
 /**
  * Cómo se toma el «a ritmo» con perilla (decisión de Orel, 04-11). `calibrado` (por omisión) descuenta una pieza por Baader al umbral

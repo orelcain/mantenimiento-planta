@@ -97,7 +97,7 @@ describe('el editor de una máquina con perilla', () => {
     fireEvent.click(getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(container.textContent).toContain('guardado · se aplica con el próximo dato'))
     expect(setMonitorPerilla).toHaveBeenCalledTimes(1)
-    expect(setMonitorPerilla).toHaveBeenCalledWith({ plantSlug: 'chonchi', machineId: 'ev1', cpm: 18, por: 'orel@test' })
+    expect(setMonitorPerilla).toHaveBeenCalledWith({ plantSlug: 'chonchi', machineId: 'ev1', cpm: 18, por: 'orel@test', motivo: '' })
     expect((getByRole('button', { name: 'Guardar' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -137,5 +137,65 @@ describe('el editor de una máquina sin perilla', () => {
     fireEvent.click(getByText('Anotar perilla'))
     expect(container.textContent).toContain('Con 16: a ritmo con 15 o más por minuto · meta Shoplogix 16')
     expect((getByRole('button', { name: 'Guardar' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+})
+
+describe('el motivo opcional del editor', () => {
+  const PERILLAS_CON_MOTIVO: PerillasDeLinea = {
+    actual: { ev1: { cpm: 17, desde: '2026-11-04T00:00:00.000Z', motivo: 'por el Knuro' } },
+    historial: [],
+  }
+
+  it('el campo dice «Motivo (opcional)», tiene el ejemplo de placeholder y tope de 60 caracteres', () => {
+    comoAdmin()
+    const { getByText, getByLabelText } = renderFranja(EDITOR)
+    fireEvent.click(getByText('Cambiar perilla'))
+    const campo = getByLabelText('Motivo (opcional)') as HTMLInputElement
+    expect(campo.placeholder).toBe('por ejemplo: por el Knuro')
+    expect(campo.maxLength).toBe(60)
+    expect(campo.value).toBe('')
+  })
+
+  it('se precarga con el motivo vigente', () => {
+    comoAdmin()
+    const { getByText, getByLabelText } = renderFranja(EDITOR, PERILLAS_CON_MOTIVO)
+    fireEvent.click(getByText('Cambiar perilla'))
+    expect((getByLabelText('Motivo (opcional)') as HTMLInputElement).value).toBe('por el Knuro')
+  })
+
+  it('con el motivo vigente sin cambios, Guardar queda apagado', () => {
+    comoAdmin()
+    const { getByText, getByRole } = renderFranja(EDITOR, PERILLAS_CON_MOTIVO)
+    fireEvent.click(getByText('Cambiar perilla'))
+    expect((getByRole('button', { name: 'Guardar' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('añadir un motivo a una perilla que no se mueve habilita Guardar y guarda el valor vigente con el motivo', async () => {
+    comoAdmin()
+    const { getByText, getByRole, getByLabelText, container } = renderFranja(EDITOR)
+    fireEvent.click(getByText('Cambiar perilla'))
+    fireEvent.change(getByLabelText('Motivo (opcional)'), { target: { value: 'por el Knuro' } })
+    expect((getByRole('button', { name: 'Guardar' }) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(container.textContent).toContain('guardado · se aplica con el próximo dato'))
+    expect(setMonitorPerilla).toHaveBeenCalledWith({ plantSlug: 'chonchi', machineId: 'ev1', cpm: 17, por: 'orel@test', motivo: 'por el Knuro' })
+  })
+
+  it('vaciar el motivo vigente y guardar manda el motivo vacío (sin motivo)', async () => {
+    comoAdmin()
+    const { getByText, getByRole, getByLabelText, container } = renderFranja(EDITOR, PERILLAS_CON_MOTIVO)
+    fireEvent.click(getByText('Cambiar perilla'))
+    fireEvent.change(getByLabelText('Motivo (opcional)'), { target: { value: '' } })
+    fireEvent.click(getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(container.textContent).toContain('guardado · se aplica con el próximo dato'))
+    expect(setMonitorPerilla).toHaveBeenCalledWith({ plantSlug: 'chonchi', machineId: 'ev1', cpm: 17, por: 'orel@test', motivo: '' })
+  })
+
+  it('solo espacios no cuentan como motivo: sin motivo vigente, Guardar sigue apagado', () => {
+    comoAdmin()
+    const { getByText, getByRole, getByLabelText } = renderFranja(EDITOR)
+    fireEvent.click(getByText('Cambiar perilla'))
+    fireEvent.change(getByLabelText('Motivo (opcional)'), { target: { value: '   ' } })
+    expect((getByRole('button', { name: 'Guardar' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

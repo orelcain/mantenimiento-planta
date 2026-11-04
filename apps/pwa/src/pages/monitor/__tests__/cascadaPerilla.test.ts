@@ -105,6 +105,35 @@ describe('cuadre: cada vista cierra sola (podía − perilla − detenciones −
   })
 })
 
+describe('motivo de la perilla vigente al final del turno', () => {
+  it('Ev 1 lleva el motivo de su perilla; Ev 2 y Ev 3, sin motivo, lo llevan null', () => {
+    const conMotivo = cascadaPorMeta(args({
+      actual: {
+        [IDS[0]!]: { cpm: 17, desde, motivo: 'por el Knuro' },
+        [IDS[1]!]: { cpm: 16, desde },
+        [IDS[2]!]: { cpm: 16, desde },
+      },
+      historial: [],
+    }))
+    expect(conMotivo.baaders[0]!.motivo).toBe('por el Knuro')
+    expect(conMotivo.baaders[1]!.motivo).toBeNull()
+    expect(conMotivo.baaders[2]!.motivo).toBeNull()
+  })
+
+  it('el motivo es el de la anotación vigente al cierre: una anotación anterior con motivo no pasa', () => {
+    const reemplazada = cascadaPorMeta(args({
+      actual: { [IDS[0]!]: { cpm: 17, desde } },
+      historial: [{ machineId: IDS[0]!, cpm: 17, desde: '2026-11-03T12:00:00.000Z', motivo: 'por el Knuro' }],
+    }))
+    expect(reemplazada.baaders[0]!.vara).toBe(17)
+    expect(reemplazada.baaders[0]!.motivo).toBeNull()
+  })
+
+  it('sin perillas no hay motivo', () => {
+    expect(cascadaPorMeta(args(null)).baaders[0]!.motivo).toBeNull()
+  })
+})
+
 describe('perilla', () => {
   it('sin perillas la pérdida es 0 y el resto queda igual que con perillas iguales a la meta', () => {
     const sinPerillas = cascadaPorMeta(args(null))
