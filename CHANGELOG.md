@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.15.1] - 2026-11-04
+Monitor: el rótulo de la detención programada del tiempo del turno no se corta en el celular.
+
+### Corregido
+- «Detención programada, toda la línea» ocupa dos líneas a 375 px en vez de cortarse con «…» (revisión en producción de la 4.15.0).
+
 ## [4.15.0] - 2026-11-04
 Monitor: el tablero («Más del turno») pasa a la cascada a la meta de Shoplogix, la misma de la vista clásica.
 

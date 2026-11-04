@@ -2042,7 +2042,7 @@ function TiempoV2({ t }: { t: NonNullable<MasDelTurno['tiempo']> }) {
       <ul className="mt-4 space-y-2">
         {partes.map((x) => (
           <li key={x.k} className="flex items-center justify-between gap-3 text-[15px]">
-            <span className="inline-flex min-w-0 items-center gap-2"><i className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: x.color }} /><span className="truncate">{x.k}</span></span>
+            <span className="inline-flex min-w-0 items-center gap-2"><i className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: x.color }} /><span className="min-w-0 leading-snug" data-rotulo-tiempo>{x.k}</span></span>
             <span className="shrink-0 tabular-nums text-muted-foreground">{horas(x.min)} · {Math.round((x.min / tot) * 100)} %</span>
           </li>
         ))}

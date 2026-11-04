@@ -11,6 +11,11 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-04 · Claude · Monitor: el rótulo del tiempo del turno no se corta en el celular (v4.15.1)
+- Hecho: la revisión en producción de la 4.15.0 (verificador-web, 2 monitores × 375/1280 × claro/oscuro) pasó cascada, cuadre, detalle y vocabulario; a 375 px «Detención programada, toda la línea» se cortaba con «…» (span `truncate` de 174 px para 242). Ahora ocupa dos líneas. Archivos: `MonitorV2.tsx` (`TiempoV2`) y `MonitorV2.elTurno.test.tsx`; versión 4.15.1.
+- Verificación: vitest del archivo 25/25; mutante (vuelve `truncate`) → 1 falla, revertido.
+- Estado: EN REVISIÓN (PR).
+
 ## 2026-11-04 · Claude · Monitor: el tablero pasa a la cascada a la meta y 6 arreglos de la revisión en producción (v4.15.0)
 - Hecho: «Más del turno» del tablero v2 deja la cascada vieja (capacidad al set point) y pinta la cascada a la meta (`cascadaPorMeta`) con «Ver detalle» por causa, Baader y hora (`cascadaMetaDetalle.ts`, reparte el total de cada escalón; `CascadaMetaV2.tsx`). Sin serie por minuto queda la vieja como respaldo. Mockup aprobado (Etapa 2 de 3, opción A con pestañas; prueba de 5 s 3/3 con 4/4). Además: `esProgramada` con la regla del servidor (`esParoPlanificado`: espacios colapsados y substring), «faltó para llegar a la perilla» = vacíos de la cascada, `conPerilla` en `BaaderCascada`, `etiquetaVista` en `cascadaPerilla.ts`, textos de una máquina en la franja de Filete, ⓘ del set point con `BotonInfo`, vocabulario («Detención programada», «detenida», «microdetenciones», `nombreCausa` en «Imputado») y el patrón de `vocabulario.ts` que ahora atrapa «parado», «microparada» y «paró», tiempo del turno con rango y «Detención programada, toda la línea».
 - Archivos: `cascadaPerilla.ts`, `cascadaMetaDetalle.ts` (nuevo), `CascadaMetaV2.tsx` (nuevo), `MonitorV2.tsx`, `PublicShiftMonitorPage.tsx`, `CascadaTurnoCard.tsx`, `FilaRendimientoPerilla.tsx`, `GraficoRitmoVivo.tsx`, `textosCausas.ts`, `CascadaTurnoAnterior.tsx`, `MonitorShiftParts.tsx`, `shoplogixColors.ts` y sus pruebas; versión 4.15.0.
