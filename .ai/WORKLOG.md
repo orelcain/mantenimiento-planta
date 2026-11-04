@@ -11,7 +11,19 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
-## 2026-11-04 · Claude · Monitor: fase A-2b de la perilla, promedio de 15 min y etiquetas de vara (v4.11.0)
+## 2026-11-04 · Claude · Monitor: la perilla de cada Baader pasa a ser la vara, fase A (v4.11.0)
+- Fase A completa, en 13 commits de `feat/monitor-perilla`:
+  - perilla por máquina, con fecha en hora de planta, historial y regla de solo admin, probada con el emulador;
+  - transporte al monitor público por `loadPlannedShift`, sin el nombre de quien anotó;
+  - vara por minuto en «Ritmo en vivo»;
+  - «a ritmo» = la perilla completa cuando hay perilla, y 75 % de Shoplogix sin ella;
+  - franja con «carros con pieza» y «minutos a ritmo»;
+  - editor para admin;
+  - panel de 15 min con promedio;
+  - etiquetas de vara.
+- Lo decidió el usuario en los cuestionarios del 04-11 (Etapas 1 y 2 de 3). El mockup pasó la prueba de 5 s con 3 de 3 lectores.
+- El Duelo, la cascada, el OEE y los KPI no cambian; van en la fase B. Al mergear se despliegan las reglas de Firestore y las functions.
+- Detalle de la última pasada (A-2b):
 - Hecho: el gráfico de la tarjeta pone la vara bajo cada Baader («perilla 17»; sin perilla, «Shoplogix 16» en el tono de atento). El panel «Carros con pieza, por máquina · últimos 15 minutos» muestra el promedio de la ventana (Σ piezas ÷ Σ vara × fracción andando, con la regla de `vaciosTurnoDe`), la raya en el umbral entero («17 o más», «12 o más») y la vara bajo la cifra. `aWallClockMs` y `desdePerilla` pasan a `lib/horaDePlanta.ts`, así services ya no importa de pages. Quién anotó: el historial muestra lo que va antes de «@» y la página guarda el nombre visible.
 - Archivos: `lib/horaDePlanta.ts` (nuevo); `pages/monitor/` (`ritmoVivo.ts`, `perilla.ts`, `contadorCrudo.ts`, `GraficoRitmoVivo.tsx`, `RitmoVivoV2.tsx`, `EditorPerilla.tsx`); `services/shoplogix/pinShiftEnd.ts`; `PublicShiftMonitorPage.tsx` (una línea: `por`); `functions/lib/dueloNucleo.cjs` regenerado (sin cambio de lógica); pruebas en `__tests__/` (ritmoVivo, perilla, editorPerilla, GraficoRitmoVivo, nueva `RitmoVivoPanel15min`); versión 4.11.0 (`package.json`, `version.ts`, `version.json`, `VERSION.md`).
 - Verificación: antes, tsc 0; eslint 29 (0 errores); vitest 402 archivos, 5253 ok, 8 omitidas; functions 664/664; vite build 0. Después, tsc 0; eslint 29 (0 errores); vitest 403 archivos, 5267 ok, 8 omitidas, 0 fallas; functions 664/664; vite build 0; el `.cjs` regenerado coincide con el commiteado. Mutantes, restaurados y confirmados con `cmp`: promedio = último minuto, 3 de 3 pruebas nuevas de ritmoVivo fallan; `quienAnoto` con el correo entero, 4 pruebas en 2 archivos; cifra del panel = último minuto, falla la prueba de render. Banco: texto leído por DevTools en Edge headless, 0 errores de página; medido, «Shoplogix 16» mide 72,6 px en la columna de 62 px de la tarjeta (sobresale 10,6 px sin cortarse).
