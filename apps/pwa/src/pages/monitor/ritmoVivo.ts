@@ -506,32 +506,40 @@ export function vaciosTurnoDe(
   }
 }
 
-/** Señales sobrias: lo que el dato muestra y qué mirar; nunca afirman una causa. */
-export function senalesDe(lineas: LineaLlenado[], unidad: 'carros' | 'silletas' | null, separaParadas: boolean): Senal[] {
+/**
+ * Señales sobrias: lo que el dato muestra y qué mirar; nunca afirman una causa. Las cifras que citan son las del PANEL
+ * (`cifraPanel`, de `carrosVentana`: los mismos 15 min y la misma regla). La caída compara el inicio y el fin de la tira
+ * (3 minutos cada uno), que no es esa cifra: por eso la caída se dice SIN porcentajes. Así hay un solo número por máquina.
+ */
+export function senalesDe(lineas: LineaLlenado[], unidad: 'carros' | 'silletas' | null, separaParadas: boolean, cifraPanel: Record<string, number | null> = {}): Senal[] {
   const cosa = unidad ? `${unidad} con pieza` : 'llenado'
   const out: Senal[] = []
   const n = lineas.length
   const medidas = lineas.filter((l) => l.ini != null && l.fin != null)
   const bajan = medidas.filter((l) => l.baja)
+  /* Sin una cifra del panel por cada máquina medida no se cita ninguna: no se muestra un rango a medias. */
+  const citable = medidas.length > 0 && medidas.every((l) => cifraPanel[l.id] != null)
+  const valoresPanel = citable ? medidas.map((l) => cifraPanel[l.id]!) : []
   if (medidas.length === 0) {
     out.push({ tono: 'neutra', texto: 'Todavía no hay minutos con llenado medible para dar una señal.' })
   } else if (n > 1) {
     if (bajan.length === n) {
-      out.push({ tono: 'atento', texto: `Bajan las ${n} a la vez: de ${rangoTxt(lineas.map((l) => l.ini!))} % a ${rangoTxt(lineas.map((l) => l.fin!))} % de ${cosa}. Cuando caen juntas conviene revisar la alimentación o la MMPP; el dato no confirma la causa.` })
+      out.push({ tono: 'atento', texto: `Bajan las ${n} a la vez en los 15 min de ${cosa}. Cuando caen juntas conviene revisar la alimentación o la MMPP; el dato no confirma la causa.` })
     } else if (bajan.length === 1) {
       const b = bajan[0]!
-      const otras = medidas.filter((l) => !l.baja)
-      out.push({ tono: 'atento', texto: `Solo baja ${b.nombre}: de ${b.ini} % a ${b.fin} % de ${cosa}${otras.length ? `; las otras siguen en ${rangoTxt(otras.map((l) => l.fin!))} %` : ''}. Conviene revisar esa máquina.` })
+      const otras = medidas.filter((l) => !l.baja).length
+      out.push({ tono: 'atento', texto: `Solo baja ${b.nombre} en los 15 min de ${cosa}${otras ? '; las otras no bajan' : ''}. Conviene revisar esa máquina.` })
     } else if (bajan.length > 1) {
-      out.push({ tono: 'atento', texto: `Bajan ${bajan.map((l) => l.nombre).join(' y ')}: ${bajan.map((l) => `${l.ini} → ${l.fin} %`).join(' y ')} de ${cosa}. El dato no confirma la causa.` })
+      out.push({ tono: 'atento', texto: `Bajan ${bajan.map((l) => l.nombre).join(' y ')} en los 15 min de ${cosa}. El dato no confirma la causa.` })
     } else {
-      out.push({ tono: 'neutra', texto: `Llenado parejo${n > 1 ? ` en las ${n}` : ''}: ${rangoTxt(medidas.map((l) => l.fin!))} % de ${cosa}. Sin señales.` })
+      out.push({ tono: 'neutra', texto: citable ? `Llenado parejo en las ${n}: ${rangoTxt(valoresPanel)} % de ${cosa}. Sin señales.` : `Llenado parejo en las ${n}. Sin señales.` })
     }
   } else {
     const l = medidas[0]!
+    const cap = `${cosa[0]!.toUpperCase()}${cosa.slice(1)}`
     out.push(l.baja
-      ? { tono: 'atento', texto: `${cosa[0]!.toUpperCase()}${cosa.slice(1)} baja de ${l.ini} % a ${l.fin} % en 15 min. Conviene revisar la máquina.` }
-      : { tono: 'neutra', texto: `${cosa[0]!.toUpperCase()}${cosa.slice(1)} estable, ${l.fin} %. Sin señales.` })
+      ? { tono: 'atento', texto: `${cap} baja en los 15 min. Conviene revisar la máquina.` }
+      : { tono: 'neutra', texto: citable ? `${cap} estable, ${valoresPanel[0]} %. Sin señales.` : `${cap} estable. Sin señales.` })
   }
   for (const l of medidas) {
     if (l.baja && l.microsRecientes >= 2) {
@@ -602,6 +610,8 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
     e,
     e.perillas,
   )
+  /* La cifra del panel de cada Baader (`carrosVentana`, redondeada como se muestra): la señal la cita tal cual. */
+  const cifraPanel: Record<string, number | null> = Object.fromEntries(carrosVentana.maquinas.map((x) => [x.id, x.pct == null ? null : Math.round(x.pct)]))
   return {
     minutos,
     porMaquina,
@@ -615,7 +625,7 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
     lineas,
     separaParadas,
     carrosVentana,
-    senales: senalesDe(lineas, unidad, separaParadas),
+    senales: senalesDe(lineas, unidad, separaParadas, cifraPanel),
     unidad,
   }
 }

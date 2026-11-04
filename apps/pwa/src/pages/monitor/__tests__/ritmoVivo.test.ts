@@ -175,6 +175,23 @@ describe('señales', () => {
     expect(r.lineas[2]!.microsRecientes).toBe(2)
     expect(r.senales.some((s) => /2 micro detenciones en 7 min/.test(s.texto) && /Señal temprana/.test(s.texto))).toBe(true)
   })
+
+  it('el llenado parejo cita la cifra del panel (15 min, Σ ÷ Σ), no la de los últimos 3 minutos', () => {
+    /* 11 minutos a 12 pz (75 % de 16) y los 3 últimos a 16 (100 %): el fin de la tira da 100, pero el panel promedia los 14 min:
+       180 de 224 = 80 %. La señal dice 80, el mismo número que el panel. */
+    const cola = [...Array.from({ length: 11 }, () => 12), 16, 16, 16]
+    const r = calcularRitmoVivo(entrada([maq('1', cola), maq('2', cola), maq('3', cola)], base), 'carros')!
+    expect(r.carrosVentana.maquinas.map((m) => Math.round(m.pct!))).toEqual([80, 80, 80])
+    expect(r.senales[0]!.texto).toBe('Llenado parejo en las 3: 80 % de carros con pieza. Sin señales.')
+  })
+
+  it('la caída se dice sin porcentajes: no compite con la cifra del panel', () => {
+    const solo = calcularRitmoVivo(entrada([maq('1', sana), maq('2', sana), maq('3', cae)], base), 'carros')!
+    const todas = calcularRitmoVivo(entrada([maq('1', cae), maq('2', cae), maq('3', cae)], base), 'carros')!
+    expect(solo.senales[0]!.texto).toMatch(/Solo baja Evisceradora 3/)
+    expect(solo.senales[0]!.texto).not.toMatch(/%/)
+    expect(todas.senales[0]!.texto).not.toMatch(/%/)
+  })
 })
 
 describe('tarjeta completa', () => {
