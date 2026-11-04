@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.15.3] - 2026-11-04
+Grader: «detención» en vez de «paro» en todo lo que se lee, y una prueba que lo vigila.
+
+### Corregido
+- 125 textos del Grader (tarjetas, ayudas, botones, PDF del turno y de Mantención, resumen ejecutivo, rótulo del tramo «Detención») dicen «detención/detenciones», «microdetenciones» y «detenida» con la concordancia corregida.
+- `vocabularioGrader.test.ts` lee el código del Grader con el parser de TypeScript y falla si vuelve «paro», «parada», «parado» o «paró» a un texto visible; las claves internas se marcan con `vocab-ok`.
+- El patrón de vocabulario compartido ya no confunde «reemplazar» o «desplazar» con «azar».
+
 ## [4.15.2] - 2026-11-04
 Monitor: una sola definición de «detención programada» para la cascada y el servidor.
 

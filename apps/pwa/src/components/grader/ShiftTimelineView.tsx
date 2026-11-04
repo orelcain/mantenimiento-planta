@@ -1494,9 +1494,9 @@ export function ShiftTimelineView({
               title={
                 coverage.unclassifiedMin > 0
                   ? canAnnotate
-                    ? `Cobertura ${coverage.pct}%: porcentaje del tiempo de paro que tiene una causa asignada (tag). Faltan ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales — click para ir al primer paro sin tag.`
-                    : `Cobertura ${coverage.pct}%: porcentaje del tiempo de paro con causa asignada. ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales.`
-                  : `Cobertura ${coverage.pct}%: todos los ${coverage.totalMin} min de paros del turno tienen causa asignada (tag) — análisis completo.`
+                    ? `Cobertura ${coverage.pct}%: porcentaje del tiempo de detención que tiene una causa asignada (tag). Faltan ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales — click para ir a la primera detención sin tag.`
+                    : `Cobertura ${coverage.pct}%: porcentaje del tiempo de detención con causa asignada. ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales.`
+                  : `Cobertura ${coverage.pct}%: todos los ${coverage.totalMin} min de detenciones del turno tienen causa asignada (tag) — análisis completo.`
               }
               onClick={canAnnotate && coverage.unclassifiedMin > 0 ? handleCoverageBadgeClick : undefined}
             >

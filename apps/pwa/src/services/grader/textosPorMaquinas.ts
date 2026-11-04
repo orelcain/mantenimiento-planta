@@ -26,6 +26,6 @@ export function sinIntervencion(sanas: number, total: number): string {
 /** La leyenda debajo de las barras de reparto. */
 export function leyendaReparto(total: number): string {
   return total === 1
-    ? 'La barra arranca por falla técnica: el bloque rojo es el tiempo que le tocó a Mantención. Tócala para ver el Gantt, los paros y los comentarios del operador.'
-    : `Las ${total} barras miden el mismo turno y arrancan por falla técnica: el bloque rojo se compara de un vistazo. Toca una máquina para ver su Gantt, sus paros y los comentarios del operador.`
+    ? 'La barra arranca por falla técnica: el bloque rojo es el tiempo que le tocó a Mantención. Tócala para ver el Gantt, las detenciones y los comentarios del operador.'
+    : `Las ${total} barras miden el mismo turno y arrancan por falla técnica: el bloque rojo se compara de un vistazo. Toca una máquina para ver su Gantt, sus detenciones y los comentarios del operador.`
 }

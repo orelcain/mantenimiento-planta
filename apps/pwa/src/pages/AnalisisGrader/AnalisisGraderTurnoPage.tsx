@@ -2939,7 +2939,7 @@ export function AnalisisGraderTurnoPage() {
             <div className="flex items-center justify-between gap-2 -mb-1 px-1">
               <span
                 className="text-caption text-muted-foreground cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
-                title="Línea upstream = el proceso aguas arriba del Grader. En esta planta son las 3 Baader 142 (Evisceradoras) que reciben los salmones, los evisceran y los pasan al Grader. Su uptime / paros afectan directamente al throughput del Grader."
+                title="Línea upstream = el proceso aguas arriba del Grader. En esta planta son las 3 Baader 142 (Evisceradoras) que reciben los salmones, los evisceran y los pasan al Grader. Su uptime / detenciones afectan directamente al throughput del Grader."
               >
                 Línea upstream · Baader 142
               </span>

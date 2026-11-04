@@ -338,7 +338,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     const color     = slxStateColor(st.type, st.reason, st.color, st.name)
     const cause     = st.reason || st.name
     const typeLabel = st.type === 'uptime'  ? 'Produciendo'
-      : st.type === 'break'  ? 'Paro programado'
+      : st.type === 'break'  ? 'Detención programada'
       : st.type === 'setup'  ? 'Setup'
       : 'Detención'
     // Offset cursor + clamp a viewport para que no se salga del lado derecho.

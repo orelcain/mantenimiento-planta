@@ -66,8 +66,8 @@ export async function exportMaintenanceImpactPDF(
   doc.setFillColor(255, 247, 237)
   const phrase =
     rel.eventsCount > 0
-      ? `Mantencion atendio ${rel.eventsCount} paros (${rel.fallasCount} fallas + ${rel.intervencionesCount} intervenciones) por ${fmt(rel.maintenanceDowntimeSec)} en el periodo.`
-      : 'Sin paros clasificados como falla de equipo o intervencion de mantencion en el periodo.'
+      ? `Mantencion atendio ${rel.eventsCount} detenciones (${rel.fallasCount} fallas + ${rel.intervencionesCount} intervenciones) por ${fmt(rel.maintenanceDowntimeSec)} en el periodo.`
+      : 'Sin detenciones clasificadas como falla de equipo o intervencion de mantencion en el periodo.'
   doc.roundedRect(MARGIN, y, pageW - MARGIN * 2, 12, 2, 2, 'FD')
   doc.setFontSize(9.5)
   doc.setFont('helvetica', 'normal')
@@ -87,7 +87,7 @@ export async function exportMaintenanceImpactPDF(
       ['Disponibilidad atribuible', availTxt],
       ['Averias (falla de equipo)', String(rel.fallasCount)],
       ['Intervenciones de mantencion', String(rel.intervencionesCount)],
-      ['Paro total de mantencion', `${fmt(rel.maintenanceDowntimeSec)}  (${shareTxt} del muerto)`],
+      ['Detencion total de mantencion', `${fmt(rel.maintenanceDowntimeSec)}  (${shareTxt} del muerto)`],
       ['Tiempo operativo del periodo', fmt(rel.operatingSec)],
       ['Micro-detenciones (<5min, aparte)', `${rel.microCount.toLocaleString('es-CL')}  ·  ${fmt(rel.microSec)}`],
     ],
@@ -103,11 +103,11 @@ export async function exportMaintenanceImpactPDF(
   if (rel.trend.length > 0) {
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
-    doc.text(`Tendencia del paro de mantencion ${rel.trend[0]?.grouped ? '(por semana)' : '(por dia)'}`, MARGIN, y)
+    doc.text(`Tendencia de la detencion de mantencion ${rel.trend[0]?.grouped ? '(por semana)' : '(por dia)'}`, MARGIN, y)
     y += 2
     autoTable(doc, {
       startY: y,
-      head: [['Periodo', 'Paro de mantencion', 'Eventos']],
+      head: [['Periodo', 'Detencion de mantencion', 'Eventos']],
       body: rel.trend.map((t) => [t.label, fmt(t.downtimeSec), String(t.events)]),
       theme: 'grid',
       headStyles: { fillColor: [100, 116, 139] },
@@ -157,7 +157,7 @@ export async function exportMaintenanceImpactPDF(
   doc.setFontSize(7.5)
   doc.setTextColor(120)
   const note =
-    'Definiciones: MTTR = tiempo medio de reparacion de averias macro (paros relevantes >=5min). ' +
+    'Definiciones: MTTR = tiempo medio de reparacion de averias macro (detenciones relevantes >=5min). ' +
     'MTBF = tiempo en operacion / N de averias. Disponibilidad atribuible = uptime / tiempo operativo. ' +
     'Las micro-detenciones (<5min) se reportan aparte para no distorsionar el MTTR. ' +
     'Fuente: pausas del Grader clasificadas como falla de equipo / intervencion de mantencion.'

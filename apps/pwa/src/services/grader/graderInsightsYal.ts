@@ -136,7 +136,7 @@ export function deriveYalSuggestions(ctx: YalSuggestionContext): SuggestedAction
       id: 'yal-low-throughput',
       category: 'verificar',
       title: 'Throughput bajo del objetivo',
-      description: `${piecesPerMin.toFixed(0)} pzs/min vs target ~${YAL_TARGET_PIECES_PER_MIN} pzs/min (3 Baader 142 a 22 c/u). Verificar uptime de las Baader, paros recientes y velocidad efectiva de la línea.`,
+      description: `${piecesPerMin.toFixed(0)} pzs/min vs target ~${YAL_TARGET_PIECES_PER_MIN} pzs/min (3 Baader 142 a 22 c/u). Verificar uptime de las Baader, detenciones recientes y velocidad efectiva de la línea.`,
       severity: piecesPerMin < YAL_TARGET_PIECES_PER_MIN * 0.5 ? 'critical' : 'warning',
     })
   }
@@ -149,7 +149,7 @@ export function deriveYalSuggestions(ctx: YalSuggestionContext): SuggestedAction
         id: 'yal-baader-low-uptime',
         category: 'verificar',
         title: 'Uptime Baader 142 bajo',
-        description: `Promedio de las 3 evisceradoras: ${(uptimePct * 100).toFixed(0)}% (umbral ${(YAL_BAADER_UPTIME_WARN * 100).toFixed(0)}%). Revisar Shoplogix por paros prolongados; un Baader detenido reduce el throughput total a 2/3.`,
+        description: `Promedio de las 3 evisceradoras: ${(uptimePct * 100).toFixed(0)}% (umbral ${(YAL_BAADER_UPTIME_WARN * 100).toFixed(0)}%). Revisar Shoplogix por detenciones prolongadas; un Baader detenido reduce el throughput total a 2/3.`,
         severity: uptimePct < YAL_BAADER_UPTIME_WARN * 0.7 ? 'critical' : 'warning',
       })
     }

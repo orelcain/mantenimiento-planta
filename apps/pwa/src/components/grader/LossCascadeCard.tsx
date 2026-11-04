@@ -355,7 +355,7 @@ export function LossCascadeCard({
           {calcOpen && (
             <div className="rounded-ctl border border-transparent bg-primary/[0.15] px-3 py-2 text-caption space-y-1 font-mono tabular-nums">
               <div>
-                <span className="text-muted-foreground">Turno (Σ máq) = tiempo rastreado por Shoplogix en el turno × 3 Baader (procesando + pausas + paros + setup; colación incluida hasta el paso siguiente) = </span>
+                <span className="text-muted-foreground">Turno (Σ máq) = tiempo rastreado por Shoplogix en el turno × 3 Baader (procesando + pausas + detenciones + setup; colación incluida hasta el paso siguiente) = </span>
                 <b>{fmtHm(turnoSec)}</b>
               </div>
               <div>
@@ -387,7 +387,7 @@ export function LossCascadeCard({
               pérdidas por magnitud) — mismo criterio que la Cascada del mes.
               Los grupos de pérdida son BOTONES: click filtra la lista abajo. */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 text-caption">
-            <div className="rounded-ctl bg-muted/40 px-2 py-1.5" title="Suma del tiempo rastreado por Shoplogix en el turno, de las 3 máquinas (procesando + pausas + paros + setup).">
+            <div className="rounded-ctl bg-muted/40 px-2 py-1.5" title="Suma del tiempo rastreado por Shoplogix en el turno, de las 3 máquinas (procesando + pausas + detenciones + setup).">
               <div className="text-muted-foreground text-caption uppercase">Turno (Σ máq)</div>
               <div className="font-mono tabular-nums">{fmtHm(turnoSec)}</div>
               <div className="text-caption text-muted-foreground/60">100%</div>
@@ -477,7 +477,7 @@ export function LossCascadeCard({
                         {activeBucket == null && m.piezas > 0 && (
                           <div
                             className="mt-0.5 text-caption tabular-nums text-foreground/70"
-                            title={`${m.piezas.toLocaleString('es-CL')} piezas en ${fmtHm(m.cascade.produccionSec)} de proceso. La cadencia se mide solo sobre el tiempo en proceso: si contara las horas paradas, una máquina detenida parecería lenta en vez de parada.`}
+                            title={`${m.piezas.toLocaleString('es-CL')} piezas en ${fmtHm(m.cascade.produccionSec)} de proceso. La cadencia se mide solo sobre el tiempo en proceso: si contara las horas sin producir, una máquina detenida parecería lenta en vez de detenida.`}
                           >
                             {m.piezas.toLocaleString('es-CL')} pz
                             <span className="text-muted-foreground"> · </span>

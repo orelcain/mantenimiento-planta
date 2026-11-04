@@ -19,7 +19,7 @@ import type { PauseTier } from './types'
 export const PAUSE_TIER_LABEL: Record<PauseTier, string> = {
   pausa:  'Pausa',
   larga:  'Pausa larga',
-  parada: 'Parada',
+  parada: 'Detención',
 }
 
 /**

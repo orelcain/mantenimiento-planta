@@ -118,7 +118,7 @@ const DEFS = {
   avail:   { desc: 'Porcentaje del tiempo productivo en que la máquina estuvo operativa.\n\nA = Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las Baaders.' },
   perf:    { desc: 'Velocidad real respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)' },
   quality: { desc: 'Porcentaje de piezas buenas sobre el total.\n\nQ = 1 − P0% del Grader\n\nSolo disponible cuando hay datos del Grader para ese período.' },
-  mttr:    { desc: 'Tiempo medio de reparación de una avería MACRO (paro relevante ≥5min).\n\nMTTR = Σ duración averías macro / N° averías macro\n\nExcluye micro-detenciones (<5min) para no distorsionar el indicador.\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
+  mttr:    { desc: 'Tiempo medio de reparación de una avería MACRO (detención relevante ≥5min).\n\nMTTR = Σ duración averías macro / N° averías macro\n\nExcluye micro-detenciones (<5min) para no distorsionar el indicador.\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
   mtbf:    { desc: 'Tiempo medio entre averías macro.\n\nMTBF = Uptime / N° averías macro\n\n> 2 h excelente · 1‒2 h aceptable · < 1 h bajo' },
 }
 
@@ -225,7 +225,7 @@ export function PlantKPIBoard({
           lost,
           lostByStops: m.lostByStops,
           stopsPct: lost > 0 ? m.lostByStops / lost : 0,
-          dominant: m.lostByStops >= m.lostBySpeed ? ('paros' as const) : ('velocidad' as const),
+          dominant: m.lostByStops >= m.lostBySpeed ? ('detenciones' as const) : ('velocidad' as const),
         }
       })
     if (withData.length < 2) return null
@@ -406,12 +406,12 @@ export function PlantKPIBoard({
               />
               <div
                 className="px-1 py-1.5"
-                title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
+                title="Averías macro: detenciones relevantes ≥5min (excluye micro-detenciones y detenciones operacionales). Son los eventos que cuentan para MTTR/MTBF."
               >
                 <div className="text-caption font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
                 <div className="text-xl font-bold tabular-nums leading-none">{kpis.failureCount}</div>
                 <p className="text-caption text-muted-foreground/60 mt-1 leading-tight">
-                  paros ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
+                  detenciones ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
                 </p>
               </div>
             </div>
@@ -429,12 +429,12 @@ export function PlantKPIBoard({
               <div className="flex items-start gap-1.5 rounded-ctl bg-warning/[0.15] px-2.5 py-2 text-caption text-ink-warn">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
-                  title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad — una es el modelo antiguo (19 pz/min) y las otras dos el nuevo (16 pz/min), así que su % no es comparable.`}
+                  title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por detenciones: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad — una es el modelo antiguo (19 pz/min) y las otras dos el nuevo (16 pz/min), así que su % no es comparable.`}
                 >
                   <b className="font-semibold">La que más arrastra:</b> {machineDiag.worst.name} —{' '}
                   <b>{Math.round(machineDiag.worst.lost).toLocaleString('es-CL')} piezas perdidas</b>
-                  {' '}({pct(machineDiag.worst.stopsPct, 0)} por paros) · pérdida dominante:{' '}
-                  <b>{machineDiag.worst.dominant === 'paros' ? 'Paros (disponibilidad)' : 'Velocidad (micro-paradas / cadencia)'}</b>.
+                  {' '}({pct(machineDiag.worst.stopsPct, 0)} por detenciones) · pérdida dominante:{' '}
+                  <b>{machineDiag.worst.dominant === 'detenciones' ? 'Detenciones (disponibilidad)' : 'Velocidad (microdetenciones / cadencia)'}</b>.
                 </span>
               </div>
             )}
@@ -460,7 +460,7 @@ export function PlantKPIBoard({
               {kpis.machines.map((m, idx) => {
                 const availPctTxt = m.availability !== null ? `${(m.availability * 100).toFixed(0)}%` : 'sin datos'
                 const perfPctTxt  = m.performance  !== null ? `${(m.performance  * 100).toFixed(0)}%` : 'sin datos'
-                const mttrTxt     = m.mttrMin > 0 ? fmtMin(m.mttrMin) : 'sin paros'
+                const mttrTxt     = m.mttrMin > 0 ? fmtMin(m.mttrMin) : 'sin detenciones'
                 const isWorst     = machineDiag?.worst.id === m.machineid
                 return (
                 <div
@@ -469,7 +469,7 @@ export function PlantKPIBoard({
                     'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-caption',
                     isWorst && 'ring-1 ring-warning/40 bg-warning/[0.04]',
                   )}
-                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\nLa que más piezas pierde del grupo' : ''}`}
+                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} detenciones${isWorst ? '\nLa que más piezas pierde del grupo' : ''}`}
                 >
                   {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-ink-warn shrink-0" />}
                   <span
@@ -493,16 +493,16 @@ export function PlantKPIBoard({
                   </span>
                   <span
                     className={cn('w-14 sm:w-16 tabular-nums', mttrColor(m.mttrMin))}
-                    title={`MTTR (Mean Time To Repair): ${mttrTxt}\nDuración promedio de cada paro. Solo cuenta paros tipo 'Break' (≥5 min).\n\n<5 min excelente · 5-15 min aceptable · >15 min crítico`}
+                    title={`MTTR (Mean Time To Repair): ${mttrTxt}\nDuración promedio de cada detención. Solo cuenta detenciones tipo 'Break' (≥5 min).\n\n<5 min excelente · 5-15 min aceptable · >15 min crítico`}
                   >
                     {fmtMin(m.mttrMin)}
                   </span>
                   <span
                     className="text-muted-foreground/60 tabular-nums"
-                    title={`Paros: ${m.failureCount} eventos\nCantidad de paros detectados por Shoplogix (intervalos de tipo 'Break' ≥5 min). No incluye micro-detenciones (<5 min).`}
+                    title={`Detenciones: ${m.failureCount} eventos\nCantidad de detenciones detectadas por Shoplogix (intervalos de tipo 'Break' ≥5 min). No incluye micro-detenciones (<5 min).`}
                   >
-                    {m.failureCount} <span className="hidden sm:inline">paro{m.failureCount !== 1 ? 's' : ''}</span>
-                    <span className="sm:hidden">par</span>
+                    {m.failureCount} <span className="hidden sm:inline">{m.failureCount === 1 ? 'detención' : 'detenciones'}</span>
+                    <span className="sm:hidden">det.</span>
                   </span>
                   {m.shoplogixTargetCpm !== null && (
                     <span

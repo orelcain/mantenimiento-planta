@@ -109,7 +109,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
   const handleSave = useCallback(async () => {
     const dur = Number(duracion)
     if (!etapaFinal) { setError('Elige o escribe la etapa.'); return }
-    if (!Number.isFinite(dur) || dur <= 0) { setError('Indica la duración del paro (minutos).'); return }
+    if (!Number.isFinite(dur) || dur <= 0) { setError('Indica la duración de la detención (minutos).'); return }
     setSaving(true)
     setError(null)
     try {
@@ -128,14 +128,14 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
       await load()
       onChanged?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar el paro.')
+      setError(err instanceof Error ? err.message : 'No se pudo registrar la detención.')
     } finally {
       setSaving(false)
     }
   }, [duracion, etapaFinal, causa, fecha, plantLineId, user, load])
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!isAdmin || !window.confirm('¿Eliminar este paro?')) return
+    if (!isAdmin || !window.confirm('¿Eliminar esta detención?')) return
     try { await deleteParo(id); await load(); onChanged?.() } catch { /* noop */ }
   }, [isAdmin, load, onChanged])
 
@@ -144,7 +144,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <PauseCircle className="h-4 w-4 text-cat-5-ink" />
-          Paros de etapa (línea)
+          Detenciones de etapa (línea)
           {areaLabel && (
             <Badge variant="outline" className="ml-1 text-caption font-normal text-muted-foreground border-border/50">{areaLabel}</Badge>
           )}
@@ -213,7 +213,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
               para esto (3.80:1). Ver DESIGN.md §3: el tinte vivo no va en
               rellenos grandes. */}
           <Button type="button" variant="destructive" onClick={handleSave} disabled={saving}>
-            {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Guardando…</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar paro</>}
+            {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Guardando…</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar detención</>}
           </Button>
           {justSaved && <span className="flex items-center gap-1 text-xs text-ink-ok font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Registrado</span>}
         </div>
@@ -222,12 +222,12 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         <div className="pt-2 border-t border-border/40 space-y-2">
           <p className="text-caption font-medium text-muted-foreground flex items-center gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" /> ¿Qué etapa para más la línea? · este mes
-            {pareto.totalN > 0 && <span className="text-muted-foreground/60">({pareto.totalN} paros · {fmtDur(pareto.totalMin)} total)</span>}
+            {pareto.totalN > 0 && <span className="text-muted-foreground/60">({pareto.totalN} detenciones · {fmtDur(pareto.totalMin)} total)</span>}
           </p>
           {loading ? (
             <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…</p>
           ) : pareto.rows.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-1">Sin paros registrados este mes. El primero aparecerá acá con su ranking.</p>
+            <p className="text-xs text-muted-foreground py-1">Sin detenciones registradas este mes. La primera aparecerá acá con su ranking.</p>
           ) : (
             <div className="space-y-1.5">
               {pareto.rows.map((r, i) => {
@@ -236,7 +236,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
                   <div key={r.etapa} className="space-y-0.5">
                     <div className="flex items-center justify-between text-caption">
                       <span className={cn('font-medium', i === 0 ? 'text-cat-5-ink' : 'text-foreground')}>{i + 1}. {r.etapa}</span>
-                      <span className="tabular-nums text-muted-foreground">{fmtDur(r.min)} · {r.n} paro{r.n !== 1 ? 's' : ''}</span>
+                      <span className="tabular-nums text-muted-foreground">{fmtDur(r.min)} · {r.n} {r.n === 1 ? 'detención' : 'detenciones'}</span>
                     </div>
                     <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
                       <div className={cn('h-full rounded-full', i === 0 ? 'bg-fill-critical' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${wpct}%` }} />

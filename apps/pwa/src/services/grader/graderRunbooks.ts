@@ -226,7 +226,7 @@ export const RUNBOOKS: Record<string, Runbook> = {
   'motor-tambor': {
     id: 'motor-tambor',
     title: 'Revisión de motor tambor cinta de aceleración',
-    summary: 'Inspeccionar el motor del tambor de la 2ª cinta ante parada o ruido anormal',
+    summary: 'Inspeccionar el motor del tambor de la 2ª cinta ante detención o ruido anormal',
     category: 'mantencion',
     imageRef: '/docs/grader/troubleshooting/moto-tambor.jpg',
     steps: [
@@ -240,7 +240,7 @@ export const RUNBOOKS: Record<string, Runbook> = {
     ],
     successCriteria: ['Cinta gira sin ruido anormal', 'Sin vibración excesiva', 'Posición de montaje dentro de los 40° admitidos'],
     triggers: [
-      { condition: 'Cinta de aceleración parada o con velocidad reducida' },
+      { condition: 'Cinta de aceleración detenida o con velocidad reducida' },
       { condition: 'Ruido anormal en zona de la 2ª cinta' },
     ],
     source: 'Moto tambor cinta aceleración 2 grader.jpg (OneDrive GRADER) + manual Marelec MS4/12 §7.5, págs 38-40. El manual NO fija ningún límite de temperatura para el drum motor.',

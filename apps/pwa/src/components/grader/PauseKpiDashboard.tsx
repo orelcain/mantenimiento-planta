@@ -499,7 +499,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
           <KpiCard
             label="Pausas ≥5 min"
             value={kpis!.totalPauses.toLocaleString('es-CL')}
-            sub="pausa · larga · parada"
+            sub="pausa · larga · detención"
             icon={<PauseCircle className="w-3.5 h-3.5" />}
           />
           <KpiCard

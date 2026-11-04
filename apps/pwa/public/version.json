@@ -1,7 +1,7 @@
 {
-  "version": "4.15.2",
+  "version": "4.15.3",
   "buildDate": "2026-11-04",
-  "buildTimestamp": 1793833642704,
+  "buildTimestamp": 1793838600000,
   "features": [
     "Monitor: el tablero muestra la misma cascada a la meta que la vista clásica, con su detalle por causa, Baader y hora, y dice de quién es cada pérdida",
     "Monitor: la perilla de cada Baader lleva un motivo opcional («por el Knuro») que se ve en la franja y en la cascada, para que la pérdida no se lea como falla",

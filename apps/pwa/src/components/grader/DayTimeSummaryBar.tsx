@@ -98,7 +98,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
       <span className="text-ink-ok tabular-nums" title={`Tiempo total procesando (suma de ${maquinasLabel}, todos los turnos)`}>
         ▲ {fmtDurationSec(totals.uptimeSec)} procesando
       </span>
-      <span className="text-ink-crit tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
+      <span className="text-ink-crit tabular-nums" title={`Tiempo total de detención (suma de ${maquinasLabel}, todos los turnos)`}>
         <PauseCircle className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.downtimeSec)} detenidas
       </span>
       {/* Con solo el ícono de la taza, este número quedaba sin nombre al lado de
@@ -124,7 +124,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
               {getShiftMeta(t.shiftId).shortLabel}{' '}
               {t.downtimeSec > 0
                 ? fmtDurationSec(t.downtimeSec)
-                : <span className="text-ink-ok">sin paros</span>}
+                : <span className="text-ink-ok">sin detenciones</span>}
             </span>
           ))}
         </span>
