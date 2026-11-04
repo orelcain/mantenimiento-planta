@@ -245,3 +245,25 @@ describe('MonitorV2 pinta la cascada a la meta cuando su «Más del turno» la t
     expect(texto(container)).not.toContain('pz bajo la meta')
   })
 })
+
+describe('tarjeta de la cascada: detenciones de segundos y nombres largos', () => {
+  it('una detención de 20 s que costó piezas dice «menos de 1 min», no «0 min»; el nombre de la causa no se corta en una línea', () => {
+    const id = 'b1'
+    const t0 = Date.parse('2026-11-04T08:00:00.000Z')
+    const cortos: CascadaArgs = {
+      serie: { desde: '2026-11-04T08:00:00.000Z', maquinas: [{ id, nombre: 'Evisceradora 1', esperado: 16, cycles: Array.from({ length: 10 }, (_, k) => (k === 4 ? 10 : 16)) }] },
+      n: 10,
+      paradas: paradasDetalle({ stopEvents: [{ r: 0, f: new Date(t0 + 4 * 60_000).toISOString(), s: 20, m: 0 }], stopReasons: ['ACUMULACION RECHAZO EVISCERADO Y LIMPIEZA'], stopMachines: [id], enCurso: [] }),
+      perillas: null,
+    }
+    const c = cascadaPorMeta(cortos)
+    const { container } = render(<CascadaMetaV2 cascada={c} detalle={detalleCascadaMeta(cortos, c)} contenedor="carro" />)
+    expect(c.linea.detenciones.piezas).toBeGreaterThan(0)
+    fireEvent.click(fila(container, 'Detenciones'))
+    expect(texto(container)).toContain('menos de 1 min')
+    expect(texto(container)).not.toContain('· 0 min')
+    const nombre = [...container.querySelectorAll('span')].find((e) => /acumulaci/i.test(e.textContent ?? '') && e.children.length === 0)!
+    expect(nombre.className).toContain('line-clamp-2')
+    expect(nombre.className).not.toContain('truncate')
+  })
+})

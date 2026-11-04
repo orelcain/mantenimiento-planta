@@ -25,6 +25,9 @@ const horasTxt = (min: number) => {
   return h ? `${h} h ${m} min` : `${m} min`
 }
 
+/** Minutos de una causa o una Baader: una detención de segundos no dice «0 min» si costó piezas. */
+const minTxt = (min: number | undefined, pz: number) => (Math.round(min ?? 0) === 0 && pz > 0 ? 'menos de 1 min' : `${Math.round(min ?? 0)} min`)
+
 type Fila = 'det' | 'micro' | 'vac'
 type Pestana = 'causa' | 'baader' | 'hora'
 type Parte = { n: number; color: string; op?: number }
@@ -67,7 +70,7 @@ function Renglones({ filas, total }: { filas: FilaDetalle[]; total: number }) {
       {filas.map((f) => (
         <li key={f.clave} className="min-w-0">
           <div className="grid grid-cols-[minmax(0,7.5rem)_1fr_auto] sm:grid-cols-[minmax(0,11rem)_1fr_auto] items-center gap-2 text-[13px]">
-            <span className="truncate text-foreground first-letter:uppercase">{f.nombre}</span>
+            <span className="line-clamp-2 break-words text-foreground first-letter:uppercase">{f.nombre}</span>
             <div className="flex h-2 overflow-hidden rounded-full" style={{ width: `${Math.max(3, (f.pz / max) * 100)}%` }}>
               {f.partes.filter((p) => p.n > 0).map((p, i) => <i key={i} className="block h-full" style={{ flex: p.n, background: p.color, opacity: p.op ?? 1 }} />)}
             </div>
@@ -140,7 +143,7 @@ function DetalleFila({ fila, d, v, unica, contenedor }: { fila: Fila; d: Detalle
         clave: c.clave,
         nombre: c.nombre,
         pz: c.piezas,
-        sub: `${c.dueno === 'aguas' ? 'Aguas arriba' : 'Mantención y operación'} · ${c.min ?? 0} min`,
+        sub: `${c.dueno === 'aguas' ? 'Aguas arriba' : 'Mantención y operación'} · ${minTxt(c.min, c.piezas)}`,
         partes: [{ n: c.piezas, color: c.dueno === 'aguas' ? C.aguas : C.mant }],
       }))}
     />
@@ -150,12 +153,12 @@ function DetalleFila({ fila, d, v, unica, contenedor }: { fila: Fila; d: Detalle
       total={total}
       filas={(baaders ?? []).map((b: RenglonMeta) => {
         if (fila === 'vac') return { clave: b.clave, nombre: b.nombre, pz: b.piezas, sub: b.vara != null ? `perilla ${b.vara} pz/min` : 'sin perilla', partes: [{ n: 1, color: C.aguas, op: 0.5 }] }
-        if (fila === 'micro') return { clave: b.clave, nombre: b.nombre, pz: b.piezas, sub: `${b.min ?? 0} min · ${b.veces ?? 0} veces`, partes: [{ n: 1, color: C.mant, op: 0.55 }] }
+        if (fila === 'micro') return { clave: b.clave, nombre: b.nombre, pz: b.piezas, sub: `${minTxt(b.min, b.piezas)} · ${b.veces ?? 0} veces`, partes: [{ n: 1, color: C.mant, op: 0.55 }] }
         return {
           clave: b.clave,
           nombre: b.nombre,
           pz: b.piezas,
-          sub: `${b.min ?? 0} min · ${b.veces ?? 0} veces`,
+          sub: `${minTxt(b.min, b.piezas)} · ${b.veces ?? 0} veces`,
           partes: [{ n: b.partes?.mantOp ?? 0, color: C.mant }, { n: b.partes?.aguas ?? 0, color: C.aguas }],
         }
       })}
@@ -238,7 +241,7 @@ export function CascadaMetaV2({ cascada, detalle, contenedor }: { cascada: Casca
       et: 'Detenciones',
       pz: det.piezas,
       resta: true,
-      info: [`${Math.round(det.min)} min${sumaDe}`, `${det.veces} veces`, partesTxt(detMant, det.aguas)].filter(Boolean).join(' · '),
+      info: [`${minTxt(det.min, det.piezas)}${sumaDe}`, `${det.veces} veces`, partesTxt(detMant, det.aguas)].filter(Boolean).join(' · '),
       abre: 'det',
       partes: [{ n: detMant, color: C.mant }, { n: det.aguas, color: C.aguas }],
     },
@@ -247,7 +250,7 @@ export function CascadaMetaV2({ cascada, detalle, contenedor }: { cascada: Casca
       et: 'Microdetenciones',
       pz: v.micro.piezas,
       resta: true,
-      info: `${Math.round(v.micro.min)} min · ${v.micro.veces} veces · ${v.micro.aguas > 0 ? partesTxt(microMant, v.micro.aguas) : 'Mantención y operación'}`,
+      info: `${minTxt(v.micro.min, v.micro.piezas)} · ${v.micro.veces} veces · ${v.micro.aguas > 0 ? partesTxt(microMant, v.micro.aguas) : 'Mantención y operación'}`,
       abre: 'micro',
       partes: [{ n: 1, color: C.mant, op: 0.55 }],
     },
