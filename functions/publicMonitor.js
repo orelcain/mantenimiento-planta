@@ -832,8 +832,45 @@ function normShiftName(s) {
   return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 }
 
+/**
+ * Una perilla de velocidad, saneada. Null si no es usable: sin un cpm positivo
+ * o sin `desde` con fecha válida, no se publica.
+ */
+function normPerilla(v) {
+  const cpm = Number(v?.cpm)
+  const t = typeof v?.desde === 'string' ? Date.parse(v.desde) : NaN
+  if (!(cpm > 0) || !Number.isFinite(t)) return null
+  return { cpm, desde: v.desde, por: typeof v.por === 'string' ? v.por : null }
+}
+
+/**
+ * Perillas de velocidad por máquina del doc de la línea: `monitorPerillas` (la
+ * vigente de cada máquina) y `monitorPerillasHistorial` (máx. 100, la más nueva al
+ * final). Viajan en el payload porque el monitor público no puede leer
+ * graderModuleConfigs. Solo admin las escribe: la regla está en firestore.rules.
+ * Null si la línea no tiene ninguna perilla.
+ */
+function leerPerillas(data) {
+  const actual = {}
+  if (data?.monitorPerillas && typeof data.monitorPerillas === 'object') {
+    for (const [machineId, v] of Object.entries(data.monitorPerillas)) {
+      const p = normPerilla(v)
+      if (p) actual[machineId] = p
+    }
+  }
+  const historial = []
+  if (Array.isArray(data?.monitorPerillasHistorial)) {
+    for (const h of data.monitorPerillasHistorial) {
+      const p = normPerilla(h)
+      if (p && typeof h.machineId === 'string' && h.machineId) historial.push({ ...p, machineId: h.machineId })
+    }
+  }
+  if (Object.keys(actual).length === 0 && historial.length === 0) return null
+  return { actual, historial: historial.slice(-100) }
+}
+
 async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
-  const vacio = { plannedEnd: null, quotaPieces: null, setPoint: null, pesoPromedioKg: null, quotaOrigen: null }
+  const vacio = { plannedEnd: null, quotaPieces: null, setPoint: null, perillas: null, pesoPromedioKg: null, quotaOrigen: null }
   if (!shiftId || !scheduledStart) return vacio
   /*
    * Cada `plantSlug` del monitor es UNA línea, así que el id de config se
@@ -860,8 +897,14 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
         por: typeof spRaw.por === 'string' ? spRaw.por : null,
       }
       : null
+    /*
+     * Perillas por máquina: mismo doc y misma resolución que el set point, así que
+     * se leen ANTES del horario, por la misma razón: la primera noche de un turno
+     * nuevo no pierde la velocidad de la perilla.
+     */
+    const perillas = leerPerillas(snap.data())
     const schedule = snap.data()?.shiftSchedule
-    if (!Array.isArray(schedule)) return { ...vacio, setPoint }
+    if (!Array.isArray(schedule)) return { ...vacio, setPoint, perillas }
     /*
      * Comparación TOLERANTE de nombre de turno. Filete llama al suyo
      * "Turno Dia" y la config guarda "Turno día": comparando literal, Filete
@@ -871,7 +914,7 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     // ̀-ͯ = los diacríticos que separa NFD. Escapado y no literal:
     // un archivo con otro encoding convertiría el rango en basura silenciosa.
     const entry = schedule.find(s => normShiftName(s?.shiftId) === normShiftName(shiftId))
-    if (!entry) return { ...vacio, setPoint }
+    if (!entry) return { ...vacio, setPoint, perillas }
 
     const endH = Number(entry.endHour)
     const endM = Number(entry.endMinute ?? 0)
@@ -955,6 +998,7 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     return {
       plannedEnd: end,
       setPoint,
+      perillas,
       /* El vigente: último registro DEL turno; legacy solo si cae dentro. */
       pesoPromedioKg: pesoRegistros.length > 0
         ? pesoRegistros[pesoRegistros.length - 1].pesoKg
@@ -1805,6 +1849,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
   const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
   const planned = { quotaPieces: cfg.quotaPieces, pesoPromedioKg: cfg.pesoPromedioKg ?? null, pesoRegistros: cfg.pesoRegistros ?? [], quotaOrigen: cfg.quotaOrigen ?? null }
   const setPoint = cfg.setPoint ?? null
+  const perillas = cfg.perillas ?? null
 
   let plannedEnd = null
   let plannedEndSource = null
@@ -1902,6 +1947,12 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
      * que un dato del PLC, y la pantalla lo dice.
      */
     setPoint,
+    /*
+     * Perillas por máquina (velocidad configurada en cada máquina) y su historial.
+     * Viajan como `setPoint`: el monitor público no puede leer graderModuleConfigs.
+     * La vara del minuto sale de ellas en la PWA (pages/monitor/perilla.ts).
+     */
+    perillas,
     /** Turnos anteriores usados cuando se infirió del historial. */
     plannedEndSamples,
     /*
