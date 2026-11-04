@@ -425,6 +425,8 @@ describe('MonitorV2 · Tiempo del turno: rango con el turno cerrado y detención
   it('con tres máquinas la parte programada dice «Detención programada, toda la línea» (ya no «colación, aseo»)', () => {
     const { container } = render(<MonitorV2 {...con(tiempo(3, true), true)} />)
     expect(screen.getByText('Detención programada, toda la línea')).toBeTruthy()
+    /* A 375 px el rótulo no cabe en una línea: puede ocupar dos, nunca cortarse con «…» (revisión en prod de v4.15.0). */
+    expect(screen.getByText('Detención programada, toda la línea').className).not.toContain('truncate')
     expect(texto(container)).not.toContain('colación, aseo')
   })
 
