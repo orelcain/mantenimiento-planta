@@ -115,7 +115,7 @@ describe('el editor de una máquina con perilla', () => {
     expect(container.textContent).not.toContain('guardado · se aplica con el próximo dato')
   })
 
-  it('el historial muestra solo las anotaciones de esta máquina, con quien anotó', async () => {
+  it('el historial muestra solo las anotaciones de esta máquina, con quien anotó y sin correo completo', async () => {
     comoAdmin()
     vi.mocked(leerPerillasHistorial).mockResolvedValue([
       { machineId: 'ev1', cpm: 17, desde: '2026-11-04T00:00:00.000Z', por: 'orel@test' },
@@ -123,8 +123,9 @@ describe('el editor de una máquina con perilla', () => {
     ])
     const { getByText, container } = renderFranja(EDITOR)
     fireEvent.click(getByText('Cambiar perilla'))
-    await waitFor(() => expect(container.textContent).toContain('17 pz/min · desde 04-11 00:00 · orel@test'))
-    expect(container.textContent).not.toContain('otro@test')
+    await waitFor(() => expect(container.textContent).toContain('17 pz/min · desde 04-11 00:00 · orel'))
+    expect(container.textContent).not.toContain('@')
+    expect(container.textContent).not.toContain('otro')
     expect(leerPerillasHistorial).toHaveBeenCalledWith('chonchi')
   })
 })

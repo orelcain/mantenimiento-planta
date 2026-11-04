@@ -8,6 +8,10 @@ import { describe, expect, it } from 'vitest'
 import { construirPerilla, desdePerilla } from '@/lib/horaDePlanta'
 import {
   perillaEn,
+  porDeUsuario,
+  quienAnoto,
+  rotuloRaya,
+  tonoDePorcentajeVara,
   tonoVara,
   umbralARitmo,
   UMBRAL_A_RITMO_PERILLA,
@@ -179,5 +183,51 @@ describe('perillaEn con un instante que no es número', () => {
     const perillas = { actual: { ev1: { cpm: 17, desde: '2026-11-04T01:20:00.000Z' } }, historial: [] }
     expect(perillaEn(perillas, 'ev1', Number.NaN)).toBeNull()
     expect(perillaEn(perillas, 'ev1', Date.parse('2026-11-04T02:00:00.000Z'))).toBe(17)
+  })
+})
+
+describe('rótulo de la raya «a ritmo»: el entero de la vara, no el 75 % de siempre con perilla', () => {
+  it('con perilla anotada es la perilla completa: 17 o más', () => {
+    expect(rotuloRaya({ cpm: 17, fuente: 'perilla' })).toBe('17 o más')
+  })
+
+  it('sin perilla es el 75 % de la meta de Shoplogix: meta 16 → 12 o más', () => {
+    expect(rotuloRaya({ cpm: 16, fuente: 'shoplogix' })).toBe('12 o más')
+  })
+
+  it('sin vara no hay rótulo', () => {
+    expect(rotuloRaya({ cpm: null, fuente: 'shoplogix' })).toBeNull()
+  })
+
+  it('el tono de una cifra de carros sigue la regla de tonoVara (perilla completa, o 75 % y 50 %)', () => {
+    expect(tonoDePorcentajeVara(100, { cpm: 17, fuente: 'perilla' })).toBe('bien')
+    /* 82 % de 17 son 13,9 pz/min: ni a ritmo (17) ni bajo, sino «atento». */
+    expect(tonoDePorcentajeVara(82, { cpm: 17, fuente: 'perilla' })).toBe('atento')
+    expect(tonoDePorcentajeVara(75, { cpm: 16, fuente: 'shoplogix' })).toBe('bien')
+    expect(tonoDePorcentajeVara(60, { cpm: 16, fuente: 'shoplogix' })).toBe('atento')
+    expect(tonoDePorcentajeVara(40, { cpm: 16, fuente: 'shoplogix' })).toBe('mal')
+    expect(tonoDePorcentajeVara(null, { cpm: 16, fuente: 'shoplogix' })).toBe('sin')
+  })
+})
+
+describe('quién anotó: nunca un correo completo en pantalla', () => {
+  it('un correo se muestra solo como lo que va antes de «@»', () => {
+    expect(quienAnoto('ana.perez@ejemplo.cl')).toBe('ana.perez')
+  })
+
+  it('un nombre se muestra tal cual, sin cortarlo', () => {
+    expect(quienAnoto('Ana Pérez')).toBe('Ana Pérez')
+  })
+
+  it('sin dato, o sin nada antes de «@», no inventa un nombre', () => {
+    expect(quienAnoto(null)).toBeNull()
+    expect(quienAnoto('   ')).toBeNull()
+    expect(quienAnoto('@ejemplo.cl')).toBeNull()
+  })
+
+  it('al anotar guarda el nombre visible; sin nombre, lo que va antes de «@» del correo', () => {
+    expect(porDeUsuario({ nombre: 'Ana', apellido: 'Pérez', email: 'ana.perez@ejemplo.cl' })).toBe('Ana Pérez')
+    expect(porDeUsuario({ nombre: '', apellido: null, email: 'ana.perez@ejemplo.cl' })).toBe('ana.perez')
+    expect(porDeUsuario(null)).toBeNull()
   })
 })

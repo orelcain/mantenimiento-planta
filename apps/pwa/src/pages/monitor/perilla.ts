@@ -150,3 +150,42 @@ export function bandasEnteras(vara: { cpm: number | null; fuente: FuenteVara }):
 export const diaMesPerilla = (desde: string): string => `${desde.slice(8, 10)}-${desde.slice(5, 7)}`
 /** «01:20»: la hora de un `desde`, sin convertir zona (misma convención que `diaMesPerilla`). */
 export const horaPerilla = (desde: string): string => desde.slice(11, 16)
+
+/**
+ * Rótulo de la raya «a ritmo» de una vara: «17 o más» con perilla, «12 o más» sin ella. Es el entero de `umbralEntero`, el mismo
+ * que la franja escribe bajo «minutos a ritmo». Null sin vara.
+ */
+export function rotuloRaya(vara: { cpm: number | null; fuente: FuenteVara }): string | null {
+  const umbral = umbralEntero(vara)
+  return umbral == null ? null : `${umbral} o más`
+}
+
+/**
+ * Tono de una cifra de carros con pieza (un porcentaje de la vara), con la misma regla que `tonoVara`: con perilla, «a ritmo» es la
+ * perilla completa; sin perilla, el 75 % y el 50 % de siempre. Sin vara o sin cifra, `sin`.
+ */
+export function tonoDePorcentajeVara(pct: number | null, vara: { cpm: number | null; fuente: FuenteVara }): TonoVara {
+  if (pct == null || vara.cpm == null || !(vara.cpm > 0)) return 'sin'
+  return tonoVara((pct / 100) * vara.cpm, vara)
+}
+
+/**
+ * Quién anotó, para mostrar. Una anotación puede traer el correo de la sesión (las anotaciones viejas): se muestra solo lo que va
+ * antes de «@». Nunca un correo completo. Sin dato, o sin nada antes de «@», no hay nombre que mostrar: null.
+ */
+export function quienAnoto(por: string | null | undefined): string | null {
+  const t = (por ?? '').trim()
+  if (!t) return null
+  const arroba = t.indexOf('@')
+  if (arroba < 0) return t
+  return t.slice(0, arroba).trim() || null
+}
+
+/**
+ * Lo que se guarda como «por» al anotar una perilla: el nombre visible del usuario si lo tiene; si no, lo que va antes de «@» de su
+ * correo. Así la anotación nueva no guarda el correo completo.
+ */
+export function porDeUsuario(u: { nombre?: string | null; apellido?: string | null; email?: string | null } | null | undefined): string | null {
+  const nombre = `${u?.nombre ?? ''} ${u?.apellido ?? ''}`.trim()
+  return nombre || quienAnoto(u?.email) || null
+}

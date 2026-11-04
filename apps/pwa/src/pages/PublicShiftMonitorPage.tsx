@@ -41,6 +41,7 @@ import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo'
 import type { PulsoVivoElegido } from './monitor/contadorCrudo'
+import { porDeUsuario } from './monitor/perilla'
 import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/datoDuro'
 import { construirCascada } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
@@ -7111,7 +7112,7 @@ function MonitorDelToken() {
                     turno={barrasMinuto}
                     perillas={live.perillas ?? null}
                     carros={carrosDelTurno}
-                    perillaEditor={esAdminMonitor && esActual && data.plantSlug ? { plantSlug: data.plantSlug, por: usuarioActual?.email ?? null } : null}
+                    perillaEditor={esAdminMonitor && esActual && data.plantSlug ? { plantSlug: data.plantSlug, por: porDeUsuario(usuarioActual) } : null}
                     cerrado={turnoCerrado}
                     turnoTerminado={turnoTerminadoV2}
                     marca={marcaRitmo}

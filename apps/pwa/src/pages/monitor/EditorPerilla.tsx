@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from 'react'
 import { leerPerillasHistorial, setMonitorPerilla, type PerillaHistorial } from '@/services/shoplogix/pinShiftEnd'
-import { diaMesPerilla, horaPerilla, umbralARitmo, type PerillaPublica, type PerillasDeLinea } from './perilla'
+import { diaMesPerilla, horaPerilla, quienAnoto, umbralARitmo, type PerillaPublica, type PerillasDeLinea } from './perilla'
 
 /** A quién se le anota: la línea del monitor (`plantSlug`) y quien firma (`por`, el email de la sesión). */
 export interface PerillaEditorDatos {
@@ -126,7 +126,7 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
               <ul className="mt-1">
                 {historial.map((h, k) => (
                   <li key={`${h.desde}-${k}`} className="border-t border-border py-1.5 text-[13px] leading-[18px] tabular-nums text-muted-foreground first:border-t-0">
-                    {`${h.cpm} pz/min · desde ${diaMesPerilla(h.desde)} ${horaPerilla(h.desde)} · ${h.por ?? 'sin registro'}`}
+                    {`${h.cpm} pz/min · desde ${diaMesPerilla(h.desde)} ${horaPerilla(h.desde)} · ${quienAnoto(h.por) ?? 'sin registro'}`}
                   </li>
                 ))}
               </ul>
