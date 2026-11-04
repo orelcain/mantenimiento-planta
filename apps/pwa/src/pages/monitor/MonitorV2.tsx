@@ -32,7 +32,7 @@ import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina, varaDeMinuto, type VaciosTurno } from './ritmoVivo'
-import { bandasEnteras, diaMesPerilla, perillaVigenteEn, tonoVara, umbralEntero, type FuenteVara, type PerillaPublica, type PerillasDeLinea } from './perilla'
+import { bandasEnteras, diaMesPerilla, MODO_UMBRAL_POR_OMISION, perillaVigenteEn, tonoVara, umbralEntero, type PerillaPublica, type PerillasDeLinea, type VaraUmbral } from './perilla'
 import { EditorPerilla, type PerillaEditorDatos } from './EditorPerilla'
 import { useIsAdmin } from '@/store/authStore'
 import type { PestanaMonitor } from './BarraLateralPC'
@@ -315,8 +315,8 @@ export interface EventoMarcado {
 }
 
 type TonoMinuto = 'ok' | 'warn' | 'crit' | 'sin'
-/** Una vara de minuto: su valor y de dónde sale (perilla o Shoplogix). */
-export type VaraDeMinuto = { cpm: number | null; fuente: FuenteVara }
+/** Una vara de minuto (la de `perilla.ts`): su valor, de dónde sale y, con perilla, su modo y sus partes. */
+export type VaraDeMinuto = VaraUmbral
 /** Tono de un minuto contra SU vara: con perilla, «a ritmo» es la perilla completa; sin perilla, el 75 % de siempre. */
 function tonoDeMinuto(v: number, vara: VaraDeMinuto): TonoMinuto {
   const t = tonoVara(v, vara)
@@ -461,12 +461,15 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
      El escalar de la fila («esperado N pz/min», la referencia) va con el último minuto. */
   const kUlt = Math.max(0, n - 1)
   const varasDeLinea = (k: number) => d.maquinas.map((m) => varaDeMinuto(m, t0, k, perillas))
-  /* La línea va a ritmo con la perilla completa solo si TODAS sus Baaders la tienen en ese minuto; si una va con el esperado
-     de Shoplogix, la línea va al 75 % de la suma (igual que el mockup aprobado: 37 con 17 + 16 + 16 y una sin perilla). */
+  /* La línea va a ritmo con la perilla solo si TODAS sus Baaders la tienen en ese minuto; si una va con el esperado
+     de Shoplogix, la línea va al 75 % de la suma (igual que el mockup aprobado: 37 con 17 + 16 + 16 y una sin perilla). Con perilla, la
+     línea lleva el modo y `partes`: su umbral calibrado es la suma de los de sus Baaders (17 + 16 + 16 = 49 → 46). */
   const varaLineaK: VaraDeMinuto[] = Array.from({ length: n }, (_, k) => {
     const vs = varasDeLinea(k)
     if (!vs.every((v) => v.cpm != null)) return { cpm: null, fuente: 'shoplogix' }
-    return { cpm: vs.reduce<number>((a, v) => a + (v.cpm ?? 0), 0), fuente: vs.every((v) => v.fuente === 'perilla') ? 'perilla' : 'shoplogix' }
+    const cpm = vs.reduce<number>((a, v) => a + (v.cpm ?? 0), 0)
+    if (!vs.every((v) => v.fuente === 'perilla')) return { cpm, fuente: 'shoplogix' }
+    return { cpm, fuente: 'perilla', modo: perillas?.modo ?? MODO_UMBRAL_POR_OMISION, partes: d.maquinas.length }
   })
   const filas = [
     ...(varias

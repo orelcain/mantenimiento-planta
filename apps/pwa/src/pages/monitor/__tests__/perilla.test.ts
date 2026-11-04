@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import { construirPerilla, desdePerilla } from '@/lib/horaDePlanta'
 import {
+  DESCUENTO_CALIBRADO,
   perillaEn,
   porDeUsuario,
   quienAnoto,
@@ -14,7 +15,6 @@ import {
   tonoDePorcentajeVara,
   tonoVara,
   umbralARitmo,
-  UMBRAL_A_RITMO_PERILLA,
   varaMinuto,
   type PerillasDeLinea,
 } from '../perilla'
@@ -93,9 +93,14 @@ describe('perillaEn', () => {
 })
 
 describe('varaMinuto', () => {
-  it('con perilla vigente manda la perilla, aunque Shoplogix diga otra cosa', () => {
+  it('con perilla vigente manda la perilla, aunque Shoplogix diga otra cosa; sin modo publicado, calibrado', () => {
     const p = perillasDe([{ machineId: 'ev1', cpm: 17, desde: enHora(-24) }])
-    expect(varaMinuto(p, 'ev1', INICIO + HORA, 18)).toEqual({ cpm: 17, fuente: 'perilla' })
+    expect(varaMinuto(p, 'ev1', INICIO + HORA, 18)).toEqual({ cpm: 17, fuente: 'perilla', modo: 'calibrado' })
+  })
+
+  it('con el modo que publicó el servidor, la vara lo lleva', () => {
+    const p = { ...perillasDe([{ machineId: 'ev1', cpm: 17, desde: enHora(-24) }]), modo: 'optimo' as const }
+    expect(varaMinuto(p, 'ev1', INICIO + HORA, 18)).toEqual({ cpm: 17, fuente: 'perilla', modo: 'optimo' })
   })
 
   it('sin perilla cae al esperado de Shoplogix', () => {
@@ -112,25 +117,46 @@ describe('varaMinuto', () => {
   })
 })
 
-describe('umbralARitmo: con perilla anotada, a ritmo es la perilla completa', () => {
-  it('la constante vale 1 (decisión de Orel, 04-11)', () => {
-    expect(UMBRAL_A_RITMO_PERILLA).toBe(1)
+describe('umbralARitmo: por omisión (calibrado) es la perilla menos una pieza por Baader', () => {
+  it('el descuento calibrado vale 1 pieza por Baader (calibración de Chonchi, turno noche del 03-11)', () => {
+    expect(DESCUENTO_CALIBRADO).toBe(1)
   })
   it.each([
-    [17, 17], // con 17 anotado, a ritmo es 17 o más
+    [17, 16], // con 17 anotado, a ritmo es 16 o más
+    [16, 15],
+    [18, 17],
+    [15, 14],
+    [20, 19],
+    [5, 4],
+    [30, 29],
+  ])('calibrado: con %i pz/min el umbral es %i', (cpm, umbral) => {
+    expect(umbralARitmo(cpm)).toBe(umbral)
+    expect(umbralARitmo(cpm, 'calibrado', 1)).toBe(umbral)
+  })
+  it.each([
+    [17, 17], // modo óptimo: la perilla completa
     [16, 16],
     [18, 18],
     [15, 15],
     [20, 20],
     [5, 5],
     [30, 30],
-  ])('con %i pz/min el umbral es %i', (cpm, umbral) => {
-    expect(umbralARitmo(cpm)).toBe(umbral)
+  ])('óptimo: con %i pz/min el umbral es %i', (cpm, umbral) => {
+    expect(umbralARitmo(cpm, 'optimo')).toBe(umbral)
+  })
+  it('la línea descuenta una pieza por Baader: 17 + 16 + 16 = 49 da 46 calibrado y 49 óptimo', () => {
+    expect(umbralARitmo(49, 'calibrado', 3)).toBe(46)
+    expect(umbralARitmo(49, 'optimo', 3)).toBe(49)
+  })
+  it('el piso es 1: una perilla de 1 o de 2 pz con descuento no baja de 1', () => {
+    expect(umbralARitmo(1)).toBe(1)
+    expect(umbralARitmo(2, 'calibrado', 3)).toBe(1)
   })
 })
 
 describe('tonoVara: bandas de la perilla y el 75 % de Shoplogix', () => {
   const perilla17 = { cpm: 17, fuente: 'perilla' as const }
+  const perilla17Optimo = { cpm: 17, fuente: 'perilla' as const, modo: 'optimo' as const }
   const shoplogix16 = { cpm: 16, fuente: 'shoplogix' as const }
   it.each([
     [17, 'bien'], // el umbral entero: a ritmo
@@ -139,8 +165,23 @@ describe('tonoVara: bandas de la perilla y el 75 % de Shoplogix', () => {
     [9, 'atento'], // 9/17 = 52,9 %: sobre la mitad
     [8, 'mal'], // 8/17 = 47 %: muy bajo
     [0, 'mal'], // detenida con vara: muy bajo
-  ])('perilla 17 · %i pz → %s', (v, tono) => {
+  ])('perilla 17 en modo óptimo · %i pz → %s', (v, tono) => {
+    expect(tonoVara(v, perilla17Optimo)).toBe(tono)
+  })
+  it.each([
+    [17, 'bien'],
+    [16, 'bien'], // calibrado por omisión: a ritmo desde 16
+    [15, 'atento'], // 15/17 = 88 %: bajo, no a ritmo
+    [9, 'atento'], // 9/17 = 52,9 %: sobre la mitad
+    [8, 'mal'], // 8/17 = 47 %: muy bajo
+    [0, 'mal'], // detenida con vara: muy bajo
+  ])('perilla 17 calibrada por omisión · %i pz → %s', (v, tono) => {
     expect(tonoVara(v, perilla17)).toBe(tono)
+  })
+  it('la línea de 49 con 3 Baaders (calibrada: a ritmo desde 46) usa sus partes', () => {
+    const linea = { cpm: 49, fuente: 'perilla' as const, modo: 'calibrado' as const, partes: 3 }
+    expect(tonoVara(46, linea)).toBe('bien')
+    expect(tonoVara(45, linea)).toBe('atento')
   })
   it.each([
     [12, 'bien'], // 75 % exacto de 16 (Shoplogix): sigue siendo a ritmo
@@ -187,8 +228,16 @@ describe('perillaEn con un instante que no es número', () => {
 })
 
 describe('rótulo de la raya «a ritmo»: el entero de la vara, no el 75 % de siempre con perilla', () => {
-  it('con perilla anotada es la perilla completa: 17 o más', () => {
-    expect(rotuloRaya({ cpm: 17, fuente: 'perilla' })).toBe('17 o más')
+  it('con perilla y modo óptimo es la perilla completa: 17 o más', () => {
+    expect(rotuloRaya({ cpm: 17, fuente: 'perilla', modo: 'optimo' })).toBe('17 o más')
+  })
+
+  it('con perilla calibrada por omisión es la perilla menos una pieza: 16 o más', () => {
+    expect(rotuloRaya({ cpm: 17, fuente: 'perilla' })).toBe('16 o más')
+  })
+
+  it('en la línea de 3 Baaders (17 + 16 + 16 = 49) calibrada es 46 o más', () => {
+    expect(rotuloRaya({ cpm: 49, fuente: 'perilla', modo: 'calibrado', partes: 3 })).toBe('46 o más')
   })
 
   it('sin perilla es el 75 % de la meta de Shoplogix: meta 16 → 12 o más', () => {
@@ -199,9 +248,12 @@ describe('rótulo de la raya «a ritmo»: el entero de la vara, no el 75 % de si
     expect(rotuloRaya({ cpm: null, fuente: 'shoplogix' })).toBeNull()
   })
 
-  it('el tono de una cifra de carros sigue la regla de tonoVara (perilla completa, o 75 % y 50 %)', () => {
+  it('el tono de una cifra de carros sigue la regla de tonoVara (a ritmo por modo, o 75 % y 50 %)', () => {
     expect(tonoDePorcentajeVara(100, { cpm: 17, fuente: 'perilla' })).toBe('bien')
-    /* 82 % de 17 son 13,9 pz/min: ni a ritmo (17) ni bajo, sino «atento». */
+    /* 96 % de 17 son 16,3 pz/min: a ritmo con calibrado (desde 16), bajo con modo óptimo (desde 17). */
+    expect(tonoDePorcentajeVara(96, { cpm: 17, fuente: 'perilla' })).toBe('bien')
+    expect(tonoDePorcentajeVara(96, { cpm: 17, fuente: 'perilla', modo: 'optimo' })).toBe('atento')
+    /* 82 % de 17 son 13,9 pz/min: ni a ritmo (desde 16) ni bajo, sino «atento». */
     expect(tonoDePorcentajeVara(82, { cpm: 17, fuente: 'perilla' })).toBe('atento')
     expect(tonoDePorcentajeVara(75, { cpm: 16, fuente: 'shoplogix' })).toBe('bien')
     expect(tonoDePorcentajeVara(60, { cpm: 16, fuente: 'shoplogix' })).toBe('atento')

@@ -1,6 +1,6 @@
 /**
  * El panel «Carros con pieza, por máquina · últimos 15 minutos» (`RitmoVivoAmpliado`). Lo que se protege: que la cifra de cada
- * Baader sea el PROMEDIO de la ventana y no el último minuto, que la raya diga su entero («17 o más» con perilla, «12 o más»
+ * Baader sea el PROMEDIO de la ventana y no el último minuto, que la raya diga su entero («16 o más» con perilla calibrada, «12 o más»
  * sin ella) y que la vara bajo el nombre sea la perilla o la meta de Shoplogix. jsdom no mide: el ancho se simula.
  */
 import { cleanup, render, screen } from '@testing-library/react'
@@ -52,17 +52,17 @@ describe('panel de 15 minutos: cifra promedio, raya en el umbral y vara bajo el 
     expect(screen.queryByText('100 %')).toBeNull()
   })
 
-  it('la raya dice su entero: 17 o más con perilla, 12 o más sin ella, y la vara va bajo el nombre', () => {
+  it('la raya dice su entero: 16 o más con perilla 17 calibrada por omisión, 12 o más sin ella, y la vara va bajo el nombre', () => {
     renderPanel()
-    expect(screen.getByText('17 o más')).toBeTruthy()
+    expect(screen.getByText('16 o más')).toBeTruthy()
     expect(screen.getByText('12 o más')).toBeTruthy()
     expect(screen.getByText('perilla 17')).toBeTruthy()
     expect(screen.getByText('Shoplogix 16')).toBeTruthy()
   })
 
-  it('el rótulo «17 o más» va pintado encima de la línea de datos de su fila (la línea cruza su inicio); el halo lo mide el banco, jsdom no aplica paint-order', () => {
+  it('el rótulo «16 o más» va pintado encima de la línea de datos de su fila (la línea cruza su inicio); el halo lo mide el banco, jsdom no aplica paint-order', () => {
     renderPanel()
-    const rotulo = screen.getByText('17 o más')
+    const rotulo = screen.getByText('16 o más')
     const lineas = Array.from(rotulo.parentElement!.querySelectorAll('polyline'))
     expect(lineas.length).toBeGreaterThan(0)
     expect(lineas.some((pl) => (pl.compareDocumentPosition(rotulo) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)).toBe(true)

@@ -17,7 +17,7 @@
  */
 import type { PublicMonitorLive, PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import { classifyLossState } from '@/services/shoplogix/lossBuckets'
-import { varaMinuto, type FuenteVara, type PerillasDeLinea } from './perilla'
+import { varaMinuto, type FuenteVara, type PerillasDeLinea, type VaraUmbral } from './perilla'
 
 /** Cuánto duran, como máximo, las micro detenciones en los datos medidos (nota informativa, jamás decide un color). */
 export const MICRO_MAX_MEDIDO_S = 90
@@ -68,10 +68,10 @@ export function varaEnMinuto(m: { id?: string; esperado: number | null }, t0: nu
 }
 
 /**
- * La misma vara que `varaEnMinuto`, con su fuente (perilla o Shoplogix). El tono de
- * «a ritmo» depende de la fuente: con perilla es la perilla completa.
+ * La misma vara que `varaEnMinuto`, con su fuente (perilla o Shoplogix) y, con perilla, su `modo`. El tono de «a ritmo» depende de la
+ * fuente y del modo: con perilla es la perilla menos el descuento calibrado (por omisión).
  */
-export function varaDeMinuto(m: { id?: string; esperado: number | null }, t0: number, k: number, perillas?: PerillasDeLinea | null): { cpm: number | null; fuente: FuenteVara } {
+export function varaDeMinuto(m: { id?: string; esperado: number | null }, t0: number, k: number, perillas?: PerillasDeLinea | null): VaraUmbral {
   if (m.esperado == null) return { cpm: null, fuente: 'shoplogix' }
   if (m.id == null || !Number.isFinite(t0)) return { cpm: m.esperado, fuente: 'shoplogix' }
   return varaMinuto(perillas, m.id, t0 + k * 60_000, m.esperado)

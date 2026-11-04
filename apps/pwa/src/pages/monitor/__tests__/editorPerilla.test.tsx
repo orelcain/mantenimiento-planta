@@ -135,7 +135,7 @@ describe('el editor de una máquina sin perilla', () => {
     comoAdmin()
     const { getByText, getByRole, container } = renderFranja(EDITOR)
     fireEvent.click(getByText('Anotar perilla'))
-    expect(container.textContent).toContain('Con 16: a ritmo con 16 o más por minuto · meta Shoplogix 16')
+    expect(container.textContent).toContain('Con 16: a ritmo con 15 o más por minuto · meta Shoplogix 16')
     expect((getByRole('button', { name: 'Guardar' }) as HTMLButtonElement).disabled).toBe(false)
   })
 })
