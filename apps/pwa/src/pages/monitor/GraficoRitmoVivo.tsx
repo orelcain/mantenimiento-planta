@@ -42,8 +42,8 @@ import {
   tonoRitmo, trazoHastaLectura, valorEnCurva, ventanaDe, zoomActivo, zoomMaxPara,
   type AnclaRotulo, type CeldaBaader, type Diseno, type ParadaEje, type ParadasMaquina, type Punto, type Tramo, type TonoRitmo, type Zoom,
 } from './ejeTurno'
-import { varaEnMinuto } from './ritmoVivo'
-import type { PerillasDeLinea } from './perilla'
+import { varaDeMinuto, varaEnMinuto } from './ritmoVivo'
+import type { FuenteVara, PerillasDeLinea } from './perilla'
 import { calibracionDe, type CalibracionPlanta } from './causasCalibracion'
 import { CAUSAS_MICRO, COLOR_CAUSA, clasificarMicros, motivoLegible, numerosPorCelda, observacionDeForma, type CausaMicro, type MicroClasificada } from './microCausa'
 import { ResumenCausasMicro } from './ResumenCausas'
@@ -130,7 +130,7 @@ interface Modelo {
   esperadoLinea: number | null
   /** Tope de la escala de las barras por minuto (pz/min). */
   topBarra: number
-  maquinas: Array<{ id: string; nombre: string; esperado: number | null; esperadoK: Array<number | null>; cycles: number[]; celdas: CeldaBaader[]; llenados: Array<number | null>; pct: number | null; ultimoLlenado: number | null; anduvo: number | null }>
+  maquinas: Array<{ id: string; nombre: string; esperado: number | null; fuente: FuenteVara; esperadoK: Array<number | null>; cycles: number[]; celdas: CeldaBaader[]; llenados: Array<number | null>; pct: number | null; ultimoLlenado: number | null; anduvo: number | null }>
   /**
    * El minuto por dentro: las paradas de cada Baader al segundo (`paradasDetalle`) y, por Baader y por minuto de la serie, lo que ocupan
    * (`tramos`), los segundos que anduvo y su ritmo mientras anduvo. null sin paradas por máquina (doc anterior) o sin serie.
@@ -758,7 +758,16 @@ function RotulosIzq({ m }: { m: Modelo }) {
       )}
       {m.maquinas.map((q, i) => {
         const c = d.carriles[i]
-        return c ? <text key={q.id} x={xr} y={r1(c.y0 + c.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">{etiquetaMaquina(q.nombre)}</text> : null
+        if (!c) return null
+        /* Dos renglones por Baader: el nombre y, debajo, su vara («perilla 17»; sin perilla, «Shoplogix 16» en el tono de atento). */
+        return (
+          <g key={q.id}>
+            <text x={xr} y={r1(c.y0 + c.h / 2 - 2)} textAnchor="end" fontSize={fs} className="fill-foreground">{etiquetaMaquina(q.nombre)}</text>
+            {q.esperado != null && (q.fuente === 'perilla'
+              ? <text x={xr} y={r1(c.y0 + c.h / 2 + 10)} textAnchor="end" fontSize={fs} className="fill-muted-foreground tabular-nums">perilla {int(q.esperado)}</text>
+              : <text x={xr} y={r1(c.y0 + c.h / 2 + 10)} textAnchor="end" fontSize={fs} fontWeight={600} className="tabular-nums" style={{ fill: 'var(--v2-atento-texto)' }}>Shoplogix {int(q.esperado)}</text>)}
+          </g>
+        )
       })}
       <text x={xr} y={r1(d.paradas.y0 + d.paradas.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">Detenciones</text>
       {d.micro && <text x={xr} y={r1(d.micro.y0 + d.micro.h / 2 + 4)} textAnchor="end" fontSize={fs} className="fill-foreground">Micro</text>}
@@ -1508,7 +1517,7 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
         const anduvo = e.ritmoAnduvo?.find((r) => r.nombre.trim() === q.nombre.trim())?.cpm
         /* `esperadoK`: la vara de CADA minuto de esta Baader (el globo y su cifra «de X» leen ese minuto); `esperado` es la del último. */
         const esperadoK = Array.from({ length: n }, (_, k) => varaEnMinuto(q, Date.parse(minuto.desde), k, e.perillas))
-        return { id: q.id, nombre: q.nombre, esperado: esperadoK[Math.max(0, n - 1)] ?? null, esperadoK, cycles: q.cycles, celdas, llenados, pct: pctAndando(celdas), ultimoLlenado: e.llenado?.find((l) => l.id === q.id)?.ultimo ?? null, anduvo: anduvo != null && Number.isFinite(anduvo) ? anduvo : null }
+        return { id: q.id, nombre: q.nombre, esperado: esperadoK[Math.max(0, n - 1)] ?? null, fuente: varaDeMinuto(q, Date.parse(minuto.desde), Math.max(0, n - 1), e.perillas).fuente, esperadoK, cycles: q.cycles, celdas, llenados, pct: pctAndando(celdas), ultimoLlenado: e.llenado?.find((l) => l.id === q.id)?.ultimo ?? null, anduvo: anduvo != null && Number.isFinite(anduvo) ? anduvo : null }
       })
       : []
     /* Micro con hora: solo si el doc dice de qué Baader fue cada parada. Las que ya pasaron (no las del minuto que aún no llega). */

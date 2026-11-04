@@ -116,6 +116,15 @@ describe('GraficoRitmoVivo', () => {
     expect(screen.getByText('1 h 0 min')).toBeTruthy()
   })
 
+  it('cada Baader lleva su vara bajo el nombre: «perilla 17» con perilla anotada; «Shoplogix 16» (tono de atento) sin ella', () => {
+    const conPerilla = { ...eje, perillas: { actual: { a: { cpm: 17, desde: new Date(INI).toISOString() } }, historial: [] } }
+    render(<GraficoRitmoVivo p={p} e={conPerilla} reloj={reloj} />)
+    expect(screen.getByText('perilla 17')).toBeTruthy()
+    const sinPerilla = screen.getAllByText('Shoplogix 16')
+    expect(sinPerilla).toHaveLength(2)
+    expect(sinPerilla[0]!.getAttribute('style')).toContain('--v2-atento-texto')
+  })
+
   it('«1 h» y «15 min» marcan su atajo y «Turno» vuelve a todo el turno', () => {
     render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     fireEvent.click(screen.getByRole('button', { name: '1 h' }))
