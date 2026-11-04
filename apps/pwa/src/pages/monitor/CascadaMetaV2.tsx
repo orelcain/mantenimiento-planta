@@ -320,7 +320,7 @@ export function CascadaMetaV2({ cascada, detalle, contenedor }: { cascada: Casca
                       {f.abre && <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${ab ? '' : '-rotate-90'}`} aria-hidden />}
                       <span className={`truncate ${f.resta ? '' : 'font-medium'}`}>{f.et}</span>
                     </span>
-                    <span className={`shrink-0 tabular-nums ${f.resta ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{f.resta ? `−${int(f.pz)}` : int(f.pz)} pz</span>
+                    <span className={`shrink-0 tabular-nums ${f.resta ? 'text-muted-foreground' : 'font-medium text-foreground'}`}>{f.resta && f.pz > 0 ? `−${int(f.pz)}` : int(f.pz)} pz</span>
                   </div>
                   <Barra desde={desde} hasta={hasta} tope={v.podia} partes={f.partes} />
                   {f.info && !ab && <div className="mt-1 text-[12px] tabular-nums text-muted-foreground">{f.info}</div>}
