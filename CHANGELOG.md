@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.13.0] - 2026-11-04
+Monitor: la cascada a la meta de Shoplogix con la perilla, por Baader y por línea, con la línea de dueños.
+
+### Añadido
+- «Dónde se fueron las piezas» parte de la meta de Shoplogix: tiempo de producción (turno menos detención programada), podía a la meta, perilla más lenta, podía con la perilla, detenciones, microdetenciones, vacíos y hizo. Selector Línea | Ev 1 | Ev 2 | Ev 3, con cuadre al entero en cada vista.
+- Línea de dueños por vista: cuánto es de Mantención y operación, cuánto aguas arriba (vacíos y detenciones de MMPP, abastecimiento, acopio, bombeo o ducto) y cuánto de producción (perilla). Ajuste del operador, cambio de lote y cumplimiento de cuota son de Mantención y operación.
+- Fila «Al rendimiento le faltan X pts» arriba de los escalones de la cascada, con las dos partes (perilla más lenta y lo que faltó para llegar a ella), sus piezas y su ⓘ. Cambia con el selector de Baader.
+
+### Cambiado
+- «Sin la detención programada» (desglose) descuenta el mismo conjunto que la cascada: colación, reunión de inicio y ejercicio. La limpieza de ducto ya no se resta como programada, ni en el desglose ni en «Ver detalle».
+- Sin serie por minuto en el turno, la tarjeta vuelve a la cascada anterior.
+
 ## [4.12.0] - 2026-11-04
 Monitor: el desglose de la perilla por Baader y el modo del umbral «a ritmo» de la línea.
 

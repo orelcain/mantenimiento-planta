@@ -74,7 +74,9 @@ describe('filas y porcentajes de la Evisceradora 1', () => {
   it('cada zona suma su % y las filas bajo 16 suman lo que dice el pie del spec', () => {
     const { container } = renderEv1()
     expect(container.textContent).toContain('Bajo 16 sin detención: 15 min de marcha inicial y 74 de falta de pescado.')
-    expect(container.textContent).toContain('Sin colación: a ritmo 276 de 399 min (69 %).')
+    /* Descuenta TODAS las programadas del fixture (colación 56 + reunión 2 + ejercicio 4 = 62 min), no solo la colación. */
+    expect(container.textContent).toContain('Sin la detención programada: a ritmo 276 de 393 min (70 %).')
+    expect(container.textContent).not.toContain('Sin colación')
   })
 })
 
@@ -106,6 +108,16 @@ describe('detención: el detalle de la fila 0 y sus causas', () => {
       expect(container.textContent).toContain(grupo)
     }
     expect(container.textContent).toContain('Ocultar detalle')
+  })
+
+  it('la limpieza de ducto marcada «programada» por el legado va en otras detenciones, no en programadas (B-2)', () => {
+    /* `paradasDetalle` la marca programada (legado LIMPIEZA); la fila 0 tiene 4 min de limpieza y 3 de ajuste del operador. */
+    const legado = paradas.map((p) => (p.razon === 'Limpieza de Ducto' ? { ...p, tipo: 'programada' as const } : p))
+    const { container, getByText } = render(
+      <DesglosePiezas nombre="Evisceradora 1" linea={false} n={N} desglose={desglose()} vara={VARA} paradas={legado} cambio={false} onCerrar={() => {}} />,
+    )
+    fireEvent.click(getByText('Ver detalle', { exact: false }))
+    expect(container.textContent).toContain('colación 55 min · otras programadas 4 · micro 2 · otras detenciones 7')
   })
 
   it('las causas reparten el % de la fila 0: colación 12 % de los 15 %', () => {

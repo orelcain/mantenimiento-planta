@@ -46,7 +46,8 @@ import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/dat
 import { construirCascada } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
-import { CascadaTurnoCard } from './monitor/CascadaTurnoCard'
+import { TarjetaCascada } from './monitor/CascadaTurnoCard'
+import { cascadaPorMeta } from './monitor/cascadaPerilla'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
 import {
@@ -103,7 +104,7 @@ import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/Hec
 import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
-import { etiquetaMaquina, hayBandaParada, llenadoDelPanel, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
+import { etiquetaMaquina, hayBandaParada, llenadoDelPanel, paradasDetalle, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -6073,6 +6074,28 @@ function MonitorDelToken() {
      mezclarlos haría que la suma no cierre. Declara su propio corte. */
   const cascada = construirCascada({ live, ritmoMaquina: setCpmVigente })
 
+  /* La cascada a la meta de Shoplogix con la perilla (Fase B): por Baader y la línea. Misma serie por minuto que las barras
+     y mismas detenciones del turno (solo tramos cerrados, como la cascada de arriba). `cascadaPerilla` calcula; la card muestra. */
+  const cascadaMeta = (() => {
+    const s = serieMinutoVista
+    if (!s?.maquinas?.length) return null
+    const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
+    if (!(largo > 1) || !Number.isFinite(Date.parse(s.desde))) return null
+    const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
+    return {
+      cascada: cascadaPorMeta({
+        serie: {
+          desde: s.desde,
+          maquinas: s.maquinas.map((m) => ({ id: m.id, nombre: nombrePorId.get(m.id) ?? m.id, esperado: m.esperado, cycles: m.cycles })),
+        },
+        n: largo,
+        paradas: paradasDetalle({ stopEvents: live.stopEvents, stopReasons: live.stopReasons, stopMachines: live.stopMachines, enCurso: [] }),
+        perillas: live.perillas ?? null,
+      }),
+      minutos: largo,
+    }
+  })()
+
   const stale = live.lastSyncAt
     ? (now - new Date(live.lastSyncAt).getTime()) / 1000 > 15 * 60
     : true
@@ -7530,9 +7553,9 @@ function MonitorDelToken() {
                 las piezas a la línea (hallazgo del rediseño 26-08).
                 En la TV nace OCULTA (fábrica de TV), no ausente: así se puede
                 agregar desde Personalizar cuando la sala la quiera ver. */}
-            {cascada && (
+            {(cascadaMeta || cascada) && (
               <TarjetaTablero id="cascada" t={tablero}>
-                <CascadaTurnoCard cascada={cascada} />
+                <TarjetaCascada meta={cascadaMeta} anterior={cascada} />
               </TarjetaTablero>
             )}
             {/* La respuesta de Mantención, junto al «dónde se fueron las

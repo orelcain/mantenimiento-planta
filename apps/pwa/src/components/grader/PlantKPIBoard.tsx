@@ -20,11 +20,18 @@ import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 import { resolveOeeTileMode } from '@/services/grader/oeeSinCalidad'
+import { FilaRendimientoPerilla } from './FilaRendimientoPerilla'
+import type { RendimientoPartido } from '@/pages/monitor/cascadaPerilla'
 
 interface Props {
   plantSlug: PlantSlug
   graderSummaries: GraderDailySummary[]
   enabled?: boolean
+  /**
+   * La partición del rendimiento con la perilla (Fase B, `rendimientoPartido`). Sin ella no se pinta la fila «Al rendimiento
+   * le faltan»: este board no tiene la serie por minuto ni las perillas del turno, y no se inventan.
+   */
+  rendimientoPerilla?: RendimientoPartido | null
   /**
    * Línea/área seleccionada. De acá salen los textos que NO son universales:
    * cómo se llaman las máquinas y qué alcance tiene el OEE. Sin esto el panel
@@ -174,6 +181,7 @@ export function PlantKPIBoard({
   plantLineId,
   selectedDateKey = null,
   currentMonth,
+  rendimientoPerilla = null,
 }: Props) {
   const [period, setPeriod] = useState<KpiPeriod>('day')
   const effectiveMonth = currentMonth ?? new Date()
@@ -372,6 +380,9 @@ export function PlantKPIBoard({
             </div>
               )
             })()}
+
+            {/* Fila bajo el OEE: «Al rendimiento le faltan» (Fase B). Solo si la pantalla trae la partición. */}
+            {rendimientoPerilla && <FilaRendimientoPerilla r={rendimientoPerilla} />}
 
             {/* ── Fila 2: MTTR · MTBF · Averías macro (ocultar si solo Grader) ── */}
             {!kpis.graderOnly && (
