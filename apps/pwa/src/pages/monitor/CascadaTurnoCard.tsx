@@ -131,7 +131,8 @@ export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPo
               </span>
               <span
                 className={`text-footnote font-semibold tabular-nums ${
-                  e.resta ? (e.clave === 'vacios' ? 'text-ink-warn' : 'text-ink-crit') : 'text-foreground'
+                  /* La perilla no es una detención: su resta va en tinta neutra, no en la de crítico. */
+                  e.resta ? (e.clave === 'vacios' ? 'text-ink-warn' : e.clave === 'perilla' ? 'text-muted-foreground' : 'text-ink-crit') : 'text-foreground'
                 }`}
               >
                 {e.resta && e.piezas > 0 ? '−' : ''}{fmt(e.piezas)}
