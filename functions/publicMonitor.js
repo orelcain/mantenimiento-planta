@@ -849,8 +849,12 @@ function normPerilla(v) {
  * vigente de cada máquina) y `monitorPerillasHistorial` (máx. 100, la más nueva al
  * final). Viajan en el payload porque el monitor público no puede leer
  * graderModuleConfigs. Solo admin las escribe: la regla está en firestore.rules.
- * Null si la línea no tiene ninguna perilla.
+ * `modo` (calibrado u óptimo) viene de `monitorUmbralARitmo`, que también es solo
+ * admin. Sin el dato o con un valor desconocido, la respuesta va sin `modo` y la
+ * PWA lo toma por calibrado. Null si la línea no tiene ninguna perilla ni modo.
  */
+const MODOS_UMBRAL = ['calibrado', 'optimo']
+
 function leerPerillas(data) {
   const actual = {}
   if (data?.monitorPerillas && typeof data.monitorPerillas === 'object') {
@@ -866,8 +870,11 @@ function leerPerillas(data) {
       if (p && typeof h.machineId === 'string' && h.machineId) historial.push({ ...p, machineId: h.machineId })
     }
   }
-  if (Object.keys(actual).length === 0 && historial.length === 0) return null
-  return { actual, historial: historial.slice(-100) }
+  const modo = MODOS_UMBRAL.includes(data?.monitorUmbralARitmo?.modo) ? data.monitorUmbralARitmo.modo : null
+  if (Object.keys(actual).length === 0 && historial.length === 0 && !modo) return null
+  const perillas = { actual, historial: historial.slice(-100) }
+  if (modo) perillas.modo = modo
+  return perillas
 }
 
 async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
