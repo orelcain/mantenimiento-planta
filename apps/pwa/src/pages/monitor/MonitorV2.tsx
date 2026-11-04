@@ -31,8 +31,8 @@ import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
-import { etiquetaMaquina, varaEnMinuto } from './ritmoVivo'
-import type { PerillasDeLinea } from './perilla'
+import { etiquetaMaquina, varaDeMinuto } from './ritmoVivo'
+import { tonoVara, type FuenteVara, type PerillasDeLinea } from './perilla'
 import type { PestanaMonitor } from './BarraLateralPC'
 import { horaDelCuadro, minutoDeDatos, piezasMostradas } from './aEstaHora'
 import { useCifrasVivas, VistaVivaCtx, type VistaViva } from './useCifrasVivas'
@@ -313,21 +313,22 @@ export interface EventoMarcado {
 }
 
 type TonoMinuto = 'ok' | 'warn' | 'crit' | 'sin'
-/** Los cortes de Shoplogix en sus barras: ≥75 % del esperado ok, 50-75 atención, <50 crítico. */
-function tonoMinuto(v: number, esperado: number | null): TonoMinuto {
-  if (esperado == null || esperado <= 0) return v > 0 ? 'ok' : 'sin'
-  const r = v / esperado
-  return r >= 0.75 ? 'ok' : r >= 0.5 ? 'warn' : 'crit'
+/** Una vara de minuto: su valor y de dónde sale (perilla o Shoplogix). */
+export type VaraDeMinuto = { cpm: number | null; fuente: FuenteVara }
+/** Tono de un minuto contra SU vara: con perilla, «a ritmo» es la perilla completa; sin perilla, el 75 % de siempre. */
+function tonoDeMinuto(v: number, vara: VaraDeMinuto): TonoMinuto {
+  const t = tonoVara(v, vara)
+  return t === 'bien' ? 'ok' : t === 'atento' ? 'warn' : t === 'mal' ? 'crit' : 'sin'
 }
 
 /**
- * % de los `n` minutos en que la fila anduvo a ritmo, cada minuto contra SU vara (`esperadoK[k]`). Null si la fila no tiene
- * esperado de Shoplogix o no hay minutos. Puro: lo prueba `__tests__/perillaConsumidores.test.ts`.
+ * % de los `n` minutos en que la fila anduvo a ritmo, cada minuto contra SU vara (`varaK[k]`, con su fuente). Null si la fila
+ * no tiene esperado de Shoplogix o no hay minutos. Puro: lo prueba `__tests__/perillaConsumidores.test.ts`.
  */
-export function pctARitmoFila(cycles: number[], esperadoK: Array<number | null>, n: number, esperado: number | null): number | null {
+export function pctARitmoFila(cycles: number[], varaK: VaraDeMinuto[], n: number, esperado: number | null): number | null {
   if (esperado == null || n === 0) return null
   let ok = 0
-  for (let k = 0; k < n; k++) if (tonoMinuto(cycles[k] ?? 0, esperadoK[k] ?? null) === 'ok') ok++
+  for (let k = 0; k < n; k++) if (tonoDeMinuto(cycles[k] ?? 0, varaK[k] ?? { cpm: null, fuente: 'shoplogix' }) === 'ok') ok++
   return Math.round((ok / n) * 100)
 }
 /* Paleta calma: lo normal va en el acento y solo lo que se queda atrás toma color (ámbar y coral apagados). */
@@ -436,30 +437,37 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas }: {
   /* La vara de cada minuto: la perilla vigente o, si no hay, el esperado de Shoplogix (sin perillas, el mismo esperado de siempre).
      El escalar de la fila («esperado N pz/min», la referencia) va con el último minuto. */
   const kUlt = Math.max(0, n - 1)
-  const varasDeLinea = (k: number) => d.maquinas.map((m) => varaEnMinuto(m, t0, k, perillas))
-  const esperadoLineaK = Array.from({ length: n }, (_, k) => {
+  const varasDeLinea = (k: number) => d.maquinas.map((m) => varaDeMinuto(m, t0, k, perillas))
+  /* La línea va a ritmo con la perilla completa solo si TODAS sus Baaders la tienen en ese minuto; si una va con el esperado
+     de Shoplogix, la línea va al 75 % de la suma (igual que el mockup aprobado: 37 con 17 + 16 + 16 y una sin perilla). */
+  const varaLineaK: VaraDeMinuto[] = Array.from({ length: n }, (_, k) => {
     const vs = varasDeLinea(k)
-    return vs.every((v) => v != null) ? vs.reduce<number>((a, v) => a + (v ?? 0), 0) : null
+    if (!vs.every((v) => v.cpm != null)) return { cpm: null, fuente: 'shoplogix' }
+    return { cpm: vs.reduce<number>((a, v) => a + (v.cpm ?? 0), 0), fuente: vs.every((v) => v.fuente === 'perilla') ? 'perilla' : 'shoplogix' }
   })
   const filas = [
     ...(varias
       ? [{
           nombre: 'Línea',
           nota: `las ${d.maquinas.length} suman`,
-          esperado: d.maquinas.every((m) => m.esperado != null) ? varasDeLinea(kUlt).reduce<number>((a, v) => a + (v ?? 0), 0) : null,
-          esperadoK: esperadoLineaK,
+          esperado: d.maquinas.every((m) => m.esperado != null) ? varasDeLinea(kUlt).reduce<number>((a, v) => a + (v.cpm ?? 0), 0) : null,
+          esperadoK: varaLineaK.map((v) => v.cpm),
+          varaK: varaLineaK,
           cycles: suma,
           principal: true,
           id: null as string | null,
         }]
       : []),
-    ...d.maquinas.map((m) => ({
-      nombre: m.nombre, nota: null as string | null, esperado: varaEnMinuto(m, t0, kUlt, perillas),
-      esperadoK: Array.from({ length: n }, (_, k) => varaEnMinuto(m, t0, k, perillas)),
-      cycles: m.cycles, principal: !varias, id: m.id as string | null,
-    })),
+    ...d.maquinas.map((m) => {
+      const varaK = Array.from({ length: n }, (_, k) => varaDeMinuto(m, t0, k, perillas))
+      return {
+        nombre: m.nombre, nota: null as string | null, esperado: varaDeMinuto(m, t0, kUlt, perillas).cpm,
+        esperadoK: varaK.map((v) => v.cpm), varaK,
+        cycles: m.cycles, principal: !varias, id: m.id as string | null,
+      }
+    }),
   ]
-  const aRitmo = (f: (typeof filas)[number]) => pctARitmoFila(f.cycles, f.esperadoK, n, f.esperado)
+  const aRitmo = (f: (typeof filas)[number]) => pctARitmoFila(f.cycles, f.varaK, n, f.esperado)
   const indice = (e: { clientX: number; currentTarget: HTMLDivElement }) => {
     const r = e.currentTarget.getBoundingClientRect()
     const ancho = r.width - 2 * PAD_MINUTO
@@ -534,7 +542,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas }: {
                       <span className="pointer-events-none absolute inset-x-0 border-t border-dashed" style={{ bottom: `${yEsperado}%`, borderColor: 'var(--v2-tenue)' }} />
                     )}
                     {f.cycles.slice(0, n).map((v, k) => {
-                      const t = tonoMinuto(v, f.esperadoK[k] ?? null)
+                      const t = tonoDeMinuto(v, f.varaK[k] ?? { cpm: null, fuente: 'shoplogix' })
                       return (
                         <span
                           key={k}
@@ -593,7 +601,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas }: {
         {(['ok', 'warn', 'crit'] as const).map((t) => (
           <span key={t} className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR_MINUTO[t] }} />
-            {t === 'ok' ? 'a ritmo (75 % o más del esperado)' : t === 'warn' ? '50 a 75 %' : 'menos de 50 %'}
+            {t === 'ok' ? 'a ritmo' : t === 'warn' ? 'bajo' : 'muy bajo'}
           </span>
         ))}
         <span className="ml-auto">{cerrado ? 'turno cerrado' : `hasta las ${relojDe(t0 + (n - 1) * 60_000)}`}</span>

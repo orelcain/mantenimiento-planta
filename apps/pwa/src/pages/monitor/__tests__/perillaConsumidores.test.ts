@@ -8,7 +8,7 @@ import type { PerillaHistorial, PerillaMaquina } from '@/services/shoplogix/pinS
 import type { PerillasDeLinea } from '../perilla'
 import { esperadoPorMinuto, filasBaader } from '../ejeTurno'
 import { pctARitmoFila } from '../MonitorV2'
-import { calcularRitmoVivo, llenadoDe, vaciosTurnoDe, varaEnMinuto, type EntradaRitmoVivo, type MaquinaSerie } from '../ritmoVivo'
+import { calcularRitmoVivo, llenadoDe, vaciosTurnoDe, varaDeMinuto, varaEnMinuto, type EntradaRitmoVivo, type MaquinaSerie } from '../ritmoVivo'
 
 /* Hora de planta (wall-as-UTC), la misma convención que `serieMinuto.desde`. */
 const T0 = '2026-11-04T10:00:00.000Z'
@@ -58,10 +58,11 @@ describe('Ev1 con perilla 17 y Shoplogix 18', () => {
     expect(lineas[0]!.esperado).toBe(18)
   })
 
-  it('aRitmo (pctARitmoFila) cuenta el minuto de 13 como a ritmo con 17 y no con 18', () => {
-    const conPerilla = esperadoPorMinuto([ev1], 6, { desde: T0, perillas })
-    expect(pctARitmoFila(ev1.cycles, conPerilla, 6, 18)).toBe(100)
-    const sinPerilla = esperadoPorMinuto([ev1], 6, { desde: T0, perillas: null })
+  it('aRitmo (pctARitmoFila): con perilla 17, 13 piezas NO son a ritmo (la perilla completa); 17 sí', () => {
+    const conPerilla = Array.from({ length: 6 }, (_, k) => varaDeMinuto(ev1, t0, k, perillas))
+    expect(pctARitmoFila(ev1.cycles, conPerilla, 6, 18)).toBe(0)
+    expect(pctARitmoFila(minutos(6, 17), conPerilla, 6, 18)).toBe(100)
+    const sinPerilla = Array.from({ length: 6 }, (_, k) => varaDeMinuto(ev1, t0, k, null))
     expect(pctARitmoFila(ev1.cycles, sinPerilla, 6, 18)).toBe(0)
   })
 

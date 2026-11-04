@@ -112,6 +112,16 @@ export function tonoVara(v: number, vara: { cpm: number | null; fuente: FuenteVa
 }
 
 /**
+ * Umbral «a ritmo» entero de una vara, según su fuente: con perilla, `umbralARitmo`
+ * (17 → 17); con vara de Shoplogix, el 75 % redondeado hacia arriba (17 → 13, como
+ * antes de la perilla). Null si no hay vara.
+ */
+export function umbralEntero(vara: { cpm: number | null; fuente: FuenteVara }): number | null {
+  if (vara.cpm == null || !(vara.cpm > 0)) return null
+  return vara.fuente === 'perilla' ? umbralARitmo(vara.cpm) : Math.ceil(vara.cpm * 0.75 - EPSILON_UMBRAL)
+}
+
+/**
  * `desde` de una anotación: la hora de PLANTA (America/Santiago) sellada como UTC, la
  * misma convención que los minutos del monitor. Con `toISOString()` directo quedaría
  * UTC real: una perilla anotada a las 10:00 en Chile entraría en vigor a las 13:00.
