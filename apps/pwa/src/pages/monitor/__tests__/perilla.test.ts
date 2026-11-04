@@ -5,9 +5,8 @@
  * y que sin perilla la vara vuelva a Shoplogix.
  */
 import { describe, expect, it } from 'vitest'
+import { construirPerilla, desdePerilla } from '@/lib/horaDePlanta'
 import {
-  construirPerilla,
-  desdePerilla,
   perillaEn,
   tonoVara,
   umbralARitmo,

@@ -30,29 +30,10 @@
  */
 
 import type { PublicMonitorLive, PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
+import { aWallClockMs } from '@/lib/horaDePlanta'
 
-/** Zona de las plantas. La misma que usa el resto del monitor. */
-const TZ = 'America/Santiago'
-
-const PARTES = new Intl.DateTimeFormat('en-CA', {
-  timeZone: TZ,
-  year: 'numeric', month: '2-digit', day: '2-digit',
-  hour: '2-digit', minute: '2-digit', second: '2-digit',
-  hourCycle: 'h23',
-})
-
-/**
- * Pasa un instante UTC real a milisegundos de RELOJ DE PLANTA, para poder
- * compararlo con los `t` de la serie, que ya vienen en wall-clock-as-UTC.
- */
-export function aWallClockMs(iso: string): number | null {
-  const ms = Date.parse(iso)
-  if (!Number.isFinite(ms)) return null
-  const p: Record<string, string> = {}
-  for (const parte of PARTES.formatToParts(new Date(ms))) p[parte.type] = parte.value
-  const rearmado = Date.parse(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}Z`)
-  return Number.isFinite(rearmado) ? rearmado : null
-}
+/** `aWallClockMs` vive en `lib/horaDePlanta` (también la usa `services/`). Se re-exporta aquí para quien ya lo importaba de este módulo. */
+export { aWallClockMs }
 
 export interface ContadorElegido {
   /** El número que va grande. */

@@ -16,7 +16,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from '@/services/firestoreTracked'
 import { db } from '../firebase'
 import type { PlantSlug } from './shoplogixMachines'
-import { construirPerilla } from '@/pages/monitor/perilla'
+import { construirPerilla } from '@/lib/horaDePlanta'
 
 const COLLECTION = 'graderModuleConfigs'
 

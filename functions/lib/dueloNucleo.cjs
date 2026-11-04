@@ -306,21 +306,6 @@ function repartoDeTurno(t) {
   return out;
 }
 
-// apps/pwa/src/pages/monitor/contadorCrudo.ts
-var TZ = "America/Santiago";
-var PARTES = new Intl.DateTimeFormat("en-CA", {
-  timeZone: TZ,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23"
-});
-var TOLERANCIA_MS = 6 * 6e4;
-var VIVO_TOLERANCIA_MS = 6 * 6e4;
-
 // apps/pwa/src/pages/monitor/ritmoVivo.ts
 function normalizar(s) {
   return (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();

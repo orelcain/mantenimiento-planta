@@ -12,9 +12,6 @@
  * y el gráfico del Ritmo en vivo. El Duelo, la cascada y el OEE no la usan: siguen con el
  * esperado de Shoplogix.
  */
-import type { PerillaMaquina } from '@/services/shoplogix/pinShiftEnd'
-import { aWallClockMs } from './contadorCrudo'
-
 /**
  * Lo que el monitor público ve de una perilla: velocidad y cuándo entró en vigor.
  * Quién la anotó no sale del servidor (functions/publicMonitor.js, normPerilla).
@@ -153,20 +150,3 @@ export function bandasEnteras(vara: { cpm: number | null; fuente: FuenteVara }):
 export const diaMesPerilla = (desde: string): string => `${desde.slice(8, 10)}-${desde.slice(5, 7)}`
 /** «01:20»: la hora de un `desde`, sin convertir zona (misma convención que `diaMesPerilla`). */
 export const horaPerilla = (desde: string): string => desde.slice(11, 16)
-
-/**
- * `desde` de una anotación: la hora de PLANTA (America/Santiago) sellada como UTC, la
- * misma convención que los minutos del monitor. Con `toISOString()` directo quedaría
- * UTC real: una perilla anotada a las 10:00 en Chile entraría en vigor a las 13:00.
- * Reusa `aWallClockMs`, que ya pasa los instantes del contador a hora de planta.
- */
-export function desdePerilla(nowMs: number): string {
-  const wall = Number.isFinite(nowMs) ? aWallClockMs(new Date(nowMs).toISOString()) : null
-  if (wall == null) throw new Error('Instante de la perilla no válido')
-  return new Date(wall).toISOString()
-}
-
-/** La anotación nueva: la velocidad, quién la anotó y su `desde` en hora de planta. */
-export function construirPerilla(params: { cpm: number; por: string | null; nowMs: number }): PerillaMaquina {
-  return { cpm: params.cpm, desde: desdePerilla(params.nowMs), por: params.por }
-}
