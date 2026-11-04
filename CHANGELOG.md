@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.14.0] - 2026-11-04
+Monitor: el motivo de la perilla («por el Knuro») se ve en la franja y en la cascada.
+
+### Añadido
+- Motivo opcional en la perilla de cada Baader (máximo 60 caracteres). Quien anota la perilla lo escribe junto a la velocidad; se guarda con la anotación y en su historial.
+- La franja lo muestra después de «anotada dd-mm». La cascada lo pone en el escalón «Perilla más lenta que la meta» («17 en vez de 18 · por el Knuro»). Es el motivo de la perilla vigente al final del turno.
+
+### Cambiado
+- Guardar en el editor de la perilla queda activo también cuando solo cambia el motivo, sin mover la velocidad.
+
 ## [4.13.0] - 2026-11-04
 Monitor: la cascada a la meta de Shoplogix con la perilla, por Baader y por línea, con la línea de dueños.
 
