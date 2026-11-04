@@ -5,7 +5,16 @@
  * y que sin perilla la vara vuelva a Shoplogix.
  */
 import { describe, expect, it } from 'vitest'
-import { perillaEn, umbralARitmo, varaMinuto, type PerillasDeLinea } from '../perilla'
+import {
+  construirPerilla,
+  desdePerilla,
+  perillaEn,
+  tonoVara,
+  umbralARitmo,
+  UMBRAL_A_RITMO_PERILLA,
+  varaMinuto,
+  type PerillasDeLinea,
+} from '../perilla'
 
 const HORA = 3_600_000
 /** Inicio de turno de referencia (UTC). */
@@ -19,12 +28,12 @@ function perillasDe(historial: Array<{ machineId: string; cpm: number; desde: st
   for (const h of historial) {
     const previo = actual[h.machineId]
     if (!previo || Date.parse(h.desde) >= Date.parse(previo.desde)) {
-      actual[h.machineId] = { cpm: h.cpm, desde: h.desde, por: 'admin' }
+      actual[h.machineId] = { cpm: h.cpm, desde: h.desde }
     }
   }
   return {
     actual,
-    historial: historial.map((h) => ({ cpm: h.cpm, desde: h.desde, por: 'admin', machineId: h.machineId })),
+    historial: historial.map((h) => ({ cpm: h.cpm, desde: h.desde, machineId: h.machineId })),
   }
 }
 
@@ -73,7 +82,7 @@ describe('perillaEn', () => {
 
   it('si el historial se recortó, la anotación actual sigue valiendo', () => {
     const p: PerillasDeLinea = {
-      actual: { ev1: { cpm: 17, desde: enHora(-24), por: 'admin' } },
+      actual: { ev1: { cpm: 17, desde: enHora(-24) } },
       historial: [],
     }
     expect(perillaEn(p, 'ev1', INICIO)).toBe(17)
@@ -100,16 +109,76 @@ describe('varaMinuto', () => {
   })
 })
 
-describe('umbralARitmo', () => {
+describe('umbralARitmo: con perilla anotada, a ritmo es la perilla completa', () => {
+  it('la constante vale 1 (decisión de Orel, 04-11)', () => {
+    expect(UMBRAL_A_RITMO_PERILLA).toBe(1)
+  })
   it.each([
-    [17, 13], // 12,75 sube a 13
-    [16, 12], // exacto: no sube
-    [18, 14], // 13,5 sube a 14
-    [15, 12], // 11,25 sube a 12
-    [20, 15], // exacto
-    [5, 4], // 3,75 sube a 4
-    [30, 23], // 22,5 sube a 23
+    [17, 17], // con 17 anotado, a ritmo es 17 o más
+    [16, 16],
+    [18, 18],
+    [15, 15],
+    [20, 20],
+    [5, 5],
+    [30, 30],
   ])('con %i pz/min el umbral es %i', (cpm, umbral) => {
     expect(umbralARitmo(cpm)).toBe(umbral)
+  })
+})
+
+describe('tonoVara: bandas de la perilla y el 75 % de Shoplogix', () => {
+  const perilla17 = { cpm: 17, fuente: 'perilla' as const }
+  const shoplogix16 = { cpm: 16, fuente: 'shoplogix' as const }
+  it.each([
+    [17, 'bien'], // el umbral entero: a ritmo
+    [18, 'bien'],
+    [16, 'atento'], // una menos que la perilla ya es bajo, no a ritmo
+    [9, 'atento'], // 9/17 = 52,9 %: sobre la mitad
+    [8, 'mal'], // 8/17 = 47 %: muy bajo
+    [0, 'mal'], // detenida con vara: muy bajo
+  ])('perilla 17 · %i pz → %s', (v, tono) => {
+    expect(tonoVara(v, perilla17)).toBe(tono)
+  })
+  it.each([
+    [12, 'bien'], // 75 % exacto de 16 (Shoplogix): sigue siendo a ritmo
+    [11, 'atento'],
+    [8, 'atento'], // 50 % exacto: bajo
+    [7, 'mal'],
+  ])('Shoplogix 16 · %i pz → %s (sin perilla no cambia)', (v, tono) => {
+    expect(tonoVara(v, shoplogix16)).toBe(tono)
+  })
+  it('sin vara: con piezas es a ritmo (como antes), sin piezas es sin dato', () => {
+    expect(tonoVara(5, { cpm: null, fuente: 'shoplogix' })).toBe('bien')
+    expect(tonoVara(0, { cpm: null, fuente: 'shoplogix' })).toBe('sin')
+  })
+})
+
+describe('desdePerilla: la hora de planta sellada como UTC, no la UTC real', () => {
+  it('verano (UTC−3, 04-11-2026 04:20Z) → 01:20 de planta', () => {
+    expect(desdePerilla(Date.parse('2026-11-04T04:20:00Z'))).toBe('2026-11-04T01:20:00.000Z')
+  })
+  it('invierno (UTC−4, 01-07-2026 12:00Z) → 08:00 de planta', () => {
+    expect(desdePerilla(Date.parse('2026-07-01T12:00:00Z'))).toBe('2026-07-01T08:00:00.000Z')
+  })
+  it('anotada a las 10:00 en Chile entra en vigor a las 10:00, no a las 13:00', () => {
+    expect(desdePerilla(Date.parse('2026-11-04T13:00:00Z'))).toBe('2026-11-04T10:00:00.000Z')
+  })
+  it('un instante que no es número no se guarda', () => {
+    expect(() => desdePerilla(Number.NaN)).toThrow()
+  })
+  it('construirPerilla usa esa misma hora y guarda quién la anotó', () => {
+    expect(construirPerilla({ cpm: 17, por: 'Orel C.', nowMs: Date.parse('2026-11-04T04:20:00Z') })).toEqual({
+      cpm: 17,
+      desde: '2026-11-04T01:20:00.000Z',
+      por: 'Orel C.',
+    })
+  })
+})
+
+describe('perillaEn con un instante que no es número', () => {
+  it('devuelve null aunque haya una anotación (con NaN todas parecían vigentes)', () => {
+    const perillas = { actual: { ev1: { cpm: 17, desde: '2026-11-04T01:20:00.000Z' } }, historial: [] }
+    expect(perillaEn(perillas, 'ev1', Number.NaN)).toBeNull()
+    expect(perillaEn(perillas, 'ev1', Date.parse('2026-11-04T02:00:00.000Z'))).toBe(17)
   })
 })

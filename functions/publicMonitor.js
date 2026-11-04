@@ -834,13 +834,14 @@ function normShiftName(s) {
 
 /**
  * Una perilla de velocidad, saneada. Null si no es usable: sin un cpm positivo
- * o sin `desde` con fecha válida, no se publica.
+ * o sin `desde` con fecha válida, no se publica. Solo sale `cpm` y `desde`: el
+ * monitor público no muestra quién anotó (el editor de admin lo lee de graderModuleConfigs).
  */
 function normPerilla(v) {
   const cpm = Number(v?.cpm)
   const t = typeof v?.desde === 'string' ? Date.parse(v.desde) : NaN
   if (!(cpm > 0) || !Number.isFinite(t)) return null
-  return { cpm, desde: v.desde, por: typeof v.por === 'string' ? v.por : null }
+  return { cpm, desde: v.desde }
 }
 
 /**
@@ -3458,6 +3459,8 @@ function huellaEstable(v) {
 
 module.exports = {
   buildFallaRepetida,
+  normPerilla,
+  leerPerillas,
   COLLECTION,
   esTurnoSellado,
   CLOSE_MARGIN_MS,

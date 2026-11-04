@@ -16,6 +16,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from '@/services/firestoreTracked'
 import { db } from '../firebase'
 import type { PlantSlug } from './shoplogixMachines'
+import { construirPerilla } from '@/pages/monitor/perilla'
 
 const COLLECTION = 'graderModuleConfigs'
 
@@ -201,7 +202,7 @@ export async function setMonitorPerilla(params: {
   const historialPrevio: PerillaHistorial[] = Array.isArray(snap.data()?.monitorPerillasHistorial)
     ? snap.data()!.monitorPerillasHistorial
     : []
-  const nueva: PerillaMaquina = { cpm: params.cpm, desde: new Date().toISOString(), por: params.por }
+  const nueva: PerillaMaquina = construirPerilla({ cpm: params.cpm, por: params.por, nowMs: Date.now() })
   await setDoc(ref, {
     // Merge profundo: escribe solo esta máquina y deja intactas las demás.
     monitorPerillas: { [params.machineId]: nueva },
