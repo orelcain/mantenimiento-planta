@@ -307,6 +307,8 @@ export interface LineaLlenado {
   id: string
   nombre: string
   esperado: number
+  /** De dónde sale la vara del último minuto: la perilla o el esperado de Shoplogix (`varaDeMinuto`). */
+  fuente: FuenteVara
   /** % de llenado por minuto cerrado (0–100); null = sin dato (parada o <30 s andando). */
   fills: Array<number | null>
   /** Índices de minuto con micro detención de ESA máquina. */
@@ -351,6 +353,8 @@ export interface RitmoVivo {
   lineas: LineaLlenado[]
   /** Falso en docs anteriores a `stopMachines`: el llenado no separa las paradas. */
   separaParadas: boolean
+  /** Carros con pieza de los minutos cerrados de `lineas` (la ventana de la franja), con la regla de `vaciosTurnoDe`: Σ piezas ÷ Σ (vara × fracción andando). Es la cifra del panel, no el último minuto. */
+  carrosVentana: VaciosTurno
   senales: Senal[]
   unidad: 'carros' | 'silletas' | null
 }
@@ -409,10 +413,12 @@ export function llenadoDe(e: EntradaRitmoVivo, i0: number, n: number): { lineas:
     const ini = validos.length >= 6 ? Math.round(media(validos.slice(0, 3))) : null
     const fin = validos.length >= 6 ? Math.round(media(validos.slice(-3))) : null
     const baja = ini != null && fin != null && ini - fin >= CAIDA_LLENADO_PP
+    const varaUltimo = varaDeMinuto(m, t0, Math.max(0, n - 1), e.perillas)
     lineas.push({
       id: m.id,
       nombre: m.nombre,
-      esperado: varaEnMinuto(m, t0, Math.max(0, n - 1), e.perillas)!,
+      esperado: varaUltimo.cpm!,
+      fuente: varaUltimo.fuente,
       fills,
       micros,
       microsDetalle,
@@ -588,6 +594,14 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
   }
 
   const { lineas, separaParadas } = llenadoDe(e, i0, n)
+  /* Carros con pieza de la misma ventana que dibuja el panel (los minutos cerrados de `lineas`), con la regla de `vaciosTurnoDe`
+     sobre la serie recortada a esa ventana. Es Σ piezas ÷ Σ (vara × fracción andando): ni el último minuto ni un promedio de porcentajes. */
+  const carrosVentana = vaciosTurnoDe(
+    { desde: new Date(t0 + i0 * 60_000).toISOString(), maquinas: maq.map((m) => ({ ...m, cycles: m.cycles.slice(i0, n) })) },
+    n - i0,
+    e,
+    e.perillas,
+  )
   return {
     minutos,
     porMaquina,
@@ -600,6 +614,7 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
     horaCurso: hh(t0 + n * 60_000),
     lineas,
     separaParadas,
+    carrosVentana,
     senales: senalesDe(lineas, unidad, separaParadas),
     unidad,
   }

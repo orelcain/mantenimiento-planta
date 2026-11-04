@@ -378,6 +378,42 @@ describe('la parada en curso: micro o detención lo dice Shoplogix', () => {
   })
 })
 
+describe('carros con pieza de los 15 min de la franja (carrosVentana): promedio de la ventana, no el último minuto', () => {
+  it('es Σ piezas ÷ Σ capacidad de los minutos cerrados, no el porcentaje del último', () => {
+    /* 13 minutos a 10 pz y el último a 16 (100 % de 16): Σ 146 de 224 = 65,2 %. El último minuto daría 100. */
+    const cycles = [...Array.from({ length: 13 }, () => 10), 16]
+    const r = calcularRitmoVivo(entrada([maq('ev1', cycles, 16)]), 'carros')!
+    const v = r.carrosVentana.maquinas.find((x) => x.id === 'ev1')!
+    expect(v.conPieza).toBe(146)
+    expect(v.pasaron).toBe(224)
+    expect(v.pct).toBeCloseTo(65.18, 1)
+    expect(v.pct).not.toBe(100)
+  })
+
+  it('pondera por la vara de cada minuto: con perilla que cambia a mitad de la ventana no promedia porcentajes', () => {
+    /* Minutos 0 a 6: vara 16 y 8 pz cada uno (50 %). Minutos 7 a 13: perilla 12 desde el minuto 7 y 12 pz (100 %).
+       Σ 56 + 84 = 140 de 7·16 + 7·12 = 196 → 71,4 %. El promedio de porcentajes daría 75 %. */
+    const cycles = [...Array.from({ length: 7 }, () => 8), ...Array.from({ length: 7 }, () => 12)]
+    const perillas = { actual: { ev1: { cpm: 12, desde: iso(7) } }, historial: [] }
+    const r = calcularRitmoVivo(entrada([maq('ev1', cycles, 16)], { perillas }), 'carros')!
+    const v = r.carrosVentana.maquinas.find((x) => x.id === 'ev1')!
+    expect(v.conPieza).toBe(140)
+    expect(v.pasaron).toBe(196)
+    expect(v.pct).toBeCloseTo(71.43, 1)
+  })
+
+  it('un minuto con detención que deja menos de 30 s andando no entra en la ventana', () => {
+    /* 14 minutos a 16 pz; el minuto 5 tiene una detención de 50 s (10 s andando): no cuenta ni en piezas ni en capacidad. */
+    const cycles = Array.from({ length: 14 }, () => 16)
+    cycles[5] = 0
+    const e = entrada([maq('ev1', cycles, 16)], { stopEvents: [{ r: 0, f: iso(5, 5), s: 50, m: 0 }], stopReasons: ['Detencion'], stopMachines: ['ev1'] })
+    const v = calcularRitmoVivo(e, 'carros')!.carrosVentana.maquinas.find((x) => x.id === 'ev1')!
+    expect(v.pasaron).toBe(13 * 16)
+    expect(v.conPieza).toBe(13 * 16)
+    expect(v.pct).toBe(100)
+  })
+})
+
 describe('carros vacíos del turno (estimación: velocidad seteada × tiempo andando − lo contado)', () => {
   /* Dos Baader de 16 y 20 por minuto. Minutos: 0 y 1 andando completos; 2 con Ev A parada 40 s (20 s andando < 30: no cuenta);
      3 con la LÍNEA entera en cero (no se distingue de una parada pactada); 4 con Ev B parada 15 s (45 s andando). */
