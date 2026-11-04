@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v4.10.1**
+## Versión Actual: **v4.11.0**
 
 **Fecha de lanzamiento**: 4 de agosto de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v4.11.0 — Monitor: promedio de 15 min por Baader, vara bajo cada nombre y perilla sin correo (04/11/2026)
+- 📈 **«Carros con pieza» de los últimos 15 minutos** por Baader: la cifra es el promedio de la ventana (Σ piezas ÷ Σ de lo que daba andando), no el último minuto. La raya marca a ritmo: «17 o más» con perilla, «12 o más» sin ella
+- 🏷️ **La vara en el gráfico**: bajo cada Baader, «perilla 17»; sin perilla anotada, «Shoplogix 16»
+- 👤 **Quién anotó la perilla**: el nombre visible, sin correo completo en pantalla
+- 🚀 **Al mergear a `main`** se despliega sola la Cloud Function (`deploy-functions.yml`, porque cambia `functions/lib/dueloNucleo.cjs`). Las reglas de Firestore (`deploy-firestore-rules.yml`) solo se despliegan si cambia `firestore.rules`, y esta versión no lo cambia
 
 ### v4.0.0 — Variadores, matriz de turnos y auditoría de Aprendizaje (04/08/2026)
 - ⚡ **Catálogo de variadores**: 8 fichas, ~300 parámetros en 61 menús verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»
