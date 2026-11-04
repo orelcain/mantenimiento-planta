@@ -16,6 +16,15 @@ Monitor: el motivo de la perilla («por el Knuro») se ve en la franja y en la c
 
 ### Cambiado
 - Guardar en el editor de la perilla queda activo también cuando solo cambia el motivo, sin mover la velocidad.
+- La vista Línea de la cascada pone el motivo entre paréntesis: «Ev 1 17 en vez de 18 (por el Knuro)».
+- Textos del monitor: «se detuvieron», «nunca se detuvieron a la vez», «casi detenida» y «una máquina detenida de tres»; los motivos se muestran sin « - Paro» («Ejercicio compensatorio»).
+
+### Corregido
+- La cascada no cuadraba cuando una Baader no tenía meta de Shoplogix (esperado 0). Esa Baader ya no entra en la cuenta de la línea y la línea lo dice («Ev 1 sin meta de Shoplogix en este turno: no entra en la cuenta»). La línea vuelve a cuadrar y vuelve a mostrar «Al rendimiento le faltan» y su línea de dueños.
+- El tiempo del turno y los minutos de la cascada se cortan en el fin del turno: una serie que sigue después del cierre ya no suma minutos ni piezas.
+- «Minutos a ritmo» muestra «—» en una Baader sin vara (meta 0 y sin perilla): sin porcentaje, sin ⓘ y sin desglose.
+- Filete (una sola máquina): la franja, los globos y la cascada hablan de silletas y de «la máquina»; no sale el selector Línea | máquina; el rótulo de los vacíos es «Silletas vacías».
+- Pie del desglose: «a ritmo X de Y» usa el tiempo de producción de la cascada, y «Bajo U» explica todos sus minutos (con detención y sin ella).
 
 ## [4.13.0] - 2026-11-04
 Monitor: la cascada a la meta de Shoplogix con la perilla, por Baader y por línea, con la línea de dueños.

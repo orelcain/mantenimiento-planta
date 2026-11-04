@@ -11,7 +11,7 @@ import { SegmentedControl, type Segment } from '@/components/piel/SegmentedContr
 import { FilaRendimientoPerilla } from '@/components/grader/FilaRendimientoPerilla'
 import { BotonInfo } from './GlobosFranja'
 import { CascadaTurnoAnterior } from './CascadaTurnoAnterior'
-import type { Cascada } from './cascadaTurno'
+import { vaciasEtiqueta, type Cascada, type Contenedor } from './cascadaTurno'
 import type { CascadaPorMeta, PiezasVista } from './cascadaPerilla'
 
 /* La cascada a la meta de Shoplogix con la perilla (Fase B). Las cifras salen de `cascadaPerilla.ts`; aquí solo se
@@ -44,7 +44,7 @@ interface Escalon {
   sub?: boolean
 }
 
-function escalonesDe(v: PiezasVista, metas: string, perillas: string, sumaDe: number | null): Escalon[] {
+function escalonesDe(v: PiezasVista, metas: string, perillas: string, sumaDe: number | null, contenedor: Contenedor): Escalon[] {
   const min = (x: number) => Math.round(x)
   return [
     { clave: 'capacidad', etiqueta: 'Podía hacer a la meta', detalle: `meta ${metas}`, piezas: v.podia, resta: false },
@@ -58,20 +58,22 @@ function escalonesDe(v: PiezasVista, metas: string, perillas: string, sumaDe: nu
       resta: true,
     },
     { clave: 'micro', etiqueta: 'Microdetenciones', detalle: `${min(v.micro.min)} min · ${v.micro.veces} ×`, piezas: v.micro.piezas, resta: true },
-    { clave: 'vacios', etiqueta: 'Carros vacíos', piezas: v.vacios, resta: true },
+    { clave: 'vacios', etiqueta: vaciasEtiqueta(contenedor), piezas: v.vacios, resta: true },
     { clave: 'hizo', etiqueta: 'Hizo', piezas: v.hizo, resta: false },
   ]
 }
 
-export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPorMeta; minutosTurno: number }) {
+export function CascadaTurnoCard({ cascada, minutosTurno, contenedor = 'silleta' }: { cascada: CascadaPorMeta; minutosTurno: number; contenedor?: Contenedor }) {
   const [vista, setVista] = useState<string>('linea')
   const [info, setInfo] = useState(false)
 
+  /* Con una sola máquina no hay línea que elegir: el selector «Línea | máquina» no sale y la vista es la de la máquina. */
+  const unica = cascada.baaders.length === 1
   const segmentos: Segment<string>[] = [
     { value: 'linea', label: 'Línea' },
     ...cascada.baaders.map((b) => ({ value: b.id, label: etiquetaVista(b.nombre) })),
   ]
-  const baader = cascada.baaders.find((b) => b.id === vista) ?? null
+  const baader = unica ? (cascada.baaders[0] ?? null) : (cascada.baaders.find((b) => b.id === vista) ?? null)
   const v: PiezasVista = baader ?? cascada.linea
   /* La línea cuenta solo las Baader con meta usable. Una sin meta no entra en la cuenta: se nombra en una nota, no en los escalones. */
   const cuentan = cascada.baaders.filter((b) => !b.sinMeta)
@@ -91,7 +93,7 @@ export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPo
       : 'igual a su meta'
     : cuentan.filter((b) => b.perilla > 0).map((b) => `${etiquetaVista(b.nombre)} ${b.vara} en vez de ${b.meta}${conMotivoEntre(b.motivo)}`).join(' · ') || 'ninguna más lenta que su meta'
 
-  const escalones = escalonesDe(v, metas, perillas, baader == null && cuentan.length > 1 ? cuentan.length : null)
+  const escalones = escalonesDe(v, metas, perillas, baader == null && cuentan.length > 1 ? cuentan.length : null, contenedor)
   const d = v.duenos
 
   return (
@@ -108,13 +110,15 @@ export function CascadaTurnoCard({ cascada, minutosTurno }: { cascada: CascadaPo
           Parte de la meta de Shoplogix en el tiempo de producción: el turno menos la detención programada (colación,
           reunión de inicio y ejercicio compensatorio), que no es pérdida de nadie. La perilla se resta primero; desde
           «podía hacer con la perilla» todo se mide a la perilla. Detenciones: minutos con detención no programada de
-          cada Baader; en la línea, su suma. Vacíos por diferencia, para que la suma cierre al entero.
+          {unica ? 'la máquina' : 'cada Baader; en la línea, su suma'}. Vacíos por diferencia, para que la suma cierre al entero.
         </p>
       )}
 
-      <div className="mt-3">
-        <SegmentedControl value={vista} onChange={setVista} segments={segmentos} ariaLabel="Ver por Baader" />
-      </div>
+      {!unica && (
+        <div className="mt-3">
+          <SegmentedControl value={vista} onChange={setVista} segments={segmentos} ariaLabel="Ver por Baader" />
+        </div>
+      )}
 
       {/* Una Baader sin meta usable no tiene escalones: su vista es solo el aviso. */}
       {baader?.sinMeta ? (
@@ -202,10 +206,10 @@ export function TarjetaCascada({
   meta,
   anterior,
 }: {
-  meta: { cascada: CascadaPorMeta; minutos: number } | null
+  meta: { cascada: CascadaPorMeta; minutos: number; contenedor?: Contenedor } | null
   anterior: Cascada | null
 }) {
-  if (meta) return <CascadaTurnoCard cascada={meta.cascada} minutosTurno={meta.minutos} />
+  if (meta) return <CascadaTurnoCard cascada={meta.cascada} minutosTurno={meta.minutos} contenedor={meta.contenedor} />
   if (anterior) return <CascadaTurnoAnterior cascada={anterior} />
   return null
 }

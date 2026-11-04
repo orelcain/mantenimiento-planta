@@ -163,9 +163,23 @@ describe('CascadaTurnoCard: fila de rendimiento, rótulo y regresión (B-2)', ()
     expect(container.textContent ?? '').toContain('de producción · 378 piezas')
   })
 
-  it('el rótulo es «Carros vacíos»', () => {
-    const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+  it('el rótulo es «Carros vacíos» en Eviscerado (carros) y «Silletas vacías» en Filete (silletas)', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} contenedor="carro" />)
     expect(container.textContent ?? '').toContain('Carros vacíos')
+    const f = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} contenedor="silleta" />)
+    expect(f.container.textContent ?? '').toContain('Silletas vacías')
+    expect(f.container.textContent ?? '').not.toContain('Carros vacíos')
+  })
+
+  it('con una sola máquina (Filete) no sale el selector «Línea» y el texto no nombra «Baader»', () => {
+    const una = cascadaPorMeta({ serie: { ...serie, maquinas: [serie.maquinas[0]!] }, n: N, paradas, perillas: PERILLAS })
+    const { container, queryByRole } = render(<CascadaTurnoCard cascada={una} minutosTurno={N} contenedor="silleta" />)
+    expect(queryByRole('tab', { name: 'Línea' })).toBeNull()
+    expect(queryByRole('tablist')).toBeNull()
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('Tiempo de producción')
+    expect(texto).toContain('Cuadre:')
+    expect(texto).not.toContain('Baader')
   })
 
   it('sin serie por minuto, la tarjeta vuelve a la cascada anterior (construirCascada), como antes de B-2', () => {

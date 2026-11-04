@@ -49,8 +49,16 @@ export interface DatosGloboRitmo {
   bajo: number
   /** Carros con pieza de la Baader o de la línea; null si no se pueden calcular (sin el dato completo). */
   carros: number | null
+  /** La unidad de la máquina: «carros» o «silletas» (la que la página resuelve). */
+  unidad: 'carros' | 'silletas'
+  /** Una sola máquina: los textos dicen «la máquina», no «la Baader». */
+  unica: boolean
   onVerDesglose: () => void
 }
+
+/* Los textos de la franja cambian con la unidad («los carros» / «las silletas») y con la cantidad de máquinas. */
+const conArticulo = (u: 'carros' | 'silletas') => (u === 'silletas' ? 'las silletas' : 'los carros')
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** Globo de «minutos a ritmo»: lo que cuenta el umbral, de dónde sale y con qué se compara; y «Ver desglose». */
 export function GloboRitmo(d: DatosGloboRitmo) {
@@ -58,6 +66,7 @@ export function GloboRitmo(d: DatosGloboRitmo) {
   const conPerilla = d.vara.fuente === 'perilla'
   const optimo = d.vara.modo === 'optimo'
   const otros = d.total - d.n
+  const maquina = d.unica ? 'máquina' : 'Baader'
   const etiqueta = d.linea ? 'Minutos a ritmo de la línea' : `Minutos a ritmo de la ${d.nombre}`
   return (
     <Globo etiqueta={etiqueta}>
@@ -68,7 +77,7 @@ export function GloboRitmo(d: DatosGloboRitmo) {
         ? (
           <>
             <p className="mt-2">{`La línea suma la vara de sus Baader (${p}). Mientras una no tenga perilla, el umbral es el 75 % de esa suma; con las 3, la suma de sus umbrales.`}</p>
-            {d.carros != null && <p className="mt-2">Carros con pieza de la línea: <b className="font-semibold text-foreground">{Math.round(d.carros)} %</b>, la suma de sus Baader.</p>}
+            {d.carros != null && <p className="mt-2">{capital(d.unidad)} con pieza de la línea: <b className="font-semibold text-foreground">{Math.round(d.carros)} %</b>, la suma de sus Baader.</p>}
           </>
         )
         : (
@@ -79,9 +88,9 @@ export function GloboRitmo(d: DatosGloboRitmo) {
                 : optimo
                   ? `Es la perilla completa. Con la cadena llena, Shoplogix registra ${p - 1}, ${p} o ${p + 1} según dónde cae el corte de cada minuto: los de ${p - 1} no cuentan.`
                   : `El umbral es la perilla ${p} menos 1: con la cadena llena, Shoplogix registra ${p - 1}, ${p} o ${p + 1} según dónde cae el corte de cada minuto.`}
-              {` De los otros ${otros}, ${d.detenida} con la Baader detenida y ${d.bajo} bajo ${d.umbral}.`}
+              {` De los otros ${otros}, ${d.detenida} con la ${maquina} detenida y ${d.bajo} bajo ${d.umbral}.`}
             </p>
-            {d.carros != null && <p className="mt-2">Con la pantalla de la Baader se compara <b className="font-semibold text-foreground">carros con pieza: {Math.round(d.carros)} %</b>.</p>}
+            {d.carros != null && <p className="mt-2">Con la pantalla de la {maquina} se compara <b className="font-semibold text-foreground">{d.unidad} con pieza: {Math.round(d.carros)} %</b>.</p>}
           </>
         )}
       <button
@@ -102,6 +111,8 @@ export interface DatosGloboCarros {
   conPerilla: boolean
   perilla: number | null
   meta: number | null
+  unidad: 'carros' | 'silletas'
+  unica: boolean
 }
 
 /** Globo de «carros con pieza» de una Baader: de dónde sale la cifra y por qué debería parecerse a la pantalla de la Baader. */
@@ -109,11 +120,12 @@ export function GloboCarros(d: DatosGloboCarros) {
   const vara = d.conPerilla
     ? `la perilla en ${d.perilla}`
     : `la meta de Shoplogix (${d.meta}), porque no tiene perilla anotada`
+  const maquina = d.unica ? 'máquina' : 'Baader'
   return (
-    <Globo etiqueta={`Carros con pieza de la ${d.nombre}`}>
-      <p className="text-[15px] font-semibold leading-snug text-foreground">{`${Math.round(d.carros)} % de los carros llevaron pieza.`}</p>
-      <p className="mt-2">{`Se calcula con los datos de Shoplogix: piezas contadas ÷ las que habrían pasado con ${vara}. Solo cuentan los minutos en que la Baader anduvo 30 s o más, sin los de la línea entera en cero.`}</p>
-      <p className="mt-2">Por eso, en teoría, debería ser similar a la ocupación de carros que muestra la pantalla de la Baader.</p>
+    <Globo etiqueta={`${capital(d.unidad)} con pieza de la ${d.nombre}`}>
+      <p className="text-[15px] font-semibold leading-snug text-foreground">{`${Math.round(d.carros)} % de ${conArticulo(d.unidad)} llevaron pieza.`}</p>
+      <p className="mt-2">{`Se calcula con los datos de Shoplogix: piezas contadas ÷ las que habrían pasado con ${vara}. Solo cuentan los minutos en que la ${maquina} anduvo 30 s o más, sin los de la línea entera en cero.`}</p>
+      <p className="mt-2">{`Por eso, en teoría, debería ser similar a la ocupación de ${d.unidad} que muestra la pantalla de la ${maquina}.`}</p>
     </Globo>
   )
 }

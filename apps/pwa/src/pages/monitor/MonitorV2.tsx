@@ -36,6 +36,7 @@ import { desgloseDe, detencionesPorMinuto, varaCambio, type Desglose } from './d
 import { BotonInfo, GloboCarros, GloboRitmo } from './GlobosFranja'
 import { DesglosePiezas } from './DesglosePiezas'
 import { detencionLinea } from './desgloseVista'
+import { cascadaPorMeta } from './cascadaPerilla'
 import { bandasEnteras, diaMesPerilla, MODO_UMBRAL_POR_OMISION, perillaVigenteEn, tonoVara, umbralEntero, type ModoUmbral, type PerillaPublica, type PerillasDeLinea, type VaraUmbral } from './perilla'
 import { EditorPerilla, type PerillaEditorDatos } from './EditorPerilla'
 import { EditorUmbral, type EfectoBaader, type UmbralEditorDatos } from './EditorUmbral'
@@ -334,6 +335,8 @@ function tonoDeMinuto(v: number, vara: VaraDeMinuto): TonoMinuto {
  */
 export function pctARitmoFila(cycles: number[], varaK: VaraDeMinuto[], n: number, esperado: number | null): number | null {
   if (esperado == null || n === 0) return null
+  /* Sin vara en ningún minuto (meta 0 y sin perilla) no hay umbral: la celda dice «—», no un porcentaje sin referencia. */
+  if (!varaK.slice(0, n).some((v) => v?.cpm != null && v.cpm > 0)) return null
   let ok = 0
   for (let k = 0; k < n; k++) if (tonoDeMinuto(cycles[k] ?? 0, varaK[k] ?? { cpm: null, fuente: 'shoplogix' }) === 'ok') ok++
   return Math.round((ok / n) * 100)
@@ -393,8 +396,10 @@ function CifraFranja({ ancho, valor, pie, principal }: { ancho: string; valor: n
  * abre con el turno completo. Pasar el mouse o tocar marca el mismo minuto en todas las franjas.
  * Las cabeceras quedan pegadas al borde visible mientras el contenido se desplaza.
  */
-export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carros, perillaEditor, umbralEditor, paradas }: {
+export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carros, perillaEditor, umbralEditor, paradas, unidad }: {
   d: MinutoTurno; cerrado: boolean; marca?: EventoMarcado | null; onQuitarMarca?: () => void; perillas?: PerillasDeLinea | null
+  /** «carros» o «silletas», la unidad que la página resuelve para la máquina (`unidadDeMaquinas`). Sin ella, «carros». */
+  unidad?: 'carros' | 'silletas' | null
   /** Carros con pieza del turno completo (`vaciosTurnoDe` sobre la serie entera). La franja no los recalcula: la Baader elegida no cambia la regla. */
   carros?: VaciosTurno | null
   /** Quién puede anotar la perilla (solo admin): la línea y quien firma. Sin ella, la franja no ofrece el editor. */
@@ -532,6 +537,17 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
   const paradasPorId = useMemo(() => paradasDetalle(paradas ?? { stopEvents: null, stopReasons: null, stopMachines: null, enCurso: [] }), [paradas])
   const detPorId = new Map(d.maquinas.map((m) => [m.id, detencionesPorMinuto(paradasPorId.get(m.id), t0, n)] as const))
   const detLinea = detencionLinea(d.maquinas.map((m) => paradasPorId.get(m.id)), t0, n)
+  /* El tiempo de producción de cada Baader sale de la misma cascada que la tarjeta («Dónde se fueron las piezas»): el «de Y» del
+     desglose tiene que ser ese número y no otro. */
+  const produccionPorId = useMemo(() => new Map(cascadaPorMeta({
+    serie: { desde: d.desde, maquinas: d.maquinas.map((m) => ({ id: m.id, nombre: m.nombre, esperado: m.esperado, cycles: m.cycles })) },
+    n,
+    paradas: paradasPorId,
+    perillas: perillas ?? null,
+  }).baaders.map((b) => [b.id, b.minProduccion] as const)), [d, n, paradasPorId, perillas])
+  /* Con una sola máquina no hay «Baader» que nombrar: la franja dice «la máquina» (la unidad es carros o silletas, la de la máquina). */
+  const unidadTxt = unidad ?? 'carros'
+  const maquinaTxt = varias ? 'Baader' : 'máquina'
   const desgloseDeFila = (f: (typeof filas)[number]): Desglose | null => {
     const vara = f.varaK[kUlt]
     const det = f.id == null ? detLinea : detPorId.get(f.id)
@@ -587,7 +603,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
             </button>
           </span>
         )}
-        <span className="w-[72px] sm:w-[76px]">carros <br className="sm:hidden" />con pieza</span>
+        <span className="w-[72px] sm:w-[76px]">{unidadTxt} <br className="sm:hidden" />con pieza</span>
         <span className="w-[80px] sm:w-[120px]">minutos <br className="sm:hidden" />a ritmo{modoVigente === 'optimo' ? ' óptimo' : ''}</span>
       </div>
       {editandoUmbral && puedeEditarUmbral && umbralEditor && (
@@ -662,7 +678,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
                         valor={carrosF}
                         principal={f.principal}
                         pie={f.id != null
-                          ? <>similar a <br className="sm:hidden" />la Baader{carrosF != null && <BotonInfo etiqueta="Cómo se calculan los carros con pieza" abierto={globo === `c1:${clave}`} alCambiar={(v) => setGlobo(v ? `c1:${clave}` : null)} />}</>
+                          ? <>similar a <br className="sm:hidden" />la {maquinaTxt}{carrosF != null && <BotonInfo etiqueta={`Cómo se calculan los ${unidadTxt} con pieza`} abierto={globo === `c1:${clave}`} alCambiar={(v) => setGlobo(v ? `c1:${clave}` : null)} />}</>
                           : undefined}
                       />
                       <CifraFranja
@@ -700,6 +716,8 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
                         detenida={desg.zonas[3]?.n ?? 0}
                         bajo={n - (desg.zonas[0]?.n ?? 0) - (desg.zonas[3]?.n ?? 0)}
                         carros={carrosF}
+                        unidad={unidadTxt}
+                        unica={!varias}
                         onVerDesglose={() => { setGlobo(null); setDesgloseAbierto(clave) }}
                       />
                     </div>
@@ -712,6 +730,8 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
                         conPerilla={varaF.fuente === 'perilla'}
                         perilla={varaF.cpm}
                         meta={f.meta}
+                        unidad={unidadTxt}
+                        unica={!varias}
                       />
                     </div>
                   )}
@@ -724,6 +744,7 @@ export function MinutoTurnoV2({ d, cerrado, marca, onQuitarMarca, perillas, carr
                         desglose={desg}
                         vara={varaF}
                         paradas={parasDeFila(f)}
+                        produccionMin={f.id == null ? null : (produccionPorId.get(f.id) ?? null)}
                         cambio={varaCambio(f.varaK)}
                         onCerrar={() => setDesgloseAbierto(null)}
                       />
@@ -1415,7 +1436,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         titulo: 'Tiempo perdido', sub: `${horas(totalPerdida)} de línea recuperables`,
         cuerpo: (
           <>
-            <Grupo titulo="Por dueño" nota="Minutos equivalentes de línea: una máquina parada de tres cuenta un tercio.">
+            <Grupo titulo="Por dueño" nota="Minutos equivalentes de línea: una máquina detenida de tres cuenta un tercio.">
               {p.perdidas.map((x) => <ListCell key={x.dueno} leading={<Punto color={RELLENO[x.dueno]} />} title={DUENO_UI[x.dueno].corto} value={horas(x.min)} />)}
             </Grupo>
             <Grupo titulo="Todas las causas">

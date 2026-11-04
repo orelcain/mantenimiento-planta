@@ -584,7 +584,7 @@ describe('microCausa v3 · sin datos y textos', () => {
 
   it('el motivo de una detención se muestra como en el resto del monitor, sin mayúsculas sostenidas, y la detención sin motivo no dice nada', () => {
     expect(motivoLegible('COLACION')).toBe('Colación')
-    expect(motivoLegible('EJERCICIO COMPENSATORIO - Paro')).toBe('Ejercicio compensatorio - Paro')
+    expect(motivoLegible('EJERCICIO COMPENSATORIO - Paro')).toBe('Ejercicio compensatorio')
     expect(motivoLegible('REUNION INICIO TURNO')).toBe('Reunión inicio turno')
     expect(motivoLegible('Planta De Riles')).toBe('Planta de riles')
     expect(motivoLegible('Detencion')).toBeNull()

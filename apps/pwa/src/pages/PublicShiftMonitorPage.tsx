@@ -43,7 +43,7 @@ import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo
 import type { PulsoVivoElegido } from './monitor/contadorCrudo'
 import { porDeUsuario } from './monitor/perilla'
 import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/datoDuro'
-import { construirCascada } from './monitor/cascadaTurno'
+import { construirCascada, contenedorDe } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
 import { TarjetaCascada } from './monitor/CascadaTurnoCard'
@@ -2910,7 +2910,7 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
                 estuvo <b className="tabular-nums">{fmtInt(m.sinImputarLineaMin)} min</b> detenida
                 sin causa.</>
             ) : (
-              <> {m.porMaquina.length === 3 ? 'Las tres' : 'Todas'} nunca pararon a la vez:
+              <> {m.porMaquina.length === 3 ? 'Las tres' : 'Todas'} nunca se detuvieron a la vez:
                 la línea completa no perdió tiempo por estos paros.</>
             )
           )}
@@ -3029,7 +3029,7 @@ function RespuestaMantencion({ m, cerrado, riel, fallaLineaMin, enCurso }: {
           {m.sinImputarLineaMin != null && (
             m.sinImputarLineaMin >= 1
               ? <>La línea completa estuvo <span className="tabular-nums">{fmtInt(m.sinImputarLineaMin)} min</span> detenida sin causa. </>
-              : <>{m.porMaquina.length === 3 ? 'Las tres' : 'Todas'} nunca pararon a la vez: la línea completa no perdió tiempo por esos paros. </>
+              : <>{m.porMaquina.length === 3 ? 'Las tres' : 'Todas'} nunca se detuvieron a la vez: la línea completa no perdió tiempo por esas detenciones. </>
           )}
           Imputarlas cierra la historia del turno.
         </p>
@@ -3083,11 +3083,11 @@ function fraseMaquinas(r: RitmosPorMaquina): string {
     const peor = conUptime.reduce((a, b) => (b.uptimePct! < a.uptimePct! ? b : a))
     const brecha = Math.round(mejor.uptimePct! - peor.uptimePct!)
     if (brecha >= 10) {
-      return `${cuantas} corren casi igual (${rango}). Lo que las separa es cuánto pararon: `
+      return `${cuantas} corren casi igual (${rango}). Lo que las separa es cuánto se detuvo cada una: `
         + `${nombreCorto(peor.nombre)} perdió ${brecha} puntos de marcha contra ${nombreCorto(mejor.nombre)}.`
     }
   }
-  return `${cuantas} corren casi igual (${rango}), y también pararon parecido.`
+  return `${cuantas} corren casi igual (${rango}), y también se detuvieron parecido.`
 }
 
 /**
@@ -3820,7 +3820,7 @@ function ReglaDeRitmo({ parte, ahora, ahoraReloj, pedido, turno, setCpm, techoDe
     ? 'al cierre'
     : pedido && pedido > 0
       ? estado === 'ok' ? 'alcanza la meta' : estado === 'lento' ? 'falta ritmo' : 'muy por debajo'
-      : estado === 'ok' ? 'a ritmo' : estado === 'lento' ? 'va lento' : 'casi parada'
+      : estado === 'ok' ? 'a ritmo' : estado === 'lento' ? 'va lento' : 'casi detenida'
   const colorRelleno = estado === 'ok'
     ? 'bg-ink-ok' : estado === 'lento' ? 'bg-ink-warn' : 'bg-ink-crit'
   const colorPunto = estado === 'ok'
@@ -6095,6 +6095,8 @@ function MonitorDelToken() {
         perillas: live.perillas ?? null,
       }),
       minutos: n,
+      /* Carros o silletas, por la máquina (la 142 lleva carros; la 200, silletas): el rótulo de los vacíos. */
+      contenedor: contenedorDe(live.machines),
     }
   })()
 

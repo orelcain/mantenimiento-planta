@@ -454,7 +454,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
         <div className={r ? 'rv-l' : ''}>
           <h4 className="text-[15px] font-semibold leading-tight text-foreground">El turno completo, minuto a minuto</h4>
           <p className="text-[13px] text-muted-foreground">piezas contadas por Shoplogix desde el inicio del turno{selId !== SEL_LINEA ? ' · solo la Baader elegida' : ''} · el mismo eje de tiempo que las franjas de abajo</p>
-          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} carros={carros} perillaEditor={perillaEditor} umbralEditor={umbralEditor} paradas={paradas} />
+          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} carros={carros} perillaEditor={perillaEditor} umbralEditor={umbralEditor} unidad={r?.unidad ?? null}paradas={paradas} />
         </div>
       )}
       {r && r.lineas.length > 0 && (

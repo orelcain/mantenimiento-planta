@@ -73,10 +73,18 @@ describe('filas y porcentajes de la Evisceradora 1', () => {
 
   it('cada zona suma su % y las filas bajo 16 suman lo que dice el pie del spec', () => {
     const { container } = renderEv1()
-    expect(container.textContent).toContain('Bajo 16 sin detención: 15 min de marcha inicial y 74 de falta de pescado.')
+    /* «Bajo U» explica todos sus minutos: 111 con 0 < pieza < 16 = 22 con detención registrada + 89 sin ella (15 de marcha inicial y 74 de falta). */
+    expect(container.textContent).toContain('Bajo 16: 111 min, 22 con detención registrada y 89 sin ella (15 de marcha inicial y 74 de falta de pescado).')
     /* Descuenta TODAS las programadas del fixture (colación 56 + reunión 2 + ejercicio 4 = 62 min), no solo la colación. */
     expect(container.textContent).toContain('Sin la detención programada: a ritmo 276 de 393 min (70 %).')
     expect(container.textContent).not.toContain('Sin colación')
+  })
+
+  it('el «de Y» del pie es el tiempo de producción de la cascada (produccionMin), no el turno menos la programada', () => {
+    const { container } = render(
+      <DesglosePiezas nombre="Evisceradora 1" linea={false} n={N} desglose={desglose()} vara={VARA} paradas={paradas} produccionMin={399} cambio={false} onCerrar={() => {}} />,
+    )
+    expect(container.textContent).toContain('Sin la detención programada: a ritmo 276 de 399 min (69 %).')
   })
 })
 
