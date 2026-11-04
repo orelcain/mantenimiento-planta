@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.15.2] - 2026-11-04
+Monitor: una sola definición de «detención programada» para la cascada y el servidor.
+
+### Corregido
+- La lista de causas programadas vive en `functions/lib/causasProgramadas.json` y la leen la cascada (`esProgramada`) y el servidor (`esParoPlanificado`). Una tabla de casos compartida, con «EJERCICIO  COMPENSATORIO» de dos espacios, corre en vitest y en `node --test`: si las reglas se separan, falla. Antes, con dos copias, la cascada y el «Tiempo del turno» llegaron a dar 56 contra 64 min programados.
+- Vocabulario: «se detuvo» y «detenciones» en la ayuda del panel de causas del sensor (Grader) y «Upstream detenido» en el globo de la línea de tiempo.
+
 ## [4.15.1] - 2026-11-04
 Monitor: el rótulo de la detención programada del tiempo del turno no se corta en el celular.
 
