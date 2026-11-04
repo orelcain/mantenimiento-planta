@@ -74,7 +74,7 @@ export interface EjeDatos {
   /** La línea se ve detenida por el estado que ya existe (máquinas detenidas / `currentReason`). */
   detenidaEstado: boolean
   paradas: ParadaEje[]
-  /** Último % de llenado de cada máquina y su unidad (carros / silletas). */
+  /** Cifra del panel de cada máquina (promedio de 15 min, `llenadoDelPanel`; `ultimo` es el nombre de antes) y su unidad (carros / silletas). */
   llenado: Array<{ id: string; ultimo: number | null }> | null
   unidad: 'carros' | 'silletas' | null
   /**

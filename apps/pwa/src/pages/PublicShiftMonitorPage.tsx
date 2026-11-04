@@ -103,7 +103,7 @@ import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/Hec
 import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
-import { etiquetaMaquina, hayBandaParada, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
+import { etiquetaMaquina, hayBandaParada, llenadoDelPanel, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -6949,7 +6949,8 @@ function MonitorDelToken() {
                   ? vivoV2.maquinas.length > 0 && vivoV2.maquinas.every((m) => m.status === 'detenida')
                   : live.status === 'detenida'),
                 paradas: paradasEnEje(gruposEventos, primeraPiezaMs, iniEjeMs),
-                llenado: vivoV2 ? vivoV2.r.lineas.map((l) => ({ id: l.id, ultimo: l.fills[l.fills.length - 1] ?? null })) : null,
+                /* La cifra del panel de 15 min de cada Baader, no el último minuto: la tarjeta y el panel dicen lo mismo. */
+                llenado: vivoV2 ? llenadoDelPanel(vivoV2.r) : null,
                 unidad: vivoV2?.r.unidad ?? null,
                 /* Las filas Ev se normalizan como el llenado de «Ritmo en vivo»: segundos andando por minuto (paradas por máquina) y la línea en cero = sin dato. */
                 paradasMaquina: {

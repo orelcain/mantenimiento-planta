@@ -270,8 +270,6 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
             <g key={l.id} opacity={atenuada ? 0.4 : 1} style={{ transition: 'opacity 200ms' }}>
               <rect x={lc} y={y0} width={pw} height={rh} rx={8} style={{ fill: 'var(--v2-reja)' }} opacity={0.6} />
               {yUmbral != null && <line x1={lc} x2={lc + pw} y1={r1(yUmbral)} y2={r1(yUmbral)} strokeWidth={1} strokeDasharray="3 4" style={{ stroke: 'var(--v2-tenue)' }} />}
-              {/* Al inicio de la raya: a la derecha, el punto del último minuto tapaba parte del rótulo. */}
-              {yUmbral != null && rotulo && <text x={lc + 6} y={r1(yUmbral + 13)} fontSize={11} className="fill-muted-foreground tabular-nums">{rotulo}</text>}
               {tramos.filter((t) => t.length > 1).map((t, q) => (
                 <g key={q}>
                   <path d={`M${r1(t[0]![0])},${y0 + rh - 3} ${t.map(([px, py]) => `L${r1(px)},${r1(py)}`).join(' ')} L${r1(t[t.length - 1]![0])},${y0 + rh - 3} Z`} opacity={0.14} style={{ fill: color }} />
@@ -279,6 +277,9 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
                 </g>
               ))}
               {tramos.filter((t) => t.length === 1).map((t, q) => <circle key={`p${q}`} cx={r1(t[0]![0])} cy={r1(t[0]![1])} r={2.5} style={{ fill: color }} />)}
+              {/* Al inicio de la raya: a la derecha, el punto del último minuto tapaba parte del rótulo. Va DESPUÉS de la línea de datos,
+                  que cruza su inicio, con halo del color de la tarjeta para que se lea encima de ella. */}
+              {yUmbral != null && rotulo && <text x={lc + 6} y={r1(yUmbral + 13)} fontSize={11} className="fill-muted-foreground tabular-nums" style={{ paintOrder: 'stroke', stroke: 'rgb(var(--card))', strokeWidth: 3, strokeLinejoin: 'round' }}>{rotulo}</text>}
               {l.microsDetalle.map((q) => {
                 const px = lc + ((q.inicioMs - r.inicioTiraMs) / 60_000) * slot
                 return <rect key={q.inicioMs} x={r1(Math.max(lc, px))} y={y0 + rh - 8} width={r1(Math.max(4, (q.duracionS / 60) * slot))} height={6} rx={2} style={{ fill: 'var(--v2-ext)' }}><title>{`micro detención de ${cronometro(q.duracionS)}`}</title></rect>

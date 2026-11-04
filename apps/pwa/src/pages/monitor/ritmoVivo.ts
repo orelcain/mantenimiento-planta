@@ -630,6 +630,18 @@ export function calcularRitmoVivo(e: EntradaRitmoVivo, unidad: 'carros' | 'sille
   }
 }
 
+/**
+ * El llenado que la tarjeta «Ritmo en vivo» pone a la derecha de cada Baader: la MISMA cifra del panel de 15 min
+ * (`carrosVentana`, redondeada como se muestra), no el último minuto. La página y el banco llaman a esta función, así
+ * las dos columnas salen de una sola fuente. El nombre `ultimo` es de antes: ya no es el último minuto.
+ */
+export function llenadoDelPanel(r: RitmoVivo): Array<{ id: string; ultimo: number | null }> {
+  return r.lineas.map((l) => {
+    const pct = r.carrosVentana.maquinas.find((x) => x.id === l.id)?.pct
+    return { id: l.id, ultimo: pct == null ? null : Math.round(pct) }
+  })
+}
+
 // ── Qué se ve: la línea o una Baader ─────────────────────────────────────────
 
 /** Lo que dibuja la tira de 15 min y el «último minuto»: la suma de la línea o UNA Baader con su esperado. */
