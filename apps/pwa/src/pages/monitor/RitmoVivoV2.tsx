@@ -270,7 +270,8 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
             <g key={l.id} opacity={atenuada ? 0.4 : 1} style={{ transition: 'opacity 200ms' }}>
               <rect x={lc} y={y0} width={pw} height={rh} rx={8} style={{ fill: 'var(--v2-reja)' }} opacity={0.6} />
               {yUmbral != null && <line x1={lc} x2={lc + pw} y1={r1(yUmbral)} y2={r1(yUmbral)} strokeWidth={1} strokeDasharray="3 4" style={{ stroke: 'var(--v2-tenue)' }} />}
-              {yUmbral != null && rotulo && <text x={ancho - 2} y={r1(yUmbral + 13)} textAnchor="end" fontSize={11} className="fill-muted-foreground tabular-nums">{rotulo}</text>}
+              {/* Al inicio de la raya: a la derecha, el punto del último minuto tapaba parte del rótulo. */}
+              {yUmbral != null && rotulo && <text x={lc + 6} y={r1(yUmbral + 13)} fontSize={11} className="fill-muted-foreground tabular-nums">{rotulo}</text>}
               {tramos.filter((t) => t.length > 1).map((t, q) => (
                 <g key={q}>
                   <path d={`M${r1(t[0]![0])},${y0 + rh - 3} ${t.map(([px, py]) => `L${r1(px)},${r1(py)}`).join(' ')} L${r1(t[t.length - 1]![0])},${y0 + rh - 3} Z`} opacity={0.14} style={{ fill: color }} />
@@ -334,7 +335,8 @@ function UltimoMinuto({ v, promedio }: { v: VistaSerie; promedio?: number | null
   )
 }
 
-const LEYENDA: Array<[Tono, string]> = [['bien', '≥75 %'], ['atento', '50–75'], ['mal', '<50 del esperado']]
+/* La regla de cada tono contra la raya de SU máquina (con perilla, la perilla completa; sin ella, el 75 % del esperado). Los enteros van en el ⓘ. */
+const LEYENDA: Array<[Tono, string]> = [['bien', 'a ritmo: llega a la raya de su máquina'], ['atento', 'bajo: bajo la raya, pero la mitad o más'], ['mal', 'muy bajo: menos de la mitad']]
 
 /** Las opciones del selector: la línea y cada Baader (de la tira en vivo o, sin ella, del turno completo). */
 const opcionesDe = (r: RitmoVivo | null, turno: MinutoTurno | null) =>
@@ -350,7 +352,7 @@ function seleccionDe(r: RitmoVivo | null, turno: MinutoTurno | null, sel: string
 /** El color de la barra del minuto en curso: el de la parada (detención = coral, micro = celeste) o el acento si marcha. */
 const colorCurso = (parada: ParadaVivo | null) => (parada?.clase === 'detencion' ? 'var(--v2-mal)' : parada?.clase === 'micro' ? 'var(--v2-ext)' : 'var(--v2-bien)')
 
-/** Los tres tonos de las barras: ≥75 %, 50–75 y <50 del esperado. */
+/** Los tres tonos de las barras, con sus nombres de la regla «a ritmo», «bajo» y «muy bajo». */
 function LeyendaTonos() {
   return (
     <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-muted-foreground">

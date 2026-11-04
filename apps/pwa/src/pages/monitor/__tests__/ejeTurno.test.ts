@@ -395,10 +395,15 @@ describe('alturas del gráfico', () => {
     expect([g.paradas.h, m.paradas.h, c.paradas.h]).toEqual([14, 11, 10])
     expect([g.micro!.h, m.micro!.h, c.micro!.h]).toEqual([16, 12, 12])
   })
-  it('columna de rótulos: 74/70/70 («Detenciones» cabe) a la izquierda y 128/120/4 a la derecha (en el celular los rótulos van dentro)', () => {
+  it('columna de rótulos: 88/82/82 («Shoplogix 16» cabe) a la izquierda y 128/120/4 a la derecha (en el celular los rótulos van dentro)', () => {
     expect([disenar(1806, 'grande', 3, true), disenar(1276, 'medio', 3, true), disenar(309, 'chico', 3, true)].map((d) => [d.pl, d.pr]))
-      .toEqual([[74, 128], [70, 120], [70, 4]])
-    expect(disenar(1806, 'grande', 3, true).plotW).toBe(1604)
+      .toEqual([[88, 128], [82, 120], [82, 4]])
+    expect(disenar(1806, 'grande', 3, true).plotW).toBe(1590)
+  })
+  it('«Shoplogix 16» cabe en la columna izquierda con 8 px de aire: 72,6 px a 11 px (medido en Chromium, cifras tabulares) y 79,2 a 12 px (escala lineal)', () => {
+    expect(disenar(309, 'chico', 3, true).pl - 8).toBeGreaterThanOrEqual(72.6)
+    expect(disenar(1276, 'medio', 3, true).pl - 8).toBeGreaterThanOrEqual(72.6)
+    expect(disenar(1806, 'grande', 3, true).pl - 8).toBeGreaterThanOrEqual(79.2)
   })
   for (const [w, tam] of [[1806, 'grande'], [1276, 'medio'], [309, 'chico']] as const) {
     it(`cada banda queda debajo de la anterior y las filas no se pisan (${w} px)`, () => {

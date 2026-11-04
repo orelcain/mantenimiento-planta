@@ -141,8 +141,8 @@ describe('GraficoRitmoVivo', () => {
     /* Sin globo, la cifra ya está en el rótulo junto a la punta: 9.690 − 10.667. */
     expect(screen.getAllByText('977 atrás').length).toBe(1)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    /* x del minuto 305 dentro del gráfico (1.604 px de ancho, 6 de aire a la derecha: 1.598 px para 450 min). */
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((305.5 / 450) * 1598), buttons: 0 }) })
+    /* x del minuto 305 dentro del gráfico (1.806 − 88 de rótulos − 128 de la derecha = 1.590 px de ancho, 6 de aire: 1.584 px para 450 min). */
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((305.5 / 450) * 1584), buttons: 0 }) })
     expect(screen.getByRole('tooltip').textContent).toContain('(977 atrás)')
     /* El minuto en curso de un turno en vivo: «Meta a esta hora» (un minuto pasado dice «a esa hora»), y «Hechas» en vez de «Acumulado». */
     expect(screen.getByRole('tooltip').textContent).toContain('Meta a esta hora')
@@ -155,7 +155,7 @@ describe('GraficoRitmoVivo', () => {
   it('un minuto con la línea en cero lista cada Baader sin acusarla y nombra la parada y su dueño', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1598), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1584), buttons: 0 }) })
     const globo = screen.getByRole('tooltip').textContent ?? ''
     expect(globo).toContain('Ritmo de la línea')
     expect(globo).toContain('0 de 51 pz/min')
@@ -167,7 +167,7 @@ describe('GraficoRitmoVivo', () => {
   it('un minuto con la línea en cero SIN parada registrada no acusa: cada Baader queda «sin dato», no «detenida»', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={{ ...eje, paradasMaquina: null }} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1598), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.5 / 450) * 1584), buttons: 0 }) })
     const globo = screen.getByRole('tooltip').textContent ?? ''
     expect((globo.match(/sin dato/g) ?? []).length).toBe(3)
     expect(globo).not.toContain('detenida')
@@ -176,10 +176,10 @@ describe('GraficoRitmoVivo', () => {
   it('el globo no es una región viva (no anuncia cada movimiento) y sigue siendo el mismo nodo mientras el cursor está en el mismo minuto', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.2 / 450) * 1598), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.2 / 450) * 1584), buttons: 0 }) })
     const globo = screen.getByRole('tooltip')
     expect(screen.queryByRole('status')).toBeNull()
-    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.8 / 450) * 1598), buttons: 0 }) })
+    act(() => { fireEvent.pointerMove(lienzo, { pointerType: 'mouse', clientX: Math.round((130.8 / 450) * 1584), buttons: 0 }) })
     expect(screen.getByRole('tooltip')).toBe(globo)
   })
 
@@ -202,7 +202,7 @@ describe('GraficoRitmoVivo', () => {
   it('el globo también sale con un toque; tocar el mismo minuto o fuera lo cierra', () => {
     const { container } = render(<GraficoRitmoVivo p={p} e={eje} reloj={reloj} />)
     const lienzo = container.querySelector('.v2-minuto-scroll') as HTMLElement
-    const x = Math.round((250.5 / 450) * 1598)
+    const x = Math.round((250.5 / 450) * 1584)
     act(() => { fireEvent.pointerDown(lienzo, { pointerType: 'touch', clientX: x }) })
     act(() => { fireEvent.click(lienzo, { clientX: x }) })
     /* Un minuto PASADO: «Meta a esa hora» (no «a esta hora») y la diferencia en palabras. */
@@ -229,7 +229,7 @@ describe('GraficoRitmoVivo', () => {
     expect(screen.queryByText('Detenciones, por dueño')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Qué significan los colores' }))
     expect(screen.getByText('Detenciones, por dueño')).toBeTruthy()
-    expect(screen.getByText('75 % o más del esperado')).toBeTruthy()
+    expect(screen.getByText('a ritmo: llega a la raya de su máquina')).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByText('Detenciones, por dueño')).toBeNull()
   })
@@ -252,8 +252,8 @@ describe('GraficoRitmoVivo', () => {
 
 // ── Pulido G3 ────────────────────────────────────────────────────────────────
 
-/** x (px) del minuto `m` dentro del lienzo de 1.604 px (1.598 para 450 min: 6 de aire a la derecha). */
-const xDe = (m: number) => Math.round((m / 450) * 1598)
+/** x (px) del minuto `m` dentro del lienzo de 1.590 px (1.584 para 450 min: 6 de aire a la derecha; rótulos de 88 px desde el ancho 1.806). */
+const xDe = (m: number) => Math.round((m / 450) * 1584)
 
 describe('GraficoRitmoVivo · táctil', () => {
   it('un toque o un deslizar sobre el gráfico no llega a la página (que cambiaría de turno con 60 px)', () => {

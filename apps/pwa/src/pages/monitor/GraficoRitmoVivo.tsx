@@ -1378,9 +1378,9 @@ function InfoLeyenda({ ayuda }: { ayuda: string }) {
         <div id={id} role="tooltip" className="v2-tip absolute top-full z-20 mt-2 box-border rounded-[22px] px-4 py-3.5 text-[13px] leading-snug text-foreground" style={{ left: pos.izq, width: pos.ancho }}>
           <div className="font-semibold">Barras y filas Ev</div>
           <ul className="mt-1.5 grid gap-1 text-muted-foreground">
-            <li className="flex items-center gap-2">{cuadro('var(--v2-bien)')}75 % o más del esperado</li>
-            <li className="flex items-center gap-2">{cuadro('var(--v2-atento)')}entre 50 y 75 %</li>
-            <li className="flex items-center gap-2">{cuadro('var(--rv-mal)')}menos de 50 %</li>
+            <li className="flex items-center gap-2">{cuadro('var(--v2-bien)')}a ritmo: llega a la raya de su máquina</li>
+            <li className="flex items-center gap-2">{cuadro('var(--v2-atento)')}bajo: bajo la raya, pero la mitad o más</li>
+            <li className="flex items-center gap-2">{cuadro('var(--rv-mal)')}muy bajo: menos de la mitad</li>
           </ul>
           <div className="mt-3 font-semibold">Detenciones, por dueño</div>
           <ul className="mt-1.5 grid gap-1 text-muted-foreground">
