@@ -77,7 +77,7 @@ describe('microCausa v3 · el golden micro a micro (5 turnos de Chonchi y 5 de F
     expect(Math.max(...Object.values(real))).toBe(real.sin)
   })
 
-  it('Filete, los 5 turnos: 77 micro · 9 · 0 · 0 · 0 · 6 · 62, y ninguna sale «Otra Baader paró» (hay una sola Baader)', () => {
+  it('Filete, los 5 turnos: 77 micro · 9 · 0 · 0 · 0 · 6 · 62, y ninguna sale «Otra Baader se detuvo» (hay una sola Baader)', () => {
     const real = sumaForma(de('Filete'))
     expect(real).toEqual({ arranque: 9, linea_a_la_vez: 0, linea_en_cadena: 0, linea_tras_paro_otra: 0, paro: 6, sin: 62 })
     expect(Object.values(real).reduce((a, b) => a + b, 0)).toBe(77)

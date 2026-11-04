@@ -1,8 +1,9 @@
 {
-  "version": "4.13.0",
+  "version": "4.14.0",
   "buildDate": "2026-11-04",
-  "buildTimestamp": 1793814436075,
+  "buildTimestamp": 1793817472716,
   "features": [
+    "Monitor: la perilla de cada Baader lleva un motivo opcional («por el Knuro») que se ve en la franja y en la cascada, para que la pérdida no se lea como falla",
     "Monitor: la cascada de cada Baader mide contra la meta de Shoplogix con la perilla, y dice de quién es cada pieza que no se hizo",
     "Catálogo de variadores: 8 fichas con ~300 parámetros verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»",
     "Grader: la matriz de turnos reemplaza al calendario mensual y el detalle del turno queda en 4 pestañas",

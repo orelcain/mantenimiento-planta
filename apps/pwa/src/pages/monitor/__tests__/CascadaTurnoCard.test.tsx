@@ -73,6 +73,76 @@ describe('CascadaTurnoCard: dueños por vista', () => {
   })
 })
 
+describe('CascadaTurnoCard: el motivo de la perilla en el escalón', () => {
+  const PERILLAS_CON_MOTIVO: PerillasDeLinea = {
+    actual: {
+      [IDS[0]!]: { cpm: 17, desde, motivo: 'por el Knuro' },
+      [IDS[1]!]: { cpm: 16, desde },
+      [IDS[2]!]: { cpm: 16, desde },
+    },
+    historial: [],
+  }
+  const cascadaConMotivo = cascadaPorMeta({ serie, n: N, paradas, perillas: PERILLAS_CON_MOTIVO })
+
+  it('en Ev 1, el detalle «Perilla más lenta» dice «17 en vez de 18 · por el Knuro»', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascadaConMotivo} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    expect(container.textContent ?? '').toContain('17 en vez de 18 · por el Knuro')
+  })
+
+  it('en la línea, la Baader con pérdida lleva su motivo entre paréntesis: «Ev 1 17 en vez de 18 (por el Knuro)»', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascadaConMotivo} minutosTurno={N} />)
+    expect(container.textContent ?? '').toContain('Ev 1 17 en vez de 18 (por el Knuro)')
+  })
+
+  it('sin motivo, el detalle queda como antes: «17 en vez de 18» y no aparece ningún motivo', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('17 en vez de 18')
+    expect(texto).not.toContain('por el Knuro')
+  })
+})
+
+/* Ev 1 con esperado 0 (sin meta de Shoplogix en el turno): el caso de producción del 04-11 (la Línea no cuadraba). */
+const serieEv1SinMeta: CascadaArgs['serie'] = { ...serie, maquinas: serie.maquinas.map((m, i) => (i === 0 ? { ...m, esperado: 0 } : m)) }
+const cascadaSinMeta = cascadaPorMeta({ serie: serieEv1SinMeta, n: N, paradas, perillas: PERILLAS })
+const AVISO_EV1 = 'Ev 1 sin meta de Shoplogix en este turno: no entra en la cuenta'
+
+describe('CascadaTurnoCard: Baader sin meta de Shoplogix (Ev 1 con esperado 0)', () => {
+  it('la línea cuadra exacto y lleva la nota «Ev 1 sin meta de Shoplogix en este turno: no entra en la cuenta»', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascadaSinMeta} minutosTurno={N} />)
+    const L = cascadaSinMeta.linea
+    const texto = container.textContent ?? ''
+    expect(texto).toContain(`Cuadre: ${es(L.podia)} − ${es(L.perilla)} − ${es(L.detenciones.piezas)} − ${es(L.micro.piezas)} − ${es(L.vacios)} = ${es(L.hizo)} piezas hechas.`)
+    expect(texto).toContain(AVISO_EV1)
+  })
+
+  it('la línea no suma a Ev 1: su meta no aparece en la lista de metas', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascadaSinMeta} minutosTurno={N} />)
+    const metas = `${cascadaSinMeta.baaders[1]!.meta} + ${cascadaSinMeta.baaders[2]!.meta} pz/min`
+    expect(container.textContent ?? '').toContain(metas)
+  })
+
+  it('la línea sigue mostrando «Al rendimiento le faltan» y su línea de dueños (antes salían solo en Ev 2 y Ev 3)', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascadaSinMeta} minutosTurno={N} />)
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('Al rendimiento le faltan')
+    expect(texto).toContain(`De ${es(cascadaSinMeta.linea.perdido)} piezas bajo la meta`)
+  })
+
+  it('la vista de Ev 1 muestra solo el aviso: sin escalones, sin cuadre y sin rendimiento', () => {
+    const { container, getByRole } = render(<CascadaTurnoCard cascada={cascadaSinMeta} minutosTurno={N} />)
+    fireEvent.click(getByRole('tab', { name: 'Ev 1' }))
+    const texto = container.textContent ?? ''
+    expect(texto).toContain(AVISO_EV1)
+    expect(texto).not.toContain('Cuadre:')
+    expect(texto).not.toContain('Tiempo de producción')
+    expect(texto).not.toContain('Podía hacer a la meta')
+    expect(texto).not.toContain('Al rendimiento le faltan')
+  })
+})
+
 describe('CascadaTurnoCard: fila de rendimiento, rótulo y regresión (B-2)', () => {
   it('arriba de los escalones: la línea dice 13,7 pts con 378 de la perilla y 2.213 bajo ella', () => {
     const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
@@ -93,9 +163,23 @@ describe('CascadaTurnoCard: fila de rendimiento, rótulo y regresión (B-2)', ()
     expect(container.textContent ?? '').toContain('de producción · 378 piezas')
   })
 
-  it('el rótulo es «Carros vacíos»', () => {
-    const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} />)
+  it('el rótulo es «Carros vacíos» en Eviscerado (carros) y «Silletas vacías» en Filete (silletas)', () => {
+    const { container } = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} contenedor="carro" />)
     expect(container.textContent ?? '').toContain('Carros vacíos')
+    const f = render(<CascadaTurnoCard cascada={cascada} minutosTurno={N} contenedor="silleta" />)
+    expect(f.container.textContent ?? '').toContain('Silletas vacías')
+    expect(f.container.textContent ?? '').not.toContain('Carros vacíos')
+  })
+
+  it('con una sola máquina (Filete) no sale el selector «Línea» y el texto no nombra «Baader»', () => {
+    const una = cascadaPorMeta({ serie: { ...serie, maquinas: [serie.maquinas[0]!] }, n: N, paradas, perillas: PERILLAS })
+    const { container, queryByRole } = render(<CascadaTurnoCard cascada={una} minutosTurno={N} contenedor="silleta" />)
+    expect(queryByRole('tab', { name: 'Línea' })).toBeNull()
+    expect(queryByRole('tablist')).toBeNull()
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('Tiempo de producción')
+    expect(texto).toContain('Cuadre:')
+    expect(texto).not.toContain('Baader')
   })
 
   it('sin serie por minuto, la tarjeta vuelve a la cascada anterior (construirCascada), como antes de B-2', () => {

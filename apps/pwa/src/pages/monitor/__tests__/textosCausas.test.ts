@@ -2,7 +2,7 @@
  * Los textos de las causas de las micro (`textosCausas.ts`) y el vocabulario que decidió Mantención (03-11-2026):
  *  · nunca «casualidad» ni «azar»: «las microdetenciones no ocurren jamás por casualidad, solo que no entendemos aún el por qué pasan con los datos y
  *    análisis actuales»; el vocabulario es «causa probable» (el estimado) y «causa posible» (la micro coincidió con eso);
- *  · «ya no le llamamos paro ni paradas sino detenciones o detención» («Otra Baader paró» se queda porque lo eligió el usuario).
+ *  · «ya no le llamamos paro ni paradas sino detenciones o detención» (04-11: el usuario lo cambió a "se detuvo" por la regla de "detención").
  * La prueba junta TODO lo que el módulo puede decir (sus constantes y lo que dicen sus funciones con datos reales de los 10 turnos validados) y exige que
  * ninguna palabra prohibida aparezca. Los identificadores (claves internas como `paro`) no son texto visible y no se tocan.
  */
@@ -34,9 +34,9 @@ function cadenas(v: unknown, out: string[] = []): string[] {
 const sp = (s: string) => s.replace(/\u00a0/g, ' ')
 
 describe('textosCausas · vocabulario: nada de «casualidad», «azar», «paro» ni «parada(s)»', () => {
-  it('la expresión prohibida detecta lo que debe (y no «paró», que es el nombre que eligió el usuario)', () => {
+  it('la expresión prohibida detecta lo que debe (y no «paró», que ya no es el nombre de la causa)', () => {
     for (const mala of ['por casualidad', 'al azar', 'un paro', 'los paros', 'Parada programada', 'las paradas', 'PARO']) expect(mala).toMatch(PROHIBIDAS)
-    for (const buena of ['Otra Baader paró', 'detención', 'se detuvo', 'Al volver de una detención', 'comparar', 'separar']) expect(buena).not.toMatch(PROHIBIDAS)
+    for (const buena of ['Otra Baader se detuvo', 'detención', 'se detuvo', 'Al volver de una detención', 'comparar', 'separar']) expect(buena).not.toMatch(PROHIBIDAS)
   })
 
   it('las constantes del módulo (rótulos, formas, textos del resumen y del globo) no dicen nada prohibido', () => {
@@ -46,8 +46,8 @@ describe('textosCausas · vocabulario: nada de «casualidad», «azar», «paro�
     for (const t of todas) expect(t).not.toMatch(PROHIBIDAS)
   })
 
-  it('los rótulos nuevos: Arranque · Otra Baader paró · Al volver de una detención · Sin contexto, y las formas «a la vez», «en cadena» y «detención previa»', () => {
-    expect(CAUSAS_MICRO.map((c) => T.ROTULO_CAUSA[c])).toEqual(['Arranque', 'Otra Baader paró', 'Al volver de una detención', 'Sin contexto'])
+  it('los rótulos nuevos: Arranque · Otra Baader se detuvo · Al volver de una detención · Sin contexto, y las formas «a la vez», «en cadena» y «detención previa»', () => {
+    expect(CAUSAS_MICRO.map((c) => T.ROTULO_CAUSA[c])).toEqual(['Arranque', 'Otra Baader se detuvo', 'Al volver de una detención', 'Sin contexto'])
     expect(T.ROTULO_FORMA).toEqual({ a_la_vez: 'a la vez', en_cadena: 'en cadena', tras_paro_otra: 'detención previa' })
   })
 

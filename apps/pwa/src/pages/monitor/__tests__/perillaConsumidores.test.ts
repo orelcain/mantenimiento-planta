@@ -66,6 +66,12 @@ describe('Ev1 con perilla 17 y Shoplogix 18', () => {
     expect(pctARitmoFila(ev1.cycles, sinPerilla, 6, 18)).toBe(0)
   })
 
+  it('Baader sin vara (meta 0 y sin perilla): pctARitmoFila da null («—»), no un porcentaje sin umbral', () => {
+    const sinVara = Array.from({ length: 6 }, () => ({ cpm: 0, fuente: 'shoplogix' as const }))
+    expect(pctARitmoFila(minutos(6, 12), sinVara, 6, 0)).toBeNull()
+    expect(pctARitmoFila(minutos(6, 12), sinVara, 6, 16)).toBeNull()
+  })
+
   it('la franja (filasBaader) pinta el minuto como andando con 17 y como lenta con 18', () => {
     expect(filasBaader({ desde: T0, maquinas: [ev1] }, 6, null, perillas)[0]!.celdas[0]!.estado).toBe('andando')
     expect(filasBaader({ desde: T0, maquinas: [ev1] }, 6, null)[0]!.celdas[0]!.estado).toBe('lenta')

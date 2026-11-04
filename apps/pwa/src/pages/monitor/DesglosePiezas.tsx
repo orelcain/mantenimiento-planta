@@ -143,6 +143,8 @@ export interface DesglosePiezasProps {
   vara: VaraUmbral
   /** Detenciones de la Baader (de la línea, las de todas sus Baaders): de ahí salen los nombres y los tipos. */
   paradas: ParadaDetalle[]
+  /** Tiempo de producción de la Baader, el de la cascada («Dónde se fueron las piezas»): el «de Y» del pie. Sin él, el turno menos la programada. */
+  produccionMin?: number | null
   /** La vara cambió durante el turno: el desglose usa la vigente. */
   cambio: boolean
   onCerrar: () => void
@@ -156,7 +158,7 @@ function leerUnidad(): Unidad {
   }
 }
 
-export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, cambio, onCerrar }: DesglosePiezasProps) {
+export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, produccionMin, cambio, onCerrar }: DesglosePiezasProps) {
   const [unidad, setUnidad] = useState<Unidad>(leerUnidad)
   const [detalle, setDetalle] = useState(false)
   const [globo, setGlobo] = useState<string | null>(null)
@@ -186,6 +188,11 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
   const pctTotal = d.zonas.reduce((a, z) => a + z.pct, 0)
   const bajoSin = d.bajoSinDetencion
   const marcha = d.marchaInicial
+  /* El «de Y» del pie: el tiempo de producción de la Baader, el mismo de la cascada. Sin él, el turno menos la programada. */
+  const prodY = linea ? n - nProg : Math.round(produccionMin ?? n - nProg)
+  /* «Bajo U» cuenta los minutos con 0 < pieza < U: con detención registrada (las filas de esas piezas) y sin ella (`bajoSinDetencion`). */
+  const bajoCon = linea ? 0 : todas.reduce((a, f) => (f.v != null && f.v > 0 && f.v < d.umbral ? a + f.con : a), 0)
+  const bajoTotal = bajoCon + bajoSin
 
   const varaTexto = linea
     ? `vara ${vara.cpm} pz/min`
@@ -384,19 +391,15 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
         ? <p className="mt-2.5 text-[13px] leading-[18px] text-muted-foreground">Un minuto de la línea cuenta con detención si alguna de sus Baader tuvo una.</p>
         : (
           <>
-            {nProg > 0 && n - nProg > 0 && (
+            {nProg > 0 && prodY > 0 && (
               <p className="mt-2.5 text-[13px] leading-[18px] tabular-nums text-muted-foreground">
                 {'Sin la detención programada: a ritmo '}
-                <b className="font-semibold text-foreground">{`${tiempoTexto(nRitmo, u)} de ${tiempoTexto(n - nProg, u)}${u === 'h' ? '' : ' min'}`}</b>
-                {` (${Math.round((nRitmo / (n - nProg)) * 100)} %).`}
+                <b className="font-semibold text-foreground">{`${tiempoTexto(nRitmo, u)} de ${tiempoTexto(prodY, u)}${u === 'h' ? '' : ' min'}`}</b>
+                {` (${Math.round((nRitmo / prodY) * 100)} %).`}
               </p>
             )}
             <p className="mt-2.5 text-[13px] leading-[18px] tabular-nums text-muted-foreground">
-              {`Bajo ${d.umbral} sin detención: `}
-              <b className="font-semibold text-foreground">{`${marcha} min de marcha inicial`}</b>
-              {' y '}
-              <b className="font-semibold text-foreground">{`${bajoSin - marcha} de falta de pescado`}</b>
-              {'.'}
+              {`Bajo ${d.umbral}: ${bajoTotal} min, ${bajoCon} con detención registrada y ${bajoSin} sin ella (${marcha} de marcha inicial y ${bajoSin - marcha} de falta de pescado).`}
             </p>
           </>
         )}

@@ -162,6 +162,8 @@ export type PerillaMaquina = {
   cpm: number
   desde: string
   por: string | null
+  /** Motivo de la perilla («por el Knuro»). Cadena vacía = sin motivo. Siempre se escribe: con `merge`, una clave ausente dejaría el motivo viejo. */
+  motivo?: string
 }
 
 /** Una entrada del historial de perillas: la máquina y lo que se anotó para ella. */
@@ -169,6 +171,18 @@ export type PerillaHistorial = PerillaMaquina & { machineId: string }
 
 /** El historial guarda como máximo estas entradas; la más vieja sale primero. */
 const HISTORIAL_PERILLAS_MAX = 100
+
+/** Tope del motivo de una perilla, en caracteres. El servidor (functions/publicMonitor.js) lo vuelve a aplicar al publicar. */
+const MOTIVO_PERILLA_MAX = 60
+
+/**
+ * Motivo de una perilla, saneado: sin espacios sobrantes y con tope de 60 caracteres. Se cuentan caracteres, no unidades de
+ * código, para no partir un emoji. Vacío o no texto = cadena vacía, que quiere decir «sin motivo».
+ */
+export function normMotivoPerilla(motivo: string | null | undefined): string {
+  if (typeof motivo !== 'string') return ''
+  return Array.from(motivo.trim()).slice(0, MOTIVO_PERILLA_MAX).join('').trim()
+}
 
 /**
  * Anota la velocidad de la perilla de UNA máquina de la línea.
@@ -191,6 +205,8 @@ export async function setMonitorPerilla(params: {
   machineId: string
   cpm: number
   por: string | null
+  /** Motivo opcional («por el Knuro»): vacío o ausente = sin motivo. Se recorta a 60 caracteres. */
+  motivo?: string | null
 }): Promise<void> {
   const docId = CONFIG_DOC_ID[params.plantSlug]
   if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
@@ -202,7 +218,11 @@ export async function setMonitorPerilla(params: {
   const historialPrevio: PerillaHistorial[] = Array.isArray(snap.data()?.monitorPerillasHistorial)
     ? snap.data()!.monitorPerillasHistorial
     : []
-  const nueva: PerillaMaquina = construirPerilla({ cpm: params.cpm, por: params.por, nowMs: Date.now() })
+  /* El motivo va siempre, null incluido: con `merge`, una clave que no se escribe dejaría el motivo de la anotación anterior. */
+  const nueva: PerillaMaquina = {
+    ...construirPerilla({ cpm: params.cpm, por: params.por, nowMs: Date.now() }),
+    motivo: normMotivoPerilla(params.motivo),
+  }
   await setDoc(ref, {
     // Merge profundo: escribe solo esta máquina y deja intactas las demás.
     monitorPerillas: { [params.machineId]: nueva },

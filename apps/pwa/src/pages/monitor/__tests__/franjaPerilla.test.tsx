@@ -63,6 +63,28 @@ afterEach(() => {
   useAuthStore.setState({ user: null })
 })
 
+describe('el motivo de la perilla en la franja', () => {
+  const PERILLAS_CON_MOTIVO: PerillasDeLinea = {
+    actual: { ev1: { cpm: 17, desde: '2026-11-04T00:00:00.000Z', motivo: 'por el Knuro' } },
+    historial: [],
+  }
+
+  it('con motivo: va después de «anotada dd-mm», separado con «·», y antes de la meta', () => {
+    const d = turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18))
+    const { container } = render(
+      <MinutoTurnoV2 d={d} cerrado={false} perillas={PERILLAS_CON_MOTIVO} carros={carrosDe(d, null)} perillaEditor={null} />,
+    )
+    expect(container.textContent).toContain('perilla 17 · anotada 04-11 · por el Knuro · meta Shoplogix 18')
+  })
+
+  it('sin motivo: la línea sigue igual, sin el motivo', () => {
+    const d = turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18))
+    const { container } = renderFranja(d, null)
+    expect(container.textContent).toContain('perilla 17 · anotada 04-11 · meta Shoplogix 18')
+    expect(container.textContent).not.toContain('por el Knuro')
+  })
+})
+
 describe('encabezado de la franja', () => {
   it('los rótulos de las dos columnas aparecen una sola vez', () => {
     const d = turno(cyc(15), cyc(18))

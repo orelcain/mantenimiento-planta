@@ -195,6 +195,10 @@ describe('tonoVara: bandas de la perilla y el 75 % de Shoplogix', () => {
     expect(tonoVara(5, { cpm: null, fuente: 'shoplogix' })).toBe('bien')
     expect(tonoVara(0, { cpm: null, fuente: 'shoplogix' })).toBe('sin')
   })
+  it('meta 0 y sin perilla (cpm 0): no hay vara, así que ningún minuto sale «bien» (antes, cualquier minuto con piezas)', () => {
+    expect(tonoVara(5, { cpm: 0, fuente: 'shoplogix' })).toBe('sin')
+    expect(tonoVara(0, { cpm: 0, fuente: 'shoplogix' })).toBe('sin')
+  })
 })
 
 describe('desdePerilla: la hora de planta sellada como UTC, no la UTC real', () => {

@@ -13,10 +13,10 @@
  * esperado de Shoplogix.
  */
 /**
- * Lo que el monitor público ve de una perilla: velocidad y cuándo entró en vigor.
- * Quién la anotó no sale del servidor (functions/publicMonitor.js, normPerilla).
+ * Lo que el monitor público ve de una perilla: velocidad, cuándo entró en vigor y, si el admin lo anotó, el motivo
+ * («por el Knuro»): explica por qué va por debajo de la meta. Quién la anotó no sale del servidor (functions/publicMonitor.js, normPerilla).
  */
-export type PerillaPublica = { cpm: number; desde: string }
+export type PerillaPublica = { cpm: number; desde: string; motivo?: string }
 
 /**
  * Cómo se toma el «a ritmo» con perilla (decisión de Orel, 04-11). `calibrado` (por omisión) descuenta una pieza por Baader al umbral
@@ -128,7 +128,9 @@ export type TonoVara = 'bien' | 'atento' | 'mal' | 'sin'
  */
 export function tonoVara(v: number, vara: VaraUmbral): TonoVara {
   const cpm = vara.cpm
-  if (cpm == null || !(cpm > 0)) return v > 0 ? 'bien' : 'sin'
+  if (cpm == null) return v > 0 ? 'bien' : 'sin'
+  /* Meta 0 y sin perilla: no hay vara, así que no hay «a ritmo» que contar (antes cualquier minuto con piezas salía «bien»). */
+  if (!(cpm > 0)) return 'sin'
   if (vara.fuente === 'perilla') {
     if (v >= umbralARitmo(cpm, vara.modo, vara.partes)) return 'bien'
     return v / cpm >= 0.5 ? 'atento' : 'mal'

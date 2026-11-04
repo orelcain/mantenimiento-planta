@@ -11,6 +11,7 @@
  */
 import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 import { dec1 } from '@/utils/formatoNumeros'
+import { nombreCausa } from './desgloseVista'
 import { fechaDMA, SEMANAS_VENTANA, type CalibracionPlanta, type MotivoObservacion, type ParametrosCausas } from './causasCalibracion'
 import type { CausaMicro, CercaMicro, EvidenciaMicro, FormaMicro, MicroClasificada, ModoLinea } from './microCausa'
 import { cronometro } from './ritmoVivo'
@@ -55,8 +56,8 @@ export const CERCA_MAX_S = 300
 export function motivoLegible(razon: string | null | undefined): string | null {
   const t = (razon ?? '').trim().replace(/\s+/g, ' ')
   if (!t) return null
-  const hoja = matchImputacion(t).leaf
-  if (hoja) return hoja.label
+  /* La hoja de la taxonomía sin « - Paro»: el mismo nombre que el desglose (`nombreCausa`), «Ejercicio compensatorio». */
+  if (matchImputacion(t).leaf) return nombreCausa(t)
   const bajo = t.toLowerCase()
   if (bajo === 'detencion' || bajo === 'detención') return null
   return bajo.charAt(0).toUpperCase() + bajo.slice(1)
@@ -67,7 +68,7 @@ export function motivoLegible(razon: string | null | undefined): string | null {
 /** El nombre de cada causa en pantalla. */
 export const ROTULO_CAUSA: Record<CausaMicro, string> = {
   arranque: 'Arranque',
-  linea: 'Otra Baader paró',
+  linea: 'Otra Baader se detuvo',
   paro: 'Al volver de una detención',
   sin: 'Sin contexto',
 }
