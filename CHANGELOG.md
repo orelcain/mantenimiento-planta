@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.12.0] - 2026-11-04
+Monitor: el desglose de la perilla por Baader y el modo del umbral «a ritmo» de la línea.
+
+### Añadido
+- Desglose de cada Baader y de la línea en la franja «El turno completo»: minutos por zona (a ritmo, bajo, marcha parcial y detenida), barra por minuto y «Total del turno» que suma 100 %. Con selector «min | h».
+- Globos ⓘ de «minutos a ritmo» (con «Ver desglose») y de «carros con pieza» de cada Baader.
+- Tarjeta «Minutos a ritmo de la línea» (solo admin): elegir Calibrado u Óptimo, ver el efecto por Baader antes de guardar, y quién lo anotó y cuándo. Se abre con «Cambiar» en la cabecera de columnas.
+
+### Cambiado
+- Los globos ⓘ se abren y cierran solo con clic o toque: el puntero encima ya no mueve el contenido.
+- Una causa que la taxonomía no conoce se muestra en minúsculas y con tilde («micro detención»), sin « - Paro».
+- El botón Guardar del editor de perilla usa el color de marca.
+
 ## [4.0.0] - 2026-08-04
 Cierre de 39 mejoras acumuladas desde la v3.99.6 (23/07). No hay cambios incompatibles:
 el salto de MAJOR marca el hito de las dos semanas, no una ruptura.

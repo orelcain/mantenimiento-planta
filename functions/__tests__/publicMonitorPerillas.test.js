@@ -44,3 +44,42 @@ test('leerPerillas: ni la vigente ni el historial llevan el nombre de quien anot
 test('leerPerillas sin anotaciones devuelve null', () => {
   assert.equal(leerPerillas({}), null)
 })
+
+test('leerPerillas publica el modo del umbral que anotó el admin, sin quién lo anotó', () => {
+  const perillas = leerPerillas({
+    monitorPerillas: { ev1: { cpm: 17, desde: DESDE, por: 'Orel C.' } },
+    monitorUmbralARitmo: { modo: 'optimo', desde: DESDE, por: 'Orel C.' },
+  })
+  assert.equal(perillas.modo, 'optimo')
+  assert.deepEqual(perillas.actual, { ev1: { cpm: 17, desde: DESDE } })
+  assert.equal(JSON.stringify(perillas).includes('Orel'), false)
+})
+
+test('leerPerillas: calibrado también se publica como modo', () => {
+  const perillas = leerPerillas({
+    monitorPerillas: { ev1: { cpm: 17, desde: DESDE, por: 'x' } },
+    monitorUmbralARitmo: { modo: 'calibrado', desde: DESDE, por: 'x' },
+  })
+  assert.equal(perillas.modo, 'calibrado')
+})
+
+test('leerPerillas: un modo desconocido se ignora y la respuesta va sin la clave modo', () => {
+  const perillas = leerPerillas({
+    monitorPerillas: { ev1: { cpm: 17, desde: DESDE, por: 'x' } },
+    monitorUmbralARitmo: { modo: 'otro', desde: DESDE, por: 'x' },
+  })
+  assert.deepEqual(perillas, { actual: { ev1: { cpm: 17, desde: DESDE } }, historial: [] })
+  assert.equal('modo' in perillas, false)
+})
+
+test('leerPerillas: sin perillas, el modo solo basta para publicar la respuesta', () => {
+  assert.deepEqual(
+    leerPerillas({ monitorUmbralARitmo: { modo: 'calibrado', desde: DESDE, por: 'x' } }),
+    { actual: {}, historial: [], modo: 'calibrado' },
+  )
+})
+
+test('leerPerillas sin perillas ni modo válido devuelve null, aunque monitorUmbralARitmo exista', () => {
+  assert.equal(leerPerillas({ monitorUmbralARitmo: null }), null)
+  assert.equal(leerPerillas({ monitorUmbralARitmo: { modo: 'otro' } }), null)
+})

@@ -89,20 +89,23 @@ describe('encabezado de la franja', () => {
   it('«con N o más por minuto» usa el umbral de la vara vigente al final del turno', () => {
     const d = turno(cyc(15), cyc(18))
     const { container } = renderFranja(d, null)
-    /* Con perilla 17, a ritmo es 17 o más; sin perilla, el 75 % de la meta 16 es 12. */
-    expect(container.textContent).toContain('con 17 o más por minuto')
+    /* Con perilla 17 (calibrada por omisión), a ritmo es 16 o más; sin perilla, el 75 % de la meta 16 es 12. */
+    expect(container.textContent).toContain('con 16 o más por minuto')
     expect(container.textContent).toContain('con 12 o más por minuto')
   })
 
-  it('la leyenda trae el texto exacto con «Carros con pieza» y «Minutos a ritmo» en negrita', () => {
+  it('ya no hay el párrafo bajo la franja que explicaba «Carros con pieza» y «Minutos a ritmo»: lo dicen los ⓘ', () => {
     const d = turno(cyc(15), cyc(18))
     const { container } = renderFranja(d, null)
-    expect(container.textContent).toContain(
-      'Carros con pieza cuenta solo mientras la Baader anda, como su pantalla. Minutos a ritmo cuenta todo el turno: cada detención resta.',
-    )
-    const negritas = Array.from(container.querySelectorAll('b')).map((b) => b.textContent)
-    expect(negritas).toContain('Carros con pieza')
-    expect(negritas).toContain('Minutos a ritmo')
+    expect(container.textContent).not.toContain('Carros con pieza cuenta solo mientras la Baader anda')
+    expect(container.textContent).not.toContain('cada detención resta')
+  })
+
+  it('«anotada dd-mm» no se corta: va en un bloque que no parte la línea', () => {
+    const d = turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18))
+    const { container } = renderFranja(d, null)
+    const anotada = Array.from(container.querySelectorAll<HTMLElement>('span.whitespace-nowrap')).find((s) => s.textContent === 'anotada 04-11')
+    expect(anotada).toBeTruthy()
   })
 })
 
@@ -130,7 +133,7 @@ describe('carros con pieza: con detenciones, sin detenciones y el tope de 100 %'
 })
 
 describe('minutos a ritmo y el ⓘ de los enteros', () => {
-  it('con perilla, a ritmo es la perilla completa: 6 de 10 minutos en 17 o más dan 60 %', () => {
+  it('con perilla calibrada por omisión (a ritmo desde 16): 6 de 10 minutos con 17 dan 60 %', () => {
     const d = turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18))
     const { getByText } = renderFranja(d, null)
     expect(getByText('60')).toBeTruthy()
@@ -139,10 +142,35 @@ describe('minutos a ritmo y el ⓘ de los enteros', () => {
   it('el ⓘ lista los enteros de cada máquina: a ritmo, bajo y muy bajo', () => {
     const d = turno(cyc(15), cyc(18))
     const { container, getByRole } = renderFranja(d, null)
-    expect(container.textContent).not.toContain('a ritmo con 17 o más; bajo de 9 a 16; muy bajo con 8 o menos')
+    expect(container.textContent).not.toContain('a ritmo con 16 o más; bajo de 9 a 15; muy bajo con 8 o menos')
     fireEvent.click(getByRole('button', { name: 'Enteros de cada máquina' }))
-    expect(container.textContent).toContain('Ev 1: a ritmo con 17 o más; bajo de 9 a 16; muy bajo con 8 o menos')
+    expect(container.textContent).toContain('Ev 1: a ritmo con 16 o más; bajo de 9 a 15; muy bajo con 8 o menos')
     expect(container.textContent).toContain('Ev 2: a ritmo con 12 o más; bajo de 8 a 11; muy bajo con 7 o menos')
+  })
+})
+
+describe('la línea con tres Baaders en perilla: su umbral calibrado descuenta una pieza por Baader', () => {
+  it('perillas 17 + 16 + 16 = 49, con 3 Baaders: «con 46 o más por minuto» (no 48, que sería descontar una sola vez)', () => {
+    const d: MinutoTurno = {
+      desde: DESDE,
+      maquinas: [
+        { id: 'ev1', nombre: 'Evisceradora 1', esperado: 18, cycles: cyc(18) },
+        { id: 'ev2', nombre: 'Evisceradora 2', esperado: 16, cycles: cyc(16) },
+        { id: 'ev3', nombre: 'Evisceradora 3', esperado: 16, cycles: cyc(16) },
+      ],
+    }
+    const perillas3: PerillasDeLinea = {
+      actual: {
+        ev1: { cpm: 17, desde: '2026-11-04T00:00:00.000Z' },
+        ev2: { cpm: 16, desde: '2026-11-04T00:00:00.000Z' },
+        ev3: { cpm: 16, desde: '2026-11-04T00:00:00.000Z' },
+      },
+      historial: [],
+    }
+    const { container } = render(
+      <MinutoTurnoV2 d={d} cerrado={false} perillas={perillas3} carros={vaciosTurnoDe(d, MINUTOS, null, perillas3)} perillaEditor={null} />,
+    )
+    expect(container.textContent).toContain('con 46 o más por minuto')
   })
 })
 
@@ -157,8 +185,9 @@ describe('funciones puras que usa la franja', () => {
     expect(perillaVigenteEn(perillas, 'ev1', Date.parse('2026-10-31T00:00:00.000Z'))).toBeNull()
   })
 
-  it('bandasEnteras con perilla 17: a ritmo desde 17, bajo desde 9; sin perilla y meta 16: 12 y 8', () => {
-    expect(bandasEnteras({ cpm: 17, fuente: 'perilla' })).toEqual({ aRitmo: 17, bajo: 9 })
+  it('bandasEnteras con perilla 17 calibrada: a ritmo desde 16, bajo desde 9; con modo óptimo, desde 17; sin perilla y meta 16: 12 y 8', () => {
+    expect(bandasEnteras({ cpm: 17, fuente: 'perilla' })).toEqual({ aRitmo: 16, bajo: 9 })
+    expect(bandasEnteras({ cpm: 17, fuente: 'perilla', modo: 'optimo' })).toEqual({ aRitmo: 17, bajo: 9 })
     expect(bandasEnteras({ cpm: 16, fuente: 'shoplogix' })).toEqual({ aRitmo: 12, bajo: 8 })
     expect(bandasEnteras({ cpm: null, fuente: 'shoplogix' })).toBeNull()
   })
@@ -189,8 +218,9 @@ describe('maquetación de la cabecera de cada franja (clases de anchos)', () => 
 
   it('«con N o más por minuto» se parte en «con N o más» y «por minuto» solo bajo 640 px; el texto no cambia', () => {
     const { container } = renderFranja(turno(cyc(15), cyc(18)), null)
-    const pie = cabeceraDe(container, 'Evisceradora 1').querySelector<HTMLElement>('.leading-snug')!
-    expect(pie.textContent).toBe('con 17 o más por minuto')
+    /* La segunda cifra de la cabecera (minutos a ritmo): la primera, carros, también tiene su pie «similar a la Baader». */
+    const pie = cabeceraDe(container, 'Evisceradora 1').querySelectorAll<HTMLElement>('div.text-right')[1]!.querySelector<HTMLElement>('.leading-snug')!
+    expect(pie.textContent).toBe('con 16 o más por minuto')
     expect(pie.querySelector('br')?.className).toBe('sm:hidden')
   })
 
@@ -203,5 +233,69 @@ describe('maquetación de la cabecera de cada franja (clases de anchos)', () => 
     expect(minutos.className).toContain('w-[80px] sm:w-[120px]')
     expect(carros.querySelector('br')?.className).toBe('sm:hidden')
     expect(minutos.querySelector('br')?.className).toBe('sm:hidden')
+  })
+})
+
+/* Los ⓘ (A2-2a): cada globo abre y cierra con su botón, «Ver desglose» abre el panel de la Baader y los carros solo se explican en las
+   Baaders (la línea no tiene pie). El desglose de la Evisceradora 1 con 6 minutos a ritmo de 10: la misma cifra que el frente. */
+describe('los ⓘ de la franja y «Ver desglose»', () => {
+  const cabeceraEv1 = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll<HTMLElement>('.sticky.z-10.mb-2')).find((el) => el.textContent?.includes('Evisceradora 1'))!
+  const botonInfo = (container: HTMLElement, etiqueta: string) =>
+    cabeceraEv1(container).querySelector<HTMLButtonElement>(`button[aria-label="${etiqueta}"]`)!
+  const ETQ_RITMO = 'Cómo se cuentan los minutos a ritmo'
+  const ETQ_CARROS = 'Cómo se calculan los carros con pieza'
+
+  it('el ⓘ de minutos a ritmo abre su globo con la cuenta y lo cierra con otro toque', () => {
+    const { container } = renderFranja(turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18)), null)
+    const info = botonInfo(container, ETQ_RITMO)
+    expect(info.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(info)
+    const globo = container.querySelector<HTMLElement>('[role="dialog"][aria-label="Minutos a ritmo de la Evisceradora 1"]')!
+    expect(globo.textContent).toContain('6 de 10 minutos llegaron a 16 o más por minuto.')
+    expect(globo.textContent).toContain('El umbral es la perilla 17 menos 1')
+    expect(botonInfo(container, ETQ_RITMO).getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(botonInfo(container, ETQ_RITMO))
+    expect(container.querySelector('[role="dialog"][aria-label="Minutos a ritmo de la Evisceradora 1"]')).toBeNull()
+  })
+
+  it('el puntero encima de un ⓘ no abre el globo: solo el clic o el toque (A2-2b, nada se mueve sin clic)', () => {
+    const { container } = renderFranja(turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18)), null)
+    const info = botonInfo(container, ETQ_RITMO)
+    fireEvent.pointerOver(info, { pointerType: 'mouse' })
+    fireEvent.pointerEnter(info, { pointerType: 'mouse' })
+    expect(info.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('[role="dialog"][aria-label="Minutos a ritmo de la Evisceradora 1"]')).toBeNull()
+    fireEvent.click(info)
+    expect(info.getAttribute('aria-expanded')).toBe('true')
+    expect(container.querySelector('[role="dialog"][aria-label="Minutos a ritmo de la Evisceradora 1"]')).not.toBeNull()
+  })
+
+  it('«Ver desglose» del globo abre el panel de la Baader con su suma a ritmo igual al 60 % del frente', () => {
+    const { container, getByText } = renderFranja(turno([17, 17, 17, 17, 17, 17, 15, 15, 15, 15], cyc(18)), null)
+    fireEvent.click(botonInfo(container, ETQ_RITMO))
+    fireEvent.click(getByText('Ver desglose'))
+    const panel = container.querySelector<HTMLElement>('[role="region"][aria-label="Desglose de la Evisceradora 1"]')!
+    expect(panel).toBeTruthy()
+    const ritmo = Array.from(panel.querySelectorAll<HTMLElement>('[data-zona="ritmo"] [data-fila]'))
+    const suma = ritmo.reduce((a, f) => a + Number((Array.from(f.querySelectorAll('span')).find((s) => /^\d+ %$/.test(s.textContent ?? ''))?.textContent ?? '').replace(' %', '')), 0)
+    expect(suma).toBe(60)
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('el ⓘ de carros abre la explicación de cada Baader (con perilla, la perilla; sin ella, la meta) y la línea no tiene ⓘ', () => {
+    const { container } = renderFranja(turno(cyc(15), cyc(18)), null)
+    /* Dos Baaders: dos ⓘ de carros, uno por fila de Baader; la fila de la línea no lleva pie. */
+    expect(container.querySelectorAll(`button[aria-label="${ETQ_CARROS}"]`).length).toBe(2)
+    fireEvent.click(botonInfo(container, ETQ_CARROS))
+    const globo = container.querySelector<HTMLElement>('[role="dialog"][aria-label="Carros con pieza de la Evisceradora 1"]')!
+    expect(globo.textContent).toContain('% de los carros llevaron pieza.')
+    expect(globo.textContent).toContain('la perilla en 17')
+    expect(botonInfo(container, ETQ_CARROS).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('el pie «similar a la Baader» sale en cada Baader, no en la línea', () => {
+    const { container } = renderFranja(turno(cyc(15), cyc(18)), null)
+    expect(container.textContent!.split('similar a la Baader').length - 1).toBe(2)
   })
 })

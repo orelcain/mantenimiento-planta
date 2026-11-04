@@ -18,14 +18,29 @@
  */
 export type PerillaPublica = { cpm: number; desde: string }
 
+/**
+ * Cómo se toma el «a ritmo» con perilla (decisión de Orel, 04-11). `calibrado` (por omisión) descuenta una pieza por Baader al umbral
+ * óptimo; `optimo` es la perilla completa. Lo publica el servidor (`monitorUmbralARitmo`, A2-1b); sin el dato, calibrado.
+ */
+export type ModoUmbral = 'calibrado' | 'optimo'
+export const MODO_UMBRAL_POR_OMISION: ModoUmbral = 'calibrado'
+
 /** Forma de `live.perillas` en el monitor público (publicShiftMonitor.service.ts). */
 export interface PerillasDeLinea {
   actual: Record<string, PerillaPublica>
   historial: Array<PerillaPublica & { machineId: string }>
+  /** Modo del «a ritmo» que eligió el admin. Ausente = calibrado. */
+  modo?: ModoUmbral
 }
 
 /** De dónde sale la vara del minuto: la perilla de la máquina o el esperado de Shoplogix. */
 export type FuenteVara = 'perilla' | 'shoplogix'
+
+/**
+ * Una vara de minuto: su valor, de dónde sale y, con perilla, cómo se toma su «a ritmo». `modo` solo lo lleva la vara de perilla.
+ * `partes` es cuántas Baaders suma (1 en una Baader; el número de Baaders en la vara de la línea) y solo pesa en el modo calibrado.
+ */
+export type VaraUmbral = { cpm: number | null; fuente: FuenteVara; modo?: ModoUmbral; partes?: number }
 
 /**
  * Velocidad de la perilla vigente para una máquina en `tMs`: la anotación más
@@ -69,7 +84,8 @@ export function perillaVigenteEn(
 
 /**
  * Vara del minuto para una máquina: la perilla vigente si la hay; si no, el esperado
- * de Shoplogix. `fuente` dice de dónde salió, para poder decirlo en pantalla. Si no
+ * de Shoplogix. `fuente` dice de dónde salió, para poder decirlo en pantalla. Con perilla
+ * lleva además el `modo` del «a ritmo» (el publicado, o calibrado por omisión). Si no
  * hay ninguno de los dos, `cpm` es null y la fuente queda en 'shoplogix'.
  */
 export function varaMinuto(
@@ -77,44 +93,44 @@ export function varaMinuto(
   machineId: string,
   tMs: number,
   esperadoShoplogix: number | null,
-): { cpm: number | null; fuente: FuenteVara } {
+): VaraUmbral {
   const perilla = perillaEn(perillas, machineId, tMs)
-  if (perilla !== null) return { cpm: perilla, fuente: 'perilla' }
+  if (perilla !== null) return { cpm: perilla, fuente: 'perilla', modo: perillas?.modo ?? MODO_UMBRAL_POR_OMISION }
   return { cpm: esperadoShoplogix, fuente: 'shoplogix' }
 }
 
 /**
- * Fracción de la perilla desde la que un minuto cuenta «a ritmo». Con perilla
- * anotada, «a ritmo» es la perilla completa (decisión de Orel, 04-11): con 17, 17 o
- * más. Es la única constante del umbral. Sin perilla no se usa: la vara de Shoplogix
- * conserva el 75 % de siempre (`tonoVara`).
+ * Piezas por Baader que el modo calibrado descuenta del umbral óptimo (la perilla). Calibración del turno noche de Chonchi del 03-11
+ * (21:25 a 05:00, 455 min, Ev 1 con perilla 17; `__tests__/fixtures/chonchi_0311_turno1_minutos.json`). Entre los 363 minutos sin
+ * detención registrada: con 16 o más, 274 (75 %); con 17 o más, 212 (58 %). Por eso calibrado = perilla − 1.
  */
-export const UMBRAL_A_RITMO_PERILLA = 1
+export const DESCUENTO_CALIBRADO = 1
 const EPSILON_UMBRAL = 1e-9
 
 /**
- * Umbral «a ritmo» entero de una perilla: el entero hacia arriba de
- * UMBRAL_A_RITMO_PERILLA × cpm. Con 17 da 17. El epsilon resta una cantidad ínfima
- * antes de redondear, para que un resultado exacto no suba a la unidad siguiente
- * por un error de coma flotante.
+ * Umbral «a ritmo» entero de una perilla. Óptimo: el entero hacia arriba de `cpm` (17 → 17). Calibrado: ese entero menos
+ * `DESCUENTO_CALIBRADO` por cada Baader (`partes`), sin bajar de 1 (17 → 16; la línea de 17 + 16 + 16 = 49 con `partes` 3 → 46). El epsilon
+ * resta una cantidad ínfima antes de redondear, para que un resultado exacto no suba a la unidad siguiente por un error de coma flotante.
  */
-export function umbralARitmo(cpm: number): number {
-  return Math.ceil(cpm * UMBRAL_A_RITMO_PERILLA - EPSILON_UMBRAL)
+export function umbralARitmo(cpm: number, modo: ModoUmbral = MODO_UMBRAL_POR_OMISION, partes = 1): number {
+  const entero = Math.ceil(cpm - EPSILON_UMBRAL)
+  if (modo === 'optimo') return entero
+  return Math.max(1, entero - DESCUENTO_CALIBRADO * partes)
 }
 
 /** Tono de un minuto contra su vara. `sin` = la Baader no tiene vara ni dato de ese minuto. */
 export type TonoVara = 'bien' | 'atento' | 'mal' | 'sin'
 
 /**
- * Tono de un minuto contra SU vara. Con perilla: «a ritmo» desde el umbral entero,
- * «bajo» desde la mitad de la perilla y «muy bajo» debajo. Con vara de Shoplogix: el
- * 75 % y el 50 % de siempre. No cambia `tonoDe` ni `tonoMinuto`, que comparte el Duelo.
+ * Tono de un minuto contra SU vara. Con perilla: «a ritmo» desde el umbral entero de su modo (`umbralARitmo`), «bajo» desde la mitad
+ * de la perilla y «muy bajo» debajo. Con vara de Shoplogix: el 75 % y el 50 % de siempre. No cambia `tonoDe` ni `tonoMinuto`, que
+ * comparte el Duelo.
  */
-export function tonoVara(v: number, vara: { cpm: number | null; fuente: FuenteVara }): TonoVara {
+export function tonoVara(v: number, vara: VaraUmbral): TonoVara {
   const cpm = vara.cpm
   if (cpm == null || !(cpm > 0)) return v > 0 ? 'bien' : 'sin'
   if (vara.fuente === 'perilla') {
-    if (v >= umbralARitmo(cpm)) return 'bien'
+    if (v >= umbralARitmo(cpm, vara.modo, vara.partes)) return 'bien'
     return v / cpm >= 0.5 ? 'atento' : 'mal'
   }
   const r = v / cpm
@@ -122,13 +138,12 @@ export function tonoVara(v: number, vara: { cpm: number | null; fuente: FuenteVa
 }
 
 /**
- * Umbral «a ritmo» entero de una vara, según su fuente: con perilla, `umbralARitmo`
- * (17 → 17); con vara de Shoplogix, el 75 % redondeado hacia arriba (17 → 13, como
- * antes de la perilla). Null si no hay vara.
+ * Umbral «a ritmo» entero de una vara, según su fuente: con perilla, `umbralARitmo` con su modo y sus partes (calibrado por omisión:
+ * 17 → 16); con vara de Shoplogix, el 75 % redondeado hacia arriba (17 → 13, como antes de la perilla). Null si no hay vara.
  */
-export function umbralEntero(vara: { cpm: number | null; fuente: FuenteVara }): number | null {
+export function umbralEntero(vara: VaraUmbral): number | null {
   if (vara.cpm == null || !(vara.cpm > 0)) return null
-  return vara.fuente === 'perilla' ? umbralARitmo(vara.cpm) : Math.ceil(vara.cpm * 0.75 - EPSILON_UMBRAL)
+  return vara.fuente === 'perilla' ? umbralARitmo(vara.cpm, vara.modo, vara.partes) : Math.ceil(vara.cpm * 0.75 - EPSILON_UMBRAL)
 }
 
 /**
@@ -136,7 +151,7 @@ export function umbralEntero(vara: { cpm: number | null; fuente: FuenteVara }): 
  * (el de `umbralEntero`) y `bajo` el primero «bajo»; de `bajo` a `aRitmo - 1` es «bajo» y debajo de `bajo` es «muy bajo».
  * Si no hay ningún entero «bajo», `bajo` queda igual a `aRitmo`. Null sin vara.
  */
-export function bandasEnteras(vara: { cpm: number | null; fuente: FuenteVara }): { aRitmo: number; bajo: number } | null {
+export function bandasEnteras(vara: VaraUmbral): { aRitmo: number; bajo: number } | null {
   const aRitmo = umbralEntero(vara)
   if (aRitmo == null) return null
   let bajo = aRitmo
@@ -152,19 +167,19 @@ export const diaMesPerilla = (desde: string): string => `${desde.slice(8, 10)}-$
 export const horaPerilla = (desde: string): string => desde.slice(11, 16)
 
 /**
- * Rótulo de la raya «a ritmo» de una vara: «17 o más» con perilla, «12 o más» sin ella. Es el entero de `umbralEntero`, el mismo
- * que la franja escribe bajo «minutos a ritmo». Null sin vara.
+ * Rótulo de la raya «a ritmo» de una vara: «16 o más» con perilla calibrada por omisión (17 anotado), «12 o más» sin ella. Es el entero
+ * de `umbralEntero`, el mismo que la franja escribe bajo «minutos a ritmo». Null sin vara.
  */
-export function rotuloRaya(vara: { cpm: number | null; fuente: FuenteVara }): string | null {
+export function rotuloRaya(vara: VaraUmbral): string | null {
   const umbral = umbralEntero(vara)
   return umbral == null ? null : `${umbral} o más`
 }
 
 /**
- * Tono de una cifra de carros con pieza (un porcentaje de la vara), con la misma regla que `tonoVara`: con perilla, «a ritmo» es la
- * perilla completa; sin perilla, el 75 % y el 50 % de siempre. Sin vara o sin cifra, `sin`.
+ * Tono de una cifra de carros con pieza (un porcentaje de la vara), con la misma regla que `tonoVara`: con perilla, «a ritmo» es el umbral
+ * de su modo; sin perilla, el 75 % y el 50 % de siempre. Sin vara o sin cifra, `sin`.
  */
-export function tonoDePorcentajeVara(pct: number | null, vara: { cpm: number | null; fuente: FuenteVara }): TonoVara {
+export function tonoDePorcentajeVara(pct: number | null, vara: VaraUmbral): TonoVara {
   if (pct == null || vara.cpm == null || !(vara.cpm > 0)) return 'sin'
   return tonoVara((pct / 100) * vara.cpm, vara)
 }

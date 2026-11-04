@@ -16,7 +16,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from '@/services/firestoreTracked'
 import { db } from '../firebase'
 import type { PlantSlug } from './shoplogixMachines'
-import { construirPerilla } from '@/lib/horaDePlanta'
+import { construirPerilla, desdePerilla } from '@/lib/horaDePlanta'
 
 const COLLECTION = 'graderModuleConfigs'
 
@@ -222,6 +222,58 @@ export async function leerPerillasHistorial(plantSlug: PlantSlug | string): Prom
   const snap = await getDoc(doc(db, COLLECTION, docId))
   const historial = snap.data()?.monitorPerillasHistorial
   return Array.isArray(historial) ? (historial as PerillaHistorial[]) : []
+}
+
+/** Los dos modos del umbral «a ritmo» de la línea: calibrado (perilla − 1 por Baader) u óptimo (la perilla completa). */
+export type ModoUmbralLinea = 'calibrado' | 'optimo'
+
+/** El modo vigente o una entrada del historial: qué modo, cuándo entró en vigor (hora de planta) y quién lo anotó. */
+export type UmbralARitmo = { modo: ModoUmbralLinea; desde: string; por: string | null }
+
+/**
+ * Anota el modo del umbral «a ritmo» de la LÍNEA. Mismo documento y mismo patrón que `setMonitorPerilla`:
+ * `CONFIG_DOC_ID[plantSlug]`, `desde` = el momento de anotar y historial de como máximo `HISTORIAL_PERILLAS_MAX`.
+ *
+ * Quién puede escribir: solo admin. Las reglas de `graderModuleConfigs` lo exigen con `affectedKeys` sobre
+ * `monitorUmbralARitmo` y `monitorUmbralARitmoHistorial`. Esta función no vuelve a comprobar el rol: la UI lo
+ * oculta y las reglas lo bloquean.
+ */
+export async function setMonitorUmbralARitmo(params: {
+  plantSlug: PlantSlug | string
+  modo: ModoUmbralLinea
+  por: string | null
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  if (params.modo !== 'calibrado' && params.modo !== 'optimo') throw new Error(`Modo de umbral desconocido: ${params.modo}`)
+
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const historialPrevio: UmbralARitmo[] = Array.isArray(snap.data()?.monitorUmbralARitmoHistorial)
+    ? snap.data()!.monitorUmbralARitmoHistorial
+    : []
+  const nueva: UmbralARitmo = { modo: params.modo, desde: desdePerilla(Date.now()), por: params.por }
+  await setDoc(ref, {
+    monitorUmbralARitmo: nueva,
+    monitorUmbralARitmoHistorial: [...historialPrevio, nueva].slice(-HISTORIAL_PERILLAS_MAX),
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
+}
+
+/**
+ * El modo del umbral de la línea: `vigente` (la última anotación; null si nunca se anotó) e `historial` (la más
+ * vieja primero). Lo lee el editor de admin. Sin documento, `vigente` null e `historial` vacío.
+ */
+export async function leerUmbralARitmo(plantSlug: PlantSlug | string): Promise<{ vigente: UmbralARitmo | null; historial: UmbralARitmo[] }> {
+  const docId = CONFIG_DOC_ID[plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${plantSlug}`)
+  const snap = await getDoc(doc(db, COLLECTION, docId))
+  const vigente = snap.data()?.monitorUmbralARitmo ?? null
+  const historial = snap.data()?.monitorUmbralARitmoHistorial
+  return {
+    vigente: vigente as UmbralARitmo | null,
+    historial: Array.isArray(historial) ? (historial as UmbralARitmo[]) : [],
+  }
 }
 
 /**

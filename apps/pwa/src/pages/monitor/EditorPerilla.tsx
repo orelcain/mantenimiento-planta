@@ -113,7 +113,7 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
       </div>
       <p className="mt-2.5 text-[13px] leading-snug tabular-nums text-muted-foreground">
         {valor != null
-          ? <>Con {valor}: a ritmo con <b className="font-semibold text-foreground">{umbralARitmo(valor)} o más por minuto</b>{meta != null ? ` · meta Shoplogix ${Math.round(meta)}` : ''}</>
+          ? <>Con {valor}: a ritmo con <b className="font-semibold text-foreground">{umbralARitmo(valor, perillas?.modo)} o más por minuto</b>{meta != null ? ` · meta Shoplogix ${Math.round(meta)}` : ''}</>
           : 'Sin valor propuesto: la máquina no tiene meta de Shoplogix.'}
       </p>
       <p className="mt-3.5 text-[13px] font-semibold leading-[18px] text-muted-foreground">Historial</p>
@@ -142,7 +142,7 @@ export function EditorPerilla({ machineId, nombre, datos, vigente, meta, perilla
           type="button"
           disabled={!puedeGuardar}
           onClick={() => void guardar()}
-          className="tap-44 h-[44px] rounded-full px-5 text-[15px] font-semibold text-white disabled:opacity-40"
+          className="tap-44 h-[44px] rounded-full px-5 text-[15px] font-semibold text-brand-foreground disabled:opacity-40"
           style={{ background: 'var(--v2-acento)' }}
         >
           {estado === 'guardando' ? 'Guardando…' : 'Guardar'}

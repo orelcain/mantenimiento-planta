@@ -19,8 +19,10 @@ import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
 import { Globo } from './AmpliarV2'
 import { useCuentaCifra } from './ampliarHooks'
 import { MinutoTurnoV2, type EventoMarcado, type MinutoTurno } from './MonitorV2'
-import { rotuloRaya, tonoDePorcentajeVara, umbralEntero, type FuenteVara, type PerillasDeLinea } from './perilla'
+import { MODO_UMBRAL_POR_OMISION, rotuloRaya, tonoDePorcentajeVara, umbralEntero, type FuenteVara, type PerillasDeLinea, type VaraUmbral } from './perilla'
+import type { ParadasMaquina } from './ejeTurno'
 import type { PerillaEditorDatos } from './EditorPerilla'
+import type { UmbralEditorDatos } from './EditorUmbral'
 import { ReglasMinuto } from './ReglasMinuto'
 import {
   MICRO_MAX_MEDIDO_S,
@@ -201,7 +203,14 @@ function Tira({ v, horaCurso, cursoColor, ancho, alto = 128 }: { v: VistaSerie; 
 
 const ultimo = (l: LineaLlenado) => [...l.fills].reverse().find((x): x is number => x != null)
 /** Franjas por Baader: small multiples con el mismo eje, cursor vertical común y globo con la micro y su duración real. */
-function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }) {
+/** La vara de una Baader en su fila: con perilla lleva el modo vigente (calibrado por omisión) para su raya y su tono; sin ella, el esperado de Shoplogix. */
+function varaDeFila(l: { esperado: number; fuente: FuenteVara }, perillas?: PerillasDeLinea | null): VaraUmbral {
+  return l.fuente === 'perilla'
+    ? { cpm: l.esperado, fuente: l.fuente, modo: perillas?.modo ?? MODO_UMBRAL_POR_OMISION }
+    : { cpm: l.esperado, fuente: l.fuente }
+}
+
+function Franjas({ r, ancho, sel, perillas }: { r: RitmoVivo; ancho: number; sel: string; perillas?: PerillasDeLinea | null }) {
   const [idx, setIdx] = useState<number | null>(null)
   const lineas = r.lineas
   const n = lineas[0]?.fills.length ?? 0
@@ -235,7 +244,7 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
             return (
               <div key={l.id} className="tabular-nums" style={{ opacity: sel !== SEL_LINEA && sel !== l.id ? 0.55 : 1 }}>
                 <span className="text-muted-foreground">{etiquetaMaquina(l.nombre)} · </span>
-                {f != null ? <b style={{ color: colorDeCifra(f, { cpm: l.esperado, fuente: l.fuente }) }}>{f} %</b> : <span className="text-muted-foreground">sin dato</span>}
+                {f != null ? <b style={{ color: colorDeCifra(f, varaDeFila(l, perillas)) }}>{f} %</b> : <span className="text-muted-foreground">sin dato</span>}
                 {ms.map((q) => <span key={q.inicioMs} className="rv-micro-txt"> <i className="rv-micro-marca" aria-hidden />micro {cronometro(q.duracionS)}</span>)}
               </div>
             )
@@ -252,7 +261,7 @@ function Franjas({ r, ancho, sel }: { r: RitmoVivo; ancho: number; sel: string }
           const atenuada = sel !== SEL_LINEA && sel !== l.id
           /* La cifra de la fila es el promedio de la ventana de la franja (Σ piezas ÷ Σ vara × andando), no el último minuto. Su color
              sale de la misma regla que la raya («a ritmo»). */
-          const vara = { cpm: l.esperado, fuente: l.fuente }
+          const vara = varaDeFila(l, perillas)
           const prom = r.carrosVentana.maquinas.find((x) => x.id === l.id)?.pct ?? null
           const tonoP = tonoDePorcentajeVara(prom, vara)
           const color = tonoP === 'sin' ? 'var(--v2-gris)' : COLOR[tonoP]
@@ -389,6 +398,10 @@ export interface RitmoVivoAmpliadoProps {
   carros?: VaciosTurno | null
   /** Quién puede anotar la perilla (solo admin). Sin ella, la franja no ofrece el editor. */
   perillaEditor?: PerillaEditorDatos | null
+  /** Quién puede cambiar el modo del umbral «a ritmo» (solo admin). Sin ello, la franja no ofrece «Cambiar». */
+  umbralEditor?: UmbralEditorDatos | null
+  /** Las detenciones del turno (los 4 campos de `paradasDetalle`): el desglose de la franja sale de ellas. */
+  paradas?: ParadasMaquina | null
 }
 
 /**
@@ -396,7 +409,7 @@ export interface RitmoVivoAmpliadoProps {
  * minuto (`MinutoTurnoV2`), el llenado por Baader, las señales y, con `conReglas`, «Último minuto, pieza a pieza».
  * Lo abre el gráfico unido de «El turno» (`GraficoRitmoVivo`).
  */
-export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel, perillas, carros, perillaEditor }: RitmoVivoAmpliadoProps) {
+export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, promedios, maquinas, turnoTerminado, conReglas, sel: selProp, onSel, perillas, carros, perillaEditor, umbralEditor, paradas }: RitmoVivoAmpliadoProps) {
   const [selLocal, setSelLocal] = useState(SEL_LINEA)
   const sel = selProp ?? selLocal
   const { v, selId } = seleccionDe(r, turno, sel)
@@ -441,7 +454,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
         <div className={r ? 'rv-l' : ''}>
           <h4 className="text-[15px] font-semibold leading-tight text-foreground">El turno completo, minuto a minuto</h4>
           <p className="text-[13px] text-muted-foreground">piezas contadas por Shoplogix desde el inicio del turno{selId !== SEL_LINEA ? ' · solo la Baader elegida' : ''} · el mismo eje de tiempo que las franjas de abajo</p>
-          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} carros={carros} perillaEditor={perillaEditor} />
+          <MinutoTurnoV2 d={turnoVista} cerrado={cerrado} marca={marca} onQuitarMarca={onQuitarMarca} perillas={perillas} carros={carros} perillaEditor={perillaEditor} umbralEditor={umbralEditor} paradas={paradas} />
         </div>
       )}
       {r && r.lineas.length > 0 && (
@@ -454,7 +467,7 @@ export function RitmoVivoAmpliado({ r, turno, cerrado, marca, onQuitarMarca, pro
             {hayMicros && <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground"><i className="rv-micro-marca" aria-hidden />micro detención (ancho = duración)</span>}
           </div>
           {medible
-            ? <div className="mt-3"><Medido>{(w) => <Franjas r={r} ancho={w} sel={selId} />}</Medido></div>
+            ? <div className="mt-3"><Medido>{(w) => <Franjas r={r} ancho={w} sel={selId} perillas={perillas} />}</Medido></div>
             : <p className="mt-2 text-[15px] leading-snug text-muted-foreground">Sin minutos con la máquina andando para medir el llenado.</p>}
         </div>
       )}

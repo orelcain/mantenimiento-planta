@@ -6909,13 +6909,15 @@ function MonitorDelToken() {
           const vivoV2 = esActual && pv && !pv.recalibrando ? ritmoVivoDeMonitor({ pulse: data.pulse, live, ahoraPorId }) : null
           /* Carros con pieza del turno ENTERO, no de la Baader elegida: la línea entera decide qué minuto es válido (misma regla
              que el llenado de «Ritmo en vivo»). Por eso se calcula aquí, con la serie completa, y no dentro de la franja. */
+          /* Las detenciones del turno: las mismas para los carros con pieza y para el desglose de la franja (A2-2a). */
+          const paradasDelTurno = {
+            stopEvents: live.stopEvents,
+            stopReasons: live.stopReasons,
+            stopMachines: live.stopMachines,
+            enCurso: (vivoV2?.maquinas ?? []).filter((m) => m.status === 'detenida' && m.desdeMs != null).map((m) => ({ id: m.id, desdeMs: m.desdeMs! })),
+          }
           const carrosDelTurno = barrasMinuto && barrasMinuto.maquinas.length > 0
-            ? vaciosTurnoDe(barrasMinuto, Math.min(...barrasMinuto.maquinas.map((q) => q.cycles.length)), {
-              stopEvents: live.stopEvents,
-              stopReasons: live.stopReasons,
-              stopMachines: live.stopMachines,
-              enCurso: (vivoV2?.maquinas ?? []).filter((m) => m.status === 'detenida' && m.desdeMs != null).map((m) => ({ id: m.id, desdeMs: m.desdeMs! })),
-            }, live.perillas ?? null)
+            ? vaciosTurnoDe(barrasMinuto, Math.min(...barrasMinuto.maquinas.map((q) => q.cycles.length)), paradasDelTurno, live.perillas ?? null)
             : null
           /* Pasada la hora de cierre programada, una línea quieta no es una detención que haya que anotar:
              el 27-10 a las 15:20 la banda pedía «hay que anotar la causa» de un turno que cerró a las 15:00. */
@@ -7113,7 +7115,9 @@ function MonitorDelToken() {
                     turno={barrasMinuto}
                     perillas={live.perillas ?? null}
                     carros={carrosDelTurno}
+                    paradas={paradasDelTurno}
                     perillaEditor={esAdminMonitor && esActual && data.plantSlug ? { plantSlug: data.plantSlug, por: porDeUsuario(usuarioActual) } : null}
+                    umbralEditor={esAdminMonitor && esActual && data.plantSlug ? { plantSlug: data.plantSlug, por: porDeUsuario(usuarioActual) } : null}
                     cerrado={turnoCerrado}
                     turnoTerminado={turnoTerminadoV2}
                     marca={marcaRitmo}
