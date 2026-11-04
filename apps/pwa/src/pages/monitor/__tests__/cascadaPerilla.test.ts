@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import fixture from './fixtures/chonchi_0311_turno1_minutos.json'
-import { cascadaPorMeta, rendimientoPartido, type CascadaArgs } from '../cascadaPerilla'
+import { cascadaPorMeta, esAguasArriba, esProgramada, rendimientoPartido, type CascadaArgs } from '../cascadaPerilla'
 import { paradasDetalle, type EntradaRitmoVivo } from '../ritmoVivo'
 import type { PerillasDeLinea } from '../perilla'
 
@@ -141,5 +141,57 @@ describe('rendimiento partido', () => {
     expect(r.hizo).toBe(16_283)
     expect(Math.round(r.expMeta)).toBe(18_874)
     expect(r.rendimiento * 100).toBeCloseTo(86.27, 1)
+  })
+})
+
+describe('dueños de lo que no se hizo (B-2)', () => {
+  it('en cada vista, Mantención y operación + aguas arriba + producción = podía − hizo', () => {
+    for (const v of [linea, ev1!, ev2!, ev3!]) {
+      const d = v.duenos
+      expect(d.mantOp + d.aguas + d.produccion).toBe(v.podia - v.hizo)
+    }
+  })
+
+  it('la perilla es de producción: Ev 2 y Ev 3 (perilla igual a la meta) no tienen parte de producción', () => {
+    expect(ev2!.duenos.produccion).toBe(0)
+    expect(ev3!.duenos.produccion).toBe(0)
+    expect(ev1!.duenos.produccion).toBe(378)
+  })
+
+  it('los vacíos son siempre aguas arriba', () => {
+    for (const v of [linea, ev1!, ev2!, ev3!]) expect(v.duenos.aguas).toBeGreaterThanOrEqual(v.vacios)
+  })
+
+  it('clasifica el dueño por razón: ducto, acopio, bombeo y «externo» van aguas arriba; las demás no', () => {
+    expect(esAguasArriba('Limpieza de Ducto')).toBe(true)
+    expect(esAguasArriba('ACOPIO de pescado')).toBe(true)
+    expect(esAguasArriba('Bombeo')).toBe(true)
+    expect(esAguasArriba('FALTA MMPP')).toBe(true)
+    expect(esAguasArriba('Micro Detencion')).toBe(false)
+    expect(esAguasArriba('MOTORES')).toBe(false)
+    expect(esAguasArriba('Cuchillería')).toBe(false)
+  })
+
+  it('programada = solo colación, reunión de inicio y ejercicio; limpieza de ducto NO es programada', () => {
+    expect(esProgramada('COLACION')).toBe(true)
+    expect(esProgramada('Reunión inicio turno')).toBe(true)
+    expect(esProgramada('Ejercicio compensatorio - Paro')).toBe(true)
+    expect(esProgramada('Limpieza de Ducto')).toBe(false)
+  })
+})
+
+describe('piezas de la cascada para la vista (B-2)', () => {
+  it('Ev 1: detenciones 148 pz, micro 106 pz, perdido 1.222 (podía 7.114 − hizo 5.892)', () => {
+    expect(ev1!.detenciones.piezas).toBe(148)
+    expect(ev1!.micro.piezas).toBe(106)
+    expect(ev1!.perdido).toBe(1_222)
+  })
+
+  it('la vara vigente al final del turno: Ev 1 en 17 y Ev 2 en 16; sin perillas, la vara es la meta de Shoplogix (18)', () => {
+    expect(ev1!.vara).toBe(17)
+    expect(ev2!.vara).toBe(16)
+    const sinPerillas = cascadaPorMeta(args(null))
+    expect(sinPerillas.baaders[0]!.vara).toBe(18)
+    expect(sinPerillas.linea.perdido).toBe(sinPerillas.linea.podia - sinPerillas.linea.hizo)
   })
 })

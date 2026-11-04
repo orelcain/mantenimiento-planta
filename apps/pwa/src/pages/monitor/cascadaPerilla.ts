@@ -17,10 +17,27 @@
  */
 import { ANDANDO_MIN_S, esMicroDetencion, normalizar, varaEnMinuto, type MaquinaSerie, type ParadaDetalle } from './ritmoVivo'
 import type { PerillasDeLinea } from './perilla'
+import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 
 /* Lo que el mockup cuenta como programado: colación, reunión de inicio de turno y ejercicio compensatorio. Va normalizado. */
 const PROGRAMADAS = new Set(['colacion', 'reunion inicio turno', 'ejercicio compensatorio - paro'])
 const MS_MINUTO = 60_000
+
+/**
+ * ¿La razón es detención programada (la que se descuenta del turno para dar el tiempo de producción)? Es el MISMO conjunto
+ * que usa la cascada; `DesglosePiezas` (A2) lo usa también para que el «sin la detención programada» cuadre con ella.
+ */
+export const esProgramada = (razon: string | null | undefined): boolean => PROGRAMADAS.has(normalizar(razon))
+
+/**
+ * Dueño «aguas arriba»: lo que frena la línea antes de las Baader (abastecimiento, acopio, bombeo, ducto) y las causas
+ * `externo` del árbol. Se decide AQUÍ y no en `imputacionTaxonomy`: agregar hojas o cambiar `LIMPIEZA` movería otras cifras.
+ */
+const AGUAS_ARRIBA_TEXTO = /\b(DUCTO|ACOPIO|BOMBEO)\b/
+export const esAguasArriba = (razon: string | null | undefined): boolean => {
+  const r = normalizar(razon).toUpperCase()
+  return AGUAS_ARRIBA_TEXTO.test(r) || matchImputacion(razon).bucket === 'externo'
+}
 
 export interface CascadaArgs {
   serie: { desde: string; maquinas: MaquinaSerie[] }
@@ -43,12 +60,19 @@ export interface PiezasVista {
   perilla: number
   /** Podía hacer con la perilla. */
   podiaConPerilla: number
-  detenciones: { min: number; veces: number }
-  micro: { min: number; veces: number }
+  detenciones: { min: number; veces: number; piezas: number }
+  micro: { min: number; veces: number; piezas: number }
   vacios: number
   hizo: number
+  /** Lo que no se hizo: podía − hizo (la suma de perilla, detenciones, micro y vacíos cuando `cuadra`). */
+  perdido: number
   /** podía − perilla − detenciones − micro − vacíos = hizo. */
   cuadra: boolean
+  /**
+   * Dueños de lo que no se hizo: podía − hizo = mantOp + aguas + produccion (cuando `cuadra`). Producción = la perilla;
+   * aguas arriba = vacíos + detenciones y micro de acopio, bombeo, ducto o `externo`; el resto, Mantención y operación.
+   */
+  duenos: { mantOp: number; aguas: number; produccion: number }
 }
 
 export interface BaaderCascada extends PiezasVista {
@@ -56,6 +80,8 @@ export interface BaaderCascada extends PiezasVista {
   nombre: string
   /** Meta de Shoplogix en pz/min. */
   meta: number
+  /** Vara vigente al final del turno (pz/min), la misma que usa el desglose. Sin perilla, es la meta de Shoplogix. */
+  vara: number | null
 }
 
 export interface CascadaPorMeta {
@@ -90,6 +116,9 @@ interface Calculo {
   daba: number
   det: number
   micro: number
+  /** La parte de det y micro que es aguas arriba (el resto es de Mantención y operación). */
+  detAg: number
+  microAg: number
   vac: number
   hizo: number
   minDet: number
@@ -98,6 +127,8 @@ interface Calculo {
   vMicro: number
   andTodo: number
   expMeta: number
+  /** Perilla vigente al final del turno; null si la Baader no tiene meta. */
+  vara: number | null
 }
 
 /** Minutos del turno de una Baader con sus segundos por clase. Una pasada por las paradas; después, todo sale por minuto. */
@@ -105,7 +136,7 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
   const { serie, n, paradas, perillas } = args
   const t0 = Date.parse(serie.desde)
   const meta = m.esperado ?? 0
-  const segundos = Array.from({ length: n }, () => ({ parada: 0, prog: 0, micro: 0, det: 0, claves: new Set<string>() }))
+  const segundos = Array.from({ length: n }, () => ({ parada: 0, prog: 0, micro: 0, det: 0, microAg: 0, detAg: 0, claves: new Set<string>() }))
 
   for (const p of paradas.get(m.id) ?? []) {
     const kIni = Math.max(0, Math.floor((p.iniMs - t0) / MS_MINUTO))
@@ -123,8 +154,14 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
         continue
       }
       const micro = esMicroDetencion(p.razon)
-      if (micro) s.micro += ov
-      else s.det += ov
+      const aguas = esAguasArriba(p.razon)
+      if (micro) {
+        s.micro += ov
+        if (aguas) s.microAg += ov
+      } else {
+        s.det += ov
+        if (aguas) s.detAg += ov
+      }
       s.claves.add(`${micro ? 'micro' : 'det'}|${razon}`)
     }
   }
@@ -136,6 +173,8 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
   let perdidaPer = 0
   let det = 0
   let micro = 0
+  let detAgSeg = 0
+  let microAgSeg = 0
   let hizo = 0
   let vDet = 0
   let vMicro = 0
@@ -151,6 +190,8 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
     if (andando >= ANDANDO_MIN_S) perdidaPer += Math.max(0, meta - vara) * (andando / 60)
     det += (s.det / 60) * vara
     micro += (s.micro / 60) * vara
+    detAgSeg += (s.detAg / 60) * vara
+    microAgSeg += (s.microAg / 60) * vara
     hizo += m.cycles[k] ?? 0
     for (const c of s.claves) {
       if (previas.has(c)) continue
@@ -166,6 +207,9 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
   const daba = cap - per
   const pzDet = Math.round(det)
   const pzMicro = Math.round(micro)
+  /* La parte aguas arriba se redondea aparte y el resto es la diferencia: así el total de cada escalón no cambia. */
+  const pzDetAg = Math.round(detAgSeg)
+  const pzMicroAg = Math.round(microAgSeg)
   const vac = Math.max(0, daba - pzDet - pzMicro - hizo)
   return {
     id: m.id,
@@ -178,6 +222,8 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
     daba,
     det: pzDet,
     micro: pzMicro,
+    detAg: pzDetAg,
+    microAg: pzMicroAg,
     vac,
     hizo,
     minDet: detSeg / 60,
@@ -186,6 +232,7 @@ function calcularBaader(m: MaquinaSerie, args: CascadaArgs): Calculo {
     vMicro,
     andTodo,
     expMeta: meta * andTodo,
+    vara: varaEnMinuto(m, t0, n - 1, perillas),
   }
 }
 
@@ -204,17 +251,25 @@ function vistaDe(lista: Calculo[]): PiezasVista {
   const micro = sumar(lista, 'micro')
   const vac = sumar(lista, 'vac')
   const hizo = sumar(lista, 'hizo')
+  const detAg = sumar(lista, 'detAg')
+  const microAg = sumar(lista, 'microAg')
   return {
     minProduccion: sumar(lista, 'prodMin') / N,
     minProgramada: sumar(lista, 'progMin') / N,
     podia: cap,
     perilla: per,
     podiaConPerilla: sumar(lista, 'daba'),
-    detenciones: { min: sumar(lista, 'minDet'), veces: sumar(lista, 'vDet') },
-    micro: { min: sumar(lista, 'minMicro'), veces: sumar(lista, 'vMicro') },
+    detenciones: { min: sumar(lista, 'minDet'), veces: sumar(lista, 'vDet'), piezas: det },
+    micro: { min: sumar(lista, 'minMicro'), veces: sumar(lista, 'vMicro'), piezas: micro },
     vacios: vac,
     hizo,
+    perdido: cap - hizo,
     cuadra: cap - per - det - micro - vac === hizo,
+    duenos: {
+      mantOp: det - detAg + (micro - microAg),
+      aguas: vac + detAg + microAg,
+      produccion: per,
+    },
   }
 }
 
@@ -230,6 +285,7 @@ export function cascadaPorMeta(args: CascadaArgs): CascadaPorMeta {
       id: c.id,
       nombre: c.nombre,
       meta: c.meta,
+      vara: c.vara,
       ...vistaDe([c]),
     })),
   }

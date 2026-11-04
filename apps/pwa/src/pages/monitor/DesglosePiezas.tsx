@@ -14,6 +14,7 @@ import { repartirPorMayorResto, type BloqueZona, type Desglose, type ZonaDesglos
 import { normalizar, type ParadaDetalle, type TipoParada } from './ritmoVivo'
 import { alTeclearGlobo, nombreCausa, sufijoRitmo, tiempoTexto, useGlobo, type Unidad } from './desgloseVista'
 import type { VaraUmbral } from './perilla'
+import { esProgramada } from './cascadaPerilla'
 
 const CLAVE_UNIDAD = 'monitor.desglose.unidad'
 /** Columnas: piezas · barra · tiempo · «% del turno». Desde 640 px la barra es de 300 px (PC). */
@@ -179,8 +180,9 @@ export function DesglosePiezas({ nombre, linea, n, desglose: d, vara, paradas, c
   const todas = d.zonas.flatMap((z) => filasDe(z, linea))
   const max = Math.max(1, ...todas.map((f) => f.n))
   const nRitmo = d.zonas[0]?.n ?? 0
-  /* Todas las programadas (colación, reunión, ejercicio…), no solo la colación: su tiempo no es de nadie y se descuenta del turno. */
-  const nProg = linea ? 0 : todas.reduce((a, f) => a + Object.entries(f.razones).reduce((s, [r, c]) => s + (tipoDe.get(r) === 'programada' ? c : 0), 0), 0)
+  /* Todas las programadas (colación, reunión, ejercicio…), no solo la colación: su tiempo no es de nadie y se descuenta del turno.
+     Mismo conjunto que la cascada (`esProgramada`): la limpieza de ducto NO es programada aunque el legado la marque así. */
+  const nProg = linea ? 0 : todas.reduce((a, f) => a + Object.entries(f.razones).reduce((s, [r, c]) => s + (esProgramada(r) ? c : 0), 0), 0)
   const pctTotal = d.zonas.reduce((a, z) => a + z.pct, 0)
   const bajoSin = d.bajoSinDetencion
   const marcha = d.marchaInicial
