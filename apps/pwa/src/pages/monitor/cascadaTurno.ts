@@ -87,6 +87,13 @@ export const vaciasEtiqueta = (c: Contenedor) => (c === 'carro' ? 'Carros vacío
 /** «silletas» / «carros», en minúscula para las frases. */
 export const contenedorPlural = (c: Contenedor) => (c === 'carro' ? 'carros' : 'silletas')
 
+/** «2 h 05 min» o «45 min»: el formato de horas del tablero v2 (la cascada y la celda Camino a la meta). */
+export const horasTxt = (min: number) => {
+  const h = Math.floor(min / 60)
+  const m = Math.round(min - h * 60)
+  return h ? `${h} h ${m} min` : `${m} min`
+}
+
 /** Piezas del último tramo cerrado, y hasta cuándo llega. */
 function hastaElUltimoTramo(live: PublicMonitorLive): { piezas: number | null; corteWallMs: number | null } {
   const serie = live.series

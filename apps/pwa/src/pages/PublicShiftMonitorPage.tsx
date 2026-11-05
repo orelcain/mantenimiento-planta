@@ -47,6 +47,7 @@ import { construirCascada, contenedorDe } from './monitor/cascadaTurno'
 import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
 import { TarjetaCascada } from './monitor/CascadaTurnoCard'
+import { CascadaMetaV2 } from './monitor/CascadaMetaV2'
 import { cascadaPorMeta, minutosDelTurno, type CascadaArgs } from './monitor/cascadaPerilla'
 import { detalleCascadaMeta } from './monitor/cascadaMetaDetalle'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
@@ -7182,8 +7183,11 @@ function MonitorDelToken() {
               conBanda={vivoV2 ? hayBandaParada(vivoV2.maquinas, turnoTerminadoV2) : false}
               /* Sin desglose del tiempo no hay celda: la franja queda en cuatro. */
               caminoMeta={!(live.timeBreakdown && live.timeBreakdown.windowMin > 0) ? undefined : (() => {
+                /* La cascada a la meta de «Dónde se fueron las piezas» (la misma del tablero). Sin piezas que medir, Camino a la meta queda como antes. */
+                const cascadaCamino = cascadaMeta && cascadaMeta.cascada.linea.podia > 0 ? cascadaMeta : null
                 /* Un solo juego de props: la celda de la franja y el detalle de la capa cuentan lo mismo. */
                 const camino = {
+                  cascada: cascadaCamino ? { linea: cascadaCamino.cascada.linea, contenedor: cascadaCamino.contenedor } : null,
                   tb: live.timeBreakdown,
                   causaSel,
                   onCausa: (c: string | null) => { setCausaSel(c); setTramoSel(null) },
@@ -7205,7 +7209,13 @@ function MonitorDelToken() {
                   grupos: gruposEventos,
                   notasTurno: notasDeTurnoCompleto,
                 }
-                return <TiempoDelTurno {...camino} v2="celda" ampliado={<div className="v2-clasico"><TiempoDelTurno {...camino} v2="ampliado" /></div>} />
+                /* Con cascada, la capa abre con la misma cascada del tablero y debajo el detalle por causa, Baader y hora con las notas. */
+                return <TiempoDelTurno {...camino} v2="celda" ampliado={
+                  <>
+                    {cascadaCamino && <CascadaMetaV2 enCapa cascada={cascadaCamino.cascada} detalle={cascadaCamino.detalle} contenedor={cascadaCamino.contenedor} />}
+                    <div className="v2-clasico"><TiempoDelTurno {...camino} v2="ampliado" /></div>
+                  </>
+                } />
               })()}
               duelo={<TarjetaDueloV2 datos={datosDuelo} nombres={nombresDuelo} unidad={unidadDuelo} inicioMs={inicioDueloMs} />}
               vista={vistaV2}
