@@ -1149,6 +1149,8 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
    una de ellas de cinco dígitos, queden juntas (celda de 256 px: 234 de texto + 3 huecos). */
 .fc-camino-cifras dd { white-space: nowrap; }
 @media (min-width: 1840px) and (max-width: 1919px) { .fc-camino-cifras { column-gap: 4px; } }
+/* Cascada a la meta: cinco cifras («Carros vacíos» incluido) no caben en una fila de la celda; van en dos columnas en cualquier ancho. */
+.fc-camino-cifras.fc-camino-dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 @media (min-width: 768px) {
   .fc-cifra-p { font-size: 48px; }

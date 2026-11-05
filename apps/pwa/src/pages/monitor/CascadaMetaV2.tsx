@@ -9,7 +9,7 @@ import { Tarjeta } from './AmpliarV2'
 import { BotonInfo } from './GlobosFranja'
 import { Pill } from '@/components/piel/Pill'
 import { SegmentedControl, type Segment } from '@/components/piel/SegmentedControl'
-import { vaciasEtiqueta, type Contenedor } from './cascadaTurno'
+import { horasTxt, vaciasEtiqueta, type Contenedor } from './cascadaTurno'
 import type { BaaderCascada, CascadaPorMeta, PiezasVista } from './cascadaPerilla'
 import { etiquetaVista, type DetalleCascadaMeta, type DetalleVistaMeta, type HoraMeta, type RenglonMeta } from './cascadaMetaDetalle'
 
@@ -19,11 +19,6 @@ const C = { mant: 'var(--v2-mant)', aguas: 'var(--v2-ext)', prod: 'var(--v2-prog
 
 const int = (n: number) => Math.round(Math.abs(n)).toLocaleString('es-CL')
 const pts = (x: number) => x.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-const horasTxt = (min: number) => {
-  const h = Math.floor(min / 60)
-  const m = Math.round(min - h * 60)
-  return h ? `${h} h ${m} min` : `${m} min`
-}
 
 /** Minutos de una causa o una Baader: una detención de segundos no dice «0 min» si costó piezas. */
 const minTxt = (min: number | undefined, pz: number) => (Math.round(min ?? 0) === 0 && pz > 0 ? 'menos de 1 min' : `${Math.round(min ?? 0)} min`)
@@ -201,7 +196,11 @@ function perillaDe(b: BaaderCascada): string {
   return 'igual a su meta'
 }
 
-export function CascadaMetaV2({ cascada, detalle, contenedor }: { cascada: CascadaPorMeta; detalle: DetalleCascadaMeta; contenedor: Contenedor }) {
+/**
+ * `enCapa`: dentro de la capa ampliada de Camino a la meta. La capa ya trae su título, así que la tarjeta no repite
+ * «Dónde se fueron las piezas»: se dibuja solo el cuerpo, con la misma cascada y el mismo detalle.
+ */
+export function CascadaMetaV2({ cascada, detalle, contenedor, enCapa = false }: { cascada: CascadaPorMeta; detalle: DetalleCascadaMeta; contenedor: Contenedor; enCapa?: boolean }) {
   const [k, setK] = useState<string>('linea')
   const [abierta, setAbierta] = useState<Fila | null>(null)
   const [info, setInfo] = useState(false)
@@ -281,8 +280,8 @@ export function CascadaMetaV2({ cascada, detalle, contenedor }: { cascada: Casca
   const sinMetaSel = sel?.sinMeta === true
   const sub = sinMetaSel ? 'a la meta de Shoplogix' : `a la meta de Shoplogix · ${horasTxt(v.minProduccion)} de producción`
 
-  return (
-    <Tarjeta icono={<Filter className="h-[18px] w-[18px]" />} titulo="Dónde se fueron las piezas" sub={sub}>
+  const cuerpo = (
+    <>
       {!sinMetaSel && (
         <>
           <Cifra valor={int(v.perdido)} unidad="pz bajo la meta" />
@@ -374,6 +373,13 @@ export function CascadaMetaV2({ cascada, detalle, contenedor }: { cascada: Casca
           ))}
         </>
       )}
+    </>
+  )
+
+  if (enCapa) return <div>{cuerpo}</div>
+  return (
+    <Tarjeta icono={<Filter className="h-[18px] w-[18px]" />} titulo="Dónde se fueron las piezas" sub={sub}>
+      {cuerpo}
     </Tarjeta>
   )
 }

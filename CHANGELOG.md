@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.16.0] - 2026-11-05
+Monitor: «Camino a la meta» usa la misma cascada que «Dónde se fueron las piezas» del tablero.
+
+### Cambiado
+- Celda «Dónde se fueron las piezas» de la franja de «El turno»: N pz bajo la meta y «hizo X de Y»; la barra reparte lo que podía hacer a la meta en Hechas, Detenciones, Micro, Carros o Silletas vacíos y Perilla. Sin «Por ritmo» ni «Por jugar».
+- Al tocarla, la capa abre con la cascada del tablero y debajo está el detalle de detenciones con su hora, su duración y las notas del operador. Ese detalle ya no muestra piezas de la resta anterior: muestra minutos.
+- Sin cascada (turno sin serie por minuto) la celda queda como antes.
+
 ## [4.15.3] - 2026-11-04
 Grader: «detención» en vez de «paro» en todo lo que se lee, y una prueba que lo vigila.
 

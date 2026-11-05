@@ -24,6 +24,8 @@ import { aEstaHora } from './aEstaHora'
 import { useCifrasVivas } from './useCifrasVivas'
 import { adelanteAtras } from './ejeTurno'
 import { RotuloFranja, Tocable } from './FranjaTocable'
+import { horasTxt, vaciasEtiqueta, type Contenedor } from './cascadaTurno'
+import type { PiezasVista } from './cascadaPerilla'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -151,9 +153,9 @@ function fmtDurMin(min: number): string {
 }
 
 /** Un tramo de la barra de Camino a la meta. `hueco` = lo que aún no se juega: reja con un borde de 1 px, no un relleno. */
-interface TramoCamino { rotulo: string; color: string; ancho: number; hueco?: boolean }
+interface TramoCamino { rotulo: string; color: string; ancho: number; hueco?: boolean; op?: number }
 /** Una cifra de la leyenda: la MISMA clave, orden y color que su tramo; `u` es la unidad («pz») y va aparte, más chica. */
-interface CifraCamino { k: string; v: string; u?: string; punto: string; hueco?: boolean }
+interface CifraCamino { k: string; v: string; u?: string; punto: string; hueco?: boolean; op?: number }
 
 /** El hueco de «por jugar»: la reja de siempre + un borde de 1 px en gris (el relleno solo no se veía). */
 const BORDE_HUECO = 'inset 0 0 0 1px var(--v2-gris)'
@@ -164,8 +166,12 @@ const BORDE_HUECO = 'inset 0 0 0 1px var(--v2-gris)'
  * MISMO ampliado de Camino a la meta (sin botón «Ampliar»: una sola señal en toda la franja, el chevron).
  * `raya` = dónde cae la meta (0–1 de la barra) cuando se superó y la escala creció; se dice en el nombre accesible.
  */
-function CeldaCamino({ titulo, tramos, cifras, ampliado, raya }: {
+function CeldaCamino({ titulo, sub, cifraGrande, tramos, cifras, ampliado, raya }: {
   titulo: string
+  /** Una línea bajo el título («a la meta de Shoplogix · 7 h 45 min de producción»). Solo la celda de la cascada. */
+  sub?: string
+  /** La cifra grande y su unidad («pz bajo la meta · hizo 9.690 de 15.000»). Solo la celda de la cascada. */
+  cifraGrande?: { valor: string; unidad: string } | null
   tramos: TramoCamino[]
   cifras: CifraCamino[]
   ampliado?: ReactNode
@@ -181,14 +187,16 @@ function CeldaCamino({ titulo, tramos, cifras, ampliado, raya }: {
       <div className="fc-cab">
         <RotuloFranja tocable={ampliado != null}>{titulo}</RotuloFranja>
       </div>
+      {sub && <p className="fc-nota">{sub}</p>}
+      {cifraGrande && <div className="fc-cifra-m tabular-nums">{cifraGrande.valor} <small>{cifraGrande.unidad}</small></div>}
       <div className="fc-camino-barra" role="img" aria-label={descripcion}>
-        {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4, boxShadow: t.hueco ? BORDE_HUECO : undefined }} />)}
+        {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4, boxShadow: t.hueco ? BORDE_HUECO : undefined, opacity: t.op }} />)}
         {raya && <i className="fc-camino-raya" style={{ left: `calc(${(raya.f * 100).toFixed(2)}% - ${(Math.max(0, tramos.length - 1) * 3 * raya.f + 1).toFixed(1)}px)` }} />}{/* decimal-tecnico: posición CSS */}
       </div>
-      <dl className="fc-dl fc-camino-cifras" style={{ ['--n' as string]: cifras.length }}>
+      <dl className={`fc-dl fc-camino-cifras${cifras.length > 4 ? ' fc-camino-dos' : ''}`} style={{ ['--n' as string]: cifras.length }}>
         {cifras.map((c) => (
           <div key={c.k}>
-            <dt><i className="fc-pto" style={{ background: c.punto, boxShadow: c.hueco ? BORDE_HUECO : undefined }} aria-hidden /><span>{c.k}</span></dt>
+            <dt><i className="fc-pto" style={{ background: c.punto, boxShadow: c.hueco ? BORDE_HUECO : undefined, opacity: c.op }} aria-hidden /><span>{c.k}</span></dt>
             <dd className="tabular-nums">{c.v}{c.u && <> <small>{c.u}</small></>}</dd>
           </div>
         ))}
@@ -240,8 +248,15 @@ function CeldaCamino({ titulo, tramos, cifras, ampliado, raya }: {
 export function TiempoDelTurno({
   tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas: hechasBase,
   piezasPulso, corteHora,
-  cuotaAhora: cuotaBase, horaAhora: horaBase, cpmAndando, costo, grupos, notasTurno, v2, ampliado,
+  cuotaAhora: cuotaBase, horaAhora: horaBase, cpmAndando, costo, grupos, notasTurno, v2, ampliado, cascada,
 }: {
+  /**
+   * Solo en el monitor v2: la cascada a la meta de Shoplogix de la línea (`cascadaMeta` de la página) y su contenedor.
+   * Con ella, la celda dibuja «Dónde se fueron las piezas» con las mismas cifras que el tablero, y el ampliado deja fuera
+   * las piezas de la resta vieja (la capa pone la cascada arriba). Sin ella —null, o una cascada sin piezas que medir—
+   * queda la celda de siempre: es el respaldo.
+   */
+  cascada?: { linea: PiezasVista; contenedor: Contenedor } | null
   /**
    * Solo en el monitor v2. `celda`: la quinta celda de la franja de «El turno», sin marco (título, botón «Ampliar» que abre
    * `ampliado`, barra de tramos proporcionales a la meta y tres cifras chicas). `ampliado`: el componente completo, sin marco
@@ -338,6 +353,10 @@ export function TiempoDelTurno({
   /* Con el turno cerrado no hay próxima parada: decía «entra a las ~17:14»
      con el turno terminado a las 17:05 (Chonchi 28-09). */
   const proxima = cerrado ? null : proximaParada
+  /* La cascada solo cuenta con piezas que medir; sin ellas, queda la celda y el ampliado de siempre (el respaldo). */
+  const cascadaOk = cascada && cascada.linea.podia > 0 ? cascada : null
+  /* En el ampliado con cascada, la resta vieja no se dibuja: ni «por ritmo», ni «atrás», ni piezas por causa. La cuenta es la cascada. */
+  const ampliadoCascada = v2 === 'ampliado' && cascadaOk != null
   if (!tb || tb.windowMin <= 0) return null
 
   const pct = (m: number) => Math.max(0, (m / tb.windowMin) * 100)
@@ -508,6 +527,34 @@ export function TiempoDelTurno({
      recalcula. «Programado» es TIEMPO, no piezas: vive en el ampliado. «A esta hora» ya vive en la celda de al lado (`aEstaHora`).
      «Por ritmo» es lo que falta DESPUÉS de lo hecho y de las paradas, contra la vara de la resta: cerrado, la meta; en vivo,
      la cuota a esta hora (lo que la cuota aún no pide es «por jugar»: meta − cuota). */
+  /* Con la cascada a la meta (la misma de «Dónde se fueron las piezas» del tablero): cinco tramos sobre lo que podía hacer a la
+     meta, en el orden de la cascada. La leyenda son esos mismos cinco, con sus piezas; no hay «por ritmo» ni «por jugar». */
+  if (v2 === 'celda' && cascadaOk) {
+    const L = cascadaOk.linea
+    const rotuloVacios = vaciasEtiqueta(cascadaOk.contenedor)
+    const items: Array<{ k: string; rotulo: string; v: number; color: string; op?: number }> = [
+      { k: 'Hechas', rotulo: 'hechas', v: L.hizo, color: 'var(--v2-acento)' },
+      /* Detenciones y micro son de Mantención y operación; una detención de aguas arriba sigue en su fila (no se parte). */
+      { k: 'Detenciones', rotulo: 'detenciones', v: L.detenciones.piezas, color: 'var(--v2-mant)' },
+      { k: 'Micro', rotulo: 'microdetenciones', v: L.micro.piezas, color: 'var(--v2-mant)', op: 0.55 },
+      { k: rotuloVacios, rotulo: rotuloVacios.toLowerCase(), v: L.vacios, color: 'var(--v2-ext)', op: 0.5 },
+      { k: 'Perilla', rotulo: 'perilla más lenta que la meta', v: L.perilla, color: 'var(--v2-prog)' },
+    ]
+    /* Si el piso de vacíos tapó un déficit (`cuadra` falso), la suma pasa la meta: la escala crece para que la barra no se salga. */
+    const suma = items.reduce((a, t) => a + Math.max(0, t.v), 0)
+    const escala = Math.max(L.podia, suma)
+    return (
+      <CeldaCamino
+        titulo="Dónde se fueron las piezas"
+        sub={`a la meta de Shoplogix · ${horasTxt(L.minProduccion)} de producción`}
+        cifraGrande={{ valor: fmtInt(L.perdido), unidad: `pz bajo la meta · hizo ${fmtInt(L.hizo)} de ${fmtInt(L.podia)}` }}
+        tramos={items.filter((t) => Math.round(t.v) > 0).map((t) => ({ rotulo: t.rotulo, color: t.color, ancho: (t.v / escala) * 100, op: t.op }))}
+        cifras={items.map((t) => ({ k: t.k, v: fmtInt(t.v), u: 'pz', punto: t.color, op: t.op }))}
+        ampliado={ampliado}
+        raya={null}
+      />
+    )
+  }
   if (v2 === 'celda') {
     const titulo = hayBrecha || superada ? 'Camino a la meta' : 'A dónde se va el tiempo'
     /* «7 min» con la unidad; desde una hora, «1 h 02 min». */
@@ -561,7 +608,7 @@ export function TiempoDelTurno({
       id="tiempo"
       plano={todo}
       /* En la capa ampliada la resta contra la cuota abre el contenido: es la MISMA cifra de «A esta hora» de la franja. */
-      extraPlano={todo && (hayBrecha || superada)}
+      extraPlano={todo && !ampliadoCascada && (hayBrecha || superada)}
       // El título depende de si hay algo que explicar: con la meta cumplida,
       // "Por qué no llegamos" sería un titular falso.
       /* «Camino a la meta» funciona perdiendo, ganando y en vivo — el nombre
@@ -591,7 +638,7 @@ export function TiempoDelTurno({
         : <span className="tabular-nums">{fmtDurMin(tb.windowMin)} de turno</span>}
     >
       {/* ── 1 · La resta ────────────────────────────────────────────────── */}
-      {restaVisible && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null && (
+      {!ampliadoCascada && restaVisible && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null && (
         <div className="mt-2">
           {/*
            * La barra madre: su largo total ES la meta, todo en piezas. Lo hecho
@@ -932,7 +979,7 @@ export function TiempoDelTurno({
       )}
       {/* Sin ritmo de referencia la resta no se puede repartir — pero decirlo
           es mejor que desaparecer mudo, que es lo que hacía antes. */}
-      {hayBrecha && perdidas == null && (
+      {!ampliadoCascada && hayBrecha && perdidas == null && (
         <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
           {cerrado
             ? 'Sin un ritmo de referencia no se puede repartir la brecha entre detenciones y ritmo.'
@@ -944,7 +991,7 @@ export function TiempoDelTurno({
           SOLO sin acordeón: con la resta visible, las causas imputables viven
           dentro de «Paradas» (abierta por defecto) y el convenio dentro de
           «Programado» — repetirlas acá era la duplicación que acusó Orel. */}
-      {!restaVisible && (
+      {(!restaVisible || ampliadoCascada) && (
         <div className="mt-2">
           <p className="text-[11px] text-muted-foreground">
             Qué pasó en el turno
@@ -968,6 +1015,7 @@ export function TiempoDelTurno({
                 notas={notas}
                 proximaParada={g.dueno === 'programado' ? proxima : null}
                 plannedMin={tb.plannedMin}
+                sinPiezas={ampliadoCascada}
               />
               {/* ⚠ La frase que Mantención necesita poder decir. Va pegada al
                   último grupo que se le puede imputar a alguien, no al final:
@@ -1024,7 +1072,7 @@ export function TiempoDelTurno({
           ya viven bajo la fila «Hechas» y esto sería la segunda barra de
           vuelta. Sin brecha (meta cumplida, sin meta, sin cpm) sigue siendo
           la única puerta a los minutos. */}
-      {!restaVisible && (
+      {(!restaVisible || ampliadoCascada) && (
         <>
       <button
         type="button"
@@ -1105,9 +1153,11 @@ export function TiempoDelTurno({
  * que nadie imputó— y sin la separación la cifra se lee como si alguien de
  * Mantención hubiera fallado.
  */
-function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaParada, plannedMin, detalleMaquinas }: {
+function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaParada, plannedMin, detalleMaquinas, sinPiezas }: {
   /** Muestra bajo cada causa cuánto fue de cada Baader sin tener que abrirla (capa ampliada del v2). */
   detalleMaquinas?: boolean
+  /** Sin piezas: la cifra de cada causa y del grupo es su tiempo. Lo pide el ampliado con cascada (las piezas de la cuenta vieja no se muestran ahí). */
+  sinPiezas?: boolean
   g: GrupoDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
@@ -1131,7 +1181,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
         </span>
         <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {fmtDurMin(g.min)}
-          {g.piezas != null && (
+          {g.piezas != null && !sinPiezas && (
             <>
               {' · '}
               <b className="text-red-700 dark:text-red-400">{fmtInt(g.piezas)} pz</b>
@@ -1142,7 +1192,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
       <ul className="mt-0.5 space-y-0.5 pl-2 text-[11.5px]">
         {g.causas.map((c) => (
           <FilaEvento key={c.reason} c={c} sel={sel} onCausa={onCausa} onVentana={onVentana}
-            onTramo={onTramo} notas={notas?.get(c.reason)} detalleMaquinas={detalleMaquinas} />
+            onTramo={onTramo} notas={notas?.get(c.reason)} detalleMaquinas={detalleMaquinas} sinPiezas={sinPiezas} />
         ))}
       </ul>
       {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
@@ -1170,8 +1220,10 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
  * quedaría fuera de pantalla. La causa se marca igual en la serie, y el salto es
  * un toque más, explícito.
  */
-function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquinas }: {
+function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquinas, sinPiezas }: {
   detalleMaquinas?: boolean
+  /** Sin piezas: la fila muestra solo sus minutos (ver `GrupoDeEventos`). */
+  sinPiezas?: boolean
   c: CausaDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
@@ -1250,10 +1302,10 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquina
 
   const cifras = (
     <span className="shrink-0 tabular-nums">
-      {c.piezas != null && (
+      {c.piezas != null && !sinPiezas && (
         <span className="font-semibold text-red-700 dark:text-red-400">{fmtInt(c.piezas)} pz</span>
       )}
-      {c.piezas == null && <span className="text-muted-foreground">{Math.round(c.min)} min</span>}
+      {(c.piezas == null || sinPiezas) && <span className="text-muted-foreground">{Math.round(c.min)} min</span>}
     </span>
   )
 
