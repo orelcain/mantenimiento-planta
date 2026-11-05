@@ -170,8 +170,8 @@ function CeldaCamino({ titulo, sub, cifraGrande, tramos, cifras, ampliado, raya 
   titulo: string
   /** Una línea bajo el título («a la meta de Shoplogix · 7 h 45 min de producción»). Solo la celda de la cascada. */
   sub?: string
-  /** La cifra grande y su unidad («pz bajo la meta · hizo 9.690 de 15.000»). Solo la celda de la cascada. */
-  cifraGrande?: { valor: string; unidad: string } | null
+  /** La cifra grande con su unidad («20.387 pz bajo la meta») y, en su propia línea y en texto secundario, «hizo X de Y». Solo la celda de la cascada. */
+  cifraGrande?: { valor: string; unidad: string; detalle: string } | null
   tramos: TramoCamino[]
   cifras: CifraCamino[]
   ampliado?: ReactNode
@@ -188,12 +188,17 @@ function CeldaCamino({ titulo, sub, cifraGrande, tramos, cifras, ampliado, raya 
         <RotuloFranja tocable={ampliado != null}>{titulo}</RotuloFranja>
       </div>
       {sub && <p className="fc-nota">{sub}</p>}
-      {cifraGrande && <div className="fc-cifra-m tabular-nums">{cifraGrande.valor} <small>{cifraGrande.unidad}</small></div>}
+      {cifraGrande && (
+        <>
+          <div className="fc-cifra-m tabular-nums">{cifraGrande.valor} <small>{cifraGrande.unidad}</small></div>
+          <p className="fc-nota fc-camino-hizo tabular-nums">{cifraGrande.detalle}</p>
+        </>
+      )}
       <div className="fc-camino-barra" role="img" aria-label={descripcion}>
         {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4, boxShadow: t.hueco ? BORDE_HUECO : undefined, opacity: t.op }} />)}
         {raya && <i className="fc-camino-raya" style={{ left: `calc(${(raya.f * 100).toFixed(2)}% - ${(Math.max(0, tramos.length - 1) * 3 * raya.f + 1).toFixed(1)}px)` }} />}{/* decimal-tecnico: posición CSS */}
       </div>
-      <dl className={`fc-dl fc-camino-cifras${cifras.length > 4 ? ' fc-camino-dos' : ''}`} style={{ ['--n' as string]: cifras.length }}>
+      <dl className="fc-dl fc-camino-cifras" style={{ ['--n' as string]: cifras.length }}>
         {cifras.map((c) => (
           <div key={c.k}>
             <dt><i className="fc-pto" style={{ background: c.punto, boxShadow: c.hueco ? BORDE_HUECO : undefined, opacity: c.op }} aria-hidden /><span>{c.k}</span></dt>
@@ -204,7 +209,7 @@ function CeldaCamino({ titulo, sub, cifraGrande, tramos, cifras, ampliado, raya 
     </>
   )
   return (
-    <div ref={ref} className="fc-camino">
+    <div ref={ref} className={`fc-camino${cifraGrande ? ' fc-camino-cascada' : ''}`}>
       {ampliado != null ? (
         <Tocable onAbrir={() => setAbierta((a) => !a)} etiqueta={titulo} nombre={`${titulo}: ${descripcion}. Ver detalle`} abierta={abierta} zonaRef={zonaRef}>
           {cuerpo}
@@ -547,7 +552,7 @@ export function TiempoDelTurno({
       <CeldaCamino
         titulo="Dónde se fueron las piezas"
         sub={`a la meta de Shoplogix · ${horasTxt(L.minProduccion)} de producción`}
-        cifraGrande={{ valor: fmtInt(L.perdido), unidad: `pz bajo la meta · hizo ${fmtInt(L.hizo)} de ${fmtInt(L.podia)}` }}
+        cifraGrande={{ valor: fmtInt(L.perdido), unidad: 'pz bajo la meta', detalle: `hizo ${fmtInt(L.hizo)} de ${fmtInt(L.podia)}` }}
         tramos={items.filter((t) => Math.round(t.v) > 0).map((t) => ({ rotulo: t.rotulo, color: t.color, ancho: (t.v / escala) * 100, op: t.op }))}
         cifras={items.map((t) => ({ k: t.k, v: fmtInt(t.v), u: 'pz', punto: t.color, op: t.op }))}
         ampliado={ampliado}

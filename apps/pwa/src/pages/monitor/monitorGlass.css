@@ -1149,8 +1149,17 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
    una de ellas de cinco dígitos, queden juntas (celda de 256 px: 234 de texto + 3 huecos). */
 .fc-camino-cifras dd { white-space: nowrap; }
 @media (min-width: 1840px) and (max-width: 1919px) { .fc-camino-cifras { column-gap: 4px; } }
-/* Cascada a la meta: cinco cifras («Carros vacíos» incluido) no caben en una fila de la celda; van en dos columnas en cualquier ancho. */
-.fc-camino-cifras.fc-camino-dos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Cascada a la meta (celda «Dónde se fueron las piezas»): nada se sale de la tarjeta. Cinco cifras («Carros vacíos» incluido) van
+   en dos columnas en cualquier ancho; el título, la cifra y las cifras de la leyenda pueden partirse en líneas. Solo la celda de
+   la cascada tiene estas reglas (clase `fc-camino-cascada`): el respaldo sigue igual. */
+.fc-camino-cascada { min-width: 0; }
+.fc-camino-cascada .fc-cab > .fc-rotulo { flex: 0 1 auto; min-width: 0; white-space: normal; }
+.fc-camino-cascada .fc-cifra-m { min-width: 0; white-space: normal; }
+.fc-camino-cascada .fc-camino-hizo { margin: 0; }
+.fc-camino-cascada .fc-camino-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fc-camino-cascada .fc-camino-cifras > div { min-width: 0; }
+.fc-camino-cascada .fc-camino-cifras dt > span,
+.fc-camino-cascada .fc-camino-cifras dd { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 
 @media (min-width: 768px) {
   .fc-cifra-p { font-size: 48px; }

@@ -3,7 +3,7 @@
  * ampliado. Turno Chonchi 03-11 (perillas 17 · 16 · 16), el mismo fixture que la prueba de la cascada. Sin cascada (null, o
  * sin piezas que medir) la celda queda como antes: se prueba al final como respaldo.
  */
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import fixture from './fixtures/chonchi_0311_turno1_minutos.json'
 import { agruparEventos } from '@/services/shoplogix/monitorEventos'
@@ -59,6 +59,11 @@ const tb: PublicMonitorLive['timeBreakdown'] = {
 }
 const grupos = agruparEventos({ tb, cpmGlobal: 41 })
 
+/* jsdom no implementa la animación de la capa; la prueba no la mide, solo abre y lee el texto. */
+if (!('animate' in Element.prototype)) {
+  Object.defineProperty(Element.prototype, 'animate', { value: () => ({ finished: Promise.resolve(), cancel() {}, finish() {}, addEventListener() {}, removeEventListener() {} }), configurable: true })
+}
+
 afterEach(() => cleanup())
 
 /** La leyenda de la celda: rótulo y cifra de cada fila de `.fc-camino-cifras`. */
@@ -107,9 +112,9 @@ describe('Camino a la meta con la cascada: las cifras son las de «Dónde se fue
     const { container } = celda()
     expect(container.querySelector('.fc-rotulo')?.textContent).toBe('Dónde se fueron las piezas')
     expect(container.querySelector('.fc-nota')?.textContent).toBe(`a la meta de Shoplogix · ${horas(L.minProduccion)} de producción`)
-    expect(container.querySelector('.fc-cifra-m')?.textContent).toBe(
-      `${fmt(L.perdido)} pz bajo la meta · hizo ${fmt(L.hizo)} de ${fmt(L.podia)}`,
-    )
+    /* La cifra y «hizo X de Y» van en líneas separadas: la cifra con su unidad, y el detalle en texto secundario. */
+    expect(container.querySelector('.fc-cifra-m')?.textContent).toBe(`${fmt(L.perdido)} pz bajo la meta`)
+    expect(container.querySelector('.fc-camino-hizo')?.textContent).toBe(`hizo ${fmt(L.hizo)} de ${fmt(L.podia)}`)
   })
 
   it('la barra reparte lo que podía hacer: un tramo por cifra que redondea a más de 0, con ancho piezas / podía', () => {
@@ -199,5 +204,23 @@ describe('Camino a la meta sin cascada: el respaldo es la celda de siempre', () 
     const { container } = celda({ linea: { ...L, podia: 0 } })
     expect(container.textContent).not.toContain('Dónde se fueron las piezas')
     expect(container.querySelector('.fc-rotulo')?.textContent).toBe('Camino a la meta')
+  })
+})
+
+describe('Camino a la meta con la cascada: la capa muestra el título una sola vez', () => {
+  it('abierta la capa, «Dónde se fueron las piezas» aparece una vez dentro de ella (el encabezado de la capa, sin uno interno)', () => {
+    const detalle = detalleCascadaMeta(args(PERILLAS_17_16_16), cascada)
+    const { getByRole } = render(
+      <TiempoDelTurno
+        tb={tb} cerrado={false} meta={15000} hechas={9690} cuotaAhora={10667} horaAhora="02:35" cpmAndando={41}
+        grupos={grupos} v2="celda" cascada={{ linea: L, contenedor: 'silleta' }}
+        ampliado={<CascadaMetaV2 enCapa cascada={cascada} detalle={detalle} contenedor="silleta" />}
+      />,
+    )
+    fireEvent.click(getByRole('button', { name: /^Dónde se fueron las piezas:/ }))
+    const capa = document.querySelector('[role="dialog"]')
+    expect(capa).not.toBeNull()
+    const veces = (capa?.textContent ?? '').split('Dónde se fueron las piezas').length - 1
+    expect(veces).toBe(1)
   })
 })
