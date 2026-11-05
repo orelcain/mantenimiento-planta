@@ -40,6 +40,7 @@ import { normHub, textoBuscable, coincide } from '@/data/learningHubSearch'
 import { ListGroup, ListCell, SwipeRow, Tag } from '@/components/piel'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { CompartirPaseLectura } from '@/components/learning/CompartirPaseLectura'
 import { cn } from '@/lib/utils'
 
 const NEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
@@ -214,6 +215,9 @@ export function LearningHubPage() {
         <header>
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-display font-bold tracking-tight text-foreground">Aprendizaje</h1>
+            <div className="flex shrink-0 items-center gap-2">
+            {/* Link + QR del pase de lectura para los nuevos (Aprendizaje, Repuestos, monitores) */}
+            {isAdmin && <CompartirPaseLectura />}
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -232,6 +236,7 @@ export function LearningHubPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            </div>
           </div>
           <p className="text-footnote text-muted-foreground tabular-nums">
             {totalCatalog} equipos y simuladores · {itemsWithContent} con material publicado

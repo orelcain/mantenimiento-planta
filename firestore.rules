@@ -21,8 +21,24 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.get('anime_tg', null) != null;
     }
 
+    // Teléfono con PASE DE LECTURA para los nuevos (04-11-2026): cuenta creada
+    // por la función `paseLectura` con los claims `pase_lectura` y `pl_v`. Igual
+    // que el de bitácora, NO es una sesión de la app: solo LEE lo que se le abre
+    // con `paseLecturaActivo()` (Aprendizaje, Repuestos) y nunca escribe.
+    function tienePaseLectura() {
+      return request.auth != null && request.auth.token.get('pase_lectura', false) == true;
+    }
+
+    // Vigente = el pase no está pausado y la cuenta entró con la versión actual
+    // del link («Cambiar link» deja fuera a quien entró con el anterior).
+    function paseLecturaActivo() {
+      return tienePaseLectura()
+        && get(/databases/$(database)/documents/paseLectura/actual).data.get('activo', false) == true
+        && get(/databases/$(database)/documents/paseLectura/actual).data.get('version', -1) == request.auth.token.get('pl_v', -2);
+    }
+
     function isAuthenticated() {
-      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime();
+      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime() && !tienePaseLectura();
     }
 
     // El teléfono del pase sigue habilitado (un supervisor no lo quitó ni
@@ -402,7 +418,7 @@ service cloud.firestore {
     // ============================================
     match /hierarchy/{nodeId} {
       // El pase de bitácora lee la jerarquía para el buscador de equipos.
-      allow read: if isCatalogReader() || paseBitacoraActivo();
+      allow read: if isCatalogReader() || paseBitacoraActivo() || paseLecturaActivo();
       allow create: if isAdmin()
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 2
@@ -1114,14 +1130,14 @@ service cloud.firestore {
 
     match /bodega/{codigoSAP} {
       // El pase de bitácora ve ubicación y stock al elegir un repuesto.
-      allow read: if isNotAnonymous() || paseBitacoraActivo();
+      allow read: if isNotAnonymous() || paseBitacoraActivo() || paseLecturaActivo();
       allow create: if isTechnician() && isValidBodega();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
       // Movimientos de bodega (entradas, salidas, ajustes)
       match /movimientos/{movId} {
-        allow read: if isNotAnonymous();
+        allow read: if isNotAnonymous() || paseLecturaActivo();
         allow create: if isTechnician();
         allow update: if isAdmin();
         allow delete: if isAdmin();
@@ -1134,19 +1150,19 @@ service cloud.firestore {
     // dentro de un ítem concreto), y había que iterar los ~2.200 ítems uno a uno.
     // `movimientos` solo existe bajo /bodega, así que el alcance es el mismo.
     match /{path=**}/movimientos/{movId} {
-      allow read: if isNotAnonymous();
+      allow read: if isNotAnonymous() || paseLecturaActivo();
     }
 
     // Inventarios periódicos de bodega
     match /bodega_inventarios/{inventarioId} {
-      allow read: if isNotAnonymous();
+      allow read: if isNotAnonymous() || paseLecturaActivo();
       allow create: if isSupervisor() && isValidBodegaInventario();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
       // Conteos individuales por SAP
       match /conteos/{conteoId} {
-        allow read: if isNotAnonymous();
+        allow read: if isNotAnonymous() || paseLecturaActivo();
         allow create: if isTechnician();
         allow update: if isTechnician();
         allow delete: if isAdmin();
@@ -1471,6 +1487,11 @@ service cloud.firestore {
     match /bitacoraPines/{pinId} {
       allow read, write: if false;
     }
+    // Pase de lectura para los nuevos (04-11-2026): el token solo lo entrega la
+    // función `paseLectura` a un supervisor. Ningún cliente lee ni escribe aquí.
+    match /paseLectura/{docId} {
+      allow read, write: if false;
+    }
     match /bitacoraDispositivos/{uid} {
       allow read: if isSupervisor() || (tienePaseBitacora() && request.auth.uid == uid);
       allow write: if false;
@@ -1645,13 +1666,13 @@ service cloud.firestore {
     // ============================================
     match /repuestos/{repuestoId} {
       // El pase de bitácora lo lee para agregar repuestos usados a un evento (16-09-2026).
-      allow read: if isCatalogReader() || paseBitacoraActivo();
+      allow read: if isCatalogReader() || paseBitacoraActivo() || paseLecturaActivo();
       allow create, update: if isTechnician();
       allow delete: if isSupervisor();
 
       // Historial de cambios por repuesto
       match /historial/{historialId} {
-        allow read: if isNotAnonymous();
+        allow read: if isNotAnonymous() || paseLecturaActivo();
         allow create: if isTechnician();
         allow update, delete: if isAdmin();
       }
@@ -2523,7 +2544,7 @@ service cloud.firestore {
     }
 
     match /manuales/{manualId} {
-      allow read: if isCatalogReader();
+      allow read: if isCatalogReader() || paseLecturaActivo();
       allow create, update: if isSupervisor() && isValidDocSize();
       allow delete: if isAdmin();
     }

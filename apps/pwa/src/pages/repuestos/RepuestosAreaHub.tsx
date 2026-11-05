@@ -360,7 +360,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // ── Solicitudes de repuesto (Fase 6) ──
   const user = useAuthStore((s) => s.user)
-  const { solicitudes, loading: solicitudesLoading, pendientesCount, crearSolicitud, avanzarEstado, registrarAltaCreada, rechazarAlta } = useSolicitudes()
+  // Pase de lectura: no crea, aprueba ni entrega solicitudes; no lee la lista ni sus favoritos.
+  const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
+  const { solicitudes, loading: solicitudesLoading, pendientesCount, crearSolicitud, avanzarEstado, registrarAltaCreada, rechazarAlta } = useSolicitudes({ enabled: !soloLectura })
   const [solicitarOpen, setSolicitarOpen] = useState(false)
   const [solicitarRepuesto, setSolicitarRepuesto] = useState<RepuestoLite | null>(null)
   // «Solicitar repuestos» de la máquina enfocada: varios de una vez.
@@ -510,11 +512,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
   // Los favoritos salen del hook compartido: la misma lista que usan el expediente y Bodega.
-  const { favKeys, toggleFav } = useRepuestoFavoritos(user?.id)
+  const { favKeys, toggleFav } = useRepuestoFavoritos(soloLectura ? undefined : user?.id)
   const [repFavOnly, setRepFavOnly] = useState(false)
   // Favoritos POR EQUIPO (se suman a los globales; viven en user_preferences.repuestoFavLists[equipo]).
   // Clave = la del equipo seleccionado en el hub (id del nodo = r.equipos[].machineId).
-  const favEq = useRepuestoFavoritosEquipo(user?.id, selectedEquipMachineId)
+  const favEq = useRepuestoFavoritosEquipo(soloLectura ? undefined : user?.id, selectedEquipMachineId)
   /** null = sin filtro · '*' = «Favoritos de este equipo» (unión de listas) · otro = nombre de una lista del equipo. */
   const [favEqFiltro, setFavEqFiltro] = useState<string | null>(null)
   /** Repuesto cuya hoja «Favoritos de este equipo» está abierta. */
@@ -542,9 +544,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [addToListRowKey, setAddToListRowKey] = useState<string | null>(null) // repuesto objetivo del modal
   const [newListName, setNewListName] = useState('')
   useEffect(() => {
-    if (!user?.id) return
+    if (!user?.id || soloLectura) return
     getRepuestoFavListsGlobal(user.id).then(setFavLists).catch(() => {})
-  }, [user?.id])
+  }, [user?.id, soloLectura])
   const persistLists = useCallback((lists: RepuestoFavList[]) => {
     setFavLists(lists)
     if (user?.id) saveRepuestoFavListsGlobal(user.id, lists)
@@ -573,9 +575,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [favBarOpen, setFavBarOpen] = useState(false) // barra de favoritos colapsada por defecto (UX)
   const [favCargando, setFavCargando] = useState(true)
   useEffect(() => {
-    if (!user?.id) { setFavCargando(false); return }
+    if (!user?.id || soloLectura) { setFavCargando(false); return }
     getUserPreferences(user.id).then((p) => setEquipFavLists(p.favoriteLists || [])).catch(() => {}).finally(() => setFavCargando(false))
-  }, [user?.id])
+  }, [user?.id, soloLectura])
 
   // ── Gestión de favoritos de EQUIPOS (G2, Wave 2) ──
   // El hub ahora puede crear/editar listas (antes solo lectura). Persisten en
@@ -2009,6 +2011,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               </button>
             )}
           </div>
+          {!soloLectura && (
           <button
             type="button"
             onClick={() => setSolicitudesOpen(true)}
@@ -2020,6 +2023,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <span className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink-crit/[0.15] px-1 text-caption font-semibold text-ink-crit tabular-nums">{pendientesCount}</span>
             )}
           </button>
+          )}
           <button
             type="button"
             onClick={() => setMenuMasOpen(true)}
@@ -2035,7 +2039,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         {marcaMaquina && <div className="flex px-4 pb-1 sm:hidden">{marcaMaquina}</div>}
         <PSheet open={menuMasOpen} onClose={() => setMenuMasOpen(false)} title="Más acciones">
           <ListGroup>
-            {!selectedEquipKey && (
+            {!selectedEquipKey && !soloLectura && (
               <ListCell
                 leading={<CellIcon tone="neutral"><Plus aria-hidden /></CellIcon>}
                 title="Solicitar un repuesto"
@@ -2089,6 +2093,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             />
           </div>
           {marcaMaquina}
+          {!soloLectura && (<>
           <Button variant="outline" size="sm" className="h-11 w-11 justify-center gap-1.5 px-0 sm:w-auto sm:px-3" onClick={() => setSolicitudesOpen(true)}>
             <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitudes</span>
             {pendientesCount > 0 && (
@@ -2104,6 +2109,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
             </Button>
           )}
+          </>)}
           {/* Herramientas admin: toolbar en desktop (≥sm) */}
           {isAdmin && (
             <div className="hidden items-center gap-1 border-l border-border pl-2 sm:flex">
@@ -2313,7 +2319,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           </div>
 
           {/* Teléfono, con un equipo abierto: «Solicitar repuestos» es el único botón relleno de la vista. */}
-          {selectedEquipKey && (
+          {selectedEquipKey && !soloLectura && (
             <div className="-mt-1 mb-4 sm:hidden">
               <PButton variant="filled" size="block" onClick={() => setSolicitarVariosOpen(true)}>
                 <ClipboardList aria-hidden /> Solicitar repuestos
@@ -2718,6 +2724,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               ) : <span className="text-muted-foreground/40">—</span>}
                             </td>
                             <td className="px-3 py-2">
+                              {!soloLectura && (<>
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
                                 /* Era 20×20. Holgura medida a su alrededor: 104 arriba, 32
@@ -2740,6 +2747,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                   <ListPlus className={['h-4 w-4', favEq.esFavorito(r) ? 'stroke-[2.75]' : ''].join(' ')} />
                                 </button>
                               )}
+                              </>)}
                             </td>
                           </tr>
                           </Fragment>
@@ -2848,10 +2856,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           volverA={formatNombreSAP(selectedEquipName).nombre || selectedEquipName || undefined}
           onClose={() => setSelectedRowKey(null)}
           loadMovimientos={loadMovimientos}
-          onSaveLocation={handleSaveLocation}
-          onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, stock: stockDeSolicitud(r) })}
-          onAssignSap={!selectedRep.codigoSAP ? () => { setAsignarSapValue(''); setAsignarSapOpen(true) } : undefined}
-          onAssignEquipo={() => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
+          onSaveLocation={soloLectura ? undefined : handleSaveLocation}
+          onSolicitar={soloLectura ? undefined : (r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, stock: stockDeSolicitud(r) })}
+          onAssignSap={soloLectura || selectedRep.codigoSAP ? undefined : () => { setAsignarSapValue(''); setAsignarSapOpen(true) }}
+          onAssignEquipo={soloLectura ? undefined : () => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
           onRemoveEquipo={isAdmin ? handleQuitarEquipo : undefined}
           totalUnidades={totalUnidades}
           isAdmin={isAdmin}
@@ -2868,11 +2876,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             return m ? { fig: m.rotulo, rotulo: m.rotulo, abrir: () => setRowLightbox({ photos: m.urls, index: 0 }) } : null
           })()}
           isFavorite={favKeys.has(selectedRep.rowKey)}
-          onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
-          onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
-          favoritoEquipo={selectedEquipKey ? { activo: favEq.esFavorito(selectedRep), nombreEquipo: selectedEquipName, abrir: () => setFavEqRep(selectedRep) } : undefined}
+          onToggleFavorite={soloLectura ? undefined : () => toggleFav(selectedRep.rowKey)}
+          onAddToList={soloLectura ? undefined : () => setAddToListRowKey(selectedRep.rowKey)}
+          favoritoEquipo={selectedEquipKey && !soloLectura ? { activo: favEq.esFavorito(selectedRep), nombreEquipo: selectedEquipName, abrir: () => setFavEqRep(selectedRep) } : undefined}
           onSaveApodos={isAdmin ? (arr) => persistApodos(selectedRep, arr) : undefined}
-          onContar={handleContar}
+          onContar={soloLectura ? undefined : handleContar}
           comunEn={selectedRep.comunEn}
           onMarkComun={isAdmin ? () => { setComunQuery(''); setComunPickerOpen(true) } : undefined}
           onRemoveComun={isAdmin ? (slug) => handleToggleComun(slug) : undefined}
@@ -2894,6 +2902,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         piezas={piezasDeLaMaquina}
         onSubmit={handleCrearVarias}
       />
+      {/* Pase de lectura: no ve el panel de solicitudes (ni puede leerlas). */}
+      {!soloLectura && (
       <SolicitudesPanel
         open={solicitudesOpen}
         onOpenChange={setSolicitudesOpen}
@@ -2909,6 +2919,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           return o ? { configurado: true, stockActual: o.stockActual, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega } : { configurado: false }
         }}
       />
+      )}
 
       {/* Herramientas admin de catálogo */}
       {isAdmin && (

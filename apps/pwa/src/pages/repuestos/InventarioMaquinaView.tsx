@@ -74,6 +74,8 @@ interface CtxEnlaces {
   itemDe: (codigoSAP: string) => BodegaMergedItem | undefined
   abrirFicha?: (item: BodegaMergedItem) => void
   alternarFavorito: (item: BodegaMergedItem) => void
+  /** Pase de lectura: no se ofrecen ajustar, validar, confirmar nombre ni marcar favorito. */
+  soloLectura: boolean
   /** Confirma el nombre de SAP del repuesto de esa línea (maestro + bodega + líneas). */
   confirmarNombre: (l: InventarioLinea, nombre: string) => Promise<void>
 }
@@ -125,13 +127,15 @@ function BotonExcel({ onDescargar, disabled, className }: { onDescargar: () => P
   )
 }
 
-export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirFicha }: {
+export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirFicha, soloLectura = false }: {
   sesion: InventarioSesion
   bodega: ReturnType<typeof useBodega>
   user: { id: string; nombre: string } | null
   onVolver: () => void
   /** Abre la ficha del repuesto (la de Bodega → Stock) encima del inventario. */
   onAbrirFicha?: (item: BodegaMergedItem) => void
+  /** Pase de lectura: el inventario se ve, sin operar. */
+  soloLectura?: boolean
 }) {
   const { items, loadLineas, validarLinea, aplicarAjusteInventario, toggleWatch, confirmarNombreRepuesto } = bodega
   const porSap = useMemo(() => new Map(items.filter(i => i.codigoSAP).map(i => [i.codigoSAP, i])), [items])
@@ -167,12 +171,13 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirF
     itemDe: sap => (sap ? porSap.get(sap) : undefined),
     abrirFicha: onAbrirFicha,
     alternarFavorito: i => toggleWatch(i.rowKey),
+    soloLectura,
     confirmarNombre: async (l, nombre) => {
       if (!user) throw new Error('Hay que iniciar sesión.')
       await confirmarNombreRepuesto(sesion.id, l, lineas ?? [], nombre, user.id, user.nombre)
       await recargar()
     },
-  }), [sesion.id, sesion.maquina, figuras, manuales, porSap, onAbrirFicha, toggleWatch, confirmarNombreRepuesto, user, lineas, recargar])
+  }), [sesion.id, sesion.maquina, figuras, manuales, porSap, onAbrirFicha, toggleWatch, confirmarNombreRepuesto, user, lineas, recargar, soloLectura])
 
   const guardar: Guardar = async (l, datos) => {
     if (!user) throw new Error('Hay que iniciar sesión.')
@@ -196,7 +201,7 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirF
       {error && <p className="flex items-center gap-1.5 text-footnote text-ink-crit"><AlertTriangle className="h-4 w-4" />{error}</p>}
       {!lineas && !error && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
 
-      {lineas && user && (
+      {lineas && user && !soloLectura && (
         <PanelAjuste lineas={lineas}
                      onAplicar={async (plan, onProgreso) => {
                        const r = await aplicarAjusteInventario(sesion, lineas, plan, user.id, user.nombre, onProgreso)
@@ -327,7 +332,7 @@ function EnlacesPC({ codigo, sap }: { codigo: string; sap: string }) {
 function EstrellaFavorito({ sap }: { sap: string }) {
   const e = useEnlaces()
   const item = e.itemDe(sap)
-  if (!item) return <span className="flex size-8" />
+  if (!item || e.soloLectura) return <span className="flex size-8" />
   return (
     <button type="button" aria-label={item.isWatched ? 'Quitar de favoritos' : 'Agregar a favoritos'}
             onClick={ev => { ev.stopPropagation(); e.alternarFavorito(item) }}
@@ -369,6 +374,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
   onGuardar: Guardar
   nombreArchivo: string
 }) {
+  const enl = useEnlaces()
   const [f, setF] = useState<FiltrosTabla>(FILTROS_VACIOS)
   const [busca, setBusca] = useState('')
   const [orden, setOrden] = useState<{ col: ColumnaOrden; dir: 1 | -1 }>({ col: 'ubicacion', dir: 1 })
@@ -475,7 +481,7 @@ function TablaInventario({ lineas, items, onGuardar, nombreArchivo }: {
               )}
               {visibles.map(l => (
                 <Fragment key={l.id}>
-                  <tr onClick={() => setAbierta(a => (a === l.id ? null : l.id))}
+                  <tr onClick={enl.soloLectura ? undefined : () => setAbierta(a => (a === l.id ? null : l.id))}
                       className={`cursor-pointer hover:bg-muted/60 ${abierta === l.id ? 'bg-muted/60' : ''}`}>
                     <td className="border-b border-border/40 pl-1"><EstrellaFavorito sap={l.codigoSAP} /></td>
                     <td className="border-b border-border/40 px-2 py-2 whitespace-nowrap">{l.ubicacion}</td>
@@ -709,7 +715,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
              title={tituloDe(l) || l.codigoFabricante}
              description={<span className="font-mono tabular-nums">{l.codigoFabricante}{l.codigoSAP ? ` · SAP ${l.codigoSAP}` : ''} · {l.ubicacion}</span>}>
         <ListGroup>
-          {l.nombrePendiente && (
+          {l.nombrePendiente && !e.soloLectura && (
             <ListCell
               leading={<BadgeCheck className="h-5 w-5 text-primary" />}
               title="Confirmar nombre"
@@ -725,7 +731,7 @@ function FilaValidada({ linea: l, items, onGuardar }: {
             chevron={!!item && !!e.abrirFicha}
             className={item && e.abrirFicha ? '' : 'opacity-50'}
             onClick={item && e.abrirFicha ? () => { setAcciones(false); e.abrirFicha!(item) } : undefined} />
-          {item && (
+          {item && !e.soloLectura && (
             <ListCell
               leading={<Star className={`h-5 w-5 text-ink-warn ${item.isWatched ? 'fill-current' : ''}`} />}
               title={item.isWatched ? 'Quitar de favoritos' : 'Agregar a favoritos'}
@@ -752,12 +758,14 @@ function FilaValidada({ linea: l, items, onGuardar }: {
             chevron={!!man?.url}
             className={man?.url ? '' : 'opacity-50'}
             onClick={man?.url ? () => { window.open(man.url!, '_blank', 'noopener') } : undefined} />
-          <ListCell
-            leading={<Pencil className="h-5 w-5 text-primary" />}
-            title="Corregir o recontar"
-            subtitle="Código, cantidad o SAP de esta línea"
-            chevron
-            onClick={() => { setAcciones(false); setEditando(true) }} />
+          {!e.soloLectura && (
+            <ListCell
+              leading={<Pencil className="h-5 w-5 text-primary" />}
+              title="Corregir o recontar"
+              subtitle="Código, cantidad o SAP de esta línea"
+              chevron
+              onClick={() => { setAcciones(false); setEditando(true) }} />
+          )}
         </ListGroup>
       </Sheet>
     </>
@@ -771,6 +779,7 @@ function TarjetaDudosa({ linea: l, items, onGuardar }: {
   items: BodegaMergedItem[]
   onGuardar: Guardar
 }) {
+  const e = useEnlaces()
   const m = l.motivo ? MOTIVO[l.motivo] : undefined
   return (
     <div className="space-y-3 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
@@ -784,7 +793,7 @@ function TarjetaDudosa({ linea: l, items, onGuardar }: {
         {l.notaCuaderno && <span className="text-muted-foreground"> · «{l.notaCuaderno}»</span>}
       </p>
       {l.detalleDuda && <p className="text-footnote text-muted-foreground">{l.detalleDuda}</p>}
-      <FormularioLinea linea={l} items={items} textoBoton="Validar" onGuardar={d => onGuardar(l, d)} />
+      {!e.soloLectura && <FormularioLinea linea={l} items={items} textoBoton="Validar" onGuardar={d => onGuardar(l, d)} />}
     </div>
   )
 }

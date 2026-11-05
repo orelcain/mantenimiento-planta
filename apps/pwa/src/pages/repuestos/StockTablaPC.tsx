@@ -63,8 +63,9 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
   onAbrir: (i: BodegaMergedItem) => void
   /** Figura del despiece de ese ítem (por código de fabricante); null = sin dibujo. */
   dibujoDe?: (i: BodegaMergedItem) => { ruta: string; fig: string } | null
-  onMovimiento: (i: BodegaMergedItem) => void
-  onFavorito: (i: BodegaMergedItem) => void
+  /** Sin handler (pase de lectura) no se muestra el botón. */
+  onMovimiento?: (i: BodegaMergedItem) => void
+  onFavorito?: (i: BodegaMergedItem) => void
 }) {
   const [f, setF] = useState<FiltrosBodega>(FILTROS_INICIALES)
   const [busca, setBusca] = useState('')
@@ -233,11 +234,13 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                   return (
                     <tr key={i.rowKey} onClick={() => onAbrir(i)} className="cursor-pointer hover:bg-muted/60">
                       <td className="border-b border-border/40 pl-1.5">
-                        <button type="button" aria-label={i.isWatched ? 'Quitar de favoritos' : 'Marcar como favorito'}
-                                onClick={e => { e.stopPropagation(); onFavorito(i) }}
-                                className={cn('flex size-8 items-center justify-center rounded-full hover:bg-muted', i.isWatched ? 'text-ink-warn' : 'text-muted-foreground/40')}>
-                          <Star className={cn('size-4', i.isWatched && 'fill-current')} />
-                        </button>
+                        {onFavorito && (
+                          <button type="button" aria-label={i.isWatched ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                                  onClick={e => { e.stopPropagation(); onFavorito(i) }}
+                                  className={cn('flex size-8 items-center justify-center rounded-full hover:bg-muted', i.isWatched ? 'text-ink-warn' : 'text-muted-foreground/40')}>
+                            <Star className={cn('size-4', i.isWatched && 'fill-current')} />
+                          </button>
+                        )}
                       </td>
                       <td className="max-w-[26rem] border-b border-border/40 px-2 py-2">
                         {nv.etiquetas.map(e => <Tag key={e} tone="neutral" className="mr-1.5 align-[1px]">{e}</Tag>)}
@@ -265,11 +268,13 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                         ) : <span className="text-muted-foreground/40">—</span>}
                       </td>
                       <td className="border-b border-border/40 pr-1.5">
-                        <button type="button" aria-label="Registrar movimiento" title="Registrar movimiento"
-                                onClick={e => { e.stopPropagation(); onMovimiento(i) }}
-                                className="flex size-9 items-center justify-center rounded-full text-primary hover:bg-muted">
-                          <ArrowDownCircle className="size-4" />
-                        </button>
+                        {onMovimiento && (
+                          <button type="button" aria-label="Registrar movimiento" title="Registrar movimiento"
+                                  onClick={e => { e.stopPropagation(); onMovimiento(i) }}
+                                  className="flex size-9 items-center justify-center rounded-full text-primary hover:bg-muted">
+                            <ArrowDownCircle className="size-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

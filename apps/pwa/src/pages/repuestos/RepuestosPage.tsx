@@ -19,6 +19,7 @@ import { BodegaView } from './BodegaView'
 import { SegmentedControl } from '@/components/piel'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
 import { CodigosFabricanteView, type CrearDesdeCatalogo } from './CodigosFabricanteView'
+import { useAuthStore } from '@/store'
 
 type Tab = 'areas' | 'bodega' | 'codigos'
 
@@ -48,6 +49,8 @@ const TABS: TabDef[] = [
 
 export function RepuestosPage() {
   const [activeTab, setActiveTab] = useState<Tab>(getDefaultTab)
+  // Pase de lectura: Códigos fabricante no ofrece «Crear repuesto desde catálogo».
+  const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   // Lazy mount: solo renderiza un tab la primera vez que se activa
   const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(new Set([getDefaultTab()]))
 
@@ -159,7 +162,7 @@ export function RepuestosPage() {
 
         <div className={activeTab === 'codigos' ? '' : 'hidden'}>
           {mountedTabs.has('codigos') && (
-            <CodigosFabricanteView onBuscarEnRepuestos={handleSearchSimilar} onCrearRepuesto={handleCrearDesdeCatalogo} />
+            <CodigosFabricanteView onBuscarEnRepuestos={handleSearchSimilar} onCrearRepuesto={soloLectura ? undefined : handleCrearDesdeCatalogo} />
           )}
         </div>
 
