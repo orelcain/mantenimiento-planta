@@ -44,7 +44,8 @@ interface RepuestoDetailPanelProps {
   volverA?: string
   onClose: () => void
   loadMovimientos: (bodegaDocId: string, max?: number) => Promise<MovimientoBodega[]>
-  onSaveLocation: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
+  /** Sin handler (pase de lectura) no se ofrece «Editar ubicación». */
+  onSaveLocation?: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
   /** Abrir el modal de solicitud prellenado con este repuesto (Fase 6). */
   onSolicitar?: (item: AreaRepuestoRow) => void
   /** Asignar un código SAP a una pieza de despiece (sin SAP → ordenable). */
@@ -248,7 +249,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
   }, [onSaveApodos, apodosVal])
 
   const saveLoc = useCallback(async () => {
-    if (!item) return
+    if (!item || !onSaveLocation) return
     setSavingLoc(true)
     try { await onSaveLocation(item.codigoSAP, locForm); setEditLoc(false) }
     finally { setSavingLoc(false) }
@@ -620,7 +621,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               {!editLoc && (
                 <span className="flex items-center gap-1.5 text-right text-footnote font-medium text-foreground">
                   {formatUbicacion(item)}
-                  {item.bodegaId && (
+                  {item.bodegaId && onSaveLocation && (
                     <button onClick={startEditLoc} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Editar ubicación">
                       <Pencil className="h-3 w-3" />
                     </button>

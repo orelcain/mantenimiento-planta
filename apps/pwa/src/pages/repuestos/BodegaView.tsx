@@ -303,6 +303,8 @@ function exportCsv(items: BodegaMergedItem[]) {
 
 function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
   const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
+  // Pase de lectura: sin escrituras (ajustes, movimientos, fotos, favoritos); se ven la tabla, la ficha y CSV.
+  const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   const [searchQuery, setSearchQuery] = useState('')
   // Código de fabricante → figura del despiece (BAADER 142/200): acceso al dibujo desde la tabla y el drawer.
   const figurasDespiece = useFigurasDespiece()
@@ -388,12 +390,14 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[13rem]">
-            <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBatchMov(true)}><Layers className="size-4 text-muted-foreground" />Movimiento en lote</DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowCargaRapida(true)}><MapPin className="size-4 text-muted-foreground" />Carga rápida de stock</DropdownMenuItem>
-            {stats.sinConfig > 0 && (
-              <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBulkConfig(true)}><Settings2 className="size-4 text-muted-foreground" />Configurar múltiples</DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
+            {!soloLectura && (<>
+              <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBatchMov(true)}><Layers className="size-4 text-muted-foreground" />Movimiento en lote</DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowCargaRapida(true)}><MapPin className="size-4 text-muted-foreground" />Carga rápida de stock</DropdownMenuItem>
+              {stats.sinConfig > 0 && (
+                <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBulkConfig(true)}><Settings2 className="size-4 text-muted-foreground" />Configurar múltiples</DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+            </>)}
             <DropdownMenuItem className="gap-2 py-2" onClick={() => exportCsv(filtered)}><Download className="size-4 text-muted-foreground" />Exportar CSV</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -407,7 +411,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} dibujo={dibujoDeItem(drawerItem)} />}
+      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={soloLectura ? undefined : () => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={soloLectura ? undefined : () => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={soloLectura ? undefined : addPhoto} removePhoto={soloLectura ? undefined : removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} dibujo={dibujoDeItem(drawerItem)} />}
     </>
   )
 
@@ -416,8 +420,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     return (
       <>
         <StockTablaPC items={items} acciones={menuAcciones}
-                      onAbrir={setDrawerItem} onMovimiento={setMovimientoItem}
-                      onFavorito={i => toggleWatch(i.rowKey)} dibujoDe={dibujoDeItem} />
+                      onAbrir={setDrawerItem} onMovimiento={soloLectura ? undefined : setMovimientoItem}
+                      onFavorito={soloLectura ? undefined : (i => toggleWatch(i.rowKey))} dibujoDe={dibujoDeItem} />
         {modales}
       </>
     )
@@ -579,8 +583,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         >
           {filtered.map(item => (
             <BodegaRow key={item.codigoSAP} item={item}
-              onEdit={() => setEditingItem(item)} onMovimiento={() => setMovimientoItem(item)}
-              onToggleWatch={() => toggleWatch(item.rowKey)}
+              onEdit={soloLectura ? undefined : () => setEditingItem(item)} onMovimiento={soloLectura ? undefined : () => setMovimientoItem(item)}
+              onToggleWatch={soloLectura ? undefined : () => toggleWatch(item.rowKey)}
               onOpenDrawer={() => setDrawerItem(item)} />
           ))}
         </ListGroup>
@@ -600,6 +604,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
   onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void
 }) {
   const { items, crearInventario, loadInventarios, loadConteos, registrarConteo, finalizarInventario } = bodega
+  // Pase de lectura: ve las sesiones y sus conteos, pero no crea, cuenta, finaliza ni ajusta.
+  const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   // La ficha del repuesto (la MISMA de Bodega → Stock) se abre encima del
   // inventario: al cerrarla se vuelve justo donde se estaba, con los filtros.
   const [fichaItem, setFichaItem] = useState<BodegaMergedItem | null>(null)
@@ -715,14 +721,14 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
     const vivo = (i: BodegaMergedItem) => items.find(x => x.rowKey === i.rowKey) ?? i
     return (
       <>
-        <InventarioMaquinaView sesion={activeSesion} bodega={bodega} user={user}
+        <InventarioMaquinaView sesion={activeSesion} bodega={bodega} user={user} soloLectura={soloLectura}
                                onVolver={() => { setActiveSesion(null); void reload() }}
                                onAbrirFicha={setFichaItem} />
         {fichaItem && (
           <ItemDrawer item={vivo(fichaItem)} loadMovimientos={bodega.loadMovimientos} onClose={() => setFichaItem(null)}
-                      onEdit={() => { setFichaEditar(vivo(fichaItem)); setFichaItem(null) }}
-                      onMovimiento={() => { setFichaMovimiento(vivo(fichaItem)); setFichaItem(null) }}
-                      addPhoto={bodega.addPhoto} removePhoto={bodega.removePhoto} calcReorderData={bodega.calcReorderData}
+                      onEdit={soloLectura ? undefined : () => { setFichaEditar(vivo(fichaItem)); setFichaItem(null) }}
+                      onMovimiento={soloLectura ? undefined : () => { setFichaMovimiento(vivo(fichaItem)); setFichaItem(null) }}
+                      addPhoto={soloLectura ? undefined : bodega.addPhoto} removePhoto={soloLectura ? undefined : bodega.removePhoto} calcReorderData={bodega.calcReorderData}
                       onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />
         )}
         {fichaEditar && (
@@ -754,7 +760,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
               {activeSesion.estado === 'finalizado' && <span className="ml-2 text-ink-ok font-semibold">✓ Finalizado</span>}
             </p>
           </div>
-          {activeSesion.estado === 'en_curso' && (
+          {!soloLectura && activeSesion.estado === 'en_curso' && (
             <button onClick={handleFinalizar}
               className="flex h-11 items-center gap-1.5 rounded-full bg-primary px-5 text-subhead font-medium text-primary-foreground transition-colors hover:brightness-95">
               <CheckCircle2 className="h-4 w-4" /> Finalizar y ajustar
@@ -772,13 +778,14 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           </div>
         </div>
 
-        <ConteoList conteos={conteos} catalogo={bodega.items} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={handleConteo} />
+        <ConteoList conteos={conteos} catalogo={bodega.items} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={soloLectura ? undefined : handleConteo} />
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
+      {!soloLectura && (
       <div className="bg-card border border-border rounded-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Nuevo inventario periódico</h3>
         <div className="flex items-end gap-3">
@@ -802,6 +809,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           <p className="text-caption text-muted-foreground mt-2">Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP</p>
         )}
       </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
@@ -842,7 +850,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
 
 function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
   conteos: InventarioConteo[]; catalogo: BodegaMergedItem[]; isFinalizado: boolean
-  onConteo: (sap: string, stockFisico: number, obs?: string) => Promise<void>
+  /** Sin handler (pase de lectura) la lista se ve, sin controles de conteo. */
+  onConteo?: (sap: string, stockFisico: number, obs?: string) => Promise<void>
 }) {
   const [tab, setTab] = useState<'pendientes' | 'contados' | 'diferencias'>('pendientes')
   const [editingSAP, setEditingSAP] = useState<string | null>(null)
@@ -869,7 +878,10 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
     })
   }, [baseList, conteoSearch, indiceNombres])
 
+  const puedeContar = !!onConteo && !isFinalizado
+
   const handleSave = async (sap: string) => {
+    if (!onConteo) return
     await onConteo(sap, editValue, editObs)
     setEditingSAP(null)
     setEditObs('')
@@ -897,7 +909,7 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
           </button>
         ))}
         <div className="flex-1" />
-        {!isFinalizado && tab === 'pendientes' && (
+        {puedeContar && tab === 'pendientes' && (
           <label className="flex items-center gap-1.5 text-caption text-muted-foreground cursor-pointer">
             <input type="checkbox" checked={quickScan} onChange={e => setQuickScan(e.target.checked)} className="rounded-ctl h-3 w-3" />
             <Zap className="h-3 w-3" /> Escaneo rápido
@@ -942,7 +954,7 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
                         {c.diferencia > 0 ? '+' : ''}{c.diferencia}
                       </p>
                     </div>
-                    {!isFinalizado && (
+                    {puedeContar && (
                       <button onClick={() => { setEditingSAP(c.codigoSAP); setEditValue(c.stockFisico!); setEditObs(c.observaciones || '') }}
                         className="p-1.5 rounded-ctl hover:bg-muted text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
                     )}
@@ -957,12 +969,12 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
                       <button onClick={() => handleSave(c.codigoSAP)} className="p-1 rounded-ctl bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" /></button>
                       <button onClick={() => setEditingSAP(null)} className="p-1 rounded-ctl hover:bg-muted text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
                     </div>
-                  ) : (
+                  ) : puedeContar ? (
                     <button onClick={() => { setEditingSAP(c.codigoSAP); setEditValue(c.stockSistema) }}
                       className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-brand-ink bg-primary/10 rounded-card hover:bg-primary/20 transition-colors shrink-0">
                       <CircleDot className="h-3.5 w-3.5" /> Contar
                     </button>
-                  )
+                  ) : null
                 )}
               </div>
               {c.observaciones && c.stockFisico !== null && <p className="text-caption text-muted-foreground mt-1 ml-1">Obs: {c.observaciones}</p>}
@@ -1687,8 +1699,9 @@ function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; 
   )
 }
 
+/** Sin `onEdit` / `onMovimiento` / `onToggleWatch` (pase de lectura) la fila no ofrece esa acción. */
 function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: {
-  item: BodegaMergedItem; onEdit: () => void; onMovimiento: () => void; onToggleWatch: () => void; onOpenDrawer: () => void
+  item: BodegaMergedItem; onEdit?: () => void; onMovimiento?: () => void; onToggleWatch?: () => void; onOpenDrawer: () => void
 }) {
   const has = !!item.bodegaId
   const isBajo = has && item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && item.stockActual > 0
@@ -1727,10 +1740,10 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
   return (
     <SwipeRow
       trailing={[
-        { label: has ? 'Editar' : 'Configurar', icon: has ? <Pencil className="size-5" /> : <Settings2 className="size-5" />, tone: 'neutral', onClick: onEdit },
-        { label: 'Movimiento', icon: <ArrowDownCircle className="size-5" />, tone: 'brand', onClick: onMovimiento },
+        ...(onEdit ? [{ label: has ? 'Editar' : 'Configurar', icon: has ? <Pencil className="size-5" /> : <Settings2 className="size-5" />, tone: 'neutral' as const, onClick: onEdit }] : []),
+        ...(onMovimiento ? [{ label: 'Movimiento', icon: <ArrowDownCircle className="size-5" />, tone: 'brand' as const, onClick: onMovimiento }] : []),
       ]}
-      leading={{ label: item.isWatched ? 'Quitar' : 'Favorito', icon: <Star className={cn('size-5', item.isWatched && 'fill-current')} />, onClick: onToggleWatch, active: item.isWatched }}
+      leading={onToggleWatch ? { label: item.isWatched ? 'Quitar' : 'Favorito', icon: <Star className={cn('size-5', item.isWatched && 'fill-current')} />, onClick: onToggleWatch, active: item.isWatched } : undefined}
     >
       <ListCell
         className="bg-card"
@@ -1768,7 +1781,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
 
 function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData, onViewInEquipo, onSearchSimilar, dibujo }: {
   item: BodegaMergedItem; loadMovimientos: (id: string, max?: number) => Promise<MovimientoBodega[]>
-  onClose: () => void; onEdit: () => void; onMovimiento: () => void
+  onClose: () => void; onEdit?: () => void; onMovimiento?: () => void
   addPhoto?: (sap: string, file: File) => Promise<string>
   removePhoto?: (sap: string, url: string) => Promise<void>
   calcReorderData?: (item: BodegaMergedItem, movs: MovimientoBodega[]) => { consumoDiario: number; puntoReorden: number; diasRestantes: number; necesitaPedir: boolean } | null
@@ -1859,12 +1872,16 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-ink-ok/[0.15] border border-transparent rounded-card hover:bg-ink-ok/[0.15] text-ink-ok">
-              <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
-            </button>
-            <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
-              <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
-            </button>
+            {onMovimiento && (
+              <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-ink-ok/[0.15] border border-transparent rounded-card hover:bg-ink-ok/[0.15] text-ink-ok">
+                <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
+              </button>
+            )}
+            {onEdit && (
+              <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
+                <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
+              </button>
+            )}
             {onSearchSimilar && (
               <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/[0.15] border border-transparent rounded-card hover:bg-primary/[0.15] text-brand-ink">
                 <Search className="h-3.5 w-3.5" />

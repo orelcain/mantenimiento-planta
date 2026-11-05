@@ -10090,6 +10090,43 @@ exports.paseBitacora = onCall(
   },
 )
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Pase de lectura para los nuevos (04-11-2026) — lógica en paseLectura.js
+// Solo corre cuando alguien abre el link o un supervisor lo administra.
+// ─────────────────────────────────────────────────────────────────────────────
+const paseLecturaMod = require('./paseLectura')
+
+exports.paseLectura = onCall(
+  { region: 'us-central1', memory: '256MiB', cpu: 0.25, concurrency: 1, maxInstances: 3, timeoutSeconds: 60 },
+  async (request) => {
+    const deps = {
+      db,
+      auth: getAuth(),
+      ahoraMs: () => Date.now(),
+      error: (code, msg) => new HttpsError(code, msg),
+      asegurarMonitorLinea: (plantSlug, plantLineId) =>
+        publicMonitorMod.ensureLineMonitor(db, plantSlug, { ttlDays: 30, meta: { plantLineId } }),
+    }
+    const accion = String(request.data?.accion ?? '')
+    // Pública: la usa quien abre el link (todavía sin sesión).
+    if (accion === 'entrar') {
+      const r = await paseLecturaMod.entrar(deps, request.data)
+      logger.info('[paseLectura] teléfono habilitado')
+      return r
+    }
+    if (accion === 'monitores') return paseLecturaMod.monitores(deps, request.auth?.token)
+    const fn = paseLecturaMod.ACCIONES_SUPERVISOR[accion]
+    if (!fn) throw new HttpsError('invalid-argument', 'Acción desconocida')
+    // Solo el administrador entrega, cambia o pausa el link (decisión de Orel 04-11-2026).
+    const { uid, user } = await _assertSupervisorCaller(request)
+    if (user.rol !== 'admin') throw new HttpsError('permission-denied', 'Solo administradores')
+    const nombre = [user.nombre, user.apellido].filter(Boolean).join(' ')
+    const r = await fn(deps, request.data, { uid, nombre })
+    logger.info('[paseLectura] acción de administrador', { accion, uid })
+    return r
+  },
+)
+
 /** Duraciones ofrecidas al generar el link (horas). 720 = 30 dias, para el
  *  link de linea que se pega en la pared y no se regenera. */
 const MONITOR_TTL_CHOICES = [12, 24, 72, 168, 720]

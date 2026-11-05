@@ -25,6 +25,8 @@ export interface User {
    * en `users` y solo ve la bitácora. `nombre` es el técnico dueño del teléfono.
    */
   paseBitacora?: { plantId: string; nombre: string }
+  /** Teléfono con el pase de lectura de los nuevos (claim `pase_lectura`): solo lee. */
+  paseLectura?: boolean
 }
 
 // Tipo de zona
