@@ -14,6 +14,7 @@ import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
 import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { ImputacionPeriodCard } from './ImputacionPeriodCard'
+import { JackKnifeCard } from './JackKnifeCard'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 const MONTH_NAMES = [
@@ -34,9 +35,11 @@ interface Props {
   isClassificationPlant?: boolean
   /** Si la línea pasa por Grader. Filete no: la tarjeta de P0% nunca se llena. */
   tieneGrader?: boolean
+  /** Planta de Shoplogix para el Jack-Knife. Sin planta, la tarjeta no se muestra. */
+  plantSlug?: string | null
 }
 
-export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isClassificationPlant = true, tieneGrader = true }: Props) {
+export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isClassificationPlant = true, tieneGrader = true, plantSlug = null }: Props) {
   const monthLabel = `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`
 
   const stats = useMemo(() => {
@@ -368,6 +371,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       {slxStats?.imputacion && (
         <ImputacionPeriodCard imputacion={slxStats.imputacion} />
       )}
+
+      {/* Jack-Knife de Mantención: junto a la imputación, con la planta del panel. */}
+      {plantSlug && <JackKnifeCard plantSlug={plantSlug} />}
 
       {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ──
           §22 divulgación progresiva: el desglose completo es DETALLE, no dato de
