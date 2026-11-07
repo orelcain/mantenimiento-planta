@@ -54,6 +54,17 @@ function leerArgs(argv) {
 
 const redondear1 = (n) => Math.round(n * 10) / 10
 
+// Firestore devuelve las claves de un mapa en otro orden que el objeto recién
+// calculado; JSON.stringify directo nunca coincidía (07-11: 817 «pendientes»
+// tras escribirlos). Se compara con las claves ordenadas en todos los niveles.
+function jsonEstable(v) {
+  if (Array.isArray(v)) return `[${v.map(jsonEstable).join(',')}]`
+  if (v && typeof v === 'object') {
+    return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${jsonEstable(v[k])}`).join(',')}}`
+  }
+  return JSON.stringify(v ?? null)
+}
+
 async function main() {
   const opts = leerArgs(process.argv.slice(2))
   if (!admin.apps.length) {
@@ -104,7 +115,7 @@ async function main() {
         tot.bytesTotal += bytes
         if (bytes > tot.bytesMax) { tot.bytesMax = bytes; tot.maxId = t.id }
 
-        if (JSON.stringify(t.previo) === JSON.stringify(jk)) { tot.sinCambios++; return }
+        if (t.previo && jsonEstable(t.previo) === jsonEstable(jk)) { tot.sinCambios++; return }
         tot.aEscribir++
         if (opts.escribir) {
           await t.ref.set({ jackKnife: jk }, { merge: true })
