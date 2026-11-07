@@ -26,6 +26,7 @@ const { toShoplogixTime, parseShoplogixTime } = require('./time')
 const { pauseBetweenMachines, currentShift, toChileWall, chileUtcOffsetHours, ahoraEnPlanta } = require('./polling')
 const { revisarTurnosDelSync } = require('./guardiaTurnos')
 const { canonicalShiftName } = require('./canonicalShift')
+const { resumenJackKnifeTurno, debeResumirse } = require('./jackKnife')
 
 /** Plantas activas — usada en wakeup scheduler. */
 const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal', 'filete'])
@@ -961,6 +962,8 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     }
 
     const shiftMachineResults = []
+    // Docs de máquina del turno para el resumen Jack-Knife (ver jackKnife.js).
+    const jackKnifeDocs = []
     // Ventana EFECTIVA del turno: primer→último estado `uptime` entre TODAS las
     // máquinas ("primer pescado que pasó" → último). Distinta del horario
     // programado (scheduledStart/End): si el turno arranca 14:45 pero la línea
@@ -1116,6 +1119,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
           if (effectiveEndMs   === null || eMs > effectiveEndMs)   effectiveEndMs   = eMs
         }
 
+        jackKnifeDocs.push({ machineName: machines[i].name, states: doc.states, comments: doc.comments })
         shiftMachineResults.push({
           machineid:   machines[i].machineid,
           name:        machines[i].name,
@@ -1136,6 +1140,15 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       }
     }
 
+    // Resumen Jack-Knife del turno (campo chico en el MISMO set del doc padre).
+    // Si el cálculo falla, se registra y se omite el campo: el sync no se rompe.
+    let jackKnife = null
+    try {
+      if (debeResumirse(group.shiftId)) jackKnife = resumenJackKnifeTurno(jackKnifeDocs)
+    } catch (err) {
+      logger.warn(`[syncDay][${plantSlug}] jackKnife omitido en ${parentShiftDateKey}_${group.shiftId}: ${err.message}`)
+    }
+
     // Metadata del doc padre del turno — `parentShiftDateKey` ya se calculó
     // arriba (freeze check); reusarlo evita una segunda derivación divergente.
     const parentDoc = {
@@ -1154,6 +1167,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       ...(group.ventanaCorregida ? { ventanaCorregida: group.ventanaCorregida } : {}),
       lastSyncAt:     syncedAt,
       machines:       shiftMachineResults,
+      ...(jackKnife ? { jackKnife } : {}),
       // Ventana efectiva de producción (primer/último uptime real). Null si el
       // turno no procesó nada (solo idle) — la UI degrada al horario programado.
       effectiveStart: effectiveStartMs !== null ? new Date(effectiveStartMs) : null,
