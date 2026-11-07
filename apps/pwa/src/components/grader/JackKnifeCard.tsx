@@ -8,21 +8,36 @@
  * riel y colocación de etiquetas es la del mockup.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, FileDown, FileText } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { SegmentedControl } from '@/components/piel'
+import { Button, SegmentedControl } from '@/components/piel'
 import { calcularLayout } from './jackKnifeLayout'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 import {
+  ETIQUETA_VEREDICTO,
   SIN_IMPUTAR,
+  agruparComentarios,
   calcularJackKnife,
   cargarTurnosCrudos,
+  codificarEstadoJK,
   comentariosDe,
+  datosInforme,
+  filtrarComentarios,
+  leerEstadoJK,
+  palabrasFrecuentes,
+  previaAnterior,
+  previaJK,
   prepararTurnos,
+  resumenComparacion,
+  sentidoCambio,
+  veredicto,
   ventanaJK,
   type CuadranteJK,
+  type ModoCmpJK,
+  type PreviaJK,
+  type RangoJK,
   type TurnoCrudo,
   type TurnoJK,
   type VentanaJK,
@@ -36,22 +51,30 @@ const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oc
 /** Colores de cuadrante: tinta para el texto, punto para el marcador, relleno de baja opacidad. */
 const Q: Record<CuadranteJK, { t: string; a: string; ink: string; dot: string; fill: string }> = {
   amb: { t: 'Agudas y crónicas', a: 'Prioridad 1: atacar causa raíz y tiempo de reparación.', ink: 'rgb(var(--tw-red-600))', dot: 'rgb(var(--tw-red-500))', fill: 'rgb(var(--tw-red-500) / 0.08)' },
-  agu: { t: 'Agudas', a: 'Pocas veces, pero larga: revisar repuestos, diagnóstico y procedimiento.', ink: 'rgb(var(--warning-ink))', dot: 'rgb(var(--warning))', fill: 'rgb(var(--warning) / 0.08)' },
-  cro: { t: 'Crónicas', a: 'Rápida, pero repetida: buscar causa raíz o preventivo.', ink: 'rgb(var(--tw-amber-600))', dot: 'rgb(var(--tw-amber-500))', fill: 'rgb(var(--tw-amber-500) / 0.08)' },
+  agu: { t: 'Agudas', a: 'Pocas veces, pero larga: revisar repuestos, diagnóstico y procedimiento.', ink: 'rgb(var(--jk-agu))', dot: 'rgb(var(--jk-agu))', fill: 'rgb(var(--jk-agu) / 0.08)' },
+  cro: { t: 'Crónicas', a: 'Rápida, pero repetida: buscar causa raíz o preventivo.', ink: 'rgb(var(--jk-cro))', dot: 'rgb(var(--jk-cro))', fill: 'rgb(var(--jk-cro) / 0.08)' },
   ok: { t: 'Bajo control', a: 'Sin acción. Mantener seguimiento.', ink: 'rgb(var(--success))', dot: 'rgb(var(--success))', fill: 'rgb(var(--success) / 0.07)' },
 }
 const COLOR_SIN = 'rgb(var(--cat-6-ink))'
+
+/** Etiqueta corta en pantallas angostas; el texto largo sigue siendo el nombre accesible. */
+const dual = (largo: string, corto: string) => (
+  <>
+    <span aria-hidden className="text-center leading-tight whitespace-normal sm:hidden">{corto}</span>
+    <span className="sr-only text-center leading-tight whitespace-normal sm:not-sr-only">{largo}</span>
+  </>
+)
 
 const VISTAS: { value: VistaJK; label: string }[] = [
   { value: 'imp', label: 'Imputadas' },
   { value: 'sin', label: 'Sin imputar' },
   { value: 'todas', label: 'Todas' },
 ]
-const PRESETS: { value: VentanaJK; label: string }[] = [
-  { value: 'turno', label: 'Último turno' },
-  { value: '7', label: '7 días' },
-  { value: '30', label: '30 días' },
-  { value: '90', label: '90 días' },
+const PRESETS: { value: VentanaJK; label: ReactNode }[] = [
+  { value: 'turno', label: dual('Último turno', 'Turno') },
+  { value: '7', label: dual('7 días', '7 d') },
+  { value: '30', label: dual('30 días', '30 d') },
+  { value: '90', label: dual('90 días', '90 d') },
   { value: 'todo', label: 'Todo' },
 ]
 
@@ -77,15 +100,250 @@ const RANGO_INPUT =
   '[&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full ' +
   '[&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-accent [&::-moz-range-thumb]:bg-card'
 
+/** «Ahora» o «Antes» en palabras: fecha y turno de cada extremo, o «N turnos». */
+const rangoTexto = (turnos: readonly TurnoJK[], r: RangoJK) => {
+  const a = turnos[r.desde]
+  const b = turnos[r.hasta]
+  if (!a || !b) return ''
+  return r.desde === r.hasta
+    ? `${fechaCorta(a.dateKey)} ${turnoCorto(a.shiftId)}`
+    : `${fechaCorta(a.dateKey)} ${turnoCorto(a.shiftId)} a ${fechaCorta(b.dateKey)} ${turnoCorto(b.shiftId)}`
+}
+
+const TONO_CAMBIO: Record<'mejor' | 'peor' | 'igual', string> = {
+  mejor: 'text-ink-ok',
+  peor: 'text-ink-crit',
+  igual: 'text-muted-foreground',
+}
+const SIMBOLO_CAMBIO: Record<'mejor' | 'peor' | 'igual', string> = { mejor: '▼', peor: '▲', igual: '=' }
+const TONO_VEREDICTO: Record<string, string> = {
+  mejoro: 'text-ink-ok',
+  sinEventos: 'text-ink-ok',
+  empeoro: 'text-ink-crit',
+  nueva: 'text-ink-crit',
+  igual: 'text-muted-foreground',
+}
+
+/** Antes → ahora de una magnitud, con ▼ mejor, ▲ peor o = igual (±10 %). Color y símbolo, no solo color. */
+function CambioTexto({ nombre, antes, ahora, unidad, fmt }: { nombre: string; antes: number; ahora: number; unidad: string; fmt: (x: number) => string }) {
+  const s = sentidoCambio(antes, ahora)
+  const palabra = s === 'mejor' ? 'mejor' : s === 'peor' ? 'peor' : 'igual'
+  return (
+    <span className="tabular-nums">
+      {nombre} {fmt(antes)} → {fmt(ahora)}{unidad}{' '}
+      <span className={cn('font-semibold', TONO_CAMBIO[s])}>{SIMBOLO_CAMBIO[s]} {palabra}</span>
+    </span>
+  )
+}
+
+const MODOS: { value: ModoCmpJK; label: ReactNode }[] = [
+  { value: 'ant', label: dual('Vs. período anterior', 'Anterior') },
+  { value: 'mes', label: dual('Vs. mes pasado', 'Mes pasado') },
+  { value: 'mano', label: dual('Elegir a mano', 'A mano') },
+  { value: 'no', label: <span className="text-center text-footnote leading-tight whitespace-normal">Sin comparar</span> },
+]
+
+// Riel: manijas «Antes» en color de advertencia suave (solo en «Elegir a mano»).
+const RANGO_INPUT_ANTES = RANGO_INPUT.replace(/border-accent/g, 'border-warning')
+
+/** Fecha y hora de un comentario: «7-nov 14:05». */
+const fechaHora = (ms: number) => {
+  const d = new Date(ms)
+  return `${d.getDate()}-${MES[d.getMonth()]} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+interface ComentarioVista { dateKey: string; shiftId: string; inicioMs: number; texto: string }
+
+/** Todos los comentarios del período de la causa elegida: chips, búsqueda y orden. */
+function ComentariosCausa({ causa, todos, busqueda, onBusqueda, palabra, onPalabra, modo, onModo }: {
+  causa: string
+  todos: ComentarioVista[]
+  busqueda: string
+  onBusqueda: (v: string) => void
+  palabra: string | null
+  onPalabra: (v: string | null) => void
+  modo: 'grupo' | 'fecha'
+  onModo: (v: 'grupo' | 'fecha') => void
+}) {
+  const chips = useMemo(() => palabrasFrecuentes(todos.map((c) => c.texto), 10), [todos])
+  const filtrados = filtrarComentarios(todos, busqueda, palabra)
+  const filas = modo === 'grupo'
+    ? agruparComentarios(filtrados).map((g) => ({
+      clave: g.texto,
+      texto: g.texto,
+      cola: `${g.n > 1 ? `×${g.n} · ` : ''}${fechaHora(g.ultimoMs)}`,
+    }))
+    : [...filtrados].sort((a, b) => b.inicioMs - a.inicioMs).map((c) => ({
+      clave: `${c.inicioMs}-${c.texto}`,
+      texto: c.texto,
+      cola: `${fechaHora(c.inicioMs)} · ${turnoCorto(c.shiftId)}`,
+    }))
+
+  return (
+    <div className="space-y-2 pt-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h4 className="text-footnote font-semibold text-foreground">Comentarios de {causa}</h4>
+        <span className="text-caption tabular-nums text-muted-foreground">{filtrados.length} de {todos.length} en el período</span>
+      </div>
+      {todos.length === 0 ? (
+        <p className="text-footnote text-muted-foreground">Esta causa no tiene comentarios en el período.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <button
+                key={c.palabra}
+                type="button"
+                aria-pressed={palabra === c.palabra}
+                onClick={() => onPalabra(palabra === c.palabra ? null : c.palabra)}
+                className={cn(
+                  'min-h-[44px] rounded-ctl px-3 text-caption tabular-nums',
+                  palabra === c.palabra ? 'bg-card font-semibold text-accent ring-1 ring-accent' : 'bg-muted text-foreground',
+                )}
+              >
+                {c.palabra} <b className="font-semibold">{c.n}</b>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2 min-[561px]:flex-row min-[561px]:items-center">
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => onBusqueda(e.target.value)}
+              placeholder="Buscar en los comentarios"
+              aria-label="Buscar en los comentarios"
+              className="min-h-[44px] min-w-0 flex-1 rounded-ctl bg-muted px-3 text-footnote text-foreground placeholder:text-muted-foreground"
+            />
+            <SegmentedControl<'grupo' | 'fecha'>
+              ariaLabel="Orden de comentarios"
+              value={modo}
+              onChange={onModo}
+              segments={[{ value: 'grupo', label: 'Agrupados' }, { value: 'fecha', label: 'Por fecha' }]}
+            />
+          </div>
+          <ul className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
+            {filas.length === 0 ? (
+              <li className="text-footnote text-muted-foreground">Ningún comentario coincide.</li>
+            ) : filas.map((f) => (
+              <li key={f.clave} className="text-footnote text-foreground">
+                <span className="break-words">{f.texto}</span>
+                <span className="block text-caption tabular-nums text-muted-foreground">{f.cola}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
+type InformeDatos = NonNullable<ReturnType<typeof datosInforme>>
+
+/** Informe: resultado, mejoraron y empeoraron, prioridad 1, detalle por causa y comentarios clave. */
+function InformeJackKnife({ planta, informe, ahoraTxt, antesTxt, horasAhora, horasAntes, vistaTxt, pdfEnCurso, errorPdf, onPdf }: {
+  planta: string
+  informe: InformeDatos
+  ahoraTxt: string
+  antesTxt: string
+  horasAhora: number
+  horasAntes: number
+  vistaTxt: string
+  pdfEnCurso: boolean
+  errorPdf: boolean
+  onPdf: () => void
+}) {
+  const i = informe
+  const signo = i.variacionPct <= 0 ? '−' : '+'
+  const resultadoTxt = i.resultado === 'se_mantiene' ? 'se mantiene' : i.resultado === 'mejoro' ? 'mejoró' : 'empeoró'
+  return (
+    <section aria-label="Informe Jack-Knife" className="space-y-4 pt-2 text-footnote text-foreground">
+      <h4 className="text-headline font-semibold">Informe Jack-Knife · {planta}</h4>
+      <p className="text-caption tabular-nums text-muted-foreground">
+        Ahora: {ahoraTxt} ({i.nAhora} {plural(i.nAhora, 'turno', 'turnos')}) · Antes: {antesTxt} ({i.nAntes} {plural(i.nAntes, 'turno', 'turnos')}) · {vistaTxt}. Fuente: detenciones imputadas en Shoplogix, causas del balde Mantención.
+      </p>
+
+      <div className="space-y-1">
+        <h5 className="font-semibold">Resultado</h5>
+        <p className="tabular-nums">
+          La detención atribuida a Mantención pasó de {dec1(i.minTurnoAntes)} a {dec1(i.minTurnoAhora)} min por turno ({signo}{dec(Math.abs(i.variacionPct), 0)} %): {resultadoTxt}. En total, {hrs(horasAntes)} antes y {hrs(horasAhora)} ahora.
+        </p>
+        <p>
+          <b>Mejoraron ({i.mejoraron.length}):</b> {i.mejoraron.join(', ') || 'ninguna'}. <b>Empeoraron o aparecieron ({i.empeoraron.length}):</b> {i.empeoraron.join(', ') || 'ninguna'}.
+        </p>
+        {i.prioridad1.length > 0 && (
+          <p><b>Prioridad 1 ahora:</b> {i.prioridad1.join(', ')}: se repiten más que el promedio y tardan más en repararse.</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h5 className="font-semibold">Detalle por causa (por cada 10 turnos)</h5>
+        <ul className="space-y-3">
+          {i.filas.map((f) => (
+            <li key={f.causa} className="min-w-0 space-y-1">
+              <p className="flex flex-wrap items-baseline justify-between gap-x-2">
+                <span className="min-w-0 break-words font-semibold">{f.causa}</span>
+                <span className={cn('text-caption font-semibold', TONO_VEREDICTO[f.veredicto])}>{ETIQUETA_VEREDICTO[f.veredicto]}</span>
+              </p>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-caption tabular-nums">
+                <dt className="text-muted-foreground">Eventos antes → ahora</dt>
+                <dd className="text-foreground">{dec1(f.evAntes10)} → {dec1(f.evAhora10)}</dd>
+                <dt className="text-muted-foreground">Reparación antes → ahora</dt>
+                <dd className="text-foreground">{f.antes ? `${dec1(f.antes.mttr)} min` : '—'} → {f.ahora ? `${dec1(f.ahora.mttr)} min` : '—'}</dd>
+                <dt className="text-muted-foreground">Min. detenido antes → ahora</dt>
+                <dd className="text-foreground">{dec(f.minAntes10, 0)} → {dec(f.minAhora10, 0)}</dd>
+              </dl>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="space-y-1">
+        <h5 className="font-semibold">Qué dicen los comentarios</h5>
+        {i.comentariosClave.length === 0 ? (
+          <p>Sin causas prioritarias ni empeoradas.</p>
+        ) : i.comentariosClave.map((g) => (
+          <p key={g.causa} className="break-words">
+            <b>{g.causa}:</b>{' '}
+            {g.top.length ? g.top.map((t) => `«${t.texto}»${t.n > 1 ? ` ×${t.n}` : ''}`).join(' · ') : 'sin comentarios en el período.'}
+          </p>
+        ))}
+      </div>
+
+      <p className="text-caption text-muted-foreground">
+        Regla: una causa mejora o empeora si sus minutos por turno cambian más de 10 %. Las horas y los eventos se llevan a cada 10 turnos para comparar períodos de distinto largo. El PDF trae un QR que abre esta misma vista.
+      </p>
+
+      <div className="flex flex-col gap-2 min-[561px]:flex-row min-[561px]:items-center">
+        <Button variant="filled" size="md" onClick={onPdf} disabled={pdfEnCurso} className="gap-2">
+          <FileDown aria-hidden />
+          {pdfEnCurso ? 'Preparando PDF…' : 'Descargar PDF'}
+        </Button>
+        {errorPdf && <p role="alert" className="text-footnote text-ink-crit">No se pudo generar el PDF. Intenta de nuevo.</p>}
+      </div>
+    </section>
+  )
+}
+
 export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
+  // Filtros desde el QR o el link del informe (#jk=…), leídos una sola vez al abrir.
+  const [inicial] = useState(() => leerEstadoJK(window.location.hash, plantSlug))
   const [crudos, setCrudos] = useState<TurnoCrudo[] | null>(null)
   const [error, setError] = useState(false)
-  const [vista, setVista] = useState<VistaJK>('imp')
-  const [preset, setPreset] = useState<VentanaJK | 'libre'>('90')
-  const [manual, setManual] = useState<{ a: number; b: number } | null>(null)
+  const [vista, setVista] = useState<VistaJK>(inicial?.vs ?? 'imp')
+  const [preset, setPreset] = useState<VentanaJK | 'libre'>(inicial?.v ?? '90')
+  const [manual, setManual] = useState<RangoJK | null>(null)
+  const [modoCmp, setModoCmp] = useState<ModoCmpJK>(inicial?.cmp ?? 'ant')
+  const [manualAntes, setManualAntes] = useState<RangoJK | null>(null)
   const [sel, setSel] = useState<string | null>(null)
+  const [busqueda, setBusqueda] = useState('')
+  const [palabra, setPalabra] = useState<string | null>(null)
+  const [modoCom, setModoCom] = useState<'grupo' | 'fecha'>('grupo')
+  const [verInforme, setVerInforme] = useState(false)
+  const [pdfEnCurso, setPdfEnCurso] = useState(false)
+  const [errorPdf, setErrorPdf] = useState(false)
   const [ancho, setAncho] = useState(0)
   const rootRef = useRef<HTMLDivElement>(null)
+  const pendienteURL = useRef(inicial)
 
   useEffect(() => {
     let vivo = true
@@ -111,11 +369,25 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   const turnos: TurnoJK[] = prep.turnos
   const n = turnos.length
 
+  // Filtros del enlace: los extremos manuales llegan como id de turno.
+  useEffect(() => {
+    const e = pendienteURL.current
+    if (!e || !turnos.length) return
+    pendienteURL.current = null
+    const idx = (id?: string) => (id ? turnos.findIndex((t) => t.id === id) : -1)
+    const ha = idx(e.ha)
+    const hb = idx(e.hb)
+    const ca = idx(e.ca)
+    const cb = idx(e.cb)
+    if (ha >= 0 && hb >= 0) setManual({ desde: Math.min(ha, hb), hasta: Math.max(ha, hb) })
+    if (ca >= 0 && cb >= 0) setManualAntes({ desde: Math.min(ca, cb), hasta: Math.max(ca, cb) })
+  }, [turnos])
+
   const win = useMemo(() => {
     if (preset !== 'libre') return ventanaJK(turnos, preset)
     if (!manual || n === 0) return ventanaJK(turnos, '90')
-    const desde = Math.min(Math.max(0, manual.a), n - 1)
-    const hasta = Math.min(Math.max(manual.b, desde), n - 1)
+    const desde = Math.min(Math.max(0, manual.desde), n - 1)
+    const hasta = Math.min(Math.max(manual.hasta, desde), n - 1)
     return { desde, hasta }
   }, [turnos, preset, manual, n])
 
@@ -124,7 +396,67 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
     [turnos, win.desde, win.hasta, vista],
   )
 
+  // Período de comparación. «Elegir a mano» parte con el período anterior.
+  const antesEf: RangoJK = manualAntes ?? previaAnterior(win.desde, win.hasta) ?? { desde: 0, hasta: 0 }
+  const previa: PreviaJK | null = useMemo(
+    () => (modoCmp === 'mano' ? previaJK(turnos, win, 'mano', antesEf) : previaJK(turnos, win, modoCmp)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [turnos, win.desde, win.hasta, modoCmp, antesEf.desde, antesEf.hasta],
+  )
+  const antesCalc = useMemo(
+    () => (previa ? calcularJackKnife(turnos, previa.desde, previa.hasta, vista) : null),
+    [turnos, previa, vista],
+  )
+  const resumen = useMemo(() => resumenComparacion(calc, antesCalc, previa), [calc, antesCalc, previa])
+  const informe = useMemo(
+    () => (verInforme && previa && antesCalc ? datosInforme(turnos, calc, antesCalc, previa) : null),
+    [verInforme, turnos, calc, antesCalc, previa],
+  )
+  const nAhoraT = win.hasta - win.desde + 1
+  const nAntesT = previa ? previa.hasta - previa.desde + 1 : 0
+  const plantaTxt = plantSlug === 'chonchi' ? 'Chonchi' : plantSlug === 'yal' ? 'Yal' : plantSlug
+  // Causas que tuvieron eventos antes y ahora no: la lista de la tarjeta no las dibuja.
+  const soloAntes = antesCalc ? antesCalc.pts.filter((p) => !calc.pts.some((q) => q.k === p.k)) : []
+
+  /** Enlace de esta vista con los mismos filtros, para el QR del PDF. */
+  const urlVista = () => {
+    const estado = {
+      pl: plantSlug,
+      v: preset,
+      vs: vista,
+      cmp: modoCmp,
+      ...(preset === 'libre' && n ? { ha: turnos[win.desde]?.id, hb: turnos[win.hasta]?.id } : {}),
+      ...(modoCmp === 'mano' && previa ? { ca: turnos[previa.desde]?.id, cb: turnos[previa.hasta]?.id } : {}),
+    }
+    return `${window.location.origin}${window.location.pathname}${codificarEstadoJK(estado)}`
+  }
+
+  const descargarPdf = async () => {
+    if (!informe || !previa || !antesCalc) return
+    setPdfEnCurso(true)
+    setErrorPdf(false)
+    try {
+      const { exportarInformeJackKnifePDF } = await import('@/services/grader/jackKnifePdf')
+      await exportarInformeJackKnifePDF({
+        planta: plantaTxt,
+        informe,
+        ahoraTxt: rangoTexto(turnos, win),
+        antesTxt: rangoTexto(turnos, previa),
+        horasAhora: calc.D,
+        horasAntes: antesCalc.D,
+        vistaTxt: VISTAS.find((v) => v.value === vista)?.label ?? '',
+        url: urlVista(),
+      })
+    } catch {
+      setErrorPdf(true)
+    } finally {
+      setPdfEnCurso(false)
+    }
+  }
+
   const W = Math.max(300, ancho || 900)
+  // Columnas de la lista según el ancho de la TARJETA (no del viewport): 4 ≥ 900 px, 2 ≥ 520 px, 1 si no.
+  const columnasLista = ancho >= 900 ? 4 : ancho >= 520 ? 2 : 1
   const layout = useMemo(
     () => (calc.pts.length ? calcularLayout(calc, W, sel) : null),
     [calc, W, sel],
@@ -134,7 +466,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   const selPunto = calc.pts.find((p) => p.k === sel) ?? porTotal[0] ?? null
   const esSin = vista === 'sin' || selPunto?.k === SIN_IMPUTAR
   const comentarios = selPunto && !esSin && n > 0
-    ? comentariosDe(turnos, win.desde, win.hasta, selPunto.k, 5)
+    ? comentariosDe(turnos, win.desde, win.hasta, selPunto.k, Infinity)
     : []
 
   const prim = calc.pts.filter((p) => p.q === 'amb')
@@ -160,6 +492,19 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   if (calc.cob !== null && calc.cob < 0.5) {
     avisos.push(`Solo ${Math.round(calc.cob * 100)} % del tiempo detenido no planificado tiene causa anotada, contando microdetenciones: faltan eventos en este gráfico.`)
   }
+
+  if (modoCmp !== 'no') {
+    if (!previa) {
+      avisos.push(modoCmp === 'mes'
+        ? 'No hay turnos del mes pasado en los datos para comparar.'
+        : 'No hay historia anterior a esta ventana para comparar: elige otro período.')
+    } else if (previa.parcial) {
+      avisos.push('La historia no alcanza para un período anterior completo: se compara con menos turnos.')
+    }
+  }
+  const tesisCmp = resumen
+    ? ` Antes: ${hrs(resumen.horasAntes)} en ${resumen.nAntes} ${plural(resumen.nAntes, 'turno', 'turnos')}; por turno ${dec1(resumen.minAntes)} → ${dec1(resumen.minAhora)} min. ${resumen.mejoraron} ${plural(resumen.mejoraron, 'causa mejoró', 'causas mejoraron')} y ${resumen.empeoraron} ${plural(resumen.empeoraron, 'empeoró', 'empeoraron')}.${resumen.parcial ? ' La historia no alcanza para un período anterior completo.' : ''}`
+    : ''
 
   // Riel: barras por turno (escala raíz, como el mockup).
   const mxBarra = Math.max(...calc.barras, 1)
@@ -188,15 +533,23 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
     let b = win.hasta + dir * len
     if (a < 0) { a = 0; b = len - 1 }
     if (b > max) { b = max; a = max - len + 1 }
-    setManual({ a, b })
+    setManual({ desde: a, hasta: b })
     setPreset('libre')
   }
 
-  const cambiarVista = (v: VistaJK) => { setVista(v); setSel(null) }
+  // Al cambiar de causa o de vista se limpian el filtro y la búsqueda de comentarios.
+  const elegirCausa = (k: string) => { setSel(k); setBusqueda(''); setPalabra(null) }
+  const cambiarVista = (v: VistaJK) => { setVista(v); setSel(null); setBusqueda(''); setPalabra(null) }
   const cambiarPreset = (v: VentanaJK | 'libre') => { setPreset(v); setManual(null) }
+  const cambiarModo = (m: ModoCmpJK) => {
+    setModoCmp(m)
+    if (m === 'mano') setManualAntes(previaAnterior(win.desde, win.hasta) ?? { desde: 0, hasta: 0 })
+  }
 
-  const nuevoA = (v: number) => { setManual({ a: Math.min(v, win.hasta), b: win.hasta }); setPreset('libre') }
-  const nuevoB = (v: number) => { setManual({ a: win.desde, b: Math.max(v, win.desde) }); setPreset('libre') }
+  const nuevoA = (v: number) => { setManual({ desde: Math.min(v, win.hasta), hasta: win.hasta }); setPreset('libre') }
+  const nuevoB = (v: number) => { setManual({ desde: win.desde, hasta: Math.max(v, win.desde) }); setPreset('libre') }
+  const nuevoAntesA = (v: number) => setManualAntes({ desde: v, hasta: antesEf.hasta })
+  const nuevoAntesB = (v: number) => setManualAntes({ desde: antesEf.desde, hasta: v })
 
   const inicioVentana = n ? turnos[win.desde]! : null
   const finVentana = n ? turnos[win.hasta]! : null
@@ -215,6 +568,9 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
         <div className="flex flex-wrap gap-2">
           <SegmentedControl<VistaJK> ariaLabel="Qué detenciones ver" value={vista} onChange={cambiarVista} segments={VISTAS} />
           <SegmentedControl<VentanaJK | 'libre'> ariaLabel="Período" value={preset} onChange={cambiarPreset} segments={PRESETS} />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <SegmentedControl<ModoCmpJK> ariaLabel="Comparar con" value={modoCmp} onChange={cambiarModo} segments={MODOS} />
         </div>
 
         {error && <p className="text-footnote text-destructive">No se pudo leer el resumen de turnos. Intenta de nuevo.</p>}
@@ -275,7 +631,13 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                       y={100 - alturaBarra(v)}
                       width={0.8}
                       height={alturaBarra(v)}
-                      className={i >= win.desde && i <= win.hasta ? 'fill-accent' : 'fill-muted-foreground opacity-40'}
+                      className={
+                    i >= win.desde && i <= win.hasta
+                      ? 'fill-accent'
+                      : previa && i >= previa.desde && i <= previa.hasta
+                        ? 'fill-warning'
+                        : 'fill-muted-foreground opacity-40'
+                  }
                     />
                   ))}
                 </svg>
@@ -301,6 +663,32 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                   disabled={n === 0}
                   className={RANGO_INPUT}
                 />
+                {modoCmp === 'mano' && (
+                  <>
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(0, n - 1)}
+                      step={1}
+                      value={antesEf.desde}
+                      onChange={(e) => nuevoAntesA(Number(e.target.value))}
+                      aria-label="Primer turno de Antes"
+                      disabled={n === 0}
+                      className={RANGO_INPUT_ANTES}
+                    />
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(0, n - 1)}
+                      step={1}
+                      value={antesEf.hasta}
+                      onChange={(e) => nuevoAntesB(Number(e.target.value))}
+                      aria-label="Último turno de Antes"
+                      disabled={n === 0}
+                      className={RANGO_INPUT_ANTES}
+                    />
+                  </>
+                )}
                 <div className="absolute inset-x-0 bottom-0 h-4 text-caption text-muted-foreground">
                   {meses.map(({ i, t }) => (
                     <span
@@ -313,12 +701,19 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                   ))}
                 </div>
               </div>
+              {previa && (
+                <p className="text-footnote tabular-nums text-foreground">
+                  Ahora: {rangoTexto(turnos, win)}
+                  <span className="text-muted-foreground"> · Antes: {rangoTexto(turnos, previa)}, {previa.hasta - previa.desde + 1} {plural(previa.hasta - previa.desde + 1, 'turno', 'turnos')}</span>
+                </p>
+              )}
               <p className="text-caption text-muted-foreground">
                 Las barras son las horas de detención por turno de lo que muestra el filtro. Arrastra las dos manijas, o usa ‹ › para mover la misma ventana.
+                {previa && ' En color de advertencia: el período de comparación.'}
               </p>
             </div>
 
-            <p className="text-body font-semibold text-foreground">{tesis}</p>
+            <p className="text-body font-semibold text-foreground">{tesis}{tesisCmp}</p>
             {avisos.length > 0 && <p className="text-footnote text-warning">{avisos.join(' ')}</p>}
             {prep.sinResumen > 0 && (
               <p className="text-caption text-muted-foreground">
@@ -373,7 +768,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                 ))}
                 {layout.puntos.map(({ p, x, y, rad, etiqueta }) => {
                   const color = p.k === SIN_IMPUTAR ? COLOR_SIN : Q[p.q].dot
-                  const activar = () => setSel(p.k)
+                  const activar = () => elegirCausa(p.k)
                   return (
                     <g
                       key={p.k}
@@ -410,20 +805,40 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                       : Q[selPunto.q].a}
                   </span>
                 </p>
-                {comentarios.length > 0 && (
-                  <ul className="space-y-1 pt-1">
-                    {comentarios.map((c) => (
-                      <li key={`${c.inicioMs}-${c.texto}`} className="text-foreground">
-                        <span className="text-caption text-muted-foreground tabular-nums">{fechaCorta(c.dateKey)} · {turnoCorto(c.shiftId)}</span>{' '}
-                        «{c.texto}»
-                      </li>
-                    ))}
-                  </ul>
+                {previa && (() => {
+                  const ant = antesCalc?.pts.find((p) => p.k === selPunto.k)
+                  return ant ? (
+                    <p className="text-foreground">
+                      <span className="text-muted-foreground">Antes → ahora, por cada 10 turnos: </span>
+                      <CambioTexto nombre="eventos" antes={(ant.ev / nAntesT) * 10} ahora={(selPunto.ev / nAhoraT) * 10} unidad="" fmt={(x) => dec1(x)} />
+                      {' · '}
+                      <CambioTexto nombre="reparación" antes={ant.mttr} ahora={selPunto.mttr} unidad=" min" fmt={(x) => dec1(x)} />
+                      {' · '}
+                      <CambioTexto nombre="detenido" antes={(ant.min / nAntesT) * 10} ahora={(selPunto.min / nAhoraT) * 10} unidad=" min" fmt={(x) => dec(x, 0)} />
+                    </p>
+                  ) : (
+                    <p className="text-foreground">
+                      <span className="font-semibold text-ink-crit">Nueva:</span>{' '}
+                      <span className="text-muted-foreground">no tuvo eventos en el período de comparación.</span>
+                    </p>
+                  )
+                })()}
+                {!esSin && (
+                  <ComentariosCausa
+                    causa={selPunto.k}
+                    todos={comentarios}
+                    busqueda={busqueda}
+                    onBusqueda={setBusqueda}
+                    palabra={palabra}
+                    onPalabra={setPalabra}
+                    modo={modoCom}
+                    onModo={setModoCom}
+                  />
                 )}
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-6 min-[561px]:grid-cols-2 min-[981px]:grid-cols-4">
+            <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${columnasLista}, minmax(0, 1fr))` }}>
               {(['amb', 'agu', 'cro', 'ok'] as const).map((k) => {
                 const filas = calc.pts.filter((p) => p.q === k).sort((a, b) => b.min - a.min)
                 return (
@@ -438,14 +853,22 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                           key={p.k}
                           type="button"
                           aria-pressed={selPunto?.k === p.k}
-                          onClick={() => setSel(p.k)}
+                          onClick={() => elegirCausa(p.k)}
                           className={cn(
-                            'flex min-h-11 w-full items-center justify-between gap-3 text-left text-footnote tabular-nums',
-                            selPunto?.k === p.k ? 'font-semibold text-accent' : 'text-foreground',
+                            'flex min-h-[44px] w-full items-start justify-between gap-3 text-left text-footnote tabular-nums',
+                            selPunto?.k === p.k ? 'font-semibold text-brand-ink' : 'text-foreground',
                           )}
                         >
-                          <span className="min-w-0 truncate">{p.k}</span>
-                          <span className="shrink-0 text-caption text-muted-foreground">{p.ev} · {durS(p.mttr)}</span>
+                          <span className="min-w-0 flex-1 break-words">{p.k}</span>
+                          <span className="shrink-0 text-right text-caption text-muted-foreground">
+                            <span className="block">{p.ev} · {durS(p.mttr)}</span>
+                            {previa && (() => {
+                              const v = veredicto(p, antesCalc?.pts.find((x) => x.k === p.k), nAhoraT, nAntesT)
+                              return v === 'igual' ? null : (
+                                <span className={cn('block font-semibold', TONO_VEREDICTO[v])}>{ETIQUETA_VEREDICTO[v]}</span>
+                              )
+                            })()}
+                          </span>
                         </button>
                       ))
                     ) : (
@@ -454,6 +877,43 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                   </div>
                 )
               })}
+            </div>
+
+            {soloAntes.length > 0 && (
+              <p className="text-caption text-muted-foreground">
+                <span className="font-semibold text-ink-ok">{ETIQUETA_VEREDICTO.sinEventos}</span>: {soloAntes.map((p) => p.k).join(', ')}.
+              </p>
+            )}
+
+            <div className="space-y-2">
+              <Button variant="tinted" size="md" onClick={() => setVerInforme((v) => !v)} aria-expanded={verInforme} className="gap-2">
+                <FileText aria-hidden />
+                {verInforme ? 'Ocultar informe' : 'Generar informe'}
+              </Button>
+              {verInforme && (
+                !previa ? (
+                  <p className="text-footnote text-muted-foreground">
+                    Elige un período de comparación para que el informe diga qué causas mejoraron o empeoraron.
+                  </p>
+                ) : !informe || !antesCalc ? (
+                  <p className="text-footnote text-muted-foreground">
+                    No hay eventos en el período de comparación: el informe no puede decir qué causas mejoraron.
+                  </p>
+                ) : (
+                  <InformeJackKnife
+                    planta={plantaTxt}
+                    informe={informe}
+                    ahoraTxt={rangoTexto(turnos, win)}
+                    antesTxt={rangoTexto(turnos, previa)}
+                    horasAhora={calc.D}
+                    horasAntes={antesCalc.D}
+                    vistaTxt={VISTAS.find((v) => v.value === vista)?.label ?? ''}
+                    pdfEnCurso={pdfEnCurso}
+                    errorPdf={errorPdf}
+                    onPdf={() => void descargarPdf()}
+                  />
+                )
+              )}
             </div>
 
             <p className="text-caption text-muted-foreground">

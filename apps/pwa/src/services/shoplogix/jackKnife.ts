@@ -258,3 +258,358 @@ export function limpiarCacheJackKnife(planta?: string): void {
   if (planta) cachePlanta.delete(planta)
   else cachePlanta.clear()
 }
+
+// ── Comparación de períodos ─────────────────────────────────────────────────
+
+/** Modo de comparación: «Vs. período anterior», «Vs. mes pasado», «Elegir a mano», «Sin comparar». */
+export type ModoCmpJK = 'ant' | 'mes' | 'mano' | 'no'
+export interface RangoJK { desde: number; hasta: number }
+/** Período de comparación. `parcial` = la historia no alcanza para un período completo. */
+export interface PreviaJK extends RangoJK { parcial: boolean }
+
+/**
+ * Resta un mes a una fecha YYYY-MM-DD. Si el día no existe en el mes anterior,
+ * usa su último día: 31-mar → 28/29-feb, nunca 3-mar (el mockup se pasaba).
+ */
+export function restarMes(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number) as [number, number, number]
+  const mesAnterior0 = m - 2 // índice base 0 del mes anterior
+  const anio = mesAnterior0 < 0 ? y - 1 : y
+  const mes0 = (mesAnterior0 + 12) % 12
+  const ultimoDia = new Date(Date.UTC(anio, mes0 + 1, 0)).getUTCDate()
+  const dia = Math.min(d, ultimoDia)
+  return `${anio}-${String(mes0 + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+
+/** Período inmediatamente anterior, del mismo largo. Null si no hay historia. */
+export function previaAnterior(desde: number, hasta: number): PreviaJK | null {
+  if (desde <= 0) return null
+  const n = hasta - desde + 1
+  return { desde: Math.max(0, desde - n), hasta: desde - 1, parcial: desde - n < 0 }
+}
+
+/** Mismas fechas, un mes antes. Null si no hay turnos en ese rango. */
+export function previaMesPasado(turnos: readonly TurnoJK[], desde: number, hasta: number): PreviaJK | null {
+  if (!turnos.length || hasta < desde) return null
+  const lo = restarMes(turnos[desde]!.dateKey)
+  const hi = restarMes(turnos[hasta]!.dateKey)
+  const a = turnos.findIndex((t) => t.dateKey >= lo)
+  let b = -1
+  for (let i = turnos.length - 1; i >= 0; i--) {
+    if (turnos[i]!.dateKey <= hi) { b = i; break }
+  }
+  return a < 0 || b < a ? null : { desde: a, hasta: b, parcial: false }
+}
+
+/** Período de comparación según el modo. `manual` solo se usa en «Elegir a mano». */
+export function previaJK(
+  turnos: readonly TurnoJK[],
+  rango: RangoJK,
+  modo: ModoCmpJK,
+  manual?: RangoJK,
+): PreviaJK | null {
+  if (modo === 'no') return null
+  if (modo === 'ant') return previaAnterior(rango.desde, rango.hasta)
+  if (modo === 'mano') {
+    if (!manual) return null
+    return { desde: Math.min(manual.desde, manual.hasta), hasta: Math.max(manual.desde, manual.hasta), parcial: false }
+  }
+  return previaMesPasado(turnos, rango.desde, rango.hasta)
+}
+
+// ── Veredictos y variación ──────────────────────────────────────────────────
+
+export type SentidoJK = 'mejor' | 'peor' | 'igual'
+/** Variación con umbral ±10 %: «igual» si el cambio relativo es menor a 10 %. */
+export function sentidoCambio(antes: number, ahora: number): SentidoJK {
+  const d = ahora - antes
+  const rel = antes ? Math.abs(d) / antes : 1
+  if (rel < 0.1) return 'igual'
+  return d < 0 ? 'mejor' : 'peor'
+}
+
+export type VeredictoJK = 'mejoro' | 'empeoro' | 'igual' | 'nueva' | 'sinEventos'
+/** Veredicto por causa: minutos por turno, ±10 %. */
+export function veredicto(
+  ahora: PuntoJK | undefined,
+  antes: PuntoJK | undefined,
+  nAhora: number,
+  nAntes: number,
+): VeredictoJK {
+  if (!antes) return 'nueva'
+  if (!ahora) return 'sinEventos'
+  const r = (ahora.min / nAhora) / (antes.min / nAntes)
+  return r < 0.9 ? 'mejoro' : r > 1.1 ? 'empeoro' : 'igual'
+}
+
+export const ETIQUETA_VEREDICTO: Record<VeredictoJK, string> = {
+  mejoro: 'mejoró',
+  empeoro: 'empeoró',
+  igual: 'igual',
+  nueva: 'nueva',
+  sinEventos: 'sin eventos ahora',
+}
+
+/** Resumen numérico de la comparación para la tesis. Null si no hay eventos antes. */
+export interface ResumenComparacionJK {
+  nAntes: number
+  nAhora: number
+  minAntes: number
+  minAhora: number
+  horasAntes: number
+  parcial: boolean
+  mejoraron: number
+  empeoraron: number
+}
+export function resumenComparacion(
+  ahora: CalculoJK,
+  antes: CalculoJK | null,
+  previa: PreviaJK | null,
+): ResumenComparacionJK | null {
+  if (!antes || !previa || antes.N === 0) return null
+  const nAhora = ahora.hasta - ahora.desde + 1
+  const nAntes = previa.hasta - previa.desde + 1
+  const PV = new Map(antes.pts.map((p) => [p.k, p]))
+  const AH = new Map(ahora.pts.map((p) => [p.k, p]))
+  const claves = new Set([...PV.keys(), ...AH.keys()])
+  let mejoraron = 0
+  let empeoraron = 0
+  for (const k of claves) {
+    const v = veredicto(AH.get(k), PV.get(k), nAhora, nAntes)
+    if (v === 'mejoro' || v === 'sinEventos') mejoraron++
+    else if (v === 'empeoro' || v === 'nueva') empeoraron++
+  }
+  return {
+    nAntes,
+    nAhora,
+    minAntes: antes.D / nAntes,
+    minAhora: ahora.D / nAhora,
+    horasAntes: antes.D,
+    parcial: previa.parcial,
+    mejoraron,
+    empeoraron,
+  }
+}
+
+// ── Comentarios: palabras, agrupación y filtro ──────────────────────────────
+
+/** Texto normalizado: minúsculas, sin tildes, solo letras, números y espacios simples. */
+export function normalizarTexto(t: string): string {
+  return t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9ñ ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Palabras que no cuentan para los chips (mockup: VACIAS). */
+const PALABRAS_VACIAS = new Set(
+  'de la el en y a con se por no del al lo las los un una que para es mas sin muy le su o e se realiza cambio'.split(' '),
+)
+
+/** Las `max` palabras más repetidas (más de 3 letras, sin vacías ni números), contadas una vez por comentario. */
+export function palabrasFrecuentes(textos: readonly string[], max = 10): { palabra: string; n: number }[] {
+  const cuenta = new Map<string, number>()
+  for (const t of textos) {
+    for (const w of new Set(normalizarTexto(t).split(' '))) {
+      if (w.length <= 3 || PALABRAS_VACIAS.has(w) || /^\d+$/.test(w)) continue
+      cuenta.set(w, (cuenta.get(w) ?? 0) + 1)
+    }
+  }
+  return [...cuenta.entries()]
+    .map(([palabra, n]) => ({ palabra, n }))
+    .sort((a, b) => b.n - a.n || (a.palabra < b.palabra ? -1 : 1))
+    .slice(0, max)
+}
+
+/** Filtra por texto de búsqueda (sin tildes) y por palabra de chip (palabra exacta). */
+export function filtrarComentarios<T extends { texto: string }>(
+  lista: readonly T[],
+  busqueda: string,
+  palabra: string | null,
+): T[] {
+  const q = normalizarTexto(busqueda)
+  return lista.filter((c) => {
+    const n = normalizarTexto(c.texto)
+    return (!q || n.includes(q)) && (!palabra || n.split(' ').includes(palabra))
+  })
+}
+
+export interface GrupoComentarioJK {
+  texto: string
+  n: number
+  ultimoMs: number
+}
+/** Agrupa por texto normalizado (×n) y guarda la fecha del último. Más repetidos primero. */
+export function agruparComentarios(lista: readonly { texto: string; inicioMs: number }[]): GrupoComentarioJK[] {
+  const grupos = new Map<string, GrupoComentarioJK>()
+  for (const c of lista) {
+    const clave = normalizarTexto(c.texto)
+    const g = grupos.get(clave)
+    if (g) {
+      g.n++
+      g.ultimoMs = Math.max(g.ultimoMs, c.inicioMs)
+    } else {
+      grupos.set(clave, { texto: c.texto, n: 1, ultimoMs: c.inicioMs })
+    }
+  }
+  return [...grupos.values()].sort((a, b) => b.n - a.n || b.ultimoMs - a.ultimoMs)
+}
+
+// ── Informe ─────────────────────────────────────────────────────────────────
+
+export interface FilaInformeJK {
+  causa: string
+  ahora: PuntoJK | undefined
+  antes: PuntoJK | undefined
+  /** Por cada 10 turnos. */
+  evAhora10: number
+  evAntes10: number
+  minAhora10: number
+  minAntes10: number
+  veredicto: VeredictoJK
+}
+
+export interface InformeJK {
+  nAhora: number
+  nAntes: number
+  minTurnoAntes: number
+  minTurnoAhora: number
+  /** Variación de minutos por turno, en %. */
+  variacionPct: number
+  /** Regla de ±10 %. */
+  resultado: 'mejoro' | 'empeoro' | 'se_mantiene'
+  mejoraron: string[]
+  empeoraron: string[]
+  prioridad1: string[]
+  filas: FilaInformeJK[]
+  /** Dos comentarios más repetidos de cada causa prioritaria o empeorada (máx. 4 causas). */
+  comentariosClave: { causa: string; top: { texto: string; n: number }[] }[]
+}
+
+/** Datos del informe, sin formato. Null si no hay comparación con eventos. */
+export function datosInforme(
+  turnos: readonly TurnoJK[],
+  ahora: CalculoJK,
+  antes: CalculoJK,
+  previa: PreviaJK,
+): InformeJK | null {
+  if (antes.N === 0) return null
+  const nAhora = ahora.hasta - ahora.desde + 1
+  const nAntes = previa.hasta - previa.desde + 1
+  const PV = new Map(antes.pts.map((p) => [p.k, p]))
+  const AH = new Map(ahora.pts.map((p) => [p.k, p]))
+  const claves = [...new Set([...AH.keys(), ...PV.keys()])]
+
+  const filas: (FilaInformeJK & { delta: number })[] = claves.map((causa) => {
+    const a = AH.get(causa)
+    const b = PV.get(causa)
+    const minAhora10 = a ? (a.min / nAhora) * 10 : 0
+    const minAntes10 = b ? (b.min / nAntes) * 10 : 0
+    return {
+      causa,
+      ahora: a,
+      antes: b,
+      evAhora10: a ? (a.ev / nAhora) * 10 : 0,
+      evAntes10: b ? (b.ev / nAntes) * 10 : 0,
+      minAhora10,
+      minAntes10,
+      veredicto: veredicto(a, b, nAhora, nAntes),
+      delta: minAhora10 - minAntes10,
+    }
+  })
+  filas.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
+
+  const de = (...vs: VeredictoJK[]) => filas.filter((f) => vs.includes(f.veredicto)).map((f) => f.causa)
+  const mejoraron = de('mejoro', 'sinEventos')
+  const empeoraron = de('empeoro', 'nueva')
+  const prioridad1 = ahora.pts
+    .filter((p) => p.q === 'amb')
+    .sort((x, y) => y.min - x.min)
+    .map((p) => p.k)
+
+  const minTurnoAntes = antes.D / nAntes
+  const minTurnoAhora = ahora.D / nAhora
+  const variacionPct = minTurnoAntes ? ((minTurnoAhora - minTurnoAntes) / minTurnoAntes) * 100 : 0
+  const resultado = Math.abs(variacionPct) < 10 ? 'se_mantiene' : variacionPct < 0 ? 'mejoro' : 'empeoro'
+
+  const claveCausas = [...new Set([...prioridad1, ...empeoraron])].slice(0, 4)
+  const comentariosClave = claveCausas.map((causa) => {
+    const textos = comentariosDe(turnos, ahora.desde, ahora.hasta, causa, Infinity)
+    return {
+      causa,
+      top: agruparComentarios(textos).slice(0, 2).map((g) => ({ texto: g.texto, n: g.n })),
+    }
+  })
+
+  return {
+    nAhora,
+    nAntes,
+    minTurnoAntes,
+    minTurnoAhora,
+    variacionPct,
+    resultado,
+    mejoraron,
+    empeoraron,
+    prioridad1,
+    filas: filas.map(({ delta: _d, ...f }) => f),
+    comentariosClave,
+  }
+}
+
+// ── Estado en la URL (QR del informe) ───────────────────────────────────────
+
+/**
+ * Filtros de la tarjeta en el hash, con el mismo patrón que `/nuevos` (`#t=`):
+ * `#jk=pl=chonchi&v=90&vs=imp&cmp=ant`. Los extremos manuales van por id de turno,
+ * no por índice, para que el enlace siga apuntando al mismo día si llegan turnos nuevos.
+ */
+export interface EstadoURLJK {
+  pl: string
+  v: VentanaJK | 'libre'
+  vs: VistaJK
+  cmp: ModoCmpJK
+  ha?: string
+  hb?: string
+  ca?: string
+  cb?: string
+}
+
+const VENTANAS_URL: readonly string[] = ['turno', '7', '30', '90', 'todo', 'libre']
+const VISTAS_URL: readonly string[] = ['imp', 'sin', 'todas']
+const MODOS_URL: readonly string[] = ['ant', 'mes', 'mano', 'no']
+
+export function codificarEstadoJK(e: EstadoURLJK): string {
+  const p = new URLSearchParams()
+  p.set('pl', e.pl)
+  p.set('v', e.v)
+  p.set('vs', e.vs)
+  p.set('cmp', e.cmp)
+  if (e.ha) p.set('ha', e.ha)
+  if (e.hb) p.set('hb', e.hb)
+  if (e.ca) p.set('ca', e.ca)
+  if (e.cb) p.set('cb', e.cb)
+  return `#jk=${p.toString()}`
+}
+
+/** Lee el hash. Null si no es de la tarjeta o es de otra planta. Valores inválidos se ignoran. */
+export function leerEstadoJK(hash: string, planta: string): EstadoURLJK | null {
+  if (!hash.startsWith('#jk=')) return null
+  const p = new URLSearchParams(hash.slice(4))
+  if (p.get('pl') !== planta) return null
+  const v = p.get('v') ?? '90'
+  const vs = p.get('vs') ?? 'imp'
+  const cmp = p.get('cmp') ?? 'ant'
+  return {
+    pl: planta,
+    v: (VENTANAS_URL.includes(v) ? v : '90') as VentanaJK | 'libre',
+    vs: (VISTAS_URL.includes(vs) ? vs : 'imp') as VistaJK,
+    cmp: (MODOS_URL.includes(cmp) ? cmp : 'ant') as ModoCmpJK,
+    ha: p.get('ha') ?? undefined,
+    hb: p.get('hb') ?? undefined,
+    ca: p.get('ca') ?? undefined,
+    cb: p.get('cb') ?? undefined,
+  }
+}
