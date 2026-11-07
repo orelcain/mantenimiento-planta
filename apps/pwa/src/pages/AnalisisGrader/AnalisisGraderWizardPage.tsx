@@ -995,6 +995,7 @@ export function AnalisisGraderWizardPage() {
           slxStats={calendarSlxStats}
           isClassificationPlant={lineConfig.isClassificationPlant !== false}
           tieneGrader={lineConfig.hasGraderData !== false}
+          plantSlug={lineConfig.shoplogixEnabled && !lineConfig.comingSoon ? lineConfig.plantSlug : null}
         />
       </div>
 
