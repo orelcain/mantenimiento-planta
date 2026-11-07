@@ -41,7 +41,9 @@ const { matchImputacion } = require('./imputacion')
 
 const RE_PLANIFICADO = /COLACI|DETENCION PROGRAMADA|REUNION|EJERCICIO|CHARLA|ASEO|LIMPIEZA|SANITIZ|PLANNED\s*DOWNTIME|CAMBIO DE TURNO/
 const RE_EXTERNO = /MMPP|MATERIA PRIMA|FALTA PERSONAL|ACUMULACION|RECHAZO|ABASTEC|ESPERA/
-const BUCKET_A_CLASE = { mantencion: 'falla', externo: 'externo', planificado: 'planificado', 'fuera-turno': 'planificado' }
+// Dueño de la pérdida según el árbol. `fuera-turno` (Planned Downtime) y null
+// NO están: caen al respaldo de regex, como antes.
+const BUCKET_A_CLASE = { mantencion: 'falla', externo: 'externo', planificado: 'planificado' }
 
 function normaliza(s) {
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
@@ -55,10 +57,8 @@ function clasificaCausa(state) {
   const r = normaliza(reason || name)
   if (/EXCEDID/i.test(name)) return 'excedido'
   if (/MICRO/i.test(name) && !reason) return 'micro'
-  if (reason) {
-    const clase = BUCKET_A_CLASE[matchImputacion(reason).bucket]
-    if (clase) return clase
-  }
+  const clase = BUCKET_A_CLASE[matchImputacion(reason || name).bucket]
+  if (clase) return clase
   if (RE_PLANIFICADO.test(r)) return 'planificado'
   if (RE_EXTERNO.test(r)) return 'externo'
   if (!reason) return 'sin-imputar'

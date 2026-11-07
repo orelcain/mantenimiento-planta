@@ -113,6 +113,12 @@ const IMPUTACION_LEAVES = [
   // propia y no alias: desde el reason plano no se puede afirmar que la de
   // Filete sea de rechazo. Mismo bucket, asi que la cascada no cambia.
   { label: 'Acumulación',          categorias: ['mmpp'], bucket: 'externo', equipo: 'baader200', extension: 'filete-baader200', match: ['ACUMULACION'] },
+
+  // Extensión · Chonchi (no son del curso — ver el .ts). Se anotan en Shoplogix
+  // y se decidió (Orel, 07-11-2026) que son de Mantención. `categorias` vacío:
+  // el dato no dice eléctrica o mecánica, y no se inventa.
+  { label: 'Planta de Riles', categorias: [], bucket: 'mantencion', extension: 'fuera-del-curso', match: ['PLANTA DE RILES'] },
+  { label: 'Túneles',         categorias: [], bucket: 'mantencion', extension: 'fuera-del-curso', match: ['TUNELES MEC', 'TUNELES'] },
 ]
 
 /**
@@ -202,6 +208,7 @@ function matchImputacion(rawReason) {
 function categoriaLabel(m) {
   if (!m || m.sinCausa) return 'Sin causa imputada'
   if (m.fueraDelArbol) return 'Fuera del árbol'
+  if (m.leaf && m.leaf.extension === 'fuera-del-curso') return 'Fuera del curso'
   if (m.categoria) return CATEGORIA_META[m.categoria].short
   if (m.leaf && m.leaf.categorias.length > 1) {
     return m.leaf.categorias.map((c) => CATEGORIA_META[c].short).join(' o ')

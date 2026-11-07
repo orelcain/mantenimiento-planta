@@ -35,9 +35,21 @@ describe('clasificaCausa', () => {
     [{ type: 'downtime', name: 'Detencion', reason: 'CINTAS (MECANICA)' }, 'falla'],
     [{ type: 'downtime', name: 'Detencion', reason: 'Equipo Auxiliar/GEA' }, 'falla'],
     [{ type: 'downtime', name: 'Detencion', reason: 'AJUSTE MANTENIMIENTO' }, 'falla'],
+    // 07-11: Shoplogix escribe «CAMBIO TURNO» y «CUMPLIMIENTO CUOTA» (no los regex viejos); el árbol los resuelve.
+    [{ type: 'break', name: 'Detencion', reason: 'CAMBIO TURNO' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'CUMPLIMIENTO CUOTA' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'CONTRASTACION' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'KNURO' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'BOMBAS (MECANICA)' }, 'falla'],
+    // Riles y Túneles: anotadas en Shoplogix, de Mantención (extensión fuera del curso).
+    [{ type: 'downtime', name: 'Detencion', reason: 'Planta De Riles' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Túneles MEC' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Tuneles' }, 'falla'],
+    // Sin causal: sin-imputar. Micro sin causal: micro.
+    [{ type: 'downtime', name: 'Detencion', reason: '' }, 'sin-imputar'],
+    [{ type: 'downtime', name: 'Micro Detencion', reason: '' }, 'micro'],
     // Fuera del árbol: siguen los patrones de siempre.
     [{ type: 'break', name: 'Detencion', reason: 'Limpieza de Ducto' }, 'planificado'],
-    [{ type: 'downtime', name: 'Detencion', reason: 'Planta De Riles' }, 'falla'],
   ]
   for (const [st, esperado] of casos) {
     test(`${st.name}/${st.reason || '∅'} → ${esperado}`, () => {

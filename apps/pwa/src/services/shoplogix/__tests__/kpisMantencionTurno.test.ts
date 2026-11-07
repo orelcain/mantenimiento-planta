@@ -37,6 +37,18 @@ describe('clasificaCausa', () => {
     [{ type: 'downtime', name: 'Micro Detencion', reason: '' }, 'micro'],
     [{ type: 'downtime', name: 'Detencion', reason: 'KNURO' }, 'falla'],
     [{ type: 'downtime', name: 'Detencion', reason: '' }, 'sin-imputar'],
+    // 07-11: Shoplogix escribe «CAMBIO TURNO» y «CUMPLIMIENTO CUOTA»; el árbol oficial los resuelve.
+    [{ type: 'break', name: 'Detencion', reason: 'CAMBIO TURNO' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'CUMPLIMIENTO CUOTA' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'CONTRASTACION' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'BOMBAS (MECANICA)' }, 'falla'],
+    // Riles y Túneles: de Mantención (extensión fuera del curso).
+    [{ type: 'downtime', name: 'Detencion', reason: 'Planta De Riles' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Túneles MEC' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Tuneles' }, 'falla'],
+    // Respaldo de regex: causal que el árbol no conoce.
+    [{ type: 'break', name: 'Detencion', reason: 'Limpieza de Ducto' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Causal inventada' }, 'falla'],
   ] as const)('%o → %s', (state, esperado) => {
     expect(clasificaCausa(state as never)).toBe(esperado)
   })

@@ -24,7 +24,7 @@
     "noche": false,
     "equipo": "rebolledo",
     "piezas": 13541,
-    "piezasMant": 129.49775755177416
+    "piezasMant": 608.6394604933386
    },
    {
     "id": "2026-10-27_Turno 1",
@@ -563,10 +563,10 @@
    "equipos": {
     "rebolledo": {
      "turnos": 3,
-     "fallasN": 10,
-     "fallaMin": 7.76949806949807,
-     "piezasPerdidas": 296.9599094132404,
-     "minPorFalla": 0.776949806949807
+     "fallasN": 13,
+     "fallaMin": 20.54330759330759,
+     "piezasPerdidas": 776.1016123548048,
+     "minPorFalla": 1.58025443025443
     },
     "cardenas": {
      "turnos": 4,
