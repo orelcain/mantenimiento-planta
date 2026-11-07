@@ -75,7 +75,7 @@ export interface ImputacionLeaf {
    * presentar como oficial algo que no lo es sería exactamente el error que la
    * app ya evita en otros lados.
    */
-  extension?: 'filete-baader200'
+  extension?: 'filete-baader200' | 'fuera-del-curso'
   /** Formas normalizadas con las que puede llegar el reason desde Shoplogix. */
   match: string[]
 }
@@ -192,6 +192,12 @@ export const IMPUTACION_LEAVES: ImputacionLeaf[] = [
    * evita es ponerle a un dato una etiqueta mas especifica de la que tiene.
    */
   { label: 'Acumulación',          categorias: ['mmpp'], bucket: 'externo', equipo: 'baader200', extension: 'filete-baader200', match: ['ACUMULACION'] },
+
+  // Extensión · Chonchi (no son del curso). Shoplogix las anota y Orel decidió
+  // (07-11-2026) que son de Mantención. `categorias` vacío: el dato no dice
+  // eléctrica o mecánica, y no se inventa.
+  { label: 'Planta de Riles', categorias: [], bucket: 'mantencion', extension: 'fuera-del-curso', match: ['PLANTA DE RILES'] },
+  { label: 'Túneles',         categorias: [], bucket: 'mantencion', extension: 'fuera-del-curso', match: ['TUNELES MEC', 'TUNELES'] },
 ]
 
 /**
@@ -237,6 +243,7 @@ export function matchImputacion(rawReason: string | undefined | null): Imputacio
 
 /** Etiqueta de categoría para mostrar; dice explícitamente cuándo no se puede distinguir. */
 export function categoriaLabel(leaf: ImputacionLeaf | null): string {
+  if (leaf?.extension === 'fuera-del-curso') return 'Fuera del curso'
   if (!leaf || leaf.categorias.length === 0) return 'Sin clasificar'
   return leaf.categorias.map((c) => CATEGORIA_META[c].short).join(' o ')
 }

@@ -24,15 +24,29 @@ import type {
   UpstreamMachineState,
   UpstreamProductionInterval,
 } from './types'
+import { matchImputacion } from './imputacionTaxonomy'
 
 export type FamiliaCausa =
   | 'produccion' | 'planificado' | 'excedido' | 'externo' | 'micro' | 'falla' | 'sin-imputar'
 
+// Respaldo de texto: solo para causales que el árbol oficial no conoce.
 const RE_PLANIFICADO = /COLACI|DETENCION PROGRAMADA|REUNION|EJERCICIO|CHARLA|ASEO|LIMPIEZA|SANITIZ|PLANNED\s*DOWNTIME|CAMBIO DE TURNO/
 const RE_EXTERNO = /MMPP|MATERIA PRIMA|FALTA PERSONAL|ACUMULACION|RECHAZO|ABASTEC|ESPERA/
 
 function normaliza(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+}
+
+/**
+ * Dueño de la pérdida según el árbol oficial (`matchImputacion`, la misma
+ * cascada del turno). `fuera-turno` (Planned Downtime) y `null` NO están aquí:
+ * caen al respaldo de regex, como antes.
+ */
+function familiaDeArbol(bucket: string | null): FamiliaCausa | null {
+  if (bucket === 'mantencion') return 'falla'
+  if (bucket === 'externo') return 'externo'
+  if (bucket === 'planificado') return 'planificado'
+  return null
 }
 
 export function clasificaCausa(state: Pick<UpstreamMachineState, 'type' | 'name' | 'reason'>): FamiliaCausa {
@@ -42,6 +56,8 @@ export function clasificaCausa(state: Pick<UpstreamMachineState, 'type' | 'name'
   const r = normaliza(reason || name)
   if (/EXCEDID/i.test(name)) return 'excedido'
   if (/MICRO/i.test(name) && !reason) return 'micro'
+  const porArbol = familiaDeArbol(matchImputacion(reason || name).bucket)
+  if (porArbol) return porArbol
   if (RE_PLANIFICADO.test(r)) return 'planificado'
   if (RE_EXTERNO.test(r)) return 'externo'
   if (!reason) return 'sin-imputar'

@@ -586,7 +586,8 @@ describe('microCausa v3 · sin datos y textos', () => {
     expect(motivoLegible('COLACION')).toBe('Colación')
     expect(motivoLegible('EJERCICIO COMPENSATORIO - Paro')).toBe('Ejercicio compensatorio')
     expect(motivoLegible('REUNION INICIO TURNO')).toBe('Reunión inicio turno')
-    expect(motivoLegible('Planta De Riles')).toBe('Planta de riles')
+    // 07-11: Riles está en el árbol (extensión «Planta de Riles», de Mantención): usa su etiqueta oficial.
+    expect(motivoLegible('Planta De Riles')).toBe('Planta de Riles')
     expect(motivoLegible('Detencion')).toBeNull()
     expect(motivoLegible('  ')).toBeNull()
     expect(motivoLegible(null)).toBeNull()

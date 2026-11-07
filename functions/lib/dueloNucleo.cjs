@@ -143,7 +143,12 @@ var IMPUTACION_LEAVES = [
    * rechazo. Mismo bucket (`externo`), asi que la cascada no cambia; lo que se
    * evita es ponerle a un dato una etiqueta mas especifica de la que tiene.
    */
-  { label: "Acumulaci\xF3n", categorias: ["mmpp"], bucket: "externo", equipo: "baader200", extension: "filete-baader200", match: ["ACUMULACION"] }
+  { label: "Acumulaci\xF3n", categorias: ["mmpp"], bucket: "externo", equipo: "baader200", extension: "filete-baader200", match: ["ACUMULACION"] },
+  // Extensión · Chonchi (no son del curso). Shoplogix las anota y Orel decidió
+  // (07-11-2026) que son de Mantención. `categorias` vacío: el dato no dice
+  // eléctrica o mecánica, y no se inventa.
+  { label: "Planta de Riles", categorias: [], bucket: "mantencion", extension: "fuera-del-curso", match: ["PLANTA DE RILES"] },
+  { label: "T\xFAneles", categorias: [], bucket: "mantencion", extension: "fuera-del-curso", match: ["TUNELES MEC", "TUNELES"] }
 ];
 var NO_TAXONOMIA = [
   { match: ["PLANNED DOWNTIME"], bucket: "fuera-turno" }
@@ -167,6 +172,7 @@ function matchImputacion(rawReason) {
   return { leaf: null, bucket: null, ambigua: false };
 }
 function categoriaLabel(leaf) {
+  if (leaf?.extension === "fuera-del-curso") return "Fuera del curso";
   if (!leaf || leaf.categorias.length === 0) return "Sin clasificar";
   return leaf.categorias.map((c) => CATEGORIA_META[c].short).join(" o ");
 }

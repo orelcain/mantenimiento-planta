@@ -137,8 +137,8 @@ test('distingue sin causa, fuera del árbol y clasificado', () => {
   assert.strictEqual(matchImputacion('').sinCausa, true)
   assert.strictEqual(matchImputacion(null).sinCausa, true)
 
-  // Causales reales de Chonchi que el curso V12 no cubre.
-  for (const r of ['Planta De Riles', 'Limpieza de Ducto']) {
+  // Causal real de Chonchi que el curso V12 no cubre y que no es de Mantención.
+  for (const r of ['Limpieza de Ducto']) {
     const m = matchImputacion(r)
     assert.strictEqual(m.fueraDelArbol, true, r)
     assert.strictEqual(m.sinCausa, false, `${r} SÍ fue imputado, solo que fuera del árbol`)
@@ -146,6 +146,21 @@ test('distingue sin causa, fuera del árbol y clasificado', () => {
   }
 
   assert.strictEqual(matchImputacion('KNURO').fueraDelArbol, false)
+})
+
+test('Riles y Túneles son de Mantención, fuera del curso (07-11-2026)', () => {
+  for (const [reason, hoja] of [['Planta De Riles', 'Planta de Riles'], ['Túneles MEC', 'Túneles'], ['Tuneles', 'Túneles']]) {
+    const m = matchImputacion(reason)
+    assert.strictEqual(m.leaf && m.leaf.label, hoja, `hoja de ${reason}`)
+    assert.strictEqual(m.bucket, 'mantencion', `bucket de ${reason}`)
+    assert.strictEqual(m.fueraDelArbol, false, `${reason} ya no es «fuera del árbol»`)
+    assert.strictEqual(categoriaLabel(m), 'Fuera del curso')
+    assert.strictEqual(clasificarParaInforme(reason).esDeMantencion, true)
+  }
+  // Y no entran al conteo ni al árbol dibujable del curso.
+  for (const l of IMPUTACION_LEAVES.filter((x) => x.extension === 'fuera-del-curso')) {
+    assert.deepStrictEqual(l.categorias, [])
+  }
 })
 
 // ── Salida para el informe ──────────────────────────────────────────────────
