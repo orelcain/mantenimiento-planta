@@ -14,10 +14,12 @@ import {
   previaJK,
   previaMesPasado,
   resumenComparacion,
+  restarMes,
   sentidoCambio,
   veredicto,
   ventanaJK,
   type TurnoCrudo,
+  type TurnoJK,
 } from '../jackKnife'
 
 // Fixture real de Chonchi (mockup jack-knife-v5-con-datos.html, const DATA), últimos 120 turnos hasta 07-11.
@@ -143,6 +145,33 @@ describe('comentarios', () => {
     expect(g[1]!.n).toBe(1)
   })
 })
+
+describe('mes pasado en fin de mes', () => {
+  it('31-mar → 28-feb (2026), 31-mar → 29-feb en año bisiesto, nunca 3-mar', () => {
+    expect(restarMes('2026-03-31')).toBe('2026-02-28')
+    expect(restarMes('2028-03-31')).toBe('2028-02-29')
+    expect(restarMes('2026-03-30')).toBe('2026-02-28')
+    expect(restarMes('2026-01-15')).toBe('2025-12-15')
+    expect(restarMes('2026-05-31')).toBe('2026-04-30')
+  })
+
+  it('«Vs. mes pasado» toma el turno del último día del mes anterior', () => {
+    const t = (dateKey: string): TurnoJK => ({
+      id: `${dateKey}_Turno 1`,
+      dateKey,
+      shiftId: 'Turno 1',
+      resumen: fixtureResumen(),
+    })
+    const turnos = [t('2026-02-27'), t('2026-02-28'), t('2026-03-01'), t('2026-03-31')]
+    const p = previaMesPasado(turnos, 3, 3)!
+    expect(turnos[p.desde]!.dateKey).toBe('2026-02-28')
+    expect(turnos[p.hasta]!.dateKey).toBe('2026-02-28')
+  })
+})
+
+function fixtureResumen() {
+  return { v: 1 as const, eventos: [], sinImputar: [], sinImputarLinea: [], comentarios: [], conCausaMin: 0, sinCausaMin: 0, uptimeMin: 1 }
+}
 
 describe('enlace con los filtros (#jk=)', () => {
   it('ida y vuelta de los filtros, con extremos manuales por id de turno', () => {

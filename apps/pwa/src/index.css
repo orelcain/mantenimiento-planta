@@ -33,6 +33,9 @@
    `:root` sin `.dark` = tema claro (papel tintado al azul de marca), para
    quienes prefieren fondo blanco. Toggle: useTheme (header + Ajustes). */
 :root {
+  /* Jack-Knife: cuadrantes Agudas (naranja) y Crónicas (oliva). AA como texto sobre la tarjeta blanca. */
+  --jk-agu: 168 72 0;
+  --jk-cro: 96 100 20;
   color-scheme: light;
   /* Claro "mate azulado" (pedido de Orel 2026-07-17, recalibrado 2026-07-18
      contra Pantone Fashion&Home real, ronda 2 tras feedback "no veo mayor
@@ -242,6 +245,9 @@
   --cat-8-tint: 162 132 94;    /* café     */
 }
 .dark {
+  /* Jack-Knife: cuadrantes Agudas (naranja) y Crónicas (oliva/amarillo). AA como texto sobre la tarjeta. */
+  --jk-agu: 255 159 10;
+  --jk-cro: 255 214 10;
   color-scheme: dark;
   --background: 13 23 34;           /* #0d1722 */
   --foreground: 233 238 243;        /* #e9eef3 */

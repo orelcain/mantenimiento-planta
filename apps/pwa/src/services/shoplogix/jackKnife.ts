@@ -267,11 +267,18 @@ export interface RangoJK { desde: number; hasta: number }
 /** Período de comparación. `parcial` = la historia no alcanza para un período completo. */
 export interface PreviaJK extends RangoJK { parcial: boolean }
 
-/** Resta un mes a una fecha YYYY-MM-DD (aritmética UTC, como el mockup). */
-function restarMes(dateKey: string): string {
-  const d = new Date(`${dateKey}T12:00:00Z`)
-  d.setUTCMonth(d.getUTCMonth() - 1)
-  return d.toISOString().slice(0, 10)
+/**
+ * Resta un mes a una fecha YYYY-MM-DD. Si el día no existe en el mes anterior,
+ * usa su último día: 31-mar → 28/29-feb, nunca 3-mar (el mockup se pasaba).
+ */
+export function restarMes(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number) as [number, number, number]
+  const mesAnterior0 = m - 2 // índice base 0 del mes anterior
+  const anio = mesAnterior0 < 0 ? y - 1 : y
+  const mes0 = (mesAnterior0 + 12) % 12
+  const ultimoDia = new Date(Date.UTC(anio, mes0 + 1, 0)).getUTCDate()
+  const dia = Math.min(d, ultimoDia)
+  return `${anio}-${String(mes0 + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
 
 /** Período inmediatamente anterior, del mismo largo. Null si no hay historia. */

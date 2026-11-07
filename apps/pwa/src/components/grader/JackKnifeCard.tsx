@@ -8,7 +8,7 @@
  * riel y colocación de etiquetas es la del mockup.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, FileDown, FileText } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -51,22 +51,30 @@ const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oc
 /** Colores de cuadrante: tinta para el texto, punto para el marcador, relleno de baja opacidad. */
 const Q: Record<CuadranteJK, { t: string; a: string; ink: string; dot: string; fill: string }> = {
   amb: { t: 'Agudas y crónicas', a: 'Prioridad 1: atacar causa raíz y tiempo de reparación.', ink: 'rgb(var(--tw-red-600))', dot: 'rgb(var(--tw-red-500))', fill: 'rgb(var(--tw-red-500) / 0.08)' },
-  agu: { t: 'Agudas', a: 'Pocas veces, pero larga: revisar repuestos, diagnóstico y procedimiento.', ink: 'rgb(var(--warning-ink))', dot: 'rgb(var(--warning))', fill: 'rgb(var(--warning) / 0.08)' },
-  cro: { t: 'Crónicas', a: 'Rápida, pero repetida: buscar causa raíz o preventivo.', ink: 'rgb(var(--tw-amber-600))', dot: 'rgb(var(--tw-amber-500))', fill: 'rgb(var(--tw-amber-500) / 0.08)' },
+  agu: { t: 'Agudas', a: 'Pocas veces, pero larga: revisar repuestos, diagnóstico y procedimiento.', ink: 'rgb(var(--jk-agu))', dot: 'rgb(var(--jk-agu))', fill: 'rgb(var(--jk-agu) / 0.08)' },
+  cro: { t: 'Crónicas', a: 'Rápida, pero repetida: buscar causa raíz o preventivo.', ink: 'rgb(var(--jk-cro))', dot: 'rgb(var(--jk-cro))', fill: 'rgb(var(--jk-cro) / 0.08)' },
   ok: { t: 'Bajo control', a: 'Sin acción. Mantener seguimiento.', ink: 'rgb(var(--success))', dot: 'rgb(var(--success))', fill: 'rgb(var(--success) / 0.07)' },
 }
 const COLOR_SIN = 'rgb(var(--cat-6-ink))'
+
+/** Etiqueta corta en pantallas angostas; el texto largo sigue siendo el nombre accesible. */
+const dual = (largo: string, corto: string) => (
+  <>
+    <span aria-hidden className="text-center leading-tight whitespace-normal sm:hidden">{corto}</span>
+    <span className="sr-only text-center leading-tight whitespace-normal sm:not-sr-only">{largo}</span>
+  </>
+)
 
 const VISTAS: { value: VistaJK; label: string }[] = [
   { value: 'imp', label: 'Imputadas' },
   { value: 'sin', label: 'Sin imputar' },
   { value: 'todas', label: 'Todas' },
 ]
-const PRESETS: { value: VentanaJK; label: string }[] = [
-  { value: 'turno', label: 'Último turno' },
-  { value: '7', label: '7 días' },
-  { value: '30', label: '30 días' },
-  { value: '90', label: '90 días' },
+const PRESETS: { value: VentanaJK; label: ReactNode }[] = [
+  { value: 'turno', label: dual('Último turno', 'Turno') },
+  { value: '7', label: dual('7 días', '7 d') },
+  { value: '30', label: dual('30 días', '30 d') },
+  { value: '90', label: dual('90 días', '90 d') },
   { value: 'todo', label: 'Todo' },
 ]
 
@@ -128,11 +136,11 @@ function CambioTexto({ nombre, antes, ahora, unidad, fmt }: { nombre: string; an
   )
 }
 
-const MODOS: { value: ModoCmpJK; label: string }[] = [
-  { value: 'ant', label: 'Vs. período anterior' },
-  { value: 'mes', label: 'Vs. mes pasado' },
-  { value: 'mano', label: 'Elegir a mano' },
-  { value: 'no', label: 'Sin comparar' },
+const MODOS: { value: ModoCmpJK; label: ReactNode }[] = [
+  { value: 'ant', label: dual('Vs. período anterior', 'Anterior') },
+  { value: 'mes', label: dual('Vs. mes pasado', 'Mes pasado') },
+  { value: 'mano', label: dual('Elegir a mano', 'A mano') },
+  { value: 'no', label: <span className="text-center text-footnote leading-tight whitespace-normal">Sin comparar</span> },
 ]
 
 // Riel: manijas «Antes» en color de advertencia suave (solo en «Elegir a mano»).
@@ -447,6 +455,8 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   }
 
   const W = Math.max(300, ancho || 900)
+  // Columnas de la lista según el ancho de la TARJETA (no del viewport): 4 ≥ 900 px, 2 ≥ 520 px, 1 si no.
+  const columnasLista = ancho >= 900 ? 4 : ancho >= 520 ? 2 : 1
   const layout = useMemo(
     () => (calc.pts.length ? calcularLayout(calc, W, sel) : null),
     [calc, W, sel],
@@ -828,7 +838,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-6 min-[561px]:grid-cols-2 min-[981px]:grid-cols-4">
+            <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${columnasLista}, minmax(0, 1fr))` }}>
               {(['amb', 'agu', 'cro', 'ok'] as const).map((k) => {
                 const filas = calc.pts.filter((p) => p.q === k).sort((a, b) => b.min - a.min)
                 return (
@@ -845,11 +855,11 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                           aria-pressed={selPunto?.k === p.k}
                           onClick={() => elegirCausa(p.k)}
                           className={cn(
-                            'flex min-h-[44px] w-full items-center justify-between gap-3 text-left text-footnote tabular-nums',
-                            selPunto?.k === p.k ? 'font-semibold text-accent' : 'text-foreground',
+                            'flex min-h-[44px] w-full items-start justify-between gap-3 text-left text-footnote tabular-nums',
+                            selPunto?.k === p.k ? 'font-semibold text-brand-ink' : 'text-foreground',
                           )}
                         >
-                          <span className="min-w-0 truncate">{p.k}</span>
+                          <span className="min-w-0 flex-1 break-words">{p.k}</span>
                           <span className="shrink-0 text-right text-caption text-muted-foreground">
                             <span className="block">{p.ev} · {durS(p.mttr)}</span>
                             {previa && (() => {
