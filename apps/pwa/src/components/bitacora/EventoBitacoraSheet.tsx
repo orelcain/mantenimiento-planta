@@ -41,6 +41,8 @@ import { useAuthStore } from '@/store'
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { copiaDeOrigen, etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { borrarFotoOEncolar, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+import { AcrEntrada } from '@/components/acr/AcrEntrada'
+import { eventoRequiereAcr } from '@/services/acr/acrLogica'
 import { SelectorTecnico } from './SelectorTecnico'
 import { SelectorParticipantes } from './SelectorParticipantes'
 import { BuscadorEquipo } from './BuscadorEquipo'
@@ -1164,6 +1166,10 @@ export function EventoBitacoraSheet({
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
           overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
       <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
+        {/* Causa raíz, lo primero de la hoja: al final del formulario nadie la encontraba
+            (prueba como técnico, 08-11; opción A del mockup aprobado). */}
+        {evento && eventoRequiereAcr(evento) && <AcrEntrada evento={evento} />}
+
         {/* Estado del borrador: que se vea que no hay que tocar nada para guardar. */}
         {autoguarda && (
           <p className="-mt-2 flex items-center gap-1.5 text-footnote text-muted-foreground" role="status" aria-live="polite">

@@ -23,8 +23,9 @@ export interface SheetProps {
   /**
    * `wide` = el doble de ancho en pantallas grandes (60rem), para formularios
    * largos que en el PC caben en dos columnas. En el teléfono no cambia nada.
+   * `full` = casi todo el ancho del PC (92 vw, tope 90rem), para tablas y listas con columnas.
    */
-  size?: 'default' | 'wide'
+  size?: 'default' | 'wide' | 'full'
   children?: React.ReactNode
   /**
    * Opcional: captura teclas en cualquier campo del panel (por ejemplo Cmd/Ctrl+Enter
@@ -41,9 +42,15 @@ export interface SheetProps {
   headerAction?: React.ReactNode
   /** Zona fija bajo el título, fuera del scroll (por ejemplo un buscador). */
   toolbar?: React.ReactNode
+  /**
+   * Opt-in: oculta la barra de desplazamiento del cuerpo (solo en hojas estructuradas). La barra
+   * global de `index.css` (8 px) le quita ancho al cuerpo en PC, y el contenido queda más angosto
+   * que el pie. Sin esto, ninguna hoja cambia.
+   */
+  ocultarBarra?: boolean
 }
 
-export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown, surface = 'card', headerAction, toolbar }: SheetProps) {
+export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown, surface = 'card', headerAction, toolbar, ocultarBarra = false }: SheetProps) {
   /** Con `grouped` o `toolbar` el panel es una columna: encabezado fijo y cuerpo que desplaza. */
   const estructurado = surface === 'grouped' || toolbar != null
   const panelRef = React.useRef<HTMLDivElement>(null)
@@ -139,7 +146,7 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
           'relative w-full rounded-t-panel pt-2.5',
           surface === 'grouped' ? 'bg-background' : 'bg-card',
           estructurado ? 'flex max-h-[85dvh] flex-col px-4' : 'px-6 pb-8',
-          size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
+          size === 'full' ? 'max-w-[min(92vw,90rem)]' : size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
           'shadow-[0_-10px_50px_rgba(0,0,0,0.3)] outline-none',
           'piel-sheet-in',
         )}
@@ -171,7 +178,7 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
         )}
         {toolbar && <div className="mt-2 flex-none">{toolbar}</div>}
         {children && (estructurado ? (
-          <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(12px,env(safe-area-inset-bottom))]">{children}</div>
+          <div className={cn('mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(12px,env(safe-area-inset-bottom))]', ocultarBarra && '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>{children}</div>
         ) : (
           <div className="mt-4">{children}</div>
         ))}

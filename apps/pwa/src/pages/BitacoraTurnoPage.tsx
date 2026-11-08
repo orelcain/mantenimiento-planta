@@ -128,6 +128,7 @@ export function BitacoraTurnoVista({
     () => (ocultos.size ? eventosServidor.filter((e) => !ocultos.has(e.id)) : eventosServidor),
     [eventosServidor, ocultos],
   )
+  const senalesAcr = fuente.useSenalesAcr(eventos)
   const calendario = fuente.useTecnicos(turno)
   const { observacion, guardarObservacion, guardarPresentes } = fuente.useObservacion(turno)
   const { ajustes, guardarAjustes } = fuente.useAjustes()
@@ -708,6 +709,7 @@ export function BitacoraTurnoVista({
       enPendientes={!esBorrador(e) && fuePendiente(e)}
       abiertoPor={otrosEditando(conectados, e.id, miDispositivoId)}
       nuevo={recienLlegados.has(e.id)}
+      senal={senalesAcr.get(e.id) ?? null}
       onAbrir={() => {
         marcarVisto(e.id)
         setEditor({ evento: e, idNuevo: e.id, turno })

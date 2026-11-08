@@ -481,6 +481,14 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "rootCauseAnalysis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "plantId", "order": "ASCENDING" },
+        { "fieldPath": "fechaTurno", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

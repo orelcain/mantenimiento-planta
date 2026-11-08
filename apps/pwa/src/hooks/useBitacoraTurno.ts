@@ -31,6 +31,7 @@ import { tecnicosDelCalendario, tecnicosDeTurno, type CalendarioDoc } from '@/se
 import { turnoMantencionEn, turnoDesdeId } from '@/services/bitacora/turnoMantencion'
 import { borrarFotoOEncolar, type subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 import { autorVisible } from '@/services/bitacora/bitacora.types'
+import { useSenalesAcr, type SenalAcr } from '@/components/acr/useSenalesAcr'
 import { dispositivoActual } from '@/services/bitacora/dispositivo'
 import { usePresenciaBitacora } from '@/hooks/usePresenciaBitacora'
 import { logger } from '@/lib/logger'
@@ -745,6 +746,8 @@ export interface FuenteBitacora {
   useOpcionesEquipo: (activo: boolean) => ReturnType<typeof useOpcionesEquipo>
   usePresencia: typeof usePresenciaBitacora
   useBorradoresAnteriores: (turno: TurnoMantencion) => EventoBitacora[]
+  /** Señales de causa raíz (repetición o análisis) de los eventos de la lista. */
+  useSenalesAcr: (eventos: readonly EventoBitacora[]) => Map<string, SenalAcr>
   /** Reemplaza la subida a Storage. */
   subirFoto?: typeof subirFotoBitacora
   /** Reemplaza las lecturas del maestro de repuestos. */
@@ -769,5 +772,6 @@ export const FUENTE_FIRESTORE: FuenteBitacora = {
   useOpcionesEquipo,
   usePresencia: usePresenciaBitacora,
   useBorradoresAnteriores,
+  useSenalesAcr,
   useFavoritosRepuestos: useFavoritosRepuestosFirestore,
 }
