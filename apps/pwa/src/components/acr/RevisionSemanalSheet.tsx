@@ -103,7 +103,7 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
             <p className="px-4 py-3 text-body text-muted-foreground">No hay ACR con acciones en este período.</p>
           </ListGroup>
         ) : (
-          <ListGroup title="Acciones, primero las débiles">
+          <ListGroup data-tutorial="t-revision" title="Acciones, primero las débiles">
             {/* PC (lg): tabla Falla · Equipo · Acción · Fuerza. Celular: una columna por fila. */}
             <div
               className={`hidden px-4 py-2 text-footnote font-semibold text-muted-foreground lg:grid lg:gap-4 ${COLUMNAS_PC(puedeEditar)}`}
@@ -114,9 +114,10 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
               <span>Acción</span>
               {puedeEditar && <span>Fuerza</span>}
             </div>
-            {filas.map(({ acr, accion }) => (
+            {filas.map(({ acr, accion }, i) => (
               <div
                 key={accion.id}
+                data-tutorial={i === 0 ? 't-rev-fila' : undefined}
                 className={`flex flex-col gap-2 px-4 py-3 lg:grid lg:items-center lg:gap-4 ${COLUMNAS_PC(puedeEditar)}`}
               >
                 <div className="flex items-start gap-2 lg:col-start-3 lg:row-start-1">

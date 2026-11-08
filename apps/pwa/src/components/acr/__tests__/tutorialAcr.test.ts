@@ -1,10 +1,12 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  AUDIO_CIERRE,
+  CAPITULOS,
   ESTADO_INICIAL,
+  INICIO_CAPITULO,
   PASOS_TUTORIAL,
+  practicaAlEmpezar,
   siguienteEstado,
   urlAudio,
   type EstadoTutorial,
@@ -13,30 +15,57 @@ import {
 /** apps/pwa/public/tutorial-acr. Vitest corre desde apps/pwa (como el test de reglas). */
 const CARPETA_AUDIO = join(process.cwd(), 'public', 'tutorial-acr') + '/'
 
-describe('guion del tutorial', () => {
-  it('tiene 8 pasos, cada uno con un audio que existe en public/tutorial-acr', () => {
-    expect(PASOS_TUTORIAL).toHaveLength(8)
+describe('guion del tutorial (v2)', () => {
+  it('tiene 27 pasos en 11 capítulos, cada uno con un audio que existe en public/tutorial-acr', () => {
+    expect(PASOS_TUTORIAL).toHaveLength(27)
+    expect(CAPITULOS).toHaveLength(11)
     for (const paso of PASOS_TUTORIAL) {
       expect(existsSync(CARPETA_AUDIO + paso.audio), `falta ${paso.audio}`).toBe(true)
     }
   })
 
-  it('el cierre (paso-9) también existe', () => {
-    expect(existsSync(CARPETA_AUDIO + AUDIO_CIERRE)).toBe(true)
+  it('no sobran audios viejos en la carpeta (paso-1..paso-9 del tutorial anterior)', () => {
+    const usados = new Set(PASOS_TUTORIAL.map((p) => p.audio))
+    const sobran = readdirSync(CARPETA_AUDIO).filter((f) => f.endsWith('.mp3') && !usados.has(f))
+    expect(sobran).toEqual([])
   })
 
-  it('los objetivos son únicos y los textos no están vacíos', () => {
-    const objetivos = PASOS_TUTORIAL.map((p) => p.objetivo)
-    expect(new Set(objetivos).size).toBe(objetivos.length)
+  it('los capítulos van en orden, sin huecos, y cada uno tiene al menos un paso', () => {
+    const caps = PASOS_TUTORIAL.map((p) => p.capitulo)
+    expect(caps).toEqual([...caps].sort((a, b) => a - b))
+    expect(new Set(caps).size).toBe(CAPITULOS.length)
+    expect(INICIO_CAPITULO.every((i) => i >= 0)).toBe(true)
+  })
+
+  it('ids únicos, textos no vacíos y momentos dentro del audio (0..1)', () => {
+    const ids = PASOS_TUTORIAL.map((p) => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
     for (const paso of PASOS_TUTORIAL) {
       expect(paso.texto.trim()).not.toBe('')
-      expect(paso.id.trim()).not.toBe('')
+      for (const m of paso.momentos ?? []) {
+        expect(m.en, `${paso.id}`).toBeGreaterThanOrEqual(0)
+        expect(m.en, `${paso.id}`).toBeLessThanOrEqual(1)
+      }
     }
   })
 
   it('la URL del audio sale del BASE_URL de la app', () => {
-    expect(urlAudio('/', 0)).toBe('/tutorial-acr/paso-1.mp3')
-    expect(urlAudio('/app/', PASOS_TUTORIAL.length)).toBe(`/app/tutorial-acr/${AUDIO_CIERRE}`)
+    expect(urlAudio('/', 0)).toBe('/tutorial-acr/paso-01.mp3')
+    expect(urlAudio('/app/', 26)).toBe('/app/tutorial-acr/paso-27.mp3')
+  })
+
+  it('la práctica al empezar un paso es lo que dejaron los anteriores', () => {
+    expect(practicaAlEmpezar(0)).toEqual({
+      pieza: false, porQue: false, queHacemos: false, propuesta: false, humanaCorregida: false, guardado: false,
+    })
+    const idx = (id: string) => PASOS_TUTORIAL.findIndex((p) => p.id === id)
+    // En el paso de la pregunta 2 aún no está escrita (la escribe ese paso); en el siguiente, sí.
+    expect(practicaAlEmpezar(idx('pregunta-2')).porQue).toBe(false)
+    expect(practicaAlEmpezar(idx('pregunta-3')).porQue).toBe(true)
+    // Saltar al capítulo 7 deja la propuesta a la vista y la pieza marcada.
+    const c7 = practicaAlEmpezar(INICIO_CAPITULO[6]!)
+    expect(c7).toMatchObject({ pieza: true, porQue: true, queHacemos: true, propuesta: true, guardado: false })
+    expect(practicaAlEmpezar(idx('lectura')).guardado).toBe(true)
   })
 })
 
@@ -47,6 +76,7 @@ describe('siguienteEstado', () => {
     for (let k = 0; k < indice; k++) e = siguienteEstado(e, { tipo: 'audioTerminado', indice: e.indice })
     return e
   }
+  const ultimo = PASOS_TUTORIAL.length - 1
 
   it('iniciar arranca en el paso 1 hablando', () => {
     expect(siguienteEstado(ESTADO_INICIAL, { tipo: 'iniciar' })).toEqual({ fase: 'hablando', indice: 0 })
@@ -73,18 +103,25 @@ describe('siguienteEstado', () => {
     expect(siguienteEstado(pausado, { tipo: 'siguiente' })).toEqual({ fase: 'hablando', indice: 2 })
   })
 
-  it('después del último paso suena el cierre y luego queda en fin', () => {
-    const ultimo = PASOS_TUTORIAL.length - 1
-    const alCierre = siguienteEstado(enPaso(ultimo), { tipo: 'audioTerminado', indice: ultimo })
-    expect(alCierre).toEqual({ fase: 'hablando', indice: PASOS_TUTORIAL.length })
-    expect(siguienteEstado(alCierre, { tipo: 'audioTerminado', indice: PASOS_TUTORIAL.length })).toEqual({
+  it('saltar a un capítulo va a su primer paso y sigue desde ahí, aun en pausa o al final', () => {
+    expect(siguienteEstado(enPaso(1), { tipo: 'saltar', capitulo: 7 })).toEqual({
+      fase: 'hablando',
+      indice: INICIO_CAPITULO[6],
+    })
+    const fin: EstadoTutorial = { fase: 'fin', indice: ultimo }
+    expect(siguienteEstado(fin, { tipo: 'saltar', capitulo: 1 })).toEqual({ fase: 'hablando', indice: 0 })
+    expect(siguienteEstado(enPaso(3), { tipo: 'saltar', capitulo: 99 })).toEqual(enPaso(3))
+  })
+
+  it('el último paso es el cierre: al terminar su audio queda en fin', () => {
+    expect(siguienteEstado(enPaso(ultimo), { tipo: 'audioTerminado', indice: ultimo })).toEqual({
       fase: 'fin',
-      indice: PASOS_TUTORIAL.length,
+      indice: ultimo,
     })
   })
 
   it('repetir desde fin vuelve al paso 1; cerrar siempre deja el tutorial inactivo', () => {
-    const fin: EstadoTutorial = { fase: 'fin', indice: PASOS_TUTORIAL.length }
+    const fin: EstadoTutorial = { fase: 'fin', indice: ultimo }
     expect(siguienteEstado(fin, { tipo: 'repetir' })).toEqual({ fase: 'hablando', indice: 0 })
     expect(siguienteEstado(enPaso(3), { tipo: 'cerrar' })).toEqual(ESTADO_INICIAL)
   })

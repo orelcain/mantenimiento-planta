@@ -1,105 +1,520 @@
 /**
- * Guion y reductor del tutorial del ACR narrado por ARIA (SPEC_ACR_TUTORIAL.md §1 y §2).
- * Datos y lógica pura: sin React ni audio. El motor (TutorialAcr.tsx) los usa.
+ * Guion y reductor del tutorial del ACR narrado por ARIA (guion v2: 11 capítulos, 27 pasos).
+ * Datos y lógica pura: sin React ni audio. El motor (MotorTutorialAcr.tsx) y la tarjeta
+ * (AcrRapidoSheet.tsx) los usan.
  *
- * El texto de cada paso es el del mockup aprobado (acr-tutorial.html) y es el mismo que dicen los
- * audios de public/tutorial-acr (paso-1..paso-9). No cambiar uno sin regrabar el otro.
+ * El texto de cada paso es el del guion v2 aprobado y es lo que dice Aiko en los audios de
+ * public/tutorial-acr (paso-01..paso-27, ElevenLabs, 08-11-2026). No cambiar uno sin regrabar el otro.
  */
-import type { AccionAcr, CausaAcr } from '@/services/acr/acr.types'
+import type { Acr, AccionAcr, CausaAcr } from '@/services/acr/acr.types'
+import type { Repeticion } from '@/services/acr/repeticion'
 
-/** Acciones automáticas del tutorial: la app hace lo que haría el técnico. */
-export type AccionTutorial = 'proponer' | 'corregirHumana' | 'guardar'
+// ── Opciones de la herramienta ───────────────────────────────────────────────
+
+/**
+ * Todo lo que la herramienta del ACR deja hacer. Cada opción tiene que quedar explicada por al menos
+ * un paso del guion (`explica`); el test `tutorialAcr.test.ts` falla si alguna queda sin explicar.
+ * Si agregas una opción a la herramienta, agrégala aquí y al guion.
+ */
+export const OPCIONES_ACR = {
+  'fila-se-repite': 'Aviso «Se repite» en el evento de Bitácora',
+  'fila-opcional': 'Fila «Analizar causa (opcional)» en fallas con detención',
+  'fila-ver': 'Fila «Ver análisis de causa · % fuertes»',
+  'ver-tutorial': 'Botón «Ver tutorial» e índice de capítulos',
+  fotos: 'Fotos del evento como evidencia',
+  pieza: 'Interruptor «Pieza dañada guardada»',
+  q1: 'Pregunta 1: qué se rompió (viene llena)',
+  dictado: 'Dictado con el micrófono',
+  q2: 'Pregunta 2: por qué se rompió',
+  q3: 'Pregunta 3: qué hacemos para que no vuelva',
+  'nivel-fisica': 'Causa física',
+  'nivel-humana': 'Causa humana',
+  'nivel-latente': 'Causa latente (obligatoria para cerrar)',
+  proponer: 'Botón «Proponer causas» y «ARIA está pensando…»',
+  'propuesta-pct': 'Propuesta de la IA y % de acciones fuertes',
+  'fuerza-debil': 'Fuerza débil',
+  'fuerza-media': 'Fuerza media',
+  'fuerza-fuerte': 'Fuerza fuerte',
+  'editar-texto': 'Hoja «Causa/Acción»: corregir el texto',
+  'editar-nivel': 'Hoja «Causa»: cambiar el nivel',
+  'editar-fuerza': 'Hoja «Acción»: cambiar la fuerza',
+  listo: 'Botón «Listo» de la hoja',
+  borrar: 'Botón «Borrar» y su confirmación',
+  'armar-mano': 'Botón «Armar a mano»',
+  'caida-manual': 'Si la IA no responde, pasa sola a armar a mano',
+  'manual-nivel': 'Armar a mano: nivel de la causa del porqué',
+  'manual-fuerza': 'Armar a mano: fuerza de la acción (sin marcar)',
+  autoguardado: 'Autoguardado como borrador',
+  motivo: 'Mensaje de lo que falta para cerrar',
+  'guardar-arriba': 'Botón «Guardar» de arriba',
+  'guardar-cerrar': '«Guardar análisis» y cierre',
+  lectura: 'Vista de lectura (evidencia, causas, acciones con «Ataca:»)',
+  verificacion: 'Verificación a 60 días',
+  'editar-lectura': 'Botón «Editar» de la vista de lectura',
+  'revision-semanal': 'Revisión semanal del supervisor, débiles arriba',
+  'revision-subir': 'El supervisor sube la fuerza',
+  'revision-solo-lectura': 'El técnico solo ve la revisión',
+} as const
+
+export type OpcionAcr = keyof typeof OPCIONES_ACR
+
+// ── Guion ────────────────────────────────────────────────────────────────────
+
+/**
+ * Acciones automáticas del tutorial: la app hace lo que haría el técnico, siempre sobre la copia de
+ * práctica (nada se guarda).
+ */
+export type AccionTutorial =
+  | 'mostrarPropuesta'
+  | 'pensar'
+  | 'pieza'
+  | 'accionDebil'
+  | 'accionMedia'
+  | 'accionFuerte'
+  | 'editarHumana'
+  | 'corregirHumana'
+  | 'editarAccion'
+  | 'cerrarEditor'
+  | 'confirmarBorrado'
+  | 'cancelarBorrado'
+  | 'armarManual'
+  | 'nivelLatente'
+  | 'fuerzaFuerte'
+  | 'mensajeFalta'
+  | 'guardar'
+  | 'subirFuerza'
+
+/** Lo que el tutorial abre encima de la tarjeta durante un paso. */
+export type VistaTutorial = 'filas' | 'lectura' | 'revision'
+
+/**
+ * Algo que pasa durante un paso. `en` es la fracción del audio (0 = al empezar, 1 = al terminar):
+ * así el gesto cae sobre la frase aunque cambie la duración del audio.
+ */
+export interface MomentoTutorial {
+  en: number
+  /** Nuevo elemento iluminado. */
+  objetivo?: string
+  /** Elemento que recibe el pulso de toque. */
+  tocar?: string
+  accion?: AccionTutorial
+}
+
+/** Estado de la práctica que deja un paso al terminar (se acumula; saltar de capítulo lo rearma). */
+export interface PracticaTutorial {
+  pieza: boolean
+  porQue: boolean
+  queHacemos: boolean
+  propuesta: boolean
+  humanaCorregida: boolean
+  guardado: boolean
+}
 
 export interface PasoTutorial {
   id: string
+  /** 1..11. */
+  capitulo: number
   /** Texto que dice ARIA (y que se muestra como subtítulo). */
   texto: string
   /** Archivo en public/tutorial-acr. */
   audio: string
-  /** Valor de `data-tutorial` del elemento que se ilumina. */
+  /**
+   * Elemento que se ilumina al empezar: valor de `data-tutorial`, o un selector CSS si empieza con
+   * «[» (p. ej. el micrófono, que no lleva marca propia).
+   */
   objetivo: string
   /** Campo de la tarjeta que se escribe letra a letra. */
   escribir?: { campo: 'porQue' | 'queHacemos'; texto: string }
-  /** Valor de `data-tutorial` del elemento que recibe el pulso de toque. */
-  tocar?: string
-  /** Lo que pasa al tocar (la acción real de la tarjeta). */
-  accion?: AccionTutorial
+  momentos?: MomentoTutorial[]
+  vista?: VistaTutorial
+  deja?: Partial<PracticaTutorial>
+  /** Opciones de la herramienta que este paso explica. */
+  explica: OpcionAcr[]
 }
 
+export const CAPITULOS: readonly string[] = [
+  'Dónde aparece el análisis',
+  'Evidencia antes de limpiar',
+  'Las 3 preguntas y el dictado',
+  'Los 3 niveles de causa',
+  'Proponer causas con ARIA',
+  'La fuerza de cada acción',
+  'Corregir y borrar',
+  'Armar a mano, sin IA',
+  'Guardar: borrador o cerrado',
+  'Ver y editar después',
+  'Revisión semanal del supervisor',
+]
+
+/** El micrófono de la pregunta 2 (SpeechTextarea no lleva `data-tutorial`). */
+export const SELECTOR_MICROFONO = '[data-tutorial="t-q2"] button'
+/** La confirmación de borrado (ActionSheet). */
+export const SELECTOR_CONFIRMAR = '[role="alertdialog"]'
+
+export const TEXTO_Q2 =
+  'La chapaleta golpea fuerte al entrar el pescado. En la N3 se puso regulador el 20-09 y no ha cortado'
+export const TEXTO_Q3 = 'Poner regulador de aire en N1 y N2, igual que en la N3'
+
+const p = (n: number) => `paso-${String(n).padStart(2, '0')}.mp3`
+
 export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
+  // 1 · Dónde aparece el análisis
   {
     id: 'inicio',
-    texto: 'Hola, soy ARIA. Te muestro cómo analizar una falla en menos de un minuto.',
-    audio: 'paso-1.mp3',
+    capitulo: 1,
+    texto:
+      'Hola, soy ARIA. Te enseño a analizar la causa raíz de una falla. Son once partes cortas. Puedes saltar a cualquiera desde el índice.',
+    audio: p(1),
     objetivo: 't-head',
-    tocar: 't-head',
+    momentos: [{ en: 0.75, tocar: 't-indice', objetivo: 't-indice' }],
+    explica: ['ver-tutorial'],
   },
   {
-    id: 'aviso',
+    id: 'entradas',
+    capitulo: 1,
     texto:
-      'Cuando una falla se repite, la Bitácora te avisa. Aquí: el resorte de la chapaleta se cortó tres veces el 24 de septiembre.',
-    audio: 'paso-2.mp3',
+      'El análisis se abre desde el evento de la Bitácora. Si la falla se repite, te aviso así. Si tuvo detención pero no se repite, verás «Analizar causa, opcional». Y si ya existe uno, dice «Ver análisis» con su porcentaje de acciones fuertes.',
+    audio: p(2),
     objetivo: 't-alert',
+    vista: 'filas',
+    momentos: [{ en: 0.35, objetivo: 't-filas' }],
+    explica: ['fila-se-repite', 'fila-opcional', 'fila-ver'],
   },
+  // 2 · Evidencia antes de limpiar
+  {
+    id: 'fotos',
+    capitulo: 2,
+    texto:
+      'Las fotos que subiste en la Bitácora entran solas al análisis como evidencia. Sácalas antes de limpiar o de cambiar la pieza.',
+    audio: p(3),
+    objetivo: 't-fotos',
+    explica: ['fotos'],
+  },
+  {
+    id: 'pieza',
+    capitulo: 2,
+    texto:
+      'Guarda la pieza dañada, por ejemplo el resorte cortado, y marca este interruptor. La pieza dice mucho más que una foto.',
+    audio: p(4),
+    objetivo: 't-pieza',
+    momentos: [{ en: 0.45, tocar: 't-pieza', accion: 'pieza' }],
+    deja: { pieza: true },
+    explica: ['pieza'],
+  },
+  // 3 · Las 3 preguntas y el dictado
   {
     id: 'pregunta-1',
-    texto: 'La primera pregunta ya viene llena con lo que anotaste en la Bitácora.',
-    audio: 'paso-3.mp3',
+    capitulo: 3,
+    texto:
+      'Primera pregunta: qué se rompió. Viene llena con lo que anotaste en la Bitácora. Si quieres, corrígela.',
+    audio: p(5),
     objetivo: 't-q1',
+    explica: ['q1'],
+  },
+  {
+    id: 'microfono',
+    capitulo: 3,
+    texto:
+      'No hace falta escribir. Toca el micrófono, habla, y vuelve a tocarlo para terminar. Yo paso tu voz a texto.',
+    audio: p(6),
+    objetivo: 't-q2',
+    momentos: [
+      { en: 0.25, tocar: SELECTOR_MICROFONO },
+      { en: 0.6, tocar: SELECTOR_MICROFONO },
+    ],
+    explica: ['dictado'],
   },
   {
     id: 'pregunta-2',
-    texto: 'En la segunda, cuenta por qué crees que se rompió. Puedes dictarlo con el micrófono.',
-    audio: 'paso-4.mp3',
+    capitulo: 3,
+    texto: 'Segunda: por qué crees que se rompió. Cuenta lo que viste, aunque no estés seguro.',
+    audio: p(7),
     objetivo: 't-q2',
-    escribir: {
-      campo: 'porQue',
-      texto: 'La chapaleta golpea fuerte al entrar el pescado. En la N3 se puso regulador el 20-09 y no ha cortado',
-    },
+    escribir: { campo: 'porQue', texto: TEXTO_Q2 },
+    deja: { porQue: true },
+    explica: ['q2'],
   },
   {
     id: 'pregunta-3',
-    texto: 'En la tercera, qué harías para que no vuelva a pasar.',
-    audio: 'paso-5.mp3',
+    capitulo: 3,
+    texto:
+      'Tercera: qué harías para que no vuelva a pasar. Piensa en algo que cambie la máquina o el método, no solo en tener más cuidado.',
+    audio: p(8),
     objetivo: 't-q3',
-    escribir: { campo: 'queHacemos', texto: 'Poner regulador de aire en N1 y N2, igual que en la N3' },
+    escribir: { campo: 'queHacemos', texto: TEXTO_Q3 },
+    deja: { queHacemos: true },
+    explica: ['q3'],
   },
+  // 4 · Los 3 niveles de causa
+  {
+    id: 'causa-fisica',
+    capitulo: 4,
+    texto:
+      'Toda falla tiene tres niveles. La física es lo que falló en la pieza: el resorte se cortó por fatiga.',
+    audio: p(9),
+    objetivo: 't-fis',
+    momentos: [{ en: 0, accion: 'mostrarPropuesta' }],
+    deja: { propuesta: true },
+    explica: ['nivel-fisica'],
+  },
+  {
+    id: 'causa-humana',
+    capitulo: 4,
+    texto:
+      'La humana es lo que hizo o no hizo la tarea, sin culpar a nadie: el resorte se cambia sin anotar sus horas.',
+    audio: p(10),
+    objetivo: 't-hum',
+    explica: ['nivel-humana'],
+  },
+  {
+    id: 'causa-latente',
+    capitulo: 4,
+    texto:
+      'La latente es la del sistema, la que hace que la falla vuelva: el golpe de la chapaleta no está amortiguado en N1 y N2. El error humano nunca es la causa raíz. Sin latente, el análisis no se cierra.',
+    audio: p(11),
+    objetivo: 't-lat',
+    explica: ['nivel-latente'],
+  },
+  // 5 · Proponer causas con ARIA
   {
     id: 'proponer',
+    capitulo: 5,
     texto:
-      'Toca Proponer causas. Yo ordeno tu respuesta en causa física, humana y latente, y te digo qué tan fuerte es la acción.',
-    audio: 'paso-6.mp3',
+      'Con las preguntas 2 y 3 respondidas, toca Proponer causas. Mientras pienso verás «ARIA está pensando».',
+    audio: p(12),
     objetivo: 't-prop',
-    tocar: 't-prop',
-    accion: 'proponer',
+    momentos: [
+      { en: 0.3, tocar: 't-prop', accion: 'pensar' },
+      { en: 0.95, accion: 'mostrarPropuesta' },
+    ],
+    explica: ['proponer'],
   },
   {
-    id: 'latente',
+    id: 'propuesta',
+    capitulo: 5,
     texto:
-      'La latente es la importante: es lo que hace que la falla vuelva. Si algo no calza, tócalo y corrígelo.',
-    audio: 'paso-7.mp3',
-    objetivo: 't-lat',
-    tocar: 't-hum',
-    accion: 'corregirHumana',
+      'Te propongo las causas en sus tres niveles y la acción con su fuerza. Abajo ves qué porcentaje de las acciones es fuerte. Es una propuesta: tú decides.',
+    audio: p(13),
+    objetivo: 't-propuesta',
+    explica: ['propuesta-pct'],
+  },
+  // 6 · La fuerza de cada acción
+  {
+    id: 'fuerza-debil',
+    capitulo: 6,
+    texto:
+      'Cada acción tiene una fuerza. Débil: depende de que alguien se acuerde, como capacitar o avisar. Ejemplo: revisar el resorte en cada engrase.',
+    audio: p(14),
+    objetivo: 't-accion',
+    momentos: [{ en: 0.2, accion: 'accionDebil' }],
+    explica: ['fuerza-debil'],
+  },
+  {
+    id: 'fuerza-media',
+    capitulo: 6,
+    texto: 'Media: un checklist o una alerta que te lo recuerda. Ejemplo: agregar el resorte a la pauta de engrase.',
+    audio: p(15),
+    objetivo: 't-accion',
+    momentos: [{ en: 0.05, accion: 'accionMedia' }],
+    explica: ['fuerza-media'],
+  },
+  {
+    id: 'fuerza-fuerte',
+    capitulo: 6,
+    texto:
+      'Fuerte: cambia la máquina o elimina la tarea, y ya no depende de nadie. Ejemplo: poner regulador de aire en N1 y N2. Busca siempre la fuerte.',
+    audio: p(16),
+    objetivo: 't-accion',
+    momentos: [{ en: 0.05, accion: 'accionFuerte' }],
+    explica: ['fuerza-fuerte'],
+  },
+  // 7 · Corregir y borrar
+  {
+    id: 'corregir',
+    capitulo: 7,
+    texto: 'Si algo no calza, tócalo. Se abre esta hoja: corriges el texto y, si hace falta, el nivel.',
+    audio: p(17),
+    objetivo: 't-hum',
+    momentos: [
+      { en: 0.12, tocar: 't-hum', accion: 'editarHumana' },
+      { en: 0.25, objetivo: 't-editor' },
+      { en: 0.45, accion: 'corregirHumana' },
+      { en: 0.75, objetivo: 't-editor-sel' },
+    ],
+    deja: { humanaCorregida: true },
+    explica: ['editar-texto', 'editar-nivel'],
+  },
+  {
+    id: 'cambiar-fuerza',
+    capitulo: 7,
+    texto: 'En una acción, aquí cambias su fuerza. Toca Listo para volver.',
+    audio: p(18),
+    objetivo: 't-editor-sel',
+    momentos: [
+      { en: 0, accion: 'editarAccion' },
+      { en: 0.6, tocar: 't-listo', objetivo: 't-listo' },
+      { en: 0.9, accion: 'cerrarEditor' },
+    ],
+    explica: ['editar-fuerza', 'listo'],
+  },
+  {
+    id: 'borrar',
+    capitulo: 7,
+    texto: 'Si una causa o acción sobra, tócala y luego Borrar. Te pido confirmar, y puedes volver a agregarla después.',
+    audio: p(19),
+    objetivo: 't-hum',
+    momentos: [
+      { en: 0.1, tocar: 't-hum', accion: 'editarHumana' },
+      { en: 0.3, tocar: 't-borrar', objetivo: 't-borrar' },
+      { en: 0.42, accion: 'confirmarBorrado', objetivo: SELECTOR_CONFIRMAR },
+      { en: 0.95, accion: 'cancelarBorrado' },
+    ],
+    explica: ['borrar'],
+  },
+  // 8 · Armar a mano, sin IA
+  {
+    id: 'armar-mano',
+    capitulo: 8,
+    texto:
+      'Sin señal, o si prefieres hacerlo tú, toca Armar a mano. Si yo no respondo, la tarjeta pasa sola a este modo.',
+    audio: p(20),
+    objetivo: 't-manual',
+    momentos: [
+      { en: 0.35, tocar: 't-manual', accion: 'armarManual' },
+      { en: 0.55, objetivo: 't-elige' },
+    ],
+    explica: ['armar-mano', 'caida-manual'],
+  },
+  {
+    id: 'elige-mano',
+    capitulo: 8,
+    texto:
+      'La pregunta 1 queda como causa física. Para la 2 eliges el nivel, y para la 3 la fuerza. La fuerza no viene marcada: tienes que elegirla.',
+    audio: p(21),
+    objetivo: 't-elige',
+    momentos: [
+      { en: 0, accion: 'armarManual' },
+      { en: 0.3, tocar: 't-nivel', accion: 'nivelLatente' },
+      { en: 0.55, tocar: 't-fuerza', accion: 'fuerzaFuerte' },
+      { en: 0.97, accion: 'mostrarPropuesta' },
+    ],
+    explica: ['manual-nivel', 'manual-fuerza'],
+  },
+  // 9 · Guardar: borrador o cerrado
+  {
+    id: 'borrador',
+    capitulo: 9,
+    texto:
+      'Lo que escribes se guarda solo, como borrador. Si falta algo, te lo digo aquí abajo. También puedes guardar con el botón de arriba.',
+    audio: p(22),
+    objetivo: 't-motivo',
+    momentos: [
+      { en: 0, accion: 'mensajeFalta' },
+      { en: 0.7, tocar: 't-guardar-arriba', objetivo: 't-guardar-arriba' },
+    ],
+    explica: ['autoguardado', 'motivo', 'guardar-arriba'],
   },
   {
     id: 'guardar',
+    capitulo: 9,
     texto:
-      'Marca si guardaste la pieza dañada y toca Guardar. Listo: el análisis cuenta en el indicador de acciones fuertes.',
-    audio: 'paso-8.mp3',
+      'Con las tres respuestas, una causa latente y una acción, el análisis queda cerrado y cuenta en el indicador de acciones fuertes de Mantención.',
+    audio: p(23),
     objetivo: 't-save',
-    tocar: 't-pieza',
-    accion: 'guardar',
+    momentos: [{ en: 0.3, tocar: 't-save', accion: 'guardar' }],
+    deja: { guardado: true },
+    explica: ['guardar-cerrar'],
+  },
+  // 10 · Ver y editar después
+  {
+    id: 'lectura',
+    capitulo: 10,
+    texto:
+      'Desde el evento, «Ver análisis» abre este resumen: la evidencia, las causas, cada acción con la causa que ataca, y la verificación. Revisaré que la falla no se repita en sesenta días.',
+    audio: p(24),
+    objetivo: 't-lectura',
+    vista: 'lectura',
+    momentos: [{ en: 0.75, objetivo: 't-verificacion' }],
+    explica: ['lectura', 'verificacion'],
+  },
+  {
+    id: 'editar-despues',
+    capitulo: 10,
+    texto: 'Si aprendes algo nuevo, toca Editar y vuelves a la tarjeta de tres preguntas.',
+    audio: p(25),
+    objetivo: 't-editar',
+    vista: 'lectura',
+    momentos: [{ en: 0.35, tocar: 't-editar' }],
+    explica: ['editar-lectura'],
+  },
+  // 11 · Revisión semanal del supervisor
+  {
+    id: 'revision',
+    capitulo: 11,
+    texto:
+      'Una vez por semana, el supervisor abre esta revisión desde el indicador de acciones fuertes. Arriba quedan las acciones débiles.',
+    audio: p(26),
+    objetivo: 't-revision',
+    vista: 'revision',
+    explica: ['revision-semanal'],
+  },
+  {
+    id: 'revision-subir',
+    capitulo: 11,
+    texto:
+      'El supervisor sube su fuerza, por ejemplo llevando la revisión a la pauta. El técnico solo la ve. Eso es todo: ahora te toca a ti con una falla real.',
+    audio: p(27),
+    objetivo: 't-rev-fila',
+    vista: 'revision',
+    momentos: [{ en: 0.2, tocar: 't-rev-fila', accion: 'subirFuerza' }],
+    explica: ['revision-subir', 'revision-solo-lectura'],
   },
 ]
 
-/** Cierre: ARIA termina, sin resaltar nada. Es el audio paso-9. */
-export const TEXTO_CIERRE =
-  'Fin del tutorial. Ahora te toca a ti: abre una falla repetida en la Bitácora.'
-export const AUDIO_CIERRE = 'paso-9.mp3'
+/** Índice del primer paso de cada capítulo (posición 0 = capítulo 1). */
+export const INICIO_CAPITULO: readonly number[] = CAPITULOS.map((_, c) =>
+  PASOS_TUTORIAL.findIndex((paso) => paso.capitulo === c + 1),
+)
+
+const PRACTICA_VACIA: PracticaTutorial = {
+  pieza: false,
+  porQue: false,
+  queHacemos: false,
+  propuesta: false,
+  humanaCorregida: false,
+  guardado: false,
+}
+
+/**
+ * Cómo debe estar la práctica al EMPEZAR el paso `indice`: lo que dejaron los pasos anteriores.
+ * Con esto saltar a un capítulo (o seguir tras «Siguiente») no depende de haber visto lo previo.
+ */
+export function practicaAlEmpezar(indice: number): PracticaTutorial {
+  return PASOS_TUTORIAL.slice(0, Math.max(0, indice)).reduce<PracticaTutorial>(
+    (acc, paso) => ({ ...acc, ...paso.deja }),
+    PRACTICA_VACIA,
+  )
+}
 
 /** Texto que escribe el tutorial al corregir la causa humana. */
 export const CORRECCION_HUMANA = 'Al cambiar el resorte no se guarda el cortado ni se anotan sus horas'
+
+/** Texto de la acción para cada fuerza (capítulo 6). */
+export const ACCION_POR_FUERZA: Record<AccionAcr['fuerza'], string> = {
+  debil: 'Revisar el resorte en cada engrase',
+  media: 'Agregar el resorte a la pauta de engrase',
+  fuerte: 'Regulador de aire en N1 y N2: cambia la condición, no depende de nadie',
+}
+
+/** Mensaje de ejemplo de lo que falta (capítulo 9). */
+export const MOTIVO_EJEMPLO = 'Falta la causa latente.'
+
+/** Repetición de ejemplo, para la práctica en eventos que no se repiten. */
+export const REPETICION_TUTORIAL: Repeticion = {
+  eventoIds: ['tut-n1', 'tut-n2', 'tut-b200'],
+  resumen: 'El resorte de la chapaleta se cortó 3 veces el 24-09-2026 (N1, N2 y Baader 200).',
+  minutos: 21,
+}
 
 /**
  * Propuesta de ejemplo del tutorial (mockup R1, «Propuesta IA»). Sale de la app, no de la red.
@@ -114,7 +529,7 @@ export const PROPUESTA_TUTORIAL: { causas: CausaAcr[]; acciones: AccionAcr[] } =
   acciones: [
     {
       id: 'tut-accion',
-      texto: 'Regulador de aire en N1 y N2: cambia la condición, no depende de nadie',
+      texto: ACCION_POR_FUERZA.fuerte,
       fuerza: 'fuerte',
       causaId: 'tut-latente',
       responsable: '',
@@ -124,6 +539,32 @@ export const PROPUESTA_TUTORIAL: { causas: CausaAcr[]; acciones: AccionAcr[] } =
   ],
 }
 
+/**
+ * Los ACR de la revisión semanal de práctica: el de la práctica y uno de la semana con una acción
+ * débil («Revisar resorte en el engrase»), que el supervisor sube a media en el paso 27.
+ */
+export function acrsRevisionTutorial(base: Acr, subida: boolean): Acr[] {
+  const semana: Acr = {
+    ...base,
+    id: 'tut-semana-b200',
+    equipo: 'BAADER 200',
+    definicion: 'Se cortan resortes alimentación 1 y 2, se reutilizan los mismos',
+    causas: [{ id: 'tut-sem-c', texto: 'Resorte reutilizado tras cortarse', nivel: 'latente', m6: null }],
+    acciones: [
+      {
+        id: 'tut-sem-a',
+        texto: 'Revisar resorte en el engrase',
+        fuerza: subida ? 'media' : 'debil',
+        causaId: 'tut-sem-c',
+        responsable: '',
+        fechaLimite: null,
+        estado: 'pendiente',
+      },
+    ],
+  }
+  return [semana, base]
+}
+
 // ── Reductor ─────────────────────────────────────────────────────────────────
 
 /** `hablando` = suena un paso; `pausado` = en pausa; `fin` = terminó; `inactivo` = no corre. */
@@ -131,7 +572,7 @@ export type FaseTutorial = 'inactivo' | 'hablando' | 'pausado' | 'fin'
 
 export interface EstadoTutorial {
   fase: FaseTutorial
-  /** 0..PASOS_TUTORIAL.length-1 = pasos; PASOS_TUTORIAL.length = cierre (paso-9). */
+  /** 0..PASOS_TUTORIAL.length-1. */
   indice: number
 }
 
@@ -142,22 +583,22 @@ export type EventoTutorial =
   | { tipo: 'pausar' }
   | { tipo: 'seguir' }
   | { tipo: 'siguiente' }
+  | { tipo: 'saltar'; capitulo: number }
   | { tipo: 'cerrar' }
 
 export const ESTADO_INICIAL: EstadoTutorial = { fase: 'inactivo', indice: 0 }
 
-/** Índice del cierre: el paso que sigue al último. */
-const INDICE_CIERRE = PASOS_TUTORIAL.length
+const ULTIMO = PASOS_TUTORIAL.length - 1
 
 function avanzar(e: EstadoTutorial): EstadoTutorial {
-  if (e.indice >= INDICE_CIERRE) return { fase: 'fin', indice: e.indice }
+  if (e.indice >= ULTIMO) return { fase: 'fin', indice: ULTIMO }
   return { fase: 'hablando', indice: e.indice + 1 }
 }
 
 /**
  * Siguiente estado del tutorial. Puro: lo que suena y lo que se toca lo decide el motor a partir
  * de `fase` e `indice`. `audioTerminado` solo cuenta si es del paso en curso (un temporizador
- * viejo no puede saltar al siguiente).
+ * viejo no puede saltar al siguiente). El último paso ya es el cierre («Eso es todo…»).
  */
 export function siguienteEstado(e: EstadoTutorial, ev: EventoTutorial): EstadoTutorial {
   switch (ev.tipo) {
@@ -170,6 +611,10 @@ export function siguienteEstado(e: EstadoTutorial, ev: EventoTutorial): EstadoTu
       return e.fase === 'pausado' ? { ...e, fase: 'hablando' } : e
     case 'siguiente':
       return e.fase === 'inactivo' || e.fase === 'fin' ? e : avanzar(e)
+    case 'saltar': {
+      const indice = INICIO_CAPITULO[ev.capitulo - 1]
+      return indice == null || indice < 0 ? e : { fase: 'hablando', indice }
+    }
     case 'audioTerminado':
       return e.fase === 'hablando' && ev.indice === e.indice ? avanzar(e) : e
     case 'cerrar':
@@ -179,6 +624,6 @@ export function siguienteEstado(e: EstadoTutorial, ev: EventoTutorial): EstadoTu
 
 /** URL del audio de un paso. `base` es `import.meta.env.BASE_URL`. */
 export function urlAudio(base: string, indice: number): string {
-  const nombre = indice < PASOS_TUTORIAL.length ? PASOS_TUTORIAL[indice]?.audio : AUDIO_CIERRE
-  return `${base}tutorial-acr/${nombre ?? AUDIO_CIERRE}`
+  const paso = PASOS_TUTORIAL[Math.min(Math.max(indice, 0), ULTIMO)]
+  return `${base}tutorial-acr/${paso?.audio ?? p(1)}`
 }

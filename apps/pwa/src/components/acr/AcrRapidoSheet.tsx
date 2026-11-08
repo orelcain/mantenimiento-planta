@@ -5,7 +5,7 @@
  * Meta: llenar un ACR en menos de un minuto. El borrador se guarda solo (`AUTOGUARDADO_MS`),
  * igual que la Bitácora.
  */
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Button, ListGroup, Pill, SegmentedControl, Sheet, ActionSheet } from '@/components/piel'
 import { SpeechTextarea } from '@/components/ui/SpeechTextarea'
 import { auth } from '@/services/firebase'
@@ -32,7 +32,23 @@ import {
 import { logger } from '@/lib/logger'
 import { Play } from 'lucide-react'
 import { MotorTutorialAcr } from './MotorTutorialAcr'
-import { CORRECCION_HUMANA, PROPUESTA_TUTORIAL, type AccionTutorial } from './tutorialAcr'
+import { AcrLectura } from './AcrLectura'
+import { FilaAnalisis } from './AcrEntrada'
+import { RevisionSemanalSheet } from './RevisionSemanalSheet'
+import {
+  ACCION_POR_FUERZA,
+  CORRECCION_HUMANA,
+  MOTIVO_EJEMPLO,
+  PASOS_TUTORIAL,
+  PROPUESTA_TUTORIAL,
+  REPETICION_TUTORIAL,
+  TEXTO_Q2,
+  TEXTO_Q3,
+  acrsRevisionTutorial,
+  practicaAlEmpezar,
+  type AccionTutorial,
+  type VistaTutorial,
+} from './tutorialAcr'
 
 /** Marca del tutorial visto: sin ella, la tarjeta ofrece el tutorial la primera vez. */
 const CLAVE_TUTORIAL_VISTO = 'acr-tutorial-visto'
@@ -174,6 +190,11 @@ export function AcrRapidoSheet({
   const [avisoIA, setAvisoIA] = useState<string | null>(null)
   const [editando, setEditando] = useState<{ tipo: 'causa' | 'accion'; id: string } | null>(null)
   const [confirmarBorrado, setConfirmarBorrado] = useState(false)
+  // Solo en la práctica del tutorial: lo que ARIA abre o muestra encima de la tarjeta.
+  const [vistaPractica, setVistaPractica] = useState<VistaTutorial | null>(null)
+  const [pensandoPractica, setPensandoPractica] = useState(false)
+  const [motivoPractica, setMotivoPractica] = useState<string | null>(null)
+  const [revisionSubida, setRevisionSubida] = useState(false)
   /** Falso hasta el primer guardado de un análisis nuevo: ahí se crea el documento. */
   const guardadoRef = useRef(acrExistente != null)
   const idPiezas = useId()
@@ -300,6 +321,49 @@ export function AcrRapidoSheet({
     realRef.current = null
     setSucio(false)
     setPracticaFinal(null)
+    cerrarCapasPractica()
+  }
+
+  /** Cierra todo lo que el tutorial abrió encima de la tarjeta. */
+  const cerrarCapasPractica = () => {
+    setEditando(null)
+    setConfirmarBorrado(false)
+    setVistaPractica(null)
+    setPensandoPractica(false)
+    setMotivoPractica(null)
+    setRevisionSubida(false)
+  }
+
+  /**
+   * Deja la práctica como debe estar al empezar el paso `indice` (lo que dejaron los anteriores).
+   * Así saltar a un capítulo, «Siguiente» o «Repetir» siempre parten de un estado coherente.
+   */
+  const prepararPractica = (indice: number) => {
+    const pr = practicaAlEmpezar(indice)
+    const base = acrNuevo(evento, auth.currentUser?.uid ?? '', nombreDe(user), repeticion)
+    const causas = pr.propuesta
+      ? PROPUESTA_TUTORIAL.causas.map((c) =>
+          c.id === 'tut-humana' && pr.humanaCorregida ? { ...c, texto: CORRECCION_HUMANA } : c,
+        )
+      : []
+    const a: Acr = {
+      ...base,
+      respuestas: {
+        ...(base.respuestas ?? RESPUESTAS_VACIAS),
+        porQue: pr.porQue ? TEXTO_Q2 : '',
+        queHacemos: pr.queHacemos ? TEXTO_Q3 : '',
+      },
+      piezaGuardada: pr.pieza,
+      causas,
+      acciones: pr.propuesta ? PROPUESTA_TUTORIAL.acciones : [],
+      ...(pr.propuesta ? { propuesta: { origen: 'ia' as const, modelo: 'tutorial' } } : {}),
+      estado: pr.guardado ? 'cerrado' : 'borrador',
+    }
+    cerrarCapasPractica()
+    setAcr(a)
+    setSucio(false)
+    setPracticaFinal(pr.guardado ? estadoDe(a) : null)
+    setVistaPractica(PASOS_TUTORIAL[indice]?.vista ?? null)
   }
 
   const terminarTutorialVisto = () => {
@@ -316,22 +380,97 @@ export function AcrRapidoSheet({
     }
   })
 
+  /** Cambia la fuerza (y el texto de ejemplo) de la acción de la propuesta. */
+  const fuerzaEjemplo = (fuerza: FuerzaAccion) =>
+    setAcr((prev) => ({
+      ...prev,
+      acciones: prev.acciones.map((x) =>
+        x.id === 'tut-accion' ? { ...x, fuerza, texto: ACCION_POR_FUERZA[fuerza] } : x,
+      ),
+    }))
+
+  /** Lo que ARIA hace en la práctica. Nunca escribe en Firestore: todo es estado local. */
   const accionTutorial = (a: AccionTutorial) => {
-    if (a === 'proponer') {
-      setAcr((prev) => ({
-        ...prev,
-        causas: PROPUESTA_TUTORIAL.causas,
-        acciones: PROPUESTA_TUTORIAL.acciones,
-        propuesta: { origen: 'ia', modelo: 'tutorial' },
-      }))
-    } else if (a === 'corregirHumana') {
-      setAcr((prev) => ({
-        ...prev,
-        causas: prev.causas.map((c) => (c.id === 'tut-humana' ? { ...c, texto: CORRECCION_HUMANA } : c)),
-      }))
-    } else {
-      setAcr((prev) => ({ ...prev, piezaGuardada: true, estado: 'cerrado' }))
-      setPracticaFinal(estadoDe({ ...acr, piezaGuardada: true, estado: 'cerrado' }))
+    switch (a) {
+      case 'mostrarPropuesta':
+        setPensandoPractica(false)
+        setAcr((prev) => ({
+          ...prev,
+          causas: PROPUESTA_TUTORIAL.causas,
+          acciones: PROPUESTA_TUTORIAL.acciones,
+          propuesta: { origen: 'ia', modelo: 'tutorial' },
+        }))
+        return
+      case 'pensar':
+        setPensandoPractica(true)
+        setAcr((prev) => ({ ...prev, causas: [], acciones: [] }))
+        return
+      case 'pieza':
+        setAcr((prev) => ({ ...prev, piezaGuardada: true }))
+        return
+      case 'accionDebil':
+        return fuerzaEjemplo('debil')
+      case 'accionMedia':
+        return fuerzaEjemplo('media')
+      case 'accionFuerte':
+        return fuerzaEjemplo('fuerte')
+      case 'editarHumana':
+        setEditando({ tipo: 'causa', id: 'tut-humana' })
+        return
+      case 'corregirHumana':
+        setAcr((prev) => ({
+          ...prev,
+          causas: prev.causas.map((c) => (c.id === 'tut-humana' ? { ...c, texto: CORRECCION_HUMANA } : c)),
+        }))
+        return
+      case 'editarAccion':
+        setEditando({ tipo: 'accion', id: 'tut-accion' })
+        return
+      case 'cerrarEditor':
+        setEditando(null)
+        return
+      case 'confirmarBorrado':
+        setConfirmarBorrado(true)
+        return
+      case 'cancelarBorrado':
+        // Se cancela: en la práctica no se borra nada.
+        setConfirmarBorrado(false)
+        setEditando(null)
+        return
+      case 'armarManual':
+        setAcr((prev) => (prev.propuesta?.origen === 'manual' ? prev : armadoManual(prev)))
+        return
+      case 'nivelLatente':
+        setAcr((prev) => ({ ...prev, causas: prev.causas.map((c) => (c.id === 'q2' ? { ...c, nivel: 'latente' } : c)) }))
+        return
+      case 'fuerzaFuerte':
+        setAcr((prev) => {
+          const r2 = prev.respuestas ?? RESPUESTAS_VACIAS
+          const q3: AccionAcr = {
+            id: 'q3',
+            texto: r2.queHacemos,
+            fuerza: 'fuerte',
+            causaId: 'q2',
+            responsable: '',
+            fechaLimite: null,
+            estado: 'pendiente',
+          }
+          return { ...prev, acciones: [...prev.acciones.filter((x) => x.id !== 'q3'), q3] }
+        })
+        return
+      case 'mensajeFalta':
+        setMotivoPractica(MOTIVO_EJEMPLO)
+        return
+      case 'guardar': {
+        setMotivoPractica(null)
+        const cerrado: Acr = { ...acr, piezaGuardada: true, estado: 'cerrado' }
+        setAcr(cerrado)
+        setPracticaFinal(estadoDe(cerrado))
+        return
+      }
+      case 'subirFuerza':
+        setRevisionSubida(true)
+        return
     }
   }
 
@@ -368,6 +507,10 @@ export function AcrRapidoSheet({
   }
 
   const motivo = motivoNoCierra(acr)
+  /** En la práctica siempre hay aviso de repetición: el caso de los resortes. */
+  const avisoRepeticion = repeticion ?? (tutorial ? REPETICION_TUTORIAL : null)
+  const nada = () => {}
+  const revisionAcrs = useMemo(() => acrsRevisionTutorial(acr, revisionSubida), [acr, revisionSubida])
   const minutos = acr.minutosDetencion != null ? `${acr.minutosDetencion} min` : 'Sin detención'
   const resumen = resumenFuerza(acr.acciones)
 
@@ -380,15 +523,15 @@ export function AcrRapidoSheet({
       title="Causa raíz"
       description={`${acr.equipo} · ${fechaCorta(acr.fechaTurno)} · ${minutos}`}
       headerAction={
-        <Button variant="plain" onClick={guardarAhora}>
+        <Button data-tutorial="t-guardar-arriba" variant="plain" onClick={guardarAhora}>
           Guardar
         </Button>
       }
       actions={
         <div className="flex w-full flex-col gap-2.5">
-          {motivo && (
-            <p role="status" className="text-footnote font-semibold text-ink-warn">
-              {motivo}
+          {(motivoPractica ?? motivo) && (
+            <p data-tutorial="t-motivo" role="status" className="text-footnote font-semibold text-ink-warn">
+              {motivoPractica ?? motivo}
             </p>
           )}
           {error && (
@@ -415,7 +558,7 @@ export function AcrRapidoSheet({
           </p>
         )}
         {!visto && !tutorial && (
-          <p className="text-footnote text-muted-foreground">¿Primera vez? ARIA te muestra cómo en 1 minuto.</p>
+          <p className="text-footnote text-muted-foreground">¿Primera vez? ARIA te lo muestra en 11 partes cortas.</p>
         )}
         <Button data-tutorial="t-head" variant="tinted" disabled={tutorial} onClick={iniciarTutorial}>
           <Play />
@@ -426,15 +569,32 @@ export function AcrRapidoSheet({
       {/* Celular: una columna en este orden. PC (lg): izquierda = preguntas; derecha = propuesta. */}
       <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
         <div className="flex flex-col gap-5">
-        {repeticion && (
+        {avisoRepeticion && (
           <ListGroup data-tutorial="t-alert">
             <div className="flex flex-col gap-2 px-4 py-3">
               <Pill tone="warning" className="self-start">
                 Se repite
               </Pill>
-              <p className="text-body text-foreground">{repeticion.resumen}</p>
+              <p className="text-body text-foreground">{avisoRepeticion.resumen}</p>
             </div>
           </ListGroup>
+        )}
+
+        {/* Práctica, paso 2: las tres formas de la fila del evento de Bitácora. */}
+        {tutorial && vistaPractica === 'filas' && (
+          <div data-tutorial="t-filas" className="flex flex-col gap-3">
+            <p className="text-footnote font-semibold text-muted-foreground">Así se ve en el evento de la Bitácora</p>
+            <FilaAnalisis acr={null} cargando={false} aplica repeticion={avisoRepeticion} onVer={nada} onAnalizar={nada} />
+            <FilaAnalisis acr={null} cargando={false} aplica repeticion={null} onVer={nada} onAnalizar={nada} />
+            <FilaAnalisis
+              acr={{ ...acr, acciones: PROPUESTA_TUTORIAL.acciones, estado: 'cerrado' }}
+              cargando={false}
+              aplica
+              repeticion={null}
+              onVer={nada}
+              onAnalizar={nada}
+            />
+          </div>
         )}
 
         <section data-tutorial="t-q1" className="flex flex-col gap-2">
@@ -485,20 +645,26 @@ export function AcrRapidoSheet({
           <Button data-tutorial="t-prop" variant="tinted" disabled={!puedeProponer} onClick={proponerConIA}>
             Proponer causas
           </Button>
-          <Button variant="plain" disabled={tutorial} onClick={() => cambiar((a) => armadoManual(a))}>
+          <Button
+            data-tutorial="t-manual"
+            variant="plain"
+            disabled={tutorial}
+            onClick={() => cambiar((a) => armadoManual(a))}
+          >
             Armar a mano
           </Button>
-          {pensando && <p className="text-footnote text-muted-foreground">ARIA está pensando…</p>}
+          {(pensando || pensandoPractica) && <p className="text-footnote text-muted-foreground">ARIA está pensando…</p>}
           {avisoIA && <p className="text-footnote font-semibold text-ink-warn">{avisoIA}</p>}
         </div>
 
+        <div data-tutorial="t-propuesta" className="flex flex-col gap-5">
         {hayGrupo && (
           <ListGroup title={manual ? 'Armado a mano · toca para corregir' : 'Propuesta IA · toca para corregir'}>
             {acr.causas.map((c) => (
               <button
                 key={c.id}
                 type="button"
-                data-tutorial={c.nivel === 'latente' ? 't-lat' : c.nivel === 'humana' ? 't-hum' : undefined}
+                data-tutorial={c.nivel === 'latente' ? 't-lat' : c.nivel === 'humana' ? 't-hum' : 't-fis'}
                 onClick={() => setEditando({ tipo: 'causa', id: c.id })}
                 className="flex min-h-11 w-full flex-col items-start gap-1.5 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
@@ -510,6 +676,7 @@ export function AcrRapidoSheet({
               <button
                 key={a.id}
                 type="button"
+                data-tutorial="t-accion"
                 onClick={() => setEditando({ tipo: 'accion', id: a.id })}
                 className="flex min-h-11 w-full flex-col items-start gap-1.5 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
@@ -521,24 +688,26 @@ export function AcrRapidoSheet({
         )}
 
         {manual && (
-          <ListGroup title="Elige a mano">
+          <ListGroup data-tutorial="t-elige" title="Elige a mano">
             <div className="flex flex-col gap-3 px-4 py-3">
               <p className="text-footnote font-semibold text-foreground">Nivel de la causa del porqué</p>
-              <SegmentedControl
-                ariaLabel="Nivel de la causa del porqué"
-                value={nivelQ2}
-                onChange={fijarNivelQ2}
-                segments={NIVEL_SEGMENTOS}
-                className="lg:max-w-[320px]"
-              />
+              <div data-tutorial="t-nivel" className="lg:max-w-[320px]">
+                <SegmentedControl
+                  ariaLabel="Nivel de la causa del porqué"
+                  value={nivelQ2}
+                  onChange={fijarNivelQ2}
+                  segments={NIVEL_SEGMENTOS}
+                />
+              </div>
               <p className="text-footnote font-semibold text-foreground">Fuerza de la acción</p>
-              <SegmentedControl
-                ariaLabel="Fuerza de la acción"
-                value={(fuerzaQ3 ?? '') as FuerzaAccion}
-                onChange={fijarFuerzaQ3}
-                segments={FUERZA_SEGMENTOS}
-                className="lg:max-w-[320px]"
-              />
+              <div data-tutorial="t-fuerza" className="lg:max-w-[320px]">
+                <SegmentedControl
+                  ariaLabel="Fuerza de la acción"
+                  value={(fuerzaQ3 ?? '') as FuerzaAccion}
+                  onChange={fijarFuerzaQ3}
+                  segments={FUERZA_SEGMENTOS}
+                />
+              </div>
               <p className="text-footnote text-muted-foreground">{AYUDA_FUERZA}</p>
             </div>
           </ListGroup>
@@ -549,9 +718,10 @@ export function AcrRapidoSheet({
             {Math.round(resumen.fuertePct)} % de las acciones son fuertes.
           </p>
         )}
+        </div>
 
-        {evento.fotos.length > 0 && (
-          <div className="grid grid-cols-3 gap-3" aria-label="Fotos del evento">
+        {evento.fotos.length > 0 ? (
+          <div data-tutorial="t-fotos" className="grid grid-cols-3 gap-3" aria-label="Fotos del evento">
             {evento.fotos.map((f) => (
               <img
                 key={f.path}
@@ -561,6 +731,15 @@ export function AcrRapidoSheet({
               />
             ))}
           </div>
+        ) : (
+          tutorial && (
+            // Práctica sin fotos en el evento: el lugar donde entran, para poder mostrarlo.
+            <ListGroup data-tutorial="t-fotos" title="Fotos del evento">
+              <p className="px-4 py-3 text-body text-muted-foreground">
+                Aquí entran solas las fotos que subiste en la Bitácora.
+              </p>
+            </ListGroup>
+          )
         )}
 
         <ListGroup>
@@ -579,10 +758,26 @@ export function AcrRapidoSheet({
             volverAlReal()
           }}
           onTerminar={terminarTutorialVisto}
+          preparar={prepararPractica}
           escribir={(campo, texto) =>
             setAcr((prev) => ({ ...prev, respuestas: { ...(prev.respuestas ?? RESPUESTAS_VACIAS), [campo]: texto } }))
           }
           accion={accionTutorial}
+        />
+      )}
+
+      {/* Práctica, capítulos 10 y 11: la vista de lectura y la revisión semanal, sin Firestore. */}
+      {tutorial && vistaPractica === 'lectura' && (
+        <AcrLectura open onClose={() => setVistaPractica(null)} acr={acr} onEditar={() => setVistaPractica(null)} />
+      )}
+      {tutorial && vistaPractica === 'revision' && (
+        <RevisionSemanalSheet
+          open
+          onClose={() => setVistaPractica(null)}
+          acrs={revisionAcrs}
+          periodo="21-09-2026 → 27-09-2026"
+          puedeEditar
+          onGuardar={nada}
         />
       )}
 
@@ -594,16 +789,21 @@ export function AcrRapidoSheet({
           title={editando.tipo === 'causa' ? 'Causa' : 'Acción'}
           actions={
             <div className="flex w-full flex-col gap-2.5">
-              <Button variant="filled" size="block" onClick={() => setEditando(null)}>
+              <Button data-tutorial="t-listo" variant="filled" size="block" onClick={() => setEditando(null)}>
                 Listo
               </Button>
-              <Button variant="destructive" size="block" onClick={() => setConfirmarBorrado(true)}>
+              <Button
+                data-tutorial="t-borrar"
+                variant="destructive"
+                size="block"
+                onClick={() => setConfirmarBorrado(true)}
+              >
                 Borrar
               </Button>
             </div>
           }
         >
-          <div className="flex flex-col gap-4">
+          <div data-tutorial="t-editor" className="flex flex-col gap-4">
             <textarea
               aria-label="Texto"
               rows={3}
@@ -617,6 +817,7 @@ export function AcrRapidoSheet({
               }
               className={`${CAMPO} resize-y pr-14`}
             />
+            <div data-tutorial="t-editor-sel">
             {editando.tipo === 'causa' ? (
               <SegmentedControl
                 ariaLabel="Nivel de la causa"
@@ -636,6 +837,7 @@ export function AcrRapidoSheet({
                 segments={FUERZA_SEGMENTOS}
               />
             )}
+            </div>
           </div>
         </Sheet>
       )}

@@ -49,7 +49,7 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
       title="Análisis de causa raíz"
       description={`${acr.equipo} · ${fechaCorta(acr.fechaTurno)} · ${minutos}`}
       actions={
-        <Button variant="filled" size="block" onClick={onEditar}>
+        <Button data-tutorial="t-editar" variant="filled" size="block" onClick={onEditar}>
           Editar
         </Button>
       }
@@ -57,7 +57,7 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
       {/* Celular: una columna en el orden de siempre. PC (lg): izquierda = definición, evidencia y
           verificación; derecha = causas y acciones. Cada bloque fija su celda para que el orden
           del celular no cambie. */}
-      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+      <div data-tutorial="t-lectura" className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
         <div className="flex flex-col gap-2 lg:col-start-1 lg:row-start-1">
           <p className="text-body text-foreground">{acr.definicion}</p>
           <p className="text-footnote text-muted-foreground">
@@ -124,7 +124,7 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
           ))}
         </ListGroup>
 
-        <ListGroup title="Verificación" className="lg:col-start-1 lg:row-start-3">
+        <ListGroup data-tutorial="t-verificacion" title="Verificación" className="lg:col-start-1 lg:row-start-3">
           <ListCell title={acr.verificacion.criterio} subtitle={`${acr.verificacion.dias} días`} />
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <span className="text-body text-foreground">Resultado</span>
