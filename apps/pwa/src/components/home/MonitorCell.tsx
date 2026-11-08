@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Loader2, Monitor } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ListCell, Pill } from '@/components/piel'
+import { usePielApple } from '@/hooks/usePielApple'
 import { toast } from '@/hooks/useToast'
 import type { PlantLineId } from '@/config/plantLines'
 import {
@@ -27,6 +28,7 @@ export function MonitorCell({ lineId, anidada = true }: {
   const linea = lineaConMonitor(lineId)
   const [enTurno, setEnTurno] = useState<boolean | null>(null)
   const [abriendo, setAbriendo] = useState(false)
+  const apple = usePielApple()
 
   useEffect(() => {
     if (!linea) return
@@ -63,7 +65,7 @@ export function MonitorCell({ lineId, anidada = true }: {
         </span>
       }
       className={anidada ? 'before:left-[4.75rem]' : undefined}
-      title={<span className={cn('whitespace-nowrap font-semibold text-primary', anidada && 'text-subhead')}>Monitor {linea.areaLabel}</span>}
+      title={<span className={cn(apple ? 'whitespace-nowrap text-primary' : 'whitespace-nowrap font-semibold text-primary', anidada && 'text-subhead')}>Monitor {linea.areaLabel}</span>}
       trailing={
         abriendo
           ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Abriendo" />
