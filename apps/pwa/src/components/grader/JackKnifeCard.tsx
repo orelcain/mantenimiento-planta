@@ -22,7 +22,10 @@ import { calcularLayout } from './jackKnifeLayout'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { listarAcrsConCache } from '@/services/acr/acrFirestore'
 import { resumenAcrPorCausa, type ResumenCausaJK } from '@/services/acr/acrHistorial'
-import type { Acr } from '@/services/acr/acr.types'
+import { eventoDesdeDetencion } from '@/services/acr/desdeJackKnife'
+import type { Acr, EventoRefAcr } from '@/services/acr/acr.types'
+import { EscogerDetencionSheet } from '@/components/acr/EscogerDetencionSheet'
+import { AcrRapidoSheet } from '@/components/acr/AcrRapidoSheet'
 import { logger } from '@/lib/logger'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 import {
@@ -284,6 +287,16 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
     return () => { vivo = false }
   }, [plantSlug])
   const esBitacora = plantSlug === BITACORA_PLANTA.id
+  // Análisis nuevo desde una detención: primero se escoge cuál (`EscogerDetencionSheet`), luego se llena.
+  const [escogiendoCausa, setEscogiendoCausa] = useState<string | null>(null)
+  const [nuevoAnalisis, setNuevoAnalisis] = useState<{ causa: string; evento: EventoRefAcr } | null>(null)
+  const recargarAcrs = () => {
+    listarAcrsConCache()
+      .then(setAcrs)
+      .catch((e: unknown) => {
+        logger.error('No se pudieron recargar los análisis de causa raíz para el Jack-Knife', e instanceof Error ? e : undefined)
+      })
+  }
   const analisis = useMemo<Map<string, ResumenCausaJK>>(() => resumenAcrPorCausa(acrs), [acrs])
   const anillos = useMemo(() => new Set([...analisis].filter(([, r]) => r.fuertesHechas > 0).map(([k]) => k)), [analisis])
 
@@ -503,7 +516,40 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
             {previa && <label className="flex min-h-[44px] items-center gap-2 text-footnote"><input type="checkbox" checked={limitesBase} onChange={e => setLimitesBase(e.target.checked)} />Límites del período base</label>}
             <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
               <JackKnifeGrafico calc={calc} ancho={W} sel={sel} fantasmas={fantasmas} elegirCausa={elegirCausa} anillos={esBitacora ? anillos : undefined} />
-              <JackKnifeListas calc={calc} informe={informe} turnos={turnos} elegirCausa={elegirCausa} analisis={esBitacora ? analisis : undefined} causaSel={sel} />
+              <JackKnifeListas
+                calc={calc}
+                informe={informe}
+                turnos={turnos}
+                elegirCausa={elegirCausa}
+                analisis={esBitacora ? analisis : undefined}
+                causaSel={sel}
+                onAnalizar={esBitacora ? (causa) => setEscogiendoCausa(causa) : undefined}
+              />
+              {esBitacora && escogiendoCausa && (
+                <EscogerDetencionSheet
+                  open
+                  onClose={() => setEscogiendoCausa(null)}
+                  causa={escogiendoCausa}
+                  turnos={turnos}
+                  desde={win.desde}
+                  hasta={win.hasta}
+                  onSeguir={(d) => {
+                    setNuevoAnalisis({ causa: escogiendoCausa, evento: eventoDesdeDetencion(plantSlug, d, escogiendoCausa) })
+                    setEscogiendoCausa(null)
+                  }}
+                />
+              )}
+              {nuevoAnalisis && (
+                <AcrRapidoSheet
+                  open
+                  onClose={() => {
+                    setNuevoAnalisis(null)
+                    recargarAcrs()
+                  }}
+                  evento={nuevoAnalisis.evento}
+                  causaJKInicial={nuevoAnalisis.causa}
+                />
+              )}
             </div>
             <details ref={detalleRef} className="space-y-4"><summary className="cursor-pointer py-4 font-semibold text-accent">Ver detalle</summary>
             <p className="text-footnote text-muted-foreground">¿Cómo se lee? Los cuadrantes separan frecuencia y duración altas o bajas. La línea de disponibilidad une causas con igual tiempo detenido. Los límites del período base mantienen su MTTR y ajustan la frecuencia al número de turnos actuales; al desactivarlos se recalculan con el período actual.</p>

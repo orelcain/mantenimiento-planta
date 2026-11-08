@@ -43,6 +43,9 @@ export const OPCIONES_ACR = {
   'editar-texto': 'Hoja «Causa/Acción»: corregir el texto',
   'editar-nivel': 'Hoja «Causa»: cambiar el nivel',
   'editar-fuerza': 'Hoja «Acción»: cambiar la fuerza',
+  'accion-causa': 'Acción: a qué causa apunta',
+  'accion-responsable': 'Acción: responsable',
+  'accion-fecha': 'Acción: fecha límite',
   listo: 'Botón «Listo» de la hoja',
   borrar: 'Botón «Borrar» y su confirmación',
   'armar-mano': 'Botón «Armar a mano»',
@@ -458,6 +461,21 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
       { palabra: 'volver', desfase: 0.6, accion: 'cerrarEditor' },
     ],
     explica: ['editar-fuerza', 'listo'],
+  },
+  {
+    id: 'detalle-accion',
+    capitulo: 7,
+    texto:
+      'En cada acción también eliges a qué causa apunta, quién la hace y para cuándo. Si ARIA la dejó en la causa equivocada, tócala y queda corregida. El responsable y la fecha puedes dejarlos para después.',
+    audio: 'paso-18b.mp3',
+    objetivo: 't-accion-causa',
+    momentos: [
+      { en: 0, accion: 'editarAccion' },
+      { palabra: 'apunta', objetivo: 't-accion-causa' },
+      { palabra: 'responsable', objetivo: 't-accion-quien' },
+      { palabra: 'despues', desfase: 0.6, accion: 'cerrarEditor' },
+    ],
+    explica: ['accion-causa', 'accion-responsable', 'accion-fecha'],
   },
   {
     id: 'borrar',

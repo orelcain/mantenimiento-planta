@@ -40,7 +40,7 @@ export function AccionDetalle({ accion, causas, tecnicos, onCausa, onResponsable
   return (
     <div className="flex flex-col gap-5">
       {causas.length > 0 && (
-        <ListGroup title="Ataca esta causa">
+        <ListGroup data-tutorial="t-accion-causa" title="Ataca esta causa">
           <div role="radiogroup" aria-label="Causa que ataca" className="flex flex-col">
             {causas.map((c) => {
               const elegida = accion.causaId === c.id
@@ -65,7 +65,7 @@ export function AccionDetalle({ accion, causas, tecnicos, onCausa, onResponsable
         </ListGroup>
       )}
 
-      <ListGroup title="Quién y para cuándo">
+      <ListGroup data-tutorial="t-accion-quien" title="Quién y para cuándo">
         <div className="flex min-h-11 items-center justify-between gap-3 px-4 py-2">
           <span className="text-body text-foreground">Responsable</span>
           <select

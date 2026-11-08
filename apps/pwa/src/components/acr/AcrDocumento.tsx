@@ -12,10 +12,15 @@ import {
   ETIQUETA_NIVEL,
   ETIQUETA_RESULTADO,
   type Acr,
+  type AccionAcr,
   type ResultadoVerificacion,
 } from '@/services/acr/acr.types'
 import { nombreEquipoLegible } from '@/services/bitacora/nombreEquipo'
+import { fechaVerificacion } from '@/services/acr/acrHistorial'
 import { fraseDetencion, totalFuertes } from './acrDocumentoTextos'
+import { ControlAccionHecha, ControlResultado } from './AcrLectura'
+import { useUbicacionJK } from './useUbicacionJK'
+import { textoUbicacionJK } from './textoUbicacionJK'
 
 const FILA = 'border-t border-border py-[11px]'
 const FILA_CAUSA = `grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-4 lg:grid-cols-[88px_minmax(0,1fr)] ${FILA}`
@@ -40,18 +45,45 @@ function continuarFrase(texto: string): string {
   return /^\p{Lu}\p{Ll}/u.test(texto) ? texto.charAt(0).toLocaleLowerCase('es') + texto.slice(1) : texto
 }
 
-export function AcrDocumento({ acr }: { acr: Acr }) {
+export interface AcrDocumentoProps {
+  acr: Acr
+  /** Una sola columna a cualquier ancho (el panel de PC de Causa raíz). */
+  compacto?: boolean
+  /** Si existe, la lectura deja marcar acciones hechas y el resultado de la verificación. */
+  onActualizar?: (a: Acr) => void
+}
+
+export function AcrDocumento({ acr, compacto = false, onActualizar }: AcrDocumentoProps) {
   const equipo = nombreEquipoLegible(acr.equipo)
   const criterio = acr.verificacion.criterio.replace(acr.equipo, equipo)
   const fuertes = acr.acciones.filter((a) => a.fuerza === 'fuerte').length
   const causaDe = (id: string | null): string | null => (id && acr.causas.find((c) => c.id === id)?.texto) || null
   const punto = PUNTO_RESULTADO[acr.verificacion.resultado]
+  const cambiarAccion = (id: string, cambio: Partial<AccionAcr>) =>
+    onActualizar?.({
+      ...acr,
+      acciones: acr.acciones.map((x) => (x.id === id ? { ...x, ...cambio } : x)),
+      updatedAt: new Date(),
+    })
+  const cambiarResultado = (resultado: ResultadoVerificacion) =>
+    onActualizar?.({ ...acr, verificacion: { ...acr.verificacion, resultado }, updatedAt: new Date() })
+  const definicion = acr.definicion.trim() !== '' ? acr.definicion : equipo
 
   return (
-    <article className="flex flex-col gap-9 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,32%)] lg:items-start lg:gap-x-[56px] lg:gap-y-0">
+    <article
+      className={
+        compacto
+          ? 'flex flex-col gap-9'
+          : 'flex flex-col gap-9 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,32%)] lg:items-start lg:gap-x-[56px] lg:gap-y-0'
+      }
+    >
       <div className="min-w-0">
         <p className="text-footnote text-muted-foreground">Análisis de causa raíz</p>
-        <h1 className="mt-1.5 text-title1 text-foreground [text-wrap:balance]">{acr.definicion}</h1>
+        {compacto ? (
+          <h2 className="mt-1.5 text-title2 text-foreground [text-wrap:balance]">{definicion}</h2>
+        ) : (
+          <h1 className="mt-1.5 text-title1 text-foreground [text-wrap:balance]">{definicion}</h1>
+        )}
         <p className="mt-2.5 text-body text-muted-foreground">
           {equipo}, turno del <span className="whitespace-nowrap tabular-nums">{fechaCorta(acr.fechaTurno)}</span>. {fraseDetencion(acr.minutosDetencion)}
         </p>
@@ -73,14 +105,32 @@ export function AcrDocumento({ acr }: { acr: Acr }) {
           <p className={`text-body text-muted-foreground ${FILA}`}>Sin acciones registradas</p>
         ) : (
           <>
-            <div className={`hidden pb-2 text-footnote text-muted-foreground min-[1400px]:grid ${COLUMNAS_ACCION}`}>
-              <span>Fuerza</span>
-              <span>Qué se hace</span>
-              <span>Responsable</span>
-              <span>Límite</span>
-            </div>
+            {!compacto && (
+              <div className={`hidden pb-2 text-footnote text-muted-foreground min-[1400px]:grid ${COLUMNAS_ACCION}`}>
+                <span>Fuerza</span>
+                <span>Qué se hace</span>
+                <span>Responsable</span>
+                <span>Límite</span>
+              </div>
+            )}
             {acr.acciones.map((a) => {
               const ataca = causaDe(a.causaId)
+              if (compacto) {
+                return (
+                  <div key={a.id} className={`flex flex-col gap-1.5 ${FILA}`}>
+                    <span className={`text-body text-foreground ${a.fuerza === 'fuerte' ? 'font-semibold' : ''}`}>
+                      {ETIQUETA_FUERZA[a.fuerza]}
+                    </span>
+                    <p className="max-w-[80ch] text-body text-foreground">{a.texto}</p>
+                    <p className="text-footnote text-muted-foreground">{ataca ? `Ataca: ${continuarFrase(ataca)}` : 'Sin causa asociada'}</p>
+                    <p className="text-footnote text-muted-foreground">Responsable: {a.responsable || 'Sin asignar'}</p>
+                    <p className="text-footnote text-muted-foreground tabular-nums">
+                      Límite: {a.fechaLimite ? fechaCorta(a.fechaLimite) : 'Sin fecha'}
+                    </p>
+                    {onActualizar && <ControlAccionHecha accion={a} onCambiar={(c) => cambiarAccion(a.id, c)} />}
+                  </div>
+                )
+              }
               return (
                 <div key={a.id} className={`${COLUMNAS_ACCION} ${FILA}`}>
                   <span className={`text-body text-foreground ${a.fuerza === 'fuerte' ? 'font-semibold' : ''}`}>
@@ -103,9 +153,13 @@ export function AcrDocumento({ acr }: { acr: Acr }) {
                 </div>
               )
             })}
-            <div className={`${COLUMNAS_ACCION} border-t border-foreground pt-[11px]`}>
-              <span className="col-start-2 text-footnote text-foreground">{totalFuertes(fuertes, acr.acciones.length)}</span>
-            </div>
+            {compacto ? (
+              <p className="border-t border-foreground pt-[11px] text-footnote text-foreground">{totalFuertes(fuertes, acr.acciones.length)}</p>
+            ) : (
+              <div className={`${COLUMNAS_ACCION} border-t border-foreground pt-[11px]`}>
+                <span className="col-start-2 text-footnote text-foreground">{totalFuertes(fuertes, acr.acciones.length)}</span>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -141,6 +195,7 @@ export function AcrDocumento({ acr }: { acr: Acr }) {
 
         <h2 className="mb-3 mt-8 text-title3 text-foreground">Verificación</h2>
         <p className="text-body text-foreground">{criterio}</p>
+        <p className="mt-1 text-footnote text-muted-foreground tabular-nums">Vence el {fechaCorta(fechaVerificacion(acr))}</p>
         <div className={`mt-3.5 ${DATO}`}>
           <span className="text-body text-foreground">Resultado</span>
           <span className="text-body text-foreground">
@@ -148,7 +203,33 @@ export function AcrDocumento({ acr }: { acr: Acr }) {
             {ETIQUETA_RESULTADO[acr.verificacion.resultado]}
           </span>
         </div>
+        {onActualizar && acr.verificacion.resultado === 'pendiente' && <ControlResultado onElegir={cambiarResultado} />}
+
+        {acr.causaJK !== undefined && (
+          <>
+            <h2 className="mb-3 mt-8 text-title3 text-foreground">En el Jack-Knife</h2>
+            {acr.causaJK === null ? (
+              <p className={`text-body text-foreground ${FILA}`}>No aparece en el Jack-Knife</p>
+            ) : (
+              <SeccionJK causa={acr.causaJK} />
+            )}
+          </>
+        )}
       </aside>
     </article>
+  )
+}
+
+/** Dónde cae la causa en el Jack-Knife de 90 días (mismo texto que la hoja del celular). */
+function SeccionJK({ causa }: { causa: string }) {
+  const { detalle, nivel } = textoUbicacionJK(useUbicacionJK(causa))
+  return (
+    <div className={FILA}>
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="text-body text-foreground">{causa}</span>
+        {nivel && <span className="text-body text-foreground tabular-nums">{nivel}</span>}
+      </div>
+      <p className="mt-1 text-footnote text-muted-foreground tabular-nums">{detalle}</p>
+    </div>
   )
 }

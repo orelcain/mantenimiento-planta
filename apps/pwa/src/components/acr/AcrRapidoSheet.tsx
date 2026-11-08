@@ -38,7 +38,7 @@ import { FilaAnalisis } from './AcrEntrada'
 import { RevisionSemanalSheet } from './RevisionSemanalSheet'
 import { CadenaPorQues } from './CadenaPorQues'
 import { FilaJackKnifeRapido } from './JackKnifeRapido'
-import { AccionDetalleConLista } from './AccionDetalle'
+import { AccionDetalle, AccionDetalleConLista } from './AccionDetalle'
 import { useSugerenciaJK } from './useSugerenciaJK'
 import {
   ACCION_POR_FUERZA,
@@ -94,6 +94,8 @@ export interface AcrRapidoSheetProps {
   arrancarTutorial?: boolean
   /** No muestra «¿Dónde cae en el Jack-Knife?» ni lee el turno (las vitrinas lo usan). */
   sinJackKnife?: boolean
+  /** Análisis nacido de una detención del Jack-Knife: queda en esa causa y no se pregunta de nuevo. */
+  causaJKInicial?: string
 }
 
 // ── Constantes y helpers ─────────────────────────────────────────────────────
@@ -118,10 +120,18 @@ function nombreDe(user: { nombre?: string; apellido?: string } | null | undefine
 }
 
 /** Análisis nuevo a partir del evento. El criterio sale del spec, con 60 días. */
-function acrNuevo(evento: EventoRefAcr, uid: string, nombre: string, repeticion: Repeticion | null): Acr {
+function acrNuevo(
+  evento: EventoRefAcr,
+  uid: string,
+  nombre: string,
+  repeticion: Repeticion | null,
+  causaJK?: string,
+): Acr {
   const ahora = new Date()
   const equipo = evento.equipo || 'Sin equipo'
   return {
+    // Solo si viene de una detención del Jack-Knife: nunca se escribe `undefined`.
+    ...(causaJK !== undefined ? { causaJK } : {}),
     id: nuevoIdAcr(),
     version: 2,
     plantId: BITACORA_PLANTA.id,
@@ -194,18 +204,19 @@ export function AcrRapidoSheet({
   preguntar = preguntarPorQue,
   arrancarTutorial = false,
   sinJackKnife = false,
+  causaJKInicial,
 }: AcrRapidoSheetProps) {
   const user = useAuthStore((s) => s.user)
   const [acr, setAcr] = useState<Acr>(
-    () => acrExistente ?? acrNuevo(evento, auth.currentUser?.uid ?? '', nombreDe(user), repeticion),
+    () => acrExistente ?? acrNuevo(evento, auth.currentUser?.uid ?? '', nombreDe(user), repeticion, causaJKInicial),
   )
   const [sucio, setSucio] = useState(false)
   // Tutorial (SPEC_ACR_TUTORIAL.md §3): corre sobre una copia en memoria; lo real se guarda aparte.
   const [tutorial, setTutorial] = useState(false)
   const [practicaFinal, setPracticaFinal] = useState<string | null>(null)
   const [visto, setVisto] = useState(leerTutorialVisto)
-  // «¿Dónde cae en el Jack-Knife?»: no aparece en el tutorial ni en la vitrina.
-  const muestraJK = !tutorial && !sinJackKnife
+  // «¿Dónde cae en el Jack-Knife?»: no aparece en el tutorial, en la vitrina ni si ya viene de una detención del Jack-Knife.
+  const muestraJK = !tutorial && !sinJackKnife && causaJKInicial === undefined
   const jk = useSugerenciaJK(evento, muestraJK)
   // La sugerencia se asigna una sola vez (si el ACR no tiene causa todavía); no marca el borrador.
   useEffect(() => {
@@ -951,19 +962,14 @@ export function AcrRapidoSheet({
             )}
             </div>
 
-            {/* Causa, responsable y fecha de la acción: fuera del tutorial y de la vitrina. */}
-            {!tutorial && editando.tipo === 'accion' && (
-              <AccionDetalleConLista
+            {/* Causa, responsable y fecha de la acción. En el tutorial se ve sin leer Firestore. */}
+            {editando.tipo === 'accion' && (
+              <DetalleAccionEditada
+                tutorial={tutorial}
                 accion={itemEditado as AccionAcr}
                 causas={acr.causas}
-                onCausa={(causaId) =>
-                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, causaId } : x)) }))
-                }
-                onResponsable={(responsable) =>
-                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, responsable } : x)) }))
-                }
-                onFecha={(fechaLimite) =>
-                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, fechaLimite } : x)) }))
+                onCambiar={(cambio) =>
+                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, ...cambio } : x)) }))
                 }
               />
             )}
@@ -1005,6 +1011,28 @@ export function AcrRapidoSheet({
 }
 
 /** Interruptor de «Pieza dañada guardada» (mismo marcado que el de la Bitácora). */
+/** Causa, responsable y fecha de una acción en la hoja. Tutorial: sin técnicos de Firestore. */
+function DetalleAccionEditada({
+  tutorial,
+  accion,
+  causas,
+  onCambiar,
+}: {
+  tutorial: boolean
+  accion: AccionAcr
+  causas: CausaAcr[]
+  onCambiar: (cambio: Partial<AccionAcr>) => void
+}) {
+  const props = {
+    accion,
+    causas,
+    onCausa: (causaId: string) => onCambiar({ causaId }),
+    onResponsable: (responsable: string) => onCambiar({ responsable }),
+    onFecha: (fechaLimite: string | null) => onCambiar({ fechaLimite }),
+  }
+  return tutorial ? <AccionDetalle {...props} tecnicos={[]} /> : <AccionDetalleConLista {...props} />
+}
+
 function InterruptorPieza({ activo, onCambiar }: { activo: boolean; onCambiar: (v: boolean) => void }) {
   return (
     <button

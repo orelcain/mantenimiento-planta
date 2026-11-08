@@ -7,9 +7,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, ListCell, ListGroup, Pill } from '@/components/piel'
-import { AcrLectura, AcrLecturaCuerpo } from './AcrLectura'
+import { AcrLectura } from './AcrLectura'
+import { AcrDocumento } from './AcrDocumento'
 import { AcrRapidoSheet } from './AcrRapidoSheet'
 import { guardarAcr, leerEventoAcr, listarAcrsConCache } from '@/services/acr/acrFirestore'
+import { esEventoJK, eventoRefDesdeAcr } from '@/services/acr/desdeJackKnife'
 import {
   agruparHistorial,
   equiposDe,
@@ -40,8 +42,6 @@ const TEXTO_FUERZA: Record<FuerzaAccion, string> = { debil: 'Acción débil', me
 
 /** DD-MM (sin año), como en las filas. */
 const ddmm = (iso: string): string => `${iso.slice(8, 10)}-${iso.slice(5, 7)}`
-/** DD-MM-AAAA, como en la lectura. */
-const ddmmaaaa = (iso: string): string => `${iso.slice(8, 10)}-${iso.slice(5, 7)}-${iso.slice(0, 4)}`
 const minutosTexto = (m: number): string => (Number.isInteger(m) ? String(m) : dec1(m))
 
 /** `#acr=<id>` del hash de la URL, o null. */
@@ -106,6 +106,11 @@ export function HistorialAcr() {
     const eventoId = acr.eventoBitacoraIds[0]
     if (!eventoId) {
       setAviso('Este análisis no tiene un evento de la Bitácora para editar.')
+      return
+    }
+    // Un análisis nacido del Jack-Knife no tiene evento de Bitácora: su referencia basta.
+    if (esEventoJK(eventoId)) {
+      setEditando({ acr, evento: eventoRefDesdeAcr(acr) })
       return
     }
     leerEventoAcr(eventoId)
@@ -187,18 +192,12 @@ export function HistorialAcr() {
         </div>
         {esPC && actual && (
           <section className="flex min-w-0 flex-col gap-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <h2 className="text-title2 font-semibold text-foreground">Análisis de causa raíz</h2>
-                <p className="text-footnote text-muted-foreground">
-                  {`${actual.equipo}, ${ddmmaaaa(actual.fechaTurno)}${actual.minutosDetencion != null ? `, ${minutosTexto(actual.minutosDetencion)} min` : ''}`}
-                </p>
-              </div>
-              <Button variant="filled" onClick={() => editar(actual)}>
+            <div className="flex justify-end">
+              <Button variant="tinted" onClick={() => editar(actual)}>
                 Editar
               </Button>
             </div>
-            <AcrLecturaCuerpo key={actual.id} acr={actual} onActualizar={actualizar} />
+            <AcrDocumento key={actual.id} acr={actual} compacto onActualizar={actualizar} />
           </section>
         )}
       </div>
