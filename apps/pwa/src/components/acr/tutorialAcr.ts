@@ -347,7 +347,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
   {
     id: 'cambiar-fuerza',
     capitulo: 7,
-    texto: 'En una acción, aquí cambias su fuerza. Toca Listo para volver.',
+    texto: 'En una acción, aquí puedes cambiar su fuerza. Toca Listo para volver.',
     audio: p(18),
     objetivo: 't-editor-sel',
     momentos: [

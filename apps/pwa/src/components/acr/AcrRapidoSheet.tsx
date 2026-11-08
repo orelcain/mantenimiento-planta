@@ -584,11 +584,12 @@ export function AcrRapidoSheet({
 
         {/* Práctica, paso 2: las tres formas de la fila del evento de Bitácora. */}
         {tutorial && vistaPractica === 'filas' && (
-          <div data-tutorial="t-filas" className="flex flex-col gap-3">
+          <div data-tutorial="t-filas" className="flex flex-col gap-2">
             <p className="text-footnote font-semibold text-muted-foreground">Así se ve en el evento de la Bitácora</p>
-            <FilaAnalisis acr={null} cargando={false} aplica repeticion={avisoRepeticion} onVer={nada} onAnalizar={nada} />
-            <FilaAnalisis acr={null} cargando={false} aplica repeticion={null} onVer={nada} onAnalizar={nada} />
+            <FilaAnalisis compacta acr={null} cargando={false} aplica repeticion={avisoRepeticion} onVer={nada} onAnalizar={nada} />
+            <FilaAnalisis compacta acr={null} cargando={false} aplica repeticion={null} onVer={nada} onAnalizar={nada} />
             <FilaAnalisis
+              compacta
               acr={{ ...acr, acciones: PROPUESTA_TUTORIAL.acciones, estado: 'cerrado' }}
               cargando={false}
               aplica

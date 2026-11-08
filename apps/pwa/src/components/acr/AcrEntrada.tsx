@@ -91,6 +91,8 @@ export interface FilaAnalisisProps {
   repeticion: Repeticion | null
   onVer: () => void
   onAnalizar: () => void
+  /** Sin título ni pie (el tutorial muestra las tres formas juntas y debe caber en el celular). */
+  compacta?: boolean
 }
 
 /**
@@ -100,13 +102,13 @@ export interface FilaAnalisisProps {
  * - falla con detención → «Analizar causa (opcional)»;
  * - otros eventos → nada.
  */
-export function FilaAnalisis({ acr, cargando, aplica, repeticion, onVer, onAnalizar }: FilaAnalisisProps) {
+export function FilaAnalisis({ acr, cargando, aplica, repeticion, onVer, onAnalizar, compacta = false }: FilaAnalisisProps) {
   const pct = acr ? resumenFuerza(acr.acciones).fuertePct : null
 
   // Mientras no llega la lectura no se ofrece «Analizar»: con un análisis ya existente, eso duplicaría.
   if (cargando) {
     return aplica ? (
-      <ListGroup title="Causa raíz">
+      <ListGroup title={compacta ? undefined : 'Causa raíz'}>
         <ListCell title="Cargando análisis…" />
       </ListGroup>
     ) : null
@@ -114,7 +116,10 @@ export function FilaAnalisis({ acr, cargando, aplica, repeticion, onVer, onAnali
 
   if (acr) {
     return (
-      <ListGroup title="Causa raíz" footer="El análisis se guarda en la Bitácora y cuenta en el KPI de acciones fuertes.">
+      <ListGroup
+        title={compacta ? undefined : 'Causa raíz'}
+        footer={compacta ? undefined : 'El análisis se guarda en la Bitácora y cuenta en el KPI de acciones fuertes.'}
+      >
         <ListCell
           title="Ver análisis de causa"
           subtitle={`Estado: ${acr.estado === 'cerrado' ? 'cerrado' : 'borrador'}`}
@@ -130,7 +135,7 @@ export function FilaAnalisis({ acr, cargando, aplica, repeticion, onVer, onAnali
 
   if (repeticion) {
     return (
-      <ListGroup title="Causa raíz">
+      <ListGroup title={compacta ? undefined : 'Causa raíz'}>
         <button
           type="button"
           onClick={onAnalizar}
@@ -144,7 +149,7 @@ export function FilaAnalisis({ acr, cargando, aplica, repeticion, onVer, onAnali
   }
 
   return (
-    <ListGroup title="Causa raíz">
+    <ListGroup title={compacta ? undefined : 'Causa raíz'}>
       <ListCell title="Analizar causa (opcional)" subtitle="Sin análisis todavía" chevron onClick={onAnalizar} />
     </ListGroup>
   )
