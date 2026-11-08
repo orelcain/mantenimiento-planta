@@ -13,6 +13,7 @@ import { ListGroup, ListCell, Pill } from '@/components/piel'
 import { BitacoraTurnoCard } from '@/components/bitacora/BitacoraTurnoCard'
 import { useAuthStore, useAppStore } from '@/store'
 import { useWipOverrides } from '@/hooks/useWipOverrides'
+import { usePielApple } from '@/hooks/usePielApple'
 import type { UserRole } from '@/types'
 import { LEARNING_MACHINES } from '@/data/learningMachines'
 import { PLANT_LINES, PLANTS, type PlantLineId } from '@/config/plantLines'
@@ -234,7 +235,7 @@ function getGreeting() {
 
 // ─── CTA Tile ─────────────────────────────────────────────────────────────────
 
-function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; onRelease?: () => void }) {
+function CtaTile({ tile, showWip, onRelease, apple }: { tile: Tile; showWip: boolean; onRelease?: () => void; apple: boolean }) {
   const [confirming, setConfirming] = useState(false)
   const Icon = tile.icon
 
@@ -253,13 +254,13 @@ function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; o
         <Icon className="size-5 text-muted-foreground" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-subhead font-semibold leading-tight text-foreground">{tile.label}</p>
+        <p className={apple ? 'text-subhead leading-tight text-foreground' : 'text-subhead font-semibold leading-tight text-foreground'}>{tile.label}</p>
         {tile.sublabel && <p className="mt-0.5 text-footnote text-muted-foreground">{tile.sublabel}</p>}
       </div>
       {showWip && !confirming && (
         <span
           onClick={onRelease ? (e) => { e.preventDefault(); setConfirming(true) } : undefined}
-          className={cn('shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption font-semibold text-muted-foreground', onRelease && 'cursor-pointer')}
+          className={apple ? cn('shrink-0 text-footnote text-muted-foreground', onRelease && 'cursor-pointer') : cn('shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption font-semibold text-muted-foreground', onRelease && 'cursor-pointer')}
         >
           En desarrollo
         </span>
@@ -336,6 +337,14 @@ function AppShareCard() {
   )
 }
 
+/**
+ * ¿Se dibuja la fila en el Inicio móvil (piel Apple)? «En desarrollo» la ve solo el admin,
+ * que la libera desde aquí. Función pura, para probarla sin render.
+ */
+export function mostrarEnInicio(wip: boolean, isAdmin: boolean): boolean {
+  return !wip || isAdmin
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function MobileHomeGrid() {
@@ -346,6 +355,7 @@ export function MobileHomeGrid() {
   const groups         = GROUPS[role] ?? GROUPS.usuario
   const firstName      = user?.nombre?.split(' ')[0] ?? 'Usuario'
   const { isWip, toggleRelease, isAdmin } = useWipOverrides()
+  const apple = usePielApple()
 
   return (
     <div className="md:hidden px-4 pt-4 pb-6 space-y-5">
@@ -380,22 +390,47 @@ export function MobileHomeGrid() {
       {groups.map((group) => {
         const ctaTile   = group.tiles.find((t) => t.cta)
         const chipTiles = group.tiles.filter((t) => !t.cta)
+        // Piel Apple: «En desarrollo» solo lo ve el admin; Formación es una sola fila con contador.
+        const formacion = apple && group.label === 'Formación'
+        const ctaVisible = ctaTile !== undefined && (!apple || mostrarEnInicio(isWip(ctaTile.id, ctaTile.wip), isAdmin))
+        const cursos = formacion
+          ? chipTiles.filter((t) => t.id !== 'hub' && mostrarEnInicio(isWip(t.id, t.wip), isAdmin)).length
+          : 0
+        const filasVisibles = !apple
+          ? chipTiles
+          : formacion ? [] : chipTiles.filter((t) => mostrarEnInicio(isWip(t.id, t.wip), isAdmin))
+        // Un grupo sin filas visibles no dibuja su título.
+        if (apple && !ctaVisible && filasVisibles.length === 0 && cursos === 0) return null
 
         return (
           <div key={group.label} className="space-y-1.5">
+            {!formacion && (
             <p className="text-caption font-semibold tracking-widest text-muted-foreground px-0.5">
               {group.label}
             </p>
+            )}
 
-            {ctaTile && (
+            {ctaTile && ctaVisible && (
               <CtaTile
                 tile={ctaTile}
+                apple={apple}
                 showWip={isWip(ctaTile.id, ctaTile.wip)}
                 onRelease={isAdmin ? () => toggleRelease(ctaTile.id) : undefined}
               />
             )}
 
-            {chipTiles.length > 0 && (
+            {formacion && cursos > 0 && (
+              <ListGroup>
+                <ListCell
+                  leading={<GraduationCap className="size-5 text-muted-foreground" />}
+                  title="Formación"
+                  trailing={<span className="text-body text-muted-foreground">{cursos === 1 ? '1 curso' : `${cursos} cursos`}</span>}
+                  onClick={() => navigate('/aprendizaje')}
+                />
+              </ListGroup>
+            )}
+
+            {filasVisibles.length > 0 && (
               /*
                 LISTA AGRUPADA, no una grilla de mosaicos de color.
                 Esta es LA diferencia que se nota al comparar con un iPhone:
@@ -406,7 +441,7 @@ export function MobileHomeGrid() {
                 contenido, nunca para navegar.
               */
               <ListGroup>
-                {chipTiles.flatMap((tile) => {
+                {filasVisibles.flatMap((tile) => {
                   const Icon = tile.icon
                   const wip = isWip(tile.id, tile.wip)
                   // Tile NEUTRO (systemFill + glifo secundario), no tintado con el
@@ -420,12 +455,14 @@ export function MobileHomeGrid() {
                     <ListCell
                       key={tile.id}
                       leading={
+                        apple ? <Icon className="size-5 text-muted-foreground" /> : (
                         <span className="flex size-7 items-center justify-center rounded-ctl bg-muted-foreground/[0.12]">
                           <Icon className="size-4 text-muted-foreground" />
                         </span>
+                        )
                       }
                       title={tile.label}
-                      trailing={wip ? <Pill tone="neutral">En desarrollo</Pill> : undefined}
+                      trailing={wip ? (apple ? <span className="text-footnote text-muted-foreground">En desarrollo</span> : <Pill tone="neutral">En desarrollo</Pill>) : undefined}
                       onClick={() => navigate(tile.href)}
                     />,
                     /* Los hijos van en la MISMA tarjeta que el padre: una card

@@ -7,6 +7,7 @@ import { resumirBitacora } from '@/services/bitacora/resumenBitacora'
 import { esBorrador, soloListos } from '@/services/bitacora/borradores'
 import { etiquetaTurno, formatoMinutos, horarioTurno } from '@/services/bitacora/turnoMantencion'
 import { tieneHora } from '@/services/bitacora/presentacionEvento'
+import { usePielApple } from '@/hooks/usePielApple'
 
 /**
  * Acceso inmediato a la bitácora del turno que está corriendo: lo primero del
@@ -24,6 +25,7 @@ export function BitacoraTurnoCard({
 }) {
   const navigate = useNavigate()
   const turno = useTurnoMantencionActual()
+  const apple = usePielApple()
   const { eventos, cargando } = useEventos(turno)
   const ver = alVer ?? (() => navigate('/bitacora'))
   const agregar = alAgregar ?? (() => navigate('/bitacora?nuevo=1'))
@@ -43,6 +45,9 @@ export function BitacoraTurnoCard({
         <Pill tone="info" dot="pulse">En curso</Pill>
       </div>
 
+      {apple && !cargando && r.eventos === 0 && r.pendientes === 0 ? (
+        <p className="text-body text-muted-foreground">Sin eventos todavía</p>
+      ) : (
       <div className="grid grid-cols-3 gap-3">
         <div>
           <span className="block text-headline leading-tight tabular-nums">{cargando ? '–' : r.eventos}</span>
@@ -63,6 +68,7 @@ export function BitacoraTurnoCard({
           </span>
         </div>
       </div>
+      )}
 
       {(ultimo || enRedaccion > 0) && (
         <p className="truncate text-footnote text-muted-foreground">
