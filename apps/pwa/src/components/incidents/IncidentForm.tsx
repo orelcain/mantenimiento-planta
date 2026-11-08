@@ -19,7 +19,8 @@ import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImag
 import { refineText, extractSymptomsFromDescription, isAIConfigured } from '@/services/ai'
 import type { IncidentPriority, Incident, Equipment } from '@/types'
 import { HierarchyLevel } from '@/types/hierarchy'
-import { cn } from '@/lib/utils'
+import { cn, validarPrioridadIncidencia } from '@/lib/utils'
+import { usePielApple } from '@/hooks/usePielApple'
 import { createIncidentSchema, validateFileList } from '@/lib/validation'
 import { logger } from '@/lib/logger'
 import { HierarchySelector } from '../hierarchy/HierarchySelector'
@@ -63,6 +64,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
   const [photoPreview, setPhotoPreview] = useState<string[]>([])
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const apple = usePielApple()
   const [aiSymptoms, setAiSymptoms] = useState<string[]>(COMMON_SYMPTOMS)
   const [isGeneratingSymptoms, setIsGeneratingSymptoms] = useState(false)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
@@ -98,7 +100,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
     descripcion: incident?.descripcion || prefill?.descripcion || '',
     zoneId: incident?.zoneId || preselectedZoneId || '',
     hierarchyNodeId: incident?.hierarchyNodeId as string | undefined,
-    prioridad: (incident?.prioridad || 'media') as IncidentPriority,
+    prioridad: (incident?.prioridad || (apple ? '' : 'media')) as IncidentPriority | '',
   })
 
   // Inicializar datos de edición
@@ -139,7 +141,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
         try {
             const context = {
                 title: formData.titulo,
-                priority: formData.prioridad,
+                priority: formData.prioridad || undefined,
                 equipmentName: selectedEquipment?.nombre,
                 // Si no hay equipo seleccionado, usa el ID de jerarquía como referencia
                 locationName: formData.hierarchyNodeId 
@@ -223,7 +225,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
       // 2. Extraer síntomas con mayor contexto
       const context = {
         title: formData.titulo,
-        priority: formData.prioridad,
+        priority: formData.prioridad || undefined,
         equipmentName: selectedEquipment?.nombre
       }
       
@@ -322,6 +324,13 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
     setValidationErrors({})
 
     try {
+      // Prioridad obligatoria (piel Apple: sin preselección). Va antes de Zod, que daría otro mensaje.
+      const errorPrioridad = validarPrioridadIncidencia(formData.prioridad)
+      if (errorPrioridad) {
+        setValidationErrors({ prioridad: errorPrioridad })
+        return
+      }
+
       // Validar datos con Zod antes de enviar
       const dataToValidate = {
         tipo: 'correctivo' as const,
@@ -329,7 +338,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
         descripcion: formData.descripcion,
         zoneId: formData.zoneId,
         hierarchyNodeId: formData.hierarchyNodeId,
-        prioridad: formData.prioridad,
+        prioridad: formData.prioridad as IncidentPriority,
         status: assignToSelf ? 'en_proceso' as const : 'pendiente' as const,
         fotos: [],
         reportadoPor: user.id,
@@ -369,7 +378,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
         descripcion: formData.descripcion,
         zoneId: formData.zoneId,
         hierarchyNodeId: formData.hierarchyNodeId || undefined,
-        prioridad: formData.prioridad,
+        prioridad: formData.prioridad as IncidentPriority,
         status: assignToSelf ? 'en_proceso' : 'pendiente',
         fotos: [],
         reportadoPor: user.id,
@@ -419,6 +428,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
       return
     }
 
+    const errorPrioridad = validarPrioridadIncidencia(formData.prioridad)
+    if (errorPrioridad) {
+      setValidationErrors({ prioridad: errorPrioridad })
+      return
+    }
+
     setIsLoading(true)
     setValidationErrors({})
 
@@ -428,7 +443,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
       const updateData = {
         titulo: formData.titulo,
         descripcion: formData.descripcion,
-        prioridad: formData.prioridad,
+        prioridad: formData.prioridad as IncidentPriority,
         ...(selectedSymptoms.length > 0 && { sintomas: selectedSymptoms }),
       }
 
@@ -485,7 +500,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                       ) : (
                           <div className="flex items-center gap-2 text-muted-foreground group-hover:text-foreground">
                              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                                <Sparkles className="h-4 w-4" />
+                                {apple ? <MapPin className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                              </div>
                              <span className="text-sm">Tocar para seleccionar ubicación...</span>
                           </div>
@@ -636,7 +651,10 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setFormData({ ...formData, prioridad: opt.value as IncidentPriority })}
+                  onClick={() => {
+                    setFormData({ ...formData, prioridad: opt.value as IncidentPriority })
+                    if (validationErrors.prioridad) setValidationErrors({ ...validationErrors, prioridad: '' })
+                  }}
                   className={cn(
                     'p-2 rounded-card border text-center transition-all flex flex-col items-center justify-center h-20 shadow-sm relative overflow-hidden',
                     formData.prioridad === opt.value 
@@ -645,7 +663,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                   )}
                 > 
                   {/* Highlight Glow Effect */}
-                  {formData.prioridad === opt.value && (
+                  {!apple && formData.prioridad === opt.value && (
                       <div className="absolute inset-0 bg-white/20" />
                   )}
                   
@@ -661,6 +679,9 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                 </button>
               ))}
             </div>
+            {validationErrors.prioridad && (
+              <p className={apple ? 'text-footnote text-destructive' : 'text-sm text-destructive'}>{validationErrors.prioridad}</p>
+            )}
           </div>
 
           {!isEditMode && user && (
@@ -687,7 +708,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                   value={formData.titulo}
                   onChange={(e) => setFormData(prev => ({ ...prev, titulo: e.target.value }))}
                   placeholder="Ej: Fuga de aceite..."
-                  className="pr-24 resize-none overflow-hidden min-h-[40px] leading-relaxed"
+                  className={`${apple ? 'pr-36' : 'pr-24'} resize-none overflow-hidden min-h-[40px] leading-relaxed`}
                   rows={1}
                   required
                 />
@@ -697,10 +718,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                   size="sm"
                   onClick={handleRefineTitle}
                   disabled={isRefiningTitle || !formData.titulo}
-                  className="absolute right-12 top-1 h-8 w-8 p-0 text-muted-foreground hover:text-primary z-10"
+                  className={apple
+                    ? 'absolute right-14 top-2 min-h-[44px] px-3 text-footnote font-medium text-primary hover:text-primary z-10'
+                    : 'absolute right-12 top-1 h-8 w-8 p-0 text-muted-foreground hover:text-primary z-10'}
                   title="Mejorar título"
                 >
-                  {isRefiningTitle ? <Spinner size="sm" /> : <Wand2 className="h-4 w-4" />}
+                  {isRefiningTitle ? <Spinner size="sm" /> : apple ? 'Mejorar' : <Wand2 className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -728,7 +751,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                   </>
                 ) : (
                   <>
-                    <Wand2 className="h-3 w-3 mr-1" />
+                    {!apple && <Wand2 className="h-3 w-3 mr-1" />}
                     <span>Mejorar redacción</span>
                   </>
                 )}
@@ -765,7 +788,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                           try {
                              const context = {
                                 title: formData.titulo,
-                                priority: formData.prioridad,
+                                priority: formData.prioridad || undefined,
                                 equipmentName: selectedEquipment?.nombre,
                                 locationName: formData.hierarchyNodeId 
                              }
@@ -785,7 +808,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                       className="h-6 px-2 text-brand-ink hover:bg-primary/10"
                       title="Proponer variantes de síntomas"
                    >
-                       <Sparkles className="h-3 w-3 mr-1" />
+                       {!apple && <Sparkles className="h-3 w-3 mr-1" />}
                        <span className="text-caption">Sugerir</span>
                    </Button>
 
@@ -798,7 +821,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident, 
                       </>
                     ) : (
                       <>
-                        <Sparkles className="h-3 w-3 text-primary" />
+                        {!apple && <Sparkles className="h-3 w-3 text-primary" />}
                         <span>Sugerencias IA</span>
                       </>
                     )}

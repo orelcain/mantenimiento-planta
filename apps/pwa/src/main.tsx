@@ -11,6 +11,10 @@ import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-500.css'
 import '@fontsource/ibm-plex-mono/latin-600.css'
 import { logger } from '@/lib/logger'
+import { marcarVidrioSolido } from '@/lib/vidrioSolido'
+
+// Gama baja (≤ 4 GB o ≤ 4 núcleos): el vidrio se ve sólido. Antes de pintar, para no parpadear.
+marcarVidrioSolido(document.documentElement)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

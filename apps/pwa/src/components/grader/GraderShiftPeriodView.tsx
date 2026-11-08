@@ -15,6 +15,13 @@ import type { PeriodShift } from '@/services/grader/graderShiftPeriod'
 import { DEFAULT_MATRIX_KPI, type MatrixKpi } from '@/services/grader/graderShiftMatrixKpi'
 import { kpisDeMatriz } from '@/services/grader/graderShiftMatrixKpi'
 import { SegmentedControl } from '@/components/piel'
+import { usePielApple } from '@/hooks/usePielApple'
+import type { MatrixKpi as KpiId } from '@/services/grader/graderShiftMatrixKpi'
+import { dec1 } from '@/utils/formatoNumeros'
+
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+/** Rótulos completos para el segmentado de la piel Apple (los de la piel vieja se cortan en 375 px). */
+const ETIQUETA_KPI_APPLE: Record<KpiId, string> = { cycles: 'Ciclos', uptime: 'Uptime', pieces: 'Piezas', p0: 'P0 %' }
 
 export interface GraderShiftPeriodViewProps {
   shifts: readonly PeriodShift[]
@@ -51,6 +58,7 @@ export function GraderShiftPeriodView({
   // Si la línea no ofrece el KPI elegido (se cambió de línea), volver al default.
   const kpiVigente = kpisDisponibles.some((k) => k.id === kpi) ? kpi : DEFAULT_MATRIX_KPI
   const [onlyOutOfShift, setOnlyOutOfShift] = useState(false)
+  const apple = usePielApple()
 
   const visible = useMemo(
     () => (onlyOutOfShift ? shifts.filter(s => s.unscheduled) : shifts),
@@ -92,7 +100,8 @@ export function GraderShiftPeriodView({
       <div className="flex flex-wrap items-center gap-2">
         {/* Navegación de mes. La traía el calendario que esta vista reemplaza:
             sin ella el período queda congelado en el mes actual. */}
-        {month && onMonthChange && (
+        {/* Piel Apple: el mes lo mueve el período único de la página (la matriz sigue el día elegido). */}
+        {month && onMonthChange && !apple && (
           <div className="inline-flex items-center gap-1 mr-1">
             <button
               type="button" aria-label="Mes anterior"
@@ -104,7 +113,9 @@ export function GraderShiftPeriodView({
               <ChevronLeft className="h-4 w-4" aria-hidden />
             </button>
             <span className="font-semibold text-sm min-w-[8.5rem] text-center capitalize">
-              {month.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}
+              {apple
+                ? `${MESES[month.getMonth()]} ${month.getFullYear()}`
+                : month.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })}
             </span>
             <button
               type="button" aria-label="Mes siguiente"
@@ -131,14 +142,38 @@ export function GraderShiftPeriodView({
           ariaLabel="Indicador de la matriz"
           value={kpiVigente}
           onChange={setKpi}
-          segments={kpisDisponibles.map(k => ({ value: k.id, label: k.label }))}
-          className="w-auto max-w-xs shrink-0"
+          segments={kpisDisponibles.map(k => ({ value: k.id, label: apple ? ETIQUETA_KPI_APPLE[k.id] : k.label }))}
+          ajustado={apple}
+          className={apple ? 'w-full lg:w-auto' : 'w-auto max-w-xs shrink-0'}
         />
 
         {/* Con residuo sin turno el chip filtra; sin residuo (todo ya atribuido)
             queda informativo — el dato operacional "cuánto se produjo fuera de
             ventana" no debe desaparecer solo porque la vista lo ordenó. */}
-        {outOfShift.count > 0 ? (
+        {apple ? (
+          outOfShift.cycles > 0 ? (
+            outOfShift.count > 0 ? (
+              // Piel Apple: texto de 13 px, sin fondo ni borde. Toda la línea es el botón (44 px).
+              <button
+                type="button"
+                onClick={() => setOnlyOutOfShift(v => !v)}
+                aria-pressed={onlyOutOfShift}
+                title="Ciclos que Shoplogix no pudo atribuir a ninguna ventana de turno configurada"
+                className={cn(
+                  'inline-flex min-h-11 items-center rounded-ctl text-footnote tabular-nums text-muted-foreground underline-offset-4',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                  onlyOutOfShift && 'text-foreground underline',
+                )}
+              >
+                {`Fuera de turno ${outOfShift.pct < 1 ? '<1' : Math.round(outOfShift.pct)} %`}
+              </button>
+            ) : (
+              <p className="text-footnote tabular-nums text-muted-foreground" title={`${outOfShift.cycles.toLocaleString('es-CL')} ciclos ocurrieron fuera de las ventanas de turno configuradas en Shoplogix; ya están sumados a sus turnos.`}>
+                {`Fuera de ventana ${outOfShift.pct < 1 ? '<1' : Math.round(outOfShift.pct)} %`}
+              </p>
+            )
+          ) : null
+        ) : outOfShift.count > 0 ? (
           <button
             type="button"
             onClick={() => setOnlyOutOfShift(v => !v)}
@@ -202,20 +237,31 @@ export function GraderShiftPeriodView({
         )}
       </div>
 
-      {error && (
+      {error && apple && <p className="text-subhead text-ink-crit">{error}</p>}
+      {error && !apple && (
         <div className="rounded-ctl border px-3 py-2 text-xs"
              style={{ borderColor: 'var(--lc-crit)', color: 'var(--lc-crit)' }}>
           {error}
         </div>
       )}
-      {slxDegraded && !error && (
+      {slxDegraded && !error && apple && (
+        <p className="text-footnote text-muted-foreground">
+          Shoplogix no respondió: se muestran solo los turnos con Excel del Grader cargado.
+        </p>
+      )}
+      {slxDegraded && !error && !apple && (
         <div className="rounded-ctl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground
                         inline-flex items-center gap-2">
           <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
           Shoplogix no respondió: se muestran solo los turnos con Excel del Grader cargado.
         </div>
       )}
-      {onlyOutOfShift && (
+      {onlyOutOfShift && apple && (
+        <p className="text-footnote text-muted-foreground">
+          {`Mostrando solo producción fuera de turno: ${outOfShift.cycles.toLocaleString('es-CL')} ciclos en ${outOfShift.count} ${outOfShift.count === 1 ? 'registro' : 'registros'}, el ${dec1(outOfShift.pct)} % del período. Son ciclos que Shoplogix no pudo atribuir a ninguna ventana de turno configurada.`}
+        </p>
+      )}
+      {onlyOutOfShift && !apple && (
         <div className="rounded-ctl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           Mostrando solo producción <b className="text-foreground">fuera de turno</b>:{' '}
           <b className="text-foreground font-mono">{outOfShift.cycles.toLocaleString('es-CL')}</b> ciclos en{' '}

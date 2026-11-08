@@ -7,6 +7,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
 } from '@/components/ui'
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -15,11 +19,12 @@ import type { IncidentStatus, IncidentPriority } from '@/types'
 import type { MapLocation } from '@/types/maps'
 import { Button, Pill, ListGroup, ListCell, type PillTone } from '@/components/piel'
 import { logger } from '@/lib/logger'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, formatFechaDia, pareceIdDeUsuario } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { debounce } from '@/lib/rate-limit'
 import { getUserDisplayNameMap, getUserInfoLabelMap } from '@/services/userDisplay'
+import { usePielApple } from '@/hooks/usePielApple'
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: any }> = {
   pendiente: { label: 'Pendiente', variant: 'warning' },
@@ -38,6 +43,19 @@ const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; tone: PillTone 
   media: { label: 'Media', tone: 'info' },
   baja: { label: 'Baja', tone: 'neutral' },
 }
+
+/** Punto de color del estado en la fila (piel Apple). Pendiente y confirmada son neutros. */
+const PUNTO_ESTADO: Record<IncidentStatus, string> = {
+  pendiente: 'bg-muted-foreground',
+  confirmada: 'bg-muted-foreground',
+  en_proceso: 'bg-primary',
+  resuelta: 'bg-warning',
+  cerrada: 'bg-fill-ok',
+  rechazada: 'bg-destructive',
+}
+
+/** Los chips que se ven a la vista en piel Apple; el resto va en «Más». */
+const CHIPS_VISTA_APPLE: (string | null)[] = [null, 'pendientes', 'criticas', 'mis-asignadas']
 
 export function IncidentsPage() {
   const canValidate = useCanValidateIncidents()
@@ -73,6 +91,7 @@ export function IncidentsPage() {
   const [selectedReporter, setSelectedReporter] = useState<string>(() => searchParams.get('reporter') ?? 'all')
   const [reporterNames, setReporterNames] = useState<Record<string, string>>({})
   const [userInfoLabels, setUserInfoLabels] = useState<Record<string, string>>({})
+  const apple = usePielApple()
 
   const isAdminOrSupervisor = user?.rol === 'admin' || user?.rol === 'supervisor'
 
@@ -216,10 +235,12 @@ export function IncidentsPage() {
       )
     )
     if (ids.length === 0) return
-    getUserInfoLabelMap(ids).then(setUserInfoLabels).catch(() => {
+    // Piel Apple: solo el nombre. La piel anterior conserva la etiqueta completa (rol, proveedor).
+    const cargar = apple ? getUserDisplayNameMap : getUserInfoLabelMap
+    cargar(ids).then(setUserInfoLabels).catch(() => {
       setUserInfoLabels({})
     })
-  }, [visibleIncidents])
+  }, [visibleIncidents, apple])
 
   /**
    * Filtros como PÍLDORAS deslizables, no como 12 tarjetas con borde.
@@ -247,6 +268,19 @@ export function IncidentsPage() {
     { id: 'rechazadas', label: 'Rechazadas', value: stats.rechazadas, tone: 'critical' },
   ]
 
+  // Piel Apple: cuatro chips a la vista y el resto en «Más». La piel anterior sigue con todos.
+  const chipsVisibles = apple ? filtros.filter((f) => CHIPS_VISTA_APPLE.includes(f.id)) : filtros
+  const filtrosEnMas = apple ? filtros.filter((f) => !CHIPS_VISTA_APPLE.includes(f.id)) : []
+  const filtroEnMas = filtrosEnMas.find((f) => f.id === activeFilter)
+  const claseChip = (activo: boolean) => [
+    `flex shrink-0 items-center gap-1.5 ${apple ? 'h-[44px]' : 'h-9'} rounded-full px-3.5 text-subhead font-medium font-medium`,
+    'transition-colors duration-150 motion-reduce:transition-none',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+    activo
+      ? 'bg-primary text-primary-foreground'
+      : 'bg-muted-foreground/10 text-muted-foreground hover:text-foreground',
+  ].join(' ')
+
   return (
     <div className="flex flex-col gap-5">
       {/* Título grande: el rol `display` de la escala (§2). Uno por pantalla. */}
@@ -254,7 +288,9 @@ export function IncidentsPage() {
         <div>
           <h1 className="text-[2.05rem] font-bold leading-none tracking-[-0.028em]">Incidencias</h1>
           <p className="mt-1 text-[0.85rem] text-muted-foreground">
-            {filteredIncidents.length} de {stats.total} · mantenimiento correctivo
+            {apple
+              ? `${filteredIncidents.length} de ${stats.total}. Mantenimiento correctivo.`
+              : <>{filteredIncidents.length} de {stats.total} · mantenimiento correctivo</>}
           </p>
         </div>
         <div className="ml-auto">
@@ -265,29 +301,48 @@ export function IncidentsPage() {
       </div>
 
       {/* Fila de filtros: una línea que se desliza, en vez de una grilla. */}
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {filtros.map((f) => {
+      <div className={`-mx-1 flex gap-2 px-1 pb-1 ${apple ? 'flex-wrap sm:flex-nowrap' : 'overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
+        {chipsVisibles.map((f) => {
           const activo = activeFilter === f.id
           return (
             <button
               key={String(f.id)}
               type="button"
               onClick={() => setActiveFilter(f.id)}
-              className={[
-                'flex shrink-0 items-center gap-1.5 h-9 rounded-full px-3.5 text-subhead font-medium font-medium',
-                'transition-colors duration-150 motion-reduce:transition-none',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                activo
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted-foreground/10 text-muted-foreground hover:text-foreground',
-              ].join(' ')}
+              className={claseChip(activo)}
               aria-pressed={activo}
             >
               {f.label}
-              <span className={`tabular-nums font-semibold ${activo ? '' : 'text-foreground'}`}>{f.value}</span>
+              {(!apple || f.value > 0) && (
+                <span className={`tabular-nums font-semibold ${activo ? '' : 'text-foreground'}`}>{f.value}</span>
+              )}
             </button>
           )
         })}
+        {apple && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={claseChip(!!filtroEnMas)}
+                aria-pressed={!!filtroEnMas}
+              >
+                {filtroEnMas ? filtroEnMas.label : 'Más'}
+                {filtroEnMas && filtroEnMas.value > 0 && (
+                  <span className="tabular-nums font-semibold">{filtroEnMas.value}</span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {filtrosEnMas.map((f) => (
+                <DropdownMenuItem key={String(f.id)} className="min-h-[44px]" onSelect={() => setActiveFilter(f.id)}>
+                  {f.label}
+                  {f.value > 0 && <span className="ml-auto pl-4 tabular-nums">{f.value}</span>}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Search - Simplificado */}
@@ -384,7 +439,20 @@ export function IncidentsPage() {
               <ListCell
                 key={incident.id}
                 title={incident.titulo}
-                subtitle={
+                subtitle={apple ? (
+                  <span className="flex items-center gap-1.5">
+                    <span aria-hidden className={`size-2 shrink-0 rounded-full ${PUNTO_ESTADO[incident.status] ?? 'bg-muted-foreground'}`} />
+                    <span className="truncate">
+                      {[
+                        incident.status === 'resuelta' ? 'Por validar' : st.label,
+                        quien?.startsWith('telegram:') ? 'por Telegram' : quien && !pareceIdDeUsuario(quien) ? quien : null,
+                        (incident.fotos?.length || 0) > 0
+                          ? (incident.fotos!.length === 1 ? '1 foto' : `${incident.fotos!.length} fotos`)
+                          : null,
+                      ].filter(Boolean).join(', ')}
+                    </span>
+                  </span>
+                ) : (
                   <span className="flex items-center gap-1.5">
                     <span className="truncate">{st.label}</span>
                     {quien && (
@@ -400,9 +468,13 @@ export function IncidentsPage() {
                       </>
                     )}
                   </span>
-                }
-                trailing={<Pill tone={pr.tone}>{pr.label}</Pill>}
-                value={formatRelativeTime(incident.createdAt)}
+                )}
+                trailing={apple
+                  ? (incident.prioridad === 'critica' || incident.prioridad === 'alta'
+                    ? <Pill tone={pr.tone}>{pr.label}</Pill>
+                    : undefined)
+                  : <Pill tone={pr.tone}>{pr.label}</Pill>}
+                value={apple ? formatFechaDia(incident.createdAt) : formatRelativeTime(incident.createdAt)}
                 onClick={() => setSelectedIncident(incident)}
               />
             )

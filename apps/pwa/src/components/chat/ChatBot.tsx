@@ -13,6 +13,7 @@ import { saveFeedback } from '@/services/ariaLearning'
 import { loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
 import { logger } from '@/lib/logger'
 import { useBurbujaChatOculta, registrarAbrirAria, type OpcionesAria } from '@/lib/pantallaCompletaMovil'
+import { useOcultarAlBajar } from '@/hooks/useOcultarAlBajar'
 import { ContextoHojaAria } from './ContextoHojaAria'
 import { useHojaAria } from './useHojaAria'
 import { AriaAvatar } from './AriaAvatar'
@@ -948,6 +949,8 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
 export function ChatBot() {
   const navigate = useNavigate()
   const pantallaCompletaMovil = useBurbujaChatOculta()
+  // Se esconde mientras la página baja. Con el chat abierto nunca se esconde: hay que poder cerrarlo.
+  const ocultoAlBajar = useOcultarAlBajar()
   const {
     messages,
     isLoading,
@@ -1825,11 +1828,16 @@ export function ChatBot() {
           // Detalle de repuesto a pantalla completa en el teléfono: la burbuja tapaba su barra inferior.
           (pantallaCompletaMovil && !isOpen) || hoja ? 'hidden' : ''
         } ${
+          // Oculto al bajar (transform/opacity). Con el chat abierto no se oculta.
+          ocultoAlBajar && !isOpen ? 'opacity-0 translate-y-24 pointer-events-none motion-reduce:transition-none' : 'opacity-100 translate-y-0'
+        } ${
           isOpen
             ? 'bg-muted text-muted-foreground hover:bg-muted/80'
             : 'bg-primary text-primary-foreground hover:bg-primary/90'
         }`}
         title={isOpen ? 'Cerrar chat' : 'Abrir asistente'}
+        aria-hidden={ocultoAlBajar && !isOpen ? true : undefined}
+        tabIndex={ocultoAlBajar && !isOpen ? -1 : undefined}
       >
         {isOpen ? (
           <X className="w-6 h-6" />

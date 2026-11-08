@@ -20,6 +20,7 @@ import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/gra
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
+import { usePielApple } from '@/hooks/usePielApple'
 import { listShiftInfosForDay, type ShoplogixShiftDayInfo } from '@/services/shoplogix/shoplogixShift.service'
 import type { GraderShiftSchedule } from '@/services/grader/types'
 
@@ -52,8 +53,19 @@ function fmtElapsed(min: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
 
+/** «Turno 1 mañana»: el nombre del turno con su período, sin el guion de la etiqueta larga. */
+function etiquetaTurnoApple(shiftId: string, start: Date | null): string {
+  const meta = getShiftMeta(shiftId, start)
+  const base = meta.label.split(' — ')[0]!
+  const periodo = meta.period === 'mañana' || meta.period === 'tarde' || meta.period === 'noche'
+    ? ` ${meta.period}`
+    : ''
+  return `${base}${periodo}`
+}
+
 export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipProps) {
   const navigate = useNavigate()
+  const apple = usePielApple()
   const cfg = getPlantLineConfig(plantLineId)
   const baseSchedule = cfg.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE
 
@@ -207,6 +219,41 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
   }, [upstream.snapshot, upstream.source, upstream.syncedAt])
 
   if (!cfg.shoplogixEnabled && !cfg.hasGraderData) return null
+
+  if (apple) {
+    // Piel Apple: una línea de texto bajo el título, sin fondo. El punto de color
+    // aparece solo si una máquina está en una detención abierta ahora mismo
+    // (`isCurrent` del state de Shoplogix, tipo downtime).
+    const detencionEnCurso = upstream.snapshot?.machines.some((m) =>
+      m.states.some((s) => s.isCurrent && s.type === 'downtime'),
+    ) ?? false
+    if (!live) {
+      return (
+        <p className={cn('text-subhead text-muted-foreground', className)}>Sin turno activo ahora.</p>
+      )
+    }
+    const etiqueta = etiquetaTurnoApple(live.shiftId, live.scheduledStart)
+    const linea = hasActivity
+      ? `${etiqueta}, en curso. ${fmtElapsed(live.tw.elapsedMin)} transcurridos${
+          live.tw.progressPct != null ? `, ${Math.round(live.tw.progressPct)} %` : ''}.`
+      : `${etiqueta}, programado. ${upstream.loading ? 'Verificando producción…' : 'Sin actividad todavía.'}`
+    const href = `/analisis-grader/turno/${live.dateKey}__${encodeURIComponent(live.shiftId)}${
+      plantLineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${encodeURIComponent(plantLineId)}` : ''}`
+    return (
+      <button
+        type="button"
+        onClick={() => navigate(href)}
+        className={cn(
+          'flex min-h-11 w-full items-center gap-2 text-left text-subhead text-foreground',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+          className,
+        )}
+      >
+        {detencionEnCurso && <span aria-hidden className="size-2 shrink-0 rounded-full bg-ink-crit" />}
+        <span>{linea}</span>
+      </button>
+    )
+  }
 
   // Sin turno activo — etiqueta sutil. No es error, simplemente fuera de ventana operativa.
   if (!live) {

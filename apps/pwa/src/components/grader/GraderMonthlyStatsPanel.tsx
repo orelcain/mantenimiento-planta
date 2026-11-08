@@ -11,9 +11,11 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { aggregateByShiftDay } from '@/services/grader/graderCalendarAggregation'
 import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
+import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { fmt, fmtDec } from '@/lib/format'
 import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { ImputacionPeriodCard } from './ImputacionPeriodCard'
+import { usePielApple } from '@/hooks/usePielApple'
 import { Link } from 'react-router-dom'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 
@@ -39,8 +41,43 @@ interface Props {
   plantSlug?: string | null
 }
 
+/** Fecha del turno como se dice en planta: «miércoles 4 mañana». */
+function fechaTurnoApple(dateKey: string, shiftId: string): string {
+  const dia = new Date(`${dateKey}T12:00:00`).toLocaleDateString('es-CL', { weekday: 'long' })
+  const numero = Number(dateKey.slice(8, 10))
+  const meta = getShiftMeta(shiftId)
+  const periodo = meta.period === 'mañana' || meta.period === 'tarde' || meta.period === 'noche'
+    ? meta.period
+    : meta.shortLabel
+  return `${dia} ${numero}, ${periodo}`
+}
+
+/** La métrica en palabras de planta: «P0», «uptime». */
+const metricaApple = (m: string) => (m === 'P0%' ? 'P0' : m)
+
+/** Espacio duro antes del «%» (que no se corte al final de línea). */
+const ESPACIO_DURO = String.fromCharCode(160)
+const conEspacioPct = (s: string) => s.replace('%', `${ESPACIO_DURO}%`)
+
+/**
+ * Una fila rótulo/valor de la tabla del mes: sin marco, filete fino entre filas,
+ * 44 px como mínimo. `detalle` es una segunda línea de 13 px bajo el rótulo.
+ */
+function FilaMesApple({ rotulo, valor, detalle }: { rotulo: string; valor: string; detalle?: string }) {
+  return (
+    <tr className="h-11 border-b border-border last:border-b-0">
+      <th scope="row" className="py-2 pr-3 text-left font-normal text-muted-foreground">
+        {rotulo}
+        {detalle && <span className="block text-footnote">{detalle}</span>}
+      </th>
+      <td className="py-2 text-right align-middle">{valor}</td>
+    </tr>
+  )
+}
+
 export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isClassificationPlant = true, tieneGrader = true, plantSlug = null }: Props) {
   const monthLabel = `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`
+  const apple = usePielApple()
 
   const stats = useMemo(() => {
     const valid = summaries.filter(s => s.totalPieces > 0)
@@ -139,6 +176,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       ? { value: `${slxStats.worstShift.uptimePct.toFixed(0)}%`, metric: 'uptime', date: `${slxStats.worstShift.dateKey.slice(5)} · ${shortShiftLabel(slxStats.worstShift.shiftId)}` }
       : null
 
+  // Turno de referencia (fecha + turno) de mejor y peor: la piel Apple lo escribe como «miércoles 4 mañana».
+  const bestRef = stats
+    ? { dateKey: stats.best.primaryDateKey, shiftId: stats.best.shiftId }
+    : slxStats?.bestShift ? { dateKey: slxStats.bestShift.dateKey, shiftId: slxStats.bestShift.shiftId } : null
+  const worstRef = stats
+    ? { dateKey: stats.worst.primaryDateKey, shiftId: stats.worst.shiftId }
+    : slxStats?.worstShift ? { dateKey: slxStats.worstShift.dateKey, shiftId: slxStats.worstShift.shiftId } : null
+
   /*
    * Día/Noche del Excel: se cuentan por shiftId EXACTO ('Turno día' /
    * 'Turno noche'). Chonchi dejó de emitir esos nombres —ahora manda
@@ -169,8 +214,64 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
     // top-[4.5rem]: el header global es sticky h-14 (56px) con z-30; si el panel
     // se fija en top-4 (16px) queda DEBAJO del header y sus cards superiores
     // (Mejor/Peor turno) aparecen cortadas al scrollear. 4.5rem = 56px header + 16px gap.
-    <div className="space-y-2 lg:sticky lg:top-[4.5rem]">
+    <div className={apple ? 'space-y-7 lg:sticky lg:top-[4.5rem]' : 'space-y-2 lg:sticky lg:top-[4.5rem]'}>
 
+      {apple ? (
+        <>
+          {/* Piel Apple: causas primero (lo que pide la conversación), después el mes. */}
+          {slxStats?.imputacion && <ImputacionPeriodCard imputacion={slxStats.imputacion} />}
+          <section className="space-y-2">
+            <h2 className="text-headline">{`${monthLabel}, ${turnosCount} ${turnosCount === 1 ? 'turno' : 'turnos'}`}</h2>
+            <table className="w-full text-subhead tabular-nums">
+              <tbody>
+                {slxStats && <FilaMesApple rotulo="Uptime promedio" valor={conEspacioPct(`${slxStats.avgUptimePct.toFixed(0)}%`)} />}
+                {best && bestRef && (
+                  <FilaMesApple
+                    rotulo="Mejor turno"
+                    detalle={`${metricaApple(best.metric)}, ${fechaTurnoApple(bestRef.dateKey, bestRef.shiftId)}`}
+                    valor={conEspacioPct(best.value)}
+                  />
+                )}
+                {worst && worstRef && (
+                  <FilaMesApple
+                    rotulo="Peor turno"
+                    detalle={`${metricaApple(worst.metric)}, ${fechaTurnoApple(worstRef.dateKey, worstRef.shiftId)}`}
+                    valor={conEspacioPct(worst.value)}
+                  />
+                )}
+                {/* Un cero no es noticia: el P0 solo se dibuja si hay dato. */}
+                {tieneGrader && stats && <FilaMesApple rotulo="P0 % promedio" valor={conEspacioPct(`${fmtDec(stats.p0Avg, 2)}%`)} />}
+                {slxStats && <FilaMesApple rotulo="Ciclos Baader" valor={slxStats.totalCycles.toLocaleString('es-CL')} />}
+                {/* Turnos: los de día y noche si la planta clasifica así; si no, T1, T2 y T3 (como la grilla de la piel anterior). */}
+                {(isClassificationPlant && dayShifts + nightShifts > 0) || !useNumberedShiftGrid
+                  ? (dayShifts + nightShifts > 0 && <FilaMesApple rotulo="Turnos día y noche" valor={`${dayShifts} y ${nightShifts}`} />)
+                  : (t1Shifts + t2Shifts + t3Shifts > 0 && <FilaMesApple rotulo="Turnos T1, T2 y T3" valor={`${t1Shifts}, ${t2Shifts} y ${t3Shifts}`} />)}
+                {slxStats && slxStats.unscheduled.cycles > 0 && (
+                  <>
+                    <FilaMesApple rotulo="Fuera de turno: ciclos" valor={slxStats.unscheduled.cycles.toLocaleString('es-CL')} />
+                    <FilaMesApple rotulo="Fuera de turno: horas-máquina" valor={fmtDurationSec(slxStats.unscheduled.uptimeSec)} />
+                    <FilaMesApple rotulo="Fuera de turno: días" valor={String(slxStats.unscheduled.daysWithData)} />
+                  </>
+                )}
+              </tbody>
+            </table>
+          </section>
+          {/* Causas P0 del mes, como filas de texto (sin barra ni caja). */}
+          {stats && stats.causas.length > 0 && (
+            <section className="space-y-2">
+              <h2 className="text-headline">{`Causas P0 del mes, ${stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz`}</h2>
+              <table className="w-full text-subhead tabular-nums">
+                <tbody>
+                  {stats.causas.map(({ error, pieces, pct }) => (
+                    <FilaMesApple key={error} rotulo={getCauseLabel(error)} valor={`${pieces.toLocaleString('es-CL')} pz, ${conEspacioPct(`${dec2(pct)}%`)}`} />
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+        </>
+      ) : (
+        <>
       {/* ── Header ── */}
       <div>
         <p className="text-caption text-muted-foreground font-semibold tracking-wide">Resumen del mes</p>
@@ -258,10 +359,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         </Card>
       </div>
 
+        </>
+      )}
+
       {/* ── Fila 3: Distribución de turnos —
           Chonchi (clasificadora) → Día / Noche.
           Yal y otras no-clasificadoras → T1 / T2 / T3 (nomenclatura real
           de Shoplogix, sin inventar Día/Noche). */}
+      {!apple && (
       <Card>
         <CardContent className="py-1.5 px-4">
           {/* De dónde salen estos números: el encabezado cuenta los turnos CON
@@ -315,6 +420,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* ── Fila 3.5: Producción fuera de turno configurado ──
           Visibilidad de horas extra productivas: la planta a veces entra
@@ -324,7 +430,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           ver slxMonthlyStats), pero tampoco se esconde — y es la munición
           concreta para pedirle a planta que configure ese turno si el bloque
           se repite seguido. Se oculta si el mes no tuvo nada fuera de turno. */}
-      {slxStats && slxStats.unscheduled.cycles > 0 && (
+      {!apple && slxStats && slxStats.unscheduled.cycles > 0 && (
         <Card className="border-0 bg-muted-foreground/[0.10]">
           <CardContent className="py-1.5 px-4">
             <div className="flex items-center gap-1.5 mb-1">
@@ -368,12 +474,12 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           mejorando turno a turno. Es el número que la capacitación de
           imputación tiene que mover; sin causal, el tiempo perdido no se le
           puede atribuir a nadie. Se oculta si el período no trae agregados. */}
-      {slxStats?.imputacion && (
+      {slxStats?.imputacion && !apple && (
         <ImputacionPeriodCard imputacion={slxStats.imputacion} />
       )}
 
       {/* Jack-Knife de Mantención: junto a la imputación, con la planta del panel. */}
-      {plantSlug && <Link className="block min-h-[52px] py-4 text-accent" to={`/jack-knife#jk=pl=${plantSlug}`}>Jack-Knife de Mantención ›</Link>}
+      {plantSlug && <Link className={apple ? 'block min-h-11 py-2 text-subhead text-accent' : 'block min-h-[52px] py-4 text-accent'} to={`/jack-knife#jk=pl=${plantSlug}`}>Jack-Knife de Mantención ›</Link>}
 
       {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ──
           §22 divulgación progresiva: el desglose completo es DETALLE, no dato de
@@ -381,7 +487,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           hubo?"— y el reparto por causa se abre solo si se está investigando.
           Antes eran ~8 filas con barra siempre a la vista compitiendo con los
           KPIs del turno. */}
-      {stats && stats.causas.length > 0 && (
+      {!apple && stats && stats.causas.length > 0 && (
         <Disclosure
           title="Causas P0 del mes"
           summary={`${stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz`}

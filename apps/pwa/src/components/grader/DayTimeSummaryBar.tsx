@@ -18,6 +18,7 @@ import { PLANT_MACHINES, lineMachinesLabel } from '@/services/shoplogix/shoplogi
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { getShiftMeta, SLX_NOISE_THRESHOLD } from '@/services/grader/graderShiftDisplay'
+import { usePielApple } from '@/hooks/usePielApple'
 
 interface DayTotals {
   uptimeSec: number
@@ -74,6 +75,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
     ? `la ${modelo || 'máquina'}`
     : `las ${maquinas.length} ${modelo || 'máquinas'}`
   const [totals, setTotals] = useState<DayTotals | null>(null)
+  const apple = usePielApple()
 
   useEffect(() => {
     if (!enabled || !dateKey) { setTotals(null); return }
@@ -85,6 +87,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
   }, [dateKey, plantSlug, enabled])
 
   if (!enabled || !totals) return null
+  if (apple) return <TiemposDelDiaApple totals={totals} className={className} />
 
   return (
     <div className={cn(
@@ -130,5 +133,56 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
         </span>
       )}
     </div>
+  )
+}
+
+/** Nombre del turno sin el período: «Turno 2 — Tarde» → «turno 2». */
+const nombreTurno = (shiftId: string) => getShiftMeta(shiftId).label.split(' — ')[0]!.toLowerCase()
+
+/**
+ * Piel Apple: «Cómo se usó el día». Una barra de tres tramos y tres cifras debajo.
+ * Misma data que la forma anterior; la frase de los turnos se deriva de `turnos`
+ * (sin cálculo nuevo): si toda la detención cae en un turno, se nombra; si no,
+ * se cuenta cuántos turnos tuvieron detención.
+ */
+function TiemposDelDiaApple({ totals, className }: { totals: DayTotals; className?: string }) {
+  const conDetencion = totals.turnos.filter((t) => t.downtimeSec > 0)
+  const fraseTurnos = conDetencion.length === 1
+    ? `todo en el ${nombreTurno(conDetencion[0]!.shiftId)}`
+    : conDetencion.length > 1
+      ? `repartidas en ${conDetencion.length} turnos`
+      : null
+  const tieneColacion = totals.breakSec > 0
+  const resumen = [
+    `${fmtDurationSec(totals.uptimeSec)} procesando`,
+    `${fmtDurationSec(totals.downtimeSec)} detenidas${fraseTurnos ? `, ${fraseTurnos}` : ''}`,
+    ...(tieneColacion ? [`${fmtDurationSec(totals.breakSec)} colación`] : []),
+  ].join('. ')
+
+  return (
+    <section className={cn('space-y-2.5', className)}>
+      <h2 className="text-headline">Cómo se usó el día</h2>
+      <div className="flex h-3 gap-0.5 overflow-hidden rounded-full" role="img" aria-label={resumen}>
+        <div className="bg-primary" style={{ flex: Math.max(totals.uptimeSec, 0) }} />
+        <div className="bg-warning" style={{ flex: Math.max(totals.downtimeSec, 0) }} />
+        {tieneColacion && <div className="bg-muted-foreground" style={{ flex: totals.breakSec }} />}
+      </div>
+      <div className={cn('grid gap-2 text-footnote text-muted-foreground', tieneColacion ? 'grid-cols-3' : 'grid-cols-2')}>
+        <div>
+          <p className="text-subhead tabular-nums text-foreground">{fmtDurationSec(totals.uptimeSec)}</p>
+          procesando
+        </div>
+        <div>
+          <p className="text-subhead tabular-nums text-foreground">{fmtDurationSec(totals.downtimeSec)}</p>
+          detenidas{fraseTurnos ? `, ${fraseTurnos}` : ''}
+        </div>
+        {tieneColacion && (
+          <div>
+            <p className="text-subhead tabular-nums text-foreground">{fmtDurationSec(totals.breakSec)}</p>
+            colación
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
