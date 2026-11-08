@@ -58,7 +58,9 @@ function rectDe(id: string): Rect | null {
 const tiempoLectura = (texto: string): number => Math.max(3500, texto.length * 62)
 
 export function MotorTutorialAcr({ onCerrar, onTerminar, escribir, accion }: MotorTutorialAcrProps) {
-  const [est, dispatch] = useReducer(siguienteEstado, ESTADO_INICIAL)
+  // Montar el motor = empezar el tutorial. Sin esto quedaba en «inactivo» y el botón decía
+  // «Seguir» sin que nada sonara (visto en preview, 08-11).
+  const [est, dispatch] = useReducer(siguienteEstado, ESTADO_INICIAL, (e) => siguienteEstado(e, { tipo: 'iniciar' }))
   const [objetivo, setObjetivo] = useState<string | null>(null)
   const [anillo, setAnillo] = useState<Rect | null>(null)
   const [toque, setToque] = useState<{ r: Rect; n: number } | null>(null)
@@ -151,19 +153,23 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, escribir, accion }: Mot
     }
 
     // Audio. Si ya hay uno de este paso (se reanuda tras pausa), se sigue desde donde quedó.
+    // Una sola salida por corrida: el fin del audio, el respaldo o el tope de tiempo, lo que
+    // llegue primero. Sin tope, un `play()` que nunca resuelve (pestaña en segundo plano,
+    // política de autoplay) dejaba el tutorial pegado en el paso (visto en preview, 08-11).
+    let avanzado = false
     const terminado = () => {
-      window.setTimeout(() => dispatch({ tipo: 'audioTerminado', indice }), RETARDO_SIGUIENTE_MS)
+      if (avanzado || !vigente()) return
+      avanzado = true
+      window.setTimeout(() => {
+        if (vigente()) dispatch({ tipo: 'audioTerminado', indice })
+      }, RETARDO_SIGUIENTE_MS)
     }
+    let respaldoUsado = false
     const respaldo = () => {
-      // Sin audio: la voz del navegador con el mismo texto; si tampoco, avanza por tiempo.
-      let hecho = false
-      const fin = () => {
-        if (hecho) return
-        hecho = true
-        terminado()
-      }
-      speak(texto, { onend: fin, onerror: () => window.setTimeout(fin, tiempoLectura(texto)) })
-      window.setTimeout(fin, tiempoLectura(texto) + 4000)
+      if (respaldoUsado || avanzado || !vigente()) return
+      respaldoUsado = true
+      // Sin audio: la voz de ARIA del navegador con el mismo texto; si tampoco, avanza por tiempo.
+      speak(texto, { onend: terminado, onerror: () => window.setTimeout(terminado, tiempoLectura(texto)) })
     }
     let audio = audioRef.current
     if (!audio || audioIndiceRef.current !== indice || audio.ended) {
@@ -171,10 +177,16 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, escribir, accion }: Mot
       audio = new Audio(urlAudio(import.meta.env.BASE_URL, indice))
       audioRef.current = audio
       audioIndiceRef.current = indice
-      audio.onended = terminado
-      audio.onerror = respaldo
     }
+    // Siempre se reasignan: tras una pausa el efecto vuelve a correr con un turno nuevo y los
+    // manejadores viejos ya no son vigentes.
+    audio.onended = terminado
+    audio.onerror = respaldo
     audio.play().catch(respaldo)
+    const restante = Number.isFinite(audio.duration) && audio.duration > 0
+      ? (audio.duration - audio.currentTime) * 1000
+      : tiempoLectura(texto)
+    window.setTimeout(terminado, Math.max(restante, tiempoLectura(texto)) + 4000)
 
     // Cada corrida ya invalida a la anterior al empezar (`++turnoRef`): no hace falta cleanup.
     // `est` entero: el efecto depende de fase e índice; los callbacks van por ref.
