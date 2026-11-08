@@ -700,6 +700,8 @@
 .piel-fade-in { animation: piel-fade-in .35s ease-out both }
 .piel-sheet-in { animation: piel-sheet-in .5s cubic-bezier(.32, .72, 0, 1) both }
 .piel-pulse { animation: piel-pulse 2.2s ease-out infinite }
+/* Ventana de PC (Sheet presentacionPC="ventana"): aparece en su lugar, no sube desde abajo. */
+@media (min-width: 1024px) { .piel-ventana-in { animation: piel-fade-in .2s ease-out both } }
 @media (prefers-reduced-motion: reduce) {
   /* HIG «Accessibility»: los desplazamientos en x/y/z se REEMPLAZAN por un
      fundido, no se quitan del todo — si no, una hoja aparece de golpe y no se
