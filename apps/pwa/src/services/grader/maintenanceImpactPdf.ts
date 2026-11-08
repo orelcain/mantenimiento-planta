@@ -143,6 +143,7 @@ export async function exportMaintenanceImpactPDF(
         ['Cumplimiento preventivo', p(work.cumplimientoPct)],
         ['Trabajo proactivo (madurez TPM)', `${p(work.proactivoPct)}${work.proactivoTrend === 'mejor' ? '  (en alza)' : work.proactivoTrend === 'peor' ? '  (a la baja)' : ''}`],
         ['Equipos recurrentes (>=2 incidencias)', String(work.equiposRecurrentes)],
+        ['Acciones fuertes (ACR)', work.accionesAcr > 0 ? `${work.accionesFuertes} de ${work.accionesAcr}  (${p(work.accionesFuertesPct)})` : 'Sin ACR en el periodo'],
       ],
       theme: 'striped',
       headStyles: { fillColor: [14, 165, 233] },

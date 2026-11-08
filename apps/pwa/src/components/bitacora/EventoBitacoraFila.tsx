@@ -9,6 +9,8 @@ import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 import { etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { codigoEquipoDe, etiquetaTipo, nombreRepuesto, normalizarRepuestos, tieneHora, tituloDe } from '@/services/bitacora/presentacionEvento'
 import { nombreEquipoLegible } from '@/services/bitacora/nombreEquipo'
+import { FranjaAcr } from '@/components/acr/FranjaAcr'
+import type { SenalAcr } from '@/components/acr/useSenalesAcr'
 
 /**
  * Un evento en la línea de tiempo del turno (opción A del mockup, aprobada).
@@ -30,6 +32,7 @@ export function EventoBitacoraFila({
   asa,
   desplazamiento = null,
   nuevo = false,
+  senal = null,
 }: {
   evento: EventoBitacora
   /** El mismo número del evento en WhatsApp, correo y PDF (un borrador no lleva). */
@@ -55,6 +58,8 @@ export function EventoBitacoraFila({
   desplazamiento?: number | null
   /** Entró solo, de otro equipo, con la bitácora abierta (HIG «Live-updating content»). */
   nuevo?: boolean
+  /** Señal de causa raíz del evento (ver `useSenalesAcr`); sin ella, no hay franja. */
+  senal?: SenalAcr | null
 }) {
   const borrador = evento.estado === 'borrador'
   const quienesAbren = abiertoPor.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')
@@ -274,6 +279,8 @@ export function EventoBitacoraFila({
             {abiertoPor.length ? ` · ${quienesAbren} lo tiene abierto` : ''}
           </span>
         )}
+        {/* Franja de causa raíz: solo fallas con detención que se repiten o ya tienen análisis. */}
+        {!borrador && <FranjaAcr evento={evento} senal={senal} />}
       </div>
       {conAsa && (
         // Asa para arrastrarlo entre los demás (los con hora quedan por reloj).
