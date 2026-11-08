@@ -19,6 +19,11 @@ import { JackKnifeLamina } from './JackKnifeLamina'
 import { exportarLamina } from '@/services/grader/jackKnifeExport'
 import { JackKnifeListas } from './JackKnifeListas'
 import { calcularLayout } from './jackKnifeLayout'
+import { BITACORA_PLANTA } from '@/config/bitacora'
+import { listarAcrsConCache } from '@/services/acr/acrFirestore'
+import { resumenAcrPorCausa, type ResumenCausaJK } from '@/services/acr/acrHistorial'
+import type { Acr } from '@/services/acr/acr.types'
+import { logger } from '@/lib/logger'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 import {
   ETIQUETA_VEREDICTO, ACCION_CUADRANTE, nivelPrioridad, limitesPeriodoBase, causasConHistoria, frasePrioridad, textoResumenComparacion,
@@ -243,7 +248,9 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   const [manual, setManual] = useState<RangoJK | null>(null)
   const [modoCmp, setModoCmp] = useState<ModoCmpJK>(inicial?.cmp ?? 'ant')
   const [manualAntes, setManualAntes] = useState<RangoJK | null>(null)
-  const [sel, setSel] = useState<string | null>(null)
+  const [sel, setSel] = useState<string | null>(inicial?.causa ?? null)
+  /** Análisis de causa raíz (solo en la planta de Bitácora): una lectura, caché de 15 min. */
+  const [acrs, setAcrs] = useState<Acr[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [palabra, setPalabra] = useState<string | null>(null)
   const [modoCom, setModoCom] = useState<'grupo' | 'fecha'>('grupo')
@@ -265,6 +272,20 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
       .catch(() => { if (vivo) setError(true) })
     return () => { vivo = false }
   }, [plantSlug])
+
+  useEffect(() => {
+    if (plantSlug !== BITACORA_PLANTA.id) return undefined
+    let vivo = true
+    listarAcrsConCache()
+      .then((lista) => { if (vivo) setAcrs(lista) })
+      .catch((e: unknown) => {
+        logger.error('No se pudieron leer los análisis de causa raíz para el Jack-Knife', e instanceof Error ? e : undefined)
+      })
+    return () => { vivo = false }
+  }, [plantSlug])
+  const esBitacora = plantSlug === BITACORA_PLANTA.id
+  const analisis = useMemo<Map<string, ResumenCausaJK>>(() => resumenAcrPorCausa(acrs), [acrs])
+  const anillos = useMemo(() => new Set([...analisis].filter(([, r]) => r.fuertesHechas > 0).map(([k]) => k)), [analisis])
 
   useEffect(() => {
     const el = rootRef.current
@@ -340,6 +361,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
       vs: vista,
       cmp: modoCmp,
       lb: limitesBase,
+      ...(sel ? { causa: sel } : {}),
       ...(preset === 'libre' && n ? { ha: turnos[win.desde]?.id, hb: turnos[win.hasta]?.id } : {}),
       ...(modoCmp === 'mano' && previa ? { ca: turnos[previa.desde]?.id, cb: turnos[previa.hasta]?.id } : {}),
     }
@@ -480,8 +502,8 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
             </div>
             {previa && <label className="flex min-h-[44px] items-center gap-2 text-footnote"><input type="checkbox" checked={limitesBase} onChange={e => setLimitesBase(e.target.checked)} />Límites del período base</label>}
             <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-              <JackKnifeGrafico calc={calc} ancho={W} sel={sel} fantasmas={fantasmas} elegirCausa={elegirCausa} />
-              <JackKnifeListas calc={calc} informe={informe} turnos={turnos} elegirCausa={elegirCausa} />
+              <JackKnifeGrafico calc={calc} ancho={W} sel={sel} fantasmas={fantasmas} elegirCausa={elegirCausa} anillos={esBitacora ? anillos : undefined} />
+              <JackKnifeListas calc={calc} informe={informe} turnos={turnos} elegirCausa={elegirCausa} analisis={esBitacora ? analisis : undefined} causaSel={sel} />
             </div>
             <details ref={detalleRef} className="space-y-4"><summary className="cursor-pointer py-4 font-semibold text-accent">Ver detalle</summary>
             <p className="text-footnote text-muted-foreground">¿Cómo se lee? Los cuadrantes separan frecuencia y duración altas o bajas. La línea de disponibilidad une causas con igual tiempo detenido. Los límites del período base mantienen su MTTR y ajustan la frecuencia al número de turnos actuales; al desactivarlos se recalculan con el período actual.</p>
