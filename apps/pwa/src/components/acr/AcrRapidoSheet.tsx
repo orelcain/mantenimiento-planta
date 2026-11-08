@@ -14,6 +14,7 @@ import { AUTOGUARDADO_MS, BITACORA_PLANTA, ETIQUETA_FOTO } from '@/config/bitaco
 import { guardarAcr, nuevoIdAcr } from '@/services/acr/acrFirestore'
 import { cadenaPorQues, motivoNoCierra, puedeCerrar, resumenFuerza } from '@/services/acr/acrLogica'
 import { proponerAcr, type ProponerAcr } from '@/services/acr/proponerAcr'
+import { preguntarPorQue, type PreguntarPorQue } from '@/services/acr/preguntarPorQue'
 import type { Repeticion } from '@/services/acr/repeticion'
 import {
   AYUDA_FUERZA,
@@ -42,6 +43,7 @@ import {
   MOTIVO_EJEMPLO,
   PASOS_TUTORIAL,
   PORQUES_TUTORIAL,
+  PREGUNTA_TUTORIAL,
   PROPUESTA_TUTORIAL,
   REPETICION_TUTORIAL,
   TEXTO_Q2,
@@ -83,6 +85,8 @@ export interface AcrRapidoSheetProps {
   onGuardar?: (acr: Acr) => void
   /** Reemplaza la llamada a la IA (la vitrina la simula). */
   proponer?: ProponerAcr
+  /** Reemplaza la pregunta de «ARIA pregunta» (la vitrina la simula). */
+  preguntar?: PreguntarPorQue
   /** Arranca el tutorial al abrir (la vitrina lo usa; en la app se pide con el botón). */
   arrancarTutorial?: boolean
 }
@@ -181,6 +185,7 @@ export function AcrRapidoSheet({
   repeticion = null,
   onGuardar,
   proponer,
+  preguntar = preguntarPorQue,
   arrancarTutorial = false,
 }: AcrRapidoSheetProps) {
   const user = useAuthStore((s) => s.user)
@@ -205,6 +210,10 @@ export function AcrRapidoSheet({
   const [revisionSubida, setRevisionSubida] = useState(false)
   /** Pantalla completa de los 5 porqués (`CadenaPorQues`). */
   const [pantallaPorQues, setPantallaPorQues] = useState(false)
+  /** Tarjeta de «ARIA pregunta» (`CadenaPorQues`); el tutorial la abre con `abrirAria`. */
+  const [ariaPorQues, setAriaPorQues] = useState(false)
+  /** Pregunta fija de la práctica del tutorial: con ella la IA nunca se llama. */
+  const [preguntaPractica, setPreguntaPractica] = useState<string | null>(null)
   /** Falso hasta el primer guardado de un análisis nuevo: ahí se crea el documento. */
   const guardadoRef = useRef(acrExistente != null)
   const idPiezas = useId()
@@ -243,7 +252,7 @@ export function AcrRapidoSheet({
     cambiar((a) => sincronizarManual({ ...a, respuestas: { ...(a.respuestas ?? RESPUESTAS_VACIAS), [campo]: valor } }))
 
   /** Porqué 1 y porqués extra de la cadena «¿Y por qué?» (mismo camino que `cambiarRespuesta`). */
-  const cambiarPorQues = (cambio: { porQue?: string; porQues?: string[] }) =>
+  const cambiarPorQues = (cambio: { porQue?: string; porQues?: string[]; porQuesModo?: 'cadena' | 'aria' }) =>
     cambiar((a) => sincronizarManual({ ...a, respuestas: { ...(a.respuestas ?? RESPUESTAS_VACIAS), ...cambio } }))
 
   const r = acr.respuestas ?? RESPUESTAS_VACIAS
@@ -348,6 +357,8 @@ export function AcrRapidoSheet({
     setMotivoPractica(null)
     setRevisionSubida(false)
     setPantallaPorQues(false)
+    setAriaPorQues(false)
+    setPreguntaPractica(null)
   }
 
   /**
@@ -499,6 +510,13 @@ export function AcrRapidoSheet({
         return
       case 'cerrarPantalla':
         setPantallaPorQues(false)
+        return
+      case 'abrirAria':
+        setPreguntaPractica(PREGUNTA_TUTORIAL)
+        setAriaPorQues(true)
+        return
+      case 'cerrarAria':
+        setAriaPorQues(false)
         return
     }
   }
@@ -664,6 +682,13 @@ export function AcrRapidoSheet({
             onCambiarExtras={(v) => cambiarPorQues({ porQues: v })}
             pantallaAbierta={pantallaPorQues}
             onPantalla={setPantallaPorQues}
+            preguntar={preguntar}
+            equipo={acr.equipo}
+            onUsoAria={() => cambiarPorQues({ porQuesModo: 'aria' })}
+            ariaAbierta={ariaPorQues}
+            onAria={setAriaPorQues}
+            // En el tutorial siempre la pregunta fija (aunque el técnico toque el botón a mano).
+            preguntaPractica={tutorial ? (preguntaPractica ?? PREGUNTA_TUTORIAL) : null}
           />
         </section>
 

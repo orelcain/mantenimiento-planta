@@ -79,6 +79,8 @@ export interface RespuestasAcr {
   queHacemos: string
   /** Porqués 2..5 de la cadena «¿Y por qué?» (máx. 4). Opcional: los ACR guardados no lo tienen. */
   porQues?: string[]
+  /** Cómo se armó la cadena: `'aria'` si el técnico agregó un porqué respondiendo a ARIA pregunta. */
+  porQuesModo?: 'cadena' | 'aria'
 }
 
 export type OrigenPropuesta = 'ia' | 'manual'

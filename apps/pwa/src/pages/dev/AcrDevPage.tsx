@@ -16,6 +16,7 @@ import { iniciarVerificacion, type ResultadoGesto } from '@/components/acr/verif
 import type { Acr, AccionAcr, CausaAcr, EventoRefAcr } from '@/services/acr/acr.types'
 import { detectarRepeticion, type EventoRepeticion } from '@/services/acr/repeticion'
 import type { PropuestaIA, ProponerAcr } from '@/services/acr/proponerAcr'
+import type { PreguntarPorQue } from '@/services/acr/preguntarPorQue'
 
 const EVENTO_DEMO: EventoRefAcr = {
   id: 'demo-evento-resorte-n1',
@@ -150,6 +151,29 @@ const PROPUESTA_DEMO: PropuestaIA = {
 const proponerDemo = (fallar: boolean): ProponerAcr => () =>
   new Promise<PropuestaIA>((resolver, rechazar) => {
     setTimeout(() => (fallar ? rechazar(new Error('Fallo simulado de la IA')) : resolver(PROPUESTA_DEMO)), 600)
+  })
+
+/** Preguntas de ejemplo de «ARIA pregunta», en orden. Sin datos técnicos inventados. */
+const PREGUNTAS_DEMO = [
+  '¿Quién revisa que el regulador de aire quede instalado en todas las N?',
+  '¿Qué plan de revisión incluye el regulador de aire?',
+  '¿Qué stock de reguladores hay en bodega para cambiarlos?',
+]
+
+/** Fuera de la función: la vitrina la crea en cada render y un contador local volvía a cero. */
+let siguientePreguntaDemo = 0
+
+/** «ARIA pregunta» simulada: tarda 600 ms y recorre las 3 preguntas; con «Simular fallo» rechaza. */
+const preguntarDemo = (fallar: boolean): PreguntarPorQue => () =>
+  new Promise<string>((resolver, rechazar) => {
+    setTimeout(() => {
+      if (fallar) {
+        rechazar(new Error('Fallo simulado de ARIA'))
+        return
+      }
+      resolver(PREGUNTAS_DEMO[siguientePreguntaDemo % PREGUNTAS_DEMO.length] ?? PREGUNTAS_DEMO[0] ?? '')
+      siguientePreguntaDemo++
+    }, 600)
   })
 
 /** Un análisis de revisión semanal: mismos datos que la tabla del mockup («Semana del 21 al 27-09»). */
@@ -383,6 +407,7 @@ export function AcrDevPage() {
           repeticion={REPETICION_DEMO}
           arrancarTutorial={arranque}
           proponer={proponerDemo(fallar)}
+          preguntar={preguntarDemo(fallar)}
           onGuardar={(a) => {
             setAcr(a)
             setUltimo(`${a.estado}, ${a.causas.length} causas, ${a.acciones.length} acciones`)

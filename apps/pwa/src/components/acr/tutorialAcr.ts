@@ -1,5 +1,5 @@
 /**
- * Guion y reductor del tutorial del ACR narrado por ARIA (guion v2: 11 capítulos, 28 pasos).
+ * Guion y reductor del tutorial del ACR narrado por ARIA (guion v2: 11 capítulos, 29 pasos).
  * Datos y lógica pura: sin React ni audio. El motor (MotorTutorialAcr.tsx) y la tarjeta
  * (AcrRapidoSheet.tsx) los usan.
  *
@@ -34,6 +34,7 @@ export const OPCIONES_ACR = {
   'nivel-latente': 'Causa latente (obligatoria para cerrar)',
   'porques-cadena': '«¿Y por qué?»: cadena de hasta 5 porqués',
   'porques-pantalla': 'Pantalla completa de los 5 porqués',
+  'porques-aria': '«ARIA pregunta»: ARIA propone el siguiente porqué',
   proponer: 'Botón «Proponer causas» y «ARIA está pensando…»',
   'propuesta-pct': 'Propuesta de la IA y % de acciones fuertes',
   'fuerza-debil': 'Fuerza débil',
@@ -90,6 +91,8 @@ export type AccionTutorial =
   | 'porQueMas'
   | 'abrirPantalla'
   | 'cerrarPantalla'
+  | 'abrirAria'
+  | 'cerrarAria'
 
 /** Lo que el tutorial abre encima de la tarjeta durante un paso. */
 export type VistaTutorial = 'filas' | 'lectura' | 'revision'
@@ -218,6 +221,9 @@ export const PORQUES_TUTORIAL = [
   'En N1 y N2 nunca se instaló; solo en N3 el 20-09.',
 ]
 
+/** Pregunta fija que ARIA muestra en la práctica de «ARIA pregunta» (nunca llama a la IA). */
+export const PREGUNTA_TUTORIAL = '¿Por qué la mejora de N3 no se hizo también en N1 y N2?'
+
 const p = (n: number) => `paso-${String(n).padStart(2, '0')}.mp3`
 
 export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
@@ -315,6 +321,20 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     ],
     deja: { porQues: true },
     explica: ['porques-cadena', 'porques-pantalla'],
+  },
+  {
+    id: 'aria-pregunta',
+    capitulo: 3,
+    texto:
+      'Si prefieres, toca ARIA pregunta y yo te hago la siguiente pregunta a partir de lo que escribiste. Sin señal, escribes tú.',
+    audio: 'paso-07c.mp3',
+    objetivo: 't-aria-pregunta',
+    momentos: [
+      { palabra: 'aria', tocar: 't-aria-pregunta', accion: 'abrirAria' },
+      { palabra: 'siguiente', objetivo: 't-aria-card' },
+      { en: 0.97, accion: 'cerrarAria' },
+    ],
+    explica: ['porques-aria'],
   },
   {
     id: 'pregunta-3',
