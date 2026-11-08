@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { detectarRepeticion, equipoBase, piezasDe, type EventoRepeticion } from '../repeticion'
 
 /**
- * Casos del 24-09-2026 (mockup R1). Ojo: el texto de N2 y el nombre «BAADER 200» son los del
- * mockup (resumen de Orel), no el texto verbatim de la Bitácora. Confirmar con los eventos reales
- * antes de tomar el resultado como dato.
+ * Casos reales del 24-09-2026, texto y equipo tal como están en `bitacoraEventos` (leídos el
+ * 07-11-2026). Solo se quitó la puntuación repetida de N2 («baader 2….»).
  */
 const HOY = new Date(2026, 8, 24) // 24-09-2026, hora local
 
@@ -18,14 +17,14 @@ const N1: EventoRepeticion = {
 const N2: EventoRepeticion = {
   id: 'n2',
   equipo: 'EVISCERADORA BAADER 142 N2',
-  descripcion: 'Mismo resorte de la chapaleta, mismo turno',
+  descripcion: 'Se corta resorte ingreso chapaleta baader 2. Se reemplaza y normaliza',
   fechaTurno: '2026-09-24',
   minutosParada: 8,
 }
 const B200: EventoRepeticion = {
   id: 'b2',
   equipo: 'BAADER 200',
-  descripcion: 'Se cortan resortes alimentación 1 y 2, se reutilizan los mismos',
+  descripcion: 'Se cortan resortes alimentacion 1 y 2 , se reutilizan los mismos',
   fechaTurno: '2026-09-24',
   minutosParada: 6,
 }

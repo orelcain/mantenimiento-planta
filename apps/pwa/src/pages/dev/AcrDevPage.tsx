@@ -105,21 +105,20 @@ function acrDemo(): Acr {
 }
 
 /**
- * Repetición con el detector real. N2 y B200 son los textos del mockup R1 (resumen de Orel), no el
- * texto verbatim de la Bitácora: confirmar con los eventos reales antes de tomarlo como dato.
+ * Repetición con el detector real y los eventos reales del 24-09-2026 de `bitacoraEventos`.
  */
 const HOY_DEMO = new Date(2026, 8, 24)
 const EVENTO_N2: EventoRepeticion = {
   id: 'demo-evento-n2',
   equipo: 'EVISCERADORA BAADER 142 N2',
-  descripcion: 'Mismo resorte de la chapaleta, mismo turno',
+  descripcion: 'Se corta resorte ingreso chapaleta baader 2. Se reemplaza y normaliza',
   fechaTurno: '2026-09-24',
   minutosParada: 8,
 }
 const EVENTO_B200: EventoRepeticion = {
   id: 'demo-evento-b200',
   equipo: 'BAADER 200',
-  descripcion: 'Se cortan resortes alimentación 1 y 2, se reutilizan los mismos',
+  descripcion: 'Se cortan resortes alimentacion 1 y 2 , se reutilizan los mismos',
   fechaTurno: '2026-09-24',
   minutosParada: 6,
 }
