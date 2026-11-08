@@ -23,8 +23,9 @@ export interface SheetProps {
   /**
    * `wide` = el doble de ancho en pantallas grandes (60rem), para formularios
    * largos que en el PC caben en dos columnas. En el teléfono no cambia nada.
+   * `full` = casi todo el ancho del PC (92 vw, tope 90rem), para tablas y listas con columnas.
    */
-  size?: 'default' | 'wide'
+  size?: 'default' | 'wide' | 'full'
   children?: React.ReactNode
   /**
    * Opcional: captura teclas en cualquier campo del panel (por ejemplo Cmd/Ctrl+Enter
@@ -139,7 +140,7 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
           'relative w-full rounded-t-panel pt-2.5',
           surface === 'grouped' ? 'bg-background' : 'bg-card',
           estructurado ? 'flex max-h-[85dvh] flex-col px-4' : 'px-6 pb-8',
-          size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
+          size === 'full' ? 'max-w-[min(92vw,90rem)]' : size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
           'shadow-[0_-10px_50px_rgba(0,0,0,0.3)] outline-none',
           'piel-sheet-in',
         )}

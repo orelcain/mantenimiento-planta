@@ -80,7 +80,7 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
       open={open}
       onClose={onClose}
       surface="grouped"
-      size="wide"
+      size="full"
       title="Revisión semanal"
       description={periodo}
       actions={
@@ -126,10 +126,10 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
                   <p className="text-body text-foreground">{accion.texto}</p>
                 </div>
                 <p className="text-footnote text-muted-foreground lg:col-start-1 lg:row-start-1">
-                  Falla: {acr.definicion}
+                  <span className="lg:hidden">Falla: </span>{acr.definicion}
                 </p>
                 <p className="text-footnote text-muted-foreground lg:col-start-2 lg:row-start-1">
-                  Equipo: {acr.equipo}
+                  <span className="lg:hidden">Equipo: </span>{acr.equipo}
                 </p>
                 {puedeEditar && (
                   <SegmentedControl
