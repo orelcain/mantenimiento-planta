@@ -54,8 +54,8 @@ describe('GraderMonthlyStatsPanel · piel Apple', () => {
   it('el mejor y el peor turno se escriben con día de la semana, número y turno', () => {
     const { container } = panel()
     const texto = (container.textContent ?? '').split(String.fromCharCode(160)).join(' ')
-    expect(texto).toContain('Mejor turnomiércoles 4, mañana83 %')
-    expect(texto).toContain('Peor turnoviernes 6, tarde49 %')
+    expect(texto).toContain('Mejor turnouptime, miércoles 4, mañana83 %')
+    expect(texto).toContain('Peor turnouptime, viernes 6, tarde49 %')
     expect(texto).not.toContain('11-04')
   })
 

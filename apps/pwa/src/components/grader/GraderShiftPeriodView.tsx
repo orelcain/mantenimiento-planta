@@ -143,6 +143,7 @@ export function GraderShiftPeriodView({
           value={kpiVigente}
           onChange={setKpi}
           segments={kpisDisponibles.map(k => ({ value: k.id, label: apple ? ETIQUETA_KPI_APPLE[k.id] : k.label }))}
+          ajustado={apple}
           className={apple ? 'w-full lg:w-auto' : 'w-auto max-w-xs shrink-0'}
         />
 

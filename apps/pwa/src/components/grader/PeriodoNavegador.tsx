@@ -35,17 +35,18 @@ export interface PeriodoNavegadorProps {
 export function PeriodoNavegador({ period, onPeriodChange, referencia, onStep, className }: PeriodoNavegadorProps) {
   const etiqueta = etiquetaPeriodo(referencia, period)
   return (
-    <div className={cn('flex flex-wrap items-center gap-3', className)}>
-      <div className="min-w-0 flex-1">
-        <SegmentedControl
-          ariaLabel="Período del análisis"
-          value={period}
-          onChange={onPeriodChange}
-          segments={PERIODOS.map((p) => ({ value: p.id, label: p.label }))}
-          className="w-full"
-        />
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
+    // Móvil: el segmentado en su propia fila a todo el ancho y la fecha debajo.
+    // PC: el segmentado a la izquierda según su contenido, y la fecha a la derecha.
+    <div className={cn('flex flex-col gap-3 lg:flex-row lg:items-center', className)}>
+      <SegmentedControl
+        ariaLabel="Período del análisis"
+        value={period}
+        onChange={onPeriodChange}
+        segments={PERIODOS.map((p) => ({ value: p.id, label: p.label }))}
+        ajustado
+        className="w-full lg:w-auto"
+      />
+      <div className="flex items-center gap-1 lg:ml-auto">
         <button type="button" onClick={() => onStep(-1)} aria-label="Período anterior" className={BOTON_FLECHA}>
           <ChevronLeft className="h-4 w-4" aria-hidden />
         </button>

@@ -41,6 +41,19 @@ describe('PeriodoNavegador · piel Apple', () => {
     expect(screen.getByRole('button', { name: 'Período anterior' }).className).toContain('size-11')
   })
 
+  it('el segmentado no trunca sus rótulos y en PC mide según su contenido', () => {
+    render(<PeriodoNavegador period="day" onPeriodChange={() => {}} referencia={ref} onStep={() => {}} />)
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]')) as HTMLElement[]
+    expect(tabs.map((t) => t.textContent)).toEqual(['Día', 'Semana', 'Mes'])
+    // Ajustado: cada rótulo con su espacio (px-3) y sin la clase que corta el texto.
+    tabs.forEach((t) => {
+      expect(t.innerHTML).not.toContain('truncate')
+      expect(t.innerHTML).toContain('whitespace-nowrap')
+    })
+    const raiz = document.querySelector('[role="tablist"]') as HTMLElement
+    expect(raiz.className).toContain('lg:w-auto')
+  })
+
   it('cambiar el segmentado emite el período elegido', () => {
     const onPeriodChange = vi.fn()
     render(<PeriodoNavegador period="day" onPeriodChange={onPeriodChange} referencia={ref} onStep={() => {}} />)

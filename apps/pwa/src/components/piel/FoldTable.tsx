@@ -93,7 +93,7 @@ export function FoldTable({ caption, columns, rows, cierre, nota, className }: F
                             type="button"
                             aria-expanded={abierta}
                             aria-controls={idDetalle}
-                            className="block min-h-11 w-full rounded-ctl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            className="block w-full rounded-ctl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           >
                             {cell}
                           </button>

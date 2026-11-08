@@ -626,7 +626,20 @@ function PlantKPIBoardApple({
 
           {/* Conclusión: OEE, cómo se compone y la máquina que más pierde. */}
           <section className="space-y-1.5 border-b-2 border-foreground pb-4">
-            <p className="text-footnote text-muted-foreground">{sinQ ? 'OEE sin calidad' : 'OEE'}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-footnote text-muted-foreground">{sinQ ? 'OEE sin calidad' : 'OEE'}</p>
+              {/* Alcance honesto del OEE (es de las evisceradoras): plegado detrás de un ícono. Va en la misma línea del rótulo. */}
+              <button
+                type="button"
+                onClick={() => setAlcanceAbierto((v) => !v)}
+                aria-expanded={alcanceAbierto}
+                aria-label="Alcance de los indicadores"
+                className="-my-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Info className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+            {alcanceAbierto && <p className="text-footnote text-muted-foreground">{scopeNote}</p>}
             {oeeVal !== null ? (
               <p className="text-display font-semibold tabular-nums" title={sinQ ? DEFS.oeeSinQ.desc : DEFS.oee.desc}>
                 {pctAp(oeeVal)}
@@ -711,20 +724,6 @@ function PlantKPIBoardApple({
         </>
       )}
 
-      {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área.
-          Va plegado detrás de un ícono de información: la pantalla no lo necesita siempre. */}
-      <div className="space-y-2">
-        <button
-          type="button"
-          onClick={() => setAlcanceAbierto((v) => !v)}
-          aria-expanded={alcanceAbierto}
-          aria-label="Alcance de los indicadores"
-          className="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <Info className="h-4 w-4" aria-hidden />
-        </button>
-        {alcanceAbierto && <p className="text-footnote text-muted-foreground">{scopeNote}</p>}
-      </div>
     </section>
   )
 }

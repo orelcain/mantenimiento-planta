@@ -102,4 +102,14 @@ describe('PlantKPIBoard · piel Apple', () => {
     const { container } = render(<PlantKPIBoard {...props} />)
     expect(container.querySelector('[role="tablist"]')).toBeNull()
   })
+
+  it('el ícono de alcance va junto al rótulo OEE, no en una línea propia', () => {
+    const { container } = render(<PlantKPIBoard {...props} />)
+    const boton = container.querySelector('button[aria-label="Alcance de los indicadores"]')!
+    expect(boton).toBeTruthy()
+    // El botón comparte fila con el rótulo: su padre directo también contiene el texto «OEE sin calidad».
+    expect(boton.parentElement?.textContent).toContain('OEE sin calidad')
+    fireEvent.click(boton)
+    expect(boton.getAttribute('aria-expanded')).toBe('true')
+  })
 })

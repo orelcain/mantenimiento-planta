@@ -52,6 +52,9 @@ function fechaTurnoApple(dateKey: string, shiftId: string): string {
   return `${dia} ${numero}, ${periodo}`
 }
 
+/** La métrica en palabras de planta: «P0», «uptime». */
+const metricaApple = (m: string) => (m === 'P0%' ? 'P0' : m)
+
 /** Espacio duro antes del «%» (que no se corte al final de línea). */
 const ESPACIO_DURO = String.fromCharCode(160)
 const conEspacioPct = (s: string) => s.replace('%', `${ESPACIO_DURO}%`)
@@ -225,14 +228,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 {best && bestRef && (
                   <FilaMesApple
                     rotulo="Mejor turno"
-                    detalle={fechaTurnoApple(bestRef.dateKey, bestRef.shiftId)}
+                    detalle={`${metricaApple(best.metric)}, ${fechaTurnoApple(bestRef.dateKey, bestRef.shiftId)}`}
                     valor={conEspacioPct(best.value)}
                   />
                 )}
                 {worst && worstRef && (
                   <FilaMesApple
                     rotulo="Peor turno"
-                    detalle={fechaTurnoApple(worstRef.dateKey, worstRef.shiftId)}
+                    detalle={`${metricaApple(worst.metric)}, ${fechaTurnoApple(worstRef.dateKey, worstRef.shiftId)}`}
                     valor={conEspacioPct(worst.value)}
                   />
                 )}
