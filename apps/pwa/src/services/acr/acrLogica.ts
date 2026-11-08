@@ -18,8 +18,11 @@ export function cadenaPorQues(r: RespuestasAcr): string[] {
   return [r.porQue, ...(r.porQues ?? [])].map((s) => s.trim()).filter((s) => s !== '')
 }
 
-export const MENSAJE_LATENTE =
-  'Falta la causa latente: la que hace que vuelva a pasar. El error humano no es causa raíz.'
+/** Sin causas todavía: la salida es proponer o armar a mano. */
+export const MENSAJE_LATENTE_SIN_CAUSAS = 'Falta la causa latente: toca «Proponer causas» o «Armar a mano».'
+
+/** Con causas, pero ninguna en nivel latente: la salida es cambiarle el nivel a una. */
+export const MENSAJE_LATENTE_SIN_NIVEL = 'Falta la causa latente: toca una causa y cámbiale el nivel a Latente.'
 
 /** Tipos de evento que piden ACR (los ids reales de `TIPOS_EVENTO` + el legado `falla`). */
 const TIPOS_CON_ACR = ['correctivo', 'falla'] as const
@@ -38,10 +41,21 @@ export function motivoNoCierra(acr: Acr): string | null {
   if (!r?.queSeRompio.trim()) return 'Falta: qué se rompió.'
   if (!r.porQue.trim()) return 'Falta: por qué se rompió.'
   if (!r.queHacemos.trim()) return 'Falta: qué hacemos para que no vuelva.'
-  if (!acr.causas.some((c) => c.nivel === 'latente')) return MENSAJE_LATENTE
+  if (acr.causas.length === 0) return MENSAJE_LATENTE_SIN_CAUSAS
+  if (!acr.causas.some((c) => c.nivel === 'latente')) return MENSAJE_LATENTE_SIN_NIVEL
   if (acr.acciones.length === 0 || acr.acciones.some((a) => !a.texto.trim())) {
     return 'Falta una acción con texto y su fuerza.'
   }
+  return null
+}
+
+/**
+ * Por qué «Proponer causas» está deshabilitado (la pregunta 2 es el porqué; la 3, qué hacemos).
+ * `null` si ya se puede proponer. La UI decide cuándo mostrarlo (no en tutorial ni mientras piensa).
+ */
+export function motivoNoPropone(r: Pick<RespuestasAcr, 'porQue' | 'queHacemos'>): string | null {
+  if (!r.porQue.trim()) return 'Para proponer, responde la pregunta 2.'
+  if (!r.queHacemos.trim()) return 'Para proponer, responde la pregunta 3.'
   return null
 }
 

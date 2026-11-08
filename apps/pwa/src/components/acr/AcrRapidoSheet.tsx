@@ -12,7 +12,7 @@ import { auth } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { AUTOGUARDADO_MS, BITACORA_PLANTA, ETIQUETA_FOTO } from '@/config/bitacora'
 import { guardarAcr, nuevoIdAcr } from '@/services/acr/acrFirestore'
-import { cadenaPorQues, motivoNoCierra, puedeCerrar, resumenFuerza } from '@/services/acr/acrLogica'
+import { cadenaPorQues, motivoNoCierra, motivoNoPropone, puedeCerrar, resumenFuerza } from '@/services/acr/acrLogica'
 import { proponerAcr, type ProponerAcr } from '@/services/acr/proponerAcr'
 import { preguntarPorQue, type PreguntarPorQue } from '@/services/acr/preguntarPorQue'
 import type { Repeticion } from '@/services/acr/repeticion'
@@ -93,8 +93,9 @@ export interface AcrRapidoSheetProps {
 
 // ── Constantes y helpers ─────────────────────────────────────────────────────
 
+/** `!` gana a `text-sm` y `min-h-[80px]` de `ui/Textarea`: las tres preguntas miden igual (16 px de letra, iOS no hace zoom). */
 const CAMPO =
-  'w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+  'w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 !text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary !min-h-16'
 const TITULO_PREGUNTA = 'text-body font-semibold text-foreground'
 const NIVEL_SEGMENTOS = (['fisica', 'humana', 'latente'] as const).map((n) => ({ value: n, label: ETIQUETA_NIVEL[n] }))
 const FUERZA_SEGMENTOS = (['debil', 'media', 'fuerte'] as const).map((f) => ({ value: f, label: ETIQUETA_FUERZA[f] }))
@@ -203,6 +204,8 @@ export function AcrRapidoSheet({
   const [avisoIA, setAvisoIA] = useState<string | null>(null)
   const [editando, setEditando] = useState<{ tipo: 'causa' | 'accion'; id: string } | null>(null)
   const [confirmarBorrado, setConfirmarBorrado] = useState(false)
+  /** «Armar a mano» con una propuesta de ARIA: se confirma antes de reemplazarla. */
+  const [confirmarArmado, setConfirmarArmado] = useState(false)
   // Solo en la práctica del tutorial: lo que ARIA abre o muestra encima de la tarjeta.
   const [vistaPractica, setVistaPractica] = useState<VistaTutorial | null>(null)
   const [pensandoPractica, setPensandoPractica] = useState(false)
@@ -567,6 +570,7 @@ export function AcrRapidoSheet({
       onClose={cerrarHoja}
       surface="grouped"
       size="wide"
+      ocultarBarra
       title="Causa raíz"
       description={`${acr.equipo} · ${fechaCorta(acr.fechaTurno)} · ${minutos}`}
       headerAction={
@@ -598,18 +602,27 @@ export function AcrRapidoSheet({
       }
     >
       {/* Tutorial: botón bajo el título (no reemplaza a Guardar). La primera vez, una línea discreta. */}
-      <div className="mb-5 flex flex-col gap-2.5">
-        {tutorial && (
-          <p className="text-footnote font-semibold text-muted-foreground">
-            Modo práctica: el caso de los resortes. Nada se guarda.
-          </p>
-        )}
-        {!visto && !tutorial && (
-          <p className="text-footnote text-muted-foreground">¿Primera vez? ARIA te lo muestra en 11 partes cortas.</p>
-        )}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          {tutorial && (
+            <p className="text-footnote font-semibold text-muted-foreground">
+              Modo práctica: el caso de los resortes. Nada se guarda.
+            </p>
+          )}
+          {!visto && !tutorial && (
+            <p className="text-footnote text-muted-foreground">¿Primera vez? ARIA te lo muestra en 11 partes cortas.</p>
+          )}
+        </div>
         {/* En la práctica no se deshabilita: ARIA lo ilumina y debe verse como lo verá el técnico.
             Tocarlo ahí no hace nada (iniciarTutorial ya corre). */}
-        <Button data-tutorial="t-head" variant="tinted" aria-disabled={tutorial} onClick={iniciarTutorial}>
+        <Button
+          data-tutorial="t-head"
+          variant="tinted"
+          size="sm"
+          className="min-h-[44px] shrink-0"
+          aria-disabled={tutorial}
+          onClick={iniciarTutorial}
+        >
           <Play />
           Ver tutorial
         </Button>
@@ -719,12 +732,18 @@ export function AcrRapidoSheet({
           >
             Proponer causas
           </Button>
+          {!tutorial && !pensando && !puedeProponer && (
+            <p className="text-footnote text-muted-foreground">{motivoNoPropone(r)}</p>
+          )}
           <Button
             data-tutorial="t-manual"
             variant="plain"
             aria-disabled={tutorial}
             onClick={() => {
-              if (!tutorial) cambiar((a) => armadoManual(a))
+              if (tutorial) return
+              // Con una propuesta de ARIA, armar a mano la reemplaza: se pide confirmar.
+              if (acr.propuesta?.origen === 'ia' && hayGrupo) setConfirmarArmado(true)
+              else cambiar((a) => armadoManual(a))
             }}
           >
             Armar a mano
@@ -917,6 +936,18 @@ export function AcrRapidoSheet({
           </div>
         </Sheet>
       )}
+
+      <ActionSheet
+        open={confirmarArmado}
+        title="¿Armar a mano?"
+        description="Se reemplaza la propuesta de ARIA por lo que escribiste en las preguntas."
+        confirmLabel="Armar a mano"
+        onConfirm={() => {
+          setConfirmarArmado(false)
+          cambiar((a) => armadoManual(a))
+        }}
+        onCancel={() => setConfirmarArmado(false)}
+      />
 
       <ActionSheet
         open={confirmarBorrado}

@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { Acr, AccionAcr, CausaAcr } from '../acr.types'
 import {
   MAX_PORQUES,
-  MENSAJE_LATENTE,
+  MENSAJE_LATENTE_SIN_CAUSAS,
+  MENSAJE_LATENTE_SIN_NIVEL,
   aplicaAnalisis,
   cadenaPorQues,
   eventoRequiereAcr,
   kpiFuerzaAcciones,
   motivoNoCierra,
+  motivoNoPropone,
   puedeCerrar,
   resumenFuerza,
 } from '../acrLogica'
@@ -172,10 +174,18 @@ describe('motivoNoCierra y puedeCerrar (R1)', () => {
     expect(motivoNoCierra(sinHacer)).toBe('Falta: qué hacemos para que no vuelva.')
   })
 
-  it('sin causa latente no cierra, aunque haya física y humana', () => {
+  it('sin causas todavía, el motivo dice qué tocar: proponer o armar a mano', () => {
+    const sinCausas = acrBase({ ...CASO_REAL, causas: [] })
+    expect(puedeCerrar(sinCausas)).toBe(false)
+    expect(motivoNoCierra(sinCausas)).toBe('Falta la causa latente: toca «Proponer causas» o «Armar a mano».')
+    expect(motivoNoCierra(sinCausas)).toBe(MENSAJE_LATENTE_SIN_CAUSAS)
+  })
+
+  it('con causas pero sin latente, el motivo dice cambiarle el nivel a una causa', () => {
     const sinLatente = acrBase({ ...CASO_REAL, causas: [causa('fisica', 'c1'), causa('humana', 'c2')] })
     expect(puedeCerrar(sinLatente)).toBe(false)
-    expect(motivoNoCierra(sinLatente)).toBe(MENSAJE_LATENTE)
+    expect(motivoNoCierra(sinLatente)).toBe('Falta la causa latente: toca una causa y cámbiale el nivel a Latente.')
+    expect(motivoNoCierra(sinLatente)).toBe(MENSAJE_LATENTE_SIN_NIVEL)
   })
 
   it('exige al menos una acción y que tenga texto', () => {
@@ -200,5 +210,23 @@ describe('eventoRequiereAcr', () => {
     expect(eventoRequiereAcr({ tipo: 'rutinario', minutosParada: 5 })).toBe(true)
     expect(eventoRequiereAcr({ tipo: 'rutinario', minutosParada: 0 })).toBe(false)
     expect(eventoRequiereAcr({ tipo: 'inspeccion', minutosParada: null })).toBe(false)
+  })
+})
+
+describe('motivoNoPropone', () => {
+  const vacias = { queSeRompio: 'Resorte roto', porQue: '', queHacemos: '' }
+
+  it('sin la pregunta 2 dice que responda la 2', () => {
+    expect(motivoNoPropone(vacias)).toBe('Para proponer, responde la pregunta 2.')
+    expect(motivoNoPropone({ porQue: '   ', queHacemos: 'Cambiar el resorte' })).toBe('Para proponer, responde la pregunta 2.')
+  })
+
+  it('con la pregunta 2 y sin la 3 dice que responda la 3', () => {
+    expect(motivoNoPropone({ porQue: 'Fatiga', queHacemos: '' })).toBe('Para proponer, responde la pregunta 3.')
+    expect(motivoNoPropone({ porQue: 'Fatiga', queHacemos: '  ' })).toBe('Para proponer, responde la pregunta 3.')
+  })
+
+  it('con las preguntas 2 y 3 respondidas no hay motivo', () => {
+    expect(motivoNoPropone({ porQue: 'Fatiga', queHacemos: 'Cambiar el resorte' })).toBeNull()
   })
 })

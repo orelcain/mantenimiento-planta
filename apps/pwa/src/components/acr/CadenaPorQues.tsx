@@ -15,9 +15,12 @@ import { TONO_NIVEL } from '@/services/acr/acr.types'
 import { MAX_PORQUES, cadenaPorQues } from '@/services/acr/acrLogica'
 import type { PreguntarPorQue } from '@/services/acr/preguntarPorQue'
 
-/** Mismo campo que las preguntas de `AcrRapidoSheet` (copia de la clase, no se exporta de allí). */
+/** Mismo campo que las preguntas de `AcrRapidoSheet` (copia de la clase, no se exporta de allí). `!` gana a `ui/Textarea`. */
 const CAMPO =
-  'w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+  'w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 !text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary !min-h-16'
+
+/** Alto mínimo de todo botón táctil de esta tarjeta (HIG: 44 px). */
+const TACTIL = 'min-h-[44px]'
 
 /** Preferencia de la forma de «ARIA pregunta»: solo cambia el aspecto del botón, nunca llama a la IA. */
 const CLAVE_PREFERENCIA_ARIA = 'acr-porques-modo'
@@ -227,6 +230,15 @@ export function CadenaPorQues({
                     {etiquetaPorQue(numero)}
                   </label>
                   {indiceCandidata === i + 1 && <Pill tone={TONO_NIVEL.latente}>Latente candidata</Pill>}
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    className={`${TACTIL} ml-auto`}
+                    aria-label={`Quitar porqué ${numero}`}
+                    onClick={() => onCambiarExtras(extras.filter((_, j) => j !== i))}
+                  >
+                    Quitar
+                  </Button>
                 </div>
                 <SpeechTextarea
                   id={id}
@@ -237,16 +249,6 @@ export function CadenaPorQues({
                   onChange={(e) => onCambiarExtras(extras.map((v, j) => (j === i ? e.target.value : v)))}
                   className={`${CAMPO} resize-y pr-14`}
                 />
-                <div>
-                  <Button
-                    variant="plain"
-                    size="sm"
-                    aria-label={`Quitar porqué ${numero}`}
-                    onClick={() => onCambiarExtras(extras.filter((_, j) => j !== i))}
-                  >
-                    Quitar
-                  </Button>
-                </div>
               </div>
             )
           })}
@@ -278,15 +280,16 @@ export function CadenaPorQues({
             <Button
               variant="filled"
               size="sm"
+              className={TACTIL}
               disabled={pensandoAria || pregunta == null || respuestaAria.trim() === ''}
               onClick={responder}
             >
               Responder
             </Button>
-            <Button variant="plain" size="sm" onClick={cerrarAria}>
+            <Button variant="plain" size="sm" className={TACTIL} onClick={cerrarAria}>
               Ya llegué a la causa
             </Button>
-            <Button variant="plain" size="sm" onClick={cerrarAria}>
+            <Button variant="plain" size="sm" className={TACTIL} onClick={cerrarAria}>
               Escribo yo
             </Button>
           </div>
@@ -294,25 +297,32 @@ export function CadenaPorQues({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button data-tutorial="t-ypq" variant="tinted" size="sm" disabled={ultimoVacio || llena} onClick={agregar}>
+        <Button data-tutorial="t-ypq" variant="tinted" size="sm" className={TACTIL} disabled={ultimoVacio || llena} onClick={agregar}>
           ＋ ¿Y por qué?
         </Button>
         <span className="text-footnote text-muted-foreground tabular-nums">{`${n} de ${MAX_PORQUES} · opcional`}</span>
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-2 gap-2">
           <Button
             data-tutorial="t-aria-pregunta"
             variant={modoAria ? 'tinted' : 'plain'}
             size="sm"
+            className={`${TACTIL} w-full px-2`}
             disabled={ariaDeshabilitado}
             onClick={() => onAria(true)}
           >
             <Sparkles />
             ARIA pregunta
           </Button>
-          <Button data-tutorial="t-pantalla" variant="plain" size="sm" onClick={() => onPantalla(true)}>
+          <Button
+            data-tutorial="t-pantalla"
+            variant="plain"
+            size="sm"
+            className={`${TACTIL} w-full px-2`}
+            onClick={() => onPantalla(true)}
+          >
             <Maximize2 />
             Pantalla completa
           </Button>
@@ -337,7 +347,7 @@ export function CadenaPorQues({
           </Button>
         }
       >
-        <ol data-tutorial="t-porques-hoja" className="flex flex-col gap-4">
+        <ol data-tutorial="t-porques-hoja" className="flex min-h-[65dvh] flex-col gap-4">
           {todos.map((valor, i) => {
             const numero = i + 1
             const id = `${idBase}-hoja-${numero}`
@@ -369,7 +379,7 @@ export function CadenaPorQues({
         </ol>
         {!llena && (
           <div className="mt-4">
-            <Button variant="tinted" size="sm" disabled={ultimoVacio} onClick={agregar}>
+            <Button variant="tinted" size="sm" className={TACTIL} disabled={ultimoVacio} onClick={agregar}>
               ＋ ¿Y por qué?
             </Button>
           </div>

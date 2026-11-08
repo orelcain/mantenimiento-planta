@@ -610,7 +610,7 @@ export const ACCION_POR_FUERZA: Record<AccionAcr['fuerza'], string> = {
 }
 
 /** Mensaje de ejemplo de lo que falta (capítulo 9). */
-export const MOTIVO_EJEMPLO = 'Falta la causa latente.'
+export const MOTIVO_EJEMPLO = 'Falta la causa latente: toca una causa y cámbiale el nivel a Latente.'
 
 /** Repetición de ejemplo, para la práctica en eventos que no se repiten. */
 export const REPETICION_TUTORIAL: Repeticion = {
