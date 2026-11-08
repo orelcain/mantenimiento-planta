@@ -15,9 +15,12 @@
 import { ListChecks } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Disclosure } from '@/components/piel'
+import { Disclosure, FoldTable, type FoldTableRow } from '@/components/piel'
+import { usePielApple } from '@/hooks/usePielApple'
 import { fmtSecPanoramic, type PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
 import { topCausas, etiquetaDueno } from '@/services/grader/imputacionTopCausas'
+import { SIN_CAUSAL } from '@/services/shoplogix/imputacionPareto'
+import { LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
 
 export type TendenciaImputacion = { dir: 'sube' | 'baja' | 'estable'; deltaPts: number } | null
 
@@ -68,7 +71,9 @@ const BUCKET_FILL: Record<string, string> = {
 }
 
 export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
+  const apple = usePielApple()
   if (!imputacion || imputacion.totalSec <= 0) return null
+  if (apple) return <PorQueSeDetuvoApple imputacion={imputacion} />
 
   const pct = imputacion.cobertura * 100
   const th = nivel(pct)
@@ -203,5 +208,103 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/** Quién responde, por dueño del bucket. Mantención se nombra así (la pantalla lo pide). */
+function duenoApple(b: LossBucket | undefined): string {
+  if (b === 'mantencion') return 'Mantención'
+  const meta = b ? LOSS_BUCKET_META[b as keyof typeof LOSS_BUCKET_META] : undefined
+  return meta?.owner ?? 'Varios'
+}
+
+/** Espacio duro entre el número y el «%»: que no se corte al final de línea. */
+const ESPACIO_DURO = String.fromCharCode(160)
+const pctApple = (frac: number) => `${Math.round(frac * 100)}${ESPACIO_DURO}%`
+
+/**
+ * Piel Apple: «Por qué se detuvo». Tabla con las 3 causales de más tiempo, la de
+ * Mantención siempre visible (si no entró al top, se suma su categoría más grande),
+ * el resto agrupado en «Otras N causales» y el cierre con lo sin anotar.
+ * Todo sale de `topCausas` y `topCategorias`: no se calcula nada nuevo.
+ */
+function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
+  const total = imputacion.totalSec
+  const sinCausalSec = total - imputacion.imputadoSec
+  const tend = tendenciaImputacion(imputacion.porTurno)
+  const mostradas = topCausas(imputacion).map((c) => ({ label: c.label, durationSec: c.durationSec, bucket: c.bucket }))
+  const yaMostradas = new Set(mostradas.map((c) => c.label))
+  const resto = imputacion.topCategorias.filter(
+    (c) => c.label !== SIN_CAUSAL && c.durationSec > 0 && !yaMostradas.has(c.label),
+  )
+  const mantencionFuera = mostradas.some((c) => c.bucket === 'mantencion')
+    ? null
+    : resto.filter((c) => c.bucket === 'mantencion').sort((a, b) => b.durationSec - a.durationSec)[0] ?? null
+  const filas = [...mostradas, ...(mantencionFuera ? [mantencionFuera] : [])]
+    .sort((a, b) => b.durationSec - a.durationSec)
+  const otras = mantencionFuera ? resto.filter((c) => c !== mantencionFuera) : resto
+  const otrasSec = otras.reduce((a, c) => a + c.durationSec, 0)
+
+  const rows: FoldTableRow[] = filas.map((c) => ({
+    id: c.label,
+    destacada: c.bucket === 'mantencion',
+    cells: [c.label, duenoApple(c.bucket), pctApple(c.durationSec / total)],
+  }))
+  if (otras.length > 0 && otrasSec > 0) {
+    rows.push({
+      id: 'otras',
+      cells: [
+        otras.length === 1 ? 'Otra causal' : `Otras ${otras.length} causales`,
+        'Varios',
+        pctApple(otrasSec / total),
+      ],
+    })
+  }
+
+  const cierre: FoldTableRow | undefined = sinCausalSec > 0
+    ? { id: 'sin-anotar', cells: ['Sin anotar', fmtSecPanoramic(sinCausalSec), pctApple(sinCausalSec / total)] }
+    : undefined
+
+  const pctCausa = Math.round(imputacion.cobertura * 100)
+  const tendTxt = tend == null
+    ? ''
+    : tend.dir === 'estable'
+      ? ', estable en el período'
+      : `, ${Math.abs(Math.round(tend.deltaPts))} puntos ${tend.dir === 'sube' ? 'más' : 'menos'} que en la primera mitad del período`
+
+  return (
+    <section className="space-y-2.5">
+      <h2 className="text-headline">Por qué se detuvo</h2>
+      <FoldTable
+        caption="Causas de detención del período"
+        columns={[
+          { id: 'causa', label: 'Causa' },
+          { id: 'dueno', label: 'Quién responde' },
+          { id: 'tiempo', label: 'Tiempo', align: 'right' },
+        ]}
+        rows={rows}
+        cierre={cierre}
+        nota={`${fmtSecPanoramic(total)} detenidas en ${imputacion.turnos} turno${imputacion.turnos === 1 ? '' : 's'}. Con causa anotada: ${pctCausa}${ESPACIO_DURO}%${tendTxt}.`}
+      />
+      {imputacion.topCategorias.length > 0 && (
+        <Disclosure
+          variant="inline"
+          title={`Ver las ${imputacion.topCategorias.length} causales y lo sin anotar`}
+          defaultOpen={false}
+          storageKey="grader-imputacion-causales"
+        >
+          <div className="flex flex-wrap gap-1">
+            {imputacion.topCategorias.slice(0, 5).map((c) => (
+              <span
+                key={c.label}
+                className="text-caption px-2 py-0.5 rounded-full bg-muted text-muted-foreground tabular-nums"
+              >
+                {c.label} <b className="text-foreground/80">{fmtSecPanoramic(c.durationSec)}</b>
+              </span>
+            ))}
+          </div>
+        </Disclosure>
+      )}
+    </section>
   )
 }

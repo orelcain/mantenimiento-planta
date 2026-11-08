@@ -29,6 +29,7 @@ import { LineOeeCard } from '@/components/grader/LineOeeCard'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import { DayTimeSummaryBar } from '@/components/grader/DayTimeSummaryBar'
+import { usePielApple } from '@/hooks/usePielApple'
 import { getPlantLineConfig, getAreaDisplayLabel, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
@@ -85,6 +86,7 @@ export function AnalisisGraderWizardPage() {
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const apple = usePielApple()
 
   // ── Línea/planta activa — persiste en ?linea= ──
   const lineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
@@ -981,12 +983,25 @@ export function AnalisisGraderWizardPage() {
               turno: ahí sumaba las horas de todos los turnos del día contra un
               turno de 8 h, y quedaban dos escalas distintas en la misma
               pantalla ("55 h detenidas" en un turno de 8 h). */}
+          {!apple && (
           <DayTimeSummaryBar
             dateKey={selectedDateKey ?? todayDateKey}
             plantSlug={lineConfig.plantSlug}
             enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
           />
+          )}
         </div>
+
+        {/* Piel Apple: la barra del día va a todo el ancho, después de los indicadores
+            en el móvil y debajo de las dos columnas en PC (`lg:order-last`). */}
+        {apple && (
+          <DayTimeSummaryBar
+            className="lg:col-span-2 lg:order-last"
+            dateKey={selectedDateKey ?? todayDateKey}
+            plantSlug={lineConfig.plantSlug}
+            enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+          />
+        )}
 
         {/* Col derecha: Resumen del mes — arranca a la altura de las pestañas */}
         <GraderMonthlyStatsPanel

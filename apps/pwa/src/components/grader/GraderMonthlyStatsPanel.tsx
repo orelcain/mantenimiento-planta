@@ -14,6 +14,7 @@ import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
 import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { ImputacionPeriodCard } from './ImputacionPeriodCard'
+import { usePielApple } from '@/hooks/usePielApple'
 import { Link } from 'react-router-dom'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 
@@ -39,8 +40,20 @@ interface Props {
   plantSlug?: string | null
 }
 
+/** Fecha del turno como se dice en planta: «miércoles 4 mañana». */
+function fechaTurnoApple(dateKey: string, shiftId: string): string {
+  const dia = new Date(`${dateKey}T12:00:00`).toLocaleDateString('es-CL', { weekday: 'long' })
+  const numero = Number(dateKey.slice(8, 10))
+  const meta = getShiftMeta(shiftId)
+  const periodo = meta.period === 'mañana' || meta.period === 'tarde' || meta.period === 'noche'
+    ? meta.period
+    : meta.shortLabel
+  return `${dia} ${numero} ${periodo}`
+}
+
 export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isClassificationPlant = true, tieneGrader = true, plantSlug = null }: Props) {
   const monthLabel = `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`
+  const apple = usePielApple()
 
   const stats = useMemo(() => {
     const valid = summaries.filter(s => s.totalPieces > 0)
@@ -139,6 +152,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       ? { value: `${slxStats.worstShift.uptimePct.toFixed(0)}%`, metric: 'uptime', date: `${slxStats.worstShift.dateKey.slice(5)} · ${shortShiftLabel(slxStats.worstShift.shiftId)}` }
       : null
 
+  // Turno de referencia (fecha + turno) de mejor y peor: la piel Apple lo escribe como «miércoles 4 mañana».
+  const bestRef = stats
+    ? { dateKey: stats.best.primaryDateKey, shiftId: stats.best.shiftId }
+    : slxStats?.bestShift ? { dateKey: slxStats.bestShift.dateKey, shiftId: slxStats.bestShift.shiftId } : null
+  const worstRef = stats
+    ? { dateKey: stats.worst.primaryDateKey, shiftId: stats.worst.shiftId }
+    : slxStats?.worstShift ? { dateKey: slxStats.worstShift.dateKey, shiftId: slxStats.worstShift.shiftId } : null
+
   /*
    * Día/Noche del Excel: se cuentan por shiftId EXACTO ('Turno día' /
    * 'Turno noche'). Chonchi dejó de emitir esos nombres —ahora manda
@@ -171,6 +192,61 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
     // (Mejor/Peor turno) aparecen cortadas al scrollear. 4.5rem = 56px header + 16px gap.
     <div className="space-y-2 lg:sticky lg:top-[4.5rem]">
 
+      {apple ? (
+        <>
+          {/* Piel Apple: causas primero (lo que pide la conversación), después el mes. */}
+          {slxStats?.imputacion && <ImputacionPeriodCard imputacion={slxStats.imputacion} />}
+          <section className="space-y-2">
+            <h2 className="text-headline">{`${monthLabel}, ${turnosCount} ${turnosCount === 1 ? 'turno' : 'turnos'}`}</h2>
+            <table className="w-full text-subhead tabular-nums">
+              <tbody>
+                {slxStats && (
+                  <tr className="border-b border-border">
+                    <th scope="row" className="py-2.5 pr-3 text-left font-normal text-muted-foreground">Uptime promedio</th>
+                    <td className="py-2.5 text-right">{`${slxStats.avgUptimePct.toFixed(0)}%`}</td>
+                  </tr>
+                )}
+                {best && bestRef && (
+                  <tr className="border-b border-border">
+                    <th scope="row" className="py-2.5 pr-3 text-left font-normal text-muted-foreground">{`Mejor turno (${best.metric})`}</th>
+                    <td className="py-2.5 text-right">{`${best.value}, ${fechaTurnoApple(bestRef.dateKey, bestRef.shiftId)}`}</td>
+                  </tr>
+                )}
+                {worst && worstRef && (
+                  <tr className="border-b border-border">
+                    <th scope="row" className="py-2.5 pr-3 text-left font-normal text-muted-foreground">{`Peor turno (${worst.metric})`}</th>
+                    <td className="py-2.5 text-right">{`${worst.value}, ${fechaTurnoApple(worstRef.dateKey, worstRef.shiftId)}`}</td>
+                  </tr>
+                )}
+                {slxStats && (
+                  <tr>
+                    <th scope="row" className="py-2.5 pr-3 text-left font-normal text-muted-foreground">Ciclos Baader</th>
+                    <td className="py-2.5 text-right">{slxStats.totalCycles.toLocaleString('es-CL')}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+          {/* El P0 del Grader no está en el informe de una columna todavía: se conserva tal cual. */}
+          {tieneGrader && (
+            <Card className={stats ? '' : 'opacity-40'}>
+              <CardContent className="pt-2 pb-2 px-3">
+                <p className="text-caption text-muted-foreground mb-0.5">P0% promedio</p>
+                <p className="text-xl font-bold leading-none tabular-nums text-foreground">
+                  {stats ? `${fmtDec(stats.p0Avg, 2)}%` : 'sin datos'}
+                </p>
+                {stats && (
+                  <p className="text-caption text-muted-foreground mt-0.5 leading-snug">
+                    {fmt(stats.totalPieces)} pz
+                    {stats.totalWeightKg > 0 && <>, {fmtDec(stats.totalWeightKg / 1000, 1)} t</>}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      ) : (
+        <>
       {/* ── Header ── */}
       <div>
         <p className="text-caption text-muted-foreground font-semibold tracking-wide">Resumen del mes</p>
@@ -257,6 +333,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           </CardContent>
         </Card>
       </div>
+
+        </>
+      )}
 
       {/* ── Fila 3: Distribución de turnos —
           Chonchi (clasificadora) → Día / Noche.
@@ -368,7 +447,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           mejorando turno a turno. Es el número que la capacitación de
           imputación tiene que mover; sin causal, el tiempo perdido no se le
           puede atribuir a nadie. Se oculta si el período no trae agregados. */}
-      {slxStats?.imputacion && (
+      {slxStats?.imputacion && !apple && (
         <ImputacionPeriodCard imputacion={slxStats.imputacion} />
       )}
 
