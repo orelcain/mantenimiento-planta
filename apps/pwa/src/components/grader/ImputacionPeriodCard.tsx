@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { Disclosure, FoldTable, type FoldTableRow } from '@/components/piel'
 import { usePielApple } from '@/hooks/usePielApple'
 import { fmtSecPanoramic, type PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
+import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { topCausas, etiquetaDueno } from '@/services/grader/imputacionTopCausas'
 import { SIN_CAUSAL } from '@/services/shoplogix/imputacionPareto'
 import { LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
@@ -262,7 +263,7 @@ function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
   }
 
   const cierre: FoldTableRow | undefined = sinCausalSec > 0
-    ? { id: 'sin-anotar', cells: ['Sin anotar', fmtSecPanoramic(sinCausalSec), pctApple(sinCausalSec / total)] }
+    ? { id: 'sin-anotar', cells: ['Sin anotar', fmtDurationSec(sinCausalSec), pctApple(sinCausalSec / total)] }
     : undefined
 
   const pctCausa = Math.round(imputacion.cobertura * 100)
@@ -284,7 +285,7 @@ function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
         ]}
         rows={rows}
         cierre={cierre}
-        nota={`${fmtSecPanoramic(total)} detenidas en ${imputacion.turnos} turno${imputacion.turnos === 1 ? '' : 's'}. Con causa anotada: ${pctCausa}${ESPACIO_DURO}%${tendTxt}.`}
+        nota={`${fmtDurationSec(total)} detenidas en ${imputacion.turnos} turno${imputacion.turnos === 1 ? '' : 's'}. Con causa anotada: ${pctCausa}${ESPACIO_DURO}%${tendTxt}.`}
       />
       {imputacion.topCategorias.length > 0 && (
         <Disclosure
@@ -299,7 +300,7 @@ function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
                 key={c.label}
                 className="text-caption px-2 py-0.5 rounded-full bg-muted text-muted-foreground tabular-nums"
               >
-                {c.label} <b className="text-foreground/80">{fmtSecPanoramic(c.durationSec)}</b>
+                {c.label} <b className="text-foreground/80">{fmtDurationSec(c.durationSec)}</b>
               </span>
             ))}
           </div>

@@ -53,16 +53,32 @@ describe('GraderMonthlyStatsPanel · piel Apple', () => {
 
   it('el mejor y el peor turno se escriben con día de la semana, número y turno', () => {
     const { container } = panel()
-    const texto = container.textContent ?? ''
-    expect(texto).toContain('Mejor turno (uptime)83%, miércoles 4 mañana')
-    expect(texto).toContain('Peor turno (uptime)49%, viernes 6 tarde')
+    const texto = (container.textContent ?? '').split(String.fromCharCode(160)).join(' ')
+    expect(texto).toContain('Mejor turno83 % de uptime, miércoles 4 mañana')
+    expect(texto).toContain('Peor turno49 % de uptime, viernes 6 tarde')
     expect(texto).not.toContain('11-04')
+  })
+
+  it('sin dato de P0 no se dibuja la fila, aunque la planta tenga Grader', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <GraderMonthlyStatsPanel
+          currentMonth={new Date(2026, 10, 1)}
+          summaries={[]}
+          slxStats={slxStats}
+          isClassificationPlant={true}
+          tieneGrader={true}
+          plantSlug={null}
+        />
+      </MemoryRouter>,
+    )
+    expect(container.textContent ?? '').not.toContain('P0 % promedio')
   })
 
   it('la tabla trae uptime promedio y ciclos, sin marco', () => {
     const { container } = panel()
-    const texto = container.textContent ?? ''
-    expect(texto).toContain('Uptime promedio76%')
+    const texto = (container.textContent ?? '').split(String.fromCharCode(160)).join(' ')
+    expect(texto).toContain('Uptime promedio76 %')
     expect(texto).toContain('Ciclos Baader176.900')
     expect(container.querySelector('table')?.className).not.toContain('border')
   })
