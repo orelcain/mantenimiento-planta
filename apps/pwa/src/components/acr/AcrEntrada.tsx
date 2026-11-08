@@ -12,22 +12,41 @@ import type { Acr, EventoRefAcr } from '@/services/acr/acr.types'
 import { logger } from '@/lib/logger'
 import { AcrRapidoSheet } from './AcrRapidoSheet'
 import { AcrLectura } from './AcrLectura'
+import { PREGUNTA_TUTORIAL, PROPUESTA_TUTORIAL, REPETICION_TUTORIAL } from './tutorialAcr'
 
 /** Ventana del detector de repetición (SPEC_ACR_R1.md §2). */
 const DIAS_REPETICION = 30
 
+/**
+ * Vitrina `/dev/bitacora`: la hoja del evento real con datos de ejemplo, sin Firestore ni sesión.
+ * `import.meta.env.DEV` la deja fuera de la versión publicada.
+ */
+const EN_VITRINA =
+  import.meta.env.DEV && typeof window !== 'undefined' && window.location.pathname.includes('/dev/bitacora')
+const PROPS_VITRINA = EN_VITRINA
+  ? {
+      onGuardar: () => {},
+      proponer: () => Promise.resolve({ ...PROPUESTA_TUTORIAL, modelo: 'vitrina' }),
+      preguntar: () => Promise.resolve(PREGUNTA_TUTORIAL),
+    }
+  : {}
+
 export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
-  const [acrs, setAcrs] = useState<Acr[] | null>(null)
+  const [acrs, setAcrs] = useState<Acr[] | null>(EN_VITRINA ? [] : null)
   const [recientes, setRecientes] = useState<EventoRepeticion[] | null>(null)
   const [vista, setVista] = useState<'ninguna' | 'editor' | 'lectura'>('ninguna')
   /** Sin permiso de lectura (p. ej. técnico con pase de Bitácora) la fila no se muestra. */
   const [sinAcceso, setSinAcceso] = useState(false)
 
-  useEffect(() => escucharAcrDeEvento(evento.id, setAcrs, () => setSinAcceso(true)), [evento.id])
+  useEffect(
+    () => (EN_VITRINA ? undefined : escucharAcrDeEvento(evento.id, setAcrs, () => setSinAcceso(true))),
+    [evento.id],
+  )
 
   // Eventos de los últimos 30 días para ver si la falla se repite. Si la lectura falla, no hay
   // aviso de repetición: se registra y el resto de la fila sigue igual.
   useEffect(() => {
+    if (EN_VITRINA) return undefined
     let vivo = true
     listarEventosRecientes(DIAS_REPETICION)
       .then((lista) => { if (vivo) setRecientes(lista) })
@@ -41,7 +60,11 @@ export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
   }, [])
 
   const repeticion = useMemo<Repeticion | null>(
-    () => (aplicaAnalisis(evento) && recientes ? detectarRepeticion(evento, recientes) : null),
+    () => {
+      if (!aplicaAnalisis(evento)) return null
+      if (EN_VITRINA) return REPETICION_TUTORIAL
+      return recientes ? detectarRepeticion(evento, recientes) : null
+    },
     [evento, recientes],
   )
 
@@ -68,6 +91,7 @@ export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
           evento={evento}
           acrExistente={acr}
           repeticion={repeticion}
+          {...PROPS_VITRINA}
         />
       )}
       {vista === 'lectura' && acr && (
@@ -143,6 +167,7 @@ export function FilaAnalisis({ acr, cargando, aplica, repeticion, onVer, onAnali
         >
           <Pill tone="warning">Se repite</Pill>
           <span className="text-body text-foreground">{repeticion.resumen}</span>
+          <span className="text-body font-semibold text-primary">Analizar causa ›</span>
         </button>
       </ListGroup>
     )

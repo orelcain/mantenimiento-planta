@@ -666,7 +666,8 @@ export function AcrRapidoSheet({
           </label>
           <textarea
             id={`${idPiezas}-q1`}
-            rows={2}
+            // Viene llena desde la Bitácora: que se lea entera sin desplazarse dentro del campo.
+            rows={Math.min(6, Math.max(2, Math.ceil(r.queSeRompio.length / 32)))}
             maxLength={2000}
             value={r.queSeRompio}
             onChange={(e) => cambiarRespuesta('queSeRompio', e.target.value)}
