@@ -6,6 +6,7 @@
  * texto del mockup R1 («a validar en terreno»); no son dato verificado. El evento sale del mockup
  * (7 min, «Se corta resorte ingreso chapaleta baader 1…», turno 24-09-2026). Sin Firestore.
  */
+import { dec2 } from '@/utils/formatoNumeros'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, ListCell, ListGroup } from '@/components/piel'
 import { AcrRapidoSheet } from '@/components/acr/AcrRapidoSheet'
@@ -252,7 +253,7 @@ function TablaSincronia({ filas }: { filas: ResultadoGesto[] }) {
                   </td>
                   <td className="py-1 pr-3">{f.id}</td>
                   <td className="py-1 pr-3">{f.tipo}</td>
-                  <td className="py-1 pr-3">{f.desfase === null ? '—' : `${f.desfase.toFixed(2)} s`}</td>
+                  <td className="py-1 pr-3">{f.desfase === null ? '—' : `${dec2(f.desfase)} s`}</td>
                   <td className="py-1">{f.fallas.join('; ')}</td>
                 </tr>
               ))}

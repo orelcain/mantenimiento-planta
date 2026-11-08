@@ -6,6 +6,7 @@
  * atiende ese control (el propio, un hijo o el padre directo) y no la barra de ARIA u otra capa;
  * 4) el instante del audio que suena está a ≤ 0,35 s del esperado (cuando no habla el respaldo).
  */
+import { dec2 } from '@/utils/formatoNumeros'
 import type { GestoTutorial } from './tutorialAcr'
 
 const ESPERA_REVISION_MS = 700
@@ -57,7 +58,7 @@ function revisar(g: GestoTutorial): ResultadoGesto {
     }
   }
   if (desfase !== null && Math.abs(desfase) > TOLERANCIA_SEG) {
-    fallas.push(`desfase de ${desfase.toFixed(2)} s (tolerancia ${TOLERANCIA_SEG} s)`)
+    fallas.push(`desfase de ${dec2(desfase)} s (tolerancia ${dec2(TOLERANCIA_SEG)} s)`)
   }
   return {
     indice: g.indice,
