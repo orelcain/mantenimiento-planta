@@ -276,6 +276,7 @@ export function AcrRapidoSheet({
       open={open}
       onClose={cerrarHoja}
       surface="grouped"
+      size="wide"
       title="Causa raíz"
       description={`${acr.equipo} · ${fechaCorta(acr.fechaTurno)} · ${minutos}`}
       headerAction={
@@ -301,7 +302,9 @@ export function AcrRapidoSheet({
         </div>
       }
     >
-      <div className="flex flex-col gap-5">
+      {/* Celular: una columna en este orden. PC (lg): izquierda = preguntas; derecha = propuesta. */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
+        <div className="flex flex-col gap-5">
         {repeticion && (
           <ListGroup>
             <div className="flex flex-col gap-2 px-4 py-3">
@@ -355,6 +358,8 @@ export function AcrRapidoSheet({
           />
         </section>
 
+        </div>
+        <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2.5">
           <Button variant="tinted" disabled={!puedeProponer} onClick={proponerConIA}>
             Proponer causas
@@ -402,6 +407,7 @@ export function AcrRapidoSheet({
                 value={nivelQ2}
                 onChange={fijarNivelQ2}
                 segments={NIVEL_SEGMENTOS}
+                className="lg:max-w-[320px]"
               />
               <p className="text-footnote font-semibold text-foreground">Fuerza de la acción</p>
               <SegmentedControl
@@ -409,6 +415,7 @@ export function AcrRapidoSheet({
                 value={(fuerzaQ3 ?? '') as FuerzaAccion}
                 onChange={fijarFuerzaQ3}
                 segments={FUERZA_SEGMENTOS}
+                className="lg:max-w-[320px]"
               />
               <p className="text-footnote text-muted-foreground">{AYUDA_FUERZA}</p>
             </div>
@@ -440,6 +447,7 @@ export function AcrRapidoSheet({
             onCambiar={(v) => cambiar((a) => ({ ...a, piezaGuardada: v }))}
           />
         </ListGroup>
+        </div>
       </div>
 
       {itemEditado && editando && (

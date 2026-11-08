@@ -45,6 +45,7 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
       open={open}
       onClose={onClose}
       surface="grouped"
+      size="wide"
       title="Análisis de causa raíz"
       description={`${acr.equipo} · ${fechaCorta(acr.fechaTurno)} · ${minutos}`}
       actions={
@@ -53,15 +54,18 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
         </Button>
       }
     >
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
+      {/* Celular: una columna en el orden de siempre. PC (lg): izquierda = definición, evidencia y
+          verificación; derecha = causas y acciones. Cada bloque fija su celda para que el orden
+          del celular no cambie. */}
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+        <div className="flex flex-col gap-2 lg:col-start-1 lg:row-start-1">
           <p className="text-body text-foreground">{acr.definicion}</p>
           <p className="text-footnote text-muted-foreground">
             Estado: {acr.estado === 'cerrado' ? 'cerrado' : 'borrador'}
           </p>
         </div>
 
-        <ListGroup title="Evidencia">
+        <ListGroup title="Evidencia" className="lg:col-start-1 lg:row-start-2">
           {acr.evidencias.length === 0 && (
             <ListCell
               title="Sin fotos"
@@ -83,7 +87,7 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
           )}
         </ListGroup>
 
-        <ListGroup title="Causas">
+        <ListGroup title="Causas" className="lg:col-start-2 lg:row-start-1">
           {acr.causas.length === 0 && <ListCell title="Sin causas registradas" />}
           {acr.causas.map((c) => (
             <div key={c.id} className="flex flex-col gap-1.5 px-4 py-3">
@@ -97,6 +101,7 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
         </ListGroup>
 
         <ListGroup
+          className="lg:col-start-2 lg:row-start-2"
           title="Acciones"
           footer={
             fuerza.fuertePct == null
@@ -119,7 +124,7 @@ export function AcrLectura({ open, onClose, acr, onEditar }: AcrLecturaProps) {
           ))}
         </ListGroup>
 
-        <ListGroup title="Verificación">
+        <ListGroup title="Verificación" className="lg:col-start-1 lg:row-start-3">
           <ListCell title={acr.verificacion.criterio} subtitle={`${acr.verificacion.dias} días`} />
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <span className="text-body text-foreground">Resultado</span>

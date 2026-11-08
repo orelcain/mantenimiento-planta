@@ -30,6 +30,12 @@ export interface RevisionSemanalSheetProps {
 }
 
 const ORDEN: Record<FuerzaAccion, number> = { debil: 0, media: 1, fuerte: 2 }
+
+/** Columnas de la tabla en PC. La de fuerza mide 320 px fijos: el selector no se estira. */
+const COLUMNAS_PC = (conFuerza: boolean) =>
+  conFuerza
+    ? 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.6fr)_320px]'
+    : 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.6fr)]'
 const FUERZA_SEGMENTOS = (['debil', 'media', 'fuerte'] as const).map((f) => ({ value: f, label: ETIQUETA_FUERZA[f] }))
 
 interface FilaRevision {
@@ -74,6 +80,7 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
       open={open}
       onClose={onClose}
       surface="grouped"
+      size="wide"
       title="Revisión semanal"
       description={periodo}
       actions={
@@ -97,16 +104,32 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
           </ListGroup>
         ) : (
           <ListGroup title="Acciones, primero las débiles">
+            {/* PC (lg): tabla Falla · Equipo · Acción · Fuerza. Celular: una columna por fila. */}
+            <div
+              className={`hidden px-4 py-2 text-footnote font-semibold text-muted-foreground lg:grid lg:gap-4 ${COLUMNAS_PC(puedeEditar)}`}
+              aria-hidden="true"
+            >
+              <span>Falla</span>
+              <span>Equipo</span>
+              <span>Acción</span>
+              {puedeEditar && <span>Fuerza</span>}
+            </div>
             {filas.map(({ acr, accion }) => (
-              <div key={accion.id} className="flex flex-col gap-2 px-4 py-3">
-                <div className="flex items-start gap-2">
+              <div
+                key={accion.id}
+                className={`flex flex-col gap-2 px-4 py-3 lg:grid lg:items-center lg:gap-4 ${COLUMNAS_PC(puedeEditar)}`}
+              >
+                <div className="flex items-start gap-2 lg:col-start-3 lg:row-start-1">
                   <Pill tone={TONO_FUERZA[accion.fuerza]} className="shrink-0">
                     {ETIQUETA_FUERZA[accion.fuerza]}
                   </Pill>
                   <p className="text-body text-foreground">{accion.texto}</p>
                 </div>
-                <p className="text-footnote text-muted-foreground">
-                  Falla: {acr.definicion} · Equipo: {acr.equipo}
+                <p className="text-footnote text-muted-foreground lg:col-start-1 lg:row-start-1">
+                  Falla: {acr.definicion}
+                </p>
+                <p className="text-footnote text-muted-foreground lg:col-start-2 lg:row-start-1">
+                  Equipo: {acr.equipo}
                 </p>
                 {puedeEditar && (
                   <SegmentedControl
@@ -114,6 +137,7 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
                     value={accion.fuerza}
                     onChange={(f) => cambiarFuerza(acr.id, accion.id, f)}
                     segments={FUERZA_SEGMENTOS}
+                    className="lg:col-start-4 lg:row-start-1 lg:max-w-[320px]"
                   />
                 )}
               </div>

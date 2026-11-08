@@ -204,7 +204,7 @@ export function AcrDevPage() {
   const [ultimo, setUltimo] = useState<string | null>(null)
 
   return (
-    <div className="mx-auto flex max-w-[40rem] flex-col gap-5 p-4">
+    <div className="flex flex-col gap-5 p-4 lg:px-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-title2 font-semibold text-foreground">Causa raíz (R1)</h1>
         <p className="text-footnote text-muted-foreground">
@@ -212,6 +212,9 @@ export function AcrDevPage() {
         </p>
       </header>
 
+      {/* Celular: una columna. PC (lg): izquierda = evento y filas; derecha = botones de la vitrina. */}
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
+      <div className="flex flex-col gap-5">
       <ListGroup title="Evento de la Bitácora">
         <ListCell
           title={EVENTO_DEMO.equipo}
@@ -244,6 +247,8 @@ export function AcrDevPage() {
         />
       </section>
 
+      </div>
+      <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2.5">
         <Button variant="tinted" onClick={() => setVista('r1')}>
           Tarjeta R1 (3 preguntas)
@@ -265,6 +270,9 @@ export function AcrDevPage() {
         Causas, acciones y la propuesta de la IA son el texto del mockup R1: a validar en terreno. La IA es simulada
         (600 ms). El caso real tiene una foto en la Bitácora; esta vitrina no la carga.
       </p>
+
+      </div>
+      </div>
 
       {vista === 'r1' && (
         <AcrRapidoSheet
