@@ -11,6 +11,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-07 · codex · Jack-Knife ronda 3, etapas 1 y 2
+- Hecho: ruta y menú propios, enlace desde período, filtros compactos, titular por turno, listas breves y detalle plegable. Gráfico log-log con línea de disponibilidad, límites base escalados, fantasmas/flechas, radios por raíz de minutos y etiquetas selectivas. Prioridades y comparación corregidas. Lámina clara única con QR, PNG y PDF horizontal; retirado PDF largo sin consumidores.
+- Archivos: App/MainLayout/GraderMonthlyStatsPanel, JackKnifePage, JackKnifeCard/Grafico/Listas/Lamina, jackKnifeLayout/Presentacion, servicios shoplogix/jackKnife y grader/jackKnifeExport, pruebas JackKnife y memoria .ai.
+- Decisiones: sin eventos base se recalculan límites y se omite el porcentaje indefinido, conservando conteos; lb en el hash reproduce el interruptor del QR. Comentarios de lámina limitados a dos líneas; detalle íntegro en la app.
+- Verificación: 913 tests verdes en 73 archivos; ESLint sin errores ni avisos en archivos tocados. TypeScript (npx tsc --noEmit -p .): sin errores, exit 0. Sin servidor ni revisión visual, por pedido explícito.
+- Entorno: git pull --ff-only bloqueado al escribir FETCH_HEAD fuera del worktree. Vitest estándar bloqueado por .vite-temp en node_modules compartido; se ejecutó con --configLoader runner y copia temporal idéntica de vite.config sustituyendo __dirname por process.cwd(), sin cambiar configuración versionada.
+- Estado: HECHO; pendiente revisión visual de Orel. Sin commit/push ni cambios en functions, scripts o Firestore. SPEC_JK3.md retirado al terminar según su instrucción.
+
 ## 2026-11-04 · Claude + Codex · Grader: «detención» en vez de «paro» y una prueba que lo vigila (v4.15.3)
 - Hecho: `components/grader/__tests__/vocabularioGrader.test.ts` lee `components/grader`, `pages/AnalisisGrader` y `services/grader` con el parser de TypeScript y revisa solo literales, plantillas y texto JSX (no comentarios, identificadores, imports ni tipos) contra `PROHIBIDAS`; las claves internas van con `vocab-ok` en su línea (`paro_sensor` de Firestore y 3 comparaciones del `PauseTier` `'parada'`). Partió con 125 hallazgos; Codex los corrigió con la concordancia (la detención, ninguna, plurales armados de nuevo, «detenida», «microdetenciones», rótulo del tramo «Detención», PDF sin tildes) y renombró la clave local `'paros'` → `'detenciones'` de `PlantKPIBoard`. `PROHIBIDAS` ahora pide límite de palabra en «azar» («reemplazar» caía como prohibida; Codex lo había esquivado cambiando la palabra, revertido).
 - Verificación: tsc 0; vitest 5508 ok (+2), 8 omitidas; `vite build` ok; eslint 0 errores (los 10 avisos ya estaban en la base); audits sin deuda nueva; sin revisión visual en el navegador (el Grader pide sesión). 6 mutantes atrapados (texto JSX, literal del PDF, plantilla, sin `vocab-ok`, lector ciego al JSX, patrón viejo de «azar»).

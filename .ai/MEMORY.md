@@ -132,3 +132,11 @@ el código. Pendiente menor que sí sigue vivo: `EquipoPlacementTool` + `equipoT
 
 - Textos visibles: detención/detenciones y microdetención/microdetenciones; estados de máquina: detenida/detenido. Conservar las claves compartidas de PauseTier (`parada`) y el origen persistido `paro_sensor`, con excepción `vocab-ok` en su línea. Los PDF sin tildes conservan ese estilo.
 - Lo vigila `components/grader/__tests__/vocabularioGrader.test.ts`: lee `components/grader`, `pages/AnalisisGrader` y `services/grader` con el parser de TypeScript (solo literales, plantillas y texto JSX) y usa el patrón `PROHIBIDAS` de `pages/monitor/__tests__/vocabulario.ts`. Para sumar otra carpeta, agregarla a `CARPETAS`.
+
+## 2026-11-07 · Jack-Knife ronda 3 (worktree, sin commit)
+
+- Página propia /jack-knife, plantas Shoplogix chonchi/yal; el panel mensual solo enlaza.
+- Vista principal breve y detalle plegado; gráfico SVG compartido con lámina clara 1600×1131, exportación PNG/PDF A4 horizontal con QR respetando BASE_URL.
+- Límites base activos por defecto: frecuencia escalada por número de turnos, MTTR fijo. Si la base no tiene eventos se usan límites actuales. El hash conserva lb=0|1.
+- Cinco prioridades; crónicas A/B por igual tiempo detenido. Comparación separa mejoraron, desaparecieron, empeoraron, aparecieron y sin historia (todos los turnos anteriores cargados). Base cero conserva conteos y no inventa porcentaje.
+- Sin cambios en Firestore/backend/scripts. Revisión visual y exportación real pendientes para Orel; no iniciar servidores por instrucción de la tarea.

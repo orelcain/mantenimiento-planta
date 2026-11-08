@@ -134,6 +134,7 @@ const BitacoraTurnoPage = lazyWithReload(() => import('@/pages/BitacoraTurnoPage
 const HistorialBitacoraPage = lazyWithReload(() => import('@/pages/HistorialBitacoraPage').then((mod) => ({ default: mod.HistorialBitacoraPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const HmiGeaPage = lazyWithReload(() => import('@/pages/HmiGeaPage').then((mod) => ({ default: mod.HmiGeaPage })))
+const JackKnifePage = lazyWithReload(() => import('@/pages/JackKnifePage'))
 const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then((mod) => ({ default: mod.HmiGraderPage })))
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
 const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
@@ -1006,6 +1007,7 @@ export function App() {
               </Suspense>
             } />
             {/* Home del módulo = Wizard (upload + calendar + KPIs + config). */}
+            <Route path="jack-knife" element={<Suspense fallback={<LoadingScreen />}><JackKnifePage /></Suspense>} />
             <Route path="analisis-grader" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderWizardPage />

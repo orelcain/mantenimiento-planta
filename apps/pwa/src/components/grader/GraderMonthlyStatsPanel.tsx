@@ -14,7 +14,7 @@ import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
 import { fmtSecPanoramic, type SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { ImputacionPeriodCard } from './ImputacionPeriodCard'
-import { JackKnifeCard } from './JackKnifeCard'
+import { Link } from 'react-router-dom'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 
 const MONTH_NAMES = [
@@ -373,7 +373,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       )}
 
       {/* Jack-Knife de Mantención: junto a la imputación, con la planta del panel. */}
-      {plantSlug && <JackKnifeCard plantSlug={plantSlug} />}
+      {plantSlug && <Link className="block min-h-[52px] py-4 text-accent" to={`/jack-knife#jk=pl=${plantSlug}`}>Jack-Knife de Mantención ›</Link>}
 
       {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ──
           §22 divulgación progresiva: el desglose completo es DETALLE, no dato de

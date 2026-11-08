@@ -23,6 +23,7 @@ import {
   Mail,
   Box,
   BarChart3,
+  ScatterChart,
   Bot,
   CloudSun,
   Droplets,
@@ -113,6 +114,7 @@ const navGroups: NavGroup[] = [
       { name: 'Visor de planta 3D', href: '/map', icon: Building2, module: 'mapa' },
       { name: 'Visor 3D', href: '/visor-3d', icon: Box },
       { name: 'Análisis de turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+      { name: 'Jack-Knife', href: '/jack-knife', icon: ScatterChart, module: 'analisisGrader' },
       { name: 'Clima del puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
       { name: 'Planos de aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
       // HMI Knuro y HMI Grader NO van en el menú: se entra solo desde el Centro de
@@ -530,7 +532,7 @@ export function MainLayout() {
         ])
         setZones(zonesData)
         setEquipment(equipmentData)
-      } catch (error) {
+      } catch {
         // Silenciar errores de carga inicial para no bloquear UI
         logger.warn('Init load error')
       }

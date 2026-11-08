@@ -45,9 +45,10 @@ describe('Chonchi 30 días al 07-11 frente a los 30 anteriores', () => {
     expect(r.minAhora.toFixed(1)).toBe('14.3')
   })
 
-  it('11 causas mejoraron (incluye «sin eventos ahora») y 3 empeoraron', () => {
+  it('9 causas mejoraron, 2 desaparecieron y 3 empeoraron', () => {
     const r = resumenComparacion(ahora, antes, previa)!
-    expect(r.mejoraron).toBe(11)
+    expect(r.mejoraron).toBe(9)
+    expect(r.desaparecieron).toBe(2)
     expect(r.empeoraron).toBe(3)
   })
 

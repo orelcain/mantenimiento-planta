@@ -88,3 +88,5 @@ No tomes una tarea que ya está EN CURSO por otro.
 ## Hecho (reciente)
 
 - [x] Normalización repuestos Fases 0–6 (maestro SAP) + rework UI incrementos 1–7. (claude, 2026-06-12 — ver WORKLOG)
+
+- [ ] **Jack-Knife ronda 3, etapas 1 y 2** — HECHO — codex (pendiente revisión visual de Orel). Rama feat/jack-knife-pagina; sin commit ni push por instrucción explícita.
