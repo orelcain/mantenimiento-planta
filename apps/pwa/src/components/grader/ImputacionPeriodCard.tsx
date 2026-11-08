@@ -215,12 +215,16 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
 /** Quién responde, por dueño del bucket. Mantención se nombra así (la pantalla lo pide). */
 function duenoApple(b: LossBucket | undefined): string {
   if (b === 'mantencion') return 'Mantención'
+  if (b === 'externo') return 'Proceso'
   const meta = b ? LOSS_BUCKET_META[b as keyof typeof LOSS_BUCKET_META] : undefined
   return meta?.owner ?? 'Varios'
 }
 
 /** Espacio duro entre el número y el «%»: que no se corte al final de línea. */
 const ESPACIO_DURO = String.fromCharCode(160)
+/** Rótulo visible de una causal: «Eléctrica o Mecánica» se lee «Eléctrica o mecánica». Solo el texto, no la clave. */
+const rotuloCausaApple = (s: string) => s.replace(/ o Mecánica\b/g, ' o mecánica')
+
 const pctApple = (frac: number) => `${Math.round(frac * 100)}${ESPACIO_DURO}%`
 
 /**
@@ -249,7 +253,7 @@ function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
   const rows: FoldTableRow[] = filas.map((c) => ({
     id: c.label,
     destacada: c.bucket === 'mantencion',
-    cells: [c.label, duenoApple(c.bucket), pctApple(c.durationSec / total)],
+    cells: [rotuloCausaApple(c.label), duenoApple(c.bucket), pctApple(c.durationSec / total)],
   }))
   if (otras.length > 0 && otrasSec > 0) {
     rows.push({

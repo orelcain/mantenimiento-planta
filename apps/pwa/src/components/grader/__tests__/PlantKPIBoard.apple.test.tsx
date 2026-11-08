@@ -98,8 +98,8 @@ describe('PlantKPIBoard · piel Apple', () => {
     expect(detalle.textContent).toContain('18,0 pz/min')
   })
 
-  it('el segmentado de período ocupa el ancho', () => {
+  it('no trae su propio selector de período: lo lleva la página, arriba', () => {
     const { container } = render(<PlantKPIBoard {...props} />)
-    expect(container.querySelector('[role="tablist"]')?.className ?? '').toContain('w-full')
+    expect(container.querySelector('[role="tablist"]')).toBeNull()
   })
 })

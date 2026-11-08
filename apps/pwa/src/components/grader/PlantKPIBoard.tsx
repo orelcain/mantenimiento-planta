@@ -8,7 +8,7 @@
 
 import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
-import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
+import { TrendingUp, AlertTriangle, TrendingDown, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Disclosure, SegmentedControl, FoldTable, Skeleton, SkeletonBloque } from '@/components/piel'
 import { usePielApple } from '@/hooks/usePielApple'
@@ -43,6 +43,12 @@ interface Props {
   selectedDateKey?: string | null
   /** Mes visible en el calendario (para modo Mes). */
   currentMonth?: Date
+  /**
+   * Período controlado desde la página (piel Apple: el período único arriba). Sin
+   * esto, el tablero guarda su propio período, como siempre.
+   */
+  period?: KpiPeriod
+  onPeriodChange?: (p: KpiPeriod) => void
 }
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -183,8 +189,12 @@ export function PlantKPIBoard({
   selectedDateKey = null,
   currentMonth,
   rendimientoPerilla = null,
+  period: periodProp,
+  onPeriodChange,
 }: Props) {
-  const [period, setPeriod] = useState<KpiPeriod>('day')
+  const [periodLocal, setPeriodLocal] = useState<KpiPeriod>('day')
+  const period = periodProp ?? periodLocal
+  const setPeriod = onPeriodChange ?? setPeriodLocal
   const apple = usePielApple()
   const effectiveMonth = currentMonth ?? new Date()
   const lineCfg     = getPlantLineConfig(plantLineId)
@@ -244,8 +254,6 @@ export function PlantKPIBoard({
   if (apple) {
     return (
       <PlantKPIBoardApple
-        period={period}
-        onPeriod={setPeriod}
         kpis={kpis}
         loading={loading}
         error={error}
@@ -552,8 +560,6 @@ interface MachineDiagApple {
 }
 
 interface PlantKPIBoardAppleProps {
-  period: KpiPeriod
-  onPeriod: (p: KpiPeriod) => void
   kpis: KpisPlanta
   loading: boolean
   error: string | null
@@ -579,8 +585,9 @@ function CifraApple({ valor, rotulo, ayuda }: { valor: string; rotulo: string; a
 }
 
 function PlantKPIBoardApple({
-  period, onPeriod, kpis, loading, error, scopeNote, machineDiag,
+  kpis, loading, error, scopeNote, machineDiag,
 }: PlantKPIBoardAppleProps) {
+  const [alcanceAbierto, setAlcanceAbierto] = useState(false)
   const oeeMode = kpis ? resolveOeeTileMode(kpis) : null
   const sinQ = oeeMode?.mode === 'sin-calidad'
   const oeeVal = oeeMode?.value ?? null
@@ -588,14 +595,6 @@ function PlantKPIBoardApple({
 
   return (
     <section aria-label="Indicadores de rendimiento" className="space-y-7">
-      <SegmentedControl
-        ariaLabel="Período de los indicadores"
-        value={period}
-        onChange={onPeriod}
-        segments={PERIODS.map(p => ({ value: p.id, label: p.label }))}
-        className="w-full"
-      />
-
       {loading && (
         <SkeletonBloque label="Cargando indicadores" className="space-y-7">
           <div className="space-y-2">
@@ -712,8 +711,20 @@ function PlantKPIBoardApple({
         </>
       )}
 
-      {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área. */}
-      <p className="text-footnote text-muted-foreground">{scopeNote}</p>
+      {/* Alcance honesto del OEE: es de las evisceradoras, no de toda el área.
+          Va plegado detrás de un ícono de información: la pantalla no lo necesita siempre. */}
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => setAlcanceAbierto((v) => !v)}
+          aria-expanded={alcanceAbierto}
+          aria-label="Alcance de los indicadores"
+          className="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <Info className="h-4 w-4" aria-hidden />
+        </button>
+        {alcanceAbierto && <p className="text-footnote text-muted-foreground">{scopeNote}</p>}
+      </div>
     </section>
   )
 }

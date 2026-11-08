@@ -7,7 +7,11 @@
  * El identificador que se emite (`onSelect`) sigue siendo el `PlantLineId` de la
  * ÁREA (hoja) — el resto del módulo (carga de datos por `?linea=`) no cambia.
  */
+import { useState } from 'react'
+import { ChevronDown, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Sheet } from '@/components/piel'
+import { usePielApple } from '@/hooks/usePielApple'
 import {
   PLANTS,
   getPlantOf,
@@ -27,11 +31,100 @@ interface PlantLineTabsProps {
 export function PlantLineTabs({ selected, onSelect, className }: PlantLineTabsProps) {
   const activePlant = getPlantOf(selected)
   const areas = getAreasOfPlant(activePlant)
+  const apple = usePielApple()
+  const [hojaAbierta, setHojaAbierta] = useState(false)
 
   const handlePlantClick = (plant: PlantId) => {
     if (plant === activePlant || isPlantComingSoon(plant)) return
     const target = getDefaultAreaOfPlant(plant)
     if (target && !target.comingSoon) onSelect(target.id)
+  }
+
+  if (apple) {
+    // Piel Apple: una sola línea-botón «Planta, Área». Al tocarla se abre una hoja
+    // con las dos listas. Las dos filas de chips de la forma anterior no se dibujan.
+    const plantaLabel = PLANTS.find((p) => p.id === activePlant)?.label ?? ''
+    const areaLabel = areas.find((a) => a.id === selected)?.areaLabel ?? ''
+    return (
+      <div className={cn('w-full', className)}>
+        <button
+          type="button"
+          onClick={() => setHojaAbierta(true)}
+          aria-haspopup="dialog"
+          className="flex min-h-11 w-full items-center justify-between gap-3 rounded-ctl bg-muted px-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span className="min-w-0 text-subhead font-semibold">{`${plantaLabel}, ${areaLabel}`}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+
+        <Sheet open={hojaAbierta} onClose={() => setHojaAbierta(false)} title="Planta y área">
+          <div className="space-y-6">
+            <section className="space-y-1" aria-label="Planta">
+              <h3 className="text-footnote text-muted-foreground">Planta</h3>
+              <ul className="divide-y divide-border">
+                {PLANTS.map((p) => {
+                  const soon = isPlantComingSoon(p.id)
+                  const activa = p.id === activePlant
+                  return (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        disabled={soon}
+                        aria-current={activa || undefined}
+                        onClick={() => {
+                          handlePlantClick(p.id)
+                          if (!soon) setHojaAbierta(false)
+                        }}
+                        className="flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left text-subhead disabled:text-muted-foreground/60"
+                      >
+                        <span>{p.label}</span>
+                        {soon ? (
+                          <span className="text-footnote">próximamente</span>
+                        ) : activa ? (
+                          <Check className="h-4 w-4 text-primary" aria-hidden />
+                        ) : null}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+
+            {areas.length > 0 && (
+              <section className="space-y-1" aria-label="Área">
+                <h3 className="text-footnote text-muted-foreground">Área</h3>
+                <ul className="divide-y divide-border">
+                  {areas.map((area) => {
+                    const activa = area.id === selected
+                    return (
+                      <li key={area.id}>
+                        <button
+                          type="button"
+                          disabled={area.comingSoon}
+                          aria-current={activa || undefined}
+                          onClick={() => {
+                            onSelect(area.id)
+                            setHojaAbierta(false)
+                          }}
+                          className="flex min-h-11 w-full items-center justify-between gap-3 py-2 text-left text-subhead disabled:text-muted-foreground/60"
+                        >
+                          <span>{area.areaLabel}</span>
+                          {area.comingSoon ? (
+                            <span className="text-footnote">próximamente</span>
+                          ) : activa ? (
+                            <Check className="h-4 w-4 text-primary" aria-hidden />
+                          ) : null}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            )}
+          </div>
+        </Sheet>
+      </div>
+    )
   }
 
   return (

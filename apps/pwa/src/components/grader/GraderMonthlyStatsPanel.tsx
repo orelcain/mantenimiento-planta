@@ -49,21 +49,25 @@ function fechaTurnoApple(dateKey: string, shiftId: string): string {
   const periodo = meta.period === 'mañana' || meta.period === 'tarde' || meta.period === 'noche'
     ? meta.period
     : meta.shortLabel
-  return `${dia} ${numero} ${periodo}`
+  return `${dia} ${numero}, ${periodo}`
 }
 
 /** Espacio duro antes del «%» (que no se corte al final de línea). */
 const ESPACIO_DURO = String.fromCharCode(160)
 const conEspacioPct = (s: string) => s.replace('%', `${ESPACIO_DURO}%`)
-/** La métrica en palabras de planta: «P0», «uptime». */
-const metricaApple = (m: string) => (m === 'P0%' ? 'P0' : m)
 
-/** Una fila rótulo/valor de la tabla del mes: sin marco, filete fino entre filas. */
-function FilaMesApple({ rotulo, valor }: { rotulo: string; valor: string }) {
+/**
+ * Una fila rótulo/valor de la tabla del mes: sin marco, filete fino entre filas,
+ * 44 px como mínimo. `detalle` es una segunda línea de 13 px bajo el rótulo.
+ */
+function FilaMesApple({ rotulo, valor, detalle }: { rotulo: string; valor: string; detalle?: string }) {
   return (
-    <tr className="border-b border-border last:border-b-0">
-      <th scope="row" className="py-2.5 pr-3 text-left font-normal text-muted-foreground">{rotulo}</th>
-      <td className="py-2.5 text-right">{valor}</td>
+    <tr className="h-11 border-b border-border last:border-b-0">
+      <th scope="row" className="py-2 pr-3 text-left font-normal text-muted-foreground">
+        {rotulo}
+        {detalle && <span className="block text-footnote">{detalle}</span>}
+      </th>
+      <td className="py-2 text-right align-middle">{valor}</td>
     </tr>
   )
 }
@@ -207,7 +211,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
     // top-[4.5rem]: el header global es sticky h-14 (56px) con z-30; si el panel
     // se fija en top-4 (16px) queda DEBAJO del header y sus cards superiores
     // (Mejor/Peor turno) aparecen cortadas al scrollear. 4.5rem = 56px header + 16px gap.
-    <div className="space-y-2 lg:sticky lg:top-[4.5rem]">
+    <div className={apple ? 'space-y-7 lg:sticky lg:top-[4.5rem]' : 'space-y-2 lg:sticky lg:top-[4.5rem]'}>
 
       {apple ? (
         <>
@@ -221,13 +225,15 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 {best && bestRef && (
                   <FilaMesApple
                     rotulo="Mejor turno"
-                    valor={`${conEspacioPct(best.value)} de ${metricaApple(best.metric)}, ${fechaTurnoApple(bestRef.dateKey, bestRef.shiftId)}`}
+                    detalle={fechaTurnoApple(bestRef.dateKey, bestRef.shiftId)}
+                    valor={conEspacioPct(best.value)}
                   />
                 )}
                 {worst && worstRef && (
                   <FilaMesApple
                     rotulo="Peor turno"
-                    valor={`${conEspacioPct(worst.value)} de ${metricaApple(worst.metric)}, ${fechaTurnoApple(worstRef.dateKey, worstRef.shiftId)}`}
+                    detalle={fechaTurnoApple(worstRef.dateKey, worstRef.shiftId)}
+                    valor={conEspacioPct(worst.value)}
                   />
                 )}
                 {/* Un cero no es noticia: el P0 solo se dibuja si hay dato. */}
@@ -235,7 +241,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 {slxStats && <FilaMesApple rotulo="Ciclos Baader" valor={slxStats.totalCycles.toLocaleString('es-CL')} />}
                 {/* Turnos: los de día y noche si la planta clasifica así; si no, T1, T2 y T3 (como la grilla de la piel anterior). */}
                 {(isClassificationPlant && dayShifts + nightShifts > 0) || !useNumberedShiftGrid
-                  ? (dayShifts + nightShifts > 0 && <FilaMesApple rotulo="Turnos de día y de noche" valor={`${dayShifts} y ${nightShifts}`} />)
+                  ? (dayShifts + nightShifts > 0 && <FilaMesApple rotulo="Turnos día y noche" valor={`${dayShifts} y ${nightShifts}`} />)
                   : (t1Shifts + t2Shifts + t3Shifts > 0 && <FilaMesApple rotulo="Turnos T1, T2 y T3" valor={`${t1Shifts}, ${t2Shifts} y ${t3Shifts}`} />)}
                 {slxStats && slxStats.unscheduled.cycles > 0 && (
                   <>
@@ -470,7 +476,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
       )}
 
       {/* Jack-Knife de Mantención: junto a la imputación, con la planta del panel. */}
-      {plantSlug && <Link className="block min-h-[52px] py-4 text-accent" to={`/jack-knife#jk=pl=${plantSlug}`}>Jack-Knife de Mantención ›</Link>}
+      {plantSlug && <Link className={apple ? 'block min-h-11 py-2 text-subhead text-accent' : 'block min-h-[52px] py-4 text-accent'} to={`/jack-knife#jk=pl=${plantSlug}`}>Jack-Knife de Mantención ›</Link>}
 
       {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ──
           §22 divulgación progresiva: el desglose completo es DETALLE, no dato de
