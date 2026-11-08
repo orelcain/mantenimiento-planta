@@ -90,6 +90,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   document.body.innerHTML = ''
+  vi.useRealTimers()
 })
 
 const texto = (el: Element) => el.textContent ?? ''
@@ -202,6 +203,8 @@ describe('MonitorV2 · «El turno» ordenado', () => {
       paradas: {},
       pulsoAtMs: null,
     }
+    /* Reloj quieto: la cola avanza con el tiempo real, y con la CPU ocupada corría entre la lectura de la celda y la del detalle. */
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] })
     const { getByRole, container } = render(<MonitorV2 {...props(0)} repro={{ entrada, tope: armarTope(9690, null) }} />)
     const celda = container.querySelector('.fc-cifra-p')?.textContent
     expect(celda).toBe('8.800')
