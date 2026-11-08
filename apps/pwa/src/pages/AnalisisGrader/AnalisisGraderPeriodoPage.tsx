@@ -51,6 +51,8 @@ import { MaintenanceWorkCard } from '@/components/grader/MaintenanceWorkCard'
 import { useAppStore } from '@/store'
 import { getExecutions, getOverdueTasks } from '@/services/preventive'
 import { computeMaintenanceWork } from '@/services/grader/maintenanceWork'
+import { listarAcrEnRango } from '@/services/acr/acrFirestore'
+import type { Acr } from '@/services/acr/acr.types'
 import type { PreventiveExecution } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -108,9 +110,19 @@ export function AnalisisGraderPeriodoPage() {
       })
     return () => { active = false }
   }, [])
+  // ACR del período (acciones fuertes). Si la consulta falla, queda vacío: ver el reporte
+  // (necesita el índice compuesto de `firestore.indexes.json`).
+  const [acrs, setAcrs] = useState<Acr[]>([])
+  useEffect(() => {
+    let active = true
+    listarAcrEnRango(range.start, range.end)
+      .then((lista) => { if (active) setAcrs(lista) })
+      .catch(() => { if (active) setAcrs([]) })
+    return () => { active = false }
+  }, [range.start, range.end])
   const work = useMemo(
-    () => (workReady ? computeMaintenanceWork(incidents, executions, overdueCount, { start: range.start, end: range.end }) : null),
-    [workReady, incidents, executions, overdueCount, range],
+    () => (workReady ? computeMaintenanceWork(incidents, executions, overdueCount, { start: range.start, end: range.end }, acrs) : null),
+    [workReady, incidents, executions, overdueCount, range, acrs],
   )
 
   // Cargar benchmark una sola vez al montar

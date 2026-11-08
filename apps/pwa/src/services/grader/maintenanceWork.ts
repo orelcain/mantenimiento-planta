@@ -16,6 +16,8 @@
  * Función PURA (testeable sin Firestore); recibe arrays ya cargados + el rango.
  */
 import type { Incident, PreventiveExecution } from '@/types'
+import type { Acr } from '@/services/acr/acr.types'
+import { kpiFuerzaAcciones } from '@/services/acr/acrLogica'
 
 export interface MaintenanceWork {
   // Correctivo (input)
@@ -37,6 +39,10 @@ export interface MaintenanceWork {
   proactivoTrend: 'mejor' | 'igual' | 'peor' | null
   // ¿No vuelve?
   equiposRecurrentes: number // equipos con ≥2 incidencias creadas en el rango
+  // Acciones de ACR (eliminan la causa): % fuertes sobre todas las acciones del período
+  accionesAcr: number // acciones de los ACR con turno en el rango
+  accionesFuertes: number
+  accionesFuertesPct: number | null // null si no hay acciones
 }
 
 const CLOSED = new Set<Incident['status']>(['resuelta', 'cerrada'])
@@ -63,12 +69,14 @@ function asDate(d: Date | string | undefined): Date | null {
  * @param executions Ejecuciones de preventivas (preventiveExecutions).
  * @param vencidasCount  N° de preventivas activas vencidas HOY (de getOverdueTasks()).
  * @param range  { start, end } en 'YYYY-MM-DD' inclusive.
+ * @param acrs   ACR del período (para «Acciones fuertes»). Opcional: sin él, el KPI queda en null.
  */
 export function computeMaintenanceWork(
   incidents: Incident[],
   executions: PreventiveExecution[],
   vencidasCount: number,
   range: { start: string; end: string },
+  acrs: Acr[] = [],
 ): MaintenanceWork {
   const inRange = (k: string | null): boolean => !!k && k >= range.start && k <= range.end
 
@@ -124,6 +132,9 @@ export function computeMaintenanceWork(
   const denom = preventivasCumplidas + preventivasVencidas
   const cumplimientoPct = denom > 0 ? (preventivasCumplidas / denom) * 100 : null
 
+  // Acciones fuertes de los ACR del período (todas las acciones, en borrador o cerradas)
+  const kpiAcr = kpiFuerzaAcciones(acrs, range)
+
   return {
     correctivasResueltas,
     mttrCorrectivoMin,
@@ -138,6 +149,9 @@ export function computeMaintenanceWork(
     proactivoPct,
     proactivoTrend,
     equiposRecurrentes,
+    accionesAcr: kpiAcr.acciones,
+    accionesFuertes: kpiAcr.fuerte,
+    accionesFuertesPct: kpiAcr.fuertePct,
   }
 }
 

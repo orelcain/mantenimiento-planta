@@ -9,7 +9,7 @@
  * Presentacional: recibe `work` ya computado por la página (computeMaintenanceWork).
  */
 import { Card, CardContent, CardHeader, CardTitle, InfoTooltip } from '@/components/ui'
-import { Wrench, Clock, Search, ShieldCheck, TrendingUp, TrendingDown, Repeat, Loader2 } from 'lucide-react'
+import { Wrench, Clock, Search, ShieldCheck, Target, TrendingUp, TrendingDown, Repeat, Loader2 } from 'lucide-react'
 import { maintenanceWorkHeadline, type MaintenanceWork } from '@/services/grader/maintenanceWork'
 
 function fmtMin(min: number | null): string {
@@ -83,7 +83,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
               {maintenanceWorkHeadline(work)}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <Kpi
                 label="Correctivas resueltas"
                 value={String(work.correctivasResueltas)}
@@ -119,6 +119,15 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
                 sub="≥2 incidencias · objetivo: bajar"
                 icon={<Repeat className="w-3.5 h-3.5" />}
                 valueColor="text-foreground"
+              />
+              <Kpi
+                label="Acciones fuertes"
+                value={pct(work.accionesFuertesPct)}
+                sub={work.accionesAcr > 0
+                  ? `${work.accionesFuertes} de ${work.accionesAcr} acciones de ACR · eliminan la causa`
+                  : 'Sin ACR en el período'}
+                icon={<Target className="w-3.5 h-3.5" />}
+                valueColor={work.accionesFuertesPct == null ? undefined : 'text-foreground'}
               />
             </div>
 

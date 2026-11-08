@@ -41,6 +41,8 @@ import { useAuthStore } from '@/store'
 import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { copiaDeOrigen, etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { borrarFotoOEncolar, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
+import { AcrEntrada } from '@/components/acr/AcrEntrada'
+import { eventoRequiereAcr } from '@/services/acr/acrLogica'
 import { SelectorTecnico } from './SelectorTecnico'
 import { SelectorParticipantes } from './SelectorParticipantes'
 import { BuscadorEquipo } from './BuscadorEquipo'
@@ -1767,6 +1769,7 @@ export function EventoBitacoraSheet({
           </p>
         )}
 
+        {evento && eventoRequiereAcr(evento) && <AcrEntrada evento={evento} />}
         {(!esNuevo || existeEnServidor.current) && !puedeEliminar && (
           <p className="text-footnote text-muted-foreground">
             {modoBorrador ? 'Descartarlo' : 'Borrarlo'} solo puede quien lo empezó o un supervisor.
