@@ -326,7 +326,7 @@ export function AcrRapidoSheet({
             maxLength={2000}
             value={r.queSeRompio}
             onChange={(e) => cambiarRespuesta('queSeRompio', e.target.value)}
-            className={`${CAMPO} resize-y`}
+            className={`${CAMPO} resize-y pr-14`}
           />
         </section>
 
@@ -340,7 +340,7 @@ export function AcrRapidoSheet({
             maxLength={2000}
             value={r.porQue}
             onChange={(e) => cambiarRespuesta('porQue', e.target.value)}
-            className={`${CAMPO} resize-y`}
+            className={`${CAMPO} resize-y pr-14`}
           />
         </section>
 
@@ -354,7 +354,7 @@ export function AcrRapidoSheet({
             maxLength={2000}
             value={r.queHacemos}
             onChange={(e) => cambiarRespuesta('queHacemos', e.target.value)}
-            className={`${CAMPO} resize-y`}
+            className={`${CAMPO} resize-y pr-14`}
           />
         </section>
 
@@ -479,7 +479,7 @@ export function AcrRapidoSheet({
                     : { ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, texto: e.target.value } : x)) },
                 )
               }
-              className={`${CAMPO} resize-y`}
+              className={`${CAMPO} resize-y pr-14`}
             />
             {editando.tipo === 'causa' ? (
               <SegmentedControl
