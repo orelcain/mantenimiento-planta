@@ -1,7 +1,7 @@
 /**
  * AcrLectura — opción B del ACR: vista de solo lectura, en grupos (Evidencia, Causas, Acciones,
  * Verificación). Spec: SPEC_ACR.md §5. Mockup aprobado: acr-mockup.html (marco B).
- * El botón «Editar» abre la hoja guiada (AcrSheet); quien monta este componente decide cómo.
+ * El botón «Editar» abre la tarjeta R1 (AcrRapidoSheet); quien monta este componente decide cómo.
  */
 import { Button, ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import {

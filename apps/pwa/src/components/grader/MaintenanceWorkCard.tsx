@@ -10,7 +10,11 @@
  */
 import { Card, CardContent, CardHeader, CardTitle, InfoTooltip } from '@/components/ui'
 import { Wrench, Clock, Search, ShieldCheck, Target, TrendingUp, TrendingDown, Repeat, Loader2 } from 'lucide-react'
+import { useState } from 'react'
 import { maintenanceWorkHeadline, type MaintenanceWork } from '@/services/grader/maintenanceWork'
+import { usePermissions } from '@/hooks/usePermissions'
+import { RevisionSemanalSheet } from '@/components/acr/RevisionSemanalSheet'
+import type { Acr } from '@/services/acr/acr.types'
 
 function fmtMin(min: number | null): string {
   if (min == null) return '—'
@@ -23,19 +27,40 @@ function pct(v: number | null): string {
   return v == null ? '—' : `${Math.round(v)}%`
 }
 
-function Kpi({ label, value, sub, icon, valueColor }: {
-  label: string; value: string; sub: string; icon: React.ReactNode; valueColor?: string
+function Kpi({ label, value, sub, icon, valueColor, onClick }: {
+  label: string; value: string; sub: string; icon: React.ReactNode; valueColor?: string; onClick?: () => void
 }) {
-  return (
-    <div className="rounded-card border border-border bg-muted px-3 py-2.5">
+  const contenido = (
+    <>
       <div className="flex items-center gap-1.5 text-caption text-muted-foreground mb-1">{icon}{label}</div>
       <div className={`text-lg font-semibold tabular-nums leading-none ${valueColor ?? ''}`}>{value}</div>
       <div className="text-caption text-muted-foreground/60 mt-1">{sub}</div>
-    </div>
+    </>
   )
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="rounded-card border border-border bg-muted px-3 py-2.5 text-left min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {contenido}
+      </button>
+    )
+  }
+  return <div className="rounded-card border border-border bg-muted px-3 py-2.5">{contenido}</div>
 }
 
-export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) {
+export function MaintenanceWorkCard({ work, acrs = [], periodo = '' }: {
+  work: MaintenanceWork | null
+  /** ACR del período: la revisión semanal lista sus acciones. */
+  acrs?: Acr[]
+  /** Texto del período para la revisión semanal. */
+  periodo?: string
+}) {
+  const { isSupervisor, isAdmin } = usePermissions()
+  const [revisando, setRevisando] = useState(false)
+
   if (!work) {
     return (
       <Card>
@@ -128,6 +153,7 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
                   : 'Sin ACR en el período'}
                 icon={<Target className="w-3.5 h-3.5" />}
                 valueColor={work.accionesFuertesPct == null ? undefined : 'text-foreground'}
+                onClick={() => setRevisando(true)}
               />
             </div>
 
@@ -138,6 +164,13 @@ export function MaintenanceWorkCard({ work }: { work: MaintenanceWork | null }) 
           </>
         )}
       </CardContent>
+      <RevisionSemanalSheet
+        open={revisando}
+        onClose={() => setRevisando(false)}
+        acrs={acrs}
+        periodo={periodo}
+        puedeEditar={isSupervisor || isAdmin}
+      />
     </Card>
   )
 }

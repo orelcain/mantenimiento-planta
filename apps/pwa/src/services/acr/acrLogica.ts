@@ -1,22 +1,11 @@
 /**
- * Lógica pura del ACR: qué falta para avanzar de paso, cuándo se puede cerrar y el KPI de
- * fuerza de las acciones. Sin Firestore ni React: se prueba en `__tests__/acrLogica.test.ts`.
+ * Lógica pura del ACR: cuándo se puede cerrar y el KPI de fuerza de las acciones. Sin Firestore
+ * ni React: se prueba en `__tests__/acrLogica.test.ts`.
  *
- * Método de 5 pasos (spec SPEC_ACR.md §2): definir → evidencia → analizar → acciones → verificar.
- * Regla de fondo: el ACR no se cierra con una causa humana; tiene que llegar a la latente.
+ * R1 (SPEC_ACR_R1.md §1): la hoja de 5 pasos se retiró. Cerrar pide las 3 respuestas, una causa
+ * latente y una acción. Regla de fondo: el ACR no se cierra con una causa humana.
  */
 import type { Acr, AccionAcr, EventoRefAcr, FuerzaAccion } from './acr.types'
-
-export const PASOS = ['definir', 'evidencia', 'analizar', 'acciones', 'verificar'] as const
-export type Paso = (typeof PASOS)[number]
-
-export const ETIQUETA_PASO: Record<Paso, string> = {
-  definir: 'Definir',
-  evidencia: 'Evidencia',
-  analizar: 'Analizar',
-  acciones: 'Acciones',
-  verificar: 'Verificar',
-}
 
 export const MENSAJE_LATENTE =
   'Falta la causa latente: la que hace que vuelva a pasar. El error humano no es causa raíz.'
@@ -29,49 +18,32 @@ export function eventoRequiereAcr(evento: Pick<EventoRefAcr, 'minutosParada'> & 
   return (TIPOS_CON_ACR as readonly string[]).includes(evento.tipo) || (evento.minutosParada ?? 0) > 0
 }
 
-/** Mensaje en español de lo que impide terminar el paso, o null si ya se puede avanzar. */
-export function faltaParaAvanzar(paso: Paso, acr: Acr): string | null {
-  switch (paso) {
-    case 'definir':
-      return acr.definicion.trim() ? null : 'Escribe qué pasó.'
-    case 'evidencia':
-      return acr.evidencias.length > 0 || acr.piezaGuardada
-        ? null
-        : 'Agrega una foto o marca que la pieza dañada quedó guardada.'
-    case 'analizar':
-      if (acr.causas.length === 0) return 'Agrega al menos una causa.'
-      return acr.causas.some((c) => c.nivel === 'latente') ? null : MENSAJE_LATENTE
-    case 'acciones':
-      if (acr.acciones.length === 0) return 'Agrega al menos una acción.'
-      return acr.acciones.every((a) => a.texto.trim()) ? null : 'Toda acción necesita un texto.'
-    case 'verificar':
-      if (!acr.verificacion.criterio.trim()) return 'Escribe el criterio de verificación.'
-      return acr.verificacion.dias > 0 ? null : 'Los días de verificación tienen que ser mayores que cero.'
-  }
-}
-
-/** Primer paso que todavía no cumple, o null si el ACR está completo. */
-export function primerPasoPendiente(acr: Acr): Paso | null {
-  return PASOS.find((p) => faltaParaAvanzar(p, acr) !== null) ?? null
-}
-
 /**
- * Para saltar de `desde` a `hasta` (puede ser hacia atrás): revisa cada paso que se deja
- * atrás. Devuelve el primero que falta, o null si se puede ir.
+ * Lo primero que impide cerrar el ACR (R1), o null si ya se puede. El orden es el de la tarjeta:
+ * las 3 preguntas, luego la causa latente y por último la acción.
  */
-export function faltaParaIr(acr: Acr, desde: Paso, hasta: Paso): { paso: Paso; mensaje: string } | null {
-  const i = PASOS.indexOf(desde)
-  const j = PASOS.indexOf(hasta)
-  if (j <= i) return null
-  for (const paso of PASOS.slice(i, j)) {
-    const mensaje = faltaParaAvanzar(paso, acr)
-    if (mensaje) return { paso, mensaje }
+export function motivoNoCierra(acr: Acr): string | null {
+  const r = acr.respuestas
+  if (!r?.queSeRompio.trim()) return 'Falta: qué se rompió.'
+  if (!r.porQue.trim()) return 'Falta: por qué se rompió.'
+  if (!r.queHacemos.trim()) return 'Falta: qué hacemos para que no vuelva.'
+  if (!acr.causas.some((c) => c.nivel === 'latente')) return MENSAJE_LATENTE
+  if (acr.acciones.length === 0 || acr.acciones.some((a) => !a.texto.trim())) {
+    return 'Falta una acción con texto y su fuerza.'
   }
   return null
 }
 
 export function puedeCerrar(acr: Acr): boolean {
-  return primerPasoPendiente(acr) === null
+  return motivoNoCierra(acr) === null
+}
+
+/**
+ * ¿Aplica el análisis a este evento? Solo fallas correctivas con detención de máquina (R1).
+ * `eventoRequiereAcr` es más amplio: decide si la fila se monta, por si ya existe un ACR.
+ */
+export function aplicaAnalisis(evento: { tipo: string; minutosParada: number | null }): boolean {
+  return (TIPOS_CON_ACR as readonly string[]).includes(evento.tipo) && (evento.minutosParada ?? 0) > 0
 }
 
 export interface ResumenFuerza {

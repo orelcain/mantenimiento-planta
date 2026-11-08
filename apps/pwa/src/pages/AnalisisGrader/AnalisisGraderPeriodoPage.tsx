@@ -434,7 +434,7 @@ export function AnalisisGraderPeriodoPage() {
           />
 
           {/* ── Trabajo de Mantención (TPM): correctivo → causa raíz → prevención ── */}
-          <MaintenanceWorkCard work={work} />
+          <MaintenanceWorkCard work={work} acrs={acrs} periodo={`${range.start} → ${range.end}`} />
 
           {/* ── Tiempo muerto del período ──────────────────────────────── */}
           <PauseKpiDashboard summaries={allSummaries} />

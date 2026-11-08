@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { Acr, AccionAcr, CausaAcr } from '../acr.types'
 import {
   MENSAJE_LATENTE,
+  aplicaAnalisis,
   eventoRequiereAcr,
-  faltaParaAvanzar,
-  faltaParaIr,
   kpiFuerzaAcciones,
-  primerPasoPendiente,
+  motivoNoCierra,
   puedeCerrar,
   resumenFuerza,
 } from '../acrLogica'
@@ -50,6 +49,11 @@ const accion = (fuerza: AccionAcr['fuerza'], id: string, texto = `acción ${id}`
 
 /** Caso real del mockup: resorte de la chapaleta, 3 acciones (débil, media, fuerte). */
 const CASO_REAL = acrBase({
+  respuestas: {
+    queSeRompio: 'Resorte de ingreso de la chapaleta, cortado',
+    porQue: 'Golpea fuerte, en N3 se puso regulador',
+    queHacemos: 'Regulador de aire en N1 y N2',
+  },
   causas: [causa('fisica', 'c1'), causa('humana', 'c2'), causa('latente', 'c3')],
   acciones: [accion('debil', 'a1'), accion('media', 'a2'), accion('fuerte', 'a3')],
   evidencias: [{ path: 'bitacora/T/E/f.jpg', url: 'https://x/f.jpg', nota: 'Foto', origen: 'bitacora' }],
@@ -126,64 +130,40 @@ describe('resumenFuerza', () => {
   })
 })
 
-describe('faltaParaAvanzar', () => {
-  it('definir: exige texto', () => {
-    expect(faltaParaAvanzar('definir', acrBase({ definicion: '   ' }))).not.toBeNull()
-    expect(faltaParaAvanzar('definir', acrBase())).toBeNull()
+describe('motivoNoCierra y puedeCerrar (R1)', () => {
+  it('el caso real del mockup se puede cerrar; el borrador vacío no', () => {
+    expect(puedeCerrar(CASO_REAL)).toBe(true)
+    expect(motivoNoCierra(CASO_REAL)).toBeNull()
+    expect(puedeCerrar(acrBase())).toBe(false)
   })
 
-  it('piezaGuardada sola habilita evidencia (sin fotos)', () => {
-    expect(faltaParaAvanzar('evidencia', acrBase({ evidencias: [], piezaGuardada: true }))).toBeNull()
-    expect(faltaParaAvanzar('evidencia', acrBase({ evidencias: [], piezaGuardada: false }))).not.toBeNull()
+  it('pide las 3 respuestas, en orden', () => {
+    const sinQue = acrBase({ ...CASO_REAL, respuestas: { ...CASO_REAL.respuestas!, queSeRompio: '  ' } })
+    expect(motivoNoCierra(sinQue)).toBe('Falta: qué se rompió.')
+    const sinPorQue = acrBase({ ...CASO_REAL, respuestas: { ...CASO_REAL.respuestas!, porQue: '' } })
+    expect(motivoNoCierra(sinPorQue)).toBe('Falta: por qué se rompió.')
+    const sinHacer = acrBase({ ...CASO_REAL, respuestas: { ...CASO_REAL.respuestas!, queHacemos: '' } })
+    expect(motivoNoCierra(sinHacer)).toBe('Falta: qué hacemos para que no vuelva.')
   })
 
-  it('una foto sola también habilita evidencia', () => {
-    const conFoto = acrBase({
-      evidencias: [{ path: 'p', url: 'u', nota: '', origen: 'acr' }],
-      piezaGuardada: false,
-    })
-    expect(faltaParaAvanzar('evidencia', conFoto)).toBeNull()
+  it('sin causa latente no cierra, aunque haya física y humana', () => {
+    const sinLatente = acrBase({ ...CASO_REAL, causas: [causa('fisica', 'c1'), causa('humana', 'c2')] })
+    expect(puedeCerrar(sinLatente)).toBe(false)
+    expect(motivoNoCierra(sinLatente)).toBe(MENSAJE_LATENTE)
   })
 
-  it('sin latente bloquea analizar, aunque haya causas físicas y humanas', () => {
-    const sinLatente = acrBase({ causas: [causa('fisica', 'c1'), causa('humana', 'c2')] })
-    expect(faltaParaAvanzar('analizar', sinLatente)).toBe(MENSAJE_LATENTE)
-    expect(faltaParaAvanzar('analizar', CASO_REAL)).toBeNull()
-  })
-
-  it('analizar sin ninguna causa pide una causa antes que la latente', () => {
-    expect(faltaParaAvanzar('analizar', acrBase({ causas: [] }))).toBe('Agrega al menos una causa.')
-  })
-
-  it('acciones: exige al menos una y que todas tengan texto', () => {
-    expect(faltaParaAvanzar('acciones', acrBase({ acciones: [] }))).not.toBeNull()
-    expect(faltaParaAvanzar('acciones', acrBase({ acciones: [accion('fuerte', 'a', '  ')] }))).not.toBeNull()
-    expect(faltaParaAvanzar('acciones', CASO_REAL)).toBeNull()
-  })
-
-  it('verificar: criterio no vacío y días mayores que cero', () => {
-    expect(
-      faltaParaAvanzar('verificar', acrBase({ verificacion: { criterio: '', dias: 60, resultado: 'pendiente' } })),
-    ).not.toBeNull()
-    expect(
-      faltaParaAvanzar('verificar', acrBase({ verificacion: { criterio: 'x', dias: 0, resultado: 'pendiente' } })),
-    ).not.toBeNull()
-    expect(faltaParaAvanzar('verificar', acrBase())).toBeNull()
+  it('exige al menos una acción y que tenga texto', () => {
+    expect(motivoNoCierra(acrBase({ ...CASO_REAL, acciones: [] }))).not.toBeNull()
+    expect(motivoNoCierra(acrBase({ ...CASO_REAL, acciones: [accion('fuerte', 'a', '  ')] }))).not.toBeNull()
   })
 })
 
-describe('cierre y navegación entre pasos', () => {
-  it('el caso real del mockup se puede cerrar; el borrador vacío no', () => {
-    expect(puedeCerrar(CASO_REAL)).toBe(true)
-    expect(puedeCerrar(acrBase())).toBe(false)
-    expect(primerPasoPendiente(acrBase())).toBe('evidencia')
-  })
-
-  it('faltaParaIr revisa cada paso que se deja atrás y permite volver sin revisar', () => {
-    const solo = acrBase()
-    expect(faltaParaIr(solo, 'definir', 'evidencia')).toBeNull()
-    expect(faltaParaIr(solo, 'definir', 'analizar')?.paso).toBe('evidencia')
-    expect(faltaParaIr(solo, 'verificar', 'definir')).toBeNull()
+describe('aplicaAnalisis', () => {
+  it('solo correctivo o falla con detención de máquina (R1)', () => {
+    expect(aplicaAnalisis({ tipo: 'correctivo', minutosParada: 7 })).toBe(true)
+    expect(aplicaAnalisis({ tipo: 'falla', minutosParada: 1 })).toBe(true)
+    expect(aplicaAnalisis({ tipo: 'correctivo', minutosParada: null })).toBe(false)
+    expect(aplicaAnalisis({ tipo: 'rutinario', minutosParada: 5 })).toBe(false)
   })
 })
 

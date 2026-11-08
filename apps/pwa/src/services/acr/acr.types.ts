@@ -64,11 +64,28 @@ export interface Acr {
   createdByNombre: string
   createdAt: Date
   updatedAt: Date
+  // R1 (SPEC_ACR_R1.md §1). Opcionales: los ACR de la opción A no los tienen.
+  /** Las 3 preguntas de la tarjeta R1. */
+  respuestas?: RespuestasAcr
+  /** De dónde salen causas y acciones: la IA o el técnico a mano. */
+  propuesta?: { origen: OrigenPropuesta; modelo: string | null }
+  /** Repetición detectada al abrir el análisis (null o ausente = no se repite). */
+  repeticion?: { eventoIds: string[]; resumen: string } | null
 }
+
+export interface RespuestasAcr {
+  queSeRompio: string
+  porQue: string
+  queHacemos: string
+}
+
+export type OrigenPropuesta = 'ia' | 'manual'
 
 /** Lo que el ACR necesita de un evento de la Bitácora (el evento completo lo cumple). */
 export interface EventoRefAcr {
   id: string
+  /** Tipo del evento (`TipoEvento`): decide si aplica el análisis (R1). */
+  tipo: string
   turnoId: string
   fechaTurno: string
   equipo: string

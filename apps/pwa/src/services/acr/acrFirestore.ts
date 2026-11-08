@@ -10,6 +10,7 @@ import {
   collection,
   doc,
   getDocs,
+  limit,
   onSnapshot,
   query,
   serverTimestamp,
@@ -19,8 +20,10 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
-import { BITACORA_PLANTA } from '@/config/bitacora'
+import { BITACORA_COLECCION, BITACORA_PLANTA } from '@/config/bitacora'
 import { logger } from '@/lib/logger'
+import { fechaLocal } from '@/services/bitacora/turnoMantencion'
+import type { EventoBitacora } from '@/services/bitacora/bitacora.types'
 import type { Acr } from './acr.types'
 
 export const ACR_COLECCION = 'rootCauseAnalysis'
@@ -103,4 +106,27 @@ export async function listarAcrEnRango(start: string, end: string): Promise<Acr[
   )
   const snap = await getDocs(q)
   return snap.docs.map(acrDeSnapshot)
+}
+
+/** Tope de eventos por consulta: con 30 días de turnos sobra; evita una lectura desmedida. */
+const TOPE_EVENTOS_RECIENTES = 1000
+
+/**
+ * Eventos de la Bitácora de los últimos `dias` días (hoy incluido), sin borradores. Un solo
+ * `where` por rango de `fechaTurno`: no pide índice compuesto. Igual que `useHistorialBitacora`,
+ * el `plantId` se filtra en el cliente.
+ */
+export async function listarEventosRecientes(dias: number, hoy: Date = new Date()): Promise<EventoBitacora[]> {
+  const desde = fechaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - dias))
+  const snap = await getDocs(
+    query(
+      collection(db, BITACORA_COLECCION),
+      where('fechaTurno', '>=', desde),
+      where('fechaTurno', '<=', fechaLocal(hoy)),
+      limit(TOPE_EVENTOS_RECIENTES),
+    ),
+  )
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as EventoBitacora)
+    .filter((e) => e.plantId === BITACORA_PLANTA.id && e.estado !== 'borrador')
 }
