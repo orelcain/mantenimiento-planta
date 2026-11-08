@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, Clock3, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { ActionSheet, Button, Sheet } from '@/components/piel'
+import { useEsPC } from '@/hooks/useEsPC'
 import { useToast } from '@/hooks/useToast'
 import {
   AUTOGUARDADO_MS,
@@ -208,6 +209,10 @@ function FilaInterruptor({
 // iOS no haga zoom al enfocar.
 const CAMPO =
   'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+/** Columna de la ventana de PC (mockup A, 08-11-2026). */
+const COLUMNA_PC = 'flex min-w-0 flex-col gap-4 [&>*]:shrink-0'
+/** Quién y turno en PC: filas con filete, sin tarjeta, alineadas al borde de la columna. */
+const FILAS_QUIEN_PC = 'border-b border-border [&>*]:!pl-0 [&>*]:before:!left-0'
 const ETIQUETA_CAMPO = 'mb-1.5 block text-footnote text-muted-foreground'
 
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
@@ -312,6 +317,7 @@ export function EventoBitacoraSheet({
   /** Foto(s) encima del bloque de Fotos, listas para soltar (HIG «Drag and drop»). */
   const [arrastrandoFoto, setArrastrandoFoto] = useState(false)
   /** Cerrar un evento PUBLICADO con cambios sin guardar pide confirmación (HIG «Sheets»). */
+  const esVentana = useEsPC()
   const [confirmarDescarte, setConfirmarDescarte] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** Fotos subidas en ESTA edición: si se cancela, se borran de Storage. */
@@ -1125,12 +1131,550 @@ export function EventoBitacoraSheet({
     }
   }
 
+  /** En PC, una foto sola se ve grande; con varias, todas a tamaño parejo para que quepan. */
+  const fotoGrande = (indice: number) => esVentana && indice === 0 && fotos.length + subidas.length === 1
+  const filaCausaRaiz = evento && eventoRequiereAcr(evento) ? <AcrEntrada evento={evento} comoEnlace={esVentana} /> : null
+  const bloqueQuien = (
+    <>
+        {/* Quién y dónde, en UNA tarjeta de filas (mockup aprobado 19-09-2026, como el
+            editor de eventos del Calendario de iOS): cada fila dice su valor y se abre
+            en su lugar; lo que falta viene abierto. «Quién edita» y «Quién lo registró»
+            eran dos preguntas para el mismo técnico (Orel): queda una, «Técnico» — el
+            autor. Si corrige otro, el «editado por» se toma del nombre que recuerda
+            este teléfono, sin preguntar. */}
+        <div className="flex flex-col gap-1.5">
+          <div className={esVentana ? FILAS_QUIEN_PC : 'overflow-hidden rounded-ctl bg-muted-foreground/10'}>
+            {autorFijo ? (
+              <div className="flex min-h-[44px] items-center gap-3 px-3">
+                <span className="flex-1 text-body">Técnico</span>
+                <span className="text-body text-muted-foreground">{autorFijo}</span>
+              </div>
+            ) : tecnicos.todos.length > 0 ? (
+              <>
+                {filaQuien('tecnico', 'Técnico', valorTecnico || (esNuevo || modoBorrador ? '' : autorVisible(evento!)), !valorTecnico && (esNuevo || modoBorrador))}
+                {abierta === 'tecnico' && (
+                  <div className="px-3 pb-3">
+                    <SelectorTecnico
+                      etiqueta="Técnico"
+                      sinEtiqueta
+                      deTurno={tecnicos.deTurno}
+                      todos={tecnicos.todos}
+                      valor={valorTecnico}
+                      onChange={(n) => {
+                        if (autorEditable) setRegistrador(n)
+                        else setQuien(n)
+                        setAbierta(null)
+                      }}
+                      recordar={!autorEditable}
+                      vacio="Elige al técnico"
+                    />
+                  </div>
+                )}
+              </>
+            ) : null}
+            <label
+              htmlFor={`${campoId}-turno`}
+              className="relative flex min-h-[44px] items-center justify-between gap-3 pl-3 pr-1 before:absolute before:left-3 before:right-0 before:top-0 before:h-px before:bg-muted-foreground/25 before:content-[''] first:before:hidden"
+            >
+              <span className="text-body">Turno</span>
+              <select
+                id={`${campoId}-turno`}
+                value={turnoDestino}
+                onChange={(e) => setTurnoDestino(e.target.value)}
+                className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {opcionesTurno.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {nombreTurnoCorto(t.id)}
+                    {t.id === turnoEnCurso.id ? ' · en curso' : ''}
+                    {t.id === origenPendienteId ? ' · del pendiente' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {tecnicos.todos.length > 0 && (
+              <>
+                {filaQuien('participantes', 'Participaron', participantes.length ? participantes.join(', ') : 'Nadie', false)}
+                {abierta === 'participantes' && (
+                  <div className="px-3 pb-3">
+                    <SelectorParticipantes
+                      sinEtiqueta
+                      presentes={tecnicos.deTurno}
+                      todos={tecnicos.todos}
+                      excluir={quienRegistro}
+                      valor={participantes}
+                      onChange={setParticipantes}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {modoBorrador && evento && autorVisible(evento) !== quien && (
+            <p className="px-3 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
+          )}
+          {autorEditable && evento && registrador && registrador !== registradoEnServidor && (
+            <p className="px-3 text-footnote text-muted-foreground">Hoy figura: {autorVisible(evento)}. Al guardar queda {registrador}.</p>
+          )}
+          {turnoDestino !== turno.id && (
+            <p className="px-3 text-footnote text-muted-foreground">
+              Al {modoBorrador || esNuevo ? 'publicar' : 'guardar'}, el evento pasa al {etiquetaCortaTurno(turnoDestino).toLowerCase()}
+              {turnoDesdeId(turnoDestino) ? ` (${horarioTurno(turnoDesdeId(turnoDestino)!)})` : ''}
+              {origenPendienteId ? ' y el pendiente queda resuelto ahí' : ''}.
+            </p>
+          )}
+        </div>
+    </>
+  )
+  const bloqueTipo = (
+    <>
+        {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de
+            arriba. Los 8 a la vista (en filas): deslizando, «Novedad» no se veía. */}
+        <div>
+          {/* «Tipo» respondía a dos preguntas a la vez (qué pasó y qué se hizo) y
+              había que elegir una: el rótulo ahora dice cuál de las dos. Lo que
+              pasó lo cuenta el impacto, y la falla sale de los dos (18-09-2026). */}
+          <span className={ETIQUETA_CAMPO}>
+            ¿Qué se hizo?
+            {tipo == null && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+          </span>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de evento">
+            {TIPOS_EVENTO.map((t) => (
+              <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
+                {t.id === 'otro' ? 'Otro…' : t.label}
+              </Chip>
+            ))}
+            {/* Un evento guardado con un tipo que ya no se ofrece («Falla», antes del
+                18-09) se abría sin ningún chip marcado: parecía faltar el dato. Se
+                muestra marcado; tocar otro lo cambia (pasada visual 19-09-2026). */}
+            {tipo != null && !TIPOS_EVENTO.some((t) => t.id === tipo) && (
+              <Chip activo onClick={() => undefined}>
+                {etiquetaTipo({ tipo, tipoOtro: null })} (anterior)
+              </Chip>
+            )}
+          </div>
+          {tipo === 'otro' && (
+            <div className="mt-3 flex flex-col gap-2">
+              <label htmlFor="bitacora-tipo-otro" className="sr-only">Escribe el tipo</label>
+              <input
+                id="bitacora-tipo-otro"
+                maxLength={MAX_TIPO_OTRO}
+                className={CAMPO}
+                value={tipoOtro}
+                onChange={(e) => setTipoOtro(e.target.value)}
+                placeholder="Escribe el tipo: mejora, lubricación…"
+                autoCapitalize="sentences"
+              />
+              {tiposSugeridos.length > 0 && (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Tipos ya usados">
+                  {tiposSugeridos.map((t) => (
+                    <Chip key={t} activo={normalizarTipo(t) === normalizarTipo(tipoOtro)} onClick={() => setTipoOtro(t)}>
+                      {t}
+                    </Chip>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+    </>
+  )
+  const bloqueMaquina = (
+    <>
+          <BuscadorEquipo
+            texto={equipo}
+            onChange={(texto, id) => {
+              setEquipo(texto)
+              setEquipoId(id)
+              setEquipoCodigo(id ? (opcionesEquipo.find((o) => o.id === id)?.codigo ?? '') : '')
+            }}
+            opciones={opcionesEquipo}
+            cargando={cargandoEquipos}
+            recientes={equiposSugeridos}
+            vinculado={Boolean(equipoId)}
+          />
+          {equipoId && (opcionElegida || equipoCodigo) && (
+            <p className="-mt-1.5 text-footnote text-muted-foreground">
+              {[opcionElegida?.planta, opcionElegida?.area, etiquetaCodigoEquipo(equipoCodigo)].filter(Boolean).join(' · ')}
+            </p>
+          )}
+    </>
+  )
+  const bloqueFalla = (
+    <>
+          <div>
+            <label htmlFor="bitacora-titulo" className={`${ETIQUETA_CAMPO} flex justify-between gap-2`}>
+              {/* Los rótulos son los de la planilla «Recoleccion MTTR» (Máquina · Falla ·
+                  Observaciones) para que nadie tenga que traducir (Orel, 17-09). */}
+              <span>Falla</span>
+              <span>Opcional · en pocas palabras</span>
+            </label>
+            <input
+              id="bitacora-titulo"
+              maxLength={MAX_TITULO_EVENTO}
+              className={CAMPO}
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ej: Cambio de tubos fluorescentes"
+              autoCapitalize="sentences"
+            />
+          </div>
+    </>
+  )
+  const bloqueHoras = (
+    <>
+          {/* Como «Todo el día» en el Calendario de iOS: esconde las horas. */}
+          <FilaInterruptor activo={sinHora} onCambiar={cambiarSinHora} titulo="Sin hora" />
+          {sinHora ? (
+            // El evento sin hora se ubica ARRASTRÁNDOLO en la lista, que es como
+            // se hace en la práctica: el selector de «Ubicación en el turno»
+            // listaba un chip por evento del turno —seis o más— y lo usó 1 de 22
+            // eventos reales. Se quitó el 18-09-2026; `posicionMin` la sigue
+            // escribiendo el arrastre y editar un evento no la pierde.
+            impacto === 'con-parada' ? (
+              <p className="-mt-1 text-footnote text-muted-foreground">
+                Anota abajo los minutos de parada: sin hora no se pueden calcular.
+              </p>
+            ) : null
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>
+                    Inicio
+                    {horaFaltante && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+                  </label>
+                  {/* HIG «Pickers»: minutos de 5 en 5, que con guantes se acierta. */}
+                  <input id="bitacora-inicio" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} onKeyDown={enterGuarda} />
+                </div>
+                <div>
+                  <label htmlFor="bitacora-termino" className={ETIQUETA_CAMPO}>Término</label>
+                  <input id="bitacora-termino" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} onBlur={validarTermino} onKeyDown={enterGuarda} />
+                </div>
+              </div>
+              {/* El «08:00» de un turno cerrado se leía como un dato real y nadie lo
+                  revisaba (medido 19-09-2026: 27% de los eventos se carga así). Ahora
+                  el campo nace vacío y esto explica por qué. */}
+              {horaFaltante && turnoInicioCerrado && (
+                <p className="-mt-1 text-footnote text-muted-foreground">Ese turno ya terminó: escribe la hora en que empezó de verdad.</p>
+              )}
+              {/* Sin término no hay minutos de parada: 17 de 22 eventos reales se
+                  guardaron sin él (18-09-2026). Un toque lo cierra con la hora
+                  de ahora, que es la que corresponde al salir de la máquina —
+                  pero solo mientras el turno corre: 6 de 15 eventos se cargaron
+                  más de 2 h después, y ahí «ahora» es la hora de carga, no el
+                  término. El rótulo dice la duración para que se vea antes. */}
+              {!horaTermino && terminoSugerido.disponible && (
+                <button
+                  type="button"
+                  onClick={() => setHoraTermino(terminoSugerido.hora)}
+                  className="-mt-1 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 text-footnote font-semibold text-brand-ink transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <Clock3 className="size-4" aria-hidden />
+                  <span>
+                    Terminó ahora · {terminoSugerido.hora} · <span className="tabular-nums">{formatoMinutos(terminoSugerido.minutos)}</span>
+                  </span>
+                </button>
+              )}
+              {/* Cargando tarde, «ahora» ya no es el término: un toque en la
+                  duración lo calcula desde el inicio. Sigue a la vista con el
+                  término puesto, para poder corregir la elección. */}
+              {cargaTardia && (
+                <div className="-mt-1">
+                  <p id="bitacora-cuanto-duro" className={ETIQUETA_CAMPO}>
+                    ¿Cuánto duró?
+                    <span className="sr-only">
+                      {terminoSugerido.motivo === 'turno-terminado'
+                        ? ' Ese turno ya terminó.'
+                        : ` Empezó hace más de ${TOPE_TERMINO_AHORA_MIN / 60} horas.`}
+                    </span>
+                  </p>
+                  <div role="group" aria-labelledby="bitacora-cuanto-duro" className="flex flex-wrap gap-2">
+                    {DURACIONES_SUGERIDAS_MIN.map((n, i) => (
+                      <Chip key={n} activo={duracion === n} onClick={() => setHoraTermino(horaMasMinutos(horaInicio, n) ?? '')}>
+                        <span className="tabular-nums">
+                          {n}
+                          {i === DURACIONES_SUGERIDAS_MIN.length - 1 ? ' min' : <span className="sr-only"> minutos</span>}
+                        </span>
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
+            </>
+          )}
+    </>
+  )
+  const bloqueObservaciones = (
+    <>
+        {/* Qué pasó */}
+        <div>
+          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>
+            Observaciones · qué pasó y qué se hizo
+            {!descripcion.trim() && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
+          </label>
+          <textarea
+            id="bitacora-descripcion"
+            maxLength={3000}
+            className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío."
+          />
+        </div>
+    </>
+  )
+  const bloqueRepuestos = (
+    <>
+        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} favoritos={favoritosRepuestos} />
+    </>
+  )
+  const bloqueImpacto = (
+    <>
+        {/* Impacto en producción */}
+        <div>
+          {(!esVentana || impacto == null) && (
+            <span className={ETIQUETA_CAMPO}>
+              ¿Cómo afectó al proceso?
+              {impacto == null && <span className="ml-1.5 font-normal text-ink-warn">obligatorio</span>}
+            </span>
+          )}
+          {/* Una respuesta por fila, con su ejemplo debajo. Con tres chips en
+              línea y sin explicación, 19 de 22 eventos reales terminaban en
+              «No aplica» — incluida una Baader 142 en falla (18-09-2026). */}
+          <div className={esVentana ? 'flex flex-col' : 'flex flex-col gap-2'} role="group" aria-label="Impacto en el proceso">
+            {IMPACTOS.map((i) => {
+              const activo = impacto === i.id
+              if (esVentana) {
+                return (
+                  <button
+                    key={i.id}
+                    type="button"
+                    aria-pressed={activo}
+                    onClick={() => setImpacto(i.id)}
+                    className="grid min-h-[44px] grid-cols-[22px_minmax(0,1fr)] gap-x-2.5 border-t border-border py-[9px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <span aria-hidden className={`mt-[3px] size-4 rounded-full ${activo ? 'border-[5px] border-primary' : 'border-[1.5px] border-muted-foreground'}`} />
+                    <span className="flex flex-col">
+                      <span className="text-body text-foreground">{i.label}</span>
+                      <span className="text-footnote text-muted-foreground">{i.detalle}</span>
+                    </span>
+                  </button>
+                )
+              }
+              return (
+                <button
+                  key={i.id}
+                  type="button"
+                  aria-pressed={activo}
+                  onClick={() => setImpacto(i.id)}
+                  className={[
+                    'flex min-h-[56px] flex-col justify-center gap-0.5 rounded-card px-4 py-2.5 text-left transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                    activo ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/10 text-foreground',
+                  ].join(' ')}
+                >
+                  <span className="text-subhead font-semibold leading-tight">{i.label}</span>
+                  <span className={`text-footnote leading-tight ${activo ? 'opacity-80' : 'text-muted-foreground'}`}>
+                    {i.detalle}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {impacto === 'con-parada' && (
+            <div className="mt-3">
+              <label htmlFor="bitacora-minutos" className={ETIQUETA_CAMPO}>Minutos de máquina detenida</label>
+              <input
+                id="bitacora-minutos"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={1440}
+                className={`${CAMPO} tabular-nums`}
+                value={minutos}
+                onChange={(e) => setMinutos(e.target.value)}
+                placeholder={duracion != null ? `${duracion} (la duración del evento)` : 'Ej: 35'}
+              />
+              <p className="mt-1.5 text-footnote text-muted-foreground">
+                {sinHora
+                  ? 'Cuenta para el MTTR del turno. Vacío, la parada queda sin duración.'
+                  : 'Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.'}
+              </p>
+            </div>
+          )}
+          {impacto === 'afecta-sin-detener' && (
+            <div className="mt-3">
+              <label htmlFor="bitacora-contingencia" className={ETIQUETA_CAMPO}>¿Qué se hizo para que siguiera?</label>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {CONTINGENCIAS_SUGERIDAS.map((c) => (
+                  <Chip key={c} activo={contingencia === c} onClick={() => setContingencia(c)}>
+                    {c}
+                  </Chip>
+                ))}
+              </div>
+              <input
+                id="bitacora-contingencia"
+                maxLength={120}
+                className={CAMPO}
+                value={contingencia}
+                onChange={(e) => setContingencia(e.target.value)}
+                // El ejemplo va en el placeholder: dice qué escribir Y que se
+                // puede escribir (pedido de Orel, 18-09-2026).
+                placeholder="Ejemplo: se retiran cabezas a mano"
+              />
+              <p className="mt-1.5 text-footnote text-muted-foreground">
+                No suma minutos de parada. Queda registrado que el proceso siguió gracias a Mantención.
+              </p>
+            </div>
+          )}
+          {impacto === 'en-ventana' && (
+            <div className="mt-3">
+              <label htmlFor="bitacora-ventana" className={ETIQUETA_CAMPO}>¿En qué momento se intervino?</label>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {VENTANAS_SUGERIDAS.map((v) => (
+                  <Chip key={v} activo={ventana === v} onClick={() => setVentana(v)}>
+                    {v}
+                  </Chip>
+                ))}
+              </div>
+              <input
+                id="bitacora-ventana"
+                maxLength={120}
+                className={CAMPO}
+                value={ventana}
+                onChange={(e) => setVentana(e.target.value)}
+                placeholder="O escríbelo: durante colación filete…"
+              />
+            </div>
+          )}
+        </div>
+    </>
+  )
+  const bloqueFotos = (
+    <>
+        {/* Fotos */}
+        <div
+          onDragOver={(e) => {
+            // Sin preventDefault el navegador no deja soltar (HIG «Drag and drop»).
+            e.preventDefault()
+            setArrastrandoFoto(true)
+          }}
+          onDragLeave={(e) => {
+            // `dragleave` también salta al pasar sobre un hijo del bloque: sin
+            // este filtro el borde punteado parpadea mientras se arrastra.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastrandoFoto(false)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setArrastrandoFoto(false)
+            alSoltarOPegar(Array.from(e.dataTransfer.files))
+          }}
+          className={arrastrandoFoto ? 'rounded-ctl border-2 border-dashed border-primary/60' : 'border-2 border-dashed border-transparent'}
+        >
+          <span className={ETIQUETA_CAMPO}>Fotos</span>
+          {arrastrandoFoto && <p className="mb-1.5 text-footnote text-muted-foreground">Suelta las fotos aquí</p>}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => alElegir(e.target.files)}
+          />
+          {(fotos.length > 0 || subidas.length > 0) && (
+            <div className="mb-3 grid grid-cols-3 gap-2">
+              {fotos.map((f, indice) => (
+                <figure key={f.path} className={`relative m-0 ${fotoGrande(indice) ? 'col-span-3' : ''}`}>
+                  {/* Ronda 47: la miniatura de 320 px, no la original de 1.600 px — este
+                      grid ya la pinta a ~110 px, y bajar la foto entera se paga en la red
+                      de planta por cada foto del editor, otra vez. */}
+                  <img
+                    src={fotoGrande(indice) ? f.url : (f.thumbUrl ?? f.url)}
+                    alt={ETIQUETA_FOTO[f.etiqueta]}
+                    className={`${fotoGrande(indice) ? 'aspect-[2/1]' : 'aspect-square'} w-full rounded-ctl bg-muted-foreground/10 object-cover`}
+                  />
+                  <figcaption className="pt-1 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
+                  <button
+                    type="button"
+                    onClick={() => quitarFoto(f)}
+                    aria-label={`Quitar foto ${ETIQUETA_FOTO[f.etiqueta]}`}
+                    className="absolute right-0 top-0 flex size-[44px] items-start justify-end p-1.5"
+                  >
+                    <span className="flex size-6 items-center justify-center rounded-full bg-black/60 text-white">
+                      <X className="size-3.5" />
+                    </span>
+                  </button>
+                </figure>
+              ))}
+              {subidas.map((s) => (
+                <div key={s.clave} className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-ctl bg-muted-foreground/10 p-2 text-center">
+                  {s.error ? (
+                    <>
+                      <AlertTriangle className="size-5 text-ink-warn" aria-hidden />
+                      <span className="text-caption text-muted-foreground">{s.error}</span>
+                      {/* min-h-44: piso táctil del HIG (accessibility); con guantes, «Reintentar»
+                          es el botón que más se toca justo cuando la red de planta ya falló. */}
+                      <span className="flex items-center gap-3">
+                        <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-primary">
+                          <RotateCw className="size-3.5" /> Reintentar
+                        </button>
+                        {/* Sin esto, una foto que nunca va a subir (un HEIC, por
+                            ejemplo) obligaba a cancelar el evento entero para
+                            sacarla y se perdía todo lo escrito (revisión 15-09). */}
+                        <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                          <X className="size-3.5" /> Quitar
+                        </button>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+                      <span className="text-caption text-muted-foreground">Subiendo {ETIQUETA_FOTO[s.etiqueta].toLowerCase()}…</span>
+                      <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
+                        <X className="size-3.5" /> Quitar
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            {(['antes', 'despues', 'foto'] as const).map((et) => (
+              <Button key={et} variant="tinted" size="md" className="rounded-ctl px-2" onClick={() => elegirFotos(et)} disabled={fotos.length + subidas.length >= MAX_FOTOS_EVENTO}>
+                <ImagePlus /> {et === 'foto' ? 'Otra' : ETIQUETA_FOTO[et]}
+              </Button>
+            ))}
+          </div>
+        </div>
+    </>
+  )
+  const bloquePendiente = (
+    <>
+        {/* Pendiente */}
+        <FilaInterruptor
+          activo={pendiente}
+          onCambiar={setPendiente}
+          titulo="Queda pendiente"
+          detalle="Sale destacado en el correo para el turno siguiente."
+        />
+    </>
+  )
   return (
     <Sheet
       open={open}
       onClose={cerrarHoja}
       onKeyDown={cmdEnterGuarda}
       size="wide"
+      presentacionPC="ventana"
+      headerAction={esVentana ? filaCausaRaiz : undefined}
+      description={
+        esVentana
+          ? `Turno ${nombreTurnoCorto(turnoDestino).toLowerCase()}.${evento ? ` Registró ${autorVisible(evento)}.` : ''}`
+          : undefined
+      }
       title={
         pendienteOrigen && esNuevo
           ? 'Resolver pendiente'
@@ -1145,7 +1689,7 @@ export function EventoBitacoraSheet({
           {faltaObligatorio && !guardando && (
             <p className="text-footnote font-semibold text-ink-warn">Falta completar: {faltantes.join(', ')}</p>
           )}
-          <div className="flex gap-2.5 [&>*]:flex-1">
+          <div className="flex gap-2.5 [&>*]:flex-1 lg:justify-end lg:[&>*]:flex-none">
             <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
               {modoBorrador ? 'Cerrar' : 'Cancelar'}
             </Button>
@@ -1165,10 +1709,10 @@ export function EventoBitacoraSheet({
     >
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
           overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
-      <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
+      <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0 lg:-mx-2 lg:max-h-none lg:min-h-0 lg:flex-1 lg:px-2">
         {/* Causa raíz, lo primero de la hoja: al final del formulario nadie la encontraba
             (prueba como técnico, 08-11; opción A del mockup aprobado). */}
-        {evento && eventoRequiereAcr(evento) && <AcrEntrada evento={evento} />}
+        {!esVentana && filaCausaRaiz}
 
         {/* Estado del borrador: que se vea que no hay que tocar nada para guardar. */}
         {autoguarda && (
@@ -1273,492 +1817,49 @@ export function EventoBitacoraSheet({
           </div>
         )}
 
+        {esVentana ? (
+          // PC (mockup A aprobado el 08-11-2026): todo a la vista, en tres bloques.
+          <div className="grid grid-cols-3 items-start gap-x-[48px]">
+            <div className={COLUMNA_PC}>
+              <h3 className="text-title3 text-foreground">Qué pasó</h3>
+              <div className="flex flex-col gap-3">{bloqueMaquina}</div>
+              <div>{bloqueTipo}</div>
+              {bloqueFalla}
+              {bloqueObservaciones}
+              {bloqueQuien}
+            </div>
+            <div className={COLUMNA_PC}>
+              <h3 className="text-title3 text-foreground">Cómo afectó</h3>
+              {bloqueImpacto}
+              <div className="flex flex-col gap-3">{bloqueHoras}</div>
+            </div>
+            <div className={COLUMNA_PC}>
+              <h3 className="text-title3 text-foreground">Evidencia</h3>
+              {bloqueFotos}
+              {bloqueRepuestos}
+              {bloquePendiente}
+            </div>
+          </div>
+        ) : (
         <div className="grid gap-5 md:grid-cols-2 md:gap-x-7">
-        <div className="flex min-w-0 flex-col gap-5">
-        {/* Quién y dónde, en UNA tarjeta de filas (mockup aprobado 19-09-2026, como el
-            editor de eventos del Calendario de iOS): cada fila dice su valor y se abre
-            en su lugar; lo que falta viene abierto. «Quién edita» y «Quién lo registró»
-            eran dos preguntas para el mismo técnico (Orel): queda una, «Técnico» — el
-            autor. Si corrige otro, el «editado por» se toma del nombre que recuerda
-            este teléfono, sin preguntar. */}
-        <div className="flex flex-col gap-1.5">
-          <div className="overflow-hidden rounded-ctl bg-muted-foreground/10">
-            {autorFijo ? (
-              <div className="flex min-h-[44px] items-center gap-3 px-3">
-                <span className="flex-1 text-body">Técnico</span>
-                <span className="text-body text-muted-foreground">{autorFijo}</span>
-              </div>
-            ) : tecnicos.todos.length > 0 ? (
-              <>
-                {filaQuien('tecnico', 'Técnico', valorTecnico || (esNuevo || modoBorrador ? '' : autorVisible(evento!)), !valorTecnico && (esNuevo || modoBorrador))}
-                {abierta === 'tecnico' && (
-                  <div className="px-3 pb-3">
-                    <SelectorTecnico
-                      etiqueta="Técnico"
-                      sinEtiqueta
-                      deTurno={tecnicos.deTurno}
-                      todos={tecnicos.todos}
-                      valor={valorTecnico}
-                      onChange={(n) => {
-                        if (autorEditable) setRegistrador(n)
-                        else setQuien(n)
-                        setAbierta(null)
-                      }}
-                      recordar={!autorEditable}
-                      vacio="Elige al técnico"
-                    />
-                  </div>
-                )}
-              </>
-            ) : null}
-            <label
-              htmlFor={`${campoId}-turno`}
-              className="relative flex min-h-[44px] items-center justify-between gap-3 pl-3 pr-1 before:absolute before:left-3 before:right-0 before:top-0 before:h-px before:bg-muted-foreground/25 before:content-[''] first:before:hidden"
-            >
-              <span className="text-body">Turno</span>
-              <select
-                id={`${campoId}-turno`}
-                value={turnoDestino}
-                onChange={(e) => setTurnoDestino(e.target.value)}
-                className="min-h-[44px] min-w-0 max-w-[70%] cursor-pointer truncate rounded-ctl bg-transparent px-2 text-right text-campo font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                {opcionesTurno.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {nombreTurnoCorto(t.id)}
-                    {t.id === turnoEnCurso.id ? ' · en curso' : ''}
-                    {t.id === origenPendienteId ? ' · del pendiente' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {tecnicos.todos.length > 0 && (
-              <>
-                {filaQuien('participantes', 'Participaron', participantes.length ? participantes.join(', ') : 'Nadie', false)}
-                {abierta === 'participantes' && (
-                  <div className="px-3 pb-3">
-                    <SelectorParticipantes
-                      sinEtiqueta
-                      presentes={tecnicos.deTurno}
-                      todos={tecnicos.todos}
-                      excluir={quienRegistro}
-                      valor={participantes}
-                      onChange={setParticipantes}
-                    />
-                  </div>
-                )}
-              </>
-            )}
+          <div className="flex min-w-0 flex-col gap-5">
+            {bloqueQuien}
+            {bloqueTipo}
+            <div className="flex flex-col gap-3">
+              {bloqueMaquina}
+              {bloqueFalla}
+              {bloqueHoras}
+            </div>
+            {bloqueObservaciones}
           </div>
-          {modoBorrador && evento && autorVisible(evento) !== quien && (
-            <p className="px-3 text-footnote text-muted-foreground">Lo empezó: {autorVisible(evento)}</p>
-          )}
-          {autorEditable && evento && registrador && registrador !== registradoEnServidor && (
-            <p className="px-3 text-footnote text-muted-foreground">Hoy figura: {autorVisible(evento)}. Al guardar queda {registrador}.</p>
-          )}
-          {turnoDestino !== turno.id && (
-            <p className="px-3 text-footnote text-muted-foreground">
-              Al {modoBorrador || esNuevo ? 'publicar' : 'guardar'}, el evento pasa al {etiquetaCortaTurno(turnoDestino).toLowerCase()}
-              {turnoDesdeId(turnoDestino) ? ` (${horarioTurno(turnoDesdeId(turnoDestino)!)})` : ''}
-              {origenPendienteId ? ' y el pendiente queda resuelto ahí' : ''}.
-            </p>
-          )}
-        </div>
-
-        {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de
-            arriba. Los 8 a la vista (en filas): deslizando, «Novedad» no se veía. */}
-        <div>
-          {/* «Tipo» respondía a dos preguntas a la vez (qué pasó y qué se hizo) y
-              había que elegir una: el rótulo ahora dice cuál de las dos. Lo que
-              pasó lo cuenta el impacto, y la falla sale de los dos (18-09-2026). */}
-          <span className={ETIQUETA_CAMPO}>
-            ¿Qué se hizo?
-            {tipo == null && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
-          </span>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de evento">
-            {TIPOS_EVENTO.map((t) => (
-              <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
-                {t.id === 'otro' ? 'Otro…' : t.label}
-              </Chip>
-            ))}
-            {/* Un evento guardado con un tipo que ya no se ofrece («Falla», antes del
-                18-09) se abría sin ningún chip marcado: parecía faltar el dato. Se
-                muestra marcado; tocar otro lo cambia (pasada visual 19-09-2026). */}
-            {tipo != null && !TIPOS_EVENTO.some((t) => t.id === tipo) && (
-              <Chip activo onClick={() => undefined}>
-                {etiquetaTipo({ tipo, tipoOtro: null })} (anterior)
-              </Chip>
-            )}
-          </div>
-          {tipo === 'otro' && (
-            <div className="mt-3 flex flex-col gap-2">
-              <label htmlFor="bitacora-tipo-otro" className="sr-only">Escribe el tipo</label>
-              <input
-                id="bitacora-tipo-otro"
-                maxLength={MAX_TIPO_OTRO}
-                className={CAMPO}
-                value={tipoOtro}
-                onChange={(e) => setTipoOtro(e.target.value)}
-                placeholder="Escribe el tipo: mejora, lubricación…"
-                autoCapitalize="sentences"
-              />
-              {tiposSugeridos.length > 0 && (
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Tipos ya usados">
-                  {tiposSugeridos.map((t) => (
-                    <Chip key={t} activo={normalizarTipo(t) === normalizarTipo(tipoOtro)} onClick={() => setTipoOtro(t)}>
-                      {t}
-                    </Chip>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Equipo y horas */}
-        <div className="flex flex-col gap-3">
-          <BuscadorEquipo
-            texto={equipo}
-            onChange={(texto, id) => {
-              setEquipo(texto)
-              setEquipoId(id)
-              setEquipoCodigo(id ? (opcionesEquipo.find((o) => o.id === id)?.codigo ?? '') : '')
-            }}
-            opciones={opcionesEquipo}
-            cargando={cargandoEquipos}
-            recientes={equiposSugeridos}
-            vinculado={Boolean(equipoId)}
-          />
-          {equipoId && (opcionElegida || equipoCodigo) && (
-            <p className="-mt-1.5 text-footnote text-muted-foreground">
-              {[opcionElegida?.planta, opcionElegida?.area, etiquetaCodigoEquipo(equipoCodigo)].filter(Boolean).join(' · ')}
-            </p>
-          )}
-          <div>
-            <label htmlFor="bitacora-titulo" className={`${ETIQUETA_CAMPO} flex justify-between gap-2`}>
-              {/* Los rótulos son los de la planilla «Recoleccion MTTR» (Máquina · Falla ·
-                  Observaciones) para que nadie tenga que traducir (Orel, 17-09). */}
-              <span>Falla</span>
-              <span>Opcional · en pocas palabras</span>
-            </label>
-            <input
-              id="bitacora-titulo"
-              maxLength={MAX_TITULO_EVENTO}
-              className={CAMPO}
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Ej: Cambio de tubos fluorescentes"
-              autoCapitalize="sentences"
-            />
-          </div>
-          {/* Como «Todo el día» en el Calendario de iOS: esconde las horas. */}
-          <FilaInterruptor activo={sinHora} onCambiar={cambiarSinHora} titulo="Sin hora" />
-          {sinHora ? (
-            // El evento sin hora se ubica ARRASTRÁNDOLO en la lista, que es como
-            // se hace en la práctica: el selector de «Ubicación en el turno»
-            // listaba un chip por evento del turno —seis o más— y lo usó 1 de 22
-            // eventos reales. Se quitó el 18-09-2026; `posicionMin` la sigue
-            // escribiendo el arrastre y editar un evento no la pierde.
-            impacto === 'con-parada' ? (
-              <p className="-mt-1 text-footnote text-muted-foreground">
-                Anota abajo los minutos de parada: sin hora no se pueden calcular.
-              </p>
-            ) : null
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>
-                    Inicio
-                    {horaFaltante && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
-                  </label>
-                  {/* HIG «Pickers»: minutos de 5 en 5, que con guantes se acierta. */}
-                  <input id="bitacora-inicio" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} onKeyDown={enterGuarda} />
-                </div>
-                <div>
-                  <label htmlFor="bitacora-termino" className={ETIQUETA_CAMPO}>Término</label>
-                  <input id="bitacora-termino" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} onBlur={validarTermino} onKeyDown={enterGuarda} />
-                </div>
-              </div>
-              {/* El «08:00» de un turno cerrado se leía como un dato real y nadie lo
-                  revisaba (medido 19-09-2026: 27% de los eventos se carga así). Ahora
-                  el campo nace vacío y esto explica por qué. */}
-              {horaFaltante && turnoInicioCerrado && (
-                <p className="-mt-1 text-footnote text-muted-foreground">Ese turno ya terminó: escribe la hora en que empezó de verdad.</p>
-              )}
-              {/* Sin término no hay minutos de parada: 17 de 22 eventos reales se
-                  guardaron sin él (18-09-2026). Un toque lo cierra con la hora
-                  de ahora, que es la que corresponde al salir de la máquina —
-                  pero solo mientras el turno corre: 6 de 15 eventos se cargaron
-                  más de 2 h después, y ahí «ahora» es la hora de carga, no el
-                  término. El rótulo dice la duración para que se vea antes. */}
-              {!horaTermino && terminoSugerido.disponible && (
-                <button
-                  type="button"
-                  onClick={() => setHoraTermino(terminoSugerido.hora)}
-                  className="-mt-1 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 text-footnote font-semibold text-brand-ink transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                >
-                  <Clock3 className="size-4" aria-hidden />
-                  <span>
-                    Terminó ahora · {terminoSugerido.hora} · <span className="tabular-nums">{formatoMinutos(terminoSugerido.minutos)}</span>
-                  </span>
-                </button>
-              )}
-              {/* Cargando tarde, «ahora» ya no es el término: un toque en la
-                  duración lo calcula desde el inicio. Sigue a la vista con el
-                  término puesto, para poder corregir la elección. */}
-              {cargaTardia && (
-                <div className="-mt-1">
-                  <p id="bitacora-cuanto-duro" className={ETIQUETA_CAMPO}>
-                    ¿Cuánto duró?
-                    <span className="sr-only">
-                      {terminoSugerido.motivo === 'turno-terminado'
-                        ? ' Ese turno ya terminó.'
-                        : ` Empezó hace más de ${TOPE_TERMINO_AHORA_MIN / 60} horas.`}
-                    </span>
-                  </p>
-                  <div role="group" aria-labelledby="bitacora-cuanto-duro" className="flex flex-wrap gap-2">
-                    {DURACIONES_SUGERIDAS_MIN.map((n, i) => (
-                      <Chip key={n} activo={duracion === n} onClick={() => setHoraTermino(horaMasMinutos(horaInicio, n) ?? '')}>
-                        <span className="tabular-nums">
-                          {n}
-                          {i === DURACIONES_SUGERIDAS_MIN.length - 1 ? ' min' : <span className="sr-only"> minutos</span>}
-                        </span>
-                      </Chip>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
-            </>
-          )}
-        </div>
-
-        {/* Qué pasó */}
-        <div>
-          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>
-            Observaciones · qué pasó y qué se hizo
-            {!descripcion.trim() && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
-          </label>
-          <textarea
-            id="bitacora-descripcion"
-            maxLength={3000}
-            className="min-h-[112px] w-full resize-y rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary"
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío."
-          />
-        </div>
-
-        </div>
-        <div className="flex min-w-0 flex-col gap-5">
-        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} favoritos={favoritosRepuestos} />
-
-        {/* Impacto en producción */}
-        <div>
-          <span className={ETIQUETA_CAMPO}>
-            ¿Cómo afectó al proceso?
-            {impacto == null && <span className="ml-1.5 font-normal text-ink-warn">obligatorio</span>}
-          </span>
-          {/* Una respuesta por fila, con su ejemplo debajo. Con tres chips en
-              línea y sin explicación, 19 de 22 eventos reales terminaban en
-              «No aplica» — incluida una Baader 142 en falla (18-09-2026). */}
-          <div className="flex flex-col gap-2" role="group" aria-label="Impacto en el proceso">
-            {IMPACTOS.map((i) => {
-              const activo = impacto === i.id
-              return (
-                <button
-                  key={i.id}
-                  type="button"
-                  aria-pressed={activo}
-                  onClick={() => setImpacto(i.id)}
-                  className={[
-                    'flex min-h-[56px] flex-col justify-center gap-0.5 rounded-card px-4 py-2.5 text-left transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                    activo ? 'bg-primary text-primary-foreground' : 'bg-muted-foreground/10 text-foreground',
-                  ].join(' ')}
-                >
-                  <span className="text-subhead font-semibold leading-tight">{i.label}</span>
-                  <span className={`text-footnote leading-tight ${activo ? 'opacity-80' : 'text-muted-foreground'}`}>
-                    {i.detalle}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          {impacto === 'con-parada' && (
-            <div className="mt-3">
-              <label htmlFor="bitacora-minutos" className={ETIQUETA_CAMPO}>Minutos de máquina detenida</label>
-              <input
-                id="bitacora-minutos"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={1440}
-                className={`${CAMPO} tabular-nums`}
-                value={minutos}
-                onChange={(e) => setMinutos(e.target.value)}
-                placeholder={duracion != null ? `${duracion} (la duración del evento)` : 'Ej: 35'}
-              />
-              <p className="mt-1.5 text-footnote text-muted-foreground">
-                {sinHora
-                  ? 'Cuenta para el MTTR del turno. Vacío, la parada queda sin duración.'
-                  : 'Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.'}
-              </p>
-            </div>
-          )}
-          {impacto === 'afecta-sin-detener' && (
-            <div className="mt-3">
-              <label htmlFor="bitacora-contingencia" className={ETIQUETA_CAMPO}>¿Qué se hizo para que siguiera?</label>
-              <div className="mb-2 flex flex-wrap gap-2">
-                {CONTINGENCIAS_SUGERIDAS.map((c) => (
-                  <Chip key={c} activo={contingencia === c} onClick={() => setContingencia(c)}>
-                    {c}
-                  </Chip>
-                ))}
-              </div>
-              <input
-                id="bitacora-contingencia"
-                maxLength={120}
-                className={CAMPO}
-                value={contingencia}
-                onChange={(e) => setContingencia(e.target.value)}
-                // El ejemplo va en el placeholder: dice qué escribir Y que se
-                // puede escribir (pedido de Orel, 18-09-2026).
-                placeholder="Ejemplo: se retiran cabezas a mano"
-              />
-              <p className="mt-1.5 text-footnote text-muted-foreground">
-                No suma minutos de parada. Queda registrado que el proceso siguió gracias a Mantención.
-              </p>
-            </div>
-          )}
-          {impacto === 'en-ventana' && (
-            <div className="mt-3">
-              <label htmlFor="bitacora-ventana" className={ETIQUETA_CAMPO}>¿En qué momento se intervino?</label>
-              <div className="mb-2 flex flex-wrap gap-2">
-                {VENTANAS_SUGERIDAS.map((v) => (
-                  <Chip key={v} activo={ventana === v} onClick={() => setVentana(v)}>
-                    {v}
-                  </Chip>
-                ))}
-              </div>
-              <input
-                id="bitacora-ventana"
-                maxLength={120}
-                className={CAMPO}
-                value={ventana}
-                onChange={(e) => setVentana(e.target.value)}
-                placeholder="O escríbelo: durante colación filete…"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Fotos */}
-        <div
-          onDragOver={(e) => {
-            // Sin preventDefault el navegador no deja soltar (HIG «Drag and drop»).
-            e.preventDefault()
-            setArrastrandoFoto(true)
-          }}
-          onDragLeave={(e) => {
-            // `dragleave` también salta al pasar sobre un hijo del bloque: sin
-            // este filtro el borde punteado parpadea mientras se arrastra.
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastrandoFoto(false)
-          }}
-          onDrop={(e) => {
-            e.preventDefault()
-            setArrastrandoFoto(false)
-            alSoltarOPegar(Array.from(e.dataTransfer.files))
-          }}
-          className={arrastrandoFoto ? 'rounded-ctl border-2 border-dashed border-primary/60' : 'border-2 border-dashed border-transparent'}
-        >
-          <span className={ETIQUETA_CAMPO}>Fotos</span>
-          {arrastrandoFoto && <p className="mb-1.5 text-footnote text-muted-foreground">Suelta las fotos aquí</p>}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => alElegir(e.target.files)}
-          />
-          {(fotos.length > 0 || subidas.length > 0) && (
-            <div className="mb-3 grid grid-cols-3 gap-2">
-              {fotos.map((f) => (
-                <figure key={f.path} className="relative m-0">
-                  {/* Ronda 47: la miniatura de 320 px, no la original de 1.600 px — este
-                      grid ya la pinta a ~110 px, y bajar la foto entera se paga en la red
-                      de planta por cada foto del editor, otra vez. */}
-                  <img
-                    src={f.thumbUrl ?? f.url}
-                    alt={ETIQUETA_FOTO[f.etiqueta]}
-                    className="aspect-square w-full rounded-ctl bg-muted-foreground/10 object-cover"
-                  />
-                  <figcaption className="pt-1 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
-                  <button
-                    type="button"
-                    onClick={() => quitarFoto(f)}
-                    aria-label={`Quitar foto ${ETIQUETA_FOTO[f.etiqueta]}`}
-                    className="absolute right-0 top-0 flex size-[44px] items-start justify-end p-1.5"
-                  >
-                    <span className="flex size-6 items-center justify-center rounded-full bg-black/60 text-white">
-                      <X className="size-3.5" />
-                    </span>
-                  </button>
-                </figure>
-              ))}
-              {subidas.map((s) => (
-                <div key={s.clave} className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-ctl bg-muted-foreground/10 p-2 text-center">
-                  {s.error ? (
-                    <>
-                      <AlertTriangle className="size-5 text-ink-warn" aria-hidden />
-                      <span className="text-caption text-muted-foreground">{s.error}</span>
-                      {/* min-h-44: piso táctil del HIG (accessibility); con guantes, «Reintentar»
-                          es el botón que más se toca justo cuando la red de planta ya falló. */}
-                      <span className="flex items-center gap-3">
-                        <button type="button" onClick={() => void subir(s)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-primary">
-                          <RotateCw className="size-3.5" /> Reintentar
-                        </button>
-                        {/* Sin esto, una foto que nunca va a subir (un HEIC, por
-                            ejemplo) obligaba a cancelar el evento entero para
-                            sacarla y se perdía todo lo escrito (revisión 15-09). */}
-                        <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
-                          <X className="size-3.5" /> Quitar
-                        </button>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-                      <span className="text-caption text-muted-foreground">Subiendo {ETIQUETA_FOTO[s.etiqueta].toLowerCase()}…</span>
-                      <button type="button" onClick={() => descartarSubida(s.clave)} className="inline-flex min-h-[44px] items-center gap-1 text-footnote font-semibold text-muted-foreground">
-                        <X className="size-3.5" /> Quitar
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="grid grid-cols-3 gap-2">
-            {(['antes', 'despues', 'foto'] as const).map((et) => (
-              <Button key={et} variant="tinted" size="md" className="rounded-ctl px-2" onClick={() => elegirFotos(et)} disabled={fotos.length + subidas.length >= MAX_FOTOS_EVENTO}>
-                <ImagePlus /> {et === 'foto' ? 'Otra' : ETIQUETA_FOTO[et]}
-              </Button>
-            ))}
+          <div className="flex min-w-0 flex-col gap-5">
+            {bloqueRepuestos}
+            {bloqueImpacto}
+            {bloqueFotos}
+            {bloquePendiente}
           </div>
         </div>
-
-        {/* Pendiente */}
-        <FilaInterruptor
-          activo={pendiente}
-          onCambiar={setPendiente}
-          titulo="Queda pendiente"
-          detalle="Sale destacado en el correo para el turno siguiente."
-        />
-
-        </div>
-        </div>
+        )}
 
         {error && (
           <p role="alert" className="text-footnote font-semibold text-ink-crit">
