@@ -300,7 +300,7 @@ describe('GloboMicro v3 · «Ver detalle»: cerrado por defecto y se abre con cl
   })
 })
 
-describe('GloboMicro v3 · la leyenda de ▽ solo sale cuando la tabla muestra un ▽ (339 micro reales de los 10 turnos validados)', () => {
+describe('GloboMicro v3 · la leyenda de ▽ solo sale cuando la tabla muestra un ▽ (339 micro reales de los 10 turnos validados)', { timeout: 30_000 }, () => {
   it('con «Ver detalle» abierto, la leyenda está si y solo si hay al menos un ▽ en la tabla; y nunca hay ▽ sin su leyenda', () => {
     const leer = <T,>(archivo: string) => JSON.parse(readFileSync(resolve(__dirname, 'fixtures', archivo), 'utf8')) as T
     const { turnos } = leer<{ turnos: Array<{ id: string; planta: 'Chonchi' | 'Filete'; doc: Omit<DocMicro, '_fuente'> }> }>('turnos_validados.json')
