@@ -79,6 +79,10 @@ import { indicePorSap, nombreVisiblePorSap, tituloOCodigo } from '@/utils/repues
 import { cn } from '@/lib/utils'
 import { ResumenStockFila, type EstadoResumenStock } from '@/components/repuestos/ResumenStockFila'
 import { resumenStock } from '@/utils/repuestos/resumenStock'
+import { usePielApple } from '@/hooks/usePielApple'
+import { FilaRepuestoMovil } from '@/components/repuestos/FilaRepuestoMovil'
+import { ChipsFiltroMovil, MasFiltrosSheet } from '@/components/repuestos/FiltrosMovilRepuestos'
+import { chipsFiltroMovil, filtrosHojaRestantes, resumenMas } from '@/components/repuestos/chipsFiltroMovil'
 import { hayAlgoQueExportar } from '@/utils/repuestos/alcanceDeExportacion'
 import { Button as PButton, CellIcon, ListCell, ListGroup, SegmentedControl, Sheet as PSheet } from '@/components/piel'
 import { GaleriaRepuestos } from '@/components/repuestos/GaleriaRepuestos'
@@ -99,6 +103,8 @@ type SortCol = 'codigoSAP' | 'codigoFabricante' | 'textoBreve' | 'equipo' | 'sto
 
 type StockFilter = 'all' | StockStatus
 const PAGE_SIZES = [8, 25, 50]
+/** Filas que dibuja la lista del teléfono antes de «Mostrar más» (igual que Bodega). */
+const FILAS_POR_PAGINA_MOVIL = 60
 
 const STORAGE_KEY = 'repuestos-nav-node' // compartido con EquipmentNavigator
 /** Mismo corte que el resto del módulo: bajo `sm` (640 px) es teléfono; desde ahí aparece el árbol fijo. */
@@ -662,6 +668,21 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     })
   }, [recientes, bodegaItems])
   const [menuMasOpen, setMenuMasOpen] = useState(false)
+  // Lista del teléfono en piel Apple (plan PLAN_LISTA_REPUESTOS_MOVIL): filas con foto y chips-filtro.
+  // PC y piel anterior siguen con la tabla de siempre.
+  const apple = usePielApple()
+  const [telefono, setTelefono] = useState(esTelefono)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia(CORTE_TELEFONO)
+    const sync = () => setTelefono(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+  const listaMovil = apple && telefono
+  const [masOpen, setMasOpen] = useState(false)
+  const [limiteMovil, setLimiteMovil] = useState(FILAS_POR_PAGINA_MOVIL)
   /** `showingAll` lo levantó el buscador (no el usuario): al borrar el texto se devuelve. */
   const autoTodasRef = useRef(!!vueltaDelDibujo?.autoTodas)
   // La burbuja de ARIA tapaba estrellas y filas en todo Repuestos: en el teléfono se esconde
@@ -1130,6 +1151,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
 
   // Reset de página al cambiar área/filtros
   useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, facetaEfectiva, repStockFilter, repComunSinStock, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repConFotos, listFilter, favEqFiltro, repPageSize])
+  useEffect(() => { setLimiteMovil(FILAS_POR_PAGINA_MOVIL) }, [selectedAreaId, showingAll, repQuery, facetaEfectiva, repStockFilter, repComunSinStock, repClaseFilter, repTipoFilter, repSoloSap, repFavOnly, repConFotos, listFilter, favEqFiltro])
   // La faceta de equipo es de ESTA búsqueda: al cambiar de área o de texto, se reinicia.
   useEffect(() => { setFacetaEquipo(null) }, [selectedAreaId, showingAll, repQuery])
 
@@ -1941,6 +1963,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     setSidebarMobileOpen(true)
   }
   const celdaMenu = 'min-h-[52px]'
+  // Chips del teléfono (piel Apple): qué se dibuja y cuándo «Más» figura activo.
+  const chipsMovil = chipsFiltroMovil({ total: resumenVisible.total, low: resumenVisible.low, out: resumenVisible.out, estadoActivo: estadoResumenActivo })
+  const masMovil = resumenMas({
+    estadoActivo: estadoResumenActivo, favOnly: repFavOnly, favEquipo: favEqFiltro !== null,
+    faceta: facetaEfectiva !== null, conFotos: repConFotos, galeria: vistaRep === 'galeria', filtrosHojaTotal: filtrosActivos,
+  })
+  const elegirChipMovil = (clave: 'todos' | 'low' | 'out') => {
+    if (clave === 'todos') { setRepStockFilter('all'); setRepComunSinStock(false); return }
+    elegirEstadoResumen(clave)
+  }
 
   return (
     <div className="tipo-ingenieria relative flex h-full bg-background">
@@ -2011,7 +2043,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               </button>
             )}
           </div>
-          {!soloLectura && (
+          {!soloLectura && apple && (
+            <PButton variant="plain" className="shrink-0 px-2" onClick={() => (selectedEquipKey ? setSolicitarVariosOpen(true) : openSolicitar(null))}>
+              Solicitar
+            </PButton>
+          )}
+          {!soloLectura && !apple && (
           <button
             type="button"
             onClick={() => setSolicitudesOpen(true)}
@@ -2031,15 +2068,40 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             className="relative flex size-11 shrink-0 items-center justify-center rounded-full text-brand-ink hover:bg-muted"
           >
             <MoreHorizontal className="size-5" aria-hidden />
-            {isAdmin && trashCount > 0 && (
+            {((isAdmin && trashCount > 0) || (apple && !soloLectura && pendientesCount > 0)) && (
               <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-ink-crit" aria-hidden />
             )}
           </button>
         </div>
-        {marcaMaquina && <div className="flex px-4 pb-1 sm:hidden">{marcaMaquina}</div>}
+        {marcaMaquina && !(listaMovil && selectedEquipKey) && <div className="flex px-4 pb-1 sm:hidden">{marcaMaquina}</div>}
         <PSheet open={menuMasOpen} onClose={() => setMenuMasOpen(false)} title="Más acciones">
           <ListGroup>
-            {!selectedEquipKey && !soloLectura && (
+            {apple && !soloLectura && (
+              <ListCell
+                leading={<CellIcon tone="neutral"><ClipboardList aria-hidden /></CellIcon>}
+                title="Solicitudes"
+                value={pendientesCount > 0 ? pendientesCount : undefined}
+                onClick={() => { setMenuMasOpen(false); setSolicitudesOpen(true) }}
+                className={celdaMenu}
+              />
+            )}
+            {listaMovil && selectedEquipKey && selectedEquipMachineId && (
+              <ListCell
+                leading={<CellIcon tone="neutral"><ClipboardList aria-hidden /></CellIcon>}
+                title="Ver expediente"
+                onClick={() => { setMenuMasOpen(false); navigate(rutaExpedienteEquipo(selectedEquipMachineId)) }}
+                className={celdaMenu}
+              />
+            )}
+            {listaMovil && isAdmin && (selectedAreaId || showingAll) && (
+              <ListCell
+                leading={<CellIcon tone="neutral"><Plus aria-hidden /></CellIcon>}
+                title="Agregar repuesto"
+                onClick={() => { setMenuMasOpen(false); startCreate() }}
+                className={celdaMenu}
+              />
+            )}
+            {!apple && !selectedEquipKey && !soloLectura && (
               <ListCell
                 leading={<CellIcon tone="neutral"><Plus aria-hidden /></CellIcon>}
                 title="Solicitar un repuesto"
@@ -2181,7 +2243,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 onAbrirArea={abrirAreaEntrada}
               />
             </div>
-          ) : (
+          ) : listaMovil && selectedEquipKey ? null : (
             <div className="-mt-2 mb-1 sm:hidden">
               <PButton variant="plain" className="-ml-3 gap-1 pl-2 pr-4" onClick={volverAEntrada}>
                 <ChevronLeft aria-hidden /> Repuestos
@@ -2253,8 +2315,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           {/* Cabecera del área */}
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
+              {/* Teléfono con piel Apple y equipo abierto: una sola vuelta atrás, sin ruta ni chips de navegación. */}
+              {listaMovil && selectedEquipKey && (
+                <button type="button" onClick={quitarFocoMaquina} className="-ml-1 flex min-h-[44px] max-w-full items-center gap-1 text-body text-primary">
+                  <ChevronLeft className="size-5 shrink-0" aria-hidden />
+                  <span className="truncate">{selectedNode?.nombre ?? 'Área'}</span>
+                </button>
+              )}
               {/* Breadcrumb: con equipo seleccionado incluye el área; si no, la deja para el título. */}
-              {(selectedEquipKey ? breadcrumb.length > 0 : breadcrumb.length > 1) && (
+              {!(listaMovil && selectedEquipKey) && (selectedEquipKey ? breadcrumb.length > 0 : breadcrumb.length > 1) && (
                 <>
                   {/* Teléfono: la ruta abre el árbol de áreas (reemplaza al botón de menú). */}
                   <button
@@ -2271,7 +2340,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 </>
               )}
               <div className="flex items-center gap-2">
-                {selectedEquipKey && <Cog className="h-5 w-5 shrink-0 text-cat-7-ink" />}
+                {selectedEquipKey && !listaMovil && <Cog className="h-5 w-5 shrink-0 text-cat-7-ink" />}
                 <h1 className="truncate text-title2 font-medium tracking-[-0.005em] text-foreground">{title}</h1>
                 {selectedNode && !repQuery.trim() && !selectedEquipKey && (
                   <Badge variant="secondary" className="tabular-nums">{eqCount} equipos</Badge>
@@ -2282,7 +2351,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   </Badge>
                 )}
               </div>
-              {selectedEquipKey ? (
+              {selectedEquipKey && !listaMovil ? (
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <button
                     onClick={quitarFocoMaquina}
@@ -2310,7 +2379,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               ) : null}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {isAdmin && (selectedAreaId || showingAll) && (
+              {isAdmin && !listaMovil && (selectedAreaId || showingAll) && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={startCreate} title="Agregar repuesto a un equipo del área">
                   <Plus className="h-4 w-4" /> Repuesto
                 </Button>
@@ -2319,7 +2388,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           </div>
 
           {/* Teléfono, con un equipo abierto: «Solicitar repuestos» es el único botón relleno de la vista. */}
-          {selectedEquipKey && !soloLectura && (
+          {selectedEquipKey && !soloLectura && !apple && (
             <div className="-mt-1 mb-4 sm:hidden">
               <PButton variant="filled" size="block" onClick={() => setSolicitarVariosOpen(true)}>
                 <ClipboardList aria-hidden /> Solicitar repuestos
@@ -2328,12 +2397,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           )}
 
           {/* Resumen de stock de lo que se ve (sigue búsqueda, área, faceta y filtros, salvo el propio de stock). */}
+          {listaMovil ? (
+            !repuestosBusy && <ChipsFiltroMovil chips={chipsMovil} onEstado={elegirChipMovil} mas={masMovil} onMas={() => setMasOpen(true)} />
+          ) : (
           <ResumenStockFila
             resumen={resumenVisible}
             activo={estadoResumenActivo}
             onElegir={elegirEstadoResumen}
             cargando={repuestosBusy}
           />
+          )}
 
 
           {/* (Fase 4 normalización) La sección "Motores y bombas del área" se eliminó:
@@ -2346,6 +2419,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
             {/* Filtros (la búsqueda vive en la barra superior — global, sticky).
                 En móvil colapsados tras el botón "Filtros" del strip de KPIs. */}
             {/* Barra: favoritos · bajo stock · filtros (hoja) · vista. Clase/Tipo/Stock/SAP/listas viven en la hoja. */}
+            {!listaMovil && (
             <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <div className="-mx-4 flex min-w-0 items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
                 <ChipBarra
@@ -2402,11 +2476,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 segments={[{ value: 'lista', label: 'Lista' }, { value: 'galeria', label: 'Galería' }]}
               />
             </div>
+            )}
 
             {!repuestosBusy && (
               <>
-                <ChipsEquipo rows={filasParaChips} plantaDe={plantaDe} faceta={facetaEfectiva} onChange={setFacetaEquipo} />
-                <p className="mb-2 px-1 text-footnote text-muted-foreground" aria-live="polite">{lineaResultados}</p>
+                {!listaMovil && <ChipsEquipo rows={filasParaChips} plantaDe={plantaDe} faceta={facetaEfectiva} onChange={setFacetaEquipo} />}
+                {(!listaMovil || repQuery.trim()) && <p className="mb-2 px-1 text-footnote text-muted-foreground" aria-live="polite">{lineaResultados}</p>}
               </>
             )}
 
@@ -2438,6 +2513,32 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                   'Esta área no tiene repuestos con código SAP.'
                 ) : (
                   'Sin resultados para los filtros aplicados.'
+                )}
+              </div>
+            ) : listaMovil && vistaRep === 'lista' ? (
+              <div>
+                <ListGroup>
+                  {sortedRep.slice(0, limiteMovil).map((r) => (
+                    <FilaRepuestoMovil
+                      key={r.rowKey}
+                      r={r}
+                      fotos={fotosDeFila(r, equiposEnFoco)}
+                      esFavorito={favKeys.has(r.rowKey)}
+                      onToggleFav={soloLectura ? undefined : () => toggleFav(r.rowKey)}
+                      onAgregarLista={selectedEquipKey && !soloLectura ? () => setFavEqRep(r) : undefined}
+                      esFavoritoEquipo={!!selectedEquipKey && favEq.esFavorito(r)}
+                      onAbrir={() => setSelectedRowKey(r.rowKey)}
+                    />
+                  ))}
+                </ListGroup>
+                {sortedRep.length > limiteMovil && (
+                  <button
+                    type="button"
+                    onClick={() => setLimiteMovil((l) => l + FILAS_POR_PAGINA_MOVIL)}
+                    className="mx-auto mt-3 flex min-h-[44px] items-center rounded-full bg-muted px-5 text-subhead font-medium"
+                  >
+                    Mostrar más ({sortedRep.length - limiteMovil})
+                  </button>
                 )}
               </div>
             ) : vistaRep === 'galeria' ? (
@@ -2823,6 +2924,32 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         </div>
       </div>
 
+      {apple && (
+        <MasFiltrosSheet
+          open={masOpen && listaMovil}
+          onClose={() => setMasOpen(false)}
+          total={filteredRep.length}
+          estadoActivo={estadoResumenActivo}
+          ok={resumenVisible.ok}
+          comunSinStock={resumenVisible.comunSinStock}
+          valor={resumenVisible.valor}
+          onEstado={elegirEstadoResumen}
+          favoritos={{ n: favoritosEnScope, activo: repFavOnly, onToggle: () => setRepFavOnly((v) => !v) }}
+          favoritosEquipo={conteosFavEq ? {
+            total: conteosFavEq.total,
+            porLista: conteosFavEq.porLista,
+            filtro: favEqFiltro,
+            onToggle: (clave) => setFavEqFiltro((f) => (f === clave ? null : clave)),
+          } : null}
+          conFotos={repConFotos}
+          onConFotos={() => setRepConFotos((v) => !v)}
+          equipo={{ rows: filasParaChips, plantaDe, faceta: facetaEfectiva, onChange: setFacetaEquipo }}
+          vista={vistaRep}
+          onVista={cambiarVistaRep}
+          filtrosHoja={filtrosHojaRestantes(filtrosActivos, estadoResumenActivo)}
+          onAbrirFiltros={() => { setMasOpen(false); setFiltrosOpen(true) }}
+        />
+      )}
       <FiltrosRepuestosSheet
         open={filtrosOpen}
         onClose={() => setFiltrosOpen(false)}
