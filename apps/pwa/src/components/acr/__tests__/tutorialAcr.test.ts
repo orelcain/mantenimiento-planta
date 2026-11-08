@@ -43,6 +43,8 @@ describe('guion del tutorial (v2)', () => {
     for (const paso of PASOS_TUTORIAL) {
       expect(paso.texto.trim()).not.toBe('')
       for (const m of paso.momentos ?? []) {
+        // Los anclados a una palabra se miden en tutorialSincronia.test.ts.
+        if (m.en === undefined) continue
         expect(m.en, `${paso.id}`).toBeGreaterThanOrEqual(0)
         expect(m.en, `${paso.id}`).toBeLessThanOrEqual(1)
       }

@@ -6,12 +6,13 @@
  * texto del mockup R1 («a validar en terreno»); no son dato verificado. El evento sale del mockup
  * (7 min, «Se corta resorte ingreso chapaleta baader 1…», turno 24-09-2026). Sin Firestore.
  */
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, ListCell, ListGroup } from '@/components/piel'
 import { AcrRapidoSheet } from '@/components/acr/AcrRapidoSheet'
 import { AcrLectura } from '@/components/acr/AcrLectura'
 import { FilaAnalisis } from '@/components/acr/AcrEntrada'
 import { RevisionSemanalSheet } from '@/components/acr/RevisionSemanalSheet'
+import { iniciarVerificacion, type ResultadoGesto } from '@/components/acr/verificarSincronia'
 import type { Acr, AccionAcr, CausaAcr, EventoRefAcr } from '@/services/acr/acr.types'
 import { detectarRepeticion, type EventoRepeticion } from '@/services/acr/repeticion'
 import type { PropuestaIA, ProponerAcr } from '@/services/acr/proponerAcr'
@@ -196,6 +197,49 @@ const REVISION_DEMO: Acr[] = [
   ]),
 ]
 
+/** Resultado del verificador de sincronía: cuántos gestos quedaron bien y cuáles fallan. */
+function TablaSincronia({ filas }: { filas: ResultadoGesto[] }) {
+  const malas = filas.filter((f) => !f.ok)
+  return (
+    <section className="flex flex-col gap-2">
+      <p className="text-footnote font-semibold text-foreground tabular-nums">
+        Sincronía: {filas.length - malas.length} de {filas.length} gestos bien
+      </p>
+      {filas.length === 0 && (
+        <p className="text-footnote text-muted-foreground">No llegó ningún gesto. ¿Se abrió el tutorial?</p>
+      )}
+      {malas.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-footnote tabular-nums">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="py-1 pr-3 font-semibold">Paso</th>
+                <th className="py-1 pr-3 font-semibold">Marca</th>
+                <th className="py-1 pr-3 font-semibold">Tipo</th>
+                <th className="py-1 pr-3 font-semibold">Desfase</th>
+                <th className="py-1 font-semibold">Fallas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {malas.map((f, i) => (
+                <tr key={`${f.indice}-${f.id}-${f.tipo}-${i}`} className="align-top">
+                  <td className="py-1 pr-3">
+                    {f.indice + 1} · {f.pasoId}
+                  </td>
+                  <td className="py-1 pr-3">{f.id}</td>
+                  <td className="py-1 pr-3">{f.tipo}</td>
+                  <td className="py-1 pr-3">{f.desfase === null ? '—' : `${f.desfase.toFixed(2)} s`}</td>
+                  <td className="py-1">{f.fallas.join('; ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export function AcrDevPage() {
   const [acr, setAcr] = useState<Acr>(acrDemo)
   const [vista, setVista] = useState<'ninguna' | 'r1' | 'lectura' | 'revision'>('ninguna')
@@ -204,6 +248,43 @@ export function AcrDevPage() {
   const [ultimo, setUltimo] = useState<string | null>(null)
   /** «Tutorial con ARIA» abre la tarjeta y arranca el guion. */
   const [arranque, setArranque] = useState(false)
+  /** «Verificar sincronía»: escucha los gestos del tutorial mientras corre. */
+  const verRef = useRef<{ detener(): ResultadoGesto[] } | null>(null)
+  const [verificando, setVerificando] = useState(false)
+  const [sincronia, setSincronia] = useState<ResultadoGesto[] | null>(null)
+
+  /** Para la verificación y deja la tabla. Sirve al terminar el guion o al cerrar la tarjeta. */
+  const cerrarVerificacion = useCallback(() => {
+    const ver = verRef.current
+    if (!ver) return
+    verRef.current = null
+    const filas = ver.detener()
+    setVerificando(false)
+    setSincronia(filas)
+    // La vitrina de desarrollo muestra la tabla también en consola (lo pide el spec de sincronía).
+    // eslint-disable-next-line no-console
+    console.table(filas)
+    ;(window as unknown as { __sinciaAcr?: ResultadoGesto[] }).__sinciaAcr = filas
+  }, [])
+
+  useEffect(() => {
+    if (!verificando) return
+    // La barra del tutorial muestra «Repetir» al llegar al final del guion.
+    const vigilar = window.setInterval(() => {
+      const fin = [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Repetir')
+      if (fin) cerrarVerificacion()
+    }, 500)
+    return () => window.clearInterval(vigilar)
+  }, [verificando, cerrarVerificacion])
+
+  const verificarSincronia = () => {
+    cerrarVerificacion()
+    setSincronia(null)
+    verRef.current = iniciarVerificacion()
+    setVerificando(true)
+    setArranque(true)
+    setVista('r1')
+  }
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:px-8">
@@ -264,6 +345,9 @@ export function AcrDevPage() {
         >
           Tutorial con ARIA
         </Button>
+        <Button variant="tinted" onClick={verificarSincronia}>
+          Verificar sincronía
+        </Button>
         <Button variant="tinted" onClick={() => setVista('lectura')}>
           Vista de lectura (B)
         </Button>
@@ -276,6 +360,8 @@ export function AcrDevPage() {
       </div>
 
       {ultimo && <p className="text-footnote text-muted-foreground tabular-nums">Último guardado: {ultimo}</p>}
+
+      {sincronia && <TablaSincronia filas={sincronia} />}
 
       <p className="text-footnote text-muted-foreground">
         Causas, acciones y la propuesta de la IA son el texto del mockup R1: a validar en terreno. La IA es simulada
@@ -291,6 +377,7 @@ export function AcrDevPage() {
           onClose={() => {
             setArranque(false)
             setVista('ninguna')
+            cerrarVerificacion()
           }}
           evento={EVENTO_DEMO}
           repeticion={REPETICION_DEMO}

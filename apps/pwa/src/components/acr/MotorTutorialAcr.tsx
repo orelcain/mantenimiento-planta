@@ -20,9 +20,12 @@ import {
   CAPITULOS,
   ESTADO_INICIAL,
   PASOS_TUTORIAL,
+  duracionAudioDe,
+  segundoDeMomento,
   siguienteEstado,
   urlAudio,
   type AccionTutorial,
+  type GestoTutorial,
 } from './tutorialAcr'
 
 const RETARDO_SIGUIENTE_MS = 500
@@ -31,6 +34,8 @@ const DURACION_TOQUE_MS = 700
 const LETRA_MS = 38
 /** Mientras aparece una hoja, el anillo se vuelve a medir durante este tiempo. */
 const BUSCAR_OBJETIVO_MS = 1600
+/** Lo que se ve el pulso de un toque antes de que pase lo que el toque provoca. */
+const TOQUE_ANTES_DE_ACCION_MS = 150
 /** Si el audio no empieza a sonar en este tiempo (sin red, bloqueado), habla el respaldo. */
 const ESPERA_ARRANQUE_MS = 12000
 /** Tope de seguridad tras lo que le queda al audio cuando suena (por si `ended` no llega). */
@@ -213,6 +218,14 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
       audioIndiceRef.current = indice
     }
     const a = audio
+    // Para el verificador de sincronía (/dev/acr): un evento por objetivo o toque. Sin costo si nadie escucha.
+    const emitir = (tipo: GestoTutorial['tipo'], id: string, esperado: number, real: number | null) =>
+      window.dispatchEvent(
+        new CustomEvent<GestoTutorial>('tutorial-acr:gesto', {
+          detail: { indice, pasoId: paso.id, id, tipo, esperado, real },
+        }),
+      )
+    emitir('objetivo', paso.objetivo, 0, Number.isFinite(a.currentTime) ? a.currentTime : null)
     // Precarga del que sigue.
     if (indice + 1 < PASOS_TUTORIAL.length && precargaRef.current?.indice !== indice + 1) {
       const sig = new Audio(urlAudio(import.meta.env.BASE_URL, indice + 1))
@@ -224,21 +237,41 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
     // empieza a SONAR (no cuando empieza el paso: con red lenta la carga correría los gestos), o
     // con el tiempo de lectura si habla el respaldo.
     let programados = false
-    const programar = () => {
+    // Segundo del audio que suena (null si habla el respaldo de voz).
+    const realAhora = (): number | null =>
+      respaldoUsado || !Number.isFinite(a.currentTime) ? null : a.currentTime
+    // `conVoz`: no hay audio que medir; cada momento va a su fracción del paso por el tiempo de lectura.
+    const programar = (conVoz: boolean) => {
       if (programados || !vigente()) return
       programados = true
       const total = Number.isFinite(a.duration) && a.duration > 0 ? a.duration * 1000 : tiempoLectura(texto)
-      const yaSonado = Number.isFinite(a.currentTime) ? a.currentTime * 1000 : 0
+      const yaSonado = !conVoz && Number.isFinite(a.currentTime) ? a.currentTime * 1000 : 0
+      const duracionJson = duracionAudioDe(paso)
       for (const m of paso.momentos ?? []) {
-        const espera = Math.max(0, m.en * total - yaSonado)
+        const seg = segundoDeMomento(paso, m)
+        const espera = conVoz
+          ? (seg !== null && duracionJson ? seg / duracionJson : (m.en ?? 0)) * tiempoLectura(texto)
+          : Math.max(0, (seg !== null ? seg * 1000 : (m.en ?? 0) * total) - yaSonado)
         window.setTimeout(() => {
           if (!vigente()) return
-          if (m.accion) cbRef.current.accion(m.accion)
-          if (m.objetivo) setObjetivo(m.objetivo)
+          const esperado = seg ?? 0
+          if (m.objetivo) {
+            setObjetivo(m.objetivo)
+            emitir('objetivo', m.objetivo, esperado, realAhora())
+          }
+          // Primero el toque y después lo que provoca, como cuando toca una persona: si la acción
+          // va antes, la hoja o la cadena tapan o mueven el botón justo en el pulso.
           if (m.tocar) {
-            const id = m.tocar
-            // Tras la acción la hoja puede estar abriéndose: el pulso espera un cuadro.
-            requestAnimationFrame(() => pulsar(id))
+            emitir('tocar', m.tocar, esperado, realAhora())
+            pulsar(m.tocar)
+            if (m.accion) {
+              const accion = m.accion
+              window.setTimeout(() => {
+                if (vigente()) cbRef.current.accion(accion)
+              }, TOQUE_ANTES_DE_ACCION_MS)
+            }
+          } else if (m.accion) {
+            cbRef.current.accion(m.accion)
           }
         }, espera)
       }
@@ -261,14 +294,14 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
       respaldoUsado = true
       window.clearTimeout(arranque)
       a.pause()
-      programar()
+      programar(true)
       speak(texto, { onend: terminado, onerror: () => window.setTimeout(terminado, tiempoLectura(texto)) })
     }
     let tope = 0
     const alSonar = () => {
       if (!vigente() || respaldoUsado) return
       window.clearTimeout(arranque)
-      programar()
+      programar(false)
       window.clearTimeout(tope)
       const restante = Number.isFinite(a.duration) && a.duration > 0
         ? (a.duration - a.currentTime) * 1000
@@ -323,6 +356,9 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
 
   const saltar = (c: number) => {
     setIndiceAbierto(false)
+    // Saltar al capítulo que ya suena lo reinicia: sin esto, los gestos volvían a empezar y el
+    // audio seguía donde iba (desincronizados).
+    audioIndiceRef.current = -1
     dispatch({ tipo: 'saltar', capitulo: c })
   }
 

@@ -9,6 +9,7 @@
  */
 import type { Acr, AccionAcr, CausaAcr } from '@/services/acr/acr.types'
 import type { Repeticion } from '@/services/acr/repeticion'
+import tiemposJson from './tiemposTutorialAcr.json'
 
 // ── Opciones de la herramienta ───────────────────────────────────────────────
 
@@ -94,11 +95,19 @@ export type AccionTutorial =
 export type VistaTutorial = 'filas' | 'lectura' | 'revision'
 
 /**
- * Algo que pasa durante un paso. `en` es la fracción del audio (0 = al empezar, 1 = al terminar):
- * así el gesto cae sobre la frase aunque cambie la duración del audio.
+ * Algo que pasa durante un paso. Se ancla a una palabra del audio (`palabra`, normalizada, con su
+ * `ocurrencia` y un `desfase` en segundos) o a una fracción del audio (`en`: 0 = al empezar, 1 = al
+ * terminar). Cada momento usa una de las dos, no ambas. Los de inicio y cierre van con `en`.
  */
 export interface MomentoTutorial {
-  en: number
+  /** Fracción del audio (0..1). Solo si el momento no tiene `palabra`. */
+  en?: number
+  /** Palabra del texto del paso, normalizada con `normalizarPalabra`. */
+  palabra?: string
+  /** Qué aparición de `palabra` en el audio (1 = la primera). Por defecto 1. */
+  ocurrencia?: number
+  /** Segundos que se suman al instante de la palabra. Por defecto 0. */
+  desfase?: number
   /** Nuevo elemento iluminado. */
   objetivo?: string
   /** Elemento que recibe el pulso de toque. */
@@ -140,6 +149,47 @@ export interface PasoTutorial {
   explica: OpcionAcr[]
 }
 
+/** Lo que el motor emite como `tutorial-acr:gesto` cada vez que cambia el objetivo o toca algo. */
+export interface GestoTutorial {
+  indice: number
+  pasoId: string
+  id: string
+  tipo: 'objetivo' | 'tocar'
+  /** Segundos del audio en que debía ocurrir (0 al empezar el paso). */
+  esperado: number
+  /** `audio.currentTime` al ocurrir, o null si habló el respaldo de voz. */
+  real: number | null
+}
+
+/** Tiempos medidos por archivo de audio (lo genera `apps/pwa/scripts/tiempos-tutorial-acr.py`). */
+export type TiemposAudio = Record<string, { bytes: number; duracion: number; palabras: [string, number][] }>
+// TS infiere `palabras` como arreglos, no como tuplas: el JSON lo genera el script, así que el cast es seguro.
+const tiempos = tiemposJson as unknown as TiemposAudio
+
+/** Misma regla que el script de tiempos: minúsculas, sin tildes, solo a-z0-9. */
+export function normalizarPalabra(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
+}
+
+/** Duración en segundos del audio del paso según los tiempos medidos, o null si no está medido. */
+export function duracionAudioDe(paso: PasoTutorial): number | null {
+  return tiempos[paso.audio]?.duracion ?? null
+}
+
+/**
+ * Segundo del audio del paso en que ocurre el momento. Con `palabra`: el inicio de su aparición
+ * `ocurrencia` (1 = la primera) más el `desfase`; null si el audio no la tiene. Con `en`: `en` por la
+ * duración del audio; null si el paso no tiene audio medido. Pura.
+ */
+export function segundoDeMomento(paso: PasoTutorial, m: MomentoTutorial): number | null {
+  const entrada = tiempos[paso.audio]
+  if (!entrada) return null
+  if (m.palabra === undefined) return m.en === undefined ? null : m.en * entrada.duracion
+  const aparecidas = entrada.palabras.filter(([p]) => p === m.palabra)
+  const hallada = aparecidas[(m.ocurrencia ?? 1) - 1]
+  return hallada ? hallada[1] + (m.desfase ?? 0) : null
+}
+
 export const CAPITULOS: readonly string[] = [
   'Dónde aparece el análisis',
   'Evidencia antes de limpiar',
@@ -179,7 +229,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
       'Hola, soy ARIA. Te enseño a analizar la causa raíz de una falla. Son once partes cortas. Puedes saltar a cualquiera desde el índice.',
     audio: p(1),
     objetivo: 't-head',
-    momentos: [{ en: 0.75, tocar: 't-indice', objetivo: 't-indice' }],
+    momentos: [{ palabra: 'indice', tocar: 't-indice', objetivo: 't-indice' }],
     explica: ['ver-tutorial'],
   },
   {
@@ -190,7 +240,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(2),
     objetivo: 't-alert',
     vista: 'filas',
-    momentos: [{ en: 0.35, objetivo: 't-filas' }],
+    momentos: [{ palabra: 'tuvo', objetivo: 't-filas' }],
     explica: ['fila-se-repite', 'fila-opcional', 'fila-ver'],
   },
   // 2 · Evidencia antes de limpiar
@@ -210,7 +260,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
       'Guarda la pieza dañada, por ejemplo el resorte cortado, y marca este interruptor. La pieza dice mucho más que una foto.',
     audio: p(4),
     objetivo: 't-pieza',
-    momentos: [{ en: 0.45, tocar: 't-pieza', accion: 'pieza' }],
+    momentos: [{ palabra: 'interruptor', tocar: 't-pieza', accion: 'pieza' }],
     deja: { pieza: true },
     explica: ['pieza'],
   },
@@ -232,8 +282,8 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(6),
     objetivo: 't-q2',
     momentos: [
-      { en: 0.25, tocar: SELECTOR_MICROFONO },
-      { en: 0.6, tocar: SELECTOR_MICROFONO },
+      { palabra: 'microfono', tocar: SELECTOR_MICROFONO },
+      { palabra: 'tocarlo', tocar: SELECTOR_MICROFONO },
     ],
     explica: ['dictado'],
   },
@@ -255,10 +305,12 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: 'paso-07b.mp3',
     objetivo: 't-ypq',
     momentos: [
-      { en: 0.15, tocar: 't-ypq', accion: 'porQueMas' },
-      { en: 0.25, objetivo: 't-porques' },
-      { en: 0.7, tocar: 't-pantalla', accion: 'abrirPantalla' },
-      { en: 0.75, objetivo: 't-porques-hoja' },
+      { palabra: 'toca', tocar: 't-ypq', accion: 'porQueMas' },
+      { palabra: 'preguntar', objetivo: 't-porques' },
+      // Se ilumina antes de tocarlo: así el botón queda a la vista cuando llega el pulso.
+      { palabra: 'pantalla', desfase: -0.7, objetivo: 't-pantalla' },
+      { palabra: 'pantalla', tocar: 't-pantalla', accion: 'abrirPantalla' },
+      { palabra: 'pantalla', desfase: 0.5, objetivo: 't-porques-hoja' },
       { en: 0.97, accion: 'cerrarPantalla' },
     ],
     deja: { porQues: true },
@@ -314,7 +366,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(12),
     objetivo: 't-prop',
     momentos: [
-      { en: 0.3, tocar: 't-prop', accion: 'pensar' },
+      { palabra: 'proponer', tocar: 't-prop', accion: 'pensar' },
       { en: 0.95, accion: 'mostrarPropuesta' },
     ],
     explica: ['proponer'],
@@ -336,7 +388,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
       'Cada acción tiene una fuerza. Débil: depende de que alguien se acuerde, como capacitar o avisar. Ejemplo: revisar el resorte en cada engrase.',
     audio: p(14),
     objetivo: 't-accion',
-    momentos: [{ en: 0.2, accion: 'accionDebil' }],
+    momentos: [{ palabra: 'debil', accion: 'accionDebil' }],
     explica: ['fuerza-debil'],
   },
   {
@@ -345,7 +397,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     texto: 'Media: un checklist o una alerta que te lo recuerda. Ejemplo: agregar el resorte a la pauta de engrase.',
     audio: p(15),
     objetivo: 't-accion',
-    momentos: [{ en: 0.05, accion: 'accionMedia' }],
+    momentos: [{ palabra: 'media', accion: 'accionMedia' }],
     explica: ['fuerza-media'],
   },
   {
@@ -355,7 +407,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
       'Fuerte: cambia la máquina o elimina la tarea, y ya no depende de nadie. Ejemplo: poner regulador de aire en N1 y N2. Busca siempre la fuerte.',
     audio: p(16),
     objetivo: 't-accion',
-    momentos: [{ en: 0.05, accion: 'accionFuerte' }],
+    momentos: [{ palabra: 'fuerte', accion: 'accionFuerte' }],
     explica: ['fuerza-fuerte'],
   },
   // 7 · Corregir y borrar
@@ -366,10 +418,10 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(17),
     objetivo: 't-hum',
     momentos: [
-      { en: 0.12, tocar: 't-hum', accion: 'editarHumana' },
-      { en: 0.25, objetivo: 't-editor' },
-      { en: 0.45, accion: 'corregirHumana' },
-      { en: 0.75, objetivo: 't-editor-sel' },
+      { palabra: 'tocalo', tocar: 't-hum', accion: 'editarHumana' },
+      { palabra: 'hoja', objetivo: 't-editor' },
+      { palabra: 'texto', accion: 'corregirHumana' },
+      { palabra: 'nivel', objetivo: 't-editor-sel' },
     ],
     deja: { humanaCorregida: true },
     explica: ['editar-texto', 'editar-nivel'],
@@ -382,8 +434,8 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     objetivo: 't-editor-sel',
     momentos: [
       { en: 0, accion: 'editarAccion' },
-      { en: 0.6, tocar: 't-listo', objetivo: 't-listo' },
-      { en: 0.9, accion: 'cerrarEditor' },
+      { palabra: 'listo', tocar: 't-listo', objetivo: 't-listo' },
+      { palabra: 'volver', desfase: 0.6, accion: 'cerrarEditor' },
     ],
     explica: ['editar-fuerza', 'listo'],
   },
@@ -394,9 +446,9 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(19),
     objetivo: 't-hum',
     momentos: [
-      { en: 0.1, tocar: 't-hum', accion: 'editarHumana' },
-      { en: 0.3, tocar: 't-borrar', objetivo: 't-borrar' },
-      { en: 0.42, accion: 'confirmarBorrado', objetivo: SELECTOR_CONFIRMAR },
+      { palabra: 'tocala', tocar: 't-hum', accion: 'editarHumana' },
+      { palabra: 'borrar', tocar: 't-borrar', objetivo: 't-borrar' },
+      { palabra: 'confirmar', accion: 'confirmarBorrado', objetivo: SELECTOR_CONFIRMAR },
       { en: 0.95, accion: 'cancelarBorrado' },
     ],
     explica: ['borrar'],
@@ -410,8 +462,8 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(20),
     objetivo: 't-manual',
     momentos: [
-      { en: 0.35, tocar: 't-manual', accion: 'armarManual' },
-      { en: 0.55, objetivo: 't-elige' },
+      { palabra: 'armar', tocar: 't-manual', accion: 'armarManual' },
+      { palabra: 'respondo', objetivo: 't-elige' },
     ],
     explica: ['armar-mano', 'caida-manual'],
   },
@@ -424,8 +476,8 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     objetivo: 't-elige',
     momentos: [
       { en: 0, accion: 'armarManual' },
-      { en: 0.3, tocar: 't-nivel', accion: 'nivelLatente' },
-      { en: 0.55, tocar: 't-fuerza', accion: 'fuerzaFuerte' },
+      { palabra: 'nivel', tocar: 't-nivel', accion: 'nivelLatente' },
+      { palabra: 'fuerza', ocurrencia: 1, tocar: 't-fuerza', accion: 'fuerzaFuerte' },
       { en: 0.97, accion: 'mostrarPropuesta' },
     ],
     explica: ['manual-nivel', 'manual-fuerza'],
@@ -437,10 +489,10 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     texto:
       'Lo que escribes se guarda solo, como borrador. Si falta algo, te lo digo aquí abajo. También puedes guardar con el botón de arriba.',
     audio: p(22),
-    objetivo: 't-motivo',
+    objetivo: 't-q3',
     momentos: [
-      { en: 0, accion: 'mensajeFalta' },
-      { en: 0.7, tocar: 't-guardar-arriba', objetivo: 't-guardar-arriba' },
+      { palabra: 'falta', accion: 'mensajeFalta', objetivo: 't-motivo' },
+      { palabra: 'arriba', tocar: 't-guardar-arriba', objetivo: 't-guardar-arriba' },
     ],
     explica: ['autoguardado', 'motivo', 'guardar-arriba'],
   },
@@ -451,7 +503,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
       'Con las tres respuestas, una causa latente y una acción, el análisis queda cerrado y cuenta en el indicador de acciones fuertes de Mantención.',
     audio: p(23),
     objetivo: 't-save',
-    momentos: [{ en: 0.3, tocar: 't-save', accion: 'guardar' }],
+    momentos: [{ palabra: 'cerrado', tocar: 't-save', accion: 'guardar' }],
     deja: { guardado: true },
     explica: ['guardar-cerrar'],
   },
@@ -464,7 +516,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(24),
     objetivo: 't-lectura',
     vista: 'lectura',
-    momentos: [{ en: 0.75, objetivo: 't-verificacion' }],
+    momentos: [{ palabra: 'verificacion', objetivo: 't-verificacion' }],
     explica: ['lectura', 'verificacion'],
   },
   {
@@ -474,7 +526,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(25),
     objetivo: 't-editar',
     vista: 'lectura',
-    momentos: [{ en: 0.35, tocar: 't-editar' }],
+    momentos: [{ palabra: 'editar', tocar: 't-editar' }],
     explica: ['editar-lectura'],
   },
   // 11 · Revisión semanal del supervisor
@@ -496,7 +548,7 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     audio: p(27),
     objetivo: 't-rev-fila',
     vista: 'revision',
-    momentos: [{ en: 0.2, tocar: 't-rev-fila', accion: 'subirFuerza' }],
+    momentos: [{ palabra: 'sube', tocar: 't-rev-fila', accion: 'subirFuerza' }],
     explica: ['revision-subir', 'revision-solo-lectura'],
   },
 ]
