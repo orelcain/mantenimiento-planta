@@ -631,10 +631,7 @@ export function MainLayout() {
                           <span className="vidrio-capsula vidrio-capsula--alerta ml-auto">{incidenciasActivas}</span>
                         )}
                         {apple && item.href === '/bitacora' && (
-                          <span className="vidrio-capsula ml-auto">
-                            <span className="vidrio-punto" aria-hidden="true" />
-                            en curso
-                          </span>
+                          <span className="vidrio-punto ml-auto mr-1" role="img" aria-label="Turno en curso" />
                         )}
                       </NavLink>
                     ))}
@@ -1314,7 +1311,7 @@ export function MainLayout() {
         <div className="flex items-center h-[60px] px-1.5 [@media(max-height:500px)]:h-10">
           {bottomNavItems.map(item => {
             const isActive = item.href === '/'
-              ? location.pathname === '/'
+              ? location.pathname === '/' || location.pathname === '/dashboard'
               : location.pathname.startsWith(item.href)
             return (
               <NavLink
