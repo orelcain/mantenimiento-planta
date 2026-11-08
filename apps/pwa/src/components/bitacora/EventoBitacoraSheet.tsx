@@ -1166,6 +1166,10 @@ export function EventoBitacoraSheet({
       {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
           overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
       <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
+        {/* Causa raíz, lo primero de la hoja: al final del formulario nadie la encontraba
+            (prueba como técnico, 08-11; opción A del mockup aprobado). */}
+        {evento && eventoRequiereAcr(evento) && <AcrEntrada evento={evento} />}
+
         {/* Estado del borrador: que se vea que no hay que tocar nada para guardar. */}
         {autoguarda && (
           <p className="-mt-2 flex items-center gap-1.5 text-footnote text-muted-foreground" role="status" aria-live="polite">
@@ -1769,7 +1773,6 @@ export function EventoBitacoraSheet({
           </p>
         )}
 
-        {evento && eventoRequiereAcr(evento) && <AcrEntrada evento={evento} />}
         {(!esNuevo || existeEnServidor.current) && !puedeEliminar && (
           <p className="text-footnote text-muted-foreground">
             {modoBorrador ? 'Descartarlo' : 'Borrarlo'} solo puede quien lo empezó o un supervisor.
