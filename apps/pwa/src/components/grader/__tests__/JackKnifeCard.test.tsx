@@ -49,7 +49,7 @@ vi.mock('@/services/shoplogix/jackKnife', async (orig) => {
 describe('JackKnifeCard', () => {
   it('muestra la tesis, el aviso de turnos sin resumen y el gráfico con la causa', async () => {
     render(<JackKnifeCard plantSlug="chonchi" />)
-    expect(await screen.findByText('Diagrama Jack-Knife de Mantención')).toBeTruthy()
+    expect(await screen.findByText('Exportar para reunión')).toBeTruthy()
     await waitFor(() => expect(screen.getByRole('img', { name: 'Eventos contra MTTR por causa' })).toBeTruthy())
     expect(screen.getAllByText(/Knuro/).length).toBeGreaterThan(0)
     expect(screen.getByText(/1 turno sin resumen/)).toBeTruthy()

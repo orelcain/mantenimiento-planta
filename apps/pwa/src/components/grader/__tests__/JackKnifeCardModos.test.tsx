@@ -23,8 +23,8 @@ describe('JackKnifeCard con el fixture de Chonchi', () => {
   it('abre con los filtros del hash y compara con el período anterior', async () => {
     render(<JackKnifeCard plantSlug="chonchi" />)
     await esperarGrafico()
-    expect(screen.getByText(/por turno 24,2 → 14,3 min/)).toBeTruthy()
-    expect(screen.getByText(/11 causas mejoraron y 3 empeoraron/)).toBeTruthy()
+    expect(screen.getByText(/24,2 → 14,3 min por turno/)).toBeTruthy()
+    expect(screen.getByText(/9 mejoraron, 2 desaparecieron, 3 empeoraron/)).toBeTruthy()
     expect(screen.getAllByText(/Antes:/).length).toBeGreaterThan(0)
   })
 
@@ -32,7 +32,7 @@ describe('JackKnifeCard con el fixture de Chonchi', () => {
     render(<JackKnifeCard plantSlug="chonchi" />)
     await esperarGrafico()
     fireEvent.click(screen.getByText('Sin comparar'))
-    expect(screen.queryByText(/por turno 24,2/)).toBeNull()
+    expect(screen.queryByText(/24,2 →/)).toBeNull()
     expect(screen.queryByText(/Antes:/)).toBeNull()
   })
 
@@ -52,14 +52,14 @@ describe('JackKnifeCard con el fixture de Chonchi', () => {
     expect(screen.getAllByText(/Antes:/).length).toBeGreaterThan(0)
   })
 
-  it('«Generar informe» muestra mejoraron, empeoraron y la prioridad 1', async () => {
+  it('muestra listas breves y el menú de exportación PDF/PNG', async () => {
     render(<JackKnifeCard plantSlug="chonchi" />)
     await esperarGrafico()
-    fireEvent.click(screen.getByText('Generar informe'))
-    expect(screen.getByText(/Mejoraron \(11\)/)).toBeTruthy()
-    expect(screen.getByText(/Empeoraron o aparecieron \(3\)/)).toBeTruthy()
-    expect(screen.getByText(/Prioridad 1 ahora:/)).toBeTruthy()
-    expect(screen.getByText('Descargar PDF')).toBeTruthy()
+    fireEvent.click(screen.getByText('Exportar para reunión'))
+    expect(screen.getByText(/Mejoraron \(9\)/)).toBeTruthy()
+    expect(screen.getByText(/Empeoraron \(3\)/)).toBeTruthy()
+    expect(screen.getByText('Atacar ahora')).toBeTruthy()
+    expect(screen.getByText('PDF')).toBeTruthy()
   })
 
   it('el detalle compara por cada 10 turnos con las flechas de texto', async () => {
@@ -76,4 +76,18 @@ describe('JackKnifeCard con el fixture de Chonchi', () => {
     expect(buscador.value).toBe('sensor')
     expect(screen.getAllByText(/en el período/).length).toBeGreaterThan(0)
   })
+  it('abre el detalle al elegir un punto y Mes selecciona 30 días contra mes pasado', async () => {
+    render(<JackKnifeCard plantSlug="chonchi" />)
+    await esperarGrafico()
+    const detalle = screen.getByText('Ver detalle').closest('details')!
+    expect(detalle.open).toBe(false)
+    const grafico = screen.getByRole('img', { name: 'Eventos contra MTTR por causa' })
+    const punto = grafico.querySelector('[role="button"]')!
+    fireEvent.click(punto)
+    expect(detalle.open).toBe(true)
+    fireEvent.click(screen.getByText('Mes'))
+    expect(screen.getByRole('tab', {name:'30 días'}).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', {name:'Vs. mes pasado'}).getAttribute('aria-selected')).toBe('true')
+  })
+
 })

@@ -9,14 +9,19 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ChevronLeft, ChevronRight, FileDown, FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Button, SegmentedControl } from '@/components/piel'
+import { Q, pctCambio } from './jackKnifePresentacion'
+import { JackKnifeGrafico } from './JackKnifeGrafico'
+import { JackKnifeLamina } from './JackKnifeLamina'
+import { exportarLamina } from '@/services/grader/jackKnifeExport'
+import { JackKnifeListas } from './JackKnifeListas'
 import { calcularLayout } from './jackKnifeLayout'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 import {
-  ETIQUETA_VEREDICTO,
+  ETIQUETA_VEREDICTO, ACCION_CUADRANTE, nivelPrioridad, limitesPeriodoBase, causasConHistoria, frasePrioridad, textoResumenComparacion,
   SIN_IMPUTAR,
   agruparComentarios,
   calcularJackKnife,
@@ -34,7 +39,6 @@ import {
   sentidoCambio,
   veredicto,
   ventanaJK,
-  type CuadranteJK,
   type ModoCmpJK,
   type PreviaJK,
   type RangoJK,
@@ -49,14 +53,6 @@ import {
 const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
 
 /** Colores de cuadrante: tinta para el texto, punto para el marcador, relleno de baja opacidad. */
-const Q: Record<CuadranteJK, { t: string; a: string; ink: string; dot: string; fill: string }> = {
-  amb: { t: 'Agudas y crónicas', a: 'Prioridad 1: atacar causa raíz y tiempo de reparación.', ink: 'rgb(var(--tw-red-600))', dot: 'rgb(var(--tw-red-500))', fill: 'rgb(var(--tw-red-500) / 0.08)' },
-  agu: { t: 'Agudas', a: 'Pocas veces, pero larga: revisar repuestos, diagnóstico y procedimiento.', ink: 'rgb(var(--jk-agu))', dot: 'rgb(var(--jk-agu))', fill: 'rgb(var(--jk-agu) / 0.08)' },
-  cro: { t: 'Crónicas', a: 'Rápida, pero repetida: buscar causa raíz o preventivo.', ink: 'rgb(var(--jk-cro))', dot: 'rgb(var(--jk-cro))', fill: 'rgb(var(--jk-cro) / 0.08)' },
-  ok: { t: 'Bajo control', a: 'Sin acción. Mantener seguimiento.', ink: 'rgb(var(--success))', dot: 'rgb(var(--success))', fill: 'rgb(var(--success) / 0.07)' },
-}
-const COLOR_SIN = 'rgb(var(--cat-6-ink))'
-
 /** Etiqueta corta en pantallas angostas; el texto largo sigue siendo el nombre accesible. */
 const dual = (largo: string, corto: string) => (
   <>
@@ -71,7 +67,6 @@ const VISTAS: { value: VistaJK; label: string }[] = [
   { value: 'todas', label: 'Todas' },
 ]
 const PRESETS: { value: VentanaJK; label: ReactNode }[] = [
-  { value: 'turno', label: dual('Último turno', 'Turno') },
   { value: '7', label: dual('7 días', '7 d') },
   { value: '30', label: dual('30 días', '30 d') },
   { value: '90', label: dual('90 días', '90 d') },
@@ -121,6 +116,7 @@ const TONO_VEREDICTO: Record<string, string> = {
   sinEventos: 'text-ink-ok',
   empeoro: 'text-ink-crit',
   nueva: 'text-ink-crit',
+  sinHistoria: 'text-muted-foreground',
   igual: 'text-muted-foreground',
 }
 
@@ -237,93 +233,6 @@ function ComentariosCausa({ causa, todos, busqueda, onBusqueda, palabra, onPalab
   )
 }
 
-type InformeDatos = NonNullable<ReturnType<typeof datosInforme>>
-
-/** Informe: resultado, mejoraron y empeoraron, prioridad 1, detalle por causa y comentarios clave. */
-function InformeJackKnife({ planta, informe, ahoraTxt, antesTxt, horasAhora, horasAntes, vistaTxt, pdfEnCurso, errorPdf, onPdf }: {
-  planta: string
-  informe: InformeDatos
-  ahoraTxt: string
-  antesTxt: string
-  horasAhora: number
-  horasAntes: number
-  vistaTxt: string
-  pdfEnCurso: boolean
-  errorPdf: boolean
-  onPdf: () => void
-}) {
-  const i = informe
-  const signo = i.variacionPct <= 0 ? '−' : '+'
-  const resultadoTxt = i.resultado === 'se_mantiene' ? 'se mantiene' : i.resultado === 'mejoro' ? 'mejoró' : 'empeoró'
-  return (
-    <section aria-label="Informe Jack-Knife" className="space-y-4 pt-2 text-footnote text-foreground">
-      <h4 className="text-headline font-semibold">Informe Jack-Knife · {planta}</h4>
-      <p className="text-caption tabular-nums text-muted-foreground">
-        Ahora: {ahoraTxt} ({i.nAhora} {plural(i.nAhora, 'turno', 'turnos')}) · Antes: {antesTxt} ({i.nAntes} {plural(i.nAntes, 'turno', 'turnos')}) · {vistaTxt}. Fuente: detenciones imputadas en Shoplogix, causas del balde Mantención.
-      </p>
-
-      <div className="space-y-1">
-        <h5 className="font-semibold">Resultado</h5>
-        <p className="tabular-nums">
-          La detención atribuida a Mantención pasó de {dec1(i.minTurnoAntes)} a {dec1(i.minTurnoAhora)} min por turno ({signo}{dec(Math.abs(i.variacionPct), 0)} %): {resultadoTxt}. En total, {hrs(horasAntes)} antes y {hrs(horasAhora)} ahora.
-        </p>
-        <p>
-          <b>Mejoraron ({i.mejoraron.length}):</b> {i.mejoraron.join(', ') || 'ninguna'}. <b>Empeoraron o aparecieron ({i.empeoraron.length}):</b> {i.empeoraron.join(', ') || 'ninguna'}.
-        </p>
-        {i.prioridad1.length > 0 && (
-          <p><b>Prioridad 1 ahora:</b> {i.prioridad1.join(', ')}: se repiten más que el promedio y tardan más en repararse.</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <h5 className="font-semibold">Detalle por causa (por cada 10 turnos)</h5>
-        <ul className="space-y-3">
-          {i.filas.map((f) => (
-            <li key={f.causa} className="min-w-0 space-y-1">
-              <p className="flex flex-wrap items-baseline justify-between gap-x-2">
-                <span className="min-w-0 break-words font-semibold">{f.causa}</span>
-                <span className={cn('text-caption font-semibold', TONO_VEREDICTO[f.veredicto])}>{ETIQUETA_VEREDICTO[f.veredicto]}</span>
-              </p>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-caption tabular-nums">
-                <dt className="text-muted-foreground">Eventos antes → ahora</dt>
-                <dd className="text-foreground">{dec1(f.evAntes10)} → {dec1(f.evAhora10)}</dd>
-                <dt className="text-muted-foreground">Reparación antes → ahora</dt>
-                <dd className="text-foreground">{f.antes ? `${dec1(f.antes.mttr)} min` : '—'} → {f.ahora ? `${dec1(f.ahora.mttr)} min` : '—'}</dd>
-                <dt className="text-muted-foreground">Min. detenido antes → ahora</dt>
-                <dd className="text-foreground">{dec(f.minAntes10, 0)} → {dec(f.minAhora10, 0)}</dd>
-              </dl>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="space-y-1">
-        <h5 className="font-semibold">Qué dicen los comentarios</h5>
-        {i.comentariosClave.length === 0 ? (
-          <p>Sin causas prioritarias ni empeoradas.</p>
-        ) : i.comentariosClave.map((g) => (
-          <p key={g.causa} className="break-words">
-            <b>{g.causa}:</b>{' '}
-            {g.top.length ? g.top.map((t) => `«${t.texto}»${t.n > 1 ? ` ×${t.n}` : ''}`).join(' · ') : 'sin comentarios en el período.'}
-          </p>
-        ))}
-      </div>
-
-      <p className="text-caption text-muted-foreground">
-        Regla: una causa mejora o empeora si sus minutos por turno cambian más de 10 %. Las horas y los eventos se llevan a cada 10 turnos para comparar períodos de distinto largo. El PDF trae un QR que abre esta misma vista.
-      </p>
-
-      <div className="flex flex-col gap-2 min-[561px]:flex-row min-[561px]:items-center">
-        <Button variant="filled" size="md" onClick={onPdf} disabled={pdfEnCurso} className="gap-2">
-          <FileDown aria-hidden />
-          {pdfEnCurso ? 'Preparando PDF…' : 'Descargar PDF'}
-        </Button>
-        {errorPdf && <p role="alert" className="text-footnote text-ink-crit">No se pudo generar el PDF. Intenta de nuevo.</p>}
-      </div>
-    </section>
-  )
-}
-
 export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   // Filtros desde el QR o el link del informe (#jk=…), leídos una sola vez al abrir.
   const [inicial] = useState(() => leerEstadoJK(window.location.hash, plantSlug))
@@ -338,7 +247,9 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   const [busqueda, setBusqueda] = useState('')
   const [palabra, setPalabra] = useState<string | null>(null)
   const [modoCom, setModoCom] = useState<'grupo' | 'fecha'>('grupo')
-  const [verInforme, setVerInforme] = useState(false)
+  const [limitesBase, setLimitesBase] = useState(inicial?.lb !== false)
+  const detalleRef = useRef<HTMLDetailsElement>(null)
+  const laminaRef = useRef<HTMLDivElement>(null)
   const [pdfEnCurso, setPdfEnCurso] = useState(false)
   const [errorPdf, setErrorPdf] = useState(false)
   const [ancho, setAncho] = useState(0)
@@ -391,7 +302,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
     return { desde, hasta }
   }, [turnos, preset, manual, n])
 
-  const calc = useMemo(
+  const calcActual = useMemo(
     () => calcularJackKnife(turnos, win.desde, win.hasta, vista),
     [turnos, win.desde, win.hasta, vista],
   )
@@ -407,13 +318,16 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
     () => (previa ? calcularJackKnife(turnos, previa.desde, previa.hasta, vista) : null),
     [turnos, previa, vista],
   )
-  const resumen = useMemo(() => resumenComparacion(calc, antesCalc, previa), [calc, antesCalc, previa])
+  const calc = useMemo(() => limitesPeriodoBase(calcActual, antesCalc, limitesBase), [calcActual, antesCalc, limitesBase])
+  const historia = useMemo(() => causasConHistoria(turnos, win.desde, vista), [turnos, win.desde, vista])
+  const resumen = useMemo(() => resumenComparacion(calc, antesCalc, previa, historia), [calc, antesCalc, previa, historia])
   const informe = useMemo(
-    () => (verInforme && previa && antesCalc ? datosInforme(turnos, calc, antesCalc, previa) : null),
-    [verInforme, turnos, calc, antesCalc, previa],
+    () => (previa && antesCalc ? datosInforme(turnos, calc, antesCalc, previa, vista) : null),
+    [turnos, calc, antesCalc, previa, vista],
   )
   const nAhoraT = win.hasta - win.desde + 1
   const nAntesT = previa ? previa.hasta - previa.desde + 1 : 0
+  const fantasmas = antesCalc ? antesCalc.pts.filter(p => calc.pts.some(a => a.k === p.k && (a.q !== 'ok' || p.q !== 'ok'))).map(p => ({ ...p, ev: p.ev * nAhoraT / nAntesT })) : []
   const plantaTxt = plantSlug === 'chonchi' ? 'Chonchi' : plantSlug === 'yal' ? 'Yal' : plantSlug
   // Causas que tuvieron eventos antes y ahora no: la lista de la tarjeta no las dibuja.
   const soloAntes = antesCalc ? antesCalc.pts.filter((p) => !calc.pts.some((q) => q.k === p.k)) : []
@@ -425,36 +339,24 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
       v: preset,
       vs: vista,
       cmp: modoCmp,
+      lb: limitesBase,
       ...(preset === 'libre' && n ? { ha: turnos[win.desde]?.id, hb: turnos[win.hasta]?.id } : {}),
       ...(modoCmp === 'mano' && previa ? { ca: turnos[previa.desde]?.id, cb: turnos[previa.hasta]?.id } : {}),
     }
-    return `${window.location.origin}${window.location.pathname}${codificarEstadoJK(estado)}`
+    return `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}/jack-knife${codificarEstadoJK(estado)}`
   }
 
-  const descargarPdf = async () => {
-    if (!informe || !previa || !antesCalc) return
+  const descargar = async (formato: 'pdf' | 'png') => {
     setPdfEnCurso(true)
     setErrorPdf(false)
     try {
-      const { exportarInformeJackKnifePDF } = await import('@/services/grader/jackKnifePdf')
-      await exportarInformeJackKnifePDF({
-        planta: plantaTxt,
-        informe,
-        ahoraTxt: rangoTexto(turnos, win),
-        antesTxt: rangoTexto(turnos, previa),
-        horasAhora: calc.D,
-        horasAntes: antesCalc.D,
-        vistaTxt: VISTAS.find((v) => v.value === vista)?.label ?? '',
-        url: urlVista(),
-      })
-    } catch {
-      setErrorPdf(true)
-    } finally {
-      setPdfEnCurso(false)
-    }
+      await new Promise<void>(resolve => setTimeout(resolve, 80)) // timeout y no rAF: rAF se pausa con la pestaña en segundo plano
+      if (!laminaRef.current) throw new Error('Lámina no disponible')
+      await exportarLamina(laminaRef.current, formato, 'jack-knife_' + plantSlug + '_' + turnos[win.desde]?.dateKey + '_' + turnos[win.hasta]?.dateKey)
+    } catch { setErrorPdf(true) } finally { setPdfEnCurso(false) }
   }
 
-  const W = Math.max(300, ancho || 900)
+  const W = Math.max(300, window.innerWidth >= 1024 ? ((ancho || 900) - 56) * 1.6 / 2.6 : ancho || 900)
   // Columnas de la lista según el ancho de la TARJETA (no del viewport): 4 ≥ 900 px, 2 ≥ 520 px, 1 si no.
   const columnasLista = ancho >= 900 ? 4 : ancho >= 520 ? 2 : 1
   const layout = useMemo(
@@ -469,8 +371,6 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
     ? comentariosDe(turnos, win.desde, win.hasta, selPunto.k, Infinity)
     : []
 
-  const prim = calc.pts.filter((p) => p.q === 'amb')
-  const sinPt = calc.pts.find((p) => p.k === SIN_IMPUTAR)
   const tesis = (() => {
     if (vista === 'sin') {
       if (!calc.pts.length) return 'No hay detenciones sin causa en esta ventana, sin contar microdetenciones.'
@@ -478,11 +378,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
       return `${calc.N} ${plural(calc.N, 'detención', 'detenciones')} sin causa anotada (${hrs(calc.D)}). La que más deja sin anotar: ${top.k}, con ${top.ev} y ${hrs(top.min)}.`
     }
     if (!calc.pts.length) return 'Sin detenciones de Mantención con causa en esta ventana.'
-    const cabecera = prim.length
-      ? `Prioridad 1: ${[...prim].sort((a, b) => b.min - a.min).map((p) => p.k).join(', ')}.`
-      : 'Ninguna causa cae en agudas y crónicas.'
-    const sinTxt = sinPt ? `, de las que ${hrs(sinPt.min)} no tienen causa.` : ' atribuidas a Mantención.'
-    return `${cabecera} ${calc.N} ${plural(calc.N, 'evento', 'eventos')} y ${hrs(calc.D)} de detención${sinTxt}`
+    return frasePrioridad(calc, hrs)
   })()
 
   const avisos: string[] = []
@@ -502,9 +398,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
       avisos.push('La historia no alcanza para un período anterior completo: se compara con menos turnos.')
     }
   }
-  const tesisCmp = resumen
-    ? ` Antes: ${hrs(resumen.horasAntes)} en ${resumen.nAntes} ${plural(resumen.nAntes, 'turno', 'turnos')}; por turno ${dec1(resumen.minAntes)} → ${dec1(resumen.minAhora)} min. ${resumen.mejoraron} ${plural(resumen.mejoraron, 'causa mejoró', 'causas mejoraron')} y ${resumen.empeoraron} ${plural(resumen.empeoraron, 'empeoró', 'empeoraron')}.${resumen.parcial ? ' La historia no alcanza para un período anterior completo.' : ''}`
-    : ''
+  const tesisCmp = resumen ? ' ' + textoResumenComparacion(resumen) + '.' : ''
 
   // Riel: barras por turno (escala raíz, como el mockup).
   const mxBarra = Math.max(...calc.barras, 1)
@@ -538,12 +432,15 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   }
 
   // Al cambiar de causa o de vista se limpian el filtro y la búsqueda de comentarios.
-  const elegirCausa = (k: string) => { setSel(k); setBusqueda(''); setPalabra(null) }
+  const elegirCausa = (k: string) => { if (detalleRef.current) detalleRef.current.open = true; setSel(k); setBusqueda(''); setPalabra(null) }
   const cambiarVista = (v: VistaJK) => { setVista(v); setSel(null); setBusqueda(''); setPalabra(null) }
   const cambiarPreset = (v: VentanaJK | 'libre') => { setPreset(v); setManual(null) }
   const cambiarModo = (m: ModoCmpJK) => {
     setModoCmp(m)
-    if (m === 'mano') setManualAntes(previaAnterior(win.desde, win.hasta) ?? { desde: 0, hasta: 0 })
+    if (m === 'mano') {
+      setManualAntes(previaAnterior(win.desde, win.hasta) ?? { desde: 0, hasta: 0 })
+      if (detalleRef.current) detalleRef.current.open = true
+    }
   }
 
   const nuevoA = (v: number) => { setManual({ desde: Math.min(v, win.hasta), hasta: win.hasta }); setPreset('libre') }
@@ -559,25 +456,36 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
     <Card ref={rootRef} className="bg-card">
       <CardContent className="p-4 space-y-3 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-headline font-semibold text-foreground">Diagrama Jack-Knife de Mantención</h3>
+          <SegmentedControl<VentanaJK | 'libre'> className="sm:w-auto sm:min-w-[300px]" ariaLabel="Período" value={preset} onChange={cambiarPreset} segments={PRESETS} />
+          <Button variant={preset === '30' && modoCmp === 'mes' ? 'tinted' : 'plain'} onClick={() => { cambiarPreset('30'); cambiarModo('mes') }} aria-pressed={preset === '30' && modoCmp === 'mes'}>Mes</Button>
+          <SegmentedControl<ModoCmpJK> className="sm:w-auto sm:min-w-[360px]" ariaLabel="Comparar con" value={modoCmp} onChange={cambiarModo} segments={MODOS} />
+          <details className="relative ml-auto"><summary className="cursor-pointer rounded-full bg-primary px-4 py-3 font-semibold text-primary-foreground">Exportar para reunión</summary>
+            <div className="absolute right-0 z-10 rounded-2xl bg-card p-2 shadow">
+              <Button disabled={pdfEnCurso || !n} onClick={() => void descargar('pdf')}>PDF</Button>
+              <Button disabled={pdfEnCurso || !n} onClick={() => void descargar('png')}>PNG</Button>
+            </div>
+          </details>
         </div>
-        <p className="text-footnote text-muted-foreground max-w-prose">
-          Cada punto es una causa de Mantención: cuántas veces detuvo la línea y cuánto duró cada vez.
-        </p>
-
-        <div className="flex flex-wrap gap-2">
-          <SegmentedControl<VistaJK> ariaLabel="Qué detenciones ver" value={vista} onChange={cambiarVista} segments={VISTAS} />
-          <SegmentedControl<VentanaJK | 'libre'> ariaLabel="Período" value={preset} onChange={cambiarPreset} segments={PRESETS} />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <SegmentedControl<ModoCmpJK> ariaLabel="Comparar con" value={modoCmp} onChange={cambiarModo} segments={MODOS} />
-        </div>
-
+        {pdfEnCurso && <p role="status">Preparando lámina…</p>}
+        {errorPdf && <p role="alert" className="text-destructive">No se pudo exportar la lámina. Intenta de nuevo.</p>}
         {error && <p className="text-footnote text-destructive">No se pudo leer el resumen de turnos. Intenta de nuevo.</p>}
         {!error && crudos === null && <p className="text-footnote text-muted-foreground">Cargando turnos…</p>}
 
         {crudos !== null && (
           <>
+            <div className="py-4">
+              <p className="text-display font-bold tabular-nums">{resumen ? dec1(resumen.minAntes) + ' → ' : ''}{dec1(nAhoraT ? calc.D / nAhoraT : 0)} min por turno</p>
+              {resumen && resumen.minAntes > 0 && <p className={cn('text-title2 tabular-nums', resumen.minAhora < resumen.minAntes ? 'text-ink-ok' : resumen.minAhora > resumen.minAntes ? 'text-ink-crit' : 'text-muted-foreground')}>{pctCambio(resumen.minAhora / resumen.minAntes - 1)}</p>}
+              <p className="text-footnote text-muted-foreground">Detención atribuida a Mantención · {rangoTexto(turnos, win)}{previa && ' frente a ' + rangoTexto(turnos, previa)}</p>
+            </div>
+            {previa && <label className="flex min-h-[44px] items-center gap-2 text-footnote"><input type="checkbox" checked={limitesBase} onChange={e => setLimitesBase(e.target.checked)} />Límites del período base</label>}
+            <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+              <JackKnifeGrafico calc={calc} ancho={W} sel={sel} fantasmas={fantasmas} elegirCausa={elegirCausa} />
+              <JackKnifeListas calc={calc} informe={informe} turnos={turnos} elegirCausa={elegirCausa} />
+            </div>
+            <details ref={detalleRef} className="space-y-4"><summary className="cursor-pointer py-4 font-semibold text-accent">Ver detalle</summary>
+            <p className="text-footnote text-muted-foreground">¿Cómo se lee? Los cuadrantes separan frecuencia y duración altas o bajas. La línea de disponibilidad une causas con igual tiempo detenido. Los límites del período base mantienen su MTTR y ajustan la frecuencia al número de turnos actuales; al desactivarlos se recalculan con el período actual.</p>
+            <SegmentedControl<VistaJK> ariaLabel="Qué detenciones ver" value={vista} onChange={cambiarVista} segments={VISTAS} />
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <button
@@ -721,88 +629,18 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
               </p>
             )}
 
-            {layout ? (
-              <svg
-                viewBox={`0 0 ${layout.W} ${layout.H}`}
-                height={layout.H}
-                role="img"
-                aria-label="Eventos contra MTTR por causa"
-                className="block w-full"
-              >
-                <rect x={layout.L} y={layout.T} width={Math.max(0, layout.ux - layout.L)} height={Math.max(0, layout.uy - layout.T)} fill={Q.agu.fill} />
-                <rect x={layout.ux} y={layout.T} width={Math.max(0, layout.W - layout.R - layout.ux)} height={Math.max(0, layout.uy - layout.T)} fill={Q.amb.fill} />
-                <rect x={layout.L} y={layout.uy} width={Math.max(0, layout.ux - layout.L)} height={Math.max(0, layout.T + layout.ih - layout.uy)} fill={Q.ok.fill} />
-                <rect x={layout.ux} y={layout.uy} width={Math.max(0, layout.W - layout.R - layout.ux)} height={Math.max(0, layout.T + layout.ih - layout.uy)} fill={Q.cro.fill} />
-
-                {layout.xs.map(({ v, x }) => (
-                  <text key={`x${v}`} x={x} y={layout.T + layout.ih + 18} textAnchor="middle" className="fill-muted-foreground text-caption">
-                    {String(v).replace('.', ',')}
-                  </text>
-                ))}
-                {layout.ys.map(({ v, y }) => (
-                  <text key={`y${v}`} x={layout.L - 8} y={y + 4} textAnchor="end" className="fill-muted-foreground text-caption">
-                    {String(v).replace('.', ',')}
-                  </text>
-                ))}
-                <text x={layout.L + layout.iw / 2} y={layout.H - 6} textAnchor="middle" className="fill-muted-foreground text-caption">Eventos en el período</text>
-                <text transform={`translate(13 ${layout.T + layout.ih / 2}) rotate(-90)`} textAnchor="middle" className="fill-muted-foreground text-caption">MTTR (min)</text>
-
-                <line x1={layout.ux} y1={layout.T} x2={layout.ux} y2={layout.T + layout.ih} className="stroke-muted-foreground opacity-40" strokeDasharray="4 4" />
-                <line x1={layout.L} y1={layout.uy} x2={layout.W - layout.R} y2={layout.uy} className="stroke-muted-foreground opacity-40" strokeDasharray="4 4" />
-
-                {(
-                  [
-                    ['amb', 'Agudas y crónicas', layout.W - layout.R - 8, layout.T + 18, 'end'],
-                    ['agu', 'Agudas', layout.L + 8, layout.T + 18, 'start'],
-                    ['ok', 'Bajo control', layout.L + 8, layout.T + layout.ih - 8, 'start'],
-                    ['cro', 'Crónicas', layout.W - layout.R - 8, layout.T + layout.ih - 8, 'end'],
-                  ] as const
-                ).map(([q, t, x, y, an]) => (
-                  <text key={q} x={x} y={y} textAnchor={an} className="text-footnote font-semibold" style={{ fill: Q[q].ink }}>
-                    {t}
-                  </text>
-                ))}
-
-                {layout.puntos.filter((d) => d.etiqueta?.lin).map(({ p, x, y, etiqueta }) => (
-                  <line key={`l-${p.k}`} x1={x} y1={y} x2={etiqueta!.cx} y2={etiqueta!.cy} className="stroke-muted-foreground opacity-40" />
-                ))}
-                {layout.puntos.map(({ p, x, y, rad, etiqueta }) => {
-                  const color = p.k === SIN_IMPUTAR ? COLOR_SIN : Q[p.q].dot
-                  const activar = () => elegirCausa(p.k)
-                  return (
-                    <g
-                      key={p.k}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`${p.k}: ${p.ev} ${plural(p.ev, 'evento', 'eventos')}, ${durS(p.mttr)}`}
-                      onClick={activar}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activar() } }}
-                      className="cursor-pointer focus-visible:outline-none"
-                    >
-                      <title>{p.k}</title>
-                      <circle cx={x} cy={y} r={rad} fill={color} className="stroke-card" strokeWidth={1.5} />
-                      {etiqueta && (
-                        <text x={etiqueta.bx} y={etiqueta.by} className="fill-foreground text-footnote">{p.k}</text>
-                      )}
-                    </g>
-                  )
-                })}
-              </svg>
-            ) : (
-              <p className="text-footnote text-muted-foreground">Sin detenciones de Mantención con causa en esta ventana.</p>
-            )}
 
             {selPunto && (
               <div className="text-footnote space-y-1">
                 <p className="font-semibold text-foreground">
-                  <span style={{ color: Q[selPunto.q].ink }}>{selPunto.k} · {Q[selPunto.q].t}</span>
+                  <span style={{ color: Q[selPunto.q].ink }}>{selPunto.k} · {selPunto.q === 'cro' ? (nivelPrioridad(selPunto, calc.un, calc.um) === 3 ? 'Crónica A' : 'Crónica B') : Q[selPunto.q].t}</span>
                 </p>
                 <p className="text-foreground tabular-nums">
                   {selPunto.ev} {plural(selPunto.ev, 'evento', 'eventos')} · {esSin ? 'duración media' : 'MTTR'} {durS(selPunto.mttr)} · {hrs(selPunto.min)} en total.{' '}
                   <span className="text-muted-foreground">
                     {esSin
                       ? 'Sin causa anotada: pedir la imputación al supervisor del turno; hasta entonces no se sabe si es de Mantención.'
-                      : Q[selPunto.q].a}
+                      : ACCION_CUADRANTE[selPunto.q]}
                   </span>
                 </p>
                 {previa && (() => {
@@ -818,7 +656,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                     </p>
                   ) : (
                     <p className="text-foreground">
-                      <span className="font-semibold text-ink-crit">Nueva:</span>{' '}
+                      <span className="font-semibold text-muted-foreground">{historia.has(selPunto.k) ? 'Apareció:' : 'Sin historia:'}</span>{' '}
                       <span className="text-muted-foreground">no tuvo eventos en el período de comparación.</span>
                     </p>
                   )
@@ -840,7 +678,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
 
             <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${columnasLista}, minmax(0, 1fr))` }}>
               {(['amb', 'agu', 'cro', 'ok'] as const).map((k) => {
-                const filas = calc.pts.filter((p) => p.q === k).sort((a, b) => b.min - a.min)
+                const filas = calc.pts.filter((p) => p.q === k).sort((a, b) => nivelPrioridad(a, calc.un, calc.um) - nivelPrioridad(b, calc.un, calc.um) || b.min - a.min)
                 return (
                   <div key={k} className="min-w-0">
                     <h4 className="flex items-center gap-2 text-footnote font-semibold text-foreground mb-1">
@@ -863,7 +701,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                           <span className="shrink-0 text-right text-caption text-muted-foreground">
                             <span className="block">{p.ev} · {durS(p.mttr)}</span>
                             {previa && (() => {
-                              const v = veredicto(p, antesCalc?.pts.find((x) => x.k === p.k), nAhoraT, nAntesT)
+                              const v = veredicto(p, antesCalc?.pts.find((x) => x.k === p.k), nAhoraT, nAntesT, historia.has(p.k))
                               return v === 'igual' ? null : (
                                 <span className={cn('block font-semibold', TONO_VEREDICTO[v])}>{ETIQUETA_VEREDICTO[v]}</span>
                               )
@@ -885,41 +723,10 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
               </p>
             )}
 
-            <div className="space-y-2">
-              <Button variant="tinted" size="md" onClick={() => setVerInforme((v) => !v)} aria-expanded={verInforme} className="gap-2">
-                <FileText aria-hidden />
-                {verInforme ? 'Ocultar informe' : 'Generar informe'}
-              </Button>
-              {verInforme && (
-                !previa ? (
-                  <p className="text-footnote text-muted-foreground">
-                    Elige un período de comparación para que el informe diga qué causas mejoraron o empeoraron.
-                  </p>
-                ) : !informe || !antesCalc ? (
-                  <p className="text-footnote text-muted-foreground">
-                    No hay eventos en el período de comparación: el informe no puede decir qué causas mejoraron.
-                  </p>
-                ) : (
-                  <InformeJackKnife
-                    planta={plantaTxt}
-                    informe={informe}
-                    ahoraTxt={rangoTexto(turnos, win)}
-                    antesTxt={rangoTexto(turnos, previa)}
-                    horasAhora={calc.D}
-                    horasAntes={antesCalc.D}
-                    vistaTxt={VISTAS.find((v) => v.value === vista)?.label ?? ''}
-                    pdfEnCurso={pdfEnCurso}
-                    errorPdf={errorPdf}
-                    onPdf={() => void descargarPdf()}
-                  />
-                )
-              )}
-            </div>
-
             <p className="text-caption text-muted-foreground">
               {calc.N > 0 && (vista === 'sin'
                 ? `Umbrales: ${dec1(calc.un)} eventos por evisceradora y ${dec1(calc.um)} min de duración media. `
-                : `Umbrales: ${dec1(calc.un)} eventos por causa y ${dec1(calc.um)} min de MTTR, recalculados con cada ventana. `)}
+                : `Umbrales: ${dec1(calc.un)} eventos por causa y ${dec1(calc.um)} min de MTTR, ${limitesBase && antesCalc?.N ? 'del período base' : 'recalculados con cada ventana'}. `)}
               {calc.cob !== null && `Cobertura de causa aproximada, con microdetenciones: ${Math.round(calc.cob * 100)} %. `}
               {layout && layout.ocultas > 0 && `${layout.ocultas} ${plural(layout.ocultas, 'punto no lleva', 'puntos no llevan')} nombre para no montarse: tócalos o míralos en la lista. `}
               {vista === 'sin'
@@ -927,6 +734,8 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                 : 'Una detención simultánea en las 3 evisceradoras cuenta como un evento.'}
               {vista === 'todas' && ' «Sin imputar» junta las detenciones sin causa de la línea, sin microdetenciones.'}
             </p>
+            </details>
+            {pdfEnCurso && <div style={{ position: 'fixed', left: -20000, top: 0 }} aria-hidden><JackKnifeLamina ref={laminaRef} calc={calc} informe={informe} turnos={turnos} fantasmas={fantasmas} planta={plantaTxt} ahoraTxt={rangoTexto(turnos, win)} antesTxt={previa ? rangoTexto(turnos, previa) : ''} minAntes={resumen?.minAntes} minAhora={nAhoraT ? calc.D / nAhoraT : 0} vista={VISTAS.find(v => v.value === vista)?.label ?? ''} limitesBase={limitesBase && !!antesCalc?.N} url={urlVista()} /></div>}
           </>
         )}
       </CardContent>

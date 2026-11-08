@@ -328,15 +328,16 @@ export function sentidoCambio(antes: number, ahora: number): SentidoJK {
   return d < 0 ? 'mejor' : 'peor'
 }
 
-export type VeredictoJK = 'mejoro' | 'empeoro' | 'igual' | 'nueva' | 'sinEventos'
+export type VeredictoJK = 'mejoro' | 'empeoro' | 'igual' | 'nueva' | 'sinHistoria' | 'sinEventos'
 /** Veredicto por causa: minutos por turno, ±10 %. */
 export function veredicto(
   ahora: PuntoJK | undefined,
   antes: PuntoJK | undefined,
   nAhora: number,
   nAntes: number,
+  tieneHistoria = true,
 ): VeredictoJK {
-  if (!antes) return 'nueva'
+  if (!antes) return tieneHistoria ? 'nueva' : 'sinHistoria'
   if (!ahora) return 'sinEventos'
   const r = (ahora.min / nAhora) / (antes.min / nAntes)
   return r < 0.9 ? 'mejoro' : r > 1.1 ? 'empeoro' : 'igual'
@@ -346,11 +347,12 @@ export const ETIQUETA_VEREDICTO: Record<VeredictoJK, string> = {
   mejoro: 'mejoró',
   empeoro: 'empeoró',
   igual: 'igual',
-  nueva: 'nueva',
+  nueva: 'apareció',
+  sinHistoria: 'sin historia',
   sinEventos: 'sin eventos ahora',
 }
 
-/** Resumen numérico de la comparación para la tesis. Null si no hay eventos antes. */
+/** Resumen numérico de la comparación para la tesis. Null si no hay período de comparación. */
 export interface ResumenComparacionJK {
   nAntes: number
   nAhora: number
@@ -360,13 +362,17 @@ export interface ResumenComparacionJK {
   parcial: boolean
   mejoraron: number
   empeoraron: number
+  desaparecieron: number
+  aparecieron: number
+  sinHistoria: number
 }
 export function resumenComparacion(
   ahora: CalculoJK,
   antes: CalculoJK | null,
   previa: PreviaJK | null,
+  historia: ReadonlySet<string> = new Set(),
 ): ResumenComparacionJK | null {
-  if (!antes || !previa || antes.N === 0) return null
+  if (!antes || !previa) return null
   const nAhora = ahora.hasta - ahora.desde + 1
   const nAntes = previa.hasta - previa.desde + 1
   const PV = new Map(antes.pts.map((p) => [p.k, p]))
@@ -374,10 +380,16 @@ export function resumenComparacion(
   const claves = new Set([...PV.keys(), ...AH.keys()])
   let mejoraron = 0
   let empeoraron = 0
+  let desaparecieron = 0
+  let aparecieron = 0
+  let sinHistoria = 0
   for (const k of claves) {
-    const v = veredicto(AH.get(k), PV.get(k), nAhora, nAntes)
-    if (v === 'mejoro' || v === 'sinEventos') mejoraron++
-    else if (v === 'empeoro' || v === 'nueva') empeoraron++
+    const v = veredicto(AH.get(k), PV.get(k), nAhora, nAntes, historia.has(k))
+    if (v === 'mejoro') mejoraron++
+    else if (v === 'empeoro') empeoraron++
+    else if (v === 'sinEventos') desaparecieron++
+    else if (v === 'nueva') aparecieron++
+    else if (v === 'sinHistoria') sinHistoria++
   }
   return {
     nAntes,
@@ -388,6 +400,7 @@ export function resumenComparacion(
     parcial: previa.parcial,
     mejoraron,
     empeoraron,
+    desaparecieron, aparecieron, sinHistoria,
   }
 }
 
@@ -478,31 +491,35 @@ export interface InformeJK {
   minTurnoAntes: number
   minTurnoAhora: number
   /** Variación de minutos por turno, en %. */
-  variacionPct: number
+  variacionPct: number | null
   /** Regla de ±10 %. */
   resultado: 'mejoro' | 'empeoro' | 'se_mantiene'
   mejoraron: string[]
   empeoraron: string[]
+  desaparecieron: string[]
+  aparecieron: string[]
+  sinHistoria: string[]
   prioridad1: string[]
   filas: FilaInformeJK[]
   /** Dos comentarios más repetidos de cada causa prioritaria o empeorada (máx. 4 causas). */
   comentariosClave: { causa: string; top: { texto: string; n: number }[] }[]
 }
 
-/** Datos del informe, sin formato. Null si no hay comparación con eventos. */
+/** Datos del informe, sin formato. Conserva causas nuevas incluso si el período base no tiene eventos. */
 export function datosInforme(
   turnos: readonly TurnoJK[],
   ahora: CalculoJK,
   antes: CalculoJK,
   previa: PreviaJK,
+  vista: VistaJK = 'imp',
 ): InformeJK | null {
-  if (antes.N === 0) return null
   const nAhora = ahora.hasta - ahora.desde + 1
   const nAntes = previa.hasta - previa.desde + 1
   const PV = new Map(antes.pts.map((p) => [p.k, p]))
   const AH = new Map(ahora.pts.map((p) => [p.k, p]))
   const claves = [...new Set([...AH.keys(), ...PV.keys()])]
 
+  const historia = causasConHistoria(turnos, ahora.desde, vista)
   const filas: (FilaInformeJK & { delta: number })[] = claves.map((causa) => {
     const a = AH.get(causa)
     const b = PV.get(causa)
@@ -516,15 +533,15 @@ export function datosInforme(
       evAntes10: b ? (b.ev / nAntes) * 10 : 0,
       minAhora10,
       minAntes10,
-      veredicto: veredicto(a, b, nAhora, nAntes),
+      veredicto: veredicto(a, b, nAhora, nAntes, historia.has(causa)),
       delta: minAhora10 - minAntes10,
     }
   })
-  filas.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
+  filas.sort((x, y) => (x.ahora ? nivelPrioridad(x.ahora, ahora.un, ahora.um) : 6) - (y.ahora ? nivelPrioridad(y.ahora, ahora.un, ahora.um) : 6) || (y.ahora?.min ?? 0) - (x.ahora?.min ?? 0))
 
   const de = (...vs: VeredictoJK[]) => filas.filter((f) => vs.includes(f.veredicto)).map((f) => f.causa)
-  const mejoraron = de('mejoro', 'sinEventos')
-  const empeoraron = de('empeoro', 'nueva')
+  const mejoraron = de('mejoro')
+  const empeoraron = de('empeoro')
   const prioridad1 = ahora.pts
     .filter((p) => p.q === 'amb')
     .sort((x, y) => y.min - x.min)
@@ -532,8 +549,8 @@ export function datosInforme(
 
   const minTurnoAntes = antes.D / nAntes
   const minTurnoAhora = ahora.D / nAhora
-  const variacionPct = minTurnoAntes ? ((minTurnoAhora - minTurnoAntes) / minTurnoAntes) * 100 : 0
-  const resultado = Math.abs(variacionPct) < 10 ? 'se_mantiene' : variacionPct < 0 ? 'mejoro' : 'empeoro'
+  const variacionPct = minTurnoAntes ? ((minTurnoAhora - minTurnoAntes) / minTurnoAntes) * 100 : null
+  const resultado = variacionPct === null ? (minTurnoAhora ? 'empeoro' : 'se_mantiene') : Math.abs(variacionPct) < 10 ? 'se_mantiene' : variacionPct < 0 ? 'mejoro' : 'empeoro'
 
   const claveCausas = [...new Set([...prioridad1, ...empeoraron])].slice(0, 4)
   const comentariosClave = claveCausas.map((causa) => {
@@ -554,6 +571,7 @@ export function datosInforme(
     mejoraron,
     empeoraron,
     prioridad1,
+    desaparecieron: de('sinEventos'), aparecieron: de('nueva'), sinHistoria: de('sinHistoria'),
     filas: filas.map(({ delta: _d, ...f }) => f),
     comentariosClave,
   }
@@ -571,6 +589,7 @@ export interface EstadoURLJK {
   v: VentanaJK | 'libre'
   vs: VistaJK
   cmp: ModoCmpJK
+  lb?: boolean
   ha?: string
   hb?: string
   ca?: string
@@ -587,6 +606,7 @@ export function codificarEstadoJK(e: EstadoURLJK): string {
   p.set('v', e.v)
   p.set('vs', e.vs)
   p.set('cmp', e.cmp)
+  if (e.lb !== undefined) p.set('lb', e.lb ? '1' : '0')
   if (e.ha) p.set('ha', e.ha)
   if (e.hb) p.set('hb', e.hb)
   if (e.ca) p.set('ca', e.ca)
@@ -604,6 +624,7 @@ export function leerEstadoJK(hash: string, planta: string): EstadoURLJK | null {
   const cmp = p.get('cmp') ?? 'ant'
   return {
     pl: planta,
+    ...(p.has('lb') ? { lb: p.get('lb') !== '0' } : {}),
     v: (VENTANAS_URL.includes(v) ? v : '90') as VentanaJK | 'libre',
     vs: (VISTAS_URL.includes(vs) ? vs : 'imp') as VistaJK,
     cmp: (MODOS_URL.includes(cmp) ? cmp : 'ant') as ModoCmpJK,
@@ -612,4 +633,31 @@ export function leerEstadoJK(hash: string, planta: string): EstadoURLJK | null {
     ca: p.get('ca') ?? undefined,
     cb: p.get('cb') ?? undefined,
   }
+}
+
+export const ACCION_CUADRANTE: Record<CuadranteJK, string> = {
+  amb: 'Prioridad 1: causa raíz y tiempo de reparación.',
+  agu: 'Bajar el tiempo de reparación: repuestos a mano, procedimiento y acceso.',
+  cro: 'Causa raíz para que no se repita: diseño, táctica de mantención, operación o capacitación.',
+  ok: 'Mantener y vigilar.',
+}
+export function nivelPrioridad(p: PuntoJK, un: number, um: number): number {
+  const q = cuadrante(p.ev, p.mttr, un, um)
+  return q === 'amb' ? 1 : q === 'agu' ? 2 : q === 'cro' ? (p.min >= un * um ? 3 : 4) : 5
+}
+export function limitesPeriodoBase(ahora: CalculoJK, antes: CalculoJK | null, activo: boolean): CalculoJK {
+  if (!activo || !antes || !antes.N) return ahora
+  const un = antes.un * (ahora.hasta - ahora.desde + 1) / (antes.hasta - antes.desde + 1)
+  const um = antes.um
+  return { ...ahora, un, um, pts: ahora.pts.map(p => ({ ...p, q: cuadrante(p.ev, p.mttr, un, um) })) }
+}
+export function causasConHistoria(turnos: readonly TurnoJK[], inicio: number, vista: VistaJK = 'imp'): Set<string> {
+  return new Set(turnos.slice(0, inicio).flatMap(t => eventosDeVista(t.resumen, vista).map(([k]) => k)))
+}
+export function frasePrioridad(c: CalculoJK, formato: (min: number) => string): string {
+  const p = [...c.pts].filter(p => nivelPrioridad(p, c.un, c.um) === 1).sort((a,b) => b.min-a.min)[0]
+  return (p ? 'Prioridad 1: ' + p.k + ', ' + p.ev + ' eventos y ' + formato(p.min) + '. ' : 'Ninguna causa cae en agudas y crónicas. ') + 'Mantención en total: ' + c.N + ' eventos y ' + formato(c.D) + '.'
+}
+export function textoResumenComparacion(r: ResumenComparacionJK): string {
+  return [[r.mejoraron, 'mejoró', 'mejoraron'], [r.desaparecieron, 'desapareció', 'desaparecieron'], [r.empeoraron, 'empeoró', 'empeoraron'], [r.aparecieron, 'apareció', 'aparecieron'], [r.sinHistoria, 'sin historia', 'sin historia']].filter(([n]) => Number(n) > 0).map(([n, uno, varios]) => n + ' ' + (n === 1 ? uno : varios)).join(', ')
 }
