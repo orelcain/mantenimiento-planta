@@ -133,6 +133,7 @@ const RuedaPublicaPage = lazyWithReload(() => import('@/pages/RuedaPublicaPage')
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
 const BitacoraTurnoPage = lazyWithReload(() => import('@/pages/BitacoraTurnoPage').then((mod) => ({ default: mod.BitacoraTurnoPage })))
 const HistorialBitacoraPage = lazyWithReload(() => import('@/pages/HistorialBitacoraPage').then((mod) => ({ default: mod.HistorialBitacoraPage })))
+const CausaRaizDetallePage = lazyWithReload(() => import('@/pages/CausaRaizDetallePage').then((mod) => ({ default: mod.CausaRaizDetallePage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const HmiGeaPage = lazyWithReload(() => import('@/pages/HmiGeaPage').then((mod) => ({ default: mod.HmiGeaPage })))
 const JackKnifePage = lazyWithReload(() => import('@/pages/JackKnifePage'))
@@ -1071,6 +1072,11 @@ export function App() {
             <Route path="bitacora/historial" element={
               <Suspense fallback={<LoadingScreen />}>
                 <HistorialBitacoraPage />
+              </Suspense>
+            } />
+            <Route path="causa-raiz/:acrId" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <CausaRaizDetallePage />
               </Suspense>
             } />
             <Route path="aria-actions" element={

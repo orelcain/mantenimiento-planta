@@ -17,9 +17,26 @@ vi.mock('@/components/acr/AcrEntrada', () => ({
     ),
 }))
 
+const navegar = vi.fn()
+vi.mock('react-router-dom', () => ({ useNavigate: () => navegar }))
+
+let esPC = false
+vi.mock('@/hooks/useEsPC', () => ({ useEsPC: () => esPC }))
+
+let conPase = false
+vi.mock('@/store/authStore', () => ({
+  useAuthStore: (sel: (s: { user: { paseBitacora?: object } }) => unknown) =>
+    sel({ user: conPase ? { paseBitacora: {} } : {} }),
+}))
+
 import { FranjaAcr } from '../FranjaAcr'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  navegar.mockClear()
+  esPC = false
+  conPase = false
+})
 
 const EVENTO = {
   id: 'ej-1',
@@ -97,6 +114,31 @@ describe('FranjaAcr', () => {
     const hoja = screen.getByTestId('hoja')
     expect(hoja.getAttribute('data-vista')).toBe('lectura')
     expect(hoja.getAttribute('data-acr')).toBe('acr-1')
+  })
+
+  it('en PC «Analizado» navega a la página del análisis, sin abrir la hoja', () => {
+    esPC = true
+    render(<FranjaAcr evento={EVENTO} senal={{ tipo: 'analizado', acr: ACR }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Ver/ }))
+    expect(navegar).toHaveBeenCalledWith('/causa-raiz/acr-1')
+    expect(screen.queryByTestId('hoja')).toBeNull()
+  })
+
+  it('en PC con pase de bitácora sigue la hoja: la página no existe para el pase', () => {
+    esPC = true
+    conPase = true
+    render(<FranjaAcr evento={EVENTO} senal={{ tipo: 'analizado', acr: ACR }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Ver/ }))
+    expect(navegar).not.toHaveBeenCalled()
+    expect(screen.getByTestId('hoja').getAttribute('data-vista')).toBe('lectura')
+  })
+
+  it('en PC «Se repite» sigue abriendo el editor', () => {
+    esPC = true
+    render(<FranjaAcr evento={EVENTO} senal={{ tipo: 'repite', repeticion: REPETICION }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Analizar/ }))
+    expect(navegar).not.toHaveBeenCalled()
+    expect(screen.getByTestId('hoja').getAttribute('data-vista')).toBe('editor')
   })
 
   it('«Analizado» sin acciones no muestra porcentaje', () => {
