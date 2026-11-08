@@ -17,6 +17,7 @@ import { kpisDeMatriz } from '@/services/grader/graderShiftMatrixKpi'
 import { SegmentedControl } from '@/components/piel'
 import { usePielApple } from '@/hooks/usePielApple'
 import type { MatrixKpi as KpiId } from '@/services/grader/graderShiftMatrixKpi'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 /** Rótulos completos para el segmentado de la piel Apple (los de la piel vieja se cortan en 375 px). */
@@ -255,7 +256,7 @@ export function GraderShiftPeriodView({
       )}
       {onlyOutOfShift && apple && (
         <p className="text-footnote text-muted-foreground">
-          {`Mostrando solo producción fuera de turno: ${outOfShift.cycles.toLocaleString('es-CL')} ciclos en ${outOfShift.count} ${outOfShift.count === 1 ? 'registro' : 'registros'}, el ${outOfShift.pct.toFixed(1).replace('.', ',')} % del período. Son ciclos que Shoplogix no pudo atribuir a ninguna ventana de turno configurada.`}
+          {`Mostrando solo producción fuera de turno: ${outOfShift.cycles.toLocaleString('es-CL')} ciclos en ${outOfShift.count} ${outOfShift.count === 1 ? 'registro' : 'registros'}, el ${dec1(outOfShift.pct)} % del período. Son ciclos que Shoplogix no pudo atribuir a ninguna ventana de turno configurada.`}
         </p>
       )}
       {onlyOutOfShift && !apple && (

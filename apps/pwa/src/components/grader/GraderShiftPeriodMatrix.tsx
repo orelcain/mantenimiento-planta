@@ -32,6 +32,7 @@ import {
 } from '@/services/grader/graderShiftMatrixKpi'
 import { usePielApple } from '@/hooks/usePielApple'
 import { Button as BotonPiel, Skeleton, SkeletonBloque } from '@/components/piel'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const ICONS = { Sun, Sunset, Moon, Sunrise, Clock } as const
 
@@ -534,7 +535,7 @@ function PanelTurnoApple({ focused, onOpenShift }: { focused: PeriodShift | null
     `${focused.cycles.toLocaleString('es-CL')} ciclos${focused.attributedCycles ? ` (+${focused.attributedCycles.toLocaleString('es-CL')} fuera de horario)` : ''}`,
     focused.uptimePct != null ? `uptime ${Math.round(focused.uptimePct)} %` : null,
     focused.pieces != null ? `${focused.pieces.toLocaleString('es-CL')} piezas` : 'sin Excel del Grader',
-    focused.p0Pct != null ? `P0 ${focused.p0Pct.toFixed(1).replace('.', ',')} %` : null,
+    focused.p0Pct != null ? `P0 ${dec1(focused.p0Pct)} %` : null,
   ].filter((s): s is string => s != null)
   return (
     <div className="space-y-2">
