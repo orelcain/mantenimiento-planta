@@ -61,7 +61,6 @@ const CAMPO_LINEA = `${CAMPO} h-11 py-0`
 const TITULO = 'text-title2 font-semibold text-foreground'
 const AVISO = 'text-footnote font-semibold text-ink-warn'
 
-const PASO_SEGMENTOS = PASOS.map((p) => ({ value: p, label: ETIQUETA_PASO[p] }))
 const NIVEL_SEGMENTOS = (['fisica', 'humana', 'latente'] as const).map((n) => ({ value: n, label: ETIQUETA_NIVEL[n] }))
 const FUERZA_SEGMENTOS = (['debil', 'media', 'fuerte'] as const).map((f) => ({ value: f, label: ETIQUETA_FUERZA[f] }))
 const RESULTADO_SEGMENTOS = (['pendiente', 'eficaz', 'no_eficaz'] as const).map((r) => ({
@@ -214,12 +213,27 @@ export function AcrSheet({ open, onClose, evento, acrExistente = null, onGuardar
       }
     >
       <div className="flex flex-col gap-5">
-        <div className="flex gap-1.5" aria-hidden="true">
-          {PASOS.map((p, i) => (
-            <span key={p} className={`h-1 flex-1 rounded-full ${i <= indice ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
-          ))}
+        {/* Cinco etiquetas no caben a 375 px: la barra misma es el selector (cada tramo es un
+            botón de 44 px de alto) y abajo va el nombre del paso actual. */}
+        <div className="flex flex-col gap-1">
+          <div className="-my-5 flex gap-1.5" role="group" aria-label="Paso del análisis">
+            {PASOS.map((p, i) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => irA(p)}
+                aria-label={`Paso ${i + 1}: ${ETIQUETA_PASO[p]}`}
+                aria-current={p === paso ? 'step' : undefined}
+                className="flex h-11 flex-1 items-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <span className={`h-1 w-full rounded-full ${i <= indice ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
+              </button>
+            ))}
+          </div>
+          <p className="text-footnote text-muted-foreground tabular-nums">
+            Paso {indice + 1} de {PASOS.length} · {ETIQUETA_PASO[paso]}
+          </p>
         </div>
-        <SegmentedControl ariaLabel="Paso del análisis" value={paso} onChange={irA} segments={PASO_SEGMENTOS} />
 
         {paso === 'definir' && <PasoDefinir acr={acr} minutos={minutos} cambiar={cambiar} />}
         {paso === 'evidencia' && (

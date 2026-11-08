@@ -14,8 +14,12 @@ import { AcrLectura } from './AcrLectura'
 export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
   const [acrs, setAcrs] = useState<Acr[] | null>(null)
   const [vista, setVista] = useState<'ninguna' | 'editor' | 'lectura'>('ninguna')
+  /** Sin permiso de lectura (p. ej. técnico con pase de Bitácora) la fila no se muestra. */
+  const [sinAcceso, setSinAcceso] = useState(false)
 
-  useEffect(() => escucharAcrDeEvento(evento.id, setAcrs), [evento.id])
+  useEffect(() => escucharAcrDeEvento(evento.id, setAcrs, () => setSinAcceso(true)), [evento.id])
+
+  if (sinAcceso) return null
 
   // Si hay varios, manda el más reciente.
   const acr = acrs?.slice().sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null

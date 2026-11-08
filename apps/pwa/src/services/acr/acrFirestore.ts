@@ -68,7 +68,11 @@ export async function guardarAcr(acr: Acr, esNuevo: boolean): Promise<void> {
 }
 
 /** Escucha los ACR de un evento de la Bitácora. Devuelve la función para dejar de escuchar. */
-export function escucharAcrDeEvento(eventoId: string, cb: (acrs: Acr[]) => void): () => void {
+export function escucharAcrDeEvento(
+  eventoId: string,
+  cb: (acrs: Acr[]) => void,
+  onError?: () => void,
+): () => void {
   const q = query(
     collection(db, ACR_COLECCION),
     where('plantId', '==', BITACORA_PLANTA.id),
@@ -79,7 +83,10 @@ export function escucharAcrDeEvento(eventoId: string, cb: (acrs: Acr[]) => void)
     (snap) => cb(snap.docs.map(acrDeSnapshot)),
     // Si la lectura falla no se llama a `cb`: así la pantalla no dice «Analizar causa» cuando
     // en realidad ya existe un análisis y se podría duplicar.
-    (error) => logger.error('No se pudo leer el análisis de causa raíz', error, { eventoId }),
+    (error) => {
+      logger.error('No se pudo leer el análisis de causa raíz', error, { eventoId })
+      onError?.()
+    },
   )
 }
 
