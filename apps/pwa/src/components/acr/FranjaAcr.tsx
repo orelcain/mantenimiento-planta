@@ -35,7 +35,7 @@ export function FranjaAcr({ evento, senal }: { evento: EventoRefAcr; senal: Sena
         <button
           type="button"
           onClick={() => setVista(repite ? 'editor' : 'lectura')}
-          className={`mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-ctl px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+          className={`mt-1 flex min-h-[44px] w-full items-center justify-between gap-3 rounded-ctl px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
             repite ? 'bg-warning/[0.15]' : 'bg-ink-ok/[0.15]'
           }`}
         >
