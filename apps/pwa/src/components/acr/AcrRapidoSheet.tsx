@@ -12,7 +12,7 @@ import { auth } from '@/services/firebase'
 import { useAuthStore } from '@/store'
 import { AUTOGUARDADO_MS, BITACORA_PLANTA, ETIQUETA_FOTO } from '@/config/bitacora'
 import { guardarAcr, nuevoIdAcr } from '@/services/acr/acrFirestore'
-import { motivoNoCierra, puedeCerrar, resumenFuerza } from '@/services/acr/acrLogica'
+import { cadenaPorQues, motivoNoCierra, puedeCerrar, resumenFuerza } from '@/services/acr/acrLogica'
 import { proponerAcr, type ProponerAcr } from '@/services/acr/proponerAcr'
 import type { Repeticion } from '@/services/acr/repeticion'
 import {
@@ -35,11 +35,13 @@ import { MotorTutorialAcr } from './MotorTutorialAcr'
 import { AcrLectura } from './AcrLectura'
 import { FilaAnalisis } from './AcrEntrada'
 import { RevisionSemanalSheet } from './RevisionSemanalSheet'
+import { CadenaPorQues } from './CadenaPorQues'
 import {
   ACCION_POR_FUERZA,
   CORRECCION_HUMANA,
   MOTIVO_EJEMPLO,
   PASOS_TUTORIAL,
+  PORQUES_TUTORIAL,
   PROPUESTA_TUTORIAL,
   REPETICION_TUTORIAL,
   TEXTO_Q2,
@@ -138,6 +140,12 @@ function acrNuevo(evento: EventoRefAcr, uid: string, nombre: string, repeticion:
   }
 }
 
+/** La causa q2 (porqué) es el último de la cadena «¿Y por qué?»; sin cadena, el porqué 1. */
+function textoCausaQ2(r: RespuestasAcr): string {
+  const cadena = cadenaPorQues(r)
+  return cadena.length > 0 ? (cadena[cadena.length - 1] ?? r.porQue) : r.porQue
+}
+
 /**
  * Armado a mano (SPEC §4.5): Q1 → causa física; Q2 → causa con el nivel elegido (por defecto
  * latente); Q3 → acción con la fuerza elegida, sin valor por defecto. Ids fijos (`q1`, `q2`, `q3`)
@@ -147,7 +155,7 @@ function armadoManual(a: Acr): Acr {
   const r = a.respuestas ?? RESPUESTAS_VACIAS
   const causas: CausaAcr[] = [
     { id: 'q1', texto: r.queSeRompio, nivel: 'fisica', m6: null },
-    { id: 'q2', texto: r.porQue, nivel: 'latente', m6: null },
+    { id: 'q2', texto: textoCausaQ2(r), nivel: 'latente', m6: null },
   ]
   return { ...a, propuesta: { origen: 'manual', modelo: null }, causas, acciones: [] }
 }
@@ -158,7 +166,7 @@ function sincronizarManual(a: Acr): Acr {
   const r = a.respuestas ?? RESPUESTAS_VACIAS
   return {
     ...a,
-    causas: a.causas.map((c) => (c.id === 'q1' ? { ...c, texto: r.queSeRompio } : c.id === 'q2' ? { ...c, texto: r.porQue } : c)),
+    causas: a.causas.map((c) => (c.id === 'q1' ? { ...c, texto: r.queSeRompio } : c.id === 'q2' ? { ...c, texto: textoCausaQ2(r) } : c)),
     acciones: a.acciones.map((x) => (x.id === 'q3' ? { ...x, texto: r.queHacemos } : x)),
   }
 }
@@ -195,6 +203,8 @@ export function AcrRapidoSheet({
   const [pensandoPractica, setPensandoPractica] = useState(false)
   const [motivoPractica, setMotivoPractica] = useState<string | null>(null)
   const [revisionSubida, setRevisionSubida] = useState(false)
+  /** Pantalla completa de los 5 porqués (`CadenaPorQues`). */
+  const [pantallaPorQues, setPantallaPorQues] = useState(false)
   /** Falso hasta el primer guardado de un análisis nuevo: ahí se crea el documento. */
   const guardadoRef = useRef(acrExistente != null)
   const idPiezas = useId()
@@ -232,6 +242,10 @@ export function AcrRapidoSheet({
   const cambiarRespuesta = (campo: keyof RespuestasAcr, valor: string) =>
     cambiar((a) => sincronizarManual({ ...a, respuestas: { ...(a.respuestas ?? RESPUESTAS_VACIAS), [campo]: valor } }))
 
+  /** Porqué 1 y porqués extra de la cadena «¿Y por qué?» (mismo camino que `cambiarRespuesta`). */
+  const cambiarPorQues = (cambio: { porQue?: string; porQues?: string[] }) =>
+    cambiar((a) => sincronizarManual({ ...a, respuestas: { ...(a.respuestas ?? RESPUESTAS_VACIAS), ...cambio } }))
+
   const r = acr.respuestas ?? RESPUESTAS_VACIAS
   // Durante el tutorial la IA real no se llama: ARIA toca la propuesta de ejemplo.
   const puedeProponer = r.porQue.trim() !== '' && r.queHacemos.trim() !== '' && !pensando && !tutorial
@@ -248,6 +262,7 @@ export function AcrRapidoSheet({
       queSeRompio: r.queSeRompio,
       porQue: r.porQue,
       queHacemos: r.queHacemos,
+      porQues: (r.porQues ?? []).filter((s) => s.trim() !== ''),
       descripcionEvento: evento.descripcion,
       repeticion: repeticion?.resumen ?? null,
     })
@@ -332,6 +347,7 @@ export function AcrRapidoSheet({
     setPensandoPractica(false)
     setMotivoPractica(null)
     setRevisionSubida(false)
+    setPantallaPorQues(false)
   }
 
   /**
@@ -351,6 +367,7 @@ export function AcrRapidoSheet({
       respuestas: {
         ...(base.respuestas ?? RESPUESTAS_VACIAS),
         porQue: pr.porQue ? TEXTO_Q2 : '',
+        porQues: pr.porQues ? PORQUES_TUTORIAL : [],
         queHacemos: pr.queHacemos ? TEXTO_Q3 : '',
       },
       piezaGuardada: pr.pieza,
@@ -470,6 +487,18 @@ export function AcrRapidoSheet({
       }
       case 'subirFuerza':
         setRevisionSubida(true)
+        return
+      case 'porQueMas':
+        setAcr((prev) => ({
+          ...prev,
+          respuestas: { ...(prev.respuestas ?? RESPUESTAS_VACIAS), porQues: PORQUES_TUTORIAL },
+        }))
+        return
+      case 'abrirPantalla':
+        setPantallaPorQues(true)
+        return
+      case 'cerrarPantalla':
+        setPantallaPorQues(false)
         return
     }
   }
@@ -625,6 +654,16 @@ export function AcrRapidoSheet({
             value={r.porQue}
             onChange={(e) => cambiarRespuesta('porQue', e.target.value)}
             className={`${CAMPO} resize-y pr-14`}
+          />
+          <CadenaPorQues
+            idBase={idPiezas}
+            queSeRompio={r.queSeRompio}
+            primero={r.porQue}
+            extras={r.porQues ?? []}
+            onCambiarPrimero={(v) => cambiarPorQues({ porQue: v })}
+            onCambiarExtras={(v) => cambiarPorQues({ porQues: v })}
+            pantallaAbierta={pantallaPorQues}
+            onPantalla={setPantallaPorQues}
           />
         </section>
 

@@ -1,14 +1,40 @@
 import { describe, expect, it } from 'vitest'
 import type { Acr, AccionAcr, CausaAcr } from '../acr.types'
 import {
+  MAX_PORQUES,
   MENSAJE_LATENTE,
   aplicaAnalisis,
+  cadenaPorQues,
   eventoRequiereAcr,
   kpiFuerzaAcciones,
   motivoNoCierra,
   puedeCerrar,
   resumenFuerza,
 } from '../acrLogica'
+
+describe('cadenaPorQues', () => {
+  const base = { queSeRompio: 'Resorte', queHacemos: 'Regulador' }
+
+  it('el porqué 1 va primero, seguido de los extra', () => {
+    expect(cadenaPorQues({ ...base, porQue: 'A', porQues: ['B', 'C'] })).toEqual(['A', 'B', 'C'])
+  })
+
+  it('sin porQues (ACR guardados antes de la cadena) es solo el porqué 1', () => {
+    expect(cadenaPorQues({ ...base, porQue: 'A' })).toEqual(['A'])
+  })
+
+  it('descarta vacíos y espacios, y recorta los textos', () => {
+    expect(cadenaPorQues({ ...base, porQue: '  A ', porQues: ['', '   ', ' B', 'C  '] })).toEqual(['A', 'B', 'C'])
+  })
+
+  it('sin porqué 1 ni extra con texto da lista vacía', () => {
+    expect(cadenaPorQues({ ...base, porQue: '', porQues: ['  '] })).toEqual([])
+  })
+
+  it('el máximo son 5 porqués contando el primero', () => {
+    expect(MAX_PORQUES).toBe(5)
+  })
+})
 
 const EQUIPO = 'EVISCERADORA BAADER 142 N1'
 

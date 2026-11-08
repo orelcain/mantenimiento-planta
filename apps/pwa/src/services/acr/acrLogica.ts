@@ -5,7 +5,18 @@
  * R1 (SPEC_ACR_R1.md §1): la hoja de 5 pasos se retiró. Cerrar pide las 3 respuestas, una causa
  * latente y una acción. Regla de fondo: el ACR no se cierra con una causa humana.
  */
-import type { Acr, AccionAcr, EventoRefAcr, FuerzaAccion } from './acr.types'
+import type { Acr, AccionAcr, EventoRefAcr, FuerzaAccion, RespuestasAcr } from './acr.types'
+
+/** Máximo de porqués de la cadena, contando el primero (pregunta 2). */
+export const MAX_PORQUES = 5
+
+/**
+ * La cadena de porqués: el primero (`porQue`) y los extra de «¿Y por qué?», sin vacíos y sin
+ * espacios sobrantes. El último de la lista es el que se propone como causa (ver `AcrRapidoSheet`).
+ */
+export function cadenaPorQues(r: RespuestasAcr): string[] {
+  return [r.porQue, ...(r.porQues ?? [])].map((s) => s.trim()).filter((s) => s !== '')
+}
 
 export const MENSAJE_LATENTE =
   'Falta la causa latente: la que hace que vuelva a pasar. El error humano no es causa raíz.'

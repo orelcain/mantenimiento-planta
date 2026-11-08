@@ -15,6 +15,8 @@ export interface EntradaPropuesta {
   queSeRompio: string
   porQue: string
   queHacemos: string
+  /** Porqués extra de la cadena «¿Y por qué?» (sin vacíos). Lista vacía si no hay. */
+  porQues: string[]
   descripcionEvento: string
   /** Texto del detector de repetición, o null. */
   repeticion: string | null
@@ -52,6 +54,7 @@ Reglas:
 - No inventes datos técnicos (medidas, códigos, tolerancias, fechas) que no estén en la entrada.
 - Máximo 3 causas y 3 acciones. Exactamente una causa de nivel latente.
 - Cada acción ataca una causa: indícalo en "causa" con el número de esa causa, empezando en 1.
+- Si viene "porQues", es la cadena de los 5 porqués que hizo el técnico después de "porQue": úsala; la última respuesta suele apuntar a la causa latente.
 
 Responde SOLO con JSON, sin texto alrededor, con esta forma:
 {"causas":[{"texto":"...","nivel":"fisica|humana|latente"}],"acciones":[{"texto":"...","fuerza":"debil|media|fuerte","causa":1}]}`

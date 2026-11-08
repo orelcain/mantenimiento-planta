@@ -1,10 +1,11 @@
 /**
- * Guion y reductor del tutorial del ACR narrado por ARIA (guion v2: 11 capítulos, 27 pasos).
+ * Guion y reductor del tutorial del ACR narrado por ARIA (guion v2: 11 capítulos, 28 pasos).
  * Datos y lógica pura: sin React ni audio. El motor (MotorTutorialAcr.tsx) y la tarjeta
  * (AcrRapidoSheet.tsx) los usan.
  *
  * El texto de cada paso es el del guion v2 aprobado y es lo que dice Aiko en los audios de
- * public/tutorial-acr (paso-01..paso-27, ElevenLabs, 08-11-2026). No cambiar uno sin regrabar el otro.
+ * public/tutorial-acr (paso-01..paso-27 más paso-07b para «¿Y por qué?», ElevenLabs, 08-11-2026).
+ * No cambiar uno sin regrabar el otro.
  */
 import type { Acr, AccionAcr, CausaAcr } from '@/services/acr/acr.types'
 import type { Repeticion } from '@/services/acr/repeticion'
@@ -30,6 +31,8 @@ export const OPCIONES_ACR = {
   'nivel-fisica': 'Causa física',
   'nivel-humana': 'Causa humana',
   'nivel-latente': 'Causa latente (obligatoria para cerrar)',
+  'porques-cadena': '«¿Y por qué?»: cadena de hasta 5 porqués',
+  'porques-pantalla': 'Pantalla completa de los 5 porqués',
   proponer: 'Botón «Proponer causas» y «ARIA está pensando…»',
   'propuesta-pct': 'Propuesta de la IA y % de acciones fuertes',
   'fuerza-debil': 'Fuerza débil',
@@ -83,6 +86,9 @@ export type AccionTutorial =
   | 'mensajeFalta'
   | 'guardar'
   | 'subirFuerza'
+  | 'porQueMas'
+  | 'abrirPantalla'
+  | 'cerrarPantalla'
 
 /** Lo que el tutorial abre encima de la tarjeta durante un paso. */
 export type VistaTutorial = 'filas' | 'lectura' | 'revision'
@@ -104,6 +110,8 @@ export interface MomentoTutorial {
 export interface PracticaTutorial {
   pieza: boolean
   porQue: boolean
+  /** La cadena «¿Y por qué?» tiene sus porqués extra (paso «por-que-mas»). */
+  porQues: boolean
   queHacemos: boolean
   propuesta: boolean
   humanaCorregida: boolean
@@ -154,6 +162,11 @@ export const SELECTOR_CONFIRMAR = '[role="alertdialog"]'
 export const TEXTO_Q2 =
   'La chapaleta golpea fuerte al entrar el pescado. En la N3 se puso regulador el 20-09 y no ha cortado'
 export const TEXTO_Q3 = 'Poner regulador de aire en N1 y N2, igual que en la N3'
+/** Porqués extra que escribe el tutorial en la cadena «¿Y por qué?» (son los porqués 3 y 4). */
+export const PORQUES_TUTORIAL = [
+  'El cilindro entra con la presión de línea, sin regulador.',
+  'En N1 y N2 nunca se instaló; solo en N3 el 20-09.',
+]
 
 const p = (n: number) => `paso-${String(n).padStart(2, '0')}.mp3`
 
@@ -233,6 +246,23 @@ export const PASOS_TUTORIAL: readonly PasoTutorial[] = [
     escribir: { campo: 'porQue', texto: TEXTO_Q2 },
     deja: { porQue: true },
     explica: ['q2'],
+  },
+  {
+    id: 'por-que-mas',
+    capitulo: 3,
+    texto:
+      'Si quieres ir más hondo, toca «¿Y por qué?» y vuelve a preguntar, hasta cinco veces. La última respuesta suele ser la causa latente. En pantalla completa la ves como una escalera.',
+    audio: 'paso-07b.mp3',
+    objetivo: 't-ypq',
+    momentos: [
+      { en: 0.15, tocar: 't-ypq', accion: 'porQueMas' },
+      { en: 0.25, objetivo: 't-porques' },
+      { en: 0.7, tocar: 't-pantalla', accion: 'abrirPantalla' },
+      { en: 0.75, objetivo: 't-porques-hoja' },
+      { en: 0.97, accion: 'cerrarPantalla' },
+    ],
+    deja: { porQues: true },
+    explica: ['porques-cadena', 'porques-pantalla'],
   },
   {
     id: 'pregunta-3',
@@ -479,6 +509,7 @@ export const INICIO_CAPITULO: readonly number[] = CAPITULOS.map((_, c) =>
 const PRACTICA_VACIA: PracticaTutorial = {
   pieza: false,
   porQue: false,
+  porQues: false,
   queHacemos: false,
   propuesta: false,
   humanaCorregida: false,

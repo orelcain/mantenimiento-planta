@@ -16,8 +16,8 @@ import {
 const CARPETA_AUDIO = join(process.cwd(), 'public', 'tutorial-acr') + '/'
 
 describe('guion del tutorial (v2)', () => {
-  it('tiene 27 pasos en 11 capítulos, cada uno con un audio que existe en public/tutorial-acr', () => {
-    expect(PASOS_TUTORIAL).toHaveLength(27)
+  it('tiene 28 pasos en 11 capítulos, cada uno con un audio que existe en public/tutorial-acr', () => {
+    expect(PASOS_TUTORIAL).toHaveLength(28)
     expect(CAPITULOS).toHaveLength(11)
     for (const paso of PASOS_TUTORIAL) {
       expect(existsSync(CARPETA_AUDIO + paso.audio), `falta ${paso.audio}`).toBe(true)
@@ -51,17 +51,20 @@ describe('guion del tutorial (v2)', () => {
 
   it('la URL del audio sale del BASE_URL de la app', () => {
     expect(urlAudio('/', 0)).toBe('/tutorial-acr/paso-01.mp3')
-    expect(urlAudio('/app/', 26)).toBe('/app/tutorial-acr/paso-27.mp3')
+    expect(urlAudio('/app/', 27)).toBe('/app/tutorial-acr/paso-27.mp3')
   })
 
   it('la práctica al empezar un paso es lo que dejaron los anteriores', () => {
     expect(practicaAlEmpezar(0)).toEqual({
-      pieza: false, porQue: false, queHacemos: false, propuesta: false, humanaCorregida: false, guardado: false,
+      pieza: false, porQue: false, porQues: false, queHacemos: false, propuesta: false, humanaCorregida: false, guardado: false,
     })
     const idx = (id: string) => PASOS_TUTORIAL.findIndex((p) => p.id === id)
     // En el paso de la pregunta 2 aún no está escrita (la escribe ese paso); en el siguiente, sí.
     expect(practicaAlEmpezar(idx('pregunta-2')).porQue).toBe(false)
     expect(practicaAlEmpezar(idx('pregunta-3')).porQue).toBe(true)
+    // «¿Y por qué?» se escribe en el paso por-que-mas: en la pregunta 3 ya están los porqués extra.
+    expect(practicaAlEmpezar(idx('pregunta-2')).porQues).toBe(false)
+    expect(practicaAlEmpezar(idx('pregunta-3')).porQues).toBe(true)
     // Saltar al capítulo 7 deja la propuesta a la vista y la pieza marcada.
     const c7 = practicaAlEmpezar(INICIO_CAPITULO[6]!)
     expect(c7).toMatchObject({ pieza: true, porQue: true, queHacemos: true, propuesta: true, guardado: false })
