@@ -202,6 +202,8 @@ export function AcrDevPage() {
   const [fallar, setFallar] = useState(false)
   const [revision, setRevision] = useState<Acr[]>(REVISION_DEMO)
   const [ultimo, setUltimo] = useState<string | null>(null)
+  /** «Tutorial con ARIA» abre la tarjeta y arranca el guion. */
+  const [arranque, setArranque] = useState(false)
 
   return (
     <div className="flex flex-col gap-5 p-4 lg:px-8">
@@ -253,6 +255,15 @@ export function AcrDevPage() {
         <Button variant="tinted" onClick={() => setVista('r1')}>
           Tarjeta R1 (3 preguntas)
         </Button>
+        <Button
+          variant="tinted"
+          onClick={() => {
+            setArranque(true)
+            setVista('r1')
+          }}
+        >
+          Tutorial con ARIA
+        </Button>
         <Button variant="tinted" onClick={() => setVista('lectura')}>
           Vista de lectura (B)
         </Button>
@@ -277,9 +288,13 @@ export function AcrDevPage() {
       {vista === 'r1' && (
         <AcrRapidoSheet
           open
-          onClose={() => setVista('ninguna')}
+          onClose={() => {
+            setArranque(false)
+            setVista('ninguna')
+          }}
           evento={EVENTO_DEMO}
           repeticion={REPETICION_DEMO}
+          arrancarTutorial={arranque}
           proponer={proponerDemo(fallar)}
           onGuardar={(a) => {
             setAcr(a)

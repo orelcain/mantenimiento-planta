@@ -30,6 +30,28 @@ import {
   type RespuestasAcr,
 } from '@/services/acr/acr.types'
 import { logger } from '@/lib/logger'
+import { Play } from 'lucide-react'
+import { MotorTutorialAcr } from './MotorTutorialAcr'
+import { CORRECCION_HUMANA, PROPUESTA_TUTORIAL, type AccionTutorial } from './tutorialAcr'
+
+/** Marca del tutorial visto: sin ella, la tarjeta ofrece el tutorial la primera vez. */
+const CLAVE_TUTORIAL_VISTO = 'acr-tutorial-visto'
+
+function leerTutorialVisto(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_TUTORIAL_VISTO) !== null
+  } catch {
+    return false
+  }
+}
+
+function marcarTutorialVisto(): void {
+  try {
+    localStorage.setItem(CLAVE_TUTORIAL_VISTO, '1')
+  } catch {
+    // Sin almacenamiento el tutorial se ofrece de nuevo; no pasa nada más.
+  }
+}
 
 export interface AcrRapidoSheetProps {
   open: boolean
@@ -43,6 +65,8 @@ export interface AcrRapidoSheetProps {
   onGuardar?: (acr: Acr) => void
   /** Reemplaza la llamada a la IA (la vitrina la simula). */
   proponer?: ProponerAcr
+  /** Arranca el tutorial al abrir (la vitrina lo usa; en la app se pide con el botón). */
+  arrancarTutorial?: boolean
 }
 
 // ── Constantes y helpers ─────────────────────────────────────────────────────
@@ -133,12 +157,18 @@ export function AcrRapidoSheet({
   repeticion = null,
   onGuardar,
   proponer,
+  arrancarTutorial = false,
 }: AcrRapidoSheetProps) {
   const user = useAuthStore((s) => s.user)
   const [acr, setAcr] = useState<Acr>(
     () => acrExistente ?? acrNuevo(evento, auth.currentUser?.uid ?? '', nombreDe(user), repeticion),
   )
   const [sucio, setSucio] = useState(false)
+  // Tutorial (SPEC_ACR_TUTORIAL.md §3): corre sobre una copia en memoria; lo real se guarda aparte.
+  const [tutorial, setTutorial] = useState(false)
+  const [practicaFinal, setPracticaFinal] = useState<string | null>(null)
+  const [visto, setVisto] = useState(leerTutorialVisto)
+  const realRef = useRef<Acr | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pensando, setPensando] = useState(false)
   const [avisoIA, setAvisoIA] = useState<string | null>(null)
@@ -166,11 +196,12 @@ export function AcrRapidoSheet({
   persistirRef.current = persistir
 
   // Autoguardado: `AUTOGUARDADO_MS` después del último cambio, como la Bitácora.
+  // En la práctica del tutorial no se guarda nada (SPEC_ACR_TUTORIAL.md §3).
   useEffect(() => {
-    if (!sucio) return
+    if (!sucio || tutorial) return
     const t = setTimeout(() => persistirRef.current(acr), AUTOGUARDADO_MS)
     return () => clearTimeout(t)
-  }, [sucio, acr])
+  }, [sucio, acr, tutorial])
 
   const cambiar = (fn: (previo: Acr) => Acr) => {
     setAcr(fn)
@@ -181,7 +212,8 @@ export function AcrRapidoSheet({
     cambiar((a) => sincronizarManual({ ...a, respuestas: { ...(a.respuestas ?? RESPUESTAS_VACIAS), [campo]: valor } }))
 
   const r = acr.respuestas ?? RESPUESTAS_VACIAS
-  const puedeProponer = r.porQue.trim() !== '' && r.queHacemos.trim() !== '' && !pensando
+  // Durante el tutorial la IA real no se llama: ARIA toca la propuesta de ejemplo.
+  const puedeProponer = r.porQue.trim() !== '' && r.queHacemos.trim() !== '' && !pensando && !tutorial
   const manual = acr.propuesta?.origen === 'manual'
   const hayGrupo = acr.causas.length > 0 || acr.acciones.length > 0
 
@@ -232,7 +264,15 @@ export function AcrRapidoSheet({
   const fuerzaQ3 = acr.acciones.find((x) => x.id === 'q3')?.fuerza ?? null
   const nivelQ2 = acr.causas.find((c) => c.id === 'q2')?.nivel ?? 'latente'
 
+  /** Dentro de la práctica «Guardar» solo muestra el estado final; no escribe nada. */
+  const estadoDe = (a: Acr): string =>
+    `${puedeCerrar(a) ? 'Guardado · cerrado' : 'Borrador · falta algo'} · ${Math.round(resumenFuerza(a.acciones).fuertePct ?? 0)} % fuertes`
+
   const guardarAhora = () => {
+    if (tutorial) {
+      setPracticaFinal(estadoDe(acr))
+      return
+    }
     const completo = puedeCerrar(acr)
     const siguiente: Acr = { ...acr, estado: completo ? 'cerrado' : 'borrador', updatedAt: new Date() }
     setAcr(siguiente)
@@ -240,8 +280,68 @@ export function AcrRapidoSheet({
     if (completo) onClose()
   }
 
-  const cerrarHoja = () => {
+  // ── Tutorial ─────────────────────────────────────────────────────────────
+
+  /** Pasa a la práctica: guarda lo real pendiente y corre sobre una copia del caso de los resortes. */
+  const iniciarTutorial = () => {
+    if (tutorial) return
     if (sucio) persistir(acr)
+    realRef.current = acr
+    setAcr(acrNuevo(evento, auth.currentUser?.uid ?? '', nombreDe(user), repeticion))
+    setSucio(false)
+    setPracticaFinal(null)
+    setTutorial(true)
+  }
+
+  /** Vuelve lo que el técnico tenía escrito antes del tutorial. */
+  const volverAlReal = () => {
+    setTutorial(false)
+    if (realRef.current) setAcr(realRef.current)
+    realRef.current = null
+    setSucio(false)
+    setPracticaFinal(null)
+  }
+
+  const terminarTutorialVisto = () => {
+    marcarTutorialVisto()
+    setVisto(true)
+  }
+
+  // Arranque pedido desde fuera (la vitrina): una sola vez al abrir.
+  const arrancadoRef = useRef(false)
+  useEffect(() => {
+    if (arrancarTutorial && !arrancadoRef.current) {
+      arrancadoRef.current = true
+      iniciarTutorial()
+    }
+  })
+
+  const accionTutorial = (a: AccionTutorial) => {
+    if (a === 'proponer') {
+      setAcr((prev) => ({
+        ...prev,
+        causas: PROPUESTA_TUTORIAL.causas,
+        acciones: PROPUESTA_TUTORIAL.acciones,
+        propuesta: { origen: 'ia', modelo: 'tutorial' },
+      }))
+    } else if (a === 'corregirHumana') {
+      setAcr((prev) => ({
+        ...prev,
+        causas: prev.causas.map((c) => (c.id === 'tut-humana' ? { ...c, texto: CORRECCION_HUMANA } : c)),
+      }))
+    } else {
+      setAcr((prev) => ({ ...prev, piezaGuardada: true, estado: 'cerrado' }))
+      setPracticaFinal(estadoDe({ ...acr, piezaGuardada: true, estado: 'cerrado' }))
+    }
+  }
+
+  const cerrarHoja = () => {
+    if (tutorial) {
+      terminarTutorialVisto()
+      volverAlReal()
+    } else if (sucio) {
+      persistir(acr)
+    }
     onClose()
   }
 
@@ -296,17 +396,38 @@ export function AcrRapidoSheet({
               {error}
             </p>
           )}
-          <Button variant="filled" size="block" onClick={guardarAhora}>
+          {practicaFinal && (
+            <p role="status" className="text-footnote font-semibold text-foreground">
+              {practicaFinal}
+            </p>
+          )}
+          <Button data-tutorial="t-save" variant="filled" size="block" onClick={guardarAhora}>
             Guardar análisis
           </Button>
         </div>
       }
     >
+      {/* Tutorial: botón bajo el título (no reemplaza a Guardar). La primera vez, una línea discreta. */}
+      <div className="mb-5 flex flex-col gap-2.5">
+        {tutorial && (
+          <p className="text-footnote font-semibold text-muted-foreground">
+            Modo práctica: el caso de los resortes. Nada se guarda.
+          </p>
+        )}
+        {!visto && !tutorial && (
+          <p className="text-footnote text-muted-foreground">¿Primera vez? ARIA te muestra cómo en 1 minuto.</p>
+        )}
+        <Button data-tutorial="t-head" variant="tinted" disabled={tutorial} onClick={iniciarTutorial}>
+          <Play />
+          Ver tutorial
+        </Button>
+      </div>
+
       {/* Celular: una columna en este orden. PC (lg): izquierda = preguntas; derecha = propuesta. */}
       <div className="grid gap-5 lg:grid-cols-2 lg:gap-6">
         <div className="flex flex-col gap-5">
         {repeticion && (
-          <ListGroup>
+          <ListGroup data-tutorial="t-alert">
             <div className="flex flex-col gap-2 px-4 py-3">
               <Pill tone="warning" className="self-start">
                 Se repite
@@ -316,7 +437,7 @@ export function AcrRapidoSheet({
           </ListGroup>
         )}
 
-        <section className="flex flex-col gap-2">
+        <section data-tutorial="t-q1" className="flex flex-col gap-2">
           <label htmlFor={`${idPiezas}-q1`} className={TITULO_PREGUNTA}>
             1. ¿Qué se rompió?
           </label>
@@ -330,7 +451,7 @@ export function AcrRapidoSheet({
           />
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section data-tutorial="t-q2" className="flex flex-col gap-2">
           <label htmlFor={`${idPiezas}-q2`} className={TITULO_PREGUNTA}>
             2. ¿Por qué se rompió?
           </label>
@@ -344,7 +465,7 @@ export function AcrRapidoSheet({
           />
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section data-tutorial="t-q3" className="flex flex-col gap-2">
           <label htmlFor={`${idPiezas}-q3`} className={TITULO_PREGUNTA}>
             3. ¿Qué hacemos para que no vuelva?
           </label>
@@ -361,10 +482,10 @@ export function AcrRapidoSheet({
         </div>
         <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2.5">
-          <Button variant="tinted" disabled={!puedeProponer} onClick={proponerConIA}>
+          <Button data-tutorial="t-prop" variant="tinted" disabled={!puedeProponer} onClick={proponerConIA}>
             Proponer causas
           </Button>
-          <Button variant="plain" onClick={() => cambiar((a) => armadoManual(a))}>
+          <Button variant="plain" disabled={tutorial} onClick={() => cambiar((a) => armadoManual(a))}>
             Armar a mano
           </Button>
           {pensando && <p className="text-footnote text-muted-foreground">ARIA está pensando…</p>}
@@ -377,6 +498,7 @@ export function AcrRapidoSheet({
               <button
                 key={c.id}
                 type="button"
+                data-tutorial={c.nivel === 'latente' ? 't-lat' : c.nivel === 'humana' ? 't-hum' : undefined}
                 onClick={() => setEditando({ tipo: 'causa', id: c.id })}
                 className="flex min-h-11 w-full flex-col items-start gap-1.5 px-4 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
@@ -450,6 +572,20 @@ export function AcrRapidoSheet({
         </div>
       </div>
 
+      {tutorial && (
+        <MotorTutorialAcr
+          onCerrar={() => {
+            terminarTutorialVisto()
+            volverAlReal()
+          }}
+          onTerminar={terminarTutorialVisto}
+          escribir={(campo, texto) =>
+            setAcr((prev) => ({ ...prev, respuestas: { ...(prev.respuestas ?? RESPUESTAS_VACIAS), [campo]: texto } }))
+          }
+          accion={accionTutorial}
+        />
+      )}
+
       {itemEditado && editando && (
         <Sheet
           open
@@ -522,6 +658,7 @@ function InterruptorPieza({ activo, onCambiar }: { activo: boolean; onCambiar: (
     <button
       type="button"
       role="switch"
+      data-tutorial="t-pieza"
       aria-checked={activo}
       onClick={() => onCambiar(!activo)}
       className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
