@@ -788,6 +788,8 @@ export function AnalisisGraderWizardPage() {
             <h1 className="text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]">
               Análisis de turno
             </h1>
+            {/* Piel Apple: el estado del turno va justo bajo el título, como una línea de texto. */}
+            {apple && !isManual && <CurrentShiftChip plantLineId={lineId} className="mt-2" />}
             <p className="mt-2 text-[0.85rem] text-muted-foreground">
               {lineConfig.hasGraderData
                 ? lineConfig.isClassificationPlant === false
@@ -968,7 +970,7 @@ export function AnalisisGraderWizardPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
             <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
-            <CurrentShiftChip plantLineId={lineId} />
+            {!apple && <CurrentShiftChip plantLineId={lineId} />}
           </div>
           <PlantKPIBoard
             plantSlug={lineConfig.plantSlug}

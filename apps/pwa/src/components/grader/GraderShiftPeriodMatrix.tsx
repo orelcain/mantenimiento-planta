@@ -30,6 +30,9 @@ import {
   matrixKpiMeta, matrixKpiValue, formatMatrixKpi, isBelowMatrixTarget,
   type MatrixKpi,
 } from '@/services/grader/graderShiftMatrixKpi'
+import { usePielApple } from '@/hooks/usePielApple'
+import { Button as BotonPiel, Skeleton, SkeletonBloque } from '@/components/piel'
+import { dec1 } from '@/utils/formatoNumeros'
 
 const ICONS = { Sun, Sunset, Moon, Sunrise, Clock } as const
 
@@ -91,6 +94,7 @@ export function GraderShiftPeriodMatrix({
   selectedKey = null, onSelect, onOpenShift, className,
 }: GraderShiftPeriodMatrixProps) {
   const quartiles = useQuartiles(shifts, kpi)
+  const apple = usePielApple()
   const [hoverKey, setHoverKey] = useState<string | null>(null)
   // Posición del tooltip flotante, en coordenadas de viewport. Pedido explícito
   // de Orel: los datos del turno tienen que aparecer JUNTO al cursor — el panel
@@ -98,7 +102,12 @@ export function GraderShiftPeriodMatrix({
   const [tipPos, setTipPos] = useState<{ x: number; y: number } | null>(null)
 
   const kpiMeta = matrixKpiMeta(kpi)
-  const gridCols = `minmax(96px, 128px) repeat(${days.length}, minmax(0, 1fr))`
+  // Piel Apple: columnas de ancho FIJO (52 px). Con 31 días en `minmax(0, 1fr)` un
+  // total de 6 cifras («42.268») se montaba sobre el de al lado; con ancho fijo la
+  // grilla se desplaza dentro de su contenedor y cada cifra cabe.
+  const gridCols = apple
+    ? `minmax(96px, 128px) repeat(${days.length}, 52px)`
+    : `minmax(96px, 128px) repeat(${days.length}, minmax(0, 1fr))`
 
   // Σ 24 h solo tiene sentido en magnitudes acumulables. Sumar el UPT o el P0%
   // de dos turnos no significa nada, así que la fila no se muestra vacía: no va.
@@ -124,26 +133,47 @@ export function GraderShiftPeriodMatrix({
   const focused = selectedKey ? byKey.get(selectedKey) ?? null : null
 
   return (
-    <Card className={cn('relative', className)}>
-      <CardHeader className="flex flex-row items-baseline justify-between gap-3 pb-3 flex-wrap">
-        <h3 className="font-semibold tracking-tight text-base">Turnos del período</h3>
-        <span className="text-xs text-muted-foreground">
-          Color = {kpiMeta.label.toLowerCase()} · {shifts.length} turno{shifts.length === 1 ? '' : 's'}
-        </span>
+    // Piel Apple: la matriz no es una tarjeta. El Card de la UI se anula con
+    // importantes (`!`) para que no pinte borde, fondo ni sombra.
+    <Card className={cn('relative', apple && '!border-0 !bg-transparent !shadow-none !rounded-none', className)}>
+      <CardHeader className={cn(
+        'flex flex-row items-baseline justify-between gap-3 pb-3 flex-wrap',
+        apple && 'px-0',
+      )}>
+        {apple ? (
+          <h2 className="text-headline">Turnos del período</h2>
+        ) : (
+          <h3 className="font-semibold tracking-tight text-base">Turnos del período</h3>
+        )}
+        {apple ? (
+          <span className="text-footnote text-muted-foreground">
+            {`Color por ${kpiMeta.label.toLowerCase()}, ${shifts.length} ${shifts.length === 1 ? 'turno' : 'turnos'}`}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            Color = {kpiMeta.label.toLowerCase()} · {shifts.length} turno{shifts.length === 1 ? '' : 's'}
+          </span>
+        )}
       </CardHeader>
 
-      <CardContent className="pt-0">
+      <CardContent className={cn('pt-0', apple && 'px-0')}>
         {loading ? (
+          apple ? (
+            <SkeletonBloque label="Cargando turnos del período" className="space-y-1.5">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-11 w-full" />)}
+            </SkeletonBloque>
+          ) : (
           <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">
             Cargando turnos…
           </div>
+          )
         ) : rows.length === 0 ? (
-          <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">
+          <div className={apple ? 'py-6 text-subhead' : 'h-32 flex items-center justify-center text-sm text-muted-foreground'}>
             Sin turnos con datos en este período.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <div className="min-w-[720px]">
+            <div className={apple ? 'w-max min-w-full' : 'min-w-[720px]'}>
               {/* Cabecera de días */}
               <div className="grid gap-[2px]" style={{ gridTemplateColumns: gridCols }}>
                 <div />
@@ -208,7 +238,7 @@ export function GraderShiftPeriodMatrix({
                         return (
                           <div
                             key={dk}
-                            className="rounded-ctl min-h-[40px]"
+                            className={apple ? 'rounded-ctl min-h-11' : 'rounded-ctl min-h-[40px]'}
                             style={{ background: 'var(--shift-empty)' }}
                             aria-hidden
                           />
@@ -236,7 +266,7 @@ export function GraderShiftPeriodMatrix({
                           aria-label={`${displayShiftName(shiftId)}, ${dk}, ${formatMatrixKpi(v, kpi)}${s.crossesMidnight || s.startDayOffset > 0 ? ', termina otro día' : ''}${s.mergedFrom ? `, ${s.mergedFrom.length} jornadas` : ''}${s.corregido ? ', corregido después del brief' : ''}`}
                           aria-pressed={selected}
                           className={cn(
-                            'relative rounded-ctl min-h-[40px]',
+                            apple ? 'relative rounded-ctl min-h-11' : 'relative rounded-ctl min-h-[40px]',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             'focus-visible:ring-offset-1 focus-visible:z-10',
                             selected && 'ring-2 ring-foreground ring-offset-1 z-10',
@@ -307,7 +337,7 @@ export function GraderShiftPeriodMatrix({
                 >
                   <div className="pl-2 text-caption text-muted-foreground">Σ 24 h</div>
                   {days.map(dk => (
-                    <div key={dk} className="text-center text-caption font-mono tabular-nums text-muted-foreground">
+                    <div key={dk} className={apple ? 'text-center text-footnote tabular-nums text-muted-foreground' : 'text-center text-caption font-mono tabular-nums text-muted-foreground'}>
                       {totals.get(dk) ? Math.round(totals.get(dk)!).toLocaleString('es-CL') : ''}
                     </div>
                   ))}
@@ -319,8 +349,9 @@ export function GraderShiftPeriodMatrix({
 
         {/* Leyenda: obligatoria en escala continua — sin ella el color no se puede leer. */}
         {!loading && rows.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-border
-                          text-[11px] text-muted-foreground">
+          <div className={apple
+            ? 'flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-border text-footnote text-muted-foreground'
+            : 'flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-border text-[11px] text-muted-foreground'}>
             <span className="inline-flex items-center gap-1.5">
               {kpiMeta.scaleLo}
               <span className="inline-flex rounded-ctl overflow-hidden" aria-hidden>
@@ -414,6 +445,11 @@ export function GraderShiftPeriodMatrix({
 
         {/* Panel del turno SELECCIONADO — permanente, con el acceso al análisis.
             En tablet (sin hover) es la única superficie de lectura. */}
+        {apple ? (
+          <div className="mt-3">
+            <PanelTurnoApple focused={focused} onOpenShift={onOpenShift} />
+          </div>
+        ) : (
         <div className={cn(
           'mt-3 rounded-ctl border px-3 py-2 text-xs transition-colors',
           // Alto reservado: sin esto, al seleccionar un turno el panel pasa de
@@ -480,8 +516,43 @@ export function GraderShiftPeriodMatrix({
             </span>
           )}
         </div>
+        )}
 
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * Piel Apple: el turno fijado, en texto. Sin caja ni fondo: la fila de datos
+ * va en 15 px y el botón «Ver turno» (44 px) es el camino en tablet, donde no hay hover.
+ */
+function PanelTurnoApple({ focused, onOpenShift }: { focused: PeriodShift | null; onOpenShift?: (s: PeriodShift) => void }) {
+  if (!focused) {
+    return <p className="text-footnote text-muted-foreground">Toca un turno para fijarlo acá y poder abrir su análisis.</p>
+  }
+  const cifras = [
+    `${focused.cycles.toLocaleString('es-CL')} ciclos${focused.attributedCycles ? ` (+${focused.attributedCycles.toLocaleString('es-CL')} fuera de horario)` : ''}`,
+    focused.uptimePct != null ? `uptime ${Math.round(focused.uptimePct)} %` : null,
+    focused.pieces != null ? `${focused.pieces.toLocaleString('es-CL')} piezas` : 'sin Excel del Grader',
+    focused.p0Pct != null ? `P0 ${dec1(focused.p0Pct)} %` : null,
+  ].filter((s): s is string => s != null)
+  return (
+    <div className="space-y-2">
+      <p className="text-subhead">
+        {`${focused.unscheduled ? 'Sin turno configurado' : displayShiftName(focused.shiftId)}, ${focused.dateKey.slice(8, 10)}/${focused.dateKey.slice(5, 7)}, ${formatShiftWindow(focused)}`}
+      </p>
+      <p className="text-subhead tabular-nums">{cifras.join(', ')}</p>
+      {focused.corregido && (
+        <p className="text-footnote" style={{ color: 'var(--lc-warn)' }}>
+          {focused.notaCorreccion ?? 'Shoplogix corrigió este turno después del brief'}
+        </p>
+      )}
+      {onOpenShift && (
+        <BotonPiel variant="filled" size="md" onClick={() => onOpenShift(focused)}>
+          Ver turno
+        </BotonPiel>
+      )}
+    </div>
   )
 }

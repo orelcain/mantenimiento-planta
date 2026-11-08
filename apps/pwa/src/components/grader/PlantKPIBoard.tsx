@@ -10,7 +10,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
 import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Disclosure, SegmentedControl, FoldTable } from '@/components/piel'
+import { Disclosure, SegmentedControl, FoldTable, Skeleton, SkeletonBloque } from '@/components/piel'
 import { usePielApple } from '@/hooks/usePielApple'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
@@ -596,7 +596,18 @@ function PlantKPIBoardApple({
         className="w-full"
       />
 
-      {loading && <p className="text-footnote text-muted-foreground">Cargando…</p>}
+      {loading && (
+        <SkeletonBloque label="Cargando indicadores" className="space-y-7">
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-9 w-40" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        </SkeletonBloque>
+      )}
       {error && <p className="text-footnote text-ink-crit">{error}</p>}
       {!loading && !error && !kpis && (
         <p className="text-footnote text-muted-foreground">Sin datos Shoplogix disponibles para este período.</p>
