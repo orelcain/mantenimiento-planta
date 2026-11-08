@@ -460,7 +460,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
           <Button variant={preset === '30' && modoCmp === 'mes' ? 'tinted' : 'plain'} onClick={() => { cambiarPreset('30'); cambiarModo('mes') }} aria-pressed={preset === '30' && modoCmp === 'mes'}>Mes</Button>
           <SegmentedControl<ModoCmpJK> className="sm:w-auto sm:min-w-[360px]" ariaLabel="Comparar con" value={modoCmp} onChange={cambiarModo} segments={MODOS} />
           <details className="relative ml-auto"><summary className="cursor-pointer rounded-full bg-primary px-4 py-3 font-semibold text-primary-foreground">Exportar para reunión</summary>
-            <div className="absolute right-0 z-10 rounded-2xl bg-card p-2 shadow">
+            <div className="absolute right-0 z-10 rounded-panel bg-card p-2 shadow">
               <Button disabled={pdfEnCurso || !n} onClick={() => void descargar('pdf')}>PDF</Button>
               <Button disabled={pdfEnCurso || !n} onClick={() => void descargar('png')}>PNG</Button>
             </div>
