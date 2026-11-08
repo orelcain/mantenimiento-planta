@@ -90,3 +90,5 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [x] Normalización repuestos Fases 0–6 (maestro SAP) + rework UI incrementos 1–7. (claude, 2026-06-12 — ver WORKLOG)
 
 - [ ] **Jack-Knife ronda 3, etapas 1 y 2** — HECHO — codex (pendiente revisión visual de Orel). Rama feat/jack-knife-pagina; sin commit ni push por instrucción explícita.
+
+- [ ] **Vidrio líquido fase 2 · cápsulas agrupadas** — EN REVISIÓN — codex (CI local verde; preview visual pendiente por host de navegador no disponible). Rama existente feat/vidrio-fase2-capsulas; solo piel Apple, sin commit ni push.

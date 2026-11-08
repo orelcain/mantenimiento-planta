@@ -1295,3 +1295,12 @@ Estos seguían abiertos cuando se compactó el historial (2026-07-30):
   quedó restringida.
 - Opcional: botones Confirmar/Cancelar dedicados para repuestos en el chat ARIA de la PWA (hoy es
   solo texto plano) + soporte de fotos.
+
+## 2026-11-08 · Vidrio líquido fase 2 · codex (sin commit ni push)
+
+- Rama existente: feat/vidrio-fase2-capsulas. Solo piel Apple: material vidrio-barra, cabecera PC en tres cápsulas (h-14), slot persistente visible con scrollY > 64, portal PC de filtros de Incidencias con contadores y estado existentes, lanzador del chat y cápsulas de Bitácora/Repuesto. Piel anterior conserva sus clases; sin consultas nuevas ni backend.
+- Accesibilidad: cápsula izquierda oculta también inerte; asignación DOM por ref compatible con React 18. Listener passive y actualizaciones solo al cruzar el umbral.
+- Verificación final: pnpm.cmd ci:local → «CI local en verde: 9 pasos.» Rutas SPA OK; typecheck (incluye tests) OK; lint general «29 problems (0 errors, 29 warnings)», todos en archivos ajenos; PWA «Test Files 451 passed (451)», «Tests 5797 passed | 8 skipped (5805)»; functions «tests 727 / pass 727 / fail 0»; gráficos «sin deuda nueva. Línea base íntegra.»; piel «OK: la deuda de piel no creció.»; voseo «sin voseo. La app habla en español neutro.»; decimales «sin deuda nueva (154).»
+- Verificación adicional: vitest run src/components/layout → «Test Files 1 passed (1) / Tests 14 passed (14)». ESLint de los siete archivos TS/TSX modificados: salida vacía, código 0. git diff --check: código 0 (solo avisos Git de conversión LF/CRLF en memoria/tablero).
+- Cascada CSS comprobada con PostCSS y selectores DOM: html.vidrio-solido y prefers-reduced-transparency, ambos claro #fbfaf7 y oscuro #2a2927 opacos. El respaldo ya gana por orden/especificidad; no se ajustó. No equivale a validación visual.
+- Limitaciones/desvíos: git pull --ff-only falló con Permission denied sobre FETCH_HEAD del repo principal; se conservó la rama de este worktree. pnpm ci:local literal bloqueado por política de pnpm.ps1; se ejecutó el mismo script mediante pnpm.cmd. Primer typecheck detectó inert no tipado en React 18; corregido antes de la CI verde. Vite arrancó en 5178, pero preview visual pendiente: «The browser access host is unavailable». Servidor local detenido al terminar.

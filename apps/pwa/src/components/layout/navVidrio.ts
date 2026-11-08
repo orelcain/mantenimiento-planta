@@ -51,7 +51,7 @@ export function claseItemPC(apple: boolean, activo: boolean): string {
 /** Barra inferior del celular (< lg). */
 export function claseBarraInferior(apple: boolean): string {
   return apple
-    ? 'lg:hidden fixed inset-x-3 z-40 rounded-full vidrio'
+    ? 'lg:hidden fixed inset-x-3 z-40 rounded-full vidrio vidrio-barra'
     : 'lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav'
 }
 
@@ -63,4 +63,16 @@ export function claseTabBarra(apple: boolean, activo: boolean): string {
       : 'text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
   }
   return activo ? 'text-primary' : 'text-muted-foreground'
+}
+
+/** Barra superior de PC: conserva la altura que usan las páginas. */
+export function claseHeaderPC(apple: boolean): string {
+  return apple
+    ? 'hidden lg:flex sticky top-0 z-30 items-start h-14 px-4 pt-2 vidrio-borde-superior pointer-events-none'
+    : 'hidden lg:flex sticky top-0 z-30 items-center h-14 px-4 bg-background/80 backdrop-blur border-b'
+}
+
+/** Cápsula con su propio ancestro para el brillo del material. */
+export function claseCapsulaBarra(): string {
+  return 'relative vidrio vidrio-barra pointer-events-auto flex items-center h-[42px] rounded-full'
 }

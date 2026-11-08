@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  claseHeaderPC,
+  claseCapsulaBarra,
   claseAsidePC,
   clasePaddingContenidoPC,
   claseItemPC,
@@ -85,5 +87,22 @@ describe('contarIncidenciasActivas', () => {
 
   it('lista vacía da 0', () => {
     expect(contarIncidenciasActivas([])).toBe(0)
+  })
+})
+
+describe('cápsulas agrupadas de la barra superior', () => {
+  it('conserva exactamente la cabecera anterior sin Apple', () => {
+    expect(claseHeaderPC(false)).toBe('hidden lg:flex sticky top-0 z-30 items-center h-14 px-4 bg-background/80 backdrop-blur border-b')
+    expect(claseBarraInferior(false)).toBe('lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav')
+  })
+
+  it('mantiene h-14 y deja pasar los eventos entre cápsulas en Apple', () => {
+    expect(claseHeaderPC(true)).toBe('hidden lg:flex sticky top-0 z-30 items-start h-14 px-4 pt-2 vidrio-borde-superior pointer-events-none')
+  })
+
+  it('posiciona el brillo de cada cápsula y permite sus interacciones', () => {
+    expect(claseCapsulaBarra()).toBe('relative vidrio vidrio-barra pointer-events-auto flex items-center h-[42px] rounded-full')
+    expect(claseBarraInferior(true)).toBe('lg:hidden fixed inset-x-3 z-40 rounded-full vidrio vidrio-barra')
+    expect(claseAsidePC(true, false)).not.toContain('vidrio-barra')
   })
 })
