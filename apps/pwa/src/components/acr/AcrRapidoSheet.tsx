@@ -560,7 +560,9 @@ export function AcrRapidoSheet({
         {!visto && !tutorial && (
           <p className="text-footnote text-muted-foreground">¿Primera vez? ARIA te lo muestra en 11 partes cortas.</p>
         )}
-        <Button data-tutorial="t-head" variant="tinted" disabled={tutorial} onClick={iniciarTutorial}>
+        {/* En la práctica no se deshabilita: ARIA lo ilumina y debe verse como lo verá el técnico.
+            Tocarlo ahí no hace nada (iniciarTutorial ya corre). */}
+        <Button data-tutorial="t-head" variant="tinted" aria-disabled={tutorial} onClick={iniciarTutorial}>
           <Play />
           Ver tutorial
         </Button>
@@ -642,14 +644,23 @@ export function AcrRapidoSheet({
         </div>
         <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2.5">
-          <Button data-tutorial="t-prop" variant="tinted" disabled={!puedeProponer} onClick={proponerConIA}>
+          {/* En la práctica se ve habilitado (ARIA lo toca); la IA real no se llama. */}
+          <Button
+            data-tutorial="t-prop"
+            variant="tinted"
+            disabled={!tutorial && !puedeProponer}
+            aria-disabled={tutorial}
+            onClick={proponerConIA}
+          >
             Proponer causas
           </Button>
           <Button
             data-tutorial="t-manual"
             variant="plain"
-            disabled={tutorial}
-            onClick={() => cambiar((a) => armadoManual(a))}
+            aria-disabled={tutorial}
+            onClick={() => {
+              if (!tutorial) cambiar((a) => armadoManual(a))
+            }}
           >
             Armar a mano
           </Button>

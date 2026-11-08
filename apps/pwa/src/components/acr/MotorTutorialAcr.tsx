@@ -31,8 +31,10 @@ const DURACION_TOQUE_MS = 700
 const LETRA_MS = 38
 /** Mientras aparece una hoja, el anillo se vuelve a medir durante este tiempo. */
 const BUSCAR_OBJETIVO_MS = 1600
-/** Si el audio no da su duración en este tiempo, los momentos usan el tiempo de lectura. */
-const ESPERA_DURACION_MS = 1200
+/** Si el audio no empieza a sonar en este tiempo (sin red, bloqueado), habla el respaldo. */
+const ESPERA_ARRANQUE_MS = 12000
+/** Tope de seguridad tras lo que le queda al audio cuando suena (por si `ended` no llega). */
+const MARGEN_TOPE_MS = 2500
 
 export interface MotorTutorialAcrProps {
   onCerrar: () => void
@@ -82,6 +84,7 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
   const [altoVentana, setAltoVentana] = useState(() => (typeof window === 'undefined' ? 0 : window.innerHeight))
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioIndiceRef = useRef(-1)
+  const precargaRef = useRef<{ indice: number; audio: HTMLAudioElement } | null>(null)
   /** Cada cambio de paso o de pausa abre un «turno»: los temporizadores viejos se descartan. */
   const turnoRef = useRef(0)
   // Los callbacks de quien monta el motor, siempre al día sin reiniciar el guion.
@@ -197,17 +200,29 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
     }
 
     // Audio. Si ya hay uno de este paso (se reanuda tras pausa), se sigue desde donde quedó.
+    // Si el paso siguiente ya estaba precargado, se usa ese: sin espera de red entre pasos.
     let audio = audioRef.current
     if (!audio || audioIndiceRef.current !== indice || audio.ended) {
       audio?.pause()
-      audio = new Audio(urlAudio(import.meta.env.BASE_URL, indice))
+      const precargado = precargaRef.current
+      audio =
+        precargado && precargado.indice === indice
+          ? precargado.audio
+          : new Audio(urlAudio(import.meta.env.BASE_URL, indice))
       audioRef.current = audio
       audioIndiceRef.current = indice
     }
     const a = audio
+    // Precarga del que sigue.
+    if (indice + 1 < PASOS_TUTORIAL.length && precargaRef.current?.indice !== indice + 1) {
+      const sig = new Audio(urlAudio(import.meta.env.BASE_URL, indice + 1))
+      sig.preload = 'auto'
+      precargaRef.current = { indice: indice + 1, audio: sig }
+    }
 
-    // Momentos: cada uno en su fracción del audio que queda. Se programan una vez, cuando se sabe
-    // la duración (o al rato, con el tiempo de lectura).
+    // Momentos: cada uno en su fracción del audio que queda. Se programan una vez, cuando el audio
+    // empieza a SONAR (no cuando empieza el paso: con red lenta la carga correría los gestos), o
+    // con el tiempo de lectura si habla el respaldo.
     let programados = false
     const programar = () => {
       if (programados || !vigente()) return
@@ -228,14 +243,10 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
         }, espera)
       }
     }
-    if (Number.isFinite(a.duration) && a.duration > 0) programar()
-    else {
-      a.addEventListener('loadedmetadata', programar, { once: true })
-      window.setTimeout(programar, ESPERA_DURACION_MS)
-    }
-
     // Una sola salida por corrida: el fin del audio, el respaldo o el tope de tiempo, lo que
     // llegue primero. Sin tope, un `play()` que nunca resuelve dejaba el tutorial pegado.
+    // El tope cuenta desde que el audio SUENA: contado desde el inicio del paso, una carga lenta
+    // (wifi de planta) hacía avanzar antes de que terminara la frase.
     let avanzado = false
     const terminado = () => {
       if (avanzado || !vigente()) return
@@ -248,15 +259,28 @@ export function MotorTutorialAcr({ onCerrar, onTerminar, preparar, escribir, acc
     const respaldo = () => {
       if (respaldoUsado || avanzado || !vigente()) return
       respaldoUsado = true
+      window.clearTimeout(arranque)
+      a.pause()
+      programar()
       speak(texto, { onend: terminado, onerror: () => window.setTimeout(terminado, tiempoLectura(texto)) })
     }
+    let tope = 0
+    const alSonar = () => {
+      if (!vigente() || respaldoUsado) return
+      window.clearTimeout(arranque)
+      programar()
+      window.clearTimeout(tope)
+      const restante = Number.isFinite(a.duration) && a.duration > 0
+        ? (a.duration - a.currentTime) * 1000
+        : tiempoLectura(texto)
+      tope = window.setTimeout(terminado, restante + MARGEN_TOPE_MS)
+    }
+    // Si en ESPERA_ARRANQUE_MS no empezó a sonar (sin red, bloqueado), lo lee el respaldo.
+    const arranque = window.setTimeout(respaldo, ESPERA_ARRANQUE_MS)
+    a.onplaying = alSonar
     a.onended = terminado
     a.onerror = respaldo
     a.play().catch(respaldo)
-    const restante = Number.isFinite(a.duration) && a.duration > 0
-      ? (a.duration - a.currentTime) * 1000
-      : tiempoLectura(texto)
-    window.setTimeout(terminado, Math.max(restante, tiempoLectura(texto)) + 4000)
   }, [est])
 
   // Al desmontar (cerrar o cambiar de hoja): silencio y ningún temporizador pendiente.
