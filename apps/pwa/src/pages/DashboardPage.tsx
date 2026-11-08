@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui'
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, pareceIdDeUsuario } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
@@ -36,6 +36,7 @@ import { MonitorCell } from '@/components/home/MonitorCell'
 import { ListGroup } from '@/components/piel'
 import { LINEAS_CON_MONITOR } from '@/services/shoplogix/monitorDeLinea'
 import { dec1 } from '@/utils/formatoNumeros'
+import { usePielApple } from '@/hooks/usePielApple'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -44,6 +45,7 @@ export function DashboardPage() {
   const { incidents, equipment, zones, selectedIncident, setSelectedIncident } = useAppStore()
   const [selectedZoneForDetail, setSelectedZoneForDetail] = useState<Zone | null>(null)
   const [usersCache, setUsersCache] = useState<Record<string, User>>({})
+  const apple = usePielApple()
 
   // Cache local de detalles IoT por equipo
   const [iotDetails, setIotDetails] = useState<Record<string, {
@@ -72,11 +74,12 @@ export function DashboardPage() {
     !!value && value.length > 20 && !value.includes(' ')
 
   const formatUserLabel = (userData?: User, fallback?: string) => {
+    if (userData && apple) return `${userData.nombre} ${userData.apellido}`
     if (userData) {
       const providerLabel = userData.authProvider === 'google' ? 'Google' : 'Email'
       return `${userData.nombre} ${userData.apellido} · ${roleLabels[userData.rol]} · ${providerLabel}`
     }
-    if (!fallback) return 'Desconocido'
+    if (!fallback || (apple && pareceIdDeUsuario(fallback))) return 'Desconocido'
     return fallback
   }
 
@@ -177,7 +180,9 @@ export function DashboardPage() {
   // Últimas incidencias
   // Incidencias críticas
   const criticalIncidents = incidents.filter(
-    (i) => i.prioridad === 'critica' && i.status !== 'cerrada'
+    (i) => i.prioridad === 'critica' && (apple
+      ? ['pendiente', 'confirmada', 'en_proceso'].includes(i.status)
+      : i.status !== 'cerrada')
   )
 
   return (
@@ -193,11 +198,13 @@ export function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">
-            Bienvenido, {user?.nombre || 'Usuario'}
+            {apple ? 'Inicio' : <>Bienvenido, {user?.nombre || 'Usuario'}</>}
           </h1>
-          <p className="text-muted-foreground">
-            Panel de control de mantenimiento industrial
-          </p>
+          {!apple && (
+            <p className="text-muted-foreground">
+              Panel de control de mantenimiento industrial
+            </p>
+          )}
         </div>
         <Button onClick={() => navigate('/incidents')}>
           <Plus className="h-4 w-4 mr-2" />
@@ -277,6 +284,7 @@ export function DashboardPage() {
       )}
 
       {/* Stats Grid */}
+      {!apple && (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card
           className="cursor-pointer hover:border-primary/50 transition-colors"
@@ -356,9 +364,10 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Recent Activity */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className={apple && zones.length === 0 ? 'grid gap-6' : 'grid gap-6 lg:grid-cols-2'}>
         {/* Últimas incidencias */}
         <Card className="-mx-3 sm:mx-0 rounded-none sm:rounded-card border-x-0 sm:border">
           <CardHeader>
@@ -456,6 +465,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Resumen por zona */}
+        {!(apple && zones.length === 0) && (
         <Card className="-mx-4 sm:mx-0 rounded-none sm:rounded-card border-x-0 sm:border">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -507,6 +517,7 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* Incident Detail Modal */}

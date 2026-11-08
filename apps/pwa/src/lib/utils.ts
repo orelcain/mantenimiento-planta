@@ -62,6 +62,43 @@ export function formatRelativeTime(date: Date | string | number | undefined): st
   return formatDate(date)
 }
 
+/** Fecha absoluta `08-02-2026` (hora local). Valor ausente o inválido: cadena vacía. */
+export function formatFechaDia(date: Date | string | number | undefined | null): string {
+  const d = aFechaValida(date)
+  if (!d) return ''
+  return `${dos(d.getDate())}-${dos(d.getMonth() + 1)}-${d.getFullYear()}`
+}
+
+/** Fecha y hora absoluta `08-02-2026 00:10` (24 h, hora local). Valor ausente o inválido: cadena vacía. */
+export function formatFechaHora(date: Date | string | number | undefined | null): string {
+  const d = aFechaValida(date)
+  if (!d) return ''
+  return `${formatFechaDia(d)} ${dos(d.getHours())}:${dos(d.getMinutes())}`
+}
+
+function aFechaValida(date: Date | string | number | undefined | null): Date | null {
+  if (date === undefined || date === null || date === '') return null
+  const d = date instanceof Date ? date : new Date(date)
+  return isNaN(d.getTime()) ? null : d
+}
+
+const dos = (n: number) => String(n).padStart(2, '0')
+
+/** Un id de Firebase colado como nombre: largo y sin espacios. No debe mostrarse a una persona. */
+export function pareceIdDeUsuario(valor: string | null | undefined): boolean {
+  return !!valor && valor.length > 20 && !/[\s.@]/.test(valor)
+}
+
+const PRIORIDADES_INCIDENCIA = ['critica', 'alta', 'media', 'baja'] as const
+
+/**
+ * Prioridad obligatoria al guardar una incidencia. Sin preselección, un vacío o un valor fuera
+ * de la lista es un error. Devuelve el mensaje para el usuario, o `null` si está bien.
+ */
+export function validarPrioridadIncidencia(prioridad: string | null | undefined): string | null {
+  return (PRIORIDADES_INCIDENCIA as readonly string[]).includes(prioridad ?? '') ? null : 'Elige la prioridad'
+}
+
 export function generateInviteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let code = ''
