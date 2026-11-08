@@ -746,6 +746,183 @@
   }
 }
 
+/* ── Vidrio líquido · piel apple (PLAN_VIDRIO_LIQUIDO.md, Fase 1) ──────────────
+   Material de CROMO: menú lateral de PC y barra inferior del celular. Solo lo
+   usa la piel apple (MainLayout, rama apple); la piel anterior sigue con
+   .glass-nav, intacta. Valores del mockup aprobado: F-liquido-claro.dc.html,
+   F-liquido-oscuro.dc.html y G-movil-liquido.dc.html (.g, .sheen, .lens, .cap).
+   Capas: relleno + borde de luz (doble fondo padding-box / border-box), brillo
+   interior, reflejo superior en ::before (z-index -1: queda DETRÁS del texto) y
+   sombra. Sin relleno sólido no hay contraste garantizado: el respaldo sólido
+   está más abajo (transparencia reducida, sin backdrop-filter, gama baja). */
+/* Sin `position`: el elemento de vidrio ya va `fixed` (panel y barra) y esta regla
+   no debe pisar la posición de Tailwind. El reflejo ::before se ancla a ese fijo. */
+.vidrio {
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.38)) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+  border: 1px solid transparent;
+  -webkit-backdrop-filter: blur(26px) saturate(1.9);
+  backdrop-filter: blur(26px) saturate(1.9);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.95),
+    inset 0 -10px 20px rgba(255, 255, 255, 0.14),
+    0 1px 1px rgba(0, 0, 0, 0.04),
+    0 20px 54px rgba(30, 40, 55, 0.16);
+}
+.vidrio::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 34%);
+  pointer-events: none;
+}
+.dark .vidrio {
+  background:
+    linear-gradient(180deg, rgba(52, 50, 47, 0.7), rgba(28, 27, 25, 0.5)) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  backdrop-filter: blur(26px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.16),
+    inset 0 -10px 24px rgba(0, 0, 0, 0.18),
+    0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.dark .vidrio::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 30%);
+}
+
+/* Selección: cápsula de vidrio denso (ítem activo del menú, gota de la barra). */
+.vidrio-lente {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.7));
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    inset 0 -1px 2px rgba(0, 0, 0, 0.05),
+    0 6px 18px rgba(46, 117, 182, 0.22),
+    0 0 0 1px rgba(46, 117, 182, 0.16);
+  color: #1b5c97;
+  font-weight: 600;
+}
+.dark .vidrio-lente {
+  background: linear-gradient(180deg, rgba(90, 160, 220, 0.34), rgba(90, 160, 220, 0.18));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 0 1px rgba(90, 160, 220, 0.35),
+    0 8px 26px rgba(90, 160, 220, 0.28);
+  color: #ffffff;
+}
+
+/* Contador dentro del vidrio. Neutro = «en curso»; --alerta = tinte rojo. */
+.vidrio-capsula {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: rgba(118, 118, 128, 0.12);
+  color: rgb(var(--muted-foreground));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.vidrio-capsula--alerta {
+  background: rgba(201, 55, 44, 0.12);
+  color: #a62b22;
+}
+.dark .vidrio-capsula {
+  background: rgba(118, 118, 128, 0.24);
+  color: rgba(232, 226, 215, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.dark .vidrio-capsula--alerta {
+  background: rgba(255, 107, 94, 0.2);
+  color: #ff8f84;
+}
+.vidrio-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: #2e7d4f;
+  box-shadow: 0 0 0 4px rgba(46, 125, 79, 0.16);
+}
+.dark .vidrio-punto {
+  background: #6cc08b;
+  box-shadow:
+    0 0 0 4px rgba(108, 192, 139, 0.18),
+    0 0 10px rgba(108, 192, 139, 0.6);
+}
+
+/* Badge de incidencias activas sobre la pestaña de la barra inferior. */
+.vidrio-insignia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #c9372c;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Respaldo sólido (DESIGN.md §6 + PLAN_VIDRIO_LIQUIDO.md): el mismo borde y brillo,
+   relleno #FBFAF7 (claro) / #2A2927 (oscuro) y sin backdrop-filter. Se activa con
+   transparencia reducida, sin soporte de backdrop-filter o con <html class="vidrio-solido">
+   (gama baja, marcado en lib/vidrioSolido.ts). Los selectores de tema van al final y
+   con más especificidad: `.dark .vidrio` (0,2,0) pisaría al claro si no. */
+@media (prefers-reduced-transparency: reduce) {
+  .vidrio {
+    background:
+      linear-gradient(#fbfaf7, #fbfaf7) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .dark .vidrio {
+    background:
+      linear-gradient(#2a2927, #2a2927) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .vidrio {
+    background:
+      linear-gradient(#fbfaf7, #fbfaf7) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+  }
+  .dark .vidrio {
+    background:
+      linear-gradient(#2a2927, #2a2927) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+  }
+}
+html.vidrio-solido .vidrio {
+  background:
+    linear-gradient(#fbfaf7, #fbfaf7) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html.vidrio-solido.dark .vidrio {
+  background:
+    linear-gradient(#2a2927, #2a2927) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* ── Transparencia reducida (DESIGN.md §6) ────────────────────────────────────
    iOS 27 le dio al usuario un slider de transparencia (Ajustes > Appearance >
    Liquid Glass) y Apple documenta que el material responde a Reduce Transparency.
