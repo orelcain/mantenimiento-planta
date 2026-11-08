@@ -46,7 +46,7 @@ export function calcularSenales(
 }
 
 export function useSenalesAcr(eventos: readonly EventoBitacora[]): Map<string, SenalAcr> {
-  const [recientes, setRecientes] = useState<EventoBitacora[] | null>(null)
+  const [recientes, setRecientes] = useState<EventoRepeticion[] | null>(null)
   const [acrs, setAcrs] = useState<Acr[] | null>(null)
   const [fallo, setFallo] = useState(false)
 
