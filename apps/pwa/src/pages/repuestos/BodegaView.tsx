@@ -35,6 +35,8 @@ import { useBodega } from '@/hooks/repuestos/useBodega'
 import { Tag as CatTag, type TagTone, ListGroup, ListCell, SwipeRow } from '@/components/piel'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { usePielApple } from '@/hooks/usePielApple'
+import { metaFilaBodega } from './metaFilaBodega'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { indicePorSap, nombreVisiblePorSap } from '@/utils/repuestos/nombrePorSap'
 import { cn } from '@/lib/utils'
@@ -301,6 +303,9 @@ function exportCsv(items: BodegaMergedItem[]) {
   URL.revokeObjectURL(url)
 }
 
+// Cuántas filas se dibujan de una vez en el celular. Con las 2.407 eran 108.420 elementos.
+const FILAS_POR_PAGINA = 60
+
 function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
   const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
   // Pase de lectura: sin escrituras (ajustes, movimientos, fotos, favoritos); se ven la tabla, la ficha y CSV.
@@ -314,6 +319,9 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   // 759 a 3.778 ítems (mayoría sin stock). El gestor de bodega quiere ver primero
   // su inventario real (los que tienen registro de bodega); el resto, a un clic.
   const [stockFilter, setStockFilter] = useState<StockFilter>('configurados')
+  const [limite, setLimite] = useState(FILAS_POR_PAGINA)
+  const apple = usePielApple()
+  const sep = apple ? ', ' : ' · '
   const [editingItem, setEditingItem] = useState<BodegaMergedItem | null>(null)
   const [movimientoItem, setMovimientoItem] = useState<BodegaMergedItem | null>(null)
   const [historialItem, setHistorialItem] = useState<BodegaMergedItem | null>(null)
@@ -367,6 +375,10 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     })
     return result
   }, [items, stockFilter, searchQuery, sortField, sortDir])
+
+  // Otra búsqueda, filtro u orden: primera página. No depende de `items`, para que un dato
+  // nuevo o un favorito no devuelva al técnico al comienzo de la lista.
+  useEffect(() => { setLimite(FILAS_POR_PAGINA) }, [stockFilter, searchQuery, sortField, sortDir])
 
   // Desglose de las alertas para el encabezado del filtro «Alertas». La alerta solo vigila
   // los ítems con mínimo definido; los en cero sin mínimo se aclaran al pie para que el
@@ -433,9 +445,9 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const enAlertas = stockFilter === 'alertas'
   const tituloLista = enAlertas
     ? (searchQuery.trim()
-        ? `Alertas · ${filtered.length} de ${stats.alertas.length}`
-        : ['Alertas', desgloseAlertas.sinStock > 0 && `${desgloseAlertas.sinStock} sin stock`, desgloseAlertas.bajoMinimo > 0 && `${desgloseAlertas.bajoMinimo} bajo mínimo`].filter(Boolean).join(' · '))
-    : `Por ${ordenadoPor} · ${filtered.length} de ${items.length}`
+        ? `Alertas${sep}${filtered.length} de ${stats.alertas.length}`
+        : ['Alertas', desgloseAlertas.sinStock > 0 && `${desgloseAlertas.sinStock} sin stock`, desgloseAlertas.bajoMinimo > 0 && `${desgloseAlertas.bajoMinimo} bajo mínimo`].filter(Boolean).join(sep))
+    : `Por ${ordenadoPor}${sep}${filtered.length} de ${items.length}`
   const pieLista = enAlertas && !searchQuery.trim() && desgloseAlertas.enCeroSinMinimo > 0
     ? `${desgloseAlertas.enCeroSinMinimo} más en cero sin mínimo: no alertan porque no tienen mínimo.`
     : undefined
@@ -517,7 +529,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           // La alerta solo vigila los ítems con mínimo definido. Sin esta parte,
           // «21 sin stock» convivía con el chip que dice 545 y nadie entendía la diferencia.
           enCeroSinMinimo > 0 && `+${enCeroSinMinimo} en cero sin mínimo`,
-        ].filter(Boolean).join(' · ')
+        ].filter(Boolean).join(sep)
         return (
           <ListGroup>
             <ListCell
@@ -537,7 +549,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
                 variant="child"
                 title={<span className="font-normal">{nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : item.codigoSAP}</span>}
                 detail={nv.oficial}
-                subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(' · ')}
+                subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(sep)}
                 trailing={
                   <span className="flex flex-col items-end">
                     <span className="text-headline tabular-nums text-foreground">{item.stockActual}<span className="ml-1 text-footnote font-normal text-muted-foreground">{item.unidad}</span></span>
@@ -560,6 +572,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {filtered.length === 0 ? (
         <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
       ) : (
+        <>
         <ListGroup
           title={tituloLista}
           footer={pieLista}
@@ -581,13 +594,23 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
             </DropdownMenu>
           }
         >
-          {filtered.map(item => (
-            <BodegaRow key={item.codigoSAP} item={item}
+          {filtered.slice(0, limite).map(item => (
+            <BodegaRow key={item.codigoSAP} item={item} apple={apple} orden={sortField}
               onEdit={soloLectura ? undefined : () => setEditingItem(item)} onMovimiento={soloLectura ? undefined : () => setMovimientoItem(item)}
               onToggleWatch={soloLectura ? undefined : () => toggleWatch(item.rowKey)}
               onOpenDrawer={() => setDrawerItem(item)} />
           ))}
         </ListGroup>
+        {filtered.length > limite && (
+          <button
+            type="button"
+            onClick={() => setLimite((l) => l + FILAS_POR_PAGINA)}
+            className="mx-auto mt-3 flex min-h-[44px] items-center rounded-full bg-muted px-5 text-subhead font-medium"
+          >
+            Mostrar más ({filtered.length - limite})
+          </button>
+        )}
+        </>
       )}
 
       {modales}
@@ -1700,8 +1723,8 @@ function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; 
 }
 
 /** Sin `onEdit` / `onMovimiento` / `onToggleWatch` (pase de lectura) la fila no ofrece esa acción. */
-function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: {
-  item: BodegaMergedItem; onEdit?: () => void; onMovimiento?: () => void; onToggleWatch?: () => void; onOpenDrawer: () => void
+function BodegaRow({ item, apple, orden, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: {
+  item: BodegaMergedItem; apple: boolean; orden: SortField; onEdit?: () => void; onMovimiento?: () => void; onToggleWatch?: () => void; onOpenDrawer: () => void
 }) {
   const has = !!item.bodegaId
   const isBajo = has && item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && item.stockActual > 0
@@ -1722,14 +1745,19 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
     : isSin
       ? { texto: 'Sin stock', cls: 'text-ink-crit' }
       : isBajo
-        ? { texto: `Bajo mín · ${item.stockMinimo}`, cls: 'text-ink-warn' }
+        ? { texto: apple ? `Bajo mín ${item.stockMinimo}` : `Bajo mín · ${item.stockMinimo}`, cls: 'text-ink-warn' }
         : isCeroNeutro
           ? { texto: 'Sin mínimo', cls: 'text-muted-foreground' }
           : item.stockMinimo > 0
             ? { texto: `mín ${item.stockMinimo}`, cls: 'text-muted-foreground' }
             : null
 
-  const meta = [
+  const meta = apple ? metaFilaBodega({
+    codigoSAP: item.codigoSAP,
+    ubicacion: item.ubicacionBodega && (formatNombreSAP(item.ubicacionBodega).nombre || item.ubicacionBodega),
+    equipos: item.equipos.length,
+    valorTotal,
+  }, orden) : [
     item.codigoSAP,
     item.ubicacionBodega && (formatNombreSAP(item.ubicacionBodega).nombre || item.ubicacionBodega),
     item.equipos.length > 0 && `${item.equipos.length} ${item.equipos.length === 1 ? 'equipo' : 'equipos'}`,
@@ -1756,7 +1784,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
           <span className="font-normal">
             {nv.etiquetas.map(e => <CatTag key={e} tone="neutral" className="mr-1.5 align-[2px]">{e}</CatTag>)}
             {item.isWatched && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
-            {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre · SAP {item.codigoSAP}</span>}
+            {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">{apple ? 'Sin nombre' : `Sin nombre · SAP ${item.codigoSAP}`}</span>}
           </span>
         }
         detail={nv.oficial}
