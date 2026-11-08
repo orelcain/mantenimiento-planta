@@ -4,7 +4,7 @@
  * turno fijado como texto. Con la piel anterior, la forma de siempre.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, cleanup } from '@testing-library/react'
 import { GraderShiftPeriodView } from '../GraderShiftPeriodView'
 
 const NBSP = String.fromCharCode(160)
@@ -61,6 +61,7 @@ describe('GraderShiftPeriodView · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
   })
 

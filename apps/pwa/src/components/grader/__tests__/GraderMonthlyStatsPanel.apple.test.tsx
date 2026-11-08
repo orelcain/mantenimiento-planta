@@ -3,7 +3,7 @@
  * peor escrito como se dice en planta («miércoles 4 mañana»), no como «11-04 · T1».
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { GraderMonthlyStatsPanel } from '../GraderMonthlyStatsPanel'
 
@@ -43,6 +43,7 @@ describe('GraderMonthlyStatsPanel · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
   })
 

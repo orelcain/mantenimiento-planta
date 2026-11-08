@@ -4,7 +4,7 @@
  * acá es la forma, no el cálculo (eso lo cubren sus propios tests).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, cleanup } from '@testing-library/react'
 import { PlantKPIBoard } from '../PlantKPIBoard'
 import type { PlantKPIs } from '@/services/grader/plantKpiCompute'
 
@@ -47,6 +47,7 @@ describe('PlantKPIBoard · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
   })
 

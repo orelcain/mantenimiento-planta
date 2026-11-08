@@ -4,7 +4,7 @@
  * nota de «Estimado» una sola vez.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render, waitFor, cleanup } from '@testing-library/react'
 import { LineOeeCard } from '../LineOeeCard'
 
 const NBSP = String.fromCharCode(160)
@@ -50,6 +50,7 @@ describe('LineOeeCard · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
     calc.value = 0
   })
