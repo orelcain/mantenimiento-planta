@@ -9,6 +9,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   limit,
   onSnapshot,
@@ -25,7 +26,7 @@ import type { EventoRepeticion } from './repeticion'
 import { logger } from '@/lib/logger'
 import { fechaLocal } from '@/services/bitacora/turnoMantencion'
 import type { EventoBitacora } from '@/services/bitacora/bitacora.types'
-import type { Acr } from './acr.types'
+import type { Acr, EventoRefAcr } from './acr.types'
 import { MAX_IDS_POR_CONSULTA, trocear } from './acrLogica'
 
 export const ACR_COLECCION = 'rootCauseAnalysis'
@@ -70,6 +71,52 @@ export async function guardarAcr(acr: Acr, esNuevo: boolean): Promise<void> {
     },
     { merge: true },
   )
+  // Lo que se acaba de guardar no puede venir de la caché de la lista de análisis.
+  limpiarCacheAcrs()
+}
+
+/** Minutos que se reutiliza la lista de ACR (como la de eventos recientes). */
+const MINUTOS_CACHE_ACRS = 15
+let cacheAcrs: { vence: number; lista: Promise<Acr[]> } | null = null
+
+/**
+ * Todos los ACR de la planta (tope 500), reutilizados 15 minutos. Si la lectura falla, no se
+ * guarda el error: la próxima llamada vuelve a leer.
+ */
+export function listarAcrsConCache(): Promise<Acr[]> {
+  const ahora = Date.now()
+  if (cacheAcrs && cacheAcrs.vence > ahora) return cacheAcrs.lista
+  const lista = getDocs(
+    query(collection(db, ACR_COLECCION), where('plantId', '==', BITACORA_PLANTA.id), limit(500)),
+  )
+    .then((snap) => snap.docs.map(acrDeSnapshot))
+    .catch((e: unknown) => {
+      cacheAcrs = null
+      throw e
+    })
+  cacheAcrs = { vence: ahora + MINUTOS_CACHE_ACRS * 60_000, lista }
+  return lista
+}
+
+export function limpiarCacheAcrs(): void {
+  cacheAcrs = null
+}
+
+/** Lo que el ACR necesita de un evento de la Bitácora, o null si el evento ya no existe. */
+export async function leerEventoAcr(eventoId: string): Promise<EventoRefAcr | null> {
+  const snap = await getDoc(doc(db, BITACORA_COLECCION, eventoId))
+  if (!snap.exists()) return null
+  const d = snap.data() as Partial<EventoRefAcr>
+  return {
+    id: snap.id,
+    tipo: d.tipo ?? '',
+    turnoId: d.turnoId ?? '',
+    fechaTurno: d.fechaTurno ?? '',
+    equipo: d.equipo ?? '',
+    descripcion: d.descripcion ?? '',
+    minutosParada: d.minutosParada ?? null,
+    fotos: d.fotos ?? [],
+  }
 }
 
 /** Escucha los ACR de un evento de la Bitácora. Devuelve la función para dejar de escuchar. */

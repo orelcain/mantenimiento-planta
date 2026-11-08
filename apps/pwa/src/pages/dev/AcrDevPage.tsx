@@ -407,6 +407,7 @@ export function AcrDevPage() {
           evento={EVENTO_DEMO}
           repeticion={REPETICION_DEMO}
           arrancarTutorial={arranque}
+          sinJackKnife
           proponer={proponerDemo(fallar)}
           preguntar={preguntarDemo(fallar)}
           onGuardar={(a) => {

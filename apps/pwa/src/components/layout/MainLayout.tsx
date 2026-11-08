@@ -33,6 +33,7 @@ import {
   FolderArchive,
   Plus,
   NotebookPen,
+  SearchCheck,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -94,6 +95,7 @@ const navGroups: NavGroup[] = [
     items: [
       // Sin `module`: la bitácora es de todo el equipo de Mantención.
       { name: 'Bitácora de turno', href: '/bitacora', icon: NotebookPen },
+      { name: 'Causa raíz', href: '/causa-raiz', icon: SearchCheck },
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard', inDevelopment: true },
       { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias', inDevelopment: true },
       { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia', inDevelopment: true },

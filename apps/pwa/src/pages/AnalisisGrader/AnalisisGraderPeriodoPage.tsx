@@ -48,6 +48,7 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { PauseKpiDashboard } from '@/components/grader/PauseKpiDashboard'
 import { MaintenanceImpactCard } from '@/components/grader/MaintenanceImpactCard'
 import { MaintenanceWorkCard } from '@/components/grader/MaintenanceWorkCard'
+import { EfectoAccionesCard } from '@/components/acr/EfectoAccionesCard'
 import { useAppStore } from '@/store'
 import { getExecutions, getOverdueTasks } from '@/services/preventive'
 import { computeMaintenanceWork } from '@/services/grader/maintenanceWork'
@@ -435,6 +436,9 @@ export function AnalisisGraderPeriodoPage() {
 
           {/* ── Trabajo de Mantención (TPM): correctivo → causa raíz → prevención ── */}
           <MaintenanceWorkCard work={work} acrs={acrs} periodo={`${range.start} → ${range.end}`} />
+
+          {/* ── Efecto de las acciones fuertes (causa raíz → Jack-Knife) ── */}
+          <EfectoAccionesCard />
 
           {/* ── Tiempo muerto del período ──────────────────────────────── */}
           <PauseKpiDashboard summaries={allSummaries} />

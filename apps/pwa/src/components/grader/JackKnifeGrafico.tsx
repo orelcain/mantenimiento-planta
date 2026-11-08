@@ -7,7 +7,7 @@ const COLOR_SIN = 'rgb(var(--cat-6-ink))'
 
 const durS = (m: number) => m >= 90 ? dec1(m/60)+' h' : dec1(m)+' min'
 const plural = (n: number, uno: string, varios: string) => n === 1 ? uno : varios
-export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = [], elegirCausa = () => {} }: { calc: CalculoJK; ancho?: number; sel?: string | null; fantasmas?: PuntoJK[]; elegirCausa?: (k: string) => void }) {
+export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = [], elegirCausa = () => {}, anillos }: { calc: CalculoJK; ancho?: number; sel?: string | null; fantasmas?: PuntoJK[]; elegirCausa?: (k: string) => void; /** Causas con acción fuerte hecha: se marcan con un aro. */ anillos?: ReadonlySet<string> }) {
  const layout = useMemo(() => calc.pts.length ? calcularLayout(calc, ancho, sel, fantasmas) : null, [calc, ancho, sel, fantasmas])
  if (!layout) return <p>Sin detenciones de Mantención con causa en esta ventana.</p>
  return (              <svg
@@ -70,17 +70,19 @@ export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = []
                 {layout.puntos.map(({ p, x, y, rad, etiqueta }) => {
                   const color = p.q === 'ok' && !etiqueta ? 'rgb(var(--muted-foreground))' : p.k === SIN_IMPUTAR ? COLOR_SIN : Q[p.q].dot
                   const activar = () => elegirCausa(p.k)
+                  const conAccion = anillos?.has(p.k) ?? false
                   return (
                     <g
                       key={p.k}
                       role="button"
                       tabIndex={0}
-                      aria-label={`${p.k}: ${p.ev} ${plural(p.ev, 'evento', 'eventos')}, ${durS(p.mttr)}`}
+                      aria-label={`${p.k}: ${p.ev} ${plural(p.ev, 'evento', 'eventos')}, ${durS(p.mttr)}${conAccion ? ', con acción fuerte hecha' : ''}`}
                       onClick={activar}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activar() } }}
                       className="cursor-pointer focus-visible:outline-none"
                     >
                       <title>{p.k}</title>
+                      {conAccion && <circle cx={x} cy={y} r={rad + 5} fill="none" stroke="rgb(var(--accent))" strokeWidth={2.5} />}
                       <circle cx={x} cy={y} r={rad} fill={color} className="stroke-card" strokeWidth={1.5} />
                       {etiqueta && (
                         <text x={etiqueta.bx} y={etiqueta.by} className="fill-foreground text-footnote">{p.k}</text>

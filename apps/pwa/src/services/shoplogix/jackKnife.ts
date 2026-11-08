@@ -15,7 +15,7 @@
  * (scratchpad jack-knife-mockup, 07-11-2026).
  */
 
-import { collection, getDocs } from '@/services/firestoreTracked'
+import { collection, documentId, endAt, getDocs, orderBy, query, startAt } from '@/services/firestoreTracked'
 import { db } from '../firebase'
 
 export type VistaJK = 'imp' | 'sin' | 'todas'
@@ -257,6 +257,30 @@ export function cargarTurnosCrudos(planta: string): Promise<TurnoCrudo[]> {
 export function limpiarCacheJackKnife(planta?: string): void {
   if (planta) cachePlanta.delete(planta)
   else cachePlanta.clear()
+}
+
+/**
+ * Resúmenes de los turnos de un día (2-3 documentos). Si la planta ya está en caché, filtra
+ * de ahí; si no, pide solo los docs de esa fecha (ids `YYYY-MM-DD_…`). Nunca trae los 571.
+ */
+export async function resumenesJKDeFecha(planta: string, fecha: string): Promise<ResumenJK[]> {
+  const previa = cachePlanta.get(planta)
+  if (previa) {
+    return (await previa)
+      .filter((t) => t.dateKey === fecha && t.jackKnife)
+      .map((t) => t.jackKnife as ResumenJK)
+  }
+  const snap = await getDocs(
+    query(
+      collection(db, 'shoplogix', planta, 'shifts'),
+      orderBy(documentId()),
+      startAt(fecha),
+      endAt(fecha + ''),
+    ),
+  )
+  return snap.docs
+    .map((d) => (d.data() as { jackKnife?: ResumenJK | null }).jackKnife ?? null)
+    .filter((r): r is ResumenJK => r !== null)
 }
 
 // ── Comparación de períodos ─────────────────────────────────────────────────
@@ -594,6 +618,8 @@ export interface EstadoURLJK {
   hb?: string
   ca?: string
   cb?: string
+  /** Causa marcada en el gráfico (parámetro `c`). */
+  causa?: string
 }
 
 const VENTANAS_URL: readonly string[] = ['turno', '7', '30', '90', 'todo', 'libre']
@@ -611,6 +637,7 @@ export function codificarEstadoJK(e: EstadoURLJK): string {
   if (e.hb) p.set('hb', e.hb)
   if (e.ca) p.set('ca', e.ca)
   if (e.cb) p.set('cb', e.cb)
+  if (e.causa) p.set('c', e.causa)
   return `#jk=${p.toString()}`
 }
 
@@ -632,6 +659,7 @@ export function leerEstadoJK(hash: string, planta: string): EstadoURLJK | null {
     hb: p.get('hb') ?? undefined,
     ca: p.get('ca') ?? undefined,
     cb: p.get('cb') ?? undefined,
+    causa: p.get('c') ?? undefined,
   }
 }
 

@@ -37,6 +37,9 @@ import { AcrLectura } from './AcrLectura'
 import { FilaAnalisis } from './AcrEntrada'
 import { RevisionSemanalSheet } from './RevisionSemanalSheet'
 import { CadenaPorQues } from './CadenaPorQues'
+import { FilaJackKnifeRapido } from './JackKnifeRapido'
+import { AccionDetalleConLista } from './AccionDetalle'
+import { useSugerenciaJK } from './useSugerenciaJK'
 import {
   ACCION_POR_FUERZA,
   CORRECCION_HUMANA,
@@ -89,6 +92,8 @@ export interface AcrRapidoSheetProps {
   preguntar?: PreguntarPorQue
   /** Arranca el tutorial al abrir (la vitrina lo usa; en la app se pide con el botón). */
   arrancarTutorial?: boolean
+  /** No muestra «¿Dónde cae en el Jack-Knife?» ni lee el turno (las vitrinas lo usan). */
+  sinJackKnife?: boolean
 }
 
 // ── Constantes y helpers ─────────────────────────────────────────────────────
@@ -188,6 +193,7 @@ export function AcrRapidoSheet({
   proponer,
   preguntar = preguntarPorQue,
   arrancarTutorial = false,
+  sinJackKnife = false,
 }: AcrRapidoSheetProps) {
   const user = useAuthStore((s) => s.user)
   const [acr, setAcr] = useState<Acr>(
@@ -198,6 +204,17 @@ export function AcrRapidoSheet({
   const [tutorial, setTutorial] = useState(false)
   const [practicaFinal, setPracticaFinal] = useState<string | null>(null)
   const [visto, setVisto] = useState(leerTutorialVisto)
+  // «¿Dónde cae en el Jack-Knife?»: no aparece en el tutorial ni en la vitrina.
+  const muestraJK = !tutorial && !sinJackKnife
+  const jk = useSugerenciaJK(evento, muestraJK)
+  // La sugerencia se asigna una sola vez (si el ACR no tiene causa todavía); no marca el borrador.
+  useEffect(() => {
+    const s = jk.sugerencia
+    if (!s || acr.causaJK !== undefined) return
+    const causa = s.sugerida ?? (s.fueraDelGrafico ? null : undefined)
+    if (causa === undefined) return
+    setAcr((a) => (a.causaJK === undefined ? { ...a, causaJK: causa } : a))
+  }, [jk.sugerencia, acr.causaJK])
   const realRef = useRef<Acr | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pensando, setPensando] = useState(false)
@@ -720,6 +737,15 @@ export function AcrRapidoSheet({
           />
         </section>
 
+        {muestraJK && (
+          <FilaJackKnifeRapido
+            causaActual={acr.causaJK}
+            sugerencia={jk.sugerencia}
+            cargando={jk.cargando}
+            onElegir={(causa) => cambiar((a) => ({ ...a, causaJK: causa }))}
+          />
+        )}
+
         </div>
         <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2.5">
@@ -883,20 +909,10 @@ export function AcrRapidoSheet({
           onClose={() => setEditando(null)}
           surface="grouped"
           title={editando.tipo === 'causa' ? 'Causa' : 'Acción'}
-          actions={
-            <div className="flex w-full flex-col gap-2.5">
-              <Button data-tutorial="t-listo" variant="filled" size="block" onClick={() => setEditando(null)}>
-                Listo
-              </Button>
-              <Button
-                data-tutorial="t-borrar"
-                variant="destructive"
-                size="block"
-                onClick={() => setConfirmarBorrado(true)}
-              >
-                Borrar
-              </Button>
-            </div>
+          headerAction={
+            <Button data-tutorial="t-listo" variant="plain" className="font-semibold" onClick={() => setEditando(null)}>
+              Listo
+            </Button>
           }
         >
           <div data-tutorial="t-editor" className="flex flex-col gap-4">
@@ -934,6 +950,32 @@ export function AcrRapidoSheet({
               />
             )}
             </div>
+
+            {/* Causa, responsable y fecha de la acción: fuera del tutorial y de la vitrina. */}
+            {!tutorial && editando.tipo === 'accion' && (
+              <AccionDetalleConLista
+                accion={itemEditado as AccionAcr}
+                causas={acr.causas}
+                onCausa={(causaId) =>
+                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, causaId } : x)) }))
+                }
+                onResponsable={(responsable) =>
+                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, responsable } : x)) }))
+                }
+                onFecha={(fechaLimite) =>
+                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, fechaLimite } : x)) }))
+                }
+              />
+            )}
+
+            <Button
+              data-tutorial="t-borrar"
+              variant="plain"
+              className="self-start text-destructive"
+              onClick={() => setConfirmarBorrado(true)}
+            >
+              Borrar
+            </Button>
           </div>
         </Sheet>
       )}
