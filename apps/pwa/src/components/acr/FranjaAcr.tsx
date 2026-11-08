@@ -9,7 +9,10 @@
  * portales hasta la fila.
  */
 import { useState, type SyntheticEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Pill } from '@/components/piel'
+import { useEsPC } from '@/hooks/useEsPC'
+import { useAuthStore } from '@/store/authStore'
 import { aplicaAnalisis, resumenFuerza } from '@/services/acr/acrLogica'
 import type { EventoRefAcr } from '@/services/acr/acr.types'
 import { HojasAcr, type VistaAcr } from './AcrEntrada'
@@ -17,8 +20,15 @@ import type { SenalAcr } from './useSenalesAcr'
 
 const detener = (e: SyntheticEvent) => e.stopPropagation()
 
+/** Las vitrinas `/dev/*` usan ACR de ejemplo, sin página propia: siguen en la hoja. */
+const enVitrina = () => import.meta.env.DEV && window.location.pathname.includes('/dev/')
+
 export function FranjaAcr({ evento, senal }: { evento: EventoRefAcr; senal: SenalAcr | null | undefined }) {
   const [vista, setVista] = useState<VistaAcr>('ninguna')
+  const esPC = useEsPC()
+  const navegar = useNavigate()
+  // El pase de bitácora solo tiene la bitácora: ahí /causa-raiz rebotaría de vuelta.
+  const conPase = useAuthStore((s) => Boolean(s.user?.paseBitacora))
   const visible = senal != null && aplicaAnalisis(evento)
   // Con una hoja abierta se conserva aunque la señal cambie: si no, la hoja se cerraría sola.
   if (!visible && vista === 'ninguna') return null
@@ -28,14 +38,19 @@ export function FranjaAcr({ evento, senal }: { evento: EventoRefAcr; senal: Sena
   const repeticion = senal?.tipo === 'repite' ? senal.repeticion : null
   const n = repeticion?.eventoIds.length ?? 0
   const pct = acr ? resumenFuerza(acr.acciones).fuertePct : null
+  const abrir = () => {
+    // En PC lo que se lee es una página; en el celular sigue la hoja.
+    if (acr && esPC && !conPase && !enVitrina()) navegar(`/causa-raiz/${acr.id}`)
+    else setVista(repite ? 'editor' : 'lectura')
+  }
 
   return (
     <div className="min-w-0" onClick={detener} onKeyDown={detener} onPointerDown={detener} onTouchStart={detener}>
       {visible && (
         <button
           type="button"
-          onClick={() => setVista(repite ? 'editor' : 'lectura')}
-          className={`mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-ctl px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+          onClick={abrir}
+          className={`mt-1 flex min-h-[44px] w-full items-center justify-between gap-3 rounded-ctl px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
             repite ? 'bg-warning/[0.15]' : 'bg-ink-ok/[0.15]'
           }`}
         >

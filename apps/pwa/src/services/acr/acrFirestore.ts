@@ -41,7 +41,7 @@ function aFecha(v: unknown): Date {
   return typeof conv?.toDate === 'function' ? conv.toDate() : new Date()
 }
 
-function acrDesdeDoc(id: string, data: DocumentData): Acr {
+export function acrDesdeDoc(id: string, data: DocumentData): Acr {
   return {
     ...(data as Omit<Acr, 'id' | 'createdAt' | 'updatedAt'>),
     id,
