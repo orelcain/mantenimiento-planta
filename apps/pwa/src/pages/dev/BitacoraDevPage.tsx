@@ -14,6 +14,9 @@ import { fechaDesde, filasPorTurno, resumirPeriodo } from '@/services/bitacora/h
 import { AJUSTES_VACIOS, type AjustesTecnicos } from '@/services/bitacora/listaTecnicos'
 import { construirOpcionesEquipo, type NodoJerarquia } from '@/services/bitacora/buscarEquipos'
 import type { DatoBodega, FavoritosRepuestos, FuenteRepuestos, RepuestoDelCatalogo } from '@/services/bitacora/repuestosBitacora'
+import type { SenalAcr } from '@/components/acr/useSenalesAcr'
+import { REPETICION_TUTORIAL } from '@/components/acr/tutorialAcr'
+import { aplicaAnalisis } from '@/services/acr/acrLogica'
 
 /**
  * Vitrina de la Bitácora con DATOS DE EJEMPLO — solo desarrollo (la ruta va
@@ -495,6 +498,23 @@ function useFavoritosEjemplo(): FavoritosRepuestos {
   return useMemo(() => ({ claves, alternar }), [claves, alternar])
 }
 
+/**
+ * Señales de causa raíz de ejemplo, sin Firestore. «Se repite» en la falla con detención
+ * «Evisceradora Baader 142 N3» (ej-1). El ejemplo no trae otra falla con detención, así que no
+ * hay «Analizado»: no se inventa un análisis.
+ */
+function useSenalesEjemplo(eventos: readonly EventoBitacora[]): Map<string, SenalAcr> {
+  return useMemo(
+    () =>
+      new Map<string, SenalAcr>(
+        eventos
+          .filter((e) => e.id === 'ej-1' && aplicaAnalisis(e))
+          .map((e): [string, SenalAcr] => [e.id, { tipo: 'repite', repeticion: REPETICION_TUTORIAL }]),
+      ),
+    [eventos],
+  )
+}
+
 // Exportada para la vitrina del pase (solo desarrollo): la recarga en caliente no importa aquí.
 // eslint-disable-next-line react-refresh/only-export-components
 export const FUENTE_EJEMPLO: FuenteBitacora = {
@@ -506,6 +526,7 @@ export const FUENTE_EJEMPLO: FuenteBitacora = {
   useOpcionesEquipo: () => ({ opciones: OPCIONES_EJEMPLO, cargando: false }),
   usePresencia: usePresenciaEjemplo,
   useBorradoresAnteriores: useBorradoresEjemplo,
+  useSenalesAcr: useSenalesEjemplo,
   repuestos: REPUESTOS_FALSOS,
   useFavoritosRepuestos: useFavoritosEjemplo,
   subirFoto: async (_turnoId, _eventoId, archivo, etiqueta) => {

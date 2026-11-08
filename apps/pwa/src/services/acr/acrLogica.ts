@@ -162,3 +162,13 @@ export function kpiFuerzaAcciones(
 export function nuevoIdSubdoc(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
+
+/** Máximo de valores en un `array-contains-any` de Firestore. */
+export const MAX_IDS_POR_CONSULTA = 30
+
+/** Parte `ids` en tandas de hasta `tamano` (sin ids, ninguna tanda). */
+export function trocear<T>(ids: readonly T[], tamano: number = MAX_IDS_POR_CONSULTA): T[][] {
+  const tandas: T[][] = []
+  for (let i = 0; i < ids.length; i += tamano) tandas.push(ids.slice(i, i + tamano))
+  return tandas
+}

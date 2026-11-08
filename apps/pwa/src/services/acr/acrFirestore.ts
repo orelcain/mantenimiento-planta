@@ -21,10 +21,12 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { BITACORA_COLECCION, BITACORA_PLANTA } from '@/config/bitacora'
+import type { EventoRepeticion } from './repeticion'
 import { logger } from '@/lib/logger'
 import { fechaLocal } from '@/services/bitacora/turnoMantencion'
 import type { EventoBitacora } from '@/services/bitacora/bitacora.types'
 import type { Acr } from './acr.types'
+import { MAX_IDS_POR_CONSULTA, trocear } from './acrLogica'
 
 export const ACR_COLECCION = 'rootCauseAnalysis'
 
@@ -94,6 +96,47 @@ export function escucharAcrDeEvento(
 }
 
 /**
+ * Escucha los ACR de varios eventos a la vez (`array-contains-any`, en tandas de 30 ids, el
+ * límite de Firestore). Entrega la lista unida, sin repetir un ACR que toca dos tandas.
+ * Devuelve la función para dejar de escuchar todas las tandas.
+ */
+export function escucharAcrDeEventos(
+  eventoIds: string[],
+  alCambiar: (acrs: Acr[]) => void,
+  alError?: () => void,
+): () => void {
+  const tandas = trocear(eventoIds, MAX_IDS_POR_CONSULTA)
+  if (tandas.length === 0) {
+    alCambiar([])
+    return () => {}
+  }
+  const porTanda: Acr[][] = tandas.map(() => [])
+  const emitir = () => {
+    const unicos = new Map(porTanda.flat().map((a) => [a.id, a] as const))
+    alCambiar([...unicos.values()])
+  }
+  const quitar = tandas.map((ids, i) => {
+    const q = query(
+      collection(db, ACR_COLECCION),
+      where('plantId', '==', BITACORA_PLANTA.id),
+      where('eventoBitacoraIds', 'array-contains-any', ids),
+    )
+    return onSnapshot(
+      q,
+      (snap) => {
+        porTanda[i] = snap.docs.map(acrDeSnapshot)
+        emitir()
+      },
+      (error) => {
+        logger.error('No se pudo leer el análisis de causa raíz de la lista del turno', error, { tanda: i })
+        alError?.()
+      },
+    )
+  })
+  return () => quitar.forEach((f) => f())
+}
+
+/**
  * ACR cuyo turno cae en el rango (inclusive), de cualquier estado. Requiere el índice
  * compuesto (plantId, fechaTurno) de `firestore.indexes.json`.
  */
@@ -116,6 +159,25 @@ const TOPE_EVENTOS_RECIENTES = 1000
  * `where` por rango de `fechaTurno`: no pide índice compuesto. Igual que `useHistorialBitacora`,
  * el `plantId` se filtra en el cliente.
  */
+/** Minutos que se reutiliza la lectura de los eventos recientes: son hasta 1000 documentos. */
+const MINUTOS_CACHE_RECIENTES = 15
+let cacheRecientes: { dias: number; vence: number; lista: Promise<EventoRepeticion[]> } | null = null
+
+/**
+ * Igual que `listarEventosRecientes`, pero reutiliza la lectura durante 15 minutos: abrir la
+ * Bitácora o cada evento no vuelve a leer los 30 días. Si la lectura falla, no se guarda.
+ */
+export function eventosRecientesConCache(dias: number): Promise<EventoRepeticion[]> {
+  const ahora = Date.now()
+  if (cacheRecientes && cacheRecientes.dias === dias && cacheRecientes.vence > ahora) return cacheRecientes.lista
+  const lista = listarEventosRecientes(dias).catch((e: unknown) => {
+    cacheRecientes = null
+    throw e
+  })
+  cacheRecientes = { dias, vence: ahora + MINUTOS_CACHE_RECIENTES * 60_000, lista }
+  return lista
+}
+
 export async function listarEventosRecientes(dias: number, hoy: Date = new Date()): Promise<EventoBitacora[]> {
   const desde = fechaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - dias))
   const snap = await getDocs(

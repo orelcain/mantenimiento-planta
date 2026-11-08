@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { ListCell, ListGroup, Pill } from '@/components/piel'
-import { escucharAcrDeEvento, listarEventosRecientes } from '@/services/acr/acrFirestore'
+import { escucharAcrDeEvento, eventosRecientesConCache } from '@/services/acr/acrFirestore'
 import { aplicaAnalisis, resumenFuerza } from '@/services/acr/acrLogica'
 import { detectarRepeticion, type EventoRepeticion, type Repeticion } from '@/services/acr/repeticion'
 import type { Acr, EventoRefAcr } from '@/services/acr/acr.types'
@@ -23,7 +23,9 @@ const DIAS_REPETICION = 30
  */
 const EN_VITRINA =
   import.meta.env.DEV && typeof window !== 'undefined' && window.location.pathname.includes('/dev/bitacora')
-const PROPS_VITRINA = EN_VITRINA
+// Exportada para la franja de la lista del turno (misma vitrina). Ver el precedente en BitacoraDevPage.
+// eslint-disable-next-line react-refresh/only-export-components
+export const PROPS_VITRINA = EN_VITRINA
   ? {
       onGuardar: () => {},
       proponer: () => Promise.resolve({ ...PROPUESTA_TUTORIAL, modelo: 'vitrina' }),
@@ -31,10 +33,54 @@ const PROPS_VITRINA = EN_VITRINA
     }
   : {}
 
+/** Qué hoja del ACR está abierta. */
+export type VistaAcr = 'ninguna' | 'editor' | 'lectura'
+
+/**
+ * Las hojas del ACR de un evento (editor R1 y lectura). Las usan la fila de la hoja del evento
+ * y la franja de la lista del turno: quien la monta decide el evento, el ACR y la repetición.
+ */
+export function HojasAcr({
+  evento,
+  acr,
+  repeticion,
+  vista,
+  onVista,
+}: {
+  evento: EventoRefAcr
+  acr: Acr | null
+  repeticion: Repeticion | null
+  vista: VistaAcr
+  onVista: (v: VistaAcr) => void
+}) {
+  return (
+    <>
+      {vista === 'editor' && (
+        <AcrRapidoSheet
+          open
+          onClose={() => onVista('ninguna')}
+          evento={evento}
+          acrExistente={acr}
+          repeticion={repeticion}
+          {...PROPS_VITRINA}
+        />
+      )}
+      {vista === 'lectura' && acr && (
+        <AcrLectura
+          open
+          onClose={() => onVista('ninguna')}
+          acr={acr}
+          onEditar={() => onVista('editor')}
+        />
+      )}
+    </>
+  )
+}
+
 export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
   const [acrs, setAcrs] = useState<Acr[] | null>(EN_VITRINA ? [] : null)
   const [recientes, setRecientes] = useState<EventoRepeticion[] | null>(null)
-  const [vista, setVista] = useState<'ninguna' | 'editor' | 'lectura'>('ninguna')
+  const [vista, setVista] = useState<VistaAcr>('ninguna')
   /** Sin permiso de lectura (p. ej. técnico con pase de Bitácora) la fila no se muestra. */
   const [sinAcceso, setSinAcceso] = useState(false)
 
@@ -48,7 +94,7 @@ export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
   useEffect(() => {
     if (EN_VITRINA) return undefined
     let vivo = true
-    listarEventosRecientes(DIAS_REPETICION)
+    eventosRecientesConCache(DIAS_REPETICION)
       .then((lista) => { if (vivo) setRecientes(lista) })
       .catch((e: unknown) => {
         logger.warn('No se pudieron leer los eventos recientes para detectar repetición', {
@@ -84,24 +130,7 @@ export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
         onAnalizar={() => setVista('editor')}
       />
 
-      {vista === 'editor' && (
-        <AcrRapidoSheet
-          open
-          onClose={() => setVista('ninguna')}
-          evento={evento}
-          acrExistente={acr}
-          repeticion={repeticion}
-          {...PROPS_VITRINA}
-        />
-      )}
-      {vista === 'lectura' && acr && (
-        <AcrLectura
-          open
-          onClose={() => setVista('ninguna')}
-          acr={acr}
-          onEditar={() => setVista('editor')}
-        />
-      )}
+      <HojasAcr evento={evento} acr={acr} repeticion={repeticion} vista={vista} onVista={setVista} />
     </>
   )
 }
