@@ -112,6 +112,8 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   const [mapVersion, setMapVersion] = useState<MapVersion | null>(null)
   const [mapLocation, setMapLocation] = useState<MapLocation | null>(null)
   const [mapLoading, setMapLoading] = useState(false)
+  // Solo con la consulta terminada y sin error se puede afirmar que no hay ubicación.
+  const [mapConsultado, setMapConsultado] = useState(false)
   const [reporterName, setReporterName] = useState<string>('')
 
   // Piel Apple: nombre de la zona desde el store, y punto de mapa utilizable (x e y finitos).
@@ -195,9 +197,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
       if (!incident.mapVersionId || !incident.mapLocationId) {
         setMapVersion(null)
         setMapLocation(null)
+        setMapConsultado(true)
         return
       }
 
+      setMapConsultado(false)
       setMapLoading(true)
       try {
         const [versionData, locationData] = await Promise.all([
@@ -206,6 +210,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         ])
         setMapVersion(versionData)
         setMapLocation(locationData)
+        setMapConsultado(true)
       } catch (error) {
         logger.error('Error loading map data', error instanceof Error ? error : new Error(String(error)))
       } finally {
@@ -681,7 +686,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 )}
               </div>
             )}
-            {apple && (incident.mapVersionId || incident.mapLocationId) && !mapLoading && !(puntoValido && mapVersion?.imageUrl) && (
+            {apple && (incident.mapVersionId || incident.mapLocationId) && mapConsultado && !mapLoading && !(puntoValido && mapVersion?.imageUrl) && (
               <p className="text-footnote text-muted-foreground">Sin ubicación en mapa</p>
             )}
 
