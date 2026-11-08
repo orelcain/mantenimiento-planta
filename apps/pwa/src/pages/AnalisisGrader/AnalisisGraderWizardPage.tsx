@@ -25,6 +25,9 @@ import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsP
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
 import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
+import { PeriodoNavegador } from '@/components/grader/PeriodoNavegador'
+import type { KpiPeriod } from '@/hooks/usePlantKPIs'
+import { desplazarPeriodo, fechaDeClave, claveDeFecha } from '@/services/grader/periodoNavegacion'
 import { LineOeeCard } from '@/components/grader/LineOeeCard'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
@@ -182,6 +185,20 @@ export function AnalisisGraderWizardPage() {
   // Se incrementa al registrar/borrar un paro de etapa: el OEE del área los
   // suma y vive en otra card, así que necesita releerlos.
   const [parosVersion, setParosVersion] = useState(0)
+
+  // Período único (piel Apple): una sola referencia, el día elegido (o hoy). Día,
+  // semana y mes salen de ahí; la matriz toma el mes de esa misma fecha. Mover el
+  // período mueve `selectedDateKey` y `calendarMonth`: no hay una segunda fuente.
+  const [kpiPeriodo, setKpiPeriodo] = useState<KpiPeriod>('day')
+  const referenciaPeriodo = useMemo(
+    () => fechaDeClave(selectedDateKey ?? todayDateKey),
+    [selectedDateKey, todayDateKey],
+  )
+  const moverPeriodo = useCallback((dir: -1 | 1) => {
+    const nueva = desplazarPeriodo(referenciaPeriodo, kpiPeriodo, dir)
+    setSelectedDateKey(claveDeFecha(nueva))
+    setCalendarMonth(new Date(nueva.getFullYear(), nueva.getMonth(), 1))
+  }, [referenciaPeriodo, kpiPeriodo])
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -785,11 +802,13 @@ export function AnalisisGraderWizardPage() {
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-wrap items-center gap-4">
           <div className="min-w-0">
-            <h1 className="text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]">
+            <h1 className={apple ? 'text-display' : 'text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]'}>
               Análisis de turno
             </h1>
             {/* Piel Apple: el estado del turno va justo bajo el título, como una línea de texto. */}
             {apple && !isManual && <CurrentShiftChip plantLineId={lineId} className="mt-2" />}
+            {/* Piel Apple: el subtítulo «Línea completa Grader + Baaders» sale; las otras dos líneas lo mantienen. */}
+            {!(apple && lineConfig.hasGraderData && lineConfig.isClassificationPlant !== false) && (
             <p className="mt-2 text-[0.85rem] text-muted-foreground">
               {lineConfig.hasGraderData
                 ? lineConfig.isClassificationPlant === false
@@ -799,6 +818,7 @@ export function AnalisisGraderWizardPage() {
                   ? `${lineConfig.description} · voz → IA → historial de Mantención`
                   : `${lineConfig.description} · datos Shoplogix`}
             </p>
+            )}
           </div>
           {/* El botón "Cargar Excel" se movió al lado de las pestañas de
               planta para que quede claro a qué planta se está cargando. */}
@@ -822,7 +842,7 @@ export function AnalisisGraderWizardPage() {
           )}
           <Button variant="outline" onClick={() => navigate('/analisis-grader/periodo')} className="border-transparent text-brand-ink hover:bg-primary/10">
             <BarChart3 className="h-4 w-4 mr-1.5" />
-            <span className="hidden sm:inline">Análisis </span>período
+            {apple ? 'Análisis del período' : <><span className="hidden sm:inline">Análisis </span>período</>}
           </Button>
         </div>
       </div>
@@ -961,6 +981,16 @@ export function AnalisisGraderWizardPage() {
         </div>
       )}
 
+      {/* Piel Apple: el período único (Día/Semana/Mes y «‹ 7 nov ›») gobierna el tablero y la matriz. */}
+      {apple && !isManual && (
+        <PeriodoNavegador
+          period={kpiPeriodo}
+          onPeriodChange={setKpiPeriodo}
+          referencia={referenciaPeriodo}
+          onStep={moverPeriodo}
+        />
+      )}
+
       {/* ═══ Grid 2-col que arranca en las pestañas de planta ═══ */}
       {!isManual && (
       <>
@@ -973,6 +1003,8 @@ export function AnalisisGraderWizardPage() {
             {!apple && <CurrentShiftChip plantLineId={lineId} />}
           </div>
           <PlantKPIBoard
+            period={kpiPeriodo}
+            onPeriodChange={setKpiPeriodo}
             plantSlug={lineConfig.plantSlug}
             plantLineId={lineId}
             graderSummaries={calendarSummaries}
@@ -1051,6 +1083,15 @@ export function AnalisisGraderWizardPage() {
             title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
           >
             <Upload className="h-3.5 w-3.5 shrink-0" />
+            {apple ? (
+              // Piel Apple: el rótulo solo, y la situación del mes en su propia línea de 13 px (sin truncar).
+              <span className="flex-1 text-left min-w-0">
+                <span className="block text-subhead text-foreground">Cargar Excel del Grader</span>
+                <span className="block text-footnote text-muted-foreground tabular-nums">
+                  {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'Sin Excel este mes'}
+                </span>
+              </span>
+            ) : (
             <span className="flex-1 text-left min-w-0 truncate">
               Cargar Excel del Grader
               <span className="text-muted-foreground/70 tabular-nums">
@@ -1058,6 +1099,7 @@ export function AnalisisGraderWizardPage() {
                 {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'sin Excel en este mes'}
               </span>
             </span>
+            )}
             {!uploadPanelExpanded && uploadedFiles.length > 0 && (
               <span className="text-caption px-1.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-medium shrink-0">
                 {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}

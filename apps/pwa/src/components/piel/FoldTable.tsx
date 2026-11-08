@@ -81,19 +81,19 @@ export function FoldTable({ caption, columns, rows, cierre, nota, className }: F
                 <Fragment key={r.id}>
                   <tr
                     onClick={plegable ? () => alternar(r.id) : undefined}
-                    className={cn('border-b border-border', plegable && 'cursor-pointer')}
+                    className={cn('h-11 border-b border-border', plegable && 'cursor-pointer')}
                   >
                     {r.cells.map((cell, i) => (
                       <td
                         key={i}
-                        className={cn('px-2.5 py-2.5 align-middle', alinear(i), r.destacada && 'font-semibold')}
+                        className={cn('px-2.5 py-2 align-middle', alinear(i), r.destacada && 'font-semibold')}
                       >
                         {i === 0 && plegable ? (
                           <button
                             type="button"
                             aria-expanded={abierta}
                             aria-controls={idDetalle}
-                            className="block min-h-11 w-full rounded-ctl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            className="block w-full rounded-ctl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           >
                             {cell}
                           </button>
@@ -114,11 +114,11 @@ export function FoldTable({ caption, columns, rows, cierre, nota, className }: F
               )
             })}
             {cierre && (
-              <tr className="border-t-2 border-foreground">
+              <tr className="h-11 border-t-2 border-foreground">
                 {cierre.cells.map((cell, i) => (
                   <td
                     key={i}
-                    className={cn('px-2.5 py-2.5 align-middle', alinear(i), cierre.destacada && 'font-semibold')}
+                    className={cn('px-2.5 py-2 align-middle', alinear(i), cierre.destacada && 'font-semibold')}
                   >
                     {cell}
                   </td>

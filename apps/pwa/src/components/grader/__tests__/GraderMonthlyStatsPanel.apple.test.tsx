@@ -3,7 +3,7 @@
  * peor escrito como se dice en planta («miércoles 4 mañana»), no como «11-04 · T1».
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { GraderMonthlyStatsPanel } from '../GraderMonthlyStatsPanel'
 
@@ -43,6 +43,7 @@ describe('GraderMonthlyStatsPanel · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
   })
 
@@ -54,8 +55,8 @@ describe('GraderMonthlyStatsPanel · piel Apple', () => {
   it('el mejor y el peor turno se escriben con día de la semana, número y turno', () => {
     const { container } = panel()
     const texto = (container.textContent ?? '').split(String.fromCharCode(160)).join(' ')
-    expect(texto).toContain('Mejor turno83 % de uptime, miércoles 4 mañana')
-    expect(texto).toContain('Peor turno49 % de uptime, viernes 6 tarde')
+    expect(texto).toContain('Mejor turnouptime, miércoles 4, mañana83 %')
+    expect(texto).toContain('Peor turnouptime, viernes 6, tarde49 %')
     expect(texto).not.toContain('11-04')
   })
 

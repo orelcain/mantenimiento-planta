@@ -4,7 +4,7 @@
  * dos formas que puede tomar (sin turno activo, o turno programado sin actividad).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render, waitFor, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { CurrentShiftChip } from '../CurrentShiftChip'
 
@@ -31,6 +31,7 @@ describe('CurrentShiftChip · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
   })
 

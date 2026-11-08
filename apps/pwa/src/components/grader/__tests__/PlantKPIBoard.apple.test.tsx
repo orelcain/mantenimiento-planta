@@ -4,7 +4,7 @@
  * acá es la forma, no el cálculo (eso lo cubren sus propios tests).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, cleanup } from '@testing-library/react'
 import { PlantKPIBoard } from '../PlantKPIBoard'
 import type { PlantKPIs } from '@/services/grader/plantKpiCompute'
 
@@ -47,6 +47,7 @@ describe('PlantKPIBoard · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
   })
 
@@ -98,8 +99,18 @@ describe('PlantKPIBoard · piel Apple', () => {
     expect(detalle.textContent).toContain('18,0 pz/min')
   })
 
-  it('el segmentado de período ocupa el ancho', () => {
+  it('no trae su propio selector de período: lo lleva la página, arriba', () => {
     const { container } = render(<PlantKPIBoard {...props} />)
-    expect(container.querySelector('[role="tablist"]')?.className ?? '').toContain('w-full')
+    expect(container.querySelector('[role="tablist"]')).toBeNull()
+  })
+
+  it('el ícono de alcance va junto al rótulo OEE, no en una línea propia', () => {
+    const { container } = render(<PlantKPIBoard {...props} />)
+    const boton = container.querySelector('button[aria-label="Alcance de los indicadores"]')!
+    expect(boton).toBeTruthy()
+    // El botón comparte fila con el rótulo: su padre directo también contiene el texto «OEE sin calidad».
+    expect(boton.parentElement?.textContent).toContain('OEE sin calidad')
+    fireEvent.click(boton)
+    expect(boton.getAttribute('aria-expanded')).toBe('true')
   })
 })

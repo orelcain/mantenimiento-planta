@@ -4,7 +4,7 @@
  * turno fijado como texto. Con la piel anterior, la forma de siempre.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, cleanup } from '@testing-library/react'
 import { GraderShiftPeriodView } from '../GraderShiftPeriodView'
 
 const NBSP = String.fromCharCode(160)
@@ -61,14 +61,16 @@ describe('GraderShiftPeriodView · piel Apple', () => {
     document.documentElement.setAttribute('data-skin', 'apple')
   })
   afterEach(() => {
+    cleanup()
     document.documentElement.removeAttribute('data-skin')
   })
 
-  it('el mes se escribe «Noviembre 2026», sin «De» en medio', () => {
+  it('no trae su propio selector de mes: el período único de la página lo mueve', () => {
     const { container } = vista()
     const texto = container.textContent ?? ''
-    expect(texto).toContain('Noviembre 2026')
-    expect(texto).not.toContain(' De ')
+    expect(texto).not.toContain('Hoy')
+    expect(container.querySelector('button[aria-label="Mes anterior"]')).toBeNull()
+    expect(container.querySelector('button[aria-label="Mes siguiente"]')).toBeNull()
   })
 
   it('el segmentado trae los rótulos completos, no las abreviaturas que se cortaban', () => {

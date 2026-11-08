@@ -214,8 +214,9 @@ export function GraderShiftPeriodMatrix({
                     )}
                     style={{ gridTemplateColumns: gridCols }}
                   >
-                    <div className={cn('flex items-center gap-1.5 pl-2 pr-1 border-l-[3px] min-w-0',
-                      meta.borderColorClass)}>
+                    <div className={apple
+                      ? 'flex items-center gap-1.5 pl-2 pr-1 min-w-0'
+                      : cn('flex items-center gap-1.5 pl-2 pr-1 border-l-[3px] min-w-0', meta.borderColorClass)}>
                       <Icon className={cn('h-3.5 w-3.5 shrink-0', meta.textColorClass)} aria-hidden />
                       <span className="min-w-0">
                         <span className="block text-footnote font-semibold leading-tight truncate">

@@ -100,7 +100,8 @@ export function GraderShiftPeriodView({
       <div className="flex flex-wrap items-center gap-2">
         {/* Navegación de mes. La traía el calendario que esta vista reemplaza:
             sin ella el período queda congelado en el mes actual. */}
-        {month && onMonthChange && (
+        {/* Piel Apple: el mes lo mueve el período único de la página (la matriz sigue el día elegido). */}
+        {month && onMonthChange && !apple && (
           <div className="inline-flex items-center gap-1 mr-1">
             <button
               type="button" aria-label="Mes anterior"
@@ -142,7 +143,8 @@ export function GraderShiftPeriodView({
           value={kpiVigente}
           onChange={setKpi}
           segments={kpisDisponibles.map(k => ({ value: k.id, label: apple ? ETIQUETA_KPI_APPLE[k.id] : k.label }))}
-          className={apple ? 'w-full' : 'w-auto max-w-xs shrink-0'}
+          ajustado={apple}
+          className={apple ? 'w-full lg:w-auto' : 'w-auto max-w-xs shrink-0'}
         />
 
         {/* Con residuo sin turno el chip filtra; sin residuo (todo ya atribuido)
