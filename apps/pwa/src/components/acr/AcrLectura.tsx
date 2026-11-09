@@ -17,11 +17,10 @@ import {
 import { resumenFuerza } from '@/services/acr/acrLogica'
 import { fechaVerificacion } from '@/services/acr/acrHistorial'
 import { codificarEstadoJK } from '@/services/shoplogix/jackKnife'
-import { Q } from '@/components/grader/jackKnifePresentacion'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { fechaLocal } from '@/services/bitacora/turnoMantencion'
-import { dec, dec1 } from '@/utils/formatoNumeros'
 import { useUbicacionJK } from './useUbicacionJK'
+import { textoUbicacionJK } from './textoUbicacionJK'
 
 export interface AcrLecturaProps {
   open: boolean
@@ -140,25 +139,7 @@ export function AcrLecturaCuerpo({ acr, onActualizar }: AcrLecturaCuerpoProps) {
                 Ataca: {causaDe(a.causaId)}, responsable: {a.responsable || 'sin asignar'}
                 {a.fechaLimite ? `, límite ${fechaCorta(a.fechaLimite)}` : ''}
               </p>
-              {onActualizar &&
-                (a.estado === 'hecha' ? (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-footnote text-muted-foreground">
-                      {a.hechaEn ? `Hecha el ${fechaCorta(a.hechaEn)}` : 'Hecha'}
-                    </span>
-                    <Button variant="plain" onClick={() => cambiarAccion(a.id, { estado: 'pendiente', hechaEn: null })}>
-                      Deshacer
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="plain"
-                    className="self-start"
-                    onClick={() => cambiarAccion(a.id, { estado: 'hecha', hechaEn: fechaLocal(new Date()) })}
-                  >
-                    Marcar hecha
-                  </Button>
-                ))}
+              {onActualizar && <ControlAccionHecha accion={a} onCambiar={(c) => cambiarAccion(a.id, c)} />}
             </div>
           ))}
         </ListGroup>
@@ -174,17 +155,49 @@ export function AcrLecturaCuerpo({ acr, onActualizar }: AcrLecturaCuerpoProps) {
             <span className="text-body text-foreground">{ETIQUETA_RESULTADO[acr.verificacion.resultado]}</span>
           </div>
           {onActualizar && acr.verificacion.resultado === 'pendiente' && (
-            <div className="flex flex-wrap gap-3 px-4 py-3">
-              <Button variant="plain" onClick={() => cambiarResultado('eficaz')}>
-                Eficaz
-              </Button>
-              <Button variant="plain" onClick={() => cambiarResultado('no_eficaz')}>
-                No eficaz
-              </Button>
-            </div>
+            <ControlResultado onElegir={cambiarResultado} />
           )}
         </ListGroup>
       </div>
+  )
+}
+
+/** Marcar una acción hecha, o deshacerlo. Lo usan la hoja del celular y el panel de PC. */
+export function ControlAccionHecha({ accion, onCambiar }: { accion: AccionAcr; onCambiar: (cambio: Partial<AccionAcr>) => void }) {
+  if (accion.estado === 'hecha') {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-footnote text-muted-foreground">
+          {accion.hechaEn ? `Hecha el ${fechaCorta(accion.hechaEn)}` : 'Hecha'}
+        </span>
+        <Button variant="plain" className="min-h-11" onClick={() => onCambiar({ estado: 'pendiente', hechaEn: null })}>
+          Deshacer
+        </Button>
+      </div>
+    )
+  }
+  return (
+    <Button
+      variant="plain"
+      className="min-h-11 self-start"
+      onClick={() => onCambiar({ estado: 'hecha', hechaEn: fechaLocal(new Date()) })}
+    >
+      Marcar hecha
+    </Button>
+  )
+}
+
+/** Eficaz / No eficaz, mientras la verificación esté pendiente. */
+export function ControlResultado({ onElegir }: { onElegir: (resultado: ResultadoVerificacion) => void }) {
+  return (
+    <div className="flex flex-wrap gap-3 px-4 py-3">
+      <Button variant="plain" className="min-h-11" onClick={() => onElegir('eficaz')}>
+        Eficaz
+      </Button>
+      <Button variant="plain" className="min-h-11" onClick={() => onElegir('no_eficaz')}>
+        No eficaz
+      </Button>
+    </div>
   )
 }
 
@@ -202,28 +215,14 @@ function GrupoEnJackKnife({ causa, className }: { causa: string | null; classNam
 
 function GrupoCausaJK({ causa, className }: { causa: string; className?: string }) {
   const u = useUbicacionJK(causa)
-  if (u.estado === 'cargando') {
+  const texto = textoUbicacionJK(u)
+  if (u.estado !== 'listo' || !u.punto) {
     return (
       <ListGroup title="En el Jack-Knife" className={className}>
-        <ListCell title={causa} subtitle="Leyendo el Jack-Knife…" />
+        <ListCell title={causa} subtitle={texto.detalle} />
       </ListGroup>
     )
   }
-  if (u.estado === 'error') {
-    return (
-      <ListGroup title="En el Jack-Knife" className={className}>
-        <ListCell title={causa} subtitle="No se pudo leer el Jack-Knife." />
-      </ListGroup>
-    )
-  }
-  if (!u.punto) {
-    return (
-      <ListGroup title="En el Jack-Knife" className={className}>
-        <ListCell title={causa} subtitle="Sin detenciones en los últimos 90 días" />
-      </ListGroup>
-    )
-  }
-  const p = u.punto
   const destino = `/jack-knife${codificarEstadoJK({ pl: BITACORA_PLANTA.id, v: '90', vs: 'imp', cmp: 'ant', causa })}`
   return (
     <ListGroup title="En el Jack-Knife" className={className} footer="Abre el Jack-Knife con esta causa marcada.">
@@ -233,11 +232,9 @@ function GrupoCausaJK({ causa, className }: { causa: string; className?: string 
       >
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="text-body text-foreground">{causa}</span>
-          <span className="text-footnote text-muted-foreground tabular-nums">
-            {`${Q[p.q].t}, ${p.ev} detenciones de ${dec1(p.mttr)} min, ${dec(p.min, 0)} min en ${u.turnos} turnos`}
-          </span>
+          <span className="text-footnote text-muted-foreground tabular-nums">{texto.detalle}</span>
         </span>
-        {u.nivel !== null && <span className="shrink-0 text-body text-foreground tabular-nums">{`Nivel ${u.nivel} de 5`}</span>}
+        {texto.nivel !== null && <span className="shrink-0 text-body text-foreground tabular-nums">{texto.nivel}</span>}
       </Link>
     </ListGroup>
   )

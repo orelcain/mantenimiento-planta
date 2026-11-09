@@ -7,10 +7,11 @@ import { Link, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { Button, Skeleton } from '@/components/piel'
 import { AcrDocumento } from '@/components/acr/AcrDocumento'
-import { rotuloVolver } from '@/components/acr/acrDocumentoTextos'
 import { HojasAcr, type VistaAcr } from '@/components/acr/AcrEntrada'
 import { escucharAcr, leerEventoDeAcr } from '@/services/acr/acrPagina'
-import type { Acr } from '@/services/acr/acr.types'
+import { guardarAcr } from '@/services/acr/acrFirestore'
+import { esEventoJK, eventoRefDesdeAcr } from '@/services/acr/desdeJackKnife'
+import type { Acr, EventoRefAcr } from '@/services/acr/acr.types'
 import type { EventoBitacora } from '@/services/bitacora/bitacora.types'
 import { logger } from '@/lib/logger'
 
@@ -19,8 +20,9 @@ type Lectura = { fase: 'cargando' } | { fase: 'error' } | { fase: 'lista'; acr: 
 export function CausaRaizDetallePage() {
   const { acrId } = useParams<{ acrId: string }>()
   const [lectura, setLectura] = useState<Lectura>({ fase: 'cargando' })
-  const [evento, setEvento] = useState<EventoBitacora | null>(null)
+  const [eventoBitacora, setEventoBitacora] = useState<EventoBitacora | null>(null)
   const [vista, setVista] = useState<VistaAcr>('ninguna')
+  const [aviso, setAviso] = useState<string | null>(null)
 
   useEffect(() => {
     if (!acrId) return
@@ -34,12 +36,14 @@ export function CausaRaizDetallePage() {
 
   const acr = lectura.fase === 'lista' ? lectura.acr : null
   const eventoId = acr?.eventoBitacoraIds[0]
+  const desdeJK = eventoId !== undefined && esEventoJK(eventoId)
   useEffect(() => {
-    if (!eventoId) return
+    // Un análisis nacido del Jack-Knife no tiene evento de Bitácora que leer.
+    if (!eventoId || desdeJK) return
     let vigente = true
     leerEventoDeAcr(eventoId)
       .then((e) => {
-        if (vigente) setEvento(e)
+        if (vigente) setEventoBitacora(e)
       })
       .catch((e: unknown) => {
         logger.error('No se pudo leer el evento del análisis', e instanceof Error ? e : undefined, { eventoId })
@@ -47,19 +51,28 @@ export function CausaRaizDetallePage() {
     return () => {
       vigente = false
     }
-  }, [eventoId])
+  }, [eventoId, desdeJK])
 
-  const destino = evento ? `/bitacora?turno=${evento.turnoId}` : '/bitacora'
+  const evento: EventoRefAcr | null = acr && desdeJK ? eventoRefDesdeAcr(acr) : eventoBitacora
+
+  /** Guarda el cambio y lo muestra de inmediato; la escucha del análisis lo confirma después. */
+  const actualizar = (a: Acr) => {
+    setLectura({ fase: 'lista', acr: a })
+    guardarAcr(a, false).catch((e: unknown) => {
+      logger.error('No se pudo guardar el análisis de causa raíz', e instanceof Error ? e : undefined, { acrId: a.id })
+      setAviso('No se guardó el cambio. Revisa la conexión y tus permisos.')
+    })
+  }
 
   return (
     <div className="w-full px-4 pb-8 pt-3 lg:px-6 lg:pb-8 lg:pt-6">
       <header className="mb-3 flex min-h-[44px] items-center justify-between gap-4">
         <Link
-          to={destino}
+          to="/causa-raiz"
           className="-ml-1 inline-flex min-h-[44px] items-center gap-1.5 rounded-ctl px-1 text-subhead text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <ChevronLeft className="h-4 w-4 flex-none" aria-hidden />
-          {rotuloVolver(evento?.turnoId)}
+          Causa raíz
         </Link>
         {acr && evento && (
           <Button variant="tinted" onClick={() => setVista('editor')}>
@@ -80,7 +93,12 @@ export function CausaRaizDetallePage() {
       )}
       {lectura.fase === 'error' && <p className="text-body text-muted-foreground">No se pudo leer este análisis.</p>}
       {lectura.fase === 'lista' && !acr && <p className="text-body text-muted-foreground">Este análisis ya no existe.</p>}
-      {acr && <AcrDocumento acr={acr} />}
+      {acr && <AcrDocumento acr={acr} onActualizar={actualizar} />}
+      {aviso && (
+        <p role="status" className="mt-4 text-footnote text-muted-foreground">
+          {aviso}
+        </p>
+      )}
 
       {evento && <HojasAcr evento={evento} acr={acr} repeticion={null} vista={vista} onVista={setVista} />}
     </div>
