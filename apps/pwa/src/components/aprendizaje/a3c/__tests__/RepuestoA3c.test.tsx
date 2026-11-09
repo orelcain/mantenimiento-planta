@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   sapsPedidos: [] as string[],
   confirmar: vi.fn(async () => {}),
   subirFoto: vi.fn(async () => 'https://foto'),
+  esPC: false,
   /** altas de código tal como las entrega el listener compartido. */
   altas: [] as unknown[],
   crearAlta: vi.fn(async () => ({ resultado: 'creada' })),
@@ -26,6 +27,12 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/hooks/usePartesPlano', () => ({ usePartesPlano: () => mocks.partes }))
+vi.mock('@/hooks/useEsPC', () => ({ useEsPC: () => mocks.esPC }))
+vi.mock('@/components/ui/ImageLightbox', () => ({
+  ImageLightbox: ({ photos, onClose }: { photos: string[]; onClose: () => void }) => (
+    <div data-testid="visor"><span>{photos.join(',')}</span><button type="button" onClick={onClose}>Cerrar visor</button></div>
+  ),
+}))
 // El hook real agrupa y filtra con las funciones puras de vinculoTerreno: se reusan acá.
 vi.mock('@/hooks/usePlanoVinculos', async () => {
   const u = await vi.importActual<typeof import('@/utils/aprendizaje/vinculoTerreno')>('@/utils/aprendizaje/vinculoTerreno')
@@ -106,6 +113,7 @@ beforeEach(() => {
   mocks.maquinaPedida = null
   localStorage.clear()
   mocks.bySap = new Map()
+  mocks.esPC = false
   mocks.altas = []
   mocks.sapsPedidos = []
   mocks.confirmar.mockClear()
@@ -117,6 +125,28 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('RepuestoA3c', () => {
+  const conFoto = () => {
+    mocks.bySap = new Map<string, RepuestoResuelto>([['3300012350', { id: 'x', codigoSAP: '3300012350', nombre: 'Sensor', fotoUrl: 'https://f/1.jpg' } as RepuestoResuelto]])
+  }
+
+  it('Foto de pieza: en PC se abre en el visor y se cierra', () => {
+    mocks.esPC = true
+    conFoto()
+    montar('B1')
+    fireEvent.click(screen.getByRole('button', { name: /^Ampliar foto de/ }))
+    expect(screen.getByTestId('visor').textContent).toContain('https://f/1.jpg')
+    fireEvent.click(screen.getByText('Cerrar visor'))
+    expect(screen.queryByTestId('visor')).toBeNull()
+  })
+
+  it('Foto de pieza: en celular sigue en la hoja', () => {
+    conFoto()
+    montar('B1')
+    fireEvent.click(screen.getByRole('button', { name: /^Ampliar foto de/ }))
+    expect(screen.queryByTestId('visor')).toBeNull()
+    expect(screen.getByAltText(/^Foto de /)).toBeTruthy()
+  })
+
   it('A: pieza exacta con SAP, stock en vivo y acciones', () => {
     mocks.bySap = new Map<string, RepuestoResuelto>([['3300012350', { id: 'x', codigoSAP: '3300012350', nombre: 'Sensor inductivo con cable', stockFisico: 4, ubicacion: 'C-3' }]])
     montar('B1')

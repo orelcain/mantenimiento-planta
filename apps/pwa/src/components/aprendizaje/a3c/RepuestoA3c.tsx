@@ -26,6 +26,8 @@ import { crearAltaCodigo, reabrirAlta, type AltaCodigo } from '@/hooks/repuestos
 import { SolicitarAltaSheet, type DatosEnvioAlta } from './SolicitarAltaSheet'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/lib/utils'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import { useEsPC } from '@/hooks/useEsPC'
 import { armarAltaCodigo, codigoParaAlta, elementosConCodigo, fechaCortaAlta, listaEnFrase, sapEfectivo } from '@/utils/aprendizaje/altaCodigoA3c'
 import { normCodigo } from '@/utils/repuestos/normCodigo'
 import { certezaDe, clasificarRepuesto, esModoCandidatos, origenPieza, SLUG_PLANO_A3C } from '@/utils/aprendizaje/repuestosA3c'
@@ -215,6 +217,7 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
   const v = candidatos || indice === 0 ? vinculos.vinculos.get(codigo) : undefined
   const cert = certezaDe(pieza.confianza, v, pieza.nr, nrPrimera)
   const [foto, setFoto] = useState(false)
+  const esPC = useEsPC()
   // El nombre y la ubicación del cruce (`partes.json`) hablan del SAP del plano; para el de un alta creada, el maestro.
   const nombreSap = pieza.sap ? (repuesto?.nombre ?? pieza.sapNombre) : (repuesto?.nombre ?? alta?.textoBreve)
   const ubicacion = pieza.sap ? (repuesto?.ubicacion ?? pieza.sapUbicacion) : repuesto?.ubicacion
@@ -371,9 +374,13 @@ function PiezaBloque({ className, codigo, pieza, indice, total, despiece, vincul
         />
       )}
 
-      <Sheet open={foto} onClose={() => setFoto(false)} title={pieza.nr} description={nombreSap ?? pieza.es}>
-        {repuesto?.fotoUrl && <img src={repuesto.fotoUrl} alt={`Foto de ${pieza.nr}`} className="mx-auto max-h-[60dvh] w-full rounded-ctl object-contain" />}
-      </Sheet>
+      {esPC ? (
+        foto && repuesto?.fotoUrl && <ImageLightbox photos={[repuesto.fotoUrl]} onClose={() => setFoto(false)} />
+      ) : (
+        <Sheet open={foto} onClose={() => setFoto(false)} title={pieza.nr} description={nombreSap ?? pieza.es}>
+          {repuesto?.fotoUrl && <img src={repuesto.fotoUrl} alt={`Foto de ${pieza.nr}`} className="mx-auto max-h-[60dvh] w-full rounded-ctl object-contain" />}
+        </Sheet>
+      )}
     </div>
   )
 }
