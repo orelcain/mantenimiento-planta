@@ -87,6 +87,7 @@ function renderTable(rows: string[][]): string {
 
 function formatLine(text: string): string {
   return text
+    .replace(/^(\s*)\* /, '$1• ')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded-ctl text-xs">$1</code>')
@@ -1826,7 +1827,7 @@ export function ChatBot() {
               </button>
             </div>
             <p className="text-caption text-muted-foreground mt-1 text-center">
-              ARIA v6 · Powered by Gemini AI · /ayuda · /mis para plantillas
+              ARIA v6 · /ayuda · /mis para plantillas
             </p>
           </div>
         </div>
