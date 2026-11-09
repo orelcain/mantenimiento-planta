@@ -14,6 +14,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { ActionSheet, Button, Pill, SegmentedControl, Sheet } from '@/components/piel'
 import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
+import { useEsPC } from '@/hooks/useEsPC'
+import { EditarFavoritosPC, NUEVA_LISTA, type FiltroPlanta } from './EditarFavoritosPC'
 import type { FavList } from '@/services/userPreferences'
 import { getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
 import { plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
@@ -49,6 +51,8 @@ export interface EditarFavoritosSheetProps {
   nombreDe: (id: string) => string
   /** Planta (p. ej. «PLANTA CHONCHI») de un nodo; `undefined` si no se sabe. */
   plantaDe: (id: string) => string | undefined
+  /** Sección de la línea de un nodo, solo para la vista de PC. */
+  seccionDe?: (id: string) => string | undefined
   onGuardar: (next: FavList[]) => Promise<void>
   /** Lista que recibe los equipos al abrir desde «Agregar a…» (por nombre guardado). */
   listaInicial?: string
@@ -56,8 +60,8 @@ export interface EditarFavoritosSheetProps {
   equipoInicial?: { id: string; nombre: string }
 }
 
-const NUEVA = '__nueva__'
-type FiltroPlanta = 'todas' | 'chonchi' | 'yal'
+const NUEVA = NUEVA_LISTA
+const SIN_SECCION_DE = () => undefined
 
 function Pastilla({ planta }: { planta: string }) {
   if (!planta) return null
@@ -246,8 +250,10 @@ function motivoDe(d: DiffFavoritos, plantaDe: (id: string) => string | undefined
 }
 
 export function EditarFavoritosSheet({
-  open, onOpenChange, listas, nombreDe, plantaDe, onGuardar, listaInicial, equipoInicial,
+  open, onOpenChange, listas, nombreDe, plantaDe, seccionDe = SIN_SECCION_DE, onGuardar, listaInicial, equipoInicial,
 }: EditarFavoritosSheetProps) {
+  const esPC = useEsPC()
+  const [activa, setActiva] = useState<string | null>(null)
   const [borrador, setBorrador] = useState<ListaBorrador[]>([])
   const [sel, setSel] = useState<Map<string, string>>(new Map())
   const [consulta, setConsulta] = useState('')
@@ -270,6 +276,7 @@ export function EditarFavoritosSheet({
     setBorrador(b)
     const ini = (p.listaInicial ? b.find((l) => l.origen === p.listaInicial) : undefined) ?? b[0]
     setDestino(ini?.key ?? NUEVA)
+    setActiva(ini?.key ?? null)
     setSel(p.equipoInicial ? new Map([[p.equipoInicial.id, p.equipoInicial.nombre]]) : new Map())
     setConsulta('')
     setFiltro('todas')
@@ -284,7 +291,7 @@ export function EditarFavoritosSheet({
   const yaIds = useMemo(() => new Set(borrador.filter((l) => !l.eliminada).flatMap((l) => l.items.map((i) => i.id))), [borrador])
 
   // Resultados: desde 2 letras se busca en todos los equipos; antes, solo lo ya elegido (p. ej. el de la estrella).
-  const grupos = useMemo(() => {
+  const { grupos, conteo } = useMemo(() => {
     const q = normalizeForSearch(consulta)
     const base: { id: string; nombre: string; sub: string; planta: string }[] = []
     if (q.length < 2) {
@@ -298,13 +305,18 @@ export function EditarFavoritosSheet({
         if (base.length >= 60) break
       }
     }
+    const conteo: Record<FiltroPlanta, number> = {
+      todas: base.length,
+      chonchi: base.filter((r) => r.planta.toLowerCase().startsWith('chonchi')).length,
+      yal: base.filter((r) => r.planta.toLowerCase().startsWith('yal')).length,
+    }
     const filtrados = base.filter((r) => filtro === 'todas' || r.planta.toLowerCase().startsWith(filtro))
     const porPlanta = new Map<string, typeof filtrados>()
     for (const r of filtrados) {
       const k = r.planta || 'Sin planta'
       porPlanta.set(k, [...(porPlanta.get(k) ?? []), r])
     }
-    return [...porPlanta.entries()]
+    return { grupos: [...porPlanta.entries()], conteo }
   }, [consulta, filtro, sel, plantaDe])
 
   const cambiar = (f: (b: ListaBorrador[]) => ListaBorrador[]) => setBorrador((b) => f(b))
@@ -334,6 +346,29 @@ export function EditarFavoritosSheet({
     setBorrador(agregarEquipos(base, key, equipos))
     setSel(new Map())
     setNombreNueva('')
+    if (esPC) {
+      // En PC los resultados ocupan el lugar de la tabla: se vuelve a la lista que recibió los equipos.
+      setActiva(key)
+      setConsulta('')
+    }
+  }
+
+  const elegirLista = (key: string) => {
+    setActiva(key)
+    setDestino(key)
+  }
+
+  const crearListaVacia = (nombre: string) => {
+    const r = crearLista(borrador, nombre)
+    if (!r.key) return false
+    setBorrador(r.borrador)
+    elegirLista(r.key)
+    return true
+  }
+
+  const volverALista = () => {
+    setConsulta('')
+    setSel(new Map())
   }
 
   const intentarCerrar = () => {
@@ -362,6 +397,68 @@ export function EditarFavoritosSheet({
   }
 
   const nListas = borrador.filter((l) => !l.eliminada).length
+
+  const dialogos = (
+    <>
+      <ActionSheet
+        open={descartar}
+        title="¿Descartar los cambios?"
+        description="Lo que editaste en las listas no se guardará."
+        confirmLabel="Descartar cambios"
+        onConfirm={() => { setDescartar(false); onOpenChange(false) }}
+        cancelLabel="Seguir editando"
+        onCancel={() => setDescartar(false)}
+      />
+
+      <ReAuthConfirmDialog
+        elevado
+        open={claveAbierta}
+        onOpenChange={setClaveAbierta}
+        reason={motivoDe(diff, plantaDe)}
+        onConfirmed={guardar}
+      />
+    </>
+  )
+
+  if (esPC) {
+    return (
+      <>
+        <EditarFavoritosPC
+          open={open}
+          onClose={intentarCerrar}
+          borrador={borrador}
+          activa={activa}
+          onActiva={elegirLista}
+          onBorrador={cambiar}
+          onCrearLista={crearListaVacia}
+          plantaDe={plantaDe}
+          seccionDe={seccionDe}
+          diff={diff}
+          consulta={consulta}
+          buscando={normalizeForSearch(consulta).length >= 2 || sel.size > 0}
+          onConsulta={setConsulta}
+          onVolver={volverALista}
+          filtro={filtro}
+          onFiltro={setFiltro}
+          conteo={conteo}
+          grupos={grupos}
+          seleccion={sel}
+          onAlternar={alternarSel}
+          yaIds={yaIds}
+          destino={destino}
+          onDestino={setDestino}
+          nombreNueva={nombreNueva}
+          onNombreNueva={setNombreNueva}
+          puedeAgregar={puedeAgregar}
+          onAgregar={agregarSeleccion}
+          guardando={guardando}
+          error={error}
+          onGuardar={alGuardar}
+        />
+        {dialogos}
+      </>
+    )
+  }
 
   return (
     <>
@@ -506,23 +603,7 @@ export function EditarFavoritosSheet({
         </div>
       </Sheet>
 
-      <ActionSheet
-        open={descartar}
-        title="¿Descartar los cambios?"
-        description="Lo que editaste en las listas no se guardará."
-        confirmLabel="Descartar cambios"
-        onConfirm={() => { setDescartar(false); onOpenChange(false) }}
-        cancelLabel="Seguir editando"
-        onCancel={() => setDescartar(false)}
-      />
-
-      <ReAuthConfirmDialog
-        elevado
-        open={claveAbierta}
-        onOpenChange={setClaveAbierta}
-        reason={motivoDe(diff, plantaDe)}
-        onConfirmed={guardar}
-      />
+      {dialogos}
     </>
   )
 }

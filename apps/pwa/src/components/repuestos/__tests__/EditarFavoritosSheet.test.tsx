@@ -14,6 +14,8 @@ vi.mock('@/components/admin/ReAuthConfirmDialog', () => ({
     ) : null,
 }))
 
+vi.mock('@/hooks/useEsPC', () => ({ useEsPC: () => false }))
+
 import { EditarFavoritosSheet } from '../EditarFavoritosSheet'
 
 const LISTAS: FavList[] = [
