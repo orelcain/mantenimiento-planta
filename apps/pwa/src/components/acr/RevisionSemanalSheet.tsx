@@ -15,6 +15,8 @@ import {
   type FuerzaAccion,
 } from '@/services/acr/acr.types'
 import { logger } from '@/lib/logger'
+import { useEsPC } from '@/hooks/useEsPC'
+import { RevisionSemanalPC } from './RevisionSemanalPC'
 
 export interface RevisionSemanalSheetProps {
   open: boolean
@@ -50,6 +52,7 @@ function filasDelPeriodo(acrs: readonly Acr[]): FilaRevision[] {
 }
 
 export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar, onGuardar }: RevisionSemanalSheetProps) {
+  const esPC = useEsPC()
   // Copia local: al cambiar una fuerza la lista se actualiza sin esperar a recargar el período.
   const [lista, setLista] = useState<Acr[]>(acrs)
   useEffect(() => setLista(acrs), [acrs])
@@ -73,6 +76,19 @@ export function RevisionSemanalSheet({ open, onClose, acrs, periodo, puedeEditar
     guardarAcr(siguiente, false).catch((e: unknown) => {
       logger.error('No se pudo guardar la fuerza de la acción', e instanceof Error ? e : undefined, { acrId })
     })
+  }
+
+  if (esPC) {
+    return (
+      <RevisionSemanalPC
+        open={open}
+        onClose={onClose}
+        acrs={lista}
+        periodo={periodo}
+        puedeEditar={puedeEditar}
+        onCambiarFuerza={cambiarFuerza}
+      />
+    )
   }
 
   return (
