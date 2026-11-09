@@ -29,6 +29,7 @@ const EVENTO_DEMO: EventoRefAcr = {
   descripcion: 'Se corta resorte ingreso chapaleta baader 1. Se reemplaza y normaliza',
   minutosParada: 7,
   fotos: [],
+  repuestos: [{ codigoSAP: '3300012407', nombre: 'MUELLE 38010321', nombreComun: 'Resorte medidor largo', cantidad: 2 }],
 }
 
 /** Análisis de ejemplo: contenido del mockup (acr-mockup.html, marcos A y B). */

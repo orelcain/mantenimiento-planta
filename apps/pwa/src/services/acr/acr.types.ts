@@ -7,7 +7,7 @@
  *
  * Spec: SPEC_ACR.md (opción A, aprobada por Orel 07-11-2026).
  */
-import type { EtiquetaFoto } from '@/services/bitacora/bitacora.types'
+import type { EtiquetaFoto, RepuestoUsado } from '@/services/bitacora/bitacora.types'
 
 export type NivelCausa = 'fisica' | 'humana' | 'latente'
 export type FuerzaAccion = 'debil' | 'media' | 'fuerte'
@@ -100,6 +100,8 @@ export interface EventoRefAcr {
   descripcion: string
   minutosParada: number | null
   fotos: ReadonlyArray<{ url: string; path: string; etiqueta: EtiquetaFoto; thumbUrl?: string }>
+  /** Repuestos usados en el evento: el expediente de PC los muestra. */
+  repuestos?: ReadonlyArray<RepuestoUsado>
 }
 
 export const ETIQUETA_NIVEL: Record<NivelCausa, string> = {

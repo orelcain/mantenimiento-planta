@@ -21,6 +21,13 @@ describe('Sheet: presentacionPC', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('`libre` deja el contenido al que lo usa: sin botón propio ni pie, y el título solo para lectores', () => {
+    render(<Sheet open onClose={() => {}} title="Causa raíz" presentacionPC="libre" actions={undefined}>Cuerpo</Sheet>)
+    expect(screen.queryByRole('button', { name: 'Cerrar' })).toBeNull()
+    expect(panel().className.split(' ')).toContain('lg:p-0')
+    expect(screen.getByRole('heading', { name: 'Causa raíz' }).className).toContain('lg:sr-only')
+  })
+
   it('`ventana` solo actúa desde lg: el celular conserva la hoja y su tirador', () => {
     render(<Sheet open onClose={() => {}} title="Editar evento" presentacionPC="ventana">Cuerpo</Sheet>)
     const clases = panel().className.split(' ')

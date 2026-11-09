@@ -22,6 +22,8 @@ export interface Repeticion {
   eventoIds: string[]
   resumen: string
   minutos: number
+  /** Los eventos del grupo, para listarlos como antecedentes (no se guarda en el análisis). */
+  eventos?: EventoRepeticion[]
 }
 
 const VENTANA_DIAS = 30
@@ -171,5 +173,6 @@ export function detectarRepeticion(
     eventoIds: grupo.map((e) => e.id),
     resumen: `${etiqueta} · ${n} ${n === 1 ? 'vez' : 'veces'} ${cuando} · ${equiposDelGrupo(grupo.map((e) => e.equipo))} · ${minutos} min`,
     minutos,
+    eventos: grupo,
   }
 }
