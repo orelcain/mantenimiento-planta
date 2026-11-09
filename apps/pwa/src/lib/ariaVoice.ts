@@ -36,6 +36,34 @@ async function getTtsProxy() {
 
 let pref: VoicePref = { rate: 1.0 }
 let currentAudio: HTMLAudioElement | null = null
+// iOS solo deja sonar sin toque a un <audio> que ya sonó dentro de un toque, y la voz llega
+// segundos después de enviar. Por eso hay un único reproductor: se desbloquea con el primer
+// toque y todas las frases pasan por él.
+let reproductor: HTMLAudioElement | null = null
+let audioDesbloqueado = false
+function getReproductor(): HTMLAudioElement {
+  reproductor ??= new Audio()
+  return reproductor
+}
+/** 0,1 s de silencio (WAV 8 kHz, 8 bits) para desbloquear el reproductor. */
+function urlSilencio(): string {
+  const muestras = 800
+  const bytes = new Uint8Array(44 + muestras).fill(0x80)
+  const v = new DataView(bytes.buffer)
+  const texto = (pos: number, t: string) => { for (let i = 0; i < t.length; i++) bytes[pos + i] = t.charCodeAt(i) }
+  texto(0, 'RIFF'); v.setUint32(4, 36 + muestras, true); texto(8, 'WAVEfmt ')
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true)
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true)
+  texto(36, 'data'); v.setUint32(40, muestras, true)
+  return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
+}
+/** Llamar dentro de un toque o tecla. Solo actúa hasta que el navegador lo acepta. */
+export function desbloquearAudio(): void {
+  if (audioDesbloqueado || currentAudio || typeof Audio === 'undefined') return
+  const audio = getReproductor()
+  audio.src = urlSilencio()
+  audio.play().then(() => { audioDesbloqueado = true }).catch(() => { /* se reintenta en el próximo toque */ })
+}
 // Secuencia de habla: cada speak()/stopSpeaking() la incrementa. La cadena de frases
 // en curso compara su número; si cambió, abandona (la superó otra orden o un stop).
 let speakSeq = 0
@@ -90,7 +118,7 @@ export function isAikoVoice(uri?: string): boolean {
 async function isAikoUp(): Promise<boolean> {
   for (const s of AIKO_SERVERS) {
     try {
-      const r = await fetch(`${s}/salud`, { signal: AbortSignal.timeout(1200) })
+      const r = await fetch(`${s}/salud`, { signal: AbortSignal.timeout(2500) })
       if (r.ok) { aikoServer = s; return true }
     } catch { /* probar la siguiente dirección */ }
   }
@@ -336,15 +364,27 @@ async function playChunks(
       if (i === 0 && !started && onFirstFail) { dropPrefetch(); onFirstFail(); return }
       continue                                                              // salta una frase fallida del medio
     }
+    let bloqueado = false
     await new Promise<void>((resolve) => {
-      const audio = new Audio(url!)
+      const audio = getReproductor()
       currentAudio = audio
       audio.onplaying = () => { if (!started) { started = true; emitSpeaking(true) } }
       audio.onended = () => { safeRevoke(url!); resolve() }
       audio.onerror = () => { safeRevoke(url!); resolve() }
-      audio.play().catch(() => { safeRevoke(url!); resolve() })
+      audio.src = url!
+      audio.play().catch((e: unknown) => {
+        bloqueado = (e as { name?: string })?.name === 'NotAllowedError'
+        safeRevoke(url!)
+        resolve()
+      })
     })
     if (myseq !== speakSeq) { dropPrefetch(); return }                      // stop mientras sonaba
+    if (bloqueado) {                                                        // el navegador no deja sonar: no seguir sintetizando
+      dropPrefetch()
+      currentAudio = null
+      wrapped.onerror?.()
+      return
+    }
   }
   if (myseq !== speakSeq) return
   currentAudio = null
