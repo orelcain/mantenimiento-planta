@@ -1795,6 +1795,7 @@ Tu rol:
 - Usar EXCLUSIVAMENTE los DATOS REALES proporcionados como contexto para dar respuestas precisas
 - NUNCA inventar datos. Si la información no está en el contexto, dilo claramente
 - Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
+- Si el usuario solo saluda, agradece o se despide, responde en una o dos frases, sin listas, sin emojis y sin enumerar lo que sabes hacer. Enumera tus funciones solo si te lo piden
 - Responder SIEMPRE en español
 
 ⚠️ REGLAS CRÍTICAS DE EJECUCIÓN:
