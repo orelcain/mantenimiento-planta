@@ -76,6 +76,27 @@ async function isChatterboxUp(): Promise<boolean> {
   }
 }
 
+// Voz de Aiko: Qwen3-TTS en el PC de mantención, encendido a mano. Solo responde dentro de
+// la red privada Tailscale, así que en cualquier otro equipo la prueba falla y no cambia nada.
+const AIKO_PREFIX = 'aiko:'
+export const AIKO_VOICE = AIKO_PREFIX + 'local'
+// En el propio PC va directo; desde el iPhone, por Tailscale. Chromium no deja que una web
+// pública llegue a la dirección de Tailscale, pero sí a 127.0.0.1.
+export const AIKO_SERVERS = ['http://127.0.0.1:8805', 'https://lenovo-casa.tail24c741.ts.net:8445'] as const
+let aikoServer: string = AIKO_SERVERS[0]
+export function isAikoVoice(uri?: string): boolean {
+  return !!uri && uri.startsWith(AIKO_PREFIX)
+}
+async function isAikoUp(): Promise<boolean> {
+  for (const s of AIKO_SERVERS) {
+    try {
+      const r = await fetch(`${s}/salud`, { signal: AbortSignal.timeout(1200) })
+      if (r.ok) { aikoServer = s; return true }
+    } catch { /* probar la siguiente dirección */ }
+  }
+  return false
+}
+
 // ── Estado "hablando" (para el avatar de video) ─────────────────────
 // El motor por defecto (Web Speech API) no expone un stream de audio analizable,
 // así que el avatar engancha aquí: notificamos true al empezar a hablar (cualquier
@@ -102,6 +123,11 @@ export async function loadVoicePref(): Promise<VoicePref> {
     pref = { voiceURI: cfg.voiceURI, rate: cfg.speechRate ?? 1.0 }
   } catch {
     rateFromConfig = false
+  }
+  // Si la voz de Aiko responde, manda sobre la configuración: solo la alcanzan los equipos de su red.
+  if (await isAikoUp()) {
+    pref.voiceURI = AIKO_VOICE
+    return pref
   }
   // Preferencia automática de motor cuando el admin no eligió uno cloud/local:
   //   1) Chatterbox local (la voz elegida de ARIA) si su server está arriba
@@ -271,6 +297,20 @@ function httpGetFetcher(makeUrl: (sentence: string) => string): AudioFetcher {
   }
 }
 
+/** Fetcher de la voz de Aiko: una frase, un WAV. Qwen tarda 1,6 s por segundo de audio; el tope cubre una frase larga en espera de turno. */
+function aikoFetcher(): AudioFetcher {
+  return async (sentence: string) => {
+    const r = await fetch(`${aikoServer}/frase`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto: sentence }),
+      signal: AbortSignal.timeout(45000),
+    })
+    if (!r.ok) throw new Error(`aiko ${r.status}`)
+    return URL.createObjectURL(await r.blob())
+  }
+}
+
 /**
  * Reproduce las frases en orden con un fetch "1 adelante" (precarga la siguiente
  * mientras suena la actual). Emite "hablando" cuando suena la 1ª frase y onend al
@@ -383,6 +423,13 @@ export function speakWith(text: string, voiceURI: string | undefined, rate: numb
   const wrapped: SpeakOpts = {
     onend: () => { emitSpeaking(false); opts.onend?.() },
     onerror: () => { emitSpeaking(false); opts.onerror?.() },
+  }
+  if (isAikoVoice(voiceURI)) {
+    // Si el PC se apagó o se cerró el servidor, ARIA sigue hablando con la voz de Google.
+    void playChunks(sentences, aikoFetcher(), wrapped, () => {
+      void playChunks(sentences, googleFetcher(DEFAULT_GCLOUD_VOICE.slice(GCLOUD_PREFIX.length), r), wrapped)
+    })
+    return
   }
   if (isChatterboxVoice(voiceURI)) {
     const chatterbox = httpGetFetcher((s) => `${CHATTERBOX_SERVER}/tts?text=${encodeURIComponent(s)}`)
