@@ -113,7 +113,7 @@ const CAMPO_PC =
   'w-full resize-none rounded-ctl border border-border bg-background px-2.5 py-2 !text-subhead leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary !min-h-[76px]'
 const TITULO_PREGUNTA_PC = 'mb-1.5 block text-subhead font-semibold text-foreground'
 /** PC: comandos de texto y botones rectos, sin píldora. */
-const BOTON_PC = '!min-h-9 !rounded-ctl !text-subhead'
+const BOTON_PC = '!min-h-[36px] !rounded-ctl !text-subhead'
 const NIVEL_SEGMENTOS = (['fisica', 'humana', 'latente'] as const).map((n) => ({ value: n, label: ETIQUETA_NIVEL[n] }))
 const FUERZA_SEGMENTOS = (['debil', 'media', 'fuerte'] as const).map((f) => ({ value: f, label: ETIQUETA_FUERZA[f] }))
 const RESPUESTAS_VACIAS: RespuestasAcr = { queSeRompio: '', porQue: '', queHacemos: '' }
@@ -835,7 +835,7 @@ export function AcrRapidoSheet({
                   type="button"
                   aria-label="Cerrar"
                   onClick={cerrarHoja}
-                  className="grid size-9 flex-none place-items-center rounded-ctl bg-muted-foreground/15 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="grid size-[36px] flex-none place-items-center rounded-ctl bg-muted-foreground/15 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <X className="size-3.5" aria-hidden />
                 </button>
@@ -1339,7 +1339,7 @@ function InterruptorPieza({ activo, onCambiar, compacto = false }: { activo: boo
         data-tutorial="t-pieza"
         aria-checked={activo}
         onClick={() => onCambiar(!activo)}
-        className="flex min-h-9 w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="flex min-h-[36px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <span className="text-subhead text-foreground">Pieza dañada guardada</span>
         <span className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${activo ? 'bg-primary' : 'bg-muted-foreground/30'}`}>

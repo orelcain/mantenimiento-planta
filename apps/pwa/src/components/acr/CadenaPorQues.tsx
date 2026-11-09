@@ -316,7 +316,7 @@ export function CadenaPorQues({
       </Sheet>
   )
 
-  const CMD_PC = '!min-h-9 !px-0 !text-subhead !font-normal'
+  const CMD_PC = '!min-h-[36px] !px-0 !text-subhead !font-normal'
 
   if (compacta) {
     return (
