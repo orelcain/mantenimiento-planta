@@ -9,6 +9,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, Minus, Plus, Search, Send } from 'lucide-react'
 import { Button, Sheet } from '@/components/piel'
+import { useEsPC } from '@/hooks/useEsPC'
+import { SolicitarVariosPC } from './SolicitarVariosPC'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
@@ -35,6 +37,7 @@ interface Props {
 const CAMPO = 'h-11 w-full rounded-ctl bg-muted pl-9 pr-3 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40'
 
 export function SolicitarVariosSheet({ open, onClose, maquina, piezas, cargarStock, onSubmit }: Props) {
+  const esPC = useEsPC()
   const [query, setQuery] = useState('')
   const [seleccion, setSeleccion] = useState<Map<string, number>>(() => new Map())
   const [observaciones, setObservaciones] = useState('')
@@ -74,6 +77,30 @@ export function SolicitarVariosSheet({ open, onClose, maquina, piezas, cargarSto
     try { await onSubmit(lineas) }
     catch { setError('No se pudieron crear las solicitudes. Intenta de nuevo.') }
     finally { setEnviando(false) }
+  }
+
+  if (esPC) {
+    return (
+      <SolicitarVariosPC
+        open={open}
+        onClose={onClose}
+        maquina={maquina}
+        piezas={conStock}
+        grupos={grupos}
+        resumen={resumen}
+        seleccion={seleccion}
+        leyendoStock={Boolean(cargarStock) && !stockCargado}
+        query={query}
+        onQuery={setQuery}
+        onAlternar={alternar}
+        onFijar={fijar}
+        observaciones={observaciones}
+        onObservaciones={setObservaciones}
+        enviando={enviando}
+        error={error}
+        onEnviar={() => void enviar()}
+      />
+    )
   }
 
   return (
