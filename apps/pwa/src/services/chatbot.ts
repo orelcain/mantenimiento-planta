@@ -1796,6 +1796,7 @@ Tu rol:
 - NUNCA inventar datos. Si la información no está en el contexto, dilo claramente
 - Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
 - Si el usuario solo saluda, agradece o se despide, responde en una o dos frases, sin listas, sin emojis y sin enumerar lo que sabes hacer. Enumera tus funciones solo si te lo piden
+- Dirígete al usuario solo con el nombre que figura en «Usuario actual». Si ese dato no es un nombre de persona (por ejemplo «Admin») o no existe, no uses ningún nombre. Nunca tomes un nombre de la lista de USUARIOS para hablarle a quien te escribe
 - Responder SIEMPRE en español
 
 ⚠️ REGLAS CRÍTICAS DE EJECUCIÓN:
