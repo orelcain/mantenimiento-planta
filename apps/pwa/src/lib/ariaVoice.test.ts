@@ -30,6 +30,7 @@ import { speakWith, stopSpeaking, onSpeakingChange, loadVoicePref, AIKO_VOICE, A
 // ── Fakes de navegador (happy-dom no reproduce audio real) ──────────
 class FakeAudio {
   static instances: FakeAudio[] = []
+  static reproducciones = 0
   src: string
   onplaying: (() => void) | null = null
   onended: (() => void) | null = null
@@ -37,6 +38,7 @@ class FakeAudio {
   paused = false
   constructor(src?: string) { this.src = src || ''; FakeAudio.instances.push(this) }
   play(): Promise<void> {
+    FakeAudio.reproducciones++
     // simula reproducción: "suena" y "termina" en microtasks sucesivos
     queueMicrotask(() => { this.onplaying?.(); queueMicrotask(() => this.onended?.()) })
     return Promise.resolve()
@@ -48,6 +50,7 @@ const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
 
 beforeEach(() => {
   FakeAudio.instances = []
+  FakeAudio.reproducciones = 0
   vi.stubGlobal('Audio', FakeAudio as unknown as typeof Audio)
   vi.stubGlobal('URL', { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} })
   ttsCallableMock.mockClear()
@@ -66,7 +69,7 @@ describe('speakWith — reproducción por frases (Google)', () => {
     off()
 
     expect(ttsCallableMock.mock.calls.length).toBe(3) // una síntesis por frase, no una sola gigante
-    expect(FakeAudio.instances.length).toBe(3)    // un audio por frase
+    expect(FakeAudio.reproducciones).toBe(3)    // un audio por frase
     // la 1ª petición lleva SOLO la 1ª frase (prueba el troceo + el orden)
     const call0 = ttsCallableMock.mock.calls[0]![0] as { text: string }
     expect(call0.text).toContain('Primera frase')
@@ -104,7 +107,7 @@ describe('voz de Aiko (servidor local)', () => {
     expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([`${AIKO_SERVERS[0]}/frase`, `${AIKO_SERVERS[0]}/frase`])
     expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)).texto).toContain('Primera frase')
     expect(ttsCallableMock).not.toHaveBeenCalled()
-    expect(FakeAudio.instances.length).toBe(2)
+    expect(FakeAudio.reproducciones).toBe(2)
     expect(onend).toHaveBeenCalledTimes(1)
   })
 
@@ -115,7 +118,7 @@ describe('voz de Aiko (servidor local)', () => {
     for (let i = 0; i < 20 && onend.mock.calls.length === 0; i++) await flush()
 
     expect(ttsCallableMock).toHaveBeenCalledTimes(2)
-    expect(FakeAudio.instances.length).toBe(2)
+    expect(FakeAudio.reproducciones).toBe(2)
     expect(onend).toHaveBeenCalledTimes(1)
   })
 

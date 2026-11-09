@@ -10,7 +10,7 @@ import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
-import { loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
+import { desbloquearAudio, loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
 import { logger } from '@/lib/logger'
 import { useBurbujaChatOculta, registrarAbrirAria, type OpcionesAria } from '@/lib/pantallaCompletaMovil'
 import { useOcultarAlBajar } from '@/hooks/useOcultarAlBajar'
@@ -1073,9 +1073,20 @@ export function ChatBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading, streamingContent])
 
-  // Cargar preferencia de voz (definida en Configuración → ARIA)
+  // Cargar preferencia de voz (Configuración → ARIA) cada vez que se abre: el servidor de la voz de Aiko pudo encenderse después.
   useEffect(() => {
     loadVoicePref()
+  }, [isOpen])
+
+  // iOS exige un toque para permitir sonido; la respuesta llega segundos después.
+  useEffect(() => {
+    const opciones = { capture: true, passive: true }
+    document.addEventListener('touchend', desbloquearAudio, opciones)
+    document.addEventListener('click', desbloquearAudio, opciones)
+    return () => {
+      document.removeEventListener('touchend', desbloquearAudio, opciones)
+      document.removeEventListener('click', desbloquearAudio, opciones)
+    }
   }, [])
 
   // Esc cierra la hoja (la herramienta de atrás queda tal cual).
