@@ -19,6 +19,8 @@ export interface RepuestoResuelto {
   fotoUrl?: string
   stockFisico?: number
   ubicacion?: string
+  /** Figura y posición en el manual (`Fig. 12 pos. 27`). */
+  posicionManual?: string
 }
 
 function chunk<T>(arr: T[], n: number): T[][] {
@@ -92,6 +94,7 @@ export function useRepuestosByCodigos(saps: string[]): { bySap: Map<string, Repu
               fotoUrl: pickFoto(r),
               stockFisico: stockBySap.has(sap) ? stockBySap.get(sap) : (stockBySap.has(d.id) ? stockBySap.get(d.id) : undefined),
               ubicacion: typeof r.ubicacionEnPlanta === 'string' ? r.ubicacionEnPlanta : undefined,
+              posicionManual: typeof r.posicionManual === 'string' && r.posicionManual ? r.posicionManual : undefined,
             })
           }
         }

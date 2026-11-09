@@ -16,8 +16,8 @@ import {
 const CARPETA_AUDIO = join(process.cwd(), 'public', 'tutorial-acr') + '/'
 
 describe('guion del tutorial (v2)', () => {
-  it('tiene 29 pasos en 11 capítulos, cada uno con un audio que existe en public/tutorial-acr', () => {
-    expect(PASOS_TUTORIAL).toHaveLength(29)
+  it('tiene 30 pasos en 11 capítulos, cada uno con un audio que existe en public/tutorial-acr', () => {
+    expect(PASOS_TUTORIAL).toHaveLength(30)
     expect(CAPITULOS).toHaveLength(11)
     for (const paso of PASOS_TUTORIAL) {
       expect(existsSync(CARPETA_AUDIO + paso.audio), `falta ${paso.audio}`).toBe(true)
@@ -53,7 +53,7 @@ describe('guion del tutorial (v2)', () => {
 
   it('la URL del audio sale del BASE_URL de la app', () => {
     expect(urlAudio('/', 0)).toBe('/tutorial-acr/paso-01.mp3')
-    expect(urlAudio('/app/', 28)).toBe('/app/tutorial-acr/paso-27.mp3')
+    expect(urlAudio('/app/', 29)).toBe('/app/tutorial-acr/paso-27.mp3')
   })
 
   it('la práctica al empezar un paso es lo que dejaron los anteriores', () => {

@@ -134,6 +134,7 @@ const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/Calendario
 const BitacoraTurnoPage = lazyWithReload(() => import('@/pages/BitacoraTurnoPage').then((mod) => ({ default: mod.BitacoraTurnoPage })))
 const HistorialBitacoraPage = lazyWithReload(() => import('@/pages/HistorialBitacoraPage').then((mod) => ({ default: mod.HistorialBitacoraPage })))
 const CausaRaizDetallePage = lazyWithReload(() => import('@/pages/CausaRaizDetallePage').then((mod) => ({ default: mod.CausaRaizDetallePage })))
+const CausaRaizPage = lazyWithReload(() => import('@/pages/CausaRaizPage').then((mod) => ({ default: mod.CausaRaizPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const HmiGeaPage = lazyWithReload(() => import('@/pages/HmiGeaPage').then((mod) => ({ default: mod.HmiGeaPage })))
 const JackKnifePage = lazyWithReload(() => import('@/pages/JackKnifePage'))
@@ -1077,6 +1078,11 @@ export function App() {
             <Route path="causa-raiz/:acrId" element={
               <Suspense fallback={<LoadingScreen />}>
                 <CausaRaizDetallePage />
+              </Suspense>
+            } />
+            <Route path="causa-raiz" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <CausaRaizPage />
               </Suspense>
             } />
             <Route path="aria-actions" element={

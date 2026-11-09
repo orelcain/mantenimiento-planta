@@ -7,7 +7,7 @@
  *
  * Spec: SPEC_ACR.md (opción A, aprobada por Orel 07-11-2026).
  */
-import type { EtiquetaFoto } from '@/services/bitacora/bitacora.types'
+import type { EtiquetaFoto, RepuestoUsado } from '@/services/bitacora/bitacora.types'
 
 export type NivelCausa = 'fisica' | 'humana' | 'latente'
 export type FuerzaAccion = 'debil' | 'media' | 'fuerte'
@@ -32,6 +32,8 @@ export interface AccionAcr {
   /** YYYY-MM-DD o null. */
   fechaLimite: string | null
   estado: 'pendiente' | 'hecha'
+  /** YYYY-MM-DD en que se marcó hecha (null o ausente = no hecha / sin fecha). */
+  hechaEn?: string | null
 }
 
 export interface EvidenciaAcr {
@@ -71,6 +73,8 @@ export interface Acr {
   propuesta?: { origen: OrigenPropuesta; modelo: string | null }
   /** Repetición detectada al abrir el análisis (null o ausente = no se repite). */
   repeticion?: { eventoIds: string[]; resumen: string } | null
+  /** Causa del Jack-Knife: string = causa; null = no aparece en el gráfico; ausente = sin asignar. */
+  causaJK?: string | null
 }
 
 export interface RespuestasAcr {
@@ -96,6 +100,8 @@ export interface EventoRefAcr {
   descripcion: string
   minutosParada: number | null
   fotos: ReadonlyArray<{ url: string; path: string; etiqueta: EtiquetaFoto; thumbUrl?: string }>
+  /** Repuestos usados en el evento: el expediente de PC los muestra. */
+  repuestos?: ReadonlyArray<RepuestoUsado>
 }
 
 export const ETIQUETA_NIVEL: Record<NivelCausa, string> = {

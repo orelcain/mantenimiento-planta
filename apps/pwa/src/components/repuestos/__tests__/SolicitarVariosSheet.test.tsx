@@ -4,6 +4,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { SolicitarVariosSheet } from '../SolicitarVariosSheet'
 import type { PiezaSolicitable } from '@/utils/repuestos/solicitudMultiple'
 
+// Esta suite prueba la vista de celular; la de PC está en SolicitarVariosPC.test.tsx.
+vi.mock('@/hooks/useEsPC', () => ({ useEsPC: () => false }))
+
 // Piezas reales de la BAADER 200 (inventario 25-09-26).
 const PIEZAS: PiezaSolicitable[] = [
   { clave: 'a', codigoSAP: '3300106403', textoBreve: 'CUCHILLA CIRC 200MM 94011760', comun: true, cantidadPorMaquina: 40, stock: { configurado: true, stockActual: 20 } },

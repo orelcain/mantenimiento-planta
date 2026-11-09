@@ -1,21 +1,97 @@
 ﻿import { ACCION_CUADRANTE, agruparComentarios, comentariosDe, nivelPrioridad, type CalculoJK, type InformeJK, type TurnoJK } from '@/services/shoplogix/jackKnife'
 import { dec1 } from '@/utils/formatoNumeros'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ListCell, ListGroup } from '@/components/piel'
+import { AcrLectura } from '@/components/acr/AcrLectura'
+import type { Acr } from '@/services/acr/acr.types'
+import type { ResumenCausaJK } from '@/services/acr/acrHistorial'
 
-export function JackKnifeListas({ calc, informe, turnos, elegirCausa = () => {}, lamina = false }: {
+/** Estado del análisis de una causa, en la fila de «Atacar ahora». */
+function PillAnalisis({ r }: { r: ResumenCausaJK | undefined }) {
+  if (!r || r.total === 0) return <Marca punto="bg-warning">Sin análisis</Marca>
+  if (r.fuertesHechas > 0) return <Marca punto="bg-success">Acción fuerte hecha</Marca>
+  return <span className="text-footnote text-muted-foreground">{`${r.total} análisis`}</span>
+}
+
+/** Punto de color de estado + palabra. Sin píldora. */
+function Marca({ punto, children }: { punto: string; children: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-footnote text-foreground">
+      <span className={`size-2 shrink-0 rounded-full ${punto}`} aria-hidden="true" />
+      {children}
+    </span>
+  )
+}
+
+/** Los análisis de la causa seleccionada; cada fila abre la lectura, que lleva a Causa raíz. */
+function SeccionAnalisis({ causa, resumen }: { causa: string; resumen: ResumenCausaJK }) {
+  const navigate = useNavigate()
+  const [abierto, setAbierto] = useState<Acr | null>(null)
+  return (
+    <section className="border-t-2 border-primary pt-3">
+      <h3 className="text-headline font-semibold">{causa}</h3>
+      <p className="text-footnote text-muted-foreground">
+        {`${resumen.total} análisis, ${resumen.fuertesHechas} con acción fuerte hecha`}
+      </p>
+      <div className="mt-2">
+        <ListGroup>
+          {resumen.acrs.map((a) => (
+            <ListCell
+              key={a.id}
+              title={a.equipo}
+              subtitle={a.definicion}
+              value={a.estado === 'cerrado' ? 'Cerrado' : 'Borrador'}
+              chevron
+              onClick={() => setAbierto(a)}
+            />
+          ))}
+        </ListGroup>
+      </div>
+      {abierto && (
+        <AcrLectura
+          open
+          acr={abierto}
+          onClose={() => setAbierto(null)}
+          onEditar={() => navigate(`/causa-raiz#acr=${abierto.id}`)}
+        />
+      )}
+    </section>
+  )
+}
+
+export function JackKnifeListas({ calc, informe, turnos, elegirCausa = () => {}, lamina = false, analisis, causaSel = null, onAnalizar }: {
   calc: CalculoJK; informe: InformeJK | null; turnos: TurnoJK[]; elegirCausa?: (k: string) => void; lamina?: boolean
+  /** Análisis de causa raíz por causa. Sin él (lámina, Yal) no aparecen las marcas de análisis. */
+  analisis?: ReadonlyMap<string, ResumenCausaJK>
+  causaSel?: string | null
+  /** «Analizar» en «Atacar ahora» para una causa sin análisis. Sin él no aparece el botón. */
+  onAnalizar?: (causa: string) => void
 }) {
   const atacar = [...calc.pts].filter(p => nivelPrioridad(p, calc.un, calc.um) <= 2).sort((a,b) => nivelPrioridad(a, calc.un, calc.um) - nivelPrioridad(b, calc.un, calc.um) || b.min-a.min).slice(0,2)
+  const analisisSel = causaSel ? analisis?.get(causaSel) : undefined
   return <div className="space-y-4 text-footnote" style={lamina ? { fontSize: 20, lineHeight: 1.4 } : undefined}>
     <section className="border-t-2 border-warning pt-3">
       <h3 className="text-headline font-semibold" style={lamina ? { fontSize: 26 } : undefined}>Atacar ahora</h3>
       {!atacar.length && <p className="text-muted-foreground">Sin causas de nivel 1 o 2.</p>}
       {atacar.map(p => <div key={p.k} className="py-2">
         <button className="min-h-[44px] text-left font-semibold" onClick={() => elegirCausa(p.k)}>{p.k} · <span className="tabular-nums">{p.ev} det. · {dec1(p.mttr)} min</span></button>
+        {analisis && (
+          <div className="my-1 flex min-h-[44px] items-center justify-between gap-3">
+            <PillAnalisis r={analisis.get(p.k)} />
+            {onAnalizar && (analisis.get(p.k)?.total ?? 0) === 0 && (
+              <button type="button" className="min-h-[44px] shrink-0 font-medium text-primary" onClick={() => onAnalizar(p.k)}>
+                Analizar
+              </button>
+            )}
+          </div>
+        )}
         <p>{ACCION_CUADRANTE[p.q]}</p>
         {agruparComentarios(comentariosDe(turnos, calc.desde, calc.hasta, p.k, Infinity)).slice(0,lamina ? 1 : 2).map(g => <p key={g.texto} className="mt-1 break-words text-muted-foreground">{lamina && g.texto.length > 90 ? g.texto.slice(0, 88).trimEnd() + '…' : g.texto} ×{g.n}</p>)}{/* sin line-clamp: html2canvas no lo soporta y corta el texto */}
       </div>)}
     </section>
-    {(['mejoraron', 'empeoraron'] as const).map(tipo => <section key={tipo} className={'border-t-2 pt-3 ' + (tipo === 'mejoraron' ? 'border-success' : 'border-destructive')}>
+    {causaSel && analisisSel && <SeccionAnalisis causa={causaSel} resumen={analisisSel} />}
+    {(['mejoraron', 'empeoraron'] as const).map(tipo =><section key={tipo} className={'border-t-2 pt-3 ' + (tipo === 'mejoraron' ? 'border-success' : 'border-destructive')}>
       <h3 className="text-headline font-semibold" style={lamina ? { fontSize: 26 } : undefined}>{tipo === 'mejoraron' ? 'Mejoraron' : 'Empeoraron'} ({informe?.[tipo].length ?? 0})</h3>
       {!informe && <p className="text-muted-foreground">Sin comparación con eventos.</p>}
       {informe?.[tipo].slice(0,3).map(k => {

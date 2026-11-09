@@ -37,6 +37,10 @@ const BOTON_PASO =
 const FILA =
   'relative flex items-center gap-2 py-1.5 pl-3 pr-1 before:absolute before:left-3 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
 
+const BOTON_PASO_PC =
+  'flex size-[30px] items-center justify-center rounded-ctl border border-border text-foreground transition-colors hover:bg-muted-foreground/10 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+const FILA_TABLA = 'grid grid-cols-[minmax(0,1fr)_120px_minmax(0,1fr)_140px] items-center gap-x-3'
+
 const nombreLegible = (r: { nombre: string }) => formatNombreSAP(r.nombre).nombre || r.nombre
 
 /** "bodega B-7-2 · 3 pzas" / "bodega B-7-2 · sin stock" / ''. */
@@ -54,6 +58,7 @@ export function RepuestosUsados({
   fuente,
   puedeEditarMaestro = true,
   favoritos = null,
+  comoTabla = false,
 }: {
   valor: readonly RepuestoUsado[]
   onChange: (repuestos: RepuestoUsado[]) => void
@@ -64,6 +69,8 @@ export function RepuestosUsados({
   puedeEditarMaestro?: boolean
   /** Sin favoritos (el pase) no hay estrella. */
   favoritos?: FavoritosRepuestos | null
+  /** PC: lo agregado como tabla con su total, y el buscador en una línea. */
+  comoTabla?: boolean
 }) {
   const id = useId()
   const [consulta, setConsulta] = useState('')
@@ -269,14 +276,127 @@ export function RepuestosUsados({
     </button>
   ) : null
 
-  return (
-    <div className="flex flex-col gap-3">
-      <span className={ETIQUETA}>
-        <span>Repuestos usados</span>
-        <span>Opcional</span>
-      </span>
+  const unidades = valor.reduce((suma, r) => suma + r.cantidad, 0)
+  const tablaAgregados = comoTabla && valor.length > 0 && (
+    <div role="table" aria-label="Repuestos agregados">
+      <div role="row" className={`${FILA_TABLA} border-t border-foreground py-[3px] text-footnote text-muted-foreground`}>
+        <span role="columnheader">Repuesto</span>
+        <span role="columnheader">SAP</span>
+        <span role="columnheader">Nombre SAP</span>
+        <span role="columnheader" className="text-right">Cantidad</span>
+      </div>
+      {valor.map((r) => {
+        const comun = (r.nombreComun ?? '').trim()
+        const sap = nombreRepuesto(r)
+        const editando = edicionComun?.codigo === r.codigoSAP
+        const bodegaTexto = textoBodega(bodega.get(r.codigoSAP))
+        return (
+          <div key={r.codigoSAP} role="row" className={`${FILA_TABLA} border-t border-border py-1.5`}>
+            <div role="cell" className="min-w-0">
+              <p className="truncate text-subhead text-foreground">{comun || sap || 'Sin nombre en el maestro'}</p>
+              {puedeEditarMaestro && sap && !editando && (
+                <button type="button" className="text-footnote text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={() => abrirEdicionComun(r)}>
+                  {comun ? 'Editar nombre común' : '＋ nombre común'}
+                </button>
+              )}
+              {editando && (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <label htmlFor={`${id}-comun`} className="sr-only">
+                    Nombre común de {r.codigoSAP}
+                  </label>
+                  <input
+                    ref={inputComunRef}
+                    id={`${id}-comun`}
+                    maxLength={80}
+                    className={CAMPO}
+                    value={edicionComun.texto}
+                    readOnly={guardandoComun}
+                    placeholder="Como le dicen en planta"
+                    onChange={(e) => setEdicionComun({ codigo: r.codigoSAP, texto: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        void guardarComun()
+                      }
+                      if (e.key === 'Escape') setEdicionComun(null)
+                    }}
+                  />
+                  <Button variant="plain" size="sm" className="!min-h-[36px] !px-0 !font-normal" onClick={() => void guardarComun()} disabled={guardandoComun}>
+                    Guardar
+                  </Button>
+                  <Button variant="plain" size="sm" className="!min-h-[36px] !px-0 !font-normal" onClick={() => setEdicionComun(null)} disabled={guardandoComun}>
+                    Cancelar
+                  </Button>
+                </div>
+              )}
+            </div>
+            <span role="cell" className="text-subhead tabular-nums text-foreground">{r.codigoSAP}</span>
+            <div role="cell" className="min-w-0">
+              <p className="truncate text-subhead text-foreground">{sap}</p>
+              {bodegaTexto && <p className="truncate text-footnote text-muted-foreground">{bodegaTexto}</p>}
+            </div>
+            <div role="cell" className="flex items-center justify-end gap-1.5">
+              <button type="button" className={BOTON_PASO_PC} onClick={() => cambiarCantidad(r.codigoSAP, -1)} disabled={r.cantidad <= 1} aria-label="Uno menos">
+                <Minus className="size-3.5" />
+              </button>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={String(MAX_CANTIDAD_REPUESTO).length}
+                aria-label={`Cantidad de ${comun || sap || r.codigoSAP}`}
+                value={borradorCantidad[r.codigoSAP] ?? String(r.cantidad)}
+                onChange={(e) => {
+                  const solo = e.target.value.replace(/[^0-9]/g, '')
+                  setBorradorCantidad((prev) => ({ ...prev, [r.codigoSAP]: solo }))
+                }}
+                onBlur={() => aplicarCantidadEscrita(r.codigoSAP)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                  }
+                }}
+                className="h-[30px] w-8 rounded-ctl bg-transparent text-center text-subhead tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+              <button type="button" className={BOTON_PASO_PC} onClick={() => cambiarCantidad(r.codigoSAP, 1)} aria-label="Uno más">
+                <Plus className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                className="ml-1 flex size-[30px] items-center justify-center rounded-ctl text-muted-foreground hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                onClick={() => onChange(valor.filter((x) => x.codigoSAP !== r.codigoSAP))}
+                aria-label={`Quitar ${r.codigoSAP}`}
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        )
+      })}
+      <p className="border-t border-foreground pt-1 text-right text-footnote tabular-nums text-foreground">
+        {`${valor.length} ${valor.length === 1 ? 'repuesto' : 'repuestos'}, ${unidades} UN`}
+      </p>
+    </div>
+  )
 
-      {valor.length > 0 && (
+  return (
+    <div className={comoTabla ? 'flex flex-col gap-1.5' : 'flex flex-col gap-3'}>
+      {comoTabla ? (
+        <span className="flex items-baseline gap-3">
+          <h3 className="text-headline text-foreground">Repuestos usados</h3>
+          <span className="text-footnote text-muted-foreground">Opcional</span>
+        </span>
+      ) : (
+        <span className={ETIQUETA}>
+          <span>Repuestos usados</span>
+          <span>Opcional</span>
+        </span>
+      )}
+
+      {tablaAgregados}
+
+      {!comoTabla && valor.length > 0 && (
         <ul className="overflow-hidden rounded-ctl bg-muted-foreground/10" aria-label="Repuestos agregados">
           {valor.map((r) => {
             const comun = (r.nombreComun ?? '').trim()
@@ -387,12 +507,16 @@ export function RepuestosUsados({
         </ul>
       )}
 
-      <div className="flex flex-col gap-2">
+      <div className={comoTabla ? 'flex flex-wrap items-center gap-x-3 gap-y-2 [&>*]:basis-full [&>.buscador-fila]:basis-0 [&>.buscador-fila]:grow [&>.alcance-fila]:basis-[300px] [&>.alcance-fila]:grow-0' : 'flex flex-col gap-2'}>
         {/* Las pestañas a todo el ancho y la estrella junto al buscador: con la letra
             grande del teléfono, pestañas + estrella en una fila cortaban «En este eq…»
             (capturas reales al 135 %, 19-09-2026). */}
-        {equipoId && <SegmentedControl ariaLabel="Dónde buscar el repuesto" value={alcance} onChange={cambiarAlcance} segments={segmentos} />}
-        <div className="flex items-center gap-2">
+        {equipoId && (
+          <div className={comoTabla ? 'alcance-fila' : 'contents'}>
+            <SegmentedControl ariaLabel="Dónde buscar el repuesto" value={alcance} onChange={cambiarAlcance} segments={segmentos} />
+          </div>
+        )}
+        <div className={`flex items-center gap-2 ${comoTabla ? 'buscador-fila' : ''}`}>
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <label htmlFor={`${id}-buscar`} className="sr-only">

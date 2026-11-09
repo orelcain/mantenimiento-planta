@@ -177,7 +177,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // El catálogo (colección plana `repuestos`) referencia nodos de hierarchy por id;
   // el equipment cache aporta nombre/alias/path de cada nodo-equipo.
   const { loading: eqLoading } = useGlobalEquipmentSearch('', 999)
-  const { isUnder, plantaDe, loading: pathsLoading } = useHierarchyPaths()
+  const { isUnder, plantaDe, seccionDe, loading: pathsLoading } = useHierarchyPaths()
   // Unidades que tiene cada familia en cada planta (KNURO en Chonchi: N1, N2, N3), para que
   // «Dónde se usa» diga «todas» en vez de listar las tres.
   const totalUnidades = useMemo(() => {
@@ -3442,6 +3442,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         listas={equipFavLists}
         nombreDe={(id) => equipNameMap.get(id) || id}
         plantaDe={plantaDe}
+        seccionDe={seccionDe}
         onGuardar={guardarEquipFav}
         equipoInicial={editarFav?.equipo}
       />

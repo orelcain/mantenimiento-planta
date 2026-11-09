@@ -81,6 +81,10 @@ export interface CadenaPorQuesProps {
   onAria: (abierta: boolean) => void
   /** En el tutorial: pregunta fija. Con valor, la IA nunca se llama. */
   preguntaPractica?: string | null
+  /** PC: los porqués como filas con filete y los comandos en una línea. */
+  compacta?: boolean
+  /** Con `compacta`, muestra «Pantalla completa» (solo la práctica del tutorial la usa en PC). */
+  conPantalla?: boolean
 }
 
 /**
@@ -115,6 +119,8 @@ export function CadenaPorQues({
   ariaAbierta,
   onAria,
   preguntaPractica = null,
+  compacta = false,
+  conPantalla = false,
 }: CadenaPorQuesProps) {
   const todos = [primero, ...extras]
   const ultimoVacio = (todos[todos.length - 1] ?? '').trim() === ''
@@ -216,46 +222,7 @@ export function CadenaPorQues({
 
   const agregar = () => onCambiarExtras([...extras, ''])
 
-  return (
-    <div className="flex flex-col gap-3">
-      {extras.length > 0 && (
-        <div data-tutorial="t-porques" className="ml-2 flex flex-col gap-3 border-l-2 border-muted-foreground/25 pl-4">
-          {extras.map((valor, i) => {
-            const numero = i + 2
-            const id = `${idBase}-porque-${numero}`
-            return (
-              <div key={numero} className="flex flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <label htmlFor={id} className="text-footnote font-semibold text-foreground">
-                    {etiquetaPorQue(numero)}
-                  </label>
-                  {indiceCandidata === i + 1 && <Pill tone={TONO_NIVEL.latente}>Latente candidata</Pill>}
-                  <Button
-                    variant="plain"
-                    size="sm"
-                    className={`${TACTIL} ml-auto`}
-                    aria-label={`Quitar porqué ${numero}`}
-                    onClick={() => onCambiarExtras(extras.filter((_, j) => j !== i))}
-                  >
-                    Quitar
-                  </Button>
-                </div>
-                <SpeechTextarea
-                  id={id}
-                  rows={2}
-                  maxLength={2000}
-                  aria-label={`Porqué ${numero}`}
-                  value={valor}
-                  onChange={(e) => onCambiarExtras(extras.map((v, j) => (j === i ? e.target.value : v)))}
-                  className={`${CAMPO} resize-y pr-14`}
-                />
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {ariaAbierta && (
+  const tarjetaAria = ariaAbierta ? (
         <div data-tutorial="t-aria-card" className="flex flex-col gap-3 rounded-card bg-card p-4">
           <p className="text-footnote font-semibold text-muted-foreground">
             {`ARIA · porqué ${cadenaLimpia.length + 1} de ${MAX_PORQUES}`}
@@ -294,47 +261,9 @@ export function CadenaPorQues({
             </Button>
           </div>
         </div>
-      )}
+  ) : null
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button data-tutorial="t-ypq" variant="tinted" size="sm" className={TACTIL} disabled={ultimoVacio || llena} onClick={agregar}>
-          ＋ ¿Y por qué?
-        </Button>
-        <span className="text-footnote text-muted-foreground tabular-nums">{`${n} de ${MAX_PORQUES} · opcional`}</span>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            data-tutorial="t-aria-pregunta"
-            variant={modoAria ? 'tinted' : 'plain'}
-            size="sm"
-            className={`${TACTIL} w-full px-2`}
-            disabled={ariaDeshabilitado}
-            onClick={() => onAria(true)}
-          >
-            <Sparkles />
-            ARIA pregunta
-          </Button>
-          <Button
-            data-tutorial="t-pantalla"
-            variant="plain"
-            size="sm"
-            className={`${TACTIL} w-full px-2`}
-            onClick={() => onPantalla(true)}
-          >
-            <Maximize2 />
-            Pantalla completa
-          </Button>
-        </div>
-        {sinSenal && <p className="text-footnote text-muted-foreground">Sin señal: escribe tú</p>}
-        {ariaFallo && (
-          <p role="status" className="text-footnote font-semibold text-ink-warn">
-            ARIA no respondió. Escribe tú.
-          </p>
-        )}
-      </div>
-
+  const hojaPantalla = (
       <Sheet
         open={pantallaAbierta}
         onClose={() => onPantalla(false)}
@@ -385,6 +314,149 @@ export function CadenaPorQues({
           </div>
         )}
       </Sheet>
+  )
+
+  const CMD_PC = '!min-h-[36px] !px-0 !text-subhead !font-normal'
+
+  if (compacta) {
+    return (
+      <div className="flex flex-col">
+        {extras.length > 0 && (
+          <ol data-tutorial="t-porques" className="mt-1 flex flex-col">
+            {extras.map((valor, i) => {
+              const numero = i + 2
+              return (
+                <li key={numero} className="group grid grid-cols-[18px_minmax(0,1fr)_auto] items-start gap-x-1.5 border-b border-border">
+                  <span className="pt-[7px] text-footnote text-muted-foreground tabular-nums">{numero}</span>
+                  <SpeechTextarea
+                    id={`${idBase}-porque-${numero}`}
+                    rows={1}
+                    maxLength={2000}
+                    aria-label={`Porqué ${numero}`}
+                    value={valor}
+                    onChange={(e) => onCambiarExtras(extras.map((v, j) => (j === i ? e.target.value : v)))}
+                    className="w-full resize-none rounded-none border-0 bg-transparent px-0 py-1 pr-9 !text-subhead leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 !min-h-7"
+                  />
+                  <span className="flex items-center gap-2">
+                    {indiceCandidata === i + 1 && <span className="pt-[3px] text-footnote text-muted-foreground">Latente candidata</span>}
+                    <Button
+                      variant="plain"
+                      size="sm"
+                      className="!min-h-7 !px-0 !text-footnote !font-normal opacity-0 focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
+                      aria-label={`Quitar porqué ${numero}`}
+                      onClick={() => onCambiarExtras(extras.filter((_, j) => j !== i))}
+                    >
+                      Quitar
+                    </Button>
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+        {tarjetaAria && <div className="mt-2">{tarjetaAria}</div>}
+        <div className="flex flex-wrap items-center gap-x-4">
+          <Button data-tutorial="t-ypq" variant="plain" size="sm" className={CMD_PC} disabled={ultimoVacio || llena} onClick={agregar}>
+            ¿Y por qué?
+          </Button>
+          <Button data-tutorial="t-aria-pregunta" variant="plain" size="sm" className={CMD_PC} disabled={ariaDeshabilitado} onClick={() => onAria(true)}>
+            ARIA pregunta
+          </Button>
+          {conPantalla && (
+            <Button data-tutorial="t-pantalla" variant="plain" size="sm" className={CMD_PC} onClick={() => onPantalla(true)}>
+              Pantalla completa
+            </Button>
+          )}
+          {sinSenal && <span className="text-footnote text-muted-foreground">Sin señal: escribe tú</span>}
+          {ariaFallo && <span role="status" className="text-footnote font-semibold text-ink-warn">ARIA no respondió. Escribe tú.</span>}
+          <span className="ml-auto text-footnote text-muted-foreground tabular-nums">{`${n} de ${MAX_PORQUES}`}</span>
+        </div>
+        {hojaPantalla}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {extras.length > 0 && (
+        <div data-tutorial="t-porques" className="ml-2 flex flex-col gap-3 border-l-2 border-muted-foreground/25 pl-4">
+          {extras.map((valor, i) => {
+            const numero = i + 2
+            const id = `${idBase}-porque-${numero}`
+            return (
+              <div key={numero} className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label htmlFor={id} className="text-footnote font-semibold text-foreground">
+                    {etiquetaPorQue(numero)}
+                  </label>
+                  {indiceCandidata === i + 1 && <Pill tone={TONO_NIVEL.latente}>Latente candidata</Pill>}
+                  <Button
+                    variant="plain"
+                    size="sm"
+                    className={`${TACTIL} ml-auto`}
+                    aria-label={`Quitar porqué ${numero}`}
+                    onClick={() => onCambiarExtras(extras.filter((_, j) => j !== i))}
+                  >
+                    Quitar
+                  </Button>
+                </div>
+                <SpeechTextarea
+                  id={id}
+                  rows={2}
+                  maxLength={2000}
+                  aria-label={`Porqué ${numero}`}
+                  value={valor}
+                  onChange={(e) => onCambiarExtras(extras.map((v, j) => (j === i ? e.target.value : v)))}
+                  className={`${CAMPO} resize-y pr-14`}
+                />
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {tarjetaAria}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button data-tutorial="t-ypq" variant="tinted" size="sm" className={TACTIL} disabled={ultimoVacio || llena} onClick={agregar}>
+          ＋ ¿Y por qué?
+        </Button>
+        <span className="text-footnote text-muted-foreground tabular-nums">{`${n} de ${MAX_PORQUES} · opcional`}</span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            data-tutorial="t-aria-pregunta"
+            variant={modoAria ? 'tinted' : 'plain'}
+            size="sm"
+            className={`${TACTIL} w-full px-2`}
+            disabled={ariaDeshabilitado}
+            onClick={() => onAria(true)}
+          >
+            <Sparkles />
+            ARIA pregunta
+          </Button>
+          <Button
+            data-tutorial="t-pantalla"
+            variant="plain"
+            size="sm"
+            className={`${TACTIL} w-full px-2`}
+            onClick={() => onPantalla(true)}
+          >
+            <Maximize2 />
+            Pantalla completa
+          </Button>
+        </div>
+        {sinSenal && <p className="text-footnote text-muted-foreground">Sin señal: escribe tú</p>}
+        {ariaFallo && (
+          <p role="status" className="text-footnote font-semibold text-ink-warn">
+            ARIA no respondió. Escribe tú.
+          </p>
+        )}
+      </div>
+
+      {hojaPantalla}
     </div>
   )
 }

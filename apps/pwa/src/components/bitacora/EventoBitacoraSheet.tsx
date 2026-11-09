@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, Clock3, ImagePlus, Loader2, RotateCw, Trash2, Users, X } from 'lucide-react'
 import { ActionSheet, Button, Sheet } from '@/components/piel'
+import { useEsPC } from '@/hooks/useEsPC'
 import { useToast } from '@/hooks/useToast'
 import {
   AUTOGUARDADO_MS,
@@ -42,6 +43,7 @@ import { autorVisible } from '@/services/bitacora/bitacora.types'
 import { copiaDeOrigen, etiquetaCortaTurno } from '@/services/bitacora/entregaTurno'
 import { borrarFotoOEncolar, subirFotoBitacora } from '@/services/bitacora/fotosBitacora'
 import { AcrEntrada } from '@/components/acr/AcrEntrada'
+import { partesEquipo, tituloAcr } from '@/components/acr/acrExpedienteTextos'
 import { eventoRequiereAcr } from '@/services/acr/acrLogica'
 import { SelectorTecnico } from './SelectorTecnico'
 import { SelectorParticipantes } from './SelectorParticipantes'
@@ -179,12 +181,34 @@ function FilaInterruptor({
   onCambiar,
   titulo,
   detalle,
+  compacto = false,
 }: {
   activo: boolean
   onCambiar: (v: boolean) => void
   titulo: string
   detalle?: string
+  /** PC: sin tarjeta, letra de escritorio e interruptor chico. */
+  compacto?: boolean
 }) {
+  if (compacto) {
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activo}
+        onClick={() => onCambiar(!activo)}
+        className="flex min-h-[36px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <span className="flex flex-col">
+          <span className="text-subhead text-foreground">{titulo}</span>
+          {detalle && <span className="text-footnote text-muted-foreground">{detalle}</span>}
+        </span>
+        <span className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${activo ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+          <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-transform duration-200 motion-reduce:transition-none ${activo ? 'translate-x-[19px]' : 'translate-x-[3px]'}`} />
+        </span>
+      </button>
+    )
+  }
   return (
     <button
       type="button"
@@ -208,9 +232,31 @@ function FilaInterruptor({
 // iOS no haga zoom al enfocar.
 const CAMPO =
   'h-[44px] w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 text-campo text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary'
+/** Quién y turno en PC: filas con filete, rótulo chico y valor a la derecha. */
+const FILAS_QUIEN_PC =
+  'border-b border-border [&>*]:!min-h-[36px] [&>*]:!pl-0 [&>*]:before:!left-0 [&_span.flex-1]:!text-footnote [&_span.flex-1]:!text-muted-foreground [&_label>span]:!text-footnote [&_label>span]:!text-muted-foreground [&_span.text-right]:!text-subhead [&_span.text-right]:!text-foreground [&_span.text-body]:!text-subhead [&_select]:!min-h-[36px] [&_select]:!text-subhead [&_select]:!font-normal'
+/**
+ * Campos de la ventana de PC: letra de escritorio y filete en vez de relleno, para todo lo que
+ * vive adentro (incluidos el buscador de equipo y el de repuestos). Las cantidades, con `pattern`, no.
+ */
+const CAMPOS_PC =
+  '[&_input:not([pattern]):not([type=file])]:!h-[36px] [&_input:not([pattern])]:!border [&_input:not([pattern])]:!border-border [&_input:not([pattern])]:!bg-background [&_input:not([pattern])]:!text-subhead [&_textarea]:!min-h-[76px] [&_textarea]:!border [&_textarea]:!border-border [&_textarea]:!bg-background [&_textarea]:!px-2.5 [&_textarea]:!py-2 [&_textarea]:!text-subhead [&_button[aria-pressed]]:!min-h-[36px] [&_button.rounded-full[aria-pressed]]:!rounded-ctl [&_button.rounded-full[aria-pressed]]:!text-subhead [&_button.rounded-full[aria-pressed]]:!font-normal'
+const COMANDO_PC = '!min-h-[36px] !px-0 !text-subhead !font-normal'
 const ETIQUETA_CAMPO = 'mb-1.5 block text-footnote text-muted-foreground'
 
-function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
+function Chip({ activo, onClick, children, enBarra = false }: { activo: boolean; onClick: () => void; children: ReactNode; enBarra?: boolean }) {
+  if (enBarra) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={activo}
+        className={`min-h-[36px] min-w-0 border-l border-border px-2 text-subhead transition-colors duration-150 first:border-l-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary motion-reduce:transition-none ${activo ? 'bg-primary font-semibold text-primary-foreground' : 'text-foreground hover:bg-muted-foreground/10'}`}
+      >
+        {children}
+      </button>
+    )
+  }
   return (
     <button
       type="button"
@@ -312,6 +358,7 @@ export function EventoBitacoraSheet({
   /** Foto(s) encima del bloque de Fotos, listas para soltar (HIG «Drag and drop»). */
   const [arrastrandoFoto, setArrastrandoFoto] = useState(false)
   /** Cerrar un evento PUBLICADO con cambios sin guardar pide confirmación (HIG «Sheets»). */
+  const esVentana = useEsPC()
   const [confirmarDescarte, setConfirmarDescarte] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** Fotos subidas en ESTA edición: si se cancela, se borran de Storage. */
@@ -1125,156 +1172,12 @@ export function EventoBitacoraSheet({
     }
   }
 
-  return (
-    <Sheet
-      open={open}
-      onClose={cerrarHoja}
-      onKeyDown={cmdEnterGuarda}
-      size="wide"
-      title={
-        pendienteOrigen && esNuevo
-          ? 'Resolver pendiente'
-          : esNuevo
-            ? 'Nuevo evento'
-            : modoBorrador
-              ? 'Continuar borrador'
-              : 'Editar evento'
-      }
-      actions={
-        <div className="flex w-full flex-col gap-2.5">
-          {faltaObligatorio && !guardando && (
-            <p className="text-footnote font-semibold text-ink-warn">Falta completar: {faltantes.join(', ')}</p>
-          )}
-          <div className="flex gap-2.5 [&>*]:flex-1">
-            <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
-              {modoBorrador ? 'Cerrar' : 'Cancelar'}
-            </Button>
-            <Button onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
-              {guardando ? <Loader2 className="animate-spin" /> : null}
-              {guardando
-                ? 'Guardando…'
-                : subiendo
-                ? rotuloSubiendo
-                : modoBorrador
-                  ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
-                  : 'Guardar'}
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
-          overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
-      <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0">
-        {/* Causa raíz, lo primero de la hoja: al final del formulario nadie la encontraba
-            (prueba como técnico, 08-11; opción A del mockup aprobado). */}
-        {evento && eventoRequiereAcr(evento) && <AcrEntrada evento={evento} />}
-
-        {/* Estado del borrador: que se vea que no hay que tocar nada para guardar. */}
-        {autoguarda && (
-          <p className="-mt-2 flex items-center gap-1.5 text-footnote text-muted-foreground" role="status" aria-live="polite">
-            {horaFaltante ? (
-              <span className="font-semibold text-ink-warn">Falta la hora de inicio: sin ella no se guarda. Si no aplica, activa «Sin hora».</span>
-            ) : porGuardar ? (
-              <>
-                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> Guardando borrador…
-              </>
-            ) : guardadoEn ? (
-              <>
-                <Check className="size-3.5 text-ink-ok" aria-hidden />
-                <span>
-                  Borrador guardado · <span className="tabular-nums">{horaDe(guardadoEn)}</span> · el turno lo ve
-                </span>
-              </>
-            ) : existeEnServidor.current ? (
-              'Borrador en la bitácora · lo que cambies se guarda solo'
-            ) : (
-              'Se guarda solo mientras escribes'
-            )}
-          </p>
-        )}
-
-        {otrosEditando.length > 0 && (
-          <div className="flex items-start gap-2.5 rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
-            <Users className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-            <p className="text-footnote">
-              <span className="font-semibold">
-                {otrosEditando.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')}
-              </span>{' '}
-              {otrosEditando.length === 1 ? 'también tiene' : 'también tienen'} abierto este evento. Lo que cambie aparece aquí
-              al instante; si los dos cambian lo mismo, se avisa.
-            </p>
-          </div>
-        )}
-
-        {conflictos.length > 0 && (
-          <div role="alert" className="flex flex-col gap-2 rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
-            <p className="text-footnote font-semibold text-ink-warn">
-              Otro equipo cambió {conflictos.map((c) => NOMBRE_CAMPO[c]).join(', ')} mientras tú también lo cambiabas.
-            </p>
-            {conflictos.includes('descripcion') && remotoConflicto.current?.descripcion && (
-              <p className="line-clamp-4 whitespace-pre-line text-footnote text-muted-foreground">
-                Su versión: «{remotoConflicto.current.descripcion}»
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="tinted" size="sm" onClick={usarLaSuya}>
-                Usar la suya
-              </Button>
-              <Button variant="plain" size="sm" onClick={() => setConflictos([])}>
-                Mantener la mía
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {eliminadoAfuera && (
-          <div role="alert" className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
-            <p className="text-footnote font-semibold text-ink-warn">Este evento ya no está en la bitácora.</p>
-            <p className="text-footnote text-muted-foreground">
-              Lo borraron en otro equipo o el servidor no lo aceptó. Lo que tienes en pantalla no se guardó; sus fotos ya no
-              están.
-            </p>
-            <Button
-              variant="tinted"
-              size="sm"
-              className="mt-2"
-              onClick={() => {
-                // Las fotos se borraron junto con el evento: recrearlo con ellas
-                // dejaba enlaces rotos (revisión 16-09).
-                setFotos([])
-                fotosServidor.current = []
-                existeEnServidor.current = false
-                vistoVivo.current = false
-                creadoAqui.current = false
-                setEliminadoAfuera(false)
-                ultimaFirma.current = ''
-              }}
-            >
-              Volver a crearlo con lo que tengo
-            </Button>
-          </div>
-        )}
-
-        {publicadoAfuera && (
-          <p className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5 text-footnote">
-            <span className="font-semibold">Otro equipo ya lo publicó.</span> Lo que cambies se sigue guardando solo.
-          </p>
-        )}
-
-        {pendienteOrigen && esNuevo && (
-          <div className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
-            <p className="text-footnote font-semibold text-ink-warn">
-              Viene del {etiquetaCortaTurno(pendienteOrigen.turnoId)} · {autorVisible(pendienteOrigen)}
-            </p>
-            <p className="line-clamp-3 text-footnote text-foreground">
-              {[pendienteOrigen.equipo, pendienteOrigen.descripcion].filter(Boolean).join(' · ')}
-            </p>
-          </div>
-        )}
-
-        <div className="grid gap-5 md:grid-cols-2 md:gap-x-7">
-        <div className="flex min-w-0 flex-col gap-5">
+  const etiqueta = esVentana ? 'mb-1.5 block text-subhead font-semibold text-foreground' : ETIQUETA_CAMPO
+  /** En PC, una foto sola se ve grande; con varias, todas a tamaño parejo para que quepan. */
+  const fotoGrande = (indice: number) => esVentana && indice === 0 && fotos.length + subidas.length === 1
+  const filaCausaRaiz = evento && eventoRequiereAcr(evento) ? <AcrEntrada evento={evento} comoEnlace={esVentana} /> : null
+  const bloqueQuien = (
+    <>
         {/* Quién y dónde, en UNA tarjeta de filas (mockup aprobado 19-09-2026, como el
             editor de eventos del Calendario de iOS): cada fila dice su valor y se abre
             en su lugar; lo que falta viene abierto. «Quién edita» y «Quién lo registró»
@@ -1282,7 +1185,7 @@ export function EventoBitacoraSheet({
             autor. Si corrige otro, el «editado por» se toma del nombre que recuerda
             este teléfono, sin preguntar. */}
         <div className="flex flex-col gap-1.5">
-          <div className="overflow-hidden rounded-ctl bg-muted-foreground/10">
+          <div className={esVentana ? FILAS_QUIEN_PC : 'overflow-hidden rounded-ctl bg-muted-foreground/10'}>
             {autorFijo ? (
               <div className="flex min-h-[44px] items-center gap-3 px-3">
                 <span className="flex-1 text-body">Técnico</span>
@@ -1363,20 +1266,23 @@ export function EventoBitacoraSheet({
             </p>
           )}
         </div>
-
+    </>
+  )
+  const bloqueTipo = (
+    <>
         {/* Tipo — con rótulo propio: sin él se confundía con la fila de nombres de
             arriba. Los 8 a la vista (en filas): deslizando, «Novedad» no se veía. */}
         <div>
           {/* «Tipo» respondía a dos preguntas a la vez (qué pasó y qué se hizo) y
               había que elegir una: el rótulo ahora dice cuál de las dos. Lo que
               pasó lo cuenta el impacto, y la falla sale de los dos (18-09-2026). */}
-          <span className={ETIQUETA_CAMPO}>
+          <span className={etiqueta}>
             ¿Qué se hizo?
             {tipo == null && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
           </span>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de evento">
+          <div className={esVentana ? 'grid auto-cols-fr grid-flow-col overflow-hidden rounded-ctl border border-border' : 'flex flex-wrap gap-2'} role="group" aria-label="Tipo de evento">
             {TIPOS_EVENTO.map((t) => (
-              <Chip key={t.id} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
+              <Chip key={t.id} enBarra={esVentana} activo={tipo === t.id} onClick={() => setTipo(t.id)}>
                 {t.id === 'otro' ? 'Otro…' : t.label}
               </Chip>
             ))}
@@ -1384,7 +1290,7 @@ export function EventoBitacoraSheet({
                 18-09) se abría sin ningún chip marcado: parecía faltar el dato. Se
                 muestra marcado; tocar otro lo cambia (pasada visual 19-09-2026). */}
             {tipo != null && !TIPOS_EVENTO.some((t) => t.id === tipo) && (
-              <Chip activo onClick={() => undefined}>
+              <Chip enBarra={esVentana} activo onClick={() => undefined}>
                 {etiquetaTipo({ tipo, tipoOtro: null })} (anterior)
               </Chip>
             )}
@@ -1413,9 +1319,10 @@ export function EventoBitacoraSheet({
             </div>
           )}
         </div>
-
-        {/* Equipo y horas */}
-        <div className="flex flex-col gap-3">
+    </>
+  )
+  const bloqueMaquina = (
+    <>
           <BuscadorEquipo
             texto={equipo}
             onChange={(texto, id) => {
@@ -1428,17 +1335,21 @@ export function EventoBitacoraSheet({
             recientes={equiposSugeridos}
             vinculado={Boolean(equipoId)}
           />
-          {equipoId && (opcionElegida || equipoCodigo) && (
+          {!esVentana && equipoId && (opcionElegida || equipoCodigo) && (
             <p className="-mt-1.5 text-footnote text-muted-foreground">
               {[opcionElegida?.planta, opcionElegida?.area, etiquetaCodigoEquipo(equipoCodigo)].filter(Boolean).join(' · ')}
             </p>
           )}
+    </>
+  )
+  const bloqueFalla = (
+    <>
           <div>
-            <label htmlFor="bitacora-titulo" className={`${ETIQUETA_CAMPO} flex justify-between gap-2`}>
+            <label htmlFor="bitacora-titulo" className={`${etiqueta} flex justify-between gap-2`}>
               {/* Los rótulos son los de la planilla «Recoleccion MTTR» (Máquina · Falla ·
                   Observaciones) para que nadie tenga que traducir (Orel, 17-09). */}
               <span>Falla</span>
-              <span>Opcional · en pocas palabras</span>
+              <span className={esVentana ? 'text-footnote font-normal text-muted-foreground' : undefined}>Opcional · en pocas palabras</span>
             </label>
             <input
               id="bitacora-titulo"
@@ -1450,24 +1361,59 @@ export function EventoBitacoraSheet({
               autoCapitalize="sentences"
             />
           </div>
+    </>
+  )
+  const campoMinutos = (
+    <>
+      <label htmlFor="bitacora-minutos" className={etiqueta}>{esVentana ? 'Minutos' : 'Minutos de máquina detenida'}</label>
+      <input
+        id="bitacora-minutos"
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={1440}
+        className={`${CAMPO} tabular-nums`}
+        value={minutos}
+        onChange={(e) => setMinutos(e.target.value)}
+        placeholder={duracion != null ? `${duracion} (la duración del evento)` : 'Ej: 35'}
+      />
+    </>
+  )
+  const ayudaMinutos = (
+    <p className="mt-1.5 text-footnote text-muted-foreground">
+      {sinHora
+        ? 'Cuenta para el MTTR del turno. Vacío, la parada queda sin duración.'
+        : 'Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.'}
+    </p>
+  )
+  const bloqueHoras = (
+    <>
           {/* Como «Todo el día» en el Calendario de iOS: esconde las horas. */}
-          <FilaInterruptor activo={sinHora} onCambiar={cambiarSinHora} titulo="Sin hora" />
+          <FilaInterruptor compacto={esVentana} activo={sinHora} onCambiar={cambiarSinHora} titulo="Sin hora" />
           {sinHora ? (
             // El evento sin hora se ubica ARRASTRÁNDOLO en la lista, que es como
             // se hace en la práctica: el selector de «Ubicación en el turno»
             // listaba un chip por evento del turno —seis o más— y lo usó 1 de 22
             // eventos reales. Se quitó el 18-09-2026; `posicionMin` la sigue
             // escribiendo el arrastre y editar un evento no la pierde.
-            impacto === 'con-parada' ? (
+            esVentana ? (
+              impacto === 'con-parada' ? (
+                <>
+                  <div className="w-1/3">{campoMinutos}</div>
+                  {ayudaMinutos}
+                </>
+              ) : null
+            ) : impacto === 'con-parada' ? (
               <p className="-mt-1 text-footnote text-muted-foreground">
                 Anota abajo los minutos de parada: sin hora no se pueden calcular.
               </p>
             ) : null
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${esVentana && impacto === 'con-parada' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                {esVentana && impacto === 'con-parada' && <div>{campoMinutos}</div>}
                 <div>
-                  <label htmlFor="bitacora-inicio" className={ETIQUETA_CAMPO}>
+                  <label htmlFor="bitacora-inicio" className={etiqueta}>
                     Inicio
                     {horaFaltante && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
                   </label>
@@ -1475,10 +1421,11 @@ export function EventoBitacoraSheet({
                   <input id="bitacora-inicio" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} onKeyDown={enterGuarda} />
                 </div>
                 <div>
-                  <label htmlFor="bitacora-termino" className={ETIQUETA_CAMPO}>Término</label>
+                  <label htmlFor="bitacora-termino" className={etiqueta}>Término</label>
                   <input id="bitacora-termino" type="time" step={300} className={`${CAMPO} tabular-nums`} value={horaTermino} onChange={(e) => setHoraTermino(e.target.value)} onBlur={validarTermino} onKeyDown={enterGuarda} />
                 </div>
               </div>
+              {esVentana && impacto === 'con-parada' && ayudaMinutos}
               {/* El «08:00» de un turno cerrado se leía como un dato real y nadie lo
                   revisaba (medido 19-09-2026: 27% de los eventos se carga así). Ahora
                   el campo nace vacío y esto explica por qué. */}
@@ -1495,7 +1442,7 @@ export function EventoBitacoraSheet({
                 <button
                   type="button"
                   onClick={() => setHoraTermino(terminoSugerido.hora)}
-                  className="-mt-1 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-primary/60 bg-primary/10 px-4 text-footnote font-semibold text-brand-ink transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className={`-mt-1 flex w-full items-center justify-center gap-2 ${esVentana ? 'min-h-[36px] rounded-ctl' : 'min-h-[44px] rounded-full'} border border-primary/60 bg-primary/10 px-4 text-footnote font-semibold text-brand-ink transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary`}
                 >
                   <Clock3 className="size-4" aria-hidden />
                   <span>
@@ -1508,7 +1455,7 @@ export function EventoBitacoraSheet({
                   término puesto, para poder corregir la elección. */}
               {cargaTardia && (
                 <div className="-mt-1">
-                  <p id="bitacora-cuanto-duro" className={ETIQUETA_CAMPO}>
+                  <p id="bitacora-cuanto-duro" className={etiqueta}>
                     ¿Cuánto duró?
                     <span className="sr-only">
                       {terminoSugerido.motivo === 'turno-terminado'
@@ -1531,11 +1478,13 @@ export function EventoBitacoraSheet({
               {duracion != null && <p className="-mt-1 text-footnote text-muted-foreground">Duración: {formatoMinutos(duracion)}</p>}
             </>
           )}
-        </div>
-
+    </>
+  )
+  const bloqueObservaciones = (
+    <>
         {/* Qué pasó */}
         <div>
-          <label htmlFor="bitacora-descripcion" className={ETIQUETA_CAMPO}>
+          <label htmlFor="bitacora-descripcion" className={etiqueta}>
             Observaciones · qué pasó y qué se hizo
             {!descripcion.trim() && <span className="ml-1.5 text-ink-warn">obligatorio</span>}
           </label>
@@ -1548,23 +1497,42 @@ export function EventoBitacoraSheet({
             placeholder="Detención por E777. Muelle de tracción del carro cortado; se cambia y se prueba en vacío."
           />
         </div>
-
-        </div>
-        <div className="flex min-w-0 flex-col gap-5">
-        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} favoritos={favoritosRepuestos} />
-
+    </>
+  )
+  const bloqueRepuestos = (
+    <>
+        <RepuestosUsados valor={repuestos} onChange={setRepuestos} equipoId={equipoId} fuente={fuenteRepuestos} puedeEditarMaestro={puedeEditarMaestro} favoritos={favoritosRepuestos} comoTabla={esVentana} />
+    </>
+  )
+  const bloqueImpacto = (
+    <>
         {/* Impacto en producción */}
         <div>
-          <span className={ETIQUETA_CAMPO}>
-            ¿Cómo afectó al proceso?
+          <span className={etiqueta}>
+            {esVentana ? 'Cómo afectó' : '¿Cómo afectó al proceso?'}
             {impacto == null && <span className="ml-1.5 font-normal text-ink-warn">obligatorio</span>}
           </span>
           {/* Una respuesta por fila, con su ejemplo debajo. Con tres chips en
               línea y sin explicación, 19 de 22 eventos reales terminaban en
               «No aplica» — incluida una Baader 142 en falla (18-09-2026). */}
-          <div className="flex flex-col gap-2" role="group" aria-label="Impacto en el proceso">
+          <div className={esVentana ? 'flex flex-col border-b border-border' : 'flex flex-col gap-2'} role="group" aria-label="Impacto en el proceso">
             {IMPACTOS.map((i) => {
               const activo = impacto === i.id
+              if (esVentana) {
+                return (
+                  <button
+                    key={i.id}
+                    type="button"
+                    aria-pressed={activo}
+                    onClick={() => setImpacto(i.id)}
+                    className="grid min-h-[36px] grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-1.5 border-t border-border py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <span aria-hidden className={`size-3.5 rounded-full ${activo ? 'border-4 border-primary' : 'border-[1.5px] border-muted-foreground'}`} />
+                    <span className="text-subhead text-foreground">{i.label}</span>
+                    <span className="text-right text-footnote text-muted-foreground">{i.detalle}</span>
+                  </button>
+                )
+              }
               return (
                 <button
                   key={i.id}
@@ -1585,30 +1553,15 @@ export function EventoBitacoraSheet({
               )
             })}
           </div>
-          {impacto === 'con-parada' && (
+          {impacto === 'con-parada' && !esVentana && (
             <div className="mt-3">
-              <label htmlFor="bitacora-minutos" className={ETIQUETA_CAMPO}>Minutos de máquina detenida</label>
-              <input
-                id="bitacora-minutos"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={1440}
-                className={`${CAMPO} tabular-nums`}
-                value={minutos}
-                onChange={(e) => setMinutos(e.target.value)}
-                placeholder={duracion != null ? `${duracion} (la duración del evento)` : 'Ej: 35'}
-              />
-              <p className="mt-1.5 text-footnote text-muted-foreground">
-                {sinHora
-                  ? 'Cuenta para el MTTR del turno. Vacío, la parada queda sin duración.'
-                  : 'Cuenta para el MTTR del turno. Si lo dejas vacío se usa la duración.'}
-              </p>
+              {campoMinutos}
+              {ayudaMinutos}
             </div>
           )}
           {impacto === 'afecta-sin-detener' && (
             <div className="mt-3">
-              <label htmlFor="bitacora-contingencia" className={ETIQUETA_CAMPO}>¿Qué se hizo para que siguiera?</label>
+              <label htmlFor="bitacora-contingencia" className={etiqueta}>¿Qué se hizo para que siguiera?</label>
               <div className="mb-2 flex flex-wrap gap-2">
                 {CONTINGENCIAS_SUGERIDAS.map((c) => (
                   <Chip key={c} activo={contingencia === c} onClick={() => setContingencia(c)}>
@@ -1633,7 +1586,7 @@ export function EventoBitacoraSheet({
           )}
           {impacto === 'en-ventana' && (
             <div className="mt-3">
-              <label htmlFor="bitacora-ventana" className={ETIQUETA_CAMPO}>¿En qué momento se intervino?</label>
+              <label htmlFor="bitacora-ventana" className={etiqueta}>¿En qué momento se intervino?</label>
               <div className="mb-2 flex flex-wrap gap-2">
                 {VENTANAS_SUGERIDAS.map((v) => (
                   <Chip key={v} activo={ventana === v} onClick={() => setVentana(v)}>
@@ -1652,7 +1605,10 @@ export function EventoBitacoraSheet({
             </div>
           )}
         </div>
-
+    </>
+  )
+  const bloqueFotos = (
+    <>
         {/* Fotos */}
         <div
           onDragOver={(e) => {
@@ -1672,7 +1628,7 @@ export function EventoBitacoraSheet({
           }}
           className={arrastrandoFoto ? 'rounded-ctl border-2 border-dashed border-primary/60' : 'border-2 border-dashed border-transparent'}
         >
-          <span className={ETIQUETA_CAMPO}>Fotos</span>
+          {!esVentana && <span className={etiqueta}>Fotos</span>}
           {arrastrandoFoto && <p className="mb-1.5 text-footnote text-muted-foreground">Suelta las fotos aquí</p>}
           <input
             ref={inputRef}
@@ -1683,18 +1639,18 @@ export function EventoBitacoraSheet({
             onChange={(e) => alElegir(e.target.files)}
           />
           {(fotos.length > 0 || subidas.length > 0) && (
-            <div className="mb-3 grid grid-cols-3 gap-2">
-              {fotos.map((f) => (
-                <figure key={f.path} className="relative m-0">
+            <div className={esVentana ? 'grid grid-cols-2 gap-1.5' : 'mb-3 grid grid-cols-3 gap-2'}>
+              {fotos.map((f, indice) => (
+                <figure key={f.path} className={`relative m-0 ${fotoGrande(indice) ? 'col-span-2' : ''}`}>
                   {/* Ronda 47: la miniatura de 320 px, no la original de 1.600 px — este
                       grid ya la pinta a ~110 px, y bajar la foto entera se paga en la red
                       de planta por cada foto del editor, otra vez. */}
                   <img
-                    src={f.thumbUrl ?? f.url}
+                    src={fotoGrande(indice) ? f.url : (f.thumbUrl ?? f.url)}
                     alt={ETIQUETA_FOTO[f.etiqueta]}
-                    className="aspect-square w-full rounded-ctl bg-muted-foreground/10 object-cover"
+                    className={`${fotoGrande(indice) ? 'aspect-[7/4]' : esVentana ? 'aspect-[4/3]' : 'aspect-square'} w-full rounded-ctl bg-muted-foreground/10 object-cover`}
                   />
-                  <figcaption className="pt-1 text-caption text-muted-foreground">{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
+                  <figcaption className={`pt-1 text-muted-foreground ${esVentana ? 'text-footnote' : 'text-caption'}`}>{ETIQUETA_FOTO[f.etiqueta]}</figcaption>
                   <button
                     type="button"
                     onClick={() => quitarFoto(f)}
@@ -1740,24 +1696,334 @@ export function EventoBitacoraSheet({
               ))}
             </div>
           )}
-          <div className="grid grid-cols-3 gap-2">
-            {(['antes', 'despues', 'foto'] as const).map((et) => (
-              <Button key={et} variant="tinted" size="md" className="rounded-ctl px-2" onClick={() => elegirFotos(et)} disabled={fotos.length + subidas.length >= MAX_FOTOS_EVENTO}>
-                <ImagePlus /> {et === 'foto' ? 'Otra' : ETIQUETA_FOTO[et]}
-              </Button>
-            ))}
-          </div>
+          {esVentana ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-footnote text-muted-foreground">Agregar foto</span>
+              <span className="flex items-center gap-3.5">
+                {(['antes', 'despues', 'foto'] as const).map((et) => (
+                  <Button key={et} variant="plain" size="sm" className={COMANDO_PC} onClick={() => elegirFotos(et)} disabled={fotos.length + subidas.length >= MAX_FOTOS_EVENTO}>
+                    {et === 'foto' ? 'Otra' : ETIQUETA_FOTO[et]}
+                  </Button>
+                ))}
+              </span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {(['antes', 'despues', 'foto'] as const).map((et) => (
+                <Button key={et} variant="tinted" size="md" className="rounded-ctl px-2" onClick={() => elegirFotos(et)} disabled={fotos.length + subidas.length >= MAX_FOTOS_EVENTO}>
+                  <ImagePlus /> {et === 'foto' ? 'Otra' : ETIQUETA_FOTO[et]}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
-
+    </>
+  )
+  const bloquePendiente = (
+    <>
         {/* Pendiente */}
         <FilaInterruptor
+          compacto={esVentana}
           activo={pendiente}
           onCambiar={setPendiente}
           titulo="Queda pendiente"
           detalle="Sale destacado en el correo para el turno siguiente."
         />
+    </>
+  )
+  const tituloHoja =
+    pendienteOrigen && esNuevo
+      ? 'Resolver pendiente'
+      : esNuevo
+        ? 'Nuevo evento'
+        : modoBorrador
+          ? 'Continuar borrador'
+          : 'Editar evento'
+  const rotuloGuardar = guardando
+    ? 'Guardando…'
+    : subiendo
+      ? rotuloSubiendo
+      : modoBorrador
+        ? (pendienteOrigen || (eventoVivo ?? evento)?.resuelvePendiente) ? 'Listo y cerrar pendiente' : 'Listo'
+        : 'Guardar'
+  const estadoBorrador = (
+    <>
+        {/* Estado del borrador: que se vea que no hay que tocar nada para guardar. */}
+        {autoguarda && (
+          <p className="-mt-2 flex items-center gap-1.5 text-footnote text-muted-foreground" role="status" aria-live="polite">
+            {horaFaltante ? (
+              <span className="font-semibold text-ink-warn">Falta la hora de inicio: sin ella no se guarda. Si no aplica, activa «Sin hora».</span>
+            ) : porGuardar ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> Guardando borrador…
+              </>
+            ) : guardadoEn ? (
+              <>
+                <Check className="size-3.5 text-ink-ok" aria-hidden />
+                <span>
+                  Borrador guardado · <span className="tabular-nums">{horaDe(guardadoEn)}</span> · el turno lo ve
+                </span>
+              </>
+            ) : existeEnServidor.current ? (
+              'Borrador en la bitácora · lo que cambies se guarda solo'
+            ) : (
+              'Se guarda solo mientras escribes'
+            )}
+          </p>
+        )}
+    </>
+  )
+  const avisos = (
+    <>
+        {otrosEditando.length > 0 && (
+          <div className="flex items-start gap-2.5 rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <Users className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <p className="text-footnote">
+              <span className="font-semibold">
+                {otrosEditando.map((p) => `${p.nombre} (${NOMBRE_DISPOSITIVO[p.dispositivo]})`).join(', ')}
+              </span>{' '}
+              {otrosEditando.length === 1 ? 'también tiene' : 'también tienen'} abierto este evento. Lo que cambie aparece aquí
+              al instante; si los dos cambian lo mismo, se avisa.
+            </p>
+          </div>
+        )}
 
+        {conflictos.length > 0 && (
+          <div role="alert" className="flex flex-col gap-2 rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <p className="text-footnote font-semibold text-ink-warn">
+              Otro equipo cambió {conflictos.map((c) => NOMBRE_CAMPO[c]).join(', ')} mientras tú también lo cambiabas.
+            </p>
+            {conflictos.includes('descripcion') && remotoConflicto.current?.descripcion && (
+              <p className="line-clamp-4 whitespace-pre-line text-footnote text-muted-foreground">
+                Su versión: «{remotoConflicto.current.descripcion}»
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="tinted" size="sm" onClick={usarLaSuya}>
+                Usar la suya
+              </Button>
+              <Button variant="plain" size="sm" onClick={() => setConflictos([])}>
+                Mantener la mía
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {eliminadoAfuera && (
+          <div role="alert" className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <p className="text-footnote font-semibold text-ink-warn">Este evento ya no está en la bitácora.</p>
+            <p className="text-footnote text-muted-foreground">
+              Lo borraron en otro equipo o el servidor no lo aceptó. Lo que tienes en pantalla no se guardó; sus fotos ya no
+              están.
+            </p>
+            <Button
+              variant="tinted"
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                // Las fotos se borraron junto con el evento: recrearlo con ellas
+                // dejaba enlaces rotos (revisión 16-09).
+                setFotos([])
+                fotosServidor.current = []
+                existeEnServidor.current = false
+                vistoVivo.current = false
+                creadoAqui.current = false
+                setEliminadoAfuera(false)
+                ultimaFirma.current = ''
+              }}
+            >
+              Volver a crearlo con lo que tengo
+            </Button>
+          </div>
+        )}
+
+        {publicadoAfuera && (
+          <p className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5 text-footnote">
+            <span className="font-semibold">Otro equipo ya lo publicó.</span> Lo que cambies se sigue guardando solo.
+          </p>
+        )}
+
+        {pendienteOrigen && esNuevo && (
+          <div className="rounded-ctl bg-muted-foreground/10 px-3 py-2.5">
+            <p className="text-footnote font-semibold text-ink-warn">
+              Viene del {etiquetaCortaTurno(pendienteOrigen.turnoId)} · {autorVisible(pendienteOrigen)}
+            </p>
+            <p className="line-clamp-3 text-footnote text-foreground">
+              {[pendienteOrigen.equipo, pendienteOrigen.descripcion].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        )}
+    </>
+  )
+  const confirmacion = (
+    <>
+      <ActionSheet
+        open={confirmarDescarte}
+        title="¿Descartar los cambios?"
+        description="Lo que escribiste en este evento no se guardó. El evento queda como estaba."
+        confirmLabel="Descartar cambios"
+        onConfirm={() => {
+          setConfirmarDescarte(false)
+          cancelar()
+        }}
+        cancelLabel="Seguir editando"
+        onCancel={() => setConfirmarDescarte(false)}
+      />
+    </>
+  )
+
+  if (esVentana) {
+    const { tipo: tipoMaquina, nombre: nombreMaquina } = partesEquipo(equipo)
+    const detalleMaquina = [etiquetaCodigoEquipo(equipoCodigo), [opcionElegida?.planta, opcionElegida?.area].filter(Boolean).join(', ')]
+      .filter(Boolean)
+      .join('. ')
+    const puedeBorrar = (!esNuevo || existeEnServidor.current) && puedeEliminar
+    return (
+      <Sheet open={open} onClose={cerrarHoja} onKeyDown={cmdEnterGuarda} presentacionPC="libre" title={tituloHoja}>
+        <div className={`grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] ${CAMPOS_PC}`}>
+          <aside aria-label="Máquina y evidencia" className="flex min-h-0 flex-col overflow-y-auto overscroll-contain border-r border-border bg-background px-5 pb-4 pt-[18px]">
+            {tipoMaquina && <p className="text-footnote text-muted-foreground">{tipoMaquina}</p>}
+            <p className="text-headline text-foreground">{nombreMaquina || 'Sin máquina elegida'}</p>
+            {detalleMaquina && <p className="text-footnote text-muted-foreground">{detalleMaquina}</p>}
+            <div className="mt-2.5">{bloqueFotos}</div>
+            <div className="mt-1">{bloqueQuien}</div>
+            {evento && (
+              <div className="flex items-baseline justify-between gap-3 border-b border-border py-[7px]">
+                <span className="text-footnote text-muted-foreground">Registró</span>
+                <span className="min-w-0 truncate text-subhead text-foreground">{autorVisible(evento)}</span>
+              </div>
+            )}
+            <div className="mt-2">{bloquePendiente}</div>
+          </aside>
+
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <header className="flex flex-none items-center justify-between gap-5 border-b border-border px-7 pb-3 pt-3.5">
+              <h2 className="min-w-0 truncate text-title2" title={evento?.descripcion}>
+                {esNuevo ? tituloHoja : tituloAcr(evento?.descripcion ?? '') || tituloHoja}
+              </h2>
+              <div className="flex flex-none items-center gap-3.5">
+                {filaCausaRaiz && <div className="[&_button]:!min-h-[36px] [&_button]:!text-subhead">{filaCausaRaiz}</div>}
+                <button
+                  type="button"
+                  aria-label="Cerrar"
+                  onClick={cerrarHoja}
+                  className="grid size-[36px] flex-none place-items-center rounded-ctl bg-muted-foreground/15 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <X className="size-3.5" aria-hidden />
+                </button>
+              </div>
+            </header>
+
+            <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain px-7 pb-3.5 pt-4 [&>*]:shrink-0">
+              {avisos}
+              {bloqueTipo}
+              <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-x-6">
+                <div className="flex min-w-0 flex-col gap-3">
+                  <div className="flex flex-col gap-3 [&_label]:!text-subhead [&_label]:!font-semibold [&_label]:!text-foreground">{bloqueMaquina}</div>
+                  {bloqueFalla}
+                  {bloqueObservaciones}
+                </div>
+                <div className="flex min-w-0 flex-col gap-3">
+                  {bloqueImpacto}
+                  <div className="flex flex-col gap-3">{bloqueHoras}</div>
+                </div>
+              </div>
+              {bloqueRepuestos}
+              {error && (
+                <p role="alert" className="text-footnote font-semibold text-ink-crit">
+                  {error}
+                </p>
+              )}
+              {modoBorrador && (
+                <p className="text-footnote text-muted-foreground">
+                  Puedes cerrar y seguir después: el borrador queda en la bitácora del turno. No cuenta en los números ni sale en el correo hasta que toques{' '}
+                  <span className="font-semibold text-foreground">Listo</span>.
+                </p>
+              )}
+              {(!esNuevo || existeEnServidor.current) && !puedeEliminar && (
+                <p className="text-footnote text-muted-foreground">
+                  {modoBorrador ? 'Descartarlo' : 'Borrarlo'} solo puede quien lo empezó o un supervisor.
+                </p>
+              )}
+            </div>
+
+            <footer className="flex flex-none items-center justify-end gap-4 border-t border-border px-7 py-2.5">
+              <div className="mr-auto min-w-0 [&>p]:!mt-0">
+                {faltaObligatorio && !guardando && <p className="text-footnote font-semibold text-ink-warn">Falta completar: {faltantes.join(', ')}</p>}
+                {estadoBorrador}
+              </div>
+              {puedeBorrar && (
+                <Button variant="plain" size="sm" className={`${COMANDO_PC} text-destructive`} onClick={borrar} disabled={guardando}>
+                  {modoBorrador ? 'Descartar borrador' : 'Borrar evento'}
+                </Button>
+              )}
+              <Button variant="plain" size="sm" className={COMANDO_PC} onClick={cerrarHoja} disabled={guardando}>
+                {modoBorrador ? 'Cerrar' : 'Cancelar'}
+              </Button>
+              <Button size="sm" className="!min-h-[36px] !rounded-ctl !px-[18px] !text-subhead" onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
+                {guardando ? <Loader2 className="animate-spin" /> : null}
+                {rotuloGuardar}
+              </Button>
+            </footer>
+          </div>
         </div>
+        {confirmacion}
+      </Sheet>
+    )
+  }
+
+
+  return (
+    <Sheet
+      open={open}
+      onClose={cerrarHoja}
+      onKeyDown={cmdEnterGuarda}
+      size="wide"
+      title={tituloHoja}
+      actions={
+        <div className="flex w-full flex-col gap-2.5">
+          {faltaObligatorio && !guardando && (
+            <p className="text-footnote font-semibold text-ink-warn">Falta completar: {faltantes.join(', ')}</p>
+          )}
+          <div className="flex gap-2.5 [&>*]:flex-1 lg:justify-end lg:[&>*]:flex-none">
+            <Button variant="tinted" onClick={cerrarHoja} disabled={guardando}>
+              {modoBorrador ? 'Cerrar' : 'Cancelar'}
+            </Button>
+            <Button onClick={guardar} disabled={guardando || eliminadoAfuera || faltaObligatorio}>
+              {guardando ? <Loader2 className="animate-spin" /> : null}
+              {rotuloGuardar}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      {/* `[&>*]:shrink-0`: en un flex vertical con alto acotado, un hijo con
+          overflow-x (la fila de tipos) se encoge a 0 px y desaparece. */}
+      <div className="-mx-6 flex max-h-[min(68vh,640px)] flex-col gap-5 overflow-y-auto px-6 pb-1 [&>*]:shrink-0 lg:-mx-2 lg:max-h-none lg:min-h-0 lg:flex-1 lg:px-2">
+        {/* Causa raíz, lo primero de la hoja: al final del formulario nadie la encontraba
+            (prueba como técnico, 08-11; opción A del mockup aprobado). */}
+        {filaCausaRaiz}
+
+        {estadoBorrador}
+        {avisos}
+
+        <div className="grid gap-5 md:grid-cols-2 md:gap-x-7">
+          <div className="flex min-w-0 flex-col gap-5">
+            {bloqueQuien}
+            {bloqueTipo}
+            <div className="flex flex-col gap-3">
+              {bloqueMaquina}
+              {bloqueFalla}
+              {bloqueHoras}
+            </div>
+            {bloqueObservaciones}
+          </div>
+          <div className="flex min-w-0 flex-col gap-5">
+            {bloqueRepuestos}
+            {bloqueImpacto}
+            {bloqueFotos}
+            {bloquePendiente}
+          </div>
         </div>
 
         {error && (
@@ -1785,18 +2051,7 @@ export function EventoBitacoraSheet({
           </Button>
         )}
       </div>
-      <ActionSheet
-        open={confirmarDescarte}
-        title="¿Descartar los cambios?"
-        description="Lo que escribiste en este evento no se guardó. El evento queda como estaba."
-        confirmLabel="Descartar cambios"
-        onConfirm={() => {
-          setConfirmarDescarte(false)
-          cancelar()
-        }}
-        cancelLabel="Seguir editando"
-        onCancel={() => setConfirmarDescarte(false)}
-      />
+      {confirmacion}
     </Sheet>
   )
 }

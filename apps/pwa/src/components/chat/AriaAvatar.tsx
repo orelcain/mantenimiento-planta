@@ -23,7 +23,10 @@ import { onSpeakingChange } from '@/lib/ariaVoice'
 const IDLE_SRC = `${import.meta.env.BASE_URL}aria/idle.mp4`
 const TALK_SRC = `${import.meta.env.BASE_URL}aria/talk_aligned.mp4`
 
-export function AriaAvatar({ visible }: { visible: boolean }) {
+/** Tres tamaños, un solo componente: círculo (cabecera, 40 px), riel (escritorio) y escenario (celular al hablar). */
+export type TamanoAvatar = 'circulo' | 'riel' | 'escenario'
+
+export function AriaAvatar({ visible, tamano = 'riel' }: { visible: boolean; tamano?: TamanoAvatar }) {
   const idleRef = useRef<HTMLVideoElement>(null)
   const talkRef = useRef<HTMLVideoElement>(null)
   const speakingRef = useRef(false)
@@ -99,14 +102,21 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
 
   if (!visible) return null
 
+  // Rostro del video (560 × 720) en x 48 %, y 17 %: el recorte del círculo y del escenario lo mantiene.
+  const rostro = { objectPosition: '48% 17%' }
+  const marco = tamano === 'circulo'
+    ? `relative size-10 shrink-0 overflow-hidden rounded-full bg-black ${isSpeaking ? 'ring-2 ring-primary ring-offset-[3px] ring-offset-background' : ''}`
+    : tamano === 'escenario'
+      ? 'relative h-[min(52dvh,470px)] w-full overflow-hidden bg-black'
+      : `relative w-full aspect-[7/9] rounded-card overflow-hidden bg-black border transition-shadow duration-300 ${
+          isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgb(var(--brand)/0.45)]' : 'border-border shadow'
+        }`
+
   return (
-    <div
-      className={`relative w-full aspect-[7/9] rounded-card overflow-hidden bg-black border transition-shadow duration-300 ${
-        isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgb(var(--brand)/0.45)]' : 'border-border shadow'
-      }`}
-    >
+    <div className={marco}>
       <video
         ref={idleRef}
+        style={rostro}
         className="absolute inset-0 w-full h-full object-cover"
         muted
         loop
@@ -120,14 +130,16 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
         loop
         playsInline
         preload="auto"
-        style={{ opacity: 0 }}
+        style={{ opacity: 0, ...rostro }}
       />
-      <span
-        className={`absolute bottom-1.5 right-1.5 w-2 h-2 rounded-full border border-black/40 ${
-          isSpeaking ? 'bg-primary animate-pulse' : 'bg-fill-ok'
-        }`}
-        title={isSpeaking ? 'ARIA hablando' : 'ARIA en línea'}
-      />
+      {tamano !== 'circulo' && (
+        <span
+          className={`absolute bottom-1.5 right-1.5 w-2 h-2 rounded-full border border-black/40 ${
+            isSpeaking ? 'bg-primary animate-pulse' : 'bg-fill-ok'
+          }`}
+          title={isSpeaking ? 'ARIA hablando' : 'ARIA en línea'}
+        />
+      )}
     </div>
   )
 }
