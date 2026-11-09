@@ -50,6 +50,25 @@ describe('clasificaCausa', () => {
     [{ type: 'downtime', name: 'Micro Detencion', reason: '' }, 'micro'],
     // Fuera del árbol: siguen los patrones de siempre.
     [{ type: 'break', name: 'Detencion', reason: 'Limpieza de Ducto' }, 'planificado'],
+    // Cada palabra del respaldo, con un texto que el árbol NO resuelve (08-11, mutantes).
+    [{ type: 'break', name: 'Detencion', reason: 'COLACI' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Reunión de área' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Ejercicio de brigada' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Charla de seguridad' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Aseo general' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Sanitizado de línea' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Planned Downtime' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'PLANNEDDOWNTIME' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Sin MMPP' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Materia prima tardía' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Falta personal' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Rechazo de pesca' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Abastecimiento de hielo' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Espera de grúa' }, 'externo'],
+    // Sin causal, pero el nombre es una causal de Mantención: el árbol la lee del nombre.
+    [{ type: 'downtime', name: 'KNURO', reason: '' }, 'falla'],
+    // Campos ausentes: no revienta y queda sin imputar.
+    [{ type: 'downtime' }, 'sin-imputar'],
   ]
   for (const [st, esperado] of casos) {
     test(`${st.name}/${st.reason || '∅'} → ${esperado}`, () => {
