@@ -20,6 +20,7 @@ import {
   AYUDA_FUERZA,
   ETIQUETA_FUERZA,
   ETIQUETA_NIVEL,
+  ETIQUETA_RESULTADO,
   TONO_FUERZA,
   TONO_NIVEL,
   type Acr,
@@ -31,7 +32,7 @@ import {
   type RespuestasAcr,
 } from '@/services/acr/acr.types'
 import { logger } from '@/lib/logger'
-import { Play } from 'lucide-react'
+import { Play, X } from 'lucide-react'
 import { MotorTutorialAcr } from './MotorTutorialAcr'
 import { AcrLectura } from './AcrLectura'
 import { FilaAnalisis } from './AcrEntrada'
@@ -40,6 +41,9 @@ import { CadenaPorQues } from './CadenaPorQues'
 import { FilaJackKnifeRapido } from './JackKnifeRapido'
 import { AccionDetalle, AccionDetalleConLista } from './AccionDetalle'
 import { useSugerenciaJK } from './useSugerenciaJK'
+import { useEsPC } from '@/hooks/useEsPC'
+import { PlanAccionPC, Punto, RielExpediente } from './AcrExpedientePC'
+import { etiquetaTurno, tituloAcr } from './acrExpedienteTextos'
 import {
   ACCION_POR_FUERZA,
   CORRECCION_HUMANA,
@@ -104,6 +108,12 @@ export interface AcrRapidoSheetProps {
 const CAMPO =
   'w-full rounded-ctl border-0 bg-muted-foreground/10 px-3 py-2.5 !text-campo leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary !min-h-16'
 const TITULO_PREGUNTA = 'text-body font-semibold text-foreground'
+/** PC: letra de escritorio (15 px) y filete en vez de relleno. `!` gana a `ui/Textarea`. */
+const CAMPO_PC =
+  'w-full resize-none rounded-ctl border border-border bg-background px-2.5 py-2 !text-subhead leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary !min-h-[76px]'
+const TITULO_PREGUNTA_PC = 'mb-1.5 block text-subhead font-semibold text-foreground'
+/** PC: comandos de texto y botones rectos, sin píldora. */
+const BOTON_PC = '!min-h-9 !rounded-ctl !text-subhead'
 const NIVEL_SEGMENTOS = (['fisica', 'humana', 'latente'] as const).map((n) => ({ value: n, label: ETIQUETA_NIVEL[n] }))
 const FUERZA_SEGMENTOS = (['debil', 'media', 'fuerte'] as const).map((f) => ({ value: f, label: ETIQUETA_FUERZA[f] }))
 const RESPUESTAS_VACIAS: RespuestasAcr = { queSeRompio: '', porQue: '', queHacemos: '' }
@@ -207,6 +217,7 @@ export function AcrRapidoSheet({
   causaJKInicial,
 }: AcrRapidoSheetProps) {
   const user = useAuthStore((s) => s.user)
+  const esPC = useEsPC()
   const [acr, setAcr] = useState<Acr>(
     () => acrExistente ?? acrNuevo(evento, auth.currentUser?.uid ?? '', nombreDe(user), repeticion, causaJKInicial),
   )
@@ -226,6 +237,8 @@ export function AcrRapidoSheet({
     if (causa === undefined) return
     setAcr((a) => (a.causaJK === undefined ? { ...a, causaJK: causa } : a))
   }, [jk.sugerencia, acr.causaJK])
+  /** PC: la fila de Jack-Knife se abre para cambiar la causa. */
+  const [jkAbierto, setJkAbierto] = useState(false)
   const realRef = useRef<Acr | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pensando, setPensando] = useState(false)
@@ -584,6 +597,26 @@ export function AcrRapidoSheet({
     setConfirmarBorrado(false)
   }
 
+  /** Cierra el editor; una acción nueva que quedó sin texto no se conserva. */
+  const cerrarEditor = () => {
+    if (editando?.tipo === 'accion') {
+      const id = editando.id
+      setAcr((a) => (a.acciones.some((x) => x.id === id && x.texto.trim() === '') ? { ...a, acciones: a.acciones.filter((x) => x.id !== id) } : a))
+    }
+    setEditando(null)
+  }
+
+  /** PC, «Sin acción. Agregar»: crea la acción ligada a esa causa y abre su editor. */
+  const agregarAccion = (causaId: string) => {
+    if (tutorial) return
+    const id = `accion-${Date.now().toString(36)}`
+    cambiar((a) => ({
+      ...a,
+      acciones: [...a.acciones, { id, texto: '', fuerza: 'media', causaId, responsable: '', fechaLimite: null, estado: 'pendiente' }],
+    }))
+    setEditando({ tipo: 'accion', id })
+  }
+
   const motivo = motivoNoCierra(acr)
   /** En la práctica siempre hay aviso de repetición: el caso de los resortes. */
   const avisoRepeticion = repeticion ?? (tutorial ? REPETICION_TUTORIAL : null)
@@ -591,6 +624,391 @@ export function AcrRapidoSheet({
   const revisionAcrs = useMemo(() => acrsRevisionTutorial(acr, revisionSubida), [acr, revisionSubida])
   const minutos = acr.minutosDetencion != null ? `${acr.minutosDetencion} min` : 'Sin detención'
   const resumen = resumenFuerza(acr.acciones)
+
+  const capas = (
+    <>
+      {tutorial && (
+        <MotorTutorialAcr
+          onCerrar={() => {
+            terminarTutorialVisto()
+            volverAlReal()
+          }}
+          onTerminar={terminarTutorialVisto}
+          preparar={prepararPractica}
+          escribir={(campo, texto) =>
+            setAcr((prev) => ({ ...prev, respuestas: { ...(prev.respuestas ?? RESPUESTAS_VACIAS), [campo]: texto } }))
+          }
+          accion={accionTutorial}
+        />
+      )}
+
+      {/* Práctica, capítulos 10 y 11: la vista de lectura y la revisión semanal, sin Firestore. */}
+      {tutorial && vistaPractica === 'lectura' && (
+        <AcrLectura open onClose={() => setVistaPractica(null)} acr={acr} onEditar={() => setVistaPractica(null)} />
+      )}
+      {tutorial && vistaPractica === 'revision' && (
+        <RevisionSemanalSheet
+          open
+          onClose={() => setVistaPractica(null)}
+          acrs={revisionAcrs}
+          periodo="21-09-2026 → 27-09-2026"
+          puedeEditar
+          onGuardar={nada}
+        />
+      )}
+
+      {itemEditado && editando && (
+        <Sheet
+          open
+          onClose={cerrarEditor}
+          surface="grouped"
+          title={editando.tipo === 'causa' ? 'Causa' : 'Acción'}
+          headerAction={
+            <Button data-tutorial="t-listo" variant="plain" className="font-semibold" onClick={cerrarEditor}>
+              Listo
+            </Button>
+          }
+        >
+          <div data-tutorial="t-editor" className="flex flex-col gap-4">
+            <textarea
+              aria-label="Texto"
+              rows={3}
+              value={itemEditado.texto}
+              onChange={(e) =>
+                cambiar((a) =>
+                  editando.tipo === 'causa'
+                    ? { ...a, causas: a.causas.map((c) => (c.id === editando.id ? { ...c, texto: e.target.value } : c)) }
+                    : { ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, texto: e.target.value } : x)) },
+                )
+              }
+              className={`${CAMPO} resize-y pr-14`}
+            />
+            <div data-tutorial="t-editor-sel">
+            {editando.tipo === 'causa' ? (
+              <SegmentedControl
+                ariaLabel="Nivel de la causa"
+                value={(itemEditado as CausaAcr).nivel}
+                onChange={(nivel) =>
+                  cambiar((a) => ({ ...a, causas: a.causas.map((c) => (c.id === editando.id ? { ...c, nivel } : c)) }))
+                }
+                segments={NIVEL_SEGMENTOS}
+              />
+            ) : (
+              <SegmentedControl
+                ariaLabel="Fuerza de la acción"
+                value={(itemEditado as AccionAcr).fuerza}
+                onChange={(fuerza) =>
+                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, fuerza } : x)) }))
+                }
+                segments={FUERZA_SEGMENTOS}
+              />
+            )}
+            </div>
+
+            {/* Causa, responsable y fecha de la acción. En el tutorial se ve sin leer Firestore. */}
+            {editando.tipo === 'accion' && (
+              <DetalleAccionEditada
+                tutorial={tutorial}
+                accion={itemEditado as AccionAcr}
+                causas={acr.causas}
+                onCambiar={(cambio) =>
+                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, ...cambio } : x)) }))
+                }
+              />
+            )}
+
+            <Button
+              data-tutorial="t-borrar"
+              variant="plain"
+              className="self-start text-destructive"
+              onClick={() => setConfirmarBorrado(true)}
+            >
+              Borrar
+            </Button>
+          </div>
+        </Sheet>
+      )}
+
+      <ActionSheet
+        open={confirmarArmado}
+        title="¿Armar a mano?"
+        description="Se reemplaza la propuesta de ARIA por lo que escribiste en las preguntas."
+        confirmLabel="Armar a mano"
+        onConfirm={() => {
+          setConfirmarArmado(false)
+          cambiar((a) => armadoManual(a))
+        }}
+        onCancel={() => setConfirmarArmado(false)}
+      />
+
+      <ActionSheet
+        open={confirmarBorrado}
+        title={editando?.tipo === 'causa' ? '¿Borrar esta causa?' : '¿Borrar esta acción?'}
+        description="Se quita del análisis. Puedes volver a agregarla."
+        confirmLabel="Borrar"
+        onConfirm={borrarItem}
+        onCancel={() => setConfirmarBorrado(false)}
+      />
+    </>
+  )
+
+  if (esPC) {
+    const causaJKTexto = acr.causaJK === null ? 'No aparece' : (acr.causaJK ?? 'Sin asignar')
+    return (
+      <Sheet open={open} onClose={cerrarHoja} presentacionPC="libre" title="Causa raíz">
+        <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+          <RielExpediente
+            evento={evento}
+            equipo={acr.equipo}
+            turno={etiquetaTurno(evento.turnoId, acr.fechaTurno)}
+            minutos={minutos}
+            registro={acr.createdByNombre}
+            tutorial={tutorial}
+            repeticion={avisoRepeticion}
+            preguntaUno={
+              <section data-tutorial="t-q1">
+                <label htmlFor={`${idPiezas}-q1`} className={TITULO_PREGUNTA_PC}>
+                  1. ¿Qué se rompió?
+                </label>
+                <textarea
+                  id={`${idPiezas}-q1`}
+                  rows={3}
+                  maxLength={2000}
+                  value={r.queSeRompio}
+                  onChange={(e) => cambiarRespuesta('queSeRompio', e.target.value)}
+                  className={`${CAMPO_PC} !bg-transparent`}
+                />
+              </section>
+            }
+            jackKnife={
+              muestraJK ? (
+                <>
+                  <div className="flex items-baseline justify-between gap-3 border-t border-border py-[5px]">
+                    <span className="text-footnote text-muted-foreground">Jack-Knife</span>
+                    <button
+                      type="button"
+                      aria-expanded={jkAbierto}
+                      onClick={() => setJkAbierto((v) => !v)}
+                      className="min-w-0 text-right text-subhead text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      {causaJKTexto}
+                    </button>
+                  </div>
+                  {jkAbierto && (
+                    <FilaJackKnifeRapido
+                      causaActual={acr.causaJK}
+                      sugerencia={jk.sugerencia}
+                      cargando={jk.cargando}
+                      onElegir={(causa) => cambiar((a) => ({ ...a, causaJK: causa }))}
+                    />
+                  )}
+                </>
+              ) : undefined
+            }
+            pieza={<InterruptorPieza compacto activo={acr.piezaGuardada} onCambiar={(v) => cambiar((a) => ({ ...a, piezaGuardada: v }))} />}
+          />
+
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <header className="flex flex-none items-center justify-between gap-5 border-b border-border px-7 pb-3 pt-3.5">
+              <h2 className="min-w-0 truncate text-title2" title={acr.definicion}>
+                {tituloAcr(acr.definicion)}
+              </h2>
+              <div className="flex flex-none items-center gap-3.5">
+                {tutorial ? (
+                  <span className="text-footnote font-semibold text-muted-foreground">Modo práctica. Nada se guarda.</span>
+                ) : (
+                  <span className="text-footnote text-muted-foreground">
+                    <Punto clase={acr.estado === 'cerrado' ? 'bg-fill-ok' : 'bg-fill-warning'} />
+                    {acr.estado === 'cerrado' ? 'Cerrado' : 'Borrador'}
+                  </span>
+                )}
+                {!visto && !tutorial && <span className="text-footnote text-muted-foreground">¿Primera vez?</span>}
+                {tutorial && (
+                  <Button data-tutorial="t-guardar-arriba" variant="plain" size="sm" className={`${BOTON_PC} !px-0 !font-normal`} onClick={guardarAhora}>
+                    Guardar
+                  </Button>
+                )}
+                <Button data-tutorial="t-head" variant="plain" size="sm" className={`${BOTON_PC} !px-0 !font-normal`} aria-disabled={tutorial} onClick={iniciarTutorial}>
+                  Tutorial
+                </Button>
+                <button
+                  type="button"
+                  aria-label="Cerrar"
+                  onClick={cerrarHoja}
+                  className="grid size-9 flex-none place-items-center rounded-ctl bg-muted-foreground/15 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <X className="size-3.5" aria-hidden />
+                </button>
+              </div>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-7 pb-3.5 pt-4">
+              {tutorial && vistaPractica === 'filas' && (
+                <div data-tutorial="t-filas" className="mb-4 flex flex-col gap-2">
+                  <p className="text-footnote font-semibold text-muted-foreground">Así se ve en el evento de la Bitácora</p>
+                  <FilaAnalisis compacta acr={null} cargando={false} aplica repeticion={avisoRepeticion} onVer={nada} onAnalizar={nada} />
+                  <FilaAnalisis compacta acr={null} cargando={false} aplica repeticion={null} onVer={nada} onAnalizar={nada} />
+                </div>
+              )}
+
+              <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-x-5">
+                <section data-tutorial="t-q2">
+                  <label htmlFor={`${idPiezas}-q2`} className={TITULO_PREGUNTA_PC}>
+                    2. ¿Por qué se rompió?
+                  </label>
+                  <SpeechTextarea
+                    id={`${idPiezas}-q2`}
+                    rows={2}
+                    maxLength={2000}
+                    value={r.porQue}
+                    onChange={(e) => cambiarRespuesta('porQue', e.target.value)}
+                    className={`${CAMPO_PC} pr-9`}
+                  />
+                  <CadenaPorQues
+                    compacta
+                    conPantalla={tutorial}
+                    idBase={idPiezas}
+                    queSeRompio={r.queSeRompio}
+                    primero={r.porQue}
+                    extras={r.porQues ?? []}
+                    onCambiarPrimero={(v) => cambiarPorQues({ porQue: v })}
+                    onCambiarExtras={(v) => cambiarPorQues({ porQues: v })}
+                    pantallaAbierta={pantallaPorQues}
+                    onPantalla={setPantallaPorQues}
+                    preguntar={preguntar}
+                    equipo={acr.equipo}
+                    onUsoAria={() => cambiarPorQues({ porQuesModo: 'aria' })}
+                    ariaAbierta={ariaPorQues}
+                    onAria={setAriaPorQues}
+                    preguntaPractica={tutorial ? (preguntaPractica ?? PREGUNTA_TUTORIAL) : null}
+                  />
+                </section>
+                <section data-tutorial="t-q3">
+                  <label htmlFor={`${idPiezas}-q3`} className={TITULO_PREGUNTA_PC}>
+                    3. ¿Qué hacemos para que no vuelva?
+                  </label>
+                  <SpeechTextarea
+                    id={`${idPiezas}-q3`}
+                    rows={2}
+                    maxLength={2000}
+                    value={r.queHacemos}
+                    onChange={(e) => cambiarRespuesta('queHacemos', e.target.value)}
+                    className={`${CAMPO_PC} pr-9`}
+                  />
+                </section>
+              </div>
+
+              <div className="mt-2.5 flex items-center justify-between gap-4 pb-1.5">
+                <div className="flex min-w-0 items-baseline gap-3">
+                  <h3 className="flex-none text-headline text-foreground">Causas y plan de acción</h3>
+                  <span className={`truncate text-footnote ${avisoIA ? 'font-semibold text-ink-warn' : 'text-muted-foreground'}`}>
+                    {pensando || pensandoPractica
+                      ? 'ARIA está pensando…'
+                      : (avisoIA ??
+                        (hayGrupo
+                          ? `${manual ? 'Armado a mano' : 'Propuesta de ARIA'}. Toca una fila para corregir.`
+                          : !tutorial && !puedeProponer
+                            ? motivoNoPropone(r)
+                            : ''))}
+                  </span>
+                </div>
+                <div className="flex flex-none items-center gap-3.5">
+                  <Button
+                    data-tutorial="t-prop"
+                    variant="plain"
+                    size="sm"
+                    className={`${BOTON_PC} border border-border !font-normal text-foreground`}
+                    disabled={!tutorial && !puedeProponer}
+                    aria-disabled={tutorial}
+                    onClick={proponerConIA}
+                  >
+                    Proponer causas
+                  </Button>
+                  <Button
+                    data-tutorial="t-manual"
+                    variant="plain"
+                    size="sm"
+                    className={`${BOTON_PC} !px-0 !font-normal`}
+                    aria-disabled={tutorial}
+                    onClick={() => {
+                      if (tutorial) return
+                      if (acr.propuesta?.origen === 'ia' && hayGrupo) setConfirmarArmado(true)
+                      else cambiar((a) => armadoManual(a))
+                    }}
+                  >
+                    Armar a mano
+                  </Button>
+                </div>
+              </div>
+
+              {hayGrupo ? (
+                <PlanAccionPC
+                  causas={acr.causas}
+                  acciones={acr.acciones}
+                  onEditarCausa={(id) => setEditando({ tipo: 'causa', id })}
+                  onEditarAccion={(id) => setEditando({ tipo: 'accion', id })}
+                  onAgregarAccion={agregarAccion}
+                />
+              ) : (
+                <p data-tutorial="t-propuesta" className="border-t border-foreground py-3 text-subhead text-muted-foreground">
+                  Responde las preguntas y pide la propuesta, o arma el análisis a mano.
+                </p>
+              )}
+
+              {manual && (
+                <div data-tutorial="t-elige" className="mt-2 grid grid-cols-[auto_minmax(0,280px)_auto_minmax(0,280px)] items-center gap-x-3 border-t border-border pt-2">
+                  <span className="text-footnote font-semibold text-foreground">Nivel del porqué</span>
+                  <div data-tutorial="t-nivel">
+                    <SegmentedControl ariaLabel="Nivel de la causa del porqué" value={nivelQ2} onChange={fijarNivelQ2} segments={NIVEL_SEGMENTOS} />
+                  </div>
+                  <span className="text-footnote font-semibold text-foreground">Fuerza de la acción</span>
+                  <div data-tutorial="t-fuerza">
+                    <SegmentedControl ariaLabel="Fuerza de la acción" value={(fuerzaQ3 ?? '') as FuerzaAccion} onChange={fijarFuerzaQ3} segments={FUERZA_SEGMENTOS} />
+                  </div>
+                  <p className="col-span-4 mt-1 text-footnote text-muted-foreground">{AYUDA_FUERZA}</p>
+                </div>
+              )}
+
+              <div className="mt-2 grid grid-cols-[78px_minmax(0,1fr)_84px_70px] items-center gap-x-3 border-t border-border pt-2">
+                <span className="text-footnote text-muted-foreground">Verificar</span>
+                <span className="text-subhead text-foreground">{acr.verificacion.criterio}</span>
+                <span className="text-subhead tabular-nums text-foreground">{`${acr.verificacion.dias} días`}</span>
+                <span className="whitespace-nowrap text-footnote text-muted-foreground">
+                  {acr.verificacion.resultado === 'pendiente' && <Punto clase="bg-fill-warning" />}
+                  {ETIQUETA_RESULTADO[acr.verificacion.resultado]}
+                </span>
+              </div>
+            </div>
+
+            <footer className="flex flex-none items-center justify-end gap-4 border-t border-border px-7 py-2.5">
+              <div className="mr-auto min-w-0 text-footnote font-semibold">
+                {(motivoPractica ?? motivo) && (
+                  <p data-tutorial="t-motivo" role="status" className="text-ink-warn">
+                    {motivoPractica ?? motivo}
+                  </p>
+                )}
+                {error && (
+                  <p role="alert" className="text-ink-crit">
+                    {error}
+                  </p>
+                )}
+                {practicaFinal && (
+                  <p role="status" className="text-foreground">
+                    {practicaFinal}
+                  </p>
+                )}
+              </div>
+              <Button data-tutorial="t-save" variant="filled" size="sm" className={`${BOTON_PC} !px-[18px]`} onClick={guardarAhora}>
+                Guardar análisis
+              </Button>
+            </footer>
+          </div>
+        </div>
+        {capas}
+      </Sheet>
+    )
+  }
+
 
   return (
     <Sheet
@@ -884,128 +1302,7 @@ export function AcrRapidoSheet({
         </div>
       </div>
 
-      {tutorial && (
-        <MotorTutorialAcr
-          onCerrar={() => {
-            terminarTutorialVisto()
-            volverAlReal()
-          }}
-          onTerminar={terminarTutorialVisto}
-          preparar={prepararPractica}
-          escribir={(campo, texto) =>
-            setAcr((prev) => ({ ...prev, respuestas: { ...(prev.respuestas ?? RESPUESTAS_VACIAS), [campo]: texto } }))
-          }
-          accion={accionTutorial}
-        />
-      )}
-
-      {/* Práctica, capítulos 10 y 11: la vista de lectura y la revisión semanal, sin Firestore. */}
-      {tutorial && vistaPractica === 'lectura' && (
-        <AcrLectura open onClose={() => setVistaPractica(null)} acr={acr} onEditar={() => setVistaPractica(null)} />
-      )}
-      {tutorial && vistaPractica === 'revision' && (
-        <RevisionSemanalSheet
-          open
-          onClose={() => setVistaPractica(null)}
-          acrs={revisionAcrs}
-          periodo="21-09-2026 → 27-09-2026"
-          puedeEditar
-          onGuardar={nada}
-        />
-      )}
-
-      {itemEditado && editando && (
-        <Sheet
-          open
-          onClose={() => setEditando(null)}
-          surface="grouped"
-          title={editando.tipo === 'causa' ? 'Causa' : 'Acción'}
-          headerAction={
-            <Button data-tutorial="t-listo" variant="plain" className="font-semibold" onClick={() => setEditando(null)}>
-              Listo
-            </Button>
-          }
-        >
-          <div data-tutorial="t-editor" className="flex flex-col gap-4">
-            <textarea
-              aria-label="Texto"
-              rows={3}
-              value={itemEditado.texto}
-              onChange={(e) =>
-                cambiar((a) =>
-                  editando.tipo === 'causa'
-                    ? { ...a, causas: a.causas.map((c) => (c.id === editando.id ? { ...c, texto: e.target.value } : c)) }
-                    : { ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, texto: e.target.value } : x)) },
-                )
-              }
-              className={`${CAMPO} resize-y pr-14`}
-            />
-            <div data-tutorial="t-editor-sel">
-            {editando.tipo === 'causa' ? (
-              <SegmentedControl
-                ariaLabel="Nivel de la causa"
-                value={(itemEditado as CausaAcr).nivel}
-                onChange={(nivel) =>
-                  cambiar((a) => ({ ...a, causas: a.causas.map((c) => (c.id === editando.id ? { ...c, nivel } : c)) }))
-                }
-                segments={NIVEL_SEGMENTOS}
-              />
-            ) : (
-              <SegmentedControl
-                ariaLabel="Fuerza de la acción"
-                value={(itemEditado as AccionAcr).fuerza}
-                onChange={(fuerza) =>
-                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, fuerza } : x)) }))
-                }
-                segments={FUERZA_SEGMENTOS}
-              />
-            )}
-            </div>
-
-            {/* Causa, responsable y fecha de la acción. En el tutorial se ve sin leer Firestore. */}
-            {editando.tipo === 'accion' && (
-              <DetalleAccionEditada
-                tutorial={tutorial}
-                accion={itemEditado as AccionAcr}
-                causas={acr.causas}
-                onCambiar={(cambio) =>
-                  cambiar((a) => ({ ...a, acciones: a.acciones.map((x) => (x.id === editando.id ? { ...x, ...cambio } : x)) }))
-                }
-              />
-            )}
-
-            <Button
-              data-tutorial="t-borrar"
-              variant="plain"
-              className="self-start text-destructive"
-              onClick={() => setConfirmarBorrado(true)}
-            >
-              Borrar
-            </Button>
-          </div>
-        </Sheet>
-      )}
-
-      <ActionSheet
-        open={confirmarArmado}
-        title="¿Armar a mano?"
-        description="Se reemplaza la propuesta de ARIA por lo que escribiste en las preguntas."
-        confirmLabel="Armar a mano"
-        onConfirm={() => {
-          setConfirmarArmado(false)
-          cambiar((a) => armadoManual(a))
-        }}
-        onCancel={() => setConfirmarArmado(false)}
-      />
-
-      <ActionSheet
-        open={confirmarBorrado}
-        title={editando?.tipo === 'causa' ? '¿Borrar esta causa?' : '¿Borrar esta acción?'}
-        description="Se quita del análisis. Puedes volver a agregarla."
-        confirmLabel="Borrar"
-        onConfirm={borrarItem}
-        onCancel={() => setConfirmarBorrado(false)}
-      />
+      {capas}
     </Sheet>
   )
 }
@@ -1033,7 +1330,24 @@ function DetalleAccionEditada({
   return tutorial ? <AccionDetalle {...props} tecnicos={[]} /> : <AccionDetalleConLista {...props} />
 }
 
-function InterruptorPieza({ activo, onCambiar }: { activo: boolean; onCambiar: (v: boolean) => void }) {
+function InterruptorPieza({ activo, onCambiar, compacto = false }: { activo: boolean; onCambiar: (v: boolean) => void; compacto?: boolean }) {
+  if (compacto) {
+    return (
+      <button
+        type="button"
+        role="switch"
+        data-tutorial="t-pieza"
+        aria-checked={activo}
+        onClick={() => onCambiar(!activo)}
+        className="flex min-h-9 w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <span className="text-subhead text-foreground">Pieza dañada guardada</span>
+        <span className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors duration-200 motion-reduce:transition-none ${activo ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+          <span className={`absolute top-[3px] size-4 rounded-full bg-white shadow transition-transform duration-200 motion-reduce:transition-none ${activo ? 'translate-x-[19px]' : 'translate-x-[3px]'}`} />
+        </span>
+      </button>
+    )
+  }
   return (
     <button
       type="button"
