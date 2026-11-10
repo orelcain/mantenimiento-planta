@@ -105,7 +105,8 @@ describe('AnalisisV2', () => {
     render(<AnalisisV2 {...base()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle: detenciones de hoy' }))
     expect(screen.getAllByText('¿Cuánto se detuvo la línea hoy y de quién fue?').length).toBeGreaterThan(0)
-    expect(screen.getByText('Cada falla de equipo')).toBeTruthy()
+    /* En PC la sección sale también en el índice del costado (DetalleExpedientePC). */
+    expect(screen.getAllByText('Cada falla de equipo').length).toBeGreaterThan(0)
     expect(screen.getByText(/Evisceradora 1 · 08:20–08:26/)).toBeTruthy()
   })
 })

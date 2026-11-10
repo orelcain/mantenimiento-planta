@@ -903,7 +903,7 @@ export function AnalisisV2(p: AnalisisV2Props) {
         {fallasMant && <TarjetaFallasMant r={fallasMant} onVer={abrir('fallasMant')} />}
       </Bloque>
 
-      <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
+      <PanelDetalle forma="expediente" abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
         {detalle?.cuerpo}
       </PanelDetalle>
     </div>
