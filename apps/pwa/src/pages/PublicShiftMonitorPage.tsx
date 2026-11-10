@@ -108,7 +108,7 @@ import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/Hec
 import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
-import { etiquetaMaquina, hayBandaParada, llenadoDelPanel, paradasDetalle, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
+import { causaLegible, etiquetaMaquina, hayBandaParada, llenadoDelPanel, paradasDetalle, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
 import { PestanaDueloV2, TarjetaDueloV2 } from './monitor/DueloV2'
 import { SelectorLinea, type LineasMonitor } from './monitor/SelectorLinea'
 import { construirDuelo, nombresEfectivos } from './monitor/duelo'
@@ -7030,7 +7030,7 @@ function MonitorDelToken() {
               eje={eje}
               piezas={contador.valor}
               corteHora={corteHoraV2}
-              causaParada={live.currentReason ? motivoEnEspanol(live.currentReason) : null}
+              causaParada={live.currentReason ? causaLegible(motivoEnEspanol(live.currentReason)) : null}
               turnoId={vista?.shiftDocId ?? data.shiftDocId}
               cuota={comparacion.optimalAtCurrentMinute != null ? {
                 piezas: comparacion.optimalAtCurrentMinute,

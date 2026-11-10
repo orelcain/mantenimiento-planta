@@ -720,6 +720,17 @@ export interface ParadaVivo {
 }
 
 const RAZONES_SIN_CAUSA = new Set(['detencion', 'micro detencion', ''])
+
+/**
+ * La causa de la parada como se lee en pantalla. «Detencion» o «Micro detencion» es lo que pone Shoplogix cuando nadie la
+ * clasificó: también es un dato (la detención quedó sin causa), así que se dice, con tilde y sin repetir «detenida» a secas.
+ */
+export function causaLegible(razon: string | null | undefined): string | null {
+  if (razon == null) return null
+  if (!RAZONES_SIN_CAUSA.has(normalizar(razon))) return razon
+  if (normalizar(razon) === '') return null
+  return esMicroDetencion(razon) ? 'Micro detención, sin causa anotada' : 'Detención, sin causa anotada'
+}
 const rank: Record<ClaseParada, number> = { detencion: 3, micro: 2, programada: 1 }
 
 /**
