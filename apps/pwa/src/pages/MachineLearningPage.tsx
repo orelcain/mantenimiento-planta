@@ -5,7 +5,7 @@
  * Muestra 4 secciones (tabs): Manual, Procedimientos, Flujos, Diagnostico.
  * Si la seccion esta vacia, muestra empty state.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
@@ -22,7 +22,11 @@ import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
 import { getCommonParts, type CommonPart } from '@/data/commonPartsByMachine'
 import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
 import { useMarkedCommonParts } from '@/hooks/repuestos/useMarkedCommonParts'
+import { useEsPC } from '@/hooks/useEsPC'
+import { DiagnosticoMaestroPC } from '@/components/learning/DiagnosticoMaestroPC'
 import {
+  getMachineContentMeta,
+  type MachineContentMeta,
   listProcedures,
   listManualSections,
   listFlows,
@@ -219,6 +223,25 @@ export function MachineLearningPage() {
   const machine = slug ? findMachineBySlug(slug) : undefined
   const isCourse = !!machine && machine.area === COURSE_AREA
 
+  // PC: barra con pestañas y su recuento real (no solo el de la pestaña abierta).
+  const pc = useEsPC()
+  const [meta, setMeta] = useState<MachineContentMeta | null>(null)
+  const barraRef = useRef<HTMLDivElement>(null)
+  const [altoBarra, setAltoBarra] = useState(96)
+  useEffect(() => {
+    if (!pc || !machine || machine.customRoute) return
+    let cancelled = false
+    getMachineContentMeta(machine.slug).then(m => { if (!cancelled) setMeta(m) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [pc, machine])
+  useEffect(() => {
+    const el = barraRef.current
+    if (!pc || !el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setAltoBarra(Math.round(el.getBoundingClientRect().height)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [pc])
+
   // Repuestos comunes: config (fallback, hoy vacía) + los marcados en Firestore
   // (comunEn). Se resuelve acá (antes de los early returns) para decidir si mostrar
   // la 5ª pestaña. Dedup por SAP.
@@ -325,9 +348,71 @@ export function MachineLearningPage() {
     ? 'Curso / Normativa'
     : `${Object.values(machine.sections).filter(Boolean).length} secciones`
 
+  // Recuento por pestaña para la barra de PC: el de Firestore si llegó, si no el cargado.
+  const cuentaPestana = (id: TabId): number => {
+    if (meta) {
+      if (id === 'manual') return meta.manual
+      if (id === 'procedures') return meta.procedures
+      if (id === 'flows') return meta.flows
+      if (id === 'diagnosis') return meta.diagnosis
+      if (id === 'casos') return meta.flows + meta.diagnosis
+      if (id === 'quiz' && meta.quiz != null) return meta.quiz
+    }
+    return countFor(id)
+  }
+  const puedeAdministrar = isAdmin && ADMIN_EDITABLE_TABS.has(activeTab)
+  const abrirAdmin = () => window.open(`/mantenimiento-planta/aprendizaje/admin/${machine.slug}?tab=${activeTab}`, '_blank', 'noopener,noreferrer')
+
   return (
-    <div className={`dossier ${heightClass} w-full`}>
-      {/* Encabezado único del marco de herramientas (antes «← Centro de aprendizaje» en mono). */}
+    <div
+      className={`dossier ${heightClass} w-full${pc ? ' dp-pc' : ''}`}
+      style={pc ? ({ '--dp-barra': `${altoBarra}px` } as CSSProperties) : undefined}
+    >
+      {pc ? (
+        <div className="dp-barra" ref={barraRef}>
+          <div className="dp-barra-fila">
+            <button type="button" className="dp-barra-volver" onClick={() => navigate('/aprendizaje')}>‹ Aprendizaje</button>
+            <h1>{machine.name}</h1>
+            <span className="dp-barra-cod">{docCode} · {isCourse ? (machine.programa ?? 'Curso') : 'rev. 2026-07'}</span>
+            {quizBest != null && (
+              <span className="dp-barra-cod">{quizPassed ? `Evaluación aprobada · ${quizBest} %` : `Evaluación: ${quizBest} % (umbral 70 %)`}</span>
+            )}
+            <div className="dp-barra-acc">
+              {!isCourse && machine.hmiRoute && (
+                <button type="button" className="dp-btn" onClick={() => navigate(machine.hmiRoute!)}>
+                  <MonitorPlay className="h-4 w-4" /> {machine.hmiLabel ?? 'Simulador'}
+                </button>
+              )}
+              {machine.slug === 'baader-142' && (
+                <button type="button" className="dp-btn" onClick={() => navigate('/aprendizaje/baader-142/tarjeta-a3c')}>
+                  <CircuitBoard className="h-4 w-4" /> Tarjeta A3C
+                </button>
+              )}
+              {machine.slug === 'baader-200' && activeTab === 'manual' && (
+                <button type="button" className="dp-btn" onClick={() => navigate('/aprendizaje/baader-200/terreno')}>
+                  <Ruler className="h-4 w-4" /> Referencia de terreno
+                </button>
+              )}
+              {puedeAdministrar && (
+                <button type="button" className="dp-btn" title="Administrar esta sección — pedirá confirmar identidad" onClick={abrirAdmin}>
+                  <Lock className="h-4 w-4" /> Administrar
+                </button>
+              )}
+            </div>
+          </div>
+          <nav className="dp-tabs" aria-label="Secciones">
+            {tabs.map(t => {
+              const n = cuentaPestana(t.id)
+              return (
+                <button key={t.id} type="button" aria-current={t.id === activeTabData.id} onClick={() => setActiveTab(t.id)}>
+                  {t.label}{n > 0 && <span className="dp-n">{n}</span>}
+                </button>
+              )
+            })}
+          </nav>
+        </div>
+      ) : (
+      /* Encabezado único del marco de herramientas (antes «← Centro de aprendizaje» en mono). */
       <EncabezadoHerramienta
         pegajoso
         etiquetaVolver="Aprendizaje"
@@ -355,10 +440,15 @@ export function MachineLearningPage() {
         )}
         contextoAria={`Estoy en ${isCourse ? 'el curso' : 'la ficha técnica de'} ${machine.name} del Centro de aprendizaje. `}
       />
+      )}
       {/* Sin barra inferior en esta ruta (modo «lectura»): solo aire para el gesto de inicio. */}
-      <div className="dp-wrap" style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}>
+      <div
+        className="dp-wrap"
+        style={{ paddingBottom: pc && activeTab === 'diagnosis' ? 0 : 'calc(3rem + env(safe-area-inset-bottom))' }}
+      >
 
-        {/* Portada del documento */}
+        {/* Portada del documento (en PC la reemplaza la barra) */}
+        {!pc && (
         <header style={{ paddingTop: 'clamp(10px, 3vw, 30px)' }}>
           <div className="dp-eyebrow">
             {isCourse ? (machine.modulo != null ? 'Módulo' : 'Curso') : 'Ficha técnica'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area) : 'Rev. 2026-07'}
@@ -398,11 +488,13 @@ export function MachineLearningPage() {
             </div>
           )}
         </header>
+        )}
 
-        <div className="dp-course">
+        <div className={pc && activeTab !== 'diagnosis' ? 'dp-course dp-pc-cuerpo' : 'dp-course'}>
           <div className="dp-main-col">
 
-        {/* Cabecera de sección activa */}
+        {/* Cabecera de sección activa (en PC el nombre ya está en la pestaña) */}
+        {!pc && (<>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginTop: 34 }}>
           <div className="dp-sec-head">
             <span className="dp-sec-no">Sección {String(activeIndex + 1).padStart(2, '0')}</span>
@@ -433,6 +525,7 @@ export function MachineLearningPage() {
             <Ruler className="h-4 w-4" /> Referencia de terreno
           </button>
         )}
+        </>)}
 
         {activeTab === 'quickref' && quickRefGroups ? (
           <QuickRefView groups={quickRefGroups} showSensitive={isAuthenticated} />
@@ -462,7 +555,15 @@ export function MachineLearningPage() {
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
-          <DiagnosisList entries={diagnosis} machineSlug={machine.slug} />
+          pc ? (
+            <DiagnosticoMaestroPC
+              key={machine.slug}
+              entries={diagnosis}
+              accion={entry => <HmiPracticeButton contentId={entry.id} machineSlug={machine.slug} />}
+            />
+          ) : (
+            <DiagnosisList entries={diagnosis} machineSlug={machine.slug} />
+          )
         ) : activeTab === 'casos' && (flows.length > 0 || diagnosis.length > 0) ? (
           <div>
             {flows.length > 0 && (
@@ -508,7 +609,8 @@ export function MachineLearningPage() {
           />
         )}
 
-            <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
+            {/* En PC la barra ya lleva de vuelta al Centro; los 15 accesos sobran. */}
+            {!pc && <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />}
           </div>
         </div>
       </div>
