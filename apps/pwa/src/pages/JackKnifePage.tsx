@@ -4,12 +4,30 @@ import { SegmentedControl } from '@/components/piel'
 import { JackKnifeCard } from '@/components/grader/JackKnifeCard'
 import { LECTURA_NOTA } from '@/components/piel/Lectura'
 import { usePielApple } from '@/hooks/usePielApple'
+import { useEsPC } from '@/hooks/useEsPC'
+import { TJK_SEG, claseSegmento } from '@/components/grader/jackKnifeTablero'
 
 export default function JackKnifePage() {
   const location = useLocation()
   const inicial = location.hash.startsWith('#jk=') ? new URLSearchParams(location.hash.slice(4)).get('pl') : null
   const [planta, setPlanta] = useState(inicial === 'yal' ? 'yal' : 'chonchi')
   const apple = usePielApple()
+  const esPC = useEsPC()
+  if (apple && esPC) {
+    // PC: tablero de una pantalla; la planta va al inicio de la barra de controles.
+    const selector = (
+      <div role="group" aria-label="Planta" className={TJK_SEG}>
+        {(['chonchi', 'yal'] as const).map((valor) => (
+          <button key={valor} type="button" aria-pressed={planta === valor} onClick={() => setPlanta(valor)} className={claseSegmento(planta === valor)}>
+            {valor === 'chonchi' ? 'Chonchi' : 'Yal'}
+          </button>
+        ))}
+      </div>
+    )
+    return <main className="w-full min-w-0 px-7 py-5">
+      <JackKnifeCard key={planta} plantSlug={planta} planta={selector} />
+    </main>
+  }
   if (apple) {
     const opcion = (valor: string, texto: string) => (
       <button type="button" aria-pressed={planta === valor} onClick={() => setPlanta(valor)}

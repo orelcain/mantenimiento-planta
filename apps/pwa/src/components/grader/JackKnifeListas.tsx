@@ -2,6 +2,7 @@
 import { causasAtacar } from '@/services/shoplogix/jackKnifeLectura'
 import { dec1 } from '@/utils/formatoNumeros'
 import { LECTURA_CUERPO, SeccionLectura } from '@/components/piel/Lectura'
+import { TJK_BOTON, TJK_CUERPO, TJK_NOTA } from './jackKnifeTablero'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListCell, ListGroup } from '@/components/piel'
@@ -69,15 +70,40 @@ const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : vari
  * «Analizar» con borde a la derecha; abajo, la recomendación y los comentarios más
  * repetidos. Cierra con la nota de la causa crónica más costosa.
  */
-export function AtacarAhoraLectura({ calc, turnos, elegirCausa = () => {}, analisis, onAnalizar }: {
+export function AtacarAhoraLectura({ calc, turnos, elegirCausa = () => {}, analisis, onAnalizar, pc = false }: {
   calc: CalculoJK; turnos: TurnoJK[]; elegirCausa?: (k: string) => void
   analisis?: ReadonlyMap<string, ResumenCausaJK>
   onAnalizar?: (causa: string) => void
+  /** Tablero de PC: una línea por causa (estado y el comentario más repetido), botón de 36 px. */
+  pc?: boolean
 }) {
   const atacar = causasAtacar(calc)
   const cronica = [...calc.pts].filter(p => p.q === 'cro').sort((a, b) => b.min - a.min)[0]
   const comentariosCronica = cronica ? comentariosDe(turnos, calc.desde, calc.hasta, cronica.k, Infinity) : []
   const masRepetido = comentariosCronica.length ? agruparComentarios(comentariosCronica)[0] : undefined
+  if (pc) {
+    return <section data-testid="jk-atacar">
+      <h2 className={TJK_NOTA + ' m-0 mb-1'}>Atacar ahora</h2>
+      {!atacar.length && <p className={TJK_CUERPO + ' border-t border-border py-2 text-muted-foreground'}>Sin causas de nivel 1 o 2.</p>}
+      {atacar.map(p => {
+        const r = analisis?.get(p.k)
+        const estado = !analisis ? '' : !r || r.total === 0 ? 'Sin análisis. ' : r.fuertesHechas > 0 ? 'Acción fuerte hecha. ' : `${r.total} análisis. `
+        const top = agruparComentarios(comentariosDe(turnos, calc.desde, calc.hasta, p.k, Infinity))[0]
+        return <div key={p.k} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-t border-border py-2 ${TJK_CUERPO}`}>
+          <div className="min-w-0">
+            <p className="m-0">
+              <button type="button" className="text-left font-semibold text-ink-crit hover:underline" onClick={() => elegirCausa(p.k)}>{p.k}</button>
+              <span>, {p.ev} {plural(p.ev, 'detención', 'detenciones')} de {dec1(p.mttr)} min</span>
+            </p>
+            {(estado || top) && <p className={TJK_NOTA + ' m-0 truncate'}>{estado}{top ? `${top.texto} ×${top.n}` : ''}</p>}
+          </div>
+          {onAnalizar && (r?.total ?? 0) === 0 && (
+            <button type="button" className={TJK_BOTON} onClick={() => onAnalizar(p.k)}>Analizar</button>
+          )}
+        </div>
+      })}
+    </section>
+  }
   return <SeccionLectura titulo="Atacar ahora" testId="jk-atacar">
     {!atacar.length && <p className="text-muted-foreground">Sin causas de nivel 1 o 2.</p>}
     {atacar.map(p => {
