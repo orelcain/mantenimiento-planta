@@ -13,11 +13,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Button, SegmentedControl } from '@/components/piel'
+import { LECTURA_CUERPO } from '@/components/piel/Lectura'
 import { Q, pctCambio } from './jackKnifePresentacion'
 import { JackKnifeGrafico } from './JackKnifeGrafico'
 import { JackKnifeLamina } from './JackKnifeLamina'
 import { exportarLamina } from '@/services/grader/jackKnifeExport'
 import { JackKnifeListas } from './JackKnifeListas'
+import { JackKnifeLectura } from './JackKnifeLectura'
+import { usePielApple } from '@/hooks/usePielApple'
+import type { FilaLecturaJK, TramoLectura } from '@/services/shoplogix/jackKnifeLectura'
 import { calcularLayout } from './jackKnifeLayout'
 import { BITACORA_PLANTA } from '@/config/bitacora'
 import { listarAcrsConCache } from '@/services/acr/acrFirestore'
@@ -299,6 +303,8 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   }
   const analisis = useMemo<Map<string, ResumenCausaJK>>(() => resumenAcrPorCausa(acrs), [acrs])
   const anillos = useMemo(() => new Set([...analisis].filter(([, r]) => r.fuertesHechas > 0).map(([k]) => k)), [analisis])
+  /** Piel Apple: modo lectura (JackKnifeLectura). La piel anterior conserva su forma. */
+  const apple = usePielApple()
 
   useEffect(() => {
     const el = rootRef.current
@@ -487,10 +493,30 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
   const finVentana = n ? turnos[win.hasta]! : null
   const nTurnosVentana = n ? win.hasta - win.desde + 1 : 0
 
-  return (
-    <Card ref={rootRef} className="bg-card">
-      <CardContent className="p-4 space-y-3 min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
+  // Piel Apple: filas de la tabla y tramos de la identidad (servicio jackKnifeLectura).
+  const filasLectura: FilaLecturaJK[] = calc.pts.map((p) => {
+    const f = informe?.filas.find((x) => x.causa === p.k)
+    return {
+      causa: p.k,
+      q: p.q,
+      ev: p.ev,
+      min: p.min,
+      mttr: p.mttr,
+      veredicto: previa ? veredicto(p, antesCalc?.pts.find((x) => x.k === p.k), nAhoraT, nAntesT, historia.has(p.k)) : null,
+      minAntes10: f?.minAntes10,
+      minAhora10: f?.minAhora10,
+    }
+  })
+  const tramoAhora: TramoLectura | null = inicioVentana && finVentana
+    ? { desdeKey: inicioVentana.dateKey, hastaKey: finVentana.dateKey, turnos: nTurnosVentana }
+    : null
+  const tramoAntes: TramoLectura | null = previa && turnos[previa.desde] && turnos[previa.hasta]
+    ? { desdeKey: turnos[previa.desde]!.dateKey, hastaKey: turnos[previa.hasta]!.dateKey, turnos: nAntesT }
+    : null
+
+  const contenido = (
+    <>
+        {!apple && <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl<VentanaJK | 'libre'> className="sm:w-auto sm:min-w-[300px]" ariaLabel="Período" value={preset} onChange={cambiarPreset} segments={PRESETS} />
           <Button variant={preset === '30' && modoCmp === 'mes' ? 'tinted' : 'plain'} onClick={() => { cambiarPreset('30'); cambiarModo('mes') }} aria-pressed={preset === '30' && modoCmp === 'mes'}>Mes</Button>
           <SegmentedControl<ModoCmpJK> className="sm:w-auto sm:min-w-[360px]" ariaLabel="Comparar con" value={modoCmp} onChange={cambiarModo} segments={MODOS} />
@@ -500,7 +526,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
               <Button disabled={pdfEnCurso || !n} onClick={() => void descargar('png')}>PNG</Button>
             </div>
           </details>
-        </div>
+        </div>}
         {pdfEnCurso && <p role="status">Preparando lámina…</p>}
         {errorPdf && <p role="alert" className="text-destructive">No se pudo exportar la lámina. Intenta de nuevo.</p>}
         {error && <p className="text-footnote text-destructive">No se pudo leer el resumen de turnos. Intenta de nuevo.</p>}
@@ -508,13 +534,44 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
 
         {crudos !== null && (
           <>
-            <div className="py-4">
+            {!apple && <div className="py-4">
               <p className="text-display font-bold tabular-nums">{resumen ? dec1(resumen.minAntes) + ' → ' : ''}{dec1(nAhoraT ? calc.D / nAhoraT : 0)} min por turno</p>
               {resumen && resumen.minAntes > 0 && <p className={cn('text-title2 tabular-nums', resumen.minAhora < resumen.minAntes ? 'text-ink-ok' : resumen.minAhora > resumen.minAntes ? 'text-ink-crit' : 'text-muted-foreground')}>{pctCambio(resumen.minAhora / resumen.minAntes - 1)}</p>}
               <p className="text-footnote text-muted-foreground">Detención atribuida a Mantención · {rangoTexto(turnos, win)}{previa && ' frente a ' + rangoTexto(turnos, previa)}</p>
-            </div>
-            {previa && <label className="flex min-h-[44px] items-center gap-2 text-footnote"><input type="checkbox" checked={limitesBase} onChange={e => setLimitesBase(e.target.checked)} />Límites del período base</label>}
-            <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+            </div>}
+            {!apple && previa && <label className="flex min-h-[44px] items-center gap-2 text-footnote"><input type="checkbox" checked={limitesBase} onChange={e => setLimitesBase(e.target.checked)} />Límites del período base</label>}
+            {apple ? (
+              <JackKnifeLectura
+                calc={calc}
+                turnos={turnos}
+                filas={filasLectura}
+                ahora={tramoAhora}
+                antes={tramoAntes}
+                minAhora={nAhoraT ? calc.D / nAhoraT : 0}
+                minAntes={resumen ? resumen.minAntes : null}
+                fantasmas={fantasmas}
+                sel={sel}
+                elegirCausa={elegirCausa}
+                anillos={esBitacora ? anillos : undefined}
+                analisis={esBitacora ? analisis : undefined}
+                onAnalizar={esBitacora ? (causa) => setEscogiendoCausa(causa) : undefined}
+                preset={preset}
+                onPreset={cambiarPreset}
+                modoCmp={modoCmp}
+                onModo={cambiarModo}
+                mesActivo={preset === '30' && modoCmp === 'mes'}
+                onMes={() => { cambiarPreset('30'); cambiarModo('mes') }}
+                hayPrevia={!!previa}
+                limitesBase={limitesBase}
+                onLimites={setLimitesBase}
+                umbralesDelBase={limitesBase && !!antesCalc?.N}
+                desaparecieron={informe?.desaparecieron.length ?? 0}
+                exportable={n > 0}
+                exportando={pdfEnCurso}
+                onExportar={(formato) => void descargar(formato)}
+              />
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
               <JackKnifeGrafico calc={calc} ancho={W} sel={sel} fantasmas={fantasmas} elegirCausa={elegirCausa} anillos={esBitacora ? anillos : undefined} />
               <JackKnifeListas
                 calc={calc}
@@ -525,7 +582,9 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                 causaSel={sel}
                 onAnalizar={esBitacora ? (causa) => setEscogiendoCausa(causa) : undefined}
               />
-              {esBitacora && escogiendoCausa && (
+              </div>
+            )}
+            {esBitacora && escogiendoCausa && (
                 <EscogerDetencionSheet
                   open
                   onClose={() => setEscogiendoCausa(null)}
@@ -550,8 +609,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                   causaJKInicial={nuevoAnalisis.causa}
                 />
               )}
-            </div>
-            <details ref={detalleRef} className="space-y-4"><summary className="cursor-pointer py-4 font-semibold text-accent">Ver detalle</summary>
+            <details ref={detalleRef} className="space-y-4"><summary className={`cursor-pointer py-4 font-semibold text-brand-ink ${LECTURA_CUERPO}`}>Ver detalle</summary>
             <p className="text-footnote text-muted-foreground">¿Cómo se lee? Los cuadrantes separan frecuencia y duración altas o bajas. La línea de disponibilidad une causas con igual tiempo detenido. Los límites del período base mantienen su MTTR y ajustan la frecuencia al número de turnos actuales; al desactivarlos se recalculan con el período actual.</p>
             <SegmentedControl<VistaJK> ariaLabel="Qué detenciones ver" value={vista} onChange={cambiarVista} segments={VISTAS} />
             <div className="space-y-2">
@@ -689,7 +747,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
               </p>
             </div>
 
-            <p className="text-body font-semibold text-foreground">{tesis}{tesisCmp}</p>
+            {!apple && <p className="text-body font-semibold text-foreground">{tesis}{tesisCmp}</p>}
             {avisos.length > 0 && <p className="text-footnote text-warning">{avisos.join(' ')}</p>}
             {prep.sinResumen > 0 && (
               <p className="text-caption text-muted-foreground">
@@ -744,7 +802,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
               </div>
             )}
 
-            <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${columnasLista}, minmax(0, 1fr))` }}>
+            {!apple && <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${columnasLista}, minmax(0, 1fr))` }}>
               {(['amb', 'agu', 'cro', 'ok'] as const).map((k) => {
                 const filas = calc.pts.filter((p) => p.q === k).sort((a, b) => nivelPrioridad(a, calc.un, calc.um) - nivelPrioridad(b, calc.un, calc.um) || b.min - a.min)
                 return (
@@ -783,7 +841,7 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                   </div>
                 )
               })}
-            </div>
+            </div>}
 
             {soloAntes.length > 0 && (
               <p className="text-caption text-muted-foreground">
@@ -806,7 +864,14 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
             {pdfEnCurso && <div style={{ position: 'fixed', left: -20000, top: 0 }} aria-hidden><JackKnifeLamina ref={laminaRef} calc={calc} informe={informe} turnos={turnos} fantasmas={fantasmas} planta={plantaTxt} ahoraTxt={rangoTexto(turnos, win)} antesTxt={previa ? rangoTexto(turnos, previa) : ''} minAntes={resumen?.minAntes} minAhora={nAhoraT ? calc.D / nAhoraT : 0} vista={VISTAS.find(v => v.value === vista)?.label ?? ''} limitesBase={limitesBase && !!antesCalc?.N} url={urlVista()} /></div>}
           </>
         )}
-      </CardContent>
+    </>
+  )
+
+  return apple ? (
+    <div ref={rootRef} className="min-w-0 space-y-6">{contenido}</div>
+  ) : (
+    <Card ref={rootRef} className="bg-card">
+      <CardContent className="p-4 space-y-3 min-w-0">{contenido}</CardContent>
     </Card>
   )
 }
