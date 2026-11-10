@@ -254,3 +254,21 @@
 .an-fr-bt { position: relative; background: var(--v2-reja); }
 .an-fr-meta { position: absolute; top: -3px; bottom: -3px; width: 1.5px; margin-left: -0.75px; background: rgb(var(--foreground) / 0.55); }
 .an-fr-poco .an-vv, .an-fr-poco b { color: rgb(var(--muted-foreground)); font-weight: 400; }
+
+/* Detalle en PC como expediente (DetalleExpedientePC, mockup A del 10-11-2026): la respuesta es el título y cada sección,
+   una tabla con filete. Solo bajo .an-pc; el celular sigue con las reglas de arriba. */
+.an-pc .an-d { gap: 24px; padding: 0; }
+.an-pc .an-d-resp { margin: 0; padding: 0 52px 12px 0; border: 0; border-bottom: 1px solid var(--an-sep); border-radius: 0; background: transparent; }
+.an-pc .an-d-resp-t { font-size: 22px; line-height: 1.27; font-weight: 600; letter-spacing: -0.015em; }
+.an-pc .an-d-resp .an-d-nota { margin-top: 4px; }
+.an-pc .an-d-nota { font-size: 13px; line-height: 1.35; }
+.an-pc .an-d-sec h4 { gap: 10px; margin-bottom: 6px; font-size: 17px; line-height: 1.35; }
+.an-pc .an-d-n { width: auto; height: auto; border: 0; border-radius: 0; font-size: 13px; font-weight: 400; color: rgb(var(--muted-foreground)); }
+.an-pc .an-d-sec h4 + .an-ev { border-top-color: rgb(var(--foreground)); }
+.an-pc .an-ev { display: grid; grid-template-columns: minmax(0, 1fr) 120px minmax(72px, auto); grid-template-areas: 'l bar v'; column-gap: 16px; align-items: center; min-height: 30px; padding: 5px 0; }
+.an-pc .an-ev-t { display: contents; }
+.an-pc .an-ev-l { grid-area: l; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: baseline; font-size: 15px; line-height: 1.33; }
+.an-pc .an-ev-l span { font-weight: 400; }
+.an-pc .an-ev-l small { font-size: 13px; }
+.an-pc .an-ev-t b { grid-area: v; font-size: 15px; }
+.an-pc .an-ev .an-bt { grid-area: bar; margin: 0; height: 6px; border-radius: 2px; overflow: hidden; }
