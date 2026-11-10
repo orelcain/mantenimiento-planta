@@ -8,6 +8,7 @@ import {
   resolverPiel,
   type EntradaIntensidad,
 } from '../intensidad'
+import { lecturaDe } from '@/lib/modoLectura'
 
 /**
  * Paleta Pizarra: la intensidad (Día · Penumbra · Automático) se resuelve ANTES
@@ -143,7 +144,7 @@ function correrScriptInicial({ search = '', store = {}, celular = false, sistema
     }),
   }
   new Function('document', 'localStorage', 'location', 'window', src)(doc, ls, { search }, win)
-  return { oscuro: clases.has('dark'), dataSkin: attrs['data-skin'] ?? null, paleta: attrs['data-paleta'] ?? null, themeColor, store }
+  return { oscuro: clases.has('dark'), dataSkin: attrs['data-skin'] ?? null, paleta: attrs['data-paleta'] ?? null, lectura: attrs['data-modo-lectura'] ?? null, themeColor, store }
 }
 
 // Elección explícita de la paleta anterior: app-skin=apple CON la marca de versión.
@@ -314,5 +315,23 @@ describe('script inline de index.html (anti-parpadeo)', () => {
       expect({ guardada, tema, celular, sistemaOscuro, oscuro: real.oscuro }).toEqual({ guardada, tema, celular, sistemaOscuro, oscuro: esperado.oscuro })
       expect(real.themeColor).toBe(esperado.oscuro ? '#171614' : '#F2F1EC')
     }
+  })
+})
+
+describe('modo lectura (script real + regla)', () => {
+  it('sin app-lectura: apagado, y el script no escribe nada', () => {
+    const r = correrScriptInicial({})
+    expect(r.lectura).toBeNull()
+    expect(r.store['app-lectura']).toBeUndefined()
+    expect(lecturaDe(null)).toBe(false)
+  })
+  it("app-lectura='1' marca data-modo-lectura antes del primer pintado; '0' no", () => {
+    expect(correrScriptInicial({ store: { 'app-lectura': '1' } }).lectura).toBe('on')
+    expect(correrScriptInicial({ store: { 'app-lectura': '0' } }).lectura).toBeNull()
+    expect(lecturaDe('1')).toBe(true)
+    expect(lecturaDe('0')).toBe(false)
+  })
+  it('con almacenamiento roto el script no se cae', () => {
+    expect(correrScriptInicial({ falla: 'ambos' }).lectura).toBeNull()
   })
 })
