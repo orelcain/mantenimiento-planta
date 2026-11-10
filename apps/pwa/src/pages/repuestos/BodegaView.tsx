@@ -10,7 +10,7 @@
  * Solo repuestos con código SAP.
  */
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import {
   Package, Search, AlertTriangle, ArrowDownCircle, ArrowUpCircle,
   Settings2, History, X, Check, Pencil, MapPin, TrendingDown,
@@ -20,7 +20,7 @@ import {
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
   Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal, Shapes,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { dibujoDe, maquinaDeDespiece, useFigurasDespiece } from './enlacesPieza'
 import { QRCodeSVG } from 'qrcode.react'
 import { escapeHtml } from '@/lib/escapeHtml'
@@ -52,6 +52,14 @@ import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
 import { StockTablaPC } from './StockTablaPC'
+import { FichaPieza } from './FichaPieza'
+import { PARAM_PIEZA, contenedorConScroll, pedidosAbiertosDe } from './datosFichaPieza'
+import { PedidosPorAtender } from '@/components/repuestos/PedidosPorAtender'
+import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
+import { SolicitarRepuestoModal } from '@/components/repuestos/SolicitarRepuestoModal'
+import { useSolicitudes } from '@/hooks/repuestos/useSolicitudes'
+import { useAccionesSolicitudes } from '@/hooks/repuestos/useAccionesSolicitudes'
+import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 import { useEsPC } from '@/hooks/useEsPC'
 import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { Pill, SegmentedControl, Button as PielButton } from '@/components/piel'
@@ -102,9 +110,12 @@ interface BodegaViewProps {
 
 export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps = {}) {
   const user = useAuthStore(s => s.user)
+  // Con la ficha de una pieza abierta (?pieza=), Bodega es esa página: sin sus pestañas ni avisos.
+  const [paramsUrl] = useSearchParams()
+  const fichaAbierta = paramsUrl.has(PARAM_PIEZA) || paramsUrl.has('sap')
   // Al volver del dibujo desde un inventario (teléfono), se reabre Inventarios.
   const [subTab, setSubTab] = useState<BodegaTab>(() => {
-    try { return sessionStorage.getItem(CLAVE_VOLVER_INVENTARIO) ? 'inventarios' : 'stock' } catch { return 'stock' }
+    try { return sessionStorage.getItem(CLAVE_VOLVER_INVENTARIO) && !new URLSearchParams(window.location.search).has(PARAM_PIEZA) ? 'inventarios' : 'stock' } catch { return 'stock' }
   })
 
   // ── Cargar catálogo (mismo patrón que BuscadorGlobal) ──
@@ -197,7 +208,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:p-6 lg:max-w-[1680px]">
       {/* PC: las cuatro vistas a la vista, con cuántos inventarios hay en curso. */}
-      <div className="hidden max-w-2xl lg:block">
+      <div className={cn('hidden max-w-2xl', !fichaAbierta && 'lg:block')}>
         <SegmentedControl<BodegaTab>
           value={subTab} onChange={setSubTab} ariaLabel="Vista de Bodega"
           segments={SUB_TABS.map(t => ({
@@ -211,7 +222,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos.
           El inventario en curso va en la misma fila, a la derecha: un toque y sin gastar
           una tarjeta de alto encima de la lista. */}
-      <div className="flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden">
+      <div className={cn('flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden', fichaAbierta && 'hidden sm:hidden')}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -254,7 +265,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
       </div>
 
       {/* Desde sm: el aviso completo, como siempre. Solo en el celular (<sm) lo reemplaza el botón del título. */}
-      {subTab === 'stock' && enCurso.map(s => (
+      {subTab === 'stock' && !fichaAbierta && enCurso.map(s => (
         <div key={s.id} className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
           <ClipboardList className="size-5 shrink-0 text-ink-warn" />
           <div className="min-w-0 flex-1">
@@ -307,7 +318,7 @@ function exportCsv(items: BodegaMergedItem[]) {
 const FILAS_POR_PAGINA = 60
 
 function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
-  const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
+  const { items, allItems, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, calcReorderData, overlayDeSap, registrarSalidaDeSolicitud } = bodega
   // Pase de lectura: sin escrituras (ajustes, movimientos, fotos, favoritos); se ven la tabla, la ficha y CSV.
   const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   const [searchQuery, setSearchQuery] = useState('')
@@ -328,12 +339,68 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const [showBulkConfig, setShowBulkConfig] = useState(false)
   const [showCargaRapida, setShowCargaRapida] = useState(false)
   const [showBatchMov, setShowBatchMov] = useState(false)
-  const [drawerItem, setDrawerItem] = useState<BodegaMergedItem | null>(null)
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [alertasAbiertas, setAlertasAbiertas] = useState(false)
 
   const esPC = useEsPC()
+  const { toast } = useToast()
+
+  // ── Ficha de la pieza como página: /repuestos?pieza=<rowKey>. ?sap= es el QR de antes. ──
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const piezaParam = searchParams.get(PARAM_PIEZA) ?? searchParams.get('sap')
+  const pieza = useMemo(
+    () => (piezaParam ? items.find(i => i.rowKey === piezaParam) ?? items.find(i => i.codigoSAP === piezaParam) ?? null : null),
+    [items, piezaParam],
+  )
+  /** Orden de la lista desde la que se abrió (para «Anterior» y «Siguiente»). */
+  const [ordenFicha, setOrdenFicha] = useState<BodegaMergedItem[]>([])
+  const raizRef = useRef<HTMLDivElement>(null)
+  const scrollLista = useRef(0)
+  const conPieza = useCallback((rowKey: string | null) => {
+    const p = new URLSearchParams(searchParams)
+    p.delete('sap')
+    if (rowKey) p.set(PARAM_PIEZA, rowKey); else p.delete(PARAM_PIEZA)
+    return p
+  }, [searchParams])
+  const abrirPieza = useCallback((i: BodegaMergedItem, orden?: BodegaMergedItem[]) => {
+    const sc = contenedorConScroll(raizRef.current)
+    scrollLista.current = sc ? sc.scrollTop : window.scrollY
+    if (orden) setOrdenFicha(orden)
+    setSearchParams(conPieza(i.rowKey), { state: { desdeLista: true } })
+  }, [conPieza, setSearchParams])
+  const abrirPiezaPorSap = useCallback((sap: string) => {
+    const i = items.find(x => x.codigoSAP === sap)
+    if (i) abrirPieza(i)
+  }, [items, abrirPieza])
+  const cambiarPieza = useCallback((i: BodegaMergedItem) => {
+    setSearchParams(conPieza(i.rowKey), { replace: true, state: location.state })
+  }, [conPieza, setSearchParams, location.state])
+  const volverALista = useCallback(() => {
+    if ((location.state as { desdeLista?: boolean } | null)?.desdeLista) navigate(-1)
+    else setSearchParams(conPieza(null), { replace: true })
+  }, [location.state, navigate, setSearchParams, conPieza])
+  // La ficha empieza arriba; al volver, la lista queda donde estaba.
+  const claveFicha = pieza?.rowKey ?? null
+  useLayoutEffect(() => {
+    const y = claveFicha ? 0 : scrollLista.current
+    const sc = contenedorConScroll(raizRef.current)
+    if (sc) sc.scrollTop = y; else window.scrollTo({ top: y })
+  }, [claveFicha])
+
+  // ── Pedidos de repuestos: se atienden desde Bodega (antes solo desde Áreas) ──
+  const { solicitudes, crearSolicitud, avanzarEstado, registrarAltaCreada, rechazarAlta, loading: cargandoSolicitudes } = useSolicitudes({ enabled: !soloLectura })
+  const indiceNombresPorSap = useMemo(() => indicePorSap(allItems), [allItems])
+  const accionesPedidos = useAccionesSolicitudes({ solicitudes, avanzarEstado, registrarAltaCreada, rechazarAlta, registrarSalidaDeSolicitud, indiceNombresPorSap })
+  const stockDe = useCallback((sap: string): StockDeSolicitud => {
+    const o = overlayDeSap(sap)
+    return o ? { configurado: true, stockActual: o.stockActual, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega } : { configurado: false }
+  }, [overlayDeSap])
+  const nombreDe = useCallback((sap: string, texto?: string) => nombreVisiblePorSap(indiceNombresPorSap, sap, texto), [indiceNombresPorSap])
+  const [panelPedidos, setPanelPedidos] = useState(false)
+  const [solicitarItem, setSolicitarItem] = useState<BodegaMergedItem | null>(null)
 
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => { if (prev === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev } setSortDir('asc'); return field })
@@ -423,19 +490,87 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={soloLectura ? undefined : () => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={soloLectura ? undefined : () => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={soloLectura ? undefined : addPhoto} removePhoto={soloLectura ? undefined : removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} dibujo={dibujoDeItem(drawerItem)} />}
+      {!soloLectura && (
+        <SolicitudesPanel
+          open={panelPedidos}
+          onOpenChange={setPanelPedidos}
+          solicitudes={solicitudes}
+          loading={cargandoSolicitudes}
+          onAvanzar={accionesPedidos.avanzar}
+          onRegistrarSap={accionesPedidos.puedeResolverAltas ? accionesPedidos.registrarSap : undefined}
+          onRechazarAlta={accionesPedidos.puedeResolverAltas ? accionesPedidos.rechazar : undefined}
+          buscarSap={accionesPedidos.buscarSap}
+          nombreDe={nombreDe}
+          stockDe={stockDe}
+        />
+      )}
+      {!soloLectura && (
+        <SolicitarRepuestoModal
+          open={!!solicitarItem}
+          onOpenChange={o => { if (!o) setSolicitarItem(null) }}
+          repuesto={solicitarItem ? { codigoSAP: solicitarItem.codigoSAP, textoBreve: solicitarItem.textoBreve, nombresComunes: solicitarItem.nombresComunes, stock: stockDe(solicitarItem.codigoSAP) } : null}
+          onSubmit={async data => {
+            await crearSolicitud(data, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+            setSolicitarItem(null)
+            toast({ title: 'Solicitud enviada', description: `${nombreDe(data.codigoSAP, data.textoBreve).titulo} ×${data.cantidad}. Queda en Pedidos y se avisa al grupo de Mantención en Telegram.`, variant: 'success' })
+          }}
+        />
+      )}
     </>
   )
 
-  // PC (≥1024 px): filtros a la izquierda y tabla a todo el ancho.
+  // La lista queda montada (oculta) mientras se lee la ficha: al volver conserva búsqueda, filtros y orden.
+  const nFicha = pieza ? ordenFicha.findIndex(i => i.rowKey === pieza.rowKey) : -1
+  const anterior = nFicha > 0 ? ordenFicha[nFicha - 1] : undefined
+  const siguiente = nFicha >= 0 && nFicha < ordenFicha.length - 1 ? ordenFicha[nFicha + 1] : undefined
+  const ficha = pieza && (
+        <FichaPieza
+          item={pieza}
+          esPC={esPC}
+          origen="Bodega"
+          onVolver={volverALista}
+          onAnterior={anterior ? () => cambiarPieza(anterior) : undefined}
+          onSiguiente={siguiente ? () => cambiarPieza(siguiente) : undefined}
+          loadMovimientos={loadMovimientos}
+          calcReorderData={calcReorderData}
+          dibujo={dibujoDeItem(pieza)}
+          pedidos={soloLectura ? [] : pedidosAbiertosDe(solicitudes, pieza.codigoSAP)}
+          onAvanzarPedido={soloLectura ? undefined : accionesPedidos.avanzar}
+          onSolicitar={soloLectura ? undefined : () => setSolicitarItem(pieza)}
+          onMovimiento={soloLectura ? undefined : () => setMovimientoItem(pieza)}
+          onEditar={soloLectura ? undefined : () => setEditingItem(pieza)}
+          addPhoto={soloLectura ? undefined : addPhoto}
+          onViewInEquipo={onViewInEquipo}
+          onSearchSimilar={onSearchSimilar}
+        />
+  )
+  const claseLista = pieza ? 'hidden' : 'contents'
+
+  const pedidos = soloLectura ? null : (
+    <PedidosPorAtender
+      solicitudes={solicitudes}
+      esPC={esPC}
+      stockDe={stockDe}
+      nombreDe={nombreDe}
+      onAvanzar={accionesPedidos.avanzar}
+      onVerTodos={() => setPanelPedidos(true)}
+      onAbrirPieza={abrirPiezaPorSap}
+    />
+  )
+
+  // PC (≥1024 px): pedidos arriba y la tabla a todo el ancho.
   if (esPC) {
     return (
-      <>
+      <div ref={raizRef} className="contents">
+        {ficha}
+        <div className={claseLista}>
+        {pedidos}
         <StockTablaPC items={items} acciones={menuAcciones}
-                      onAbrir={setDrawerItem} onMovimiento={soloLectura ? undefined : setMovimientoItem}
-                      onFavorito={soloLectura ? undefined : (i => toggleWatch(i.rowKey))} dibujoDe={dibujoDeItem} />
+                      onAbrir={abrirPieza} onMovimiento={soloLectura ? undefined : setMovimientoItem}
+                      onFavorito={soloLectura ? undefined : (i => toggleWatch(i.rowKey))} />
+        </div>
         {modales}
-      </>
+      </div>
     )
   }
 
@@ -453,7 +588,10 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     : undefined
 
   return (
-    <>
+    <div ref={raizRef} className="contents">
+      {ficha}
+      <div className={claseLista}>
+      {pedidos}
       {/* ── Buscar + menú de acciones ── */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
@@ -556,7 +694,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
                     <span className={cn('text-footnote font-medium', item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn')}>{item.stockActual === 0 ? 'Sin stock' : `Bajo mín · ${item.stockMinimo}`}</span>
                   </span>
                 }
-                onClick={() => setDrawerItem(item)}
+                onClick={() => abrirPieza(item, stats.alertas)}
               />
               )
             })}
@@ -598,7 +736,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
             <BodegaRow key={item.codigoSAP} item={item} apple={apple} orden={sortField}
               onEdit={soloLectura ? undefined : () => setEditingItem(item)} onMovimiento={soloLectura ? undefined : () => setMovimientoItem(item)}
               onToggleWatch={soloLectura ? undefined : () => toggleWatch(item.rowKey)}
-              onOpenDrawer={() => setDrawerItem(item)} />
+              onOpenDrawer={() => abrirPieza(item, filtered)} />
           ))}
         </ListGroup>
         {filtered.length > limite && (
@@ -613,8 +751,9 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         </>
       )}
 
+      </div>
       {modales}
-    </>
+    </div>
   )
 }
 
