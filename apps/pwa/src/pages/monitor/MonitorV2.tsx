@@ -33,6 +33,7 @@ import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { CifrasExpedientePC } from './CifrasExpedientePC'
+import { DetalleExpedientePC } from './DetalleExpedientePC'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina, paradasDetalle, varaDeMinuto, type VaciosTurno } from './ritmoVivo'
 import { desgloseDe, detencionesPorMinuto, varaCambio, type Desglose } from './desglose'
@@ -101,16 +102,18 @@ function useActivo() {
 
 // ── Detalle: hoja (celular) / panel lateral (PC) ─────────────────────────────
 
-export function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
+export function PanelDetalle({ abierto, titulo, sub, onClose, children, forma = 'panel' }: {
   abierto: boolean; titulo: string; sub?: string; onClose: () => void; children: ReactNode
+  /** `expediente`: en PC, ventana con la pregunta al costado (los detalles de Análisis). */
+  forma?: 'panel' | 'expediente'
 }) {
   const pc = useEsPc()
   useEffect(() => {
-    if (!abierto || !pc) return
+    if (!abierto || !pc || forma === 'expediente') return
     const f = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
-  }, [abierto, pc, onClose])
+  }, [abierto, pc, onClose, forma])
   if (!pc) {
     return (
       <Sheet
@@ -126,6 +129,7 @@ export function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
       </Sheet>
     )
   }
+  if (forma === 'expediente') return <DetalleExpedientePC abierto={abierto} titulo={titulo} sub={sub} onClose={onClose}>{children}</DetalleExpedientePC>
   if (!abierto) return null
   return createPortal(
     <div className="fixed inset-0 z-[100]">
