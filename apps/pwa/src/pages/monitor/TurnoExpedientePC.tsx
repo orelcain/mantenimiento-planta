@@ -249,16 +249,20 @@ function CuerpoRitmo({ onClose, p, reloj }: TurnoExpedientePCProps) {
   )
 }
 
-function CuerpoCierre({ onClose, p }: TurnoExpedientePCProps) {
+function CuerpoCierre({ onClose, p, reloj }: TurnoExpedientePCProps) {
   const vivas = useCifrasVivas()
   const meta = p.meta && p.meta > 0 ? p.meta : null
   const hechas = vivas && !p.cerrado ? Math.round(vivas.hechas) : p.piezas
   const faltan = meta != null ? Math.max(0, meta - hechas) : (p.cierre?.faltan ?? null)
-  const titulo = tituloCierre(p.proyeccion, meta, p.cierre?.hora)
+  /* La misma regla que la franja (`ContraLaMeta`) y el gráfico: detenida, la proyección queda en pausa. */
+  const detenida = !p.cerrado && (reloj.detenida || (p.eje?.detenidaEstado ?? false))
+  const titulo = tituloCierre(p.proyeccion, meta, p.cierre?.hora, detenida)
   const c = p.cierre
+  const cifra = detenida ? 'en pausa' : p.proyeccion != null ? `${int(p.proyeccion)} pz` : '—'
+  const nota = detenida ? (p.causaParada ? `línea detenida · ${p.causaParada}` : 'línea detenida') : c?.hora ? `proyección hasta las ${c.hora}` : 'proyección del turno'
   const costado = (
     <>
-      <Cabeza rotulo="Al cierre" p={p} cifra={p.proyeccion != null ? `${int(p.proyeccion)} pz` : '—'} nota={c?.hora ? `proyección hasta las ${c.hora}` : 'proyección del turno'} />
+      <Cabeza rotulo="Al cierre" p={p} cifra={cifra} nota={nota} />
       {meta != null && <Clave k="Meta del turno" v={`${int(meta)} pz`} />}
       {faltan != null && <Clave k="Faltan para la meta" v={`${int(faltan)} pz`} />}
       {c?.quedaMin != null && <Clave k="Tiempo que queda" v={horas(c.quedaMin)} />}
