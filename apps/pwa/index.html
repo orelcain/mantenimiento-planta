@@ -97,6 +97,11 @@
         if (skin !== 'default') {
           document.documentElement.setAttribute('data-skin', pizarra ? 'apple' : skin);
         }
+        // Modo lectura (app-lectura: '1' activo, '0' o vacío apagado). Misma regla en
+        // src/lib/modoLectura.ts; la capa CSS solo actúa con la piel Apple.
+        if (get('app-lectura') === '1') {
+          document.documentElement.setAttribute('data-modo-lectura', 'on');
+        }
         // theme-color del chrome móvil acorde al tema, antes de que cargue React
         var tc = document.querySelector('meta[name="theme-color"]');
         if (tc) {
