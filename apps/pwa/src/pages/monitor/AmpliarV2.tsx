@@ -58,9 +58,12 @@ export interface TarjetaProps {
   datos?: Record<string, string | undefined>
   /** Etiqueta accesible de la tarjeta. */
   etiqueta?: string
+  /** En PC (lg+), «Ampliar» abre esta ventana en vez de la capa; en celular sigue la hoja con `ampliado`. */
+  ventanaPC?: (abierta: boolean, cerrar: () => void) => ReactNode
 }
 
-export function Tarjeta({ icono, titulo, sub, children, className = '', onAbrir, iconoSoloPc, ampliado, subAmpliado, derecha, datos, etiqueta, compacta, abrirCon }: TarjetaProps) {
+export function Tarjeta({ icono, titulo, sub, children, className = '', onAbrir, iconoSoloPc, ampliado, subAmpliado, derecha, datos, etiqueta, compacta, abrirCon, ventanaPC }: TarjetaProps) {
+  const pc = useEsPc()
   const ref = useRef<HTMLElement>(null)
   const botonRef = useRef<HTMLButtonElement>(null)
   const [abierta, setAbierta] = useState(false)
@@ -112,7 +115,8 @@ export function Tarjeta({ icono, titulo, sub, children, className = '', onAbrir,
         </div>
       </div>
       <AbrirCtx.Provider value={conAmpliado ? () => setAbierta(true) : null}>{children}</AbrirCtx.Provider>
-      {conAmpliado && (
+      {conAmpliado && pc && ventanaPC && ventanaPC(abierta, () => setAbierta(false))}
+      {conAmpliado && !(pc && ventanaPC) && (
         <CapaAmpliada
           abierta={abierta}
           onCerrar={() => setAbierta(false)}

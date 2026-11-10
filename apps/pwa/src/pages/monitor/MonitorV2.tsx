@@ -32,6 +32,7 @@ import { CascadaMetaV2 } from './CascadaMetaV2'
 import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
+import { CifrasExpedientePC } from './CifrasExpedientePC'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina, paradasDetalle, varaDeMinuto, type VaciosTurno } from './ritmoVivo'
 import { desgloseDe, detencionesPorMinuto, varaCambio, type Desglose } from './desglose'
@@ -1456,6 +1457,8 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
     }
   }
   const detalle = detalleDe(abierta)
+  /* En PC, «Fallas de equipos» y «Tiempo perdido» abren la misma ventana expediente (mockup A del 09-11). */
+  const ventanaCifras = (abiertaPC: boolean, cerrar: () => void) => <CifrasExpedientePC open={abiertaPC} onClose={cerrar} datos={p} />
 
   /* El turno anterior con UNA cifra, la MISMA de la leyenda del gráfico (`cifraTurnoAnterior`): en vivo, el valor de su curva en el
      mismo minuto desde la primera pieza (lo que se dibuja); cerrado, su total (el mismo de «Comparado con otros días»).
@@ -1567,7 +1570,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         <>
           {p.duelo && <div className="min-w-0">{p.duelo}</div>}
           <div className="grid grid-cols-1 gap-3 min-[1024px]:grid-cols-2 min-[1600px]:gap-4">
-            <Tarjeta ampliado={detalleDe('mant')?.cuerpo} subAmpliado={detalleDe('mant')?.sub} icono={<Wrench className={ic} />} titulo="Fallas de equipos" sub={p.eventos.length ? `${p.eventos.length} en el turno · ${horas(fallasMin)}` : 'ninguna en el turno'}>
+            <Tarjeta ampliado={detalleDe('mant')?.cuerpo} subAmpliado={detalleDe('mant')?.sub} ventanaPC={ventanaCifras} icono={<Wrench className={ic} />} titulo="Fallas de equipos" sub={p.eventos.length ? `${p.eventos.length} en el turno · ${horas(fallasMin)}` : 'ninguna en el turno'}>
               {p.rielMttr.length > 1 && <RielMttr riel={p.rielMttr} />}
               {p.eventos.length > 0 && (
                 <ol className="mt-4 space-y-3">
@@ -1588,7 +1591,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
               )}
             </Tarjeta>
 
-            <Tarjeta ampliado={detalleDe('perdido')?.cuerpo} subAmpliado={detalleDe('perdido')?.sub} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub={p.perdidasMaquina && p.perdidasMaquina.maquinas > 1 ? `minutos de línea: ${int(p.perdidasMaquina.min)} min de máquina ÷ ${p.perdidasMaquina.maquinas}` : 'minutos de línea, por dueño y causa'}>
+            <Tarjeta ampliado={detalleDe('perdido')?.cuerpo} subAmpliado={detalleDe('perdido')?.sub} ventanaPC={ventanaCifras} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub={p.perdidasMaquina && p.perdidasMaquina.maquinas > 1 ? `minutos de línea: ${int(p.perdidasMaquina.min)} min de máquina ÷ ${p.perdidasMaquina.maquinas}` : 'minutos de línea, por dueño y causa'}>
               <Cifra valor={horasCifra(totalPerdida)} chica />
               {totalPerdida > 0 && (
                 <>
