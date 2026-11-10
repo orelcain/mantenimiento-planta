@@ -1582,3 +1582,21 @@ html.vidrio-solido.dark .vidrio {
     font-size: 17px;
   }
 }
+
+/* Un escalón más de letra en TODO el contenido, también en las pantallas ya hechas
+   en lectura (Informe de turno, Jack-Knife, Período, Causa raíz): sus tamaños y los
+   roles de la escala tipográfica multiplican por --escala-texto. La Bitácora fija la
+   suya en <html> (style inline) cuando la persona eligió otro tamaño: entonces manda
+   esa elección y esta regla no aplica. */
+:root[data-skin='apple'][data-modo-lectura='on']:not([style*='--escala-texto']) #main-content:not([data-sin-lectura]) {
+  --escala-texto: 1.12;
+}
+/* Ancho de lectura en PC: el contenido no pasa de 1280 px y queda centrado, así las
+   líneas de texto y las tablas no cruzan una pantalla ancha de lado a lado. */
+@media (min-width: 1024px) {
+  :root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) > * {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
