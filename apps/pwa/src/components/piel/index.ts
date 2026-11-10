@@ -31,3 +31,4 @@ export { EncabezadoHerramienta, type EncabezadoHerramientaProps, type ItemMasHer
 export { SelectorSeccion, type SelectorSeccionProps, type OpcionSeccion } from './SelectorSeccion'
 export { FoldTable, type FoldTableProps, type FoldTableRow, type FoldTableColumn } from './FoldTable'
 export { Skeleton, SkeletonBloque, type SkeletonBloqueProps } from './Skeleton'
+export { SeccionLectura, FilasLectura, type FilaLectura } from './Lectura'
