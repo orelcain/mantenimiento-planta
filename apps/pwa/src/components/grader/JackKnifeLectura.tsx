@@ -6,7 +6,7 @@
  * ahora» a la derecha (PC) y la tabla «Todas las causas». El detalle plegable
  * («Ver detalle») lo arma la tarjeta y se muestra debajo de esto.
  */
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { useAncho } from '@/hooks/useAncho'
 import { useEsPC } from '@/hooks/useEsPC'
@@ -28,6 +28,7 @@ import {
 } from '@/services/shoplogix/jackKnifeLectura'
 import { JackKnifeGrafico } from './JackKnifeGrafico'
 import { AtacarAhoraLectura } from './JackKnifeListas'
+import { TJK_BOTON, TJK_BOTON_PRI, TJK_CUERPO, TJK_ENLACE, TJK_NOTA, TJK_SECCION, TJK_SEG, TJK_TITULO, claseSegmento } from './jackKnifeTablero'
 
 const PERIODOS: { value: VentanaJK | 'libre'; label: string }[] = [
   { value: '7', label: '7 días' },
@@ -55,7 +56,7 @@ const fechaDia = (ms: number) => {
  * acción del cuadrante y los comentarios más repetidos. Lo arma la lectura para el
  * PC (columna derecha) y para el celular (hoja). Mismos datos que la tarjeta.
  */
-function CuerpoDetalleCausa({ punto, calc, turnos, antes, nAhoraT, nAntesT, onVerTodos, onAnalizar }: {
+function CuerpoDetalleCausa({ punto, calc, turnos, antes, nAhoraT, nAntesT, onVerTodos, onAnalizar, pc = false }: {
   punto: PuntoJK
   calc: CalculoJK
   turnos: TurnoJK[]
@@ -65,10 +66,13 @@ function CuerpoDetalleCausa({ punto, calc, turnos, antes, nAhoraT, nAntesT, onVe
   nAntesT: number
   onVerTodos?: () => void
   onAnalizar?: (causa: string) => void
+  /** Tablero de PC: 7 comentarios con su total, controles de 36 px. */
+  pc?: boolean
 }) {
   const esSin = punto.k === SIN_IMPUTAR
   const comentarios = esSin ? [] : comentariosDe(turnos, calc.desde, calc.hasta, punto.k, Infinity)
-  const grupos = agruparComentarios(comentarios).slice(0, 5)
+  const grupos = agruparComentarios(comentarios).slice(0, pc ? 7 : 5)
+  const enGrupos = grupos.reduce((s, g) => s + g.n, 0)
   const cuadrante = punto.q === 'cro'
     ? (nivelPrioridad(punto, calc.un, calc.um) === 3 ? 'Crónica A' : 'Crónica B')
     : TITULO_CUADRANTE[punto.q]
@@ -122,17 +126,23 @@ function CuerpoDetalleCausa({ punto, calc, turnos, antes, nAhoraT, nAntesT, onVe
               ),
             }))}
           />
+          {pc && grupos.length > 1 && (
+            <div className={cn('flex items-baseline justify-between gap-4 border-t-[1.5px] border-foreground py-[7px] font-semibold tabular-nums', LECTURA_CUERPO)}>
+              <span>{`Los ${grupos.length} más repetidos`}</span>
+              <span>{`${enGrupos} de ${comentarios.length}`}</span>
+            </div>
+          )}
         </>
       )}
       {(onAnalizar && !esSin || (onVerTodos && comentarios.length > 0)) && (
         <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
           {onAnalizar && !esSin && (
-            <button type="button" className="min-h-11 rounded-ctl border border-border px-3 text-brand-ink lg:min-h-0 lg:py-1" onClick={() => onAnalizar(punto.k)}>
+            <button type="button" className={pc ? TJK_BOTON_PRI : 'min-h-11 rounded-ctl border border-border px-3 text-brand-ink lg:min-h-0 lg:py-1'} onClick={() => onAnalizar(punto.k)}>
               Analizar causa raíz
             </button>
           )}
           {onVerTodos && comentarios.length > 0 && (
-            <button type="button" className={LECTURA_ENLACE} onClick={onVerTodos}>
+            <button type="button" className={pc ? TJK_ENLACE : LECTURA_ENLACE} onClick={onVerTodos}>
               {`Ver los ${comentarios.length}`}
             </button>
           )}
@@ -180,6 +190,10 @@ export interface JackKnifeLecturaProps {
   exportable: boolean
   exportando: boolean
   onExportar: (formato: 'pdf' | 'png') => void
+  /** PC: selector de planta al inicio de la barra de controles. */
+  planta?: ReactNode
+  /** PC: turnos (índices) del período de comparación, para pintar el riel. */
+  rangoAntes?: { desde: number; hasta: number } | null
 }
 
 export function JackKnifeLectura(p: JackKnifeLecturaProps) {
@@ -200,9 +214,11 @@ export function JackKnifeLectura(p: JackKnifeLecturaProps) {
   )
   const bajada = useMemo(() => (p.filas.length ? bajadaLectura(p.filas) : ''), [p.filas])
   const nAgudasCronicas = calc.pts.filter((x) => x.q === 'amb').length
-  const resumenCuadrantes = `${nAgudasCronicas} ${plural(nAgudasCronicas, 'causa', 'causas')}. ${
-    nAgudasCronicas === 0 ? 'Ninguna cae en agudas y crónicas' : `${nAgudasCronicas === 1 ? 'Cae' : 'Caen'} en agudas y crónicas`
-  }. Umbrales ${p.umbralesDelBase ? 'del período base' : 'recalculados con cada ventana'}: ${dec1(calc.un)} eventos y ${dec1(calc.um)} min de MTTR.`
+  const cuadrantesTexto = nAgudasCronicas === 0
+    ? 'Ninguna causa cae en agudas y crónicas'
+    : `${nAgudasCronicas} ${plural(nAgudasCronicas, 'causa cae', 'causas caen')} en agudas y crónicas`
+  const umbralesTexto = `Umbrales ${p.umbralesDelBase ? 'del período base' : 'recalculados con cada ventana'}: ${dec1(calc.un)} eventos y ${dec1(calc.um)} min de MTTR`
+  const resumenCuadrantes = `${cuadrantesTexto}. ${umbralesTexto}.`
   const colsPC = esPC ? 'grid-cols-[minmax(0,7fr)_minmax(0,5fr)] items-start' : ''
   /* PC: si la causa se eligió desde la tabla (más abajo), el detalle queda fuera de
      la vista; se lleva la vista a él solo cuando no se ve. */
@@ -217,6 +233,187 @@ export function JackKnifeLectura(p: JackKnifeLecturaProps) {
     const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     el.scrollIntoView({ block: 'start', behavior: reducido ? 'auto' : 'smooth' })
   }, [causaPC])
+
+  if (esPC) {
+    // Riel: horas por turno del período de comparación (ámbar) y del actual (acento).
+    const ra = p.rangoAntes ?? null
+    const ini = ra ? Math.min(ra.desde, calc.desde) : calc.desde
+    const riel = calc.barras.slice(ini, calc.hasta + 1)
+    const mxRiel = Math.max(...riel, 1)
+    const tono = (i: number) => {
+      const k = ini + i
+      if (k >= calc.desde) return 'bg-brand-ink'
+      return ra && k >= ra.desde && k <= ra.hasta ? 'bg-warning' : 'bg-border'
+    }
+    return (
+      <div className="min-w-0 space-y-[18px]" data-testid="jk-tablero">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-border pb-3.5">
+          {p.planta}
+          <div role="group" aria-label="Período" className={TJK_SEG}>
+            {PERIODOS.map((o) => {
+              const on = !p.mesActivo && p.preset === o.value
+              return (
+                <button key={o.value} type="button" aria-pressed={on} onClick={() => p.onPreset(o.value)} className={claseSegmento(on)}>
+                  {o.label}
+                </button>
+              )
+            })}
+            <button type="button" aria-pressed={p.mesActivo} onClick={p.onMes} className={claseSegmento(p.mesActivo)}>Mes</button>
+          </div>
+          <label className="flex items-center gap-2.5">
+            <span className={cn(TJK_CUERPO, 'text-muted-foreground')}>Comparar con</span>
+            <select
+              value={p.modoCmp}
+              onChange={(e) => p.onModo(e.target.value as ModoCmpJK)}
+              className={cn('min-h-[36px] rounded-ctl border border-border bg-background px-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', TJK_CUERPO)}
+            >
+              {COMPARACIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          {p.hayPrevia && (
+            <label className={cn('flex min-h-[36px] items-center gap-2.5', TJK_CUERPO)}>
+              <input type="checkbox" className="h-4 w-4 accent-primary" checked={p.limitesBase} onChange={(e) => p.onLimites(e.target.checked)} />
+              Límites del período base
+            </label>
+          )}
+          <span className="flex-1" />
+          <button type="button" className={TJK_BOTON} disabled={p.exportando || !p.exportable} onClick={() => p.onExportar('pdf')}>Exportar PDF</button>
+          <button type="button" className={TJK_BOTON} disabled={p.exportando || !p.exportable} onClick={() => p.onExportar('png')}>PNG</button>
+        </div>
+
+        <header className="max-w-[1100px] space-y-1.5">
+          {p.ahora ? (
+            <>
+              <p className={cn(TJK_NOTA, 'm-0')}>{identidadLectura(p.ahora, p.antes)}</p>
+              <h1 className={TJK_TITULO}>{titularLectura(p.minAhora, p.minAntes)}</h1>
+              {bajada && <p className={cn(TJK_CUERPO, 'm-0 pt-0.5')}>{bajada}</p>}
+            </>
+          ) : (
+            <p className={cn(TJK_NOTA, 'm-0')}>Sin turnos con resumen en este período.</p>
+          )}
+        </header>
+
+        <div className="grid grid-cols-[minmax(0,1fr)_clamp(400px,31vw,560px)] items-start gap-8">
+          <figure className="m-0 min-w-0" data-testid="jk-grafico">
+            <div ref={graficoRef} className="min-w-0 max-w-[900px]">
+              <JackKnifeGrafico
+                calc={calc}
+                ancho={ancho}
+                sel={p.sel}
+                fantasmas={p.fantasmas}
+                elegirCausa={elegir}
+                anillos={p.anillos}
+                lectura
+                enAtacar={enAtacar}
+              />
+            </div>
+            {riel.length > 1 && (
+              <div
+                role="img"
+                aria-label={`Horas de detención de Mantención por turno, ${riel.length} turnos`}
+                className="mt-3.5 flex h-11 max-w-[900px] items-end border-b border-border"
+              >
+                {riel.map((v, i) => (
+                  <span
+                    key={ini + i}
+                    className={cn('min-w-0 flex-1', tono(i))}
+                    style={{ height: v ? Math.max(1, 44 * Math.sqrt(v / mxRiel)) : 0 }}
+                  />
+                ))}
+              </div>
+            )}
+            <figcaption className={cn(TJK_NOTA, 'mt-1.5 flex max-w-[900px] flex-wrap justify-between gap-x-4 gap-y-1')}>
+              <span>
+                {ra && p.antes && <><i className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-warning align-[1px]" aria-hidden />{`Antes, ${p.antes.turnos} turnos`}<span className="mr-3.5" /></>}
+                {p.ahora && <><i className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-brand-ink align-[1px]" aria-hidden />{`Ahora, ${p.ahora.turnos} turnos`}</>}
+              </span>
+              <span>{umbralesTexto}</span>
+            </figcaption>
+            <p className={cn(TJK_NOTA, 'mt-1')}>{`${cuadrantesTexto}. La flecha une cada causa con su lugar en el período anterior.`}</p>
+          </figure>
+
+          {punto ? (
+            <section className="min-w-0 space-y-2" data-testid="jk-detalle" aria-label={punto.k}>
+              <button type="button" className={TJK_ENLACE} onClick={() => p.onCerrarCausa?.()}>‹ Todas las causas</button>
+              <div className="border-t-2 border-brand-ink pt-2.5">
+                <h2 className={TJK_SECCION}>{punto.k}</h2>
+                <CuerpoDetalleCausa
+                  punto={punto}
+                  calc={calc}
+                  turnos={p.turnos}
+                  antes={antesDeLaCausa}
+                  nAhoraT={p.ahora?.turnos ?? 0}
+                  nAntesT={p.antes?.turnos ?? 0}
+                  onVerTodos={() => verTodos(punto.k)}
+                  onAnalizar={p.onAnalizar}
+                  pc
+                />
+              </div>
+            </section>
+          ) : (
+            <section className="min-w-0 space-y-3.5">
+              <AtacarAhoraLectura calc={calc} turnos={p.turnos} elegirCausa={elegir} analisis={p.analisis} onAnalizar={p.onAnalizar} pc />
+              <table className={cn('w-full table-fixed border-collapse tabular-nums', TJK_CUERPO)} data-testid="jk-tabla">
+                <colgroup>
+                  <col />
+                  <col className="w-[60px]" />
+                  <col className="w-[56px]" />
+                  <col className="w-[52px]" />
+                  <col className="w-[100px]" />
+                </colgroup>
+                <thead>
+                  <tr className={TJK_NOTA}>
+                    <th scope="col" className="pb-1 text-left font-normal">Todas las causas</th>
+                    <th scope="col" className="pb-1 text-right font-normal">Eventos</th>
+                    <th scope="col" className="pb-1 text-right font-normal">MTTR</th>
+                    <th scope="col" className="pb-1 text-right font-normal">Horas</th>
+                    <th scope="col" className="pb-1 text-right font-normal">Frente</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tabla.grupos.map((g) => (
+                    <Fragment key={g.q}>
+                      <tr className="border-t border-border">
+                        <th scope="rowgroup" className="pb-1 pt-2.5 text-left font-semibold">{g.titulo}</th>
+                        <td className="pb-1 pt-2.5 text-right font-semibold">{g.ev}</td>
+                        <td />
+                        <td className="pb-1 pt-2.5 text-right font-semibold">{g.horas}</td>
+                        <td />
+                      </tr>
+                      {g.filas.map((f) => (
+                        <tr key={f.causa} className="border-t border-border">
+                          <td className="truncate pr-3">
+                            <button type="button" aria-pressed={false} onClick={() => elegir(f.causa)} className="min-h-[30px] max-w-full truncate text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                              {f.causa}
+                            </button>
+                          </td>
+                          <td className="text-right">{f.ev}</td>
+                          <td className="text-right">{dec1(f.mttr)}</td>
+                          <td className="text-right">{f.horas}</td>
+                          <td className={cn('whitespace-nowrap text-right', f.frente === 'empeoró' ? 'text-ink-crit' : 'text-muted-foreground')}>
+                            {f.frente === 'empeoró' && <i className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-ink-crit align-[1px]" aria-hidden />}
+                            {f.frente}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                  <tr className="border-t-[1.5px] border-foreground font-semibold">
+                    <th scope="row" className="pt-1.5 text-left font-semibold">Mantención</th>
+                    <td className="pt-1.5 text-right">{tabla.ev}</td>
+                    <td />
+                    <td className="pt-1.5 text-right">{tabla.horas}</td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+              {tabla.nota && <p className={TJK_NOTA}>{tabla.nota}</p>}
+            </section>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-w-0 space-y-5">

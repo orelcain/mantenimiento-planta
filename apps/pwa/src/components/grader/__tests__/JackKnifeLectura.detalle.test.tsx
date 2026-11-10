@@ -111,11 +111,11 @@ describe('JackKnifeLectura, detalle de causa (PC)', () => {
     expect(ahora).toHaveLength(3)
   })
 
-  it('«Cerrar» quita la selección: vuelve «Atacar ahora» y no abre nada', () => {
+  it('«‹ Todas las causas» quita la selección y no abre nada', () => {
     const onCerrarCausa = vi.fn()
     const onVerDetalle = vi.fn()
     render(<JackKnifeLectura {...props({ sel: 'Knuro', onCerrarCausa, onVerDetalle })} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    fireEvent.click(screen.getByRole('button', { name: '‹ Todas las causas' }))
     expect(onCerrarCausa).toHaveBeenCalledTimes(1)
     expect(onVerDetalle).not.toHaveBeenCalled()
   })
@@ -138,10 +138,38 @@ describe('JackKnifeLectura, detalle de causa (PC)', () => {
     expect(onVerDetalle).not.toHaveBeenCalled()
   })
 
-  it('la fila elegida se destaca con bg-muted', () => {
+  it('con causa elegida, el detalle reemplaza a la tabla y a «Atacar ahora»', () => {
     render(<JackKnifeLectura {...props({ sel: 'Knuro' })} />)
-    const fila = screen.getByRole('button', { name: 'Knuro', pressed: true }).closest('tr')!
-    expect(fila.className).toContain('bg-muted')
+    expect(screen.queryByTestId('jk-tabla')).toBeNull()
+    expect(screen.queryByTestId('jk-atacar')).toBeNull()
+  })
+
+  it('la tabla cierra con el total de Mantención', () => {
+    render(<JackKnifeLectura {...props()} />)
+    const total = within(screen.getByTestId('jk-tabla')).getByRole('rowheader', { name: 'Mantención' }).closest('tr')!
+    expect(total.className).toContain('border-foreground')
+  })
+
+  it('la barra lleva la planta, el período con «Mes» y la comparación como lista', () => {
+    const onModo = vi.fn()
+    const onMes = vi.fn()
+    render(<JackKnifeLectura {...props({ onModo, onMes, planta: <span>Selector de planta</span> })} />)
+    expect(screen.getByText('Selector de planta')).toBeTruthy()
+    const periodo = screen.getByRole('group', { name: 'Período' })
+    expect(within(periodo).getByRole('button', { name: '90 días', pressed: true })).toBeTruthy()
+    fireEvent.click(within(periodo).getByRole('button', { name: 'Mes' }))
+    expect(onMes).toHaveBeenCalledTimes(1)
+    fireEvent.change(screen.getByRole('combobox', { name: /Comparar con/ }), { target: { value: 'mes' } })
+    expect(onModo).toHaveBeenCalledWith('mes')
+  })
+
+  it('el riel pinta el período anterior y el actual', () => {
+    const calc = { ...CALC, barras: [10, 0, 20, 30], desde: 2, hasta: 3 }
+    const turnos = [0, 1, 2, 3].map((i) => ({ ...TURNOS[0]!, id: `t${i}` }))
+    render(<JackKnifeLectura {...props({ calc, turnos, rangoAntes: { desde: 0, hasta: 1 } })} />)
+    const riel = screen.getByRole('img', { name: /por turno, 4 turnos/ })
+    const tonos = [...riel.children].map((b) => b.className.match(/bg-[a-z-]+/)?.[0])
+    expect(tonos).toEqual(['bg-warning', 'bg-warning', 'bg-brand-ink', 'bg-brand-ink'])
   })
 })
 
