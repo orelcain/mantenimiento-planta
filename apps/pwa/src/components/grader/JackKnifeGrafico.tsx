@@ -92,6 +92,7 @@ export function JackKnifeGrafico({ calc, ancho = 900, sel = null, fantasmas = []
                     >
                       <title>{p.k}</title>
                       {conAccion && <circle cx={x} cy={y} r={rad + 5} fill="none" stroke="rgb(var(--accent))" strokeWidth={2.5} />}
+                      {lectura && sel === p.k && <circle cx={x} cy={y} r={rad + 5} fill="none" stroke="rgb(var(--brand-ink))" strokeWidth={2} />}
                       <circle cx={x} cy={y} r={rad} fill={color} className="stroke-card" strokeWidth={1.5} />
                       {etiqueta && (
                         <text x={etiqueta.bx} y={etiqueta.by} className="fill-foreground text-footnote">{p.k}</text>

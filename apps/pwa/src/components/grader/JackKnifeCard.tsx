@@ -474,6 +474,14 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
 
   // Al cambiar de causa o de vista se limpian el filtro y la búsqueda de comentarios.
   const elegirCausa = (k: string) => { if (detalleRef.current) detalleRef.current.open = true; setSel(k); setBusqueda(''); setPalabra(null) }
+  /** Piel Apple: elegir una causa no abre «Ver detalle» ni mueve la página; el detalle sale al lado (PC) o en la hoja (celular). */
+  const elegirCausaLectura = (k: string) => { setSel(k); setBusqueda(''); setPalabra(null) }
+  /** «Ver los N» de la lectura: abre «Ver detalle» con la causa elegida y lleva la vista ahí. */
+  const verDetalleCausa = (k: string) => {
+    setSel(k); setBusqueda(''); setPalabra(null)
+    if (detalleRef.current) { detalleRef.current.open = true; detalleRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }
+  }
+  const quitarCausa = () => setSel(null)
   const cambiarVista = (v: VistaJK) => { setVista(v); setSel(null); setBusqueda(''); setPalabra(null) }
   const cambiarPreset = (v: VentanaJK | 'libre') => { setPreset(v); setManual(null) }
   const cambiarModo = (m: ModoCmpJK) => {
@@ -551,7 +559,10 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                 minAntes={resumen ? resumen.minAntes : null}
                 fantasmas={fantasmas}
                 sel={sel}
-                elegirCausa={elegirCausa}
+                elegirCausa={elegirCausaLectura}
+                onCerrarCausa={quitarCausa}
+                onVerDetalle={verDetalleCausa}
+                antesPts={antesCalc?.pts ?? null}
                 anillos={esBitacora ? anillos : undefined}
                 analisis={esBitacora ? analisis : undefined}
                 onAnalizar={esBitacora ? (causa) => setEscogiendoCausa(causa) : undefined}
