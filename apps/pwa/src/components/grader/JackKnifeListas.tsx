@@ -1,5 +1,7 @@
 ﻿import { ACCION_CUADRANTE, agruparComentarios, comentariosDe, nivelPrioridad, type CalculoJK, type InformeJK, type TurnoJK } from '@/services/shoplogix/jackKnife'
+import { causasAtacar } from '@/services/shoplogix/jackKnifeLectura'
 import { dec1 } from '@/utils/formatoNumeros'
+import { LECTURA_CUERPO, SeccionLectura } from '@/components/piel/Lectura'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListCell, ListGroup } from '@/components/piel'
@@ -58,6 +60,48 @@ function SeccionAnalisis({ causa, resumen }: { causa: string; resumen: ResumenCa
       )}
     </section>
   )
+}
+
+const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios)
+
+/**
+ * «Atacar ahora» en modo lectura (piel Apple): una fila con filete por causa, con
+ * «Analizar» con borde a la derecha; abajo, la recomendación y los comentarios más
+ * repetidos. Cierra con la nota de la causa crónica más costosa.
+ */
+export function AtacarAhoraLectura({ calc, turnos, elegirCausa = () => {}, analisis, onAnalizar }: {
+  calc: CalculoJK; turnos: TurnoJK[]; elegirCausa?: (k: string) => void
+  analisis?: ReadonlyMap<string, ResumenCausaJK>
+  onAnalizar?: (causa: string) => void
+}) {
+  const atacar = causasAtacar(calc)
+  const cronica = [...calc.pts].filter(p => p.q === 'cro').sort((a, b) => b.min - a.min)[0]
+  const comentariosCronica = cronica ? comentariosDe(turnos, calc.desde, calc.hasta, cronica.k, Infinity) : []
+  const masRepetido = comentariosCronica.length ? agruparComentarios(comentariosCronica)[0] : undefined
+  return <SeccionLectura titulo="Atacar ahora" testId="jk-atacar">
+    {!atacar.length && <p className="text-muted-foreground">Sin causas de nivel 1 o 2.</p>}
+    {atacar.map(p => {
+      const r = analisis?.get(p.k)
+      const estado = !analisis ? '' : !r || r.total === 0 ? 'Sin análisis. ' : r.fuertesHechas > 0 ? 'Acción fuerte hecha. ' : `${r.total} análisis. `
+      return <div key={p.k} className={`border-t border-border py-2.5 ${LECTURA_CUERPO}`}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0">
+            <button type="button" className="text-left font-semibold text-ink-crit hover:underline min-h-11 lg:min-h-0" onClick={() => elegirCausa(p.k)}>{p.k}</button>
+            <span>, {p.ev} {plural(p.ev, 'detención', 'detenciones')} de {dec1(p.mttr)} min</span>
+          </p>
+          {onAnalizar && (r?.total ?? 0) === 0 && (
+            <button type="button" className="shrink-0 rounded-ctl border border-border px-3 min-h-11 text-brand-ink lg:min-h-0 lg:py-1" onClick={() => onAnalizar(p.k)}>Analizar</button>
+          )}
+        </div>
+        <p className="mt-1">{estado}{ACCION_CUADRANTE[p.q]}</p>
+        {agruparComentarios(comentariosDe(turnos, calc.desde, calc.hasta, p.k, Infinity)).slice(0, 2).map(g => <p key={g.texto} className="mt-1 break-words text-footnote text-muted-foreground">{g.texto} ×{g.n}</p>)}
+      </div>
+    })}
+    {cronica && masRepetido && <p className="mt-3 text-footnote text-muted-foreground">
+      <span className="font-semibold text-foreground">{cronica.k}, {comentariosCronica.length} {plural(comentariosCronica.length, 'comentario', 'comentarios')}.</span>{' '}
+      El más repetido: {masRepetido.texto.replace(/[.!?…]+$/, '')}.
+    </p>}
+  </SeccionLectura>
 }
 
 export function JackKnifeListas({ calc, informe, turnos, elegirCausa = () => {}, lamina = false, analisis, causaSel = null, onAnalizar }: {
