@@ -41,20 +41,18 @@ describe('PeriodoNavegador · piel Apple', () => {
     expect(screen.getByRole('button', { name: 'Período anterior' }).className).toContain('size-11')
   })
 
-  it('el segmentado no trunca sus rótulos y en PC mide según su contenido', () => {
-    render(<PeriodoNavegador period="day" onPeriodChange={() => {}} referencia={ref} onStep={() => {}} />)
-    const tabs = Array.from(document.querySelectorAll('[role="tab"]')) as HTMLElement[]
-    expect(tabs.map((t) => t.textContent)).toEqual(['Día', 'Semana', 'Mes'])
-    // Ajustado: cada rótulo con su espacio (px-3) y sin la clase que corta el texto.
-    tabs.forEach((t) => {
-      expect(t.innerHTML).not.toContain('truncate')
-      expect(t.innerHTML).toContain('whitespace-nowrap')
-    })
-    const raiz = document.querySelector('[role="tablist"]') as HTMLElement
-    expect(raiz.className).toContain('lg:w-auto')
+  it('el período va como texto: tres botones y el elegido marcado (modo lectura)', () => {
+    render(<PeriodoNavegador period="week" onPeriodChange={() => {}} referencia={ref} onStep={() => {}} />)
+    const grupo = screen.getByRole('group', { name: 'Período del análisis' })
+    const botones = Array.from(grupo.querySelectorAll('button'))
+    expect(botones.map((b) => b.textContent)).toEqual(['Día', 'Semana', 'Mes'])
+    expect(botones.map((b) => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false'])
+    // Sin cápsula: ni lista de pestañas ni fondo.
+    expect(document.querySelector('[role="tablist"]')).toBeNull()
+    botones.forEach((b) => expect(b.className).toContain('min-h-11'))
   })
 
-  it('cambiar el segmentado emite el período elegido', () => {
+  it('cambiar el período emite el período elegido', () => {
     const onPeriodChange = vi.fn()
     render(<PeriodoNavegador period="day" onPeriodChange={onPeriodChange} referencia={ref} onStep={() => {}} />)
     fireEvent.click(screen.getByText('Mes'))

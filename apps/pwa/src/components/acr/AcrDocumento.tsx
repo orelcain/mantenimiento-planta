@@ -21,6 +21,8 @@ import { fraseDetencion, totalFuertes } from './acrDocumentoTextos'
 import { ControlAccionHecha, ControlResultado } from './AcrLectura'
 import { useUbicacionJK } from './useUbicacionJK'
 import { textoUbicacionJK } from './textoUbicacionJK'
+import { AcrLecturaA } from './AcrLecturaA'
+import { usePielApple } from '@/hooks/usePielApple'
 
 const FILA = 'border-t border-border py-[11px]'
 const FILA_CAUSA = `grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-x-4 lg:grid-cols-[88px_minmax(0,1fr)] ${FILA}`
@@ -54,6 +56,9 @@ export interface AcrDocumentoProps {
 }
 
 export function AcrDocumento({ acr, compacto = false, onActualizar }: AcrDocumentoProps) {
+  // Piel Apple: la página completa va en modo lectura (`AcrLecturaA`). El panel compacto sigue igual.
+  const apple = usePielApple()
+  if (apple && !compacto) return <AcrLecturaA acr={acr} onActualizar={onActualizar} />
   const equipo = nombreEquipoLegible(acr.equipo)
   const criterio = acr.verificacion.criterio.replace(acr.equipo, equipo)
   const fuertes = acr.acciones.filter((a) => a.fuerza === 'fuerte').length
