@@ -105,6 +105,21 @@ describe('ventanas Ritmo y Máquinas en PC', () => {
     expect(costado.getByText('44,6 pz/min')).toBeTruthy()
     expect(screen.getByRole('table', { name: 'Ritmo de cada Baader y de la línea' })).toBeTruthy()
   })
+  it('Al cierre con la línea detenida: la proyección queda en pausa, como en la franja y el gráfico', () => {
+    const p = { ...P, cerrado: false, proyeccion: 11144, causaParada: 'Falta MMPP', cierre: { hora: '15:00', quedaMin: 328 } } as unknown as MonitorV2Props
+    render(<TurnoExpedientePC clave="cierre" onClose={() => {}} p={p} reloj={{ ...RELOJ, detenida: true }} />)
+    expect(screen.getByRole('heading', { level: 2, name: 'La línea está detenida: la proyección del cierre queda en pausa' })).toBeTruthy()
+    const costado = within(screen.getByRole('complementary', { name: 'Resumen del cierre' }))
+    expect(costado.getByText('en pausa')).toBeTruthy()
+    expect(costado.getByText('línea detenida · Falta MMPP')).toBeTruthy()
+    expect(costado.queryByText('11.144 pz')).toBeNull()
+  })
+  it('Al cierre andando muestra la proyección', () => {
+    const p = { ...P, cerrado: false, proyeccion: 11144, cierre: { hora: '15:00', quedaMin: 328 } } as unknown as MonitorV2Props
+    render(<TurnoExpedientePC clave="cierre" onClose={() => {}} p={p} reloj={{ ...RELOJ, detenida: false }} />)
+    expect(screen.getByRole('heading', { level: 2, name: 'Al cierre de las 15:00 llegaría a 11.144 pz; faltarían 3.856 para la meta' })).toBeTruthy()
+    expect(within(screen.getByRole('complementary', { name: 'Resumen del cierre' })).getByText('11.144 pz')).toBeTruthy()
+  })
   it('cerrada no dibuja nada', () => {
     const { container } = render(<TurnoExpedientePC clave={null} onClose={() => {}} p={P} reloj={RELOJ} />)
     expect(container.textContent).toBe('')

@@ -56,8 +56,12 @@ export function totalHoras(filas: HourlyRow[], porMaquina: Array<{ nombre: strin
   }
 }
 
-/** «Al cierre de las 15:05 llegaría a 15.200 pz, 200 sobre la meta». Sin proyección lo dice. */
-export function tituloCierre(proyeccion: number | null, meta: number | null, hora: string | null | undefined): string {
+/**
+ * «Al cierre de las 15:05 llegaría a 15.200 pz, 200 sobre la meta». Sin proyección lo dice. Con la línea detenida, la proyección
+ * queda en pausa, igual que en la franja y en el gráfico: no se promete una cifra que supone que la línea ya volvió a andar.
+ */
+export function tituloCierre(proyeccion: number | null, meta: number | null, hora: string | null | undefined, detenida = false): string {
+  if (detenida) return 'La línea está detenida: la proyección del cierre queda en pausa'
   if (proyeccion == null) return 'Sin proyección del cierre para este turno'
   const base = `Al cierre${hora ? ` de las ${hora}` : ''} llegaría a ${int(proyeccion)} pz`
   if (!meta || meta <= 0) return base
