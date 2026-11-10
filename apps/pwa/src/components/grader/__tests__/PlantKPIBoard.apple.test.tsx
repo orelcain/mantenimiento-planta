@@ -1,6 +1,6 @@
 /**
- * PlantKPIBoard en la piel Apple: conclusión con filete, cifras sin caja y
- * máquinas en tabla que se pliega. El hook de datos va mockeado; lo que se fija
+ * PlantKPIBoard en la piel Apple (modo lectura): titular, una frase con el OEE y
+ * las máquinas en tabla con filete que se pliega. El hook de datos va mockeado; lo que se fija
  * acá es la forma, no el cálculo (eso lo cubren sus propios tests).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -51,36 +51,41 @@ describe('PlantKPIBoard · piel Apple', () => {
     document.documentElement.removeAttribute('data-skin')
   })
 
-  it('no es una tarjeta: la sección es la pantalla', () => {
+  it('modo lectura: un titular h1 y «Por máquina» como sección con filete, sin tarjeta', () => {
     const { container } = render(<PlantKPIBoard {...props} />)
-    expect(container.querySelector('section[aria-label="Indicadores de rendimiento"]')).not.toBeNull()
-  })
-
-  it('la conclusión trae «OEE sin calidad», la cifra y la composición', () => {
-    const { container } = render(<PlantKPIBoard {...props} />)
-    const texto = container.textContent ?? ''
-    expect(texto).toContain('OEE sin calidad')
-    expect(texto).toContain(`61,4${NBSP}%`)
-    expect(texto).toContain(`Disponibilidad 78,8${NBSP}% por rendimiento 77,9${NBSP}%`)
-  })
-
-  it('nombra la máquina que más pierde con sus piezas y su parte por detenciones', () => {
-    const { container } = render(<PlantKPIBoard {...props} />)
-    const frase = container.textContent ?? ''
-    // Evisceradora 3: 1.717 piezas perdidas, 1.500 de ellas por detenciones → 87 %.
-    expect(frase).toContain('es la que más pierde: 1.717 piezas, el 87')
-    expect(frase).toContain('por detenciones.')
-  })
-
-  it('las cuatro cifras de tiempo van sin caja, con su rótulo debajo', () => {
-    const { container } = render(<PlantKPIBoard {...props} />)
-    const texto = container.textContent ?? ''
-    expect(texto).toContain('MTTR, baja es mejor')
-    expect(texto).toContain('MTBF, alta es mejor')
-    expect(texto).toContain('averías de 5 min o más')
-    // fmtMin (helper compartido) escribe un decimal: «30,0 min», como «19,4 min» del MTTR.
-    expect(texto).toContain('microdetenciones, 30,0 min en total, fuera del MTTR')
+    expect(container.querySelector('h1')).not.toBeNull()
+    const maquinas = container.querySelector('[data-testid="kpi-maquinas"]')!
+    expect(maquinas.tagName).toBe('SECTION')
+    expect(maquinas.className).toContain('border-t')
+    expect(maquinas.querySelector('h2')?.textContent).toBe('Por máquina')
+    // La tabla es de lectura: sin marco ni banda de encabezado.
+    expect(maquinas.querySelector('.rounded-ctl.border')).toBeNull()
+    expect(maquinas.querySelector('thead')?.className).not.toContain('bg-muted')
     expect(container.querySelector('.rounded-card')).toBeNull()
+  })
+
+  it('el titular nombra la máquina que más pierde con sus piezas y su parte por detenciones', () => {
+    const { container } = render(<PlantKPIBoard {...props} />)
+    // Evisceradora 3: 1.717 piezas perdidas, 1.500 de ellas por detenciones → 87 %.
+    expect(container.querySelector('h1')?.textContent).toContain('es la que más pierde: 1.717 piezas, el 87')
+  })
+
+  it('la frase trae «OEE sin calidad», la cifra, la composición, MTTR y MTBF', () => {
+    const { container } = render(<PlantKPIBoard {...props} />)
+    const texto = container.textContent ?? ''
+    expect(texto).toContain(`OEE sin calidad 61,4${NBSP}%: disponibilidad 78,8${NBSP}% por rendimiento 77,9${NBSP}%.`)
+    expect(texto).toContain('MTTR 19,4 min y MTBF 1,3 h.')
+  })
+
+  it('la máquina que más pierde va en tinta crítica y la nota cuenta averías y micro', () => {
+    const { container } = render(<PlantKPIBoard {...props} />)
+    const filas = container.querySelectorAll('[data-testid="kpi-maquinas"] tbody tr:not([hidden])')
+    expect(filas[2]!.className).toContain('text-ink-crit')
+    expect(filas[0]!.className).not.toContain('text-ink-crit')
+    const texto = container.textContent ?? ''
+    expect(texto).toContain('14 averías, 148 micro.')
+    // fmtMin (helper compartido) escribe un decimal: «30,0 min», como «19,4 min» del MTTR.
+    expect(texto).toContain('Las microdetenciones suman 30,0 min y van fuera del MTTR.')
   })
 
   it('las máquinas van en tabla plegable: los botones traen aria-expanded', () => {
@@ -104,7 +109,7 @@ describe('PlantKPIBoard · piel Apple', () => {
     expect(container.querySelector('[role="tablist"]')).toBeNull()
   })
 
-  it('el ícono de alcance va junto al rótulo OEE, no en una línea propia', () => {
+  it('el ícono de alcance va en la frase del OEE, no en una línea propia', () => {
     const { container } = render(<PlantKPIBoard {...props} />)
     const boton = container.querySelector('button[aria-label="Alcance de los indicadores"]')!
     expect(boton).toBeTruthy()

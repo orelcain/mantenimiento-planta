@@ -7,12 +7,13 @@
  * máquina, compuertas, imputar) queda a un toque, y el análisis técnico anterior
  * completo en el plegable del final.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import {
   FilasLectura, SeccionLectura,
   LECTURA_CUERPO, LECTURA_ENLACE, LECTURA_NOTA, LECTURA_TITULO,
 } from '@/components/piel/Lectura'
+import { useAncho } from '@/hooks/useAncho'
 import { useEsPC } from '@/hooks/useEsPC'
 import { useFallasRepetidas } from '@/hooks/useFallasRepetidas'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
@@ -30,25 +31,6 @@ const COLOR = {
   planificado: 'rgb(var(--muted-foreground) / 0.34)',
   texto: 'rgb(var(--foreground))',
   nota: 'rgb(var(--muted-foreground))',
-}
-
-function useAncho(inicial: number) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [ancho, setAncho] = useState(inicial)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const medido = Math.round(el.getBoundingClientRect().width)
-    if (medido > 0) setAncho(medido)
-    if (typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(([e]) => {
-      const w = Math.round(e?.contentRect.width ?? 0)
-      if (w > 0) setAncho(w)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  return { ref, ancho }
 }
 
 const cm = (d: Date) => d.getTime()

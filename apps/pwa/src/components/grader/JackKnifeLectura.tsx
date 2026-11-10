@@ -8,8 +8,9 @@
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useAncho } from '@/hooks/useAncho'
 import { useEsPC } from '@/hooks/useEsPC'
-import { FilasLectura, LECTURA_CUERPO, LECTURA_ENLACE, LECTURA_NOTA, LECTURA_TITULO, SeccionLectura } from '@/components/piel/Lectura'
+import { FilasLectura, LECTURA_CUERPO, LECTURA_OPCION, OpcionesLectura, LECTURA_ENLACE, LECTURA_NOTA, LECTURA_TITULO, SeccionLectura } from '@/components/piel/Lectura'
 import { Sheet } from '@/components/piel'
 import { dec, dec1 } from '@/utils/formatoNumeros'
 import type { CalculoJK, ModoCmpJK, PuntoJK, TurnoJK, VentanaJK } from '@/services/shoplogix/jackKnife'
@@ -42,55 +43,6 @@ const COMPARACIONES: { value: ModoCmpJK; label: string }[] = [
 ]
 
 const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios)
-
-/** Estilo de control como texto: el elegido va en negrita y subrayado. */
-const ESTILO_OPCION = 'min-h-11 border-b-2 pb-0.5 text-footnote lg:min-h-8'
-
-/** Ancho medido del gráfico: el viewBox mide lo mismo que se pinta, y el texto sale a 13 px reales. */
-function useAncho(inicial: number) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [ancho, setAncho] = useState(inicial)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const medido = Math.round(el.getBoundingClientRect().width)
-    if (medido > 0) setAncho(medido)
-    if (typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(([e]) => {
-      const w = Math.round(e?.contentRect.width ?? 0)
-      if (w > 0) setAncho(w)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  return { ref, ancho }
-}
-
-function Opciones<T extends string>({ nombre, valor, opciones, onCambio }: {
-  nombre: string
-  valor: T | null
-  opciones: readonly { value: T; label: string }[]
-  onCambio: (v: T) => void
-}) {
-  return (
-    <div role="group" aria-label={nombre} className="flex flex-wrap gap-x-5 gap-y-1">
-      {opciones.map((o) => {
-        const on = valor === o.value
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onCambio(o.value)}
-            className={cn(ESTILO_OPCION, on ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground')}
-          >
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
 const fechaDia = (ms: number) => {
@@ -269,16 +221,16 @@ export function JackKnifeLectura(p: JackKnifeLecturaProps) {
   return (
     <div className="min-w-0 space-y-5">
       <div className="flex flex-wrap items-end gap-x-7 gap-y-3">
-        <Opciones nombre="Período" valor={p.preset} opciones={PERIODOS} onCambio={p.onPreset} />
+        <OpcionesLectura nombre="Período" valor={p.preset} opciones={PERIODOS} onCambio={p.onPreset} />
         <button
           type="button"
           aria-pressed={p.mesActivo}
           onClick={p.onMes}
-          className={cn(ESTILO_OPCION, p.mesActivo ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground')}
+          className={cn(LECTURA_OPCION, p.mesActivo ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground')}
         >
           Mes
         </button>
-        <Opciones nombre="Comparar con" valor={p.modoCmp} opciones={COMPARACIONES} onCambio={p.onModo} />
+        <OpcionesLectura nombre="Comparar con" valor={p.modoCmp} opciones={COMPARACIONES} onCambio={p.onModo} />
         <details className="relative ml-auto">
           <summary className="min-h-11 cursor-pointer list-none rounded-ctl border border-border px-3 py-2 text-footnote text-brand-ink lg:min-h-0">
             Exportar para reunión

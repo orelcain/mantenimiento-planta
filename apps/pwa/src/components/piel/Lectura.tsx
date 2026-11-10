@@ -31,6 +31,37 @@ export function SeccionLectura({ titulo, extra, children, className, testId }: {
   )
 }
 
+/** Control como texto: el elegido va en negrita y subrayado. 44 px en el celular. */
+export const LECTURA_OPCION = 'min-h-11 border-b-2 pb-0.5 text-footnote lg:min-h-8'
+
+/** Grupo de opciones como texto (Día, Semana, Mes). `aria-pressed` marca la elegida. */
+export function OpcionesLectura<T extends string>({ nombre, valor, opciones, onCambio, className }: {
+  nombre: string
+  valor: T | null
+  opciones: readonly { value: T; label: string }[]
+  onCambio: (v: T) => void
+  className?: string
+}) {
+  return (
+    <div role="group" aria-label={nombre} className={cn('flex flex-wrap gap-x-5 gap-y-1', className)}>
+      {opciones.map((o) => {
+        const on = valor === o.value
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onCambio(o.value)}
+            className={cn(LECTURA_OPCION, on ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground')}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export interface FilaLectura { rotulo: ReactNode; valor: ReactNode }
 
 /** Pares rótulo/valor separados por filete; el valor, a la derecha y tabular. */
