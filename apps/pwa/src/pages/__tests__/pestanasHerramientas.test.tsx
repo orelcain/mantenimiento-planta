@@ -21,6 +21,8 @@ vi.mock('@/services/learningContent', () => ({
 }))
 vi.mock('@/hooks/repuestos/useRepuestosByCodigos', () => ({ useRepuestosByCodigos: () => ({ data: [], resueltos: new Map(), isLoading: false }) }))
 vi.mock('@/hooks/repuestos/useMarkedCommonParts', () => ({ useMarkedCommonParts: () => ({ parts: [] }) }))
+// happy-dom mide 1024 px (= PC); esta suite prueba la vista de celular.
+vi.mock('@/hooks/useEsPC', () => ({ useEsPC: () => false }))
 
 import { VariadoresPage } from '../VariadoresPage'
 import { MachineLearningPage } from '../MachineLearningPage'
