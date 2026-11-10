@@ -15,6 +15,7 @@
  * una fila propia. Toda cifra viene de Shoplogix por props que ya existían; aquí solo se ubican y se dicen.
  */
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { CifraViva } from './CifraViva'
 import { RotuloFranja } from './FranjaTocable'
 import { esperadoPorMinuto, int, minutosCompletos, relojDe, sumaPorMinuto } from './ejeTurno'
 import type { EjeDatos } from './GraficoRitmoVivo'
@@ -338,6 +339,148 @@ export function RitmoDetalle({ p, reloj, filas, referencias }: { p: MonitorV2Pro
       )}
 
       {referencias}
+    </div>
+  )
+}
+
+// ── El Ritmo en la ventana expediente de PC ──────────────────────────────────
+
+/** Un ▲▼ de la tabla de PC: el mismo texto que `Delta`, a 15 px, sin cápsula. Sin referencia, un punto tenue. */
+function DeltaPC({ d }: { d: number | null | undefined }) {
+  const c = comparacion(d)
+  if (!c) return <span role="cell" className="text-right text-muted-foreground/70" aria-label="sin referencia">·</span>
+  return <span role="cell" className={`rb-d-${c.clase} text-right`}>{c.texto}</span>
+}
+
+/**
+ * El cuerpo de la ventana «Ritmo» en PC: «Cada Baader» como tabla real (cada Baader y la fila Línea al cierre, con piezas, último
+ * minuto, % andando, ritmo andando, aporte y las comparaciones), el control del pulso tal cual y los carros del turno, también
+ * cerrados con la Línea. Mismas cuentas que `RitmoDetalle`; solo cambia la forma.
+ */
+export function RitmoTablaPC({ p, reloj, filas, clases }: {
+  p: MonitorV2Props; reloj: RelojDeDatos; filas: FilaBaader[]
+  clases: { cab: string; fila: string; total: string }
+}) {
+  const ap = p.aporte ?? null
+  const e = p.eje ?? null
+  const minuto = e?.minuto ?? null
+  const n = minuto ? minutosCompletos(minuto.maquinas) : 0
+  const conMinuto = minuto != null && n > 0 && !p.cerrado
+  const ultimo = conMinuto ? sumaPorMinuto(minuto.maquinas, n)[n - 1] ?? 0 : null
+  const esperado = conMinuto ? esperadoPorMinuto(minuto.maquinas, n, { desde: minuto.desde, perillas: e?.perillas })[n - 1] ?? null : null
+  const previos = ap?.antesDeRodar === true
+  const conU = ap != null && ap.conUltimo && !previos
+  const conP = ap != null && ap.conProm
+  const lineaAporte = ap?.linea.aporte ?? p.ritmo
+  const hora = conMinuto ? relojDe(Date.parse(minuto.desde) + (n - 1) * 60_000) : null
+  const unidad = e?.unidad ?? null
+  const cols = [
+    'minmax(0,1fr)', '84px', ...(conMinuto ? ['150px'] : []), '76px', '104px', '76px', ...(conU ? ['84px'] : []), ...(conP ? ['92px'] : []),
+  ].join(' ')
+  const est = { gridTemplateColumns: cols }
+
+  const vacios = minuto && n > 0 ? vaciosTurnoDe(minuto, n, e?.paradasMaquina, e?.perillas) : null
+  const conVacios = vacios != null && vacios.maquinas.length > 0 && vacios.linea.pasaron > 0
+  const Unidad = unidad ? unidad[0]!.toUpperCase() + unidad.slice(1) : 'Carros'
+  const colsV = { gridTemplateColumns: 'minmax(0,1fr) 96px 96px 96px 104px' }
+
+  return (
+    <div className="tabular-nums">
+      <section aria-label="Cada Baader">
+        <h3 className="mb-1.5 text-headline text-foreground">Cada Baader</h3>
+        <div role="table" aria-label="Ritmo de cada Baader y de la línea">
+          <div role="row" className={clases.cab} style={est}>
+            <span role="columnheader">Baader</span>
+            <span role="columnheader" className="text-right">Piezas</span>
+            {conMinuto && <span role="columnheader" className="text-right">{`Minuto ${hora}${unidad ? `, ${unidad}` : ''}`}</span>}
+            <span role="columnheader" className="text-right">Andando</span>
+            <span role="columnheader" className="text-right">Pz/min andando</span>
+            <span role="columnheader" className="text-right">Aporte</span>
+            {conU && <span role="columnheader" className="text-right">vs último</span>}
+            {conP && <span role="columnheader" className="text-right">{`vs prom. ${ap?.turnosProm ?? ''}`.trim()}</span>}
+          </div>
+          {filas.map((f) => {
+            const a = aporteDe(ap, f.nombre)
+            const pal = f.estado != null && f.estado in TEXTO_ESTADO ? f.estado : null
+            const color = f.estado ? PUNTO_ESTADO[f.estado] : 'var(--v2-gris)'
+            return (
+              <div key={f.id} role="row" className={clases.fila} style={est}>
+                <span role="cell" className="min-w-0 truncate">
+                  <span aria-hidden className="mr-1.5 inline-block size-[7px] rounded-full align-[1px]" style={{ background: color }} />
+                  {f.nombre}
+                </span>
+                <span role="cell" className="text-right"><PiezasBaader reloj={reloj} id={f.id} respaldo={f.piezas} /></span>
+                {conMinuto && (
+                  <span role="cell" className="text-right">
+                    {f.ritmo != null ? int(f.ritmo) : '—'}{f.esperado != null ? ` de ${int(f.esperado)}` : ''}
+                    {pal && <span className="ml-1.5 text-footnote" style={{ color: TEXTO_ESTADO[pal] }}>{pal}</span>}
+                  </span>
+                )}
+                <span role="cell" className="text-right">{a?.uptimePct != null ? `${Math.round(a.uptimePct)} %` : '—'}</span>
+                <span role="cell" className="text-right">{a ? dec(a.cpm) : f.promedio != null ? dec(f.promedio) : '—'}</span>
+                <span role="cell" className="text-right">{a?.aporte != null ? dec(a.aporte) : '—'}</span>
+                {conU && <DeltaPC d={a?.vsUltimo} />}
+                {conP && <DeltaPC d={a?.vsProm} />}
+              </div>
+            )
+          })}
+          {filas.length > 1 && (
+            <div role="row" className={clases.total} style={est}>
+              <span role="cell">Línea</span>
+              <span role="cell" className="text-right"><CifraViva reloj={reloj} respaldo={filas.reduce((s, f) => s + f.piezas, 0)} /></span>
+              {conMinuto && <span role="cell" className="text-right">{`${int(ultimo ?? 0)}${esperado != null && esperado > 0 ? ` de ${int(esperado)}` : ''}`}</span>}
+              <span role="cell" className="text-right font-normal text-muted-foreground">—</span>
+              <span role="cell" className="text-right font-normal text-muted-foreground">—</span>
+              <span role="cell" className="text-right">{lineaAporte != null ? dec(lineaAporte) : '—'}</span>
+              {conU && <DeltaPC d={ap?.linea.vsUltimo} />}
+              {conP && <DeltaPC d={ap?.linea.vsProm} />}
+            </div>
+          )}
+        </div>
+        <p className="mt-2 text-footnote text-muted-foreground">
+          {`Aporte: lo que cada Baader pone en el promedio del turno; ${filas.length > 1 ? 'las Baader suman el de la línea' : 'es el de la línea'}. Andando: % del turno con la máquina produciendo.`}
+          {(conU || conP) && ' ▲▼: cada Baader contra sí misma. Menos de 0,3 va en raya.'}
+          {previos && ' Las comparaciones aparecen desde los 45 min produciendo.'}
+        </p>
+      </section>
+
+      {p.ritmoPulso && <div className="mt-5">{p.ritmoPulso}</div>}
+
+      {conVacios && vacios && (
+        <section aria-label={`${Unidad} del turno, por Baader`} className="mt-6">
+          <h3 className="text-headline text-foreground">{`${Unidad} del turno, por Baader`}</h3>
+          <p className="mb-1.5 text-footnote text-muted-foreground">{`Estimación según la velocidad seteada y el tiempo andando · ${vacios.minutos} min con dato`}</p>
+          <div role="table" aria-label={`${Unidad} por Baader`}>
+            <div role="row" className={clases.cab} style={colsV}>
+              <span role="columnheader">Baader</span>
+              <span role="columnheader" className="text-right">Pasaron</span>
+              <span role="columnheader" className="text-right">Con pieza</span>
+              <span role="columnheader" className="text-right">Vacíos</span>
+              <span role="columnheader" className="text-right">% con pieza</span>
+            </div>
+            {vacios.maquinas.map((v) => (
+              <div key={v.id} role="row" className={clases.fila} style={colsV}>
+                <span role="cell" className="min-w-0 truncate">{v.nombre}</span>
+                <span role="cell" className="text-right">{int(v.pasaron)}</span>
+                <span role="cell" className="text-right">{int(v.conPieza)}</span>
+                <span role="cell" className="text-right">{int(v.vacios)}</span>
+                <span role="cell" className="text-right">{v.pct != null ? `${dec(v.pct)} %` : '—'}</span>
+              </div>
+            ))}
+            <div role="row" className={clases.total} style={colsV}>
+              <span role="cell">Línea</span>
+              <span role="cell" className="text-right">{int(vacios.linea.pasaron)}</span>
+              <span role="cell" className="text-right">{int(vacios.linea.conPieza)}</span>
+              <span role="cell" className="text-right">{int(vacios.linea.vacios)}</span>
+              <span role="cell" className="text-right">{vacios.linea.pct != null ? `${dec(vacios.linea.pct)} %` : '—'}</span>
+            </div>
+          </div>
+          <p className="mt-2 text-footnote text-muted-foreground">
+            {`Los vacíos son ${unidad ?? 'carros'} que llegaron sin pescado: es pescado que no llegó a la Baader, no una falla de la máquina.`}
+            {vacios.linea.pasaron - vacios.linea.conPieza !== vacios.linea.vacios && ' La Línea suma los vacíos de cada Baader: una que contó más de lo que su velocidad seteada permite no compensa a las otras.'}
+          </p>
+        </section>
+      )}
     </div>
   )
 }

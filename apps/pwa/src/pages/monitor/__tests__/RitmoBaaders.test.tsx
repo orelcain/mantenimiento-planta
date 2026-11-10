@@ -253,6 +253,8 @@ describe('tarjeta Ritmo · los tres arreglos de Orel (estructura y CSS; la geome
 })
 
 describe('detalle de Ritmo', () => {
+  /* La hoja del celular: en PC el detalle es la ventana expediente (`RitmoTablaPC`, suite `TurnoExpedientePC`). */
+  beforeEach(() => { ancho = 390 })
   const abrir = (props: MonitorV2Props) => {
     const r = render(<MonitorV2 {...props} />)
     fireEvent.click(r.getByRole('button', { name: 'Ritmo: ver detalle' }))
