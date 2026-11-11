@@ -69,6 +69,7 @@ import {
   clasePaddingContenidoPC,
   claseItemPC,
   claseBarraInferior,
+  claseBuscarInferior,
   claseTabBarra,
   contarIncidenciasActivas,
 } from './navVidrio'
@@ -1499,6 +1500,18 @@ export function MainLayout() {
           </button>
         </div>
       </nav>
+      {/* Piel Apple: búsqueda a un toque, en su propio círculo junto a la barra (iOS 26). */}
+      {apple && (
+        <button
+          type="button"
+          onClick={() => setBuscadorAbierto(true)}
+          className={cn(claseBuscarInferior(), (location.pathname === '/' || modoHerr) && 'hidden')}
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+          aria-label="Buscar en la app"
+        >
+          <Search className="h-[22px] w-[22px] [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4" />
+        </button>
+      )}
 
       <BuscadorRapido open={buscadorAbierto} onOpenChange={setBuscadorAbierto} paginas={paginasBuscador} />
     </div>

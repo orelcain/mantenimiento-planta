@@ -4,7 +4,8 @@
 const { test } = require('node:test')
 const assert = require('node:assert')
 
-const { cambiosIndice, construirIndice, entradaDe } = require('../repuestosIndice')
+const { FieldPath } = require('firebase-admin/firestore')
+const { cambiosIndice, construirIndice, entradaDe, argumentosUpdate } = require('../repuestosIndice')
 
 const filtro = { codigoSAP: '3300135877', textoBreve: 'FILTRO 1/2  PURGA N.A AFF40-04D-D 295734', nombresComunes: ['Filtro FRL'], fotosReales: [] }
 
@@ -35,4 +36,20 @@ test('solo se escribe cuando cambia algo que el índice muestra', () => {
 test('construir de cero deja solo los que tienen SAP', () => {
   const m = construirIndice([filtro, { codigoSAP: null, descripcion: 'Motor SEW' }, { codigoSAP: '4600001', textoBreve: 'Filtro de agua' }])
   assert.deepStrictEqual(Object.keys(m).sort(), ['3300135877', '4600001'])
+})
+
+test('el update usa FieldPath por segmentos: la clave queda «3300135877», sin comillas invertidas', () => {
+  const cambios = cambiosIndice({ ...filtro, codigoSAP: '3300135877' }, { ...filtro, codigoSAP: '3300135878' })
+  const args = argumentosUpdate(cambios, { FieldPath, borrar: 'DEL', ahora: 'TS' })
+  assert.deepStrictEqual(args.slice(0, 2), ['actualizadoEn', 'TS'])
+  const pares = []
+  for (let i = 2; i < args.length; i += 2) pares.push([args[i], args[i + 1]])
+  assert.strictEqual(pares.length, 2)
+  assert.ok(pares[0][0] instanceof FieldPath)
+  assert.ok(pares[0][0].isEqual(new FieldPath('m', '3300135877')))
+  assert.strictEqual(pares[0][1], 'DEL')
+  assert.ok(pares[1][0].isEqual(new FieldPath('m', '3300135878')))
+  assert.deepStrictEqual(pares[1][1], ['FILTRO 1/2  PURGA N.A AFF40-04D-D 295734', 'Filtro FRL'])
+  // Ningún argumento es un texto con comillas invertidas (el error de antes).
+  assert.ok(!args.some((a) => typeof a === 'string' && a.includes('`')))
 })

@@ -10053,12 +10053,13 @@ exports.onRepuestoEscritoIndice = onDocumentWritten(
     const cambios = repuestosIndiceMod.cambiosIndice(antes, despues)
     if (!cambios) return
     const ref = db.collection(repuestosIndiceMod.COLECCION).doc(repuestosIndiceMod.DOC)
-    const update = { actualizadoEn: FieldValue.serverTimestamp() }
-    for (const [ruta, valor] of Object.entries(cambios)) {
-      update[new FieldPath(...ruta.split('.'))] = valor === 'BORRAR' ? FieldValue.delete() : valor
-    }
+    const args = repuestosIndiceMod.argumentosUpdate(cambios, {
+      FieldPath,
+      borrar: FieldValue.delete(),
+      ahora: FieldValue.serverTimestamp(),
+    })
     // Sin el doc (nunca se construyó) no se crea uno a medias: lo arma el script de carga.
-    await ref.update(update).catch((e) => {
+    await ref.update(...args).catch((e) => {
       if (e?.code !== 5) throw e // 5 = NOT_FOUND
       logger.warn('[repuestosIndice] el índice no existe todavía; correr construir-indice-repuestos.cjs')
     })

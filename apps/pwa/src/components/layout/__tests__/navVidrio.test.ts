@@ -8,6 +8,7 @@ import {
   clasePaddingContenidoPC,
   claseItemPC,
   claseBarraInferior,
+  claseBuscarInferior,
   claseTabBarra,
   contarIncidenciasActivas,
 } from '../navVidrio'
@@ -50,6 +51,16 @@ describe('material del panel y de la barra', () => {
     expect(claseBarraInferior(true)).not.toContain('glass-nav')
     expect(claseBarraInferior(false)).toContain('glass-nav')
     expect(claseBarraInferior(false)).not.toContain('vidrio')
+  })
+
+  it('la barra Apple deja sitio al círculo de búsqueda; la piel anterior no cambia', () => {
+    expect(claseBarraInferior(true)).toContain('right-[84px]')
+    expect(claseBarraInferior(true)).not.toContain('inset-x-3')
+    expect(claseBarraInferior(false)).toContain('inset-x-3')
+    // 60 px de círculo + 12 px de aire + 12 px de borde = 84 px.
+    expect(claseBuscarInferior()).toContain('size-[60px]')
+    expect(claseBuscarInferior()).toContain('right-3')
+    expect(claseBuscarInferior()).toContain('vidrio')
   })
 
   it('el panel de PC es flotante (fixed, 16 px) con .vidrio solo en apple', () => {
@@ -104,7 +115,7 @@ describe('cápsulas agrupadas de la barra superior', () => {
 
   it('posiciona el brillo de cada cápsula y permite sus interacciones', () => {
     expect(claseCapsulaBarra()).toBe('relative vidrio vidrio-barra pointer-events-auto flex items-center h-[42px] rounded-full')
-    expect(claseBarraInferior(true)).toBe('lg:hidden fixed inset-x-3 z-40 rounded-full vidrio vidrio-barra')
+    expect(claseBarraInferior(true)).toBe('lg:hidden fixed left-3 right-[84px] z-40 rounded-full vidrio vidrio-barra')
     expect(claseAsidePC(true, false)).not.toContain('vidrio-barra')
   })
 })
