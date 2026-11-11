@@ -50,9 +50,22 @@ export function claseItemPC(apple: boolean, activo: boolean): string {
 
 /** Barra inferior del celular (< lg). */
 export function claseBarraInferior(apple: boolean): string {
+  // Apple: a la derecha deja sitio al círculo de búsqueda (60 px + 12 px de aire), como la
+  // pestaña de búsqueda separada de iOS 26. La piel anterior no cambia.
   return apple
-    ? 'lg:hidden fixed inset-x-3 z-40 rounded-full vidrio vidrio-barra'
+    ? 'lg:hidden fixed left-3 right-[84px] z-40 rounded-full vidrio vidrio-barra'
     : 'lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav'
+}
+
+/** Círculo de búsqueda junto a la barra inferior (solo piel Apple): mismo material y altura que la barra. */
+export function claseBuscarInferior(): string {
+  return cn(
+    'lg:hidden fixed right-3 z-40 grid size-[60px] place-items-center rounded-full text-muted-foreground',
+    'active:scale-[0.97] transition-transform motion-reduce:transition-none',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+    '[@media(max-height:500px)]:size-10',
+    'vidrio vidrio-barra',
+  )
 }
 
 /** Pestaña de la barra inferior. Apple: la activa es una gota `.vidrio-lente`. */
