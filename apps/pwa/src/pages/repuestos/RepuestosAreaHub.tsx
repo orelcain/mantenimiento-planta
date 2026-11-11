@@ -2607,7 +2607,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         {renderSortTh('stock', 'Stock', 'hidden md:table-cell')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
                         <th className="hidden w-16 px-2 py-2 text-center text-nota font-medium md:table-cell">Dibujo</th>
-                        {!soloLectura && <th className="w-14 px-2 py-2 text-center text-nota font-medium">Pedido</th>}
+                        {!soloLectura && <th className="w-[56px] px-0 py-2 text-center text-nota font-medium">Pedido</th>}
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -2863,9 +2863,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                               ) : <span className="text-muted-foreground/40">—</span>}
                             </td>
                             {!soloLectura && (
-                              <td className="px-2 py-2 text-center">
+                              <td className="w-[56px] px-0 py-2 text-center">
                                 {/* Columna propia: el ListPlus de la celda vecina es «favorito de este
-                                    equipo» y no se mueve. Áreas de 44 px que no se tocan con la estrella. */}
+                                    equipo» y no se mueve. Ancho en px literales (la raíz del PC mide
+                                    14 px): el centro queda a 28 px del borde y la estrella a ~18,5
+                                    (px-3 + 8) → ~46 px entre centros, las dos áreas de 44 no se tocan. */}
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); alternarPedido(r) }}
