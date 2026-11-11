@@ -15,7 +15,7 @@ vi.mock('@/store', () => ({
 }))
 vi.mock('@/services/incidents', () => ({ getIncidents: async () => [], resolveIncident: async () => {} }))
 vi.mock('@/services/variadoresAportes', () => ({ crearAporte: async () => {}, aportesDePosicion: async () => [] }))
-vi.mock('@/services/learningContent', () => ({
+vi.mock('@/services/learningContent', () => ({ getMachineContentMeta: async () => ({ manual: 6, procedures: 10, flows: 6, diagnosis: 29, lastUpdatedAt: 0 }),
   listProcedures: async () => [], listManualSections: async () => [], listFlows: async () => [],
   listDiagnosis: async () => [], listQuiz: async () => [], listGlossary: async () => [], listBibliografia: async () => [],
 }))
@@ -49,18 +49,18 @@ describe('Variadores · una sola forma de pestañas', () => {
   })
 })
 
-describe('Ficha de máquina · «Sección ▾»', () => {
-  it('abre un Sheet con las secciones y elegir una cambia la sección activa', () => {
+describe('Ficha de máquina en celular · pestañas en la barra', () => {
+  it('sin hoja «Sección ▾»: las pestañas cambian la sección activa', () => {
     render(
       <MemoryRouter initialEntries={['/aprendizaje/maquina/baader-142']}>
         <Routes><Route path="/aprendizaje/maquina/:slug" element={<MachineLearningPage />} /></Routes>
       </MemoryRouter>,
     )
-    const selector = screen.getByRole('button', { name: /^Sección/ })
-    fireEvent.click(selector)
-    expect(screen.getByRole('dialog')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /Procedimientos/ }))
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('heading', { level: 2, name: 'Procedimientos' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Sección/ })).toBeNull()
+    const nav = screen.getByRole('navigation', { name: 'Secciones' })
+    const proced = Array.from(nav.querySelectorAll('button')).find(b => b.textContent?.startsWith('Proced'))!
+    fireEvent.click(proced)
+    expect(proced.getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('heading', { level: 1, name: /Baader 142/ })).toBeTruthy()
   })
 })

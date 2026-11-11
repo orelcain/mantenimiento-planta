@@ -636,3 +636,26 @@
 .dossier .dp-md-bloque li::before { content: "—"; color: var(--dp-ink-soft); }
 .dossier .dp-md-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 14px; border-top: 1px solid var(--dp-rule); }
 .dossier .dp-md-vacio { font-size: 13px; color: var(--dp-ink-soft); padding: 12px 10px; }
+
+/* ── Celular (forma B, 10-11-2026): barra compacta con pestañas y Diagnóstico desplegable ── */
+.dossier .dp-barra-movil { padding: max(6px, env(safe-area-inset-top)) 16px 0; gap: 0; }
+.dossier .dp-barra-movil .dp-barra-fila { min-height: 44px; flex-wrap: nowrap; }
+.dossier .dp-barra-movil .dp-barra-volver { min-height: 44px; font-size: 15px; }
+.dossier .dp-barra-movil h1 { font-size: 20px; line-height: 1.25; margin: 0; }
+.dossier .dp-barra-movil .dp-tabs { margin: 6px -16px 0; padding: 0 6px; }
+.dossier .dp-barra-movil .dp-tabs button { min-height: 44px; padding: 0 10px; }
+.dossier .dp-btn-ico { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: transparent; color: var(--dp-accent); cursor: pointer; }
+.dossier:not(.dp-pc) .dp-pc-cuerpo { padding-top: 16px; }
+.dossier .dp-ml-buscar { height: 44px; width: 100%; border: 1px solid var(--dp-rule-hard); border-radius: 10px; background: transparent; color: var(--dp-ink); padding: 0 12px; font: inherit; font-size: 17px; }
+.dossier .dp-ml-buscar::placeholder { color: var(--dp-ink-soft); }
+.dossier .dp-ml-grupo { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--dp-ink-soft); padding: 16px 0 4px; }
+.dossier .dp-ml-grupo .dp-n { font-family: var(--dp-mono); }
+.dossier .dp-ml-caso { border-bottom: 1px solid var(--dp-rule); }
+.dossier .dp-ml-it { width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) 16px; gap: 6px; align-items: start; min-height: 48px; padding: 12px 0; border: 0; background: transparent; color: var(--dp-ink); font: inherit; font-size: 17px; line-height: 1.35; text-align: left; cursor: pointer; }
+.dossier .dp-ml-it .dp-n { font-family: var(--dp-mono); font-size: 13px; color: var(--dp-ink-soft); padding-top: 3px; }
+.dossier .dp-ml-chev { color: var(--dp-ink-soft); margin-top: 4px; transition: transform .2s ease; }
+.dossier .dp-ml-caso[data-abierto="true"] .dp-ml-chev { transform: rotate(180deg); }
+.dossier .dp-ml-detalle { padding: 0 0 14px 36px; font-size: 15px; display: flex; flex-direction: column; gap: 8px; }
+.dossier .dp-ml-detalle .dp-md-bloque { padding: 10px 0 0; }
+.dossier .dp-ml-detalle .dp-practice { font-size: 15px; min-height: 44px; align-self: flex-start; }
+.dossier.dp-pc .dp-md-acciones .dp-practice { font-size: 15px; min-height: 36px; }
