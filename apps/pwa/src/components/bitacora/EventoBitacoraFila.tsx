@@ -33,7 +33,14 @@ export function EventoBitacoraFila({
   desplazamiento = null,
   nuevo = false,
   senal = null,
+  compacta = false,
 }: {
+  /**
+   * Registro corrido del celular (opción A, 10-11-2026): una línea por trabajo con
+   * equipo, «tipo · qué se hizo» y una miniatura; el detalle se ve al abrirlo.
+   * Conserva el deslizar, el asa y la franja de causa raíz.
+   */
+  compacta?: boolean
   evento: EventoBitacora
   /** El mismo número del evento en WhatsApp, correo y PDF (un borrador no lleva). */
   numero?: number
@@ -79,7 +86,114 @@ export function EventoBitacoraFila({
   const arrastrando = desplazamiento != null
   const conAsa = !conHora && Boolean(onMover || asa)
 
-  const fila = (
+  const asaBoton = conAsa && (
+    // Asa para arrastrarlo entre los demás (los con hora quedan por reloj).
+    // Con teclado: flechas arriba y abajo (mockup iOS 27, 17-09).
+    <div className="flex self-center" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label="Reordenar: arrastra, o usa las flechas arriba y abajo"
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            e.stopPropagation()
+            onMover?.(e.key === 'ArrowUp' ? -1 : 1)
+          } else e.stopPropagation()
+        }}
+        onPointerDown={asa?.onPointerDown}
+        onPointerMove={asa?.onPointerMove}
+        onPointerUp={asa?.onPointerUp}
+        onPointerCancel={asa?.onPointerUp}
+        className={`-mr-2 flex size-11 touch-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+          arrastrando ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+      >
+        <Menu className="size-5" />
+      </button>
+    </div>
+  )
+
+  // Qué se hizo, en una línea: hora (si la hay) · tipo · título o primera línea del texto.
+  const queSeHizo = [
+    conHora ? evento.horaInicio : null,
+    borrador ? (abiertoPor.length ? `${quienesAbren} lo está escribiendo` : 'En redacción') : etiquetaTipo(evento),
+    titulo || evento.descripcion?.trim().split('\n')[0] || null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  // El impacto, con su punto y su palabra, solo cuando costó algo a la línea.
+  const impactoCorto =
+    evento.impacto === 'con-parada'
+      ? { tono: 'crit' as const, texto: `Detuvo ${formatoMinutos(parada)}` }
+      : evento.impacto === 'afecta-sin-detener'
+        ? { tono: 'warn' as const, texto: 'Afectó sin detener' }
+        : null
+
+  const filaCompacta = (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onAbrir}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onAbrir()
+        }
+      }}
+      className={[
+        'relative grid min-h-[56px] cursor-pointer items-center gap-x-2.5 bg-background px-4 py-1.5',
+        conAsa ? 'grid-cols-[18px_minmax(0,1fr)_44px_auto]' : 'grid-cols-[18px_minmax(0,1fr)_44px]',
+        'transition-colors duration-150 active:bg-accent motion-reduce:transition-none',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
+      ].join(' ')}
+    >
+      <span
+        aria-label={numero != null ? `Evento ${numero}` : undefined}
+        className={`text-footnote tabular-nums ${enPendientes ? 'text-ink-warn' : 'text-muted-foreground'}`}
+      >
+        {numero ?? ''}
+      </span>
+      <span className="min-w-0">
+        <span className={`block truncate text-body ${sinEquipo ? 'text-muted-foreground' : ''}`}>
+          {nombreEquipo}
+          {nuevo && !borrador && <span className="text-footnote text-primary"> · nuevo</span>}
+        </span>
+        <span className="block truncate text-footnote text-muted-foreground">
+          {impactoCorto && (
+            <span className={impactoCorto.tono === 'crit' ? 'font-semibold text-ink-crit' : 'font-semibold text-ink-warn'}>{impactoCorto.texto} · </span>
+          )}
+          {evento.pendiente && !enPendientes && !borrador && <span className="font-semibold text-ink-warn">Pendiente · </span>}
+          {queSeHizo}
+        </span>
+        {!borrador && senal && <FranjaAcr evento={evento} senal={senal} />}
+      </span>
+      {fotos.length > 0 ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (onVerFoto) onVerFoto(fotos, 0)
+            else onAbrir()
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          aria-label={`Ver ${fotos.length === 1 ? 'la foto' : `las ${fotos.length} fotos`}`}
+          className="relative size-11 overflow-hidden rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <Miniatura foto={fotos[0]!} tamano="size-11 rounded-[4px]" />
+          {fotos.length > 1 && (
+            <span className="absolute bottom-0 right-0 rounded-tl-[4px] bg-black/60 px-1 text-caption tabular-nums text-white">{fotos.length}</span>
+          )}
+        </button>
+      ) : (
+        <span className="text-center text-footnote text-muted-foreground" aria-label="Sin fotos">
+          —
+        </span>
+      )}
+      {asaBoton}
+    </div>
+  )
+
+  const fila = compacta ? filaCompacta : (
     <div
       role="button"
       tabIndex={0}
@@ -282,32 +396,7 @@ export function EventoBitacoraFila({
         {/* Franja de causa raíz: solo fallas con detención que se repiten o ya tienen análisis. */}
         {!borrador && <FranjaAcr evento={evento} senal={senal} />}
       </div>
-      {conAsa && (
-        // Asa para arrastrarlo entre los demás (los con hora quedan por reloj).
-        // Con teclado: flechas arriba y abajo (mockup iOS 27, 17-09).
-        <div className="flex self-center" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            aria-label="Reordenar: arrastra, o usa las flechas arriba y abajo"
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                e.preventDefault()
-                e.stopPropagation()
-                onMover?.(e.key === 'ArrowUp' ? -1 : 1)
-              } else e.stopPropagation()
-            }}
-            onPointerDown={asa?.onPointerDown}
-            onPointerMove={asa?.onPointerMove}
-            onPointerUp={asa?.onPointerUp}
-            onPointerCancel={asa?.onPointerUp}
-            className={`-mr-2 flex size-11 touch-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-              arrastrando ? 'cursor-grabbing' : 'cursor-grab'
-            }`}
-          >
-            <Menu className="size-5" />
-          </button>
-        </div>
-      )}
+      {asaBoton}
     </div>
   )
 
@@ -315,7 +404,8 @@ export function EventoBitacoraFila({
     <div
       data-evento-id={evento.id}
       className={[
-        'relative before:absolute before:left-[5rem] before:right-0 before:top-0 before:z-[1] before:h-px before:bg-border before:content-[""] first:before:hidden',
+        compacta ? 'relative before:absolute before:left-[44px] before:right-0' : 'relative before:absolute before:left-[5rem] before:right-0',
+        'before:top-0 before:z-[1] before:h-px before:bg-border before:content-[""] first:before:hidden',
         // HIG «Drag and drop»: lo que se arrastra va translúcido, para que se vea
         // como una copia en la mano y no como la fila misma (ronda 45, 18-09).
         arrastrando ? 'z-20 rounded-[18px] opacity-70 shadow-[0_12px_28px_rgba(0,0,0,0.25)] before:hidden' : '',
@@ -346,7 +436,7 @@ export function EventoBitacoraFila({
  * Desde esa fecha cada foto trae su `thumbUrl` de 320 px (~20 KB); las de antes
  * no la tienen y caen a la original.
  */
-function Miniatura({ foto }: { foto: FotoEvento }) {
+function Miniatura({ foto, tamano = 'size-12 rounded-ctl' }: { foto: FotoEvento; tamano?: string }) {
   const url = foto.thumbUrl ?? foto.url
   const [intento, setIntento] = useState(0)
   const [falló, setFalló] = useState(false)
@@ -357,7 +447,7 @@ function Miniatura({ foto }: { foto: FotoEvento }) {
   if (falló) {
     return (
       <span
-        className="flex size-12 items-center justify-center rounded-ctl bg-muted-foreground/10 text-muted-foreground"
+        className={`flex ${tamano} items-center justify-center bg-muted-foreground/10 text-muted-foreground`}
         title="La miniatura no cargó. Toca para ver la foto."
       >
         <ImageOff className="size-4" aria-hidden />
@@ -371,7 +461,7 @@ function Miniatura({ foto }: { foto: FotoEvento }) {
       alt=""
       loading="lazy"
       decoding="async"
-      className="size-12 rounded-ctl bg-muted-foreground/10 object-cover"
+      className={`${tamano} bg-muted-foreground/10 object-cover`}
       onError={() => {
         if (intento >= 2) {
           setFalló(true)
