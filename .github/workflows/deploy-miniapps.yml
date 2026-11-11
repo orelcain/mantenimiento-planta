@@ -71,6 +71,19 @@ jobs:
           # Las API keys de IA YA NO se pasan al build — ver deploy.yml.
         run: pnpm build
 
+      - name: Copiar la PWA bajo /mantenimiento-planta/
+        # El build usa base /mantenimiento-planta/ (el de GitHub Pages), pero Hosting
+        # publica dist en la RAÍZ: /mantenimiento-planta/assets/*.js no existía y el
+        # rewrite ** devolvía index.html como JS → la PWA en web.app estaba rota
+        # (medido 11-11-2026). Una copia bajo esa ruta la deja funcionando, con los
+        # headers de firebase.json, como respaldo y para una migración futura. Las
+        # Mini Apps siguen en la raíz.
+        working-directory: apps/pwa
+        run: |
+          mkdir -p /tmp/pwa-copia
+          cp -r dist/. /tmp/pwa-copia/
+          mv /tmp/pwa-copia dist/mantenimiento-planta
+
       - name: Install Firebase CLI
         # Version fija igual que deploy-functions.yml. OJO: 15.11.0 fallaba la auth
         # con service account en runner Linux ("Failed to authenticate"); 15.22.3 la
