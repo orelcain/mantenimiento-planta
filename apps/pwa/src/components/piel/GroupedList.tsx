@@ -42,7 +42,7 @@ export function ListGroup({ title, action, footer, className, children, ...props
       )}
       {/* Paleta Pizarra: borde de 1 px (--card-edge) y sin sombra, que con reflejo de planta no
           separa; sin Pizarra las clases [[data-paleta=pizarra]_&]: no aplican y queda igual. */}
-      <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [[data-paleta=pizarra]_&]:border [[data-paleta=pizarra]_&]:border-card-edge [[data-paleta=pizarra]_&]:shadow-none">
+      <div data-superficie="tarjeta" className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [[data-paleta=pizarra]_&]:border [[data-paleta=pizarra]_&]:border-card-edge [[data-paleta=pizarra]_&]:shadow-none">
         {children}
       </div>
       {footer && <p className="px-4 pt-2 text-[0.75rem] text-muted-foreground">{footer}</p>}
@@ -138,7 +138,7 @@ export function ListCell({
       */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className={cn('line-clamp-2 text-body leading-tight sm:truncate',
-          esHijo ? 'font-normal' : 'font-semibold')}>{title}</div>
+          esHijo ? 'font-normal' : 'font-semibold [[data-skin=apple]_&]:font-normal')}>{title}</div>
         {detail && (
           <div className="line-clamp-1 text-footnote leading-tight text-muted-foreground">{detail}</div>
         )}
@@ -147,14 +147,14 @@ export function ListCell({
         )}
         {(value || valueSub) && (
           <div className="mt-0.5 flex items-baseline gap-1.5 tabular-nums sm:hidden">
-            {value && <span className="text-footnote font-semibold">{value}</span>}
+            {value && <span className="text-footnote font-semibold [[data-skin=apple]_&]:font-normal [[data-skin=apple]_&]:text-muted-foreground">{value}</span>}
             {valueSub && <span className="text-caption text-muted-foreground">{valueSub}</span>}
           </div>
         )}
       </div>
       {(value || valueSub) && (
         <div className="hidden shrink-0 text-right tabular-nums sm:block">
-          {value && <div className="text-footnote font-semibold leading-tight">{value}</div>}
+          {value && <div className="text-footnote font-semibold leading-tight [[data-skin=apple]_&]:font-normal [[data-skin=apple]_&]:text-muted-foreground">{value}</div>}
           {valueSub && <div className="text-caption leading-tight text-muted-foreground">{valueSub}</div>}
         </div>
       )}

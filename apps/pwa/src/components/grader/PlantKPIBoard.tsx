@@ -6,11 +6,13 @@
  * - Mes:    mes visible en el calendario.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
-import { TrendingUp, AlertTriangle, TrendingDown } from 'lucide-react'
+import { TrendingUp, AlertTriangle, TrendingDown, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Disclosure, SegmentedControl } from '@/components/piel'
+import { Disclosure, SegmentedControl, FoldTable, Skeleton, SkeletonBloque } from '@/components/piel'
+import { usePielApple } from '@/hooks/usePielApple'
+import { LECTURA_CUERPO, LECTURA_NOTA, LECTURA_TITULO, SeccionLectura } from '@/components/piel/Lectura'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
 import type { KpiPeriod } from '@/hooks/usePlantKPIs'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
@@ -19,11 +21,19 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { KPI_CUTOFFS, OEE_GOOD } from '@/services/grader/kpiThresholds'
 import { shortMachineName } from '@/services/grader/graderMachineNames'
 import { dec, dec1 } from '@/utils/formatoNumeros'
+import { resolveOeeTileMode } from '@/services/grader/oeeSinCalidad'
+import { FilaRendimientoPerilla } from './FilaRendimientoPerilla'
+import type { RendimientoPartido } from '@/pages/monitor/cascadaPerilla'
 
 interface Props {
   plantSlug: PlantSlug
   graderSummaries: GraderDailySummary[]
   enabled?: boolean
+  /**
+   * La partición del rendimiento con la perilla (Fase B, `rendimientoPartido`). Sin ella no se pinta la fila «Al rendimiento
+   * le faltan»: este board no tiene la serie por minuto ni las perillas del turno, y no se inventan.
+   */
+  rendimientoPerilla?: RendimientoPartido | null
   /**
    * Línea/área seleccionada. De acá salen los textos que NO son universales:
    * cómo se llaman las máquinas y qué alcance tiene el OEE. Sin esto el panel
@@ -34,6 +44,14 @@ interface Props {
   selectedDateKey?: string | null
   /** Mes visible en el calendario (para modo Mes). */
   currentMonth?: Date
+  /**
+   * Período controlado desde la página (piel Apple: el período único arriba). Sin
+   * esto, el tablero guarda su propio período, como siempre.
+   */
+  period?: KpiPeriod
+  onPeriodChange?: (p: KpiPeriod) => void
+  /** Piel Apple: dónde va cada pieza (titular y «Por máquina») en la grilla de la página. */
+  ranuras?: RanurasKPIBoard
 }
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -106,10 +124,11 @@ function barWidth(v: number | null, max = 1): string {
 
 const DEFS = {
   oee:     { desc: 'OEE de las EVISCERADORAS (Baader 142) — no de toda el área.\n\nMide el % del tiempo planificado en que las Baader producen a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n(A·R de las Baader · Q = calidad del Grader)\n\nNO incluye: bombeo, chiller, desangrador, cintas, Marel, corte ni etiquetado.\n\n< 50% crítico · 50‒65% aceptable · 65‒85% bueno · ≥ 85% clase mundial\n(el 85% es para una máquina/cuello de botella, no para un OEE de línea).' },
+  oeeSinQ: { desc: 'OEE SIN CALIDAD de las EVISCERADORAS (Baader 142) — no de toda el área.\n\nOEE = Disponibilidad × Rendimiento × Calidad.\nSin el Excel del Grader no hay Calidad, así que acá se muestra Disponibilidad × Rendimiento (la cuenta está debajo del número).\n\nNo es la Disponibilidad sola: es menor porque también descuenta la velocidad. Al cargar el Excel del Grader aparece la Calidad y el OEE completo.' },
   avail:   { desc: 'Porcentaje del tiempo productivo en que la máquina estuvo operativa.\n\nA = Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las Baaders.' },
   perf:    { desc: 'Velocidad real respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)' },
   quality: { desc: 'Porcentaje de piezas buenas sobre el total.\n\nQ = 1 − P0% del Grader\n\nSolo disponible cuando hay datos del Grader para ese período.' },
-  mttr:    { desc: 'Tiempo medio de reparación de una avería MACRO (paro relevante ≥5min).\n\nMTTR = Σ duración averías macro / N° averías macro\n\nExcluye micro-detenciones (<5min) para no distorsionar el indicador.\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
+  mttr:    { desc: 'Tiempo medio de reparación de una avería MACRO (detención relevante ≥5min).\n\nMTTR = Σ duración averías macro / N° averías macro\n\nExcluye micro-detenciones (<5min) para no distorsionar el indicador.\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
   mtbf:    { desc: 'Tiempo medio entre averías macro.\n\nMTBF = Uptime / N° averías macro\n\n> 2 h excelente · 1‒2 h aceptable · < 1 h bajo' },
 }
 
@@ -172,8 +191,15 @@ export function PlantKPIBoard({
   plantLineId,
   selectedDateKey = null,
   currentMonth,
+  rendimientoPerilla = null,
+  period: periodProp,
+  onPeriodChange,
+  ranuras,
 }: Props) {
-  const [period, setPeriod] = useState<KpiPeriod>('day')
+  const [periodLocal, setPeriodLocal] = useState<KpiPeriod>('day')
+  const period = periodProp ?? periodLocal
+  const setPeriod = onPeriodChange ?? setPeriodLocal
+  const apple = usePielApple()
   const effectiveMonth = currentMonth ?? new Date()
   const lineCfg     = getPlantLineConfig(plantLineId)
   const machineKind = getMachineKind(plantLineId)
@@ -215,7 +241,7 @@ export function PlantKPIBoard({
           lost,
           lostByStops: m.lostByStops,
           stopsPct: lost > 0 ? m.lostByStops / lost : 0,
-          dominant: m.lostByStops >= m.lostBySpeed ? ('paros' as const) : ('velocidad' as const),
+          dominant: m.lostByStops >= m.lostBySpeed ? ('detenciones' as const) : ('velocidad' as const),
         }
       })
     if (withData.length < 2) return null
@@ -228,6 +254,19 @@ export function PlantKPIBoard({
   }, [kpis])
 
   if (!enabled) return null
+
+  if (apple) {
+    return (
+      <PlantKPIBoardApple
+        kpis={kpis}
+        loading={loading}
+        error={error}
+        scopeNote={scopeNote}
+        machineDiag={machineDiag}
+        ranuras={ranuras}
+      />
+    )
+  }
 
   return (
     <Card className="border-0 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
@@ -308,18 +347,27 @@ export function PlantKPIBoard({
               )
             })()}
 
-            {/* ── Fila 1: OEE + A + P + Q ── 2x2 mobile, 4col desde sm */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            {/* ── Fila 1: OEE + A + P (+ Q) ──
+                Sin calidad: «OEE sin calidad» (D × R) y 3 tiles.
+                Con calidad: OEE completo y 4 tiles (2x2 mobile, 4col desde sm). */}
+            {(() => {
+              const oeeMode = resolveOeeTileMode(kpis)
+              const sinQ = oeeMode.mode === 'sin-calidad'
+              const oeeVal = oeeMode.value
+              return (
+            <div className={cn('grid gap-1.5', sinQ ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4')}>
               <KPICard
-                label="OEE"
-                tooltip={DEFS.oee.desc}
-                value={kpis.oee !== null ? pct(kpis.oee) : '—'}
-                valueColor={oeeColor(kpis.oee)}
-                barValue={kpis.oee}
-                barColor={kpis.oee !== null
-                  ? (kpis.oee >= OEE_GOOD ? 'bg-fill-ok' : kpis.oee >= KPI_CUTOFFS.oee.warnBelow ? 'bg-primary' : kpis.oee >= KPI_CUTOFFS.oee.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
+                label={sinQ ? 'OEE sin calidad' : 'OEE'}
+                tooltip={sinQ ? DEFS.oeeSinQ.desc : DEFS.oee.desc}
+                value={oeeVal !== null ? pct(oeeVal) : '—'}
+                valueColor={oeeColor(oeeVal)}
+                barValue={oeeVal}
+                barColor={oeeVal !== null
+                  ? (oeeVal >= OEE_GOOD ? 'bg-fill-ok' : oeeVal >= KPI_CUTOFFS.oee.warnBelow ? 'bg-primary' : oeeVal >= KPI_CUTOFFS.oee.critBelow ? 'bg-fill-warning' : 'bg-fill-critical')
                   : 'bg-muted'}
-                note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (classifies ? 'Sin Q' : 'A·P solamente') : undefined}
+                note={oeeMode.mode === 'sin-calidad'
+                  ? `${dec(oeeMode.availability * 100, 1)} × ${dec(oeeMode.performance * 100, 1)}`
+                  : kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (classifies ? 'Sin Q' : 'A·P solamente') : undefined}
               />
               <KPICard
                 label="Disponibilidad"
@@ -343,6 +391,7 @@ export function PlantKPIBoard({
                   : undefined}
                 note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
+              {!sinQ && (
               <KPICard
                 label="Calidad"
                 tooltip={DEFS.quality.desc}
@@ -356,7 +405,13 @@ export function PlantKPIBoard({
                   : undefined}
                 note={kpis.quality === null ? (classifies ? 'Sin Grader' : 'No clasifica') : undefined}
               />
+              )}
             </div>
+              )
+            })()}
+
+            {/* Fila bajo el OEE: «Al rendimiento le faltan» (Fase B). Solo si la pantalla trae la partición. */}
+            {rendimientoPerilla && <FilaRendimientoPerilla r={rendimientoPerilla} />}
 
             {/* ── Fila 2: MTTR · MTBF · Averías macro (ocultar si solo Grader) ── */}
             {!kpis.graderOnly && (
@@ -380,12 +435,12 @@ export function PlantKPIBoard({
               />
               <div
                 className="px-1 py-1.5"
-                title="Averías macro: paros relevantes ≥5min (excluye micro-detenciones y paros operacionales). Son los eventos que cuentan para MTTR/MTBF."
+                title="Averías macro: detenciones relevantes ≥5min (excluye micro-detenciones y detenciones operacionales). Son los eventos que cuentan para MTTR/MTBF."
               >
                 <div className="text-caption font-medium text-muted-foreground leading-tight mb-1">Averías macro</div>
                 <div className="text-xl font-bold tabular-nums leading-none">{kpis.failureCount}</div>
                 <p className="text-caption text-muted-foreground/60 mt-1 leading-tight">
-                  paros ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
+                  detenciones ≥5min · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
                 </p>
               </div>
             </div>
@@ -403,12 +458,12 @@ export function PlantKPIBoard({
               <div className="flex items-start gap-1.5 rounded-ctl bg-warning/[0.15] px-2.5 py-2 text-caption text-ink-warn">
                 <TrendingDown className="w-3 h-3 shrink-0 mt-0.5" />
                 <span
-                  title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por paros: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad — una es el modelo antiguo (19 pz/min) y las otras dos el nuevo (16 pz/min), así que su % no es comparable.`}
+                  title={`Piezas perdidas = lo que dejó de aportar a la línea, medido contra la cadencia de la propia línea:\n· por detenciones: minutos detenida × cadencia de la línea\n· por velocidad: solo si corre MÁS LENTO que sus pares\n\nNo se compara el Rendimiento (%) entre máquinas: las 3 Baader no tienen la misma capacidad — una es el modelo antiguo (19 pz/min) y las otras dos el nuevo (16 pz/min), así que su % no es comparable.`}
                 >
                   <b className="font-semibold">La que más arrastra:</b> {machineDiag.worst.name} —{' '}
                   <b>{Math.round(machineDiag.worst.lost).toLocaleString('es-CL')} piezas perdidas</b>
-                  {' '}({pct(machineDiag.worst.stopsPct, 0)} por paros) · pérdida dominante:{' '}
-                  <b>{machineDiag.worst.dominant === 'paros' ? 'Paros (disponibilidad)' : 'Velocidad (micro-paradas / cadencia)'}</b>.
+                  {' '}({pct(machineDiag.worst.stopsPct, 0)} por detenciones) · pérdida dominante:{' '}
+                  <b>{machineDiag.worst.dominant === 'detenciones' ? 'Detenciones (disponibilidad)' : 'Velocidad (microdetenciones / cadencia)'}</b>.
                 </span>
               </div>
             )}
@@ -434,7 +489,7 @@ export function PlantKPIBoard({
               {kpis.machines.map((m, idx) => {
                 const availPctTxt = m.availability !== null ? `${(m.availability * 100).toFixed(0)}%` : 'sin datos'
                 const perfPctTxt  = m.performance  !== null ? `${(m.performance  * 100).toFixed(0)}%` : 'sin datos'
-                const mttrTxt     = m.mttrMin > 0 ? fmtMin(m.mttrMin) : 'sin paros'
+                const mttrTxt     = m.mttrMin > 0 ? fmtMin(m.mttrMin) : 'sin detenciones'
                 const isWorst     = machineDiag?.worst.id === m.machineid
                 return (
                 <div
@@ -443,7 +498,7 @@ export function PlantKPIBoard({
                     'flex items-center gap-2 rounded-ctl px-2 py-1.5 text-caption',
                     isWorst && 'ring-1 ring-warning/40 bg-warning/[0.04]',
                   )}
-                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros${isWorst ? '\nLa que más piezas pierde del grupo' : ''}`}
+                  title={`${shortMachineName(m.machineName)} — ${machineKind.long}${kpis.machines.length > 1 ? ` N°${idx + 1}` : ''}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} detenciones${isWorst ? '\nLa que más piezas pierde del grupo' : ''}`}
                 >
                   {isWorst && <AlertTriangle className="w-2.5 h-2.5 text-ink-warn shrink-0" />}
                   <span
@@ -467,16 +522,16 @@ export function PlantKPIBoard({
                   </span>
                   <span
                     className={cn('w-14 sm:w-16 tabular-nums', mttrColor(m.mttrMin))}
-                    title={`MTTR (Mean Time To Repair): ${mttrTxt}\nDuración promedio de cada paro. Solo cuenta paros tipo 'Break' (≥5 min).\n\n<5 min excelente · 5-15 min aceptable · >15 min crítico`}
+                    title={`MTTR (Mean Time To Repair): ${mttrTxt}\nDuración promedio de cada detención. Solo cuenta detenciones tipo 'Break' (≥5 min).\n\n<5 min excelente · 5-15 min aceptable · >15 min crítico`}
                   >
                     {fmtMin(m.mttrMin)}
                   </span>
                   <span
                     className="text-muted-foreground/60 tabular-nums"
-                    title={`Paros: ${m.failureCount} eventos\nCantidad de paros detectados por Shoplogix (intervalos de tipo 'Break' ≥5 min). No incluye micro-detenciones (<5 min).`}
+                    title={`Detenciones: ${m.failureCount} eventos\nCantidad de detenciones detectadas por Shoplogix (intervalos de tipo 'Break' ≥5 min). No incluye micro-detenciones (<5 min).`}
                   >
-                    {m.failureCount} <span className="hidden sm:inline">paro{m.failureCount !== 1 ? 's' : ''}</span>
-                    <span className="sm:hidden">par</span>
+                    {m.failureCount} <span className="hidden sm:inline">{m.failureCount === 1 ? 'detención' : 'detenciones'}</span>
+                    <span className="sm:hidden">det.</span>
                   </span>
                   {m.shoplogixTargetCpm !== null && (
                     <span
@@ -496,5 +551,163 @@ export function PlantKPIBoard({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+// ── Piel Apple: modo lectura ──────────────────────────────────────────────────
+// Misma data que la forma anterior, otra forma: el titular dice qué máquina pierde
+// más, una frase lleva el OEE y sus factores, y las máquinas van en tabla con filete.
+// Nada nuevo se calcula. Las dos piezas se ubican por separado (`ranuras`): en PC
+// el titular cruza las dos columnas y «Por máquina» abre la izquierda.
+
+type KpisPlanta = ReturnType<typeof usePlantKPIsForPeriod>['kpis']
+
+interface MachineDiagApple {
+  worst: { id: string; name: string; lost: number; stopsPct: number }
+}
+
+/** Clases de ubicación de cada pieza del tablero en la grilla de la página. */
+export interface RanurasKPIBoard {
+  titular?: string
+  maquinas?: string
+  /** Línea que va sobre el titular (el turno en curso). */
+  cabecera?: ReactNode
+}
+
+interface PlantKPIBoardAppleProps {
+  kpis: KpisPlanta
+  loading: boolean
+  error: string | null
+  scopeNote: string
+  machineDiag: MachineDiagApple | null
+  ranuras?: RanurasKPIBoard
+}
+
+/** Espacio duro entre el número y el «%» (que no se corte al final de línea). */
+const ESPACIO_DURO = String.fromCharCode(160)
+/** Porcentaje con el formato del informe: «78,8 %». */
+const pctAp = (v: number | null, decimals = 1): string =>
+  v === null || !Number.isFinite(v) ? 'sin datos' : `${dec(v * 100, decimals)}${ESPACIO_DURO}%`
+const sinDatos = (s: string): string => (s === '—' ? 'sin datos' : s)
+
+function PlantKPIBoardApple({
+  kpis, loading, error, scopeNote, machineDiag, ranuras,
+}: PlantKPIBoardAppleProps) {
+  const [alcanceAbierto, setAlcanceAbierto] = useState(false)
+  const oeeMode = kpis ? resolveOeeTileMode(kpis) : null
+  const sinQ = oeeMode?.mode === 'sin-calidad'
+  const oeeVal = oeeMode?.value ?? null
+  const ciclosTotales = kpis ? kpis.machines.reduce((a, m) => a + (m.totalCycles ?? 0), 0) : 0
+  const rotuloOee = sinQ ? 'OEE sin calidad' : 'OEE'
+
+  // Titular: la máquina que más pierde; sin diferencia entre máquinas, el OEE.
+  const titular = machineDiag
+    ? `La ${shortMachineName(machineDiag.worst.name)} es la que más pierde: ${Math.round(machineDiag.worst.lost).toLocaleString('es-CL')} piezas, el ${pctAp(machineDiag.worst.stopsPct, 0)} por detenciones`
+    : oeeVal !== null ? `${rotuloOee} ${pctAp(oeeVal)}` : 'Sin OEE en este período'
+  const factores = kpis
+    ? `disponibilidad ${pctAp(kpis.availability)} por rendimiento ${pctAp(kpis.performance)}${!sinQ && kpis.quality !== null ? ` por calidad ${pctAp(kpis.quality)}` : ''}`
+    : ''
+  const tiempos = kpis && !kpis.graderOnly
+    ? ` MTTR ${sinDatos(fmtMin(kpis.mttrMin))} y MTBF ${sinDatos(fmtHours(kpis.mtbfHours))}.`
+    : ''
+  // Si el titular ya dice el OEE, la frase no lo repite.
+  const frase = !kpis
+    ? ''
+    : oeeVal !== null && machineDiag
+      ? `${rotuloOee} ${pctAp(oeeVal)}: ${factores}.${tiempos}`
+      : `${factores.charAt(0).toLocaleUpperCase('es')}${factores.slice(1)}.${tiempos}`
+
+  return (
+    <div className="contents">
+      <div className={ranuras?.titular} data-testid="kpi-titular">
+        {ranuras?.cabecera}
+        {loading && (
+          <SkeletonBloque label="Cargando indicadores" className="space-y-2">
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-5 w-full" />
+          </SkeletonBloque>
+        )}
+        {error && <p className={cn(LECTURA_NOTA, 'text-ink-crit')}>{error}</p>}
+        {!loading && !error && !kpis && (
+          <p className={LECTURA_NOTA}>Sin datos Shoplogix disponibles para este período.</p>
+        )}
+        {!loading && kpis && (
+          <>
+            {kpis.graderOnly && (
+              <p className={cn(LECTURA_NOTA, 'text-ink-info')}>Sin datos Shoplogix para este período, solo calidad Grader.</p>
+            )}
+            {!kpis.graderOnly && ciclosTotales < 100 && (
+              <p className={cn(LECTURA_NOTA, 'text-ink-warn')}>
+                Período sin producción significativa ({ciclosTotales.toLocaleString('es-CL')} ciclos totales).
+                Los KPIs son matemáticamente válidos pero no describen un período productivo.
+              </p>
+            )}
+            <h1 className={cn(LECTURA_TITULO, 'mt-1.5 max-w-[920px] tabular-nums')} title={sinQ ? DEFS.oeeSinQ.desc : DEFS.oee.desc}>
+              {titular}
+            </h1>
+            <p className={cn(LECTURA_CUERPO, 'mt-2 max-w-[820px] tabular-nums')}>
+              {frase}
+              {/* Alcance honesto del OEE (es de las evisceradoras): plegado detrás de un ícono. */}
+              <button
+                type="button"
+                onClick={() => setAlcanceAbierto((v) => !v)}
+                aria-expanded={alcanceAbierto}
+                aria-label="Alcance de los indicadores"
+                className="-my-3 ml-0.5 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full align-middle text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Info className="h-4 w-4" aria-hidden />
+              </button>
+            </p>
+            {alcanceAbierto && <p className={cn(LECTURA_NOTA, 'mt-1')}>{scopeNote}</p>}
+          </>
+        )}
+      </div>
+
+      {/* Por máquina: la que más pierde, en tinta crítica. Detenciones y velocidad nominal, al tocar la fila. */}
+      {!loading && kpis && !kpis.graderOnly && (
+        <SeccionLectura titulo="Por máquina" className={ranuras?.maquinas} testId="kpi-maquinas">
+          <FoldTable
+            lectura
+            caption="Indicadores por máquina"
+            columns={[
+              { id: 'maquina', label: 'Máquina' },
+              { id: 'disp', label: 'Disp.', align: 'right' },
+              { id: 'rend', label: 'Rend.', align: 'right' },
+              { id: 'mttr', label: 'MTTR', align: 'right' },
+            ]}
+            rows={kpis.machines.map((m) => ({
+              id: m.machineid,
+              critica: machineDiag?.worst.id === m.machineid,
+              cells: [
+                shortMachineName(m.machineName),
+                pctAp(m.availability, 0),
+                pctAp(m.performance, 0),
+                sinDatos(fmtMin(m.mttrMin)),
+              ],
+              detail: (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+                  <dt>Detenciones</dt>
+                  <dd className="tabular-nums text-foreground">{m.failureCount}</dd>
+                  <dt>Velocidad nominal</dt>
+                  <dd className="tabular-nums text-foreground">
+                    {m.shoplogixTargetCpm !== null ? `${dec1(m.shoplogixTargetCpm)} pz/min` : 'sin datos'}
+                  </dd>
+                </dl>
+              ),
+            }))}
+            nota={
+              <>
+                <span className="font-semibold text-foreground tabular-nums">
+                  {`${kpis.failureCount} ${kpis.failureCount === 1 ? 'avería' : 'averías'}, ${kpis.microCount.toLocaleString('es-CL')} micro.`}
+                </span>
+                {' Averías de 5 min o más.'}
+                {kpis.microCount > 0 && ` Las microdetenciones suman ${sinDatos(fmtMin(kpis.microMin))} y van fuera del MTTR.`}
+                {' Toca una máquina para ver sus detenciones.'}
+              </>
+            }
+          />
+        </SeccionLectura>
+      )}
+    </div>
   )
 }

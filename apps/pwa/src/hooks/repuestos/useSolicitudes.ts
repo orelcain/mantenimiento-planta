@@ -280,11 +280,13 @@ export async function reabrirAlta(
   })
 }
 
-export function useSolicitudes() {
+/** `enabled: false` (pase de lectura): no abre el listener; la lista queda vacía y no carga. */
+export function useSolicitudes({ enabled = true }: { enabled?: boolean } = {}) {
   const [solicitudes, setSolicitudes] = useState<SolicitudItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
 
   useEffect(() => {
+    if (!enabled) { setLoading(false); return }
     const q = query(collection(db, SOLICITUDES_COL), orderBy('createdAt', 'desc'))
     const unsub = onSnapshot(
       q,
@@ -300,7 +302,7 @@ export function useSolicitudes() {
       },
     )
     return () => unsub()
-  }, [])
+  }, [enabled])
 
   const crearSolicitud = useCallback(async (data: NuevaSolicitud, userId: string, userName: string) => {
     const payload: Record<string, unknown> = {

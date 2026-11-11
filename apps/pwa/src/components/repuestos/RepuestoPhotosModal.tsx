@@ -5,7 +5,7 @@
  * - Imágenes Manual: solo lectura (capturas del PDF, no se editan aquí).
  * - Lightbox compartido con pan+zoom para todas las imágenes.
  */
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Camera, Trash2, Loader2, ImageOff, Plus } from 'lucide-react'
 import type { ImagenRepuesto, MachineImage } from '@/types/repuestos'
 import {
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { ConfirmUploadDialog } from '@/components/repuestos/ConfirmUploadDialog'
 import { uploadRepuestoFoto, deleteRepuestoFoto, SIN_EQUIPO_STORAGE_SEGMENT } from '@/services/storage'
+import { ReAuthConfirmDialog } from '@/components/admin/ReAuthConfirmDialog'
 import { generateId } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
@@ -49,6 +50,8 @@ interface RepuestoPhotosModalProps {
    * El modal no escribe directamente: delega al hub que tiene colPathOf.
    */
   onSaveFotos?: (fotos: ImagenRepuesto[]) => Promise<void>
+  /** Persistir `imagenesManual` tras quitar un recorte del manual (solo admin). */
+  onSaveImagenesManual?: (imgs: ImagenRepuesto[]) => Promise<void>
 }
 
 export function RepuestoPhotosModal({
@@ -64,6 +67,7 @@ export function RepuestoPhotosModal({
   machineName,
   codigoSAP,
   onSaveFotos,
+  onSaveImagenesManual,
 }: RepuestoPhotosModalProps) {
   // Estado local de fotos reales (para reflejar cambios sin esperar reload global)
   const [fotosReales, setFotosReales] = useState<ImagenRepuesto[]>(fotosRealesProp)
@@ -85,7 +89,9 @@ export function RepuestoPhotosModal({
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [pendingPreviews, setPendingPreviews] = useState<string[]>([])
 
-  const allPhotos = [...fotosReales, ...imagenesManual]
+  const [imgsManual, setImgsManual] = useState<ImagenRepuesto[]>(imagenesManual)
+  useEffect(() => { setImgsManual(imagenesManual) }, [imagenesManual])
+  const allPhotos = [...fotosReales, ...imgsManual]
   // El lightbox indexa sobre TODAS las imágenes visibles: fotos reales + manual + galería heredada.
   const allPhotoUrls = [...allPhotos.map((p) => p.url), ...gallery.map((g) => g.url)].filter((u): u is string => !!u)
 
@@ -155,36 +161,35 @@ export function RepuestoPhotosModal({
     [pendingFiles, canEdit, user, fotosReales, machineId, repuestoId, onSaveFotos, clearPending, toast],
   )
 
-  // ── Delete ──
-  const handleDelete = useCallback(
-    async (foto: ImagenRepuesto) => {
-      if (!canEdit) return
-      if (!confirm(`¿Eliminar esta foto?`)) return
-      setDeletingId(foto.id)
-      try {
-        await deleteRepuestoFoto(foto.url)
-        const updated = fotosReales.filter((f) => f.id !== foto.id)
-        // Si era principal y quedan fotos → marcar la primera como principal
-        const withPrincipal = updated.map((f, i) => ({
-          ...f,
-          esPrincipal: foto.esPrincipal && i === 0 ? true : f.esPrincipal,
-        }))
-        await onSaveFotos!(withPrincipal)
-        setFotosReales(withPrincipal)
-      } catch (error) {
-        // Igual que en la subida: sin catch el fallo moría mudo y la foto
-        // "no se borraba" sin explicación (deleteRepuestoFoto ahora propaga).
-        toast({
-          title: 'No se pudo eliminar la foto',
-          description: error instanceof Error ? error.message : String(error),
-          variant: 'destructive',
-        })
-      } finally {
-        setDeletingId(null)
-      }
-    },
-    [canEdit, fotosReales, onSaveFotos, toast],
-  )
+  // ── Quitar (foto real o recorte del manual) ──
+  // Pide la clave de la cuenta (ReAuthConfirmDialog): una foto borrada no se recupera.
+  const [porQuitar, setPorQuitar] = useState<{ tipo: 'real' | 'manual'; img: ImagenRepuesto } | null>(null)
+  const puedeQuitarManual = canEdit && !!onSaveImagenesManual
+
+  const quitarConfirmado = useCallback(async () => {
+    if (!porQuitar) return
+    const { tipo, img } = porQuitar
+    setDeletingId(img.id || img.url)
+    try {
+      if (img.url) await deleteRepuestoFoto(img.url)
+      const lista = tipo === 'real' ? fotosReales : imgsManual
+      const restantes = lista.filter((f) => (f.id || f.url) !== (img.id || img.url))
+      // Si era la principal y quedan fotos → la primera pasa a principal.
+      const conPrincipal = restantes.map((f, i) => ({ ...f, orden: i, esPrincipal: img.esPrincipal && i === 0 ? true : f.esPrincipal }))
+      if (tipo === 'real') { await onSaveFotos!(conPrincipal); setFotosReales(conPrincipal) }
+      else { await onSaveImagenesManual!(conPrincipal); setImgsManual(conPrincipal) }
+    } catch (error) {
+      // Sin catch el fallo moría mudo y la foto «no se borraba» sin explicación.
+      toast({
+        title: 'No se pudo quitar la foto',
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    } finally {
+      setDeletingId(null)
+      setPorQuitar(null)
+    }
+  }, [porQuitar, fotosReales, imgsManual, onSaveFotos, onSaveImagenesManual, toast])
 
   return (
     <>
@@ -279,10 +284,11 @@ export function RepuestoPhotosModal({
                       <div className="absolute inset-0 flex items-start justify-end bg-black/0 p-1 transition group-hover:bg-black/20">
                         {canEdit && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleDelete(foto) }}
+                            onClick={(e) => { e.stopPropagation(); setPorQuitar({ tipo: 'real', img: foto }) }}
                             disabled={deletingId === foto.id}
-                            className="rounded-ctl bg-black/60 p-1 text-ink-crit opacity-0 transition hover:brightness-95 group-hover:opacity-100"
-                            title="Eliminar foto"
+                            aria-label={`Quitar foto ${idx + 1}`}
+                            className="rounded-ctl bg-black/60 p-2 text-ink-crit transition hover:brightness-95 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                            title="Quitar foto (pide la clave)"
                           >
                             {deletingId === foto.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -319,16 +325,16 @@ export function RepuestoPhotosModal({
             </div>
 
             {/* ── Imágenes Manual (solo lectura) ── */}
-            {imagenesManual.length > 0 && (
+            {imgsManual.length > 0 && (
               <div>
                 <h3 className="mb-2 text-sm font-semibold">
                   Imágenes del manual
                   <span className="ml-1.5 text-caption font-normal text-muted-foreground">
-                    ({imagenesManual.length}) — solo lectura
+                    ({imgsManual.length}){puedeQuitarManual ? '' : ' — solo lectura'}
                   </span>
                 </h3>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                  {imagenesManual.map((img, idx) => (
+                  {imgsManual.map((img, idx) => (
                     <div
                       key={`manual-${idx}`}
                       className="group relative aspect-square cursor-pointer overflow-hidden rounded-card border border-border bg-muted"
@@ -349,7 +355,19 @@ export function RepuestoPhotosModal({
                           Sin imagen
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-black/0 transition group-hover:bg-black/20" />
+                      <div className="absolute inset-0 flex items-start justify-end bg-black/0 p-1 transition group-hover:bg-black/20">
+                        {puedeQuitarManual && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setPorQuitar({ tipo: 'manual', img }) }}
+                            disabled={deletingId === (img.id || img.url)}
+                            aria-label={`Quitar imagen del manual ${idx + 1}`}
+                            className="rounded-ctl bg-black/60 p-2 text-ink-crit transition hover:brightness-95 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                            title="Quitar imagen del manual (pide la clave)"
+                          >
+                            {deletingId === (img.id || img.url) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -415,6 +433,13 @@ export function RepuestoPhotosModal({
         uploading={uploading}
         onConfirm={handleConfirmUpload}
         onCancel={clearPending}
+      />
+      <ReAuthConfirmDialog
+        elevado
+        open={!!porQuitar}
+        onOpenChange={(o) => { if (!o) setPorQuitar(null) }}
+        reason={porQuitar ? `para quitar ${porQuitar.tipo === 'real' ? 'esta foto' : 'esta imagen del manual'} de «${repuestoName}»` : ''}
+        onConfirmed={quitarConfirmado}
       />
     </>
   )

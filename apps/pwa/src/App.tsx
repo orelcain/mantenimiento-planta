@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams, usePar
 import { onAuthChange, getUserByIdConTokenFresco, signOut as signOutService } from '@/services/auth'
 import { paseDeSesion, usuarioDePase } from '@/services/bitacora/paseBitacora'
 import { PaseBitacoraLayout } from '@/components/layout/PaseBitacoraLayout'
+import { PaseLecturaLayout } from '@/components/layout/PaseLecturaLayout'
+import { esSesionDeLectura, usuarioDeLectura } from '@/services/paseLectura'
 import { useAuthStore, usePermissionsStore, startSessionWatchdog } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
@@ -36,8 +38,10 @@ const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuert
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
 const BitacoraRealDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraRealDevPage })))
 const PaseBitacoraDevPage = lazyWithReload(() => import('@/pages/dev/PaseBitacoraDevPage').then((mod) => ({ default: mod.PaseBitacoraDevPage })))
+const AcrDevPage = lazyWithReload(() => import('@/pages/dev/AcrDevPage').then((mod) => ({ default: mod.AcrDevPage })))
 const PendientesDevPage = lazyWithReload(() => import('@/pages/dev/PendientesDevPage').then((mod) => ({ default: mod.PendientesDevPage })))
 const InspeccionDevPage = lazyWithReload(() => import('@/pages/dev/InspeccionDevPage').then((mod) => ({ default: mod.InspeccionDevPage })))
+const NuevosPage = lazyWithReload(() => import('@/pages/NuevosPage').then((mod) => ({ default: mod.NuevosPage })))
 const PaseBitacoraPage = lazyWithReload(() => import('@/pages/PaseBitacoraPage').then((mod) => ({ default: mod.PaseBitacoraPage })))
 /** Banco de pruebas del resumen ejecutivo — solo montado en dev (ver Routes). */
 const ResumenTurnoDevPage = lazyWithReload(() => import('@/pages/dev/ResumenTurnoDevPage'))
@@ -73,6 +77,7 @@ const DefaultRoutePage = lazyWithReload(() => import('@/pages/admin/DefaultRoute
 const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
+const SubirArchivosEquiposPage = lazyWithReload(() => import('@/pages/admin/SubirArchivosEquiposPage').then((mod) => ({ default: mod.SubirArchivosEquiposPage })))
 const ShoplogixCredentialsPage = lazyWithReload(() => import('@/pages/admin/ShoplogixCredentialsPage').then((mod) => ({ default: mod.ShoplogixCredentialsPage })))
 const AdminPanelPage = lazyWithReload(() => import('@/pages/admin/AdminPanelPage').then((mod) => ({ default: mod.AdminPanelPage })))
 const MachineCapacityPage = lazyWithReload(() => import('@/pages/admin/MachineCapacityPage').then((mod) => ({ default: mod.MachineCapacityPage })))
@@ -128,7 +133,11 @@ const RuedaPublicaPage = lazyWithReload(() => import('@/pages/RuedaPublicaPage')
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
 const BitacoraTurnoPage = lazyWithReload(() => import('@/pages/BitacoraTurnoPage').then((mod) => ({ default: mod.BitacoraTurnoPage })))
 const HistorialBitacoraPage = lazyWithReload(() => import('@/pages/HistorialBitacoraPage').then((mod) => ({ default: mod.HistorialBitacoraPage })))
+const CausaRaizDetallePage = lazyWithReload(() => import('@/pages/CausaRaizDetallePage').then((mod) => ({ default: mod.CausaRaizDetallePage })))
+const CausaRaizPage = lazyWithReload(() => import('@/pages/CausaRaizPage').then((mod) => ({ default: mod.CausaRaizPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
+const HmiGeaPage = lazyWithReload(() => import('@/pages/HmiGeaPage').then((mod) => ({ default: mod.HmiGeaPage })))
+const JackKnifePage = lazyWithReload(() => import('@/pages/JackKnifePage'))
 const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then((mod) => ({ default: mod.HmiGraderPage })))
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
 const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
@@ -211,6 +220,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export function App() {
   const { setUser, setLoading } = useAuthStore()
   const esPaseBitacora = useAuthStore((s) => Boolean(s.user?.paseBitacora))
+  const esPaseLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   const { loadPermissions, clearPermissions } = usePermissionsStore()
 
   // Escuchar cambios en la autenticación
@@ -220,6 +230,12 @@ export function App() {
         try {
           // Teléfono con pase de bitácora: no tiene perfil en `users` (a
           // propósito) y no carga permisos: solo ve la bitácora.
+          // Pase de lectura de los nuevos: tampoco tiene perfil ni permisos; solo lee.
+          if (await esSesionDeLectura(firebaseUser)) {
+            clearPermissions()
+            setUser(usuarioDeLectura(firebaseUser.uid))
+            return
+          }
           const pase = await paseDeSesion(firebaseUser)
           if (pase) {
             clearPermissions()
@@ -277,6 +293,141 @@ export function App() {
   // interacción del usuario. Ver startSessionWatchdog en authStore.
   useEffect(() => startSessionWatchdog(), [])
 
+  // Rutas del Centro de Aprendizaje: públicas, y las mismas para el pase de lectura.
+  const rutasAprendizaje = (
+    <>
+      <Route
+        path="/aprendizaje"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <LearningHubPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/maquina/:slug"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <MachineLearningPage />
+          </Suspense>
+        }
+      />
+      {/* La vista inmersiva del Baader 200 (iframe con tema propio) se unificó
+          en la ficha estándar para no tener 2 formatos distintos en el Centro.
+          El share standalone por QR (/baader-200/learn) se conserva aparte. */}
+      {/* Referencia de terreno del manual de ajustes (cifra primero, dibujo con leyenda,
+          página del PDF a un toque). Rutas estáticas: ganan a `:sectionId` de abajo. */}
+      <Route
+        path="/aprendizaje/baader-200/terreno"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <Baader200TerrenoPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/baader-200/terreno/:seccionId"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <Baader200TerrenoPage />
+          </Suspense>
+        }
+      />
+      <Route path="/aprendizaje/baader-200/:sectionId" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
+      <Route path="/aprendizaje/baader-200" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
+      <Route
+        path="/aprendizaje/hmi-knuro/:presetId"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <HmiKnuroPublicPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/hmi-knuro"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <HmiKnuroPublicPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/hmi-grader"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <HmiGraderPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/hmi-gea"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <HmiGeaPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/hmi-bombeo-s2"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <HmiBombeoS2PublicPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/planos"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <PlanosElectricosPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/planos/:slug"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <PlanosElectricosPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/variadores"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <VariadoresPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/aprendizaje/perilla-5"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <Perilla5Page />
+          </Suspense>
+        }
+      />
+      {/* Tarjeta A3C de la BAADER 142: plano 888 hojas 22 y 23, interactivo. */}
+      <Route
+        path="/aprendizaje/baader-142/tarjeta-a3c"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <Baader142A3cPage />
+          </Suspense>
+        }
+      />
+      {/* Por confirmar en terreno: elementos del plano 888 por prioridad de fallas. */}
+      <Route
+        path="/aprendizaje/baader-142/tarjeta-a3c/por-confirmar"
+        element={
+          <Suspense fallback={<LoadingScreen />}>
+            <Baader142A3cPorConfirmarPage />
+          </Suspense>
+        }
+      />
+    </>
+  )
+
   return (
     <HelpProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
@@ -292,6 +443,24 @@ export function App() {
                   <Route path="/bitacora/historial" element={<HistorialBitacoraPage />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/bitacora" replace />} />
+              </Routes>
+            ) : esPaseLectura ? (
+              // Pase de lectura: Aprendizaje, Repuestos y monitores; nada más (las reglas tampoco).
+              <Routes>
+                <Route
+                  path="/monitor/:token"
+                  element={
+                    <div className="monitor-tv contents">
+                      <PublicShiftMonitorPage />
+                    </div>
+                  }
+                />
+                <Route element={<PaseLecturaLayout />}>
+                  <Route path="/nuevos" element={<NuevosPage />} />
+                  <Route path="/repuestos" element={<RepuestosPage />} />
+                  {rutasAprendizaje}
+                </Route>
+                <Route path="*" element={<Navigate to="/nuevos" replace />} />
               </Routes>
             ) : (
             <Routes>
@@ -355,6 +524,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <BitacoraDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/acr"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <AcrDevPage />
                     </Suspense>
                   }
                 />
@@ -526,127 +705,9 @@ export function App() {
 
           {/* Learning Hub — Centro de Aprendizaje (publico, con sidebar si el usuario esta autenticado) */}
           <Route element={<PublicOrPrivateLayout />}>
-            <Route
-              path="/aprendizaje"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <LearningHubPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/maquina/:slug"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <MachineLearningPage />
-                </Suspense>
-              }
-            />
-            {/* La vista inmersiva del Baader 200 (iframe con tema propio) se unificó
-                en la ficha estándar para no tener 2 formatos distintos en el Centro.
-                El share standalone por QR (/baader-200/learn) se conserva aparte. */}
-            {/* Referencia de terreno del manual de ajustes (cifra primero, dibujo con leyenda,
-                página del PDF a un toque). Rutas estáticas: ganan a `:sectionId` de abajo. */}
-            <Route
-              path="/aprendizaje/baader-200/terreno"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <Baader200TerrenoPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/baader-200/terreno/:seccionId"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <Baader200TerrenoPage />
-                </Suspense>
-              }
-            />
-            <Route path="/aprendizaje/baader-200/:sectionId" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
-            <Route path="/aprendizaje/baader-200" element={<Navigate to="/aprendizaje/maquina/baader-200" replace />} />
-            <Route
-              path="/aprendizaje/hmi-knuro/:presetId"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <HmiKnuroPublicPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/hmi-knuro"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <HmiKnuroPublicPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/hmi-grader"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <HmiGraderPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/hmi-bombeo-s2"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <HmiBombeoS2PublicPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/planos"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <PlanosElectricosPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/planos/:slug"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <PlanosElectricosPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/variadores"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <VariadoresPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/aprendizaje/perilla-5"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <Perilla5Page />
-                </Suspense>
-              }
-            />
-            {/* Tarjeta A3C de la BAADER 142: plano 888 hojas 22 y 23, interactivo. */}
-            <Route
-              path="/aprendizaje/baader-142/tarjeta-a3c"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <Baader142A3cPage />
-                </Suspense>
-              }
-            />
-            {/* Por confirmar en terreno: elementos del plano 888 por prioridad de fallas. */}
-            <Route
-              path="/aprendizaje/baader-142/tarjeta-a3c/por-confirmar"
-              element={
-                <Suspense fallback={<LoadingScreen />}>
-                  <Baader142A3cPorConfirmarPage />
-                </Suspense>
-              }
-            />
+            {/* Portal del pase de lectura: con sesión normal muestra las mismas puertas. */}
+            <Route path="/nuevos" element={<NuevosPage />} />
+            {rutasAprendizaje}
           </Route>
 
           {/* Legacy redirects — keep old URLs working */}
@@ -807,6 +868,15 @@ export function App() {
                 </RequireReAuth>
               </AdminRoute>
             } />
+            <Route path="admin/archivos-equipos" element={
+              <AdminRoute>
+                <RequireReAuth reason="antes de subir archivos de equipos">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <SubirArchivosEquiposPage />
+                  </Suspense>
+                </RequireReAuth>
+              </AdminRoute>
+            } />
             <Route path="admin/permissions" element={
               <AdminRoute>
                 <RequireReAuth reason="antes de modificar permisos de usuarios">
@@ -950,6 +1020,7 @@ export function App() {
               </Suspense>
             } />
             {/* Home del módulo = Wizard (upload + calendar + KPIs + config). */}
+            <Route path="jack-knife" element={<Suspense fallback={<LoadingScreen />}><JackKnifePage /></Suspense>} />
             <Route path="analisis-grader" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderWizardPage />
@@ -1002,6 +1073,16 @@ export function App() {
             <Route path="bitacora/historial" element={
               <Suspense fallback={<LoadingScreen />}>
                 <HistorialBitacoraPage />
+              </Suspense>
+            } />
+            <Route path="causa-raiz/:acrId" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <CausaRaizDetallePage />
+              </Suspense>
+            } />
+            <Route path="causa-raiz" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <CausaRaizPage />
               </Suspense>
             } />
             <Route path="aria-actions" element={

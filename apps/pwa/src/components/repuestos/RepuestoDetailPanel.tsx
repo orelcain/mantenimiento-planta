@@ -6,7 +6,7 @@
  * tarjeta de stock (Disponible/Mínimo/Máximo) · Bodega · Ubicación ·
  * última actualización (último movimiento) · Ver movimientos.
  */
-import { useState, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import { ChevronLeft, MoreHorizontal, X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Shapes, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { findMachineBySlug } from '@/data/learningMachines'
@@ -23,8 +23,10 @@ import { Button as PielButton, ListGroup, ListCell } from '@/components/piel'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
-import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta } from '@/hooks/repuestos/dondeSeUsa'
+import { agruparDondeSeUsa, totalDondeSeUsa, plantaCorta, detalleUnidades, equiposVisiblesEnRepuestos } from '@/hooks/repuestos/dondeSeUsa'
+import { tituloFamilia } from '@/utils/repuestos/facetasEquipo'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
+import { fotosParaEquipos } from '@/hooks/repuestos/documentacionDeRepuesto'
 
 export interface UbicacionEstructurada { pasillo?: string; estante?: string; nivel?: string }
 
@@ -35,18 +37,25 @@ interface RepuestoDetailPanelProps {
    * «KNURO N1» de Chonchi y de Yal se colapsan en uno: el panel decía 3 equipos para 6.
    */
   plantaDe?: (nodeId: string) => string | undefined
+  /** Equipo(s) en foco: oculta las capturas de manual de otra máquina (ver `fotosParaEquipos`). */
+  equiposEnFoco?: readonly string[] | null
   areaName: string
   /** Texto del «‹ volver» en el teléfono (la cinta/equipo desde donde se llegó). Por defecto, el área. */
   volverA?: string
   onClose: () => void
   loadMovimientos: (bodegaDocId: string, max?: number) => Promise<MovimientoBodega[]>
-  onSaveLocation: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
+  /** Sin handler (pase de lectura) no se ofrece «Editar ubicación». */
+  onSaveLocation?: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
   /** Abrir el modal de solicitud prellenado con este repuesto (Fase 6). */
   onSolicitar?: (item: AreaRepuestoRow) => void
   /** Asignar un código SAP a una pieza de despiece (sin SAP → ordenable). */
   onAssignSap?: () => void
   /** Asignar/añadir un equipo donde se usa el material (N:M). */
   onAssignEquipo?: () => void
+  /** Quitar un equipo de la asignación N:M (pide confirmación en el panel). Solo admin. */
+  onRemoveEquipo?: (nodeId: string) => Promise<void>
+  /** Unidades de cada familia en cada planta (para decir «todas» en el teléfono). */
+  totalUnidades?: (familia: string, planta: string | undefined) => number | undefined
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
   /** ¿el usuario es admin? Habilita editar/renombrar/reubicar/eliminar. */
   isAdmin?: boolean
@@ -63,13 +72,16 @@ interface RepuestoDetailPanelProps {
   /** Ver vínculos al manual. */
   onManual?: () => void
   /** Figura del despiece donde va la pieza (por código de fabricante); null = no está en un despiece. */
-  dibujo?: { fig: string; abrir: () => void } | null
+  /** `rotulo`: el del dibujo del manual («fig. 65 · pos. 3»); sin él se rotula «fig. N» del despiece. */
+  dibujo?: { fig: string; rotulo?: string; abrir: () => void } | null
   /** ¿el repuesto está en favoritos? */
   isFavorite?: boolean
   /** Alternar favorito. */
   onToggleFavorite?: () => void
   /** Abrir el gestor de listas con nombre para este repuesto. */
   onAddToList?: () => void
+  /** Con un equipo seleccionado: favorito POR EQUIPO (aparte de la estrella global). */
+  favoritoEquipo?: { activo: boolean; nombreEquipo: string; abrir: () => void }
   /**
    * Guardar nombres comunes (apodos). Solo admin. En desktop también se editan
    * en la columna "Apodos" de la tabla (lg+); este campo es el ÚNICO camino en móvil.
@@ -124,7 +136,7 @@ function ActionBtn({ icon: Icon, label, onClick, danger, contenido }: {
       ].join(' ')}
     >
       {senal && tiene && (
-        <span className="absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold leading-none text-primary-foreground">
+        <span className="absolute right-1 top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-medium leading-none text-primary-foreground">
           {cuantos ?? '✓'}
         </span>
       )}
@@ -165,7 +177,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, totalUnidades, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, favoritoEquipo, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -237,7 +249,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   }, [onSaveApodos, apodosVal])
 
   const saveLoc = useCallback(async () => {
-    if (!item) return
+    if (!item || !onSaveLocation) return
     setSavingLoc(true)
     try { await onSaveLocation(item.codigoSAP, locForm); setEditLoc(false) }
     finally { setSavingLoc(false) }
@@ -255,11 +267,64 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   const bodegaDocId = item?.bodegaId
   const sap = item?.codigoSAP ?? ''
 
+  // Equipo a quitar, a la espera de confirmación (nunca se quita con un solo toque).
+  const [quitar, setQuitar] = useState<{ nodeId: string; etiqueta: string } | null>(null)
+  const [quitando, setQuitando] = useState(false)
+  useEffect(() => { setQuitar(null) }, [item?.codigoSAP, item?.codigoFabricante])
+  // En el teléfono la confirmación va bajo la lista: al tocar la x de arriba quedaba fuera de pantalla.
+  const confirmacionRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (quitar) confirmacionRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }) }, [quitar])
+  const confirmarQuitar = useCallback(async () => {
+    if (!quitar || !onRemoveEquipo) return
+    setQuitando(true)
+    try { await onRemoveEquipo(quitar.nodeId); setQuitar(null) } catch { /* el hub ya avisó con un toast */ }
+    finally { setQuitando(false) }
+  }, [quitar, onRemoveEquipo])
+
   // Equipos N:M donde se usa el material (nodeIds) y manuales heredados de ellos.
   const equiposReales = (item?.equipos ?? []).filter((e) => e.machineId)
   // Agrupado por PLANTA y familia: los equipos se llaman igual en las dos plantas.
-  const familiasEquipos = agruparDondeSeUsa(equiposReales, plantaDe)
+  // Sin plantas ocultas (Yal), igual que la lista y el teléfono.
+  const familiasEquipos = agruparDondeSeUsa(equiposVisiblesEnRepuestos(equiposReales, plantaDe), plantaDe)
   const totalEquiposUnicos = totalDondeSeUsa(familiasEquipos)
+  // Teléfono: familias visibles (sin plantas ocultas) con detalle compacto, como en la lista.
+  const [familiaAbierta, setFamiliaAbierta] = useState<string | null>(null)
+  const familiasMovil = (() => {
+    const grupos = agruparDondeSeUsa(equiposVisiblesEnRepuestos(equiposReales, plantaDe), plantaDe)
+    const variasPlantas = new Set(grupos.map((g) => g.planta ?? '')).size > 1
+    const m = new Map<string, { clave: string; titulo: string; grupos: typeof grupos; detalle: string; variasPlantas: boolean }>()
+    for (const g of grupos) {
+      const clave = g.familia.trim().toUpperCase()
+      const f = m.get(clave) ?? { clave, titulo: tituloFamilia(g.familia), grupos: [], detalle: '', variasPlantas }
+      f.grupos.push(g)
+      m.set(clave, f)
+    }
+    for (const f of m.values()) {
+      f.detalle = f.grupos.map((g) => {
+        const d = detalleUnidades(g, totalUnidades?.(g.familia, g.planta))
+        const txt = d.tipo === 'texto' ? d.texto : d.tipo === 'unidades' ? d.unidades.map((u) => u.unidad).filter(Boolean).join(' ') : ''
+        const pl = variasPlantas ? plantaCorta(g.planta) : ''
+        return [pl, txt].filter(Boolean).join(' ')
+      }).filter(Boolean).join(' · ')
+    }
+    return [...m.values()]
+  })()
+  const etiquetaUnidad = (familia: string, unidad: string, planta?: string) =>
+    `${familia}${unidad ? ` ${unidad}` : ''}${planta ? ` · ${plantaCorta(planta)}` : ''}`
+  const confirmacionQuitar = quitar && onRemoveEquipo ? (
+    <div ref={confirmacionRef} role="alertdialog" aria-label="Confirmar quitar equipo" className="mt-2 rounded-ctl border border-destructive/40 p-2.5 text-footnote text-foreground">
+      <p>
+        ¿Quitar <strong>{quitar.etiqueta}</strong> de este repuesto?
+        {equiposReales.length === 1 && ' Quedará como material transversal, sin equipo.'}
+      </p>
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" variant="destructive" className="gap-1.5" disabled={quitando} onClick={confirmarQuitar}>
+          {quitando && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Quitar
+        </Button>
+        <Button size="sm" variant="outline" disabled={quitando} onClick={() => setQuitar(null)}>Cancelar</Button>
+      </div>
+    </div>
+  ) : null
   // Con qué se llega filtrada la lista del expediente: el código de ESTA pieza.
   const buscarEnExpediente = (item?.codigoSAP || item?.codigoFabricante || '').trim()
   const { manuales: manualesHeredados, loading: manualesLoading } = useManualesDeEquipos(equiposReales.map((e) => e.machineId))
@@ -308,7 +373,9 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   if (!item) return null
 
   // Fotos de bodega (del físico) primero; si no hay, las del catálogo (manual/galería)
-  const allPhotos = [...(item.fotos ?? []), ...(item.fotosCatalogo ?? [])]
+  // Con un equipo en foco, sin el dibujo del manual de OTRA máquina (igual que la fila de la lista).
+  const fotosCatalogo = fotosParaEquipos(item.fotosCatalogo ?? [], item.equiposDeFoto, equiposEnFoco)
+  const allPhotos = [...(item.fotos ?? []), ...fotosCatalogo]
   const photo = allPhotos[0]
   const ultimo = movs && movs.length > 0 ? movs[0] : null
   const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
@@ -483,17 +550,17 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border text-center">
           <div className="bg-card px-2 py-3">
             <div className="text-caption tracking-wide text-muted-foreground">Disponible</div>
-            <div className={['text-2xl font-bold tabular-nums', item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'].join(' ')}>
+            <div className={['text-2xl font-medium tabular-nums', item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'].join(' ')}>
               {item.bodegaId ? item.stockActual : '—'}
             </div>
           </div>
           <div className="bg-card px-2 py-3">
             <div className="text-caption tracking-wide text-muted-foreground">Mínimo</div>
-            <div className="text-2xl font-bold tabular-nums text-foreground">{item.bodegaId ? item.stockMinimo : '—'}</div>
+            <div className="text-2xl font-medium tabular-nums text-foreground">{item.bodegaId ? item.stockMinimo : '—'}</div>
           </div>
           <div className="bg-card px-2 py-3">
             <div className="text-caption tracking-wide text-muted-foreground">Máximo</div>
-            <div className="text-2xl font-bold tabular-nums text-foreground">{item.stockMaximo ?? '—'}</div>
+            <div className="text-2xl font-medium tabular-nums text-foreground">{item.stockMaximo ?? '—'}</div>
           </div>
         </div>
 
@@ -517,7 +584,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
             ) : (
               <div className="rounded-card border border-transparent bg-primary/5 p-2">
                 <div className="mb-1.5 text-caption text-muted-foreground">
-                  Antes había <span className="font-bold text-foreground">{item.bodegaId ? item.stockActual : 0}</span>. ¿Cuántas hay ahora? (0 = no había)
+                  Antes había <span className="font-medium text-foreground">{item.bodegaId ? item.stockActual : 0}</span>. ¿Cuántas hay ahora? (0 = no había)
                 </div>
                 <div className="flex gap-2">
                   <Input
@@ -554,7 +621,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               {!editLoc && (
                 <span className="flex items-center gap-1.5 text-right text-footnote font-medium text-foreground">
                   {formatUbicacion(item)}
-                  {item.bodegaId && (
+                  {item.bodegaId && onSaveLocation && (
                     <button onClick={startEditLoc} className="rounded-ctl p-0.5 text-muted-foreground hover:text-primary" title="Editar ubicación">
                       <Pencil className="h-3 w-3" />
                     </button>
@@ -619,7 +686,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   )
 
   if (!isDesktop) {
-    const hayMenu = !!onAddToList || (isAdmin && (!!onEditRepuesto || !!onDeleteRepuesto))
+    const hayMenu = !!onAddToList || !!favoritoEquipo || (isAdmin && (!!onEditRepuesto || !!onDeleteRepuesto))
     const tonoStock = item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'
     return (
       <aside className="fixed inset-0 z-50 flex h-full w-full flex-col bg-background pt-[env(safe-area-inset-top)]">
@@ -643,6 +710,11 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[13rem]">
+                  {favoritoEquipo && (
+                    <DropdownMenuItem className="min-h-[44px] gap-2 text-body" onSelect={favoritoEquipo.abrir}>
+                      <Star className={['size-4', favoritoEquipo.activo ? 'fill-current' : ''].join(' ')} /> Favorito de este equipo…
+                    </DropdownMenuItem>
+                  )}
                   {onAddToList && (
                     <DropdownMenuItem className="min-h-[44px] gap-2 text-body" onSelect={onAddToList}>
                       <ListPlus className="size-4" /> Agregar a lista
@@ -672,7 +744,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
           <div className="px-4 pt-1">
             {nv.esComun ? (
               <>
-                <h2 className="text-title2 font-bold text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+                <h2 className="text-title2 font-medium text-foreground">{etiquetasNombre}{nv.titulo}</h2>
                 {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
                   <InlineEditName
                     value={item.textoBreve || ''}
@@ -687,7 +759,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                 ))}
               </>
             ) : isAdmin && onRename ? (
-              <h2 className="text-title2 font-bold text-foreground">
+              <h2 className="text-title2 font-medium text-foreground">
                 {etiquetasNombre}
                 <InlineEditName
                   value={item.textoBreve || ''}
@@ -695,12 +767,12 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                   onSave={onRename}
                   canEdit
                   placeholder="(sin nombre)"
-                  textClassName="text-title2 font-bold"
-                  inputClassName="text-title2 font-bold"
+                  textClassName="text-title2 font-medium"
+                  inputClassName="text-title2 font-medium"
                 />
               </h2>
             ) : (
-              <h2 className="text-title2 font-bold text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+              <h2 className="text-title2 font-medium text-foreground">{etiquetasNombre}{nv.titulo}</h2>
             )}
           </div>
           {/* SAP + copiar (44×44: a la derecha hay espacio) */}
@@ -722,7 +794,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               <>
                 <span className={['size-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-ink-crit' : item.stockStatus === 'low' ? 'bg-ink-warn' : 'bg-ink-ok'].join(' ')} aria-hidden />
                 <span>
-                  <b className={['font-semibold tabular-nums', tonoStock].join(' ')}>{item.stockActual} {item.unidad || 'pzas'}</b>
+                  <b className={['font-medium tabular-nums', tonoStock].join(' ')}>{item.stockActual} {item.unidad || 'pzas'}</b>
                   {item.stockStatus === 'out' ? ' · sin stock' : item.stockStatus === 'low' ? ' · bajo mínimo' : ' disponibles'} · {bodega}
                 </span>
               </>
@@ -748,23 +820,66 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
             </div>
           )}
 
-          {/* Dónde se usa: la fila ENTERA es tocable (antes el «Ver» medía 38×32) */}
+          {/* Documentos: ARRIBA, junto a las fotos — es lo que se busca en terreno (antes quedaba bajo la lista de equipos, fuera de pantalla). */}
+          {(onSpecs || onManual || dibujo || onPhotos) && (
+            <div className="pb-5">
+              <ListGroup className="px-4" title="Documentos">
+                {onSpecs && <ListCell className="min-h-[52px]" leading={<FileText className="size-5 text-primary" />} title="Ficha técnica" value={item.tieneFicha ? undefined : 'Sin cargar'} onClick={onSpecs} />}
+                {onManual && <ListCell className="min-h-[52px]" leading={<BookOpen className="size-5 text-primary" />} title="Manual" value={manualesLoading ? undefined : ((item.manuales ?? 0) + manualesHeredados.length) || 'Sin cargar'} onClick={onManual} />}
+                {dibujo && <ListCell className="min-h-[52px]" leading={<Shapes className="size-5 text-primary" />} title={`Dibujo · ${dibujo.rotulo ?? `fig. ${dibujo.fig}`}`} onClick={dibujo.abrir} />}
+                {onPhotos && <ListCell className="min-h-[52px]" leading={<ImageIcon className="size-5 text-primary" />} title="Fotos" value={allPhotos.length || 'Sin cargar'} onClick={onPhotos} />}
+              </ListGroup>
+            </div>
+          )}
+
+          {/* Dónde se usa (teléfono): una fila por familia, compacta como en la lista —sin Yal,
+              Baader 142 «antigua/nueva», «todas»—; tocarla despliega sus unidades (abrir o quitar). */}
           <div className="pb-5">
             <ListGroup
               className="px-4"
-              title={equiposReales.length > 0 ? `Dónde se usa · ${totalEquiposUnicos} ${totalEquiposUnicos === 1 ? 'equipo' : 'equipos'}` : 'Material transversal'}
+              title={equiposReales.length > 0 ? 'Dónde se usa' : 'Material transversal'}
             >
               {equiposReales.length > 0 ? (
-                familiasEquipos.flatMap((f) =>
-                  f.unidades.map((u) => (
+                familiasMovil.length > 0 ? familiasMovil.flatMap((f) => {
+                  const abierta = familiaAbierta === f.clave
+                  const celdas = [
                     <ListCell
-                      key={u.nodeId}
+                      key={f.clave}
                       className="min-h-[52px]"
-                      title={`${f.familia}${u.unidad ? ` ${u.unidad}` : ''}`}
-                      subtitle={f.planta ? plantaCorta(f.planta) : undefined}
-                      onClick={() => navigate(rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente }))}
-                    />
-                  )),
+                      title={f.titulo}
+                      subtitle={f.detalle || undefined}
+                      value={`${f.grupos.reduce((n, g) => n + g.unidades.length, 0)}`}
+                      onClick={() => setFamiliaAbierta(abierta ? null : f.clave)}
+                      aria-expanded={abierta}
+                    />,
+                  ]
+                  if (abierta) {
+                    for (const g of f.grupos) for (const u of g.unidades) {
+                      celdas.push(
+                        <ListCell
+                          key={u.nodeId}
+                          variant="child"
+                          className="min-h-[48px]"
+                          title={`${u.unidad || tituloFamilia(f.titulo)}${f.variasPlantas && g.planta ? ` · ${plantaCorta(g.planta)}` : ''}`}
+                          onClick={() => navigate(rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente }))}
+                          trailing={onRemoveEquipo && (
+                            <button
+                              type="button"
+                              aria-label={`Quitar ${etiquetaUnidad(g.familia, u.unidad, g.planta)}`}
+                              onClick={(e) => { e.stopPropagation(); setQuitar({ nodeId: u.nodeId, etiqueta: etiquetaUnidad(g.familia, u.unidad, g.planta) }) }}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              className="-my-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
+                            >
+                              <X className="size-4" />
+                            </button>
+                          )}
+                        />,
+                      )
+                    }
+                  }
+                  return celdas
+                }) : (
+                  <ListCell className="min-h-[52px]" title="Solo en otra planta" subtitle="Sus equipos están en una planta que Repuestos no muestra" />
                 )
               ) : (
                 <ListCell className="min-h-[52px]" title="Disponible para toda la planta" subtitle="Insumo o herramienta sin equipo fijo" />
@@ -773,19 +888,8 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                 <ListCell className="min-h-[52px] text-primary" title={equiposReales.length > 0 ? 'Agregar equipo' : 'Asignar a un equipo'} onClick={onAssignEquipo} />
               )}
             </ListGroup>
+            {confirmacionQuitar && <div className="px-4">{confirmacionQuitar}</div>}
           </div>
-
-          {/* Documentos */}
-          {(onSpecs || onManual || dibujo || onPhotos) && (
-            <div className="pb-5">
-              <ListGroup className="px-4" title="Documentos">
-                {onSpecs && <ListCell className="min-h-[52px]" leading={<FileText className="size-5 text-primary" />} title="Ficha técnica" value={item.tieneFicha ? undefined : 'Sin cargar'} onClick={onSpecs} />}
-                {onManual && <ListCell className="min-h-[52px]" leading={<BookOpen className="size-5 text-primary" />} title="Manual" value={manualesLoading ? undefined : ((item.manuales ?? 0) + manualesHeredados.length) || 'Sin cargar'} onClick={onManual} />}
-                {dibujo && <ListCell className="min-h-[52px]" leading={<Shapes className="size-5 text-primary" />} title={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />}
-                {onPhotos && <ListCell className="min-h-[52px]" leading={<ImageIcon className="size-5 text-primary" />} title="Fotos" value={allPhotos.length || 'Sin cargar'} onClick={onPhotos} />}
-              </ListGroup>
-            </div>
-          )}
 
           <div className="px-4">{resto}</div>
         </div>
@@ -815,7 +919,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
   return (
     <aside
       style={isDesktop ? { width } : undefined}
-      className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:static sm:z-auto sm:w-auto sm:shrink-0 relative"
+      className="tipo-ingenieria fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-[var(--panel-surface)] sm:static sm:z-auto sm:w-auto sm:shrink-0 relative"
     >
       {/* Asa de arrastre para ajustar el ancho (solo desktop) */}
       <div
@@ -826,7 +930,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
       />
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <span className="text-caption font-bold tracking-wider text-muted-foreground">Detalle del repuesto</span>
+        <span className="text-caption font-medium tracking-wider text-muted-foreground">Detalle del repuesto</span>
         <div className="flex items-center gap-1">
           {onToggleFavorite && (
             <button
@@ -864,7 +968,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         {/* Nombre + SAP */}
         {nv.esComun ? (
           <>
-            <h2 className="text-base font-bold leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+            <h2 className="text-base font-medium leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
             {(nv.oficial || (isAdmin && onRename)) && (isAdmin && onRename ? (
               <InlineEditName
                 value={item.textoBreve || ''}
@@ -880,7 +984,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
             ))}
           </>
         ) : isAdmin && onRename ? (
-          <h2 className="text-base font-bold leading-tight text-foreground">
+          <h2 className="text-base font-medium leading-tight text-foreground">
             {etiquetasNombre}
             <InlineEditName
               value={item.textoBreve || ''}
@@ -888,12 +992,12 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               onSave={onRename}
               canEdit
               placeholder="(sin nombre)"
-              textClassName="text-base font-bold leading-tight text-foreground"
-              inputClassName="text-base font-bold leading-tight"
+              textClassName="text-base font-medium leading-tight text-foreground"
+              inputClassName="text-base font-medium leading-tight"
             />
           </h2>
         ) : (
-          <h2 className="text-base font-bold leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
+          <h2 className="text-base font-medium leading-tight text-foreground">{etiquetasNombre}{nv.titulo}</h2>
         )}
         <div className="mb-3 mt-1.5 flex flex-wrap items-center gap-2">
           {item.clase && (
@@ -920,7 +1024,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
             (mín/máx/conteo) sigue abajo; esto es el resumen de un vistazo. */}
         {item.bodegaId && (
           <div className="mb-3 flex items-center justify-between gap-2 rounded-card border border-border bg-muted px-3 py-2">
-            <span className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums">
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium tabular-nums">
               <span className={['h-2 w-2 shrink-0 rounded-full', item.stockStatus === 'out' ? 'bg-fill-critical' : item.stockStatus === 'low' ? 'bg-fill-warning' : 'bg-fill-ok'].join(' ')} />
               <span className={item.stockStatus === 'out' ? 'text-ink-crit' : item.stockStatus === 'low' ? 'text-ink-warn' : 'text-ink-ok'}>
                 {item.stockActual} {item.unidad || 'pzas'}
@@ -957,7 +1061,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         {(onSpecs || onPhotos || onManual || dibujo) && (
           <div className={['mb-3 grid gap-1.5', dibujo ? 'grid-cols-2' : 'grid-cols-3'].join(' ')}>
             {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} contenido={!!item.tieneFicha} />}
-            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={(item.fotos?.length ?? 0) + (item.fotosCatalogo?.length ?? 0)} />}
+            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} contenido={allPhotos.length} />}
             {/*
               El modal de manual muestra los vínculos PROPIOS del repuesto Y los HEREDADOS de
               sus equipos, así que la señal tiene que sumar los dos: contar solo los propios
@@ -965,7 +1069,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               afirma nada (`undefined` = sin señal), para no decir «vacío» antes de saberlo.
             */}
             {dibujo && (
-              <ActionBtn icon={Shapes} label={`Dibujo · fig. ${dibujo.fig}`} onClick={dibujo.abrir} />
+              <ActionBtn icon={Shapes} label={`Dibujo · ${dibujo.rotulo ?? `fig. ${dibujo.fig}`}`} onClick={dibujo.abrir} />
             )}
             {onManual && (
               <ActionBtn
@@ -979,6 +1083,11 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
         )}
 
         {/* Agregar a lista de favoritos con nombre */}
+        {favoritoEquipo && (
+          <Button variant="outline" size="sm" className="mb-2 w-full gap-1.5" onClick={favoritoEquipo.abrir}>
+            <Star className={['h-4 w-4', favoritoEquipo.activo ? 'fill-current' : ''].join(' ')} /> {favoritoEquipo.activo ? 'Favorito de este equipo' : 'Marcar favorito de este equipo'}…
+          </Button>
+        )}
         {onAddToList && (
           <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onAddToList}>
             <ListPlus className="h-4 w-4" /> Agregar a lista
@@ -1017,8 +1126,8 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                   */}
                   <span className="ml-auto flex shrink-0 items-center gap-1">
                     {f.unidades.map((u) => (
+                      <span key={u.nodeId} className="inline-flex items-center rounded-ctl bg-background">
                       <Link
-                        key={u.nodeId}
                         to={rutaExpedienteEquipo(u.nodeId, 'recursos', { buscar: buscarEnExpediente })}
                         title={`Abrir el expediente de ${u.nombre}${f.planta ? ` (${plantaCorta(f.planta)})` : ''}`}
                         /* Tamaño REAL y no un área ampliada: N1, N2 y N3 quedan a 4 px entre sí y un pseudo-
@@ -1027,6 +1136,18 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
                       >
                         {u.unidad || 'Ver'}
                       </Link>
+                      {onRemoveEquipo && (
+                        <button
+                          type="button"
+                          aria-label={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)}`}
+                          title={`Quitar ${etiquetaUnidad(f.familia, u.unidad, f.planta)} de este repuesto`}
+                          onClick={() => setQuitar({ nodeId: u.nodeId, etiqueta: etiquetaUnidad(f.familia, u.unidad, f.planta) })}
+                          className="-ml-1.5 inline-flex min-h-[32px] min-w-[22px] items-center justify-center rounded-ctl text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      </span>
                     ))}
                   </span>
                 </div>
@@ -1034,6 +1155,7 @@ export function RepuestoDetailPanel({ item, plantaDe, areaName, volverA, onClose
               {familiasEquipos.length > 6 && (
                 <div className="px-2 text-caption text-muted-foreground">y {familiasEquipos.length - 6} familias más…</div>
               )}
+              {confirmacionQuitar}
               {onAssignEquipo && (
                 /* 15 px de alto. Sube a 44 sin estirar la lista: medidos 65 px libres arriba
                    y 86 abajo, así que el área crece hacia afuera sin pisar nada. */

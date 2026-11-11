@@ -303,12 +303,36 @@ function ritmoDelTurno({ machines, windowStart, windowEnd, pasoMin = 5 }) {
  * @param {number} [umbral=0.9] fracción del ritmo normal que cuenta como "volvió"
  * @returns {{volvioMs:number|null, minutos:number|null}}
  */
-function recuperacion({ bloques, ritmoNormal, desdeMs, umbral = 0.9 }) {
+function recuperacion({ bloques, ritmoNormal, desdeMs, umbral = 0.9, pasoMin = 5, pausas = [] }) {
   if (!ritmoNormal) return { volvioMs: null, minutos: null }
   const objetivo = ritmoNormal * umbral
-  const b = bloques.find((x) => x.inicioMs >= desdeMs && x.piezasPorMin >= objetivo)
+  const pasoMs = pasoMin * 60_000
+  /* El bloque que CONTIENE el fin del evento también cuenta: si aun cargando
+     el rato detenido llegó al ritmo, la línea ya estaba de vuelta. Sin esto,
+     Chonchi 21-10 T2 informaba «Cintas: 69 min» — el bloque de las 10:50 iba a
+     39 pz/min, a las 10:55 empezaba la colación, y la búsqueda saltaba hasta
+     las 12:00. */
+  const b = bloques.find((x) => x.inicioMs + pasoMs > desdeMs && x.piezasPorMin >= objetivo)
   if (!b) return { volvioMs: null, minutos: null }
-  return { volvioMs: b.inicioMs, minutos: Math.round((b.inicioMs - desdeMs) / 60_000) }
+  const volvioMs = Math.max(b.inicioMs, desdeMs)
+  // Las pausas planificadas (colación, reunión) en medio no son tiempo de
+  // recuperación: la línea estaba parada por decisión, no por la falla.
+  const enPausaMs = pausas.reduce((a, [p, q]) => a + Math.max(0, Math.min(q, volvioMs) - Math.max(p, desdeMs)), 0)
+  return { volvioMs, minutos: Math.round((volvioMs - desdeMs - enPausaMs) / 60_000) }
+}
+
+/** Intervalos de pausa planificada (`type: 'break'`) de todas las máquinas, fusionados. */
+function intervalosDePausa(machines) {
+  const ivs = []
+  for (const m of machines) {
+    for (const s of m.states || []) {
+      if (s.type !== 'break') continue
+      const a = aMs(s.startAt)
+      const b = aMs(s.endAt)
+      if (a != null && b != null && b > a) ivs.push([a, b])
+    }
+  }
+  return fusionar(ivs)
 }
 
 /**
@@ -568,5 +592,6 @@ module.exports = {
   impactoPorCausa,
   ritmoDelTurno,
   recuperacion,
+  intervalosDePausa,
   tramosDeRitmo,
 }

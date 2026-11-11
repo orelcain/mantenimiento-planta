@@ -245,7 +245,7 @@ describe('buildPeriodSummary · presentación', () => {
     const peor = s.rows.find(r => r.label.includes('2 ago'))!
     // Es el peor del mes Y tiene una máquina parada: se reporta la causa, que
     // explica el turno, no el ranking, que solo lo ordena.
-    expect(peor.flag).toBe('máquina parada')
+    expect(peor.flag).toBe('máquina detenida')
     expect(s.verdictDetail).toContain('1 de 2 turnos')
   })
 })

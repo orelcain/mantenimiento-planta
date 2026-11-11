@@ -101,7 +101,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
 
   it('con el turno todavía sin ninguna parada de convenio, lo dice así', () => {
     const t = textoAviso({ ...ANTES_DE_LA_COLACION, plannedMin: 0, planned: [] }, { hora: '12:55', reason: 'COLACION' })
-    expect(t).toMatch(/Todavía sin paradas de convenio/i)
+    expect(t).toMatch(/Todavía sin detenciones de convenio/i)
     expect(t).toContain('~12:55')
   })
 
@@ -113,8 +113,8 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
 
   it('sin próxima parada conocida no inventa una línea', () => {
     const t = texto(ANTES_DE_LA_COLACION, null)
-    expect(t).not.toMatch(/parada de convenio entra/i)
-    expect(t).not.toMatch(/Todavía sin paradas/i)
+    expect(t).not.toMatch(/detención de convenio entra/i)
+    expect(t).not.toMatch(/Todavía sin detenciones/i)
   })
 
   it('el convenio se muestra aparte y con sus minutos', () => {
@@ -196,7 +196,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
      * vivo el 26-08 a las 04:00 con 2 h 40 min sin imputar.
      */
     const t = texto(ANTES_DE_LA_COLACION, null, 1081, 13.5)
-    expect(t).not.toMatch(/Ninguna parada/i)
+    expect(t).not.toMatch(/Ninguna detención/i)
     expect(t).toMatch(/Sin imputar/i)          // sí dice que no hay dato
   })
 
@@ -219,7 +219,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
       },
       null, 1081, 13.5,
     )
-    expect(t).toMatch(/Ninguna parada con causa anotada fue falla de máquina/i)
+    expect(t).toMatch(/Ninguna detención con causa anotada fue falla de máquina/i)
     expect(t).toMatch(/27 min sin imputar/)
     expect(t).not.toMatch(/en este turno/)
   })
@@ -230,7 +230,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
       null, 1081, 13.5,
     )
     expect(t).toMatch(/Mantención/)
-    expect(t).not.toMatch(/Ninguna parada por falla de máquina/i)
+    expect(t).not.toMatch(/Ninguna detención por falla de máquina/i)
   })
 
   it('⚠ lo anotado para todo el turno ya no se pierde', () => {
@@ -247,7 +247,7 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
     const t = texto(ANTES_DE_LA_COLACION, null, 0, 13.5)
     expect(t).toMatch(/Camino a la meta/i)
     expect(t).toMatch(/Meta cumplida/i)
-    expect(t).toMatch(/Las paradas igual costaron/i)
+    expect(t).toMatch(/Las detenciones igual costaron/i)
     expect(t).not.toMatch(/que faltaron/i)
   })
 
@@ -263,7 +263,8 @@ describe('TiempoDelTurno · aviso de la próxima parada de convenio', () => {
       />,
     )
     const t = r.container.textContent ?? ''
-    expect(t).toMatch(/\+200/)
+    expect(t).toMatch(/200 adelante/)
+    expect(t).not.toMatch(/\+200/)
     expect(t).toMatch(/Meta cumplida/i)
   })
 })
@@ -278,17 +279,19 @@ describe('TiempoDelTurno · en vivo la vara es la cuota de la hora, no la meta',
   it('no pinta como ritmo perdido lo que aún no se juega', () => {
     const t = textoVivo({ meta: 5000, hechas: 2230, cuotaAhora: 2600, cpmAndando: 10 })
     expect(t).toMatch(/Camino a la meta/i)
-    expect(t).toMatch(/370/)                    // la brecha contra la cuota de ahora
+    expect(t).toMatch(/370 atrás/)              // la brecha contra la cuota de ahora, en palabras de planta
     expect(t).toMatch(/a esta hora/i)
     expect(t).toMatch(/Por jugar\s*2\.400/)     // meta − cuota: hueco, no pérdida
     expect(t).not.toMatch(/2\.770/)             // la brecha mentirosa contra la meta
-    expect(t).toMatch(/tocaban a las 11:00/)
+    expect(t).toMatch(/Van 2\.230 hechas; meta a las 11:00: 2\.600/)
+    expect(t).not.toMatch(/tocaban/)
   })
 
-  it('al día con la cuota: positivo, no un «vamos atrás»', () => {
+  it('al día con la meta a esta hora: positivo, no un «vamos atrás»', () => {
     const t = textoVivo({ meta: 5000, hechas: 2650, cuotaAhora: 2600, cpmAndando: 10 })
     expect(t).toMatch(/Camino a la meta/i)
-    expect(t).toMatch(/Al día con la cuota/i)
+    expect(t).toMatch(/Al día con la meta a esta hora/i)
+    expect(t).toMatch(/2\.650 hechas de 2\.600 pz \(50 adelante\)/)
     expect(t).not.toMatch(/que faltaron/i)
   })
 
@@ -324,7 +327,7 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     expect(t).toMatch(/Sin imputar/i)
     // Con todo sin imputar no se afirma nada sobre falla de máquina: ver el
     // test «⚠ con TODO sin imputar…» más arriba y `veredictoFallaDeMaquina`.
-    expect(t).not.toMatch(/Ninguna parada/i)
+    expect(t).not.toMatch(/Ninguna detención/i)
     // Los minutos esperan bajo «Hechas»; el pliegue viejo no aparece.
     expect(t).not.toMatch(/Produciendo/)
     expect(t).not.toMatch(/ver el reparto del tiempo/i)
@@ -379,7 +382,7 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     fireEvent.click(r.getByRole('button', { name: /^Ritmo/ }))
     const t = r.container.textContent ?? ''
     // 1 · qué es: el resto de la resta, no una medición aparte.
-    expect(t).toMatch(/queda de la brecha después de descontar las paradas/i)
+    expect(t).toMatch(/queda de la brecha después de descontar las detenciones/i)
     // 2 · la cuenta, con las dos varas.
     expect(t).toMatch(/13,5 pz\/min/)
     expect(t).toMatch(/para la meta necesitaba/i)
@@ -394,7 +397,7 @@ describe('TiempoDelTurno · acordeón por parte (una barra, cada parte se abre)'
     fireEvent.click(r.getByRole('button', { name: /^Hechas/ }))
     fireEvent.click(r.getByRole('button', { name: /^Ritmo/ }))
     const t = r.container.textContent ?? ''
-    expect(t).toMatch(/queda de la brecha después de descontar las paradas/i)
+    expect(t).toMatch(/queda de la brecha después de descontar las detenciones/i)
     expect(t).not.toMatch(/la LÍNEA, que solo se detiene/i)
   })
 })
@@ -440,7 +443,7 @@ describe('TiempoDelTurno · cada parada se ubica y se salta sola', () => {
     const r = montar((v) => ventanas.push(v))
     fireEvent.click(r.getByRole('button', { name: /FALLA OPERACIONAL/ }))
     // La de las 08:57 es la más larga: primera de la lista.
-    fireEvent.click(r.getAllByTitle('Ver esta parada en el gráfico')[0]!)
+    fireEvent.click(r.getAllByTitle('Ver esta detención en el gráfico')[0]!)
     expect(ventanas).toHaveLength(1)
     // 08:57 son 77 min desde t0 (07:40); termina a los 82,5. Con aire de 4,4.
     expect(ventanas[0]!.desdeMin).toBeCloseTo(72.6, 1)
@@ -457,7 +460,7 @@ describe('TiempoDelTurno · cada parada se ubica y se salta sola', () => {
     const r = montar(undefined)
     fireEvent.click(r.getByRole('button', { name: /FALLA OPERACIONAL/ }))
     expect(r.container.textContent ?? '').toMatch(/08:57.*09:02/)
-    expect(r.queryAllByTitle('Ver esta parada en el gráfico')).toHaveLength(0)
+    expect(r.queryAllByTitle('Ver esta detención en el gráfico')).toHaveLength(0)
   })
 })
 
@@ -519,7 +522,33 @@ describe('TiempoDelTurno · el comentario del operador vive DENTRO de su parada'
     fireEvent.click(r.getByRole('button', { name: /CUCHILLERIA DORSAL/ }))
     const t = r.container.textContent ?? ''
     expect(t).toMatch(/se revisa el eje/)
-    expect(t).toMatch(/14:40→14:45/)   // con su tramo, para poder ubicarlo
+    // Sin hora: el tramo de Shoplogix es el bloque en que se escribió, no una detención.
+    expect(t).not.toMatch(/14:40→14:45/)
+  })
+
+  it('el bloque horario del comentario NO se muestra: va la hora de su detención', () => {
+    /*
+     * Orel, 30-10: «23:30→00:30 · cadena pegada» al lado de «23 min · 3×» se
+     * leía como una detención de 1 hora. Shoplogix cuelga el comentario del
+     * bloque horario; la nota va a la detención más larga dentro de ese bloque.
+     */
+    const notas = notasPorCausa(
+      [{ r: 'Baader 200/CUCHILLERIA DORSAL', f: '2026-08-13T09:00:00.000Z', h: '2026-08-13T10:00:00.000Z', t: 'cadena pegada' }],
+      (iso) => iso.slice(11, 16), T0,
+    )
+    const t = render(
+      <TiempoDelTurno
+        tb={TB} cerrado meta={5000} hechas={3919} cpmAndando={13.5}
+        onCausa={() => {}} onVentana={() => {}} notas={notas}
+        grupos={agruparEventos({
+          tb: TB, stopEvents: EVENTOS, stopReasons: ['Baader 200/CUCHILLERIA DORSAL'],
+          cpmGlobal: 13.5, t0: T0,
+        })}
+      />,
+    ).container.textContent ?? ''
+    expect(t).toMatch(/cadena pegada/)
+    expect(t).not.toMatch(/09:00→10:00/)
+    expect(t).toMatch(/09:17[^«]*«cadena pegada»/)   // la de 10 min, no la de 3
   })
 
   it('con la causa cerrada se siguen viendo: son la señal de que el piso explicó algo', () => {
@@ -566,7 +595,7 @@ describe('TiempoDelTurno · la parada tocada se marca SOLA en el gráfico', () =
       />,
     )
     fireEvent.click(r.getByRole('button', { name: /Micro Detencion/ }))
-    fireEvent.click(r.getAllByTitle('Ver esta parada en el gráfico')[0]!)
+    fireEvent.click(r.getAllByTitle('Ver esta detención en el gráfico')[0]!)
     expect(causas).toContain('Micro Detencion')
     expect(tramos).toHaveLength(1)
     // 08:11:20 son 31,33 min desde t0 (07:40); dura 1,5.
@@ -590,7 +619,7 @@ describe('TiempoDelTurno · la parada tocada se marca SOLA en el gráfico', () =
       />,
     )
     fireEvent.click(r.getByRole('button', { name: /Micro Detencion/ }))
-    expect(r.getAllByTitle('Ver esta parada en el gráfico')).toHaveLength(3)
+    expect(r.getAllByTitle('Ver esta detención en el gráfico')).toHaveLength(3)
     expect(r.container.textContent ?? '').not.toMatch(/las 3 más largas/)
   })
 
@@ -635,8 +664,9 @@ describe('TiempoDelTurno · minutos de máquina (tbv 3, 28-09-2026)', () => {
         grupos={agruparEventos({ tb: TB3, cpmGlobal: 36 })} />,
     ).container.textContent ?? ''
     expect(t).toMatch(/PUNTO CERO/)
-    expect(t).toMatch(/133 pz · 11 min · 1×/)     // 3,7 × 36 — antes «0 pz · 0 min»
-    expect(t).toMatch(/565 pz · 47 min · 74×/)    // 15,7 × 36
+    // Piezas a la derecha; «N detenciones · X min en total» en la línea de abajo.
+    expect(t).toMatch(/133 pz1 detención · 11 min/)               // 3,7 × 36 — antes «0 pz · 0 min»
+    expect(t).toMatch(/565 pz74 detenciones · 47 min en total/)    // 15,7 × 36
     expect(t).toMatch(/de máquina/)
   })
 })
@@ -663,14 +693,59 @@ describe('TiempoDelTurno · las paradas pueden costar MÁS que la brecha (28-09-
 
   it('la fila «Paradas» muestra el costo REAL, no la brecha', () => {
     // 32,5 min equivalentes × 38 pz/min = 1.235, no las 780 que faltaron.
-    expect(t()).toMatch(/Paradas1\.235 pz/)
+    expect(t()).toMatch(/Detenciones1\.235 pz/)
   })
 
   it('y la frase dice cuánto se pasaba de la meta sin esas paradas', () => {
     const texto = t()
     expect(texto).toMatch(/más que las 780 pz que faltaron/)
-    expect(texto).toMatch(/~455 pz sobre la meta/)
+    expect(texto).toMatch(/~455 pz adelante de la meta/)
     // Ya no tiene sentido hablar de «ritmo por debajo»: las paradas lo explican todo.
     expect(texto).not.toMatch(/ritmo por debajo del necesario/)
+  })
+})
+
+describe('TiempoDelTurno · los tramos de la barra del ampliado no son destino de toque en el celular', () => {
+  const TB: PublicMonitorLive['timeBreakdown'] = {
+    ...ANTES_DE_LA_COLACION,
+    recoverable: [{ reason: 'FALLA OPERACIONAL', min: 8, count: 2, lineMin: 8 }],
+  }
+  const ancho = (px: number) => {
+    window.matchMedia = ((q: string) => {
+      const min = /min-width:\s*(\d+)px/.exec(q)
+      return { matches: min ? px >= Number(min[1]) : false, media: q, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false }
+    }) as unknown as typeof window.matchMedia
+  }
+  const tramos = () => {
+    const c = render(
+      <TiempoDelTurno tb={TB} cerrado meta={5000} hechas={3919} cpmAndando={13.5}
+        grupos={agruparEventos({ tb: TB, cpmGlobal: 13.5 })} />,
+    ).container
+    return Array.from(c.querySelectorAll('div[class*="h-6"] > button')) as HTMLButtonElement[]
+  }
+
+  it('bajo 768 px: fuera del foco y del lector, sin eventos (las filas de 44 px de abajo abren lo mismo)', () => {
+    ancho(375)
+    const t = tramos()
+    expect(t.length).toBeGreaterThan(1)
+    for (const b of t) {
+      expect(b.getAttribute('tabindex')).toBe('-1')
+      expect(b.getAttribute('aria-hidden')).toBe('true')
+      expect(b.getAttribute('aria-label')).toBeNull()
+      expect(b.className).toContain('pointer-events-none')
+    }
+  })
+
+  it('desde 768 px siguen siendo atajos con su nombre y su estado', () => {
+    ancho(1366)
+    const t = tramos()
+    expect(t.length).toBeGreaterThan(1)
+    for (const b of t) {
+      expect(b.getAttribute('tabindex')).toBeNull()
+      expect(b.getAttribute('aria-hidden')).toBeNull()
+      expect(b.getAttribute('aria-label')).toMatch(/ver detalle$/)
+      expect(b.getAttribute('aria-expanded')).not.toBeNull()
+      expect(b.className).not.toContain('pointer-events-none')
+    }
   })
 })

@@ -5,7 +5,7 @@
  * Muestra 4 secciones (tabs): Manual, Procedimientos, Flujos, Diagnostico.
  * Si la seccion esta vacia, muestra empty state.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   BookOpen, ListChecks, GitBranch, AlertTriangle, Wrench, ChevronDown,
@@ -22,7 +22,12 @@ import { GRADER_GLOSSARY } from '@/services/grader/graderGlossary'
 import { getCommonParts, type CommonPart } from '@/data/commonPartsByMachine'
 import { useRepuestosByCodigos, type RepuestoResuelto } from '@/hooks/repuestos/useRepuestosByCodigos'
 import { useMarkedCommonParts } from '@/hooks/repuestos/useMarkedCommonParts'
+import { useEsPC } from '@/hooks/useEsPC'
+import { DiagnosticoMaestroPC } from '@/components/learning/DiagnosticoMaestroPC'
+import { DiagnosticoListaMovil } from '@/components/learning/DiagnosticoListaMovil'
 import {
+  getMachineContentMeta,
+  type MachineContentMeta,
   listProcedures,
   listManualSections,
   listFlows,
@@ -39,7 +44,6 @@ import {
   type GlossaryEntry,
   type BibliographyEntry,
 } from '@/services/learningContent'
-import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningModulesStrip'
 import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
 import { QuizView } from '@/components/learning/QuizView'
 import { GraderVisualPilot } from '@/components/learning/GraderVisualPilot'
@@ -47,7 +51,6 @@ import { QuickRefView } from '@/components/learning/QuickRefView'
 import { getQuickRef, hasQuickRef } from '@/data/learningQuickRef'
 import { posicionesDeMaquina, VARIADORES, type PosicionReceta } from '@/data/variadores'
 import { getQuizBest } from '@/utils/learningProgress'
-import { EncabezadoHerramienta, SegmentedControl, SelectorSeccion } from '@/components/piel'
 
 /** Area del catalogo cuyos temas son cursos (no maquinas) -> set de pestanas distinto. */
 const COURSE_AREA = CAPACITACION_AREA
@@ -219,6 +222,30 @@ export function MachineLearningPage() {
   const machine = slug ? findMachineBySlug(slug) : undefined
   const isCourse = !!machine && machine.area === COURSE_AREA
 
+  // PC: barra con pestañas y su recuento real (no solo el de la pestaña abierta).
+  const pc = useEsPC()
+  const [meta, setMeta] = useState<MachineContentMeta | null>(null)
+  const barraRef = useRef<HTMLDivElement>(null)
+  const [altoBarra, setAltoBarra] = useState(96)
+  useEffect(() => {
+    if (!machine || machine.customRoute) return
+    let cancelled = false
+    getMachineContentMeta(machine.slug).then(m => { if (!cancelled) setMeta(m) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [pc, machine])
+  useEffect(() => {
+    const el = barraRef.current
+    if (!pc || !el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setAltoBarra(Math.round(el.getBoundingClientRect().height)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [pc])
+  // En celular las pestañas se desplazan: la activa siempre a la vista.
+  useEffect(() => {
+    const activa = barraRef.current?.querySelector<HTMLElement>('.dp-tabs [aria-current="true"]')
+    if (typeof activa?.scrollIntoView === 'function') activa.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeTab, loadingTab, meta]) // el recuento llega después y ensancha la pestaña
+
   // Repuestos comunes: config (fallback, hoy vacía) + los marcados en Firestore
   // (comunEn). Se resuelve acá (antes de los early returns) para decidir si mostrar
   // la 5ª pestaña. Dedup por SAP.
@@ -316,123 +343,98 @@ export function MachineLearningPage() {
   // Altura adaptativa: dentro de MainLayout usar min-h-full, publico usar min-h-dvh
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
   const docCode = machine.slug.toUpperCase()
-  const activeIndex = tabs.findIndex(t => t.id === activeTab)
   // Progreso = SOLO evaluación (el material es de consulta periódica; el "% visto"
   // no aporta). Aprobado si el mejor examen local llegó al umbral.
   const quizBest = getQuizBest(machine.slug)
   const quizPassed = quizBest != null && quizBest >= 70
-  const contenido = isCourse
-    ? 'Curso / Normativa'
-    : `${Object.values(machine.sections).filter(Boolean).length} secciones`
+
+  // Recuento por pestaña para la barra de PC: el de Firestore si llegó, si no el cargado.
+  const cuentaPestana = (id: TabId): number => {
+    if (meta) {
+      if (id === 'manual') return meta.manual
+      if (id === 'procedures') return meta.procedures
+      if (id === 'flows') return meta.flows
+      if (id === 'diagnosis') return meta.diagnosis
+      if (id === 'casos') return meta.flows + meta.diagnosis
+      if (id === 'quiz' && meta.quiz != null) return meta.quiz
+    }
+    return countFor(id)
+  }
+  const puedeAdministrar = isAdmin && ADMIN_EDITABLE_TABS.has(activeTab)
+  const abrirAdmin = () => window.open(`/mantenimiento-planta/aprendizaje/admin/${machine.slug}?tab=${activeTab}`, '_blank', 'noopener,noreferrer')
+  const codigoFicha = `${docCode} · ${isCourse ? (machine.programa ?? 'Curso') : 'rev. 2026-07'}`
+  const estadoEvaluacion = quizBest == null ? null
+    : quizPassed ? `Evaluación aprobada · ${quizBest} %` : `Evaluación: ${quizBest} % (umbral 70 %)`
+  // Accesos de la ficha: con texto en PC, solo ícono (44 px) en celular.
+  const acciones: { id: string; etiqueta: string; titulo?: string; icono: ReactNode; onClick: () => void }[] = [
+    ...(!isCourse && machine.hmiRoute
+      ? [{ id: 'hmi', etiqueta: machine.hmiLabel ?? 'Simulador', titulo: 'Practicar en el simulador', icono: <MonitorPlay className="h-4 w-4" />, onClick: () => navigate(machine.hmiRoute!) }]
+      : []),
+    ...(machine.slug === 'baader-142'
+      ? [{ id: 'a3c', etiqueta: 'Tarjeta A3C', titulo: 'Tarjeta A3C · qué LED prende', icono: <CircuitBoard className="h-4 w-4" />, onClick: () => navigate('/aprendizaje/baader-142/tarjeta-a3c') }]
+      : []),
+    ...(machine.slug === 'baader-200' && activeTab === 'manual'
+      ? [{ id: 'terreno', etiqueta: 'Referencia de terreno', icono: <Ruler className="h-4 w-4" />, onClick: () => navigate('/aprendizaje/baader-200/terreno') }]
+      : []),
+    ...(puedeAdministrar
+      ? [{ id: 'admin', etiqueta: 'Administrar', titulo: 'Administrar esta sección — pedirá confirmar identidad', icono: <Lock className="h-4 w-4" />, onClick: abrirAdmin }]
+      : []),
+  ]
+
 
   return (
-    <div className={`dossier ${heightClass} w-full`}>
-      {/* Encabezado único del marco de herramientas (antes «← Centro de aprendizaje» en mono). */}
-      <EncabezadoHerramienta
-        pegajoso
-        etiquetaVolver="Aprendizaje"
-        volverA="/aprendizaje"
-        titulo={isCourse ? 'Curso' : 'Ficha técnica'}
-        subtitulo={machine.name}
-        // Una sola forma de pestañas: 2-4 secciones cortas = segmentado; más = «Sección ▾» (Sheet con lista).
-        control={tabs.length <= 4 ? (
-          <SegmentedControl
-            tamano="herramienta"
-            ariaLabel="Secciones"
-            value={activeTabData.id}
-            onChange={setActiveTab}
-            segments={tabs.map(t => ({ value: t.id, label: t.shortLabel }))}
-          />
-        ) : (
-          <SelectorSeccion
-            value={activeTabData.id}
-            onChange={setActiveTab}
-            opciones={tabs.map(t => {
-              const TabIcon = t.icon
-              return { value: t.id, label: t.label, icon: <TabIcon />, hecho: t.id === 'quiz' && quizPassed }
-            })}
-          />
-        )}
-        contextoAria={`Estoy en ${isCourse ? 'el curso' : 'la ficha técnica de'} ${machine.name} del Centro de aprendizaje. `}
-      />
-      {/* Sin barra inferior en esta ruta (modo «lectura»): solo aire para el gesto de inicio. */}
-      <div className="dp-wrap" style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom))' }}>
-
-        {/* Portada del documento */}
-        <header style={{ paddingTop: 'clamp(10px, 3vw, 30px)' }}>
-          <div className="dp-eyebrow">
-            {isCourse ? (machine.modulo != null ? 'Módulo' : 'Curso') : 'Ficha técnica'}<span className="sep">/</span><b>{docCode}</b><span className="sep">·</span>{isCourse ? (machine.programa ?? machine.area) : 'Rev. 2026-07'}
+    <div
+      className={`dossier ${heightClass} w-full${pc ? ' dp-pc' : ''}`}
+      style={pc ? ({ '--dp-barra': `${altoBarra}px` } as CSSProperties) : undefined}
+    >
+      <div className={pc ? 'dp-barra' : 'dp-barra dp-barra-movil'} ref={barraRef}>
+        <div className="dp-barra-fila">
+          <button type="button" className="dp-barra-volver" onClick={() => navigate('/aprendizaje')}>‹ Aprendizaje</button>
+          {pc && <h1>{machine.name}</h1>}
+          {pc && <span className="dp-barra-cod">{codigoFicha}</span>}
+          {pc && estadoEvaluacion && <span className="dp-barra-cod">{estadoEvaluacion}</span>}
+          <div className="dp-barra-acc">
+            {acciones.map(a => (
+              <button
+                key={a.id}
+                type="button"
+                className={pc ? 'dp-btn' : 'dp-btn-ico'}
+                aria-label={pc ? undefined : a.etiqueta}
+                title={a.titulo}
+                onClick={a.onClick}
+              >
+                {a.icono}{pc && ` ${a.etiqueta}`}
+              </button>
+            ))}
           </div>
-          <h1 className="dp-title">{machine.name}</h1>
-          <p className="dp-sub">{machine.description}</p>
+        </div>
+        {!pc && (
+          <>
+            <h1>{machine.name}</h1>
+            <span className="dp-barra-cod">{codigoFicha}{estadoEvaluacion && ` · ${estadoEvaluacion}`}</span>
+          </>
+        )}
+        <nav className="dp-tabs" aria-label="Secciones">
+          {tabs.map(t => {
+            const n = cuentaPestana(t.id)
+            return (
+              <button key={t.id} type="button" aria-current={t.id === activeTabData.id} onClick={() => setActiveTab(t.id)}>
+                {pc ? t.label : t.shortLabel}{n > 0 && <span className="dp-n">{n}</span>}
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+      {/* Sin barra inferior en esta ruta (modo «lectura»): solo aire para el gesto de inicio. */}
+      <div
+        className="dp-wrap"
+        style={{ paddingBottom: pc && activeTab === 'diagnosis' ? 0 : 'calc(3rem + env(safe-area-inset-bottom))' }}
+      >
 
-          {isCourse && (
-            <div className="dp-meta">
-              <div><span className="dp-lbl">Área</span><span className="dp-val">{machine.programa ?? machine.area}</span></div>
-              <div><span className="dp-lbl">Contenido</span><span className="dp-val dp-num">{contenido}</span></div>
-              <div><span className="dp-lbl">Uso</span><span className="dp-val">Estudio</span></div>
-              {/* Cursos sueltos (sin numero de modulo) muestran el nivel; "M—" no dice nada. */}
-              <div><span className="dp-lbl">Nivel</span><span className="dp-val">{machine.modulo != null ? `M${machine.modulo}` : (machine.nivel != null ? `N${machine.nivel}` : '—')}</span></div>
-            </div>
-          )}
 
-          {!isCourse && machine.hmiRoute && (
-            <button className="dp-hmi" onClick={() => navigate(machine.hmiRoute!)}>
-              <MonitorPlay className="h-4 w-4" /> Practicar en el simulador · {machine.hmiLabel}
-            </button>
-          )}
-          {/* Tarjeta A3C interactiva (plano 888 h. 22-23), solo BAADER 142. */}
-          {machine.slug === 'baader-142' && (
-            <button className="dp-hmi" onClick={() => navigate('/aprendizaje/baader-142/tarjeta-a3c')}>
-              <CircuitBoard className="h-4 w-4" /> Tarjeta A3C · qué LED prende
-            </button>
-          )}
-
-          {/* Estado de evaluación (único progreso que importa: esto es material
-              de consulta periódica, no un curso lineal) */}
-          {quizBest != null && (
-            <div className="dp-progress">
-              <span className={`dp-progress-label ${quizPassed ? 'is-ok' : ''}`}>
-                {quizPassed ? `✓ Evaluación aprobada · ${quizBest}%` : `Evaluación: mejor intento ${quizBest}% — umbral 70%`}
-              </span>
-            </div>
-          )}
-        </header>
-
-        <div className="dp-course">
+        <div className={pc && activeTab === 'diagnosis' ? 'dp-course' : 'dp-course dp-pc-cuerpo'}>
           <div className="dp-main-col">
 
-        {/* Cabecera de sección activa */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginTop: 34 }}>
-          <div className="dp-sec-head">
-            <span className="dp-sec-no">Sección {String(activeIndex + 1).padStart(2, '0')}</span>
-            <h2 className="dp-sec-title">{activeTabData.label}</h2>
-          </div>
-          {isAdmin && ADMIN_EDITABLE_TABS.has(activeTab) && (
-            <button
-              type="button"
-              className="dp-edit"
-              style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}
-              title="Administrar esta sección — pedirá confirmar identidad"
-              onClick={() => window.open(`/mantenimiento-planta/aprendizaje/admin/${machine.slug}?tab=${activeTab}`, '_blank', 'noopener,noreferrer')}
-            >
-              <Lock className="h-3 w-3" />
-              Administrar
-            </button>
-          )}
-        </div>
-        <div className="dp-sec-code" style={{ marginBottom: 28 }}>{activeTabData.description}</div>
-        {/* Acceso a la referencia de terreno (cifra primero + página del PDF), solo B200. */}
-        {machine.slug === 'baader-200' && activeTab === 'manual' && (
-          <button
-            type="button"
-            className="dp-hmi"
-            style={{ marginTop: -16, marginBottom: 24, minHeight: 44 }}
-            onClick={() => navigate('/aprendizaje/baader-200/terreno')}
-          >
-            <Ruler className="h-4 w-4" /> Referencia de terreno
-          </button>
-        )}
 
         {activeTab === 'quickref' && quickRefGroups ? (
           <QuickRefView groups={quickRefGroups} showSensitive={isAuthenticated} />
@@ -462,7 +464,19 @@ export function MachineLearningPage() {
         ) : activeTab === 'flows' && flows.length > 0 ? (
           <FlowDiagramViewer flows={flows} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
-          <DiagnosisList entries={diagnosis} machineSlug={machine.slug} />
+          pc ? (
+            <DiagnosticoMaestroPC
+              key={machine.slug}
+              entries={diagnosis}
+              accion={entry => <HmiPracticeButton contentId={entry.id} machineSlug={machine.slug} />}
+            />
+          ) : (
+            <DiagnosticoListaMovil
+              key={machine.slug}
+              entries={diagnosis}
+              accion={entry => <HmiPracticeButton contentId={entry.id} machineSlug={machine.slug} />}
+            />
+          )
         ) : activeTab === 'casos' && (flows.length > 0 || diagnosis.length > 0) ? (
           <div>
             {flows.length > 0 && (
@@ -508,7 +522,6 @@ export function MachineLearningPage() {
           />
         )}
 
-            <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
           </div>
         </div>
       </div>

@@ -19,12 +19,18 @@ import { BodegaView } from './BodegaView'
 import { SegmentedControl } from '@/components/piel'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
 import { CodigosFabricanteView, type CrearDesdeCatalogo } from './CodigosFabricanteView'
+import { useAuthStore } from '@/store'
 
 type Tab = 'areas' | 'bodega' | 'codigos'
 
 const STORAGE_KEY = 'repuestos-active-tab'
 
 function getDefaultTab(): Tab {
+  try {
+    // Enlace a la ficha de una pieza (?pieza= o el QR viejo ?sap=): la ficha vive en Bodega.
+    const url = new URLSearchParams(window.location.search)
+    if (url.has('pieza') || url.has('sap')) return 'bodega'
+  } catch { /* noop */ }
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
     if (saved === 'areas' || saved === 'bodega' || saved === 'codigos') return saved
@@ -48,6 +54,8 @@ const TABS: TabDef[] = [
 
 export function RepuestosPage() {
   const [activeTab, setActiveTab] = useState<Tab>(getDefaultTab)
+  // Pase de lectura: Códigos fabricante no ofrece «Crear repuesto desde catálogo».
+  const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   // Lazy mount: solo renderiza un tab la primera vez que se activa
   const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(new Set([getDefaultTab()]))
 
@@ -159,7 +167,7 @@ export function RepuestosPage() {
 
         <div className={activeTab === 'codigos' ? '' : 'hidden'}>
           {mountedTabs.has('codigos') && (
-            <CodigosFabricanteView onBuscarEnRepuestos={handleSearchSimilar} onCrearRepuesto={handleCrearDesdeCatalogo} />
+            <CodigosFabricanteView onBuscarEnRepuestos={handleSearchSimilar} onCrearRepuesto={soloLectura ? undefined : handleCrearDesdeCatalogo} />
           )}
         </div>
 

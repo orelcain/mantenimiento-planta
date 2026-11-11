@@ -201,6 +201,7 @@ function armarCotejo(referencia, comparables) {
       inicioMs: t.inicioMs,
       ciclos: t.ciclos,
       detencionLineaSec: t.detencionLineaSec ?? null,
+      mantencionSec: t.mantencionSec ?? null,
       esReferencia: t.id === referencia.id,
     }))
 
@@ -295,6 +296,9 @@ async function cotejarTurnos({ db, plant, shiftDocId, dias = 21, n = 7, minPieza
       finMs: aMs(x.scheduledEnd) ?? aMs(x.officialSchedule && x.officialSchedule.end),
       ciclos: (x.endBriefSnapshot && x.endBriefSnapshot.total) ?? resumen?.ciclos ?? null,
       detencionLineaSec: resumen ? resumen.detencion.unionSec : null,
+      // Lo que se cerró a nombre de Mantención en ESE turno, tal como quedó al
+      // cierre. null cuando el turno no tiene resumen cacheado.
+      mantencionSec: resumen && typeof resumen.mantencionEquivSec === 'number' ? resumen.mantencionEquivSec : null,
     }
   }
 

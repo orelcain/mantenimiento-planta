@@ -7,6 +7,94 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [4.16.0] - 2026-11-05
+Monitor: «Camino a la meta» usa la misma cascada que «Dónde se fueron las piezas» del tablero.
+
+### Cambiado
+- Celda «Dónde se fueron las piezas» de la franja de «El turno»: N pz bajo la meta y «hizo X de Y»; la barra reparte lo que podía hacer a la meta en Hechas, Detenciones, Micro, Carros o Silletas vacíos y Perilla. Sin «Por ritmo» ni «Por jugar».
+- Al tocarla, la capa abre con la cascada del tablero y debajo está el detalle de detenciones con su hora, su duración y las notas del operador. Ese detalle ya no muestra piezas de la resta anterior: muestra minutos.
+- Sin cascada (turno sin serie por minuto) la celda queda como antes.
+
+## [4.15.3] - 2026-11-04
+Grader: «detención» en vez de «paro» en todo lo que se lee, y una prueba que lo vigila.
+
+### Corregido
+- 125 textos del Grader (tarjetas, ayudas, botones, PDF del turno y de Mantención, resumen ejecutivo, rótulo del tramo «Detención») dicen «detención/detenciones», «microdetenciones» y «detenida» con la concordancia corregida.
+- `vocabularioGrader.test.ts` lee el código del Grader con el parser de TypeScript y falla si vuelve «paro», «parada», «parado» o «paró» a un texto visible; las claves internas se marcan con `vocab-ok`.
+- El patrón de vocabulario compartido ya no confunde «reemplazar» o «desplazar» con «azar».
+
+## [4.15.2] - 2026-11-04
+Monitor: una sola definición de «detención programada» para la cascada y el servidor.
+
+### Corregido
+- La lista de causas programadas vive en `functions/lib/causasProgramadas.json` y la leen la cascada (`esProgramada`) y el servidor (`esParoPlanificado`). Una tabla de casos compartida, con «EJERCICIO  COMPENSATORIO» de dos espacios, corre en vitest y en `node --test`: si las reglas se separan, falla. Antes, con dos copias, la cascada y el «Tiempo del turno» llegaron a dar 56 contra 64 min programados.
+- Vocabulario: «se detuvo» y «detenciones» en la ayuda del panel de causas del sensor (Grader) y «Upstream detenido» en el globo de la línea de tiempo.
+
+## [4.15.1] - 2026-11-04
+Monitor: el rótulo de la detención programada del tiempo del turno no se corta en el celular.
+
+### Corregido
+- «Detención programada, toda la línea» ocupa dos líneas a 375 px en vez de cortarse con «…» (revisión en producción de la 4.15.0).
+
+## [4.15.0] - 2026-11-04
+Monitor: el tablero («Más del turno») pasa a la cascada a la meta de Shoplogix, la misma de la vista clásica.
+
+### Cambiado
+- «Dónde se fueron las piezas» del tablero: N pz bajo la meta, «Quién responde» (Mantención y operación · aguas arriba · producción por la perilla), la cascada podía a la meta → perilla → podía con la perilla → detenciones → micro → vacíos → hizo, con el dueño en cada fila, el cuadre y lo que le falta al rendimiento. Selector Línea | Ev 1 | Ev 2 | Ev 3.
+- «Ver detalle»: al tocar detenciones, micro o vacíos se abre Causa · Baader · Hora. Cada vista reparte las piezas de su fila y suma lo mismo.
+- «Faltó para llegar a la perilla» dice «carros vacíos» (o «silletas vacías») con las piezas de la cascada: las detenciones y las micro le restan a la disponibilidad, no al rendimiento.
+- Tiempo del turno: «7 h 45 min de turno · 07:15 → 15:00» y «Detención programada, toda la línea» (antes «Programado (colación, aseo)»: el aseo no entraba).
+- Filete (una máquina): la franja ampliada dice «la máquina» en vez de «cada Baader»; el ⓘ del set point abre con un toque.
+- Textos: «Detención programada», «detenida», «minutos detenidos», «microdetenciones» e «Imputado: Ejercicio compensatorio» (sin « - Paro»).
+
+### Corregido
+- La detención programada de la cascada usa la misma regla que el servidor: el «EJERCICIO  COMPENSATORIO» con dos espacios de Shoplogix ya no cuenta como detención de Mantención y operación (Filete: 56 → 64 min, igual que el tiempo del turno).
+- La cascada clásica ya no dice «perilla 20» en una máquina sin perilla anotada («sin perilla anotada»).
+
+## [4.14.0] - 2026-11-04
+Monitor: el motivo de la perilla («por el Knuro») se ve en la franja y en la cascada.
+
+### Añadido
+- Motivo opcional en la perilla de cada Baader (máximo 60 caracteres). Quien anota la perilla lo escribe junto a la velocidad; se guarda con la anotación y en su historial.
+- La franja lo muestra después de «anotada dd-mm». La cascada lo pone en el escalón «Perilla más lenta que la meta» («17 en vez de 18 · por el Knuro»). Es el motivo de la perilla vigente al final del turno.
+
+### Cambiado
+- Guardar en el editor de la perilla queda activo también cuando solo cambia el motivo, sin mover la velocidad.
+- La vista Línea de la cascada pone el motivo entre paréntesis: «Ev 1 17 en vez de 18 (por el Knuro)».
+- Textos del monitor: «se detuvieron», «nunca se detuvieron a la vez», «casi detenida» y «una máquina detenida de tres»; los motivos se muestran sin « - Paro» («Ejercicio compensatorio»).
+
+### Corregido
+- La cascada no cuadraba cuando una Baader no tenía meta de Shoplogix (esperado 0). Esa Baader ya no entra en la cuenta de la línea y la línea lo dice («Ev 1 sin meta de Shoplogix en este turno: no entra en la cuenta»). La línea vuelve a cuadrar y vuelve a mostrar «Al rendimiento le faltan» y su línea de dueños.
+- El tiempo del turno y los minutos de la cascada se cortan en el fin del turno: una serie que sigue después del cierre ya no suma minutos ni piezas.
+- «Minutos a ritmo» muestra «—» en una Baader sin vara (meta 0 y sin perilla): sin porcentaje, sin ⓘ y sin desglose.
+- Filete (una sola máquina): la franja, los globos y la cascada hablan de silletas y de «la máquina»; no sale el selector Línea | máquina; el rótulo de los vacíos es «Silletas vacías».
+- Pie del desglose: «a ritmo X de Y» usa el tiempo de producción de la cascada, y «Bajo U» explica todos sus minutos (con detención y sin ella).
+
+## [4.13.0] - 2026-11-04
+Monitor: la cascada a la meta de Shoplogix con la perilla, por Baader y por línea, con la línea de dueños.
+
+### Añadido
+- «Dónde se fueron las piezas» parte de la meta de Shoplogix: tiempo de producción (turno menos detención programada), podía a la meta, perilla más lenta, podía con la perilla, detenciones, microdetenciones, vacíos y hizo. Selector Línea | Ev 1 | Ev 2 | Ev 3, con cuadre al entero en cada vista.
+- Línea de dueños por vista: cuánto es de Mantención y operación, cuánto aguas arriba (vacíos y detenciones de MMPP, abastecimiento, acopio, bombeo o ducto) y cuánto de producción (perilla). Ajuste del operador, cambio de lote y cumplimiento de cuota son de Mantención y operación.
+- Fila «Al rendimiento le faltan X pts» arriba de los escalones de la cascada, con las dos partes (perilla más lenta y lo que faltó para llegar a ella), sus piezas y su ⓘ. Cambia con el selector de Baader.
+
+### Cambiado
+- «Sin la detención programada» (desglose) descuenta el mismo conjunto que la cascada: colación, reunión de inicio y ejercicio. La limpieza de ducto ya no se resta como programada, ni en el desglose ni en «Ver detalle».
+- Sin serie por minuto en el turno, la tarjeta vuelve a la cascada anterior.
+
+## [4.12.0] - 2026-11-04
+Monitor: el desglose de la perilla por Baader y el modo del umbral «a ritmo» de la línea.
+
+### Añadido
+- Desglose de cada Baader y de la línea en la franja «El turno completo»: minutos por zona (a ritmo, bajo, marcha parcial y detenida), barra por minuto y «Total del turno» que suma 100 %. Con selector «min | h».
+- Globos ⓘ de «minutos a ritmo» (con «Ver desglose») y de «carros con pieza» de cada Baader.
+- Tarjeta «Minutos a ritmo de la línea» (solo admin): elegir Calibrado u Óptimo, ver el efecto por Baader antes de guardar, y quién lo anotó y cuándo. Se abre con «Cambiar» en la cabecera de columnas.
+
+### Cambiado
+- Los globos ⓘ se abren y cierran solo con clic o toque: el puntero encima ya no mueve el contenido.
+- Una causa que la taxonomía no conoce se muestra en minúsculas y con tilde («micro detención»), sin « - Paro».
+- El botón Guardar del editor de perilla usa el color de marca.
+
 ## [4.0.0] - 2026-08-04
 Cierre de 39 mejoras acumuladas desde la v3.99.6 (23/07). No hay cambios incompatibles:
 el salto de MAJOR marca el hito de las dos semanas, no una ruptura.

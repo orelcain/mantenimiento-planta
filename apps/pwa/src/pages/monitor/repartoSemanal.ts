@@ -16,13 +16,62 @@
  * ⚠ Las piezas se valorizan al ritmo PROPIO de cada turno (total/producingMin),
  * nunca a un promedio global: un ritmo sobre tiempo productivo solo se compara
  * contra ritmos productivos.
+ *
+ * ── Detalle por semana (27-10-2026) ─────────────────────────────────────────
+ * La hoja de una semana necesita el turno (grilla día × turno), TODAS las
+ * causas con sus veces (antes se cortaba a 5 y se perdía `count`) y las
+ * paradas ubicadas en el reloj. Las paradas (`shiftStats[].paradas`) existen
+ * solo en los turnos que el backend rearmó desde el 27-10-2026; en los demás
+ * `paradas` es null y la UI dice «sin dato» en vez de inventarlas.
  */
 
 import type { ShiftStat } from '@/services/shoplogix/publicShiftMonitor.service'
 import { duenoDe, type DuenoPerdida } from '@/services/shoplogix/monitorEventos'
+import { matchImputacion } from '@/services/shoplogix/imputacionTaxonomy'
 
 /** Los tres dueños que aparecen en lo recuperable (lo programado no entra). */
 export type DuenoReparto = Exclude<DuenoPerdida, 'programado'>
+
+export const DUENOS_REPARTO = ['mantencion', 'externo', 'sin-imputar'] as const
+
+/** Una causa (agregada en la semana o en un turno). */
+export interface CausaReparto {
+  causa: string
+  dueno: DuenoReparto
+  /** Categoría del árbol de imputación («Mecánica», «MMPP»…); null si no calza. */
+  categoria: string | null
+  /** Equipo al que apunta la causa (solo Mantención): «Baader 200», «GEA»… */
+  equipo: string | null
+  /** Minutos de LÍNEA (escalados) y piezas al ritmo propio del turno. */
+  min: number
+  pz: number
+  /** Paradas (tramos de línea) en que ocurrió: el «N veces». */
+  count: number
+}
+
+/** Una parada ubicada en el reloj (solo turnos que traen `paradas`). */
+export interface ParadaReparto {
+  causa: string
+  dueno: DuenoReparto
+  /** HH:MM, hora de planta. */
+  inicio: string
+  fin: string
+  seg: number
+  /** Nombres de las máquinas que tuvieron la causa en ese tramo. */
+  maquinas: string[]
+}
+
+export interface TurnoReparto {
+  shiftDocId: string
+  dateKey: string
+  shiftId: string
+  piezas: number
+  min: Record<DuenoReparto, number>
+  pz: Record<DuenoReparto, number>
+  causas: CausaReparto[]
+  /** null = turno anterior al dato de paradas (backend 27-10-2026). */
+  paradas: ParadaReparto[] | null
+}
 
 export interface SemanaReparto {
   /** Lunes de la semana (dateKey, hora de planta). */
@@ -33,8 +82,10 @@ export interface SemanaReparto {
   /** Minutos de LÍNEA y piezas estimadas de pérdida, por dueño. */
   min: Record<DuenoReparto, number>
   pz: Record<DuenoReparto, number>
-  /** Las causas top de la semana por dueño (min de línea), para el detalle. */
-  causas: Record<DuenoReparto, Array<{ causa: string; min: number }>>
+  /** TODAS las causas de la semana por dueño, de mayor a menor (min de línea). */
+  causas: Record<DuenoReparto, CausaReparto[]>
+  /** Cada turno de la semana, en orden cronológico. */
+  detalle: TurnoReparto[]
 }
 
 /** Lunes de la semana del dateKey (el dateKey ya viene en hora de planta). */
@@ -43,6 +94,80 @@ export function lunesDe(dateKey: string): string {
   if (Number.isNaN(d.getTime())) return dateKey
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
   return d.toISOString().slice(0, 10)
+}
+
+const EQUIPO_NOMBRE = { baader142: 'Baader 142', baader200: 'Baader 200' } as const
+
+/**
+ * Equipo al que apunta una causa de Mantención, según el árbol de imputación.
+ * La Baader se nombra por modelo (sus hojas son componentes); los auxiliares
+ * por la hoja misma (GEA, Knuro, Cintas…). Fuera de Mantención no hay equipo.
+ */
+export function equipoDe(reason: string): string | null {
+  const m = matchImputacion(reason)
+  if (m.bucket !== 'mantencion' || !m.leaf) return null
+  const e = m.leaf.equipo
+  return e === 'baader142' || e === 'baader200' ? EQUIPO_NOMBRE[e] : m.leaf.label
+}
+
+const cero = (): Record<DuenoReparto, number> => ({ mantencion: 0, externo: 0, 'sin-imputar': 0 })
+
+/** «HH:MM:SS» + segundos → «HH:MM» (da la vuelta a medianoche). */
+export function finDeParada(t: string, seg: number): string {
+  const [h, m, s] = t.split(':').map(Number)
+  if (h == null || m == null || !Number.isFinite(h) || !Number.isFinite(m)) return t.slice(0, 5)
+  const total = Math.round((h * 3600 + m * 60 + (s && Number.isFinite(s) ? s : 0) + seg) / 60) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+const duenoDeCausa = (reason: string): { dueno: DuenoReparto; categoria: string | null } => {
+  const d = duenoDe(reason)
+  return { dueno: d.dueno === 'programado' ? 'sin-imputar' : d.dueno, categoria: d.categoria }
+}
+
+/** Un turno de `shiftStats` repartido por dueño, en minutos de LÍNEA. */
+export function repartoDeTurno(t: ShiftStat): TurnoReparto {
+  const out: TurnoReparto = {
+    shiftDocId: t.shiftDocId, dateKey: t.dateKey, shiftId: t.shiftId, piezas: t.total || 0,
+    min: cero(), pz: cero(), causas: [], paradas: null,
+  }
+  const rec = t.recoverable ?? []
+  const sumaMaquina = rec.reduce((a, c) => a + (c.min || 0), 0)
+  if (sumaMaquina > 0 && t.recoverableMin != null && t.recoverableMin >= 0) {
+    /* Escala máquina → línea: las causas reparten los minutos de LÍNEA a
+       prorrata de sus minutos de máquina. */
+    const factor = t.recoverableMin / sumaMaquina
+    const ritmo = t.producingMin > 0 ? (t.total || 0) / t.producingMin : 0
+    for (const c of rec) {
+      const linMin = (c.min || 0) * factor
+      if (!(linMin > 0)) continue
+      const { dueno, categoria } = duenoDeCausa(c.reason)
+      out.min[dueno] += linMin
+      out.pz[dueno] += linMin * ritmo
+      out.causas.push({
+        causa: c.reason, dueno, categoria, equipo: equipoDe(c.reason),
+        min: linMin, pz: linMin * ritmo, count: c.count || 0,
+      })
+    }
+    out.causas.sort((a, b) => b.min - a.min)
+  }
+  if (t.paradas) {
+    const maquinas = t.porMaquina ?? []
+    out.paradas = []
+    for (const p of t.paradas) {
+      const c = rec[p.c]
+      if (!c || typeof p.t !== 'string' || !(p.s > 0)) continue
+      out.paradas.push({
+        causa: c.reason,
+        dueno: duenoDeCausa(c.reason).dueno,
+        inicio: p.t.slice(0, 5),
+        fin: finDeParada(p.t, p.s),
+        seg: p.s,
+        maquinas: (p.m ?? []).map((i) => maquinas[i]?.n).filter((n): n is string => Boolean(n)),
+      })
+    }
+  }
+  return out
 }
 
 /**
@@ -56,53 +181,38 @@ export function repartoSemanal(
 ): SemanaReparto[] {
   if (!stats?.length) return []
   const semanas = new Map<string, SemanaReparto>()
-  const causasAcum = new Map<string, Map<string, { dueno: DuenoReparto; min: number }>>()
+  const causasAcum = new Map<string, Map<string, CausaReparto>>()
 
   for (const t of stats) {
     const w = lunesDe(t.dateKey)
     let s = semanas.get(w)
-    if (!s) {
+    let mapa = causasAcum.get(w)
+    if (!s || !mapa) {
       s = {
-        semana: w, turnos: 0, piezas: 0,
-        min: { mantencion: 0, externo: 0, 'sin-imputar': 0 },
-        pz: { mantencion: 0, externo: 0, 'sin-imputar': 0 },
-        causas: { mantencion: [], externo: [], 'sin-imputar': [] },
+        semana: w, turnos: 0, piezas: 0, min: cero(), pz: cero(),
+        causas: { mantencion: [], externo: [], 'sin-imputar': [] }, detalle: [],
       }
+      mapa = new Map()
       semanas.set(w, s)
-      causasAcum.set(w, new Map())
+      causasAcum.set(w, mapa)
     }
     s.turnos++
     s.piezas += t.total || 0
-
-    const sumaMaquina = (t.recoverable ?? []).reduce((a, c) => a + (c.min || 0), 0)
-    if (!(sumaMaquina > 0) || t.recoverableMin == null || !(t.recoverableMin >= 0)) continue
-    /* Escala máquina → línea: las causas reparten los minutos de LÍNEA a
-       prorrata de sus minutos de máquina. */
-    const factor = t.recoverableMin / sumaMaquina
-    const ritmo = t.producingMin > 0 ? (t.total || 0) / t.producingMin : 0
-    const mapa = causasAcum.get(w)!
-    for (const c of t.recoverable ?? []) {
-      const linMin = (c.min || 0) * factor
-      if (!(linMin > 0)) continue
-      const d = duenoDe(c.reason).dueno
-      const dueno: DuenoReparto = d === 'programado' ? 'sin-imputar' : d
-      s.min[dueno] += linMin
-      s.pz[dueno] += linMin * ritmo
-      const prev = mapa.get(c.reason)
-      if (prev) prev.min += linMin
-      else mapa.set(c.reason, { dueno, min: linMin })
+    const r = repartoDeTurno(t)
+    s.detalle.push(r)
+    for (const d of DUENOS_REPARTO) { s.min[d] += r.min[d]; s.pz[d] += r.pz[d] }
+    for (const c of r.causas) {
+      const prev = mapa.get(c.causa)
+      if (prev) { prev.min += c.min; prev.pz += c.pz; prev.count += c.count }
+      else mapa.set(c.causa, { ...c })
     }
   }
 
   const out = [...semanas.values()].sort((a, b) => (a.semana < b.semana ? -1 : 1)).slice(-maxSemanas)
   for (const s of out) {
-    const mapa = causasAcum.get(s.semana)
-    if (!mapa) continue
-    for (const [causa, x] of mapa) s.causas[x.dueno].push({ causa, min: x.min })
-    for (const d of ['mantencion', 'externo', 'sin-imputar'] as const) {
-      s.causas[d].sort((a, b) => b.min - a.min)
-      s.causas[d] = s.causas[d].slice(0, 5)
-    }
+    s.detalle.sort((a, b) => (a.shiftDocId < b.shiftDocId ? -1 : 1))
+    for (const c of causasAcum.get(s.semana)?.values() ?? []) s.causas[c.dueno].push(c)
+    for (const d of DUENOS_REPARTO) s.causas[d].sort((a, b) => b.min - a.min)
   }
   return out
 }

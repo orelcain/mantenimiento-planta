@@ -14,19 +14,25 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { BarChart3, Loader2, CheckCircle2, Calendar, Upload, AlertCircle, ChevronDown } from 'lucide-react'
 import { logger } from '@/lib/logger'
+import { registrarVista } from '@/services/telemetria/registrarVista'
 import { cn } from '@/lib/utils'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import type { SlxMonthlyStats } from '@/services/grader/graderPeriodMonthlyStats'
 import { GraderShiftPeriodContainer } from '@/components/grader/GraderShiftPeriodContainer'
+import { ultimaCargaDateKey, dateKeyDdMm } from '@/services/grader/graderUltimaCarga'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
 import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
+import { PeriodoNavegador } from '@/components/grader/PeriodoNavegador'
+import type { KpiPeriod } from '@/hooks/usePlantKPIs'
+import { desplazarPeriodo, fechaDeClave, claveDeFecha } from '@/services/grader/periodoNavegacion'
 import { LineOeeCard } from '@/components/grader/LineOeeCard'
 import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import { DayTimeSummaryBar } from '@/components/grader/DayTimeSummaryBar'
+import { usePielApple } from '@/hooks/usePielApple'
 import { getPlantLineConfig, getAreaDisplayLabel, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
@@ -83,10 +89,16 @@ export function AnalisisGraderWizardPage() {
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const apple = usePielApple()
 
   // ── Línea/planta activa — persiste en ?linea= ──
   const lineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
   const lineConfig = getPlantLineConfig(lineId)
+
+  // Telemetría de uso (25-10-2026): al montar y al cambiar de línea.
+  useEffect(() => {
+    void registrarVista('periodo', lineId)
+  }, [lineId])
   const handleLineSelect = (id: PlantLineId) => {
     // Guard: no hacer nada si ya está seleccionada (evita re-render innecesario
     // que se percibe como "refresh" al re-clickear la tab activa).
@@ -112,7 +124,7 @@ export function AnalisisGraderWizardPage() {
   )
   // Panel "Cargar Excel del Grader" — colapsable. Por defecto cerrado en mobile
   // si ya hay summaries (no es la acción primaria), abierto si está vacío.
-  const [uploadPanelExpanded, setUploadPanelExpanded] = useState(true)
+  const [uploadPanelExpanded, setUploadPanelExpanded] = useState(false)
   const [gates, setGates] = useState<GateAssignment[]>(getDefaultGates())
   const [config, setConfig] = useState<GraderAnalysisConfig>({
     intervalMinutes: 15,
@@ -157,6 +169,7 @@ export function AnalisisGraderWizardPage() {
   // Estado del panel de resumen mensual — se sincroniza con el calendario embebido
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
   const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
+  const ultimaCarga = useMemo(() => ultimaCargaDateKey(calendarSummaries), [calendarSummaries])
   // Las emite ahora la vista de período (`computePeriodMonthlyStats`); antes
   // las calculaba el calendario mensual, ya retirado.
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
@@ -172,6 +185,20 @@ export function AnalisisGraderWizardPage() {
   // Se incrementa al registrar/borrar un paro de etapa: el OEE del área los
   // suma y vive en otra card, así que necesita releerlos.
   const [parosVersion, setParosVersion] = useState(0)
+
+  // Período único (piel Apple): una sola referencia, el día elegido (o hoy). Día,
+  // semana y mes salen de ahí; la matriz toma el mes de esa misma fecha. Mover el
+  // período mueve `selectedDateKey` y `calendarMonth`: no hay una segunda fuente.
+  const [kpiPeriodo, setKpiPeriodo] = useState<KpiPeriod>('day')
+  const referenciaPeriodo = useMemo(
+    () => fechaDeClave(selectedDateKey ?? todayDateKey),
+    [selectedDateKey, todayDateKey],
+  )
+  const moverPeriodo = useCallback((dir: -1 | 1) => {
+    const nueva = desplazarPeriodo(referenciaPeriodo, kpiPeriodo, dir)
+    setSelectedDateKey(claveDeFecha(nueva))
+    setCalendarMonth(new Date(nueva.getFullYear(), nueva.getMonth(), 1))
+  }, [referenciaPeriodo, kpiPeriodo])
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -366,21 +393,6 @@ export function AnalisisGraderWizardPage() {
   useEffect(() => {
     lastConfigMutationAtRef.current = Date.now()
   }, [config, gates])
-
-  // Auto-collapse del panel "Cargar Excel" cuando ya hay summaries del mes.
-  // Solo dispara una vez (cuando aparecen) — el usuario puede expandirlo manual.
-  const calendarHasSummariesRef = useRef(false)
-  useEffect(() => {
-    const hasNow = calendarSummaries.length > 0
-    if (hasNow && !calendarHasSummariesRef.current) {
-      setUploadPanelExpanded(false)
-      calendarHasSummariesRef.current = true
-    } else if (!hasNow && calendarHasSummariesRef.current) {
-      // Mes sin summaries → re-abrir para invitar a cargar
-      setUploadPanelExpanded(true)
-      calendarHasSummariesRef.current = false
-    }
-  }, [calendarSummaries.length])
 
   // Restaurar draft desde cloud
   useEffect(() => {
@@ -790,9 +802,15 @@ export function AnalisisGraderWizardPage() {
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-wrap items-center gap-4">
           <div className="min-w-0">
-            <h1 className="text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]">
-              Análisis de turno
-            </h1>
+            {/* Piel Apple (modo lectura): el titular de la pantalla lo pone el tablero
+                («La Baader 2 es la que más pierde…»); el nombre del módulo ya está en el menú. */}
+            {(!apple || isManual) && (
+              <h1 className={apple ? 'text-display' : 'text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]'}>
+                Análisis de turno
+              </h1>
+            )}
+            {/* Piel Apple: el subtítulo «Línea completa Grader + Baaders» sale; las otras dos líneas lo mantienen. */}
+            {!(apple && lineConfig.hasGraderData && lineConfig.isClassificationPlant !== false) && (
             <p className="mt-2 text-[0.85rem] text-muted-foreground">
               {lineConfig.hasGraderData
                 ? lineConfig.isClassificationPlant === false
@@ -802,6 +820,7 @@ export function AnalisisGraderWizardPage() {
                   ? `${lineConfig.description} · voz → IA → historial de Mantención`
                   : `${lineConfig.description} · datos Shoplogix`}
             </p>
+            )}
           </div>
           {/* El botón "Cargar Excel" se movió al lado de las pestañas de
               planta para que quede claro a qué planta se está cargando. */}
@@ -825,7 +844,7 @@ export function AnalisisGraderWizardPage() {
           )}
           <Button variant="outline" onClick={() => navigate('/analisis-grader/periodo')} className="border-transparent text-brand-ink hover:bg-primary/10">
             <BarChart3 className="h-4 w-4 mr-1.5" />
-            <span className="hidden sm:inline">Análisis </span>período
+            {apple ? 'Análisis del período' : <><span className="hidden sm:inline">Análisis </span>período</>}
           </Button>
         </div>
       </div>
@@ -964,9 +983,63 @@ export function AnalisisGraderWizardPage() {
         </div>
       )}
 
-      {/* ═══ Grid 2-col que arranca en las pestañas de planta ═══ */}
+      {/* Piel Apple: el período único (Día/Semana/Mes y «‹ 7 nov ›») gobierna el tablero y la matriz. */}
+      {apple && !isManual && (
+        <PeriodoNavegador
+          period={kpiPeriodo}
+          onPeriodChange={setKpiPeriodo}
+          referencia={referenciaPeriodo}
+          onStep={moverPeriodo}
+        />
+      )}
+
+      {/* ═══ Indicadores del período ═══ */}
       {!isManual && (
       <>
+      {apple ? (
+        /* Piel Apple, modo lectura (opción A, «secciones pareadas»): el titular cruza
+           las dos columnas y debajo van pares con filete, 7/5 en PC: «Por máquina» con
+           «Cómo se usó el día» y «Por qué se detuvo» con el mes. En el celular, una
+           columna: máquinas, por qué, el día y el mes (`max-lg:order-*` los deja al final). */
+        <>
+          <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
+          <div className="grid grid-cols-1 items-start gap-y-[26px] lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-x-12" data-testid="periodo-lectura">
+            <PlantKPIBoard
+              period={kpiPeriodo}
+              onPeriodChange={setKpiPeriodo}
+              plantSlug={lineConfig.plantSlug}
+              plantLineId={lineId}
+              graderSummaries={calendarSummaries}
+              enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+              selectedDateKey={selectedDateKey}
+              currentMonth={calendarMonth}
+              ranuras={{
+                cabecera: <CurrentShiftChip plantLineId={lineId} lectura />,
+                titular: 'lg:col-span-2 lg:row-start-1',
+                maquinas: 'lg:col-start-1 lg:row-start-2',
+              }}
+            />
+            <DayTimeSummaryBar
+              className="max-lg:order-1 lg:col-start-2 lg:row-start-2"
+              dateKey={selectedDateKey ?? todayDateKey}
+              plantSlug={lineConfig.plantSlug}
+              enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+            />
+            <GraderMonthlyStatsPanel
+              currentMonth={calendarMonth}
+              summaries={calendarSummaries}
+              slxStats={calendarSlxStats}
+              isClassificationPlant={lineConfig.isClassificationPlant !== false}
+              tieneGrader={lineConfig.hasGraderData !== false}
+              plantSlug={lineConfig.shoplogixEnabled && !lineConfig.comingSoon ? lineConfig.plantSlug : null}
+              ranuras={{
+                porQue: 'lg:col-start-1 lg:row-start-3',
+                mes: 'max-lg:order-2 lg:col-start-2 lg:row-start-3',
+              }}
+            />
+          </div>
+        </>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
         {/* Col izquierda: pestañas + KPI */}
@@ -975,48 +1048,9 @@ export function AnalisisGraderWizardPage() {
             <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
             <CurrentShiftChip plantLineId={lineId} />
           </div>
-          {/* Botón "Cargar Excel" contextual a la pestaña seleccionada.
-              Antes vivía en el header global → era ambiguo a qué planta
-              estabas cargando. Ahora queda DEBAJO de las pestañas: el
-              `lineId` de la pestaña activa se propaga al guardar el doc
-              con el prefix correcto (`yal-eviscerado__...` cuando aplica). */}
-          {lineConfig.hasGraderData && (
-            <div className="rounded-card border border-transparent bg-primary/[0.15]">
-              <button
-                type="button"
-                onClick={() => setUploadPanelExpanded((v) => !v)}
-                className="w-full flex min-h-[44px] items-center gap-2 rounded-full px-4 text-subhead font-medium text-ink-info/90 dark:text-ink-info/80 hover:bg-primary/[0.15] transition-colors"
-                title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
-              >
-                <Upload className="h-3 w-3 shrink-0" />
-                <span className="flex-1 text-left">
-                  Cargar Excel del Grader · <b className="text-primary">{lineConfig.label}</b>
-                </span>
-                {!uploadPanelExpanded && uploadedFiles.length > 0 && (
-                  <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-medium">
-                    {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
-                  </span>
-                )}
-                <ChevronDown
-                  className={cn(
-                    'h-3.5 w-3.5 shrink-0 transition-transform text-ink-info/60',
-                    uploadPanelExpanded && 'rotate-180',
-                  )}
-                />
-              </button>
-              {uploadPanelExpanded && (
-                <div className="px-2.5 pb-2.5 pt-0">
-                  <AnalisisGraderUploadPage
-                    compact
-                    onComplete={handleUploadComplete}
-                    initialFiles={uploadedFiles}
-                    onFilesChange={setUploadedFiles}
-                  />
-                </div>
-              )}
-            </div>
-          )}
           <PlantKPIBoard
+            period={kpiPeriodo}
+            onPeriodChange={setKpiPeriodo}
             plantSlug={lineConfig.plantSlug}
             plantLineId={lineId}
             graderSummaries={calendarSummaries}
@@ -1043,8 +1077,10 @@ export function AnalisisGraderWizardPage() {
           slxStats={calendarSlxStats}
           isClassificationPlant={lineConfig.isClassificationPlant !== false}
           tieneGrader={lineConfig.hasGraderData !== false}
+          plantSlug={lineConfig.shoplogixEnabled && !lineConfig.comingSoon ? lineConfig.plantSlug : null}
         />
       </div>
+      )}
 
       {/* Vista de período por TURNO (matriz / lista) — reemplaza al calendario
           mensual: acá un turno que cruza medianoche ocupa UNA celda en vez de
@@ -1066,6 +1102,62 @@ export function AnalisisGraderWizardPage() {
           navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}${linea}`)
         }}
       />
+
+      {/* «Cargar Excel del Grader»: fila delgada al final. Los indicadores van
+          primero; la carga es poco frecuente pero sigue a un toque. Mismo
+          cargador de siempre. La fecha sale de los resúmenes del mes visible
+          (0 lecturas extra); si el mes no tiene ninguno, lo dice. */}
+      {lineConfig.hasGraderData && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setUploadPanelExpanded((v) => !v)}
+            aria-expanded={uploadPanelExpanded}
+            className="w-full flex min-h-[44px] items-center gap-2 rounded-full bg-muted/50 px-4 text-footnote text-muted-foreground hover:text-foreground transition-colors"
+            title={uploadPanelExpanded ? 'Ocultar el panel de carga' : 'Mostrar el panel de carga'}
+          >
+            <Upload className="h-3.5 w-3.5 shrink-0" />
+            {apple ? (
+              // Piel Apple: el rótulo solo, y la situación del mes en su propia línea de 13 px (sin truncar).
+              <span className="flex-1 text-left min-w-0">
+                <span className="block text-subhead text-foreground">Cargar Excel del Grader</span>
+                <span className="block text-footnote text-muted-foreground tabular-nums">
+                  {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'Sin Excel este mes'}
+                </span>
+              </span>
+            ) : (
+            <span className="flex-1 text-left min-w-0 truncate">
+              Cargar Excel del Grader
+              <span className="text-muted-foreground/70 tabular-nums">
+                {' · '}
+                {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'sin Excel en este mes'}
+              </span>
+            </span>
+            )}
+            {!uploadPanelExpanded && uploadedFiles.length > 0 && (
+              <span className="text-caption px-1.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-medium shrink-0">
+                {uploadedFiles.length} archivo{uploadedFiles.length === 1 ? '' : 's'}
+              </span>
+            )}
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 shrink-0 transition-transform',
+                uploadPanelExpanded && 'rotate-180',
+              )}
+            />
+          </button>
+          {uploadPanelExpanded && (
+            <div className="pt-2">
+              <AnalisisGraderUploadPage
+                compact
+                onComplete={handleUploadComplete}
+                initialFiles={uploadedFiles}
+                onFilesChange={setUploadedFiles}
+              />
+            </div>
+          )}
+        </div>
+      )}
       </>
       )}
 

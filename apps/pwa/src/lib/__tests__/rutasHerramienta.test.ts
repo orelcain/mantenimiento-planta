@@ -6,6 +6,7 @@ describe('modoHerramienta', () => {
     '/aprendizaje/hmi-knuro',
     '/aprendizaje/hmi-knuro/Planta%20Principal%20-%20BAA142%20-%20N1',
     '/aprendizaje/hmi-grader',
+    '/aprendizaje/hmi-gea',
     '/aprendizaje/hmi-bombeo-s2',
     '/aprendizaje/perilla-5',
     '/aprendizaje/baader-142/tarjeta-a3c',

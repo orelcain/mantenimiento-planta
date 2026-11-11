@@ -10,7 +10,7 @@
  * informe NO afirma. El PDF salía bien formado y pesaba lo esperado.
  *
  * Por eso acá no se verifica que el PDF "se genere": eso ya pasaba. Se verifica
- * que TODO lo que `construirTextos` decidió afirmar haya llegado al papel, y que
+ * que TODO lo que el informe decidió afirmar haya llegado al papel, y que
  * nada se haya escrito fuera de la hoja. La única forma de saberlo sin renderizar
  * es el registro que expone `generarInformeTurno`.
  */
@@ -122,7 +122,7 @@ test('nada se escribe bajo el borde de la hoja', () => {
     const d = datos(caso)
     const fuera = escrituras(d)
       .filter((e) => e.yFin > Y_FIN)
-      .filter((e) => !e.texto.startsWith('Generado automaticamente'))
+      .filter((e) => !e.texto.startsWith('Datos de Shoplogix'))
     assert.deepStrictEqual(
       fuera.map((e) => `p${e.pagina} y=${e.yFin.toFixed(0)} ${e.texto.slice(0, 40)}`), [],
       `caso ${JSON.stringify(caso)}: hay texto bajo el borde util (${Y_FIN} mm)`,
@@ -138,18 +138,17 @@ test('nada se escribe fuera de la hoja fisica, ni siquiera el pie', () => {
 
 // ── Que todo lo que se afirma llegue al papel ───────────────────────────────
 
-test('todos los bloques de la lamina 4 llegan al PDF, con turno largo', () => {
+test('todos los bloques de la lamina de ritmo llegan al PDF, con turno largo', () => {
   // Este es literalmente el defecto del 2026-08-20: con 14 caidas, la tabla
   // llegaba al borde y todo lo de abajo desaparecia sin dejar rastro.
   const registro = escrituras(datos({ nCaidas: 14 }))
   const todo = registro.map((e) => e.texto).join(' | ')
   for (const esperado of [
-    'Lo que estos numeros si prueban', // la nota que declara lo que el informe NO dice
-    'Como leer el reparto',
-    'SILLETAS LLENAS',
-    'SILLETAS VACIAS',
-    'CADENA EN MARCHA',
-    'RECUPERACION - (SIN CAUSA IMPUTADA)',
+    'DÓNDE FALTARON LAS 707 PIEZAS',
+    'Contención',
+    'Silletas',
+    'CADA CAÍDA DE LÍNEA',
+    'LO QUE ESTE INFORME NO DICE', // la nota que declara lo que el informe NO afirma
   ]) {
     assert.ok(todo.includes(esperado), `falta "${esperado}" en el PDF`)
   }
@@ -166,7 +165,7 @@ test('ninguna fila de la tabla de caidas se pierde al continuar de hoja', () => 
 
 test('la cabecera de una tabla se repite en la hoja de continuacion', () => {
   const registro = escrituras(datos({ nCaidas: 20 }))
-  const cabeceras = registro.filter((e) => e.texto === wa('CAIDA'))
+  const cabeceras = registro.filter((e) => e.texto === wa('Caída'))
   assert.ok(cabeceras.length >= 2, 'la tabla de caidas continua de hoja sin repetir la cabecera')
   assert.ok(
     new Set(cabeceras.map((e) => e.pagina)).size >= 2,
@@ -174,14 +173,23 @@ test('la cabecera de una tabla se repite en la hoja de continuacion', () => {
   )
 })
 
-test('el texto de las lamina 5 y 6 llega entero aunque haya muchos pendientes', () => {
-  const d = datos()
-  d.textos.pendientes = Array.from({ length: 12 }, (_, i) => `Pendiente largo numero ${i + 1}. `.repeat(10))
+test('lo que queda abierto llega entero aunque sea largo', () => {
+  // Doce fallas que se repiten: cada una deja una línea en «Queda abierto», y
+  // la lista tiene que continuar de hoja en vez de perder el final.
+  const d = datos({ planta: 'chonchi' })
+  d.fallas = {
+    filas: Array.from({ length: 12 }, (_, i) => ({
+      etiqueta: `Causa larga numero ${i + 1}`, maquina: 'Evisceradora 1', maquinaCorta: 'Ev 1', ambigua: false,
+      eventos: 2, sec: 600, min: 3, mediaMin: 5, volvioMin: 2, turnosSeguidos: 3,
+    })),
+    totalMin: 36,
+    eventos: 24,
+  }
   const todo = escrituras(d).map((e) => e.texto).join(' | ')
   for (let i = 1; i <= 12; i++) {
-    assert.ok(todo.includes(`Pendiente largo numero ${i}.`), `falta el pendiente ${i}`)
+    assert.ok(todo.includes(`Causa larga numero ${i} en Ev 1:`), `falta el abierto ${i}`)
   }
-  assert.ok(todo.includes('Generado automaticamente'), 'falta el pie de fuente')
+  assert.ok(todo.includes('Generado automáticamente'), 'falta el pie de fuente')
 })
 
 // ── Numeración ──────────────────────────────────────────────────────────────
@@ -212,33 +220,32 @@ test('un turno corto no gasta hojas de mas', () => {
 // "1 maquinas" y la barra de solapamiento etiquetaba "LAS 1 - linea muerta".
 // Se barre el registro de escrituras, que es lo unico que ve lo dibujado.
 
-test('el PDF de una sola maquina no dice "1 maquinas" ni "LAS 1"', () => {
+test('el PDF de una sola maquina no habla de varias', () => {
   const d = datos({ planta: 'filete' })       // maquinas: 1
   const todo = escrituras(d).map((e) => e.texto).join(' | ')
-  assert.ok(!/1 maquinas/i.test(todo), 'la cabecera dice "1 maquinas"')
-  assert.ok(!/LAS 1\b/i.test(todo), 'el grafico dice "LAS 1 - linea muerta"')
-  assert.ok(!/todas las maquinas a la vez/i.test(todo), 'el KPI habla de todas las maquinas')
-  assert.ok(/1 maquina\b/.test(todo), 'deberia decir "1 maquina" en singular')
+  assert.ok(!/1 máquinas/i.test(todo), 'dice "1 máquinas"')
+  assert.ok(!/LAS 1\b/i.test(todo), 'dice "LAS 1"')
+  assert.ok(!/detenidas a la vez/i.test(todo), 'la cifra habla de varias máquinas a la vez')
+  assert.ok(/Baader 200/.test(todo), 'deberia nombrar el equipo de la linea')
+  assert.ok(/La línea es una sola máquina/.test(todo), 'falta explicar que cada minuto detenido es de linea')
 })
 
-test('con una maquina la lamina 2 no muestra cuatro columnas iguales', () => {
+test('con una maquina no hay anexo de suma contra linea', () => {
+  // Con una maquina suma, union, todas y equivalente son el mismo numero: una
+  // tabla de cuatro columnas iguales argumenta algo que ella misma desmiente.
   const d = datos({ planta: 'filete' })
   const todo = escrituras(d).map((e) => e.texto).join(' | ')
-  // Las columnas del doble conteo no tienen nada que corregir con una maquina.
-  assert.ok(!/SUMA DEL AREA/i.test(todo), 'sigue mostrando la columna de suma del area')
-  assert.ok(!/AL MENOS 1/i.test(todo))
-  assert.ok(!/EQUIV\. LINEA/i.test(todo))
-  // Y en su lugar aporta algo que antes no decia.
-  assert.ok(/LINEA DETENIDA/i.test(todo), 'falta la columna de linea detenida')
-  assert.ok(/PROMEDIO/i.test(todo), 'falta el promedio por evento')
-  assert.ok(/En que se fue el tiempo detenido/i.test(todo), 'la lamina 2 conserva el titulo viejo')
+  assert.ok(!/Suma de máquinas/.test(todo), 'sigue mostrando la columna de suma')
+  assert.ok(!/Al menos 1 parada/.test(todo))
+  assert.ok(!/Cómo se cuentan los minutos/.test(todo))
 })
 
-test('con varias maquinas la lamina 2 conserva la correccion del rollup', () => {
+test('con varias maquinas el anexo conserva la correccion del rollup', () => {
   const d = datos({ planta: 'chonchi' })      // maquinas: 3
   const todo = escrituras(d).map((e) => e.texto).join(' | ')
-  assert.ok(/SUMA DEL AREA/i.test(todo))
-  assert.ok(/EQUIV\. LINEA/i.test(todo))
-  assert.ok(/Horas-maquina no son horas de linea/i.test(todo))
-  assert.ok(/3 maquinas/.test(todo))
+  assert.ok(/Suma de máquinas/.test(todo))
+  assert.ok(/Min de línea/.test(todo))
+  assert.ok(/Cómo se cuentan los minutos/.test(todo))
+  assert.ok(/3 Baader 142/.test(todo))
+  assert.ok(/con las 3 detenidas a la vez/.test(todo))
 })

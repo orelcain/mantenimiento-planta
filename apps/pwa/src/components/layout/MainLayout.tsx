@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Suspense } from 'react'
 import {
@@ -23,6 +23,7 @@ import {
   Mail,
   Box,
   BarChart3,
+  ScatterChart,
   Bot,
   CloudSun,
   Droplets,
@@ -32,6 +33,7 @@ import {
   FolderArchive,
   Plus,
   NotebookPen,
+  SearchCheck,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -56,6 +58,16 @@ import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/servi
 import { loadSidebarConfig } from '@/services/sidebarConfig'
 import { useTheme } from '@/hooks/useTheme'
 import { ControlIntensidad } from '@/components/piel/ControlIntensidad'
+import { BotonLectura, ControlLectura } from '@/components/piel/ControlLectura'
+import { usePielApple } from '@/hooks/usePielApple'
+import {
+  claseAsidePC,
+  clasePaddingContenidoPC,
+  claseItemPC,
+  claseBarraInferior,
+  claseTabBarra,
+  contarIncidenciasActivas,
+} from './navVidrio'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
 import { useContadorVistas } from '@/hooks/useContadorVistas'
 
@@ -84,6 +96,7 @@ const navGroups: NavGroup[] = [
     items: [
       // Sin `module`: la bitácora es de todo el equipo de Mantención.
       { name: 'Bitácora de turno', href: '/bitacora', icon: NotebookPen },
+      { name: 'Causa raíz', href: '/causa-raiz', icon: SearchCheck },
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard', inDevelopment: true },
       { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias', inDevelopment: true },
       { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia', inDevelopment: true },
@@ -113,6 +126,7 @@ const navGroups: NavGroup[] = [
       { name: 'Visor de planta 3D', href: '/map', icon: Building2, module: 'mapa' },
       { name: 'Visor 3D', href: '/visor-3d', icon: Box },
       { name: 'Análisis de turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+      { name: 'Jack-Knife', href: '/jack-knife', icon: ScatterChart, module: 'analisisGrader' },
       { name: 'Clima del puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
       { name: 'Planos de aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
       // HMI Knuro y HMI Grader NO van en el menú: se entra solo desde el Centro de
@@ -213,6 +227,11 @@ export function MainLayout() {
     return () => window.clearInterval(id)
   }, [hasUpdate])
   const { setZones, setEquipment, setIncidents } = useAppStore()
+  // Piel Apple: el menú y la barra usan el vidrio líquido (navVidrio.ts). Los contadores
+  // salen de lo que ya está en memoria (store de incidencias); no hay consultas nuevas.
+  const apple = usePielApple()
+  const incidenciasEnMemoria = useAppStore((s) => s.incidents)
+  const incidenciasActivas = useMemo(() => contarIncidenciasActivas(incidenciasEnMemoria), [incidenciasEnMemoria])
   const isGanttRoute = location.pathname.startsWith('/gantt')
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
   // Editor (/hmi-knuro) y simulador público con sesión (/aprendizaje/hmi-knuro): ambos son
@@ -530,7 +549,7 @@ export function MainLayout() {
         ])
         setZones(zonesData)
         setEquipment(equipmentData)
-      } catch (error) {
+      } catch {
         // Silenciar errores de carga inicial para no bloquear UI
         logger.warn('Init load error')
       }
@@ -558,12 +577,7 @@ export function MainLayout() {
           mientras el main hace scroll. El inner es solo un contenedor de
           ancho fijo (w-64) para que el contenido no se reflowee durante
           la animación de colapsado del wrapper. */}
-      <div
-        className={cn(
-          'hidden lg:flex flex-col flex-shrink-0 bg-[var(--sidebar-surface)] border-r transition-[width] duration-200 overflow-hidden h-screen sticky top-0',
-          shouldHideDesktopSidebar ? 'w-0' : 'w-64'
-        )}
-      >
+      <div className={claseAsidePC(apple, shouldHideDesktopSidebar)}>
         <div className="w-64 flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b">
@@ -607,16 +621,21 @@ export function MainLayout() {
                             // Píldora INSETADA (mx-1), no fila a sangre: es lo
                             // que separa una barra lateral de macOS de una lista
                             // de links. El ícono acompaña al texto en el acento.
-                            'mx-1 flex items-center gap-2.5 rounded-ctl px-2.5 py-2 text-sm font-medium transition-colors',
+                            'mx-1 flex items-center gap-2.5 px-2.5 py-2 text-sm font-medium transition-colors',
                             '[&_svg]:size-[18px]',
-                            isActive
-                              ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-active-foreground)]'
-                              : 'text-muted-foreground hover:bg-muted-foreground/10 hover:text-foreground'
+                            claseItemPC(apple, isActive)
                           )
                         }
                       >
                         <item.icon className="h-5 w-5" />
                         {item.name}
+                        {/* Contadores del vidrio (piel apple): solo lo que ya está en memoria. */}
+                        {apple && item.href === '/incidents' && incidenciasActivas > 0 && (
+                          <span className="vidrio-capsula vidrio-capsula--alerta ml-auto">{incidenciasActivas}</span>
+                        )}
+                        {apple && item.href === '/bitacora' && (
+                          <span className="vidrio-punto ml-auto mr-1" role="img" aria-label="Turno en curso" />
+                        )}
                       </NavLink>
                     ))}
                   </div>
@@ -689,6 +708,7 @@ export function MainLayout() {
               {userMenuOpen && (
                 <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                   <ControlIntensidad />
+                  <ControlLectura />
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -726,6 +746,7 @@ export function MainLayout() {
                   <span className="font-semibold">Mantenimiento</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <BotonLectura iconClassName="h-5 w-5" />
                   <button
                     onClick={toggleTheme}
                     title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
@@ -821,6 +842,7 @@ export function MainLayout() {
                   {userMenuOpen && (
                     <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                       <ControlIntensidad />
+                      <ControlLectura />
                       <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -862,7 +884,7 @@ export function MainLayout() {
       )}
 
       {/* ══════ MAIN CONTENT AREA ══════ */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      <div className={cn('flex-1 min-w-0 flex flex-col min-h-screen', clasePaddingContenidoPC(apple, shouldHideDesktopSidebar))}>
         {/* Top bar */}
         <header className="hidden lg:flex sticky top-0 z-30 items-center h-14 px-4 bg-background/80 backdrop-blur border-b">
           {/* Mobile: title centrado + hamburgesa para rutas secundarias */}
@@ -926,6 +948,7 @@ export function MainLayout() {
                 </Button>
               )}
             </div>
+            <BotonLectura />
             <button
               onClick={toggleTheme}
               title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
@@ -1188,6 +1211,13 @@ export function MainLayout() {
         {/* Page content */}
         <main
           id="main-content"
+          // Modo lectura global: no aplica a lienzos, pantallas de alto fijo (HMI, mapas,
+          // planos, Repuestos, líneas, clima) ni al inicio de mosaicos.
+          data-sin-lectura={
+            modoHerr === 'lienzo' || isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute ||
+            isPlanosAguasRoute || isRepuestosRoute || isLineasRoute || location.pathname === '/'
+              ? '' : undefined
+          }
           className={`${
             modoHerr === 'lienzo'
               // Alto exacto del dispositivo: ya no hay barra inferior que descontar (antes -4rem).
@@ -1285,7 +1315,7 @@ export function MainLayout() {
           // despegada del fondo, con el material de vidrio (.glass-nav). La barra
           // rectangular de borde a borde con border-t era iOS 15. Sin border-t:
           // el borde lo pone el inset de 0.5px del propio material.
-          'lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav',
+          claseBarraInferior(apple),
           (location.pathname === '/' || modoHerr) && 'hidden',
         )}
         // Flota 12px por encima de la safe area (el home indicator), no se apoya en ella.
@@ -1295,7 +1325,7 @@ export function MainLayout() {
         <div className="flex items-center h-[60px] px-1.5 [@media(max-height:500px)]:h-10">
           {bottomNavItems.map(item => {
             const isActive = item.href === '/'
-              ? location.pathname === '/'
+              ? location.pathname === '/' || location.pathname === '/dashboard'
               : location.pathname.startsWith(item.href)
             return (
               <NavLink
@@ -1305,15 +1335,19 @@ export function MainLayout() {
                 className={cn(
                   // §16: 44px mínimo de área táctil (uso con guantes).
                   'flex-1 flex flex-col items-center justify-center gap-0.5 min-h-11 text-caption font-medium transition-colors active:scale-[0.97] relative',
-                  isActive ? 'text-primary' : 'text-muted-foreground'
+                  claseTabBarra(apple, isActive)
                 )}
-                aria-label={item.name}
+                aria-label={apple && item.href === '/incidents' && incidenciasActivas > 0 ? `${item.name}, ${incidenciasActivas} activas` : item.name}
               >
                 {/* La barrita superior era un patrón de Material Design. En iOS
                     el estado activo se comunica con el COLOR del ícono y del
                     texto, y con más peso de trazo — nada más (§17). */}
                 <item.icon className={cn('h-[22px] w-[22px] [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4', isActive && 'stroke-[2.4px]')} />
                 <span className="[@media(max-height:500px)]:hidden">{item.name}</span>
+                {/* Piel apple: badge rojo de incidencias activas (dato ya en memoria). */}
+                {apple && item.href === '/incidents' && incidenciasActivas > 0 && (
+                  <span className="vidrio-insignia absolute -top-1 right-[18%]" aria-hidden="true">{incidenciasActivas}</span>
+                )}
               </NavLink>
             )
           }).flatMap((el, idx) =>

@@ -43,7 +43,7 @@ describe('veredictoOrigenDelTurno', () => {
     // paros coinciden con paros programados de Baader». Las dos afirmaciones
     // eran ciertas y juntas se leían como un error.
     const v = veredictoOrigenDelTurno({ ...base, totalParos: 2, parosProgramados: 2 })!
-    expect(v.evidencia).toContain('parada imprevista')
+    expect(v.evidencia).toContain('detención imprevista')
     expect(v.evidencia).toContain('2 cayeron en colación o reunión')
     expect(v.evidencia).not.toMatch(/Ninguno de los 2 paros coincidió con las Baader[.;]/)
   })

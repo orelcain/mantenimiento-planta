@@ -98,7 +98,7 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
       d: `${Math.round(t.hoy)} min contra ${Math.round(t.ayer)}`,
     }),
     paradas: (t) => (t.hoy === t.ayer ? null : {
-      t: t.hoy < t.ayer ? 'Menos paradas evitables' : 'Más paradas evitables',
+      t: t.hoy < t.ayer ? 'Menos detenciones evitables' : 'Más detenciones evitables',
       d: `${Math.round(t.hoy)} min contra ${Math.round(t.ayer)}`,
     }),
     ritmo: (t) => ({
@@ -125,7 +125,7 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
           {sinConvenio.turnosMirados} turnos iguales traen{' '}
           <span className="tabular-nums">~{sinConvenio.tipicoMin} min</span>. Lo más probable es que
           la colación no quedara anotada como tal: si se registró con otra etiqueta, está contada
-          acá abajo como <b>parada evitable</b> — y el renglón de convenio no es una mejora.
+          acá abajo como <b>detención evitable</b> — y el renglón de convenio no es una mejora.
         </p>
       )}
 
@@ -198,7 +198,7 @@ export function VsAyerBloque({ r, records, sinConvenio }: {
                 : c.clave === 'paradas' ? (v: number) => `${Math.round(v)} min`
                   : (v: number) => `${Math.round(v)}%`
               const nombre = c.clave === 'ritmo' ? 'Ritmo andando'
-                : c.clave === 'paradas' ? 'Paradas evitables'
+                : c.clave === 'paradas' ? 'Detenciones evitables'
                   /* «del tiempo disponible»: misma base y mismo rótulo que el
                      KPI de la página (ventana − planificado). */
                   : 'Tiempo produciendo (del disponible)'

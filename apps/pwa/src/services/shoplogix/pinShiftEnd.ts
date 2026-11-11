@@ -16,6 +16,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from '@/services/firestoreTracked'
 import { db } from '../firebase'
 import type { PlantSlug } from './shoplogixMachines'
+import { construirPerilla, desdePerilla } from '@/lib/horaDePlanta'
 
 const COLLECTION = 'graderModuleConfigs'
 
@@ -154,6 +155,148 @@ export async function setMonitorSetPoint(params: {
 }
 
 /**
+ * Velocidad de la perilla de UNA máquina, en pz/min. `desde` es ISO y marca
+ * cuándo entró en vigor: al anotar es siempre «ahora». `por` es quién la anotó.
+ */
+export type PerillaMaquina = {
+  cpm: number
+  desde: string
+  por: string | null
+  /** Motivo de la perilla («por el Knuro»). Cadena vacía = sin motivo. Siempre se escribe: con `merge`, una clave ausente dejaría el motivo viejo. */
+  motivo?: string
+}
+
+/** Una entrada del historial de perillas: la máquina y lo que se anotó para ella. */
+export type PerillaHistorial = PerillaMaquina & { machineId: string }
+
+/** El historial guarda como máximo estas entradas; la más vieja sale primero. */
+const HISTORIAL_PERILLAS_MAX = 100
+
+/** Tope del motivo de una perilla, en caracteres. El servidor (functions/publicMonitor.js) lo vuelve a aplicar al publicar. */
+const MOTIVO_PERILLA_MAX = 60
+
+/**
+ * Motivo de una perilla, saneado: sin espacios sobrantes y con tope de 60 caracteres. Se cuentan caracteres, no unidades de
+ * código, para no partir un emoji. Vacío o no texto = cadena vacía, que quiere decir «sin motivo».
+ */
+export function normMotivoPerilla(motivo: string | null | undefined): string {
+  if (typeof motivo !== 'string') return ''
+  return Array.from(motivo.trim()).slice(0, MOTIVO_PERILLA_MAX).join('').trim()
+}
+
+/**
+ * Anota la velocidad de la perilla de UNA máquina de la línea.
+ *
+ * Documento: el mismo que lee `loadPlannedShift` (functions/publicMonitor.js) para
+ * esa línea. Se resuelve con `CONFIG_DOC_ID[plantSlug]`, la misma tabla que usa el
+ * backend: chonchi → `global`, yal → `yal-eviscerado`, filete → `chonchi-filete`.
+ * Si las dos tablas divergieran, la anotación quedaría en un documento que nadie
+ * lee, por eso no hay una segunda tabla aquí.
+ *
+ * `desde` es siempre el momento de anotar: no se acepta una fecha de vigencia
+ * anterior, porque fecharla hacia atrás cambiaría lo que ya se midió.
+ *
+ * Quién puede escribir: solo admin. Las reglas de `graderModuleConfigs` lo exigen
+ * con `affectedKeys` sobre `monitorPerillas` y `monitorPerillasHistorial`. Esta
+ * función no vuelve a comprobar el rol: la UI lo oculta y las reglas lo bloquean.
+ */
+export async function setMonitorPerilla(params: {
+  plantSlug: PlantSlug | string
+  machineId: string
+  cpm: number
+  por: string | null
+  /** Motivo opcional («por el Knuro»): vacío o ausente = sin motivo. Se recorta a 60 caracteres. */
+  motivo?: string | null
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  if (!params.machineId) throw new Error('Falta la máquina de la perilla')
+  if (!(params.cpm >= 5 && params.cpm <= 30)) throw new Error('Perilla fuera de rango (5 a 30 pz/min)')
+
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const historialPrevio: PerillaHistorial[] = Array.isArray(snap.data()?.monitorPerillasHistorial)
+    ? snap.data()!.monitorPerillasHistorial
+    : []
+  /* El motivo va siempre, null incluido: con `merge`, una clave que no se escribe dejaría el motivo de la anotación anterior. */
+  const nueva: PerillaMaquina = {
+    ...construirPerilla({ cpm: params.cpm, por: params.por, nowMs: Date.now() }),
+    motivo: normMotivoPerilla(params.motivo),
+  }
+  await setDoc(ref, {
+    // Merge profundo: escribe solo esta máquina y deja intactas las demás.
+    monitorPerillas: { [params.machineId]: nueva },
+    monitorPerillasHistorial: [...historialPrevio, { ...nueva, machineId: params.machineId }].slice(-HISTORIAL_PERILLAS_MAX),
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
+}
+
+/**
+ * El historial de perillas de la línea, tal como se guardó (el más viejo primero). Lo lee el editor de la franja, y solo un
+ * admin lo abre: el monitor público no trae `por`, así que quien anotó sale de aquí. La regla de lectura es la de Firestore
+ * (`graderModuleConfigs` lo deja leer a cualquier sesión). Sin documento o sin historial, lista vacía.
+ */
+export async function leerPerillasHistorial(plantSlug: PlantSlug | string): Promise<PerillaHistorial[]> {
+  const docId = CONFIG_DOC_ID[plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${plantSlug}`)
+  const snap = await getDoc(doc(db, COLLECTION, docId))
+  const historial = snap.data()?.monitorPerillasHistorial
+  return Array.isArray(historial) ? (historial as PerillaHistorial[]) : []
+}
+
+/** Los dos modos del umbral «a ritmo» de la línea: calibrado (perilla − 1 por Baader) u óptimo (la perilla completa). */
+export type ModoUmbralLinea = 'calibrado' | 'optimo'
+
+/** El modo vigente o una entrada del historial: qué modo, cuándo entró en vigor (hora de planta) y quién lo anotó. */
+export type UmbralARitmo = { modo: ModoUmbralLinea; desde: string; por: string | null }
+
+/**
+ * Anota el modo del umbral «a ritmo» de la LÍNEA. Mismo documento y mismo patrón que `setMonitorPerilla`:
+ * `CONFIG_DOC_ID[plantSlug]`, `desde` = el momento de anotar y historial de como máximo `HISTORIAL_PERILLAS_MAX`.
+ *
+ * Quién puede escribir: solo admin. Las reglas de `graderModuleConfigs` lo exigen con `affectedKeys` sobre
+ * `monitorUmbralARitmo` y `monitorUmbralARitmoHistorial`. Esta función no vuelve a comprobar el rol: la UI lo
+ * oculta y las reglas lo bloquean.
+ */
+export async function setMonitorUmbralARitmo(params: {
+  plantSlug: PlantSlug | string
+  modo: ModoUmbralLinea
+  por: string | null
+}): Promise<void> {
+  const docId = CONFIG_DOC_ID[params.plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
+  if (params.modo !== 'calibrado' && params.modo !== 'optimo') throw new Error(`Modo de umbral desconocido: ${params.modo}`)
+
+  const ref = doc(db, COLLECTION, docId)
+  const snap = await getDoc(ref)
+  const historialPrevio: UmbralARitmo[] = Array.isArray(snap.data()?.monitorUmbralARitmoHistorial)
+    ? snap.data()!.monitorUmbralARitmoHistorial
+    : []
+  const nueva: UmbralARitmo = { modo: params.modo, desde: desdePerilla(Date.now()), por: params.por }
+  await setDoc(ref, {
+    monitorUmbralARitmo: nueva,
+    monitorUmbralARitmoHistorial: [...historialPrevio, nueva].slice(-HISTORIAL_PERILLAS_MAX),
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
+}
+
+/**
+ * El modo del umbral de la línea: `vigente` (la última anotación; null si nunca se anotó) e `historial` (la más
+ * vieja primero). Lo lee el editor de admin. Sin documento, `vigente` null e `historial` vacío.
+ */
+export async function leerUmbralARitmo(plantSlug: PlantSlug | string): Promise<{ vigente: UmbralARitmo | null; historial: UmbralARitmo[] }> {
+  const docId = CONFIG_DOC_ID[plantSlug]
+  if (!docId) throw new Error(`Línea sin config: ${plantSlug}`)
+  const snap = await getDoc(doc(db, COLLECTION, docId))
+  const vigente = snap.data()?.monitorUmbralARitmo ?? null
+  const historial = snap.data()?.monitorUmbralARitmoHistorial
+  return {
+    vigente: vigente as UmbralARitmo | null,
+    historial: Array.isArray(historial) ? (historial as UmbralARitmo[]) : [],
+  }
+}
+
+/**
  * La cuota del turno, editable desde el monitor.
  *
  * Pedido de Orel (26-08): «la cuota ponla en el monitor para seleccionarla,
@@ -192,12 +335,12 @@ export async function setShiftQuota(params: {
   const docId = CONFIG_DOC_ID[params.plantSlug]
   if (!docId) throw new Error(`Línea sin config: ${params.plantSlug}`)
   if (params.piezas != null && !(params.piezas > 0)) {
-    throw new Error('La cuota tiene que ser un número de piezas mayor que cero.')
+    throw new Error('La meta tiene que ser un número de piezas mayor que cero.')
   }
   // Un dedo de más (150.000 en vez de 15.000) quedaría fijado como meta del
   // turno y descolocaría todos los porcentajes de la pantalla.
   if (params.piezas != null && params.piezas > 200_000) {
-    throw new Error('Esa cuota es demasiado alta: revisa el número.')
+    throw new Error('Esa meta es demasiado alta: revisa el número.')
   }
 
   const ref = doc(db, COLLECTION, docId)

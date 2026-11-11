@@ -14,6 +14,7 @@
 import { useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { InfoTooltip } from '@/components/ui'
 import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
 import type { ConfigDriftResult } from '@/services/grader/graderConfigDrift'
 import type { MatrixP0Cause } from '@/services/grader/types'
@@ -133,14 +134,15 @@ export function ConfigDriftBanner({
               <>{drift.changedGateNumbers.length === 1 ? 'cambió la gate' : 'cambiaron las gates'}{' '}
                 {drift.changedGateNumbers.join(', ')} · </>
             )}
-            {drift.mode === 'estimated' && (
-              <>estimado: este turno no guardó la configuración que usó, así que la columna «guardado»
-                sale del desglose persistido · </>
-            )}
-            el % de punto cero no cambia — es el conteo físico de piezas que la máquina mandó a puerta 0.
-            Este turno no guardó sus registros de Puerta 0, así que no puede recalcularse solo: para
-            actualizar el desglose hay que volver a subir los Excel desde el wizard. Los turnos
-            cargados de ahora en adelante se actualizan solos al cambiar las gates.
+            {drift.mode === 'estimated' && <>desglose estimado · </>}
+            para actualizar el desglose, vuelve a subir los Excel desde el wizard.{' '}
+            <InfoTooltip
+              iconSize={11}
+              text={(drift.mode === 'estimated'
+                ? 'Estimado: este turno no guardó la configuración que usó, así que la columna «guardado» sale del desglose persistido.\n\n'
+                : '')
+                + 'El % de punto cero no cambia — es el conteo físico de piezas que la máquina mandó a puerta 0. Este turno no guardó sus registros de Puerta 0, así que no puede recalcularse solo: para actualizar el desglose hay que volver a subir los Excel desde el wizard. Los turnos cargados de ahora en adelante se actualizan solos al cambiar las gates.'}
+            />
           </p>
         </div>
       )}

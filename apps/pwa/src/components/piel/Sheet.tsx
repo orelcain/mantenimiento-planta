@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { createPortal } from 'react-dom'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -23,8 +24,9 @@ export interface SheetProps {
   /**
    * `wide` = el doble de ancho en pantallas grandes (60rem), para formularios
    * largos que en el PC caben en dos columnas. En el teléfono no cambia nada.
+   * `full` = casi todo el ancho del PC (92 vw, tope 90rem), para tablas y listas con columnas.
    */
-  size?: 'default' | 'wide'
+  size?: 'default' | 'wide' | 'full'
   children?: React.ReactNode
   /**
    * Opcional: captura teclas en cualquier campo del panel (por ejemplo Cmd/Ctrl+Enter
@@ -41,9 +43,25 @@ export interface SheetProps {
   headerAction?: React.ReactNode
   /** Zona fija bajo el título, fuera del scroll (por ejemplo un buscador). */
   toolbar?: React.ReactNode
+  /**
+   * Opt-in: oculta la barra de desplazamiento del cuerpo (solo en hojas estructuradas). La barra
+   * global de `index.css` (8 px) le quita ancho al cuerpo en PC, y el contenido queda más angosto
+   * que el pie. Sin esto, ninguna hoja cambia.
+   */
+  ocultarBarra?: boolean
+  /**
+   * Opt-in, solo desde 1024 px. `ventana` = ventana ancha para formularios grandes: centrada, casi
+   * toda la pantalla, esquinas en los cuatro lados, sin tirador y con botón de cerrar. El cuerpo
+   * ocupa el alto que queda y la hoja debe desplazar su propio contenido. Sin esto, nada cambia.
+   * `libre` = la misma ventana sin encabezado, sin pie y sin márgenes, del alto de su contenido: quien
+   * la usa dibuja todo adentro, incluido el botón de cerrar. El título queda para lectores de pantalla.
+   */
+  presentacionPC?: 'hoja' | 'ventana' | 'libre'
 }
 
-export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown, surface = 'card', headerAction, toolbar }: SheetProps) {
+export function Sheet({ open, onClose, title, description, actions, size = 'default', children, onKeyDown, surface = 'card', headerAction, toolbar, ocultarBarra = false, presentacionPC = 'hoja' }: SheetProps) {
+  const ventana = presentacionPC === 'ventana'
+  const libre = presentacionPC === 'libre'
   /** Con `grouped` o `toolbar` el panel es una columna: encabezado fijo y cuerpo que desplaza. */
   const estructurado = surface === 'grouped' || toolbar != null
   const panelRef = React.useRef<HTMLDivElement>(null)
@@ -123,7 +141,7 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end justify-center">
+    <div className={cn('fixed inset-0 z-[100] flex items-end justify-center', (ventana || libre) && 'lg:items-center')}>
       <div
         className="absolute inset-0 bg-black/35 piel-fade-in"
         onClick={onClose}
@@ -139,9 +157,13 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
           'relative w-full rounded-t-panel pt-2.5',
           surface === 'grouped' ? 'bg-background' : 'bg-card',
           estructurado ? 'flex max-h-[85dvh] flex-col px-4' : 'px-6 pb-8',
-          size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
+          size === 'full' ? 'max-w-[min(92vw,90rem)]' : size === 'wide' ? 'max-w-[60rem]' : 'max-w-[30rem]',
           'shadow-[0_-10px_50px_rgba(0,0,0,0.3)] outline-none',
           'piel-sheet-in',
+          ventana &&
+            'piel-ventana-in lg:flex lg:h-[min(844px,94dvh)] lg:w-[calc(100vw-48px)] min-[1440px]:w-[min(1560px,90vw)] lg:max-w-none lg:flex-col lg:rounded-panel lg:px-[44px] lg:pb-6 lg:pt-7 lg:shadow-[0_24px_80px_rgba(0,0,0,0.45)]',
+          libre &&
+            'piel-ventana-in lg:flex lg:max-h-[min(1000px,94dvh)] lg:w-[calc(100vw-48px)] min-[1440px]:w-[min(1560px,90vw)] lg:max-w-none lg:flex-col lg:overflow-hidden lg:rounded-card lg:border lg:border-border lg:p-0 lg:shadow-[0_24px_80px_rgba(0,0,0,0.45)]',
         )}
       >
         {/* Zona de arrastre: agarradera + título, con área táctil generosa
@@ -153,29 +175,39 @@ export function Sheet({ open, onClose, title, description, actions, size = 'defa
           onPointerMove={moverArrastre}
           onPointerUp={soltarArrastre}
           onPointerCancel={cancelarArrastre}
-          className="absolute inset-x-0 top-0 h-[44px] touch-none select-none"
+          className={cn('absolute inset-x-0 top-0 h-[44px] touch-none select-none', (ventana || libre) && 'lg:hidden')}
         />
         {/* Agarradera: señal de "esto se arrastra/cierra", no decoración. */}
-        <div className="mx-auto mb-3.5 h-[5px] w-9 rounded-full bg-muted-foreground/40" aria-hidden />
-        {estructurado || headerAction ? (
-          <div className="flex min-h-[44px] flex-none items-center gap-2">
-            {title && <h2 className="min-w-0 flex-1 text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]">{title}</h2>}
+        <div className={cn('mx-auto mb-3.5 h-[5px] w-9 rounded-full bg-muted-foreground/40', (ventana || libre) && 'lg:hidden')} aria-hidden />
+        {estructurado || headerAction || ventana ? (
+          <div className={cn('flex min-h-[44px] flex-none items-center gap-2', ventana && 'lg:gap-5')}>
+            {title && <h2 className={cn('min-w-0 flex-1 text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]', ventana && 'lg:text-title1')}>{title}</h2>}
             {/* Por encima de la zona de arrastre (absolute, 44 px de alto), que si no se comería el toque. */}
             {headerAction && <div className="relative z-10 flex-none">{headerAction}</div>}
+            {ventana && (
+              <button
+                type="button"
+                aria-label="Cerrar"
+                onClick={onClose}
+                className="hidden size-[44px] flex-none place-items-center rounded-full bg-muted-foreground/15 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:grid"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            )}
           </div>
         ) : (
-          title && <h2 className="text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]">{title}</h2>
+          title && <h2 className={cn('text-[length:calc(1.1rem*var(--escala-texto,1))] font-semibold tracking-[-0.015em]', libre && 'lg:sr-only')}>{title}</h2>
         )}
         {description && (
-          <p className="mt-1 text-[length:calc(0.83rem*var(--escala-texto,1))] leading-snug text-muted-foreground">{description}</p>
+          <p className={cn('mt-1 text-[length:calc(0.83rem*var(--escala-texto,1))] leading-snug text-muted-foreground', ventana && 'lg:text-body')}>{description}</p>
         )}
         {toolbar && <div className="mt-2 flex-none">{toolbar}</div>}
         {children && (estructurado ? (
-          <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(12px,env(safe-area-inset-bottom))]">{children}</div>
+          <div className={cn('mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(12px,env(safe-area-inset-bottom))]', ocultarBarra && '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>{children}</div>
         ) : (
-          <div className="mt-4">{children}</div>
+          <div className={cn('mt-4', ventana && 'lg:mt-6 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col', libre && 'lg:mt-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col')}>{children}</div>
         ))}
-        {actions && <div className="mt-5 flex gap-2.5 [&>*]:flex-1">{actions}</div>}
+        {actions && <div className={cn('mt-5 flex gap-2.5 [&>*]:flex-1', ventana && 'lg:mt-3 lg:flex-none lg:border-t lg:border-border lg:pt-3.5')}>{actions}</div>}
       </div>
     </div>,
     document.body,

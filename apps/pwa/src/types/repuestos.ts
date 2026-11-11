@@ -17,6 +17,10 @@ export interface ImagenRepuesto {
   esPrincipal: boolean;
   tipo: 'manual' | 'real'; // manual: captura del PDF, real: foto del repuesto físico
   createdAt: Date;
+  /** Equipos (ids de `hierarchy`) a los que corresponde una captura del manual: los del manual
+   *  del que salió. Una pieza estándar usada en dos máquinas tiene un dibujo de cada manual y
+   *  en cada máquina se muestra el suyo. Sin el campo, la imagen se ve en todas. */
+  equipos?: string[];
 
   // Metadata opcional para debugging de compresión
   sizeOriginal?: number; // bytes

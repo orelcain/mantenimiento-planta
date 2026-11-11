@@ -2,18 +2,18 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '4.2.0' as const
+export const APP_VERSION = '4.16.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-09-12' as const
+export const VERSION_DATE = '2026-11-05' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Constitucion de diseno Apple: estructura, tipografia y densidad' as const
+export const VERSION_NAME = 'Monitor: Camino a la meta usa la cascada de «Dónde se fueron las piezas»' as const
 
 /**
  * Nota:

@@ -7,7 +7,7 @@
  * Es además como cuenta Shoplogix (confirmado por Orel, 12-08).
  */
 import { describe, it, expect } from 'vitest'
-import { buildHourlyRows, peakPieces, type MonitorSeriesPoint } from '../monitorHourly'
+import { buildHourlyRows, piezasPorHoraDeMaquina, peakPieces, type MonitorSeriesPoint } from '../monitorHourly'
 
 /** Serie de tramos de 5 min desde `desde`. */
 function serie(desde: string, piezasPorTramo: number[]): MonitorSeriesPoint[] {
@@ -138,5 +138,21 @@ describe('buildHourlyRows · el turno empieza en la primera pieza', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]!.pieces).toBe(60)
     expect(rows[0]!.from).toContain('07:45')
+  })
+})
+
+describe('piezasPorHoraDeMaquina', () => {
+  const serie = (n: number, f: (i: number) => number) =>
+    Array.from({ length: n }, (_, i) => ({ t: new Date(Date.UTC(2026, 9, 27, 7, 20) + i * 5 * 60_000).toISOString(), pieces: f(i) }))
+  it('las máquinas suman la línea en cada hora, con el mismo arranque y corte', () => {
+    const a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+    const b = a.map((x) => x * 2)
+    const linea = serie(26, (i) => a[i]! + b[i]!)
+    const rows = buildHourlyRows(linea)
+    const ha = piezasPorHoraDeMaquina(linea, rows, a)
+    const hb = piezasPorHoraDeMaquina(linea, rows, b)
+    expect(rows.length).toBe(3)
+    rows.forEach((r, i) => expect(ha[i]! + hb[i]!).toBe(r.pieces))
+    expect(ha[0]).toBe(78) // 1..12
   })
 })

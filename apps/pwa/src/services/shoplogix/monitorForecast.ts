@@ -264,12 +264,12 @@ export function explicacionDelMetodo(
   if (metodo === 'proporcional') {
     const frac = fraccionTipicaAEstaAltura(history, currentMinute)
     if (frac == null) return null
-    return `a esta altura llevaban el ${Math.round(frac * 100)}% de su total`
+    return `a esta hora tenían hecho el ${Math.round(frac * 100)} % de su total`
   }
   if (metodo === 'aditivo') {
     const deltas = history.map((t) => Math.max(0, t.totalPieces - (piecesAt(t.curve, currentMinute) ?? 0)))
     if (deltas.length === 0) return null
-    return `desde esta altura sumaron ${Math.round(mediana(deltas)).toLocaleString('es-CL')} pz más`
+    return `desde esta hora sumaron ${Math.round(mediana(deltas)).toLocaleString('es-CL')} pz más`
   }
   // Decir que es ritmo de RELOJ no basta: lo que hace que este número sea el
   // más alto de la pantalla es que no descuenta las colaciones, y de madrugada

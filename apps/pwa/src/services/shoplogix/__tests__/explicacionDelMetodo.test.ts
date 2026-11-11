@@ -27,7 +27,7 @@ const HISTORIA: HistoryShift[] = [1, 2, 3].map((n) => ({
 })) as unknown as HistoryShift[]
 
 describe('fraccionTipicaAEstaAltura', () => {
-  it('dice qué parte del total llevaban a esta altura', () => {
+  it('dice qué parte del total tenían hecho a esta hora', () => {
     expect(fraccionTipicaAEstaAltura(HISTORIA, 180)).toBeCloseTo(0.4, 2)
   })
 
@@ -37,14 +37,14 @@ describe('fraccionTipicaAEstaAltura', () => {
 })
 
 describe('explicacionDelMetodo', () => {
-  it('proporcional: dice el porcentaje que llevaban', () => {
+  it('proporcional: dice el porcentaje que tenían hecho', () => {
     expect(explicacionDelMetodo('proporcional', HISTORIA, 180))
-      .toBe('a esta altura llevaban el 40% de su total')
+      .toBe('a esta hora tenían hecho el 40 % de su total')
   })
 
   it('aditivo: dice cuántas piezas sumaron después', () => {
     expect(explicacionDelMetodo('aditivo', HISTORIA, 180))
-      .toContain('desde esta altura sumaron')
+      .toContain('desde esta hora sumaron')
   })
 
   it('ritmo: dice que la colación queda fuera (regla de Orel: es tiempo fuera de proceso)', () => {

@@ -72,6 +72,12 @@ const COLLECTION = 'publicShiftMonitors'
 
 /** Versión vigente del desglose de tiempos (`timeBreakdown.tbv`). Ver buildMonitorLive. */
 const TBV = 3
+/**
+ * Versión de la clasificación de causas de `live.mantencion` (fallas, MTTR, disponibilidad). 2 = árbol oficial de
+ * imputación (29-10-2026, #1359: FALLA OPERACIONAL, ATASCAMIENTO… dejaron de contarse como Mantención). Un turno del
+ * historial medido con otra versión se rearma, si no «Anterior» mostraría para siempre las fallas viejas.
+ */
+const MANT_CLASIF = 2
 
 /** Intervalo de producción de Shoplogix: 5 minutos fijos. */
 const INTERVAL_MIN = 5
@@ -173,13 +179,14 @@ function esPlannedDowntime(state) {
  *
  * Lista confirmada por Orel el 12-08. Se compara sin tildes ni mayúsculas
  * porque Shoplogix escribe las causas a mano y ya varían entre turnos.
+ *
+ * La lista vive en `lib/causasProgramadas.json` y la PWA importa ese MISMO
+ * archivo (`esProgramada` en `cascadaPerilla.ts`). La tabla
+ * `__tests__/fixtures/causasProgramadas.casos.json` la corren las dos pruebas
+ * de paridad (aquí y en vitest): si las reglas se separan, el monitor y la
+ * cascada vuelven a dar minutos programados distintos (fue 56 contra 64 min).
  */
-const CAUSAS_PLANIFICADAS = [
-  'colacion',
-  'detencion programada',
-  'reunion inicio turno',
-  'ejercicio compensatorio',
-]
+const CAUSAS_PLANIFICADAS = require('./lib/causasProgramadas.json')
 
 function esParoPlanificado(reason) {
   /*
@@ -826,8 +833,58 @@ function normShiftName(s) {
   return String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 }
 
+/** Tope del motivo publicado de una perilla, en caracteres (la PWA lo aplica al guardar; aquí se vuelve a aplicar). */
+const MOTIVO_PERILLA_MAX = 60
+
+/**
+ * Una perilla de velocidad, saneada. Null si no es usable: sin un cpm positivo
+ * o sin `desde` con fecha válida, no se publica. Salen `cpm`, `desde` y, solo si
+ * hay texto, `motivo` (recortado y con tope de 60). Nunca `por`: el monitor público
+ * no muestra quién anotó (el editor de admin lo lee de graderModuleConfigs).
+ */
+function normPerilla(v) {
+  const cpm = Number(v?.cpm)
+  const t = typeof v?.desde === 'string' ? Date.parse(v.desde) : NaN
+  if (!(cpm > 0) || !Number.isFinite(t)) return null
+  const motivo = typeof v?.motivo === 'string' ? Array.from(v.motivo.trim()).slice(0, MOTIVO_PERILLA_MAX).join('').trim() : ''
+  return motivo ? { cpm, desde: v.desde, motivo } : { cpm, desde: v.desde }
+}
+
+/**
+ * Perillas de velocidad por máquina del doc de la línea: `monitorPerillas` (la
+ * vigente de cada máquina) y `monitorPerillasHistorial` (máx. 100, la más nueva al
+ * final). Viajan en el payload porque el monitor público no puede leer
+ * graderModuleConfigs. Solo admin las escribe: la regla está en firestore.rules.
+ * `modo` (calibrado u óptimo) viene de `monitorUmbralARitmo`, que también es solo
+ * admin. Sin el dato o con un valor desconocido, la respuesta va sin `modo` y la
+ * PWA lo toma por calibrado. Null si la línea no tiene ninguna perilla ni modo.
+ */
+const MODOS_UMBRAL = ['calibrado', 'optimo']
+
+function leerPerillas(data) {
+  const actual = {}
+  if (data?.monitorPerillas && typeof data.monitorPerillas === 'object') {
+    for (const [machineId, v] of Object.entries(data.monitorPerillas)) {
+      const p = normPerilla(v)
+      if (p) actual[machineId] = p
+    }
+  }
+  const historial = []
+  if (Array.isArray(data?.monitorPerillasHistorial)) {
+    for (const h of data.monitorPerillasHistorial) {
+      const p = normPerilla(h)
+      if (p && typeof h.machineId === 'string' && h.machineId) historial.push({ ...p, machineId: h.machineId })
+    }
+  }
+  const modo = MODOS_UMBRAL.includes(data?.monitorUmbralARitmo?.modo) ? data.monitorUmbralARitmo.modo : null
+  if (Object.keys(actual).length === 0 && historial.length === 0 && !modo) return null
+  const perillas = { actual, historial: historial.slice(-100) }
+  if (modo) perillas.modo = modo
+  return perillas
+}
+
 async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
-  const vacio = { plannedEnd: null, quotaPieces: null, setPoint: null, pesoPromedioKg: null, quotaOrigen: null }
+  const vacio = { plannedEnd: null, quotaPieces: null, setPoint: null, perillas: null, pesoPromedioKg: null, quotaOrigen: null }
   if (!shiftId || !scheduledStart) return vacio
   /*
    * Cada `plantSlug` del monitor es UNA línea, así que el id de config se
@@ -854,8 +911,14 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
         por: typeof spRaw.por === 'string' ? spRaw.por : null,
       }
       : null
+    /*
+     * Perillas por máquina: mismo doc y misma resolución que el set point, así que
+     * se leen ANTES del horario, por la misma razón: la primera noche de un turno
+     * nuevo no pierde la velocidad de la perilla.
+     */
+    const perillas = leerPerillas(snap.data())
     const schedule = snap.data()?.shiftSchedule
-    if (!Array.isArray(schedule)) return { ...vacio, setPoint }
+    if (!Array.isArray(schedule)) return { ...vacio, setPoint, perillas }
     /*
      * Comparación TOLERANTE de nombre de turno. Filete llama al suyo
      * "Turno Dia" y la config guarda "Turno día": comparando literal, Filete
@@ -865,7 +928,7 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     // ̀-ͯ = los diacríticos que separa NFD. Escapado y no literal:
     // un archivo con otro encoding convertiría el rango en basura silenciosa.
     const entry = schedule.find(s => normShiftName(s?.shiftId) === normShiftName(shiftId))
-    if (!entry) return { ...vacio, setPoint }
+    if (!entry) return { ...vacio, setPoint, perillas }
 
     const endH = Number(entry.endHour)
     const endM = Number(entry.endMinute ?? 0)
@@ -949,6 +1012,7 @@ async function loadPlannedShift(db, plantSlug, shiftId, scheduledStart) {
     return {
       plannedEnd: end,
       setPoint,
+      perillas,
       /* El vigente: último registro DEL turno; legacy solo si cae dentro. */
       pesoPromedioKg: pesoRegistros.length > 0
         ? pesoRegistros[pesoRegistros.length - 1].pesoKg
@@ -1183,7 +1247,10 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
   // razón en cada evento engorda el doc sin aportar nada.
   const stopReasons = []
   const eventosCrudos = []
-  for (const m of machines) {
+  // `m` = índice en `stopMachines`: de qué máquina es cada parada (Eviscerado tiene 3 Baader y
+  // el análisis tiene que poder decir cuál es la que para).
+  const stopMachines = machines.map(m => m.id)
+  for (const [mi, m] of machines.entries()) {
     for (const st of m.states || []) {
       if (st.type === 'uptime') continue
       if (esPlannedDowntime(st)) continue
@@ -1193,13 +1260,13 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
       const reason = (st.reason || st.name || 'Sin razón').trim()
       let r = stopReasons.indexOf(reason)
       if (r === -1) { stopReasons.push(reason); r = stopReasons.length - 1 }
-      eventosCrudos.push({ r, f: desde.toISOString(), s: sec })
+      eventosCrudos.push({ r, f: desde.toISOString(), s: sec, m: mi })
     }
   }
   const vistosEv = new Set()
   const stopEvents = eventosCrudos
     .filter(e => {
-      const k = `${e.r}|${e.f}|${e.s}`
+      const k = `${e.m}|${e.r}|${e.f}|${e.s}`
       if (vistosEv.has(k)) return false
       vistosEv.add(k)
       return true
@@ -1432,15 +1499,39 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
    */
   const resumir = (g) => {
     let celdasCausa = 0, tramos = 0, previo = 0, celdasLinea = 0
+    const rangos = []
     for (let i = 0; i < g.length; i++) {
       if (g[i]) {
         celdasCausa++
         if (linea[i] !== 1) celdasLinea++
-        if (!previo) tramos++
+        if (!previo) { tramos++; rangos.push([i, i + 1]) } else rangos[rangos.length - 1][1] = i + 1
       }
       previo = g[i]
     }
-    return { min: aMin(celdasCausa), count: tramos, lineMin: aMin(celdasLinea) }
+    return { min: aMin(celdasCausa), count: tramos, lineMin: aMin(celdasLinea), rangos }
+  }
+
+  /*
+   * Los MISMOS tramos que cuenta `count`, ubicados en el reloj (detalle semanal
+   * de «De quién fue la pérdida», 27-10-2026: «al tocar una causa, en qué
+   * paradas ocurrió»). Salen de la misma rejilla, así que «9 veces» lista 9
+   * paradas. `t` = inicio en hora de planta (wall-clock, como todo Shoplogix),
+   * `o` = segundos desde el inicio de la rejilla (para ordenar turnos que
+   * cruzan la medianoche), `s` = segundos que duró el tramo, `m` = índices en `stopMachines` de las
+   * máquinas que tuvieron esa causa dentro del tramo.
+   */
+  const tramosDe = (reason, rangos) => {
+    if (t0Ventana == null) return []
+    const r = stopReasons.indexOf(reason)
+    const propios = stopEvents.filter(e => e.r === r)
+    return rangos.map(([a, b]) => {
+      const desde = t0Ventana + a * PASO_SEG * 1000
+      const hasta = t0Ventana + b * PASO_SEG * 1000
+      const m = [...new Set(propios
+        .filter(e => { const x = new Date(e.f).getTime(); return x < hasta && x + e.s * 1000 > desde })
+        .map(e => e.m))].sort((x, y) => x - y)
+      return { t: new Date(desde).toISOString().slice(11, 19), o: a * PASO_SEG, s: (b - a) * PASO_SEG, m }
+    })
   }
 
   const planificados = []
@@ -1448,8 +1539,14 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
   for (const [reason, g] of [...porCausa.entries()].sort()) {
     const r = resumir(g)
     if (r.min <= 0) continue
-    ;(esParoPlanificado(reason) ? planificados : recuperables)
-      .push({ reason, min: r.min, count: r.count, lineMin: r.lineMin, ...minutosDeMaquina(reason) })
+    if (esParoPlanificado(reason)) {
+      planificados.push({ reason, min: r.min, count: r.count, lineMin: r.lineMin, ...minutosDeMaquina(reason) })
+    } else {
+      recuperables.push({
+        reason, min: r.min, count: r.count, lineMin: r.lineMin, ...minutosDeMaquina(reason),
+        tramos: tramosDe(reason, r.rangos),
+      })
+    }
   }
   planificados.sort((a, b) => b.min - a.min)
   recuperables.sort((a, b) => b.min - a.min)
@@ -1567,6 +1664,9 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
       pieces,
       piecesPerHour: mHours > 0 ? pieces / mHours : 0,
       uptimePct: mTracked > 0 ? (mUptime / mTracked) * 100 : 0,
+      /* Segundos andando (estado uptime) de esta máquina: la base del llenado por
+         puesto del Duelo de equipos (piezas ÷ (esperado × minutos andando)). */
+      uptimeSec: Math.round(mUptime),
       // Piezas de ESTA máquina en cada bucket de `series` (mismo orden). Los
       // buckets sin dato van en 0 — incluida la cola extendida de paros.
       serie: series.map(p => byBucketDeMaquina.get(m.id)?.get(Date.parse(p.t)) || 0),
@@ -1637,6 +1737,23 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
        monitor no registra las imputaciones» (28-08, verificado contra la
        fuente: las imputaciones estaban, el payload no las publicaba). */
     const imputadasAcc = {}
+    /* Micro detención por HORA DE PRODUCCIÓN (hora 1 = los primeros 60 min desde la primera pieza, el mismo origen que
+       `curvaCompacta`), en segundos de MÁQUINA sumados entre máquinas: la MISMA regla que `microMin` (clasificación oficial
+       sobre los states saneados), así que `microH` suma lo que suma `mic` en `resumenDuelo`. Un tramo se reparte entre las
+       horas que cruza; lo que cae antes de la primera pieza va a la hora 1 y lo posterior al fin, a la última, para que el
+       total no se pierda. Sin primera pieza no hay eje: queda vacío. */
+    const t0Prod = arranqueProductivo ? arranqueProductivo.getTime() : null
+    const nHorasMicro = t0Prod != null ? Math.min(16, Math.max(1, Math.ceil((fin.getTime() - t0Prod) / 3_600_000))) : 0
+    const microSegPorHora = new Array(nHorasMicro).fill(0)
+    const repartirMicro = (aMs, bMs) => {
+      if (!nHorasMicro) return
+      for (let h = 0; h < nHorasMicro; h++) {
+        const desde = h === 0 ? -Infinity : t0Prod + h * 3_600_000
+        const hasta = h === nHorasMicro - 1 ? Infinity : t0Prod + (h + 1) * 3_600_000
+        const seg = (Math.min(bMs, hasta) - Math.max(aMs, desde)) / 1000
+        if (seg > 0) microSegPorHora[h] += seg
+      }
+    }
     const porMaquina = machines.map((m) => {
       /* Los states traen Timestamps de Firestore; el módulo espera fechas
          parseables (`new Date(Timestamp)` da NaN y el saneo lo bota todo). */
@@ -1658,6 +1775,12 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
           ]),
       )
       const k = kpisMantencion.kpisDeMaquina(saneados)
+      for (const s of saneados) {
+        if (kpisMantencion.clasificaCausa(s) !== 'micro') continue
+        /* `durationSec` ya es el solape con la ventana: el tramo recortado arranca en max(inicio, ventana.start). */
+        const a = Math.max(new Date(s.startAt).getTime(), ventana.start.getTime())
+        repartirMicro(a, a + s.durationSec * 1000)
+      }
       for (const e of k.eventosFalla) {
         eventosTodos.push({
           maquina: m.machineName || m.id,
@@ -1702,7 +1825,11 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
       }
     })
     return {
+      /** Versión de la clasificación de causas (`MANT_CLASIF`): un turno cacheado con otra se rearma. */
+      clasif: MANT_CLASIF,
       porMaquina,
+      /** Micro detención (min de máquina, suma entre máquinas) por hora de producción. Ver `repartirMicro`. */
+      microH: microSegPorHora.map((s) => Math.round(s / 6) / 10),
       /** Los eventos del turno, del más caro al más barato. Tope chico: el doc es público. */
       eventos: eventosTodos.sort((a, b) => b.min - a.min).slice(0, 6),
       /** Minutos con TODAS las máquinas detenidas sin causa a la vez. */
@@ -1736,6 +1863,7 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
   const cfg = await loadPlannedShift(db, plantSlug, shiftIdActual, scheduledStart)
   const planned = { quotaPieces: cfg.quotaPieces, pesoPromedioKg: cfg.pesoPromedioKg ?? null, pesoRegistros: cfg.pesoRegistros ?? [], quotaOrigen: cfg.quotaOrigen ?? null }
   const setPoint = cfg.setPoint ?? null
+  const perillas = cfg.perillas ?? null
 
   let plannedEnd = null
   let plannedEndSource = null
@@ -1833,6 +1961,12 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
      * que un dato del PLC, y la pantalla lo dice.
      */
     setPoint,
+    /*
+     * Perillas por máquina (velocidad configurada en cada máquina) y su historial.
+     * Viajan como `setPoint`: el monitor público no puede leer graderModuleConfigs.
+     * La vara del minuto sale de ellas en la PWA (pages/monitor/perilla.ts).
+     */
+    perillas,
     /** Turnos anteriores usados cuando se infirió del historial. */
     plannedEndSamples,
     /*
@@ -1914,7 +2048,9 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
     /** Razones, para que los eventos no repitan el texto en cada uno. */
     comments: comentarios.slice(0, COMMENTS_MAX),
     stopReasons,
-    /** Detenciones ubicadas en el tiempo: `r` = índice en stopReasons. */
+    /** Ids de máquina, referenciados por índice desde `stopEvents[].m`. */
+    stopMachines,
+    /** Detenciones ubicadas en el tiempo: `r` = índice en stopReasons, `m` = índice en stopMachines. */
     stopEvents,
   }
 }
@@ -2162,7 +2298,8 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
     // i === 0 es el turno inmediatamente anterior: puede seguir moviéndose.
     // Y solo se reusa un live medido con la rejilla vigente: uno viejo dejaría
     // «Anterior» mostrando el desglose recortado para siempre.
-    if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === TBV) { out.push(cacheado); continue }
+    if (cacheado?.live && i > 0 && cacheado.live.timeBreakdown?.tbv === TBV
+      && (cacheado.live.mantencion == null || cacheado.live.mantencion.clasif === MANT_CLASIF)) { out.push(cacheado); continue }
     try {
       const live = await buildMonitorLive(db, plantSlug, id, index, t.fuente ?? null)
       if (!live) continue
@@ -2268,12 +2405,12 @@ function resumirParaForecast(live) {
 
 
 /**
- * Cuántos turnos guarda el arreglo liviano de estadísticas. 40 son ~20 días
- * con dos turnos: alcanza para ventanas de «últimos 30» sin acercarse al
- * límite de 1 MB del documento (medido el 16-08: el doc entero pesaba 74 KB y
- * cada entrada de estas ronda los 0,4 KB, así que 40 suman ~16 KB).
+ * Cuántos turnos guarda el arreglo liviano de estadísticas. 62 = un mes de 31 días con dos turnos: el «mes» del Duelo
+ * cubre el mes ENTERO (con 40, ~20 días, se le caían los primeros días). Medido el 29-10: cada entrada pesa 3,6 KB
+ * (Eviscerado) y el doc 291 KB; con 62 queda en ~370 KB, lejos del límite de 1 MB. Las 22 nuevas se arman de a
+ * `STATS_NUEVOS_POR_CORRIDA`.
  */
-const STATS_MAX = 40
+const STATS_MAX = 62
 /**
  * Cuántas entradas NUEVAS se construyen por corrida.
  *
@@ -2283,6 +2420,39 @@ const STATS_MAX = 40
  * usa las que ya hay — que es exactamente cómo se comporta hoy el historial.
  */
 const STATS_NUEVOS_POR_CORRIDA = 5
+
+/**
+ * Gracia de las imputaciones tardías (fase 3 de `docs/PLAN_CIERRE_DUELO.md`, 29-10-2026).
+ *
+ * ⚠ Las causas se imputan DESPUÉS del turno. El re-sync móvil las trae a
+ * `shoplogix/` hasta J+3 a las 12:00 (ayer cada hora; hace 2 y 3 días, una vez
+ * al día), pero el caché de abajo reusaba toda entrada con `i > 0`: las noches
+ * Ev del 27 y 28-10 siguieron con «Detencion» 96 y 91 min sin imputar cuando
+ * Shoplogix ya decía ACUMULACION RECHAZO, Falta MMPP… Si la causa hubiera sido
+ * técnica, el Duelo habría contado mal la falla sin ningún aviso.
+ *
+ * Por eso una entrada de los últimos STATS_GRACIA_DIAS se rearma cuando cambia
+ * la huella de su turno (`hu`). `lastSyncAt` no sirve de huella: el re-sync
+ * horario lo mueve aunque nada cambie. Tope por corrida aparte del de nuevos.
+ */
+const STATS_GRACIA_DIAS = 3
+const STATS_GRACIA_POR_CORRIDA = 2
+
+/**
+ * Huella de lo que puede cambiar en un turno cerrado: piezas y causas por
+ * máquina. Sale del doc padre que el índice ya leyó (`machines[].stateAggregates`,
+ * sumado por el sync desde los mismos states), así que no cuesta lecturas.
+ * null = el padre no trae agregados: sin huella no se rearma nada.
+ */
+function huellaTurno(parent) {
+  const ms = Array.isArray(parent?.machines) ? parent.machines : []
+  if (!ms.some(m => Array.isArray(m?.stateAggregates))) return null
+  const base = ms
+    .map(m => [String(m.machineid ?? m.name ?? ''), m.totalCycles ?? 0,
+      (m.stateAggregates || []).map(s => [s.type ?? '', s.name ?? '', s.reason ?? '', s.durationSec ?? 0, s.count ?? 0].join('|')).sort()])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+  return require('crypto').createHash('sha1').update(JSON.stringify(base)).digest('base64').slice(0, 12)
+}
 
 /**
  * Estadística LIVIANA de los últimos turnos, de TODOS los nombres.
@@ -2297,7 +2467,208 @@ const STATS_NUEVOS_POR_CORRIDA = 5
  * Sin esto, «lo que se repite» solo podía mirar los 6 turnos de `history`, que
  * cargan la serie completa de cada uno y por eso son pocos.
  */
-async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null) {
+/** Tope de paradas por turno en `shiftStats[].paradas` (se guardan las más largas). */
+const PARADAS_MAX = 120
+
+/** `recoverable[].tramos` → `[{ c, t, s, m }]` en orden de reloj, con tope. */
+function paradasCompactas(recoverable) {
+  const todas = []
+  recoverable.forEach((c, ci) => {
+    for (const x of c.tramos || []) {
+      if (!x || typeof x.t !== 'string' || !(x.s > 0)) continue
+      todas.push({ c: ci, t: x.t, s: x.s, m: Array.isArray(x.m) ? x.m : [], o: x.o ?? 0 })
+    }
+  })
+  const recortadas = todas.length > PARADAS_MAX
+    ? todas.slice().sort((a, b) => b.s - a.s).slice(0, PARADAS_MAX)
+    : todas
+  // Por `o` y no por `t`: en el turno de noche 01:10 va después de 23:40.
+  return recortadas.sort((a, b) => a.o - b.o).map(({ o: _o, ...x }) => x)
+}
+
+/**
+ * Índice del arranque PRODUCTIVO de una serie de 5 min (primer tramo con piezas,
+ * saltando picos sueltos). Es la MISMA regla que `arranqueProductivo` de
+ * `buildMonitorLive` y que `desdePrimeraPieza` de la PWA: el eje de la curva del
+ * rival tiene que partir del mismo origen que el de hoy. -1 si no hay piezas.
+ */
+function indiceArranqueProductivo(serie) {
+  const conPz = []
+  serie.forEach((p, i) => { if ((p.pieces || 0) > 0) conPz.push(i) })
+  if (conPz.length === 0) return -1
+  let inicio = conPz[0]
+  for (let k = 1; k < conPz.length; k++) {
+    const huecoMin = (conPz[k] - conPz[k - 1] - 1) * INTERVAL_MIN
+    if (huecoMin > 60) inicio = conPz[k]
+    else break
+  }
+  return inicio
+}
+
+/** Una parada tiene que durar al menos esto para marcarse en el gráfico del Duelo. */
+const EV_MIN_SEG = 300
+/** Tope de marcas por turno en `shiftStats[].duelo.ev` (se guardan las más largas). */
+const EV_MAX = 16
+
+/**
+ * Las paradas largas de un turno para el gráfico del Duelo: `[{ n, o, d, p? }]` con `n` = causa, `o` = minutos desde
+ * el inicio PLANIFICADO, `d` = minutos de duración y `p: 1` si es programada (colación, reunión…). Las máquinas se
+ * unen por causa (si tres Baader paran a la vez por la misma causa es UNA marca) y solo quedan las de 5 min o más.
+ * Sale de `stopEvents`, así que la colación y la falta de materia prima ya vienen ahí. Siempre devuelve un arreglo.
+ */
+function eventosDelDuelo(l, iniMs) {
+  if (!Number.isFinite(iniMs)) return []
+  const causas = l?.stopReasons || []
+  const porCausa = new Map()
+  for (const e of l?.stopEvents || []) {
+    const n = causas[e.r]
+    const f = Date.parse(e.f)
+    if (!n || !Number.isFinite(f) || !(e.s > 0)) continue
+    if (!porCausa.has(n)) porCausa.set(n, [])
+    porCausa.get(n).push([f, f + e.s * 1000])
+  }
+  const out = []
+  for (const [n, rangos] of porCausa) {
+    rangos.sort((x, y) => x[0] - y[0])
+    const unidos = []
+    for (const r of rangos) {
+      const u = unidos[unidos.length - 1]
+      if (u && r[0] <= u[1]) u[1] = Math.max(u[1], r[1])
+      else unidos.push([r[0], r[1]])
+    }
+    for (const [d0, d1] of unidos) {
+      if ((d1 - d0) / 1000 < EV_MIN_SEG) continue
+      out.push({ n, o: Math.round((d0 - iniMs) / 60_000), d: Math.round((d1 - d0) / 60_000), ...(esParoPlanificado(n) ? { p: 1 } : {}) })
+    }
+  }
+  return out.sort((x, y) => y.d - x.d).slice(0, EV_MAX).sort((x, y) => x.o - y.o)
+}
+
+/**
+ * Lo que el Duelo de equipos necesita de un turno YA CERRADO y que `shiftStats`
+ * no traía. Todo compacto y sin `undefined` (Firestore lo rechaza):
+ *  - `h0`: hora planificada de inicio (HH:MM, hora de planta). De acá sale si el
+ *    turno fue de día o de noche — no del nombre.
+ *  - `ini`: minutos entre ese inicio planificado y el arranque productivo (tramos de 5 min).
+ *  - `uh`: piezas de la última hora del horario planificado.
+ *  - `mic`: minutos de micro detención sumados entre máquinas (clasificación oficial).
+ *  - `alim`: llenado por puesto = piezas ÷ (esperado × minutos andando), tope 100.
+ *  - `ev`: paradas de 5 min o más (colación, falta de materia prima, fallas…) ubicadas desde el
+ *    inicio planificado, para marcarlas en la carrera. Ver `eventosDelDuelo`.
+ *  - `cv`/`cvp`/`cvm`: curva acumulada compacta (cada 15 min) para correr un turno pasado. Ver `curvaCompacta`.
+ */
+function resumenDuelo(l, serieMin = null) {
+  const serie = (l?.series || []).filter(p => p && p.t)
+  const iniMs = Date.parse(l?.scheduledStart ?? '')
+  const finMs = Date.parse(l?.plannedEnd ?? l?.scheduledEnd ?? '')
+  const i0 = indiceArranqueProductivo(serie)
+  const ini = i0 >= 0 && Number.isFinite(iniMs)
+    ? Math.max(0, Math.round((Date.parse(serie[i0].t) - iniMs) / 60_000))
+    : null
+  const uh = Number.isFinite(finMs) && serie.length
+    ? serie
+      .filter(p => { const t = Date.parse(p.t); return t >= finMs - 60 * 60_000 && t < finMs })
+      .reduce((a, p) => a + (p.pieces || 0), 0)
+    : null
+  const mant = l?.mantencion?.porMaquina
+  const mic = Array.isArray(mant) ? Math.round(mant.reduce((a, m) => a + (m.microMin || 0), 0) * 10) / 10 : null
+  /* ⚠ Los datos que faltan NO viajan como null: la clave simplemente no existe
+     (el test de «documento válido» exige que ningún valor sea null/undefined). */
+  const alim = (l?.machines || []).map(m => ({
+    n: m.name,
+    ...(m.targetCpm > 0 && m.uptimeSec > 0
+      ? { f: Math.min(100, Math.round((100 * (m.pieces || 0)) / (m.targetCpm * (m.uptimeSec / 60)))) }
+      : {}),
+  }))
+  return {
+    ...(Number.isFinite(iniMs) ? { h0: new Date(iniMs).toISOString().slice(11, 16) } : {}),
+    ...(ini != null ? { ini } : {}),
+    ...(uh != null ? { uh } : {}),
+    ...(mic != null ? { mic } : {}),
+    alim,
+    ev: eventosDelDuelo(l, iniMs),
+    ...curvaCompacta(l),
+    /* Micro por hora de producción y por máquina, con la MISMA regla que `mic` (ver `microH` en `buildMonitorLive`):
+       `micH` suma ≈ `mic` y `micM` es `mic` por máquina, en el orden de `machines`. Siempre arreglos (vacíos sin dato):
+       `micH` presente es lo que marca al turno como ya rearmado en el caché. */
+    micH: Array.isArray(l?.mantencion?.microH) ? l.mantencion.microH : [],
+    micM: Array.isArray(mant) ? mant.map((m) => Math.round((m.microMin || 0) * 10) / 10) : [],
+    ...minutosA90(serieMin, l?.machines),
+  }
+}
+
+/** Una máquina rinde «a ritmo» cuando produce al menos esta fracción de su esperado en el minuto. */
+const V90_FRACCION = 0.9
+
+/**
+ * Minutos sostenidos a ≥ 90 % del esperado, de la serie minuto a minuto ARCHIVADA del turno (`seriesMinuto`):
+ *  - `v90`: minutos en que la LÍNEA (suma de máquinas) produjo ≥ 90 % de la suma de sus esperados.
+ *  - `v90m`: lo mismo por máquina, en el orden de `machines` (máquina que falta en la serie: no se publica nada).
+ * Sin esperado en alguna máquina no se puede afirmar «a ritmo»: `v90` y `v90m` no viajan, pero `v90m: []` queda como
+ * marca de «ya mirado» (si no, el caché volvería a rearmar ese turno para siempre). Sin serie: `{}` (la clave
+ * no existe y el turno sigue sin dato, que es lo honesto: Shoplogix no devuelve el minuto a minuto de turnos viejos).
+ */
+function minutosA90(serieMin, machines) {
+  if (!serieMin) return {}
+  if (!Array.isArray(serieMin.maquinas) || !serieMin.maquinas.length || !Array.isArray(machines) || !machines.length) return { v90m: [] }
+  const porId = new Map(serieMin.maquinas.map((m) => [m.id, m]))
+  const mias = machines.map((m) => porId.get(m.id))
+  if (mias.some((m) => !m || !Array.isArray(m.cycles) || !(m.esperado > 0))) return { v90m: [] }
+  const largo = Math.min(...mias.map((m) => m.cycles.length))
+  const esperadoLinea = mias.reduce((a, m) => a + m.esperado, 0)
+  let linea = 0
+  const porMaq = mias.map(() => 0)
+  for (let i = 0; i < largo; i++) {
+    let suma = 0
+    mias.forEach((m, k) => {
+      const c = m.cycles[i] || 0
+      suma += c
+      if (c >= V90_FRACCION * m.esperado) porMaq[k]++
+    })
+    if (suma >= V90_FRACCION * esperadoLinea) linea++
+  }
+  return { v90: linea, v90m: porMaq }
+}
+
+/** Paso (min) de la curva compacta `shiftStats[].duelo.cv`: ~32 puntos por turno de 8 h. */
+const DUELO_CV_PASO_MIN = 15
+
+/**
+ * Curva acumulada compacta de un turno cerrado, para que el Duelo corra un turno PASADO contra el del otro horario
+ * de su jornada (`rivalCurve` solo existe para el turno vigente). Mismo origen que `curvaDesdeArranque` (el arranque
+ * productivo). Formato: `cv` = piezas acumuladas a los minutos `paso, 2·paso, …`; el ÚLTIMO valor es el cierre del
+ * turno y cae en el minuto `cvm` (casi nunca múltiplo del paso). `cvp` = paso. Sin curva: `cv: []` (nunca null ni
+ * undefined: Firestore) — y un arreglo siempre presente es lo que marca el turno como ya rearmado en el caché.
+ */
+function curvaCompacta(live, paso = DUELO_CV_PASO_MIN) {
+  const vacia = { cv: [], cvp: paso }
+  const serie = (live?.series || []).filter(p => p && p.t)
+  const i0 = indiceArranqueProductivo(serie)
+  if (i0 < 0) return vacia
+  let ult = serie.length - 1
+  while (ult > i0 && !((serie[ult].pieces || 0) > 0)) ult--
+  const t0 = Date.parse(serie[i0].t)
+  if (Number.isNaN(t0)) return vacia
+  const pts = []
+  let acum = 0
+  for (let i = i0; i <= ult; i++) {
+    acum += serie[i].pieces || 0
+    pts.push({ m: Math.round((Date.parse(serie[i].t) - t0) / 60_000) + INTERVAL_MIN, p: acum })
+  }
+  const fin = pts[pts.length - 1]
+  if (!fin || !(fin.m > 0)) return vacia
+  const n = Math.ceil(fin.m / paso)
+  const cv = []
+  let j = 0
+  for (let k = 1; k < n; k++) {
+    while (j + 1 < pts.length && pts[j + 1].m <= k * paso) j++
+    cv.push(pts[j].m <= k * paso ? pts[j].p : 0)
+  }
+  cv.push(fin.p)
+  return { cv, cvp: paso, cvm: fin.m }
+}
+
+async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], history = [], forecast = [], index = null, descartados = null, seriesMin = []) {
   const nowWall = shoplogixPolling.toChileWall(new Date())
   const desde = shiftDateKey(nowWall, -SHIFT_INDEX_LOOKBACK_DAYS)
 
@@ -2318,22 +2689,44 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
 
   const previos = new Map((prev || []).map(h => [h.shiftDocId, h]))
   // Lives que este mismo refresco ya construyó: se aprovechan gratis.
+  // Solo los que ya traen `tramos` por causa (lives anteriores al 27-10-2026 no
+  // los tienen y se reconstruyen para poder armar `paradas`).
   const yaConstruidos = new Map([
-    ...(history || []).filter(h => h.live?.timeBreakdown?.tbv === TBV).map(h => [h.shiftDocId, h.live]),
+    ...(history || [])
+      .filter(h => h.live?.timeBreakdown?.tbv === TBV && (h.live.timeBreakdown.recoverable || []).every(c => Array.isArray(c.tramos))
+        /* Los lives anteriores al micro por hora no lo traen: reusarlos sellaría `micH: []` para siempre. */
+        && (h.live.mantencion == null || Array.isArray(h.live.mantencion.microH)))
+      .map(h => [h.shiftDocId, h.live]),
   ])
   const conCurva = new Set((forecast || []).map(f => f.shiftDocId))
+  /* Series minuto a minuto archivadas (≤ 6 turnos): de ahí salen los minutos a ≥ 90 % de `duelo.v90`. */
+  const serieDe = new Map((seriesMin || []).filter(e => e && e.shiftDocId).map(e => [e.shiftDocId, e]))
+
+  /* Sin índice (llamadores esporádicos) no hay huella: se conserva el caché de siempre. */
+  const desdeGracia = shiftDateKey(nowWall, -STATS_GRACIA_DIAS)
+  const huellaDe = (id) => (index ? huellaTurno(index.byId.get(id)?.data) : null)
 
   const out = []
   let nuevos = 0
+  let rearmadosGracia = 0
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i]
     const cacheado = previos.get(id)
+    const hu = huellaDe(id)
+    /* Una entrada sin `hu` (anterior a este cambio, o armada con un live del historial) cuenta como cambio: se rearma una vez. */
+    const cambioEnGracia = i > 0 && !!cacheado && hu != null && id.slice(0, 10) >= desdeGracia && cacheado.hu !== hu
+    if (cambioEnGracia && rearmadosGracia >= STATS_GRACIA_POR_CORRIDA) { out.push(cacheado); continue }
     // i === 0 es el turno anterior: el re-sync móvil todavía puede moverlo.
     // `porMaquina` entra con el mismo criterio que `expected` en el pronóstico:
     // sin forzar el rearmado, las entradas viejas nunca lo tendrían y el delta
     // por máquina tardaría 45 días en poblarse solo. Se compara contra
     // `undefined` a propósito — un turno sin máquinas guarda `[]` y NO se rearma.
-    if (cacheado && i > 0 && cacheado.tbv === TBV && cacheado.porMaquina !== undefined) {
+    if (cacheado && i > 0 && !cambioEnGracia && cacheado.tbv === TBV && cacheado.porMaquina !== undefined && cacheado.paradas !== undefined && cacheado.duelo !== undefined && Array.isArray(cacheado.duelo.ev) && Array.isArray(cacheado.duelo.cv)
+      /* 5b (28-10-2026): micro por hora/máquina y minutos de línea por causa. Un turno sin ellos se rearma de a
+         STATS_NUEVOS_POR_CORRIDA; y uno que ahora SÍ tiene su serie minuto a minuto archivada y aún no trae `v90m`, una vez. */
+      && Array.isArray(cacheado.duelo.micH) && Array.isArray(cacheado.duelo.micM)
+      && (cacheado.recoverable || []).every(c => c.lineMin !== undefined)
+      && (Array.isArray(cacheado.duelo.v90m) || !serieDe.has(id))) {
       out.push(cacheado); continue
     }
     /*
@@ -2346,14 +2739,16 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
      * se vuelve a mirar (salvo en i === 0, que aún puede moverse).
      */
     if (descartados && i > 0 && !cacheado && descartados.has(id)) continue
-    const live = yaConstruidos.get(id)
-    if (!live && nuevos >= STATS_NUEVOS_POR_CORRIDA) {
+    /* Si cambió en gracia, el live del historial puede ser el viejo: se lee de nuevo desde `shoplogix/`. */
+    const live = cambioEnGracia ? null : yaConstruidos.get(id)
+    if (!live && !cambioEnGracia && nuevos >= STATS_NUEVOS_POR_CORRIDA) {
       if (cacheado) out.push(cacheado)
       continue
     }
     try {
       const l = live || await buildMonitorLive(db, plantSlug, id, index)
-      if (!live) nuevos++
+      if (cambioEnGracia) rearmadosGracia++
+      else if (!live) nuevos++
       const tb = l?.timeBreakdown
       if (!tb || !(tb.windowMin > 0)) {
         if (cacheado) out.push(cacheado)
@@ -2389,6 +2784,10 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
            Solo reason/min/count — ni paradas sueltas ni comentarios. */
         recoverable: (tb.recoverable || []).map(c => ({
           reason: c.reason, min: c.min, count: c.count ?? 0,
+          /* Minutos de LÍNEA y equivalentes (peso 1/N por máquina) de la causa, los mismos que muestra «El turno»:
+             el «Por qué» del Duelo usa `equivMin ?? lineMin ?? min` y cuadra con él. Solo si el desglose los trae. */
+          ...(Number.isFinite(c.lineMin) ? { lineMin: c.lineMin } : {}),
+          ...(Number.isFinite(c.equivMin) ? { equivMin: c.equivMin } : {}),
         })),
         /*
          * Piezas de CADA máquina en ese turno (pedido de Orel, 31-08: «que cada
@@ -2406,6 +2805,20 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
          */
         porMaquina: (l.machines || []).map(m => ({ n: m.name, p: m.pieces ?? 0 })),
         /*
+         * Cada parada recuperable del turno, ubicada en el reloj (detalle por
+         * semana de «De quién fue la pérdida», 27-10-2026). Son los tramos de
+         * LÍNEA que cuenta `recoverable[].count`: `c` = índice en `recoverable`,
+         * `t` = inicio HH:MM:SS hora de planta, `s` = segundos, `m` = índices en
+         * `porMaquina` (mismo orden que `machines`). Existe desde los turnos
+         * reconstruidos a partir del 27-10-2026; antes, la PWA dice «sin dato».
+         * Tope de PARADAS_MAX por turno (las más largas) para no engordar el doc:
+         * ~50 paradas × 40 turnos × ~35 B ≈ 70 KB.
+         */
+        paradas: paradasCompactas(tb.recoverable || []),
+        /* Duelo de equipos (27-10-2026): arranque, última hora, micro detenciones
+           y llenado por puesto de este turno. Ver `resumenDuelo`. */
+        duelo: resumenDuelo(l, serieDe.get(id)),
+        /*
          * ⚠⚠ NUNCA `undefined` en un doc de Firestore: lo rechaza y el write
          * del patch falla ENTERO — no solo este campo. Pasó el 16-08: cada
          * refresco de CADA monitor murió con «Cannot use undefined as a
@@ -2415,6 +2828,8 @@ async function buildShiftStats(db, plantSlug, currentShiftDocId, prev = [], hist
          * escribiendo. El campo solo existe cuando es true.
          */
         ...(conCurva.has(id) ? { tieneCurva: true } : {}),
+        /* Huella del turno con que se armó; solo si el live se leyó recién (uno del historial puede venir de antes). */
+        ...(!live && hu != null ? { hu } : {}),
         tbv: tb.tbv ?? null,
       })
     } catch {
@@ -2489,6 +2904,87 @@ async function buildForecastHistory(db, plantSlug, currentShiftDocId, shiftId, p
     }
   }
   return out
+}
+
+/** Un punto cada 5 min: la curva del rival del Duelo (≈100 puntos por turno). */
+const RIVAL_STEP_MIN = 5
+
+/**
+ * Curva acumulada del turno, medida desde el arranque productivo (mismo origen
+ * que `cumulativeFromStart` de la PWA), submuestreada a `RIVAL_STEP_MIN`. Objetos
+ * {m, p} y no pares: Firestore rechaza los arrays anidados. Sin la cola vacía
+ * que el backend agrega para ver el último paro.
+ */
+function curvaDesdeArranque(live) {
+  const serie = (live?.series || []).filter(p => p && p.t)
+  const i0 = indiceArranqueProductivo(serie)
+  if (i0 < 0) return null
+  let ult = serie.length - 1
+  while (ult > i0 && !((serie[ult].pieces || 0) > 0)) ult--
+  const t0 = Date.parse(serie[i0].t)
+  if (Number.isNaN(t0)) return null
+  const curve = []
+  let acum = 0
+  let proximo = 0
+  for (let i = i0; i <= ult; i++) {
+    acum += serie[i].pieces || 0
+    const m = Math.round((Date.parse(serie[i].t) - t0) / 60_000) + INTERVAL_MIN
+    if (m >= proximo || i === ult) {
+      curve.push({ m, p: acum })
+      proximo = m + RIVAL_STEP_MIN
+    }
+  }
+  return curve.length >= 3 ? curve : null
+}
+
+/**
+ * La curva del último turno CERRADO del OTRO nombre (día ↔ noche), para el
+ * duelo directo de hoy. Un turno cerrado no cambia, así que se reusa lo ya
+ * publicado y solo se recompone si es el turno inmediatamente anterior (el
+ * re-sync móvil todavía puede moverlo) o si cambió el rival. Devuelve null si no
+ * hay un rival presentable: con `merge`, un campo que no se manda se queda.
+ */
+async function buildRivalCurve(db, plantSlug, currentShiftDocId, shiftId, prev = null, history = [], index = null, descartados = null) {
+  if (!shiftId || !currentShiftDocId) return null
+  const nowWall = shoplogixPolling.toChileWall(new Date())
+  const desde = shiftDateKey(nowWall, -7)
+  const idsCrudos = index
+    ? index.entries.map(e => e.id)
+    : (await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()).map(r => r.id)
+  const todos = idsCrudos
+    .filter(id => id !== currentShiftDocId && id.slice(11) !== 'Unscheduled' && id.slice(0, 10) >= desde && id.slice(0, 10) <= currentShiftDocId.slice(0, 10))
+    .sort()
+    .reverse()
+  const masReciente = todos[0]
+  const candidatos = todos.filter(id => id.slice(11) !== shiftId).slice(0, 3)
+  const yaConstruidos = new Map((history || [])
+    .filter(h => h.live?.timeBreakdown?.tbv === TBV)
+    .map(h => [h.shiftDocId, h.live]))
+  for (const id of candidatos) {
+    if (prev && prev.shiftDocId === id && id !== masReciente && Array.isArray(prev.curve)) return prev
+    if (descartados && id !== masReciente && descartados.has(id)) continue
+    try {
+      const live = yaConstruidos.get(id) || await buildMonitorLive(db, plantSlug, id, index)
+      const curve = live && curvaDesdeArranque(live)
+      const total = live?.totalPieces ?? 0
+      if (!curve || total < FORECAST_MIN_PIECES) { descartados?.add(id); continue }
+      const tb = live.timeBreakdown || {}
+      const h0 = Date.parse(live.scheduledStart ?? '')
+      return {
+        shiftDocId: id,
+        dateKey: id.slice(0, 10),
+        shiftId: id.slice(11),
+        ...(Number.isFinite(h0) ? { h0: new Date(h0).toISOString().slice(11, 16) } : {}),
+        curve,
+        total,
+        producingMin: tb.producingMin ?? 0,
+        ...(tb.windowMin != null ? { windowMin: tb.windowMin } : {}),
+      }
+    } catch {
+      /* este candidato no se pudo armar: se prueba el siguiente */
+    }
+  }
+  return null
 }
 
 /** Máximo de series archivadas (≈5-10 KB cada una): las mismas ~6 del historial. */
@@ -2582,7 +3078,93 @@ function ordenarSensorComoActual(shiftDocId, live, history) {
   }
 }
 
-async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map(), shiftIndexByPlant = new Map()) {
+/** Cada cuánto se vuelven a buscar las líneas hermanas: cambian cuando alguien genera o vence un link, no cada refresco. */
+const HERMANAS_TTL_MS = 60 * 60 * 1000
+
+/**
+ * Los otros monitores de LÍNEA vigentes de la misma planta (`chonchi-eviscerado` y `chonchi-filete`), para el
+ * selector «Eviscerado | Filete» del Duelo, que tiene que funcionar sin sesión. Una sola consulta por rango sobre
+ * `plantLineId` (solo lee los de esa planta); de cada línea se queda con el link que vence más tarde. Devuelve
+ * `[{ nombre, token }]` ordenado por nombre, o null si el monitor no trae `plantLineId` con prefijo de planta.
+ */
+async function lineasHermanasDe(db, monitor, nowMs = Date.now()) {
+  const id = String(monitor?.plantLineId || '')
+  const corte = id.indexOf('-')
+  if (corte <= 0) return null
+  const planta = id.slice(0, corte)
+  const snap = await db.collection(COLLECTION)
+    .where('plantLineId', '>=', `${planta}-`)
+    .where('plantLineId', '<', `${planta}.`)
+    .get()
+  const ahora = new Date(nowMs).toISOString()
+  const porLinea = new Map()
+  for (const d of snap.docs) {
+    const x = d.data() || {}
+    if (x.mode !== 'line' || !x.plantLineId || x.plantLineId === id || d.id === monitor.token) continue
+    if (String(x.expiresAt || '') <= ahora) continue
+    const previo = porLinea.get(x.plantLineId)
+    if (!previo || String(x.expiresAt) > String(previo.expiresAt)) {
+      porLinea.set(x.plantLineId, { token: d.id, nombre: x.areaLabel || x.plantLineId, expiresAt: x.expiresAt })
+    }
+  }
+  return [...porLinea.values()]
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    .map(({ nombre, token }) => ({ nombre, token }))
+}
+
+/** El trozo del parche con las líneas hermanas; vacío si aún están al día o no se pudieron buscar. */
+async function patchHermanas(db, monitor, nowMs = Date.now()) {
+  if (!monitor?.plantLineId) return {}
+  const at = Date.parse(monitor.lineasHermanasAt || '')
+  if (Array.isArray(monitor.lineasHermanas) && Number.isFinite(at) && nowMs - at < HERMANAS_TTL_MS) return {}
+  try {
+    const lineas = await lineasHermanasDe(db, monitor, nowMs)
+    return lineas ? { lineasHermanas: lineas, lineasHermanasAt: new Date(nowMs).toISOString() } : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Falla repetida para el Monitor (28-10-2026): la serie mensual, el ranking de
+ * causas y la serie semanal `semanas` («fallas repetidas de Mantención», 03-11-2026)
+ * que el cron `recalcularFallaRepetida` dejó en
+ * `shoplogixReincidencia/{planta}`, más los avisos de ESTE turno: máquinas que
+ * acaban de soltar un paro de una causa que vuelve en ≤ 8 h de operación al
+ * menos 3 de cada 10 veces. Costo: 1 lectura del resumen + las máquinas del
+ * turno, una vez por planta y evento. Nunca tumba el refresco: ante cualquier
+ * error devuelve null y el Monitor no muestra la tarjeta.
+ */
+async function buildFallaRepetida(db, plantSlug, shiftDocId, cache = new Map()) {
+  const k = `${plantSlug}|${shiftDocId}`
+  if (cache.has(k)) return cache.get(k)
+  let out = null
+  try {
+    const fallaRepetida = require('./shoplogix/fallaRepetida')
+    const resumen = await db.doc(`shoplogixReincidencia/${plantSlug}`).get()
+    if (resumen.exists) {
+      const r = resumen.data() || {}
+      const causas = Array.isArray(r.causas) ? r.causas : []
+      const ms = await db.collection(`shoplogix/${plantSlug}/shifts/${shiftDocId}/machines`).get()
+      const maquinas = ms.docs.map(m => ({ id: m.id, name: String(m.data()?.machineName || m.id), states: m.data()?.states || [] }))
+      const nowWallMs = shoplogixPolling.toChileWall(new Date()).getTime()
+      out = {
+        meses: Array.isArray(r.meses) ? r.meses : [],
+        semanas: Array.isArray(r.semanas) ? r.semanas : [],
+        causas: causas.slice(0, 10),
+        avisos: fallaRepetida.avisosFallaRepetida(maquinas, causas, nowWallMs),
+        desde: r.desde || null,
+        calculadoEl: r.calculadoEl?.toDate ? r.calculadoEl.toDate().toISOString() : (r.calculadoEl || null),
+      }
+    }
+  } catch (e) {
+    out = null
+  }
+  cache.set(k, out)
+  return out
+}
+
+async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map(), shiftIndexByPlant = new Map(), fallaByPlant = new Map()) {
   const plantSlug = monitor.plantSlug
   if (!plantSlug) return null
 
@@ -2630,6 +3212,13 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
       ),
       statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
       forecastDescartados: podado(forecastSkip, 30),
+      /* Duelo de equipos: el último turno cerrado del OTRO nombre. */
+      rivalCurve: await buildRivalCurve(
+        db, plantSlug, monitor.shiftDocId, String(monitor.shiftDocId).slice(11), monitor.rivalCurve, history, index, forecastSkip,
+      ),
+      ...(await patchHermanas(db, monitor)),
+      /* Falla repetida: serie mensual, ranking y avisos al soltar un paro. */
+      fallaRepetida: await buildFallaRepetida(db, plantSlug, monitor.shiftDocId, fallaByPlant),
     }
   }
 
@@ -2687,9 +3276,17 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     forecastHistory: fhLinea,
     /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
        un turno contra el otro. Ver `buildShiftStats`. */
-    shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea, index, statsSkip),
+    shiftStats: await buildShiftStats(db, plantSlug, shiftDocId, monitor.shiftStats, history, fhLinea, index, statsSkip, seriesMinuto || monitor.seriesMinuto || []),
     statsDescartados: podado(statsSkip, SHIFT_INDEX_LOOKBACK_DAYS),
     forecastDescartados: podado(forecastSkip, 30),
+    /* Duelo de equipos: el último turno cerrado del OTRO nombre. */
+    rivalCurve: await buildRivalCurve(
+      db, plantSlug, shiftDocId, shiftDocId.slice(11), monitor.rivalCurve, history, index, forecastSkip,
+    ),
+    /* Selector de línea del Duelo (sin sesión): los otros monitores vigentes de la planta. */
+    ...(await patchHermanas(db, monitor)),
+    /* Falla repetida: serie mensual, ranking y avisos al soltar un paro. */
+    fallaRepetida: await buildFallaRepetida(db, plantSlug, publicado.shiftDocId, fallaByPlant),
     shiftDocId: publicado.shiftDocId,
     dateKey: publicado.shiftDocId.slice(0, 10),
     shiftId: publicado.shiftDocId.slice(11),
@@ -2874,6 +3471,9 @@ function huellaEstable(v) {
 }
 
 module.exports = {
+  buildFallaRepetida,
+  normPerilla,
+  leerPerillas,
   COLLECTION,
   esTurnoSellado,
   CLOSE_MARGIN_MS,
@@ -2881,6 +3481,16 @@ module.exports = {
   buildMonitorHistory,
   buildForecastHistory,
   buildShiftStats,
+  huellaTurno,
+  STATS_GRACIA_DIAS,
+  STATS_GRACIA_POR_CORRIDA,
+  buildRivalCurve,
+  resumenDuelo,
+  minutosA90,
+  curvaCompacta,
+  eventosDelDuelo,
+  lineasHermanasDe,
+  patchHermanas,
   inferShiftEndFromDuration,
   buildMonitorPatch,
   archivarSerieMinuto,
@@ -2895,6 +3505,8 @@ module.exports = {
   loadShiftIndex,
   parentSinCambioReal,
   // exportados para tests
+  esParoPlanificado,
+  CAUSAS_PLANIFICADAS,
   cierreOficialCoherente,
   bloquesDelSensor,
   ordenarSensorComoActual,

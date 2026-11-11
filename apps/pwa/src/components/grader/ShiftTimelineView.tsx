@@ -1270,7 +1270,7 @@ export function ShiftTimelineView({
                 else { byReason.set(b.reason, { count: 1, totalMin: b.durationMin, color: b.color }) }
               }
               const sorted = [...byReason.entries()].sort(([, a], [, b]) => b.totalMin - a.totalMin)
-              lines.push('<span style="color:#94a3b8">Upstream parado:</span>')
+              lines.push('<span style="color:#94a3b8">Upstream detenido:</span>')
               for (const [reason, info] of sorted.slice(0, 4)) {
                 const machinesLabel = info.count === 1 ? '1 Baader' : `${info.count} Baaders`
                 lines.push(`&nbsp;&nbsp;<span style="color:${info.color}">▮</span> <b>${reason}</b> · ${machinesLabel}`)
@@ -1494,9 +1494,9 @@ export function ShiftTimelineView({
               title={
                 coverage.unclassifiedMin > 0
                   ? canAnnotate
-                    ? `Cobertura ${coverage.pct}%: porcentaje del tiempo de paro que tiene una causa asignada (tag). Faltan ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales — click para ir al primer paro sin tag.`
-                    : `Cobertura ${coverage.pct}%: porcentaje del tiempo de paro con causa asignada. ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales.`
-                  : `Cobertura ${coverage.pct}%: todos los ${coverage.totalMin} min de paros del turno tienen causa asignada (tag) — análisis completo.`
+                    ? `Cobertura ${coverage.pct}%: porcentaje del tiempo de detención que tiene una causa asignada (tag). Faltan ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales — click para ir a la primera detención sin tag.`
+                    : `Cobertura ${coverage.pct}%: porcentaje del tiempo de detención con causa asignada. ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales.`
+                  : `Cobertura ${coverage.pct}%: todos los ${coverage.totalMin} min de detenciones del turno tienen causa asignada (tag) — análisis completo.`
               }
               onClick={canAnnotate && coverage.unclassifiedMin > 0 ? handleCoverageBadgeClick : undefined}
             >

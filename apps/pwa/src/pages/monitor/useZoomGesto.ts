@@ -38,17 +38,22 @@ export interface Ventana {
   hastaMin: number
 }
 
+/** Tope de zoom por defecto: el de los gráficos que ya usan el hook. */
 const ZOOM_MAX = 12
 /** Por debajo de esto se considera "sin zoom": evita rebotes por redondeo. */
 const SIN_ZOOM = 1.02
 
-export function useZoomGesto({ dominioMin, ventana, onVentana }: {
+export function useZoomGesto({ dominioMin, ventana, onVentana, zoomMax = ZOOM_MAX, onRuedaSinModificador }: {
   /** Minutos de turno que abarca el gráfico COMPLETO. */
   dominioMin: number
   /** La ventana compartida. null = todo el turno. */
   ventana?: Ventana | null
   /** Se llama cuando el usuario cambia el zoom o panea. */
   onVentana?: (v: Ventana | null) => void
+  /** Cuántas veces se puede acercar (12 por defecto). Un gráfico que ofrece «15 min» sobre un turno de 450 pide ≥ 30. */
+  zoomMax?: number
+  /** La rueda SIN Ctrl ni ⌘ giró sobre el gráfico. No se secuestra (la página sigue desplazándose): sirve para mostrar la pista «Ctrl + rueda…». */
+  onRuedaSinModificador?: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
@@ -62,6 +67,10 @@ export function useZoomGesto({ dominioMin, ventana, onVentana }: {
   dominioRef.current = dominioMin
   const onVentanaRef = useRef(onVentana)
   onVentanaRef.current = onVentana
+  const zoomMaxRef = useRef(zoomMax)
+  zoomMaxRef.current = zoomMax
+  const ruedaSinModRef = useRef(onRuedaSinModificador)
+  ruedaSinModRef.current = onRuedaSinModificador
 
   /** La ventana que este gráfico está mostrando ahora mismo. */
   const ventanaActual = useCallback((): Ventana | null => {
@@ -85,7 +94,7 @@ export function useZoomGesto({ dominioMin, ventana, onVentana }: {
 
   /** Aplica un zoom nuevo dejando quieto el punto que se está mirando. */
   const zoomA = useCallback((nuevo: number, clientX?: number) => {
-    const z = Math.min(ZOOM_MAX, Math.max(1, nuevo))
+    const z = Math.min(zoomMaxRef.current, Math.max(1, nuevo))
     const el = scrollRef.current
     if (el && el.scrollWidth > 0) {
       const r = el.getBoundingClientRect()
@@ -138,7 +147,7 @@ export function useZoomGesto({ dominioMin, ventana, onVentana }: {
     const hasta = Math.min(dominioMin, Math.max(ventana.hastaMin, desde + 1))
     const ancho = hasta - desde
     if (ancho <= 0) return
-    const z = Math.min(ZOOM_MAX, Math.max(1, dominioMin / ancho))
+    const z = Math.min(zoomMaxRef.current, Math.max(1, dominioMin / ancho))
     aplicandoRef.current = true
     anclaRef.current = null
     setZoom(z)
@@ -163,7 +172,7 @@ export function useZoomGesto({ dominioMin, ventana, onVentana }: {
       // Sin modificador la rueda sigue desplazando la página: secuestrar el
       // scroll de un bloque chico hace que la pantalla se sienta rota. El
       // pellizco del trackpad llega justamente como ctrl+wheel.
-      if (!ev.ctrlKey && !ev.metaKey) return
+      if (!ev.ctrlKey && !ev.metaKey) { ruedaSinModRef.current?.(); return }
       ev.preventDefault()
       zoomA(zoomRef.current * (ev.deltaY < 0 ? 1.25 : 0.8), ev.clientX)
     }

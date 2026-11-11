@@ -26,6 +26,14 @@ import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { ParoEtapa } from '@/types'
 import { dec } from '@/utils/formatoNumeros'
+import { usePielApple } from '@/hooks/usePielApple'
+import { Skeleton, SkeletonBloque } from '@/components/piel'
+import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
+
+/** Porcentaje de la piel Apple: «61 %», con espacio duro. «sin datos» si no hay cifra. */
+const ESPACIO_DURO = String.fromCharCode(160)
+const pctAp = (v: number | null, d = 0): string =>
+  v === null || !Number.isFinite(v) ? 'sin datos' : `${dec(v * 100, d)}${ESPACIO_DURO}%`
 
 interface LineOeeCardProps {
   plantLineId: string
@@ -89,6 +97,102 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
   )
 
   const busy = loading || loadingParos
+  const apple = usePielApple()
+
+  if (apple) {
+    return (
+      <section className={cn('space-y-3', className)} aria-labelledby="oee-area-titulo">
+        <div className="flex items-center gap-2">
+          <h2 id="oee-area-titulo" className="text-headline">OEE del área (estimado)</h2>
+          <InfoTooltip
+            text={'Aproxima el OEE de TODA el área, no solo la máquina instrumentada.\n\nA_área = uptime de la máquina / (tiempo rastreado por el sensor + detenciones de etapa registradas)\nR_área ≈ R de la máquina (proxy del cuello de botella)\nQ_área = calidad del Grader donde existe; donde no hay Grader el OEE se muestra como A×R y se rotula.\n\nUna detención de etapa solo SUMA tiempo si no detuvo a la máquina: si la detuvo, ya está en el downtime del sensor y se anota como causa de esa detención. Así el mismo minuto no se castiga dos veces.'}
+            iconSize={11}
+            position="top"
+          />
+        </div>
+
+        {busy && (
+          <SkeletonBloque label="Cargando OEE del área" className="space-y-3">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </SkeletonBloque>
+        )}
+
+        {!busy && !calc && (
+          <p className="text-subhead text-muted-foreground">Sin datos del mes para estimar el OEE del área.</p>
+        )}
+
+        {/* Igual que la máquina: una línea. No hay nada que comparar. */}
+        {!busy && calc && calc.etapaMin <= 0 && (
+          <p className="text-subhead tabular-nums">
+            {`OEE del área igual al de la máquina (${pctAp(calc.oeeMachine)}): sin detenciones de etapa registradas.`}
+          </p>
+        )}
+
+        {!busy && calc && calc.etapaMin > 0 && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-headline tabular-nums">{pctAp(calc.oeeMachine)}</p>
+                <p className="text-footnote text-muted-foreground">
+                  {machineLabel ? `OEE de la máquina, ${machineLabel}` : 'OEE de la máquina'}
+                </p>
+              </div>
+              <div>
+                <p className="text-headline tabular-nums">{pctAp(calc.oeeArea)}</p>
+                <p className="text-footnote text-muted-foreground">
+                  {calc.sinCalidad ? 'OEE del área, disponibilidad por rendimiento' : 'OEE del área'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-subhead text-muted-foreground tabular-nums">
+              {`Área = la máquina penalizada por ${fmtDurationSec(calc.etapaMin * 60)} de detenciones de etapa este mes (disponibilidad ${pctAp(calc.availabilityMachine)} a ${pctAp(calc.availabilityArea)}, sobre una base de ${fmtDurationSec(calc.baseMin * 60)}).`}
+            </p>
+
+            {calc.perdidas.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-headline">Dónde pierde tiempo el área</h3>
+                <p className="text-footnote text-muted-foreground">
+                  {`Este mes, ${fmtDurationSec(calc.perdidasTotal * 60)} en total.`}
+                </p>
+                {/* Tres columnas: tabla bordered simple, sin desplegar. */}
+                <div className="overflow-hidden rounded-ctl border border-border">
+                  <table className="w-full border-collapse text-subhead tabular-nums">
+                    <caption className="sr-only">Dónde pierde tiempo el área este mes</caption>
+                    <thead className="bg-muted/50 text-footnote text-muted-foreground">
+                      <tr>
+                        <th scope="col" className="border-b border-border px-2.5 py-2 text-left font-normal">Pérdida</th>
+                        <th scope="col" className="border-b border-border px-2.5 py-2 text-left font-normal">Origen</th>
+                        <th scope="col" className="border-b border-border px-2.5 py-2 text-right font-normal">Tiempo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calc.perdidas.map((p) => (
+                        <tr key={p.label} className="border-b border-border last:border-b-0">
+                          <td className="px-2.5 py-2.5 align-middle">{p.label}</td>
+                          <td className="px-2.5 py-2.5 align-middle text-muted-foreground">
+                            {p.fuente === 'maquina' ? 'Máquina' : 'Etapa sin sensor'}
+                          </td>
+                          <td className="px-2.5 py-2.5 align-middle text-right">{fmtDurationSec(p.min * 60)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* La nota larga, una sola vez, en 13 px. */}
+            <p className="text-footnote text-muted-foreground">
+              {`Estimado. El rendimiento es el de la máquina instrumentada${calc.sinCalidad ? ' y el área no tiene medición de calidad' : ' y la calidad viene del Grader'}; las demás etapas entran a la disponibilidad vía sus detenciones registradas. Mejora al instrumentar o registrar más.`}
+            </p>
+          </>
+        )}
+      </section>
+    )
+  }
 
   return (
     <Card className={cn('border-primary/[0.25]', className)}>
@@ -97,7 +201,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
           <GitMerge className="h-4 w-4 text-ink-info" />
           OEE del área (estimado)
           <InfoTooltip
-            text={'Aproxima el OEE de TODA el área, no solo la máquina instrumentada.\n\nA_área = uptime de la máquina / (tiempo rastreado por el sensor + paros de etapa registrados)\nR_área ≈ R de la máquina (proxy del cuello de botella)\nQ_área = calidad del Grader donde existe; donde no hay Grader el OEE se muestra como A×R y se rotula.\n\nUn paro de etapa solo SUMA tiempo si no detuvo a la máquina: si la detuvo, ya está en el downtime del sensor y se anota como causa de ese paro. Así el mismo minuto no se castiga dos veces.\n\nESTIMADO: mejora a medida que registras paros de etapa.'}
+            text={'Aproxima el OEE de TODA el área, no solo la máquina instrumentada.\n\nA_área = uptime de la máquina / (tiempo rastreado por el sensor + detenciones de etapa registradas)\nR_área ≈ R de la máquina (proxy del cuello de botella)\nQ_área = calidad del Grader donde existe; donde no hay Grader el OEE se muestra como A×R y se rotula.\n\nUna detención de etapa solo SUMA tiempo si no detuvo a la máquina: si la detuvo, ya está en el downtime del sensor y se anota como causa de esa detención. Así el mismo minuto no se castiga dos veces.\n\nESTIMADO: mejora a medida que registras detenciones de etapa.'}
             iconSize={11}
             position="top"
           />
@@ -140,8 +244,8 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             {/* Explicación del ajuste */}
             <p className="text-caption text-muted-foreground leading-relaxed">
               {calc.etapaMin > 0
-                ? <>Área = la máquina penalizada por <b className="text-ink-crit">{fmtDur(calc.etapaMin)}</b> de paros de etapa este mes (disponibilidad {pct(calc.availabilityMachine)} → {pct(calc.availabilityArea)}, sobre una base de {fmtDur(calc.baseMin)}). El rendimiento sigue siendo el de la máquina instrumentada.</>
-                : <>Todavía no registraste paros de etapa → el OEE del área es el de la máquina. Registra abajo los paros de las etapas sin sensor (la GEA, cintas) y este número se separa.</>}
+                ? <>Área = la máquina penalizada por <b className="text-ink-crit">{fmtDur(calc.etapaMin)}</b> de detenciones de etapa este mes (disponibilidad {pct(calc.availabilityMachine)} → {pct(calc.availabilityArea)}, sobre una base de {fmtDur(calc.baseMin)}). El rendimiento sigue siendo el de la máquina instrumentada.</>
+                : <>Sin detenciones de etapa: igual al OEE de la máquina.{' '}<InfoTooltip text={"Todavía no registraste detenciones de etapa → el OEE del área es el de la máquina. Registra abajo las detenciones de las etapas sin sensor (la GEA, cintas) y este número se separa."} iconSize={11} /></>}
             </p>
 
             {/* Pareto unificado de pérdidas de la línea */}
@@ -161,8 +265,8 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
                           <span
                             className="text-caption px-1 rounded-ctl bg-muted-foreground/12 text-muted-foreground shrink-0"
                             title={p.fuente === 'maquina'
-                              ? 'Paro de la máquina instrumentada (lo midió el sensor)'
-                              : 'Paro de una etapa sin sensor (registrado a mano)'}
+                              ? 'Detención de la máquina instrumentada (la midió el sensor)'
+                              : 'Detención de una etapa sin sensor (registrada a mano)'}
                           >
                             {p.fuente === 'maquina' ? 'máquina' : 'etapa'}
                           </span>
@@ -181,7 +285,7 @@ export function LineOeeCard({ plantLineId, plantSlug, graderSummaries, currentMo
             <div className="flex items-start gap-1.5 text-caption text-muted-foreground">
               <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
               <span>
-                Estimado. El rendimiento es el de la máquina instrumentada{calc.sinCalidad ? ' y el área no tiene medición de calidad' : ' y la calidad viene del Grader'}; las demás etapas entran a la disponibilidad vía sus paros registrados. Mejora al instrumentar o registrar más.
+                Estimado. El rendimiento es el de la máquina instrumentada{calc.sinCalidad ? ' y el área no tiene medición de calidad' : ' y la calidad viene del Grader'}; las demás etapas entran a la disponibilidad vía sus detenciones registradas. Mejora al instrumentar o registrar más.
               </span>
             </div>
           </>

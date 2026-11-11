@@ -223,12 +223,12 @@ export function SensorStopsCausePanel({
           equipmentId: `area:${plantLineId}`,
           fecha: stop.startAt,
           tipo: 'correctivo',
-          hallazgo: `Paro de ${Math.round(stop.durationMin)} min en ${shortMachineName(stop.machineName)} (${fmtHora(stop.startAt)}): ${causa}`,
+          hallazgo: `Detención de ${Math.round(stop.durationMin)} min en ${shortMachineName(stop.machineName)} (${fmtHora(stop.startAt)}): ${causa}`,
           severidad: stop.durationMin >= 15 ? 'rojo' : 'amarillo',
           tecnico: user?.nombre ?? user?.email ?? undefined,
           plantLineId,
           shiftId,
-          origen: 'paro_sensor',
+          origen: 'paro_sensor', // vocab-ok: valor persistido en Firestore
         })
       }
       setOpenKey(null)
@@ -265,9 +265,9 @@ export function SensorStopsCausePanel({
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-sm flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-ink-warn" />
-            Causa de los paros
+            Causa de las detenciones
             <InfoTooltip
-              text={`El sensor mide cuánto y cuándo paró la máquina, pero no por qué. Cada causa anotada acá convierte minutos perdidos en un pareto por responsable — y las de Mantención quedan además en el historial del equipo.\n\nParos de menos de ${MIN_STOP_MIN} min no se listan (son micro-detenciones: se analizan como conjunto, no una por una).`}
+              text={`El sensor mide cuánto y cuándo se detuvo la máquina, pero no por qué. Cada causa anotada acá convierte minutos perdidos en un pareto por responsable — y las de Mantención quedan además en el historial del equipo.\n\nLas detenciones de menos de ${MIN_STOP_MIN} min no se listan (son microdetenciones: se analizan como conjunto, no una por una).`}
               iconSize={11} position="top"
             />
           </CardTitle>
@@ -414,10 +414,10 @@ export function SensorStopsCausePanel({
             className="text-caption text-muted-foreground hover:text-foreground underline decoration-dotted pt-0.5"
           >
             {verTodos
-              ? (sinCausa.length > 0 ? 'Ver solo los paros sin causa' : `Ver solo los ${TOP_WHEN_ALL_EXPLAINED} paros más largos`)
+              ? (sinCausa.length > 0 ? 'Ver solo las detenciones sin causa' : `Ver solo las ${TOP_WHEN_ALL_EXPLAINED} detenciones más largas`)
               : sinCausa.length > 0
-                ? `Ver también los ${conCausa.length} paros que el sensor ya clasificó`
-                : `Ver los ${stops.length - visibles.length} paros más cortos`}
+                ? `Ver también las ${conCausa.length} detenciones que el sensor ya clasificó`
+                : `Ver las ${stops.length - visibles.length} detenciones más cortas`}
           </button>
         )}
       </CardContent>

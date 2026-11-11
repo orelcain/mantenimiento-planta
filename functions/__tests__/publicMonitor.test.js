@@ -793,6 +793,12 @@ test('el historial reusa lo ya publicado salvo el turno inmediatamente anterior'
   ]
   const histViejo = await buildMonitorHistory(db, 'filete', actual, prevViejo)
   assert.equal(histViejo[1].live.totalPieces, 1000, 'sin la rejilla vigente no se reusa')
+
+  // 29-10 (#1359): un live con `mantencion` medida con la clasificación vieja (sin `clasif`) se rearma; si no, «Anterior»
+  // seguía contando FALLA OPERACIONAL como falla de Mantención. Con la vigente se reusa.
+  const conMant = (clasif) => [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', live: { totalPieces: 888888, timeBreakdown: { tbv: 3 }, mantencion: { porMaquina: [], ...(clasif ? { clasif } : {}) } } }]
+  assert.equal((await buildMonitorHistory(db, 'filete', actual, conMant(null)))[1].live.totalPieces, 1000, 'clasificación vieja: se rearma')
+  assert.equal((await buildMonitorHistory(db, 'filete', actual, conMant(2)))[1].live.totalPieces, 888888, 'clasificación vigente: se reusa')
 })
 
 test('Unscheduled NUNCA gana como turno vigente, ni con mucha producción', async () => {
@@ -1356,4 +1362,280 @@ test('una Baader parada con las otras dos andando: 11 min de máquina, 3,7 equiv
   assert.equal(pc.lineMin, 0, 'la línea entera nunca paró')
   const re = tb.planned.find(c => c.reason === 'REUNION INICIO TURNO')
   assert.equal(re.min, 9, 'la reunión completa 09:15→09:24, no recortada en la primera pieza (09:20)')
+})
+
+
+test('shiftStats.paradas: los MISMOS tramos que cuenta `count`, ubicados en el reloj', async () => {
+  /*
+   * Detalle por semana de «De quién fue la pérdida» (27-10-2026): al tocar una
+   * causa se listan las paradas en que ocurrió. Si `count` dice 2, la lista trae
+   * 2 — salen de la misma rejilla. Dos estados solapados de la misma causa son
+   * UNA parada, no dos.
+   */
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const hDe = (d, h, m = 0) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h, m))
+  const t0 = hDe(d1, 8).getTime()
+  const parada = (h, m, sec, reason) => ({ startAt: hDe(d1, h, m).toISOString(), durationSec: sec, type: 'downtime', name: 'Detencion', reason })
+  const maq = maquinaStats(2000, t0)
+  maq.states = [
+    parada(9, 0, 300, 'CUCHILLERIA'),
+    parada(9, 2, 240, 'CUCHILLERIA'), // solapada: misma parada
+    parada(10, 20, 120, 'CUCHILLERIA'),
+    parada(10, 0, 180, 'ACUMULACION'),
+  ]
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]:   { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+  }, { [ayer]: [maq] })
+
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  const t = out.find(o => o.shiftDocId === ayer)
+  assert.ok(t, 'el turno tiene que estar')
+  const ci = t.recoverable.findIndex(c => c.reason === 'CUCHILLERIA')
+  assert.ok(ci >= 0)
+  const propias = t.paradas.filter(p => p.c === ci)
+  assert.equal(propias.length, t.recoverable[ci].count, '«N veces» y la lista cuadran')
+  assert.equal(propias.length, 2)
+  assert.equal(propias[0].t, '09:00:00')
+  assert.equal(propias[0].s, 360, '09:00 → 09:06: la solapada alarga, no suma otra')
+  assert.deepEqual(propias[0].m, [0])
+  // En orden de reloj, mezclando causas.
+  assert.deepEqual(t.paradas.map(p => p.t), ['09:00:00', '10:00:00', '10:20:00'])
+})
+
+test('shiftStats rearma un turno cacheado que todavía no trae `paradas`', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const anteayer = `${d2}_Turno Dia`
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  const db = fakeShiftsDb({
+    [actual]:   { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]:     { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [anteayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 1000 }] },
+  }, { [anteayer]: [maquinaStats(1000, hDe(d2, 8).getTime())] })
+  const prev = [{ shiftDocId: anteayer, dateKey: d2, shiftId: 'Turno Dia', total: 777777, windowMin: 480, tbv: 3, porMaquina: [] }]
+  const out = await buildShiftStats(db, 'filete', actual, prev, [], [])
+  const viejo = out.find(o => o.shiftDocId === anteayer)
+  assert.ok(Array.isArray(viejo?.paradas), 'se rearma para sumar las paradas')
+  assert.notEqual(viejo.total, 777777)
+})
+
+/* ── 5b (28-10-2026): lo que el Duelo en PC necesita de shiftStats ─────────── */
+
+test('shiftStats.duelo: micro por hora y por máquina con la MISMA regla que `mic` (cuadran)', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const hDe = (d, h, m = 0) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h, m))
+  const t0 = hDe(d1, 8).getTime()
+  const micro = (h, m, s) => ({ startAt: hDe(d1, h, m).toISOString(), endAt: new Date(hDe(d1, h, m).getTime() + s * 1000).toISOString(), durationSec: s, type: 'downtime', name: 'Micro Detencion' })
+  const a = { ...maquinaStats(2000, t0), machineid: 'm-a', machineName: 'Ev 1' }
+  const b = { ...maquinaStats(1000, t0), machineid: 'm-b', machineName: 'Ev 2' }
+  a.states = [micro(8, 10, 90), micro(8, 59, 120)] // la 2.ª cruza el límite entre la 1.ª y la 2.ª hora de producción
+  b.states = [micro(8, 59, 120), micro(9, 30, 66)]
+  const db = fakeShiftsDb({
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 11), machines: [{ totalCycles: 3000 }] },
+  }, { [ayer]: [a, b] })
+  const out = await buildShiftStats(db, 'eviscerado', actual, [], [], [])
+  const d = out.find(o => o.shiftDocId === ayer)?.duelo
+  assert.ok(d, 'el turno tiene que estar')
+  assert.deepEqual(d.micM, [3.5, 3.1], 'por máquina: lo mismo que suma `mic`')
+  assert.equal(d.mic, 6.6)
+  const suma = Math.round(d.micH.reduce((x, y) => x + y, 0) * 10) / 10
+  assert.ok(Math.abs(suma - d.mic) <= 0.15, `micH (${suma}) cuadra con mic (${d.mic})`)
+  assert.equal(d.micH[0], 3.5, 'hora 1: 90 s + 60 s de la que cruza en una máquina + 60 s de la que cruza en la otra')
+  assert.equal(d.micH[1], 3.1, 'hora 2: el resto de las dos que cruzan (60 s + 60 s) y la de 09:30 (66 s)')
+  assert.ok(d.micH.length >= 3, 'una entrada por hora de producción del turno (aunque no tenga micro)')
+})
+
+test('shiftStats.recoverable trae lineMin y equivMin, y un turno cacheado sin ellos se rearma', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const anteayer = `${d2}_Turno Dia`
+  const hDe = (d, h, m = 0) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h, m))
+  const maq = (d) => {
+    const m = maquinaStats(2000, hDe(d, 8).getTime())
+    m.states = [{ startAt: hDe(d, 9).toISOString(), durationSec: 600, type: 'downtime', name: 'Detencion', reason: 'CUCHILLERIA' }]
+    return m
+  }
+  const parents = {
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [anteayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 2000 }] },
+  }
+  const db = fakeShiftsDb(parents, { [ayer]: [maq(d1)], [anteayer]: [maq(d2)] })
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [])
+  const t = out.find(o => o.shiftDocId === ayer)
+  const c = t.recoverable.find(x => x.reason === 'CUCHILLERIA')
+  assert.equal(c.lineMin, 10, 'con una sola máquina, toda su parada es parada de línea')
+  assert.equal(c.equivMin, 10)
+  // Reconstruido una vez, el caché lo reusa; sin `lineMin` o sin `micH` se rearma.
+  const reusado = await buildShiftStats(db, 'filete', actual, out, [], [])
+  assert.deepEqual(reusado.find(o => o.shiftDocId === anteayer), out.find(o => o.shiftDocId === anteayer), 'completo: se reusa tal cual')
+  const viejo = out.map(o => o.shiftDocId === anteayer
+    ? { ...o, total: 777777, recoverable: o.recoverable.map(({ lineMin: _l, equivMin: _e, ...r }) => r) }
+    : o)
+  const rearmado = await buildShiftStats(db, 'filete', actual, viejo, [], [])
+  const r = rearmado.find(o => o.shiftDocId === anteayer)
+  assert.notEqual(r.total, 777777, 'sin lineMin se rearma')
+  assert.equal(r.recoverable.find(x => x.reason === 'CUCHILLERIA').lineMin, 10)
+  const sinMicro = out.map(o => o.shiftDocId === anteayer ? { ...o, total: 777777, duelo: { ...o.duelo, micH: undefined } } : o)
+  const rearmado2 = await buildShiftStats(db, 'filete', actual, sinMicro, [], [])
+  assert.notEqual(rearmado2.find(o => o.shiftDocId === anteayer).total, 777777, 'sin micH se rearma')
+})
+
+test('shiftStats.duelo: v90 sale de la serie minuto a minuto archivada y un turno cacheado sin v90m se rearma una vez', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const d2 = dk(new Date(w.getTime() - 2 * 86_400_000))
+  const actual = `${dk(w)}_Turno Dia`
+  const ayer = `${d1}_Turno Dia`
+  const anteayer = `${d2}_Turno Dia`
+  const hDe = (d, h, m = 0) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h, m))
+  const parents = {
+    [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] },
+    [ayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d1, 8), scheduledEnd: hDe(d1, 16), machines: [{ totalCycles: 2000 }] },
+    [anteayer]: { shiftId: 'Turno Dia', scheduledStart: hDe(d2, 8), scheduledEnd: hDe(d2, 16), machines: [{ totalCycles: 2000 }] },
+  }
+  const mk = (d) => ({ ...maquinaStats(2000, hDe(d, 8).getTime()), machineid: 'm-a', machineName: 'Ev 1' })
+  const db = fakeShiftsDb(parents, { [ayer]: [mk(d1)], [anteayer]: [mk(d2)] })
+  // Esperado 20: el umbral es 0,9 × 20 = 18. Minutos: 20, 18, 17, 0, 25 → 3 a ritmo.
+  const serie = (id) => ({ shiftDocId: id, desde: hDe(id.slice(0, 10), 8).toISOString(), maquinas: [{ id: 'm-a', esperado: 20, cycles: [20, 18, 17, 0, 25] }] })
+  const out = await buildShiftStats(db, 'filete', actual, [], [], [], null, null, [serie(ayer)])
+  const d = out.find(o => o.shiftDocId === ayer).duelo
+  assert.equal(d.v90, 3)
+  assert.deepEqual(d.v90m, [3])
+  assert.equal(out.find(o => o.shiftDocId === anteayer).duelo.v90, undefined, 'sin serie archivada no hay dato (y no se inventa)')
+  // Sin esperado en alguna máquina no se puede afirmar «a ritmo»: ni v90 ni v90m, pero queda la marca de mirado.
+  const sinEsperado = { shiftDocId: ayer, desde: serie(ayer).desde, maquinas: [{ id: 'm-a', esperado: null, cycles: [20, 18] }] }
+  const o2 = await buildShiftStats(db, 'filete', actual, [], [], [], null, null, [sinEsperado])
+  assert.deepEqual(o2.find(o => o.shiftDocId === ayer).duelo.v90m, [])
+  assert.equal(o2.find(o => o.shiftDocId === ayer).duelo.v90, undefined)
+  // Un turno ya cacheado sin v90m, cuya serie ahora sí está archivada, se rearma; sin serie se reusa.
+  const cache = out.map(o => o.shiftDocId === anteayer ? { ...o, total: 777777 } : o)
+  const sinSerie = await buildShiftStats(db, 'filete', actual, cache, [], [], null, null, [serie(ayer)])
+  assert.equal(sinSerie.find(o => o.shiftDocId === anteayer).total, 777777, 'sin serie archivada el caché manda')
+  const conSerie = await buildShiftStats(db, 'filete', actual, cache, [], [], null, null, [serie(ayer), serie(anteayer)])
+  assert.notEqual(conSerie.find(o => o.shiftDocId === anteayer).total, 777777)
+  assert.equal(conSerie.find(o => o.shiftDocId === anteayer).duelo.v90, 3)
+})
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Gracia de imputaciones tardías (fase 3 de PLAN_CIERRE_DUELO, 29-10-2026):
+ * las causas se imputan después del turno y el re-sync las trae hasta J+3.
+ * Una entrada de esos días se rearma cuando cambia la huella de su turno.
+ * ────────────────────────────────────────────────────────────────────────── */
+const { huellaTurno, STATS_GRACIA_DIAS, STATS_GRACIA_POR_CORRIDA } = require('../publicMonitor')
+
+test('huellaTurno cambia con una causa imputada y no con el orden ni con lastSyncAt', () => {
+  const agg = (reason) => [{ type: 'downtime', name: 'Detencion', reason, durationSec: 600, count: 1 }]
+  const p = (reason, extra = {}) => ({ ...extra, machines: [
+    { machineid: 'a', totalCycles: 10, stateAggregates: agg(reason) },
+    { machineid: 'b', totalCycles: 20, stateAggregates: [] },
+  ] })
+  const sinImputar = huellaTurno(p(''))
+  assert.ok(sinImputar)
+  assert.notEqual(huellaTurno(p('ACUMULACION RECHAZO')), sinImputar, 'imputar la causa cambia la huella')
+  assert.equal(huellaTurno(p('', { lastSyncAt: new Date() })), sinImputar, 'el re-sync horario solo mueve lastSyncAt')
+  const alReves = { machines: [...p('').machines].reverse() }
+  assert.equal(huellaTurno(alReves), sinImputar, 'el orden de las máquinas no importa')
+  assert.equal(huellaTurno({ machines: [{ totalCycles: 5 }] }), null, 'sin agregados no hay huella')
+  assert.equal(huellaTurno(undefined), null)
+})
+
+const { describe } = require('node:test')
+
+describe('shiftStats: gracia de imputaciones tardías', () => {
+  const DIA = 86_400_000
+  const hDe = (d, h) => new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)), h))
+  /** Escenario: hoy + turnos de hace 1..n días; `reason` = la causa que Shoplogix tiene HOY en cada uno. */
+  const escenario = (dias, reason = 'ACUMULACION RECHAZO', nombres = ['Turno Dia']) => {
+    const w = nowWall()
+    const actual = `${dk(w)}_Turno Dia`
+    const parents = { [actual]: { shiftId: 'Turno Dia', scheduledStart: hoy(8), scheduledEnd: hoy(16), machines: [{ totalCycles: 3000 }] } }
+    const machines = {}
+    const ids = []
+    for (const n of dias) for (const nombre of nombres) {
+      const d = dk(new Date(w.getTime() - n * DIA))
+      const id = `${d}_${nombre}`
+      const h0 = nombre === 'Turno Noche' ? 13 : 4
+      ids.push(id)
+      const m = maquinaStats(2000, hDe(d, h0).getTime())
+      m.states = [{ startAt: hDe(d, h0 + 1).toISOString(), durationSec: 600, type: 'downtime', name: 'Detencion', reason }]
+      machines[id] = [m]
+      parents[id] = { shiftId: nombre, scheduledStart: hDe(d, h0), scheduledEnd: hDe(d, h0 + 8),
+        machines: [{ machineid: 'b200', totalCycles: 2000, stateAggregates: [{ type: 'downtime', name: 'Detencion', reason, durationSec: 600, count: 1 }] }] }
+    }
+    const entries = Object.entries(parents).map(([id, data]) => ({ id, data }))
+    const index = { plantSlug: 'filete', desde: '2000-01-01', entries, byId: new Map(entries.map(e => [e.id, e])) }
+    return { db: fakeShiftsDb(parents, machines), actual, ids, index }
+  }
+  /** Lo publicado antes de imputar: armado con la causa vacía y marcado con un total imposible. */
+  const publicadoAntes = async (dias) => {
+    const e = escenario(dias, '')
+    const out = await buildShiftStats(e.db, 'filete', e.actual, [], [], [], e.index)
+    return out.map(o => ({ ...o, total: 777777 }))
+  }
+
+  test('una entrada en gracia se rearma cuando Shoplogix imputa la causa, y queda con la causa nueva', async () => {
+    const prev = await publicadoAntes([1, 2])
+    const e = escenario([1, 2])
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    const t = out.find(o => o.shiftDocId === e.ids[1])
+    assert.notEqual(t.total, 777777, 'cambió la huella: se rearma')
+    assert.ok(t.recoverable.some(c => c.reason === 'ACUMULACION RECHAZO'), 'con la causa imputada')
+    assert.equal(t.hu, huellaTurno(e.index.byId.get(e.ids[1]).data))
+    // Rearmada, la siguiente corrida la reusa tal cual.
+    const otra = await buildShiftStats(e.db, 'filete', e.actual, out.map(o => ({ ...o, total: 888888 })), [], [], e.index)
+    assert.equal(otra.find(o => o.shiftDocId === e.ids[1]).total, 888888, 'sin cambio: se reusa')
+  })
+
+  test('fuera de la gracia lo publicado queda fijo aunque Shoplogix cambie', async () => {
+    const lejos = STATS_GRACIA_DIAS + 2
+    const prev = await publicadoAntes([1, lejos])
+    const e = escenario([1, lejos])
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    assert.equal(out.find(o => o.shiftDocId === e.ids[1]).total, 777777)
+  })
+
+  test('sin índice no hay huella: el caché se reusa como antes', async () => {
+    const prev = await publicadoAntes([1, 2])
+    const e = escenario([1, 2])
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [])
+    assert.equal(out.find(o => o.shiftDocId === e.ids[1]).total, 777777)
+  })
+
+  test('tope por corrida: con más cambios que el tope, el resto espera a la próxima', async () => {
+    // Día y noche de ayer y anteayer: i = 0 siempre se rearma; los otros tres cambian y el tope deja pasar 2.
+    const nombres = ['Turno Dia', 'Turno Noche']
+    const prev = (await buildShiftStats(escenario([1, 2], '', nombres).db, 'filete', escenario([1, 2], '', nombres).actual, [], [], [], escenario([1, 2], '', nombres).index))
+      .map(o => ({ ...o, total: 777777 }))
+    const e = escenario([1, 2], 'ACUMULACION RECHAZO', nombres)
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    assert.equal(out.length, 4, 'los cuatro turnos siguen en el arreglo')
+    const rearmados = out.filter((o, i) => i > 0 && o.total !== 777777).length
+    assert.equal(rearmados, STATS_GRACIA_POR_CORRIDA)
+    const despues = await buildShiftStats(e.db, 'filete', e.actual, out, [], [], e.index)
+    assert.equal(despues.filter(o => o.total === 777777).length, 0, 'la corrida siguiente rearma el que faltaba')
+  })
+
+  test('una entrada en gracia sin huella guardada se rearma una vez', async () => {
+    const prev = (await publicadoAntes([1, 2])).map(({ hu: _h, ...o }) => o)
+    const e = escenario([1, 2], '')
+    const out = await buildShiftStats(e.db, 'filete', e.actual, prev, [], [], e.index)
+    const t = out.find(o => o.shiftDocId === e.ids[1])
+    assert.notEqual(t.total, 777777)
+    assert.ok(t.hu)
+  })
 })

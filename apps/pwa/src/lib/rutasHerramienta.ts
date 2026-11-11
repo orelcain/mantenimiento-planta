@@ -26,7 +26,7 @@ export function modoHerramienta(pathname: string): ModoHerramienta {
   const r = p.slice('/aprendizaje/'.length)
 
   if (r === 'hmi-knuro' || r.startsWith('hmi-knuro/')) return 'lienzo'
-  if (r === 'hmi-grader' || r === 'hmi-bombeo-s2' || r === 'perilla-5') return 'lienzo'
+  if (r === 'hmi-grader' || r === 'hmi-gea' || r === 'hmi-bombeo-s2' || r === 'perilla-5') return 'lienzo'
   if (r === 'baader-142/tarjeta-a3c') return 'lienzo'
   // Plano abierto (hoja): lienzo. El catálogo /aprendizaje/planos es una lista: lectura.
   if (r.startsWith('planos/')) return 'lienzo'

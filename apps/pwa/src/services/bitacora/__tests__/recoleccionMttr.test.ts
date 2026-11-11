@@ -87,10 +87,10 @@ describe('planilla «Recoleccion MTTR» llenada desde la bitácora', () => {
     expect(htmlRecoleccionMttr(filasRecoleccion(turno, [ev({ descripcion: 'Presión <2 bar>' })]))).toContain('Presión &lt;2 bar&gt;')
   })
 
-  it('va arriba del correo del turno y del texto plano; sin eventos no aparece', () => {
+  it('va al final del correo del turno (después del encabezado); el texto plano no cambia; sin eventos no aparece', () => {
     const datos = { turno, eventos: [ev({})], tecnicos: ['Jose Chodil'], planta: 'Planta Chonchi' }
     const html = bitacoraAHtmlCorreo(datos)
-    expect(html.indexOf('MTBF - MTTR')).toBeLessThan(html.indexOf('Bitácora de Mantención'))
+    expect(html.indexOf('MTBF - MTTR')).toBeGreaterThan(html.indexOf('Bitácora de Mantención'))
     expect(bitacoraATextoPlano(datos).startsWith('Fecha\tMáquina\tFalla\tDuración Falla (Min)\tObservaciones\n17-sept-2026 jue\tDESPLAZADOR AUTOMATICO 1\t')).toBe(true)
     expect(bitacoraAHtmlCorreo({ ...datos, eventos: [] })).not.toContain('MTBF - MTTR')
   })

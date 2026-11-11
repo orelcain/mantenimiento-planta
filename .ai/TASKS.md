@@ -9,6 +9,11 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [ ] **Visor de imágenes: zoom fluido en el celular** — EN REVISIÓN — claude (rama `fix/visor-zoom-movil`).
   Reporte de Danilo: al hacer zoom/paneo en el teléfono la imagen parpadea y «se fuerza hacia
   diferentes lados». Gestos reescritos en `ImageLightbox` + matemática probada en `lib/zoomVisor`.
+- [ ] **Falla repetida (reincidencia de paros de Mantención)** — HECHO (PR #1355 y #1356 mergeados 29-10) — claude.
+  Estudio y plan: OneDrive `ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_PREDICTIVA_MICRODETENCIONES.md`.
+  PR 1: helper + card 1A en Análisis de Turno (lee el turno y los 3 anteriores). PR 2: Cloud Function que
+  precalcula por mes y por paro → serie en Período (2A) y aviso al cerrar paro en el Monitor (3A).
+
 - [ ] **Bitácora de turno de Mantención (`/bitacora`)** — EN PROD, esperando uso real — claude (PR #1021-#1046; ver WORKLOG 2026-09-15).
   Eventos del turno con fotos antes/después, parada (MTTR) o ventana sin detener, pendientes que pasan
   solos al turno siguiente, técnicos del calendario, buscador de equipos; copiar al correo (Outlook
@@ -86,3 +91,5 @@ No tomes una tarea que ya está EN CURSO por otro.
 ## Hecho (reciente)
 
 - [x] Normalización repuestos Fases 0–6 (maestro SAP) + rework UI incrementos 1–7. (claude, 2026-06-12 — ver WORKLOG)
+
+- [ ] **Jack-Knife ronda 3, etapas 1 y 2** — HECHO — codex (pendiente revisión visual de Orel). Rama feat/jack-knife-pagina; sin commit ni push por instrucción explícita.

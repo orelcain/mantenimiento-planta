@@ -114,6 +114,8 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Termoformadora GEA PowerPak PLUS: empaque al vacío de productos finales.',
     icon: Package,
     color: '#5f8f88',
+    hmiRoute: '/aprendizaje/hmi-gea',
+    hmiLabel: 'HMI GEA PowerPak',
     sections: { manual: false, procedures: false, flows: false, diagnosis: false },
   },
   {

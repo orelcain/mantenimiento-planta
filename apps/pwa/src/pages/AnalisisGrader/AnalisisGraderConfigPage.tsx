@@ -40,13 +40,13 @@ const MODAL_SECTIONS: { id: SettingsTab; label: string; desc: string; Icon: type
   {
     id: 'tags',
     label: 'Tags de pausa',
-    desc: 'Etiquetas con las que se clasifican los paros.',
+    desc: 'Etiquetas con las que se clasifican las detenciones.',
     Icon: Tag,
   },
   {
     id: 'detector',
     label: 'Detector de pausas',
-    desc: 'Sensibilidad con la que se detecta un paro.',
+    desc: 'Sensibilidad con la que se detecta una detención.',
     Icon: Timer,
   },
 ]

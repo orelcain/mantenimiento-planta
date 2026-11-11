@@ -13,8 +13,15 @@ service firebase.storage {
     function tieneSesionAnime() {
       return request.auth != null && request.auth.token.get('anime_tg', null) != null;
     }
+    // Pase de lectura de los nuevos (claim pase_lectura, 04-11-2026): no es una
+    // sesión de la app y nunca escribe. Solo LEE las fotos de Repuestos (abajo).
+    // Sin cross-service, como el de bitácora: al cambiar el link su token deja
+    // de servir en Firestore al instante y aquí en menos de una hora.
+    function tienePaseLectura() {
+      return request.auth != null && request.auth.token.get('pase_lectura', false) == true;
+    }
     function sesionApp() {
-      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime();
+      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime() && !tienePaseLectura();
     }
     // Rol del usuario (cross-service: lee el doc de Firestore del caller).
     // Solo se usa donde el path es explícitamente admin-only (ver /maps/).
@@ -117,6 +124,21 @@ service firebase.storage {
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
       allow delete: if sesionApp();
+    }
+
+    // Documentos de equipos subidos desde Panel de administración → «Subir archivos de equipos»
+    // (manuales, catálogos y planos de la GEA y otros; cualquier formato), hasta 100 MB por
+    // archivo (101 MB de margen). Lectura: la regla general de sesión de la app.
+    // ⚠ NO usar isAdmin() aquí: en producción deniega siempre (ver /models3d más abajo). El
+    // 16-10-2026 un admin recibió 403 al subir. La restricción a admin la dan la ruta
+    // (AdminRoute + clave) y la regla de `manuales` en Firestore (crear exige supervisor);
+    // si el registro falla, la página borra el archivo subido.
+    match /documentosEquipos/{equipoId}/{fileName} {
+      allow write: if sesionApp()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.resource.size < 101 * 1024 * 1024;
+      allow delete: if sesionApp()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
     // Manuales PDF de máquinas (max 50MB)

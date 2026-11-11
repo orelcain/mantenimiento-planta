@@ -93,7 +93,7 @@ describe('turno real 3-ago: la Baader 2 no arrancó', () => {
   it('las máquinas van ordenadas por producción, con la parada marcada', () => {
     expect(r.machines.map(m => m.name)).toEqual(['Baader 1', 'Baader 3', 'Baader 2'])
     expect(r.machines.find(m => m.name === 'Baader 2')!.stopped).toBe(true)
-    expect(r.machines.find(m => m.name === 'Baader 2')!.flag).toBe('parada')
+    expect(r.machines.find(m => m.name === 'Baader 2')!.flag).toBe('detenida')
   })
 
   it('declara que no hay Excel del Grader en vez de imprimir ceros', () => {

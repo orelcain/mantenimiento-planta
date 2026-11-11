@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dibujoDe, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, rutaDibujo, type EnDespiece } from '../enlacesPieza'
+import { dibujoDe, esDesdeRepuestos, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, rutaDibujo, VUELTA_RELECTURA_MS, type EnDespiece } from '../enlacesPieza'
 
 // 512247 = Riel de guía de la BAADER 200 (fig. 3-3); el código ficticio 999 va en las dos.
 const FIG: Record<string, EnDespiece[]> = {
@@ -34,13 +34,30 @@ describe('dibujo de una pieza', () => {
 })
 
 describe('volver del dibujo a Áreas', () => {
-  it('repone búsqueda y repuesto una sola vez', () => {
+  it('repone búsqueda y repuesto en una sola vuelta', () => {
     recordarVueltaDelDibujo({ q: 'guia', rowKey: '3300012252' })
-    expect(leerVueltaDelDibujo()).toEqual({ q: 'guia', rowKey: '3300012252' })
-    expect(leerVueltaDelDibujo()).toBeNull()
+    expect(leerVueltaDelDibujo(1000)).toEqual({ q: 'guia', rowKey: '3300012252' })
+    // El hub se monta dos veces al cargar: la segunda lectura, segundos después, también la ve.
+    expect(leerVueltaDelDibujo(1000 + VUELTA_RELECTURA_MS - 1)).toEqual({ q: 'guia', rowKey: '3300012252' })
+    // Pasado el margen ya no: una visita posterior a Áreas empieza limpia.
+    expect(leerVueltaDelDibujo(1000 + VUELTA_RELECTURA_MS + 1)).toBeNull()
+    expect(leerVueltaDelDibujo(1000)).toBeNull()
+  })
+  it('repone también el alcance «todas las áreas»', () => {
+    recordarVueltaDelDibujo({ q: 'clavija', rowKey: null, todas: true, autoTodas: true })
+    expect(leerVueltaDelDibujo(5)).toEqual({ q: 'clavija', rowKey: null, todas: true, autoTodas: true })
   })
   it('un valor roto no revienta', () => {
     sessionStorage.setItem('repuestos:volverDelDibujo', '{no es json')
     expect(leerVueltaDelDibujo()).toBeNull()
+  })
+})
+
+describe('esDesdeRepuestos', () => {
+  it('reconoce solo el estado con que Repuestos abre el dibujo', () => {
+    expect(esDesdeRepuestos({ desdeRepuestos: true, busqueda: 'clavija' })).toBe(true)
+    expect(esDesdeRepuestos(null)).toBe(false)
+    expect(esDesdeRepuestos({ desdeRepuestos: 'si' })).toBe(false)
+    expect(esDesdeRepuestos('repuestos')).toBe(false)
   })
 })

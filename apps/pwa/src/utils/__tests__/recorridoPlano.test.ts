@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PlanoAparicion } from '@/hooks/usePlano'
 import {
+  esCajaRespaldo,
   MAX_RECIENTES, indiceInicial, leerRecientes, marcaEnHoja, ordenarPuntos, paso, sumarReciente,
 } from '../recorridoPlano'
 
@@ -53,5 +54,18 @@ describe('historial', () => {
     for (let i = 0; i < 12; i++) l = sumarReciente(l, { c: String(i) })
     expect(l).toHaveLength(MAX_RECIENTES)
     expect(l[0]!.c).toBe('11')
+  })
+})
+
+describe('esCajaRespaldo', () => {
+  it('reconoce el bloque central que el extractor pone a una posición sin ubicar', () => {
+    expect(esCajaRespaldo([148.8, 210.5, 297.5, 421.0], [595, 842])).toBe(true)
+  })
+  it('una caja real de un número de posición no lo es', () => {
+    expect(esCajaRespaldo([369.6, 393.5, 4.1, 3.1], [595, 842])).toBe(false)
+    expect(esCajaRespaldo([148.8, 210.5, 10, 8], [595, 842])).toBe(false)
+  })
+  it('sin tamaño de hoja no decide', () => {
+    expect(esCajaRespaldo([148.8, 210.5, 297.5, 421.0], [])).toBe(false)
   })
 })

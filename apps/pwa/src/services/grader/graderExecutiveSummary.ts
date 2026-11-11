@@ -61,7 +61,7 @@ export interface ExecutiveMachineRow {
   uptimePct: number | null
   /** Ritmo real vs objetivo del sensor, 0-100. */
   ratePct: number | null
-  /** Etiqueta corta de estado: "parada", "41%", … */
+  /** Etiqueta corta de estado: "detenida", "41%", … */
   flag: string
   stopped: boolean
 }
@@ -156,7 +156,7 @@ function buildMachineRows(machines: readonly UpstreamMachineShift[]): ExecutiveM
         cycles: m.totalCycles,
         uptimePct,
         ratePct,
-        flag: stopped ? 'parada' : ratePct != null ? pct(ratePct) : '—',
+        flag: stopped ? 'detenida' : ratePct != null ? pct(ratePct) : '—',
         stopped,
       }
     })
@@ -243,7 +243,7 @@ function buildVerdict(
     const names = stopped.map(m => m.name).join(' y ')
     const verbo = stopped.length === 1 ? 'no produjo un solo ciclo' : 'no produjeron un solo ciclo'
     return {
-      verdict: `Turno perdido por parada de máquina: ${names} ${verbo}.`,
+      verdict: `Turno perdido por detención de máquina: ${names} ${verbo}.`,
       severity: 'critical',
     }
   }
@@ -261,7 +261,7 @@ function buildVerdict(
   }
   if (driver === 'disponibilidad' && uptimePct != null) {
     return {
-      verdict: `Turno con paros frecuentes: ${pct(uptimePct)} de uptime sobre el tiempo de turno.`,
+      verdict: `Turno con detenciones frecuentes: ${pct(uptimePct)} de uptime sobre el tiempo de turno.`,
       severity: 'warn',
     }
   }
@@ -324,7 +324,7 @@ function buildAsk(
     return 'Revisar alimentación aguas arriba: el tiempo estuvo disponible, las piezas no llegaron al ritmo objetivo.'
   }
   if (driver === 'disponibilidad') {
-    return 'Revisar las causas de paro más repetidas del turno para atacar la disponibilidad, que es donde está la pérdida.'
+    return 'Revisar las causas de detención más repetidas del turno para atacar la disponibilidad, que es donde está la pérdida.'
   }
   return 'Sin acción pendiente de Mantención para este turno.'
 }

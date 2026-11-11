@@ -10,7 +10,7 @@
  * Solo repuestos con código SAP.
  */
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import {
   Package, Search, AlertTriangle, ArrowDownCircle, ArrowUpCircle,
   Settings2, History, X, Check, Pencil, MapPin, TrendingDown,
@@ -20,7 +20,7 @@ import {
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
   Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal, Shapes,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { dibujoDe, maquinaDeDespiece, useFigurasDespiece } from './enlacesPieza'
 import { QRCodeSVG } from 'qrcode.react'
 import { escapeHtml } from '@/lib/escapeHtml'
@@ -35,6 +35,8 @@ import { useBodega } from '@/hooks/repuestos/useBodega'
 import { Tag as CatTag, type TagTone, ListGroup, ListCell, SwipeRow } from '@/components/piel'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
+import { usePielApple } from '@/hooks/usePielApple'
+import { metaFilaBodega } from './metaFilaBodega'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { indicePorSap, nombreVisiblePorSap } from '@/utils/repuestos/nombrePorSap'
 import { cn } from '@/lib/utils'
@@ -50,6 +52,14 @@ import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
 import { StockTablaPC } from './StockTablaPC'
+import { FichaPieza } from './FichaPieza'
+import { PARAM_PIEZA, contenedorConScroll, pedidosAbiertosDe } from './datosFichaPieza'
+import { PedidosPorAtender } from '@/components/repuestos/PedidosPorAtender'
+import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
+import { SolicitarRepuestoModal } from '@/components/repuestos/SolicitarRepuestoModal'
+import { useSolicitudes } from '@/hooks/repuestos/useSolicitudes'
+import { useAccionesSolicitudes } from '@/hooks/repuestos/useAccionesSolicitudes'
+import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 import { useEsPC } from '@/hooks/useEsPC'
 import { useColoresGrafico } from '@/hooks/useColoresGrafico'
 import { Pill, SegmentedControl, Button as PielButton } from '@/components/piel'
@@ -100,9 +110,12 @@ interface BodegaViewProps {
 
 export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps = {}) {
   const user = useAuthStore(s => s.user)
+  // Con la ficha de una pieza abierta (?pieza=), Bodega es esa página: sin sus pestañas ni avisos.
+  const [paramsUrl] = useSearchParams()
+  const fichaAbierta = paramsUrl.has(PARAM_PIEZA) || paramsUrl.has('sap')
   // Al volver del dibujo desde un inventario (teléfono), se reabre Inventarios.
   const [subTab, setSubTab] = useState<BodegaTab>(() => {
-    try { return sessionStorage.getItem(CLAVE_VOLVER_INVENTARIO) ? 'inventarios' : 'stock' } catch { return 'stock' }
+    try { return sessionStorage.getItem(CLAVE_VOLVER_INVENTARIO) && !new URLSearchParams(window.location.search).has(PARAM_PIEZA) ? 'inventarios' : 'stock' } catch { return 'stock' }
   })
 
   // ── Cargar catálogo (mismo patrón que BuscadorGlobal) ──
@@ -195,7 +208,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:p-6 lg:max-w-[1680px]">
       {/* PC: las cuatro vistas a la vista, con cuántos inventarios hay en curso. */}
-      <div className="hidden max-w-2xl lg:block">
+      <div className={cn('hidden max-w-2xl', !fichaAbierta && 'lg:block')}>
         <SegmentedControl<BodegaTab>
           value={subTab} onChange={setSubTab} ariaLabel="Vista de Bodega"
           segments={SUB_TABS.map(t => ({
@@ -209,7 +222,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
           evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos.
           El inventario en curso va en la misma fila, a la derecha: un toque y sin gastar
           una tarjeta de alto encima de la lista. */}
-      <div className="flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden">
+      <div className={cn('flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden', fichaAbierta && 'hidden sm:hidden')}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -252,7 +265,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
       </div>
 
       {/* Desde sm: el aviso completo, como siempre. Solo en el celular (<sm) lo reemplaza el botón del título. */}
-      {subTab === 'stock' && enCurso.map(s => (
+      {subTab === 'stock' && !fichaAbierta && enCurso.map(s => (
         <div key={s.id} className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
           <ClipboardList className="size-5 shrink-0 text-ink-warn" />
           <div className="min-w-0 flex-1">
@@ -301,8 +314,13 @@ function exportCsv(items: BodegaMergedItem[]) {
   URL.revokeObjectURL(url)
 }
 
+// Cuántas filas se dibujan de una vez en el celular. Con las 2.407 eran 108.420 elementos.
+const FILAS_POR_PAGINA = 60
+
 function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
-  const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
+  const { items, allItems, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, calcReorderData, overlayDeSap, registrarSalidaDeSolicitud } = bodega
+  // Pase de lectura: sin escrituras (ajustes, movimientos, fotos, favoritos); se ven la tabla, la ficha y CSV.
+  const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   const [searchQuery, setSearchQuery] = useState('')
   // Código de fabricante → figura del despiece (BAADER 142/200): acceso al dibujo desde la tabla y el drawer.
   const figurasDespiece = useFigurasDespiece()
@@ -312,18 +330,77 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   // 759 a 3.778 ítems (mayoría sin stock). El gestor de bodega quiere ver primero
   // su inventario real (los que tienen registro de bodega); el resto, a un clic.
   const [stockFilter, setStockFilter] = useState<StockFilter>('configurados')
+  const [limite, setLimite] = useState(FILAS_POR_PAGINA)
+  const apple = usePielApple()
+  const sep = apple ? ', ' : ' · '
   const [editingItem, setEditingItem] = useState<BodegaMergedItem | null>(null)
   const [movimientoItem, setMovimientoItem] = useState<BodegaMergedItem | null>(null)
   const [historialItem, setHistorialItem] = useState<BodegaMergedItem | null>(null)
   const [showBulkConfig, setShowBulkConfig] = useState(false)
   const [showCargaRapida, setShowCargaRapida] = useState(false)
   const [showBatchMov, setShowBatchMov] = useState(false)
-  const [drawerItem, setDrawerItem] = useState<BodegaMergedItem | null>(null)
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [alertasAbiertas, setAlertasAbiertas] = useState(false)
 
   const esPC = useEsPC()
+  const { toast } = useToast()
+
+  // ── Ficha de la pieza como página: /repuestos?pieza=<rowKey>. ?sap= es el QR de antes. ──
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const piezaParam = searchParams.get(PARAM_PIEZA) ?? searchParams.get('sap')
+  const pieza = useMemo(
+    () => (piezaParam ? items.find(i => i.rowKey === piezaParam) ?? items.find(i => i.codigoSAP === piezaParam) ?? null : null),
+    [items, piezaParam],
+  )
+  /** Orden de la lista desde la que se abrió (para «Anterior» y «Siguiente»). */
+  const [ordenFicha, setOrdenFicha] = useState<BodegaMergedItem[]>([])
+  const raizRef = useRef<HTMLDivElement>(null)
+  const scrollLista = useRef(0)
+  const conPieza = useCallback((rowKey: string | null) => {
+    const p = new URLSearchParams(searchParams)
+    p.delete('sap')
+    if (rowKey) p.set(PARAM_PIEZA, rowKey); else p.delete(PARAM_PIEZA)
+    return p
+  }, [searchParams])
+  const abrirPieza = useCallback((i: BodegaMergedItem, orden?: BodegaMergedItem[]) => {
+    const sc = contenedorConScroll(raizRef.current)
+    scrollLista.current = sc ? sc.scrollTop : window.scrollY
+    if (orden) setOrdenFicha(orden)
+    setSearchParams(conPieza(i.rowKey), { state: { desdeLista: true } })
+  }, [conPieza, setSearchParams])
+  const abrirPiezaPorSap = useCallback((sap: string) => {
+    const i = items.find(x => x.codigoSAP === sap)
+    if (i) abrirPieza(i)
+  }, [items, abrirPieza])
+  const cambiarPieza = useCallback((i: BodegaMergedItem) => {
+    setSearchParams(conPieza(i.rowKey), { replace: true, state: location.state })
+  }, [conPieza, setSearchParams, location.state])
+  const volverALista = useCallback(() => {
+    if ((location.state as { desdeLista?: boolean } | null)?.desdeLista) navigate(-1)
+    else setSearchParams(conPieza(null), { replace: true })
+  }, [location.state, navigate, setSearchParams, conPieza])
+  // La ficha empieza arriba; al volver, la lista queda donde estaba.
+  const claveFicha = pieza?.rowKey ?? null
+  useLayoutEffect(() => {
+    const y = claveFicha ? 0 : scrollLista.current
+    const sc = contenedorConScroll(raizRef.current)
+    if (sc) sc.scrollTop = y; else window.scrollTo({ top: y })
+  }, [claveFicha])
+
+  // ── Pedidos de repuestos: se atienden desde Bodega (antes solo desde Áreas) ──
+  const { solicitudes, crearSolicitud, avanzarEstado, registrarAltaCreada, rechazarAlta, loading: cargandoSolicitudes } = useSolicitudes({ enabled: !soloLectura })
+  const indiceNombresPorSap = useMemo(() => indicePorSap(allItems), [allItems])
+  const accionesPedidos = useAccionesSolicitudes({ solicitudes, avanzarEstado, registrarAltaCreada, rechazarAlta, registrarSalidaDeSolicitud, indiceNombresPorSap })
+  const stockDe = useCallback((sap: string): StockDeSolicitud => {
+    const o = overlayDeSap(sap)
+    return o ? { configurado: true, stockActual: o.stockActual, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega } : { configurado: false }
+  }, [overlayDeSap])
+  const nombreDe = useCallback((sap: string, texto?: string) => nombreVisiblePorSap(indiceNombresPorSap, sap, texto), [indiceNombresPorSap])
+  const [panelPedidos, setPanelPedidos] = useState(false)
+  const [solicitarItem, setSolicitarItem] = useState<BodegaMergedItem | null>(null)
 
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => { if (prev === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev } setSortDir('asc'); return field })
@@ -366,6 +443,10 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
     return result
   }, [items, stockFilter, searchQuery, sortField, sortDir])
 
+  // Otra búsqueda, filtro u orden: primera página. No depende de `items`, para que un dato
+  // nuevo o un favorito no devuelva al técnico al comienzo de la lista.
+  useEffect(() => { setLimite(FILAS_POR_PAGINA) }, [stockFilter, searchQuery, sortField, sortDir])
+
   // Desglose de las alertas para el encabezado del filtro «Alertas». La alerta solo vigila
   // los ítems con mínimo definido; los en cero sin mínimo se aclaran al pie para que el
   // «Sin stock» de otro chip no parezca contradecirla.
@@ -388,12 +469,14 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[13rem]">
-            <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBatchMov(true)}><Layers className="size-4 text-muted-foreground" />Movimiento en lote</DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowCargaRapida(true)}><MapPin className="size-4 text-muted-foreground" />Carga rápida de stock</DropdownMenuItem>
-            {stats.sinConfig > 0 && (
-              <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBulkConfig(true)}><Settings2 className="size-4 text-muted-foreground" />Configurar múltiples</DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
+            {!soloLectura && (<>
+              <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBatchMov(true)}><Layers className="size-4 text-muted-foreground" />Movimiento en lote</DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowCargaRapida(true)}><MapPin className="size-4 text-muted-foreground" />Carga rápida de stock</DropdownMenuItem>
+              {stats.sinConfig > 0 && (
+                <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBulkConfig(true)}><Settings2 className="size-4 text-muted-foreground" />Configurar múltiples</DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+            </>)}
             <DropdownMenuItem className="gap-2 py-2" onClick={() => exportCsv(filtered)}><Download className="size-4 text-muted-foreground" />Exportar CSV</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -407,19 +490,87 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} dibujo={dibujoDeItem(drawerItem)} />}
+      {!soloLectura && (
+        <SolicitudesPanel
+          open={panelPedidos}
+          onOpenChange={setPanelPedidos}
+          solicitudes={solicitudes}
+          loading={cargandoSolicitudes}
+          onAvanzar={accionesPedidos.avanzar}
+          onRegistrarSap={accionesPedidos.puedeResolverAltas ? accionesPedidos.registrarSap : undefined}
+          onRechazarAlta={accionesPedidos.puedeResolverAltas ? accionesPedidos.rechazar : undefined}
+          buscarSap={accionesPedidos.buscarSap}
+          nombreDe={nombreDe}
+          stockDe={stockDe}
+        />
+      )}
+      {!soloLectura && (
+        <SolicitarRepuestoModal
+          open={!!solicitarItem}
+          onOpenChange={o => { if (!o) setSolicitarItem(null) }}
+          repuesto={solicitarItem ? { codigoSAP: solicitarItem.codigoSAP, textoBreve: solicitarItem.textoBreve, nombresComunes: solicitarItem.nombresComunes, stock: stockDe(solicitarItem.codigoSAP) } : null}
+          onSubmit={async data => {
+            await crearSolicitud(data, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+            setSolicitarItem(null)
+            toast({ title: 'Solicitud enviada', description: `${nombreDe(data.codigoSAP, data.textoBreve).titulo} ×${data.cantidad}. Queda en Pedidos y se avisa al grupo de Mantención en Telegram.`, variant: 'success' })
+          }}
+        />
+      )}
     </>
   )
 
-  // PC (≥1024 px): filtros a la izquierda y tabla a todo el ancho.
+  // La lista queda montada (oculta) mientras se lee la ficha: al volver conserva búsqueda, filtros y orden.
+  const nFicha = pieza ? ordenFicha.findIndex(i => i.rowKey === pieza.rowKey) : -1
+  const anterior = nFicha > 0 ? ordenFicha[nFicha - 1] : undefined
+  const siguiente = nFicha >= 0 && nFicha < ordenFicha.length - 1 ? ordenFicha[nFicha + 1] : undefined
+  const ficha = pieza && (
+        <FichaPieza
+          item={pieza}
+          esPC={esPC}
+          origen="Bodega"
+          onVolver={volverALista}
+          onAnterior={anterior ? () => cambiarPieza(anterior) : undefined}
+          onSiguiente={siguiente ? () => cambiarPieza(siguiente) : undefined}
+          loadMovimientos={loadMovimientos}
+          calcReorderData={calcReorderData}
+          dibujo={dibujoDeItem(pieza)}
+          pedidos={soloLectura ? [] : pedidosAbiertosDe(solicitudes, pieza.codigoSAP)}
+          onAvanzarPedido={soloLectura ? undefined : accionesPedidos.avanzar}
+          onSolicitar={soloLectura ? undefined : () => setSolicitarItem(pieza)}
+          onMovimiento={soloLectura ? undefined : () => setMovimientoItem(pieza)}
+          onEditar={soloLectura ? undefined : () => setEditingItem(pieza)}
+          addPhoto={soloLectura ? undefined : addPhoto}
+          onViewInEquipo={onViewInEquipo}
+          onSearchSimilar={onSearchSimilar}
+        />
+  )
+  const claseLista = pieza ? 'hidden' : 'contents'
+
+  const pedidos = soloLectura ? null : (
+    <PedidosPorAtender
+      solicitudes={solicitudes}
+      esPC={esPC}
+      stockDe={stockDe}
+      nombreDe={nombreDe}
+      onAvanzar={accionesPedidos.avanzar}
+      onVerTodos={() => setPanelPedidos(true)}
+      onAbrirPieza={abrirPiezaPorSap}
+    />
+  )
+
+  // PC (≥1024 px): pedidos arriba y la tabla a todo el ancho.
   if (esPC) {
     return (
-      <>
+      <div ref={raizRef} className="contents">
+        {ficha}
+        <div className={claseLista}>
+        {pedidos}
         <StockTablaPC items={items} acciones={menuAcciones}
-                      onAbrir={setDrawerItem} onMovimiento={setMovimientoItem}
-                      onFavorito={i => toggleWatch(i.rowKey)} dibujoDe={dibujoDeItem} />
+                      onAbrir={abrirPieza} onMovimiento={soloLectura ? undefined : setMovimientoItem}
+                      onFavorito={soloLectura ? undefined : (i => toggleWatch(i.rowKey))} />
+        </div>
         {modales}
-      </>
+      </div>
     )
   }
 
@@ -429,15 +580,18 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const enAlertas = stockFilter === 'alertas'
   const tituloLista = enAlertas
     ? (searchQuery.trim()
-        ? `Alertas · ${filtered.length} de ${stats.alertas.length}`
-        : ['Alertas', desgloseAlertas.sinStock > 0 && `${desgloseAlertas.sinStock} sin stock`, desgloseAlertas.bajoMinimo > 0 && `${desgloseAlertas.bajoMinimo} bajo mínimo`].filter(Boolean).join(' · '))
-    : `Por ${ordenadoPor} · ${filtered.length} de ${items.length}`
+        ? `Alertas${sep}${filtered.length} de ${stats.alertas.length}`
+        : ['Alertas', desgloseAlertas.sinStock > 0 && `${desgloseAlertas.sinStock} sin stock`, desgloseAlertas.bajoMinimo > 0 && `${desgloseAlertas.bajoMinimo} bajo mínimo`].filter(Boolean).join(sep))
+    : `Por ${ordenadoPor}${sep}${filtered.length} de ${items.length}`
   const pieLista = enAlertas && !searchQuery.trim() && desgloseAlertas.enCeroSinMinimo > 0
     ? `${desgloseAlertas.enCeroSinMinimo} más en cero sin mínimo: no alertan porque no tienen mínimo.`
     : undefined
 
   return (
-    <>
+    <div ref={raizRef} className="contents">
+      {ficha}
+      <div className={claseLista}>
+      {pedidos}
       {/* ── Buscar + menú de acciones ── */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
@@ -513,7 +667,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           // La alerta solo vigila los ítems con mínimo definido. Sin esta parte,
           // «21 sin stock» convivía con el chip que dice 545 y nadie entendía la diferencia.
           enCeroSinMinimo > 0 && `+${enCeroSinMinimo} en cero sin mínimo`,
-        ].filter(Boolean).join(' · ')
+        ].filter(Boolean).join(sep)
         return (
           <ListGroup>
             <ListCell
@@ -533,14 +687,14 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
                 variant="child"
                 title={<span className="font-normal">{nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : item.codigoSAP}</span>}
                 detail={nv.oficial}
-                subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(' · ')}
+                subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(sep)}
                 trailing={
                   <span className="flex flex-col items-end">
                     <span className="text-headline tabular-nums text-foreground">{item.stockActual}<span className="ml-1 text-footnote font-normal text-muted-foreground">{item.unidad}</span></span>
                     <span className={cn('text-footnote font-medium', item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn')}>{item.stockActual === 0 ? 'Sin stock' : `Bajo mín · ${item.stockMinimo}`}</span>
                   </span>
                 }
-                onClick={() => setDrawerItem(item)}
+                onClick={() => abrirPieza(item, stats.alertas)}
               />
               )
             })}
@@ -556,6 +710,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
       {filtered.length === 0 ? (
         <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
       ) : (
+        <>
         <ListGroup
           title={tituloLista}
           footer={pieLista}
@@ -577,17 +732,28 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
             </DropdownMenu>
           }
         >
-          {filtered.map(item => (
-            <BodegaRow key={item.codigoSAP} item={item}
-              onEdit={() => setEditingItem(item)} onMovimiento={() => setMovimientoItem(item)}
-              onToggleWatch={() => toggleWatch(item.rowKey)}
-              onOpenDrawer={() => setDrawerItem(item)} />
+          {filtered.slice(0, limite).map(item => (
+            <BodegaRow key={item.codigoSAP} item={item} apple={apple} orden={sortField}
+              onEdit={soloLectura ? undefined : () => setEditingItem(item)} onMovimiento={soloLectura ? undefined : () => setMovimientoItem(item)}
+              onToggleWatch={soloLectura ? undefined : () => toggleWatch(item.rowKey)}
+              onOpenDrawer={() => abrirPieza(item, filtered)} />
           ))}
         </ListGroup>
+        {filtered.length > limite && (
+          <button
+            type="button"
+            onClick={() => setLimite((l) => l + FILAS_POR_PAGINA)}
+            className="mx-auto mt-3 flex min-h-[44px] items-center rounded-full bg-muted px-5 text-subhead font-medium"
+          >
+            Mostrar más ({filtered.length - limite})
+          </button>
+        )}
+        </>
       )}
 
+      </div>
       {modales}
-    </>
+    </div>
   )
 }
 
@@ -600,6 +766,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
   onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void
 }) {
   const { items, crearInventario, loadInventarios, loadConteos, registrarConteo, finalizarInventario } = bodega
+  // Pase de lectura: ve las sesiones y sus conteos, pero no crea, cuenta, finaliza ni ajusta.
+  const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
   // La ficha del repuesto (la MISMA de Bodega → Stock) se abre encima del
   // inventario: al cerrarla se vuelve justo donde se estaba, con los filtros.
   const [fichaItem, setFichaItem] = useState<BodegaMergedItem | null>(null)
@@ -715,14 +883,14 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
     const vivo = (i: BodegaMergedItem) => items.find(x => x.rowKey === i.rowKey) ?? i
     return (
       <>
-        <InventarioMaquinaView sesion={activeSesion} bodega={bodega} user={user}
+        <InventarioMaquinaView sesion={activeSesion} bodega={bodega} user={user} soloLectura={soloLectura}
                                onVolver={() => { setActiveSesion(null); void reload() }}
                                onAbrirFicha={setFichaItem} />
         {fichaItem && (
           <ItemDrawer item={vivo(fichaItem)} loadMovimientos={bodega.loadMovimientos} onClose={() => setFichaItem(null)}
-                      onEdit={() => { setFichaEditar(vivo(fichaItem)); setFichaItem(null) }}
-                      onMovimiento={() => { setFichaMovimiento(vivo(fichaItem)); setFichaItem(null) }}
-                      addPhoto={bodega.addPhoto} removePhoto={bodega.removePhoto} calcReorderData={bodega.calcReorderData}
+                      onEdit={soloLectura ? undefined : () => { setFichaEditar(vivo(fichaItem)); setFichaItem(null) }}
+                      onMovimiento={soloLectura ? undefined : () => { setFichaMovimiento(vivo(fichaItem)); setFichaItem(null) }}
+                      addPhoto={soloLectura ? undefined : bodega.addPhoto} removePhoto={soloLectura ? undefined : bodega.removePhoto} calcReorderData={bodega.calcReorderData}
                       onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />
         )}
         {fichaEditar && (
@@ -754,7 +922,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
               {activeSesion.estado === 'finalizado' && <span className="ml-2 text-ink-ok font-semibold">✓ Finalizado</span>}
             </p>
           </div>
-          {activeSesion.estado === 'en_curso' && (
+          {!soloLectura && activeSesion.estado === 'en_curso' && (
             <button onClick={handleFinalizar}
               className="flex h-11 items-center gap-1.5 rounded-full bg-primary px-5 text-subhead font-medium text-primary-foreground transition-colors hover:brightness-95">
               <CheckCircle2 className="h-4 w-4" /> Finalizar y ajustar
@@ -772,13 +940,14 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           </div>
         </div>
 
-        <ConteoList conteos={conteos} catalogo={bodega.items} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={handleConteo} />
+        <ConteoList conteos={conteos} catalogo={bodega.items} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={soloLectura ? undefined : handleConteo} />
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
+      {!soloLectura && (
       <div className="bg-card border border-border rounded-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Nuevo inventario periódico</h3>
         <div className="flex items-end gap-3">
@@ -802,6 +971,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
           <p className="text-caption text-muted-foreground mt-2">Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP</p>
         )}
       </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
@@ -842,7 +1012,8 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
 
 function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
   conteos: InventarioConteo[]; catalogo: BodegaMergedItem[]; isFinalizado: boolean
-  onConteo: (sap: string, stockFisico: number, obs?: string) => Promise<void>
+  /** Sin handler (pase de lectura) la lista se ve, sin controles de conteo. */
+  onConteo?: (sap: string, stockFisico: number, obs?: string) => Promise<void>
 }) {
   const [tab, setTab] = useState<'pendientes' | 'contados' | 'diferencias'>('pendientes')
   const [editingSAP, setEditingSAP] = useState<string | null>(null)
@@ -869,7 +1040,10 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
     })
   }, [baseList, conteoSearch, indiceNombres])
 
+  const puedeContar = !!onConteo && !isFinalizado
+
   const handleSave = async (sap: string) => {
+    if (!onConteo) return
     await onConteo(sap, editValue, editObs)
     setEditingSAP(null)
     setEditObs('')
@@ -897,7 +1071,7 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
           </button>
         ))}
         <div className="flex-1" />
-        {!isFinalizado && tab === 'pendientes' && (
+        {puedeContar && tab === 'pendientes' && (
           <label className="flex items-center gap-1.5 text-caption text-muted-foreground cursor-pointer">
             <input type="checkbox" checked={quickScan} onChange={e => setQuickScan(e.target.checked)} className="rounded-ctl h-3 w-3" />
             <Zap className="h-3 w-3" /> Escaneo rápido
@@ -942,7 +1116,7 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
                         {c.diferencia > 0 ? '+' : ''}{c.diferencia}
                       </p>
                     </div>
-                    {!isFinalizado && (
+                    {puedeContar && (
                       <button onClick={() => { setEditingSAP(c.codigoSAP); setEditValue(c.stockFisico!); setEditObs(c.observaciones || '') }}
                         className="p-1.5 rounded-ctl hover:bg-muted text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
                     )}
@@ -957,12 +1131,12 @@ function ConteoList({ conteos, catalogo, isFinalizado, onConteo }: {
                       <button onClick={() => handleSave(c.codigoSAP)} className="p-1 rounded-ctl bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" /></button>
                       <button onClick={() => setEditingSAP(null)} className="p-1 rounded-ctl hover:bg-muted text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
                     </div>
-                  ) : (
+                  ) : puedeContar ? (
                     <button onClick={() => { setEditingSAP(c.codigoSAP); setEditValue(c.stockSistema) }}
                       className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-brand-ink bg-primary/10 rounded-card hover:bg-primary/20 transition-colors shrink-0">
                       <CircleDot className="h-3.5 w-3.5" /> Contar
                     </button>
-                  )
+                  ) : null
                 )}
               </div>
               {c.observaciones && c.stockFisico !== null && <p className="text-caption text-muted-foreground mt-1 ml-1">Obs: {c.observaciones}</p>}
@@ -1687,8 +1861,9 @@ function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; 
   )
 }
 
-function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: {
-  item: BodegaMergedItem; onEdit: () => void; onMovimiento: () => void; onToggleWatch: () => void; onOpenDrawer: () => void
+/** Sin `onEdit` / `onMovimiento` / `onToggleWatch` (pase de lectura) la fila no ofrece esa acción. */
+function BodegaRow({ item, apple, orden, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: {
+  item: BodegaMergedItem; apple: boolean; orden: SortField; onEdit?: () => void; onMovimiento?: () => void; onToggleWatch?: () => void; onOpenDrawer: () => void
 }) {
   const has = !!item.bodegaId
   const isBajo = has && item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && item.stockActual > 0
@@ -1709,14 +1884,19 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
     : isSin
       ? { texto: 'Sin stock', cls: 'text-ink-crit' }
       : isBajo
-        ? { texto: `Bajo mín · ${item.stockMinimo}`, cls: 'text-ink-warn' }
+        ? { texto: apple ? `Bajo mín ${item.stockMinimo}` : `Bajo mín · ${item.stockMinimo}`, cls: 'text-ink-warn' }
         : isCeroNeutro
           ? { texto: 'Sin mínimo', cls: 'text-muted-foreground' }
           : item.stockMinimo > 0
             ? { texto: `mín ${item.stockMinimo}`, cls: 'text-muted-foreground' }
             : null
 
-  const meta = [
+  const meta = apple ? metaFilaBodega({
+    codigoSAP: item.codigoSAP,
+    ubicacion: item.ubicacionBodega && (formatNombreSAP(item.ubicacionBodega).nombre || item.ubicacionBodega),
+    equipos: item.equipos.length,
+    valorTotal,
+  }, orden) : [
     item.codigoSAP,
     item.ubicacionBodega && (formatNombreSAP(item.ubicacionBodega).nombre || item.ubicacionBodega),
     item.equipos.length > 0 && `${item.equipos.length} ${item.equipos.length === 1 ? 'equipo' : 'equipos'}`,
@@ -1727,10 +1907,10 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
   return (
     <SwipeRow
       trailing={[
-        { label: has ? 'Editar' : 'Configurar', icon: has ? <Pencil className="size-5" /> : <Settings2 className="size-5" />, tone: 'neutral', onClick: onEdit },
-        { label: 'Movimiento', icon: <ArrowDownCircle className="size-5" />, tone: 'brand', onClick: onMovimiento },
+        ...(onEdit ? [{ label: has ? 'Editar' : 'Configurar', icon: has ? <Pencil className="size-5" /> : <Settings2 className="size-5" />, tone: 'neutral' as const, onClick: onEdit }] : []),
+        ...(onMovimiento ? [{ label: 'Movimiento', icon: <ArrowDownCircle className="size-5" />, tone: 'brand' as const, onClick: onMovimiento }] : []),
       ]}
-      leading={{ label: item.isWatched ? 'Quitar' : 'Favorito', icon: <Star className={cn('size-5', item.isWatched && 'fill-current')} />, onClick: onToggleWatch, active: item.isWatched }}
+      leading={onToggleWatch ? { label: item.isWatched ? 'Quitar' : 'Favorito', icon: <Star className={cn('size-5', item.isWatched && 'fill-current')} />, onClick: onToggleWatch, active: item.isWatched } : undefined}
     >
       <ListCell
         className="bg-card"
@@ -1743,7 +1923,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
           <span className="font-normal">
             {nv.etiquetas.map(e => <CatTag key={e} tone="neutral" className="mr-1.5 align-[2px]">{e}</CatTag>)}
             {item.isWatched && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
-            {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre · SAP {item.codigoSAP}</span>}
+            {nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">{apple ? 'Sin nombre' : `Sin nombre · SAP ${item.codigoSAP}`}</span>}
           </span>
         }
         detail={nv.oficial}
@@ -1768,7 +1948,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: 
 
 function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData, onViewInEquipo, onSearchSimilar, dibujo }: {
   item: BodegaMergedItem; loadMovimientos: (id: string, max?: number) => Promise<MovimientoBodega[]>
-  onClose: () => void; onEdit: () => void; onMovimiento: () => void
+  onClose: () => void; onEdit?: () => void; onMovimiento?: () => void
   addPhoto?: (sap: string, file: File) => Promise<string>
   removePhoto?: (sap: string, url: string) => Promise<void>
   calcReorderData?: (item: BodegaMergedItem, movs: MovimientoBodega[]) => { consumoDiario: number; puntoReorden: number; diasRestantes: number; necesitaPedir: boolean } | null
@@ -1859,12 +2039,16 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-ink-ok/[0.15] border border-transparent rounded-card hover:bg-ink-ok/[0.15] text-ink-ok">
-              <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
-            </button>
-            <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
-              <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
-            </button>
+            {onMovimiento && (
+              <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-ink-ok/[0.15] border border-transparent rounded-card hover:bg-ink-ok/[0.15] text-ink-ok">
+                <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
+              </button>
+            )}
+            {onEdit && (
+              <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted border border-border rounded-card hover:bg-muted text-muted-foreground">
+                <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
+              </button>
+            )}
             {onSearchSimilar && (
               <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/[0.15] border border-transparent rounded-card hover:bg-primary/[0.15] text-brand-ink">
                 <Search className="h-3.5 w-3.5" />

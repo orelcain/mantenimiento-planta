@@ -1,8 +1,12 @@
 {
-  "version": "4.2.0",
-  "buildDate": "2026-08-09",
-  "buildTimestamp": 1786327488532,
+  "version": "4.16.0",
+  "buildDate": "2026-11-05",
+  "buildTimestamp": 1793915619480,
   "features": [
+    "Monitor: Camino a la meta muestra la misma cascada que «Dónde se fueron las piezas» (las mismas cifras), y su detalle abre con la cascada y debajo las detenciones con sus notas",
+    "Monitor: el tablero muestra la misma cascada a la meta que la vista clásica, con su detalle por causa, Baader y hora, y dice de quién es cada pérdida",
+    "Monitor: la perilla de cada Baader lleva un motivo opcional («por el Knuro») que se ve en la franja y en la cascada, para que la pérdida no se lea como falla",
+    "Monitor: la cascada de cada Baader mide contra la meta de Shoplogix con la perilla, y dice de quién es cada pieza que no se hizo",
     "Catálogo de variadores: 8 fichas con ~300 parámetros verificados contra los 12 manuales, buscador global y «la misma cinta con otro variador»",
     "Grader: la matriz de turnos reemplaza al calendario mensual y el detalle del turno queda en 4 pestañas",
     "Grader: resumen ejecutivo del turno como PNG y desglose de Puerta 0 con input propio",

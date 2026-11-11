@@ -1,0 +1,20 @@
+[
+  { "razon": "COLACION", "programada": true, "por": "como la escribe Shoplogix" },
+  { "razon": "Colación", "programada": true, "por": "tilde y mayúscula inicial" },
+  { "razon": "DETENCION PROGRAMADA", "programada": true, "por": "como la escribe Shoplogix" },
+  { "razon": "  detención   programada  ", "programada": true, "por": "espacios al borde y por dentro, con tilde" },
+  { "razon": "REUNION INICIO TURNO", "programada": true, "por": "como la escribe Shoplogix" },
+  { "razon": "Reunión inicio turno", "programada": true, "por": "tilde" },
+  { "razon": "EJERCICIO  COMPENSATORIO", "programada": true, "por": "DOS espacios: el caso del 04-11 en Filete (160 piezas cargadas a Mantención y operación)" },
+  { "razon": "EJERCICIO COMPENSATORIO - Paro", "programada": true, "por": "la causa trae una cola" },
+  { "razon": "Ejercicio\tcompensatorio", "programada": true, "por": "tabulación entre palabras" },
+  { "razon": "Limpieza de Ducto", "programada": false, "por": "el legado la marca planificada, pero no es detención programada" },
+  { "razon": "AJUSTE OPERADOR", "programada": false, "por": "detención de operación" },
+  { "razon": "Micro Detencion", "programada": false, "por": "micro" },
+  { "razon": "Detencion", "programada": false, "por": "detención sin causa" },
+  { "razon": "Planned Downtime", "programada": false, "por": "el nombre en inglés no está en la lista" },
+  { "razon": "EJERCICIOCOMPENSATORIO", "programada": false, "por": "sin espacio no es la causa" },
+  { "razon": "", "programada": false, "por": "vacía" },
+  { "razon": "   ", "programada": false, "por": "solo espacios" },
+  { "razon": null, "programada": false, "por": "sin razón" }
+]

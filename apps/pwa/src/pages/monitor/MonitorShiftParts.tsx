@@ -7,7 +7,7 @@
  */
 
 import { desdePrimeraPieza } from '@/services/shoplogix/monitorActividad'
-import { useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { PublicMonitorLive } from '@/services/shoplogix/publicShiftMonitor.service'
 import type { CostoDeParadas } from '@/services/shoplogix/monitorPerdidas'
@@ -18,6 +18,14 @@ import { MAX_MAPE_PCT, type ConePoint, type ForecastResult } from '@/services/sh
 import { MonitorCompareChart } from './MonitorCompareChart'
 import type { Ventana } from './useZoomGesto'
 import type { NotaDeOperador } from './notasOperador'
+import { CapaAmpliada } from './AmpliarV2'
+import { useAnchoMin, useCerrarCapa } from './ampliarHooks'
+import { aEstaHora } from './aEstaHora'
+import { useCifrasVivas } from './useCifrasVivas'
+import { adelanteAtras } from './ejeTurno'
+import { RotuloFranja, Tocable } from './FranjaTocable'
+import { horasTxt, vaciasEtiqueta, type Contenedor } from './cascadaTurno'
+import type { PiezasVista } from './cascadaPerilla'
 
 const nf = new Intl.NumberFormat('es-CL')
 const fmtInt = (n: number) => nf.format(Math.round(n || 0))
@@ -34,12 +42,16 @@ const fmtDec = (n: number) => nf1.format(n || 0)
  * El estado se guarda por `id` en `localStorage`, si no cada refresco (30 s)
  * volvería a abrir todo.
  */
-export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
+export function Bloque({ id, titulo, extra, defaultAbierto = true, plano = false, extraPlano = false, children }: {
   id: string
   titulo: string
   /** Dato que se sigue viendo con el bloque cerrado. */
   extra?: React.ReactNode
   defaultAbierto?: boolean
+  /** Sin marco, sin título y sin plegar: el contenido a secas (lo usa la capa ampliada del v2, que ya trae su título). */
+  plano?: boolean
+  /** En modo `plano`, el dato de `extra` abre el contenido en vez de perderse (Camino a la meta: «−977 pz a esta hora»). */
+  extraPlano?: boolean
   children: React.ReactNode
 }) {
   /*
@@ -71,6 +83,7 @@ export function Bloque({ id, titulo, extra, defaultAbierto = true, children }: {
     })
   }
 
+  if (plano) return <div>{extraPlano && extra != null && <p className="mb-3 text-[17px] leading-snug text-foreground">{extra}</p>}{children}</div>
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
       <button
@@ -121,7 +134,7 @@ export function referenciaDe(cmp: CompareResult, clave: string | null) {
 function nombreDeConvenio(reason: string): string {
   const bajo = reason.toLowerCase().replace(/\s+/g, ' ').trim()
   if (bajo === 'colacion') return 'La colación'
-  return `La parada de convenio «${bajo}»`
+  return `La detención de convenio «${bajo}»`
 }
 
 /** Cuántas máquinas tiene la línea: viaja en el desglose (tbv 3); si no, se deduce de equivMin = machineMin / N. */
@@ -137,6 +150,78 @@ function fmtDurMin(min: number): string {
   const m = Math.round(min % 60)
   if (h === 0) return `${m} min`
   return m > 0 ? `${h} h ${m} min` : `${h} h`
+}
+
+/** Un tramo de la barra de Camino a la meta. `hueco` = lo que aún no se juega: reja con un borde de 1 px, no un relleno. */
+interface TramoCamino { rotulo: string; color: string; ancho: number; hueco?: boolean; op?: number }
+/** Una cifra de la leyenda: la MISMA clave, orden y color que su tramo; `u` es la unidad («pz») y va aparte, más chica. */
+interface CifraCamino { k: string; v: string; u?: string; punto: string; hueco?: boolean; op?: number }
+
+/** El hueco de «por jugar»: la reja de siempre + un borde de 1 px en gris (el relleno solo no se veía). */
+const BORDE_HUECO = 'inset 0 0 0 1px var(--v2-gris)'
+
+/**
+ * La quinta celda de la franja de «El turno»: el rótulo con su chevron, la barra de tramos proporcionales a la meta
+ * (separados 3 px) y la leyenda, que es LOS tramos dibujados (mismo orden y color, todo en piezas). La celda ENTERA abre el
+ * MISMO ampliado de Camino a la meta (sin botón «Ampliar»: una sola señal en toda la franja, el chevron).
+ * `raya` = dónde cae la meta (0–1 de la barra) cuando se superó y la escala creció; se dice en el nombre accesible.
+ */
+function CeldaCamino({ titulo, sub, cifraGrande, tramos, cifras, ampliado, raya }: {
+  titulo: string
+  /** Una línea bajo el título («a la meta de Shoplogix · 7 h 45 min de producción»). Solo la celda de la cascada. */
+  sub?: string
+  /** La cifra grande con su unidad («20.387 pz bajo la meta») y, en su propia línea y en texto secundario, «hizo X de Y». Solo la celda de la cascada. */
+  cifraGrande?: { valor: string; unidad: string; detalle: string } | null
+  tramos: TramoCamino[]
+  cifras: CifraCamino[]
+  ampliado?: ReactNode
+  raya?: { f: number; texto: string } | null
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const zonaRef = useRef<HTMLDivElement>(null)
+  const [abierta, setAbierta] = useState(false)
+  const cerrar = () => { setAbierta(false); zonaRef.current?.focus({ preventScroll: true }) }
+  const descripcion = [...tramos.map((t) => `${Math.round(t.ancho)} % ${t.rotulo}`), ...(raya ? [raya.texto] : [])].join(', ')
+  const cuerpo = (
+    <>
+      <div className="fc-cab">
+        <RotuloFranja tocable={ampliado != null}>{titulo}</RotuloFranja>
+      </div>
+      {sub && <p className="fc-nota">{sub}</p>}
+      {cifraGrande && (
+        <>
+          <div className="fc-cifra-m tabular-nums">{cifraGrande.valor} <small>{cifraGrande.unidad}</small></div>
+          <p className="fc-nota fc-camino-hizo tabular-nums">{cifraGrande.detalle}</p>
+        </>
+      )}
+      <div className="fc-camino-barra" role="img" aria-label={descripcion}>
+        {tramos.map((t) => <span key={t.rotulo} style={{ width: `${t.ancho}%`, background: t.color, minWidth: 4, boxShadow: t.hueco ? BORDE_HUECO : undefined, opacity: t.op }} />)}
+        {raya && <i className="fc-camino-raya" style={{ left: `calc(${(raya.f * 100).toFixed(2)}% - ${(Math.max(0, tramos.length - 1) * 3 * raya.f + 1).toFixed(1)}px)` }} />}{/* decimal-tecnico: posición CSS */}
+      </div>
+      <dl className="fc-dl fc-camino-cifras" style={{ ['--n' as string]: cifras.length }}>
+        {cifras.map((c) => (
+          <div key={c.k}>
+            <dt><i className="fc-pto" style={{ background: c.punto, boxShadow: c.hueco ? BORDE_HUECO : undefined, opacity: c.op }} aria-hidden /><span>{c.k}</span></dt>
+            <dd className="tabular-nums">{c.v}{c.u && <> <small>{c.u}</small></>}</dd>
+          </div>
+        ))}
+      </dl>
+    </>
+  )
+  return (
+    <div ref={ref} className={`fc-camino${cifraGrande ? ' fc-camino-cascada' : ''}`}>
+      {ampliado != null ? (
+        <Tocable onAbrir={() => setAbierta((a) => !a)} etiqueta={titulo} nombre={`${titulo}: ${descripcion}. Ver detalle`} abierta={abierta} zonaRef={zonaRef}>
+          {cuerpo}
+        </Tocable>
+      ) : cuerpo}
+      {ampliado != null && (
+        <CapaAmpliada abierta={abierta} onCerrar={cerrar} origen={ref} titulo={titulo} sub="causas y detenciones, por Baader">
+          {ampliado}
+        </CapaAmpliada>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -166,10 +251,26 @@ function fmtDurMin(min: number): string {
  * le pide a la línea que recupere un tiempo que por convenio no se recupera.
  */
 export function TiempoDelTurno({
-  tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas,
+  tb, causaSel, onCausa, onVentana, onTramo, proximaParada, notas, cerrado, meta, hechas: hechasBase,
   piezasPulso, corteHora,
-  cuotaAhora, horaAhora, cpmAndando, costo, grupos, notasTurno,
+  cuotaAhora: cuotaBase, horaAhora: horaBase, cpmAndando, costo, grupos, notasTurno, v2, ampliado, cascada,
 }: {
+  /**
+   * Solo en el monitor v2: la cascada a la meta de Shoplogix de la línea (`cascadaMeta` de la página) y su contenedor.
+   * Con ella, la celda dibuja «Dónde se fueron las piezas» con las mismas cifras que el tablero, y el ampliado deja fuera
+   * las piezas de la resta vieja (la capa pone la cascada arriba). Sin ella —null, o una cascada sin piezas que medir—
+   * queda la celda de siempre: es el respaldo.
+   */
+  cascada?: { linea: PiezasVista; contenedor: Contenedor } | null
+  /**
+   * Solo en el monitor v2. `celda`: la quinta celda de la franja de «El turno», sin marco (título, botón «Ampliar» que abre
+   * `ampliado`, barra de tramos proporcionales a la meta y tres cifras chicas). `ampliado`: el componente completo, sin marco
+   * ni título (los pone la capa), con todas las filas abiertas y, bajo cada causa, cuánto fue de cada Baader. Sin `v2`: el
+   * de siempre.
+   */
+  v2?: 'celda' | 'ampliado'
+  /** El contenido de la capa ampliada (la misma tarjeta con `v2="ampliado"`). Solo con `v2="celda"`. */
+  ampliado?: ReactNode
   tb: PublicMonitorLive['timeBreakdown']
   causaSel?: string | null
   onCausa?: (c: string | null) => void
@@ -182,7 +283,7 @@ export function TiempoDelTurno({
    * Marcar UNA parada en el gráfico. Sin esto, tocar una microdetención
    * pintaba las 40 de su causa y no se podía saber cuál era ni medirla.
    */
-  onTramo?: (v: Ventana | null) => void
+  onTramo?: (v: (Ventana & { maquinaId?: string | null }) | null) => void
   /** La próxima parada de convenio pronosticada: hora de reloj Y su nombre —
       «la próxima entra a las 12:50» obligaba a adivinar cuál. */
   proximaParada?: { hora: string; reason: string } | null
@@ -229,6 +330,12 @@ export function TiempoDelTurno({
    */
   notasTurno?: string[]
 }) {
+  /* PR B: en el v2, hechas, cuota y su hora del MISMO instante del reloj (avanzan con la reproducción del minuto). En el
+     clásico (sin contexto) o cerrado, las de siempre. */
+  const vivas = useCifrasVivas()
+  const hechas = vivas ? vivas.hechas : hechasBase
+  const cuotaAhora = vivas?.cuota ?? cuotaBase
+  const horaAhora = vivas?.tMs != null ? new Date(vivas.tMs).toISOString().slice(11, 16) : horaBase
   /*
    * Acordeón por parte (mockup v3): cada parte de la barra abre SU detalle,
    * uno a la vez. Los minutos del turno viven como texto bajo «Hechas» — la
@@ -241,11 +348,20 @@ export function TiempoDelTurno({
    * no lo vería nadie. Quien mira otra parte la pliega, y un tap la devuelve.
    */
   const [parte, setParte] = useState<'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado' | null>('paradas')
+  /* Bajo 768 px los tramos de la barra (22 × 18 px, mucho menos de los 44 del piso táctil) no son destino de toque: las filas de 44 px
+     de abajo abren lo mismo. Quedan como dibujo (sin foco, sin lector de pantalla, sin eventos). */
+  const movil = !useAnchoMin(768)
+  /* En la capa ampliada del v2 todas las filas van abiertas: es el detalle completo. */
+  const todo = v2 === 'ampliado'
   const alternarParte = (p: 'hechas' | 'paradas' | 'ritmo' | 'jugar' | 'programado') =>
     setParte((v) => (v === p ? null : p))
   /* Con el turno cerrado no hay próxima parada: decía «entra a las ~17:14»
      con el turno terminado a las 17:05 (Chonchi 28-09). */
   const proxima = cerrado ? null : proximaParada
+  /* La cascada solo cuenta con piezas que medir; sin ellas, queda la celda y el ampliado de siempre (el respaldo). */
+  const cascadaOk = cascada && cascada.linea.podia > 0 ? cascada : null
+  /* En el ampliado con cascada, la resta vieja no se dibuja: ni «por ritmo», ni «atrás», ni piezas por causa. La cuenta es la cascada. */
+  const ampliadoCascada = v2 === 'ampliado' && cascadaOk != null
   if (!tb || tb.windowMin <= 0) return null
 
   const pct = (m: number) => Math.max(0, (m / tb.windowMin) * 100)
@@ -345,7 +461,10 @@ export function TiempoDelTurno({
     ? Math.min(Math.round(cuotaAhora), metaOk)
     : null
   const referencia = cerrado ? metaOk : cuotaOk
-  const brecha = referencia != null && hechas != null ? Math.max(0, referencia - hechas) : null
+  /* «A esta hora» sale del helper de toda la vista (`aEstaHora`: mostradas − las que tocaban): la misma resta en la
+     franja, el gráfico y acá. Cerrado, la vara es la meta completa. */
+  const resta = referencia != null && hechas != null ? aEstaHora(hechas, referencia, metaOk) : null
+  const brecha = resta != null ? Math.max(0, -resta) : null
   const hayBrecha = brecha != null && brecha > 0
   /*
    * Meta cumplida (regla de Orel: «seamos positivos — ¿qué pasa si se llega?»).
@@ -355,14 +474,15 @@ export function TiempoDelTurno({
    * de Mantención que existe.
    */
   const superada = referencia != null && hechas != null && referencia > 0 && brecha === 0
-  const excedente = superada ? Math.max(0, Math.round(hechas! - referencia!)) : 0
+  const excedente = superada ? Math.max(0, resta ?? 0) : 0
   const perdidas = crudas == null ? null : hayBrecha ? Math.min(crudas, brecha) : crudas
   const porRitmo = (hayBrecha || superada) && perdidas != null ? Math.max(0, (brecha ?? 0) - perdidas) : null
   /**
    * Lo que las paradas costaron DE VERDAD, sin topar a la brecha.
    *
-   * `perdidas` está topada porque la BARRA reparte la meta y no puede dibujar
-   * más de lo que faltó. Pero el número que se LEE tiene que ser el real: desde
+   * `perdidas` está topada porque la BARRA del bloque clásico reparte la meta y no puede dibujar
+   * más de lo que faltó (la celda de la franja, en cambio, dibuja el tramo real y hace crecer
+   * la escala con una raya en la meta: su leyenda es exactamente lo dibujado). Pero el número que se LEE tiene que ser el real: desde
    * que cada máquina detenida cuenta su parte (tbv 3, #1195) las paradas pueden
    * explicar más que la brecha —Chonchi 28-09: 1.245 pz contra 780 faltantes— y
    * la fila decía 780 arriba de un detalle cuyos grupos sumaban 1.245. Para
@@ -406,9 +526,94 @@ export function TiempoDelTurno({
   const veredicto = veredictoFallaDeMaquina(gruposVisibles)
   const ultimoImputable = [...gruposVisibles].reverse().find((g) => g.dueno !== 'programado')?.dueno
 
+  /* ── v2 celda: la quinta celda de la franja de «El turno» ─────────────────────────────────────────
+     La barra reparte la meta en tramos proporcionales y la leyenda ES esos tramos: mismo orden, mismo color, todo en piezas
+     (Hechas · Paradas · Por ritmo · Por jugar, este último solo en vivo). Salen de las mismas cuentas de arriba: nada se
+     recalcula. «Programado» es TIEMPO, no piezas: vive en el ampliado. «A esta hora» ya vive en la celda de al lado (`aEstaHora`).
+     «Por ritmo» es lo que falta DESPUÉS de lo hecho y de las paradas, contra la vara de la resta: cerrado, la meta; en vivo,
+     la cuota a esta hora (lo que la cuota aún no pide es «por jugar»: meta − cuota). */
+  /* Con la cascada a la meta (la misma de «Dónde se fueron las piezas» del tablero): cinco tramos sobre lo que podía hacer a la
+     meta, en el orden de la cascada. La leyenda son esos mismos cinco, con sus piezas; no hay «por ritmo» ni «por jugar». */
+  if (v2 === 'celda' && cascadaOk) {
+    const L = cascadaOk.linea
+    const rotuloVacios = vaciasEtiqueta(cascadaOk.contenedor)
+    const items: Array<{ k: string; rotulo: string; v: number; color: string; op?: number }> = [
+      { k: 'Hechas', rotulo: 'hechas', v: L.hizo, color: 'var(--v2-acento)' },
+      /* Detenciones y micro son de Mantención y operación; una detención de aguas arriba sigue en su fila (no se parte). */
+      { k: 'Detenciones', rotulo: 'detenciones', v: L.detenciones.piezas, color: 'var(--v2-mant)' },
+      { k: 'Micro', rotulo: 'microdetenciones', v: L.micro.piezas, color: 'var(--v2-mant)', op: 0.55 },
+      { k: rotuloVacios, rotulo: rotuloVacios.toLowerCase(), v: L.vacios, color: 'var(--v2-ext)', op: 0.5 },
+      { k: 'Perilla', rotulo: 'perilla más lenta que la meta', v: L.perilla, color: 'var(--v2-prog)' },
+    ]
+    /* Si el piso de vacíos tapó un déficit (`cuadra` falso), la suma pasa la meta: la escala crece para que la barra no se salga. */
+    const suma = items.reduce((a, t) => a + Math.max(0, t.v), 0)
+    const escala = Math.max(L.podia, suma)
+    return (
+      <CeldaCamino
+        titulo="Dónde se fueron las piezas"
+        sub={`a la meta de Shoplogix · ${horasTxt(L.minProduccion)} de producción`}
+        cifraGrande={{ valor: fmtInt(L.perdido), unidad: 'pz bajo la meta', detalle: `hizo ${fmtInt(L.hizo)} de ${fmtInt(L.podia)}` }}
+        tramos={items.filter((t) => Math.round(t.v) > 0).map((t) => ({ rotulo: t.rotulo, color: t.color, ancho: (t.v / escala) * 100, op: t.op }))}
+        cifras={items.map((t) => ({ k: t.k, v: fmtInt(t.v), u: 'pz', punto: t.color, op: t.op }))}
+        ampliado={ampliado}
+        raya={null}
+      />
+    )
+  }
+  if (v2 === 'celda') {
+    const titulo = hayBrecha || superada ? 'Camino a la meta' : 'A dónde se va el tiempo'
+    /* «7 min» con la unidad; desde una hora, «1 h 02 min». */
+    const durTxt = (min: number) => (min >= 60 ? fmtDurMin(min) : `${Math.round(min)} min`)
+    let tramos: TramoCamino[]
+    let cifras: CifraCamino[]
+    let raya: { f: number; texto: string } | null = null
+    if (restaVisible && metaOk != null && hechas != null && perdidas != null && porRitmo != null) {
+      /* La leyenda es EXACTAMENTE los tramos dibujados, con el número real de cada uno (#1195: las paradas pueden explicar
+         más que la brecha y la cifra que se lee es la real, la del ampliado). Si la suma de los tramos pasa la meta, la barra ya
+         no la reparte: la escala crece hasta esa suma y una raya marca dónde estaba la meta («meta superada» es el caso en que
+         lo hecho solo ya la pasa). Una tolerancia de 1 pz: «por ritmo» sale de restas con decimales. */
+      const paradas = Math.round(perdidasReales ?? perdidas)
+      const sobre = hechas >= metaOk
+      const items: Array<{ k: string; rotulo: string; v: number; color: string; hueco?: boolean }> = [
+        { k: 'Hechas', rotulo: 'hechas', v: hechas, color: 'var(--v2-acento)' },
+        ...(sobre || hayBrecha ? [{ k: 'Detenciones', rotulo: 'perdidas en detenciones', v: paradas, color: 'var(--v2-mal)' }] : []),
+        ...(hayBrecha ? [{ k: 'Por ritmo', rotulo: 'por ritmo', v: porRitmo, color: 'var(--v2-atento)' }] : []),
+        ...(!sobre && !cerrado && porJugarBarra > 0 ? [{ k: 'Por jugar', rotulo: 'aún por jugar', v: porJugarBarra, color: 'var(--v2-reja)', hueco: true }] : []),
+      ]
+      const suma = items.reduce((a, t) => a + t.v, 0)
+      const pasaLaMeta = sobre || suma > metaOk + 1
+      const escala = pasaLaMeta ? Math.max(metaOk, suma) : metaOk
+      tramos = items.filter((t) => Math.round(t.v) > 0).map((t) => ({ rotulo: t.rotulo, color: t.color, ancho: (t.v / escala) * 100, hueco: t.hueco }))
+      cifras = items.map((t) => ({ k: t.k, v: fmtInt(t.v), u: 'pz', punto: t.color, hueco: t.hueco }))
+      if (pasaLaMeta) {
+        raya = {
+          f: metaOk / escala,
+          texto: sobre
+            ? `la raya marca la meta de ${fmtInt(metaOk)} pz: la escala crece para mostrar lo hecho y lo perdido en detenciones`
+            : `la raya marca la meta de ${fmtInt(metaOk)} pz: los tramos suman ${fmtInt(suma)} pz y la escala crece para mostrarlos completos`,
+        }
+      }
+    } else {
+      tramos = [
+        { v: tb.producingMin, color: 'var(--v2-bien)', rotulo: 'produciendo', ancho: pct(tb.producingMin) },
+        { v: tb.plannedMin, color: 'var(--v2-gris)', rotulo: 'programado', ancho: pct(tb.plannedMin) },
+        { v: tb.recoverableMin, color: 'var(--v2-mal)', rotulo: 'detenciones evitables', ancho: pct(tb.recoverableMin) },
+      ].filter((t) => t.v > 0)
+      cifras = [
+        { k: 'Produciendo', v: durTxt(tb.producingMin), punto: 'var(--v2-acento)' },
+        { k: 'Detenciones evitables', v: durTxt(tb.recoverableMin), punto: 'var(--v2-mal)' },
+        { k: 'Programado', v: durTxt(tb.plannedMin), punto: 'var(--v2-gris)' },
+      ]
+    }
+    return <CeldaCamino titulo={titulo} tramos={tramos} cifras={cifras} ampliado={ampliado} raya={raya} />
+  }
+
   return (
     <Bloque
       id="tiempo"
+      plano={todo}
+      /* En la capa ampliada la resta contra la cuota abre el contenido: es la MISMA cifra de «A esta hora» de la franja. */
+      extraPlano={todo && !ampliadoCascada && (hayBrecha || superada)}
       // El título depende de si hay algo que explicar: con la meta cumplida,
       // "Por qué no llegamos" sería un titular falso.
       /* «Camino a la meta» funciona perdiendo, ganando y en vivo — el nombre
@@ -418,7 +623,7 @@ export function TiempoDelTurno({
       extra={hayBrecha
         ? (
           <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
-            −{fmtInt(brecha)} pz
+            {fmtInt(brecha)} atrás
             {/* En vivo la cifra es contra la cuota de AHORA, y tiene que decirlo:
                 sin el sufijo se lee como si faltara eso para la meta completa. */}
             {!cerrado && <span className="font-normal text-muted-foreground"> a esta hora</span>}
@@ -427,7 +632,7 @@ export function TiempoDelTurno({
         : superada
         ? (
           <span className="tabular-nums font-semibold text-ink-ok">
-            {excedente > 0 ? `✓ +${fmtInt(excedente)} pz` : '✓ en la meta'}
+            {excedente > 0 ? `✓ ${fmtInt(excedente)} adelante` : '✓ en la meta'}
             {!cerrado && <span className="font-normal text-muted-foreground"> a esta hora</span>}
           </span>
         )
@@ -438,7 +643,7 @@ export function TiempoDelTurno({
         : <span className="tabular-nums">{fmtDurMin(tb.windowMin)} de turno</span>}
     >
       {/* ── 1 · La resta ────────────────────────────────────────────────── */}
-      {restaVisible && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null && (
+      {!ampliadoCascada && restaVisible && perdidas != null && porRitmo != null && metaOk != null && hechas != null && cpm != null && (
         <div className="mt-2">
           {/*
            * La barra madre: su largo total ES la meta, todo en piezas. Lo hecho
@@ -455,7 +660,7 @@ export function TiempoDelTurno({
           <div className="mt-1 flex h-6 gap-[2px]">
             {([
               { p: 'hechas' as const, v: hechas, cls: 'bg-muted-foreground/[0.35]', flex: true, rotulo: 'hechas' },
-              { p: 'paradas' as const, v: hayBrecha ? perdidas : 0, cls: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]', rotulo: 'perdidas en paradas' },
+              { p: 'paradas' as const, v: hayBrecha ? perdidas : 0, cls: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]', rotulo: 'perdidas en detenciones' },
               { p: 'ritmo' as const, v: hayBrecha ? porRitmo : 0, cls: 'bg-amber-600 dark:bg-amber-500 pizarra:bg-[rgb(var(--serie-1))] pz-trama', rotulo: 'por ritmo' },
               { p: 'jugar' as const, v: porJugarBarra, cls: 'border border-dashed border-muted-foreground/[0.4]', rotulo: 'aún por jugar' },
             ]).filter((s) => s.flex || s.v > 0).map((s) => (
@@ -463,9 +668,11 @@ export function TiempoDelTurno({
                 key={s.p}
                 type="button"
                 onClick={() => alternarParte(s.p)}
-                aria-expanded={parte === s.p}
-                aria-label={`${fmtInt(s.v)} piezas ${s.rotulo} — ver detalle`}
-                className={`rounded-[4px] transition-opacity ${s.cls} ${parte != null && parte !== s.p ? 'opacity-30' : ''}`}
+                aria-expanded={movil ? undefined : parte === s.p}
+                aria-label={movil ? undefined : `${fmtInt(s.v)} piezas ${s.rotulo} — ver detalle`}
+                aria-hidden={movil ? true : undefined}
+                tabIndex={movil ? -1 : undefined}
+                className={`rounded-[4px] transition-opacity ${s.cls} ${movil ? 'pointer-events-none' : ''} ${!todo && parte != null && parte !== s.p ? 'opacity-30' : ''}`}
                 style={s.flex ? { flex: '1 1 0%' } : { width: `${(s.v / metaOk) * 100}%`, minWidth: 3 }}
               />
             ))}
@@ -478,7 +685,7 @@ export function TiempoDelTurno({
                  adentro—; el segmento de la barra sigue topado a la brecha,
                  porque la barra reparte la meta. La frase de abajo lo dice
                  cuando los dos números se separan. */
-              { p: 'paradas' as const, nombre: 'Paradas', valor: `${fmtInt(perdidasReales ?? perdidas)} pz`, pct: pctMeta(perdidasReales ?? perdidas), tick: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]' },
+              { p: 'paradas' as const, nombre: 'Detenciones', valor: `${fmtInt(perdidasReales ?? perdidas)} pz`, pct: pctMeta(perdidasReales ?? perdidas), tick: 'bg-red-600 dark:bg-red-500 pizarra:bg-[rgb(var(--serie-1))]' },
               { p: 'ritmo' as const, nombre: 'Ritmo', valor: `${fmtInt(porRitmo)} pz`, pct: pctMeta(porRitmo), tick: 'bg-amber-600 dark:bg-amber-500 pizarra:bg-[rgb(var(--serie-1))] pz-trama' },
               ...(porJugarBarra > 0 ? [{ p: 'jugar' as const, nombre: 'Por jugar', valor: `${fmtInt(porJugarBarra)} pz`, pct: pctMeta(porJugarBarra), tick: 'border border-dashed border-muted-foreground/[0.5] bg-transparent' }] : []),
               /*
@@ -498,8 +705,8 @@ export function TiempoDelTurno({
                 <button
                   type="button"
                   onClick={() => alternarParte(f.p)}
-                  aria-expanded={parte === f.p}
-                  className={`flex min-h-[44px] w-full items-center gap-2.5 px-3 text-left text-[13px] text-foreground ${parte === f.p ? 'bg-primary/[0.08]' : ''}`}
+                  aria-expanded={todo || parte === f.p}
+                  className={`flex min-h-[44px] w-full items-center gap-2.5 px-3 text-left text-[13px] text-foreground ${!todo && parte === f.p ? 'bg-primary/[0.08]' : ''}`}
                 >
                   <i className={`h-5 w-1 shrink-0 rounded-full ${f.tick}`} />
                   <span className="flex-1 truncate">{f.nombre}</span>
@@ -509,9 +716,9 @@ export function TiempoDelTurno({
                       {f.pct}
                     </span>
                   )}
-                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${parte === f.p ? '' : '-rotate-90'}`} />
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${todo || parte === f.p ? '' : '-rotate-90'}`} />
                 </button>
-                {parte === f.p && (
+                {(todo || parte === f.p) && (
                   /* `pantalla-oculta`: en la TV la tarjeta muestra solo la
                      barra, las filas y el veredicto — el detalle expandido es
                      para tocar, y en la sala nadie toca. */
@@ -572,6 +779,7 @@ export function TiempoDelTurno({
                               notas={notas}
                               proximaParada={null}
                               plannedMin={tb.plannedMin}
+                              detalleMaquinas={todo}
                             />
                             {veredicto && g.dueno === ultimoImputable && (
                               <p className="mt-2 text-[11px] font-semibold text-ink-ok">
@@ -582,7 +790,7 @@ export function TiempoDelTurno({
                         ))}
                         {onCausa && gruposImputables.length > 0 && (
                           <p className="mt-1.5 text-[11px] text-muted-foreground/80">
-                            Toca una causa para ver sus paradas una por una.
+                            Toca una causa para ver sus detenciones una por una.
                           </p>
                         )}
                         {/* ⚠ El supuesto va escrito: es la parte discutible del
@@ -597,7 +805,7 @@ export function TiempoDelTurno({
                                     línea (1 de {nMaquinasDe(tb)}).{' '}
                                   </>
                                 )}
-                                Cada parada valorizada al ritmo que la línea traía justo antes
+                                Cada detención valorizada al ritmo que la línea traía justo antes
                                 {rango && (
                                   <>
                                     {' '}(<span className="tabular-nums">{fmtDec(rango.min)}</span> a{' '}
@@ -622,7 +830,7 @@ export function TiempoDelTurno({
                             aparte. Sin esto se lee como si alguien hubiera medido
                             «piezas perdidas por velocidad», que no existe. */}
                         <p className="text-muted-foreground">
-                          Es lo que queda de la brecha <b>después</b> de descontar las paradas:{' '}
+                          Es lo que queda de la brecha <b>después</b> de descontar las detenciones:{' '}
                           <span className="tabular-nums font-semibold text-foreground">{fmtInt(porRitmo)} pz</span>{' '}
                           que no se hicieron <b>con la línea andando</b>.
                         </p>
@@ -649,14 +857,14 @@ export function TiempoDelTurno({
                         <p className="mt-1.5 text-muted-foreground/80">
                           <b>Por qué anduvo más lento, esto no lo dice.</b> Las causas habituales son
                           menos producto llegando desde aguas arriba, calibre distinto al del set
-                          point, o microparadas más cortas que el umbral con que Shoplogix las
+                          point, o microdetenciones más cortas que el umbral con que Shoplogix las
                           registra. Confirmarlo es pregunta de terreno, no del dato.
                         </p>
                       </>
                     )}
                     {f.p === 'jugar' && (
                       <p className="text-muted-foreground">
-                        Piezas que la cuota todavía no pide a esta altura: no son pérdida, son el
+                        Piezas que la meta todavía no pide a esta hora: no son pérdida, son el
                         resto del turno. El pronóstico de cierre vive en su propia tarjeta, más
                         abajo.
                       </p>
@@ -683,6 +891,7 @@ export function TiempoDelTurno({
                           notas={notas}
                           proximaParada={proximaParada}
                           plannedMin={tb.plannedMin}
+                          detalleMaquinas={todo}
                         />
                       </>
                     )}
@@ -698,14 +907,14 @@ export function TiempoDelTurno({
                  argumento de cuánto más se puede. */
               <p className="mt-2 text-[13.5px] leading-snug text-foreground">
                 <span className="font-semibold text-ink-ok">
-                  {cerrado ? 'Meta cumplida' : 'Al día con la cuota'}
+                  {cerrado ? 'Meta cumplida' : 'Al día con la meta a esta hora'}
                 </span>
-                : <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> de{' '}
+                : <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> hechas de{' '}
                 <span className="tabular-nums">{fmtInt(referencia ?? 0)} pz</span>
-                {excedente > 0 && <> (+{fmtInt(excedente)})</>}.
+                {excedente > 0 && <> ({fmtInt(excedente)} adelante)</>}.
                 {perdidas != null && perdidas > 0 && (
                   <>
-                    {' '}Las paradas igual costaron ~
+                    {' '}Las detenciones igual costaron ~
                     <span className="tabular-nums font-semibold">{fmtInt(perdidasReales ?? perdidas)} pz</span> — sin
                     ellas {cerrado ? 'el cierre quedaba' : 'iríamos'} más arriba.
                   </>
@@ -718,7 +927,7 @@ export function TiempoDelTurno({
                  son paradas» esconde el argumento. El excedente es lo que el
                  turno habría cerrado POR ENCIMA de la meta sin esas paradas. */
               <p className="mt-2 text-[13.5px] leading-snug text-foreground">
-                Las paradas costaron{' '}
+                Las detenciones costaron{' '}
                 <span className="tabular-nums font-semibold text-ink-crit">
                   {fmtInt(perdidasReales!)} pz
                 </span>
@@ -728,21 +937,20 @@ export function TiempoDelTurno({
                 <span className="tabular-nums font-semibold text-ink-ok">
                   ~{fmtInt(paradasSobreBrecha)} pz
                 </span>{' '}
-                sobre la meta.
+                adelante de la meta.
               </p>
             )
             : cerrado
             ? (
               <p className="mt-2 text-[13.5px] leading-snug text-foreground">
-                De las <span className="tabular-nums font-semibold">{fmtInt(brecha!)} pz</span> que
-                faltaron,{' '}
+                De las <span className="tabular-nums font-semibold">{fmtInt(brecha!)} pz</span> atrás,{' '}
                 <span className="tabular-nums font-semibold text-red-700 dark:text-red-400">
                   {fmtInt(perdidas)}
                 </span>{' '}
                 son{' '}
                 {minMaquinaTotal != null
-                  ? <b>paradas evitables ({fmtDurMin(minMaquinaTotal)} de máquina)</b>
-                  : <b>{fmtDurMin(tb.recoverableMin)} de paradas evitables</b>}{' '}
+                  ? <b>detenciones evitables ({fmtDurMin(minMaquinaTotal)} de máquina)</b>
+                  : <b>{fmtDurMin(tb.recoverableMin)} de detenciones evitables</b>}{' '}
                 y{' '}
                 <span className="tabular-nums font-semibold">{fmtInt(porRitmo)}</span>, ritmo por
                 debajo del necesario.
@@ -750,9 +958,8 @@ export function TiempoDelTurno({
             )
             : (
               <p className="mt-2 text-[13.5px] leading-snug text-foreground">
-                Van <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> de las{' '}
-                <span className="tabular-nums font-semibold">{fmtInt(cuotaOk ?? 0)}</span> que
-                tocaban {horaAhora ? <>a las <span className="tabular-nums">{horaAhora}</span></> : 'a esta altura'}.
+                Van <span className="tabular-nums font-semibold">{fmtInt(hechas)}</span> hechas; meta {horaAhora ? <>a las <span className="tabular-nums">{horaAhora}</span></> : 'a esta hora'}:{' '}
+                <span className="tabular-nums font-semibold">{fmtInt(cuotaOk ?? 0)}</span>.
                 {' '}
                 {/* `recoverableMin` son los minutos con la LÍNEA ENTERA detenida, y
                     arriba cada causa muestra los minutos en que estuvo activa en
@@ -764,12 +971,12 @@ export function TiempoDelTurno({
                     27-08 con solo micro y una máquina parada de a una). El
                     cero acá es una BUENA noticia y se dice como tal. */}
                 {tb.recoverableMin >= 1 ? (
-                  <>Las paradas evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
+                  <>Las detenciones evitables llevan <b>{fmtDurMin(tb.recoverableMin)}</b>
                   {(tb.recoverable ?? []).some((x) => (x.lineMin ?? x.min) < x.min)
                     ? ' con la línea entera detenida.'
                     : '.'}</>
                 ) : (
-                  <>La línea entera todavía no pierde tiempo por paradas evitables.</>
+                  <>La línea entera todavía no pierde tiempo por detenciones evitables.</>
                 )}
               </p>
             )}
@@ -777,11 +984,11 @@ export function TiempoDelTurno({
       )}
       {/* Sin ritmo de referencia la resta no se puede repartir — pero decirlo
           es mejor que desaparecer mudo, que es lo que hacía antes. */}
-      {hayBrecha && perdidas == null && (
+      {!ampliadoCascada && hayBrecha && perdidas == null && (
         <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
           {cerrado
-            ? 'Sin un ritmo de referencia no se puede repartir la brecha entre paradas y ritmo.'
-            : 'La línea todavía no produce: sin un ritmo de referencia no se puede repartir lo que falta entre paradas y ritmo.'}
+            ? 'Sin un ritmo de referencia no se puede repartir la brecha entre detenciones y ritmo.'
+            : 'La línea todavía no produce: sin un ritmo de referencia no se puede repartir lo que falta entre detenciones y ritmo.'}
         </p>
       )}
 
@@ -789,7 +996,7 @@ export function TiempoDelTurno({
           SOLO sin acordeón: con la resta visible, las causas imputables viven
           dentro de «Paradas» (abierta por defecto) y el convenio dentro de
           «Programado» — repetirlas acá era la duplicación que acusó Orel. */}
-      {!restaVisible && (
+      {(!restaVisible || ampliadoCascada) && (
         <div className="mt-2">
           <p className="text-[11px] text-muted-foreground">
             Qué pasó en el turno
@@ -813,6 +1020,7 @@ export function TiempoDelTurno({
                 notas={notas}
                 proximaParada={g.dueno === 'programado' ? proxima : null}
                 plannedMin={tb.plannedMin}
+                sinPiezas={ampliadoCascada}
               />
               {/* ⚠ La frase que Mantención necesita poder decir. Va pegada al
                   último grupo que se le puede imputar a alguien, no al final:
@@ -828,7 +1036,7 @@ export function TiempoDelTurno({
 
           {onCausa && gruposVisibles.length > 0 && (
             <p className="mt-1.5 text-[11px] text-muted-foreground/80">
-              Toca una causa para ver sus paradas una por una.
+              Toca una causa para ver sus detenciones una por una.
             </p>
           )}
         </div>
@@ -840,9 +1048,9 @@ export function TiempoDelTurno({
           «Programado» esté abierta — con ella cerrada, este renglón es el
           único que lo dice; con ella abierta lo dice el grupo y esto se
           calla para no repetirlo. */}
-      {proxima && (tb.plannedMin === 0 || (restaVisible && parte !== 'programado')) && (
+      {proxima && (tb.plannedMin === 0 || (restaVisible && !todo && parte !== 'programado')) && (
         <p className="mt-1.5 text-[11px] text-muted-foreground/80">
-          {tb.plannedMin === 0 ? 'Todavía sin paradas de convenio: ' : ''}
+          {tb.plannedMin === 0 ? 'Todavía sin detenciones de convenio: ' : ''}
           {nombreDeConvenio(proxima.reason)} entra a las{' '}
           {/* ~ porque es la mediana de los turnos anteriores, no un pacto. */}
           <span className="tabular-nums">~{proxima.hora}</span>.
@@ -869,7 +1077,7 @@ export function TiempoDelTurno({
           ya viven bajo la fila «Hechas» y esto sería la segunda barra de
           vuelta. Sin brecha (meta cumplida, sin meta, sin cpm) sigue siendo
           la única puerta a los minutos. */}
-      {!restaVisible && (
+      {(!restaVisible || ampliadoCascada) && (
         <>
       <button
         type="button"
@@ -950,12 +1158,16 @@ export function TiempoDelTurno({
  * que nadie imputó— y sin la separación la cifra se lee como si alguien de
  * Mantención hubiera fallado.
  */
-function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaParada, plannedMin }: {
+function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaParada, plannedMin, detalleMaquinas, sinPiezas }: {
+  /** Muestra bajo cada causa cuánto fue de cada Baader sin tener que abrirla (capa ampliada del v2). */
+  detalleMaquinas?: boolean
+  /** Sin piezas: la cifra de cada causa y del grupo es su tiempo. Lo pide el ampliado con cascada (las piezas de la cuenta vieja no se muestran ahí). */
+  sinPiezas?: boolean
   g: GrupoDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
   onVentana?: (v: Ventana | null) => void
-  onTramo?: (v: Ventana | null) => void
+  onTramo?: (v: (Ventana & { maquinaId?: string | null }) | null) => void
   notas?: Map<string, NotaDeOperador[]>
   /** Solo en el grupo de convenio: cuándo entra la próxima, y cuál. */
   proximaParada?: { hora: string; reason: string } | null
@@ -974,7 +1186,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
         </span>
         <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
           {fmtDurMin(g.min)}
-          {g.piezas != null && (
+          {g.piezas != null && !sinPiezas && (
             <>
               {' · '}
               <b className="text-red-700 dark:text-red-400">{fmtInt(g.piezas)} pz</b>
@@ -985,7 +1197,7 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
       <ul className="mt-0.5 space-y-0.5 pl-2 text-[11.5px]">
         {g.causas.map((c) => (
           <FilaEvento key={c.reason} c={c} sel={sel} onCausa={onCausa} onVentana={onVentana}
-            onTramo={onTramo} notas={notas?.get(c.reason)} />
+            onTramo={onTramo} notas={notas?.get(c.reason)} detalleMaquinas={detalleMaquinas} sinPiezas={sinPiezas} />
         ))}
       </ul>
       {/* ⚠ El aviso NO se apaga con la primera parada planificada: 7 min de
@@ -1013,12 +1225,15 @@ function GrupoDeEventos({ g, sel, onCausa, onVentana, onTramo, notas, proximaPar
  * quedaría fuera de pantalla. La causa se marca igual en la serie, y el salto es
  * un toque más, explícito.
  */
-function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
+function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas, detalleMaquinas, sinPiezas }: {
+  detalleMaquinas?: boolean
+  /** Sin piezas: la fila muestra solo sus minutos (ver `GrupoDeEventos`). */
+  sinPiezas?: boolean
   c: CausaDelTurno
   sel: string | null
   onCausa?: (c: string | null) => void
   onVentana?: (v: Ventana | null) => void
-  onTramo?: (v: Ventana | null) => void
+  onTramo?: (v: (Ventana & { maquinaId?: string | null }) | null) => void
   /**
    * Lo que el operador escribió sobre ESTA causa. La causa y su explicación son
    * la misma respuesta a "¿por qué paró?", así que van juntas.
@@ -1026,6 +1241,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
   notas?: NotaDeOperador[]
 }) {
   const [abierta, setAbierta] = useState(false)
+  const cerrarCapa = useCerrarCapa()
   const activa = sel === c.reason
   /*
    * Con muchas paradas, listarlas todas es la lista de 46 filas que estamos
@@ -1040,6 +1256,13 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
    */
   const MUCHAS = 6
   const muchas = c.paradas.length > MUCHAS
+  const porMaquina = [...c.paradas.reduce((acc, p) => {
+    if (!p.maquina) return acc
+    const x = acc.get(p.maquina) ?? { maquina: p.maquina, veces: 0, min: 0 }
+    x.veces++
+    x.min += p.min
+    return acc.set(p.maquina, x)
+  }, new Map<string, { maquina: string; veces: number; min: number }>()).values()].sort((a, b) => b.min - a.min)
   const visibles = c.paradas
   /*
    * ⚠ El resumen se calcula con el `count` de la FILA, no con la cantidad de
@@ -1059,27 +1282,48 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
    *
    * Las que no calzan con ninguna parada visible NO se tiran: quedan en la
    * lista de abajo. Perder lo que escribió el piso ya nos costó una vez.
+   *
+   * ⚠ Shoplogix cuelga el comentario del BLOQUE HORARIO en que se escribió
+   * (23:30→00:30), no de la detención. Mostrar ese tramo se leía como «una
+   * detención de 1 hora» al lado de «23 min · 3 detenciones» (Orel, 30-10).
+   * Por eso la nota va a la detención más larga que cae dentro de su bloque y
+   * muestra la hora de ESA detención; si no calza con ninguna, va sin hora.
    */
   const TOLERANCIA_MIN = 2
-  const notaDe = (p: { desdeMin: number | null; hastaMin: number | null }) =>
-    (notas ?? []).filter((n) =>
-      n.desdeMin != null && p.desdeMin != null && p.hastaMin != null &&
-      n.desdeMin >= p.desdeMin - TOLERANCIA_MIN && n.desdeMin <= p.hastaMin + TOLERANCIA_MIN)
-  const emparejadas = new Set(
-    (c.paradas ?? []).flatMap((p) => notaDe(p)).map((n) => n.texto),
-  )
-  const sueltas = (notas ?? []).filter((n) => !emparejadas.has(n.texto))
+  type Parada = CausaDelTurno['paradas'][number]
+  const paradaDe = (n: NotaDeOperador): Parada | null => {
+    if (n.desdeMin == null) return null
+    const fin = (n.hastaMin ?? n.desdeMin) + TOLERANCIA_MIN
+    const ini = n.desdeMin - TOLERANCIA_MIN
+    let mejor: Parada | null = null
+    for (const p of c.paradas) {
+      if (p.desdeMin == null || p.hastaMin == null) continue
+      if (p.desdeMin <= fin && p.hastaMin >= ini && (!mejor || p.min > mejor.min)) mejor = p
+    }
+    return mejor
+  }
+  const notaDe = (p: Parada) => (notas ?? []).filter((n) => paradaDe(n) === p)
+  const sueltas = (notas ?? []).filter((n) => paradaDe(n) == null)
 
   const cifras = (
     <span className="shrink-0 tabular-nums">
-      {c.piezas != null && (
+      {c.piezas != null && !sinPiezas && (
         <span className="font-semibold text-red-700 dark:text-red-400">{fmtInt(c.piezas)} pz</span>
       )}
-      <span className="text-muted-foreground">
-        {c.piezas != null ? ' · ' : ''}{Math.round(c.min)} min{c.count > 0 ? ` · ${c.count}×` : ''}
-      </span>
+      {(c.piezas == null || sinPiezas) && <span className="text-muted-foreground">{Math.round(c.min)} min</span>}
     </span>
   )
+
+  /*
+   * «3×» no decía de qué: los 23 min son la SUMA de las 3 detenciones (Orel,
+   * 30-10). Va en su propia línea porque al lado de las piezas dejaba el nombre
+   * de la causa en 32 px a 375 de ancho.
+   */
+  const resumen = [
+    c.count > 0 ? `${c.count} ${c.count === 1 ? 'detención' : 'detenciones'}` : null,
+    `${Math.round(c.min)} min${c.count > 1 ? ' en total' : ''}`,
+    c.categoria,
+  ].filter(Boolean).join(' · ')
 
   const nombre = (
     <span className="min-w-0 truncate">
@@ -1116,10 +1360,19 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
 
       {/* La categoría del curso, para que la etiqueta no sea nuestra: si el
           árbol dice que ATASCAMIENTO es MMPP, nadie discute la fila. */}
-      {c.categoria && (
-        <p className="px-1 text-[9.5px] text-muted-foreground/80">
-          {c.categoria}
-          {c.extension && <span className="ml-1 normal-case tracking-normal">· fuera del curso</span>}
+      {/* «fuera del curso» (hoja agregada para la B200) era jerga nuestra: en
+          planta no decía nada (Orel, 30-10). El dato sigue en `c.extension`. */}
+      <p className="px-1 text-[11px] tabular-nums text-muted-foreground/80">{resumen}</p>
+
+      {(abierta || detalleMaquinas) && porMaquina.length > 1 && (
+        /* Cuál Baader es la que para: veces y minutos de esta causa en cada máquina. */
+        <p className="px-1 pt-0.5 text-[11px] tabular-nums text-muted-foreground">
+          {porMaquina.map((x, k) => (
+            <span key={x.maquina}>
+              {k > 0 && ' · '}
+              <b className="font-semibold text-foreground/80">{x.maquina}</b> {x.veces}× {fmtDec(x.min)} min
+            </span>
+          ))}
         </p>
       )}
 
@@ -1132,7 +1385,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
                   demás era el único número en segundos de toda la pantalla —
                   «510 s» al lado de una lista en minutos obliga a dividir por
                   60 de cabeza, parado en planta. */}
-              {cuantas} paradas de {prom < 60
+              {cuantas} detenciones de {prom < 60
                 ? `${Math.round(prom)} s`
                 : `${fmtDec(prom / 60)} min`} en promedio.
             </p>
@@ -1149,6 +1402,9 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
               const saltable = onVentana != null && p.desdeMin != null && p.hastaMin != null
               const contenido = (
                 <>
+                  {p.maquina && (
+                    <span className="v2-chip-maquina shrink-0 rounded-full bg-muted px-1.5 font-medium text-foreground/80">{p.maquina}</span>
+                  )}
                   <span className="tabular-nums text-muted-foreground/80">
                     {p.hora}<span className="px-0.5">→</span>{p.hasta}
                   </span>
@@ -1164,7 +1420,7 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
                       onClick={() => {
                         onCausa?.(c.reason)
                         /* La banda marcada es ESTA parada, no las 40 de su causa. */
-                        onTramo?.({ desdeMin: p.desdeMin!, hastaMin: p.hastaMin! })
+                        onTramo?.({ desdeMin: p.desdeMin!, hastaMin: p.hastaMin!, maquinaId: p.maquinaId ?? null })
                         /* Un respiro proporcional a la parada (mín. 3 min): pegada
                            al borde no se entiende qué venía antes ni después. */
                         const aire = Math.max(3, p.min * 0.8)
@@ -1172,11 +1428,13 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
                           desdeMin: Math.max(0, p.desdeMin! - aire),
                           hastaMin: p.hastaMin! + aire,
                         })
+                        /* Dentro de la capa ampliada: se baja el telón para que el gráfico se vea. */
+                        cerrarCapa?.()
                         document.getElementById('grafico-turno')
                           ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                       }}
                       className="flex w-full items-center gap-3 rounded-ctl px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted"
-                      title="Ver esta parada en el gráfico"
+                      title="Ver esta detención en el gráfico"
                     >
                       {contenido}
                       <span className="ml-auto text-brand-ink">ver ›</span>
@@ -1208,11 +1466,22 @@ function FilaEvento({ c, sel, onCausa, onVentana, onTramo, notas }: {
           muestran todas — son la señal de que el piso explicó algo. */}
       {(abierta ? sueltas : (notas ?? [])).length > 0 && (
         <ul className="mt-0.5 space-y-0.5 border-l-2 border-primary pl-2">
-          {(abierta ? sueltas : (notas ?? [])).map((n, i) => (
-            <li key={`${n.desde}-${i}`} className="text-[11px] leading-snug text-muted-foreground">
-              <span className="tabular-nums">
-                {n.desde}{n.hasta && n.hasta !== n.desde && <>→{n.hasta}</>}
-              </span> · «{n.texto}»
+          {/* Dos notas de la MISMA detención (una larga que cruza dos bloques
+              horarios) van juntas, con la hora una sola vez. */}
+          {[...(abierta ? sueltas : (notas ?? [])).reduce((acc, n) => {
+            const p = paradaDe(n)
+            const k = p ? `${p.hora}-${p.hasta}` : `suelta-${n.texto}`
+            const g = acc.get(k) ?? { p, textos: [] as string[] }
+            g.textos.push(n.texto)
+            return acc.set(k, g)
+          }, new Map<string, { p: Parada | null; textos: string[] }>()).entries()].map(([k, { p, textos }]) => (
+            <li key={k} className="text-[11px] leading-snug text-muted-foreground">
+              {p && (
+                <span className="tabular-nums">
+                  {p.hora}→{p.hasta} · {fmtDec(p.min)} min ·{' '}
+                </span>
+              )}
+              {textos.map((t) => `«${t}»`).join(' · ')}
             </li>
           ))}
         </ul>
@@ -1280,7 +1549,7 @@ export function ComparadorDias({ cmp, live, cone, ventana, onVentana, refSel, on
                 ? 'text-ink-ok'
                 : 'text-red-700 dark:text-red-400'
             }`}>
-              {resumen.cuota.dif >= 0 ? '+' : '−'}{fmtInt(Math.abs(resumen.cuota.dif))} vs cuota
+              {adelanteAtras(resumen.cuota.dif)}
             </span>
           )
           : <span className="tabular-nums">{hh} h {String(mm).padStart(2, '0')} de turno</span>
@@ -1385,9 +1654,9 @@ function Veredicto({ cmp, cerrado }: {
             {!r.reciente && ' · '}
             {' '}
             <span className={`font-semibold tabular-nums ${tono(r.cuota.dif)}`}>
-              {fmtInt(Math.abs(r.cuota.dif))} {r.cuota.dif >= 0 ? 'arriba' : 'abajo'}
+              {adelanteAtras(r.cuota.dif)}
             </span>{' '}
-            de la cuota
+            de la meta a esta hora
             {/* Lo que la cuota pide A ESTA ALTURA, no la meta del turno: la meta
                 ya está arriba, y el número que explica la diferencia es este.
                 Se compara REDONDEADO porque puede venir con decimales. */}
@@ -1406,7 +1675,7 @@ function Veredicto({ cmp, cerrado }: {
         */}
       {r.rango && (
         <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
-          {cerrado ? 'A esa altura' : 'A esta altura'} los{' '}
+          {cerrado ? 'A esa hora' : 'A esta hora'} los{' '}
           <span className="tabular-nums">{r.rango.dias}</span>{' '}
           {r.muestra.mismoTurno ? 'turnos iguales anteriores' : 'turnos anteriores'} fueron de{' '}
           <span className="tabular-nums text-foreground/80">{fmtInt(r.rango.min)}</span> a{' '}
@@ -1478,7 +1747,7 @@ export function PronosticoCierre({ f, meta, horizonte }: {
       <Bloque id="pronostico" titulo="Cierre estimado" defaultAbierto={false}
         extra={<span>todavía no</span>}>
         <p className="mt-2 text-[12px] text-muted-foreground">
-          A esta altura el pronóstico erra{' '}
+          A esta hora el pronóstico erra{' '}
           <span className="tabular-nums text-foreground/80">{fmtDec(f.mapePct)}%</span> en esta
           línea — más adelante en el turno empieza a servir.
         </p>
@@ -1582,7 +1851,7 @@ export function PronosticoCierre({ f, meta, horizonte }: {
               : `La meta de ${fmtInt(meta)} entra: ${f.hitsTarget} de ${f.samples} turnos la superaron desde acá.`
             : grado === 'dificil'
             ? `La meta de ${fmtInt(meta)} es difícil: solo ${f.hitsTarget} de ${f.samples} turnos la superó desde acá.`
-            : `La meta de ${fmtInt(meta)} no entra: ninguno de los ${f.samples} turnos anteriores llegó desde esta altura.`}
+            : `La meta de ${fmtInt(meta)} no entra: ninguno de los ${f.samples} turnos anteriores llegó desde esta hora.`}
         </p>
       )}
 

@@ -21,8 +21,24 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.get('anime_tg', null) != null;
     }
 
+    // Teléfono con PASE DE LECTURA para los nuevos (04-11-2026): cuenta creada
+    // por la función `paseLectura` con los claims `pase_lectura` y `pl_v`. Igual
+    // que el de bitácora, NO es una sesión de la app: solo LEE lo que se le abre
+    // con `paseLecturaActivo()` (Aprendizaje, Repuestos) y nunca escribe.
+    function tienePaseLectura() {
+      return request.auth != null && request.auth.token.get('pase_lectura', false) == true;
+    }
+
+    // Vigente = el pase no está pausado y la cuenta entró con la versión actual
+    // del link («Cambiar link» deja fuera a quien entró con el anterior).
+    function paseLecturaActivo() {
+      return tienePaseLectura()
+        && get(/databases/$(database)/documents/paseLectura/actual).data.get('activo', false) == true
+        && get(/databases/$(database)/documents/paseLectura/actual).data.get('version', -1) == request.auth.token.get('pl_v', -2);
+    }
+
     function isAuthenticated() {
-      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime();
+      return request.auth != null && !tienePaseBitacora() && !tieneSesionAnime() && !tienePaseLectura();
     }
 
     // El teléfono del pase sigue habilitado (un supervisor no lo quitó ni
@@ -292,15 +308,22 @@ service cloud.firestore {
         && (!('atendidoPor' in d) || d.atendidoPor is string);
     }
 
+    // ACR esquema v2 (SPEC_ACR.md §4): reemplaza el esquema viejo (`metodo`, `causaRaizIdentificada`),
+    // sin documentos. `reglas` del ACR en `services/acr/__tests__/reglasAcr.test.ts`.
     function isValidRootCauseAnalysis() {
       let d = request.resource.data;
-      return d.incidentId is string && d.incidentId.size() > 0
-        && d.metodo in ['ishikawa', '5porques']
-        && d.causas is list
-        && d.causaRaizIdentificada is string && d.causaRaizIdentificada.size() > 0
-        && d.acciones is list
-        && d.createdBy is string && d.createdBy.size() > 0
-        && (!('efectividad' in d) || d.efectividad is number);
+      return d.version == 2
+        && d.plantId is string
+        && d.eventoBitacoraIds is list && d.eventoBitacoraIds.size() >= 1 && d.eventoBitacoraIds.size() <= 20
+        && d.equipo is string && d.equipo.size() >= 1 && d.equipo.size() <= 200
+        && d.fechaTurno is string
+        && d.definicion is string && d.definicion.size() <= 2000
+        && d.evidencias is list && d.evidencias.size() <= 30
+        && d.causas is list && d.causas.size() <= 30
+        && d.acciones is list && d.acciones.size() <= 30
+        && d.piezaGuardada is bool
+        && d.estado in ['borrador', 'cerrado']
+        && d.createdBy is string && d.createdBy.size() > 0;
     }
 
     function isValidModel3D() {
@@ -402,7 +425,7 @@ service cloud.firestore {
     // ============================================
     match /hierarchy/{nodeId} {
       // El pase de bitácora lee la jerarquía para el buscador de equipos.
-      allow read: if isCatalogReader() || paseBitacoraActivo();
+      allow read: if isCatalogReader() || paseBitacoraActivo() || paseLecturaActivo();
       allow create: if isAdmin()
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 2
@@ -635,6 +658,27 @@ service cloud.firestore {
             || isNonEmptyString(request.resource.data.tag, 1, 40))
         && request.resource.data.uid == request.auth.uid
         && isNonEmptyString(request.resource.data.dia, 10, 10);
+      allow update, delete: if false;
+    }
+
+    // Vistas por pantalla y pestaña (Analisis de Turno, Periodo, monitores).
+    // Existe para MEDIR ~2 semanas que se mira de verdad antes de recortar
+    // (decision 25-10-2026). Mismo patron que planoUsos: solo se CREA, nadie
+    // edita. Si una vista nueva no cabe aca, la escritura se pierde en
+    // silencio (registrarVista traga el error): revisar esta lista.
+    match /pantallaUsos/{usoId} {
+      allow read: if isSupervisor();
+      allow create: if isActiveUser()
+        && request.resource.data.keys().hasOnly(['plantId', 'pantalla', 'vista', 'plantLineId', 'uid', 'dia', 'ts'])
+        && request.resource.data.plantId is string
+        && request.resource.data.pantalla in ['turno', 'periodo', 'monitor']
+        && isNonEmptyString(request.resource.data.vista, 1, 40)
+        && (!('plantLineId' in request.resource.data)
+            || (request.resource.data.plantLineId is string
+                && request.resource.data.plantLineId.size() <= 60))
+        && request.resource.data.uid == request.auth.uid
+        && isNonEmptyString(request.resource.data.dia, 10, 10)
+        && request.resource.data.ts == request.time;
       allow update, delete: if false;
     }
 
@@ -1056,10 +1100,15 @@ service cloud.firestore {
     }
 
     // Análisis de causa raíz
+    // ACR: lo escriben los mismos técnicos que la Bitácora. `createdBy` es del autor y no cambia.
     match /rootCauseAnalysis/{analysisId} {
-      allow read: if isNotAnonymous();
-      allow create: if isSupervisor() && isValidRootCauseAnalysis();
-      allow update: if isSupervisor();
+      allow read: if isActiveUser();
+      allow create: if isActiveUser()
+        && isValidRootCauseAnalysis()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isActiveUser()
+        && isValidRootCauseAnalysis()
+        && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if isAdmin();
     }
 
@@ -1093,14 +1142,14 @@ service cloud.firestore {
 
     match /bodega/{codigoSAP} {
       // El pase de bitácora ve ubicación y stock al elegir un repuesto.
-      allow read: if isNotAnonymous() || paseBitacoraActivo();
+      allow read: if isNotAnonymous() || paseBitacoraActivo() || paseLecturaActivo();
       allow create: if isTechnician() && isValidBodega();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
       // Movimientos de bodega (entradas, salidas, ajustes)
       match /movimientos/{movId} {
-        allow read: if isNotAnonymous();
+        allow read: if isNotAnonymous() || paseLecturaActivo();
         allow create: if isTechnician();
         allow update: if isAdmin();
         allow delete: if isAdmin();
@@ -1113,19 +1162,19 @@ service cloud.firestore {
     // dentro de un ítem concreto), y había que iterar los ~2.200 ítems uno a uno.
     // `movimientos` solo existe bajo /bodega, así que el alcance es el mismo.
     match /{path=**}/movimientos/{movId} {
-      allow read: if isNotAnonymous();
+      allow read: if isNotAnonymous() || paseLecturaActivo();
     }
 
     // Inventarios periódicos de bodega
     match /bodega_inventarios/{inventarioId} {
-      allow read: if isNotAnonymous();
+      allow read: if isNotAnonymous() || paseLecturaActivo();
       allow create: if isSupervisor() && isValidBodegaInventario();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
       // Conteos individuales por SAP
       match /conteos/{conteoId} {
-        allow read: if isNotAnonymous();
+        allow read: if isNotAnonymous() || paseLecturaActivo();
         allow create: if isTechnician();
         allow update: if isTechnician();
         allow delete: if isAdmin();
@@ -1450,6 +1499,11 @@ service cloud.firestore {
     match /bitacoraPines/{pinId} {
       allow read, write: if false;
     }
+    // Pase de lectura para los nuevos (04-11-2026): el token solo lo entrega la
+    // función `paseLectura` a un supervisor. Ningún cliente lee ni escribe aquí.
+    match /paseLectura/{docId} {
+      allow read, write: if false;
+    }
     match /bitacoraDispositivos/{uid} {
       allow read: if isSupervisor() || (tienePaseBitacora() && request.auth.uid == uid);
       allow write: if false;
@@ -1624,13 +1678,13 @@ service cloud.firestore {
     // ============================================
     match /repuestos/{repuestoId} {
       // El pase de bitácora lo lee para agregar repuestos usados a un evento (16-09-2026).
-      allow read: if isCatalogReader() || paseBitacoraActivo();
+      allow read: if isCatalogReader() || paseBitacoraActivo() || paseLecturaActivo();
       allow create, update: if isTechnician();
       allow delete: if isSupervisor();
 
       // Historial de cambios por repuesto
       match /historial/{historialId} {
-        allow read: if isNotAnonymous();
+        allow read: if isNotAnonymous() || paseLecturaActivo();
         allow create: if isTechnician();
         allow update, delete: if isAdmin();
       }
@@ -1811,9 +1865,14 @@ service cloud.firestore {
     }
 
     // ANÁLISIS GRADER - Configuracion global del modulo
+    // La perilla por máquina (monitorPerillas, monitorPerillasHistorial) y el modo del umbral (monitorUmbralARitmo, monitorUmbralARitmoHistorial) los anota SOLO admin.
+    // El resto del doc sigue para supervisor. affectedKeys: escribir otros campos no toca esta regla.
     match /graderModuleConfigs/{configId} {
       allow read: if isNotAnonymous();
-      allow create, update: if isSupervisor();
+      allow create: if isSupervisor()
+        && (!request.resource.data.keys().hasAny(['monitorPerillas', 'monitorPerillasHistorial', 'monitorUmbralARitmo', 'monitorUmbralARitmoHistorial']) || isAdmin());
+      allow update: if isSupervisor()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['monitorPerillas', 'monitorPerillasHistorial', 'monitorUmbralARitmo', 'monitorUmbralARitmoHistorial']) || isAdmin());
       allow delete: if isAdmin();
     }
 
@@ -1953,6 +2012,41 @@ service cloud.firestore {
     match /publicShiftMonitorLabels/{token} {
       allow read: if isNotAnonymous();
       allow write: if isSupervisor();
+    }
+
+    // Duelo de equipos del monitor público (27-10-2026): nombres de los dos
+    // supervisores y correcciones manuales de qué equipo hizo cada turno.
+    //   { duelo: { equipos: { rebolledo: 'Nombre', cardenas: 'Nombre' },
+    //              overrides: { '<shiftDocId>': 'rebolledo' | 'cardenas' } } }
+    // Los nombres son PÚBLICOS por decisión del plan (el monitor se abre sin
+    // sesión): lectura puntual (get, nunca list) y solo mientras el link del mismo
+    // token siga vigente. Escribe únicamente un supervisor o admin; los operadores
+    // no figuran en ningún campo (se compara por puesto, sin nombres).
+    function dueloConfigValida() {
+      return request.resource.data.keys().hasOnly(['duelo', 'updatedAt'])
+        && request.resource.data.duelo is map
+        && request.resource.data.duelo.keys().hasOnly(['equipos', 'overrides', 'overridesMeta'])
+        && (!('equipos' in request.resource.data.duelo)
+          || (request.resource.data.duelo.equipos is map
+            && request.resource.data.duelo.equipos.keys().hasOnly(['rebolledo', 'cardenas'])
+            && request.resource.data.duelo.equipos.get('rebolledo', '') is string
+            && request.resource.data.duelo.equipos.get('cardenas', '') is string
+            && request.resource.data.duelo.equipos.get('rebolledo', '').size() <= 60
+            && request.resource.data.duelo.equipos.get('cardenas', '').size() <= 60))
+        && (!('overrides' in request.resource.data.duelo)
+          || (request.resource.data.duelo.overrides is map
+            && request.resource.data.duelo.overrides.size() <= 200))
+        && (!('overridesMeta' in request.resource.data.duelo)
+          || (request.resource.data.duelo.overridesMeta is map
+            && request.resource.data.duelo.overridesMeta.size() <= 200));
+    }
+
+    match /monitor_config/{token} {
+      allow get: if exists(/databases/$(database)/documents/publicShiftMonitors/$(token))
+        && timestamp.value(get(/databases/$(database)/documents/publicShiftMonitors/$(token)).data.expiresAt) > request.time;
+      allow list: if false;
+      allow create, update: if isSupervisor() && dueloConfigValida();
+      allow delete: if isAdmin();
     }
 
     // Contador de vistas por módulo: UN doc por día (hora de Chile), id YYYY-MM-DD.
@@ -2330,6 +2424,15 @@ service cloud.firestore {
           && docId == 'datos'
           && isValidDocSize();
       }
+
+      // Plataforma recordada por serie ({plat:{idAniList: clave}}): la lee el aviso «Ver ahora» del bot.
+      match /prefs/{docId} {
+        allow read: if tieneSesionAnime() && request.auth.token.anime_tg == userId;
+        allow create, update: if tieneSesionAnime()
+          && request.auth.token.anime_tg == userId
+          && docId == 'ver'
+          && isValidDocSize();
+      }
     }
 
     // ── Telegram Mini App — whitelist de chats autorizados ───────────────────
@@ -2416,6 +2519,22 @@ service cloud.firestore {
       allow create, update: if isSupervisor() && isValidDocSize();
       allow delete: if isAdmin();
     }
+    // Rutas de inspección (R-MAN-CH-004, 26-09-2026): la pauta la edita un supervisor; el
+    // recorrido lo llena quien está de turno, igual que la bitácora.
+    // ⚠ Sin este `match` la colección cae en el deny por defecto y NO escribe nada — es lo que
+    // pasó con los eventos de Diego: la app escribe sin esperar al servidor, así que el rechazo
+    // no se ve y el dato se pierde en la caché local.
+    match /rutasInspeccion/{rutaId} {
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+    match /recorridos/{recorridoId} {
+      allow read: if isActiveUser() || paseBitacoraActivo();
+      allow create, update: if (isActiveUser() || paseBitacoraActivo()) && isValidDocSize();
+      allow delete: if isSupervisor();
+    }
+
     match /inspecciones/{inspeccionId} {
       allow read: if isActiveUser() || paseBitacoraActivo();
       // Se escribe con `merge`, así que create y update son el mismo gesto. No se
@@ -2428,8 +2547,16 @@ service cloud.firestore {
     // ============================================
     // MANUALES — Documentación técnica (F4 2026-05-04)
     // ============================================
-    match /manuales/{manualId} {
+    // Ubicaciones del despiece corregidas a mano (modo revisión del visor, 16-10-2026):
+    // las lee cualquier sesión de catálogo; las escribe admin o supervisor.
+    match /anclasDespiece/{anclaId} {
       allow read: if isCatalogReader();
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
+    match /manuales/{manualId} {
+      allow read: if isCatalogReader() || paseLecturaActivo();
       allow create, update: if isSupervisor() && isValidDocSize();
       allow delete: if isAdmin();
     }

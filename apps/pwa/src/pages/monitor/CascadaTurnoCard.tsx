@@ -1,113 +1,217 @@
 /**
- * «Dónde se fueron las piezas»: la cascada del turno, dibujada.
+ * «Dónde se fueron las piezas»: la cascada del turno a la meta de Shoplogix, con la perilla (Fase B).
  *
- * Cada barra es una resta contra la capacidad de la máquina, y la última es lo
- * que de verdad se hizo. Las barras están a la MISMA escala (capacidad = 100%)
- * porque la comparación entre pérdidas es el punto: con cada barra normalizada a
- * su propio máximo, 72 piezas y 534 se verían igual de grandes.
- *
- * El cálculo vive en `cascadaTurno.ts` y está testeado aparte; acá solo se
- * dibuja.
+ * Cada barra es una resta contra «podía hacer a la meta» de la vista elegida (Línea o una Baader), y la última es lo que
+ * de verdad se hizo. El cálculo vive en `cascadaPerilla.ts` y está testeado aparte; acá solo se dibuja y se elige la vista.
  */
 
 
-import type { Cascada } from './cascadaTurno'
+import { useState } from 'react'
+import { SegmentedControl, type Segment } from '@/components/piel/SegmentedControl'
+import { FilaRendimientoPerilla } from '@/components/grader/FilaRendimientoPerilla'
+import { BotonInfo } from './GlobosFranja'
+import { CascadaTurnoAnterior } from './CascadaTurnoAnterior'
+import { vaciasEtiqueta, type Cascada, type Contenedor } from './cascadaTurno'
+import { etiquetaVista, type CascadaPorMeta, type PiezasVista } from './cascadaPerilla'
 
-const fmt = (n: number) => Math.abs(n).toLocaleString('es-CL')
+/* La cascada a la meta de Shoplogix con la perilla (Fase B). Las cifras salen de `cascadaPerilla.ts`; aquí solo se
+   muestran y se elige la vista (Línea o una Baader). Cada vista cuadra sola: podía − perilla − detenciones − micro −
+   vacíos = hizo. El tamaño de texto más chico es 11 px (`text-caption`). */
 
-const hhmm = (ms: number | null) =>
-  ms == null ? null : new Date(ms).toISOString().slice(11, 16)
+const fmt = (n: number) => Math.round(Math.abs(n)).toLocaleString('es-CL')
 
-/** Tono de cada paso. Semánticos: parado es crítico, andando es atención. */
-const TONO: Record<Cascada['pasos'][number]['clave'], string> = {
-  capacidad: 'bg-brand-ink/25',
-  detenciones: 'bg-destructive',
-  micro: 'bg-destructive/70',
-  vacias: 'bg-warning',
-  producido: 'bg-brand-ink',
+/** Tono de cada escalón con los tokens de la piel Pizarra (`--v2-*`). Ningún hex nuevo. */
+const TONO = {
+  capacidad: 'var(--v2-gris)',
+  perilla: 'var(--v2-prog)',
+  daba: 'var(--v2-secundaria)',
+  detenciones: 'var(--v2-mal)',
+  micro: 'var(--v2-mal-texto)',
+  vacios: 'var(--v2-mant)',
+  hizo: 'var(--v2-acento)',
+} as const
+
+interface Escalon {
+  clave: keyof typeof TONO
+  etiqueta: string
+  detalle?: string
+  piezas: number
+  resta: boolean
+  negrita?: boolean
+  sub?: boolean
 }
 
-export function CascadaTurnoCard({ cascada }: { cascada: Cascada }) {
-  const corte = hhmm(cascada.corteWallMs)
-  const anchoDe = (piezas: number) =>
-    cascada.capacidad > 0 ? `${Math.max((Math.abs(piezas) / cascada.capacidad) * 100, 0.8)}%` : '0%'
+function escalonesDe(v: PiezasVista, metas: string, perillas: string, sumaDe: number | null, contenedor: Contenedor): Escalon[] {
+  const min = (x: number) => Math.round(x)
+  return [
+    { clave: 'capacidad', etiqueta: 'Podía hacer a la meta', detalle: `meta ${metas}`, piezas: v.podia, resta: false },
+    { clave: 'perilla', etiqueta: 'Perilla más lenta que la meta', detalle: perillas, piezas: v.perilla, resta: true },
+    { clave: 'daba', etiqueta: 'Podía hacer con la perilla', piezas: v.podiaConPerilla, resta: false, negrita: true, sub: true },
+    {
+      clave: 'detenciones',
+      etiqueta: 'Detenciones',
+      detalle: `${min(v.detenciones.min)} min${sumaDe ? `, suma de las ${sumaDe} Baader` : ''} · ${v.detenciones.veces} ×`,
+      piezas: v.detenciones.piezas,
+      resta: true,
+    },
+    { clave: 'micro', etiqueta: 'Microdetenciones', detalle: `${min(v.micro.min)} min · ${v.micro.veces} ×`, piezas: v.micro.piezas, resta: true },
+    { clave: 'vacios', etiqueta: vaciasEtiqueta(contenedor), piezas: v.vacios, resta: true },
+    { clave: 'hizo', etiqueta: 'Hizo', piezas: v.hizo, resta: false },
+  ]
+}
+
+export function CascadaTurnoCard({ cascada, minutosTurno, contenedor = 'silleta' }: { cascada: CascadaPorMeta; minutosTurno: number; contenedor?: Contenedor }) {
+  const [vista, setVista] = useState<string>('linea')
+  const [info, setInfo] = useState(false)
+
+  /* Con una sola máquina no hay línea que elegir: el selector «Línea | máquina» no sale y la vista es la de la máquina. */
+  const unica = cascada.baaders.length === 1
+  const segmentos: Segment<string>[] = [
+    { value: 'linea', label: 'Línea' },
+    ...cascada.baaders.map((b) => ({ value: b.id, label: etiquetaVista(b.nombre) })),
+  ]
+  const baader = unica ? (cascada.baaders[0] ?? null) : (cascada.baaders.find((b) => b.id === vista) ?? null)
+  const v: PiezasVista = baader ?? cascada.linea
+  /* La línea cuenta solo las Baader con meta usable. Una sin meta no entra en la cuenta: se nombra en una nota, no en los escalones. */
+  const cuentan = cascada.baaders.filter((b) => !b.sinMeta)
+  const sinMeta = cascada.baaders.filter((b) => b.sinMeta)
+  const avisoSinMeta = (nombre: string) => `${etiquetaVista(nombre)} sin meta de Shoplogix en este turno: no entra en la cuenta`
+
+  const metas = baader
+    ? `${baader.meta} pz/min`
+    : `${cuentan.map((b) => b.meta).join(' + ')} pz/min`
+  /* El motivo («por el Knuro») va después de la cifra: explica la pérdida para que nadie la lea como falla. En la línea, entre
+     paréntesis, para que no se confunda con el separador de las Baader. */
+  const conMotivo = (motivo: string | null) => (motivo ? ` · ${motivo}` : '')
+  const conMotivoEntre = (motivo: string | null) => (motivo ? ` (${motivo})` : '')
+  /* Sin perilla anotada, la vara cae en la meta: decirlo así, no «igual a su meta», que sugiere una perilla puesta a propósito. */
+  const perillas = baader
+    ? !baader.conPerilla
+      ? 'sin perilla anotada'
+      : baader.vara != null && baader.vara !== baader.meta
+        ? `${baader.vara} en vez de ${baader.meta}${conMotivo(baader.motivo)}`
+        : 'igual a su meta'
+    : cuentan.filter((b) => b.perilla > 0).map((b) => `${etiquetaVista(b.nombre)} ${b.vara} en vez de ${b.meta}${conMotivoEntre(b.motivo)}`).join(' · ') || 'ninguna más lenta que su meta'
+
+  /* En la línea con más de una Baader que cuenta, el tiempo de producción es el promedio de esas Baader, y se dice. */
+  const varias = baader == null && cuentan.length > 1 ? cuentan.length : null
+  const escalones = escalonesDe(v, metas, perillas, varias, contenedor)
+  const d = v.duenos
 
   return (
     <section className="rounded-card border border-border p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-footnote font-semibold text-muted-foreground">
-          Dónde se fueron las piezas
-        </h2>
-        {corte && (
-          <span className="text-caption tabular-nums text-muted-foreground/80">
-            tramos cerrados hasta las {corte}
-          </span>
-        )}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center">
+          <h2 className="text-footnote font-semibold text-muted-foreground">Dónde se fueron las piezas</h2>
+          <BotonInfo etiqueta="Cómo se calcula" abierto={info} alCambiar={setInfo} />
+        </div>
+        <span className="text-caption tabular-nums text-muted-foreground/80">{baader ? etiquetaVista(baader.nombre) : 'Línea'}</span>
       </div>
-
-      <div className="mt-3 flex flex-col gap-2.5">
-        {cascada.pasos.map(paso => {
-          const esResta = paso.piezas < 0
-          const detalle = [
-            paso.minutos != null ? `${paso.minutos} min` : null,
-            paso.veces ? `${paso.veces} ×` : null,
-            paso.clave === 'vacias' ? `${100 - cascada.silletasLlenasPor100} de cada 100` : null,
-          ].filter(Boolean).join(' · ')
-          return (
-            <div key={paso.clave} className="flex flex-col gap-1">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-footnote text-foreground/80">
-                  {paso.etiqueta}
-                  {detalle && (
-                    <span className="text-caption tabular-nums text-muted-foreground/80"> · {detalle}</span>
-                  )}
-                </span>
-                <span
-                  className={`text-footnote font-semibold tabular-nums ${
-                    esResta ? (paso.clave === 'vacias' ? 'text-ink-warn' : 'text-ink-crit') : 'text-foreground'
-                  }`}
-                >
-                  {esResta ? '−' : ''}{fmt(paso.piezas)}
-                </span>
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full ${TONO[paso.clave]}`}
-                  style={{ width: anchoDe(paso.piezas) }}
-                />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/*
-        La conclusión, escrita. Sin esta línea la cascada es un gráfico bonito
-        del que cada uno saca lo que quiere; con ella dice a quién le toca.
-        OJO: NO dice «sin las detenciones habríamos hecho X»: eso supone un turno
-        ideal que no ocurrió. Dice dónde se fue el tiempo, que es lo que pasó.
-      */}
-      {cascada.perdido > 0 && (
-        <p className="mt-3 text-footnote text-foreground/80">
-          De las <b className="tabular-nums">{fmt(cascada.perdido)}</b> piezas que no se hicieron,{' '}
-          <b className="tabular-nums">{fmt(cascada.perdidoParado)}</b> fueron con la línea parada y{' '}
-          <b className="tabular-nums">{fmt(cascada.perdidoAndando)}</b> con la línea andando y la
-          silleta vacía.{' '}
-          {cascada.perdidoAndando > cascada.perdidoParado ? (
-            <>La mayor parte <b>no es una falla</b>: es abastecimiento aguas arriba.</>
-          ) : (
-            <>La mayor parte se perdió <b>con la línea detenida</b>.</>
-          )}
+      {info && (
+        <p className="mt-2 text-nota text-muted-foreground">
+          Parte de la meta de Shoplogix en el tiempo de producción: el turno menos la detención programada (colación,
+          reunión de inicio y ejercicio compensatorio), que no es pérdida de nadie. La perilla se resta primero; desde
+          «podía hacer con la perilla» todo se mide a la perilla. Detenciones: minutos con detención no programada de
+          {unica ? 'la máquina' : 'cada Baader; en la línea, su suma'}. Vacíos por diferencia, para que la suma cierre al entero.
         </p>
       )}
 
-      {/* Pie de contexto. NO va en un `Pill`: el primitivo rinde a 9,5 px, bajo
-          el piso de 11 de la constitución (§9/§64), y una frase larga tampoco es
-          para lo que sirve una píldora. */}
-      <p className="mt-3 text-caption tabular-nums text-muted-foreground">
-        {cascada.silletasLlenasPor100} de cada 100 silletas con pieza · máquina a{' '}
-        {cascada.ritmoMaquina} pz/min · {cascada.minutosEnMarcha} min andando
-      </p>
+      {!unica && (
+        <div className="mt-3">
+          <SegmentedControl value={vista} onChange={setVista} segments={segmentos} ariaLabel="Ver por Baader" />
+        </div>
+      )}
+
+      {/* Una Baader sin meta usable no tiene escalones: su vista es solo el aviso. */}
+      {baader?.sinMeta ? (
+        <p className="mt-3 text-footnote text-foreground/80">{avisoSinMeta(baader.nombre)}</p>
+      ) : (
+        <>
+          {/* La partición del rendimiento de la vista elegida (la cuenta la cascada en `cascadaPerilla.ts`): arriba de los escalones. */}
+          <div className="mt-3">
+            <FilaRendimientoPerilla r={v.rendimiento} contenedor={contenedor} />
+          </div>
+
+          <div className="mt-3 flex items-baseline justify-between gap-3">
+            <span className="text-footnote text-foreground/80">Tiempo de producción</span>
+            <span className="text-footnote font-semibold tabular-nums text-foreground">{fmt(v.minProduccion)} min</span>
+          </div>
+          <p className="text-caption tabular-nums text-muted-foreground">
+            ({minutosTurno} del turno − {fmt(v.minProgramada)} de detención programada{varias ? `, promedio de las ${varias} Baader` : ''}: colación, reunión y ejercicio), que no es pérdida de nadie
+          </p>
+
+          <div className="mt-3 flex flex-col gap-2.5">
+            {escalones.map((e) => (
+              <div key={e.clave} className={`flex flex-col gap-1 ${e.sub ? 'pl-3' : ''}`}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-footnote text-foreground/80">
+                    {e.etiqueta}
+                    {e.detalle && <span className="text-caption tabular-nums text-muted-foreground/80"> · {e.detalle}</span>}
+                  </span>
+                  <span
+                    className={`text-footnote font-semibold tabular-nums ${
+                      /* La perilla no es una detención: su resta va en tinta neutra, no en la de crítico. */
+                      e.resta ? (e.clave === 'vacios' ? 'text-ink-warn' : e.clave === 'perilla' ? 'text-muted-foreground' : 'text-ink-crit') : 'text-foreground'
+                    }`}
+                  >
+                    {e.resta && e.piezas > 0 ? '−' : ''}{fmt(e.piezas)}
+                  </span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${v.podia > 0 ? Math.max((Math.abs(e.piezas) / v.podia) * 100, e.piezas ? 0.8 : 0) : 0}%`,
+                      background: TONO[e.clave],
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Cuadre: los mismos números de arriba, en una línea. Vista por vista, cierra al entero. */}
+          <p className="mt-3 text-footnote tabular-nums text-foreground/80">
+            Cuadre: {fmt(v.podia)} − {fmt(v.perilla)} − {fmt(v.detenciones.piezas)} − {fmt(v.micro.piezas)} − {fmt(v.vacios)} = <b>{fmt(v.hizo)}</b> piezas hechas.
+          </p>
+
+          {/* La línea de dueños, por vista: quién debe mover cada parte de lo que no se hizo. */}
+          {v.perdido > 0 && (
+            <p className="mt-2 text-footnote tabular-nums text-foreground/80">
+              De <b>{fmt(v.perdido)}</b> piezas bajo la meta, <b>{fmt(d.mantOp)}</b> son de Mantención y operación, <b>{fmt(d.aguas)}</b> de aguas arriba (vacíos y detenciones de MMPP, abastecimiento, acopio, bombeo o ducto) y <b>{fmt(d.produccion)}</b> de producción (perilla).
+            </p>
+          )}
+
+          {/* La línea nombra a la Baader que no entra en la cuenta, para que la suma se pueda seguir. */}
+          {!baader && sinMeta.map((b) => (
+            <p key={b.id} className="mt-2 text-footnote text-muted-foreground">{avisoSinMeta(b.nombre)}</p>
+          ))}
+        </>
+      )}
+
+      {!baader?.sinMeta && (
+        <p className="mt-3 text-caption tabular-nums text-muted-foreground">
+          {baader
+            ? `${etiquetaVista(baader.nombre)}: meta de Shoplogix ${baader.meta} pz/min${baader.conPerilla && baader.vara != null ? `, perilla ${baader.vara}` : ''}.`
+            : `Perilla: la velocidad puesta en cada Baader. Meta de Shoplogix: ${cuentan.map((b) => b.meta).join(' · ')} pz/min.`}
+        </p>
+      )}
     </section>
   )
+}
+
+/**
+ * La tarjeta «Dónde se fueron las piezas» del monitor: la cascada a la meta con la perilla cuando el turno trae la serie por
+ * minuto; si no, la cascada anterior (`construirCascada`), como antes de B-2. Sin ninguna, no hay tarjeta.
+ */
+export function TarjetaCascada({
+  meta,
+  anterior,
+}: {
+  meta: { cascada: CascadaPorMeta; minutos: number; contenedor?: Contenedor } | null
+  anterior: Cascada | null
+}) {
+  if (meta) return <CascadaTurnoCard cascada={meta.cascada} minutosTurno={meta.minutos} contenedor={meta.contenedor} />
+  if (anterior) return <CascadaTurnoAnterior cascada={anterior} />
+  return null
 }

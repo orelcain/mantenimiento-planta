@@ -1,46 +1,46 @@
 {
   "rules": {
     "devices": {
-      ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
+      ".read": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null",
+      ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
       "$deviceId": {
-        ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
-        "online": { ".write": "auth != null" },
-        "lastSeen": { ".write": "auth != null" },
-        "ip": { ".write": "auth != null" },
-        "rssi": { ".write": "auth != null" },
-        "wifiSsid": { ".write": "auth != null" },
-        "mdns": { ".write": "auth != null" },
-        "deviceName": { ".write": "auth != null" },
-        "firmwareVersion": { ".write": "auth != null" },
-        "sensorType": { ".write": "auth != null" },
-        "sendInterval": { ".write": "auth != null" },
-        "assignedEquipmentId": { ".write": "auth != null" },
-        "apAlwaysOn": { ".write": "auth != null" },
-        "apSsid": { ".write": "auth != null" },
-        "apIp": { ".write": "auth != null" },
-        "telemetry": { ".write": "auth != null" },
-        "thresholds": { ".write": "auth != null" },
-        "alerts": { ".write": "auth != null" }
+        ".read": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null",
+        ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
+        "online": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "lastSeen": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "ip": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "rssi": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "wifiSsid": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "mdns": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "deviceName": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "firmwareVersion": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "sensorType": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "sendInterval": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "assignedEquipmentId": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "apAlwaysOn": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "apSsid": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "apIp": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "telemetry": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "thresholds": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "alerts": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" }
       }
     },
     "sensors": {
-      ".read": "auth != null",
-      ".write": "auth != null",
+      ".read": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null",
+      ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null",
       "$equipmentId": {
-        ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
-        "temperatura": { ".write": "auth != null" },
-        "humedad": { ".write": "auth != null" },
+        ".read": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null",
+        ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
+        "temperatura": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "humedad": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
         "readings": {
-          ".write": "auth != null",
+          ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null",
           ".indexOn": ["timestamp"]
         },
-        "online": { ".write": "auth != null" },
-        "lastSeen": { ".write": "auth != null" },
-        "equipmentId": { ".write": "auth != null" },
-        "alerts": { ".write": "auth != null" }
+        "online": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "lastSeen": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "equipmentId": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" },
+        "alerts": { ".write": "auth != null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null && auth.token.pase_lectura !== true && auth.token.pase_bitacora !== true && auth.token.anime_tg === null" }
       }
     }
   }

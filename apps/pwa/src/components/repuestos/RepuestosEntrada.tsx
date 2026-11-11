@@ -1,9 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Cog, MapPin, Package, Search, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Button, CellIcon, Disclosure, ListCell, ListGroup, Sheet } from '@/components/piel'
 import { normalizeForSearch } from '@/utils/repuestos/searchNormalize'
-import type { FavoritoQuitado } from '@/utils/repuestos/favoritosListas'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import type { RecienteRepuesto } from '@/utils/repuestos/recientesRepuestos'
 
@@ -29,10 +27,8 @@ interface Props {
   listasFavoritos: ListaFavoritos[]
   favoritosCargando: boolean
   onAbrirEquipo: (id: string, nombre: string) => void
-  /** Solo admin: quitar un equipo de su lista desde la hoja «Ver todos» (modo Editar). */
-  onQuitarFavorito?: (lista: string, id: string) => void
-  /** Solo admin: deshacer un quitar; devuelve el equipo a su posición y recrea la lista si quedó vacía. */
-  onRestaurarFavorito?: (quitado: FavoritoQuitado) => void
+  /** Solo admin: abre la hoja de edición de favoritos (agregar, reordenar y quitar con clave). */
+  onEditarFavoritos?: () => void
   /** «Buscar en todos los repuestos»: pasa el texto al buscador principal. */
   onBuscarTodo?: (texto: string) => void
   areas: AreaFila[]
@@ -59,19 +55,14 @@ const accionHeader = '-my-3 flex min-h-[44px] items-center px-2 text-subhead fon
 
 export function RepuestosEntrada({
   recientes, onAbrirReciente, onLimpiarRecientes,
-  listasFavoritos, favoritosCargando, onAbrirEquipo, onQuitarFavorito, onRestaurarFavorito, onBuscarTodo,
+  listasFavoritos, favoritosCargando, onAbrirEquipo, onEditarFavoritos, onBuscarTodo,
   areas, onAbrirArea,
 }: Props) {
   const [verTodosFav, setVerTodosFav] = useState(false)
   const [consulta, setConsulta] = useState('')
-  const [editando, setEditando] = useState(false)
-  /** Fila con el signo menos tocado: muestra «Quitar» (clave `lista` + NUL + `id`). */
-  const [porQuitar, setPorQuitar] = useState<string | null>(null)
-  const [quitados, setQuitados] = useState<FavoritoQuitado[]>([])
   const cuerpoRef = useRef<HTMLDivElement>(null)
   /** Alto del cuerpo congelado al enfocar el buscador, para que la hoja no salte al filtrar. */
   const [altoCongelado, setAltoCongelado] = useState<number | undefined>(undefined)
-  const puedeEditar = Boolean(onQuitarFavorito && onRestaurarFavorito)
 
   const totalFavoritos = useMemo(() => listasFavoritos.reduce((n, l) => n + l.items.length, 0), [listasFavoritos])
 
@@ -105,9 +96,6 @@ export function RepuestosEntrada({
   const cerrarHoja = () => {
     setVerTodosFav(false)
     setConsulta('')
-    setEditando(false)
-    setPorQuitar(null)
-    setQuitados([])
     setAltoCongelado(undefined)
   }
 
@@ -126,65 +114,15 @@ export function RepuestosEntrada({
     )
   }
 
-  const nombreQuitado = (q: FavoritoQuitado) => nombreBonito(q.machineName || q.machineId)
-
-  const quitar = (lista: string, f: FavoritoEquipo) => {
-    if (!onQuitarFavorito) return
-    const listIndex = listasFavoritos.findIndex((l) => l.nombre === lista)
-    const index = listasFavoritos[listIndex]?.items.findIndex((x) => x.id === f.id) ?? -1
-    if (listIndex < 0 || index < 0) return
-    setQuitados((q) => [...q, { listName: lista, machineId: f.id, machineName: f.nombre, index, listIndex }])
-    setPorQuitar(null)
-    onQuitarFavorito(lista, f.id)
-  }
-
-  const filaFavorito = (lista: string, f: FavoritoEquipo) => {
-    const nombre = nombreBonito(f.nombre)
-    const clave = `${lista}\u0000${f.id}`
-    if (!editando) {
-      return (
-        <ListCell
-          key={f.id}
-          leading={<CellIcon tone="neutral"><Cog aria-hidden /></CellIcon>}
-          title={resaltar(nombre)}
-          onClick={() => { cerrarHoja(); onAbrirEquipo(f.id, f.nombre) }}
-          className="min-h-[52px]"
-        />
-      )
-    }
-    return (
-      <ListCell
-        key={f.id}
-        leading={
-          <div className="-ml-3 flex items-center gap-1">
-            <button
-              type="button"
-              aria-label={`Quitar ${nombre} de ${lista}`}
-              aria-expanded={porQuitar === clave}
-              onClick={() => setPorQuitar(porQuitar === clave ? null : clave)}
-              className="flex size-11 items-center justify-center"
-            >
-              <span className="relative block size-[22px] rounded-full bg-destructive" aria-hidden>
-                <span className="absolute inset-x-[5px] top-[10px] h-[2px] rounded-full bg-destructive-foreground" />
-              </span>
-            </button>
-            <CellIcon tone="neutral"><Cog aria-hidden /></CellIcon>
-          </div>
-        }
-        title={resaltar(nombre)}
-        trailing={porQuitar === clave ? (
-          <button
-            type="button"
-            onClick={() => quitar(lista, f)}
-            className="flex min-h-[44px] items-center rounded-full bg-destructive px-4 text-subhead font-semibold text-destructive-foreground"
-          >
-            Quitar
-          </button>
-        ) : undefined}
-        className="min-h-[52px] before:left-[4.6rem]"
-      />
-    )
-  }
+  const filaFavorito = (f: FavoritoEquipo) => (
+    <ListCell
+      key={f.id}
+      leading={<CellIcon tone="neutral"><Cog aria-hidden /></CellIcon>}
+      title={resaltar(nombreBonito(f.nombre))}
+      onClick={() => { cerrarHoja(); onAbrirEquipo(f.id, f.nombre) }}
+      className="min-h-[52px]"
+    />
+  )
 
   const hayRecientes = recientes.length > 0
   const hayFavoritos = totalFavoritos > 0
@@ -265,15 +203,13 @@ export function RepuestosEntrada({
         onClose={cerrarHoja}
         title="Favoritos"
         surface="grouped"
-        headerAction={puedeEditar ? (
+        headerAction={onEditarFavoritos ? (
           <button
             type="button"
-            onClick={() => {
-              if (editando) { setEditando(false); setPorQuitar(null); setQuitados([]) } else { setEditando(true) }
-            }}
-            className={cn('flex min-h-[44px] items-center px-2 text-body text-primary', editando && 'font-semibold')}
+            onClick={() => { cerrarHoja(); onEditarFavoritos() }}
+            className="flex min-h-[44px] items-center px-2 text-body text-primary"
           >
-            {editando ? 'Listo' : 'Editar'}
+            Editar
           </button>
         ) : undefined}
         toolbar={
@@ -323,7 +259,7 @@ export function RepuestosEntrada({
                 key={c.lista.nombre}
                 title={<>{c.lista.nombre} <span className="font-normal tabular-nums">· {c.items.length} de {c.lista.items.length}</span></>}
               >
-                {c.items.map((f) => filaFavorito(c.lista.nombre, f))}
+                {c.items.map((f) => filaFavorito(f))}
               </ListGroup>
             ))
           ) : (
@@ -343,30 +279,9 @@ export function RepuestosEntrada({
                   </span>
                 }
               >
-                {l.items.map((f) => filaFavorito(l.nombre, f))}
+                {l.items.map((f) => filaFavorito(f))}
               </Disclosure>
             ))
-          )}
-          {quitados.length > 0 && onRestaurarFavorito && (
-            <div
-              role="status"
-              className="sticky bottom-0 flex min-h-[52px] items-center gap-2 rounded-card bg-card py-1 pl-4 pr-2 shadow-[0_2px_12px_rgba(0,0,0,0.10)] dark:shadow-none"
-            >
-              <span className="min-w-0 flex-1 text-subhead leading-snug">
-                {nombreQuitado(quitados[quitados.length - 1]!)} quitado de {quitados[quitados.length - 1]!.listName}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const ultimo = quitados[quitados.length - 1]!
-                  onRestaurarFavorito(ultimo)
-                  setQuitados((q) => q.slice(0, -1))
-                }}
-                className="flex min-h-[44px] items-center px-3 text-body font-semibold text-primary"
-              >
-                Deshacer
-              </button>
-            </div>
           )}
         </div>
       </Sheet>

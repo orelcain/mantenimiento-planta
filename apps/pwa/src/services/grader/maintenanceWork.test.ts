@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeMaintenanceWork, maintenanceWorkHeadline } from './maintenanceWork'
 import type { Incident, PreventiveExecution } from '@/types'
+import type { Acr } from '@/services/acr/acr.types'
 
 const RANGE = { start: '2026-05-01', end: '2026-05-31' }
 
@@ -59,6 +60,29 @@ describe('computeMaintenanceWork', () => {
       inc({ id: '3', equipmentId: 'eB', createdAt: new Date('2026-05-09') }),
     ]
     expect(computeMaintenanceWork(incs, [], 0, RANGE).equiposRecurrentes).toBe(1) // solo eA
+  })
+
+  it('acciones fuertes de ACR: % sobre las acciones del período; sin ACR → null', () => {
+    const acrCon = (fechaTurno: string, fuerzas: Array<'debil' | 'media' | 'fuerte'>): Acr =>
+      ({
+        id: `${fechaTurno}-${fuerzas.join('')}`,
+        fechaTurno,
+        equipo: 'EVISCERADORA BAADER 142 N1',
+        acciones: fuerzas.map((fuerza, i) => ({
+          id: String(i), texto: 'x', fuerza, causaId: null, responsable: '', fechaLimite: null, estado: 'pendiente',
+        })),
+      }) as unknown as Acr
+    const enRango = acrCon('2026-05-10', ['debil', 'media', 'fuerte'])
+    const fueraDeRango = acrCon('2026-04-10', ['fuerte', 'fuerte'])
+
+    const w = computeMaintenanceWork([], [], 0, RANGE, [enRango, fueraDeRango])
+    expect(w.accionesAcr).toBe(3)
+    expect(w.accionesFuertes).toBe(1)
+    expect(w.accionesFuertesPct).toBeCloseTo(100 / 3)
+
+    const sinAcr = computeMaintenanceWork([], [], 0, RANGE)
+    expect(sinAcr.accionesAcr).toBe(0)
+    expect(sinAcr.accionesFuertesPct).toBeNull()
   })
 
   it('rango vacío → métricas neutras (null donde no hay base)', () => {

@@ -150,7 +150,7 @@ export function ParetoDeParadas({
     >
       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
         Tiempo <b>recuperable</b> de los últimos <span className="tabular-nums">{turnosMedidos}</span>{' '}
-        turnos de esta línea, por causa. Las paradas de convenio no entran: no son pérdidas que
+        turnos de esta línea, por causa. Las detenciones de convenio no entran: no son pérdidas que
         alguien pueda atacar.
       </p>
 
@@ -291,7 +291,7 @@ export function ParetoDeParadas({
           </button>
           {comoAbierto && (
             <p className="mt-1.5 rounded-ctl bg-muted px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">
-              Cada parada se multiplica por las piezas por minuto que su propio turno hizo
+              Cada detención se multiplica por las piezas por minuto que su propio turno hizo
               mientras la línea andaba
               {ctx?.cpmRango && (
                 <> — en estos {ctx.turnos} turnos ese ritmo fue de {fmtDec1(ctx.cpmRango.min)} a{' '}
@@ -599,7 +599,7 @@ function FilaPareto({ r, max, turnos, pct, abierta, onToggle }: {
           </span>
           {r.count > 0 && (
             <span className="tabular-nums text-muted-foreground">
-              {fmtInt(r.count)} {r.count === 1 ? 'parada' : 'paradas'}
+              {fmtInt(r.count)} {r.count === 1 ? 'detención' : 'detenciones'}
             </span>
           )}
           {/* Los minutos siguen a la vista, un escalón más abajo: son el dato

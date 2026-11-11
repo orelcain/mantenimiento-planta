@@ -8,13 +8,16 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PauseCircle, Loader2, CheckCircle2, AlertTriangle, Trash2, BarChart3 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, InfoTooltip } from '@/components/ui'
 import { SpeechTextarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { addParo, getParosByPlantLine, deleteParo } from '@/services/paros'
 import { getPlantLineConfig } from '@/config/plantLines'
 import type { ParoEtapa } from '@/types'
+import { usePielApple } from '@/hooks/usePielApple'
+import { Button as BotonPiel, Sheet, Skeleton, SkeletonBloque } from '@/components/piel'
+import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 
 interface ParoEtapaCaptureProps {
   plantLineId: string
@@ -79,6 +82,8 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
 
   const [paros, setParos] = useState<ParoEtapa[]>([])
   const [loading, setLoading] = useState(true)
+  const apple = usePielApple()
+  const [hojaAbierta, setHojaAbierta] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,7 +114,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
   const handleSave = useCallback(async () => {
     const dur = Number(duracion)
     if (!etapaFinal) { setError('Elige o escribe la etapa.'); return }
-    if (!Number.isFinite(dur) || dur <= 0) { setError('Indica la duración del paro (minutos).'); return }
+    if (!Number.isFinite(dur) || dur <= 0) { setError('Indica la duración de la detención (minutos).'); return }
     setSaving(true)
     setError(null)
     try {
@@ -128,29 +133,166 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
       await load()
       onChanged?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo registrar el paro.')
+      setError(err instanceof Error ? err.message : 'No se pudo registrar la detención.')
     } finally {
       setSaving(false)
     }
   }, [duracion, etapaFinal, causa, fecha, plantLineId, user, load])
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!isAdmin || !window.confirm('¿Eliminar este paro?')) return
+    if (!isAdmin || !window.confirm('¿Eliminar esta detención?')) return
     try { await deleteParo(id); await load(); onChanged?.() } catch { /* noop */ }
   }, [isAdmin, load, onChanged])
+
+  if (apple) {
+    const chip = (activo: boolean) => cn(
+      'h-11 rounded-full px-4 text-subhead font-medium transition-colors',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+      activo ? 'bg-foreground text-background' : 'bg-muted text-foreground',
+    )
+    const formulario = (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <p className="text-footnote text-muted-foreground">Etapa que se detuvo</p>
+          <div className="flex flex-wrap gap-2">
+            {ETAPAS.map((e) => (
+              <button key={e} type="button" onClick={() => setEtapaSel(e)} aria-pressed={etapaSel === e} className={chip(etapaSel === e)}>
+                {e}
+              </button>
+            ))}
+            <button type="button" onClick={() => setEtapaSel(OTRA)} aria-pressed={etapaSel === OTRA} className={chip(etapaSel === OTRA)}>
+              Otra…
+            </button>
+          </div>
+          {etapaSel === OTRA && (
+            <Input value={etapaCustom} onChange={(e) => setEtapaCustom(e.target.value)} placeholder="Nombre de la etapa" className="text-subhead bg-background" />
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1.5">
+            <span className="block text-footnote text-muted-foreground">Duración (min)</span>
+            <Input type="number" inputMode="numeric" value={duracion} onChange={(e) => setDuracion(e.target.value)} placeholder="ej. 25" className="text-subhead bg-background" />
+          </label>
+          <label className="space-y-1.5">
+            <span className="block text-footnote text-muted-foreground">Fecha y hora</span>
+            <Input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-subhead bg-background" />
+          </label>
+        </div>
+
+        <label className="block space-y-1.5">
+          <span className="block text-footnote text-muted-foreground">Causa (opcional)</span>
+          <SpeechTextarea value={causa} onChange={(e) => setCausa(e.target.value)} placeholder="Por qué se detuvo (puedes dictar)…" rows={2} className="text-subhead bg-background" />
+        </label>
+
+        {error && <p className="text-subhead text-ink-crit break-words">{error}</p>}
+        {justSaved && (
+          <p className="flex items-center gap-1.5 text-subhead text-ink-ok"><CheckCircle2 className="h-4 w-4" aria-hidden /> Registrado</p>
+        )}
+
+        {!loading && paros.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <p className="text-footnote text-muted-foreground">Últimas detenciones</p>
+            <ul className="divide-y divide-border">
+              {paros.slice(0, 15).map((p) => (
+                <li key={p.id} className="flex items-start gap-3 py-2.5 text-subhead">
+                  <span className="min-w-0 flex-1 break-words">
+                    <span>{p.etapa}</span>
+                    <span className="block text-footnote text-muted-foreground">
+                      {`${fmtDurationSec(p.duracionMin * 60)}${p.causa ? `, ${p.causa}` : ''}`}
+                    </span>
+                  </span>
+                  {isAdmin && (
+                    <button type="button" onClick={() => handleDelete(p.id)} aria-label={`Eliminar detención de ${p.etapa}`} className="size-11 shrink-0 inline-flex items-center justify-center text-muted-foreground hover:text-ink-crit">
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    )
+
+    return (
+      <section className={cn('space-y-4', className)} aria-labelledby="etapa-ranking-titulo">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="etapa-ranking-titulo" className="text-headline">¿Qué etapa para más la línea?</h2>
+            <p className="text-footnote text-muted-foreground">
+              {pareto.totalN > 0
+                ? `${pareto.totalN} ${pareto.totalN === 1 ? 'detención' : 'detenciones'}, ${fmtDurationSec(pareto.totalMin * 60)} en total, este mes`
+                : 'Etapas sin sensor Shoplogix, este mes'}
+            </p>
+          </div>
+          <BotonPiel variant="filled" size="md" onClick={() => setHojaAbierta(true)}>
+            Registrar detención de etapa
+          </BotonPiel>
+        </div>
+
+        {loading ? (
+          <SkeletonBloque label="Cargando detenciones de etapa" className="space-y-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-1.5 w-full" />
+              </div>
+            ))}
+          </SkeletonBloque>
+        ) : pareto.rows.length === 0 ? (
+          <p className="text-subhead">Sin detenciones de etapa registradas este mes.</p>
+        ) : (
+          <ol className="space-y-3">
+            {pareto.rows.map((r, i) => {
+              const wpct = pareto.rows[0]!.min > 0 ? (r.min / pareto.rows[0]!.min) * 100 : 0
+              return (
+                <li key={r.etapa} className="space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-3 text-subhead">
+                    <span className="min-w-0 break-words">{i + 1}. {r.etapa}</span>
+                    <span className="shrink-0 text-footnote tabular-nums text-muted-foreground">
+                      {`${fmtDurationSec(r.min * 60)}, ${r.n} ${r.n === 1 ? 'detención' : 'detenciones'}`}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className={cn('h-full rounded-full', i === 0 ? 'bg-fill-critical' : 'bg-muted-foreground')} style={{ width: `${wpct}%` }} />
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+
+        <Sheet
+          open={hojaAbierta}
+          onClose={() => setHojaAbierta(false)}
+          title="Registrar detención de etapa"
+          description="Una etapa sin sensor que se detuvo. Si también detuvo la máquina, ese tiempo ya lo mide el sensor y no se suma acá."
+          actions={
+            <BotonPiel variant="filled" size="block" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Guardando…</> : 'Registrar detención'}
+            </BotonPiel>
+          }
+        >
+          {formulario}
+        </Sheet>
+      </section>
+    )
+  }
 
   return (
     <Card className={cn('border-cat-5-tint/[0.25]', className)}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <PauseCircle className="h-4 w-4 text-cat-5-ink" />
-          Paros de etapa (línea)
+          Detenciones de etapa (línea)
           {areaLabel && (
             <Badge variant="outline" className="ml-1 text-caption font-normal text-muted-foreground border-border/50">{areaLabel}</Badge>
           )}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Registra cuándo se detuvo una etapa que no mide Shoplogix (bombeo, chiller, cintas, Marel, corte…). Mide la disponibilidad del área.
+          Registra cuándo se detuvo una etapa sin sensor Shoplogix.{' '}
+          <InfoTooltip text={"Registra cuándo se detuvo una etapa que no mide Shoplogix (bombeo, chiller, cintas, Marel, corte…). Mide la disponibilidad del área."} iconSize={11} />
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -212,7 +354,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
               para esto (3.80:1). Ver DESIGN.md §3: el tinte vivo no va en
               rellenos grandes. */}
           <Button type="button" variant="destructive" onClick={handleSave} disabled={saving}>
-            {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Guardando…</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar paro</>}
+            {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Guardando…</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />Registrar detención</>}
           </Button>
           {justSaved && <span className="flex items-center gap-1 text-xs text-ink-ok font-medium"><CheckCircle2 className="h-3.5 w-3.5" /> Registrado</span>}
         </div>
@@ -221,12 +363,12 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
         <div className="pt-2 border-t border-border/40 space-y-2">
           <p className="text-caption font-medium text-muted-foreground flex items-center gap-1.5">
             <BarChart3 className="h-3.5 w-3.5" /> ¿Qué etapa para más la línea? · este mes
-            {pareto.totalN > 0 && <span className="text-muted-foreground/60">({pareto.totalN} paros · {fmtDur(pareto.totalMin)} total)</span>}
+            {pareto.totalN > 0 && <span className="text-muted-foreground/60">({pareto.totalN} detenciones · {fmtDur(pareto.totalMin)} total)</span>}
           </p>
           {loading ? (
             <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…</p>
           ) : pareto.rows.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-1">Sin paros registrados este mes. El primero aparecerá acá con su ranking.</p>
+            <p className="text-xs text-muted-foreground py-1">Sin detenciones registradas este mes. La primera aparecerá acá con su ranking.</p>
           ) : (
             <div className="space-y-1.5">
               {pareto.rows.map((r, i) => {
@@ -235,7 +377,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
                   <div key={r.etapa} className="space-y-0.5">
                     <div className="flex items-center justify-between text-caption">
                       <span className={cn('font-medium', i === 0 ? 'text-cat-5-ink' : 'text-foreground')}>{i + 1}. {r.etapa}</span>
-                      <span className="tabular-nums text-muted-foreground">{fmtDur(r.min)} · {r.n} paro{r.n !== 1 ? 's' : ''}</span>
+                      <span className="tabular-nums text-muted-foreground">{fmtDur(r.min)} · {r.n} {r.n === 1 ? 'detención' : 'detenciones'}</span>
                     </div>
                     <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
                       <div className={cn('h-full rounded-full', i === 0 ? 'bg-fill-critical' : 'bg-cat-5-tint/[0.15]')} style={{ width: `${wpct}%` }} />

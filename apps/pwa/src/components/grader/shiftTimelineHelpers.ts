@@ -821,7 +821,7 @@ export function buildMarkAreas(
       labelColor = effectiveTag.color
       labelText = `${effectiveTag.label.split(' ')[0]} ${durMin}min${rangeAdjusted ? ' *' : ''}`
     } else {
-      const baseOpacity = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06
+      const baseOpacity = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06 // vocab-ok: clave compartida de PauseTier
       const opacity = isDominant ? baseOpacity * 0.4 : baseOpacity
       areaColor = elegirColor(`rgba(148,163,184,${opacity.toFixed(3)})`, 'grafico-neutro-medio', Number(opacity.toFixed(3)))
       labelColor = elegirColor('#94a3b8', 'grafico-neutro-medio')
@@ -866,7 +866,7 @@ export function buildPauseBoundaryMarkLines(
     const effectiveTag = resolveEffectiveTag(p)
     const isDominant = durMin >= PAUSE_DOMINANT_THRESHOLD_MIN
     if (!isDominant) continue
-    const color = effectiveTag?.color ?? elegirColor(p.tier === 'parada' ? '#94a3b8' : '#cbd5e1', 'grafico-neutro-medio')
+    const color = effectiveTag?.color ?? elegirColor(p.tier === 'parada' ? '#94a3b8' : '#cbd5e1', 'grafico-neutro-medio') // vocab-ok: clave compartida de PauseTier
     lines.push(
       /* Sin `label` explícito, ECharts dibuja el valor del eje sobre la línea:
          estos dos bordes eran los que escribían horas sueltas encima del

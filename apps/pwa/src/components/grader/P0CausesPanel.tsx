@@ -21,7 +21,7 @@ import {
   ChevronDown, Scale, EyeOff, Clock, HelpCircle, SlidersHorizontal,
   Scan, Award, Snowflake, Target,
 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, InfoTooltip } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
   MATRIX_P0_CAUSES,
@@ -397,8 +397,8 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
   const sectionTitle = isClassificationPlant ? 'Vista Matrix oficial' : 'Causas de rechazo'
   const sectionSubtitle = isClassificationPlant ? 'como aparece en el HMI' : 'según Excel pieza a pieza'
   const noDataCopy = isClassificationPlant
-    ? <>Sin el archivo <strong>Punto Cero</strong> exportado de Matrix no podemos mostrar las causas. Subilo junto al Excel de Pieza a Pieza para el análisis completo.</>
-    : <>Sin causas de rechazo clasificadas para este turno. Verifica que el Excel haya subido correctamente.</>
+    ? <>Falta el archivo <strong>Punto Cero</strong> de Matrix para ver las causas.{' '}<InfoTooltip text={"Sin el archivo Punto Cero exportado de Matrix no podemos mostrar las causas. Súbelo junto al Excel de Pieza a Pieza para el análisis completo."} iconSize={12} /></>
+    : <>Sin causas de rechazo clasificadas en este turno.{' '}<InfoTooltip text={"Sin causas de rechazo clasificadas para este turno. Verifica que el Excel haya subido correctamente."} iconSize={12} /></>
   const fallbackDescription = isClassificationPlant
     ? 'carga el Excel P0 para ver las causas'
     : 'sin desglose de causas disponible'

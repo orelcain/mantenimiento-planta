@@ -37,6 +37,37 @@ describe('clasificaCausa', () => {
     [{ type: 'downtime', name: 'Micro Detencion', reason: '' }, 'micro'],
     [{ type: 'downtime', name: 'Detencion', reason: 'KNURO' }, 'falla'],
     [{ type: 'downtime', name: 'Detencion', reason: '' }, 'sin-imputar'],
+    // 07-11: Shoplogix escribe «CAMBIO TURNO» y «CUMPLIMIENTO CUOTA»; el árbol oficial los resuelve.
+    [{ type: 'break', name: 'Detencion', reason: 'CAMBIO TURNO' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'CUMPLIMIENTO CUOTA' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'CONTRASTACION' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'BOMBAS (MECANICA)' }, 'falla'],
+    // Riles y Túneles: de Mantención (extensión fuera del curso).
+    [{ type: 'downtime', name: 'Detencion', reason: 'Planta De Riles' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Túneles MEC' }, 'falla'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Tuneles' }, 'falla'],
+    // Respaldo de regex: causal que el árbol no conoce.
+    [{ type: 'break', name: 'Detencion', reason: 'Limpieza de Ducto' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Causal inventada' }, 'falla'],
+    // Cada palabra del respaldo, con un texto que el árbol NO resuelve (08-11, mutantes).
+    [{ type: 'break', name: 'Detencion', reason: 'COLACI' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Reunión de área' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Ejercicio de brigada' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Charla de seguridad' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Aseo general' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Sanitizado de línea' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'Planned Downtime' }, 'planificado'],
+    [{ type: 'break', name: 'Detencion', reason: 'PLANNEDDOWNTIME' }, 'planificado'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Sin MMPP' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Materia prima tardía' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Falta personal' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Rechazo de pesca' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Abastecimiento de hielo' }, 'externo'],
+    [{ type: 'downtime', name: 'Detencion', reason: 'Espera de grúa' }, 'externo'],
+    // Sin causal, pero el nombre es una causal de Mantención: el árbol la lee del nombre.
+    [{ type: 'downtime', name: 'KNURO', reason: '' }, 'falla'],
+    // Campos ausentes: no revienta y queda sin imputar.
+    [{ type: 'downtime' }, 'sin-imputar'],
   ] as const)('%o → %s', (state, esperado) => {
     expect(clasificaCausa(state as never)).toBe(esperado)
   })

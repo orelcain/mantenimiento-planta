@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
-import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, Clock, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, Loader2, LayoutPanelTop, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { esDesdeRepuestos } from '@/pages/repuestos/enlacesPieza'
+import { useIsSupervisor } from '@/store/authStore'
+import { useAnclasDespiece } from '@/hooks/useAnclasDespiece'
+import { aplicarAIndice, aplicarATags, cajaDeToque, colaRevision, hechasHoy, type PendienteRevision } from '@/utils/planos/anclasDespiece'
+import { BandaRevision, BotonesMarca, TarjetaRevision } from '@/components/planos/ModoRevision'
+import { AlertTriangle, Camera, Check, CheckCircle2, ChevronDown, Clock, ChevronLeft, ChevronRight, ChevronUp, Component, Copy, Download, Link as LinkIcon, ListTree, Loader2, LayoutPanelTop, LocateFixed, MoreHorizontal, Printer, QrCode, Search, Wind, X, Zap } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { EncabezadoHerramienta } from '@/components/piel'
 import { EQUIPOS, PLANOS, assetPlano, planoPorSlug, planosPorEquipo, type PlanoCatalogo, type TipoPlano } from '@/data/planos'
@@ -24,7 +29,7 @@ import { usePlanoGiros } from '@/hooks/usePlanoGiros'
 import { NotasAparato } from '@/components/planos/NotasAparato'
 import { RecorridoUbicaciones } from '@/components/planos/RecorridoUbicaciones'
 import {
-  indiceInicial, leerRecientes, mismaCaja, ordenarPuntos, paso, sumarReciente, type BusquedaReciente,
+  esCajaRespaldo, indiceInicial, leerRecientes, mismaCaja, ordenarPuntos, paso, sumarReciente, type BusquedaReciente,
 } from '@/utils/recorridoPlano'
 import { compactarTramos, compararTags } from '@/utils/designaciones'
 import { coincideTitulo, etiquetaHoja } from '@/utils/hojas'
@@ -386,14 +391,53 @@ function Visor({ slug }: { slug: string }) {
   // entre planos (boton "Ver en el despiece") window.location puede ir un
   // tick atras del render y este visor arrancaba con la hoja del plano
   // ANTERIOR (carrera intermitente que devolvia al usuario a donde estaba).
-  const busquedaRuta = useLocation().search
+  const ubicacion = useLocation()
+  const busquedaRuta = ubicacion.search
+  // Llegó desde Repuestos («Dibujo» de una fila): se ofrece volver a la búsqueda con un toque.
+  // Se lee una vez: el visor reescribe la URL con replaceState y el estado del router no se usa más.
+  const [desdeRepuestos] = useState(() => (esDesdeRepuestos(ubicacion.state) ? ubicacion.state : null))
+  const volverAtras = useNavigate()
+  // Índice de figuras (columna izquierda, PC): quien llega desde Repuestos va a UNA pieza y el
+  // índice le quitaba ~20 % del ancho. Cerrado en ese caso, abierto en el resto.
+  const [indiceAbierto, setIndiceAbierto] = useState(() => !desdeRepuestos)
+  // Imprimir, sin señal, link y QR: poco uso, van en el menú «Más» para despejar la barra.
+  const [masAbierto, setMasAbierto] = useState(false)
+  useEffect(() => {
+    if (!masAbierto) return
+    // Se cierra con un toque fuera o Escape (el clic en una opción ya lo cierra).
+    const cerrar = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== 'Escape') return
+      if (e.type === 'pointerdown' && (e.target as Element | null)?.closest('[data-menu-mas]')) return
+      setMasAbierto(false)
+    }
+    document.addEventListener('pointerdown', cerrar)
+    document.addEventListener('keydown', cerrar)
+    return () => {
+      document.removeEventListener('pointerdown', cerrar)
+      document.removeEventListener('keydown', cerrar)
+    }
+  }, [masAbierto])
   const [inicial] = useState<number | undefined>(() => {
     const q = Number(new URLSearchParams(busquedaRuta).get('hoja'))
     if (Number.isInteger(q) && q > 0) return q
     const g = Number(localStorage.getItem(`plano-hoja:${slug}`))
     return Number.isInteger(g) && g > 0 ? g : undefined
   })
-  const { indice, hoja, abrir, cargando, error, reintentar, cargarBusqueda, buscadorListo } = usePlano(slug, inicial)
+  const { indice: indiceBase, hoja: hojaBase, abrir, cargando, error, reintentar, cargarBusqueda, buscadorListo } = usePlano(slug, inicial)
+  // Ubicaciones corregidas a mano (modo revisión): se aplican ENCIMA de los JSON de Storage.
+  const puedeRevisar = useIsSupervisor() && esDespiece
+  const { anclas, guardar: guardarAncla, error: errorAncla } = useAnclasDespiece(slug, esDespiece)
+  const vbPorHoja = useMemo(() => new Map((indiceBase?.hojas ?? []).map((h) => [h.blatt, h.vb] as const)), [indiceBase])
+  const indice = useMemo(
+    () => (indiceBase && anclas.length ? { ...indiceBase, indice: aplicarAIndice(indiceBase.indice, vbPorHoja, anclas) } : indiceBase),
+    [indiceBase, anclas, vbPorHoja],
+  )
+  const hoja = useMemo(
+    () => (hojaBase && anclas.length
+      ? { ...hojaBase, datos: { ...hojaBase.datos, tags: aplicarATags(hojaBase.datos.tags, hojaBase.blatt, anclas) } }
+      : hojaBase),
+    [hojaBase, anclas],
+  )
   // ?fig=70-8 — en el catálogo de piezas la referencia que la gente se pasa
   // por chat es la FIGURA impresa, no el número de hoja del visor. Se
   // resuelve cuando llega el índice (que es quien conoce el mapa fig→hoja).
@@ -418,6 +462,10 @@ function Visor({ slug }: { slug: string }) {
   const vinculosTerreno = usePlanoVinculos(slug, maquinaPlano.maquina)
   const [sel, setSel] = useState<Seleccion>(null)
   const [foco, setFoco] = useState<Foco>(null)
+  // Modo revisión: cola de ubicaciones sin marcar (o UNA, desde «Corregir ubicación»).
+  const [revision, setRevision] = useState<{ cola: (PendienteRevision & { pos?: string })[]; i: number; unica: boolean } | null>(null)
+  const [marca, setMarca] = useState<Caja | null>(null)
+  const [guardandoAncla, setGuardandoAncla] = useState(false)
   // ES por defecto: el equipo lee castellano; el aleman queda a un toque para
   // cotejar con el original. La eleccion se recuerda por equipo.
   const [mostrarEs, setMostrarEs] = useState(
@@ -871,6 +919,27 @@ function Visor({ slug }: { slug: string }) {
     [codigoRecorrido, indice],
   )
 
+  // Modo revisión (hooks ANTES de los return tempranos).
+  const pendientesRevision = useMemo(
+    () => (puedeRevisar && indice ? colaRevision(indice.indice, indice.sapPorCodigo, vbPorHoja, anclas) : []),
+    [puedeRevisar, indice, vbPorHoja, anclas],
+  )
+  const itemRevision = revision ? revision.cola[revision.i] ?? null : null
+  // La posición a ubicar: la fila de esa hoja con ese código (la que todavía no tiene marca).
+  const filaRevision = useMemo(() => {
+    if (!itemRevision || !hoja || hoja.blatt !== itemRevision.h) return null
+    const filas = (hoja.datos.filas ?? []).filter((f) => f.nr === itemRevision.codigo)
+    if (itemRevision.pos) return filas.find((f) => f.pos === itemRevision.pos) ?? null
+    return filas.find((f) => !hoja.datos.tags.some((t) => t.t === normalizarPos(f.pos))) ?? filas[0] ?? null
+  }, [itemRevision, hoja])
+  const irItemRevision = itemRevision ? `${itemRevision.h}|${itemRevision.codigo}|${revision?.i}` : null
+  useEffect(() => {
+    if (!itemRevision) return
+    setMarca(null)
+    setSel(null)
+    setRecorrido(null)
+    void irA(itemRevision.h)
+  }, [irItemRevision]) // eslint-disable-line react-hooks/exhaustive-deps
   if (error) {
     return <Aviso texto={error} onReintentar={reintentar} />
   }
@@ -923,6 +992,38 @@ function Visor({ slug }: { slug: string }) {
   // Historial al tocar el buscador: solo lo que este plano sabe abrir.
   const historialBusquedas = recientes.filter((r) => indice.indice[r.c])
   const terminarRecorrido = () => { setRecorrido(null); setBuscaConfirmada(null); setBusca('') }
+  const recorridoBajoLaFicha = esDespiece && !esMovil && sel?.tipo === 'aparato'
+
+  const empezarRevision = () => {
+    if (!pendientesRevision.length) return
+    setRevision({ cola: pendientesRevision, i: 0, unica: false })
+  }
+  const corregirUbicacion = (pos: string, codigo: string | null) => {
+    if (!hoja) return
+    setRevision({ cola: [{ codigo: codigo ?? '', h: hoja.blatt, pos }], i: 0, unica: true })
+  }
+  const salirRevision = () => { setRevision(null); setMarca(null) }
+  const siguienteRevision = () => {
+    setMarca(null)
+    setRevision((r) => (!r || r.unica || r.i + 1 >= r.cola.length ? null : { ...r, i: r.i + 1 }))
+  }
+  const guardarRevision = async (estado: 'ubicada' | 'no-esta') => {
+    if (!itemRevision || !filaRevision) return
+    setGuardandoAncla(true)
+    const ok = await guardarAncla({
+      hoja: itemRevision.h, pos: normalizarPos(filaRevision.pos), codigo: itemRevision.codigo || filaRevision.nr || null,
+      b: estado === 'ubicada' ? marca : null, estado,
+    })
+    setGuardandoAncla(false)
+    if (!ok) return
+    const unica = revision?.unica
+    siguienteRevision()
+    // «Corregir ubicación» de una pieza: al guardar, se ve la marca nueva enfocada.
+    if (unica && estado === 'ubicada' && marca) {
+      seleccionar({ tipo: 'aparato', tag: normalizarPos(filaRevision.pos) })
+      setFoco({ tipo: 'caja', b: marca })
+    }
+  }
   // En movil el panel es una hoja inferior: cerrada = plano completo.
   const abiertoMovil = sel !== null || !!busca.trim() || ayuda || !!recorridoActivo
 
@@ -936,8 +1037,8 @@ function Visor({ slug }: { slug: string }) {
           «‹ BAADER 142 / plano · rev» dentro del riel; ahora el título dice la máquina y el
           subtítulo el plano y su revisión. Las migas internas (hojas, panel) se conservan. */}
       <EncabezadoHerramienta
-        etiquetaVolver="Planos"
-        volverA="/aprendizaje/planos"
+        etiquetaVolver={desdeRepuestos ? 'Repuestos' : 'Planos'}
+        volverA={desdeRepuestos ? '/repuestos' : '/aprendizaje/planos'}
         titulo={cat?.maquina ?? indice.maquina}
         subtitulo={`${indice.plano} · ${indice.rev}`}
         contextoAria={`Estoy en el plano ${indice.plano} de ${cat?.maquina ?? indice.maquina}, hoja ${hoja.blatt}. `}
@@ -945,6 +1046,15 @@ function Visor({ slug }: { slug: string }) {
       {/* riel de búsqueda y hojas */}
       <header className="sticky top-0 z-40 flex flex-wrap items-center gap-3 border-b px-3 py-2"
               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+        {desdeRepuestos && (
+          <button type="button" onClick={() => volverAtras(-1)}
+                  aria-label={desdeRepuestos.busqueda ? `Volver a la búsqueda ${desdeRepuestos.busqueda} en Repuestos` : 'Volver a Repuestos'}
+                  className="flex min-h-[44px] max-md:min-h-[48px] max-w-[260px] shrink-0 items-center gap-1 rounded-ctl border px-3 text-footnote font-medium"
+                  style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
+            <ChevronLeft size={15} className="shrink-0" />
+            <span className="truncate">{desdeRepuestos.busqueda ? `Volver a «${desdeRepuestos.busqueda}»` : 'Volver a Repuestos'}</span>
+          </button>
+        )}
         <div className="order-last basis-full md:order-none md:basis-auto relative min-w-[180px] flex-1 md:max-w-sm">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--lc-ink-ghost)' }} />
           <input ref={buscaRef} value={busca}
@@ -1050,6 +1160,24 @@ function Visor({ slug }: { slug: string }) {
           ))}
         </div>
 
+        {puedeRevisar && !revision && pendientesRevision.length > 0 && (
+          <button type="button" onClick={empezarRevision}
+                  title="Ubicar en el dibujo los repuestos con SAP que no tienen su número marcado"
+                  className="flex min-h-[44px] max-md:min-h-[48px] items-center gap-1.5 rounded-ctl border px-3 text-footnote font-medium"
+                  style={{ borderColor: 'var(--lc-aqua)', color: 'var(--lc-aqua-bright)' }}>
+            Revisar ubicaciones <span className="tabular-nums">({pendientesRevision.length})</span>
+          </button>
+        )}
+        <div className="relative" data-menu-mas>
+        <button type="button" onClick={() => setMasAbierto((v) => !v)} aria-expanded={masAbierto} aria-label="Más opciones: imprimir, sin señal, link y QR"
+                title="Imprimir, guardar sin señal, link y QR"
+                className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
+          <MoreHorizontal size={18} />
+        </button>
+        {masAbierto && (
+        <div role="menu" onClick={() => setMasAbierto(false)}
+             className="absolute right-0 top-full z-50 mt-1 flex items-center gap-1 rounded-card border p-1"
+             style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
         <button type="button" title="Imprimir esta hoja" onClick={imprimirHoja}
                 className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <Printer size={15} />
@@ -1074,6 +1202,9 @@ function Visor({ slug }: { slug: string }) {
                 className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
           <QrCode size={15} />
         </button>
+        </div>
+        )}
+        </div>
         <div className="flex items-center gap-1 max-md:gap-2 font-mono text-footnote">
           <button type="button" disabled={!anterior} onClick={() => anterior && void irA(anterior.blatt)}
                   className="flex min-h-[44px] min-w-[44px] max-md:min-h-[48px] max-md:min-w-[48px] items-center justify-center rounded-ctl disabled:opacity-30" title="Hoja anterior">
@@ -1114,6 +1245,11 @@ function Visor({ slug }: { slug: string }) {
         </div>
       </header>
 
+      {revision && (
+        <BandaRevision i={revision.i} total={revision.cola.length} unica={revision.unica} guardando={guardandoAncla}
+                       onSaltar={siguienteRevision} onNoEsta={() => void guardarRevision('no-esta')} onSalir={salirRevision} />
+      )}
+
       {mostrarQR && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6"
              onClick={() => setMostrarQR(false)}>
@@ -1136,8 +1272,24 @@ function Visor({ slug }: { slug: string }) {
       )}
       <div className="flex min-h-0 flex-1">
         {/* índice de hojas */}
-        <nav ref={navRef} className="hidden w-56 shrink-0 overflow-y-auto border-r px-2 pb-2 md:block"
+        {!indiceAbierto && (
+          <div className="hidden w-11 shrink-0 flex-col items-center border-r pt-2 md:flex"
+               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+            <button type="button" onClick={() => setIndiceAbierto(true)} aria-label="Mostrar el índice de figuras"
+                    title="Índice de figuras"
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-mid)' }}>
+              <ListTree size={18} />
+            </button>
+          </div>
+        )}
+        <nav ref={navRef} className={`${indiceAbierto ? 'md:block' : ''} hidden w-56 shrink-0 overflow-y-auto border-r px-2 pb-2`}
              style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-border)' }}>
+          <div className="sticky top-0 z-10 -mx-2 flex justify-end px-1 pt-1" style={{ background: 'var(--lc-surface)' }}>
+            <button type="button" onClick={() => setIndiceAbierto(false)} aria-label="Ocultar el índice de figuras"
+                    className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-ctl" style={{ color: 'var(--lc-ink-ghost)' }}>
+              <ChevronLeft size={16} />
+            </button>
+          </div>
           {esDespiece && !!indice.destacados?.length && (
             <div className="flex flex-col gap-1.5 pb-2 pt-2">
               {indice.destacados.map((d, i) => (
@@ -1229,7 +1381,21 @@ function Visor({ slug }: { slug: string }) {
             onRotulo={(r) => { seleccionar({ tipo: 'rotulo', r }); setFoco(null) }}
             onFondo={() => setSel(null)}
             giro={giroHoja} onGirar={girarHoja}
+            escalaFoco={esDespiece ? 2.2 : undefined}
+            onMarcar={revision ? (x, y) => setMarca(cajaDeToque(x, y)) : undefined}
+            marca={revision ? marca : null}
           />
+          {revision && (
+            <BotonesMarca hayMarca={!!marca} guardando={guardandoAncla}
+                          onGuardar={() => void guardarRevision('ubicada')} onDeshacer={() => setMarca(null)} />
+          )}
+          {!revision && foco?.tipo === 'caja' && esCajaRespaldo(foco.b, meta?.vb ?? []) && (
+            <p role="status"
+               className="pointer-events-none absolute left-1/2 top-3 z-10 max-w-[90%] -translate-x-1/2 rounded-ctl border px-3 py-2 text-center text-footnote"
+               style={{ background: 'var(--lc-surface)', borderColor: 'var(--lc-prep)', color: 'var(--lc-ink)' }}>
+              {sel?.tipo === 'aparato' ? `La pos. ${sel.tag}` : 'Esta posición'} no está marcada en el dibujo: búscala por su número en la figura.
+            </p>
+          )}
         </main>
 
         <aside
@@ -1301,8 +1467,12 @@ function Visor({ slug }: { slug: string }) {
               {sel ? etiquetaSel(sel) : mostrarResultados ? `Resultados de “${busca.trim()}”` : 'Panel'}
             </button>
           )}
-          {!(esMovil && minimizada) && <>
-          {recorridoActivo && !mostrarResultados && !esVisor && (
+          {!(esMovil && minimizada) && revision && itemRevision && (
+            <TarjetaRevision fila={filaRevision} codigo={itemRevision.codigo} sap={indice.sapPorCodigo?.[itemRevision.codigo]}
+                             hechas={hechasHoy(anclas)} pendientes={pendientesRevision.length} error={errorAncla} />
+          )}
+          {!(esMovil && minimizada) && !revision && <>
+          {recorridoActivo && !mostrarResultados && !esVisor && !recorridoBajoLaFicha && (
             <RecorridoUbicaciones
               codigo={recorridoActivo.codigo} nombre={nombreRecorrido}
               puntos={puntosRecorrido} i={recorridoActivo.i} vistos={recorridoActivo.vistos}
@@ -1373,7 +1543,19 @@ function Visor({ slug }: { slug: string }) {
                      onIrFigura={irAFigura} onVerEnDibujo={(caja) => setFoco({ tipo: 'caja', b: caja })}
                      anclaDeAparato={anclaDeAparato}
                      partes={partes} slug={slug} sapPorCodigo={indice.sapPorCodigo}
-                     vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano} />}
+                     vinculosTerreno={vinculosTerreno} maquinaPlano={maquinaPlano}
+                     onCorregirUbicacion={puedeRevisar ? corregirUbicacion : undefined}
+                     recorridoBajoPieza={recorridoActivo && recorridoBajoLaFicha ? (
+                       // Despiece en PC: primero la pieza (stock, bodega) y DESPUÉS los otros lugares
+                       // donde va; el nombre ya lo dice la ficha (16-10-2026, panel simplificado).
+                       <div className="mt-3">
+                         <RecorridoUbicaciones
+                           codigo={recorridoActivo.codigo}
+                           puntos={puntosRecorrido} i={recorridoActivo.i} vistos={recorridoActivo.vistos}
+                           etiquetaDe={etiquetaUbicacion} onIr={irAUbicacionActual}
+                           onCerrar={terminarRecorrido} />
+                       </div>
+                     ) : null} />}
           </>}
         </aside>
       </div>
@@ -1386,7 +1568,7 @@ function Visor({ slug }: { slug: string }) {
 function Panel({
   sel, indice, hojaActual, notas, onIr, recientes, onAbrirAparato, codigoEnRecorrido, resaltar, onResaltar, enEstaHoja,
   esDespiece, meta, filas, tagsHoja, onSeleccionarFila, onIrFigura, onVerEnDibujo, anclaDeAparato, partes, slug,
-  sapPorCodigo, vinculosTerreno, maquinaPlano,
+  sapPorCodigo, vinculosTerreno, maquinaPlano, recorridoBajoPieza = null, onCorregirUbicacion,
 }: {
   sel: Seleccion
   indice: NonNullable<ReturnType<typeof usePlano>['indice']>
@@ -1420,6 +1602,10 @@ function Panel({
   desgaste?: string[]
   vinculosTerreno: ReturnType<typeof usePlanoVinculos>
   maquinaPlano: ReturnType<typeof useMaquinaPlano>
+  /** despiece en PC: el recorrido ‹ 1 de N ›, que la ficha pone justo bajo la pieza */
+  recorridoBajoPieza?: ReactNode
+  /** admin/supervisor: entra a marcar a mano la posición de esta pieza */
+  onCorregirUbicacion?: (pos: string, codigo: string | null) => void
 }) {
   const [copiadoLista, setCopiadoLista] = useState(false)
   // En el despiece, llegar a una figura y NO ver sus piezas obliga a adivinar
@@ -1646,6 +1832,8 @@ function Panel({
           desgaste={indice.desgaste}
           hermanas={filaSel.nr ? indice.hermanasPorCodigo?.[filaSel.nr]?.[String(hojaActual)] : undefined}
           onVerEnDibujo={onVerEnDibujo}
+          recorrido={recorridoBajoPieza}
+          onCorregir={onCorregirUbicacion ? () => onCorregirUbicacion(normalizarPos(filaSel.pos), filaSel.nr ?? null) : undefined}
           ubicaciones={filaSel.nr ? (indice.indice[filaSel.nr]?.length ?? 0) : 0}
           onRecorrer={filaSel.nr && filaSel.nr !== codigoEnRecorrido
             ? () => onAbrirAparato(filaSel.nr!, tagsHoja.find((t) => normalizarPos(t.t) === normalizarPos(filaSel.pos))?.b)
@@ -1889,8 +2077,9 @@ function Resultados({ items, total, onIr, partes = [], cargando = false }: {
  * ancla OCR (se eligen desde la tabla en vez de tocarlas en el dibujo).
  */
 function FichaPieza({
-  fila, filas, meta, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug,
+  fila, filas, tagsHoja, selTag, notas, onSeleccionarFila, onIrFigura, anclaId, slug,
   sapPorCodigo, usosPorCodigo, umbralComun, desgaste, hermanas, onVerEnDibujo, ubicaciones = 0, onRecorrer,
+  recorrido = null, onCorregir,
 }: {
   fila: FilaDespiece
   filas: FilaDespiece[]
@@ -1918,6 +2107,10 @@ function FichaPieza({
   ubicaciones?: number
   /** arranca el recorrido ‹ › por esos lugares */
   onRecorrer?: () => void
+  /** el recorrido ya abierto (PC), que va justo bajo la tarjeta de la pieza */
+  recorrido?: ReactNode
+  /** admin/supervisor: marcar a mano dónde va esta posición en el dibujo */
+  onCorregir?: () => void
 }) {
   const [copiado, setCopiado] = useState(false)
   // la caja de ESTA posición sobre el dibujo, si el OCR la ancló
@@ -1931,177 +2124,147 @@ function FichaPieza({
   const posN = normalizarPos(fila.pos)
   const enPlanoElectrico = /^[A-Z]\d+$/.test(posN)
   const sap = fila.nr ? sapPorCodigo?.[fila.nr] : undefined
-  // Sin curaduria manual detras de esta tabla (sale directo del catalogo
-  // escaneado): nunca se marca "confirmado" desde aca.
-  const badge = !fila.nr
-    ? { txt: 'sin registro', bg: 'var(--lc-surface-hi)', fg: 'var(--lc-ink-mid)' }
-    : { txt: 'propuesto', bg: 'var(--lc-prep-soft)', fg: 'var(--lc-prep)' }
+  const comun = !!(fila.nr && umbralComun != null && (usosPorCodigo?.[fila.nr] ?? 0) > umbralComun)
 
+  // Orden (16-10-2026, panel simplificado con Orel): 1) la pieza con su stock y bodega, que es a lo
+  // que viene el técnico; 2) notas y fotos de terreno; 3) la tabla de la figura, plegada. Se quitaron
+  // la marca «propuesto», «va en otras N figuras» (lo dice el recorrido), la línea «Figura N» (la dice
+  // la barra) y la línea SAP suelta (la dice la tarjeta del repuesto).
   return (
     <>
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <Titulo>Pieza</Titulo>
-        <span className="rounded-ctl px-1.5 py-0.5 text-nota font-medium" style={{ background: badge.bg, color: badge.fg }}>
-          {badge.txt}
-        </span>
-      </div>
-      <p className="m-0 text-[17px] font-semibold leading-snug">{fila.es || fila.de || fila.pos}</p>
-      {fila.de && fila.es && (
-        <p className="m-0 mt-0.5 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>{fila.de}</p>
-      )}
-      {/* Cuántas van en la máquina: pedir 1 cuando lleva 32 es un viaje
-          perdido a bodega. Solo se muestra si el catálogo lo dice (x1 no). */}
-      {/* Consumible: el técnico lo ve dentro de SU conjunto (un cojinete en
-          la fig 13-1) sin tener que saber que también está en la figura 00. */}
-      {fila.nr && desgaste?.includes(fila.nr) && (
-        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-nota font-semibold"
-           style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
-          Pieza de desgaste — se cambia seguido
-        </p>
-      )}
-      {fila.q != null && (
-        <p className="m-0 mt-1 inline-block rounded-ctl px-2 py-0.5 text-nota font-semibold"
-           style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
-          Lleva {fila.q} unidades
-        </p>
-      )}
-
-      {fila.nr && (
-        <div className="mt-2 flex items-center gap-2">
-          <span className="font-mono text-[17px] font-semibold" style={{ color: 'var(--lc-aqua-bright)' }}>{fila.nr}</span>
-          <button type="button" title="Copiar código"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(fila.nr!)
-                    setCopiado(true)
-                    setTimeout(() => setCopiado(false), 1500)
-                  }}
-                  className="rounded-ctl p-1" style={{ color: copiado ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
-            {copiado ? <Check size={14} /> : <Copy size={14} />}
-          </button>
+      <section className="rounded-card border p-3" aria-label="Pieza"
+               style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-bg-panel)' }}>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="m-0 text-[17px] font-medium leading-snug">{fila.es || fila.de || fila.pos}</p>
+          <span className="shrink-0 font-mono text-nota" style={{ color: 'var(--lc-ink-mid)' }}>pos. {fila.pos}</span>
         </div>
+        {fila.de && fila.es && (
+          <p className="m-0 mt-0.5 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>{fila.de}</p>
+        )}
+        {(fila.q != null || (fila.nr && desgaste?.includes(fila.nr)) || comun) && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {/* Cuántas van: pedir 1 cuando lleva 32 es un viaje perdido a bodega. */}
+            {fila.q != null && (
+              <span className="rounded-ctl px-2 py-0.5 text-nota font-medium" style={{ background: 'var(--lc-prep-soft)', color: 'var(--lc-ink-mid)' }}>
+                Lleva {fila.q} unidades
+              </span>
+            )}
+            {fila.nr && desgaste?.includes(fila.nr) && (
+              <span className="rounded-ctl px-2 py-0.5 text-nota font-medium" style={{ background: 'var(--lc-nuevo-soft)', color: 'var(--lc-nuevo)' }}>
+                Pieza de desgaste
+              </span>
+            )}
+            {comun && (
+              <span className="rounded-ctl px-2 py-0.5 text-nota" style={{ background: 'var(--lc-surface-hi)', color: 'var(--lc-ink-mid)' }}>
+                Pieza común ({usosPorCodigo![fila.nr!]} figuras)
+              </span>
+            )}
+          </div>
+        )}
+
+        {fila.nr && (
+          <div className="mt-2 flex items-center gap-1">
+            <span className="font-mono text-[17px] font-medium" style={{ color: 'var(--lc-aqua-bright)' }}>{fila.nr}</span>
+            <button type="button" title="Copiar código" aria-label="Copiar código"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(fila.nr!)
+                      setCopiado(true)
+                      setTimeout(() => setCopiado(false), 1500)
+                    }}
+                    className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-ctl" style={{ color: copiado ? 'var(--lc-nuevo)' : 'var(--lc-ink-mid)' }}>
+              {copiado ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+            {/* El dibujo ya hace zoom al llegar; esto vuelve a la marca si el técnico se movió. */}
+            {anclaEnDibujo && (
+              <button type="button" onClick={() => onVerEnDibujo(anclaEnDibujo)} title="Centrar el dibujo en esta pieza"
+                      aria-label="Centrar el dibujo en esta pieza"
+                      className="ml-auto flex min-h-[44px] min-w-[44px] items-center justify-center rounded-ctl border"
+                      style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
+                <LocateFixed size={17} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* El mismo código en varias posiciones de ESTA figura: el sensor 42303077 es a la vez B10,
+            B14 y B15; saberlo evita pedir tres repuestos creyendo que son distintos. */}
+        {hermanas && hermanas.length > 1 && (
+          <p className="m-0 mt-1 flex flex-wrap items-baseline gap-1 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
+            <span>El mismo código es también</span>
+            {hermanas.filter((h) => normalizarPos(h) !== selTag).map((h) => (
+              <button key={h} type="button"
+                      onClick={() => {
+                        const f = filas.find((x) => normalizarPos(x.pos) === normalizarPos(h))
+                        if (f) onSeleccionarFila(f)
+                      }}
+                      className="rounded-ctl border px-1.5 font-mono"
+                      style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
+                {h}
+              </button>
+            ))}
+            <span>en esta figura.</span>
+          </p>
+        )}
+
+        {/* Stock vivo con sesión; sin sesión (visor anónimo por QR) queda el dato fijo del índice. */}
+        {sap ? (
+          <div className="mt-2">
+            <FichasSap saps={[sap.s]} incrustada
+                       respaldo={
+                         <p className="m-0 flex flex-wrap items-baseline gap-x-2 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
+                           <span className="font-mono">SAP {sap.s}</span>
+                           {sap.u && <span>· bodega {sap.u}</span>}
+                         </p>
+                       } />
+          </div>
+        ) : fila.nr ? (
+          <Link to={`/repuestos?q=${encodeURIComponent(fila.nr)}`}
+                className="mt-2 inline-block text-nota underline-offset-2 hover:underline" style={{ color: 'var(--lc-aqua-bright)' }}>
+            Buscar {fila.nr} en Repuestos
+          </Link>
+        ) : (
+          <p className="m-0 mt-2 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>Sin código de repuesto en el catálogo.</p>
+        )}
+      </section>
+
+      {onCorregir && (
+        <button type="button" onClick={onCorregir}
+                className="mt-2 min-h-[44px] w-full rounded-ctl border px-3 text-footnote"
+                style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink-mid)' }}>
+          {anclaEnDibujo ? 'Corregir ubicación en el dibujo' : 'Ubicar en el dibujo'}
+        </button>
       )}
 
-      {fila.nr && usosPorCodigo?.[fila.nr] != null && (
-        <p className="m-0 mt-1 text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
-          {umbralComun != null && usosPorCodigo[fila.nr]! > umbralComun
-            ? `Pieza común: se usa en toda la máquina (${usosPorCodigo[fila.nr]} figuras)`
-            : `Esta misma pieza va en otras ${usosPorCodigo[fila.nr]! - 1} figuras`}
-        </p>
-      )}
-      {/* Antes solo lo decía: ahora se recorren, una por una, sin volver a buscar. */}
+      {recorrido}
+
+      {/* Otros lugares donde va (si todavía no se está recorriendo). */}
       {onRecorrer && ubicaciones > 1 && (
         <button type="button" onClick={onRecorrer}
-                className="mt-2 flex min-h-[44px] max-md:min-h-[48px] w-full items-center justify-center gap-1.5 rounded-full px-3 text-footnote font-semibold"
-                style={{ background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
-          Recorrer los {ubicaciones} lugares donde va <ChevronRight size={15} />
+                className="mt-2 flex min-h-[44px] max-md:min-h-[48px] w-full items-center justify-between gap-1.5 rounded-card border px-3 text-footnote"
+                style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-ink)' }}>
+          <span>También en {ubicaciones - 1} {ubicaciones - 1 === 1 ? 'figura más' : 'figuras más'}</span>
+          <ChevronRight size={15} style={{ color: 'var(--lc-aqua-bright)' }} />
         </button>
       )}
 
-      {/* El MISMO código en varias posiciones de ESTA figura: el sensor
-          42303077 es a la vez B10, B14 y B15. Saberlo evita pedir tres
-          repuestos distintos creyendo que son piezas diferentes. */}
-      {hermanas && hermanas.length > 1 && (
-        <p className="m-0 mt-1 flex flex-wrap items-baseline gap-1 text-nota"
-           style={{ color: 'var(--lc-ink-mid)' }}>
-          <span>El mismo código es también</span>
-          {hermanas.filter((h) => normalizarPos(h) !== selTag).map((h) => (
-            <button key={h} type="button"
-                    onClick={() => {
-                      const f = filas.find((x) => normalizarPos(x.pos) === normalizarPos(h))
-                      if (f) onSeleccionarFila(f)
-                    }}
-                    className="rounded-ctl border px-1.5 font-mono"
+      {(fila.fig || enPlanoElectrico) && (
+        <div className="mt-2 flex flex-col gap-2">
+          {fila.fig && (
+            <button type="button" onClick={() => onIrFigura(fila.fig!)}
+                    className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
                     style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
-              {h}
+              Ver figura {fila.fig}
             </button>
-          ))}
-          <span>en esta figura.</span>
-        </p>
+          )}
+          {enPlanoElectrico && (
+            <Link to={`/aprendizaje/planos/baader-142-888?ap=${encodeURIComponent(posN)}`}
+                  className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
+                  style={{ borderColor: 'var(--lc-border)', color: 'var(--lc-aqua-bright)' }}>
+              Ver en plano eléctrico → {posN}
+            </Link>
+          )}
+        </div>
       )}
-
-      {/* La figura del catálogo ubica cada posición SOBRE el dibujo de la
-          máquina; el botón lleva la vista a esa marca. Sin él, el técnico ve
-          la ficha y no se entera de que el dibujo de atrás dice dónde va. */}
-      {anclaEnDibujo && (
-        <button type="button" onClick={() => onVerEnDibujo(anclaEnDibujo)}
-                className="mt-2 flex min-h-[44px] max-md:min-h-[48px] w-full items-center justify-center rounded-ctl border px-3 text-footnote font-medium"
-                style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
-          Ver dónde va en el dibujo
-        </button>
-      )}
-
-      <p className="m-0 mt-2 text-footnote" style={{ color: 'var(--lc-ink-mid)' }}>
-        Figura {meta.fig} · {meta.tituloEs}
-      </p>
-
-      <div className="mt-2 flex flex-col gap-2">
-        {fila.fig && (
-          <button type="button" onClick={() => onIrFigura(fila.fig!)}
-                  className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium"
-                  style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
-            Ver figura {fila.fig}
-          </button>
-        )}
-        {enPlanoElectrico && (
-          <Link to={`/aprendizaje/planos/baader-142-888?ap=${encodeURIComponent(posN)}`}
-                className="flex min-h-[44px] max-md:min-h-[48px] items-center justify-center rounded-ctl border px-3 text-center text-footnote font-medium no-underline"
-                style={{ borderColor: 'var(--lc-aqua)', background: 'var(--lc-aqua-soft)', color: 'var(--lc-aqua-bright)' }}>
-            Ver en plano eléctrico → {posN}
-          </Link>
-        )}
-        {fila.nr && !sap && (
-          <Link to={`/repuestos?q=${encodeURIComponent(fila.nr)}`}
-                className="text-nota underline-offset-2 hover:underline"
-                style={{ color: 'var(--lc-aqua-bright)' }}>
-            Buscar {fila.nr} en repuestos
-          </Link>
-        )}
-      </div>
-
-      {sap && (
-        <>
-          {/* El dato estatico del indice se ve SIEMPRE (el visor corre anonimo
-              via QR y la coleccion repuestos exige sesion): SAP + nombre +
-              ubicacion de bodega. FichasSap suma el stock vivo con sesion. */}
-          <p className="m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-nota"
-             style={{ color: 'var(--lc-ink-mid)' }}>
-            <span className="rounded-ctl px-2 py-0.5 font-mono"
-                  style={{ background: 'var(--lc-surface-hi)' }}>SAP {sap.s}</span>
-            {sap.n && <span>{sap.n}</span>}
-            {sap.u && <span>· bodega {sap.u}</span>}
-          </p>
-          <FichasSap saps={[sap.s]} />
-        </>
-      )}
-
-      <Titulo>Posiciones de esta figura</Titulo>
-      <div className="max-h-[38vh] overflow-y-auto rounded-ctl border" style={{ borderColor: 'var(--lc-border)' }}>
-        {filas.map((f) => {
-          const fPosN = normalizarPos(f.pos)
-          const activa = fPosN === posN
-          const anclada = tagsHoja.some((t) => t.t === fPosN)
-          return (
-            <button key={f.pos} type="button" onClick={() => onSeleccionarFila(f)}
-                    className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-1.5 text-left last:border-b-0 max-md:min-h-[48px]"
-                    style={{
-                      borderColor: 'var(--lc-border)',
-                      background: activa ? 'var(--lc-aqua-soft)' : undefined,
-                      opacity: anclada || activa ? 1 : 0.55,
-                    }}>
-              <span className="shrink-0 font-mono text-footnote font-semibold"
-                    style={{ color: activa ? 'var(--lc-aqua-bright)' : 'var(--lc-ink-mid)' }}>
-                {f.pos}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
-                {f.es || f.de || '—'}
-              </span>
-              {f.nr && (
-                <span className="shrink-0 font-mono text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{f.nr}</span>
-              )}
-            </button>
-          )
-        })}
-      </div>
 
       <FichasSap notas={notas.notasDe('aparato', anclaId)} />
 
@@ -2116,6 +2279,44 @@ function FichaPieza({
         onBorrar={notas.borrar}
         onEditar={notas.editar}
       />
+
+      {/* La tabla de la figura: útil para saltar a otra pieza del mismo dibujo, pero son ~70 filas;
+          plegada para que no empuje lo importante hacia abajo. */}
+      <details className="mt-3 rounded-card border" style={{ borderColor: 'var(--lc-border)' }}>
+        <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between px-3 text-footnote">
+          <span>Posiciones de esta figura</span>
+          <span className="flex items-center gap-1 text-nota tabular-nums" style={{ color: 'var(--lc-ink-mid)' }}>
+            {filas.length} <ChevronDown size={14} />
+          </span>
+        </summary>
+        <div className="max-h-[38vh] overflow-y-auto border-t" style={{ borderColor: 'var(--lc-border)' }}>
+          {filas.map((f) => {
+            const fPosN = normalizarPos(f.pos)
+            const activa = fPosN === posN
+            const anclada = tagsHoja.some((t) => t.t === fPosN)
+            return (
+              <button key={f.pos} type="button" onClick={() => onSeleccionarFila(f)}
+                      className="flex w-full items-baseline justify-between gap-2 border-b px-2 py-1.5 text-left last:border-b-0 max-md:min-h-[48px]"
+                      style={{
+                        borderColor: 'var(--lc-border)',
+                        background: activa ? 'var(--lc-aqua-soft)' : undefined,
+                        opacity: anclada || activa ? 1 : 0.55,
+                      }}>
+                <span className="shrink-0 font-mono text-footnote font-medium"
+                      style={{ color: activa ? 'var(--lc-aqua-bright)' : 'var(--lc-ink-mid)' }}>
+                  {f.pos}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-nota" style={{ color: 'var(--lc-ink-mid)' }}>
+                  {f.es || f.de || '—'}
+                </span>
+                {f.nr && (
+                  <span className="shrink-0 font-mono text-nota" style={{ color: 'var(--lc-ink-lo)' }}>{f.nr}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </details>
     </>
   )
 }
@@ -2502,10 +2703,14 @@ function ZonaSugerida({ tag, partes, slug }: {
  * en las notas del aparato, resueltos contra el maestro de repuestos y el
  * stock de bodega. Veo la falla en el plano -> se que pedir y cuantos hay.
  */
-function FichasSap({ notas, saps: sapsDirectos }: {
+function FichasSap({ notas, saps: sapsDirectos, incrustada = false, respaldo = null }: {
   notas?: ReturnType<typeof usePlanoNotas>['notas']
   /** SAPs a mostrar directo, sin pasar por notas (p.ej. el cruce del catálogo del despiece). */
   saps?: string[]
+  /** Dentro de la tarjeta de la pieza: sin título «Repuesto vinculado» ni borde propio. */
+  incrustada?: boolean
+  /** Lo que se muestra si no hay ficha viva (sin sesión o SAP sin catalogar). */
+  respaldo?: ReactNode
 }) {
   const saps = useMemo(
     () => [...new Set([
@@ -2516,17 +2721,17 @@ function FichasSap({ notas, saps: sapsDirectos }: {
   )
   const info = usePlanoSap(saps)
   const fichas = saps.map((s) => info[s]).filter((f): f is NonNullable<typeof f> => !!f)
-  if (!fichas.length) return null
+  if (!fichas.length) return <>{respaldo}</>
   return (
     <>
-      <Titulo>Repuesto vinculado</Titulo>
+      {!incrustada && <Titulo>Repuesto vinculado</Titulo>}
       {fichas.map((f) => {
         const sinStock = f.stockActual != null && f.stockActual <= 0
         const bajo = f.stockActual != null && f.stockMinimo != null
           && f.stockActual > 0 && f.stockActual < f.stockMinimo
         return (
-          <div key={f.sap} className="mb-3 rounded-card border p-3"
-               style={{ background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
+          <div key={f.sap} className={incrustada ? 'border-t pt-2' : 'mb-3 rounded-card border p-3'}
+               style={incrustada ? { borderColor: 'var(--lc-border)' } : { background: 'var(--lc-bg-panel)', borderColor: 'var(--lc-border)' }}>
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-footnote font-semibold leading-snug">
                 {f.nombre ?? 'SAP sin catalogar'}

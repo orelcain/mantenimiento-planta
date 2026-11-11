@@ -44,7 +44,8 @@ import { getTechnicians, getUserById } from '@/services/auth'
 import { refineText, isAIConfigured } from '@/services/ai'
 import { useToast } from '@/hooks/useToast'
 import type { Incident, IncidentStatus, IncidentPriority, User as UserType } from '@/types'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatDate, formatFechaHora, pareceIdDeUsuario } from '@/lib/utils'
+import { usePielApple } from '@/hooks/usePielApple'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
 import { getMapVersionById, getMapLocationById } from '@/services/maps'
@@ -111,7 +112,16 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   const [mapVersion, setMapVersion] = useState<MapVersion | null>(null)
   const [mapLocation, setMapLocation] = useState<MapLocation | null>(null)
   const [mapLoading, setMapLoading] = useState(false)
+  // Solo con la consulta terminada y sin error se puede afirmar que no hay ubicación.
+  const [mapConsultado, setMapConsultado] = useState(false)
   const [reporterName, setReporterName] = useState<string>('')
+
+  // Piel Apple: nombre de la zona desde el store, y punto de mapa utilizable (x e y finitos).
+  const apple = usePielApple()
+  const zones = useAppStore((state) => state.zones)
+  const zonaNombre = zones.find((z) => z.id === incident.zoneId)?.nombre
+  const puntoValido = !!incident.mapPosition
+    && Number.isFinite(incident.mapPosition.x) && Number.isFinite(incident.mapPosition.y)
 
   // Cargar lista de técnicos
   useEffect(() => {
@@ -152,6 +162,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
   const formatUserLabel = (userInfo?: UserType | null, fallback?: string) => {
     if (!userInfo) return fallback || ''
+    if (apple) return `${userInfo.nombre} ${userInfo.apellido}`
     return `${userInfo.nombre} ${userInfo.apellido} · ${roleLabel(userInfo.rol)} · ${providerLabel(userInfo.authProvider)}`
   }
 
@@ -186,9 +197,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
       if (!incident.mapVersionId || !incident.mapLocationId) {
         setMapVersion(null)
         setMapLocation(null)
+        setMapConsultado(true)
         return
       }
 
+      setMapConsultado(false)
       setMapLoading(true)
       try {
         const [versionData, locationData] = await Promise.all([
@@ -197,6 +210,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         ])
         setMapVersion(versionData)
         setMapLocation(locationData)
+        setMapConsultado(true)
       } catch (error) {
         logger.error('Error loading map data', error instanceof Error ? error : new Error(String(error)))
       } finally {
@@ -484,7 +498,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 {/* Título completo en dos líneas: truncarlo a una escondía lo que la incidencia ES. */}
                 <DialogTitle className="text-title3 leading-tight line-clamp-2">{incident.titulo}</DialogTitle>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-footnote text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{formatDate(incident.createdAt)}</span>
+                  <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{apple ? formatFechaHora(incident.createdAt) : formatDate(incident.createdAt)}</span>
                   <Badge className={priorityConfig.className}>{priorityConfig.label}</Badge>
                   <Badge variant="outline" className={statusConfig.color}>
                     <StatusIcon className="h-3 w-3 mr-1" />
@@ -638,7 +652,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             )}
 
             {/* Ubicación en mapa */}
-            {incident.mapPosition && mapVersion && (
+            {incident.mapPosition && mapVersion && (!apple || (puntoValido && !!mapVersion.imageUrl)) && (
               <div>
                 <h4 className="font-medium mb-2 flex items-center gap-2">
                   <Map className="h-4 w-4" />
@@ -672,21 +686,28 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 )}
               </div>
             )}
+            {apple && (incident.mapVersionId || incident.mapLocationId) && mapConsultado && !mapLoading && !(puntoValido && mapVersion?.imageUrl) && (
+              <p className="text-footnote text-muted-foreground">Sin ubicación en mapa</p>
+            )}
 
             {/* Info adicional */}
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  {(!apple || zonaNombre) && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <MapPin className="h-4 w-4" />
-                    <span>Zona: {incident.zoneId}</span>
+                    <span>Zona: {apple ? zonaNombre : incident.zoneId}</span>
                   </div>
+                  )}
+                  {!(apple && pareceIdDeUsuario(formatUserLabel(reporterUser, reporterName || incident.reportadoPor))) && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <User className="h-4 w-4" />
                     <span>
                       Reportado por: {formatUserLabel(reporterUser, reporterName || incident.reportadoPor)}
                     </span>
                   </div>
+                  )}
                 </div>
 
                 {/* Usuario asignado */}
@@ -703,9 +724,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       <Badge variant="outline">
                         {roleLabel(assignedUser.rol)}
                       </Badge>
+                      {!apple && (
                       <Badge variant="secondary">
                         {providerLabel(assignedUser.authProvider)}
                       </Badge>
+                      )}
                     </div>
                   </div>
                 ) : incident.status === 'confirmada' && permissions.canAssignIncident && (
@@ -737,7 +760,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 </h4>
                 <p className="text-sm">{incident.resolucion}</p>
                 {/* Quién resolvió */}
-                {incident.resolvedBy && (
+                {incident.resolvedBy && !(apple && !(assignedUser && incident.resolvedBy === assignedUser.id) && !incident.resolvedByName && pareceIdDeUsuario(incident.resolvedBy)) && (
                   <p className="text-xs text-muted-foreground mt-2">
                     Resuelta por: {assignedUser && incident.resolvedBy === assignedUser.id
                       ? `${assignedUser.nombre} ${assignedUser.apellido}`
@@ -746,7 +769,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 )}
                 {incident.resolvedAt && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Fecha resolución: {incident.resolvedAt.toLocaleDateString('es-CL')} {incident.resolvedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                    Fecha resolución: {apple ? formatFechaHora(incident.resolvedAt) : <>{incident.resolvedAt.toLocaleDateString('es-CL')} {incident.resolvedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</>}
                   </p>
                 )}
                 {incident.tiempoResolucionMinutos != null && incident.tiempoResolucionMinutos > 0 && (
@@ -779,7 +802,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                          </>
                       ) : (
                         <>
-                           <Wand2 className="h-3 w-3 mr-1" />
+                           {!apple && <Wand2 className="h-3 w-3 mr-1" />}
                            <span>Mejorar redacción</span>
                         </>
                       )}
@@ -833,7 +856,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                          </>
                       ) : (
                         <>
-                           <Wand2 className="h-3 w-3 mr-1" />
+                           {!apple && <Wand2 className="h-3 w-3 mr-1" />}
                            <span>Mejorar redacción</span>
                         </>
                       )}
@@ -887,7 +910,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                          </>
                       ) : (
                         <>
-                           <Wand2 className="h-3 w-3 mr-1" />
+                           {!apple && <Wand2 className="h-3 w-3 mr-1" />}
                            <span>Mejorar redacción</span>
                         </>
                       )}

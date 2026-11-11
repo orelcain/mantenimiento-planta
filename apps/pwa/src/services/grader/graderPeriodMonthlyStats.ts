@@ -26,6 +26,7 @@ import {
 } from '@/services/grader/shoplogixMaintenance'
 import { deserializeStateAggregates } from '@/services/grader/shoplogixStateAggregates'
 import { paretoByCategoria } from '@/services/shoplogix/imputacionPareto'
+import type { LossBucket } from '@/services/shoplogix/lossBuckets'
 
 /**
  * Formatea segundos en forma compacta ("6h 18m"). Vivia en
@@ -109,7 +110,12 @@ export interface PeriodImputacion {
   /** Serie cronológica por turno — sirve para ver si la imputación mejora. */
   porTurno: Array<{ dateKey: string; shiftId: string; cobertura: number; totalSec: number }>
   /** Categorías del árbol del período, por impacto. */
-  topCategorias: Array<{ label: string; durationSec: number }>
+  topCategorias: Array<{
+    label: string
+    durationSec: number
+    /** Dueño que más tiempo aporta a la categoría (de `porDueno`); ausente si no se sabe. */
+    bucket?: LossBucket
+  }>
   /** Turnos considerados (los que traen agregados). */
   turnos: number
 }
@@ -226,7 +232,7 @@ export function computePeriodMonthlyStats(
       ),
       topCategorias: pPeriodo.categorias
         .filter(c => c.durationSec > 0)
-        .map(c => ({ label: c.label, durationSec: c.durationSec })),
+        .map(c => ({ label: c.label, durationSec: c.durationSec, bucket: c.porDueno[0]?.bucket })),
       turnos: turnosConAgregados,
     }
     : null

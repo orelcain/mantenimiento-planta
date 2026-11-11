@@ -44,6 +44,7 @@ const DESCRIPCIONES = {
 const MODULOS_FUERA_DEL_MENU = [
   { nombre: 'HMI Knuro', ruta: '/aprendizaje/hmi-knuro', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR). Se entra desde el Centro de Aprendizaje' },
   { nombre: 'HMI Grader', ruta: '/aprendizaje/hmi-grader', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI del Grader (StaticGrader Marelec Z2) para practicar. Se entra desde el Centro de Aprendizaje' },
+  { nombre: 'HMI GEA PowerPak', ruta: '/aprendizaje/hmi-gea', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI PowerPak de la termoformadora GEA V2 (serie 50520184) para practicar. Se entra desde el Centro de Aprendizaje' },
 ]
 
 function parseNavItems(src) {

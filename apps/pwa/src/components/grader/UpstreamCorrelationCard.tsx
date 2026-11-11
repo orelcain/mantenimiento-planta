@@ -164,14 +164,14 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
           {summary.upstreamCaused > 0 && (
             <div
               className="flex items-center gap-1.5 text-xs text-ink-crit tabular-nums"
-              title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDurationSec(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
+              title={`${summary.upstreamCaused} de ${summary.total} detenciones del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con detenciones Baader: ${fmtDurationSec(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
             >
               <Clock className="w-3.5 h-3.5" />
               <span className="font-semibold">
-                {fmtDurationSec(summary.upstreamCausedDurSec)} de paro upstream
+                {fmtDurationSec(summary.upstreamCausedDurSec)} de detención upstream
               </span>
               <span className="opacity-70">
-                ({summary.upstreamCaused} de {summary.total} paros · {Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto)
+                ({summary.upstreamCaused} de {summary.total} detenciones · {Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto)
               </span>
             </div>
           )}
@@ -182,14 +182,14 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
         {coincidentalCount > 0 && (
           <div className="text-caption text-cat-7-ink mb-2 flex items-center gap-1.5">
             <Info className="w-3 h-3" />
-            {coincidentalCount} paro{coincidentalCount !== 1 ? 's' : ''} coincide{coincidentalCount === 1 ? '' : 'n'} con paros programados de Baader (colación, reunión) — excluido{coincidentalCount === 1 ? '' : 's'} del conteo upstream causal.
+            {coincidentalCount} {coincidentalCount === 1 ? 'detención' : 'detenciones'} coincide{coincidentalCount === 1 ? '' : 'n'} con detenciones programadas de Baader (colación, reunión) — excluida{coincidentalCount === 1 ? '' : 's'} del conteo upstream causal.
           </div>
         )}
 
         {summary.upstreamCaused === 0 && coincidentalCount === 0 ? (
           <div className="text-xs text-muted-foreground py-2 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-ink-ok" />
-            Ninguno de los {pauses.length} paros correlacionó con eventos upstream. Las Baaders estaban corriendo normal → las causas son internas del Grader.
+            Ninguna de las {pauses.length} detenciones correlacionó con eventos upstream. Las Baaders estaban corriendo normal → las causas son internas del Grader.
           </div>
         ) : (
           <>
@@ -198,7 +198,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
               <div className="mb-3 p-2 rounded-ctl border border-border/80 bg-muted/40">
                 <div className="text-caption text-muted-foreground mb-1.5 flex items-center gap-1">
                   <Factory className="w-3 h-3" />
-                  Impacto por máquina (paros del Grader donde la máquina contribuyó)
+                  Impacto por máquina (detenciones del Grader donde la máquina contribuyó)
                 </div>
                 <div className="space-y-0.5">
                   {/* Base = suma de los solapes POR MÁQUINA, no la unión del
@@ -221,7 +221,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                             el porcentaje fuera del borde: 278 px pedidos contra 245
                             disponibles. */}
                         <span className="min-w-[4.5rem]">{shortMachineName(m.machineName)}</span>
-                        <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
+                        <span className="opacity-80">{m.pauseCount} {m.pauseCount === 1 ? 'detención' : 'detenciones'}</span>
                         <span>·</span>
                         <span className="font-semibold">{fmtDurationSec(m.totalOverlapSec)} overlap</span>
                         {/* Barra visual proporcional al share */}
@@ -265,7 +265,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
               ))}
               {sorted.length > 10 && (
                 <div className="text-caption text-muted-foreground py-2 text-center">
-                  … y {sorted.length - 10} paros más
+                  … y {sorted.length - 10} detenciones más
                 </div>
               )}
             </div>

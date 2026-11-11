@@ -33,6 +33,9 @@
    `:root` sin `.dark` = tema claro (papel tintado al azul de marca), para
    quienes prefieren fondo blanco. Toggle: useTheme (header + Ajustes). */
 :root {
+  /* Jack-Knife: cuadrantes Agudas (naranja) y Crónicas (oliva). AA como texto sobre la tarjeta blanca. */
+  --jk-agu: 168 72 0;
+  --jk-cro: 96 100 20;
   color-scheme: light;
   /* Claro "mate azulado" (pedido de Orel 2026-07-17, recalibrado 2026-07-18
      contra Pantone Fashion&Home real, ronda 2 tras feedback "no veo mayor
@@ -242,6 +245,9 @@
   --cat-8-tint: 162 132 94;    /* café     */
 }
 .dark {
+  /* Jack-Knife: cuadrantes Agudas (naranja) y Crónicas (oliva/amarillo). AA como texto sobre la tarjeta. */
+  --jk-agu: 255 159 10;
+  --jk-cro: 255 214 10;
   color-scheme: dark;
   --background: 13 23 34;           /* #0d1722 */
   --foreground: 233 238 243;        /* #e9eef3 */
@@ -694,6 +700,8 @@
 .piel-fade-in { animation: piel-fade-in .35s ease-out both }
 .piel-sheet-in { animation: piel-sheet-in .5s cubic-bezier(.32, .72, 0, 1) both }
 .piel-pulse { animation: piel-pulse 2.2s ease-out infinite }
+/* Ventana de PC (Sheet presentacionPC="ventana"): aparece en su lugar, no sube desde abajo. */
+@media (min-width: 1024px) { .piel-ventana-in { animation: piel-fade-in .2s ease-out both } }
 @media (prefers-reduced-motion: reduce) {
   /* HIG «Accessibility»: los desplazamientos en x/y/z se REEMPLAZAN por un
      fundido, no se quitan del todo — si no, una hoja aparece de golpe y no se
@@ -738,6 +746,183 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+}
+
+/* ── Vidrio líquido · piel apple (PLAN_VIDRIO_LIQUIDO.md, Fase 1) ──────────────
+   Material de CROMO: menú lateral de PC y barra inferior del celular. Solo lo
+   usa la piel apple (MainLayout, rama apple); la piel anterior sigue con
+   .glass-nav, intacta. Valores del mockup aprobado: F-liquido-claro.dc.html,
+   F-liquido-oscuro.dc.html y G-movil-liquido.dc.html (.g, .sheen, .lens, .cap).
+   Capas: relleno + borde de luz (doble fondo padding-box / border-box), brillo
+   interior, reflejo superior en ::before (z-index -1: queda DETRÁS del texto) y
+   sombra. Sin relleno sólido no hay contraste garantizado: el respaldo sólido
+   está más abajo (transparencia reducida, sin backdrop-filter, gama baja). */
+/* Sin `position`: el elemento de vidrio ya va `fixed` (panel y barra) y esta regla
+   no debe pisar la posición de Tailwind. El reflejo ::before se ancla a ese fijo. */
+.vidrio {
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.38)) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+  border: 1px solid transparent;
+  -webkit-backdrop-filter: blur(26px) saturate(1.9);
+  backdrop-filter: blur(26px) saturate(1.9);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.95),
+    inset 0 -10px 20px rgba(255, 255, 255, 0.14),
+    0 1px 1px rgba(0, 0, 0, 0.04),
+    0 20px 54px rgba(30, 40, 55, 0.16);
+}
+.vidrio::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 34%);
+  pointer-events: none;
+}
+.dark .vidrio {
+  background:
+    linear-gradient(180deg, rgba(52, 50, 47, 0.7), rgba(28, 27, 25, 0.5)) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  backdrop-filter: blur(26px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.16),
+    inset 0 -10px 24px rgba(0, 0, 0, 0.18),
+    0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.dark .vidrio::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 30%);
+}
+
+/* Selección: cápsula de vidrio denso (ítem activo del menú, gota de la barra). */
+.vidrio-lente {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.7));
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    inset 0 -1px 2px rgba(0, 0, 0, 0.05),
+    0 6px 18px rgba(46, 117, 182, 0.22),
+    0 0 0 1px rgba(46, 117, 182, 0.16);
+  color: #1b5c97;
+  font-weight: 600;
+}
+.dark .vidrio-lente {
+  background: linear-gradient(180deg, rgba(90, 160, 220, 0.34), rgba(90, 160, 220, 0.18));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 0 1px rgba(90, 160, 220, 0.35),
+    0 8px 26px rgba(90, 160, 220, 0.28);
+  color: #ffffff;
+}
+
+/* Contador dentro del vidrio. Neutro = «en curso»; --alerta = tinte rojo. */
+.vidrio-capsula {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: rgba(118, 118, 128, 0.12);
+  color: rgb(var(--muted-foreground));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.vidrio-capsula--alerta {
+  background: rgba(201, 55, 44, 0.12);
+  color: #a62b22;
+}
+.dark .vidrio-capsula {
+  background: rgba(118, 118, 128, 0.24);
+  color: rgba(232, 226, 215, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.dark .vidrio-capsula--alerta {
+  background: rgba(255, 107, 94, 0.2);
+  color: #ff8f84;
+}
+.vidrio-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: #2e7d4f;
+  box-shadow: 0 0 0 4px rgba(46, 125, 79, 0.16);
+}
+.dark .vidrio-punto {
+  background: #6cc08b;
+  box-shadow:
+    0 0 0 4px rgba(108, 192, 139, 0.18),
+    0 0 10px rgba(108, 192, 139, 0.6);
+}
+
+/* Badge de incidencias activas sobre la pestaña de la barra inferior. */
+.vidrio-insignia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #c9372c;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Respaldo sólido (DESIGN.md §6 + PLAN_VIDRIO_LIQUIDO.md): el mismo borde y brillo,
+   relleno #FBFAF7 (claro) / #2A2927 (oscuro) y sin backdrop-filter. Se activa con
+   transparencia reducida, sin soporte de backdrop-filter o con <html class="vidrio-solido">
+   (gama baja, marcado en lib/vidrioSolido.ts). Los selectores de tema van al final y
+   con más especificidad: `.dark .vidrio` (0,2,0) pisaría al claro si no. */
+@media (prefers-reduced-transparency: reduce) {
+  .vidrio {
+    background:
+      linear-gradient(#fbfaf7, #fbfaf7) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .dark .vidrio {
+    background:
+      linear-gradient(#2a2927, #2a2927) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .vidrio {
+    background:
+      linear-gradient(#fbfaf7, #fbfaf7) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+  }
+  .dark .vidrio {
+    background:
+      linear-gradient(#2a2927, #2a2927) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+  }
+}
+html.vidrio-solido .vidrio {
+  background:
+    linear-gradient(#fbfaf7, #fbfaf7) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.7)) border-box;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html.vidrio-solido.dark .vidrio {
+  background:
+    linear-gradient(#2a2927, #2a2927) padding-box,
+    linear-gradient(140deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.16)) border-box;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* ── Transparencia reducida (DESIGN.md §6) ────────────────────────────────────
@@ -978,6 +1163,12 @@
 }
 
 @layer utilities {
+  /* PRUEBA en Repuestos (15-10-2026): tipografía «ingeniería». Plex antes que Segoe para que
+     Windows/Android vean Plex; Apple sigue en SF Pro (DESIGN.md). Si se aprueba, pasa al token
+     global `sans` de tailwind.config.js y esta clase se elimina. */
+  .tipo-ingenieria {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "IBM Plex Sans", "Segoe UI Variable Text", system-ui, sans-serif;
+  }
   /* Fila horizontal de chips: se desplaza, sin barra visible (iOS no la muestra). */
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -1333,4 +1524,79 @@
 .p5-protocolo :where(button, input, textarea, [role='tab']):focus-visible {
   outline: 2px solid var(--lc-aqua);
   outline-offset: 2px;
+}
+
+/* ── MODO LECTURA GLOBAL (10-11-2026) ────────────────────────────────────────
+   Interruptor «Modo lectura» (menú de usuario + ícono junto al Sol/Luna):
+   `data-modo-lectura="on"` en <html>, ver src/lib/modoLectura.ts.
+   Solo con la piel Apple y solo dentro del contenido (#main-content); <main> se
+   excluye con `data-sin-lectura` en lienzos, pantallas de alto fijo y el inicio.
+   Las tarjetas neutras se aplanan en secciones con filete arriba (sin fondo, borde,
+   sombra ni radio). Los menús flotantes (absolute/fixed/sticky) y los tintes de
+   estado no se tocan. Letra: 17 base y 15 secundaria en celular, 15/15 en PC.
+   Las pantallas hechas a mano en lectura (Informe de turno, Jack-Knife, Período,
+   Causa raíz) ya no tienen tarjetas: esta capa no las cambia. */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) {
+  font-size: 15px;
+  line-height: 1.5;
+}
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card):not(.absolute, .fixed, .sticky) {
+  background-color: transparent !important;
+  border-width: 1px 0 0 0 !important;
+  border-style: solid !important;
+  border-color: rgb(var(--border) / 0.6) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+/* Sin la caja, el relleno lateral solo sangraba el contenido respecto del título:
+   la sección queda alineada al margen de la página (también CardHeader/CardContent). */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card):not(.absolute, .fixed, .sticky),
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  [data-superficie='tarjeta']:not(.absolute, .fixed, .sticky) > * {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* Tarjeta dentro de tarjeta: sin segundo filete. */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card)
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card):not(.absolute, .fixed, .sticky) {
+  border-top-width: 0 !important;
+}
+/* Tarjetas que son botón o enlace: al quedar sin fondo, el hover devuelve la señal. */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is(a, button).bg-card.rounded-card:hover {
+  background-color: rgb(var(--muted) / 0.5) !important;
+}
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) .text-sm {
+  font-size: 15px;
+  line-height: 1.45;
+}
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) .text-xs {
+  font-size: 13px;
+  line-height: 1.4;
+}
+@media (pointer: coarse), (max-width: 640px) {
+  :root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) {
+    font-size: 17px;
+  }
+}
+
+/* Un escalón más de letra en TODO el contenido, también en las pantallas ya hechas
+   en lectura (Informe de turno, Jack-Knife, Período, Causa raíz): sus tamaños y los
+   roles de la escala tipográfica multiplican por --escala-texto. La Bitácora fija la
+   suya en <html> (style inline) cuando la persona eligió otro tamaño: entonces manda
+   esa elección y esta regla no aplica. */
+:root[data-skin='apple'][data-modo-lectura='on']:not([style*='--escala-texto']) #main-content:not([data-sin-lectura]) {
+  --escala-texto: 1.12;
+}
+/* Ancho de lectura en PC: el contenido no pasa de 1280 px y queda centrado, así las
+   líneas de texto y las tablas no cruzan una pantalla ancha de lado a lado. */
+@media (min-width: 1024px) {
+  :root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) > * {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }

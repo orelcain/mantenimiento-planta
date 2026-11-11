@@ -1641,13 +1641,13 @@ exports.purgeSensorReadingsManual = onCall(
  * El embed llama esta función HTTP con los datos DM para cachearlos
  * en Firestore, y así checkClimaPortoAlert los puede leer.
  */
-// Sin auth A PROPÓSITO: lo llama el navegador de CUALQUIER visitante del embed
-// público (ver comentario arriba) — un secreto embebido en ese HTML estático
-// sería extraíble con "ver código fuente" y no protegería nada real. La
-// mitigación aplicable es validar estrictamente la FORMA del payload (tipos +
-// topes de tamaño) para que un curl malicioso no pueda inyectar objetos
-// arbitrarios/gigantes al doc cacheado — no evita spoofear el estado (impacto
-// bajo: solo cambia lo que se MUESTRA en el widget de clima, no autoriza nada).
+// Exige sesión de mantención (auditoría 10-11-2026). Antes no pedía auth y el
+// comentario decía que solo cambiaba lo que se muestra, pero checkClimaPortoAlert
+// lee este doc y manda el push «Bahía cerrada / Restringido» a TODOS los
+// fcmTokens: un curl sin cuenta podía disparar una alerta falsa a la planta.
+// La página Clima Puerto es AdminRoute; el embed le pasa el payload al padre
+// por postMessage y el padre llama aquí con su ID token (ClimaPortPage.tsx).
+// La validación de FORMA del payload se mantiene (tipos + topes de tamaño).
 function isPlainBoolOrUndef(v) { return v === undefined || typeof v === 'boolean' }
 function isShortStringOrNull(v) { return v === null || v === undefined || (typeof v === 'string' && v.length <= 500) }
 
@@ -1655,6 +1655,14 @@ exports.cacheDmStatus = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 5 },
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+    const m = /^Bearer (.+)$/.exec(req.get('Authorization') || '')
+    if (!m) return res.status(401).json({ error: 'unauthenticated' })
+    try {
+      const dec = await getAuth().verifyIdToken(m[1])
+      await _assertTechnicianCaller({ auth: { uid: dec.uid } })
+    } catch (e) {
+      return res.status(e?.code === 'permission-denied' ? 403 : 401).json({ error: 'forbidden' })
+    }
     const d = req.body
     const valid = d && typeof d.found === 'boolean'
       && isPlainBoolOrUndef(d.restriccionBahia)
@@ -7943,6 +7951,32 @@ exports.recalcularUmbralesParos = onSchedule(
   },
 )
 
+// ── recalcularFallaRepetida ─────────────────────────────────────────────────
+// Diario 05:45: reincidencia de los paros de Mantención por planta (misma causa
+// y máquina que vuelve en ≤ 8 h de operación) con los últimos 300 días. Deja
+// serie mensual + ranking de causas en `shoplogixReincidencia/{planta}`, que el
+// Monitor publica (tarjeta en Análisis + aviso al soltar un paro). Ver
+// `shoplogix/fallaRepetida.js`. ≈ turnos × máquinas lecturas por planta y día.
+// También deja `semanas`: la serie semanal de «fallas repetidas de Mantención» (KPI
+// aparte de esta reincidencia; sin horas de operación). Sin lecturas extra.
+const PLANTAS_FALLA_REPETIDA = ['chonchi', 'yal', 'filete']
+exports.recalcularFallaRepetida = onSchedule(
+  { schedule: 'every day 05:45', timeZone: 'America/Santiago', region: 'us-central1', memory: '1GiB', timeoutSeconds: 540 },
+  async () => {
+    const fallaRepetida = require('./shoplogix/fallaRepetida')
+    const hoyDateKey = shoplogixPolling.toChileWall(new Date()).toISOString().slice(0, 10)
+    for (const plantSlug of PLANTAS_FALLA_REPETIDA) {
+      try {
+        const r = await fallaRepetida.calcularReincidenciaPlanta({ db, plantSlug, hoyDateKey, FieldPath })
+        await db.doc(`shoplogixReincidencia/${plantSlug}`).set({ ...r, calculadoEl: new Date() })
+        logger.info(`[recalcularFallaRepetida] ${plantSlug}: ${r.turnos} turnos, ${r.causas.length} causas, ${r.meses.length} meses, ${r.semanas.length} semanas`)
+      } catch (e) {
+        logger.error(`[recalcularFallaRepetida] ${plantSlug} falló:`, e.message)
+      }
+    }
+  },
+)
+
 // ── checkShiftStartDelays ─────────────────────────────────────────────────────
 // Cron cada 5 minutos. Revisa docs pendientes en shoplogixShiftDelayChecks.
 // Un check vencido NO alerta a ciegas: evaluarDelayCheck (turnoBrief.js)
@@ -8429,6 +8463,51 @@ exports.enviarInformeTurnoManual = onCall({ region: 'us-central1' }, async (requ
   }
 })
 
+// ── informeTurnoCorreo ───────────────────────────────────────────────────────
+// Botones «Copiar correo» y «Descargar PDF» del monitor: devuelve el informe
+// del turno listo para pegar en un correo (asunto + HTML) y el PDF para
+// adjuntar. No envía nada: quien lo pega lo manda desde su propio buzón, así
+// no hay credenciales de correo en el servidor. Solo lectura, por eso no pide
+// reautenticar, pero sí ser admin: el informe trae lecturas del turno que no
+// son para cualquiera con el link del monitor.
+exports.informeTurnoCorreo = onCall({ region: 'us-central1' }, async (request) => {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Hay que iniciar sesión.')
+
+  const perfil = await db.collection('users').doc(uid).get()
+  if (perfil.data()?.rol !== 'admin') {
+    throw new HttpsError('permission-denied', 'Solo un administrador puede sacar el informe.')
+  }
+
+  const plant = String(request.data?.plant || '').trim()
+  const shiftDocId = String(request.data?.shiftDocId || '').trim()
+  if (!plant || !shiftDocId) throw new HttpsError('invalid-argument', 'Faltan la planta o el turno.')
+
+  // Mismo criterio que el botón de Telegram: sin brief de cierre, el turno
+  // sigue vivo y el informe sale marcado como foto parcial.
+  const turnoDoc = await db.collection('shoplogix').doc(plant).collection('shifts').doc(shiftDocId).get()
+  const enCurso = !turnoDoc.data()?.endBriefSentAt
+  const config = await getShoplogixNotifConfig(plant)
+
+  try {
+    const r = await shoplogixInformeMod.informeParaCorreo({
+      db, plant, shiftDocId, enCurso, minPiezas: config.shiftEnd?.minPieces || 50, logger,
+    })
+    if (r.motivo) return { motivo: r.motivo }
+    logger.info('[informeTurnoCorreo]', { uid, plant, shiftDocId, enCurso, bytes: r.pdf.length })
+    return {
+      asunto: r.asunto,
+      html: r.html,
+      pdfBase64: r.pdf.toString('base64'),
+      nombreArchivo: r.nombreArchivo,
+      enCurso,
+    }
+  } catch (e) {
+    logger.error('[informeTurnoCorreo] falló', { uid, plant, shiftDocId, err: e.message })
+    throw new HttpsError('internal', e.message)
+  }
+})
+
 // ── checkShiftReconciliation ─────────────────────────────────────────────────
 // Cron cada 30 minutos. Verifica que el brief de FIN de turno ya enviado (ver
 // `endBriefSnapshot` en checkShiftEndBriefs) siga coincidiendo con lo que
@@ -8620,6 +8699,51 @@ async function _queryAniListSeguro(query, variables) {
   throw ultimo || new Error('AniList no respondió');
 }
 
+// ── Respaldo cuando AniList no responde (Simkl → Jikan → Kitsu, IDs traducidos con ARM) ──
+// Ver functions/animeRespaldo.js. La caché vive en Firestore (anime_cache/*), solo servidor.
+const animeRespaldoLib = require('./animeRespaldo');
+const animeDondeVerLib = require('./animeDondeVer');
+async function _fetchJsonAnime(url, { method = 'GET', headers, body, timeout = 8000 } = {}) {
+  const r = await fetch(url, {
+    method,
+    headers: { Accept: 'application/json', ...(headers || {}) },
+    body,
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+let _animeRespaldoInst = null;
+function _animeRespaldo() {
+  if (!_animeRespaldoInst) {
+    _animeRespaldoInst = animeRespaldoLib.crearRespaldo({
+      fetchJson: _fetchJsonAnime,
+      tmdbTv: (id) => _tmdb(`/tv/${id}`, {}, 6 * MEDIA_H),
+      cache: {
+        async get(id) { const d = await db.collection('anime_cache').doc(id).get(); return d.exists ? d.data() : null; },
+        async set(id, obj) { await db.collection('anime_cache').doc(id).set(obj); },
+      },
+    });
+  }
+  return _animeRespaldoInst;
+}
+// Respaldo → forma {episode, airingAt, media} que usan los crons con AniList.
+// episode puede ser null (Jikan/Kitsu no dicen el número).
+function _comoSchedules(items) {
+  return items.map((it) => ({
+    episode: it.episode,
+    airingAt: it.airingAt,
+    media: {
+      id: it.id || it.idRespaldo,
+      respaldo: true,
+      isAdult: false,
+      title: { romaji: it.title, english: it.title },
+      averageScore: it.score,
+      format: it.format,
+    },
+  }));
+}
+
 // manual=true (herramienta de admin): no mira ni marca el "ya enviado", así un
 // disparo de prueba a media tarde no impide el resumen de las 23:00.
 async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
@@ -8641,12 +8765,25 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
   const from = Math.floor((Date.UTC(y, mo - 1, d, 0, 0, 0) - offsetMin * 60000) / 1000);
   const to = Math.floor(Date.now() / 1000) + 3600;
   const GQL = `query($f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id isAdult title{romaji english}averageScore format}}}}`;
-  const schedules = [];
-  for (let p = 1; p <= 4; p++) {
-    const json = await _queryAniListSeguro(GQL, { f: from, t: to, p });
-    const page = json.data.Page || {};
-    schedules.push(...(page.airingSchedules || []));
-    if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+  let schedules = [];
+  let fuenteRespaldo = null;
+  try {
+    for (let p = 1; p <= 4; p++) {
+      const json = await _queryAniListSeguro(GQL, { f: from, t: to, p });
+      const page = json.data.Page || {};
+      schedules.push(...(page.airingSchedules || []));
+      if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+    }
+  } catch (e) {
+    logger.warn('[anime] AniList falló en el resumen, uso respaldo:', e.message);
+    try {
+      const r = await _animeRespaldo().estrenosDia(from, to, { cachear: false });
+      schedules = _comoSchedules(r.items);
+      fuenteRespaldo = r.fuente;
+    } catch (e2) {
+      logger.error('[anime] respaldo del resumen también falló:', e2.message);
+      throw e; // sin ninguna fuente: no se marca el día como enviado
+    }
   }
   const visibles = schedules.filter((s) => s.media && !s.media.isAdult);
 
@@ -8686,7 +8823,8 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
   for (const s of visibles) {
     const id = String(s.media.id);
     const g = porSerie.get(id);
-    if (g) { g.eps.push(s.episode); g.airingAt = Math.min(g.airingAt, s.airingAt); } else porSerie.set(id, { media: s.media, eps: [s.episode], airingAt: s.airingAt });
+    // episode puede ser null con el respaldo (Jikan/Kitsu no dan el número)
+    if (g) { if (s.episode != null) g.eps.push(s.episode); g.airingAt = Math.min(g.airingAt, s.airingAt); } else porSerie.set(id, { media: s.media, eps: s.episode != null ? [s.episode] : [], airingAt: s.airingAt });
   }
 
   const FMT = { MOVIE: '🎬', ONA: '🖥️', OVA: '📀', SPECIAL: '🌟', TV: '📺', TV_SHORT: '📺' };
@@ -8696,7 +8834,7 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
   for (const [id, g] of porSerie) {
     const m = g.media;
     const eps = g.eps.sort((a, b) => a - b);
-    const epTxt = eps.length > 1 ? `ep${eps[0]}–${eps[eps.length - 1]}` : `ep${eps[0]}`;
+    const epTxt = !eps.length ? 'nuevo ep' : (eps.length > 1 ? `ep${eps[0]}–${eps[eps.length - 1]}` : `ep${eps[0]}`);
     const title = _tgHtml(String((m.title && (m.title.english || m.title.romaji)) || 'Sin título').substring(0, 40));
     const score = m.averageScore ? ` ⭐${m.averageScore}` : '';
     const fmt = FMT[m.format] || '🎞';
@@ -8727,7 +8865,8 @@ async function _runAnimeEstrenos(botToken, { manual = false } = {}) {
       + seccion('🆕 <b>Estrenos nuevos · ep 1', premieres, premTope)
       + seccion('📡 <b>Descubrimiento', discovery, 8)
       + (cine ? seccion('🎬 <b>Llegó a tus plataformas', cine.nuevos, 5) + seccion('🍿 <b>Estrenos en cines esta semana', cine.cines, 5) : '')
-      + (hayCine ? '\n\n<i>Cine y series: datos de JustWatch vía TMDB.</i>' : '');
+      + (hayCine ? '\n\n<i>Cine y series: datos de JustWatch vía TMDB.</i>' : '')
+      + (fuenteRespaldo ? `\n\n<i>AniList no responde: lista armada con ${({ simkl: 'Simkl', jikan: 'Jikan (MyAnimeList)', kitsu: 'Kitsu' })[fuenteRespaldo] || fuenteRespaldo}; puede faltar algún episodio.</i>` : '');
     if (text.length <= 3900) break;
     tracTope = Math.max(8, tracTope - 5);
     premTope = Math.max(5, premTope - 4);
@@ -8839,6 +8978,50 @@ async function _cineParaResumen(dateKey) {
 // Cada 30 min revisa AniList solo para los anime de «viendo». Un aviso por
 // episodio (marca anime_notifications/ep_<id>_<ep>), agrupado en un mensaje.
 // Entre 01:00 y 08:00 (Chile) llega en silencio.
+// Botón «Ver ahora»: abre directo la plataforma oficial que el usuario paga (animeDondeVer + elegirVerAhora).
+// Nunca retrasa ni rompe el aviso: tope de 7 s en total, y una serie que falló no se reintenta por 10 min.
+const _verAhoraFallo = new Map();
+async function _datosVerAhora() {
+  let plan = animeDondeVerLib.PLAN_DEFECTO;
+  let recordadas = {};
+  const base = db.collection('animelists').doc(ANIME_CHAT_ID);
+  try {
+    const d = await base.collection('cine').doc('datos').get();
+    if (d.exists) plan = animeDondeVerLib.planDeProveedores(d.data().plataformas);
+  } catch (e) { logger.warn('[anime] plan de plataformas:', e.message); }
+  try {
+    const d = await base.collection('prefs').doc('ver').get();
+    if (d.exists && d.data().plat && typeof d.data().plat === 'object') recordadas = d.data().plat;
+  } catch (e) { logger.warn('[anime] plataforma recordada:', e.message); }
+  return { plan, recordadas };
+}
+/** items: [{id (AniList), titulo}] → Map id → {clave, nombre, url}. Solo trae lo que alcanzó a resolver. */
+async function _botonesVerAhora(items) {
+  const out = new Map();
+  const validos = items.filter((it) => Number.isInteger(it.id) && it.id > 0);
+  if (!validos.length) return out;
+  const trabajo = (async () => {
+    const { plan, recordadas } = await _datosVerAhora();
+    await Promise.all(validos.map(async ({ id, titulo }) => {
+      const f = _verAhoraFallo.get(id);
+      if (f && Date.now() - f < 10 * 60 * 1000) return;
+      try {
+        const datos = await _mediaOps.animeDondeVer({ id, titulo, region: 'CL' });
+        const e = animeDondeVerLib.elegirVerAhora(datos, { recordada: recordadas[id], plan });
+        if (e) out.set(id, e);
+      } catch (err) {
+        _verAhoraFallo.set(id, Date.now());
+        logger.warn('[anime] Ver ahora', { id, msg: err.message });
+      }
+    }));
+  })();
+  await Promise.race([trabajo.catch(() => {}), new Promise((r) => setTimeout(r, 7000))]);
+  return new Map(out);
+}
+function _filaVerAhora(e, titulo) {
+  return [{ text: `▶️ Ver ahora · ${e.nombre}${e.gratis ? ' (gratis)' : ''} · ${String(titulo || '').slice(0, 16)}`.replace(/ · $/, '').slice(0, 60), url: e.url }];
+}
+
 async function _runAvisosEpisodios(botToken) {
   const ahora = Math.floor(Date.now() / 1000);
   const estadoRef = db.collection('anime_estado').doc('avisos');
@@ -8853,25 +9036,39 @@ async function _runAvisosEpisodios(botToken) {
 
   const ids = [...porId.keys()];
   const GQL = 'query($ids:[Int],$f:Int,$t:Int,$p:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage}airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
-  const schedules = [];
-  for (let i = 0; i < ids.length; i += 50) {
-    for (let p = 1; p <= 3; p++) {
-      const json = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: ahora, p });
-      const page = json.data.Page || {};
-      schedules.push(...(page.airingSchedules || []));
-      if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+  let schedules = [];
+  let conRespaldo = false;
+  try {
+    for (let i = 0; i < ids.length; i += 50) {
+      for (let p = 1; p <= 3; p++) {
+        const json = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: ahora, p });
+        const page = json.data.Page || {};
+        schedules.push(...(page.airingSchedules || []));
+        if (!page.pageInfo || !page.pageInfo.hasNextPage) break;
+      }
     }
+  } catch (e) {
+    // AniList caído: estrenos del rango por Simkl/Jikan/Kitsu, cruzados con los IDs de «viendo».
+    logger.warn('[anime] AniList falló en avisos, uso respaldo:', e.message);
+    let r;
+    try { r = await _animeRespaldo().episodiosEntre(desde, ahora); } catch (e2) {
+      logger.error('[anime] respaldo de avisos también falló:', e2.message);
+      throw e; // sin ninguna fuente: no se avanza ultimoCorte, el próximo ciclo reintenta
+    }
+    schedules = _comoSchedules(r.items.filter((it) => it.id && porId.has(it.id)));
+    conRespaldo = true;
   }
 
   const pendientes = [];
   const yaVistos = new Set(); // una emisión puede venir repetida entre páginas/grupos
   for (const s of schedules) {
     const a = porId.get(Number(s.media && s.media.id));
-    if (!a || (Number(a.watchedEps) || 0) >= s.episode) continue;
-    const clave = `${s.media.id}_${s.episode}`;
-    if (yaVistos.has(clave)) continue;
-    yaVistos.add(clave);
-    const ref = db.collection('anime_notifications').doc(`ep_${s.media.id}_${s.episode}`);
+    // episode null (respaldo): no se puede comparar con lo visto; la clave usa la fecha de emisión
+    if (!a || (s.episode != null && (Number(a.watchedEps) || 0) >= s.episode)) continue;
+    const idDoc = animeRespaldoLib.claveAvisoEpisodio(s.media.id, s.episode, s.airingAt);
+    if (yaVistos.has(idDoc)) continue;
+    yaVistos.add(idDoc);
+    const ref = db.collection('anime_notifications').doc(idDoc);
     if ((await ref.get()).exists) continue;
     pendientes.push({ s, ref });
   }
@@ -8880,24 +9077,31 @@ async function _runAvisosEpisodios(botToken) {
     const lineas = pendientes.map(({ s }) => {
       const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || 'Sin título').substring(0, 45));
       const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
-      return `▶️ <b>${t}</b> · ep ${s.episode} · ${h}`;
+      return `▶️ <b>${t}</b> · ${s.episode != null ? `ep ${s.episode}` : 'nuevo episodio'} · ${h}`;
     });
     const titulo = pendientes.length === 1 ? '🔔 <b>Salió un episodio de lo que estás viendo</b>' : `🔔 <b>Salieron ${pendientes.length} episodios de lo que estás viendo</b>`;
-    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}`;
+    const text = `${titulo}\n\n${lineas.slice(0, 20).join('\n')}${lineas.length > 20 ? `\n<i>… y ${lineas.length - 20} más</i>` : ''}${conRespaldo ? '\n\n<i>AniList no responde: aviso por hora de emisión (Simkl/Jikan/Kitsu).</i>' : ''}`;
     const hora = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
     const silencio = hora >= 1 && hora < 8;
-    const botones = pendientes.slice(0, 8).map(({ s }) => [{
-      text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`,
-      callback_data: `v:${s.media.id}:${s.episode}`,
-    }]);
-    const replyMarkup = { inline_keyboard: [...botones, [{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
+    // Sin número de episodio (respaldo) no hay botón «Visto»: no sabría qué marcar.
+    const tituloDe = (s) => String(s.media.title.english || s.media.title.romaji || '');
+    const visibles = pendientes.slice(0, 8);
+    const verAhora = await _botonesVerAhora(visibles.map(({ s }) => ({ id: Number(s.media.id), titulo: tituloDe(s) })));
+    // Por episodio: fila «Visto» y, debajo, «Ver ahora» (máx. 8 episodios = 16 filas, lejos del tope de Telegram).
+    const filas = [];
+    for (const { s } of visibles) {
+      if (s.episode != null) filas.push([{ text: `✅ Visto ep ${s.episode} · ${tituloDe(s).slice(0, 22)}`, callback_data: `v:${s.media.id}:${s.episode}` }]);
+      const e = verAhora.get(Number(s.media.id));
+      if (e) filas.push(_filaVerAhora(e, tituloDe(s)));
+    }
+    const replyMarkup = { inline_keyboard: [...filas, [{ text: '▶️ Abrir AnimeTracker', web_app: { url: ANIME_APP_URL } }]] };
     let result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup, { disable_notification: silencio });
     if (!result || !result.ok) {
       const plano = text.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
       result = await _sendTelegram(botToken, ANIME_CHAT_ID, plano, replyMarkup, { disable_notification: silencio, parse_mode: null });
     }
     if (!result || !result.ok) throw new Error(`Telegram no aceptó el aviso: ${(result && result.description) || 'sin respuesta'}`);
-    await Promise.all(pendientes.map(({ s, ref }) => ref.set({ media: s.media.id, ep: s.episode, avisadoEn: FieldValue.serverTimestamp() })));
+    await Promise.all(pendientes.map(({ s, ref }) => ref.set({ media: s.media.id, ep: s.episode == null ? null : s.episode, ...(conRespaldo ? { fuente: 'respaldo' } : {}), avisadoEn: FieldValue.serverTimestamp() })));
   }
   await estadoRef.set({ ultimoCorte: ahora, ultimaEjecucion: FieldValue.serverTimestamp() }, { merge: true });
   return { avisos: pendientes.length };
@@ -8911,7 +9115,7 @@ exports.animeAvisosEpisodios = onSchedule(
     memory: '256MiB',
     retryCount: 0,
     maxInstances: 1,
-    secrets: ['ANIME_BOT_TOKEN'],
+    secrets: ['ANIME_BOT_TOKEN', 'TMDB_READ_TOKEN'],
   },
   async () => {
     const token = process.env.ANIME_BOT_TOKEN;
@@ -9037,9 +9241,16 @@ async function _episodiosDeHoy() {
   const GQL = 'query($ids:[Int],$f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(mediaId_in:$ids,airingAt_greater:$f,airingAt_lesser:$t,sort:TIME){episode airingAt media{id title{romaji english}}}}}';
   const ids = [...porId.keys()];
   const out = [];
-  for (let i = 0; i < ids.length; i += 50) {
-    const j = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: hasta });
-    out.push(...((j.data.Page && j.data.Page.airingSchedules) || []));
+  try {
+    for (let i = 0; i < ids.length; i += 50) {
+      const j = await _queryAniListSeguro(GQL, { ids: ids.slice(i, i + 50), f: desde, t: hasta });
+      out.push(...((j.data.Page && j.data.Page.airingSchedules) || []));
+    }
+  } catch (e) {
+    logger.warn('[anime] AniList falló en /hoy, uso respaldo:', e.message);
+    const r = await _animeRespaldo().episodiosEntre(desde, hasta); // si también falla, sube el error original del llamador
+    out.length = 0;
+    out.push(..._comoSchedules(r.items.filter((it) => it.id && porId.has(it.id))));
   }
   return out.map((s) => ({ s, a: porId.get(Number(s.media.id)) }));
 }
@@ -9122,12 +9333,16 @@ exports.animeBotWebhook = onRequest(
             const lineas = eps.map(({ s, a }) => {
               const t = _tgHtml(String(s.media.title.english || s.media.title.romaji || '').substring(0, 45));
               const h = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago' });
-              const visto = (Number(a && a.watchedEps) || 0) >= s.episode;
-              return `${visto ? '✅' : '▶️'} <b>${t}</b> · ep ${s.episode} · ${h}`;
+              const visto = s.episode != null && (Number(a && a.watchedEps) || 0) >= s.episode;
+              return `${visto ? '✅' : '▶️'} <b>${t}</b> · ${s.episode != null ? `ep ${s.episode}` : 'nuevo episodio'} · ${h}`;
             });
-            const botones = eps.filter(({ s, a }) => (Number(a && a.watchedEps) || 0) < s.episode && s.airingAt * 1000 <= Date.now()).slice(0, 8)
+            const botones = eps.filter(({ s, a }) => s.episode != null && (Number(a && a.watchedEps) || 0) < s.episode && s.airingAt * 1000 <= Date.now()).slice(0, 8)
               .map(({ s }) => [{ text: `✅ Visto ep ${s.episode} · ${String(s.media.title.english || s.media.title.romaji || '').slice(0, 22)}`, callback_data: `v:${s.media.id}:${s.episode}` }]);
-            await _sendTelegram(botToken, chat, `📅 <b>Hoy en lo que estás viendo</b>\n\n${lineas.join('\n')}`, { inline_keyboard: [...botones, ...abrir.inline_keyboard] });
+            const tituloDe = (s) => String(s.media.title.english || s.media.title.romaji || '');
+            const salidos = eps.filter(({ s, a }) => s.airingAt * 1000 <= Date.now() && !(s.episode != null && (Number(a && a.watchedEps) || 0) >= s.episode)).slice(0, 8);
+            const verAhora = await _botonesVerAhora(salidos.map(({ s }) => ({ id: Number(s.media.id), titulo: tituloDe(s) })));
+            const filasVer = salidos.map(({ s }) => (verAhora.get(Number(s.media.id)) ? _filaVerAhora(verAhora.get(Number(s.media.id)), tituloDe(s)) : null)).filter(Boolean);
+            await _sendTelegram(botToken, chat, `📅 <b>Hoy en lo que estás viendo</b>\n\n${lineas.join('\n')}`, { inline_keyboard: [...botones, ...filasVer, ...abrir.inline_keyboard] });
           }
         } else {
           const m = /^\/buscar(?:@\w+)?\s+(.{2,80})$/s.exec(texto);
@@ -9339,7 +9554,67 @@ function _mediaProveedores(bloque) {
   };
 }
 
+// Respaldo de AnimeTracker cuando AniList no responde (Simkl → Jikan → Kitsu). Mismo formato que arma el front.
+async function _animeOp(fn) {
+  try { return await fn(); } catch (e) {
+    logger.warn('[mediaApi] respaldo anime', { msg: e.message });
+    const err = new Error(e.message);
+    err.status = 502;
+    err.publico = 'Ninguna fuente de respaldo respondió';
+    throw err;
+  }
+}
+
 const _mediaOps = {
+  // Estrenos con hora entre from y to (segundos epoch, máx. 3 días).
+  async animeDia(q) {
+    const from = parseInt(q.from, 10);
+    const to = parseInt(q.to, 10);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > 3 * 86400) {
+      const err = new Error('Rango inválido'); err.status = 400; err.publico = 'Rango inválido'; throw err;
+    }
+    return _animeOp(() => _animeRespaldo().estrenosDia(from, to));
+  },
+
+  async animeBuscar(q) {
+    const texto = String(q.q || '').trim().slice(0, 100);
+    if (texto.length < 2) return { items: [], fuente: null };
+    return _animeOp(() => _animeRespaldo().buscar(texto));
+  },
+
+  // «¿Dónde ver?» de un anime sin AniList: id AniList → ARM → TMDB (JustWatch) + Kitsu/Jikan + fichas externas.
+  async animeDondeVer(q) {
+    const id = _mediaInt(q.id, 0, 1, 50000000);
+    if (!id) { const err = new Error('id inválido'); err.status = 400; err.publico = 'id inválido'; throw err; }
+    const region = _mediaRegion(q.region);
+    const titulo = String(q.titulo || '').trim().slice(0, 120);
+    const clave = `adv:${id}:${region}:${titulo}`;
+    const hit = _mediaCacheGet(clave);
+    if (hit) return hit;
+    const r = await _animeOp(() => animeDondeVerLib.dondeVerAnime({
+      fetchJson: _fetchJsonAnime,
+      tmdbTitulo: (p) => _mediaOps.titulo(p),
+      anilistId: id,
+      titulo,
+      region,
+    }));
+    if (!r.fallos.length) _mediaCacheSet(clave, r, 6 * MEDIA_H);
+    return r;
+  },
+
+  // Episodios ya emitidos de las series de «Viendo» sin AniList (calendario de Simkl + ARM). ids = ids de AniList.
+  async animeEmitidos(q) {
+    const ids = String(q.ids || '').split(',').map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0).slice(0, 60);
+    if (!ids.length) return { fuente: 'simkl', items: {} };
+    // info = id:episodiosAniList:vistos,…  (para decidir la numeración de TMDB; opcional)
+    const info = {};
+    for (const par of String(q.info || '').split(',')) {
+      const [i, e, v] = par.split(':').map((x) => parseInt(x, 10));
+      if (Number.isInteger(i) && i > 0) info[i] = { eps: e > 0 ? e : 0, vistos: v > 0 ? v : 0 };
+    }
+    return _animeOp(() => _animeRespaldo().emitidos(ids, info));
+  },
+
   // Plataformas disponibles en un país (películas + series, sin duplicar).
   async plataformas(q) {
     const region = _mediaRegion(q.region);
@@ -9479,7 +9754,7 @@ exports.mediaApi = onRequest(
       res.set('Cache-Control', 'private, max-age=300');
       res.json(data);
     } catch (e) {
-      res.status(e.status || 500).json({ error: e.status === 404 ? 'No encontrado' : 'Error consultando TMDB' });
+      res.status(e.status || 500).json({ error: e.publico || (e.status === 404 ? 'No encontrado' : 'Error consultando TMDB') });
     }
   }
 );
@@ -9724,6 +9999,41 @@ exports.recordatorioProtocoloBaader142 = onSchedule(
 const publicMonitorMod = require('./publicMonitor')
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cierre congelado del Duelo de equipos (29-10-2026) — lógica en dueloCierre.js
+// Plan: ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_CIERRE_DUELO.md (fase 2, MODO SOMBRA:
+// escribe `dueloCierres/{planta}_{YYYY-MM}` y todavía nada lo lee).
+// ─────────────────────────────────────────────────────────────────────────────
+/*
+ * 06:30 y 18:30 hora de planta. La de las 18:30 es la que importa: el último
+ * re-sync de Shoplogix de una jornada J corre a las 12:00 de J+3, así que a las
+ * 18:30 de J+3 ya tiene su dato final y en J+4 se sella. Dos al día para que una
+ * corrida fallida no atrase el sellado un día entero.
+ * Costo: ~6 lecturas y 1–2 escrituras por planta y corrida (la primera, que
+ * sella octubre, ~45 lecturas).
+ */
+exports.cerrarDuelo = onSchedule(
+  {
+    schedule: '30 6,18 * * *',
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 120,
+    // El bundle de index.js no arranca en 128MiB (ver shoplogixTokenRefresh).
+    memory: '256MiB',
+    retryCount: 1,
+  },
+  async () => {
+    const dueloCierre = require('./dueloCierre')
+    const hoyKey = shoplogixPolling.toChileWall(new Date()).toISOString().slice(0, 10)
+    for (const planta of dueloCierre.PLANTAS_DUELO) {
+      try {
+        await dueloCierre.ejecutarCierre(db, planta, { hoyKey, logger })
+      } catch (err) {
+        logger.error('[cerrarDuelo] error planta', { planta, err: err?.message })
+      }
+    }
+  }
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Pase de la Bitácora (QR + PIN personal, 16-09-2026) — lógica en paseBitacora.js
 // Sin triggers ni crons: solo corre cuando un técnico escanea el QR o un
 // supervisor administra el pase. Costo fijo cero.
@@ -9784,6 +10094,43 @@ exports.paseBitacora = onCall(
     const nombre = [user.nombre, user.apellido].filter(Boolean).join(' ')
     const r = await fn(deps, request.data, { uid, nombre })
     logger.info('[paseBitacora] acción de supervisor', { accion, uid, tecnico: request.data?.nombre ?? null })
+    return r
+  },
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pase de lectura para los nuevos (04-11-2026) — lógica en paseLectura.js
+// Solo corre cuando alguien abre el link o un supervisor lo administra.
+// ─────────────────────────────────────────────────────────────────────────────
+const paseLecturaMod = require('./paseLectura')
+
+exports.paseLectura = onCall(
+  { region: 'us-central1', memory: '256MiB', cpu: 0.25, concurrency: 1, maxInstances: 3, timeoutSeconds: 60 },
+  async (request) => {
+    const deps = {
+      db,
+      auth: getAuth(),
+      ahoraMs: () => Date.now(),
+      error: (code, msg) => new HttpsError(code, msg),
+      asegurarMonitorLinea: (plantSlug, plantLineId) =>
+        publicMonitorMod.ensureLineMonitor(db, plantSlug, { ttlDays: 30, meta: { plantLineId } }),
+    }
+    const accion = String(request.data?.accion ?? '')
+    // Pública: la usa quien abre el link (todavía sin sesión).
+    if (accion === 'entrar') {
+      const r = await paseLecturaMod.entrar(deps, request.data)
+      logger.info('[paseLectura] teléfono habilitado')
+      return r
+    }
+    if (accion === 'monitores') return paseLecturaMod.monitores(deps, request.auth?.token)
+    const fn = paseLecturaMod.ACCIONES_SUPERVISOR[accion]
+    if (!fn) throw new HttpsError('invalid-argument', 'Acción desconocida')
+    // Solo el administrador entrega, cambia o pausa el link (decisión de Orel 04-11-2026).
+    const { uid, user } = await _assertSupervisorCaller(request)
+    if (user.rol !== 'admin') throw new HttpsError('permission-denied', 'Solo administradores')
+    const nombre = [user.nombre, user.apellido].filter(Boolean).join(' ')
+    const r = await fn(deps, request.data, { uid, nombre })
+    logger.info('[paseLectura] acción de administrador', { accion, uid })
     return r
   },
 )
@@ -9991,12 +10338,13 @@ exports.onShoplogixShiftWrittenPublicMonitor = onDocumentWritten(
     // `loadShiftIndex`: el índice es lo que mató los barridos por-función).
     const currentByPlant = new Map()
     const indexByPlant = new Map()
+    const fallaByPlant = new Map()
     let refrescados = 0
 
     const hallazgosMonitor = []
     for (const d of activos) {
       try {
-        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant)
+        const patch = await publicMonitorMod.buildMonitorPatch(db, d.data(), currentByPlant, indexByPlant, fallaByPlant)
         if (!patch) continue
         await d.ref.set(patch, { merge: true })
         refrescados++

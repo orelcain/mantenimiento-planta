@@ -47,6 +47,8 @@ export interface PublicMonitorMachine {
    * previos; null si el sensor nunca lo reportó.
    */
   targetCpm?: number | null
+  /** Segundos andando (estado uptime). Base del llenado por puesto del Duelo; ausente en docs previos. */
+  uptimeSec?: number
 }
 
 /**
@@ -115,6 +117,12 @@ export interface PublicMonitorLive {
    * `medidoEl`/`metodo`/`por` viajan porque la fuente es parte del dato.
    */
   setPoint?: { cpm: number; medidoEl: string | null; metodo: string | null; por: string | null } | null
+  /**
+   * Perillas (velocidad configurada en cada máquina) de la línea. `actual` = la
+   * vigente por máquina; `historial` = todas las anotaciones (máx. 100), la más
+   * nueva al final. Null si la línea no tiene ninguna perilla anotada.
+   */
+  perillas?: { actual: Record<string, { cpm: number; desde: string; motivo?: string }>; historial: Array<{ cpm: number; desde: string; machineId: string; motivo?: string }>; modo?: 'calibrado' | 'optimo' } | null
   /** Nombre del turno según Shoplogix — con él se fija el cierre de ESTE turno. */
   shiftName?: string | null
   /** Turnos anteriores usados, cuando se aprendió del historial. */
@@ -225,6 +233,8 @@ export interface PublicMonitorLive {
       mtbfMin: number | null
       microN: number
       microMin: number
+      /** Micro (min) de ESTA máquina por hora de producción. Ausente hasta que el backend lo publique. */
+      microH?: number[]
       /** Detenciones sin causa anotada: con esto la tarjeta no reclama 100%
           mientras haya paros que nadie imputó. Ausente en docs previos. */
       sinImputarN?: number
@@ -246,6 +256,12 @@ export interface PublicMonitorLive {
      */
     sinImputarLineaMin?: number
     /**
+     * Micro detención (min de máquina, sumada entre máquinas) por HORA DE PRODUCCIÓN: la hora 1 son los primeros 60 min
+     * desde la primera pieza. Suma lo mismo que `porMaquina[].microMin` (misma clasificación). Ausente en docs previos
+     * al 28-10-2026 (el Duelo en PC dice «sin dato»).
+     */
+    microH?: number[]
+    /**
      * Las causas IMPUTADAS del turno (todas: técnicas, externas, programadas
      * y excedidas — minutos de máquina sumados), de la más cara a la más
      * barata. Es lo que faltaba para que la tarjeta CUANTIFIQUE las
@@ -256,8 +272,10 @@ export interface PublicMonitorLive {
   } | null
   /** Razones de detención, referenciadas por índice desde `stopEvents`. */
   stopReasons?: string[]
-  /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos. */
-  stopEvents?: Array<{ r: number; f: string; s: number }>
+  /** Ids de máquina referenciados por índice desde `stopEvents[].m`. Ausente en docs previos. */
+  stopMachines?: string[]
+  /** Detenciones ubicadas: `r` índice de razón, `f` inicio ISO, `s` segundos, `m` índice de máquina. */
+  stopEvents?: Array<{ r: number; f: string; s: number; m?: number }>
   /**
    * Lo que el operador escribió en Shoplogix sobre una detención: `t` el texto,
    * `r` la causa a la que lo asoció, `f`/`h` la ventana (ISO wall-clock).
@@ -329,6 +347,8 @@ export interface PulsoMonitor {
 
 export interface PublicShiftMonitorDoc {
   token: string
+  /** Los otros monitores de línea vigentes de la misma planta (para el selector del Duelo, sin sesión). */
+  lineasHermanas?: Array<{ nombre: string; token: string }>
   mode?: MonitorMode
   plantSlug: string
   dateKey: string
@@ -400,6 +420,138 @@ export interface PublicShiftMonitorDoc {
    * él, cayendo a `history`/`forecastHistory`.
    */
   shiftStats?: ShiftStat[]
+  /**
+   * Duelo de equipos: la curva acumulada (desde el arranque productivo, cada 5
+   * min) del último turno CERRADO del OTRO nombre (día ↔ noche). Ver
+   * `buildRivalCurve`. null/ausente si no hay un rival presentable.
+   */
+  rivalCurve?: RivalCurve | null
+  /**
+   * Falla repetida (28-10-2026): paros de Mantención cuya misma causa vuelve en
+   * la misma máquina en ≤ 8 h de operación. Serie y ranking los calcula el cron
+   * diario `recalcularFallaRepetida`; los avisos, cada refresco. Ausente hasta
+   * la primera corrida del cron; null si falló.
+   */
+  fallaRepetida?: FallaRepetidaMonitor | null
+}
+
+export interface FallaRepetidaMes {
+  /** YYYY-MM */
+  mes: string
+  /** Episodios con 8 h de operación por delante (los demás todavía no se saben). */
+  episodios: number
+  /** De esos, cuántos volvieron en ≤ 8 h de operación. */
+  vuelven: number
+  tasa: number
+  /** Menos de 30 episodios: la tasa del mes es ruido. */
+  pocosDatos: boolean
+}
+
+export interface FallaRepetidaCausa {
+  causa: string
+  episodios: number
+  vuelven: number
+  tasa: number
+  /** Tasa de un momento cualquiera de operación (la referencia contra la que se lee `tasa`). */
+  azar: number
+}
+
+export interface FallaRepetidaAviso {
+  machineId: string
+  machineName: string
+  causa: string
+  /** Fin del paro, wall-clock-as-UTC. */
+  finAt: string
+  vuelven: number
+  episodios: number
+  /** «6 de cada 10». */
+  deCada10: number
+  /** Este paro ya era la vuelta de uno anterior del turno. */
+  esRepeticion: boolean
+}
+
+/** Una semana con turnos del KPI «fallas repetidas de Mantención» (la serie la arma el cron; el cálculo de tramos está en `fallasRepetidasKpi.ts`). */
+export interface FallaRepetidaSemana {
+  /** Lunes de la semana, YYYY-MM-DD. */
+  semana: string
+  turnos: number
+  /** Fallas de máquina (Mantención) de más de 5 min. */
+  fallas: number
+  /** De esas, cuántas tuvieron otra en la misma Baader antes de 2 h. */
+  repetidas: number
+}
+
+export interface FallaRepetidaMonitor {
+  meses: FallaRepetidaMes[]
+  causas: FallaRepetidaCausa[]
+  avisos: FallaRepetidaAviso[]
+  desde: string | null
+  calculadoEl: string | null
+  /** Serie semanal (la semana en curso incluida) del KPI de Análisis «Lo que se repite». Ausente si el cron aún no la calculó. */
+  semanas?: FallaRepetidaSemana[]
+}
+
+/** Curva del último turno cerrado del otro horario. `curve` son objetos `{m, p}` (Firestore rechaza arrays anidados). */
+export interface RivalCurve {
+  shiftDocId: string
+  dateKey: string
+  shiftId: string
+  /** Hora planificada de inicio (HH:MM, hora de planta): de acá sale si fue turno de día o de noche. */
+  h0?: string
+  curve: Array<{ m: number; p: number }>
+  total: number
+  producingMin: number
+  windowMin?: number
+}
+
+/**
+ * Lo que el Duelo necesita de un turno cerrado y `ShiftStat` no traía. Las claves
+ * que faltan simplemente no existen (turnos que el backend todavía no rearma).
+ */
+export interface ShiftDuelo {
+  /** Hora planificada de inicio, HH:MM de planta. */
+  h0?: string
+  /** Minutos entre el inicio planificado y el arranque productivo. */
+  ini?: number
+  /** Piezas de la última hora del horario planificado. */
+  uh?: number
+  /** Minutos de micro detención sumados entre máquinas. */
+  mic?: number
+  /** Llenado por puesto: piezas ÷ (esperado × minutos andando), tope 100. */
+  alim: Array<{ n: string; f?: number }>
+  /**
+   * Paradas de 5 min o más, unidas entre máquinas por causa: `n` causa, `o` minutos desde el inicio planificado,
+   * `d` minutos de duración, `p: 1` si es programada (colación, reunión). Ausente hasta que el backend rearma el turno.
+   */
+  ev?: Array<{ n: string; o: number; d: number; p?: 1 }>
+  /**
+   * Curva acumulada compacta del turno: piezas a los minutos `cvp, 2·cvp, …` desde el arranque productivo; el último
+   * valor es el cierre y cae en el minuto `cvm`. `[]` = el turno no tiene curva. Ausente hasta que el backend rearma
+   * el turno. Con ella un turno PASADO corre contra el del otro horario de su jornada (`rivalCurve` es solo del vigente).
+   */
+  cv?: number[]
+  /** Paso de `cv`, en minutos. */
+  cvp?: number
+  /** Minuto en que cae el último valor de `cv`. */
+  cvm?: number
+  /**
+   * Micro detención por hora de producción (min de máquina, sumados) y por máquina (orden de `alim`/`porMaquina`), con la
+   * MISMA regla que `mic`. `[]` = sin dato; ausentes hasta que el backend rearma el turno (28-10-2026).
+   */
+  micH?: number[]
+  micM?: number[]
+  /**
+   * Micro por máquina Y por hora de producción (filas en el orden de `micM`): el mapa de calor Baader × hora. Todavía NO lo
+   * publica el backend: ausente = «sin dato» por celda (no se reparte el total por hora entre máquinas).
+   */
+  micHM?: number[][]
+  /**
+   * Minutos sostenidos a ≥ 90 % del esperado: de la línea (`v90`) y de cada máquina (`v90m`, orden de `porMaquina`).
+   * Salen de la serie minuto a minuto archivada: turnos sin ella no los traen (no se inventan). `v90m: []` = mirado
+   * sin poder afirmarlo (sin esperado en alguna máquina).
+   */
+  v90?: number
+  v90m?: number[]
 }
 
 /** Un turno resumido, sin curva. Ver `buildShiftStats` en las functions. */
@@ -412,8 +564,12 @@ export interface ShiftStat {
   windowMin?: number | null
   plannedMin?: number | null
   recoverableMin?: number | null
-  /** Causas recuperables del turno: `reason`, minutos y cantidad de paradas. */
-  recoverable?: Array<{ reason: string; min: number; count: number }>
+  /**
+   * Causas recuperables del turno: `reason`, minutos (de máquina) y cantidad de paradas. `lineMin` = minutos en que la
+   * LÍNEA entera estuvo detenida por la causa y `equivMin` = minutos de máquina × 1/N: los mismos que usa «El turno».
+   * Ausentes hasta que el backend rearma el turno (28-10-2026).
+   */
+  recoverable?: Array<{ reason: string; min: number; count: number; lineMin?: number; equivMin?: number }>
   /**
    * Piezas de cada máquina en ese turno (`n` nombre, `p` piezas). Con
    * `producingMin` reconstruye el «aporte al promedio» de turnos pasados —
@@ -421,6 +577,15 @@ export interface ShiftStat {
    * lo tienen hasta que el backend las rearma.
    */
   porMaquina?: Array<{ n: string; p: number }>
+  /**
+   * Paradas recuperables del turno ubicadas en el reloj: los mismos tramos que
+   * cuenta `recoverable[].count`. `c` = índice en `recoverable`, `t` = inicio
+   * HH:MM:SS hora de planta, `s` = segundos, `m` = índices en `porMaquina`.
+   * Solo en turnos rearmados desde el 27-10-2026 (ausente = «sin dato»).
+   */
+  paradas?: Array<{ c: number; t: string; s: number; m?: number[] }>
+  /** Datos del Duelo de equipos; ausente en turnos anteriores al 27-10-2026 hasta que el backend los rearma. */
+  duelo?: ShiftDuelo
   tbv?: number | null
 }
 

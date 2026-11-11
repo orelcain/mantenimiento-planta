@@ -56,6 +56,7 @@ export const APP_MODULES: readonly AppModule[] = [
   // no se ofrecen como entrada: el admin los abre con el botón de edición dentro del simulador.
   { ruta: '/aprendizaje/hmi-knuro', nombre: 'HMI Knuro', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI Knuro de la Baader 142 con los presets de planta (abre sin sesión, también por QR). El admin edita presets y ayudas con el botón «Editar presets y ayudas» de esa misma pantalla' },
   { ruta: '/aprendizaje/hmi-grader', nombre: 'HMI Grader', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI del Grader (StaticGrader Marelec Z2) para practicar; abre sin sesión. El admin edita el estado con «Editar estado» de esa misma pantalla' },
+  { ruta: '/aprendizaje/hmi-gea', nombre: 'HMI GEA PowerPak', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Simulador del HMI PowerPak de la termoformadora GEA V2 (serie 50520184) para practicar; abre sin sesión. Se entra desde el Centro de Aprendizaje (ficha de la termoformadora)' },
   { ruta: '/centro-tecnico-documental', nombre: 'Centro técnico documental', grupo: 'Aprendizaje', estado: 'produccion', descripcion: 'Portada del Centro técnico documental: KPIs documentales de equipos y export a Excel' },
   // ── Administración ──
   { ruta: '/admin', nombre: 'Panel de administración', grupo: 'Administración', estado: 'produccion', descripcion: 'Panel de administración (solo administradores)', adminOnly: true },

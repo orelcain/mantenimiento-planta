@@ -84,12 +84,20 @@ export function referenciaAporte(
   stats: ShiftStat[] | null | undefined,
   shiftIdActual: string | null | undefined,
   n: number = APORTE_TURNOS_REF,
+  /**
+   * El `shiftDocId` del turno que se está MIRANDO. Mirando un turno pasado, ese mismo turno está entre los `stats`: sin
+   * excluirlo, «vs último» se comparaba consigo mismo («— 0,0») y «vs prom. N» lo llevaba adentro. Con él se descartan también
+   * los turnos POSTERIORES (su `dateKey` es mayor): el «último» es el turno anterior, no uno que aún no había pasado.
+   */
+  excluirDocId?: string | null,
 ): ReferenciaAporte | null {
   const numero = numeroDeTurno(shiftIdActual)
   if (!numero || !stats?.length) return null
+  const dateKeyVisto = excluirDocId ? excluirDocId.slice(0, 10) : null
 
   const utiles = stats
     .filter((s) => numeroDeTurno(s.shiftId) === numero)
+    .filter((s) => !excluirDocId || (s.shiftDocId !== excluirDocId && (dateKeyVisto == null || s.dateKey < dateKeyVisto)))
     .filter((s) => s.producingMin > 0 && (s.porMaquina?.length ?? 0) > 0)
     /* Por dateKey y no por el orden del arreglo: el backend lo ordena por id,
        y un id ordena alfabéticamente («Turno 1 Lunes» antes que «Turno 2»). */

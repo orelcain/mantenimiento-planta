@@ -29,3 +29,6 @@ export { SegmentedControl, type SegmentedControlProps, type Segment } from './Se
 export { SwipeRow, type SwipeRowProps, type SwipeAction } from './SwipeRow'
 export { EncabezadoHerramienta, type EncabezadoHerramientaProps, type ItemMasHerramienta } from './EncabezadoHerramienta'
 export { SelectorSeccion, type SelectorSeccionProps, type OpcionSeccion } from './SelectorSeccion'
+export { FoldTable, type FoldTableProps, type FoldTableRow, type FoldTableColumn } from './FoldTable'
+export { Skeleton, SkeletonBloque, type SkeletonBloqueProps } from './Skeleton'
+export { SeccionLectura, FilasLectura, type FilaLectura } from './Lectura'

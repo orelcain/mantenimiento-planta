@@ -143,7 +143,7 @@ export function OrigenDelTurnoCard({
             // tema claro el primary da 4,2:1 y no llega a AA para texto de 14 px.
             className="mt-3.5 w-full min-h-[44px] flex items-center justify-between text-sm font-medium text-brand-ink"
           >
-            {veredicto.tono === 'ok' ? 'Ver la evidencia' : 'Ver los paros y la nube'}
+            {veredicto.tono === 'ok' ? 'Ver la evidencia' : 'Ver las detenciones y la nube'}
             <ChevronRight className="w-4 h-4 opacity-55" />
           </button>
         </CardContent>

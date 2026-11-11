@@ -15,8 +15,14 @@
 import { ListChecks } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Disclosure } from '@/components/piel'
+import { Disclosure, FoldTable, type FoldTableRow } from '@/components/piel'
+import { usePielApple } from '@/hooks/usePielApple'
+import { FilasLectura, SeccionLectura } from '@/components/piel/Lectura'
 import { fmtSecPanoramic, type PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
+import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { topCausas, etiquetaDueno } from '@/services/grader/imputacionTopCausas'
+import { SIN_CAUSAL } from '@/services/shoplogix/imputacionPareto'
+import { LOSS_BUCKET_META, type LossBucket } from '@/services/shoplogix/lossBuckets'
 
 export type TendenciaImputacion = { dir: 'sube' | 'baja' | 'estable'; deltaPts: number } | null
 
@@ -54,14 +60,29 @@ const nivel = (pct: number) =>
   : pct >= 60 ? { text: 'text-ink-warn pizarra:text-muted-foreground', bar: 'bg-warning/[0.15] pizarra:bg-[rgb(var(--serie-1))]', label: 'Parcial' }
   : { text: 'text-ink-crit', bar: 'bg-destructive/[0.15] pizarra:bg-[rgb(var(--grafico-falla))]', label: 'Sin imputar' }
 
-export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
+/**
+ * Mismo código de color por dueño que la cascada del turno (LossCascadeCard),
+ * pero más opaco: en una barra fina sobre su pista, el 15 % de la cascada no se
+ * distinguía de la pista (contraste 1,2:1, medido en el preview).
+ */
+const BUCKET_FILL: Record<string, string> = {
+  'planificado':    'bg-muted-foreground/60',
+  'externo':        'bg-warning/80 pizarra:bg-[rgb(var(--serie-otros))] pz-trama',
+  'mantencion':     'bg-destructive/80 pizarra:bg-[rgb(var(--serie-1))]',
+  'sin-clasificar': 'bg-cat-6-tint/80 pizarra:bg-transparent pizarra:shadow-[inset_0_0_0_1px_rgb(var(--grafico-neutro-medio))]',
+}
+
+export function ImputacionPeriodCard({ imputacion, className }: { imputacion: PeriodImputacion | null; className?: string }) {
+  const apple = usePielApple()
   if (!imputacion || imputacion.totalSec <= 0) return null
+  if (apple) return <PorQueSeDetuvoApple imputacion={imputacion} className={className} />
 
   const pct = imputacion.cobertura * 100
   const th = nivel(pct)
   const sinCausalSec = imputacion.totalSec - imputacion.imputadoSec
   const tend = tendenciaImputacion(imputacion.porTurno)
   const serie = imputacion.porTurno
+  const causas = topCausas(imputacion)
 
   return (
     <Card className="bg-card">
@@ -124,19 +145,46 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-caption text-muted-foreground">
-          <span className="tabular-nums">
-            <b className="text-foreground/85">{fmtSecPanoramic(imputacion.imputadoSec)}</b> con causal
-          </span>
+        {/* Las 3 causales con más tiempo, a la vista: es la evidencia de DÓNDE se
+            pierde el tiempo y de quién es (Mantención / proceso), antes escondida
+            detrás del plegable. % sobre el tiempo detenido total del período. */}
+        {causas.length > 0 && (
+          <ul className="space-y-1.5" aria-label="Causales con más tiempo detenido">
+            {causas.map((c) => {
+              const dueno = etiquetaDueno(c.bucket)
+              return (
+                <li
+                  key={c.label}
+                  title={`${c.label}: ${fmtSecPanoramic(c.durationSec)} = ${(c.frac * 100).toFixed(0)}% del tiempo detenido total del período (${fmtSecPanoramic(imputacion.totalSec)}, con y sin causal anotada).`}
+                >
+                  <div className="flex items-baseline justify-between gap-2 text-footnote">
+                    <span className="min-w-0 truncate text-foreground/90">
+                      {c.label}
+                      {dueno && (
+                        <span className="ml-1.5 text-caption text-muted-foreground">{dueno}</span>
+                      )}
+                    </span>
+                    <b className="shrink-0 tabular-nums text-foreground">{(c.frac * 100).toFixed(0)}%</b>
+                  </div>
+                  <div className="mt-0.5 h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full', (c.bucket && BUCKET_FILL[c.bucket]) ?? 'bg-muted-foreground/[0.10]')}
+                      style={{ width: `${Math.min(100, Math.max(2, c.frac * 100))}%` }}
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        <p className="text-caption text-muted-foreground tabular-nums">
+          <b className="text-foreground/85">{fmtSecPanoramic(imputacion.imputadoSec)}</b> con causal
           {sinCausalSec > 0 && (
-            <span className="tabular-nums">
-              <b className="text-foreground/85">{fmtSecPanoramic(sinCausalSec)}</b> sin anotar
-            </span>
+            <> · <b className="text-foreground/85">{fmtSecPanoramic(sinCausalSec)}</b> sin anotar</>
           )}
-          <span className="tabular-nums">
-            de {fmtSecPanoramic(imputacion.totalSec)} detenidos en {imputacion.turnos} turno{imputacion.turnos === 1 ? '' : 's'}
-          </span>
-        </div>
+          {' '}· de {fmtSecPanoramic(imputacion.totalSec)} detenidos en {imputacion.turnos} turno{imputacion.turnos === 1 ? '' : 's'}
+        </p>
 
         {/* §22: el % y la tendencia responden la pregunta de la tarjeta; el
             reparto por causal es DETALLE. Se despliega en línea (variante
@@ -144,8 +192,7 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
         {imputacion.topCategorias.length > 0 && (
           <Disclosure
             variant="inline"
-            title="Ver reparto por causal"
-            summary={`${imputacion.topCategorias.length} causales`}
+            title={`Ver las ${imputacion.topCategorias.length} causales y lo sin anotar`}
             defaultOpen={false}
             storageKey="grader-imputacion-causales"
           >
@@ -163,5 +210,114 @@ export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputac
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/** Quién responde, por dueño del bucket. Mantención se nombra así (la pantalla lo pide). */
+function duenoApple(b: LossBucket | undefined): string {
+  if (b === 'mantencion') return 'Mantención'
+  if (b === 'externo') return 'Proceso'
+  const meta = b ? LOSS_BUCKET_META[b as keyof typeof LOSS_BUCKET_META] : undefined
+  return meta?.owner ?? 'Varios'
+}
+
+/** Espacio duro entre el número y el «%»: que no se corte al final de línea. */
+const ESPACIO_DURO = String.fromCharCode(160)
+/** Rótulo visible de una causal: «Eléctrica o Mecánica» se lee «Eléctrica o mecánica». Solo el texto, no la clave. */
+const rotuloCausaApple = (s: string) => s.replace(/ o Mecánica\b/g, ' o mecánica')
+
+const pctApple = (frac: number) => `${Math.round(frac * 100)}${ESPACIO_DURO}%`
+
+/**
+ * Piel Apple (modo lectura): «Por qué se detuvo». Tabla con filete: las 3 causales de
+ * más tiempo, la de Mantención siempre visible (si no entró al top, se suma su categoría
+ * más grande), el resto agrupado en «Otras N causales», lo sin anotar y el cierre con el
+ * total detenido. «Responde» solo en PC.
+ * Todo sale de `topCausas` y `topCategorias`: no se calcula nada nuevo.
+ */
+function PorQueSeDetuvoApple({ imputacion, className }: { imputacion: PeriodImputacion; className?: string }) {
+  const total = imputacion.totalSec
+  const sinCausalSec = total - imputacion.imputadoSec
+  const tend = tendenciaImputacion(imputacion.porTurno)
+  const mostradas = topCausas(imputacion).map((c) => ({ label: c.label, durationSec: c.durationSec, bucket: c.bucket }))
+  const yaMostradas = new Set(mostradas.map((c) => c.label))
+  const resto = imputacion.topCategorias.filter(
+    (c) => c.label !== SIN_CAUSAL && c.durationSec > 0 && !yaMostradas.has(c.label),
+  )
+  const mantencionFuera = mostradas.some((c) => c.bucket === 'mantencion')
+    ? null
+    : resto.filter((c) => c.bucket === 'mantencion').sort((a, b) => b.durationSec - a.durationSec)[0] ?? null
+  const filas = [...mostradas, ...(mantencionFuera ? [mantencionFuera] : [])]
+    .sort((a, b) => b.durationSec - a.durationSec)
+  const otras = mantencionFuera ? resto.filter((c) => c !== mantencionFuera) : resto
+  const otrasSec = otras.reduce((a, c) => a + c.durationSec, 0)
+
+  const rows: FoldTableRow[] = filas.map((c) => ({
+    id: c.label,
+    destacada: c.bucket === 'mantencion',
+    cells: [rotuloCausaApple(c.label), duenoApple(c.bucket), pctApple(c.durationSec / total)],
+  }))
+  if (otras.length > 0 && otrasSec > 0) {
+    rows.push({
+      id: 'otras',
+      cells: [
+        otras.length === 1 ? 'Otra causal' : `Otras ${otras.length} causales`,
+        'Varios',
+        pctApple(otrasSec / total),
+      ],
+    })
+  }
+
+  // Modo lectura: lo sin anotar es una fila más (dice cuánto tiempo es) y el cierre, el total detenido.
+  if (sinCausalSec > 0) {
+    rows.push({ id: 'sin-anotar', cells: ['Sin anotar', fmtDurationSec(sinCausalSec), pctApple(sinCausalSec / total)] })
+  }
+  const cierre: FoldTableRow = {
+    id: 'total',
+    cells: [`Detenido, ${imputacion.turnos} turno${imputacion.turnos === 1 ? '' : 's'}`, '', fmtDurationSec(total)],
+  }
+
+  const pctCausa = Math.round(imputacion.cobertura * 100)
+  const tendTxt = tend == null
+    ? ''
+    : tend.dir === 'estable'
+      ? ' Estable en el período.'
+      : ` ${Math.abs(Math.round(tend.deltaPts))} puntos ${tend.dir === 'sube' ? 'más' : 'menos'} que en la primera mitad del período.`
+
+  return (
+    <SeccionLectura titulo="Por qué se detuvo" className={className} testId="por-que-se-detuvo">
+      <FoldTable
+        lectura
+        caption="Causas de detención del período"
+        columns={[
+          { id: 'causa', label: 'Causa' },
+          { id: 'dueno', label: 'Responde', soloPC: true },
+          { id: 'tiempo', label: 'Tiempo', align: 'right' },
+        ]}
+        rows={rows}
+        cierre={cierre}
+        nota={
+          <>
+            <span className="font-semibold text-foreground tabular-nums">{`${pctCausa}${ESPACIO_DURO}% con causa.`}</span>
+            {tendTxt}
+          </>
+        }
+      />
+      {imputacion.topCategorias.length > 0 && (
+        <Disclosure
+          variant="inline"
+          title={`Ver las ${imputacion.topCategorias.length} causales y lo sin anotar`}
+          defaultOpen={false}
+          storageKey="grader-imputacion-causales"
+        >
+          <FilasLectura
+            filas={imputacion.topCategorias.slice(0, 5).map((c) => ({
+              rotulo: rotuloCausaApple(c.label),
+              valor: fmtDurationSec(c.durationSec),
+            }))}
+          />
+        </Disclosure>
+      )}
+    </SeccionLectura>
   )
 }

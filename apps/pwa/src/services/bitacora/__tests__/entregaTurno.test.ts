@@ -116,7 +116,7 @@ describe('entrega de turno', () => {
     const abierto = ev({ id: 'k', equipo: 'KNURO N1', descripcion: 'Pusher <irregular>', turnoId: '2026-09-15_dia', registradoPor: 'Leandro Igor' })
     const datos = { turno: noche16, eventos: [], tecnicos: [], planta: 'Planta Chonchi', pendientesAnteriores: [abierto] }
     const html = bitacoraAHtmlCorreo(datos)
-    expect(html).toContain('Sigue pendiente de turnos anteriores')
+    expect(html).toContain('SIGUE PENDIENTE DE TURNOS ANTERIORES')
     expect(html).toContain('KNURO N1 · Pusher &lt;irregular&gt; · desde Turno día 15-09 (Leandro Igor)')
     expect(bitacoraATextoPlano(datos)).toContain('SIGUE PENDIENTE DE TURNOS ANTERIORES\n\n- KNURO N1 · Pusher <irregular> · desde Turno día 15-09 (Leandro Igor)')
   })

@@ -92,7 +92,7 @@ describe('computeAreaOee', () => {
     expect(byLabel.get('atasco en salida')!.fuente).toBe('maquina')
     expect(byLabel.get('GEA')!.fuente).toBe('etapa')
     // downtime 100 − 75 anotados = 25 min todavía sin explicar
-    expect(byLabel.get('Paros sin causa anotada')!.min).toBe(25)
+    expect(byLabel.get('Detenciones sin causa anotada')!.min).toBe(25)
     expect(r.perdidas[0]!.label).toBe('atasco en salida')  // ordenado por minutos
   })
 
@@ -100,7 +100,7 @@ describe('computeAreaOee', () => {
     const r = computeAreaOee(kpis(), [
       etapa({ origen: 'shoplogix', duracionMin: 500, causa: 'anotación de otro período' }),
     ])!
-    expect(r.perdidas.find((p) => p.label === 'Paros sin causa anotada')).toBeUndefined()
+    expect(r.perdidas.find((p) => p.label === 'Detenciones sin causa anotada')).toBeUndefined()
     expect(r.perdidas.every((p) => p.min >= 0)).toBe(true)
   })
 

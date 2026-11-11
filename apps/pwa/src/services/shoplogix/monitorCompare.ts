@@ -78,6 +78,58 @@ export function piecesAt(curve: PacePoint[], min: number): number | null {
   return ultimo.pieces
 }
 
+/**
+ * Piezas de un turno a los `min` desde su primera pieza, INTERPOLANDO entre tramos (con el arranque en 0 piezas).
+ * Es la lectura «a esta misma altura» de un día comparado: la misma que dibuja la leyenda del gráfico
+ * (`cifraTurnoAnterior`). `piecesAt` es el escalón de los datos medidos; para comparar en un minuto que cae dentro de
+ * un tramo, el escalón le quitaba al otro día hasta 5 minutos de producción. null más allá de su último dato.
+ */
+export function piezasALaAltura(curve: PacePoint[], min: number): number | null {
+  if (curve.length === 0 || !Number.isFinite(min)) return null
+  if (min <= 0) return 0
+  if (min > curve[curve.length - 1]!.minutes) return null
+  let a: PacePoint = { minutes: 0, pieces: 0 }
+  for (const b of curve) {
+    if (b.minutes >= min) {
+      return b.minutes === a.minutes ? b.pieces : a.pieces + ((min - a.minutes) / (b.minutes - a.minutes)) * (b.pieces - a.pieces)
+    }
+    a = b
+  }
+  return curve[curve.length - 1]!.pieces
+}
+
+/**
+ * Lo que la cuota pide a los `minutoDatos` desde la primera pieza: la curva objetivo INTERPOLADA linealmente (es un
+ * modelo, no un conteo; acepta minutos fraccionarios). Se evalúa en la hora de los DATOS, la misma de las piezas que
+ * se le restan, y no en el fin del tramo de 5 min en curso: así «A esta hora» no salta 5 minutos de cuota al cambiar
+ * de tramo. 0 antes del arranque; pasado el último punto, lo último de la curva (o la meta). null sin curva.
+ */
+export function cuotaA(optimal: PacePoint[] | null | undefined, minutoDatos: number | null | undefined, meta?: number | null): number | null {
+  if (!optimal || optimal.length === 0 || minutoDatos == null || !Number.isFinite(minutoDatos)) return null
+  if (minutoDatos <= optimal[0]!.minutes) return minutoDatos < optimal[0]!.minutes ? 0 : optimal[0]!.pieces
+  const ultimo = optimal[optimal.length - 1]!
+  if (minutoDatos >= ultimo.minutes) return meta != null && meta > 0 ? Math.max(ultimo.pieces, meta) : ultimo.pieces
+  for (let i = 0; i < optimal.length - 1; i++) {
+    const a = optimal[i]!, b = optimal[i + 1]!
+    if (minutoDatos >= a.minutes && minutoDatos <= b.minutes) {
+      return b.minutes === a.minutes ? b.pieces : a.pieces + ((minutoDatos - a.minutes) / (b.minutes - a.minutes)) * (b.pieces - a.pieces)
+    }
+  }
+  return ultimo.pieces
+}
+
+/**
+ * El punto vivo al final de la curva de hoy. REEMPLAZA a los tramos que terminan después de él: el tramo en curso
+ * llega con sus piezas parciales rotuladas al FIN del tramo (hasta 5 min en el futuro), así que dejarlo adelantaba
+ * el «ahora» del comparador. Solo si no va hacia atrás: un contador con menos piezas que la curva no la retrocede.
+ */
+export function conPuntoVivo(hoy: PacePoint[], vivo: { pieces: number; minute: number } | null | undefined): PacePoint[] {
+  if (hoy.length === 0 || !vivo || !Number.isFinite(vivo.minute) || vivo.minute <= 0) return hoy
+  if (vivo.pieces < hoy[hoy.length - 1]!.pieces) return hoy
+  const previos = hoy.filter((p) => p.minutes < vivo.minute)
+  return [...previos, { minutes: vivo.minute, pieces: vivo.pieces }]
+}
+
 export interface DayCurve {
   label: string
   dateKey: string
@@ -114,7 +166,11 @@ export function plannedBreaks(args: {
   stopReasons?: string[] | null
   plannedReasons?: string[] | null
 }): PlannedBreak[] {
-  const t0 = args.series?.[0]?.t ? Date.parse(args.series[0]!.t) : NaN
+  /* ⚠ Desde la PRIMERA PIEZA, la misma base de la curva de hoy (`cumulativeFromStart`) y de las bandas del eje. Con el
+     primer tramo de la serie (vacío si el turno arrancó tarde) el plano de convenio de la cuota quedaba corrido los
+     minutos vacíos del arranque respecto de la línea que lo dibuja. */
+  const origen = desdePrimeraPieza(args.series)[0]?.t
+  const t0 = origen ? Date.parse(origen) : NaN
   if (Number.isNaN(t0) || !args.stopEvents || !args.stopReasons) return []
   const deConvenio = new Set(args.plannedReasons ?? [])
   if (deConvenio.size === 0) return []
@@ -390,13 +446,7 @@ export function buildDayComparison(args: {
    */
   hoyVivo?: { pieces: number; minute: number } | null
 }): CompareResult {
-  let hoy = cumulativeFromStart(args.todaySeries)
-  if (hoy.length > 0 && args.hoyVivo) {
-    const ult = hoy[hoy.length - 1]!
-    if (args.hoyVivo.minute > ult.minutes && args.hoyVivo.pieces >= ult.pieces) {
-      hoy = [...hoy, { minutes: args.hoyVivo.minute, pieces: args.hoyVivo.pieces }]
-    }
-  }
+  const hoy = conPuntoVivo(cumulativeFromStart(args.todaySeries), args.hoyVivo)
   if (hoy.length === 0) {
     return {
       days: [], currentMinute: null, optimal: null, optimalAtCurrentMinute: null,
@@ -440,7 +490,7 @@ export function buildDayComparison(args: {
       dateKey: prev.dateKey,
       curve,
       totalPieces: curve[curve.length - 1]!.pieces,
-      atCurrentMinute: piecesAt(curve, currentMinute),
+      atCurrentMinute: piezasALaAltura(curve, currentMinute),
       esHoy: false,
     })
   }
@@ -476,12 +526,42 @@ export function buildDayComparison(args: {
   if (args.targetPieces && args.targetPieces > 0 && args.usefulMin && args.usefulMin > 0) {
     const finMin = Math.max(maxMinutes, args.usefulMin + sumaBreaks(args.breaks ?? []))
     optimal = curvaObjetivo(args.targetPieces, args.usefulMin, args.breaks ?? [], finMin)
-    optimalAtCurrentMinute = piecesAt(optimal, currentMinute) ?? args.targetPieces
+    optimalAtCurrentMinute = cuotaA(optimal, currentMinute, args.targetPieces)
   }
 
   return {
     days, currentMinute, optimal, optimalAtCurrentMinute, maxMinutes,
     breaks: args.breaks ?? [], targetPieces: args.targetPieces ?? null,
+  }
+}
+
+/**
+ * La comparación leída a la HORA DE LOS DATOS: la misma T de las piezas que muestra la vista (fin del último minuto
+ * cerrado con la reproducción, o el corte del contador). `buildDayComparison` corre antes de conocer esa T (vive en un
+ * hook; las barras de minuto se arman después), así que esto la reubica: hoy termina en (T, mostradas), el «ahora»
+ * pasa a T, los otros días se leen a esa altura y la cuota es `cuotaA` en T. Así franja, globo, Camino, la leyenda y
+ * «Comparado con otros días» restan contra el mismo minuto. Sin T (o sin hoy) devuelve la comparación tal cual.
+ */
+export function alinearAHoraDeDatos(cmp: CompareResult, args: { minutoDatos: number | null; mostradas: number | null }): CompareResult {
+  const m = args.minutoDatos
+  const iHoy = cmp.days.findIndex((d) => d.esHoy)
+  if (m == null || !Number.isFinite(m) || m <= 0 || iHoy < 0) return cmp
+  const hoyDia = cmp.days[iHoy]!
+  const vivo = args.mostradas != null && Number.isFinite(args.mostradas) ? { minutes: m, pieces: args.mostradas } : null
+  /* Hoy: los tramos que terminan antes de T, y el punto (T, mostradas). Sin mostradas, solo se corta. */
+  const previos = hoyDia.curve.filter((p) => p.minutes < m)
+  const curve = vivo ? [...previos, vivo] : previos
+  if (curve.length === 0) return cmp
+  const ult = curve[curve.length - 1]!
+  const days = cmp.days.map((d, i) => i === iHoy
+    ? { ...d, curve, totalPieces: ult.pieces, atCurrentMinute: ult.pieces }
+    : { ...d, atCurrentMinute: piezasALaAltura(d.curve, m) })
+  return {
+    ...cmp,
+    days,
+    currentMinute: m,
+    maxMinutes: Math.max(cmp.maxMinutes, m),
+    optimalAtCurrentMinute: cmp.optimal ? cuotaA(cmp.optimal, m, cmp.targetPieces) : cmp.optimalAtCurrentMinute,
   }
 }
 

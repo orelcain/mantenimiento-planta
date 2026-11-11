@@ -18,6 +18,8 @@ import { PLANT_MACHINES, lineMachinesLabel } from '@/services/shoplogix/shoplogi
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { getShiftMeta, SLX_NOISE_THRESHOLD } from '@/services/grader/graderShiftDisplay'
+import { usePielApple } from '@/hooks/usePielApple'
+import { FilasLectura, SeccionLectura, type FilaLectura } from '@/components/piel/Lectura'
 
 interface DayTotals {
   uptimeSec: number
@@ -74,6 +76,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
     ? `la ${modelo || 'máquina'}`
     : `las ${maquinas.length} ${modelo || 'máquinas'}`
   const [totals, setTotals] = useState<DayTotals | null>(null)
+  const apple = usePielApple()
 
   useEffect(() => {
     if (!enabled || !dateKey) { setTotals(null); return }
@@ -85,6 +88,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
   }, [dateKey, plantSlug, enabled])
 
   if (!enabled || !totals) return null
+  if (apple) return <TiemposDelDiaApple totals={totals} className={className} />
 
   return (
     <div className={cn(
@@ -98,7 +102,7 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
       <span className="text-ink-ok tabular-nums" title={`Tiempo total procesando (suma de ${maquinasLabel}, todos los turnos)`}>
         ▲ {fmtDurationSec(totals.uptimeSec)} procesando
       </span>
-      <span className="text-ink-crit tabular-nums" title={`Tiempo total de detención/paro (suma de ${maquinasLabel}, todos los turnos)`}>
+      <span className="text-ink-crit tabular-nums" title={`Tiempo total de detención (suma de ${maquinasLabel}, todos los turnos)`}>
         <PauseCircle className="h-3 w-3 shrink-0" />{fmtDurationSec(totals.downtimeSec)} detenidas
       </span>
       {/* Con solo el ícono de la taza, este número quedaba sin nombre al lado de
@@ -124,11 +128,39 @@ export function DayTimeSummaryBar({ dateKey, plantSlug, enabled, className }: Pr
               {getShiftMeta(t.shiftId).shortLabel}{' '}
               {t.downtimeSec > 0
                 ? fmtDurationSec(t.downtimeSec)
-                : <span className="text-ink-ok">sin paros</span>}
+                : <span className="text-ink-ok">sin detenciones</span>}
             </span>
           ))}
         </span>
       )}
     </div>
+  )
+}
+
+/** Nombre del turno sin el período: «Turno 2 — Tarde» → «turno 2». */
+const nombreTurno = (shiftId: string) => getShiftMeta(shiftId).label.split(' — ')[0]!.toLowerCase()
+
+/**
+ * Piel Apple (modo lectura): «Cómo se usó el día». Tres filas con filete.
+ * Misma data que la forma anterior; la frase de los turnos se deriva de `turnos`
+ * (sin cálculo nuevo): si toda la detención cae en un turno, se nombra; si no,
+ * se cuenta cuántos turnos tuvieron detención.
+ */
+function TiemposDelDiaApple({ totals, className }: { totals: DayTotals; className?: string }) {
+  const conDetencion = totals.turnos.filter((t) => t.downtimeSec > 0)
+  const fraseTurnos = conDetencion.length === 1
+    ? `todo en el ${nombreTurno(conDetencion[0]!.shiftId)}`
+    : conDetencion.length > 1
+      ? `en ${conDetencion.length} turnos`
+      : null
+  const filas: FilaLectura[] = [
+    { rotulo: 'Procesando', valor: fmtDurationSec(totals.uptimeSec) },
+    { rotulo: `Detenidas${fraseTurnos ? `, ${fraseTurnos}` : ''}`, valor: fmtDurationSec(totals.downtimeSec) },
+    ...(totals.breakSec > 0 ? [{ rotulo: 'Colación', valor: fmtDurationSec(totals.breakSec) }] : []),
+  ]
+  return (
+    <SeccionLectura titulo="Cómo se usó el día" className={className} testId="tiempos-del-dia">
+      <FilasLectura filas={filas} />
+    </SeccionLectura>
   )
 }

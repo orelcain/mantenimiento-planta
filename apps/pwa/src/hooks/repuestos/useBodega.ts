@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { rowKeyDeRepuesto } from './identidadDeRepuesto'
-import { documentacionDe, fusionarDocumentacion } from './documentacionDeRepuesto'
+import { documentacionDe, fusionarDocumentacion, type DibujoManual } from './documentacionDeRepuesto'
 import {
   collection,
   collectionGroup,
@@ -131,6 +131,10 @@ export interface BodegaMergedItem {
    *  Complementan `fotos` (overlay de bodega) para mostrar el repuesto aunque
    *  bodega no tenga foto propia. */
   fotosCatalogo?: string[]
+  /** URL de captura de manual → equipos a los que corresponde (ver `fotosParaEquipos`). */
+  equiposDeFoto?: Record<string, string[]>
+  /** Capturas del manual con la pieza marcada (respaldo del botón «Dibujo»). */
+  dibujosManual?: DibujoManual[]
   /** ¿Tiene ficha técnica CON CONTENIDO? Alimenta el badge del botón «Ficha». */
   tieneFicha?: boolean
   /** Cuántos manuales/documentos vinculados tiene. */
@@ -420,10 +424,12 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         // miraban las fotos: una ficha que viviera en el SEGUNDO documento del mismo SAP
         // se perdía por el orden de llegada (`3300138387` tiene dos documentos).
         const doc = fusionarDocumentacion(
-          { fotos: existing.fotosCatalogo ?? [], tieneFicha: !!existing.tieneFicha, manuales: existing.manuales ?? 0 },
+          { fotos: existing.fotosCatalogo ?? [], tieneFicha: !!existing.tieneFicha, manuales: existing.manuales ?? 0, equiposDeFoto: existing.equiposDeFoto, dibujosManual: existing.dibujosManual },
           documentacionDe(rep),
         )
         existing.fotosCatalogo = doc.fotos.length ? doc.fotos : undefined
+        existing.equiposDeFoto = doc.equiposDeFoto
+        existing.dibujosManual = doc.dibujosManual
         existing.tieneFicha = doc.tieneFicha
         existing.manuales = doc.manuales
         continue
@@ -471,6 +477,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         ultimoConteoPor: overlay?.ultimoConteoPor,
         fotos: overlay?.fotos,
         fotosCatalogo: doc.fotos.length ? doc.fotos : undefined,
+        equiposDeFoto: doc.equiposDeFoto,
+        dibujosManual: doc.dibujosManual,
         tieneFicha: doc.tieneFicha,
         manuales: doc.manuales,
         isWatched: favKeys.has(key),

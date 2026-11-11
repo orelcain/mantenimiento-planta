@@ -262,7 +262,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
         {cmp.optimal && (
           <button type="button" onClick={() => onSel('cuota')} aria-pressed={claveSel === 'cuota'}
             className={chip(claveSel === 'cuota')}>
-            cuota{cmp.targetPieces ? ` ${fmtInt(cmp.targetPieces)}` : ''}
+            meta{cmp.targetPieces ? ` ${fmtInt(cmp.targetPieces)}` : ''}
           </button>
         )}
         {anteriores.map((d) => {
@@ -281,7 +281,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
           leerlo como piezas por hora: sin la unidad, dos curvas que suben no
           dicen de qué. */}
       <div className="mb-0.5 text-[11px] text-muted-foreground/80">
-        piezas acumuladas
+        piezas hechas
       </div>
 
       <div className="flex gap-1">
@@ -312,7 +312,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
               className={`w-full ${alto ? ALTO_GRANDE : ALTO_CHICO} transition-[height] duration-200`}
               preserveAspectRatio="none"
               role="img"
-              aria-label="Piezas acumuladas por minuto de turno, hoy contra la referencia elegida"
+              aria-label="Piezas hechas por minuto de turno, hoy contra la referencia elegida"
             >
               {/* Las paradas de convenio, de fondo: sin ellas la meseta de la
                   cuota parece un error del gráfico. */}
@@ -418,7 +418,7 @@ export function MonitorCompareChart({ cmp, cerrado, claveSel, onSel, cone, venta
         {refCurve && (
           <span className="flex items-center gap-1.5">
             <i className="h-1.5 w-4 rounded-full" style={{ background: refColor }} />
-            {claveSel === 'cuota' ? 'cuota (se aplana en las paradas de convenio)' : diaSel?.label}
+            {claveSel === 'cuota' ? 'ritmo de la meta (se aplana en las detenciones de convenio)' : diaSel?.label}
           </span>
         )}
         {cone && cone.length >= 2 && (

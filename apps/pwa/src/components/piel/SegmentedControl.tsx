@@ -36,9 +36,15 @@ export interface SegmentedControlProps<T extends string> {
    * 85 % del celular rinde ~37 px. El tamaño por defecto (44) no cambia: lo usa Repuestos.
    */
   tamano?: 'normal' | 'herramienta'
+  /**
+   * `ajustado`: el control mide lo que piden sus rótulos (no llena la fila). Cada
+   * segmento conserva su rótulo completo: sin truncar, con 12 px de aire a cada lado.
+   * Sin esto, `flex-1` reparte un ancho de contenido y el texto se corta.
+   */
+  ajustado?: boolean
 }
 
-export function SegmentedControl<T extends string>({ value, onChange, segments, ariaLabel, className, tamano = 'normal' }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({ value, onChange, segments, ariaLabel, className, tamano = 'normal', ajustado = false }: SegmentedControlProps<T>) {
   const grande = tamano === 'herramienta'
   const botones = useRef<(HTMLButtonElement | null)[]>([])
   // Tabulable: el elegido; si ningún valor coincide, el primero.
@@ -65,7 +71,7 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn('flex w-full rounded-full bg-muted', grande ? 'h-[48px]' : 'h-11', className)}
+      className={cn('flex rounded-full bg-muted', ajustado ? 'w-auto' : 'w-full', grande ? 'h-[48px]' : 'h-11', className)}
     >
       {segments.map((s, i) => {
         const on = s.value === value
@@ -81,18 +87,19 @@ export function SegmentedControl<T extends string>({ value, onChange, segments, 
             tabIndex={i === tabulable ? 0 : -1}
             onClick={() => onChange(s.value)}
             onKeyDown={e => alTeclear(e, i)}
-            className={cn('flex min-w-0 flex-1 rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40', grande ? 'h-[48px]' : 'h-11')}
+            className={cn(ajustado ? 'flex flex-auto' : 'flex min-w-0 flex-1', 'rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40', grande ? 'h-[48px]' : 'h-11')}
           >
             <span
               className={cn(
-                'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 text-subhead transition-[background-color,box-shadow] duration-150',
+                ajustado ? 'flex flex-auto whitespace-nowrap px-3' : 'flex min-w-0 flex-1 px-2',
+                'items-center justify-center gap-1.5 rounded-full text-subhead transition-[background-color,box-shadow] duration-150',
                 on
                   ? 'bg-card font-semibold text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.4)]'
                   : 'font-medium text-foreground/80 hover:text-foreground',
               )}
             >
               {s.icon && <span className="shrink-0 [&>svg]:size-4">{s.icon}</span>}
-              <span className="truncate">{s.label}</span>
+              <span className={ajustado ? 'whitespace-nowrap' : 'truncate'}>{s.label}</span>
             </span>
           </button>
         )

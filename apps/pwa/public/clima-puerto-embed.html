@@ -3986,12 +3986,12 @@
             lluviaUltimaHora:     parsed.medicion.rain,
           } : null,
         };
-        fetch('https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/cacheDmStatus', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        }).then(() => console.log('✅ DM cacheado en Firestore'))
-          .catch(e => console.warn('Cache DM fail:', e.message));
+        // cacheDmStatus exige sesión: el embed no tiene Firebase, así que le
+        // pasa el payload a la página padre (ClimaPortPage), que lo envía con
+        // su ID token. Abierto suelto (sin padre), simplemente no cachea.
+        if (window.parent !== window) {
+          window.parent.postMessage({ __clima: true, type: 'dm-cache', payload }, window.location.origin);
+        }
       }
 
       return parsed;
