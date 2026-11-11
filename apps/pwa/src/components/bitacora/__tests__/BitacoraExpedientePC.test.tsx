@@ -57,7 +57,6 @@ function montar(eventos = EVENTOS, extra: Partial<Parameters<typeof BitacoraExpe
     turnoNombre: 'Turno día',
     horario: 'mié 23-09 · 08:00 – 16:00',
     fecha: 'miércoles 23-09-2026',
-    planta: 'Planta Chonchi',
     esActual: false,
     onAnterior: vi.fn(),
     onSiguiente: vi.fn(),
@@ -79,7 +78,7 @@ function montar(eventos = EVENTOS, extra: Partial<Parameters<typeof BitacoraExpe
     onAbrir: vi.fn(),
     onVerFoto: vi.fn(),
     onNuevo: vi.fn(),
-    onCompartir: vi.fn(),
+    envio: <div>Columna de envío de prueba</div>,
     enlaces: [],
     ...extra,
   }
@@ -145,5 +144,20 @@ describe('ayudantes del expediente', () => {
     const t = totalesTurno([...EVENTOS, evento({ id: 'd', equipo: 'red de incendio', tipo: 'rutinario' })])
     expect(t.equipos).toBe(3)
     expect(t.tipos[0]).toEqual(['rutinario', 2])
+  })
+})
+
+describe('expediente de la Bitácora en PC: la columna «Para enviar»', () => {
+  it('a la derecha del cuerpo hay una columna «Para enviar» con el envío de la página', () => {
+    montar()
+    const columna = screen.getByRole('complementary', { name: 'Para enviar' })
+    expect(columna.textContent).toContain('Columna de envío de prueba')
+    expect(screen.getByRole('heading', { level: 2, name: 'Para enviar' })).toBeTruthy()
+  })
+
+  it('el título de la cabecera es el dato del turno y la ventana «Compartir» ya no existe en PC', () => {
+    montar()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('3 trabajos y 4 fotos; ninguno anotó detención')
+    expect(screen.queryByRole('button', { name: /Compartir/ })).toBeNull()
   })
 })
