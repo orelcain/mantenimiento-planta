@@ -140,3 +140,9 @@ el código. Pendiente menor que sí sigue vivo: `EquipoPlacementTool` + `equipoT
 - Límites base activos por defecto: frecuencia escalada por número de turnos, MTTR fijo. Si la base no tiene eventos se usan límites actuales. El hash conserva lb=0|1.
 - Cinco prioridades; crónicas A/B por igual tiempo detenido. Comparación separa mejoraron, desaparecieron, empeoraron, aparecieron y sin historia (todos los turnos anteriores cargados). Base cero conserva conteos y no inventa porcentaje.
 - Sin cambios en Firestore/backend/scripts. Revisión visual y exportación real pendientes para Orel; no iniciar servidores por instrucción de la tarea.
+
+## 2026-11-08 · Vidrio líquido fase 2 (worktree, sin commit)
+
+- Solo piel Apple: `vidrio-barra` densifica barras/cápsulas; debe preceder a los respaldos sólidos de `index.css`. Panel lateral conserva su material.
+- Cabecera PC conserva `h-14`; su slot `barra-filtros-slot` permanece montado y aparece al superar 64 px de scroll. Incidencias porta tres filtros desde el estado existente, solo desde 1024 px.
+- Las clases de la piel anterior se conservan. Sin consultas nuevas ni cambios de backend.
