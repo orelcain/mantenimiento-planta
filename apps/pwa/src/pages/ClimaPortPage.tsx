@@ -23,7 +23,10 @@ export function ClimaPortPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
-    return `${basePath}clima-puerto-embed.html`
+    // ?v= evita que un embed viejo en caché (que llamaba a la función sin
+    // token) conviva con esta página nueva y deje de cachear el estado DM.
+    const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
+    return `${basePath}clima-puerto-embed.html?v=${v}`
   }, [])
 
   useEffect(() => {
