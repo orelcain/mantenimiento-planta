@@ -142,7 +142,7 @@ export function BitacoraExpedientePC({
               </span>
             ))}
           </nav>
-          <Button className="min-h-[36px] rounded-ctl" onClick={onNuevo}>
+          <Button size="sm" className="h-auto min-h-[36px] rounded-ctl px-3.5 text-[15px] whitespace-nowrap" onClick={onNuevo}>
             <Plus /> Nuevo evento
           </Button>
         </div>
@@ -152,7 +152,7 @@ export function BitacoraExpedientePC({
         {cifras.map((c) => (
           <div key={c.rotulo} className="flex flex-col">
             <dt className="text-[13px] text-muted-foreground">{c.rotulo}</dt>
-            <dd className="text-[17px] font-semibold tabular-nums">{c.valor}</dd>
+            <dd className="text-[15px] font-semibold tabular-nums">{c.valor}</dd>
           </div>
         ))}
       </dl>
@@ -170,8 +170,8 @@ export function BitacoraExpedientePC({
         </button>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_500px] gap-7 pt-4">
-        <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pb-6 pr-1">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_540px] gap-7 pt-4">
+        <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pb-6 pr-1 [&_button]:text-[15px] [&_.text-headline]:text-[15px] [&_.text-body]:text-[15px] [&_.text-subhead]:text-[15px] [&_.text-caption]:text-[13px] [&_.text-xs]:text-[13px]">
           {antes}
           {cargando ? (
             <div className="flex flex-col gap-2 pt-3">
@@ -181,7 +181,7 @@ export function BitacoraExpedientePC({
             </div>
           ) : hechos.length === 0 && borradores.length === 0 && pendientes.length === 0 ? (
             <div className="py-16 text-center">
-              <p className="text-[17px] font-semibold">Aún no hay trabajos en este turno</p>
+              <p className="text-[15px] font-semibold">Aún no hay trabajos en este turno</p>
               <p className="mx-auto mt-1 max-w-[46ch] text-[15px] text-muted-foreground">
                 Registra fallas, ajustes y rondas con sus fotos. Lo que se carga en el celular aparece aquí solo.
               </p>
@@ -193,7 +193,7 @@ export function BitacoraExpedientePC({
               )}
               {pendientes.length > 0 && (
                 <div>
-                  <h2 className="flex items-center gap-1.5 pb-1 pt-1 text-[17px] font-semibold">
+                  <h2 className="flex items-center gap-1.5 pb-1 pt-1 text-[15px] font-semibold">
                     <span className="size-2 shrink-0 rounded-full bg-ink-warn" aria-hidden />
                     Pendiente para el turno siguiente
                     <span className="font-normal text-muted-foreground tabular-nums"> · {pendientes.length}</span>
@@ -205,7 +205,7 @@ export function BitacoraExpedientePC({
           )}
 
           <div>
-            <h2 className="pb-1.5 text-[17px] font-semibold">Entrega de turno</h2>
+            <h2 className="pb-1.5 text-[15px] font-semibold">Entrega de turno</h2>
             <button
               type="button"
               onClick={onObservacion}
@@ -223,8 +223,8 @@ export function BitacoraExpedientePC({
           </div>
         </div>
 
-        <aside aria-label="Para enviar" className="flex min-h-0 flex-col overflow-y-auto border-l border-border pl-7">
-          <h2 className="pb-3 text-[17px] font-semibold">Para enviar</h2>
+        <aside aria-label="Para enviar" className="flex min-h-0 flex-col overflow-y-auto border-l border-border pl-7 [&_.text-caption]:text-[13px] [&_.text-body]:text-[15px] [&_button]:text-[15px]">
+          <h2 className="pb-3 text-[15px] font-semibold">Para enviar</h2>
           <div className="flex flex-col gap-3">{envio}</div>
         </aside>
       </div>
