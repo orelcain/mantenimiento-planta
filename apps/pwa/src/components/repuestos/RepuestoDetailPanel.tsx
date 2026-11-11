@@ -1,3 +1,4 @@
+import { usePielApple } from '@/hooks/usePielApple'
 /**
  * RepuestoDetailPanel — Panel lateral derecho de detalle del repuesto (Fase 3).
  *
@@ -180,6 +181,7 @@ function fmtDate(d: Date): string {
 }
 
 export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, totalUnidades, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, favoritoEquipo, pedido, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+  const apple = usePielApple()
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -698,7 +700,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
             <ChevronLeft className="size-6" aria-hidden />
             <span className="max-w-[60vw] truncate">{volverA || areaName || 'Repuestos'}</span>
           </button>
-          <div className="glass-nav flex items-center rounded-full px-0.5">
+          <div className={apple ? 'relative vidrio vidrio-barra flex items-center rounded-full px-0.5' : 'glass-nav flex items-center rounded-full px-0.5'}>
             {onToggleFavorite && (
               <button onClick={onToggleFavorite} className={[AREA_TACTIL, 'rounded-full', isFavorite ? 'text-ink-warn' : 'text-foreground'].join(' ')} aria-label={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'} aria-pressed={!!isFavorite}>
                 <Star className={['size-[22px]', isFavorite ? 'fill-current' : ''].join(' ')} />

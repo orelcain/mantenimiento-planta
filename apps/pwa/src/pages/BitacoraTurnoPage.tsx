@@ -1,3 +1,4 @@
+import { usePielApple } from '@/hooks/usePielApple'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -92,6 +93,7 @@ export function BitacoraTurnoVista({
   /** Solo la vitrina: ver la página como otro usuario (p. ej. un pase) sin tocar la sesión. */
   usuarioSimulado?: User | null
 }) {
+  const apple = usePielApple()
   const { toast } = useToast()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -1223,6 +1225,64 @@ export function BitacoraTurnoVista({
           «Toolbars»): arriba el título y las acciones; abajo el turno y, a su
           lado, el estado de sincronización como una línea, no como tarjeta. */}
       <header ref={cabeceraRef} className="flex flex-col gap-1 px-1">
+        {registroCel ? (
+          // Teléfono, registro corrido (opción A, 11-11-2026): el turno es el título de la
+          // barra y el estado va en una línea; «Bitácora» ya lo dice la pestaña de la app.
+          <div className="flex min-w-0 flex-col">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => irATurno(-1)}
+                aria-label="Turno anterior"
+                className="-ml-3 flex size-[44px] shrink-0 items-center justify-center rounded-full text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-headline leading-tight">
+                  {etiquetaTurno(turno)} <span className="font-normal text-muted-foreground">{horarioTurno(turno)}</span>
+                </h1>
+                <p className="truncate text-footnote text-muted-foreground first-letter:uppercase">
+                  {fecha}
+                  {esActual ? ' · en curso' : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => irATurno(1)}
+                aria-label="Turno siguiente"
+                className="flex size-[44px] shrink-0 items-center justify-center rounded-full text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+              <AccionesCabecera
+                alHistorial={() => navigate('/bitacora/historial')}
+                alCompartir={() => setHojaCompartir(true)}
+                alQr={esSupervisor ? () => setHojaQr(true) : undefined}
+                enfocable
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <BarraSincronizacion
+                cargando={cargando}
+                error={error}
+                ultimaSync={ultimaSync}
+                cambiosPorSubir={cambiosPorSubir}
+                novedad={novedad}
+                presentes={conectados}
+                miDispositivoId={miDispositivoId}
+                editandoPorEvento={hayEventoConId}
+                tonoDe={tonoDe}
+                soloLinea
+              />
+              {!esActual && (
+                <Button variant="plain" size="sm" className="ml-auto shrink-0" onClick={irAlActual}>
+                  Hoy <ChevronRight />
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-display">Bitácora</h1>
@@ -1240,7 +1300,7 @@ export function BitacoraTurnoVista({
                 UNA cápsula de vidrio compartida (DESIGN.md §7). PDF, Excel, WhatsApp y
                 correo viven en «Compartir», como en el teléfono. */}
             <div className="hidden items-center gap-3 md:flex">
-              <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex items-center gap-0.5 rounded-full p-1">
+              <div role="group" aria-label="Acciones de la bitácora" className={apple ? 'relative vidrio vidrio-barra flex items-center gap-0.5 rounded-full p-1' : 'glass-nav flex items-center gap-0.5 rounded-full p-1'}>
                 <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
                   <BarChart3 /> Historial
                 </Button>
@@ -1316,6 +1376,7 @@ export function BitacoraTurnoVista({
           </div>
           </div>
         </div>
+        )}
       </header>
 
       {/* Dos pestañas: lo que pasó en el turno y la pauta de inspección de planta. El nombre
@@ -2135,9 +2196,10 @@ function AccionesCabecera({
 }) {
   const clase =
     'flex size-[44px] items-center justify-center rounded-full text-primary transition-transform duration-150 active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none [&>svg]:size-5'
+  const apple = usePielApple()
   const tab = enfocable ? undefined : -1
   return (
-    <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex shrink-0 items-center rounded-full">
+    <div role="group" aria-label="Acciones de la bitácora" className={apple ? 'relative vidrio vidrio-barra flex shrink-0 items-center rounded-full' : 'glass-nav flex shrink-0 items-center rounded-full'}>
       <button type="button" className={clase} onClick={alHistorial} aria-label="Historial" tabIndex={tab}>
         <BarChart3 />
       </button>

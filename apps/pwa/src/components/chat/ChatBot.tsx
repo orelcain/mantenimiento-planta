@@ -1,3 +1,4 @@
+import { usePielApple } from '@/hooks/usePielApple'
 /**
  * Componente ChatBot — v4 ARIA
  * Burbuja flotante con streaming, voz, fotos, acciones ejecutables,
@@ -956,6 +957,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
 
 // ─── Componente principal ───────────────────────────────────────────
 export function ChatBot() {
+  const apple = usePielApple()
   const navigate = useNavigate()
   const pantallaCompletaMovil = useBurbujaChatOculta()
   // Se esconde mientras la página baja. Con el chat abierto nunca se esconde: hay que poder cerrarlo.
@@ -1868,14 +1870,14 @@ export function ChatBot() {
       {/* Botón flotante — oculto en landscape móvil para no tapar la tabla */}
       <button
         onClick={toggle}
-        className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
+        className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full ${apple ? 'vidrio vidrio-barra text-primary' : 'shadow-lg'} flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
           // Detalle de repuesto a pantalla completa en el teléfono: la burbuja tapaba su barra inferior.
           (pantallaCompletaMovil && !isOpen) || hoja || (isOpen && !esPC) ? 'hidden' : ''
         } ${
           // Oculto al bajar (transform/opacity). Con el chat abierto no se oculta.
           ocultoAlBajar && !isOpen ? 'opacity-0 translate-y-24 pointer-events-none motion-reduce:transition-none' : 'opacity-100 translate-y-0'
         } ${
-          isOpen
+          apple ? '' : isOpen
             ? 'bg-muted text-muted-foreground hover:bg-muted/80'
             : 'bg-primary text-primary-foreground hover:bg-primary/90'
         }`}
