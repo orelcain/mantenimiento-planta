@@ -30,5 +30,20 @@ export { SwipeRow, type SwipeRowProps, type SwipeAction } from './SwipeRow'
 export { EncabezadoHerramienta, type EncabezadoHerramientaProps, type ItemMasHerramienta } from './EncabezadoHerramienta'
 export { SelectorSeccion, type SelectorSeccionProps, type OpcionSeccion } from './SelectorSeccion'
 export { FoldTable, type FoldTableProps, type FoldTableRow, type FoldTableColumn } from './FoldTable'
-export { Skeleton, SkeletonBloque, type SkeletonBloqueProps } from './Skeleton'
+export {
+  Skeleton,
+  SkeletonBloque,
+  SkeletonLinea,
+  SkeletonFilas,
+  SkeletonTabla,
+  SkeletonPanel,
+  SkeletonGrafico,
+  type SkeletonBloqueProps,
+  type SkeletonLineaProps,
+  type SkeletonFilasProps,
+  type SkeletonTablaProps,
+  type SkeletonPanelProps,
+  type SkeletonGraficoProps,
+  type TamanoLineaSkeleton,
+} from './Skeleton'
 export { SeccionLectura, FilasLectura, type FilaLectura } from './Lectura'
