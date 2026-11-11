@@ -11,6 +11,14 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-11 · claude · ARIA: escritura de repuestos en un módulo + endpoint para Aiko
+- Hecho: los tres escritores de repuestos de ARIA (`ariaAdjuntarFotoARepuesto`, `ariaCrearRepuestoNuevo`, `ariaEditarRepuesto`) pasan a `functions/ariaRepuestos.js` con dependencias inyectadas; index.js deja envoltorios con el mismo nombre y firma. Nuevo `completar` (varios campos, solo vacíos) y endpoint `ariaRepuestoDesdeFoto` para que Aiko pida a ARIA grabar lo que Orel aprobó con ✅ (regla «ARIA y Aiko en piedra»).
+- Seguridad: solo POST, sin CORS, `maxInstances: 2`, token OIDC de la cuenta de servicio del proyecto (audiencia = URL de la función), lista blanca de campos, SAP de 7-10 dígitos, búsqueda por id y por `codigoSAP`, 409 si ya existe, si no es único o si un campo ya tiene valor.
+- Archivos: `functions/ariaRepuestos.js`, `functions/__tests__/ariaRepuestos.test.js`, `functions/index.js`.
+- Verificación: functions 751/751; 4 mutaciones manuales detectadas (búsqueda solo por id, compuerta de campos ocupados, cuenta ajena, observaciones de ARIA); index.js carga con dependencias.
+- Estado: EN REVISIÓN (el merge despliega todas las functions).
+- Sigue: tras el deploy, curl sin token = 401; Aiko pasa a llamar al endpoint y borra su escritura propia.
+
 ## 2026-11-08 · claude · Mutation testing de clasificaCausa
 - Hecho: 16 casos de test nuevos en cada espejo (PWA y functions). Mutantes detectados: 69,1 % → 95,1 % (56 → 77 de 81); los 4 sobrevivientes son equivalentes. Stryker se usó solo en el worktree y no entra al repo.
 - Archivos: `apps/pwa/src/services/shoplogix/__tests__/kpisMantencionTurno.test.ts`, `functions/shoplogix/__tests__/kpisMantencion.test.js`.
