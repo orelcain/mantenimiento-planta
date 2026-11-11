@@ -14,6 +14,7 @@ import {
   SelectValue,
   Switch,
 } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import {
   Save,
   Loader2,
@@ -106,9 +107,8 @@ function PlantPanel({ plantSlug, plantLabel }: PlantPanelProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 p-6 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Cargando configuración…
+      <div className="p-6">
+        <SkeletonPanel label="Cargando configuración de notificaciones" lineas={4} />
       </div>
     )
   }

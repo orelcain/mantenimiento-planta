@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
-import { SegmentedControl } from '@/components/piel'
+import { SegmentedControl, SkeletonPanel } from '@/components/piel'
 import { ArrowLeft, BarChart3, Loader2, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
@@ -394,9 +394,7 @@ export function AnalisisGraderPeriodoPage() {
 
       {/* ── Estados: loading / error / view ─────────────────────────────── */}
       {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <SkeletonPanel label="Cargando el período" kpis={4} lineas={2} grafico="16rem" />
       )}
 
       {!loading && error && (

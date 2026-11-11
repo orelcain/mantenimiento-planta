@@ -1,3 +1,4 @@
+import { SkeletonPanel } from '@/components/piel'
 import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -435,8 +436,8 @@ export function PhotoEvidenceDetail({
           <DialogTitle>{evidence?.titulo ?? 'Detalle de evidencia'}</DialogTitle>
         </DialogHeader>
         {isLoading ? (
-          <div className="flex items-center justify-center p-12">
-            <Spinner className="w-8 h-8" />
+          <div className="p-6">
+            <SkeletonPanel label="Cargando evidencia" lineas={2} grafico="16rem" />
           </div>
         ) : !evidence ? (
           <div className="p-6 text-center text-muted-foreground">

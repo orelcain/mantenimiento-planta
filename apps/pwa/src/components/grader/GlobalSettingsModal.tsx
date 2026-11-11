@@ -22,6 +22,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button, Input, Label, Badge } from '@/components/ui'
+import { SkeletonFilas, SkeletonPanel } from '@/components/piel'
 import { useAuthStore, useIsAdmin } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import { getModuleRanges, saveModuleAnalysisConfig, savePauseDetectorConfig } from '@/services/grader/graderModuleConfig.service'
@@ -263,8 +264,8 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
         {/* Contenido — scrollable */}
         <div className="flex-1 overflow-y-auto py-3 space-y-4 min-h-0">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <div className="py-8">
+              <SkeletonPanel label="Cargando ajustes del grader" lineas={3} />
             </div>
           ) : tab === 'umbrales' ? (
             <div className="space-y-5">
@@ -413,9 +414,7 @@ export function GlobalSettingsModal({ open, onOpenChange, plantLineId, defaultTa
 
               {/* Lista de tags activos */}
               {tagsLoading ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                </div>
+                <SkeletonFilas label="Cargando tags de pausa" filas={3} lineas={1} cola={false} />
               ) : (
                 <div className="space-y-1">
                   {pauseTags.map(tag => (

@@ -8,6 +8,7 @@
  * 4. Confirmar posición
  */
 
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useEffect } from 'react'
 import { MapPin, ChevronRight, Loader2, AlertCircle } from 'lucide-react'
 import {
@@ -144,9 +145,7 @@ export function MapLocationSelector({
               </p>
 
               {loading && (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
+                <SkeletonFilas label="Cargando ubicaciones" filas={3} lineas={1} cola={false} />
               )}
 
               {error && (

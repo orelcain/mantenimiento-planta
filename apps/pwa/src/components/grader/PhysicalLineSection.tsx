@@ -8,6 +8,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import { Save, Loader2 } from 'lucide-react'
 import { getModuleRanges, saveModulePhysicalConfig } from '@/services/grader/graderModuleConfig.service'
 import { DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
@@ -96,10 +97,7 @@ export function PhysicalLineSection({ plantLineId }: Props = {}) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10 text-muted-foreground text-sm gap-2">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        Cargando configuración física…
-      </div>
+      <SkeletonPanel label="Cargando configuración física" lineas={3} className="py-4" />
     )
   }
 

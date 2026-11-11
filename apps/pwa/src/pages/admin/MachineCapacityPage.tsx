@@ -28,6 +28,7 @@ import {
   Spinner,
   Badge,
 } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import {
   Save,
   AlertTriangle,
@@ -162,8 +163,8 @@ export function MachineCapacityPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 max-w-2xl flex items-center gap-3 text-muted-foreground">
-        <Spinner /> Cargando configuración…
+      <div className="container mx-auto p-4 sm:p-6 max-w-2xl">
+        <SkeletonPanel label="Cargando configuración de velocidad" lineas={3} />
       </div>
     )
   }

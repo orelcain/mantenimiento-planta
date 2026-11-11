@@ -29,6 +29,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import { Key, RefreshCw, Trash2, Save, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import {
   getShoplogixCredentialsInfo,
@@ -144,8 +145,8 @@ export function ShoplogixCredentialsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner />
+      <div className="container mx-auto p-4 sm:p-6 max-w-2xl">
+        <SkeletonPanel label="Cargando credenciales de Shoplogix" lineas={3} />
       </div>
     )
   }

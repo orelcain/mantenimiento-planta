@@ -5,8 +5,9 @@
  * (`learningContent/{slug}/components/{id}`, ver `services/learningContent.ts`)
  * — este componente solo lee y renderiza, ya no tiene datos hardcodeados.
  */
+import { SkeletonGrafico } from '@/components/piel'
 import { useEffect, useState } from 'react'
-import { Loader2, ZoomIn } from 'lucide-react'
+import { ZoomIn } from 'lucide-react'
 import { HotspotDiagram } from './HotspotDiagram'
 import { MatchingExercise, type MatchingPair } from './MatchingExercise'
 import { ImageLightbox } from '../ui/ImageLightbox'
@@ -36,9 +37,8 @@ export function GraderVisualPilot({ machineSlug = 'grader' }: { machineSlug?: st
 
   if (photos === null) {
     return (
-      <div style={{ marginTop: 44, paddingTop: 26, borderTop: '1px solid var(--dp-rule-hard)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--dp-ink-soft)' }}>
-        <Loader2 size={16} className="animate-spin" />
-        Cargando componentes…
+      <div style={{ marginTop: 44, paddingTop: 26, borderTop: '1px solid var(--dp-rule-hard)' }}>
+        <SkeletonGrafico alto="12rem" label="Cargando componentes" />
       </div>
     )
   }

@@ -1,3 +1,4 @@
+import { SkeletonPanel } from '@/components/piel'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
@@ -197,10 +198,9 @@ export function PublicEquipmentView() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Package className="h-12 w-12 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Cargando información...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <SkeletonPanel label="Cargando información del equipo" lineas={3} />
         </div>
       </div>
     )

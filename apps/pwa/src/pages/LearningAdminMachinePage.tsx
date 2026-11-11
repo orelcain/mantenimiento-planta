@@ -8,6 +8,7 @@
  *   - Flujos (trigger + lista de acciones)
  *   - Diagnostico (sintoma -> causas -> solucion)
  */
+import { SkeletonFilas } from '@/components/piel'
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -1948,10 +1949,7 @@ function CollectionListView({
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
-          Cargando...
-        </div>
+        <SkeletonFilas label="Cargando lista de la máquina" filas={3} lineas={2} cola={false} />
       ) : count === 0 ? (
         <div className="p-8 text-center rounded-card border border-dashed border-border bg-card/40">
           <EmptyIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-60" />

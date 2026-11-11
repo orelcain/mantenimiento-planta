@@ -7,10 +7,10 @@
  */
 
 import { useState, useMemo, type ReactNode } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, InfoTooltip } from '@/components/ui'
 import { TrendingUp, AlertTriangle, TrendingDown, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Disclosure, SegmentedControl, FoldTable, Skeleton, SkeletonBloque } from '@/components/piel'
+import { Disclosure, SegmentedControl, FoldTable, Skeleton, SkeletonBloque, SkeletonFilas } from '@/components/piel'
 import { usePielApple } from '@/hooks/usePielApple'
 import { LECTURA_CUERPO, LECTURA_NOTA, LECTURA_TITULO, SeccionLectura } from '@/components/piel/Lectura'
 import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
@@ -300,9 +300,7 @@ export function PlantKPIBoard({
 
       <CardContent className="space-y-2 pb-3">
         {loading && (
-          <div className="flex items-center gap-2 text-muted-foreground text-xs py-1">
-            <Spinner /> Cargando…
-          </div>
+          <SkeletonFilas label="Cargando indicadores de planta" filas={3} lineas={1} />
         )}
 
         {error && (

@@ -16,7 +16,7 @@ import { addParo, getParosByPlantLine, deleteParo } from '@/services/paros'
 import { getPlantLineConfig } from '@/config/plantLines'
 import type { ParoEtapa } from '@/types'
 import { usePielApple } from '@/hooks/usePielApple'
-import { Button as BotonPiel, Sheet, Skeleton, SkeletonBloque } from '@/components/piel'
+import { Button as BotonPiel, Sheet, Skeleton, SkeletonBloque, SkeletonFilas } from '@/components/piel'
 import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 
 interface ParoEtapaCaptureProps {
@@ -366,7 +366,7 @@ export function ParoEtapaCapture({ plantLineId, areaLabel, onChanged, className 
             {pareto.totalN > 0 && <span className="text-muted-foreground/60">({pareto.totalN} detenciones · {fmtDur(pareto.totalMin)} total)</span>}
           </p>
           {loading ? (
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…</p>
+            <SkeletonFilas label="Cargando ranking de etapas" filas={3} lineas={1} />
           ) : pareto.rows.length === 0 ? (
             <p className="text-xs text-muted-foreground py-1">Sin detenciones registradas este mes. La primera aparecerá acá con su ranking.</p>
           ) : (
