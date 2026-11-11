@@ -33,6 +33,7 @@ export function BarraSincronizacion({
   editandoPorEvento,
   tonoDe,
   compacta = false,
+  soloLinea = false,
 }: {
   cargando: boolean;
   error: string | null;
@@ -50,6 +51,11 @@ export function BarraSincronizacion({
    * describe el contenido, no es una acción: no va en tarjeta ni en la toolbar.
    */
   compacta?: boolean;
+  /**
+   * Teléfono en el registro corrido (10-11-2026): siempre la línea con su panel, nunca la
+   * tarjeta. Implica `compacta`.
+   */
+  soloLinea?: boolean;
 }) {
   const enLinea = useOnlineStatus();
   const [ahora, setAhora] = useState(() => Date.now());
@@ -147,8 +153,8 @@ export function BarraSincronizacion({
 
   return (
     <>
-    {compacta && (
-      <div ref={raiz} className="relative hidden md:block">
+    {(compacta || soloLinea) && (
+      <div ref={raiz} className={soloLinea ? "relative -ml-3" : "relative hidden md:block"}>
         <button
           type="button"
           onClick={() => setPanel((v) => !v)}
@@ -175,7 +181,7 @@ export function BarraSincronizacion({
           <ChevronDown className={`size-4 shrink-0 transition-transform duration-150 motion-reduce:transition-none ${panel ? "rotate-180" : ""}`} aria-hidden />
         </button>
         {panel && (
-          <div className="glass-nav absolute left-0 top-full z-40 mt-2 w-[340px] rounded-[26px] p-4">
+          <div className="glass-nav absolute left-0 top-full z-40 mt-2 w-[min(340px,calc(100vw-2rem))] rounded-[26px] p-4">
             <p className="pb-2 text-footnote font-semibold">{titulo}</p>
             <p className="pb-3 text-footnote text-muted-foreground">{detalle}</p>
             {lista}
@@ -183,7 +189,7 @@ export function BarraSincronizacion({
         )}
       </div>
     )}
-    {modoLinea && (
+    {modoLinea && !soloLinea && (
       <button
         type="button"
         onClick={() => setAbierta(true)}
@@ -201,7 +207,7 @@ export function BarraSincronizacion({
     )}
     <section
       aria-label="Sincronización"
-      className={`${modoLinea ? "hidden" : "flex"} ${compacta ? "md:hidden" : modoLinea ? "md:flex" : ""} flex-col gap-2 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none`}
+      className={`${modoLinea || soloLinea ? "hidden" : "flex"} ${compacta ? "md:hidden" : modoLinea ? "md:flex" : ""} flex-col gap-2 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none`}
     >
       <div className="flex min-h-[44px] items-center justify-between gap-3">
         <div
