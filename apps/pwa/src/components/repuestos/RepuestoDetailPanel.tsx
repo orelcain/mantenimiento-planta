@@ -8,7 +8,7 @@ import { usePielApple } from '@/hooks/usePielApple'
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
-import { ChevronLeft, MoreHorizontal, X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Shapes, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench } from 'lucide-react'
+import { ChevronLeft, MoreHorizontal, X, Copy, Check, ClipboardCheck, History, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, BookOpen, Shapes, Trash2, SquarePen, Star, ListPlus, ExternalLink, MapPin, Wrench, ShoppingBasket } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { findMachineBySlug } from '@/data/learningMachines'
 import { machinesForCommonSap } from '@/data/commonPartsByMachine'
@@ -83,6 +83,8 @@ interface RepuestoDetailPanelProps {
   onAddToList?: () => void
   /** Con un equipo seleccionado: favorito POR EQUIPO (aparte de la estrella global). */
   favoritoEquipo?: { activo: boolean; nombreEquipo: string; abrir: () => void }
+  /** Pedido de repuestos (correo a bodega, varias máquinas). Sin esto (pase de lectura) no se ofrece. */
+  pedido?: { activo: boolean; alternar: () => void }
   /**
    * Guardar nombres comunes (apodos). Solo admin. En desktop también se editan
    * en la columna "Apodos" de la tabla (lg+); este campo es el ÚNICO camino en móvil.
@@ -178,7 +180,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, totalUnidades, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, favoritoEquipo, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, volverA, onClose, loadMovimientos, onSaveLocation, onSolicitar, onAssignSap, onAssignEquipo, onRemoveEquipo, totalUnidades, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onSpecs, onPhotos, onManual, dibujo, isFavorite, onToggleFavorite, onAddToList, favoritoEquipo, pedido, onSaveApodos, onContar, comunEn, onMarkComun, onRemoveComun }: RepuestoDetailPanelProps) {
   const apple = usePielApple()
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
@@ -897,17 +899,24 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
         </div>
 
         {/* Barra inferior de vidrio: único botón filled de la vista */}
-        <div className="glass-nav absolute inset-x-0 bottom-0 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+        <div className="glass-nav absolute inset-x-0 bottom-0 flex gap-2 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] [&>*]:min-w-0 [&>*]:flex-1">
+          {/* «Pedido» va al lado, tintado: el único relleno sigue siendo «Solicitar». */}
+          {pedido && (
+            <PielButton size="lg" variant="tinted" onClick={pedido.alternar} aria-pressed={pedido.activo}
+                        aria-label={pedido.activo ? 'Quitar del pedido' : 'Agregar al pedido'}>
+              <ShoppingBasket className={pedido.activo ? 'stroke-[2.75]' : undefined} /> {pedido.activo ? 'En el pedido' : 'Al pedido'}
+            </PielButton>
+          )}
           {sap ? (
             onSolicitar && (
-              <PielButton size="lg" className="w-full" onClick={() => onSolicitar(item)}>
-                <Plus /> Solicitar repuesto
+              <PielButton size="lg" onClick={() => onSolicitar(item)}>
+                <Plus /> Solicitar
               </PielButton>
             )
           ) : (
             onAssignSap && (
-              <PielButton size="lg" variant="tinted" className="w-full" onClick={onAssignSap}>
-                <Plus /> Asignar código SAP
+              <PielButton size="lg" variant="tinted" onClick={onAssignSap}>
+                <Plus /> Asignar SAP
               </PielButton>
             )
           )}
@@ -1088,6 +1097,11 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
         {favoritoEquipo && (
           <Button variant="outline" size="sm" className="mb-2 w-full gap-1.5" onClick={favoritoEquipo.abrir}>
             <Star className={['h-4 w-4', favoritoEquipo.activo ? 'fill-current' : ''].join(' ')} /> {favoritoEquipo.activo ? 'Favorito de este equipo' : 'Marcar favorito de este equipo'}…
+          </Button>
+        )}
+        {pedido && (
+          <Button variant="outline" size="sm" className="mb-2 w-full gap-1.5" onClick={pedido.alternar} aria-pressed={pedido.activo}>
+            <ShoppingBasket className={['h-4 w-4', pedido.activo ? 'stroke-[2.75] text-primary' : ''].join(' ')} /> {pedido.activo ? 'En el pedido · quitar' : 'Agregar al pedido'}
           </Button>
         )}
         {onAddToList && (
