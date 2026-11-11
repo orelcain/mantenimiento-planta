@@ -32,12 +32,12 @@ function stockDeSolicitud(r: { bodegaId?: string | null; stockActual: number; un
   return { configurado: !!r.bodegaId, stockActual: r.stockActual, unidad: r.unidad, ubicacionBodega: r.ubicacionBodega }
 }
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
-import { esAlta, useSolicitudes, type AltaCodigo, type NuevaSolicitud, type OrigenSap, type SolicitudEstado } from '@/hooks/repuestos/useSolicitudes'
+import { useSolicitudes, type NuevaSolicitud } from '@/hooks/repuestos/useSolicitudes'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
 import { getTrashCount } from '@/services/auditLog'
-import { buscarDestinoDeFusion, buscarRepuestoPorSap } from '@/services/repuestos/asignarSapMaestro'
+import { buscarDestinoDeFusion } from '@/services/repuestos/asignarSapMaestro'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
@@ -45,6 +45,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { dibujoDe, leerVueltaDelDibujo, maquinaDeDespiece, recordarVueltaDelDibujo, useFigurasDespiece, type DesdeRepuestos } from './enlacesPieza'
 import { rutaExpedienteEquipo } from '@/services/equipos/enlaceExpediente'
 import { useBodega } from '@/hooks/repuestos/useBodega'
+import { useAccionesSolicitudes } from '@/hooks/repuestos/useAccionesSolicitudes'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
 import { equipoParaMostrar, plantaCorta, agruparDondeSeUsa } from '@/hooks/repuestos/dondeSeUsa'
@@ -406,89 +407,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const { toast } = useToast()
   const { createRepuesto: crudCreate, updateRepuesto: crudUpdate, deleteRepuesto: crudDelete } = useRepuestoCrud()
 
-  // Avanzar solicitud a "entregada" → descuenta stock real de bodega (si el SAP ya está
-  // configurado ahí). Si no hay bodega para el SAP, no se inventa un registro (evita el latente
-  // rechazo de firestore.rules por ubicacionBodega vacía) — avanza el estado y LO DICE.
-  // Se decide sobre la bodega (entera en memoria), no sobre las filas del catálogo cargado:
-  // el catálogo va por área y una solicitud de otra área se entregaba sin descontar nada.
-  const handleAvanzarSolicitud = useCallback(
-    async (id: string, next: SolicitudEstado) => {
-      // Las altas de código tienen su propio ciclo (registrar SAP / rechazar): nunca avanzan ni descuentan stock.
-      const pedida = solicitudes.find((s) => s.id === id)
-      if (pedida && esAlta(pedida)) return
-      if (next === 'entregada' && user) {
-        const sol = pedida
-        if (sol) {
-          try {
-            const plan = await registrarSalidaDeSolicitud(
-              sol.codigoSAP,
-              sol.cantidad,
-              `Entrega solicitud · ${sol.solicitadoPorNombre || 'usuario'}`,
-              user.id,
-              user.nombre,
-            )
-            const nombre = nombreVisiblePorSap(indiceNombresPorSap, sol.codigoSAP, sol.textoBreve).titulo
-            if (plan.accion === 'sin-bodega') {
-              toast({ title: 'Entregada sin descontar stock', description: `${nombre} no tiene registro en bodega.` })
-            } else if (plan.faltante > 0) {
-              toast({
-                title: 'Stock descontado, pero no alcanzaba',
-                description: `Bodega registraba ${plan.stockAntes} y se entregaron ${sol.cantidad}: quedó en 0. Conviene contar ${nombre}.`,
-                variant: 'destructive',
-              })
-            } else {
-              toast({ title: 'Stock descontado', description: `-${sol.cantidad} ${nombre} · quedan ${plan.stockDespues}`, variant: 'success' })
-            }
-          } catch {
-            toast({ title: 'No se pudo descontar el stock', description: 'La solicitud sigue pendiente de entrega — reintenta.', variant: 'destructive' })
-            return // no avanzar a "entregada" si el descuento de stock falló
-          }
-        }
-      }
-      await avanzarEstado(id, next, user?.id ?? '', user?.nombre ?? '')
-    },
-    [solicitudes, user, registrarSalidaDeSolicitud, avanzarEstado, toast, indiceNombresPorSap],
-  )
-  // Alta de código (ficha A3C): bodega registra el SAP que creó, o rechaza con motivo. El panel pinta los
-  // bloques y valida; acá se escribe en el maestro (asigna / completa / crea `repuestos/{SAP}`) y en la solicitud.
-  const handleRegistrarSapAlta = useCallback(
-    async (alta: AltaCodigo, sap: string, origen: OrigenSap) => {
-      if (!user) throw new Error('Hay que iniciar sesión.')
-      try {
-        await registrarAltaCreada(alta, sap, origen, user.id, user.nombre)
-      } catch (e) {
-        toast({
-          variant: 'destructive',
-          title: 'No se pudo registrar el SAP',
-          // Los errores de negocio (SAP de otro repuesto, alta ya cerrada por otro operador) traen su texto.
-          description: e instanceof Error && e.name === 'ErrorAltaSap' ? e.message : 'La alta sigue pendiente: reintenta.',
-        })
-        throw e
-      }
-      invalidateGlobalRepuestosCache()
-      toast({ title: 'Alta registrada', description: `${alta.codigoFabricante} ahora es SAP ${sap}.`, variant: 'success' })
-    },
-    [user, registrarAltaCreada, toast],
-  )
-  const handleRechazarAlta = useCallback(
-    async (alta: AltaCodigo, motivo: string) => {
-      if (!user) throw new Error('Hay que iniciar sesión.')
-      try {
-        await rechazarAlta(alta.id, motivo, user.id, user.nombre)
-      } catch (e) {
-        toast({ variant: 'destructive', title: 'No se pudo rechazar', description: 'Reintenta en un momento.' })
-        throw e
-      }
-      toast({ title: 'Alta rechazada', description: `${alta.codigoFabricante}: quien la pidió verá el motivo.` })
-    },
-    [user, rechazarAlta, toast],
-  )
-  // Registrar o rechazar un alta es de bodega: técnico, supervisor o admin (igual que firestore.rules).
-  const puedeResolverAltas = user?.rol === 'tecnico' || user?.rol === 'supervisor' || user?.rol === 'admin'
-  const buscarSapEnMaestro = useCallback(async (sap: string) => {
-    const r = await buscarRepuestoPorSap(sap)
-    return r ? { nombre: r.textoBreve || r.codigoFabricante || 'Repuesto', codigoFabricante: r.codigoFabricante || '' } : null
-  }, [])
+  // Aprobar, entregar (descuenta stock) y resolver altas: mismas acciones que en Bodega.
+  const {
+    avanzar: handleAvanzarSolicitud, registrarSap: handleRegistrarSapAlta, rechazar: handleRechazarAlta,
+    buscarSap: buscarSapEnMaestro, puedeResolverAltas,
+  } = useAccionesSolicitudes({ solicitudes, avanzarEstado, registrarAltaCreada, rechazarAlta, registrarSalidaDeSolicitud, indiceNombresPorSap })
   const [actionTarget, setActionTarget] = useState<{ kind: RepAction; source: GlobalSearchResult } | null>(null)
   const [equipoPicker, setEquipoPicker] = useState<{ kind: RepAction; sources: GlobalSearchResult[] } | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
