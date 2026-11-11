@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle, ListPlus } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, History, Trash2, Star, Download, X, MoreVertical, Copy, Check, Boxes, Wrench, Settings2, MapPin, Shapes, Image as ImageIcon, MoreHorizontal, MessageCircle, ListPlus, ShoppingBasket } from 'lucide-react'
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { quitarEquipoDeRepuesto } from '@/hooks/repuestos/quitarEquipo'
@@ -24,6 +24,9 @@ import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
 import { SolicitarVariosSheet } from '@/components/repuestos/SolicitarVariosSheet'
+import { PedidoSheet } from '@/components/repuestos/PedidoSheet'
+import { usePedidoStore } from '@/store/pedidoStore'
+import { conSapAsignado, indiceEnPedido, type LineaPedido } from '@/utils/repuestos/pedidoRepuestos'
 import type { PiezaSolicitable } from '@/utils/repuestos/solicitudMultiple'
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 
@@ -148,6 +151,28 @@ function fotosDeFila(
   equiposEnFoco?: readonly string[] | null,
 ): string[] {
   return [...(r.fotos ?? []), ...fotosParaEquipos(r.fotosCatalogo ?? [], r.equiposDeFoto, equiposEnFoco)].filter(Boolean)
+}
+
+/** Una fila del catálogo como línea del pedido (foto, códigos y el stock del momento). */
+function lineaDePedido(
+  r: { rowKey: string; codigoSAP: string; codigoFabricante: string; textoBreve: string; unidad: string; stockActual: number; stockMinimo: number; ubicacionBodega: string; bodegaId?: string | null },
+  textoVisible: string,
+  equipo: string,
+  foto: string | null,
+): LineaPedido {
+  return {
+    clave: r.rowKey,
+    codigoSAP: r.codigoSAP,
+    codigoFabricante: r.codigoFabricante,
+    textoBreve: textoVisible || r.textoBreve,
+    equipo,
+    cantidad: 1,
+    unidad: r.unidad || 'UN',
+    stockActual: r.bodegaId ? r.stockActual : null,
+    stockMinimo: r.bodegaId ? r.stockMinimo : null,
+    ubicacionBodega: r.ubicacionBodega || '',
+    foto,
+  }
 }
 
 /** Prellenado de creación al llegar desde la pestaña Códigos fabricante. */
@@ -375,6 +400,49 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   // «Solicitar repuestos» de la máquina enfocada: varios de una vez.
   const [solicitarVariosOpen, setSolicitarVariosOpen] = useState(false)
   const [solicitudesOpen, setSolicitudesOpen] = useState(false)
+  // «Pedido»: lista de repuestos de cualquier máquina para el correo a bodega / Excel / solicitudes.
+  // El pase de lectura no lo ve: ni botones, ni hoja, ni efectos sobre el pedido guardado.
+  const [pedidoOpen, setPedidoOpen] = useState(false)
+  const pedidoLineas = usePedidoStore((s) => s.lineas)
+  const alternarEnPedido = usePedidoStore((s) => s.alternar)
+  const reemplazarPedido = usePedidoStore((s) => s.reemplazar)
+  const usarDuenoPedido = usePedidoStore((s) => s.usarDueno)
+  const pedidoCount = soloLectura ? 0 : pedidoLineas.length
+  // PC compartido de planta: cada usuario ve SU pedido; el de quien estaba queda apartado.
+  useEffect(() => {
+    if (user?.id && !soloLectura) usarDuenoPedido(user.id)
+  }, [user?.id, soloLectura, usarDuenoPedido])
+  // Marca la fila también si la línea se guardó con otra clave (p. ej. `fab:X` antes de tener SAP).
+  const enPedido = useMemo(() => {
+    const esta = indiceEnPedido(pedidoLineas)
+    return (r: { rowKey: string; codigoSAP?: string; codigoFabricante?: string }) =>
+      esta({ clave: r.rowKey, codigoSAP: r.codigoSAP ?? '', codigoFabricante: r.codigoFabricante ?? '' })
+  }, [pedidoLineas])
+  // Líneas guardadas sin SAP cuya pieza ya lo tiene en el catálogo → pasan al SAP (se puede
+  // registrar como solicitud y no se duplica al tocarla de nuevo). Solo si el SAP es único.
+  useEffect(() => {
+    if (soloLectura || !pedidoLineas.some((l) => !l.codigoSAP && l.codigoFabricante) || !allRepuestos.length) return
+    const saps = new Map<string, Set<string>>()
+    for (const { repuesto } of allRepuestos) {
+      const fab = (repuesto.codigoFabricante || '').trim()
+      const sap = (repuesto.codigoSAP || '').trim()
+      if (!fab || !sap) continue
+      const set = saps.get(fab) ?? new Set<string>()
+      set.add(sap)
+      saps.set(fab, set)
+    }
+    const nuevas = conSapAsignado(pedidoLineas, (fab) => {
+      const set = saps.get(fab)
+      return set && set.size === 1 ? [...set][0] : undefined
+    })
+    if (nuevas !== pedidoLineas) reemplazarPedido(nuevas)
+  }, [soloLectura, pedidoLineas, allRepuestos, reemplazarPedido])
+  const stockDePedido = useCallback((sap: string) => {
+    const o = overlayDeSap(sap)
+    return o
+      ? { configurado: true, stockActual: o.stockActual, stockMinimo: o.stockMinimo, unidad: o.unidad, ubicacionBodega: o.ubicacionBodega }
+      : { configurado: false }
+  }, [overlayDeSap])
   useEffect(() => {
     if (!abrirSolicitudes) return
     setSolicitudesOpen(true)
@@ -676,6 +744,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       variant: 'success',
     })
   }, [crearSolicitud, user, toast, selectedEquipName])
+
+  /** Una solicitud del pedido. La hoja las registra de a una y marca cada éxito, así que un
+   *  reintento no duplica. El pedido no se vacía: falta enviarlo a bodega. */
+  const handleRegistrarPedido = useCallback(async (sol: NuevaSolicitud) => {
+    await crearSolicitud(sol, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+  }, [crearSolicitud, user])
 
   const handleCrearSolicitud = useCallback(
     async (data: Parameters<typeof crearSolicitud>[0]) => {
@@ -1007,6 +1081,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
     }
     return null
   }, [selectedEquipMachineId, facetaEfectiva, areaRepuestos, equipoEnFaceta])
+
+  /** Agrega o quita una fila del pedido (con el nombre, el equipo y la foto que se ven). */
+  const alternarPedido = useCallback((r: AreaRepuestoRow) => {
+    const { nombre: equipo } = equipoParaMostrar(r.equipos, preferirEquipo)
+    const titulo = nombreVisible(r).titulo
+    const yaEstaba = enPedido(r)
+    alternarEnPedido(lineaDePedido(r, titulo, equipo, fotosDeFila(r, equiposEnFoco)[0] ?? null))
+    toast({ title: yaEstaba ? 'Quitado del pedido' : 'Agregado al pedido', description: titulo })
+  }, [preferirEquipo, equiposEnFoco, enPedido, alternarEnPedido, toast])
 
   // Con «★ Favoritos» activo: qué es cada fila (común / mía) y de qué equipo hablan las cabeceras.
   const marcasFav = useMemo(() => {
@@ -1966,6 +2049,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
               </button>
             )}
           </div>
+          {pedidoCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setPedidoOpen(true)}
+              aria-label={`Pedido, ${pedidoCount} ${pedidoCount === 1 ? 'repuesto' : 'repuestos'}`}
+              className="relative flex size-11 shrink-0 items-center justify-center rounded-full text-brand-ink hover:bg-muted"
+            >
+              <ShoppingBasket className="size-5" aria-hidden />
+              <span className="absolute right-0 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-caption font-semibold text-primary-foreground tabular-nums">{pedidoCount}</span>
+            </button>
+          )}
           {!soloLectura && apple && (
             <PButton variant="plain" className="shrink-0 px-2" onClick={() => (selectedEquipKey ? setSolicitarVariosOpen(true) : openSolicitar(null))}>
               Solicitar
@@ -2005,6 +2099,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                 title="Solicitudes"
                 value={pendientesCount > 0 ? pendientesCount : undefined}
                 onClick={() => { setMenuMasOpen(false); setSolicitudesOpen(true) }}
+                className={celdaMenu}
+              />
+            )}
+            {!soloLectura && (
+              <ListCell
+                leading={<CellIcon tone="neutral"><ShoppingBasket aria-hidden /></CellIcon>}
+                title="Pedido"
+                subtitle="Repuestos de varias máquinas para el correo a bodega"
+                value={pedidoCount > 0 ? pedidoCount : undefined}
+                onClick={() => { setMenuMasOpen(false); setPedidoOpen(true) }}
                 className={celdaMenu}
               />
             )}
@@ -2079,6 +2183,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           </div>
           {marcaMaquina}
           {!soloLectura && (<>
+          <Button variant="outline" size="sm" className="h-11 w-11 justify-center gap-1.5 px-0 sm:w-auto sm:px-3" onClick={() => setPedidoOpen(true)}
+                  title="Pedido: repuestos de cualquier máquina para copiar al correo, Excel o solicitudes"
+                  aria-label={pedidoCount ? `Pedido, ${pedidoCount} ${pedidoCount === 1 ? 'repuesto' : 'repuestos'}` : 'Pedido'}>
+            <ShoppingBasket className="h-4 w-4" /> <span className="hidden sm:inline">Pedido</span>
+            {pedidoCount > 0 && (
+              <Badge variant="secondary" className="ml-0.5 tabular-nums">{pedidoCount}</Badge>
+            )}
+          </Button>
           <Button variant="outline" size="sm" className="h-11 w-11 justify-center gap-1.5 px-0 sm:w-auto sm:px-3" onClick={() => setSolicitudesOpen(true)}>
             <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitudes</span>
             {pendientesCount > 0 && (
@@ -2449,6 +2561,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                       esFavorito={favKeys.has(r.rowKey)}
                       onToggleFav={soloLectura ? undefined : () => toggleFav(r.rowKey)}
                       onAgregarLista={selectedEquipKey && !soloLectura ? () => setFavEqRep(r) : undefined}
+                      onAlternarPedido={soloLectura ? undefined : () => alternarPedido(r)}
+                      enPedido={!soloLectura && enPedido(r)}
                       esFavoritoEquipo={!!selectedEquipKey && favEq.esFavorito(r)}
                       onAbrir={() => setSelectedRowKey(r.rowKey)}
                     />
@@ -2493,6 +2607,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                         {renderSortTh('stock', 'Stock', 'hidden md:table-cell')}
                         {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
                         <th className="hidden w-16 px-2 py-2 text-center text-nota font-medium md:table-cell">Dibujo</th>
+                        {!soloLectura && <th className="w-14 px-2 py-2 text-center text-nota font-medium">Pedido</th>}
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -2525,14 +2640,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                           <Fragment key={r.rowKey}>
                           {showFavHeader && (
                             <tr className="bg-muted">
-                              <td colSpan={10} className="px-3 py-2 text-subhead font-medium text-foreground">
+                              <td colSpan={11} className="px-3 py-2 text-subhead font-medium text-foreground">
                                 {seccionFav === 'comun' ? (etiquetaAlcance ? `Comunes de ${etiquetaAlcance}` : 'Comunes') : 'Mis estrellas'}
                               </td>
                             </tr>
                           )}
                           {showDespieceDivider && (
                             <tr className="bg-muted">
-                              <td colSpan={10} className="px-3 py-1.5 text-nota font-medium text-muted-foreground">
+                              <td colSpan={11} className="px-3 py-1.5 text-nota font-medium text-muted-foreground">
                                 Piezas de despiece · sin código SAP
                               </td>
                             </tr>
@@ -2747,6 +2862,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
                                 </button>
                               ) : <span className="text-muted-foreground/40">—</span>}
                             </td>
+                            {!soloLectura && (
+                              <td className="px-2 py-2 text-center">
+                                {/* Columna propia: el ListPlus de la celda vecina es «favorito de este
+                                    equipo» y no se mueve. Áreas de 44 px que no se tocan con la estrella. */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); alternarPedido(r) }}
+                                  className={[AREA_TACTIL_COMPACTA, 'inline-flex items-center justify-center rounded-ctl transition', enPedido(r) ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary'].join(' ')}
+                                  title={enPedido(r) ? 'Quitar del pedido' : 'Agregar al pedido'}
+                                  aria-label={enPedido(r) ? `Quitar ${nv.titulo} del pedido` : `Agregar ${nv.titulo} al pedido`}
+                                  aria-pressed={enPedido(r)}
+                                >
+                                  <ShoppingBasket className={['h-4 w-4', enPedido(r) ? 'stroke-[2.75]' : ''].join(' ')} />
+                                </button>
+                              </td>
+                            )}
                             <td className="px-3 py-2">
                               {!soloLectura && (<>
                               <button
@@ -2931,6 +3062,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           favoritoEquipo={selectedEquipKey && !soloLectura ? { activo: favEq.esFavorito(selectedRep), nombreEquipo: selectedEquipName, abrir: () => setFavEqRep(selectedRep) } : undefined}
           onSaveApodos={isAdmin ? (arr) => persistApodos(selectedRep, arr) : undefined}
           onContar={soloLectura ? undefined : handleContar}
+          pedido={soloLectura ? undefined : { activo: enPedido(selectedRep), alternar: () => alternarPedido(selectedRep) }}
           comunEn={selectedRep.comunEn}
           onMarkComun={isAdmin ? () => { setComunQuery(''); setComunPickerOpen(true) } : undefined}
           onRemoveComun={isAdmin ? (slug) => handleToggleComun(slug) : undefined}
@@ -2952,6 +3084,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
         piezas={piezasDeLaMaquina}
         onSubmit={handleCrearVarias}
       />
+      {!soloLectura && (
+        <PedidoSheet
+          open={pedidoOpen}
+          onClose={() => setPedidoOpen(false)}
+          solicitante={user?.nombre}
+          stockDe={stockDePedido}
+          onRegistrar={handleRegistrarPedido}
+        />
+      )}
       {/* Pase de lectura: no ve el panel de solicitudes (ni puede leerlas). */}
       {!soloLectura && (
       <SolicitudesPanel

@@ -3,7 +3,7 @@
  * foto de 60 px, nombre, SAP y ubicación, stock a la derecha. Todo lo demás vive en la ficha.
  * Mismo molde que `BodegaRow`: SwipeRow + ListCell.
  */
-import { Package, Star, ListPlus } from 'lucide-react'
+import { Package, Star, ListPlus, ShoppingBasket } from 'lucide-react'
 import { ListCell, SwipeRow, type SwipeAction } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
@@ -21,6 +21,9 @@ export interface FilaRepuestoMovilProps {
   /** Solo con un equipo abierto: abre la hoja «Favorito de este equipo». */
   onAgregarLista?: () => void
   esFavoritoEquipo?: boolean
+  /** Agrega o quita la pieza del pedido (sin esto, pase de lectura, no se ofrece). */
+  onAlternarPedido?: () => void
+  enPedido?: boolean
   onAbrir: () => void
 }
 
@@ -32,7 +35,7 @@ export function estadoFilaMovil(r: Pick<AreaRepuestoRow, 'stockStatus' | 'stockM
   return null
 }
 
-export function FilaRepuestoMovil({ r, fotos, esFavorito, onToggleFav, onAgregarLista, esFavoritoEquipo, onAbrir }: FilaRepuestoMovilProps) {
+export function FilaRepuestoMovil({ r, fotos, esFavorito, onToggleFav, onAgregarLista, esFavoritoEquipo, onAlternarPedido, enPedido, onAbrir }: FilaRepuestoMovilProps) {
   const nv = nombreVisible(r)
   const foto = fotos[0]
   const estado = estadoFilaMovil(r)
@@ -44,9 +47,16 @@ export function FilaRepuestoMovil({ r, fotos, esFavorito, onToggleFav, onAgregar
     valorTotal: 0,
   }, 'nombre')
 
-  const trailing: SwipeAction[] = onAgregarLista
-    ? [{ label: 'Lista', icon: <ListPlus className={cn('size-5', esFavoritoEquipo && 'stroke-[2.75]')} />, tone: 'brand', onClick: onAgregarLista }]
-    : []
+  // Deslizar a la izquierda: «Pedido» (correo a bodega) y, con un equipo abierto, «Lista»
+  // (favorito de este equipo). Cada una con su ícono: el ListPlus es solo de la lista.
+  const trailing: SwipeAction[] = [
+    ...(onAlternarPedido
+      ? [{ label: enPedido ? 'Quitar' : 'Pedido', icon: <ShoppingBasket className={cn('size-5', enPedido && 'stroke-[2.75]')} />, tone: 'brand' as const, onClick: onAlternarPedido }]
+      : []),
+    ...(onAgregarLista
+      ? [{ label: 'Lista', icon: <ListPlus className={cn('size-5', esFavoritoEquipo && 'stroke-[2.75]')} />, tone: 'neutral' as const, onClick: onAgregarLista }]
+      : []),
+  ]
 
   return (
     <SwipeRow
@@ -63,6 +73,7 @@ export function FilaRepuestoMovil({ r, fotos, esFavorito, onToggleFav, onAgregar
         title={
           <span className="font-normal">
             {esFavorito && <Star className="mr-1 inline size-3.5 fill-current align-[-1px] text-ink-warn" aria-label="Favorito" />}
+            {enPedido && <ShoppingBasket className="mr-1 inline size-3.5 align-[-1px] text-primary" aria-label="En el pedido" />}
             {nv.titulo !== '(sin nombre)' ? nv.titulo : <span className="italic text-muted-foreground">Sin nombre</span>}
           </span>
         }

@@ -6,6 +6,11 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 ## En curso
 
+- [ ] **Pedido de repuestos multi-máquina con fotos para el correo** — EN REVISIÓN — claude (rama `feat/pedido-repuestos-v2`, rehace #1272).
+  Marcar repuestos de cualquier máquina (deslizar fila / ficha / columna en PC), cantidades, copiar para
+  correo con fotos (URL o incrustadas), compartir con fotos, Excel, asunto y registrar como solicitudes.
+  Falta: OK de Orel a las decisiones de ubicación y prueba en Outlook real.
+
 - [ ] **Falla repetida (reincidencia de paros de Mantención)** — HECHO (PR #1355 y #1356 mergeados 29-10) — claude.
   Estudio y plan: OneDrive `ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_PREDICTIVA_MICRODETENCIONES.md`.
   PR 1: helper + card 1A en Análisis de Turno (lee el turno y los 3 anteriores). PR 2: Cloud Function que
