@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { cn } from '@/lib/utils'
 import {
   claseHeaderPC,
   claseCapsulaBarra,
+  claseSuperficieMenu,
   claseAsidePC,
   clasePaddingContenidoPC,
   claseItemPC,
@@ -104,5 +106,26 @@ describe('cápsulas agrupadas de la barra superior', () => {
     expect(claseCapsulaBarra()).toBe('relative vidrio vidrio-barra pointer-events-auto flex items-center h-[42px] rounded-full')
     expect(claseBarraInferior(true)).toBe('lg:hidden fixed inset-x-3 z-40 rounded-full vidrio vidrio-barra')
     expect(claseAsidePC(true, false)).not.toContain('vidrio-barra')
+  })
+})
+
+describe('superficie de menús desplegables', () => {
+  const ANTERIOR = 'rounded-ctl border bg-popover text-popover-foreground shadow-md'
+
+  it('piel anterior: devuelve su superficie tal cual', () => {
+    expect(claseSuperficieMenu(false, ANTERIOR)).toBe(ANTERIOR)
+  })
+
+  it('piel apple: material de barra, sin el relleno ni el borde opacos', () => {
+    const clases = claseSuperficieMenu(true, ANTERIOR)
+    expect(clases).toContain('vidrio vidrio-barra')
+    expect(clases).not.toContain('bg-popover')
+    expect(clases).not.toMatch(/(^| )border( |$)/)
+  })
+
+  it('un menú posicionado conserva su `absolute` si va después (tailwind-merge)', () => {
+    const clases = cn(claseSuperficieMenu(true, ANTERIOR), 'absolute bottom-full left-0')
+    expect(clases.split(' ')).toContain('absolute')
+    expect(clases.split(' ')).not.toContain('relative')
   })
 })

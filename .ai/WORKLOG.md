@@ -1311,3 +1311,11 @@ Estos seguían abiertos cuando se compactó el historial (2026-07-30):
 - Verificación adicional: vitest run src/components/layout → «Test Files 1 passed (1) / Tests 14 passed (14)». ESLint de los siete archivos TS/TSX modificados: salida vacía, código 0. git diff --check: código 0 (solo avisos Git de conversión LF/CRLF en memoria/tablero).
 - Cascada CSS comprobada con PostCSS y selectores DOM: html.vidrio-solido y prefers-reduced-transparency, ambos claro #fbfaf7 y oscuro #2a2927 opacos. El respaldo ya gana por orden/especificidad; no se ajustó. No equivale a validación visual.
 - Limitaciones/desvíos: git pull --ff-only falló con Permission denied sobre FETCH_HEAD del repo principal; se conservó la rama de este worktree. pnpm ci:local literal bloqueado por política de pnpm.ps1; se ejecutó el mismo script mediante pnpm.cmd. Primer typecheck detectó inert no tipado en React 18; corregido antes de la CI verde. Vite arrancó en 5178, pero preview visual pendiente: «The browser access host is unavailable». Servidor local detenido al terminar.
+
+## 2026-11-11 · Vidrio líquido fase 2 · menús y mapa + merge de main (Claude)
+
+- Merge de origin/main (37 commits): un conflicto en MainLayout (main agregó `BotonLectura` a la barra de PC); queda dentro de `controlesTemaAyuda`, así entra en la cápsula de controles.
+- Menús (solo piel Apple): `claseSuperficieMenu` en navVidrio.ts; `DropdownMenuContent`/`SubContent`, `SelectContent` y los dos menús de usuario del panel pasan a `vidrio vidrio-barra` radio 18. La superficie va primero en `cn()` para que el `absolute` del menú gane al `relative` del material (test).
+- Mapa de planta (solo piel Apple): la barra flota sobre el plano en 3 cápsulas (título, herramientas, 3D + nivel + vistas); activos = `vidrio-lente`; selector de nivel y barra de selección en vidrio. El alto real de la barra (`--mapa-barra-h`, ResizeObserver) baja los controles superiores de Leaflet y el panel de capas.
+- Verificación: preview :5174 con arnés temporal de sesión (no commiteado), 375/1024/1440, claro y oscuro; piel anterior sin `.mapa-vidrio` ni `.vidrio-barra`. Test nuevo roto a propósito (detectó la mutación).
+- Fuera de alcance: el panel de capas del mapa sigue oscuro fijo en vista clara.

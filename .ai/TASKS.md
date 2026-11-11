@@ -91,4 +91,4 @@ No tomes una tarea que ya está EN CURSO por otro.
 
 - [ ] **Jack-Knife ronda 3, etapas 1 y 2** — HECHO — codex (pendiente revisión visual de Orel). Rama feat/jack-knife-pagina; sin commit ni push por instrucción explícita.
 
-- [ ] **Vidrio líquido fase 2 · cápsulas agrupadas** — EN REVISIÓN — codex (CI local verde; preview visual pendiente por host de navegador no disponible). Rama existente feat/vidrio-fase2-capsulas; solo piel Apple, sin commit ni push.
+- [ ] **Vidrio líquido fase 2 · cápsulas agrupadas** — EN REVISIÓN — PR #1409, rama feat/vidrio-fase2-capsulas. 11-11: menús desplegables y mapa de planta con vidrio, al día con main, preview verificado 375/1024/1440 claro y oscuro. Falta OK de merge de Orel.

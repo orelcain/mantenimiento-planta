@@ -72,6 +72,16 @@ export function claseHeaderPC(apple: boolean): string {
     : 'hidden lg:flex sticky top-0 z-30 items-center h-14 px-4 bg-background/80 backdrop-blur border-b'
 }
 
+/**
+ * Superficie de menús desplegables y popovers (Radix, menú de usuario, selector de nivel
+ * del mapa). Apple: el mismo material denso de las barras (.vidrio-barra) con radio 18;
+ * el contenido de la página se ve desenfocado detrás. Con `apple = false` devuelve
+ * `anterior` tal cual: la piel anterior no cambia.
+ */
+export function claseSuperficieMenu(apple: boolean, anterior: string): string {
+  return apple ? 'relative vidrio vidrio-barra rounded-[18px] text-foreground' : anterior
+}
+
 /** Cápsula con su propio ancestro para el brillo del material. */
 export function claseCapsulaBarra(): string {
   return 'relative vidrio vidrio-barra pointer-events-auto flex items-center h-[42px] rounded-full'

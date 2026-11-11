@@ -63,6 +63,7 @@ import { usePielApple } from '@/hooks/usePielApple'
 import {
   claseHeaderPC,
   claseCapsulaBarra,
+  claseSuperficieMenu,
   claseAsidePC,
   clasePaddingContenidoPC,
   claseItemPC,
@@ -800,7 +801,7 @@ export function MainLayout() {
 
               {/* User dropdown */}
               {userMenuOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                <div className={cn(claseSuperficieMenu(apple, 'bg-card border rounded-card shadow-lg'), 'absolute bottom-full left-0 right-0 mb-2 overflow-hidden')}>
                   <ControlIntensidad />
                   <ControlLectura />
                   <button
@@ -934,7 +935,7 @@ export function MainLayout() {
                   </button>
 
                   {userMenuOpen && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                    <div className={cn(claseSuperficieMenu(apple, 'bg-card border rounded-card shadow-lg'), 'absolute bottom-full left-0 right-0 mb-2 overflow-hidden')}>
                       <ControlIntensidad />
                       <ControlLectura />
                       <button
