@@ -9,6 +9,7 @@
  */
 import { Fragment, useState, useMemo } from 'react'
 import { Loader2, ClipboardList, ArrowRight, Check } from 'lucide-react'
+import { SkeletonFilas } from '@/components/piel'
 import {
   Badge,
   Button,
@@ -185,9 +186,7 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
         )}
 
         {loading ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Cargando…
-          </div>
+          <SkeletonFilas label="Cargando solicitudes" filas={3} lineas={2} className="rounded-card border border-border px-3" />
         ) : solicitudes.length === 0 ? (
           <div className="rounded-card border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
             Aún no hay solicitudes. Usa “+ Solicitar repuesto”.

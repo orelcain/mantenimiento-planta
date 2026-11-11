@@ -20,7 +20,7 @@ import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
 import { AREA_TACTIL, AREA_TACTIL_COMPACTA } from '@/lib/areaTactil'
 import { Link, useNavigate } from 'react-router-dom'
-import { Button as PielButton, ListGroup, ListCell } from '@/components/piel'
+import { Button as PielButton, ListGroup, ListCell, SkeletonFilas } from '@/components/piel'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { ocultarBurbujaChat } from '@/lib/pantallaCompletaMovil'
@@ -458,7 +458,7 @@ export function RepuestoDetailPanel({ item, plantaDe, equiposEnFoco, areaName, v
               {manualesHeredados.length > 0 && <span className="font-normal">({manualesHeredados.length})</span>}
             </div>
             {manualesLoading ? (
-              <div className="flex items-center gap-1.5 text-footnote text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> cargando…</div>
+              <SkeletonFilas label="Cargando manuales del equipo" filas={2} lineas={1} cola={false} />
             ) : (
               <div className="space-y-1">
                 {manualesHeredados.map((m) => (

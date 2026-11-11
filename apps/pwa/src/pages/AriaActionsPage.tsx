@@ -3,6 +3,7 @@
  * Historial de todas las acciones ejecutadas por ARIA (el chatbot)
  * Muestra incidencias creadas, estados actualizados, técnicos asignados, etc.
  */
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -269,10 +270,7 @@ export function AriaActionsPage() {
       {/* Actions Table */}
       <div className="bg-background border border-border rounded-card overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-sm text-muted-foreground">Cargando acciones...</span>
-          </div>
+          <SkeletonFilas label="Cargando acciones de ARIA" filas={5} lineas={2} className="px-4" />
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <Bot className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />

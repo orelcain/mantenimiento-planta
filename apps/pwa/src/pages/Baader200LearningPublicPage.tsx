@@ -4,9 +4,10 @@
  * - Carga secciones desde Firestore (lectura pública)
  * - Ruta: /baader-200/learn  y  /baader-200/learn/:sectionId
  */
+import { SkeletonGrafico } from '@/components/piel'
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Loader2, AlertCircle, BookOpen, QrCode, X, Copy, Check, Maximize, Minimize } from 'lucide-react'
+import { AlertCircle, BookOpen, QrCode, X, Copy, Check, Maximize, Minimize } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getB200Sections, getB200SectionOrder } from '@/services/baader200Learning'
 import type { B200Section } from '@/services/baader200Learning'
@@ -140,11 +141,8 @@ export function Baader200LearningPublicPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen w-screen bg-[#0a1628]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-brand-ink" />
-          <p className="text-ink-info text-sm">Cargando Baader 200…</p>
-        </div>
+      <div className="h-screen w-screen bg-[#0a1628] p-4">
+        <SkeletonGrafico alto="100%" label="Cargando Baader 200" />
       </div>
     )
   }

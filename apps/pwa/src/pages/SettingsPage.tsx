@@ -1,3 +1,4 @@
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useEffect, type ChangeEvent } from 'react'
 import { logger } from '@/lib/logger'
 import {
@@ -816,10 +817,7 @@ function SystemSettings() {
         </CardHeader>
         <CardContent className="space-y-6">
           {isChecking ? (
-            <div className="flex items-center justify-center py-8">
-              <Spinner size="lg" />
-              <span className="ml-3 text-muted-foreground">Verificando sistema...</span>
-            </div>
+            <SkeletonFilas label="Verificando sistema" filas={3} lineas={1} />
           ) : (
             <>
               {/* Estado del sistema */}

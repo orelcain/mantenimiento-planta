@@ -11,6 +11,7 @@
  * - Ruta: /v/:modelId
  */
 
+import { SkeletonGrafico } from '@/components/piel'
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
@@ -20,7 +21,6 @@ import {
   Ruler,
   AlertCircle,
   Box,
-  Loader2,
   Paintbrush,
   Trash2,
   X,
@@ -375,11 +375,8 @@ export function Visor3DPublicPage() {
   // Loading
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Cargando modelo 3D...</p>
-        </div>
+      <div className="h-screen bg-background p-4">
+        <SkeletonGrafico alto="100%" label="Cargando modelo 3D" />
       </div>
     )
   }

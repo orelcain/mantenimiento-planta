@@ -115,7 +115,7 @@ import { construirDuelo, nombresEfectivos } from './monitor/duelo'
 import { useDueloConfig } from './monitor/dueloConfig'
 import type { PestanaMonitor } from './monitor/BarraLateralPC'
 import { repartoSemanal } from './monitor/repartoSemanal'
-import { Pill, SegmentedControl } from '@/components/piel'
+import { Pill, SegmentedControl, SkeletonPanel } from '@/components/piel'
 import { useIsAdmin, useIsSupervisor } from '@/store'
 import { toast } from '@/hooks/useToast'
 import {
@@ -5966,8 +5966,8 @@ function MonitorDelToken() {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <RefreshCw className="h-6 w-6 animate-spin text-sky-600 dark:text-sky-400" />
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <SkeletonPanel label="Cargando monitor de turno" kpis={3} lineas={2} className="w-full max-w-3xl" />
       </div>
     )
   }

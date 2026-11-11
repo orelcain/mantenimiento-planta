@@ -25,12 +25,12 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Loader2, AlertCircle, QrCode, X, Copy, Check, Maximize, Minimize, Pencil } from 'lucide-react'
+import { AlertCircle, QrCode, X, Copy, Check, Maximize, Minimize, Pencil } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnuro'
 import { AVISO_KEY, useHmiKnuroMovil } from '@/components/hmiKnuro/hmiKnuroMovil'
 import { ControlPresetsKnuro } from '@/components/hmiKnuro/ControlPresetsKnuro'
-import { EncabezadoHerramienta } from '@/components/piel'
+import { EncabezadoHerramienta, SkeletonGrafico } from '@/components/piel'
 import { frasePreset, partirPreset } from '@/components/hmiKnuro/knuroPresets'
 import '@/components/hmiKnuro/knuroConsola.css'
 import { useAuthStore, useIsAdmin } from '@/store'
@@ -204,7 +204,7 @@ export function HmiKnuroPublicPage() {
     return (
       <div className={`knc knc-estado ${isAuthenticated ? 'h-full w-full' : 'h-screen w-screen'}`}>
         {loading
-          ? <><Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" /><p>Cargando HMI…</p></>
+          ? <SkeletonGrafico alto="100%" label="Cargando HMI" className="h-full" />
           : <><AlertCircle className="h-8 w-8 bad" aria-hidden="true" /><p className="bad" style={{ maxWidth: 320, textAlign: 'center' }}>{error}</p></>}
       </div>
     )

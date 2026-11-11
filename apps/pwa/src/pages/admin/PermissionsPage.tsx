@@ -18,6 +18,7 @@ import {
   Switch,
   Label,
 } from '@/components/ui'
+import { SkeletonFilas } from '@/components/piel'
 import { Search, Shield, RotateCcw } from 'lucide-react'
 import { getAllUsers } from '@/services/auth'
 import {
@@ -256,9 +257,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex justify-center p-8">
-              <Spinner />
-            </div>
+            <SkeletonFilas label="Cargando usuarios" filas={4} lineas={2} />
           ) : (
             <div className="space-y-2">
               <div className="hidden md:flex items-center text-sm font-medium text-muted-foreground px-4 pb-2 border-b">
@@ -317,9 +316,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
           </DialogHeader>
 
           {isLoadingPermissions ? (
-            <div className="flex justify-center p-12">
-              <Spinner />
-            </div>
+            <SkeletonFilas label="Cargando permisos del usuario" filas={4} lineas={1} cola={false} className="py-4" />
           ) : (
             <div className="py-4 space-y-6">
               <div className="flex justify-end gap-2 mb-4">

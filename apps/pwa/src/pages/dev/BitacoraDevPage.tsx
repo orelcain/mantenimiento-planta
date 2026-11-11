@@ -184,6 +184,9 @@ function eventosDeEjemplo(turno: TurnoMantencion): EventoBitacora[] {
   ]
 }
 
+/** `?cargando=1` deja la lista en su esqueleto de carga, para revisarlo y capturarlo. */
+const CARGANDO_DEMO = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('cargando')
+
 const BORRADOR_EJEMPLO = 'ejemplo-borrador-danilo'
 const NOVEDAD_EJEMPLO = { texto: 'Leandro Igor agregó un evento', en: Date.now() }
 
@@ -294,7 +297,7 @@ function useEventosEjemplo(turno: TurnoMantencion, inicialDe: (t: TurnoMantencio
 
   return {
     eventos,
-    cargando: false,
+    cargando: CARGANDO_DEMO,
     error: null as string | null,
     sincronizando: false,
     ultimaSync: new Date(),

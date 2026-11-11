@@ -23,6 +23,7 @@ import {
 import { CondLeyenda } from '@/components/equipment/CondDot'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, InfoTooltip } from '@/components/ui'
 import { SpeechTextarea } from '@/components/ui'
+import { SkeletonFilas } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { useEquipmentForArea, type EquipmentDisplayNode } from '@/hooks/useEquipmentForArea'
@@ -480,9 +481,7 @@ export function QuickInterventionCapture({
 
           {/* Lista reciente */}
           {loadingEntries ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
-            </div>
+            <SkeletonFilas label="Cargando intervenciones recientes" filas={3} lineas={2} cola={false} />
           ) : entries.length === 0 ? (
             <p className="text-xs text-muted-foreground py-3 text-center">
               Aún no hay intervenciones registradas en esta área. La primera captura aparecerá aquí.

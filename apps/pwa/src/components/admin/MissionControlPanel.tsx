@@ -15,7 +15,6 @@ import {
   CardTitle,
   Badge,
   Switch,
-  Spinner,
 } from '@/components/ui'
 import {
   Satellite,
@@ -60,7 +59,7 @@ import {
   type LearningStats,
   type AriaCorrection,
 } from '@/services/ariaLearning'
-import { ListCell, ListGroup } from '@/components/piel'
+import { ListCell, ListGroup, SkeletonPanel } from '@/components/piel'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
@@ -266,8 +265,8 @@ export function MissionControlPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner className="h-6 w-6" />
+      <div className="space-y-6">
+        <SkeletonPanel label="Cargando control de agentes" kpis={4} lineas={3} />
       </div>
     )
   }
@@ -586,9 +585,7 @@ export function MissionControlPanel() {
               )}
             </>
           ) : (
-            <div className="flex items-center justify-center py-4">
-              <Spinner className="h-4 w-4" />
-            </div>
+            <SkeletonPanel label="Cargando datos de aprendizaje" lineas={2} />
           )}
         </CardContent>
       </Card>

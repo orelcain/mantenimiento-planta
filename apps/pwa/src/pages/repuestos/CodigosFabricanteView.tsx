@@ -20,10 +20,11 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookMarked, BookOpen, Check, ChevronDown, CircleCheck, CirclePlus, Clock, Copy, Loader2, PackagePlus, ScanSearch, Search, Shapes } from 'lucide-react'
+import { BookMarked, BookOpen, Check, ChevronDown, CircleCheck, CirclePlus, Clock, Copy, PackagePlus, ScanSearch, Search, Shapes } from 'lucide-react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Input } from '@/components/ui'
+import { SkeletonFilas } from '@/components/piel'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 import { CATALOGOS, cargarCatalogos, type PiezaCatalogo } from './catalogosFabricante'
 import { agruparPorCodigo, conRecuentoTotal, indexarGrupos } from './agruparPiezas'
@@ -244,7 +245,7 @@ export function CodigosFabricanteView({ onBuscarEnRepuestos, onCrearRepuesto, pu
         </p>
       )}
       {!error && !piezas && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Cargando catálogo…</div>
+        <SkeletonFilas label="Cargando catálogo" filas={3} lineas={2} cola={false} />
       )}
       {piezas && query.trim().length >= 3 && total === 0 && (
         <p className="text-sm text-muted-foreground">Sin resultados en los catálogos ({piezas.length.toLocaleString('es-CL')} filas indexadas).</p>

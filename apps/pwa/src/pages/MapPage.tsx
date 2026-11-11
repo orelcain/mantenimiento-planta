@@ -12,6 +12,7 @@
  * v2.67.0 — Mapa Isométrico + Editor
  */
 
+import { SkeletonGrafico } from '@/components/piel'
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -2652,11 +2653,8 @@ export function MapPage() {
             {/* Three.js Scene */}
             <Suspense
               fallback={
-                <div className="w-full h-full flex items-center justify-center bg-[#0d1117]">
-                  <div className="text-center space-y-3">
-                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-sm text-muted-foreground">Cargando escena 3D...</p>
-                  </div>
+                <div className="w-full h-full bg-[#0d1117] p-4">
+                  <SkeletonGrafico alto="100%" label="Cargando escena 3D" />
                 </div>
               }
             >

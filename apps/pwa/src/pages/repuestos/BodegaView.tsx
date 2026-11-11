@@ -62,7 +62,7 @@ import { useAccionesSolicitudes } from '@/hooks/repuestos/useAccionesSolicitudes
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 import { useEsPC } from '@/hooks/useEsPC'
 import { useColoresGrafico } from '@/hooks/useColoresGrafico'
-import { Pill, SegmentedControl, Button as PielButton } from '@/components/piel'
+import { Pill, SegmentedControl, Button as PielButton, SkeletonFilas, SkeletonBloque, SkeletonLinea } from '@/components/piel'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = StockFilterKey
@@ -178,9 +178,9 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   if (isLoading) {
     const pct = progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 px-6">
-        <Loader2 className="h-6 w-6 text-primary animate-spin" />
-        <span className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-3 py-4">
+        <SkeletonFilas label="Cargando bodega" filas={6} className="rounded-card bg-card px-4" />
+        <span className="px-4 text-footnote tabular-nums text-muted-foreground">
           {progress.phase === 'machines' && progress.total > 0
             ? `Cargando equipos… ${progress.loaded}/${progress.total}`
             : progress.phase === 'hierarchy'
@@ -974,7 +974,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
+        <SkeletonFilas label="Cargando inventarios" filas={3} lineas={2} cola={false} className="rounded-card border border-border bg-card px-4" />
       ) : sesiones.length === 0 ? (
         <EmptyState message="No hay inventarios registrados" />
       ) : (
@@ -1200,7 +1200,7 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
   const salidas = movimientos.filter(m => m.tipo === 'salida').length
   const ajustes = movimientos.filter(m => m.tipo === 'ajuste').length
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
+  if (loading) return <SkeletonFilas label="Cargando movimientos" filas={4} lineas={2} />
 
   return (
     <div className="space-y-3">
@@ -1489,7 +1489,14 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             </p>
           </div>
           {movLoading ? (
-            <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+            <SkeletonBloque label="Cargando stock sin movimiento" className="flex gap-3 p-4">
+              {[0, 1].map((i) => (
+                <div key={i} className="flex flex-1 flex-col items-center gap-2 rounded-card border border-border p-3">
+                  <SkeletonLinea ancho="2.5rem" tamano="titulo" />
+                  <SkeletonLinea ancho="4rem" tamano="nota" />
+                </div>
+              ))}
+            </SkeletonBloque>
           ) : (
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
@@ -1526,7 +1533,12 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             </p>
           </div>
           {movLoading ? (
-            <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+            <SkeletonBloque label="Cargando rotación de inventario" className="p-4">
+              <div className="flex flex-col items-center gap-2 rounded-card border border-border p-3">
+                <SkeletonLinea ancho="3rem" tamano="titulo" />
+                <SkeletonLinea ancho="7rem" tamano="nota" />
+              </div>
+            </SkeletonBloque>
           ) : (
             <div className="p-4 space-y-3">
               <div className="rounded-card border border-border bg-primary/[0.15] p-3 text-center">
@@ -1608,7 +1620,7 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
             </p>
           </div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
-            {movLoading ? <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+            {movLoading ? <SkeletonFilas label="Cargando movimientos recientes" filas={4} lineas={1} className="px-4" />
             : movimientos.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin movimientos</p>
             : movimientos.slice(0, 15).map(m => (
               <div key={m.id} className="px-4 py-2 flex items-center gap-2">
@@ -2255,7 +2267,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                 <History className="h-3 w-3" /> Movimientos recientes
               </p>
             </div>
-            {loading ? <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+            {loading ? <SkeletonFilas label="Cargando movimientos" filas={3} lineas={1} className="px-3" />
             : movs.length === 0 ? <p className="p-3 text-caption text-muted-foreground text-center">Sin movimientos</p>
             : (
               <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
@@ -2465,7 +2477,7 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
         <button onClick={onClose} className="p-1 rounded-ctl hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
       </div>
       <div className="px-5 py-4 max-h-[400px] overflow-y-auto">
-        {loading ? <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
+        {loading ? <SkeletonFilas label="Cargando historial" filas={3} lineas={2} cola={false} className="rounded-card border border-border px-3" />
           : movs.length === 0 ? <p className="text-center text-sm text-muted-foreground py-8">Sin movimientos</p>
           : <div className="space-y-2">{movs.map(m => {
             const cfg = { entrada: { l: 'Entrada', c: 'text-ink-ok bg-ink-ok/[0.15]', i: ArrowDownCircle },

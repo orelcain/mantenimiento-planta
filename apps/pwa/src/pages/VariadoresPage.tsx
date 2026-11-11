@@ -39,7 +39,7 @@ import type { Incident } from '@/types'
 import { LC as C } from '@/data/learningTheme'
 import { FOCO, tinte, chip as chipEstilo, panel as panelEstilo, aviso } from '@/data/variadoresUi'
 import { MetaText } from '@/components/learning/primitives'
-import { EncabezadoHerramienta, SegmentedControl } from '@/components/piel'
+import { EncabezadoHerramienta, SegmentedControl, SkeletonFilas } from '@/components/piel'
 import {
   VARIADORES,
   MOTORES_CINTAS,
@@ -798,9 +798,7 @@ function RegistrarCambio({ posicion }: { posicion: PosicionReceta }) {
       <div className="flex flex-col gap-2">
         <MetaText>¿Qué incidencia resolvió este cambio?</MetaText>
         {incidencias === null ? (
-          <span className="inline-flex items-center gap-2 text-footnote" style={{ color: C.inkMid }}>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando incidencias abiertas…
-          </span>
+          <SkeletonFilas label="Buscando incidencias abiertas" filas={2} lineas={1} cola={false} />
         ) : incidencias.length === 0 && !error ? (
           <span className="text-footnote" style={{ color: C.warn }}>
             No hay incidencias abiertas. El cambio se registra cerrando una existente,

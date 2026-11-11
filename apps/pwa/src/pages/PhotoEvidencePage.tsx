@@ -1,3 +1,4 @@
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useEffect } from 'react'
 import {
   Plus,
@@ -300,9 +301,7 @@ export function PhotoEvidencePage() {
       {/* Contenido */}
       <div className="p-4">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner className="w-8 h-8" />
-          </div>
+          <SkeletonFilas label="Cargando evidencias" filas={4} lineas={2} cola={false} />
         ) : filteredEvidences.length === 0 ? (
           <div className="text-center py-12">
             <Camera className="w-12 h-12 text-muted-foreground mx-auto mb-4" />

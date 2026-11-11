@@ -20,6 +20,7 @@ import {
   AlertTriangle, CheckCircle2, Loader2, Mic, Sparkles, Wrench, Users, CloudOff, CalendarClock,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, SpeechTextarea, InfoTooltip } from '@/components/ui'
+import { SkeletonBloque, SkeletonLinea } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { annotateSensorStop, getParosByPlantLine, sensorStopKey } from '@/services/paros'
@@ -282,9 +283,9 @@ export function SensorStopsCausePanel({
 
       <CardContent className="space-y-1.5 pb-3">
         {loading && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando causas anotadas…
-          </p>
+          <SkeletonBloque label="Cargando causas anotadas">
+            <SkeletonLinea ancho="40%" />
+          </SkeletonBloque>
         )}
 
         {visibles.map((stop) => {

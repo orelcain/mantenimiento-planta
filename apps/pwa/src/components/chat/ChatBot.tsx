@@ -4,6 +4,7 @@ import { usePielApple } from '@/hooks/usePielApple'
  * Burbuja flotante con streaming, voz, fotos, acciones ejecutables,
  * confirmación inline, auto-asignación y tamaño ampliado
  */
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff, Pencil, MoreHorizontal } from 'lucide-react'
@@ -803,9 +804,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
               </div>
               <div className="max-h-36 overflow-y-auto">
                 {equipLoading ? (
-                  <div className="px-2 py-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Cargando equipos...
-                  </div>
+                  <SkeletonFilas label="Cargando equipos" filas={3} lineas={1} cola={false} className="px-2 py-2" />
                 ) : filteredCandidates.length === 0 ? (
                   <div className="px-2 py-2 text-xs text-muted-foreground text-center">
                     {equipmentSearch.trim() ? 'Sin resultados — intenta otro término' : 'Escribe para buscar equipos'}
@@ -885,9 +884,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                   </div>
                   <div className="max-h-36 overflow-y-auto">
                     {techLoading ? (
-                      <div className="px-2 py-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Cargando...
-                      </div>
+                      <SkeletonFilas label="Cargando técnicos" filas={3} lineas={1} cola={false} className="px-2 py-2" />
                     ) : filteredTechs.length === 0 ? (
                       <div className="px-2 py-2 text-xs text-muted-foreground text-center">Sin resultados</div>
                     ) : (
