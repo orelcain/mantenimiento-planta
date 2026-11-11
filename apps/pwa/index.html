@@ -19,10 +19,18 @@
          embebidas de un .glb con `fetch(blob:...)` (ImageBitmapLoader). Sin blob: en
          connect-src el fetch se bloquea, GLTFLoader tira "Couldn't load texture blob:"
          y el modelo del Visor 3D se ve blanco/sin texturas (bug real 2026-08-04:
-         "Bomba Sihi"). blob: es same-origin y lo crea la propia página → riesgo nulo. -->
+         "Bomba Sihi"). blob: es same-origin y lo crea la propia página → riesgo nulo.
+         script-src (auditoría 10-11-2026): antes era 'unsafe-eval' + cualquier https:,
+         o sea, casi sin freno a un XSS. Hoy es una lista explícita, medida rastreando
+         los 333 chunks de prod: gsi (accounts.google.com), popup de Auth
+         (apis.google.com), reCAPTCHA que trae firebase/auth (www.google.com +
+         www.gstatic.com) y pdfobject de jsPDF (cdnjs). 'unsafe-eval' se cambió por
+         'wasm-unsafe-eval' para el decodificador Draco del Visor 3D (los únicos
+         eval/new Function del bundle son ramas muertas de echarts y de un polyfill).
+         Si algo se bloquea, main.tsx lo registra en errorLogs como «CSP bloqueó …». -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+      script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com https://apis.google.com https://www.google.com https://www.gstatic.com https://cdnjs.cloudflare.com;
       style-src 'self' 'unsafe-inline' https:;
       img-src 'self' data: blob: https:;
       font-src 'self' data: https:;
@@ -35,6 +43,27 @@
       form-action 'self';
     " />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <!-- Anti-enmarcado (auditoría 10-11-2026). GitHub Pages no manda
+         X-Frame-Options y el <meta> CSP no admite frame-ancestors, así que otra
+         web podía cargar la app en un iframe invisible y hacer que el usuario
+         tocara botones sin verlos (clickjacking). La página nace oculta y solo
+         se muestra si no está enmarcada o si quien la enmarca es la misma app.
+         Si el iframe ajeno bloquea scripts, queda oculta: es lo que se busca.
+         Nadie legítimo enmarca index.html: Telegram abre la PWA como link y la
+         Mini App es mant.html. -->
+    <style id="anti-enmarcado">html{display:none!important}</style>
+    <script>
+      (function () {
+        var propio = false
+        try { propio = window.self === window.top || window.top.location.origin === window.location.origin } catch (e) { propio = false }
+        if (propio) {
+          var s = document.getElementById('anti-enmarcado')
+          if (s) s.parentNode.removeChild(s)
+        } else {
+          try { window.top.location = window.self.location.href } catch (e) { /* sandbox sin top-navigation: queda oculta */ }
+        }
+      })()
+    </script>
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="icon" type="image/svg+xml" href="/mantenimiento-planta/icons/icon.svg" />

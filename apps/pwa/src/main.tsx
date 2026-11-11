@@ -13,6 +13,17 @@ import '@fontsource/ibm-plex-mono/latin-600.css'
 import { logger } from '@/lib/logger'
 import { marcarVidrioSolido } from '@/lib/vidrioSolido'
 
+// La CSP del index se endureció el 10-11-2026 (lista explícita de scripts, sin
+// 'unsafe-eval'). Si algo legítimo queda bloqueado, que se vea en errorLogs en vez
+// de romperse en silencio (el Visor 3D ya se vio blanco una vez por la CSP).
+document.addEventListener('securitypolicyviolation', (e) => {
+  logger.error(`CSP bloqueó ${e.effectiveDirective}: ${e.blockedURI || '(inline)'}`, undefined, {
+    fuente: e.sourceFile,
+    linea: e.lineNumber,
+    pagina: location.pathname,
+  })
+})
+
 // Gama baja (≤ 4 GB o ≤ 4 núcleos): el vidrio se ve sólido. Antes de pintar, para no parpadear.
 marcarVidrioSolido(document.documentElement)
 

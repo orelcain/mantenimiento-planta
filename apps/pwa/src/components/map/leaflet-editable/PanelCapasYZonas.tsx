@@ -303,7 +303,7 @@ export function PanelCapasYZonas() {
   }, [viewLayers])
 
   return (
-    <div className="absolute top-3 right-3 w-72 max-h-[calc(100%-24px)] bg-gray-900/97 backdrop-blur border border-gray-700/60 rounded-lg shadow-2xl text-gray-200 flex flex-col overflow-hidden z-[1000]">
+    <div className="mapa-panel-capas absolute top-3 right-3 w-72 max-h-[calc(100%-24px)] bg-gray-900/97 backdrop-blur border border-gray-700/60 rounded-lg shadow-2xl text-gray-200 flex flex-col overflow-hidden z-[1000]">
       {/* Tabs */}
       <div className="flex border-b border-gray-700/50 shrink-0">
         <button

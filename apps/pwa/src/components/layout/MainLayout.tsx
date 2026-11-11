@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Suspense } from 'react'
 import {
@@ -34,6 +34,7 @@ import {
   Plus,
   NotebookPen,
   SearchCheck,
+  Search,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -61,6 +62,9 @@ import { ControlIntensidad } from '@/components/piel/ControlIntensidad'
 import { BotonLectura, ControlLectura } from '@/components/piel/ControlLectura'
 import { usePielApple } from '@/hooks/usePielApple'
 import {
+  claseHeaderPC,
+  claseCapsulaBarra,
+  claseSuperficieMenu,
   claseAsidePC,
   clasePaddingContenidoPC,
   claseItemPC,
@@ -70,6 +74,8 @@ import {
 } from './navVidrio'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
 import { useContadorVistas } from '@/hooks/useContadorVistas'
+import { useAtajoBuscador, etiquetaAtajo } from '@/hooks/useAtajoBuscador'
+import { BuscadorRapido } from '@/components/buscador/BuscadorRapido'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
@@ -230,6 +236,21 @@ export function MainLayout() {
   // Piel Apple: el menú y la barra usan el vidrio líquido (navVidrio.ts). Los contadores
   // salen de lo que ya está en memoria (store de incidencias); no hay consultas nuevas.
   const apple = usePielApple()
+  const [mostrarCapsulaIzquierda, setMostrarCapsulaIzquierda] = useState(false)
+  useEffect(() => {
+    if (!apple) return
+    let visible = window.scrollY > 64
+    setMostrarCapsulaIzquierda(visible)
+    const alDesplazar = () => {
+      const siguiente = window.scrollY > 64
+      if (siguiente !== visible) {
+        visible = siguiente
+        setMostrarCapsulaIzquierda(siguiente)
+      }
+    }
+    window.addEventListener('scroll', alDesplazar, { passive: true })
+    return () => window.removeEventListener('scroll', alDesplazar)
+  }, [apple])
   const incidenciasEnMemoria = useAppStore((s) => s.incidents)
   const incidenciasActivas = useMemo(() => contarIncidenciasActivas(incidenciasEnMemoria), [incidenciasEnMemoria])
   const isGanttRoute = location.pathname.startsWith('/gantt')
@@ -457,6 +478,17 @@ export function MainLayout() {
   // Flat list for compatibility (currentPageName, etc.)
   const allNavigation = visibleGroups.flatMap(g => g.items)
 
+  // Buscador rápido (Ctrl+K / ⌘K): las páginas son las mismas que el usuario ve en el menú.
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false)
+  const alternarBuscador = useCallback(() => setBuscadorAbierto(v => !v), [])
+  useAtajoBuscador(alternarBuscador)
+  const clavePaginas = visibleGroups.map(g => `${g.label}:${g.items.map(i => `${i.name}=${i.href}`).join(',')}`).join('|')
+  const paginasBuscador = useMemo(
+    () => visibleGroups.flatMap(g => g.items.map(i => ({ name: i.name, href: i.href, grupo: g.label }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- la clave resume visibleGroups, que se rehace en cada render
+    [clavePaginas],
+  )
+
   // Collapsible group state (persisted in localStorage)
   const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => {
     try {
@@ -534,6 +566,11 @@ export function MainLayout() {
       ? location.pathname === '/'
       : location.pathname.startsWith(item.href)
   )?.name ?? ''
+  // Incidencias e Inicio viven en la barra inferior y no en el menú lateral: sin esto,
+  // la cápsula de la barra superior quedaría vacía en esas pantallas.
+  const tituloBarra = currentPageName
+    || (location.pathname.startsWith('/incidents') ? 'Incidencias' : location.pathname === '/dashboard' ? 'Inicio' : '')
+  const verCapsulaIzquierda = mostrarCapsulaIzquierda && Boolean(tituloBarra)
 
   const readOnlyPrefixes = ['/settings', '/admin', '/hierarchy']
   const isReadOnly = !isOnline && readOnlyPrefixes.some((p) => location.pathname.startsWith(p))
@@ -562,6 +599,95 @@ export function MainLayout() {
       if (unsubscribe) unsubscribe()
     }
   }, [user?.id, setZones, setEquipment, setIncidents])
+
+  const avisoPendiente = (
+    (pendingWrites > 0 || lastSyncLabel) && (
+      <button
+        className="flex items-center gap-2 text-xs text-ink-warn px-2 py-1 bg-amber-500/[0.15] rounded-ctl hover:bg-amber-500/[0.15] transition-colors"
+        title={pendingSummary || lastSyncLabel || undefined}
+        onClick={() => setShowSyncPanel((prev) => !prev)}
+      >
+        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+        <span>{pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}</span>
+      </button>
+    )
+  )
+  const fechaVersion = (
+    <div className={apple ? 'flex items-center gap-2 text-xs text-muted-foreground' : 'flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded-ctl'}>
+      <span className="tabular-nums" title={versionTooltip}>{formatBuildDateShort()}</span>
+      {isAdmin && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+          onClick={reload}
+          title="Forzar actualización"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  )
+  const controlesTemaAyuda = (
+    <>
+      <BotonLectura />
+      <button
+        onClick={toggleTheme}
+        title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
+        className="p-1.5 rounded-card transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+      >
+        {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </button>
+      <HelpButton />
+    </>
+  )
+  const identidadUsuario = (
+    <>
+      <span className="text-sm text-muted-foreground">
+        {user?.nombre} {user?.apellido}
+      </span>
+      <Avatar className="h-8 w-8">
+        <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
+          {userInitials}
+        </AvatarFallback>
+      </Avatar>
+    </>
+  )
+  // Botón «Buscar» de la barra de PC: en la piel de vidrio va en su propia cápsula.
+  const botonBuscar = (enCapsula: boolean) => (
+    <button
+      type="button"
+      onClick={() => setBuscadorAbierto(true)}
+      className={cn(
+        'flex items-center gap-2 text-subhead text-muted-foreground transition-colors hover:text-foreground',
+        enCapsula ? cn(claseCapsulaBarra(), 'pl-3.5 pr-4') : 'h-8 rounded-[8px] bg-muted px-2.5',
+      )}
+      aria-label="Buscar en la app"
+      aria-keyshortcuts="Control+K Meta+K"
+    >
+      <Search className="h-4 w-4" />
+      <span>Buscar</span>
+      <kbd className="ml-3 font-sans text-footnote">{etiquetaAtajo()}</kbd>
+    </button>
+  )
+  const botonGantt = (
+    isGanttRoute && (
+      <Button
+        size="sm"
+        variant={ganttFocusMode ? 'default' : 'outline'}
+        className={apple ? 'pointer-events-auto' : 'mr-2'}
+        onClick={() => {
+          const next = !ganttFocusMode
+          setGanttFocusMode(next)
+          setSidebarPeekOpen(false)
+          setSidebarOpen(false)
+          localStorage.setItem('gantt_focus_mode', next ? '1' : '0')
+        }}
+      >
+        {ganttFocusMode ? 'Salir enfoque' : 'Modo enfoque'}
+      </Button>
+    )
+  )
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -706,7 +832,7 @@ export function MainLayout() {
 
               {/* User dropdown */}
               {userMenuOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                <div className={cn(claseSuperficieMenu(apple, 'bg-card border rounded-card shadow-lg'), 'absolute bottom-full left-0 right-0 mb-2 overflow-hidden')}>
                   <ControlIntensidad />
                   <ControlLectura />
                   <button
@@ -746,6 +872,14 @@ export function MainLayout() {
                   <span className="font-semibold">Mantenimiento</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => { setSidebarOpen(false); setBuscadorAbierto(true) }}
+                    className="p-1.5 rounded-card text-muted-foreground hover:text-foreground hover:bg-muted"
+                    aria-label="Buscar en la app"
+                  >
+                    <Search className="h-5 w-5" />
+                  </button>
                   <BotonLectura iconClassName="h-5 w-5" />
                   <button
                     onClick={toggleTheme}
@@ -840,7 +974,7 @@ export function MainLayout() {
                   </button>
 
                   {userMenuOpen && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
+                    <div className={cn(claseSuperficieMenu(apple, 'bg-card border rounded-card shadow-lg'), 'absolute bottom-full left-0 right-0 mb-2 overflow-hidden')}>
                       <ControlIntensidad />
                       <ControlLectura />
                       <button
@@ -886,86 +1020,61 @@ export function MainLayout() {
       {/* ══════ MAIN CONTENT AREA ══════ */}
       <div className={cn('flex-1 min-w-0 flex flex-col min-h-screen', clasePaddingContenidoPC(apple, shouldHideDesktopSidebar))}>
         {/* Top bar */}
-        <header className="hidden lg:flex sticky top-0 z-30 items-center h-14 px-4 bg-background/80 backdrop-blur border-b">
-          {/* Mobile: title centrado + hamburgesa para rutas secundarias */}
-          <div className="flex-1 flex items-center lg:hidden">
-            {currentPageName && (
-              <span className="text-sm font-semibold truncate">{currentPageName}</span>
-            )}
-          </div>
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -mr-2 hover:bg-muted rounded-card text-muted-foreground"
-            aria-label="Abrir menú completo"
-            aria-expanded={sidebarOpen}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-
-          <div className="hidden lg:flex flex-1" />
-
-          {isGanttRoute && (
-            <Button
-              size="sm"
-              variant={ganttFocusMode ? 'default' : 'outline'}
-              className="mr-2"
-              onClick={() => {
-                const next = !ganttFocusMode
-                setGanttFocusMode(next)
-                setSidebarPeekOpen(false)
-                setSidebarOpen(false)
-                localStorage.setItem('gantt_focus_mode', next ? '1' : '0')
-              }}
-            >
-              {ganttFocusMode ? 'Salir enfoque' : 'Modo enfoque'}
-            </Button>
-          )}
-
-          {/* Desktop user menu */}
-          <div className="hidden lg:flex items-center gap-3">
-            {(pendingWrites > 0 || lastSyncLabel) && (
-              <button
-                className="flex items-center gap-2 text-xs text-ink-warn px-2 py-1 bg-amber-500/[0.15] rounded-ctl hover:bg-amber-500/[0.15] transition-colors"
-                title={pendingSummary || lastSyncLabel || undefined}
-                onClick={() => setShowSyncPanel((prev) => !prev)}
+        <header className={cn(claseHeaderPC(apple), apple && 'gap-2.5')}>
+          {apple ? (
+            <>
+              <div
+                className={cn(claseCapsulaBarra(), 'gap-2 pl-4 pr-1.5 transition-opacity duration-200', !verCapsulaIzquierda && 'opacity-0 pointer-events-none')}
+                ref={(elemento) => { if (elemento) elemento.inert = !verCapsulaIzquierda }}
+                aria-hidden={!verCapsulaIzquierda}
               >
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                <span>{pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}</span>
+                <span className="pr-1 text-sm font-semibold">{tituloBarra}</span>
+                <div id="barra-filtros-slot" className="flex items-center gap-0.5" />
+              </div>
+              <div className="hidden lg:flex flex-1" />
+              {botonGantt}
+              {botonBuscar(true)}
+              <div className={cn(claseCapsulaBarra(), 'gap-1 pl-3.5 pr-1.5')}>
+                {avisoPendiente}
+                {fechaVersion}
+                {controlesTemaAyuda}
+              </div>
+              <div className={cn(claseCapsulaBarra(), 'gap-2 pl-3.5 pr-1')}>
+                {identidadUsuario}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Mobile: title centrado + hamburgesa para rutas secundarias */}
+              <div className="flex-1 flex items-center lg:hidden">
+                {currentPageName && (
+                  <span className="text-sm font-semibold truncate">{currentPageName}</span>
+                )}
+              </div>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 -mr-2 hover:bg-muted rounded-card text-muted-foreground"
+                aria-label="Abrir menú completo"
+                aria-expanded={sidebarOpen}
+              >
+                <Menu className="h-5 w-5" />
               </button>
-            )}
-            {/* Colapsado: solo cabe la fecha. El resto, en el tooltip. */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded-ctl">
-              <span className="tabular-nums" title={versionTooltip}>{formatBuildDateShort()}</span>
-              {isAdmin && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={reload}
-                  title="Forzar actualización"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-            <BotonLectura />
-            <button
-              onClick={toggleTheme}
-              title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
-              className="p-1.5 rounded-card transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-            <HelpButton />
-            <span className="text-sm text-muted-foreground">
-              {user?.nombre} {user?.apellido}
-            </span>
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary/10 text-brand-ink text-xs">
-                {userInitials}
-              </AvatarFallback>
-            </Avatar>
-          </div>
+
+              <div className="hidden lg:flex flex-1" />
+
+              {botonGantt}
+
+              {/* Desktop user menu */}
+              <div className="hidden lg:flex items-center gap-3">
+                {botonBuscar(false)}
+                {avisoPendiente}
+                {/* Colapsado: solo cabe la fecha. El resto, en el tooltip. */}
+                {fechaVersion}
+                {controlesTemaAyuda}
+                {identidadUsuario}
+              </div>
+            </>
+          )}
         </header>
 
         {/* Syncing banner (mobile) */}
@@ -1390,6 +1499,8 @@ export function MainLayout() {
           </button>
         </div>
       </nav>
+
+      <BuscadorRapido open={buscadorAbierto} onOpenChange={setBuscadorAbierto} paginas={paginasBuscador} />
     </div>
   )
 }
