@@ -52,4 +52,19 @@ function construirIndice(docs) {
   return m
 }
 
-module.exports = { COLECCION, DOC, esSap, entradaDe, cambiosIndice, construirIndice }
+/**
+ * Argumentos para `ref.update(...)`: pares (FieldPath, valor) en una lista plana.
+ *
+ * Un FieldPath NO puede ir como clave de un objeto: JS lo pasa a texto («m.`3300135877`»)
+ * y Firestore guarda la clave con las comillas invertidas. Así quedaron 706 entradas
+ * sucias en el índice (11-11-2026) y los BORRAR nunca encontraban la entrada limpia.
+ */
+function argumentosUpdate(cambios, { FieldPath, borrar, ahora }) {
+  const args = ['actualizadoEn', ahora]
+  for (const [ruta, valor] of Object.entries(cambios)) {
+    args.push(new FieldPath(...ruta.split('.')), valor === 'BORRAR' ? borrar : valor)
+  }
+  return args
+}
+
+module.exports = { COLECCION, DOC, esSap, entradaDe, cambiosIndice, construirIndice, argumentosUpdate }
