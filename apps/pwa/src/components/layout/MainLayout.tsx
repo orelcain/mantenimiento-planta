@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Suspense } from 'react'
 import {
@@ -34,6 +34,7 @@ import {
   Plus,
   NotebookPen,
   SearchCheck,
+  Search,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -73,6 +74,8 @@ import {
 } from './navVidrio'
 import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
 import { useContadorVistas } from '@/hooks/useContadorVistas'
+import { useAtajoBuscador, etiquetaAtajo } from '@/hooks/useAtajoBuscador'
+import { BuscadorRapido } from '@/components/buscador/BuscadorRapido'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
@@ -475,6 +478,17 @@ export function MainLayout() {
   // Flat list for compatibility (currentPageName, etc.)
   const allNavigation = visibleGroups.flatMap(g => g.items)
 
+  // Buscador rápido (Ctrl+K / ⌘K): las páginas son las mismas que el usuario ve en el menú.
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false)
+  const alternarBuscador = useCallback(() => setBuscadorAbierto(v => !v), [])
+  useAtajoBuscador(alternarBuscador)
+  const clavePaginas = visibleGroups.map(g => `${g.label}:${g.items.map(i => `${i.name}=${i.href}`).join(',')}`).join('|')
+  const paginasBuscador = useMemo(
+    () => visibleGroups.flatMap(g => g.items.map(i => ({ name: i.name, href: i.href, grupo: g.label }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- la clave resume visibleGroups, que se rehace en cada render
+    [clavePaginas],
+  )
+
   // Collapsible group state (persisted in localStorage)
   const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => {
     try {
@@ -638,6 +652,23 @@ export function MainLayout() {
         </AvatarFallback>
       </Avatar>
     </>
+  )
+  // Botón «Buscar» de la barra de PC: en la piel de vidrio va en su propia cápsula.
+  const botonBuscar = (enCapsula: boolean) => (
+    <button
+      type="button"
+      onClick={() => setBuscadorAbierto(true)}
+      className={cn(
+        'flex items-center gap-2 text-subhead text-muted-foreground transition-colors hover:text-foreground',
+        enCapsula ? cn(claseCapsulaBarra(), 'pl-3.5 pr-4') : 'h-8 rounded-[8px] bg-muted px-2.5',
+      )}
+      aria-label="Buscar en la app"
+      aria-keyshortcuts="Control+K Meta+K"
+    >
+      <Search className="h-4 w-4" />
+      <span>Buscar</span>
+      <kbd className="ml-3 font-sans text-footnote">{etiquetaAtajo()}</kbd>
+    </button>
   )
   const botonGantt = (
     isGanttRoute && (
@@ -841,6 +872,14 @@ export function MainLayout() {
                   <span className="font-semibold">Mantenimiento</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => { setSidebarOpen(false); setBuscadorAbierto(true) }}
+                    className="p-1.5 rounded-card text-muted-foreground hover:text-foreground hover:bg-muted"
+                    aria-label="Buscar en la app"
+                  >
+                    <Search className="h-5 w-5" />
+                  </button>
                   <BotonLectura iconClassName="h-5 w-5" />
                   <button
                     onClick={toggleTheme}
@@ -994,6 +1033,7 @@ export function MainLayout() {
               </div>
               <div className="hidden lg:flex flex-1" />
               {botonGantt}
+              {botonBuscar(true)}
               <div className={cn(claseCapsulaBarra(), 'gap-1 pl-3.5 pr-1.5')}>
                 {avisoPendiente}
                 {fechaVersion}
@@ -1026,6 +1066,7 @@ export function MainLayout() {
 
               {/* Desktop user menu */}
               <div className="hidden lg:flex items-center gap-3">
+                {botonBuscar(false)}
                 {avisoPendiente}
                 {/* Colapsado: solo cabe la fecha. El resto, en el tooltip. */}
                 {fechaVersion}
@@ -1458,6 +1499,8 @@ export function MainLayout() {
           </button>
         </div>
       </nav>
+
+      <BuscadorRapido open={buscadorAbierto} onOpenChange={setBuscadorAbierto} paginas={paginasBuscador} />
     </div>
   )
 }

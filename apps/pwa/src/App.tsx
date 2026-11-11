@@ -37,6 +37,7 @@ const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurno
 const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuertaDevPage'))
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
 const BitacoraRealDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraRealDevPage })))
+const BuscadorDevPage = lazyWithReload(() => import('@/pages/dev/BuscadorDevPage').then((mod) => ({ default: mod.BuscadorDevPage })))
 const PaseBitacoraDevPage = lazyWithReload(() => import('@/pages/dev/PaseBitacoraDevPage').then((mod) => ({ default: mod.PaseBitacoraDevPage })))
 const AcrDevPage = lazyWithReload(() => import('@/pages/dev/AcrDevPage').then((mod) => ({ default: mod.AcrDevPage })))
 const PendientesDevPage = lazyWithReload(() => import('@/pages/dev/PendientesDevPage').then((mod) => ({ default: mod.PendientesDevPage })))
@@ -583,6 +584,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <BitacoraRealDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/buscador"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <BuscadorDevPage />
                     </Suspense>
                   }
                 />
