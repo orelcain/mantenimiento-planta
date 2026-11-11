@@ -21,6 +21,10 @@
     ],
     "rewrites": [
       {
+        "source": "/mantenimiento-planta/**",
+        "destination": "/mantenimiento-planta/index.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
