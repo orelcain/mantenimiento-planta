@@ -17,6 +17,9 @@ import { bitacoraATextoWhatsapp, planLaminas } from '@/services/bitacora/bitacor
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
 import { BitacoraExpedientePC } from '@/components/bitacora/BitacoraExpedientePC'
 import { useEsPC } from '@/hooks/useEsPC'
+import { useEsTelefono } from '@/hooks/useEsTelefono'
+import { tituloTurno } from '@/services/bitacora/tituloTurno'
+import { totalesTurno } from '@/components/bitacora/expedienteBitacora'
 import { BarraSincronizacion } from '@/components/bitacora/BarraSincronizacion'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
 import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
@@ -231,6 +234,7 @@ export function BitacoraTurnoVista({
   /** Hoja de WhatsApp del celular. */
   const [hojaWhatsapp, setHojaWhatsapp] = useState(false)
   const [hojaCompartir, setHojaCompartir] = useState(false)
+  const [hojaPlanilla, setHojaPlanilla] = useState(false)
   /** El título grande salió de la pantalla: se muestra la barra compacta (iOS 27). */
   const [compacta, setCompacta] = useState(false)
   const cabeceraRef = useRef<HTMLElement>(null)
@@ -731,6 +735,7 @@ export function BitacoraTurnoVista({
       acciones={accionesDe(e)}
       asa={tieneHora(e) || esBorrador(e) ? undefined : asaDe(e)}
       desplazamiento={arrastre?.id === e.id ? arrastre.dy : null}
+      compacta={registroCel}
     />
   )
 
@@ -829,6 +834,10 @@ export function BitacoraTurnoVista({
   // Post-aseo, la tablet y el teléfono siguen como estaban.
   const esPC = useEsPC()
   const expedientePC = esPC && vista === 'turno'
+  // Teléfono (< 768 px): la pestaña Turno es un registro corrido, una línea por trabajo
+  // (opción A, Orel 10-11-2026). Las cifras completas y la planilla MTTR van en una hoja.
+  const esTelefono = useEsTelefono()
+  const registroCel = esTelefono && vista === 'turno'
   const cambiarVista = (v: 'turno' | 'inspeccion' | 'rutas') => {
     setVista(v)
     setParams(
@@ -1042,6 +1051,144 @@ export function BitacoraTurnoVista({
           )}
     </>
   )
+
+  // Resumen del turno: los números que demuestran el trabajo. `cel` (grilla) y `pc` (lista).
+  const bloqueResumen = (() => {
+        const rotulo = (texto: ReactNode, punto?: 'ok' | 'warn' | 'crit') => (
+          <span className="inline-flex items-center gap-2 text-footnote font-normal text-muted-foreground">
+            {punto && <span className={`size-2 shrink-0 rounded-full ${PUNTO[punto]}`} aria-hidden />}
+            {texto}
+          </span>
+        )
+        const cifra = (texto: string) => <span className="text-headline">{texto}</span>
+        // Paradas y fallas ya NO son lo mismo: una parada programada para un
+        // preventivo detiene la máquina y no es una falla (18-09-2026).
+        const paradas = `${r.conParada} ${r.conParada === 1 ? 'parada' : 'paradas'}`
+        const fallas = `${r.fallas} ${r.fallas === 1 ? 'falla' : 'fallas'}`
+        const operando = minutosOperando(minutosDelTurno(turno), r.minutosParada)
+        const mtbf = mtbfDelTurno(turno, r)
+        // Teléfono: las cifras en grilla de 3 (como la tarjeta de Inicio). La lista de 7
+        // filas altas ocupaba una pantalla entera y explicaba el MTTR tres veces; la
+        // explicación queda una sola vez, bajo la planilla MTTR (pasada visual 19-09).
+        const celdas: { id: string; rotulo: string; valor: string; punto?: 'ok' | 'warn' | 'crit' }[] = [
+          { id: 'eventos', rotulo: 'eventos', valor: String(r.eventos) },
+          { id: 'parada', rotulo: r.conParada > 0 ? `de parada · ${paradas}` : 'de parada', valor: formatoMinutos(r.minutosParada), punto: r.minutosParada > 0 ? 'crit' : undefined },
+          ...(r.fallas > 0 ? [{ id: 'fallas', rotulo: r.fallas === 1 ? 'falla' : 'fallas', valor: String(r.fallas), punto: 'crit' as const }] : []),
+          ...(r.afectados > 0 ? [{ id: 'afectados', rotulo: 'siguió gracias a Mantención', valor: String(r.afectados), punto: 'warn' as const }] : []),
+          { id: 'ventana', rotulo: 'sin detener producción', valor: String(r.enVentana), punto: r.enVentana > 0 ? 'ok' : undefined },
+          {
+            id: 'pendientes',
+            rotulo: r.pendientesCerrados > 0 ? `pendientes · ${r.pendientesCerrados} ${r.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}` : 'pendientes',
+            valor: String(r.pendientesDelTurno),
+            punto: r.pendientes > 0 ? 'warn' : r.pendientesCerrados > 0 ? 'ok' : undefined,
+          },
+          { id: 'mttr', rotulo: 'MTTR', valor: r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin) },
+          { id: 'mtbf', rotulo: 'MTBF', valor: mtbf == null ? '—' : formatoMinutos(mtbf) },
+        ]
+        return {
+          cel: (
+          <section aria-label="Resumen del turno" className="flex flex-col md:hidden">
+            <h3 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">Resumen del turno</h3>
+            <dl className="grid grid-cols-3 gap-x-3 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+              {celdas.map((c) => (
+                <div key={c.id} className="flex min-w-0 flex-col-reverse gap-0.5">
+                  <dt className="flex items-start gap-1.5 text-footnote leading-tight text-muted-foreground">
+                    {c.punto && <span className={`mt-[0.3em] size-2 shrink-0 rounded-full ${PUNTO[c.punto]}`} aria-hidden />}
+                    <span className="min-w-0">{c.rotulo}</span>
+                  </dt>
+                  <dd className="text-headline tabular-nums">{c.valor}</dd>
+                </div>
+              ))}
+            </dl>
+            {r.fallas === 0 && <p className="px-4 pt-2 text-footnote text-muted-foreground">Sin fallas en el turno: MTTR y MTBF no aplican.</p>}
+          </section>
+          ),
+          pc: (
+          <ListGroup
+            className="hidden md:flex"
+            aria-label="Resumen del turno"
+            title="Resumen del turno"
+            footer={
+              // El pie explica el MTBF, así que se muestra cuando hay FALLAS: con
+              // solo paradas programadas no hay nada que explicar.
+              r.fallas > 0
+                ? `Operando = ${formatoMinutos(minutosDelTurno(turno))} de turno − ${formatoMinutos(MINUTOS_SIN_PRODUCCION_POR_TURNO)} sin producción (colación, reunión, ejercicios) − paradas.`
+                : 'Sin fallas en el turno: MTTR y MTBF no aplican.'
+            }
+          >
+            <ListCell title={rotulo('Eventos')} value={cifra(String(r.eventos))} />
+            <ListCell
+              title={rotulo(
+                <>
+                  Parada{r.conParada > 0 && <span className="text-muted-foreground/70"> · {paradas}{r.paradasSinDuracion > 0 ? `, ${r.paradasSinDuracion} sin duración` : ''}</span>}
+                </>,
+                r.minutosParada > 0 ? 'crit' : undefined,
+              )}
+              value={cifra(formatoMinutos(r.minutosParada))}
+            />
+            {/* La falla NO se pregunta: es un correctivo que afectó al proceso. */}
+            {r.fallas > 0 && (
+              <ListCell
+                title={rotulo(
+                  <>
+                    Fallas<span className="text-muted-foreground/70"> · MTTR {r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)}</span>
+                  </>,
+                  'crit',
+                )}
+                value={cifra(String(r.fallas))}
+              />
+            )}
+            {/* Solo si hubo: una fila en cero todos los turnos se vuelve invisible. */}
+            {r.afectados > 0 && (
+              <ListCell
+                title={rotulo('Siguió gracias a Mantención', 'warn')}
+                value={cifra(String(r.afectados))}
+              />
+            )}
+            <ListCell title={rotulo('Sin detener producción', r.enVentana > 0 ? 'ok' : undefined)} value={cifra(String(r.enVentana))} />
+            <ListCell
+              title={rotulo(
+                <>
+                  Pendientes{r.pendientesCerrados > 0 && <span className="text-muted-foreground/70"> · {r.pendientesCerrados} {r.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}</span>}
+                </>,
+                r.pendientes > 0 ? 'warn' : r.pendientesCerrados > 0 ? 'ok' : undefined,
+              )}
+              value={cifra(String(r.pendientesDelTurno))}
+            />
+            <ListCell
+              title={rotulo('MTTR')}
+              subtitle={r.mttrMin != null ? `${formatoMinutos(r.minutosFalla)} de parada por falla ÷ ${fallas}` : 'tiempo promedio en reparar cada falla'}
+              value={cifra(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin))}
+            />
+            <ListCell
+              title={rotulo('MTBF')}
+              subtitle={mtbf != null ? `${formatoMinutos(operando)} operando ÷ ${fallas}` : 'tiempo promedio operando entre fallas'}
+              value={cifra(mtbf == null ? '—' : formatoMinutos(mtbf))}
+            />
+          </ListGroup>
+          ),
+        }
+  })()
+
+  const planillaMttr = !cargando && r.eventos > 0 ? (
+        <section aria-label="Recolección MTTR" className="flex flex-col gap-2 md:hidden">
+          <div className="flex items-center justify-between gap-2 px-4">
+            <h2 className="text-caption font-semibold text-muted-foreground">Recolección MTTR · así va arriba del correo</h2>
+            <Button variant="plain" size="sm" onClick={() => void bajarExcel()} disabled={!!trabajando}>
+              {trabajando === 'excel' ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Bajar Excel
+            </Button>
+          </div>
+          {/* Fondo blanco fijo a propósito: es la planilla, no una superficie de la app. */}
+          <div
+            // En el teléfono la planilla no se aprieta: conserva su ancho y se desplaza de lado.
+            className="overflow-x-auto rounded-card p-2 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [&_table]:min-w-[760px]"
+            style={{ background: '#FFFFFF' }}
+            dangerouslySetInnerHTML={{ __html: htmlMttr }}
+          />
+          {/* Las siglas de la planilla con su definición y su cálculo (Orel, 18-09). */}
+          <p className="px-4 text-footnote text-muted-foreground">{explicacionMtbfMttr(turno, r)}</p>
+        </section>
+  ) : null
 
   return (
     // «Nuevo evento» ya no va en una barra fija: lo abre el «+» de la barra de
@@ -1495,120 +1642,8 @@ export function BitacoraTurnoVista({
       </ListGroup>
 
       {/* Resumen del turno: los números que demuestran el trabajo. */}
-      {(() => {
-        const rotulo = (texto: ReactNode, punto?: 'ok' | 'warn' | 'crit') => (
-          <span className="inline-flex items-center gap-2 text-footnote font-normal text-muted-foreground">
-            {punto && <span className={`size-2 shrink-0 rounded-full ${PUNTO[punto]}`} aria-hidden />}
-            {texto}
-          </span>
-        )
-        const cifra = (texto: string) => <span className="text-headline">{texto}</span>
-        // Paradas y fallas ya NO son lo mismo: una parada programada para un
-        // preventivo detiene la máquina y no es una falla (18-09-2026).
-        const paradas = `${r.conParada} ${r.conParada === 1 ? 'parada' : 'paradas'}`
-        const fallas = `${r.fallas} ${r.fallas === 1 ? 'falla' : 'fallas'}`
-        const operando = minutosOperando(minutosDelTurno(turno), r.minutosParada)
-        const mtbf = mtbfDelTurno(turno, r)
-        // Teléfono: las cifras en grilla de 3 (como la tarjeta de Inicio). La lista de 7
-        // filas altas ocupaba una pantalla entera y explicaba el MTTR tres veces; la
-        // explicación queda una sola vez, bajo la planilla MTTR (pasada visual 19-09).
-        const celdas: { id: string; rotulo: string; valor: string; punto?: 'ok' | 'warn' | 'crit' }[] = [
-          { id: 'eventos', rotulo: 'eventos', valor: String(r.eventos) },
-          { id: 'parada', rotulo: r.conParada > 0 ? `de parada · ${paradas}` : 'de parada', valor: formatoMinutos(r.minutosParada), punto: r.minutosParada > 0 ? 'crit' : undefined },
-          ...(r.fallas > 0 ? [{ id: 'fallas', rotulo: r.fallas === 1 ? 'falla' : 'fallas', valor: String(r.fallas), punto: 'crit' as const }] : []),
-          ...(r.afectados > 0 ? [{ id: 'afectados', rotulo: 'siguió gracias a Mantención', valor: String(r.afectados), punto: 'warn' as const }] : []),
-          { id: 'ventana', rotulo: 'sin detener producción', valor: String(r.enVentana), punto: r.enVentana > 0 ? 'ok' : undefined },
-          {
-            id: 'pendientes',
-            rotulo: r.pendientesCerrados > 0 ? `pendientes · ${r.pendientesCerrados} ${r.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}` : 'pendientes',
-            valor: String(r.pendientesDelTurno),
-            punto: r.pendientes > 0 ? 'warn' : r.pendientesCerrados > 0 ? 'ok' : undefined,
-          },
-          { id: 'mttr', rotulo: 'MTTR', valor: r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin) },
-          { id: 'mtbf', rotulo: 'MTBF', valor: mtbf == null ? '—' : formatoMinutos(mtbf) },
-        ]
-        return (
-          <>
-          <section aria-label="Resumen del turno" className="flex flex-col md:hidden">
-            <h3 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">Resumen del turno</h3>
-            <dl className="grid grid-cols-3 gap-x-3 gap-y-4 rounded-card bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-              {celdas.map((c) => (
-                <div key={c.id} className="flex min-w-0 flex-col-reverse gap-0.5">
-                  <dt className="flex items-start gap-1.5 text-footnote leading-tight text-muted-foreground">
-                    {c.punto && <span className={`mt-[0.3em] size-2 shrink-0 rounded-full ${PUNTO[c.punto]}`} aria-hidden />}
-                    <span className="min-w-0">{c.rotulo}</span>
-                  </dt>
-                  <dd className="text-headline tabular-nums">{c.valor}</dd>
-                </div>
-              ))}
-            </dl>
-            {r.fallas === 0 && <p className="px-4 pt-2 text-footnote text-muted-foreground">Sin fallas en el turno: MTTR y MTBF no aplican.</p>}
-          </section>
-          <ListGroup
-            className="hidden md:flex"
-            aria-label="Resumen del turno"
-            title="Resumen del turno"
-            footer={
-              // El pie explica el MTBF, así que se muestra cuando hay FALLAS: con
-              // solo paradas programadas no hay nada que explicar.
-              r.fallas > 0
-                ? `Operando = ${formatoMinutos(minutosDelTurno(turno))} de turno − ${formatoMinutos(MINUTOS_SIN_PRODUCCION_POR_TURNO)} sin producción (colación, reunión, ejercicios) − paradas.`
-                : 'Sin fallas en el turno: MTTR y MTBF no aplican.'
-            }
-          >
-            <ListCell title={rotulo('Eventos')} value={cifra(String(r.eventos))} />
-            <ListCell
-              title={rotulo(
-                <>
-                  Parada{r.conParada > 0 && <span className="text-muted-foreground/70"> · {paradas}{r.paradasSinDuracion > 0 ? `, ${r.paradasSinDuracion} sin duración` : ''}</span>}
-                </>,
-                r.minutosParada > 0 ? 'crit' : undefined,
-              )}
-              value={cifra(formatoMinutos(r.minutosParada))}
-            />
-            {/* La falla NO se pregunta: es un correctivo que afectó al proceso. */}
-            {r.fallas > 0 && (
-              <ListCell
-                title={rotulo(
-                  <>
-                    Fallas<span className="text-muted-foreground/70"> · MTTR {r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)}</span>
-                  </>,
-                  'crit',
-                )}
-                value={cifra(String(r.fallas))}
-              />
-            )}
-            {/* Solo si hubo: una fila en cero todos los turnos se vuelve invisible. */}
-            {r.afectados > 0 && (
-              <ListCell
-                title={rotulo('Siguió gracias a Mantención', 'warn')}
-                value={cifra(String(r.afectados))}
-              />
-            )}
-            <ListCell title={rotulo('Sin detener producción', r.enVentana > 0 ? 'ok' : undefined)} value={cifra(String(r.enVentana))} />
-            <ListCell
-              title={rotulo(
-                <>
-                  Pendientes{r.pendientesCerrados > 0 && <span className="text-muted-foreground/70"> · {r.pendientesCerrados} {r.pendientesCerrados === 1 ? 'cerrado' : 'cerrados'}</span>}
-                </>,
-                r.pendientes > 0 ? 'warn' : r.pendientesCerrados > 0 ? 'ok' : undefined,
-              )}
-              value={cifra(String(r.pendientesDelTurno))}
-            />
-            <ListCell
-              title={rotulo('MTTR')}
-              subtitle={r.mttrMin != null ? `${formatoMinutos(r.minutosFalla)} de parada por falla ÷ ${fallas}` : 'tiempo promedio en reparar cada falla'}
-              value={cifra(r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin))}
-            />
-            <ListCell
-              title={rotulo('MTBF')}
-              subtitle={mtbf != null ? `${formatoMinutos(operando)} operando ÷ ${fallas}` : 'tiempo promedio operando entre fallas'}
-              value={cifra(mtbf == null ? '—' : formatoMinutos(mtbf))}
-            />
-          </ListGroup>
-          </>
-        )
-      })()}
+      {!registroCel && bloqueResumen.cel}
+      {bloqueResumen.pc}
 
       {/* Observación general del turno (del mockup aprobado): una fila con chevron. */}
       <ListGroup aria-label="Observación general del turno" title="Observación general">
@@ -1634,25 +1669,7 @@ export function BitacoraTurnoVista({
 
       {/* La planilla «Recoleccion MTTR» tal como va ARRIBA del correo, llenándose con
           cada evento publicado: se ve en tiempo real cómo quedará (Orel, 17-09-2026). */}
-      {!cargando && r.eventos > 0 && (
-        <section aria-label="Recolección MTTR" className="flex flex-col gap-2 md:hidden">
-          <div className="flex items-center justify-between gap-2 px-4">
-            <h2 className="text-caption font-semibold text-muted-foreground">Recolección MTTR · así va arriba del correo</h2>
-            <Button variant="plain" size="sm" onClick={() => void bajarExcel()} disabled={!!trabajando}>
-              {trabajando === 'excel' ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Bajar Excel
-            </Button>
-          </div>
-          {/* Fondo blanco fijo a propósito: es la planilla, no una superficie de la app. */}
-          <div
-            // En el teléfono la planilla no se aprieta: conserva su ancho y se desplaza de lado.
-            className="overflow-x-auto rounded-card p-2 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [&_table]:min-w-[760px]"
-            style={{ background: '#FFFFFF' }}
-            dangerouslySetInnerHTML={{ __html: htmlMttr }}
-          />
-          {/* Las siglas de la planilla con su definición y su cálculo (Orel, 18-09). */}
-          <p className="px-4 text-footnote text-muted-foreground">{explicacionMtbfMttr(turno, r)}</p>
-        </section>
-      )}
+      {!registroCel && planillaMttr}
 
       {/* HIG «Typography»: la letra sigue el tamaño del teléfono. En iPhone lo lee
           solo; en Android se elige aquí (19-09-2026, capturas al 100/124/135 %). */}
@@ -1684,6 +1701,30 @@ export function BitacoraTurnoVista({
 
         {/* Línea de tiempo */}
         <section aria-label="Eventos del turno" className="order-2 flex flex-col gap-5 md:order-none md:[grid-area:centro]">
+          {/* Teléfono: el título dice qué pasó y tres cifras lo respaldan; tocarlas abre
+              las cifras completas y la planilla MTTR. */}
+          {registroCel && !cargando && eventos.length > 0 && (
+            <div className="flex flex-col gap-2.5 px-1">
+              <h2 className="text-[22px] font-semibold leading-tight">{tituloTurno(r, fotosPublicadas)}</h2>
+              <button
+                type="button"
+                onClick={() => setHojaPlanilla(true)}
+                aria-label="Ver las cifras del turno y la planilla MTTR"
+                className="grid grid-cols-3 border-t border-border pt-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {[
+                  { valor: formatoMinutos(r.minutosParada), rotulo: 'detención', tono: r.minutosParada > 0 ? 'text-ink-crit' : '' },
+                  { valor: String(r.fallas), rotulo: r.fallas === 1 ? 'falla' : 'fallas', tono: r.fallas > 0 ? 'text-ink-crit' : '' },
+                  { valor: String(r.pendientesDelTurno), rotulo: r.pendientesDelTurno === 1 ? 'pendiente' : 'pendientes', tono: r.pendientesDelTurno > 0 ? 'text-ink-warn' : '' },
+                ].map((c) => (
+                  <span key={c.rotulo} className="flex flex-col text-footnote text-muted-foreground">
+                    <span className={`text-headline tabular-nums ${c.tono || 'text-foreground'}`}>{c.valor}</span>
+                    {c.rotulo}
+                  </span>
+                ))}
+              </button>
+            </div>
+          )}
           {cargando ? (
             <div className="flex flex-col gap-2 rounded-card bg-card p-4">
               {[0, 1, 2].map((i) => (
@@ -1705,13 +1746,29 @@ export function BitacoraTurnoVista({
             <>
               {(grupos.hechos.length > 0 || borradores.length > 0) && (
                 <div className="flex flex-col">
-                  <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
-                    Eventos del turno{grupos.hechos.length > 0 && <span className="font-normal tabular-nums"> · {grupos.hechos.length}</span>}
-                  </h2>
-                  <div ref={listaRef} className="relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+                  {!registroCel && (
+                    <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
+                      Eventos del turno{grupos.hechos.length > 0 && <span className="font-normal tabular-nums"> · {grupos.hechos.length}</span>}
+                    </h2>
+                  )}
+                  <div ref={listaRef} className={registroCel ? LISTA_CEL : 'relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none'}>
                     {indicadorArrastre(false)}
                     {[...grupos.hechos, ...borradores].map(filaDe)}
                   </div>
+                  {/* La tabla cierra con su total (criterio limpio y profesional). */}
+                  {registroCel && r.eventos > 0 && (() => {
+                    const t = totalesTurno(soloListos(eventos))
+                    return (
+                      <p className="flex justify-between gap-3 px-4 pt-2 text-footnote tabular-nums text-muted-foreground">
+                        <span>
+                          {r.eventos} {r.eventos === 1 ? 'trabajo' : 'trabajos'} · {t.equipos} {t.equipos === 1 ? 'equipo' : 'equipos'} · {t.tecnicos} {t.tecnicos === 1 ? 'técnico' : 'técnicos'}
+                        </span>
+                        <span>
+                          {t.fotos} {t.fotos === 1 ? 'foto' : 'fotos'}
+                        </span>
+                      </p>
+                    )
+                  })()}
                 </div>
               )}
               {grupos.pendientes.length > 0 && (
@@ -1720,7 +1777,7 @@ export function BitacoraTurnoVista({
                     <span className="size-2 shrink-0 rounded-full bg-ink-warn" aria-hidden />
                     Pendiente para el turno siguiente<span className="font-normal tabular-nums"> · {grupos.pendientes.length}</span>
                   </h2>
-                  <div ref={listaPendientesRef} className="relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+                  <div ref={listaPendientesRef} className={registroCel ? LISTA_CEL : 'relative overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none'}>
                     {indicadorArrastre(true)}
                     {grupos.pendientes.map(filaDe)}
                   </div>
@@ -1807,7 +1864,33 @@ export function BitacoraTurnoVista({
           setHojaCompartir(false)
           void bajarExcel()
         }}
+        onPlanilla={
+          esTelefono
+            ? () => {
+                setHojaCompartir(false)
+                setHojaPlanilla(true)
+              }
+            : undefined
+        }
       />
+
+      {/* Teléfono: las cifras completas y la planilla MTTR, fuera de la página (opción A). */}
+      <Sheet
+        open={hojaPlanilla}
+        onClose={() => setHojaPlanilla(false)}
+        title="Cifras y planilla MTTR"
+        description={etiquetaCortaTurno(turno.id)}
+        actions={
+          <Button variant="tinted" onClick={() => setHojaPlanilla(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <div className="flex flex-col gap-5">
+          {bloqueResumen.cel}
+          {planillaMttr}
+        </div>
+      </Sheet>
 
 
       <Sheet
@@ -2033,6 +2116,9 @@ const PUNTO = { ok: 'bg-ink-ok', warn: 'bg-ink-warn', crit: 'bg-ink-crit' } as c
 
 /** Cuánto dura «Deshacer» después de borrar un evento. */
 const PLAZO_DESHACER_MS = 5000
+
+/** Teléfono: la lista del turno va con filetes, a lo ancho, sin tarjeta (opción A, 10-11-2026). */
+const LISTA_CEL = 'relative -mx-4 overflow-hidden border-y border-border'
 
 /** Historial, Compartir y QR como íconos en una cápsula de vidrio (teléfono). */
 function AccionesCabecera({
