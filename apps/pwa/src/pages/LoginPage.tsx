@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Wrench, LogIn, UserPlus } from 'lucide-react'
+import { Wrench, LogIn, UserPlus, ShieldCheck } from 'lucide-react'
+import type { MultiFactorResolver } from 'firebase/auth'
+import { Campo2FA } from '@/components/auth/Campo2FA'
+import { pideSegundoPaso, resolverDe, resolverConCodigo, codigoCompleto, mensajeError2FA } from '@/services/mfa'
 import {
   Card,
   CardContent,
@@ -14,8 +17,9 @@ import {
   Switch,
 } from '@/components/ui'
 import { 
-  signIn, 
-  signUpWithInviteCode, 
+  signIn,
+  completarIngreso,
+  signUpWithInviteCode,
   initGoogleSignIn, 
   renderGoogleButton,
   setAuthPersistence
@@ -55,6 +59,43 @@ export function LoginPage() {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+
+  // Segundo paso (2FA): la contraseña ya fue correcta y falta el código de la app.
+  const [resolver2FA, setResolver2FA] = useState<MultiFactorResolver | null>(null)
+  const [codigo2FA, setCodigo2FA] = useState('')
+
+  const handleCodigo2FA = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resolver2FA || !codigoCompleto(codigo2FA)) return
+    if (authFailureLimiter.isBlocked()) {
+      const waitSec = Math.ceil(authFailureLimiter.timeUntilNext() / 1000)
+      setError(`Demasiados intentos fallidos. Espera ${waitSec}s antes de intentar de nuevo.`)
+      return
+    }
+    setIsLoading(true)
+    setError(null)
+    try {
+      const cred = await resolverConCodigo(resolver2FA, codigo2FA)
+      const user = await completarIngreso(cred.user)
+      setUser(user)
+      authFailureLimiter.reset()
+      logger.info('login con 2FA OK', { userId: user.id })
+      navigate(redirectTo)
+    } catch (err) {
+      authFailureLimiter.recordFailure() // un código errado cuenta como intento fallido
+      setCodigo2FA('')
+      setError(mensajeError2FA(err))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const cancelar2FA = () => {
+    setResolver2FA(null)
+    setCodigo2FA('')
+    setPassword('')
+    setError(null)
+  }
 
   // Manejar persistencia
   useEffect(() => {
@@ -161,6 +202,12 @@ export function LoginPage() {
       logger.info(`${mode} successful`, { userId: user.id, email: user.email })
       navigate(redirectTo)
     } catch (err: unknown) {
+      if (mode === 'login' && pideSegundoPaso(err)) {
+        // La contraseña fue correcta: no es un fallo. Falta el código de la app.
+        setResolver2FA(resolverDe(err))
+        setCodigo2FA('')
+        return
+      }
       authFailureLimiter.recordFailure() // solo los fallos reales consumen intentos
       const errorObj = err instanceof Error ? err : new Error('Authentication error')
       logger.error('Auth error', errorObj)
@@ -185,7 +232,9 @@ export function LoginPage() {
             Mantenimiento Industrial
           </CardTitle>
           <CardDescription>
-            {mode === 'login'
+            {resolver2FA
+              ? 'Escribe el código de 6 dígitos que muestra tu app autenticadora'
+              : mode === 'login'
               ? 'Ingresa tus credenciales para continuar'
               : 'Registra tu cuenta con el código de invitación'}
           </CardDescription>
@@ -197,6 +246,30 @@ export function LoginPage() {
         </CardHeader>
 
         <CardContent>
+          {resolver2FA && (
+            <form onSubmit={handleCodigo2FA} className="space-y-4">
+              <Campo2FA valor={codigo2FA} onCambio={setCodigo2FA} deshabilitado={isLoading} />
+              {error && (
+                <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-ctl">
+                  {error}
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={isLoading || !codigoCompleto(codigo2FA)}>
+                {isLoading ? <Spinner size="sm" /> : (<><ShieldCheck className="h-4 w-4" />Verificar</>)}
+              </Button>
+              <button
+                type="button"
+                onClick={cancelar2FA}
+                disabled={isLoading}
+                className="inline-flex min-h-[44px] w-full items-center justify-center rounded-ctl px-3 text-sm text-muted-foreground transition-colors hover:text-brand-ink"
+              >
+                Volver a la contraseña
+              </button>
+            </form>
+          )}
+          {/* Se oculta (no se desmonta) durante el 2FA: el botón de Google se
+              dibuja una sola vez al montar y desaparecería al volver. */}
+          <div className={resolver2FA ? 'hidden' : undefined}>
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
               <>
@@ -306,7 +379,7 @@ export function LoginPage() {
               </div>
             )}
 
-            {error && (
+            {error && !resolver2FA && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-ctl">
                 {error}
               </div>
@@ -363,6 +436,7 @@ export function LoginPage() {
                 ? '¿Tienes un código de invitación? Regístrate'
                 : '¿Ya tienes cuenta? Inicia sesión'}
             </button>
+          </div>
           </div>
         </CardContent>
       </Card>

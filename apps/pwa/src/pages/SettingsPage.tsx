@@ -70,9 +70,10 @@ import { ProcessNotificationsPanel } from '@/components/settings/ProcessNotifica
 import { PermissionsPage } from '@/pages/admin/PermissionsPage'
 import { AriaMonitorPanel } from '@/components/admin/AriaMonitorPanel'
 import { MissionControlPanel } from '@/components/admin/MissionControlPanel'
-import { Brain, Satellite } from 'lucide-react'
+import { Brain, Satellite, Lock } from 'lucide-react'
+import { SeguridadSettings } from '@/components/settings/SeguridadSettings'
 
-type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'permissions' | 'aria' | 'mission' | 'system'
+type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'seguridad' | 'permissions' | 'aria' | 'mission' | 'system'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -80,9 +81,9 @@ export function SettingsPage() {
 
   const isAdmin = user?.rol === 'admin'
 
-  // Si no es admin, forzar tab de notificaciones
+  // Si no es admin, solo Notificaciones y Seguridad (2FA, auditoría 10-11-2026)
   useEffect(() => {
-    if (!isAdmin && activeTab !== 'notifications') {
+    if (!isAdmin && activeTab !== 'notifications' && activeTab !== 'seguridad') {
       setActiveTab('notifications')
     }
   }, [isAdmin, activeTab])
@@ -94,11 +95,13 @@ export function SettingsPage() {
     { id: 'permissions' as const, label: 'Permisos', icon: Shield },
     { id: 'invites' as const, label: 'Invitaciones', icon: Key },
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
+    { id: 'seguridad' as const, label: 'Seguridad', icon: Lock },
     { id: 'aria' as const, label: 'ARIA', icon: Brain },
     { id: 'mission' as const, label: 'Mission Control', icon: Satellite },
     { id: 'system' as const, label: 'Sistema', icon: Wrench },
   ] : [
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
+    { id: 'seguridad' as const, label: 'Seguridad', icon: Lock },
   ]
 
   return (
@@ -107,12 +110,12 @@ export function SettingsPage() {
       <div className="space-y-1">
         <h1 className="text-title1 font-bold">Configuración</h1>
         <p className="text-subhead text-muted-foreground">
-          {isAdmin ? 'Administra la configuración del sistema' : 'Gestiona tus notificaciones'}
+          {isAdmin ? 'Administra la configuración del sistema' : 'Gestiona tus notificaciones y la seguridad de tu cuenta'}
         </p>
       </div>
 
-      {/* Tabs (solo mostrar si es admin) */}
-      {isAdmin && (
+      {/* Tabs (todos ven al menos Notificaciones y Seguridad) */}
+      {tabs.length > 1 && (
         // Pista cápsula del primitivo (DESIGN.md §5): una sola línea que se desplaza,
         // no ocho botones que se parten en dos filas.
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
@@ -132,6 +135,7 @@ export function SettingsPage() {
       {isAdmin && activeTab === 'permissions' && <PermissionsPage isEmbedded={true} />}
       {isAdmin && activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsPushSettings />}
+      {activeTab === 'seguridad' && <SeguridadSettings />}
       {isAdmin && activeTab === 'aria' && <AriaMonitorPanel />}
       {isAdmin && activeTab === 'mission' && <MissionControlPanel />}
       {isAdmin && activeTab === 'system' && <SystemSettings />}
