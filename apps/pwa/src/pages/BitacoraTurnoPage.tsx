@@ -829,7 +829,6 @@ export function BitacoraTurnoVista({
   // Post-aseo, la tablet y el teléfono siguen como estaban.
   const esPC = useEsPC()
   const expedientePC = esPC && vista === 'turno'
-  const [ventanaEnvio, setVentanaEnvio] = useState(false)
   const cambiarVista = (v: 'turno' | 'inspeccion' | 'rutas') => {
     setVista(v)
     setParams(
@@ -860,8 +859,8 @@ export function BitacoraTurnoVista({
               >
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-headline leading-tight">{p.equipo?.trim() || 'Sin equipo'}</span>
-                  <Tag>{etiquetaTipo(p)}</Tag>
-                  <Pill tone="warning">Pendiente</Pill>
+                  {expedientePC ? <PuntoEstadoPC tono="neutro">{etiquetaTipo(p)}</PuntoEstadoPC> : <Tag>{etiquetaTipo(p)}</Tag>}
+                  {expedientePC ? <PuntoEstadoPC tono="aviso">Pendiente</PuntoEstadoPC> : <Pill tone="warning">Pendiente</Pill>}
                 </div>
                 {tituloDe(p) && <p className="text-body font-semibold">{tituloDe(p)}</p>}
                 <p className="line-clamp-3 whitespace-pre-line text-body">{p.descripcion}</p>
@@ -905,9 +904,9 @@ export function BitacoraTurnoVista({
                   className='relative flex flex-col gap-1.5 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
                 >
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Pill tone="info">En redacción</Pill>
+                    {expedientePC ? <PuntoEstadoPC tono="acento">En redacción</PuntoEstadoPC> : <Pill tone="info">En redacción</Pill>}
                     <span className="text-headline leading-tight">{b.equipo?.trim() || 'Sin equipo todavía'}</span>
-                    <Tag>{etiquetaTipo(b)}</Tag>
+                    {expedientePC ? <PuntoEstadoPC tono="neutro">{etiquetaTipo(b)}</PuntoEstadoPC> : <Tag>{etiquetaTipo(b)}</Tag>}
                   </div>
                   {tituloDe(b) && <p className="text-body font-semibold">{tituloDe(b)}</p>}
                   <p className="line-clamp-3 whitespace-pre-line text-body text-muted-foreground">
@@ -962,15 +961,41 @@ export function BitacoraTurnoVista({
   // ventana de «Compartir».
   const panelEnvio = (
     <>
-          <SegmentedControl
-            ariaLabel="Enviar por correo o por WhatsApp"
-            value={vistaEnvio}
-            onChange={setVistaEnvio}
-            segments={[
-              { value: 'correo', label: 'Correo' },
-              { value: 'whatsapp', label: 'WhatsApp' },
-            ]}
-          />
+          {expedientePC ? (
+            <SegmentoEnvioPC value={vistaEnvio} onChange={setVistaEnvio} />
+          ) : (
+            <SegmentedControl
+              ariaLabel="Enviar por correo o por WhatsApp"
+              value={vistaEnvio}
+              onChange={setVistaEnvio}
+              segments={[
+                { value: 'correo', label: 'Correo' },
+                { value: 'whatsapp', label: 'WhatsApp' },
+              ]}
+            />
+          )}
+          {expedientePC && (
+            // PC: controles de escritorio (36 px, radio de control, 15 px). Una sola fila.
+            <div className="flex flex-nowrap items-center gap-1.5">
+              {vistaEnvio === 'correo' && (
+                <>
+                  <Button size="sm" className={CTL_PC} onClick={() => void copiar()} disabled={!!trabajando || r.eventos === 0}>
+                    <Copy /> Copiar para correo
+                  </Button>
+                  <Button size="sm" variant="plain" className={CTL_PC_FILETE} onClick={() => void copiarIncrustadas()} disabled={!!trabajando || r.eventos === 0}>
+                    {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
+                    Con fotos incrustadas
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="plain" className={CTL_PC_FILETE} onClick={() => void exportarPdf()} disabled={!!trabajando || r.eventos === 0}>
+                PDF
+              </Button>
+              <Button size="sm" variant="plain" className={CTL_PC_FILETE} onClick={() => void bajarExcel()} disabled={!!trabajando || r.eventos === 0}>
+                <FileSpreadsheet /> Excel
+              </Button>
+            </div>
+          )}
           {vistaEnvio === 'whatsapp' ? (
             <div className="flex flex-col gap-4">
               <PasosWhatsapp
@@ -993,16 +1018,18 @@ export function BitacoraTurnoVista({
           <div className="flex flex-col gap-1 px-4 pb-2">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="text-caption font-semibold text-muted-foreground">Así queda al pegar en el correo</h2>
-              <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
-                {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
-                Copiar con fotos incrustadas
-              </Button>
+              {!expedientePC && (
+                <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
+                  {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
+                  Copiar con fotos incrustadas
+                </Button>
+              )}
             </div>
             {/* El portapapeles lleva el CUERPO; el asunto se copia aparte. */}
             <div className="flex min-w-0 items-center gap-2 text-footnote">
               <span className="shrink-0 text-muted-foreground">Asunto:</span>
               <span className="min-w-0 truncate">{asunto}</span>
-              <Button variant="plain" size="sm" className="shrink-0" onClick={copiarAsunto}>
+              <Button variant="plain" size="sm" className={expedientePC ? `${CTL_PC_FILETE} shrink-0` : 'shrink-0'} onClick={copiarAsunto}>
                 Copiar asunto
               </Button>
             </div>
@@ -1330,9 +1357,8 @@ export function BitacoraTurnoVista({
       ) : expedientePC ? (
         <BitacoraExpedientePC
           turnoNombre={etiquetaTurno(turno)}
-          horario={`${fecha.slice(0, 3)} ${turno.fecha.slice(8, 10)}-${turno.fecha.slice(5, 7)} · ${horarioTurno(turno)}`}
+          horario={horarioTurno(turno)}
           fecha={fecha}
-          planta={BITACORA_PLANTA.nombre}
           esActual={esActual}
           onAnterior={() => irATurno(-1)}
           onSiguiente={() => irATurno(1)}
@@ -1378,8 +1404,7 @@ export function BitacoraTurnoVista({
           }}
           onVerFoto={(e, fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
           onNuevo={abrirNuevo}
-          onCompartir={() => setVentanaEnvio(true)}
-          compartiendo={!!trabajando}
+          envio={panelEnvio}
           enlaces={[
             { etiqueta: 'Historial', onClick: () => navigate('/bitacora/historial') },
             { etiqueta: 'Rutas', onClick: () => cambiarVista('rutas') },
@@ -1784,30 +1809,6 @@ export function BitacoraTurnoVista({
         }}
       />
 
-      {/* PC: «Compartir» del expediente. El correo y WhatsApp ya no ocupan una columna
-          (era el 43 % del ancho); se miran aquí antes de copiarlos. */}
-      <Sheet
-        open={ventanaEnvio && expedientePC}
-        onClose={() => setVentanaEnvio(false)}
-        presentacionPC="ventana"
-        title="Compartir el turno"
-        description={`${etiquetaCortaTurno(turno.id)} · ${r.eventos} ${r.eventos === 1 ? 'evento' : 'eventos'} · ${fotosPublicadas} ${fotosPublicadas === 1 ? 'foto' : 'fotos'}`}
-      >
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void copiar()} disabled={!!trabajando || r.eventos === 0}>
-              <Copy /> Copiar para correo
-            </Button>
-            <Button variant="tinted" onClick={() => void exportarPdf()} disabled={!!trabajando || r.eventos === 0}>
-              PDF
-            </Button>
-            <Button variant="tinted" onClick={() => void bajarExcel()} disabled={!!trabajando || r.eventos === 0}>
-              <FileSpreadsheet /> Excel
-            </Button>
-          </div>
-          {panelEnvio}
-        </div>
-      </Sheet>
 
       <Sheet
         open={hojaWhatsapp}
@@ -2085,6 +2086,47 @@ const ANCHO_CORREO = 1000
  * los 1000 px de siempre; el de la inspección mide 680, y darle el lienzo ancho lo dejaba al
  * 31 % en un teléfono — ilegible por 320 px de papel en blanco.
  */
+/** Controles de escritorio de «Para enviar»: 36 px mínimo, radio de control y 15 px. */
+const CTL_PC = 'h-auto min-h-[36px] !rounded-ctl px-3.5 text-[15px] whitespace-nowrap'
+const CTL_PC_FILETE = `${CTL_PC} border border-foreground/20 font-normal text-foreground`
+
+/** Correo | WhatsApp en PC: un segmentado con filete y radio de control; el elegido, en tinte de acento. */
+function SegmentoEnvioPC({ value, onChange }: { value: 'correo' | 'whatsapp'; onChange: (v: 'correo' | 'whatsapp') => void }) {
+  const opciones: { value: 'correo' | 'whatsapp'; label: string }[] = [
+    { value: 'correo', label: 'Correo' },
+    { value: 'whatsapp', label: 'WhatsApp' },
+  ]
+  return (
+    <div role="group" aria-label="Enviar por correo o por WhatsApp" className="inline-flex self-start overflow-hidden rounded-ctl border border-foreground/20">
+      {opciones.map((o, i) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`min-h-[36px] px-3.5 text-[15px] ${i > 0 ? 'border-l border-foreground/20' : ''} ${
+            value === o.value ? 'bg-primary/[0.13] font-semibold text-brand-ink' : 'text-foreground'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Estado en PC: punto de 7 px y palabra en 13 px, sin píldora de fondo. El celular conserva la píldora. */
+function PuntoEstadoPC({ tono, children }: { tono: 'aviso' | 'acento' | 'neutro'; children: ReactNode }) {
+  const punto = tono === 'aviso' ? 'bg-ink-warn' : tono === 'acento' ? 'bg-primary' : 'bg-muted-foreground'
+  const texto = tono === 'aviso' ? 'text-ink-warn' : tono === 'acento' ? 'text-brand-ink' : 'text-muted-foreground'
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold leading-none whitespace-nowrap ${texto}`}>
+      <span className={`size-[7px] shrink-0 rounded-full ${punto}`} aria-hidden />
+      {children}
+    </span>
+  )
+}
+
 function VistaPreviaCorreo({ html, ancho = ANCHO_CORREO }: { html: string; ancho?: number }) {
   const ref = useRef<HTMLIFrameElement>(null)
   const [alto, setAlto] = useState(480)

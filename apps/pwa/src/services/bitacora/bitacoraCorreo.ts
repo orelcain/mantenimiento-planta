@@ -17,7 +17,8 @@ import {
   tituloDe,
 } from './presentacionEvento'
 
-import { C, FUENTE, ROTULO, SEC, TEXTO, TEXTO_FIJO, TITULO, RAYA, escaparHtml, estado, filaCifras, kpi, negrita, seccion, small } from './documentoCorreo'
+import { C, FUENTE, TEXTO_FIJO, escaparHtml, estado, negrita, small } from './documentoCorreo'
+import { tituloTurno } from './tituloTurno'
 
 // Se reexporta: el PDF y las pruebas lo importan desde aquí.
 export { horarioEvento }
@@ -60,15 +61,7 @@ export interface DatosCorreoBitacora {
 // (correo del 23-09-2026 en el celular de Orel). En PC se ven más chicas, pero se tocan.
 const ANCHO_FOTO = 156
 
-// Cabecera de cada evento en celeste (el mismo de la cabecera de la planilla) y banda azul del
-// título de la bitácora (la misma de la planilla): así el correo tiene tres niveles que se
-// distinguen por el fondo —banda de bloque, cabecera de evento, texto— y el fondo de celda es
-// de lo poco que respeta el pegado que aplana (Orel eligió la opción A del mockup, 23-09-2026).
-// `bgcolor` además de `background` (no `background-color`: la prueba del estándar lee
-// `color:#…` y lo confundiría con un color de letra) porque Word borra uno u otro al pegar.
-const CELESTE = '#BDD7EE'
-const AZUL_BANDA = '#00557F'
-const conSaltos = (t: string) => escaparHtml(t.trim()).replace(/\r?\n/g, '<br>')
+const conSaltos =(t: string) => escaparHtml(t.trim()).replace(/\r?\n/g, '<br>')
 
 export function capitalizarPrimera(t: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1)
@@ -130,7 +123,8 @@ function dimensionesFoto(f: FotoEvento): { w: number; h: number | null } {
   return { w: ANCHO_FOTO, h: null }
 }
 
-export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => string): string {
+/** `estilo: 'turno'` para el correo de turno: leyenda a 13 px sin `<small>` y sin esquinas (estándar). */
+export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) => string, estilo: 'inspeccion' | 'turno' = 'inspeccion'): string {
   if (!fotos.length) return ''
   // Antes y después juntos y en ese orden: es la comparación que se quiere ver.
   const orden = { antes: 0, despues: 1, foto: 2 } as const
@@ -143,9 +137,13 @@ export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) 
         // `valign` como ATRIBUTO: Word borra `vertical-align` del estilo al pegar.
         `<td valign="top" style="padding:8px 8px 0 0;vertical-align:top;">` +
         `<img src="${escaparHtml(fuente(f))}" width="${w}"${h == null ? '' : ` height="${h}"`} alt="${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}" ` +
-        `style="display:block;width:${w}px;${h == null ? '' : `height:${h}px;`}border:0;border-radius:4px;">` +
+        `style="display:block;width:${w}px;${h == null ? '' : `height:${h}px;`}border:0;${estilo === 'turno' ? '' : 'border-radius:4px;'}">` +
         // «Foto» debajo de cada foto era ruido; solo «Antes» y «Después» dicen algo.
-        (f.etiqueta === 'foto' ? '' : `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${small(escaparHtml(ETIQUETA_FOTO[f.etiqueta]))}</div>`) +
+        (f.etiqueta === 'foto'
+          ? ''
+          : estilo === 'turno'
+            ? `<div style="font-family:${FUENTE};font-size:13px;color:${C.sec};padding-top:2px;">${escaparHtml(ETIQUETA_FOTO[f.etiqueta])}</div>`
+            : `<div style="font-family:${FUENTE};font-size:12px;color:${C.sec};padding-top:2px;">${small(escaparHtml(ETIQUETA_FOTO[f.etiqueta]))}</div>`) +
         `</td>`
       )
     })
@@ -154,35 +152,36 @@ export function htmlFotos(fotos: readonly FotoEvento[], fuente: (f: FotoEvento) 
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">${filas.join('')}</table>`
 }
 
-/** Una etiqueta de color por cada parte del impacto (parada, ventana, pendiente). */
-/**
- * El impacto como punto de color y palabra, no como pastillas rellenas: el color marca, la
- * palabra dice (estándar del correo, regla 4). «Afectó sin detener» va en ámbar: es el trabajo
- * que sostuvo el proceso, ni la parada ni el «sin costo».
+/*
+ * Escala del correo de turno (mockup «Correo», 10-11-2026): título 22 px, texto 15 px, rótulos
+ * y cifras 13 px. Las cifras van en monoespaciada. No se usa `small()`: el navegador la achica
+ * a 1/1,2 y un texto de 13 px quedaba en 10,8.
  */
+const T_TITULO = '22px'
+const T_TEXTO = '15px'
+const T_SEC = '13px'
+const MONO = "Consolas,'Courier New',monospace"
+
+/** Color de cada parte del impacto: la parada en rojo, lo que sostuvo el proceso en ámbar, lo que no costó en verde. */
+function colorImpacto(texto: string): string {
+  if (texto.startsWith('Detuvo')) return C.parada
+  if (texto.startsWith('Afectó')) return C.afectado
+  if (texto.startsWith('Sin detener') || texto.startsWith('Cierra pendiente') || texto.startsWith('Resuelto')) return C.ventana
+  return C.sec
+}
+
+/** El impacto como punto de color y palabra, bajo el texto del técnico (estándar del correo). */
 function htmlImpacto(e: EventoBitacora): string {
   const partes = partesImpacto(e)
   if (!partes.length) return ''
-  const color = (texto: string) => {
-    if (texto.startsWith('Detuvo')) return C.parada
-    if (texto.startsWith('Afectó')) return C.afectado
-    if (texto.startsWith('Sin detener') || texto.startsWith('Cierra pendiente') || texto.startsWith('Resuelto')) return C.ventana
-    return C.sec
-  }
-  return (
-    `<div style="font-size:${SEC};line-height:1.6;color:${C.tinta};padding-top:4px;">` +
-    small(partes.map((t) => estado(t, color(t))).join(' &nbsp;·&nbsp; ')) +
-    `</div>`
-  )
+  return `<div style="font-size:${T_SEC};line-height:1.5;padding-top:4px;">${partes.map((t) => estado(t, colorImpacto(t))).join(' &nbsp;·&nbsp; ')}</div>`
 }
 
-/** Repuestos como tabla chica: código · nombre común + nombre SAP · cantidad. */
+/** Repuestos usados del trabajo: código SAP, nombre y cantidad, en una tabla de 13 px sin filetes verticales. */
 function htmlRepuestos(e: EventoBitacora): string {
   const lista = normalizarRepuestos(e.repuestos)
   if (!lista.length) return ''
-  // Anchos fijos en código y cantidad: sin ellos Outlook repartía la tabla por igual.
-  const th = (t: string, alinear = 'left', ancho = '') =>
-    `<th${ancho ? ` width="${ancho}"` : ''} style="${ancho ? `width:${ancho}px;` : ''}text-align:${alinear};white-space:nowrap;font-weight:600;color:${C.sec};font-size:${ROTULO};letter-spacing:.07em;text-transform:uppercase;padding:0 6px 5px 0;border-bottom:1px solid ${C.tinta};">${small(negrita(t))}</th>`
+  const celda = `padding:4px 10px 4px 0;border-bottom:1px solid ${C.linea};vertical-align:top;font-size:${T_SEC};line-height:1.4;`
   const filas = lista
     .map((r) => {
       const comun = (r.nombreComun ?? '').trim()
@@ -190,77 +189,51 @@ function htmlRepuestos(e: EventoBitacora): string {
       const nombre = comun
         ? `<b>${escaparHtml(comun)}</b>${sap ? `<br><span style="color:${C.sec};">${escaparHtml(sap)}</span>` : ''}`
         : escaparHtml(sap)
-      const td = `padding:5px 6px 5px 0;border-bottom:1px solid ${RAYA};vertical-align:top;line-height:1.45;`
       return (
-        `<tr><td style="${td}white-space:nowrap;font-variant-numeric:tabular-nums;">${escaparHtml(r.codigoSAP)}</td>` +
-        `<td style="${td}">${nombre}</td>` +
-        `<td style="${td}text-align:right;font-variant-numeric:tabular-nums;">${r.cantidad}</td></tr>`
+        `<tr><td valign="top" style="${celda}white-space:nowrap;font-family:${MONO};">${escaparHtml(r.codigoSAP)}</td>` +
+        `<td valign="top" style="${celda}">${nombre}</td>` +
+        `<td valign="top" align="right" style="${celda}text-align:right;font-family:${MONO};">${r.cantidad}</td></tr>`
       )
     })
     .join('')
   return (
-    `<div style="font-size:${ROTULO};font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:${C.sec};padding:12px 0 6px;">${small(negrita('Repuestos usados'))}</div>` +
-    // Sin `width:100%`: el compositor de Outlook en el iPhone lo convierte en píxeles al pegar
-    // (652 px) y el teléfono encoge el correo entero para que quepa (prueba de Orel, 23-09-2026).
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FUENTE};font-size:${SEC};color:${C.tinta};">` +
-    `<tr>${th('Código SAP', 'left', '96')}${th('Repuesto')}${th('Cant.', 'right', '48')}</tr>${filas}</table>`
+    `<div style="font-size:${T_SEC};line-height:1.5;color:${C.sec};padding-top:8px;">Repuestos usados</div>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:${FUENTE};font-size:${T_SEC};color:${C.tinta};margin-top:4px;">${filas}</table>`
   )
 }
 
 /**
- * Un evento del correo. Nació del mockup del 17-09-2026 (número, equipo y hora en una línea,
- * tipo y N° de equipo debajo, impacto, lo que escribió el técnico, repuestos, técnicos y
- * fotos) y el 21-09 pasó por el estándar del correo: el número deja el círculo relleno y va
- * en tinta —el mismo número del mensaje de WhatsApp, sin la pastilla—, la descripción deja el
- * recuadro gris con barra a la izquierda (el tic n.º 1) y va como texto, el impacto deja las
- * pastillas y va como punto y palabra, y todo cabe en los cuatro cuerpos.
+ * Un trabajo del turno: una fila con filete, como en el mockup «Correo» (10-11-2026). Número,
+ * equipo y código en negrita; tipo y hora en 13 px; lo que hizo el técnico tal cual; el impacto
+ * en color de aviso; repuestos, técnicos y fotos. Sin cajas ni fondos (estándar del correo).
  */
 function htmlEvento(e: EventoBitacora, numero: number, fuente: (f: FotoEvento) => string, pendiente: boolean): string {
   const equipo = e.equipo?.trim() ?? ''
   const titulo = tituloDe(e)
   const principal = equipo || titulo || etiquetaTipo(e)
-  const hora = horarioEvento(e)
   const cod = codigoEquipoDe(e)
-  // La hora abre la línea de datos del evento. Iba en una tercera celda de 96 px a la derecha:
-  // en el teléfono esa columna se llevaba un cuarto del ancho para dos cifras, y como Word
-  // borra `vertical-align` del estilo, la hora (y el número) flotaban a media altura del
-  // evento (correo del 23-09-2026 en el celular de Orel).
-  // Sin equipo ni título, el tipo ya es el título: no se repite en la línea de datos («Mejora /
-  // Mejora», correo del 23-09-2026).
-  const meta = [equipo || titulo ? etiquetaTipo(e) : '', cod ? `${/^\d+$/.test(cod) ? 'N° de equipo' : 'Ubicación técnica'} ${cod}` : ''].filter(Boolean).join(' · ')
+  const hora = horarioEvento(e)
+  // Sin equipo ni título, el tipo ya es el título: no se repite en la línea de datos.
+  const datos = [equipo || titulo ? etiquetaTipo(e) : '', hora].filter(Boolean).join(' · ')
+  const repuestos = htmlRepuestos(e)
   const tecnicos = tecnicosDelEvento(e)
-  // Cada evento es una TABLA propia (Orel, 23-09-2026: «usar tablas para ordenar los eventos»):
-  // una fila de cabecera con fondo celeste —número · equipo · hora— y una fila con el desglose.
-  // Sin tablas anidadas dentro del desglose salvo la de repuestos (Word no respeta el 100 % de
-  // una tabla dentro de una celda, foto de Orel 17-09). `valign` como ATRIBUTO además del
-  // estilo: es lo único que Word conserva al pegar. Sin `width:100%` (ver htmlRepuestos).
-  const cab = `vertical-align:top;background:${CELESTE};font-family:${FUENTE};color:${C.tinta};`
-  const numeroCab =
-    `<td width="28" valign="top" bgcolor="${CELESTE}" style="width:28px;${cab}padding:7px 0 7px 8px;font-size:${TEXTO};line-height:1.5;` +
-    `color:${pendiente ? C.pendBorde : C.tinta};font-variant-numeric:tabular-nums;">${negrita(String(numero))}</td>`
-  const nombreCab = `<td valign="top" bgcolor="${CELESTE}" style="${cab}padding:7px 8px;font-size:${TEXTO};line-height:1.5;font-weight:600;">${negrita(escaparHtml(principal))}</td>`
-  // La hora a la derecha de la cabecera, solo si la hay: una cabecera sin hora no deja hueco.
-  const horaCab = hora
-    ? `<td valign="top" align="right" bgcolor="${CELESTE}" style="${cab}padding:7px 10px 7px 8px;text-align:right;white-space:nowrap;font-size:${SEC};line-height:1.5;font-variant-numeric:tabular-nums;">${small(escaparHtml(hora))}</td>`
-    : ''
+  const filete = `border-top:1px solid ${C.linea};`
   return (
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:10px;border:1px solid ${C.linea};">` +
-    `<tr>${numeroCab}${nombreCab}${horaCab}</tr>` +
-    // El desglose en UNA celda que cruza las columnas de la cabecera: 2 fotos × 156 + 8 de aire
-    // + 20 de relleno + 2 de borde = 350 px, que caben en los 351 de un teléfono.
-    `<tr><td colspan="${hora ? 3 : 2}" valign="top" style="vertical-align:top;padding:8px 10px 12px;font-family:${FUENTE};color:${C.tinta};">` +
-    (equipo && titulo ? `<div style="font-size:${TEXTO};line-height:1.5;">${escaparHtml(titulo)}</div>` : '') +
-    (meta ? `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};font-variant-numeric:tabular-nums;">${small(escaparHtml(meta))}</div>` : '') +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">` +
+    `<tr><td width="30" valign="top" style="width:30px;${filete}padding:14px 10px 14px 0;vertical-align:top;font-family:${MONO};font-size:${T_SEC};line-height:1.5;color:${pendiente ? C.pendBorde : C.sec};">${numero}</td>` +
+    `<td valign="top" style="${filete}padding:14px 0;vertical-align:top;font-family:${FUENTE};color:${C.tinta};">` +
+    `<div style="font-size:${T_TEXTO};line-height:1.4;font-weight:600;">${escaparHtml(principal)}${cod ? ` <span style="font-family:${MONO};font-size:${T_SEC};font-weight:400;color:${C.sec};">${escaparHtml(cod)}</span>` : ''}</div>` +
+    (datos ? `<div style="font-size:${T_SEC};line-height:1.5;color:${C.sec};">${escaparHtml(datos)}</div>` : '') +
+    (equipo && titulo ? `<div style="font-size:${T_TEXTO};line-height:1.5;padding-top:6px;">${escaparHtml(titulo)}</div>` : '') +
+    (e.descripcion?.trim() ? `<div style="font-size:${T_TEXTO};line-height:1.5;padding-top:6px;">${conSaltos(e.descripcion)}</div>` : '') +
     htmlImpacto(e) +
-    (e.descripcion?.trim() ? `<div style="font-size:${TEXTO};line-height:1.5;padding-top:6px;">${conSaltos(e.descripcion)}</div>` : '') +
-    htmlRepuestos(e) +
-    (tecnicos.length ? `<div style="font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:8px;">${small(`Técnicos: ${escaparHtml(tecnicos.join(', '))}`)}</div>` : '') +
-    htmlFotos(e.fotos ?? [], fuente) +
+    repuestos +
+    (tecnicos.length ? `<div style="font-size:${T_SEC};line-height:1.5;color:${C.sec};padding-top:4px;">${escaparHtml(`Técnicos: ${tecnicos.join(', ')}`)}</div>` : '') +
+    htmlFotos(e.fotos ?? [], fuente, 'turno') +
     `</td></tr></table>`
   )
 }
 
-/** "de parada (2)" o "de parada (2, 1 sin duración)". */
 export function etiquetaParada(r: { conParada: number; paradasSinDuracion: number }): string {
   if (!r.conParada) return 'de parada'
   return r.paradasSinDuracion ? `de parada (${r.conParada}, ${r.paradasSinDuracion} sin duración)` : `de parada (${r.conParada})`
@@ -291,104 +264,127 @@ function lineaMtbfMttr(turno: TurnoMantencion, r: ReturnType<typeof resumirBitac
   if (!r.fallas) return ''
   const valorMtbf = mtbfDelTurno(turno, r)
   const partes = [`MTTR ${r.mttrMin == null ? '—' : formatoMinutos(r.mttrMin)}`, `MTBF ${valorMtbf == null ? '—' : formatoMinutos(valorMtbf)}`]
-  return `<div style="font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.tinta};padding-top:8px;">${negrita(escaparHtml(partes.join(' · ')))}</div>`
-}
-
-export function bitacoraAHtmlCorreo(datos: DatosCorreoBitacora): string {
-  const eventos = soloListos(datos.eventos)
-  const r = resumirBitacora(eventos)
-  // La planilla «Recoleccion MTTR» va ARRIBA, como la pegan hoy desde Excel; el detalle de la
-  // bitácora sigue debajo (pedido de Orel, 17-09-2026). Bajo la planilla, las dos siglas con
-  // su definición y su cálculo (Orel, 18-09). La planilla NO sigue el estándar del correo a
-  // propósito: es una copia del Excel, y parecer una planilla es su trabajo.
-  //
-  // ⚠ La planilla va DENTRO del mismo ancho de 680 px que el cuerpo. Iba suelta con
-  // `width:100%`, así que en Outlook se estiraba a todo el panel de lectura —mil píxeles de
-  // planilla con filas altas— mientras el cuerpo quedaba en 680: por eso se veía «como letra
-  // 30» (Orel, 21-09-2026). No era la letra, era el ancho.
-  const recoleccion = eventos.length
-    ? `<div style="max-width:680px;${TEXTO_FIJO}">${htmlRecoleccionMttr(filasRecoleccion(datos.turno, eventos))}` +
-      lineaMtbfMttr(datos.turno, r) +
-      `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:2px;">${small(escaparHtml(explicacionMtbfMttr(datos.turno, r)))}</div>` +
-      // Corte entre los dos bloques: aire, una raya de tinta y más aire. Orel (23-09-2026):
-      // «separar lo del MTTR arriba del detalle del turno abajo». La raya sobrevive al pegado
-      // que aplana; el aire, al que respeta el formato.
-      `<div style="height:22px;line-height:22px;">&nbsp;</div>` +
-      `<div style="border-top:2px solid ${C.tinta};height:0;line-height:0;font-size:0;">&nbsp;</div>` +
-      `<div style="height:18px;line-height:18px;">&nbsp;</div></div>`
-    : ''
-  return recoleccion + cuerpoBitacoraHtml(datos)
+  return `<div style="font-family:${FUENTE};font-size:${T_TEXTO};line-height:1.5;color:${C.tinta};padding-top:10px;">${negrita(escaparHtml(partes.join(' · ')))}</div>`
 }
 
 /**
- * El cuerpo del correo, del encabezado hacia abajo: lo que sigue el estándar del correo
- * (`documentoCorreo`). Separado de la planilla para que las pruebas del estándar lo midan solo.
+ * El correo de turno: primero el cuerpo (estándar del correo) y al final la planilla «MTBF -
+ * MTTR» con su cálculo. Lo que el turno hizo se lee antes que la planilla (mockup «Correo»,
+ * 10-11-2026).
+ */
+export function bitacoraAHtmlCorreo(datos: DatosCorreoBitacora): string {
+  return cuerpoBitacoraHtml(datos) + bloquePlanillaMttr(datos.turno, soloListos(datos.eventos))
+}
+
+/**
+ * La planilla con su aspecto de Excel, a 13 px (nunca menos de 12), con todas sus filas, la
+ * línea de MTTR · MTBF y la explicación del cálculo. Va dentro del mismo ancho de 680 px que el
+ * cuerpo: sin el tope, en Outlook se estira al panel de lectura.
+ */
+function bloquePlanillaMttr(turno: TurnoMantencion, eventos: readonly EventoBitacora[]): string {
+  if (!eventos.length) return ''
+  const r = resumirBitacora(eventos)
+  return (
+    `<div style="max-width:680px;${TEXTO_FIJO}border-top:1px solid ${C.tinta};margin-top:28px;padding-top:14px;">` +
+    htmlRecoleccionMttr(filasRecoleccion(turno, eventos), { tamano: T_SEC }) +
+    lineaMtbfMttr(turno, r) +
+    `<div style="font-family:${FUENTE};font-size:${T_SEC};line-height:1.5;color:${C.sec};padding-top:4px;">${escaparHtml(explicacionMtbfMttr(turno, r))}</div>` +
+    `</div>`
+  )
+}
+
+/** Un rótulo de sección: mayúsculas literales (sobreviven al pegado que aplana) y un filete encima. */
+function rotuloTurno(titulo: string, cantidad?: number): string {
+  return (
+    `<div style="font-family:${FUENTE};font-size:${T_SEC};font-weight:600;color:${C.sec};margin-top:24px;padding-top:10px;border-top:1px solid ${C.tinta};">` +
+    `${negrita(escaparHtml(titulo.toUpperCase()))}${cantidad != null ? ` <span style="color:${C.tinta};">${cantidad}</span>` : ''}</div>`
+  )
+}
+
+/** La fila de cifras con filete: de a tres por fila, para que quepa en un teléfono. */
+function filaCifrasTurno(cifras: readonly { valor: string; rotulo: string }[]): string {
+  if (!cifras.length) return ''
+  const filas: string[] = []
+  for (let i = 0; i < cifras.length; i += 3) {
+    const celdas = cifras.slice(i, i + 3).map(
+      (c) =>
+        `<td valign="top" style="padding:10px 24px 10px 0;vertical-align:top;border-top:1px solid ${i === 0 ? C.tinta : C.linea};font-family:${FUENTE};">` +
+        `<div style="font-family:${MONO};font-size:${T_TEXTO};font-weight:600;line-height:1.3;color:${C.tinta};white-space:nowrap;">${escaparHtml(c.valor)}</div>` +
+        `<div style="font-size:${T_SEC};line-height:1.4;color:${C.sec};padding-top:2px;">${escaparHtml(c.rotulo)}</div></td>`,
+    )
+    filas.push(`<tr>${celdas.join('')}</tr>`)
+  }
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:14px;">${filas.join('')}</table>`
+}
+
+/**
+ * El cuerpo del correo, del encabezado hacia abajo, con la forma del mockup «Correo» (10-11-2026):
+ * una línea de planta, el título de 22 px con el dato del turno, la fila de cifras con filete, las
+ * observaciones, los trabajos (una fila por evento, con el texto del técnico tal cual) y lo que
+ * queda pendiente. Sin cajas ni fondos. Va separado de la planilla para que las pruebas del
+ * estándar lo midan solo.
  */
 export function cuerpoBitacoraHtml({ turno, eventos: todos, tecnicos, planta, observacion, pendientesAnteriores = [], fuenteFoto }: DatosCorreoBitacora): string {
   const eventos = soloListos(todos)
   const fuente = fuenteFoto ?? ((f: FotoEvento) => f.url)
   const r = resumirBitacora(eventos)
+  const fotos = eventos.reduce((n, e) => n + (e.fotos?.length ?? 0), 0)
   const { hechos, pendientes } = gruposDelTurno(turno, eventos)
   const repuestos = repuestosDistintos(eventos)
 
-  // Eventos y pendientes siempre: son el marco de la entrega, y «0 pendientes» al cerrar un
-  // turno SÍ es noticia. Lo demás, solo si hubo: un cero no es noticia.
+  // Eventos y pendientes siempre: son el marco de la entrega. Lo demás, solo si hubo (un cero no es noticia).
   const cifras = eventos.length
-    ? [
-        kpi(String(r.eventos), r.eventos === 1 ? 'evento' : 'eventos'),
-        r.conParada > 0 ? kpi(formatoMinutos(r.minutosParada), etiquetaParada(r)) : '',
-        // MTTR solo con paradas: sin ellas era un «—» que no decía nada.
-        r.mttrMin != null ? kpi(formatoMinutos(r.mttrMin), 'MTTR') : '',
-        // Es la evidencia de que el proceso no se detuvo porque alguien lo sostuvo (la tolva
-        // de riles con las cabezas a mano).
-        r.afectados > 0 ? kpi(String(r.afectados), r.afectados === 1 ? 'siguió gracias a Mantención' : 'siguieron gracias a Mantención') : '',
-        r.enVentana > 0 ? kpi(String(r.enVentana), 'sin detener producción') : '',
-        kpi(String(r.pendientesDelTurno), etiquetaPendientes(r)),
-        // Es el número que demuestra la entrega de turno.
-        r.pendientesCerrados > 0 ? kpi(String(r.pendientesCerrados), r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados') : '',
-        repuestos > 0 ? kpi(String(repuestos), repuestos === 1 ? 'repuesto usado' : 'repuestos usados') : '',
-      ]
+    ? (
+        [
+          { valor: String(r.eventos), rotulo: r.eventos === 1 ? 'evento' : 'eventos' },
+          r.conParada > 0 ? { valor: formatoMinutos(r.minutosParada), rotulo: etiquetaParada(r) } : null,
+          r.mttrMin != null ? { valor: formatoMinutos(r.mttrMin), rotulo: 'MTTR' } : null,
+          r.afectados > 0
+            ? { valor: String(r.afectados), rotulo: r.afectados === 1 ? 'siguió gracias a Mantención' : 'siguieron gracias a Mantención' }
+            : null,
+          r.enVentana > 0 ? { valor: String(r.enVentana), rotulo: 'sin detener producción' } : null,
+          { valor: String(r.pendientesDelTurno), rotulo: etiquetaPendientes(r) },
+          r.pendientesCerrados > 0
+            ? { valor: String(r.pendientesCerrados), rotulo: r.pendientesCerrados === 1 ? 'pendiente cerrado' : 'pendientes cerrados' }
+            : null,
+          repuestos > 0 ? { valor: String(repuestos), rotulo: repuestos === 1 ? 'repuesto usado' : 'repuestos usados' } : null,
+        ].filter((c): c is { valor: string; rotulo: string } => c !== null)
+      )
     : []
 
-  // La bitácora abre con su propia banda azul, la misma de la planilla «MTBF - MTTR»: dos
-  // bloques con el mismo tipo de título se leen como dos bloques. Texto blanco por
-  // `<font color>` (y no por `color:` en el estilo, que el pegado que aplana borra y la prueba
-  // del estándar cuenta como color de letra).
   const encabezado =
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">` +
-    `<tr><td bgcolor="${AZUL_BANDA}" style="background:${AZUL_BANDA};padding:8px 14px;font-family:${FUENTE};font-size:${TEXTO};line-height:1.4;font-weight:700;white-space:nowrap;">` +
-    `<font color="#FFFFFF">${negrita('Bitácora de Mantención')}&nbsp;&nbsp;·&nbsp;&nbsp;${small(escaparHtml(planta))}</font></td></tr></table>` +
-    `<div style="font-family:${FUENTE};font-size:${TITULO};font-weight:600;line-height:1.2;color:${C.tinta};padding-top:10px;">` +
-    `${negrita(`${escaparHtml(etiquetaTurno(turno))} · ${escaparHtml(capitalizarPrimera(fechaTurnoLarga(turno)))}`)}</div>` +
-    `<div style="font-family:${FUENTE};font-size:${SEC};line-height:1.5;color:${C.sec};padding-top:4px;">` +
-    `${small(`${escaparHtml(horarioTurno(turno).replace('–', 'a'))}${tecnicos.length ? ` · Técnicos de turno: ${escaparHtml(tecnicos.join(', '))}` : ''}`)}</div>`
+    `<div style="font-family:${FUENTE};font-size:${T_SEC};line-height:1.4;color:${C.sec};">Bitácora de Mantención · ${escaparHtml(planta)}</div>` +
+    `<div style="font-family:${FUENTE};font-size:${T_TITULO};font-weight:600;line-height:1.25;color:${C.tinta};padding-top:6px;">` +
+    `${escaparHtml(`${etiquetaTurno(turno)} del ${fechaTurnoLarga(turno)}: ${tituloTurno(r, fotos)}`)}</div>` +
+    `<div style="font-family:${FUENTE};font-size:${T_SEC};line-height:1.4;color:${C.sec};padding-top:6px;">` +
+    `${escaparHtml(horarioTurno(turno).replace('–', 'a'))}${tecnicos.length ? ` · Técnicos de turno: ${escaparHtml(tecnicos.join(', '))}` : ''}</div>`
 
-  // Lo que escribió quien entrega el turno va como texto bajo su rótulo, no en un recuadro
-  // gris con barra a la izquierda (el tic n.º 1 del estándar).
+  // Lo que escribió quien entrega el turno: texto bajo su rótulo, sin recuadro.
   const bloqueObservacion = observacion?.trim()
-    ? seccion('Observaciones del turno') +
-      `<div style="font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.tinta};padding-top:8px;">${conSaltos(observacion)}</div>`
+    ? rotuloTurno('Observaciones del turno') +
+      `<div style="font-family:${FUENTE};font-size:${T_TEXTO};line-height:1.5;color:${C.tinta};padding-top:6px;">${conSaltos(observacion)}</div>`
     : ''
 
-  // Cada evento es su propia tabla (cabecera celeste + desglose); aquí solo se encadenan.
-  const tablaEventos = (lista: readonly EventoBitacora[], desde: number, pendiente: boolean) =>
+  // Cada evento es una fila con filete; aquí solo se encadenan.
+  const filasEventos = (lista: readonly EventoBitacora[], desde: number, pendiente: boolean) =>
     lista.map((e, i) => htmlEvento(e, desde + i, fuente, pendiente)).join('')
 
   const cuerpo = !eventos.length
-    ? `<p style="font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.sec};margin:28px 0 0;">Sin eventos registrados en el turno.</p>`
-    : (hechos.length ? seccion('Eventos del turno', hechos.length) + tablaEventos(hechos, 1, false) : '') +
-      (pendientes.length ? seccion('Pendiente para el turno siguiente', pendientes.length) + tablaEventos(pendientes, hechos.length + 1, true) : '')
+    ? `<p style="font-family:${FUENTE};font-size:${T_TEXTO};line-height:1.5;color:${C.sec};margin:24px 0 0;">Sin eventos registrados en el turno.</p>`
+    : (hechos.length ? rotuloTurno('Trabajos del turno', hechos.length) + filasEventos(hechos, 1, false) : '') +
+      (pendientes.length
+        ? rotuloTurno('Pendiente para el turno siguiente', pendientes.length) + filasEventos(pendientes, hechos.length + 1, true)
+        : '')
 
   const bloqueAnteriores = pendientesAnteriores.length
-    ? seccion('Sigue pendiente de turnos anteriores', pendientesAnteriores.length) +
-      `<ul style="font-family:${FUENTE};font-size:${TEXTO};line-height:1.5;color:${C.tinta};margin:8px 0 0;padding-left:18px;">` +
+    ? rotuloTurno('Sigue pendiente de turnos anteriores', pendientesAnteriores.length) +
+      `<ul style="font-family:${FUENTE};font-size:${T_TEXTO};line-height:1.5;color:${C.tinta};margin:6px 0 0;padding-left:18px;">` +
       pendientesAnteriores.map((e) => `<li style="padding:2px 0;">${escaparHtml(lineaPendienteAnterior(e))}</li>`).join('') +
       `</ul>`
     : ''
 
-  // Sin pie de «generado con la app»: quien recibe el correo sabe de dónde viene, y el
-  // documento termina donde termina la entrega (Orel, 21-09-2026).
-  return `<div style="max-width:680px;color:${C.tinta};${TEXTO_FIJO}">${encabezado}${filaCifras(cifras, 1)}${bloqueObservacion}${cuerpo}${bloqueAnteriores}</div>`
+  // Sin pie de «generado con la app»: el documento termina donde termina la entrega (Orel, 21-09-2026).
+  return `<div style="max-width:680px;color:${C.tinta};${TEXTO_FIJO}">${encabezado}${filaCifrasTurno(cifras)}${bloqueObservacion}${cuerpo}${bloqueAnteriores}</div>`
 }
 
 /** "3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente" (texto plano y WhatsApp). */
