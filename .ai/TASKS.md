@@ -90,3 +90,5 @@ No tomes una tarea que ya está EN CURSO por otro.
 - [x] Normalización repuestos Fases 0–6 (maestro SAP) + rework UI incrementos 1–7. (claude, 2026-06-12 — ver WORKLOG)
 
 - [ ] **Jack-Knife ronda 3, etapas 1 y 2** — HECHO — codex (pendiente revisión visual de Orel). Rama feat/jack-knife-pagina; sin commit ni push por instrucción explícita.
+
+- [ ] **Vidrio líquido fase 2 · cápsulas agrupadas** — EN REVISIÓN — PR #1409, rama feat/vidrio-fase2-capsulas. 11-11: menús desplegables y mapa de planta con vidrio, al día con main, preview verificado 375/1024/1440 claro y oscuro. Falta OK de merge de Orel.
