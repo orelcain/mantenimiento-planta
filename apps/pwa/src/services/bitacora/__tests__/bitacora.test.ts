@@ -105,7 +105,7 @@ describe('la bitácora archivada no cambia sola (revisión 15-09)', () => {
       tecnicos: [],
       planta: 'Planta Chonchi',
     })
-    expect(html).toContain('Pendiente para el turno siguiente')
+    expect(html).toContain('PENDIENTE PARA EL TURNO SIGUIENTE')
     expect(html).toContain('Resuelto en Turno noche 16-09 por Lucas Adrade')
     expect(html).toContain('pendiente (1 ya cerrado)')
   })
@@ -310,9 +310,9 @@ describe('correo de la bitácora', () => {
     expect(html).toContain('Detuvo la máquina 35 min')
     expect(html).toContain('Sin detener: Colación HG')
     // El orden se mira en el detalle: la planilla MTTR de arriba ya nombra a todos.
-    const detalle = html.slice(html.indexOf('Eventos del turno'))
-    expect(detalle.indexOf('Pendiente para el turno siguiente')).toBeGreaterThan(detalle.indexOf('Grader MS4/12'))
-    expect(detalle.indexOf('Enzunchadora')).toBeGreaterThan(detalle.indexOf('Pendiente para el turno siguiente'))
+    const detalle = html.slice(html.indexOf('TRABAJOS DEL TURNO'))
+    expect(detalle.indexOf('PENDIENTE PARA EL TURNO SIGUIENTE')).toBeGreaterThan(detalle.indexOf('Grader MS4/12'))
+    expect(detalle.indexOf('Enzunchadora')).toBeGreaterThan(detalle.indexOf('PENDIENTE PARA EL TURNO SIGUIENTE'))
     const texto = bitacoraATextoPlano({ ...base, eventos })
     expect(texto).toContain('3 eventos · 35 min de parada (1) · MTTR 35 min · 1 sin detener producción · 1 pendiente')
     expect(texto).toContain('Técnicos de turno: Danilo Cortes')
@@ -321,9 +321,9 @@ describe('correo de la bitácora', () => {
   it('incluye la observación general escapada y con saltos de línea', () => {
     const html = bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: 'Planta sin agua caliente <2 h>\nSe avisó a jefatura' })
     // Título de sección y el texto en recuadro, escapado y con saltos (correo 17-09).
-    expect(html).toContain('Observaciones del turno</b></small></div>')
+    expect(html).toContain('OBSERVACIONES DEL TURNO</b></div>')
     expect(html).toContain('Planta sin agua caliente &lt;2 h&gt;<br>Se avisó a jefatura</div>')
-    expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: '   ' })).not.toContain('Observaciones del turno')
+    expect(bitacoraAHtmlCorreo({ ...base, eventos: [ev({})], observacion: '   ' })).not.toContain('OBSERVACIONES DEL TURNO')
     expect(bitacoraATextoPlano({ ...base, eventos: [ev({})], observacion: 'Sin novedad' })).toContain('Observaciones del turno: Sin novedad')
   })
 

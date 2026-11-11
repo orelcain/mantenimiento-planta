@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { Disclosure, FoldTable, type FoldTableRow } from '@/components/piel'
 import { usePielApple } from '@/hooks/usePielApple'
+import { FilasLectura, SeccionLectura } from '@/components/piel/Lectura'
 import { fmtSecPanoramic, type PeriodImputacion } from '@/services/grader/graderPeriodMonthlyStats'
 import { fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { topCausas, etiquetaDueno } from '@/services/grader/imputacionTopCausas'
@@ -71,10 +72,10 @@ const BUCKET_FILL: Record<string, string> = {
   'sin-clasificar': 'bg-cat-6-tint/80 pizarra:bg-transparent pizarra:shadow-[inset_0_0_0_1px_rgb(var(--grafico-neutro-medio))]',
 }
 
-export function ImputacionPeriodCard({ imputacion }: { imputacion: PeriodImputacion | null }) {
+export function ImputacionPeriodCard({ imputacion, className }: { imputacion: PeriodImputacion | null; className?: string }) {
   const apple = usePielApple()
   if (!imputacion || imputacion.totalSec <= 0) return null
-  if (apple) return <PorQueSeDetuvoApple imputacion={imputacion} />
+  if (apple) return <PorQueSeDetuvoApple imputacion={imputacion} className={className} />
 
   const pct = imputacion.cobertura * 100
   const th = nivel(pct)
@@ -228,12 +229,13 @@ const rotuloCausaApple = (s: string) => s.replace(/ o Mecánica\b/g, ' o mecáni
 const pctApple = (frac: number) => `${Math.round(frac * 100)}${ESPACIO_DURO}%`
 
 /**
- * Piel Apple: «Por qué se detuvo». Tabla con las 3 causales de más tiempo, la de
- * Mantención siempre visible (si no entró al top, se suma su categoría más grande),
- * el resto agrupado en «Otras N causales» y el cierre con lo sin anotar.
+ * Piel Apple (modo lectura): «Por qué se detuvo». Tabla con filete: las 3 causales de
+ * más tiempo, la de Mantención siempre visible (si no entró al top, se suma su categoría
+ * más grande), el resto agrupado en «Otras N causales», lo sin anotar y el cierre con el
+ * total detenido. «Responde» solo en PC.
  * Todo sale de `topCausas` y `topCategorias`: no se calcula nada nuevo.
  */
-function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
+function PorQueSeDetuvoApple({ imputacion, className }: { imputacion: PeriodImputacion; className?: string }) {
   const total = imputacion.totalSec
   const sinCausalSec = total - imputacion.imputadoSec
   const tend = tendenciaImputacion(imputacion.porTurno)
@@ -266,30 +268,40 @@ function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
     })
   }
 
-  const cierre: FoldTableRow | undefined = sinCausalSec > 0
-    ? { id: 'sin-anotar', cells: ['Sin anotar', fmtDurationSec(sinCausalSec), pctApple(sinCausalSec / total)] }
-    : undefined
+  // Modo lectura: lo sin anotar es una fila más (dice cuánto tiempo es) y el cierre, el total detenido.
+  if (sinCausalSec > 0) {
+    rows.push({ id: 'sin-anotar', cells: ['Sin anotar', fmtDurationSec(sinCausalSec), pctApple(sinCausalSec / total)] })
+  }
+  const cierre: FoldTableRow = {
+    id: 'total',
+    cells: [`Detenido, ${imputacion.turnos} turno${imputacion.turnos === 1 ? '' : 's'}`, '', fmtDurationSec(total)],
+  }
 
   const pctCausa = Math.round(imputacion.cobertura * 100)
   const tendTxt = tend == null
     ? ''
     : tend.dir === 'estable'
-      ? ', estable en el período'
-      : `, ${Math.abs(Math.round(tend.deltaPts))} puntos ${tend.dir === 'sube' ? 'más' : 'menos'} que en la primera mitad del período`
+      ? ' Estable en el período.'
+      : ` ${Math.abs(Math.round(tend.deltaPts))} puntos ${tend.dir === 'sube' ? 'más' : 'menos'} que en la primera mitad del período.`
 
   return (
-    <section className="space-y-2.5">
-      <h2 className="text-headline">Por qué se detuvo</h2>
+    <SeccionLectura titulo="Por qué se detuvo" className={className} testId="por-que-se-detuvo">
       <FoldTable
+        lectura
         caption="Causas de detención del período"
         columns={[
           { id: 'causa', label: 'Causa' },
-          { id: 'dueno', label: 'Quién responde' },
+          { id: 'dueno', label: 'Responde', soloPC: true },
           { id: 'tiempo', label: 'Tiempo', align: 'right' },
         ]}
         rows={rows}
         cierre={cierre}
-        nota={`${fmtDurationSec(total)} detenidas en ${imputacion.turnos} turno${imputacion.turnos === 1 ? '' : 's'}. Con causa anotada: ${pctCausa}${ESPACIO_DURO}%${tendTxt}.`}
+        nota={
+          <>
+            <span className="font-semibold text-foreground tabular-nums">{`${pctCausa}${ESPACIO_DURO}% con causa.`}</span>
+            {tendTxt}
+          </>
+        }
       />
       {imputacion.topCategorias.length > 0 && (
         <Disclosure
@@ -298,18 +310,14 @@ function PorQueSeDetuvoApple({ imputacion }: { imputacion: PeriodImputacion }) {
           defaultOpen={false}
           storageKey="grader-imputacion-causales"
         >
-          <div className="flex flex-wrap gap-1">
-            {imputacion.topCategorias.slice(0, 5).map((c) => (
-              <span
-                key={c.label}
-                className="text-caption px-2 py-0.5 rounded-full bg-muted text-muted-foreground tabular-nums"
-              >
-                {c.label} <b className="text-foreground/80">{fmtDurationSec(c.durationSec)}</b>
-              </span>
-            ))}
-          </div>
+          <FilasLectura
+            filas={imputacion.topCategorias.slice(0, 5).map((c) => ({
+              rotulo: rotuloCausaApple(c.label),
+              valor: fmtDurationSec(c.durationSec),
+            }))}
+          />
         </Disclosure>
       )}
-    </section>
+    </SeccionLectura>
   )
 }

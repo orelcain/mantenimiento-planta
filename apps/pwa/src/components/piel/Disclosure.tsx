@@ -66,7 +66,7 @@ export function Disclosure({
   }, [storageKey, open])
 
   return (
-    <section className={cn(!inline && 'overflow-hidden rounded-card bg-card', className)}>
+    <section data-superficie={inline ? undefined : 'tarjeta'} className={cn(!inline && 'overflow-hidden rounded-card bg-card', className)}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

@@ -1525,3 +1525,78 @@ html.vidrio-solido.dark .vidrio {
   outline: 2px solid var(--lc-aqua);
   outline-offset: 2px;
 }
+
+/* ── MODO LECTURA GLOBAL (10-11-2026) ────────────────────────────────────────
+   Interruptor «Modo lectura» (menú de usuario + ícono junto al Sol/Luna):
+   `data-modo-lectura="on"` en <html>, ver src/lib/modoLectura.ts.
+   Solo con la piel Apple y solo dentro del contenido (#main-content); <main> se
+   excluye con `data-sin-lectura` en lienzos, pantallas de alto fijo y el inicio.
+   Las tarjetas neutras se aplanan en secciones con filete arriba (sin fondo, borde,
+   sombra ni radio). Los menús flotantes (absolute/fixed/sticky) y los tintes de
+   estado no se tocan. Letra: 17 base y 15 secundaria en celular, 15/15 en PC.
+   Las pantallas hechas a mano en lectura (Informe de turno, Jack-Knife, Período,
+   Causa raíz) ya no tienen tarjetas: esta capa no las cambia. */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) {
+  font-size: 15px;
+  line-height: 1.5;
+}
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card):not(.absolute, .fixed, .sticky) {
+  background-color: transparent !important;
+  border-width: 1px 0 0 0 !important;
+  border-style: solid !important;
+  border-color: rgb(var(--border) / 0.6) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+/* Sin la caja, el relleno lateral solo sangraba el contenido respecto del título:
+   la sección queda alineada al margen de la página (también CardHeader/CardContent). */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card):not(.absolute, .fixed, .sticky),
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  [data-superficie='tarjeta']:not(.absolute, .fixed, .sticky) > * {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+/* Tarjeta dentro de tarjeta: sin segundo filete. */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card)
+  :is([data-superficie='tarjeta'], .bg-card.rounded-card):not(.absolute, .fixed, .sticky) {
+  border-top-width: 0 !important;
+}
+/* Tarjetas que son botón o enlace: al quedar sin fondo, el hover devuelve la señal. */
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura])
+  :is(a, button).bg-card.rounded-card:hover {
+  background-color: rgb(var(--muted) / 0.5) !important;
+}
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) .text-sm {
+  font-size: 15px;
+  line-height: 1.45;
+}
+:root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) .text-xs {
+  font-size: 13px;
+  line-height: 1.4;
+}
+@media (pointer: coarse), (max-width: 640px) {
+  :root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) {
+    font-size: 17px;
+  }
+}
+
+/* Un escalón más de letra en TODO el contenido, también en las pantallas ya hechas
+   en lectura (Informe de turno, Jack-Knife, Período, Causa raíz): sus tamaños y los
+   roles de la escala tipográfica multiplican por --escala-texto. La Bitácora fija la
+   suya en <html> (style inline) cuando la persona eligió otro tamaño: entonces manda
+   esa elección y esta regla no aplica. */
+:root[data-skin='apple'][data-modo-lectura='on']:not([style*='--escala-texto']) #main-content:not([data-sin-lectura]) {
+  --escala-texto: 1.12;
+}
+/* Ancho de lectura en PC: el contenido no pasa de 1280 px y queda centrado, así las
+   líneas de texto y las tablas no cruzan una pantalla ancha de lado a lado. */
+@media (min-width: 1024px) {
+  :root[data-skin='apple'][data-modo-lectura='on'] #main-content:not([data-sin-lectura]) > * {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

@@ -245,7 +245,11 @@ function ComentariosCausa({ causa, todos, busqueda, onBusqueda, palabra, onPalab
   )
 }
 
-export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
+export function JackKnifeCard({ plantSlug, planta }: {
+  plantSlug: string
+  /** PC (piel Apple): selector de planta al inicio de la barra de controles del tablero. */
+  planta?: ReactNode
+}) {
   // Filtros desde el QR o el link del informe (#jk=…), leídos una sola vez al abrir.
   const [inicial] = useState(() => leerEstadoJK(window.location.hash, plantSlug))
   const [crudos, setCrudos] = useState<TurnoCrudo[] | null>(null)
@@ -580,6 +584,8 @@ export function JackKnifeCard({ plantSlug }: { plantSlug: string }) {
                 exportable={n > 0}
                 exportando={pdfEnCurso}
                 onExportar={(formato) => void descargar(formato)}
+                planta={planta}
+                rangoAntes={previa}
               />
             ) : (
               <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">

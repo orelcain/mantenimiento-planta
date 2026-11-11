@@ -9,6 +9,7 @@
  */
 import { getAriaConfig } from '@/services/ariaThinkingTracker'
 import { normalizeForSpeech, plainForSpeech, splitForTTS } from '@/lib/speechNormalize'
+import { tonoDeTexto, type TonoAvatar } from '@/lib/ariaTono'
 import { dec2 } from '@/utils/formatoNumeros'
 
 export interface VoicePref {
@@ -129,8 +130,10 @@ async function isAikoUp(): Promise<boolean> {
 // El motor por defecto (Web Speech API) no expone un stream de audio analizable,
 // así que el avatar engancha aquí: notificamos true al empezar a hablar (cualquier
 // motor) y false al terminar/cancelar. Cubre los 3 motores vía speakWith.
-type SpeakingListener = (speaking: boolean) => void
+// El 2.º argumento es el tono de lo que se está diciendo: el avatar elige con él su clip de expresión.
+type SpeakingListener = (speaking: boolean, tono: TonoAvatar) => void
 const speakingListeners = new Set<SpeakingListener>()
+let tonoActual: TonoAvatar = 'explicando'
 /** Suscribe a cambios de "ARIA está hablando". Devuelve la función de baja. */
 export function onSpeakingChange(fn: SpeakingListener): () => void {
   speakingListeners.add(fn)
@@ -138,7 +141,7 @@ export function onSpeakingChange(fn: SpeakingListener): () => void {
 }
 function emitSpeaking(v: boolean): void {
   speakingListeners.forEach((fn) => {
-    try { fn(v) } catch { /* un listener roto no debe cortar la voz */ }
+    try { fn(v, tonoActual) } catch { /* un listener roto no debe cortar la voz */ }
   })
 }
 
@@ -451,6 +454,7 @@ interface SpeakOpts { onend?: () => void; onerror?: () => void }
 /** Habla con una voz/velocidad explícitas (para "Probar voz"). */
 export function speakWith(text: string, voiceURI: string | undefined, rate: number, opts: SpeakOpts = {}): void {
   stopSpeaking()
+  tonoActual = tonoDeTexto(text)
   text = normalizeForSpeech(plainForSpeech(text)) // 1) quita tabla/emojis/markdown 2) números/acrónimos → forma hablada
   const r = rate || 1.0
   // Troceo por frases: la 1ª suena en ~1-2 s y las demás se precargan mientras suena,

@@ -11,6 +11,7 @@ const Card = React.forwardRef<
       'rounded-card border border-card-edge bg-card text-card-foreground shadow-sm',
       className
     )}
+    data-superficie="tarjeta"
     {...props}
   />
 ))

@@ -139,7 +139,9 @@ describe('título y «Sin hora»', () => {
     // Correo 23-09: el equipo en la cabecera celeste (sin hora: sin celda de hora, dos
     // columnas) y el título abre el desglose.
     const html = bitacoraAHtmlCorreo(datos([e]))
-    expect(html).toMatch(/>CASINO<\/b><\/td><\/tr><tr><td colspan="2"[^>]*><div style="[^"]*">Cambio de tubos<\/div>/)
+    expect(html).toMatch(/>CASINO<\/div>/)
+    expect(html).toContain('>Cambio de tubos</div>')
+    expect(html).not.toMatch(/ · <\/div>/)
     expect(html).not.toContain('> · ')
     const plano = bitacoraATextoPlano(datos([e]))
     expect(plano).toContain('\nCASINO · Cambio de tubos\n')

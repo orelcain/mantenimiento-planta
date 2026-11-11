@@ -58,6 +58,7 @@ import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/servi
 import { loadSidebarConfig } from '@/services/sidebarConfig'
 import { useTheme } from '@/hooks/useTheme'
 import { ControlIntensidad } from '@/components/piel/ControlIntensidad'
+import { BotonLectura, ControlLectura } from '@/components/piel/ControlLectura'
 import { usePielApple } from '@/hooks/usePielApple'
 import {
   claseAsidePC,
@@ -707,6 +708,7 @@ export function MainLayout() {
               {userMenuOpen && (
                 <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                   <ControlIntensidad />
+                  <ControlLectura />
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -744,6 +746,7 @@ export function MainLayout() {
                   <span className="font-semibold">Mantenimiento</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <BotonLectura iconClassName="h-5 w-5" />
                   <button
                     onClick={toggleTheme}
                     title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
@@ -839,6 +842,7 @@ export function MainLayout() {
                   {userMenuOpen && (
                     <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-card shadow-lg overflow-hidden">
                       <ControlIntensidad />
+                      <ControlLectura />
                       <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
@@ -944,6 +948,7 @@ export function MainLayout() {
                 </Button>
               )}
             </div>
+            <BotonLectura />
             <button
               onClick={toggleTheme}
               title={isDark ? 'Cambiar a vista clara' : 'Cambiar a vista oscura'}
@@ -1206,6 +1211,13 @@ export function MainLayout() {
         {/* Page content */}
         <main
           id="main-content"
+          // Modo lectura global: no aplica a lienzos, pantallas de alto fijo (HMI, mapas,
+          // planos, Repuestos, líneas, clima) ni al inicio de mosaicos.
+          data-sin-lectura={
+            modoHerr === 'lienzo' || isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute ||
+            isPlanosAguasRoute || isRepuestosRoute || isLineasRoute || location.pathname === '/'
+              ? '' : undefined
+          }
           className={`${
             modoHerr === 'lienzo'
               // Alto exacto del dispositivo: ya no hay barra inferior que descontar (antes -4rem).

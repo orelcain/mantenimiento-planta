@@ -34,6 +34,7 @@ import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
 import { CifrasExpedientePC } from './CifrasExpedientePC'
 import { DetalleExpedientePC } from './DetalleExpedientePC'
+import { PiezasExpedientePC, TurnoExpedientePC } from './TurnoExpedientePC'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina, paradasDetalle, varaDeMinuto, type VaciosTurno } from './ritmoVivo'
 import { desgloseDe, detencionesPorMinuto, varaCambio, type Desglose } from './desglose'
@@ -1312,6 +1313,8 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   const reloj = p.rep.activa ? p.rep.reloj : relojRecta
   const [abierta, setAbierta] = useState<ClaveTurno | null>(null)
   const abrir = (k: ClaveTurno) => () => setAbierta(k)
+  /* En PC (≥1024 px) los detalles son ventanas expediente (lienzo «Resto del Monitor en PC», opción A del 10-11). */
+  const pc = useEsPc()
   /* Las piezas que la vista dice en TODAS partes (franja, gráfico, Camino a la meta y este detalle): lo que la reproducción
      muestra en reposo, o el contador vivo sin ella. El detalle de «Piezas del turno» no puede decir otra cifra que la celda. */
   const mostradas = piezasMostradas(p.repro, p.piezas)
@@ -1526,6 +1529,30 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
     </div>
   )
 
+  /* En PC, «Piezas del turno» abre la ventana expediente: costado con la cifra, la meta y cada máquina; a la derecha la curva y
+     la tabla hora a hora cerrada con el turno. Las mismas cifras que la capa del celular (`ampliadoPiezas`). */
+  const ventanaPiezas = (abiertaPC: boolean, cerrar: () => void) => (
+    <PiezasExpedientePC
+      abierta={abiertaPC}
+      onClose={cerrar}
+      p={p}
+      mostradas={mostradas}
+      grafico={p.curva ? (
+        <Curva
+          curva={p.curva}
+          inicioMs={p.inicioMs}
+          alto={220}
+          conDiferencia
+          enVivo={!p.cerrado}
+          proyeccion={conProyeccion && p.curva.maxMin > finCurva + 1 ? { min: p.curva.maxMin, piezas: p.proyeccion! } : null}
+        />
+      ) : null}
+      previo={previoUna ? { calc: calcPrevio, respaldo: previoUna } : null}
+      vsAyer={!previoUna && previoSinAlinear ? p.vsAyer : null}
+    />
+  )
+  const cerrarDetalle = () => setAbierta(null)
+
   return (
     <VistaVivaCtx.Provider value={vistaViva}>
     <div ref={raizRef} className="monitor-v2 flex flex-col gap-[12px] min-[1600px]:gap-[16px]">
@@ -1533,7 +1560,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
           unido) → «Cada máquina · aporte» → «Ver más del turno». Duelo, fallas y tiempo perdido viven bajo «Ver más». */}
       {p.banda}
 
-      <FranjaCinta p={p} reloj={reloj} ampliadoPiezas={ampliadoPiezas} abrir={(k) => setAbierta(k)} camino={p.caminoMeta} />
+      <FranjaCinta p={p} reloj={reloj} ampliadoPiezas={ampliadoPiezas} ventanaPiezasPC={ventanaPiezas} abrir={(k) => setAbierta(k)} camino={p.caminoMeta} />
 
       {p.eje
         ? <GraficoRitmoVivo p={p} e={p.eje} reloj={reloj} ampliado={p.ritmoVivoAmpliado} abrirCon={p.ritmoVivoAbrirCon} />
@@ -1619,9 +1646,17 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
       )}
       <BotonDetalle vista={p.vista} onVista={p.onVista} />
 
-      <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
-        {detalle?.cuerpo}
-      </PanelDetalle>
+      {pc ? (
+        <>
+          {/* «Mantención: ver detalle» y «Tiempo perdido» abren la ventana que ya existe para ellos, sin repetir su contenido. */}
+          <CifrasExpedientePC open={abierta === 'mant' || abierta === 'perdido'} onClose={cerrarDetalle} datos={p} />
+          <TurnoExpedientePC clave={abierta === 'ritmo' || abierta === 'cierre' || abierta === 'maquinas' ? abierta : null} onClose={cerrarDetalle} p={p} reloj={reloj} />
+        </>
+      ) : (
+        <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={cerrarDetalle}>
+          {detalle?.cuerpo}
+        </PanelDetalle>
+      )}
     </div>
     </VistaVivaCtx.Provider>
   )

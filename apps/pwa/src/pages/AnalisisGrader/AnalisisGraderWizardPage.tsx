@@ -802,11 +802,13 @@ export function AnalisisGraderWizardPage() {
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-wrap items-center gap-4">
           <div className="min-w-0">
-            <h1 className={apple ? 'text-display' : 'text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]'}>
-              Análisis de turno
-            </h1>
-            {/* Piel Apple: el estado del turno va justo bajo el título, como una línea de texto. */}
-            {apple && !isManual && <CurrentShiftChip plantLineId={lineId} className="mt-2" />}
+            {/* Piel Apple (modo lectura): el titular de la pantalla lo pone el tablero
+                («La Baader 2 es la que más pierde…»); el nombre del módulo ya está en el menú. */}
+            {(!apple || isManual) && (
+              <h1 className={apple ? 'text-display' : 'text-[1.9rem] font-bold leading-none tracking-[-0.028em] lg:text-[2.15rem]'}>
+                Análisis de turno
+              </h1>
+            )}
             {/* Piel Apple: el subtítulo «Línea completa Grader + Baaders» sale; las otras dos líneas lo mantienen. */}
             {!(apple && lineConfig.hasGraderData && lineConfig.isClassificationPlant !== false) && (
             <p className="mt-2 text-[0.85rem] text-muted-foreground">
@@ -991,16 +993,60 @@ export function AnalisisGraderWizardPage() {
         />
       )}
 
-      {/* ═══ Grid 2-col que arranca en las pestañas de planta ═══ */}
+      {/* ═══ Indicadores del período ═══ */}
       {!isManual && (
       <>
+      {apple ? (
+        /* Piel Apple, modo lectura (opción A, «secciones pareadas»): el titular cruza
+           las dos columnas y debajo van pares con filete, 7/5 en PC: «Por máquina» con
+           «Cómo se usó el día» y «Por qué se detuvo» con el mes. En el celular, una
+           columna: máquinas, por qué, el día y el mes (`max-lg:order-*` los deja al final). */
+        <>
+          <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
+          <div className="grid grid-cols-1 items-start gap-y-[26px] lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-x-12" data-testid="periodo-lectura">
+            <PlantKPIBoard
+              period={kpiPeriodo}
+              onPeriodChange={setKpiPeriodo}
+              plantSlug={lineConfig.plantSlug}
+              plantLineId={lineId}
+              graderSummaries={calendarSummaries}
+              enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+              selectedDateKey={selectedDateKey}
+              currentMonth={calendarMonth}
+              ranuras={{
+                cabecera: <CurrentShiftChip plantLineId={lineId} lectura />,
+                titular: 'lg:col-span-2 lg:row-start-1',
+                maquinas: 'lg:col-start-1 lg:row-start-2',
+              }}
+            />
+            <DayTimeSummaryBar
+              className="max-lg:order-1 lg:col-start-2 lg:row-start-2"
+              dateKey={selectedDateKey ?? todayDateKey}
+              plantSlug={lineConfig.plantSlug}
+              enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+            />
+            <GraderMonthlyStatsPanel
+              currentMonth={calendarMonth}
+              summaries={calendarSummaries}
+              slxStats={calendarSlxStats}
+              isClassificationPlant={lineConfig.isClassificationPlant !== false}
+              tieneGrader={lineConfig.hasGraderData !== false}
+              plantSlug={lineConfig.shoplogixEnabled && !lineConfig.comingSoon ? lineConfig.plantSlug : null}
+              ranuras={{
+                porQue: 'lg:col-start-1 lg:row-start-3',
+                mes: 'max-lg:order-2 lg:col-start-2 lg:row-start-3',
+              }}
+            />
+          </div>
+        </>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
         {/* Col izquierda: pestañas + KPI */}
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
             <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
-            {!apple && <CurrentShiftChip plantLineId={lineId} />}
+            <CurrentShiftChip plantLineId={lineId} />
           </div>
           <PlantKPIBoard
             period={kpiPeriodo}
@@ -1017,25 +1063,12 @@ export function AnalisisGraderWizardPage() {
               turno: ahí sumaba las horas de todos los turnos del día contra un
               turno de 8 h, y quedaban dos escalas distintas en la misma
               pantalla ("55 h detenidas" en un turno de 8 h). */}
-          {!apple && (
           <DayTimeSummaryBar
             dateKey={selectedDateKey ?? todayDateKey}
             plantSlug={lineConfig.plantSlug}
             enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
           />
-          )}
         </div>
-
-        {/* Piel Apple: la barra del día va a todo el ancho, después de los indicadores
-            en el móvil y debajo de las dos columnas en PC (`lg:order-last`). */}
-        {apple && (
-          <DayTimeSummaryBar
-            className="lg:col-span-2 lg:order-last"
-            dateKey={selectedDateKey ?? todayDateKey}
-            plantSlug={lineConfig.plantSlug}
-            enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
-          />
-        )}
 
         {/* Col derecha: Resumen del mes — arranca a la altura de las pestañas */}
         <GraderMonthlyStatsPanel
@@ -1047,6 +1080,7 @@ export function AnalisisGraderWizardPage() {
           plantSlug={lineConfig.shoplogixEnabled && !lineConfig.comingSoon ? lineConfig.plantSlug : null}
         />
       </div>
+      )}
 
       {/* Vista de período por TURNO (matriz / lista) — reemplaza al calendario
           mensual: acá un turno que cruza medianoche ocupa UNA celda en vez de

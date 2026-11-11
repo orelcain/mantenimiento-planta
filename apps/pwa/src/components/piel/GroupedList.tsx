@@ -42,7 +42,7 @@ export function ListGroup({ title, action, footer, className, children, ...props
       )}
       {/* Paleta Pizarra: borde de 1 px (--card-edge) y sin sombra, que con reflejo de planta no
           separa; sin Pizarra las clases [[data-paleta=pizarra]_&]: no aplican y queda igual. */}
-      <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [[data-paleta=pizarra]_&]:border [[data-paleta=pizarra]_&]:border-card-edge [[data-paleta=pizarra]_&]:shadow-none">
+      <div data-superficie="tarjeta" className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none [[data-paleta=pizarra]_&]:border [[data-paleta=pizarra]_&]:border-card-edge [[data-paleta=pizarra]_&]:shadow-none">
         {children}
       </div>
       {footer && <p className="px-4 pt-2 text-[0.75rem] text-muted-foreground">{footer}</p>}

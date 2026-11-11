@@ -44,11 +44,14 @@ describe('ImputacionPeriodCard · piel Apple', () => {
     document.documentElement.removeAttribute('data-skin')
   })
 
-  it('muestra el título y una tabla de tres columnas', () => {
+  it('muestra el título como sección con filete y una tabla de tres columnas', () => {
     const { container } = render(<ImputacionPeriodCard imputacion={imp()} />)
     expect(container.querySelector('h2')?.textContent).toBe('Por qué se detuvo')
+    expect(container.querySelector('section')?.className).toContain('border-t')
     const cabeceras = Array.from(container.querySelectorAll('thead th')).map((th) => th.textContent)
-    expect(cabeceras).toEqual(['Causa', 'Quién responde', 'Tiempo'])
+    expect(cabeceras).toEqual(['Causa', 'Responde', 'Tiempo'])
+    // «Responde» solo en PC: en el celular la columna no se dibuja.
+    expect(container.querySelectorAll('thead th')[1]!.className).toContain('hidden lg:table-cell')
   })
 
   it('ordena por tiempo y deja la fila de Mantención en peso 600', () => {
@@ -69,19 +72,21 @@ describe('ImputacionPeriodCard · piel Apple', () => {
     expect(texto).toContain(`8${NBSP}%`)
   })
 
-  it('cierra con la fila de lo sin anotar y su porcentaje', () => {
+  it('lo sin anotar es una fila con su tiempo y su porcentaje, y el cierre es el total detenido', () => {
     const { container } = render(<ImputacionPeriodCard imputacion={imp()} />)
-    const cierre = container.querySelector('tfoot, tr.border-t-2')
-    expect(cierre?.textContent).toContain('Sin anotar')
+    const trs = Array.from(container.querySelectorAll('tbody tr'))
+    const sinAnotar = trs.find((tr) => tr.textContent?.startsWith('Sin anotar'))
     // 100 h detenidas, 88 h con causa → 12 h sin anotar = 12 %.
-    expect(cierre?.textContent).toContain(`12${NBSP}%`)
+    expect(sinAnotar?.textContent).toContain(`12${NBSP}%`)
+    const cierre = trs[trs.length - 1]!
+    expect(cierre.className).toContain('border-foreground')
+    expect(cierre.textContent).toContain('Detenido, 12 turnos')
   })
 
-  it('dice el total detenido y la cobertura en una nota de 13 px', () => {
+  it('la nota abre con la cobertura en negrita', () => {
     const { container } = render(<ImputacionPeriodCard imputacion={imp()} />)
-    const texto = container.textContent ?? ''
-    expect(texto).toContain('12 turnos')
-    expect(texto).toContain(`Con causa anotada: 88${NBSP}%`)
+    const negrita = Array.from(container.querySelectorAll('span.font-semibold')).map((e) => e.textContent)
+    expect(negrita).toContain(`88${NBSP}% con causa.`)
   })
 
   it('no trae guiones ni puntos medios en el texto visible', () => {
