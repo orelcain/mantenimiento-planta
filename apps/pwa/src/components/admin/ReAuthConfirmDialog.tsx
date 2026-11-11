@@ -35,6 +35,9 @@ import {
 } from '@/components/ui'
 import { ShieldAlert } from 'lucide-react'
 import { logger } from '@/lib/logger'
+import type { MultiFactorResolver } from 'firebase/auth'
+import { Campo2FA } from '@/components/auth/Campo2FA'
+import { pideSegundoPaso, resolverDe, resolverConCodigo, codigoCompleto, mensajeError2FA } from '@/services/mfa'
 
 interface ReAuthConfirmDialogProps {
   open: boolean
@@ -58,6 +61,9 @@ export function ReAuthConfirmDialog({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [attempts, setAttempts] = useState(0)
+  // Con 2FA activo, re-autenticar también pide el código de la app (services/mfa.ts).
+  const [resolver2FA, setResolver2FA] = useState<MultiFactorResolver | null>(null)
+  const [codigo, setCodigo] = useState('')
 
   // Limpiar estado al abrir
   useEffect(() => {
@@ -65,6 +71,8 @@ export function ReAuthConfirmDialog({
       setPassword('')
       setError(null)
       setAttempts(0)
+      setResolver2FA(null)
+      setCodigo('')
     }
   }, [open])
 
@@ -86,6 +94,12 @@ export function ReAuthConfirmDialog({
     setLoading(true)
     setError(null)
     try {
+      if (resolver2FA) {
+        await resolverConCodigo(resolver2FA, codigo)
+        onOpenChange(false)
+        await onConfirmed()
+        return
+      }
       if (conGoogle) {
         await reauthenticateWithPopup(currentUser, new GoogleAuthProvider())
       } else {
@@ -96,6 +110,16 @@ export function ReAuthConfirmDialog({
       onOpenChange(false)
       await onConfirmed()
     } catch (err) {
+      if (!resolver2FA && pideSegundoPaso(err)) {
+        // Contraseña correcta; falta el código de la app autenticadora.
+        setResolver2FA(resolverDe(err))
+        return
+      }
+      if (resolver2FA) {
+        setCodigo('')
+        setError(mensajeError2FA(err))
+        return
+      }
       const newAttempts = attempts + 1
       setAttempts(newAttempts)
       const code = (err as { code?: string }).code ?? ''
@@ -112,7 +136,7 @@ export function ReAuthConfirmDialog({
     } finally {
       setLoading(false)
     }
-  }, [password, attempts, onConfirmed, onOpenChange])
+  }, [password, attempts, onConfirmed, onOpenChange, resolver2FA, codigo])
 
   const userEmail = auth.currentUser?.email ?? '—'
 
@@ -136,7 +160,10 @@ export function ReAuthConfirmDialog({
           onSubmit={(e) => { e.preventDefault(); handleConfirm() }}
           className="space-y-3"
         >
-          {!esGoogle && (
+          {resolver2FA && (
+            <Campo2FA id="reauth-dialog-2fa" valor={codigo} onCambio={setCodigo} deshabilitado={loading} />
+          )}
+          {!esGoogle && !resolver2FA && (
             <div className="space-y-1.5">
               <Label htmlFor="reauth-dialog-pwd">Contraseña</Label>
               <Input
@@ -163,8 +190,8 @@ export function ReAuthConfirmDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" size="sm" disabled={loading || (!esGoogle && !password)}>
-              {loading ? <Spinner /> : esGoogle ? 'Confirmar con Google' : 'Confirmar y guardar'}
+            <Button type="submit" size="sm" disabled={loading || (resolver2FA ? !codigoCompleto(codigo) : !esGoogle && !password)}>
+              {loading ? <Spinner /> : resolver2FA ? 'Verificar y guardar' : esGoogle ? 'Confirmar con Google' : 'Confirmar y guardar'}
             </Button>
           </DialogFooter>
         </form>

@@ -35,9 +35,17 @@ export async function setAuthPersistence(remember: boolean): Promise<void> {
 }
 
 // Iniciar sesión con email/password
+// Si la cuenta tiene 2FA, signInWithEmailAndPassword lanza
+// `auth/multi-factor-auth-required`: LoginPage pide el código y termina con
+// `completarIngreso(cred.user)` (services/mfa.ts).
 export async function signIn(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email, password)
-  const user = await getUserByIdConTokenFresco(credential.user)
+  return completarIngreso(credential.user)
+}
+
+/** Lo que sigue a una credencial válida: perfil, cuenta activa, preferencias. */
+export async function completarIngreso(firebaseUser: FirebaseUser): Promise<User> {
+  const user = await getUserByIdConTokenFresco(firebaseUser)
   if (!user) {
     throw new Error('Usuario no encontrado en la base de datos')
   }

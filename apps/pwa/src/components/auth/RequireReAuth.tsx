@@ -36,6 +36,9 @@ import {
 } from '@/components/ui'
 import { ShieldAlert, LogIn } from 'lucide-react'
 import { logger } from '@/lib/logger'
+import type { MultiFactorResolver } from 'firebase/auth'
+import { Campo2FA } from '@/components/auth/Campo2FA'
+import { pideSegundoPaso, resolverDe, resolverConCodigo, codigoCompleto, mensajeError2FA } from '@/services/mfa'
 
 interface RequireReAuthProps {
   children: ReactNode
@@ -51,9 +54,28 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [attempts, setAttempts] = useState(0)
+  // Con 2FA activo, re-autenticar también pide el código de la app (services/mfa.ts).
+  const [resolver2FA, setResolver2FA] = useState<MultiFactorResolver | null>(null)
+  const [codigo, setCodigo] = useState('')
 
   const handleSubmit = useCallback(async () => {
     setError(null)
+
+    if (resolver2FA) {
+      if (!codigoCompleto(codigo)) return
+      setLoading(true)
+      try {
+        await resolverConCodigo(resolver2FA, codigo)
+        setAuthenticated(true)
+        setPassword('')
+      } catch (err) {
+        setCodigo('')
+        setError(mensajeError2FA(err))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
 
     const currentUser = auth.currentUser
     if (!currentUser || !currentUser.email) {
@@ -81,6 +103,10 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
       setAuthenticated(true)
       setPassword('')
     } catch (err) {
+      if (pideSegundoPaso(err)) {
+        setResolver2FA(resolverDe(err))
+        return
+      }
       const newAttempts = attempts + 1
       setAttempts(newAttempts)
       // Mensajes específicos para los códigos de Firebase Auth más comunes
@@ -97,7 +123,7 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
     } finally {
       setLoading(false)
     }
-  }, [email, password, attempts])
+  }, [email, password, attempts, resolver2FA, codigo])
 
   // Si el usuario ya pasó el gate, dejarlo pasar al contenido protegido
   if (authenticated) {
@@ -131,7 +157,10 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
             }}
             className="space-y-3 pt-1"
           >
-            <div className="space-y-1.5">
+            {resolver2FA && (
+              <Campo2FA id="reauth-2fa" valor={codigo} onCambio={setCodigo} deshabilitado={loading} />
+            )}
+            <div className={resolver2FA ? 'hidden' : 'space-y-1.5'}>
               <Label htmlFor="reauth-email">Email</Label>
               <Input
                 id="reauth-email"
@@ -143,7 +172,7 @@ export function RequireReAuth({ children, reason }: RequireReAuthProps) {
                 autoFocus
               />
             </div>
-            <div className="space-y-1.5">
+            <div className={resolver2FA ? 'hidden' : 'space-y-1.5'}>
               <Label htmlFor="reauth-password">Contraseña</Label>
               <div className="flex gap-1.5">
                 <Input
