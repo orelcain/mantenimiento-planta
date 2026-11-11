@@ -20,7 +20,7 @@ import { Wrench } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CapaAmpliada } from './AmpliarV2'
 import { aEstaHora, piezasMostradas } from './aEstaHora'
-import { useAnchoMin, useCuentaCifra } from './ampliarHooks'
+import { useAnchoMin, useCuentaCifra, useEsPc } from './ampliarHooks'
 import { CifraViva } from './CifraViva'
 import { FloteMas } from './FloteMas'
 import { esperadoPorMinuto, int, minutosCompletos, partesAdelanteAtras, relojDe, sumaPorMinuto, tonoRitmo, type EstadoBaader, type TonoRitmo } from './ejeTurno'
@@ -276,12 +276,14 @@ function ContraLaMeta({ p, e, reloj, abrir }: { p: MonitorV2Props; e: EjeDatos |
 
 // ── La franja ────────────────────────────────────────────────────────────────
 
-export function FranjaCinta({ p, reloj, ampliadoPiezas, abrir, camino }: {
+export function FranjaCinta({ p, reloj, ampliadoPiezas, ventanaPiezasPC, abrir, camino }: {
   p: MonitorV2Props
   /** El reloj de datos del monitor (con la reproducción activa, la reproducción): la cifra de piezas lo sigue. */
   reloj: RelojDeDatos
   /** El detalle de «Piezas del turno» (curva contra otros días, hora a hora): se abre tocando la celda. */
   ampliadoPiezas: ReactNode
+  /** En PC (≥1024 px), tocar la celda abre esta ventana expediente en vez de la capa de 880 px; en celular sigue la capa. */
+  ventanaPiezasPC?: (abierta: boolean, cerrar: () => void) => ReactNode
   abrir: (k: ClaveFranja) => void
   /** Camino a la meta ya armado como celda (`TiempoDelTurno v2="celda"`); sin él, la franja queda en cuatro celdas. */
   camino?: ReactNode
@@ -289,6 +291,7 @@ export function FranjaCinta({ p, reloj, ampliadoPiezas, abrir, camino }: {
   const e = p.eje ?? null
   /* Debajo de 768 px cada celda es su propia tarjeta; desde ahí, una sola con las celdas separadas por aire. */
   const apilada = !useAnchoMin(768)
+  const pc = useEsPc()
   const [ampliada, setAmpliada] = useState(false)
   const piezasRef = useRef<HTMLDivElement>(null)
   const filas = filasDeBaader(p, e)
@@ -307,9 +310,13 @@ export function FranjaCinta({ p, reloj, ampliadoPiezas, abrir, camino }: {
           </div>
           <PiezasVivas reloj={reloj} respaldo={p.piezas} meta={p.meta && p.meta > 0 ? p.meta : null} cuota={p.cuota?.piezas ?? null} cerrado={p.cerrado} />
         </Tocable>
-        <CapaAmpliada abierta={ampliada} onCerrar={() => setAmpliada(false)} origen={piezasRef} titulo="Piezas del turno" sub={p.curva ? 'hechas del turno contra el ritmo de la meta' : undefined}>
-          {ampliadoPiezas}
-        </CapaAmpliada>
+        {pc && ventanaPiezasPC
+          ? ventanaPiezasPC(ampliada, () => setAmpliada(false))
+          : (
+            <CapaAmpliada abierta={ampliada} onCerrar={() => setAmpliada(false)} origen={piezasRef} titulo="Piezas del turno" sub={p.curva ? 'hechas del turno contra el ritmo de la meta' : undefined}>
+              {ampliadoPiezas}
+            </CapaAmpliada>
+          )}
       </div>
     ),
   }

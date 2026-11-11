@@ -1,31 +1,33 @@
 /**
- * AriaAvatar — avatar de video web-native de ARIA.
+ * AriaAvatar — avatar de video de ARIA con polo y expresiones.
  *
- * Porta la técnica validada 10/10 del demo local (web_avatar/demo_referencia.html):
- *   1) Video REAL (no foto): dos <video> superpuestos, idle ↔ talk_aligned.
- *   2) Alineación frame-a-frame + LOCKSTEP: talk_aligned es lip-sync sobre la PROPIA
- *      base idle → talk[i] = idle[i] (mismo cuerpo, distinta boca). Cada frame
- *      sincronizamos talk.currentTime = idle.currentTime → el crossfade cambia SOLO
- *      la boca = cero salto de pose.
- *   3) Blob-load (fetch → createObjectURL) de ambos videos → seeks instantáneos,
- *      sin stall al inicio. Sin cache-buster: el navegador cachea el .mp4 entre aperturas.
- *   4) Gate de "hablando": el motor por defecto (Web Speech API) no expone un stream
- *      de audio analizable, así que en la PWA enganchamos el estado a ariaVoice.speak
- *      (start → habla, onend → idle) vía onSpeakingChange, con el mismo suavizado
- *      ataque-rápido / release-gentil del demo. La boca para cuando ARIA termina de hablar.
+ * Dos <video> superpuestos:
+ *   - reposo: clip con la boca cerrada en ida y vuelta (loop sin salto), siempre en marcha.
+ *   - habla: el clip de la expresión que corresponde al tono de lo que ARIA dice
+ *     (saludo, explicando, buena noticia, error, alerta; ver lib/ariaTono.ts).
+ * Al empezar a hablar se carga el clip del tono, parte desde 0 y entra con un fundido
+ * rápido; al terminar sale con un fundido suave y se pausa.
  *
- * Los videos están en apps/pwa/public/aria/{idle,talk_aligned}.mp4 (≈0.5 MB c/u),
- * generados localmente con LongCat (idle, ojos abiertos) + Wav2Lip (talk sobre el idle).
+ * Los clips (apps/pwa/public/aria/polo/*.mp4, 448 × 576, ~500 KB en total) salen de LongCat
+ * con la voz de Aiko y la boca contenida por deformación (Videos/LTX-Videos/ARIA-avatar-test/
+ * biblioteca_polo/silencio/boca_contenida.py). Se bajan como blob para que el cambio sea instantáneo:
+ * primero el reposo y después el resto en segundo plano.
  */
 import { useEffect, useRef, useState } from 'react'
 import { onSpeakingChange } from '@/lib/ariaVoice'
+import type { TonoAvatar } from '@/lib/ariaTono'
 
-const IDLE_SRC = `${import.meta.env.BASE_URL}aria/idle.mp4`
-const TALK_SRC = `${import.meta.env.BASE_URL}aria/talk_aligned.mp4`
+const BASE = `${import.meta.env.BASE_URL}aria/polo/`
+const REPOSO = `${BASE}reposo.mp4`
+const TONOS: TonoAvatar[] = ['explicando', 'saludo', 'buena_noticia', 'error', 'alerta']
+const urlTono = (t: TonoAvatar) => `${BASE}${t}.mp4`
 
-export function AriaAvatar({ visible }: { visible: boolean }) {
-  const idleRef = useRef<HTMLVideoElement>(null)
-  const talkRef = useRef<HTMLVideoElement>(null)
+/** Tres tamaños, un solo componente: círculo (cabecera, 40 px), riel (escritorio) y escenario (celular al hablar). */
+export type TamanoAvatar = 'circulo' | 'riel' | 'escenario'
+
+export function AriaAvatar({ visible, tamano = 'riel' }: { visible: boolean; tamano?: TamanoAvatar }) {
+  const reposoRef = useRef<HTMLVideoElement>(null)
+  const hablaRef = useRef<HTMLVideoElement>(null)
   const speakingRef = useRef(false)
   const lvlRef = useRef(0)
   const rafRef = useRef<number | null>(null)
@@ -33,80 +35,89 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
 
   useEffect(() => {
     if (!visible) return
-    const idle = idleRef.current
-    const talk = talkRef.current
-    if (!idle || !talk) return
+    const reposo = reposoRef.current
+    const habla = hablaRef.current
+    if (!reposo || !habla) return
 
     let cancelled = false
-    const blobUrls: string[] = []
+    const blobs = new Map<string, string>()
+    const bajar = async (url: string) => {
+      if (blobs.has(url)) return blobs.get(url)!
+      const r = await fetch(url)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const u = URL.createObjectURL(await r.blob())
+      if (cancelled) { URL.revokeObjectURL(u); throw new Error('cancelado') }
+      blobs.set(url, u)
+      return u
+    }
 
-    // Precargar ambos videos COMPLETOS a memoria → seeks instantáneos (sin stall al inicio).
     void (async () => {
       try {
-        const [ri, rt] = await Promise.all([fetch(IDLE_SRC), fetch(TALK_SRC)])
-        if (cancelled) return
-        const iu = URL.createObjectURL(await ri.blob())
-        const tu = URL.createObjectURL(await rt.blob())
-        if (cancelled) {
-          URL.revokeObjectURL(iu)
-          URL.revokeObjectURL(tu)
-          return
-        }
-        blobUrls.push(iu, tu)
-        idle.src = iu
-        talk.src = tu
-        await Promise.all([idle.play().catch(() => {}), talk.play().catch(() => {})])
+        reposo.src = await bajar(REPOSO)
       } catch {
-        // Fallback: servir directo (el navegador hace streaming por rangos).
         if (cancelled) return
-        idle.src = IDLE_SRC
-        talk.src = TALK_SRC
-        idle.play().catch(() => {})
-        talk.play().catch(() => {})
+        reposo.src = REPOSO // sin blob: el navegador lo sirve por rangos
+      }
+      reposo.play().catch(() => {})
+      // El resto en segundo plano, de a uno, para no competir con la respuesta de ARIA.
+      for (const t of TONOS) {
+        if (cancelled) return
+        await bajar(urlTono(t)).catch(() => {})
       }
     })()
 
-    // LOCKSTEP CONTINUO desde que carga: idle y talk alineados frame-a-frame
-    // (mismo cuerpo, distinta boca). Al ir ya sincronizados, al empezar a hablar
-    // NO hay seek brusco. El gate solo cruza la opacidad de la boca.
     const loop = () => {
-      if (Math.abs(talk.currentTime - idle.currentTime) > 0.06) {
-        talk.currentTime = idle.currentTime
-      }
       const target = speakingRef.current ? 1 : 0
-      const k = target > lvlRef.current ? 0.5 : 0.1 // ataque rápido, release gentil
+      const k = target > lvlRef.current ? 0.35 : 0.12 // entra rápido, sale suave
       let lvl = lvlRef.current + (target - lvlRef.current) * k
       if (lvl < 0.01) lvl = 0
       if (lvl > 0.99) lvl = 1
+      if (lvl === 0 && lvlRef.current > 0) habla.pause()
       lvlRef.current = lvl
-      talk.style.opacity = lvl.toFixed(3)
+      habla.style.opacity = lvl.toFixed(3)
       rafRef.current = requestAnimationFrame(loop)
     }
     rafRef.current = requestAnimationFrame(loop)
 
-    const unsub = onSpeakingChange((s) => {
+    const unsub = onSpeakingChange((s, tono) => {
       speakingRef.current = s
       setIsSpeaking(s)
+      if (!s) return
+      const url = urlTono(tono)
+      const src = blobs.get(url) ?? url
+      if (habla.dataset.tono !== tono) {
+        habla.src = src
+        habla.dataset.tono = tono
+      }
+      habla.currentTime = 0
+      habla.play().catch(() => {})
     })
 
     return () => {
       cancelled = true
       unsub()
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
-      blobUrls.forEach((u) => URL.revokeObjectURL(u))
+      blobs.forEach((u) => URL.revokeObjectURL(u))
     }
   }, [visible])
 
   if (!visible) return null
 
+  // Rostro del video (448 × 576) en x 48 %, y 17 %: el recorte del círculo y del escenario lo mantiene.
+  const rostro = { objectPosition: '48% 17%' }
+  const marco = tamano === 'circulo'
+    ? `relative size-10 shrink-0 overflow-hidden rounded-full bg-black ${isSpeaking ? 'ring-2 ring-primary ring-offset-[3px] ring-offset-background' : ''}`
+    : tamano === 'escenario'
+      ? 'relative h-[min(52dvh,470px)] w-full overflow-hidden bg-black'
+      : `relative w-full aspect-[7/9] rounded-card overflow-hidden bg-black border transition-shadow duration-300 ${
+          isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgb(var(--brand)/0.45)]' : 'border-border shadow'
+        }`
+
   return (
-    <div
-      className={`relative w-full aspect-[7/9] rounded-card overflow-hidden bg-black border transition-shadow duration-300 ${
-        isSpeaking ? 'border-primary/60 shadow-[0_0_0_2px_rgb(var(--brand)/0.45)]' : 'border-border shadow'
-      }`}
-    >
+    <div className={marco}>
       <video
-        ref={idleRef}
+        ref={reposoRef}
+        style={rostro}
         className="absolute inset-0 w-full h-full object-cover"
         muted
         loop
@@ -114,20 +125,22 @@ export function AriaAvatar({ visible }: { visible: boolean }) {
         preload="auto"
       />
       <video
-        ref={talkRef}
+        ref={hablaRef}
         className="absolute inset-0 w-full h-full object-cover"
         muted
         loop
         playsInline
         preload="auto"
-        style={{ opacity: 0 }}
+        style={{ opacity: 0, ...rostro }}
       />
-      <span
-        className={`absolute bottom-1.5 right-1.5 w-2 h-2 rounded-full border border-black/40 ${
-          isSpeaking ? 'bg-primary animate-pulse' : 'bg-fill-ok'
-        }`}
-        title={isSpeaking ? 'ARIA hablando' : 'ARIA en línea'}
-      />
+      {tamano !== 'circulo' && (
+        <span
+          className={`absolute bottom-1.5 right-1.5 w-2 h-2 rounded-full border border-black/40 ${
+            isSpeaking ? 'bg-primary animate-pulse' : 'bg-fill-ok'
+          }`}
+          title={isSpeaking ? 'ARIA hablando' : 'ARIA en línea'}
+        />
+      )}
     </div>
   )
 }

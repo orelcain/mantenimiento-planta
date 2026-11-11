@@ -6,12 +6,12 @@ import { usePielApple } from '@/hooks/usePielApple'
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff, Pencil } from 'lucide-react'
+import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff, Pencil, MoreHorizontal } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
-import { loadVoicePref, speak, stopSpeaking } from '@/lib/ariaVoice'
+import { desbloquearAudio, loadVoicePref, onSpeakingChange, speak, stopSpeaking } from '@/lib/ariaVoice'
 import { logger } from '@/lib/logger'
 import { useBurbujaChatOculta, registrarAbrirAria, type OpcionesAria } from '@/lib/pantallaCompletaMovil'
 import { useOcultarAlBajar } from '@/hooks/useOcultarAlBajar'
@@ -88,6 +88,7 @@ function renderTable(rows: string[][]): string {
 
 function formatLine(text: string): string {
   return text
+    .replace(/^(\s*)\* /, '$1• ')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded-ctl text-xs">$1</code>')
@@ -517,28 +518,13 @@ function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
   )
 }
 
-/** Badge pequeño que muestra qué agente generó una respuesta */
+/** Modelo y tiempo, discretos bajo cada respuesta. Usa solo datos que ya trae agentInfo. */
 function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/chatbot').ChatMessage['agentInfo']> }) {
-  const taskLabels: Record<string, string> = {
-    reasoning: 'razonamiento',
-    analysis: 'análisis',
-    code: 'código',
-    speed: 'rápido',
-    general: 'general',
-    vision: 'visión',
-  }
   return (
-    <div className="flex items-center gap-1 mt-1 text-caption text-muted-foreground opacity-70 flex-wrap">
-      <span>{agentInfo.agentEmoji}</span>
+    <div className="mt-1 flex flex-wrap items-center gap-1 text-footnote tabular-nums text-muted-foreground">
       <span>{agentInfo.agentName}</span>
       <span>·</span>
       <span>{agentInfo.latencyMs > 1000 ? `${dec1((agentInfo.latencyMs / 1000))}s` : `${agentInfo.latencyMs}ms`}</span>
-      {agentInfo.taskType && (
-        <>
-          <span>·</span>
-          <span>{taskLabels[agentInfo.taskType] || agentInfo.taskType}</span>
-        </>
-      )}
       {agentInfo.thinkingUsed && (
         <>
           <span>·</span>
@@ -565,24 +551,34 @@ const QUICK_SUGGESTIONS = [
   'Historial de ARIA',
 ]
 
-function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
+/** Tira de texto: hasta tres se reparten el ancho por igual; más de tres se deslizan en horizontal. */
+function TiraSugerencias({ items, onSelect, disabled }: { items: string[]; onSelect: (text: string) => void; disabled?: boolean }) {
+  const repartir = items.length <= 3
   return (
-    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-t border-border bg-muted">
-      <span className="w-full text-caption text-muted-foreground mb-0.5">Sugerencias rápidas:</span>
-      {QUICK_SUGGESTIONS.map(suggestion => (
+    <div className="flex h-11 overflow-x-auto">
+      {items.map((s, i) => (
         <button
-          key={suggestion}
-          onClick={() => onSelect(suggestion)}
-          className="text-xs px-2.5 py-1.5 rounded-full border border-border bg-background hover:bg-muted transition-colors text-foreground"
+          key={`${i}-${s}`}
+          onClick={() => onSelect(s)}
+          disabled={disabled}
+          className={`${repartir ? 'min-w-0 flex-1' : 'shrink-0'} h-11 whitespace-nowrap truncate px-3 text-footnote text-brand-ink transition-colors hover:bg-muted disabled:opacity-50 ${i > 0 ? 'border-l border-border' : ''}`}
         >
-          {suggestion}
+          {s}
         </button>
       ))}
     </div>
   )
 }
 
-// ─── Chips de sugerencias contextuales (post-respuesta) ─────────────
+function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
+  return (
+    <div className="border-t border-border bg-muted">
+      <TiraSugerencias items={QUICK_SUGGESTIONS} onSelect={onSelect} />
+    </div>
+  )
+}
+
+// ─── Sugerencias contextuales (post-respuesta) ──────────────────────
 function ContextualSuggestions({ suggestions, onSelect, disabled }: {
   suggestions: string[]
   onSelect: (text: string) => void
@@ -590,19 +586,32 @@ function ContextualSuggestions({ suggestions, onSelect, disabled }: {
 }) {
   if (!suggestions.length) return null
   return (
-    <div className="flex flex-wrap gap-1.5 ml-9 mt-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      {suggestions.map((s, i) => (
-        <button
-          key={i}
-          onClick={() => onSelect(s)}
-          disabled={disabled}
-          className="text-xs px-3 py-1.5 rounded-full border border-transparent bg-primary/5 text-brand-ink hover:bg-primary/15 hover:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow"
-        >
-          {s}
-        </button>
-      ))}
+    <div className="mt-1 animate-in fade-in duration-300">
+      <TiraSugerencias items={suggestions} onSelect={onSelect} disabled={disabled} />
     </div>
   )
+}
+
+/** Interruptor de la hoja Más (la misma pieza que el menú de la piel). */
+function Interruptor({ encendido }: { encendido: boolean }) {
+  return (
+    <span aria-hidden className={`relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors ${encendido ? 'bg-primary' : 'bg-muted'}`}>
+      <span className={`absolute top-[2px] size-[22px] rounded-full bg-card shadow transition-[left] ${encendido ? 'left-[20px]' : 'left-[2px]'}`} />
+    </span>
+  )
+}
+
+/** true desde lg (1024 px): ventana de escritorio. Bajo lg el chat es una hoja con velo. */
+function useEsEscritorio(): boolean {
+  const consulta = '(min-width: 1024px)'
+  const [es, setEs] = useState(() => window.matchMedia(consulta).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(consulta)
+    const alCambiar = () => setEs(mq.matches)
+    mq.addEventListener('change', alCambiar)
+    return () => mq.removeEventListener('change', alCambiar)
+  }, [])
+  return es
 }
 
 // ─── Hook de reconocimiento de voz ──────────────────────────────────
@@ -1013,15 +1022,22 @@ export function ChatBot() {
   })
   useEffect(() => { try { localStorage.setItem('aria_avatar_show', avatarShow ? '1' : '0') } catch { /* ignore */ } }, [avatarShow])
   useEffect(() => { try { localStorage.setItem('aria_avatar_autospeak', autoSpeak ? '1' : '0') } catch { /* ignore */ } }, [autoSpeak])
+  // Retrato de ARIA: al hablar (onSpeakingChange) se abre el grande en celular con la frase en curso.
+  const [hablando, setHablando] = useState(false)
+  const [fraseEnCurso, setFraseEnCurso] = useState('')
+  useEffect(() => onSpeakingChange(setHablando), [])
+  const esPC = useEsEscritorio()
+  const [showMas, setShowMas] = useState(false)
+  const masRef = useRef<HTMLDivElement>(null)
 
   // ─── Chat width (resizable) ──────────────────────────────
   const MIN_WIDTH = 380
-  const MAX_WIDTH = 900
-  const DEFAULT_WIDTH = 820
+  const MAX_WIDTH = 1200
+  const DEFAULT_WIDTH = 1200
 
   const [chatWidth, setChatWidth] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem('aria_chat_width')
+      const saved = localStorage.getItem('aria_chat_width_v2')
       if (saved) {
         const w = parseInt(saved, 10)
         if (w >= MIN_WIDTH && w <= MAX_WIDTH) return w
@@ -1056,7 +1072,7 @@ export function ChatBot() {
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
       // Persist
-      try { localStorage.setItem('aria_chat_width', String(chatWidth)) } catch { /* ignore */ }
+      try { localStorage.setItem('aria_chat_width_v2', String(chatWidth)) } catch { /* ignore */ }
     }
 
     document.addEventListener('mousemove', onMouseMove)
@@ -1065,7 +1081,7 @@ export function ChatBot() {
 
   // Persist width changes
   useEffect(() => {
-    try { localStorage.setItem('aria_chat_width', String(chatWidth)) } catch { /* ignore */ }
+    try { localStorage.setItem('aria_chat_width_v2', String(chatWidth)) } catch { /* ignore */ }
   }, [chatWidth])
 
   const { isListening, transcript, startListening, stopListening, isSupported: voiceSupported } = useSpeechRecognition()
@@ -1075,9 +1091,20 @@ export function ChatBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading, streamingContent])
 
-  // Cargar preferencia de voz (definida en Configuración → ARIA)
+  // Cargar preferencia de voz (Configuración → ARIA) cada vez que se abre: el servidor de la voz de Aiko pudo encenderse después.
   useEffect(() => {
     loadVoicePref()
+  }, [isOpen])
+
+  // iOS exige un toque para permitir sonido; la respuesta llega segundos después.
+  useEffect(() => {
+    const opciones = { capture: true, passive: true }
+    document.addEventListener('touchend', desbloquearAudio, opciones)
+    document.addEventListener('click', desbloquearAudio, opciones)
+    return () => {
+      document.removeEventListener('touchend', desbloquearAudio, opciones)
+      document.removeEventListener('click', desbloquearAudio, opciones)
+    }
   }, [])
 
   // Esc cierra la hoja (la herramienta de atrás queda tal cual).
@@ -1090,10 +1117,10 @@ export function ChatBot() {
 
   // Focus input al abrir (en la hoja no: el teclado taparía la mitad que ocupa)
   useEffect(() => {
-    if (isOpen && !hoja) {
+    if (isOpen && !hoja && esPC) {
       setTimeout(() => inputRef.current?.focus(), 200)
     }
-  }, [isOpen, hoja])
+  }, [isOpen, hoja, esPC])
 
   // Llenar input cuando termina la transcripción de voz.
   // En modo conversación, en vez de llenar el input, ENVÍA directo.
@@ -1123,6 +1150,7 @@ export function ChatBot() {
       .replace(/\[\[.*?\]\]/g, '').replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '')
     const relisten = () => { if (convoModeRef.current) startListening() }
     if (plain.trim()) {
+      setFraseEnCurso(plain)
       speak(plain, { onend: relisten, onerror: relisten })
     } else {
       relisten()
@@ -1160,6 +1188,21 @@ export function ChatBot() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showAgentSelector])
+
+  // Menú Más: se cierra al tocar fuera (incluye la lista de modelos que vive dentro)
+  useEffect(() => {
+    if (!showMas) return
+    const handler = (e: MouseEvent) => {
+      const el = e.target as HTMLElement
+      if (el.closest?.('[aria-label="Más opciones"]')) return
+      if (masRef.current && !masRef.current.contains(el)) {
+        setShowMas(false)
+        setShowAgentSelector(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showMas])
 
   const handlePhotoSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -1398,24 +1441,34 @@ export function ChatBot() {
     return []
   })()
 
-  // 380 * 1.4 ≈ 532px ancho | 520 * 1.3 ≈ 676px alto
+  const nombreModelo = selectedAgent ? (availableAgents().find(a => a.id === selectedAgent)?.name ?? selectedAgent) : 'Automático'
+  const estadoCabecera = hablando
+    ? 'Hablando con la voz de Aiko'
+    : pendingAction?.status === 'confirming'
+      ? 'Acción pendiente de confirmación'
+      : thinkingEnabled
+        ? 'Pensamiento profundo · IA'
+        : 'IA · Datos en tiempo real'
+
   return (
     <>
       {/* Panel de chat */}
-      {isOpen && hoja && (
+      {isOpen && (hoja || !esPC) && (
         <div className="fixed inset-0 z-[39] bg-black/35 piel-fade-in lg:hidden" onClick={toggle} aria-hidden />
       )}
       {isOpen && (
         <div
-          style={hoja ? undefined : { width: chatWidth }}
-          role={hoja ? 'dialog' : undefined}
-          aria-label={hoja ? 'ARIA' : undefined}
+          style={hoja || !esPC ? undefined : { width: `min(${chatWidth}px, calc(100vw - 240px))` }}
+          role={hoja || !esPC ? 'dialog' : undefined}
+          aria-label={hoja || !esPC ? 'ARIA' : undefined}
           className={hoja
             ? 'fixed inset-x-0 bottom-0 z-40 flex h-[58dvh] max-h-[calc(100dvh-4rem)] flex-col overflow-hidden rounded-t-panel border-t border-border bg-secondary pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_50px_rgba(0,0,0,0.3)] piel-sheet-in lg:inset-x-auto lg:bottom-4 lg:right-4 lg:top-20 lg:h-auto lg:max-h-none lg:w-[28rem] lg:rounded-card lg:border'
-            : 'fixed bottom-[9rem] lg:bottom-20 right-4 z-40 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-secondary border-2 border-primary/40 rounded-card shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden'}
+            : !esPC
+              ? 'fixed inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+8px)] z-40 flex flex-col overflow-hidden rounded-t-panel border-t border-border bg-secondary pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_50px_rgba(0,0,0,0.3)] piel-sheet-in'
+              : 'fixed bottom-20 top-4 right-4 z-40 max-w-[calc(100vw-240px)] flex flex-col overflow-hidden bg-secondary border border-border rounded-card shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-200 landscape-mobile-hidden'}
         >
           {/* Resize handle (left edge) */}
-          {!hoja && <div
+          {!hoja && esPC && <div
             onMouseDown={handleResizeStart}
             className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 group flex items-center"
             title="Arrastrar para redimensionar"
@@ -1424,159 +1477,142 @@ export function ChatBot() {
               <GripVertical className="w-3 h-3 text-primary/60" />
             </div>
           </div>}
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold">ARIA — Asistente de Planta</h3>
-                <p className="text-caption text-muted-foreground">
-                  {pendingAction?.status === 'confirming'
-                    ? 'Acción pendiente de confirmación'
-                    : thinkingEnabled
-                      ? 'Pensamiento profundo · IA'
-                      : 'IA · Datos en tiempo real'}
-                </p>
-              </div>
+          {/* Celular: tirador de la hoja */}
+          {!esPC && !hoja && <div aria-hidden className="absolute left-1/2 top-1.5 h-[5px] w-9 -translate-x-1/2 rounded-full bg-muted-foreground/40" />}
+          {/* Cabecera: retrato de 40 px, título y estado. Solo quedan Más y Cerrar; lo demás está en Más. */}
+          <div className="relative flex shrink-0 items-center gap-3 px-4 pb-2 pt-5">
+            {!esPC && avatarShow && !hablando && <AriaAvatar visible={avatarShow} tamano="circulo" />}
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-headline">ARIA</h3>
+              <p className="flex min-w-0 items-center gap-1.5 text-footnote text-muted-foreground">
+                {hablando && <span aria-hidden className="inline-block size-1.5 shrink-0 rounded-full bg-primary animate-pulse" />}
+                <span className="truncate">{estadoCabecera}</span>
+              </p>
             </div>
-            <div className="flex items-center gap-1">
-              {/* Selector de modelo IA */}
-              {canThink && (
-                <div className="relative" ref={agentSelectorRef}>
-                  <button
-                    onClick={() => setShowAgentSelector(p => !p)}
-                    className={`flex items-center gap-1 px-1.5 py-1 rounded-ctl text-caption transition-colors ${
-                      selectedAgent
-                        ? 'bg-primary/[0.15] text-brand-ink hover:bg-primary/[0.15]'
-                        : 'hover:bg-background text-muted-foreground hover:text-foreground'
-                    }`}
-                    title={selectedAgent ? `Modelo: ${availableAgents().find(a => a.id === selectedAgent)?.name || selectedAgent}` : 'Seleccionar modelo IA (Auto)'}
-                  >
-                    <Cpu className="w-3.5 h-3.5" />
-                    <span className="max-w-[60px] truncate">
-                      {selectedAgent
-                        ? (availableAgents().find(a => a.id === selectedAgent)?.emoji || '') + ' ' + (availableAgents().find(a => a.id === selectedAgent)?.name?.split(' ')[0] || '')
-                        : 'Auto'}
-                    </span>
-                    <ChevronDown className={`w-3 h-3 transition-transform ${showAgentSelector ? 'rotate-180' : ''}`} />
-                  </button>
-                  {showAgentSelector && (
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-card shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                      <div className="px-3 py-1.5 text-caption font-medium text-muted-foreground tracking-wider">Modelo IA</div>
-                      {/* Auto option */}
-                      <button
-                        onClick={() => { changeAgent(null); setShowAgentSelector(false) }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors ${
-                          !selectedAgent ? 'bg-primary/10 text-brand-ink font-medium' : 'text-foreground'
-                        }`}
-                      >
-                        <span className="w-5 text-center"><RefreshCw className="inline size-3.5" /></span>
-                        <div className="flex-1 text-left">
-                          <div>Auto <span className="text-muted-foreground">(ARIA elige)</span></div>
-                        </div>
-                        {!selectedAgent && <Check className="w-3.5 h-3.5 text-primary" />}
-                      </button>
-                      <div className="h-px bg-border mx-2 my-1" />
-                      {availableAgents().map(agent => (
-                        <button
-                          key={agent.id}
-                          onClick={() => { changeAgent(agent.id); setShowAgentSelector(false) }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors ${
-                            selectedAgent === agent.id ? 'bg-primary/10 text-brand-ink font-medium' : 'text-foreground'
-                          }`}
-                        >
-                          <span className="w-5 text-center">{agent.emoji}</span>
-                          <div className="flex-1 text-left">
-                            <div className="flex items-center gap-1.5">
-                              {agent.name}
-                              <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-                                agent.status === 'online' ? 'bg-fill-ok'
-                                : agent.status === 'rate-limited' ? 'bg-fill-warning'
-                                : agent.status === 'disabled' ? 'bg-muted-foreground'
-                                : 'bg-fill-critical'
-                              }`} />
-                            </div>
-                            <div className="text-caption text-muted-foreground">
-                              {agent.costTier === 'free' ? 'Gratis' : agent.costTier === 'cheap' ? 'Económico' : 'Moderado'}
-                              {' · '}
-                              {agent.status === 'online' ? 'Disponible' : agent.status === 'disabled' ? 'Sin API key' : agent.status}
-                            </div>
-                          </div>
-                          {selectedAgent === agent.id && <Check className="w-3.5 h-3.5 text-primary" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {canThink && (
-                <button
-                  onClick={toggleThinking}
-                  className={`p-1.5 rounded-ctl transition-colors ${
-                    thinkingEnabled
-                      ? 'bg-cat-6-tint/[0.15] text-cat-6-ink hover:bg-cat-6-tint/[0.15]'
-                      : 'hover:bg-background text-muted-foreground hover:text-foreground'
-                  }`}
-                  title={thinkingEnabled ? 'Pensamiento profundo: ACTIVO — click para desactivar' : 'Activar pensamiento profundo'}
-                >
-                  <Brain className="w-4 h-4" />
-                </button>
-              )}
-              {/* Ver — mostrar/ocultar el avatar de video de ARIA */}
+            <div className="flex h-11 shrink-0 items-center rounded-full bg-muted">
               <button
-                onClick={() => setAvatarShow(v => !v)}
-                className={`p-1.5 rounded-ctl transition-colors ${
-                  avatarShow
-                    ? 'bg-primary/20 text-brand-ink hover:bg-primary/30'
-                    : 'hover:bg-background text-muted-foreground hover:text-foreground'
-                }`}
-                title={avatarShow ? 'Ocultar avatar de ARIA' : 'Mostrar avatar de ARIA'}
+                onClick={() => setShowMas(v => !v)}
+                aria-label="Más opciones"
+                aria-expanded={showMas}
+                title="Más opciones"
+                className="grid size-11 place-items-center rounded-full text-foreground transition-colors hover:bg-background"
               >
-                {avatarShow ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              </button>
-              {/* Escuchar — auto-leer las respuestas de ARIA en voz alta */}
-              <button
-                onClick={() => { if (autoSpeak) stopSpeaking(); setAutoSpeak(v => !v) }}
-                className={`p-1.5 rounded-ctl transition-colors ${
-                  autoSpeak
-                    ? 'bg-primary/20 text-brand-ink hover:bg-primary/30'
-                    : 'hover:bg-background text-muted-foreground hover:text-foreground'
-                }`}
-                title={autoSpeak ? 'Auto-leer respuestas: ACTIVO — click para silenciar' : 'Auto-leer respuestas en voz alta'}
-              >
-                {autoSpeak ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={clearHistory}
-                className="p-1.5 rounded-ctl hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
-                title="Limpiar historial"
-              >
-                <Trash2 className="w-4 h-4" />
+                <MoreHorizontal className="size-5" />
               </button>
               <button
                 onClick={toggle}
-                className="p-1.5 rounded-ctl hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Cerrar"
                 title="Cerrar"
+                className="grid size-11 place-items-center rounded-full text-foreground transition-colors hover:bg-background"
               >
-                <X className="w-4 h-4" />
+                <X className="size-5" />
               </button>
             </div>
+            {showMas && (
+              <div
+                ref={masRef}
+                className="absolute right-3 top-full z-50 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-card bg-card py-1 shadow-xl animate-in fade-in duration-150"
+              >
+                {canThink && (
+                  <div ref={agentSelectorRef}>
+                    <button
+                      onClick={() => setShowAgentSelector(p => !p)}
+                      aria-expanded={showAgentSelector}
+                      className="flex min-h-12 w-full items-center gap-3 px-4 text-left"
+                    >
+                      <Cpu className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 text-body">Modelo</span>
+                      <span className="max-w-[8rem] truncate text-footnote text-muted-foreground">{nombreModelo}</span>
+                      <ChevronDown className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${showAgentSelector ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showAgentSelector && (
+                      <div className="pb-1">
+                        <button
+                          onClick={() => { changeAgent(null); setShowAgentSelector(false) }}
+                          className={`flex w-full items-center gap-2 px-6 py-2 text-left text-footnote hover:bg-muted ${!selectedAgent ? 'font-medium text-brand-ink' : 'text-foreground'}`}
+                        >
+                          <RefreshCw className="size-3.5 shrink-0" />
+                          <span className="flex-1">Auto <span className="text-muted-foreground">(ARIA elige)</span></span>
+                          {!selectedAgent && <Check className="size-3.5 text-primary" />}
+                        </button>
+                        {availableAgents().map(agent => (
+                          <button
+                            key={agent.id}
+                            onClick={() => { changeAgent(agent.id); setShowAgentSelector(false) }}
+                            className={`flex w-full items-center gap-2 px-6 py-2 text-left text-footnote hover:bg-muted ${selectedAgent === agent.id ? 'font-medium text-brand-ink' : 'text-foreground'}`}
+                          >
+                            <span className="w-5 shrink-0 text-center">{agent.emoji}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-1.5">
+                                <span className="truncate">{agent.name}</span>
+                                <span className={`inline-block size-1.5 shrink-0 rounded-full ${
+                                  agent.status === 'online' ? 'bg-fill-ok'
+                                  : agent.status === 'rate-limited' ? 'bg-fill-warning'
+                                  : agent.status === 'disabled' ? 'bg-muted-foreground'
+                                  : 'bg-fill-critical'
+                                }`} />
+                              </span>
+                              <span className="block text-caption text-muted-foreground">
+                                {agent.costTier === 'free' ? 'Gratis' : agent.costTier === 'cheap' ? 'Económico' : 'Moderado'}
+                                {' · '}
+                                {agent.status === 'online' ? 'Disponible' : agent.status === 'disabled' ? 'Sin API key' : agent.status}
+                              </span>
+                            </span>
+                            {selectedAgent === agent.id && <Check className="size-3.5 text-primary" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {canThink && (
+                  <button onClick={toggleThinking} role="switch" aria-checked={thinkingEnabled} className="flex min-h-12 w-full items-center gap-3 px-4 text-left">
+                    <Brain className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 text-body">Pensamiento profundo</span>
+                    <Interruptor encendido={thinkingEnabled} />
+                  </button>
+                )}
+                <button onClick={() => setAvatarShow(v => !v)} role="switch" aria-checked={avatarShow} className="flex min-h-12 w-full items-center gap-3 px-4 text-left">
+                  {avatarShow ? <Eye className="size-4 shrink-0 text-muted-foreground" /> : <EyeOff className="size-4 shrink-0 text-muted-foreground" />}
+                  <span className="flex-1 text-body">Mostrar a ARIA</span>
+                  <Interruptor encendido={avatarShow} />
+                </button>
+                <button
+                  onClick={() => { if (autoSpeak) stopSpeaking(); setAutoSpeak(v => !v) }}
+                  role="switch"
+                  aria-checked={autoSpeak}
+                  className="flex min-h-12 w-full items-center gap-3 px-4 text-left"
+                >
+                  {autoSpeak ? <Volume2 className="size-4 shrink-0 text-muted-foreground" /> : <VolumeX className="size-4 shrink-0 text-muted-foreground" />}
+                  <span className="flex-1 text-body">Leer en voz alta</span>
+                  <Interruptor encendido={autoSpeak} />
+                </button>
+                <button
+                  onClick={() => { setShowMas(false); clearHistory() }}
+                  className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-destructive"
+                >
+                  <Trash2 className="size-4 shrink-0" />
+                  <span className="flex-1 text-body">Limpiar conversación</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {hoja?.contexto && <ContextoHojaAria contexto={hoja.contexto} />}
 
-          {/* Cuerpo: avatar al costado izquierdo + mensajes a la derecha */}
-          <div className="flex flex-1 overflow-hidden">
-          {/* Avatar de video de ARIA — riel izquierdo (idle ↔ habla, blob-load + lockstep) */}
-          {avatarShow && !hoja && (
-            <div className="shrink-0 w-80 border-r border-border bg-[var(--panel-surface)] flex flex-col items-stretch p-3">
-              <AriaAvatar visible={avatarShow} />
-            </div>
-          )}
+          {/* Cuerpo: conversación. En escritorio, el riel de ARIA va a la derecha (300 px). */}
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            {/* Celular: al hablar se abre el retrato grande con la frase en curso */}
+            {!esPC && !hoja && avatarShow && hablando && (
+              <div className="shrink-0">
+                <AriaAvatar visible={avatarShow} tamano="escenario" />
+                <p className="line-clamp-3 px-4 pb-1 pt-3 text-title3">{fraseEnCurso}</p>
+              </div>
+            )}
           {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" onClick={handleInternalLinkClick}>
+          <div className="flex-1 overflow-y-auto px-3 py-3" onClick={handleInternalLinkClick}>
+            <div className="mx-auto w-full space-y-3 lg:max-w-[820px]">
             {messages.map((msg, idx) => {
               const isLastAssistant = msg.role === 'assistant' && idx === messages.length - 1
               return (
@@ -1626,7 +1662,15 @@ export function ChatBot() {
             {/* Loading: solo si no hay streaming aún y no hay countdown */}
             {isLoading && !streamingContent && retryCountdown === 0 && !agentStatus && <LoadingIndicator />}
             <div ref={messagesEndRef} />
+            </div>
           </div>
+          </div>
+          {/* Escritorio: riel de ARIA (retrato de 300 px) */}
+          {esPC && avatarShow && (
+            <div className="flex w-[300px] shrink-0 flex-col border-l border-border bg-card p-3">
+              <AriaAvatar visible={avatarShow} tamano="riel" />
+            </div>
+          )}
           </div>
 
           {/* Sugerencias rápidas */}
@@ -1786,9 +1830,9 @@ export function ChatBot() {
                 onFocus={() => { if (input.trim().startsWith('/')) setShowDropdown(true) }}
                 onBlur={() => setTimeout(() => { setShowDropdown(false); setShowRecents(false) }, 150)}
                 onKeyDown={handleKeyDown}
-                placeholder={isListening ? 'Escuchando...' : pendingAction?.status === 'confirming' ? 'Sí / No / Modificar...' : 'Pregunta, /comando o describe una falla...'}
+                placeholder={isListening ? 'Escuchando...' : pendingAction?.status === 'confirming' ? 'Sí / No / Modificar...' : esPC ? 'Pregunta, /comando o describe una falla...' : 'Pregunta…'}
                 disabled={isLoading}
-                className="flex-1 text-sm px-3 py-2 rounded-card border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 placeholder:text-muted-foreground"
+                className="min-w-0 flex-1 text-sm px-3 py-2 rounded-card border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 placeholder:text-muted-foreground"
               />
 
               {/* #5 v2.60 — Save template button */}
@@ -1817,7 +1861,7 @@ export function ChatBot() {
               </button>
             </div>
             <p className="text-caption text-muted-foreground mt-1 text-center">
-              ARIA v6 · Powered by Gemini AI · /ayuda · /mis para plantillas
+              ARIA v6 · /ayuda · /mis para plantillas
             </p>
           </div>
         </div>
@@ -1828,7 +1872,7 @@ export function ChatBot() {
         onClick={toggle}
         className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full ${apple ? 'vidrio vidrio-barra text-primary' : 'shadow-lg'} flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
           // Detalle de repuesto a pantalla completa en el teléfono: la burbuja tapaba su barra inferior.
-          (pantallaCompletaMovil && !isOpen) || hoja ? 'hidden' : ''
+          (pantallaCompletaMovil && !isOpen) || hoja || (isOpen && !esPC) ? 'hidden' : ''
         } ${
           // Oculto al bajar (transform/opacity). Con el chat abierto no se oculta.
           ocultoAlBajar && !isOpen ? 'opacity-0 translate-y-24 pointer-events-none motion-reduce:transition-none' : 'opacity-100 translate-y-0'

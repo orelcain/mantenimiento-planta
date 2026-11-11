@@ -1,6 +1,6 @@
 import { nombreVisible, type NombreVisible } from './nombreVisible'
 
-type FuenteNombre = {
+export type FuenteNombre = {
   codigoSAP?: string | null
   textoBreve?: string | null
   nombresComunes?: readonly string[] | null

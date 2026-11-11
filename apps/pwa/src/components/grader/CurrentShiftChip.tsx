@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, ChevronRight, Sun, Moon, Sunrise, Sunset, Clock, PauseCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { LECTURA_NOTA } from '@/components/piel/Lectura'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule, bySpecificity } from '@/services/grader/graderShiftSchedule'
 import { computeShiftTimeWindow, nowAsWallClockUTC } from '@/services/grader/graderShiftStatus'
@@ -30,6 +31,8 @@ const ACTIVITY_MAX_AGE_MIN = 30
 interface CurrentShiftChipProps {
   plantLineId: PlantLineId
   className?: string
+  /** Piel Apple, modo lectura: la línea va a 13 px, como nota sobre el titular. */
+  lectura?: boolean
 }
 
 /** dateKey en zona local del navegador (mismas convenciones wall-clock que el resto del módulo). */
@@ -63,7 +66,7 @@ function etiquetaTurnoApple(shiftId: string, start: Date | null): string {
   return `${base}${periodo}`
 }
 
-export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipProps) {
+export function CurrentShiftChip({ plantLineId, className, lectura = false }: CurrentShiftChipProps) {
   const navigate = useNavigate()
   const apple = usePielApple()
   const cfg = getPlantLineConfig(plantLineId)
@@ -229,7 +232,7 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
     ) ?? false
     if (!live) {
       return (
-        <p className={cn('text-subhead text-muted-foreground', className)}>Sin turno activo ahora.</p>
+        <p className={cn(lectura ? LECTURA_NOTA : 'text-subhead text-muted-foreground', className)}>Sin turno activo ahora.</p>
       )
     }
     const etiqueta = etiquetaTurnoApple(live.shiftId, live.scheduledStart)
@@ -244,7 +247,8 @@ export function CurrentShiftChip({ plantLineId, className }: CurrentShiftChipPro
         type="button"
         onClick={() => navigate(href)}
         className={cn(
-          'flex min-h-11 w-full items-center gap-2 text-left text-subhead text-foreground',
+          'flex min-h-11 w-full items-center gap-2 text-left',
+          lectura ? 'text-[length:calc(13px*var(--escala-texto,1))] leading-[1.38] text-muted-foreground lg:min-h-8' : 'text-subhead text-foreground',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
           className,
         )}

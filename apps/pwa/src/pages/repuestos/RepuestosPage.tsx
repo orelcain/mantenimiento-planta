@@ -27,6 +27,11 @@ const STORAGE_KEY = 'repuestos-active-tab'
 
 function getDefaultTab(): Tab {
   try {
+    // Enlace a la ficha de una pieza (?pieza= o el QR viejo ?sap=): la ficha vive en Bodega.
+    const url = new URLSearchParams(window.location.search)
+    if (url.has('pieza') || url.has('sap')) return 'bodega'
+  } catch { /* noop */ }
+  try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
     if (saved === 'areas' || saved === 'bodega' || saved === 'codigos') return saved
   } catch { /* noop */ }

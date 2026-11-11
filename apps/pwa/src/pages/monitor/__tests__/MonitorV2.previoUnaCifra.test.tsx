@@ -104,6 +104,10 @@ afterEach(() => {
 const numeros = (t: string) => (t.match(/\d{1,3}(?:\.\d{3})+|\d+/g) ?? []).map((n) => Number(n.replace(/\./g, '')))
 
 describe('turno anterior · una sola cifra en la leyenda y en la hoja «Piezas del turno»', () => {
+  /* La hoja del celular: en PC «Piezas del turno» es la ventana expediente (`PiezasExpedientePC`). */
+  beforeEach(() => {
+    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false })) as unknown as typeof window.matchMedia
+  })
   it('cerrado: los dos dicen el TOTAL del turno anterior (el último punto de su curva) y no el de «a esta hora»', () => {
     const { container, getByRole } = render(<MonitorV2 {...props({ cerrado: true, proyeccion: null })} />)
     const leyenda = container.querySelector('.rv-grafico')!.textContent ?? ''

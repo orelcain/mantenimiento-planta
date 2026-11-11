@@ -5,13 +5,14 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { ListCell, ListGroup, Pill } from '@/components/piel'
-import { escucharAcrDeEvento, eventosRecientesConCache } from '@/services/acr/acrFirestore'
+import { escucharAcrDeEvento, eventosRecientesConCache, guardarAcr } from '@/services/acr/acrFirestore'
 import { aplicaAnalisis, resumenFuerza } from '@/services/acr/acrLogica'
 import { detectarRepeticion, type EventoRepeticion, type Repeticion } from '@/services/acr/repeticion'
 import type { Acr, EventoRefAcr } from '@/services/acr/acr.types'
 import { logger } from '@/lib/logger'
 import { AcrRapidoSheet } from './AcrRapidoSheet'
 import { AcrLectura } from './AcrLectura'
+import { totalFuertes } from './acrDocumentoTextos'
 import { PREGUNTA_TUTORIAL, PROPUESTA_TUTORIAL, REPETICION_TUTORIAL } from './tutorialAcr'
 
 /** Ventana del detector de repetición (SPEC_ACR_R1.md §2). */
@@ -28,6 +29,7 @@ const EN_VITRINA =
 export const PROPS_VITRINA = EN_VITRINA
   ? {
       onGuardar: () => {},
+      sinJackKnife: true,
       proponer: () => Promise.resolve({ ...PROPUESTA_TUTORIAL, modelo: 'vitrina' }),
       preguntar: () => Promise.resolve(PREGUNTA_TUTORIAL),
     }
@@ -35,6 +37,13 @@ export const PROPS_VITRINA = EN_VITRINA
 
 /** Qué hoja del ACR está abierta. */
 export type VistaAcr = 'ninguna' | 'editor' | 'lectura'
+
+/** Guarda un cambio hecho desde la lectura (marcar acción, verificación) sin abrir el editor. */
+function guardarSinCerrar(a: Acr): void {
+  guardarAcr(a, false).catch((e: unknown) => {
+    logger.error('No se pudo guardar el cambio del análisis de causa raíz', e instanceof Error ? e : undefined, { acrId: a.id })
+  })
+}
 
 /**
  * Las hojas del ACR de un evento (editor R1 y lectura). Las usan la fila de la hoja del evento
@@ -71,13 +80,14 @@ export function HojasAcr({
           onClose={() => onVista('ninguna')}
           acr={acr}
           onEditar={() => onVista('editor')}
+          onActualizar={EN_VITRINA ? undefined : guardarSinCerrar}
         />
       )}
     </>
   )
 }
 
-export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
+export function AcrEntrada({ evento, comoEnlace = false }: { evento: EventoRefAcr; comoEnlace?: boolean }) {
   const [acrs, setAcrs] = useState<Acr[] | null>(EN_VITRINA ? [] : null)
   const [recientes, setRecientes] = useState<EventoRepeticion[] | null>(null)
   const [vista, setVista] = useState<VistaAcr>('ninguna')
@@ -119,19 +129,43 @@ export function AcrEntrada({ evento }: { evento: EventoRefAcr }) {
   // Si hay varios, manda el más reciente.
   const acr = acrs?.slice().sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
 
+  const propsFila = {
+    acr,
+    cargando: acrs === null,
+    aplica: aplicaAnalisis(evento),
+    repeticion,
+    onVer: () => setVista('lectura'),
+    onAnalizar: () => setVista('editor'),
+  }
+
   return (
     <>
-      <FilaAnalisis
-        acr={acr}
-        cargando={acrs === null}
-        aplica={aplicaAnalisis(evento)}
-        repeticion={repeticion}
-        onVer={() => setVista('lectura')}
-        onAnalizar={() => setVista('editor')}
-      />
+      {comoEnlace ? <EnlaceAnalisis {...propsFila} /> : <FilaAnalisis {...propsFila} />}
 
       <HojasAcr evento={evento} acr={acr} repeticion={repeticion} vista={vista} onVista={setVista} />
     </>
+  )
+}
+
+/** La misma entrada en una línea, para la cabecera de la ventana de PC. */
+function EnlaceAnalisis({ acr, cargando, aplica, repeticion, onVer, onAnalizar }: FilaAnalisisProps) {
+  if (cargando || (!acr && !aplica)) return null
+  const fuertes = acr?.acciones.filter((a) => a.fuerza === 'fuerte').length ?? 0
+  const texto = acr
+    ? acr.acciones.length > 0
+      ? `Causa raíz: ${totalFuertes(fuertes, acr.acciones.length)}`
+      : 'Causa raíz: sin acciones'
+    : repeticion
+      ? 'Se repite: analizar causa'
+      : 'Analizar causa'
+  return (
+    <button
+      type="button"
+      onClick={acr ? onVer : onAnalizar}
+      className="inline-flex min-h-[44px] items-center rounded-ctl text-body text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      {texto}
+    </button>
   )
 }
 

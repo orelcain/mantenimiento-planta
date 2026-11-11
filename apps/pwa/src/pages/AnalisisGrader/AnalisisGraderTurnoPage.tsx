@@ -44,6 +44,8 @@ import { detectConfigDrift } from '@/services/grader/graderConfigDrift'
 import { recomputeShiftP0Causes, loadGate0Records, p0SinPuerta } from '@/services/grader/graderGate0Store'
 import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
 import { TurnoTiemposLine } from '@/components/grader/TurnoTiemposLine'
+import { TurnoInforme } from '@/components/grader/TurnoInforme'
+import { usePielApple } from '@/hooks/usePielApple'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { resolveAxisWindow, computeProductionWindow, resolveFraming, type FramingOverride } from '@/components/grader/shiftTimelineHelpers'
 import { TimelineSyncProvider } from '@/components/grader/TimelineSyncContext'
@@ -428,6 +430,7 @@ export function AnalisisGraderTurnoPage() {
   const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null, plantLineCfg.plantSlug)
   /* KPIs de Mantención para la pestaña homónima: puro cálculo sobre el
      snapshot que ya está cargado — cero fetch nuevo. */
+  const pielApple = usePielApple()
   const kpisMant = useMemo(
     () => (upstreamLine.snapshot ? kpisDeTurno(upstreamLine.snapshot) : null),
     [upstreamLine.snapshot],
@@ -2089,6 +2092,42 @@ export function AnalisisGraderTurnoPage() {
     </Card>
   )
 
+  /** Informe corrido (dirección A): piel Apple, datos Shoplogix y sin Excel del Grader. */
+  const modoInforme = pielApple && !summary && !loading && !!upstreamLine.snapshot && !!kpisMant && activeView === 'resumen'
+  const panelSinExcel = (
+    <UpstreamMachinesPanel
+            snapshot={upstreamLine.snapshot}
+            loading={upstreamLine.loading}
+            error={upstreamLine.error}
+            syncedAt={upstreamLine.syncedAt}
+            shiftWindow={axisWindow}
+            pauses={[]}
+            plantSlug={plantLineCfg.plantSlug}
+            dataSource={upstreamLine.source}
+            // Esta rama se renderiza SIN Excel del Grader: no hay total con el
+            // que descontar la línea manual, así que la cascada informa la
+            // pérdida bruta.
+            graderTotalPieces={null}
+            framedOnProduction={framedOnProduction}
+            onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
+            onVerMantencion={() => setActiveView('mantencion')}
+          />
+  )
+  const identidadInforme = (() => {
+    if (!dateKey) return ''
+    const fecha = new Date(`${dateKey}T12:00:00Z`)
+      .toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+      .replace(',', '')
+    const turno = (shiftMeta?.label ?? shiftLabel ?? '').replace(' — ', ' de la ').toLowerCase()
+    const horario = shiftScheduleInfo ? `, ${shiftScheduleInfo.startTime} a ${shiftScheduleInfo.endTime}` : ''
+    const estado = shiftWindow?.status === 'live' ? 'En curso' : shiftWindow?.status === 'future' ? 'Programado' : 'Cerrado'
+    const atraso = kpisMant && operacionReal.start
+      ? Math.round((Date.parse(operacionReal.start) - kpisMant.ventana.start.getTime()) / 60_000)
+      : 0
+    const tarde = atraso >= 5 ? ` Arrancó ${atraso} min tarde.` : ''
+    return `${fecha.charAt(0).toUpperCase()}${fecha.slice(1)}, ${turno}${horario}. ${estado}.${tarde}`
+  })()
+
   return (
     <TimelineSyncProvider key={shiftDocId ?? 'default'} groupId={timelineGroupId}>
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-[1760px]">
@@ -2120,7 +2159,7 @@ export function AnalisisGraderTurnoPage() {
           <span className="sr-only">Desliza ← → o usa teclado flechas para navegar turnos</span>
         )}
         {/* Fila 1 en móvil · izquierda en desktop: qué turno es */}
-        <div className="flex items-center gap-2 min-w-0 overflow-hidden basis-full sm:basis-auto sm:flex-1">
+        <div className={`flex items-center gap-2 min-w-0 overflow-hidden sm:basis-auto sm:flex-1 ${modoInforme ? 'flex-none' : 'basis-full'}`}>
           <Button
             variant="outline"
             size="sm"
@@ -2130,7 +2169,7 @@ export function AnalisisGraderTurnoPage() {
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Análisis de turno</span>
           </Button>
-          {dateKey && shiftLabel && (
+          {dateKey && shiftLabel && !modoInforme && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0 min-w-0 flex-1">
               {/* Mobile: stack vertical (fecha primero, turno+horario+ícono debajo).
                   Desktop: una línea con separador y todos los elementos inline. */}
@@ -2197,7 +2236,7 @@ export function AnalisisGraderTurnoPage() {
             compartir, exportar) y al final Anterior/Siguiente, que es irse a
             otro. Pegados al borde derecho en las dos anchuras, así el pulgar los
             encuentra siempre en el mismo lugar. */}
-        <div className="flex items-center gap-1 flex-wrap justify-end basis-full sm:basis-auto sm:shrink-0">
+        <div className={`flex items-center gap-1 flex-wrap justify-end sm:basis-auto sm:shrink-0 ${modoInforme ? 'ml-auto' : 'basis-full'}`}>
           {/* M3: Siguiente pausa sin clasificar */}
           {isAdmin && summary && untaggedPauses.length > 0 && (
             <Button
@@ -2319,6 +2358,7 @@ export function AnalisisGraderTurnoPage() {
           era la programada — que en el turno del 10-ago decía 15:30 cuando la
           línea siguió hasta las 16:30. Se cae a la ventana REAL del sensor,
           incluyendo la cola de después del cierre. */}
+      {!modoInforme && (
       <TurnoTiemposLine
         programadoStart={shiftWindow?.startAt}
         programadoEnd={shiftWindow?.endAt}
@@ -2326,6 +2366,7 @@ export function AnalisisGraderTurnoPage() {
         produjoEnd={summary?.endAt ?? operacionReal.end}
         minutosActivos={summary?.durationMinutes ?? null}
       />
+      )}
 
       {/* Dos avisos distintos sobre la ventana: minutos de arranque SIN datos
           (problema: el total del turno está incompleto) y arranque anticipado
@@ -2340,7 +2381,7 @@ export function AnalisisGraderTurnoPage() {
 
       {/* Chip rollup oficial de Shoplogix (horario/especie/% target) — solo
           existe para el turno VIGENTE, degrada a nada en históricos. */}
-      {upstreamLine.officialRollup && (
+      {upstreamLine.officialRollup && !modoInforme && (
         <TurnoOficialChip
           rollup={upstreamLine.officialRollup}
           machines={upstreamLine.snapshot?.machines.map(m => ({
@@ -2382,7 +2423,7 @@ export function AnalisisGraderTurnoPage() {
           navegaciones distintas para la misma pantalla (pedido de Orel, 11-ago).
           Las que necesitan el Excel se ven deshabilitadas con su motivo, así se
           sabe que existen. */}
-      {(summary || upstreamLine.snapshot) && (
+      {(summary || upstreamLine.snapshot) && !modoInforme && (
         <TurnoViewTabs
           views={availableViews}
           active={activeView}
@@ -2430,7 +2471,28 @@ export function AnalisisGraderTurnoPage() {
           Sin Excel, Resumen muestra el estado de las máquinas (antes también lo
           mostraba la pestaña «Línea», que se unió a Resumen). Timeline, Gates y "¿Qué hacer?" sí quedan deshabilitadas
           con su motivo, porque sin el Excel no tienen nada que mostrar. */}
-      {!summary && !loading && upstreamLine.snapshot && activeView === 'resumen' && (
+      {modoInforme && kpisMant && upstreamLine.snapshot && (
+        <TurnoInforme
+          kpis={kpisMant}
+          plantSlug={plantLineCfg.plantSlug}
+          dateKey={upstreamLine.snapshot.dateKey || dateKey || ''}
+          shiftId={upstreamLine.snapshot.shiftId}
+          identidad={identidadInforme}
+          enCurso={shiftWindow?.status === 'live'}
+          piezasFueraDeHorario={outsidePieces.pieces}
+          porDetallar={accionesPendientes + imputacionesPendientes}
+          sincronizado={slxBestSyncedAt ? syncAge.label : undefined}
+          actualizando={slxSyncing}
+          onActualizar={handleSlxRefresh}
+          onVerMantencion={() => setActiveView('mantencion')}
+          onVerPorHacer={() => setActiveView('accion')}
+          onVerCompuertas={availableViews.includes('gates') ? () => setActiveView('gates') : undefined}
+          onCargarExcel={isAdmin && hasGraderData ? () => navigate(wizardUrl) : undefined}
+          analisisCompleto={panelSinExcel}
+        />
+      )}
+
+      {!modoInforme && !summary && !loading && upstreamLine.snapshot && activeView === 'resumen' && (
         <div className="space-y-4">
           {/* Scorecard principal — mismo patrón visual que HeroScorecard */}
           <ShoplogixOnlyScorecard
@@ -2496,23 +2558,7 @@ export function AnalisisGraderTurnoPage() {
           </div>
 
           {/* Panel de máquinas con timeline y Gantts */}
-          <UpstreamMachinesPanel
-            snapshot={upstreamLine.snapshot}
-            loading={upstreamLine.loading}
-            error={upstreamLine.error}
-            syncedAt={upstreamLine.syncedAt}
-            shiftWindow={axisWindow}
-            pauses={[]}
-            plantSlug={plantLineCfg.plantSlug}
-            dataSource={upstreamLine.source}
-            // Esta rama se renderiza SIN Excel del Grader: no hay total con el
-            // que descontar la línea manual, así que la cascada informa la
-            // pérdida bruta.
-            graderTotalPieces={null}
-            framedOnProduction={framedOnProduction}
-            onToggleFraming={slxProductionWindow ? () => setFramingOverride(framedOnProduction ? 'turno' : 'produccion') : undefined}
-            onVerMantencion={() => setActiveView('mantencion')}
-          />
+          {panelSinExcel}
 
         </div>
       )}

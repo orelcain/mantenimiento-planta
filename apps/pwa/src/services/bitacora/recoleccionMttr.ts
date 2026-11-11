@@ -139,8 +139,10 @@ const CABECERA = '#BDD7EE'
 const TINTA = '#1F1F1F'
 const GRIS = '#F2F2F2'
 
-export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones: { logo?: string } = {}): string {
+export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones: { logo?: string; tamano?: string } = {}): string {
   const logo = opciones.logo ?? LOGO_RECOLECCION_DATA_URI
+  // 9pt (12 px) por defecto: el historial y la página no cambian. El correo de turno pide 13 px.
+  const tamano = opciones.tamano ?? '9pt'
   // 9 pt y no 10: en Outlook la planilla se leía «como letra 30» al lado del cuerpo del correo
   // (Orel, 21-09-2026). Sigue siendo la copia del Excel —banda azul, filas alternadas, logo—,
   // pero al tamaño del documento que la sigue, no al de una hoja de cálculo a pantalla completa.
@@ -149,13 +151,13 @@ export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones:
   // texto y el celeste de las bandas (quedaba negro sobre azul; prueba de Orel, 23-09-2026).
   // Y sin anchos: los porcentajes los convertía en píxeles fijos.
   const th = (t: string) =>
-    `<th bgcolor="${CABECERA}" style="background-color:${CABECERA};color:${TINTA};font-family:${CAL};font-size:9pt;line-height:1.25;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 5px;"><b>${t}</b></th>`
+    `<th bgcolor="${CABECERA}" style="background-color:${CABECERA};color:${TINTA};font-family:${CAL};font-size:${tamano};line-height:1.25;font-weight:bold;text-align:center;vertical-align:bottom;padding:3px 5px;"><b>${t}</b></th>`
   const td = (t: string, i: number, izq = false, nowrap = false) =>
     // TableStyleMedium2 pinta la PRIMERA fila de datos y luego alterna.
     // `overflow-wrap:break-word`: una palabra larga («EMPACADORA») se parte solo si ella sola
     // no cabe en la celda. Iba `anywhere` + `word-break`, y en el teléfono «SELLADORA» salía
     // como «SELLADO / RA» aunque hubiera espacio (correo del 23-09-2026).
-    `<td bgcolor="${i % 2 ? '#FFFFFF' : BANDA}" style="background-color:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:9pt;line-height:1.3;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 5px;overflow-wrap:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
+    `<td bgcolor="${i % 2 ? '#FFFFFF' : BANDA}" style="background-color:${i % 2 ? '#FFFFFF' : BANDA};color:#000000;font-family:${CAL};font-size:${tamano};line-height:1.3;text-align:${izq ? 'left' : 'center'};vertical-align:bottom;padding:3px 5px;overflow-wrap:break-word;${nowrap ? 'white-space:nowrap;' : ''}">${escaparHtml(t)}</td>`
   // Un solo día (el correo del turno): la fecha va en la banda azul y la columna Fecha se
   // omite. En el teléfono esa columna se llevaba un cuarto de los 351 px para una sola celda
   // con dato, y «Máquina» quedaba partiendo palabras por letras (correo del 23-09-2026). El
@@ -170,7 +172,7 @@ export function htmlRecoleccionMttr(filas: readonly FilaRecoleccion[], opciones:
   const encabezado = unDia
     ? `${th('Máquina')}${th('Falla')}${th('Duración Falla (Min)')}${th('Observaciones')}`
     : `${th('Fecha')}${th('Máquina')}${th('Falla')}${th('Duración Falla (Min)')}${th('Observaciones')}`
-  const titulo = unDia && fechas[0] ? `MTBF - MTTR<span style="font-weight:normal;font-size:9pt;">&nbsp;&nbsp;·&nbsp;&nbsp;${escaparHtml(fechas[0])}</span>` : 'MTBF - MTTR'
+  const titulo = unDia && fechas[0] ? `MTBF - MTTR<span style="font-weight:normal;font-size:${tamano};">&nbsp;&nbsp;·&nbsp;&nbsp;${escaparHtml(fechas[0])}</span>` : 'MTBF - MTTR'
   return (
     // La banda va en su propia tabla: con `table-layout:fixed` la primera fila fija
     // los anchos, y la celda del logo (146 px) no debe mandar sobre la columna Fecha.

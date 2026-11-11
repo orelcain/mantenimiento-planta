@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-08 · claude · Mutation testing de clasificaCausa
+- Hecho: 16 casos de test nuevos en cada espejo (PWA y functions). Mutantes detectados: 69,1 % → 95,1 % (56 → 77 de 81); los 4 sobrevivientes son equivalentes. Stryker se usó solo en el worktree y no entra al repo.
+- Archivos: `apps/pwa/src/services/shoplogix/__tests__/kpisMantencionTurno.test.ts`, `functions/shoplogix/__tests__/kpisMantencion.test.js`.
+- Verificación: tsc limpio; vitest 5888 pasan; functions 743/743; eslint limpio en el test.
+- Estado: EN REVISIÓN
+- Sigue: decidir si la mutación entra a CI sin bloquear, solo para funciones de KPI.
+
 ## 2026-11-07 · codex · Jack-Knife ronda 3, etapas 1 y 2
 - Hecho: ruta y menú propios, enlace desde período, filtros compactos, titular por turno, listas breves y detalle plegable. Gráfico log-log con línea de disponibilidad, límites base escalados, fantasmas/flechas, radios por raíz de minutos y etiquetas selectivas. Prioridades y comparación corregidas. Lámina clara única con QR, PNG y PDF horizontal; retirado PDF largo sin consumidores.
 - Archivos: App/MainLayout/GraderMonthlyStatsPanel, JackKnifePage, JackKnifeCard/Grafico/Listas/Lamina, jackKnifeLayout/Presentacion, servicios shoplogix/jackKnife y grader/jackKnifeExport, pruebas JackKnife y memoria .ai.

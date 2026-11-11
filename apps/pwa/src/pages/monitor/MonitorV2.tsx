@@ -32,6 +32,9 @@ import { CascadaMetaV2 } from './CascadaMetaV2'
 import { DUENO_UI } from './duenoUi'
 import { useZoomGesto, type Ventana } from './useZoomGesto'
 import { Globo, Icono, Tarjeta } from './AmpliarV2'
+import { CifrasExpedientePC } from './CifrasExpedientePC'
+import { DetalleExpedientePC } from './DetalleExpedientePC'
+import { PiezasExpedientePC, TurnoExpedientePC } from './TurnoExpedientePC'
 import { useEntradaEscalonada, useEsPc } from './ampliarHooks'
 import { etiquetaMaquina, paradasDetalle, varaDeMinuto, type VaciosTurno } from './ritmoVivo'
 import { desgloseDe, detencionesPorMinuto, varaCambio, type Desglose } from './desglose'
@@ -100,16 +103,18 @@ function useActivo() {
 
 // ── Detalle: hoja (celular) / panel lateral (PC) ─────────────────────────────
 
-export function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
+export function PanelDetalle({ abierto, titulo, sub, onClose, children, forma = 'panel' }: {
   abierto: boolean; titulo: string; sub?: string; onClose: () => void; children: ReactNode
+  /** `expediente`: en PC, ventana con la pregunta al costado (los detalles de Análisis). */
+  forma?: 'panel' | 'expediente'
 }) {
   const pc = useEsPc()
   useEffect(() => {
-    if (!abierto || !pc) return
+    if (!abierto || !pc || forma === 'expediente') return
     const f = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
-  }, [abierto, pc, onClose])
+  }, [abierto, pc, onClose, forma])
   if (!pc) {
     return (
       <Sheet
@@ -125,6 +130,7 @@ export function PanelDetalle({ abierto, titulo, sub, onClose, children }: {
       </Sheet>
     )
   }
+  if (forma === 'expediente') return <DetalleExpedientePC abierto={abierto} titulo={titulo} sub={sub} onClose={onClose}>{children}</DetalleExpedientePC>
   if (!abierto) return null
   return createPortal(
     <div className="fixed inset-0 z-[100]">
@@ -1307,6 +1313,8 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
   const reloj = p.rep.activa ? p.rep.reloj : relojRecta
   const [abierta, setAbierta] = useState<ClaveTurno | null>(null)
   const abrir = (k: ClaveTurno) => () => setAbierta(k)
+  /* En PC (≥1024 px) los detalles son ventanas expediente (lienzo «Resto del Monitor en PC», opción A del 10-11). */
+  const pc = useEsPc()
   /* Las piezas que la vista dice en TODAS partes (franja, gráfico, Camino a la meta y este detalle): lo que la reproducción
      muestra en reposo, o el contador vivo sin ella. El detalle de «Piezas del turno» no puede decir otra cifra que la celda. */
   const mostradas = piezasMostradas(p.repro, p.piezas)
@@ -1456,6 +1464,8 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
     }
   }
   const detalle = detalleDe(abierta)
+  /* En PC, «Fallas de equipos» y «Tiempo perdido» abren la misma ventana expediente (mockup A del 09-11). */
+  const ventanaCifras = (abiertaPC: boolean, cerrar: () => void) => <CifrasExpedientePC open={abiertaPC} onClose={cerrar} datos={p} />
 
   /* El turno anterior con UNA cifra, la MISMA de la leyenda del gráfico (`cifraTurnoAnterior`): en vivo, el valor de su curva en el
      mismo minuto desde la primera pieza (lo que se dibuja); cerrado, su total (el mismo de «Comparado con otros días»).
@@ -1519,6 +1529,30 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
     </div>
   )
 
+  /* En PC, «Piezas del turno» abre la ventana expediente: costado con la cifra, la meta y cada máquina; a la derecha la curva y
+     la tabla hora a hora cerrada con el turno. Las mismas cifras que la capa del celular (`ampliadoPiezas`). */
+  const ventanaPiezas = (abiertaPC: boolean, cerrar: () => void) => (
+    <PiezasExpedientePC
+      abierta={abiertaPC}
+      onClose={cerrar}
+      p={p}
+      mostradas={mostradas}
+      grafico={p.curva ? (
+        <Curva
+          curva={p.curva}
+          inicioMs={p.inicioMs}
+          alto={220}
+          conDiferencia
+          enVivo={!p.cerrado}
+          proyeccion={conProyeccion && p.curva.maxMin > finCurva + 1 ? { min: p.curva.maxMin, piezas: p.proyeccion! } : null}
+        />
+      ) : null}
+      previo={previoUna ? { calc: calcPrevio, respaldo: previoUna } : null}
+      vsAyer={!previoUna && previoSinAlinear ? p.vsAyer : null}
+    />
+  )
+  const cerrarDetalle = () => setAbierta(null)
+
   return (
     <VistaVivaCtx.Provider value={vistaViva}>
     <div ref={raizRef} className="monitor-v2 flex flex-col gap-[12px] min-[1600px]:gap-[16px]">
@@ -1526,7 +1560,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
           unido) → «Cada máquina · aporte» → «Ver más del turno». Duelo, fallas y tiempo perdido viven bajo «Ver más». */}
       {p.banda}
 
-      <FranjaCinta p={p} reloj={reloj} ampliadoPiezas={ampliadoPiezas} abrir={(k) => setAbierta(k)} camino={p.caminoMeta} />
+      <FranjaCinta p={p} reloj={reloj} ampliadoPiezas={ampliadoPiezas} ventanaPiezasPC={ventanaPiezas} abrir={(k) => setAbierta(k)} camino={p.caminoMeta} />
 
       {p.eje
         ? <GraficoRitmoVivo p={p} e={p.eje} reloj={reloj} ampliado={p.ritmoVivoAmpliado} abrirCon={p.ritmoVivoAbrirCon} />
@@ -1567,7 +1601,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         <>
           {p.duelo && <div className="min-w-0">{p.duelo}</div>}
           <div className="grid grid-cols-1 gap-3 min-[1024px]:grid-cols-2 min-[1600px]:gap-4">
-            <Tarjeta ampliado={detalleDe('mant')?.cuerpo} subAmpliado={detalleDe('mant')?.sub} icono={<Wrench className={ic} />} titulo="Fallas de equipos" sub={p.eventos.length ? `${p.eventos.length} en el turno · ${horas(fallasMin)}` : 'ninguna en el turno'}>
+            <Tarjeta ampliado={detalleDe('mant')?.cuerpo} subAmpliado={detalleDe('mant')?.sub} ventanaPC={ventanaCifras} icono={<Wrench className={ic} />} titulo="Fallas de equipos" sub={p.eventos.length ? `${p.eventos.length} en el turno · ${horas(fallasMin)}` : 'ninguna en el turno'}>
               {p.rielMttr.length > 1 && <RielMttr riel={p.rielMttr} />}
               {p.eventos.length > 0 && (
                 <ol className="mt-4 space-y-3">
@@ -1588,7 +1622,7 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
               )}
             </Tarjeta>
 
-            <Tarjeta ampliado={detalleDe('perdido')?.cuerpo} subAmpliado={detalleDe('perdido')?.sub} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub={p.perdidasMaquina && p.perdidasMaquina.maquinas > 1 ? `minutos de línea: ${int(p.perdidasMaquina.min)} min de máquina ÷ ${p.perdidasMaquina.maquinas}` : 'minutos de línea, por dueño y causa'}>
+            <Tarjeta ampliado={detalleDe('perdido')?.cuerpo} subAmpliado={detalleDe('perdido')?.sub} ventanaPC={ventanaCifras} icono={<Clock className={ic} />} titulo="Tiempo perdido" sub={p.perdidasMaquina && p.perdidasMaquina.maquinas > 1 ? `minutos de línea: ${int(p.perdidasMaquina.min)} min de máquina ÷ ${p.perdidasMaquina.maquinas}` : 'minutos de línea, por dueño y causa'}>
               <Cifra valor={horasCifra(totalPerdida)} chica />
               {totalPerdida > 0 && (
                 <>
@@ -1612,9 +1646,17 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
       )}
       <BotonDetalle vista={p.vista} onVista={p.onVista} />
 
-      <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={() => setAbierta(null)}>
-        {detalle?.cuerpo}
-      </PanelDetalle>
+      {pc ? (
+        <>
+          {/* «Mantención: ver detalle» y «Tiempo perdido» abren la ventana que ya existe para ellos, sin repetir su contenido. */}
+          <CifrasExpedientePC open={abierta === 'mant' || abierta === 'perdido'} onClose={cerrarDetalle} datos={p} />
+          <TurnoExpedientePC clave={abierta === 'ritmo' || abierta === 'cierre' || abierta === 'maquinas' ? abierta : null} onClose={cerrarDetalle} p={p} reloj={reloj} />
+        </>
+      ) : (
+        <PanelDetalle abierto={detalle != null} titulo={detalle?.titulo ?? ''} sub={detalle?.sub} onClose={cerrarDetalle}>
+          {detalle?.cuerpo}
+        </PanelDetalle>
+      )}
     </div>
     </VistaVivaCtx.Provider>
   )

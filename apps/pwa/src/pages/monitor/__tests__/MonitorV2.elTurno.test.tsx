@@ -93,6 +93,11 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+/* En PC (≥1024 px) estos detalles son ventanas expediente (`TurnoExpedientePC`, con su propia suite): aquí se mide la hoja del celular. */
+const celular = () => {
+  window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false })) as unknown as typeof window.matchMedia
+}
+
 const texto = (el: Element) => el.textContent ?? ''
 
 describe('MonitorV2 · al pasar a otro turno la cifra grande salta directo', () => {
@@ -234,6 +239,7 @@ describe('MonitorV2 · hojas de detalle (FilaCifra, «Reducir», rótulos del ri
       return { matches: min ? px >= Number(min[1]) : false, media: q, addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, onchange: null, dispatchEvent: () => false }
     }) as unknown as typeof window.matchMedia
   }
+  beforeEach(celular)
   const abrir = (c: ReturnType<typeof render>, nombre: string) => fireEvent.click(c.getByRole('button', { name: nombre }))
   const hora = (i: number, partial: boolean) => ({
     hourStart: `2026-10-27T${String(21 + i).padStart(2, '0')}:30:00.000Z`, index: i + 1,
@@ -370,6 +376,7 @@ describe('MonitorV2 · todo lo que se mueve sigue al reloj único de la cola', (
   })
 
   it('«Hora a hora»: con la serie de 5 min por delante del cuadro (la hora anterior ya suma más que las hechas) las horas igual suman la cifra grande', () => {
+    celular()
     const filaSerie = (i: number, pieces: number, partial: boolean) => ({
       hourStart: new Date(INI + i * 3_600_000).toISOString(), index: i + 1, from: new Date(INI + i * 3_600_000).toISOString(),
       to: new Date(INI + (i + 1) * 3_600_000).toISOString(), pieces, minutesCovered: partial ? 5 : 60, piecesPerHour: pieces, partial,
@@ -389,6 +396,7 @@ describe('MonitorV2 · todo lo que se mueve sigue al reloj único de la cola', (
   })
 
   it('«Por máquina» del ampliado: cada Baader dice lo de su cuadro y las dos suman la cifra de «Piezas del turno»', () => {
+    celular()
     const { container, getByRole } = render(<MonitorV2 {...props(0)} repro={{ entrada: entradaCola, tope: armarTope(9690, null) }} />)
     fireEvent.click(getByRole('button', { name: 'Piezas del turno: ver detalle' }))
     act(() => { vi.advanceTimersByTime(20_000) })
@@ -437,5 +445,24 @@ describe('MonitorV2 · Tiempo del turno: rango con el turno cerrado y detención
     render(<MonitorV2 {...con(tiempo(1, true), true)} />)
     expect(screen.getByText('Detención programada')).toBeTruthy()
     expect(screen.queryByText('Detención programada, toda la línea')).toBeNull()
+  })
+})
+
+describe('MonitorV2 · en PC los detalles son ventanas expediente', () => {
+  const abrir = (nombre: string) => fireEvent.click(screen.getByRole('button', { name: nombre }))
+  it('Piezas, Ritmo y Al cierre abren la ventana con su costado; Mantención abre la de Tiempo perdido y fallas', () => {
+    render(<MonitorV2 {...props(0)} />)
+    abrir('Piezas del turno: ver detalle')
+    expect(screen.getByRole('complementary', { name: 'Resumen de las piezas del turno' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    abrir('Ritmo: ver detalle')
+    expect(screen.getByRole('table', { name: 'Ritmo de cada Baader y de la línea' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    abrir('Al cierre: ver detalle')
+    expect(screen.getByRole('complementary', { name: 'Resumen del cierre' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    abrir('Mantención: ver detalle')
+    expect(screen.getByRole('complementary', { name: 'Resumen del tiempo perdido' })).toBeTruthy()
+    expect(screen.queryByText('Respuesta de Mantención')).toBeNull()
   })
 })

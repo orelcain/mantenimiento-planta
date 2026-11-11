@@ -29,6 +29,31 @@ import { dec1 } from '@/utils/formatoNumeros'
 
 export type TaskType = 'reasoning' | 'analysis' | 'code' | 'vision' | 'speed' | 'general'
 
+/**
+ * Orden en que se intentan los agentes. «speed» prefiere al modelo rápido, pero si falla
+ * tiene que responder otro: solo GPT-OSS tiene esa capacidad y un saludo acababa en error.
+ */
+export function armarCadena(capability: AgentCapability, opts?: OrchestratorTask['opts']): string[] {
+  const ids = (cap: AgentCapability) => getAgentsForCapability(cap).map(a => a.id)
+  const base = capability === 'speed' ? [...new Set([...ids('speed'), ...ids('general')])] : ids(capability)
+  const cadena = opts?.forceAgent
+    ? [opts.forceAgent, ...base.filter(id => id !== opts.forceAgent)]
+    : base.filter(id => !opts?.excludeAgents?.includes(id))
+  if (cadena.length > 0) return cadena
+  // Último recurso: cualquier agente en línea, primero los de mayor prioridad
+  return getAllAgents()
+    .filter(a => a.status === 'online')
+    .sort((a, b) => b.priority - a.priority)
+    .map(a => a.id)
+}
+
+/** Texto para el registro: código y estado HTTP del proxy, que el mensaje solo no trae. */
+export function detalleError(err: unknown): string {
+  const e = err as { message?: string; code?: string; details?: { status?: number } } | null
+  const estado = e?.details?.status
+  return [e?.code, estado ? `HTTP ${estado}` : '', e?.message ?? String(err)].filter(Boolean).join(' · ')
+}
+
 export interface OrchestratorTask {
   messages: Array<{ role: string; content: string }>
   /** Tipo de tarea — determina qué agente se elige */
@@ -123,25 +148,7 @@ export async function orchestrate(task: OrchestratorTask): Promise<OrchestratorR
   const preview = task.taskPreview || task.messages[task.messages.length - 1]?.content?.slice(0, 80) || '(empty)'
 
   // Construir cadena de agentes
-  let agentChain: string[]
-  if (task.opts?.forceAgent) {
-    // Forzar agente pero agregar fallbacks por si falla
-    const fallbackAgents = getAgentsForCapability(capability)
-      .map(a => a.id)
-      .filter(id => id !== task.opts!.forceAgent)
-    agentChain = [task.opts.forceAgent, ...fallbackAgents]
-  } else {
-    agentChain = getAgentsForCapability(capability).map(a => a.id)
-    // Excluir manualmente
-    if (task.opts?.excludeAgents) {
-      agentChain = agentChain.filter(id => !task.opts!.excludeAgents!.includes(id))
-    }
-  }
-
-  if (agentChain.length === 0) {
-    // Último recurso: cualquier agente online
-    agentChain = getAllAgents().filter(a => a.status === 'online').map(a => a.id)
-  }
+  const agentChain = armarCadena(capability, task.opts)
 
   if (agentChain.length === 0) {
     throw new Error('No hay agentes IA disponibles. Verifica las API keys.')
@@ -192,6 +199,16 @@ export async function orchestrate(task: OrchestratorTask): Promise<OrchestratorR
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       attempts.push({ agentId, success: false, error: lastError.message })
+      addMissionLog({
+        taskType: task.taskType,
+        taskPreview: preview,
+        agentId,
+        agentName: agentId,
+        status: 'error',
+        latencyMs: 0,
+        tokens: 0,
+        errorMsg: detalleError(err),
+      })
       logger.warn(`Agent ${agentId} falló: ${lastError.message}, intentando siguiente...`)
     }
   }
@@ -232,23 +249,7 @@ export async function orchestrateStream(
     message: `Analizando consulta · tipo: ${task.taskType}`,
   })
 
-  let agentChain: string[]
-  if (task.opts?.forceAgent) {
-    // Forzar agente pero agregar fallbacks por si falla (ej: 402 sin saldo)
-    const fallbackAgents = getAgentsForCapability(capability)
-      .map(a => a.id)
-      .filter(id => id !== task.opts!.forceAgent)
-    agentChain = [task.opts.forceAgent, ...fallbackAgents]
-  } else {
-    agentChain = getAgentsForCapability(capability).map(a => a.id)
-    if (task.opts?.excludeAgents) {
-      agentChain = agentChain.filter(id => !task.opts!.excludeAgents!.includes(id))
-    }
-  }
-
-  if (agentChain.length === 0) {
-    agentChain = getAllAgents().filter(a => a.status === 'online').map(a => a.id)
-  }
+  const agentChain = armarCadena(capability, task.opts)
 
   if (agentChain.length === 0) {
     onStatus?.({ phase: 'error', message: 'No hay agentes disponibles' })
@@ -339,6 +340,16 @@ export async function orchestrateStream(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       attempts.push({ agentId, success: false, error: lastError.message })
+      addMissionLog({
+        taskType: task.taskType,
+        taskPreview: preview,
+        agentId,
+        agentName: agent?.name || agentId,
+        status: 'error',
+        latencyMs: 0,
+        tokens: 0,
+        errorMsg: detalleError(err),
+      })
 
       onStatus?.({
         phase: 'fallback',

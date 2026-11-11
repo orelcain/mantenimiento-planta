@@ -1,5 +1,5 @@
 /**
- * Resumen del mes en la piel Apple: tabla de cuatro filas con el turno de mejor y
+ * Resumen del mes en la piel Apple (modo lectura): filas con filete con el turno de mejor y
  * peor escrito como se dice en planta («miércoles 4 mañana»), no como «11-04 · T1».
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -49,14 +49,14 @@ describe('GraderMonthlyStatsPanel · piel Apple', () => {
 
   it('el título dice el mes y los turnos', () => {
     const { container } = panel()
-    expect(container.querySelector('h2')?.textContent).toBe('Noviembre 2026, 12 turnos')
+    expect(container.querySelector('h2')?.textContent).toBe('Noviembre, 12 turnos')
   })
 
   it('el mejor y el peor turno se escriben con día de la semana, número y turno', () => {
     const { container } = panel()
     const texto = (container.textContent ?? '').split(String.fromCharCode(160)).join(' ')
-    expect(texto).toContain('Mejor turnouptime, miércoles 4, mañana83 %')
-    expect(texto).toContain('Peor turnouptime, viernes 6, tarde49 %')
+    expect(texto).toContain('Mejor turno, miércoles 4, mañana83 %')
+    expect(texto).toContain('Peor turno, viernes 6, tarde49 %')
     expect(texto).not.toContain('11-04')
   })
 
@@ -76,11 +76,12 @@ describe('GraderMonthlyStatsPanel · piel Apple', () => {
     expect(container.textContent ?? '').not.toContain('P0 % promedio')
   })
 
-  it('la tabla trae uptime promedio y ciclos, sin marco', () => {
+  it('las filas traen uptime promedio y ciclos, con filete y sin marco', () => {
     const { container } = panel()
     const texto = (container.textContent ?? '').split(String.fromCharCode(160)).join(' ')
     expect(texto).toContain('Uptime promedio76 %')
     expect(texto).toContain('Ciclos Baader176.900')
-    expect(container.querySelector('table')?.className).not.toContain('border')
+    expect(container.querySelector('[data-testid="resumen-mes"]')?.className).toContain('border-t')
+    expect(container.querySelector('.rounded-card, .rounded-ctl.border')).toBeNull()
   })
 })

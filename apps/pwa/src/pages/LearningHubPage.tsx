@@ -42,6 +42,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { CompartirPaseLectura } from '@/components/learning/CompartirPaseLectura'
 import { cn } from '@/lib/utils'
+import { useEsPC } from '@/hooks/useEsPC'
+import { HubAprendizajePC } from '@/components/learning/HubAprendizajePC'
 
 const NEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -119,6 +121,7 @@ export function LearningHubPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const { isAdmin } = usePermissions()
+  const pc = useEsPC()
   const machinesByArea = groupMachinesByArea()
   const allMachines = useMemo(() => Object.values(machinesByArea).flat(), [machinesByArea])
 
@@ -208,6 +211,118 @@ export function LearningHubPage() {
     />
   )
 
+  // Resultados de búsqueda: los mismos en celular y en PC.
+  const resultadosBusqueda = (
+    noResults ? (
+      <ListGroup title={`Resultados para "${query.trim()}"`}>
+        <p className="px-4 py-6 text-body text-muted-foreground">
+          Sin resultados. Prueba con el nombre de la máquina o un síntoma más general.
+        </p>
+      </ListGroup>
+    ) : (
+      <>
+        {simHits.length > 0 && (
+          <ListGroup title="Simuladores">
+            {simHits.map(mod => <SimRow key={mod.id} mod={mod} onClick={() => navigate(mod.href)} />)}
+          </ListGroup>
+        )}
+        {machineHits.length > 0 && (
+          <ListGroup title="Máquinas">{machineHits.map(machineRow)}</ListGroup>
+        )}
+        {symptomHits.length > 0 && (
+          <ListGroup title="Síntomas de diagnóstico">
+            {symptomHits.map(hit => {
+              const m = allMachines.find(x => x.slug === hit.machineSlug)
+              return (
+                <ListCell
+                  key={`${hit.machineSlug}-${hit.diagnosisId}`}
+                  className="bg-card"
+                  leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-muted text-muted-foreground"><Stethoscope className="size-5" /></span>}
+                  title={<span className="font-normal">{hit.title || hit.symptom}</span>}
+                  subtitle={[hit.title && hit.symptom ? hit.symptom : null, m?.name].filter(Boolean).join(' · ')}
+                  onClick={() => navigate(`/aprendizaje/maquina/${hit.machineSlug}`)}
+                />
+              )
+            })}
+          </ListGroup>
+        )}
+      </>
+    )
+  )
+
+
+  if (pc) {
+    const sinCursos = Object.entries(machinesByArea)
+      .filter(([, ms]) => ms.some(m => !isCourseMachine(m)))
+      .map(([area, ms]) => ({ nombre: formatNombreSAP(area).nombre || area, maquinas: ms.filter(m => !isCourseMachine(m)) }))
+    const planta = sinCursos.flatMap(a => a.maquinas)
+    const suma = (k: 'procedures' | 'flows' | 'diagnosis') => planta.reduce((s, m) => s + (metaMap[m.slug]?.[k] ?? 0), 0)
+    const conMaterial = planta.filter(m => {
+      const x = metaMap[m.slug]
+      return !!x && x.manual + x.procedures + x.flows + x.diagnosis > 0
+    }).length
+    const cargado = Object.keys(metaMap).length > 0
+    return (
+      <div className={cn(heightClass, 'w-full bg-background')}>
+        <div className="flex w-full flex-col gap-[18px] px-8 pb-10 pt-6">
+          <header className="flex flex-wrap items-end justify-between gap-4">
+            <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-1">
+              <span className="text-[13px] text-muted-foreground tabular-nums">
+                Centro de aprendizaje · {itemsWithContent} de {totalCatalog} con material
+              </span>
+              <h1 className="text-[22px] font-semibold leading-tight text-foreground [text-wrap:balance]">
+                {cargado
+                  ? `${suma('diagnosis')} casos de diagnóstico, ${suma('procedures')} procedimientos y ${suma('flows')} flujos en ${conMaterial} máquinas`
+                  : 'Centro de aprendizaje'}
+              </h1>
+            </div>
+            <div className="flex flex-[0_1_460px] items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Máquina, simulador o síntoma"
+                  aria-label="Buscar en el Centro de aprendizaje"
+                  className="min-h-[36px] w-full rounded-ctl border border-foreground/20 bg-transparent pl-9 pr-3 text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+              {isAdmin && <CompartirPaseLectura />}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/aprendizaje/admin')}
+                  className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-ctl border border-foreground/20 px-3.5 text-[15px] text-foreground hover:border-foreground/40"
+                >
+                  <Lock className="size-4 text-muted-foreground" />Administrar
+                </button>
+              )}
+            </div>
+          </header>
+          {searching ? (
+            <div className="flex max-w-3xl flex-col gap-4">{resultadosBusqueda}</div>
+          ) : (
+            <HubAprendizajePC
+              areas={sinCursos}
+              cursos={allMachines.filter(isCourseMachine)}
+              metaMap={metaMap}
+              simuladores={visibleSims.map(s => ({
+                id: s.id,
+                titulo: s.title,
+                detalle: `${s.subtitle} · ${s.stats}`,
+                enDesarrollo: s.inDevelopment,
+                onAbrir: () => navigate(s.href),
+              }))}
+              recientes={[...favMachines, ...recentMachines]}
+              onMaquina={goMachine}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={cn(heightClass, 'w-full bg-background')}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
@@ -267,42 +382,7 @@ export function LearningHubPage() {
         </div>
 
         {searching ? (
-          /* ── Resultados de búsqueda ── */
-          noResults ? (
-            <ListGroup title={`Resultados para "${query.trim()}"`}>
-              <p className="px-4 py-6 text-body text-muted-foreground">
-                Sin resultados. Prueba con el nombre de la máquina o un síntoma más general.
-              </p>
-            </ListGroup>
-          ) : (
-            <>
-              {simHits.length > 0 && (
-                <ListGroup title="Simuladores">
-                  {simHits.map(mod => <SimRow key={mod.id} mod={mod} onClick={() => navigate(mod.href)} />)}
-                </ListGroup>
-              )}
-              {machineHits.length > 0 && (
-                <ListGroup title="Máquinas">{machineHits.map(machineRow)}</ListGroup>
-              )}
-              {symptomHits.length > 0 && (
-                <ListGroup title="Síntomas de diagnóstico">
-                  {symptomHits.map(hit => {
-                    const m = allMachines.find(x => x.slug === hit.machineSlug)
-                    return (
-                      <ListCell
-                        key={`${hit.machineSlug}-${hit.diagnosisId}`}
-                        className="bg-card"
-                        leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-muted text-muted-foreground"><Stethoscope className="size-5" /></span>}
-                        title={<span className="font-normal">{hit.title || hit.symptom}</span>}
-                        subtitle={[hit.title && hit.symptom ? hit.symptom : null, m?.name].filter(Boolean).join(' · ')}
-                        onClick={() => navigate(`/aprendizaje/maquina/${hit.machineSlug}`)}
-                      />
-                    )
-                  })}
-                </ListGroup>
-              )}
-            </>
-          )
+          resultadosBusqueda
         ) : (
           <>
             {/* ── Favoritos y recientes: una sola fila de chips ── */}

@@ -1,4 +1,4 @@
-import { ClipboardCopy, FileDown, FileSpreadsheet, Loader2, MessageCircle } from 'lucide-react'
+import { ClipboardCopy, FileDown, FileSpreadsheet, Loader2, MessageCircle, Table2 } from 'lucide-react'
 import { Button, ListCell, ListGroup, Sheet } from '@/components/piel'
 
 /**
@@ -16,6 +16,7 @@ export function CompartirTurnoSheet({
   onWhatsapp,
   onPdf,
   onExcel,
+  onPlanilla,
 }: {
   open: boolean
   onClose: () => void
@@ -28,6 +29,8 @@ export function CompartirTurnoSheet({
   onPdf: () => void
   /** La planilla «Recoleccion MTTR» del turno, llena, como archivo .xlsx para adjuntar. */
   onExcel: () => void
+  /** Celular: la planilla MTTR y las cifras del turno viven aquí (opción A, 10-11-2026). */
+  onPlanilla?: () => void
 }) {
   const icono = (children: React.ReactNode) => (
     <span className="flex size-[30px] items-center justify-center rounded-ctl bg-muted-foreground/10 text-muted-foreground [&>svg]:size-4">{children}</span>
@@ -81,6 +84,15 @@ export function CompartirTurnoSheet({
             onClick={ocupado ? undefined : onExcel}
             aria-disabled={ocupado}
           />
+          {onPlanilla && (
+            <ListCell
+              leading={icono(<Table2 />)}
+              title="Ver planilla MTTR"
+              subtitle="Cifras del turno y la planilla que va arriba del correo"
+              chevron
+              onClick={onPlanilla}
+            />
+          )}
         </ListGroup>
       )}
     </Sheet>

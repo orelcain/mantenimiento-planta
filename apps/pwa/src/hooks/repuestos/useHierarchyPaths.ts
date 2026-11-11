@@ -14,15 +14,18 @@ import { useState, useEffect, useCallback } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { logger } from '@/lib/logger'
+import { seccionDeCadena } from '@/utils/repuestos/misEquiposResumen'
 
 // nodeId → Set(ancestorIds incl. self)
 let cache: Map<string, Set<string>> | null = null
 let cacheTs = 0
 // nodeId → nombre. Sale de la MISMA lectura de `hierarchy`: no cuesta ni un documento más.
 let nombresCache: Map<string, string> = new Map()
+// nodeId → padre. También de la misma lectura.
+let padresCache: Map<string, string | null> = new Map()
 const TTL = 5 * 60 * 1000
 
-export function invalidateHierarchyPathsCache() { cache = null; cacheTs = 0; nombresCache = new Map() }
+export function invalidateHierarchyPathsCache() { cache = null; cacheTs = 0; nombresCache = new Map(); padresCache = new Map() }
 
 async function loadAncestorsMap(): Promise<Map<string, Set<string>>> {
   if (cache && Date.now() - cacheTs < TTL) return cache
@@ -37,6 +40,7 @@ async function loadAncestorsMap(): Promise<Map<string, Set<string>>> {
     }
   })
   nombresCache = new Map(nodes.map((n) => [n.id, n.nombre]))
+  padresCache = new Map(nodes.map((n) => [n.id, n.parentId]))
   const m = build(nodes)
   cache = m
   cacheTs = Date.now()
@@ -146,5 +150,21 @@ export function useHierarchyPaths() {
     [map],
   )
 
-  return { isUnder, plantaDe, loading, ready: !!map }
+  /** Sección de la línea a la que pertenece el nodo («EVISCERADO», «FILETE»…), si se conoce. */
+  const seccionDe = useCallback(
+    (nodeId: string | undefined | null): string | undefined => {
+      if (!nodeId || !map) return undefined
+      const cadena: string[] = []
+      let actual: string | null = nodeId
+      let guarda = 0
+      while (actual && guarda++ < 30) {
+        cadena.unshift(nombresCache.get(actual) ?? '')
+        actual = padresCache.get(actual) ?? null
+      }
+      return seccionDeCadena(cadena)
+    },
+    [map],
+  )
+
+  return { isUnder, plantaDe, seccionDe, loading, ready: !!map }
 }
