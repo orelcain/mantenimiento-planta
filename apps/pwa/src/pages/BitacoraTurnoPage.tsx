@@ -2087,7 +2087,7 @@ const ANCHO_CORREO = 1000
  * 31 % en un teléfono — ilegible por 320 px de papel en blanco.
  */
 /** Controles de escritorio de «Para enviar»: 36 px mínimo, radio de control y 15 px. */
-const CTL_PC = 'h-auto min-h-[36px] rounded-ctl px-3.5 text-[15px] whitespace-nowrap'
+const CTL_PC = 'h-auto min-h-[36px] !rounded-ctl px-3.5 text-[15px] whitespace-nowrap'
 const CTL_PC_FILETE = `${CTL_PC} border border-foreground/20 font-normal text-foreground`
 
 /** Correo | WhatsApp en PC: un segmentado con filete y radio de control; el elegido, en tinte de acento. */

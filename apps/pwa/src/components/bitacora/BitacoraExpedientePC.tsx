@@ -142,7 +142,7 @@ export function BitacoraExpedientePC({
               </span>
             ))}
           </nav>
-          <Button size="sm" className="h-auto min-h-[36px] rounded-ctl px-3.5 text-[15px] whitespace-nowrap" onClick={onNuevo}>
+          <Button size="sm" className="h-auto min-h-[36px] !rounded-ctl px-3.5 text-[15px] whitespace-nowrap" onClick={onNuevo}>
             <Plus /> Nuevo evento
           </Button>
         </div>
