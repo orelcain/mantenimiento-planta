@@ -1,26 +1,9 @@
 import { tecnicosDelEvento, type EventoBitacora } from '@/services/bitacora/bitacora.types'
-import type { ResumenBitacora } from '@/services/bitacora/resumenBitacora'
-import { formatoMinutos } from '@/services/bitacora/turnoMantencion'
 import { etiquetaTipo, normalizarRepuestos } from '@/services/bitacora/presentacionEvento'
 import { nombreEquipoLegible } from '@/services/bitacora/nombreEquipo'
 
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
-
-/**
- * Título del expediente del turno en PC: dice lo que pasó, no el nombre del
- * módulo (criterio limpio, 08-11-2026). Primero lo que costó a la línea.
- */
-export function tituloTurno(r: ResumenBitacora, fotos: number): string {
-  if (r.eventos === 0) return 'Sin trabajos registrados en este turno'
-  const trabajos = plural(r.eventos, 'trabajo', 'trabajos')
-  if (r.conParada > 0) {
-    const min = r.minutosParada > 0 ? ` ${formatoMinutos(r.minutosParada)}` : ''
-    return `${trabajos}; ${plural(r.conParada, 'detuvo', 'detuvieron')} la máquina${min}`
-  }
-  if (r.afectados > 0) return `${trabajos}; ${r.afectados} ${r.afectados === 1 ? 'siguió' : 'siguieron'} gracias a Mantención`
-  const conFotos = fotos > 0 ? ` y ${plural(fotos, 'foto', 'fotos')}` : ''
-  return `${trabajos}${conFotos}; ninguno anotó detención`
-}
+// El título vive en services (lo usa también el correo); se reexporta para quien ya lo importaba de aquí.
+export { tituloTurno } from '@/services/bitacora/tituloTurno'
 
 /** Técnicos del turno con cuántos trabajos firmó cada uno; los no marcados como presentes, al final. */
 export function tecnicosConTrabajos(eventos: readonly EventoBitacora[], presentes: readonly string[]) {
@@ -46,4 +29,10 @@ export function totalesTurno(eventos: readonly EventoBitacora[]) {
   const tecnicos = new Set(eventos.flatMap((e) => tecnicosDelEvento(e))).size
   const fotos = eventos.reduce((n, e) => n + (e.fotos?.length ?? 0), 0)
   return { equipos, tipos, repuestos, tecnicos, fotos }
+}
+
+/** Plural de un tipo de evento para el total: «1 correctivo», «7 correctivos», «2 mejoras». */
+export function pluralTipo(tipo: string, n: number): string {
+  if (n === 1) return tipo
+  return /[aeiou]$/i.test(tipo) ? `${tipo}s` : `${tipo}es`
 }

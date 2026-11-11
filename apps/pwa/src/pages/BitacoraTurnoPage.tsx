@@ -829,7 +829,6 @@ export function BitacoraTurnoVista({
   // Post-aseo, la tablet y el teléfono siguen como estaban.
   const esPC = useEsPC()
   const expedientePC = esPC && vista === 'turno'
-  const [ventanaEnvio, setVentanaEnvio] = useState(false)
   const cambiarVista = (v: 'turno' | 'inspeccion' | 'rutas') => {
     setVista(v)
     setParams(
@@ -971,6 +970,28 @@ export function BitacoraTurnoVista({
               { value: 'whatsapp', label: 'WhatsApp' },
             ]}
           />
+          {expedientePC && (
+            // PC: la columna «Para enviar» trae sus cuatro botones; el correo y WhatsApp se miran aquí.
+            <div className="flex flex-wrap gap-2">
+              {vistaEnvio === 'correo' && (
+                <>
+                  <Button onClick={() => void copiar()} disabled={!!trabajando || r.eventos === 0}>
+                    <Copy /> Copiar para correo
+                  </Button>
+                  <Button variant="tinted" onClick={() => void copiarIncrustadas()} disabled={!!trabajando || r.eventos === 0}>
+                    {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
+                    Con fotos incrustadas
+                  </Button>
+                </>
+              )}
+              <Button variant="tinted" onClick={() => void exportarPdf()} disabled={!!trabajando || r.eventos === 0}>
+                PDF
+              </Button>
+              <Button variant="tinted" onClick={() => void bajarExcel()} disabled={!!trabajando || r.eventos === 0}>
+                <FileSpreadsheet /> Excel
+              </Button>
+            </div>
+          )}
           {vistaEnvio === 'whatsapp' ? (
             <div className="flex flex-col gap-4">
               <PasosWhatsapp
@@ -993,10 +1014,12 @@ export function BitacoraTurnoVista({
           <div className="flex flex-col gap-1 px-4 pb-2">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="text-caption font-semibold text-muted-foreground">Así queda al pegar en el correo</h2>
-              <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
-                {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
-                Copiar con fotos incrustadas
-              </Button>
+              {!expedientePC && (
+                <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
+                  {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
+                  Copiar con fotos incrustadas
+                </Button>
+              )}
             </div>
             {/* El portapapeles lleva el CUERPO; el asunto se copia aparte. */}
             <div className="flex min-w-0 items-center gap-2 text-footnote">
@@ -1330,9 +1353,8 @@ export function BitacoraTurnoVista({
       ) : expedientePC ? (
         <BitacoraExpedientePC
           turnoNombre={etiquetaTurno(turno)}
-          horario={`${fecha.slice(0, 3)} ${turno.fecha.slice(8, 10)}-${turno.fecha.slice(5, 7)} · ${horarioTurno(turno)}`}
+          horario={horarioTurno(turno)}
           fecha={fecha}
-          planta={BITACORA_PLANTA.nombre}
           esActual={esActual}
           onAnterior={() => irATurno(-1)}
           onSiguiente={() => irATurno(1)}
@@ -1378,8 +1400,7 @@ export function BitacoraTurnoVista({
           }}
           onVerFoto={(e, fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
           onNuevo={abrirNuevo}
-          onCompartir={() => setVentanaEnvio(true)}
-          compartiendo={!!trabajando}
+          envio={panelEnvio}
           enlaces={[
             { etiqueta: 'Historial', onClick: () => navigate('/bitacora/historial') },
             { etiqueta: 'Rutas', onClick: () => cambiarVista('rutas') },
@@ -1784,30 +1805,6 @@ export function BitacoraTurnoVista({
         }}
       />
 
-      {/* PC: «Compartir» del expediente. El correo y WhatsApp ya no ocupan una columna
-          (era el 43 % del ancho); se miran aquí antes de copiarlos. */}
-      <Sheet
-        open={ventanaEnvio && expedientePC}
-        onClose={() => setVentanaEnvio(false)}
-        presentacionPC="ventana"
-        title="Compartir el turno"
-        description={`${etiquetaCortaTurno(turno.id)} · ${r.eventos} ${r.eventos === 1 ? 'evento' : 'eventos'} · ${fotosPublicadas} ${fotosPublicadas === 1 ? 'foto' : 'fotos'}`}
-      >
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void copiar()} disabled={!!trabajando || r.eventos === 0}>
-              <Copy /> Copiar para correo
-            </Button>
-            <Button variant="tinted" onClick={() => void exportarPdf()} disabled={!!trabajando || r.eventos === 0}>
-              PDF
-            </Button>
-            <Button variant="tinted" onClick={() => void bajarExcel()} disabled={!!trabajando || r.eventos === 0}>
-              <FileSpreadsheet /> Excel
-            </Button>
-          </div>
-          {panelEnvio}
-        </div>
-      </Sheet>
 
       <Sheet
         open={hojaWhatsapp}
