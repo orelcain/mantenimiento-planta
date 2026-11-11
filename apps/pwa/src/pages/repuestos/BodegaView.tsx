@@ -62,7 +62,7 @@ import { useAccionesSolicitudes } from '@/hooks/repuestos/useAccionesSolicitudes
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 import { useEsPC } from '@/hooks/useEsPC'
 import { useColoresGrafico } from '@/hooks/useColoresGrafico'
-import { Pill, SegmentedControl, Button as PielButton } from '@/components/piel'
+import { Pill, SegmentedControl, Button as PielButton, SkeletonFilas } from '@/components/piel'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = StockFilterKey
@@ -178,9 +178,9 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   if (isLoading) {
     const pct = progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 px-6">
-        <Loader2 className="h-6 w-6 text-primary animate-spin" />
-        <span className="text-sm text-muted-foreground">
+      <div className="flex flex-col gap-3 py-4">
+        <SkeletonFilas label="Cargando bodega" filas={6} className="rounded-card bg-card px-4" />
+        <span className="px-4 text-footnote tabular-nums text-muted-foreground">
           {progress.phase === 'machines' && progress.total > 0
             ? `Cargando equipos… ${progress.loaded}/${progress.total}`
             : progress.phase === 'hierarchy'

@@ -2,9 +2,11 @@
  * Esqueletos con forma: anuncian la carga una sola vez (role=status con su
  * rótulo), dibujan la cantidad de filas pedida y no dejan nada enfocable.
  */
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
 import { SkeletonFilas, SkeletonTabla, SkeletonPanel, SkeletonGrafico } from '../Skeleton'
+
+afterEach(cleanup)
 
 describe('Esqueletos con forma', () => {
   it('SkeletonFilas anuncia la carga y dibuja una fila con filete por elemento', () => {
@@ -23,7 +25,7 @@ describe('Esqueletos con forma', () => {
     const estado = screen.getByRole('status', { name: 'Cargando repuestos' })
     const filas = estado.querySelectorAll(':scope > .grid')
     expect(filas).toHaveLength(4)
-    expect(filas[0].children).toHaveLength(4)
+    expect(filas[0]?.children).toHaveLength(4)
   })
 
   it('SkeletonPanel con kpis y gráfico tiene un solo status', () => {

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Images, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
-import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
+import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, SkeletonFilas, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
@@ -1726,11 +1726,13 @@ export function BitacoraTurnoVista({
             </div>
           )}
           {cargando ? (
-            <div className="flex flex-col gap-2 rounded-card bg-card p-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-ctl bg-muted-foreground/10 motion-reduce:animate-none" />
-              ))}
-            </div>
+            <SkeletonFilas
+              label="Cargando eventos del turno"
+              filas={4}
+              lineas={3}
+              cola={false}
+              className={registroCel ? '-mx-4 border-t border-border px-4' : 'rounded-card bg-card px-4'}
+            />
           ) : eventos.length === 0 ? (
             <div className="rounded-card bg-card px-6 py-10 text-center">
               <NotebookPen className="mx-auto mb-3 size-9 text-muted-foreground" aria-hidden />

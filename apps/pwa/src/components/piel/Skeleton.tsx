@@ -2,7 +2,7 @@
  * Skeleton — bloque de carga con la forma de lo que va a llegar.
  *
  * Reemplaza al spinner en las cargas de datos: el usuario ve dónde va a aparecer
- * cada cifra y no un giro que no dice nada. Es un rectángulo del token `muted`
+ * cada cifra y no un giro que no dice nada. Es un rectángulo de `muted-foreground` al 10 % (el `muted` de la piel oscura casi no se distingue de la tarjeta)
  * con redondeo de la escala; el pulso se apaga con `prefers-reduced-motion`
  * (`motion-safe:` solo anima si el usuario no lo pidió).
  *
@@ -16,7 +16,7 @@ export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>
   return (
     <div
       aria-hidden
-      className={cn('rounded-ctl bg-muted motion-safe:animate-pulse', className)}
+      className={cn('rounded-ctl bg-muted-foreground/10 motion-safe:animate-pulse', className)}
       {...props}
     />
   )
@@ -64,7 +64,13 @@ export interface SkeletonLineaProps {
 
 /** Una línea de texto que todavía no llega. */
 export function SkeletonLinea({ ancho = '60%', tamano = 'cuerpo', className }: SkeletonLineaProps) {
-  return <Skeleton className={cn('rounded-full', ALTO_LINEA[tamano], className)} style={{ width: ancho }} />
+  return (
+    <div
+      aria-hidden
+      className={cn('rounded-full bg-muted-foreground/10 motion-safe:animate-pulse', ALTO_LINEA[tamano], className)}
+      style={{ width: ancho }}
+    />
+  )
 }
 
 export interface SkeletonFilasProps {
