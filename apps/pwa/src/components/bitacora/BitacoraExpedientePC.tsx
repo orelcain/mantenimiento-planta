@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { Button } from '@/components/piel'
+import { Button, SkeletonFilas } from '@/components/piel'
 import type { EventoBitacora, FotoEvento } from '@/services/bitacora/bitacora.types'
 import { tecnicosDelEvento } from '@/services/bitacora/bitacora.types'
 import { minutosParadaDe, type ResumenBitacora } from '@/services/bitacora/resumenBitacora'
@@ -174,11 +174,7 @@ export function BitacoraExpedientePC({
         <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pb-6 pr-1 [&_button]:text-[15px] [&_.text-headline]:text-[15px] [&_.text-body]:text-[15px] [&_.text-subhead]:text-[15px] [&_.text-caption]:text-[13px] [&_.text-xs]:text-[13px]">
           {antes}
           {cargando ? (
-            <div className="flex flex-col gap-2 pt-3">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-12 animate-pulse rounded-ctl bg-muted-foreground/10 motion-reduce:animate-none" />
-              ))}
-            </div>
+            <SkeletonFilas label="Cargando trabajos del turno" filas={5} lineas={2} className="pt-3" />
           ) : hechos.length === 0 && borradores.length === 0 && pendientes.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-[15px] font-semibold">Aún no hay trabajos en este turno</p>

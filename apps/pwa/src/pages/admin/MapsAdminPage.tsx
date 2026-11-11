@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { SkeletonFilas } from '@/components/piel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
@@ -271,9 +272,7 @@ export function MapsAdminPage() {
 
       {/* Lista de ubicaciones */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <SkeletonFilas label="Cargando ubicaciones" filas={3} lineas={2} />
       ) : locations.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
@@ -354,10 +353,7 @@ export function MapsAdminPage() {
                 {isExpanded && (
                   <CardContent className="pt-0 pb-4">
                     {isLoadingVersions ? (
-                      <div className="flex items-center gap-2 text-muted-foreground py-4">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Cargando versiones...
-                      </div>
+                      <SkeletonFilas label="Cargando versiones" filas={2} lineas={1} />
                     ) : locationVersions.length === 0 ? (
                       <div className="text-center py-6 text-muted-foreground">
                         <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />

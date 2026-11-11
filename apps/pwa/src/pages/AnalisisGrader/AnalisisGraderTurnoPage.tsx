@@ -11,7 +11,7 @@ import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-
 import { vistasDelTurno, vistaDesdeUrl, type VistaTurno } from '@/services/grader/vistasDelTurno'
 import { registrarVista } from '@/services/telemetria/registrarVista'
 import { logger } from '@/lib/logger'
-import { Button, Card, CardContent, Spinner, Badge, InfoTooltip } from '@/components/ui'
+import { Button, Card, CardContent, Badge, InfoTooltip } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Clock, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise, Radio, ExternalLink, SlidersHorizontal, Image as ImageIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
@@ -29,6 +29,7 @@ import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grade
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { PurezaPorPuertaCard } from '@/components/grader/PurezaPorPuertaCard'
 import { Disclosure } from '@/components/piel/Disclosure'
+import { SkeletonFilas, SkeletonPanel } from '@/components/piel'
 import { loadGateObservations, updateDailySummary } from '@/services/grader/graderDailySummary.service'
 import { deriveGateMix, configTimelineFromSnapshots, classifyGateCauses, derivePesoPorPuerta, detectSolapesDeRango, inferirSeteoFaltante, detectCambiosDePrograma, wallClockMsToRealIso, rangesFingerprint, deriveMezcla, mapaPesoDePuerta, type GateObservations, type SeteoMaquina, type CambioDePrograma } from '@/services/grader/graderGateObservations'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalyticsThroughput'
@@ -2399,9 +2400,9 @@ export function AnalisisGraderTurnoPage() {
 
       {/* Estados */}
       {loading && (
-        <div className="flex items-center gap-3 py-8 justify-center text-muted-foreground">
-          <Spinner className="w-5 h-5" />
-          Cargando turno…
+        <div className="flex flex-col gap-4 py-2">
+          <SkeletonPanel label="Cargando turno" kpis={4} lineas={2} />
+          <SkeletonFilas label="Cargando turnos del período" filas={4} lineas={1} />
         </div>
       )}
 

@@ -5,6 +5,7 @@
  * Permite reordenar grupos y mover módulos entre categorías.
  * Persiste en Firestore: sidebarConfig/default
  */
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -321,8 +322,8 @@ export function SidebarEditorPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <SkeletonFilas label="Cargando barra lateral" filas={4} lineas={1} cola={false} />
       </div>
     )
   }

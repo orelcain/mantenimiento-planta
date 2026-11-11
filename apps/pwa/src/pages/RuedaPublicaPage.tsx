@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AlertCircle, ExternalLink, Clock } from 'lucide-react'
-import { Spinner } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import { FranjaVentanas } from '@/components/calendario/FranjaVentanas'
 import { ResumenPlanta } from '@/components/calendario/ResumenPlanta'
 import { RuedaPlanta } from '@/components/calendario/RuedaPlanta'
@@ -83,8 +83,8 @@ export function RuedaPublicaPage() {
 
   if (estado === 'cargando') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Spinner className="h-8 w-8 text-primary" />
+      <div className="min-h-screen bg-background p-6">
+        <SkeletonPanel label="Cargando la rueda" lineas={3} grafico="16rem" className="mx-auto max-w-2xl" />
       </div>
     )
   }

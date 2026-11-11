@@ -11,6 +11,9 @@ No tomes una tarea que ya está EN CURSO por otro.
   correo con fotos (URL o incrustadas), compartir con fotos, Excel, asunto y registrar como solicitudes.
   Falta: OK de Orel a las decisiones de ubicación y prueba en Outlook real.
 
+- [ ] **Visor de imágenes: zoom fluido en el celular** — HECHO (PR #1273 mergeado 11-11) — claude.
+  Reporte de Danilo: al hacer zoom/paneo en el teléfono la imagen parpadea y «se fuerza hacia
+  diferentes lados». Gestos reescritos en `ImageLightbox` + matemática probada en `lib/zoomVisor`.
 - [ ] **Falla repetida (reincidencia de paros de Mantención)** — HECHO (PR #1355 y #1356 mergeados 29-10) — claude.
   Estudio y plan: OneDrive `ARIA_MANTENIMIENTO_PLANTA/docs/PLAN_PREDICTIVA_MICRODETENCIONES.md`.
   PR 1: helper + card 1A en Análisis de Turno (lee el turno y los 3 anteriores). PR 2: Cloud Function que

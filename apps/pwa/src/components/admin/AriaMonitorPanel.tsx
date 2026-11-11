@@ -16,8 +16,8 @@ import {
   Button,
   Input,
   Badge,
-  Spinner,
 } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import { Brain, Save, RefreshCw, Users, BarChart3, Settings2, AlertTriangle, Volume2, Play } from 'lucide-react'
 import { setVoicePref, getGoogleVoices, speakWith, stopSpeaking, ARIA_VOICE_OPTIONS } from '@/lib/ariaVoice'
 import {
@@ -130,8 +130,8 @@ export function AriaMonitorPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner className="h-6 w-6" />
+      <div className="space-y-6">
+        <SkeletonPanel label="Cargando monitor de ARIA" kpis={3} lineas={3} />
       </div>
     )
   }

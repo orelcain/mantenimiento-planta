@@ -3,6 +3,7 @@
  * Reutilizable: sin userId → edita el usuario actual. Con userId → modo admin.
  */
 
+import { SkeletonPanel } from '@/components/piel'
 import { useState, useEffect } from 'react'
 import { Factory, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Switch, Label } from '@/components/ui'
@@ -81,9 +82,8 @@ export function ProcessNotificationsPanel({ userId }: Props) {
   if (loading) {
     return (
       <Card>
-        <CardContent className="p-6 flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Cargando preferencias...
+        <CardContent className="p-6">
+          <SkeletonPanel label="Cargando preferencias de notificaciones" lineas={3} />
         </CardContent>
       </Card>
     )

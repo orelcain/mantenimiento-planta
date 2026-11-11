@@ -5,6 +5,7 @@
  * de la estructura jerárquica de 8 niveles.
  */
 
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -1063,10 +1064,7 @@ export function HierarchyPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner size="lg" />
-              <span className="ml-3 text-muted-foreground">Cargando estructura...</span>
-            </div>
+            <SkeletonFilas label="Cargando estructura" filas={5} lineas={1} cola={false} />
           ) : filteredTree.length === 0 ? (
             <div className="text-center py-12">
               <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

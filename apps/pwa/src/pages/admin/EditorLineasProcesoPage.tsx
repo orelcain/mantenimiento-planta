@@ -31,7 +31,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Boxes, ChevronDown, Crosshair, Droplets, ChevronLeft, ChevronRight, Expand, HelpCircle, Loader2, Maximize2, Minimize2, Minus, PanelLeftClose, PanelLeftOpen, Plus, Redo2, RotateCcw, Search, Split, Spline, Stethoscope, Trash2, Undo2, X } from 'lucide-react'
-import { Button, Sheet } from '@/components/piel'
+import { Button, Sheet, SkeletonGrafico } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
 import { useAuthStore } from '@/store'
@@ -2796,8 +2796,8 @@ function Editor() {
           onDrop={alSoltar}
         >
           {cargando ? (
-            <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
-              <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> Cargando el árbol de equipos…
+            <div className="h-full p-4">
+              <SkeletonGrafico alto="100%" label="Cargando el árbol de equipos" />
             </div>
           ) : (
             <ReactFlow

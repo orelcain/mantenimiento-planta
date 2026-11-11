@@ -14,6 +14,7 @@
  * Uso típico: el analista ve un spike P0 en un minuto particular, clickea
  * esa barra, y confirma qué piezas fallaron, su peso, y a qué gate iban.
  */
+import { SkeletonPanel } from '@/components/piel'
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Check, Info, Siren } from 'lucide-react'
 import {
@@ -24,7 +25,6 @@ import {
   DialogTitle,
   DialogDescription,
   Button,
-  Spinner,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import {
@@ -374,8 +374,8 @@ export function MinuteDetailDialog({
         </DialogHeader>
 
         {loading && (
-          <div className="flex items-center justify-center py-8">
-            <Spinner />
+          <div className="py-4">
+            <SkeletonPanel label="Cargando desglose del minuto" kpis={3} lineas={2} />
           </div>
         )}
 

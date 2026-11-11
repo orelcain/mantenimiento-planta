@@ -5,6 +5,7 @@
  * e inspecciones. Permite filtrar por fecha, inspección y tipo.
  */
 
+import { SkeletonGrafico } from '@/components/piel'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   MapPin, 
@@ -21,7 +22,6 @@ import {
   CardHeader, 
   CardTitle,
   Badge,
-  Spinner,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -292,8 +292,8 @@ export function MapViewPage() {
   
   if (isLoading && locations.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner className="h-8 w-8" />
+      <div className="p-4">
+        <SkeletonGrafico alto="400px" label="Cargando mapas" />
       </div>
     )
   }
@@ -478,9 +478,7 @@ export function MapViewPage() {
       <Card>
         <CardContent className="p-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-[500px]">
-              <Spinner className="h-8 w-8" />
-            </div>
+            <SkeletonGrafico alto="500px" label="Cargando mapa" />
           ) : !currentMapVersion ? (
             <div className="flex flex-col items-center justify-center h-[400px] text-center">
               <MapPin className="h-12 w-12 text-muted-foreground mb-3" />

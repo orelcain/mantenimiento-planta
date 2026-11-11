@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui'
+import { SkeletonFilas } from '@/components/piel'
 import { getTrashItems, restoreFromTrash, permanentDeleteFromTrash } from '@/services/auditLog'
 import { useToast } from '@/hooks/useToast'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
@@ -147,9 +148,7 @@ export function TrashPanel({ open, onOpenChange }: Props) {
         {/* ── Lista ── */}
         <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-2 min-h-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
+            <SkeletonFilas label="Cargando papelera" filas={3} lineas={2} className="rounded-card border border-border bg-card px-3" />
           ) : items.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">
               La papelera está vacía

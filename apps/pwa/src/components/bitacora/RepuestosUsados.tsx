@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Loader2, Minus, Plus, Search, Star, X } from 'lucide-react'
-import { Button, SegmentedControl } from '@/components/piel'
+import { Button, SegmentedControl, SkeletonFilas } from '@/components/piel'
 import { MAX_CANTIDAD_REPUESTO, MAX_REPUESTOS_EVENTO } from '@/config/bitacora'
 import type { RepuestoUsado } from '@/services/bitacora/bitacora.types'
 import { clampCantidadRepuesto, nombreRepuesto, normalizarRepuestos } from '@/services/bitacora/presentacionEvento'
@@ -589,10 +589,7 @@ export function RepuestosUsados({
           </p>
         )}
         {cargando && (
-          <p className="flex items-center gap-1.5 text-footnote text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-            {cargando === 'equipo' ? 'Cargando los repuestos del equipo…' : 'Cargando la lista de repuestos…'}
-          </p>
+          <SkeletonFilas label={cargando === 'equipo' ? 'Cargando los repuestos del equipo' : 'Cargando la lista de repuestos'} filas={3} lineas={1} cola={false} className="rounded-ctl bg-muted-foreground/10 px-3" />
         )}
         {errorLista && (
           <p role="alert" className="text-footnote font-semibold text-ink-warn">

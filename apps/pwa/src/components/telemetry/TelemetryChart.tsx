@@ -1,3 +1,4 @@
+import { SkeletonGrafico } from '@/components/piel'
 import { useMemo, useRef } from 'react'
 import 'chartjs-adapter-date-fns'
 import {
@@ -708,31 +709,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   // Mostrar skeleton mientras carga
   if (isLoading) {
     return (
-      <div style={{ height: `${height}px` }} className="relative bg-muted-foreground/[0.10] rounded-card dark:border-border overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 border-4 border-blue-500/[0.25] border-t-blue-600 rounded-full animate-spin" />
-            <p className="text-sm text-muted-foreground animate-pulse">
-              Generando historial...
-            </p>
-          </div>
-        </div>
-        {/* Skeleton del gráfico */}
-        <div className="absolute inset-4">
-          <div className="h-full flex items-end gap-1 opacity-20">
-            {Array.from({ length: 20 }).map((_, i) => (
-              <div 
-                key={i} 
-                className="flex-1 bg-gradient-to-t from-blue-300 to-blue-500 rounded-t animate-pulse"
-                style={{ 
-                  height: `${30 + Math.random() * 60}%`,
-                  animationDelay: `${i * 50}ms`
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
+      <SkeletonGrafico alto={`${height}px`} label="Generando historial" />
     )
   }
 

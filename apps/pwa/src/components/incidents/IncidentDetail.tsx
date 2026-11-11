@@ -1,3 +1,4 @@
+import { SkeletonGrafico } from '@/components/piel'
 import { useState, useEffect } from 'react'
 import { logger } from '@/lib/logger'
 import {
@@ -664,9 +665,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                   )}
                 </h4>
                 {mapLoading ? (
-                  <div className="h-40 flex items-center justify-center bg-muted rounded-card">
-                    <Spinner className="h-6 w-6" />
-                  </div>
+                  <SkeletonGrafico alto="auto" label="Cargando mapa" className="aspect-square md:aspect-[4/3] max-h-[50vh] min-h-[300px] md:min-h-[400px] rounded-card" />
                 ) : (
                   <div className="w-full aspect-square md:aspect-[4/3] max-h-[50vh] min-h-[300px] md:min-h-[400px] rounded-card overflow-hidden border">
                   <MapViewer

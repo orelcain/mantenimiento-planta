@@ -1,3 +1,4 @@
+import { SkeletonPanel } from '@/components/piel'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { 
     Card, CardContent, CardHeader, CardTitle, 
@@ -17,7 +18,7 @@ import {
   ArcElement,
 } from 'chart.js'
 import { Bar, Pie } from 'react-chartjs-2'
-import { Loader2, BrainCircuit, AlertTriangle, ChevronRight, CheckCircle2, Calendar } from 'lucide-react'
+import { BrainCircuit, AlertTriangle, ChevronRight, CheckCircle2, Calendar } from 'lucide-react'
 import { logger } from '@/lib/logger'
 
 // Registrar componentes de ChartJS
@@ -122,9 +123,8 @@ export function FailureAnalysis() {
 
   if (loading) {
       return (
-          <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin mb-2" />
-              <p>Analizando datos de fallas...</p>
+          <div className="p-4">
+              <SkeletonPanel label="Cargando análisis de fallas" lineas={3} grafico="12rem" />
           </div>
       )
   }

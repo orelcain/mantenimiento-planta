@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Package, ImageIcon, X, BookOpen, Eye, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText, Star } from 'lucide-react'
 import type { Repuesto, EquipmentRepuesto } from '@/types/repuestos'
+import { SkeletonTabla } from '@/components/piel'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 
 /** Tooltip ligero para botones de acción (CSS puro, sin deps) */
@@ -259,11 +260,8 @@ export function RepuestosTable({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin" />
-          <span className="text-sm">Cargando repuestos...</span>
-        </div>
+      <div className="rounded-card border bg-card px-4 py-2 shadow-sm">
+        <SkeletonTabla label="Cargando repuestos" filas={5} columnas={6} />
       </div>
     );
   }

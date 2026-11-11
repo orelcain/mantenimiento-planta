@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Spinner } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import { AlertCircle, Clock, PauseCircle, Activity, ExternalLink } from 'lucide-react'
 import { loadPublicToken, esAccesoDenegado } from '@/services/grader/graderPublicToken.service'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
@@ -48,8 +48,8 @@ export function GraderPublicTokenPage() {
   // ── Loading ──────────────────────────────────────────────────────────────
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <Spinner className="w-8 h-8 text-amber-400" />
+      <div className="min-h-screen bg-gray-950 p-6">
+        <SkeletonPanel label="Cargando la vista del grader" lineas={3} grafico="16rem" className="mx-auto max-w-2xl" />
       </div>
     )
   }

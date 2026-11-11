@@ -16,6 +16,7 @@ import {
   CardTitle,
   Button,
 } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import {
   Loader2,
   RefreshCw,
@@ -118,9 +119,8 @@ export function PowerBIExportPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 p-6 text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Cargando estado…
+      <div className="container mx-auto p-4 sm:p-6 max-w-6xl">
+        <SkeletonPanel label="Cargando estado de Power BI" lineas={3} />
       </div>
     )
   }

@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
+import { SkeletonPanel } from '@/components/piel'
 import { Wrench, AlertTriangle, Clock, Gauge, Activity, TrendingDown, TrendingUp, Loader2, FileDown } from 'lucide-react'
 import type { GraderDailySummary, Pause } from '@/services/grader/types'
 import {
@@ -114,9 +115,13 @@ export function MaintenanceImpactCard({ summaries, periodLabel, rangeLabel, work
             <Wrench className="w-4 h-4 text-cat-4-ink" /> Impacto de Mantención
           </CardTitle>
         </CardHeader>
-        <CardContent className="pb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Cargando detenciones del período{progress && progress.total ? ` — ${progress.done}/${progress.total} turnos…` : '…'}
+        <CardContent className="pb-6 flex flex-col gap-3">
+          <SkeletonPanel label="Cargando detenciones del período" kpis={3} lineas={1} />
+          {progress && progress.total ? (
+            <span className="text-footnote tabular-nums text-muted-foreground">
+              Cargando detenciones del período — {progress.done}/{progress.total} turnos…
+            </span>
+          ) : null}
         </CardContent>
       </Card>
     )
