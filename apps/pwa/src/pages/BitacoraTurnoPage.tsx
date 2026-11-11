@@ -15,8 +15,6 @@ import { FUENTE_ACCESO_QR, type FuenteAccesoQr } from '@/hooks/useAccesoQrBitaco
 import { apiPaseReal, type ApiPase } from '@/services/bitacora/paseBitacora'
 import { bitacoraATextoWhatsapp, planLaminas } from '@/services/bitacora/bitacoraWhatsapp'
 import { EventoBitacoraFila } from '@/components/bitacora/EventoBitacoraFila'
-import { BitacoraExpedientePC } from '@/components/bitacora/BitacoraExpedientePC'
-import { useEsPC } from '@/hooks/useEsPC'
 import { BarraSincronizacion } from '@/components/bitacora/BarraSincronizacion'
 import { EventoBitacoraSheet } from '@/components/bitacora/EventoBitacoraSheet'
 import { VisorFotosBitacora } from '@/components/bitacora/VisorFotosBitacora'
@@ -825,196 +823,6 @@ export function BitacoraTurnoVista({
   // Solo publicados: un borrador guarda el tipo a medio escribir («mejora c»).
   const sugerenciasTipo = useMemo(() => tiposPropiosUsados(soloListos([...eventos, ...pendientesPrevios])), [eventos, pendientesPrevios])
   const fecha = fechaTurnoLarga(turno)
-  // PC (≥ 1024 px): la pestaña Turno es un expediente (opción A, Orel 10-11-2026). Rutas y
-  // Post-aseo, la tablet y el teléfono siguen como estaban.
-  const esPC = useEsPC()
-  const expedientePC = esPC && vista === 'turno'
-  const [ventanaEnvio, setVentanaEnvio] = useState(false)
-  const cambiarVista = (v: 'turno' | 'inspeccion' | 'rutas') => {
-    setVista(v)
-    setParams(
-      (p) => {
-        const n = new URLSearchParams(p)
-        if (v === 'turno') n.delete('vista')
-        else n.set('vista', v)
-        return n
-      },
-      { replace: true },
-    )
-  }
-
-  // Pendientes y borradores de turnos anteriores: en el teléfono y la tablet van en la
-  // columna de entrega; en el expediente de PC, sobre la tabla de trabajos.
-  const previos = (
-    <>
-      {pendientesPrevios.length > 0 && (
-        <section aria-label="Pendientes de turnos anteriores" className="flex flex-col">
-          <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
-            Vienen de turnos anteriores<span className="font-normal tabular-nums"> · {pendientesPrevios.length}</span>
-          </h2>
-          <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-            {pendientesPrevios.map((p) => (
-              <div
-                key={p.id}
-                className='relative flex flex-col gap-1.5 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
-              >
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-headline leading-tight">{p.equipo?.trim() || 'Sin equipo'}</span>
-                  <Tag>{etiquetaTipo(p)}</Tag>
-                  <Pill tone="warning">Pendiente</Pill>
-                </div>
-                {tituloDe(p) && <p className="text-body font-semibold">{tituloDe(p)}</p>}
-                <p className="line-clamp-3 whitespace-pre-line text-body">{p.descripcion}</p>
-                <p className="text-footnote text-muted-foreground">{origenDePendiente(p, turno)}</p>
-                <div className="flex flex-wrap gap-2 pt-0.5">
-                  <Button variant="tinted" onClick={() => setEditor({ evento: null, idNuevo: nuevoId(), turno, pendienteOrigen: p })}>
-                    <Check /> Resolver
-                  </Button>
-                  <Button
-                    variant="plain"
-                    onClick={() => {
-                      setNoAplica(p)
-                      setMotivoNoAplica('')
-                      setQuienNoAplica(autorFijo ?? nombreRecordadoValido())
-                    }}
-                  >
-                    Ya no aplica
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Borradores que quedaron sin publicar: no cuentan en nada hasta que
-          alguien los publica, así que el turno que llega tiene que verlos. */}
-      {esActual && borradoresPrevios.length > 0 && (
-        <section aria-label="Borradores sin publicar de turnos anteriores" className="flex flex-col">
-          <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
-            Quedaron sin publicar<span className="font-normal tabular-nums"> · {borradoresPrevios.length}</span>
-          </h2>
-          <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-            {borradoresPrevios.map((b) => {
-              const puede =
-                b.creadoPor === auth.currentUser?.uid || usuario?.rol === 'admin' || usuario?.rol === 'supervisor'
-              const confirmando = descartandoId === b.id
-              return (
-                <div
-                  key={b.id}
-                  className='relative flex flex-col gap-1.5 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
-                >
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Pill tone="info">En redacción</Pill>
-                    <span className="text-headline leading-tight">{b.equipo?.trim() || 'Sin equipo todavía'}</span>
-                    <Tag>{etiquetaTipo(b)}</Tag>
-                  </div>
-                  {tituloDe(b) && <p className="text-body font-semibold">{tituloDe(b)}</p>}
-                  <p className="line-clamp-3 whitespace-pre-line text-body text-muted-foreground">
-                    {b.descripcion?.trim() || 'Sin descripción todavía'}
-                  </p>
-                  <p className="text-footnote text-muted-foreground">{origenDePendiente(b, turno)}</p>
-                  <p className="text-footnote text-muted-foreground">
-                    No cuenta en los números ni salió en el correo de su turno. Publícalo en su turno o descártalo.
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-0.5">
-                    <Button
-                      variant="tinted"
-                      onClick={() => {
-                        const destino = turnoDesdeId(b.turnoId)
-                        if (!destino) return
-                        // Se abre en SU turno: ahí vive y ahí se publica.
-                        const p = new URLSearchParams(params)
-                        p.set('turno', destino.id)
-                        setParams(p)
-                        setEditor({ evento: b, idNuevo: b.id, turno: destino })
-                      }}
-                    >
-                      Continuar
-                    </Button>
-                    {puede && (
-                      <Button
-                        variant={confirmando ? 'destructive' : 'plain'}
-                        onClick={() => {
-                          if (!confirmando) {
-                            setDescartandoId(b.id)
-                            return
-                          }
-                          setDescartandoId(null)
-                          void borrar(b)
-                          toast({ title: 'Borrador descartado' })
-                        }}
-                      >
-                        {confirmando ? 'Toca de nuevo para descartar' : 'Descartar'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-    </>
-  )
-
-  // Correo y WhatsApp: columna derecha entre 768 y 1023 px; en el expediente de PC, la
-  // ventana de «Compartir».
-  const panelEnvio = (
-    <>
-          <SegmentedControl
-            ariaLabel="Enviar por correo o por WhatsApp"
-            value={vistaEnvio}
-            onChange={setVistaEnvio}
-            segments={[
-              { value: 'correo', label: 'Correo' },
-              { value: 'whatsapp', label: 'WhatsApp' },
-            ]}
-          />
-          {vistaEnvio === 'whatsapp' ? (
-            <div className="flex flex-col gap-4">
-              <PasosWhatsapp
-                texto={textoWhatsapp}
-                plan={planWhatsapp}
-                listas={laminas.listas}
-                copiados={pasosCopiados}
-                onCopiado={marcarCopiado}
-                hayEventos={soloListos(eventos).length > 0}
-              />
-              {soloListos(eventos).length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <h2 className="px-4 text-caption font-semibold text-muted-foreground">Así queda en el chat</h2>
-                  <VistaPreviaWhatsapp texto={textoWhatsapp} listas={laminas.listas} />
-                </div>
-              )}
-            </div>
-          ) : (
-          <>
-          <div className="flex flex-col gap-1 px-4 pb-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-caption font-semibold text-muted-foreground">Así queda al pegar en el correo</h2>
-              <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
-                {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
-                Copiar con fotos incrustadas
-              </Button>
-            </div>
-            {/* El portapapeles lleva el CUERPO; el asunto se copia aparte. */}
-            <div className="flex min-w-0 items-center gap-2 text-footnote">
-              <span className="shrink-0 text-muted-foreground">Asunto:</span>
-              <span className="min-w-0 truncate">{asunto}</span>
-              <Button variant="plain" size="sm" className="shrink-0" onClick={copiarAsunto}>
-                Copiar asunto
-              </Button>
-            </div>
-          </div>
-          <VistaPreviaCorreo html={htmlCorreo} />
-          <p className="px-4 pt-2 text-footnote text-muted-foreground">
-            Outlook clásico: usa «Copiar para correo». En Outlook nuevo, web o celular usa «Copiar con fotos incrustadas»; si la letra sale toda igual, pega con «Mantener formato de origen».
-          </p>
-          </>
-          )}
-    </>
-  )
 
   return (
     // «Nuevo evento» ya no va en una barra fija: lo abre el «+» de la barra de
@@ -1042,8 +850,6 @@ export function BitacoraTurnoVista({
         />
       </div>
 
-      {!expedientePC && (
-      <>
       {/* Encabezado: título grande (uno por pantalla) + navegación de turnos */}
       {/* Encabezado en DOS EJES (mockup aprobado 18-09-2026; HIG «Layout» y
           «Toolbars»): arriba el título y las acciones; abajo el turno y, a su
@@ -1151,7 +957,18 @@ export function BitacoraTurnoVista({
         className="px-1"
         ariaLabel="Qué se está viendo de este turno"
         value={vista}
-        onChange={cambiarVista}
+        onChange={(v) => {
+          setVista(v)
+          setParams(
+            (p) => {
+              const n = new URLSearchParams(p)
+              if (v === 'turno') n.delete('vista')
+              else n.set('vista', v)
+              return n
+            },
+            { replace: true },
+          )
+        }}
         segments={[
           { value: 'turno', label: 'Turno' },
           { value: 'rutas', label: 'Rutas' },
@@ -1178,8 +995,6 @@ export function BitacoraTurnoVista({
           <span className="min-w-0 flex-1">{TEXTO_AVISO_INSPECCION[avisoInsp]}</span>
           <ChevronRight aria-hidden />
         </button>
-      )}
-      </>
       )}
 
       {vista === 'rutas' ? (
@@ -1327,74 +1142,6 @@ export function BitacoraTurnoVista({
             </section>
           )}
         </div>
-      ) : expedientePC ? (
-        <BitacoraExpedientePC
-          turnoNombre={etiquetaTurno(turno)}
-          horario={`${fecha.slice(0, 3)} ${turno.fecha.slice(8, 10)}-${turno.fecha.slice(5, 7)} · ${horarioTurno(turno)}`}
-          fecha={fecha}
-          planta={BITACORA_PLANTA.nombre}
-          esActual={esActual}
-          onAnterior={() => irATurno(-1)}
-          onSiguiente={() => irATurno(1)}
-          onHoy={irAlActual}
-          barra={
-            <BarraSincronizacion
-              cargando={cargando}
-              error={error}
-              ultimaSync={ultimaSync}
-              cambiosPorSubir={cambiosPorSubir}
-              novedad={novedad}
-              presentes={conectados}
-              miDispositivoId={miDispositivoId}
-              editandoPorEvento={hayEventoConId}
-              tonoDe={tonoDe}
-              compacta
-            />
-          }
-          resumen={r}
-          mtbf={mtbfDelTurno(turno, r)}
-          fotos={fotosPublicadas}
-          eventos={soloListos(eventos)}
-          hechos={grupos.hechos}
-          pendientes={grupos.pendientes}
-          borradores={borradores}
-          numeroDe={numeroDe}
-          cargando={cargando}
-          presentes={presentes.nombres}
-          onTecnicos={() => {
-            setBorradorPresentes(presentes.nombres)
-            setHojaTecnicos('presentes')
-          }}
-          observacion={{ texto: observacion.texto, autor: observacion.actualizadoPorNombre ?? null }}
-          onObservacion={() => {
-            setTextoObs(observacion.texto)
-            setQuienObs(autorFijo ?? nombreRecordadoValido())
-            setEditandoObs(true)
-          }}
-          antes={pendientesPrevios.length > 0 || (esActual && borradoresPrevios.length > 0) ? <div className="flex flex-col gap-5 pt-3">{previos}</div> : undefined}
-          onAbrir={(e) => {
-            marcarVisto(e.id)
-            setEditor({ evento: e, idNuevo: e.id, turno })
-          }}
-          onVerFoto={(e, fotos, indice) => setVisor({ fotos, indice, titulo: encabezadoEvento(e) })}
-          onNuevo={abrirNuevo}
-          onCompartir={() => setVentanaEnvio(true)}
-          compartiendo={!!trabajando}
-          enlaces={[
-            { etiqueta: 'Historial', onClick: () => navigate('/bitacora/historial') },
-            { etiqueta: 'Rutas', onClick: () => cambiarVista('rutas') },
-            {
-              etiqueta: (
-                <>
-                  Post-aseo
-                  {avisoInsp && <span aria-label={TEXTO_AVISO_INSPECCION[avisoInsp]} className="size-1.5 rounded-full bg-ink-warn" />}
-                </>
-              ),
-              onClick: () => cambiarVista('inspeccion'),
-            },
-            ...(esSupervisor ? [{ etiqueta: 'Acceso QR', onClick: () => setHojaQr(true) }] : []),
-          ]}
-        />
       ) : (
       <>
       {/* Escritorio de turno (mockup A, 18-09-2026; HIG «Split views»): en PC, tres
@@ -1413,7 +1160,114 @@ export function BitacoraTurnoVista({
       >
       {/* Entrega de turno: lo primero que ve el turno que llega (mockup aprobado). */}
       <div className="order-1 flex flex-col gap-5 empty:hidden md:order-none md:[grid-area:entrega]">
-      {previos}
+      {pendientesPrevios.length > 0 && (
+        <section aria-label="Pendientes de turnos anteriores" className="flex flex-col">
+          <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
+            Vienen de turnos anteriores<span className="font-normal tabular-nums"> · {pendientesPrevios.length}</span>
+          </h2>
+          <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+            {pendientesPrevios.map((p) => (
+              <div
+                key={p.id}
+                className='relative flex flex-col gap-1.5 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
+              >
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-headline leading-tight">{p.equipo?.trim() || 'Sin equipo'}</span>
+                  <Tag>{etiquetaTipo(p)}</Tag>
+                  <Pill tone="warning">Pendiente</Pill>
+                </div>
+                {tituloDe(p) && <p className="text-body font-semibold">{tituloDe(p)}</p>}
+                <p className="line-clamp-3 whitespace-pre-line text-body">{p.descripcion}</p>
+                <p className="text-footnote text-muted-foreground">{origenDePendiente(p, turno)}</p>
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  <Button variant="tinted" onClick={() => setEditor({ evento: null, idNuevo: nuevoId(), turno, pendienteOrigen: p })}>
+                    <Check /> Resolver
+                  </Button>
+                  <Button
+                    variant="plain"
+                    onClick={() => {
+                      setNoAplica(p)
+                      setMotivoNoAplica('')
+                      setQuienNoAplica(autorFijo ?? nombreRecordadoValido())
+                    }}
+                  >
+                    Ya no aplica
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Borradores que quedaron sin publicar: no cuentan en nada hasta que
+          alguien los publica, así que el turno que llega tiene que verlos. */}
+      {esActual && borradoresPrevios.length > 0 && (
+        <section aria-label="Borradores sin publicar de turnos anteriores" className="flex flex-col">
+          <h2 className="px-4 pb-2 text-subhead font-semibold text-muted-foreground">
+            Quedaron sin publicar<span className="font-normal tabular-nums"> · {borradoresPrevios.length}</span>
+          </h2>
+          <div className="overflow-hidden rounded-card bg-card shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
+            {borradoresPrevios.map((b) => {
+              const puede =
+                b.creadoPor === auth.currentUser?.uid || usuario?.rol === 'admin' || usuario?.rol === 'supervisor'
+              const confirmando = descartandoId === b.id
+              return (
+                <div
+                  key={b.id}
+                  className='relative flex flex-col gap-1.5 px-4 py-3 before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-border before:content-[""] first:before:hidden'
+                >
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Pill tone="info">En redacción</Pill>
+                    <span className="text-headline leading-tight">{b.equipo?.trim() || 'Sin equipo todavía'}</span>
+                    <Tag>{etiquetaTipo(b)}</Tag>
+                  </div>
+                  {tituloDe(b) && <p className="text-body font-semibold">{tituloDe(b)}</p>}
+                  <p className="line-clamp-3 whitespace-pre-line text-body text-muted-foreground">
+                    {b.descripcion?.trim() || 'Sin descripción todavía'}
+                  </p>
+                  <p className="text-footnote text-muted-foreground">{origenDePendiente(b, turno)}</p>
+                  <p className="text-footnote text-muted-foreground">
+                    No cuenta en los números ni salió en el correo de su turno. Publícalo en su turno o descártalo.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    <Button
+                      variant="tinted"
+                      onClick={() => {
+                        const destino = turnoDesdeId(b.turnoId)
+                        if (!destino) return
+                        // Se abre en SU turno: ahí vive y ahí se publica.
+                        const p = new URLSearchParams(params)
+                        p.set('turno', destino.id)
+                        setParams(p)
+                        setEditor({ evento: b, idNuevo: b.id, turno: destino })
+                      }}
+                    >
+                      Continuar
+                    </Button>
+                    {puede && (
+                      <Button
+                        variant={confirmando ? 'destructive' : 'plain'}
+                        onClick={() => {
+                          if (!confirmando) {
+                            setDescartandoId(b.id)
+                            return
+                          }
+                          setDescartandoId(null)
+                          void borrar(b)
+                          toast({ title: 'Borrador descartado' })
+                        }}
+                      >
+                        {confirmando ? 'Toca de nuevo para descartar' : 'Descartar'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
       </div>
 
       {/* Contexto del turno: técnicos, resumen, observación (y en el teléfono, la planilla). */}
@@ -1708,7 +1562,57 @@ export function BitacoraTurnoVista({
         {/* Vista previa del correo (solo PC) */}
         {/* Fija y con su propio desplazamiento: el correo entero cabe en la pantalla 16:9. */}
         <section aria-label="Enviar la bitácora" className="hidden flex-col gap-3 md:flex md:sticky md:top-4 md:max-h-[calc(100vh-2rem)] md:overflow-y-auto md:[grid-area:envio]">
-          {panelEnvio}
+          <SegmentedControl
+            ariaLabel="Enviar por correo o por WhatsApp"
+            value={vistaEnvio}
+            onChange={setVistaEnvio}
+            segments={[
+              { value: 'correo', label: 'Correo' },
+              { value: 'whatsapp', label: 'WhatsApp' },
+            ]}
+          />
+          {vistaEnvio === 'whatsapp' ? (
+            <div className="flex flex-col gap-4">
+              <PasosWhatsapp
+                texto={textoWhatsapp}
+                plan={planWhatsapp}
+                listas={laminas.listas}
+                copiados={pasosCopiados}
+                onCopiado={marcarCopiado}
+                hayEventos={soloListos(eventos).length > 0}
+              />
+              {soloListos(eventos).length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h2 className="px-4 text-caption font-semibold text-muted-foreground">Así queda en el chat</h2>
+                  <VistaPreviaWhatsapp texto={textoWhatsapp} listas={laminas.listas} />
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
+          <div className="flex flex-col gap-1 px-4 pb-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-caption font-semibold text-muted-foreground">Así queda al pegar en el correo</h2>
+              <Button variant="plain" size="sm" onClick={copiarIncrustadas} disabled={!!trabajando}>
+                {trabajando === 'copiar-incrustadas' ? <Loader2 className="animate-spin" /> : null}
+                Copiar con fotos incrustadas
+              </Button>
+            </div>
+            {/* El portapapeles lleva el CUERPO; el asunto se copia aparte. */}
+            <div className="flex min-w-0 items-center gap-2 text-footnote">
+              <span className="shrink-0 text-muted-foreground">Asunto:</span>
+              <span className="min-w-0 truncate">{asunto}</span>
+              <Button variant="plain" size="sm" className="shrink-0" onClick={copiarAsunto}>
+                Copiar asunto
+              </Button>
+            </div>
+          </div>
+          <VistaPreviaCorreo html={htmlCorreo} />
+          <p className="px-4 pt-2 text-footnote text-muted-foreground">
+            Outlook clásico: usa «Copiar para correo». En Outlook nuevo, web o celular usa «Copiar con fotos incrustadas»; si la letra sale toda igual, pega con «Mantener formato de origen».
+          </p>
+          </>
+          )}
         </section>
       </div>
       </>
@@ -1783,31 +1687,6 @@ export function BitacoraTurnoVista({
           void bajarExcel()
         }}
       />
-
-      {/* PC: «Compartir» del expediente. El correo y WhatsApp ya no ocupan una columna
-          (era el 43 % del ancho); se miran aquí antes de copiarlos. */}
-      <Sheet
-        open={ventanaEnvio && expedientePC}
-        onClose={() => setVentanaEnvio(false)}
-        presentacionPC="ventana"
-        title="Compartir el turno"
-        description={`${etiquetaCortaTurno(turno.id)} · ${r.eventos} ${r.eventos === 1 ? 'evento' : 'eventos'} · ${fotosPublicadas} ${fotosPublicadas === 1 ? 'foto' : 'fotos'}`}
-      >
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void copiar()} disabled={!!trabajando || r.eventos === 0}>
-              <Copy /> Copiar para correo
-            </Button>
-            <Button variant="tinted" onClick={() => void exportarPdf()} disabled={!!trabajando || r.eventos === 0}>
-              PDF
-            </Button>
-            <Button variant="tinted" onClick={() => void bajarExcel()} disabled={!!trabajando || r.eventos === 0}>
-              <FileSpreadsheet /> Excel
-            </Button>
-          </div>
-          {panelEnvio}
-        </div>
-      </Sheet>
 
       <Sheet
         open={hojaWhatsapp}
