@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui'
+import { SkeletonFilas } from '@/components/piel'
 import { getAuditLog } from '@/services/auditLog'
 import type { AuditLogEntry, AuditAction } from '@/types/audit'
 
@@ -203,9 +204,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
         {/* ── Timeline ── */}
         <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-1 min-h-0">
           {loading && entries.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
+            <SkeletonFilas label="Cargando registro de auditoría" filas={4} lineas={2} />
           ) : entries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">
               No hay registros

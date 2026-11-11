@@ -3460,23 +3460,23 @@ async function ariaBuscarCodigoEnMaestro(codigo) {
   return items.find((r) => r._blob.includes(upper)) || null
 }
 
-/** Sube la foto a Storage y la agrega a fotosReales del repuesto (escritura confirmada) */
+// Escritura de repuestos de ARIA: una sola lógica para ARIA (Telegram) y para Aiko (endpoint
+// ariaRepuestoDesdeFoto). Regla «ARIA y Aiko en piedra», 11-11-2026.
+const ariaRepuestosMod = require('./ariaRepuestos')
+let _escritorRepuestos = null
+function escritorRepuestos() {
+  if (!_escritorRepuestos) {
+    _escritorRepuestos = ariaRepuestosMod.crearEscritorRepuestos({
+      db, FieldValue, randomUUID, subirFoto: uploadPhotoToStorage,
+      alCambiar: () => { _ariaRepuestosCache = { at: 0, items: [] } },
+    })
+  }
+  return _escritorRepuestos
+}
+
+/** Sube la foto a Storage y la agrega a fotosReales del repuesto (escritura confirmada) — ver ariaRepuestos.js */
 async function ariaAdjuntarFotoARepuesto(codigoSAP, fileId) {
-  const snap = await db.collection('repuestos').where('codigoSAP', '==', codigoSAP).limit(1).get()
-  if (snap.empty) throw new Error(`no encontré el repuesto SAP ${codigoSAP} al confirmar`)
-  const doc = snap.docs[0]
-  const buffer = await downloadTelegramFile(fileId)
-  const url = await uploadPhotoToStorage(doc.id, buffer, 0, 'repuestos')
-  await doc.ref.update({
-    // FieldValue.serverTimestamp() no se puede usar DENTRO de un elemento de arrayUnion
-    // (Firestore lo rechaza) — se usa Date() normal, igual que uploadPhotoToStorage/tgHandlePhoto.
-    fotosReales: FieldValue.arrayUnion({
-      id: randomUUID(), url, descripcion: 'Foto vía ARIA (Telegram)', orden: 0, esPrincipal: false,
-      tipo: 'real', createdAt: new Date(),
-    }),
-    updatedAt: FieldValue.serverTimestamp(),
-  })
-  return doc.data()
+  return escritorRepuestos().adjuntarFoto(codigoSAP, () => downloadTelegramFile(fileId))
 }
 
 // ---- Repuestos nuevos desde el chat (foto → maestro) ----
@@ -3540,65 +3540,10 @@ function ariaDeducirClase(texto) {
   return 'repuesto'
 }
 
-/**
- * Crea un repuesto NUEVO en el maestro `repuestos` (escritura confirmada) —
- * misma forma que useRepuestoCrud.createRepuesto de la PWA, + `plantId` (regla
- * multi-planta 2026-07-04) + historial/audit_log para trazabilidad.
- */
+/** Crea un repuesto NUEVO en el maestro `repuestos` (escritura confirmada) — ver ariaRepuestos.js */
 async function ariaCrearRepuestoNuevo(pending, fromName, telegramUserId) {
-  const codigoSAP = pending.codigoSAP || ''
-  const nuevo = {
-    codigoSAP,
-    codigoFabricante: '',
-    textoBreve: pending.nombre,
-    descripcion: pending.descFoto || '',
-    nombreManual: '',
-    valorUnitario: 0,
-    cantidadPorMaquina: 0,
-    ubicacionEnPlanta: '',
-    observaciones: `Creado vía ARIA (Telegram) por ${fromName}`,
-    vinculosManual: [],
-    imagenesManual: [],
-    fotosReales: [],
-    equipos: pending.equipoNodeId ? [pending.equipoNodeId] : [],
-    equiposCodigos: pending.equipoNodeId ? [(pending.equipoCodigo || '').trim() || `s/c:${pending.equipoNodeId}`] : [],
-    clase: pending.clase || 'repuesto',
-    tieneSap: Boolean(codigoSAP),
-    plantId: 'chonchi',
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  }
-  // Convención del maestro: docId = código SAP cuando existe; .create() falla si
-  // ya hay un doc con ese id (no pisa un material existente)
-  const ref = codigoSAP ? db.collection('repuestos').doc(codigoSAP) : db.collection('repuestos').doc()
-  await ref.create(nuevo)
-
-  if (pending.fotoFileId) {
-    const buffer = await downloadTelegramFile(pending.fotoFileId)
-    const url = await uploadPhotoToStorage(ref.id, buffer, 0, 'repuestos')
-    await ref.update({
-      fotosReales: FieldValue.arrayUnion({
-        id: randomUUID(), url, descripcion: 'Foto vía ARIA (Telegram)', orden: 0, esPrincipal: true,
-        tipo: 'real', createdAt: new Date(), subidaPor: `ARIA (Telegram) — ${fromName}`,
-      }),
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-  }
-  // Trazabilidad con la misma forma que la PWA (useRepuestoCrud + writeAuditLog)
-  await ref.collection('historial').add({
-    campo: 'creacion', valorAnterior: null,
-    valorNuevo: JSON.stringify({ textoBreve: pending.nombre, clase: nuevo.clase, codigoSAP, equipo: pending.equipoNombre || null }),
-    fecha: FieldValue.serverTimestamp(),
-  })
-  await db.collection('audit_log').add({
-    action: 'create', collection: 'repuestos', documentId: ref.id,
-    documentLabel: `${codigoSAP || 's/SAP'} — ${pending.nombre}`,
-    userId: `telegram:${telegramUserId}`, userName: fromName,
-    metadata: { source: 'aria-telegram' },
-    timestamp: FieldValue.serverTimestamp(),
-  })
-  _ariaRepuestosCache = { at: 0, items: [] } // que la próxima búsqueda ya lo vea
-  return ref.id
+  return escritorRepuestos().crearNuevo(pending, fromName, telegramUserId,
+    pending.fotoFileId ? () => downloadTelegramFile(pending.fotoFileId) : null)
 }
 
 /** Vincula un repuesto EXISTENTE del maestro a un equipo de `hierarchy` (+ foto opcional) */
@@ -3653,40 +3598,39 @@ function ariaParseCodigoFabricante(texto) {
   return out.join(' ').slice(0, 30)
 }
 
-/**
- * Edita un campo simple de un repuesto EXISTENTE (hoy: codigoFabricante) + foto
- * opcional. Misma trazabilidad que la PWA (historial + audit_log). Escritura
- * confirmada.
- */
+/** Edita un campo simple de un repuesto EXISTENTE + foto opcional (escritura confirmada) — ver ariaRepuestos.js */
 async function ariaEditarRepuesto(pending, fromName, telegramUserId) {
-  const snap = await db.collection('repuestos').where('codigoSAP', '==', pending.codigoSAP).limit(1).get()
-  if (snap.empty) throw new Error(`no encontré el repuesto SAP ${pending.codigoSAP} al confirmar`)
-  const doc = snap.docs[0]
-  const anterior = doc.data()[pending.campo] || ''
-  const update = { [pending.campo]: pending.valor, updatedAt: FieldValue.serverTimestamp() }
-  if (pending.fotoFileId) {
-    const buffer = await downloadTelegramFile(pending.fotoFileId)
-    const url = await uploadPhotoToStorage(doc.id, buffer, 0, 'repuestos')
-    update.fotosReales = FieldValue.arrayUnion({
-      id: randomUUID(), url, descripcion: 'Foto vía ARIA (Telegram)', orden: 0, esPrincipal: false,
-      tipo: 'real', createdAt: new Date(), subidaPor: `ARIA (Telegram) — ${fromName}`,
-    })
-  }
-  await doc.ref.update(update)
-  await doc.ref.collection('historial').add({
-    campo: pending.campo, valorAnterior: anterior || null, valorNuevo: pending.valor,
-    fecha: FieldValue.serverTimestamp(),
-  })
-  await db.collection('audit_log').add({
-    action: 'update', collection: 'repuestos', documentId: doc.id,
-    documentLabel: `${pending.codigoSAP} — ${pending.nombre || ''}`.trim(),
-    userId: `telegram:${telegramUserId}`, userName: fromName,
-    metadata: { source: 'aria-telegram', campo: pending.campo },
-    timestamp: FieldValue.serverTimestamp(),
-  })
-  _ariaRepuestosCache = { at: 0, items: [] }
-  return doc.id
+  return escritorRepuestos().editar(pending, fromName, telegramUserId,
+    pending.fotoFileId ? () => downloadTelegramFile(pending.fotoFileId) : null)
 }
+
+// ---- Aiko → ARIA: grabar un repuesto que Orel aprobó con ✅ en el Telegram de Aiko ----
+// Aiko (asistente personal de Orel, PC) lee la etiqueta SAP y muestra la propuesta; con el ✅ le pide a
+// ARIA que grabe con SU lógica (ariaRepuestos.js). Público por defecto en gen2, por eso falla cerrado:
+// solo POST, sin CORS, token OIDC de la cuenta de servicio del proyecto con esta misma URL de audiencia.
+const ARIA_FOTO_AUDIENCIA = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/ariaRepuestoDesdeFoto'
+const ARIA_FOTO_CUENTA = 'firebase-adminsdk-fbsvc@mantenimiento-planta-771a3.iam.gserviceaccount.com'
+exports.ariaRepuestoDesdeFoto = onRequest(
+  { region: 'us-central1', maxInstances: 2, timeoutSeconds: 60, memory: '512MiB' },
+  async (req, res) => {
+    try {
+      const r = await ariaRepuestosMod.atenderPedidoAiko({
+        metodo: req.method, autorizacion: req.get('Authorization'), body: req.body,
+        permitido: ARIA_FOTO_CUENTA, db, escritor: escritorRepuestos(),
+        verificar: async (token) => {
+          const { OAuth2Client } = require('google-auth-library')
+          const ticket = await new OAuth2Client().verifyIdToken({ idToken: token, audience: ARIA_FOTO_AUDIENCIA })
+          const datos = ticket.getPayload() || {}
+          return datos.email_verified ? datos.email : null
+        },
+      })
+      res.status(r.status).json(r.json)
+    } catch (e) {
+      logger.error('ariaRepuestoDesdeFoto falló', { error: String(e?.message || e).slice(0, 200) })
+      res.status(500).json({ error: 'interno' })
+    }
+  },
+)
 
 /**
  * CRITERIO (LLM + validación determinista) para decidir qué hacer con un material
@@ -10053,12 +9997,13 @@ exports.onRepuestoEscritoIndice = onDocumentWritten(
     const cambios = repuestosIndiceMod.cambiosIndice(antes, despues)
     if (!cambios) return
     const ref = db.collection(repuestosIndiceMod.COLECCION).doc(repuestosIndiceMod.DOC)
-    const update = { actualizadoEn: FieldValue.serverTimestamp() }
-    for (const [ruta, valor] of Object.entries(cambios)) {
-      update[new FieldPath(...ruta.split('.'))] = valor === 'BORRAR' ? FieldValue.delete() : valor
-    }
+    const args = repuestosIndiceMod.argumentosUpdate(cambios, {
+      FieldPath,
+      borrar: FieldValue.delete(),
+      ahora: FieldValue.serverTimestamp(),
+    })
     // Sin el doc (nunca se construyó) no se crea uno a medias: lo arma el script de carga.
-    await ref.update(update).catch((e) => {
+    await ref.update(...args).catch((e) => {
       if (e?.code !== 5) throw e // 5 = NOT_FOUND
       logger.warn('[repuestosIndice] el índice no existe todavía; correr construir-indice-repuestos.cjs')
     })

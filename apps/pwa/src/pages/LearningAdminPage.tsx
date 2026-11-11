@@ -4,10 +4,11 @@
  *
  * Lista de maquinas con enlace para editar contenido de cada una.
  */
+import { SkeletonBloque, SkeletonLinea } from '@/components/piel'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { logger } from '@/lib/logger'
-import { ArrowLeft, Edit3, GraduationCap, Loader2 } from 'lucide-react'
+import { ArrowLeft, Edit3, GraduationCap } from 'lucide-react'
 import {
   LEARNING_MACHINES,
   type LearningMachine,
@@ -96,10 +97,16 @@ export function LearningAdminPage() {
         </h2>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            Cargando conteos...
-          </div>
+          <SkeletonBloque label="Cargando conteos de aprendizaje">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {LEARNING_MACHINES.map(machine => (
+                <div key={machine.slug} className="flex flex-col gap-2 rounded-card border border-border bg-card px-4 py-3">
+                  <SkeletonLinea ancho="60%" tamano="titulo" />
+                  <SkeletonLinea ancho="40%" tamano="nota" />
+                </div>
+              ))}
+            </div>
+          </SkeletonBloque>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {LEARNING_MACHINES.map(machine => (

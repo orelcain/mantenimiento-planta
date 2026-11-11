@@ -1,3 +1,4 @@
+import { SkeletonPanel } from '@/components/piel'
 import { useState, useEffect, useMemo } from 'react'
 import { logger } from '@/lib/logger'
 import { debounce } from '@/lib/rate-limit'
@@ -257,8 +258,8 @@ export function PreventivePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="space-y-6">
+        <SkeletonPanel label="Cargando mantenimiento preventivo" kpis={3} lineas={2} />
       </div>
     )
   }

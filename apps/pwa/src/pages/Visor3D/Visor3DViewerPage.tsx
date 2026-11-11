@@ -10,6 +10,7 @@
  * - Modo pintura: colorear piezas con colores mate (admin)
  */
 
+import { SkeletonGrafico } from '@/components/piel'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
@@ -24,7 +25,6 @@ import {
   Check,
   AlertCircle,
   Box,
-  Loader2,
   X,
   Paintbrush,
   MapPin,
@@ -455,11 +455,8 @@ export function Visor3DViewerPage() {
   // Loading
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Cargando modelo...</p>
-        </div>
+      <div className="h-[60vh] p-4">
+        <SkeletonGrafico alto="100%" label="Cargando modelo 3D" />
       </div>
     )
   }

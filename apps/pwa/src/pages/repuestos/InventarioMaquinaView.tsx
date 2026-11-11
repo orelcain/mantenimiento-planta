@@ -1,7 +1,7 @@
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, BookOpen, BadgeCheck, Check, Package, Star, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Loader2, Pencil, Scale, Search, Shapes, X } from 'lucide-react'
-import { Button, ListCell, ListGroup, SegmentedControl, Sheet, Tag, type TagTone } from '@/components/piel'
+import { Button, ListCell, ListGroup, SegmentedControl, Sheet, SkeletonFilas, Tag, type TagTone } from '@/components/piel'
 import {
   FILTROS_VACIOS, conTotalesPorSap, diferencia, filtrosActivos, nombreDe, ordenarLineas, tituloVisible, pasaFiltros, planDeAjuste,
   type ColumnaOrden, type FiltroDif, type FiltroEstado, type FiltrosTabla,
@@ -199,7 +199,7 @@ export function InventarioMaquinaView({ sesion, bodega, user, onVolver, onAbrirF
       </div>
 
       {error && <p className="flex items-center gap-1.5 text-footnote text-ink-crit"><AlertTriangle className="h-4 w-4" />{error}</p>}
-      {!lineas && !error && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>}
+      {!lineas && !error && <SkeletonFilas label="Cargando líneas de la máquina" filas={5} lineas={2} />}
 
       {lineas && user && !soloLectura && (
         <PanelAjuste lineas={lineas}

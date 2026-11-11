@@ -35,6 +35,7 @@ import {
   Switch,
   Label,
 } from '@/components/ui'
+import { SkeletonFilas, SkeletonPanel } from '@/components/piel'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
 import { useAuthStore } from '@/store'
@@ -254,9 +255,7 @@ function RolePermissionsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="lg" />
-      </div>
+      <SkeletonPanel label="Cargando permisos por rol" lineas={4} />
     )
   }
 
@@ -528,9 +527,7 @@ function UserPermissionsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="lg" />
-      </div>
+      <SkeletonFilas label="Cargando usuarios" filas={4} lineas={2} className="rounded-card border border-border bg-card px-4" />
     )
   }
 

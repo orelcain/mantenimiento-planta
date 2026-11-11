@@ -1,8 +1,9 @@
+import { usePielApple } from '@/hooks/usePielApple'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, BarChart3, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, FileSpreadsheet, Images, Loader2, MessageCircle, NotebookPen, Pencil, Plus, QrCode, Share, Trash2 } from 'lucide-react'
-import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, Tag, type SwipeAction } from '@/components/piel'
+import { Button, ListCell, ListGroup, Pill, SegmentedControl, Sheet, SkeletonFilas, Tag, type SwipeAction } from '@/components/piel'
 import { ToastAction } from '@/components/ui/toast'
 import { vibrar } from '@/services/bitacora/vibrar'
 import { PASO_MENSAJE, PasosWhatsapp, VistaPreviaWhatsapp } from '@/components/bitacora/PanelWhatsapp'
@@ -92,6 +93,7 @@ export function BitacoraTurnoVista({
   /** Solo la vitrina: ver la página como otro usuario (p. ej. un pase) sin tocar la sesión. */
   usuarioSimulado?: User | null
 }) {
+  const apple = usePielApple()
   const { toast } = useToast()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
@@ -1298,7 +1300,7 @@ export function BitacoraTurnoVista({
                 UNA cápsula de vidrio compartida (DESIGN.md §7). PDF, Excel, WhatsApp y
                 correo viven en «Compartir», como en el teléfono. */}
             <div className="hidden items-center gap-3 md:flex">
-              <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex items-center gap-0.5 rounded-full p-1">
+              <div role="group" aria-label="Acciones de la bitácora" className={apple ? 'relative vidrio vidrio-barra flex items-center gap-0.5 rounded-full p-1' : 'glass-nav flex items-center gap-0.5 rounded-full p-1'}>
                 <Button variant="plain" onClick={() => navigate('/bitacora/historial')}>
                   <BarChart3 /> Historial
                 </Button>
@@ -1785,11 +1787,13 @@ export function BitacoraTurnoVista({
             </div>
           )}
           {cargando ? (
-            <div className="flex flex-col gap-2 rounded-card bg-card p-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-ctl bg-muted-foreground/10 motion-reduce:animate-none" />
-              ))}
-            </div>
+            <SkeletonFilas
+              label="Cargando eventos del turno"
+              filas={4}
+              lineas={3}
+              cola={false}
+              className={registroCel ? '-mx-4 border-t border-border px-4' : 'rounded-card bg-card px-4'}
+            />
           ) : eventos.length === 0 ? (
             <div className="rounded-card bg-card px-6 py-10 text-center">
               <NotebookPen className="mx-auto mb-3 size-9 text-muted-foreground" aria-hidden />
@@ -2194,9 +2198,10 @@ function AccionesCabecera({
 }) {
   const clase =
     'flex size-[44px] items-center justify-center rounded-full text-primary transition-transform duration-150 active:scale-[0.94] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none [&>svg]:size-5'
+  const apple = usePielApple()
   const tab = enfocable ? undefined : -1
   return (
-    <div role="group" aria-label="Acciones de la bitácora" className="glass-nav flex shrink-0 items-center rounded-full">
+    <div role="group" aria-label="Acciones de la bitácora" className={apple ? 'relative vidrio vidrio-barra flex shrink-0 items-center rounded-full' : 'glass-nav flex shrink-0 items-center rounded-full'}>
       <button type="button" className={clase} onClick={alHistorial} aria-label="Historial" tabIndex={tab}>
         <BarChart3 />
       </button>

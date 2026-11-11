@@ -1,5 +1,6 @@
+import { SkeletonGrafico } from '@/components/piel'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, AirVent, Box, Loader2 } from 'lucide-react'
+import { ArrowLeft, AirVent, Box } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { Badge, Button } from '@/components/ui'
 import { SopladorasBaader142InteractiveExperience } from '@/components/visor3d/interactive/SopladorasBaader142InteractiveExperience'
@@ -75,8 +76,8 @@ export function Visor3DInteractiveBaader142Page() {
 
       <div className="rounded-xl border bg-card overflow-hidden">
         {loading ? (
-          <div className="flex h-[calc(100vh-12rem)] min-h-[740px] items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="h-[calc(100vh-12rem)] min-h-[740px] p-4">
+            <SkeletonGrafico alto="100%" label="Cargando visor 3D" />
           </div>
         ) : (
           <SopladorasBaader142InteractiveExperience

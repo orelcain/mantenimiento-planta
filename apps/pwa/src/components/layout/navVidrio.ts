@@ -50,9 +50,22 @@ export function claseItemPC(apple: boolean, activo: boolean): string {
 
 /** Barra inferior del celular (< lg). */
 export function claseBarraInferior(apple: boolean): string {
+  // Apple: a la derecha deja sitio al círculo de búsqueda (60 px + 12 px de aire), como la
+  // pestaña de búsqueda separada de iOS 26. La piel anterior no cambia.
   return apple
-    ? 'lg:hidden fixed inset-x-3 z-40 rounded-full vidrio'
+    ? 'lg:hidden fixed left-3 right-[84px] z-40 rounded-full vidrio vidrio-barra'
     : 'lg:hidden fixed inset-x-3 z-40 rounded-full glass-nav'
+}
+
+/** Círculo de búsqueda junto a la barra inferior (solo piel Apple): mismo material y altura que la barra. */
+export function claseBuscarInferior(): string {
+  return cn(
+    'lg:hidden fixed right-3 z-40 grid size-[60px] place-items-center rounded-full text-muted-foreground',
+    'active:scale-[0.97] transition-transform motion-reduce:transition-none',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+    '[@media(max-height:500px)]:size-10',
+    'vidrio vidrio-barra',
+  )
 }
 
 /** Pestaña de la barra inferior. Apple: la activa es una gota `.vidrio-lente`. */
@@ -63,4 +76,26 @@ export function claseTabBarra(apple: boolean, activo: boolean): string {
       : 'text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
   }
   return activo ? 'text-primary' : 'text-muted-foreground'
+}
+
+/** Barra superior de PC: conserva la altura que usan las páginas. */
+export function claseHeaderPC(apple: boolean): string {
+  return apple
+    ? 'hidden lg:flex sticky top-0 z-30 items-start h-14 px-4 pt-2 vidrio-borde-superior pointer-events-none'
+    : 'hidden lg:flex sticky top-0 z-30 items-center h-14 px-4 bg-background/80 backdrop-blur border-b'
+}
+
+/**
+ * Superficie de menús desplegables y popovers (Radix, menú de usuario, selector de nivel
+ * del mapa). Apple: el mismo material denso de las barras (.vidrio-barra) con radio 18;
+ * el contenido de la página se ve desenfocado detrás. Con `apple = false` devuelve
+ * `anterior` tal cual: la piel anterior no cambia.
+ */
+export function claseSuperficieMenu(apple: boolean, anterior: string): string {
+  return apple ? 'relative vidrio vidrio-barra rounded-[18px] text-foreground' : anterior
+}
+
+/** Cápsula con su propio ancestro para el brillo del material. */
+export function claseCapsulaBarra(): string {
+  return 'relative vidrio vidrio-barra pointer-events-auto flex items-center h-[42px] rounded-full'
 }

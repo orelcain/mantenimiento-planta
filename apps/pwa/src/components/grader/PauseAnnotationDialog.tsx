@@ -27,6 +27,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { Loader2, Clock, History, ChevronDown, Download, TrendingDown, Pencil, CloudOff } from 'lucide-react'
+import { SkeletonFilas } from '@/components/piel'
 import type { Pause, PauseHistoryEntry, TimelineBucket } from '@/services/grader/types'
 import { updatePauseAnnotation, updatePauseRange, loadPauseHistory } from '@/services/grader/graderDailySummary.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
@@ -558,10 +559,7 @@ export function PauseAnnotationDialog({
             {historyOpen && (
               <div className="border-t border-border/40 px-3 py-2 space-y-2 max-h-48 overflow-y-auto">
                 {historyLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Cargando…
-                  </div>
+                  <SkeletonFilas label="Cargando historial de cambios" filas={2} lineas={1} cola={false} />
                 ) : historyEntries.length === 0 ? (
                   <p className="text-xs text-muted-foreground py-1">Sin cambios registrados aún.</p>
                 ) : (

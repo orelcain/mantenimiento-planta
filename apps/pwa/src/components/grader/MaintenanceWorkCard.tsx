@@ -9,7 +9,8 @@
  * Presentacional: recibe `work` ya computado por la página (computeMaintenanceWork).
  */
 import { Card, CardContent, CardHeader, CardTitle, InfoTooltip } from '@/components/ui'
-import { Wrench, Clock, Search, ShieldCheck, Target, TrendingUp, TrendingDown, Repeat, Loader2 } from 'lucide-react'
+import { SkeletonPanel } from '@/components/piel'
+import { Wrench, Clock, Search, ShieldCheck, Target, TrendingUp, TrendingDown, Repeat } from 'lucide-react'
 import { useState } from 'react'
 import { maintenanceWorkHeadline, type MaintenanceWork } from '@/services/grader/maintenanceWork'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -69,8 +70,8 @@ export function MaintenanceWorkCard({ work, acrs = [], periodo = '' }: {
             <Wrench className="w-4 h-4 text-ink-info" /> Trabajo de Mantención (TPM)
           </CardTitle>
         </CardHeader>
-        <CardContent className="pb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Cargando incidencias y preventivas del período…
+        <CardContent className="pb-6">
+          <SkeletonPanel label="Cargando trabajo de mantención" kpis={4} lineas={1} />
         </CardContent>
       </Card>
     )

@@ -1,8 +1,10 @@
+import { usePielApple } from '@/hooks/usePielApple'
 /**
  * Componente ChatBot — v4 ARIA
  * Burbuja flotante con streaming, voz, fotos, acciones ejecutables,
  * confirmación inline, auto-asignación y tamaño ampliado
  */
+import { SkeletonFilas } from '@/components/piel'
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Wrench, Factory, HardHat, KeyRound, ClipboardList, Clock, Zap, MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu, Headphones, Eye, EyeOff, Pencil, MoreHorizontal } from 'lucide-react'
@@ -802,9 +804,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
               </div>
               <div className="max-h-36 overflow-y-auto">
                 {equipLoading ? (
-                  <div className="px-2 py-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Cargando equipos...
-                  </div>
+                  <SkeletonFilas label="Cargando equipos" filas={3} lineas={1} cola={false} className="px-2 py-2" />
                 ) : filteredCandidates.length === 0 ? (
                   <div className="px-2 py-2 text-xs text-muted-foreground text-center">
                     {equipmentSearch.trim() ? 'Sin resultados — intenta otro término' : 'Escribe para buscar equipos'}
@@ -884,9 +884,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                   </div>
                   <div className="max-h-36 overflow-y-auto">
                     {techLoading ? (
-                      <div className="px-2 py-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Cargando...
-                      </div>
+                      <SkeletonFilas label="Cargando técnicos" filas={3} lineas={1} cola={false} className="px-2 py-2" />
                     ) : filteredTechs.length === 0 ? (
                       <div className="px-2 py-2 text-xs text-muted-foreground text-center">Sin resultados</div>
                     ) : (
@@ -956,6 +954,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
 
 // ─── Componente principal ───────────────────────────────────────────
 export function ChatBot() {
+  const apple = usePielApple()
   const navigate = useNavigate()
   const pantallaCompletaMovil = useBurbujaChatOculta()
   // Se esconde mientras la página baja. Con el chat abierto nunca se esconde: hay que poder cerrarlo.
@@ -1868,14 +1867,14 @@ export function ChatBot() {
       {/* Botón flotante — oculto en landscape móvil para no tapar la tabla */}
       <button
         onClick={toggle}
-        className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
+        className={`fixed bottom-24 lg:bottom-4 right-4 z-[45] w-14 h-14 rounded-full ${apple ? 'vidrio vidrio-barra text-primary' : 'shadow-lg'} flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 landscape-mobile-hidden ${
           // Detalle de repuesto a pantalla completa en el teléfono: la burbuja tapaba su barra inferior.
           (pantallaCompletaMovil && !isOpen) || hoja || (isOpen && !esPC) ? 'hidden' : ''
         } ${
           // Oculto al bajar (transform/opacity). Con el chat abierto no se oculta.
           ocultoAlBajar && !isOpen ? 'opacity-0 translate-y-24 pointer-events-none motion-reduce:transition-none' : 'opacity-100 translate-y-0'
         } ${
-          isOpen
+          apple ? '' : isOpen
             ? 'bg-muted text-muted-foreground hover:bg-muted/80'
             : 'bg-primary text-primary-foreground hover:bg-primary/90'
         }`}

@@ -1,4 +1,5 @@
 // src/components/equipment/TelemetryChart.tsx
+import { SkeletonGrafico } from '@/components/piel'
 import { useEffect, useMemo, useState } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
@@ -17,7 +18,6 @@ import 'chartjs-adapter-date-fns'
 import { es } from 'date-fns/locale'
 import { Card, CardContent, CardHeader, CardTitle, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { fetchSensorHistory, type SensorReading } from '@/services/sensorsRtdb'
-import { Loader2 } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { dec1 } from '@/utils/formatoNumeros'
 
@@ -243,8 +243,8 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
           </div>
         )}
         {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="absolute inset-0 z-10 bg-background/50 p-4">
+                <SkeletonGrafico alto="100%" label="Actualizando telemetría" className="h-full" />
             </div>
         )}
         {data.length > 0 ? (

@@ -20,6 +20,7 @@ import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle, MapPin } from 
 import type { VinculoManual } from '@/types/vinculos';
 import { logger } from '@/lib/logger';
 import { getCachedPdf } from '@/services/pdfCache';
+import { SkeletonGrafico } from '@/components/piel';
 import {
   normalizeCoordinates,
   denormalizeCoordinates,
@@ -381,14 +382,7 @@ export function PDFViewer({
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96 bg-muted rounded-card">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando PDF...</p>
-        </div>
-      </div>
-    );
+    return <SkeletonGrafico alto="24rem" label="Cargando PDF" />;
   }
 
   if (error) {

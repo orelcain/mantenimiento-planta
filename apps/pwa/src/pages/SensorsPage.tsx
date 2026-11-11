@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb, Lightbulb, MapPin, LineChart, Crosshair, Radar, Grid3x3, CandlestickChart, Clock, CalendarDays, Signal, Lock, Globe, ChevronsDown, AreaChart, ScatterChart, Gauge, Layers, Loader2, SearchX } from 'lucide-react'
-import { Pill } from '@/components/piel'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb, Lightbulb, MapPin, LineChart, Crosshair, Radar, Grid3x3, CandlestickChart, Clock, CalendarDays, Signal, Lock, Globe, ChevronsDown, AreaChart, ScatterChart, Gauge, Layers, SearchX } from 'lucide-react'
+import { Pill, SkeletonFilas, SkeletonGrafico } from '@/components/piel'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -1332,9 +1332,7 @@ export function SensorsPage() {
                           {/* Gráfico */}
                           <div className="rounded-ctl border bg-card p-4">
                             {historyLoading ? (
-                              <div className="text-sm text-muted-foreground text-center py-8">
-                                <RefreshCw className="inline size-3.5 animate-spin" /> Cargando historial…
-                              </div>
+                              <SkeletonGrafico alto="450px" label="Cargando historial del sensor" />
                             ) : historyData.length === 0 ? (
                               <div className="text-sm text-muted-foreground text-center py-8">
                                 No hay datos históricos disponibles
@@ -1752,14 +1750,7 @@ export function SensorsPage() {
                   
                   {/* Filtros jerárquicos en cascada (padre → hijo) */}
                   {loadingEquipment ? (
-                    <div className="p-4 text-sm bg-primary/[0.15] border border-transparent rounded-ctl">
-                      <div className="font-medium text-primary mb-1">
-                        <RefreshCw className="inline size-3.5 animate-spin" /> Cargando equipos…
-                      </div>
-                      <div className="text-xs text-primary">
-                        Por favor espera un momento
-                      </div>
-                    </div>
+                    <SkeletonFilas label="Cargando equipos" filas={3} lineas={1} cola={false} />
                   ) : equipment.length === 0 ? (
                     <div className="p-4 text-sm bg-fill-warning/[0.15] border border-transparent rounded-ctl">
                       <div className="font-medium text-ink-warn mb-1">
@@ -2030,9 +2021,9 @@ export function SensorsPage() {
                     </div>
                     <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-ctl bg-muted">
                       {equipment.length === 0 ? (
-                        <div className="p-4 text-sm text-center space-y-2">
-                          <div className="flex items-center justify-center gap-1.5 text-muted-foreground"><Loader2 className="size-3.5 animate-spin" />Cargando equipos…</div>
-                          <div className="text-xs text-muted-foreground">
+                        <div className="p-4 space-y-3">
+                          <SkeletonFilas label="Cargando equipos" filas={3} lineas={1} cola={false} />
+                          <div className="text-xs text-muted-foreground text-center">
                             Si esto tarda mucho, recarga la página
                           </div>
                         </div>

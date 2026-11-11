@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, AlertTriangle, User, MapPin } from 'lucide-react'
@@ -92,6 +93,30 @@ export function IncidentsPage() {
   const [reporterNames, setReporterNames] = useState<Record<string, string>>({})
   const [userInfoLabels, setUserInfoLabels] = useState<Record<string, string>>({})
   const apple = usePielApple()
+  const [slotFiltros, setSlotFiltros] = useState<HTMLElement | null>(null)
+  // Los filtros suben a la cápsula solo cuando los de la página ya pasaron bajo la barra.
+  const [filaFiltros, setFilaFiltros] = useState<HTMLDivElement | null>(null)
+  const [filtrosBajoBarra, setFiltrosBajoBarra] = useState(false)
+  useEffect(() => {
+    if (!apple || !filaFiltros) return
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        const entrada = entradas[0]
+        if (entrada) setFiltrosBajoBarra(!entrada.isIntersecting && entrada.boundingClientRect.top < 49)
+      },
+      { rootMargin: '-49px 0px 0px 0px' },
+    )
+    observador.observe(filaFiltros)
+    return () => observador.disconnect()
+  }, [apple, filaFiltros])
+  useEffect(() => {
+    if (!apple) return
+    const pantallaPC = window.matchMedia('(min-width: 1024px)')
+    const resolverSlot = () => setSlotFiltros(pantallaPC.matches ? document.getElementById('barra-filtros-slot') : null)
+    resolverSlot()
+    pantallaPC.addEventListener('change', resolverSlot)
+    return () => pantallaPC.removeEventListener('change', resolverSlot)
+  }, [apple])
 
   const isAdminOrSupervisor = user?.rol === 'admin' || user?.rol === 'supervisor'
 
@@ -283,6 +308,20 @@ export function IncidentsPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      {apple && slotFiltros && filtrosBajoBarra && createPortal(
+        filtros.slice(0, 3).map((f) => (
+          <button
+            key={String(f.id)}
+            type="button"
+            onClick={() => setActiveFilter(f.id)}
+            aria-pressed={activeFilter === f.id}
+            className={'h-[34px] px-3 rounded-full text-[13px] whitespace-nowrap ' + (activeFilter === f.id ? 'vidrio-lente' : 'text-muted-foreground')}
+          >
+            {f.label} <span className="tabular-nums">{f.value}</span>
+          </button>
+        )),
+        slotFiltros,
+      )}
       {/* Título grande: el rol `display` de la escala (§2). Uno por pantalla. */}
       <div className="flex flex-wrap items-end gap-x-4 gap-y-2 px-1">
         <div>
@@ -301,7 +340,7 @@ export function IncidentsPage() {
       </div>
 
       {/* Fila de filtros: una línea que se desliza, en vez de una grilla. */}
-      <div className={`-mx-1 flex gap-2 px-1 pb-1 ${apple ? 'flex-wrap sm:flex-nowrap' : 'overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
+      <div ref={setFilaFiltros} className={`-mx-1 flex gap-2 px-1 pb-1 ${apple ? 'flex-wrap sm:flex-nowrap' : 'overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
         {chipsVisibles.map((f) => {
           const activo = activeFilter === f.id
           return (

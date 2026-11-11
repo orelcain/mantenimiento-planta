@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, ChevronsLeft, ChevronsDownUp, Layers, Loader2, List, X, Star, Cog, Search } from 'lucide-react'
+import { SkeletonFilas } from '@/components/piel'
 import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalEquipmentSearch, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
@@ -441,9 +442,7 @@ export function AreaSidebar({
       <div className="flex-1 overflow-y-auto py-1">
         {searching ? (
           equipSearchLoading && equipResults.length === 0 ? (
-            <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Buscando equipos…
-            </div>
+            <SkeletonFilas label="Buscando equipos" filas={3} lineas={2} cola={false} className="px-3 py-2" />
           ) : equipResults.length === 0 ? (
             <div className="px-3 py-4 text-xs text-muted-foreground">Sin equipos para «{equipSearch.trim()}».</div>
           ) : (
@@ -476,9 +475,7 @@ export function AreaSidebar({
             </div>
           )
         ) : loading ? (
-          <div className="flex items-center gap-2 px-3 py-4 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando áreas…
-          </div>
+          <SkeletonFilas label="Cargando áreas" filas={4} lineas={1} cola={false} className="px-3 py-2" />
         ) : roots.length === 0 ? (
           <div className="px-3 py-4 text-xs text-muted-foreground">No hay áreas en la jerarquía.</div>
         ) : (
