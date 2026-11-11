@@ -1641,13 +1641,13 @@ exports.purgeSensorReadingsManual = onCall(
  * El embed llama esta función HTTP con los datos DM para cachearlos
  * en Firestore, y así checkClimaPortoAlert los puede leer.
  */
-// Sin auth A PROPÓSITO: lo llama el navegador de CUALQUIER visitante del embed
-// público (ver comentario arriba) — un secreto embebido en ese HTML estático
-// sería extraíble con "ver código fuente" y no protegería nada real. La
-// mitigación aplicable es validar estrictamente la FORMA del payload (tipos +
-// topes de tamaño) para que un curl malicioso no pueda inyectar objetos
-// arbitrarios/gigantes al doc cacheado — no evita spoofear el estado (impacto
-// bajo: solo cambia lo que se MUESTRA en el widget de clima, no autoriza nada).
+// Exige sesión de mantención (auditoría 10-11-2026). Antes no pedía auth y el
+// comentario decía que solo cambiaba lo que se muestra, pero checkClimaPortoAlert
+// lee este doc y manda el push «Bahía cerrada / Restringido» a TODOS los
+// fcmTokens: un curl sin cuenta podía disparar una alerta falsa a la planta.
+// La página Clima Puerto es AdminRoute; el embed le pasa el payload al padre
+// por postMessage y el padre llama aquí con su ID token (ClimaPortPage.tsx).
+// La validación de FORMA del payload se mantiene (tipos + topes de tamaño).
 function isPlainBoolOrUndef(v) { return v === undefined || typeof v === 'boolean' }
 function isShortStringOrNull(v) { return v === null || v === undefined || (typeof v === 'string' && v.length <= 500) }
 
@@ -1655,6 +1655,14 @@ exports.cacheDmStatus = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 5 },
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+    const m = /^Bearer (.+)$/.exec(req.get('Authorization') || '')
+    if (!m) return res.status(401).json({ error: 'unauthenticated' })
+    try {
+      const dec = await getAuth().verifyIdToken(m[1])
+      await _assertTechnicianCaller({ auth: { uid: dec.uid } })
+    } catch (e) {
+      return res.status(e?.code === 'permission-denied' ? 403 : 401).json({ error: 'forbidden' })
+    }
     const d = req.body
     const valid = d && typeof d.found === 'boolean'
       && isPlainBoolOrUndef(d.restriccionBahia)
