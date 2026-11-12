@@ -23,6 +23,7 @@ import { GraderShiftPeriodContainer } from '@/components/grader/GraderShiftPerio
 import { ultimaCargaDateKey, dateKeyDdMm } from '@/services/grader/graderUltimaCarga'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
+import { BotonMonitorLinea } from '@/components/grader/BotonMonitorLinea'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
 import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
 import { PeriodoNavegador } from '@/components/grader/PeriodoNavegador'
@@ -1002,7 +1003,10 @@ export function AnalisisGraderWizardPage() {
            «Cómo se usó el día» y «Por qué se detuvo» con el mes. En el celular, una
            columna: máquinas, por qué, el día y el mes (`max-lg:order-*` los deja al final). */
         <>
-          <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
+          <div className="flex items-start gap-2">
+            <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="min-w-0 flex-1" />
+            <BotonMonitorLinea linea={lineConfig} />
+          </div>
           <div className="grid grid-cols-1 items-start gap-y-[26px] lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-x-12" data-testid="periodo-lectura">
             <PlantKPIBoard
               period={kpiPeriodo}
