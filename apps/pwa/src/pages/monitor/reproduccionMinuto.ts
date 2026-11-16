@@ -13,7 +13,7 @@
  *     CONGELADO, sin inventar piezas;
  *   · atraso = finCola − tMs. Con atraso ≤ 186 s la velocidad es ×1; sobre eso sube a ×1,12 y desde 240 s a ×1,25, con
  *     rampas (sin escalones bruscos) para ponerse al día sin saltar nada;
- *   · solo se SALTA (snap) si el atraso pasa de 8 min, si cambia la serie (otro turno, recarga) o si el contador baja.
+ *   · solo se SALTA (snap) si el atraso pasa de 4 min, si cambia la serie (otro turno, recarga) o si el contador baja.
  *     El snap deja el reloj como al cargar: en el total al cierre del minuto «último cerrado − 2», con esos 2 en cola;
  *   · el reparto dentro del minuto es el de siempre (regla del minuto: las piezas caen en los segundos que anduvo cada
  *     Baader, cruzando las paradas de `stopEvents`); al cierre de cada minuto cada Baader vale EXACTAMENTE Σ cycles[0..k]
@@ -53,8 +53,12 @@ export const FACTOR_PONIENDOSE = 1.12
 export const FACTOR_RAPIDO = 1.25
 /** Ancho de las rampas del factor (s de atraso): de ×1 a ×1,12 desde 186 s y de ×1,12 a ×1,25 desde 240 s. */
 export const RAMPA_S = 12
-/** Más atraso que esto (8 min) y se salta en vez de ponerse al día. */
-export const ATRASO_SALTO_S = 480
+/**
+ * Más atraso que esto (4 min) al llegar un minuto nuevo y se salta en vez de ponerse al día. Era 8 min: el 15-11 en
+ * Eviscerado el grande quedó 6 min atrás («Poniéndose al día · 6:00», ~280 pz bajo la cascada) y a ×1,25 recuperar eso
+ * toma ~20 min. Con 4 min ningún pulso deja el reloj más de 4 min atrás y, tras el salto, queda a 2 (Orel: «al día»).
+ */
+export const ATRASO_SALTO_S = 240
 /** Una cola vacía solo es «atrasado» pasado un pulso entero (60 s, `functions/shoplogix/pulse.js`) sin minuto nuevo. */
 export const GRACIA_ATRASADO_MS = 60_000
 /** El instante reproducido avanza en pasos de a lo más esto (el factor depende del atraso, que cambia mientras avanza). */
@@ -233,7 +237,7 @@ export interface EstadoRep {
   /** Reloj monotónico en que entró el último minuto cerrado. */
   llegadaMs: number
   pulsoAtMs: number | null
-  /** Cuántas veces se saltó (cambio de serie, contador que baja, atraso > 8 min): quien dibuja lo usa para no animar ese paso. */
+  /** Cuántas veces se saltó (cambio de serie, contador que baja, atraso > 4 min): quien dibuja lo usa para no animar ese paso. */
   saltos: number
   /** Minutos ya armados (horario por Baader), por índice: se calculan al pedirlos. */
   cache: Map<number, MinutoMaq[]>
@@ -392,7 +396,7 @@ const piezasDelMinuto = (est: EstadoRep, j: number) => suma(est.maquinas.map((m)
 /**
  * Registra la serie que llegó. Devuelve el MISMO objeto si no hay un minuto cerrado nuevo (así el llamador compara por
  * identidad: una lectura repetida no reinicia nada). Con minutos nuevos, TODOS entran a la cola y se reproducen en orden.
- * Salta (snap) solo si cambia la serie, si el contador baja o si el atraso pasaría de 8 min.
+ * Salta (snap) solo si cambia la serie, si el contador baja o si el atraso pasaría de 4 min (`ATRASO_SALTO_S`).
  */
 export function registrarSerie(est: EstadoRep, e: EntradaRep, llegadaMs: number): EstadoRep {
   const largo = minutosCerrados(e)
