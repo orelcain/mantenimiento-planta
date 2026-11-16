@@ -545,6 +545,8 @@ function EditorDuelo({ token, d, nombres, nombresGuardados, className }: { token
   }
   const actual: Eleccion = d.corregido ? d.hoy.equipo : 'auto'
   const [pendiente, setPendiente] = useState<Eleccion | null>(null)
+  /* La rotación automática acierta casi siempre: la corrección queda escondida tras un enlace y se abre sola si el turno ya está corregido. */
+  const [verEquipo, setVerEquipo] = useState(actual !== 'auto')
   const [escribiendo, setEscribiendo] = useState(false)
   const [errorEquipo, setErrorEquipo] = useState(false)
   const confirmar = async () => {
@@ -583,6 +585,7 @@ function EditorDuelo({ token, d, nombres, nombresGuardados, className }: { token
         </div>
         <p className="text-[13px] leading-snug text-muted-foreground">Nombre y apellido. En pantalla se usa el apellido. Vacío vuelve a «Grupo 1» y «Grupo 2» (Eviscerado trae a sus supervisores de fábrica).</p>
       </div>
+      {verEquipo ? (
       <div className="mt-5">
         <div className="text-[15px] font-medium text-foreground">Equipo de este turno</div>
         <p className="mt-0.5 text-[13px] text-muted-foreground">Corrige la rotación si un feriado o un cambio de turno la rompió. Pide confirmación antes de guardar.</p>
@@ -608,6 +611,9 @@ function EditorDuelo({ token, d, nombres, nombresGuardados, className }: { token
         )}
         {errorEquipo && <p className="mt-2 text-[13px] text-ink-crit">No se pudo guardar la corrección.</p>}
       </div>
+      ) : (
+        <Button className="mt-4 -ml-5" size="md" variant="plain" onClick={() => setVerEquipo(true)}>¿El equipo de este turno está mal? Corregir</Button>
+      )}
     </Tarjeta>
   )
 }

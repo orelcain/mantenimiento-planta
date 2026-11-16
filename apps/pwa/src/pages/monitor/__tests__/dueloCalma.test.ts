@@ -116,7 +116,7 @@ describe('dueloCalma · tendencia de la ventaja', () => {
 })
 
 describe('dueloCalma · frase de ventaja', () => {
-  const fila = (id: FilaPunto['id'], gana: FilaPunto['gana']): FilaPunto => ({ id, rotulo: id, sub: '', formula: '', c: 1, r: 2, unidad: '', dec: 0, gana, frase: '' })
+  const fila = (id: FilaPunto['id'], gana: FilaPunto['gana']): FilaPunto => ({ id, rotulo: id, sub: '', explica: '', formula: '', c: 1, r: 2, unidad: '', dec: 0, gana, frase: '' })
   const n = { cardenas: 'Cárdenas', rebolledo: 'Rebolledo' }
   it('un solo ganador: por qué va adelante', () => {
     expect(fraseDeVentaja([fila('carrera', 'c'), fila('ritmo', 'c'), fila('micro', 'c')], n)).toBe('Cárdenas va adelante por más piezas a la misma hora, más ritmo andando y menos micro detención.')
@@ -185,10 +185,13 @@ describe('dueloCalma · marcador y filas con la jornada abierta', () => {
     const filas = filasDePuntos({ d, nombres: { cardenas: 'Cárdenas', rebolledo: 'Rebolledo' }, micro: { cardenas: { totalTurno: 15.1, nMaquinas: 3 }, rebolledo: { totalTurno: 22.3, nMaquinas: 3 } } })
     expect(filas.map((f) => f.id)).toEqual(['carrera', 'ritmo', 'micro'])
     expect(filas.map((f) => f.gana)).toEqual(['r', 'r', 'r'])
-    expect(filas[0]!.frase).toBe('Rebolledo 100 adelante a la misma hora.')
+    expect(filas[0]!.frase).toBe('Rebolledo va 100 piezas adelante a la misma hora.')
     expect(filas[1]!.frase).toBe('Rebolledo rinde 1,0 pz/min más cuando anda.')
     expect(filas[2]).toMatchObject({ totalC: 15.1, totalR: 22.3, nMaquinas: 3 })
+    expect(filas[2]!.frase).toBe('Cada Baader de Rebolledo pierde 1,0 min menos por hora.')
     expect(filas[2]!.sub).toContain('min por hora por máquina')
+    expect(filas.map((f) => f.explica.endsWith('es mejor.'))).toEqual([true, true, true])
+    expect(filas[2]!.explica).toMatch(/^Minutos por hora que cada Baader/)
     expect(filas[2]!.formula).toContain('÷ horas transcurridas ÷ cantidad de Baader')
   })
 
