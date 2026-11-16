@@ -139,7 +139,7 @@ describe('Baader sin meta: no entra en la línea y el cuadre de la línea da exa
 })
 
 /* El tiempo del turno no sigue el reloj: la serie puede traer minutos de después del cierre (15:37 con cierre a las 15:00). */
-describe('tiempo del turno: se corta en el fin REAL del turno cerrado (minutosDelTurno)', () => {
+describe('tiempo del turno: se corta en el fin del turno (minutosDelTurno)', () => {
   const enMinuto = (k: number) => new Date(T0 + k * 60_000).toISOString()
 
   it('turno cerrado a los N minutos: una serie de N + 42 cuenta N', () => {
@@ -150,17 +150,17 @@ describe('tiempo del turno: se corta en el fin REAL del turno cerrado (minutosDe
     expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: enMinuto(N), effectiveEnd: enMinuto(N - 10), shiftClosed: true })).toBe(N - 10)
   })
 
-  it('con el turno abierto no corta ni el cierre real ni plannedEnd: la hora extra en curso cuenta', () => {
-    expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: enMinuto(N), effectiveEnd: enMinuto(N - 10), shiftClosed: false })).toBe(N + 42)
+  it('con el turno abierto no cuenta el cierre real, pero sí plannedEnd', () => {
+    expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: enMinuto(N), effectiveEnd: enMinuto(N - 10), shiftClosed: false })).toBe(N)
   })
 
   it('sin ningún fin conocido vale el largo de la serie; una serie más corta que el fin manda la serie', () => {
     expect(minutosDelTurno({ desde, largo: 497 })).toBe(497)
-    expect(minutosDelTurno({ desde, largo: 300, effectiveEnd: enMinuto(N), shiftClosed: true })).toBe(300)
+    expect(minutosDelTurno({ desde, largo: 300, plannedEnd: enMinuto(N) })).toBe(300)
   })
 
   it('un fin a medio minuto cuenta solo los minutos completos', () => {
-    expect(minutosDelTurno({ desde, largo: N + 42, effectiveEnd: new Date(T0 + N * 60_000 + 30_000).toISOString(), shiftClosed: true })).toBe(N)
+    expect(minutosDelTurno({ desde, largo: N + 42, plannedEnd: new Date(T0 + N * 60_000 + 30_000).toISOString() })).toBe(N)
   })
 
   it('con la serie de 42 minutos de más, la cascada no cambia: podía, hizo y tiempo de producción son los de N', () => {

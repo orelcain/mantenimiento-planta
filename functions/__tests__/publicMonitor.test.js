@@ -1859,3 +1859,30 @@ describe('shiftStats: gracia de imputaciones tardías', () => {
     assert.ok(live.plannedEnd)
   })
 }
+
+test('hora extra al inicio Y al final: total, serie de 5 min y por máquina cuentan TODO, nada se corta en el horario', async () => {
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const fin = Date.UTC(2026, 7, 10, 15, 30)
+  const turnoId = '2026-08-10_Turno Dia'
+  const unschId = '2026-08-10_Unscheduled'
+  // Arranque 60 min antes (12 tramos) y 2 h 30 de hora extra después (30 tramos), en el cajón Unscheduled.
+  const antes = maq(1200, inicio - 60 * 60_000, 12)
+  const despues = maq(1500, fin, 30)
+  const db = fakeShiftsDb(
+    {
+      [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 4500 }] },
+      [unschId]: { shiftId: 'Unscheduled', scheduledStart: iso(Date.UTC(2026, 7, 10, 6, 0)), scheduledEnd: iso(Date.UTC(2026, 7, 10, 19, 0)), machines: [{ totalCycles: 2700 }] },
+    },
+    {
+      [turnoId]: [maq(4500, inicio, 90)],
+      [unschId]: [{ ...antes, intervals: [...antes.intervals, ...despues.intervals], totalCycles: 2700 }],
+    },
+  )
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+  assert.equal(live.totalPieces, 1200 + 4500 + 1500)
+  const sumaSerie = live.series.reduce((a, p) => a + (p.pieces || 0), 0)
+  assert.equal(sumaSerie, live.totalPieces, 'la serie de 5 min (de donde sale «hora por hora») llega a la hora extra')
+  assert.equal(live.machines.reduce((a, m) => a + (m.pieces || 0), 0), live.totalPieces, 'por máquina también')
+  assert.equal(Date.parse(live.effectiveEnd), fin + 150 * 60_000, 'el fin real es la última pieza de la hora extra')
+  assert.equal(Date.parse(live.effectiveStart), inicio - 60 * 60_000, 'y el inicio real, la primera del arranque')
+})

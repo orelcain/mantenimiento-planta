@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { finBarrasMs } from '../aEstaHora'
-import { minutosDelTurno } from '../cascadaPerilla'
+import { minutosDelTurno, ultimoMinutoConPiezas } from '../cascadaPerilla'
 import { finDelEje } from '../ejeTurno'
 
 const T0 = Date.UTC(2026, 10, 16, 0, 0)
@@ -37,7 +37,19 @@ describe('hora extra al final', () => {
 
   it('cascada («hizo N»): cuenta los minutos de la hora extra, en vivo y cerrada', () => {
     const desde = iso(T0)
-    expect(minutosDelTurno({ desde, largo: LARGO, plannedEnd: iso(min(PREVISTO)), shiftClosed: false })).toBe(LARGO)
-    expect(minutosDelTurno({ desde, largo: LARGO + 20, plannedEnd: iso(min(PREVISTO)), effectiveEnd: iso(min(LARGO)), shiftClosed: true })).toBe(LARGO)
+    expect(minutosDelTurno({ desde, largo: LARGO, plannedEnd: iso(min(PREVISTO)), shiftClosed: false, ultimoConPiezas: LARGO })).toBe(LARGO)
+    expect(minutosDelTurno({ desde, largo: LARGO + 20, plannedEnd: iso(min(PREVISTO)), effectiveEnd: iso(min(LARGO)), shiftClosed: true, ultimoConPiezas: LARGO })).toBe(LARGO)
+  })
+
+  it('cascada: la cola EN CERO después del previsto (línea parada, turno aún sin sellar) no se cuenta como «podía»', () => {
+    const desde = iso(T0)
+    expect(minutosDelTurno({ desde, largo: PREVISTO + 42, plannedEnd: iso(min(PREVISTO)), shiftClosed: false, ultimoConPiezas: PREVISTO - 3 })).toBe(PREVISTO)
+    // Con piezas en la cola, cuenta hasta la última.
+    expect(minutosDelTurno({ desde, largo: PREVISTO + 42, plannedEnd: iso(min(PREVISTO)), shiftClosed: false, ultimoConPiezas: PREVISTO + 30 })).toBe(PREVISTO + 30)
+  })
+
+  it('el último minuto con piezas mira todas las máquinas', () => {
+    expect(ultimoMinutoConPiezas([{ cycles: [3, 0, 0, 0] }, { cycles: [0, 0, 5, 0] }], 4)).toBe(3)
+    expect(ultimoMinutoConPiezas([{ cycles: [0, 0] }], 2)).toBe(0)
   })
 })
