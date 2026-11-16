@@ -656,7 +656,7 @@ describe('cubetas de las barras con poco ancho', () => {
 
 describe('turno cerrado: hasta dónde llega el eje', () => {
   const fin = Date.UTC(2026, 9, 28, 5, 0)
-  it('en vivo, el fin previsto', () => {
+  it('en vivo, el fin previsto (el fin real no cuenta todavía)', () => {
     expect(finDelEje({ finMs: fin, cerrado: false, finRealMs: fin + 600_000 })).toBe(fin)
   })
   it('cerrado nunca encoge el eje (corte anticipado) y llega al fin real o al último dato si pasan del previsto', () => {

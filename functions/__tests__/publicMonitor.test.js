@@ -1812,3 +1812,50 @@ describe('shiftStats: gracia de imputaciones tardías', () => {
     assert.ok(t.hu)
   })
 })
+
+// ── Bloque sin turno: sin cierre inventado (Chonchi 15-11-2026) ─────────────
+
+{
+  /* Cinco turnos de ~7 h 30: con ellos `inferShiftEndFromDuration` estima un
+     cierre para cualquier arranque. Es lo que dio «22:10 → 05:43». */
+  const historial = ['10', '11', '12', '13', '14'].map((d) => ({
+    id: `2026-11-${d}_Turno 1`,
+    data: {
+      effectiveStart: new Date(`2026-11-${d}T00:00:00Z`),
+      effectiveEnd: new Date(`2026-11-${d}T07:33:00Z`),
+      machines: [{ totalCycles: 20_000 }],
+    },
+  }))
+  const index = { entries: historial, byId: new Map(historial.map((e) => [e.id, e.data])) }
+  const maquinaBloque = (startMs, n) => ({
+    machineid: 'ev1', machineName: 'Ev 1', machineType: 'baader_142',
+    totalCycles: n * 60, expectedTotalCycles: 0,
+    shiftRuntimeBreakdown: { uptimeSec: n * 300, downtimeSec: 0, breakSec: 0 },
+    intervals: intervals(startMs, n, 60),
+    states: [{ startAt: iso(startMs), endAt: iso(startMs + n * 300_000), durationSec: n * 300, type: 'uptime', name: 'Produciendo', reason: '', isCurrent: true }],
+  })
+
+  test('un bloque del sensor (sin turno en Shoplogix) NO publica un cierre estimado', async () => {
+    const ahora = nowWall().getTime()
+    const start = ahora - 70 * 60_000
+    const fin = ahora - 3 * 60_000
+    const parent = { shiftId: 'Unscheduled@22:10', scheduledStart: iso(start), scheduledEnd: iso(fin), effectiveStart: iso(start), effectiveEnd: iso(fin), lastSyncAt: new Date() }
+    const live = await buildMonitorLive(fakeDb({ parent: null, machines: [] }), 'test', '2026-11-15_Unscheduled@22:10', index,
+      { parent, machines: [maquinaBloque(start, 13)] })
+    assert.equal(live.plannedEnd, null, 'sin horario oficial no hay hora de término')
+    assert.equal(live.plannedEndSource, null)
+    assert.equal(live.shiftClosed, false, 'sigue en curso')
+    assert.equal(live.totalPieces, 13 * 60)
+  })
+
+  test('un turno CON nombre y sin horario oficial conserva su cierre estimado por duración', async () => {
+    const ahora = nowWall().getTime()
+    const start = ahora - 70 * 60_000
+    const live = await buildMonitorLive(
+      fakeDb({ parent: { scheduledStart: iso(start), scheduledEnd: iso(ahora - 3 * 60_000), lastSyncAt: new Date() }, machines: [maquinaBloque(start, 13)] }),
+      'test', '2026-11-16_Turno Nuevo', index,
+    )
+    assert.equal(live.plannedEndSource, 'duracion')
+    assert.ok(live.plannedEnd)
+  })
+}

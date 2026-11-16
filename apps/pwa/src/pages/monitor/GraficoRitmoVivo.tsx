@@ -67,6 +67,8 @@ export interface EjeDatos {
   finMs: number
   /** Fin REAL del turno cerrado (`live.effectiveEnd`, la misma hora de la cabecera). null/ausente: se usa el previsto. */
   finRealMs?: number | null
+  /** El turno no tiene hora de término (bloque sin turno en Shoplogix): `finMs` es solo el último dato, no un cierre. */
+  sinCierre?: boolean
   /** Minuto a minuto por máquina (las mismas barras de «Ritmo en vivo»). null: solo curva. */
   minuto: MinutoTurno | null
   /** La primera pieza (ms): base de `curva.hoy`, de la curva de la meta y de las paradas. */
@@ -1452,8 +1454,9 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
   /* Turno cerrado: el fin REAL (el de la cabecera) y el eje hasta lo que alcance, sin encogerse (un corte anticipado no lo acorta). */
   const finReal = p.cerrado && e.finRealMs != null && Number.isFinite(e.finRealMs) ? e.finRealMs : null
   const ultimoDatoMs = useMemo(() => {
-    if (!p.cerrado || !e.minuto) return null
-    const n = minutosVisibles(e.minuto.maquinas, true)
+    if (!e.minuto) return null
+    /* En vivo también: pasado el fin previsto (hora extra) el eje llega al último minuto de la serie. */
+    const n = minutosVisibles(e.minuto.maquinas, p.cerrado)
     return n > 0 ? Date.parse(e.minuto.desde) + n * 60_000 : null
   }, [p.cerrado, e.minuto])
   const totalMin = (finDelEje({ finMs: e.finMs, cerrado: p.cerrado, finRealMs: finReal, ultimoDatoMs }) - e.iniMs) / 60_000
@@ -1751,9 +1754,10 @@ export function GraficoRitmoVivo({ p, e, reloj, ampliado, abrirCon }: {
     if (minutoMovil == null || !(el instanceof HTMLElement)) return
     traerALaVista(el)
   }, [minutoMovil])
+  /* Sin hora de término (bloque sin turno en Shoplogix): desde cuándo corre y que sigue, nunca un cierre inventado. */
   const sub = p.cerrado && finReal != null
     ? `${relojDe(e.iniMs)} → ${relojDe(finReal)} · terminado`
-    : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
+    : e.sinCierre ? `desde ${relojDe(e.iniMs)} · en curso` : `${relojDe(e.iniMs)} → ${relojDe(e.finMs)}`
   const resumen = `Hechas del turno: ${int(mostradas)}${p.meta ? ` de ${int(p.meta)}` : ''}${p.proyeccion != null && !p.cerrado ? `, al cierre ${int(p.proyeccion)}` : ''}. Debajo, el ritmo por minuto, cada Baader y las detenciones en las mismas horas.${modelo && modelo.micros.length > 0 ? resumenAccesibleMicro(modelo.micros.length) : ''}`
   const hayProy = modelo?.proy != null
   const titulo = (

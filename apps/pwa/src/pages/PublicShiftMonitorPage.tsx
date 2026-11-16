@@ -105,7 +105,7 @@ import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
 import { ProveedorReproduccion } from './monitor/ProveedorReproduccion'
 import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/HechasVivas'
-import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
+import { barrasDesdeMs, finBarrasMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
 import { causaLegible, etiquetaMaquina, hayBandaParada, llenadoDelPanel, paradasDetalle, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
@@ -6092,11 +6092,14 @@ function MonitorDelToken() {
   /* La cascada a la meta de Shoplogix con la perilla (Fase B): por Baader y la línea. Misma serie por minuto que las barras
      y mismas detenciones del turno (solo tramos cerrados, como la cascada de arriba). `cascadaPerilla` calcula; la card muestra. */
   const cascadaMeta = (() => {
+    /* Un turno que Shoplogix no configuró (lo marcó el sensor) no tiene meta: la cascada «a la meta» la inventaría
+       (Chonchi 15-11: «33.482 pz bajo la meta» para un arranque de 70 min). Regla de Orel: sin meta puesta, no hay meta. */
+    if (vista?.extraordinario) return null
     const s = serieMinutoVista
     if (!s?.maquinas?.length) return null
     /* El tiempo del turno no sigue el reloj: la serie puede traer minutos de después del cierre (15:37 con cierre a las 15:00). */
     const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
-    const n = minutosDelTurno({ desde: s.desde, largo, plannedEnd: live.plannedEnd, effectiveEnd: live.effectiveEnd, shiftClosed: live.shiftClosed })
+    const n = minutosDelTurno({ desde: s.desde, largo, effectiveEnd: live.effectiveEnd, shiftClosed: live.shiftClosed })
     if (!(n > 1) || !Number.isFinite(Date.parse(s.desde))) return null
     const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
     const args: CascadaArgs = {
@@ -6225,9 +6228,7 @@ function MonitorDelToken() {
        dos tarjetas más arriba — dos «ahora» distintos en la misma
        pantalla, la clase de contradicción que este monitor viene
        cerrando. */
-    const fin = live.shiftClosed && Number.isFinite(finSched)
-      ? finSched + 30 * 60_000
-      : t0 + largo * 60_000
+    const fin = finBarrasMs({ t0, largo, cerrado: !!live.shiftClosed, finPrevistoMs: finSched, finRealMs: Date.parse(live.effectiveEnd ?? '') })
     /* Sin solape real, la serie es de otro turno: a las curvas. */
     const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
     const hastaIdx = Math.min(largo, Math.round((fin - t0) / 60_000))
@@ -6474,7 +6475,11 @@ function MonitorDelToken() {
 
   /* El horario de la barra («21:30 → 04:50»): el previsto en curso, el real cerrado. La hora de la última lectura del contador
      de Shoplogix (`corteHoraV2`) va con él en la barra: todas las cifras de «El turno» salen de esa lectura. */
-  const rangoBarra = `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`
+  /* Sin cierre publicado y en curso (bloque sin turno en Shoplogix), no hay hora de término que mostrar: «desde … · en curso». */
+  const sinCierre = !live.shiftClosed && !live.plannedEnd
+  const rangoBarra = sinCierre
+    ? `desde ${fmtWallTime(inicioReal)} · en curso`
+    : `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`
   const corteHoraV2 = !live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null
 
   /* Modo TV (`?pantalla=1`) sobre el v2: una pantalla fija de 1920×1080 con las MISMAS cifras que recibe `MonitorV2`
@@ -6687,7 +6692,7 @@ function MonitorDelToken() {
               {fmtDateLong(vista?.dateKey || data.dateKey)}
               {(() => {
                 /* El fin del turno: el previsto si está en curso, el real si cerró. */
-                const finIso = live.shiftClosed ? live.scheduledEnd : (live.plannedEnd ?? live.scheduledEnd)
+                const finIso = live.shiftClosed ? live.scheduledEnd : live.plannedEnd
                 if (!finIso || !inicioReal) return null
                 const ini = new Date(inicioReal)
                 const fin = new Date(finIso)
@@ -6724,6 +6729,10 @@ function MonitorDelToken() {
                   </span>
                 )}
               </span>
+            ) : sinCierre ? (
+              /* En curso y sin hora de término (bloque sin turno en Shoplogix):
+                 el último dato sincronizado NO es un cierre. */
+              <span className="tabular-nums">desde {fmtWallTime(inicioReal)} · en curso</span>
             ) : (
               /* Cerrado, el rango es el REAL (hasta la última pieza), no el
                  programado: «07:15–15:10» es lo que de verdad pasó. */
@@ -6989,6 +6998,7 @@ function MonitorDelToken() {
                 finMs: finEjeMs,
                 /* Turno cerrado: el fin REAL, el mismo `live.effectiveEnd` de la cabecera («Turno terminado 04:50»). */
                 finRealMs: live.effectiveEnd ? Date.parse(live.effectiveEnd) : null,
+                sinCierre,
                 minuto: barrasMinuto,
                 perillas: live.perillas ?? null,
                 primeraPiezaMs,

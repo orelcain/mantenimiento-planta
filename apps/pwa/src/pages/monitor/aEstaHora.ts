@@ -56,6 +56,19 @@ export function barrasDesdeMs(inicioTurnoMs: number, primeraPiezaMs: number | nu
   return primeraPiezaMs != null && Number.isFinite(primeraPiezaMs) && primeraPiezaMs < inicioTurnoMs ? primeraPiezaMs : inicioTurnoMs
 }
 
+/**
+ * Hasta dónde llegan las barras de minuto (ms wall-clock, exclusivo). En vivo, hasta el último minuto de la serie: la
+ * cola ES el presente, aunque el turno siga en hora extra pasado su fin previsto (Yal 30-08, PR #878). Cerrado, el fin
+ * previsto o el fin REAL (última pieza, con la hora extra), el que sea más tarde, con 30 min de aire. Antes el tope era
+ * solo el previsto + 30 min y una hora extra más larga se cortaba en las barras con el total contándola (Orel, 15-11:
+ * «a veces se hacen horas extra… debe contarlas todas»).
+ */
+export function finBarrasMs(args: { t0: number; largo: number; cerrado: boolean; finPrevistoMs: number; finRealMs: number }): number {
+  const { t0, largo, cerrado, finPrevistoMs, finRealMs } = args
+  const fines = [finPrevistoMs, finRealMs].filter((ms) => Number.isFinite(ms))
+  return cerrado && fines.length ? Math.max(...fines) + 30 * 60_000 : t0 + largo * 60_000
+}
+
 /** Lo que la vista necesita de un cuadro del reloj de datos (`CuadroReloj`), sin importar React. */
 interface CuadroParaHora {
   valor: number | null

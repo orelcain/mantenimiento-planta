@@ -45,6 +45,14 @@ const BUCKET_CERRADO_MS = 59_000
 const MAX_SERIE_MINUTOS = 720
 
 /**
+ * Un hueco SIN piezas más largo que esto separa dos bloques de producción.
+ * ⚠ Mismo número que `MAX_CONTINUIDAD_MS` de `functions/publicMonitor.js` (y de
+ * la matriz): el monitor arma el turno del sensor con esa regla, y el pulso
+ * tiene que contar el MISMO bloque o el número grande no calza con el turno.
+ */
+const MAX_CONTINUIDAD_MS = 90 * 60 * 1000
+
+/**
  * Convierte la respuesta de `whiteboardproduction` (buckets de 1 minuto por
  * máquina) en una lectura del pulso.
  *
@@ -112,6 +120,37 @@ function lecturaDesdeProduccion(data) {
   const msDe = (b) => {
     try { return parseShoplogixTime(b.start).getTime() } catch { return null }
   }
+  /*
+   * El arranque del bloque de producción EN CURSO: desde el minuto común hacia
+   * atrás, minuto con piezas a minuto con piezas (la línea entera), hasta el
+   * primer hueco de más de `MAX_CONTINUIDAD_MS`.
+   *
+   * Chonchi 15-11-2026: Eviscerado partió 22:10 sin turno con nombre. Sin turno,
+   * el pulso sumaba los ~12 h de la ventana y la serie por minuto arrancaba a
+   * las 11:23 (717 min en vez de 70): la cascada multiplicó el esperado por esos
+   * minutos y publicó «33.482 pz bajo la meta · hizo 2.368 de 35.850».
+   */
+  const comunMsTurno = msDe({ start: minutoComun })
+  const inicioBloqueMs = (() => {
+    const porMinuto = new Map()
+    for (const f of filas) {
+      for (const b of f.buckets) {
+        if (!((b.cycles || 0) > 0)) continue
+        const ms = msDe(b)
+        if (ms == null || (comunMsTurno != null && ms > comunMsTurno)) continue
+        porMinuto.set(ms, true)
+      }
+    }
+    const minutos = [...porMinuto.keys()].sort((a, b) => b - a)
+    if (!minutos.length) return comunMsTurno
+    let inicio = minutos[0]
+    for (const ms of minutos.slice(1)) {
+      if (inicio - ms > MAX_CONTINUIDAD_MS) break
+      inicio = ms
+    }
+    return inicio
+  })()
+
   const turno = (() => {
     const delComun = delMinuto.find((x) => x.bucket)?.bucket?.shift ?? null
     if (!esNoProgramado(delComun)) return delComun
@@ -126,6 +165,10 @@ function lecturaDesdeProduccion(data) {
         if (!mejor || ms > mejor.ms) mejor = { ms, shift: b.shift }
       }
     }
+    /* El último turno con nombre terminó ANTES de que arrancara el bloque en
+       curso (hueco > 90 min): lo de ahora no es su hora extra, es otro bloque
+       sin turno. Sumárselo inflaba ese turno con producción que no es suya. */
+    if (mejor && inicioBloqueMs != null && mejor.ms < inicioBloqueMs - MAX_CONTINUIDAD_MS) return null
     return mejor?.shift ?? null
   })()
 
@@ -153,7 +196,17 @@ function lecturaDesdeProduccion(data) {
    * mismo gotcha que ya está resuelto del lado del doc del turno.
    */
   const bucketsDelTurno = (f) => {
-    if (turno == null) return f.buckets
+    /* Sin turno con nombre, el turno es el bloque en curso y nada más: lo de
+       antes del último hueco largo es de otro bloque (o ceros de la ventana). */
+    if (turno == null) {
+      const porMinuto = new Map()
+      for (const b of f.buckets) {
+        const ms = msDe(b)
+        if (ms == null || inicioBloqueMs == null || ms < inicioBloqueMs) continue
+        if (!porMinuto.has(ms)) porMinuto.set(ms, b)
+      }
+      return [...porMinuto.values()]
+    }
     const porMinuto = new Map()
     for (const b of f.buckets) {
       const propio = b.shift === turno

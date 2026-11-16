@@ -289,9 +289,9 @@ function calcularTodo(args: CascadaArgs): Calculo[] {
 const tieneMeta = (c: Calculo): boolean => c.meta > 0
 
 /**
- * Los minutos del turno que cuenta la cascada: el largo de la serie, cortado en el fin del turno. El fin es el menor entre
- * `plannedEnd` y, con el turno cerrado, `effectiveEnd`. Sin ningún fin conocido, vale el largo de la serie. Solo cuentan los
- * minutos completos antes del fin: así el tiempo del turno no sigue el reloj cuando la serie ya trae minutos de después del cierre.
+ * Los minutos del turno que cuenta la cascada: el largo de la serie, cortado en el fin REAL del turno cerrado
+ * (`effectiveEnd`, la última pieza CON la hora extra). En vivo, o sin fin conocido, vale el largo de la serie: la hora extra
+ * cuenta entera (Orel, 15-11). `plannedEnd` ya no corta. Solo cuentan los minutos completos antes del fin.
  */
 export function minutosDelTurno(args: {
   desde: string
@@ -301,7 +301,9 @@ export function minutosDelTurno(args: {
   shiftClosed?: boolean
 }): number {
   const t0 = Date.parse(args.desde)
-  const fines = [args.plannedEnd, args.shiftClosed ? args.effectiveEnd : null]
+  /* Solo el fin REAL corta, y solo con el turno cerrado. `plannedEnd` ya no: la serie después del previsto es hora extra
+     del turno (el pulso la atribuye) y la cascada la dejaba fuera — «hizo 2.368» con más piezas contadas arriba. */
+  const fines = [args.shiftClosed ? args.effectiveEnd : null]
     .map((x) => (x ? Date.parse(x) : NaN))
     .filter((ms) => Number.isFinite(ms))
   if (!fines.length || !Number.isFinite(t0)) return args.largo

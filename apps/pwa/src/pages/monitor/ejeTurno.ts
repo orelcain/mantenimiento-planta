@@ -871,12 +871,14 @@ export function tonoDeCubeta(tonos: TonoRitmo[]): TonoRitmo {
 // ── Turno cerrado: hasta dónde llega el eje ──────────────────────────────────
 
 /**
- * El fin del eje. En vivo, el fin previsto. Cerrado: nunca menos que el previsto (un corte anticipado no encoge el eje) y
+ * El fin del eje. En vivo, el fin previsto o el último minuto con dato si ya lo pasó (hora extra). Cerrado: nunca menos que el previsto (un corte anticipado no encoge el eje) y
  * lo que alcance el fin real o el último minuto con dato, para que se vea la cola.
  */
 export function finDelEje(args: { finMs: number; cerrado: boolean; finRealMs?: number | null; ultimoDatoMs?: number | null }): number {
   const { finMs, cerrado, finRealMs, ultimoDatoMs } = args
-  if (!cerrado) return finMs
+  /* En vivo, el eje se estira con el dato: pasado el fin previsto la línea puede seguir en hora extra, y con el eje
+     clavado en el previsto las barras y la punta se congelaban ahí (las de después quedaban fuera del gráfico). */
+  if (!cerrado) return Math.max(finMs, ultimoDatoMs != null && Number.isFinite(ultimoDatoMs) ? ultimoDatoMs : 0)
   return Math.max(finMs, finRealMs != null && Number.isFinite(finRealMs) ? finRealMs : 0, ultimoDatoMs != null && Number.isFinite(ultimoDatoMs) ? ultimoDatoMs : 0)
 }
 
