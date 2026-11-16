@@ -103,7 +103,9 @@
 .dc-v { position: relative; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
 .dc-v b { font-size: 20px; line-height: 24px; font-weight: 500; color: rgb(var(--muted-foreground)); }
 .dc-v[data-gana='1'] b { font-size: 22px; font-weight: 700; color: rgb(var(--foreground)); }
-.dc-v small { font-size: 11.5px; line-height: 15px; color: rgb(var(--muted-foreground)); white-space: nowrap; }
+/* El acumulado («20,1 min hasta esta hora») se parte dentro de la columna: en una sola línea
+   ensanchaba las dos columnas de números y aplastaba el nombre de la fila en el celular. */
+.dc-v small { max-width: 84px; font-size: 11.5px; line-height: 15px; color: rgb(var(--muted-foreground)); text-wrap: balance; }
 .dc-pt { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 99px; vertical-align: middle; }
 .dc-fr { grid-column: 1 / -1; margin: 4px 0 0; font-size: 13px; line-height: 18px; color: rgb(var(--muted-foreground)); }
 
