@@ -501,21 +501,42 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
   const dateKey = shiftDocId.slice(0, 10)
   const extras = new Map()
 
+  /*
+   * El `Unscheduled` de un día cubre 06:00 → 06:00 del siguiente, así que lo
+   * suelto ANTERIOR a las 06:00 del día D vive en el doc de D-1. Un turno que
+   * arranca a medianoche tiene su arranque anticipado ahí, no en el de su día.
+   *
+   * Chonchi 15-nov-2026 (domingo): la línea partió 22:10, casi dos horas antes
+   * del «Turno 1 Lunes» de las 00:00. Mirando solo el `Unscheduled` del mismo
+   * dateKey esas piezas no eran de nadie: `bloquesDelSensor` se las daba al
+   * turno del lunes como arranque (compara contra los días ADYACENTES) y este
+   * rescate nunca las veía. Ahora los dos miran lo mismo, igual que la matriz
+   * (`graderUnscheduledAttribution.ts`).
+   *
+   * Compiten los turnos con nombre de D-1, D y D+1: sin los vecinos, un turno
+   * se llevaría la cola del anterior o el arranque del siguiente.
+   */
+  const diaMs = Date.parse(`${dateKey}T00:00:00Z`)
+  const diaDe = (n) => new Date(diaMs + n * 86_400_000).toISOString().slice(0, 10)
+  const ayer = diaDe(-1)
+  const vecinos = new Set([ayer, dateKey, diaDe(1)])
+  const delEntorno = (id) => id !== shiftDocId && vecinos.has(id.slice(0, 10))
+
   let snaps
   // El índice solo cubre su ventana: para un turno más viejo (link `shift` de
   // hace meses) se cae al camino legado, que no tiene límite de fecha.
-  if (index && dateKey >= index.desde) {
+  if (index && ayer >= index.desde) {
     snaps = index.entries
-      .filter(e => e.id.startsWith(dateKey) && e.id !== shiftDocId)
+      .filter(e => delEntorno(e.id))
       .map(e => ({ id: e.id, exists: true, data: () => e.data }))
   } else {
     const refs = await db.collection(`shoplogix/${plantSlug}/shifts`).listDocuments()
-    const delDia = refs.filter(r => r.id.startsWith(dateKey) && r.id !== shiftDocId)
-    snaps = delDia.length > 0 ? await db.getAll(...delDia) : []
+    const cercanos = refs.filter(r => delEntorno(r.id))
+    snaps = cercanos.length > 0 ? await db.getAll(...cercanos) : []
   }
   if (snaps.length === 0) return extras
 
-  // Los OTROS turnos con nombre del día: son los que compiten por cada tramo.
+  // Los OTROS turnos con nombre del entorno: son los que compiten por cada tramo.
   const otrasVentanas = []
   const unscheduled = []
   for (const snap of snaps) {
@@ -523,16 +544,67 @@ async function loadOutsideShiftProduction(db, plantSlug, shiftDocId, ventanaTurn
     const d = snap.data() || {}
     const esUnscheduled = /unscheduled/i.test(d.shiftId || snap.id)
     if (esUnscheduled) {
-      unscheduled.push(snap.id)
+      // El de D+1 no se lee: arranca a las 06:00 de mañana y el de D ya cubre
+      // hasta las 08:00 de ese día. De D+1 solo compiten sus turnos con nombre.
+      if (snap.id.slice(0, 10) <= dateKey) unscheduled.push({ id: snap.id, start: toDate(d.scheduledStart) })
     } else {
       otrasVentanas.push({ start: toDate(d.scheduledStart), end: toDate(d.scheduledEnd) })
     }
   }
   if (unscheduled.length === 0) return extras
 
-  for (const id of unscheduled) {
+  /*
+   * ⚠⚠ Los dos `Unscheduled` se FUNDEN por máquina antes de decidir nada, y
+   * cada minuto entra una sola vez. Sus ventanas se pisan: la cola 07:15→08:00
+   * del «Turno 1 Lunes» está idéntica en el doc del domingo y en el del lunes
+   * (medido: 09-nov, 21 tramos y 1.245 pz repetidos uno a uno; 02-nov, 983).
+   * Leerlos por separado contaba esa cola dos veces, y partía en dos un bloque
+   * que cruza las 06:00, con lo que cada mitad se juzgaba como cola distinta.
+   * Ante dos lecturas del mismo minuto queda la más completa (el tramo en
+   * curso solo crece; el doc de ayer se re-sincroniza una vez por hora).
+   *
+   * Los STATES no comparten rejilla y no se pueden deduplicar por hora: el doc
+   * de ayer trae los del día entero SIN recortar —también los que caen dentro
+   * de este mismo turno— y el de hoy los trae recortados a su arranque (09-nov:
+   * ayer 07:13:42→07:23:27, hoy 07:15:00→07:23:27, el mismo uptime). Así que del
+   * de ayer solo valen los que el de hoy no cubre y que no son del turno: en la
+   * práctica, lo anterior al arranque. Sin esto el «% produciendo» de los lunes
+   * subía entre 31 y 65 min por máquina de tiempo contado dos veces.
+   */
+  const inicioHoy = unscheduled.find(u => u.id.slice(0, 10) === dateKey)?.start?.getTime() ?? Number.POSITIVE_INFINITY
+  const esDelTurno = (ms) => Boolean(ventanaTurno?.start && ventanaTurno?.end)
+    && ms >= ventanaTurno.start.getTime() && ms < ventanaTurno.end.getTime()
+  const fundidas = new Map()
+  for (const { id } of [...unscheduled].sort((a, b) => a.id.localeCompare(b.id))) {
+    const deAyer = id.slice(0, 10) < dateKey
     const ms = await db.collection(`shoplogix/${plantSlug}/shifts/${id}/machines`).get()
     ms.forEach(doc => {
+      const m = doc.data() || {}
+      const acc = fundidas.get(doc.id) || { intervals: new Map(), states: new Map() }
+      for (const iv of m.intervals || []) {
+        const s = toDate(iv.startAt)?.getTime()
+        if (!Number.isFinite(s)) continue
+        const previo = acc.intervals.get(s)
+        if (!previo || (iv.cycles || 0) > (previo.cycles || 0)) acc.intervals.set(s, iv)
+      }
+      for (const st of m.states || []) {
+        const s = toDate(st.startAt)?.getTime()
+        if (!Number.isFinite(s)) continue
+        if (deAyer && (s >= inicioHoy || esDelTurno(s))) continue
+        const previo = acc.states.get(s)
+        const fin = (x) => toDate(x.endAt)?.getTime() ?? 0
+        if (!previo || fin(st) > fin(previo)) acc.states.set(s, st)
+      }
+      fundidas.set(doc.id, acc)
+    })
+  }
+
+  {
+    const maquinas = [...fundidas.entries()].map(([id, acc]) => ({
+      id,
+      data: () => ({ intervals: [...acc.intervals.values()], states: [...acc.states.values()] }),
+    }))
+    maquinas.forEach(doc => {
       const m = doc.data() || {}
       const yaEnElTurno = yaContados.get(doc.id) || new Set()
       const candidatos = (m.intervals || []).filter(iv => {
@@ -2083,11 +2155,25 @@ const SENSOR_SHIFT_MIN_MS = MAX_DURACION_COLA_SUELTA_MS
  * Un rato suelto de madrugada (293 ciclos un domingo) no es un turno y
  * mostrarlo como tal inventaría uno.
  *
+ * ⚠ La vara de las 2 h es para un bloque que YA TERMINÓ: ahí hay que decidir si
+ * fue un turno o un rato suelto. Mientras el bloque sigue corriendo no hay nada
+ * que decidir —la línea está produciendo y ningún turno con nombre lo reclama—
+ * y esperar 2 h dejaba el monitor mostrando el turno de ayer con la línea
+ * andando. Chonchi 15-nov-2026: partieron 22:10 de un domingo, dos horas antes
+ * del turno del lunes, y a las 22:50 Shoplogix llevaba 1.392 pz que el link no
+ * mostraba (lo reportó Orel en vivo). Un bloque EN CURSO entra con la vara de
+ * «esto es un turno y no una prueba» (`FORECAST_MIN_PIECES`). Si se corta antes
+ * de las 2 h vuelve a salir: no deja un turno inventado en el historial. Y si
+ * arranca un turno con nombre pegado a él, pasa a ser su arranque anticipado
+ * (ver `loadOutsideShiftProduction`).
+ *
  * @param {Array} machines — docs de `machines` del `Unscheduled`
  * @param {Array<{start: Date, end: Date}>} ventanasConNombre — turnos del día y adyacentes
+ * @param {number|null} nowWallMs — reloj de PLANTA (wall-clock, el mismo de los
+ *   intervals); null = no hay bloque en curso que valga (un doc ya cerrado).
  * @returns {Array<{start: number, end: number, pieces: number}>}
  */
-function bloquesDelSensor(machines, ventanasConNombre) {
+function bloquesDelSensor(machines, ventanasConNombre, nowWallMs = null) {
   const sueltos = []
   for (const m of machines) {
     for (const iv of m.intervals || []) {
@@ -2110,8 +2196,14 @@ function bloquesDelSensor(machines, ventanasConNombre) {
       cadenas.push({ start: t.start, end: t.end, pieces: t.pieces })
     }
   }
+  // Mismo margen con que se sella un turno: la última pieza sincronizada va
+  // siempre unos minutos detrás del reloj.
+  const enCurso = (c) => nowWallMs != null
+    && nowWallMs >= c.start
+    && nowWallMs - c.end <= CLOSE_MARGIN_MS
+    && c.pieces >= FORECAST_MIN_PIECES
   return cadenas.filter(c =>
-    c.end - c.start > SENSOR_SHIFT_MIN_MS
+    (c.end - c.start > SENSOR_SHIFT_MIN_MS || enCurso(c))
     && c.pieces >= HISTORY_MIN_PIECES
     // Si algún turno con nombre lo reclama como cola, es de ese turno.
     && !ventanasConNombre.some(v => esColaDeEsteTurno(c, v, ventanasConNombre.filter(o => o !== v))))
@@ -2167,12 +2259,12 @@ function maquinasDelBloque(machines, bloque) {
  *
  * @returns {Promise<Array<{id: string, start: Date, end: Date, pieces: number, fuenteDocId: string, fuente: {parent: object, machines: Array}}>>}
  */
-async function turnosDelSensor(db, plantSlug, unschId, unschParent, ventanasConNombre) {
+async function turnosDelSensor(db, plantSlug, unschId, unschParent, ventanasConNombre, nowWallMs = null) {
   const snap = await db.collection(`shoplogix/${plantSlug}/shifts/${unschId}/machines`).get()
   if (snap.empty) return []
   const machines = snap.docs.map(d => ({ id: d.id, ...d.data() }))
   const dateKey = unschId.slice(0, 10)
-  return bloquesDelSensor(machines, ventanasConNombre).map(b => {
+  return bloquesDelSensor(machines, ventanasConNombre, nowWallMs).map(b => {
     const id = `${dateKey}_Unscheduled@${hhmmWall(b.start)}`
     const parent = {
       shiftId: id.slice(11),
@@ -2280,7 +2372,7 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
       .filter(c => Math.abs(Date.parse(`${c.dateKey}T00:00:00Z`) - dia) <= 86_400_000)
       .map(c => c.ventana)
     try {
-      for (const t of await turnosDelSensor(db, plantSlug, u.id, u.data, ventanas)) turnos.push(t)
+      for (const t of await turnosDelSensor(db, plantSlug, u.id, u.data, ventanas, nowWall.getTime())) turnos.push(t)
     } catch {
       // Sin turnos del sensor este refresco; el historial normal sigue igual.
       if (sinTurno) delete sinTurno.next[u.id]
