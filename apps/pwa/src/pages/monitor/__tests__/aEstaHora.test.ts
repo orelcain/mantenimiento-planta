@@ -63,6 +63,13 @@ describe('piezasMostradas · la base de «A esta hora»', () => {
     expect(piezasMostradas({ entrada: e, tope: armarTope(70, null) }, 70)).toBe(70)
   })
 
+  it('lo de antes del horario (la base) va ENCIMA de la serie, y el techo sigue siendo el crudo', () => {
+    /* Eviscerado 15-11: la serie parte a las 00:00 y lo de 22:10→00:00 viene aparte. */
+    const e = entrada([[10, 12, 14], [9, 9, 9], [5, 6, 7]])
+    expect(totalEnReposo(e, armarTope(105, null, 2384))).toBe(81 + 2384)
+    expect(piezasMostradas({ entrada: e, tope: armarTope(70, null, 2384) }, 70 + 2384)).toBe(70 + 2384)
+  })
+
   it('una Baader atrasada un minuto no inventa su minuto: se cuenta hasta el menor de los largos', () => {
     const e = entrada([[10, 12, 14], [9, 9], [5, 6, 7]])
     expect(finalesCerrados(e)).toEqual([22, 18, 11])
