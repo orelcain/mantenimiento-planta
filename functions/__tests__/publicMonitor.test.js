@@ -1281,6 +1281,179 @@ test('bloquesDelSensor: una cola, ruido o un rato corto NO son un turno', () => 
   assert.equal(b[0].pieces, 71 * 70)
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Arranque anticipado que cruza la medianoche (Chonchi, domingo 15-nov-2026).
+//
+// La línea partió 22:10, casi dos horas antes del «Turno 1 Lunes» de las 00:00.
+// Shoplogix guardó esas piezas en el `Unscheduled` del DOMINGO y el monitor
+// siguió mostrando el Turno 2 del sábado (4.261 pz, cerrado) con la línea
+// andando: a las 22:55 iban 1.578 pz que el link no mostraba.
+//
+// Dos huecos distintos, los dos fijados acá:
+//   1. Mientras el bloque corre y ningún turno con nombre lo reclama, es el
+//      turno ACTUAL — no hay que esperar las 2 h de la vara de los cerrados.
+//   2. Cuando arranca el turno del lunes, esas piezas son SU arranque: el
+//      rescate tiene que mirar el `Unscheduled` de ayer, y sin contar dos veces
+//      la cola del lunes, que Shoplogix repite en los dos documentos.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('bloquesDelSensor: un bloque EN CURSO que nadie reclama es turno sin esperar las 2 h', () => {
+  const D = (d, h, m = 0) => Date.UTC(2026, 10, d, h, m)
+  const turno2Sabado = { start: new Date(D(14, 7, 15)), end: new Date(D(14, 15)) }
+  const maq1 = (ivs) => [{ intervals: ivs, states: [] }]
+  // Los tramos reales del 15-nov: 22:10→22:55, 1.578 pz.
+  const real = [61, 99, 216, 184, 180, 212, 184, 206, 198, 38]
+    .map((c, i) => ({ startAt: new Date(D(15, 22, 10 + i * 5)), endAt: new Date(D(15, 22, 15 + i * 5)), cycles: c }))
+  const ultimo = D(15, 23, 0)
+
+  // Sin reloj (un doc ya cerrado) rige la vara de siempre: 50 min no es un turno.
+  assert.deepEqual(bloquesDelSensor(maq1(real), [turno2Sabado]), [])
+
+  // 23:02, dos minutos después del último tramo: está corriendo → es el actual.
+  const b = bloquesDelSensor(maq1(real), [turno2Sabado], D(15, 23, 2))
+  assert.equal(b.length, 1)
+  assert.equal(b[0].pieces, 1578)
+  assert.equal(b[0].start, D(15, 22, 10))
+
+  // Se cortó hace más de 30 min sin llegar a 2 h: vuelve a salir, no inventa un turno.
+  assert.deepEqual(bloquesDelSensor(maq1(real), [turno2Sabado], ultimo + 31 * 60_000), [])
+
+  // Un rato suelto (293 pz) no entra ni corriendo: es una prueba, no un turno.
+  const rato = real.slice(0, 3).map((iv, i) => ({ ...iv, cycles: [61, 99, 133][i] }))
+  assert.deepEqual(bloquesDelSensor(maq1(rato), [turno2Sabado], D(15, 22, 27)), [])
+
+  // La hora extra pegada a un turno con nombre sigue siendo de ESE turno, aunque esté corriendo.
+  const horaExtra = intervals(D(14, 15), 8, 100)   // 15:00→15:40, 800 pz
+  assert.deepEqual(bloquesDelSensor(maq1(horaExtra), [turno2Sabado], D(14, 15, 42)), [])
+
+  // El reloj es el de PLANTA: con la hora UTC real (3 h adelante) el bloque parecería cortado.
+  assert.deepEqual(bloquesDelSensor(maq1(real), [turno2Sabado], D(16, 2, 2)), [])
+})
+
+/** Evisceradora con los tramos dados (5 min c/u). */
+const ev1 = (ivs) => ({
+  machineid: 'ev1', machineName: 'Evisceradora 1', machineType: 'baader_142',
+  totalCycles: ivs.reduce((a, iv) => a + iv.cycles, 0),
+  shiftRuntime: 0.8,
+  shiftRuntimeBreakdown: { uptimeSec: 3600, downtimeSec: 600, breakSec: 0 },
+  intervals: ivs, states: [],
+})
+
+test('el arranque de antes de medianoche se le suma al turno que parte a las 00:00, y la cola repetida entra UNA vez', async () => {
+  const D = (d, h, m = 0) => Date.UTC(2026, 10, d, h, m)
+  const lunes = '2026-11-16_Turno 1 Lunes'
+  const unschDom = '2026-11-15_Unscheduled'
+  const unschLun = '2026-11-16_Unscheduled'
+  const turno = intervals(D(16, 0), 87, 140)          // 00:00→07:15, 12.180 pz
+  const anticipado = intervals(D(15, 22, 10), 22, 180) // 22:10→00:00, 3.960 pz
+  const cola = intervals(D(16, 7, 15), 9, 110)         // 07:15→08:00, 990 pz
+  const padres = {
+    '2026-11-14_Turno 2': { shiftId: 'Turno 2', scheduledStart: iso(D(14, 7, 15)), scheduledEnd: iso(D(14, 15)), machines: [{ totalCycles: 4261 }] },
+    [lunes]: { shiftId: 'Turno 1 Lunes', scheduledStart: iso(D(16, 0)), scheduledEnd: iso(D(16, 7, 15)), machines: [{ totalCycles: 12180 }] },
+    // El `Unscheduled` del domingo llega hasta las 08:00 del lunes: trae el
+    // arranque Y la misma cola que también guarda el del lunes.
+    [unschDom]: { shiftId: 'Unscheduled', scheduledStart: iso(D(15, 6)), scheduledEnd: iso(D(16, 8)), machines: [{ totalCycles: 4950 }] },
+    [unschLun]: { shiftId: 'Unscheduled', scheduledStart: iso(D(16, 7, 15)), scheduledEnd: iso(D(17, 7, 15)), machines: [{ totalCycles: 990 }] },
+  }
+  const db = fakeShiftsDb(padres, {
+    [lunes]: [ev1(turno)],
+    [unschDom]: [ev1([...anticipado, ...cola])],
+    [unschLun]: [ev1(cola)],
+  })
+
+  const live = await buildMonitorLive(db, 'chonchi', lunes)
+
+  assert.equal(live.shiftPieces, 12180, 'lo que Shoplogix metió en el turno')
+  assert.equal(live.outsidePieces, 3960 + 990, 'arranque del domingo + cola del lunes, la cola una sola vez')
+  assert.equal(live.totalPieces, 12180 + 3960 + 990)
+  const antes = live.outsideRanges.filter(r => r.kind === 'antes')
+  const despues = live.outsideRanges.filter(r => r.kind === 'despues')
+  assert.equal(antes.length, 1)
+  assert.equal(antes[0].pieces, 3960)
+  assert.equal(fmtHHMM(antes[0].from), '22:10', 'el arranque real, del día anterior')
+  assert.equal(despues.length, 1)
+  assert.equal(despues[0].pieces, 990)
+
+  // Un lunes NORMAL (sin arranque anticipado) da lo mismo que antes de leer el
+  // domingo: la cola está en los dos docs y no puede sumarse dos veces.
+  // Tampoco el TIEMPO: el doc del domingo trae los states del día entero sin
+  // recortar (los del turno incluidos) y el del lunes los trae recortados a
+  // las 07:15 — el caso real del 09-nov, que inflaba el uptime 31 min.
+  const st = (ini, fin, type = 'uptime') => ({ startAt: iso(ini), endAt: iso(fin), durationSec: (fin - ini) / 1000, type, name: 'Produciendo' })
+  const statesDom = [st(D(16, 6, 30), D(16, 7, 13)), st(D(16, 7, 13), D(16, 7, 23)), st(D(16, 7, 23), D(16, 7, 45))]
+  const statesLun = [st(D(16, 7, 15), D(16, 7, 23)), st(D(16, 7, 23), D(16, 7, 45))]
+  const dbNormal = fakeShiftsDb(padres, {
+    [lunes]: [ev1(turno)],
+    [unschDom]: [{ ...ev1(cola), states: statesDom }],
+    [unschLun]: [{ ...ev1(cola), states: statesLun }],
+  })
+  const normal = await buildMonitorLive(dbNormal, 'chonchi', lunes)
+  assert.equal(normal.outsidePieces, 990)
+  assert.equal(normal.totalPieces, 12180 + 990)
+  // 3.600 s del turno + los 30 min de cola (07:15→07:45) que trae el doc del lunes.
+  assert.equal(normal.uptimeSec, 3600 + 30 * 60, 'el tiempo de la cola entra una sola vez')
+
+  // Con arranque anticipado, sus states (antes de las 00:00) sí vienen del domingo.
+  const dbAnticipado = fakeShiftsDb(padres, {
+    [lunes]: [ev1(turno)],
+    [unschDom]: [{ ...ev1([...anticipado, ...cola]), states: [st(D(15, 22, 10), D(15, 23, 58)), ...statesDom] }],
+    [unschLun]: [{ ...ev1(cola), states: statesLun }],
+  })
+  const conArranque = await buildMonitorLive(dbAnticipado, 'chonchi', lunes)
+  assert.equal(conArranque.uptimeSec, 3600 + 108 * 60 + 30 * 60, 'turno + arranque del domingo + cola, nada repetido')
+})
+
+test('el bloque sin turno EN CURSO llega al historial con el reloj de planta (no el UTC del servidor)', async () => {
+  const w = nowWall()
+  const d1 = dk(new Date(w.getTime() - 86_400_000))
+  const t2Ayer = `${d1}_Turno 2`
+  const unsch = `${dk(w)}_Unscheduled`
+  const hAyer = (h, m = 0) => new Date(Date.UTC(Number(d1.slice(0, 4)), Number(d1.slice(5, 7)) - 1, Number(d1.slice(8, 10)), h, m))
+  // Diez tramos de 5 min que terminan hace 2 min: la línea está corriendo.
+  const inicio = Math.floor((w.getTime() - 52 * 60_000) / 300_000) * 300_000
+  const corriendo = intervals(inicio, 10, 150)
+  const db = fakeShiftsDb(
+    {
+      [t2Ayer]: { shiftId: 'Turno 2', scheduledStart: hAyer(7, 15), scheduledEnd: hAyer(15), machines: [{ totalCycles: 4261 }] },
+      [unsch]: { shiftId: 'Unscheduled', scheduledStart: new Date(inicio), scheduledEnd: new Date(inicio + 50 * 60_000), lastSyncAt: new Date(), machines: [{ totalCycles: 1500 }] },
+    },
+    { [t2Ayer]: [ev1(intervals(hAyer(7, 15).getTime(), 93, 45))], [unsch]: [ev1(corriendo)] },
+  )
+
+  const hist = await buildMonitorHistory(db, 'chonchi', t2Ayer, [], null, { prev: {}, next: {} })
+  const sensor = hist.find(h => h.extraordinario)
+  assert.ok(sensor, 'el bloque en curso sale como turno del sensor')
+  assert.equal(sensor.live.totalPieces, 1500)
+  assert.equal(sensor.live.shiftClosed, false, 'y abierto: es lo que vuelve a encender el pulso de 1 min')
+})
+
+test('leer el Unscheduled de ayer no le regala al turno de hoy la cola del turno de anoche', async () => {
+  const D = (d, h, m = 0) => Date.UTC(2026, 10, d, h, m)
+  const noche = '2026-11-12_Turno 1'
+  const dia = '2026-11-13_Turno 2'
+  const unsch12 = '2026-11-12_Unscheduled'
+  // Cola del turno noche 05:00→05:50 (a 85 min del Turno 2 de las 07:15: dentro
+  // de la continuidad, así que solo la cercanía decide de quién es).
+  const cola = intervals(D(13, 5), 10, 60)
+  const padres = {
+    [noche]: { shiftId: 'Turno 1', scheduledStart: iso(D(12, 21, 15)), scheduledEnd: iso(D(13, 5)), machines: [{ totalCycles: 13766 }] },
+    [dia]: { shiftId: 'Turno 2', scheduledStart: iso(D(13, 7, 15)), scheduledEnd: iso(D(13, 15)), machines: [{ totalCycles: 8941 }] },
+    [unsch12]: { shiftId: 'Unscheduled', scheduledStart: iso(D(12, 6)), scheduledEnd: iso(D(13, 7, 15)), machines: [{ totalCycles: 600 }] },
+  }
+  const db = fakeShiftsDb(padres, {
+    [noche]: [ev1(intervals(D(12, 21, 15), 93, 148))],
+    [dia]: [ev1(intervals(D(13, 7, 15), 93, 96))],
+    [unsch12]: [ev1(cola)],
+  })
+
+  const liveDia = await buildMonitorLive(db, 'chonchi', dia)
+  assert.equal(liveDia.outsidePieces, 0, 'la cola de anoche es del turno de anoche')
+  assert.equal(liveDia.totalPieces, 93 * 96)
+
+  const liveNoche = await buildMonitorLive(db, 'chonchi', noche)
+  assert.equal(liveNoche.outsidePieces, 600, 'el turno noche conserva su cola')
+})
+
 const { ordenarSensorComoActual } = require('../publicMonitor')
 
 test('el turno del sensor posterior a un turno cerrado pasa a ser el ACTUAL; el de nombre baja a «1 atrás»', () => {
