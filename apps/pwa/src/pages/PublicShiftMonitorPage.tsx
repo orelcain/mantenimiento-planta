@@ -48,7 +48,7 @@ import { detalleCascada } from './monitor/cascadaDetalle'
 import { horaPlanta } from './monitor/horaPlanta'
 import { TarjetaCascada } from './monitor/CascadaTurnoCard'
 import { CascadaMetaV2 } from './monitor/CascadaMetaV2'
-import { cascadaPorMeta, minutosDelTurno, type CascadaArgs } from './monitor/cascadaPerilla'
+import { cascadaPorMeta, minutosDelTurno, ultimoMinutoConPiezas, type CascadaArgs } from './monitor/cascadaPerilla'
 import { detalleCascadaMeta } from './monitor/cascadaMetaDetalle'
 import { mediaMovil, ritmoAhoraCpm, ritmoAhoraAndando, repartoAhoraAndando, estadoRitmo, fraccionDeRegla, pedidoAndando, pedidoFueraDeAlcance, PASO_MIN, type TramoSerie } from '@/services/shoplogix/monitorRitmo'
 import { pinShiftEnd, unpinShiftEnd, setMonitorSetPoint, setShiftQuota, setPesoPromedio, eliminarRegistroPeso } from '@/services/shoplogix/pinShiftEnd'
@@ -105,7 +105,7 @@ import { BandaParadaV2, RitmoVivoAmpliado } from './monitor/RitmoVivoV2'
 import { armarEntradaRep, armarTope } from './monitor/reproduccionMinuto'
 import { ProveedorReproduccion } from './monitor/ProveedorReproduccion'
 import { CifraRepViva, FloteRepViva, HechasVivas, PaceVivo } from './monitor/HechasVivas'
-import { barrasDesdeMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
+import { barrasDesdeMs, finBarrasMs, horaDeLosDatos, minutoDeDatos, piezasMostradas } from './monitor/aEstaHora'
 import { lineaDetenida } from './monitor/lineaDetenida'
 import { adelanteAtras, paradasEnEje } from './monitor/ejeTurno'
 import { causaLegible, etiquetaMaquina, hayBandaParada, llenadoDelPanel, paradasDetalle, ritmoVivoDeMonitor, unidadDeMaquinas, vaciosTurnoDe, varaEnMinuto } from './monitor/ritmoVivo'
@@ -6092,11 +6092,14 @@ function MonitorDelToken() {
   /* La cascada a la meta de Shoplogix con la perilla (Fase B): por Baader y la línea. Misma serie por minuto que las barras
      y mismas detenciones del turno (solo tramos cerrados, como la cascada de arriba). `cascadaPerilla` calcula; la card muestra. */
   const cascadaMeta = (() => {
+    /* Un turno que Shoplogix no configuró (lo marcó el sensor) no tiene meta: la cascada «a la meta» la inventaría
+       (Chonchi 15-11: «33.482 pz bajo la meta» para un arranque de 70 min). Regla de Orel: sin meta puesta, no hay meta. */
+    if (vista?.extraordinario) return null
     const s = serieMinutoVista
     if (!s?.maquinas?.length) return null
     /* El tiempo del turno no sigue el reloj: la serie puede traer minutos de después del cierre (15:37 con cierre a las 15:00). */
     const largo = Math.min(...s.maquinas.map((m) => m.cycles.length))
-    const n = minutosDelTurno({ desde: s.desde, largo, plannedEnd: live.plannedEnd, effectiveEnd: live.effectiveEnd, shiftClosed: live.shiftClosed })
+    const n = minutosDelTurno({ desde: s.desde, largo, plannedEnd: live.plannedEnd, effectiveEnd: live.effectiveEnd, shiftClosed: live.shiftClosed, ultimoConPiezas: ultimoMinutoConPiezas(s.maquinas, largo) })
     if (!(n > 1) || !Number.isFinite(Date.parse(s.desde))) return null
     const nombrePorId = new Map(live.machines.map((m) => [m.id, m.name]))
     const args: CascadaArgs = {
@@ -6225,9 +6228,7 @@ function MonitorDelToken() {
        dos tarjetas más arriba — dos «ahora» distintos en la misma
        pantalla, la clase de contradicción que este monitor viene
        cerrando. */
-    const fin = live.shiftClosed && Number.isFinite(finSched)
-      ? finSched + 30 * 60_000
-      : t0 + largo * 60_000
+    const fin = finBarrasMs({ t0, largo, cerrado: !!live.shiftClosed, finPrevistoMs: finSched, finRealMs: Date.parse(live.effectiveEnd ?? '') })
     /* Sin solape real, la serie es de otro turno: a las curvas. */
     const desdeIdx = Math.max(0, Math.round((ini - t0) / 60_000))
     const hastaIdx = Math.min(largo, Math.round((fin - t0) / 60_000))
@@ -6474,7 +6475,11 @@ function MonitorDelToken() {
 
   /* El horario de la barra («21:30 → 04:50»): el previsto en curso, el real cerrado. La hora de la última lectura del contador
      de Shoplogix (`corteHoraV2`) va con él en la barra: todas las cifras de «El turno» salen de esa lectura. */
-  const rangoBarra = `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`
+  /* Sin cierre publicado y en curso (bloque sin turno en Shoplogix), no hay hora de término que mostrar: «desde … · en curso». */
+  const sinCierre = !live.shiftClosed && !live.plannedEnd
+  const rangoBarra = sinCierre
+    ? `desde ${fmtWallTime(inicioReal)} · en curso`
+    : `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`
   const corteHoraV2 = !live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null
 
   /* Modo TV (`?pantalla=1`) sobre el v2: una pantalla fija de 1920×1080 con las MISMAS cifras que recibe `MonitorV2`
@@ -6496,7 +6501,7 @@ function MonitorDelToken() {
     const techoTv = live.machines.length > 0 && live.machines.every((m) => (m.targetCpm ?? 0) > 0) ? live.machines.reduce((a, m) => a + (varaTv(m) ?? 0), 0) : null
     const ritmo15Tv = turnoCerrado ? promedioTv : (duro15?.cpm ?? pvTv?.cpm ?? null)
     const cuotaTv = comparacion.optimalAtCurrentMinute
-    const metaTv = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
+    const metaTv = metaLink ?? live.quotaPieces ?? pace?.targetPieces ?? null
     const detenidasDesde = live.machines
       .filter((m) => m.status !== 'produciendo' && m.currentSinceAt)
       .map((m) => m.currentSinceAt as string)
@@ -6517,7 +6522,7 @@ function MonitorDelToken() {
         tope={repro?.tope ?? null}
         optimal={comparacion.optimal ?? null}
         primeraPiezaMs={serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null}
-        meta={data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null}
+        meta={metaLink ?? live.quotaPieces ?? pace?.targetPieces ?? null}
         mostradas={hechasMostradas}
         cerrado={turnoCerrado}
       >
@@ -6569,7 +6574,7 @@ function MonitorDelToken() {
       tope={repro?.tope ?? null}
       optimal={comparacion.optimal ?? null}
       primeraPiezaMs={serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null}
-      meta={data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null}
+      meta={metaLink ?? live.quotaPieces ?? pace?.targetPieces ?? null}
       mostradas={hechasMostradas}
       cerrado={turnoCerrado}
     >
@@ -6687,7 +6692,7 @@ function MonitorDelToken() {
               {fmtDateLong(vista?.dateKey || data.dateKey)}
               {(() => {
                 /* El fin del turno: el previsto si está en curso, el real si cerró. */
-                const finIso = live.shiftClosed ? live.scheduledEnd : (live.plannedEnd ?? live.scheduledEnd)
+                const finIso = live.shiftClosed ? live.scheduledEnd : live.plannedEnd
                 if (!finIso || !inicioReal) return null
                 const ini = new Date(inicioReal)
                 const fin = new Date(finIso)
@@ -6724,6 +6729,10 @@ function MonitorDelToken() {
                   </span>
                 )}
               </span>
+            ) : sinCierre ? (
+              /* En curso y sin hora de término (bloque sin turno en Shoplogix):
+                 el último dato sincronizado NO es un cierre. */
+              <span className="tabular-nums">desde {fmtWallTime(inicioReal)} · en curso</span>
             ) : (
               /* Cerrado, el rango es el REAL (hasta la última pieza), no el
                  programado: «07:15–15:10» es lo que de verdad pasó. */
@@ -6969,7 +6978,7 @@ function MonitorDelToken() {
              el 27-10 a las 15:20 la banda pedía «hay que anotar la causa» de un turno que cerró a las 15:00. */
           const finTurnoMs = live.plannedEnd ? Date.parse(live.plannedEnd) : NaN
           const turnoTerminadoV2 = turnoCerrado || (Number.isFinite(finTurnoMs) && ahoraWallMs >= finTurnoMs)
-          const meta = data.targetPieces ?? live.quotaPieces ?? pace?.targetPieces ?? null
+          const meta = metaLink ?? live.quotaPieces ?? pace?.targetPieces ?? null
           const pm = live.mantencion?.porMaquina ?? []
           const fallas = pm.reduce((a, x) => a + x.eventosFalla, 0)
           const fallaMin = pm.reduce((a, x) => a + x.fallaMin, 0)
@@ -6989,6 +6998,7 @@ function MonitorDelToken() {
                 finMs: finEjeMs,
                 /* Turno cerrado: el fin REAL, el mismo `live.effectiveEnd` de la cabecera («Turno terminado 04:50»). */
                 finRealMs: live.effectiveEnd ? Date.parse(live.effectiveEnd) : null,
+                sinCierre,
                 minuto: barrasMinuto,
                 perillas: live.perillas ?? null,
                 primeraPiezaMs,
@@ -7196,7 +7206,7 @@ function MonitorDelToken() {
                   proximaParada,
                   notas: notasDeOperador,
                   cerrado: turnoCerrado,
-                  meta: data.targetPieces ?? live.quotaPieces ?? null,
+                  meta: metaLink ?? live.quotaPieces ?? null,
                   /* «Hechas» = las piezas mostradas en reposo (la base de «A esta hora» de toda la vista): en el v2 no puede
                      haber dos cifras de piezas ni dos restas contra la cuota. */
                   hechas: hechasMostradas,
@@ -7257,7 +7267,7 @@ function MonitorDelToken() {
               «faltan…» del turno vivo habla en futuro y acá ya no hay futuro
               del que hablar. «Faltaron», no «faltan» (pedido de Orel, 26-08). */}
           {turnoCerrado && (() => {
-            const meta = data.targetPieces ?? live.quotaPieces
+            const meta = metaLink ?? live.quotaPieces
             if (meta == null || meta <= 0) return null
             const pct = Math.round((live.totalPieces / meta) * 100)
             return (
@@ -7740,7 +7750,7 @@ function MonitorDelToken() {
           <TarjetaTablero id="pronostico" t={tablero}>
             <PronosticoCierre
               f={pronostico}
-              meta={data.targetPieces ?? live.quotaPieces ?? null}
+              meta={metaLink ?? live.quotaPieces ?? null}
               horizonte={horizontePronostico}
             />
           </TarjetaTablero>
@@ -7759,7 +7769,7 @@ function MonitorDelToken() {
                    turno se usa el horario declarado; en curso, el previsto. */
                 const iso = live.shiftClosed
                   ? (live.scheduledEnd ?? live.plannedEnd)
-                  : (live.plannedEnd ?? live.scheduledEnd)
+                  : sinCierre ? null : (live.plannedEnd ?? live.scheduledEnd)
                 const ms = iso ? Date.parse(iso) : NaN
                 return Number.isNaN(ms) ? null : ms
               })()}
@@ -7822,7 +7832,7 @@ function MonitorDelToken() {
                  comparador, aplanada en colacion) - contra la meta completa,
                  el "ritmo" absorberia lo que aun no se juega. */
               cerrado={turnoCerrado}
-              meta={data.targetPieces ?? live.quotaPieces ?? null}
+              meta={metaLink ?? live.quotaPieces ?? null}
               /* La MISMA base que el v2 (`hechasMostradas`, en la hora de los datos) y la misma cuota en esa hora: con
                  `live.totalPieces` (el corte del doc) y la cuota del fin del tramo, la app tenía dos «A esta hora». */
               hechas={hechasMostradas}
@@ -7937,7 +7947,7 @@ function MonitorDelToken() {
               pareto queda demasiado angosto para leer sus barras. */}
           <div className="space-y-3 lg:columns-2 lg:gap-3 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
         {glass === 'v2' && (() => {
-          const meta = data.targetPieces ?? live.quotaPieces ?? null
+          const meta = metaLink ?? live.quotaPieces ?? null
           const ini = live.scheduledStart ? Date.parse(live.scheduledStart) : NaN
           const fin = Date.parse(live.plannedEnd ?? live.scheduledEnd ?? '')
           const horasTurno = !Number.isNaN(ini) && !Number.isNaN(fin) && fin > ini ? (fin - ini) / 3_600_000 : null

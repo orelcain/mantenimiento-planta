@@ -1197,3 +1197,11 @@ describe('GloboMicro · variante del celular (una columna) y marcas', () => {
   })
 
 })
+
+describe('GraficoRitmoVivo · bloque sin turno en Shoplogix (Chonchi 15-11)', () => {
+  it('sin hora de término dice desde cuándo corre y que sigue, sin un cierre inventado', () => {
+    render(<GraficoRitmoVivo p={p} e={{ ...eje, sinCierre: true }} reloj={reloj} />)
+    expect(screen.getByText('desde 21:30 · en curso')).toBeTruthy()
+    expect(screen.queryByText('21:30 → 05:00')).toBeNull()
+  })
+})

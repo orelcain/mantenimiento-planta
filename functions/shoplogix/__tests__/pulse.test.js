@@ -266,3 +266,105 @@ test('el techo físico sigue callando a la reconciliación (fix 60-69 intacto)',
   q = componerPulso(q, lect(1, 500), 56)
   assert.strictEqual(q.lecturas.length, 1, 'el absurdo genérico sigue cortando')
 })
+
+// ── Bloque sin turno con nombre (Chonchi 15-11-2026) ────────────────────────
+
+/** Buckets de 1 min desde `desde` (wall, 'YYYY-MM-DDTHH:MM'), `n` minutos, piezas por minuto con `fn(i)`. */
+const tramo = (desde, n, fn, { shift = 'Unscheduled', rate = 19 } = {}) => {
+  const t0 = Date.parse(`${desde}:00Z`)
+  return Array.from({ length: n }, (_, i) => {
+    const iso = new Date(t0 + i * 60_000).toISOString()
+    const s = `${iso.slice(0, 4)}${iso.slice(5, 7)}${iso.slice(8, 10)}T${iso.slice(11, 13)}${iso.slice(14, 16)}00.000`
+    return { cycles: fn(i), expectedCycles: rate, totalDuration: 60_000, start: s, end: s.replace('00.000', '59.999'), rate, shift }
+  })
+}
+
+test('sin turno con nombre, el pulso cuenta SOLO el bloque en curso (12 h de ceros + 70 min)', () => {
+  // La ventana de ~12 h: 10:10→22:09 en cero (Unscheduled) y el bloque 22:10→23:19.
+  const maquina = (id, rate, pz) => ({
+    machineId: id,
+    machineProduction: [
+      ...tramo('2026-11-15T10:10', 720, () => 0, { rate }),
+      ...tramo('2026-11-15T22:10', 70, () => pz, { rate }),
+    ],
+  })
+  const l = lecturaDesdeProduccion({ machines: [maquina('ev1', 19, 12), maquina('ev2', 16, 10)] })
+  assert.strictEqual(l.totalCycles, 70 * 12 + 70 * 10)
+  assert.deepStrictEqual(l.porMaquina, { ev1: 70 * 12, ev2: 70 * 10 })
+  const s = l.duro.serieMinuto
+  assert.ok(s.desde.endsWith('T22:10:00.000Z'), `la serie parte en el arranque, no 12 h atrás (${s.desde})`)
+  assert.strictEqual(s.maquinas[0].cycles.length, 70, 'minutos del bloque, no 790')
+  // La serie, el total y el reparto por máquina cuentan lo mismo.
+  const sumaSerie = s.maquinas.reduce((a, m) => a + m.cycles.reduce((x, y) => x + y, 0), 0)
+  assert.strictEqual(sumaSerie, l.totalCycles)
+})
+
+test('sin turno, un bloque anterior separado por más de 90 min no se suma', () => {
+  const l = lecturaDesdeProduccion({ machines: [{
+    machineId: 'ev1',
+    machineProduction: [
+      ...tramo('2026-11-15T12:00', 60, () => 15),   // bloque viejo
+      ...tramo('2026-11-15T13:00', 180, () => 0),   // 3 h quieta
+      ...tramo('2026-11-15T16:00', 30, () => 8),    // bloque en curso
+    ],
+  }] })
+  assert.strictEqual(l.totalCycles, 30 * 8)
+  assert.ok(l.duro.serieMinuto.desde.endsWith('T16:00:00.000Z'))
+})
+
+test('sin turno, una detención de 60 min DENTRO del bloque no lo parte (continuidad de 90 min)', () => {
+  const l = lecturaDesdeProduccion({ machines: [{
+    machineId: 'ev1',
+    machineProduction: [
+      ...tramo('2026-11-15T22:10', 30, () => 10),
+      ...tramo('2026-11-15T22:40', 60, () => 0),
+      ...tramo('2026-11-15T23:40', 20, () => 10),
+    ],
+  }] })
+  assert.strictEqual(l.totalCycles, 50 * 10)
+  assert.ok(l.duro.serieMinuto.desde.endsWith('T22:10:00.000Z'))
+  assert.strictEqual(l.duro.serieMinuto.maquinas[0].cycles.length, 110)
+})
+
+test('un turno con nombre que terminó 3 h antes NO se lleva el bloque sin turno de ahora', () => {
+  const l = lecturaDesdeProduccion({ machines: [{
+    machineId: 'ev1',
+    machineProduction: [
+      ...tramo('2026-11-15T13:00', 120, () => 15, { shift: 'Turno 2' }),
+      ...tramo('2026-11-15T15:00', 180, () => 0),
+      ...tramo('2026-11-15T18:00', 40, () => 9),
+    ],
+  }] })
+  assert.strictEqual(l.totalCycles, 40 * 9, 'solo el bloque en curso')
+  assert.ok(l.duro.serieMinuto.desde.endsWith('T18:00:00.000Z'))
+})
+
+test('hora extra AL FINAL: el turno con nombre suma todo el Unscheduled pegado, sin tope', () => {
+  // Turno 1 hasta las 07:15 y 2 h 30 de hora extra seguidas: todo cuenta.
+  const l = lecturaDesdeProduccion({ machines: [{
+    machineId: 'ev1',
+    machineProduction: [
+      ...tramo('2026-11-16T00:00', 435, () => 10, { shift: 'Turno 1 Lunes' }),
+      ...tramo('2026-11-16T07:15', 150, () => 7),
+    ],
+  }] })
+  assert.strictEqual(l.totalCycles, 435 * 10 + 150 * 7)
+  const s = l.duro.serieMinuto
+  assert.ok(s.desde.endsWith('T00:00:00.000Z'))
+  assert.strictEqual(s.maquinas[0].cycles.length, 585, 'las barras siguen en la hora extra')
+  assert.strictEqual(s.maquinas[0].cycles.reduce((a, b) => a + b, 0), l.totalCycles)
+})
+
+test('con turno con nombre, el arranque Unscheduled ANTERIOR no entra al pulso (lo suma #324 aparte: una sola vez)', () => {
+  // Chonchi 15→16-11: 22:10→23:59 sin turno y luego «Turno 1 Lunes» desde las 00:00.
+  const l = lecturaDesdeProduccion({ machines: [{
+    machineId: 'ev1',
+    machineProduction: [
+      ...tramo('2026-11-15T22:10', 110, () => 12),
+      ...tramo('2026-11-16T00:00', 30, () => 10, { shift: 'Turno 1 Lunes' }),
+    ],
+  }] })
+  assert.strictEqual(l.totalCycles, 30 * 10, 'solo desde el primer bucket del turno con nombre')
+  assert.deepStrictEqual(l.porMaquina, { ev1: 300 })
+  assert.ok(l.duro.serieMinuto.desde.endsWith('T00:00:00.000Z'))
+})

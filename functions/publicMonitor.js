@@ -1960,12 +1960,25 @@ async function buildMonitorLive(db, plantSlug, shiftDocId, index = null, fuente 
    */
   const oficialFin = cierreOficialCoherente(parent, scheduledStart)
 
+  /*
+   * Un bloque SIN turno en Shoplogix (el que marcó el sensor, o el cajón
+   * `Unscheduled`) no tiene cierre que estimar. Chonchi 15-11-2026: Eviscerado
+   * partió 22:10 sin turno y el monitor anunció «22:10 → 05:43» por la duración
+   * típica de la línea. Orel: «no debería dejar de contar a esa hora sino hasta
+   * que deje de contar el turno, porque a veces se hacen horas extra». Sin
+   * horario oficial ni uno fijado a mano, `plannedEnd` queda null y la pantalla
+   * dice desde cuándo corre y que sigue en curso.
+   */
+  const sinHorario = fuente != null || /unscheduled/i.test(String(shiftDocId))
+
   if (oficialFin) {
     plannedEnd = oficialFin
     plannedEndSource = 'shoplogix'
   } else if (cfg.plannedEnd && cfg.endPinned) {
     plannedEnd = cfg.plannedEnd
     plannedEndSource = 'fijado'
+  } else if (sinHorario) {
+    // Nada que estimar: ver arriba.
   } else {
     if (inferido) {
       plannedEnd = inferido.end

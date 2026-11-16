@@ -289,9 +289,14 @@ function calcularTodo(args: CascadaArgs): Calculo[] {
 const tieneMeta = (c: Calculo): boolean => c.meta > 0
 
 /**
- * Los minutos del turno que cuenta la cascada: el largo de la serie, cortado en el fin del turno. El fin es el menor entre
- * `plannedEnd` y, con el turno cerrado, `effectiveEnd`. Sin ningún fin conocido, vale el largo de la serie. Solo cuentan los
- * minutos completos antes del fin: así el tiempo del turno no sigue el reloj cuando la serie ya trae minutos de después del cierre.
+ * Los minutos del turno que cuenta la cascada: el largo de la serie, cortado en el fin del turno. Solo cuentan los minutos
+ * completos antes del fin.
+ * - Con el turno cerrado, el fin REAL (`effectiveEnd`, la última pieza CON la hora extra) corta siempre.
+ * - `plannedEnd` corta solo la cola SIN piezas: pasado el previsto, cuentan los minutos hasta la última pieza
+ *   (`ultimoConPiezas`, en minutos desde `desde`). Así la hora extra entra entera (Orel, 15-11: «debe contarlas todas»)
+ *   y los minutos en cero entre la última pieza y el sellado del turno no se cuentan como «podía» (15:37 con cierre a
+ *   las 15:00). Sin `ultimoConPiezas`, `plannedEnd` corta como antes.
+ * Sin ningún fin conocido, vale el largo de la serie.
  */
 export function minutosDelTurno(args: {
   desde: string
@@ -299,13 +304,29 @@ export function minutosDelTurno(args: {
   plannedEnd?: string | null
   effectiveEnd?: string | null
   shiftClosed?: boolean
+  ultimoConPiezas?: number | null
 }): number {
   const t0 = Date.parse(args.desde)
-  const fines = [args.plannedEnd, args.shiftClosed ? args.effectiveEnd : null]
-    .map((x) => (x ? Date.parse(x) : NaN))
-    .filter((ms) => Number.isFinite(ms))
-  if (!fines.length || !Number.isFinite(t0)) return args.largo
-  return Math.max(0, Math.min(args.largo, Math.floor((Math.min(...fines) - t0) / MS_MINUTO)))
+  if (!Number.isFinite(t0)) return args.largo
+  const enMin = (iso: string | null | undefined) => {
+    const ms = iso ? Date.parse(iso) : NaN
+    return Number.isFinite(ms) ? Math.floor((ms - t0) / MS_MINUTO) : null
+  }
+  let n = args.largo
+  const real = args.shiftClosed ? enMin(args.effectiveEnd) : null
+  if (real != null) n = Math.min(n, real)
+  const previsto = enMin(args.plannedEnd)
+  if (previsto != null && n > previsto) {
+    const ultimo = args.ultimoConPiezas
+    n = Math.max(previsto, Math.min(n, ultimo != null && Number.isFinite(ultimo) ? ultimo : previsto))
+  }
+  return Math.max(0, n)
+}
+
+/** Minutos desde el inicio de la serie hasta el último minuto con piezas de alguna máquina (exclusivo). 0 sin piezas. */
+export function ultimoMinutoConPiezas(maquinas: ReadonlyArray<{ cycles: readonly number[] }>, largo: number): number {
+  for (let i = largo - 1; i >= 0; i--) if (maquinas.some((m) => (m.cycles[i] ?? 0) > 0)) return i + 1
+  return 0
 }
 
 const sumar = (lista: Calculo[], k: keyof Calculo) => lista.reduce((a, c) => a + (c[k] as number), 0)

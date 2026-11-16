@@ -1812,3 +1812,77 @@ describe('shiftStats: gracia de imputaciones tardías', () => {
     assert.ok(t.hu)
   })
 })
+
+// ── Bloque sin turno: sin cierre inventado (Chonchi 15-11-2026) ─────────────
+
+{
+  /* Cinco turnos de ~7 h 30: con ellos `inferShiftEndFromDuration` estima un
+     cierre para cualquier arranque. Es lo que dio «22:10 → 05:43». */
+  const historial = ['10', '11', '12', '13', '14'].map((d) => ({
+    id: `2026-11-${d}_Turno 1`,
+    data: {
+      effectiveStart: new Date(`2026-11-${d}T00:00:00Z`),
+      effectiveEnd: new Date(`2026-11-${d}T07:33:00Z`),
+      machines: [{ totalCycles: 20_000 }],
+    },
+  }))
+  const index = { entries: historial, byId: new Map(historial.map((e) => [e.id, e.data])) }
+  const maquinaBloque = (startMs, n) => ({
+    machineid: 'ev1', machineName: 'Ev 1', machineType: 'baader_142',
+    totalCycles: n * 60, expectedTotalCycles: 0,
+    shiftRuntimeBreakdown: { uptimeSec: n * 300, downtimeSec: 0, breakSec: 0 },
+    intervals: intervals(startMs, n, 60),
+    states: [{ startAt: iso(startMs), endAt: iso(startMs + n * 300_000), durationSec: n * 300, type: 'uptime', name: 'Produciendo', reason: '', isCurrent: true }],
+  })
+
+  test('un bloque del sensor (sin turno en Shoplogix) NO publica un cierre estimado', async () => {
+    const ahora = nowWall().getTime()
+    const start = ahora - 70 * 60_000
+    const fin = ahora - 3 * 60_000
+    const parent = { shiftId: 'Unscheduled@22:10', scheduledStart: iso(start), scheduledEnd: iso(fin), effectiveStart: iso(start), effectiveEnd: iso(fin), lastSyncAt: new Date() }
+    const live = await buildMonitorLive(fakeDb({ parent: null, machines: [] }), 'test', '2026-11-15_Unscheduled@22:10', index,
+      { parent, machines: [maquinaBloque(start, 13)] })
+    assert.equal(live.plannedEnd, null, 'sin horario oficial no hay hora de término')
+    assert.equal(live.plannedEndSource, null)
+    assert.equal(live.shiftClosed, false, 'sigue en curso')
+    assert.equal(live.totalPieces, 13 * 60)
+  })
+
+  test('un turno CON nombre y sin horario oficial conserva su cierre estimado por duración', async () => {
+    const ahora = nowWall().getTime()
+    const start = ahora - 70 * 60_000
+    const live = await buildMonitorLive(
+      fakeDb({ parent: { scheduledStart: iso(start), scheduledEnd: iso(ahora - 3 * 60_000), lastSyncAt: new Date() }, machines: [maquinaBloque(start, 13)] }),
+      'test', '2026-11-16_Turno Nuevo', index,
+    )
+    assert.equal(live.plannedEndSource, 'duracion')
+    assert.ok(live.plannedEnd)
+  })
+}
+
+test('hora extra al inicio Y al final: total, serie de 5 min y por máquina cuentan TODO, nada se corta en el horario', async () => {
+  const inicio = Date.UTC(2026, 7, 10, 8, 0)
+  const fin = Date.UTC(2026, 7, 10, 15, 30)
+  const turnoId = '2026-08-10_Turno Dia'
+  const unschId = '2026-08-10_Unscheduled'
+  // Arranque 60 min antes (12 tramos) y 2 h 30 de hora extra después (30 tramos), en el cajón Unscheduled.
+  const antes = maq(1200, inicio - 60 * 60_000, 12)
+  const despues = maq(1500, fin, 30)
+  const db = fakeShiftsDb(
+    {
+      [turnoId]: { shiftId: 'Turno Dia', scheduledStart: iso(inicio), scheduledEnd: iso(fin), machines: [{ totalCycles: 4500 }] },
+      [unschId]: { shiftId: 'Unscheduled', scheduledStart: iso(Date.UTC(2026, 7, 10, 6, 0)), scheduledEnd: iso(Date.UTC(2026, 7, 10, 19, 0)), machines: [{ totalCycles: 2700 }] },
+    },
+    {
+      [turnoId]: [maq(4500, inicio, 90)],
+      [unschId]: [{ ...antes, intervals: [...antes.intervals, ...despues.intervals], totalCycles: 2700 }],
+    },
+  )
+  const live = await buildMonitorLive(db, 'filete', turnoId)
+  assert.equal(live.totalPieces, 1200 + 4500 + 1500)
+  const sumaSerie = live.series.reduce((a, p) => a + (p.pieces || 0), 0)
+  assert.equal(sumaSerie, live.totalPieces, 'la serie de 5 min (de donde sale «hora por hora») llega a la hora extra')
+  assert.equal(live.machines.reduce((a, m) => a + (m.pieces || 0), 0), live.totalPieces, 'por máquina también')
+  assert.equal(Date.parse(live.effectiveEnd), fin + 150 * 60_000, 'el fin real es la última pieza de la hora extra')
+  assert.equal(Date.parse(live.effectiveStart), inicio - 60 * 60_000, 'y el inicio real, la primera del arranque')
+})
