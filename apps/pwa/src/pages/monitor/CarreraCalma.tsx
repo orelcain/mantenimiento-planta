@@ -202,6 +202,10 @@ export function CarreraCalma({ d, lados, nombres, inicioMs, cel }: CarreraCalmaP
             <rect width="5" height="5" className="dc-pat-fondo" />
             <rect width="2.4" height="5" fill="var(--v2-mant)" />
           </pattern>
+          {/* La ventaja proyectada al cierre puede pasar la escala de la franja (−8.850 contra ±2.000): se corta en su borde. */}
+          <clipPath id="dc-franja-recorte">
+            <rect x={x0} y={w0} width={Math.max(0, x1 - x0)} height={Math.max(0, w1 - w0)} />
+          </clipPath>
         </defs>
 
         {/* Rejilla por hora y colación (la única banda de alto completo) */}
@@ -317,7 +321,7 @@ export function CarreraCalma({ d, lados, nombres, inicioMs, cel }: CarreraCalmaP
             {m.presentes.every((e) => m.curvas[e]!.proyectado || !m.curvas[e]!.enCurso) && m.curvas.cardenas && m.curvas.rebolledo && m.xMax > m.AH && (
               <path
                 d={`M${xAhora.toFixed(1)} ${YW(firmada(m.AH)).toFixed(1)}L${X(Math.max(m.curvas.cardenas.xFin, m.curvas.rebolledo.xFin)).toFixed(1)} ${YW(m.curvas.cardenas.yFin - m.curvas.rebolledo.yFin).toFixed(1)}` /* decimal-tecnico: coordenada SVG */}
-                fill="none" className="dc-proy" strokeWidth={1.5} strokeDasharray="4 4"
+                fill="none" className="dc-proy" strokeWidth={1.5} strokeDasharray="4 4" clipPath="url(#dc-franja-recorte)"
               />
             )}
             <text x={x0 + 4} y={w0 + fs - 1} className="dc-tc" fontSize={sm} fontWeight={700}>▲ {nom('cardenas')} adelante</text>
