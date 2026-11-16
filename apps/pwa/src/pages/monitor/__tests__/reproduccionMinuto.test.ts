@@ -260,13 +260,13 @@ describe('la cola: llegadas a ráfagas, en orden y sin saltarse ningún minuto',
     expect(revisaCuadreAlCierre(pasos)).toBe(6)
   })
 
-  it('3 minutos seguidos de golpe: «poniéndose al día» (×1,12 y luego ×1,25 si hace falta), sin saltar nada, y vuelve a ×1', () => {
-    const { pasos, est } = simular({ inicial: 8, llegadas: [3, 3, 0, 0, 0, 0, 0, 0, 0, 0] })
+  it('2 y 2 minutos seguidos de golpe: «poniéndose al día» (×1,12), sin saltar nada, y vuelve a ×1', () => {
+    const { pasos, est } = simular({ inicial: 8, llegadas: [2, 2, 0, 0, 0, 0, 0, 0, 0, 0] })
     revisaContinuidad(pasos)
     expect(est.saltos).toBe(0)
     const pon = pasos.filter((p) => p.c.estado === 'poniendose')
     expect(pon.length).toBeGreaterThan(0)
-    expect(Math.max(...pasos.map((p) => p.c.factor))).toBeGreaterThan(1.12)
+    expect(Math.max(...pasos.map((p) => p.c.factor))).toBeGreaterThan(1)
     expect(Math.max(...pasos.map((p) => p.c.factor))).toBeLessThanOrEqual(1.25)
     /* mientras corre más rápido el atraso baja; y cuando llega a 186 s el factor vuelve a ×1 */
     const trasPico = pasos.slice(pasos.findIndex((p) => p.c.estado === 'poniendose'))
@@ -274,7 +274,8 @@ describe('la cola: llegadas a ráfagas, en orden y sin saltarse ningún minuto',
     expect(vueltaA1).toBeDefined()
     expect(vueltaA1!.c.atrasoS).toBeLessThanOrEqual(186)
     expect(vueltaA1!.c.factor).toBe(1)
-    expect(revisaCuadreAlCierre(pasos)).toBeGreaterThanOrEqual(7)
+    /* 4 minutos nuevos: cada uno cuadra al cerrar (los 2 de golpe y los 2 siguientes, más el de partida). */
+    expect(revisaCuadreAlCierre(pasos)).toBeGreaterThanOrEqual(5)
   })
 
   it('el factor no tiene escalones: ×1 hasta 186 s, ×1,12 desde ~198 s, ×1,25 desde ~252 s, continuo y creciente', () => {
@@ -297,7 +298,18 @@ describe('la cola: llegadas a ráfagas, en orden y sin saltarse ningún minuto',
     }
   })
 
-  it('hueco de 9 minutos sin pulsos: la cola se vacía y se congela; al volver, atraso > 8 min = salto al total «último − 2»', () => {
+  it('Eviscerado 15-11: ninguna llegada deja el reloj más de 4 min atrás del último minuto cerrado (era 6:00)', () => {
+    /* Ráfagas de 3 y un hueco de 5: con el umbral viejo (8 min) el atraso llegaba a 5–6 min y se arrastraba ~20 min. */
+    const { pasos, est } = simular({ inicial: 8, llegadas: [3, 3, 3, 0, 0, 0, 0, 5, 1, 1], extraS: 60 })
+    expect(Math.max(...pasos.map((p) => p.c.atrasoS))).toBeLessThanOrEqual(ATRASO_SALTO_S)
+    expect(ATRASO_SALTO_S).toBeLessThanOrEqual(240)
+    expect(est.saltos).toBeGreaterThan(0)
+    /* El salto deja el reloj en «último − 2», nunca más adelante que el último minuto cerrado. */
+    const tras = pasos.find((p) => p.ms === 480_000)!
+    expect(tras.c.atrasoS).toBe(COLA_INICIAL_MIN * 60)
+  })
+
+  it('hueco de 9 minutos sin pulsos: la cola se vacía y se congela; al volver, atraso > 4 min = salto al total «último − 2»', () => {
     const { pasos, est } = simular({ inicial: 5, llegadas: [0, 0, 0, 0, 0, 0, 0, 0, 0, 9], extraS: 30 })
     expect(est.saltos).toBe(1)
     expect(est.cerrados).toBe(14)
@@ -309,12 +321,17 @@ describe('la cola: llegadas a ráfagas, en orden y sin saltarse ningún minuto',
     expect(540).toBeGreaterThan(ATRASO_SALTO_S)
   })
 
-  it('un hueco de 5 minutos (atraso 300 s, menos de 8 min) NO salta: se pone al día a ×1,25', () => {
+  it('un hueco de 5 minutos (atraso 300 s, más de 4 min) salta a «último − 2» en vez de arrastrarse a ×1,25', () => {
     const { pasos, est } = simular({ inicial: 5, llegadas: [0, 0, 0, 0, 5], extraS: 120 })
+    expect(est.saltos).toBe(1)
+    const justo = pasos.find((p) => p.ms === 300_000)!
+    expect(justo.c.atrasoS).toBe(COLA_INICIAL_MIN * 60)
+  })
+
+  it('un hueco de 3 minutos (atraso 4 min justos) NO salta: se pone al día sin saltar nada', () => {
+    const { pasos, est } = simular({ inicial: 5, llegadas: [0, 0, 3], extraS: 120 })
     expect(est.saltos).toBe(0)
     revisaContinuidad(pasos)
-    const tras = pasos.filter((p) => p.ms >= 300_000 && p.ms <= 305_000)
-    expect(Math.max(...tras.map((p) => p.c.factor))).toBe(1.25)
   })
 
   it('el contador baja (reconciliación de Shoplogix): salta, no anima hacia atrás', () => {
