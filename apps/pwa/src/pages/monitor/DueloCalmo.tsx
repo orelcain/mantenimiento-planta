@@ -136,7 +136,7 @@ export function DueloCalmo(p: DueloPCProps) {
           {filas.length > 0 ? (
             <>
               {frase && <p className="dc-frase">{frase}</p>}
-              <FilasPuntos filas={filas} nombres={nombres} />
+              <FilasPuntos filas={filas} nombres={nombres} cel={modo === 'cel'} />
             </>
           ) : (
             <p className="dc-nota">{textoSinRival(d, nom)}</p>
@@ -231,17 +231,58 @@ function MarcadorDuelo({ d, nombres, m, tendencia }: { d: DatosDuelo; nombres: N
 
 // ── Una fila por cada indicador que da punto ─────────────────────────────────
 
-function FilasPuntos({ filas, nombres }: { filas: FilaPunto[]; nombres: NombresEquipos }) {
+function FilasPuntos({ filas, nombres, cel }: { filas: FilaPunto[]; nombres: NombresEquipos; cel: boolean }) {
   const nom = (e: EquipoId) => nombreCorto(e, nombres)
   const celda = (f: FilaPunto, l: Lado) => {
     const v = l === 'c' ? f.c : f.r
+    const total = l === 'c' ? f.totalC : f.totalR
     const gana = f.gana === l
     return (
       <span className="dc-v dc-num" data-gana={gana ? '1' : undefined}>
-        <b>{gana && <i className="dc-pt" aria-hidden="true" style={{ background: COLOR_EQUIPO[equipoDeLado(l)] }} />}{v != null ? dec(v, f.dec) : '—'}</b>
+        <b>
+          {gana && !cel && <i className="dc-pt" aria-hidden="true" style={{ background: COLOR_EQUIPO[equipoDeLado(l)] }} />}
+          {v != null ? dec(v, f.dec) : '—'}
+          {/* En el celular la unidad va pegada: «2,3 min/h» no se confunde con «2,3 min en total» del otro equipo. */}
+          {cel && v != null && <span className="dc-u">{f.unidad}</span>}
+        </b>
         {gana && <span className="dc-sr"> gana el punto</span>}
-        {f.id === 'micro' && (l === 'c' ? f.totalC : f.totalR) != null && <small>{dec((l === 'c' ? f.totalC : f.totalR)!)} min {f.totalRotulo ?? 'en el turno'}</small>}
+        {f.id === 'micro' && total != null && <small>{dec(total)} min {cel ? 'en total' : f.totalRotulo ?? 'en el turno'}</small>}
       </span>
+    )
+  }
+  const quienGana = (f: FilaPunto) => {
+    if (f.gana === 'c' || f.gana === 'r') {
+      const e = equipoDeLado(f.gana)
+      return <span className="dc-gana" style={colT(e)}><i className="dc-pt" aria-hidden="true" style={{ background: COLOR_EQUIPO[e] }} />gana {nom(e)}</span>
+    }
+    if (f.gana === 'empate') return <span className="dc-gana">parejos</span>
+    if (f.gana === 'pend') return <span className="dc-gana">al cierre</span>
+    return null
+  }
+  // Celular: cada fila se apila (nombre y quién gana · qué mide · las dos cifras bajo su equipo · la frase).
+  // Tres columnas en 360 px partían el nombre palabra por palabra.
+  if (cel) {
+    return (
+      <div className="dc-filas dc-filas-cel" role="table" aria-label="Indicadores que dan punto">
+        <div className="dc-fila-h" role="row">
+          <span role="columnheader" style={colT('cardenas')}>{nom('cardenas')}</span>
+          <span role="columnheader" style={colT('rebolledo')}>{nom('rebolledo')}</span>
+        </div>
+        {filas.map((f) => (
+          <div key={f.id} className="dc-fila" role="row">
+            <div className="dc-ft">
+              <span className="dc-fn" role="rowheader" tabIndex={0} data-tip={f.formula}>{f.rotulo}</span>
+              {quienGana(f)}
+            </div>
+            <p className="dc-fx">{f.explica}</p>
+            <div className="dc-fv">
+              {celda(f, 'c')}
+              {celda(f, 'r')}
+            </div>
+            <p className="dc-fr">{f.frase}</p>
+          </div>
+        ))}
+      </div>
     )
   }
   return (

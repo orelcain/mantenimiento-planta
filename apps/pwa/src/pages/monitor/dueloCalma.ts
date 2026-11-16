@@ -246,6 +246,8 @@ export interface FilaPunto {
   rotulo: string
   /** Qué mide y en qué unidad (con la fórmula en micro detención). */
   sub: string
+  /** Qué mide, en palabras de planta y con «más/menos es mejor»: la línea del celular, donde la fila se apila. */
+  explica: string
   /** La cuenta completa, para el globo. */
   formula: string
   c: number | null
@@ -289,15 +291,18 @@ export function filasDePuntos(e: EntradaFilas): FilaPunto[] {
     if (gana === 'empate') frase = 'Parejos en este indicador.'
     else if (gana === 'pend') frase = 'Se define al cierre del turno.'
     else if (dif != null && quien) {
-      if (f.id === 'carrera') frase = `${quien} ${int(dif)} ${enCurso ? 'adelante a la misma hora' : 'más piezas al cierre'}.`
+      if (f.id === 'carrera') frase = enCurso ? `${quien} va ${int(dif)} piezas adelante a la misma hora.` : `${quien} hizo ${int(dif)} piezas más al cierre.`
       else if (f.id === 'ritmo') frase = `${quien} rinde ${dec(dif)} pz/min más cuando anda.`
-      else frase = `${quien} pierde ${dec(dif)} min menos por hora por máquina.`
+      else frase = `Cada Baader de ${quien} pierde ${dec(dif)} min menos por hora.`
     }
     const fila: FilaPunto = {
       id: f.id, rotulo: f.rotulo,
       sub: f.id === 'carrera' ? (enCurso ? 'piezas hechas a la misma hora' : 'piezas hechas al cierre, con Mantención sumada')
         : f.id === 'ritmo' ? 'piezas por minuto con la línea andando'
           : 'min por hora por máquina, hasta la misma hora',
+      explica: f.id === 'carrera' ? (enCurso ? 'Piezas hechas al mismo minuto de producción. Más es mejor.' : 'Piezas del turno, con las que Mantención les quitó sumadas. Más es mejor.')
+        : f.id === 'ritmo' ? 'Piezas por minuto mientras la línea produce. Más es mejor.'
+          : 'Minutos por hora que cada Baader queda parada en detenciones cortas. Menos es mejor.',
       formula: f.id === 'micro'
         ? 'Micro detención por hora por máquina = minutos de micro detención de todas las Baader del turno, hasta la misma hora de producción ÷ horas transcurridas ÷ cantidad de Baader. Gana el que pierde menos.'
         : f.id === 'ritmo' ? 'Ritmo andando = piezas ÷ minutos con piezas. Gana el que saca más piezas por minuto cuando la línea anda.'
