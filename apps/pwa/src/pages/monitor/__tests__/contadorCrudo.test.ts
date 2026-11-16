@@ -153,16 +153,57 @@ describe('elegirContador', () => {
 
   // ── Lo que el crudo NO cuenta ─────────────────────────────────────────────
 
-  it('las piezas de fuera del horario salen aparte, nunca sumadas al crudo', () => {
+  it('la hora extra de DESPUÉS ya viene en el crudo: no se suma otra vez', () => {
+    // El pulso suma los `Unscheduled` desde el arranque del turno en adelante.
     const r = elegirContador({
-      pulse: pulso({ totalCycles: 805 }),
-      live: live({ totalPieces: 950, shiftPieces: 805, outsidePieces: 145 }),
+      pulse: pulso({ totalCycles: 950 }),
+      live: live({
+        totalPieces: 950, shiftPieces: 805, outsidePieces: 145,
+        outsideRanges: [{ from: '2026-08-20T23:00:00.000Z', to: '2026-08-20T23:40:00.000Z', pieces: 145, kind: 'despues' }],
+      }),
     })
     expect(r.fuente).toBe('pulso')
-    expect(r.valor).toBe(805)
+    expect(r.valor).toBe(950)
+    expect(r.crudo).toBe(950)
+    expect(r.antesDelHorario).toBe(0)
+    // Informativo: qué parte del total es de fuera del horario.
     expect(r.fueraDelHorario).toBe(145)
-    // La suma sigue cuadrando con lo que la gente contó en la línea.
-    expect(r.valor + r.fueraDelHorario).toBe(950)
+  })
+
+  it('el arranque anticipado se SUMA al grande (Eviscerado 15-11: 22:10 → turno de las 00:00)', () => {
+    // «sumalo al grande, necesito q se vean todas las piezas» (Orel, 15-11).
+    // El crudo cuenta desde las 00:00; lo de 22:10→00:00 llega como rango `antes`.
+    const r = elegirContador({
+      pulse: pulso({ at: '2026-11-16T03:30:00.000Z', totalCycles: 1200 }),
+      live: live({
+        series: [{ t: '2026-11-15T23:25:00.000Z', pieces: 60 }],
+        totalPieces: 3584, shiftPieces: 1200, outsidePieces: 2384,
+        outsideRanges: [{ from: '2026-11-15T22:10:00.000Z', to: '2026-11-16T00:00:00.000Z', pieces: 2384, kind: 'antes' }],
+      }),
+    })
+    expect(r.fuente).toBe('pulso')
+    expect(r.crudo).toBe(1200)
+    expect(r.antesDelHorario).toBe(2384)
+    expect(r.valor).toBe(3584)
+    // El grande calza con el total del turno (turno + antes + después).
+    expect(r.valor).toBe(3584)
+    // «dentro del turno» = valor − fuera: nada contado dos veces.
+    expect(r.valor - r.fueraDelHorario).toBe(1200)
+  })
+
+  it('con antes y después, solo lo de antes va encima del crudo', () => {
+    const r = elegirContador({
+      pulse: pulso({ totalCycles: 1000 + 50 }),
+      live: live({
+        totalPieces: 1300, shiftPieces: 1000, outsidePieces: 300,
+        outsideRanges: [
+          { from: '2026-08-20T21:00:00.000Z', to: '2026-08-20T22:00:00.000Z', pieces: 250, kind: 'antes' },
+          { from: '2026-08-20T22:50:00.000Z', to: '2026-08-20T22:55:00.000Z', pieces: 50, kind: 'despues' },
+        ],
+      }),
+    })
+    expect(r.valor).toBe(1300)
+    expect(r.antesDelHorario).toBe(250)
   })
 
   it('con el derivado no se desglosa: ese numero ya las incluye', () => {

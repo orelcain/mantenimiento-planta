@@ -6255,7 +6255,8 @@ function MonitorDelToken() {
     const ult = lecturas[lecturas.length - 1]
     return {
       entrada: armarEntradaRep({ serie: barrasMinuto, machines: live.machines, stopEvents: live.stopEvents, stopMachines: live.stopMachines, pulseAt: data.pulse?.at, perillas: live.perillas ?? null }),
-      tope: armarTope(contador.valor, ult && ult.totalCycles === contador.valor ? ult.porMaquina : null),
+      /* El tope es el crudo (la serie parte en el inicio del turno); lo de antes del horario va como base encima. */
+      tope: armarTope(contador.crudo, ult && ult.totalCycles === contador.crudo ? ult.porMaquina : null, contador.antesDelHorario),
     }
   })()
   /* UNA base para «A esta hora» en toda la app (franja, gráfico y su globo, Camino a la meta y su ampliado, y el
@@ -7035,7 +7036,7 @@ function MonitorDelToken() {
           return (
             <MonitorV2
               lectura={{ valor: contador.valor, atMs: contador.corteWallMs }}
-              semilla={(data.pulse?.lecturas ?? []).map((l) => l.totalCycles)}
+              semilla={(data.pulse?.lecturas ?? []).map((l) => l.totalCycles + contador.antesDelHorario)}
               repro={repro}
               eje={eje}
               piezas={contador.valor}
@@ -7930,7 +7931,7 @@ function MonitorDelToken() {
                   serieHoy: serieMinutoVista ?? null,
                   series: data.seriesMinuto ?? null,
                   lectura: { valor: contador.valor, atMs: contador.corteWallMs },
-                  semilla: (data.pulse?.lecturas ?? []).map((l) => l.totalCycles),
+                  semilla: (data.pulse?.lecturas ?? []).map((l) => l.totalCycles + contador.antesDelHorario),
                 }
               : null}
             lineas={lineasMonitor}

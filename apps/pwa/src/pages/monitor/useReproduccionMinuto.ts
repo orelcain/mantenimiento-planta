@@ -17,7 +17,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useMovimientoReducido } from './ampliarHooks'
 import {
-  MIN_MS, avanzar, cuadroRep, detenidaRep, minutoEn, minutosCerrados, posicion, proximoCambioMs, registrarSerie, repInicial,
+  MIN_MS, avanzar, baseDe, cuadroRep, detenidaRep, minutoEn, minutosCerrados, posicion, proximoCambioMs, registrarSerie, repInicial,
   reproduciendo,
   type EntradaRep, type EstadoRep, type EstadoVivo, type MinutoMaq, type Tope,
 } from './reproduccionMinuto'
@@ -75,11 +75,13 @@ export function useReproduccionMinuto(entrada: EntradaRep | null, limite: Tope |
     if (e.cerrados < 1 || e.desdeMs == null) return SIN_CUADRO
     const c = cuadroRep(e, limiteRef.current, ahora)
     const ini = e.desdeMs + c.minutoIdx * MIN_MS
+    /* Lo de antes del horario (la serie parte en el inicio del turno): va encima, así la cifra llega al grande completo. */
+    const base = baseDe(limiteRef.current)
     return {
-      valor: c.total,
+      valor: c.total + base,
       frac: c.frac,
-      previa: { valor: c.totalPiso, atMs: ini },
-      ultima: { valor: c.totalFinal, atMs: ini + MIN_MS },
+      previa: { valor: c.totalPiso + base, atMs: ini },
+      ultima: { valor: c.totalFinal + base, atMs: ini + MIN_MS },
       atrasada: c.atrasada,
       rep: c,
     }

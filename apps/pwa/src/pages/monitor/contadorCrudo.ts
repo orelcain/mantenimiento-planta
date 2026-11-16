@@ -42,10 +42,23 @@ export interface ContadorElegido {
   /** Hora de corte en RELOJ DE PLANTA, o null si no se puede saber. */
   corteWallMs: number | null
   /**
-   * Piezas producidas fuera del horario del turno, que el contador vivo de
-   * Shoplogix NO incluye. Se muestran aparte, nunca sumadas en silencio.
+   * Piezas producidas fuera del horario del turno (antes + después). `valor`
+   * YA las incluye (Orel, 15-11: «sumalo al grande, necesito q se vean todas
+   * las piezas»); este dato solo dice qué parte del total es de afuera.
    */
   fueraDelHorario: number
+  /**
+   * Lo que marca el contador vivo de Shoplogix tal cual (`pulse.totalCycles`).
+   * Trae el turno y la hora extra de después, NO lo de antes del arranque.
+   * Con el derivado, igual a `valor`.
+   */
+  crudo: number
+  /**
+   * Piezas de antes del horario (rangos `kind: 'antes'`) sumadas encima del
+   * crudo: `valor = crudo + antesDelHorario`. Es la base del reloj de
+   * reproducción, cuya serie por minuto parte en el inicio del turno. 0 con el derivado.
+   */
+  antesDelHorario: number
   /** Por qué se está mostrando el derivado en vez del crudo. null si va el crudo. */
   motivoFallback: string | null
 }
@@ -124,6 +137,8 @@ export function elegirContador({ pulse, live, shiftClosed }: {
     // El derivado YA incluye lo de fuera del horario: no va el desglose contra
     // el crudo, porque no hay crudo contra el cual desglosarlo.
     fueraDelHorario: 0,
+    crudo: live.totalPieces ?? 0,
+    antesDelHorario: 0,
     motivoFallback: motivo,
   })
 
@@ -140,11 +155,28 @@ export function elegirContador({ pulse, live, shiftClosed }: {
     return derivado('el contador vivo de Shoplogix quedó atrás')
   }
 
+  /* El contador vivo cuenta desde el primer minuto del turno con nombre (más la
+     hora extra de después). Lo del arranque anticipado (p. ej. 22:10 → 00:00 del
+     «Turno 1 Lunes») queda en otro bucket y llega en `outsideRanges` como
+     `antes`: se suma aquí para que el grande muestre TODAS las piezas. Lo de
+     `despues` NO se suma: el pulso ya lo trae. */
+  const antesDelHorario = piezasAntesDelHorario(live)
   return {
-    valor: pulse.totalCycles,
+    valor: pulse.totalCycles + antesDelHorario,
     fuente: 'pulso',
     corteWallMs: cortePulso,
     fueraDelHorario,
+    crudo: pulse.totalCycles,
+    antesDelHorario,
     motivoFallback: null,
   }
+}
+
+/** Σ piezas de los rangos de antes del horario del turno (`outsideRanges` con `kind: 'antes'`). */
+export function piezasAntesDelHorario(live: Pick<PublicMonitorLive, 'outsideRanges'>): number {
+  let s = 0
+  for (const r of live.outsideRanges ?? []) {
+    if (r.kind === 'antes' && Number.isFinite(r.pieces) && r.pieces > 0) s += r.pieces
+  }
+  return s
 }

@@ -187,9 +187,18 @@ export interface EntradaRep {
 
 /** Lo que registra el contador vivo de Shoplogix: lo que la reproducción jamás supera. */
 export interface Tope {
+  /** Techo de la Σ de la serie (el contador vivo crudo, SIN la base). */
   total: number | null
   porMaquina: Record<string, number> | null
+  /**
+   * Piezas de antes del horario del turno que la serie por minuto no trae (parte en el inicio del turno). Se suman encima
+   * de lo reproducido (la cifra, `totalEnReposo`) para que el reloj llegue al número grande completo. 0 o ausente: nada.
+   */
+  base?: number
 }
+
+/** La base del tope (piezas de antes del horario), 0 si no hay. */
+export const baseDe = (t: Tope | null | undefined): number => (t?.base != null && Number.isFinite(t.base) && t.base > 0 ? t.base : 0)
 
 export type EstadoMaquina = 'andando' | 'parcial' | 'detenida'
 
@@ -296,7 +305,7 @@ export function toparContadores(ids: readonly string[], valores: readonly number
 export function totalEnReposo(e: Pick<EntradaRep, 'maquinas'> | null | undefined, limite: Tope | null | undefined): number | null {
   if (!e) return null
   const finales = finalesCerrados(e)
-  return finales.length ? suma(toparContadores(e.maquinas.map((m) => m.id), finales, limite)) : null
+  return finales.length ? suma(toparContadores(e.maquinas.map((m) => m.id), finales, limite)) + baseDe(limite) : null
 }
 
 // ── La velocidad ─────────────────────────────────────────────────────────────
@@ -566,6 +575,7 @@ export function armarEntradaRep(a: {
 }
 
 /** Lo que registra el contador vivo: el tope de la reproducción. `porMaquina` es el acumulado por id de la última lectura. */
-export function armarTope(total: number | null | undefined, porMaquina: Record<string, number> | null | undefined): Tope {
-  return { total: total != null && Number.isFinite(total) ? total : null, porMaquina: porMaquina ?? null }
+export function armarTope(total: number | null | undefined, porMaquina: Record<string, number> | null | undefined, base = 0): Tope {
+  const t: Tope = { total: total != null && Number.isFinite(total) ? total : null, porMaquina: porMaquina ?? null }
+  return base > 0 ? { ...t, base } : t
 }
