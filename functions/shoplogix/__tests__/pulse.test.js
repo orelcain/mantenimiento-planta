@@ -354,3 +354,17 @@ test('hora extra AL FINAL: el turno con nombre suma todo el Unscheduled pegado, 
   assert.strictEqual(s.maquinas[0].cycles.length, 585, 'las barras siguen en la hora extra')
   assert.strictEqual(s.maquinas[0].cycles.reduce((a, b) => a + b, 0), l.totalCycles)
 })
+
+test('con turno con nombre, el arranque Unscheduled ANTERIOR no entra al pulso (lo suma #324 aparte: una sola vez)', () => {
+  // Chonchi 15→16-11: 22:10→23:59 sin turno y luego «Turno 1 Lunes» desde las 00:00.
+  const l = lecturaDesdeProduccion({ machines: [{
+    machineId: 'ev1',
+    machineProduction: [
+      ...tramo('2026-11-15T22:10', 110, () => 12),
+      ...tramo('2026-11-16T00:00', 30, () => 10, { shift: 'Turno 1 Lunes' }),
+    ],
+  }] })
+  assert.strictEqual(l.totalCycles, 30 * 10, 'solo desde el primer bucket del turno con nombre')
+  assert.deepStrictEqual(l.porMaquina, { ev1: 300 })
+  assert.ok(l.duro.serieMinuto.desde.endsWith('T00:00:00.000Z'))
+})
