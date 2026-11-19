@@ -8,6 +8,7 @@ import {
   claveArchivo,
   contarRegistrosPiezaAPieza,
   crearCandado,
+  cortadoMasReciente,
   debeLimpiarCortado,
   debeOmitirPorDatosMasCompletos,
   decidirMarcado,
@@ -16,7 +17,11 @@ import {
   esExporteCortado,
   esNombrePiezaAPieza,
   esSinDatos,
+  idSubidaAutomatica,
   listadoIncompleto,
+  recortarResultados,
+  ultimaPiezaProcesada,
+  ultimoTrasResultado,
   recortarProcesados,
   seleccionarCandidatos,
   type CandidatoCarpeta,
@@ -161,21 +166,84 @@ describe('regla 7: listado incompleto', () => {
   })
 })
 
-describe('regla 9: el cortado persiste hasta un completo más nuevo', () => {
+describe('regla 9: el cortado se limpia solo con un Pieza a pieza sano y más nuevo', () => {
   const cortado = { modificado: AHORA - 2 * HORA }
+  const pp = (modificado: number) => ({ tipo: 'PIEZA_PIEZA' as const, modificado })
 
-  it('un Pieza a pieza completo más nuevo lo limpia', () => {
-    expect(debeLimpiarCortado(cortado, AHORA - HORA)).toBe(true)
+  it('un Pieza a pieza guardado sin fallos y más nuevo lo limpia', () => {
+    expect(debeLimpiarCortado(cortado, pp(AHORA - HORA), true)).toBe(true)
   })
 
   it('un archivo más viejo que el cortado no lo limpia', () => {
-    expect(debeLimpiarCortado(cortado, AHORA - 3 * HORA)).toBe(false)
-    expect(debeLimpiarCortado(null, AHORA)).toBe(false)
+    expect(debeLimpiarCortado(cortado, pp(AHORA - 3 * HORA), true)).toBe(false)
+    expect(debeLimpiarCortado(null, pp(AHORA), true)).toBe(false)
+  })
+
+  it('un Puerta 0 más nuevo no lo limpia', () => {
+    expect(debeLimpiarCortado(cortado, { tipo: 'PUERTA_0', modificado: AHORA }, true)).toBe(false)
+  })
+
+  it('si hubo fallos en el guardado, no lo limpia', () => {
+    expect(debeLimpiarCortado(cortado, pp(AHORA - HORA), false)).toBe(false)
   })
 
   it('con cortado activo, cargar otro archivo no lo borra del estado visible', () => {
     const h = hechos({ ultimo: cargado, cortado: { archivo: 'c.xlsx', registros: 10_000, modificado: cortado.modificado, detectadoEn: AHORA } })
     expect(derivarEstado(h)).toBe('cortado')
+  })
+})
+
+describe('varios cortados: queda el de fecha máxima', () => {
+  const viejo = { archivo: 'a.xlsx', registros: 10_000, modificado: AHORA - 5 * HORA, detectadoEn: AHORA }
+  const nuevo = { archivo: 'b.xlsx', registros: 10_000, modificado: AHORA - HORA, detectadoEn: AHORA }
+
+  it('un cortado más nuevo reemplaza al actual; uno más viejo no', () => {
+    expect(cortadoMasReciente(viejo, nuevo)).toBe(nuevo)
+    expect(cortadoMasReciente(nuevo, viejo)).toBe(nuevo)
+    expect(cortadoMasReciente(null, viejo)).toBe(viejo)
+  })
+})
+
+describe('regla 5: "visto" no es "cargado"', () => {
+  const pp = (tipo: 'cargado' | 'omitido' | 'vacio' | 'fallido' | 'cortado', modificado: number) =>
+    ({ tipo, tipoArchivo: 'PIEZA_PIEZA' as const, archivo: 'p.xlsx', modificado, detectadoEn: AHORA })
+  const p0 = (tipo: 'cargado' | 'vacio', modificado: number) =>
+    ({ tipo, tipoArchivo: 'OTRO' as const, archivo: 'p0.xlsx', modificado, detectadoEn: AHORA })
+
+  it('alDia solo cuenta Pieza a pieza cargado u omitido (no cortado, vacío ni fallido)', () => {
+    expect(ultimaPiezaProcesada([pp('cortado', AHORA), pp('vacio', AHORA), pp('fallido', AHORA)])).toBeNull()
+    expect(ultimaPiezaProcesada([pp('cargado', AHORA - HORA)])).toBe(AHORA - HORA)
+    expect(ultimaPiezaProcesada([pp('omitido', AHORA - 2 * HORA)])).toBe(AHORA - 2 * HORA)
+  })
+
+  it('un Puerta 0 cargado no cuenta como Pieza a pieza al día', () => {
+    expect(ultimaPiezaProcesada([p0('cargado', AHORA)])).toBeNull()
+  })
+
+  it('un Puerta 0 cargado no puede ocultar un vacío del Pieza a pieza', () => {
+    const vacio: UltimoResultado = { tipo: 'vacio', archivo: 'p.xlsx', detectadoEn: AHORA }
+    expect(ultimoTrasResultado(vacio, 'OTRO', { tipo: 'omitido', archivo: 'p0.xlsx', detectadoEn: AHORA })).toBe(vacio)
+    expect(derivarEstado(hechos({ ultimo: ultimoTrasResultado(vacio, 'OTRO', cargado) }))).toBe('error')
+  })
+
+  it('un Pieza a pieza válido sí reemplaza el error', () => {
+    const fallo: UltimoResultado = { tipo: 'fallo', archivo: 'p.xlsx', mensaje: 'x', detectadoEn: AHORA }
+    expect(ultimoTrasResultado(fallo, 'PIEZA_PIEZA', cargado)).toBe(cargado)
+  })
+
+  it('recortarResultados conserva los más recientes', () => {
+    const mapa = { a: { detectadoEn: 1 }, b: { detectadoEn: 3 }, c: { detectadoEn: 2 } }
+    expect(Object.keys(recortarResultados(mapa, 2)).sort()).toEqual(['b', 'c'])
+  })
+})
+
+describe('regla 8: ID de subida determinista', () => {
+  it('la misma clave da el mismo ID; claves distintas, IDs distintos', () => {
+    const a = idSubidaAutomatica('p.xlsx|100|5')
+    expect(idSubidaAutomatica('p.xlsx|100|5')).toBe(a)
+    expect(idSubidaAutomatica('p.xlsx|101|5')).not.toBe(a)
+    expect(idSubidaAutomatica('p.xlsx|100|6')).not.toBe(a)
+    expect(a.startsWith('cm-')).toBe(true)
   })
 })
 

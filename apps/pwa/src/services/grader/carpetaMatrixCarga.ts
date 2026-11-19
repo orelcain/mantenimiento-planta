@@ -1,11 +1,13 @@
 /**
  * Carpeta de Matrix — una revisión: lista la carpeta, parsea los archivos nuevos
  * y los guarda con `guardarSegmentosTurno` (modo automático), la MISMA función
- * que usa la carga manual, más la misma subida del original (`saveGraderUpload`,
- * `uploadGraderFile`, `updateGraderUpload`). No escribe ni borra en la carpeta.
+ * que usa la carga manual, y sube el original con las mismas funciones del
+ * servicio de uploads, con ID y ruta deterministas (reintentos sin duplicados).
+ * No escribe ni borra nada en la carpeta.
  *
  * Las reglas de decisión están en carpetaMatrix.ts (puras, con tests). Aquí solo
- * se leen y escriben datos. Los errores no se lanzan: quedan en el resultado.
+ * se leen y escriben datos. Ningún fallo sale hacia afuera: cada archivo queda
+ * con su resultado y su contador de intentos.
  */
 import { listarExcelsEnCarpeta, resumirAnalisis, type CarpetaHandle } from './diagnosticoMatrix'
 import { mergeParsedData, parseFile } from './graderExcelParser'
@@ -19,7 +21,7 @@ import {
   type SegmentosTurno,
   type UsuarioGuarda,
 } from './guardarTurnoGrader'
-import { saveGraderUpload, updateGraderUpload, uploadGraderFile } from './graderUpload.service'
+import { getGraderUpload, saveGraderUpload, updateGraderUpload, uploadGraderFile } from './graderUpload.service'
 import { getModuleRanges } from './graderModuleConfig.service'
 import { loadShoplogixShiftWindows } from './graderShoplogixWindows'
 import { normalizeShiftSchedule, DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
@@ -31,6 +33,7 @@ import {
   calcularAlDia,
   claveArchivo,
   contarRegistrosPiezaAPieza,
+  cortadoMasReciente,
   debeLimpiarCortado,
   debeOmitirPorDatosMasCompletos,
   decidirMarcado,
@@ -38,9 +41,14 @@ import {
   esExporteCortado,
   esNombrePiezaAPieza,
   esSinDatos,
+  idSubidaAutomatica,
   listadoIncompleto,
   seleccionarCandidatos,
+  ultimaPiezaProcesada,
+  ultimoTrasResultado,
   type CortadoInfo,
+  type ResultadoArchivo,
+  type TipoResultado,
   type UltimoResultado,
 } from './carpetaMatrix'
 import { carpetaMatrixStore } from './carpetaMatrixStore'
@@ -51,7 +59,7 @@ export interface ResultadoRevision {
   cortado: CortadoInfo | null
   /** epoch ms del Pieza a pieza más nuevo de la carpeta, o null. */
   ultimoPiezaAPieza: number | null
-  /** Ver `calcularAlDia`. Solo true con dato reciente y procesado. */
+  /** Regla 10: solo con Pieza a pieza cargado u omitido reciente. */
   alDia: boolean
   /** Listado incompleto: no se puede decir «al día». */
   demasiados: boolean
@@ -59,7 +67,13 @@ export interface ResultadoRevision {
   errorTexto: string | null
 }
 
-type Parseado = Awaited<ReturnType<typeof parseFile>> & { file: File; clave: string; modificado: number }
+type TipoArchivo = 'PIEZA_PIEZA' | 'OTRO'
+type Parseado = Awaited<ReturnType<typeof parseFile>> & {
+  file: File
+  clave: string
+  modificado: number
+  tipoArchivo: TipoArchivo
+}
 
 const MENSAJE_SIN_DATOS = 'El archivo no trae datos legibles'
 
@@ -67,10 +81,7 @@ function mensajeError(e: unknown): string {
   return e instanceof Error ? e.message : 'error desconocido'
 }
 
-/**
- * Revisa la carpeta una vez. Un fallo al leer la raíz sí se propaga (el vigilante
- * lo deja como error); el resto de fallos se registra por archivo.
- */
+/** Revisa la carpeta una vez. Solo un fallo al leer la raíz se propaga (lo deja en error el vigilante). */
 export async function revisarCarpeta(
   handle: CarpetaHandle,
   usuario: UsuarioGuarda,
@@ -86,7 +97,6 @@ export async function revisarCarpeta(
   let cortado: CortadoInfo | null = (await carpetaMatrixStore.leerCortado()) ?? null
   const intentos = await carpetaMatrixStore.leerIntentos()
   const procesados = new Set(await carpetaMatrixStore.leerProcesados())
-
   const candidatos = seleccionarCandidatos(
     entradas.map((e) => ({ ruta: e.ruta, tamano: e.tamano, modificado: e.modificado })),
     ahoraMs,
@@ -94,75 +104,49 @@ export async function revisarCarpeta(
   )
   let errorTexto: string | null = null
 
-  /** Regla 6: cuenta el intento; al tercero el archivo queda fallido y no se reintenta. */
-  async function registrarFallo(clave: string, ruta: string, motivo: string): Promise<void> {
+  /** Guarda el resultado del archivo (regla 5) y, si es Pieza a pieza, el «último». */
+  async function anotar(clave: string, archivo: string, modificado: number, tipoArchivo: TipoArchivo, tipo: TipoResultado, mensaje?: string): Promise<void> {
+    const r: ResultadoArchivo = { tipo, tipoArchivo, archivo, modificado, detectadoEn: ahoraMs, mensaje }
+    await carpetaMatrixStore.guardarResultado(clave, r)
+  }
+
+  async function fijarUltimo(tipoArchivo: TipoArchivo, nuevo: UltimoResultado): Promise<void> {
+    ultimo = ultimoTrasResultado(ultimo, tipoArchivo, nuevo)
+    if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+  }
+
+  /** Regla 6: cada fallo cuenta; al tercero el archivo queda fallido definitivo. */
+  async function registrarFallo(clave: string, archivo: string, modificado: number, tipoArchivo: TipoArchivo, motivo: string): Promise<void> {
     errorTexto = motivo
     const { intentos: n, fallido } = decidirReintento(intentos[clave] ?? 0)
-    if (fallido) {
-      delete intentos[clave]
-      await carpetaMatrixStore.guardarIntentos(intentos)
-      await carpetaMatrixStore.marcarProcesado(clave)
-      ultimo = { tipo: 'fallo', archivo: ruta, mensaje: `Falló ${n} veces: ${motivo}`, detectadoEn: ahoraMs }
-      await carpetaMatrixStore.guardarUltimo(ultimo)
-    } else {
+    if (!fallido) {
       intentos[clave] = n
       await carpetaMatrixStore.guardarIntentos(intentos)
+      return
     }
-  }
-
-  /** Regla 3: sin datos legibles se marca visto y no se reintenta. */
-  async function marcarSinDatos(clave: string, ruta: string): Promise<void> {
-    ultimo = { tipo: 'fallo', archivo: ruta, mensaje: MENSAJE_SIN_DATOS, detectadoEn: ahoraMs }
-    await carpetaMatrixStore.guardarUltimo(ultimo)
+    delete intentos[clave]
+    await carpetaMatrixStore.guardarIntentos(intentos)
     await carpetaMatrixStore.marcarProcesado(clave)
+    const mensaje = `Falló ${n} veces: ${motivo}`
+    await anotar(clave, archivo, modificado, tipoArchivo, 'fallido', mensaje)
+    await fijarUltimo(tipoArchivo, { tipo: 'fallo', archivo, mensaje, detectadoEn: ahoraMs })
   }
 
-  const parseados: Parseado[] = []
-  for (const c of candidatos) {
-    const entrada = porRuta.get(c.ruta)
-    if (!entrada) continue
-    const clave = claveArchivo(c)
-    let file: File
-    try {
-      file = await entrada.handle.getFile()
-    } catch (e) {
-      await registrarFallo(clave, c.ruta, `no se pudo abrir ${c.ruta}: ${mensajeError(e)}`)
-      continue
+  /** Subida del original: ID y ruta deterministas, reanuda sin duplicar ni dejar huérfanos. */
+  async function subirOriginal(p: Parseado, inferred: { startAt?: string; endAt?: string }, sessionDate: string): Promise<void> {
+    const id = idSubidaAutomatica(p.clave)
+    const existente = await getGraderUpload(id)
+    if (existente?.fileMeta?.downloadURL) return
+    if (!existente) {
+      await saveGraderUpload({ id, fileMeta: p.fileMeta, inferred, sessionDate, plantLineId: DEFAULT_PLANT_LINE_ID, createdBy: usuario.id })
     }
-    // Regla 4: si cambió mientras lo leíamos, se salta sin marcar; la próxima revisión lo toma.
-    if (!archivoEstable(c, { size: file.size, lastModified: file.lastModified })) continue
-    let res: Awaited<ReturnType<typeof parseFile>>
-    try {
-      res = await parseFile(file)
-    } catch (e) {
-      await registrarFallo(clave, c.ruta, `no se pudo leer ${c.ruta}: ${mensajeError(e)}`)
-      continue
-    }
-    // Regla 2: el total de registros del Pieza a pieza, no solo las piezas.
-    const total = contarRegistrosPiezaAPieza(res.partialData)
-    if (esExporteCortado(res.fileMeta.kind, total)) {
-      cortado = { archivo: c.ruta, registros: total, modificado: c.modificado, detectadoEn: ahoraMs }
-      await carpetaMatrixStore.guardarCortado(cortado)
-      await carpetaMatrixStore.marcarProcesado(clave)
-      continue
-    }
-    if (total === 0) {
-      await marcarSinDatos(clave, c.ruta)
-      continue
-    }
-    parseados.push({ ...res, file, clave, modificado: c.modificado })
+    const info = await uploadGraderFile(p.file, id, { rutaFija: true })
+    await updateGraderUpload(id, {
+      fileMeta: { ...(existente?.fileMeta ?? p.fileMeta), storagePath: info.storagePath, downloadURL: info.downloadURL },
+    })
   }
 
-  if (parseados.length > 0) {
-    try {
-      await guardarLote(parseados)
-    } catch (e) {
-      errorTexto = `No se pudo guardar el Excel: ${mensajeError(e)}`
-      logger.error('Carpeta Matrix: error guardando el lote', e instanceof Error ? e : new Error(mensajeError(e)))
-    }
-  }
-
-  /** Guarda el lote de archivos nuevos: reglas 1, 3, 5, 8, 9. */
+  /** Guarda un lote de archivos nuevos. Nunca lanza: los fallos quedan en los contadores. */
   async function guardarLote(lote: Parseado[]): Promise<void> {
     const merged: ParsedMatrixData = mergeParsedData(lote)
     const linea = getPlantLineConfig(DEFAULT_PLANT_LINE_ID)
@@ -175,21 +159,34 @@ export async function revisarCarpeta(
       : []
     const multi: SegmentosTurno | null = derivarSegmentosTurno(merged, shiftSchedule, slxWindows)
 
-    // Regla 3: cero segmentos no es «cargado».
-    if (!multi || esSinDatos(merged.pieceRecords.length + merged.gate0Records.length, multi.totalSegments)) {
-      for (const p of lote) await marcarSinDatos(p.clave, p.fileMeta.name)
+    // Regla 3: cero segmentos o cero registros no es «cargado».
+    const registros = merged.pieceRecords.length + merged.gate0Records.length
+    if (!multi || esSinDatos(registros, multi.totalSegments)) {
+      for (const p of lote) {
+        await carpetaMatrixStore.marcarProcesado(p.clave)
+        await anotar(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, 'vacio', MENSAJE_SIN_DATOS)
+        await fijarUltimo(p.tipoArchivo, { tipo: 'vacio', archivo: p.fileMeta.name, detectadoEn: ahoraMs })
+        if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+      }
       return
     }
 
-    // Regla 1: no pisar un turno que ya tiene más piezas guardadas.
+    const fallos: string[] = []
+    // Regla 1: no pisar un turno con más piezas. Si no se puede leer el resumen, el segmento no se escribe.
     const omitir = new Set<string>()
     for (const [key, seg] of multi.entries) {
-      const existente = await getDailySummary(seg.sessionDate, seg.shiftId)
+      let existente: Awaited<ReturnType<typeof getDailySummary>>
+      try {
+        existente = await getDailySummary(seg.sessionDate, seg.shiftId)
+      } catch (e) {
+        fallos.push(`lectura del resumen de ${key}: ${mensajeError(e)}`)
+        omitir.add(key)
+        continue
+      }
       if (debeOmitirPorDatosMasCompletos(existente?.totalPieces ?? null, piezasDeSegmento(seg))) omitir.add(key)
     }
     const kept = quedarSegmentos(multi, (key) => !omitir.has(key))
 
-    const fallos: string[] = []
     if (kept.totalSegments > 0) {
       const r = await guardarSegmentosTurno({
         modo: 'automatico',
@@ -204,79 +201,130 @@ export async function revisarCarpeta(
       fallos.push(...r.fallos)
     }
 
-    // Regla 8: el original se sube y se registra con las mismas funciones que la carga manual.
     const sessionDate = kept.entries[0]?.[1].sessionDate ?? merged.inferred.startAt?.slice(0, 10) ?? new Date(ahoraMs).toISOString().slice(0, 10)
+    const inferred = { startAt: merged.inferred.startAt, endAt: merged.inferred.endAt }
     for (const p of lote) {
       try {
-        const up = await saveGraderUpload({
-          fileMeta: p.fileMeta,
-          inferred: { startAt: merged.inferred.startAt, endAt: merged.inferred.endAt },
-          sessionDate,
-          plantLineId: DEFAULT_PLANT_LINE_ID,
-          createdBy: usuario.id,
-        })
-        const info = await uploadGraderFile(p.file, up.id)
-        await updateGraderUpload(up.id, {
-          fileMeta: { ...up.fileMeta, storagePath: info.storagePath, downloadURL: info.downloadURL },
-        })
+        await subirOriginal(p, inferred, sessionDate)
       } catch (e) {
         fallos.push(`subida de ${p.fileMeta.name}: ${mensajeError(e)}`)
       }
     }
 
-    // Regla 5: solo se marca procesado si todo salió bien.
+    // Regla 5: procesado solo si todo salió bien; si no, cada archivo cuenta un intento.
     if (!decidirMarcado(fallos)) {
-      for (const p of lote) await registrarFallo(p.clave, p.fileMeta.name, fallos.join('; '))
+      for (const p of lote) await registrarFallo(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, fallos.join('; '))
       return
     }
+
+    const tipo: TipoResultado = kept.totalSegments > 0 ? 'cargado' : 'omitido'
     for (const p of lote) {
       await carpetaMatrixStore.marcarProcesado(p.clave)
+      await anotar(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, tipo)
     }
-    const masNuevo = lote.reduce((a, b) => (b.modificado > a.modificado ? b : a))
-    if (kept.totalSegments === 0) {
-      ultimo = { tipo: 'omitido', archivo: masNuevo.fileMeta.name, detectadoEn: ahoraMs }
-    } else {
-      const resumen = resumirAnalisis(masNuevo.fileMeta, merged)
-      const piezasKept = kept.entries.reduce((s, [, seg]) => s + piezasDeSegmento(seg), 0)
-      ultimo = {
-        tipo: 'cargado',
-        archivo: masNuevo.fileMeta.name,
-        tamano: masNuevo.file.size,
-        modificado: masNuevo.modificado,
-        piezas: piezasKept,
-        desde: resumen.desde,
-        hasta: resumen.hasta,
-        turnoDocId: kept.totalSegments === 1 ? `${kept.entries[0]![1].sessionDate}__${kept.entries[0]![1].shiftId}` : null,
-        cargadoEn: ahoraMs,
+
+    const pp = lote.filter((p) => p.tipoArchivo === 'PIEZA_PIEZA')
+    if (pp.length > 0) {
+      const masNuevo = pp.reduce((a, b) => (b.modificado > a.modificado ? b : a))
+      if (tipo === 'omitido') {
+        await fijarUltimo('PIEZA_PIEZA', { tipo: 'omitido', archivo: masNuevo.fileMeta.name, detectadoEn: ahoraMs })
+      } else {
+        const resumen = resumirAnalisis(masNuevo.fileMeta, merged)
+        const piezasKept = kept.entries.reduce((s, [, seg]) => s + piezasDeSegmento(seg), 0)
+        const turno = kept.entries.length === 1 ? kept.entries[0]![1] : null
+        await fijarUltimo('PIEZA_PIEZA', {
+          tipo: 'cargado',
+          archivo: masNuevo.fileMeta.name,
+          tamano: masNuevo.file.size,
+          modificado: masNuevo.modificado,
+          piezas: piezasKept,
+          desde: resumen.desde,
+          hasta: resumen.hasta,
+          turnoDocId: turno ? `${turno.sessionDate}__${turno.shiftId}` : null,
+          cargadoEn: ahoraMs,
+        })
       }
-      // Regla 9: un Pieza a pieza completo más nuevo que el cortado lo limpia.
-      if (debeLimpiarCortado(cortado, masNuevo.modificado)) {
+      if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+      // Regla 9: solo un Pieza a pieza guardado sin fallos y más nuevo que el cortado lo limpia.
+      if (debeLimpiarCortado(cortado, { tipo: 'PIEZA_PIEZA', modificado: masNuevo.modificado }, true)) {
         await carpetaMatrixStore.borrarCortado()
         cortado = null
       }
     }
-    await carpetaMatrixStore.guardarUltimo(ultimo)
   }
 
-  // Regla 10: «al día» depende de Pieza a pieza procesados recientes.
+  const parseados: Parseado[] = []
+  for (const c of candidatos) {
+    const entrada = porRuta.get(c.ruta)
+    if (!entrada) continue
+    const clave = claveArchivo(c)
+    const tipoNombre: TipoArchivo = esNombrePiezaAPieza(c.ruta) ? 'PIEZA_PIEZA' : 'OTRO'
+    let file: File
+    try {
+      file = await entrada.handle.getFile()
+    } catch (e) {
+      await registrarFallo(clave, c.ruta, c.modificado, tipoNombre, `no se pudo abrir ${c.ruta}: ${mensajeError(e)}`)
+      continue
+    }
+    // Regla 4: si cambió mientras se leía, se salta sin marcar ni contar intento.
+    if (!archivoEstable(c, { size: file.size, lastModified: file.lastModified })) continue
+    let res: Awaited<ReturnType<typeof parseFile>>
+    try {
+      res = await parseFile(file)
+    } catch (e) {
+      await registrarFallo(clave, c.ruta, c.modificado, tipoNombre, `no se pudo leer ${c.ruta}: ${mensajeError(e)}`)
+      continue
+    }
+    const tipoArchivo: TipoArchivo = res.fileMeta.kind === 'PIEZA_PIEZA' ? 'PIEZA_PIEZA' : 'OTRO'
+    // Regla 2: total de registros del Pieza a pieza.
+    const total = contarRegistrosPiezaAPieza(res.partialData)
+    if (esExporteCortado(res.fileMeta.kind, total)) {
+      // Varios cortados: como referencia queda el de fecha máxima.
+      const siguiente = cortadoMasReciente(cortado, { archivo: c.ruta, registros: total, modificado: c.modificado, detectadoEn: ahoraMs })
+      if (siguiente !== cortado) {
+        cortado = siguiente
+        await carpetaMatrixStore.guardarCortado(cortado)
+      }
+      await carpetaMatrixStore.marcarProcesado(clave)
+      await anotar(clave, c.ruta, c.modificado, tipoArchivo, 'cortado')
+      continue
+    }
+    // Regla 3: sin registros, visto y no se reintenta.
+    if (total === 0) {
+      await carpetaMatrixStore.marcarProcesado(clave)
+      await anotar(clave, c.ruta, c.modificado, tipoArchivo, 'vacio', MENSAJE_SIN_DATOS)
+      await fijarUltimo(tipoArchivo, { tipo: 'vacio', archivo: c.ruta, detectadoEn: ahoraMs })
+      if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+      continue
+    }
+    parseados.push({ ...res, file, clave, modificado: c.modificado, tipoArchivo })
+  }
+
+  if (parseados.length > 0) {
+    try {
+      await guardarLote(parseados)
+    } catch (e) {
+      // Red de seguridad: cualquier excepción inesperada cuenta como fallo de cada archivo.
+      logger.error('Carpeta Matrix: error guardando el lote', e instanceof Error ? e : new Error(mensajeError(e)))
+      for (const p of parseados) await registrarFallo(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, mensajeError(e))
+    }
+  }
+
+  // Regla 10: «al día» solo con Pieza a pieza cargado u omitido reciente y sin uno pendiente fuera de ventana.
+  const resultados = Object.values(await carpetaMatrixStore.leerResultados())
   const procesadosAhora = new Set(await carpetaMatrixStore.leerProcesados())
-  const delMismoTipo = piezas.map((e) => ({ e, procesado: procesadosAhora.has(claveArchivo({ ruta: e.ruta, tamano: e.tamano, modificado: e.modificado })) }))
-  const procesadosPiezas = delMismoTipo.filter((x) => x.procesado).map((x) => x.e.modificado)
-  const ultimoPiezaProcesado = procesadosPiezas.length > 0 ? Math.max(...procesadosPiezas) : null
-  const piezaPendienteFueraVentana = delMismoTipo.some(
-    (x) => !x.procesado && ahoraMs - x.e.modificado > CM_VENTANA_MS,
+  const piezaPendienteFueraVentana = piezas.some(
+    (e) => !procesadosAhora.has(claveArchivo({ ruta: e.ruta, tamano: e.tamano, modificado: e.modificado })) && ahoraMs - e.modificado > CM_VENTANA_MS,
   )
-  const alDia = calcularAlDia({ ultimoPiezaProcesado, piezaPendienteFueraVentana, ahora: ahoraMs })
-  const ultimoPiezaAPieza = piezas.length > 0 ? Math.max(...piezas.map((e) => e.modificado)) : null
+  const alDia = calcularAlDia({ ultimoPiezaProcesado: ultimaPiezaProcesada(resultados), piezaPendienteFueraVentana, ahora: ahoraMs })
 
   return {
     ultimo,
     cortado,
-    ultimoPiezaAPieza,
+    ultimoPiezaAPieza: piezas.length > 0 ? Math.max(...piezas.map((e) => e.modificado)) : null,
     alDia,
     demasiados,
     errorReciente: errorTexto !== null,
     errorTexto,
   }
-
 }

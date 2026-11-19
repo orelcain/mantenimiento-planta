@@ -5,12 +5,19 @@
  * (para que el estado «cortado» o «cargado» sobreviva a recargar la página).
  */
 import type { CarpetaHandle } from './diagnosticoMatrix'
-import { CM_MAX_PROCESADOS, recortarProcesados, type CortadoInfo, type UltimoResultado } from './carpetaMatrix'
+import {
+  CM_MAX_PROCESADOS,
+  recortarProcesados,
+  recortarResultados,
+  type CortadoInfo,
+  type ResultadoArchivo,
+  type UltimoResultado,
+} from './carpetaMatrix'
 
 const DB_NOMBRE = 'carpeta-matrix-grader'
 const TIENDA = 'kv'
 
-type Clave = 'handle' | 'procesados' | 'ultimo' | 'cortado' | 'intentos'
+type Clave = 'handle' | 'procesados' | 'ultimo' | 'cortado' | 'intentos' | 'resultados'
 
 /** Handle de la File System Access API con los métodos de permiso que usamos. */
 export interface HandleCarpeta extends CarpetaHandle {
@@ -82,6 +89,14 @@ export const carpetaMatrixStore = {
   leerCortado: () => leer<CortadoInfo>('cortado'),
   guardarCortado: (c: CortadoInfo) => escribir('cortado', c),
   borrarCortado: () => escribir('cortado', undefined),
+
+  /** Resultado por archivo (regla 5): cargado, omitido, cortado, vacio o fallido. */
+  leerResultados: async (): Promise<Record<string, ResultadoArchivo>> => (await leer<Record<string, ResultadoArchivo>>('resultados')) ?? {},
+  guardarResultado: async (clave: string, r: ResultadoArchivo): Promise<void> => {
+    const actuales = (await leer<Record<string, ResultadoArchivo>>('resultados')) ?? {}
+    const nuevo = recortarResultados({ ...actuales, [clave]: r })
+    await escribir('resultados', nuevo)
+  },
 
   /** Intentos fallidos por clave de archivo (regla 6). */
   leerIntentos: async (): Promise<Record<string, number>> => (await leer<Record<string, number>>('intentos')) ?? {},

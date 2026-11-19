@@ -106,9 +106,26 @@ export function derivarSegmentosTurno(
 }
 
 /** Guarda los turnos en Firestore. Lanza si algo falla; el llamador muestra el error. */
+/**
+ * En automático NUNCA lanza: cualquier excepción se registra en `fallos`.
+ * En manual se comporta igual que antes (lanza).
+ */
 export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promise<ResultadoGuardado> {
-  const { multiDayInfo, parsedData, user, gates, gatesEditadas, lineId, isClassificationPlant } = entrada
   const fallos: string[] = []
+  if (entrada.modo !== 'automatico') {
+    await guardarCuerpo(entrada, fallos)
+    return { fallos }
+  }
+  try {
+    await guardarCuerpo(entrada, fallos)
+  } catch (err) {
+    fallos.push(`guardado: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  return { fallos }
+}
+
+async function guardarCuerpo(entrada: EntradaGuardarTurno, fallos: string[]): Promise<void> {
+  const { multiDayInfo, parsedData, user, gates, gatesEditadas, lineId, isClassificationPlant } = entrada
   // Paso de detalle: en manual lanza igual que antes; en automático registra el fallo y sigue.
   const paso = async (nombre: string, fn: () => Promise<unknown>): Promise<void> => {
     if (entrada.modo !== 'automatico') {
@@ -300,7 +317,6 @@ export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promi
     }
   }
 
-  return { fallos }
 }
 
 /** Quita del resultado los segmentos que no pasan `keep` y recalcula sus contadores. */

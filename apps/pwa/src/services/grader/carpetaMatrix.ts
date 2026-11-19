@@ -110,9 +110,76 @@ export function listadoIncompleto(truncado: boolean, elementosNoLeidos: number):
   return truncado || elementosNoLeidos > 0
 }
 
-/** Regla 9. El cortado se limpia solo con un Pieza a pieza completo más nuevo que el cortado. */
-export function debeLimpiarCortado(cortado: { modificado: number } | null, cargadoModificado: number): boolean {
-  return cortado !== null && cargadoModificado > cortado.modificado
+/**
+ * Regla 9. El cortado se limpia solo si: hay cortado, el archivo guardado es un
+ * Pieza a pieza (no Puerta 0 ni otro), se guardó sin fallos y su lastModified es
+ * posterior al cortado.
+ */
+export function debeLimpiarCortado(
+  cortado: { modificado: number } | null,
+  pieza: { tipo: MatrixFileKind; modificado: number } | null,
+  sinFallos: boolean,
+): boolean {
+  return cortado !== null && sinFallos && pieza !== null && pieza.tipo === 'PIEZA_PIEZA' && pieza.modificado > cortado.modificado
+}
+
+/** Varios cortados: como referencia queda el de fecha máxima. Empate: se queda el actual. */
+export function cortadoMasReciente(actual: CortadoInfo | null, nuevo: CortadoInfo): CortadoInfo {
+  return actual === null || nuevo.modificado > actual.modificado ? nuevo : actual
+}
+
+/** Resultado por archivo, guardado en IndexedDB (regla 5: «visto» no es «cargado»). */
+export type TipoResultado = 'cargado' | 'omitido' | 'cortado' | 'vacio' | 'fallido'
+export interface ResultadoArchivo {
+  tipo: TipoResultado
+  tipoArchivo: 'PIEZA_PIEZA' | 'OTRO'
+  archivo: string
+  modificado: number
+  detectadoEn: number
+  mensaje?: string
+}
+
+/** Último Pieza a pieza procesado con datos (cargado u omitido). Un Puerta 0 o un error no cuentan. */
+export function ultimaPiezaProcesada(resultados: readonly ResultadoArchivo[]): number | null {
+  const ts = resultados
+    .filter((r) => r.tipoArchivo === 'PIEZA_PIEZA' && (r.tipo === 'cargado' || r.tipo === 'omitido'))
+    .map((r) => r.modificado)
+  return ts.length > 0 ? Math.max(...ts) : null
+}
+
+/** El «último» de la carpeta solo cambia con un Pieza a pieza: un Puerta 0 no puede ocultar un error o un vacío. */
+export function ultimoTrasResultado(
+  ultimo: UltimoResultado | null,
+  tipoArchivo: 'PIEZA_PIEZA' | 'OTRO',
+  nuevo: UltimoResultado,
+): UltimoResultado | null {
+  return tipoArchivo === 'PIEZA_PIEZA' ? nuevo : ultimo
+}
+
+/** Recorta un mapa de resultados a los `max` más recientes (por detectadoEn). */
+export function recortarResultados<T extends { detectadoEn: number }>(mapa: Record<string, T>, max = 200): Record<string, T> {
+  const claves = Object.keys(mapa)
+  if (claves.length <= max) return mapa
+  const orden = [...claves].sort((a, b) => mapa[b]!.detectadoEn - mapa[a]!.detectadoEn).slice(0, max)
+  return Object.fromEntries(orden.map((k) => [k, mapa[k]!]))
+}
+
+/** Hash FNV-1a de 64 bits (dos pasadas) en hex, determinista para una clave de archivo. */
+function fnv1a(s: string, semilla: number): number {
+  let h = semilla >>> 0
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return h >>> 0
+}
+export function hashClave(clave: string): string {
+  return fnv1a(clave, 0x811c9dc5).toString(16).padStart(8, '0') + fnv1a(clave, 0x9e3779b9).toString(16).padStart(8, '0')
+}
+
+/** ID de upload de la subida automática: el mismo para la misma clave, así un reintento reanuda. */
+export function idSubidaAutomatica(clave: string): string {
+  return `cm-${hashClave(clave)}`
 }
 
 /**
@@ -162,6 +229,7 @@ export type UltimoResultado =
     }
   | { tipo: 'omitido'; archivo: string; detectadoEn: number }
   | { tipo: 'fallo'; archivo: string; mensaje: string; detectadoEn: number }
+  | { tipo: 'vacio'; archivo: string; detectadoEn: number }
 
 export interface CortadoInfo {
   archivo: string
@@ -203,7 +271,7 @@ export interface HechosCarpeta {
 export function derivarEstado(h: HechosCarpeta): EstadoCarpeta {
   if (!h.autorizada) return 'sin-autorizar'
   if (!h.permisoConcedido) return 'permiso'
-  if (h.errorReciente || h.ultimo?.tipo === 'fallo') return 'error'
+  if (h.errorReciente || h.ultimo?.tipo === 'fallo' || h.ultimo?.tipo === 'vacio') return 'error'
   if (h.cortado !== null) return 'cortado'
   if (h.demasiados) return 'demasiados'
   if (!h.alDia) return 'viejo'

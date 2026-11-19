@@ -56,7 +56,7 @@ function Punto({ estado }: { estado: EstadoCarpeta }) {
 /** Línea bajo el título de Análisis de turno. */
 export function CargaAutomaticaAviso() {
   const visible = useCargaAutomaticaVisible()
-  const { estado, ultimo, cortado, ultimoPiezaAPieza, errorTexto } = useCarpetaMatrixEstado()
+  const { estado, ultimo, ultimoPiezaAPieza, errorTexto } = useCarpetaMatrixEstado()
   const navigate = useNavigate()
   const [ayudaAbierta, setAyudaAbierta] = useState(false)
   if (!visible) return null
@@ -111,7 +111,7 @@ export function CargaAutomaticaAviso() {
         <Punto estado={estado} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">La carga automática está apagada</p>
-          <p className="text-xs text-muted-foreground">Elige la carpeta donde guardas los exportes de Matrix.</p>
+          <p className="text-xs text-muted-foreground">Elige la carpeta donde guardas los exportes de Matrix. Solo se lee; nunca se escribe en ella.</p>
         </div>
         <Button size="sm" onClick={() => void elegirCarpetaMatrix()}>Elegir carpeta</Button>
       </div>
@@ -141,8 +141,7 @@ export function CargaAutomaticaAviso() {
               Exporte cortado en {CM_REGISTROS_CORTE.toLocaleString("es-CL")} registros
             </p>
             <p className="text-xs text-muted-foreground">
-              Faltan piezas. Este archivo no se usa hasta que llegue el completo.
-              {cortado ? ` (${cortado.archivo})` : ""}
+              Faltan piezas. Desmarca el límite de registros en Matrix y exporta de nuevo.
             </p>
           </div>
           <Button size="sm" variant="secondary" onClick={() => setAyudaAbierta((v) => !v)} aria-expanded={ayudaAbierta}>
