@@ -493,19 +493,22 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, ref
     setSortField(prev => { if (prev === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev } setSortDir('asc'); return field })
   }, [])
 
+  // La búsqueda va primero y los chips cuentan sobre lo buscado: con una búsqueda escrita, la cifra
+  // de cada chip sigue siendo el número de filas que aparecen al pulsarlo.
+  const buscados = useMemo(() => {
+    if (!searchQuery.trim()) return items
+    const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
+    return items.filter(i => {
+      const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${(i.nombresComunes ?? []).join(' ')} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
+      return haystackMatchesAll(h, terms)
+    })
+  }, [items, searchQuery])
+
   const filtered = useMemo(() => {
     // Un solo sitio decide quien queda en cada filtro (filtrosDeStock.ts). Las tarjetas de
     // arriba cuentan con el MISMO predicado, asi que su numero es siempre el de filas que
     // aparecen al pulsarlas — que es justo lo que se habia roto tres veces en este modulo.
-    let result = aplicarFiltroDeStock(items, stockFilter)
-
-    if (searchQuery.trim()) {
-      const terms = normalizeForSearch(searchQuery).split(/\s+/).filter(Boolean)
-      result = result.filter(i => {
-        const h = normalizeForSearch(`${i.codigoSAP} ${i.codigoFabricante} ${i.textoBreve} ${i.alias || ''} ${(i.nombresComunes ?? []).join(' ')} ${i.ubicacionBodega} ${i.proveedor || ''} ${i.tipo || ''}`)
-        return haystackMatchesAll(h, terms)
-      })
-    }
+    let result = aplicarFiltroDeStock(buscados, stockFilter)
 
     const dir = sortDir === 'asc' ? 1 : -1
     result = [...result].sort((a, b) => {
@@ -528,7 +531,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, ref
       }
     })
     return result
-  }, [items, stockFilter, searchQuery, sortField, sortDir])
+  }, [buscados, stockFilter, sortField, sortDir])
 
   // Otra búsqueda, filtro u orden: primera página. No depende de `items`, para que un dato
   // nuevo o un favorito no devuelva al técnico al comienzo de la lista.
@@ -696,6 +699,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, ref
       <div className={claseLista}>
       <StockListaMovil
         items={items}
+        contables={buscados}
         filtradas={filtered}
         filtro={stockFilter}
         onFiltro={setStockFilter}

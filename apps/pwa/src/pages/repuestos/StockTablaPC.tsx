@@ -10,7 +10,7 @@ import { BOTON_PC, fechaConteoCorta } from './datosFichaPieza'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
 import { ESTADO_VISIBLE_TEXTO, estadoVisibleDeStock, type EstadoVisible } from '@/hooks/repuestos/estadoDeStock'
-import { contarParaFiltro, FILTROS_DE_STOCK, type FiltroRapido, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
+import { FILTROS_DE_STOCK, type FiltroRapido, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
 import type { BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 import {
   CLASE_TEXTO, FILTROS_INICIALES, FILTROS_LIMPIOS, OTROS, facetas, filasDeTablaPC,
@@ -161,7 +161,10 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
     setF(p => ({ ...p, [g]: p[g].includes(v) ? p[g].filter(x => x !== v) : [...p[g], v] }))
   const activos = GRUPOS_MAS.flatMap(({ g, texto }) => f[g].map(v => ({ g, v, t: texto(v) })))
   const mismos = (a: readonly string[], b: string[]) => a.length === b.length && b.every(x => a.includes(x))
-  const cuenta = (k: StockFilterKey | 'todos') => (k === 'todos' ? items.length : contarParaFiltro(items, k))
+  // Cada chip cuenta por la MISMA ruta que la tabla (con la búsqueda y «Más filtros» aplicados):
+  // su cifra es el número de filas que quedan al pulsarlo.
+  const cuentaEstado = (estados: string[]) => filasDeTablaPC(items, { ...f, estado: estados }, busca, null).length
+  const cuentaRapido = (k: FiltroRapido) => filasDeTablaPC(items, { ...f, estado: [] }, busca, k).length
 
   const unidades = visibles.reduce((a, i) => a + (i.bodegaId ? i.stockActual : 0), 0)
   const valor = visibles.reduce((a, i) => a + valorTotal(i), 0)
@@ -202,7 +205,7 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
               key={p.k}
               on={rapido === null && mismos(f.estado, p.estados)}
               punto={PUNTO_CHIP[p.k]}
-              cifra={cuenta(p.k)}
+              cifra={cuentaEstado(p.estados)}
               onClick={() => { setRapido(null); setF(x => ({ ...x, estado: p.estados })) }}
             >
               {p.t}
@@ -213,7 +216,7 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
             <Chip
               key={k}
               on={rapido === k}
-              cifra={cuenta(k)}
+              cifra={cuentaRapido(k)}
               onClick={() => {
                 if (rapido === k) { setRapido(null); setF(x => ({ ...x, estado: ESTADOS_CONFIGURADOS })) }
                 else { setRapido(k); setF(x => ({ ...x, estado: [] })) }

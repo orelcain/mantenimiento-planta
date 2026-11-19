@@ -34,6 +34,8 @@ const CHIPS: Chip[] = [
 
 interface Props {
   items: BodegaMergedItem[]
+  /** Sobre qué cuentan los chips: lo que deja la búsqueda (así la cifra = filas al pulsar). Sin esto, `items`. */
+  contables?: BodegaMergedItem[]
   /** La lista ya filtrada y ordenada (la que cuenta «Exportar CSV»). */
   filtradas: BodegaMergedItem[]
   filtro: StockFilterKey
@@ -58,7 +60,7 @@ interface Props {
 }
 
 export function StockListaMovil({
-  items, filtradas, filtro, onFiltro, busca, onBusca, limite, onMas,
+  items, contables = items, filtradas, filtro, onFiltro, busca, onBusca, limite, onMas,
   ordenCampo, ordenDir, onOrden, titulo, pie, acciones, pedidos, inventario, fila,
 }: Props) {
   const chips = [...(contarParaFiltro(items, 'alertas') > 0 || filtro === 'alertas' ? [ALERTAS] : []), ...CHIPS]
@@ -94,7 +96,7 @@ export function StockListaMovil({
               {Icono && <Icono className="size-3.5" />}
               {c.label}
               <span className={cn('text-footnote font-semibold tabular-nums', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                {contarParaFiltro(items, c.key)}
+                {contarParaFiltro(contables, c.key)}
               </span>
             </button>
           )
