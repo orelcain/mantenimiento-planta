@@ -27,6 +27,7 @@ import { esperadoPorMinuto, int, minutosCompletos, partesAdelanteAtras, relojDe,
 import { ChevronFranja, RotuloFranja, Tocable } from './FranjaTocable'
 import type { EjeDatos } from './GraficoRitmoVivo'
 import type { MonitorV2Props } from './MonitorV2'
+import type { HoraExtra } from './horaExtra'
 import { filasDeBaader, TEXTO_ESTADO } from './baadersMinuto'
 import { PiezasBaader, RitmoBaaders } from './RitmoBaaders'
 import type { RelojDeDatos } from './useRelojDeDatos'
@@ -66,7 +67,7 @@ const COLOR_TONO: Record<TonoRitmo, string> = { bien: 'var(--v2-acento)', atento
  * barra con `scaleX` (transform). Sin meta, solo la cifra. Cerrado, o con la cuota ya en la meta, no hay raya ni parte
  * derecha: «lo que tocaba a esta hora» ya no dice nada.
  */
-function PiezasVivas({ reloj, respaldo, meta, cuota, cerrado }: { reloj: RelojDeDatos; respaldo: number; meta: number | null; cuota: number | null; cerrado: boolean }) {
+function PiezasVivas({ reloj, respaldo, meta, cuota, cerrado, extra }: { reloj: RelojDeDatos; respaldo: number; meta: number | null; cuota: number | null; cerrado: boolean; extra?: HoraExtra | null }) {
   const pctRef = useRef<HTMLElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const ultimo = useRef('')
@@ -102,6 +103,14 @@ function PiezasVivas({ reloj, respaldo, meta, cuota, cerrado }: { reloj: RelojDe
           </p>
         </>
       ) : null}
+      {/* La hora extra ya va en la cifra: se dice cuánto y entre qué horas, para que nadie crea que el monitor cortó en el fin
+          programado (reclamo del 19-11 en Chonchi, «corta a las 05:00», que no era corte). */}
+      {extra?.despues && (
+        <p className="fc-nota fc-nota-extra tabular-nums">
+          <i className="fc-punto-extra" aria-hidden />
+          <span className="min-w-0"><b>+{int(extra.despues.piezas)}</b> hora extra · <span className="whitespace-nowrap">{extra.despues.desde.slice(11, 16)}–{extra.despues.hasta.slice(11, 16)}</span></span>
+        </p>
+      )}
     </>
   )
 }
@@ -308,7 +317,7 @@ export function FranjaCinta({ p, reloj, ampliadoPiezas, ventanaPiezasPC, abrir, 
           <div className="fc-cab">
             <RotuloFranja tocable>Piezas del turno</RotuloFranja>
           </div>
-          <PiezasVivas reloj={reloj} respaldo={p.piezas} meta={p.meta && p.meta > 0 ? p.meta : null} cuota={p.cuota?.piezas ?? null} cerrado={p.cerrado} />
+          <PiezasVivas reloj={reloj} respaldo={p.piezas} meta={p.meta && p.meta > 0 ? p.meta : null} cuota={p.cuota?.piezas ?? null} cerrado={p.cerrado} extra={p.horaExtra} />
         </Tocable>
         {pc && ventanaPiezasPC
           ? ventanaPiezasPC(ampliada, () => setAmpliada(false))

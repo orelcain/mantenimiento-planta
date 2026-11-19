@@ -125,6 +125,10 @@ function CuerpoPiezas({ onClose, p, mostradas, grafico, previo, vsAyer }: Piezas
         ? <Clave k="Sobre la meta" v={hechas > meta ? `${int(hechas - meta)} pz` : 'en la meta'} />
         : <Clave k={p.cerrado ? 'Faltaron' : 'Faltan'} v={`${int(meta - hechas)} pz`} />)}
       {!p.cerrado && vivas?.cuota != null && <Clave k={`Meta a las ${vivas.tMs != null ? relojDe(vivas.tMs) : 'esta hora'}`} v={`${int(vivas.cuota)} pz`} />}
+      {/* Lo mismo que el detalle del celular: la hora extra que Shoplogix ya contó, separada del horario. */}
+      {p.horaExtra && <Clave k="En horario" v={`${int(p.horaExtra.enHorario)} pz`} />}
+      {p.horaExtra && p.horaExtra.antes > 0 && <Clave k="Antes del horario" v={`+${int(p.horaExtra.antes)} pz`} />}
+      {p.horaExtra?.despues && <Clave k="Hora extra" v={`+${int(p.horaExtra.despues.piezas)} pz`} nota={`${p.horaExtra.despues.desde.slice(11, 16)}–${p.horaExtra.despues.hasta.slice(11, 16)}`} />}
       {/* El turno anterior y, en su propia fila, dónde queda este contra él: «6.685 atrás» junto a las piezas del otro se leía al revés. */}
       {prev && (
         <>
