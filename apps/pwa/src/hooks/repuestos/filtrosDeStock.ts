@@ -19,11 +19,22 @@ import { esAlertaDeStock, stockStatusOf, type ItemConStock } from './estadoDeSto
  * volver a divergir. Si mañana se agrega un filtro, se agrega aquí y el contador viene gratis.
  */
 
-export type StockFilterKey = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos' | 'alertas'
+export type StockFilterKey =
+  | 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos' | 'alertas' | 'sinEquipo' | 'sinContar'
+
+/** Filtros rápidos de la etapa 2: miran SOLO piezas de bodega (el universo de sus KPI). */
+export type FiltroRapido = 'sinEquipo' | 'sinContar'
 
 /** Lo mínimo que necesita un ítem para poder clasificarse. */
 export interface ItemFiltrable extends ItemConStock {
   isWatched?: boolean
+  equipos?: readonly { machineId?: string | null; machineName?: string }[]
+  ultimoConteoAt?: Date | null
+}
+
+/** ¿Tiene al menos un equipo real? machineId vacío = el marcador «Sin equipo» de useGlobalSearch. */
+export function tieneEquipo(i: Pick<ItemFiltrable, 'equipos'>): boolean {
+  return (i.equipos ?? []).some((e) => !!(e.machineId ?? '').trim())
 }
 
 export const FILTROS_DE_STOCK: Record<StockFilterKey, (item: ItemFiltrable) => boolean> = {
@@ -34,6 +45,8 @@ export const FILTROS_DE_STOCK: Record<StockFilterKey, (item: ItemFiltrable) => b
   sinConfig: (i) => !i.bodegaId,
   favoritos: (i) => !!i.isWatched,
   alertas: esAlertaDeStock,
+  sinEquipo: (i) => !!i.bodegaId && !tieneEquipo(i),
+  sinContar: (i) => !!i.bodegaId && !i.ultimoConteoAt,
 }
 
 /** Aplica el filtro. Es la ÚNICA forma en que la lista debe filtrarse. */

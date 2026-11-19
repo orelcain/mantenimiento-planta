@@ -33,6 +33,26 @@ export function stockStatusOf(item: ItemConStock): StockStatus {
   return 'ok'
 }
 
+/**
+ * Lo que dice la fila de Bodega. NO es una tercera definición: parte en dos solo el `out` de
+ * `stockStatusOf`. El chip «Sin stock» y el resto de la app siguen con `out` (cero = sin stock
+ * siempre); la fila aclara si ese cero tiene mínimo (alerta) o no (pendiente de configurar).
+ */
+export type EstadoVisible = 'ok' | 'bajo' | 'sinStock' | 'ceroSinMinimo' | 'sinConfig'
+
+export const ESTADO_VISIBLE_TEXTO: Record<EstadoVisible, string> = {
+  ok: 'Con stock', bajo: 'Bajo mínimo', sinStock: 'Sin stock', ceroSinMinimo: 'En cero, sin mínimo', sinConfig: 'Sin configurar',
+}
+
+export function estadoVisibleDeStock(item: ItemConStock): EstadoVisible {
+  switch (stockStatusOf(item)) {
+    case 'unset': return 'sinConfig'
+    case 'out': return item.stockMinimo > 0 ? 'sinStock' : 'ceroSinMinimo'
+    case 'low': return 'bajo'
+    default: return 'ok'
+  }
+}
+
 export interface ConteoDeStock {
   ok: number
   low: number

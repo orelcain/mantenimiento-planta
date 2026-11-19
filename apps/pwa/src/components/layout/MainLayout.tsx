@@ -667,7 +667,7 @@ export function MainLayout() {
       aria-keyshortcuts="Control+K Meta+K"
     >
       <Search className="h-4 w-4" />
-      <span>Buscar</span>
+      <span>Buscar en la app</span>
       <kbd className="ml-3 font-sans text-footnote">{etiquetaAtajo()}</kbd>
     </button>
   )
