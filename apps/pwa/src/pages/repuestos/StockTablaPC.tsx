@@ -106,7 +106,7 @@ function Chip({ on, onClick, punto, cifra, children }: {
         on ? 'bg-primary font-semibold text-primary-foreground' : 'bg-muted font-medium text-foreground hover:bg-muted-foreground/[0.15]',
       )}
     >
-      {punto && <span aria-hidden className={cn('inline-block size-2 shrink-0 rounded-full', punto)} />}
+      {punto && <span aria-hidden className={cn('inline-block size-[8px] shrink-0 rounded-full', punto)} />}
       {children}
       <span className={cn('tabular-nums', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{cifra.toLocaleString('es-CL')}</span>
     </button>
@@ -331,7 +331,7 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
                   <td className="py-2 pr-3 text-right font-semibold tabular-nums">{i.bodegaId ? i.stockActual : <span className="font-normal text-muted-foreground/60">—</span>}</td>
                   <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{i.bodegaId && i.stockMinimo > 0 ? i.stockMinimo : '—'}</td>
                   <td className={cn('whitespace-nowrap py-2 pr-3 text-footnote', est === 'bajo' || est === 'sinStock' ? 'text-foreground' : 'text-muted-foreground')}>
-                    {punto && <span className={cn('mr-1.5 inline-block size-2 shrink-0 rounded-full align-[1px]', punto)} aria-hidden />}
+                    {punto && <span className={cn('mr-1.5 inline-block size-[8px] shrink-0 rounded-full align-[1px]', punto)} aria-hidden />}
                     {ESTADO_VISIBLE_TEXTO[est]}
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 text-footnote tabular-nums text-muted-foreground">

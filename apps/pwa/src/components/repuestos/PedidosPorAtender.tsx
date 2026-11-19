@@ -19,7 +19,7 @@ const PUNTO = { crit: 'bg-ink-crit', warn: 'bg-ink-warn', ok: '', neutro: 'bg-mu
 
 function Punto({ tono }: { tono: keyof typeof PUNTO }) {
   if (!PUNTO[tono]) return null
-  return <span className={cn('mr-1.5 inline-block size-2 shrink-0 rounded-full align-[1px]', PUNTO[tono])} aria-hidden />
+  return <span className={cn('mr-1.5 inline-block size-[8px] shrink-0 rounded-full align-[1px]', PUNTO[tono])} aria-hidden />
 }
 
 interface Props {
@@ -128,7 +128,7 @@ export function PedidosPorAtender({ solicitudes, esPC, stockDe, nombreDe, onAvan
         esPC ? 'pr-2' : 'pr-1.5',
       )}
     >
-      <span aria-hidden className="inline-block size-2 shrink-0 rounded-full bg-ink-warn" />
+      <span aria-hidden className="inline-block size-[8px] shrink-0 rounded-full bg-ink-warn" />
       <span className="whitespace-nowrap font-semibold text-foreground">{titulo}</span>
       {esPC ? <span className="min-w-0 flex-1 truncate text-muted-foreground">{detalle}</span> : <span className="flex-1" />}
       <Button

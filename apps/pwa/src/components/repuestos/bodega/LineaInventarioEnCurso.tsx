@@ -28,7 +28,7 @@ export function LineaInventarioEnCurso({ enCurso, onVer, compacta = false, ahora
   const masAntiguo = enCurso.reduce((a, b) => (b.createdAt.getTime() < a.createdAt.getTime() ? b : a))
   const hace = textoDiasAbierto(masAntiguo.createdAt, instante)
   const uno = enCurso.length === 1
-  const punto = <span aria-hidden className="inline-block size-2 shrink-0 rounded-full bg-ink-warn" />
+  const punto = <span aria-hidden className="inline-block size-[8px] shrink-0 rounded-full bg-ink-warn" />
 
   if (compacta) {
     return (

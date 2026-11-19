@@ -92,7 +92,7 @@ export function StockListaMovil({
                 on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]',
               )}
             >
-              {c.punto && <span className={cn('size-2 rounded-full', c.punto)} aria-hidden />}
+              {c.punto && <span className={cn('size-[8px] shrink-0 rounded-full', c.punto)} aria-hidden />}
               {Icono && <Icono className="size-3.5" />}
               {c.label}
               <span className={cn('text-footnote font-semibold tabular-nums', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>

@@ -1917,7 +1917,7 @@ export function BodegaRow({ item, apple, orden, onEdit, onMovimiento, onToggleWa
           <span className="flex flex-col items-end">
             {has
               ? <span className="flex items-center gap-1.5 text-title3 font-semibold leading-tight tabular-nums text-foreground">
-                  {puntoFila && <span aria-hidden className={cn('inline-block size-2 shrink-0 rounded-full', puntoFila)} />}
+                  {puntoFila && <span aria-hidden className={cn('inline-block size-[8px] shrink-0 rounded-full', puntoFila)} />}
                   {item.stockActual}<span className="ml-1 text-footnote font-normal text-muted-foreground">{item.unidad}</span>
                 </span>
               : <span className="text-title3 leading-tight text-muted-foreground/50">—</span>}
