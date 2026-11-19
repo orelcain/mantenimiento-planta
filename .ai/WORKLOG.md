@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-19 · claude · Ficha de Bodega: contar, copiar y asignar equipo (PR #1461)
+- Hecho: la ficha de Bodega cuenta (movimiento «Conteo físico» + sello), copia SAP/fabricante/ubicación y asigna o quita equipo con el diálogo de Áreas; «piezas en alerta» solo cuenta las con mínimo (79 reales, decía 646); motivo «Cuadre de existencias»; valor «—» sin costo; vitrina /dev/ficha-bodega.
+- Archivos: apps/pwa/src (pages/repuestos, hooks/repuestos, components/repuestos/AsignarEquipoDialog, pages/dev/FichaBodegaDevPage).
+- Verificación: tsc, eslint, vitest 6223 en verde, build y CI «build» OK; «Cuadre de existencias» presente en el bundle publicado (BodegaView). Merge bf73a0fd.
+- Estado: HECHO en prod. Línea base 18-11: 131 de 2.408 piezas con conteo (5,4 %); 41,2 % de SAP con equipo.
+- Sigue: verificar guardado real en Firestore y encabezado con datos reales; asignar/quitar equipo sin transacción (igual que Áreas).
+
 ## 2026-11-11 · claude · ARIA: escritura de repuestos en un módulo + endpoint para Aiko
 - Hecho: los tres escritores de repuestos de ARIA (`ariaAdjuntarFotoARepuesto`, `ariaCrearRepuestoNuevo`, `ariaEditarRepuesto`) pasan a `functions/ariaRepuestos.js` con dependencias inyectadas; index.js deja envoltorios con el mismo nombre y firma. Nuevo `completar` (varios campos, solo vacíos) y endpoint `ariaRepuestoDesdeFoto` para que Aiko pida a ARIA grabar lo que Orel aprobó con ✅ (regla «ARIA y Aiko en piedra»).
 - Seguridad: solo POST, sin CORS, `maxInstances: 2`, token OIDC de la cuenta de servicio del proyecto (audiencia = URL de la función), lista blanca de campos, SAP de 7-10 dígitos, búsqueda por id y por `codigoSAP`, 409 si ya existe, si no es único o si un campo ya tiene valor.
