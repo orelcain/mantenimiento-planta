@@ -257,7 +257,7 @@ export function DiagnosticoMatrixPage() {
             </p>
           )}
           {analisis && !analizandoRuta && (
-            <div className="rounded-md border border-border/60 p-3 text-sm space-y-1">
+            <div className="rounded-ctl border border-border/60 p-3 text-sm space-y-1">
               <div className="text-xs text-muted-foreground">{analisis.nombre}</div>
               {analisis.ok ? (
                 <>
