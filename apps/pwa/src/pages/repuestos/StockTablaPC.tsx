@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { BOTON_PC } from './datosFichaPieza'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { nombreVisible } from '@/utils/repuestos/nombreVisible'
-import { stockStatusOf, type StockStatus } from '@/hooks/repuestos/estadoDeStock'
+import { desgloseDeAlertas, stockStatusOf, type StockStatus } from '@/hooks/repuestos/estadoDeStock'
 import { contarParaFiltro, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
 import type { BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 import {
@@ -116,9 +116,9 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
   const mismos = (a: readonly string[], b: string[]) => a.length === b.length && b.every(x => a.includes(x))
   const cuenta = (k: StockFilterKey | 'todos') => (k === 'todos' ? items.length : contarParaFiltro(items, k))
 
-  const bajo = contarParaFiltro(items, 'bajo')
-  const sin = contarParaFiltro(items, 'sin')
   const config = contarParaFiltro(items, 'configurados')
+  // Alerta = bajo mínimo + sin stock CON mínimo. El cero sin mínimo no alerta: va aparte.
+  const desglose = desgloseDeAlertas(items)
   const unidades = visibles.reduce((a, i) => a + (i.bodegaId ? i.stockActual : 0), 0)
   const valor = visibles.reduce((a, i) => a + valorTotal(i), 0)
   const ordenTexto = { nombre: 'nombre', ubicacion: 'ubicación', maquina: 'equipo', stock: 'stock', minimo: 'mínimo', estado: 'estado', valor: 'valor' }[orden.c]
@@ -149,7 +149,7 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
       <div className="flex flex-col gap-1">
         <h2 className="text-[length:calc(17px*var(--escala-texto,1))] font-semibold text-foreground">Stock</h2>
         <p className="text-[length:calc(15px*var(--escala-texto,1))] text-muted-foreground">
-          <span className="text-foreground">{(bajo + sin).toLocaleString('es-CL')} piezas en alerta</span>: {bajo.toLocaleString('es-CL')} bajo mínimo y {sin.toLocaleString('es-CL')} sin stock, de {config.toLocaleString('es-CL')} configuradas.
+          <span className="text-foreground">{desglose.alertas.toLocaleString('es-CL')} piezas en alerta</span>: {desglose.bajoMinimo.toLocaleString('es-CL')} bajo mínimo y {desglose.sinStockConMinimo.toLocaleString('es-CL')} sin stock, de {config.toLocaleString('es-CL')} configuradas.{desglose.enCeroSinMinimo > 0 && ` Otras ${desglose.enCeroSinMinimo.toLocaleString('es-CL')} están en cero sin mínimo definido.`}
         </p>
       </div>
 

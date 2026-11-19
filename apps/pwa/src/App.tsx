@@ -38,6 +38,7 @@ const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuert
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
 const BitacoraRealDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraRealDevPage })))
 const BuscadorDevPage = lazyWithReload(() => import('@/pages/dev/BuscadorDevPage').then((mod) => ({ default: mod.BuscadorDevPage })))
+const FichaBodegaDevPage = lazyWithReload(() => import('@/pages/dev/FichaBodegaDevPage').then((mod) => ({ default: mod.FichaBodegaDevPage })))
 const PaseBitacoraDevPage = lazyWithReload(() => import('@/pages/dev/PaseBitacoraDevPage').then((mod) => ({ default: mod.PaseBitacoraDevPage })))
 const AcrDevPage = lazyWithReload(() => import('@/pages/dev/AcrDevPage').then((mod) => ({ default: mod.AcrDevPage })))
 const PendientesDevPage = lazyWithReload(() => import('@/pages/dev/PendientesDevPage').then((mod) => ({ default: mod.PendientesDevPage })))
@@ -594,6 +595,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <BuscadorDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/ficha-bodega"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <FichaBodegaDevPage />
                     </Suspense>
                   }
                 />

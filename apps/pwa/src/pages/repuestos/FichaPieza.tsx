@@ -11,13 +11,16 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, Download, ImagePlus, Loader2, MoreHorizontal, Printer, Search, Shapes } from 'lucide-react'
+import { ChevronLeft, Copy, Download, ImagePlus, Loader2, MoreHorizontal, Printer, Search, Shapes } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/piel'
+import { Input } from '@/components/ui'
 import { FilasLectura, LECTURA_CUERPO, LECTURA_NOTA, LECTURA_TITULO, SeccionLectura, type FilaLectura } from '@/components/piel/Lectura'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { useToast } from '@/hooks/useToast'
+import { AREA_TACTIL } from '@/lib/areaTactil'
+import { copiarTexto } from '@/lib/clipboard'
 import { escapeHtml } from '@/lib/escapeHtml'
 import { cn } from '@/lib/utils'
 import { dec1 } from '@/utils/formatoNumeros'
@@ -51,11 +54,18 @@ interface Props {
   addPhoto?: (sap: string, file: File) => Promise<string>
   onViewInEquipo?: (machineId: string) => void
   onSearchSimilar?: (query: string) => void
+  /** Agregar o asignar un equipo (abre el selector de equipos). Sin esto no se muestra la acción. */
+  onAsignarEquipo?: () => void
+  /** Quita el equipo de la pieza, con todos sus machineId de la fila (la confirmación la pone la ficha). Si falla, el padre avisa y lanza el error. */
+  onQuitarEquipo?: (machineIds: string[]) => Promise<void>
+  /** Registra un conteo físico: deja «Conteo físico» en movimientos y sella la fecha del conteo. */
+  onContar?: (contado: number) => Promise<void>
 }
 
 export function FichaPieza({
   item, esPC, origen, onVolver, onAnterior, onSiguiente, loadMovimientos, calcReorderData, dibujo, pedidos,
   onAvanzarPedido, onSolicitar, onMovimiento, onEditar, addPhoto, onViewInEquipo, onSearchSimilar,
+  onAsignarEquipo, onQuitarEquipo, onContar,
 }: Props) {
   const { toast } = useToast()
   const [movs, setMovs] = useState<MovimientoBodega[]>([])
@@ -63,6 +73,13 @@ export function FichaPieza({
   const [visor, setVisor] = useState<number | null>(null)
   const [subiendo, setSubiendo] = useState(false)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  const [contando, setContando] = useState(false)
+  const [conteoVal, setConteoVal] = useState('')
+  const [guardandoConteo, setGuardandoConteo] = useState(false)
+  const [quitar, setQuitar] = useState<{ machineIds: string[]; nombre: string } | null>(null)
+  const [quitando, setQuitando] = useState(false)
+  // Cambia con cada movimiento o conteo: así la tabla de movimientos se recarga sola.
+  const versionMovs = `${item.stockActual}|${item.ultimoConteoAt?.getTime() ?? 0}`
 
   useEffect(() => {
     let vivo = true
@@ -73,7 +90,7 @@ export function FichaPieza({
       .catch(() => {})
       .finally(() => { if (vivo) setCargandoMovs(false) })
     return () => { vivo = false }
-  }, [item.bodegaId, loadMovimientos])
+  }, [item.bodegaId, loadMovimientos, versionMovs])
 
   const nv = nombreVisible(item)
   const titulo = nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : `Sin nombre · SAP ${item.codigoSAP}`
@@ -116,6 +133,38 @@ export function FichaPieza({
     w.document.close()
   }
 
+  const copiar = (valor: string) => {
+    copiarTexto(valor)
+      .then(() => toast({ title: 'Copiado', description: valor }))
+      .catch(() => toast({ title: 'No se pudo copiar', variant: 'destructive' }))
+  }
+  // Botón de copiar: área táctil de 44 px sin agrandar la línea donde va (negativo vertical).
+  const botonCopiar = (valor: string, etiqueta: string) => (
+    <button type="button" onClick={() => copiar(valor)} aria-label={`Copiar ${etiqueta}`}
+            className={cn(AREA_TACTIL, '-my-3 shrink-0 rounded-full text-muted-foreground hover:text-foreground')}>
+      <Copy className="size-4" aria-hidden />
+    </button>
+  )
+
+  const guardarConteo = async () => {
+    // Number y no parseInt: «2,5» litros es un conteo válido y parseInt lo guardaba como 2.
+    const texto = conteoVal.trim().replace(',', '.')
+    const n = texto === '' ? Number.NaN : Number(texto)
+    if (!onContar || !Number.isFinite(n) || n < 0) return
+    setGuardandoConteo(true)
+    try { await onContar(n); setContando(false); setConteoVal('') }
+    catch { /* el padre ya avisó con un toast; el campo sigue con el número */ }
+    finally { setGuardandoConteo(false) }
+  }
+
+  const confirmarQuitar = async () => {
+    if (!quitar || !onQuitarEquipo) return
+    setQuitando(true)
+    try { await onQuitarEquipo(quitar.machineIds); setQuitar(null) }
+    catch { /* el padre ya avisó; la confirmación queda abierta */ }
+    finally { setQuitando(false) }
+  }
+
   const avanzar = async (p: SolicitudRepuesto, next: SolicitudEstado) => {
     if (!onAvanzarPedido) return
     setOcupado(p.id)
@@ -130,7 +179,7 @@ export function FichaPieza({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[13rem]">
-        {!esPC && onEditar && <DropdownMenuItem className="gap-2 py-2" onClick={onEditar}>{configurado ? 'Editar stock' : 'Configurar en bodega'}</DropdownMenuItem>}
+        {!esPC && onEditar && <DropdownMenuItem className="gap-2 py-2" onClick={onEditar}>{configurado ? 'Editar datos de bodega' : 'Configurar en bodega'}</DropdownMenuItem>}
         {onSearchSimilar && <DropdownMenuItem className="gap-2 py-2" onClick={() => onSearchSimilar(item.textoBreve || item.codigoSAP)}><Search className="size-4 text-muted-foreground" />Buscar similares en Áreas</DropdownMenuItem>}
         <DropdownMenuItem className="gap-2 py-2" onClick={qrComoPng}><Download className="size-4 text-muted-foreground" />Descargar QR</DropdownMenuItem>
         <DropdownMenuItem className="gap-2 py-2" onClick={imprimirQr}><Printer className="size-4 text-muted-foreground" />Imprimir etiqueta QR</DropdownMenuItem>
@@ -181,16 +230,16 @@ export function FichaPieza({
     </figure>
   )
 
-  const cifras: { valor: string; rotulo: string; tono?: TonoEstado; mono?: boolean }[] = [
+  const cifras: { valor: string; rotulo: string; tono?: TonoEstado; mono?: boolean; copiar?: boolean }[] = [
     { valor: configurado ? String(item.stockActual) : '—', rotulo: esPC && configurado ? `en bodega · ${item.unidad || 'pzas'}` : 'en bodega', tono: estado.tono },
     { valor: configurado && item.stockMinimo > 0 ? String(item.stockMinimo) : '—', rotulo: 'mínimo' },
-    { valor: configurado ? pesos(valorEnBodega(item)) : '—', rotulo: 'valor' },
-    { valor: ubicacion, rotulo: 'ubicación', mono: true },
+    { valor: configurado && valorEnBodega(item) !== 0 ? pesos(valorEnBodega(item)) : '—', rotulo: 'valor' },
+    { valor: ubicacion, rotulo: 'ubicación', mono: true, copiar: ubicacion !== '—' },
   ]
 
   const datos: FilaLectura[] = [
-    { rotulo: 'SAP', valor: <span className="font-mono">{item.codigoSAP || '—'}</span> },
-    { rotulo: 'Código de fabricante', valor: <span className="font-mono">{item.codigoFabricante || '—'}</span> },
+    { rotulo: 'SAP', valor: <span className="inline-flex items-center gap-1 font-mono">{item.codigoSAP || '—'}{item.codigoSAP && botonCopiar(item.codigoSAP, 'código SAP')}</span> },
+    { rotulo: 'Código de fabricante', valor: <span className="inline-flex items-center gap-1 font-mono">{item.codigoFabricante || '—'}{item.codigoFabricante && botonCopiar(item.codigoFabricante, 'código de fabricante')}</span> },
     ...(item.tipo ? [{ rotulo: 'Tipo', valor: item.tipo }] : []),
     ...(configurado ? [
       { rotulo: 'Proveedor', valor: item.proveedor || '—' },
@@ -209,7 +258,11 @@ export function FichaPieza({
           {esPC && masAcciones}
         </div>
         <p className={cn(LECTURA_CUERPO, 'text-muted-foreground')}>
-          {[subtitulo, item.codigoSAP && `SAP ${item.codigoSAP}`, item.codigoFabricante && `fab. ${item.codigoFabricante}`].filter(Boolean).join(' · ')}
+          {[
+            subtitulo,
+            item.codigoSAP ? <span key="sap" className="inline-flex items-center align-middle">SAP {item.codigoSAP}{botonCopiar(item.codigoSAP, 'código SAP')}</span> : null,
+            item.codigoFabricante ? `fab. ${item.codigoFabricante}` : null,
+          ].filter(Boolean).map((parte, n) => <span key={n}>{n > 0 && ' · '}{parte}</span>)}
         </p>
       </div>
 
@@ -217,7 +270,10 @@ export function FichaPieza({
         {cifras.map((c, n) => (
           <div key={c.rotulo} className={cn('flex min-w-0 flex-col gap-0.5', esPC ? 'pr-4' : 'pr-2', n > 0 && (esPC ? 'border-l border-border pl-4' : 'border-l border-border pl-2.5'), n === cifras.length - 1 && 'pr-0')}>
             <dt className={cn('order-2', LECTURA_NOTA)}>{c.rotulo}</dt>
-            <dd className={cn('m-0 order-1', CIFRA, c.mono && 'font-mono', c.tono ? CIFRA_TONO[c.tono] : 'text-foreground')}>{c.valor}</dd>
+            <dd className={cn('m-0 order-1 inline-flex items-center gap-1', CIFRA, c.mono && 'font-mono', c.tono ? CIFRA_TONO[c.tono] : 'text-foreground')}>{c.copiar && !esPC
+              // Celular: la celda mide ~80 px y el icono partía «C-3» en dos líneas; se copia tocando el valor.
+              ? <button type="button" onClick={() => copiar(c.valor)} aria-label={`Copiar ${c.rotulo}`} className="-my-3 min-h-11 min-w-11 whitespace-nowrap text-left">{c.valor}</button>
+              : <><span className="whitespace-nowrap">{c.valor}</span>{c.copiar && botonCopiar(c.valor, c.rotulo)}</>}</dd>
           </div>
         ))}
       </dl>
@@ -227,10 +283,36 @@ export function FichaPieza({
         {estado.texto}
       </p>
 
-      {(onSolicitar || onMovimiento || onEditar) && (
+      {contando && onContar ? (
+        <div className="flex flex-col gap-2" data-testid="ficha-contar">
+          <label htmlFor="ficha-conteo" className={LECTURA_CUERPO}>¿Cuántas hay ahora?</label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              id="ficha-conteo"
+              type="number"
+              min={0}
+              inputMode="decimal"
+              autoFocus
+              value={conteoVal}
+              onChange={(e) => setConteoVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void guardarConteo()
+                else if (e.key === 'Escape') { setContando(false); setConteoVal('') }
+              }}
+              disabled={guardandoConteo}
+              className={cn('w-28 tabular-nums', esPC ? 'h-9' : 'h-11 text-[length:calc(17px*var(--escala-texto,1))]')}
+            />
+            <Button size={esPC ? 'sm' : 'md'} className={esPC ? BOTON_PC : cn(BOTON_CEL, 'flex-1')} disabled={guardandoConteo || conteoVal.trim() === ''} onClick={() => void guardarConteo()}>
+              {guardandoConteo && <Loader2 className="size-4 animate-spin" aria-hidden />}Guardar conteo
+            </Button>
+            <Button variant="plain" size={esPC ? 'sm' : 'md'} className={esPC ? BOTON_PC : BOTON_CEL} disabled={guardandoConteo} onClick={() => { setContando(false); setConteoVal('') }}>Cancelar</Button>
+          </div>
+        </div>
+      ) : (onSolicitar || onMovimiento || onEditar || onContar) && (
         <div className="flex flex-wrap gap-2">
           {onSolicitar && item.codigoSAP && <Button size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : cn(BOTON_CEL, 'h-[50px] flex-1'))} onClick={onSolicitar}>Solicitar</Button>}
           {onMovimiento && configurado && <Button variant="tinted" size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : cn(BOTON_CEL, 'h-[50px] flex-1'))} onClick={onMovimiento}>Movimiento</Button>}
+          {onContar && item.codigoSAP && <Button variant="tinted" size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : cn(BOTON_CEL, 'h-[50px] flex-1'))} onClick={() => { setConteoVal(''); setContando(true) }}>Contar</Button>}
           {esPC && onEditar && <Button variant="tinted" size="sm" className={BOTON_PC} onClick={onEditar}>{configurado ? 'Editar' : 'Configurar en bodega'}</Button>}
         </div>
       )}
@@ -254,17 +336,41 @@ export function FichaPieza({
         </SeccionLectura>
       )}
 
-      <SeccionLectura titulo={`Dónde se usa · ${equipos.length} ${equipos.length === 1 ? 'equipo' : 'equipos'}`} testId="ficha-donde">
+      <SeccionLectura titulo={equipos.length > 0 ? `Dónde se usa · ${equipos.length} ${equipos.length === 1 ? 'equipo' : 'equipos'}` : 'Dónde se usa'} testId="ficha-donde">
         {equipos.length === 0
           ? <p className={LECTURA_NOTA}>No está asignado a ningún equipo.</p>
           : equipos.map((e) => (
             <div key={e.machineId} className={cn('flex items-center justify-between gap-3 border-t border-border py-2', LECTURA_CUERPO)}>
               <span className="min-w-0 truncate">{e.machineName}</span>
-              {onViewInEquipo && (
-                <button type="button" onClick={() => onViewInEquipo(e.machineId)} className="min-h-11 shrink-0 text-footnote text-brand-ink hover:underline lg:min-h-0">Ver en Áreas</button>
-              )}
+              <span className="flex shrink-0 items-center gap-3">
+                {onViewInEquipo && (
+                  <button type="button" onClick={() => onViewInEquipo(e.machineId)} className="min-h-11 text-footnote text-brand-ink hover:underline lg:min-h-0">Ver en Áreas</button>
+                )}
+                {onQuitarEquipo && (
+                  <button type="button" onClick={() => setQuitar({ machineIds: e.machineIds, nombre: e.machineName })} className="min-h-11 text-footnote text-ink-crit hover:underline lg:min-h-0">Quitar</button>
+                )}
+              </span>
             </div>
           ))}
+        {quitar && onQuitarEquipo && (
+          <div role="alertdialog" aria-label="Confirmar quitar equipo" className="flex flex-col gap-2 border-t border-border py-2">
+            <p className={LECTURA_CUERPO}>
+              ¿Quitar <strong>{quitar.nombre}</strong> de este repuesto?
+              {equipos.length === 1 && ' Quedará como material transversal, sin equipo.'}
+            </p>
+            <div className="flex gap-2">
+              <Button size={esPC ? 'sm' : 'md'} variant="destructive" className={esPC ? BOTON_PC : BOTON_CEL} disabled={quitando} onClick={() => void confirmarQuitar()}>
+                {quitando && <Loader2 className="size-4 animate-spin" aria-hidden />}Quitar
+              </Button>
+              <Button size={esPC ? 'sm' : 'md'} variant="plain" className={esPC ? BOTON_PC : BOTON_CEL} disabled={quitando} onClick={() => setQuitar(null)}>Cancelar</Button>
+            </div>
+          </div>
+        )}
+        {onAsignarEquipo && (
+          <button type="button" onClick={onAsignarEquipo} className="min-h-11 self-start text-footnote text-brand-ink hover:underline lg:min-h-0">
+            {equipos.length > 0 ? 'Agregar equipo' : 'Asignar a un equipo'}
+          </button>
+        )}
       </SeccionLectura>
 
       {reorden && (

@@ -110,6 +110,28 @@ describe('pedidos', () => {
   })
 })
 
+describe('equipos donde se usa', () => {
+  it('omite el marcador «Sin equipo» (machineId vacío): no es un equipo', () => {
+    const sinEquipo = pieza({ equipos: [{ machineId: '', machineName: 'Sin equipo' }] })
+    expect(equiposUnicos(sinEquipo)).toEqual([])
+  })
+  it('conserva los equipos reales aunque venga el marcador junto a ellos', () => {
+    const mezcla = pieza({ equipos: [{ machineId: '', machineName: 'Sin equipo' }, { machineId: 'b200', machineName: 'BAADER 200' }] })
+    expect(equiposUnicos(mezcla)).toEqual([{ machineId: 'b200', machineName: 'BAADER 200', machineIds: ['b200'] }])
+  })
+  it('un mismo equipo con varios machineId: la fila guarda todos y conserva el primero', () => {
+    const repetido = pieza({ equipos: [
+      { machineId: 'n1', machineName: 'CINTA 3' },
+      { machineId: 'n2', machineName: 'Cinta 3' },
+      { machineId: 'n3', machineName: 'BAADER 200' },
+    ] })
+    expect(equiposUnicos(repetido)).toEqual([
+      { machineId: 'n1', machineName: 'CINTA 3', machineIds: ['n1', 'n2'] },
+      { machineId: 'n3', machineName: 'BAADER 200', machineIds: ['n3'] },
+    ])
+  })
+})
+
 describe('formato', () => {
   it('cuándo: hoy, ayer o fecha', () => {
     const ahora = new Date('2026-11-10T12:00:00')

@@ -16,6 +16,8 @@ import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOf
 import { isCommonPartSap, machinesForCommonSap } from '@/data/commonPartsByMachine'
 import { esComun, esDespiece, contarCon } from '@/hooks/repuestos/filtrosDeRepuestos'
 import { quitarEquipoDeRepuesto } from '@/hooks/repuestos/quitarEquipo'
+import { agregarEquipoARepuesto } from '@/hooks/repuestos/asignarEquipo'
+import { AsignarEquipoDialog } from '@/components/repuestos/AsignarEquipoDialog'
 import { esCodigoSapValido } from '@/utils/repuestos/exportBomSAP'
 import { findMachineBySlug, LEARNING_MACHINES, isCourseMachine } from '@/data/learningMachines'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
@@ -501,7 +503,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
   const [asignarSapSaving, setAsignarSapSaving] = useState(false)
   // Asignar/añadir un equipo donde se usa el material (N:M). Fase 6.
   const [asignarEquipoOpen, setAsignarEquipoOpen] = useState(false)
-  const [asignarEquipoQuery, setAsignarEquipoQuery] = useState('')
   const [asignarEquipoSaving, setAsignarEquipoSaving] = useState(false)
 
   // ── Exportar (Wave 3) ──
@@ -1532,12 +1533,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       const src = resolveSources(selectedRep)[0]
       if (!src) { toast({ variant: 'destructive', title: 'No se encontró la pieza base' }); return }
       const rep = src.repuesto
-      if ((rep.equipos || []).includes(node.id)) { toast({ title: 'Ya está asignado a ese equipo' }); return }
+      const patch = agregarEquipoARepuesto(rep, node)
+      if (!patch) { toast({ title: 'Ya está asignado a ese equipo' }); return }
       setAsignarEquipoSaving(true)
       try {
-        const equipos = [...(rep.equipos || []), node.id]
-        const equiposCodigos = [...(rep.equiposCodigos || []), (node.codigo || '').trim() || `s/c:${node.nombre}`]
-        await crudUpdate('repuestos', rep.id, { equipos, equiposCodigos }, rep)
+        await crudUpdate('repuestos', rep.id, patch, rep)
         toast({ title: 'Equipo asignado', description: node.alias || node.nombre, variant: 'success' })
         setAsignarEquipoOpen(false)
         await refreshCatalog()
@@ -3042,7 +3042,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
           onSaveLocation={soloLectura ? undefined : handleSaveLocation}
           onSolicitar={soloLectura ? undefined : (r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve, nombresComunes: r.nombresComunes, stock: stockDeSolicitud(r) })}
           onAssignSap={soloLectura || selectedRep.codigoSAP ? undefined : () => { setAsignarSapValue(''); setAsignarSapOpen(true) }}
-          onAssignEquipo={soloLectura ? undefined : () => { setAsignarEquipoQuery(''); setAsignarEquipoOpen(true) }}
+          onAssignEquipo={soloLectura ? undefined : () => setAsignarEquipoOpen(true)}
           onRemoveEquipo={isAdmin ? handleQuitarEquipo : undefined}
           totalUnidades={totalUnidades}
           isAdmin={isAdmin}
@@ -3267,37 +3267,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed, pendingCreate,
       </Dialog>
 
       {/* Asignar/añadir equipo (nodo de jerarquía) donde se usa el material — N:M */}
-      <Dialog open={asignarEquipoOpen} onOpenChange={(o) => !o && setAsignarEquipoOpen(false)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-base">Asignar a un equipo</DialogTitle>
-            <DialogDescription>Elige el equipo de la planta donde se usa este material. Puedes agregar varios (un material sirve a N equipos).</DialogDescription>
-          </DialogHeader>
-          <Input value={asignarEquipoQuery} onChange={(e) => setAsignarEquipoQuery(e.target.value)} placeholder="Buscar equipo…" autoFocus />
-          <div className="mt-2 max-h-[50vh] space-y-1 overflow-y-auto">
-            {(() => {
-              const already = new Set((selectedRep?.equipos || []).map((e) => e.machineId))
-              const q = normalizeForSearch(asignarEquipoQuery)
-              const cands = (getGlobalEquipmentCache() || [])
-                .filter((e) => !e.oculto && !already.has(e.id) && (!q || normalizeForSearch(`${e.nombre} ${e.alias ?? ''} ${e.codigo ?? ''}`).includes(q)))
-                .slice(0, 50)
-              if (!cands.length) return <p className="px-1 py-2 text-xs text-muted-foreground">Sin equipos que coincidan.</p>
-              return cands.map((e) => (
-                <button
-                  key={e.id}
-                  disabled={asignarEquipoSaving}
-                  onClick={() => handleAsignarEquipo(e)}
-                  className="flex w-full items-center gap-2 rounded-card border border-border bg-card px-3 py-2 text-left text-sm transition hover:bg-muted hover:border-primary/40 disabled:opacity-50"
-                >
-                  <Cog className="h-4 w-4 shrink-0 text-cat-7-ink" />
-                  <span className="min-w-0 flex-1 truncate">{e.alias || e.nombre}</span>
-                  {e.codigo && <span className="shrink-0 font-mono text-caption text-muted-foreground">{e.codigo}</span>}
-                </button>
-              ))
-            })()}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AsignarEquipoDialog
+        open={asignarEquipoOpen}
+        onOpenChange={(o) => !o && setAsignarEquipoOpen(false)}
+        yaAsignados={(selectedRep?.equipos || []).map((e) => e.machineId)}
+        guardando={asignarEquipoSaving}
+        onElegir={handleAsignarEquipo}
+      />
 
       {/* Marcar como común de [máquina] — lista compartida (badge en tabla + pestaña de Aprendizaje) */}
       <Dialog open={comunPickerOpen} onOpenChange={(o) => !o && setComunPickerOpen(false)}>

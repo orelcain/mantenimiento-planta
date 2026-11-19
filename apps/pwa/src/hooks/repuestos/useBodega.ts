@@ -175,6 +175,8 @@ export interface MovimientoFormData {
   tipo: 'entrada' | 'salida' | 'ajuste'
   cantidad: number
   motivo: string
+  /** Ajuste que es un conteo físico («Cuadre de existencias», «Inventario periódico»): sella `ultimoConteoAt`. */
+  esConteo?: boolean
 }
 
 // ── Inventario periódico ──
@@ -578,6 +580,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     else if (mov.tipo === 'salida') nuevoStock = Math.max(0, item.stockActual - mov.cantidad)
     else nuevoStock = mov.cantidad
 
+    // Un ajuste que es conteo físico sella la fecha del conteo (la ficha muestra «Contado el …»).
+    const esConteo = mov.tipo === 'ajuste' && !!mov.esConteo
+
     let bodegaDocId = item.bodegaId
     if (!bodegaDocId) {
       bodegaDocId = key
@@ -585,10 +590,14 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         codigoSAP: key, stockActual: nuevoStock, stockMinimo: item.stockMinimo,
         ubicacionBodega: item.ubicacionBodega || '', unidad: item.unidad || 'pzas',
         ...(item.textoBreve ? { textoBreve: item.textoBreve } : denormNombre(key)),
+        ...(esConteo ? { ultimoConteoAt: serverTimestamp(), ultimoConteoPor: userName } : {}),
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       })
     } else {
-      await updateDoc(doc(db, BODEGA_COL, bodegaDocId), { stockActual: nuevoStock, updatedAt: serverTimestamp() })
+      await updateDoc(doc(db, BODEGA_COL, bodegaDocId), {
+        stockActual: nuevoStock, updatedAt: serverTimestamp(),
+        ...(esConteo ? { ultimoConteoAt: serverTimestamp(), ultimoConteoPor: userName } : {}),
+      })
     }
 
     await addDoc(collection(db, BODEGA_COL, bodegaDocId, 'movimientos'), {
@@ -596,7 +605,10 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       stockResultante: nuevoStock, motivo: mov.motivo,
       realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
     })
-    patchOverlay(key, { id: bodegaDocId, codigoSAP: key, stockActual: nuevoStock, updatedAt: new Date() })
+    patchOverlay(key, {
+      id: bodegaDocId, codigoSAP: key, stockActual: nuevoStock, updatedAt: new Date(),
+      ...(esConteo ? { ultimoConteoAt: new Date(), ultimoConteoPor: userName } : {}),
+    })
   }, [patchOverlay, denormNombre])
 
   /**

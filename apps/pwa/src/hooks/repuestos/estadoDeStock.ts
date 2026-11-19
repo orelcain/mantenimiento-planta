@@ -70,6 +70,28 @@ export function esAlertaDeStock(item: ItemConStock): boolean {
   return item.stockMinimo > 0 && item.stockActual <= item.stockMinimo
 }
 
+/**
+ * Desglose del encabezado «N piezas en alerta». `alertas` cuenta con el mismo predicado que
+ * `esAlertaDeStock`; `enCeroSinMinimo` son las piezas configuradas en cero sin mínimo, que
+ * NO son alerta (se muestran aparte para no inflar el número).
+ */
+export function desgloseDeAlertas(items: readonly ItemConStock[]): {
+  bajoMinimo: number
+  sinStockConMinimo: number
+  enCeroSinMinimo: number
+  alertas: number
+} {
+  let bajoMinimo = 0
+  let sinStockConMinimo = 0
+  let enCeroSinMinimo = 0
+  for (const item of items) {
+    if (item.stockMinimo > 0 && item.stockActual === 0) sinStockConMinimo++
+    else if (esAlertaDeStock(item)) bajoMinimo++
+    else if (item.bodegaId && item.stockActual === 0) enCeroSinMinimo++
+  }
+  return { bajoMinimo, sinStockConMinimo, enCeroSinMinimo, alertas: bajoMinimo + sinStockConMinimo }
+}
+
 /** Cuenta las alertas con el MISMO predicado que las lista. */
 export function contarAlertas(items: readonly ItemConStock[]): number {
   let n = 0

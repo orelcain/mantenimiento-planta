@@ -26,7 +26,12 @@ import { QRCodeSVG } from 'qrcode.react'
 import { escapeHtml } from '@/lib/escapeHtml'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
-import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
+import { invalidateGlobalRepuestosCache, useGlobalSearch, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
+import { rowKeyDeRepuesto } from '@/hooks/repuestos/identidadDeRepuesto'
+import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
+import { quitarEquipoDeRepuesto } from '@/hooks/repuestos/quitarEquipo'
+import { agregarEquipoARepuesto } from '@/hooks/repuestos/asignarEquipo'
+import { AsignarEquipoDialog } from '@/components/repuestos/AsignarEquipoDialog'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
 import { aplicarFiltroDeStock, contarParaFiltro, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
@@ -46,7 +51,7 @@ import type {
   InventarioSesion, InventarioConteo,
 } from '@/hooks/repuestos/useBodega'
 import type { Machine } from '@/types/repuestos'
-import { useAuthStore } from '@/store/authStore'
+import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
@@ -159,7 +164,14 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   }, [loaded, machines.length, loadAll])
 
   const bodega = useBodega(allRepuestos)
-  const isLoading = catalogLoading || (bodega.loading && allRepuestos.length === 0)
+  // Skeleton solo en la primera carga (sin ítems). En un refresco con datos, la vista sigue montada.
+  const isLoading = allRepuestos.length === 0 && (catalogLoading || bodega.loading)
+
+  // Igual que refreshCatalog del Hub: invalida la caché del módulo y recarga el catálogo.
+  const refrescarCatalogo = useCallback(async () => {
+    invalidateGlobalRepuestosCache()
+    await loadAll()
+  }, [loadAll])
 
   // Inventarios en curso: se ven en la pestaña y como aviso arriba del stock
   // (antes quedaban escondidos detrás del menú «Stock ⌄»).
@@ -283,7 +295,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
         </div>
       ))}
 
-      {subTab === 'stock' && <StockTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
+      {subTab === 'stock' && <StockTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} catalogo={allRepuestos} refrescarCatalogo={refrescarCatalogo} />}
       {subTab === 'inventarios' && <InventarioTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
       {subTab === 'movimientos' && <MovimientosTab bodega={bodega} />}
       {subTab === 'estadisticas' && <EstadisticasTab bodega={bodega} />}
@@ -317,10 +329,16 @@ function exportCsv(items: BodegaMergedItem[]) {
 // Cuántas filas se dibujan de una vez en el celular. Con las 2.407 eran 108.420 elementos.
 const FILAS_POR_PAGINA = 60
 
-function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
+function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, refrescarCatalogo }: {
+  bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void
+  /** Catálogo de Áreas (una fila por pieza y equipo): de aquí salen los documentos fuente de una pieza. */
+  catalogo: GlobalSearchResult[]; refrescarCatalogo: () => Promise<void>
+}) {
   const { items, allItems, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, calcReorderData, overlayDeSap, registrarSalidaDeSolicitud } = bodega
   // Pase de lectura: sin escrituras (ajustes, movimientos, fotos, favoritos); se ven la tabla, la ficha y CSV.
   const soloLectura = useAuthStore((s) => Boolean(s.user?.paseLectura))
+  // Quitar un equipo es solo de admin (igual que en el Hub de Áreas).
+  const isAdmin = useIsAdmin()
   const [searchQuery, setSearchQuery] = useState('')
   // Código de fabricante → figura del despiece (BAADER 142/200): acceso al dibujo desde la tabla y el drawer.
   const figurasDespiece = useFigurasDespiece()
@@ -345,6 +363,84 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
 
   const esPC = useEsPC()
   const { toast } = useToast()
+  const { updateRepuesto } = useRepuestoCrud()
+  const [asignandoPieza, setAsignandoPieza] = useState<BodegaMergedItem | null>(null)
+  const [guardandoEquipo, setGuardandoEquipo] = useState(false)
+
+  // Documentos fuente de una pieza: las filas del catálogo cuyo rowKey coincide, sin repetir el doc.
+  // Un mismo SAP puede vivir en dos documentos; los dos reciben el cambio al quitar un equipo.
+  const fuentesDePieza = (rowKey: string): GlobalSearchResult['repuesto'][] => {
+    const vistos = new Set<string>()
+    const out: GlobalSearchResult['repuesto'][] = []
+    for (const fila of catalogo) {
+      if (rowKeyDeRepuesto(fila.repuesto) !== rowKey || vistos.has(fila.repuesto.id)) continue
+      vistos.add(fila.repuesto.id)
+      out.push(fila.repuesto)
+    }
+    return out
+  }
+
+  const asignarEquipoAPieza = async (pieza: BodegaMergedItem, node: { id: string; nombre: string; alias?: string; codigo?: string }) => {
+    const fuentes = fuentesDePieza(pieza.rowKey)
+    if (!fuentes.length) { toast({ variant: 'destructive', title: 'No se encontró el repuesto base', description: 'Recarga la página e intenta de nuevo.' }); return }
+    // Se escribe en el primer documento que ya tenga equipos; si ninguno tiene, en el primero.
+    const destino = fuentes.find((r) => (r.equipos || []).length > 0) ?? fuentes[0]!
+    const patch = agregarEquipoARepuesto(destino, node)
+    if (!patch) { toast({ title: 'Ya está asignado a ese equipo' }); return }
+    setGuardandoEquipo(true)
+    try {
+      await updateRepuesto('repuestos', destino.id, patch, destino)
+      toast({ title: 'Equipo asignado', description: node.alias || node.nombre, variant: 'success' })
+      setAsignandoPieza(null)
+      await refrescarCatalogo()
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'No se pudo asignar el equipo', description: e instanceof Error ? e.message : '' })
+    } finally {
+      setGuardandoEquipo(false)
+    }
+  }
+
+  // Quitar la fila completa (todos sus machineId) de TODOS los documentos fuente que la tengan.
+  // Por documento: se encadena quitarEquipoDeRepuesto por cada id y se escribe UNA vez.
+  const quitarEquipoDePieza = async (pieza: BodegaMergedItem, machineIds: string[]) => {
+    const cache = getGlobalEquipmentCache() || []
+    const cambios: { rep: GlobalSearchResult['repuesto']; patch: { equipos: string[]; equiposCodigos: string[] } }[] = []
+    for (const rep of fuentesDePieza(pieza.rowKey)) {
+      let actual = rep
+      let cambio = false
+      for (const machineId of machineIds) {
+        const node = cache.find((e) => e.id === machineId)
+        const nombre = node?.nombre || pieza.equipos.find((e) => e.machineId === machineId)?.machineName || ''
+        const patch = quitarEquipoDeRepuesto(actual, { nodeId: machineId, codigo: node?.codigo, nombre })
+        if (patch) { actual = { ...actual, ...patch }; cambio = true }
+      }
+      if (cambio) cambios.push({ rep, patch: { equipos: actual.equipos ?? [], equiposCodigos: actual.equiposCodigos ?? [] } })
+    }
+    if (!cambios.length) { toast({ title: 'Ese equipo ya no estaba asignado' }); return }
+    const nombreFila = cache.find((e) => e.id === machineIds[0])?.nombre || pieza.equipos.find((e) => e.machineId === machineIds[0])?.machineName || ''
+    try {
+      for (const { rep, patch } of cambios) await updateRepuesto('repuestos', rep.id, patch, rep)
+      toast({ title: 'Equipo quitado', description: nombreFila, variant: 'success' })
+      await refrescarCatalogo()
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'No se pudo quitar el equipo', description: e instanceof Error ? e.message : '' })
+      // Con el SAP en dos documentos puede haber quedado quitado de uno solo: se relee para mostrar la verdad.
+      void refrescarCatalogo()
+      throw e
+    }
+  }
+
+  // Conteo desde la ficha: deja «Conteo físico» en movimientos y sella la fecha del conteo.
+  const contarPieza = async (pieza: BodegaMergedItem, contado: number) => {
+    if (!user) return
+    try {
+      await bodega.registrarConteoRapido(pieza, contado, user.id, user.nombre)
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'No se pudo guardar el conteo', description: e instanceof Error ? e.message : '' })
+      throw e
+    }
+    toast({ title: 'Conteo guardado', description: `Hay ${contado}.`, variant: 'success' })
+  }
 
   // ── Ficha de la pieza como página: /repuestos?pieza=<rowKey>. ?sap= es el QR de antes. ──
   const [searchParams, setSearchParams] = useSearchParams()
@@ -485,7 +581,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const modales = (
     <>
       {editingItem && <StockFormModal item={editingItem} onSave={async d => { await saveStock(editingItem.codigoSAP, d); setEditingItem(null) }} onClose={() => setEditingItem(null)} />}
-      {movimientoItem && <MovimientoModal item={movimientoItem} onSave={async (t, c, m) => { if (user) { await registrarMovimiento(movimientoItem, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setMovimientoItem(null) } }} onClose={() => setMovimientoItem(null)} />}
+      {movimientoItem && <MovimientoModal item={movimientoItem} onSave={async (t, c, m, esConteo) => { if (user) { await registrarMovimiento(movimientoItem, { tipo: t, cantidad: c, motivo: m, esConteo }, user.id, user.nombre); setMovimientoItem(null) } }} onClose={() => setMovimientoItem(null)} />}
       {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showCargaRapida && <CargaRapidaModal items={items} saveStock={saveStock} onClose={() => setShowCargaRapida(false)} />}
@@ -524,9 +620,13 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   const anterior = nFicha > 0 ? ordenFicha[nFicha - 1] : undefined
   const siguiente = nFicha >= 0 && nFicha < ordenFicha.length - 1 ? ordenFicha[nFicha + 1] : undefined
   const ficha = pieza && (
+        <>
         <FichaPieza
           item={pieza}
           esPC={esPC}
+          // key: «Anterior/Siguiente» cambia de pieza sin desmontar; sin esto, un conteo a medio escribir
+          // en la pieza A se guardaba sobre la B (lo mismo la confirmación de «Quitar»).
+          key={pieza.rowKey}
           origen="Bodega"
           onVolver={volverALista}
           onAnterior={anterior ? () => cambiarPieza(anterior) : undefined}
@@ -542,7 +642,18 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
           addPhoto={soloLectura ? undefined : addPhoto}
           onViewInEquipo={onViewInEquipo}
           onSearchSimilar={onSearchSimilar}
+          onAsignarEquipo={soloLectura ? undefined : () => setAsignandoPieza(pieza)}
+          onQuitarEquipo={soloLectura || !isAdmin ? undefined : (machineIds) => quitarEquipoDePieza(pieza, machineIds)}
+          onContar={soloLectura || !pieza.codigoSAP ? undefined : (n) => contarPieza(pieza, n)}
         />
+        <AsignarEquipoDialog
+          open={asignandoPieza !== null}
+          onOpenChange={(o) => !o && setAsignandoPieza(null)}
+          yaAsignados={(asignandoPieza?.equipos ?? pieza.equipos).map((e) => e.machineId)}
+          guardando={guardandoEquipo}
+          onElegir={(node) => { if (asignandoPieza) void asignarEquipoAPieza(asignandoPieza, node) }}
+        />
+        </>
   )
   const claseLista = pieza ? 'hidden' : 'contents'
 
@@ -899,7 +1010,7 @@ function InventarioTab({ bodega, user, onViewInEquipo, onSearchSimilar }: {
         )}
         {fichaMovimiento && (
           <MovimientoModal item={fichaMovimiento} onClose={() => setFichaMovimiento(null)}
-                           onSave={async (t, c, m) => { if (user) { await bodega.registrarMovimiento(fichaMovimiento, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setFichaMovimiento(null) } }} />
+                           onSave={async (t, c, m, esConteo) => { if (user) { await bodega.registrarMovimiento(fichaMovimiento, { tipo: t, cantidad: c, motivo: m, esConteo }, user.id, user.nombre); setFichaMovimiento(null) } }} />
         )}
       </>
     )
@@ -2323,7 +2434,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block"><span className="text-xs font-medium text-muted-foreground mb-1 block">{label}</span>{children}</label>
 }
 
-function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onSave: (d: BodegaStockData) => Promise<void>; onClose: () => void }) {
+export function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onSave: (d: BodegaStockData) => Promise<void>; onClose: () => void }) {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<BodegaStockData>({
     stockActual: item.stockActual, stockMinimo: item.stockMinimo, stockMaximo: item.stockMaximo ?? 0,
@@ -2332,18 +2443,23 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
     leadTime: item.leadTime ?? 0, categoria: item.categoria, observaciones: item.observaciones || '',
   })
   const set = (k: keyof BodegaStockData, v: string | number) => setForm(p => ({ ...p, [k]: v }))
+  // Con bodega configurada, el stock se mueve solo con Contar o Movimiento: no se edita aquí.
+  const configurado = !!item.bodegaId
 
   return (
     <ModalBackdrop onClose={onClose}>
-      <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(form) } finally { setSaving(false) } }}>
+      <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(configurado ? { ...form, stockActual: item.stockActual } : form) } finally { setSaving(false) } }}>
         <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-base font-bold">{item.bodegaId ? 'Editar stock' : 'Configurar stock'}</h3>
+          <h3 className="text-base font-bold">{configurado ? 'Editar datos de bodega' : 'Configurar stock'}</h3>
           <p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve}</p>
           <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-mono">{item.codigoSAP}</span>
         </div>
         <div className="px-5 py-4 space-y-3">
-          <div className="grid grid-cols-4 gap-3">
-            <Field label="Stock actual"><input type="number" min={0} value={form.stockActual} onChange={e => set('stockActual', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
+          {configurado && (
+            <p className="text-sm text-muted-foreground">Stock actual: <strong className="tabular-nums text-foreground">{item.stockActual}</strong> · se cambia con Contar o Movimiento</p>
+          )}
+          <div className={`grid ${configurado ? 'grid-cols-3' : 'grid-cols-4'} gap-3`}>
+            {!configurado && <Field label="Stock actual"><input type="number" min={0} value={form.stockActual} onChange={e => set('stockActual', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>}
             <Field label="Stock mínimo"><input type="number" min={0} value={form.stockMinimo} onChange={e => set('stockMinimo', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
             <Field label="Stock máximo"><input type="number" min={0} value={form.stockMaximo ?? 0} onChange={e => set('stockMaximo', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
             <Field label="Unidad"><select value={form.unidad} onChange={e => set('unidad', e.target.value)} className={INPUT}>
@@ -2391,6 +2507,7 @@ const MOTIVOS_POR_TIPO: Record<'entrada' | 'salida' | 'ajuste', { value: string;
     { value: 'otro_salida', label: 'Otro' },
   ],
   ajuste: [
+    { value: 'cuadre_existencias', label: 'Cuadre de existencias' },
     { value: 'inventario_periodico', label: 'Inventario periódico' },
     { value: 'correccion_admin', label: 'Corrección administrativa' },
     { value: 'merma', label: 'Merma' },
@@ -2398,8 +2515,11 @@ const MOTIVOS_POR_TIPO: Record<'entrada' | 'salida' | 'ajuste', { value: string;
   ],
 }
 
-function MovimientoModal({ item, onSave, onClose }: {
-  item: BodegaMergedItem; onSave: (t: 'entrada' | 'salida' | 'ajuste', c: number, m: string) => Promise<void>; onClose: () => void
+/** Motivos de ajuste que son un conteo físico: sellan `ultimoConteoAt`. «Corrección administrativa», «merma» y «otro» no. */
+const MOTIVOS_DE_CONTEO = new Set(['cuadre_existencias', 'inventario_periodico'])
+
+export function MovimientoModal({ item, onSave, onClose }: {
+  item: BodegaMergedItem; onSave: (t: 'entrada' | 'salida' | 'ajuste', c: number, m: string, esConteo: boolean) => Promise<void>; onClose: () => void
 }) {
   const [tipo, setTipo] = useState<'entrada' | 'salida' | 'ajuste'>('entrada')
   const [cantidad, setCantidad] = useState(1)
@@ -2422,7 +2542,7 @@ function MovimientoModal({ item, onSave, onClose }: {
 
   return (
     <ModalBackdrop onClose={onClose}>
-      <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(tipo, cantidad, motivoFinal) } finally { setSaving(false) } }}>
+      <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(tipo, cantidad, motivoFinal, tipo === 'ajuste' && MOTIVOS_DE_CONTEO.has(motivoKey)) } finally { setSaving(false) } }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div><h3 className="text-base font-bold">Registrar movimiento</h3><p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve} — {item.codigoSAP}</p></div>
           <button type="button" onClick={onClose} className="p-1 rounded-ctl hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
