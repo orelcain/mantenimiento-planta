@@ -41,6 +41,7 @@ import { ventanaDeActividad, desdePrimeraPieza, piezasAntesDelArranque } from '@
 import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicShiftMonitor.service'
 import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo'
 import type { PulsoVivoElegido } from './monitor/contadorCrudo'
+import { horaExtraDelTurno } from './monitor/horaExtra'
 import { porDeUsuario } from './monitor/perilla'
 import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/datoDuro'
 import { construirCascada, contenedorDe } from './monitor/cascadaTurno'
@@ -6478,9 +6479,13 @@ function MonitorDelToken() {
      de Shoplogix (`corteHoraV2`) va con él en la barra: todas las cifras de «El turno» salen de esa lectura. */
   /* Sin cierre publicado y en curso (bloque sin turno en Shoplogix), no hay hora de término que mostrar: «desde … · en curso». */
   const sinCierre = !live.shiftClosed && !live.plannedEnd
+  /* En vivo y pasado el horario, la barra lo dice: «07:15 → 15:00 · hora extra desde 15:00». Sin esto el fin programado se
+     leía como un corte (Chonchi 19-11, «corta a las 05:00»). Cerrado, el fin ya es el real (`effectiveEnd`). */
+  const extraEnCurso = !live.shiftClosed ? horaExtraDelTurno(live, contador.valor)?.despues ?? null : null
   const rangoBarra = sinCierre
     ? `desde ${fmtWallTime(inicioReal)} · en curso`
     : `${fmtWallTime(inicioReal)} → ${fmtWallTime(live.shiftClosed ? (live.effectiveEnd ?? live.scheduledEnd) : (live.plannedEnd ?? live.scheduledEnd))}`
+      + (extraEnCurso ? ` · hora extra desde ${fmtWallTime(extraEnCurso.desde)}` : '')
   const corteHoraV2 = !live.shiftClosed && contador.corteWallMs != null ? new Date(contador.corteWallMs).toISOString().slice(11, 16) : null
 
   /* Modo TV (`?pantalla=1`) sobre el v2: una pantalla fija de 1920×1080 con las MISMAS cifras que recibe `MonitorV2`
@@ -7065,6 +7070,7 @@ function MonitorDelToken() {
                 }
               })()}
               meta={meta}
+              horaExtra={horaExtraDelTurno(live, contador.valor)}
               proyeccion={pace?.projectedPieces ?? null}
               ritmo={promedioLinea}
               perdidasMaquina={(() => {

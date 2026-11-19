@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { createPortal } from 'react-dom'
 import { ListCell, ListGroup, Pill, Sheet } from '@/components/piel'
 import type { PillTone } from '@/components/piel/Pill'
+import type { HoraExtra } from './horaExtra'
 import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
 import type { MonitorStatus } from '@/services/shoplogix/publicShiftMonitor.service'
 import { cuotaA, type PacePoint } from '@/services/shoplogix/monitorCompare'
@@ -1211,6 +1212,8 @@ export interface MonitorV2Props {
     primeraPiezaMs?: number | null
   } | null
   meta: number | null
+  /** Lo hecho fuera del horario que Shoplogix atribuyó a este turno (`horaExtraDelTurno`): la franja y el detalle lo separan. */
+  horaExtra?: HoraExtra | null
   proyeccion: number | null
   /** Promedio del turno andando: piezas ÷ minutos produciendo (el «promedio turno» del clásico). */
   ritmo: number | null
@@ -1513,6 +1516,13 @@ function MonitorV2Cuerpo(p: MonitorV2Props & { rep: Reproduccion }) {
         />
       )}
       {p.horas && p.horas.filas.length > 0 && <HoraAHora filas={p.horas.filas} metaPorHora={p.horas.metaPorHora} porMaquina={p.horas.porMaquina} total={mostradas} cerrado={p.cerrado} />}
+      {p.horaExtra && (
+        <Grupo nota="Lo de fuera del horario lo contó Shoplogix y ya está en la cifra; aquí solo se separa.">
+          <FilaCifra title="En horario" value={`${int(p.horaExtra.enHorario)} pz`} />
+          {p.horaExtra.antes > 0 && <FilaCifra title="Antes del horario" value={`+${int(p.horaExtra.antes)} pz`} />}
+          {p.horaExtra.despues && <FilaCifra title="Hora extra" subtitle={`${hhmm(p.horaExtra.despues.desde)}–${hhmm(p.horaExtra.despues.hasta)}`} value={`+${int(p.horaExtra.despues.piezas)} pz`} />}
+        </Grupo>
+      )}
       <Grupo>
         {p.meta != null && <FilaCifra title="Meta del turno" value={`${int(p.meta)} pz`} />}
         {/* Con la meta cumplida «Faltan 0 pz» no dice nada: se dice cuánto se pasó. */}

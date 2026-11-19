@@ -148,6 +148,20 @@ describe('FranjaCinta · las celdas', () => {
     expect(alDia.querySelector('.fc-nota-piezas')?.textContent).toBe('64 % de 15.000')
   })
 
+  it('«Piezas del turno» con hora extra: dice cuánto y entre qué horas (Chonchi 11-11 T2); sin ella, nada', () => {
+    const conExtra = franja(con({
+      cerrado: true, piezas: 19050, proyeccion: null,
+      horaExtra: { despues: { piezas: 2195, desde: '2026-11-11T15:00:00.000Z', hasta: '2026-11-11T15:55:00.000Z' }, antes: 0, enHorario: 16855 },
+    })).container
+    expect(conExtra.querySelector('.fc-nota-extra')?.textContent).toBe('+2.195 hora extra · 15:00–15:55')
+    cleanup()
+    /* Solo arranque anticipado: no es hora extra, la franja no la anuncia. */
+    const soloAntes = franja(con({ horaExtra: { despues: null, antes: 300, enHorario: 9390 } })).container
+    expect(soloAntes.querySelector('.fc-nota-extra')).toBeNull()
+    cleanup()
+    expect(franja().container.querySelector('.fc-nota-extra')).toBeNull()
+  })
+
   it('«Piezas del turno» lleva su «+N» flotante: un nodo decorativo junto a la cifra (el Modo TV tiene el suyo)', () => {
     const { container } = franja()
     const celda = container.querySelector('.fc-c-piezas') as HTMLElement

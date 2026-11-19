@@ -875,6 +875,11 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 .fc-raya-mini { display: inline-block; flex: none; width: 2px; height: 10px; border-radius: 1px; background: rgb(var(--foreground)); }
 @media (min-width: 1600px) { .fc-nota-piezas { font-size: 13px; line-height: 17px; } }
 .fc-apilada .fc-nota-piezas { flex-wrap: wrap; white-space: normal; }
+/* Hora extra bajo la cifra: el punto es la muestra del tinte de hora extra del gráfico (warning), sin pastilla. */
+.fc-nota-extra { display: flex; align-items: flex-start; gap: 6px; margin-top: 4px; }
+/* El punto se alinea con el primer renglón (16 px de alto → 4 px arriba), también cuando el texto baja a un segundo renglón. */
+.fc-punto-extra { display: inline-block; flex: none; width: 8px; height: 8px; margin-top: 4px; border-radius: 9999px; background: rgb(var(--ink-warn)); }
+@media (min-width: 1600px) { .fc-nota-extra { font-size: 13px; line-height: 17px; } }
 
 /* 2 · Ritmo (A3 «sub-tarjeta», RitmoBaaders.tsx): una mini tabla donde la Línea es la primera fila y cada columna suma hacia ella.
    Las filas son subgrids de `.rb` y las columnas se piden por NOMBRE de línea (`nom pz min sep ap vu v5 fin`): el encabezado y
