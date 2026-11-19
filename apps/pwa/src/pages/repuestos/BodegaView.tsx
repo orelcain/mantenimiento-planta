@@ -10,15 +10,15 @@
  * Solo repuestos con código SAP.
  */
 
-import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useId, type ReactNode } from 'react'
 import {
   Package, Search, AlertTriangle, ArrowDownCircle, ArrowUpCircle,
   Settings2, History, X, Check, Pencil, MapPin, TrendingDown,
   PackageX, DollarSign, PackageCheck, Loader2, ClipboardList,
   BarChart3, Plus, ChevronRight, CheckCircle2, CircleDot,
-  AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
+  AlertCircle, Clock, Download, ChevronDown,
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
-  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal, Shapes,
+  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag, MoreHorizontal, Shapes, Lock,
 } from 'lucide-react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { dibujoDe, maquinaDeDespiece, useFigurasDespiece } from './enlacesPieza'
@@ -34,10 +34,10 @@ import { agregarEquipoARepuesto } from '@/hooks/repuestos/asignarEquipo'
 import { AsignarEquipoDialog } from '@/components/repuestos/AsignarEquipoDialog'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
-import { aplicarFiltroDeStock, contarParaFiltro, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
+import { aplicarFiltroDeStock, type StockFilterKey } from '@/hooks/repuestos/filtrosDeStock'
 import { useBodega } from '@/hooks/repuestos/useBodega'
 // `Tag` colisiona con el ícono homónimo de lucide ya usado acá.
-import { Tag as CatTag, type TagTone, ListGroup, ListCell, SwipeRow } from '@/components/piel'
+import { Tag as CatTag, type TagTone, ListCell, SwipeRow } from '@/components/piel'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { formatNombreSAP } from '@/utils/repuestos/formatNombreSAP'
 import { usePielApple } from '@/hooks/usePielApple'
@@ -57,6 +57,8 @@ import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { dec1, dec2 } from '@/utils/formatoNumeros'
 import { InventarioMaquinaView, CLAVE_VOLVER_INVENTARIO } from './InventarioMaquinaView'
 import { StockTablaPC } from './StockTablaPC'
+import { StockListaMovil } from './StockListaMovil'
+import { LineaInventarioEnCurso } from '@/components/repuestos/bodega/LineaInventarioEnCurso'
 import { FichaPieza } from './FichaPieza'
 import { PARAM_PIEZA, contenedorConScroll, pedidosAbiertosDe } from './datosFichaPieza'
 import { PedidosPorAtender } from '@/components/repuestos/PedidosPorAtender'
@@ -67,7 +69,7 @@ import { useAccionesSolicitudes } from '@/hooks/repuestos/useAccionesSolicitudes
 import type { StockDeSolicitud } from '@/hooks/repuestos/solicitudDeRepuesto'
 import { useEsPC } from '@/hooks/useEsPC'
 import { useColoresGrafico } from '@/hooks/useColoresGrafico'
-import { Pill, SegmentedControl, Button as PielButton, SkeletonFilas, SkeletonBloque, SkeletonLinea } from '@/components/piel'
+import { SegmentedControl, SkeletonFilas, SkeletonBloque, SkeletonLinea } from '@/components/piel'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = StockFilterKey
@@ -208,94 +210,14 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
     )
   }
 
-  const SUB_TABS: { id: BodegaTab; label: string; icon: typeof Package }[] = [
-    { id: 'stock', label: 'Stock', icon: Package },
-    { id: 'inventarios', label: 'Inventarios', icon: ClipboardList },
-    { id: 'movimientos', label: 'Movimientos', icon: History },
-    { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
-  ]
-  const unicoEnCurso = enCurso.length === 1 ? enCurso[0] : undefined
-  const subTabActual = SUB_TABS.find(t => t.id === subTab) ?? { id: 'stock' as BodegaTab, label: 'Stock', icon: Package }
+  const onVerInventario = (id?: string) => (id ? verInventario(id) : setSubTab('inventarios'))
+  const lineaInventario = <LineaInventarioEnCurso compacta enCurso={enCurso} onVer={onVerInventario} />
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:p-6 lg:max-w-[1680px]">
-      {/* PC: las cuatro vistas a la vista, con cuántos inventarios hay en curso. */}
-      <div className={cn('hidden max-w-2xl', !fichaAbierta && 'lg:block')}>
-        <SegmentedControl<BodegaTab>
-          value={subTab} onChange={setSubTab} ariaLabel="Vista de Bodega"
-          segments={SUB_TABS.map(t => ({
-            value: t.id,
-            label: t.id === 'inventarios' && enCurso.length > 0
-              ? <>{t.label} <Pill tone="warning" className="px-1.5 py-0.5 tabular-nums">{enCurso.length} en curso</Pill></>
-              : t.label,
-          }))} />
-      </div>
-      {/* Teléfono: la sub-vista se elige desde el título (patrón Salud / Fitness):
-          evita dos controles segmentados apilados bajo el de Áreas · Bodega · Códigos.
-          El inventario en curso va en la misma fila, a la derecha: un toque y sin gastar
-          una tarjeta de alto encima de la lista. */}
-      <div className={cn('flex min-h-[44px] items-center justify-between gap-2 sm:block sm:min-h-0 lg:hidden', fichaAbierta && 'hidden sm:hidden')}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex min-h-[44px] w-fit items-center gap-2 rounded-full pr-2 text-title2 font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            aria-label={`Vista de Bodega: ${subTabActual.label}. Cambiar`}
-          >
-            {subTabActual.label}
-            <span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <ChevronDown className="size-3.5" strokeWidth={2.5} />
-            </span>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-[12rem]">
-          {SUB_TABS.map(t => {
-            const Icon = t.icon
-            return (
-              <DropdownMenuItem key={t.id} onClick={() => setSubTab(t.id)} className={cn('gap-2 py-2', t.id === subTab && 'font-semibold')}>
-                <Icon className="size-4 text-muted-foreground" />
-                {t.label}
-                {t.id === subTab && <Check className="ml-auto size-4" />}
-              </DropdownMenuItem>
-            )
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {subTab === 'stock' && enCurso.length > 0 && (
-        <PielButton
-          variant="tinted"
-          size="md"
-          className="min-w-0 shrink gap-2 px-4 sm:hidden"
-          onClick={() => (unicoEnCurso ? verInventario(unicoEnCurso.id) : setSubTab('inventarios'))}
-          aria-label={unicoEnCurso ? `Inventario en curso: ${unicoEnCurso.nombre}. Abrir` : `${enCurso.length} inventarios en curso. Abrir`}
-        >
-          <span className="size-2 shrink-0 rounded-full bg-ink-warn" aria-hidden />
-          <span className="truncate">{enCurso.length === 1 ? 'Inventario en curso' : `${enCurso.length} en curso`}</span>
-          <ChevronRight className="shrink-0" />
-        </PielButton>
-      )}
-      </div>
+      <CabeceraBodega subTab={subTab} onSubTab={setSubTab} enCurso={enCurso} onVerInventario={onVerInventario} fichaAbierta={fichaAbierta} />
 
-      {/* Desde sm: el aviso completo, como siempre. Solo en el celular (<sm) lo reemplaza el botón del título. */}
-      {subTab === 'stock' && !fichaAbierta && enCurso.map(s => (
-        <div key={s.id} className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card bg-card px-4 py-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-none">
-          <ClipboardList className="size-5 shrink-0 text-ink-warn" />
-          <div className="min-w-0 flex-1">
-            <p className="text-subhead font-semibold text-foreground">{s.nombre}</p>
-            <p className="text-footnote tabular-nums text-muted-foreground">
-              En curso{s.tipo === 'maquina'
-                ? ` · ${s.totalItems} líneas${s.unidades != null ? ` · ${s.unidades} unidades` : ''} · ${s.dudosos ?? 0} dudosos · ${s.ajustado ? 'stock ajustado' : 'ajuste de stock pendiente'}`
-                : ` · ${s.contados}/${s.totalItems} contados`}
-            </p>
-          </div>
-          <button type="button" onClick={() => verInventario(s.id)}
-                  className="inline-flex min-h-[44px] items-center gap-1 rounded-full bg-primary/[0.12] px-4 text-subhead font-medium text-primary">
-            Ver inventario <ChevronRight className="size-4" />
-          </button>
-        </div>
-      ))}
-
-      {subTab === 'stock' && <StockTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} catalogo={allRepuestos} refrescarCatalogo={refrescarCatalogo} />}
+      {subTab === 'stock' && <StockTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} catalogo={allRepuestos} refrescarCatalogo={refrescarCatalogo} inventario={lineaInventario} />}
       {subTab === 'inventarios' && <InventarioTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
       {subTab === 'movimientos' && <MovimientosTab bodega={bodega} />}
       {subTab === 'estadisticas' && <EstadisticasTab bodega={bodega} />}
@@ -329,10 +251,80 @@ function exportCsv(items: BodegaMergedItem[]) {
 // Cuántas filas se dibujan de una vez en el celular. Con las 2.407 eran 108.420 elementos.
 const FILAS_POR_PAGINA = 60
 
-function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, refrescarCatalogo }: {
+const SUB_TABS: { id: BodegaTab; label: string; icon: typeof Package }[] = [
+  { id: 'stock', label: 'Stock', icon: Package },
+  { id: 'inventarios', label: 'Inventarios', icon: ClipboardList },
+  { id: 'movimientos', label: 'Movimientos', icon: History },
+  { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
+]
+
+/**
+ * Cabecera de Bodega. PC (lg): las cuatro vistas a la izquierda y, a la derecha, la línea del
+ * inventario en curso (no se repite en la vista Inventarios). Celular: el título «Stock ▾» con su menú.
+ */
+export function CabeceraBodega({ subTab, onSubTab, enCurso, onVerInventario, fichaAbierta }: {
+  subTab: BodegaTab
+  onSubTab: (t: BodegaTab) => void
+  enCurso: InventarioSesion[]
+  /** Con id abre ese inventario; sin id lleva a la vista Inventarios. */
+  onVerInventario: (id?: string) => void
+  fichaAbierta: boolean
+}) {
+  const subTabActual = SUB_TABS.find(t => t.id === subTab) ?? { id: 'stock' as BodegaTab, label: 'Stock', icon: Package }
+  return (
+    <>
+      <div className={cn('hidden items-center gap-4', !fichaAbierta && 'lg:flex')}>
+        <div className="shrink-0">
+          <SegmentedControl<BodegaTab>
+            value={subTab} onChange={onSubTab} ariaLabel="Vista de Bodega"
+            segments={SUB_TABS.map(t => ({ value: t.id, label: t.label }))} />
+        </div>
+        {subTab !== 'inventarios' && (
+          <div className="ml-auto min-w-0">
+            <LineaInventarioEnCurso enCurso={enCurso} onVer={onVerInventario} />
+          </div>
+        )}
+      </div>
+
+      {/* Celular: la sub-vista se elige desde el título (patrón Salud / Fitness). */}
+      <div className={cn('flex min-h-[44px] items-center gap-2 lg:hidden', fichaAbierta && 'hidden')}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex min-h-[44px] w-fit items-center gap-2 rounded-full pr-2 text-title2 font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              aria-label={`Vista de Bodega: ${subTabActual.label}. Cambiar`}
+            >
+              {subTabActual.label}
+              <span className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <ChevronDown className="size-3.5" strokeWidth={2.5} />
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[12rem]">
+            {SUB_TABS.map(t => {
+              const Icon = t.icon
+              return (
+                <DropdownMenuItem key={t.id} onClick={() => onSubTab(t.id)} className={cn('gap-2 py-2', t.id === subTab && 'font-semibold')}>
+                  <Icon className="size-4 text-muted-foreground" />
+                  {t.label}
+                  {t.id === subTab && <Check className="ml-auto size-4" />}
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </>
+  )
+}
+
+function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, refrescarCatalogo, inventario }: {
   bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void
   /** Catálogo de Áreas (una fila por pieza y equipo): de aquí salen los documentos fuente de una pieza. */
   catalogo: GlobalSearchResult[]; refrescarCatalogo: () => Promise<void>
+  /** Línea del inventario en curso: solo la usa el celular (en PC va en la cabecera). */
+  inventario?: ReactNode
 }) {
   const { items, allItems, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, calcReorderData, overlayDeSap, registrarSalidaDeSolicitud } = bodega
   // Pase de lectura: sin escrituras (ajustes, movimientos, fotos, favoritos); se ven la tabla, la ficha y CSV.
@@ -359,7 +351,6 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, ref
   const [showBatchMov, setShowBatchMov] = useState(false)
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [alertasAbiertas, setAlertasAbiertas] = useState(false)
 
   const esPC = useEsPC()
   const { toast } = useToast()
@@ -566,6 +557,8 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, ref
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[13rem]">
             {!soloLectura && (<>
+              <DropdownMenuItem className="gap-2 py-2" onClick={() => setPanelPedidos(true)}><ClipboardList className="size-4 text-muted-foreground" />Ver pedidos</DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowBatchMov(true)}><Layers className="size-4 text-muted-foreground" />Movimiento en lote</DropdownMenuItem>
               <DropdownMenuItem className="gap-2 py-2" onClick={() => setShowCargaRapida(true)}><MapPin className="size-4 text-muted-foreground" />Carga rápida de stock</DropdownMenuItem>
               {stats.sinConfig > 0 && (
@@ -675,8 +668,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, ref
       <div ref={raizRef} className="contents">
         {ficha}
         <div className={claseLista}>
-        {pedidos}
-        <StockTablaPC items={items} acciones={menuAcciones}
+        <StockTablaPC items={items} acciones={menuAcciones} pedidos={pedidos} atajoActivo={!pieza}
                       onAbrir={abrirPieza} onMovimiento={soloLectura ? undefined : setMovimientoItem}
                       onFavorito={soloLectura ? undefined : (i => toggleWatch(i.rowKey))} />
         </div>
@@ -702,166 +694,30 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar, catalogo, ref
     <div ref={raizRef} className="contents">
       {ficha}
       <div className={claseLista}>
-      {pedidos}
-      {/* ── Buscar + menú de acciones ── */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            placeholder="Nombre, SAP, tipo o ubicación"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="h-11 w-full rounded-full bg-muted pl-10 pr-9 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-          />
-          {searchQuery && (
-            <button type="button" onClick={() => setSearchQuery('')} aria-label="Borrar búsqueda" className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted-foreground/[0.12]">
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
-        {menuAcciones}
-      </div>
-
-      {/* ── Filtros como chips (Fotos / App Store) ──
-          El elegido va en tinte de marca; el estado es un punto de 8 px, nunca un
-          relleno verde/ámbar/rojo. Cuentan con el MISMO predicado que filtra. */}
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">
-        {([
-          // Primero: es lo que hay que mirar. Filtra con el MISMO predicado que la cifra.
-          ...(stats.alertas.length > 0 || stockFilter === 'alertas'
-            ? [{ key: 'alertas' as StockFilter, label: 'Alertas', dot: 'bg-ink-crit', soloMovil: true }]
-            : []),
-          { key: 'configurados', label: 'Configurados' },
-          { key: 'todos', label: 'Con SAP' },
-          { key: 'bajo', label: 'Bajo stock', dot: 'bg-fill-warning' },
-          { key: 'sin', label: 'Sin stock', dot: 'bg-fill-critical' },
-          { key: 'sinConfig', label: 'Sin configurar' },
-          { key: 'favoritos', label: 'Favoritos', icon: Star },
-        ] as { key: StockFilter; label: string; dot?: string; icon?: typeof Star; soloMovil?: boolean }[]).map(f => {
-          const on = stockFilter === f.key
-          const Icon = f.icon
-          return (
-            <button
-              key={f.key}
-              type="button"
-              aria-pressed={on}
-              onClick={e => { setStockFilter(f.key); e.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }) }}
-              className={cn(
-                'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-subhead font-medium transition-colors',
-                f.soloMovil && 'sm:hidden',
-                on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted-foreground/[0.15]',
-              )}
-            >
-              {f.dot && <span className={cn('size-2 rounded-full', f.dot)} aria-hidden />}
-              {Icon && <Icon className="size-3.5" />}
-              {f.label}
-              <span className={cn('text-footnote font-semibold tabular-nums', on ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                {contarParaFiltro(items, f.key)}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Desde sm: la tarjeta de alertas de siempre. En el celular (<sm) la reemplaza el chip «Alertas». */}
-      <div className="hidden sm:block">
-      {/* ── Alertas: una celda con tile rojo y badge numérico (patrón Ajustes ›
-          Actualización de software). Se despliega en el mismo grupo. ── */}
-      {stats.alertas.length > 0 && (stockFilter === 'todos' || stockFilter === 'configurados') && !searchQuery && (() => {
-        const sinStock = stats.alertas.filter(a => a.stockActual === 0)
-        const bajoStock = stats.alertas.filter(a => a.stockActual > 0)
-        const enCeroSinMinimo = stats.sinStock - sinStock.length
-        const partes = [
-          sinStock.length > 0 && `${sinStock.length} sin stock`,
-          bajoStock.length > 0 && `${bajoStock.length} bajo mínimo`,
-          // La alerta solo vigila los ítems con mínimo definido. Sin esta parte,
-          // «21 sin stock» convivía con el chip que dice 545 y nadie entendía la diferencia.
-          enCeroSinMinimo > 0 && `+${enCeroSinMinimo} en cero sin mínimo`,
-        ].filter(Boolean).join(sep)
-        return (
-          <ListGroup>
-            <ListCell
-              leading={<span className="flex size-10 items-center justify-center rounded-ctl bg-fill-critical text-white"><AlertTriangle className="size-5" /></span>}
-              title={<span className="font-normal">Alertas de stock</span>}
-              subtitle={partes}
-              trailing={<span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-fill-critical px-2 text-footnote font-semibold tabular-nums text-white">{stats.alertas.length}</span>}
-              chevron={false}
-              onClick={() => setAlertasAbiertas(v => !v)}
-              aria-expanded={alertasAbiertas}
-            />
-            {alertasAbiertas && stats.alertas.slice(0, 10).map(item => {
-              const nv = nombreVisible(item)
-              return (
-              <ListCell
-                key={item.codigoSAP}
-                variant="child"
-                title={<span className="font-normal">{nv.esComun || nv.titulo !== '(sin nombre)' ? nv.titulo : item.codigoSAP}</span>}
-                detail={nv.oficial}
-                subtitle={[item.codigoSAP, item.ubicacionBodega].filter(Boolean).join(sep)}
-                trailing={
-                  <span className="flex flex-col items-end">
-                    <span className="text-headline tabular-nums text-foreground">{item.stockActual}<span className="ml-1 text-footnote font-normal text-muted-foreground">{item.unidad}</span></span>
-                    <span className={cn('text-footnote font-medium', item.stockActual === 0 ? 'text-ink-crit' : 'text-ink-warn')}>{item.stockActual === 0 ? 'Sin stock' : `Bajo mín · ${item.stockMinimo}`}</span>
-                  </span>
-                }
-                onClick={() => abrirPieza(item, stats.alertas)}
-              />
-              )
-            })}
-            {alertasAbiertas && stats.alertas.length > 10 && (
-              <ListCell variant="child" title={<span className="font-medium text-brand-ink">Ver todas las alertas</span>} onClick={() => setStockFilter('bajo')} />
-            )}
-          </ListGroup>
-        )
-      })()}
-      </div>
-
-      {/* ── Lista agrupada: un solo scroll de página (antes 60 vh anidados) ── */}
-      {filtered.length === 0 ? (
-        <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
-      ) : (
-        <>
-        <ListGroup
-          title={tituloLista}
-          footer={pieLista}
-          action={
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="relative inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3 after:absolute after:inset-x-0 after:-inset-y-[6px] after:content-[''] sm:after:content-none text-footnote font-medium text-foreground hover:bg-muted-foreground/[0.15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                  <ArrowUpDown className="size-3.5" />Ordenar
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[11rem]">
-                {([['nombre', 'Nombre'], ['stock', 'Stock'], ['valor', 'Valor'], ['equipos', 'Equipos']] as [SortField, string][]).map(([field, label]) => (
-                  <DropdownMenuItem key={field} className={cn('gap-2 py-2', sortField === field && 'font-semibold')} onClick={() => toggleSort(field)}>
-                    {label}
-                    {sortField === field && <span className="ml-auto text-muted-foreground">{sortDir === 'asc' ? <ArrowUp className="size-4" /> : <ArrowDown className="size-4" />}</span>}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-        >
-          {filtered.slice(0, limite).map(item => (
-            <BodegaRow key={item.codigoSAP} item={item} apple={apple} orden={sortField}
-              onEdit={soloLectura ? undefined : () => setEditingItem(item)} onMovimiento={soloLectura ? undefined : () => setMovimientoItem(item)}
-              onToggleWatch={soloLectura ? undefined : () => toggleWatch(item.rowKey)}
-              onOpenDrawer={() => abrirPieza(item, filtered)} />
-          ))}
-        </ListGroup>
-        {filtered.length > limite && (
-          <button
-            type="button"
-            onClick={() => setLimite((l) => l + FILAS_POR_PAGINA)}
-            className="mx-auto mt-3 flex min-h-[44px] items-center rounded-full bg-muted px-5 text-subhead font-medium"
-          >
-            Mostrar más ({filtered.length - limite})
-          </button>
+      <StockListaMovil
+        items={items}
+        filtradas={filtered}
+        filtro={stockFilter}
+        onFiltro={setStockFilter}
+        busca={searchQuery}
+        onBusca={setSearchQuery}
+        limite={limite}
+        onMas={() => setLimite((l) => l + FILAS_POR_PAGINA)}
+        ordenCampo={sortField}
+        ordenDir={sortDir}
+        onOrden={toggleSort}
+        titulo={tituloLista}
+        pie={pieLista}
+        acciones={menuAcciones}
+        pedidos={pedidos}
+        inventario={inventario}
+        fila={(item) => (
+          <BodegaRow item={item} apple={apple} orden={sortField}
+            onEdit={soloLectura ? undefined : () => setEditingItem(item)} onMovimiento={soloLectura ? undefined : () => setMovimientoItem(item)}
+            onToggleWatch={soloLectura ? undefined : () => toggleWatch(item.rowKey)}
+            onOpenDrawer={() => abrirPieza(item, filtered)} />
         )}
-        </>
-      )}
-
+      />
       </div>
       {modales}
     </div>
@@ -1985,7 +1841,7 @@ function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; 
 }
 
 /** Sin `onEdit` / `onMovimiento` / `onToggleWatch` (pase de lectura) la fila no ofrece esa acción. */
-function BodegaRow({ item, apple, orden, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: {
+export function BodegaRow({ item, apple, orden, onEdit, onMovimiento, onToggleWatch, onOpenDrawer }: {
   item: BodegaMergedItem; apple: boolean; orden: SortField; onEdit?: () => void; onMovimiento?: () => void; onToggleWatch?: () => void; onOpenDrawer: () => void
 }) {
   const has = !!item.bodegaId
@@ -2002,12 +1858,14 @@ function BodegaRow({ item, apple, orden, onEdit, onMovimiento, onToggleWatch, on
 
   // DESIGN.md §10: la cifra va en tinta de etiqueta; el ESTADO es el rótulo de
   // 13 px debajo. Nada de canto de color, fondo teñido ni barra en la lista.
+  // El punto de 8 px lleva el estado; el rótulo va en tinta neutra (solo «Sin stock» y «Bajo mín» en primario).
+  const puntoFila = !has ? null : isSin ? 'bg-ink-crit' : isBajo ? 'bg-ink-warn' : isCeroNeutro ? 'bg-muted-foreground/50' : 'bg-ink-ok'
   const estado = !has
     ? { texto: 'Configurar', cls: 'text-brand-ink' }
     : isSin
-      ? { texto: 'Sin stock', cls: 'text-ink-crit' }
+      ? { texto: 'Sin stock', cls: 'text-foreground' }
       : isBajo
-        ? { texto: apple ? `Bajo mín ${item.stockMinimo}` : `Bajo mín · ${item.stockMinimo}`, cls: 'text-ink-warn' }
+        ? { texto: apple ? `Bajo mín ${item.stockMinimo}` : `Bajo mín · ${item.stockMinimo}`, cls: 'text-foreground' }
         : isCeroNeutro
           ? { texto: 'Sin mínimo', cls: 'text-muted-foreground' }
           : item.stockMinimo > 0
@@ -2054,7 +1912,10 @@ function BodegaRow({ item, apple, orden, onEdit, onMovimiento, onToggleWatch, on
         trailing={
           <span className="flex flex-col items-end">
             {has
-              ? <span className="text-title3 font-semibold leading-tight tabular-nums text-foreground">{item.stockActual}<span className="ml-1 text-footnote font-normal text-muted-foreground">{item.unidad}</span></span>
+              ? <span className="flex items-center gap-1.5 text-title3 font-semibold leading-tight tabular-nums text-foreground">
+                  {puntoFila && <span aria-hidden className={cn('inline-block size-2 shrink-0 rounded-full', puntoFila)} />}
+                  {item.stockActual}<span className="ml-1 text-footnote font-normal text-muted-foreground">{item.unidad}</span>
+                </span>
               : <span className="text-title3 leading-tight text-muted-foreground/50">—</span>}
             {estado && <span className={cn('text-footnote font-medium leading-tight', estado.cls)}>{estado.texto}</span>}
           </span>
@@ -2425,13 +2286,31 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
 function ModalBackdrop({ onClose, children, wide }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className={`bg-card border border-border rounded-t-panel sm:rounded-panel shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
+      <div role="dialog" aria-modal="true" className={`bg-card border border-border rounded-t-panel sm:rounded-panel shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
     </div>
   )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="text-xs font-medium text-muted-foreground mb-1 block">{label}</span>{children}</label>
+}
+
+// Campos del modal: móvil con fondo de tarjeta, PC con fondo de campo (piel Apple).
+const CAMPO_BASE = 'w-full rounded-[10px] bg-card px-3 text-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 sm:bg-muted sm:text-subhead'
+const CAMPO_MODAL = `${CAMPO_BASE} h-11`
+const CLASES_ABC = [
+  { v: 'A', t: 'A — Crítico / Alto valor' },
+  { v: 'B', t: 'B — Importante / Valor medio' },
+  { v: 'C', t: 'C — Estándar / Bajo valor' },
+]
+
+function Campo({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={cn('flex min-w-0 flex-col gap-1.5', className)}>
+      <span className="text-footnote font-semibold text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
 }
 
 export function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onSave: (d: BodegaStockData) => Promise<void>; onClose: () => void }) {
@@ -2445,48 +2324,157 @@ export function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedIt
   const set = (k: keyof BodegaStockData, v: string | number) => setForm(p => ({ ...p, [k]: v }))
   // Con bodega configurada, el stock se mueve solo con Contar o Movimiento: no se edita aquí.
   const configurado = !!item.bodegaId
+  const tituloId = useId()
+  const nombre = nombreVisible(item).titulo
+  const subtitulo = configurado ? 'Editar datos de bodega' : 'Configurar en bodega'
+
+  // Escape cierra; el clic fuera cierra por el fondo.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const guardar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try { await onSave(configurado ? { ...form, stockActual: item.stockActual } : form) } finally { setSaving(false) }
+  }
 
   return (
-    <ModalBackdrop onClose={onClose}>
-      <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(configurado ? { ...form, stockActual: item.stockActual } : form) } finally { setSaving(false) } }}>
-        <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-base font-bold">{configurado ? 'Editar datos de bodega' : 'Configurar stock'}</h3>
-          <p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve}</p>
-          <span className="text-caption px-1.5 py-0.5 rounded-ctl bg-primary/[0.15] text-brand-ink font-mono">{item.codigoSAP}</span>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          {configurado && (
-            <p className="text-sm text-muted-foreground">Stock actual: <strong className="tabular-nums text-foreground">{item.stockActual}</strong> · se cambia con Contar o Movimiento</p>
-          )}
-          <div className={`grid ${configurado ? 'grid-cols-3' : 'grid-cols-4'} gap-3`}>
-            {!configurado && <Field label="Stock actual"><input type="number" min={0} value={form.stockActual} onChange={e => set('stockActual', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>}
-            <Field label="Stock mínimo"><input type="number" min={0} value={form.stockMinimo} onChange={e => set('stockMinimo', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
-            <Field label="Stock máximo"><input type="number" min={0} value={form.stockMaximo ?? 0} onChange={e => set('stockMaximo', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
-            <Field label="Unidad"><select value={form.unidad} onChange={e => set('unidad', e.target.value)} className={INPUT}>
-              <option value="pzas">Piezas</option><option value="litros">Litros</option><option value="metros">Metros</option><option value="kg">Kilogramos</option><option value="rollos">Rollos</option><option value="cajas">Cajas</option><option value="sets">Sets</option>
-            </select></Field>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 sm:items-center sm:p-6" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={tituloId}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-h-[92dvh] overflow-y-auto rounded-t-[32px] bg-background sm:max-w-[760px] sm:rounded-[32px] sm:bg-card sm:shadow-[0_12px_40px_rgba(0,0,0,0.25)]"
+      >
+        <form onSubmit={guardar}>
+          {/* Celular: agarradera y barra con Cancelar / nombre / Guardar */}
+          <div className="sm:hidden">
+            <div aria-hidden className="mx-auto mt-2 h-[5px] w-9 rounded-full bg-muted-foreground/30" />
+            <div className="flex h-14 items-center px-2">
+              <button type="button" onClick={onClose} className="h-11 min-w-[88px] text-left text-body text-brand-ink">Cancelar</button>
+              <div className="min-w-0 flex-1 text-center">
+                <p className="truncate text-body font-semibold text-foreground">{nombre}</p>
+                <p className="truncate text-footnote text-muted-foreground">{subtitulo}</p>
+              </div>
+              <button type="submit" disabled={saving} className="h-11 min-w-[88px] text-right text-body font-semibold text-brand-ink disabled:opacity-50">Guardar</button>
+            </div>
           </div>
-          <Field label="Ubicación en bodega"><input type="text" value={form.ubicacionBodega} onChange={e => set('ubicacionBodega', e.target.value)} placeholder="Ej: Estante A3 - Caja 2" className={INPUT} /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Proveedor"><input type="text" value={form.proveedor || ''} onChange={e => set('proveedor', e.target.value)} className={INPUT} /></Field>
-            <Field label="Costo compra ($)"><input type="number" min={0} step={0.01} value={form.costoCompra ?? 0} onChange={e => set('costoCompra', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
+
+          {/* PC: título = nombre visible de la pieza; SAP y subtítulo debajo */}
+          <div className="hidden items-start justify-between gap-4 px-7 pt-6 sm:flex">
+            <div className="min-w-0">
+              <h3 id={tituloId} className="truncate text-title3 font-semibold text-foreground">{nombre}</h3>
+              <p className="text-footnote text-muted-foreground">
+                <span className="font-mono">{item.codigoSAP}</span> · {subtitulo}
+              </p>
+            </div>
+            <button type="button" onClick={onClose} aria-label="Cerrar" className="grid size-9 shrink-0 place-items-center rounded-full bg-muted">
+              <X className="size-4" aria-hidden />
+            </button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Lead time (días)"><input type="number" min={0} value={form.leadTime ?? 0} onChange={e => set('leadTime', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
-            <Field label="Categoría ABC"><select value={form.categoria || ''} onChange={e => set('categoria', e.target.value)} className={INPUT}>
-              <option value="">Sin clasificar</option><option value="A">A — Crítico / Alto valor</option><option value="B">B — Importante / Valor medio</option><option value="C">C — Estándar / Bajo valor</option>
-            </select></Field>
+
+          <div className="grid grid-cols-2 gap-x-3 gap-y-5 px-4 pb-8 pt-5 sm:grid-cols-6 sm:gap-4 sm:px-7 sm:pb-0 sm:pt-5">
+            {configurado ? (
+              <div className="col-span-2 flex items-center gap-2 rounded-[10px] bg-muted px-3.5 py-2.5 text-subhead text-muted-foreground sm:col-span-6">
+                <Lock className="size-4 shrink-0" aria-hidden />
+                <span>Stock actual: <b className="font-semibold tabular-nums text-foreground">{item.stockActual}</b> · se cambia con Contar o Movimiento</span>
+              </div>
+            ) : (
+              <>
+                <Campo label="Stock actual" className="col-span-1 sm:col-span-2">
+                  <input type="number" min={0} value={form.stockActual} onChange={e => set('stockActual', Number(e.target.value))} className={`${CAMPO_MODAL} tabular-nums`} />
+                </Campo>
+                <p className="col-span-1 self-end pb-2 text-footnote text-muted-foreground sm:col-span-4">Después se cambia con Contar o Movimiento.</p>
+              </>
+            )}
+
+            <Campo label="Stock mínimo" className="col-span-1 sm:col-span-2">
+              <input type="number" min={0} value={form.stockMinimo} onChange={e => set('stockMinimo', Number(e.target.value))} className={`${CAMPO_MODAL} tabular-nums`} />
+            </Campo>
+            <Campo label="Stock máximo" className="col-span-1 sm:col-span-2">
+              <input type="number" min={0} value={form.stockMaximo ?? 0} onChange={e => set('stockMaximo', Number(e.target.value))} className={`${CAMPO_MODAL} tabular-nums`} />
+            </Campo>
+
+            <Campo label="Unidad" className="col-span-2 sm:col-span-2">
+              <select value={form.unidad} onChange={e => set('unidad', e.target.value)} className={CAMPO_MODAL}>
+                <option value="pzas">Piezas (pzas)</option>
+                <option value="litros">Litros</option>
+                <option value="metros">Metros</option>
+                <option value="kg">Kilogramos</option>
+                <option value="rollos">Rollos</option>
+                <option value="cajas">Cajas</option>
+                <option value="sets">Sets</option>
+              </select>
+            </Campo>
+
+            <Campo label="Ubicación en bodega" className="col-span-2 sm:col-span-2">
+              <input type="text" value={form.ubicacionBodega} onChange={e => set('ubicacionBodega', e.target.value)} placeholder="Ej: C-3-2" className={`${CAMPO_MODAL} font-mono`} />
+            </Campo>
+            <Campo label="Proveedor" className="col-span-2 sm:col-span-4">
+              <input type="text" value={form.proveedor || ''} onChange={e => set('proveedor', e.target.value)} placeholder="Sin proveedor" className={CAMPO_MODAL} />
+            </Campo>
+
+            <Campo label="Costo de compra" className="col-span-1 sm:col-span-2">
+              <div className="relative">
+                <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground">$</span>
+                <input type="number" min={0} step={0.01} value={form.costoCompra ?? 0} onChange={e => set('costoCompra', Number(e.target.value))} className={`${CAMPO_MODAL} pl-7 tabular-nums`} />
+              </div>
+            </Campo>
+            <Campo label="Plazo de entrega" className="col-span-1 sm:col-span-2">
+              <div className="relative">
+                <input type="number" min={0} value={form.leadTime ?? 0} onChange={e => set('leadTime', Number(e.target.value))} className={`${CAMPO_MODAL} pr-12 tabular-nums`} />
+                <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-footnote text-muted-foreground">días</span>
+              </div>
+            </Campo>
+
+            <div className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:col-span-2">
+              <span className="text-footnote font-semibold text-muted-foreground">Clase ABC</span>
+              <div role="group" aria-label="Clase ABC" className="flex h-11 rounded-full bg-muted p-[3px]">
+                {CLASES_ABC.map(({ v, t }) => {
+                  const on = (form.categoria || '') === v
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={on}
+                      title={t}
+                      onClick={() => set('categoria', on ? '' : v)}
+                      className={cn(
+                        'flex-1 rounded-full text-subhead font-semibold transition-colors',
+                        on ? 'bg-card text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)] dark:bg-muted-foreground/30' : 'text-muted-foreground',
+                      )}
+                    >
+                      {v}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <Campo label="Observaciones" className="col-span-2 sm:col-span-6">
+              <textarea
+                value={form.observaciones || ''}
+                onChange={e => set('observaciones', e.target.value)}
+                placeholder="Sin observaciones"
+                className={`${CAMPO_BASE} h-[88px] resize-none py-2.5`}
+              />
+            </Campo>
           </div>
-          <Field label="Observaciones"><textarea value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} rows={2} className={`${INPUT} resize-none`} /></Field>
-        </div>
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-card">Cancelar</button>
-          <button type="submit" disabled={saving} className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-card hover:bg-primary/90 disabled:opacity-50">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Guardar
-          </button>
-        </div>
-      </form>
-    </ModalBackdrop>
+
+          <div className="hidden justify-end gap-2.5 px-7 pb-5 pt-6 sm:flex">
+            <button type="button" onClick={onClose} className="h-11 rounded-full bg-muted px-5 font-semibold text-foreground">Cancelar</button>
+            <button type="submit" disabled={saving} className="flex h-11 items-center gap-2 rounded-full bg-primary px-6 font-semibold text-primary-foreground disabled:opacity-50">
+              {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
+              Guardar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 

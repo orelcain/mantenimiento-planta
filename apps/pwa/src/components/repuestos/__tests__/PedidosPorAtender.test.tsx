@@ -32,7 +32,7 @@ const stocks: Record<string, StockDeSolicitud> = {
 const montar = (solicitudes: SolicitudItem[], extra: Partial<Parameters<typeof PedidosPorAtender>[0]> = {}) => {
   const onAvanzar = vi.fn(() => Promise.resolve())
   const onVerTodos = vi.fn()
-  render(
+  const { container } = render(
     <PedidosPorAtender
       solicitudes={solicitudes}
       esPC
@@ -43,8 +43,11 @@ const montar = (solicitudes: SolicitudItem[], extra: Partial<Parameters<typeof P
       {...extra}
     />,
   )
-  return { onAvanzar, onVerTodos }
+  return { onAvanzar, onVerTodos, container }
 }
+
+/** La franja se ve cerrada; «Revisar» despliega la lista con Aprobar / Entregar. */
+const revisar = () => fireEvent.click(screen.getByRole('button', { name: 'Revisar' }))
 
 describe('PedidosPorAtender', () => {
   it('cuenta lo que espera y deja aprobar ahí mismo', () => {
@@ -53,7 +56,8 @@ describe('PedidosPorAtender', () => {
       pedido({ id: 'e1', estado: 'aprobada', codigoSAP: '3300029112', textoBreve: 'Abrazadera 2" INOX' }),
       pedido({ id: 'x', estado: 'entregada' }),
     ])
-    expect(screen.getByRole('heading', { name: 'Pedidos por atender · 2' })).toBeTruthy()
+    expect(screen.getByText('2 pedidos por atender')).toBeTruthy()
+    revisar()
     expect(screen.getByText('1 por aprobar · 1 por entregar')).toBeTruthy()
     expect(screen.getByText('queda 1')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
@@ -64,19 +68,27 @@ describe('PedidosPorAtender', () => {
 
   it('sin stock no ofrece entregar: dice que falta comprar', () => {
     montar([pedido({ id: 'e2', estado: 'aprobada', codigoSAP: '3300120602', textoBreve: 'Adaptador 1420606015' })])
+    revisar()
     expect(screen.queryByRole('button', { name: 'Entregar' })).toBeNull()
     expect(screen.getByText('Falta comprar')).toBeTruthy()
   })
 
-  it('sin pendientes, una línea y el acceso al historial', () => {
-    const { onVerTodos } = montar([pedido({ id: 'x1', estado: 'entregada' }), pedido({ id: 'x2', estado: 'entregada' })])
-    expect(screen.getByText('Ninguno por atender · 2 entregados')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Ver los 2, con entregados' }))
+  it('sin pendientes no ocupa espacio', () => {
+    const { container } = montar([pedido({ id: 'x1', estado: 'entregada' }), pedido({ id: 'x2', estado: 'entregada' })])
+    expect(container.firstChild).toBeNull()
+    expect(screen.queryByTestId('pedidos-por-atender')).toBeNull()
+  })
+
+  it('al revisar, «Ver todos» sigue llevando al panel de solicitudes', () => {
+    const { onVerTodos } = montar([pedido({ id: 'a1' })])
+    revisar()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver todos' }))
     expect(onVerTodos).toHaveBeenCalled()
   })
 
   it('sin permiso de escritura no hay botones de aprobar ni entregar', () => {
     montar([pedido({ id: 'a1' })], { onAvanzar: undefined })
+    revisar()
     expect(screen.queryByRole('button', { name: 'Aprobar' })).toBeNull()
   })
 })
