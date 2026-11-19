@@ -97,6 +97,10 @@ export function FichaPieza({
   const subtitulo = nv.oficial || item.descripcion || null
   const estado = fraseDeEstado(item)
   const configurado = !!item.bodegaId
+  // Celular: los botones van en 2 columnas; con cantidad impar, el primero ocupa las 2 (p. ej. «Solicitar» arriba).
+  const botonesCel = [onSolicitar && item.codigoSAP, onMovimiento && configurado, onContar && item.codigoSAP].filter(Boolean).length
+  const primeroCel = onSolicitar && item.codigoSAP ? 'solicitar' : onMovimiento && configurado ? 'movimiento' : 'contar'
+  const anchoCel = (boton: string) => cn('h-[50px] w-full', botonesCel % 2 === 1 && boton === primeroCel && 'col-span-2')
   const imagenes = useMemo(() => imagenesDePieza(item), [item])
   const principal = imagenes[0]
   const equipos = useMemo(() => equiposUnicos(item), [item])
@@ -309,10 +313,10 @@ export function FichaPieza({
           </div>
         </div>
       ) : (onSolicitar || onMovimiento || onEditar || onContar) && (
-        <div className="flex flex-wrap gap-2">
-          {onSolicitar && item.codigoSAP && <Button size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : cn(BOTON_CEL, 'h-[50px] flex-1'))} onClick={onSolicitar}>Solicitar</Button>}
-          {onMovimiento && configurado && <Button variant="tinted" size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : cn(BOTON_CEL, 'h-[50px] flex-1'))} onClick={onMovimiento}>Movimiento</Button>}
-          {onContar && item.codigoSAP && <Button variant="tinted" size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : cn(BOTON_CEL, 'h-[50px] flex-1'))} onClick={() => { setConteoVal(''); setContando(true) }}>Contar</Button>}
+        <div className={esPC ? 'flex flex-wrap gap-2' : 'grid grid-cols-2 gap-2'}>
+          {onSolicitar && item.codigoSAP && <Button size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : anchoCel('solicitar'))} onClick={onSolicitar}>Solicitar</Button>}
+          {onMovimiento && configurado && <Button variant="tinted" size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : anchoCel('movimiento'))} onClick={onMovimiento}>Movimiento</Button>}
+          {onContar && item.codigoSAP && <Button variant="tinted" size={esPC ? 'sm' : 'md'} className={cn(esPC ? BOTON_PC : anchoCel('contar'))} onClick={() => { setConteoVal(''); setContando(true) }}>Contar</Button>}
           {esPC && onEditar && <Button variant="tinted" size="sm" className={BOTON_PC} onClick={onEditar}>{configurado ? 'Editar' : 'Configurar en bodega'}</Button>}
         </div>
       )}

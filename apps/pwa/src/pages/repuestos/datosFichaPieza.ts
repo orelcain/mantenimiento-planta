@@ -128,6 +128,15 @@ export function cuandoCorto(d: Date, ahora: Date = new Date()): string {
   return `${dd}-${mm} ${hora}`
 }
 
+/** Columna «Contado» de la tabla: «dd-mm» si es del año en curso, si no «dd-mm-aa». */
+export function fechaConteoCorta(d: Date, ahora: Date = new Date()): string {
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  if (d.getFullYear() === ahora.getFullYear()) return `${dd}-${mm}`
+  const aa = String(d.getFullYear() % 100).padStart(2, '0')
+  return `${dd}-${mm}-${aa}`
+}
+
 /** Lo que dice la columna de stock de un pedido: punto + palabras cortas. */
 export function stockDelPedido(stock: StockDeSolicitud | undefined, cantidad: number): { tono: 'crit' | 'warn' | 'ok' | 'neutro'; texto: string } {
   if (!stock?.configurado || typeof stock.stockActual !== 'number') return { tono: 'neutro', texto: 'sin registro en bodega' }

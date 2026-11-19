@@ -45,3 +45,27 @@ describe('filtros de Bodega en PC', () => {
   })
   it('la búsqueda se combina con los filtros', () => expect(ids(FILTROS_INICIALES, 'chapa')).toBe('2'))
 })
+
+// ── Etapa 2: los filtros rápidos entran por la MISMA ruta que la tabla de PC ──
+import { filasDeTablaPC } from '../filtrosBodegaPC'
+import { contarParaFiltro } from '@/hooks/repuestos/filtrosDeStock'
+
+describe('filtros rápidos en la tabla de PC', () => {
+  const LISTA = [
+    ...ITEMS,
+    it0({ codigoSAP: '5', textoBreve: 'BALIZA', bodegaId: 'b', stockActual: 3, equipos: [{ machineId: '', machineName: 'Sin equipo' }], ultimoConteoAt: new Date('2026-09-25T09:00:00') }),
+    it0({ codigoSAP: '6', textoBreve: 'CADENA', bodegaId: 'b', stockActual: 4, stockMinimo: 2, equipos: [{ machineId: 'g', machineName: 'GRADER GEA 184' }], ultimoConteoAt: new Date('2026-09-25T09:00:00') }),
+  ]
+  const ids2 = (rapido: 'sinEquipo' | 'sinContar' | null, f = FILTROS_LIMPIOS, busca = '') =>
+    filasDeTablaPC(LISTA, f, busca, rapido).map(i => i.codigoSAP).join('')
+
+  it.each(['sinEquipo', 'sinContar'] as const)('%s: la cifra del chip es el número de filas al pulsarlo', (k) => {
+    expect(filasDeTablaPC(LISTA, FILTROS_LIMPIOS, '', k)).toHaveLength(contarParaFiltro(LISTA, k))
+  })
+
+  it('«Sin equipo» deja las piezas de bodega sin equipo real (el marcador no cuenta)', () => expect(ids2('sinEquipo')).toBe('35'))
+  it('«Sin contar» deja las piezas de bodega sin sello de conteo', () => expect(ids2('sinContar')).toBe('123'))
+  it('sin filtro rápido, la tabla es la de siempre', () => expect(ids2(null, FILTROS_INICIALES)).toBe('12356'))
+  it('se combina con la búsqueda', () => expect(ids2('sinContar', FILTROS_LIMPIOS, 'chapa')).toBe('2'))
+  it('se combina con «Más filtros»', () => expect(ids2('sinEquipo', { ...FILTROS_LIMPIOS, clase: ['insumo'] })).toBe('3'))
+})
