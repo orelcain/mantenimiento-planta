@@ -3,38 +3,55 @@ import {
   CM_DATO_VIEJO_MS,
   CM_REGISTROS_CORTE,
   CM_VENTANA_MS,
+  archivoEstable,
+  calcularAlDia,
   claveArchivo,
+  contarRegistrosPiezaAPieza,
+  crearCandado,
+  debeLimpiarCortado,
+  debeOmitirPorDatosMasCompletos,
+  decidirMarcado,
+  decidirReintento,
   derivarEstado,
-  esDatoViejo,
   esExporteCortado,
   esNombrePiezaAPieza,
+  esSinDatos,
+  listadoIncompleto,
   recortarProcesados,
   seleccionarCandidatos,
   type CandidatoCarpeta,
   type HechosCarpeta,
+  type UltimoResultado,
 } from '../carpetaMatrix'
 
 const AHORA = Date.UTC(2026, 10, 19, 12, 0, 0)
 const HORA = 3_600_000
 const MIN = 60_000
+const DIA = 86_400_000
 
 function archivo(ruta: string, hacia: number, tamano = 1000): CandidatoCarpeta {
   return { ruta, tamano, modificado: AHORA - hacia }
+}
+
+const cargado: UltimoResultado = {
+  tipo: 'cargado', archivo: 'p.xlsx', tamano: 1, modificado: AHORA - HORA, piezas: 27_371,
+  desde: null, hasta: null, turnoDocId: null, cargadoEn: AHORA,
 }
 
 function hechos(extra: Partial<HechosCarpeta> = {}): HechosCarpeta {
   return {
     autorizada: true,
     permisoConcedido: true,
-    ultimoResultado: null,
-    ultimoPiezaAPieza: AHORA - HORA,
+    ultimo: null,
+    cortado: null,
+    demasiados: false,
+    alDia: true,
     errorReciente: false,
-    ahora: AHORA,
     ...extra,
   }
 }
 
-describe('seleccionarCandidatos', () => {
+describe('seleccionarCandidatos (ventana, estabilidad, procesados)', () => {
   it('ignora archivos fuera de la ventana de 48 h y deja los de dentro', () => {
     const dentro = archivo('Pieza pieza hoy.xlsx', 47 * HORA)
     const fuera = archivo('Pieza pieza vieja.xlsx', CM_VENTANA_MS + HORA)
@@ -44,9 +61,9 @@ describe('seleccionarCandidatos', () => {
 
   it('no toma archivos inestables (modificados hace 30 s o menos)', () => {
     const inestable = archivo('escribiendo.xlsx', 10_000)
-    const exactamente30 = archivo('limite.xlsx', 30_000)
+    const limite = archivo('limite.xlsx', 30_000)
     const estable = archivo('listo.xlsx', 31_000)
-    const res = seleccionarCandidatos([inestable, exactamente30, estable], AHORA, new Set())
+    const res = seleccionarCandidatos([inestable, limite, estable], AHORA, new Set())
     expect(res.map((c) => c.ruta)).toEqual(['listo.xlsx'])
   })
 
@@ -54,10 +71,8 @@ describe('seleccionarCandidatos', () => {
     const a = archivo('pieza.xlsx', 5 * MIN, 500)
     const procesados = new Set([claveArchivo(a)])
     expect(seleccionarCandidatos([a], AHORA, procesados)).toHaveLength(0)
-    const cambiado = { ...a, tamano: 501 }
-    expect(seleccionarCandidatos([cambiado], AHORA, procesados)).toHaveLength(1)
-    const otraFecha = { ...a, modificado: a.modificado + 1 }
-    expect(seleccionarCandidatos([otraFecha], AHORA, procesados)).toHaveLength(1)
+    expect(seleccionarCandidatos([{ ...a, tamano: 501 }], AHORA, procesados)).toHaveLength(1)
+    expect(seleccionarCandidatos([{ ...a, modificado: a.modificado + 1 }], AHORA, procesados)).toHaveLength(1)
   })
 
   it('ordena del más nuevo al más viejo', () => {
@@ -70,67 +85,160 @@ describe('seleccionarCandidatos', () => {
   })
 })
 
-describe('esExporteCortado', () => {
-  it('marca un Pieza a pieza con exactamente 10.000 registros', () => {
-    expect(CM_REGISTROS_CORTE).toBe(10_000)
-    expect(esExporteCortado('PIEZA_PIEZA', 10_000)).toBe(true)
+describe('regla 2: cortado cuenta el total de registros', () => {
+  it('suma piezas, No aplicable y gate0', () => {
+    const p = {
+      pieceRecords: new Array(9_990).fill(0),
+      notApplicableRecords: new Array(7).fill(0),
+      gate0Records: new Array(3).fill(0),
+    }
+    expect(contarRegistrosPiezaAPieza(p)).toBe(10_000)
+    expect(esExporteCortado('PIEZA_PIEZA', contarRegistrosPiezaAPieza(p))).toBe(true)
+  })
+
+  it('con solo pieceRecords de 10.000 pero más No aplicable el total no es 10.000', () => {
+    const p = { pieceRecords: new Array(10_000).fill(0), notApplicableRecords: [{}] }
+    expect(esExporteCortado('PIEZA_PIEZA', contarRegistrosPiezaAPieza(p))).toBe(false)
   })
 
   it('no marca 9.999 ni 10.001, ni otro tipo de archivo con 10.000', () => {
+    expect(CM_REGISTROS_CORTE).toBe(10_000)
     expect(esExporteCortado('PIEZA_PIEZA', 9_999)).toBe(false)
     expect(esExporteCortado('PIEZA_PIEZA', 10_001)).toBe(false)
     expect(esExporteCortado('PUERTA_0', 10_000)).toBe(false)
   })
 })
 
-describe('esDatoViejo', () => {
-  it('es viejo con más de 3 días y no con 2 días', () => {
-    expect(esDatoViejo(AHORA - (CM_DATO_VIEJO_MS + HORA), AHORA)).toBe(true)
-    expect(esDatoViejo(AHORA - 2 * 86_400_000, AHORA)).toBe(false)
-  })
-
-  it('sin ningún Pieza a pieza en la carpeta también es dato viejo', () => {
-    expect(esDatoViejo(null, AHORA)).toBe(false)
+describe('regla 3: sin datos nunca es cargado', () => {
+  it('cero registros o cero segmentos es sin datos', () => {
+    expect(esSinDatos(0, 3)).toBe(true)
+    expect(esSinDatos(120, 0)).toBe(true)
+    expect(esSinDatos(120, 2)).toBe(false)
   })
 })
 
-describe('derivarEstado', () => {
-  it('sin handle guardado: sin autorizar', () => {
+describe('regla 4: estabilidad tras leer el archivo', () => {
+  it('cambió el tamaño o la fecha: no es estable', () => {
+    const listado = { tamano: 100, modificado: 500 }
+    expect(archivoEstable(listado, { size: 100, lastModified: 500 })).toBe(true)
+    expect(archivoEstable(listado, { size: 101, lastModified: 500 })).toBe(false)
+    expect(archivoEstable(listado, { size: 100, lastModified: 501 })).toBe(false)
+  })
+})
+
+describe('regla 1: no pisar datos más completos', () => {
+  it('omite si Matrix ya tiene más piezas que el segmento nuevo', () => {
+    expect(debeOmitirPorDatosMasCompletos(13_000, 12_000)).toBe(true)
+  })
+
+  it('no omite si hay igual o menos piezas, ni si no hay resumen', () => {
+    expect(debeOmitirPorDatosMasCompletos(12_000, 12_000)).toBe(false)
+    expect(debeOmitirPorDatosMasCompletos(11_000, 12_000)).toBe(false)
+    expect(debeOmitirPorDatosMasCompletos(null, 12_000)).toBe(false)
+  })
+})
+
+describe('regla 5: procesado solo si todo salió bien', () => {
+  it('con fallos no se marca; sin fallos sí', () => {
+    expect(decidirMarcado(['detalle de piezas X: red'])).toBe(false)
+    expect(decidirMarcado([])).toBe(true)
+  })
+})
+
+describe('regla 6: máximo 3 intentos por archivo', () => {
+  it('el tercer intento fallido deja el archivo como fallido', () => {
+    expect(decidirReintento(0)).toEqual({ intentos: 1, fallido: false })
+    expect(decidirReintento(1)).toEqual({ intentos: 2, fallido: false })
+    expect(decidirReintento(2)).toEqual({ intentos: 3, fallido: true })
+  })
+})
+
+describe('regla 7: listado incompleto', () => {
+  it('tope alcanzado o elementos no leídos cuentan como incompleto', () => {
+    expect(listadoIncompleto(true, 0)).toBe(true)
+    expect(listadoIncompleto(false, 2)).toBe(true)
+    expect(listadoIncompleto(false, 0)).toBe(false)
+  })
+})
+
+describe('regla 9: el cortado persiste hasta un completo más nuevo', () => {
+  const cortado = { modificado: AHORA - 2 * HORA }
+
+  it('un Pieza a pieza completo más nuevo lo limpia', () => {
+    expect(debeLimpiarCortado(cortado, AHORA - HORA)).toBe(true)
+  })
+
+  it('un archivo más viejo que el cortado no lo limpia', () => {
+    expect(debeLimpiarCortado(cortado, AHORA - 3 * HORA)).toBe(false)
+    expect(debeLimpiarCortado(null, AHORA)).toBe(false)
+  })
+
+  it('con cortado activo, cargar otro archivo no lo borra del estado visible', () => {
+    const h = hechos({ ultimo: cargado, cortado: { archivo: 'c.xlsx', registros: 10_000, modificado: cortado.modificado, detectadoEn: AHORA } })
+    expect(derivarEstado(h)).toBe('cortado')
+  })
+})
+
+describe('regla 10: al día solo con dato reciente', () => {
+  it('un procesado de los últimos 3 días está al día', () => {
+    expect(calcularAlDia({ ultimoPiezaProcesado: AHORA - 2 * DIA, piezaPendienteFueraVentana: false, ahora: AHORA })).toBe(true)
+  })
+
+  it('sin Pieza a pieza, o más viejo que 3 días, no está al día', () => {
+    expect(calcularAlDia({ ultimoPiezaProcesado: null, piezaPendienteFueraVentana: false, ahora: AHORA })).toBe(false)
+    expect(calcularAlDia({ ultimoPiezaProcesado: AHORA - CM_DATO_VIEJO_MS - HORA, piezaPendienteFueraVentana: false, ahora: AHORA })).toBe(false)
+  })
+
+  it('un Pieza a pieza nuevo fuera de la ventana sin procesar no deja estar al día', () => {
+    expect(calcularAlDia({ ultimoPiezaProcesado: AHORA - HORA, piezaPendienteFueraVentana: true, ahora: AHORA })).toBe(false)
+  })
+
+  it('en el estado: no está al día = viejo, nunca «cargado» ni «vigilando»', () => {
+    expect(derivarEstado(hechos({ alDia: false, ultimo: cargado }))).toBe('viejo')
+    expect(derivarEstado(hechos({ alDia: false }))).toBe('viejo')
+  })
+})
+
+describe('regla 11: candado sin solapes', () => {
+  it('una segunda revisión no entra mientras la primera no suelta', () => {
+    const c = crearCandado()
+    expect(c.tomar()).toBe(true)
+    expect(c.tomar()).toBe(false)
+    c.soltar()
+    expect(c.tomar()).toBe(true)
+  })
+})
+
+describe('regla 8 y mensajes: estados visibles en orden de precedencia', () => {
+  it('sin autorizar y permiso mandan sobre todo', () => {
     expect(derivarEstado(hechos({ autorizada: false }))).toBe('sin-autorizar')
+    expect(derivarEstado(hechos({ permisoConcedido: false, errorReciente: true }))).toBe('permiso')
   })
 
-  it('permiso perdido tras reiniciar: permiso por renovar', () => {
-    expect(derivarEstado(hechos({ permisoConcedido: false }))).toBe('permiso')
-  })
-
-  it('exporte cortado tiene prioridad sobre dato viejo', () => {
-    const cortado = { tipo: 'cortado' as const, archivo: 'p.xlsx', registros: 10_000, detectadoEn: AHORA }
-    const res = derivarEstado(hechos({ ultimoResultado: cortado, ultimoPiezaAPieza: AHORA - 7 * 86_400_000 }))
-    expect(res).toBe('cortado')
-  })
-
-  it('dato viejo sin cortado: viejo', () => {
-    expect(derivarEstado(hechos({ ultimoPiezaAPieza: AHORA - 7 * 86_400_000 }))).toBe('viejo')
-  })
-
-  it('archivo nuevo cargado y dato al día: cargado; sin nada: vigilando', () => {
-    const cargado = {
-      tipo: 'cargado' as const, archivo: 'p.xlsx', piezas: 27_371, desde: null, hasta: null, cargadoEn: AHORA,
-    }
-    expect(derivarEstado(hechos({ ultimoResultado: cargado }))).toBe('cargado')
+  it('error > cortado > demasiados > viejo > cargado > vigilando', () => {
+    const fallo: UltimoResultado = { tipo: 'fallo', archivo: 'x.xlsx', mensaje: 'x', detectadoEn: AHORA }
+    const corte = { archivo: 'c.xlsx', registros: 10_000, modificado: AHORA, detectadoEn: AHORA }
+    expect(derivarEstado(hechos({ errorReciente: true, cortado: corte, demasiados: true, alDia: false }))).toBe('error')
+    expect(derivarEstado(hechos({ ultimo: fallo }))).toBe('error')
+    expect(derivarEstado(hechos({ cortado: corte, demasiados: true, alDia: false }))).toBe('cortado')
+    expect(derivarEstado(hechos({ demasiados: true, alDia: false }))).toBe('demasiados')
+    expect(derivarEstado(hechos({ alDia: false, ultimo: cargado }))).toBe('viejo')
+    expect(derivarEstado(hechos({ ultimo: cargado }))).toBe('cargado')
     expect(derivarEstado(hechos())).toBe('vigilando')
   })
+
+  it('demasiados nunca se muestra como «al día» aunque el dato esté reciente', () => {
+    expect(derivarEstado(hechos({ demasiados: true, alDia: true, ultimo: cargado }))).toBe('demasiados')
+  })
 })
 
-describe('nombre del Pieza a pieza', () => {
+describe('nombre del Pieza a pieza y utilidades', () => {
   it('reconoce el nombre del parser (pieza o piece)', () => {
     expect(esNombrePiezaAPieza('Pieza pieza Grader STATICGRADER1 (20261119_000000 - 20261120_000000).xlsx')).toBe(true)
     expect(esNombrePiezaAPieza('Puerta 0.xlsx')).toBe(false)
   })
-})
 
-describe('recortarProcesados', () => {
-  it('deja solo los últimos N', () => {
+  it('recortarProcesados deja solo los últimos N', () => {
     expect(recortarProcesados(['a', 'b', 'c', 'd'], 2)).toEqual(['c', 'd'])
     expect(recortarProcesados(['a'], 2)).toEqual(['a'])
   })

@@ -5,12 +5,12 @@
  * (para que el estado «cortado» o «cargado» sobreviva a recargar la página).
  */
 import type { CarpetaHandle } from './diagnosticoMatrix'
-import { CM_MAX_PROCESADOS, recortarProcesados, type UltimoResultado } from './carpetaMatrix'
+import { CM_MAX_PROCESADOS, recortarProcesados, type CortadoInfo, type UltimoResultado } from './carpetaMatrix'
 
 const DB_NOMBRE = 'carpeta-matrix-grader'
 const TIENDA = 'kv'
 
-type Clave = 'handle' | 'procesados' | 'ultimo'
+type Clave = 'handle' | 'procesados' | 'ultimo' | 'cortado' | 'intentos'
 
 /** Handle de la File System Access API con los métodos de permiso que usamos. */
 export interface HandleCarpeta extends CarpetaHandle {
@@ -77,4 +77,13 @@ export const carpetaMatrixStore = {
 
   leerUltimo: () => leer<UltimoResultado>('ultimo'),
   guardarUltimo: (ultimo: UltimoResultado) => escribir('ultimo', ultimo),
+
+  /** Exporte cortado: persiste hasta que cargue un Pieza a pieza completo más nuevo (regla 9). */
+  leerCortado: () => leer<CortadoInfo>('cortado'),
+  guardarCortado: (c: CortadoInfo) => escribir('cortado', c),
+  borrarCortado: () => escribir('cortado', undefined),
+
+  /** Intentos fallidos por clave de archivo (regla 6). */
+  leerIntentos: async (): Promise<Record<string, number>> => (await leer<Record<string, number>>('intentos')) ?? {},
+  guardarIntentos: (mapa: Record<string, number>) => escribir('intentos', Object.keys(mapa).length ? mapa : undefined),
 }

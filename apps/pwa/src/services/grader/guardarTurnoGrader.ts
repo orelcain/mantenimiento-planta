@@ -50,7 +50,14 @@ export interface UsuarioGuarda {
   email?: string | null
 }
 
+/** Resultado del guardado: qué partes fallaron (solo se llena en modo automático). */
+export interface ResultadoGuardado {
+  fallos: string[]
+}
+
 export interface EntradaGuardarTurno {
+  /** manual (default): lanza como antes. automatico: captura los pasos de detalle y los reporta en `fallos`. */
+  modo?: 'manual' | 'automatico'
   multiDayInfo: SegmentosTurno
   parsedData: ParsedMatrixData | null
   user: UsuarioGuarda
@@ -99,8 +106,21 @@ export function derivarSegmentosTurno(
 }
 
 /** Guarda los turnos en Firestore. Lanza si algo falla; el llamador muestra el error. */
-export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promise<void> {
+export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promise<ResultadoGuardado> {
   const { multiDayInfo, parsedData, user, gates, gatesEditadas, lineId, isClassificationPlant } = entrada
+  const fallos: string[] = []
+  // Paso de detalle: en manual lanza igual que antes; en automático registra el fallo y sigue.
+  const paso = async (nombre: string, fn: () => Promise<unknown>): Promise<void> => {
+    if (entrada.modo !== 'automatico') {
+      await fn()
+      return
+    }
+    try {
+      await fn()
+    } catch (err) {
+      fallos.push(`${nombre}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
   const batchId = crypto.randomUUID()
   const sourceNames = parsedData?.files.map((f) => f.name) ?? []
 
@@ -163,6 +183,7 @@ export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promi
       } catch (err) {
         // No es fatal: se clasifica con las gates del wizard, como antes.
         logger.warn('No se pudo resolver la config de gates del turno', { shiftDocId, err: String(err) })
+        fallos.push(`configuración de gates ${shiftDocId}: ${String(err)}`)
       }
     }))
   }
@@ -229,7 +250,7 @@ export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promi
       ...(r.product && { product: r.product }),
       dedupeKey: buildDedupeKey(r),
     }))
-    await savePieceRecordsBatch(summaryId, firestoreRecs)
+    await paso(`detalle de piezas ${summaryId}`, () => savePieceRecordsBatch(summaryId, firestoreRecs))
 
     // Guardar el input de Puerta 0 EXACTO que usó computeShiftSummary para
     // clasificar (el Excel P0 si vino, si no los gate=0 del pieza-a-pieza).
@@ -248,13 +269,14 @@ export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promi
       // No es fatal: el turno queda guardado igual, solo sin recálculo
       // automático (el aviso de config desfasada lo dirá).
       logger.warn('No se pudieron guardar los registros de Puerta 0', { err: String(err) })
+      fallos.push(`Puerta 0 ${summaryId}: ${String(err)}`)
     }
 
     // Pre-computar aggregates por minuto y guardar en sub-collection.
     // Idempotente: se sobrescribe en cada re-upload del mismo turno.
     const aggregates = computeTimelineAggregates(segment.pieceRecords, segment.gate0Records)
     if (aggregates.length > 0) {
-      await saveTimelineAggregates(summaryId, aggregates)
+      await paso(`timeline ${summaryId}`, () => saveTimelineAggregates(summaryId, aggregates))
     }
 
     // gateMix v2: lo observado por puerta y bloque, sin juicio, en
@@ -262,7 +284,7 @@ export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promi
     // del turno (graderGateObservations.ts). Solo plantas que clasifican.
     if (isClassificationPlant !== false) {
       const obs = computeGateObservations(segment.pieceRecords)
-      if (obs) await saveGateObservations(summaryId, obs)
+      if (obs) await paso(`observaciones de gates ${summaryId}`, () => saveGateObservations(summaryId, obs))
     }
 
     // Detalle de pausas (≥5min) + microDetentions.byHour.
@@ -274,10 +296,30 @@ export async function guardarSegmentosTurno(entrada: EntradaGuardarTurno): Promi
       const mergedPauses = prev
         ? mergeAnnotationsIntoPauses(det.pauses, prev.pauses)
         : det.pauses
-      await savePausesAggregates(summaryId, mergedPauses, det.microDetentions)
+      await paso(`pausas ${summaryId}`, () => savePausesAggregates(summaryId, mergedPauses, det.microDetentions))
     }
   }
 
+  return { fallos }
+}
+
+/** Quita del resultado los segmentos que no pasan `keep` y recalcula sus contadores. */
+export function quedarSegmentos(multi: SegmentosTurno, keep: (key: string) => boolean): SegmentosTurno {
+  const entries = multi.entries.filter(([key]) => keep(key))
+  const soloP0 = entries.filter(([, s]) => s.pieceRecords.length === 0).length
+  return {
+    ...multi,
+    entries,
+    totalSegments: entries.length,
+    uniqueDays: new Set(entries.map(([, s]) => s.sessionDate)).size,
+    segmentosSoloP0: soloP0,
+    segmentosConPiezas: entries.length - soloP0,
+  }
+}
+
+/** Piezas de un segmento (suma de `pieces` de sus registros de pieza). */
+export function piezasDeSegmento(seg: { pieceRecords: Array<{ pieces: number }> }): number {
+  return seg.pieceRecords.reduce((s, r) => s + r.pieces, 0)
 }
 
 export function getDefaultGates(): GateAssignment[] {
