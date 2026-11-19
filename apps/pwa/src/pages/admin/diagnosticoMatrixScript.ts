@@ -7,6 +7,7 @@ export const DIAGNOSTICO_MATRIX_PS1 = `# Diagnóstico de SOLO LECTURA del PC de 
 # Uso: abrir Matrix, abrir PowerShell (no hace falta administrador), pegar TODO este texto y presionar Enter.
 # Al terminar limpia la pantalla y muestra el informe ordenado para sacarle foto.
 # También lo guarda en "diagnostico-matrix.txt" en el Escritorio.
+& {  # todo en un bloque: al pegarlo corre de una vez y la pantalla queda limpia
 $out = Join-Path ([Environment]::GetFolderPath('Desktop')) 'diagnostico-matrix.txt'
 $L = New-Object System.Collections.Generic.List[string]
 function T([string]$s) { $L.Add(''); $L.Add($s) }
@@ -98,4 +99,5 @@ Write-Host 'DIAGNÓSTICO MATRIX  (solo lectura)' -ForegroundColor Yellow
 foreach ($linea in $L) { if ($linea -match '^\\d\\. ') { Write-Host $linea -ForegroundColor Cyan } else { Write-Host $linea } }
 Write-Host ''
 Write-Host "Guardado en: $out" -ForegroundColor Yellow
+}
 `
