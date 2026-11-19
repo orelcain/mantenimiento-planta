@@ -292,7 +292,7 @@ export function DiagnosticoMatrixPage() {
             Copiar script de solo lectura
           </Button>
           <p className="text-xs text-muted-foreground">
-            Pega en PowerShell; deja diagnostico-matrix.txt en el Escritorio.
+            Abre Matrix, pega en PowerShell y saca foto al informe que queda en pantalla (también queda en el Escritorio como diagnostico-matrix.txt).
           </p>
         </CardContent>
       </Card>
