@@ -163,8 +163,15 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
   const mismos = (a: readonly string[], b: string[]) => a.length === b.length && b.every(x => a.includes(x))
   // Cada chip cuenta por la MISMA ruta que la tabla (con la búsqueda y «Más filtros» aplicados):
   // su cifra es el número de filas que quedan al pulsarlo.
-  const cuentaEstado = (estados: string[]) => filasDeTablaPC(items, { ...f, estado: estados }, busca, null).length
-  const cuentaRapido = (k: FiltroRapido) => filasDeTablaPC(items, { ...f, estado: [] }, busca, k).length
+  // Memorizado: son 7 pasadas por ~4.400 piezas; solo cambian con la lista, los filtros o la búsqueda.
+  const cifrasChips = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const p of PESTANAS) m.set(p.k, filasDeTablaPC(items, { ...f, estado: p.estados }, busca, null).length)
+    for (const { k } of RAPIDOS) m.set(k, filasDeTablaPC(items, { ...f, estado: [] }, busca, k).length)
+    return m
+  }, [items, f, busca])
+  const cuentaEstado = (k: string) => cifrasChips.get(k) ?? 0
+  const cuentaRapido = (k: FiltroRapido) => cifrasChips.get(k) ?? 0
 
   const unidades = visibles.reduce((a, i) => a + (i.bodegaId ? i.stockActual : 0), 0)
   const valor = visibles.reduce((a, i) => a + valorTotal(i), 0)
@@ -205,7 +212,7 @@ export function StockTablaPC({ items, acciones, onAbrir, onMovimiento, onFavorit
               key={p.k}
               on={rapido === null && mismos(f.estado, p.estados)}
               punto={PUNTO_CHIP[p.k]}
-              cifra={cuentaEstado(p.estados)}
+              cifra={cuentaEstado(p.k)}
               onClick={() => { setRapido(null); setF(x => ({ ...x, estado: p.estados })) }}
             >
               {p.t}
