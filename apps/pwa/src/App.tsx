@@ -88,6 +88,7 @@ const EditorLineasProcesoPage = lazyWithReload(() => import('@/pages/admin/Edito
 const ShoplogixNotificationsConfigPage = lazyWithReload(() => import('@/pages/admin/ShoplogixNotificationsConfigPage').then((mod) => ({ default: mod.ShoplogixNotificationsConfigPage })))
 const TelegramSyncPage = lazyWithReload(() => import('@/pages/admin/TelegramSyncPage').then((mod) => ({ default: mod.TelegramSyncPage })))
 const PowerBIExportPage = lazyWithReload(() => import('@/pages/admin/PowerBIExportPage').then((mod) => ({ default: mod.PowerBIExportPage })))
+const DiagnosticoMatrixPage = lazyWithReload(() => import('@/pages/admin/DiagnosticoMatrixPage').then((mod) => ({ default: mod.DiagnosticoMatrixPage })))
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
@@ -978,6 +979,15 @@ export function App() {
                 <RequireReAuth reason="antes de exportar datos a Power BI">
                   <Suspense fallback={<LoadingScreen />}>
                     <PowerBIExportPage />
+                  </Suspense>
+                </RequireReAuth>
+              </AdminRoute>
+            } />
+            <Route path="admin/diagnostico-matrix" element={
+              <AdminRoute>
+                <RequireReAuth reason="para abrir el diagnóstico de Matrix">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <DiagnosticoMatrixPage />
                   </Suspense>
                 </RequireReAuth>
               </AdminRoute>

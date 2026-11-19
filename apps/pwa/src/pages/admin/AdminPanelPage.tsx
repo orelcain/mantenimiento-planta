@@ -30,6 +30,7 @@ import {
   BarChart3,
   Workflow,
   FileUp,
+  Stethoscope,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -128,6 +129,13 @@ const ADMIN_ITEMS: AdminItem[] = [
     title: 'Actualizar Power BI',
     description: 'Exporta los KPIs de Mantención y refresca el informe',
     icon: <BarChart3 className="size-4" />,
+    section: 'config',
+  },
+  {
+    to: '/admin/diagnostico-matrix',
+    title: 'Diagnóstico Matrix',
+    description: 'Revisa desde el PC de planta cómo leer el grader sin Excel manual',
+    icon: <Stethoscope className="size-4" />,
     section: 'config',
   },
   {
