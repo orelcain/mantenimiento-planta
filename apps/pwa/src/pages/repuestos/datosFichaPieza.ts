@@ -53,17 +53,22 @@ export function fraseDeEstado(i: BodegaMergedItem): { tono: TonoEstado; texto: s
  * Equipos donde se usa, sin repetir. El mismo equipo llega con varios `machineId`
  * (uno por máquina del catálogo): la ficha de antes decía «Equipos (6)» con 3 nombres repetidos.
  */
-export function equiposUnicos(i: Pick<BodegaMergedItem, 'equipos'>): { machineId: string; machineName: string }[] {
-  const vistos = new Set<string>()
-  const out: { machineId: string; machineName: string }[] = []
+export function equiposUnicos(i: Pick<BodegaMergedItem, 'equipos'>): { machineId: string; machineName: string; machineIds: string[] }[] {
+  const grupos = new Map<string, { machineId: string; machineName: string; machineIds: string[] }>()
   for (const e of i.equipos) {
+    // machineId vacío = el marcador «Sin equipo» de useGlobalSearch: no es un equipo.
+    if (!(e.machineId ?? '').trim()) continue
     const nombre = (e.machineName ?? '').trim()
     const clave = nombre.toLocaleLowerCase('es') || e.machineId
-    if (vistos.has(clave)) continue
-    vistos.add(clave)
-    out.push({ machineId: e.machineId, machineName: nombre || e.machineId })
+    const grupo = grupos.get(clave)
+    if (grupo) {
+      // Mismo equipo bajo varios machineId: la fila conserva el primero y guarda todos para quitarlos juntos.
+      if (!grupo.machineIds.includes(e.machineId)) grupo.machineIds.push(e.machineId)
+      continue
+    }
+    grupos.set(clave, { machineId: e.machineId, machineName: nombre || e.machineId, machineIds: [e.machineId] })
   }
-  return out
+  return [...grupos.values()]
 }
 
 export interface ImagenDePieza { url: string; rotulo: string; esDibujo: boolean }

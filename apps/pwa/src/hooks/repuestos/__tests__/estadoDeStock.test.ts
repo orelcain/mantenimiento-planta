@@ -110,3 +110,33 @@ describe('una alerta de stock es solo la de los ítems con mínimo definido', ()
     expect(contarAlertas([])).toBe(0)
   })
 })
+
+/**
+ * Encabezado de Bodega: «N piezas en alerta» = bajo mínimo + sin stock CON mínimo.
+ * Cero sin mínimo no es alerta (misma regla que esAlertaDeStock). Ver desgloseDeAlertas.
+ */
+import { desgloseDeAlertas } from '../estadoDeStock'
+
+describe('desgloseDeAlertas', () => {
+  const catalogo: ItemConStock[] = [
+    item({ stockActual: 0, stockMinimo: 3 }),   // sin stock con mínimo → alerta
+    item({ stockActual: 2, stockMinimo: 5 }),   // bajo mínimo → alerta
+    item({ stockActual: 5, stockMinimo: 5 }),   // en el mínimo → alerta (bajo)
+    item({ stockActual: 0, stockMinimo: 0 }),   // cero sin mínimo → NO alerta
+    item({ stockActual: 0, stockMinimo: 0, bodegaId: null }), // sin configurar → fuera
+    item({ stockActual: 9, stockMinimo: 2 }),   // ok
+  ]
+
+  it('separa bajo mínimo, sin stock con mínimo y cero sin mínimo', () => {
+    expect(desgloseDeAlertas(catalogo)).toEqual({
+      bajoMinimo: 2,
+      sinStockConMinimo: 1,
+      enCeroSinMinimo: 1,
+      alertas: 3,
+    })
+  })
+
+  it('alertas coincide con contarAlertas (mismo predicado)', () => {
+    expect(desgloseDeAlertas(catalogo).alertas).toBe(contarAlertas(catalogo))
+  })
+})
