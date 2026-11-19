@@ -8,6 +8,7 @@
  * Los tipos de carpeta son un subconjunto estructural de la File System Access
  * API: así el recorrido se prueba con objetos falsos, sin depender de `lib.dom`.
  */
+import { dec1 } from '@/utils/formatoNumeros'
 import type { MatrixFileKind, ParsedMatrixData, UploadedMatrixFile } from './types'
 
 export const DIAG_MAX_ENTRADAS = 500
@@ -129,7 +130,7 @@ export function tituloListado(cantidad: number, masNuevo: number | null, ahora: 
   return `${cantidad} ${sustantivo} · el más nuevo ${formatearHaceX(masNuevo, ahora)}`
 }
 
-const decimal = (n: number): string => n.toFixed(1).replace('.', ',')
+const decimal = (n: number): string => dec1(n)
 
 export function formatearTamano(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
