@@ -140,3 +140,43 @@ describe('desgloseDeAlertas', () => {
     expect(desgloseDeAlertas(catalogo).alertas).toBe(contarAlertas(catalogo))
   })
 })
+
+// ── Etapa 2 de Bodega: la fila dice «En cero, sin mínimo» en vez de «Sin stock» ──
+// No es una tercera definición: parte en dos SOLO el `out` de stockStatusOf, según tenga mínimo.
+import { estadoVisibleDeStock, ESTADO_VISIBLE_TEXTO } from '../estadoDeStock'
+
+describe('estadoVisibleDeStock', () => {
+  it('cero sin mínimo es «En cero, sin mínimo», no «Sin stock»', () => {
+    const e = estadoVisibleDeStock(item({ stockActual: 0, stockMinimo: 0 }))
+    expect(e).toBe('ceroSinMinimo')
+    expect(ESTADO_VISIBLE_TEXTO[e]).toBe('En cero, sin mínimo')
+  })
+
+  it('cero con mínimo sigue siendo «Sin stock»', () => {
+    const e = estadoVisibleDeStock(item({ stockActual: 0, stockMinimo: 2 }))
+    expect(e).toBe('sinStock')
+    expect(ESTADO_VISIBLE_TEXTO[e]).toBe('Sin stock')
+  })
+
+  it('bajo mínimo, con stock y sin configurar no cambian', () => {
+    expect(estadoVisibleDeStock(item({ stockActual: 2, stockMinimo: 3 }))).toBe('bajo')
+    expect(estadoVisibleDeStock(item({ stockActual: 9, stockMinimo: 3 }))).toBe('ok')
+    expect(estadoVisibleDeStock(item({ bodegaId: null, stockActual: 0, stockMinimo: 0 }))).toBe('sinConfig')
+  })
+
+  it('sus cuentas cuadran con desgloseDeAlertas y con el «out» de siempre (21 + 524 = 545)', () => {
+    const catalogo = [
+      ...Array.from({ length: 21 }, () => item({ stockActual: 0, stockMinimo: 3 })),
+      ...Array.from({ length: 524 }, () => item({ stockActual: 0, stockMinimo: 0 })),
+      ...Array.from({ length: 40 }, () => item({ stockActual: 2, stockMinimo: 5 })),
+      ...Array.from({ length: 100 }, () => item({ stockActual: 10, stockMinimo: 1 })),
+      ...Array.from({ length: 7 }, () => item({ bodegaId: null, stockActual: 0, stockMinimo: 0 })),
+    ]
+    const cuenta = (e: string) => catalogo.filter(i => estadoVisibleDeStock(i) === e).length
+    const d = desgloseDeAlertas(catalogo)
+    expect(cuenta('sinStock')).toBe(d.sinStockConMinimo)
+    expect(cuenta('ceroSinMinimo')).toBe(d.enCeroSinMinimo)
+    expect(cuenta('sinStock') + cuenta('ceroSinMinimo')).toBe(contarPorEstado(catalogo).out)
+    expect(cuenta('bajo')).toBe(contarPorEstado(catalogo).low)
+  })
+})

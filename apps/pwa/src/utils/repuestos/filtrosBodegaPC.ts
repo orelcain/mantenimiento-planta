@@ -1,4 +1,5 @@
 import { stockStatusOf, type StockStatus } from '@/hooks/repuestos/estadoDeStock'
+import { FILTROS_DE_STOCK, type FiltroRapido, type ItemFiltrable } from '@/hooks/repuestos/filtrosDeStock'
 import { haystackMatchesAll, normalizeForSearch } from '@/utils/repuestos'
 import type { BodegaMergedItem } from '@/hooks/repuestos/useBodega'
 
@@ -85,6 +86,18 @@ export function pasaFiltros(i: Item, f: FiltrosBodega, busca = '', excepto?: Gru
     if (g === 'otros' ? !sel.every(s => vals.includes(s)) : !sel.some(s => vals.includes(s))) return false
   }
   return true
+}
+
+/**
+ * Filas de la tabla de PC: el filtro rápido («Sin equipo», «Sin contar») usa el MISMO predicado que
+ * cuenta su chip (`FILTROS_DE_STOCK`); encima van búsqueda y «Más filtros». Así la cifra del chip es
+ * el número de filas al pulsarlo (con el estado vacío, que es como lo deja el chip).
+ */
+export function filasDeTablaPC<T extends Item & ItemFiltrable>(
+  items: readonly T[], f: FiltrosBodega, busca = '', rapido: FiltroRapido | null = null,
+): T[] {
+  const base = rapido ? items.filter(FILTROS_DE_STOCK[rapido]) : items
+  return base.filter(i => pasaFiltros(i, f, busca))
 }
 
 /** Opciones de un grupo con cuántos quedan si se marcan (los demás grupos ya aplicados). */

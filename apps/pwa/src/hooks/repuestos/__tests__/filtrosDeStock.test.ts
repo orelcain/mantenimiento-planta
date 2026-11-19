@@ -114,3 +114,58 @@ describe('aplicarFiltroDeStock', () => {
     expect(lista).toHaveLength(2)
   })
 })
+
+// ── Etapa 2 de Bodega: filtros rápidos «Sin equipo» y «Sin contar» ──
+// Los dos miran SOLO piezas de bodega (con bodegaId): es el universo de los KPI
+// «% con equipo» y «% contadas» de la línea base del 18-11-2026.
+describe('«Sin equipo»', () => {
+  it('una pieza de bodega sin equipos entra', () => {
+    expect(FILTROS_DE_STOCK.sinEquipo(item({ equipos: [] }))).toBe(true)
+  })
+
+  it('el marcador «Sin equipo» de useGlobalSearch (machineId vacío) no es un equipo', () => {
+    expect(FILTROS_DE_STOCK.sinEquipo(item({ equipos: [{ machineId: '', machineName: 'Sin equipo' }] }))).toBe(true)
+    expect(FILTROS_DE_STOCK.sinEquipo(item({ equipos: [{ machineId: '  ', machineName: 'Sin equipo' }] }))).toBe(true)
+  })
+
+  it('con un equipo real no entra, aunque también traiga el marcador', () => {
+    expect(FILTROS_DE_STOCK.sinEquipo(item({ equipos: [{ machineId: 'm1', machineName: 'BAADER 200' }] }))).toBe(false)
+    expect(FILTROS_DE_STOCK.sinEquipo(item({ equipos: [{ machineId: '', machineName: 'Sin equipo' }, { machineId: 'm1', machineName: 'BAADER 200' }] }))).toBe(false)
+  })
+
+  it('una pieza sin configurar en bodega no entra', () => {
+    expect(FILTROS_DE_STOCK.sinEquipo(item({ bodegaId: null, equipos: [] }))).toBe(false)
+  })
+})
+
+describe('«Sin contar»', () => {
+  it('una pieza de bodega sin ultimoConteoAt entra; una contada no', () => {
+    expect(FILTROS_DE_STOCK.sinContar(item({}))).toBe(true)
+    expect(FILTROS_DE_STOCK.sinContar(item({ ultimoConteoAt: new Date('2026-11-18T10:00:00') }))).toBe(false)
+  })
+
+  it('contada y en cero sigue siendo contada (el sello distingue «da 0» de «nunca»)', () => {
+    expect(FILTROS_DE_STOCK.sinContar(item({ stockActual: 0, ultimoConteoAt: new Date('2026-11-18T10:00:00') }))).toBe(false)
+  })
+
+  it('una pieza sin configurar en bodega no entra', () => {
+    expect(FILTROS_DE_STOCK.sinContar(item({ bodegaId: null }))).toBe(false)
+  })
+})
+
+describe('los filtros rápidos cuentan lo que muestran', () => {
+  const lista = [
+    item({ equipos: [] }),
+    item({ equipos: [{ machineId: '', machineName: 'Sin equipo' }], ultimoConteoAt: new Date('2026-10-02T09:00:00') }),
+    item({ equipos: [{ machineId: 'm1', machineName: 'BAADER 200' }] }),
+    item({ equipos: [{ machineId: 'm2', machineName: 'KNURO N1' }], ultimoConteoAt: new Date('2026-09-25T09:00:00') }),
+    item({ bodegaId: null, equipos: [] }),
+  ]
+  it.each(['sinEquipo', 'sinContar'] as StockFilterKey[])('%s: contarParaFiltro = aplicarFiltroDeStock', (key) => {
+    expect(contarParaFiltro(lista, key)).toBe(aplicarFiltroDeStock(lista, key).length)
+  })
+  it('cifras esperadas', () => {
+    expect(contarParaFiltro(lista, 'sinEquipo')).toBe(2)
+    expect(contarParaFiltro(lista, 'sinContar')).toBe(2)
+  })
+})
