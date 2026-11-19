@@ -37,6 +37,7 @@ import {
   Search,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
+import { CarpetaMatrixVigilante } from '@/components/grader/CarpetaMatrixVigilante'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
 import { useSyncStore } from '@/store/syncStore'
 import { getZones } from '@/services/zones'
@@ -1374,6 +1375,7 @@ export function MainLayout() {
           >
             <Outlet />
           </Suspense>
+          <CarpetaMatrixVigilante />
         </main>
 
         {isReadOnly && (

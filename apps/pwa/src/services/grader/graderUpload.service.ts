@@ -5,6 +5,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   deleteDoc,
@@ -77,15 +78,31 @@ export async function saveGraderUpload(params: {
   return upload
 }
 
-export async function uploadGraderFile(file: File, uploadId: string): Promise<{ storagePath: string; downloadURL: string }> {
+/**
+ * Sube el original. Con `rutaFija` (subida automática) la ruta depende solo del ID,
+ * así un reintento sobrescribe el mismo objeto y no deja huérfanos. La manual no la usa.
+ */
+export async function uploadGraderFile(
+  file: File,
+  uploadId: string,
+  opciones: { rutaFija?: boolean } = {},
+): Promise<{ storagePath: string; downloadURL: string }> {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const storagePath = `graderUploads/${uploadId}/${Date.now()}_${safeName}`
+  const storagePath = opciones.rutaFija
+    ? `graderUploads/${uploadId}/${safeName}`
+    : `graderUploads/${uploadId}/${Date.now()}_${safeName}`
   const storageRef = ref(storage, storagePath)
   await uploadBytes(storageRef, file, {
     contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
   const downloadURL = await getDownloadURL(storageRef)
   return { storagePath, downloadURL }
+}
+
+/** Lee un upload por ID (la subida automática lo usa para reanudar). */
+export async function getGraderUpload(id: string): Promise<GraderUpload | null> {
+  const snap = await getDoc(doc(db, COLLECTION, id))
+  return snap.exists() ? (snap.data() as GraderUpload) : null
 }
 
 export async function updateGraderUpload(id: string, patch: Partial<GraderUpload>): Promise<void> {
