@@ -16,8 +16,9 @@ describe('DIAGNOSTICO_MATRIX_PS1', () => {
     expect(DIAGNOSTICO_MATRIX_PS1).toContain('$env:USERPROFILE\\Documents')
   })
 
-  it('conserva los escapes de PowerShell (backtick) y las llaves de ${...} sin tocar', () => {
-    expect(DIAGNOSTICO_MATRIX_PS1).toContain('`n== Programas instalados')
+  it('conserva los $ de PowerShell y las llaves de ${...} sin tocar', () => {
+    expect(DIAGNOSTICO_MATRIX_PS1).toContain('function T([string]$s)')
+    expect(DIAGNOSTICO_MATRIX_PS1).toContain('(ini|config|udl)$')
     expect(DIAGNOSTICO_MATRIX_PS1).toContain('${env:ProgramFiles(x86)}')
   })
 
