@@ -146,17 +146,17 @@ describe('segmentByDayAndShift con ventanas de Shoplogix', () => {
       .toBe(total)
   })
 
-  it('un registro fuera de toda ventana no se pierde: cae al fallback', () => {
+  it('un registro fuera de toda ventana no se pierde ni arma un turno del schedule', () => {
+    // Con Shoplogix sincronizado solo existen sus turnos: el bloque suelto va
+    // al turno con producción más cercana (aquí el único que produjo, T1).
     const conHuerfano = [...records, piece(wall('2025-07-31', '19:30'), 100)]
     const schedule: GraderShiftSchedule[] = [
       { shiftId: 'Turno noche', startHour: 19, startMinute: 0, endHour: 7, endMinute: 0 },
     ]
     const segs = segmentByDayAndShift(conHuerfano, [], schedule, WINDOWS_31_JUL)
-    const suma = Array.from(segs.values())
-      .flatMap((s) => s.pieceRecords)
-      .reduce((s, r) => s + r.pieces, 0)
-    expect(suma).toBe(total + 100)
-    expect(segs.has('2025-07-31|Turno noche')).toBe(true)
+    expect(Array.from(segs.keys())).toEqual(['2025-07-31|Turno 1'])
+    expect(segs.get('2025-07-31|Turno 1')!.pieceRecords.reduce((s, r) => s + r.pieces, 0))
+      .toBe(total + 100)
   })
 })
 
