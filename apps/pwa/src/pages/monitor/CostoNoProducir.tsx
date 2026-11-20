@@ -146,7 +146,7 @@ export function CostoNoProducir(props: CostoNoProducirProps) {
       >
         <div className="mt-3 space-y-3">
           {/* a) Costo de lo detenido */}
-          <article className={`rounded-xl border p-3 ${faltaMargen || faltaPeso ? 'border-dashed border-border bg-muted/40' : 'border-border bg-muted/30'}`}>
+          <article className={`rounded-card border p-3 ${faltaMargen || faltaPeso ? 'border-dashed border-border bg-muted/40' : 'border-border bg-muted/30'}`}>
             <p className="text-[11px] text-muted-foreground">Costo de lo detenido</p>
             {valorizado ? (
               <>
@@ -164,7 +164,7 @@ export function CostoNoProducir(props: CostoNoProducirProps) {
                 <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-muted-foreground">
                   {valorizado.porDueno.map((p) => (
                     <li key={p.dueno} className="flex items-center gap-1.5">
-                      <span className={`inline-block h-2 w-2 rounded-sm ${DUENO_UI[p.dueno].barra}`} aria-hidden="true" />
+                      <span className={`inline-block h-2 w-2 rounded-full ${DUENO_UI[p.dueno].barra}`} aria-hidden="true" />
                       {`${DUENO_META[p.dueno].label} ${fmtPesos(p.pesos)}`}
                     </li>
                   ))}
@@ -179,7 +179,7 @@ export function CostoNoProducir(props: CostoNoProducirProps) {
                     : 'Falta el peso promedio del turno (nadie cargó la cuota).'}
                 </p>
                 {faltaMargen && puedeEditar && (
-                  <button type="button" onClick={() => setEditando(true)} className="tap-44 mt-2 rounded-[10px] border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground">
+                  <button type="button" onClick={() => setEditando(true)} className="tap-44 mt-2 rounded-ctl border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-foreground">
                     Definir margen
                   </button>
                 )}
@@ -200,7 +200,7 @@ export function CostoNoProducir(props: CostoNoProducirProps) {
 
           {/* b) Evitado por reparar rápido (solo si hubo detenciones de Mantención y se puede valorizar) */}
           {valorizado && evitado && (
-            <article className="rounded-xl border border-border bg-muted/30 p-3">
+            <article className="rounded-card border border-border bg-muted/30 p-3">
               <p className="text-[11px] text-muted-foreground">Evitado por reparar rápido · Mantención</p>
               {evitado.causas.length === 0 ? (
                 <p className="mt-1 text-[12.5px] text-muted-foreground">Aún no hay historia suficiente para comparar (mínimo 5 casos por causa).</p>
@@ -223,7 +223,7 @@ export function CostoNoProducir(props: CostoNoProducirProps) {
           )}
 
           {/* c) Cada detención */}
-          <article className="rounded-xl border border-border bg-muted/30 p-3">
+          <article className="rounded-card border border-border bg-muted/30 p-3">
             <p className="mb-1 text-[11px] text-muted-foreground">Cada detención</p>
             <ul className="divide-y divide-border">
               {filas.map((f, i) => {
@@ -315,7 +315,7 @@ function EditorMargen({ abierto, onCerrar, lineId, lineLabel, dateKey, autor, ti
     }
   }
 
-  const campo = 'w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-[14px] text-foreground tabular-nums'
+  const campo = 'w-full rounded-ctl border border-border bg-muted/40 px-3 py-2 text-[14px] text-foreground tabular-nums'
 
   return (
     <Dialog open={abierto} onOpenChange={(v) => { if (!v) onCerrar() }}>
@@ -353,8 +353,8 @@ function EditorMargen({ abierto, onCerrar, lineId, lineLabel, dateKey, autor, ti
           {error && <p role="alert" className="text-[13px] text-destructive">{error}</p>}
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onCerrar} className="rounded-[10px] border border-border px-3.5 py-2 text-[13px] font-semibold text-foreground">Cancelar</button>
-          <button type="button" disabled={guardando} onClick={guardar} className="rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
+          <button type="button" onClick={onCerrar} className="rounded-ctl border border-border px-3.5 py-2 text-[13px] font-semibold text-foreground">Cancelar</button>
+          <button type="button" disabled={guardando} onClick={guardar} className="rounded-ctl bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50">
             Guardar margen
           </button>
         </div>
