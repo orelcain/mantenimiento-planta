@@ -10411,6 +10411,57 @@ exports.publicMonitorRefrescar = onRequest(
   },
 )
 
+/**
+ * ── VER OTRO DÍA: un turno pasado, a pedido ─────────────────────────────────
+ *
+ * El doc del monitor trae los últimos 6 turnos; esto entrega UNO más viejo
+ * (hasta 45 días, los que lista `shiftStats`). Lógica y caché en
+ * `publicMonitor.buildTurnoArchivo`.
+ *
+ * ⚠ PÚBLICO como el resto del monitor. Defensas: solo tokens de monitores
+ * vigentes, la planta sale SIEMPRE del monitor (nunca del cuerpo), el id del
+ * turno se valida con forma y ventana de fechas, y lo armado se guarda en
+ * `publicMonitorArchivo`: pedirlo de nuevo no vuelve a leer `shoplogix/`. Lo que
+ * devuelve es lo mismo que ya publica el `history` del doc, de turnos más viejos.
+ * Throttle por monitor (en memoria) para que nadie lo use de martillo.
+ */
+const ARCHIVO_MIN_MS = 1500
+const archivoUltimoPorToken = new Map()
+
+exports.publicMonitorTurno = onRequest(
+  { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 5, memory: '512MiB', timeoutSeconds: 30 },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).json({ error: 'METHOD_NOT_ALLOWED' }); return }
+    const body = req.body || {}
+    const token = String(body.token || '').trim()
+    const shiftDocId = String(body.shiftDocId || '').trim()
+    if (!/^[a-f0-9-]{20,64}$/.test(token)) { res.status(400).json({ error: 'BAD_REQUEST' }); return }
+    const motivo = publicMonitorMod.motivoRechazoArchivo(shiftDocId)
+    if (motivo) { res.status(400).json({ error: motivo }); return }
+
+    const ahora = Date.now()
+    const ultimo = archivoUltimoPorToken.get(token) || 0
+    if (ahora - ultimo < ARCHIVO_MIN_MS) { res.status(429).json({ error: 'ESPERA' }); return }
+    archivoUltimoPorToken.set(token, ahora)
+    if (archivoUltimoPorToken.size > 500) archivoUltimoPorToken.clear()
+
+    try {
+      const snap = await db.collection(publicMonitorMod.COLLECTION).doc(token).get()
+      const monitor = snap.exists ? snap.data() : null
+      if (!monitor || String(monitor.expiresAt || '') <= new Date().toISOString()) {
+        res.status(404).json({ error: 'NOT_FOUND' }); return
+      }
+      if (!monitor.plantSlug) { res.status(409).json({ error: 'SIN_PLANTA' }); return }
+      const entrada = await publicMonitorMod.buildTurnoArchivo(db, monitor.plantSlug, shiftDocId)
+      if (!entrada) { res.status(404).json({ error: 'SIN_TURNO' }); return }
+      res.json({ ok: true, entrada })
+    } catch (err) {
+      logger.error('[publicMonitorTurno]', err)
+      res.status(500).json({ error: 'ERROR' })
+    }
+  },
+)
+
 exports.publicMonitorPing = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 10, memory: '256MiB', timeoutSeconds: 15 },
   async (req, res) => {
