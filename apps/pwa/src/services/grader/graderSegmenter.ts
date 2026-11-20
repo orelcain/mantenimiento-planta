@@ -219,6 +219,115 @@ export function assignFromShoplogixWindows(
   return best ? { shiftId: best.shiftId, sessionDate: best.sessionDate } : null
 }
 
+// ── Bloques de producción ─────────────────────────────────────────────────────
+
+/**
+ * Pausa sin registros que separa dos bloques de producción.
+ *
+ * Entre turnos hay al menos 32 min sin piezas (medido nov-2026, Chonchi: la
+ * brecha más corta fue T1 → T2 del 11-11), así que 20 min no une dos turnos.
+ * Cortar de más dentro de un turno (colación) no daña: cada pedazo vuelve a
+ * su turno por la misma regla.
+ */
+export const PRODUCTION_BLOCK_GAP_MS = 20 * 60 * 1000
+
+type Asignacion = { shiftId: string; sessionDate: string }
+
+/**
+ * Asigna cada timestamp a un turno REAL de Shoplogix por bloques continuos.
+ *
+ * En la planta hay dos turnos y lo que se produce fuera de su horario es hora
+ * extra de ESE turno, al inicio o al final. Antes cada pieza se medía contra la
+ * ventana ±60 min: la cola de un turno que se alargaba quedaba como «Turno día»
+ * o «Sin turno» (nov-2026: 149 piezas en 3 turnos fantasma).
+ *
+ * 1. Se corta la producción donde hay ≥ 20 min sin registros.
+ * 2. Un bloque que toca UNA sola ventana va entero a ese turno, con su hora
+ *    extra antes y después.
+ * 3. Un bloque que toca varias (la línea no paró entre turnos) se reparte pieza
+ *    a pieza: la ventana que la contiene o la más cercana.
+ * 4. Un bloque que no toca ninguna va al turno cuya producción real quedó más
+ *    cerca (empate → el anterior, hora extra al final). Si en el archivo no hay
+ *    producción dentro de ningún turno, a la ventana más cercana.
+ *
+ * `Unscheduled` nunca llega aquí (lo filtra loadShoplogixShiftWindows).
+ * Determinista: no depende del orden de los arrays.
+ */
+export function assignByProductionBlocks(
+  timestamps: readonly (string | undefined)[],
+  windows: readonly ShoplogixShiftWindow[],
+  gapMs: number = PRODUCTION_BLOCK_GAP_MS,
+): Map<string, Asignacion> {
+  const out = new Map<string, Asignacion>()
+  if (windows.length === 0) return out
+
+  const puntos = Array.from(new Set(timestamps.filter((t): t is string => !!t)))
+    .map((ts) => ({ ts, t: Date.parse(ts) }))
+    .filter((p) => !isNaN(p.t))
+    .sort((a, b) => a.t - b.t)
+  if (puntos.length === 0) return out
+
+  const bloques: { puntos: typeof puntos; ini: number; fin: number }[] = []
+  for (const p of puntos) {
+    const ultimo = bloques[bloques.length - 1]
+    if (ultimo && p.t - ultimo.fin < gapMs) {
+      ultimo.puntos.push(p)
+      ultimo.fin = p.t
+    } else {
+      bloques.push({ puntos: [p], ini: p.t, fin: p.t })
+    }
+  }
+
+  const deVentana = (w: ShoplogixShiftWindow): Asignacion =>
+    ({ shiftId: w.shiftId, sessionDate: w.sessionDate })
+  const clave = (w: ShoplogixShiftWindow) => `${w.sessionDate}|${w.shiftId}|${w.startMs}`
+
+  // Producción real de cada turno: los bloques que tocan su ventana.
+  const anclados: { ini: number; fin: number; a: Asignacion }[] = []
+  const sueltos: typeof bloques = []
+
+  for (const b of bloques) {
+    const tocadas = new Map<string, ShoplogixShiftWindow>()
+    for (const w of windows) {
+      if (b.ini < w.endMs && b.fin >= w.startMs) tocadas.set(clave(w), w)
+    }
+    if (tocadas.size === 0) { sueltos.push(b); continue }
+    if (tocadas.size === 1) {
+      const a = deVentana(tocadas.values().next().value!)
+      for (const p of b.puntos) out.set(p.ts, a)
+      anclados.push({ ini: b.ini, fin: b.fin, a })
+      continue
+    }
+    for (const p of b.puntos) {
+      const hit = assignFromShoplogixWindows(p.ts, windows, Infinity)
+      if (!hit) continue
+      out.set(p.ts, hit)
+      anclados.push({ ini: p.t, fin: p.t, a: hit })
+    }
+  }
+
+  for (const b of sueltos) {
+    let mejor: Asignacion | null = null
+    let mejorGap = Infinity
+    let mejorEsAnterior = false
+    for (const x of anclados) {
+      const esAnterior = x.fin < b.ini
+      const gap = esAnterior ? b.ini - x.fin : x.ini - b.fin
+      if (gap < mejorGap || (gap === mejorGap && esAnterior && !mejorEsAnterior)) {
+        mejor = x.a
+        mejorGap = gap
+        mejorEsAnterior = esAnterior
+      }
+    }
+    for (const p of b.puntos) {
+      const a = mejor ?? assignFromShoplogixWindows(p.ts, windows, Infinity)
+      if (a) out.set(p.ts, a)
+    }
+  }
+
+  return out
+}
+
 // ── Segmentación ──────────────────────────────────────────────────────────────
 
 /**
@@ -255,13 +364,16 @@ export function segmentByDayAndShift(
     return map.get(key)!
   }
 
-  // Shoplogix manda: si el registro cae en un turno sincronizado, ese turno y
-  // ese día ganan. Solo si no hay turno sincronizado que lo contenga se cae al
-  // schedule declarado de la planta.
-  const assign = (ts: string) =>
-    (shoplogixWindows && shoplogixWindows.length > 0
-      ? assignFromShoplogixWindows(ts, shoplogixWindows)
-      : null) ?? assignShiftAndDate(ts, schedule)
+  // Shoplogix manda: con turnos sincronizados, cada BLOQUE de producción va
+  // entero a un turno real (ver assignByProductionBlocks). El schedule
+  // declarado de la planta solo se usa si no hay ningún turno sincronizado.
+  const byBlock = shoplogixWindows && shoplogixWindows.length > 0
+    ? assignByProductionBlocks(
+        [...pieceRecords, ...gate0Records, ...notApplicableRecords].map((r) => r.ts),
+        shoplogixWindows,
+      )
+    : null
+  const assign = (ts: string) => byBlock?.get(ts) ?? assignShiftAndDate(ts, schedule)
 
   for (const rec of pieceRecords) {
     if (!rec.ts) continue
