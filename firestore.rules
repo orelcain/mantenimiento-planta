@@ -1994,6 +1994,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Turnos pasados que pidió «Ver otro día» del monitor público, ya armados
+    // (caché de `publicMonitorTurno`). Solo servidor: el cliente los recibe por
+    // el endpoint, que valida el token del link.
+    match /publicMonitorArchivo/{id} {
+      allow read, write: if false;
+    }
+
     // Telemetría de uso del monitor público (anónima: aperturas, dispositivos,
     // tiempo mirado — nunca identidad). Va en colección APARTE de
     // `publicShiftMonitors` justamente porque aquella es de lectura pública y

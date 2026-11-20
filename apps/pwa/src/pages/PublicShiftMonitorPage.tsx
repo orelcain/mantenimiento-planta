@@ -26,7 +26,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Clock, Copy, FileDown, Gauge, Hourglass, Moon, PauseCircle, QrCode, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
+import { Activity, AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Copy, FileDown, Gauge, Hourglass, Moon, PauseCircle, QrCode, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
 import { copiarCorreo, descargarPdf, pedirInformeCorreo, type InformeCorreo } from '@/services/shoplogix/informeTurnoCorreo'
 import { useTheme } from '@/hooks/useTheme'
 import {
@@ -42,6 +42,8 @@ import { refrescarPulso, type PulsoMonitor } from '@/services/shoplogix/publicSh
 import { aWallClockMs, elegirContador, pulsoVivo } from './monitor/contadorCrudo'
 import type { PulsoVivoElegido } from './monitor/contadorCrudo'
 import { horaExtraDelTurno } from './monitor/horaExtra'
+import { listaNavegable, useTurnoArchivo, vecinoEnLista } from './monitor/turnosArchivo'
+import { OtroDiaSheet } from './monitor/OtroDiaSheet'
 import { porDeUsuario } from './monitor/perilla'
 import { media15DelDuro, piezasDelDuro, horaEnCursoDelDuro } from './monitor/datoDuro'
 import { construirCascada, contenedorDe } from './monitor/cascadaTurno'
@@ -4742,7 +4744,7 @@ function MonitorDelToken() {
 
   // Turnos navegables, del actual hacia atrás. El backend publica el historial
   // ya compuesto; acá solo se elige cuál se pinta.
-  const vistas = useMemo(() => {
+  const vistasDoc = useMemo(() => {
     if (!data?.live) return []
     return [
       {
@@ -4753,6 +4755,22 @@ function MonitorDelToken() {
       ...(data.history ?? []),
     ]
   }, [data])
+
+  /*
+   * «Ver otro día» (20-11-2026): el doc trae solo 6 turnos con su `live`; uno
+   * más viejo se pide a la función `publicMonitorTurno` y se agrega al final de
+   * `vistas`, así todo lo de abajo lo trata como un turno pasado más. La lista
+   * completa (45 días) es la que recorren las flechas. Ver `turnosArchivo`.
+   */
+  const turnoEnDoc = !turnoParam || vistasDoc.some(v => v.shiftDocId === turnoParam)
+  const archivo = useTurnoArchivo(token, turnoParam, turnoEnDoc, Boolean(data?.live))
+  const entradaArchivo = archivo.estado === 'ok' ? archivo.entrada : null
+  const vistas = useMemo(
+    () => (entradaArchivo ? [...vistasDoc, entradaArchivo] : vistasDoc),
+    [vistasDoc, entradaArchivo],
+  )
+  const listaTurnos = useMemo(() => listaNavegable(vistasDoc, data), [vistasDoc, data])
+  const [otroDiaAbierto, setOtroDiaAbierto] = useState(false)
 
   // Turno que el usuario eligió mirar. Cuando arranca uno nuevo, el historial se
   // corre una posición: sin esto la pantalla saltaría sola a otro turno mientras
@@ -4949,7 +4967,24 @@ function MonitorDelToken() {
     // no existen en el turno que se acaba de abrir.
     setCausaSel(null)
   }
-  const irA = (delta: number) => verIndice(idx + delta)
+  /* Las flechas recorren la lista COMPLETA (los 6 del doc y el archivo de 45
+     días): pasado el sexto, el siguiente se pide a pedido. */
+  const verTurno = (shiftDocId: string) => {
+    if (shiftDocId === listaTurnos[0]?.shiftDocId) { verIndice(0); return }
+    const params = new URLSearchParams(searchParams)
+    params.set('turno', shiftDocId)
+    setSearchParams(params, { replace: true })
+    setCausaSel(null)
+  }
+  const irA = (delta: number) => {
+    const t = vecinoEnLista(listaTurnos, vista?.shiftDocId, delta)
+    if (t) verTurno(t.shiftDocId)
+    else verIndice(idx + delta)
+  }
+  /** Cuántos turnos atrás está el que se mira, en la lista completa. */
+  const posLista = Math.max(0, listaTurnos.findIndex(t => t.shiftDocId === vista?.shiftDocId))
+  const atrasTurnos = posLista > 0 ? posLista : idx
+  const hayAnterior = vecinoEnLista(listaTurnos, vista?.shiftDocId, 1) != null || idx < vistas.length - 1
 
   // Swipe: es la interacción natural en el celular, que es donde se abre el QR.
   // Las flechas quedan igual para desktop y accesibilidad.
@@ -6009,6 +6044,44 @@ function MonitorDelToken() {
     )
   }
 
+  /* Un turno de «Ver otro día» que todavía no llega: NO se pinta el vigente
+     mientras tanto (se leería como si fuera el pedido). */
+  if (archivo.estado === 'cargando') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <SkeletonPanel label={`Cargando el turno del ${fmtDateLong(archivo.shiftDocId.slice(0, 10))}`} kpis={3} lineas={2} className="w-full max-w-3xl" />
+      </div>
+    )
+  }
+  if (archivo.estado === 'error') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+        <CalendarDays className="h-10 w-10 text-muted-foreground" aria-hidden />
+        <p className="text-lg font-semibold text-foreground">No se pudo abrir ese turno</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          {archivo.shiftDocId.slice(11)} del {fmtDateLong(archivo.shiftDocId.slice(0, 10))}. Puede ser la conexión,
+          o que el turno ya no esté en los últimos 45 días.
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            onClick={archivo.reintentar}
+            className="tap-44 min-h-[44px] rounded-full bg-primary px-5 text-[15px] font-semibold text-primary-foreground hover:opacity-90"
+          >
+            Reintentar
+          </button>
+          <button
+            type="button"
+            onClick={() => verIndice(0)}
+            className="tap-44 min-h-[44px] rounded-full bg-muted px-5 text-[15px] font-medium text-foreground hover:opacity-80"
+          >
+            Volver al turno actual
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Un link de línea puede nacer fuera de turno (fin de semana, parada). No
   // está roto: está esperando. Decirle "no disponible" mandaría a pedir otro
   // link que tampoco mostraría nada.
@@ -6146,11 +6219,11 @@ function MonitorDelToken() {
   )
   /* Solo con historial: en una línea recién integrada las flechas nacen
      muertas. En la TV tampoco: nadie navega turnos en una pantalla de sala. */
-  const navegacionTurnos = vistas.length > 1 && !modoPantalla ? (
+  const navegacionTurnos = (vistas.length > 1 || listaTurnos.length > 1) && !modoPantalla ? (
     <div className="flex w-full items-center justify-between gap-2 lg:w-auto lg:shrink-0 lg:justify-start">
       <button
         onClick={() => irA(1)}
-        disabled={idx >= vistas.length - 1}
+        disabled={!hayAnterior}
         className="tap-44 flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1.5 text-[12px] text-foreground/80 transition-colors enabled:hover:bg-muted disabled:opacity-30"
       >
         <ChevronLeft className="h-3.5 w-3.5" />
@@ -6159,11 +6232,11 @@ function MonitorDelToken() {
 
       <div className="flex items-center gap-2">
         <span className="text-[11px] text-muted-foreground/80">
-          {esActual ? 'Turno actual' : `${idx} turno${idx > 1 ? 's' : ''} atrás`}
+          {esActual ? 'Turno actual' : `${atrasTurnos} turno${atrasTurnos > 1 ? 's' : ''} atrás`}
         </span>
         {/* Atajo al presente: con seis turnos de historial, volver de a uno
             es tedioso. Solo aparece cuando de verdad hay camino que saltar. */}
-        {idx > 1 && (
+        {atrasTurnos > 1 && (
           <button
             onClick={() => verIndice(0)}
             className="tap-44 rounded-full bg-primary/[0.13] px-2 py-0.5 text-[11px] font-semibold text-foreground transition-opacity hover:opacity-80"
@@ -6171,6 +6244,15 @@ function MonitorDelToken() {
             Ir al actual
           </button>
         )}
+        {/* Saltar a cualquier turno de los últimos 45 días sin recorrerlos de a uno. */}
+        <button
+          type="button"
+          onClick={() => setOtroDiaAbierto(true)}
+          className="tap-44 flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium text-primary transition-opacity hover:opacity-80"
+        >
+          <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+          Otro día
+        </button>
       </div>
 
       <button
@@ -6585,6 +6667,19 @@ function MonitorDelToken() {
       cerrado={turnoCerrado}
     >
     <div className="min-h-screen bg-background text-foreground" data-glass={glass} data-estado={live.status} data-detalle={String(vistaV2)} data-barra={glass === 'v2' && !modoPantalla ? 'si' : undefined}>
+      {!modoPantalla && (
+        <OtroDiaSheet
+          open={otroDiaAbierto}
+          onClose={() => setOtroDiaAbierto(false)}
+          lista={listaTurnos}
+          actualId={vista?.shiftDocId ?? null}
+          onElegir={(t, esVigente) => {
+            setOtroDiaAbierto(false)
+            if (esVigente) verIndice(0)
+            else verTurno(t.shiftDocId)
+          }}
+        />
+      )}
       {token && (
         <CompartirMonitorSheet open={compartirAbierto} onClose={() => setCompartirAbierto(false)} token={token} linea={lineTitle} />
       )}
@@ -6647,8 +6742,8 @@ function MonitorDelToken() {
           selectorPc={pestana !== 'duelo' && lineasMonitor ? <SelectorLinea lineas={lineasMonitor} className="v2-selector-barra" /> : null}
           /* De dónde salen todas las cifras, UNA vez: la hora de la última lectura del contador de Shoplogix (solo en vivo). */
           marca={corteHoraV2 ? `Shoplogix ${corteHoraV2}` : null}
-          navMovil={vistas.length > 1 && !modoPantalla
-            ? { atras: idx, puedeAnterior: idx < vistas.length - 1, onAnterior: () => irA(1), onSiguiente: () => irA(-1), onActual: () => verIndice(0) }
+          navMovil={(vistas.length > 1 || listaTurnos.length > 1) && !modoPantalla
+            ? { atras: atrasTurnos, puedeAnterior: hayAnterior, onAnterior: () => irA(1), onSiguiente: () => irA(-1), onActual: () => verIndice(0), onOtroDia: () => setOtroDiaAbierto(true) }
             : null}
           pestana={pestana}
           onPestana={verPestana}

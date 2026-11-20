@@ -2425,6 +2425,137 @@ async function buildMonitorHistory(db, plantSlug, currentShiftDocId, prevHistory
   return out
 }
 
+/**
+ * ── Turno de archivo: UN turno pasado, a pedido ─────────────────────────────
+ *
+ * El doc del monitor trae solo los últimos `HISTORY_MAX` turnos con su `live`
+ * completo (la flecha instantánea). Orel pidió poder revisar al menos el último
+ * mes desde el mismo link (20-11-2026). Subir `HISTORY_MAX` a ~60 acercaba el
+ * doc al tope de 1 MB de Firestore, lo hacía pesado en el celular y encarecía
+ * cada refresco. En vez de eso, «Ver otro día» pide UN turno a la función
+ * `publicMonitorTurno`, autenticada con el mismo token del link.
+ *
+ * El listado de qué turnos existen NO cuesta nada: sale de `shiftStats`, que ya
+ * viaja en el doc (45 días, todos los turnos con ≥ 500 pz).
+ *
+ * ⚠ Solo turnos con nombre. Los turnos del sensor (`Unscheduled@HH:MM`)
+ * necesitan recortar el `Unscheduled` contra los turnos vecinos
+ * (`turnosDelSensor`); `shiftStats` tampoco los lista, así que el selector
+ * nunca los ofrece. Los recientes siguen visibles con la flecha.
+ */
+const ARCHIVO_COLLECTION = 'publicMonitorArchivo'
+/** Hasta dónde se puede pedir: la misma ventana de `shiftStats`, que es la que arma el selector. */
+const ARCHIVO_MAX_DIAS = SHIFT_INDEX_LOOKBACK_DAYS
+/**
+ * Un turno de más de 4 días ya no cambia: el re-sync móvil reescribe hasta 3
+ * días atrás. Hasta entonces el archivo guardado vale 30 min.
+ */
+const ARCHIVO_ESTABLE_DIAS = 4
+const ARCHIVO_TTL_RECIENTE_MS = 30 * 60_000
+/** `YYYY-MM-DD_Nombre`: sin `/` (sería otra ruta de Firestore) y con largo acotado. */
+const ARCHIVO_ID_RE = /^(\d{4}-\d{2}-\d{2})_([^/]{1,60})$/
+
+/**
+ * ¿Se puede pedir este turno? Devuelve el motivo del rechazo, o null si vale.
+ * Pura: el endpoint la usa antes de leer nada.
+ */
+function motivoRechazoArchivo(shiftDocId, nowWall = shoplogixPolling.toChileWall(new Date())) {
+  const m = ARCHIVO_ID_RE.exec(String(shiftDocId || ''))
+  if (!m) return 'FORMATO'
+  if (/unscheduled/i.test(m[2])) return 'SENSOR'
+  if (m[1] < shiftDateKey(nowWall, -ARCHIVO_MAX_DIAS)) return 'MUY_VIEJO'
+  if (m[1] > shiftDateKey(nowWall, 1)) return 'FUTURO'
+  return null
+}
+
+/**
+ * Índice acotado alrededor de UN turno (−15 d … +3 d): lo que `buildMonitorLive`
+ * mira de vecinos (cola fuera de horario: ayer/hoy/mañana; inferencias de
+ * cierre: turnos recientes). Sin índice caería al camino legado, que lista la
+ * colección completa (~400 lecturas) — inaceptable en un endpoint público.
+ */
+async function loadShiftIndexAround(db, plantSlug, dateKey) {
+  const dia = Date.parse(`${dateKey}T00:00:00Z`)
+  const desde = new Date(dia - 15 * 86_400_000).toISOString().slice(0, 10)
+  const hasta = new Date(dia + 3 * 86_400_000).toISOString().slice(0, 10)
+  const snap = await db.collection(`shoplogix/${plantSlug}/shifts`)
+    .where(FieldPath.documentId(), '>=', desde)
+    .where(FieldPath.documentId(), '<', `${hasta}~`)
+    .get()
+  const entries = snap.docs.map(d => ({ id: d.id, data: d.data() }))
+  return { plantSlug, desde, entries, byId: new Map(entries.map(e => [e.id, e])) }
+}
+
+/**
+ * La lista de turnos que ofrece «Ver otro día»: solo id, hora de arranque y
+ * piezas, de los 45 días del índice. ~90 entradas × ~40 B ≈ 4 KB en el doc y
+ * cero lecturas (el índice ya está cargado). No se usa `shiftStats` para esto:
+ * tiene tope de 62 turnos, que en una planta de 3 turnos son 3 semanas.
+ *
+ * Mismos criterios que el historial: sin `Unscheduled` (ver arriba), con el
+ * piso de piezas de `HISTORY_MIN_PIECES` y sin el turno vigente.
+ *
+ * @returns {Array<{id: string, ini: string|null, pz: number}>} del más nuevo al más viejo.
+ */
+function listarTurnosArchivo(index, currentShiftDocId) {
+  if (!index) return []
+  const out = []
+  for (const e of index.entries) {
+    if (e.id === currentShiftDocId || /unscheduled/i.test(e.id) || !ARCHIVO_ID_RE.test(e.id)) continue
+    const d = e.data || {}
+    const pz = (d.machines || []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+    if (pz < HISTORY_MIN_PIECES) continue
+    const s = toDate(d.scheduledStart)
+    out.push({ id: e.id, ini: s ? hhmmWall(s.getTime()) : null, pz, _t: s ? s.getTime() : 0 })
+  }
+  // Por el arranque REAL, no por el id: «Turno 1» de Chonchi arranca 21:30 y «Turno 2» a las 09:00.
+  out.sort((a, b) => (b.id.slice(0, 10).localeCompare(a.id.slice(0, 10))) || (b._t - a._t) || b.id.localeCompare(a.id))
+  return out.map(({ _t, ...r }) => r)
+}
+
+/** ¿El archivo guardado sirve todavía? Misma vara que el historial: rejilla y clasificación vigentes. */
+function archivoVigente(guardado, dateKey, nowWall, nowMs = Date.now()) {
+  const live = guardado?.live
+  if (!live || live.timeBreakdown?.tbv !== TBV) return false
+  if (live.mantencion != null && live.mantencion.clasif !== MANT_CLASIF) return false
+  if (dateKey <= shiftDateKey(nowWall, -ARCHIVO_ESTABLE_DIAS)) return true
+  const edad = nowMs - Date.parse(guardado.builtAt || '')
+  return Number.isFinite(edad) && edad < ARCHIVO_TTL_RECIENTE_MS
+}
+
+/**
+ * Un turno pasado, con la misma forma que una entrada de `history`. Lo arma
+ * una vez y lo guarda en `publicMonitorArchivo` (solo servidor): el segundo
+ * que lo pida no lee `shoplogix/`.
+ *
+ * @returns {Promise<{shiftDocId: string, dateKey: string, shiftId: string, live: object}|null>}
+ *   null si el turno no existe o no tiene máquinas.
+ */
+async function buildTurnoArchivo(db, plantSlug, shiftDocId, { nowWall = shoplogixPolling.toChileWall(new Date()), nowMs = Date.now() } = {}) {
+  const dateKey = shiftDocId.slice(0, 10)
+  const ref = db.collection(ARCHIVO_COLLECTION).doc(`${plantSlug}__${shiftDocId}`)
+  let guardado = null
+  try {
+    const snap = await ref.get()
+    guardado = snap.exists ? snap.data() : null
+  } catch {
+    guardado = null
+  }
+  const entrada = (live) => ({ shiftDocId, dateKey, shiftId: shiftDocId.slice(11), live })
+  if (archivoVigente(guardado, dateKey, nowWall, nowMs)) return entrada(guardado.live)
+
+  const index = await loadShiftIndexAround(db, plantSlug, dateKey)
+  if (!index.byId.has(shiftDocId)) return null
+  const live = await buildMonitorLive(db, plantSlug, shiftDocId, index)
+  if (!live) return null
+  try {
+    await ref.set({ plantSlug, shiftDocId, live, builtAt: new Date(nowMs).toISOString() })
+  } catch {
+    // Sin guardar igual se responde: la próxima vez se vuelve a armar.
+  }
+  return entrada(live)
+}
+
 /** Turnos del MISMO nombre que se publican para pronosticar el cierre. */
 const FORECAST_MAX = 10
 /** Un punto cada 15 min alcanza para proyectar y deja el resumen liviano. */
@@ -3309,6 +3440,8 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
       live,
       history,
       sinTurnoRevisados: sinTurno.next,
+      /* Lo que ofrece «Ver otro día» (ver `listarTurnosArchivo`). */
+      ...(index ? { archivoTurnos: listarTurnosArchivo(index, monitor.shiftDocId) } : {}),
       forecastHistory: fh,
       /* Liviano y con TODOS los turnos: habilita elegir la ventana y comparar
          un turno contra el otro. Ver `buildShiftStats`. */
@@ -3376,6 +3509,8 @@ async function buildMonitorPatch(db, monitor, currentShiftDocIdByPlant = new Map
     extraordinario: publicado.extraordinario,
     sinTurnoRevisados: sinTurno.next,
     ...(seriesMinuto ? { seriesMinuto } : {}),
+    /* Lo que ofrece «Ver otro día» (ver `listarTurnosArchivo`). */
+    ...(index ? { archivoTurnos: listarTurnosArchivo(index, publicado.shiftDocId) } : {}),
     /* Turnos del mismo nombre: es lo que hace posible pronosticar en las
        líneas con varios turnos por día. */
     forecastHistory: fhLinea,
@@ -3614,6 +3749,12 @@ module.exports = {
   CAUSAS_PLANIFICADAS,
   cierreOficialCoherente,
   bloquesDelSensor,
+  motivoRechazoArchivo,
+  listarTurnosArchivo,
+  archivoVigente,
+  buildTurnoArchivo,
+  loadShiftIndexAround,
+  ARCHIVO_COLLECTION,
   ordenarSensorComoActual,
   currentStateOf,
   statusOf,

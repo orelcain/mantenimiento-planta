@@ -345,6 +345,21 @@ export interface PulsoMonitor {
   }
 }
 
+/** Un turno pasado con su `live` completo: una entrada de `history`, o uno pedido con «Ver otro día». */
+export interface TurnoMonitorEntrada {
+  shiftDocId: string
+  dateKey: string
+  shiftId: string
+  live: PublicMonitorLive
+  /**
+   * Presente cuando el turno lo marcó el SENSOR y no Shoplogix: un bloque
+   * de producción sin turno configurado, con tamaño de turno (Chonchi
+   * 26-sep-2026: extraordinario 16:15→22:55). Sus horas son la primera y la
+   * última pieza. No tiene meta: nadie la puso.
+   */
+  extraordinario?: { desde: string; hasta: string; fuenteDocId?: string }
+}
+
 export interface PublicShiftMonitorDoc {
   token: string
   /** Los otros monitores de línea vigentes de la misma planta (para el selector del Duelo, sin sesión). */
@@ -380,19 +395,13 @@ export interface PublicShiftMonitorDoc {
    * `history`. `null` cuando el actual es un turno con nombre.
    */
   extraordinario?: { desde: string; hasta: string; fuenteDocId?: string } | null
-  history?: Array<{
-    shiftDocId: string
-    dateKey: string
-    shiftId: string
-    live: PublicMonitorLive
-    /**
-     * Presente cuando el turno lo marcó el SENSOR y no Shoplogix: un bloque
-     * de producción sin turno configurado, con tamaño de turno (Chonchi
-     * 26-sep-2026: extraordinario 16:15→22:55). Sus horas son la primera y la
-     * última pieza. No tiene meta: nadie la puso.
-     */
-    extraordinario?: { desde: string; hasta: string; fuenteDocId?: string }
-  }>
+  history?: TurnoMonitorEntrada[]
+  /**
+   * Los turnos que ofrece «Ver otro día» (45 días): solo id, arranque HH:MM y
+   * piezas. El `live` de cada uno se pide a `publicMonitorTurno` al abrirlo.
+   * Ausente en docs anteriores a esta función (la PWA cae a `shiftStats`).
+   */
+  archivoTurnos?: Array<{ id: string; ini: string | null; pz: number }>
   /**
    * Las series minuto a minuto ARCHIVADAS de los últimos turnos (mismo formato
    * que `pulse.serieMinuto`, más el turno dueño): Shoplogix solo entrega los
@@ -696,6 +705,31 @@ export async function refrescarPulso(token: string): Promise<
     return null
   }
 }
+const TURNO_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/publicMonitorTurno'
+
+/**
+ * Trae UN turno pasado que no viaja en el doc («Ver otro día»), autenticado con
+ * el mismo token del link. Ver `buildTurnoArchivo` en functions/publicMonitor.js.
+ *
+ * No lanza: devuelve `null` si falló (link vencido, turno inexistente, red o
+ * función aún no desplegada) y quien llama ofrece reintentar o volver.
+ */
+export async function pedirTurnoArchivo(token: string, shiftDocId: string): Promise<TurnoMonitorEntrada | null> {
+  try {
+    const r = await fetch(TURNO_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, shiftDocId }),
+    })
+    if (!r.ok) return null
+    const d = await r.json()
+    const e = d?.entrada
+    return e && e.shiftDocId === shiftDocId && e.live ? (e as TurnoMonitorEntrada) : null
+  } catch {
+    return null
+  }
+}
+
 const VIEWER_KEY = 'monitorViewerId'
 
 /**
