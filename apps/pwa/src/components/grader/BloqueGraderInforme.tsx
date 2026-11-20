@@ -84,7 +84,7 @@ export function BloqueGraderInforme({ estado, datos, lineId, onSubirExporte }: {
   const filas = [
     { rotulo: 'Puerta 0', valor: <span className="font-semibold">{dec1(datos.p0Pct)} %</span> },
     { rotulo: 'Piezas clasificadas', valor: datos.piezas.toLocaleString('es-CL') },
-    ...(datos.pureza ? [{ rotulo: 'Compuertas con pureza ≥ 95 %', valor: `${datos.pureza.ok} de ${datos.pureza.asignadas}` }] : []),
+    ...(datos.pureza ? [{ rotulo: 'Pureza ≥ 95 %', valor: `${datos.pureza.ok} de ${datos.pureza.asignadas} compuertas` }] : []),
     ...(datos.cobertura ? [{ rotulo: 'Datos', valor: datos.cobertura }] : []),
   ]
 
