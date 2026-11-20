@@ -24,7 +24,7 @@
  * ⚠ Horas de TURNO en wall-clock de planta (getUTC*); `lastSyncAt` es UTC real.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Activity, AlertCircle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Copy, FileDown, Gauge, Hourglass, Moon, PauseCircle, QrCode, RefreshCw, Sun, Target, TrendingUp, Tv, Wrench } from 'lucide-react'
 import { copiarCorreo, descargarPdf, pedirInformeCorreo, type InformeCorreo } from '@/services/shoplogix/informeTurnoCorreo'
@@ -134,6 +134,9 @@ import { piezasDeToneladas, toneladasDePiezas, toneladasPorTramos } from '@/serv
 import { ritmoPorMaquina, nombreCorto, type RitmosPorMaquina } from '@/services/shoplogix/ritmoPorMaquina'
 import { classifyLossState } from '@/services/shoplogix/lossBuckets'
 import { motivoEnEspanol } from '@/services/shoplogix/shoplogixColors'
+
+/* Pestaña «Grader» (etapa 1): perezosa, así el monitor público no carga Firestore del grader hasta que se abre. */
+const PestanaGraderMonitor = lazy(() => import('./monitor/PestanaGraderMonitor'))
 
 // ── Formateadores (locales a propósito: esta página no debe arrastrar el
 //    módulo de helpers del Grader, que se lleva echarts al bundle) ───────────
@@ -4653,8 +4656,12 @@ function MonitorDelToken() {
    * pestañas: el tablero es solo lo vivo.
    */
   const verParam = searchParams.get('ver')
+  /* «Grader» solo en líneas con grader (hoy Eviscerado). Sin datos del token aún, se respeta la URL. */
+  const lineaMonitor = data ? lineaDelMonitor(data.plantLineId, data.plantSlug) : null
+  const conGrader = data ? lineaMonitor?.hasGraderData === true : verParam === 'grader'
   const pestana: PestanaMonitor = modoPantalla ? 'turno'
     : verParam === 'analisis' ? 'analisis'
+      : verParam === 'grader' && conGrader ? 'grader'
       /* El duelo solo existe en el v2: el monitor clásico no lo dibuja. */
       : verParam === 'duelo' && glass === 'v2' ? 'duelo'
         : 'turno'
@@ -6267,8 +6274,8 @@ function MonitorDelToken() {
   ) : null
   /* Las dos pestañas: el turno (se vigila) y el análisis (se estudia). */
   const selectorPestana = !modoPantalla ? (
-    <div className="grid w-full grid-cols-2 gap-1 rounded-full border border-border bg-muted p-1 lg:w-64 lg:shrink-0">
-      {([['turno', 'El turno'], ['analisis', 'Análisis']] as const).map(([id, rotulo]) => (
+    <div className={`grid w-full ${conGrader ? 'grid-cols-3 lg:w-80' : 'grid-cols-2 lg:w-64'} gap-1 rounded-full border border-border bg-muted p-1 lg:shrink-0`}>
+      {([['turno', 'El turno'], ['analisis', 'Análisis'], ...(conGrader ? [['grader', 'Grader'] as const] : [])] as const).map(([id, rotulo]) => (
         <button
           key={id}
           onClick={() => verPestana(id)}
@@ -6692,6 +6699,7 @@ function MonitorDelToken() {
           onCompartir={() => setCompartirAbierto(true)}
           oscuro={isDark}
           onTema={toggleTheme}
+          conGrader={conGrader}
         />
       )}
       {glass === 'v2' && !modoPantalla && (
@@ -6747,6 +6755,7 @@ function MonitorDelToken() {
             : null}
           pestana={pestana}
           onPestana={verPestana}
+          conGrader={conGrader}
         />
       )}
       {/* Cabecera: qué línea, qué turno, qué día, desde qué hora */}
@@ -8037,6 +8046,20 @@ function MonitorDelToken() {
               : null}
             lineas={lineasMonitor}
           />
+        )}
+
+        {pestana === 'grader' && lineaMonitor && (
+          <div className="mx-auto max-w-3xl pt-1">
+            <Suspense fallback={<div className="h-[188px] w-full animate-pulse rounded-card bg-muted" />}>
+              <PestanaGraderMonitor
+                lineId={lineaMonitor.id}
+                dateKey={vista?.dateKey || data.dateKey || null}
+                inicio={inicioReal ?? live.scheduledStart}
+                fin={(live.shiftClosed ? live.effectiveEnd : null) ?? live.plannedEnd ?? live.scheduledEnd}
+                ahoraWallMs={turnoCerrado ? Number.POSITIVE_INFINITY : ahoraWallMs}
+              />
+            </Suspense>
+          </div>
         )}
 
         {pestana === 'analisis' && (

@@ -28,7 +28,7 @@ function useCargaAutomaticaVisible(): boolean {
 }
 
 const ETIQUETA: Record<EstadoCarpeta, string> = {
-  "sin-autorizar": "carga automática apagada",
+  "sin-autorizar": "carga automática apagada en este PC",
   vigilando: "vigilando la carpeta",
   permiso: "falta renovar el permiso",
   cargado: "cargado desde la carpeta",
@@ -163,8 +163,9 @@ function CuerpoAviso() {
       <div className="flex flex-wrap items-center gap-3 rounded-card bg-card p-4">
         <Punto estado={estado} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">La carga automática está apagada</p>
-          <p className="text-xs text-muted-foreground">Elige la carpeta donde guardas los exportes de Matrix. Solo se lee; nunca se escribe en ella.</p>
+          {/* Estado LOCAL de este PC: no dice nada de hasta cuándo hay datos (eso es global, ver DatosGraderHasta). */}
+          <p className="text-sm font-semibold">Carga automática apagada en este PC</p>
+          <p className="text-xs text-muted-foreground">Solo hace falta en el PC de planta donde se guardan los exportes de Matrix. Si es este, elige la carpeta: solo se lee, nunca se escribe en ella.</p>
         </div>
         <Button size="sm" onClick={() => void elegirCarpetaMatrix()}>Elegir carpeta</Button>
       </div>
