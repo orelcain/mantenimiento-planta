@@ -1734,7 +1734,7 @@ function FilaTurnoMovil({ texto, nav }: { texto: string; nav: NavTurnosMovil | n
   )
 }
 
-export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos, sub, pestana, onPestana, selectorPc, marca, subCorto, navMovil }: {
+export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos, sub, pestana, onPestana, selectorPc, marca, subCorto, navMovil, conGrader = false }: {
   titulo: string
   area: string | null
   estado: ReactNode
@@ -1753,6 +1753,8 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
   subCorto?: string
   /** La navegación de turnos del celular en un renglón; null = sin historial. */
   navMovil?: NavTurnosMovil | null
+  /** La línea tiene grader: suma la pestaña «Grader» después de Análisis. */
+  conGrader?: boolean
 }) {
   /* Celular (< lg): la barra flotante y PEGADA arriba (48 px + 8 de aire; el estado y de dónde salen las cifras van de
      subtítulo, así siempre se ve si el turno está en vivo, detenido o terminado), el selector de línea, `‹ fecha ›` en un
@@ -1763,7 +1765,7 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
   const ancho = `mx-auto max-w-3xl ${pestana === 'turno' ? 'px-[16px] md:max-w-none' : 'px-3'}`
   const pestanas = (
     <div className="v2-segmentado flex rounded-full p-1" role="tablist">
-      {([['turno', 'El turno'], ['analisis', 'Análisis'], ['duelo', 'Duelo']] as const).map(([id, rotulo]) => (
+      {([['turno', 'El turno'], ['analisis', 'Análisis'], ...(conGrader ? [['grader', 'Grader'] as const] : []), ['duelo', 'Duelo']] as const).map(([id, rotulo]) => (
         <button
           key={id}
           role="tab"
@@ -1803,7 +1805,7 @@ export function CabeceraV2({ titulo, area, estado, tema, cambioLinea, navTurnos,
         {cambioLinea && <div className="mb-[8px] md:mb-4">{cambioLinea}</div>}
         <div className="flex flex-col gap-[8px] md:gap-4">
           <div className="contents min-w-0 px-1 md:block">
-            <h1 className="sr-only text-[34px] font-semibold leading-none tracking-tight md:not-sr-only">{pestana === 'turno' ? 'El turno' : pestana === 'analisis' ? 'Análisis' : 'Duelo'}</h1>
+            <h1 className="sr-only text-[34px] font-semibold leading-none tracking-tight md:not-sr-only">{pestana === 'turno' ? 'El turno' : pestana === 'analisis' ? 'Análisis' : pestana === 'grader' ? 'Grader' : 'Duelo'}</h1>
             <p className="mt-2 hidden text-[15px] tabular-nums text-muted-foreground first-letter:uppercase md:block">{sub}</p>
           </div>
           <div className="md:hidden"><FilaTurnoMovil texto={subCorto ?? sub} nav={navMovil ?? null} /></div>

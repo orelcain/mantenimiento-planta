@@ -162,6 +162,9 @@ export default {
         'ink-warn': 'rgb(var(--ink-warn) / <alpha-value>)',
         'ink-ok': 'rgb(var(--ink-ok) / <alpha-value>)',
         'ink-info': 'rgb(var(--ink-info) / <alpha-value>)',
+        // Grader (petróleo): marca propia de su dato frente al de Shoplogix.
+        grader: 'rgb(var(--serie-grader) / <alpha-value>)',
+        'ink-grader': 'rgb(var(--ink-grader) / <alpha-value>)',
         'card-edge': 'rgb(var(--card-edge) / <alpha-value>)',
         border: 'rgb(var(--border) / <alpha-value>)',
         input: 'rgb(var(--border) / <alpha-value>)',

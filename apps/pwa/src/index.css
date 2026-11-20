@@ -1627,3 +1627,26 @@ html.vidrio-solido.dark .vidrio {
     margin-right: auto;
   }
 }
+
+/* ── Grader en el monitor y en Análisis de turno (etapas 0-1) ────────────────
+   Color propio del grader (petróleo) para que su dato se distinga del de
+   Shoplogix: relleno de marcas (--serie-grader) y tinta de texto (--ink-grader).
+   Mismos valores en todas las pieles; solo cambia entre claro y oscuro. */
+:root {
+  --serie-grader: 19 143 130;   /* #138F82 */
+  --ink-grader: 19 108 98;      /* #136C62 */
+}
+.dark {
+  --serie-grader: 34 165 164;   /* #22A5A4 */
+  --ink-grader: 106 187 186;    /* #6ABBBA */
+}
+/* Trama de «sin datos»: franjas del color de la tarjeta sobre el relleno. A diferencia de
+   .pz-trama, sirve en cualquier paleta. `-aviso` = tramo faltante que ya es aviso. */
+.trama-sin-datos {
+  background-color: rgb(var(--muted));
+  background-image: repeating-linear-gradient(135deg, rgb(var(--card)) 0 2px, transparent 2px 6px);
+}
+.trama-sin-datos-aviso {
+  background-color: color-mix(in srgb, rgb(var(--fill-warning)) 55%, rgb(var(--card)));
+  background-image: repeating-linear-gradient(135deg, rgb(var(--card)) 0 2px, transparent 2px 6px);
+}

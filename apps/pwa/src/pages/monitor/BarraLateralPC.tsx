@@ -8,12 +8,12 @@
  * El botón de arriba la deja fijada abierta. El indicador del apartado activo se desliza (`transform`).
  * En celular no existe: sigue la barra de arriba de siempre.
  */
-import { BarChart3, Clock, Home, Menu, Moon, QrCode, Sun, Trophy, Tv } from 'lucide-react'
+import { BarChart3, Clock, Home, Menu, Moon, QrCode, Sun, Trophy, Tv, ScanLine } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 /** Los apartados del monitor v2: lo vivo, lo que se estudia y el duelo de equipos. */
-export type PestanaMonitor = 'turno' | 'analisis' | 'duelo'
+export type PestanaMonitor = 'turno' | 'analisis' | 'grader' | 'duelo'
 
 export interface BarraLateralPCProps {
   pestana: PestanaMonitor
@@ -25,6 +25,8 @@ export interface BarraLateralPCProps {
   onCompartir?: () => void
   oscuro: boolean
   onTema: () => void
+  /** La línea tiene grader: suma el apartado «Grader» después de Análisis. */
+  conGrader?: boolean
 }
 
 function Item({ icono, rotulo, activo, onClick, to, pulsado, nombre, atenuado }: {
@@ -53,15 +55,15 @@ function Item({ icono, rotulo, activo, onClick, to, pulsado, nombre, atenuado }:
   )
 }
 
-export function BarraLateralPC({ pestana, onPestana, conInicio, onModoTv, onCompartir, oscuro, onTema }: BarraLateralPCProps) {
+export function BarraLateralPC({ pestana, onPestana, conInicio, onModoTv, onCompartir, oscuro, onTema, conGrader = false }: BarraLateralPCProps) {
   const [fijada, setFijada] = useState(false)
   const [hover, setHover] = useState(false)
   const [foco, setFoco] = useState(false)
   const espera = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (espera.current) clearTimeout(espera.current) }, [])
   const abierta = fijada || hover || foco
-  /* El indicador sigue al apartado activo: 0 = botón de menú, 1 = El turno, 2 = Análisis, 3 = Duelo (40 px de alto + 4 de hueco). */
-  const fila = pestana === 'turno' ? 1 : pestana === 'analisis' ? 2 : 3
+  /* El indicador sigue al apartado activo: 0 = botón de menú, 1 = El turno, 2 = Análisis, 3 = Grader (si la línea lo tiene), luego Duelo (40 px de alto + 4 de hueco). */
+  const fila = pestana === 'turno' ? 1 : pestana === 'analisis' ? 2 : pestana === 'grader' ? 3 : conGrader ? 4 : 3
 
   return (
     <nav
@@ -91,6 +93,7 @@ export function BarraLateralPC({ pestana, onPestana, conInicio, onModoTv, onComp
         <Item icono={<Menu className="h-[18px] w-[18px]" />} rotulo={fijada ? 'Soltar menú' : 'Fijar menú'} pulsado={fijada} onClick={() => setFijada((f) => !f)} />
         <Item icono={<Clock className="h-[18px] w-[18px]" />} rotulo="El turno" activo={pestana === 'turno'} onClick={() => onPestana('turno')} />
         <Item icono={<BarChart3 className="h-[18px] w-[18px]" />} rotulo="Análisis" activo={pestana === 'analisis'} onClick={() => onPestana('analisis')} />
+        {conGrader && <Item icono={<ScanLine className="h-[18px] w-[18px]" />} rotulo="Grader" activo={pestana === 'grader'} onClick={() => onPestana('grader')} />}
         <Item icono={<Trophy className="h-[18px] w-[18px]" />} rotulo="Duelo" activo={pestana === 'duelo'} onClick={() => onPestana('duelo')} />
 
         <div className="v2-lat-sep" aria-hidden />
