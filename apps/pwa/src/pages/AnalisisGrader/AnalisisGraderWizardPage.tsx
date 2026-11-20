@@ -25,6 +25,9 @@ import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsP
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { BotonMonitorLinea } from '@/components/grader/BotonMonitorLinea'
 import { CargaAutomaticaAviso, EtiquetaCargaAutomatica } from '@/components/grader/CargaAutomaticaAviso'
+import { DatosGraderHasta } from '@/components/grader/DatosGraderHasta'
+import { useDatosGraderHasta } from '@/services/grader/graderDatosHasta'
+import { ddmmHhmm } from '@/services/grader/graderCobertura'
 import { QuickInterventionCapture } from '@/components/grader/QuickInterventionCapture'
 import { ParoEtapaCapture } from '@/components/grader/ParoEtapaCapture'
 import { PeriodoNavegador } from '@/components/grader/PeriodoNavegador'
@@ -150,6 +153,12 @@ export function AnalisisGraderWizardPage() {
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
   const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
   const ultimaCarga = useMemo(() => ultimaCargaDateKey(calendarSummaries), [calendarSummaries])
+  /* Etapa 0: hasta cuándo hay datos, GLOBAL (Firestore), igual en cualquier PC. Si aún no
+     llega, la fila de carga cae al último día con Excel del mes visible. */
+  const datosHasta = useDatosGraderHasta(lineConfig.hasGraderData ? lineId : null)
+  const textoUltimaCarga = datosHasta.estado === 'listo' && datosHasta.valor
+    ? `datos hasta ${ddmmHhmm(datosHasta.valor)}`
+    : ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : null
   // Las emite ahora la vista de período (`computePeriodMonthlyStats`); antes
   // las calculaba el calendario mensual, ya retirado.
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
@@ -593,6 +602,7 @@ export function AnalisisGraderWizardPage() {
                 Análisis de turno
               </h1>
             )}
+            {lineConfig.hasGraderData && <DatosGraderHasta lineId={lineId} className="mt-2" />}
             {lineId === DEFAULT_PLANT_LINE_ID && <div className="mt-2"><CargaAutomaticaAviso /></div>}
             {/* Piel Apple: el subtítulo «Línea completa Grader + Baaders» sale; las otras dos líneas lo mantienen. */}
             {!(apple && lineConfig.hasGraderData && lineConfig.isClassificationPlant !== false) && (
@@ -910,7 +920,7 @@ export function AnalisisGraderWizardPage() {
               <span className="flex-1 text-left min-w-0">
                 <span className="block text-subhead text-foreground">Cargar Excel del Grader</span>
                 <span className="block text-footnote text-muted-foreground tabular-nums">
-                  {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'Sin Excel este mes'}
+                  {textoUltimaCarga ?? 'Sin Excel este mes'}
                 </span>
               </span>
             ) : (
@@ -918,7 +928,7 @@ export function AnalisisGraderWizardPage() {
               Cargar Excel del Grader
               <span className="text-muted-foreground/70 tabular-nums">
                 {' · '}
-                {ultimaCarga ? `último turno con Excel: ${dateKeyDdMm(ultimaCarga)}` : 'sin Excel en este mes'}
+                {textoUltimaCarga ?? 'sin Excel en este mes'}
               </span>
             </span>
             )}
