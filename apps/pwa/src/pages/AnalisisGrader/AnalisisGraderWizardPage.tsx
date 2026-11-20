@@ -25,6 +25,7 @@ import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsP
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { BotonMonitorLinea } from '@/components/grader/BotonMonitorLinea'
 import { CargaAutomaticaAviso, EtiquetaCargaAutomatica } from '@/components/grader/CargaAutomaticaAviso'
+import { GraderDelDiaBloque } from '@/components/grader/GraderDelDiaBloque'
 import { DatosGraderHasta } from '@/components/grader/DatosGraderHasta'
 import { useDatosGraderHasta } from '@/services/grader/graderDatosHasta'
 import { ddmmHhmm } from '@/services/grader/graderCobertura'
@@ -817,12 +818,25 @@ export function AnalisisGraderWizardPage() {
                 maquinas: 'lg:col-start-1 lg:row-start-2',
               }}
             />
-            <DayTimeSummaryBar
-              className="max-lg:order-1 lg:col-start-2 lg:row-start-2"
-              dateKey={selectedDateKey ?? todayDateKey}
-              plantSlug={lineConfig.plantSlug}
-              enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
-            />
+            <div className="flex flex-col gap-[26px] max-lg:order-1 lg:col-start-2 lg:row-start-2">
+              <DayTimeSummaryBar
+                dateKey={selectedDateKey ?? todayDateKey}
+                plantSlug={lineConfig.plantSlug}
+                enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+              />
+              {/* El grader es un extra de Shoplogix con lugar FIJO: sin exporte del
+                  día deja su hueco en vez de desaparecer (mockup `analisis.html`). */}
+              {lineConfig.hasGraderData && (
+                <GraderDelDiaBloque
+                  summaries={calendarSummaries}
+                  dateKey={selectedDateKey ?? todayDateKey}
+                  onSubirExporte={() => {
+                    setUploadPanelExpanded(true)
+                    document.getElementById('cargar-excel-grader')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }}
+                />
+              )}
+            </div>
             <GraderMonthlyStatsPanel
               currentMonth={calendarMonth}
               summaries={calendarSummaries}
@@ -906,7 +920,7 @@ export function AnalisisGraderWizardPage() {
           cargador de siempre. La fecha sale de los resúmenes del mes visible
           (0 lecturas extra); si el mes no tiene ninguno, lo dice. */}
       {lineConfig.hasGraderData && (
-        <div>
+        <div id="cargar-excel-grader" className="scroll-mt-4">
           <button
             type="button"
             onClick={() => setUploadPanelExpanded((v) => !v)}
