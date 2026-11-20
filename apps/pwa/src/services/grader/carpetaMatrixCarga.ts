@@ -29,6 +29,7 @@ import { DEFAULT_PLANT_LINE_ID, getPlantLineConfig } from '@/config/plantLines'
 import { logger } from '@/lib/logger'
 import {
   CM_VENTANA_MS,
+  OPCIONES_LISTADO_CARPETA,
   archivoEstable,
   calcularAlDia,
   claveArchivo,
@@ -45,10 +46,12 @@ import {
   listadoIncompleto,
   seleccionarCandidatos,
   ultimaPiezaProcesada,
+  ultimoOtroTrasLote,
   ultimoTrasResultado,
   type CortadoInfo,
   type ResultadoArchivo,
   type TipoResultado,
+  type UltimoOtro,
   type UltimoResultado,
 } from './carpetaMatrix'
 import { carpetaMatrixStore } from './carpetaMatrixStore'
@@ -57,6 +60,8 @@ import type { ParsedMatrixData } from './types'
 export interface ResultadoRevision {
   ultimo: UltimoResultado | null
   cortado: CortadoInfo | null
+  /** Último archivo que no es Pieza a pieza (p. ej. Puerta 0) cargado, o null. */
+  ultimoOtro: UltimoOtro | null
   /** epoch ms del Pieza a pieza más nuevo de la carpeta, o null. */
   ultimoPiezaAPieza: number | null
   /** Regla 10: solo con Pieza a pieza cargado u omitido reciente. */
@@ -87,7 +92,7 @@ export async function revisarCarpeta(
   usuario: UsuarioGuarda,
   ahoraMs: number = Date.now(),
 ): Promise<ResultadoRevision> {
-  const listado = await listarExcelsEnCarpeta(handle)
+  const listado = await listarExcelsEnCarpeta(handle, OPCIONES_LISTADO_CARPETA)
   const entradas = listado.archivos
   const demasiados = listadoIncompleto(listado.truncado, listado.elementosNoLeidos)
   const piezas = entradas.filter((e) => esNombrePiezaAPieza(e.nombre))
@@ -95,6 +100,7 @@ export async function revisarCarpeta(
 
   let ultimo: UltimoResultado | null = (await carpetaMatrixStore.leerUltimo()) ?? null
   let cortado: CortadoInfo | null = (await carpetaMatrixStore.leerCortado()) ?? null
+  let ultimoOtro: UltimoOtro | null = (await carpetaMatrixStore.leerUltimoOtro()) ?? null
   const intentos = await carpetaMatrixStore.leerIntentos()
   const procesados = new Set(await carpetaMatrixStore.leerProcesados())
   const candidatos = seleccionarCandidatos(
@@ -223,6 +229,19 @@ export async function revisarCarpeta(
       await anotar(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, tipo)
     }
 
+    // Un Puerta 0 (u otro tipo) cargado no toca el «último» del Pieza a pieza: tiene su propio registro.
+    if (tipo === 'cargado') {
+      const nuevoOtro = ultimoOtroTrasLote(
+        ultimoOtro,
+        lote.map((p) => ({ tipoArchivo: p.tipoArchivo, kind: p.fileMeta.kind, archivo: p.fileMeta.name, modificado: p.modificado })),
+        ahoraMs,
+      )
+      if (nuevoOtro !== ultimoOtro && nuevoOtro) {
+        ultimoOtro = nuevoOtro
+        await carpetaMatrixStore.guardarUltimoOtro(nuevoOtro)
+      }
+    }
+
     const pp = lote.filter((p) => p.tipoArchivo === 'PIEZA_PIEZA')
     if (pp.length > 0) {
       const masNuevo = pp.reduce((a, b) => (b.modificado > a.modificado ? b : a))
@@ -321,6 +340,7 @@ export async function revisarCarpeta(
   return {
     ultimo,
     cortado,
+    ultimoOtro,
     ultimoPiezaAPieza: piezas.length > 0 ? Math.max(...piezas.map((e) => e.modificado)) : null,
     alDia,
     demasiados,

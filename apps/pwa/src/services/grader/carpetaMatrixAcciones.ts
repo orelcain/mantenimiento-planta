@@ -60,6 +60,7 @@ async function revisarCon(handle: HandleCarpeta): Promise<void> {
       revisadoEn: ahora,
       ultimo: r.ultimo,
       cortado: r.cortado,
+      ultimoOtro: r.ultimoOtro,
       ultimoPiezaAPieza: r.ultimoPiezaAPieza,
       errorTexto: r.errorTexto,
     })
@@ -76,6 +77,7 @@ async function revisarCon(handle: HandleCarpeta): Promise<void> {
 /** Una revisión a la vez: candado de la pestaña y Web Lock entre pestañas. Si hay otra, se salta. */
 export async function revisarSiToca(handle: HandleCarpeta): Promise<void> {
   if (!candadoPestana.tomar()) return
+  useCarpetaMatrixEstado.getState().actualizar({ revisando: true })
   try {
     if (typeof navigator !== "undefined" && navigator.locks) {
       await navigator.locks.request(NOMBRE_LOCK, { ifAvailable: true }, async (lock) => {
@@ -86,10 +88,34 @@ export async function revisarSiToca(handle: HandleCarpeta): Promise<void> {
     }
   } finally {
     candadoPestana.soltar()
+    useCarpetaMatrixEstado.getState().actualizar({ revisando: false })
   }
 }
 
-/** Acción «Elegir carpeta»: pide la carpeta (solo lectura), la guarda y revisa. */
+/**
+ * Botón «Revisar ahora»: salta la espera de 5 min y revisa ya. Respeta el
+ * candado: si ya hay una revisión en curso, no lanza otra (`revisarSiToca` sale).
+ */
+export async function revisarAhoraCarpetaMatrix(): Promise<void> {
+  const { actualizar } = useCarpetaMatrixEstado.getState()
+  try {
+    const handle = await carpetaMatrixStore.leerHandle()
+    if (!handle) {
+      actualizar({ estado: "sin-autorizar" })
+      return
+    }
+    await revisarSiToca(handle)
+  } catch (e) {
+    logger.error("Carpeta Matrix: no se pudo revisar ahora", e instanceof Error ? e : new Error(String(e)))
+    actualizar({ estado: "error", errorTexto: "No se pudo leer la carpeta guardada." })
+  }
+}
+
+/**
+ * Acción «Elegir carpeta» y «Cambiar carpeta»: pide la carpeta (solo lectura), la
+ * guarda en lugar de la anterior, olvida los avisos de la anterior y revisa de
+ * inmediato. Si el usuario cancela el selector, no cambia nada.
+ */
 export async function elegirCarpetaMatrix(): Promise<void> {
   const pick = (window as unknown as ConPicker).showDirectoryPicker
   const { actualizar } = useCarpetaMatrixEstado.getState()
@@ -103,12 +129,13 @@ export async function elegirCarpetaMatrix(): Promise<void> {
   }
   try {
     await carpetaMatrixStore.guardarHandle(handle)
+    await carpetaMatrixStore.limpiarAvisos()
   } catch (e) {
     logger.error("Carpeta Matrix: no se pudo guardar la carpeta", e instanceof Error ? e : new Error(String(e)))
     actualizar({ estado: "error", errorTexto: "No se pudo recordar la carpeta en este navegador." })
     return
   }
-  actualizar({ estado: "vigilando", nombreCarpeta: handle.name, ultimo: null, cortado: null, ultimoPiezaAPieza: null, errorTexto: null })
+  actualizar({ estado: "vigilando", nombreCarpeta: handle.name, ultimo: null, cortado: null, ultimoOtro: null, ultimoPiezaAPieza: null, errorTexto: null })
   await revisarSiToca(handle)
 }
 

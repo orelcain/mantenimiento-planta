@@ -11,13 +11,14 @@ import {
   recortarResultados,
   type CortadoInfo,
   type ResultadoArchivo,
+  type UltimoOtro,
   type UltimoResultado,
 } from './carpetaMatrix'
 
 const DB_NOMBRE = 'carpeta-matrix-grader'
 const TIENDA = 'kv'
 
-type Clave = 'handle' | 'procesados' | 'ultimo' | 'cortado' | 'intentos' | 'resultados'
+type Clave = 'handle' | 'procesados' | 'ultimo' | 'cortado' | 'intentos' | 'resultados' | 'ultimoOtro'
 
 /** Handle de la File System Access API con los métodos de permiso que usamos. */
 export interface HandleCarpeta extends CarpetaHandle {
@@ -84,6 +85,17 @@ export const carpetaMatrixStore = {
 
   leerUltimo: () => leer<UltimoResultado>('ultimo'),
   guardarUltimo: (ultimo: UltimoResultado) => escribir('ultimo', ultimo),
+
+  /** Último archivo que no es Pieza a pieza (p. ej. Puerta 0) cargado sin fallos. */
+  leerUltimoOtro: () => leer<UltimoOtro>('ultimoOtro'),
+  guardarUltimoOtro: (u: UltimoOtro) => escribir('ultimoOtro', u),
+
+  /** Al cambiar de carpeta: olvida todo lo de la anterior (avisos, resultados, procesados). El handle no se toca. */
+  limpiarAvisos: async (): Promise<void> => {
+    for (const clave of ['ultimo', 'ultimoOtro', 'cortado', 'resultados', 'intentos', 'procesados'] as const) {
+      await escribir(clave, undefined)
+    }
+  },
 
   /** Exporte cortado: persiste hasta que cargue un Pieza a pieza completo más nuevo (regla 9). */
   leerCortado: () => leer<CortadoInfo>('cortado'),
