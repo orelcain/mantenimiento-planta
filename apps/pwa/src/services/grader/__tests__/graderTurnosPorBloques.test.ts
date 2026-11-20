@@ -98,20 +98,47 @@ describe('assignByProductionBlocks', () => {
       .toEqual(new Set(['2026-11-11|Turno 2']))
   })
 
-  it('una pausa menor a 20 min no corta el bloque; una de 20 sí', () => {
-    // Fin de T1 a las 05:00. Pieza a 05:30 pegada a una a 05:49 (19 min):
-    // mismo bloque que la de 05:49. La de 06:09 queda a 20 min → bloque aparte.
-    // Con una ventana T2 que parte 06:09 se ve el corte.
-    const ventanas: ShoplogixShiftWindow[] = [
-      NOV[0]!,
-      { sessionDate: '2026-11-11', shiftId: 'Turno 2', startMs: ms('2026-11-11', '06:09'), endMs: ms('2026-11-11', '15:00') },
-    ]
-    const ts = [wall('2026-11-11', '04:50'), wall('2026-11-11', '05:09'), wall('2026-11-11', '05:28'),
-      wall('2026-11-11', '05:48'), wall('2026-11-11', '06:09')]
-    expect(ms('2026-11-11', '06:09') - ms('2026-11-11', '05:48')).toBeGreaterThanOrEqual(PRODUCTION_BLOCK_GAP_MS)
-    const a = assignByProductionBlocks(ts, ventanas)
-    expect(a.get(wall('2026-11-11', '05:48'))?.shiftId).toBe('Turno 1')
-    expect(a.get(wall('2026-11-11', '06:09'))?.shiftId).toBe('Turno 2')
+  // T1 produce sin parar 04:00 → 06:10 (cierre oficial 05:00) y T2 retoma tras
+  // una pausa. 06:10 está más cerca del inicio oficial del T2 (07:15, 65 min)
+  // que del fin del T1 (05:00, 70 min): solo queda en T1 si la pausa corta.
+  const t1HastaLas0610 = tramo('2026-11-11', '04:00', '06:10').map((p) => p.ts)
+
+  it('una pausa de exactamente 20 min corta el bloque', () => {
+    expect(PRODUCTION_BLOCK_GAP_MS).toBe(20 * 60_000)
+    const ts = [...t1HastaLas0610, ...tramo('2026-11-11', '06:30', '08:00').map((p) => p.ts)]
+    const a = assignByProductionBlocks(ts, NOV)
+    expect(a.get(wall('2026-11-11', '06:10'))?.shiftId).toBe('Turno 1')
+    expect(a.get(wall('2026-11-11', '06:30'))?.shiftId).toBe('Turno 2')
+  })
+
+  it('una pausa de 19 min no corta: la línea siguió y cada pieza va a su ventana', () => {
+    const ts = [...t1HastaLas0610, wall('2026-11-11', '06:29'),
+      ...tramo('2026-11-11', '06:34', '08:00').map((p) => p.ts)]
+    const a = assignByProductionBlocks(ts, NOV)
+    expect(a.get(wall('2026-11-11', '06:10'))?.shiftId).toBe('Turno 2')
+  })
+
+  it('un «No aplicable» en la pausa no une los dos turnos', () => {
+    const piezas = [...t1HastaLas0610, ...tramo('2026-11-11', '06:43', '08:00')
+      .map((p) => p.ts)].map((ts) => piece(ts))
+    const noAplica = [piece(wall('2026-11-11', '06:26'), 0)]
+    const segs = segmentByDayAndShift(piezas, [], SCHEDULE_VIEJO, NOV, noAplica)
+    const t1 = segs.get('2026-11-10|Turno 1')!.pieceRecords.map((r) => r.ts)
+    expect(t1).toContain(wall('2026-11-11', '06:10'))
+    expect(Array.from(segs.values()).reduce((a, s) => a + (s.notApplicableCount ?? 0), 0)).toBe(1)
+  })
+
+  it('día sin sincronizar: sus piezas no se le regalan al turno de ayer', () => {
+    // Solo llegó la ventana del T1 del 10-11; el 11-11 no se sincronizó.
+    const segs = segmentByDayAndShift(
+      // Arranca a las 07:30, a 2,5 h del T1: cerca de su cola, pero dura 6,5 h.
+      [...tramo('2026-11-10', '21:30', '05:00', '2026-11-11'), ...tramo('2026-11-11', '07:30', '14:00')],
+      [], SCHEDULE_VIEJO, [NOV[0]!],
+    )
+    expect(segs.has('2026-11-11|Turno día')).toBe(true)
+    const t1 = segs.get('2026-11-10|Turno 1')!.pieceRecords.map((r) => r.ts)
+    expect(t1).not.toContain(wall('2026-11-11', '07:30'))
+    expect(t1).not.toContain(wall('2026-11-11', '14:00'))
   })
 
   it('si la línea no paró entre turnos, cada pieza va a su ventana', () => {

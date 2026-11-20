@@ -231,7 +231,49 @@ export function assignFromShoplogixWindows(
  */
 export const PRODUCTION_BLOCK_GAP_MS = 20 * 60 * 1000
 
+/**
+ * Distancia máxima de un bloque suelto a la producción de un turno.
+ *
+ * La brecha más larga entre turnos (T2 → T1, nov-2026) fue 6 h 42 min: la
+ * mitad, 3 h 21, cabe en 4 h. Más lejos el bloque no es hora extra de nadie,
+ * típicamente un día cuyo turno no se sincronizó: cae al schedule.
+ */
+export const MAX_ORPHAN_DISTANCE_MS = 4 * 60 * 60 * 1000
+
 type Asignacion = { shiftId: string; sessionDate: string }
+
+/**
+ * Asigna los registros auxiliares (p.ej. «No aplicable», 0 piezas) al turno
+ * de la pieza más cercana, sin dejar que formen bloques: un registro de cero
+ * piezas en una pausa no debe unir dos turnos.
+ */
+export function assignAuxiliares(
+  auxTs: readonly (string | undefined)[],
+  asignados: ReadonlyMap<string, Asignacion>,
+  maxMs: number = MAX_ORPHAN_DISTANCE_MS,
+): Map<string, Asignacion> {
+  const out = new Map<string, Asignacion>()
+  const base = Array.from(asignados.entries())
+    .map(([ts, a]) => ({ t: Date.parse(ts), a }))
+    .filter((p) => !isNaN(p.t))
+    .sort((x, y) => x.t - y.t)
+  if (base.length === 0) return out
+  for (const ts of auxTs) {
+    if (!ts || out.has(ts)) continue
+    const hit = asignados.get(ts)
+    if (hit) { out.set(ts, hit); continue }
+    const t = Date.parse(ts)
+    if (isNaN(t)) continue
+    let lo = 0, hi = base.length
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (base[mid]!.t < t) lo = mid + 1; else hi = mid }
+    const prev = base[lo - 1], next = base[lo]
+    const dPrev = prev ? t - prev.t : Infinity
+    const dNext = next ? next.t - t : Infinity
+    const mejor = dPrev <= dNext ? prev : next
+    if (mejor && Math.min(dPrev, dNext) <= maxMs) out.set(ts, mejor.a)
+  }
+  return out
+}
 
 /**
  * Asigna cada timestamp a un turno REAL de Shoplogix por bloques continuos.
@@ -257,6 +299,7 @@ export function assignByProductionBlocks(
   timestamps: readonly (string | undefined)[],
   windows: readonly ShoplogixShiftWindow[],
   gapMs: number = PRODUCTION_BLOCK_GAP_MS,
+  maxOrphanMs: number = MAX_ORPHAN_DISTANCE_MS,
 ): Map<string, Asignacion> {
   const out = new Map<string, Asignacion>()
   if (windows.length === 0) return out
@@ -284,6 +327,8 @@ export function assignByProductionBlocks(
 
   // Producción real de cada turno: los bloques que tocan su ventana.
   const anclados: { ini: number; fin: number; a: Asignacion }[] = []
+  const ventanaDe = new Map<string, ShoplogixShiftWindow>()
+  for (const w of windows) ventanaDe.set(`${w.sessionDate}|${w.shiftId}`, w)
   const sueltos: typeof bloques = []
 
   for (const b of bloques) {
@@ -313,16 +358,32 @@ export function assignByProductionBlocks(
     for (const x of anclados) {
       const esAnterior = x.fin < b.ini
       const gap = esAnterior ? b.ini - x.fin : x.ini - b.fin
+      if (gap > maxOrphanMs) continue
+      // El bloque ENTERO tiene que quedar a ≤ maxOrphanMs de la ventana oficial
+      // de ese turno: un turno completo que no se sincronizó (horas de largo)
+      // no es hora extra del turno de ayer aunque arranque cerca de su cola.
+      const w = ventanaDe.get(`${x.a.sessionDate}|${x.a.shiftId}`)
+      if (w && (b.fin - w.endMs > maxOrphanMs || w.startMs - b.ini > maxOrphanMs)) continue
       if (gap < mejorGap || (gap === mejorGap && esAnterior && !mejorEsAnterior)) {
         mejor = x.a
         mejorGap = gap
         mejorEsAnterior = esAnterior
       }
     }
-    for (const p of b.puntos) {
-      const a = mejor ?? assignFromShoplogixWindows(p.ts, windows, Infinity)
-      if (a) out.set(p.ts, a)
+    // Sin turno con producción cerca: la ventana más cercana, con la misma
+    // condición de bloque entero; si no, sin asignar → el caller cae al
+    // schedule (día sin sincronizar: no se le regalan sus piezas al de ayer).
+    if (!mejor) {
+      let gapW = Infinity
+      for (const w of windows) {
+        const esAnterior = w.endMs <= b.ini
+        const lejos = esAnterior ? b.fin - w.endMs : w.startMs - b.ini
+        if (lejos > maxOrphanMs) continue
+        const gap = esAnterior ? b.ini - w.endMs : w.startMs - b.fin
+        if (gap < gapW || (gap === gapW && esAnterior)) { gapW = gap; mejor = deVentana(w) }
+      }
     }
+    if (mejor) for (const p of b.puntos) out.set(p.ts, mejor)
   }
 
   return out
@@ -367,13 +428,19 @@ export function segmentByDayAndShift(
   // Shoplogix manda: con turnos sincronizados, cada BLOQUE de producción va
   // entero a un turno real (ver assignByProductionBlocks). El schedule
   // declarado de la planta solo se usa si no hay ningún turno sincronizado.
+  // Los «No aplicable» no arman bloques (valen 0 piezas): se pegan a la pieza
+  // más cercana.
   const byBlock = shoplogixWindows && shoplogixWindows.length > 0
     ? assignByProductionBlocks(
-        [...pieceRecords, ...gate0Records, ...notApplicableRecords].map((r) => r.ts),
+        [...pieceRecords, ...gate0Records].map((r) => r.ts),
         shoplogixWindows,
       )
     : null
+  const byAux = byBlock
+    ? assignAuxiliares(notApplicableRecords.map((r) => r.ts), byBlock)
+    : null
   const assign = (ts: string) => byBlock?.get(ts) ?? assignShiftAndDate(ts, schedule)
+  const assignAux = (ts: string) => byAux?.get(ts) ?? assign(ts)
 
   for (const rec of pieceRecords) {
     if (!rec.ts) continue
@@ -392,7 +459,7 @@ export function segmentByDayAndShift(
   // donde ocurrió. No se suman a `pieceRecords`: valen 0 piezas.
   for (const rec of notApplicableRecords) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = assign(rec.ts)
+    const { sessionDate, shiftId } = assignAux(rec.ts)
     const seg = getOrCreate(sessionDate, shiftId)
     seg.notApplicableCount = (seg.notApplicableCount ?? 0) + 1
   }
