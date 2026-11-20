@@ -11,6 +11,13 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-20 · claude · Sonda de solo lectura de los controles de Matrix
+- Hecho: Panel admin › Diagnóstico Matrix: sonda de solo lectura que dice si Matrix se puede manejar sin mouse ni teclado (UI Automation de Windows). Paso previo al exportador automático hacia la Carpeta de Matrix.
+- Archivos: apps/pwa/src/pages/admin (DiagnosticoMatrixPage.tsx, sondaMatrixScript.ts, __tests__/sondaMatrixScript.test.ts).
+- Verificación: ci-local 9/9 (6392 tests). La prueba falla si el script pierde escapes o deja de ser de solo lectura (rota a propósito y restaurada). Sin verificación visual: la página pide sesión de admin en el preview; estructura y clases comparadas por texto con la tarjeta de arriba.
+- Estado: HECHO al mergear el PR.
+- Sigue: verificación visual con sesión de admin; correr la sonda en el PC de planta.
+
 ## 2026-11-19 · claude · Ficha de Bodega: contar, copiar y asignar equipo (PR #1461)
 - Hecho: la ficha de Bodega cuenta (movimiento «Conteo físico» + sello), copia SAP/fabricante/ubicación y asigna o quita equipo con el diálogo de Áreas; «piezas en alerta» solo cuenta las con mínimo (79 reales, decía 646); motivo «Cuadre de existencias»; valor «—» sin costo; vitrina /dev/ficha-bodega.
 - Archivos: apps/pwa/src (pages/repuestos, hooks/repuestos, components/repuestos/AsignarEquipoDialog, pages/dev/FichaBodegaDevPage).

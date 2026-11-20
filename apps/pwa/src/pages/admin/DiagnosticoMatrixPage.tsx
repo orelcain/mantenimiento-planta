@@ -34,6 +34,7 @@ import {
   type ResultadoListado,
 } from '@/services/grader/diagnosticoMatrix'
 import { DIAGNOSTICO_MATRIX_PS1 } from './diagnosticoMatrixScript'
+import { SONDA_MATRIX_PS1 } from './sondaMatrixScript'
 
 /** showDirectoryPicker no está tipado en todas las versiones de lib.dom: se lee aparte. */
 type ConPicker = { showDirectoryPicker?: (opts: { mode: 'read' }) => Promise<unknown> }
@@ -297,7 +298,30 @@ export function DiagnosticoMatrixPage() {
         </CardContent>
       </Card>
 
-      {/* 4. Pie: resumen para Claude */}
+      {/* 4. Sonda: si Matrix se deja manejar sin mouse */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Controles que Matrix deja manejar</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Revisa si Matrix se puede manejar sin mouse ni teclado, paso previo a exportar el informe de forma automática. La sonda solo lee: no pulsa ni cambia nada.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void copiarTexto(SONDA_MATRIX_PS1, 'Sonda copiada')}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar sonda de solo lectura
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Pégala dos veces en PowerShell: una con «Pieza pieza Grader» en pantalla y otra con la ventana de exportar abierta, sin guardar. Cierra antes la pantalla de Administración. Saca foto al informe; el detalle queda en el Escritorio como sonda-matrix-HHmmss.txt.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 5. Pie: resumen para Claude */}
       <div className="flex flex-col items-end gap-1">
         <Button size="sm" onClick={copiarResumen}>
           Copiar resumen para Claude
