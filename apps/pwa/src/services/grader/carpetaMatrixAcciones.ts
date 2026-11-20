@@ -8,11 +8,13 @@ import { useAuthStore } from "@/store"
 import { useCarpetaMatrixEstado } from "@/store/carpetaMatrixEstado"
 import { carpetaMatrixStore, type HandleCarpeta } from "./carpetaMatrixStore"
 import { revisarCarpeta } from "./carpetaMatrixCarga"
-import { crearCandado, derivarEstado } from "./carpetaMatrix"
+import { RevisionObsoleta, crearCandado, crearGuardia, derivarEstado } from "./carpetaMatrix"
 import type { UsuarioGuarda } from "./guardarTurnoGrader"
 import { logger } from "@/lib/logger"
 
 type ConPicker = { showDirectoryPicker?: (opts: { mode: "read" }) => Promise<HandleCarpeta> }
+
+export const MENSAJE_CAMBIO_OCUPADO = "Espera a que termine la revisión y vuelve a intentarlo"
 
 const NOMBRE_LOCK = "carpeta-matrix-grader"
 
@@ -44,7 +46,9 @@ async function revisarCon(handle: HandleCarpeta): Promise<void> {
       actualizar({ estado: "permiso", nombreCarpeta: handle.name, revisadoEn: Date.now() })
       return
     }
-    const r = await revisarCarpeta(handle, usuario)
+    const guardia = crearGuardia(await carpetaMatrixStore.leerGeneracion(), carpetaMatrixStore.leerGeneracion)
+    const r = await revisarCarpeta(handle, usuario, Date.now(), guardia)
+    await guardia.exigir()
     const ahora = Date.now()
     actualizar({
       estado: derivarEstado({
@@ -65,6 +69,8 @@ async function revisarCon(handle: HandleCarpeta): Promise<void> {
       errorTexto: r.errorTexto,
     })
   } catch (e) {
+    // La carpeta cambió a mitad de la revisión: el resultado ya no vale y no se escribe nada.
+    if (e instanceof RevisionObsoleta) return
     logger.error("Carpeta Matrix: revisión fallida", e instanceof Error ? e : new Error(String(e)))
     actualizar({
       estado: "error",
@@ -74,22 +80,37 @@ async function revisarCon(handle: HandleCarpeta): Promise<void> {
   }
 }
 
-/** Una revisión a la vez: candado de la pestaña y Web Lock entre pestañas. Si hay otra, se salta. */
-export async function revisarSiToca(handle: HandleCarpeta): Promise<void> {
-  if (!candadoPestana.tomar()) return
+/**
+ * Corre `trabajo` con EL candado de las revisiones (pestaña + Web Lock entre
+ * pestañas). Devuelve false, sin correrlo, si hay otra revisión o un cambio de carpeta en curso.
+ */
+async function conCandado(trabajo: () => Promise<void>): Promise<boolean> {
+  if (!candadoPestana.tomar()) return false
   useCarpetaMatrixEstado.getState().actualizar({ revisando: true })
   try {
     if (typeof navigator !== "undefined" && navigator.locks) {
+      let corrio = false
       await navigator.locks.request(NOMBRE_LOCK, { ifAvailable: true }, async (lock) => {
-        if (lock) await revisarCon(handle)
+        if (!lock) return
+        corrio = true
+        await trabajo()
       })
-    } else {
-      await revisarCon(handle)
+      return corrio
     }
+    await trabajo()
+    return true
   } finally {
     candadoPestana.soltar()
     useCarpetaMatrixEstado.getState().actualizar({ revisando: false })
   }
+}
+
+/** Una revisión a la vez. Si hay otra, se salta. Revisa la carpeta guardada AHORA (ya con el candado), no una leída antes. */
+export async function revisarSiToca(handle: HandleCarpeta): Promise<void> {
+  await conCandado(async () => {
+    const vigente = (await carpetaMatrixStore.leerHandle()) ?? handle
+    await revisarCon(vigente)
+  })
 }
 
 /**
@@ -114,7 +135,8 @@ export async function revisarAhoraCarpetaMatrix(): Promise<void> {
 /**
  * Acción «Elegir carpeta» y «Cambiar carpeta»: pide la carpeta (solo lectura), la
  * guarda en lugar de la anterior, olvida los avisos de la anterior y revisa de
- * inmediato. Si el usuario cancela el selector, no cambia nada.
+ * inmediato. Si el usuario cancela el selector, o hay una revisión en curso,
+ * no cambia nada (y en el segundo caso deja un mensaje visible).
  */
 export async function elegirCarpetaMatrix(): Promise<void> {
   const pick = (window as unknown as ConPicker).showDirectoryPicker
@@ -127,16 +149,21 @@ export async function elegirCarpetaMatrix(): Promise<void> {
     if (!esAbort(e)) actualizar({ estado: "error", errorTexto: "No se pudo abrir el selector de carpetas." })
     return
   }
-  try {
-    await carpetaMatrixStore.guardarHandle(handle)
-    await carpetaMatrixStore.limpiarAvisos()
-  } catch (e) {
-    logger.error("Carpeta Matrix: no se pudo guardar la carpeta", e instanceof Error ? e : new Error(String(e)))
-    actualizar({ estado: "error", errorTexto: "No se pudo recordar la carpeta en este navegador." })
-    return
-  }
-  actualizar({ estado: "vigilando", nombreCarpeta: handle.name, ultimo: null, cortado: null, ultimoOtro: null, ultimoPiezaAPieza: null, errorTexto: null })
-  await revisarSiToca(handle)
+  actualizar({ mensajeCambio: null })
+  // El reemplazo y la primera revisión de la carpeta nueva van dentro del MISMO candado:
+  // ninguna revisión de la carpeta anterior puede estar viva ni colarse entre medio.
+  const corrio = await conCandado(async () => {
+    try {
+      await carpetaMatrixStore.reemplazarCarpeta(handle)
+    } catch (e) {
+      logger.error("Carpeta Matrix: no se pudo guardar la carpeta", e instanceof Error ? e : new Error(String(e)))
+      actualizar({ estado: "error", errorTexto: "No se pudo recordar la carpeta en este navegador." })
+      return
+    }
+    actualizar({ estado: "vigilando", nombreCarpeta: handle.name, ultimo: null, cortado: null, ultimoOtro: null, ultimoPiezaAPieza: null, errorTexto: null })
+    await revisarCon(handle)
+  })
+  if (!corrio) actualizar({ mensajeCambio: MENSAJE_CAMBIO_OCUPADO })
 }
 
 /** Acción «Renovar permiso»: requiere gesto del usuario (clic). */

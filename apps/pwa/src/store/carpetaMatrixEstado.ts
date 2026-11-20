@@ -16,6 +16,8 @@ export interface CarpetaMatrixEstadoState {
   ultimoOtro: UltimoOtro | null
   /** Hay una revisión en curso (la de la pestaña, vigilante o botón). */
   revisando: boolean
+  /** Mensaje de la última acción «Cambiar carpeta» que no se pudo hacer (p. ej. revisión en curso). */
+  mensajeCambio: string | null
   ultimoPiezaAPieza: number | null
   errorTexto: string | null
   actualizar: (parcial: Partial<Omit<CarpetaMatrixEstadoState, 'actualizar'>>) => void
@@ -29,6 +31,7 @@ export const useCarpetaMatrixEstado = create<CarpetaMatrixEstadoState>()((set) =
   cortado: null,
   ultimoOtro: null,
   revisando: false,
+  mensajeCambio: null,
   ultimoPiezaAPieza: null,
   errorTexto: null,
   actualizar: (parcial) => set(parcial),

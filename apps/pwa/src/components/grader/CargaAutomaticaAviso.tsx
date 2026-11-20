@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui"
 import { useAuthStore, useIsAdmin } from "@/store"
 import { useCarpetaMatrixEstado } from "@/store/carpetaMatrixEstado"
-import { CM_REGISTROS_CORTE, type EstadoCarpeta } from "@/services/grader/carpetaMatrix"
+import { CM_REGISTROS_CORTE, debeMostrarUltimoOtro, type EstadoCarpeta } from "@/services/grader/carpetaMatrix"
 import { ETIQUETA_TIPO, formatearFechaCorta, formatearHaceX, formatearTamano } from "@/services/grader/diagnosticoMatrix"
 import { elegirCarpetaMatrix, renovarPermisoCarpetaMatrix, revisarAhoraCarpetaMatrix, soportaCarpetaMatrix } from "@/services/grader/carpetaMatrixAcciones"
 import { cn } from "@/lib/utils"
@@ -54,9 +54,11 @@ function Punto({ estado }: { estado: EstadoCarpeta }) {
 }
 
 /** Línea de un archivo que no es Pieza a pieza (p. ej. Puerta 0), cargado desde la carpeta. */
-function LineaOtroCargado({ ahora }: { ahora: number }) {
+function LineaOtroCargado() {
+  const estado = useCarpetaMatrixEstado((s) => s.estado)
   const ultimoOtro = useCarpetaMatrixEstado((s) => s.ultimoOtro)
-  if (!ultimoOtro) return null
+  if (!ultimoOtro || !debeMostrarUltimoOtro(estado, ultimoOtro)) return null
+  const ahora = Date.now()
   return (
     <div className="min-w-0">
       <p className="truncate text-sm font-semibold">
@@ -72,6 +74,7 @@ function LineaCarpeta() {
   const estado = useCarpetaMatrixEstado((s) => s.estado)
   const nombreCarpeta = useCarpetaMatrixEstado((s) => s.nombreCarpeta)
   const revisando = useCarpetaMatrixEstado((s) => s.revisando)
+  const mensajeCambio = useCarpetaMatrixEstado((s) => s.mensajeCambio)
   if (estado === "sin-autorizar" || estado === "permiso") return null
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -80,10 +83,15 @@ function LineaCarpeta() {
         <Button size="sm" variant="ghost" disabled={revisando} onClick={() => void revisarAhoraCarpetaMatrix()}>
           {revisando ? "Revisando…" : "Revisar ahora"}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => void elegirCarpetaMatrix()}>
+        <Button size="sm" variant="ghost" disabled={revisando} onClick={() => void elegirCarpetaMatrix()}>
           Cambiar carpeta
         </Button>
       </div>
+      {mensajeCambio && (
+        <p role="status" className="w-full text-xs text-ink-warn">
+          {mensajeCambio}
+        </p>
+      )}
     </div>
   )
 }
@@ -95,6 +103,7 @@ export function CargaAutomaticaAviso() {
   return (
     <div className="space-y-2">
       <CuerpoAviso />
+      <LineaOtroCargado />
       <LineaCarpeta />
     </div>
   )
@@ -108,13 +117,10 @@ function CuerpoAviso() {
 
   if (estado === "vigilando" && ultimo?.tipo !== "omitido") {
     return (
-      <div className="space-y-2">
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Punto estado={estado} />
-          Carga automática al día
-        </p>
-        <LineaOtroCargado ahora={ahora} />
-      </div>
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Punto estado={estado} />
+        Carga automática al día
+      </p>
     )
   }
 
@@ -147,9 +153,6 @@ function CuerpoAviso() {
               Ver turno
             </Button>
           )}
-          <div className="w-full empty:hidden">
-            <LineaOtroCargado ahora={ahora} />
-          </div>
         </div>
       </div>
     )

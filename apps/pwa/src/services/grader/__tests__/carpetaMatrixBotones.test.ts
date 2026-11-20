@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const store = vi.hoisted(() => ({
   leerHandle: vi.fn(),
-  guardarHandle: vi.fn(),
-  limpiarAvisos: vi.fn(),
+  reemplazarCarpeta: vi.fn(),
+  leerGeneracion: vi.fn(),
 }))
 const carga = vi.hoisted(() => ({ revisarCarpeta: vi.fn() }))
 
@@ -19,10 +19,14 @@ vi.mock('@/store', () => ({
 }))
 
 import { useCarpetaMatrixEstado } from '@/store/carpetaMatrixEstado'
-import { elegirCarpetaMatrix, revisarAhoraCarpetaMatrix } from '../carpetaMatrixAcciones'
+import { MENSAJE_CAMBIO_OCUPADO, elegirCarpetaMatrix, revisarAhoraCarpetaMatrix } from '../carpetaMatrixAcciones'
 import {
   CM_MAX_PROFUNDIDAD,
   OPCIONES_LISTADO_CARPETA,
+  RevisionObsoleta,
+  crearGuardia,
+  debeMostrarUltimoOtro,
+  protegerEscrituras,
   ultimoOtroTrasLote,
   ultimoTrasResultado,
   type CortadoInfo,
@@ -109,8 +113,8 @@ describe('«Revisar ahora» y «Cambiar carpeta»', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    store.guardarHandle.mockResolvedValue(undefined)
-    store.limpiarAvisos.mockResolvedValue(undefined)
+    store.reemplazarCarpeta.mockResolvedValue(undefined)
+    store.leerGeneracion.mockResolvedValue(1)
     carga.revisarCarpeta.mockResolvedValue(resultadoVacio)
     useCarpetaMatrixEstado.setState({
       estado: 'cortado',
@@ -142,8 +146,7 @@ describe('«Revisar ahora» y «Cambiar carpeta»', () => {
     const nueva = handleCarpeta('Nueva')
     ;(window as unknown as { showDirectoryPicker: unknown }).showDirectoryPicker = vi.fn().mockResolvedValue(nueva)
     await elegirCarpetaMatrix()
-    expect(store.guardarHandle).toHaveBeenCalledWith(nueva)
-    expect(store.limpiarAvisos).toHaveBeenCalledTimes(1)
+    expect(store.reemplazarCarpeta).toHaveBeenCalledWith(nueva)
     expect(carga.revisarCarpeta).toHaveBeenCalledTimes(1)
     expect(carga.revisarCarpeta.mock.calls[0]![0]).toBe(nueva)
     const s = useCarpetaMatrixEstado.getState()
@@ -152,13 +155,28 @@ describe('«Revisar ahora» y «Cambiar carpeta»', () => {
     expect(s.estado).not.toBe('cortado')
   })
 
+  it('con una revisión de la carpeta anterior en curso, cambiar no reemplaza ni limpia y avisa', async () => {
+    store.leerHandle.mockResolvedValue(handleCarpeta('Vieja'))
+    let terminar: (v: typeof resultadoVacio) => void = () => {}
+    carga.revisarCarpeta.mockReturnValueOnce(new Promise((res) => (terminar = res)))
+    const enCurso = revisarAhoraCarpetaMatrix()
+    await new Promise((r) => setTimeout(r, 0))
+    ;(window as unknown as { showDirectoryPicker: unknown }).showDirectoryPicker = vi.fn().mockResolvedValue(handleCarpeta('Nueva'))
+    await elegirCarpetaMatrix()
+    expect(store.reemplazarCarpeta).not.toHaveBeenCalled()
+    expect(carga.revisarCarpeta).toHaveBeenCalledTimes(1)
+    expect(useCarpetaMatrixEstado.getState().nombreCarpeta).toBe('Vieja')
+    expect(useCarpetaMatrixEstado.getState().mensajeCambio).toBe(MENSAJE_CAMBIO_OCUPADO)
+    terminar(resultadoVacio)
+    await enCurso
+  })
+
   it('cancelar el selector no cambia nada: ni handle, ni avisos, ni revisión', async () => {
     ;(window as unknown as { showDirectoryPicker: unknown }).showDirectoryPicker = vi
       .fn()
       .mockRejectedValue(Object.assign(new Error('cancelado'), { name: 'AbortError' }))
     await elegirCarpetaMatrix()
-    expect(store.guardarHandle).not.toHaveBeenCalled()
-    expect(store.limpiarAvisos).not.toHaveBeenCalled()
+    expect(store.reemplazarCarpeta).not.toHaveBeenCalled()
     expect(carga.revisarCarpeta).not.toHaveBeenCalled()
     const s = useCarpetaMatrixEstado.getState()
     expect(s.estado).toBe('cortado')
@@ -190,5 +208,32 @@ describe('aviso de otros tipos (Puerta 0)', () => {
     expect(ultimoOtroTrasLote(previo, soloPieza, 1000)).toBe(previo)
     const viejo = [{ tipoArchivo: 'OTRO' as const, kind: 'PUERTA_0' as const, archivo: 'p0-viejo.xlsx', modificado: 400 }]
     expect(ultimoOtroTrasLote(previo, viejo, 1000)).toBe(previo)
+  })
+})
+
+describe('generación de carpeta: una revisión vieja no escribe', () => {
+  it('con la generación cambiada a mitad, la siguiente escritura aborta y no llega al almacén', async () => {
+    let generacion = 1
+    const guardia = crearGuardia(1, async () => generacion)
+    const escribir = vi.fn(async (_x: string) => {})
+    const almacen = protegerEscrituras({ escribir, leer: async () => 'dato' }, () => guardia.exigir(), ['escribir'])
+    await almacen.escribir('antes')
+    generacion = 2 // se cambió de carpeta mientras revisaba
+    await expect(almacen.escribir('despues')).rejects.toBeInstanceOf(RevisionObsoleta)
+    expect(escribir).toHaveBeenCalledTimes(1)
+    expect(escribir).toHaveBeenCalledWith('antes')
+    expect(await almacen.leer()).toBe('dato') // leer no se bloquea
+  })
+})
+
+describe('«Cargado: Puerta 0» como dato adicional', () => {
+  const otro = { tipo: 'PUERTA_0' as const, archivo: 'p0.xlsx', modificado: 1, cargadoEn: 2 }
+  it('se muestra en todo estado con carpeta autorizada, y no en sin-autorizar ni permiso', () => {
+    for (const e of ['vigilando', 'cargado', 'cortado', 'viejo', 'demasiados', 'error'] as const) {
+      expect(debeMostrarUltimoOtro(e, otro)).toBe(true)
+    }
+    expect(debeMostrarUltimoOtro('sin-autorizar', otro)).toBe(false)
+    expect(debeMostrarUltimoOtro('permiso', otro)).toBe(false)
+    expect(debeMostrarUltimoOtro('viejo', null)).toBe(false)
   })
 })
