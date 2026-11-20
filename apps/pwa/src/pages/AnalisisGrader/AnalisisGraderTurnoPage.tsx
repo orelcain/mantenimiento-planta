@@ -46,6 +46,9 @@ import { recomputeShiftP0Causes, loadGate0Records, p0SinPuerta } from '@/service
 import { GraderCoverageBar } from '@/components/grader/GraderCoverageBar'
 import { TurnoTiemposLine } from '@/components/grader/TurnoTiemposLine'
 import { TurnoInforme } from '@/components/grader/TurnoInforme'
+import { BloqueGraderInforme, type DatosBloqueGrader } from '@/components/grader/BloqueGraderInforme'
+import { estadoBloqueGrader, p0PorHora, purezaCompuertas } from '@/services/grader/graderEnInforme'
+import { ahoraWall, calcularCobertura, CADENCIA_POR_DEFECTO, hhmm } from '@/services/grader/graderCobertura'
 import { usePielApple } from '@/hooks/usePielApple'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { resolveAxisWindow, computeProductionWindow, resolveFraming, type FramingOverride } from '@/components/grader/shiftTimelineHelpers'
@@ -1993,6 +1996,26 @@ export function AnalisisGraderTurnoPage() {
     setMonitorBusy(false)
   }, [monitorToken])
 
+  /* Bloque «Grader» del informe (estructura fija 20-11): el día se ve igual con o
+     sin Excel; el grader es un extra con color propio o un hueco que lo dice. */
+  const estadoGrader = estadoBloqueGrader({ tieneGrader: hasGraderData, summary, enCurso: shiftWindow?.status === 'live' })
+  const datosGrader = useMemo<DatosBloqueGrader | null>(() => {
+    if (!summary || !kpisMant) return null
+    const cob = shiftWindow
+      ? calcularCobertura({ inicio: shiftWindow.startAt, fin: shiftWindow.endAt, ahoraWallMs: ahoraWall(), resumenes: [summary], cadencia: CADENCIA_POR_DEFECTO })
+      : null
+    const primero = cob?.conDatos[0]
+    return {
+      p0Pct: summary.pointZeroPct,
+      piezas: summary.totalPieces,
+      porHora: p0PorHora(summary.hourlyBuckets, kpisMant.ventana.start.getTime(), kpisMant.ventana.end.getTime()),
+      pureza: purezaCompuertas(gateMixDerivado ?? summary.gateMix),
+      cobertura: cob && primero && cob.hasta != null && cob.pct != null
+        ? `${hhmm(primero.desde)}–${hhmm(cob.hasta)} · ${cob.pct} % del turno`
+        : null,
+    }
+  }, [summary, kpisMant, shiftWindow, gateMixDerivado])
+
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   // groupId único por turno: garantiza que múltiples instancias del provider
@@ -2094,7 +2117,7 @@ export function AnalisisGraderTurnoPage() {
   )
 
   /** Informe corrido (dirección A): piel Apple, datos Shoplogix y sin Excel del Grader. */
-  const modoInforme = pielApple && !summary && !loading && !!upstreamLine.snapshot && !!kpisMant && activeView === 'resumen'
+  const modoInforme = pielApple && !loading && !!upstreamLine.snapshot && !!kpisMant && activeView === 'resumen'
   const panelSinExcel = (
     <UpstreamMachinesPanel
             snapshot={upstreamLine.snapshot}
@@ -2488,8 +2511,17 @@ export function AnalisisGraderTurnoPage() {
           onVerMantencion={() => setActiveView('mantencion')}
           onVerPorHacer={() => setActiveView('accion')}
           onVerCompuertas={availableViews.includes('gates') ? () => setActiveView('gates') : undefined}
-          onCargarExcel={isAdmin && hasGraderData ? () => navigate(wizardUrl) : undefined}
-          analisisCompleto={panelSinExcel}
+          // Sin Excel, el hueco del bloque Grader ofrece subirlo; el panel
+          // «sin Excel» solo aplica cuando de verdad no hay resumen.
+          analisisCompleto={summary ? undefined : panelSinExcel}
+          grader={
+            <BloqueGraderInforme
+              estado={estadoGrader}
+              datos={datosGrader}
+              lineId={plantLineCfg.id}
+              onSubirExporte={isAdmin ? () => navigate(wizardUrl) : undefined}
+            />
+          }
         />
       )}
 
