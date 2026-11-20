@@ -46,8 +46,8 @@ export function CoberturaGraderCard({ cobertura: c, datosHasta, causa, cadencia,
   className?: string
 }) {
   const span = c.fin - c.inicio
-  const pos = (m: number) => `${(((m - c.inicio) / span) * 100).toFixed(2)}%`
-  const ancho = (a: number, b: number) => `${(((b - a) / span) * 100).toFixed(2)}%`
+  const pos = (m: number) => `${(((m - c.inicio) / span) * 100).toFixed(2)}%` // decimal-tecnico: posición CSS
+  const ancho = (a: number, b: number) => `${(((b - a) / span) * 100).toFixed(2)}%` // decimal-tecnico: ancho CSS
   const hastaTxt = datosHasta ? ddmmHhmm(datosHasta) : ''
   const cumple = c.pct !== null && c.pct >= META_COBERTURA_PCT
   const etiquetaBarra = [
