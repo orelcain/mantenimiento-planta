@@ -206,6 +206,10 @@ export interface TurnoInformeProps {
   onCargarExcel?: () => void
   /** El análisis técnico anterior, completo, tras un plegable. */
   analisisCompleto?: ReactNode
+  /** Bloque «Grader» (siempre presente en líneas con grader: datos o hueco). Va bajo el titular. */
+  grader?: ReactNode
+  /** Lo propio del grader (cuota, cobertura detallada, avisos), debajo del informe. */
+  graderDetalle?: ReactNode
 }
 
 export function TurnoInforme(p: TurnoInformeProps) {
@@ -351,6 +355,8 @@ export function TurnoInforme(p: TurnoInformeProps) {
         <p className="mt-2 lg:max-w-[820px]">{inf.bajada}</p>
       </header>
 
+      {p.grader}
+
       <SeccionLectura titulo="Cómo corrió el turno" extra={<span className="hidden lg:block"><Leyenda /></span>} testId="informe-grafico">
         <GraficoTurno kpis={kpis} anotacion={inf.anotacion} />
         <div className="lg:hidden mt-2"><Leyenda /></div>
@@ -366,6 +372,8 @@ export function TurnoInforme(p: TurnoInformeProps) {
       ) : (
         <div className="flex flex-col gap-6">{mantencion}{tablaMaquinas}{tablaCausas}{porDetallar}</div>
       )}
+
+      {p.graderDetalle}
 
       {p.analisisCompleto && (
         <section className="border-t border-border pt-1">
