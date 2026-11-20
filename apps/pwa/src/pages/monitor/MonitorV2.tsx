@@ -1697,6 +1697,8 @@ export interface NavTurnosMovil {
   onSiguiente: () => void
   /** Atajo al presente: el chip «Ir al actual» sale siempre que no se mira el turno actual. */
   onActual: () => void
+  /** «Ver otro día»: tocar la fecha abre la lista de turnos de los últimos 45 días. */
+  onOtroDia?: () => void
 }
 
 /**
@@ -1714,7 +1716,20 @@ function FilaTurnoMovil({ texto, nav }: { texto: string; nav: NavTurnosMovil | n
         </button>
       )}
       <div className="min-w-0 flex-1 px-1 text-center">
-        <p className="text-[13px] leading-[18px] tabular-nums text-foreground/80 first-letter:uppercase">{texto}</p>
+        {/* Con «Ver otro día», la fecha es el botón (como el título de un selector en iOS): el chevron lo anuncia. */}
+        {nav?.onOtroDia ? (
+          <button
+            type="button"
+            onClick={nav.onOtroDia}
+            aria-label={`${texto}. Ver otro día`}
+            className="inline-flex min-h-[44px] max-w-full items-center justify-center gap-1 rounded-full px-2 text-[13px] leading-[18px] tabular-nums text-foreground/80 transition-colors hover:bg-muted"
+          >
+            <span className="min-w-0 first-letter:uppercase">{texto}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+          </button>
+        ) : (
+          <p className="text-[13px] leading-[18px] tabular-nums text-foreground/80 first-letter:uppercase">{texto}</p>
+        )}
         {/* `mb-[6px]`: aire bajo el chip; su área táctil (44 de alto, centrada, `tap-44`) invadía la de las pestañas de abajo y perdía 3 px. */}
         {nav && nav.atras > 0 && (
           <div className="mb-[6px] mt-0.5 flex items-center justify-center gap-2 text-[12px] leading-[16px] text-muted-foreground">

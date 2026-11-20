@@ -177,6 +177,15 @@ describe('CabeceraV2 · celular', () => {
     expect(uno.queryByRole('button', { name: 'Ir al actual' })).not.toBeNull()
   })
 
+  it('con «Ver otro día», tocar la fecha abre la lista (botón de 44 px con la fecha como nombre)', () => {
+    const onOtroDia = vi.fn()
+    const { getByRole } = cabecera({ navMovil: nav({ onOtroDia }) })
+    const boton = getByRole('button', { name: 'Turno 1 · mar 27 oct · 21:30 → 04:50. Ver otro día' })
+    expect(boton.className).toContain('min-h-[44px]')
+    fireEvent.click(boton)
+    expect(onOtroDia).toHaveBeenCalledTimes(1)
+  })
+
   it('sin historial no hay flechas: solo la fecha', () => {
     const { container, queryByRole } = cabecera({ navMovil: null })
     expect(queryByRole('button', { name: 'Turno anterior' })).toBeNull()
