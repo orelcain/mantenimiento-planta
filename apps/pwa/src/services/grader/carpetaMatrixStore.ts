@@ -11,13 +11,14 @@ import {
   recortarResultados,
   type CortadoInfo,
   type ResultadoArchivo,
+  type UltimoOtro,
   type UltimoResultado,
 } from './carpetaMatrix'
 
 const DB_NOMBRE = 'carpeta-matrix-grader'
 const TIENDA = 'kv'
 
-type Clave = 'handle' | 'procesados' | 'ultimo' | 'cortado' | 'intentos' | 'resultados'
+type Clave = 'handle' | 'procesados' | 'ultimo' | 'cortado' | 'intentos' | 'resultados' | 'ultimoOtro' | 'generacion'
 
 /** Handle de la File System Access API con los métodos de permiso que usamos. */
 export interface HandleCarpeta extends CarpetaHandle {
@@ -84,6 +85,39 @@ export const carpetaMatrixStore = {
 
   leerUltimo: () => leer<UltimoResultado>('ultimo'),
   guardarUltimo: (ultimo: UltimoResultado) => escribir('ultimo', ultimo),
+
+  /** Último archivo que no es Pieza a pieza (p. ej. Puerta 0) cargado sin fallos. */
+  leerUltimoOtro: () => leer<UltimoOtro>('ultimoOtro'),
+  guardarUltimoOtro: (u: UltimoOtro) => escribir('ultimoOtro', u),
+
+  /** Contador que cambia en cada reemplazo de carpeta: una revisión vieja lo compara antes de escribir. */
+  leerGeneracion: async (): Promise<number> => (await leer<number>('generacion')) ?? 0,
+
+  /**
+   * Cambiar de carpeta, en UNA transacción: guarda el handle nuevo, sube la
+   * generación y olvida todo lo de la anterior (avisos, resultados, procesados).
+   */
+  reemplazarCarpeta: async (handle: HandleCarpeta): Promise<void> => {
+    const db = await abrirDb()
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(TIENDA, 'readwrite')
+      const almacen = tx.objectStore(TIENDA)
+      const actual = almacen.get('generacion')
+      actual.onsuccess = () => {
+        almacen.put(((actual.result as number | undefined) ?? 0) + 1, 'generacion')
+        almacen.put(handle, 'handle')
+        for (const clave of ['ultimo', 'ultimoOtro', 'cortado', 'resultados', 'intentos', 'procesados'] as const) almacen.delete(clave)
+      }
+      tx.oncomplete = () => {
+        db.close()
+        resolve()
+      }
+      tx.onerror = () => {
+        db.close()
+        reject(tx.error ?? new Error('Error al escribir IndexedDB'))
+      }
+    })
+  },
 
   /** Exporte cortado: persiste hasta que cargue un Pieza a pieza completo más nuevo (regla 9). */
   leerCortado: () => leer<CortadoInfo>('cortado'),

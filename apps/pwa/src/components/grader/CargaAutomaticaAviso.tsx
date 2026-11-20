@@ -11,9 +11,9 @@ import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui"
 import { useAuthStore, useIsAdmin } from "@/store"
 import { useCarpetaMatrixEstado } from "@/store/carpetaMatrixEstado"
-import { CM_REGISTROS_CORTE, type EstadoCarpeta } from "@/services/grader/carpetaMatrix"
-import { formatearFechaCorta, formatearHaceX, formatearTamano } from "@/services/grader/diagnosticoMatrix"
-import { elegirCarpetaMatrix, renovarPermisoCarpetaMatrix, soportaCarpetaMatrix } from "@/services/grader/carpetaMatrixAcciones"
+import { CM_REGISTROS_CORTE, debeMostrarUltimoOtro, type EstadoCarpeta } from "@/services/grader/carpetaMatrix"
+import { ETIQUETA_TIPO, formatearFechaCorta, formatearHaceX, formatearTamano } from "@/services/grader/diagnosticoMatrix"
+import { elegirCarpetaMatrix, renovarPermisoCarpetaMatrix, revisarAhoraCarpetaMatrix, soportaCarpetaMatrix } from "@/services/grader/carpetaMatrixAcciones"
 import { cn } from "@/lib/utils"
 
 const DIA_MS = 86_400_000
@@ -53,13 +53,66 @@ function Punto({ estado }: { estado: EstadoCarpeta }) {
   return <span aria-hidden="true" className={cn("inline-block h-2 w-2 shrink-0 rounded-full", TONO[estado])} />
 }
 
-/** Línea bajo el título de Análisis de turno. */
+/** Línea de un archivo que no es Pieza a pieza (p. ej. Puerta 0), cargado desde la carpeta. */
+function LineaOtroCargado() {
+  const estado = useCarpetaMatrixEstado((s) => s.estado)
+  const ultimoOtro = useCarpetaMatrixEstado((s) => s.ultimoOtro)
+  if (!ultimoOtro || !debeMostrarUltimoOtro(estado, ultimoOtro)) return null
+  const ahora = Date.now()
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-sm font-semibold">
+        Cargado: {ETIQUETA_TIPO[ultimoOtro.tipo]} · {ultimoOtro.archivo}
+      </p>
+      <p className="text-xs text-muted-foreground tabular-nums">{formatearHaceX(ultimoOtro.cargadoEn, ahora)}</p>
+    </div>
+  )
+}
+
+/** Carpeta vigilada con sus dos acciones. Solo con carpeta ya autorizada. */
+function LineaCarpeta() {
+  const estado = useCarpetaMatrixEstado((s) => s.estado)
+  const nombreCarpeta = useCarpetaMatrixEstado((s) => s.nombreCarpeta)
+  const revisando = useCarpetaMatrixEstado((s) => s.revisando)
+  const mensajeCambio = useCarpetaMatrixEstado((s) => s.mensajeCambio)
+  if (estado === "sin-autorizar" || estado === "permiso") return null
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p className="min-w-0 truncate text-xs text-muted-foreground">Carpeta: {nombreCarpeta ?? "sin nombre"}</p>
+      <div className="flex flex-wrap items-center gap-1">
+        <Button size="sm" variant="ghost" disabled={revisando} onClick={() => void revisarAhoraCarpetaMatrix()}>
+          {revisando ? "Revisando…" : "Revisar ahora"}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={revisando} onClick={() => void elegirCarpetaMatrix()}>
+          Cambiar carpeta
+        </Button>
+      </div>
+      {mensajeCambio && (
+        <p role="status" className="w-full text-xs text-ink-warn">
+          {mensajeCambio}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Línea bajo el título de Análisis de turno: el aviso según el estado y, con carpeta autorizada, su pie. */
 export function CargaAutomaticaAviso() {
   const visible = useCargaAutomaticaVisible()
+  if (!visible) return null
+  return (
+    <div className="space-y-2">
+      <CuerpoAviso />
+      <LineaOtroCargado />
+      <LineaCarpeta />
+    </div>
+  )
+}
+
+function CuerpoAviso() {
   const { estado, ultimo, ultimoPiezaAPieza, errorTexto } = useCarpetaMatrixEstado()
   const navigate = useNavigate()
   const [ayudaAbierta, setAyudaAbierta] = useState(false)
-  if (!visible) return null
   const ahora = Date.now()
 
   if (estado === "vigilando" && ultimo?.tipo !== "omitido") {

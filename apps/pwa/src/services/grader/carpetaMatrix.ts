@@ -19,6 +19,10 @@ export const CM_REGISTROS_CORTE = 10_000
 export const CM_INTERVALO_MS = 5 * 60_000
 /** Cuántos archivos ya procesados se recuerdan (los más viejos se olvidan). */
 export const CM_MAX_PROCESADOS = 500
+/** Niveles de subcarpeta que se recorren bajo la carpeta elegida (por quincena, por mes…). */
+export const CM_MAX_PROFUNDIDAD = 3
+/** Opciones del listado de la carga automática (las usa `revisarCarpeta`). */
+export const OPCIONES_LISTADO_CARPETA = { maxProfundidad: CM_MAX_PROFUNDIDAD, ignorarTemporales: true } as const
 /** Intentos por archivo antes de darlo por fallido (no se reintenta más). */
 export const CM_MAX_INTENTOS = 3
 
@@ -154,6 +158,67 @@ export function ultimoTrasResultado(
   nuevo: UltimoResultado,
 ): UltimoResultado | null {
   return tipoArchivo === 'PIEZA_PIEZA' ? nuevo : ultimo
+}
+
+/** Último archivo que NO es Pieza a pieza (p. ej. Puerta 0) guardado sin fallos. */
+export interface UltimoOtro {
+  tipo: MatrixFileKind
+  archivo: string
+  /** epoch ms de la última modificación del archivo. */
+  modificado: number
+  cargadoEn: number
+}
+
+/**
+ * Tras guardar un lote sin fallos: el «último otro» pasa a ser el archivo no
+ * Pieza a pieza más nuevo del lote (si no es más viejo que el que ya había).
+ * Un lote solo con Pieza a pieza lo deja igual. No toca el «último» del Pieza a pieza.
+ */
+export function ultimoOtroTrasLote(
+  actual: UltimoOtro | null,
+  lote: readonly { tipoArchivo: 'PIEZA_PIEZA' | 'OTRO'; kind: MatrixFileKind; archivo: string; modificado: number }[],
+  cargadoEn: number,
+): UltimoOtro | null {
+  const otros = lote.filter((p) => p.tipoArchivo === 'OTRO')
+  if (otros.length === 0) return actual
+  const masNuevo = otros.reduce((a, b) => (b.modificado > a.modificado ? b : a))
+  if (actual !== null && actual.modificado > masNuevo.modificado) return actual
+  return { tipo: masNuevo.kind, archivo: masNuevo.archivo, modificado: masNuevo.modificado, cargadoEn }
+}
+
+/** La carpeta cambió mientras corría una revisión: se aborta sin escribir más. */
+export class RevisionObsoleta extends Error {
+  constructor() {
+    super('La carpeta cambió durante la revisión')
+    this.name = 'RevisionObsoleta'
+  }
+}
+
+/** Guardia de generación: `exigir()` lanza `RevisionObsoleta` si la generación de la carpeta ya no es la del inicio. */
+export function crearGuardia(generacionInicial: number, leerGeneracion: () => Promise<number>): { exigir(): Promise<void> } {
+  return {
+    async exigir() {
+      if ((await leerGeneracion()) !== generacionInicial) throw new RevisionObsoleta()
+    },
+  }
+}
+
+/** Devuelve una copia del almacén cuyas escrituras exigen primero que la generación siga vigente. */
+export function protegerEscrituras<T extends object>(almacen: T, exigir: () => Promise<void>, escrituras: readonly (keyof T)[]): T {
+  const copia = { ...almacen } as Record<string | symbol, unknown>
+  for (const nombre of escrituras) {
+    const original = almacen[nombre] as unknown as (...args: unknown[]) => Promise<unknown>
+    copia[nombre as string] = async (...args: unknown[]) => {
+      await exigir()
+      return original.apply(almacen, args)
+    }
+  }
+  return copia as T
+}
+
+/** El «Cargado: Puerta 0 · …» se muestra como dato adicional en todo estado con carpeta autorizada. */
+export function debeMostrarUltimoOtro(estado: EstadoCarpeta, ultimoOtro: UltimoOtro | null): boolean {
+  return ultimoOtro !== null && estado !== 'sin-autorizar' && estado !== 'permiso'
 }
 
 /** Recorta un mapa de resultados a los `max` más recientes (por detectadoEn). */

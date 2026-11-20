@@ -29,6 +29,7 @@ import { DEFAULT_PLANT_LINE_ID, getPlantLineConfig } from '@/config/plantLines'
 import { logger } from '@/lib/logger'
 import {
   CM_VENTANA_MS,
+  OPCIONES_LISTADO_CARPETA,
   archivoEstable,
   calcularAlDia,
   claveArchivo,
@@ -41,14 +42,18 @@ import {
   esExporteCortado,
   esNombrePiezaAPieza,
   esSinDatos,
+  RevisionObsoleta,
   idSubidaAutomatica,
   listadoIncompleto,
+  protegerEscrituras,
   seleccionarCandidatos,
   ultimaPiezaProcesada,
+  ultimoOtroTrasLote,
   ultimoTrasResultado,
   type CortadoInfo,
   type ResultadoArchivo,
   type TipoResultado,
+  type UltimoOtro,
   type UltimoResultado,
 } from './carpetaMatrix'
 import { carpetaMatrixStore } from './carpetaMatrixStore'
@@ -57,6 +62,8 @@ import type { ParsedMatrixData } from './types'
 export interface ResultadoRevision {
   ultimo: UltimoResultado | null
   cortado: CortadoInfo | null
+  /** Último archivo que no es Pieza a pieza (p. ej. Puerta 0) cargado, o null. */
+  ultimoOtro: UltimoOtro | null
   /** epoch ms del Pieza a pieza más nuevo de la carpeta, o null. */
   ultimoPiezaAPieza: number | null
   /** Regla 10: solo con Pieza a pieza cargado u omitido reciente. */
@@ -75,6 +82,10 @@ type Parseado = Awaited<ReturnType<typeof parseFile>> & {
   tipoArchivo: TipoArchivo
 }
 
+const ESCRITURAS_ALMACEN = [
+  'marcarProcesado', 'guardarUltimo', 'guardarUltimoOtro', 'guardarCortado', 'borrarCortado', 'guardarResultado', 'guardarIntentos',
+] as const satisfies readonly (keyof typeof carpetaMatrixStore)[]
+
 const MENSAJE_SIN_DATOS = 'El archivo no trae datos legibles'
 
 function mensajeError(e: unknown): string {
@@ -86,17 +97,22 @@ export async function revisarCarpeta(
   handle: CarpetaHandle,
   usuario: UsuarioGuarda,
   ahoraMs: number = Date.now(),
+  guardia: { exigir(): Promise<void> } = { exigir: async () => {} },
 ): Promise<ResultadoRevision> {
-  const listado = await listarExcelsEnCarpeta(handle)
+  // Cada escritura (IndexedDB y Firebase) exige primero que la carpeta siga siendo la misma.
+  const exigir = () => guardia.exigir()
+  const almacen = protegerEscrituras(carpetaMatrixStore, exigir, ESCRITURAS_ALMACEN)
+  const listado = await listarExcelsEnCarpeta(handle, OPCIONES_LISTADO_CARPETA)
   const entradas = listado.archivos
   const demasiados = listadoIncompleto(listado.truncado, listado.elementosNoLeidos)
   const piezas = entradas.filter((e) => esNombrePiezaAPieza(e.nombre))
   const porRuta = new Map(entradas.map((e) => [e.ruta, e]))
 
-  let ultimo: UltimoResultado | null = (await carpetaMatrixStore.leerUltimo()) ?? null
-  let cortado: CortadoInfo | null = (await carpetaMatrixStore.leerCortado()) ?? null
-  const intentos = await carpetaMatrixStore.leerIntentos()
-  const procesados = new Set(await carpetaMatrixStore.leerProcesados())
+  let ultimo: UltimoResultado | null = (await almacen.leerUltimo()) ?? null
+  let cortado: CortadoInfo | null = (await almacen.leerCortado()) ?? null
+  let ultimoOtro: UltimoOtro | null = (await almacen.leerUltimoOtro()) ?? null
+  const intentos = await almacen.leerIntentos()
+  const procesados = new Set(await almacen.leerProcesados())
   const candidatos = seleccionarCandidatos(
     entradas.map((e) => ({ ruta: e.ruta, tamano: e.tamano, modificado: e.modificado })),
     ahoraMs,
@@ -107,12 +123,12 @@ export async function revisarCarpeta(
   /** Guarda el resultado del archivo (regla 5) y, si es Pieza a pieza, el «último». */
   async function anotar(clave: string, archivo: string, modificado: number, tipoArchivo: TipoArchivo, tipo: TipoResultado, mensaje?: string): Promise<void> {
     const r: ResultadoArchivo = { tipo, tipoArchivo, archivo, modificado, detectadoEn: ahoraMs, mensaje }
-    await carpetaMatrixStore.guardarResultado(clave, r)
+    await almacen.guardarResultado(clave, r)
   }
 
   async function fijarUltimo(tipoArchivo: TipoArchivo, nuevo: UltimoResultado): Promise<void> {
     ultimo = ultimoTrasResultado(ultimo, tipoArchivo, nuevo)
-    if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+    if (ultimo) await almacen.guardarUltimo(ultimo)
   }
 
   /** Regla 6: cada fallo cuenta; al tercero el archivo queda fallido definitivo. */
@@ -121,12 +137,12 @@ export async function revisarCarpeta(
     const { intentos: n, fallido } = decidirReintento(intentos[clave] ?? 0)
     if (!fallido) {
       intentos[clave] = n
-      await carpetaMatrixStore.guardarIntentos(intentos)
+      await almacen.guardarIntentos(intentos)
       return
     }
     delete intentos[clave]
-    await carpetaMatrixStore.guardarIntentos(intentos)
-    await carpetaMatrixStore.marcarProcesado(clave)
+    await almacen.guardarIntentos(intentos)
+    await almacen.marcarProcesado(clave)
     const mensaje = `Falló ${n} veces: ${motivo}`
     await anotar(clave, archivo, modificado, tipoArchivo, 'fallido', mensaje)
     await fijarUltimo(tipoArchivo, { tipo: 'fallo', archivo, mensaje, detectadoEn: ahoraMs })
@@ -134,13 +150,16 @@ export async function revisarCarpeta(
 
   /** Subida del original: ID y ruta deterministas, reanuda sin duplicar ni dejar huérfanos. */
   async function subirOriginal(p: Parseado, inferred: { startAt?: string; endAt?: string }, sessionDate: string): Promise<void> {
+    await exigir()
     const id = idSubidaAutomatica(p.clave)
     const existente = await getGraderUpload(id)
     if (existente?.fileMeta?.downloadURL) return
     if (!existente) {
       await saveGraderUpload({ id, fileMeta: p.fileMeta, inferred, sessionDate, plantLineId: DEFAULT_PLANT_LINE_ID, createdBy: usuario.id })
     }
+    await exigir()
     const info = await uploadGraderFile(p.file, id, { rutaFija: true })
+    await exigir()
     await updateGraderUpload(id, {
       fileMeta: { ...(existente?.fileMeta ?? p.fileMeta), storagePath: info.storagePath, downloadURL: info.downloadURL },
     })
@@ -163,10 +182,10 @@ export async function revisarCarpeta(
     const registros = merged.pieceRecords.length + merged.gate0Records.length
     if (!multi || esSinDatos(registros, multi.totalSegments)) {
       for (const p of lote) {
-        await carpetaMatrixStore.marcarProcesado(p.clave)
+        await almacen.marcarProcesado(p.clave)
         await anotar(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, 'vacio', MENSAJE_SIN_DATOS)
         await fijarUltimo(p.tipoArchivo, { tipo: 'vacio', archivo: p.fileMeta.name, detectadoEn: ahoraMs })
-        if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+        if (ultimo) await almacen.guardarUltimo(ultimo)
       }
       return
     }
@@ -188,6 +207,7 @@ export async function revisarCarpeta(
     const kept = quedarSegmentos(multi, (key) => !omitir.has(key))
 
     if (kept.totalSegments > 0) {
+      await exigir()
       const r = await guardarSegmentosTurno({
         modo: 'automatico',
         multiDayInfo: kept,
@@ -207,6 +227,7 @@ export async function revisarCarpeta(
       try {
         await subirOriginal(p, inferred, sessionDate)
       } catch (e) {
+        if (e instanceof RevisionObsoleta) throw e
         fallos.push(`subida de ${p.fileMeta.name}: ${mensajeError(e)}`)
       }
     }
@@ -219,8 +240,21 @@ export async function revisarCarpeta(
 
     const tipo: TipoResultado = kept.totalSegments > 0 ? 'cargado' : 'omitido'
     for (const p of lote) {
-      await carpetaMatrixStore.marcarProcesado(p.clave)
+      await almacen.marcarProcesado(p.clave)
       await anotar(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, tipo)
+    }
+
+    // Un Puerta 0 (u otro tipo) cargado no toca el «último» del Pieza a pieza: tiene su propio registro.
+    if (tipo === 'cargado') {
+      const nuevoOtro = ultimoOtroTrasLote(
+        ultimoOtro,
+        lote.map((p) => ({ tipoArchivo: p.tipoArchivo, kind: p.fileMeta.kind, archivo: p.fileMeta.name, modificado: p.modificado })),
+        ahoraMs,
+      )
+      if (nuevoOtro !== ultimoOtro && nuevoOtro) {
+        ultimoOtro = nuevoOtro
+        await almacen.guardarUltimoOtro(nuevoOtro)
+      }
     }
 
     const pp = lote.filter((p) => p.tipoArchivo === 'PIEZA_PIEZA')
@@ -244,10 +278,10 @@ export async function revisarCarpeta(
           cargadoEn: ahoraMs,
         })
       }
-      if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+      if (ultimo) await almacen.guardarUltimo(ultimo)
       // Regla 9: solo un Pieza a pieza guardado sin fallos y más nuevo que el cortado lo limpia.
       if (debeLimpiarCortado(cortado, { tipo: 'PIEZA_PIEZA', modificado: masNuevo.modificado }, true)) {
-        await carpetaMatrixStore.borrarCortado()
+        await almacen.borrarCortado()
         cortado = null
       }
     }
@@ -283,18 +317,18 @@ export async function revisarCarpeta(
       const siguiente = cortadoMasReciente(cortado, { archivo: c.ruta, registros: total, modificado: c.modificado, detectadoEn: ahoraMs })
       if (siguiente !== cortado) {
         cortado = siguiente
-        await carpetaMatrixStore.guardarCortado(cortado)
+        await almacen.guardarCortado(cortado)
       }
-      await carpetaMatrixStore.marcarProcesado(clave)
+      await almacen.marcarProcesado(clave)
       await anotar(clave, c.ruta, c.modificado, tipoArchivo, 'cortado')
       continue
     }
     // Regla 3: sin registros, visto y no se reintenta.
     if (total === 0) {
-      await carpetaMatrixStore.marcarProcesado(clave)
+      await almacen.marcarProcesado(clave)
       await anotar(clave, c.ruta, c.modificado, tipoArchivo, 'vacio', MENSAJE_SIN_DATOS)
       await fijarUltimo(tipoArchivo, { tipo: 'vacio', archivo: c.ruta, detectadoEn: ahoraMs })
-      if (ultimo) await carpetaMatrixStore.guardarUltimo(ultimo)
+      if (ultimo) await almacen.guardarUltimo(ultimo)
       continue
     }
     parseados.push({ ...res, file, clave, modificado: c.modificado, tipoArchivo })
@@ -304,6 +338,7 @@ export async function revisarCarpeta(
     try {
       await guardarLote(parseados)
     } catch (e) {
+      if (e instanceof RevisionObsoleta) throw e
       // Red de seguridad: cualquier excepción inesperada cuenta como fallo de cada archivo.
       logger.error('Carpeta Matrix: error guardando el lote', e instanceof Error ? e : new Error(mensajeError(e)))
       for (const p of parseados) await registrarFallo(p.clave, p.fileMeta.name, p.modificado, p.tipoArchivo, mensajeError(e))
@@ -311,8 +346,8 @@ export async function revisarCarpeta(
   }
 
   // Regla 10: «al día» solo con Pieza a pieza cargado u omitido reciente y sin uno pendiente fuera de ventana.
-  const resultados = Object.values(await carpetaMatrixStore.leerResultados())
-  const procesadosAhora = new Set(await carpetaMatrixStore.leerProcesados())
+  const resultados = Object.values(await almacen.leerResultados())
+  const procesadosAhora = new Set(await almacen.leerProcesados())
   const piezaPendienteFueraVentana = piezas.some(
     (e) => !procesadosAhora.has(claveArchivo({ ruta: e.ruta, tamano: e.tamano, modificado: e.modificado })) && ahoraMs - e.modificado > CM_VENTANA_MS,
   )
@@ -321,6 +356,7 @@ export async function revisarCarpeta(
   return {
     ultimo,
     cortado,
+    ultimoOtro,
     ultimoPiezaAPieza: piezas.length > 0 ? Math.max(...piezas.map((e) => e.modificado)) : null,
     alDia,
     demasiados,

@@ -57,6 +57,11 @@ export function esArchivoExcel(nombre: string): boolean {
   return EXTENSIONES_EXCEL.some((ext) => minusc.endsWith(ext))
 }
 
+/** Excel deja `~$nombre.xlsx` mientras el libro está abierto: no es un exporte. */
+export function esTemporalExcel(nombre: string): boolean {
+  return nombre.startsWith('~$')
+}
+
 /** Orden más nuevo primero; a igual fecha, por ruta. No muta la entrada. */
 export function ordenarPorFechaDesc<T extends { modificado: number; ruta: string }>(entradas: readonly T[]): T[] {
   return [...entradas].sort((a, b) => b.modificado - a.modificado || a.ruta.localeCompare(b.ruta))
@@ -70,10 +75,11 @@ export function ordenarPorFechaDesc<T extends { modificado: number; ruta: string
  */
 export async function listarExcelsEnCarpeta(
   raiz: CarpetaHandle,
-  opts: { maxEntradas?: number; maxProfundidad?: number } = {},
+  opts: { maxEntradas?: number; maxProfundidad?: number; ignorarTemporales?: boolean } = {},
 ): Promise<ResultadoListado> {
   const maxEntradas = opts.maxEntradas ?? DIAG_MAX_ENTRADAS
   const maxProfundidad = opts.maxProfundidad ?? DIAG_MAX_PROFUNDIDAD
+  const ignorarTemporales = opts.ignorarTemporales ?? false
   const archivos: EntradaArchivo[] = []
   let total = 0
   let truncado = false
@@ -81,6 +87,8 @@ export async function listarExcelsEnCarpeta(
 
   async function recorrer(dir: CarpetaHandle, prefijo: string, profundidad: number): Promise<void> {
     for await (const entrada of dir.values()) {
+      // Archivos temporales de Excel (`~$libro.xlsx`): no son datos ni cuentan para el tope.
+      if (ignorarTemporales && entrada.kind === 'file' && esTemporalExcel(entrada.name)) continue
       if (total >= maxEntradas) {
         truncado = true
         return
