@@ -7871,7 +7871,8 @@ function MonitorDelToken() {
         {/* El costo de no producir en pesos: SOLO con sesión (el monitor público no lo ve: el margen es dato interno).
             Va fuera de `TarjetaTablero` a propósito: un id nuevo exige sumarlo a las fábricas y a TITULO_TARJETA
             (tableroLayout.ts), y eso no es de este cambio. Full width (lg:col-span-6) porque el tablero es una grilla de 6. */}
-        {usuarioActual && (
+        {/* Solo supervisor o admin: con pase de lectura hay sesión, pero el margen no es para ese rol. */}
+        {usuarioActual && esSupervisorDuelo && (
           <CostoNoProducir
             grupos={gruposEventos}
             pesoKg={(pesoLocal !== undefined ? pesoLocal : live.pesoPromedioKg) ?? live.quotaOrigen?.pesoPromedioKg ?? null}
