@@ -35,6 +35,7 @@ import {
 } from '@/services/grader/diagnosticoMatrix'
 import { DIAGNOSTICO_MATRIX_PS1 } from './diagnosticoMatrixScript'
 import { SONDA_MATRIX_PS1 } from './sondaMatrixScript'
+import { LECTURA_TABLA_MATRIX_PS1 } from './lecturaTablaMatrixScript'
 
 /** showDirectoryPicker no está tipado en todas las versiones de lib.dom: se lee aparte. */
 type ConPicker = { showDirectoryPicker?: (opts: { mode: 'read' }) => Promise<unknown> }
@@ -321,7 +322,30 @@ export function DiagnosticoMatrixPage() {
         </CardContent>
       </Card>
 
-      {/* 5. Pie: resumen para Claude */}
+      {/* 5. Lectura: cuánto tarda leer la tabla del informe sin Excel */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Leer la tabla de Matrix sin Excel</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Mide cuánto tarda leer el informe que Matrix tiene en pantalla, paso previo a mostrarlo en la app sin exportar. El script solo lee: no pulsa ni cambia nada.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void copiarTexto(LECTURA_TABLA_MATRIX_PS1, 'Lectura copiada')}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar lectura de tabla
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Carga el informe en Matrix («Pieza pieza Grader» y después «Puerta 0») y pega el script en PowerShell una vez con cada uno. Tarda menos de un minuto. Cierra antes la pantalla de Administración. Saca foto al informe; la muestra queda en el Escritorio como lectura-matrix-HHmmss.txt.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 6. Pie: resumen para Claude */}
       <div className="flex flex-col items-end gap-1">
         <Button size="sm" onClick={copiarResumen}>
           Copiar resumen para Claude
