@@ -1,6 +1,7 @@
 /**
- * Pestaña «Grader» del monitor (`?ver=grader`). Etapa 1: solo la tarjeta de
- * cobertura. Se carga con `React.lazy` para que el monitor público no arrastre
+ * Pestaña «Grader» del monitor (`?ver=grader`): el grader en vivo del espejo (E-A:
+ * curva sobre las Baader, cifras, P0, calibres, línea manual y alertas), la tarjeta del
+ * espejo y la cobertura por exporte. Se carga con `React.lazy` para que el monitor público no arrastre
  * Firestore del grader a su bundle inicial.
  *
  * Permisos: `graderDailySummaries` exige sesión no anónima. Sin sesión se muestra
@@ -11,7 +12,12 @@ import { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { CoberturaGraderCard } from '@/components/grader/CoberturaGraderCard'
-import { EspejoGraderConectado } from '@/components/grader/EspejoGraderCard'
+import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
+import { ventanaDelTurno } from '@/services/grader/espejo/espejoFilas'
+import { lineaDelEspejo, useEspejoGrader } from '@/services/grader/espejo/useEspejoGrader'
+import type { SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
+import { GraderVivo } from './GraderVivo'
+import type { ParadaGrader } from './graderVivoDatos'
 import { Skeleton } from '@/components/piel/Skeleton'
 import { useCarpetaMatrixEstado } from '@/store/carpetaMatrixEstado'
 import {
@@ -113,18 +119,58 @@ function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
   )
 }
 
-/** Pestaña «Grader»: la cobertura por exporte y, debajo, el espejo en vivo del lector (si lo hay). */
-export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaEnMonitor>[0]) {
+const SIN_PARADAS: ParadaGrader[] = []
+
+/**
+ * Pestaña «Grader»: el grader en vivo arriba (si el espejo trae piezas del turno), y debajo la tarjeta del espejo
+ * y la cobertura por exporte. Una sola suscripción al espejo para las dos cosas.
+ */
+export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaEnMonitor>[0] & {
+  /** Serie por minuto de las Baader del turno que se mira (la misma de las barras del monitor). */
+  baader?: SerieMinutoBaader | null
+  /** Detenciones de Shoplogix del turno, ubicadas en el reloj. */
+  paradas?: ParadaGrader[]
+}) {
+  const { lineId, dateKey, inicio, fin, turnoId, ahoraWallMs, baader = null, paradas = SIN_PARADAS } = props
+  // Solo la ventana del turno (con su margen) se baja y se reparte; sin ventana no se baja nada.
+  const ventana = useMemo(
+    () => (dateKey && inicio ? ventanaDelTurno({ dateKey, inicio, fin, turnoId }) : null),
+    [dateKey, inicio, fin, turnoId],
+  )
+  const espejo = useEspejoGrader(lineaDelEspejo(lineId), ventana)
+  const turnoEnCurso = Number.isFinite(ahoraWallMs) && (!ventana || ahoraWallMs < ventana.endMs)
+  // Última lectura COMPLETA del lector (sin tramo pendiente ni error): hasta ahí los minutos sin piezas son de verdad.
+  const est = espejo.estado
+  const leidoHastaMs = est && est.leidoEn && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(est.leidoEn)
+    && !est.estado.error && est.estado.parcial !== true && !((est.estado.pendientes ?? 0) > 0)
+    ? Date.parse(`${est.leidoEn.slice(0, 19)}.000Z`) /* «2026-11-20T21:49:12-03:00» → hora de planta */
+    : null
   return (
     <div className="space-y-3">
-      <CoberturaEnMonitor {...props} />
-      <EspejoGraderConectado
-        lineId={props.lineId}
-        dateKey={props.dateKey}
-        inicio={props.inicio}
-        fin={props.fin}
-        turnoId={props.turnoId}
-      />
+      {ventana && !espejo.cargandoPiezas && (
+        <GraderVivo
+          cubetas={espejo.cubetas}
+          inicioMs={ventana.startMs}
+          finMs={ventana.endMs}
+          baader={baader}
+          paradas={paradas}
+          minutosSinLatido={espejo.minutos}
+          turnoEnCurso={turnoEnCurso}
+          leidoHastaMs={leidoHastaMs}
+        />
+      )}
+      <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
+        {!espejo.cargando && espejo.estado && (
+          <EspejoGraderCard
+            estado={espejo.estado}
+            vivo={espejo.vivo}
+            minutos={espejo.minutos}
+            resumen={espejo.cargandoPiezas ? null : espejo.resumen}
+            errorPiezas={espejo.errorPiezas}
+          />
+        )}
+        <CoberturaEnMonitor {...props} />
+      </div>
     </div>
   )
 }

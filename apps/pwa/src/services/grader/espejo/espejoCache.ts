@@ -51,6 +51,19 @@ export class CacheHorasEspejo {
     return ok
   }
 
+  /**
+   * El arreglo de piezas de cada documento pedido, en orden de clave. Cada arreglo conserva su identidad mientras
+   * su documento no cambie: `AgregadorMinutos` lo usa de llave para no reagrupar lo que no cambió.
+   */
+  piezasPorDoc(claves: readonly string[]): PiezaEspejo[][] {
+    const out: PiezaEspejo[][] = []
+    for (const k of [...claves].sort()) {
+      const e = this.docs.get(k)
+      if (e) out.push(e.piezas)
+    }
+    return out
+  }
+
   /** Piezas de las claves pedidas, en orden de clave (= orden por hora). Memo por versión. */
   piezas(claves: readonly string[]): PiezaEspejo[] {
     const orden = [...claves].sort()

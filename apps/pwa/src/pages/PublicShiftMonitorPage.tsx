@@ -5355,6 +5355,17 @@ function MonitorDelToken() {
     [live?.timeBreakdown?.plannedMin, data?.forecastHistory],
   )
 
+  /* Las mismas paradas, en el reloj (ms), para las bandas de la pestaña Grader. Memo: el monitor se
+     vuelve a pintar seguido y la pestaña recalcula sus series solo cuando esto cambia. */
+  const paradasGrader = useMemo(() => {
+    const t0 = serieDelTurno[0]?.t ? Date.parse(serieDelTurno[0].t) : null
+    return paradasEnEje(gruposEventos, t0, 0).map((p) => ({
+      desdeMs: p.desdeMin * 60_000,
+      hastaMs: p.hastaMin * 60_000,
+      dueno: p.dueno,
+    }))
+  }, [gruposEventos, serieDelTurno])
+
   const paradasDelTurno = useMemo<ParadaConHora[]>(
     () => (gruposEventos ?? []).flatMap((g) =>
       g.causas.flatMap((c) => c.paradas.map((p) => ({
@@ -8049,9 +8060,11 @@ function MonitorDelToken() {
         )}
 
         {pestana === 'grader' && lineaMonitor && (
-          <div className="mx-auto max-w-3xl pt-1">
+          <div className="mx-auto max-w-3xl pt-1 lg:max-w-[1200px]">
             <Suspense fallback={<div className="h-[188px] w-full animate-pulse rounded-card bg-muted" />}>
               <PestanaGraderMonitor
+                baader={serieMinutoVista ?? null}
+                paradas={paradasGrader}
                 lineId={lineaMonitor.id}
                 dateKey={vista?.dateKey || data.dateKey || null}
                 turnoId={vista?.shiftId ?? data.shiftId ?? null}
