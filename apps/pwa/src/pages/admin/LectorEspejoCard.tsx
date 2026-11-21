@@ -90,6 +90,19 @@ export function LectorEspejoCard() {
         <p className="text-xs text-muted-foreground">
           El lector corre en el PC de Matrix y envía cada 5 minutos lo que ve en «Pieza pieza Grader». Cada lector usa una llave propia; detenerlo revoca esa llave.
         </p>
+        <p className="text-xs text-muted-foreground">
+          El lector mueve las fechas del rango y desmarca «Limitar»; no toca nada más. Si Matrix no toma el rango, deja las fechas como estaban. Mientras corre, evita que el PC se suspenda; el bloqueo con contraseña de planta no se toca.
+        </p>
+
+        <ol className="list-decimal space-y-1 pl-4 text-xs" aria-label="Pasos para instalar el lector">
+          <li>Genera la llave del lector y cópiala.</li>
+          <li>Copia el instalador del lector (versión e1.2).</li>
+          <li>En el PC de Matrix, con «Pieza pieza Grader» en pantalla, abre PowerShell, pega el instalador y pulsa Enter. Pega la llave cuando la pida.</li>
+          <li>Espera 2 minutos y mira «Último estado del lector», aquí abajo: debe decir Vivo, versión e1.2 y «Rango automático: lo mueve el lector».</li>
+          <li>Si algo falla, copia el comando del registro, pégalo en PowerShell y saca una foto.</li>
+          <li>Con el lector andando, aprieta Win+L, espera 15 minutos, desbloquea y mira en «Último estado del lector» si siguió enviando piezas («Sesión de Windows: bloqueada · leyó N filas»). Si con bloqueo no lee, el camino es la base de datos de Matrix.</li>
+          <li>Al final, copia el sondeo de la base de Matrix (tarjeta de abajo), pégalo en PowerShell y saca una foto del archivo que deja en el Escritorio.</li>
+        </ol>
 
         {llaveNueva ? (
           <div className="space-y-2 rounded-ctl border border-border p-3">
@@ -169,7 +182,7 @@ export function LectorEspejoCard() {
             onClick={() => void copiar(INSTALAR_LECTOR_ESPEJO_PS1, 'Instalador copiado')}
           >
             <Copy className="h-4 w-4 mr-2" />
-            Copiar instalador del lector
+            Copiar instalador del lector (e1.2)
           </Button>
         )}
 
@@ -188,13 +201,6 @@ export function LectorEspejoCard() {
             Pégalo en PowerShell en el PC de Matrix: muestra las últimas 25 líneas del registro del lector.
           </p>
         </div>
-
-        <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
-          <li>Genera la llave y cópiala.</li>
-          <li>Copia el instalador del lector.</li>
-          <li>Pégalo en PowerShell en el PC de Matrix, con «Pieza pieza Grader» en pantalla.</li>
-          <li>Pega la llave cuando el instalador la pida.</li>
-        </ol>
       </CardContent>
 
       <ActionSheet

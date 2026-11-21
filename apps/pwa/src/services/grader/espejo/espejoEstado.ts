@@ -34,6 +34,10 @@ export interface EstadoLector {
     /** Desde e1.1: segundos del último ciclo y filas-pieza leídas en él. */
     seg?: number
     leidas?: number
+    /** Desde e1.2: resultado del rango automático (fechas del rango y casilla «Limitar»). */
+    ajuste?: string
+    /** Desde e1.2: la sesión de Windows del PC de planta estaba bloqueada en ese ciclo. */
+    bloqueada?: boolean
   }
 }
 
@@ -77,6 +81,7 @@ const FRASE_ERROR: Record<string, string> = {
   'tabla-inestable': 'La tabla de Matrix no terminó de cargar en 2 minutos.',
   'tabla-cambio': 'La tabla de Matrix cambió mientras se leía: se reintenta en el ciclo siguiente.',
   'excepcion': 'El lector tuvo un error inesperado: revisa su registro en el PC de planta.',
+  'pantalla-bloqueada': 'El PC de planta está con la sesión bloqueada: el lector no puede leer Matrix hasta que alguien la desbloquee. Si con bloqueo nunca lee, el camino es leer la base de datos de Matrix (sondeo).',
 }
 
 /** Códigos que no son un problema (el lector solo informa en qué está). */
@@ -119,6 +124,51 @@ export function avisoAvance(estado: EstadoLector['estado']): string | null {
   if (n <= 0) return 'Poniéndose al día con Matrix.'
   const cifra = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
   return `Poniéndose al día con Matrix: faltan ${cifra} filas por leer.`
+}
+
+/**
+ * Rango automático del lector e1.2: qué hizo con las fechas del rango y la casilla
+ * «Limitar». `texto` va en la ficha; `aviso` (si no es `null`) se muestra en ámbar.
+ * Un lector anterior a e1.2 no manda la clave: `null`.
+ */
+export function estadoAjuste(estado: EstadoLector['estado']): { texto: string; aviso: string | null } | null {
+  const a = estado.ajuste
+  if (a === undefined || a === null) return null
+  switch (a) {
+    case 'ok':
+      return { texto: 'lo mueve el lector', aviso: null }
+    case '':
+      return { texto: 'todavía sin probar', aviso: null }
+    case 'apagado':
+      return { texto: 'apagado', aviso: null }
+    case 'sin-controles':
+      return {
+        texto: 'no tocó nada',
+        aviso: 'El lector no encontró justo las 2 fechas del rango y la casilla «Limitar»: no tocó nada y lee como antes. Saca una foto de Matrix.',
+      }
+    case 'solo-lectura':
+      return {
+        texto: 'no tocó nada',
+        aviso: 'Las fechas del rango de Matrix no se dejan escribir: el lector no tocó nada y lee como antes.',
+      }
+    case 'no-aplico':
+      return {
+        texto: 'devuelto a como estaba',
+        aviso: 'Matrix no aceptó el rango nuevo: el lector dejó las fechas como estaban y sigue sin moverlas.',
+      }
+    case 'no-filtra':
+      return {
+        texto: 'devuelto a como estaba',
+        aviso: 'Matrix no filtró con el rango nuevo: el lector dejó las fechas como estaban y sigue sin moverlas.',
+      }
+    case 'no-devuelto':
+      return {
+        texto: 'no se pudo devolver',
+        aviso: 'Matrix no aceptó el rango nuevo y el lector no pudo devolver las fechas: revísalas en Matrix.',
+      }
+    default:
+      return { texto: a, aviso: `El rango automático avisó «${a}»: revisa el registro del lector.` }
+  }
 }
 
 /** Aviso del tope de 10 000 filas de Matrix, o `null`. */

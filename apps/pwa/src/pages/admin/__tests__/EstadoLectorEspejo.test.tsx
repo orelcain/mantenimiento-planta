@@ -38,6 +38,30 @@ describe('Estado del lector en Diagnóstico Matrix', () => {
     expect(screen.getByText(/Matrix está cortando en 10 000 registros/)).toBeTruthy()
   })
 
+  it('e1.2: muestra el rango automático y avisa si Matrix no lo tomó', () => {
+    const base = { equipo: 'CH-MANT-P07', linea: 'chonchi', ultimoLatidoMs: AHORA - 60_000, leidoEn: null, informe: 'pieza' }
+    render(<FichaEstadoLector ahora={AHORA} e={{ ...base, estado: { version: 'e1.2', ajuste: 'ok', error: '' } }} />)
+    expect(screen.getByText('Rango automático')).toBeTruthy()
+    expect(screen.getByText('lo mueve el lector')).toBeTruthy()
+    cleanup()
+    render(<FichaEstadoLector ahora={AHORA} e={{ ...base, estado: { version: 'e1.2', ajuste: 'no-filtra', error: '' } }} />)
+    expect(screen.getByText('devuelto a como estaba')).toBeTruthy()
+    expect(screen.getByText(/Matrix no filtró con el rango nuevo/)).toBeTruthy()
+    cleanup()
+    render(<FichaEstadoLector ahora={AHORA} e={{ ...base, estado: { version: 'e1.2', bloqueada: true, leidas: 38, error: '' } }} />)
+    expect(screen.getByText('bloqueada · leyó 38 filas')).toBeTruthy()
+  })
+
+  it('un lector e1.1 (sin la clave «ajuste») no muestra la fila del rango automático', () => {
+    render(
+      <FichaEstadoLector
+        ahora={AHORA}
+        e={{ equipo: 'PC', linea: 'chonchi', ultimoLatidoMs: AHORA - 60_000, leidoEn: null, informe: 'pieza', estado: { version: 'e1.1' } }}
+      />,
+    )
+    expect(screen.queryByText('Rango automático')).toBeNull()
+  })
+
   it('con el latido viejo dice «Sin lectura»', () => {
     render(
       <FichaEstadoLector
