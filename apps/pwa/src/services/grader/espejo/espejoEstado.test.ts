@@ -7,7 +7,9 @@ import {
   avisoSinPiezasDelTurno,
   avisoAvance,
   estadoAjuste,
+  fraseActualizacion,
   minutosDesde,
+  textoArranque,
   textoHace,
   type EstadoLector,
 } from './espejoEstado'
@@ -100,5 +102,37 @@ describe('rango automático del lector e1.2', () => {
   })
   it('un código desconocido igual avisa', () => {
     expect(estadoAjuste({ ajuste: 'raro' })?.aviso).toContain('«raro»')
+  })
+})
+
+describe('e1.3: arranque del lector', () => {
+  it('tarea → solo (tarea de Windows); manual → manual (sin tarea)', () => {
+    expect(textoArranque('tarea')).toBe('solo (tarea de Windows)')
+    expect(textoArranque('manual')).toBe('manual (sin tarea)')
+  })
+
+  it('sin la clave (lector anterior a e1.3) no muestra nada; otro valor se muestra tal cual', () => {
+    expect(textoArranque(undefined)).toBeNull()
+    expect(textoArranque('')).toBeNull()
+    expect(textoArranque('otra-cosa')).toBe('otra-cosa')
+  })
+})
+
+describe('e1.3: frase de la actualización', () => {
+  it('traduce cada prefijo a su frase', () => {
+    expect(fraseActualizacion('bajada e1.3')).toBe('e1.3 bajada, se pone en marcha en ≤ 5 min')
+    expect(fraseActualizacion('puesta e1.3')).toBe('e1.3 puesta a prueba')
+    expect(fraseActualizacion('confirmada e1.3')).toBe('e1.3 confirmada')
+    expect(fraseActualizacion('revertida e1.2')).toBe('e1.2 no anduvo: volvió a la anterior')
+    expect(fraseActualizacion('rechazada e1.3')).toBe('e1.3 rechazada antes (no se vuelve a bajar)')
+    expect(fraseActualizacion('hash-distinto e1.3')).toBe('e1.3 descartada: la huella no coincide')
+    expect(fraseActualizacion('sin-descarga e1.3')).toBe('no pudo bajar e1.3; reintenta')
+  })
+
+  it('un texto que no calza se muestra tal cual; sin clave, null', () => {
+    expect(fraseActualizacion('algo raro')).toBe('algo raro')
+    expect(fraseActualizacion('bajada')).toBe('bajada')
+    expect(fraseActualizacion(undefined)).toBeNull()
+    expect(fraseActualizacion('')).toBeNull()
   })
 })

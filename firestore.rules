@@ -1947,6 +1947,29 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // E1.3: códigos de alta de un solo uso (id = sha256 hex del código). Los canjea solo la función.
+    match /graderEspejoAltas/{hash} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && hash.matches('^[0-9a-f]{64}$')
+        && request.resource.data.creadaPor == request.auth.uid
+        && request.resource.data.usada == false
+        // La vigencia (25 min) la calcula la función desde creadaEn, hora del servidor.
+        && request.resource.data.creadaEn == request.time;
+      allow update, delete: if false;
+    }
+
+    // E1.3: versión del lector que debe correr en planta. Solo un admin la publica.
+    match /graderEspejoVersion/{doc} {
+      allow read: if isNotAnonymous();
+      allow create, update: if isAdmin()
+        && doc == 'actual'
+        && request.resource.data.version is string
+        && request.resource.data.version.matches('^e[0-9]{1,2}([.][0-9]{1,2}){1,2}$')
+        && request.resource.data.publicadaPor == request.auth.uid;
+      allow delete: if false;
+    }
+
     // ANÁLISIS GRADER - Turnos (uploads + acciones live)
     match /graderShifts/{shiftId} {
       allow read: if isNotAnonymous();

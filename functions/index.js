@@ -1697,12 +1697,68 @@ exports.cacheDmStatus = onRequest(
 const espejoGraderMod = require('./espejoGrader')
 const ESPEJO_TAMANO_MAX = 512 * 1024
 
+// E1.3: versión publicada por un admin (graderEspejoVersion/actual) con caché corta.
+let espejoVersionCache = { en: 0, doc: null }
+async function espejoVersionPublicada() {
+  if (Date.now() - espejoVersionCache.en < 60 * 1000) return espejoVersionCache.doc
+  const snap = await db.collection('graderEspejoVersion').doc('actual').get()
+  espejoVersionCache = { en: Date.now(), doc: snap.exists ? snap.data() : null }
+  return espejoVersionCache.doc
+}
+let espejoLectorCache = null
+function espejoLectorIncluido() {
+  if (!espejoLectorCache) espejoLectorCache = espejoGraderMod.lectorIncluido()
+  return espejoLectorCache
+}
+
+// Canje del código de alta de un solo uso (lo trae el instalador): crea la llave y la devuelve UNA vez.
+async function espejoCanjeAlta(req, res) {
+  const val = espejoGraderMod.validarAlta(req.body)
+  if (!val.ok) return res.status(400).json({ ok: false, error: val.error })
+  const altaHash = espejoGraderMod.hashLlave(val.codigo)
+  const altaRef = db.collection('graderEspejoAltas').doc(altaHash)
+  const llave = espejoGraderMod.generarLlave()
+  const llaveHash = espejoGraderMod.hashLlave(llave)
+  const motivo = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(altaRef)
+    const d = snap.exists ? snap.data() : null
+    const m = espejoGraderMod.motivoAltaNoVigente(
+      d && { usada: d.usada, creadaEnMs: d.creadaEn && typeof d.creadaEn.toMillis === 'function' ? d.creadaEn.toMillis() : null },
+      Date.now(),
+    )
+    if (m) return m
+    tx.create(db.collection('graderEspejoLlaves').doc(llaveHash), {
+      nombre: typeof d.nombre === 'string' ? d.nombre.slice(0, 60) : 'PC Matrix',
+      linea: typeof d.linea === 'string' && d.linea ? d.linea : 'chonchi',
+      creadaEn: FieldValue.serverTimestamp(),
+      creadaPor: typeof d.creadaPor === 'string' ? d.creadaPor : '',
+      revocada: false,
+      alta: altaHash.slice(0, 8),
+      equipo: val.equipo,
+    })
+    tx.update(altaRef, { usada: true, usadaEn: FieldValue.serverTimestamp(), equipo: val.equipo, llave: llaveHash.slice(0, 8) })
+    return ''
+  })
+  if (motivo) {
+    logger.warn('espejoGraderIngesta: alta rechazada', altaHash.slice(0, 8), motivo)
+    return res.status(motivo === 'código desconocido' ? 401 : 403).json({ ok: false, error: motivo })
+  }
+  logger.info('espejoGraderIngesta: alta canjeada', altaHash.slice(0, 8), '->', llaveHash.slice(0, 8))
+  return res.status(200).json({ ok: true, llave })
+}
+
 exports.espejoGraderIngesta = onRequest(
   { region: 'us-central1', maxInstances: 2 },
   async (req, res) => {
-    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'método no permitido' })
+    if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ ok: false, error: 'método no permitido' })
     const bytes = req.rawBody ? req.rawBody.length : Number(req.get('content-length') || 0)
     if (bytes > ESPEJO_TAMANO_MAX) return res.status(413).json({ ok: false, error: 'cuerpo mayor a 512 KB' })
+    if (req.method === 'POST' && req.body && typeof req.body === 'object' && 'alta' in req.body) {
+      try { return await espejoCanjeAlta(req, res) } catch (e) {
+        logger.error('espejoGraderIngesta alta error', e?.code || e?.name || 'desconocido')
+        return res.status(500).json({ ok: false, error: 'interno' })
+      }
+    }
     const llave = espejoGraderMod.extraerLlave(req.get('Authorization'))
     if (!llave) return res.status(401).json({ ok: false, error: 'llave ausente o mal formada' })
     const hash = espejoGraderMod.hashLlave(llave)
@@ -1718,6 +1774,15 @@ exports.espejoGraderIngesta = onRequest(
       if (llaveDoc.revocada === true) {
         logger.warn('espejoGraderIngesta: llave revocada', prefijo)
         return res.status(403).json({ ok: false, detener: true })
+      }
+      // GET ?lector=<versión>: entrega el lector publicado (bytes exactos; el lector verifica el sha256).
+      if (req.method === 'GET') {
+        const pedida = String(req.query.lector || '')
+        const act = espejoGraderMod.actualizacionVigente(await espejoVersionPublicada(), espejoLectorIncluido())
+        if (!act || act.version !== pedida) return res.status(404).json({ ok: false, error: 'versión no publicada' })
+        logger.info('espejoGraderIngesta: lector entregado', prefijo, act.version)
+        res.set('Content-Type', 'application/octet-stream')
+        return res.status(200).send(espejoLectorIncluido().bytes)
       }
       const val = espejoGraderMod.validarCuerpo(req.body)
       if (!val.ok) return res.status(400).json({ ok: false, error: val.error })
@@ -1752,7 +1817,11 @@ exports.espejoGraderIngesta = onRequest(
       }, { merge: true })
       batch.update(llaveRef, { ultimoUso: FieldValue.serverTimestamp() })
       await batch.commit()
-      return res.status(200).json({ ok: true, guardadas: filas.length, detener: false })
+      let actualizar = null
+      try { actualizar = espejoGraderMod.actualizacionVigente(await espejoVersionPublicada(), espejoLectorIncluido()) } catch (e) {
+        logger.warn('espejoGraderIngesta: sin versión publicada legible', e?.code || e?.name || 'desconocido')
+      }
+      return res.status(200).json({ ok: true, guardadas: filas.length, detener: false, ...(actualizar ? { actualizar } : {}) })
     } catch (e) {
       logger.error('espejoGraderIngesta error', prefijo, e?.code || e?.name || 'desconocido')
       return res.status(500).json({ ok: false, error: 'interno' })

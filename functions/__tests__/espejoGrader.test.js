@@ -220,3 +220,57 @@ test('contarDocumentos: 17 días de 24 horas supera el tope de 400', () => {
   assert.strictEqual(n, 17 + 17 * 24)
   assert.ok(n > espejo.MAX_DOCUMENTOS)
 })
+
+// ---- E1.3: alta de un solo uso, versión publicada y lector incluido ----
+const path = require('path')
+const fs = require('fs')
+
+test('alta: acepta {v:1, alta:43, equipo} y rechaza el resto', () => {
+  assert.deepStrictEqual(espejo.validarAlta({ v: 1, alta: LLAVE_OK, equipo: 'CH-MANT-P07' }), { ok: true, codigo: LLAVE_OK, equipo: 'CH-MANT-P07' })
+  assert.strictEqual(espejo.validarAlta({ v: 1, alta: 'corto', equipo: 'X' }).ok, false)
+  assert.strictEqual(espejo.validarAlta({ v: 2, alta: LLAVE_OK, equipo: 'X' }).ok, false)
+  assert.strictEqual(espejo.validarAlta({ v: 1, alta: LLAVE_OK, equipo: 'con espacio' }).ok, false)
+  assert.strictEqual(espejo.validarAlta(null).ok, false)
+})
+
+test('alta: solo se canjea una vez y antes de vencer', () => {
+  const ahora = 1_000_000_000
+  const hace = (min) => ({ usada: false, creadaEnMs: ahora - min * 60_000 })
+  assert.strictEqual(espejo.motivoAltaNoVigente(hace(1), ahora), '')
+  assert.strictEqual(espejo.motivoAltaNoVigente(hace(24.9), ahora), '')
+  assert.strictEqual(espejo.motivoAltaNoVigente(hace(25), ahora), 'código vencido')
+  assert.strictEqual(espejo.motivoAltaNoVigente(hace(-5), ahora), 'código con fecha no válida')
+  assert.strictEqual(espejo.motivoAltaNoVigente(null, ahora), 'código desconocido')
+  assert.strictEqual(espejo.motivoAltaNoVigente({ usada: true, creadaEnMs: ahora }, ahora), 'código ya usado')
+  assert.strictEqual(espejo.motivoAltaNoVigente({ usada: false, creadaEnMs: null }, ahora), 'código vencido')
+})
+
+test('llave generada: 43 base64url y distinta cada vez', () => {
+  const a = espejo.generarLlave()
+  assert.match(a, /^[A-Za-z0-9_-]{43}$/)
+  assert.notStrictEqual(a, espejo.generarLlave())
+})
+
+test('versión del lector: lee la línea $VERSION exacta', () => {
+  assert.strictEqual(espejo.versionDeLector("x\r\n$VERSION = 'e1.3'\r\ny"), 'e1.3')
+  assert.strictEqual(espejo.versionDeLector("$VERSION = 'e1.10.2'"), 'e1.10.2')
+  assert.strictEqual(espejo.versionDeLector("  $VERSION = 'e1.3'"), null)
+  assert.strictEqual(espejo.versionDeLector("$VERSION = 'x1'"), null)
+})
+
+test('actualización: solo si un admin publicó EXACTAMENTE la versión incluida', () => {
+  const incluido = { version: 'e1.3', sha256: 'a'.repeat(64) }
+  assert.deepStrictEqual(espejo.actualizacionVigente({ version: 'e1.3' }, incluido), { version: 'e1.3', sha256: 'a'.repeat(64) })
+  assert.strictEqual(espejo.actualizacionVigente({ version: 'e1.2' }, incluido), null)
+  assert.strictEqual(espejo.actualizacionVigente(null, incluido), null)
+  assert.strictEqual(espejo.actualizacionVigente({ version: 'e1.3' }, { version: null, sha256: 'x' }), null)
+})
+
+test('lector incluido: existe, declara su versión y el hash es de los bytes servidos', () => {
+  const l = espejo.lectorIncluido()
+  assert.match(l.version, espejo.RE_VERSION)
+  const bytes = fs.readFileSync(path.join(__dirname, '..', 'espejo', 'lector-espejo.ps1'))
+  assert.strictEqual(l.sha256, require('crypto').createHash('sha256').update(bytes).digest('hex'))
+  assert.strictEqual(bytes[0], 0xef, 'con BOM UTF-8 para PowerShell 5.1')
+  assert.ok(bytes.toString('utf8').includes('\r\n'), 'saltos CRLF')
+})

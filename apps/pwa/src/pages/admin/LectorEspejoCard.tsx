@@ -1,7 +1,8 @@
 /**
- * Tarjeta «Lector del espejo del grader» de Diagnóstico Matrix: genera la llave del
- * lector del PC de planta, lista las llaves y detiene un lector (revocar la llave).
- * La llave se muestra UNA vez al crearla; en Firestore solo queda su hash.
+ * Tarjeta «Lector del espejo del grader» de Diagnóstico Matrix: prepara el instalador
+ * (e1.3) con un código de alta de un solo uso, lista las llaves y detiene un lector
+ * (revocar la llave). Publica la versión que la planta debe bajar.
+ * El código de alta vive solo en memoria (estado de React); en Firestore queda su hash.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '@/components/ui'
@@ -10,24 +11,57 @@ import { Copy, KeyRound, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/useToast'
 import { logger } from '@/lib/logger'
 import { formatearFechaCorta, formatearHaceX } from '@/services/grader/diagnosticoMatrix'
-import { crearLlave, listarLlaves, revocarLlave, type LlaveEspejo } from '@/services/grader/espejo/espejoLlaves.service'
+import {
+  crearAlta,
+  leerVersionPublicada,
+  listarLlaves,
+  publicarVersion,
+  revocarLlave,
+  type LlaveEspejo,
+} from '@/services/grader/espejo/espejoLlaves.service'
+import {
+  VIGENCIA_ALTA_MIN,
+  instaladorConAlta,
+  versionDeLector,
+} from '@/services/grader/espejo/espejoVersionLogica'
 import { INSTALAR_LECTOR_ESPEJO_PS1 } from './instalarLectorEspejoScript'
 import { COMANDO_REGISTRO_LECTOR, EstadoLectorEspejo } from './EstadoLectorEspejo'
+
+const NOMBRE_POR_DEFECTO = 'PC Matrix'
+
+/** Versión que la planta tiene publicada; `undefined` mientras se lee. */
+type VersionPublicada = { version: string; publicadaEnMs: number | null } | null
+
+/** Alta lista para copiar: el código en claro no sale de aquí. */
+interface AltaLista {
+  codigo: string
+  venceEnMs: number
+}
 
 function aError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e))
 }
 
+function horaDe(ms: number): string {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 export function LectorEspejoCard() {
   const { toast } = useToast()
+  const versionApp = versionDeLector(INSTALAR_LECTOR_ESPEJO_PS1)
   const [llaves, setLlaves] = useState<LlaveEspejo[] | null>(null)
   const [errorLista, setErrorLista] = useState<string | null>(null)
-  const [nombre, setNombre] = useState('')
+  const [nombre, setNombre] = useState(NOMBRE_POR_DEFECTO)
   const [pidiendoNombre, setPidiendoNombre] = useState(false)
   const [creando, setCreando] = useState(false)
-  /** La llave en claro vive solo aquí, en memoria, hasta que se cierra el aviso. */
-  const [llaveNueva, setLlaveNueva] = useState<string | null>(null)
+  /** El alta en claro vive solo aquí, en memoria, hasta que se cierra el aviso con «Listo». */
+  const [alta, setAlta] = useState<AltaLista | null>(null)
   const [porDetener, setPorDetener] = useState<LlaveEspejo | null>(null)
+  const [publicada, setPublicada] = useState<VersionPublicada | undefined>(undefined)
+  const [errorPublicada, setErrorPublicada] = useState<string | null>(null)
+  const [publicando, setPublicando] = useState(false)
+  const [porPublicar, setPorPublicar] = useState(false)
 
   const cargar = useCallback(async () => {
     try {
@@ -39,7 +73,18 @@ export function LectorEspejoCard() {
     }
   }, [])
 
+  const cargarPublicada = useCallback(async () => {
+    try {
+      setPublicada(await leerVersionPublicada())
+      setErrorPublicada(null)
+    } catch (e) {
+      logger.error('LectorEspejo versión publicada', aError(e))
+      setErrorPublicada('No se pudo leer la versión publicada.')
+    }
+  }, [])
+
   useEffect(() => { void cargar() }, [cargar])
+  useEffect(() => { void cargarPublicada() }, [cargarPublicada])
 
   async function copiar(texto: string, okTitulo: string) {
     try {
@@ -51,19 +96,47 @@ export function LectorEspejoCard() {
     }
   }
 
-  async function generar() {
+  async function preparar() {
     setCreando(true)
     try {
-      const { llave } = await crearLlave(nombre)
-      setLlaveNueva(llave)
-      setNombre('')
+      const { codigo, venceEnMs } = await crearAlta(nombre)
+      setAlta({ codigo, venceEnMs })
+      setNombre(NOMBRE_POR_DEFECTO)
       setPidiendoNombre(false)
-      await cargar()
     } catch (e) {
-      logger.error('LectorEspejo crear', aError(e))
-      toast({ title: 'No se pudo generar la llave', description: aError(e).message, variant: 'destructive' })
+      logger.error('LectorEspejo preparar instalador', aError(e))
+      toast({ title: 'No se pudo preparar el instalador', description: aError(e).message, variant: 'destructive' })
     } finally {
       setCreando(false)
+    }
+  }
+
+  function copiarInstalador() {
+    if (!alta) return
+    let texto: string
+    try {
+      texto = instaladorConAlta(INSTALAR_LECTOR_ESPEJO_PS1, alta.codigo)
+    } catch (e) {
+      logger.error('LectorEspejo armar instalador', aError(e))
+      toast({ title: 'No se pudo armar el instalador', description: aError(e).message, variant: 'destructive' })
+      return
+    }
+    void copiar(texto, 'Instalador copiado')
+  }
+
+  async function publicar() {
+    if (!versionApp) return
+    setPorPublicar(false)
+    setPublicando(true)
+    try {
+      await publicarVersion(versionApp)
+      toast({ title: `${versionApp} publicada para planta` })
+      await cargarPublicada()
+    } catch (e) {
+      logger.error('LectorEspejo publicar', aError(e))
+      toast({ title: `No se pudo publicar ${versionApp}`, description: aError(e).message, variant: 'destructive' })
+    } finally {
+      setPublicando(false)
     }
   }
 
@@ -95,34 +168,30 @@ export function LectorEspejoCard() {
         </p>
 
         <ol className="list-decimal space-y-1 pl-4 text-xs" aria-label="Pasos para instalar el lector">
-          <li>Genera la llave del lector y cópiala.</li>
-          <li>Copia el instalador del lector (versión e1.2).</li>
-          <li>En el PC de Matrix, con «Pieza pieza Grader» en pantalla, abre PowerShell, pega el instalador y pulsa Enter. Pega la llave cuando la pida.</li>
-          <li>Espera 2 minutos y mira «Último estado del lector», aquí abajo: debe decir Vivo, versión e1.2 y «Rango automático: lo mueve el lector».</li>
-          <li>Si algo falla, copia el comando del registro, pégalo en PowerShell y saca una foto.</li>
-          <li>Con el lector andando, aprieta Win+L, espera 15 minutos, desbloquea y mira en «Último estado del lector» si siguió enviando piezas («Sesión de Windows: bloqueada · leyó N filas»). Si con bloqueo no lee, el camino es la base de datos de Matrix.</li>
-          <li>Al final, copia el sondeo de la base de Matrix (tarjeta de abajo), pégalo en PowerShell y saca una foto del archivo que deja en el Escritorio.</li>
+          <li>Prepara el instalador y cópialo.</li>
+          <li>En el PC de Matrix, con «Pieza pieza Grader» en pantalla, abre PowerShell, pega y pulsa Enter (un solo pegado; el código vence en {VIGENCIA_ALTA_MIN} min y sirve una vez).</li>
+          <li>Espera 2 minutos y mira «Último estado del lector»: Vivo, versión {versionApp ?? 'nueva'} y «Arranque: solo (tarea de Windows)».</li>
+          <li>Desde ahí arranca solo al iniciar sesión y se repara si se cae; para detenerlo usa «Detener lector».</li>
+          <li>Si algo falla, copia el comando del registro y saca una foto.</li>
         </ol>
 
-        {llaveNueva ? (
+        {alta ? (
           <div className="space-y-2 rounded-ctl border border-border p-3">
-            <p className="text-xs font-medium">Llave del lector</p>
-            <code className="block break-all rounded-ctl bg-muted px-2 py-1.5 text-xs select-all">{llaveNueva}</code>
-            <p className="text-xs text-muted-foreground">No se vuelve a mostrar. Cópiala ahora; si se pierde, genera otra y detén esta.</p>
+            <p className="text-xs font-medium">Instalador listo · vence a las {horaDe(alta.venceEnMs)} · sirve una sola vez</p>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => void copiar(llaveNueva, 'Llave copiada')}>
+              <Button size="sm" variant="outline" onClick={copiarInstalador}>
                 <Copy className="h-4 w-4 mr-2" />
-                Copiar llave
+                Copiar instalador ({versionApp ?? '—'})
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setLlaveNueva(null)}>
-                Ya la copié
+              <Button size="sm" variant="ghost" onClick={() => { setAlta(null); void cargar() }}>
+                Listo
               </Button>
             </div>
           </div>
         ) : pidiendoNombre ? (
           <form
             className="flex flex-wrap items-center gap-2"
-            onSubmit={(e) => { e.preventDefault(); if (nombre.trim()) void generar() }}
+            onSubmit={(e) => { e.preventDefault(); if (nombre.trim()) void preparar() }}
           >
             <Input
               value={nombre}
@@ -130,21 +199,21 @@ export function LectorEspejoCard() {
               placeholder="Nombre corto, por ejemplo PC Matrix"
               maxLength={60}
               autoFocus
-              aria-label="Nombre de la llave"
+              aria-label="Nombre del instalador"
               className="h-9 max-w-xs text-sm"
             />
             <Button size="sm" type="submit" disabled={creando || !nombre.trim()}>
               {creando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
-              Generar
+              Preparar
             </Button>
-            <Button size="sm" type="button" variant="ghost" onClick={() => { setPidiendoNombre(false); setNombre('') }}>
+            <Button size="sm" type="button" variant="ghost" onClick={() => { setPidiendoNombre(false); setNombre(NOMBRE_POR_DEFECTO) }}>
               Cancelar
             </Button>
           </form>
         ) : (
           <Button size="sm" variant="outline" onClick={() => setPidiendoNombre(true)}>
             <KeyRound className="h-4 w-4 mr-2" />
-            Generar llave del lector
+            Preparar instalador
           </Button>
         )}
 
@@ -175,16 +244,29 @@ export function LectorEspejoCard() {
           </ul>
         )}
 
-        {INSTALAR_LECTOR_ESPEJO_PS1 && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void copiar(INSTALAR_LECTOR_ESPEJO_PS1, 'Instalador copiado')}
-          >
-            <Copy className="h-4 w-4 mr-2" />
-            Copiar instalador del lector (e1.2)
-          </Button>
-        )}
+        <div className="space-y-2 rounded-ctl border border-border p-3">
+          <p className="text-xs font-medium">Versión del lector</p>
+          <p className="text-xs tabular-nums">En esta app: {versionApp ?? '—'}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs tabular-nums">
+              {publicada === undefined
+                ? errorPublicada ? 'Publicada para planta: no se pudo leer' : 'Publicada para planta: leyendo…'
+                : publicada
+                  ? `Publicada para planta: ${publicada.version}${publicada.publicadaEnMs ? ` · ${formatearFechaCorta(publicada.publicadaEnMs)}` : ''}`
+                  : 'Publicada para planta: ninguna'}
+            </p>
+            {versionApp && publicada?.version === versionApp ? (
+              <Pill tone="ok" dot>Publicada</Pill>
+            ) : versionApp && publicada !== undefined ? (
+              <Button size="sm" variant="outline" disabled={publicando} onClick={() => setPorPublicar(true)}>
+                {publicando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Publicar {versionApp}
+              </Button>
+            ) : null}
+          </div>
+          {errorPublicada && <p className="text-xs text-destructive">{errorPublicada}</p>}
+          <p className="text-xs text-muted-foreground">Un cambio en la app no llega a planta hasta que lo publicas aquí.</p>
+        </div>
 
         <div className="space-y-2 border-t border-border pt-3">
           <p className="text-xs font-medium">Último estado del lector</p>
@@ -206,10 +288,19 @@ export function LectorEspejoCard() {
       <ActionSheet
         open={porDetener !== null}
         title={porDetener ? `¿Detener el lector «${porDetener.nombre}»?` : ''}
-        description="La llave queda revocada y el lector se cierra solo en su próximo aviso. Para volver a usarlo hay que generar otra llave."
+        description="La llave queda revocada y el lector se cierra solo en su próximo aviso. Para volver a usarlo hay que preparar otro instalador."
         confirmLabel="Detener lector"
         onConfirm={() => { if (porDetener) void detener(porDetener) }}
         onCancel={() => setPorDetener(null)}
+      />
+
+      <ActionSheet
+        open={porPublicar && versionApp !== null}
+        title={`¿Publicar ${versionApp ?? ''} para planta?`}
+        description="El lector de planta la baja en su próximo ciclo, comprueba su huella (sha256) y se reinicia. Si no completa un ciclo en 15 minutos, vuelve solo a la versión anterior."
+        confirmLabel={`Publicar ${versionApp ?? ''}`}
+        onConfirm={() => void publicar()}
+        onCancel={() => setPorPublicar(false)}
       />
     </Card>
   )
