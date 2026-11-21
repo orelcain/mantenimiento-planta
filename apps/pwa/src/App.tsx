@@ -35,6 +35,7 @@ const LoginPage = lazyWithReload(() => import('@/pages/LoginPage').then((mod) =>
 /** Banco de pruebas de la Matriz de turnos — solo montado en dev (ver Routes). */
 const MatrizTurnosDevPage = lazyWithReload(() => import('@/pages/dev/MatrizTurnosDevPage'))
 const PurezaPuertaDevPage = lazyWithReload(() => import('@/pages/dev/PurezaPuertaDevPage'))
+const GraderVivoDevPage = lazyWithReload(() => import('@/pages/dev/GraderVivoDevPage'))
 const BitacoraDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraDevPage })))
 const BitacoraRealDevPage = lazyWithReload(() => import('@/pages/dev/BitacoraDevPage').then((mod) => ({ default: mod.BitacoraRealDevPage })))
 const BuscadorDevPage = lazyWithReload(() => import('@/pages/dev/BuscadorDevPage').then((mod) => ({ default: mod.BuscadorDevPage })))
@@ -498,6 +499,16 @@ export function App() {
                   element={
                     <Suspense fallback={<LoadingScreen />}>
                       <MatrizTurnosDevPage />
+                    </Suspense>
+                  }
+                />
+              )}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/grader-vivo"
+                  element={
+                    <Suspense fallback={<LoadingScreen />}>
+                      <GraderVivoDevPage />
                     </Suspense>
                   }
                 />

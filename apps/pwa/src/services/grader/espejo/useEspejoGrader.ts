@@ -16,6 +16,7 @@ import { useSesionFirebase } from '../graderDatosHasta'
 import { elegirEstado, estaVivo, minutosDesde, aMs, type EstadoLector } from './espejoEstado'
 import { resumirEspejo, type PiezaEspejo, type ResumenEspejo } from './espejoFilas'
 import { CacheHorasEspejo, horasDeVentana, recortarAVentana } from './espejoCache'
+import { AgregadorMinutos, type CubetaMinuto } from './espejoMinutos'
 import type { ShoplogixShiftWindow } from '../graderSegmenter'
 
 /** Línea del monitor → línea del espejo (el lector la guarda como «chonchi»). */
@@ -30,6 +31,11 @@ export interface EspejoGrader {
   cargandoPiezas: boolean
   /** Piezas únicas y ordenadas de la ventana del turno (con su margen). */
   piezas: PiezaEspejo[]
+  /**
+   * Cubetas por minuto de la ventana (con su margen), para las series del monitor. Solo se reagrupan los
+   * documentos de hora que cambiaron (`AgregadorMinutos`).
+   */
+  cubetas: CubetaMinuto[]
   /** Reparto por turno de `piezas`; `null` mientras se calcula para esta ventana. */
   resumen: ResumenEspejo | null
   /** `true` si alguna hora de la ventana no se pudo leer (sin permiso o sin red): el total puede estar incompleto. */
@@ -64,6 +70,7 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
   // Caché viva mientras no cambie la línea ni la ventana; `rev` avisa a React que cambió.
   const cache = useRef<CacheHorasEspejo>(new CacheHorasEspejo())
   const [rev, setRev] = useState(0)
+  const agregador = useRef<AgregadorMinutos>(new AgregadorMinutos())
   const [pendientes, setPendientes] = useState(0)
   // El resumen guarda para qué ventana se calculó: al cambiar de turno no se muestra el anterior.
   const [resumenDe, setResumenDe] = useState<{ clave: string; r: ResumenEspejo } | null>(null)
@@ -134,6 +141,13 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
     return recortarAVentana(cache.current.piezas(claves), Number.isFinite(startMs) ? { startMs, endMs } : null)
   }, [rev, claveHoras, startMs, endMs])
 
+  // Cubetas por documento: un snapshot reagrupa solo su hora (memo por identidad del arreglo de piezas).
+  const cubetas = useMemo(() => {
+    void rev
+    const claves = claveHoras ? claveHoras.split('|') : []
+    return agregador.current.unir(cache.current.piezasPorDoc(claves))
+  }, [rev, claveHoras])
+
   // Reparto por turno fuera del render y con espera: varios snapshots seguidos (un
   // envío del lector toca 1-2 horas) se resuelven en un solo cálculo.
   const turnoId = ventana?.shiftId ?? null
@@ -159,6 +173,7 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
     cargando: sesion === 'cargando' || (sesion === 'con' && estados === null),
     cargandoPiezas: pendientes > 0 || resumen === null,
     piezas,
+    cubetas,
     resumen,
     errorPiezas: conError,
     estado,
