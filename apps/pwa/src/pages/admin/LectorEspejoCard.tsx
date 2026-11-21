@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger'
 import { formatearFechaCorta, formatearHaceX } from '@/services/grader/diagnosticoMatrix'
 import { crearLlave, listarLlaves, revocarLlave, type LlaveEspejo } from '@/services/grader/espejo/espejoLlaves.service'
 import { INSTALAR_LECTOR_ESPEJO_PS1 } from './instalarLectorEspejoScript'
+import { COMANDO_REGISTRO_LECTOR, EstadoLectorEspejo } from './EstadoLectorEspejo'
 
 function aError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e))
@@ -171,6 +172,22 @@ export function LectorEspejoCard() {
             Copiar instalador del lector
           </Button>
         )}
+
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-xs font-medium">Último estado del lector</p>
+          <EstadoLectorEspejo />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void copiar(COMANDO_REGISTRO_LECTOR, 'Comando del registro copiado')}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar comando del registro
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Pégalo en PowerShell en el PC de Matrix: muestra las últimas 25 líneas del registro del lector.
+          </p>
+        </div>
 
         <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
           <li>Genera la llave y cópiala.</li>

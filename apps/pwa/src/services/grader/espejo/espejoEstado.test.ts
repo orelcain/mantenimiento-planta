@@ -4,6 +4,8 @@ import {
   elegirEstado,
   estaVivo,
   fraseDeError,
+  avisoSinPiezasDelTurno,
+  avisoAvance,
   minutosDesde,
   textoHace,
   type EstadoLector,
@@ -53,7 +55,23 @@ describe('estado del lector', () => {
     expect(fraseDeError('sin-tabla')).not.toBeNull()
     expect(fraseDeError('licencia-en-pantalla')).not.toBeNull()
     expect(fraseDeError('')).toBeNull()
-    expect(fraseDeError('algo-raro')).toBeNull()
+    expect(fraseDeError('iniciando')).toBeNull()
+    // E1.1: un código desconocido o sin frase ya no se calla (20-11: «tope-10-min» no avisaba nada).
+    expect(fraseDeError('algo-raro')).toContain('algo-raro')
+    expect(fraseDeError('tope-10-min')).toContain('10 minutos')
+  })
+
+  it('con 0 piezas del turno dice cuántas leyó y de cuándo es la última', () => {
+    expect(avisoSinPiezasDelTurno({ piezas: 9998, ultima: '2026-11-19 05:20:01' }))
+      .toBe('Hay 9.998 piezas leídas, ninguna de este turno (la última es del 19-11 05:20).')
+    expect(avisoSinPiezasDelTurno({ piezas: 0 })).toBeNull()
+    expect(avisoSinPiezasDelTurno({ piezas: 12 })).toBe('Hay 12 piezas leídas, ninguna de este turno.')
+  })
+
+  it('avisa la lectura a medias con las filas que faltan', () => {
+    expect(avisoAvance({ parcial: true, pendientes: 6200 })).toContain('6.200 filas')
+    expect(avisoAvance({ parcial: false, pendientes: 6200 })).toBeNull()
+    expect(avisoAvance({})).toBeNull()
   })
 
   it('avisa el corte de 10 000 solo con límite marcado y tabla llena', () => {

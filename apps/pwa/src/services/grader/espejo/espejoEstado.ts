@@ -25,6 +25,15 @@ export interface EstadoLector {
     ultima?: string
     gate0?: number
     version?: string
+    rango?: string[]
+    relectura?: boolean
+    /** Desde e1.1: la lectura quedó a medias y sigue en el ciclo siguiente. */
+    parcial?: boolean
+    /** Desde e1.1: filas de la tabla que faltan por recorrer. */
+    pendientes?: number
+    /** Desde e1.1: segundos del último ciclo y filas-pieza leídas en él. */
+    seg?: number
+    leidas?: number
   }
 }
 
@@ -62,12 +71,54 @@ const FRASE_ERROR: Record<string, string> = {
   'sin-matrix': 'El lector no encuentra Matrix abierto en el PC de planta.',
   'sin-tabla': 'Matrix no muestra la tabla del informe: carga «Pieza pieza Grader» y vuelve a buscar.',
   'licencia-en-pantalla': 'Matrix muestra un aviso de licencia en pantalla: ciérralo para que el lector siga.',
+  'tope-10-min': 'La lectura de Matrix pasó los 10 minutos y se cortó sin enviar piezas. Instala el lector nuevo o acorta el rango de fechas.',
+  'sin-boton': 'El lector no encuentra el botón «Actualizar» de Matrix.',
+  'invoke-fallo': 'Matrix no respondió al botón «Actualizar».',
+  'tabla-inestable': 'La tabla de Matrix no terminó de cargar en 2 minutos.',
+  'tabla-cambio': 'La tabla de Matrix cambió mientras se leía: se reintenta en el ciclo siguiente.',
+  'excepcion': 'El lector tuvo un error inesperado: revisa su registro en el PC de planta.',
 }
 
-/** Frase para el error que reporta el lector; `null` si no hay error o no se conoce. */
+/** Códigos que no son un problema (el lector solo informa en qué está). */
+const SIN_AVISO = new Set(['iniciando'])
+
+/**
+ * Frase para el error que reporta el lector; `null` si no hay error. Un código que
+ * la PWA no conoce igual se avisa (antes se callaba y la tarjeta mostraba «Vivo»
+ * con 0 piezas sin decir nada).
+ */
 export function fraseDeError(error: string | undefined | null): string | null {
-  if (!error) return null
-  return FRASE_ERROR[error] ?? null
+  if (!error || SIN_AVISO.has(error)) return null
+  return FRASE_ERROR[error] ?? `El lector avisó un problema («${error}»): revisa su registro en el PC de planta.`
+}
+
+/** «2026-11-19 05:20:01» → «19-11 05:20»; `null` si no tiene ese formato. */
+export function fechaCortaDeFila(fechaHora: string | undefined | null): string | null {
+  const m = fechaHora ? /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(fechaHora) : null
+  return m ? `${m[3]}-${m[2]} ${m[4]}:${m[5]}` : null
+}
+
+/**
+ * Con 0 piezas del turno pero piezas leídas por el lector: lo dice en vez de
+ * mostrar «0 piezas» (20-11: Matrix tenía el rango desde el día anterior).
+ */
+export function avisoSinPiezasDelTurno(estado: EstadoLector['estado']): string | null {
+  const n = estado.piezas ?? 0
+  if (n <= 0) return null
+  const ult = fechaCortaDeFila(estado.ultima)
+  const cifra = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return ult
+    ? `Hay ${cifra} piezas leídas, ninguna de este turno (la última es del ${ult}).`
+    : `Hay ${cifra} piezas leídas, ninguna de este turno.`
+}
+
+/** Lectura a medias que sigue sola (lector e1.1); `null` si está al día. */
+export function avisoAvance(estado: EstadoLector['estado']): string | null {
+  if (estado.parcial !== true) return null
+  const n = estado.pendientes ?? 0
+  if (n <= 0) return 'Poniéndose al día con Matrix.'
+  const cifra = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `Poniéndose al día con Matrix: faltan ${cifra} filas por leer.`
 }
 
 /** Aviso del tope de 10 000 filas de Matrix, o `null`. */

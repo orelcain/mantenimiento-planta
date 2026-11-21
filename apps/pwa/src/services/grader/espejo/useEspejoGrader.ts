@@ -1,15 +1,22 @@
 /**
- * `useEspejoGrader(linea, fechas)`: escucha en vivo las piezas que el lector del PC
- * de planta guarda en `graderEspejo/{linea}__{fecha}/horas/*` y el estado de los
+ * `useEspejoGrader(linea, ventana)`: escucha en vivo las piezas que el lector del PC
+ * de planta guarda en `graderEspejo/{linea}__{fecha}/horas/{HH}` y el estado de los
  * lectores de la línea en `graderEspejoEstado`. Solo se suscribe con usuario
  * logueado (las reglas piden `isNotAnonymous`) y limpia los listeners al desmontar.
+ *
+ * Rendimiento (E1.1): se escucha SOLO cada documento de hora de la ventana del
+ * turno con su margen (~16), no las horas de dos días; cada snapshot parsea solo
+ * las filas nuevas de ese documento (`CacheHorasEspejo`), y el reparto por turno
+ * (`resumirEspejo`) corre fuera del render, con espera de `ESPERA_RESUMEN_MS`.
  */
-import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot, query, where } from '@/services/firestoreTracked'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { collection, doc, onSnapshot, query, where } from '@/services/firestoreTracked'
 import { db } from '../../firebase'
 import { useSesionFirebase } from '../graderDatosHasta'
 import { elegirEstado, estaVivo, minutosDesde, aMs, type EstadoLector } from './espejoEstado'
-import { parsearFilas, type PiezaEspejo } from './espejoFilas'
+import { resumirEspejo, type PiezaEspejo, type ResumenEspejo } from './espejoFilas'
+import { CacheHorasEspejo, horasDeVentana, recortarAVentana } from './espejoCache'
+import type { ShoplogixShiftWindow } from '../graderSegmenter'
 
 /** Línea del monitor → línea del espejo (el lector la guarda como «chonchi»). */
 export function lineaDelEspejo(lineId: string): string {
@@ -19,8 +26,12 @@ export function lineaDelEspejo(lineId: string): string {
 export interface EspejoGrader {
   /** `true` hasta que llegó la primera respuesta de los estados. */
   cargando: boolean
-  /** Piezas únicas y ordenadas de las fechas pedidas. */
+  /** `true` hasta que respondió cada documento de hora de la ventana. */
+  cargandoPiezas: boolean
+  /** Piezas únicas y ordenadas de la ventana del turno (con su margen). */
   piezas: PiezaEspejo[]
+  /** Reparto por turno de `piezas`; `null` mientras se calcula. */
+  resumen: ResumenEspejo | null
   /** Estado del lector que avisó más recientemente; `null` si nunca hubo lector. */
   estado: EstadoLector | null
   vivo: boolean
@@ -28,7 +39,8 @@ export interface EspejoGrader {
   minutos: number | null
 }
 
-function aEstado(id: string, x: Record<string, unknown>): EstadoLector {
+/** Documento de `graderEspejoEstado` → `EstadoLector` (también lo usa Diagnóstico Matrix). */
+export function aEstado(id: string, x: Record<string, unknown>): EstadoLector {
   const est = (x.estado && typeof x.estado === 'object' ? x.estado : {}) as EstadoLector['estado']
   return {
     equipo: typeof x.equipo === 'string' ? x.equipo : id,
@@ -40,12 +52,26 @@ function aEstado(id: string, x: Record<string, unknown>): EstadoLector {
   }
 }
 
-export function useEspejoGrader(linea: string | null, fechas: readonly string[]): EspejoGrader {
+/** Espera antes de repartir por turno: junta los snapshots de un mismo envío del lector. */
+export const ESPERA_RESUMEN_MS = 250
+
+export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWindow | null): EspejoGrader {
   const sesion = useSesionFirebase()
-  const claveFechas = fechas.join('|')
   const [estados, setEstados] = useState<EstadoLector[] | null>(null)
-  const [filasPorDoc, setFilasPorDoc] = useState<Record<string, string[]>>({})
   const [ahora, setAhora] = useState(() => Date.now())
+  // Caché viva mientras no cambie la línea ni la ventana; `rev` avisa a React que cambió.
+  const cache = useRef<CacheHorasEspejo>(new CacheHorasEspejo())
+  const [rev, setRev] = useState(0)
+  const [pendientes, setPendientes] = useState(0)
+  const [resumen, setResumen] = useState<ResumenEspejo | null>(null)
+
+  const startMs = ventana?.startMs ?? NaN
+  const endMs = ventana?.endMs ?? NaN
+  const horas = useMemo(
+    () => horasDeVentana(Number.isFinite(startMs) ? { startMs, endMs } : null),
+    [startMs, endMs],
+  )
+  const claveHoras = horas.map((h) => `${h.fecha}/${h.hh}`).join('|')
 
   // Reloj propio: «vivo» y «hace N min» envejecen aunque Firestore no emita.
   useEffect(() => {
@@ -65,45 +91,63 @@ export function useEspejoGrader(linea: string | null, fechas: readonly string[])
   }, [sesion, linea])
 
   useEffect(() => {
-    // Caché de filas por línea y fechas: al cambiar cualquiera se descarta lo anterior.
-    setFilasPorDoc({})
+    // Caché por línea y ventana: al cambiar cualquiera se descarta lo anterior.
+    cache.current = new CacheHorasEspejo()
+    setRev((r) => r + 1)
+    setResumen(null)
+    const claves = claveHoras ? claveHoras.split('|') : []
+    setPendientes(sesion === 'con' && linea ? claves.length : 0)
     if (sesion !== 'con' || !linea) return
-    const fs = claveFechas ? claveFechas.split('|') : []
-    const bajas = fs.map((fecha) =>
-      onSnapshot(
-        collection(db, 'graderEspejo', `${linea}__${fecha}`, 'horas'),
+    const respondio = new Set<string>()
+    const marcar = (k: string) => {
+      if (respondio.has(k)) return
+      respondio.add(k)
+      setPendientes((n) => Math.max(0, n - 1))
+    }
+    const c = cache.current
+    const bajas = claves.map((k) => {
+      const [fecha, hh] = k.split('/') as [string, string]
+      return onSnapshot(
+        doc(db, 'graderEspejo', `${linea}__${fecha}`, 'horas', hh),
         (snap) => {
-          setFilasPorDoc((prev) => {
-            const sig: Record<string, string[]> = {}
-            // Se descarta lo anterior de esa fecha (una hora borrada no debe quedarse).
-            for (const k of Object.keys(prev)) if (!k.startsWith(`${fecha}/`)) sig[k] = prev[k] ?? []
-            for (const d of snap.docs) {
-              const f = d.data().filas
-              sig[`${fecha}/${d.id}`] = Array.isArray(f) ? f.filter((s): s is string => typeof s === 'string') : []
-            }
-            return sig
-          })
+          const f = snap.exists() ? snap.data()?.filas : undefined
+          const filas = Array.isArray(f) ? f.filter((s): s is string => typeof s === 'string') : []
+          // Una hora borrada no debe quedarse; una sin cambios no despierta a React.
+          const cambio = filas.length > 0 ? c.actualizar(k, filas) : c.quitar(k)
+          if (cambio) setRev((r) => r + 1)
+          marcar(k)
         },
-        () => { /* sin permiso o sin red: se queda lo que había */ },
-      ),
-    )
+        () => marcar(k), /* sin permiso o sin red: se queda lo que había */
+      )
+    })
     return () => { for (const b of bajas) b() }
-  }, [sesion, linea, claveFechas])
+  }, [sesion, linea, claveHoras])
 
   const piezas = useMemo(() => {
-    const fs = claveFechas ? claveFechas.split('|') : []
-    const todas: string[] = []
-    for (const [k, v] of Object.entries(filasPorDoc)) {
-      if (fs.some((f) => k.startsWith(`${f}/`))) todas.push(...v)
-    }
-    return parsearFilas(todas).piezas
-  }, [filasPorDoc, claveFechas])
+    void rev
+    const claves = claveHoras ? claveHoras.split('|') : []
+    return recortarAVentana(cache.current.piezas(claves), Number.isFinite(startMs) ? { startMs, endMs } : null)
+  }, [rev, claveHoras, startMs, endMs])
+
+  // Reparto por turno fuera del render y con espera: varios snapshots seguidos (un
+  // envío del lector toca 1-2 horas) se resuelven en un solo cálculo.
+  const turnoId = ventana?.shiftId ?? null
+  const sessionDate = ventana?.sessionDate ?? null
+  useEffect(() => {
+    const v = Number.isFinite(startMs) && sessionDate && turnoId
+      ? { sessionDate, shiftId: turnoId, startMs, endMs }
+      : null
+    const id = window.setTimeout(() => setResumen(resumirEspejo(piezas, v)), ESPERA_RESUMEN_MS)
+    return () => window.clearTimeout(id)
+  }, [piezas, startMs, endMs, sessionDate, turnoId])
 
   const estado = useMemo(() => (estados ? elegirEstado(estados) : null), [estados])
   const ult = estado?.ultimoLatidoMs ?? null
   return {
     cargando: sesion === 'cargando' || (sesion === 'con' && estados === null),
+    cargandoPiezas: pendientes > 0 || resumen === null,
     piezas,
+    resumen,
     estado,
     vivo: estaVivo(ult, ahora),
     minutos: minutosDesde(ult, ahora),

@@ -28,7 +28,9 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 # pulsa «Actualizar» (único control que acciona) y envía las filas-pieza nuevas a espejoGraderIngesta.
 # Configuración por variables de entorno (opcionales): ESPEJO_URL, ESPEJO_CADA (s, 300), ESPEJO_FILTRO
 # (matrix|marelec), ESPEJO_DIR (%LOCALAPPDATA%\\espejo-grader), ESPEJO_EQUIPO (nombre del PC),
-# ESPEJO_ESPERA_RECARGA (s, 12), ESPEJO_TOPE_CICLO (s, 600).
+# ESPEJO_ESPERA_RECARGA (s, 12), ESPEJO_TOPE_CICLO (s, 600), ESPEJO_TOPE_TRAMO (s, 90: la lectura de la
+# tabla se corta en tramos y el siguiente ciclo la continúa), ESPEJO_HORAS_ATRAS (h, 16: no lee filas más
+# viejas; 0 o negativo = sin corte).
 # La llave vive cifrada (DPAPI) en <dir>\\llave.dat. Nunca se escribe en el log ni en pantalla.
 # Sin Write-Host ni ventanas: todo va a <dir>\\lector.log.
 
@@ -53,6 +55,10 @@ $esperaRecarga = 12
 if ($env:ESPEJO_ESPERA_RECARGA) { $esperaRecarga = [double]$env:ESPEJO_ESPERA_RECARGA }
 $topeCiclo = 600
 if ($env:ESPEJO_TOPE_CICLO) { $topeCiclo = [double]$env:ESPEJO_TOPE_CICLO }
+$topeTramo = 90
+if ($env:ESPEJO_TOPE_TRAMO) { $topeTramo = [double]$env:ESPEJO_TOPE_TRAMO }
+$horasAtras = 16
+if ($env:ESPEJO_HORAS_ATRAS) { $horasAtras = [double]$env:ESPEJO_HORAS_ATRAS }
 $equipo = ([string]$env:COMPUTERNAME) -replace '[^A-Za-z0-9_-]', ''
 if ($env:ESPEJO_EQUIPO) { $equipo = ([string]$env:ESPEJO_EQUIPO) -replace '[^A-Za-z0-9_-]', '' }
 if ($equipo.Length -gt 40) { $equipo = $equipo.Substring(0, 40) }
@@ -263,7 +269,25 @@ function Nuevo-Diccionario {
   return New-Object 'System.Collections.Generic.Dictionary[string,int]' ([StringComparer]::Ordinal)
 }
 
-# Lee las filas nuevas (desde el ancla) o todas si el ancla no calza. Devuelve $null si la tabla cambió durante la lectura.
+# Primera fila cuya «fecha hora» (yyyy-MM-dd HH:mm:ss) es >= $corte. Búsqueda binaria que lee solo las
+# columnas 0 y 1. Supone la tabla en orden ascendente; una fila sin fecha válida cuenta como «después».
+function Desde-Corte($gp, [int]$filas, [string]$corte) {
+  $lo = 0
+  $hi = $filas
+  while ($lo -lt $hi) {
+    $mid = [int][math]::Floor(($lo + $hi) / 2)
+    $f = ([string](Celda $gp $mid 0)).Trim() + ' ' + ([string](Celda $gp $mid 1)).Trim()
+    $despues = $true
+    if ($f -match '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$') { $despues = ([string]::CompareOrdinal($f, $corte) -ge 0) }
+    if ($despues) { $hi = $mid } else { $lo = $mid + 1 }
+  }
+  return $lo
+}
+
+# Lee un tramo de filas nuevas (desde el ancla) o, si el ancla no calza, desde el corte por antigüedad.
+# El tramo termina al llegar a la última fila, a $script:topeTramoSeg segundos o a $LOTE_MAX filas-pieza;
+# en los dos últimos casos parcial=$true y hastaIdx/hastaTexto marcan la última fila recorrida.
+# Devuelve $null si la tabla cambió durante la lectura.
 function Lee-Tabla($gp, [int]$filas, $estado, $reloj) {
   $desde = 0
   $relectura = $false
@@ -285,20 +309,33 @@ function Lee-Tabla($gp, [int]$filas, $estado, $reloj) {
       $relectura = $true
     }
   }
+  if (-not $anclaOk -and $script:horasAtras -gt 0) {
+    $corte = (Get-Date).AddHours(-$script:horasAtras).ToString('yyyy-MM-dd HH:mm:ss')
+    $desde = Desde-Corte $gp $filas $corte
+  }
   $items = New-Object System.Collections.Generic.List[object]
   $gate0 = 0
+  $parcial = $false
+  $hastaIdx = $desde - 1
+  $hastaTexto = ''
+  $tramo = [Diagnostics.Stopwatch]::StartNew()
   for ($r = $desde; $r -lt $filas; $r++) {
-    if ($reloj.Elapsed.TotalSeconds -gt $script:topeCicloSeg) { throw 'tope-10-min' }
     $c = Fila-Celdas $gp $r
-    if (-not ($c[0] -match '^\\d{4}-\\d{2}-\\d{2}$' -and $c[1] -match '^\\d{2}:\\d{2}:\\d{2}$')) { continue }
-    $sec = $c[0] + ' ' + $c[1]
-    if ($sec -ne $dictSec) { $dict = Nuevo-Diccionario; $dictSec = $sec }
-    $clave = $c -join "\`t"
-    $ord = 0
-    if ($dict.ContainsKey($clave)) { $ord = $dict[$clave] }
-    $dict[$clave] = $ord + 1
-    $items.Add(@{ idx = $r; texto = $clave; sec = $sec; ord = $ord; ordNext = ($ord + 1); cel = $c })
-    if ((($c[5]) -replace '\\s', '') -eq '0') { $gate0++ }
+    $hastaIdx = $r
+    if ($c[0] -match '^\\d{4}-\\d{2}-\\d{2}$' -and $c[1] -match '^\\d{2}:\\d{2}:\\d{2}$') {
+      $sec = $c[0] + ' ' + $c[1]
+      if ($sec -ne $dictSec) { $dict = Nuevo-Diccionario; $dictSec = $sec }
+      $clave = $c -join "\`t"
+      $ord = 0
+      if ($dict.ContainsKey($clave)) { $ord = $dict[$clave] }
+      $dict[$clave] = $ord + 1
+      $items.Add(@{ idx = $r; texto = $clave; sec = $sec; ord = $ord; ordNext = ($ord + 1); cel = $c })
+      if ((($c[5]) -replace '\\s', '') -eq '0') { $gate0++ }
+    }
+    if ($r -lt ($filas - 1) -and ($tramo.Elapsed.TotalSeconds -ge $script:topeTramoSeg -or $items.Count -ge $LOTE_MAX)) {
+      $hastaTexto = ($c -join "\`t")
+      $parcial = $true; break
+    }
   }
   # Revalidación: misma cantidad de filas y el último punto de referencia sigue igual.
   if ([int]$gp.Current.RowCount -ne $filas) { return $null }
@@ -306,7 +343,7 @@ function Lee-Tabla($gp, [int]$filas, $estado, $reloj) {
   if ($items.Count -gt 0) { $ref = $items[$items.Count - 1] }
   elseif ($anclaOk) { $ref = @{ idx = [int]$estado.ancla.idx; texto = [string]$estado.ancla.texto } }
   if ($ref -and (((Fila-Celdas $gp ([int]$ref.idx)) -join "\`t") -ne $ref.texto)) { return $null }
-  return @{ items = $items; relectura = $relectura; gate0 = $gate0; semilla = $semilla; semillaSec = $semillaSec; anclaOk = $anclaOk }
+  return @{ items = $items; relectura = $relectura; gate0 = $gate0; semilla = $semilla; semillaSec = $semillaSec; anclaOk = $anclaOk; parcial = $parcial; hastaIdx = $hastaIdx; hastaTexto = $hastaTexto }
 }
 
 # Conteos de la última fila enviada (lote que termina en $j): semilla más lo leído hasta $j, del mismo segundo.
@@ -349,22 +386,27 @@ function Envia($filas, $estC) {
 }
 
 # Un ciclo completo: pulsa Actualizar, espera la estabilización, lee y envía. Devuelve un resumen para el log.
-function Ciclo($estado, $reloj) {
-  $res = @{ error = ''; ftabla = 0; leidas = 0; enviadas = 0; relectura = $false; gate0 = 0; rango = [string[]]@(); limite = $false; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = '' }
+function Ciclo($estado, $reloj, [bool]$refrescar) {
+  $res = @{ error = ''; ftabla = 0; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = [string[]]@(); limite = $false; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = '' }
   $foto = Foto
   $res.rango = $foto.rango
   $res.limite = $foto.limite
   if ($foto.error) { $res.error = $foto.error; return $res }
   $res.ftabla = $foto.filas
+  $script:ultFoto = @{ ftabla = $foto.filas; rango = $foto.rango; limite = $foto.limite }
 
-  $boton = Boton-Actualizar (Ventana-De $foto.el)
-  if (-not $boton) { $res.error = 'sin-boton'; return $res }
-  try { $boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
-  catch { $res.error = 'invoke-fallo'; return $res }
+  # Un ciclo de puesta al día (la lectura anterior quedó a medias) no pulsa «Actualizar» ni espera la recarga.
+  if ($refrescar) {
+    $boton = Boton-Actualizar (Ventana-De $foto.el)
+    if (-not $boton) { $res.error = 'sin-boton'; return $res }
+    try { $boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
+    catch { $res.error = 'invoke-fallo'; return $res }
 
-  Espera $esperaRecarga
-  $foto = Foto
-  if ($foto.error) { $res.error = $foto.error; return $res }
+    Espera $esperaRecarga
+    $foto = Foto
+    if ($foto.error) { $res.error = $foto.error; return $res }
+    $script:ultFoto = @{ ftabla = $foto.filas; rango = $foto.rango; limite = $foto.limite }
+  }
 
   # Estabilidad: tres lecturas iguales de RowCount separadas 2 s (tope 120 s).
   $ult = -1
@@ -399,6 +441,8 @@ function Ciclo($estado, $reloj) {
   $res.ftabla = $n
   $res.relectura = $lec.relectura
   $res.gate0 = $lec.gate0
+  $res.parcial = [bool]$lec.parcial
+  if ($lec.parcial) { $res.pendientes = [math]::Max(0, [int]($n - $lec.hastaIdx - 1)) }
   $res.lec = $lec
   $res.base = $(if ($lec.relectura) { 0 } else { $estado.piezas })
   return $res
@@ -412,18 +456,28 @@ $nuevoMutex = $false
 $script:mutex = New-Object System.Threading.Mutex -ArgumentList @($false, 'Local\\EspejoGraderLector', ([ref]$nuevoMutex))
 if (-not $nuevoMutex) { Log 'Ya hay un lector corriendo: este proceso sale.'; exit 0 }
 $script:topeCicloSeg = $topeCiclo
+$script:topeTramoSeg = $topeTramo
+$script:horasAtras = $horasAtras
+$script:ultFoto = $null
+try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch { }
 try { $script:llave = Lee-Llave } catch { Log 'No se pudo leer llave.dat (falta o no es de este usuario). El lector termina.'; exit 1 }
 if (-not $script:llave) { Log 'llave.dat vacío. El lector termina.'; exit 1 }
 Log ('Arranque: equipo=' + $equipo + ' cada=' + $cada + ' s, filtro=' + $filtro + ', dir=' + $dir)
 
 $estado = Carga-Estado
 $terminar = $false
+# Latido inmediato: Matrix queda visible como «vivo» sin esperar el primer ciclo.
+$estIni = @{ version = 'e1.1'; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; error = 'iniciando' }
+$respIni = Envia @() $estIni
+if ($respIni -eq 'fin') { $terminar = $true }
+$refrescar = $true
 while (-not $terminar) {
   $reloj = [Diagnostics.Stopwatch]::StartNew()
   $res = $null
   try {
     Revisa-Detener
-    $res = Ciclo $estado $reloj
+    # Ciclo puede dejar salida suelta en el pipeline: se toma solo el resumen (hashtable).
+    $res = @(Ciclo $estado $reloj $refrescar) | Where-Object { $_ -is [hashtable] } | Select-Object -Last 1
   } catch {
     $msg = [string]$_.Exception.Message
     if ($msg -eq 'DETENER') {
@@ -432,11 +486,14 @@ while (-not $terminar) {
       break
     }
     Log ('Error de ciclo: ' + $msg)
-    $res = @{ error = $(if ($msg -eq 'tope-10-min') { 'tope-10-min' } else { 'excepcion' }); ftabla = 0; leidas = 0; enviadas = 0; relectura = $false; gate0 = 0; rango = [string[]]@(); limite = $false; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = '' }
+    # Se conserva lo que la última Foto válida alcanzó a ver.
+    $ftErr = 0; $rangoErr = [string[]]@(); $limiteErr = $false
+    if ($script:ultFoto) { $ftErr = [int]$script:ultFoto.ftabla; $rangoErr = [string[]]@($script:ultFoto.rango); $limiteErr = [bool]$script:ultFoto.limite }
+    $res = @{ error = $(if ($msg -eq 'tope-10-min') { 'tope-10-min' } else { 'excepcion' }); ftabla = $ftErr; leidas = 0; enviadas = 0; relectura = $false; parcial = $false; pendientes = 0; gate0 = 0; rango = $rangoErr; limite = $limiteErr; primera = $estado.primera; ultima = $estado.ultima; piezas = $estado.piezas; fin = '' }
   }
 
   $items = @()
-  if ($res.lec) { $items = @($res.lec.items) }
+  if ($res.lec) { $items = $res.lec.items.ToArray() }
   $base = $res.base
   if ($null -eq $base) { $base = $estado.piezas }
   $piezas = $base + $items.Count
@@ -446,7 +503,7 @@ while (-not $terminar) {
   if ($items.Count -gt 0 -and -not $primera) { $primera = (Fecha-Hora ($items[0].cel)) }
   $ultima = $estado.ultima
   if ($items.Count -gt 0) { $ultima = (Fecha-Hora ($items[$items.Count - 1].cel)) }
-  $estC = @{ version = 'e1.0'; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = [string]$res.error }
+  $estC = @{ version = 'e1.1'; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = [string]$res.error; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial }
 
   $enviadas = 0
   $fin = ''
@@ -474,11 +531,29 @@ while (-not $terminar) {
     }
   }
 
+  # Lectura a medias y todo enviado: avanza el ancla hasta la última fila recorrida (las filas sin fecha
+  # del final del tramo no producen lote). Solo si el tramo fue parcial: al final de la tabla las filas
+  # de cierre sin fecha cambian de índice cuando la tabla crece.
+  $envioOk = ($enviadas -eq $items.Count)
+  if ($res.lec -and $res.lec.parcial -and -not $fin -and $envioOk) {
+    $idxActual = -1
+    if ($estado.ancla -and ($items.Count -gt 0 -or -not $res.lec.relectura)) { $idxActual = [int]$estado.ancla.idx }
+    if ([int]$res.lec.hastaIdx -gt $idxActual) {
+      $estado.ancla = @{ idx = [int]$res.lec.hastaIdx; texto = [string]$res.lec.hastaTexto }
+      if ($idxActual -lt 0 -and $res.lec.relectura) { $estado.conteos = @(); $estado.sec = ''; $estado.piezas = 0; $estado.primera = ''; $estado.ultima = '' }
+      Guarda-Estado $estado
+    }
+  }
+
   $seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1)
   $leidas = $items.Count
-  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' error=' + [string]$res.error)
+  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' error=' + [string]$res.error)
   if ($fin) { $terminar = $true; break }
-  try { Espera $cada } catch {
+  # Si quedó a medias (sin error ni fallo de envío), el siguiente ciclo sigue ya, sin pulsar «Actualizar».
+  $espera = $cada
+  $refrescar = $true
+  if ($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) { $espera = 5; $refrescar = $false }
+  try { Espera $espera } catch {
     if ([string]$_.Exception.Message -eq 'DETENER') {
       try { Remove-Item -LiteralPath $archivoDetener -Force } catch { }
       Log 'Archivo DETENER: el lector termina.'
