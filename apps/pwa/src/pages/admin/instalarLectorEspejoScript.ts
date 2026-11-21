@@ -1,10 +1,10 @@
 /**
- * Instalador del lector del espejo del grader (e1.4) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, y acciona solo las 2 fechas del rango, la casilla «Limitar» (solo desmarcar) y «Actualizar».
+ * Instalador del lector del espejo del grader (e1.5) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, y acciona solo las 2 fechas del rango, la casilla «Limitar» (solo desmarcar) y «Actualizar».
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/instalar-lector-espejo.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
 export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
-  # Instalador del lector del espejo del grader (e1.4). Pegar TODO en PowerShell y Enter. Un solo pegado.
+  # Instalador del lector del espejo del grader (e1.5). Pegar TODO en PowerShell y Enter. Un solo pegado.
   # Este archivo lo genera armar-instalador.mjs: no editar a mano; editar lector-espejo.ps1 o vigilante-espejo.ps1 y regenerar.
   # Trae un código de alta de UN solo uso que vence en 25 min: al canjearlo, la función entrega la llave y el
   # código ya no sirve. La llave se guarda cifrada (DPAPI) y nunca se muestra.
@@ -98,6 +98,8 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 #   3. el botón «Actualizar» (InvokePattern.Invoke).
 # Si no encuentra EXACTAMENTE 2 fechas editables y 1 casilla «Limitar el informe», no toca ni el rango ni la casilla.
 # Si Matrix no toma el rango nuevo, devuelve las fechas como estaban y sigue sin moverlas (clave «ajuste» del latido).
+# e1.5: la casilla se revisa en cada «Actualizar» aunque las fechas fallen. Matrix (Qt) ignora la escritura de sus
+# fechas por UI Automation: entonces «ajuste» = fechas-fijas y el fin del rango hay que moverlo a mano.
 # Mientras corre pide a Windows que no SUSPENDA el equipo (SetThreadExecutionState, sin pantalla: no toca el bloqueo
 # con contraseña de planta). Con la sesión bloqueada igual intenta leer, no mueve el rango y lo informa («bloqueada»).
 # Configuración por variables de entorno (opcionales): ESPEJO_URL, ESPEJO_CADA (s, 300), ESPEJO_FILTRO
@@ -112,7 +114,7 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 # ESPEJO_CADA. El plazo se arma con los segundos que manda la función, no con el reloj de este PC. Latido: clave «vivo».
 
 $ErrorActionPreference = 'Continue'
-$VERSION = 'e1.4'
+$VERSION = 'e1.5'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -434,39 +436,74 @@ function Rango-Deseado($estado) {
   return @{ desde = $ini.ToString('yyyy-MM-dd HH:mm:ss'); hasta = $ahora.Date.AddDays(1).ToString('yyyy-MM-dd HH:mm:ss') }
 }
 
-# Antes de «Actualizar»: escribe las 2 fechas (solo si cambian) y desmarca «Limitar» (solo si está marcada).
-# Devuelve $null si no tocó nada; si tocó, lo necesario para verificar y deshacer.
+# Antes de «Actualizar»: desmarca «Limitar» (solo si está marcada) y escribe las 2 fechas (solo si cambian).
+# e1.5: la casilla va por su cuenta. Un fallo de las fechas no la apaga, y ella se revisa en cada «Actualizar».
+# Devuelve $null si no tocó nada; si tocó, lo necesario para verificar y deshacer (movio = las fechas cambiaron).
 function Ajusta-Rango($el, $estado) {
   $ctl = Controles-Rango (Ventana-Raiz $el)
   if ($ctl.error) { $script:ajuste = $ctl.error; return $null }
+  $toco = $false
+  $script:casillaFalla = $false
+  if ((Estado-Casilla $ctl.casilla.el) -eq 'On') {
+    try { $ctl.casilla.el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() } catch { Log ('ajuste: Matrix no dejó desmarcar «Limitar»: ' + $_.Exception.Message) }
+    if ((Estado-Casilla $ctl.casilla.el) -eq 'Off') { $toco = $true; Log 'ajuste: casilla «Limitar» desmarcada.' }
+    else { $script:casillaFalla = $true; Log ('ajuste: la casilla «Limitar» sigue en ' + (Estado-Casilla $ctl.casilla.el) + '.') }
+  }
+  $movio = $false
   $q = Rango-Deseado $estado
+  if (-not $script:fechasApagadas) { $movio = Mueve-Fechas $ctl $q }
+  $script:ajuste = Texto-Ajuste
+  if (-not $toco -and -not $movio) { return $null }
+  return @{ ctl = $ctl; orig = $script:rangoOriginal; q = $q; movio = $movio }
+}
+
+# Estado del ajuste para el latido. La casilla manda: si no se desmarca, el informe se corta en 10 000 filas.
+function Texto-Ajuste {
+  if ($script:casillaFalla) { return 'casilla-no-aplico' }
+  if ($script:motivoFechas) { return $script:motivoFechas }
+  return 'ok'
+}
+
+# Escribe las 2 fechas. Devuelve $true si quedaron movidas. Si Matrix no las toma, deja todo como estaba y apaga
+# solo las fechas por el resto de la corrida. Matrix es Qt: su campo de fecha (QDateTimeEdit) acepta SetValue sin
+# error pero lo ignora (probado el 21-11 con Qt 5 y Qt 6). Ese caso queda como «fechas-fijas».
+function Mueve-Fechas($ctl, $q) {
   # Se deshace siempre hacia las fechas que había ANTES de que el lector tocara nada en esta corrida.
   if (-not $script:rangoOriginal) { $script:rangoOriginal = @{ desde = [string]$ctl.desde.val; hasta = [string]$ctl.hasta.val } }
   $orig = $script:rangoOriginal
-  $cambia = @{ desde = ([string]$ctl.desde.val -ne $q.desde); hasta = ([string]$ctl.hasta.val -ne $q.hasta) }
+  $antes = @{ desde = [string]$ctl.desde.val; hasta = [string]$ctl.hasta.val }
+  $cambia = @{ desde = ($antes.desde -ne $q.desde); hasta = ($antes.hasta -ne $q.hasta) }
+  if (-not $cambia.desde -and -not $cambia.hasta) { return $false }
   try {
     # Si el inicio nuevo queda después del fin actual, primero el fin (Matrix no ve un inicio > fin).
-    if ([string]::CompareOrdinal($q.desde, [string]$ctl.hasta.val) -gt 0) {
+    if ([string]::CompareOrdinal($q.desde, $antes.hasta) -gt 0) {
       if ($cambia.hasta) { Escribe-Valor $ctl.hasta.el $q.hasta }
       if ($cambia.desde) { Escribe-Valor $ctl.desde.el $q.desde }
     } else {
       if ($cambia.desde) { Escribe-Valor $ctl.desde.el $q.desde }
       if ($cambia.hasta) { Escribe-Valor $ctl.hasta.el $q.hasta }
     }
-    if ((Estado-Casilla $ctl.casilla.el) -eq 'On') { $ctl.casilla.el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() }
   } catch {
-    Log ('ajuste: Matrix rechazó el cambio: ' + $_.Exception.Message)
+    Log ('ajuste: Matrix rechazó las fechas: ' + $_.Exception.Message)
     Deshace-Rango $ctl $orig 'no-aplico'
-    return $null
+    return $false
   }
-  if ((Valor-De $ctl.desde.el) -ne $q.desde -or (Valor-De $ctl.hasta.el) -ne $q.hasta -or (Estado-Casilla $ctl.casilla.el) -ne 'Off') {
-    Log ('ajuste: los controles no quedaron como se escribieron (inicio=' + (Valor-De $ctl.desde.el) + ', casilla=' + (Estado-Casilla $ctl.casilla.el) + ')')
-    Deshace-Rango $ctl $orig 'no-aplico'
-    return $null
+  $leido = @{ desde = (Valor-De $ctl.desde.el); hasta = (Valor-De $ctl.hasta.el) }
+  if ($leido.desde -eq $q.desde -and $leido.hasta -eq $q.hasta) {
+    Log ('ajuste: rango ' + $q.desde + ' -> ' + $q.hasta)
+    return $true
   }
-  $script:ajuste = 'ok'
-  if ($cambia.desde -or $cambia.hasta) { Log ('ajuste: rango ' + $q.desde + ' -> ' + $q.hasta) }
-  return @{ ctl = $ctl; orig = $orig; q = $q }
+  $detalle = 'escrito ' + $q.desde + ' -> ' + $q.hasta + ', leído ' + $leido.desde + ' -> ' + $leido.hasta
+  if ($leido.desde -eq $antes.desde -and $leido.hasta -eq $antes.hasta) {
+    # Nada cambió: no hay nada que devolver.
+    $script:motivoFechas = 'fechas-fijas'
+    $script:fechasApagadas = $true
+    Log ('ajuste: Matrix ignora la escritura de las fechas (' + $detalle + '); el lector las deja como están y no vuelve a intentarlo en esta corrida.')
+    return $false
+  }
+  Log ('ajuste: las fechas no quedaron como se escribieron (' + $detalle + ')')
+  Deshace-Rango $ctl $orig 'no-aplico'
+  return $false
 }
 
 # Devuelve las fechas a como estaban y apaga el rango automático por el resto de la corrida.
@@ -482,16 +519,24 @@ function Deshace-Rango($ctl, $orig, [string]$motivo) {
     }
   } catch { Log ('ajuste: no se pudo devolver el rango: ' + $_.Exception.Message) }
   if ((Valor-De $ctl.desde.el) -ne $orig.desde -or (Valor-De $ctl.hasta.el) -ne $orig.hasta) { $motivo = 'no-devuelto' }
-  $script:ajuste = $motivo
-  $script:ajusteApagado = $true
-  Log ('ajuste: ' + $motivo + '; el lector deja el rango como estaba y sigue sin moverlo.')
+  $script:motivoFechas = $motivo
+  $script:fechasApagadas = $true
+  $script:ajuste = Texto-Ajuste
+  Log ('ajuste: ' + $motivo + '; el lector deja el rango como estaba y sigue sin moverlo (la casilla «Limitar» la sigue revisando).')
 }
 
-# Tras «Actualizar»: las fechas siguen escritas, la casilla desmarcada y la tabla empieza en el inicio pedido.
+# Tras «Actualizar»: la casilla desmarcada y, si se movieron, las fechas siguen escritas y la tabla empieza en el
+# inicio pedido.
 function Verifica-Ajuste($aj, $gp, [int]$filas) {
   if (-not $aj) { return }
   $ctl = $aj.ctl
-  if ((Valor-De $ctl.desde.el) -ne $aj.q.desde -or (Valor-De $ctl.hasta.el) -ne $aj.q.hasta -or (Estado-Casilla $ctl.casilla.el) -ne 'Off') {
+  if ((Estado-Casilla $ctl.casilla.el) -ne 'Off') {
+    $script:casillaFalla = $true
+    $script:ajuste = Texto-Ajuste
+    Log ('ajuste: tras «Actualizar» la casilla «Limitar» volvió a ' + (Estado-Casilla $ctl.casilla.el) + '.')
+  }
+  if (-not $aj.movio) { return }
+  if ((Valor-De $ctl.desde.el) -ne $aj.q.desde -or (Valor-De $ctl.hasta.el) -ne $aj.q.hasta) {
     Deshace-Rango $ctl $aj.orig 'no-aplico'
     return
   }
@@ -760,8 +805,8 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
   if ($refrescar) {
     $boton = Boton-Actualizar (Ventana-De $foto.el)
     if (-not $boton) { $res.error = 'sin-boton'; return $res }
-    # Con la sesión bloqueada no se mueve el rango (un fallo ahí apagaría el ajuste por toda la corrida).
-    if ($script:rangoAuto -and -not $script:ajusteApagado -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado }
+    # Con la sesión bloqueada no se mueve el rango ni la casilla. e1.5: un fallo de las fechas ya no apaga la casilla.
+    if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado }
     try { $boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
     catch { $res.error = 'invoke-fallo'; return $res }
 
@@ -843,7 +888,9 @@ $script:topeTramoSeg = $topeTramo
 $script:horasAtras = $horasAtras
 $script:ultFoto = $null
 $script:rangoAuto = $rangoAuto
-$script:ajusteApagado = $false
+$script:fechasApagadas = $false
+$script:motivoFechas = ''
+$script:casillaFalla = $false
 $script:rangoOriginal = $null
 $script:ajuste = $(if ($rangoAuto) { '' } else { 'apagado' })
 try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch { }

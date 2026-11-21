@@ -41,7 +41,17 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
 
   it('e1.2: la casilla «Limitar» solo se desmarca (Toggle único y solo si está marcada)', () => {
     expect(S.match(/\.Toggle\(\)/g)?.length).toBe(1)
-    expect(S).toContain("if ((Estado-Casilla $ctl.casilla.el) -eq 'On') { $ctl.casilla.el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() }")
+    expect(S).toContain("if ((Estado-Casilla $ctl.casilla.el) -eq 'On') {")
+    expect(S).toContain('    try { $ctl.casilla.el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() }')
+  })
+
+  it('e1.5: un fallo de las fechas no apaga la casilla; Matrix (Qt) que ignora SetValue queda como «fechas-fijas»', () => {
+    // La casilla se revisa en cada «Actualizar»: la condición ya no depende de que las fechas funcionen.
+    expect(S).toContain('if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado }')
+    expect(S).not.toContain('ajusteApagado')
+    expect(S).toContain("if (-not $script:fechasApagadas) { $movio = Mueve-Fechas $ctl $q }")
+    expect(S).toContain("$script:motivoFechas = 'fechas-fijas'")
+    expect(S).toContain("if ($script:casillaFalla) { return 'casilla-no-aplico' }")
   })
 
   it('no teclea, selecciona, cierra ni mueve el foco en Matrix', () => {
@@ -61,8 +71,8 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(S).toContain("if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }")
   })
 
-  it('es la versión e1.4 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
-    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.4'"])
+  it('es la versión e1.5 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
+    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.5'"])
     expect(S).toContain('version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste;')
     expect(S).not.toMatch(/version = 'e1\.[0-2]'/)
   })
