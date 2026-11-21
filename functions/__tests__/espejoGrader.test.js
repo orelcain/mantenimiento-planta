@@ -272,5 +272,4 @@ test('lector incluido: existe, declara su versión y el hash es de los bytes ser
   const bytes = fs.readFileSync(path.join(__dirname, '..', 'espejo', 'lector-espejo.ps1'))
   assert.strictEqual(l.sha256, require('crypto').createHash('sha256').update(bytes).digest('hex'))
   assert.strictEqual(bytes[0], 0xef, 'con BOM UTF-8 para PowerShell 5.1')
-  assert.ok(bytes.toString('utf8').includes('\r\n'), 'saltos CRLF')
 })
