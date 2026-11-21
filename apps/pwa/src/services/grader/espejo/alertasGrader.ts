@@ -101,7 +101,7 @@ export interface EntradaAlertas {
   umbrales?: Partial<UmbralesAlertas>
 }
 
-export type ReglaAlerta = 'grader-quieto' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon'
+export type ReglaAlerta = 'grader-quieto' | 'sin-datos-grader' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon'
 
 export interface AlertaGrader {
   regla: ReglaAlerta
@@ -171,13 +171,29 @@ export function dominante(r: Record<string, number>): { calibre: string; pct: nu
 
 // ── Reglas ──────────────────────────────────────────────────────────────────
 
-/** Regla 1: el grader lleva ≥ N min sin piezas mientras las Baader (corridas por el retraso) cuentan en CADA minuto. */
+/**
+ * Regla 1: el grader lleva ≥ N min sin piezas mientras las Baader (corridas por el retraso) cuentan en CADA minuto.
+ * Si el grader no tiene NINGUNA pieza en lo leído, avisa «sin datos del grader» en vez de «sin piezas».
+ */
 export function reglaGraderQuieto(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader | null {
   if (!e.baader) return null
   const L = Math.max(0, Math.round(e.retrasoMin))
   // Hasta lo leído entero (con minutos vacíos: un grader detenido no deja piezas) y, de las Baader, solo minutos cerrados.
   const hasta = Math.min(minutosCerrados(e), e.baader.length + L)
   if (hasta < u.quietoMin) return null
+  // Ninguna pieza del grader en todo lo leído, con las Baader entregando: el espejo no trae el turno (Matrix no
+  // entregó sus piezas o el lector no lo leyó, como el 18-11 T1 y el 21-11 T2). No es un grader detenido.
+  if (suma(e.grader.pz, 0, hasta) === 0) {
+    const baaderTotal = suma(e.baader, -L, hasta - L)
+    if (baaderTotal <= 0) return null
+    return {
+      regla: 'sin-datos-grader',
+      nivel: 'atento',
+      desdeMin: 0,
+      titulo: 'Sin datos del grader en este turno',
+      detalle: `Las Baader entregaron ${milesPunto(baaderTotal)} piezas y el espejo no trae ninguna del grader: el lector no leyó este turno o Matrix no entregó sus piezas. No es una detención del grader.`,
+    }
+  }
   const baaderEn = (m: number) => (m - L >= 0 ? e.baader![m - L] ?? 0 : 0)
   const quieto = (m: number) => (e.grader.pz[m] ?? 0) === 0 && baaderEn(m) > 0
   for (let m = hasta - u.quietoMin; m < hasta; m++) if (!quieto(m)) return null
