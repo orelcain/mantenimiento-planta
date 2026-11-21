@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
 type Cb = (snap: unknown) => void
-interface Escucha { ruta: string; ok: Cb; activa: boolean }
+interface Escucha { ruta: string; ok: Cb; mal?: () => void; activa: boolean }
 const escuchas: Escucha[] = []
 
 vi.mock('@/services/firestoreTracked', () => ({
@@ -10,8 +10,8 @@ vi.mock('@/services/firestoreTracked', () => ({
   doc: (_db: unknown, ...partes: string[]) => ({ ruta: partes.join('/') }),
   query: (ref: unknown) => ref,
   where: () => null,
-  onSnapshot: (ref: { ruta: string }, ok: Cb) => {
-    const e = { ruta: ref.ruta, ok, activa: true }
+  onSnapshot: (ref: { ruta: string }, ok: Cb, mal?: () => void) => {
+    const e = { ruta: ref.ruta, ok, mal, activa: true }
     escuchas.push(e)
     return () => { e.activa = false }
   },
@@ -95,5 +95,33 @@ describe('useEspejoGrader: solo la ventana del turno', () => {
     rerender({ linea: 'otra' })
     expect(result.current.piezas).toHaveLength(0)
     expect(result.current.estado).toBeNull()
+  })
+
+  it('al cambiar de turno no muestra el reparto del turno anterior', () => {
+    vi.useFakeTimers()
+    try {
+      escuchas.length = 0
+      const { result, rerender } = renderHook(
+        ({ v }: { v: typeof VENTANA }) => useEspejoGrader('chonchi', v),
+        { initialProps: { v: VENTANA } },
+      )
+      act(() => responderTodo())
+      act(() => { vi.advanceTimersByTime(ESPERA_RESUMEN_MS + 1) })
+      expect(result.current.resumen).not.toBeNull()
+      // Mismo horario, otro turno (Shoplogix lo renombró): el resumen viejo no vale.
+      rerender({ v: { ...VENTANA, shiftId: 'B' } })
+      expect(result.current.resumen).toBeNull()
+      expect(result.current.cargandoPiezas).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('una hora que no se pudo leer se avisa (no pasa por «sin piezas»)', () => {
+    escuchas.length = 0
+    const { result } = renderHook(() => useEspejoGrader('chonchi', VENTANA))
+    expect(result.current.errorPiezas).toBe(false)
+    act(() => { ultima('graderEspejo/chonchi__2026-11-20/horas/22').mal?.() })
+    expect(result.current.errorPiezas).toBe(true)
   })
 })

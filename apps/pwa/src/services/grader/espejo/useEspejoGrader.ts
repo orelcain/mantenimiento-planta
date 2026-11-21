@@ -30,8 +30,10 @@ export interface EspejoGrader {
   cargandoPiezas: boolean
   /** Piezas únicas y ordenadas de la ventana del turno (con su margen). */
   piezas: PiezaEspejo[]
-  /** Reparto por turno de `piezas`; `null` mientras se calcula. */
+  /** Reparto por turno de `piezas`; `null` mientras se calcula para esta ventana. */
   resumen: ResumenEspejo | null
+  /** `true` si alguna hora de la ventana no se pudo leer (sin permiso o sin red): el total puede estar incompleto. */
+  errorPiezas: boolean
   /** Estado del lector que avisó más recientemente; `null` si nunca hubo lector. */
   estado: EstadoLector | null
   vivo: boolean
@@ -63,7 +65,9 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
   const cache = useRef<CacheHorasEspejo>(new CacheHorasEspejo())
   const [rev, setRev] = useState(0)
   const [pendientes, setPendientes] = useState(0)
-  const [resumen, setResumen] = useState<ResumenEspejo | null>(null)
+  // El resumen guarda para qué ventana se calculó: al cambiar de turno no se muestra el anterior.
+  const [resumenDe, setResumenDe] = useState<{ clave: string; r: ResumenEspejo } | null>(null)
+  const [conError, setConError] = useState(false)
 
   const startMs = ventana?.startMs ?? NaN
   const endMs = ventana?.endMs ?? NaN
@@ -94,7 +98,8 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
     // Caché por línea y ventana: al cambiar cualquiera se descarta lo anterior.
     cache.current = new CacheHorasEspejo()
     setRev((r) => r + 1)
-    setResumen(null)
+    setResumenDe(null)
+    setConError(false)
     const claves = claveHoras ? claveHoras.split('|') : []
     setPendientes(sesion === 'con' && linea ? claves.length : 0)
     if (sesion !== 'con' || !linea) return
@@ -117,7 +122,7 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
           if (cambio) setRev((r) => r + 1)
           marcar(k)
         },
-        () => marcar(k), /* sin permiso o sin red: se queda lo que había */
+        () => { setConError(true); marcar(k) }, /* sin permiso o sin red: se queda lo que había y se avisa */
       )
     })
     return () => { for (const b of bajas) b() }
@@ -133,13 +138,20 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
   // envío del lector toca 1-2 horas) se resuelven en un solo cálculo.
   const turnoId = ventana?.shiftId ?? null
   const sessionDate = ventana?.sessionDate ?? null
+  const claveVentana = `${linea}|${claveHoras}|${startMs}|${endMs}|${sessionDate}|${turnoId}`
   useEffect(() => {
     const v = Number.isFinite(startMs) && sessionDate && turnoId
       ? { sessionDate, shiftId: turnoId, startMs, endMs }
       : null
-    const id = window.setTimeout(() => setResumen(resumirEspejo(piezas, v)), ESPERA_RESUMEN_MS)
+    const id = window.setTimeout(
+      () => setResumenDe({ clave: claveVentana, r: resumirEspejo(piezas, v) }),
+      ESPERA_RESUMEN_MS,
+    )
     return () => window.clearTimeout(id)
-  }, [piezas, startMs, endMs, sessionDate, turnoId])
+  }, [piezas, startMs, endMs, sessionDate, turnoId, claveVentana])
+  // Dentro de la misma ventana se deja el resumen anterior hasta el recálculo (≤ 250 ms, sin
+  // parpadeo cada 5 min); con otra ventana, nada hasta recalcular.
+  const resumen = resumenDe && resumenDe.clave === claveVentana ? resumenDe.r : null
 
   const estado = useMemo(() => (estados ? elegirEstado(estados) : null), [estados])
   const ult = estado?.ultimoLatidoMs ?? null
@@ -148,6 +160,7 @@ export function useEspejoGrader(linea: string | null, ventana: ShoplogixShiftWin
     cargandoPiezas: pendientes > 0 || resumen === null,
     piezas,
     resumen,
+    errorPiezas: conError,
     estado,
     vivo: estaVivo(ult, ahora),
     minutos: minutosDesde(ult, ahora),

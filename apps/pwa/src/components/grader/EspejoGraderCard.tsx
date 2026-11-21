@@ -47,12 +47,14 @@ function Fila({ k, v }: { k: string; v: string }) {
   )
 }
 
-export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: {
+export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas = false, className }: {
   estado: EstadoLector
   vivo: boolean
   minutos: number | null
   /** `null` mientras se bajan y reparten las piezas del turno. */
   resumen: ResumenEspejo | null
+  /** Alguna hora del turno no se pudo leer: el total puede estar incompleto. */
+  errorPiezas?: boolean
   className?: string
 }) {
   const codigoError = estado.estado.error
@@ -62,8 +64,9 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: 
   const avance = avisoAvance(estado.estado)
   // Los avisos van en los dos estados (vivo y sin lectura): un corte de Matrix o un
   // error del lector con la pastilla en «Vivo» es justo lo que hay que ver.
-  const aviso = [error, limite].filter((x): x is string => !!x)
-  const sinDelTurno = vivo && resumen && resumen.total === 0 ? avisoSinPiezasDelTurno(estado.estado) : null
+  const lectura = errorPiezas ? 'No se pudo leer parte de las piezas del turno (sin permiso o sin red): el total puede estar incompleto.' : null
+  const aviso = [lectura, error, limite].filter((x): x is string => !!x)
+  const sinDelTurno = vivo && !errorPiezas && resumen && resumen.total === 0 ? avisoSinPiezasDelTurno(estado.estado) : null
   const letra = resumen?.coincidencia?.letra
   const turno = letra ? `Turno ${letra}` : resumen?.turno?.shiftId ?? null
   const rango = resumen?.primera && resumen.ultima ? `${hhmm(resumen.primera)} → ${hhmm(resumen.ultima)}` : null
@@ -102,8 +105,8 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: 
               <p className="text-footnote text-muted-foreground tabular-nums">
                 {sinDelTurno ?? (iniciando
                   ? 'El lector acaba de arrancar. La primera lectura tarda unos minutos.'
-                  : error
-                    ? 'El lector no pudo leer Matrix: mira el aviso de abajo.'
+                  : error || errorPiezas
+                    ? 'Hay un problema de lectura: mira el aviso de abajo.'
                     : 'El lector todavía no ha leído piezas de este turno.')}
               </p>
             </>
@@ -165,7 +168,7 @@ export function EspejoGraderConectado({ lineId, dateKey, inicio, fin, turnoId, c
     () => (dateKey && inicio ? ventanaDelTurno({ dateKey, inicio, fin, turnoId }) : null),
     [dateKey, inicio, fin, turnoId],
   )
-  const { cargando, cargandoPiezas, resumen, estado, vivo, minutos } = useEspejoGrader(linea, ventana)
+  const { cargando, cargandoPiezas, resumen, errorPiezas, estado, vivo, minutos } = useEspejoGrader(linea, ventana)
 
   if (cargando || !estado) return null
   return (
@@ -174,6 +177,7 @@ export function EspejoGraderConectado({ lineId, dateKey, inicio, fin, turnoId, c
       vivo={vivo}
       minutos={minutos}
       resumen={cargandoPiezas ? null : resumen}
+      errorPiezas={errorPiezas}
       className={className}
     />
   )

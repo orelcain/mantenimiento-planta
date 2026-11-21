@@ -54,4 +54,10 @@ describe('EspejoGraderCard: nunca «0 piezas» a secas', () => {
     expect(screen.getByText('4.812 piezas')).toBeTruthy()
     expect(screen.getByText(/faltan 6.200 filas/)).toBeTruthy()
   })
+
+  it('con una hora sin leer avisa que el total puede estar incompleto y no dice «ninguna de este turno»', () => {
+    render(<EspejoGraderCard estado={estado({ piezas: 9998, ultima: '2026-11-19 05:20:01' })} vivo minutos={0} resumen={VACIO} errorPiezas />)
+    expect(screen.getByText(/el total puede estar incompleto/)).toBeTruthy()
+    expect(screen.queryByText(/ninguna de este turno/)).toBeNull()
+  })
 })
