@@ -106,3 +106,11 @@ export function useResumenesAlrededor(lineId: string | null, dateKey: string | n
   }, [refrescoMs])
   return useLecturaConSesion(lineId && dateKey ? `${lineId}|${dateKey}|${tick}` : null, () => fetchResumenesAlrededor(lineId!, dateKey!))
 }
+
+/** Resúmenes de los `dias` días anteriores hasta `dateKey` (para comparar con los últimos turnos). Una lectura por día visto. */
+export function useResumenesPrevios(lineId: string | null, dateKey: string | null, dias = 4): Lectura<GraderDailySummary[]> {
+  return useLecturaConSesion(
+    lineId && dateKey ? `previos|${lineId}|${dateKey}|${dias}` : null,
+    () => listDailySummariesByRange(sumarDias(dateKey!, -dias), dateKey!, lineId!),
+  )
+}
