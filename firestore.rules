@@ -1959,6 +1959,24 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // E1.4: lectura en vivo a pedido (botón «En vivo 15 min» del monitor). id = línea del espejo.
+    // La función espejoGraderIngesta lo lee y le dice al lector hasta cuándo leer cada 60 s.
+    match /graderEspejoControl/{linea} {
+      allow read: if isNotAnonymous();
+      allow create, update: if isNotAnonymous()
+        && linea.matches('^[a-z0-9_-]{1,40}$')
+        && request.resource.data.keys().hasOnly(['hasta', 'pedidoPor', 'pedidoNombre', 'pedidoEn'])
+        && request.resource.data.pedidoPor == request.auth.uid
+        && request.resource.data.pedidoEn == request.time
+        && request.resource.data.pedidoNombre is string
+        && request.resource.data.pedidoNombre.size() <= 60
+        && request.resource.data.hasta is timestamp
+        // «Volver a 5 min» escribe hasta = ahora; nunca más de 30 min adelante.
+        && request.resource.data.hasta >= request.time
+        && request.resource.data.hasta <= request.time + duration.value(30, 'm');
+      allow delete: if false;
+    }
+
     // E1.3: versión del lector que debe correr en planta. Solo un admin la publica.
     match /graderEspejoVersion/{doc} {
       allow read: if isNotAnonymous();

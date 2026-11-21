@@ -16,9 +16,12 @@
 # viejas; 0 o negativo = sin corte), ESPEJO_RANGO_AUTO (0 = no mueve el rango ni la casilla, como e1.1).
 # La llave vive cifrada (DPAPI) en <dir>\llave.dat. Nunca se escribe en el log ni en pantalla.
 # Sin Write-Host ni ventanas: todo va a <dir>\lector.log.
+# e1.4 — lectura en vivo a pedido: si la respuesta de un envío trae vivoSeg (botón «En vivo 15 min» del monitor), la
+# espera entre ciclos baja a 60 s hasta ese plazo (nunca menos: Matrix tarda ~12 s en recargar) y vuelve sola a
+# ESPEJO_CADA. El plazo se arma con los segundos que manda la función, no con el reloj de este PC. Latido: clave «vivo».
 
 $ErrorActionPreference = 'Continue'
-$VERSION = 'e1.3'
+$VERSION = 'e1.4'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -56,6 +59,9 @@ $INFORMES = @{
 $FORMATO_FECHA = '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$'
 $LIMITE_LOG = 1MB
 $LOTE_MAX = 2000
+# e1.4: espera en modo vivo y tope del plazo que acepta (la regla de Firestore ya limita a 30 min).
+$ESPERA_VIVO = 60
+$VIVO_TOPE_SEG = 1800
 $archivoLog = Join-Path $dir 'lector.log'
 $archivoEstado = Join-Path $dir 'estado.json'
 $archivoDetener = Join-Path $dir 'DETENER'
@@ -594,6 +600,21 @@ function Modo-Arranque {
   return 'manual'
 }
 
+# e1.4: plazo del modo vivo a partir de los segundos que devuelve la función (vivoSeg). $null = cada ESPEJO_CADA.
+# Sin campo, 0, negativo o no numérico → $null; más de 30 min → se recorta a 30 min.
+function Fin-Vivo($seg, [datetime]$ahora) {
+  $s = 0.0
+  if ($null -eq $seg -or -not [double]::TryParse([string]$seg, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$s)) { return $null }
+  if ([double]::IsNaN($s) -or $s -le 0) { return $null }
+  return $ahora.AddSeconds([math]::Min($s, $VIVO_TOPE_SEG))
+}
+
+# e1.4: espera hasta el ciclo siguiente. En vivo, 60 s (si ESPEJO_CADA ya es menor, se respeta: nunca la baja más).
+function Espera-Ciclo([double]$cadaSeg, $finVivo, [datetime]$ahora) {
+  if ($finVivo -and $ahora -lt $finVivo) { return [math]::Min($cadaSeg, $ESPERA_VIVO) }
+  return $cadaSeg
+}
+
 # Envía un lote. Devuelve: ok | reintento | fin (401/403: el lector termina).
 function Envia($filas, $estC) {
   $cuerpo = @{ v = 1; equipo = $equipo; informe = 'pieza'; leidoEn = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'); filas = [object[]]@($filas); estado = $estC }
@@ -617,6 +638,12 @@ function Envia($filas, $estC) {
     if ($detener) { Log 'HTTP 200 con detener=true: el lector termina.'; Marca-Revocada; return 'fin' }
     $script:actualizar = $null
     if ($jr -and $jr.actualizar) { $script:actualizar = $jr.actualizar }
+    # e1.4: cada 200 dice si sigue el modo vivo (sin vivoSeg = vuelve a ESPEJO_CADA). Un envío fallido no lo toca.
+    $antes = $script:vivoFin
+    $script:vivoFin = $null
+    if ($jr) { try { $script:vivoFin = Fin-Vivo $jr.vivoSeg (Get-Date) } catch { $script:vivoFin = $null } }
+    if ($script:vivoFin -and -not $antes) { Log ('Lectura en vivo pedida: cada ' + (Espera-Ciclo $cada $script:vivoFin (Get-Date)) + ' s hasta ' + $script:vivoFin.ToString('HH:mm:ss') + '.') }
+    elseif ($antes -and -not $script:vivoFin) { Log ('Fin de la lectura en vivo: vuelve a cada ' + $cada + ' s.') }
     return 'ok'
   }
   if ($code -eq 403) { Log 'HTTP 403: llave revocada. El lector termina.'; Marca-Revocada; return 'fin' }
@@ -709,6 +736,10 @@ function Sesion-Bloqueada {
   try { return (@(Get-Process -Name LogonUI -ErrorAction SilentlyContinue).Count -gt 0) } catch { return $false }
 }
 
+function Texto-Vivo {
+  if ($script:vivoFin -and (Get-Date) -lt $script:vivoFin) { return $script:vivoFin.ToString('yyyy-MM-ddTHH:mm:sszzz') }
+  return ''
+}
 function Fecha-Hora($cel) { return ('{0} {1}' -f $cel[0], $cel[1]) }
 
 # ---------- Arranque ----------
@@ -733,6 +764,7 @@ try {
 } catch { }
 $script:bloqueada = $false
 $script:actualizar = $null
+$script:vivoFin = $null
 try { [IO.File]::WriteAllText($archivoPid, [string]$PID, $UTF8) } catch { }
 $script:arranque = Modo-Arranque
 $script:actualiz = ''
@@ -745,7 +777,7 @@ Log ('Arranque ' + $VERSION + ' (' + $script:arranque + '): equipo=' + $equipo +
 $estado = Carga-Estado
 $terminar = $false
 # Latido inmediato: Matrix queda visible como «vivo» sin esperar el primer ciclo.
-$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; error = 'iniciando' }
+$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; vivo = ''; error = 'iniciando' }
 $respIni = Envia @() $estIni
 if ($respIni -eq 'fin') { $terminar = $true }
 Escribe-Latido 'inicio'
@@ -791,7 +823,7 @@ while (-not $terminar) {
   # Con la sesión bloqueada, si no pudo leer, el motivo que se informa es el bloqueo (el original queda en el log).
   $errC = [string]$res.error
   if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }
-  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial }
+  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial; vivo = (Texto-Vivo) }
 
   $enviadas = 0
   $fin = ''
@@ -835,7 +867,7 @@ while (-not $terminar) {
 
   $seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1)
   $leidas = $items.Count
-  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' error=' + [string]$res.error)
+  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' vivo=' + [bool]((Texto-Vivo) -ne '') + ' error=' + [string]$res.error)
   if ($fin) { $terminar = $true; break }
   # «ciclo» (confirma una versión nueva) solo si la función aceptó el envío y el ciclo no reventó; si no, «vivo».
   $tipoLat = 'vivo'
@@ -847,7 +879,7 @@ while (-not $terminar) {
     if ($ra -like 'bajada *') { $terminar = $true; break }
   }
   # Si quedó a medias (sin error ni fallo de envío), el siguiente ciclo sigue ya, sin pulsar «Actualizar».
-  $espera = $cada
+  $espera = Espera-Ciclo $cada $script:vivoFin (Get-Date)
   $refrescar = $true
   if ($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) { $espera = 5; $refrescar = $false }
   try { Espera $espera } catch {

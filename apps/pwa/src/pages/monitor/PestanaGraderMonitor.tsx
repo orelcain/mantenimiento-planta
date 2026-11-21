@@ -13,6 +13,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { CoberturaGraderCard } from '@/components/grader/CoberturaGraderCard'
 import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
+import { LecturaEnVivo } from '@/components/grader/LecturaEnVivo'
 import { ventanaDelTurno } from '@/services/grader/espejo/espejoFilas'
 import { lineaDelEspejo, useEspejoGrader } from '@/services/grader/espejo/useEspejoGrader'
 import type { SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
@@ -167,6 +168,7 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
             minutos={espejo.minutos}
             resumen={espejo.cargandoPiezas ? null : espejo.resumen}
             errorPiezas={espejo.errorPiezas}
+            accion={<LecturaEnVivo linea={lineaDelEspejo(lineId)} lector={espejo.estado} />}
           />
         )}
         <CoberturaEnMonitor {...props} />
