@@ -8,6 +8,8 @@ import {
   reglaLectorCaido,
   reglaP0Alto,
   reglasPesoYCalibre,
+  reglaAtasco,
+  minutosAtasco,
   minutosCerrados,
   tramos15,
   type EntradaAlertas,
@@ -268,5 +270,111 @@ describe('evaluarAlertas', () => {
     for (let m = 45; m < 51; m++) g.g0[m] = 1 // 6/300 = 2 %
     expect(evaluarAlertas(entrada({ grader: g }))).toEqual([])
     expect(evaluarAlertas(entrada({ grader: g, umbrales: { p0CriticoPct: 1.5 } })).map((x) => x.regla)).toEqual(['p0-alto'])
+  })
+})
+
+describe('regla 5: atasco entre las Baader y el grader', () => {
+  /** 120 min parejos a 40 pz/min; el grader baja a `pzAtasco` en [desde, desde + dura). */
+  function conAtasco(desde: number, dura: number, pzAtasco = 0, n = 120) {
+    const g = grader(n, 40)
+    for (let m = desde; m < desde + dura; m++) g.pz[m] = pzAtasco
+    return g
+  }
+  const conBaader = (n: number, pz = 40) => Array(n).fill(pz) as number[]
+
+  it('salta con ≥ 80 piezas acumuladas en 10 min y lo dice «ahora»', () => {
+    const g = conAtasco(117, 3) // 3 min a 0 con 40 pz/min corridos = 120 acumuladas
+    const a = reglaAtasco(entrada({ grader: g, baader: conBaader(120), retrasoMin: 0 }), U)
+    expect(a?.regla).toBe('atasco')
+    expect(a?.nivel).toBe('atento')
+    expect(a?.titulo).toBe('09:14 · ~120 piezas acumuladas entre las Baader y el grader')
+    expect(a?.detalle).toContain('las Baader entregaron 400 piezas y al grader llegaron 280')
+    expect(a?.detalle).toContain('Sigue acumulándose')
+  })
+
+  it('con 75 piezas no salta', () => {
+    const g = conAtasco(117, 3, 15) // (40 − 15) × 3 = 75
+    expect(reglaAtasco(entrada({ grader: g, baader: conBaader(120), retrasoMin: 0 }), U)).toBeNull()
+  })
+
+  it('aplica el retraso: las Baader corridas son las que cuentan', () => {
+    // Baader y grader paran el mismo minuto: sin retraso es una detención aguas arriba; con 3 min, las piezas que
+    // salieron de las Baader antes de parar debían llegar al grader y no llegaron.
+    const g = conAtasco(110, 3)
+    const b = conBaader(120)
+    for (let m = 110; m < 113; m++) b[m] = 0
+    expect(reglaAtasco(entrada({ grader: g, baader: b, retrasoMin: 0 }), U)).toBeNull()
+    expect(reglaAtasco(entrada({ grader: g, baader: b, retrasoMin: 3 }), U)?.regla).toBe('atasco')
+  })
+
+  it('mide contra la razón grader/Baader de la hora anterior (el grader cuenta más que las Baader)', () => {
+    // El grader cuenta 10 % más (44 contra 40). Un bajón a 36 pz/min 10 min: el tránsito absoluto daría 40, la razón 80.
+    const g = grader(120, 44)
+    for (let m = 110; m < 120; m++) g.pz[m] = 36
+    const e = entrada({ grader: g, baader: conBaader(120), retrasoMin: 0 })
+    const ms = minutosAtasco(e, U, 119, 120)
+    expect(ms[0]!.razon).toBeCloseTo(1.1, 5)
+    expect(ms[0]!.acumulado).toBeCloseTo(80, 5) // 400 × 1,1 − 360
+    expect(reglaAtasco(e, U)?.detalle).toContain('llevadas a la cuenta del grader')
+  })
+
+  it('exige las Baader andando: promedio de la ventana ≥ 20 pz/min', () => {
+    const g = grader(120, 18)
+    for (let m = 115; m < 120; m++) g.pz[m] = 0
+    expect(reglaAtasco(entrada({ grader: g, baader: conBaader(120, 18), retrasoMin: 0 }), { ...U, atascoPz: 50 })).toBeNull()
+  })
+
+  it('un bajón de 2 min de las Baader dentro de la ventana no lo apaga (la serie real por minuto los trae)', () => {
+    const g = conAtasco(116, 4)
+    const b = conBaader(120)
+    b[112] = 8
+    b[113] = 9
+    expect(reglaAtasco(entrada({ grader: g, baader: b, retrasoMin: 0 }), U)?.regla).toBe('atasco')
+  })
+
+  it('queda fuera durante los 15 min siguientes a un arranque de las Baader', () => {
+    const b = conBaader(120)
+    for (let m = 60; m < 90; m++) b[m] = 0 // colación
+    const g = grader(120, 40)
+    for (let m = 60; m < 96; m++) g.pz[m] = 0 // el grader parte 6 min después
+    const e = (hasta: number) => entrada({ grader: { ...g, pz: g.pz.slice(0, hasta) }, baader: b.slice(0, hasta), retrasoMin: 0, hastaMin: hasta, leidoHastaMin: hasta })
+    expect(reglaAtasco(e(97), U)).toBeNull()
+    // Pasados los 15 min, un atasco nuevo sí avisa (la razón de esa hora todavía arrastra el arranque: 0,85).
+    for (let m = 110; m < 115; m++) g.pz[m] = 0
+    expect(reglaAtasco(e(116), U)?.regla).toBe('atasco')
+  })
+
+  it('el inicio del turno cuenta como arranque', () => {
+    const g = grader(30, 40)
+    for (let m = 0; m < 6; m++) g.pz[m] = 0
+    expect(reglaAtasco(entrada({ grader: g, baader: conBaader(30), retrasoMin: 0 }), U)).toBeNull()
+  })
+
+  it('sigue a la vista 15 min después de drenar, con la hora en que dejó de crecer', () => {
+    const g = conAtasco(100, 3, 0, 110)
+    for (let m = 103; m < 106; m++) g.pz[m] = 80 // drena
+    const a = reglaAtasco(entrada({ grader: g, baader: conBaader(110), retrasoMin: 0 }), U)
+    expect(a?.titulo.startsWith('08:57')).toBe(true)
+    expect(a?.detalle).toContain('Dejó de crecer a las 08:59')
+    // 16 min después del último minuto sobre 80 ya no se muestra.
+    const g2 = conAtasco(90, 3, 0, 110)
+    for (let m = 93; m < 96; m++) g2.pz[m] = 80
+    expect(reglaAtasco(entrada({ grader: g2, baader: conBaader(110), retrasoMin: 0 }), U)).toBeNull()
+  })
+
+  it('un minuto de las Baader sin dato (NaN) no cumple', () => {
+    const g = conAtasco(117, 3)
+    const b = conBaader(120)
+    b[115] = NaN
+    expect(reglaAtasco(entrada({ grader: g, baader: b, retrasoMin: 0 }), U)).toBeNull()
+  })
+
+  it('sin la serie de las Baader, nada', () => {
+    expect(reglaAtasco(entrada({ grader: conAtasco(117, 3), baader: null }), U)).toBeNull()
+  })
+
+  it('con el grader quieto ≥ 5 min avisa solo «grader quieto»', () => {
+    const a = evaluarAlertas(entrada({ grader: conAtasco(113, 7), baader: conBaader(120), retrasoMin: 0 }))
+    expect(a.map((x) => x.regla)).toEqual(['grader-quieto'])
   })
 })
