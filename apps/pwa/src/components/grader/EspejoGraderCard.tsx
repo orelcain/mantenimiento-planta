@@ -14,16 +14,16 @@ import { Pill } from '@/components/piel'
 import { cn } from '@/lib/utils'
 import { dec1 } from '@/utils/formatoNumeros'
 import {
+  avisoAvance,
   avisoLimite,
+  avisoSinPiezasDelTurno,
   fraseDeError,
   textoHace,
   type EstadoLector,
 } from '@/services/grader/espejo/espejoEstado'
 import {
-  fechasDelTurno,
   hhmm,
   miles,
-  resumirEspejo,
   ventanaDelTurno,
   type ResumenEspejo,
 } from '@/services/grader/espejo/espejoFilas'
@@ -47,20 +47,30 @@ function Fila({ k, v }: { k: string; v: string }) {
   )
 }
 
-export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: {
+export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas = false, className }: {
   estado: EstadoLector
   vivo: boolean
   minutos: number | null
-  resumen: ResumenEspejo
+  /** `null` mientras se bajan y reparten las piezas del turno. */
+  resumen: ResumenEspejo | null
+  /** Alguna hora del turno no se pudo leer: el total puede estar incompleto. */
+  errorPiezas?: boolean
   className?: string
 }) {
-  const error = fraseDeError(estado.estado.error)
+  const codigoError = estado.estado.error
+  const iniciando = codigoError === 'iniciando'
+  const error = fraseDeError(codigoError)
   const limite = avisoLimite(estado.estado)
-  const aviso = [error, limite].filter((x): x is string => !!x)
-  const letra = resumen.coincidencia?.letra
-  const turno = letra ? `Turno ${letra}` : resumen.turno?.shiftId ?? null
-  const rango = resumen.primera && resumen.ultima ? `${hhmm(resumen.primera)} → ${hhmm(resumen.ultima)}` : null
-  const p0 = resumen.p0 !== null ? `P0 ${dec1(resumen.p0)} %` : null
+  const avance = avisoAvance(estado.estado)
+  // Los avisos van en los dos estados (vivo y sin lectura): un corte de Matrix o un
+  // error del lector con la pastilla en «Vivo» es justo lo que hay que ver.
+  const lectura = errorPiezas ? 'No se pudo leer parte de las piezas del turno (sin permiso o sin red): el total puede estar incompleto.' : null
+  const aviso = [lectura, error, limite].filter((x): x is string => !!x)
+  const sinDelTurno = vivo && !errorPiezas && resumen && resumen.total === 0 ? avisoSinPiezasDelTurno(estado.estado) : null
+  const letra = resumen?.coincidencia?.letra
+  const turno = letra ? `Turno ${letra}` : resumen?.turno?.shiftId ?? null
+  const rango = resumen?.primera && resumen.ultima ? `${hhmm(resumen.primera)} → ${hhmm(resumen.ultima)}` : null
+  const p0 = resumen && resumen.p0 !== null ? `P0 ${dec1(resumen.p0)} %` : null
   const linea = [turno, rango, p0].filter(Boolean).join(' · ')
   const ultimaAviso = estado.ultimoLatidoMs !== null ? horaLocal(estado.ultimoLatidoMs) : '—'
 
@@ -68,7 +78,9 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: 
     <section className={cn('rounded-card border border-border bg-card p-4', className)} aria-label="Espejo del grader">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-subhead font-semibold">Espejo del grader</h3>
-        {vivo ? (
+        {vivo && iniciando ? (
+          <Pill tone="info" dot="pulse">Iniciando · {textoHace(minutos ?? 0)}</Pill>
+        ) : vivo ? (
           <Pill tone="ok" dot="pulse">Vivo · {textoHace(minutos ?? 0)}</Pill>
         ) : (
           <Pill tone="warning" dot>{minutos === null ? 'Sin lectura' : `Sin lectura ${textoHace(minutos)}`}</Pill>
@@ -77,13 +89,33 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: 
 
       {vivo ? (
         <div className="mt-2">
-          <p className="text-title1 font-semibold tabular-nums">{miles(resumen.total)} piezas</p>
-          {linea && <p className="text-footnote text-muted-foreground tabular-nums">{linea}</p>}
+          {!resumen ? (
+            <p className="text-title2 font-semibold text-muted-foreground" aria-busy="true">Cargando piezas…</p>
+          ) : resumen.total > 0 ? (
+            <>
+              <p className="text-title1 font-semibold tabular-nums">{miles(resumen.total)} piezas</p>
+              {linea && <p className="text-footnote text-muted-foreground tabular-nums">{linea}</p>}
+            </>
+          ) : (
+            <>
+              {/* Con 0 piezas no se muestra «0 piezas»: se dice por qué. */}
+              <p className="text-title2 font-semibold">
+                {iniciando ? 'Primera lectura en curso' : 'Sin piezas de este turno'}
+              </p>
+              <p className="text-footnote text-muted-foreground tabular-nums">
+                {sinDelTurno ?? (iniciando
+                  ? 'El lector acaba de arrancar. La primera lectura tarda unos minutos.'
+                  : error || errorPiezas
+                    ? 'Hay un problema de lectura: mira el aviso de abajo.'
+                    : 'El lector todavía no ha leído piezas de este turno.')}
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="mt-2">
           <p className="text-title1 font-semibold tabular-nums">
-            {resumen.ultima ? `Datos hasta ${hhmm(resumen.ultima)}` : 'Sin datos del turno'}
+            {resumen?.ultima ? `Datos hasta ${hhmm(resumen.ultima)}` : 'Sin datos del turno'}
           </p>
           <p className="text-footnote text-muted-foreground">
             El PC de planta dejó de enviar. Matrix cerrado, PC apagado o lector detenido.
@@ -91,11 +123,12 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: 
         </div>
       )}
 
-      {aviso.length > 0 && (
+      {(aviso.length > 0 || avance) && (
         <div className="mt-2 space-y-1">
           {aviso.map((t) => (
             <p key={t} className="text-footnote text-ink-warn">{t}</p>
           ))}
+          {avance && <p className="text-footnote text-muted-foreground tabular-nums">{avance}</p>}
         </div>
       )}
 
@@ -106,7 +139,7 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, className }: 
             <Fila k="Puerta 0 (motivos)" v="pendiente" />
             <Fila
               k="Turno de Matrix vs regla"
-              v={resumen.coincidencia ? `coincide ${Math.round(resumen.coincidencia.pct)} %` : '—'}
+              v={resumen?.coincidencia ? `coincide ${Math.round(resumen.coincidencia.pct)} %` : '—'}
             />
           </>
         ) : (
@@ -130,13 +163,22 @@ export function EspejoGraderConectado({ lineId, dateKey, inicio, fin, turnoId, c
   className?: string
 }) {
   const linea = lineaDelEspejo(lineId)
-  const fechas = useMemo(() => fechasDelTurno(inicio, fin), [inicio, fin])
-  const { cargando, piezas, estado, vivo, minutos } = useEspejoGrader(linea, fechas)
-  const resumen = useMemo(() => {
-    const ventana = dateKey && inicio ? ventanaDelTurno({ dateKey, inicio, fin, turnoId }) : null
-    return resumirEspejo(piezas, ventana)
-  }, [piezas, dateKey, inicio, fin, turnoId])
+  // Solo la ventana del turno (con su margen) se baja y se reparte; sin ventana no se baja nada.
+  const ventana = useMemo(
+    () => (dateKey && inicio ? ventanaDelTurno({ dateKey, inicio, fin, turnoId }) : null),
+    [dateKey, inicio, fin, turnoId],
+  )
+  const { cargando, cargandoPiezas, resumen, errorPiezas, estado, vivo, minutos } = useEspejoGrader(linea, ventana)
 
   if (cargando || !estado) return null
-  return <EspejoGraderCard estado={estado} vivo={vivo} minutos={minutos} resumen={resumen} className={className} />
+  return (
+    <EspejoGraderCard
+      estado={estado}
+      vivo={vivo}
+      minutos={minutos}
+      resumen={cargandoPiezas ? null : resumen}
+      errorPiezas={errorPiezas}
+      className={className}
+    />
+  )
 }
