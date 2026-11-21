@@ -493,6 +493,16 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "horas",
+      "fieldPath": "filas",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "p0",
+      "fieldPath": "filas",
+      "indexes": []
+    },
+    {
       "collectionGroup": "movimientos",
       "fieldPath": "createdAt",
       "indexes": [

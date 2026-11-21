@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { CoberturaGraderCard } from '@/components/grader/CoberturaGraderCard'
+import { EspejoGraderConectado } from '@/components/grader/EspejoGraderCard'
 import { Skeleton } from '@/components/piel/Skeleton'
 import { useCarpetaMatrixEstado } from '@/store/carpetaMatrixEstado'
 import {
@@ -53,10 +54,12 @@ function Aviso({ titulo, texto, accion }: { titulo: string; texto: string; accio
   )
 }
 
-export default function PestanaGraderMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
+function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
   lineId: string
   /** dateKey del turno que se está viendo. */
   dateKey: string | null
+  /** Turno que se está viendo (nombre de Shoplogix), para repartir las piezas del espejo. */
+  turnoId?: string | null
   /** Ventana del turno (wall-clock-as-UTC). */
   inicio: string | null | undefined
   fin: string | null | undefined
@@ -107,5 +110,21 @@ export default function PestanaGraderMonitor({ lineId, dateKey, inicio, fin, aho
       cadencia={cadencia}
       onCadencia={setCadencia}
     />
+  )
+}
+
+/** Pestaña «Grader»: la cobertura por exporte y, debajo, el espejo en vivo del lector (si lo hay). */
+export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaEnMonitor>[0]) {
+  return (
+    <div className="space-y-3">
+      <CoberturaEnMonitor {...props} />
+      <EspejoGraderConectado
+        lineId={props.lineId}
+        dateKey={props.dateKey}
+        inicio={props.inicio}
+        fin={props.fin}
+        turnoId={props.turnoId}
+      />
+    </div>
   )
 }

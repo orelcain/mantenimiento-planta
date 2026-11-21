@@ -8054,6 +8054,7 @@ function MonitorDelToken() {
               <PestanaGraderMonitor
                 lineId={lineaMonitor.id}
                 dateKey={vista?.dateKey || data.dateKey || null}
+                turnoId={vista?.shiftId ?? data.shiftId ?? null}
                 inicio={inicioReal ?? live.scheduledStart}
                 fin={(live.shiftClosed ? live.effectiveEnd : null) ?? live.plannedEnd ?? live.scheduledEnd}
                 ahoraWallMs={turnoCerrado ? Number.POSITIVE_INFINITY : ahoraWallMs}

@@ -37,6 +37,7 @@ import { DIAGNOSTICO_MATRIX_PS1 } from './diagnosticoMatrixScript'
 import { SONDA_MATRIX_PS1 } from './sondaMatrixScript'
 import { LECTURA_TABLA_MATRIX_PS1 } from './lecturaTablaMatrixScript'
 import { PRUEBA_VIDA_ESPEJO_PS1 } from './pruebaVidaEspejoScript'
+import { LectorEspejoCard } from './LectorEspejoCard'
 
 /** showDirectoryPicker no está tipado en todas las versiones de lib.dom: se lee aparte. */
 type ConPicker = { showDirectoryPicker?: (opts: { mode: 'read' }) => Promise<unknown> }
@@ -369,7 +370,10 @@ export function DiagnosticoMatrixPage() {
         </CardContent>
       </Card>
 
-      {/* 7. Pie: resumen para Claude */}
+      {/* 7. Lector del espejo: llave, lista y detener */}
+      <LectorEspejoCard />
+
+      {/* 8. Pie: resumen para Claude */}
       <div className="flex flex-col items-end gap-1">
         <Button size="sm" onClick={copiarResumen}>
           Copiar resumen para Claude
