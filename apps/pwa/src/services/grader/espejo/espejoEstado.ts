@@ -38,6 +38,10 @@ export interface EstadoLector {
     ajuste?: string
     /** Desde e1.2: la sesión de Windows del PC de planta estaba bloqueada en ese ciclo. */
     bloqueada?: boolean
+    /** Desde e1.3: cómo arranca el lector («tarea» = tarea programada de Windows; «manual» = sin tarea). */
+    arranque?: 'tarea' | 'manual' | string
+    /** Desde e1.3: última actualización del lector («bajada eX», «confirmada eX», …). */
+    actualiz?: string
   }
 }
 
@@ -168,6 +172,40 @@ export function estadoAjuste(estado: EstadoLector['estado']): { texto: string; a
       }
     default:
       return { texto: a, aviso: `El rango automático avisó «${a}»: revisa el registro del lector.` }
+  }
+}
+
+/** Desde e1.3: «solo (tarea de Windows)» / «manual (sin tarea)»; `null` si el lector no lo manda. */
+export function textoArranque(arranque: string | undefined): string | null {
+  if (arranque === undefined || arranque === '') return null
+  if (arranque === 'tarea') return 'solo (tarea de Windows)'
+  if (arranque === 'manual') return 'manual (sin tarea)'
+  return arranque
+}
+
+/** Frase para la última actualización del lector e1.3 («bajada e1.3» → «e1.3 bajada, …»). `null` si no hay clave. */
+export function fraseActualizacion(actualiz: string | undefined): string | null {
+  if (actualiz === undefined || actualiz === '') return null
+  const m = /^(bajada|puesta|confirmada|revertida|rechazada|hash-distinto|sin-descarga) (\S+)$/.exec(actualiz)
+  if (!m) return actualiz
+  const [, estado, v] = m
+  switch (estado) {
+    case 'bajada':
+      return `${v} bajada, se pone en marcha en ≤ 5 min`
+    case 'puesta':
+      return `${v} puesta a prueba`
+    case 'confirmada':
+      return `${v} confirmada`
+    case 'revertida':
+      return `${v} no anduvo: volvió a la anterior`
+    case 'rechazada':
+      return `${v} rechazada antes (no se vuelve a bajar)`
+    case 'hash-distinto':
+      return `${v} descartada: la huella no coincide`
+    case 'sin-descarga':
+      return `no pudo bajar ${v}; reintenta`
+    default:
+      return actualiz
   }
 }
 

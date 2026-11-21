@@ -10,6 +10,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   serverTimestamp,
   setDoc,
@@ -18,10 +19,14 @@ import {
 import { auth, db } from '../../firebase'
 import { aMs } from './espejoEstado'
 import { esHashValido, generarLlave, limpiarNombre } from './espejoLlavesLogica'
+import { VIGENCIA_ALTA_MIN, esVersionValida } from './espejoVersionLogica'
 
 export { generarLlave } from './espejoLlavesLogica'
 
 const COLECCION = 'graderEspejoLlaves'
+const COLECCION_ALTAS = 'graderEspejoAltas'
+const COLECCION_VERSION = 'graderEspejoVersion'
+const DOC_VERSION_ACTUAL = 'actual'
 const LINEA_POR_DEFECTO = 'chonchi'
 
 export interface LlaveEspejo {
@@ -35,21 +40,46 @@ export interface LlaveEspejo {
   revocadaEnMs: number | null
 }
 
-/** Crea la llave y devuelve la llave en claro (única vez que existe fuera del PC del lector). */
-export async function crearLlave(nombre: string, linea: string = LINEA_POR_DEFECTO): Promise<{ llave: string; hash: string }> {
+/**
+ * Prepara un código de alta de un solo uso para el instalador del PC de Matrix.
+ * `graderEspejoAltas/{hash}`: solo se guarda el hash; el código en claro se devuelve una vez.
+ */
+export async function crearAlta(nombre: string, linea: string = LINEA_POR_DEFECTO): Promise<{ codigo: string; venceEnMs: number }> {
   const limpio = limpiarNombre(nombre)
-  if (!limpio) throw new Error('Escribe un nombre corto para la llave.')
+  if (!limpio) throw new Error('Escribe un nombre corto para el instalador.')
   const uid = auth.currentUser?.uid
-  if (!uid) throw new Error('Inicia sesión como administrador para generar la llave.')
+  if (!uid) throw new Error('Inicia sesión como administrador para preparar el instalador.')
   const { llave, hash } = await generarLlave()
-  await setDoc(doc(db, COLECCION, hash), {
+  const venceEnMs = Date.now() + VIGENCIA_ALTA_MIN * 60_000
+  await setDoc(doc(db, COLECCION_ALTAS, hash), {
     nombre: limpio,
     linea,
     creadaEn: serverTimestamp(),
     creadaPor: uid,
-    revocada: false,
+    usada: false,
   })
-  return { llave, hash }
+  return { codigo: llave, venceEnMs }
+}
+
+/** Versión que la planta debe bajar (`graderEspejoVersion/actual`); `null` si no hay ninguna. */
+export async function leerVersionPublicada(): Promise<{ version: string; publicadaEnMs: number | null } | null> {
+  const snap = await getDoc(doc(db, COLECCION_VERSION, DOC_VERSION_ACTUAL))
+  if (!snap.exists()) return null
+  const x = snap.data() as Record<string, unknown>
+  if (typeof x.version !== 'string') return null
+  return { version: x.version, publicadaEnMs: aMs(x.publicadaEn) }
+}
+
+/** Publica la versión para planta. Valida el formato antes de escribir. */
+export async function publicarVersion(version: string): Promise<void> {
+  if (!esVersionValida(version)) throw new Error('La versión no tiene el formato eX.Y.')
+  const uid = auth.currentUser?.uid
+  if (!uid) throw new Error('Inicia sesión como administrador para publicar.')
+  await setDoc(doc(db, COLECCION_VERSION, DOC_VERSION_ACTUAL), {
+    version,
+    publicadaEn: serverTimestamp(),
+    publicadaPor: uid,
+  })
 }
 
 export async function listarLlaves(): Promise<LlaveEspejo[]> {

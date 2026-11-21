@@ -2,7 +2,9 @@
  * Espejo del grader (E1): lógica PURA de la ingesta. Sin Firebase.
  * Contrato: `espejo-grader-e1-contrato.md` (sesión #459).
  */
-const { createHash } = require('crypto')
+const { createHash, randomBytes } = require('crypto')
+const fs = require('fs')
+const path = require('path')
 
 const VERSION_CUERPO = 1
 const MAX_FILAS = 2000
@@ -19,6 +21,13 @@ const INDICES = {
   pieza: { fecha: 0, hora: 1 },
   p0: { fecha: 2, hora: 3 },
 }
+
+// E1.3: código de alta de un solo uso (mismo formato que la llave) y versión del lector.
+const RE_ALTA = /^[A-Za-z0-9_-]{43}$/
+const RE_VERSION = /^e\d{1,2}(\.\d{1,2}){1,2}$/
+// La vigencia sale de `creadaEn` (hora del servidor): el reloj del PC del admin no influye.
+const VIGENCIA_ALTA_MS = 25 * 60 * 1000
+const LECTOR_RUTA = path.join(__dirname, 'espejo', 'lector-espejo.ps1')
 
 const RE_LLAVE_HEADER = /^Bearer ([A-Za-z0-9_-]{43})$/
 const RE_EQUIPO = /^[A-Za-z0-9_-]{1,40}$/
@@ -131,7 +140,74 @@ function contarDocumentos(grupos) {
   return fechas.size + grupos.length
 }
 
+
+/** Llave nueva: 32 bytes aleatorios en base64url (43 caracteres). */
+function generarLlave() {
+  return randomBytes(32).toString('base64url')
+}
+
+/**
+ * Cuerpo del canje de alta: `{ v: 1, alta: '<43>', equipo }` (sin Authorization).
+ * @returns {{ok: true, codigo: string, equipo: string} | {ok: false, error: string}}
+ */
+function validarAlta(body) {
+  if (!esObjetoPlano(body)) return { ok: false, error: 'cuerpo no es objeto' }
+  if (body.v !== VERSION_CUERPO) return { ok: false, error: 'versión no soportada' }
+  if (typeof body.alta !== 'string' || !RE_ALTA.test(body.alta)) return { ok: false, error: 'código de alta mal formado' }
+  if (typeof body.equipo !== 'string' || !RE_EQUIPO.test(body.equipo)) return { ok: false, error: 'equipo no válido' }
+  return { ok: true, codigo: body.alta, equipo: body.equipo }
+}
+
+/**
+ * ¿Se puede canjear este documento de alta? '' si sí; si no, el motivo.
+ * `creadaEnMs` = creadaEn del servidor en milisegundos (Timestamp.toMillis()).
+ */
+function motivoAltaNoVigente(doc, ahoraMs) {
+  if (!doc) return 'código desconocido'
+  if (doc.usada === true) return 'código ya usado'
+  if (typeof doc.creadaEnMs !== 'number') return 'código vencido'
+  if (doc.creadaEnMs > ahoraMs + 60 * 1000) return 'código con fecha no válida'
+  if (ahoraMs - doc.creadaEnMs >= VIGENCIA_ALTA_MS) return 'código vencido'
+  return ''
+}
+
+/** Versión declarada en el texto del lector (`$VERSION = 'e1.3'`), o null. */
+function versionDeLector(texto) {
+  const m = /^\$VERSION = '(e[0-9.]+)'\r?$/m.exec(String(texto))
+  return m && RE_VERSION.test(m[1]) ? m[1] : null
+}
+
+/**
+ * El lector que va dentro de esta función: bytes EXACTOS que se sirven, su sha256 y su versión.
+ * El hash se calcula sobre esos mismos bytes, así el lector verifica lo que de verdad recibió.
+ */
+function lectorIncluido(ruta = LECTOR_RUTA) {
+  const bytes = fs.readFileSync(ruta)
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
+  return { bytes, sha256, version: versionDeLector(bytes.toString('utf8')) }
+}
+
+/**
+ * Qué versión debe correr en planta. Solo hay actualización si un admin publicó EXACTAMENTE la versión
+ * que trae esta función (un merge no cambia nada en planta hasta que se pulsa «Publicar»).
+ * @returns {{version: string, sha256: string} | null}
+ */
+function actualizacionVigente(publicado, incluido) {
+  if (!publicado || !incluido || !incluido.version) return null
+  if (publicado.version !== incluido.version) return null
+  return { version: incluido.version, sha256: incluido.sha256 }
+}
+
 module.exports = {
+  RE_VERSION,
+  VIGENCIA_ALTA_MS,
+  LECTOR_RUTA,
+  generarLlave,
+  validarAlta,
+  motivoAltaNoVigente,
+  versionDeLector,
+  lectorIncluido,
+  actualizacionVigente,
   VERSION_CUERPO,
   MAX_FILAS,
   MAX_LARGO_FILA,

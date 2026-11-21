@@ -1,19 +1,30 @@
 /**
- * Instalador del lector del espejo del grader que se copia desde Diagnóstico Matrix: deja el lector oculto en el PC de Matrix. Controles que acciona: las 2 fechas del rango, la casilla «Limitar» (solo desmarcar) y «Actualizar».
+ * Instalador del lector del espejo del grader (e1.3) que se copia desde Diagnóstico Matrix: trae un código de alta de un solo uso, deja el lector oculto con una tarea programada que lo arranca y lo repara, y acciona solo las 2 fechas del rango, la casilla «Limitar» (solo desmarcar) y «Actualizar».
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/instalar-lector-espejo.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
 export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
-  # Instalador del lector del espejo del grader. Pegar TODO en PowerShell y Enter (una vez por PC).
-  # Este archivo lo genera armar-instalador.mjs: no editar a mano; editar lector-espejo.ps1 y regenerar.
+  # Instalador del lector del espejo del grader (e1.3). Pegar TODO en PowerShell y Enter. Un solo pegado.
+  # Este archivo lo genera armar-instalador.mjs: no editar a mano; editar lector-espejo.ps1 o vigilante-espejo.ps1 y regenerar.
+  # Trae un código de alta de UN solo uso que vence en 25 min: al canjearlo, la función entrega la llave y el
+  # código ya no sirve. La llave se guarda cifrada (DPAPI) y nunca se muestra.
   $ErrorActionPreference = 'Stop'
   $UTF8 = New-Object System.Text.UTF8Encoding($false)
   if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') {
     throw 'Este PowerShell no está en FullLanguage. Ábrelo normal (sin modo restringido) y vuelve a pegar.'
   }
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+  $ALTA = '@@ALTA@@'
+  $URL_ALTA = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/espejoGraderIngesta'
+  $TAREA = 'Espejo del grader'
   $dir = Join-Path $env:LOCALAPPDATA 'espejo-grader'
   $archivoLlave = Join-Path $dir 'llave.dat'
   $archivoDetener = Join-Path $dir 'DETENER'
+  $vbs = Join-Path $dir 'vigilante.vbs'
+  $vigilante = Join-Path $dir 'vigilante-espejo.ps1'
+  $equipo = ([string]$env:COMPUTERNAME) -replace '[^A-Za-z0-9_-]', ''
+  if ($equipo.Length -gt 40) { $equipo = $equipo.Substring(0, 40) }
+  if (-not $equipo) { $equipo = 'PC' }
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
   function Lector-Vivo {
@@ -21,8 +32,63 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
     catch { return $false }
   }
 
-  # 1) El lector: una sola fuente, incrustada aquí (con BOM UTF-8 para PowerShell 5.1).
-  $lectorTexto = @'
+  # Saca del historial de PowerShell las líneas con el código (aunque ya no sirva, no se deja escrito).
+  function Limpia-Historial {
+    try {
+      $ruta = (Get-PSReadLineOption).HistorySavePath
+      if ($ruta -and (Test-Path -LiteralPath $ruta)) {
+        $lineas = [IO.File]::ReadAllLines($ruta)
+        $quedan = @($lineas | Where-Object { $_ -notlike ('*' + $ALTA + '*') })
+        if ($quedan.Count -ne $lineas.Count) { [IO.File]::WriteAllLines($ruta, [string[]]$quedan, $UTF8) }
+      }
+    } catch { }
+    try { [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory() } catch { }
+    try { Clear-History } catch { }
+  }
+
+  try {
+    # 1) La llave: se canjea el código de un solo uso. Sin código válido se conserva la llave guardada.
+    if ($ALTA -match '^[A-Za-z0-9_-]{43}$') {
+      $cuerpo = ConvertTo-Json -InputObject @{ v = 1; alta = $ALTA; equipo = $equipo } -Compress
+      $code = -1
+      $resp = $null
+      try {
+        $r = Invoke-WebRequest -Uri $URL_ALTA -Method Post -ContentType 'application/json; charset=utf-8' -Body ($UTF8.GetBytes($cuerpo)) -UseBasicParsing -TimeoutSec 60
+        $code = [int]$r.StatusCode
+        $resp = ConvertFrom-Json ([string]$r.Content)
+      } catch {
+        if ($_.Exception.Response) { try { $code = [int]$_.Exception.Response.StatusCode } catch { } }
+      }
+      if ($code -ne 200 -or -not $resp -or ([string]$resp.llave) -notmatch '^[A-Za-z0-9_-]{43}$') {
+        if ($code -eq 401 -or $code -eq 403) { throw 'El código del instalador ya se usó o venció (dura 25 min). Copia el instalador otra vez desde la app y pégalo.' }
+        throw ('No se pudo canjear el código (HTTP ' + $code + '). Revisa la conexión a internet y vuelve a pegar.')
+      }
+      $ss = ConvertTo-SecureString ([string]$resp.llave) -AsPlainText -Force
+      $resp = $null
+      [IO.File]::WriteAllText($archivoLlave, (ConvertFrom-SecureString $ss), $UTF8)
+      Write-Output 'Llave nueva recibida y guardada cifrada (DPAPI de este usuario).'
+    } elseif (Test-Path -LiteralPath $archivoLlave) {
+      Write-Output 'Este instalador no trae código: se conserva la llave guardada.'
+    } else {
+      throw 'Este instalador no trae código de alta y no hay llave guardada. Cópialo desde la app (botón «Copiar instalador»).'
+    }
+
+    # 2) Recién con la llave asegurada se detiene lo anterior (un código vencido no deja la planta sin lector).
+    # Primero la tarea (para que no lo vuelva a arrancar), después el lector. Si sigue en un ciclo, se instala
+    # igual: el archivo DETENER lo hace salir al terminar ese ciclo y la tarea nueva arranca el lector nuevo.
+    $esperaViejo = $false
+    try { Unregister-ScheduledTask -TaskName $TAREA -Confirm:$false -ErrorAction Stop; Write-Output 'Tarea anterior quitada.' } catch { }
+    if (Lector-Vivo) {
+      New-Item -ItemType File -Force -Path $archivoDetener | Out-Null
+      $fin = (Get-Date).AddSeconds(20)
+      while ((Lector-Vivo) -and (Get-Date) -lt $fin) { Start-Sleep -Milliseconds 500 }
+      if (Lector-Vivo) { $esperaViejo = $true; Write-Output 'El lector anterior está en un ciclo: sale al terminarlo y el nuevo arranca solo.' }
+      else { Write-Output 'Lector anterior detenido.' }
+    }
+    if (-not $esperaViejo) { Remove-Item -LiteralPath $archivoDetener -ErrorAction SilentlyContinue }
+
+    # 3) El lector y el vigilante: una sola fuente cada uno, incrustada aquí (con BOM UTF-8 para PowerShell 5.1).
+    $lectorTexto = @'
 # Lector del espejo del grader, contrato E1 (fuente: espejo-grader-e1-contrato.md).
 # Corre OCULTO y en una sola instancia. Lee «Pieza pieza Grader» de Matrix CG por UI Automation y envía las
 # filas-pieza nuevas a espejoGraderIngesta. Controles que acciona (y ningún otro, nunca datos):
@@ -43,6 +109,7 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
 # Sin Write-Host ni ventanas: todo va a <dir>\\lector.log.
 
 $ErrorActionPreference = 'Continue'
+$VERSION = 'e1.3'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -84,6 +151,17 @@ $archivoLog = Join-Path $dir 'lector.log'
 $archivoEstado = Join-Path $dir 'estado.json'
 $archivoDetener = Join-Path $dir 'DETENER'
 $archivoLlave = Join-Path $dir 'llave.dat'
+# E1.3: el vigilante (tarea programada) lee latido.txt y lector.pid; REVOCADA le dice que borre la tarea;
+# lector-nuevo.ps1 + nuevo.json son una versión ya bajada y verificada que el vigilante pone en marcha.
+$archivoLatido = Join-Path $dir 'latido.txt'
+$archivoPid = Join-Path $dir 'lector.pid'
+$archivoRevocada = Join-Path $dir 'REVOCADA'
+$archivoNuevo = Join-Path $dir 'lector-nuevo.ps1'
+$archivoNuevoInfo = Join-Path $dir 'nuevo.json'
+$archivoRechazadas = Join-Path $dir 'rechazadas.txt'
+$archivoActualiz = Join-Path $dir 'actualiz.txt'
+$TAREA = 'Espejo del grader'
+if ($env:ESPEJO_TAREA) { $TAREA = $env:ESPEJO_TAREA }
 $UTF8 = New-Object System.Text.UTF8Encoding($false)
 $AE = [System.Windows.Automation.AutomationElement]
 $WALK = [System.Windows.Automation.TreeWalker]::ControlViewWalker
@@ -550,6 +628,63 @@ function Conteos-Hasta($lec, $j) {
   return , $salida.ToArray()
 }
 
+# ---- E1.3: vigilante y autoactualización ----
+# La llave ya no sirve: el vigilante lo ve en REVOCADA y borra la tarea programada (no vuelve a arrancar).
+function Marca-Revocada {
+  try { [IO.File]::WriteAllText($archivoRevocada, (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'), $UTF8) } catch { }
+}
+
+# Fin de cada ciclo: el vigilante mira la fecha y la versión para saber si el lector sigue sano.
+# $tipo: inicio (recién arrancado) | vivo (ciclo con falla) | ciclo (ciclo sano con envío aceptado: solo eso
+# confirma una versión nueva).
+function Escribe-Latido([string]$tipo) {
+  try { [IO.File]::WriteAllText($archivoLatido, ((Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') + ' ' + $VERSION + ' ' + $tipo), $UTF8) } catch { }
+}
+
+function Sha256-Hex([byte[]]$b) {
+  $h = [Security.Cryptography.SHA256]::Create()
+  try { return (-join ($h.ComputeHash($b) | ForEach-Object { $_.ToString('x2') })) } finally { $h.Dispose() }
+}
+
+# La función ofrece { version, sha256 } solo si un admin pulsó «Publicar». Baja el lector de ESA misma
+# función (con la llave), comprueba el sha256 sobre los bytes recibidos y que declare esa versión, y lo deja
+# en lector-nuevo.ps1. Nunca ejecuta nada: el vigilante lo pone en marcha y vuelve atrás si no late.
+# Devuelve '' (nada que hacer) | 'bajada eX' | otro motivo para el latido.
+function Revisa-Actualizacion {
+  $act = $script:actualizar
+  if (-not $act) { return '' }
+  $v = [string]$act.version
+  $sha = ([string]$act.sha256).ToLower()
+  if ($v -notmatch '^e\\d{1,2}(\\.\\d{1,2}){1,2}$' -or $sha -notmatch '^[0-9a-f]{64}$') { return 'oferta-mal-formada' }
+  if ($v -eq $VERSION) { return '' }
+  # Sin tarea programada nadie pondría la versión nueva: el lector sigue con la actual y lo informa.
+  if ((Modo-Arranque) -ne 'tarea') { return ('sin-tarea ' + $v) }
+  if ((Test-Path -LiteralPath $archivoRechazadas) -and (@(Get-Content -LiteralPath $archivoRechazadas -ErrorAction SilentlyContinue) -contains $sha)) { return ('rechazada ' + $v) }
+  if ((Test-Path -LiteralPath $archivoNuevo) -and (Test-Path -LiteralPath $archivoNuevoInfo)) { return ('bajada ' + $v) }
+  $b = $null
+  try {
+    $r = Invoke-WebRequest -Uri ($url + '?lector=' + [uri]::EscapeDataString($v)) -Method Get -Headers @{ Authorization = ('Bearer ' + $script:llave) } -UseBasicParsing -TimeoutSec 60
+    if ([int]$r.StatusCode -ne 200) { return ('sin-descarga ' + $v) }
+    $b = $r.RawContentStream.ToArray()
+  } catch { return ('sin-descarga ' + $v) }
+  if (-not $b -or $b.Length -lt 1000) { return ('sin-descarga ' + $v) }
+  if ((Sha256-Hex $b) -ne $sha) { Log ('Actualización ' + $v + ' descartada: el sha256 no coincide.'); return ('hash-distinto ' + $v) }
+  $texto = (New-Object System.Text.UTF8Encoding($false)).GetString($b)
+  if ($texto -notmatch ("(?m)^\\\`$VERSION = '" + [regex]::Escape($v) + "'\\r?$")) { Log ('Actualización ' + $v + ' descartada: no declara esa versión.'); return ('version-distinta ' + $v) }
+  try {
+    [IO.File]::WriteAllBytes($archivoNuevo, $b)
+    [IO.File]::WriteAllText($archivoNuevoInfo, (ConvertTo-Json -InputObject @{ version = $v; sha256 = $sha } -Compress), $UTF8)
+  } catch { return ('sin-escribir ' + $v) }
+  Log ('Actualización ' + $v + ' bajada y verificada (sha256 ' + $sha.Substring(0, 8) + '): el lector sale y el vigilante la pone en marcha.')
+  return ('bajada ' + $v)
+}
+
+# ¿Lo levanta la tarea programada? (latido «arranque»: tarea | manual)
+function Modo-Arranque {
+  try { if (Get-ScheduledTask -TaskName $TAREA -ErrorAction Stop) { return 'tarea' } } catch { }
+  return 'manual'
+}
+
 # Envía un lote. Devuelve: ok | reintento | fin (401/403: el lector termina).
 function Envia($filas, $estC) {
   $cuerpo = @{ v = 1; equipo = $equipo; informe = 'pieza'; leidoEn = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'); filas = [object[]]@($filas); estado = $estC }
@@ -567,12 +702,16 @@ function Envia($filas, $estC) {
   }
   if ($code -eq 200) {
     $detener = $false
-    try { $detener = [bool](ConvertFrom-Json $cuerpoResp).detener } catch { }
-    if ($detener) { Log 'HTTP 200 con detener=true: el lector termina.'; return 'fin' }
+    $jr = $null
+    try { $jr = ConvertFrom-Json $cuerpoResp } catch { }
+    if ($jr) { try { $detener = [bool]$jr.detener } catch { } }
+    if ($detener) { Log 'HTTP 200 con detener=true: el lector termina.'; Marca-Revocada; return 'fin' }
+    $script:actualizar = $null
+    if ($jr -and $jr.actualizar) { $script:actualizar = $jr.actualizar }
     return 'ok'
   }
-  if ($code -eq 403) { Log 'HTTP 403: llave revocada. El lector termina.'; return 'fin' }
-  if ($code -eq 401) { Log 'HTTP 401: sin llave o llave desconocida. El lector termina.'; return 'fin' }
+  if ($code -eq 403) { Log 'HTTP 403: llave revocada. El lector termina.'; Marca-Revocada; return 'fin' }
+  if ($code -eq 401) { Log 'HTTP 401: sin llave o llave desconocida. El lector termina.'; Marca-Revocada; return 'fin' }
   if ($code -eq -1) { Log 'Sin respuesta (red o tiempo agotado): se reintenta en el ciclo siguiente.' }
   else { Log ('HTTP ' + $code + ': se reintenta en el ciclo siguiente sin avanzar el ancla.') }
   return 'reintento'
@@ -684,16 +823,28 @@ try {
   [void][EspejoGrader.Energia]::SetThreadExecutionState([uint32]2147483649)
 } catch { }
 $script:bloqueada = $false
+$script:actualizar = $null
+try { [IO.File]::WriteAllText($archivoPid, [string]$PID, $UTF8) } catch { }
+$script:arranque = Modo-Arranque
+$script:actualiz = ''
+if (Test-Path -LiteralPath $archivoActualiz) { try { $script:actualiz = ([IO.File]::ReadAllText($archivoActualiz)).Trim() } catch { } }
+if ($script:actualiz.Length -gt 60) { $script:actualiz = $script:actualiz.Substring(0, 60) }
 try { $script:llave = Lee-Llave } catch { Log 'No se pudo leer llave.dat (falta o no es de este usuario). El lector termina.'; exit 1 }
 if (-not $script:llave) { Log 'llave.dat vacío. El lector termina.'; exit 1 }
-Log ('Arranque: equipo=' + $equipo + ' cada=' + $cada + ' s, filtro=' + $filtro + ', dir=' + $dir)
+Log ('Arranque ' + $VERSION + ' (' + $script:arranque + '): equipo=' + $equipo + ' cada=' + $cada + ' s, filtro=' + $filtro + ', dir=' + $dir)
 
 $estado = Carga-Estado
 $terminar = $false
 # Latido inmediato: Matrix queda visible como «vivo» sin esperar el primer ciclo.
-$estIni = @{ version = 'e1.2'; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; error = 'iniciando' }
+$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; error = 'iniciando' }
 $respIni = Envia @() $estIni
 if ($respIni -eq 'fin') { $terminar = $true }
+Escribe-Latido 'inicio'
+if (-not $terminar) {
+  $ra = Revisa-Actualizacion
+  if ($ra) { $script:actualiz = $ra }
+  if ($ra -like 'bajada *') { $terminar = $true }
+}
 $refrescar = $true
 while (-not $terminar) {
   $reloj = [Diagnostics.Stopwatch]::StartNew()
@@ -731,7 +882,7 @@ while (-not $terminar) {
   # Con la sesión bloqueada, si no pudo leer, el motivo que se informa es el bloqueo (el original queda en el log).
   $errC = [string]$res.error
   if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }
-  $estC = @{ version = 'e1.2'; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial }
+  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial }
 
   $enviadas = 0
   $fin = ''
@@ -777,6 +928,15 @@ while (-not $terminar) {
   $leidas = $items.Count
   Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' error=' + [string]$res.error)
   if ($fin) { $terminar = $true; break }
+  # «ciclo» (confirma una versión nueva) solo si la función aceptó el envío y el ciclo no reventó; si no, «vivo».
+  $tipoLat = 'vivo'
+  if ($resp -eq 'ok' -and @('excepcion', 'tope-10-min') -notcontains [string]$res.error) { $tipoLat = 'ciclo' }
+  Escribe-Latido $tipoLat
+  if ($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) { } else {
+    $ra = Revisa-Actualizacion
+    if ($ra) { $script:actualiz = $ra }
+    if ($ra -like 'bajada *') { $terminar = $true; break }
+  }
   # Si quedó a medias (sin error ni fallo de envío), el siguiente ciclo sigue ya, sin pulsar «Actualizar».
   $espera = $cada
   $refrescar = $true
@@ -793,52 +953,236 @@ Log 'Fin del lector.'
 try { $script:mutex.ReleaseMutex() } catch { }
 exit 0
 '@
-  [IO.File]::WriteAllText((Join-Path $dir 'lector-espejo.ps1'), $lectorTexto, (New-Object System.Text.UTF8Encoding($true)))
-  Write-Output 'Lector escrito en la carpeta del espejo.'
+    $vigilanteTexto = @'
+# Vigilante del lector del espejo del grader (E1.3). Lo corre la tarea programada «Espejo del grader» cada
+# 5 minutos, oculta y con el usuario de Windows que inició sesión (el lector necesita su escritorio y su DPAPI).
+# Cada vuelta hace UNA cosa y sale:
+#   1. REVOCADA (la app detuvo el lector): borra la tarea y no arranca nada.
+#   2. Hay una versión nueva ya bajada y verificada: la pone en marcha y guarda la anterior.
+#   3. Una versión recién puesta no late en 15 min: vuelve a la anterior y no la vuelve a bajar.
+#   4. El lector no corre: lo arranca. Corre pero no late hace 20 min: lo detiene (solo por su PID) y lo arranca.
+# Nunca toca Matrix. Todo va a <dir>\\vigilante.log.
+$ErrorActionPreference = 'Continue'
+$dir = Join-Path $env:LOCALAPPDATA 'espejo-grader'
+if ($env:ESPEJO_DIR) { $dir = $env:ESPEJO_DIR }
+$TAREA = 'Espejo del grader'
+if ($env:ESPEJO_TAREA) { $TAREA = $env:ESPEJO_TAREA }
+$MIN_SIN_LATIDO = 20
+if ($env:ESPEJO_MIN_SIN_LATIDO) { $MIN_SIN_LATIDO = [double]$env:ESPEJO_MIN_SIN_LATIDO }
+$MIN_PRUEBA = 15
+if ($env:ESPEJO_MIN_PRUEBA) { $MIN_PRUEBA = [double]$env:ESPEJO_MIN_PRUEBA }
+$MUTEX = 'Local\\EspejoGraderLector'
+if ($env:ESPEJO_MUTEX) { $MUTEX = $env:ESPEJO_MUTEX }
+$UTF8 = New-Object System.Text.UTF8Encoding($false)
+$lector = Join-Path $dir 'lector-espejo.ps1'
+$anterior = Join-Path $dir 'lector-anterior.ps1'
+$nuevo = Join-Path $dir 'lector-nuevo.ps1'
+$nuevoInfo = Join-Path $dir 'nuevo.json'
+$cambio = Join-Path $dir 'cambio.json'
+$latido = Join-Path $dir 'latido.txt'
+$archivoPid = Join-Path $dir 'lector.pid'
+$revocada = Join-Path $dir 'REVOCADA'
+$rechazadas = Join-Path $dir 'rechazadas.txt'
+$actualiz = Join-Path $dir 'actualiz.txt'
+$archivoLog = Join-Path $dir 'vigilante.log'
 
-  # 2) La llave: se pide oculta y se guarda cifrada con DPAPI (solo este usuario de Windows la puede leer).
-  $pedir = $true
-  if (Test-Path -LiteralPath $archivoLlave) {
-    $r = Read-Host 'Ya hay una llave guardada. Enter = conservarla; escribe R y Enter para reemplazarla'
-    if ($r -ne 'R') { $pedir = $false }
-  }
-  if ($pedir) {
-    $ss = Read-Host 'Pega la llave del espejo (no se muestra)' -AsSecureString
-    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss)
-    try { $plano = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
-    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-    if ($plano -notmatch '^[A-Za-z0-9_-]{43}$') { $plano = $null; throw 'La llave debe tener 43 caracteres base64url. No se guardó nada.' }
-    $plano = $null
-    [IO.File]::WriteAllText($archivoLlave, (ConvertFrom-SecureString $ss), $UTF8)
-    Write-Output 'Llave guardada cifrada (DPAPI de este usuario).'
-  } else {
-    Write-Output 'Se conserva la llave guardada.'
-  }
-
-  # 3) Si hay un lector corriendo, se detiene por el archivo DETENER (hasta 20 s).
-  if (Lector-Vivo) {
-    New-Item -ItemType File -Force -Path $archivoDetener | Out-Null
-    $fin = (Get-Date).AddSeconds(20)
-    while ((Lector-Vivo) -and (Get-Date) -lt $fin) { Start-Sleep -Milliseconds 500 }
-    if (Lector-Vivo) {
-      throw 'El lector anterior sigue en un ciclo (puede tardar hasta 10 min). Espera a que termine y vuelve a pegar este bloque. El archivo DETENER queda para él.'
+function VLog([string]$m) {
+  try {
+    if ((Test-Path -LiteralPath $archivoLog) -and (Get-Item -LiteralPath $archivoLog).Length -ge 256KB) {
+      Move-Item -LiteralPath $archivoLog -Destination ($archivoLog + '.1') -Force
     }
-    Write-Output 'Lector anterior detenido.'
+    [IO.File]::AppendAllText($archivoLog, ('{0:yyyy-MM-dd HH:mm:ss} {1}' -f (Get-Date), $m) + "\`r\`n", $UTF8)
+  } catch { }
+}
+
+function Lector-Vivo {
+  try { $m = [System.Threading.Mutex]::OpenExisting($MUTEX); $m.Dispose(); return $true } catch { return $false }
+}
+
+function Sha256-Archivo([string]$ruta) {
+  $h = [Security.Cryptography.SHA256]::Create()
+  try { return (-join ($h.ComputeHash([IO.File]::ReadAllBytes($ruta)) | ForEach-Object { $_.ToString('x2') })) } finally { $h.Dispose() }
+}
+
+# Fecha y versión del último latido local ($null si no hay).
+function Lee-Latido {
+  try {
+    $t = ([IO.File]::ReadAllText($latido)).Trim().Split(' ')
+    return @{ fecha = [datetime]::Parse($t[0]); version = [string]$t[1]; tipo = [string]$t[2] }
+  } catch { return $null }
+}
+
+# Detiene SOLO el proceso del lector: el PID de lector.pid y solo si su línea de comandos es la del lector.
+function Detiene-Lector {
+  try {
+    $p = [int]([IO.File]::ReadAllText($archivoPid)).Trim()
+    $proc = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $p) -ErrorAction Stop
+    if ($proc -and ([string]$proc.CommandLine) -like ('*' + $lector + '*')) {
+      Stop-Process -Id $p -Force -ErrorAction Stop
+      VLog ('Lector detenido (PID ' + $p + ').')
+      Start-Sleep -Seconds 2
+      return $true
+    }
+    VLog ('PID ' + $p + ' no es el lector: no se toca.')
+  } catch { VLog ('No se pudo detener el lector: ' + $_.Exception.Message) }
+  return $false
+}
+
+function Arranca-Lector {
+  if (-not (Test-Path -LiteralPath $lector)) { VLog 'No está lector-espejo.ps1: no hay nada que arrancar.'; return }
+  $ps = 'powershell.exe'
+  if ($env:ESPEJO_POWERSHELL) { $ps = $env:ESPEJO_POWERSHELL }
+  Start-Process $ps -WindowStyle Hidden -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $lector + '"') | Out-Null
+  VLog 'Lector arrancado (oculto).'
+}
+
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+# Un solo vigilante a la vez (dos disparos juntos podrían pisar lector-anterior.ps1).
+$nuevoVig = $false
+$mxVig = New-Object System.Threading.Mutex -ArgumentList @($false, ($MUTEX + 'Vigilante'), ([ref]$nuevoVig))
+if (-not $nuevoVig) { VLog 'Otro vigilante está trabajando: este sale.'; exit 0 }
+
+# 1) Detenido desde la app: la tarea se borra sola.
+if (Test-Path -LiteralPath $revocada) {
+  try { Unregister-ScheduledTask -TaskName $TAREA -Confirm:$false -ErrorAction Stop; VLog 'REVOCADA: tarea programada borrada.' }
+  catch { VLog ('REVOCADA: no se pudo borrar la tarea: ' + $_.Exception.Message) }
+  exit 0
+}
+
+$vivo = Lector-Vivo
+
+# 2) Versión nueva bajada y verificada por el lector: se pone en marcha cuando el lector ya salió.
+if ((Test-Path -LiteralPath $nuevo) -and (Test-Path -LiteralPath $nuevoInfo) -and -not $vivo) {
+  $info = $null
+  try { $info = ConvertFrom-Json ([IO.File]::ReadAllText($nuevoInfo)) } catch { }
+  $sha = ''
+  if ($info) { $sha = ([string]$info.sha256).ToLower() }
+  if (-not $info -or (Sha256-Archivo $nuevo) -ne $sha) {
+    VLog 'lector-nuevo.ps1 no coincide con su sha256: se descarta.'
+    Remove-Item -LiteralPath $nuevo, $nuevoInfo -Force -ErrorAction SilentlyContinue
+  } else {
+    try {
+      Copy-Item -LiteralPath $lector -Destination $anterior -Force -ErrorAction Stop
+      Move-Item -LiteralPath $nuevo -Destination $lector -Force -ErrorAction Stop
+    } catch {
+      # Sin cambio a medias: si la nueva no quedó entera, vuelve la actual y se reintenta en la próxima vuelta.
+      VLog ('No se pudo poner la versión nueva: ' + $_.Exception.Message)
+      if ((Test-Path -LiteralPath $anterior) -and -not (Test-Path -LiteralPath $nuevo)) { Copy-Item -LiteralPath $anterior -Destination $lector -Force -ErrorAction SilentlyContinue }
+      Arranca-Lector
+      exit 0
+    }
+    Remove-Item -LiteralPath $nuevoInfo -Force -ErrorAction SilentlyContinue
+    $c = @{ desde = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'); version = [string]$info.version; sha256 = $sha }
+    [IO.File]::WriteAllText($cambio, (ConvertTo-Json -InputObject $c -Compress), $UTF8)
+    [IO.File]::WriteAllText($actualiz, ('puesta ' + [string]$info.version), $UTF8)
+    VLog ('Versión ' + [string]$info.version + ' puesta en marcha; la anterior queda en lector-anterior.ps1.')
+    Arranca-Lector
+    exit 0
   }
-  # Un DETENER viejo haría que el lector nuevo saliera al instante.
-  Remove-Item -LiteralPath $archivoDetener -ErrorAction SilentlyContinue
+}
 
-  # 4) Arranque oculto del lector.
-  Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $dir 'lector-espejo.ps1') | Out-Null
-  Start-Sleep -Seconds 5
-  if (Lector-Vivo) { Write-Output 'Lector en marcha (oculto).' }
-  else { Write-Output 'OJO: no se ve el lector en marcha. Revisa el log antes de dar por instalado.' }
+# 3) Período de prueba de una versión recién puesta.
+if (Test-Path -LiteralPath $cambio) {
+  $c = $null
+  try { $c = ConvertFrom-Json ([IO.File]::ReadAllText($cambio)) } catch { }
+  $lat = Lee-Latido
+  $desde = $null
+  if ($c) { try { $desde = [datetime]::Parse([string]$c.desde) } catch { } }
+  if (-not $c -or -not $desde) {
+    Remove-Item -LiteralPath $cambio -Force -ErrorAction SilentlyContinue
+  } elseif ($lat -and $lat.version -eq [string]$c.version -and $lat.tipo -eq 'ciclo' -and $lat.fecha -gt $desde) {
+    Remove-Item -LiteralPath $cambio -Force -ErrorAction SilentlyContinue
+    [IO.File]::WriteAllText($actualiz, ('confirmada ' + [string]$c.version), $UTF8)
+    VLog ('Versión ' + [string]$c.version + ' confirmada: completó un ciclo.')
+  } elseif (((Get-Date) - $desde).TotalMinutes -ge $MIN_PRUEBA) {
+    VLog ('Versión ' + [string]$c.version + ' no completó un ciclo en ' + $MIN_PRUEBA + ' min: vuelta a la anterior.')
+    # Primero se detiene la versión nueva; si no se pudo, nada cambia y se reintenta en la próxima vuelta.
+    if ($vivo -and -not (Detiene-Lector)) { VLog 'La versión nueva sigue corriendo: la vuelta atrás queda para la próxima vuelta.'; exit 0 }
+    [IO.File]::AppendAllText($rechazadas, ([string]$c.sha256 + "\`r\`n"), $UTF8)
+    if (Test-Path -LiteralPath $anterior) {
+      try { Copy-Item -LiteralPath $anterior -Destination $lector -Force -ErrorAction Stop }
+      catch { VLog ('No se pudo devolver la versión anterior: ' + $_.Exception.Message + '. Se reintenta.'); exit 0 }
+    }
+    Remove-Item -LiteralPath $cambio -Force -ErrorAction SilentlyContinue
+    [IO.File]::WriteAllText($actualiz, ('revertida ' + [string]$c.version), $UTF8)
+    Arranca-Lector
+    exit 0
+  } else {
+    if (-not $vivo) { Arranca-Lector }
+    exit 0
+  }
+}
 
-  # 5) Resumen.
-  Write-Output ''
-  Write-Output ('Dónde queda: ' + $dir)
-  Write-Output ('Log: ' + (Join-Path $dir 'lector.log'))
-  Write-Output 'Cómo se detiene: botón «Detener» de la app (revoca la llave), o crear el archivo DETENER en esa carpeta.'
-  Write-Output 'NO arranca solo al reiniciar el PC: hay que volver a pegar este bloque.'
+# 4) Sano: corre y latió hace poco. Si no corre, se arranca; si corre sin latir, se reinicia.
+if (-not $vivo) {
+  VLog 'El lector no corre.'
+  Arranca-Lector
+  exit 0
+}
+$lat = Lee-Latido
+if (-not $lat -or ((Get-Date) - $lat.fecha).TotalMinutes -ge $MIN_SIN_LATIDO) {
+  VLog ('El lector corre pero no late hace ' + $MIN_SIN_LATIDO + ' min o más: se reinicia.')
+  if (Detiene-Lector) { Arranca-Lector }
+}
+exit 0
+'@
+    $BOM = New-Object System.Text.UTF8Encoding($true)
+    [IO.File]::WriteAllText((Join-Path $dir 'lector-espejo.ps1'), $lectorTexto, $BOM)
+    [IO.File]::WriteAllText($vigilante, $vigilanteTexto, $BOM)
+    # Instalación limpia: sin versiones a medio poner ni marcas de una llave vieja.
+    foreach ($a in 'lector-nuevo.ps1', 'nuevo.json', 'cambio.json', 'REVOCADA', 'actualiz.txt') {
+      Remove-Item -LiteralPath (Join-Path $dir $a) -Force -ErrorAction SilentlyContinue
+    }
+    Write-Output 'Lector y vigilante escritos en la carpeta del espejo.'
+
+    # 4) Arranque solo: tarea del usuario de Windows, oculta, cada 5 min (el vigilante arranca o repara el lector).
+    $wshApagado = $false
+    foreach ($raiz in 'HKCU:', 'HKLM:') {
+      try { if ((Get-ItemProperty -Path ($raiz + '\\Software\\Microsoft\\Windows Script Host\\Settings') -Name Enabled -ErrorAction Stop).Enabled -eq 0) { $wshApagado = $true } } catch { }
+    }
+    $lineaPs = 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $vigilante + '"'
+    [IO.File]::WriteAllText($vbs, ('CreateObject("WScript.Shell").Run "' + $lineaPs.Replace('"', '""') + '", 0, True'), $UTF8)
+    if ($wshApagado) {
+      $accion = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $vigilante + '"')
+      Write-Output 'OJO: Windows Script Host está apagado en este PC; la tarea usa PowerShell directo y puede asomar una ventana un instante.'
+    } else {
+      $accion = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('//B //Nologo "' + $vbs + '"')
+    }
+    $quien = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+    $conf = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 3) -Hidden
+    $cada5 = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
+    $alEntrar = New-ScheduledTaskTrigger -AtLogOn -User ([Security.Principal.WindowsIdentity]::GetCurrent().Name)
+    $modoTarea = 'no'
+    try {
+      Register-ScheduledTask -TaskName $TAREA -Action $accion -Trigger @($cada5, $alEntrar) -Principal $quien -Settings $conf -Description 'Lector del espejo del grader: lo arranca y lo repara. Se borra solo si la app lo detiene.' -Force -ErrorAction Stop | Out-Null
+      $modoTarea = 'cada 5 min y al iniciar sesión'
+    } catch {
+      try {
+        Register-ScheduledTask -TaskName $TAREA -Action $accion -Trigger $cada5 -Principal $quien -Settings $conf -Description 'Lector del espejo del grader: lo arranca y lo repara. Se borra solo si la app lo detiene.' -Force -ErrorAction Stop | Out-Null
+        $modoTarea = 'cada 5 min'
+      } catch { Write-Output ('OJO: Windows no dejó crear la tarea programada: ' + $_.Exception.Message) }
+    }
+    if ($modoTarea -ne 'no') { Write-Output ('Tarea «' + $TAREA + '» creada (' + $modoTarea + ').') }
+
+    # 5) Arranque inmediato del lector, oculto.
+    if ($esperaViejo) {
+      Write-Output 'El lector nuevo lo arranca la tarea cuando el anterior termine su ciclo (hasta 15 min).'
+    } else {
+      Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + (Join-Path $dir 'lector-espejo.ps1') + '"') | Out-Null
+      Start-Sleep -Seconds 5
+      if (Lector-Vivo) { Write-Output 'Lector en marcha (oculto).' }
+      else { Write-Output 'OJO: no se ve el lector en marcha. Revisa el log antes de dar por instalado.' }
+    }
+
+    # 6) Resumen.
+    Write-Output ''
+    Write-Output ('Dónde queda: ' + $dir)
+    Write-Output ('Logs: ' + (Join-Path $dir 'lector.log') + ' y vigilante.log')
+    Write-Output 'Cómo se detiene: botón «Detener» de la app (revoca la llave y la tarea se borra sola).'
+    if ($modoTarea -ne 'no') { Write-Output 'Arranca solo al iniciar sesión y se repara solo si se cae. Las versiones nuevas llegan solas cuando un admin las publica.' }
+    else { Write-Output 'Sin tarea programada: tras reiniciar el PC hay que volver a pegar un instalador nuevo.' }
+  } finally {
+    Limpia-Historial
+  }
 }
 `

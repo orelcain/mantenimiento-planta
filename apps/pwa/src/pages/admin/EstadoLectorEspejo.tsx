@@ -16,7 +16,9 @@ import {
   avisoLimite,
   estadoAjuste,
   estaVivo,
+  fraseActualizacion,
   fraseDeError,
+  textoArranque,
   type EstadoLector,
 } from '@/services/grader/espejo/espejoEstado'
 import { miles } from '@/services/grader/espejo/espejoFilas'
@@ -41,6 +43,8 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
   const limite = avisoLimite(est)
   const avance = avisoAvance(est)
   const ajuste = estadoAjuste(est)
+  const arranque = textoArranque(est.arranque)
+  const actualiz = fraseActualizacion(est.actualiz)
   const rango = Array.isArray(est.rango) && est.rango.length > 0 ? est.rango.slice(0, 2).join(' → ') : '—'
   return (
     <div className="space-y-2 rounded-ctl border border-border p-3">
@@ -60,6 +64,8 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
           v={e.ultimoLatidoMs ? `${formatearFechaCorta(e.ultimoLatidoMs)} · ${formatearHaceX(e.ultimoLatidoMs, ahora)}` : 'nunca'}
         />
         <Dato k="Versión del lector" v={est.version ?? '—'} />
+        {arranque && <Dato k="Arranque" v={arranque} />}
+        {actualiz && <Dato k="Actualización" v={actualiz} />}
         <Dato k="Filas de la tabla" v={typeof est.filasTabla === 'number' ? miles(est.filasTabla) : '—'} />
         <Dato k="Piezas leídas" v={typeof est.piezas === 'number' ? miles(est.piezas) : '—'} />
         <Dato k="Primera fila" v={est.primera || '—'} />
