@@ -7,6 +7,7 @@ import {
   avisoSinPiezasDelTurno,
   avisoAvance,
   estadoAjuste,
+  avisoFinRango,
   fraseActualizacion,
   minutosDesde,
   textoArranque,
@@ -102,6 +103,33 @@ describe('rango automático del lector e1.2', () => {
   })
   it('un código desconocido igual avisa', () => {
     expect(estadoAjuste({ ajuste: 'raro' })?.aviso).toContain('«raro»')
+  })
+})
+
+describe('lector e1.5: casilla aparte y fechas fijas (Matrix Qt ignora SetValue)', () => {
+  const rango = ['2026-11-22 00:00:00', '2026-11-23 00:00:00']
+  it('casilla que no se desmarca: avisa el corte en 10 000', () => {
+    expect(estadoAjuste({ ajuste: 'casilla-no-aplico' })?.aviso).toMatch(/10 000/)
+  })
+  it('fechas fijas con el fin lejos: ficha sin aviso ámbar', () => {
+    const r = estadoAjuste({ ajuste: 'fechas-fijas', rango }, new Date(2026, 10, 22, 8, 0, 0))
+    expect(r).toEqual({ texto: 'fechas a mano (Matrix no deja moverlas)', aviso: null })
+  })
+  it('fechas fijas a menos de 12 h del fin: pide moverlo a mano', () => {
+    const aviso = estadoAjuste({ ajuste: 'fechas-fijas', rango }, new Date(2026, 10, 22, 21, 30, 0))?.aviso
+    expect(aviso).toMatch(/termina el 23-11 00:00/)
+    expect(aviso).toMatch(/a mano/)
+  })
+  it('fechas fijas con el fin ya pasado: dice que no se leen las piezas posteriores', () => {
+    expect(avisoFinRango(rango, new Date(2026, 10, 23, 1, 0, 0))).toMatch(/terminó el 23-11 00:00/)
+  })
+  it('borde: justo a 12 h no avisa, un segundo después sí', () => {
+    expect(avisoFinRango(rango, new Date(2026, 10, 22, 12, 0, 0))).toBeNull()
+    expect(avisoFinRango(rango, new Date(2026, 10, 22, 12, 0, 1))).toMatch(/termina/)
+  })
+  it('sin rango legible igual pide moverlo a mano', () => {
+    expect(avisoFinRango(undefined, new Date())).toMatch(/a mano/)
+    expect(avisoFinRango(['x', 'y'], new Date())).toMatch(/a mano/)
   })
 })
 

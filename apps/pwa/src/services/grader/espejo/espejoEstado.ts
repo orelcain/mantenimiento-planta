@@ -137,10 +137,20 @@ export function avisoAvance(estado: EstadoLector['estado']): string | null {
  * «Limitar». `texto` va en la ficha; `aviso` (si no es `null`) se muestra en ámbar.
  * Un lector anterior a e1.2 no manda la clave: `null`.
  */
-export function estadoAjuste(estado: EstadoLector['estado']): { texto: string; aviso: string | null } | null {
+export function estadoAjuste(
+  estado: EstadoLector['estado'],
+  ahora: Date = new Date(),
+): { texto: string; aviso: string | null } | null {
   const a = estado.ajuste
   if (a === undefined || a === null) return null
   switch (a) {
+    case 'casilla-no-aplico':
+      return {
+        texto: 'no desmarcó «Limitar»',
+        aviso: 'Matrix no dejó desmarcar «Limitar el informe a 10 000 registros»: el informe se corta en 10 000 filas. Desmárcala a mano.',
+      }
+    case 'fechas-fijas':
+      return { texto: 'fechas a mano (Matrix no deja moverlas)', aviso: avisoFinRango(estado.rango, ahora) }
     case 'ok':
       return { texto: 'lo mueve el lector', aviso: null }
     case '':
@@ -175,6 +185,28 @@ export function estadoAjuste(estado: EstadoLector['estado']): { texto: string; a
     default:
       return { texto: a, aviso: `El rango automático avisó «${a}»: revisa el registro del lector.` }
   }
+}
+
+/** Horas antes del fin del rango en que se avisa que hay que moverlo (cubre un turno de noche que cruza medianoche). */
+export const HORAS_AVISO_FIN_RANGO = 12
+
+/**
+ * e1.5: con las fechas fijas, el lector solo ve lo que cae antes del fin del rango de Matrix. Avisa cuando
+ * faltan menos de {@link HORAS_AVISO_FIN_RANGO} h o ya pasó; antes, `null` (la ficha ya dice «fechas a mano»). El rango viene en hora del PC de planta
+ * («yyyy-MM-dd HH:mm:ss»), la misma zona que la PWA en Chonchi.
+ */
+export function avisoFinRango(rango: string[] | undefined, ahora: Date): string | null {
+  const fin = rango?.[1]
+  const m = fin ? /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(fin) : null
+  const pedir = 'Pon a mano en Matrix el fin del rango en 2 días más (por ejemplo, pasado mañana 00:00).'
+  if (!m) return `Matrix no deja que el lector mueva las fechas del rango. ${pedir}`
+  const [, y, mo, d, h, mi, s] = m
+  const t = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s))
+  const corto = `${d}-${mo} ${h}:${mi}`
+  const faltanH = (t.getTime() - ahora.getTime()) / 3_600_000
+  if (faltanH <= 0) return `El rango de Matrix terminó el ${corto}: las piezas posteriores no se leen. ${pedir}`
+  if (faltanH < HORAS_AVISO_FIN_RANGO) return `El rango de Matrix termina el ${corto}: después de esa hora no se lee nada. ${pedir}`
+  return null
 }
 
 /** Desde e1.3: «solo (tarea de Windows)» / «manual (sin tarea)»; `null` si el lector no lo manda. */
