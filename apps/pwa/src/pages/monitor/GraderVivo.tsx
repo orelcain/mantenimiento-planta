@@ -8,7 +8,7 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, BellRing, Gauge, Hand, Layers, ShieldAlert } from 'lucide-react'
+import { Activity, BellRing, Filter, Gauge, Hand, Layers, Package, ShieldAlert, SplitSquareHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
@@ -67,9 +67,9 @@ function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
   return (
     <Tarjeta titulo={a.length > 0 ? 'Pide atención' : 'Sin alertas'} icono={<BellRing className={IC} />}>
       <ul className="mt-3 space-y-2" aria-label="Alertas del grader">
-        {a.map((x: AlertaGrader) => (
+        {a.map((x: AlertaGrader, i) => (
           <li
-            key={x.regla}
+            key={`${x.regla}-${i}`}
             data-regla={x.regla}
             className="v2-subtarjeta flex gap-2.5 rounded-card px-3 py-2.5"
           >
@@ -381,12 +381,237 @@ function LineaManual({ d }: { d: Datos }) {
   )
 }
 
+type Pesca = NonNullable<Datos['pesca']>
+
+/** Una fila de barra horizontal: rótulo, barra 2,5 sobre `bg-muted`, cifra a la derecha y una línea de detalle. */
+function FilaBarra({ rotulo, n, pct, tono, detalle }: { rotulo: string; n: number; pct: number; tono: string; detalle?: string }) {
+  return (
+    <div>
+      <div className="grid grid-cols-[minmax(0,150px)_1fr_44px] items-center gap-2.5 text-[13px] leading-[18px]">
+        <span className="truncate font-medium text-foreground">{rotulo}</span>
+        <span className="h-2.5 overflow-hidden rounded-full bg-muted">
+          <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: tono }} />
+        </span>
+        <span className="text-right font-semibold tabular-nums text-foreground">{milesPunto(n)}</span>
+      </div>
+      {detalle && <p className="mt-0.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">{detalle}</p>}
+    </div>
+  )
+}
+
+const lista = (r: Record<string, number>, max = 3) =>
+  Object.entries(r).sort((a, b) => b[1] - a[1]).slice(0, max).map(([k, v]) => `${k.replace(/ lb/g, '')} ${milesPunto(v)}`).join(' · ')
+
+/** Etapa 2: por qué va a P0, con el seteo inferido de las piezas. */
+function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
+  const c = p.causas
+  const tot = Math.max(1, c.total)
+  const t = d.totales
+  const ultHora = d.p0.filter((x) => x.completo).slice(-4)
+  const hTot = ultHora.reduce((s, x) => s + x.total, 0)
+  const hG0 = ultHora.reduce((s, x) => s + x.g0, 0)
+  const sub = `${milesPunto(c.total)} pz${t.p0 !== null ? ` · ${coma1(t.p0)} % del turno` : ''}${hTot > 0 ? ` · última hora ${coma1((hG0 / hTot) * 100)} %` : ''}`
+  const peso = [c.pesoSinGate['12-UP lb'] ? `${milesPunto(c.pesoSinGate['12-UP lb'])} sobre 5,5 kg sin gate 12-UP` : '', lista(Object.fromEntries(Object.entries(c.pesoSinGate).filter(([k]) => k !== '12-UP lb'))), c.pesoBajo ? `${milesPunto(c.pesoBajo)} bajo 0,9 kg` : ''].filter(Boolean).join(' · ')
+  return (
+    <Tarjeta titulo="Por qué va a P0" sub={sub} icono={<Filter className={IC} />}>
+      {c.total === 0 ? (
+        <p className="py-6 text-center text-[13px] text-muted-foreground">Sin piezas en Gate 0 todavía.</p>
+      ) : (
+        <div className="mt-3 space-y-2.5">
+          <FilaBarra rotulo="Sin gate para su peso" n={c.causas['sin-gate-peso']} pct={(c.causas['sin-gate-peso'] / tot) * 100} tono="var(--v2-mal)" detalle={peso || undefined} />
+          <FilaBarra rotulo="Calidad sin gate" n={c.causas['calidad-sin-gate']} pct={(c.causas['calidad-sin-gate'] / tot) * 100} tono="var(--v2-atento)" detalle={lista(c.calidadSinGate) ? `${lista(c.calidadSinGate)}: ninguna gate tiene esa combinación.` : undefined} />
+          <FilaBarra rotulo="Calidad D" n={c.causas['calidad-d']} pct={(c.causas['calidad-d'] / tot) * 100} tono="var(--v2-gris)" detalle="No hay gate D: van a P0 por diseño." />
+          <FilaBarra rotulo="Tenía gate" n={c.causas['tenia-gate']} pct={(c.causas['tenia-gate'] / tot) * 100} tono="var(--v2-acento)" detalle="Causa física (fotocélula, fuera de límites, puerta no preparada): el detalle llega con Puerta 0." />
+          <p className="pt-1 text-[12px] leading-[16px] text-muted-foreground">
+            Con el seteo leído de las piezas de cada gate, por el peso y la calidad de cada pieza de Gate 0.{c.sinPeso > 0 ? ` ${milesPunto(c.sinPeso)} sin peso.` : ''}
+          </p>
+        </div>
+      )}
+    </Tarjeta>
+  )
+}
+
+const TONO_810 = 'rgb(var(--muted-foreground) / 0.65)'
+
+/** Etapa 1: zona compartida 4,59–4,99 kg y dónde cae el peso en cada gate (dato, sin aviso). */
+function ZonaCompartida({ p }: { p: Pesca }) {
+  const z = p.zonaHora
+  const a = z.lados.find((l) => l.calibre === '8-10 lb')
+  const b = z.lados.find((l) => l.calibre === '10-12 lb')
+  const tono = (cal: string) => (cal === '8-10 lb' ? TONO_810 : 'var(--v2-acento)')
+  return (
+    <Tarjeta titulo="Zona compartida 4,59–4,99 kg" sub={`Premium, última hora (${p.hora.desde}–${p.hora.hasta}) · ${milesPunto(z.piezas)} pz`} icono={<SplitSquareHorizontal className={IC} />}>
+      {z.piezas === 0 ? (
+        <p className="py-6 text-center text-[13px] text-muted-foreground">Sin piezas Premium en esa zona en la última hora.</p>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <div className="flex h-6 overflow-hidden rounded-[10px] text-[12px] font-semibold tabular-nums" role="img" aria-label={z.lados.map((l) => `${milesPunto(l.piezas)} a ${l.calibre}`).join(', ')}>
+            {z.lados.map((l) => (
+              <div key={l.calibre} className="flex items-center whitespace-nowrap px-2 text-white" style={{ flex: l.piezas, background: tono(l.calibre) }}>
+                {l.calibre.replace(' lb', '')} · {milesPunto(l.piezas)}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] leading-[16px] text-muted-foreground">
+            {z.lados.map((l) => (
+              <span key={l.calibre} className="inline-flex items-center gap-1.5">
+                <i aria-hidden className="h-[3px] w-3 rounded-full" style={{ background: tono(l.calibre) }} />
+                {l.calibre} · {l.destino} (G{l.gates.join(', G')})
+              </span>
+            ))}
+          </div>
+          {a && b && z.pct810 !== null && (
+            <p className="text-[13px] leading-[18px] text-foreground/80 tabular-nums">
+              Esta hora el {Math.round(z.pct810)} % de la zona fue a 8-10{p.zonaTurno.pct810 !== null ? `; en el turno, el ${Math.round(p.zonaTurno.pct810)} %` : ''}. La pieza va según el producto de cada gate, no por la balanza.
+            </p>
+          )}
+          <BordesGate p={p} />
+        </div>
+      )}
+    </Tarjeta>
+  )
+}
+
+function BordesGate({ p }: { p: Pesca }) {
+  const filas = p.bordes.filter((b) => b.bajo !== null)
+  if (filas.length === 0) return null
+  return (
+    <div className="overflow-x-auto">
+      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Peso en el borde del rango de cada gate (10 % de cada extremo del rango observado)</p>
+      <table className="w-full text-[13px] leading-[18px] tabular-nums">
+        <thead>
+          <tr className="text-left text-[12px] text-muted-foreground">
+            <th className="py-1 pr-2 font-normal">Gate</th>
+            <th className="py-1 pr-2 font-normal">Programa</th>
+            <th className="py-1 pr-2 text-right font-normal">pz</th>
+            <th className="py-1 pr-2 text-right font-normal">Bajo</th>
+            <th className="py-1 text-right font-normal">Alto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((b) => (
+            <tr key={b.gate} className="border-t border-border/60" data-gate={b.gate}>
+              <td className="py-1 pr-2">G{b.gate}</td>
+              <td className="py-1 pr-2 text-foreground/80"><span className="whitespace-nowrap">{b.programa.replace(' lb', '')}</span> <span className="text-muted-foreground">{b.destino.split(' · ')[1] ?? ''}</span></td>
+              <td className="py-1 pr-2 text-right">{milesPunto(b.piezas)}</td>
+              <td className="py-1 pr-2 text-right">{Math.round(b.bajo ?? 0)} %</td>
+              <td className="py-1 text-right">{Math.round(b.alto ?? 0)} %</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/** Etapa 5: lote en curso, peso de la última hora contra el turno y los últimos 6 turnos. */
+function LoteYPesca({ p }: { p: Pesca }) {
+  const l = p.lote
+  const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${Math.round(v)} %`)
+  const kg = (v: number | null) => (v === null ? '—' : `${coma1(v)} kg`)
+  return (
+    <Tarjeta titulo={l ? `Lote ${loteLegible(l.lote)}` : 'Lote en curso'} sub={l ? `desde las ${l.desdeTs.slice(11, 16)} · ${milesPunto(l.piezas)} piezas` : undefined} icono={<Package className={IC} />}>
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
+          {l && (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+              <Cifra chico k="Calibre dominante" v={l.perfil.calibreDominante?.calibre.replace(' lb', '') ?? '—'} s={pct(l.perfil.calibreDominante?.pct)} />
+              <Cifra chico k="10-12 lb" v={pct(l.perfil.calibrePct['10-12 lb'] ?? 0)} s={l.anterior ? `antes ${pct(l.anterior.perfil.calibrePct['10-12 lb'] ?? 0)}` : 'primer lote'} />
+              <Cifra chico k="Premium" v={l.perfil.premiumPct === null ? '—' : `${coma1(l.perfil.premiumPct)} %`} s={l.anterior?.perfil.premiumPct != null ? `antes ${coma1(l.anterior.perfil.premiumPct)} %` : ''} />
+              <Cifra chico k="Peso medio" v={kg(l.perfil.pesoMedioKg)} s={l.anterior ? `antes ${kg(l.anterior.perfil.pesoMedioKg)}` : ''} />
+            </div>
+          )}
+          <HistPeso p={p} />
+        </div>
+        <TurnosAnteriores filas={p.filas} />
+      </div>
+    </Tarjeta>
+  )
+}
+
+function HistPeso({ p }: { p: Pesca }) {
+  const [ref, w] = useAncho<HTMLDivElement>()
+  const h = 150
+  const ml = 30
+  const mb = 20
+  const mt = 6
+  const W = Math.max(10, w - ml - 6)
+  const H = h - mt - mb
+  const a = p.histHora.pct
+  const b = p.histTurno.pct
+  const tope = Math.max(10, Math.ceil(Math.max(...a, ...b) / 10) * 10)
+  const bw = W / a.length
+  const y = (v: number) => mt + H - (H * v) / tope
+  return (
+    <div>
+      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Peso, última hora contra el turno (cada 250 g)</p>
+      <div ref={ref} className="w-full">
+        {w > 0 && (
+          <svg width={w} height={h} role="img" aria-label="Distribución de peso cada 250 g" className="block">
+            {[0, tope / 2, tope].map((v) => (
+              <g key={v}>
+                <line x1={ml} x2={w - 6} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" />
+                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
+              </g>
+            ))}
+            {a.map((v, i) => <rect key={i} x={ml + i * bw + 1} y={y(v)} width={Math.max(1, bw - 2)} height={mt + H - y(v)} rx={2} fill="var(--v2-acento)" fillOpacity={0.7} />)}
+            <path d={b.map((v, i) => `${i ? 'L' : 'M'}${(ml + i * bw + bw / 2).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')} fill="none" stroke={TONO_810} strokeWidth={2} /* decimal-tecnico: ruta SVG */ />
+            {[0, 4, 8, 12, 16, 20].map((i) => (
+              <text key={i} x={ml + i * bw} y={h - 5} fontSize={12} className="fill-muted-foreground tabular-nums">{1 + i * 0.25}</text>
+            ))}
+          </svg>
+        )}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] leading-[16px] text-muted-foreground tabular-nums">
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3 rounded-[3px]" style={{ background: 'var(--v2-acento)', opacity: 0.7 }} />Última hora · media {p.histHora.mediaKg === null ? '—' : `${coma1(p.histHora.mediaKg)} kg`}</span>
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: TONO_810 }} />Turno · media {p.histTurno.mediaKg === null ? '—' : `${coma1(p.histTurno.mediaKg)} kg`}</span>
+      </div>
+    </div>
+  )
+}
+
+function TurnosAnteriores({ filas }: { filas: Pesca['filas'] }) {
+  const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v)} %`)
+  return (
+    <div className="overflow-x-auto">
+      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">Contra los últimos 6 turnos (cierre)</p>
+      <table className="w-full text-[13px] leading-[18px] tabular-nums">
+        <thead>
+          <tr className="text-[12px] text-muted-foreground">
+            <th className="py-1 pr-2 text-left font-normal">Turno</th>
+            <th className="py-1 pr-2 text-right font-normal">pz/h</th>
+            <th className="py-1 pr-2 text-right font-normal">P0</th>
+            <th className="py-1 pr-2 text-right font-normal">kg</th>
+            <th className="py-1 pr-2 text-right font-normal">6-8</th>
+            <th className="py-1 pr-2 text-right font-normal">8-10</th>
+            <th className="py-1 text-right font-normal">10-12</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f, i) => (
+            <tr key={f.rotulo} className={cn('border-t border-border/60', i === 0 && 'font-semibold text-foreground')}>
+              <td className="whitespace-nowrap py-1 pr-2">{f.rotulo}</td>
+              <td className="py-1 pr-2 text-right">{f.pzH === null ? '—' : milesPunto(f.pzH)}</td>
+              <td className="py-1 pr-2 text-right">{f.p0Pct === null ? '—' : `${coma1(f.p0Pct)} %`}</td>
+              <td className="py-1 pr-2 text-right">{f.pesoMedioKg === null ? '—' : coma1(f.pesoMedioKg)}</td>
+              <td className="py-1 pr-2 text-right">{pct(f.c68)}</td>
+              <td className="py-1 pr-2 text-right">{pct(f.c810)}</td>
+              <td className="py-1 text-right">{pct(f.c1012)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {filas.length === 1 && <p className="mt-1.5 text-[12px] text-muted-foreground">Sin resúmenes de cierre de los días anteriores.</p>}
+    </div>
+  )
+}
+
 /** La pestaña en vivo. `null` mientras no haya piezas del espejo en el turno: la tarjeta del espejo explica por qué. */
 export function GraderVivo(props: EntradaGraderVivo) {
-  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs } = props
+  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId } = props
   const d = useMemo(
-    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs }),
-    [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs],
+    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId }),
+    [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId],
   )
   // Sin piezas del turno: solo las alertas (el lector caído antes del cambio de turno tiene que verse).
   if (d.serie.hastaMin === 0) {
@@ -400,6 +625,15 @@ export function GraderVivo(props: EntradaGraderVivo) {
         <Cifras d={d} />
       </div>
       <Curva d={d} />
+      {d.pesca && (
+        <>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <CausasP0 d={d} p={d.pesca} />
+            <ZonaCompartida p={d.pesca} />
+          </div>
+          <LoteYPesca p={d.pesca} />
+        </>
+      )}
       <div className="grid gap-3 lg:grid-cols-3">
         <P0Barras d={d} />
         <CalibreCalidad d={d} />
