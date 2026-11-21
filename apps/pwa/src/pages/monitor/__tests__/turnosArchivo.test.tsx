@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { agruparPorDia, listaNavegable, useTurnoArchivo, vecinoEnLista, _limpiarCacheArchivo } from '../turnosArchivo'
+import { agruparPorDia, celdasDelMes, mesesConTurnos, milesCorto, turnosPorDia, listaNavegable, useTurnoArchivo, vecinoEnLista, _limpiarCacheArchivo } from '../turnosArchivo'
 import type { TurnoMonitorEntrada } from '@/services/shoplogix/publicShiftMonitor.service'
 
 const entrada = (id: string, ini: string, pz: number, extra = false): TurnoMonitorEntrada => ({
@@ -112,5 +112,27 @@ describe('useTurnoArchivo', () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ entrada: entrada('2026-10-24_Turno 1', '21:30', 1) }) })
     const { result } = renderHook(() => useTurnoArchivo('tok', '2026-10-25_Turno 2', false, true))
     await waitFor(() => expect(result.current.estado).toBe('error'))
+  })
+})
+
+describe('calendario de «Ver otro día»', () => {
+  it('noviembre 2026 parte el domingo: 6 rellenos antes del lunes y 30 días', () => {
+    const c = celdasDelMes('2026-11')
+    expect(c.slice(0, 6).every((x) => x === null)).toBe(true)
+    expect(c[6]).toEqual({ dateKey: '2026-11-01', dia: 1 })
+    expect(c.filter(Boolean)).toHaveLength(30)
+  })
+
+  it('meses con turnos en orden y turnos por día', () => {
+    const t = (id: string, pz: number | null) => ({ shiftDocId: id, dateKey: id.slice(0, 10), shiftId: id.slice(11), ini: null, piezas: pz, enDoc: false, extraordinario: false })
+    const lista = [t('2026-11-02_Turno 1', 17102), t('2026-11-02_Turno 2', 16188), t('2026-10-30_Turno 1', null)]
+    expect(mesesConTurnos(lista)).toEqual(['2026-10', '2026-11'])
+    expect(turnosPorDia(lista).get('2026-11-02')?.map((x) => x.shiftId)).toEqual(['Turno 1', 'Turno 2'])
+  })
+
+  it('miles con coma y un decimal', () => {
+    expect(milesCorto(17102)).toBe('17,1')
+    expect(milesCorto(16188)).toBe('16,2')
+    expect(milesCorto(null)).toBe('—')
   })
 })

@@ -157,3 +157,40 @@ export function useTurnoArchivo(token: string | undefined, turnoPedido: string |
 
 /** Solo para tests. */
 export function _limpiarCacheArchivo() { cache.clear() }
+
+/* ── Calendario de «Ver otro día» ───────────────────────────────────────── */
+
+/** Un mes del calendario: `YYYY-MM`. */
+export type ClaveMes = string
+
+/** Los meses que tienen turnos, del más viejo al más nuevo. */
+export function mesesConTurnos(lista: TurnoNavegable[]): ClaveMes[] {
+  return [...new Set(lista.map((t) => t.dateKey.slice(0, 7)))].sort()
+}
+
+/** Los turnos de cada día (`dateKey`), en el orden de la lista. */
+export function turnosPorDia(lista: TurnoNavegable[]): Map<string, TurnoNavegable[]> {
+  const m = new Map<string, TurnoNavegable[]>()
+  for (const g of agruparPorDia(lista)) m.set(g.dateKey, [...(m.get(g.dateKey) ?? []), ...g.turnos])
+  return m
+}
+
+/**
+ * Las celdas del mes, con la semana empezando el lunes (como en Chile): `null` = relleno antes del día 1.
+ * Cada celda trae su `dateKey` (`YYYY-MM-DD`) y el número del día.
+ */
+export function celdasDelMes(mes: ClaveMes): Array<{ dateKey: string; dia: number } | null> {
+  const [y, mo] = mes.split('-').map(Number) as [number, number]
+  const primero = new Date(Date.UTC(y, mo - 1, 1))
+  const dias = new Date(Date.UTC(y, mo, 0)).getUTCDate()
+  const relleno = (primero.getUTCDay() + 6) % 7 // lunes = 0
+  const out: Array<{ dateKey: string; dia: number } | null> = Array.from({ length: relleno }, () => null)
+  for (let d = 1; d <= dias; d++) out.push({ dateKey: `${mes}-${String(d).padStart(2, '0')}`, dia: d })
+  return out
+}
+
+/** «17,1»: miles de piezas con un decimal, para la celda del calendario. */
+export function milesCorto(pz: number | null | undefined): string {
+  if (pz == null || !Number.isFinite(pz)) return '—'
+  return (Math.round(pz / 100) / 10).toFixed(1).replace('.', ',') // decimal-tecnico: ya pasa a coma
+}

@@ -56,6 +56,24 @@ describe('el módulo de reglas se puede llevar a functions', () => {
 })
 
 describe('regla 1: grader quieto con las Baader andando', () => {
+  it('sin ninguna pieza del grader en todo lo leído dice «sin datos del grader», no «sin piezas»', () => {
+    const g = grader(100)
+    g.pz.fill(0)
+    const e = entrada({ grader: g, hastaMin: 0, leidoHastaMin: 100 })
+    const a = reglaGraderQuieto(e, U)
+    expect(a?.regla).toBe('sin-datos-grader')
+    expect(a?.nivel).toBe('atento')
+    expect(a?.titulo).toBe('Sin datos del grader en este turno')
+    // Tampoco sale el atasco: el aviso ya explica que falta el dato.
+    expect(evaluarAlertas(e).map((x) => x.regla)).toEqual(['sin-datos-grader'])
+  })
+
+  it('sin piezas del grader ni de las Baader no avisa nada', () => {
+    const g = grader(100)
+    g.pz.fill(0)
+    expect(reglaGraderQuieto(entrada({ grader: g, baader: new Array(100).fill(0), hastaMin: 0, leidoHastaMin: 100 }), U)).toBeNull()
+  })
+
   it('salta con 5 min sin piezas en el grader y las Baader contando en cada minuto', () => {
     const g = grader(100)
     for (let m = 95; m < 100; m++) g.pz[m] = 0
