@@ -68,10 +68,38 @@ test('fin: piezas por máquina, total, % target, uptime, paros y calidad', () =>
   assert.match(msg, /Total: <b>17\.204<\/b> piezas/)
   assert.match(msg, /✅ 116% del target/) // 17204/14862 ≈ 115.8%
   assert.match(msg, /SALAR/)
-  assert.match(msg, /Uptime promedio: <b>90%<\/b>/) // (0.91+0.93+0.86)/3 = 0.90
+  // Sin desglose por máquina no hay denominador: degrada al promedio simple y lo
+  // dice en el rótulo, para que nadie lo compare con el uptime ponderado.
+  assert.match(msg, /Uptime promedio por máquina: <b>90%<\/b>/) // (0.91+0.93+0.86)/3 = 0.90
   assert.match(msg, /⛔ 1 paro \(7m\)/)
   assert.match(msg, /⚡ 1 micro \(50s\)/)
   assert.match(msg, /P0 <b>1\.87%<\/b>.*16\.800 pz/)
+})
+
+test('fin: el uptime de la línea pondera por segundos, no promedia máquinas', () => {
+  // Una máquina corrió el turno entero y la otra casi no arrancó. El promedio
+  // simple da 55% y no es el uptime de nada: la línea estuvo arriba 3.660 s de
+  // los 4.200 s productivos, o sea 87%. Este es el error que el promedio de
+  // razones produce sin avisar.
+  const msg = componerBriefFinTurno({
+    plantLabel: 'Yal', shiftId: 'Turno 1', dateKey: '2026-09-19',
+    machines: [
+      {
+        machineName: 'YAL Evisceradora 1', totalCycles: 5000, shiftRuntime: 1,
+        shiftRuntimeBreakdown: { uptimeSec: 3600, breakSec: 0, downtimeSec: 0, setupSec: 0 },
+        states: [],
+      },
+      {
+        machineName: 'YAL Evisceradora 2', totalCycles: 80, shiftRuntime: 0.1,
+        shiftRuntimeBreakdown: { uptimeSec: 60, breakSec: 0, downtimeSec: 540, setupSec: 0 },
+        states: [],
+      },
+    ],
+    officialTargets: null, currentJob: null, grader: null,
+  })
+  assert.match(msg, /Uptime de la línea: <b>87%<\/b>/) // 3660/4200
+  assert.doesNotMatch(msg, /55%/)
+  assert.doesNotMatch(msg, /Uptime promedio/)
 })
 
 test('fin: sin target, sin grader, sin paros — degrada limpio (caso Yal hoy)', () => {

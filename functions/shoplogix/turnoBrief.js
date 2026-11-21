@@ -220,11 +220,34 @@ function componerBriefFinTurno({ plantLabel, shiftId, dateKey, machines, officia
   }
   if (currentJob?.name) lineas.push(`🐟 Especie: ${currentJob.name}`)
 
-  // Uptime promedio (shiftRuntime ya excluye planned downtime del denominador)
-  const runtimes = ms.map((m) => m.shiftRuntime).filter((r) => typeof r === 'number' && r > 0)
-  if (runtimes.length > 0) {
-    const avg = (runtimes.reduce((a, b) => a + b, 0) / runtimes.length) * 100
-    lineas.push(`⚙️ Uptime promedio: <b>${avg.toFixed(0)}%</b>`)
+  // Uptime de la LÍNEA (shiftRuntime ya excluye planned downtime del denominador).
+  //
+  // ⚠ Se suman los segundos de todas las máquinas y se divide UNA vez, en vez de
+  // promediar el shiftRuntime de cada una. Un promedio simple le da el mismo voto
+  // a la máquina que corrió 20 minutos que a la que corrió el turno entero, y el
+  // número que sale no es el uptime de nada. Misma cuenta que hace el monitor
+  // público (`publicMonitor.js`) y ahora la PWA (`aggregatePlantRatios`).
+  //
+  // La definición de la métrica NO cambia: sigue siendo uptime / (uptime + break
+  // + downtime + setup), o sea sin el tiempo programado. Solo cambia cómo se
+  // consolidan varias máquinas.
+  const conBreakdown = ms.filter((m) => m.shiftRuntimeBreakdown)
+  if (conBreakdown.length === ms.length && ms.length > 0) {
+    const sum = (f) => conBreakdown.reduce((a, m) => a + (f(m.shiftRuntimeBreakdown) || 0), 0)
+    const uptimeSec     = sum((b) => b.uptimeSec)
+    const productivoSec = uptimeSec + sum((b) => b.breakSec) + sum((b) => b.downtimeSec) + sum((b) => b.setupSec)
+    if (productivoSec > 0) {
+      lineas.push(`⚙️ Uptime de la línea: <b>${((uptimeSec / productivoSec) * 100).toFixed(0)}%</b>`)
+    }
+  } else {
+    // Datos sin desglose (histórico anterior al normalizador actual): no hay
+    // denominador por máquina, así que solo se puede promediar. Se rotula
+    // distinto para que nadie compare este número con el ponderado.
+    const runtimes = ms.map((m) => m.shiftRuntime).filter((r) => typeof r === 'number' && r > 0)
+    if (runtimes.length > 0) {
+      const avg = (runtimes.reduce((a, b) => a + b, 0) / runtimes.length) * 100
+      lineas.push(`⚙️ Uptime promedio por máquina: <b>${avg.toFixed(0)}%</b>`)
+    }
   }
 
   // Paros del turno (suma de las máquinas)
