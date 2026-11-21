@@ -53,8 +53,9 @@ export default function GraderVivoDevPage() {
   const c = useMemo(() => cubetas(hasta), [hasta])
   const baader = useMemo(() => ({ desde: real.t0, maquinas: [{ cycles: real.baader.slice(0, Math.max(0, hasta - 2)) }] }), [hasta])
   return (
-    <div className="min-h-screen bg-background p-4 text-foreground">
-      <div className="mx-auto max-w-3xl space-y-3 lg:max-w-[1200px]">
+    // `data-glass="v2"` + `<main>`: el mismo material de vidrio que la pestaña tiene en el monitor público.
+    <div className="min-h-screen bg-background p-4 text-foreground" data-glass="v2">
+      <main className="mx-auto max-w-3xl space-y-3 lg:max-w-[1200px]">
         <label className="flex items-center gap-3 text-footnote text-muted-foreground">
           Hora de la vista
           <input
@@ -77,7 +78,7 @@ export default function GraderVivoDevPage() {
           minutosSinLatido={1}
           turnoEnCurso
         />
-      </div>
+      </main>
     </div>
   )
 }

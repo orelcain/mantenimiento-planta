@@ -8,11 +8,13 @@
  * `services/grader/espejo/` (puras, con tests); este archivo solo arma y dibuja.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Activity, BellRing, Gauge, Hand, Layers, ShieldAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
 import { coma1, horaDelEje, milesPunto, type AlertaGrader } from '@/services/grader/espejo/alertasGrader'
 import { RETRASO_REFERENCIA_FUENTE, movil } from '@/services/grader/espejo/graderVivo'
 import type { DuenoPerdida } from '@/services/shoplogix/monitorEventos'
+import { Icono } from './AmpliarV2'
 import { RELLENO_DUENO } from './ejeTurno'
 import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 
@@ -39,36 +41,47 @@ function useAncho<T extends HTMLElement>(): [React.RefObject<T>, number] {
   return [ref, w]
 }
 
-function Tarjeta({ titulo, sub, children, className }: { titulo?: string; sub?: string; children: React.ReactNode; className?: string }) {
+/** La tarjeta de vidrio del monitor v2 (`v2-tarjeta`, como `Tarjeta` de AmpliarV2): ícono en su círculo, título 15/500, sub 13. */
+function Tarjeta({ titulo, sub, icono, children, className }: { titulo?: string; sub?: string; icono?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className={cn('min-w-0 rounded-card bg-card p-4', className)}>
-      {titulo && <h3 className="text-headline font-semibold">{titulo}</h3>}
-      {sub && <p className="text-footnote text-muted-foreground">{sub}</p>}
+    <section className={cn('v2-tarjeta min-w-0 rounded-card p-4 lg:p-5', className)}>
+      {titulo && (
+        <div className="flex min-w-0 items-center gap-2">
+          {icono && <Icono>{icono}</Icono>}
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-medium leading-tight text-foreground">{titulo}</h3>
+            {sub && <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{sub}</p>}
+          </div>
+        </div>
+      )}
       {children}
     </section>
   )
 }
 
+const IC = "h-3.5 w-3.5"
+
+
 function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
   const a = d.alertas
   return (
-    <Tarjeta titulo={a.length > 0 ? 'Pide atención' : 'Sin alertas'}>
-      <ul className="mt-1 space-y-2" aria-label="Alertas del grader">
+    <Tarjeta titulo={a.length > 0 ? 'Pide atención' : 'Sin alertas'} icono={<BellRing className={IC} />}>
+      <ul className="mt-3 space-y-2" aria-label="Alertas del grader">
         {a.map((x: AlertaGrader) => (
           <li
             key={x.regla}
             data-regla={x.regla}
-            className={cn('flex gap-2.5 rounded-[14px] px-3 py-2.5', x.nivel === 'mal' ? 'bg-ink-crit/[0.10]' : 'bg-ink-warn/[0.10]')}
+            className="v2-subtarjeta flex gap-2.5 rounded-card px-3 py-2.5"
           >
-            <span aria-hidden className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', x.nivel === 'mal' ? 'bg-ink-crit' : 'bg-ink-warn')} />
+            <span aria-hidden className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: x.nivel === 'mal' ? 'var(--v2-mal)' : 'var(--v2-atento)' }} />
             <div className="min-w-0">
-              <p className={cn('text-subhead font-semibold tabular-nums', x.nivel === 'mal' ? 'text-ink-crit' : 'text-ink-warn')}>{x.titulo}</p>
-              <p className="text-footnote text-muted-foreground">{x.detalle}</p>
+              <p className="text-[15px] font-semibold leading-tight tabular-nums" style={{ color: x.nivel === 'mal' ? 'var(--v2-mal-texto)' : 'var(--v2-atento-texto)' }}>{x.titulo}</p>
+              <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{x.detalle}</p>
             </div>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-footnote text-muted-foreground tabular-nums">
+      <p className="mt-3 text-[13px] leading-[18px] text-muted-foreground tabular-nums">
         {ultimaHora ? `Última pieza leída ${ultimaHora}. ` : ''}Las alertas se miden hasta la última pieza leída, no hasta la hora del reloj.
       </p>
     </Tarjeta>
@@ -78,9 +91,9 @@ function Alertas({ d, ultimaHora }: { d: Datos; ultimaHora: string | null }) {
 function Cifra({ k, v, s, chico }: { k: string; v: string; s: string; chico?: boolean }) {
   return (
     <div className="min-w-0">
-      <p className="text-footnote text-muted-foreground">{k}</p>
-      <p className={cn('font-semibold tabular-nums', chico ? 'text-title3 leading-[34px]' : 'text-title1')}>{v}</p>
-      <p className="text-footnote text-muted-foreground tabular-nums">{s}</p>
+      <p className="text-[13px] leading-[18px] text-muted-foreground">{k}</p>
+      <p className={cn('mt-1 font-semibold tracking-tight tabular-nums text-foreground', chico ? 'text-[20px] leading-[32px] lg:leading-[38px]' : 'text-[28px] leading-[32px] lg:text-[32px] lg:leading-[38px]')}>{v}</p>
+      <p className="mt-0.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">{s}</p>
     </div>
   )
 }
@@ -91,8 +104,8 @@ function Cifras({ d }: { d: Datos }) {
   const t = d.totales
   const lote = d.serie.lote
   return (
-    <Tarjeta>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3.5 lg:grid-cols-4">
+    <Tarjeta titulo="El grader ahora" icono={<Gauge className={IC} />}>
+      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-4">
         <Cifra k="Piezas/h de salida" v={s ? milesPunto(s.piezasH) : '—'} s={parcial} />
         <Cifra k="kg/h de salida" v={s ? milesPunto(s.kgH) : '—'} s={s?.pesoMedio ? `peso medio ${coma1(s.pesoMedio)} kg` : 'sin pesos'} />
         {t.p0 !== null ? (
@@ -115,8 +128,9 @@ function Cifras({ d }: { d: Datos }) {
   )
 }
 
-const GRADER = 'rgb(var(--brand))'
-const BAADER = 'rgb(142 142 147 / 0.8)'
+/* Los trazos del Ritmo en vivo: el grader en el acento (2,5 px), las Baader como la curva de referencia (gris 1,5 px). */
+const GRADER = 'var(--v2-acento)'
+const BAADER = 'rgb(var(--muted-foreground) / 0.65)'
 
 /** Une las detenciones por dueño para no apilar transparencias (tres Baader paradas = una banda). */
 function bandas(paradas: Datos['paradas']): Array<{ desde: number; hasta: number; dueno: DuenoPerdida }> {
@@ -147,16 +161,16 @@ function Curva({ d }: { d: Datos }) {
     ? `Grader corrido ${L} min, el retraso medido en este turno (r ${(d.retraso.r ?? 0).toFixed(2).replace('.', ',')}).` // decimal-tecnico: ya pasa a coma
     : `Grader corrido ${L} min, ${RETRASO_REFERENCIA_FUENTE}: el turno aún no alcanza para medirlo.`
   return (
-    <Tarjeta titulo="Piezas por minuto" sub={sub}>
-      <div ref={ref} className="mt-2 w-full">
+    <Tarjeta titulo="Piezas por minuto" sub={sub} icono={<Activity className={IC} />}>
+      <div ref={ref} className="mt-3 w-full">
         {w > 0 && <CurvaSvg d={d} w={w} h={h} />}
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-footnote text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[3px] w-3.5 rounded-full" style={{ background: GRADER }} />Grader</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[3px] w-3.5 rounded-full" style={{ background: BAADER }} />3 Baader 142</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5 rounded-[3px] opacity-40" style={{ background: RELLENO_DUENO.mantencion }} />Detención Mantención</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5 rounded-[3px] opacity-40" style={{ background: RELLENO_DUENO.externo }} />Otras detenciones</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5 rounded-[3px] opacity-40" style={{ background: RELLENO_DUENO.programado }} />Programada</span>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] leading-[18px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[3px] w-4 rounded-full" style={{ background: GRADER }} />Grader</span>
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-[2px] w-4 rounded-full" style={{ background: BAADER }} />3 Baader 142</span>
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5" style={{ background: `color-mix(in srgb, ${RELLENO_DUENO.mantencion} 22%, transparent)`, borderTop: `2px solid ${RELLENO_DUENO.mantencion}` }} />Detención Mantención</span>
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5" style={{ background: `color-mix(in srgb, ${RELLENO_DUENO.externo} 22%, transparent)`, borderTop: `2px solid ${RELLENO_DUENO.externo}` }} />Otras detenciones</span>
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="h-2.5 w-3.5 border border-dashed" style={{ borderColor: 'var(--v2-gris)' }} />Programada</span>
       </div>
     </Tarjeta>
   )
@@ -165,7 +179,7 @@ function Curva({ d }: { d: Datos }) {
 function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
   const ml = 30
   const mr = 8
-  const mt = 10
+  const mt = 12
   const mb = 22
   const W = Math.max(10, w - ml - mr)
   const H = h - mt - mb
@@ -201,30 +215,37 @@ function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
   const ultima = d.serie.hastaMin - L
   return (
     <svg width={w} height={h} role="img" aria-label="Piezas por minuto del grader y de las Baader" className="block">
-      {bandas(d.paradas).map((p, i) => (
-        <rect
-          key={i}
-          x={x(p.desde)}
-          y={mt}
-          width={Math.max(1, x(p.hasta) - x(p.desde))}
-          height={H}
-          fill={RELLENO_DUENO[p.dueno]}
-          opacity={p.dueno === 'programado' ? 0.22 : 0.3}
-        />
-      ))}
       {rayas.map((v) => (
         <g key={v}>
-          <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="currentColor" className="text-border" strokeWidth={1} />
-          <text x={ml - 6} y={y(v) + 4} textAnchor="end" className="fill-muted-foreground text-caption tabular-nums">{v}</text>
+          <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
+          <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
         </g>
       ))}
+      {/* Detenciones como las bandas del Ritmo en vivo: velo del tono con su borde arriba; la programada, solo contorno punteado. */}
+      {bandas(d.paradas).map((p, i) => {
+        const bx = x(p.desde)
+        const bw = Math.max(1, x(p.hasta) - x(p.desde))
+        if (p.dueno === 'programado') {
+          return <rect key={i} x={bx} y={mt} width={bw} height={H} rx={2} fill="none" stroke="var(--v2-gris)" strokeDasharray="3 3" />
+        }
+        const tono = RELLENO_DUENO[p.dueno]
+        return (
+          <g key={i}>
+            <rect x={bx} y={mt} width={bw} height={H} fill={tono} fillOpacity={0.14} />
+            <line x1={bx} x2={bx + bw} y1={mt} y2={mt} stroke={tono} strokeOpacity={0.7} strokeWidth={2} />
+          </g>
+        )
+      })}
       {marcas.map((m) => (
-        <text key={m} x={x(m)} y={h - 6} textAnchor="middle" className="fill-muted-foreground text-caption tabular-nums">{horaDelEje(d.serie.t0Ms, m)}</text>
+        <text key={m} x={x(m)} y={h - 6} textAnchor="middle" fontSize={12} className="fill-muted-foreground tabular-nums">{horaDelEje(d.serie.t0Ms, m)}</text>
       ))}
-      {b.length > 0 && <path d={traza(b, -b0)} fill="none" stroke={BAADER} strokeWidth={1.5} />}
-      <path d={traza(g, L)} fill="none" stroke={GRADER} strokeWidth={2} data-serie="grader" />
+      {b.length > 0 && <path d={traza(b, -b0)} fill="none" stroke={BAADER} strokeWidth={1.5} strokeLinejoin="round" />}
+      <path d={traza(g, L)} fill="none" stroke={GRADER} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" data-serie="grader" />
       {ultima > 0 && ultima < n && (
-        <line x1={x(ultima)} x2={x(ultima)} y1={mt} y2={mt + H} stroke="currentColor" className="text-muted-foreground" strokeDasharray="2 3" />
+        <>
+          <line x1={x(ultima)} x2={x(ultima)} y1={mt} y2={mt + H} stroke="rgb(var(--foreground) / 0.35)" strokeWidth={1} />
+          <circle cx={x(ultima)} cy={y(g[g.length - 1] ?? 0)} r={4.5} fill={GRADER} stroke="rgb(var(--background))" strokeWidth={2} />
+        </>
       )}
     </svg>
   )
@@ -246,16 +267,19 @@ function P0Barras({ d }: { d: Datos }) {
   const bw = ts.length > 0 ? W / Math.max(ts.length, 8) : W
   const umbral = DEFAULT_P0_CRITICAL_PCT
   return (
-    <Tarjeta titulo="P0 cada 15 min" sub={`Raya en ${coma1(umbral)} % · gris: menos de ${P0_LINE_MIN_PIECES} piezas en el tramo`}>
-      <div ref={ref} className="mt-2 w-full">
+    <Tarjeta titulo="P0 cada 15 min" sub={`Raya en ${coma1(umbral)} % · gris: menos de ${P0_LINE_MIN_PIECES} piezas en el tramo`} icono={<ShieldAlert className={IC} />}>
+      <div ref={ref} className="mt-3 w-full">
         {d.totales.p0 === null ? (
-          <p className="py-6 text-center text-footnote text-muted-foreground">
+          <p className="py-6 text-center text-[13px] text-muted-foreground">
             {d.totales.piezas >= PIEZAS_PARA_DECIR_SIN_GATE0 ? 'P0 llega con Puerta 0: este informe no trae piezas de Gate 0.' : 'Sin rechazos todavía.'}
           </p>
         ) : w > 0 && (
           <svg width={w} height={h} role="img" aria-label="P0 por tramo de 15 minutos" className="block">
             {[0, Math.round(tope / 2), tope].map((v) => (
-              <text key={v} x={ml - 6} y={y(v) + 4} textAnchor="end" className="fill-muted-foreground text-caption tabular-nums">{v}</text>
+              <g key={v}>
+                <line x1={ml} x2={w - mr} y1={y(v)} y2={y(v)} stroke="var(--v2-reja)" strokeWidth={1} />
+                <text x={ml - 6} y={y(v) + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground tabular-nums">{v}</text>
+              </g>
             ))}
             {ts.map((t, i) => {
               if (t.pct === null) return null
@@ -269,15 +293,16 @@ function P0Barras({ d }: { d: Datos }) {
                   height={mt + H - y(t.pct)}
                   rx={2}
                   data-tramo={t.rotulo}
-                  className={t.pocaMasa ? 'fill-muted-foreground/30' : alto ? 'fill-ink-crit' : 'fill-primary/55'}
+                  fill={t.pocaMasa ? 'var(--v2-prog)' : alto ? 'var(--v2-mal)' : 'var(--v2-acento)'}
+                  fillOpacity={t.pocaMasa || alto ? 1 : 0.5}
                 >
                   <title>{`${t.rotulo}: ${coma1(t.pct)} % (${milesPunto(t.g0)} de ${milesPunto(t.total)})`}</title>
                 </rect>
               )
             })}
-            <line x1={ml} x2={w - mr} y1={y(umbral)} y2={y(umbral)} stroke="currentColor" className="text-ink-crit" strokeDasharray="4 3" />
+            <line x1={ml} x2={w - mr} y1={y(umbral)} y2={y(umbral)} stroke="var(--v2-mal)" strokeWidth={1} strokeDasharray="2 4" />
             {ts.map((t, i) => (i % 4 === 0 ? (
-              <text key={`h${t.desde}`} x={ml + i * bw} y={h - 4} className="fill-muted-foreground text-caption tabular-nums">{horaDelEje(d.serie.t0Ms, t.desde)}</text>
+              <text key={`h${t.desde}`} x={ml + i * bw} y={h - 4} fontSize={12} className="fill-muted-foreground tabular-nums">{horaDelEje(d.serie.t0Ms, t.desde)}</text>
             ) : null))}
           </svg>
         )}
@@ -286,18 +311,22 @@ function P0Barras({ d }: { d: Datos }) {
   )
 }
 
-function Reparto({ filas }: { filas: Array<{ clave: string; pct: number }> }) {
+/** Las barras de la cascada «Dónde se fueron las piezas»: 2,5 de alto sobre `bg-muted`, la cifra a la derecha. */
+function Reparto({ titulo, filas }: { titulo: string; filas: Array<{ clave: string; pct: number }> }) {
   return (
-    <div className="space-y-1">
-      {filas.map((f) => (
-        <div key={f.clave} className="grid grid-cols-[76px_1fr_52px] items-center gap-2 text-footnote">
-          <span className="truncate">{f.clave}</span>
-          <span className="h-2 overflow-hidden rounded-full bg-muted-foreground/15">
-            <span className="block h-full rounded-full bg-primary" style={{ width: `${f.pct}%` }} />
-          </span>
-          <span className="text-right tabular-nums">{coma1(f.pct)} %</span>
-        </div>
-      ))}
+    <div>
+      <p className="mb-1.5 text-[12px] leading-[16px] text-muted-foreground">{titulo}</p>
+      <div className="space-y-1.5">
+        {filas.map((f) => (
+          <div key={f.clave} className="grid grid-cols-[72px_1fr_52px] items-center gap-2.5 text-[13px] leading-[18px]">
+            <span className="truncate text-foreground/80">{f.clave}</span>
+            <span className="h-2.5 overflow-hidden rounded-full bg-muted">
+              <span className="block h-full rounded-full" style={{ width: `${f.pct}%`, background: 'var(--v2-acento)' }} />
+            </span>
+            <span className="text-right font-semibold tabular-nums text-foreground">{coma1(f.pct)} %</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -305,13 +334,13 @@ function Reparto({ filas }: { filas: Array<{ clave: string; pct: number }> }) {
 function CalibreCalidad({ d }: { d: Datos }) {
   const r = d.reparto
   return (
-    <Tarjeta titulo="Calibre y calidad" sub="Salida del turno, sin Gate 0 ni piezas sin peso">
+    <Tarjeta titulo="Calibre y calidad" sub="Salida del turno, sin Gate 0 ni piezas sin peso" icono={<Layers className={IC} />}>
       {r.calibre.length === 0 ? (
-        <p className="py-6 text-center text-footnote text-muted-foreground">Sin piezas con peso todavía.</p>
+        <p className="py-6 text-center text-[13px] text-muted-foreground">Sin piezas con peso todavía.</p>
       ) : (
         <>
-          <div className="mt-2"><Reparto filas={r.calibre} /></div>
-          <div className="mt-3"><Reparto filas={r.calidad} /></div>
+          <div className="mt-3"><Reparto titulo="Calibre" filas={r.calibre} /></div>
+          <div className="mt-4"><Reparto titulo="Calidad" filas={r.calidad} /></div>
         </>
       )}
     </Tarjeta>
@@ -323,27 +352,27 @@ function LineaManual({ d }: { d: Datos }) {
   const tope = Math.max(1, ...filas.map((f) => Math.abs(f.diferencia)))
   const total = filas.reduce((a, f) => a + f.diferencia, 0)
   return (
-    <Tarjeta titulo="Línea manual por hora" sub="Piezas del grader menos piezas de las Baader de la misma hora">
+    <Tarjeta titulo="Línea manual por hora" sub="Piezas del grader menos piezas de las Baader de la misma hora" icono={<Hand className={IC} />}>
       {!d.baader ? (
-        <p className="py-6 text-center text-footnote text-muted-foreground">Sin la serie por minuto de Shoplogix no se puede restar.</p>
+        <p className="py-6 text-center text-[13px] text-muted-foreground">Sin la serie por minuto de Shoplogix no se puede restar.</p>
       ) : filas.length === 0 ? (
-        <p className="py-6 text-center text-footnote text-muted-foreground">Se calcula al cerrar la primera hora completa.</p>
+        <p className="py-6 text-center text-[13px] text-muted-foreground">Se calcula al cerrar la primera hora completa.</p>
       ) : (
-        <div className="mt-2 space-y-1">
+        <div className="mt-3 space-y-1.5">
           {filas.map((f) => (
-            <div key={f.hora} data-hora={f.hora} className="grid grid-cols-[52px_1fr_60px] items-center gap-2 text-footnote">
-              <span className="tabular-nums">{f.hora}</span>
-              <span className="relative h-2">
-                <span aria-hidden className="absolute inset-y-[-3px] left-1/2 w-px bg-border" />
+            <div key={f.hora} data-hora={f.hora} className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
+              <span className="tabular-nums text-foreground/80">{f.hora}</span>
+              <span className="relative h-2.5 rounded-full bg-muted">
+                <span aria-hidden className="absolute inset-y-[-3px] left-1/2 w-px bg-foreground/25" />
                 <span
-                  className={cn('absolute inset-y-0 rounded-full', f.diferencia >= 0 ? 'left-1/2 bg-primary' : 'right-1/2 bg-muted-foreground/60')}
-                  style={{ width: `${(Math.abs(f.diferencia) / tope) * 50}%` }}
+                  className={cn('absolute inset-y-0 rounded-full', f.diferencia >= 0 ? 'left-1/2' : 'right-1/2')}
+                  style={{ width: `${(Math.abs(f.diferencia) / tope) * 50}%`, background: f.diferencia >= 0 ? 'var(--v2-acento)' : 'var(--v2-gris)' }}
                 />
               </span>
-              <span className="text-right tabular-nums">{f.diferencia > 0 ? '+' : f.diferencia < 0 ? '−' : ''}{milesPunto(Math.abs(f.diferencia))}</span>
+              <span className="text-right font-semibold tabular-nums text-foreground">{f.diferencia > 0 ? '+' : f.diferencia < 0 ? '−' : ''}{milesPunto(Math.abs(f.diferencia))}</span>
             </div>
           ))}
-          <p className="pt-1 text-footnote text-muted-foreground tabular-nums">
+          <p className="pt-1.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">
             {filas.length} {filas.length === 1 ? 'hora' : 'horas'}: {total > 0 ? '+' : total < 0 ? '−' : ''}{milesPunto(Math.abs(total))} piezas. La hora en curso entra al cerrar.
           </p>
         </div>
