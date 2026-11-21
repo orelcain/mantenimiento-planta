@@ -32,6 +32,20 @@ export interface UmbralesAlertas {
   pesoMinPiezas: number
   /** Ventaja mínima (puntos %) del calibre nuevo sobre el dominante del turno para llamarlo «salto». */
   calibreVentajaPp: number
+  /** Atasco: piezas acumuladas entre las Baader y el grader en la ventana que lo dispara. */
+  atascoPz: number
+  /** Atasco: minutos de la ventana que se suma. */
+  atascoVentanaMin: number
+  /** Atasco: promedio mínimo de las Baader (corridas) en la ventana, pz/min. */
+  atascoBaaderPzMin: number
+  /** Atasco: minutos sin avisar después de un arranque de las Baader. */
+  atascoArranqueMin: number
+  /** Atasco: minutos de la razón grader/Baader («la hora anterior»), que terminan donde empieza la ventana. */
+  atascoRazonMin: number
+  /** Atasco: piezas de las Baader mínimas en la hora anterior para creerle a la razón (si no, razón 1). */
+  atascoRazonMinPiezas: number
+  /** Atasco: minutos que el aviso sigue a la vista después del último minuto sobre el umbral. */
+  atascoVigenteMin: number
 }
 
 export const UMBRALES_ALERTAS: UmbralesAlertas = {
@@ -42,6 +56,13 @@ export const UMBRALES_ALERTAS: UmbralesAlertas = {
   pesoBanda: 0.15,
   pesoMinPiezas: 200,
   calibreVentajaPp: 5,
+  atascoPz: 80,
+  atascoVentanaMin: 10,
+  atascoBaaderPzMin: 20,
+  atascoArranqueMin: 15,
+  atascoRazonMin: 60,
+  atascoRazonMinPiezas: 500,
+  atascoVigenteMin: 15,
 }
 
 /** Lo que el grader clasificó en cada minuto (todas las gates salvo donde se dice). */
@@ -80,7 +101,7 @@ export interface EntradaAlertas {
   umbrales?: Partial<UmbralesAlertas>
 }
 
-export type ReglaAlerta = 'grader-quieto' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto'
+export type ReglaAlerta = 'grader-quieto' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco'
 
 export interface AlertaGrader {
   regla: ReglaAlerta
@@ -273,6 +294,120 @@ export function reglasPesoYCalibre(e: EntradaAlertas, u: UmbralesAlertas): Alert
   return out
 }
 
+/** Un minuto evaluado por la regla de atasco. */
+export interface MinutoAtasco {
+  /** Minuto del eje (el último de la ventana). */
+  m: number
+  /** Piezas acumuladas en la ventana: Baader corridas × razón − grader. */
+  acumulado: number
+  /** Piezas de las Baader corridas y del grader en la ventana. */
+  baader: number
+  grader: number
+  /** Razón grader/Baader de la hora anterior a la ventana (1 sin masa). */
+  razon: number
+  /** Cumple todo: umbral, Baader andando y fuera de un arranque. */
+  dispara: boolean
+}
+
+/**
+ * Regla 5 (aprobada el 21-11): se acumulan piezas entre las Baader y el grader (clasificado manual, corte de cabeza
+ * o el propio grader). Los atascos reales duran 3-5 min: «grader quieto ≥ 5 min» no los ve.
+ *
+ * Por minuto `i`, en la ventana de 10 min que termina en `i`: acumulado = Baader corridas por el retraso × razón −
+ * grader. La razón es grader/Baader de los 60 min anteriores a la ventana, porque el grader cuenta 1,4-15 % más que
+ * las Baader y el tránsito absoluto se desvía. Exige las Baader andando (promedio de la ventana ≥ 20 pz/min: la
+ * serie real por minuto trae bajones de 1-2 min que un mínimo por minuto confundiría con una parada) y descarta los
+ * 15 min siguientes a un arranque, cuando las Baader parten antes que el grader. Un arranque es el minuto en que el
+ * promedio de 5 min de las Baader corridas pasa de bajo 20 a 20 o más (el inicio del turno cuenta: antes no hay
+ * dato). Un minuto de las Baader sin dato (`NaN`) no cumple.
+ */
+export function minutosAtasco(e: EntradaAlertas, u: UmbralesAlertas, desde: number, hasta: number): MinutoAtasco[] {
+  const b = e.baader
+  if (!b) return []
+  const L = Math.max(0, Math.round(e.retrasoMin))
+  const bs = (j: number): number => {
+    const v = j - L >= 0 ? b[j - L] : undefined
+    return v !== undefined && Number.isFinite(v) ? v : NaN
+  }
+  const media5 = (fin: number): number => {
+    let s = 0
+    for (let j = fin - 5; j < fin; j++) {
+      const v = bs(j)
+      if (Number.isFinite(v)) s += v
+    }
+    return s / 5
+  }
+  const V = u.atascoVentanaMin
+  const out: MinutoAtasco[] = []
+  for (let i = Math.max(0, desde); i < hasta; i++) {
+    const ini = i - V + 1
+    if (ini < 0) continue
+    let sb = 0
+    let sg = 0
+    let completa = true
+    for (let j = ini; j <= i; j++) {
+      const v = bs(j)
+      if (!Number.isFinite(v)) { completa = false; break }
+      sb += v
+      sg += e.grader.pz[j] ?? 0
+    }
+    if (!completa) continue
+    let rb = 0
+    let rg = 0
+    for (let j = Math.max(0, ini - u.atascoRazonMin); j < ini; j++) {
+      const v = bs(j)
+      if (!Number.isFinite(v)) continue
+      rb += v
+      rg += e.grader.pz[j] ?? 0
+    }
+    const razon = rb >= u.atascoRazonMinPiezas ? rg / rb : 1
+    const acumulado = sb * razon - sg
+    let arranque = false
+    for (let x = i; x > i - u.atascoArranqueMin && x >= 0; x--) {
+      if (media5(x + 1) >= u.atascoBaaderPzMin && media5(x) < u.atascoBaaderPzMin) { arranque = true; break }
+    }
+    const dispara = acumulado >= u.atascoPz && sb / V >= u.atascoBaaderPzMin && !arranque
+    out.push({ m: i, acumulado, baader: sb, grader: sg, razon, dispara })
+  }
+  return out
+}
+
+/** La regla 5 en vivo: el último episodio de atasco de los últimos 15 min (sigue a la vista aunque ya drenó). */
+export function reglaAtasco(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader | null {
+  if (!e.baader) return null
+  const L = Math.max(0, Math.round(e.retrasoMin))
+  // Hasta lo leído entero del grader y lo que alcanza la serie de las Baader corrida.
+  const hasta = Math.min(minutosCerrados(e), e.baader.length + L)
+  const desde = hasta - u.atascoVigenteMin
+  // Se evalúa desde antes para poder seguir el episodio hacia atrás hasta su inicio.
+  const ms = minutosAtasco(e, u, desde - 30, hasta)
+  let k = ms.length - 1
+  while (k >= 0 && !(ms[k]!.dispara && ms[k]!.m >= desde)) k--
+  if (k < 0) return null
+  const ultimo = ms[k]!
+  // El episodio: minutos seguidos que disparan, hacia atrás desde el último.
+  let j = k
+  while (j > 0 && ms[j - 1]!.dispara && ms[j - 1]!.m === ms[j]!.m - 1) j--
+  const inicio = ms[j]!
+  let pico = inicio
+  for (let x = j; x <= k; x++) if (ms[x]!.acumulado > pico.acumulado) pico = ms[x]!
+  const activo = ultimo.m === hasta - 1
+  const aprox = Math.round(pico.acumulado / 10) * 10
+  const hora = horaDelEje(e.t0Ms, pico.m)
+  // Las Baader se muestran ya llevadas a la cuenta del grader, para que la resta se pueda hacer de cabeza.
+  const corregidas = Math.abs(pico.razon - 1) > 0.005 ? ' (llevadas a la cuenta del grader con la hora anterior)' : ''
+  return {
+    regla: 'atasco',
+    nivel: 'atento',
+    desdeMin: inicio.m,
+    titulo: `${hora} · ~${milesPunto(aprox)} piezas acumuladas entre las Baader y el grader`,
+    detalle:
+      `En los ${u.atascoVentanaMin} min hasta las ${hora} las Baader entregaron ${milesPunto(pico.baader * pico.razon)} piezas${corregidas} y al grader llegaron ${milesPunto(pico.grader)}. ` +
+      (activo ? 'Sigue acumulándose. ' : `Dejó de crecer a las ${horaDelEje(e.t0Ms, ultimo.m + 1)}. `) +
+      'Puede ser el clasificado manual, el corte de cabeza o el grader.',
+  }
+}
+
 /** Todas las reglas, las de nivel `mal` primero y luego por minuto de inicio. */
 export function evaluarAlertas(e: EntradaAlertas): AlertaGrader[] {
   const u: UmbralesAlertas = { ...UMBRALES_ALERTAS, ...e.umbrales }
@@ -283,6 +418,9 @@ export function evaluarAlertas(e: EntradaAlertas): AlertaGrader[] {
   if (quieto) out.push(quieto)
   const p0 = reglaP0Alto(e, u)
   if (p0) out.push(p0)
+  // Con el grader quieto ≥ 5 min ese aviso ya dice lo mismo, más fuerte.
+  const atasco = quieto ? null : reglaAtasco(e, u)
+  if (atasco) out.push(atasco)
   out.push(...reglasPesoYCalibre(e, u))
   const peso = { mal: 0, atento: 1 }
   return out.sort((a, b) => peso[a.nivel] - peso[b.nivel] || a.desdeMin - b.desdeMin)
