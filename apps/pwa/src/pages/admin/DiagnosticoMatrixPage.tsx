@@ -37,6 +37,7 @@ import { DIAGNOSTICO_MATRIX_PS1 } from './diagnosticoMatrixScript'
 import { SONDA_MATRIX_PS1 } from './sondaMatrixScript'
 import { LECTURA_TABLA_MATRIX_PS1 } from './lecturaTablaMatrixScript'
 import { PRUEBA_VIDA_ESPEJO_PS1 } from './pruebaVidaEspejoScript'
+import { SONDEO_BASE_MATRIX_PS1 } from './sondeoBaseMatrixScript'
 import { LectorEspejoCard } from './LectorEspejoCard'
 
 /** showDirectoryPicker no está tipado en todas las versiones de lib.dom: se lee aparte. */
@@ -373,7 +374,30 @@ export function DiagnosticoMatrixPage() {
       {/* 7. Lector del espejo: llave, lista y detener */}
       <LectorEspejoCard />
 
-      {/* 8. Pie: resumen para Claude */}
+      {/* 8. Sondeo de la base de Matrix: para leer algún día sin Matrix abierto */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Base de datos de Matrix</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Averigua dónde guarda Matrix sus datos: motor, servidor y base. El script solo lee: no se conecta a la base, no muestra usuarios, contraseñas ni la licencia y no cambia nada.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void copiarTexto(SONDEO_BASE_MATRIX_PS1, 'Sondeo copiado')}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar sondeo de la base de Matrix
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Pégalo en PowerShell en el PC de Matrix. Tarda menos de un minuto. Saca foto al veredicto; queda en el Escritorio como sondeo-base-matrix-HHmmss.txt.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 9. Pie: resumen para Claude */}
       <div className="flex flex-col items-end gap-1">
         <Button size="sm" onClick={copiarResumen}>
           Copiar resumen para Claude

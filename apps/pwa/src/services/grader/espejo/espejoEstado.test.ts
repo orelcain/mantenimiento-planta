@@ -6,6 +6,7 @@ import {
   fraseDeError,
   avisoSinPiezasDelTurno,
   avisoAvance,
+  estadoAjuste,
   minutosDesde,
   textoHace,
   type EstadoLector,
@@ -78,5 +79,26 @@ describe('estado del lector', () => {
     expect(avisoLimite({ limite: true, filasTabla: 10000 })).toContain('10 000')
     expect(avisoLimite({ limite: true, filasTabla: 9998 })).toBeNull()
     expect(avisoLimite({ limite: false, filasTabla: 10000 })).toBeNull()
+  })
+})
+
+describe('rango automático del lector e1.2', () => {
+  it('sin la clave (lector e1.1) no dice nada', () => {
+    expect(estadoAjuste({})).toBeNull()
+  })
+  it('ok no avisa; los fallos avisan y dicen que no tocó nada o que devolvió las fechas', () => {
+    expect(estadoAjuste({ ajuste: 'ok' })).toEqual({ texto: 'lo mueve el lector', aviso: null })
+    expect(estadoAjuste({ ajuste: 'sin-controles' })?.aviso).toMatch(/no tocó nada/)
+    expect(estadoAjuste({ ajuste: 'solo-lectura' })?.aviso).toMatch(/no tocó nada/)
+    expect(estadoAjuste({ ajuste: 'no-aplico' })?.aviso).toMatch(/dejó las fechas como estaban/)
+    expect(estadoAjuste({ ajuste: 'no-filtra' })?.aviso).toMatch(/no filtró/)
+    expect(estadoAjuste({ ajuste: 'no-devuelto' })?.aviso).toMatch(/revísalas en Matrix/)
+  })
+  it('sesión bloqueada: frase propia que apunta a la base de datos', () => {
+    expect(fraseDeError('pantalla-bloqueada')).toMatch(/sesión bloqueada/)
+    expect(fraseDeError('pantalla-bloqueada')).toMatch(/base de datos/)
+  })
+  it('un código desconocido igual avisa', () => {
+    expect(estadoAjuste({ ajuste: 'raro' })?.aviso).toContain('«raro»')
   })
 })

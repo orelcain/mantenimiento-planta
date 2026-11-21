@@ -14,6 +14,7 @@ import { aEstado } from '@/services/grader/espejo/useEspejoGrader'
 import {
   avisoAvance,
   avisoLimite,
+  estadoAjuste,
   estaVivo,
   fraseDeError,
   type EstadoLector,
@@ -39,6 +40,7 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
   const error = est.error && est.error !== 'iniciando' ? fraseDeError(est.error) : null
   const limite = avisoLimite(est)
   const avance = avisoAvance(est)
+  const ajuste = estadoAjuste(est)
   const rango = Array.isArray(est.rango) && est.rango.length > 0 ? est.rango.slice(0, 2).join(' → ') : '—'
   return (
     <div className="space-y-2 rounded-ctl border border-border p-3">
@@ -64,12 +66,19 @@ export function FichaEstadoLector({ e, ahora }: { e: EstadoLector; ahora: number
         <Dato k="Última fila" v={est.ultima || '—'} />
         <Dato k="Rango de Matrix" v={rango} />
         <Dato k="Límite de 10 000" v={est.limite === true ? 'marcado' : est.limite === false ? 'no marcado' : '—'} />
+        {ajuste && <Dato k="Rango automático" v={ajuste.texto} />}
+        {typeof est.bloqueada === 'boolean' && (
+          <Dato
+            k="Sesión de Windows"
+            v={est.bloqueada ? (est.error ? 'bloqueada · no pudo leer' : `bloqueada · leyó ${miles(est.leidas ?? 0)} filas`) : 'desbloqueada'}
+          />
+        )}
         {typeof est.seg === 'number' && (
           <Dato k="Último ciclo" v={`${String(est.seg).replace('.', ',')} s · ${miles(est.leidas ?? 0)} filas leídas`} />
         )}
         <Dato k="Error" v={est.error || 'ninguno'} />
       </dl>
-      {[error, limite].filter(Boolean).map((t) => (
+      {[error, limite, ajuste?.aviso ?? null].filter(Boolean).map((t) => (
         <p key={t!} className="text-xs text-ink-warn">{t}</p>
       ))}
       {avance && <p className="text-xs text-muted-foreground tabular-nums">{avance}</p>}

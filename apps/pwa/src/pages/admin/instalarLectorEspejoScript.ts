@@ -1,5 +1,5 @@
 /**
- * Instalador del lector del espejo del grader que se copia desde Diagnóstico Matrix: deja el lector oculto en el PC de Matrix. El único control de Matrix que acciona es «Actualizar».
+ * Instalador del lector del espejo del grader que se copia desde Diagnóstico Matrix: deja el lector oculto en el PC de Matrix. Controles que acciona: las 2 fechas del rango, la casilla «Limitar» (solo desmarcar) y «Actualizar».
  * Fuente: _HERRAMIENTAS/matrix-diagnostico/instalar-lector-espejo.ps1 (copiado TAL CUAL).
  * Si el .ps1 cambia, regenerar este archivo con generar-ts.mjs; no editarlo a mano.
  */
@@ -24,13 +24,21 @@ export const INSTALAR_LECTOR_ESPEJO_PS1 = `& {
   # 1) El lector: una sola fuente, incrustada aquí (con BOM UTF-8 para PowerShell 5.1).
   $lectorTexto = @'
 # Lector del espejo del grader, contrato E1 (fuente: espejo-grader-e1-contrato.md).
-# Corre OCULTO y en una sola instancia. Lee «Pieza pieza Grader» de Matrix CG por UI Automation,
-# pulsa «Actualizar» (único control que acciona) y envía las filas-pieza nuevas a espejoGraderIngesta.
+# Corre OCULTO y en una sola instancia. Lee «Pieza pieza Grader» de Matrix CG por UI Automation y envía las
+# filas-pieza nuevas a espejoGraderIngesta. Controles que acciona (y ningún otro, nunca datos):
+#   1. las 2 fechas del rango (ValuePattern.SetValue): inicio = última pieza enviada - 10 min (o 00:00 de hoy),
+#      fin = mañana 00:00; nunca más atrás que el corte por antigüedad;
+#   2. la casilla «Limitar el informe…» (TogglePattern.Toggle), solo para desmarcarla;
+#   3. el botón «Actualizar» (InvokePattern.Invoke).
+# Si no encuentra EXACTAMENTE 2 fechas editables y 1 casilla «Limitar el informe», no toca ni el rango ni la casilla.
+# Si Matrix no toma el rango nuevo, devuelve las fechas como estaban y sigue sin moverlas (clave «ajuste» del latido).
+# Mientras corre pide a Windows que no SUSPENDA el equipo (SetThreadExecutionState, sin pantalla: no toca el bloqueo
+# con contraseña de planta). Con la sesión bloqueada igual intenta leer, no mueve el rango y lo informa («bloqueada»).
 # Configuración por variables de entorno (opcionales): ESPEJO_URL, ESPEJO_CADA (s, 300), ESPEJO_FILTRO
 # (matrix|marelec), ESPEJO_DIR (%LOCALAPPDATA%\\espejo-grader), ESPEJO_EQUIPO (nombre del PC),
 # ESPEJO_ESPERA_RECARGA (s, 12), ESPEJO_TOPE_CICLO (s, 600), ESPEJO_TOPE_TRAMO (s, 90: la lectura de la
 # tabla se corta en tramos y el siguiente ciclo la continúa), ESPEJO_HORAS_ATRAS (h, 16: no lee filas más
-# viejas; 0 o negativo = sin corte).
+# viejas; 0 o negativo = sin corte), ESPEJO_RANGO_AUTO (0 = no mueve el rango ni la casilla, como e1.1).
 # La llave vive cifrada (DPAPI) en <dir>\\llave.dat. Nunca se escribe en el log ni en pantalla.
 # Sin Write-Host ni ventanas: todo va a <dir>\\lector.log.
 
@@ -59,6 +67,7 @@ $topeTramo = 90
 if ($env:ESPEJO_TOPE_TRAMO) { $topeTramo = [double]$env:ESPEJO_TOPE_TRAMO }
 $horasAtras = 16
 if ($env:ESPEJO_HORAS_ATRAS) { $horasAtras = [double]$env:ESPEJO_HORAS_ATRAS }
+$rangoAuto = ($env:ESPEJO_RANGO_AUTO -ne '0')
 $equipo = ([string]$env:COMPUTERNAME) -replace '[^A-Za-z0-9_-]', ''
 if ($env:ESPEJO_EQUIPO) { $equipo = ([string]$env:ESPEJO_EQUIPO) -replace '[^A-Za-z0-9_-]', '' }
 if ($equipo.Length -gt 40) { $equipo = $equipo.Substring(0, 40) }
@@ -68,6 +77,7 @@ if (-not $equipo) { $equipo = 'PC' }
 $INFORMES = @{
   'Pieza pieza Grader' = @('Fecha', 'Hora', 'Peso de las piezas', 'Cantidad de piezas', 'Lote', 'Gate', 'Calidad', 'Conservacion', 'Calibre', 'Producto', 'Turno')
 }
+$FORMATO_FECHA = '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$'
 $LIMITE_LOG = 1MB
 $LOTE_MAX = 2000
 $archivoLog = Join-Path $dir 'lector.log'
@@ -152,7 +162,7 @@ function Guarda-Estado($e) {
 
 # ---- UI Automation: búsqueda (reutiliza la forma de la prueba de vida) ----
 function Recorre($e, [int]$nivel, $acc, $reloj) {
-  if ($acc.visitados -ge 4000 -or $nivel -gt 16 -or $reloj.Elapsed.TotalSeconds -gt 20) { return }
+  if ($acc.visitados -ge 4000 -or $nivel -gt 16 -or $reloj.Elapsed.TotalSeconds -gt 20) { $acc.cortado = $true; return }
   $acc.visitados++
   try {
     $nom = [string]$e.Current.Name
@@ -163,11 +173,19 @@ function Recorre($e, [int]$nivel, $acc, $reloj) {
     if ($tipo -eq 'ControlType.CheckBox') {
       $estadoCb = '?'
       try { $estadoCb = [string]$e.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState } catch { }
-      $acc.casillas.Add(@{ nombre = $nom; estado = $estadoCb })
+      $acc.casillas.Add(@{ nombre = $nom; estado = $estadoCb; el = $e })
     } elseif ([bool]$e.GetCurrentPropertyValue($AE::IsValuePatternAvailableProperty)) {
       $val = ''
-      try { $val = [string]$e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value } catch { }
-      if ($val -match '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$') { $acc.fechas.Add($val) }
+      $soloLectura = $true
+      try {
+        $vp = $e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+        $val = [string]$vp.Current.Value
+        $soloLectura = [bool]$vp.Current.IsReadOnly
+      } catch { }
+      if ($val -match $FORMATO_FECHA) {
+        $acc.fechas.Add($val)
+        if ($null -ne $acc.campos) { $acc.campos.Add(@{ el = $e; val = $val; soloLectura = $soloLectura }) }
+      }
     }
   } catch { return }
   $h = $null
@@ -263,6 +281,181 @@ function Boton-Actualizar($ventana) {
   $lista = $ventana.FindAll([System.Windows.Automation.TreeScope]::Descendants, $c)
   if ($lista.Count -eq 1) { return $lista.Item(0) }
   return $null
+}
+
+# ---- E1.2: rango automático ----
+# Ventana de nivel superior (hija directa del escritorio) que contiene la grilla: ahí viven las fechas y la casilla.
+function Ventana-Raiz($el) {
+  $x = $el
+  $raiz = $AE::RootElement
+  for ($i = 0; $i -lt 40 -and $x; $i++) {
+    $p = $null
+    try { $p = $WALK.GetParent($x) } catch { return $null }
+    if (-not $p) { return $null }
+    if ([System.Windows.Automation.Automation]::Compare($p, $raiz)) { return $x }
+    $x = $p
+  }
+  return $null
+}
+
+# Busca los controles del rango. Solo vale si hay EXACTAMENTE 2 campos con fecha «yyyy-MM-dd HH:mm:ss»
+# (inicio <= fin) y EXACTAMENTE 1 casilla «Limitar el informe…». error: '' | sin-controles | solo-lectura.
+function Controles-Rango($ventana) {
+  $r = @{ error = 'sin-controles'; desde = $null; hasta = $null; casilla = $null }
+  if (-not $ventana) { return $r }
+  $acc = @{ grillas = (New-Object System.Collections.Generic.List[object]); casillas = (New-Object System.Collections.Generic.List[object]); fechas = (New-Object System.Collections.Generic.List[string]); campos = (New-Object System.Collections.Generic.List[object]); licencia = $false; visitados = 0; procesos = 0 }
+  $reloj = [Diagnostics.Stopwatch]::StartNew()
+  Recorre $ventana 0 $acc $reloj
+  # Un recorrido cortado (tope de nodos, nivel o tiempo) no prueba que haya EXACTAMENTE 2 fechas: no se toca nada.
+  if ($acc.cortado) { return $r }
+  $lim = @($acc.casillas | Where-Object { $_.nombre -match '^\\s*Limitar el informe' })
+  if ($acc.campos.Count -ne 2 -or $lim.Count -ne 1) { return $r }
+  $d = $acc.campos[0]
+  $h = $acc.campos[1]
+  if ([string]::CompareOrdinal([string]$d.val, [string]$h.val) -gt 0) { return $r }
+  if ($d.soloLectura -or $h.soloLectura) { $r.error = 'solo-lectura'; return $r }
+  $r.error = ''
+  $r.desde = $d
+  $r.hasta = $h
+  $r.casilla = $lim[0]
+  return $r
+}
+
+function Valor-De($el) {
+  try { return [string]$el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value } catch { return '' }
+}
+function Escribe-Valor($el, [string]$v) {
+  $el.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($v)
+}
+function Estado-Casilla($el) {
+  try { return [string]$el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState } catch { return '?' }
+}
+
+# Inicio deseado: última pieza enviada - 10 min (o 00:00 de hoy sin ancla), nunca antes del corte por
+# antigüedad, redondeado al minuto hacia atrás. Fin: mañana 00:00.
+function Rango-Deseado($estado) {
+  $ahora = Get-Date
+  $ini = $ahora.Date
+  $u = [string]$estado.ultima
+  $t = [datetime]::MinValue
+  if ($u -match $FORMATO_FECHA -and [datetime]::TryParseExact($u, 'yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$t)) {
+    $ini = $t.AddMinutes(-10)
+  }
+  if ($script:horasAtras -gt 0) {
+    $piso = $ahora.AddHours(-$script:horasAtras)
+    if ($ini -lt $piso) { $ini = $piso }
+  }
+  if ($ini -gt $ahora) { $ini = $ahora }
+  $ini = $ini.AddSeconds(-$ini.Second)
+  return @{ desde = $ini.ToString('yyyy-MM-dd HH:mm:ss'); hasta = $ahora.Date.AddDays(1).ToString('yyyy-MM-dd HH:mm:ss') }
+}
+
+# Antes de «Actualizar»: escribe las 2 fechas (solo si cambian) y desmarca «Limitar» (solo si está marcada).
+# Devuelve $null si no tocó nada; si tocó, lo necesario para verificar y deshacer.
+function Ajusta-Rango($el, $estado) {
+  $ctl = Controles-Rango (Ventana-Raiz $el)
+  if ($ctl.error) { $script:ajuste = $ctl.error; return $null }
+  $q = Rango-Deseado $estado
+  # Se deshace siempre hacia las fechas que había ANTES de que el lector tocara nada en esta corrida.
+  if (-not $script:rangoOriginal) { $script:rangoOriginal = @{ desde = [string]$ctl.desde.val; hasta = [string]$ctl.hasta.val } }
+  $orig = $script:rangoOriginal
+  $cambia = @{ desde = ([string]$ctl.desde.val -ne $q.desde); hasta = ([string]$ctl.hasta.val -ne $q.hasta) }
+  try {
+    # Si el inicio nuevo queda después del fin actual, primero el fin (Matrix no ve un inicio > fin).
+    if ([string]::CompareOrdinal($q.desde, [string]$ctl.hasta.val) -gt 0) {
+      if ($cambia.hasta) { Escribe-Valor $ctl.hasta.el $q.hasta }
+      if ($cambia.desde) { Escribe-Valor $ctl.desde.el $q.desde }
+    } else {
+      if ($cambia.desde) { Escribe-Valor $ctl.desde.el $q.desde }
+      if ($cambia.hasta) { Escribe-Valor $ctl.hasta.el $q.hasta }
+    }
+    if ((Estado-Casilla $ctl.casilla.el) -eq 'On') { $ctl.casilla.el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle() }
+  } catch {
+    Log ('ajuste: Matrix rechazó el cambio: ' + $_.Exception.Message)
+    Deshace-Rango $ctl $orig 'no-aplico'
+    return $null
+  }
+  if ((Valor-De $ctl.desde.el) -ne $q.desde -or (Valor-De $ctl.hasta.el) -ne $q.hasta -or (Estado-Casilla $ctl.casilla.el) -ne 'Off') {
+    Log ('ajuste: los controles no quedaron como se escribieron (inicio=' + (Valor-De $ctl.desde.el) + ', casilla=' + (Estado-Casilla $ctl.casilla.el) + ')')
+    Deshace-Rango $ctl $orig 'no-aplico'
+    return $null
+  }
+  $script:ajuste = 'ok'
+  if ($cambia.desde -or $cambia.hasta) { Log ('ajuste: rango ' + $q.desde + ' -> ' + $q.hasta) }
+  return @{ ctl = $ctl; orig = $orig; q = $q }
+}
+
+# Devuelve las fechas a como estaban y apaga el rango automático por el resto de la corrida.
+function Deshace-Rango($ctl, $orig, [string]$motivo) {
+  try {
+    # Si el inicio original queda después del fin escrito, primero el fin (Matrix no ve un inicio > fin).
+    if ([string]::CompareOrdinal($orig.desde, (Valor-De $ctl.hasta.el)) -gt 0) {
+      if ((Valor-De $ctl.hasta.el) -ne $orig.hasta) { Escribe-Valor $ctl.hasta.el $orig.hasta }
+      if ((Valor-De $ctl.desde.el) -ne $orig.desde) { Escribe-Valor $ctl.desde.el $orig.desde }
+    } else {
+      if ((Valor-De $ctl.desde.el) -ne $orig.desde) { Escribe-Valor $ctl.desde.el $orig.desde }
+      if ((Valor-De $ctl.hasta.el) -ne $orig.hasta) { Escribe-Valor $ctl.hasta.el $orig.hasta }
+    }
+  } catch { Log ('ajuste: no se pudo devolver el rango: ' + $_.Exception.Message) }
+  if ((Valor-De $ctl.desde.el) -ne $orig.desde -or (Valor-De $ctl.hasta.el) -ne $orig.hasta) { $motivo = 'no-devuelto' }
+  $script:ajuste = $motivo
+  $script:ajusteApagado = $true
+  Log ('ajuste: ' + $motivo + '; el lector deja el rango como estaba y sigue sin moverlo.')
+}
+
+# Tras «Actualizar»: las fechas siguen escritas, la casilla desmarcada y la tabla empieza en el inicio pedido.
+function Verifica-Ajuste($aj, $gp, [int]$filas) {
+  if (-not $aj) { return }
+  $ctl = $aj.ctl
+  if ((Valor-De $ctl.desde.el) -ne $aj.q.desde -or (Valor-De $ctl.hasta.el) -ne $aj.q.hasta -or (Estado-Casilla $ctl.casilla.el) -ne 'Off') {
+    Deshace-Rango $ctl $aj.orig 'no-aplico'
+    return
+  }
+  for ($r = 0; $r -lt [math]::Min($filas, 5); $r++) {
+    $f = ([string](Celda $gp $r 0)).Trim() + ' ' + ([string](Celda $gp $r 1)).Trim()
+    if ($f -match $FORMATO_FECHA) {
+      if ([string]::CompareOrdinal($f, $aj.q.desde) -lt 0) { Deshace-Rango $ctl $aj.orig 'no-filtra' }
+      return
+    }
+  }
+}
+
+# El ancla se guarda por índice; al mover el rango el índice cambia. La busca por contenido: primera fila de
+# su segundo (búsqueda binaria) y, dentro de ese segundo, la n-ésima fila idéntica (n = su conteo).
+# Devuelve movida | sin-ancla | sin-fecha | no-esta | desordenada.
+function Re-Ancla($gp, [int]$filas, $estado) {
+  if (-not $estado.ancla) { return 'sin-ancla' }
+  $texto = [string]$estado.ancla.texto
+  # Siempre por contenido: tras mover el rango, el índice viejo puede caer en OTRA copia idéntica (Codex, 21-11).
+  $p = $texto.Split([char]9)
+  if ($p.Count -ne 11 -or $p[0] -notmatch '^\\d{4}-\\d{2}-\\d{2}$' -or $p[1] -notmatch '^\\d{2}:\\d{2}:\\d{2}$') { return 'sin-fecha' }
+  $sec = $p[0] + ' ' + $p[1]
+  if ([string]$estado.sec -ne $sec) { return 'sin-fecha' }
+  $n = 0
+  foreach ($c in @($estado.conteos)) { if ([string]$c.k -eq $texto) { $n = [int]$c.n } }
+  if ($n -lt 1) { return 'sin-fecha' }
+  $lo = Desde-Corte $gp $filas $sec
+  # Orden ascendente: la fila de antes es de un segundo anterior.
+  if ($lo -gt 0) {
+    $antes = ([string](Celda $gp ($lo - 1) 0)).Trim() + ' ' + ([string](Celda $gp ($lo - 1) 1)).Trim()
+    if ($antes -match $FORMATO_FECHA -and [string]::CompareOrdinal($antes, $sec) -ge 0) { return 'desordenada' }
+  }
+  $cuenta = 0
+  $hallada = -1
+  $r = $lo
+  for (; $r -lt $filas -and $r -lt ($lo + 2000); $r++) {
+    $c = Fila-Celdas $gp $r
+    if (($c[0] + ' ' + $c[1]) -ne $sec) { break }
+    if ($hallada -lt 0 -and ($c -join "\`t") -eq $texto) { $cuenta++; if ($cuenta -eq $n) { $hallada = $r } }
+  }
+  if ($hallada -lt 0) { return 'no-esta' }
+  # La primera fila después del segundo del ancla, si tiene fecha, debe ser posterior.
+  if ($r -lt $filas) {
+    $despues = ([string](Celda $gp $r 0)).Trim() + ' ' + ([string](Celda $gp $r 1)).Trim()
+    if ($despues -match $FORMATO_FECHA -and [string]::CompareOrdinal($despues, $sec) -le 0) { return 'desordenada' }
+  }
+  $estado.ancla = @{ idx = $hallada; texto = $texto }
+  return 'movida'
 }
 
 function Nuevo-Diccionario {
@@ -395,10 +588,14 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
   $res.ftabla = $foto.filas
   $script:ultFoto = @{ ftabla = $foto.filas; rango = $foto.rango; limite = $foto.limite }
 
-  # Un ciclo de puesta al día (la lectura anterior quedó a medias) no pulsa «Actualizar» ni espera la recarga.
+  # Un ciclo de puesta al día (la lectura anterior quedó a medias) no pulsa «Actualizar» ni espera la recarga,
+  # y tampoco mueve el rango.
+  $aj = $null
   if ($refrescar) {
     $boton = Boton-Actualizar (Ventana-De $foto.el)
     if (-not $boton) { $res.error = 'sin-boton'; return $res }
+    # Con la sesión bloqueada no se mueve el rango (un fallo ahí apagaría el ajuste por toda la corrida).
+    if ($script:rangoAuto -and -not $script:ajusteApagado -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado }
     try { $boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
     catch { $res.error = 'invoke-fallo'; return $res }
 
@@ -407,6 +604,8 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
     if ($foto.error) { $res.error = $foto.error; return $res }
     $script:ultFoto = @{ ftabla = $foto.filas; rango = $foto.rango; limite = $foto.limite }
   }
+  $res.rango = $foto.rango
+  $res.limite = $foto.limite
 
   # Estabilidad: tres lecturas iguales de RowCount separadas 2 s (tope 120 s).
   $ult = -1
@@ -422,10 +621,18 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
       if ($foto.error) { $res.error = $foto.error; return $res }
       continue
     }
-    if ($n -eq $ult -and $n -gt 0) { $iguales++ } else { $iguales = 1; $ult = $n }
+    # Con el rango corto la tabla puede quedar vacía de verdad: entonces 0 filas también vale como estable.
+    if ($n -eq $ult -and ($n -gt 0 -or $aj)) { $iguales++ } else { $iguales = 1; $ult = $n }
     if ($iguales -ge 3) { break }
     if ($t0.Elapsed.TotalSeconds -gt 120) { $res.error = 'tabla-inestable'; return $res }
     Espera 2
+  }
+
+  # Tras mover el rango: comprobar que Matrix lo tomó y buscar el ancla por contenido (su índice cambió).
+  if ($aj) {
+    Verifica-Ajuste $aj $foto.gp $n
+    $ra = Re-Ancla $foto.gp $n $estado
+    Log ('reancla=' + $ra)
   }
 
   # Lectura, con un reintento si la tabla cambió mientras se leía.
@@ -435,6 +642,7 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
     $foto = Foto
     if ($foto.error) { $res.error = $foto.error; return $res }
     $n = [int]$foto.gp.Current.RowCount
+    if ($aj) { [void](Re-Ancla $foto.gp $n $estado) }
     $lec = Lee-Tabla $foto.gp $n $estado $reloj
     if (-not $lec) { $res.error = 'tabla-cambio'; return $res }
   }
@@ -448,6 +656,11 @@ function Ciclo($estado, $reloj, [bool]$refrescar) {
   return $res
 }
 
+# Sesión de Windows bloqueada: LogonUI corre mientras se muestra la pantalla de bloqueo.
+function Sesion-Bloqueada {
+  try { return (@(Get-Process -Name LogonUI -ErrorAction SilentlyContinue).Count -gt 0) } catch { return $false }
+}
+
 function Fecha-Hora($cel) { return ('{0} {1}' -f $cel[0], $cel[1]) }
 
 # ---------- Arranque ----------
@@ -459,7 +672,18 @@ $script:topeCicloSeg = $topeCiclo
 $script:topeTramoSeg = $topeTramo
 $script:horasAtras = $horasAtras
 $script:ultFoto = $null
+$script:rangoAuto = $rangoAuto
+$script:ajusteApagado = $false
+$script:rangoOriginal = $null
+$script:ajuste = $(if ($rangoAuto) { '' } else { 'apagado' })
 try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch { }
+# Que el equipo no se suspenda mientras el lector corre (ES_CONTINUOUS | ES_SYSTEM_REQUIRED). No mantiene la
+# pantalla encendida ni evita el bloqueo con contraseña: esa política de planta no se toca.
+try {
+  Add-Type -Namespace EspejoGrader -Name Energia -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);' -ErrorAction Stop
+  [void][EspejoGrader.Energia]::SetThreadExecutionState([uint32]2147483649)
+} catch { }
+$script:bloqueada = $false
 try { $script:llave = Lee-Llave } catch { Log 'No se pudo leer llave.dat (falta o no es de este usuario). El lector termina.'; exit 1 }
 if (-not $script:llave) { Log 'llave.dat vacío. El lector termina.'; exit 1 }
 Log ('Arranque: equipo=' + $equipo + ' cada=' + $cada + ' s, filtro=' + $filtro + ', dir=' + $dir)
@@ -467,13 +691,14 @@ Log ('Arranque: equipo=' + $equipo + ' cada=' + $cada + ' s, filtro=' + $filtro 
 $estado = Carga-Estado
 $terminar = $false
 # Latido inmediato: Matrix queda visible como «vivo» sin esperar el primer ciclo.
-$estIni = @{ version = 'e1.1'; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; error = 'iniciando' }
+$estIni = @{ version = 'e1.2'; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; error = 'iniciando' }
 $respIni = Envia @() $estIni
 if ($respIni -eq 'fin') { $terminar = $true }
 $refrescar = $true
 while (-not $terminar) {
   $reloj = [Diagnostics.Stopwatch]::StartNew()
   $res = $null
+  $script:bloqueada = Sesion-Bloqueada
   try {
     Revisa-Detener
     # Ciclo puede dejar salida suelta en el pipeline: se toma solo el resumen (hashtable).
@@ -503,7 +728,10 @@ while (-not $terminar) {
   if ($items.Count -gt 0 -and -not $primera) { $primera = (Fecha-Hora ($items[0].cel)) }
   $ultima = $estado.ultima
   if ($items.Count -gt 0) { $ultima = (Fecha-Hora ($items[$items.Count - 1].cel)) }
-  $estC = @{ version = 'e1.1'; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = [string]$res.error; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial }
+  # Con la sesión bloqueada, si no pudo leer, el motivo que se informa es el bloqueo (el original queda en el log).
+  $errC = [string]$res.error
+  if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }
+  $estC = @{ version = 'e1.2'; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$piezas; primera = $primera; ultima = $ultima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = [bool]$res.parcial }
 
   $enviadas = 0
   $fin = ''
@@ -547,7 +775,7 @@ while (-not $terminar) {
 
   $seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1)
   $leidas = $items.Count
-  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' error=' + [string]$res.error)
+  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' error=' + [string]$res.error)
   if ($fin) { $terminar = $true; break }
   # Si quedó a medias (sin error ni fallo de envío), el siguiente ciclo sigue ya, sin pulsar «Actualizar».
   $espera = $cada
