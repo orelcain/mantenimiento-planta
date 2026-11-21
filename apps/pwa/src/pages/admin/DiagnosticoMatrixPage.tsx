@@ -36,6 +36,7 @@ import {
 import { DIAGNOSTICO_MATRIX_PS1 } from './diagnosticoMatrixScript'
 import { SONDA_MATRIX_PS1 } from './sondaMatrixScript'
 import { LECTURA_TABLA_MATRIX_PS1 } from './lecturaTablaMatrixScript'
+import { PRUEBA_VIDA_ESPEJO_PS1 } from './pruebaVidaEspejoScript'
 
 /** showDirectoryPicker no está tipado en todas las versiones de lib.dom: se lee aparte. */
 type ConPicker = { showDirectoryPicker?: (opts: { mode: 'read' }) => Promise<unknown> }
@@ -345,7 +346,30 @@ export function DiagnosticoMatrixPage() {
         </CardContent>
       </Card>
 
-      {/* 6. Pie: resumen para Claude */}
+      {/* 6. Prueba de vida del espejo: lo que hay que saber antes de dejar un lector corriendo */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Prueba de vida del espejo del grader</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Antes de dejar un lector corriendo: revisa si la tabla de Matrix crece sola, si «Pieza pieza Grader» trae las piezas de la Gate 0 y si este PC llega a la app. El script solo lee: no pulsa ni cambia nada, no envía datos y termina solo.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void copiarTexto(PRUEBA_VIDA_ESPEJO_PS1, 'Prueba de vida copiada')}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar prueba de vida
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Con la línea andando, deja «Pieza pieza Grader» en pantalla con el rango hasta mañana y pega el script en PowerShell. Tarda unos 6 minutos: no toques Matrix mientras corre. Cierra antes la pantalla de Administración. Saca foto al veredicto; queda en el Escritorio como vida-espejo-HHmmss.txt.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 7. Pie: resumen para Claude */}
       <div className="flex flex-col items-end gap-1">
         <Button size="sm" onClick={copiarResumen}>
           Copiar resumen para Claude
