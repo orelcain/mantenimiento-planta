@@ -83,6 +83,7 @@ import { BotonInfo } from './monitor/GlobosFranja'
 import { nombreCausa } from './monitor/desgloseVista'
 import { useZoomGesto, type Ventana } from './monitor/useZoomGesto'
 import { TiempoDelTurno, ComparadorDias, Bloque, PronosticoCierre } from './monitor/MonitorShiftParts'
+import { CostoNoProducir } from './monitor/CostoNoProducir'
 import { BarraLateralPC } from './monitor/BarraLateralPC'
 import { CompartirMonitorSheet } from './monitor/CompartirMonitor'
 import { notasPorCausa, notasDelTurno } from './monitor/notasOperador'
@@ -5201,6 +5202,15 @@ function MonitorDelToken() {
      el cpm andando del turno en que ocurrió. */
   const pareto = useMemo(() => buildPareto(turnosDelPareto), [turnosDelPareto])
   const paretoCtx = useMemo(() => contextoPareto(turnosDelPareto), [turnosDelPareto])
+  /* Los turnos con causas para «lo habitual» del costo de no producir: todos los cargados, sin la ventana del pareto
+     (no agrega lecturas), menos el turno que se está mirando (compararlo consigo mismo daría siempre «igual a lo habitual»). */
+  const turnoCostoDateKey = vista?.dateKey ?? data?.dateKey ?? null
+  const turnoCostoShiftId = vista?.shiftId ?? data?.shiftId ?? null
+  const turnosAnterioresCosto = useMemo(
+    () => turnosConocidos.filter((t) =>
+      !!t.causas && !(t.dateKey === turnoCostoDateKey && (t.shiftId ?? null) === turnoCostoShiftId)),
+    [turnosConocidos, turnoCostoDateKey, turnoCostoShiftId],
+  )
   /*
    * ⚠⚠ La tendencia mira LOS MISMOS turnos que el ranking, no más.
    *
@@ -7972,6 +7982,22 @@ function MonitorDelToken() {
               notasTurno={notasDeTurnoCompleto}
             />
           </TarjetaTablero>
+        )}
+        {/* El costo de no producir en pesos: SOLO con sesión (el monitor público no lo ve: el margen es dato interno).
+            Va fuera de `TarjetaTablero` a propósito: un id nuevo exige sumarlo a las fábricas y a TITULO_TARJETA
+            (tableroLayout.ts), y eso no es de este cambio. Full width (lg:col-span-6) porque el tablero es una grilla de 6. */}
+        {/* Solo supervisor o admin: con pase de lectura hay sesión, pero el margen no es para ese rol. */}
+        {usuarioActual && esSupervisorDuelo && (
+          <CostoNoProducir
+            grupos={gruposEventos}
+            pesoKg={(pesoLocal !== undefined ? pesoLocal : live.pesoPromedioKg) ?? live.quotaOrigen?.pesoPromedioKg ?? null}
+            lineId={data?.plantLineId ?? null}
+            lineLabel={data?.lineLabel ?? data?.areaLabel ?? null}
+            dateKey={turnoCostoDateKey}
+            turnosAnteriores={turnosAnterioresCosto}
+            puedeEditar={esAdminMonitor}
+            autor={porDeUsuario(usuarioActual) ?? usuarioActual.email ?? ''}
+          />
         )}
         {/* La curva contra los otros días, antes del «vs ayer» en fábrica
             (pedido de Orel): esta enseña el turno completo de un vistazo y la
