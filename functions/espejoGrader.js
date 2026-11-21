@@ -198,7 +198,29 @@ function actualizacionVigente(publicado, incluido) {
   return { version: incluido.version, sha256: incluido.sha256 }
 }
 
+// E1.4: lectura en vivo a pedido. El monitor escribe graderEspejoControl/{linea} con `hasta`; la función lo
+// devuelve en la respuesta de cada envío y el lector baja su espera a 60 s mientras siga vigente.
+const VIVO_MAX_MS = 30 * 60 * 1000
+
+/**
+ * Lectura en vivo vigente según el documento de control. `hastaMs` = hasta del documento en milisegundos
+ * (Timestamp.toMillis()). Devuelve el fin en ISO (hora del servidor) y los segundos que faltan: el lector arma su
+ * plazo con los segundos, así el reloj del PC de planta no influye. Un `hasta` vencido o a más de 30 min no vale
+ * (las reglas ya lo impiden; esto cubre un documento escrito por otro camino).
+ * @returns {{vivoHasta: string, vivoSeg: number} | null}
+ */
+function vivoDeControl(hastaMs, ahoraMs) {
+  if (typeof hastaMs !== 'number' || !Number.isFinite(hastaMs)) return null
+  if (typeof ahoraMs !== 'number' || !Number.isFinite(ahoraMs)) return null
+  const falta = hastaMs - ahoraMs
+  if (falta <= 0 || falta > VIVO_MAX_MS + 60 * 1000) return null
+  const seg = Math.ceil(falta / 1000)
+  return { vivoHasta: new Date(hastaMs).toISOString(), vivoSeg: seg }
+}
+
 module.exports = {
+  VIVO_MAX_MS,
+  vivoDeControl,
   RE_VERSION,
   VIGENCIA_ALTA_MS,
   LECTOR_RUTA,
