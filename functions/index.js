@@ -1691,6 +1691,75 @@ exports.cacheDmStatus = onRequest(
   }
 )
 
+// ==================== ESPEJO DEL GRADER (E1) ====================
+// Ingesta desde un PC de planta (script PowerShell): sin CORS, la autentica una llave.
+// Lógica pura en ./espejoGrader.js; contrato en espejo-grader-e1-contrato.md.
+const espejoGraderMod = require('./espejoGrader')
+const ESPEJO_TAMANO_MAX = 512 * 1024
+
+exports.espejoGraderIngesta = onRequest(
+  { region: 'us-central1', maxInstances: 2 },
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'método no permitido' })
+    const bytes = req.rawBody ? req.rawBody.length : Number(req.get('content-length') || 0)
+    if (bytes > ESPEJO_TAMANO_MAX) return res.status(413).json({ ok: false, error: 'cuerpo mayor a 512 KB' })
+    const llave = espejoGraderMod.extraerLlave(req.get('Authorization'))
+    if (!llave) return res.status(401).json({ ok: false, error: 'llave ausente o mal formada' })
+    const hash = espejoGraderMod.hashLlave(llave)
+    const prefijo = hash.slice(0, 8) // nunca la llave en logs
+    try {
+      const llaveRef = db.collection('graderEspejoLlaves').doc(hash)
+      const llaveSnap = await llaveRef.get()
+      if (!llaveSnap.exists) {
+        logger.warn('espejoGraderIngesta: llave desconocida', prefijo)
+        return res.status(401).json({ ok: false, error: 'llave desconocida' })
+      }
+      const llaveDoc = llaveSnap.data()
+      if (llaveDoc.revocada === true) {
+        logger.warn('espejoGraderIngesta: llave revocada', prefijo)
+        return res.status(403).json({ ok: false, detener: true })
+      }
+      const val = espejoGraderMod.validarCuerpo(req.body)
+      if (!val.ok) return res.status(400).json({ ok: false, error: val.error })
+      const { equipo, informe, leidoEn, filas, estado } = val.datos
+      const linea = typeof llaveDoc.linea === 'string' && llaveDoc.linea ? llaveDoc.linea : 'chonchi'
+      const grupos = espejoGraderMod.agruparPorDiaHora(informe, filas)
+      if (espejoGraderMod.contarDocumentos(grupos) > espejoGraderMod.MAX_DOCUMENTOS) {
+        return res.status(400).json({ ok: false, error: 'demasiados documentos distintos' })
+      }
+      const sub = informe === 'p0' ? 'p0' : 'horas'
+      const batch = db.batch()
+      const fechasVistas = new Set()
+      for (const g of grupos) {
+        const padre = db.collection('graderEspejo').doc(`${linea}__${g.fecha}`)
+        if (!fechasVistas.has(g.fecha)) {
+          fechasVistas.add(g.fecha)
+          batch.set(padre, { linea, fecha: g.fecha, actualizado: FieldValue.serverTimestamp() }, { merge: true })
+        }
+        batch.set(padre.collection(sub).doc(g.hora), {
+          filas: FieldValue.arrayUnion(...g.filas),
+          actualizado: FieldValue.serverTimestamp(),
+        }, { merge: true })
+      }
+      batch.set(db.collection('graderEspejoEstado').doc(equipo), {
+        equipo,
+        linea,
+        ultimoLatido: FieldValue.serverTimestamp(),
+        leidoEn,
+        informe,
+        estado,
+        llave: prefijo,
+      }, { merge: true })
+      batch.update(llaveRef, { ultimoUso: FieldValue.serverTimestamp() })
+      await batch.commit()
+      return res.status(200).json({ ok: true, guardadas: filas.length, detener: false })
+    } catch (e) {
+      logger.error('espejoGraderIngesta error', prefijo, e?.code || e?.name || 'desconocido')
+      return res.status(500).json({ ok: false, error: 'interno' })
+    }
+  }
+)
+
 // ==================== CLIMA PUERTO — ALERTAS AUTOMÁTICAS ====================
 
 const CHONCHI_LAT = -42.62

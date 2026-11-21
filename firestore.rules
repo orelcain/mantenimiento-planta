@@ -1916,6 +1916,37 @@ service cloud.firestore {
       }
     }
 
+    // ESPEJO DEL GRADER (E1) - filas que sube el PC de planta.
+    // Escritura solo por la Cloud Function espejoGraderIngesta (Admin SDK).
+    match /graderEspejo/{docId} {
+      allow read: if isNotAnonymous();
+      allow write: if false;
+
+      match /horas/{hora} {
+        allow read: if isNotAnonymous();
+        allow write: if false;
+      }
+
+      match /p0/{hora} {
+        allow read: if isNotAnonymous();
+        allow write: if false;
+      }
+    }
+
+    match /graderEspejoEstado/{equipo} {
+      allow read: if isNotAnonymous();
+      allow write: if false;
+    }
+
+    // Llaves del espejo: el id es sha256 hex de la llave (la llave en claro no se guarda).
+    match /graderEspejoLlaves/{hash} {
+      allow read, update: if isAdmin();
+      allow create: if isAdmin()
+        && hash.matches('^[0-9a-f]{64}$')
+        && request.resource.data.creadaPor == request.auth.uid;
+      allow delete: if false;
+    }
+
     // ANÁLISIS GRADER - Turnos (uploads + acciones live)
     match /graderShifts/{shiftId} {
       allow read: if isNotAnonymous();
