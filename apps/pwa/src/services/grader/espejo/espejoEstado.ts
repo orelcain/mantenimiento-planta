@@ -42,6 +42,8 @@ export interface EstadoLector {
     arranque?: 'tarea' | 'manual' | string
     /** Desde e1.3: última actualización del lector («bajada eX», «confirmada eX», …). */
     actualiz?: string
+    /** Desde e1.4: fin del modo «en vivo a pedido» (lee cada 60 s) en hora del PC, o '' si lee cada 5 min. */
+    vivo?: string
   }
 }
 

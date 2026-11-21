@@ -16,6 +16,17 @@ import real from '@/services/grader/espejo/__fixtures__/chonchi-2026-11-19-turno
 import type { CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
 import { GraderVivo } from '@/pages/monitor/GraderVivo'
 import type { ParadaGrader } from '@/pages/monitor/graderVivoDatos'
+import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
+import { LecturaEnVivoFila } from '@/components/grader/LecturaEnVivo'
+import type { EstadoVivo } from '@/services/grader/espejo/lecturaVivo'
+
+/** E1.4: la tarjeta del espejo con la lectura en vivo a pedido en sus cuatro estados (sin Firestore). */
+const MODOS_VIVO: Array<{ estado: EstadoVivo; version: string }> = [
+  { estado: { modo: 'normal', hastaMs: null }, version: 'e1.4' },
+  { estado: { modo: 'pedido', hastaMs: Date.now() + 15 * 60_000 }, version: 'e1.4' },
+  { estado: { modo: 'vivo', hastaMs: Date.now() + 12 * 60_000 }, version: 'e1.4' },
+  { estado: { modo: 'sin-soporte', hastaMs: Date.now() + 15 * 60_000 }, version: 'e1.3' },
+]
 
 const T0 = Date.parse(real.t0)
 const PROGRAMADA = /COLACION|REUNION|EJERCICIO|Limpieza/i
@@ -116,6 +127,18 @@ export default function GraderVivoDevPage() {
           resumenes={resumenes as unknown as GraderDailySummary[]}
           turnoActualId="2026-11-19__Turno 2"
         />
+        <div className="grid gap-3 lg:grid-cols-2" data-testid="dev-lectura-en-vivo">
+          {MODOS_VIVO.map((m) => (
+            <EspejoGraderCard
+              key={m.estado.modo}
+              estado={{ equipo: 'CH-MANT-P07', linea: 'chonchi', ultimoLatidoMs: Date.now() - 60_000, leidoEn: '2026-11-19T10:49:12-03:00', informe: 'pieza', estado: { version: m.version } }}
+              vivo
+              minutos={1}
+              resumen={{ piezas: [], total: 4812, gate0: 0, p0: null, primera: '07:20:05', ultima: '10:49:00', turno: null, coincidencia: null }}
+              accion={<LecturaEnVivoFila estado={m.estado} pedidoNombre="Orel" version={m.version} ocupado={false} error={null} onPedir={() => {}} onTerminar={() => {}} />}
+            />
+          ))}
+        </div>
       </main>
     </div>
   )

@@ -273,3 +273,30 @@ test('lector incluido: existe, declara su versión y el hash es de los bytes ser
   assert.strictEqual(l.sha256, require('crypto').createHash('sha256').update(bytes).digest('hex'))
   assert.strictEqual(bytes[0], 0xef, 'con BOM UTF-8 para PowerShell 5.1')
 })
+
+// ---- E1.4: lectura en vivo a pedido ----
+const AHORA = Date.UTC(2026, 10, 21, 14, 0, 0)
+
+test('vivo: hasta en el futuro → fin ISO y segundos que faltan (redondeo hacia arriba)', () => {
+  assert.deepStrictEqual(espejo.vivoDeControl(AHORA + 15 * 60 * 1000, AHORA), {
+    vivoHasta: new Date(AHORA + 15 * 60 * 1000).toISOString(),
+    vivoSeg: 900,
+  })
+  assert.strictEqual(espejo.vivoDeControl(AHORA + 1500, AHORA).vivoSeg, 2)
+})
+
+test('vivo: vencido, justo ahora o sin documento → null (vuelve a 5 min)', () => {
+  assert.strictEqual(espejo.vivoDeControl(AHORA - 1, AHORA), null)
+  assert.strictEqual(espejo.vivoDeControl(AHORA, AHORA), null)
+  assert.strictEqual(espejo.vivoDeControl(null, AHORA), null)
+  assert.strictEqual(espejo.vivoDeControl(undefined, AHORA), null)
+  assert.strictEqual(espejo.vivoDeControl(Number.NaN, AHORA), null)
+  assert.strictEqual(espejo.vivoDeControl('2026-11-21T14:15:00Z', AHORA), null)
+})
+
+test('vivo: más de 30 min (+1 min de holgura de reloj) no vale', () => {
+  assert.ok(espejo.vivoDeControl(AHORA + 30 * 60 * 1000, AHORA))
+  assert.ok(espejo.vivoDeControl(AHORA + 31 * 60 * 1000, AHORA))
+  assert.strictEqual(espejo.vivoDeControl(AHORA + 31 * 60 * 1000 + 1, AHORA), null)
+  assert.strictEqual(espejo.VIVO_MAX_MS, 30 * 60 * 1000)
+})
