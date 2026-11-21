@@ -61,8 +61,8 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     expect(S).toContain("if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }")
   })
 
-  it('es la versión e1.3 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
-    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.3'"])
+  it('es la versión e1.4 (una sola línea $VERSION) y avisa arranque, actualización y rango en el latido', () => {
+    expect(S.match(/^\$VERSION = 'e[0-9.]+'\r?$/gm)).toEqual(["$VERSION = 'e1.4'"])
     expect(S).toContain('version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste;')
     expect(S).not.toMatch(/version = 'e1\.[0-2]'/)
   })
@@ -72,6 +72,8 @@ describe('INSTALAR_LECTOR_ESPEJO_PS1', () => {
     const claves = linea.slice(linea.indexOf('@{') + 2, linea.lastIndexOf('}')).split(';').filter((x) => x.includes('='))
     expect(claves.length).toBeGreaterThan(15)
     expect(claves.length).toBeLessThanOrEqual(20)
+    // e1.4: la lectura en vivo a pedido se informa en la clave «vivo».
+    expect(linea).toContain('vivo = (Texto-Vivo) }')
   })
 
   it('solo lee una tabla con las columnas exactas de «Pieza pieza Grader»', () => {

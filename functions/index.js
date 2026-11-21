@@ -1821,7 +1821,16 @@ exports.espejoGraderIngesta = onRequest(
       try { actualizar = espejoGraderMod.actualizacionVigente(await espejoVersionPublicada(), espejoLectorIncluido()) } catch (e) {
         logger.warn('espejoGraderIngesta: sin versión publicada legible', e?.code || e?.name || 'desconocido')
       }
-      return res.status(200).json({ ok: true, guardadas: filas.length, detener: false, ...(actualizar ? { actualizar } : {}) })
+      // E1.4: lectura en vivo a pedido (graderEspejoControl/{linea}). Sin caché: el botón tiene que verse en el envío siguiente.
+      let vivo = null
+      try {
+        const ctl = await db.collection('graderEspejoControl').doc(linea).get()
+        const h = ctl.exists ? ctl.data().hasta : null
+        vivo = espejoGraderMod.vivoDeControl(h && typeof h.toMillis === 'function' ? h.toMillis() : null, Date.now())
+      } catch (e) {
+        logger.warn('espejoGraderIngesta: control de lectura en vivo ilegible', e?.code || e?.name || 'desconocido')
+      }
+      return res.status(200).json({ ok: true, guardadas: filas.length, detener: false, ...(actualizar ? { actualizar } : {}), ...(vivo || {}) })
     } catch (e) {
       logger.error('espejoGraderIngesta error', prefijo, e?.code || e?.name || 'desconocido')
       return res.status(500).json({ ok: false, error: 'interno' })

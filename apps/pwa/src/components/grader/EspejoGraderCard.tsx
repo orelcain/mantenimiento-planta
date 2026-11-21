@@ -47,7 +47,7 @@ function Fila({ k, v }: { k: string; v: string }) {
   )
 }
 
-export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas = false, className }: {
+export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas = false, accion, className }: {
   estado: EstadoLector
   vivo: boolean
   minutos: number | null
@@ -55,6 +55,8 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
   resumen: ResumenEspejo | null
   /** Alguna hora del turno no se pudo leer: el total puede estar incompleto. */
   errorPiezas?: boolean
+  /** Control junto al estado del lector (en el monitor: la lectura en vivo a pedido). */
+  accion?: React.ReactNode
   className?: string
 }) {
   const codigoError = estado.estado.error
@@ -149,6 +151,7 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
           </>
         )}
       </dl>
+      {accion}
     </section>
   )
 }
