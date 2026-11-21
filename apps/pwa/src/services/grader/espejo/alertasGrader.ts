@@ -68,6 +68,12 @@ export interface EntradaAlertas {
   retrasoMin: number
   /** Minutos del eje con dato del grader: la última pieza leída cae en `hastaMin - 1`. */
   hastaMin: number
+  /**
+   * Minutos del eje que el lector leyó ENTEROS: la última lectura completa (sin tramo pendiente) fue en el minuto
+   * `leidoHastaMin`, así que [0, leidoHastaMin) está cerrado aunque no traiga piezas. Sin este dato se usa
+   * `hastaMin - 1` (el minuto de la última pieza puede seguir abierto). Nunca el reloj: el lector envía cada 5 min.
+   */
+  leidoHastaMin?: number | null
   /** Minutos desde el último latido del lector; `null` si nunca latió. */
   minutosSinLatido: number | null
   turnoEnCurso: boolean
@@ -95,7 +101,7 @@ export function horaDelEje(t0Ms: number, m: number): string {
 
 /** Un decimal con coma: 3.849 → «3,8». */
 export function coma1(n: number): string {
-  return (Math.round(n * 10) / 10).toFixed(1).replace('.', ',')
+  return (Math.round(n * 10) / 10).toFixed(1).replace('.', ',') // decimal-tecnico: sin imports (va a functions), ya pasa a coma
 }
 
 /** Entero con punto de miles: 1234 → «1.234». */
@@ -103,9 +109,18 @@ export function milesPunto(n: number): string {
   return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
+/** Minutos cerrados: los leídos enteros, o hasta la última pieza sin contar su minuto (puede seguir abierto). */
+export function minutosCerrados(e: Pick<EntradaAlertas, 'hastaMin' | 'leidoHastaMin'>): number {
+  const l = e.leidoHastaMin
+  return l !== null && l !== undefined && Number.isFinite(l) ? Math.max(0, Math.floor(l)) : Math.max(0, e.hastaMin - 1)
+}
+
 const suma = (a: readonly number[], desde: number, hasta: number): number => {
   let s = 0
-  for (let i = Math.max(0, desde); i < Math.min(a.length, hasta); i++) s += a[i] ?? 0
+  for (let i = Math.max(0, desde); i < Math.min(a.length, hasta); i++) {
+    const v = a[i] ?? 0
+    if (Number.isFinite(v)) s += v // minuto sin cobertura (NaN) no suma
+  }
   return s
 }
 
@@ -139,8 +154,8 @@ export function dominante(r: Record<string, number>): { calibre: string; pct: nu
 export function reglaGraderQuieto(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader | null {
   if (!e.baader) return null
   const L = Math.max(0, Math.round(e.retrasoMin))
-  // Una Baader solo cuenta con minuto cerrado: el horizonte es el menor de los dos.
-  const hasta = Math.min(e.hastaMin, e.baader.length + L)
+  // Hasta lo leído entero (con minutos vacíos: un grader detenido no deja piezas) y, de las Baader, solo minutos cerrados.
+  const hasta = Math.min(minutosCerrados(e), e.baader.length + L)
   if (hasta < u.quietoMin) return null
   const baaderEn = (m: number) => (m - L >= 0 ? e.baader![m - L] ?? 0 : 0)
   const quieto = (m: number) => (e.grader.pz[m] ?? 0) === 0 && baaderEn(m) > 0
@@ -180,7 +195,7 @@ export function tramos15(t0Ms: number, hasta: number): Array<{ desde: number; ha
 
 /** Regla 2: el último tramo de 15 min COMPLETO tiene P0 % sobre el umbral, con masa suficiente. */
 export function reglaP0Alto(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader | null {
-  const ts = tramos15(e.t0Ms, e.hastaMin).filter((t) => t.completo && t.hasta - t.desde === 15)
+  const ts = tramos15(e.t0Ms, minutosCerrados(e)).filter((t) => t.completo && t.hasta - t.desde === 15)
   const t = ts[ts.length - 1]
   if (!t) return null
   const total = suma(e.grader.pz, t.desde, t.hasta)
@@ -216,7 +231,7 @@ export function reglaLectorCaido(e: EntradaAlertas, u: UmbralesAlertas): AlertaG
  * calibre dominante distinto con una ventaja clara (si no, un empate 40/39 % saltaría a cada rato).
  */
 export function reglasPesoYCalibre(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader[] {
-  const h = e.hastaMin
+  const h = minutosCerrados(e)
   const ini = h - 60
   if (ini <= 0) return []
   const out: AlertaGrader[] = []
@@ -228,7 +243,8 @@ export function reglasPesoYCalibre(e: EntradaAlertas, u: UmbralesAlertas): Alert
     const pH = kgH / nH
     const pT = kgT / nT
     const d = pH / pT - 1
-    if (Math.abs(d) > u.pesoBanda) {
+    // 3,4 / 4 − 1 da −0,15000000000000002: justo en el borde no es «fuera».
+    if (Math.abs(d) - u.pesoBanda > 1e-9) {
       out.push({
         regla: 'peso-fuera',
         nivel: 'atento',

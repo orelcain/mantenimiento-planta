@@ -8,6 +8,7 @@ import {
   reglaLectorCaido,
   reglaP0Alto,
   reglasPesoYCalibre,
+  minutosCerrados,
   tramos15,
   type EntradaAlertas,
   type MinutosGrader,
@@ -36,6 +37,8 @@ function entrada(p: Partial<EntradaAlertas> & { grader: MinutosGrader }): Entrad
     baader: Array(p.grader.pz.length).fill(36),
     retrasoMin: 3,
     hastaMin: p.grader.pz.length,
+    // Por omisión el lector leyó entero todo el eje.
+    leidoHastaMin: p.hastaMin ?? p.grader.pz.length,
     minutosSinLatido: 2,
     turnoEnCurso: true,
     ...p,
@@ -119,6 +122,30 @@ describe('regla 1: grader quieto con las Baader andando', () => {
   })
 })
 
+describe('corte por lectura (hallazgos de Codex)', () => {
+  it('P1: grader detenido con el lector vivo SÍ alerta: la última pieza es de hace 15 min pero el lector leyó hasta ahora', () => {
+    const g = grader(110)
+    for (let m = 95; m < 110; m++) g.pz[m] = 0
+    // `hastaMin` = minuto siguiente a la última pieza; el lector leyó entero hasta el 110.
+    const a = reglaGraderQuieto(entrada({ grader: g, hastaMin: 95, leidoHastaMin: 110 }), U)
+    expect(a?.titulo).toBe('Grader sin piezas 15 min con las Baader andando')
+  })
+
+  it('sin saber hasta dónde leyó el lector, el minuto de la última pieza no cuenta como cerrado', () => {
+    expect(minutosCerrados({ hastaMin: 15, leidoHastaMin: null })).toBe(14)
+    expect(minutosCerrados({ hastaMin: 15, leidoHastaMin: 20 })).toBe(20)
+  })
+
+  it('P2: con la última pieza a las 07:29:01, el cuarto 07:15-07:30 aún no está cerrado', () => {
+    const g = grader(15, 0)
+    for (let m = 0; m < 15; m++) g.pz[m] = 4 // 60 piezas
+    g.g0[3] = 2
+    g.g0[9] = 2 // 4/60 = 6,7 %
+    expect(reglaP0Alto(entrada({ grader: g, hastaMin: 15, leidoHastaMin: null }), U)).toBeNull()
+    expect(reglaP0Alto(entrada({ grader: g, hastaMin: 15, leidoHastaMin: 15 }), U)?.regla).toBe('p0-alto')
+  })
+})
+
 describe('regla 2: P0 sobre 3,5 % sostenido 15 min', () => {
   it('tramos de 15 min alineados al cuarto de hora del reloj', () => {
     const t0 = Date.parse('2026-11-19T07:20:00.000Z')
@@ -184,6 +211,13 @@ describe('regla 4: peso medio y calibre de la última hora frente al resto del t
   it('peso −1,8 % (caso real 19-11 a las 10:50) no salta', () => {
     const g = grader(180)
     for (let m = 120; m < 180; m++) g.kgSalida[m] = (g.pzPeso[m] ?? 0) * 4.0
+    expect(reglasPesoYCalibre(entrada({ grader: g }), U)).toEqual([])
+  })
+
+  it('P5: justo en −15 % no salta (3,4 / 4 − 1 da −0,15000000000000002)', () => {
+    const g = grader(180)
+    for (let m = 0; m < 120; m++) g.kgSalida[m] = (g.pzPeso[m] ?? 0) * 4
+    for (let m = 120; m < 180; m++) g.kgSalida[m] = (g.pzPeso[m] ?? 0) * 3.4
     expect(reglasPesoYCalibre(entrada({ grader: g }), U)).toEqual([])
   })
 

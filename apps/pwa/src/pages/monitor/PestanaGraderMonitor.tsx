@@ -139,6 +139,12 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
   )
   const espejo = useEspejoGrader(lineaDelEspejo(lineId), ventana)
   const turnoEnCurso = Number.isFinite(ahoraWallMs) && (!ventana || ahoraWallMs < ventana.endMs)
+  // Última lectura COMPLETA del lector (sin tramo pendiente ni error): hasta ahí los minutos sin piezas son de verdad.
+  const est = espejo.estado
+  const leidoHastaMs = est && est.leidoEn && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(est.leidoEn)
+    && !est.estado.error && est.estado.parcial !== true && !((est.estado.pendientes ?? 0) > 0)
+    ? Date.parse(`${est.leidoEn.slice(0, 19)}.000Z`) /* «2026-11-20T21:49:12-03:00» → hora de planta */
+    : null
   return (
     <div className="space-y-3">
       {ventana && !espejo.cargandoPiezas && (
@@ -150,6 +156,7 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
           paradas={paradas}
           minutosSinLatido={espejo.minutos}
           turnoEnCurso={turnoEnCurso}
+          leidoHastaMs={leidoHastaMs}
         />
       )}
       <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">

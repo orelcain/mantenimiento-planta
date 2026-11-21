@@ -144,7 +144,7 @@ function Curva({ d }: { d: Datos }) {
   const h = w >= 600 ? 240 : 180
   const L = d.retraso.min
   const sub = d.retraso.medido
-    ? `Grader corrido ${L} min, el retraso medido en este turno (r ${(d.retraso.r ?? 0).toFixed(2).replace('.', ',')}).`
+    ? `Grader corrido ${L} min, el retraso medido en este turno (r ${(d.retraso.r ?? 0).toFixed(2).replace('.', ',')}).` // decimal-tecnico: ya pasa a coma
     : `Grader corrido ${L} min, ${RETRASO_REFERENCIA_FUENTE}: el turno aún no alcanza para medirlo.`
   return (
     <Tarjeta titulo="Piezas por minuto" sub={sub}>
@@ -172,7 +172,9 @@ function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
   const n = d.n
   const L = d.retraso.min
   const g = movil(d.serie.pz.slice(0, d.serie.hastaMin), 3)
-  const b = d.baader ? movil(d.baader.slice(0, Math.min(d.baader.length, n)), 3) : []
+  // Las Baader se dibujan desde que empieza su serie (antes van en NaN: sin cobertura).
+  const b0 = d.baader ? Math.max(0, d.baader.findIndex((v) => Number.isFinite(v))) : 0
+  const b = d.baader ? movil(d.baader.slice(b0, Math.min(d.baader.length, n)), 3) : []
   let tope = 10
   for (const v of g) tope = Math.max(tope, v)
   for (const v of b) tope = Math.max(tope, v)
@@ -185,7 +187,7 @@ function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
     for (let i = 0; i < vals.length; i++) {
       const m = i - corre
       if (m < 0 || m > n) continue
-      s += `${s ? 'L' : 'M'}${x(m).toFixed(1)} ${y(vals[i] ?? 0).toFixed(1)}`
+      s += `${s ? 'L' : 'M'}${x(m).toFixed(1)} ${y(vals[i] ?? 0).toFixed(1)}` // decimal-tecnico: ruta SVG, el punto es obligatorio
     }
     return s
   }
@@ -219,7 +221,7 @@ function CurvaSvg({ d, w, h }: { d: Datos; w: number; h: number }) {
       {marcas.map((m) => (
         <text key={m} x={x(m)} y={h - 6} textAnchor="middle" className="fill-muted-foreground text-caption tabular-nums">{horaDelEje(d.serie.t0Ms, m)}</text>
       ))}
-      {b.length > 0 && <path d={traza(b, 0)} fill="none" stroke={BAADER} strokeWidth={1.5} />}
+      {b.length > 0 && <path d={traza(b, -b0)} fill="none" stroke={BAADER} strokeWidth={1.5} />}
       <path d={traza(g, L)} fill="none" stroke={GRADER} strokeWidth={2} data-serie="grader" />
       {ultima > 0 && ultima < n && (
         <line x1={x(ultima)} x2={x(ultima)} y1={mt} y2={mt + H} stroke="currentColor" className="text-muted-foreground" strokeDasharray="2 3" />
@@ -352,12 +354,15 @@ function LineaManual({ d }: { d: Datos }) {
 
 /** La pestaña en vivo. `null` mientras no haya piezas del espejo en el turno: la tarjeta del espejo explica por qué. */
 export function GraderVivo(props: EntradaGraderVivo) {
-  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso } = props
+  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs } = props
   const d = useMemo(
-    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso }),
-    [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso],
+    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs }),
+    [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs],
   )
-  if (d.serie.hastaMin === 0) return null
+  // Sin piezas del turno: solo las alertas (el lector caído antes del cambio de turno tiene que verse).
+  if (d.serie.hastaMin === 0) {
+    return d.alertas.length > 0 ? <div className="v2-vars" data-testid="grader-vivo"><Alertas d={d} ultimaHora={null} /></div> : null
+  }
   const ultimaHora = d.serie.ultimaTs ? d.serie.ultimaTs.slice(11, 16) : null
   return (
     <div className="v2-vars space-y-3" data-testid="grader-vivo">

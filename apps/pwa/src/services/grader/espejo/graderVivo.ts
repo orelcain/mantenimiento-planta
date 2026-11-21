@@ -26,7 +26,11 @@ export interface SerieMinutoBaader {
   maquinas: Array<{ cycles: number[] }>
 }
 
-/** Piezas por minuto de las Baader sumadas, en el eje del grader (minuto 0 = `t0Ms`). Solo minutos cerrados. */
+/**
+ * Piezas por minuto de las Baader sumadas, en el eje del grader (minuto 0 = `t0Ms`). Solo minutos cerrados. Los
+ * minutos ANTES de que empiece la serie van en `NaN` (sin cobertura), no en 0: un cero inventaría línea manual y
+ * ensuciaría la correlación del retraso.
+ */
 export function baaderEnEje(s: SerieMinutoBaader | null | undefined, t0Ms: number): number[] | null {
   if (!s || s.maquinas.length === 0) return null
   const d = Date.parse(s.desde.endsWith('Z') ? s.desde : `${s.desde}Z`)
@@ -37,6 +41,7 @@ export function baaderEnEje(s: SerieMinutoBaader | null | undefined, t0Ms: numbe
   const n = off + largo
   if (n <= 0) return []
   const out = new Array<number>(n).fill(0)
+  for (let k = 0; k < Math.min(off, n); k++) out[k] = NaN
   for (const m of s.maquinas) {
     for (let i = 0; i < m.cycles.length; i++) {
       const k = off + i
@@ -89,7 +94,9 @@ export function medirRetraso(baader: number[] | null, grader: number[], hastaMin
     for (let m = L; m < Math.min(hastaMin, grader.length); m++) {
       const k = m - L
       if (k >= baader.length) break
-      a.push(baader[k] ?? 0)
+      const v = baader[k] ?? 0
+      if (!Number.isFinite(v)) continue // sin cobertura de Shoplogix
+      a.push(v)
       b.push(grader[m] ?? 0)
     }
     if (a.length < RETRASO_MIN_MINUTOS) continue
@@ -161,7 +168,14 @@ export function lineaManualPorHora(
     if (a - L < 0 || a + 60 - L > baader.length) continue
     let g = 0
     let b = 0
-    for (let m = a; m < a + 60; m++) { g += s.pz[m] ?? 0; b += baader[m - L] ?? 0 }
+    let cubierta = true
+    for (let m = a; m < a + 60; m++) {
+      const v = baader[m - L] ?? 0
+      if (!Number.isFinite(v)) { cubierta = false; break }
+      g += s.pz[m] ?? 0
+      b += v
+    }
+    if (!cubierta) continue // la serie de las Baader no cubre esa hora entera
     out.push({ hora: horaDelEje(s.t0Ms, a), grader: g, baader: b, diferencia: g - b })
   }
   return out

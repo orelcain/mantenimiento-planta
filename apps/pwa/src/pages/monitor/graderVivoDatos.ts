@@ -4,7 +4,7 @@
  */
 import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
 import { serieDesdeCubetas, type CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
-import { evaluarAlertas } from '@/services/grader/espejo/alertasGrader'
+import { evaluarAlertas, minutosCerrados } from '@/services/grader/espejo/alertasGrader'
 import {
   baaderEnEje,
   lineaManualPorHora,
@@ -35,6 +35,11 @@ export interface EntradaGraderVivo {
   paradas: readonly ParadaGrader[]
   minutosSinLatido: number | null
   turnoEnCurso: boolean
+  /**
+   * Hasta dónde leyó el lector ENTERO (ms wall-clock de su última lectura completa, sin tramo pendiente ni error).
+   * Con esto un grader detenido se ve: hay minutos leídos sin piezas. `null` si no se sabe.
+   */
+  leidoHastaMs?: number | null
 }
 
 /** Todo lo que se pinta, calculado de una vez (puro: lo usan el componente y los tests). */
@@ -43,7 +48,12 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
   const serie = serieDesdeCubetas(e.cubetas, e.inicioMs, n)
   const baader = baaderEnEje(e.baader, serie.t0Ms)
   const retraso = retrasoOReferencia(baader, serie.pz, serie.hastaMin)
+  const leidoHastaMin = e.leidoHastaMs != null && Number.isFinite(e.leidoHastaMs)
+    ? Math.min(n, Math.max(serie.hastaMin - 1, Math.floor((e.leidoHastaMs - serie.t0Ms) / 60_000)))
+    : null
+  const cerrados = minutosCerrados({ hastaMin: serie.hastaMin, leidoHastaMin })
   const alertas = evaluarAlertas({
+    leidoHastaMin,
     t0Ms: serie.t0Ms,
     grader: serie,
     baader,
@@ -63,7 +73,8 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     salida: salidaUltimaHora(serie),
     p0: p0Por15(serie, P0_LINE_MIN_PIECES),
     reparto: repartoDelTurno(serie),
-    manual: lineaManualPorHora(serie, baader, retraso.min),
+    // Solo horas cerradas: la de la última pieza puede seguir abierta.
+    manual: lineaManualPorHora({ ...serie, hastaMin: cerrados }, baader, retraso.min),
     paradas: e.paradas
       .map((p) => ({ desde: (p.desdeMs - serie.t0Ms) / 60_000, hasta: (p.hastaMs - serie.t0Ms) / 60_000, dueno: p.dueno }))
       // Hasta donde hay dato (grader o Baader): una banda no puede ir por delante de la curva.

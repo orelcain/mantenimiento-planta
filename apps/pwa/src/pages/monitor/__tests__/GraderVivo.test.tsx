@@ -105,6 +105,11 @@ describe('GraderVivo', () => {
     expect(document.querySelector('[data-hora="10:00"]')).toBeNull() // en curso a las 10:50
   })
 
+  it('P4: sin piezas pero con el lector caído, la alerta se ve igual', () => {
+    render(<GraderVivo {...entrada({ cubetas: [], minutosSinLatido: 30 })} />)
+    expect(document.querySelector('[data-regla="lector-caido"]')?.textContent).toMatch(/Lector sin aviso hace 30 min/)
+  })
+
   it('sin piezas del espejo no pinta nada (la tarjeta del espejo explica por qué)', () => {
     const { container } = render(<GraderVivo {...entrada({ cubetas: [] })} />)
     expect(container.innerHTML).toBe('')

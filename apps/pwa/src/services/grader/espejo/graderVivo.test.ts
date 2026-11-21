@@ -108,7 +108,7 @@ describe('retraso Baader → grader', () => {
 describe('serie de las Baader en el eje del grader', () => {
   it('suma las máquinas y corre por el desfase entre el inicio del turno y el de la serie', () => {
     const b = baaderEnEje({ desde: '2026-11-19T07:17:00.000Z', maquinas: [{ cycles: [1, 2] }, { cycles: [3, 4, 5] }] }, Date.parse('2026-11-19T07:15:00.000Z'))
-    expect(b).toEqual([0, 0, 4, 6, 5])
+    expect(b).toEqual([NaN, NaN, 4, 6, 5]) // antes de la serie: sin cobertura, no 0
   })
   it('sin serie, `null` (no ceros)', () => {
     expect(baaderEnEje(null, 0)).toBeNull()
@@ -138,6 +138,16 @@ describe('línea manual por hora', () => {
   it('la hora en curso no entra aunque Shoplogix ya tenga esa hora entera (el lector va atrasado)', () => {
     const h = lineaManualPorHora({ t0Ms: t0, pz: Array(170).fill(40), hastaMin: 170 }, Array(260).fill(38), 3)
     expect(h.map((x) => x.hora)).toEqual(['08:00', '09:00'])
+  })
+  it('P3: una hora sin cobertura entera de Shoplogix no se resta (antes inventaba +1.320)', () => {
+    const b = baaderEnEje({ desde: '2026-11-19T08:30:00.000Z', maquinas: [{ cycles: Array(120).fill(40) }] }, t0)!
+    const h = lineaManualPorHora({ t0Ms: t0, pz: Array(200).fill(40), hastaMin: 200 }, b, 3)
+    expect(h.map((x) => x.hora)).toEqual(['09:00'])
+    expect(h[0]?.diferencia).toBe(0)
+  })
+  it('P3: la correlación del retraso ignora los minutos sin cobertura', () => {
+    const conHueco = [...Array(100).fill(NaN), ...real.baader.slice(100, 400)]
+    expect(medirRetraso(conHueco, real.grader.slice(0, 400), 400)?.min).toBe(3)
   })
   it('usa las Baader corridas por el retraso', () => {
     const pz = Array(120).fill(0)
