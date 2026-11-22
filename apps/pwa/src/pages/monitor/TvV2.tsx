@@ -35,6 +35,8 @@ export interface TvRitmo {
 export interface TvV2Props {
   /** «Eviscerado» / «Filete · Baader 200 · Línea 1». */
   linea: string
+  /** La línea que se mira es de referencia (Yal): pastilla «Referencia» junto al estado. */
+  referencia?: boolean
   /** «P. Principal · Turno 2 · 07:15 → 15:00». */
   turno: string
   estado: EstadoTv
@@ -93,6 +95,7 @@ export function TvV2(props: TvV2Props) {
           <span className="tv-linea">{p.linea}</span>
           <span className="tv-turno">{p.turno}</span>
           <span className="tv-estado" data-det={p.estado.detenida ? '1' : '0'}>{p.estado.texto}</span>
+          {p.referencia && <span className="tv-ref">Referencia</span>}
           {p.reloj && <span className="tv-reloj">{p.reloj}</span>}
         </header>
 

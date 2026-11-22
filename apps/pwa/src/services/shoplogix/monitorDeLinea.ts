@@ -17,7 +17,7 @@ import { createPublicShiftMonitor } from './publicShiftMonitor.service'
 import { hayTurnoEnCurso, type TurnoLigero } from './turnoEnCurso'
 
 /** Las líneas con acceso directo al monitor (decisión de Orel, 22-09: solo Principal). */
-export const LINEAS_CON_MONITOR: readonly PlantLineId[] = ['chonchi-eviscerado', 'chonchi-filete']
+export const LINEAS_CON_MONITOR: readonly PlantLineId[] = ['chonchi-eviscerado', 'chonchi-filete', 'yal-eviscerado']
 
 export function lineaConMonitor(id: string | null | undefined): PlantLineConfig | null {
   if (!id || !(LINEAS_CON_MONITOR as readonly string[]).includes(id)) return null

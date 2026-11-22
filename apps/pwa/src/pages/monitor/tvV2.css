@@ -41,6 +41,11 @@
 .tvv2 .tv-estado::before { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--tv-fg2); }
 .tvv2 .tv-estado[data-det='1'] { background: var(--tv-crit-fondo); color: var(--tv-sobre-crit); }
 .tvv2 .tv-estado[data-det='1']::before { background: var(--tv-sobre-crit); }
+/* Pastilla «Referencia» (Yal): mismo tamaño que .tv-estado, sin fondo ni punto; solo borde y tinta secundaria. */
+.tvv2 .tv-ref {
+  display: inline-flex; align-items: center; font-size: 36px; font-weight: 700; padding: 12px 28px; border-radius: 999px;
+  background: transparent; color: var(--tv-fg2); border: 1px solid color-mix(in srgb, var(--tv-fg2) 45%, transparent); white-space: nowrap;
+}
 .tvv2 .tv-reloj { font-size: 64px; font-weight: 700; letter-spacing: -.02em; }
 
 .tvv2 .tv-cuerpo { display: grid; grid-template-rows: 1fr 292px; gap: 24px; min-height: 0; }

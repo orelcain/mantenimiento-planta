@@ -1246,13 +1246,10 @@ html[data-v2-capa] [data-glass='v2'] :is(.v2-tarjeta, .v2-ritmo > section, .v2-c
 @media (prefers-reduced-motion: reduce) { .dpc-globo { animation: none; } }
 
 
-/* Selector de línea (Eviscerado | Filete) DENTRO de la barra de PC, en El turno y Análisis: 220 × 32 px (ocupaba una fila
-   entera de 48 px bajo la barra). Con puntero táctil (iPad en horizontal) vuelve a 44. El Duelo trae el suyo en su lienzo. */
-.v2-selector-barra { width: 220px; flex: none; }
-.v2-selector-barra [role='tablist'], .v2-selector-barra [role='tablist'] > button { height: 32px; }
-@media (pointer: coarse) {
-  .v2-selector-barra [role='tablist'], .v2-selector-barra [role='tablist'] > button { height: 44px; }
-}
+/* Selector de línea agrupado por planta (Principal: Eviscerado | Filete · Referencia: Yal) DENTRO de la barra de PC, en
+   El turno y Análisis. Ancho según sus rótulos; la altura de cada pista la pone SegmentedControl (32 px, 44 con puntero
+   táctil). El Duelo trae el suyo en su lienzo. */
+.v2-selector-barra { width: auto; flex: none; }
 
 /* El estado de la línea como subtítulo de la barra del celular (< 768 px): el mismo punto y texto de la píldora, a 12 px y
    sin su fondo (la barra ya es el contenedor). */

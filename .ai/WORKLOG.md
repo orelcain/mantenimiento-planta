@@ -11,6 +11,11 @@ Una entrada por bloque de trabajo. La más reciente arriba. Formato:
 - Sigue: ...
 ```
 
+## 2026-11-22 · claude · Monitor: Principal · Eviscerado / Filete y Yal como referencia (PR #1495)
+- Hecho: títulos calculados por `plantLineId`, selector agrupado por planta, Yal con la marca «Referencia»; el servidor entrega las 3 líneas desde una lista fija (`LINEAS_MONITOR_HERMANAS`) y Yal aparece en el dashboard y en la portada móvil.
+- Verificación: ci:local verde (6.696 tests de PWA), 10 + 15 tests nuevos y prueba de sabotaje.
+- Estado: HECHO al mergear. Falta revisar en producción el selector, el ⓘ y la navegación a Yal.
+
 ## 2026-11-20 · claude · Sonda de solo lectura de los controles de Matrix
 - Hecho: Panel admin › Diagnóstico Matrix: sonda de solo lectura que dice si Matrix se puede manejar sin mouse ni teclado (UI Automation de Windows). Paso previo al exportador automático hacia la Carpeta de Matrix.
 - Archivos: apps/pwa/src/pages/admin (DiagnosticoMatrixPage.tsx, sondaMatrixScript.ts, __tests__/sondaMatrixScript.test.ts).

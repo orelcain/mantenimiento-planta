@@ -3318,41 +3318,49 @@ function ordenarSensorComoActual(shiftDocId, live, history) {
 const HERMANAS_TTL_MS = 60 * 60 * 1000
 
 /**
- * Los otros monitores de LÍNEA vigentes de la misma planta (`chonchi-eviscerado` y `chonchi-filete`), para el
- * selector «Eviscerado | Filete» del Duelo, que tiene que funcionar sin sesión. Una sola consulta por rango sobre
- * `plantLineId` (solo lee los de esa planta); de cada línea se queda con el link que vence más tarde. Devuelve
- * `[{ nombre, token }]` ordenado por nombre, o null si el monitor no trae `plantLineId` con prefijo de planta.
+ * Las líneas con monitor de línea (mismo listado que `LINEAS_CON_MONITOR` de la PWA,
+ * `apps/pwa/src/services/shoplogix/monitorDeLinea.ts`; el test de paridad en `dueloEquipos.test.js` lo vigila).
+ * Yal es otra planta: entra como referencia en el selector.
+ */
+const LINEAS_MONITOR_HERMANAS = ['chonchi-eviscerado', 'chonchi-filete', 'yal-eviscerado']
+
+/**
+ * Los otros monitores de LÍNEA vigentes (de cualquier planta de `LINEAS_MONITOR_HERMANAS`), para el selector del
+ * monitor, que tiene que funcionar sin sesión. Una sola consulta `plantLineId in [...]`; el filtro de `mode` y de
+ * vencimiento va en memoria (no pide índice compuesto). De cada línea se queda con el link que vence más tarde.
+ * Devuelve `[{ nombre, token, plantLineId }]` ordenado por `plantLineId`, o null si el monitor no trae `plantLineId`.
+ * `nombre` es solo respaldo: la PWA arma el rótulo desde `plantLineId`.
  */
 async function lineasHermanasDe(db, monitor, nowMs = Date.now()) {
   const id = String(monitor?.plantLineId || '')
-  const corte = id.indexOf('-')
-  if (corte <= 0) return null
-  const planta = id.slice(0, corte)
+  if (!id) return null
   const snap = await db.collection(COLLECTION)
-    .where('plantLineId', '>=', `${planta}-`)
-    .where('plantLineId', '<', `${planta}.`)
+    .where('plantLineId', 'in', LINEAS_MONITOR_HERMANAS)
     .get()
   const ahora = new Date(nowMs).toISOString()
   const porLinea = new Map()
   for (const d of snap.docs) {
     const x = d.data() || {}
-    if (x.mode !== 'line' || !x.plantLineId || x.plantLineId === id || d.id === monitor.token) continue
+    if (x.mode !== 'line' || !LINEAS_MONITOR_HERMANAS.includes(x.plantLineId)) continue
+    if (x.plantLineId === id || d.id === monitor.token) continue
     if (String(x.expiresAt || '') <= ahora) continue
     const previo = porLinea.get(x.plantLineId)
     if (!previo || String(x.expiresAt) > String(previo.expiresAt)) {
-      porLinea.set(x.plantLineId, { token: d.id, nombre: x.areaLabel || x.plantLineId, expiresAt: x.expiresAt })
+      porLinea.set(x.plantLineId, { token: d.id, nombre: x.areaLabel || x.plantLineId, plantLineId: x.plantLineId, expiresAt: x.expiresAt })
     }
   }
   return [...porLinea.values()]
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-    .map(({ nombre, token }) => ({ nombre, token }))
+    .sort((a, b) => a.plantLineId.localeCompare(b.plantLineId, 'es'))
+    .map(({ nombre, token, plantLineId }) => ({ nombre, token, plantLineId }))
 }
 
 /** El trozo del parche con las líneas hermanas; vacío si aún están al día o no se pudieron buscar. */
 async function patchHermanas(db, monitor, nowMs = Date.now()) {
   if (!monitor?.plantLineId) return {}
   const at = Date.parse(monitor.lineasHermanasAt || '')
-  if (Array.isArray(monitor.lineasHermanas) && Number.isFinite(at) && nowMs - at < HERMANAS_TTL_MS) return {}
+  // Las listas guardadas antes de Yal no traen `plantLineId`: se buscan otra vez aunque no hayan vencido.
+  const completas = Array.isArray(monitor.lineasHermanas) && monitor.lineasHermanas.every((h) => h?.plantLineId)
+  if (completas && Number.isFinite(at) && nowMs - at < HERMANAS_TTL_MS) return {}
   try {
     const lineas = await lineasHermanasDe(db, monitor, nowMs)
     return lineas ? { lineasHermanas: lineas, lineasHermanasAt: new Date(nowMs).toISOString() } : {}
@@ -3730,6 +3738,7 @@ module.exports = {
   curvaCompacta,
   eventosDelDuelo,
   lineasHermanasDe,
+  LINEAS_MONITOR_HERMANAS,
   patchHermanas,
   inferShiftEndFromDuration,
   buildMonitorPatch,

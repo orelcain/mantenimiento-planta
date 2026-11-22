@@ -13,20 +13,38 @@ describe('SelectorLinea · Eviscerado | Filete', () => {
     expect(c2.firstChild).toBeNull()
   })
 
-  it('muestra las dos líneas en orden alfabético y al elegir la otra manda su token', () => {
+  it('muestra Eviscerado, Filete y Yal en orden fijo, agrupados por planta, y al elegir Yal manda su token', () => {
     const onIr = vi.fn()
-    render(<SelectorLinea lineas={{ actual: 'Eviscerado', hermanas: [{ nombre: 'Filete', token: 'tk-filete' }], onIr }} />)
-    const a = screen.getByText('Eviscerado')
-    const b = screen.getByText('Filete')
-    expect(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    fireEvent.click(b)
-    expect(onIr).toHaveBeenCalledWith('tk-filete')
+    render(<SelectorLinea lineas={{
+      actual: 'chonchi-eviscerado',
+      hermanas: [
+        { nombre: 'Yal', token: 'tk-yal', plantLineId: 'yal-eviscerado' },
+        { nombre: 'Filete', token: 'tk-filete', plantLineId: 'chonchi-filete' },
+      ],
+      onIr,
+    }} />)
+    const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
+    expect(tabs).toEqual(['Eviscerado', 'Filete', 'Yal'])
+    expect(screen.getAllByText('Planta Principal').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Referencia').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: 'Yal' }))
+    expect(onIr).toHaveBeenCalledWith('tk-yal')
+  })
+
+  it('Yal sin elegir va con la tinta atenuada; la ayuda de Referencia dice para qué está', () => {
+    render(<SelectorLinea lineas={{
+      actual: 'chonchi-eviscerado',
+      hermanas: [{ nombre: 'Yal', token: 'tk-yal', plantLineId: 'yal-eviscerado' }],
+      onIr: () => {},
+    }} />)
+    expect(screen.getByRole('tab', { name: 'Yal' }).querySelector(':scope > span')?.className).toContain('text-muted-foreground')
+    expect(screen.getByText('Yal la mantiene otro equipo de Mantención. Se muestra para comparar.')).toBeTruthy()
   })
 
   it('elegir la línea en la que ya estás no navega', () => {
     const onIr = vi.fn()
-    render(<SelectorLinea lineas={{ actual: 'Eviscerado', hermanas: [{ nombre: 'Filete', token: 'tk-filete' }], onIr }} />)
-    fireEvent.click(screen.getByText('Eviscerado'))
+    render(<SelectorLinea lineas={{ actual: 'chonchi-eviscerado', hermanas: [{ nombre: 'Filete', token: 'tk-filete', plantLineId: 'chonchi-filete' }], onIr }} />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Eviscerado' }))
     expect(onIr).not.toHaveBeenCalled()
   })
 
