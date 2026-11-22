@@ -18,6 +18,7 @@ import { Tarjeta } from './TarjetaVivo'
 import { RELLENO_DUENO } from './ejeTurno'
 import { PIEZAS_PARA_DECIR_SIN_GATE0, armarGraderVivo, type DatosGraderVivo, type EntradaGraderVivo } from './graderVivoDatos'
 import { SeteoGates, PescaPorPrograma } from './SeteoGatesVivo'
+import { PRECISION_ESTIMADO_PCT } from '@/services/grader/espejo/motivoP0'
 
 type Datos = DatosGraderVivo
 
@@ -416,7 +417,12 @@ function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
   const calD = estimSeteo('calidad-d')
   const estMant = r.mantencion.estimadoPz
   const pctExacto = r.pctExacto === null ? 0 : r.pctExacto
-  const fuente = r.exactitud === 'exacto' ? 'motivo de Matrix (Puerta 0)' : `estimado · ${coma1(pctExacto)} % exacto`
+  // «exacto» del estimado = precisión medida de «tenía gate» contra Puerta 0; en mixto, cuántas piezas traen su motivo.
+  const fuente = r.exactitud === 'exacto'
+    ? 'motivo de Matrix (Puerta 0)'
+    : r.exactitud === 'mixto'
+      ? `motivo de Matrix en el ${Math.round(pctExacto)} % de las piezas · resto estimado`
+      : `estimado · ${PRECISION_ESTIMADO_PCT} % exacto`
   const linea = (k: string, n: number) => (n > 0 ? <p key={k} className="pl-[22px] text-[12px] leading-[16px] text-muted-foreground tabular-nums">{k} {milesPunto(n)}</p> : null)
   return (
     <Tarjeta titulo="Por qué va a P0" sub={sub} icono={<Filter className={IC} />}>

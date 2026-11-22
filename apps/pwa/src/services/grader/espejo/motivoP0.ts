@@ -181,6 +181,12 @@ export function duenoDelTramo(porPieza: readonly PiezaP0[], t0Ms: number, desdeM
   return { dueno: mant * 2 > total ? 'mantencion' : 'seteo', mant, total, estimado: estimadoPz > 0 }
 }
 
+/**
+ * Precisión del estimado sin Puerta 0: de las piezas que caen en «tenía gate», el 74 % es de verdad fotocélula o puerta
+ * (402 de 543, 7 turnos del 16 al 19-11-2026, cruzadas con Puerta 0). Las de los otros grupos son 100 % «Fuera de límites».
+ */
+export const PRECISION_ESTIMADO_PCT = 74
+
 export const RAFAGA_VENTANA_MS = 15 * 60_000
 /** Piezas de Mantención en la ventana para decir que hay ráfaga. Umbral ilustrativo, a validar en terreno. */
 export const RAFAGA_UMBRAL_PZ = 12
