@@ -8,13 +8,15 @@
  * el aviso para iniciarla (la vista pública filtrada es la etapa 6). No se
  * consulta nada sin sesión.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { CoberturaGraderCard } from '@/components/grader/CoberturaGraderCard'
 import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
 import { LecturaEnVivo } from '@/components/grader/LecturaEnVivo'
 import { ventanaDelTurno } from '@/services/grader/espejo/espejoFilas'
+import { loadGate0Records, type StoredGate0Record } from '@/services/grader/graderGate0Store'
+import { buildDailySummaryId } from '@/services/grader/graderDailySummary.service'
 import { lineaDelEspejo, useEspejoGrader } from '@/services/grader/espejo/useEspejoGrader'
 import { leidoHastaDelLector } from '@/services/grader/espejo/espejoEstado'
 import type { SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
@@ -146,6 +148,20 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
   // Última lectura COMPLETA del lector (sin tramo pendiente, error ni recarga), nunca más allá del fin del rango de
   // Matrix: hasta ahí los minutos sin piezas son de verdad.
   const leidoHastaMs = leidoHastaDelLector(espejo.estado)
+  const turnoActualId = dateKey && turnoId ? `${dateKey}__${turnoId}` : null
+  // Puerta 0 del turno (Excel): el mismo id que usa el guardado (`buildDailySummaryId`, con la línea). Una lectura
+  // por turno y línea, sin listener. Sin registros o con error, sigue el estimado.
+  const gate0Id = dateKey && turnoId ? buildDailySummaryId(dateKey, turnoId, lineId) : null
+  const [gate0Exacto, setGate0Exacto] = useState<StoredGate0Record[] | null>(null)
+  useEffect(() => {
+    let vigente = true
+    setGate0Exacto(null)
+    if (!gate0Id) return
+    loadGate0Records(gate0Id)
+      .then((r) => { if (vigente) setGate0Exacto(r) })
+      .catch(() => { if (vigente) setGate0Exacto(null) })
+    return () => { vigente = false }
+  }, [gate0Id])
   return (
     <div className="space-y-3">
       {ventana && !espejo.cargandoPiezas && (
@@ -160,7 +176,8 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
           leidoHastaMs={leidoHastaMs}
           piezas={espejo.piezas}
           resumenes={previos.estado === 'listo' ? previos.valor : null}
-          turnoActualId={dateKey && turnoId ? `${dateKey}__${turnoId}` : null}
+          turnoActualId={turnoActualId}
+          gate0Exacto={gate0Exacto}
         />
       )}
       <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
