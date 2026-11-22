@@ -80,6 +80,8 @@ export interface MinutosGrader {
 }
 
 export interface EntradaAlertas {
+  /** Dueño de las piezas P0 de un tramo del eje (`duenoDelTramo`); `null` sin piezas. Para el dueño de «P0 alto». */
+  duenoP0?: (desdeMin: number, hastaMin: number) => { dueno: 'mantencion' | 'seteo'; mant: number; total: number; estimado: boolean } | null
   /** Minuto 0 del eje (ms, wall-clock-as-UTC). */
   t0Ms: number
   grader: MinutosGrader
@@ -101,7 +103,7 @@ export interface EntradaAlertas {
   umbrales?: Partial<UmbralesAlertas>
 }
 
-export type ReglaAlerta = 'grader-quieto' | 'sin-datos-grader' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon' | 'gate-cambio'
+export type ReglaAlerta = 'grader-quieto' | 'sin-datos-grader' | 'p0-alto' | 'lector-caido' | 'peso-fuera' | 'calibre-salto' | 'atasco' | 'lote-cambio' | 'escalon' | 'gate-cambio' | 'rafaga-fotocelula'
 
 export interface AlertaGrader {
   regla: ReglaAlerta
@@ -239,6 +241,8 @@ export function reglaP0Alto(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader
   const g0 = suma(e.grader.g0, t.desde, t.hasta)
   if (total < u.p0MinPiezas) return null
   const pct = (g0 / total) * 100
+  const d = e.duenoP0?.(t.desde, t.hasta) ?? null
+  const dueno = d ? ` Dueño: ${d.dueno === 'mantencion' ? 'Mantención' : 'seteo y pesca'}, ${milesPunto(d.dueno === 'mantencion' ? d.mant : d.total - d.mant)} de ${milesPunto(d.total)} piezas${d.estimado ? ' (estimado)' : ''}.` : ''
   // 7 / 200 · 100 da 3,5000000000000004 en coma flotante: «justo 3,5 %» no es «sobre 3,5 %».
   if (!(pct - u.p0CriticoPct > 1e-9)) return null
   return {
@@ -246,7 +250,7 @@ export function reglaP0Alto(e: EntradaAlertas, u: UmbralesAlertas): AlertaGrader
     nivel: 'mal',
     desdeMin: t.desde,
     titulo: `P0 ${coma1(pct)} % de ${horaDelEje(e.t0Ms, t.desde)} a ${horaDelEje(e.t0Ms, t.hasta)}`,
-    detalle: `Sobre ${coma1(u.p0CriticoPct)} % los 15 min completos: ${milesPunto(g0)} de ${milesPunto(total)} piezas a Gate 0.`,
+    detalle: `Sobre ${coma1(u.p0CriticoPct)} % los 15 min completos: ${milesPunto(g0)} de ${milesPunto(total)} piezas a Gate 0.${dueno}`,
   }
 }
 
