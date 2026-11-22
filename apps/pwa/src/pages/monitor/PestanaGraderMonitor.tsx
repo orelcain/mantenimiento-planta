@@ -12,14 +12,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { CoberturaGraderCard } from '@/components/grader/CoberturaGraderCard'
-import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
+import { EspejoGraderCard, type TurnoDelMonitor } from '@/components/grader/EspejoGraderCard'
 import { LecturaEnVivo } from '@/components/grader/LecturaEnVivo'
 import { ventanaDelTurno } from '@/services/grader/espejo/espejoFilas'
 import { loadGate0Records, type StoredGate0Record } from '@/services/grader/graderGate0Store'
 import { buildDailySummaryId } from '@/services/grader/graderDailySummary.service'
 import { lineaDelEspejo, useEspejoGrader } from '@/services/grader/espejo/useEspejoGrader'
 import { leidoHastaDelLector } from '@/services/grader/espejo/espejoEstado'
-import type { SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
+import { baaderEnEje, RETRASO_REFERENCIA_MIN, type SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
+import { minutosSinLectura } from '@/services/grader/espejo/alertasGrader'
+import { serieDesdeCubetas, type CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
+import { useIsAdmin } from '@/store/authStore'
 import { GraderVivo } from './GraderVivo'
 import type { ParadaGrader } from './graderVivoDatos'
 import { Skeleton } from '@/components/piel/Skeleton'
@@ -30,6 +33,7 @@ import {
   calcularCobertura,
   causaFaltante,
   type CadenciaExporte,
+  type Tramo,
 } from '@/services/grader/graderCobertura'
 import { useDatosGraderHasta, useResumenesAlrededor, useResumenesPrevios } from '@/services/grader/graderDatosHasta'
 
@@ -64,7 +68,7 @@ function Aviso({ titulo, texto, accion }: { titulo: string; texto: string; accio
   )
 }
 
-function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
+function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs, espejo = SIN_TRAMOS }: {
   lineId: string
   /** dateKey del turno que se está viendo. */
   dateKey: string | null
@@ -74,6 +78,8 @@ function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
   inicio: string | null | undefined
   fin: string | null | undefined
   ahoraWallMs: number
+  /** Tramos que trae el espejo (sin sus huecos): también son datos del grader, no solo el Excel. */
+  espejo?: readonly Tramo[]
 }) {
   const location = useLocation()
   const [cadencia, setCadencia] = useCadencia(lineId)
@@ -83,8 +89,8 @@ function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
 
   const cobertura = useMemo(() => {
     if (resumenes.estado !== 'listo') return null
-    return calcularCobertura({ inicio, fin, ahoraWallMs, resumenes: resumenes.valor, cadencia })
-  }, [resumenes, inicio, fin, ahoraWallMs, cadencia])
+    return calcularCobertura({ inicio, fin, ahoraWallMs, resumenes: resumenes.valor, cadencia, espejo })
+  }, [resumenes, inicio, fin, ahoraWallMs, cadencia, espejo])
 
   if (hasta.estado === 'sin-sesion' || resumenes.estado === 'sin-sesion') {
     const volver = encodeURIComponent(location.pathname + location.search)
@@ -115,7 +121,7 @@ function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
   return (
     <CoberturaGraderCard
       cobertura={cobertura}
-      datosHasta={hasta.estado === 'listo' ? hasta.valor : null}
+      datosHasta={masReciente(hasta.estado === 'listo' ? hasta.valor : null, cobertura.hasta)}
       causa={causaFaltante(estadoCarpeta)}
       cadencia={cadencia}
       onCadencia={setCadencia}
@@ -124,6 +130,54 @@ function CoberturaEnMonitor({ lineId, dateKey, inicio, fin, ahoraWallMs }: {
 }
 
 const SIN_PARADAS: ParadaGrader[] = []
+const SIN_TRAMOS: Tramo[] = []
+
+/** El dato más nuevo entre el último Excel (ISO) y el último minuto del espejo (ms), como ISO wall-clock. */
+function masReciente(excel: string | null, espejoMs: number | null): string | null {
+  const e = excel ? Date.parse(excel) : NaN
+  if (espejoMs === null || (Number.isFinite(e) && e >= espejoMs)) return excel
+  return new Date(espejoMs).toISOString()
+}
+
+/**
+ * Lo que el espejo cubre del turno: de la primera pieza a la última, menos los minutos que no leyó (huecos con las
+ * Baader andando). Con el retraso de referencia: un hueco dura ≥ 15 min y 1 min de corrimiento no lo cambia.
+ */
+function tramosDelEspejo(cubetas: readonly CubetaMinuto[], inicioMs: number, finMs: number, baader: SerieMinutoBaader | null): Tramo[] {
+  const n = Math.max(1, Math.ceil((finMs - inicioMs) / 60_000))
+  const serie = serieDesdeCubetas(cubetas, inicioMs, n)
+  if (serie.hastaMin === 0) return []
+  let primera = 0
+  while (primera < serie.hastaMin && (serie.pz[primera] ?? 0) === 0) primera++
+  const sin = minutosSinLectura(serie.pz, baaderEnEje(baader, serie.t0Ms), RETRASO_REFERENCIA_MIN, serie.hastaMin)
+  const out: Tramo[] = []
+  let a = -1
+  for (let m = primera; m <= serie.hastaMin; m++) {
+    const leido = m < serie.hastaMin && !sin[m]
+    if (leido && a < 0) a = m
+    if (!leido && a >= 0) { out.push({ desde: serie.t0Ms + a * 60_000, hasta: serie.t0Ms + m * 60_000 }); a = -1 }
+  }
+  return out
+}
+
+/** Piezas del grader y de las Baader dentro de la ventana del turno, para la tarjeta del espejo. */
+function cuentaDelTurno(cubetas: readonly CubetaMinuto[], inicioMs: number, finMs: number, baader: SerieMinutoBaader | null) {
+  let piezas = 0
+  let g0 = 0
+  for (const c of cubetas) if (c.ms >= inicioMs && c.ms < finMs) { piezas += c.pz; g0 += c.g0 }
+  let b: number | null = null
+  const desde = baader ? Date.parse(baader.desde.endsWith('Z') ? baader.desde : `${baader.desde}Z`) : NaN
+  if (baader && Number.isFinite(desde)) {
+    b = 0
+    for (const m of baader.maquinas) {
+      m.cycles.forEach((v, i) => {
+        const t = desde + i * 60_000
+        if (t >= inicioMs && t < finMs) b! += v ?? 0
+      })
+    }
+  }
+  return { piezas, g0, baader: b }
+}
 
 /**
  * Pestaña «Grader»: el grader en vivo arriba (si el espejo trae piezas del turno), y debajo la tarjeta del espejo
@@ -136,6 +190,7 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
   paradas?: ParadaGrader[]
 }) {
   const { lineId, dateKey, inicio, fin, turnoId, ahoraWallMs, baader = null, paradas = SIN_PARADAS } = props
+  const esAdmin = useIsAdmin()
   // Solo la ventana del turno (con su margen) se baja y se reparte; sin ventana no se baja nada.
   const ventana = useMemo(
     () => (dateKey && inicio ? ventanaDelTurno({ dateKey, inicio, fin, turnoId }) : null),
@@ -149,6 +204,21 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
   // Matrix: hasta ahí los minutos sin piezas son de verdad.
   const leidoHastaMs = leidoHastaDelLector(espejo.estado)
   const turnoActualId = dateKey && turnoId ? `${dateKey}__${turnoId}` : null
+  const tramosEspejo = useMemo(
+    () => (ventana && !espejo.cargandoPiezas ? tramosDelEspejo(espejo.cubetas, ventana.startMs, ventana.endMs, baader) : SIN_TRAMOS),
+    [ventana, espejo.cargandoPiezas, espejo.cubetas, baader],
+  )
+  // La tarjeta del espejo dice el mismo turno, horario y cifra que el encabezado y «El grader ahora».
+  const turnoMonitor = useMemo<TurnoDelMonitor | null>(() => {
+    if (!ventana || !inicio) return null
+    const finIso = fin ?? new Date(ventana.endMs).toISOString()
+    return {
+      nombre: turnoId || ventana.shiftId,
+      desde: inicio.slice(11, 16),
+      hasta: finIso.slice(11, 16),
+      ...cuentaDelTurno(espejo.cubetas, ventana.startMs, ventana.endMs, baader),
+    }
+  }, [ventana, inicio, fin, turnoId, espejo.cubetas, baader])
   // Puerta 0 del turno (Excel): el mismo id que usa el guardado (`buildDailySummaryId`, con la línea). Una lectura
   // por turno y línea, sin listener. Sin registros o con error, sigue el estimado.
   const gate0Id = dateKey && turnoId ? buildDailySummaryId(dateKey, turnoId, lineId) : null
@@ -188,10 +258,13 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
             minutos={espejo.minutos}
             resumen={espejo.cargandoPiezas ? null : espejo.resumen}
             errorPiezas={espejo.errorPiezas}
+            publico={!esAdmin}
+            turnoEnCurso={turnoEnCurso}
+            turnoMonitor={turnoMonitor}
             accion={<LecturaEnVivo linea={lineaDelEspejo(lineId)} lector={espejo.estado} />}
           />
         )}
-        <CoberturaEnMonitor {...props} />
+        <CoberturaEnMonitor {...props} espejo={tramosEspejo} />
       </div>
     </div>
   )
