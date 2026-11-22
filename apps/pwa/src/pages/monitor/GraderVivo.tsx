@@ -348,8 +348,10 @@ function CalibreCalidad({ d }: { d: Datos }) {
 
 function LineaManual({ d }: { d: Datos }) {
   const filas = d.manual
-  const tope = Math.max(1, ...filas.map((f) => Math.abs(f.diferencia)))
-  const total = filas.reduce((a, f) => a + f.diferencia, 0)
+  const leidas = filas.filter((f) => f.diferencia !== null)
+  const tope = Math.max(1, ...leidas.map((f) => Math.abs(f.diferencia ?? 0)))
+  const total = leidas.reduce((a, f) => a + (f.diferencia ?? 0), 0)
+  const sinLectura = filas.length - leidas.length
   return (
     <Tarjeta titulo="Línea manual por hora" sub="Piezas del grader menos piezas de las Baader de la misma hora" icono={<Hand className={IC} />}>
       {!d.baader ? (
@@ -358,7 +360,13 @@ function LineaManual({ d }: { d: Datos }) {
         <p className="py-6 text-center text-[13px] text-muted-foreground">Se calcula al cerrar la primera hora completa.</p>
       ) : (
         <div className="mt-3 space-y-1.5">
-          {filas.map((f) => (
+          {filas.map((f) => f.diferencia === null ? (
+            <div key={f.hora} data-hora={f.hora} data-sin-lectura className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
+              <span className="tabular-nums text-foreground/80">{f.hora}</span>
+              <span className="h-2.5 rounded-full border border-dashed border-border" aria-hidden />
+              <span className="text-right text-[12px] text-muted-foreground">sin lectura</span>
+            </div>
+          ) : (
             <div key={f.hora} data-hora={f.hora} className="grid grid-cols-[48px_1fr_56px] items-center gap-2.5 text-[13px] leading-[18px]">
               <span className="tabular-nums text-foreground/80">{f.hora}</span>
               <span className="relative h-2.5 rounded-full bg-muted">
@@ -372,7 +380,7 @@ function LineaManual({ d }: { d: Datos }) {
             </div>
           ))}
           <p className="pt-1.5 text-[12px] leading-[16px] text-muted-foreground tabular-nums">
-            {filas.length} {filas.length === 1 ? 'hora' : 'horas'}: {total > 0 ? '+' : total < 0 ? '−' : ''}{milesPunto(Math.abs(total))} piezas. La hora en curso entra al cerrar.
+            {leidas.length} {leidas.length === 1 ? 'hora' : 'horas'}: {total > 0 ? '+' : total < 0 ? '−' : ''}{milesPunto(Math.abs(total))} piezas.{sinLectura > 0 ? ` ${sinLectura === 1 ? 'Una hora queda' : `${sinLectura} horas quedan`} fuera: el espejo no la leyó entera.` : ''} La hora en curso entra al cerrar.
           </p>
         </div>
       )}
