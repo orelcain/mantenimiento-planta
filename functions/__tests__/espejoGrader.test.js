@@ -155,13 +155,13 @@ test('cota leidoEn: debe ser ISO parseable', () => {
   assert.strictEqual(errorDe(cuerpo({ leidoEn: '2026-13-45T99:00:00Z' })), 'leidoEn no válido')
 })
 
-test('cota estado: más de 20 claves se rechaza', () => {
+test('cota estado: más de 24 claves se rechaza (e1.7 sube el tope de 20 a 24)', () => {
   const estado = {}
-  for (let i = 0; i < 21; i++) estado[`k${i}`] = i
+  for (let i = 0; i < 25; i++) estado[`k${i}`] = i
   assert.strictEqual(errorDe(cuerpo({ estado })), 'estado con demasiadas claves')
-  const veinte = {}
-  for (let i = 0; i < 20; i++) veinte[`k${i}`] = i
-  assert.strictEqual(espejo.validarCuerpo(cuerpo({ estado: veinte })).ok, true)
+  const veinticuatro = {}
+  for (let i = 0; i < 24; i++) veinticuatro[`k${i}`] = i
+  assert.strictEqual(espejo.validarCuerpo(cuerpo({ estado: veinticuatro })).ok, true)
 })
 
 test('cota estado: valor fuera de tipo o demasiado largo se rechaza', () => {

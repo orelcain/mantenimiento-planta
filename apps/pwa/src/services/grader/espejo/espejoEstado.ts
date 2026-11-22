@@ -49,6 +49,18 @@ export interface EstadoLector {
      * <enviadas>», «con-limite», «terminada <enviadas> <primera> a <última>» o «cancelada <enviadas>».
      */
     recarga?: string
+    /**
+     * Desde e1.7: pantalla y bloqueo. «<pedida|no-pedida> <sin-bloqueo|bloqueada-desde F H|ultimo-bloqueo F H>[ políticas]»;
+     * políticas = «inactividad=900s(ti)», «protector=600s(ti|usuario)».
+     */
+    pantalla?: string
+    /** Desde e1.7: «abierto-por-lector F H[ esperando]», «no-abre <motivo>» o '' (Matrix ya corría). */
+    matrix?: string
+    /**
+     * Desde e1.7: relleno de huecos del espejo dentro del rango de Matrix. «rellenando <releídas>/<total> <n>h <hora>»,
+     * «al-dia <n>h <desde> a <hasta>[ releidas N]», «sin-rango», «sin-conteos», «desordenada», «error» o ''.
+     */
+    huecos?: string
   }
 }
 
@@ -340,6 +352,60 @@ export function fraseRecarga(
   m = /^cancelada (\d+)$/.exec(recarga)
   if (m) return { texto: `cancelada · ${cifraPunto(Number(m[1]))} piezas enviadas`, aviso: avisoVolverRango(rango, ahora, 'Recarga cancelada.') }
   return { texto: recarga, aviso: null }
+}
+
+/**
+ * e1.7: frase de la pantalla del PC de planta (clave `pantalla`). `aviso` sale cuando la sesión se bloqueó con la
+ * pantalla pedida: la causa es una política (de TI o del usuario) o alguien la bloqueó a mano. El lector no la evade.
+ */
+export function frasePantalla(pantalla: string | undefined): { texto: string; aviso: string | null } | null {
+  if (!pantalla) return null
+  const m = /^(pedida|no-pedida) (sin-bloqueo|bloqueada-desde (\S+ \S+)|ultimo-bloqueo (\S+ \S+))(?: (.*))?$/.exec(pantalla)
+  if (!m) return { texto: pantalla, aviso: null }
+  const pedida = m[1] === 'pedida'
+  const politicas = (m[5] ?? '').split(' ').filter(Boolean)
+  const ti = politicas.filter((p) => p.endsWith('(ti)')).map((p) => p.replace(/^inactividad=(\d+)s\(ti\)$/, (_, s) => `bloqueo por inactividad a los ${Math.round(Number(s) / 60)} min`).replace(/^protector=(\d*)s\(ti\)$/, (_, s) => `protector de pantalla con contraseña${s ? ` a los ${Math.round(Number(s) / 60)} min` : ''}`))
+  const usuario = politicas.some((p) => p.endsWith('(usuario)'))
+  const bloqueo = m[3] ? `bloqueada desde ${m[3]}` : m[4] ? `último bloqueo ${m[4]}` : 'sin bloqueo'
+  const texto = `${pedida ? 'encendida (pedida a Windows)' : 'sin pedir (Windows no aceptó)'} · ${bloqueo}`
+  let aviso: string | null = null
+  if (m[3] || m[4]) {
+    if (ti.length) aviso = `La sesión se bloquea por una política de TI (${ti.join('; ')}). El lector no la evade: pedir a TI una excepción para este PC.`
+    else if (usuario) aviso = 'La sesión se bloquea por el protector de pantalla con contraseña de este usuario de Windows: se puede quitar en Configuración › Personalización › Pantalla de bloqueo.'
+    else if (pedida) aviso = 'La sesión se bloqueó con la pantalla encendida: alguien la bloqueó a mano (Windows + L) o hay una política que el lector no ve.'
+  }
+  return { texto, aviso }
+}
+
+/** e1.7: frase de Matrix abierto por el lector (clave `matrix`). `null` si Matrix ya corría. */
+export function fraseMatrix(matrix: string | undefined): { texto: string; aviso: string | null } | null {
+  if (!matrix) return null
+  let m = /^abierto-por-lector (\S+ \S+)( esperando)?$/.exec(matrix)
+  if (m) return { texto: `lo abrió el lector (${m[1]})`, aviso: 'Si Matrix no abre solo el informe «Pieza pieza Grader», alguien tiene que abrirlo una vez: el lector no navega por Matrix.' }
+  m = /^no-abre (\S+)/.exec(matrix)
+  if (m) {
+    const motivo: Record<string, string> = {
+      apagado: 'abrir Matrix está apagado en este PC',
+      'sin-ruta': 'no sabe dónde está Matrix (ábrelo una vez a mano y el lector guarda la ruta)',
+      'tope-diario': 'ya lo abrió 6 veces en 24 h: alguien lo está cerrando',
+      fallo: 'Windows no dejó abrirlo',
+    }
+    return { texto: 'cerrado', aviso: `Matrix está cerrado y el lector no lo abre: ${motivo[m[1]!] ?? m[1]}.` }
+  }
+  return { texto: matrix, aviso: null }
+}
+
+/** e1.7: frase del relleno de huecos (clave `huecos`). `null` sin dato. */
+export function fraseHuecos(huecos: string | undefined): { texto: string; aviso: string | null } | null {
+  if (!huecos) return null
+  let m = /^rellenando (\d+)\/(\d+) (\d+)h (\d{4}-\d{2}-\d{2} \d{2})$/.exec(huecos)
+  if (m) return { texto: `rellenando · ${cifraPunto(Number(m[1]))} de ${cifraPunto(Number(m[2]))} filas · ${m[3]} h con hueco · ahora ${m[4]} h`, aviso: null }
+  m = /^al-dia (\d+)h (\S+ \d{2}) a (\S+ \d{2})(?: releidas (\d+))?$/.exec(huecos)
+  if (m) return { texto: `sin huecos · ${m[1]} h revisadas (${m[2]} h a ${m[3]} h)${m[4] ? ` · ${cifraPunto(Number(m[4]))} filas releídas` : ''}`, aviso: null }
+  if (huecos === 'sin-conteos') return { texto: 'sin revisar', aviso: 'La función no entrega los conteos del espejo: falta desplegar la e1.7 de la función.' }
+  if (huecos === 'desordenada') return { texto: 'sin revisar', aviso: 'La tabla de Matrix no está en orden de fecha y hora: el lector no rellena huecos.' }
+  if (huecos === 'sin-rango') return { texto: 'sin revisar (el rango de Matrix no tiene horas cerradas)', aviso: null }
+  return { texto: huecos, aviso: null }
 }
 
 /** Orden para el PC de planta: crea el archivo RECARGA en la carpeta del lector. */

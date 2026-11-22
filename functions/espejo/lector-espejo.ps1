@@ -9,8 +9,8 @@
 # Si Matrix no toma el rango nuevo, devuelve las fechas como estaban y sigue sin moverlas (clave «ajuste» del latido).
 # e1.5: la casilla se revisa en cada «Actualizar» aunque las fechas fallen. Matrix (Qt) ignora la escritura de sus
 # fechas por UI Automation: entonces «ajuste» = fechas-fijas y el fin del rango hay que moverlo a mano.
-# Mientras corre pide a Windows que no SUSPENDA el equipo (SetThreadExecutionState, sin pantalla: no toca el bloqueo
-# con contraseña de planta). Con la sesión bloqueada igual intenta leer, no mueve el rango y lo informa («bloqueada»).
+# Mientras corre pide a Windows que no suspenda el equipo ni apague la pantalla (SetThreadExecutionState, e1.7). Con la
+# sesión bloqueada igual intenta leer, no mueve el rango y lo informa («bloqueada», «pantalla»).
 # Configuración por variables de entorno (opcionales): ESPEJO_URL, ESPEJO_CADA (s, 300), ESPEJO_FILTRO
 # (matrix|marelec), ESPEJO_DIR (%LOCALAPPDATA%\espejo-grader), ESPEJO_EQUIPO (nombre del PC),
 # ESPEJO_ESPERA_RECARGA (s, 12), ESPEJO_TOPE_CICLO (s, 600), ESPEJO_TOPE_TRAMO (s, 90: la lectura de la
@@ -29,7 +29,22 @@
 # su #n por segundo y se une con arrayUnion por hora. Latido: clave «recarga».
 
 $ErrorActionPreference = 'Continue'
-$VERSION = 'e1.6'
+# e1.7 — leer siempre, sin nadie en planta:
+#   · Pantalla: pide a Windows que no apague la pantalla ni suspenda (SetThreadExecutionState con ES_DISPLAY_REQUIRED),
+#     sin simular teclas ni mouse. Si la sesión se bloquea igual, lo informa con la hora y las políticas de bloqueo que
+#     lee del registro (solo lectura; una política de TI no se evade). Latido: clave «pantalla».
+#   · Matrix: si no corre, lo abre minimizado y sin activar con la misma ruta del proceso que vio antes (matrix-ruta.txt)
+#     o el único .exe «Matrix» de la carpeta de Marelec. Como mucho una vez cada 30 min y 6 al día (abrir.json). No lo
+#     cierra ni lo configura: si no abre el informe solo, el latido lo dice. ESPEJO_ABRIR_MATRIX=0 lo apaga. Clave «matrix».
+#   · Huecos: compara las filas por hora de la tabla de Matrix (búsqueda binaria en los bordes de hora) con las que tiene
+#     el espejo (GET ?conteos= a la función) y relee solo las horas que faltan, por tramos, entre los ciclos del turno: el
+#     turno en curso va primero («Actualizar» al menos cada ESPEJO_CADA) y en modo vivo no se rellena. El servidor no
+#     duplica (#n por segundo + arrayUnion). Solo dentro del rango que muestra Matrix: Qt ignora la escritura de las
+#     fechas por UI Automation y el lector no teclea. Latido: clave «huecos» (filas releídas / filas de las horas con hueco).
+#   · El error del ciclo va tal cual aunque la sesión esté bloqueada (antes se tapaba con «pantalla-bloqueada»).
+#   · Recarga e1.6: el total del avance es el de la última tabla leída (antes salía «/0» si el ciclo fallaba).
+
+$VERSION = 'e1.7'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 try {
   Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
@@ -55,7 +70,16 @@ if ($env:ESPEJO_TOPE_TRAMO) { $topeTramo = [double]$env:ESPEJO_TOPE_TRAMO }
 $horasAtras = 16
 if ($env:ESPEJO_HORAS_ATRAS) { $horasAtras = [double]$env:ESPEJO_HORAS_ATRAS }
 $rangoAuto = ($env:ESPEJO_RANGO_AUTO -ne '0')
-$equipo = ([string]$env:COMPUTERNAME) -replace '[^A-Za-z0-9_-]', ''
+# e1.7: abrir Matrix si no corre (0 = no), carpeta donde buscar su .exe, tope por ciclo del relleno de huecos (s) y
+# cada cuánto se piden los conteos del espejo a la función (min).
+$abrirMatrix = ($env:ESPEJO_ABRIR_MATRIX -ne '0')
+$carpetaMatrix = Join-Path ([string]${env:ProgramFiles(x86)}) 'Marelec Food Technologies\MATRIX CG'
+if ($env:ESPEJO_CARPETA_MATRIX) { $carpetaMatrix = $env:ESPEJO_CARPETA_MATRIX }
+$topeHueco = 90
+if ($env:ESPEJO_TOPE_HUECO) { $topeHueco = [double]$env:ESPEJO_TOPE_HUECO }
+$minConteos = 30
+if ($env:ESPEJO_MIN_CONTEOS) { $minConteos = [double]$env:ESPEJO_MIN_CONTEOS }
+$equipo =([string]$env:COMPUTERNAME) -replace '[^A-Za-z0-9_-]', ''
 if ($env:ESPEJO_EQUIPO) { $equipo = ([string]$env:ESPEJO_EQUIPO) -replace '[^A-Za-z0-9_-]', '' }
 if ($equipo.Length -gt 40) { $equipo = $equipo.Substring(0, 40) }
 if (-not $equipo) { $equipo = 'PC' }
@@ -86,7 +110,10 @@ $archivoNuevo = Join-Path $dir 'lector-nuevo.ps1'
 $archivoNuevoInfo = Join-Path $dir 'nuevo.json'
 $archivoRechazadas = Join-Path $dir 'rechazadas.txt'
 $archivoActualiz = Join-Path $dir 'actualiz.txt'
-$TAREA = 'Espejo del grader'
+# e1.7: ruta del Matrix que se vio corriendo y registro de las veces que el lector lo abrió.
+$archivoRutaMatrix = Join-Path $dir 'matrix-ruta.txt'
+$archivoAbrir = Join-Path $dir 'abrir.json'
+$TAREA ='Espejo del grader'
 if ($env:ESPEJO_TAREA) { $TAREA = $env:ESPEJO_TAREA }
 $UTF8 = New-Object System.Text.UTF8Encoding($false)
 $AE = [System.Windows.Automation.AutomationElement]
@@ -206,6 +233,8 @@ function Escanea($acc, $reloj) {
   $raiz = $AE::RootElement
   $procs = @(Get-Process | Where-Object { $_.ProcessName -match $script:filtroProc })
   $acc.procesos = $procs.Count
+  # e1.7: la ruta del Matrix que corre queda guardada para volver a abrirlo si se cierra.
+  foreach ($p in $procs) { try { Recuerda-Matrix ([string]$p.Path) } catch { } }
   foreach ($p in $procs) {
     try {
       $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, $p.Id)
@@ -730,6 +759,7 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
     if ($script:rangoAuto -and -not $script:bloqueada) { $aj = Ajusta-Rango $foto.el $estado $recarga }
     try { $boton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
     catch { $res.error = 'invoke-fallo'; return $res }
+    $script:ultRefresco = Get-Date
 
     Espera $esperaRecarga
     $foto = Foto
@@ -788,6 +818,8 @@ function Ciclo($estado, $reloj, [bool]$refrescar, [bool]$recarga = $false, [bool
   $res.parcial = [bool]$lec.parcial
   if ($lec.parcial) { $res.pendientes = [math]::Max(0, [int]($n - $lec.hastaIdx - 1)) }
   $res.lec = $lec
+  # e1.7: la misma tabla, ya estable, sirve para buscar y rellenar huecos en este ciclo.
+  $res.gp = $foto.gp
   $res.base = $(if ($lec.relectura) { 0 } else { $estado.piezas })
   return $res
 }
@@ -814,9 +846,345 @@ function Marca-Recarga {
 function Texto-Recarga($rec, [string]$cierre, [int]$recorridas, [int]$filas, [string]$errorCiclo) {
   if ($rec) {
     if ($errorCiclo -eq 'recarga-con-limite') { return 'con-limite' }
+    # e1.7: $filas es la tabla de la última lectura buena (no la de un ciclo fallido): nunca «/0» por un error.
+    if ($filas -gt 0 -and $recorridas -gt $filas) { $recorridas = $filas }
     return ('leyendo ' + $recorridas + '/' + $filas + ' ' + [int]$rec.enviadas)
   }
   return [string]$cierre
+}
+
+# ---- e1.7: pantalla despierta y políticas de bloqueo ----
+# ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED: ni suspensión ni pantalla apagada mientras el lector corre
+# (es lo que hace un reproductor de video). No simula teclas ni mouse. $true si Windows aceptó el pedido.
+function Pide-Pantalla {
+  try { return ([EspejoGrader.Energia]::SetThreadExecutionState([uint32]2147483651) -ne 0) } catch { return $false }
+}
+
+function Valor-Registro([string]$ruta, [string]$nombre) {
+  try { return [string](Get-ItemProperty -LiteralPath $ruta -Name $nombre -ErrorAction Stop).$nombre } catch { return '' }
+}
+
+# Políticas que bloquean la sesión aunque la pantalla siga encendida (solo se leen, nunca se cambian): «Límite de
+# inactividad del equipo» de TI y protector de pantalla con contraseña (de TI o del usuario). '' si no hay ninguna.
+function Politicas-Bloqueo {
+  $p = New-Object System.Collections.Generic.List[string]
+  $ina = Valor-Registro 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' 'InactivityTimeoutSecs'
+  if ($ina -match '^\d+$' -and [int64]$ina -gt 0) { $p.Add('inactividad=' + $ina + 's(ti)') }
+  $g = 'HKCU:\Software\Policies\Microsoft\Windows\Control Panel\Desktop'
+  $u = 'HKCU:\Control Panel\Desktop'
+  if ((Valor-Registro $g 'ScreenSaveActive') -eq '1' -and (Valor-Registro $g 'ScreenSaverIsSecure') -eq '1') {
+    $p.Add('protector=' + (Valor-Registro $g 'ScreenSaveTimeOut') + 's(ti)')
+  } elseif ((Valor-Registro $u 'SCRNSAVE.EXE') -and (Valor-Registro $u 'ScreenSaveActive') -eq '1' -and (Valor-Registro $u 'ScreenSaverIsSecure') -eq '1') {
+    $p.Add('protector=' + (Valor-Registro $u 'ScreenSaveTimeOut') + 's(usuario)')
+  }
+  return ($p -join ' ')
+}
+
+# Clave «pantalla» del latido: '<pedida|no-pedida> <sin-bloqueo|bloqueada-desde F H|ultimo-bloqueo F H>[ políticas]'.
+# Si la sesión se bloquea con la pantalla pedida, la causa es una política (TI o usuario) o alguien la bloqueó a mano.
+function Texto-Pantalla([bool]$pedida, [bool]$bloqueada, [datetime]$ahora) {
+  if ($bloqueada) {
+    if (-not $script:bloqueoDesde) { $script:bloqueoDesde = $ahora; Log ('pantalla: la sesión se bloqueó (' + $(if ($script:politicas) { $script:politicas } else { 'sin política de bloqueo leída' }) + ').') }
+    $script:ultimoBloqueo = $script:bloqueoDesde
+  } elseif ($script:bloqueoDesde) {
+    Log ('pantalla: la sesión volvió a estar desbloqueada (bloqueada desde ' + $script:bloqueoDesde.ToString('yyyy-MM-dd HH:mm') + ').')
+    $script:bloqueoDesde = $null
+  }
+  $b = 'sin-bloqueo'
+  if ($script:bloqueoDesde) { $b = 'bloqueada-desde ' + $script:bloqueoDesde.ToString('yyyy-MM-dd HH:mm') }
+  elseif ($script:ultimoBloqueo) { $b = 'ultimo-bloqueo ' + $script:ultimoBloqueo.ToString('yyyy-MM-dd HH:mm') }
+  $t = $(if ($pedida) { 'pedida' } else { 'no-pedida' }) + ' ' + $b
+  if ($script:politicas) { $t += ' ' + $script:politicas }
+  if ($t.Length -gt 200) { $t = $t.Substring(0, 200) }
+  return $t
+}
+
+# ---- e1.7: abrir Matrix si no corre ----
+# Guarda la ruta del Matrix que corre (solo un .exe con «matrix» en el nombre).
+function Recuerda-Matrix([string]$ruta) {
+  if (-not $ruta -or $ruta -notmatch '(?i)\.exe$' -or (Split-Path -Leaf $ruta) -notmatch '(?i)matrix') { return }
+  if ($script:rutaMatrix -eq $ruta) { return }
+  $script:rutaMatrix = $ruta
+  try { [IO.File]::WriteAllText($archivoRutaMatrix, $ruta, $UTF8) } catch { }
+}
+
+# Ruta para abrir Matrix: la del proceso que se vio correr (matrix-ruta.txt) o el ÚNICO .exe con «matrix» en el nombre
+# de la carpeta de Marelec. '' si no hay una respuesta segura: entonces no se abre nada.
+function Ruta-Matrix {
+  $r = [string]$script:rutaMatrix
+  if (-not $r -and (Test-Path -LiteralPath $archivoRutaMatrix)) { try { $r = ([IO.File]::ReadAllText($archivoRutaMatrix)).Trim() } catch { } }
+  if ($r -and (Test-Path -LiteralPath $r -PathType Leaf)) { return $r }
+  $exes = @(Get-ChildItem -LiteralPath $script:carpetaMatrix -Filter '*.exe' -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '(?i)matrix' })
+  if ($exes.Count -eq 1) { return [string]$exes[0].FullName }
+  return ''
+}
+
+# Aperturas de las últimas 24 h (abrir.json sobrevive a los reinicios del lector: así no hay tormenta de instancias).
+function Lee-Aperturas([datetime]$ahora) {
+  $l = New-Object System.Collections.Generic.List[datetime]
+  if (-not (Test-Path -LiteralPath $archivoAbrir)) { return , $l }
+  try {
+    $j = Get-Content -LiteralPath $archivoAbrir -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($s in @($j.veces)) {
+      $t = [datetime]::MinValue
+      if ([datetime]::TryParseExact([string]$s, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$t)) {
+        if (($ahora - $t).TotalHours -lt 24 -and $t -le $ahora.AddMinutes(1)) { $l.Add($t) }
+      }
+    }
+  } catch { }
+  return , $l
+}
+
+# Minimizado y sin activar (SW_SHOWMINNOACTIVE = 7): no le quita el foco a quien esté usando el PC.
+function Lanza-Minimizado([string]$ruta) {
+  $carpeta = Split-Path -Parent $ruta
+  try {
+    $sh = New-Object -ComObject WScript.Shell
+    $sh.CurrentDirectory = $carpeta
+    [void]$sh.Run('"' + $ruta + '"', 7, $false)
+    return $true
+  } catch { }
+  try { Start-Process -FilePath $ruta -WorkingDirectory $carpeta -WindowStyle Minimized -ErrorAction Stop | Out-Null; return $true } catch { return $false }
+}
+
+# Matrix no corre: lo abre si se puede. Como mucho 1 vez cada 30 min y 6 en 24 h. Devuelve la clave «matrix».
+function Abre-Matrix([datetime]$ahora) {
+  if (-not $script:abrirMatrix) { return 'no-abre apagado' }
+  $veces = Lee-Aperturas $ahora
+  $ult = $null
+  foreach ($t in $veces) { if (-not $ult -or $t -gt $ult) { $ult = $t } }
+  if ($veces.Count -ge 6) { return ('no-abre tope-diario ' + $veces.Count) }
+  if ($ult -and ($ahora - $ult).TotalMinutes -lt 30) { return ('abierto-por-lector ' + $ult.ToString('yyyy-MM-dd HH:mm') + ' esperando') }
+  $ruta = Ruta-Matrix
+  if (-not $ruta) { return 'no-abre sin-ruta' }
+  $veces.Add($ahora)
+  $txt = ConvertTo-Json -InputObject @{ veces = [string[]]@($veces | ForEach-Object { $_.ToString('yyyy-MM-ddTHH:mm:ss') }) } -Compress
+  try { [IO.File]::WriteAllText($archivoAbrir, $txt, $UTF8) } catch { }
+  if (-not (Lanza-Minimizado $ruta)) { Log ('matrix: no se pudo abrir ' + $ruta); return 'no-abre fallo' }
+  Log ('matrix: no corría; el lector lo abrió minimizado (' + $ruta + ', vez ' + $veces.Count + ' en 24 h). No toca nada más de Matrix.')
+  return ('abierto-por-lector ' + $ahora.ToString('yyyy-MM-dd HH:mm'))
+}
+
+# ---- e1.7: huecos del espejo dentro del rango que muestra Matrix ----
+function Fecha-Exacta([string]$s) {
+  $t = [datetime]::MinValue
+  if ($s -match $FORMATO_FECHA -and [datetime]::TryParseExact($s, 'yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$t)) { return $t }
+  return $null
+}
+function Hora-Abajo([datetime]$t) { return $t.Date.AddHours($t.Hour) }
+
+# Filas del espejo por hora para esas fechas (GET ?conteos=a,b): @{ 'yyyy-MM-dd' = @{ 'HH' = n } }. $null si la función
+# no responde o no lo conoce (una función anterior a e1.7 contesta 404): entonces no se rellena nada.
+function Pide-Conteos([string[]]$fechas) {
+  try {
+    $r = Invoke-WebRequest -Uri ($url + '?conteos=' + [uri]::EscapeDataString(($fechas -join ','))) -Method Get -Headers @{ Authorization = ('Bearer ' + $script:llave) } -UseBasicParsing -TimeoutSec 60
+    if ([int]$r.StatusCode -ne 200) { return $null }
+    $j = ConvertFrom-Json ([string]$r.Content)
+    if (-not $j -or -not $j.conteos) { return $null }
+    $out = @{}
+    foreach ($f in $fechas) {
+      $h = @{}
+      $d = $j.conteos.$f
+      if ($d) { foreach ($p in $d.PSObject.Properties) { $h[[string]$p.Name] = [int]$p.Value } }
+      $out[$f] = $h
+    }
+    return $out
+  } catch { return $null }
+}
+
+# Las horas del rango que ya cerraron (hasta 10 min antes de ahora), de la más nueva a la más vieja, tope 7 días.
+function Horas-Rango([string[]]$rango, [datetime]$ahora) {
+  $l = New-Object System.Collections.Generic.List[datetime]
+  if ($rango.Count -lt 2) { return , $l }
+  $d = Fecha-Exacta $rango[0]
+  $h = Fecha-Exacta $rango[1]
+  if (-not $d -or -not $h) { return , $l }
+  $fin = Hora-Abajo $ahora.AddMinutes(-10)
+  if ($h -lt $fin) { $fin = Hora-Abajo $h }
+  $ini = Hora-Abajo $d
+  if ($ini -lt $d) { $ini = $ini.AddHours(1) }
+  if ($ini -lt $fin.AddDays(-7)) { $ini = $fin.AddDays(-7) }
+  for ($t = $fin.AddHours(-1); $t -ge $ini; $t = $t.AddHours(-1)) { $l.Add($t) }
+  return , $l
+}
+
+# Filas de Matrix por hora (bordes por búsqueda binaria) contra las del espejo. Devuelve @{ error; revisadas; huecos }:
+# cada hueco = @{ clave = 'yyyy-MM-dd HH'; desde; hasta (índices de la tabla, hasta exclusivo); matrix; espejo }.
+# error 'desordenada' si un borde no calza (tabla fuera de orden): entonces no se relee nada.
+function Plan-Huecos($gp, [int]$filas, $horas, $datos) {
+  $res = @{ error = ''; revisadas = 0; huecos = (New-Object System.Collections.Generic.List[object]) }
+  # Las horas van de la más nueva a la más vieja y son seguidas: el inicio de una hora es el fin de la anterior, y su
+  # búsqueda binaria se hace solo bajo ese borde (la mitad de lecturas de celdas).
+  $prevT = $null
+  $prevI0 = $filas
+  foreach ($t in $horas) {
+    Revisa-Detener
+    $clave = $t.ToString('yyyy-MM-dd HH')
+    if ($prevT -and $prevT -eq $t.AddHours(1)) { $i1 = $prevI0 }
+    else { $i1 = Desde-Corte $gp $prevI0 ($t.AddHours(1).ToString('yyyy-MM-dd HH:mm:ss')) }
+    $i0 = Desde-Corte $gp $i1 ($t.ToString('yyyy-MM-dd HH:mm:ss'))
+    $prevT = $t
+    $prevI0 = $i0
+    if ($script:horasAgotadas.ContainsKey($clave)) { continue }
+    $res.revisadas++
+    $m = $i1 - $i0
+    if ($m -le 0) { continue }
+    # Los bordes deben caer dentro de la hora: la primera y la última fila del tramo son de esa hora.
+    $a = ([string](Celda $gp $i0 0)).Trim() + ' ' + ([string](Celda $gp $i0 1)).Trim()
+    $z = ([string](Celda $gp ($i1 - 1) 0)).Trim() + ' ' + ([string](Celda $gp ($i1 - 1) 1)).Trim()
+    if (-not $a.StartsWith($clave + ':') -or -not $z.StartsWith($clave + ':')) { $res.error = 'desordenada'; return $res }
+    $e = 0
+    $dia = $datos[$t.ToString('yyyy-MM-dd')]
+    if ($dia -and $dia.ContainsKey($t.ToString('HH'))) { $e = [int]$dia[$t.ToString('HH')] }
+    if ($m -gt $e) { $res.huecos.Add(@{ clave = $clave; desde = $i0; hasta = $i1; matrix = $m; espejo = $e; firma = ((Fila-Celdas $gp $i0) -join "`t") }) }
+  }
+  return $res
+}
+
+# Lee un tramo de una hora con hueco desde $h.idx, con el #n por segundo que sigue de los tramos anteriores. No cambia $h:
+# devuelve el avance para aplicarlo solo tras el 200. $null si una fila no es de esa hora (la tabla cambió).
+function Lee-Hueco($gp, $h, [double]$tope) {
+  $items = New-Object System.Collections.Generic.List[string]
+  $dict = New-Object 'System.Collections.Generic.Dictionary[string,int]' -ArgumentList @($h.dict, [StringComparer]::Ordinal)
+  $dictSec = [string]$h.dictSec
+  $t = [Diagnostics.Stopwatch]::StartNew()
+  $r = [int]$h.idx
+  while ($r -lt [int]$h.hasta) {
+    if (($r % 200) -eq 0) { Revisa-Detener }
+    $c = Fila-Celdas $gp $r
+    $sec = $c[0] + ' ' + $c[1]
+    if ($sec -notmatch $FORMATO_FECHA -or -not $sec.StartsWith($h.clave + ':')) { return $null }
+    if ($sec -ne $dictSec) { $dict = Nuevo-Diccionario; $dictSec = $sec }
+    $clave = $c -join "`t"
+    $ord = 0
+    if ($dict.ContainsKey($clave)) { $ord = $dict[$clave] }
+    $dict[$clave] = $ord + 1
+    $items.Add(($clave + "`t#" + [string]$ord))
+    $r++
+    if ($items.Count -ge $LOTE_MAX -or $t.Elapsed.TotalSeconds -ge $tope) { break }
+  }
+  return @{ items = $items; idx = $r; dict = $dict; dictSec = $dictSec }
+}
+
+# Clave «huecos» del latido: 'rellenando <releídas>/<total> <horas>h <hora en curso>' mientras hay horas con hueco,
+# 'al-dia <horas revisadas>h <desde> a <hasta>[ releidas N]' sin huecos, o el motivo por el que no se revisa
+# (sin-rango | sin-conteos | desordenada).
+function Texto-Huecos {
+  $t = [string]$script:huecosTexto
+  if ($t.Length -gt 200) { $t = $t.Substring(0, 200) }
+  return $t
+}
+
+function Texto-Rellenando($h) {
+  return ('rellenando ' + [int]$script:huecosRonda.leidas + '/' + [int]$script:huecosRonda.total + ' ' + [int]$h.horas + 'h ' + $h.clave)
+}
+
+# Un paso de relleno (tope ESPEJO_TOPE_HUECO s). Se llama solo con el turno al día. Devuelve @{ resp; enviadas; sigue }:
+# sigue = quedan horas con hueco (el ciclo siguiente vuelve enseguida, con «Actualizar» al menos cada ESPEJO_CADA).
+function Paso-Huecos($gp, [int]$filas, [string[]]$rango, $estC) {
+  $out = @{ resp = ''; enviadas = 0; sigue = $false }
+  $ahora = Get-Date
+  $reloj = [Diagnostics.Stopwatch]::StartNew()
+  $h = $script:huecoActual
+  # Una hora a medias sigue solo si la tabla es la misma (misma primera fila del tramo y el tramo entero a la vista).
+  if ($h) {
+    $firma = ((Fila-Celdas $gp ([int]$h.desde)) -join "`t")
+    if ($filas -lt [int]$h.hasta -or $firma -ne $h.firma) { Log ('huecos: la tabla cambió, se vuelve a planear (' + $h.clave + ').'); $h = $null; $script:huecoActual = $null; $script:huecosPlan = $null }
+  }
+  # Las horas que quedan del plan de esta ronda (la tabla solo crece al final: sus índices siguen valiendo si la primera
+  # fila de cada hora es la misma). Sin plan, se planea de nuevo con conteos frescos o en caché.
+  if (-not $h -and $script:huecosPlan -and $script:huecosPlan.Count -gt 0) {
+    $x = $script:huecosPlan[0]
+    $script:huecosPlan.RemoveAt(0)
+    if ($filas -ge [int]$x.hasta -and ((Fila-Celdas $gp ([int]$x.desde)) -join "`t") -eq $x.firma) {
+      $h = @{ clave = $x.clave; desde = [int]$x.desde; hasta = [int]$x.hasta; idx = [int]$x.desde; matrix = [int]$x.matrix; espejo = [int]$x.espejo; dict = (Nuevo-Diccionario); dictSec = ''; firma = $x.firma; horas = $script:huecosPlan.Count + 1 }
+      $script:huecoActual = $h
+      Log ('huecos: relee ' + $h.clave + ' h (Matrix ' + $h.matrix + ' filas, espejo ' + $h.espejo + ').')
+    } else {
+      Log ('huecos: la tabla cambió, se vuelve a planear (' + $x.clave + ').')
+      $script:huecosPlan = $null
+    }
+  }
+  if (-not $h) {
+    $horas = Horas-Rango $rango $ahora
+    if ($horas.Count -eq 0) { $script:huecosTexto = 'sin-rango'; return $out }
+    $fechas = [string[]]@($horas | ForEach-Object { $_.ToString('yyyy-MM-dd') } | Select-Object -Unique)
+    $clavesF = $fechas -join ','
+    $c = $script:conteos
+    $pedidos = $false
+    if (-not $c -or $c.fechas -ne $clavesF -or ($ahora - $c.en).TotalMinutes -ge $script:minConteos) {
+      $d = Pide-Conteos $fechas
+      if ($null -eq $d) { $script:huecosTexto = 'sin-conteos'; return $out }
+      $c = @{ en = $ahora; fechas = $clavesF; datos = $d }
+      $script:conteos = $c
+      $pedidos = $true
+    }
+    $plan = Plan-Huecos $gp $filas $horas $c.datos
+    if ($plan.error) { $script:huecosTexto = $plan.error; Log ('huecos: ' + $plan.error + ', no se relee nada.'); return $out }
+    # Un hueco en una hora que seguía en curso cuando se pidieron los conteos puede ser solo un conteo viejo: se piden otra vez.
+    $reciente = @($plan.huecos | Where-Object { (Fecha-Exacta ($_.clave + ':00:00')).AddHours(1) -gt $c.en.AddMinutes(-10) })
+    if ($reciente.Count -gt 0 -and -not $pedidos) {
+      $d = Pide-Conteos $fechas
+      if ($null -eq $d) { $script:huecosTexto = 'sin-conteos'; return $out }
+      $c = @{ en = $ahora; fechas = $clavesF; datos = $d }
+      $script:conteos = $c
+      $plan = Plan-Huecos $gp $filas $horas $c.datos
+      if ($plan.error) { $script:huecosTexto = $plan.error; return $out }
+    }
+    $desdeT = $horas[$horas.Count - 1].ToString('yyyy-MM-dd HH')
+    $hastaT = $horas[0].ToString('yyyy-MM-dd HH')
+    if ($plan.huecos.Count -eq 0) {
+      $t = 'al-dia ' + $plan.revisadas + 'h ' + $desdeT + ' a ' + $hastaT
+      if ($script:huecosRonda) { $t += ' releidas ' + [int]$script:huecosRonda.leidas; Log ('huecos: al día; ' + [int]$script:huecosRonda.leidas + ' filas releídas en esta ronda.') }
+      $script:huecosRonda = $null
+      $script:huecosTexto = $t
+      return $out
+    }
+    $falta = 0
+    foreach ($x in $plan.huecos) { $falta += [int]$x.matrix }
+    if (-not $script:huecosRonda) {
+      $script:huecosRonda = @{ leidas = 0; total = $falta }
+      Log ('huecos: ' + $plan.huecos.Count + ' horas con menos filas en el espejo que en Matrix (' + $falta + ' filas a releer), entre ' + $desdeT + ' y ' + $hastaT + '.')
+    } else {
+      $script:huecosRonda.total = [int]$script:huecosRonda.leidas + $falta
+    }
+    $script:huecosPlan = $plan.huecos
+    $x = $script:huecosPlan[0]
+    $script:huecosPlan.RemoveAt(0)
+    $h = @{ clave = $x.clave; desde = [int]$x.desde; hasta = [int]$x.hasta; idx = [int]$x.desde; matrix = [int]$x.matrix; espejo = [int]$x.espejo; dict = (Nuevo-Diccionario); dictSec = ''; firma = $x.firma; horas = $script:huecosPlan.Count + 1 }
+    $script:huecoActual = $h
+    Log ('huecos: relee ' + $h.clave + ' h (Matrix ' + $h.matrix + ' filas, espejo ' + $h.espejo + ').')
+  }
+  while ($reloj.Elapsed.TotalSeconds -lt $script:topeHuecoSeg -and [int]$h.idx -lt [int]$h.hasta) {
+    $lec = Lee-Hueco $gp $h ($script:topeHuecoSeg - $reloj.Elapsed.TotalSeconds)
+    if (-not $lec) { Log ('huecos: una fila no es de ' + $h.clave + ' h: se vuelve a planear.'); $script:huecoActual = $null; $script:huecosPlan = $null; $out.sigue = $true; return $out }
+    if ($lec.items.Count -gt 0) {
+      $script:huecosTexto = 'rellenando ' + ([int]$script:huecosRonda.leidas + $lec.items.Count) + '/' + [int]$script:huecosRonda.total + ' ' + [int]$h.horas + 'h ' + $h.clave
+      $estC.huecos = Texto-Huecos
+      $resp = Envia ([string[]]$lec.items.ToArray()) $estC
+      $out.resp = $resp
+      if ($resp -ne 'ok') { $script:huecosTexto = Texto-Rellenando $h; $out.sigue = ($resp -ne 'fin'); return $out }
+      $out.enviadas += $lec.items.Count
+      $script:huecosRonda.leidas = [int]$script:huecosRonda.leidas + $lec.items.Count
+    }
+    $h.idx = $lec.idx; $h.dict = $lec.dict; $h.dictSec = $lec.dictSec
+  }
+  $script:huecosTexto = Texto-Rellenando $h
+  if ([int]$h.idx -ge [int]$h.hasta) {
+    # Hora terminada: hasta los conteos siguientes, el espejo de esa hora cuenta como el de Matrix. Si ya se releyó dos
+    # veces y el espejo sigue corto, no se insiste en esta corrida (queda en el log).
+    $f = $h.clave.Substring(0, 10)
+    $hh = $h.clave.Substring(11, 2)
+    $n = 0
+    if ($script:horasReleidas.ContainsKey($h.clave)) { $n = [int]$script:horasReleidas[$h.clave] }
+    $script:horasReleidas[$h.clave] = $n + 1
+    if ($n + 1 -ge 2) { $script:horasAgotadas[$h.clave] = $true; Log ('huecos: ' + $h.clave + ' h releída 2 veces; no se insiste en esta corrida.') }
+    if ($script:conteos -and $script:conteos.datos[$f]) { $script:conteos.datos[$f][$hh] = [int]$h.matrix }
+    Log ('huecos: ' + $h.clave + ' h releída (' + $h.matrix + ' filas).')
+    $script:huecoActual = $null
+  }
+  $out.sigue = $true
+  return $out
 }
 
 # ---------- Arranque ----------
@@ -835,12 +1203,28 @@ $script:casillaFalla = $false
 $script:rangoOriginal = $null
 $script:ajuste = $(if ($rangoAuto) { '' } else { 'apagado' })
 try { (Get-Process -Id $PID).PriorityClass = 'BelowNormal' } catch { }
-# Que el equipo no se suspenda mientras el lector corre (ES_CONTINUOUS | ES_SYSTEM_REQUIRED). No mantiene la
-# pantalla encendida ni evita el bloqueo con contraseña: esa política de planta no se toca.
-try {
-  Add-Type -Namespace EspejoGrader -Name Energia -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);' -ErrorAction Stop
-  [void][EspejoGrader.Energia]::SetThreadExecutionState([uint32]2147483649)
-} catch { }
+# e1.7: que el equipo no se suspenda ni apague la pantalla mientras el lector corre (Pide-Pantalla, se repite en cada
+# ciclo). No simula teclas ni mouse, y las políticas de bloqueo de TI solo se leen: no se tocan.
+try { Add-Type -Namespace EspejoGrader -Name Energia -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);' -ErrorAction Stop } catch { }
+$script:pantallaPedida = Pide-Pantalla
+$script:politicas = Politicas-Bloqueo
+$script:bloqueoDesde = $null
+$script:ultimoBloqueo = $null
+# e1.7: Matrix (ruta vista, abrir si no corre) y huecos (conteos del espejo, hora a medias, ronda en curso).
+$script:abrirMatrix = $abrirMatrix
+$script:carpetaMatrix = $carpetaMatrix
+$script:rutaMatrix = ''
+$script:matrixTexto = ''
+$script:topeHuecoSeg = $topeHueco
+$script:minConteos = $minConteos
+$script:conteos = $null
+$script:huecoActual = $null
+$script:huecosPlan = $null
+$script:huecosRonda = $null
+$script:huecosTexto = ''
+$script:horasReleidas = @{}
+$script:horasAgotadas = @{}
+$script:ultRefresco = [datetime]::MinValue
 $script:bloqueada = $false
 $script:actualizar = $null
 $script:vivoFin = $null
@@ -861,7 +1245,7 @@ Log ('Arranque ' + $VERSION + ' (' + $script:arranque + '): equipo=' + $equipo +
 $estado = Carga-Estado
 $terminar = $false
 # Latido inmediato: Matrix queda visible como «vivo» sin esperar el primer ciclo.
-$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; vivo = ''; recarga = ''; error = 'iniciando' }
+$estIni = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; filasTabla = 0; piezas = [int]$estado.piezas; primera = [string]$estado.primera; ultima = [string]$estado.ultima; rango = [string[]]@(); limite = $false; gate0 = 0; relectura = $false; vivo = ''; recarga = ''; pantalla = (Texto-Pantalla $script:pantallaPedida (Sesion-Bloqueada) (Get-Date)); matrix = ''; huecos = ''; error = 'iniciando' }
 $respIni = Envia @() $estIni
 if ($respIni -eq 'fin') { $terminar = $true }
 Escribe-Latido 'inicio'
@@ -875,10 +1259,13 @@ while (-not $terminar) {
   $reloj = [Diagnostics.Stopwatch]::StartNew()
   $res = $null
   $script:bloqueada = Sesion-Bloqueada
+  # e1.7: el pedido de pantalla se renueva y las políticas se vuelven a leer en cada ciclo (son lecturas de registro).
+  $script:pantallaPedida = Pide-Pantalla
+  $script:politicas = Politicas-Bloqueo
   # e1.6: empieza, sigue o se cancela la recarga de historia según el archivo RECARGA.
   $marcaRec = Marca-Recarga
   if ($marcaRec -and -not $script:recarga -and $marcaRec -ne $script:recargaHecha) {
-    $script:recarga = @{ estado = (Carga-Estado $archivoRecargaEstado); enviadas = 0; marca = $marcaRec; avance = 0; reanclar = $false }
+    $script:recarga = @{ estado = (Carga-Estado $archivoRecargaEstado); enviadas = 0; marca = $marcaRec; avance = 0; total = 0; reanclar = $false }
     $script:recarga.reanclar = [bool]$script:recarga.estado.ancla
     # Al retomar, lo ya enviado sale de recarga.json (sus «piezas»), no vuelve a 0.
     $script:recarga.enviadas = [int]$script:recarga.estado.piezas
@@ -928,17 +1315,20 @@ while (-not $terminar) {
   if ($items.Count -gt 0 -and -not $primera) { $primera = (Fecha-Hora ($items[0].cel)) }
   $ultima = $est.ultima
   if ($items.Count -gt 0) { $ultima = (Fecha-Hora ($items[$items.Count - 1].cel)) }
-  # Con la sesión bloqueada, si no pudo leer, el motivo que se informa es el bloqueo (el original queda en el log).
+  # e1.7: el error va tal cual; el bloqueo viaja aparte (claves «bloqueada» y «pantalla»).
   $errC = [string]$res.error
-  if ($script:bloqueada -and $errC) { $errC = 'pantalla-bloqueada' }
+  # e1.7: Matrix no corre: el lector lo abre (con tope). Con Matrix a la vista la clave conserva solo la última apertura.
+  if ($errC -eq 'sin-matrix') { $script:matrixTexto = Abre-Matrix (Get-Date) }
+  elseif ($script:matrixTexto -like 'no-abre*') { $script:matrixTexto = '' }
+  elseif ($script:matrixTexto -like '* esperando') { $script:matrixTexto = $script:matrixTexto.Substring(0, $script:matrixTexto.Length - 10) }
   # e1.6: en recarga el latido sigue contando el turno normal (piezas, primera, última) y va «parcial»: el monitor
   # no da por leídos los minutos de hoy mientras el lector mira días viejos.
   $latPiezas = $piezas; $latPrimera = $primera; $latUltima = $ultima; $latParcial = [bool]$res.parcial
   if ($rec) {
     $latPiezas = $estado.piezas; $latPrimera = $estado.primera; $latUltima = $estado.ultima; $latParcial = $true
-    if ($res.lec) { $rec.avance = [int]$res.lec.hastaIdx + 1 }
+    if ($res.lec) { $rec.avance = [int]$res.lec.hastaIdx + 1; $rec.total = [int]$res.ftabla }
   }
-  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$latPiezas; primera = $latPrimera; ultima = $latUltima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = $latParcial; vivo = (Texto-Vivo); recarga = (Texto-Recarga $rec $script:recargaCierre $(if ($rec) { [int]$rec.avance } else { 0 }) ([int]$res.ftabla) ([string]$res.error)) }
+  $estC = @{ version = $VERSION; arranque = $script:arranque; actualiz = [string]$script:actualiz; ajuste = [string]$script:ajuste; bloqueada = [bool]$script:bloqueada; filasTabla = [int]$res.ftabla; piezas = [int]$latPiezas; primera = $latPrimera; ultima = $latUltima; rango = [string[]]@($res.rango); limite = [bool]$res.limite; gate0 = [int]$res.gate0; relectura = [bool]$res.relectura; error = $errC; seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1); leidas = [int]$items.Count; pendientes = [int]$res.pendientes; parcial = $latParcial; vivo = (Texto-Vivo); recarga = (Texto-Recarga $rec $script:recargaCierre $(if ($rec) { [int]$rec.avance } else { 0 }) $(if ($rec) { [int]$rec.total } else { 0 }) ([string]$res.error)); pantalla = (Texto-Pantalla $script:pantallaPedida $script:bloqueada (Get-Date)); matrix = [string]$script:matrixTexto; huecos = (Texto-Huecos) }
 
   $enviadas = 0
   $fin = ''
@@ -1000,9 +1390,37 @@ while (-not $terminar) {
     $script:reanclar = $false
   }
 
+  # e1.7: huecos del espejo, solo con el turno al día: sin recarga ni modo vivo, y la lectura normal completa y enviada.
+  $huecoSigue = $false
+  $enviadasH = 0
+  if (-not $rec -and -not $fin -and $res.gp -and $res.lec -and -not $res.lec.parcial -and -not [string]$res.error -and $envioOk -and -not (Texto-Vivo)) {
+    try {
+      $ph = Paso-Huecos $res.gp ([int]$res.ftabla) ([string[]]@($res.rango)) $estC
+      $enviadasH = [int]$ph.enviadas
+      $huecoSigue = [bool]$ph.sigue
+      if ($ph.resp -eq 'fin') { $fin = 'fin' }
+      # Sin filas que mandar pero con otro texto (p. ej. quedó «al-dia»): latido corto para que la ficha lo vea ya.
+      if (-not $fin -and $enviadasH -eq 0 -and [string]$estC.huecos -ne (Texto-Huecos)) {
+        $estC.huecos = Texto-Huecos
+        if ((Envia @() $estC) -eq 'fin') { $fin = 'fin' }
+      }
+    } catch {
+      if ([string]$_.Exception.Message -eq 'DETENER') {
+        try { Remove-Item -LiteralPath $archivoDetener -Force } catch { }
+        Log 'Archivo DETENER: el lector termina.'
+        $terminar = $true
+        break
+      }
+      Log ('huecos: error ' + $_.Exception.Message)
+      $script:huecoActual = $null
+      $script:huecosPlan = $null
+      $script:huecosTexto = 'error'
+    }
+  }
+
   $seg = [math]::Round($reloj.Elapsed.TotalSeconds, 1)
   $leidas = $items.Count
-  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' vivo=' + [bool]((Texto-Vivo) -ne '') + ' recarga=' + [bool]$rec + ' error=' + [string]$res.error)
+  Log ('ciclo: filas-pieza leídas=' + $leidas + ' enviadas=' + $enviadas + ' filas-tabla=' + [int]$res.ftabla + ' seg=' + $seg + ' relectura=' + [bool]$res.relectura + ' parcial=' + [bool]$res.parcial + ' pendientes=' + [int]$res.pendientes + ' bloqueada=' + [bool]$script:bloqueada + ' vivo=' + [bool]((Texto-Vivo) -ne '') + ' recarga=' + [bool]$rec + ' huecos=' + $enviadasH + ' error=' + [string]$res.error)
   if ($fin) { $terminar = $true; break }
   # «ciclo» (confirma una versión nueva) solo si la función aceptó el envío y el ciclo no reventó; si no, «vivo».
   $tipoLat = 'vivo'
@@ -1020,6 +1438,11 @@ while (-not $terminar) {
   # e1.6: una recarga que no pudo leer (Matrix ocupado, «Limitar» marcada) reintenta en 1 min, no en 5.
   if ($res.lec -and $res.lec.parcial -and -not [string]$res.error -and $envioOk) { $espera = 5; $refrescar = $false }
   elseif ($script:recarga) { $espera = [math]::Min($espera, $ESPERA_VIVO) }
+  elseif ($huecoSigue) {
+    # e1.7: quedan huecos: sigue enseguida, pero el turno va primero: «Actualizar» al menos cada ESPEJO_CADA.
+    $espera = 5
+    $refrescar = (((Get-Date) - $script:ultRefresco).TotalSeconds -ge $cada)
+  }
   try { Espera $espera } catch {
     if ([string]$_.Exception.Message -eq 'DETENER') {
       try { Remove-Item -LiteralPath $archivoDetener -Force } catch { }

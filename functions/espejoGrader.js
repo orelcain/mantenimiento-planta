@@ -11,7 +11,8 @@ const MAX_FILAS = 2000
 const MAX_LARGO_FILA = 300
 const CAMPOS_FILA = 12
 const MAX_DOCUMENTOS = 400 // fechas + horas distintas por envío (ops del batch ≤ 402 < 500)
-const MAX_CLAVES_ESTADO = 20
+// e1.7 suma «pantalla», «matrix» y «huecos» (23); queda una de holgura.
+const MAX_CLAVES_ESTADO = 24
 const MAX_TEXTO_ESTADO = 200
 const MAX_LISTA_ESTADO = 4
 const MAX_LISTA_ITEM = 200
@@ -218,7 +219,44 @@ function vivoDeControl(hastaMs, ahoraMs) {
   return { vivoHasta: new Date(hastaMs).toISOString(), vivoSeg: seg }
 }
 
+// e1.7: el lector compara las filas por hora de Matrix con las del espejo para rellenar huecos. Pide los conteos con
+// GET ?conteos=AAAA-MM-DD[,AAAA-MM-DD…]: como mucho 8 fechas distintas (el lector revisa hasta 7 días).
+const MAX_FECHAS_CONTEOS = 8
+const RE_FECHA_CONTEOS = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Valida la lista de fechas de una consulta de conteos.
+ * @returns {{ok: true, fechas: string[]} | {ok: false, error: string}}
+ */
+function validarConteos(q) {
+  if (typeof q !== 'string' || !q) return { ok: false, error: 'conteos sin fechas' }
+  const fechas = [...new Set(q.split(','))]
+  if (fechas.length > MAX_FECHAS_CONTEOS) return { ok: false, error: 'demasiadas fechas' }
+  for (const f of fechas) {
+    if (!RE_FECHA_CONTEOS.test(f) || Number.isNaN(Date.parse(`${f}T00:00:00Z`))) return { ok: false, error: 'fecha no válida' }
+  }
+  return { ok: true, fechas }
+}
+
+/**
+ * Filas por hora de un día del espejo: { 'HH': n } a partir de los documentos `horas` ({ id, filas }). Las horas vacías
+ * no salen. n = filas distintas guardadas (arrayUnion), lo mismo que cuenta el lector en la tabla de Matrix.
+ */
+function conteoPorHora(docs) {
+  const out = {}
+  for (const d of docs || []) {
+    if (!d || typeof d.id !== 'string' || !/^\d{2}$/.test(d.id)) continue
+    const n = Array.isArray(d.filas) ? d.filas.length : 0
+    if (n > 0) out[d.id] = n
+  }
+  return out
+}
+
 module.exports = {
+  MAX_CLAVES_ESTADO,
+  MAX_FECHAS_CONTEOS,
+  validarConteos,
+  conteoPorHora,
   VIVO_MAX_MS,
   vivoDeControl,
   RE_VERSION,
