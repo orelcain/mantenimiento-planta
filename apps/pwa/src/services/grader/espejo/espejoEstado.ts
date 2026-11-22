@@ -44,6 +44,11 @@ export interface EstadoLector {
     actualiz?: string
     /** Desde e1.4: fin del modo «en vivo a pedido» (lee cada 60 s) en hora del PC, o '' si lee cada 5 min. */
     vivo?: string
+    /**
+     * Desde e1.6: recarga de historia (archivo RECARGA en el PC de planta). '' sin recarga; «leyendo <recorridas>/<filas>
+     * <enviadas>», «con-limite», «terminada <enviadas> <primera> a <última>» o «cancelada <enviadas>».
+     */
+    recarga?: string
   }
 }
 
@@ -87,7 +92,8 @@ const FRASE_ERROR: Record<string, string> = {
   'tabla-inestable': 'La tabla de Matrix no terminó de cargar en 2 minutos.',
   'tabla-cambio': 'La tabla de Matrix cambió mientras se leía: se reintenta en el ciclo siguiente.',
   'excepcion': 'El lector tuvo un error inesperado: revisa su registro en el PC de planta.',
-  'pantalla-bloqueada': 'El PC de planta está con la sesión bloqueada: el lector no puede leer Matrix hasta que alguien la desbloquee. Si con bloqueo nunca lee, el camino es leer la base de datos de Matrix (sondeo).',
+  'recarga-con-limite': 'La recarga de historia espera: «Limitar el informe a 10 000 registros» sigue marcada en Matrix. Desmárcala a mano.',
+  'pantalla-bloqueada':'El PC de planta está con la sesión bloqueada: el lector no puede leer Matrix hasta que alguien la desbloquee. Si con bloqueo nunca lee, el camino es leer la base de datos de Matrix (sondeo).',
 }
 
 /** Códigos que no son un problema (el lector solo informa en qué está). */
@@ -259,3 +265,82 @@ export function aMs(v: unknown): number | null {
   }
   return null
 }
+
+/** «yyyy-MM-dd HH:mm:ss» del PC de planta → ms en wall-clock-as-UTC (la convención del monitor); `null` si no calza. */
+export function msDeFechaPlanta(t: string | undefined | null): number | null {
+  if (!t || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(t)) return null
+  const ms = Date.parse(`${t.replace(' ', 'T')}.000Z`)
+  return Number.isFinite(ms) ? ms : null
+}
+
+/**
+ * Hasta qué hora (ms, wall-clock-as-UTC) la última lectura del lector fue COMPLETA: sin error, sin tramo pendiente y
+ * sin recarga de historia en curso (e1.6 la marca «parcial»). Nunca pasa el fin del rango de Matrix: con un rango viejo
+ * (tras una recarga, o las fechas fijas vencidas) el lector no ve las piezas de hoy, y dar esos minutos por leídos haría
+ * decir «grader sin piezas» con las Baader andando. `null` = no hay minutos que dar por cerrados.
+ */
+export function leidoHastaDelLector(e: EstadoLector | null): number | null {
+  if (!e || !e.leidoEn || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(e.leidoEn)) return null
+  const s = e.estado
+  if (s.error || s.parcial === true || (s.pendientes ?? 0) > 0) return null
+  // «2026-11-20T21:49:12-03:00» → hora de planta.
+  const leido = Date.parse(`${e.leidoEn.slice(0, 19)}.000Z`)
+  if (!Number.isFinite(leido)) return null
+  const fin = msDeFechaPlanta(s.rango?.[1])
+  return fin === null ? leido : Math.min(leido, fin)
+}
+
+/** ¿El rango de Matrix (hora del PC de planta) contiene `ahora`? `null` si no se sabe. */
+function rangoIncluye(rango: string[] | undefined, ahora: Date): boolean | null {
+  const a = msDeFechaPlanta(rango?.[0])
+  const b = msDeFechaPlanta(rango?.[1])
+  if (a === null || b === null) return null
+  // `ahora` en la misma convención: la hora local de Chonchi escrita como si fuera UTC.
+  const t = Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), ahora.getHours(), ahora.getMinutes(), ahora.getSeconds())
+  return a <= t && t < b
+}
+
+const cifraPunto = (n: number) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+
+/** Aviso para volver al rango de hoy tras una recarga, o `null` si el rango ya incluye ahora. */
+function avisoVolverRango(rango: string[] | undefined, ahora: Date, que: string): string | null {
+  if (rangoIncluye(rango, ahora) === true) return null
+  return `${que} Vuelve a poner en Matrix el rango de hoy (inicio hoy 00:00, fin pasado mañana 00:00): hasta entonces el lector no ve las piezas del turno.`
+}
+
+/**
+ * e1.6: frase de la recarga de historia para Diagnóstico Matrix (clave `recarga` del latido). `null` sin recarga.
+ * `texto` va en la ficha; `aviso` pide algo a Orel (desmarcar «Limitar» o volver el rango de Matrix a hoy).
+ */
+export function fraseRecarga(
+  recarga: string | undefined,
+  rango: string[] | undefined,
+  ahora: Date,
+): { texto: string; aviso: string | null } | null {
+  if (!recarga) return null
+  let m = /^leyendo (\d+)\/(\d+) (\d+)$/.exec(recarga)
+  if (m) {
+    return { texto: `leyendo · ${cifraPunto(Number(m[1]))} de ${cifraPunto(Number(m[2]))} filas · ${cifraPunto(Number(m[3]))} piezas enviadas`, aviso: null }
+  }
+  if (recarga === 'con-limite') {
+    // El aviso ya sale del error «recarga-con-limite» (fraseDeError): no se repite.
+    return { texto: 'esperando · «Limitar» marcada', aviso: null }
+  }
+  m = /^terminada (\d+) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) a (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})$/.exec(recarga)
+  if (m) {
+    const p = fechaCortaDeFila(m[2])
+    const u = fechaCortaDeFila(m[3])
+    return {
+      texto: `terminada · ${cifraPunto(Number(m[1]))} piezas (${p} a ${u})`,
+      aviso: avisoVolverRango(rango, ahora, 'Recarga terminada.'),
+    }
+  }
+  m = /^terminada (\d+)$/.exec(recarga)
+  if (m) return { texto: `terminada · ${cifraPunto(Number(m[1]))} piezas (el rango estaba vacío o ya estaba todo)`, aviso: avisoVolverRango(rango, ahora, 'Recarga terminada.') }
+  m = /^cancelada (\d+)$/.exec(recarga)
+  if (m) return { texto: `cancelada · ${cifraPunto(Number(m[1]))} piezas enviadas`, aviso: avisoVolverRango(rango, ahora, 'Recarga cancelada.') }
+  return { texto: recarga, aviso: null }
+}
+
+/** Orden para el PC de planta: crea el archivo RECARGA en la carpeta del lector. */
+export const COMANDO_RECARGA = 'New-Item -ItemType File -Force "$env:LOCALAPPDATA\\espejo-grader\\RECARGA"'

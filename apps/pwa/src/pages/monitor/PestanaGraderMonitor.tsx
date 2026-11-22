@@ -16,6 +16,7 @@ import { EspejoGraderCard } from '@/components/grader/EspejoGraderCard'
 import { LecturaEnVivo } from '@/components/grader/LecturaEnVivo'
 import { ventanaDelTurno } from '@/services/grader/espejo/espejoFilas'
 import { lineaDelEspejo, useEspejoGrader } from '@/services/grader/espejo/useEspejoGrader'
+import { leidoHastaDelLector } from '@/services/grader/espejo/espejoEstado'
 import type { SerieMinutoBaader } from '@/services/grader/espejo/graderVivo'
 import { GraderVivo } from './GraderVivo'
 import type { ParadaGrader } from './graderVivoDatos'
@@ -142,12 +143,9 @@ export default function PestanaGraderMonitor(props: Parameters<typeof CoberturaE
   // Cierres de los días anteriores, para comparar el turno con los últimos 6 (una lectura por día visto).
   const previos = useResumenesPrevios(lineId, dateKey)
   const turnoEnCurso = Number.isFinite(ahoraWallMs) && (!ventana || ahoraWallMs < ventana.endMs)
-  // Última lectura COMPLETA del lector (sin tramo pendiente ni error): hasta ahí los minutos sin piezas son de verdad.
-  const est = espejo.estado
-  const leidoHastaMs = est && est.leidoEn && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(est.leidoEn)
-    && !est.estado.error && est.estado.parcial !== true && !((est.estado.pendientes ?? 0) > 0)
-    ? Date.parse(`${est.leidoEn.slice(0, 19)}.000Z`) /* «2026-11-20T21:49:12-03:00» → hora de planta */
-    : null
+  // Última lectura COMPLETA del lector (sin tramo pendiente, error ni recarga), nunca más allá del fin del rango de
+  // Matrix: hasta ahí los minutos sin piezas son de verdad.
+  const leidoHastaMs = leidoHastaDelLector(espejo.estado)
   return (
     <div className="space-y-3">
       {ventana && !espejo.cargandoPiezas && (
