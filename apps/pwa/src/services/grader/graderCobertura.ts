@@ -117,6 +117,8 @@ export function calcularCobertura(params: {
   ahoraWallMs: number
   resumenes: ReadonlyArray<{ startAt?: string | null; endAt?: string | null }>
   cadencia: CadenciaExporte
+  /** Tramos que trae el espejo del grader (ms wall-clock): cuentan como datos igual que el Excel. */
+  espejo?: ReadonlyArray<Tramo>
 }): CoberturaTurno | null {
   const inicio = parse(params.inicio)
   const fin = parse(params.fin)
@@ -124,12 +126,13 @@ export function calcularCobertura(params: {
   const cerrado = params.ahoraWallMs >= fin
   const ahora = Math.min(Math.max(params.ahoraWallMs, inicio), fin)
 
-  const conDatos = unirTramos(
-    params.resumenes.map((r) => ({
+  const conDatos = unirTramos([
+    ...params.resumenes.map((r) => ({
       desde: Math.max(parse(r.startAt), inicio),
       hasta: Math.min(parse(r.endAt), ahora),
     })),
-  )
+    ...(params.espejo ?? []).map((t) => ({ desde: Math.max(t.desde, inicio), hasta: Math.min(t.hasta, ahora) })),
+  ])
 
   const faltantes: Tramo[] = []
   let cursor = inicio

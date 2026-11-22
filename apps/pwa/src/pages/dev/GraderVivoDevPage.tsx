@@ -41,13 +41,18 @@ const RECARGAS = [
 const T0 = Date.parse(real.t0)
 const PROGRAMADA = /COLACION|REUNION|EJERCICIO|Limpieza/i
 
+/** `?hueco=1`: el espejo no leyó de 09:00 a 09:40 (como el 18-11 23:39 → 00:28), para ver «sin lectura». */
+const HUECO: [number, number] | null = typeof location !== 'undefined' && new URLSearchParams(location.search).has('hueco') ? [105, 145] : null
+/** `?publico=1`: la vista de quien no es admin. */
+const PUBLICO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('publico')
+
 function cubetas(hasta: number): CubetaMinuto[] {
   const totCal = Object.values(real.calibreTurno).reduce((a, b) => a + b, 0)
   const totCal2 = Object.values(real.calidadTurno).reduce((a, b) => a + b, 0)
   const out: CubetaMinuto[] = []
   for (let m = 0; m < hasta; m++) {
     const pz = real.grader[m] ?? 0
-    if (pz <= 0) continue
+    if (pz <= 0 || (HUECO && m >= HUECO[0] && m < HUECO[1])) continue
     const g0 = real.g0[m] ?? 0
     const sal = pz - g0
     const lote = m < 209 ? '720260738' : '720260739' // cambio real de lote a las 10:44
@@ -105,7 +110,8 @@ export default function GraderVivoDevPage() {
   const piezas = useMemo(() => {
     if (!todas) return undefined
     const lim = new Date(T0 + hasta * 60_000).toISOString()
-    return todas.filter((p) => p.ts < lim)
+    const h = HUECO ? [new Date(T0 + HUECO[0] * 60_000).toISOString(), new Date(T0 + HUECO[1] * 60_000).toISOString()] : null
+    return todas.filter((p) => p.ts < lim && !(h && p.ts >= h[0]! && p.ts < h[1]!))
   }, [todas, hasta])
   const baader = useMemo(() => ({ desde: real.t0, maquinas: [{ cycles: real.baader.slice(0, Math.max(0, hasta - 2)) }] }), [hasta])
   return (
@@ -136,7 +142,29 @@ export default function GraderVivoDevPage() {
           piezas={piezas}
           resumenes={resumenes as unknown as GraderDailySummary[]}
           turnoActualId="2026-11-19__Turno 2"
+          publico={PUBLICO}
         />
+        {/* 22-11: la tarjeta del espejo con el turno del encabezado, en público y admin, en curso y cerrado. */}
+        <div className="grid gap-3 lg:grid-cols-2" data-testid="dev-espejo-turno">
+          {[
+            { publico: true, enCurso: true },
+            { publico: true, enCurso: false },
+            { publico: false, enCurso: true },
+            { publico: false, enCurso: false },
+          ].map((v) => (
+            <EspejoGraderCard
+              key={`${v.publico}-${v.enCurso}`}
+              estado={{ equipo: 'CH-MANT-P07', linea: 'chonchi', ultimoLatidoMs: Date.now() - 60_000, leidoEn: '2026-11-21T14:51:12-03:00', informe: 'pieza', estado: { version: 'e1.7', error: 'pantalla-bloqueada', parcial: true, pendientes: 1200 } }}
+              vivo
+              minutos={1}
+              resumen={{ piezas: [], total: 17876, gate0: 412, p0: 2.3, primera: '07:21:04', ultima: '14:52:10', turno: null, coincidencia: { letra: 'B', pct: 99 } }}
+              publico={v.publico}
+              turnoEnCurso={v.enCurso}
+              turnoMonitor={{ nombre: 'Turno 2', desde: '07:15', hasta: '14:50', piezas: 17836, g0: 410, baader: 16188 }}
+              accion={<LecturaEnVivoFila estado={{ modo: 'normal', hastaMs: null }} pedidoNombre="Orel" version="e1.7" ocupado={false} error={null} onPedir={() => {}} onTerminar={() => {}} />}
+            />
+          ))}
+        </div>
         <div className="grid gap-3 lg:grid-cols-2" data-testid="dev-lectura-en-vivo">
           {MODOS_VIVO.map((m) => (
             <EspejoGraderCard

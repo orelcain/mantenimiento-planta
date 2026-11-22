@@ -4,11 +4,12 @@
  */
 import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
 import { serieDesdeCubetas, type CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
-import { evaluarAlertas, milesPunto, minutosCerrados } from '@/services/grader/espejo/alertasGrader'
+import { evaluarAlertas, milesPunto, minutosCerrados, minutosSinLectura } from '@/services/grader/espejo/alertasGrader'
 import {
   baaderEnEje,
   lineaManualPorHora,
   p0Por15,
+  RETRASO_REFERENCIA_MIN,
   repartoDelTurno,
   retrasoOReferencia,
   salidaUltimaHora,
@@ -165,11 +166,15 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
   const n = Math.max(1, Math.ceil((e.finMs - e.inicioMs) / 60_000))
   const serie = serieDesdeCubetas(e.cubetas, e.inicioMs, n)
   const baader = baaderEnEje(e.baader, serie.t0Ms)
-  const retraso = retrasoOReferencia(baader, serie.pz, serie.hastaMin)
   const leidoHastaMin = e.leidoHastaMs != null && Number.isFinite(e.leidoHastaMs)
     ? Math.min(n, Math.max(serie.hastaMin - 1, Math.floor((e.leidoHastaMs - serie.t0Ms) / 60_000)))
     : null
   const cerrados = minutosCerrados({ hastaMin: serie.hastaMin, leidoHastaMin })
+  // Minutos que el espejo no leyó (huecos con las Baader andando): la línea manual, el atasco y la medición del
+  // retraso callan ahí. Primero con el retraso de referencia (un hueco dura ≥ 15 min: 1 min de corrimiento no lo
+  // cambia), y de nuevo con el medido sin esos minutos (18-11 T1: con el hueco adentro la correlación bajaba a 0,76; sin él, 0,90).
+  const retraso = retrasoOReferencia(baader, serie.pz, serie.hastaMin, minutosSinLectura(serie.pz, baader, RETRASO_REFERENCIA_MIN, cerrados))
+  const sinLectura = minutosSinLectura(serie.pz, baader, retraso.min, cerrados)
   const pesca = e.piezas ? armarPesca(e.piezas, e.inicioMs, e.finMs, e.resumenes ?? null, e.turnoActualId ?? null, e.leidoHastaMs ?? null, e.gate0Exacto ?? null) : null
   const mantMin = pesca ? mantPorMinuto(pesca.p0Dueno.porPieza, serie.t0Ms) : null
   const alertas = evaluarAlertas({
@@ -202,7 +207,8 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     }),
     reparto: repartoDelTurno(serie),
     // Solo horas cerradas: la de la última pieza puede seguir abierta.
-    manual: lineaManualPorHora({ ...serie, hastaMin: cerrados }, baader, retraso.min),
+    manual: lineaManualPorHora({ ...serie, hastaMin: cerrados }, baader, retraso.min, sinLectura),
+    sinLectura,
     paradas: e.paradas
       .map((p) => ({ desde: (p.desdeMs - serie.t0Ms) / 60_000, hasta: (p.hastaMs - serie.t0Ms) / 60_000, dueno: p.dueno }))
       // Hasta donde hay dato (grader o Baader): una banda no puede ir por delante de la curva.

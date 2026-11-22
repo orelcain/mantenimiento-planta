@@ -47,7 +47,21 @@ function Fila({ k, v }: { k: string; v: string }) {
   )
 }
 
-export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas = false, accion, className }: {
+/** Lo que la tarjeta toma del monitor para decir lo mismo que el encabezado y que «El grader ahora». */
+export interface TurnoDelMonitor {
+  /** Nombre del turno como en el encabezado («Turno 2»). */
+  nombre: string
+  /** Horario del encabezado, «HH:MM». */
+  desde: string
+  hasta: string
+  /** Piezas del grader y de Gate 0 dentro de esa ventana (la misma cuenta que «El grader ahora»). */
+  piezas: number
+  g0: number
+  /** Piezas de las 3 Baader en la misma ventana (Shoplogix); `null` sin la serie. */
+  baader: number | null
+}
+
+export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas = false, accion, publico = false, turnoEnCurso = true, turnoMonitor = null, className }: {
   estado: EstadoLector
   vivo: boolean
   minutos: number | null
@@ -57,6 +71,14 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
   errorPiezas?: boolean
   /** Control junto al estado del lector (en el monitor: la lectura en vivo a pedido). */
   accion?: React.ReactNode
+  /**
+   * Vista para quien no es admin: solo estado, piezas, turno y horario (lista de permitidos). Los avisos del lector,
+   * su avance, el equipo y las filas técnicas son para admin.
+   */
+  publico?: boolean
+  /** Con el turno cerrado la pastilla dice «Turno cerrado», no «Vivo»: el lector puede seguir latiendo para el siguiente. */
+  turnoEnCurso?: boolean
+  turnoMonitor?: TurnoDelMonitor | null
   className?: string
 }) {
   const codigoError = estado.estado.error
@@ -66,21 +88,35 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
   const avance = avisoAvance(estado.estado)
   // Los avisos van en los dos estados (vivo y sin lectura): un corte de Matrix o un
   // error del lector con la pastilla en «Vivo» es justo lo que hay que ver.
-  const lectura = errorPiezas ? 'No se pudo leer parte de las piezas del turno (sin permiso o sin red): el total puede estar incompleto.' : null
-  const aviso = [lectura, error, limite].filter((x): x is string => !!x)
-  const sinDelTurno = vivo && !errorPiezas && resumen && resumen.total === 0 ? avisoSinPiezasDelTurno(estado.estado) : null
+  const lectura = errorPiezas
+    ? publico
+      ? 'Parte de las piezas del turno no se pudo leer: el total puede estar incompleto.'
+      : 'No se pudo leer parte de las piezas del turno (sin permiso o sin red): el total puede estar incompleto.'
+    : null
+  const aviso = publico ? [lectura].filter((x): x is string => !!x) : [lectura, error, limite].filter((x): x is string => !!x)
+  const t = turnoMonitor
+  // Con el turno del monitor, la cifra y el horario son los del encabezado (07:15 → 14:50) y no los de la primera y
+  // la última pieza (07:21 → 14:52, con el margen del reparto): así coincide con «El grader ahora».
+  const total = resumen ? (t ? t.piezas : resumen.total) : null
+  const p0Pct = t ? (t.g0 > 0 && t.piezas > 0 ? (t.g0 / t.piezas) * 100 : null) : resumen?.p0 ?? null
+  const sinDelTurno = vivo && !errorPiezas && total === 0 && !publico ? avisoSinPiezasDelTurno(estado.estado) : null
   const letra = resumen?.coincidencia?.letra
-  const turno = letra ? `Turno ${letra}` : resumen?.turno?.shiftId ?? null
-  const rango = resumen?.primera && resumen.ultima ? `${hhmm(resumen.primera)} → ${hhmm(resumen.ultima)}` : null
-  const p0 = resumen && resumen.p0 !== null ? `P0 ${dec1(resumen.p0)} %` : null
+  const turno = t ? t.nombre : letra ? `Turno ${letra}` : resumen?.turno?.shiftId ?? null
+  const rango = t ? `${t.desde} → ${t.hasta}` : resumen?.primera && resumen.ultima ? `${hhmm(resumen.primera)} → ${hhmm(resumen.ultima)}` : null
+  const p0 = p0Pct !== null ? `P0 ${dec1(p0Pct)} %` : null
   const linea = [turno, rango, p0].filter(Boolean).join(' · ')
   const ultimaAviso = estado.ultimoLatidoMs !== null ? horaLocal(estado.ultimoLatidoMs) : '—'
+  // Turno cerrado: lo que importa es lo que trajo el espejo, no si el lector sigue latiendo.
+  const conCifra = vivo || !turnoEnCurso
+  const estadoLector = vivo ? `vivo · ${textoHace(minutos ?? 0)}` : minutos === null ? 'sin lectura' : `sin lectura ${textoHace(minutos)}`
 
   return (
     <section className={cn('rounded-card border border-border bg-card p-4', className)} aria-label="Espejo del grader">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-subhead font-semibold">Espejo del grader</h3>
-        {vivo && iniciando ? (
+        {!turnoEnCurso ? (
+          <Pill tone="neutral">Turno cerrado</Pill>
+        ) : vivo && iniciando ? (
           <Pill tone="info" dot="pulse">Iniciando · {textoHace(minutos ?? 0)}</Pill>
         ) : vivo ? (
           <Pill tone="ok" dot="pulse">Vivo · {textoHace(minutos ?? 0)}</Pill>
@@ -89,23 +125,23 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
         )}
       </div>
 
-      {vivo ? (
+      {conCifra ? (
         <div className="mt-2">
-          {!resumen ? (
+          {total === null ? (
             <p className="text-title2 font-semibold text-muted-foreground" aria-busy="true">Cargando piezas…</p>
-          ) : resumen.total > 0 ? (
+          ) : total > 0 ? (
             <>
-              <p className="text-title1 font-semibold tabular-nums">{miles(resumen.total)} piezas</p>
+              <p className="text-title1 font-semibold tabular-nums">{miles(total)} piezas</p>
               {linea && <p className="text-footnote text-muted-foreground tabular-nums">{linea}</p>}
             </>
           ) : (
             <>
               {/* Con 0 piezas no se muestra «0 piezas»: se dice por qué. */}
               <p className="text-title2 font-semibold">
-                {iniciando ? 'Primera lectura en curso' : 'Sin piezas de este turno'}
+                {iniciando && turnoEnCurso ? 'Primera lectura en curso' : 'Sin piezas de este turno'}
               </p>
               <p className="text-footnote text-muted-foreground tabular-nums">
-                {sinDelTurno ?? (iniciando
+                {publico || !turnoEnCurso ? 'El espejo no trae piezas de este turno.' : sinDelTurno ?? (iniciando
                   ? 'El lector acaba de arrancar. La primera lectura tarda unos minutos.'
                   : error || errorPiezas
                     ? 'Hay un problema de lectura: mira el aviso de abajo.'
@@ -125,23 +161,28 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
         </div>
       )}
 
-      {(aviso.length > 0 || avance) && (
+      {(aviso.length > 0 || (avance && !publico)) && (
         <div className="mt-2 space-y-1">
           {aviso.map((t) => (
             <p key={t} className="text-footnote text-ink-warn">{t}</p>
           ))}
-          {avance && <p className="text-footnote text-muted-foreground tabular-nums">{avance}</p>}
+          {avance && !publico && <p className="text-footnote text-muted-foreground tabular-nums">{avance}</p>}
         </div>
       )}
 
       <dl className="mt-3">
-        {vivo ? (
+        {t && t.baader !== null && conCifra && (
+          // Shoplogix cuenta las 3 Baader (16.188 el 21-11 T2); el grader cuenta más: también le llega la línea manual.
+          <Fila k="3 Baader (Shoplogix)" v={`${miles(t.baader)} piezas`} />
+        )}
+        {publico ? null : conCifra ? (
           <>
+            {!turnoEnCurso && <Fila k="Lector" v={estadoLector} />}
             <Fila k="Pieza pieza" v={`leída ${horaDeLectura(estado.leidoEn)}`} />
             <Fila k="Puerta 0 (motivos)" v="pendiente" />
             <Fila
               k="Turno de Matrix vs regla"
-              v={resumen?.coincidencia ? `coincide ${Math.round(resumen.coincidencia.pct)} %` : '—'}
+              v={resumen?.coincidencia ? `coincide ${Math.round(resumen.coincidencia.pct)} % · Turno ${resumen.coincidencia.letra}` : '—'}
             />
           </>
         ) : (
@@ -151,7 +192,7 @@ export function EspejoGraderCard({ estado, vivo, minutos, resumen, errorPiezas =
           </>
         )}
       </dl>
-      {accion}
+      {turnoEnCurso && accion}
     </section>
   )
 }

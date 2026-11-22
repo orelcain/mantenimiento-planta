@@ -12,7 +12,6 @@ import { coma1, milesPunto } from '@/services/grader/espejo/alertasGrader'
 import {
   EJE_PESO_KG,
   GATE_APAGADA_MIN,
-  RITMO_TOPE_PZ_MIN,
   type GateVivo,
   type SeteoVivo,
   type Solape,
@@ -50,15 +49,6 @@ function MarcaGate({ g }: { g: GateVivo }) {
   if (g.provisional) return <Marca>desde {hhmm(g.provisional.desdeTs)} · sin confirmar ({milesPunto(g.provisional.piezas)} de 100 pz)</Marca>
   if (g.desdeTs) return <Marca>desde {hhmm(g.desdeTs)}</Marca>
   return null
-}
-
-/** Barra de ritmo en escala fija 0–10 pz/min (no habla de saturación: la capacidad de una gate no se conoce). */
-function Ritmo({ v, mal, className }: { v: number; mal?: boolean; className?: string }) {
-  return (
-    <span className={cn('block h-2 overflow-hidden rounded-full bg-muted', className)} role="img" aria-label={`${coma1(v)} de ${RITMO_TOPE_PZ_MIN} pz/min`}>
-      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (v / RITMO_TOPE_PZ_MIN) * 100)}%`, background: mal ? 'var(--v2-mal)' : 'var(--v2-acento)' }} />
-    </span>
-  )
 }
 
 /** Peso p1–p99 en el eje común 1–7 kg, con la franja de solape encima donde la cruza. */
@@ -129,7 +119,6 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
               <th className="py-1.5 pr-3 font-normal">Programa</th>
               <th className="py-1.5 pr-3 text-right font-normal">pz/min última hora</th>
               <th className="py-1.5 pr-3 text-right font-normal">% del flujo</th>
-              <th className="py-1.5 pr-3 font-normal">Ritmo <span className="text-[11px]">0–{RITMO_TOPE_PZ_MIN} pz/min</span></th>
               <th className="w-[30%] min-w-[220px] py-1.5 font-normal">Peso real p1–p99 (kg)<Ticks /></th>
             </tr>
           </thead>
@@ -148,7 +137,6 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
                   <span className="text-[12px] text-muted-foreground">turno {coma1(g.pzMinTurno)}</span>
                 </td>
                 <td className="py-2 pr-3 text-right text-foreground/80">{coma1(g.pctHora)} %</td>
-                <td className="py-2 pr-3"><Ritmo v={g.pzMinHora} className="w-28" /></td>
                 <td className="py-2">
                   <EjePeso rango={g.pesoKg} solapes={solapesDe(g, s)} />
                   <span className="mt-1 block text-[12px] leading-[16px] text-muted-foreground">{rangoTxt(g.pesoKg)}</span>
@@ -165,7 +153,6 @@ export function SeteoGates({ s }: { s: SeteoVivo }) {
                 <span className="text-[12px] text-muted-foreground">turno {coma1(g0.pzMinTurno)}</span>
               </td>
               <td className="py-2 pr-3 text-right text-foreground/80">{coma1(g0.pctHora)} %</td>
-              <td className="py-2 pr-3"><Ritmo v={g0.pzMinHora} mal className="w-28" /></td>
               <td className="py-2">
                 <EjePeso rango={g0.pesoKg} solapes={s.solapes} mal />
                 <span className="mt-1 block text-[12px] leading-[16px] text-muted-foreground">{rangoTxt(g0.pesoKg)}</span>
@@ -223,8 +210,9 @@ const gatesTxt = (gs: SeteoVivo['programas'][number]['gates']) =>
   gs.map((g) => `G${g.gate}${g.desde ? ` desde ${hhmm(g.desde)}` : ''}${g.hasta ? ` hasta ${hhmm(g.hasta)}` : ''}`).join(' · ')
 
 /** Debajo: la pesca del turno por programa y la sugerencia (con su costo en P0). */
-export function PescaPorPrograma({ s }: { s: SeteoVivo }) {
-  const sg = s.sugerencia
+export function PescaPorPrograma({ s, publico = false }: { s: SeteoVivo; publico?: boolean }) {
+  // La sugerencia está en prueba: solo admin la ve.
+  const sg = publico ? null : s.sugerencia
   return (
     <Tarjeta titulo="Pesca por programa" sub={`Turno hasta las ${s.hora.hasta} · salida sin Gate 0`} icono={<Fish className={IC} />}>
       <div className="mt-3 space-y-3" role="list" aria-label="Pesca por programa">
@@ -256,7 +244,7 @@ export function PescaPorPrograma({ s }: { s: SeteoVivo }) {
               ? `sus ${milesPunto(sg.costo.piezas)} piezas ${sinLb(sg.deProg)} del turno quedarían sin gate; si van a Gate 0, el P0 sube de ${coma1(sg.costo.p0Antes)} % a ~${coma1(sg.costo.p0Despues)} %.`
               : `ninguno: ${sinLb(sg.deProg)} tiene otra gate.`}
           </p>
-          <p className="text-[12px] leading-[16px] text-muted-foreground">Falta un dato para decidir: cuántas piezas por minuto aguanta una gate. La barra de ritmo no lo dice.</p>
+          <p className="text-[12px] leading-[16px] text-muted-foreground">Falta un dato para decidir: cuántas piezas por minuto aguanta una gate.</p>
         </div>
       )}
     </Tarjeta>

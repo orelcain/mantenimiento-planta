@@ -46,6 +46,8 @@ export interface UmbralesAlertas {
   atascoRazonMinPiezas: number
   /** Atasco: minutos que el aviso sigue a la vista después del último minuto sobre el umbral. */
   atascoVigenteMin: number
+  /** Hueco del espejo: minutos seguidos sin piezas del grader con las Baader andando que se leen como «sin lectura». */
+  huecoMin: number
 }
 
 export const UMBRALES_ALERTAS: UmbralesAlertas = {
@@ -63,6 +65,7 @@ export const UMBRALES_ALERTAS: UmbralesAlertas = {
   atascoRazonMin: 60,
   atascoRazonMinPiezas: 500,
   atascoVigenteMin: 15,
+  huecoMin: 15,
 }
 
 /** Lo que el grader clasificó en cada minuto (todas las gates salvo donde se dice). */
@@ -136,6 +139,46 @@ export function milesPunto(n: number): string {
 export function minutosCerrados(e: Pick<EntradaAlertas, 'hastaMin' | 'leidoHastaMin'>): number {
   const l = e.leidoHastaMin
   return l !== null && l !== undefined && Number.isFinite(l) ? Math.max(0, Math.floor(l)) : Math.max(0, e.hastaMin - 1)
+}
+
+/**
+ * Minutos que el espejo NO leyó (huecos): ≥ `huecoMin` minutos seguidos sin ninguna pieza del grader mientras las
+ * Baader corridas por el retraso promedian ≥ `atascoBaaderPzMin` pz/min en ese tramo. Con las Baader así, 15 min
+ * son ≥ 300 piezas sin destino: la línea no corre tanto con el grader detenido, así que es el lector el que no
+ * trajo esas filas. Caso real: 18-11 Turno 1, sin piezas de 23:39:25 a 00:28:51 con las Baader a ~40 pz/min y
+ * Puerta 0 registrando piezas en el mismo tramo. Se suma un minuto a cada lado (minutos de borde leídos a medias).
+ * Antes de `huecoMin` un grader sin piezas sigue siendo «grader quieto»: en vivo no se puede saber todavía.
+ * Sin serie de las Baader no se marca nada (las reglas que lo usan tampoco corren).
+ */
+export function minutosSinLectura(
+  pz: readonly number[],
+  baader: readonly number[] | null,
+  retrasoMin: number,
+  hasta: number,
+  u: Pick<UmbralesAlertas, 'huecoMin' | 'atascoBaaderPzMin'> = UMBRALES_ALERTAS,
+): boolean[] {
+  const out = new Array<boolean>(Math.max(0, hasta)).fill(false)
+  if (!baader) return out
+  const L = Math.max(0, Math.round(retrasoMin))
+  let m = 0
+  while (m < hasta) {
+    if ((pz[m] ?? 0) !== 0) { m++; continue }
+    let f = m
+    while (f < hasta && (pz[f] ?? 0) === 0) f++
+    if (f - m >= u.huecoMin) {
+      let sb = 0
+      let cubiertos = 0
+      for (let j = m; j < f; j++) {
+        const v = j - L >= 0 ? baader[j - L] : undefined
+        if (v !== undefined && Number.isFinite(v)) { sb += v; cubiertos++ }
+      }
+      if (cubiertos >= u.huecoMin && sb / cubiertos >= u.atascoBaaderPzMin) {
+        for (let j = Math.max(0, m - 1); j < Math.min(hasta, f + 1); j++) out[j] = true
+      }
+    }
+    m = f
+  }
+  return out
 }
 
 const suma = (a: readonly number[], desde: number, hasta: number): number => {
@@ -358,6 +401,8 @@ export function minutosAtasco(e: EntradaAlertas, u: UmbralesAlertas, desde: numb
     return s / 5
   }
   const V = u.atascoVentanaMin
+  // Un minuto que el espejo no leyó tiene 0 piezas del grader: restarlo inventaría un atasco (18-11 23:51).
+  const sinLectura = minutosSinLectura(e.grader.pz, b, e.retrasoMin, minutosCerrados(e), u)
   const out: MinutoAtasco[] = []
   for (let i = Math.max(0, desde); i < hasta; i++) {
     const ini = i - V + 1
@@ -367,7 +412,7 @@ export function minutosAtasco(e: EntradaAlertas, u: UmbralesAlertas, desde: numb
     let completa = true
     for (let j = ini; j <= i; j++) {
       const v = bs(j)
-      if (!Number.isFinite(v)) { completa = false; break }
+      if (!Number.isFinite(v) || sinLectura[j]) { completa = false; break }
       sb += v
       sg += e.grader.pz[j] ?? 0
     }
@@ -376,7 +421,7 @@ export function minutosAtasco(e: EntradaAlertas, u: UmbralesAlertas, desde: numb
     let rg = 0
     for (let j = Math.max(0, ini - u.atascoRazonMin); j < ini; j++) {
       const v = bs(j)
-      if (!Number.isFinite(v)) continue
+      if (!Number.isFinite(v) || sinLectura[j]) continue
       rb += v
       rg += e.grader.pz[j] ?? 0
     }
