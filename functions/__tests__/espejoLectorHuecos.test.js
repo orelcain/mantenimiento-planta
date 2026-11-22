@@ -159,7 +159,7 @@ test('Horas-Rango: horas cerradas del rango, de la más nueva a la más vieja, s
 test('Abre-Matrix: abre una vez, espera 30 min, tope de 6 en 24 h y sin ruta segura no abre', { skip: !PS && 'sin PowerShell' }, () => {
   const guion = BASE + funcion('Lee-Aperturas') + funcion('Abre-Matrix') + [
     "$UTF8 = New-Object System.Text.UTF8Encoding($false)",
-    "$archivoAbrir = '@@DIR@@\\abrir.json'",
+    "$archivoAbrir = Join-Path '@@DIR@@' 'abrir.json'",
     '$script:abrirMatrix = $true',
     "$script:ruta = 'C:\\x\\MATRIX CG.exe'",
     'function Ruta-Matrix { return $script:ruta }',
@@ -189,9 +189,9 @@ test('Abre-Matrix: abre una vez, espera 30 min, tope de 6 en 24 h y sin ruta seg
 test('Recuerda-Matrix y Ruta-Matrix: solo un .exe «matrix», y el único de la carpeta de Marelec', { skip: !PS && 'sin PowerShell' }, () => {
   const guion = BASE + funcion('Recuerda-Matrix') + funcion('Ruta-Matrix') + [
     "$UTF8 = New-Object System.Text.UTF8Encoding($false)",
-    "$archivoRutaMatrix = '@@DIR@@\\matrix-ruta.txt'",
+    "$archivoRutaMatrix = Join-Path '@@DIR@@' 'matrix-ruta.txt'",
     "$script:rutaMatrix = ''",
-    "$script:carpetaMatrix = '@@DIR@@\\marelec'",
+    "$script:carpetaMatrix = Join-Path '@@DIR@@' 'marelec'",
     'New-Item -ItemType Directory -Path $script:carpetaMatrix | Out-Null',
     "Recuerda-Matrix 'C:\\Windows\\notepad.exe'",
     "'notepad=[' + $script:rutaMatrix + ']'",
