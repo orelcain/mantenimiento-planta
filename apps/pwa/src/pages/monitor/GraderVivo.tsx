@@ -250,7 +250,7 @@ function P0Barras({ d }: { d: Datos }) {
   const bw = ts.length > 0 ? W / Math.max(ts.length, 8) : W
   const umbral = DEFAULT_P0_CRITICAL_PCT
   return (
-    <Tarjeta titulo="P0 cada 15 min" sub={`Raya en ${coma1(umbral)} % · gris: menos de ${P0_LINE_MIN_PIECES} piezas en el tramo`} icono={<ShieldAlert className={IC} />}>
+    <Tarjeta titulo="P0 cada 15 min" sub={`Raya en ${coma1(umbral)} % · gris: menos de ${P0_LINE_MIN_PIECES} piezas en el tramo${d.pesca && d.pesca.p0Dueno.exactitud !== 'exacto' && d.pesca.p0Dueno.pz > 0 ? ' · estimado' : ''}`} icono={<ShieldAlert className={IC} />}>
       <div ref={ref} className="mt-3 w-full">
         {d.totales.p0 === null ? (
           <p className="py-6 text-center text-[13px] text-muted-foreground">
@@ -267,19 +267,34 @@ function P0Barras({ d }: { d: Datos }) {
             {ts.map((t, i) => {
               if (t.pct === null) return null
               const alto = !t.pocaMasa && t.pct - umbral > 1e-9 /* la misma comparación de la regla */
+              const x0 = ml + i * bw + 1
+              const w0 = Math.max(1, bw - 2)
+              const titulo = `${t.rotulo}: ${coma1(t.pct)} % (${milesPunto(t.g0)} de ${milesPunto(t.total)})`
+              if (t.mantPz != null && !t.pocaMasa && t.total > 0) {
+                // Apilada por dueño: seteo y pesca abajo, Mantención arriba (como en el mockup).
+                const pctM = (t.mantPz / t.total) * 100
+                const pctS = Math.max(0, t.pct - pctM)
+                return (
+                  <g key={t.desde} data-tramo={t.rotulo}>
+                    <rect x={x0} y={y(pctS)} width={w0} height={mt + H - y(pctS)} rx={2} fill="var(--v2-ext)" fillOpacity={0.6} />
+                    <rect x={x0} y={y(t.pct)} width={w0} height={y(pctS) - y(t.pct)} rx={2} fill="var(--v2-mant)" />
+                    <title>{`${titulo} · Mantención ${milesPunto(Math.round(t.mantPz))}, seteo ${milesPunto(Math.round(t.g0 - t.mantPz))}`}</title>
+                  </g>
+                )
+              }
               return (
                 <rect
                   key={t.desde}
-                  x={ml + i * bw + 1}
+                  x={x0}
                   y={y(t.pct)}
-                  width={Math.max(1, bw - 2)}
+                  width={w0}
                   height={mt + H - y(t.pct)}
                   rx={2}
                   data-tramo={t.rotulo}
                   fill={t.pocaMasa ? 'var(--v2-prog)' : alto ? 'var(--v2-mal)' : 'var(--v2-acento)'}
                   fillOpacity={t.pocaMasa || alto ? 1 : 0.5}
                 >
-                  <title>{`${t.rotulo}: ${coma1(t.pct)} % (${milesPunto(t.g0)} de ${milesPunto(t.total)})`}</title>
+                  <title>{titulo}</title>
                 </rect>
               )
             })}
@@ -382,32 +397,44 @@ function FilaBarra({ rotulo, n, pct, tono, detalle }: { rotulo: string; n: numbe
   )
 }
 
-const lista = (r: Record<string, number>, max = 3) =>
-  Object.entries(r).sort((a, b) => b[1] - a[1]).slice(0, max).map(([k, v]) => `${k.replace(/ lb/g, '')} ${milesPunto(v)}`).join(' · ')
-
-/** Etapa 2: por qué va a P0, con el seteo inferido de las piezas. */
+/** Etapa 2: por qué va a P0, por dueño (Mantención / seteo y pesca). Exacto con Puerta 0; si no, estimado. */
 function CausasP0({ d, p }: { d: Datos; p: Pesca }) {
-  const c = p.causas
-  const tot = Math.max(1, c.total)
+  const r = p.p0Dueno
+  const tot = Math.max(1, r.pz)
   const t = d.totales
   const ultHora = d.p0.filter((x) => x.completo).slice(-4)
   const hTot = ultHora.reduce((s, x) => s + x.total, 0)
   const hG0 = ultHora.reduce((s, x) => s + x.g0, 0)
-  const sub = `${milesPunto(c.total)} pz${t.p0 !== null ? ` · ${coma1(t.p0)} % del turno` : ''}${hTot > 0 ? ` · última hora ${coma1((hG0 / hTot) * 100)} %` : ''}`
-  const peso = [c.pesoSinGate['12-UP lb'] ? `${milesPunto(c.pesoSinGate['12-UP lb'])} sobre 5,5 kg sin gate 12-UP` : '', lista(Object.fromEntries(Object.entries(c.pesoSinGate).filter(([k]) => k !== '12-UP lb'))), c.pesoBajo ? `${milesPunto(c.pesoBajo)} bajo 0,9 kg` : ''].filter(Boolean).join(' · ')
+  const sub = `${milesPunto(r.pz)} pz${t.p0 !== null ? ` · ${coma1(t.p0)} % del turno` : ''}${hTot > 0 ? ` · última hora ${coma1((hG0 / hTot) * 100)} %` : ''}`
+  const motivo = (k: string) => r.motivos[k]
+  const fotocelula = motivo('No leído por fotocélula')
+  const puerta = motivo('Puerta no preparada')
+  const fuera = motivo('Fuera de límites')
+  const estimSeteo = (causa: string) => r.porPieza.filter((x) => x.dueno === 'seteo' && !x.exacto && x.causa === causa).reduce((s, x) => s + x.cantidad, 0)
+  const sinGateCal = estimSeteo('calidad-sin-gate')
+  const sinGatePeso = estimSeteo('sin-gate-peso')
+  const calD = estimSeteo('calidad-d')
+  const estMant = r.mantencion.estimadoPz
+  const pctExacto = r.pctExacto === null ? 0 : r.pctExacto
+  const fuente = r.exactitud === 'exacto' ? 'motivo de Matrix (Puerta 0)' : `estimado · ${coma1(pctExacto)} % exacto`
+  const linea = (k: string, n: number) => (n > 0 ? <p key={k} className="pl-[22px] text-[12px] leading-[16px] text-muted-foreground tabular-nums">{k} {milesPunto(n)}</p> : null)
   return (
     <Tarjeta titulo="Por qué va a P0" sub={sub} icono={<Filter className={IC} />}>
-      {c.total === 0 ? (
+      {r.pz === 0 ? (
         <p className="py-6 text-center text-[13px] text-muted-foreground">Sin piezas en Gate 0 todavía.</p>
       ) : (
         <div className="mt-3 space-y-2.5">
-          <FilaBarra rotulo="Sin gate para su peso" n={c.causas['sin-gate-peso']} pct={(c.causas['sin-gate-peso'] / tot) * 100} tono="var(--v2-mal)" detalle={peso || undefined} />
-          <FilaBarra rotulo="Calidad sin gate" n={c.causas['calidad-sin-gate']} pct={(c.causas['calidad-sin-gate'] / tot) * 100} tono="var(--v2-atento)" detalle={lista(c.calidadSinGate) ? `${lista(c.calidadSinGate)}: ninguna gate tiene esa combinación.` : undefined} />
-          <FilaBarra rotulo="Calidad D" n={c.causas['calidad-d']} pct={(c.causas['calidad-d'] / tot) * 100} tono="var(--v2-gris)" detalle="No hay gate D: van a P0 por diseño." />
-          <FilaBarra rotulo="Tenía gate" n={c.causas['tenia-gate']} pct={(c.causas['tenia-gate'] / tot) * 100} tono="var(--v2-acento)" detalle="Causa física (fotocélula, fuera de límites, puerta no preparada): el detalle llega con Puerta 0." />
-          <p className="pt-1 text-[12px] leading-[16px] text-muted-foreground">
-            Con el seteo leído de las piezas de cada gate, por el peso y la calidad de cada pieza de Gate 0.{c.sinPeso > 0 ? ` ${milesPunto(c.sinPeso)} sin peso.` : ''}
-          </p>
+          <FilaBarra rotulo="Mantención" n={r.mantencion.pz} pct={(r.mantencion.pz / tot) * 100} tono="var(--v2-mant)" detalle={`${milesPunto(Math.round(r.mantencion.kg))} kg`} />
+          {linea('Fotocélula', fotocelula?.pz ?? 0)}
+          {linea('Puerta no preparada', puerta?.pz ?? 0)}
+          {linea('Fotocélula o puerta (estimado)', estMant)}
+          <FilaBarra rotulo="Seteo y pesca" n={r.seteo.pz} pct={(r.seteo.pz / tot) * 100} tono="var(--v2-ext)" detalle={`${milesPunto(Math.round(r.seteo.kg))} kg`} />
+          {linea('Fuera de límites', fuera?.pz ?? 0)}
+          {linea('Sin gate para su calidad (estimado)', sinGateCal)}
+          {linea('Sin gate para su peso (estimado)', sinGatePeso)}
+          {linea('Calidad D (estimado)', calD)}
+          {r.sinReparto.pz > 0 && <FilaBarra rotulo="Sin reparto" n={r.sinReparto.pz} pct={(r.sinReparto.pz / tot) * 100} tono="var(--v2-gris)" detalle="Sin peso: no se puede repartir." />}
+          <p className="pt-1 text-[12px] leading-[16px] text-muted-foreground">Fuente: {fuente}.</p>
         </div>
       )}
     </Tarjeta>
@@ -591,10 +618,10 @@ function TurnosAnteriores({ filas }: { filas: Pesca['filas'] }) {
 
 /** La pestaña en vivo. `null` mientras no haya piezas del espejo en el turno: la tarjeta del espejo explica por qué. */
 export function GraderVivo(props: EntradaGraderVivo) {
-  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId } = props
+  const { cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto } = props
   const d = useMemo(
-    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId }),
-    [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId],
+    () => armarGraderVivo({ cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto }),
+    [cubetas, inicioMs, finMs, baader, paradas, minutosSinLatido, turnoEnCurso, leidoHastaMs, piezas, resumenes, turnoActualId, gate0Exacto],
   )
   // Sin piezas del turno: solo las alertas (el lector caído antes del cambio de turno tiene que verse).
   if (d.serie.hastaMin === 0) {

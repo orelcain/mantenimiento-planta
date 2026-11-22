@@ -4,7 +4,7 @@
  */
 import { DEFAULT_P0_CRITICAL_PCT, P0_LINE_MIN_PIECES } from '@/services/grader/graderP0Thresholds'
 import { serieDesdeCubetas, type CubetaMinuto } from '@/services/grader/espejo/espejoMinutos'
-import { evaluarAlertas, minutosCerrados } from '@/services/grader/espejo/alertasGrader'
+import { evaluarAlertas, milesPunto, minutosCerrados } from '@/services/grader/espejo/alertasGrader'
 import {
   baaderEnEje,
   lineaManualPorHora,
@@ -32,11 +32,15 @@ import {
 } from '@/services/grader/espejo/pescaVivo'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { seteoGatesVivo } from '@/services/grader/espejo/seteoGatesVivo'
+import { clasificarP0, duenoDelTramo, mantPorMinuto, rafagaFotocelula, type ResumenP0 } from '@/services/grader/espejo/motivoP0'
+import type { StoredGate0Record } from '@/services/grader/graderGate0Store'
 
 /** El aviso de cambio de lote se muestra la primera hora del lote nuevo. */
 export const LOTE_AVISO_MIN = 60
 /** El aviso de cambio de programa de una gate, la primera hora desde el cambio. */
 export const GATE_CAMBIO_AVISO_MIN = 60
+/** La ráfaga de fotocélula se muestra 60 min después de su última pieza. */
+export const RAFAGA_AVISO_MIN = 60
 
 const kg2 = (v: number | null) => (v === null ? '—' : v.toFixed(2).replace('.', ',')) // decimal-tecnico: ya pasa a coma
 
@@ -44,7 +48,7 @@ const kg2 = (v: number | null) => (v === null ? '—' : v.toFixed(2).replace('.'
  * Agregados que necesitan las piezas una a una (etapas 2, 5 y 1): causas P0, lote, distribución de peso, zona
  * compartida y los turnos anteriores. `null` sin piezas del turno.
  */
-export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, finMs: number, resumenes: readonly GraderDailySummary[] | null, turnoActualId: string | null, leidoHastaMs: number | null = null) {
+export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, finMs: number, resumenes: readonly GraderDailySummary[] | null, turnoActualId: string | null, leidoHastaMs: number | null = null, gate0Exacto: readonly StoredGate0Record[] | null = null) {
   const ini = new Date(inicioMs).toISOString()
   const fin = new Date(finMs).toISOString()
   const pz = piezas.filter((p) => p.ts >= ini && p.ts < fin)
@@ -88,11 +92,28 @@ export function armarPesca(piezas: readonly PiezaEspejo[], inicioMs: number, fin
         : `Venía con ${c.antes}. Confirmado con 100 piezas; nadie lo registró en la app.`,
     })
   }
+  // Motivo P0 por pieza: exacto con Puerta 0 si hay registros; si no, estimado con el seteo inferido.
+  const p0Dueno: ResumenP0 = clasificarP0(pz, gate0Exacto)
+  const rafaga = rafagaFotocelula(p0Dueno.porPieza)
+  if (rafaga && ultMs - rafaga.hastaMs <= RAFAGA_AVISO_MIN * 60_000) {
+    const hm = (ms: number) => new Date(ms).toISOString().slice(11, 16)
+    const est = rafaga.estimado ? ' (estimado)' : ''
+    avisos.push({
+      regla: 'rafaga-fotocelula',
+      nivel: 'mal',
+      desdeMin: desdeMin(new Date(rafaga.desdeMs).toISOString()),
+      titulo: rafaga.estimado || rafaga.puerta > 0
+        ? `${hm(rafaga.desdeMs)} · ${rafaga.pz} piezas de fotocélula o puerta en 15 min${est}`
+        : `${hm(rafaga.desdeMs)} · ${rafaga.pz} piezas sin leer por la fotocélula en 15 min`,
+      detalle: `De ${hm(rafaga.desdeMs)} a ${hm(rafaga.hastaMs)} · ${milesPunto(Math.round(rafaga.kg))} kg a P0. Revisar el lente de la fotocélula.`,
+    })
+  }
   const filas: FilaTurno[] = [
     filaDelTurno(pz, `Hoy hasta ${pz[pz.length - 1]!.ts.slice(11, 16)}`),
     ...(resumenes && turnoActualId ? ultimosTurnos(resumenes, turnoActualId) : []),
   ]
   return {
+    p0Dueno,
     causas: causasP0Vivo(pz),
     lote,
     hora: { desde: hora[0]?.ts.slice(11, 16) ?? '', hasta: pz[pz.length - 1]!.ts.slice(11, 16) },
@@ -135,6 +156,8 @@ export interface EntradaGraderVivo {
   /** Resúmenes de cierre de los días anteriores y el id del turno actual (`{dateKey}__{turno}`), para comparar. */
   resumenes?: readonly GraderDailySummary[] | null
   turnoActualId?: string | null
+  /** Registros de Puerta 0 del turno (`loadGate0Records`): motivo exacto por pieza. `null` sin registros. */
+  gate0Exacto?: readonly StoredGate0Record[] | null
 }
 
 /** Todo lo que se pinta, calculado de una vez (puro: lo usan el componente y los tests). */
@@ -147,6 +170,8 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     ? Math.min(n, Math.max(serie.hastaMin - 1, Math.floor((e.leidoHastaMs - serie.t0Ms) / 60_000)))
     : null
   const cerrados = minutosCerrados({ hastaMin: serie.hastaMin, leidoHastaMin })
+  const pesca = e.piezas ? armarPesca(e.piezas, e.inicioMs, e.finMs, e.resumenes ?? null, e.turnoActualId ?? null, e.leidoHastaMs ?? null, e.gate0Exacto ?? null) : null
+  const mantMin = pesca ? mantPorMinuto(pesca.p0Dueno.porPieza, serie.t0Ms) : null
   const alertas = evaluarAlertas({
     leidoHastaMin,
     t0Ms: serie.t0Ms,
@@ -157,8 +182,8 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     minutosSinLatido: e.minutosSinLatido,
     turnoEnCurso: e.turnoEnCurso,
     umbrales: { p0CriticoPct: DEFAULT_P0_CRITICAL_PCT, p0MinPiezas: P0_LINE_MIN_PIECES },
+    duenoP0: pesca ? (desde, hasta) => duenoDelTramo(pesca.p0Dueno.porPieza, serie.t0Ms, desde, hasta) : undefined,
   })
-  const pesca = e.piezas ? armarPesca(e.piezas, e.inicioMs, e.finMs, e.resumenes ?? null, e.turnoActualId ?? null, e.leidoHastaMs ?? null) : null
   return {
     n,
     serie,
@@ -168,7 +193,13 @@ export function armarGraderVivo(e: EntradaGraderVivo) {
     pesca,
     totales: totalesDelTurno(serie),
     salida: salidaUltimaHora(serie),
-    p0: p0Por15(serie, P0_LINE_MIN_PIECES),
+    // `mantPz`: piezas de Mantención del tramo (fotocélula + puerta, o «tenía gate» estimado). `null` sin piezas.
+    p0: p0Por15(serie, P0_LINE_MIN_PIECES).map((t) => {
+      if (!mantMin) return { ...t, mantPz: null }
+      let mantPz = 0
+      for (let m = t.desde; m < t.hasta; m++) mantPz += mantMin.get(m) ?? 0
+      return { ...t, mantPz }
+    }),
     reparto: repartoDelTurno(serie),
     // Solo horas cerradas: la de la última pieza puede seguir abierta.
     manual: lineaManualPorHora({ ...serie, hastaMin: cerrados }, baader, retraso.min),
